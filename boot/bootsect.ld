@@ -1,0 +1,50 @@
+ENTRY(entry)
+SECTIONS {
+    .text 0x7C00 : {
+        __initialized_data_start = .;
+        *(.head)
+        *(.head.*)
+        bootsect.o(.text.startup)
+        bootsect.o(.text)
+        bootsect.o(.text.*)
+        bootsect.o(.text.unlikely)
+
+		. = ALIGN(16);
+		bootsect.o(.data)
+        bootsect.o(.data.*)
+        bootsect.o(.rodata)
+        bootsect.o(.rodata.*)
+
+        . = 0x1BE;
+        partition_table = .;
+        *(.parttab)
+
+        /* --- additional sectors --- */
+        *(.text)
+        *(.text.*)
+        *(.text.unlikely)
+
+        . = ALIGN(16);
+
+        *(.data)
+        *(.data.*)
+        *(.rodata)
+        *(.rodata.*)
+
+		/* sector align end */
+        . = ALIGN(512);
+        __initialized_data_end = .;
+    } = 0x90
+
+    .bss : {
+        ___bss_st = .;
+        *(.bss)
+        *(.bss.*)
+        *(COMMON)
+        ___bss_en = .;
+
+        . = ALIGN(16);
+		__heap = .;
+    }	
+	__heap_end = 0xFFF0;
+}

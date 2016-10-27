@@ -1,0 +1,6 @@
+set architecture i8086
+symbol-file $SYMBOLFILE
+target remote | exec qemu-system-i386 -S -drive file=$DISKIMAGE,format=raw -gdb stdio
+shell wmctrl -a kernel/boot
+layout src
+
