@@ -3,10 +3,15 @@
 
 gdt_entry_t gdt[] = {
     GDT_MAKE_EMPTY(),
-    GDT_MAKE_CODESEG(0),
-    GDT_MAKE_DATASEG(0),
-    GDT_MAKE_CODESEG(3),
-    GDT_MAKE_DATASEG(3)
+    // Kernel code and data
+    GDT_MAKE_CODESEG32(0),  // 0x08
+    GDT_MAKE_DATASEG32(0),  // 0x10
+    // User code and data
+    GDT_MAKE_CODESEG32(3),  // 0x18
+    GDT_MAKE_DATASEG32(3),  // 0x20
+    // 16 bit code and data
+    GDT_MAKE_CODESEG16(0),  // 0x28
+    GDT_MAKE_DATASEG16(0)   // 0x30
 };
 
 // Returns BIOS error code, or zero on success
@@ -14,25 +19,31 @@ gdt_entry_t gdt[] = {
 //  86h function not supported
 uint16_t toggle_a20(uint16_t enable)
 {
-    uint16_t ax = 0x2400 | (enable != 0);
-
-    // INT 15 AX=2401
     __asm__ __volatile__ (
-        // Flush cache
-        "wbinvd\n\t"
-        "outb %%al,$0x80\n\t"
-        // Enable A20
-        "int $0x15\n\t"
-        "setc %%al\n\t"
-        "negb %%al\n\t"
-        "andb %%al,%%ah\n\t"
-        "movzbw %%ah,%%ax\n\t"
-        "out %%al,$0x80\n\t"
-        : "=a" (ax)
-        : "a" (ax)
+        "outb %%al,$0x92\n\t"
+        :
+        : "a" ((!!enable) << 1)
     );
-
-    return ax;
+    return 0;
+//    uint16_t ax = 0x2400 | (enable != 0);
+//
+//    // INT 15 AX=2401
+//    __asm__ __volatile__ (
+//        // Flush cache
+//        "wbinvd\n\t"
+//        //"outb %%al,$0x80\n\t"
+//        // Enable A20
+//        "int $0x15\n\t"
+//        "setc %%al\n\t"
+//        "negb %%al\n\t"
+//        "andb %%al,%%ah\n\t"
+//        "movzbw %%ah,%%ax\n\t"
+//        //"out %%al,$0x80\n\t"
+//        : "=a" (ax)
+//        : "a" (ax)
+//    );
+//
+//    return ax;
 }
 
 // Returns true if the CPU supports that leaf
@@ -193,16 +204,16 @@ void ack_irq(uint8_t irq)
     outb(PIC1_COMMAND,PIC_EOI);
 }
 
-void load_gdt()
+void load_gdt(void *gdt, size_t size)
 {
     table_register_t dtr;
 
-    dtr.limit = sizeof(gdt) - 1;
+    dtr.limit = size - 1;
     dtr.base_lo = (uint16_t)(uint32_t)gdt;
     dtr.base_hi = (uint16_t)((uint32_t)gdt >> 16);
 
     __asm__ __volatile__ (
-        "lgdt %0"
+        "lgdtl %0"
         :
         : "m" (dtr)
     );
@@ -217,4 +228,106 @@ void init_cpu()
     init_8259_pic(0x20, 0x28);
 
     __asm__ __volatile__ ( "sti" );
+}
+
+uint16_t disable_interrupts()
+{
+    uint32_t int_enabled;
+    __asm__ __volatile__ (
+        "pushfl\n"
+        "popl %0\n"
+        "shrl $9,%0\n\t"
+        "andl $1,%0\n\t"
+        "cli\n\t"
+        : "=r" (int_enabled)
+    );
+    return !!int_enabled;
+}
+
+void enable_interrupts()
+{
+    __asm__ __volatile__ ("sti");
+}
+
+void toggle_interrupts(uint16_t enable)
+{
+    if (enable)
+        enable_interrupts();
+    else
+        disable_interrupts();
+}
+
+void copy_to_address(uint32_t address, void *src, uint32_t size)
+{
+    uint16_t intf = disable_interrupts();
+    toggle_a20(1);
+    load_gdt(&gdt, sizeof(gdt));
+
+    __asm__ __volatile__ (
+        // Enable protected mode
+        "movl %%cr0,%%eax\n\t"
+        "orl $0x21,%%eax\n\t"
+        "movl %%eax,%%cr0\n\t"
+
+        // Clear prefetch queue
+        "jmp 0f\n\t"
+        "nop\n\t"
+        "0:\n\t"
+
+        // Far jump to load cs selector
+        "ljmpl $8,$0f\n\t"
+        "nop\n\t"
+
+        // In protected mode
+        // Switch assembler to assume 32 bit mode
+        ".code32\n\t"
+        "0:\n\t"
+
+        // Load 32-bit data segments
+        "mov $0x10,%%ax\n\t"
+        "movw %%ax,%%ds\n\t"
+        "movw %%ax,%%es\n\t"
+
+        // Copy memory
+        "cld\n\t"
+        "rep movsb\n\t"
+
+        // Load 16 bit selectors
+        "movw $0x30,%%ax\n\t"
+        "movw %%ax,%%ds\n\t"
+        "movw %%ax,%%es\n\t"
+
+        // Load 16-bit code segment
+        "ljmp $0x28,$0f\n\t"
+
+        // 16-bit addressing mode reenabled
+        ".code16gcc\n\t"
+        "0:\n\t"
+
+        // Disable protected mode
+        "movl %%cr0,%%eax\n\t"
+        "decl %%eax\n\t"
+        "movl %%eax,%%cr0\n\t"
+
+        // Clear prefetch queue
+        "jmp 0f\n\t"
+        "nop\n\t"
+        "0:\n\t"
+
+        // In real mode
+        "0:\n\t"
+
+        // Load real mode segments
+        "xorw %%ax,%%ax\n\t"
+        "movw %%ax,%%ds\n\t"
+        "movw %%ax,%%es\n\t"
+        "ljmp $0,$0f\n\t"
+        "0:"
+        :
+        : "D" (address), "S" (src), "c" (size)
+        : "eax"
+    );
+
+    toggle_a20(0);
+    toggle_interrupts(intf);
 }

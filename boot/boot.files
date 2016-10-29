@@ -20,3 +20,4 @@ dump/bootsect.hex
 dump/bootsect.map
 string.c
 string.h
+cpu32.c

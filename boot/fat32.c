@@ -5,6 +5,7 @@
 #include "bootsect.h"
 #include "screen.h"
 #include "string.h"
+#include "cpu.h"
 
 bpb_data_t bpb;
 
@@ -154,7 +155,7 @@ static uint32_t lba_from_cluster(uint32_t cluster)
             cluster * bpb.sec_per_cluster;
 }
 
-uint16_t is_eof_cluster(uint32_t cluster)
+static uint16_t is_eof_cluster(uint32_t cluster)
 {
     return cluster < 2 || cluster >= 0x0FFFFFF8;
 }
@@ -483,10 +484,11 @@ static void fill_short_filename(dir_union_t *match, char const *filename)
 // Returns new value of encoded_src caller should use
 // Uses/updates done_name flag which the caller needs to
 // carry across fragment calls
-uint16_t const *encode_lfn_name_fragment(uint8_t *lfn_fragment,
-                                   uint16_t fragment_size,
-                                   uint16_t const *encoded_src,
-                                   uint16_t *done_name)
+static uint16_t const *encode_lfn_name_fragment(
+        uint8_t *lfn_fragment,
+        uint16_t fragment_size,
+        uint16_t const *encoded_src,
+        uint16_t *done_name)
 {
     for (uint16_t i = 0; i < fragment_size; ++i) {
         if (*done_name) {
@@ -524,9 +526,6 @@ static uint16_t dir_entry_match(dir_union_t const *entry,
 
         if (entry->long_entry.ordinal != match->long_entry.ordinal)
             return 0;
-
-        //if (entry->long_entry.checksum != match->long_entry.checksum)
-        //    return 0;
 
         if (memcmp(entry->long_entry.name,
                    match->long_entry.name,
@@ -662,6 +661,11 @@ void boot_partition(uint32_t partition_lba)
 {
     //test_malloc();
 
+    copy_to_address(0x100000, "Hello!", 6);
+
+    // Ensure A20 is really working correctly
+    copy_to_address(0x12345678, 0, 0x100000);
+
     print_line("Booting partition at LBA %u", partition_lba);
 
     uint16_t err = read_bpb(partition_lba);
@@ -678,15 +682,8 @@ void boot_partition(uint32_t partition_lba)
     print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);    // 0x0D 8=4KB cluster
     print_line("number_of_fats:	  %d", bpb.number_of_fats);		// 0x10 Always 2
 
-    // Read first sector of root directory
-    //uint32_t root_dir_cluster = bpb.root_dir_start * bpb.sec_per_cluster +
-    //        bpb.cluster_begin_lba;
-
     uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
     print_line("kernel start=%d", root);
-
-    //dir_entry_t const *entry = (dir_entry_t const *)sector_buffer;
-    //print_line("root dir at %x", root_dir_cluster * bpb.bytes_per_sec);
 }
 
 static void test_utf16()

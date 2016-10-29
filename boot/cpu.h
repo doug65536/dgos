@@ -42,11 +42,17 @@ typedef struct {
 #define GDT_MAKE_EMPTY() \
     GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0, 0, 0, 0, 0, 0, 0, 0)
 
-#define GDT_MAKE_CODESEG(ring) \
+#define GDT_MAKE_CODESEG32(ring) \
     GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 1)
 
-#define GDT_MAKE_DATASEG(ring) \
+#define GDT_MAKE_DATASEG32(ring) \
     GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1)
+
+#define GDT_MAKE_CODESEG16(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 1, 0, 1, 0, 0)
+
+#define GDT_MAKE_DATASEG16(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0)
 
 typedef struct {
     uint16_t limit;
@@ -62,11 +68,11 @@ typedef struct {
 } cpuid_t;
 
 typedef struct {
-uint16_t offset_lo; // offset bits 0..15
-uint16_t selector; // a code segment selector in GDT or LDT
-uint8_t zero;      // unused, set to 0
-uint8_t type_attr; // type and attributes
-uint16_t offset_hi; // offset bits 16..31
+    uint16_t offset_lo; // offset bits 0..15
+    uint16_t selector;  // a code segment selector in GDT or LDT
+    uint8_t zero;       // unused, set to 0
+    uint8_t type_attr;  // type and attributes
+    uint16_t offset_hi; // offset bits 16..31
 } idt_entry_t;
 
 // idt_entry_t selector field
@@ -77,3 +83,5 @@ uint16_t offset_hi; // offset bits 16..31
 #define IDT_TASK    0x05
 #define IDT_INTR    0x0E
 #define IDT_TRAP    0x0F
+
+void copy_to_address(uint32_t address, void *src, uint32_t size);

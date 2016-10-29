@@ -1,6 +1,47 @@
+# Yeah I know this duplicates remake
+# If I try to use remake at startup, gdb crashes
+
 set architecture i8086
 symbol-file $SYMBOLFILE
 target remote | exec qemu-system-i386 -S -drive file=$DISKIMAGE,format=raw -gdb stdio
 shell wmctrl -a kernel/boot
 layout src
+b debug_break
 
+define remake
+	kill inferior 1
+	make debuggable_disk
+	refresh
+	set architecture i8086
+	target remote | exec qemu-system-i386 -S -drive file=$DISKIMAGE,format=raw -gdb stdio
+	shell wmctrl -a kernel/boot
+end
+
+document remake
+Kills the inferior,
+runs make debuggable_disk,
+refreshes the window,
+starts the inferior,
+and sets focus back to GDB
+end
+
+define qq
+	kill inferior 1
+	quit
+end
+
+document qq
+Kills the inferior and quits, without prompting
+end
+
+define code16
+	set architecture i8086
+	refresh
+end
+
+define code32
+	set architecture i386
+	refresh
+end
+
+b find_file_by_name
