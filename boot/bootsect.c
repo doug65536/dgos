@@ -11,14 +11,14 @@ asm (
     "xorw %ax,%ax\n"
     "movw %ax,%ds\n"
     "movw %ax,%es\n"
-    // Set ss:esp to 0x0000:0x00007c00
+    // Set initial stack pointer
     "pushw %ax\n"
-    "pushl $0x7c00\n"
+    "pushl $__initial_stack\n"
     "movw %sp,%bx\n"
     "lss (%bx),%esp\n"
     // Clear bss
-    "leal ___bss_en,%ecx\n"
-    "leal ___bss_st,%edi\n"
+    "movl $___bss_en,%ecx\n"
+    "movl $___bss_st,%edi\n"
     "subw %di,%cx\n"
     "cld\n"
     "rep stosb\n"
@@ -103,10 +103,11 @@ static drive_geometry_t get_drive_geometry(uint8_t drive)
 {
     drive_geometry_t geometry;
     short dx, cx;
+    // Set ES:DI to 0 to workaround possible BIOS bugs
     __asm__ __volatile__ (
         "int $0x13\n\t"
         : "=d" (dx), "=c" (cx)
-        : "a" (0x800), "d" (drive)
+        : "a" (0x800), "d" (drive), "D" (0)
     );
     geometry.sectors = cx & 0x3F;
     geometry.heads = (dx >> 8) + 1;
@@ -188,7 +189,7 @@ int init()
             halt(0);
     }
 
-    boot_partition(partition_table[0].start_lba, boot_drive);
+    boot_partition(partition_table[0].start_lba);
 
     return 0;
 }

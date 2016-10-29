@@ -10,6 +10,12 @@
 typedef struct {
     uint8_t alloc_id;
     uint8_t heap_ready;
+
+    // Simplify starting at the beginning of the heap
+    uint16_t first_header;
+
+    // Optimize starting point for free block search
+    uint16_t first_free;
 } alloc_state_t;
 
 extern alloc_state_t __heap;
@@ -111,9 +117,15 @@ static uint8_t malloc_take_id()
     return id;
 }
 
+static void debug_ff(uint16_t addr)
+{
+    (void)addr;
+//    print_line("FF=%x", addr);
+}
+
 void *malloc(uint16_t bytes)
 {
-    uint16_t addr = addr_of(&__heap);
+    uint16_t addr;
     uint16_t best_size = 0;
     uint16_t best_addr;
 
@@ -131,7 +143,14 @@ void *malloc(uint16_t bytes)
         addr = malloc_next_header(addr_of(&__heap));
         set_id_of(addr, 0);
         set_size_of(addr, addr_of(__heap_end) - payload_of(addr));
+
+        __heap.first_header = addr;
+        __heap.first_free = addr;
+        debug_ff(addr);
     }
+
+    uint16_t seen_free = 0;
+    addr = __heap.first_free;
 
     for (;;) {
         addr = malloc_next_header(addr);
@@ -147,11 +166,25 @@ void *malloc(uint16_t bytes)
         if (id == 0) {
             // Yes, it is free
 
+            if (seen_free == 0) {
+                seen_free = 1;
+
+                // Make first free precise
+                if (__heap.first_free != addr) {
+                    __heap.first_free = addr;
+                    debug_ff(addr);
+                }
+            }
+
             // See if we can coalesce this block with the next
             uint16_t next_header = malloc_next_header(addr + size + 3);
             uint16_t next_size = size_of(next_header);
 
             if (next_size && id_of(next_header) == 0) {
+                // Free space rover can't possibly point to the
+                // block we coalesce because this block is free
+                // and freeing moves it back
+
                 // Coalesce
                 inc_size_of(addr, next_size + 3);
                 continue;
@@ -193,7 +226,17 @@ void *malloc(uint16_t bytes)
 
         // Reduce the size of the block we took
         set_size_of(best_addr, new_header - best_addr - 3);
+
+        // Move free block rover forward if we split first free block
+        if (__heap.first_free == best_addr) {
+            __heap.first_free = new_header;
+            debug_ff(new_header);
+        }
     }
+
+    // Maybe __heap.first_free still points to this block?
+    // That's okay. Only freeing and coalescing blocks moves it back.
+    // Only splitting the first free block moves it forward
 
     return payload_ptr_of(best_addr);
 }
@@ -205,8 +248,19 @@ void free(void *p)
 
     uint16_t addr = addr_of(p);
 
+    if (__heap.first_header + 3 > addr)
+        debug_break();
+
     // Mark as free
     set_id_of(addr - 3, 0);
+
+    // Move free space rover back to this block
+    // if this block is before the old first free
+    // block
+    if (__heap.first_free > addr) {
+        __heap.first_free = addr - 3;
+        debug_ff(addr);
+    }
 }
 
 static uint32_t seed_z1 = 12345;
@@ -247,27 +301,47 @@ uint32_t rand_range(uint32_t st, uint32_t en)
 
 uint16_t *alloc_random_block()
 {
-    uint16_t size = rand_range(8, 1024) >> 1;
+    uint16_t size = rand_range(8, 512) >> 1;
     uint16_t *block = malloc(size * sizeof(uint16_t));
+
+    if (!block) {
+        print_line("Warning, malloc failed, size=%d", size);
+        return 0;
+    }
+
+    uint16_t addr = addr_of(block);
+
     block[0] = size;
-    for (uint16_t i = 1; i < size; ++i)
-        block[i] = 0x8000 + i;
+    block[1] = ~size ^ addr;
+    for (uint16_t i = 2; i < size; ++i)
+        block[i] = (0x8000 + i) ^ addr;
     return block;
 }
 
 void check_random_block(uint16_t *block)
 {
     uint16_t size = block[0];
+
     if (size < 4)
     {
         print_line("check_random_block failed, size=%d", size);
         debug_break();
     }
 
-    for (uint16_t i = 1; i < size; ++i)
+    uint16_t addr = addr_of(block);
+    uint16_t expect = ~size ^ addr;
+    uint16_t got = block[1];
+
+    if (got != expect) {
+        print_line("check_random_block failed,"
+                   " expected=%d, value=%d", expect, got);
+        debug_break();
+    }
+
+    for (uint16_t i = 2; i < size; ++i)
     {
-        uint16_t expect = 0x8000 + i;
-        uint16_t got = block[i];
+        expect = (0x8000 + i) ^ addr;
+        got = block[i];
         if (got != expect) {
             print_line("check_random_block failed,"
                        " expected=%d, value=%d", expect, got);
@@ -276,23 +350,31 @@ void check_random_block(uint16_t *block)
     }
 }
 
-#define TEST_SIZE 64
+#define TEST_SIZE 48
 void test_malloc(void)
 {
     uint16_t *ptrs[TEST_SIZE];
     const uint32_t iters = 0xFFFFFF;
 
     // Populate with random blocks
-    for (uint16_t i = 0; i < TEST_SIZE; ++i)
+    for (uint16_t i = 0; i < TEST_SIZE; ++i) {
         ptrs[i] = alloc_random_block();
+
+        if (!ptrs[i])
+            debug_break();
+    }
 
     for (uint32_t i = 0; i < iters; ++i)
     {
         // Pick something to free
         uint16_t f = rand_range(0, TEST_SIZE);
-        check_random_block(ptrs[f]);
+        if (ptrs[f])
+            check_random_block(ptrs[f]);
         free(ptrs[f]);
+
         ptrs[f] = alloc_random_block();
+        if (!ptrs[f])
+            debug_break();
 
         if (!(i & 0xFFFF))
             print_line("Iter %d", i);
@@ -301,4 +383,14 @@ void test_malloc(void)
     // Free everything
     for (uint16_t i = 0; i < TEST_SIZE; ++i)
         free(ptrs[i]);
+
+    // Try huge allocation and make sure it fails
+    // Also coalesces all free blocks
+    ptrs[0] = malloc(0xFFFF);
+    // Should fail
+    if (ptrs[0])
+        debug_break();
+
+    //uint16_t chk = malloc_next_header(addr_of(&__heap));
+    //print_line("Max block remaining is %x", chk);
 }

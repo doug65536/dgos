@@ -18,3 +18,5 @@ code16gcc.h
 dump/bootsect.dis
 dump/bootsect.hex
 dump/bootsect.map
+string.c
+string.h

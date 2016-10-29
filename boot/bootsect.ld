@@ -33,18 +33,20 @@ SECTIONS {
 
 		/* sector align end */
         . = ALIGN(512);
-        __initialized_data_end = .;
-    } = 0x90
+		__initialized_data_end = .;
+	} = 0x90
 
     .bss : {
         ___bss_st = .;
         *(.bss)
         *(.bss.*)
         *(COMMON)
-        ___bss_en = .;
+		___bss_en = .;
 
-        . = ALIGN(16);
-		__heap = .;
-    }	
-	__heap_end = 0xFFF0;
+		. = ALIGN(16);
+	}
+
+	__initial_stack = 0xfff0;
+	__heap = 0x500;
+	__heap_end = 0x7bf0;
 }

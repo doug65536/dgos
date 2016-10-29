@@ -116,11 +116,12 @@ typedef struct {
 // Each long filename entry stores 13 UTF-16 characters
 
 // https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#VFAT_long_file_names
+// encodes 13 UTF-16 codepoints per entry
 typedef struct {
     // offset = 0x00
     uint8_t ordinal;
 
-    // offset = 0x01 (5 UTF-16 characters)
+    // offset = 0x01 (5 UTF-16 characters) (misaligned!)
     uint8_t name[10];
 
     // offset = 0x0B (FAT_LONGNAME (0x0F))
@@ -142,21 +143,46 @@ typedef struct {
     uint8_t name3[4];
 } long_dir_entry_t;
 
+typedef union {
+    dir_entry_t short_entry;
+    long_dir_entry_t long_entry;
+} dir_union_t;
+
 typedef struct {
     uint8_t ordinal;
     uint16_t fragment[13];
 } long_name_fragment_t;
 
+// Handles advancing through the sectors of
+// a cluster and following the cluster chain
+// to the next cluster
 typedef struct {
-    // Cluster number of cluster
+    uint32_t start_cluster;
+
+    // Cluster number of current position
     uint32_t cluster;
 
     // Sector offset from beginning of cluster
     uint16_t sector_offset;
 
+    uint16_t err;
+} sector_iterator_t;
+
+// Handles iterating a directory and advancing
+// to the next dir_union_t
+typedef struct {
+    // Directory file iterator
+    sector_iterator_t dir_file;
+
     // dir_entry_t index into sector
     uint16_t sector_index;
 } directory_iterator_t;
 
+typedef struct {
+    uint8_t lowercase_flags;
+    uint8_t filename_length;
+    uint8_t extension_length;
+} filename_info_t;
+
 bpb_data_t decode_bpb(char const *sector_buffer);
-void boot_partition(uint32_t partition_lba, uint16_t drive);
+void boot_partition(uint32_t partition_lba);

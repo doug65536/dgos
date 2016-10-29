@@ -56,45 +56,4 @@ partition_table_entry_unused
 partition_table_entry_unused
 partition_table_entry_unused
 
-#.byte 0x80 # active
-## CHS = 0/2/2 (LBA=128)
-#.byte 0
-#.word 0x82
-## win95 FAT32
-#.byte 0x0b
-## CHS=1023/255/63
-#.byte 0xFF
-#.word 0xFF
-## 64KB boundary
-#.int 128
-## 1<<(33-9)
-#.int 0x1000000
-#
-#.byte 0
-#.byte 0
-#.word 0
-#.byte 0
-#.byte 0
-#.word 0
-#.int 0
-#.int 0
-#
-#.byte 0
-#.byte 0
-#.word 0
-#.byte 0
-#.byte 0
-#.word 0
-#.int 0
-#.int 0
-#
-#.byte 0
-#.byte 0
-#.word 0
-#.byte 0
-#.byte 0
-#.word 0
-#.int 0
-#.int 0
-
 .word 0xAA55

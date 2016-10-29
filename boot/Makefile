@@ -5,7 +5,8 @@ CSRCS := \
 	screen.c \
 	fat32.c \
 	cpu.c \
-	malloc.c
+	malloc.c \
+	string.c
 
 ASRCS := \
 	part.s
@@ -26,10 +27,10 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m32
 TARGET_ARCH_AS := --32
 
-CFLAGS ?= -g3 -DNDEBUG -Os -ffreestanding \
-	-Wall -Wextra -Wpedantic \
+CFLAGS ?= -g3 -O0 -ffreestanding \
+	-Wall -Wextra -Wpedantic -Werror \
 	-falign-functions=1 -falign-labels=1 -falign-loops=1 -falign-jumps=1 \
-	-Wno-unused-function -fno-omit-frame-pointer -fno-asynchronous-unwind-tables
+	-Wno-unused-function
 
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
@@ -44,13 +45,16 @@ OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
 	$(DUMPDIR)/bootsect.dis $(DUMPDIR)/bootsect.hex
 
 NEEDSMALLEST := bootsect.c
+#malloc.c cpu.c screen.c
+#screen.c cpu.c malloc.c
+#fat32.c
 
 DISKIMAGE ?= /large/vm/dgos.fat32.raw
 
 LDFLAGS ?= -m i386linux -no-stdlib -M -T bootsect.ld
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
-$(NEEDSMALLEST:.c=.o): CFLAGS += -Os
+$(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 
 all: $(OUTPUTS)
 
@@ -91,7 +95,7 @@ $(DISKIMAGE):
 
 bootable_disk: $(DISKIMAGE) $(BOOTSECTORS)
 	# Inject boot sector (up to 64KB)
-	dd if=$(BOOTSECTORS) of=$(DISKIMAGE) bs=1 conv=notrunc
+	dd if=$(BOOTSECTORS) of=$(DISKIMAGE) bs=1 count=65536 conv=notrunc
 
 debuggable_disk: bootable_disk $(SYMBOLFILE)
 
