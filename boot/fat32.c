@@ -755,14 +755,3 @@ void boot_partition(uint32_t partition_lba)
     uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
     print_line("kernel start=%d", root);
 }
-
-static void test_utf16()
-{
-    uint16_t utf16[8], *up;
-    char const *utf8 = u8"$¢€𐍈";
-    utf8_to_utf16(utf16, sizeof(utf16), utf8);
-
-    for (up = utf16; *up; ++up)
-        print_line("%x", *up);
-}
-
