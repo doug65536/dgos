@@ -107,6 +107,9 @@ $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
 debug: debuggable_disk $(BINDIR)/debug-kvm-gdbcommands $(DISKIMAGE)
 	gdb -x $(BINDIR)/debug-kvm-gdbcommands
 
+run: bootable_disk
+	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw
+
 mountdisk:
 	@mkdir -p $(MOUNTDIR) >/dev/null
 	SAVEUID=$$(id -u) && \
@@ -118,7 +121,7 @@ umountdisk:
 	sudo umount $(MOUNTDIR)
 	sudo kpartx -d $(DISKIMAGE)
 
-.PHONY: all clean deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
+.PHONY: all clean run deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
 
 .PRECIOUS: $(DISKIMAGE)
 
