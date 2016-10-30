@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include "screen.h"
 
-#define DIRECT_VGA 1
+#define DIRECT_VGA 0
 #if DIRECT_VGA
 #define print_at vga_print_at
 #define scroll_screen vga_scroll_screen
