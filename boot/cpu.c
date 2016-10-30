@@ -83,6 +83,7 @@ uint16_t toggle_a20(uint8_t enable)
 // Returns true if the CPU supports that leaf
 uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
+    // Automatically check for support for the leaf
     if ((eax & 0x7FFFFFFF) != 0) {
         cpuid(output, eax & 0x80000000, 0);
         if (output->eax < eax)
@@ -99,10 +100,18 @@ uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
     return 1;
 }
 
+static uint16_t cpu_has_long_mode(void)
+{
+    cpuid_t cpuinfo;
+    return cpuid(&cpuinfo, 0x80000001, 0) &&
+            (cpuinfo.edx & (1<<29));
+}
+
 static uint16_t cpu_has_apic(void)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, 9, 0) && (cpuinfo.edx & (1<<9));
+    return cpuid(&cpuinfo, 9, 0) &&
+            (cpuinfo.edx & (1<<9));
 }
 
 void outb(uint16_t dx, uint8_t al)
@@ -294,6 +303,9 @@ void toggle_interrupts(uint16_t enable)
 
 void copy_to_address(uint64_t address, void *src, uint32_t size)
 {
+    if (!cpu_has_long_mode())
+        halt("Need 64-bit CPU");
+
     uint16_t intf = disable_interrupts();
     uint16_t was_a20 = check_a20();
     if (!was_a20) {
