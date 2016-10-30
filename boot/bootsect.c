@@ -29,13 +29,17 @@ asm (
     // Call C
     "call init\n"
 
-    // Put null message pointer at (%esp)
-    // As if someone called halt((char*)0)
-    // Can check halt reason if called elsewhere
-    "pushl $0\n"
+    // Skip halt message
+    "jmp 0f\n"
 "halt:\n"
+    // Skip print if not fully loaded
+    "cmpb $0,fully_loaded\n"
+    "je 0f\n"
+    "pushl 4(%esp)\n"
+    "call print_line\n"
+"0:\n"
     "hlt\n"
-    "jmp halt\n"
+    "jmp 0b\n"
     ".section .text\n"
 );
 
@@ -61,6 +65,7 @@ typedef struct
 
 drive_geometry_t drive_geometry;
 uint8_t boot_drive;
+uint8_t fully_loaded;
 
 //static void bochs_out(const char *msg)
 //{
@@ -188,6 +193,8 @@ int init()
         if (err != 0)
             halt(0);
     }
+
+    fully_loaded = 1;
 
     boot_partition(partition_table[0].start_lba);
 
