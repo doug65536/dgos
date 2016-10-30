@@ -26,3 +26,6 @@ elf64.h
 paging.c
 paging.h
 .gitignore
+utf.c
+utf.h
+utils/bochs-config.bxrc.template

@@ -7,6 +7,7 @@ CSRCS := \
 	cpu.c \
 	malloc.c \
 	string.c \
+	utf.c \
 	paging.c \
 	elf64.c
 
@@ -15,9 +16,11 @@ ASRCS := \
 
 BINDIR := bin
 DUMPDIR := dump
+DISKIMGDIR ?= diskimg
 MOUNTDIR := disk
 
 $(shell mkdir -p $(BINDIR) >/dev/null)
+$(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
 AOBJS := $(ASRCS:.s=.o)
@@ -29,7 +32,7 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m32
 TARGET_ARCH_AS := --32
 
-CFLAGS ?= -g3 -O0 -ffreestanding \
+CFLAGS ?= -ggdb -O0 -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror \
 	-falign-functions=1 -falign-labels=1 -falign-loops=1 -falign-jumps=1 \
 	-Wno-unused-function
@@ -51,12 +54,15 @@ NEEDSMALLEST := bootsect.c
 #screen.c cpu.c malloc.c
 #fat32.c
 
-DISKIMAGE ?= /large/vm/dgos.fat32.raw
+DISKIMAGE ?= $(DISKIMGDIR)/dgos.fat32.raw
 
 LDFLAGS ?= -m i386linux -no-stdlib -M -T bootsect.ld
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
+
+#
+# Standard targets
 
 all: $(OUTPUTS)
 
@@ -66,16 +72,22 @@ clean:
 	@rm -f $(DUMPDIR)/*.map
 	@rm -f $(OUTPUTS)
 
-deletedisk:
-	@rm -f $(DISKIMAGE)
-
 cleaner: clean deletedisk
+
+#
+# Link binaries
 
 $(SYMBOLFILE): $(OBJS) $(LINKERSCRIPT)
 	ld $(LDFLAGS) --oformat elf32-little $(OUTPUT_OPTION) -g $(OBJS) > $(DUMPDIR)/bootsect-debug.map
 
 $(BOOTSECTORS): $(OBJS) $(LINKERSCRIPT)
 	ld $(LDFLAGS) --oformat binary $(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/bootsect.map
+
+#
+# Create/delete disk image
+
+deletedisk:
+	@rm -f $(DISKIMAGE)
 
 # Create disk image
 $(DISKIMAGE):
@@ -101,14 +113,32 @@ bootable_disk: $(DISKIMAGE) $(BOOTSECTORS)
 
 debuggable_disk: bootable_disk $(SYMBOLFILE)
 
+#
+# Debug in KVM
+
 $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug: debuggable_disk $(BINDIR)/debug-kvm-gdbcommands $(DISKIMAGE)
+debug: debuggable_disk $(BINDIR)/debug-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kvm-gdbcommands
 
 run: bootable_disk
 	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw
+
+#
+# Debug in bochs
+
+$(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
+	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+
+debug-bochs: debuggable_disk $(BINDIR)/bochs-config.bxrc
+	bochs -f $(BINDIR)/bochs-config.bxrc
+
+run-bochs: debuggable_disk $(BINDIR)/bochs-config.bxrc
+	bochs -qf $(BINDIR)/bochs-config.bxrc -q
+
+#
+# Mount/unmount disk image through loop device
 
 mountdisk:
 	@mkdir -p $(MOUNTDIR) >/dev/null
@@ -121,7 +151,7 @@ umountdisk:
 	sudo umount $(MOUNTDIR)
 	sudo kpartx -d $(DISKIMAGE)
 
-.PHONY: all clean run deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
+.PHONY: all clean run debug-bochs deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
 
 .PRECIOUS: $(DISKIMAGE)
 

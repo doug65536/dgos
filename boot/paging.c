@@ -33,6 +33,7 @@ static uint64_t read_pte(uint16_t segment, uint16_t slot)
         "movl %%fs:4(,%2,8),%%edx\n\t"
         : "=A" (pte)
         : "r" (segment), "r" ((uint32_t)slot)
+        : "memory"
     );
     return pte;
 }
@@ -46,6 +47,7 @@ static void write_pte(uint16_t segment, uint16_t slot, uint64_t pte)
         "mov %%edx,%%fs:4(,%2,8)\n\t"
         :
         : "A" (pte), "r" (segment), "r" ((uint32_t)slot)
+        : "memory"
     );
 }
 
