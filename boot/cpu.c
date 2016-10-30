@@ -250,6 +250,7 @@ void load_gdt(void *gdt, size_t size)
         "lgdtl %0"
         :
         : "m" (dtr)
+        : "memory"
     );
 }
 
@@ -291,21 +292,26 @@ void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
-void copy_to_address(uint64_t *address, void *src, uint32_t size)
+void copy_to_address(uint64_t address, void *src, uint32_t size)
 {
     uint16_t intf = disable_interrupts();
-    toggle_a20(1);
-    if (!check_a20()) {
-        halt("A20 not enabled!");
+    uint16_t was_a20 = check_a20();
+    if (!was_a20) {
+        toggle_a20(1);
+        if (!check_a20()) {
+            halt("A20 not enabled!");
+        }
     }
 
     load_gdt(&gdt, sizeof(gdt));
     uint32_t pdbr = paging_root_addr();
 
+    uint64_t *address_ptr = &address;
+
     __asm__ __volatile__ (
         // Enable protected mode
         "movl %%cr0,%%eax\n\t"
-        "orl $0x21,%%eax\n\t"
+        "orl $0x1,%%eax\n\t"
         "movl %%eax,%%cr0\n\t"
 
         // Clear prefetch queue
@@ -412,11 +418,13 @@ void copy_to_address(uint64_t *address, void *src, uint32_t size)
         "movw %%ax,%%es\n\t"
         "ljmp $0,$0f\n\t"
         "0:"
-        : "=D" (address), "=S" (src), "=c" (size)
-        : "0" (address), "1" (src), "2" (size), "b" (pdbr)
-        : "eax"
+        : "=D" (address_ptr), "=S" (src), "=c" (size)
+        : "0" (address_ptr), "1" (src), "2" (size), "b" (pdbr)
+        : "eax", "memory"
     );
 
-    toggle_a20(0);
+    if (!was_a20)
+        toggle_a20(0);
+
     toggle_interrupts(intf);
 }

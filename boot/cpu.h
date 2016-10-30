@@ -92,4 +92,4 @@ typedef struct {
 #define IDT_INTR    0x0E
 #define IDT_TRAP    0x0F
 
-void copy_to_address(uint64_t *address, void *src, uint32_t size);
+void copy_to_address(uint64_t address, void *src, uint32_t size);

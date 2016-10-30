@@ -1,7 +1,7 @@
 #include "code16gcc.h"
 
-#include "malloc.h"
 #include "fat32.h"
+#include "malloc.h"
 #include "bootsect.h"
 #include "screen.h"
 #include "string.h"
@@ -11,35 +11,6 @@
 bpb_data_t bpb;
 
 char *sector_buffer;
-
-//uint16_t get_sector_size(uint8_t drive)
-//{
-//    // AH = 48h
-//    // DL = drive (80h-FFh)
-//    // DS:SI -> buffer for drive parameters
-//
-//    uint16_t buf[64];
-//    uint16_t ax = 0x4800;
-//
-//    buf[0] = (uint16_t)sizeof(buf);
-//
-//    __asm__ __volatile__ (
-//        "int $0x13\n\t"
-//        "setc %%al\n\t"
-//        "negb %%al\n\t"
-//        "andb %%al,%%ah\n\t"
-//        "movzbw %%ah,%%ax\n\t"
-//        : "=a" (ax)
-//        : "a" (ax), "d" (drive), "S" (buf)
-//    );
-//
-//    if (ax != 0) {
-//        print_line("Can't get sector size: %d", ax);
-//        return 512;
-//    }
-//
-//    return buf[0x0c];
-//}
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
@@ -670,12 +641,12 @@ void boot_partition(uint32_t partition_lba)
     // Map 4KB at linear address 0xd00d0000 to physaddr 0x100000
     addr = 0xd00d0000;
     paging_map_range(addr, 0x1000, 0x100000, 0x1);
-    copy_to_address(&addr, "Hello!", 6);
+    copy_to_address(addr, "Hello!", 6);
 
     // Map 64KB at linear address 0x12345000 to physaddr 0x101000
     addr = 0x12345000;
     paging_map_range(addr, 0x10000, 0x101000, 0x1);
-    copy_to_address(&addr, 0, 0x10000);
+    copy_to_address(addr, 0, 0x10000);
 
     print_line("Booting partition at LBA %u", partition_lba);
 
