@@ -1,5 +1,7 @@
 #include "code16gcc.h"
 #include "cpu.h"
+#include "paging.h"
+#include "bootsect.h"
 
 gdt_entry_t gdt[] = {
     GDT_MAKE_EMPTY(),
@@ -11,18 +13,50 @@ gdt_entry_t gdt[] = {
     GDT_MAKE_DATASEG32(3),  // 0x20
     // 16 bit code and data
     GDT_MAKE_CODESEG16(0),  // 0x28
-    GDT_MAKE_DATASEG16(0)   // 0x30
+    GDT_MAKE_DATASEG16(0),  // 0x30
+    // 64 bit kernel code and data
+    GDT_MAKE_CODESEG64(0),  // 0x38
+    GDT_MAKE_DATASEG64(0),  // 0x40
+    // 64 bit user code and data
+    GDT_MAKE_CODESEG64(3),  // 0x48
+    GDT_MAKE_DATASEG64(3)  // 0x50
 };
+
+// See if A20 is blocked or enabled
+uint16_t check_a20()
+{
+    uint16_t enabled;
+    __asm__ __volatile__ (
+        "mov $0xFFFF,%%ax\n\t"
+        "mov %%ax,%%fs\n\t"
+        "pushf\n\t"
+        "cli\n\t"
+        "pushw 0\n\t"
+        "movw $0,0\n\t"
+        "movw $1,%%fs:16\n\t"
+        "xorw %%ax,%%ax\n\t"
+        "cmpw $0,0\n\t"
+        "sete %%al\n\t"
+        "popw 0\n\t"
+        "popf\n\t"
+        : "=a" (enabled)
+    );
+    return enabled;
+}
 
 // Returns BIOS error code, or zero on success
 //  01h keyboard controller is in secure mode
 //  86h function not supported
-uint16_t toggle_a20(uint16_t enable)
+uint16_t toggle_a20(uint8_t enable)
 {
+    uint8_t value;
     __asm__ __volatile__ (
-        "outb %%al,$0x92\n\t"
-        :
-        : "a" ((!!enable) << 1)
+        "inb $0x92,%1\n\t"
+        "andb $~2,%1\n\t"
+        "orb %0,%1\n"
+        "outb %1,$0x92\n\t"
+        : "=c" (enable), "=a" (value)
+        : "0" ((enable != 0) << 1)
     );
     return 0;
 //    uint16_t ax = 0x2400 | (enable != 0);
@@ -257,11 +291,16 @@ void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
-void copy_to_address(uint32_t address, void *src, uint32_t size)
+void copy_to_address(uint64_t *address, void *src, uint32_t size)
 {
     uint16_t intf = disable_interrupts();
     toggle_a20(1);
+    if (!check_a20()) {
+        halt("A20 not enabled!");
+    }
+
     load_gdt(&gdt, sizeof(gdt));
+    uint32_t pdbr = paging_root_addr();
 
     __asm__ __volatile__ (
         // Enable protected mode
@@ -288,9 +327,59 @@ void copy_to_address(uint32_t address, void *src, uint32_t size)
         "movw %%ax,%%ds\n\t"
         "movw %%ax,%%es\n\t"
 
+        // Enable CR4.PAE (bit 5)
+        "movl %%cr4,%%eax\n\t"
+        "orl $0x20,%%eax\n\t"
+        "movl %%eax,%%cr4\n\t"
+
+        // Load PDBR
+        "movl %%ebx,%%cr3\n\t"
+
+        // Enable long mode IA32_EFER.LME (bit 8) MSR 0xC0000080
+        "pushl %%ecx\n\t"
+        "movl $0xC0000080,%%ecx\n"
+        "rdmsr\n\t"
+        "orl $0x100,%%eax\n\t"
+        "wrmsr\n\t"
+        "popl %%ecx\n\t"
+
+        // Enable paging (CR0.PG (bit 31)
+        "movl %%cr0,%%eax\n\t"
+        "orl $0x80000000,%%eax\n\t"
+        "movl %%eax,%%cr0\n\t"
+
+        // Now in 64 bit compatibility mode (still really 32 bit)
+
+        // Far jump to selector that has L bit set (64 bit)
+        "lcall $0x38,$0f\n\t"
+        "jmp 1f\n\t"
+
+        ".code64\n\t"
+        "0:\n\t"
+        "movq (%%edi),%%rdi\n\t"
+
         // Copy memory
         "cld\n\t"
         "rep movsb\n\t"
+
+        // Far return to 32 bit compatibility mode code segment
+        "retf\n\t"
+
+        "1:\n\t"
+        ".code32\n\t"
+
+        "addl $16,%%esp\n\t"
+
+        // Disable paging
+        "mov %%cr0,%%eax\n\t"
+        "btr $31,%%eax\n\t"
+        "mov %%eax,%%cr0\n\t"
+
+        // Switch back to 64 bit compatibility mode
+        "movl $0xC0000080,%%ecx\n"
+        "rdmsr\n\t"
+        "andl $~0x100,%%eax\n\t"
+        "wrmsr\n\t"
 
         // Load 16 bit selectors
         "movw $0x30,%%ax\n\t"
@@ -323,8 +412,8 @@ void copy_to_address(uint32_t address, void *src, uint32_t size)
         "movw %%ax,%%es\n\t"
         "ljmp $0,$0f\n\t"
         "0:"
-        :
-        : "D" (address), "S" (src), "c" (size)
+        : "=D" (address), "=S" (src), "=c" (size)
+        : "0" (address), "1" (src), "2" (size), "b" (pdbr)
         : "eax"
     );
 

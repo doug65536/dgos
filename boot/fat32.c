@@ -6,6 +6,7 @@
 #include "screen.h"
 #include "string.h"
 #include "cpu.h"
+#include "paging.h"
 
 bpb_data_t bpb;
 
@@ -593,11 +594,13 @@ static uint32_t find_file_by_name(char const *filename,
                         sizeof(match_fill->long_entry.name) >> 1,
                         encoded_src,
                         &done_name);
+
             encoded_src = encode_lfn_name_fragment(
                         match_fill->long_entry.name2,
                         sizeof(match_fill->long_entry.name2) >> 1,
                         encoded_src,
                         &done_name);
+
             encoded_src = encode_lfn_name_fragment(
                         match_fill->long_entry.name3,
                         sizeof(match_fill->long_entry.name3) >> 1,
@@ -660,11 +663,19 @@ static uint32_t find_file_by_name(char const *filename,
 void boot_partition(uint32_t partition_lba)
 {
     //test_malloc();
+    paging_init();
 
-    copy_to_address(0x100000, "Hello!", 6);
+    uint64_t addr;
 
-    // Ensure A20 is really working correctly
-    copy_to_address(0x12345678, 0, 0x100000);
+    // Map 4KB at linear address 0xd00d0000 to physaddr 0x100000
+    addr = 0xd00d0000;
+    paging_map_range(addr, 0x1000, 0x100000, 0x1);
+    copy_to_address(&addr, "Hello!", 6);
+
+    // Map 64KB at linear address 0x12345000 to physaddr 0x101000
+    addr = 0x12345000;
+    paging_map_range(addr, 0x10000, 0x101000, 0x1);
+    copy_to_address(&addr, 0, 0x10000);
 
     print_line("Booting partition at LBA %u", partition_lba);
 

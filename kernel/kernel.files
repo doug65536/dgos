@@ -1,0 +1,4 @@
+Makefile
+kernel.ld
+main.c
+entry.s

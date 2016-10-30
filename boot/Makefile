@@ -6,7 +6,9 @@ CSRCS := \
 	fat32.c \
 	cpu.c \
 	malloc.c \
-	string.c
+	string.c \
+	paging.c \
+	elf64.c
 
 ASRCS := \
 	part.s
@@ -116,7 +118,7 @@ umountdisk:
 	sudo umount $(MOUNTDIR)
 	sudo kpartx -d $(DISKIMAGE)
 
-.PHONY: clean deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
+.PHONY: all clean deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
 
 .PRECIOUS: $(DISKIMAGE)
 

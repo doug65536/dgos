@@ -13,7 +13,7 @@ define remake
 	make debuggable_disk
 	refresh
 	set architecture i8086
-	target remote | exec qemu-system-i386 -S -drive file=$DISKIMAGE,format=raw -gdb stdio
+	target remote | exec qemu-system-x86_64 -S -drive file=$DISKIMAGE,format=raw -gdb stdio
 	shell wmctrl -a kernel/boot
 end
 
@@ -41,6 +41,11 @@ end
 
 define code32
 	set architecture i386
+	refresh
+end
+
+define code64
+	set architecture i386:x86-64
 	refresh
 end
 

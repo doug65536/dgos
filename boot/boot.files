@@ -21,3 +21,8 @@ dump/bootsect.map
 string.c
 string.h
 cpu32.c
+elf64.c
+elf64.h
+paging.c
+paging.h
+.gitignore

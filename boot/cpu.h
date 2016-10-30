@@ -18,7 +18,8 @@ typedef struct {
             downward, \
             rw, \
             granularity, \
-            is32) \
+            is32, \
+            is64) \
 { \
     ((limit) & 0xFFFF), \
     ((base) & 0xFFFF), \
@@ -34,25 +35,32 @@ typedef struct {
     ( \
         ((granularity) ? 1 << 7 : 0) | \
         ((is32) ? 1 << 6 : 0) | \
+        ((is64) ? 1 << 5 : 0) | \
         (((limit) >> 16) & 0x0F) \
     ), \
     (((base) >> 24) & 0xFF) \
 }
 
 #define GDT_MAKE_EMPTY() \
-    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0, 0, 0, 0, 0, 0, 0, 0)
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 #define GDT_MAKE_CODESEG32(ring) \
-    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 1)
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 1, 0)
 
 #define GDT_MAKE_DATASEG32(ring) \
-    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1)
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1, 0)
+
+#define GDT_MAKE_CODESEG64(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 0, 1)
+
+#define GDT_MAKE_DATASEG64(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 0, 1)
 
 #define GDT_MAKE_CODESEG16(ring) \
-    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 1, 0, 1, 0, 0)
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 1, 0, 1, 0, 0, 0)
 
 #define GDT_MAKE_DATASEG16(ring) \
-    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0)
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 typedef struct {
     uint16_t limit;
@@ -84,4 +92,4 @@ typedef struct {
 #define IDT_INTR    0x0E
 #define IDT_TRAP    0x0F
 
-void copy_to_address(uint32_t address, void *src, uint32_t size);
+void copy_to_address(uint64_t *address, void *src, uint32_t size);
