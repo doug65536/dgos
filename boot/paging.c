@@ -118,14 +118,14 @@ void paging_map_range(
     }
 }
 
-uint32_t paging_root_addr()
+uint32_t paging_root_addr(void)
 {
     return 0x10000;
 }
 
 // Identity map the first 64KB of physical addresses and
 // prepare to populate tables
-void paging_init()
+void paging_init(void)
 {
     // Clear the root page directory
     uint16_t segment = 0x1000;

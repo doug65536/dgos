@@ -26,3 +26,8 @@ typedef struct {
 } directory_iterator_t;
 
 void boot_partition(uint32_t partition_lba);
+
+// Open/close/read file on the boot drive
+int boot_open(char const *filename);
+int boot_close(int file);
+int boot_pread(int file, void *buf, size_t bytes, off_t ofs);

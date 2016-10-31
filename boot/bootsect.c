@@ -67,6 +67,8 @@ drive_geometry_t drive_geometry;
 uint8_t boot_drive;
 uint8_t fully_loaded;
 
+int init(void);
+
 //static void bochs_out(const char *msg)
 //{
 //    uint16_t ax = 0;
@@ -178,7 +180,7 @@ uint16_t read_lba_sector(char *buf, uint8_t drive, uint32_t lba)
 extern char __initialized_data_start[];
 extern char __initialized_data_end[];
 
-int init()
+int init(void)
 {
     // Prepare to do LBA to CHS conversions
     drive_geometry = get_drive_geometry(boot_drive);

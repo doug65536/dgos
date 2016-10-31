@@ -27,6 +27,7 @@
 //    //bochs_out(p);
 //}
 
+#if !DIRECT_VGA
 
 // INT 0x10
 // AH = 0x13
@@ -85,6 +86,8 @@ static void bios_scroll_screen()
 {
     bios_scroll_region(0, ((24 << 8) | 79), 1, 0x00);
 }
+
+#else
 
 static void vga_scroll_screen()
 {
@@ -154,6 +157,7 @@ static void vga_print_at(
         : "eax"
     );
 }
+#endif
 
 static void buffer_char(char *buf, char **pptr, char c)
 {

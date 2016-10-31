@@ -9,7 +9,8 @@ CSRCS := \
 	string.c \
 	utf.c \
 	paging.c \
-	elf64.c
+	elf64.c \
+	rand.c
 
 ASRCS := \
 	part.s
@@ -33,10 +34,9 @@ TARGET_ARCH := -m32
 TARGET_ARCH_AS := --32
 
 CFLAGS ?= -ggdb -O0 -ffreestanding \
-	-Wall -Wextra -Wpedantic -Werror \
-	-falign-functions=1 -falign-labels=1 -falign-loops=1 -falign-jumps=1 \
-	-Wno-unused-function
-
+	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
+	-falign-functions=1 -falign-labels=1 \
+	-falign-loops=1 -falign-jumps=1
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
@@ -49,10 +49,7 @@ BOOTSECTORS = $(BINDIR)/bootsect.bin
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
 	$(DUMPDIR)/bootsect.dis $(DUMPDIR)/bootsect.hex
 
-NEEDSMALLEST := bootsect.c
-#malloc.c cpu.c screen.c
-#screen.c cpu.c malloc.c
-#fat32.c
+NEEDSMALLEST := bootsect.c malloc.c cpu.c screen.c fat32.c
 
 DISKIMAGE ?= $(DISKIMGDIR)/dgos.fat32.raw
 
@@ -78,10 +75,10 @@ cleaner: clean deletedisk
 # Link binaries
 
 $(SYMBOLFILE): $(OBJS) $(LINKERSCRIPT)
-	ld $(LDFLAGS) --oformat elf32-little $(OUTPUT_OPTION) -g $(OBJS) > $(DUMPDIR)/bootsect-debug.map
+	$(LD) $(LDFLAGS) --oformat elf32-little $(OUTPUT_OPTION) -g $(OBJS) > $(DUMPDIR)/bootsect-debug.map
 
 $(BOOTSECTORS): $(OBJS) $(LINKERSCRIPT)
-	ld $(LDFLAGS) --oformat binary $(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/bootsect.map
+	$(LD) $(LDFLAGS) --oformat binary $(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/bootsect.map
 
 #
 # Create/delete disk image

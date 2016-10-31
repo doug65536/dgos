@@ -171,6 +171,8 @@ typedef struct {
 // ===========================================================================
 
 bpb_data_t bpb;
+sector_iterator_t *file_handles;
+#define MAX_HANDLES 5
 
 char *sector_buffer;
 
@@ -285,7 +287,8 @@ static uint32_t next_cluster(
 // Returns 1 if successfully advanced to next sector
 static int16_t sector_iterator_next(
         sector_iterator_t *iter,
-        char *sector)
+        char *sector,
+        uint16_t read_data)
 {
     if (is_eof_cluster(iter->cluster))
         return 0;
@@ -304,7 +307,7 @@ static int16_t sector_iterator_next(
 
         if (iter->cluster == 0xFFFFFFFF)
             return -1;
-    } else {
+    } else if (read_data) {
         uint32_t lba = lba_from_cluster(iter->cluster) +
                 iter->sector_offset;
 
@@ -316,6 +319,21 @@ static int16_t sector_iterator_next(
     }
 
     return 1;
+}
+
+static uint16_t sector_iterator_seek(
+        sector_iterator_t *iter,
+        uint32_t sector_offset,
+        char *sector)
+{
+    uint16_t status = sector_iterator_begin(
+                iter, sector, iter->start_cluster);
+
+    while (status > 0 && sector_offset--)
+        status = sector_iterator_next(iter, sector,
+                                      sector_offset == 0);
+
+    return status;
 }
 
 // Read the first sector of a directory
@@ -365,8 +383,9 @@ static int16_t read_directory_move_next(
         char *sector)
 {
     // Advance to next sector_index
-    if (++iter->sector_index >= bpb.bytes_per_sec / sizeof(dir_entry_t))
-        return sector_iterator_next(&iter->dir_file, sector);
+    if (++iter->sector_index >=
+            bpb.bytes_per_sec / sizeof(dir_entry_t))
+        return sector_iterator_next(&iter->dir_file, sector, 1);
 
     return 1;
 }
@@ -634,9 +653,7 @@ static uint32_t find_file_by_name(char const *filename,
 
         lfn_entries = (encoded_len + 12) / 13;
 
-        match = malloc(lfn_entries * sizeof(*match));
-
-        memset(match, 0, lfn_entries * sizeof(*match));
+        match = calloc(lfn_entries, sizeof(*match));
 
         // Fill in reverse order
         dir_union_t *match_fill = match + (lfn_entries - 1);
@@ -717,6 +734,8 @@ static uint32_t find_file_by_name(char const *filename,
 
 void boot_partition(uint32_t partition_lba)
 {
+    file_handles = calloc(MAX_HANDLES, sizeof(*file_handles));
+
     paging_init();
 
     uint64_t addr;
@@ -754,4 +773,102 @@ void boot_partition(uint32_t partition_lba)
 
     uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
     print_line("kernel start=%d", root);
+}
+
+static int find_available_file_handle()
+{
+    for (size_t i = 0; i < MAX_HANDLES; ++i) {
+        if (file_handles[i].start_cluster == 0)
+            return i;
+    }
+    return -1;
+}
+
+int boot_open(const char *filename)
+{
+    uint32_t cluster;
+
+    // Find the start of the file
+    cluster = find_file_by_name(filename, bpb.root_dir_start);
+    if (cluster == 0)
+        return -1;
+
+    // Allocate a file handle
+    int file = find_available_file_handle();
+    if (file < 0)
+        return -1;
+
+    // Get ready to read the file
+    uint16_t status = sector_iterator_begin(
+                file_handles + file, sector_buffer, cluster);
+    if (status != 0)
+        return -1;
+
+    // Return file handle
+    return file;
+}
+
+int boot_close(int file)
+{
+    if (file < 0 || file >= MAX_HANDLES)
+        return -1;
+
+    int result = 0;
+
+    // Fail the close if the file is in error state
+    if (file_handles[file].err)
+        result = -1;
+
+    // Mark as available
+    memset(file_handles + file, 0, sizeof(*file_handles));
+
+    return result;
+}
+
+int boot_pread(int file, void *buf, size_t bytes, off_t ofs)
+{
+    if (file < 0 || file >= MAX_HANDLES)
+        return -1;
+
+    uint32_t sector_offset = ofs >> 9;
+    uint16_t byte_offset = ofs & ~((1 << 9)-1);
+
+    uint16_t status = sector_iterator_seek(
+                file_handles + file,
+                sector_offset,
+                sector_buffer);
+
+    char *output = buf;
+
+    int total = 0;
+    for (;;) {
+        // Error?
+        if (status != 0)
+            return -1;
+
+        // EOF?
+        if (status == 0)
+            return 0;
+
+        uint16_t limit = 512 - byte_offset;
+        if (limit > bytes)
+            limit = bytes;
+
+        if (limit == 0)
+            break;
+
+        // Copy data from sector buffer
+        memcpy(output, sector_buffer + byte_offset, limit);
+
+        bytes -= limit;
+        output += limit;
+        total += limit;
+
+        byte_offset = 0;
+
+        status = sector_iterator_next(
+                    file_handles + file, sector_buffer, 1);
+    }
+
+    return total;
 }

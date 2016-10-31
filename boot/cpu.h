@@ -92,4 +92,11 @@ typedef struct {
 #define IDT_INTR    0x0E
 #define IDT_TRAP    0x0F
 
+uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
 void copy_to_address(uint64_t address, void *src, uint32_t size);
+void outb(uint16_t dx, uint8_t al);
+void outw(uint16_t dx, uint16_t ax);
+void outl(uint16_t dx, uint32_t eax);
+uint8_t inb(uint16_t dx);
+uint16_t inw(uint16_t dx);
+uint32_t inl(uint16_t dx);

@@ -242,15 +242,15 @@ typedef struct
 #define DT_LOPROC 0x70000000  // Defines a range of dynamic table tags that are reserved for processor-specific use.
 #define DT_HIPROC 0x7FFFFFFF
 
-unsigned long elf64_hash(unsigned char const *name)
-{
-    unsigned long h = 0, g;
-    while (*name) {
-        h = (h << 4) + *name++;
-        g = h & 0xf0000000;
-        h ^= g >> 24;
-        h &= 0x0fffffff;
-    }
-    return h;
-}
+//static unsigned long elf64_hash(unsigned char const *name)
+//{
+//    unsigned long h = 0, g;
+//    while (*name) {
+//        h = (h << 4) + *name++;
+//        g = h & 0xf0000000;
+//        h ^= g >> 24;
+//        h &= 0x0fffffff;
+//    }
+//    return h;
+//}
 

@@ -23,7 +23,7 @@ gdt_entry_t gdt[] = {
 };
 
 // See if A20 is blocked or enabled
-uint16_t check_a20()
+static uint16_t check_a20()
 {
     uint16_t enabled;
     __asm__ __volatile__ (
@@ -47,7 +47,7 @@ uint16_t check_a20()
 // Returns BIOS error code, or zero on success
 //  01h keyboard controller is in secure mode
 //  86h function not supported
-uint16_t toggle_a20(uint8_t enable)
+static uint16_t toggle_a20(uint8_t enable)
 {
     uint8_t value;
     __asm__ __volatile__ (
@@ -107,12 +107,12 @@ static uint16_t cpu_has_long_mode(void)
             (cpuinfo.edx & (1<<29));
 }
 
-static uint16_t cpu_has_apic(void)
-{
-    cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, 9, 0) &&
-            (cpuinfo.edx & (1<<9));
-}
+//static uint16_t cpu_has_apic(void)
+//{
+//    cpuid_t cpuinfo;
+//    return cpuid(&cpuinfo, 9, 0) &&
+//            (cpuinfo.edx & (1<<9));
+//}
 
 void outb(uint16_t dx, uint8_t al)
 {
@@ -193,61 +193,61 @@ uint32_t inl(uint16_t dx)
 #define ICW4_BUF_MASTER	0x0C	// Buffered mode/master
 #define ICW4_SFNM       0x10	// Special fully nested (not)
 
-void io_wait()
-{
-    __asm__ __volatile__ (
-        "outb %al,$0x80\n\t"
-    );
-}
+//static void io_wait()
+//{
+//    __asm__ __volatile__ (
+//        "outb %al,$0x80\n\t"
+//    );
+//}
 
-void init_8259_pic(uint8_t pic1_base, uint8_t pic2_base)
-{
-    unsigned char a1, a2;
-
-    // save masks
-    a1 = inb(PIC1_DATA);
-    a2 = inb(PIC2_DATA);
-    io_wait();
-
-    // starts the initialization sequence (in cascade mode)
-    outb(PIC1_COMMAND, ICW1_INIT+ICW1_ICW4);
-    outb(PIC2_COMMAND, ICW1_INIT+ICW1_ICW4);
-    io_wait();
-
-    // ICW2: Master PIC vector offset
-    outb(PIC1_DATA, pic1_base);
-    // ICW2: Slave PIC vector offset
-    outb(PIC2_DATA, pic2_base);
-    io_wait();
-
-    // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
-    outb(PIC1_DATA, 4);
-    // ICW3: tell Slave PIC its cascade identity (0000 0010)
-    outb(PIC2_DATA, 2);
-    io_wait();
-
-    outb(PIC1_DATA, ICW4_8086);
-    outb(PIC2_DATA, ICW4_8086);
-    io_wait();
-
-    outb(PIC1_DATA, a1);   // restore saved masks.
-    outb(PIC2_DATA, a2);
-    io_wait();
-}
+//static void init_8259_pic(uint8_t pic1_base, uint8_t pic2_base)
+//{
+//    unsigned char a1, a2;
+//
+//    // save masks
+//    a1 = inb(PIC1_DATA);
+//    a2 = inb(PIC2_DATA);
+//    io_wait();
+//
+//    // starts the initialization sequence (in cascade mode)
+//    outb(PIC1_COMMAND, ICW1_INIT+ICW1_ICW4);
+//    outb(PIC2_COMMAND, ICW1_INIT+ICW1_ICW4);
+//    io_wait();
+//
+//    // ICW2: Master PIC vector offset
+//    outb(PIC1_DATA, pic1_base);
+//    // ICW2: Slave PIC vector offset
+//    outb(PIC2_DATA, pic2_base);
+//    io_wait();
+//
+//    // ICW3: tell Master PIC that there is a slave PIC at IRQ2 (0000 0100)
+//    outb(PIC1_DATA, 4);
+//    // ICW3: tell Slave PIC its cascade identity (0000 0010)
+//    outb(PIC2_DATA, 2);
+//    io_wait();
+//
+//    outb(PIC1_DATA, ICW4_8086);
+//    outb(PIC2_DATA, ICW4_8086);
+//    io_wait();
+//
+//    outb(PIC1_DATA, a1);   // restore saved masks.
+//    outb(PIC2_DATA, a2);
+//    io_wait();
+//}
 
 #define PIC_EOI		0x20
 
-void ack_irq(uint8_t irq)
-{
-    // Ack PIC 2 if IRQ was from PIC2
-    if(irq >= 8)
-        outb(PIC2_COMMAND,PIC_EOI);
+//static void ack_irq(uint8_t irq)
+//{
+//    // Ack PIC 2 if IRQ was from PIC2
+//    if(irq >= 8)
+//        outb(PIC2_COMMAND,PIC_EOI);
+//
+//    // Always ack PIC 1 due to cascade
+//    outb(PIC1_COMMAND,PIC_EOI);
+//}
 
-    // Always ack PIC 1 due to cascade
-    outb(PIC1_COMMAND,PIC_EOI);
-}
-
-void load_gdt(void *gdt, size_t size)
+static void load_gdt(void *gdt, size_t size)
 {
     table_register_t dtr;
 
@@ -263,18 +263,18 @@ void load_gdt(void *gdt, size_t size)
     );
 }
 
-void init_cpu()
-{
-    __asm__ __volatile__ ( "cli" );
+//static void init_cpu()
+//{
+//    __asm__ __volatile__ ( "cli" );
+//
+//    toggle_a20(1);
+//
+//    init_8259_pic(0x20, 0x28);
+//
+//    __asm__ __volatile__ ( "sti" );
+//}
 
-    toggle_a20(1);
-
-    init_8259_pic(0x20, 0x28);
-
-    __asm__ __volatile__ ( "sti" );
-}
-
-uint16_t disable_interrupts()
+static uint16_t disable_interrupts()
 {
     uint32_t int_enabled;
     __asm__ __volatile__ (
@@ -288,12 +288,12 @@ uint16_t disable_interrupts()
     return !!int_enabled;
 }
 
-void enable_interrupts()
+static void enable_interrupts()
 {
     __asm__ __volatile__ ("sti");
 }
 
-void toggle_interrupts(uint16_t enable)
+static void toggle_interrupts(uint16_t enable)
 {
     if (enable)
         enable_interrupts();
