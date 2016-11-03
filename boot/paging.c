@@ -1,5 +1,6 @@
 #include "code16gcc.h"
 #include "paging.h"
+#include "screen.h"
 
 // Builds 64-bit page tables using far pointers in real mode
 //
@@ -9,11 +10,11 @@
 //  Address
 //  Bits
 //  -----------
-//   47:39 Page directory
-//   38:30 Page directory
-//   29:21 Page directory
-//   20:12 Page table
-//   11:0  Offset
+//   47:39 Page directory (512GB regions)
+//   38:30 Page directory (1GB regions)
+//   29:21 Page directory (2MB regions)
+//   20:12 Page table (4KB regions)
+//   11:0  Offset (bytes)
 
 // Page tables are accessed through far pointers and manipulated
 // with helper functions that load segment registers
@@ -76,8 +77,8 @@ static void paging_map_page(
 
     // Process the address bits from high to low
     // in groups of 9 bits
-    uint8_t shift = 39;
-    for (uint16_t i = 0; ; ++i, shift -= 9) {
+
+    for (uint8_t shift = 39; ; shift -= 9) {
         // Extract 9 bits of the linear address
         slot = (uint16_t)(linear_addr >> shift) & 0x1FF;
 
@@ -85,22 +86,29 @@ static void paging_map_page(
         pte = read_pte(segment, slot);
 
         // If we are in the last level page table, then done
-        if (i == 3)
+        if (shift == 12)
             break;
 
         uint16_t next_segment = (uint16_t)(pte >> 4) & 0xFF00;
 
         if (next_segment == 0) {
+            print_line("Creating page directory for %lx",
+                       (uint64_t)(linear_addr >> shift) << shift);
+
             // Allocate a page table on first use
             next_segment = allocate_page_table();
 
             pte = (uint64_t)next_segment << 4;
-            pte |= 1;
+            pte |= PTE_PRESENT | PTE_WRITABLE;
             write_pte(segment, slot, pte);
         }
 
         segment = next_segment;
     }
+
+    print_line("mapping %lx to physaddr %lx pageseg=%x slot=%x",
+               linear_addr, phys_addr,
+               segment, slot);
 
     write_pte(segment, slot, phys_addr | pte_flags);
 }
@@ -133,6 +141,43 @@ void paging_init(void)
     clear_page_table(segment);
 
     // Identity map first 64KB
-    // 0x101 = Present, Global
-    paging_map_range(0, 0x10000, 0, 0x101);
+    paging_map_range(0, 0x10000, 0, PTE_PRESENT | PTE_WRITABLE);
 }
+
+//void paging_copy_far(far_ptr_realmode_t const *dest,
+//                     far_ptr_realmode_t const *src,
+//                     uint16_t size)
+//{
+//    __asm__ __volatile__ (
+//        "pushw %%ds\n\t"
+//        "pushw %%si\n\t"
+//        "pushw %%es\n\t"
+//        "pushw %%di\n\t"
+//
+//        "les (%2),%%di\n\t"
+//        "lds (%3),%%si\n\t"
+//        "cld\n\t"
+//        "rep movsb\n\t"
+//
+//        "popw %%di\n\t"
+//        "popw %%es\n\t"
+//        "popw %%si\n\t"
+//        "popw %%ds\n\t"
+//        : "=c" (size)
+//        : "0" (size), "d" (dest), "a" (src)
+//        : "memory"
+//    );
+//}
+//
+//far_ptr_realmode_t paging_far_realmode_ptr2(uint16_t seg, uint16_t ofs)
+//{
+//    far_ptr_realmode_t ptr;
+//    ptr.offset = ofs;
+//    ptr.seg = seg;
+//    return ptr;
+//}
+//
+//far_ptr_realmode_t paging_far_realmode_ptr(uint32_t addr)
+//{
+//    return paging_far_realmode_ptr2(addr >> 4, addr & 0x0000F);
+//}

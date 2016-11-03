@@ -8,6 +8,7 @@
 #include "cpu.h"
 #include "paging.h"
 #include "utf.h"
+#include "elf64.h"
 
 // Bytes Per Sector	BPB_BytsPerSec	0x0B	16 Bits	Always 512 Bytes
 // Sectors Per Cluster	BPB_SecPerClus	0x0D	8 Bits	1,2,4,8,16,32,64,128
@@ -231,6 +232,7 @@ static int16_t sector_iterator_begin(
     iter->err = 0;
     iter->start_cluster = cluster;
     iter->cluster = cluster;
+    iter->position = 0;
     iter->sector_offset = 0;
 
     if (!is_eof_cluster(cluster)) {
@@ -255,7 +257,7 @@ static uint32_t next_cluster(
         uint32_t current_cluster, char *sector, uint16_t *err_ptr)
 {
     uint32_t fat_sector_index = current_cluster >> (9-2);
-    uint32_t fat_sector_offset = current_cluster & ~((1 << (9-2))-1);
+    uint32_t fat_sector_offset = current_cluster & ((1 << (9-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
     uint32_t lba = bpb.first_fat_lba + fat_sector_index;
 
@@ -293,6 +295,8 @@ static int16_t sector_iterator_next(
     if (is_eof_cluster(iter->cluster))
         return 0;
 
+    ++iter->position;
+
     // Advance to the next sector
     if (++iter->sector_offset == bpb.sec_per_cluster) {
         // Reached end of cluster
@@ -321,12 +325,19 @@ static int16_t sector_iterator_next(
     return 1;
 }
 
-static uint16_t sector_iterator_seek(
+static int16_t sector_iterator_seek(
         sector_iterator_t *iter,
         uint32_t sector_offset,
         char *sector)
 {
-    uint16_t status = sector_iterator_begin(
+
+    // See if we are already there
+    if (iter->position == sector_offset) {
+        uint16_t is_eof_now = is_eof_cluster(iter->cluster);
+        return is_eof_now ? 0 : 1;
+    }
+
+    int16_t status = sector_iterator_begin(
                 iter, sector, iter->start_cluster);
 
     while (status > 0 && sector_offset--)
@@ -346,7 +357,7 @@ static int16_t read_directory_begin(
         char *sector,
         uint32_t cluster)
 {
-    uint16_t status = sector_iterator_begin(
+    int16_t status = sector_iterator_begin(
                 &iter->dir_file, sector, cluster);
     iter->sector_index = 0;
 
@@ -738,23 +749,6 @@ void boot_partition(uint32_t partition_lba)
 
     paging_init();
 
-    uint64_t addr;
-
-    // Map 4KB at linear address 0xd00d0000 to physaddr 0x100000
-    addr = 0xd00d0000;
-    paging_map_range(addr, 0x1000, 0x100000, 0x1);
-    copy_to_address(addr, "Hello!", 6);
-
-    // Map 64KB at linear address 0x12345000 to physaddr 0x101000
-    addr = 0x12345000;
-    paging_map_range(addr, 0x10000, 0x101000, 0x1);
-    copy_to_address(addr, 0, 0x10000);
-
-    // Map 64KB at linear address 0x4eedface2000 to physaddr 0x111000
-    addr = 0x4eedface2000;
-    paging_map_range(addr, 0x10000, 0x101000, 0x1);
-    copy_to_address(addr, "256TB!", 7);
-
     print_line("Booting partition at LBA %u", partition_lba);
 
     uint16_t err = read_bpb(partition_lba);
@@ -771,8 +765,10 @@ void boot_partition(uint32_t partition_lba)
     print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);    // 0x0D 8=4KB cluster
     print_line("number_of_fats:	  %d", bpb.number_of_fats);		// 0x10 Always 2
 
-    uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
-    print_line("kernel start=%d", root);
+    //uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
+    //print_line("kernel start=%d", root);
+
+    elf64_run("dgos-kernel");
 }
 
 static int find_available_file_handle()
@@ -799,9 +795,9 @@ int boot_open(const char *filename)
         return -1;
 
     // Get ready to read the file
-    uint16_t status = sector_iterator_begin(
+    int16_t status = sector_iterator_begin(
                 file_handles + file, sector_buffer, cluster);
-    if (status != 0)
+    if (status < 0)
         return -1;
 
     // Return file handle
@@ -831,9 +827,9 @@ int boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         return -1;
 
     uint32_t sector_offset = ofs >> 9;
-    uint16_t byte_offset = ofs & ~((1 << 9)-1);
+    uint16_t byte_offset = ofs & ((1 << 9)-1);
 
-    uint16_t status = sector_iterator_seek(
+    int16_t status = sector_iterator_seek(
                 file_handles + file,
                 sector_offset,
                 sector_buffer);
@@ -843,7 +839,7 @@ int boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     int total = 0;
     for (;;) {
         // Error?
-        if (status != 0)
+        if (status < 0)
             return -1;
 
         // EOF?
@@ -866,8 +862,10 @@ int boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 
         byte_offset = 0;
 
-        status = sector_iterator_next(
-                    file_handles + file, sector_buffer, 1);
+        if (bytes > 0) {
+            status = sector_iterator_next(
+                        file_handles + file, sector_buffer, 1);
+        }
     }
 
     return total;

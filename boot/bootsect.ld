@@ -34,7 +34,7 @@ SECTIONS {
 		/* sector align end */
         . = ALIGN(512);
 		__initialized_data_end = .;
-	} = 0x90
+	} = 0xCC
 
     .bss : {
         ___bss_st = .;

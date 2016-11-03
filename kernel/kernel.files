@@ -2,3 +2,5 @@ Makefile
 kernel.ld
 main.c
 entry.s
+dump/kernel-headers
+dump/kernel.map

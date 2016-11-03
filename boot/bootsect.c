@@ -26,6 +26,12 @@ asm (
     // Store boot drive number
     "movb %dl,boot_drive\n"
 
+    // Reset FPU
+    "fninit\n"
+    "pushl $0xE3F\n"
+    "fldcw (%esp)\n"
+    "addl $4,%esp\n"
+
     // Call C
     "call init\n"
 

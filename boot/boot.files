@@ -1,5 +1,6 @@
 utils/bochs-config.bxrc.template
 utils/debug-kvm-commands.template
+utils/debug-kernel-kvm-commands.template
 bootsect.c
 bootsect.h
 bootsect.ld
@@ -29,3 +30,7 @@ utf.h
 dump/bootsect.map
 dump/bootsect.dis
 dump/bootsect.hex
+elf64decl.h
+exception.s
+exception.h
+utils/bochs-debugger-commands

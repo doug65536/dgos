@@ -21,7 +21,9 @@ TARGET_ARCH_AS := --64
 
 CFLAGS ?= -g3 -O0 -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror \
-	-Wno-unused-function
+	-Wno-unused-function -fpic -mno-red-zone
+
+#-mcmodel=large
 
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
@@ -36,12 +38,13 @@ OUTPUTS = $(KERNEL)
 NEEDSMALLEST :=
 
 LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T kernel.ld
+
 #-m i386linux
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 
-all: $(OUTPUTS)
+all: $(OUTPUTS) $(DUMPDIR)/kernel-headers
 
 clean:
 	@rm -f $(BINDIR)/kernel
@@ -50,7 +53,10 @@ clean:
 	@rm -f $(OUTPUTS)
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT)
-	ld $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/kernel.map
+	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/kernel.map
+
+$(DUMPDIR)/kernel-headers: $(KERNEL)
+	objdump --all-headers $< > $@
 
 .PHONY: all clean
 
@@ -86,6 +92,12 @@ OUTPUT_OPTION = -o $@
 %.o : %.c
 %.o : %.c $(DEPDIR)/%.d
 	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(POSTCOMPILE)
+
+# Generate assembly dump for C
+$(DUMPDIR)/%.s : %.c
+$(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
+	$(COMPILE.c) $(OUTPUT_OPTION) -S $<
 	$(POSTCOMPILE)
 
 # Compile C++ with cc extension

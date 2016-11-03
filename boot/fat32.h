@@ -9,6 +9,10 @@ typedef struct {
     // Cluster number of current position
     uint32_t cluster;
 
+    // Offset from start_cluster in sectors
+    // (This being 32 bit means max file size is 2TB)
+    uint32_t position;
+
     // Sector offset from beginning of cluster
     uint16_t sector_offset;
 

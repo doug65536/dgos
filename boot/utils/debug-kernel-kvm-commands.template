@@ -1,15 +1,12 @@
 # Yeah I know this duplicates remake
 # If I try to use remake at startup, gdb crashes
 
-set architecture i8086
 symbol-file $SYMBOLFILE
 set architecture i386:x86-64
 target remote | exec qemu-system-x86_64 -S -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
 #-d int,cpu_reset
-set architecture i8086
 shell wmctrl -a kernel/boot
 layout src
-b debug_break
 
 define remake
 	kill inferior 1
@@ -18,7 +15,6 @@ define remake
 	set architecture i386:x86-64
 	target remote | exec qemu-system-x86_64 -S -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
 	#-d int,cpu_reset
-	set architecture i8086
 	shell wmctrl -a kernel/boot
 end
 
@@ -53,5 +49,3 @@ define code64
 	set architecture i386:x86-64
 	refresh
 end
-
-b elf64_run

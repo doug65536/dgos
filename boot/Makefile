@@ -13,7 +13,8 @@ CSRCS := \
 	rand.c
 
 ASRCS := \
-	part.s
+	part.s \
+	exception.s
 
 BINDIR := bin
 DUMPDIR := dump
@@ -23,6 +24,14 @@ MOUNTDIR := disk
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
+
+# Linking libgcc.a crashes my linker
+#LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
+#LIBGCCDIR := $(dir $(LIBGCC))
+#LIBGCCFILENAME = $(notdir $(LIBGCC))
+#LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
+
+$(info $(LIBGCCNAME))
 
 AOBJS := $(ASRCS:.s=.o)
 COBJS := $(CSRCS:.c=.o)
@@ -36,7 +45,11 @@ TARGET_ARCH_AS := --32
 CFLAGS ?= -ggdb -O0 -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
 	-falign-functions=1 -falign-labels=1 \
-	-falign-loops=1 -falign-jumps=1
+	-falign-loops=1 -falign-jumps=1 -msse -msse2
+	#-mmmx -msse -msse2 -mfpmath=sse
+
+ASFLAGS ?= --warn
+
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
@@ -45,11 +58,13 @@ LINKERSCRIPT = bootsect.ld
 
 SYMBOLFILE = $(BINDIR)/bootsect-debug.bin
 BOOTSECTORS = $(BINDIR)/bootsect.bin
+BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
 
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
 	$(DUMPDIR)/bootsect.dis $(DUMPDIR)/bootsect.hex
 
-NEEDSMALLEST := bootsect.c malloc.c cpu.c screen.c fat32.c
+NEEDSMALLEST := bootsect.c
+#malloc.c cpu.c screen.c fat32.c
 
 DISKIMAGE ?= $(DISKIMGDIR)/dgos.fat32.raw
 
@@ -75,10 +90,19 @@ cleaner: clean deletedisk
 # Link binaries
 
 $(SYMBOLFILE): $(OBJS) $(LINKERSCRIPT)
-	$(LD) $(LDFLAGS) --oformat elf32-little $(OUTPUT_OPTION) -g $(OBJS) > $(DUMPDIR)/bootsect-debug.map
+	$(LD) $(LDFLAGS) --oformat elf32-little \
+		$(OUTPUT_OPTION) -g $(OBJS) > $(DUMPDIR)/bootsect-debug.map
+		#-L$(LIBGCCDIR) -l$(LIBGCCNAME)
 
 $(BOOTSECTORS): $(OBJS) $(LINKERSCRIPT)
-	$(LD) $(LDFLAGS) --oformat binary $(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/bootsect.map
+	$(LD) $(LDFLAGS) --oformat binary \
+		$(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/bootsect.map
+		#-L$(LIBGCCDIR) -l$(LIBGCCNAME)
+
+#
+# Build kernel
+kernel:
+	(cd ../kernel && $(MAKE))
 
 #
 # Create/delete disk image
@@ -104,11 +128,14 @@ $(DISKIMAGE):
 	# Add 64KB to the end of the file (16777216+128) + 100 hack
 	dd if=/dev/zero of=$(DISKIMAGE) bs=512 count=0 seek=16777414
 
-bootable_disk: $(DISKIMAGE) $(BOOTSECTORS)
+bootable-disk: $(DISKIMAGE) $(BOOTSECTORS)
 	# Inject boot sector (up to 64KB)
 	dd if=$(BOOTSECTORS) of=$(DISKIMAGE) bs=1 count=65536 conv=notrunc
 
-debuggable_disk: bootable_disk $(SYMBOLFILE)
+debuggable-disk: bootable-disk $(SYMBOLFILE)
+
+debuggable-kernel-disk: kernel bootable-disk
+	$(MAKE) inject-kernel
 
 #
 # Debug in KVM
@@ -116,22 +143,38 @@ debuggable_disk: bootable_disk $(SYMBOLFILE)
 $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug: debuggable_disk $(BINDIR)/debug-kvm-gdbcommands
+$(BINDIR)/debug-kernel-kvm-gdbcommands: utils/debug-kernel-kvm-commands.template
+	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+
+debug: all debuggable-disk $(BINDIR)/debug-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kvm-gdbcommands
 
-run: bootable_disk
+debug-kernel: all debuggable-kernel-disk $(BINDIR)/debug-kernel-kvm-gdbcommands
+	gdb -x $(BINDIR)/debug-kernel-kvm-gdbcommands
+
+run-debug: all bootable-disk
+	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw  -no-shutdown -no-reboot -d int,cpu_reset
+
+#,guest_errors,unimp
+
+run: all bootable-disk
 	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw
 
 #
 # Debug in bochs
 
+$(BOCHSSYMBOLS): $(SYMBOLFILE)
+	objdump --syms bin/bootsect-debug.bin | \
+		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_]\S+$$' | \
+		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' > $@
+
 $(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug-bochs: debuggable_disk $(BINDIR)/bochs-config.bxrc
-	bochs -f $(BINDIR)/bochs-config.bxrc
+debug-bochs: all $(BOCHSSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc
+	bochs -f $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-commands
 
-run-bochs: debuggable_disk $(BINDIR)/bochs-config.bxrc
+run-bochs: all debuggable-disk $(BINDIR)/bochs-config.bxrc
 	bochs -qf $(BINDIR)/bochs-config.bxrc -q
 
 #
@@ -148,7 +191,15 @@ umountdisk:
 	sudo umount $(MOUNTDIR)
 	sudo kpartx -d $(DISKIMAGE)
 
-.PHONY: all clean run debug-bochs deletedisk bootable_disk debuggable_disk debug mountdisk umountdisk
+inject-kernel:
+	$(MAKE) mountdisk
+	(cd ../kernel && $(MAKE))
+	cp ../kernel/bin/kernel disk/dgos-kernel
+	$(MAKE) umountdisk
+
+.PHONY: all clean run debug-bochs debug
+.PHONY: deletedisk bootable-disk debuggable-disk mountdisk umountdisk
+.PHONY: kernel debuggable-kernel-disk
 
 .PRECIOUS: $(DISKIMAGE)
 
@@ -167,6 +218,7 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
 # Compile commands for C and C++
 COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
+COMPILE_TO_ASM.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -S
 COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
 COMPILE.s = $(AS) $(ASFLAGS) $(TARGET_ARCH_AS) -c
 
@@ -203,6 +255,11 @@ OUTPUT_OPTION = -o $@
 %.o : %.cpp $(DEPDIR)/%.d
 	$(COMPILE.cc) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
+
+# Compile C to assembly
+$(DUMPDIR)/%.s : %.c
+$(DUMPDIR)/%.s : %.c
+	$(COMPILE_TO_ASM.c) $(OUTPUT_OPTION) $<
 
 # Disassemble
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin

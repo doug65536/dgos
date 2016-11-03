@@ -172,41 +172,80 @@ static void buffer_char(char *buf, char **pptr, char c)
         *(*pptr)++ = c;
 }
 
+#define FLAG_SIGNED 0x01
+#define FLAG_NEG    0x02
+#define FLAG_LONG   0x04
+
+// Very weird, gets wrong results
+//static uint64_t ulonglong_mod(uint64_t a, uint64_t b)
+//{
+//    double da = (double)a;
+//    double db = (double)b;
+//    double dq = da / db;
+//    uint64_t quot = (uint64_t)dq;
+//    return (uint64_t)(da - (db * (double)quot));
+//}
+//
+//static uint64_t ulonglong_div(uint64_t a, uint64_t b)
+//{
+//    double da = (double)a;
+//    double db = (double)b;
+//    double dq = da / db;
+//    uint64_t quot = (uint64_t)dq;
+//    return quot;
+//}
+
+char const hexlookup[] = "0123456789ABCDEF";
+
 void print_line(char const* format, ...)
 {
     va_list ap;
     va_start(ap, format);
 
     char buf[81];
-    char digit[12];
+    char digit[22];
     char *dp;
     char const *s;
     char *out = buf;
     char const *p = format;
     uint32_t base;
-    uint32_t n;
-    uint16_t is_signed;
-    static char const hexlookup[] = "0123456789ABCDEF";
+    uint64_t n;
+    uint8_t flags;
 
     for (p = format; *p; ++p) {
         switch (*p) {
         case '%':
+            flags = 0;
+
             switch (p[1]) {
-            case 'x':
+            case 'l':
+                flags |= FLAG_LONG;
+                ++p;
+                break;
+            }
+
+            switch (p[1]) {
+            case 'x':   // fall through
+            case 'p':
                 base = 16;
-                is_signed = 0;
+                break;
+            case 'o':
+                base = 8;
                 break;
             case 'd':
                 base = 10;
-                is_signed = 1;
+                if (!(flags & FLAG_LONG))
+                    flags |= FLAG_SIGNED;
                 break;
             case 'u':
                 base = 10;
-                is_signed = 0;
                 break;
             case 's':
                 base = 0;
                 break;
+            case '%':
+                buffer_char(buf, &out, p[1]);
+                continue;
             case 0:
                 // Strange % at end of format string
                 // Emit it
@@ -224,27 +263,65 @@ void print_line(char const* format, ...)
             ++p;
 
             if (base) {
-                n = (uint32_t)va_arg(ap, int);
+                // Read correct sized vararg and sign extend if needed
+                if (flags & FLAG_SIGNED) {
+                    if (flags & FLAG_LONG) {
+                        n = (uint64_t)va_arg(ap, int64_t);
+                        if ((int64_t)n < 0)
+                            flags |= FLAG_NEG;
+                    } else {
+                        // Sign extend to 64 bit
+                        n = (uint64_t)(int64_t)va_arg(ap, int32_t);
+                        if ((int32_t)n < 0)
+                            flags |= FLAG_NEG;
+                    }
+                } else {
+                    if (flags & FLAG_LONG) {
+                        n = va_arg(ap, uint64_t);
+                    } else {
+                        n = va_arg(ap, uint32_t);
+                    }
+                }
 
                 // If it is signed and it is negative
                 // then emit '-' and make it positive
-                if (is_signed && (int32_t)n < 0) {
+                if ((flags & FLAG_SIGNED) && (int64_t)n < 0) {
+                    // Emit negative sign
                     buffer_char(buf, &out, '-');
-                    n = (uint32_t)-(int32_t)n;
+
+                    // Get absolute value
+                    n = (uint64_t)-(int64_t)n;
                 }
 
                 // Build null terminated string in digit
-                dp = digit + 12;
+                dp = digit + 22;
                 *--dp = 0;
-                do
-                {
-                    *--dp = hexlookup[n % base];
-                    n /= base;
-                } while (n);
+                // We force all 64 bit values to hex,
+                // because of issues with libgcc
+                // __udivi3 and __umodi3. Why would
+                // you want to print 21 digit long decimal anyway?
+                if (base == 16 || (flags & FLAG_LONG)) {
+                    do
+                    {
+                        *--dp = hexlookup[n & 0x0F];
+                        n >>= 4;
+                    } while (n && dp > digit);
+                } else {
+                    do
+                    {
+                        *--dp = hexlookup[(uint32_t)n % base];
+                        n = (uint32_t)n / base;
+                    } while (n && dp > digit);
+                }
 
                 s = dp;
             } else {
                 s = va_arg(ap, char const*);
+
+                if (!s)
+                    s = "{[(null)]}";
+                else if ((uint32_t)s >= 0x10000)
+                    s = "{[(invalid)]}";
             }
 
             while (*s)
