@@ -42,7 +42,7 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m32
 TARGET_ARCH_AS := --32
 
-CFLAGS ?= -ggdb -O0 -ffreestanding \
+CFLAGS ?= -ggdb -Os -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
 	-falign-functions=1 -falign-labels=1 \
 	-falign-loops=1 -falign-jumps=1 -msse -msse2
