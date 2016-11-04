@@ -60,6 +60,19 @@ $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
 	$(COMPILE.cc) $(OUTPUT_OPTION) $<
 	$(POSTCOMPILE)
 
+ifdef DISASSEMBLEFLAGS
+# Disassemble
+$(DUMPDIR)/%.dis : $(BINDIR)/%.bin
+$(DUMPDIR)/%.dis : $(BINDIR)/%.bin
+	objdump $(DISASSEMBLEFLAGS) $< > $@
+endif
+
+# Hex Dump
+$(DUMPDIR)/%.hex : $(BINDIR)/%.bin
+$(DUMPDIR)/%.hex : $(BINDIR)/%.bin
+	hexdump -C $< > $@
+
+
 # Tolerate the dependency files being missing
 $(DEPDIR)/%.d: ;
 
