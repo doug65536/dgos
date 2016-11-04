@@ -12,6 +12,7 @@ SECTIONS {
 
 	/* Code and read-only data */
 	.text 0x0000400000000000 : {
+		PROVIDE(___text_st = .);
 		*(.text)
 		*(.text.*)
 
@@ -28,6 +29,7 @@ SECTIONS {
 		. = ALIGN(64);
 		*(.rodata)
 		*(.rodata.*)
+		PROVIDE(___text_en = .);
 	} = 0xCC
 
 	/* Initialized data */
@@ -51,8 +53,10 @@ SECTIONS {
 
 	/* Copy on write initialized thread_local */
 	.tdata : ALIGN(4096) {
+		PROVIDE(___tdata_st = .);
 		*(.tdata)
 		. = ALIGN(4096);
+		PROVIDE(___tdata_en = .);
 	}
 
 	/* Zero page pool initialized thread_local */

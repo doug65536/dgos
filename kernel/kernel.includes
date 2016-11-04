@@ -1,1 +1,5 @@
 .
+arch/x86_64
+arch
+lib
+config

@@ -1,4 +1,6 @@
 
+#include "cpu.h"
+
 int life_and_stuff = 42;
 
 char buf[42];
@@ -19,6 +21,8 @@ __attribute__((destructor)) void goin_down()
 
 int main()
 {
+    init_cpu();
+
     short *screen = (short*)0xB8000;
     static char message[] = "In kernel!!!";
     for (int i = 0; message[i]; ++i)
