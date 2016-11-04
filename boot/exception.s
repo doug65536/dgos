@@ -73,7 +73,7 @@ isr_common:
 	movl %eax,%es
 	movl %eax,%fs
 
-	# Pass a pointer to the
+	# Pass a pointer to the interrupt number and error code
 	leaq 13*8(%rsp),%rax
 	push %rax
 	call isr_handler
@@ -103,13 +103,16 @@ isr_common:
 .align 8
 
 msg_exception:
-	.string "Exception="
+	.string "  Exception=0x"
 
 msg_code:
-	.string " Code="
+	.string " Code=0x"
 
 msg_address:
-	.string " Addr="
+	.string " Addr=0x"
+
+msg_CR2:
+	.string " CR2=0x"
 
 isr_handler:
 	movq 8(%rsp),%r10
@@ -125,7 +128,7 @@ isr_handler:
 
 	# Exception number
 	movq 0(%r10),%rsi
-	call hex_out
+	call hex2_out
 
 	# Code=
 	movl $msg_code,%esi
@@ -133,15 +136,26 @@ isr_handler:
 
 	# Error code
 	movq 8(%r10),%rsi
-	call hex_out
+	call hex8_out
 
-	# Code=
+	# Addr=
 	movl $msg_address,%esi
 	call text_out
 
 	# Address
 	movq 16(%r10),%rsi
-	call hex_out
+	call hex16_out
+
+	# Next line
+
+	# CR2=
+	#movl $(0xb8000 + 80*2),%edi
+	movl $msg_CR2,%esi
+	call text_out
+
+	# Page fault address
+	mov %cr2,%rsi
+	call hex16_out
 
 0:
 	hlt
@@ -161,12 +175,28 @@ text_out:
 0:
 	ret
 
+# print 2 digit hex (8 bits), see hex_common
+hex2_out:
+	shl $(64-8),%rsi
+	mov $2,%r8b
+	jmp hex_common
+
+# print 8 digit hex (16 bits), see hex_common
+hex8_out:
+	shl $(64-32),%rsi
+	mov $8,%r8b
+	jmp hex_common
+
+hex16_out:
+	mov $16,%r8b
+
 #  in: %ah=attribute, %rsi=number, %rdi=video memory
+#  in: %r8b number of hex digits
+#      number must be in highest bits of rsi
 # out: %rsi=0, %rdi=advanced output pointer %r9=hexlookup
 #      %al=0
 # clobber: %rdx %r8b
-hex_out:
-	mov $16,%r8b
+hex_common:
 	mov $hexlookup,%r9d
 0:
 	xorq %rdx,%rdx
