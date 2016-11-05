@@ -4,8 +4,46 @@
 #include "string.h"
 #include "bootsect.h"
 #include "rand.h"
+#include "farptr.h"
 
-// Simple allocator
+// Allocate-only (no free) far pointer allocator
+
+// Next free location for aligned far allocations
+// Starts at top of first 64KB
+static uint16_t free_seg_st = 0x1000;
+
+// Aligned top of memory for far allocations
+static uint16_t free_seg_en;
+
+static uint16_t get_top_of_low_memory() {
+    // Read top of memory from BIOS data area
+    return *(uint16_t*)0x40E;
+}
+
+// Allocate from top of memory
+uint16_t far_malloc(uint32_t bytes)
+{
+    if (free_seg_en == 0)
+        free_seg_en = get_top_of_low_memory();
+
+    uint16_t paragraphs = (bytes - 1 + (1 << 4)) >> 4;
+    uint16_t segment = (free_seg_en -= paragraphs);
+    far_zero(far_ptr2(segment, 0), paragraphs);
+
+    return segment;
+}
+
+// Returns segment guaranteed aligned on page boundary
+uint16_t far_malloc_aligned(uint32_t bytes)
+{
+    uint16_t segment = free_seg_st;
+    uint16_t paragraphs = ((bytes - 1 + (1 << 12)) & -4096) >> 4;
+    free_seg_st += paragraphs;
+    far_zero(far_ptr2(segment, 0), paragraphs);
+    return segment;
+}
+
+// Simple heap allocator
 
 // This must be small enough to fit before first header
 // Maximum 13 bytes
@@ -267,6 +305,16 @@ void free(void *p)
     }
 }
 
+void *calloc(uint16_t num, uint16_t size)
+{
+    uint16_t bytes = num * size;
+    void *block = malloc(bytes);
+    memset(block, 0, bytes);
+    return block;
+}
+
+#ifndef NDEBUG
+
 static uint16_t *alloc_random_block()
 {
     uint16_t size = rand_range(8, 512) >> 1;
@@ -318,14 +366,6 @@ static void check_random_block(uint16_t *block)
     }
 }
 
-void *calloc(uint16_t num, uint16_t size)
-{
-    uint16_t bytes = num * size;
-    void *block = malloc(bytes);
-    memset(block, 0, bytes);
-    return block;
-}
-
 #define TEST_SIZE 48
 void test_malloc(void)
 {
@@ -370,3 +410,5 @@ void test_malloc(void)
     //uint16_t chk = malloc_next_header(addr_of(&__heap));
     //print_line("Max block remaining is %x", chk);
 }
+
+#endif

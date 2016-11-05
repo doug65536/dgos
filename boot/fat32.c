@@ -385,7 +385,7 @@ static dir_union_t const *read_directory_current(
         char const* sector)
 {
     if (iter->dir_file.err == 0)
-        return (dir_union_t*)sector + iter->sector_index;
+        return (dir_union_t const*)sector + iter->sector_index;
     return 0;
 }
 

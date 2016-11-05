@@ -1,5 +1,6 @@
 #include "code16gcc.h"
 #include "elf64.h"
+#include "elf64decl.h"
 #include "string.h"
 #include "fat32.h"
 #include "screen.h"
@@ -7,7 +8,7 @@
 #include "paging.h"
 #include "cpu.h"
 #include "bootsect.h"
-#include "elf64decl.h"
+#include "physmem.h"
 
 //static unsigned long elf64_hash(unsigned char const *name)
 //{
@@ -25,7 +26,10 @@ void enter_kernel(uint64_t entry_point);
 
 void enter_kernel(uint64_t entry_point)
 {
-    copy_or_enter(entry_point, 0, 0);
+    uint32_t phys_mem_table =
+            (uint32_t)get_ram_regions() << 4;
+
+    copy_or_enter(entry_point, 0, phys_mem_table);
 }
 
 uint16_t elf64_run(char const *filename)
@@ -89,16 +93,20 @@ uint16_t elf64_run(char const *filename)
     paging_map_range(0xA0000, 0x20000, 0xA0000,
                      PTE_PRESENT | PTE_WRITABLE);
 
+    // Allocate a page of memory to be used to alias high memory
+    uint32_t address_window =
+            (uint32_t)far_malloc_aligned(PAGE_SIZE) << 4;
+
     // For each section
     for (size_t i = 1; !failed && i < file_hdr.e_shnum; ++i) {
         Elf64_Shdr *sec = section_hdrs + i;
 
         print_line("section %d:"
                    " name=%s"
-                   " addr=%lx"
-                   " size=%lx"
-                   " off=%lx"
-                   " flags=%lx"
+                   " addr=%llx"
+                   " size=%llx"
+                   " off=%llx"
+                   " flags=%llx"
                    " type=%x",
                    i,
                    section_names + sec->sh_name,
@@ -159,14 +167,14 @@ uint16_t elf64_run(char const *filename)
             // Alias a range for copying at the top of real mode memory
             // Which maps to the physical memory of the segment
             // because segment might be read only
-            paging_map_range(0x80000, PAGE_SIZE, page_alloc,
+            paging_map_range(address_window, PAGE_SIZE, page_alloc,
                              PTE_PRESENT | PTE_WRITABLE);
 
             page_alloc += PAGE_SIZE;
             addr += PAGE_SIZE;
 
             // Copy to alias region
-            copy_or_enter(0x80000, (uint32_t)read_buffer, read_size);
+            copy_or_enter(address_window, (uint32_t)read_buffer, read_size);
         }
 
         // If we don't read whole section, something went wrong
@@ -180,7 +188,7 @@ uint16_t elf64_run(char const *filename)
 
     print_line("Entering kernel");
 
-    paging_map_range(0x80000, PAGE_SIZE, 0x100000,
+    paging_map_range(address_window, PAGE_SIZE, 0x100000,
                      PTE_PRESENT | PTE_WRITABLE);
 
     if (!failed)

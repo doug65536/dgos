@@ -172,9 +172,9 @@ static void buffer_char(char *buf, char **pptr, char c)
         *(*pptr)++ = c;
 }
 
-#define FLAG_SIGNED 0x01
-#define FLAG_NEG    0x02
-#define FLAG_LONG   0x04
+#define FLAG_SIGNED     0x01
+#define FLAG_NEG        0x02
+#define FLAG_LONGLONG   0x04
 
 // Very weird, gets wrong results
 //static uint64_t ulonglong_mod(uint64_t a, uint64_t b)
@@ -217,11 +217,9 @@ void print_line(char const* format, ...)
         case '%':
             flags = 0;
 
-            switch (p[1]) {
-            case 'l':
-                flags |= FLAG_LONG;
-                ++p;
-                break;
+            if (p[1] == 'l' && p[2] == 'l') {
+                flags |= FLAG_LONGLONG;
+                p += 2;
             }
 
             switch (p[1]) {
@@ -234,7 +232,7 @@ void print_line(char const* format, ...)
                 break;
             case 'd':
                 base = 10;
-                if (!(flags & FLAG_LONG))
+                if (!(flags & FLAG_LONGLONG))
                     flags |= FLAG_SIGNED;
                 break;
             case 'u':
@@ -265,7 +263,7 @@ void print_line(char const* format, ...)
             if (base) {
                 // Read correct sized vararg and sign extend if needed
                 if (flags & FLAG_SIGNED) {
-                    if (flags & FLAG_LONG) {
+                    if (flags & FLAG_LONGLONG) {
                         n = (uint64_t)va_arg(ap, int64_t);
                         if ((int64_t)n < 0)
                             flags |= FLAG_NEG;
@@ -276,7 +274,7 @@ void print_line(char const* format, ...)
                             flags |= FLAG_NEG;
                     }
                 } else {
-                    if (flags & FLAG_LONG) {
+                    if (flags & FLAG_LONGLONG) {
                         n = va_arg(ap, uint64_t);
                     } else {
                         n = va_arg(ap, uint32_t);
@@ -300,7 +298,7 @@ void print_line(char const* format, ...)
                 // because of issues with libgcc
                 // __udivi3 and __umodi3. Why would
                 // you want to print 21 digit long decimal anyway?
-                if (base == 16 || (flags & FLAG_LONG)) {
+                if (base == 16 || (flags & FLAG_LONGLONG)) {
                     do
                     {
                         *--dp = hexlookup[n & 0x0F];

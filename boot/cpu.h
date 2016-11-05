@@ -10,15 +10,6 @@ typedef struct {
     uint8_t base_high;
 } gdt_entry_t;
 
-typedef struct {
-    uint16_t limit_low;
-    uint16_t base_low;
-    uint8_t base_middle;
-    uint8_t access;
-    uint8_t flags_limit_high;
-    uint8_t base_high;
-} gdt_entry_64_t;
-
 #define GDT_MAKE_SEGMENT_DESCRIPTOR(base, \
             limit, \
             present, \

@@ -12,7 +12,7 @@ void *memchr(void const *mem, int ch, size_t count)
 {
     for (char const *p = mem; count--; ++p)
         if (*p == (char)ch)
-            return (void*)p;
+            return (void *)p;
    return 0;
 }
 

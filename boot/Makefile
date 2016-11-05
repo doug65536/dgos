@@ -10,7 +10,9 @@ CSRCS := \
 	utf.c \
 	paging.c \
 	elf64.c \
-	rand.c
+	rand.c \
+	physmem.c \
+	farptr.c
 
 ASRCS := \
 	part.s \
@@ -42,11 +44,30 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m32
 TARGET_ARCH_AS := --32
 
-CFLAGS ?= -ggdb -Os -ffreestanding \
+CFLAGS ?= -ggdb -O0 -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
 	-falign-functions=1 -falign-labels=1 \
-	-falign-loops=1 -falign-jumps=1 -msse -msse2
-	#-mmmx -msse -msse2 -mfpmath=sse
+	-falign-loops=1 -falign-jumps=1 -msse -msse2 -mfpmath=sse
+
+#	-mmmx -msse -msse2 -mfpmath=sse
+
+# Max warnings
+#ridiculous WEVERYTHING  = -Wconversion
+WEVERYTHING += -Wdouble-promotion
+WEVERYTHING += -Wformat=2
+WEVERYTHING += -Wfloat-equal
+WEVERYTHING += -Wundef
+WEVERYTHING += -Wbad-function-cast
+WEVERYTHING += -Wwrite-strings
+WEVERYTHING += -Wmissing-prototypes
+WEVERYTHING += -Wredundant-decls
+WEVERYTHING += -Wunsuffixed-float-constants
+WEVERYTHING += -fstrict-aliasing
+
+CFLAGS += $(WEVERYTHING)
+
+# Optimize
+CFLAGS += -O0 -DNDEBUG
 
 ASFLAGS ?= --warn
 
@@ -63,8 +84,14 @@ BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
 	$(DUMPDIR)/bootsect.dis $(DUMPDIR)/bootsect.hex
 
-NEEDSMALLEST := bootsect.c
-#malloc.c cpu.c screen.c fat32.c
+NEEDSMALLEST := bootsect.c malloc.c cpu.c screen.c fat32.c \
+	string.c \
+	utf.c \
+	elf64.c \
+	rand.c
+	#physmem.c \
+	farptr.c # paging.c
+
 
 DISKIMAGE ?= $(DISKIMGDIR)/dgos.fat32.raw
 
@@ -153,12 +180,12 @@ debug-kernel: all debuggable-kernel-disk $(BINDIR)/debug-kernel-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kernel-kvm-gdbcommands
 
 run-debug: all bootable-disk
-	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw  -no-shutdown -no-reboot -d int,cpu_reset
+	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw -no-shutdown -no-reboot -d int,cpu_reset
 
 #,guest_errors,unimp
 
 run: all bootable-disk
-	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw
+	qemu-system-x86_64 -m 8G -drive file=$(DISKIMAGE),format=raw
 
 #
 # Debug in bochs

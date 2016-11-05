@@ -34,3 +34,7 @@ elf64decl.h
 exception.s
 exception.h
 utils/bochs-debugger-commands
+physmem.c
+physmem.h
+farptr.h
+farptr.c
