@@ -44,7 +44,7 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m32
 TARGET_ARCH_AS := --32
 
-CFLAGS ?= -ggdb -O0 -ffreestanding \
+CFLAGS ?= -ggdb -Os -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
 	-falign-functions=1 -falign-labels=1 \
 	-falign-loops=1 -falign-jumps=1 -msse -msse2 -mfpmath=sse
@@ -84,13 +84,7 @@ BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
 	$(DUMPDIR)/bootsect.dis $(DUMPDIR)/bootsect.hex
 
-NEEDSMALLEST := bootsect.c malloc.c cpu.c screen.c fat32.c \
-	string.c \
-	utf.c \
-	elf64.c \
-	rand.c
-	#physmem.c \
-	farptr.c # paging.c
+NEEDSMALLEST := bootsect.c
 
 
 DISKIMAGE ?= $(DISKIMGDIR)/dgos.fat32.raw

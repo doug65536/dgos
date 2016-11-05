@@ -28,11 +28,13 @@ static uint64_t read_pte(uint16_t segment, uint16_t slot)
 {
     uint64_t pte;
     __asm__ __volatile__ (
-        "movw %1,%%fs\n\t"
-        "movl %%fs:(,%2,8),%%eax\n\t"
-        "movl %%fs:4(,%2,8),%%edx\n\t"
-        : "=A" (pte)
-        : "r" (segment), "r" ((uint32_t)slot)
+        "shl $3,%w[slot]\n\t"
+        "movw %[seg],%%fs\n\t"
+        "movl %%fs:(%w[slot]),%%eax\n\t"
+        "movl %%fs:4(%w[slot]),%%edx\n\t"
+        : "=A" (pte),
+          [slot] "+bSD" (slot)
+        : [seg] "r" (segment)
         : "memory"
     );
     return pte;
@@ -42,11 +44,12 @@ static uint64_t read_pte(uint16_t segment, uint16_t slot)
 static void write_pte(uint16_t segment, uint16_t slot, uint64_t pte)
 {
     __asm__ __volatile__ (
-        "mov %1,%%fs\n\t"
-        "mov %%eax,%%fs:(,%2,8)\n\t"
-        "mov %%edx,%%fs:4(,%2,8)\n\t"
-        :
-        : "A" (pte), "r" (segment), "r" ((uint32_t)slot)
+        "shl $3,%w[slot]\n\t"
+        "mov %[seg],%%fs\n\t"
+        "mov %%eax,%%fs:(%w[slot])\n\t"
+        "mov %%edx,%%fs:4(%w[slot])\n\t"
+        : [slot] "+bSD" (slot)
+        : "A" (pte), [seg] "r" (segment)
         : "memory"
     );
 }
