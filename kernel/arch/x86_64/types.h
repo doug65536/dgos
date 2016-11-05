@@ -19,4 +19,14 @@ typedef int64_t intptr_t;
 
 typedef int64_t off_t;
 
+typedef int wint_t;
+
+typedef int64_t ptrdiff_t;
+typedef uint64_t uptrdiff_t;
+
+typedef int64_t intmax_t;
+typedef uint64_t uintmax_t;
+
+typedef int wchar_t;
+
 #endif

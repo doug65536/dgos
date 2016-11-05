@@ -27,6 +27,8 @@
 #define MAP_NONBLOCK
 
 /// Ignored. Hint that pages will be used as stacks
+/// Just in case platform needs to use special memory
+/// area for stacks
 #define MAP_STACK
 
 /// Map at specified address, otherwise, just fail

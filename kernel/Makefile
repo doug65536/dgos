@@ -30,9 +30,23 @@ INCS := arch arch/$(ARCH) lib
 INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
 
+# Max warnings
+WEVERYTHING  = -Wconversion
+WEVERYTHING += -Wdouble-promotion
+WEVERYTHING += -Wformat=2
+WEVERYTHING += -Wfloat-equal
+WEVERYTHING += -Wundef
+WEVERYTHING += -Wbad-function-cast
+WEVERYTHING += -Wcast-qual
+WEVERYTHING += -Wwrite-strings
+WEVERYTHING += -Wmissing-prototypes
+WEVERYTHING += -Wredundant-decls
+WEVERYTHING += -Wunsuffixed-float-constants
+
 CFLAGS ?= -g3 -O0 -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror \
-	-Wno-unused-function -fpic -mno-red-zone
+	-Wno-unused-function -fpic -mno-red-zone \
+	$(WEVERYTHING)
 
 CFLAGS += $(INCLUDEARGS)
 
