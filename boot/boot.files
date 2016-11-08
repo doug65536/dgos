@@ -1,6 +1,8 @@
 utils/bochs-config.bxrc.template
 utils/debug-kvm-commands.template
 utils/debug-kernel-kvm-commands.template
+utils/bochs-debugger-commands
+utils/bochs-debugger-boot-commands
 bootsect.c
 bootsect.h
 bootsect.ld
@@ -33,7 +35,6 @@ dump/bootsect.hex
 elf64decl.h
 exception.s
 exception.h
-utils/bochs-debugger-commands
 physmem.c
 physmem.h
 farptr.h

@@ -3,7 +3,7 @@
 
 symbol-file $SYMBOLFILE
 set architecture i386:x86-64
-target remote | exec qemu-system-x86_64 -S -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
+target remote | exec qemu-system-x86_64 -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
 #-d int,cpu_reset
 shell wmctrl -a kernel/boot
 layout src
@@ -13,7 +13,7 @@ define remake
 	make debuggable_disk
 	refresh
 	set architecture i386:x86-64
-	target remote | exec qemu-system-x86_64 -S -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
+	target remote | exec qemu-system-x86_64 -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
 	#-d int,cpu_reset
 	shell wmctrl -a kernel/boot
 end
@@ -49,3 +49,5 @@ define code64
 	set architecture i386:x86-64
 	refresh
 end
+
+b main

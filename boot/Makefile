@@ -52,7 +52,7 @@ CFLAGS ?= -ggdb -Os -ffreestanding \
 #	-mmmx -msse -msse2 -mfpmath=sse
 
 # Max warnings
-#ridiculous WEVERYTHING  = -Wconversion
+#too many false positives WEVERYTHING  = -Wconversion
 WEVERYTHING += -Wdouble-promotion
 WEVERYTHING += -Wformat=2
 WEVERYTHING += -Wfloat-equal
@@ -78,8 +78,11 @@ endif
 LINKERSCRIPT = bootsect.ld
 
 SYMBOLFILE = $(BINDIR)/bootsect-debug.bin
+KERNELSYMBOLFILE = $(BINDIR)/../../kernel/bin/kernel
 BOOTSECTORS = $(BINDIR)/bootsect.bin
 BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
+BOCHSKERNELSYMBOLS = $(BINDIR)/bochs-kernel-symbols
+BOCHSCOMBINEDSYMBOLS = $(BINDIR)/bochs-combined-symbols
 
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
 	$(DUMPDIR)/bootsect.dis $(DUMPDIR)/bootsect.hex
@@ -165,7 +168,7 @@ $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
 $(BINDIR)/debug-kernel-kvm-gdbcommands: utils/debug-kernel-kvm-commands.template
-	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+	sed "s|\$$SYMBOLFILE|$(KERNELSYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
 debug: all debuggable-disk $(BINDIR)/debug-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kvm-gdbcommands
@@ -174,7 +177,7 @@ debug-kernel: all debuggable-kernel-disk $(BINDIR)/debug-kernel-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kernel-kvm-gdbcommands
 
 run-debug: all bootable-disk
-	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw -no-shutdown -no-reboot -d int,cpu_reset
+	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw -no-shutdown -no-reboot -d int,cpu_reset -s
 
 #,guest_errors,unimp
 
@@ -184,16 +187,28 @@ run: all bootable-disk
 #
 # Debug in bochs
 
+# This works poorly because bochs truncates symbols to 32 bits
+$(BOCHSCOMBINEDSYMBOLS): $(BOCHSKERNELSYMBOLS) $(BOCHSSYMBOLS)
+	cat $^ > $@
+
+$(BOCHSKERNELSYMBOLS): kernel
+	objdump --syms ../kernel/bin/kernel | \
+		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
+		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' > $@
+
 $(BOCHSSYMBOLS): $(SYMBOLFILE)
-	objdump --syms bin/bootsect-debug.bin | \
-		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_]\S+$$' | \
+	objdump --syms $^ | \
+		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' > $@
 
 $(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug-bochs: all $(BOCHSSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc
+debug-bochs: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc
 	bochs -f $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-commands
+
+debug-bochs-boot: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc
+	bochs -f $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-boot-commands
 
 run-bochs: all debuggable-disk $(BINDIR)/bochs-config.bxrc
 	bochs -qf $(BINDIR)/bochs-config.bxrc -q
@@ -212,7 +227,7 @@ umountdisk:
 	sudo umount $(MOUNTDIR)
 	sudo kpartx -d $(DISKIMAGE)
 
-inject-kernel:
+inject-kernel: all
 	$(MAKE) mountdisk
 	(cd ../kernel && $(MAKE))
 	cp ../kernel/bin/kernel disk/dgos-kernel

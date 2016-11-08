@@ -10,7 +10,7 @@ include config/$(CONFIG).mk
 CSRCS := \
 	main.c
 
-ASRCS := entry.s
+ASRCS :=
 
 BINDIR := bin
 DUMPDIR := dump
@@ -31,26 +31,39 @@ INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
 
 # Max warnings
-WEVERYTHING  = -Wconversion
+WEVERYTHING := -Wall
+WEVERYTHING += -Wextra
+WEVERYTHING += -Wpedantic
+WEVERYTHING += -Werror
+#too many false positives WEVERYTHING  = -Wconversion
 WEVERYTHING += -Wdouble-promotion
 WEVERYTHING += -Wformat=2
 WEVERYTHING += -Wfloat-equal
 WEVERYTHING += -Wundef
 WEVERYTHING += -Wbad-function-cast
-WEVERYTHING += -Wcast-qual
+#overkill WEVERYTHING += -Wcast-qual
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
 WEVERYTHING += -Wunsuffixed-float-constants
 
-CFLAGS ?= -g3 -O0 -ffreestanding \
-	-Wall -Wextra -Wpedantic -Werror \
+# Strict overflow is noise
+WEVERYTHING += -Wno-strict-overflow
+
+ifndef TLS_MODEL
+TLS_MODEL := global-dynamic
+endif
+
+CFLAGS ?= -g3 -O2 -ffreestanding \
 	-Wno-unused-function -fpic -mno-red-zone \
+	-ftls-model=$(TLS_MODEL) \
 	$(WEVERYTHING)
 
 CFLAGS += $(INCLUDEARGS)
 
 export CFLAGS
+
+ASFLAGS ?= --warn
 
 #-mcmodel=large
 

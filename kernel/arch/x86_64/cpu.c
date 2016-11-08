@@ -6,7 +6,7 @@
 int init_cpu(void)
 {
     init_gdt();
-    init_mmu();
+    mmu_init();
 
     return 0;
 }

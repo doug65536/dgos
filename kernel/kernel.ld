@@ -13,6 +13,9 @@ SECTIONS {
 	/* Code and read-only data */
 	.text 0x0000400000000000 : {
 		PROVIDE(___text_st = .);
+		*(.entry)
+
+		. = ALIGN(64);
 		*(.text)
 		*(.text.*)
 
@@ -20,8 +23,13 @@ SECTIONS {
 		*(.text.unlikely)
 
 		. = ALIGN(64);
+		___init_st = .;
 		*(.init_array)
+		___init_en = .;
+
+		___fini_st = .;
 		*(.fini_array)
+		___fini_en = .;
 
 		. = ALIGN(64);
 		*(.eh_frame)
@@ -36,6 +44,17 @@ SECTIONS {
 	.data  : ALIGN(4096) {
 		*(.data)
 		*(.data.*)
+
+		/* Statically allocate room for the main */
+		/* kernel thread TLS */
+		. = ALIGN(16);
+		___main_tls_bottom = .;
+		. += ___tbss_en - ___tdata_st /*SIZEOF(.tdata) + SIZEOF(.tbss)*/;
+		___main_teb = .;
+		/* 8 is sizeof thread_env_t! */
+		QUAD(___main_teb);
+		___main_teb_end = .;
+		. = ALIGN(16);
 	} = 0x00
 
 	/* Zero page pool initialized */
@@ -51,19 +70,22 @@ SECTIONS {
 		*(.got.plt)
 	}
 
+	. = ALIGN(4096);
+
 	/* Copy on write initialized thread_local */
-	.tdata : ALIGN(4096) {
-		PROVIDE(___tdata_st = .);
+	.tdata : {
+		___tdata_st = .;
 		*(.tdata)
-		. = ALIGN(4096);
-		PROVIDE(___tdata_en = .);
+		. = ALIGN(16);
+		___tdata_en = .;
 	}
 
 	/* Zero page pool initialized thread_local */
 	.tbss : {
-		PROVIDE(___tbss_st = .);
+		___tbss_st = .;
 		*(.tbss)
-		PROVIDE(___tbss_en = .);
+		. = ALIGN(16);
+		___tbss_en = .;
 	}
 
 	.debug 0 : {

@@ -1,13 +1,8 @@
 #include "printk.h"
 #include "types.h"
+#include "halt.h"
 
-void printk(const char *format, ...)
-{
-    va_list ap;
-    va_start(ap, format);
-    vprintk(format, ap);
-    va_end(ap);
-}
+#include "conio.h"
 
 typedef enum {
     length_none,
@@ -47,10 +42,13 @@ typedef struct {
     unsigned int leading_zero : 1;
     unsigned int hash : 1;
     unsigned int upper : 1;
+    unsigned int negative : 1;
 
     int min_width;
     int precision;
     int base;
+    int excess_leading_pad;
+    char pad;
 
     length_mod_t length;
     arg_type_t arg_type;
@@ -74,7 +72,8 @@ static char const *parse_int(char const *p, int *result)
     while (*p >= '0' && *p <= '9')
         n = n * 10 + (*p++ - '0');
 
-    *result = n * sign;
+    if (result)
+        *result = n * sign;
 
     return p;
 }
@@ -85,14 +84,17 @@ static char const *parse_int(char const *p, int *result)
 #define RETURN_FORMATTER_ERROR(chars_written) return (-1)
 #endif
 
+static char const formatter_hexlookup[] = "0123456789ABCDEF";
+
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
 static int formatter(const char *format, va_list ap,
-              int (*emit_chars)(char *, int))
+              int (*emit_chars)(char const *, int))
 {
     formatter_flags_t flags;
     int chars_written = 0;
     int *output_arg;
+    char digits[32], *digit_out;
 
     for (char const *fp = format; *fp; ++fp) {
         char ch = *fp;
@@ -136,18 +138,24 @@ static int formatter(const char *format, va_list ap,
             } else if (ch >= '0' && ch <= '9') {
                 // Parse numeric field width
                 fp = parse_int(fp, &flags.min_width);
+                // Leading 0 on width specifies 0 padding
+                if (ch == '0')
+                    flags.precision = flags.min_width;
             }
 
             if (ch == '.') {
                 ch = *++fp;
 
-                if (ch == '*') {
+                if (flags.precision == 0 && ch == '*') {
                     // Get precision from arguments
                     flags.precision = va_arg(ap, int);
                 } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
                     // Parse numeric precision
                     // Negative values are ignored
-                    fp = parse_int(fp, &flags.precision);
+                    fp = parse_int(fp,
+                                   flags.precision
+                                   ? 0
+                                   : &flags.precision);
                 }
             }
 
@@ -347,14 +355,177 @@ static int formatter(const char *format, va_list ap,
                 }
                 break;
             }
+
+            //
+            // Convert digits to text then change them to strings
+            // to handle padding later
+
+            switch (flags.arg_type) {
+            default:
+                break;
+
+            case arg_type_none:
+                // Nothing to do!
+                continue;
+
+            case arg_type_intptr_value:
+                if (flags.arg.intptr_value < 0) {
+                    flags.negative = 1;
+                    flags.arg.intptr_value = -flags.arg.intptr_value;
+                }
+                flags.arg.uintptr_value = (uintptr_t)flags.arg.intptr_value;
+                // fall through
+            case arg_type_uintptr_value:
+                digit_out = digits + sizeof(digits);
+                do {
+                    *--digit_out = formatter_hexlookup[
+                            flags.arg.intptr_value % flags.base];
+                    flags.arg.intptr_value /= flags.base;
+                } while (flags.arg.intptr_value &&
+                         digit_out > digits &&
+                         digit_out > digits +
+                         sizeof(digits) - flags.precision);
+
+                // Pad with zeros until minimum length reached
+                while (digit_out > digits &&
+                       digit_out > digits + sizeof(digits) - flags.min_width)
+                    *--digit_out = '0';
+
+                // If they specified a ridiculous number of leading zeros
+                if (flags.precision > (int)sizeof(digits) - 1) {
+                    flags.excess_leading_pad = flags.precision -
+                            (int)sizeof(digits) - 1;
+                    flags.excess_leading_pad = '0';
+                }
+
+                // Emit negative sign now if there's room
+                if (flags.excess_leading_pad == 0 &&
+                        flags.negative &&
+                        digit_out > digits) {
+                    *--digit_out = '-';
+                    flags.negative = 0;
+                }
+
+                // Now treat as string
+                // Don't forget to emit negative and leading zeros later
+                flags.arg_type = arg_type_char_ptr;
+                flags.arg.char_ptr_value = digit_out;
+
+                break;
+
+            }
+
+            if (flags.pad == 0)
+                flags.pad = ' ';
+
+            if (flags.excess_leading_pad != 0) {
+                if (flags.negative) {
+                    flags.negative = 0;
+                    chars_written += emit_chars(0, '-');
+                }
+
+                for (int i = 0; i < flags.excess_leading_pad; ++i)
+                    chars_written += emit_chars(0, flags.pad);
+            }
+
+            //
+            // Now print stuff...
+
+            switch (flags.arg_type) {
+            default:
+                // Nothing to do!
+                continue;
+
+            case arg_type_char_ptr:
+                chars_written += emit_chars(flags.arg.char_ptr_value, 0);
+                break;
+
+            case arg_type_wchar_ptr:
+                // FIXME
+                for (size_t i = 0; flags.arg.char_ptr_value[i]; ++i)
+                    if (flags.arg.wchar_buf[i] <= 0xFF)
+                        chars_written += emit_chars(0, flags.arg.char_ptr_value[i]);
+                break;
+
+            case arg_type_char_buf:
+                chars_written += emit_chars(0, flags.arg.char_buf[0]);
+                break;
+
+            case arg_type_wchar_buf:
+                // FIXME:
+                if (flags.arg.wchar_buf[0] > 0xFF)
+                    chars_written += emit_chars(0, '?');
+                else
+                    chars_written += emit_chars(0, flags.arg.wchar_buf[0]);
+                break;
+
+            }
+
             break;
 
         default:
-            emit_chars(0, ch);
+            chars_written += emit_chars(0, ch);
             break;
 
         }
     }
 
     return chars_written;
+}
+
+int cprintf(char const *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    int result = vcprintf(format, ap);
+    va_end(ap);
+    return result;
+}
+
+static int vcprintf_emit_chars(char const *s, int c)
+{
+    if (console_display) {
+        if (s) {
+            return console_display_vtbl.print(
+                        console_display, s);
+        } else if (c) {
+            console_display_vtbl.putc(
+                        console_display, c);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int vcprintf(char const *format, va_list ap)
+{
+    return formatter(format, ap, vcprintf_emit_chars);
+}
+
+void printk(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vprintk(format, ap);
+    va_end(ap);
+}
+
+void vprintk(char const *format, va_list ap)
+{
+    vcprintf(format, ap);
+}
+
+void panic(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vpanic(format, ap);
+    va_end(ap);
+}
+
+void vpanic(char const *format, va_list ap)
+{
+    printk("KERNEL PANIC! ");
+    vprintk(format, ap);
+    halt_forever();
 }

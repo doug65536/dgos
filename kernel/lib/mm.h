@@ -7,53 +7,59 @@
 ///
 /// mmap __prot
 
-#define PROT_READ 0x01
-#define PROT_WRITE 0x02
-#define PROT_EXEC 0x04
+#define PROT_READ           0x01
+#define PROT_WRITE          0x02
+#define PROT_EXEC           0x04
 
 ///
 /// mmap __flags
 
-/// Map below 2GB
-#define MAP_32BIT
+/// Map at specified address, otherwise, just fail
+#define MAP_FIXED           0x00000001
 
-/// Not file backed
-#define MAP_ANONYMOUS
-
-/// Ignored. Redundant.
-#define MAP_DENYWRITE
-#define MAP_EXECUTABLE
-#define MAP_FILE
-#define MAP_NONBLOCK
+/// Lock the mapped region in memory
+#define MAP_LOCKED          0x00000002
 
 /// Ignored. Hint that pages will be used as stacks
 /// Just in case platform needs to use special memory
 /// area for stacks
-#define MAP_STACK
-
-/// Map at specified address, otherwise, just fail
-#define MAP_FIXED
+#define MAP_STACK           0x00000004
 
 /// Mapping grows downward in memory
-#define MAP_GROWSDOWN
+#define MAP_GROWSDOWN       0x00000008
 
 /// Use huge pages
-#define MAP_HUGETLB
-
-/// Lock the mapped region in memory
-#define MAP_LOCKED
+#define MAP_HUGETLB         0x00000010
 
 /// Don't commit swap space for uncommitted pages,
 /// just SIGSEGV if an uncommitted page is touched
 /// when there is insufficient space
-#define MAP_NORESERVE
+#define MAP_NORESERVE       0x00000020
 
 /// Don't do demand paging, actually commit pages up front
 /// Hint file mappings to read ahead
-#define MAP_POPULATE
+#define MAP_POPULATE        0x00000040
 
 /// If allowed, skip clearing the pages to zero
-#define MAP_UNINITIALIZED
+#define MAP_UNINITIALIZED   0x00000080
+
+/// Map below 2GB
+#define MAP_32BIT           0x00000100
+
+/// Not file backed
+#define MAP_ANONYMOUS       0x00000200
+
+/// Kernel only: Disable caching
+#define MAP_NOCACHE         0x40000000
+
+/// Kernel only: The provided address is a physical address
+#define MAP_PHYSICAL        0x80000000
+
+/// Ignored. Redundant.
+#define MAP_DENYWRITE       0
+#define MAP_EXECUTABLE      0
+#define MAP_FILE            0
+#define MAP_NONBLOCK        0
 
 /// Map a range of address space
 /// __addr, hint, map memory as near as possible to that address,
@@ -105,58 +111,58 @@ void *mremap(
 int mprotect(void *__addr, size_t __len, int __prot);
 
 /// Advise normal behavior
-#define MADV_NORMAL
-
-/// Advise that read-ahead probably won't help
-#define MADV_RANDOM
+#define MADV_NORMAL         0
 
 /// Advise that read-ahead is probably useful
-#define MADV_SEQUENTIAL
+#define MADV_SEQUENTIAL     1
+
+/// Advise that read-ahead probably won't help
+#define MADV_RANDOM         101
 
 /// Advise that this range is going to be needed soon
-#define MADV_WILLNEED
+#define MADV_WILLNEED       2
 
 /// Advise that this region can be discarded, and replaced
 /// with zero pages or reread from the backing file if it
 /// is touched again
-#define MADV_DONTNEED
+#define MADV_DONTNEED       102
 
 /// Advise that this region can be discarded and deleted
 /// from the backing file
-#define MADV_REMOVE (since Linux 2.6.16)
-
-/// Advise that this region should not be cloned when forking
-#define MADV_DONTFORK (since Linux 2.6.16)
+#define MADV_REMOVE         7
 
 /// Advise that this region should be cloned when forking
-#define MADV_DOFORK (since Linux 2.6.16)
+#define MADV_DOFORK         3
+
+/// Advise that this region should not be cloned when forking
+#define MADV_DONTFORK       103
 
 /// Advise that there is something wrong with the RAM in this region
-#define MADV_HWPOISON (since Linux 2.6.32)
+#define MADV_HWPOISON       8
 
 /// Advise that we should pretend that there is something wrong with
 /// the RAM in this region
-#define MADV_SOFT_OFFLINE (since Linux 2.6.33)
+#define MADV_SOFT_OFFLINE   108
 
 /// Advise that this page should be considered in background page
 /// deduplication
-#define MADV_MERGEABLE (since Linux 2.6.32)
+#define MADV_MERGEABLE      4
 
 /// Advise that this page should not be considered in background page
 /// deduplication
-#define MADV_UNMERGEABLE (since Linux 2.6.32)
+#define MADV_UNMERGEABLE    104
 
 /// Advise that this region is a good candidate for huge pages
-#define MADV_HUGEPAGE (since Linux 2.6.38)
+#define MADV_HUGEPAGE       5
 
 /// Advise that this region is not a good candidate for huge pages
-#define MADV_NOHUGEPAGE (since Linux 2.6.38)
-
-/// Advise that this region is probably not useful in core dumps
-#define MADV_DONTDUMP (since Linux 3.4)
+#define MADV_NOHUGEPAGE     105
 
 // Advise that this region is probably useful in core dumps
-#define MADV_DODUMP (since Linux 3.4)
+#define MADV_DODUMP         6
+
+/// Advise that this region is probably not useful in core dumps
+#define MADV_DONTDUMP       106
 
 /// Set hints about a range of address space
 /// __addr, address, start of range

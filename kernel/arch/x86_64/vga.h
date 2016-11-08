@@ -1,1 +1,1 @@
-void init_vga(void);
+// Auto registered by constructor

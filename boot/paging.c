@@ -21,6 +21,12 @@
 // with helper functions that load segment registers
 // The fs segment is used and is not preserved
 
+// Structure to hold the segment and slot for the PTE for a given address
+typedef struct pte_ref_t {
+    uint16_t segment;
+    uint16_t slot;
+} pte_ref_t;
+
 static uint16_t root_page_dir;
 
 // Read a 64-bit entry from the specified slot of the specified segment
@@ -67,13 +73,12 @@ static uint16_t allocate_page_table()
     return segment;
 }
 
-static void paging_map_page(
-        uint64_t linear_addr,
-        uint64_t phys_addr,
-        uint64_t pte_flags)
+// Returns with segment == 0 if it does mapping does not exist
+static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create)
 {
-    uint16_t segment = root_page_dir;
-    uint16_t slot;
+    pte_ref_t ref;
+    ref.segment = root_page_dir;
+
     uint64_t pte;
 
     // Process the address bits from high to low
@@ -81,18 +86,23 @@ static void paging_map_page(
 
     for (uint8_t shift = 39; ; shift -= 9) {
         // Extract 9 bits of the linear address
-        slot = (uint16_t)(linear_addr >> shift) & 0x1FF;
-
-        // Read page table entry
-        pte = read_pte(segment, slot);
+        ref.slot = (uint16_t)(linear_addr >> shift) & 0x1FF;
 
         // If we are in the last level page table, then done
         if (shift == 12)
             break;
 
+        // Read page table entry
+        pte = read_pte(ref.segment, ref.slot);
+
         uint16_t next_segment = (uint16_t)(pte >> 4) & 0xFF00;
 
         if (next_segment == 0) {
+            if (!create) {
+                ref.segment = 0;
+                break;
+            }
+
             print_line("Creating page directory for %llx",
                        (uint64_t)(linear_addr >> shift) << shift);
 
@@ -101,30 +111,85 @@ static void paging_map_page(
 
             pte = (uint64_t)next_segment << 4;
             pte |= PTE_PRESENT | PTE_WRITABLE;
-            write_pte(segment, slot, pte);
+            write_pte(ref.segment, ref.slot, pte);
         }
 
-        segment = next_segment;
+        ref.segment = next_segment;
     }
+
+    return ref;
+}
+
+// If keep is != 0 and the page had a mapping, return 0
+// Otherwise, return 1
+static uint16_t paging_map_page(
+        uint64_t linear_addr,
+        uint64_t phys_addr,
+        uint64_t pte_flags,
+        uint16_t keep)
+{
+    pte_ref_t ref = paging_find_pte(linear_addr, 1);
+
+    // Read page table entry
+    uint64_t pte = read_pte(ref.segment, ref.slot);
+
+    // If keep flag is set, avoid overwriting mapping
+    if (keep && (pte & PTE_ADDR))
+        return 0;
 
     print_line("mapping %llx to physaddr %llx pageseg=%x slot=%x",
                linear_addr, phys_addr,
-               segment, slot);
+               ref.segment, ref.slot);
 
-    write_pte(segment, slot, phys_addr | pte_flags);
+    write_pte(ref.segment, ref.slot, phys_addr | pte_flags);
+
+    return 1;
 }
 
-void paging_map_range(
+void paging_alias_range(uint64_t alias_addr,
+                        uint64_t linear_addr,
+                        uint64_t size,
+                        uint64_t alias_flags)
+{
+    for (uint64_t offset = 0; offset < size; offset += PAGE_SIZE) {
+        pte_ref_t original = paging_find_pte(linear_addr, 0);
+        pte_ref_t alias_ref = paging_find_pte(alias_addr, 1);
+
+        uint64_t pte;
+
+        if (original.segment != 0) {
+            pte = read_pte(original.segment, original.slot);
+
+            write_pte(alias_ref.segment, alias_ref.slot,
+                      (pte & PTE_ADDR) | alias_flags);
+        } else {
+            write_pte(alias_ref.segment, alias_ref.slot,
+                      alias_flags & ~(PTE_PRESENT | PTE_ADDR));
+        }
+    }
+}
+
+// If keep is 1, then only advance phys_addr when a new
+// page was assigned, otherwise
+uint64_t paging_map_range(
         uint64_t linear_base,
         uint64_t length,
         uint64_t phys_addr,
-        uint64_t pte_flags)
+        uint64_t pte_flags,
+        uint16_t keep)
 {
-    for (uint64_t offset = 0; offset < length; offset += 0x1000) {
-        paging_map_page(linear_base + offset,
-                        phys_addr + offset,
-                        pte_flags);
+    uint64_t allocated = 0;
+    for (uint64_t offset = 0; offset < length; offset += PAGE_SIZE) {
+        if (paging_map_page(linear_base + offset,
+                            phys_addr,
+                            pte_flags,
+                            keep))
+        {
+            ++allocated;
+            phys_addr += PAGE_SIZE;
+        }
     }
+    return allocated;
 }
 
 uint32_t paging_root_addr(void)
@@ -142,5 +207,6 @@ void paging_init(void)
     clear_page_table(root_page_dir);
 
     // Identity map first 64KB
-    paging_map_range(0, 0x10000, 0, PTE_PRESENT | PTE_WRITABLE);
+    paging_map_range(0, 0x10000, 0,
+                     PTE_PRESENT | PTE_WRITABLE, 0);
 }

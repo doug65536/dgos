@@ -2,6 +2,10 @@
 
 LIBNAME := kernel
 CSRCS := mm.c \
-	printk.c
+	tls.c \
+	printk.c \
+	dev_text.c \
+	conio.c \
+	string.c
 
 include $(BUILDROOT)/library.mk

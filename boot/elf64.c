@@ -91,11 +91,13 @@ uint16_t elf64_run(char const *filename)
 
     // Map the screen for debugging convenience
     paging_map_range(0xA0000, 0x20000, 0xA0000,
-                     PTE_PRESENT | PTE_WRITABLE);
+                     PTE_PRESENT | PTE_WRITABLE |
+                     PTE_PCD | PTE_PWT, 0);
 
     // Allocate a page of memory to be used to alias high memory
+    // Map two pages to simplify copies that are not page aligned
     uint32_t address_window =
-            (uint32_t)far_malloc_aligned(PAGE_SIZE) << 4;
+            (uint32_t)far_malloc_aligned(PAGE_SIZE << 1) << 4;
 
     // For each section
     for (size_t i = 1; !failed && i < file_hdr.e_shnum; ++i) {
@@ -162,19 +164,21 @@ uint16_t elf64_run(char const *filename)
             }
 
             // Map pages
-            paging_map_range(addr, PAGE_SIZE, page_alloc, page_flags);
+            // If it is not page aligned, map two pages
+            page_alloc += paging_map_range(
+                        addr, PAGE_SIZE + (addr & (PAGE_SIZE-1)),
+                        page_alloc,
+                        page_flags, 1) << PAGE_SIZE_BIT;
 
-            // Alias a range for copying at the top of real mode memory
-            // Which maps to the physical memory of the segment
-            // because segment might be read only
-            paging_map_range(address_window, PAGE_SIZE, page_alloc,
-                             PTE_PRESENT | PTE_WRITABLE);
+            paging_alias_range(address_window, addr, PAGE_SIZE,
+                               PTE_PRESENT | PTE_WRITABLE);
 
-            page_alloc += PAGE_SIZE;
             addr += PAGE_SIZE;
 
             // Copy to alias region
-            copy_or_enter(address_window, (uint32_t)read_buffer, read_size);
+            // Add misalignment offset
+            copy_or_enter(address_window + (addr & (PAGE_SIZE-1)),
+                          (uint32_t)read_buffer, read_size);
         }
 
         // If we don't read whole section, something went wrong
@@ -187,9 +191,6 @@ uint16_t elf64_run(char const *filename)
     free(section_hdrs);
 
     print_line("Entering kernel");
-
-    paging_map_range(address_window, PAGE_SIZE, 0x100000,
-                     PTE_PRESENT | PTE_WRITABLE);
 
     if (!failed)
         enter_kernel(file_hdr.e_entry);
