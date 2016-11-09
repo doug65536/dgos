@@ -2,11 +2,23 @@
 
 .globl entry
 entry:
+	jmp 1f
+	# Debugger hack
+	mov $0,%rbp
+	0:
+	test %rbp,%rbp
+	pause
+	jz 0b
+	1:
+
 	# Store the physical memory map address
 	# passed in from bootloader
 	mov %rcx,phys_mem_map(%rip)
 
+	# Align stack
 	and $-16,%rsp
+
+	call cpu_init
 
 	call tls_init
 
@@ -39,7 +51,7 @@ invoke_function_array:
 	mov %rsi,%rbp
 0:
 	cmp %rbx,%rbp
-	jae 0f
+	jbe 0f
 	call *(%rbx)
 	add $8,%rbx
 	jmp 0b

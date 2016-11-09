@@ -25,10 +25,12 @@ SECTIONS {
 		. = ALIGN(64);
 		___init_st = .;
 		*(.init_array)
+		*(.init_array.*)
 		___init_en = .;
 
 		___fini_st = .;
 		*(.fini_array)
+		*(.fini_array.*)
 		___fini_en = .;
 
 		. = ALIGN(64);
@@ -88,13 +90,11 @@ SECTIONS {
 		___tbss_en = .;
 	}
 
-	.debug 0 : {
-		*(.debug_info   )
-		*(.debug_abbrev )
-		*(.debug_aranges)
-		*(.debug_macro  )
-		*(.debug_line   )
-		*(.debug_str    )
-		*(.comment      )
-	}
+	.debug_info    0 : { *(.debug_info)    }
+	.debug_abbrev  0 : { *(.debug_abbrev)  }
+	.debug_aranges 0 : { *(.debug_aranges) }
+	.debug_macro   0 : { *(.debug_macro)   }
+	.debug_line    0 : { *(.debug_line)    }
+	.debug_str     0 : { *(.debug_str)     }
+	.comment       0 : { *(.comment)       }
 }

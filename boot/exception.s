@@ -103,7 +103,7 @@ isr_common:
 .align 8
 
 msg_exception:
-	.string "  Exception=0x"
+	.string "Exception=0x"
 
 msg_code:
 	.string " Code=0x"
@@ -146,16 +146,27 @@ isr_handler:
 	movq 16(%r10),%rsi
 	call hex16_out
 
-	# Next line
-
 	# CR2=
-	#movl $(0xb8000 + 80*2),%edi
+
 	movl $msg_CR2,%esi
 	call text_out
 
 	# Page fault address
 	mov %cr2,%rsi
 	call hex16_out
+
+	# Next line
+	movl $(0xb8000 + 80*2),%edi
+
+	# Name of exception
+	movzbq 0(%r10),%r12
+	movl $isr_name_invalid,%esi
+	cmpl $32,%r12d
+	ja 0f
+	movl $isr_names,%r11d
+	movzwl (%r11,%r12,2),%esi
+0:
+	call text_out
 
 0:
 	hlt
@@ -244,3 +255,60 @@ isr_table:
 .word isr_entry_29
 .word isr_entry_30
 .word isr_entry_31
+
+isr_name_invalid: .string "(Invalid!)"
+isr_name_reserved: .string "(Reserved)"
+isr_name_0:  .string "#DE Divide Error"
+isr_name_1:  .string "#DB Debug"
+isr_name_2:  .string "NMI"
+isr_name_3:  .string "#BP Breakpoint"
+isr_name_4:  .string "#OF Overflow"
+isr_name_5:  .string "#BR BOUND Range Exceeded"
+isr_name_6:  .string "#UD Invalid Opcode"
+isr_name_7:  .string "#NM Device Not Available"
+isr_name_8:  .string "#DF Double Fault"
+isr_name_10: .string "#TS Invalid TSS"
+isr_name_11: .string "#NP Segment Not Present"
+isr_name_12: .string "#SS Stack Fault"
+isr_name_13: .string "#GP General Protection"
+isr_name_14: .string "#PF Page Fault"
+isr_name_16: .string "#MF Floating-Point Error"
+isr_name_17: .string "#AC Alignment Check"
+isr_name_18: .string "#MC Machine Check"
+isr_name_19: .string "#XM SIMD"
+isr_name_20: .string "#VE Virtualization"
+
+.globl isr_names
+isr_names:
+.word isr_name_0
+.word isr_name_1
+.word isr_name_2
+.word isr_name_3
+.word isr_name_4
+.word isr_name_5
+.word isr_name_6
+.word isr_name_reserved
+.word isr_name_8
+.word isr_name_reserved
+.word isr_name_10
+.word isr_name_11
+.word isr_name_12
+.word isr_name_13
+.word isr_name_14
+.word isr_name_reserved
+.word isr_name_16
+.word isr_name_17
+.word isr_name_18
+.word isr_name_19
+.word isr_name_20
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved
+.word isr_name_reserved

@@ -3,6 +3,7 @@ kernel.ld
 main.c
 dump/kernel-headers
 dump/kernel.map
+dump/kernel.dis
 arch/x86_64/cpu.c
 arch/cpu.h
 arch/mmu.h
@@ -47,3 +48,5 @@ arch/x86_64/halt.c
 arch/x86_64/halt.h
 lib/string.c
 lib/string.h
+arch/x86_64/cpuid.c
+arch/x86_64/cpuid.h

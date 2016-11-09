@@ -32,7 +32,7 @@ struct text_display_t {
 #define VGA_SET_CURSOR_LO(pos) (0x0F | ((pos) & 0xFF))
 #define VGA_SET_CURSOR_HI(pos) (0x0E | ((pos >> 8) & 0xFF))
 
-text_display_t displays[MAX_VGA_DISPLAYS];
+static text_display_t displays[MAX_VGA_DISPLAYS];
 
 // === Internal API ===
 
@@ -54,6 +54,14 @@ static void move_cursor_to(text_display_t *self, int x, int y)
     uint16_t position = y * self->width + x;
     outw(VGA_CRT_CTRL, VGA_SET_CURSOR_LO(position));
     outw(VGA_CRT_CTRL, VGA_SET_CURSOR_HI(position));
+}
+
+static void move_cursor_if_on(text_display_t *self)
+{
+    if (self->cursor_on)
+        move_cursor_to(self,
+                       self->cursor_x,
+                       self->cursor_y);
 }
 
 static void write_char_at(text_display_t *self,
@@ -112,8 +120,7 @@ static void scroll_screen(text_display_t *self, int x, int y)
         self->cursor_x += x;
         self->cursor_y += y;
         cap_position(self, &self->cursor_x, &self->cursor_y);
-        if (self->cursor_on)
-            move_cursor_to(self, self->cursor_x, self->cursor_y);
+        move_cursor_if_on(self);
         return;
     }
 
@@ -196,11 +203,41 @@ static void advance_cursor(text_display_t *self)
     }
 }
 
+// Handle linefeed and tab, advance cursor,
+// put character on the screen, but does not
+// update the hardware cursor
+static void print_character(text_display_t *self, int ch)
+{
+    switch (ch) {
+    case '\n':
+        if (self->cursor_y < self->height - 1)
+            ++self->cursor_y;
+        else
+            scroll_screen(self, 0, -1);
+        self->cursor_x = 0;
+        break;
+
+    case '\t':
+        self->cursor_x = (self->cursor_x + 7) & -8;
+        break;
+
+    default:
+        write_char_at(self,
+                      self->cursor_x,
+                      self->cursor_y,
+                      ch);
+        advance_cursor(self);
+        break;
+    }
+}
+
 // === Public API ===
 
 static int vga_detect(text_display_base_t **result)
 {
+    displays[0].vtbl = &vga_device_vtbl;
     displays[0].io_base = READ_BIOS_DATA_AREA(uint16_t, 0x463) - 4;
+    displays[0].video_mem = (void*)0xB8000;
     displays[0].cursor_on = 1;
     displays[0].cursor_x = 0;
     displays[0].cursor_y = 0;
@@ -262,7 +299,7 @@ static void vga_goto_xy(text_display_base_t *dev,
     if (self->cursor_x != x || self->cursor_y != y) {
         self->cursor_x = x;
         self->cursor_y = y;
-        move_cursor_to(self, x, y);
+        move_cursor_if_on(self);
     }
 }
 
@@ -317,7 +354,7 @@ static void vga_cursor_toggle(text_display_base_t *dev,
 {
     TEXT_DEV_PTR(dev);
     if (!show != !self->cursor_on) {
-        show = self->cursor_on;
+        self->cursor_on = show;
         if (!show)
             move_cursor_to(self, 0xFF, 0xFF);
         else
@@ -338,11 +375,7 @@ static void vga_putc(text_display_base_t *dev,
                     int character)
 {
     TEXT_DEV_PTR(dev);
-    write_char_at(self,
-                  self->cursor_x,
-                  self->cursor_y,
-                  character);
-    advance_cursor(self);
+    print_character(self, character);
 }
 
 static void vga_putc_xy(text_display_base_t *dev,
@@ -358,26 +391,22 @@ static void vga_putc_xy(text_display_base_t *dev,
     self->cursor_x = x;
     self->cursor_y = y;
 
-    write_char_at(self,
-                  self->cursor_x,
-                  self->cursor_y,
-                  character);
-
-    advance_cursor(self);
+    print_character(self, character);
 }
-
-// Print string, updating cursor position
-// possibly scrolling the screen content up
 
 static int vga_print(text_display_base_t *dev,
                      char const *s)
 {
-    TEXT_DEV_PTR_UNUSED(dev);
+    TEXT_DEV_PTR(dev);
+
     int written = 0;
     while (*s) {
-        vga_putc(dev, *s++);
         ++written;
+        print_character(self, *s++);
     }
+
+    move_cursor_if_on(self);
+
     return written;
 }
 

@@ -176,24 +176,30 @@ static void buffer_char(char *buf, char **pptr, char c)
 #define FLAG_NEG        0x02
 #define FLAG_LONGLONG   0x04
 
-// Very weird, gets wrong results
-//static uint64_t ulonglong_mod(uint64_t a, uint64_t b)
-//{
-//    double da = (double)a;
-//    double db = (double)b;
-//    double dq = da / db;
-//    uint64_t quot = (uint64_t)dq;
-//    return (uint64_t)(da - (db * (double)quot));
-//}
-//
-//static uint64_t ulonglong_div(uint64_t a, uint64_t b)
-//{
-//    double da = (double)a;
-//    double db = (double)b;
-//    double dq = da / db;
-//    uint64_t quot = (uint64_t)dq;
-//    return quot;
-//}
+#define USE_LONGLONG_MOD 1
+
+#if USE_LONGLONG_MOD
+// Only works correctly for values <= 2⁵³
+// Which is fine for all legal addresses,
+// and all reasonable file offsets
+static uint64_t ulonglong_mod(uint64_t a, uint64_t b)
+{
+    double da = (double)a;
+    double db = (double)b;
+    double dq = da / db;
+    uint64_t quot = (uint64_t)dq;
+    return (uint64_t)(da - (db * (double)quot));
+}
+
+static uint64_t ulonglong_div(uint64_t a, uint64_t b)
+{
+    double da = (double)a;
+    double db = (double)b;
+    double dq = da / db;
+    uint64_t quot = (uint64_t)dq;
+    return quot;
+}
+#endif
 
 char const hexlookup[] = "0123456789ABCDEF";
 
@@ -295,10 +301,12 @@ void print_line(char const* format, ...)
                 dp = digit + 22;
                 *--dp = 0;
                 // We force all 64 bit values to hex,
+                // if USE_LONGLONG_MOD is 0,
                 // because of issues with libgcc
-                // __udivi3 and __umodi3. Why would
-                // you want to print 21 digit long decimal anyway?
-                if (base == 16 || (flags & FLAG_LONGLONG)) {
+                // __udivi3 and __umodi3. 64 bit values are
+                // almost always file offsets or addresses
+                // and hex is ideal for those anyway
+                if (base == 16 || (!USE_LONGLONG_MOD && (flags & FLAG_LONGLONG))) {
                     do
                     {
                         *--dp = hexlookup[n & 0x0F];
@@ -307,8 +315,13 @@ void print_line(char const* format, ...)
                 } else {
                     do
                     {
+#if USE_LONGLONG_MOD
+                        *--dp = hexlookup[ulonglong_mod(n, base)];
+                        n = ulonglong_div(n, base);
+#else
                         *--dp = hexlookup[(uint32_t)n % base];
                         n = (uint32_t)n / base;
+#endif
                     } while (n && dp > digit);
                 }
 

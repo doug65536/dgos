@@ -377,6 +377,7 @@ static int formatter(const char *format, va_list ap,
                 // fall through
             case arg_type_uintptr_value:
                 digit_out = digits + sizeof(digits);
+                *--digit_out = 0;
                 do {
                     *--digit_out = formatter_hexlookup[
                             flags.arg.intptr_value % flags.base];

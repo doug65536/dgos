@@ -47,7 +47,7 @@ TARGET_ARCH_AS := --32
 CFLAGS ?= -ggdb -Os -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
 	-falign-functions=1 -falign-labels=1 \
-	-falign-loops=1 -falign-jumps=1 -msse -msse2 -mfpmath=sse
+	-falign-loops=1 -falign-jumps=1 -mno-sse -mno-sse2 -mfpmath=387
 
 #	-mmmx -msse -msse2 -mfpmath=sse
 
@@ -158,26 +158,29 @@ bootable-disk: $(DISKIMAGE) $(BOOTSECTORS)
 
 debuggable-disk: bootable-disk $(SYMBOLFILE)
 
-debuggable-kernel-disk: kernel bootable-disk
-	$(MAKE) inject-kernel
+debuggable-kernel-disk: kernel bootable-disk inject-kernel
 
 #
 # Debug in KVM
 
 $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
-	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | \
+		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" | \
+		sort > $@
 
 $(BINDIR)/debug-kernel-kvm-gdbcommands: utils/debug-kernel-kvm-commands.template
-	sed "s|\$$SYMBOLFILE|$(KERNELSYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+	sed "s|\$$SYMBOLFILE|$(KERNELSYMBOLFILE)|g" $< | \
+		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" | \
+		sort > $@
 
 debug: all debuggable-disk $(BINDIR)/debug-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kvm-gdbcommands
 
-debug-kernel: all debuggable-kernel-disk $(BINDIR)/debug-kernel-kvm-gdbcommands
+debug-kernel: all $(BINDIR)/debug-kernel-kvm-gdbcommands
 	gdb -x $(BINDIR)/debug-kernel-kvm-gdbcommands
 
-run-debug: all bootable-disk
-	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw -no-shutdown -no-reboot -d int,cpu_reset -s
+run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
+	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw -no-shutdown -no-reboot -d cpu_reset -s
 
 #,guest_errors,unimp
 
@@ -194,17 +197,19 @@ $(BOCHSCOMBINEDSYMBOLS): $(BOCHSKERNELSYMBOLS) $(BOCHSSYMBOLS)
 $(BOCHSKERNELSYMBOLS): kernel
 	objdump --syms ../kernel/bin/kernel | \
 		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' > $@
+		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
+		sort > $@
 
 $(BOCHSSYMBOLS): $(SYMBOLFILE)
 	objdump --syms $^ | \
 		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' > $@
+		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
+		sort > $@
 
 $(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug-bochs: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc
+debug-bochs: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-kernel-disk $(BINDIR)/bochs-config.bxrc
 	bochs -f $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-commands
 
 debug-bochs-boot: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc

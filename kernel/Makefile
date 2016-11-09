@@ -51,7 +51,7 @@ WEVERYTHING += -Wunsuffixed-float-constants
 WEVERYTHING += -Wno-strict-overflow
 
 ifndef TLS_MODEL
-TLS_MODEL := global-dynamic
+TLS_MODEL := local-exec
 endif
 
 CFLAGS ?= -g3 -O2 -ffreestanding \
@@ -82,14 +82,14 @@ OUTPUTS = $(KERNEL)
 
 NEEDSMALLEST :=
 
-LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T kernel.ld
+LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T kernel.ld -g
 
 #-m i386linux
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 
-all: libs $(OUTPUTS) $(DUMPDIR)/kernel-headers
+all: libs $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
 
 clean:
 	@rm -f $(BINDIR)/kernel
@@ -112,5 +112,8 @@ $(KERNEL): $(LIBFILES)  $(OBJS) $(LINKERSCRIPT)
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)
 	objdump --all-headers $< > $@
+
+$(DUMPDIR)/kernel.dis: $(KERNEL)
+	objdump --disassemble --source $^ > $@
 
 include autodep.mk

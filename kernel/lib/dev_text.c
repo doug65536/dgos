@@ -11,7 +11,7 @@ void register_text_display_device(
     device_count = vtbl->detect(&devices);
 
     if (device_count > 0)
-        console_display = devices;
+        console_display = &devices[0];
 
     //
     // Store the default text display device where

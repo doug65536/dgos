@@ -1,5 +1,5 @@
 
-int init_cpu(void);
+void cpu_init(void);
 int init_mp(void);
 
 int irq_hook(int irq, void (*handler)(void));

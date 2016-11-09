@@ -1,10 +1,13 @@
 
 #include "cpu.h"
 #include "mm.h"
+#include "printk.h"
 
 int life_and_stuff = 42;
 
 char buf[12];
+
+extern void (*device_constructor_list[])(void);
 
 __thread int tls_thing;
 //__thread int tls_thing_2;
@@ -28,14 +31,16 @@ static __attribute__((destructor)) void goin_down()
     //tls_thing = -22;
 }
 
+// Pull in the device constructors
+// to cause them to be initialized
+void (** volatile device_list)(void) = device_constructor_list;
+
 int main()
 {
-    //init_cpu();
-
-    short *screen = (short*)0xB8000;
-    static char message[] = "In kernel!!!";
-    for (int i = 0; message[i]; ++i)
-        screen[i] = (short)(0x700 | message[i]);
+    printk("Testing!\n");
+    printk("Testing again!\n");
+    printk("... and again!\n");
+    printk("Come on -> %d\n", 42);
 
     return 42;
 }
