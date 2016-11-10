@@ -52,3 +52,4 @@ arch/x86_64/cpuid.c
 arch/x86_64/cpuid.h
 arch/x86_64/legacy_timer_pic.c
 arch/x86_64/legacy_timer_pic.h
+arch/x86_64/.gitignore
