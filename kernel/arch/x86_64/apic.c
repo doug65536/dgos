@@ -1,6 +1,6 @@
 #include "apic.h"
 
-int init_apic(void)
+int apic_init(void)
 {
     return 0;
 }

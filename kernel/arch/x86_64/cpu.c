@@ -3,6 +3,8 @@
 #include "mmu.h"
 #include "gdt.h"
 #include "msr.h"
+#include "legacy_timer_pic.h"
+#include "apic.h"
 #include "cpuid.h"
 
 void cpu_init(void)
@@ -35,4 +37,15 @@ void cpu_init(void)
     cpu_cr4_change_bits(CR4_TSD,
                         cr4 |
                         CR4_OSXMMEX);
+
+    if (cpuid_edx_bit(9, 1, 0)) {
+        apic_init();
+
+        // Still need to initialize in case of
+        // spurious IRQs
+        timerpic_disable();
+    } else {
+        timerpic_init();
+    }
+
 }

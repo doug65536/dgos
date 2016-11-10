@@ -1,1 +1,1 @@
-int init_apic(void);
+int apic_init(void);

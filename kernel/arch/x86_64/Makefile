@@ -14,6 +14,7 @@ CSRCS := cpu.c \
 	apic.c \
 	pci.c \
 	legacy_keyboard.c \
+	legacy_timer_pic.c \
 	halt.c \
 	$(DEVSRCS)
 
