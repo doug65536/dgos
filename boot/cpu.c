@@ -88,6 +88,40 @@ static uint16_t toggle_a20(uint8_t enable)
     return 0;
 }
 
+#if 0
+// Returns the value that was at the location
+// If the returned value is not equal to expect
+// then the value was not replaced
+int64_t cmpxchg8b(
+        int64_t volatile *value, int64_t expect, int64_t replacement);
+int64_t cmpxchg8b(
+        int64_t volatile *value, int64_t expect, int64_t replacement)
+{
+    __asm__ __volatile__ (
+        "lock cmpxchg8b (%[value])\n\t"
+        : "+A" (expect)
+        : [value] "SD" (value),
+          "b" ((uint32_t)replacement & 0xFFFFFFFF),
+          "c" ((uint32_t)(replacement >> 32))
+        : "memory"
+    );
+    return expect;
+}
+
+int64_t atomic_inc64(int64_t volatile *value);
+int64_t atomic_inc64(int64_t volatile *value)
+{
+    int64_t stale = *value;
+    int64_t fresh;
+    for (;;) {
+        fresh = cmpxchg8b(value, stale, stale + 1);
+        if (fresh == stale)
+            return fresh + 1;
+        stale = fresh;
+    }
+}
+#endif
+
 // Returns true if the CPU supports that leaf
 uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {

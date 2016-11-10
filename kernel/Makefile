@@ -48,13 +48,13 @@ WEVERYTHING += -Wredundant-decls
 WEVERYTHING += -Wunsuffixed-float-constants
 
 # Strict overflow is noise
-WEVERYTHING += -Wno-strict-overflow
+#WEVERYTHING += -Wno-strict-overflow
 
 ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
 
-CFLAGS ?= -g3 -O2 -ffreestanding \
+CFLAGS ?= -g3 -O0 -ffreestanding \
 	-Wno-unused-function -fpic -mno-red-zone \
 	-ftls-model=$(TLS_MODEL) \
 	$(WEVERYTHING)

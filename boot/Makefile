@@ -27,6 +27,8 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
+GDB ?= gdb-multiarch
+
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
 #LIBGCCDIR := $(dir $(LIBGCC))
@@ -107,6 +109,7 @@ clean:
 	@rm -f $(OBJS)
 	@rm -f $(DUMPDIR)/*.map
 	@rm -f $(OUTPUTS)
+	(cd ../kernel && $(MAKE) clean)
 
 cleaner: clean deletedisk
 
@@ -174,10 +177,10 @@ $(BINDIR)/debug-kernel-kvm-gdbcommands: utils/debug-kernel-kvm-commands.template
 		sort > $@
 
 debug: all debuggable-disk $(BINDIR)/debug-kvm-gdbcommands
-	gdb -x $(BINDIR)/debug-kvm-gdbcommands
+	$(GDB) -x $(BINDIR)/debug-kvm-gdbcommands
 
 debug-kernel: all $(BINDIR)/debug-kernel-kvm-gdbcommands
-	gdb -x $(BINDIR)/debug-kernel-kvm-gdbcommands
+	$(GDB) -x $(BINDIR)/debug-kernel-kvm-gdbcommands
 
 run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 	qemu-system-x86_64 -drive file=$(DISKIMAGE),format=raw -no-shutdown -no-reboot -d cpu_reset -s
@@ -190,32 +193,34 @@ run: all bootable-disk
 #
 # Debug in bochs
 
-# This works poorly because bochs truncates symbols to 32 bits
+bochs-symbols: $(BOCHSCOMBINEDSYMBOLS)
+
 $(BOCHSCOMBINEDSYMBOLS): $(BOCHSKERNELSYMBOLS) $(BOCHSSYMBOLS)
 	cat $^ > $@
 
 $(BOCHSKERNELSYMBOLS): kernel
-	objdump --syms ../kernel/bin/kernel | \
+	objdump --wide --syms ../kernel/bin/kernel | \
 		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		sort > $@
 
 $(BOCHSSYMBOLS): $(SYMBOLFILE)
-	objdump --syms $^ | \
+	objdump --wide --syms $^ | \
 		grep -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		sed -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		sort > $@
 
 $(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
-	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | \
+		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug-bochs: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-kernel-disk $(BINDIR)/bochs-config.bxrc
-	bochs -f $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-commands
+debug-bochs: all bochs-symbols debuggable-kernel-disk $(BINDIR)/bochs-config.bxrc
+	bochs -qf $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-commands
 
-debug-bochs-boot: all $(BOCHSSYMBOLS) $(BOCHSKERNELSYMBOLS) debuggable-disk $(BINDIR)/bochs-config.bxrc
-	bochs -f $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-boot-commands
+debug-bochs-boot: all bochs-symbols debuggable-disk $(BINDIR)/bochs-config.bxrc
+	bochs -qf $(BINDIR)/bochs-config.bxrc -rc utils/bochs-debugger-boot-commands
 
-run-bochs: all debuggable-disk $(BINDIR)/bochs-config.bxrc
+run-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-config.bxrc
 	bochs -qf $(BINDIR)/bochs-config.bxrc -q
 
 #
@@ -238,7 +243,7 @@ inject-kernel: all
 	cp ../kernel/bin/kernel disk/dgos-kernel
 	$(MAKE) umountdisk
 
-.PHONY: all clean run debug-bochs debug
+.PHONY: all clean run debug-bochs debug bochs-symbols
 .PHONY: deletedisk bootable-disk debuggable-disk mountdisk umountdisk
 .PHONY: kernel debuggable-kernel-disk
 

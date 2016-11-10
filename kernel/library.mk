@@ -15,10 +15,8 @@ OBJS := $(AOBJS) $(COBJS)
 all: $(LIBFILENAME)
 
 clean:
-	@rm -f $(BINDIR)/kernel
 	@rm -f $(OBJS)
-	@rm -f $(DUMPDIR)/*.map
-	@rm -f $(OUTPUTS)
+	@rm -f $(LIBFILENAME)
 
 $(LIBFILENAME): $(OBJS)
 	ar -rcs $@ $^

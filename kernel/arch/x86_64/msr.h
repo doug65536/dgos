@@ -70,116 +70,25 @@
 #define CR4_PKE             (1 << CR4_PKE_BIT     )
 
 // Get whole MSR register as a 64-bit value
-inline uint64_t msr_get(uint32_t msr)
-{
-    uint64_t result;
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        "shl $32,%%rdx\n\t"
-        "or %%rdx,%%rax\n\t"
-        : "=a" (result)
-        : "c" (msr)
-        : "rdx"
-    );
-    return result;
-}
+uint64_t msr_get(uint32_t msr);
 
 // Get low 32 bits pf MSR register
-inline uint32_t msr_get_lo(uint32_t msr)
-{
-    uint64_t result;
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        : "=a" (result)
-        : "c" (msr)
-        : "rdx"
-    );
-    return result;
-}
+uint32_t msr_get_lo(uint32_t msr);
 
 // High high 32 bits of MSR register
-inline uint32_t msr_get_hi(uint32_t msr)
-{
-    uint64_t result;
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        : "=d" (result)
-        : "c" (msr)
-        : "rax"
-    );
-    return result;
-}
+uint32_t msr_get_hi(uint32_t msr);
 
 // Set whole MSR as a 64 bit value
-inline void msr_set(uint32_t msr, uint64_t value)
-{
-    __asm__ __volatile__ (
-        "mov %%rax,%%rdx\n\t"
-        "shr $32,%%rdx\n\t"
-        "wrmsr\n\t"
-        :
-        : "a" (value),
-          "c" (msr)
-        : "rdx"
-    );
-}
+void msr_set(uint32_t msr, uint64_t value);
 
 // Update the low 32 bits of MSR, preserving the high 32 bits
-inline void msr_set_lo(uint32_t msr, uint32_t value)
-{
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        "mov %[value],%%eax\n\t"
-        "wrmsr"
-        :
-        : [value] "S" (value),
-          "c" (msr)
-        : "rdx"
-    );
-}
+void msr_set_lo(uint32_t msr, uint32_t value);
 
 // Update the low 32 bits of MSR, preserving the high 32 bits
-inline void msr_set_hi(uint32_t msr, uint32_t value)
-{
-    __asm__ __volatile__ (
-        "rdmsr\n\t"
-        "mov %[value],%%edx\n\t"
-        "wrmsr"
-        :
-        : [value] "S" (value),
-          "c" (msr)
-        : "rdx"
-    );
-}
+void msr_set_hi(uint32_t msr, uint32_t value);
 
 // Returns new value of cr0
-inline uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set)
-{
-    uint64_t rax;
-    __asm__ __volatile__ (
-        "mov %%cr0,%[result]\n\t"
-        "and %[clear],%[result]\n\t"
-        "or %[set],%[result]\n\t"
-        "mov %[result],%%cr0\n\t"
-        : [result] "=&A" (rax)
-        : [clear] "ri" (~clear),
-          [set] "ri" (set)
-    );
-    return rax;
-}
+uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set);
 
 // Returns new value of cr0
-inline uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set)
-{
-    uint64_t rax;
-    __asm__ __volatile__ (
-        "mov %%cr4,%[result]\n\t"
-        "and %[clear],%[result]\n\t"
-        "or %[set],%[result]\n\t"
-        "mov %[result],%%cr4\n\t"
-        : [result] "=&A" (rax)
-        : [clear] "ri" (~clear),
-          [set] "ri" (set)
-    );
-    return rax;
-}
+uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set);

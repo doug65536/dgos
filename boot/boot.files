@@ -39,3 +39,4 @@ physmem.c
 physmem.h
 farptr.h
 farptr.c
+utils/watch-bochs.sh

@@ -89,7 +89,7 @@ static void fill_region(text_display_t *self,
     uint16_t *dst = self->video_mem + (sy * self->width);
 
     character &= 0xFF;
-    while (row_count) {
+    while (row_count--) {
         for (row_ofs = sx; row_ofs < ex; ++row_ofs)
             dst[row_ofs] = character | (self->attrib << 8);
         dst += self->width;
@@ -116,9 +116,19 @@ static void scroll_screen(text_display_t *self, int x, int y)
             (y < 0 && -y >= self->height) ||
             (y > 0 && y >= self->height)) {
         clear_screen(self);
+
         // Cursor tries to move with content
-        self->cursor_x += x;
-        self->cursor_y += y;
+
+        if (x < self->width - self->cursor_x)
+            self->cursor_x += x;
+        else
+            self->cursor_x = self->width - 1;
+
+        if (y < self->height - self->cursor_y)
+            self->cursor_y += y;
+        else
+            self->cursor_y = self->height;
+
         cap_position(self, &self->cursor_x, &self->cursor_y);
         move_cursor_if_on(self);
         return;
@@ -163,7 +173,7 @@ static void scroll_screen(text_display_t *self, int x, int y)
     }
 
     while (row_count--) {
-        memmove(dst, src, row_size);
+        memmove(dst, src, row_size * sizeof(*dst));
         dst += row_step;
         src += row_step;
     }
@@ -192,9 +202,10 @@ static void scroll_screen(text_display_t *self, int x, int y)
 // Move the cursor right one character, wrapping and
 // scrolling as necessary.
 // Does not update hardware cursor.
-static void advance_cursor(text_display_t *self)
+static void advance_cursor(text_display_t *self, int distance)
 {
-    if (++self->cursor_x >= self->width) {
+    self->cursor_x += distance;
+    if (self->cursor_x >= self->width) {
         self->cursor_x = 0;
         if (++self->cursor_y >= self->height) {
             self->cursor_y = self->height - 1;
@@ -208,17 +219,16 @@ static void advance_cursor(text_display_t *self)
 // update the hardware cursor
 static void print_character(text_display_t *self, int ch)
 {
+    int advance;
     switch (ch) {
     case '\n':
-        if (self->cursor_y < self->height - 1)
-            ++self->cursor_y;
-        else
-            scroll_screen(self, 0, -1);
-        self->cursor_x = 0;
+        advance_cursor(self, self->width - self->cursor_x);
         break;
 
     case '\t':
-        self->cursor_x = (self->cursor_x + 7) & -8;
+        advance = ((self->cursor_x + 8) & -8) -
+                self->cursor_x;
+        advance_cursor(self, advance);
         break;
 
     default:
@@ -226,7 +236,7 @@ static void print_character(text_display_t *self, int ch)
                       self->cursor_x,
                       self->cursor_y,
                       ch);
-        advance_cursor(self);
+        advance_cursor(self, 1);
         break;
     }
 }

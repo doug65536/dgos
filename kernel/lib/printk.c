@@ -1,7 +1,7 @@
 #include "printk.h"
 #include "types.h"
 #include "halt.h"
-
+#include "string.h"
 #include "conio.h"
 
 typedef enum {
@@ -43,12 +43,16 @@ typedef struct {
     unsigned int hash : 1;
     unsigned int upper : 1;
     unsigned int negative : 1;
+    unsigned int has_min_width : 1;
+    unsigned int has_precision : 1;
+    unsigned int limit_string : 1;
 
     int min_width;
     int precision;
     int base;
-    int excess_leading_pad;
-    char pad;
+    int pending_leading_zeros;
+    int pending_padding;
+    int max_chars;
 
     length_mod_t length;
     arg_type_t arg_type;
@@ -88,8 +92,10 @@ static char const formatter_hexlookup[] = "0123456789ABCDEF";
 
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
-static int formatter(const char *format, va_list ap,
-              int (*emit_chars)(char const *, int))
+static int formatter(
+        const char *format, va_list ap,
+        int (*emit_chars)(char const *, int, void*),
+        void *emit_context)
 {
     formatter_flags_t flags;
     int chars_written = 0;
@@ -108,7 +114,7 @@ static int formatter(const char *format, va_list ap,
             switch (ch) {
             case '%':
                 // Literal %
-                chars_written += emit_chars(0, '%');
+                chars_written += emit_chars(0, '%', emit_context);
                 continue;
 
             case '-':
@@ -134,13 +140,17 @@ static int formatter(const char *format, va_list ap,
 
             if (ch == '*') {
                 // Get minimum field width from arguments
+                flags.has_min_width = 1;
                 flags.min_width = va_arg(ap, int);
+                ch = *++fp;
             } else if (ch >= '0' && ch <= '9') {
                 // Parse numeric field width
+                flags.has_min_width = 1;
                 fp = parse_int(fp, &flags.min_width);
                 // Leading 0 on width specifies 0 padding
                 if (ch == '0')
                     flags.precision = flags.min_width;
+                ch = *fp;
             }
 
             if (ch == '.') {
@@ -148,14 +158,18 @@ static int formatter(const char *format, va_list ap,
 
                 if (flags.precision == 0 && ch == '*') {
                     // Get precision from arguments
+                    flags.has_precision = 1;
                     flags.precision = va_arg(ap, int);
+                    ch = *++fp;
                 } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
                     // Parse numeric precision
                     // Negative values are ignored
+                    flags.has_precision = 1;
                     fp = parse_int(fp,
                                    flags.precision
                                    ? 0
                                    : &flags.precision);
+                    ch = *fp;
                 }
             }
 
@@ -169,6 +183,7 @@ static int formatter(const char *format, va_list ap,
                     flags.length = length_h;
                     fp += 1;
                 }
+                ch = *fp;
                 break;
 
             case 'l':
@@ -179,26 +194,27 @@ static int formatter(const char *format, va_list ap,
                     flags.length = length_l;
                     fp += 1;
                 }
+                ch = *fp;
                 break;
 
             case 'j':
                 flags.length = length_j;
-                ++fp;
+                ch = *++fp;
                 break;
 
             case 'z':
                 flags.length = length_z;
-                ++fp;
+                ch = *++fp;
                 break;
 
             case 't':
                 flags.length = length_t;
-                ++fp;
+                ch = *++fp;
                 break;
 
             case 'L':
                 flags.length = length_L;
-                ++fp;
+                ch = *++fp;
                 break;
 
             }
@@ -220,6 +236,11 @@ static int formatter(const char *format, va_list ap,
                 break;
 
             case 's':
+                if (flags.has_precision) {
+                    flags.limit_string = 1;
+                    flags.max_chars = flags.precision;
+                }
+
                 switch (flags.length) {
                 case length_l:
                     flags.arg_type = arg_type_wchar_ptr;
@@ -360,6 +381,8 @@ static int formatter(const char *format, va_list ap,
             // Convert digits to text then change them to strings
             // to handle padding later
 
+            int len;
+
             switch (flags.arg_type) {
             default:
                 break;
@@ -367,6 +390,16 @@ static int formatter(const char *format, va_list ap,
             case arg_type_none:
                 // Nothing to do!
                 continue;
+
+            case arg_type_char_ptr:
+                len = strlen(flags.arg.char_ptr_value);
+                if (flags.limit_string && len > flags.precision)
+                    len = flags.precision;
+
+                if (flags.min_width > len)
+                    flags.pending_padding = flags.min_width - len;
+
+                break;
 
             case arg_type_intptr_value:
                 if (flags.arg.intptr_value < 0) {
@@ -376,36 +409,26 @@ static int formatter(const char *format, va_list ap,
                 flags.arg.uintptr_value = (uintptr_t)flags.arg.intptr_value;
                 // fall through
             case arg_type_uintptr_value:
+                flags.pending_leading_zeros = flags.precision;
+                flags.pending_padding = flags.min_width;
+
                 digit_out = digits + sizeof(digits);
                 *--digit_out = 0;
                 do {
                     *--digit_out = formatter_hexlookup[
-                            flags.arg.intptr_value % flags.base];
-                    flags.arg.intptr_value /= flags.base;
-                } while (flags.arg.intptr_value &&
-                         digit_out > digits &&
-                         digit_out > digits +
-                         sizeof(digits) - flags.precision);
+                            flags.arg.uintptr_value % flags.base];
+                    flags.arg.uintptr_value /= flags.base;
 
-                // Pad with zeros until minimum length reached
-                while (digit_out > digits &&
-                       digit_out > digits + sizeof(digits) - flags.min_width)
-                    *--digit_out = '0';
+                    flags.pending_leading_zeros -=
+                            (flags.pending_leading_zeros > 0);
+                    flags.pending_padding -=
+                            (flags.pending_padding > 0);
 
-                // If they specified a ridiculous number of leading zeros
-                if (flags.precision > (int)sizeof(digits) - 1) {
-                    flags.excess_leading_pad = flags.precision -
-                            (int)sizeof(digits) - 1;
-                    flags.excess_leading_pad = '0';
-                }
-
-                // Emit negative sign now if there's room
-                if (flags.excess_leading_pad == 0 &&
-                        flags.negative &&
-                        digit_out > digits) {
-                    *--digit_out = '-';
-                    flags.negative = 0;
-                }
+                    // Keep going while
+                    //  We are not going to buffer overrun, and,
+                    //  (If there is no precision, until number is 0
+                    //  If there is a precision, until we reach it)
+                } while (digit_out > digits && flags.arg.uintptr_value);
 
                 // Now treat as string
                 // Don't forget to emit negative and leading zeros later
@@ -416,17 +439,34 @@ static int formatter(const char *format, va_list ap,
 
             }
 
-            if (flags.pad == 0)
-                flags.pad = ' ';
+            // Make room for minus/plus
+            if (flags.negative || flags.leading_plus) {
+                flags.pending_padding -=
+                        (flags.pending_padding > 0);
+            }
 
-            if (flags.excess_leading_pad != 0) {
+            if (flags.pending_padding != 0 &&
+                    !flags.left_justify) {
+                if (flags.pending_padding > flags.pending_leading_zeros)
+                    flags.pending_padding -= flags.pending_leading_zeros;
+                else
+                    flags.pending_padding = 0;
+
+                // Write leading padding for right justification
+                for (int i = 0; i < flags.pending_padding; ++i)
+                    chars_written += emit_chars(0, ' ', emit_context);
+
                 if (flags.negative) {
                     flags.negative = 0;
-                    chars_written += emit_chars(0, '-');
+                    chars_written += emit_chars(0, '-', emit_context);
+                } else if (flags.leading_plus) {
+                    flags.leading_plus = 0;
+                    chars_written += emit_chars(0, '+', emit_context);
                 }
 
-                for (int i = 0; i < flags.excess_leading_pad; ++i)
-                    chars_written += emit_chars(0, flags.pad);
+                // Write leading zeros
+                for (int i = 0; i < flags.pending_leading_zeros; ++i)
+                    chars_written += emit_chars(0, '0', emit_context);
             }
 
             //
@@ -438,34 +478,59 @@ static int formatter(const char *format, va_list ap,
                 continue;
 
             case arg_type_char_ptr:
-                chars_written += emit_chars(flags.arg.char_ptr_value, 0);
+                if (flags.limit_string) {
+                    // Limit string output
+                    for (size_t i = 0; flags.arg.char_ptr_value[i] &&
+                         flags.max_chars > 0 &&
+                         i < (size_t)flags.max_chars; ++i) {
+                        chars_written += emit_chars(
+                                    0, flags.arg.char_ptr_value[i],
+                                    emit_context);
+                    }
+                } else {
+                    chars_written += emit_chars(
+                                flags.arg.char_ptr_value, 0,
+                                emit_context);
+                }
                 break;
 
             case arg_type_wchar_ptr:
                 // FIXME
                 for (size_t i = 0; flags.arg.char_ptr_value[i]; ++i)
                     if (flags.arg.wchar_buf[i] <= 0xFF)
-                        chars_written += emit_chars(0, flags.arg.char_ptr_value[i]);
+                        chars_written += emit_chars(
+                                    0, flags.arg.char_ptr_value[i],
+                                    emit_context);
                 break;
 
             case arg_type_char_buf:
-                chars_written += emit_chars(0, flags.arg.char_buf[0]);
+                chars_written += emit_chars(
+                            0, flags.arg.char_buf[0],
+                            emit_context);
                 break;
 
             case arg_type_wchar_buf:
                 // FIXME:
                 if (flags.arg.wchar_buf[0] > 0xFF)
-                    chars_written += emit_chars(0, '?');
+                    chars_written += emit_chars(
+                                0, '?', emit_context);
                 else
-                    chars_written += emit_chars(0, flags.arg.wchar_buf[0]);
+                    chars_written += emit_chars(
+                                0, flags.arg.wchar_buf[0],
+                                emit_context);
                 break;
 
             }
 
+            // Write trailing padding for left justification
+            if (flags.left_justify) {
+                for (int i = 0; i < flags.pending_padding; ++i)
+                    chars_written += emit_chars(0, ' ', emit_context);
+            }
             break;
 
         default:
-            chars_written += emit_chars(0, ch);
+            chars_written += emit_chars(0, ch, emit_context);
             break;
 
         }
@@ -483,8 +548,10 @@ int cprintf(char const *format, ...)
     return result;
 }
 
-static int vcprintf_emit_chars(char const *s, int c)
+static int vcprintf_emit_chars(char const *s, int c, void *unused)
 {
+    (void)unused;
+
     if (console_display) {
         if (s) {
             return console_display_vtbl.print(
@@ -500,7 +567,7 @@ static int vcprintf_emit_chars(char const *s, int c)
 
 int vcprintf(char const *format, va_list ap)
 {
-    return formatter(format, ap, vcprintf_emit_chars);
+    return formatter(format, ap, vcprintf_emit_chars, 0);
 }
 
 void printk(const char *format, ...)
@@ -529,4 +596,60 @@ void vpanic(char const *format, va_list ap)
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
     halt_forever();
+}
+
+typedef struct vsnprintf_context_t {
+    char *buf;
+    size_t limit;
+    size_t level;
+} vsnprintf_context_t;
+
+static int vsnprintf_emit_chars(char const *s, int ch, void *context)
+{
+    vsnprintf_context_t *ctx = context;
+    int count = 0;
+
+    do {
+        if (s) {
+            ch = *s++;
+            if (!ch)
+                break;
+        }
+
+        ++count;
+
+        if (ctx->level + 1 == ctx->limit) {
+            // The last byte of space in the buffer,
+            // write guaranteed null terminator
+            if (ctx->buf)
+                ctx->buf[ctx->level] = 0;
+            ++ctx->level;
+        } else if (ctx->level < ctx->limit) {
+            // Within the buffer
+            if (ctx->buf)
+                ctx->buf[ctx->level] = ch;
+            ++ctx->level;
+        }
+    } while (s);
+
+    return count;
+}
+
+// Write up to "limit" bytes to "buf" using format string.
+// If limit is 0, buf is optional and is never accessed.
+// Always return the number of bytes of output it would
+// have generated, not including the null terminator, if
+// it were given a suffiently sized buffer. May return
+// a number higher than the number of bytes written to
+// "buf".
+// "buf" is guaranteed to be null terminated upon
+// returning, if limit > 0.
+int vsnprintf(char *buf, size_t limit, const char *format, va_list ap)
+{
+    vsnprintf_context_t context;
+    context.buf = buf;
+    context.limit = limit;
+    context.level = 0;
+
+    return formatter(format, ap, vsnprintf_emit_chars, &context);
 }

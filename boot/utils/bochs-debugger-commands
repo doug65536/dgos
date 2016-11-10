@@ -1,4 +1,3 @@
 u switch-mode
 ldsym "bin/bochs-kernel-symbols"
-lb 0x400000000000
 c
