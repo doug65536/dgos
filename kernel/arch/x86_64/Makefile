@@ -15,7 +15,9 @@ CSRCS := cpu.c \
 	pci.c \
 	legacy_keyboard.c \
 	legacy_pic.c \
+	legacy_pit.c \
 	halt.c \
+	atomic.c \
 	$(DEVSRCS)
 
 ASRCS := entry.s \

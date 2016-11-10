@@ -3,7 +3,8 @@
 #include "mmu.h"
 #include "gdt.h"
 #include "msr.h"
-#include "legacy_timer_pic.h"
+#include "legacy_pic.h"
+#include "legacy_pit.h"
 #include "apic.h"
 #include "cpuid.h"
 
@@ -44,8 +45,12 @@ void cpu_init(void)
         // Still need to initialize in case of
         // spurious IRQs
         timerpic_disable();
+
+        // Initialize APIC timer...
     } else {
         timerpic_init();
+
+        pit8254_init();
     }
 
 }

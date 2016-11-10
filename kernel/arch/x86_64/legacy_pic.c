@@ -1,5 +1,6 @@
-#include "legacy_timer_pic.h"
+#include "legacy_pic.h"
 #include "ioport.h"
+#include "irq.h"
 
 // Implements legacy Programmable Interval Timer
 // and Programmable Interrupt Controller, used
@@ -16,8 +17,6 @@
 #define PIC2_DATA   (PIC2_BASE+1)
 
 #define PIC_EOI     0x20
-
-static void (*irq_handlers[16])(int irq);
 
 static void pic8259_init(uint8_t pic1_irq_base, uint8_t pic2_irq_base)
 {
@@ -101,9 +100,11 @@ static void pic8259_dispatcher(int irq)
     }
 
     // If we made it here, it was not a spurious IRQ
-    if (irq_handlers[irq])
-        irq_handlers[irq](irq);
 
+    // Run IRQ handler
+    irq_invoke(irq);
+
+    // Acknowledge IRQ
     pic8259_eoi(is_slave);
 }
 
