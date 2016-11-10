@@ -21,8 +21,7 @@ typedef enum {
 
     arg_type_char_ptr,
     arg_type_wchar_ptr,
-    arg_type_char_buf,
-    arg_type_wchar_buf,
+    arg_type_character,
     arg_type_intptr_value,
     arg_type_uintptr_value,
 } arg_type_t;
@@ -30,8 +29,7 @@ typedef enum {
 typedef union {
     char *char_ptr_value;
     wchar_t *wchar_ptr_value;
-    char char_buf[2];
-    wchar_t wchar_buf[2];
+    int character;
     intptr_t intptr_value;
     uintptr_t uintptr_value;
 } arg_t;
@@ -120,21 +118,25 @@ static int formatter(
             case '-':
                 // Left justify
                 flags.left_justify = 1;
+                ch = *++fp;
                 break;
 
             case '+':
                 // Use leading plus if positive
                 flags.leading_plus = 1;
+                ch = *++fp;
                 break;
 
             case '#':
                 // Varies
                 flags.hash = 1;
+                ch = *++fp;
                 break;
 
             case '0':
                 // Use leading zeros
                 flags.leading_zero = 1;
+                ch = *++fp;
                 break;
             }
 
@@ -163,15 +165,24 @@ static int formatter(
                     ch = *++fp;
                 } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
                     // Parse numeric precision
-                    // Negative values are ignored
                     flags.has_precision = 1;
                     fp = parse_int(fp,
                                    flags.precision
                                    ? 0
                                    : &flags.precision);
+
+                    // Negative values are ignored
+                    if (flags.precision < 0)
+                        flags.precision = 0;
                     ch = *fp;
                 }
             }
+
+            // If no precision specified and leading zero
+            // was given on min_width, then use min_width
+            // for the precision
+            if (!flags.has_precision && flags.leading_zero)
+                flags.precision = flags.min_width;
 
             // Length modifier
             switch (ch) {
@@ -223,12 +234,12 @@ static int formatter(
             case 'c':
                 switch (flags.length) {
                 case length_l:
-                    flags.arg_type = arg_type_wchar_buf;
-                    flags.arg.wchar_buf[0] = va_arg(ap, wchar_t);
+                    flags.arg_type = arg_type_character;
+                    flags.arg.character = va_arg(ap, wchar_t);
                     break;
                 case length_none:
-                    flags.arg_type = arg_type_char_buf;
-                    flags.arg.char_buf[0] = (char)va_arg(ap, int);
+                    flags.arg_type = arg_type_character;
+                    flags.arg.character = (char)va_arg(ap, int);
                     break;
                 default:
                     RETURN_FORMATTER_ERROR(chars_written);
@@ -391,6 +402,11 @@ static int formatter(
                 // Nothing to do!
                 continue;
 
+            case arg_type_character:
+                if (flags.min_width > 1)
+                    flags.pending_padding = flags.min_width - 1;
+                break;
+
             case arg_type_char_ptr:
                 len = strlen(flags.arg.char_ptr_value);
                 if (flags.limit_string && len > flags.precision)
@@ -423,11 +439,6 @@ static int formatter(
                             (flags.pending_leading_zeros > 0);
                     flags.pending_padding -=
                             (flags.pending_padding > 0);
-
-                    // Keep going while
-                    //  We are not going to buffer overrun, and,
-                    //  (If there is no precision, until number is 0
-                    //  If there is a precision, until we reach it)
                 } while (digit_out > digits && flags.arg.uintptr_value);
 
                 // Now treat as string
@@ -447,6 +458,7 @@ static int formatter(
 
             if (flags.pending_padding != 0 &&
                     !flags.left_justify) {
+                // Reduce padding by number of leading zeros
                 if (flags.pending_padding > flags.pending_leading_zeros)
                     flags.pending_padding -= flags.pending_leading_zeros;
                 else
@@ -455,19 +467,19 @@ static int formatter(
                 // Write leading padding for right justification
                 for (int i = 0; i < flags.pending_padding; ++i)
                     chars_written += emit_chars(0, ' ', emit_context);
-
-                if (flags.negative) {
-                    flags.negative = 0;
-                    chars_written += emit_chars(0, '-', emit_context);
-                } else if (flags.leading_plus) {
-                    flags.leading_plus = 0;
-                    chars_written += emit_chars(0, '+', emit_context);
-                }
-
-                // Write leading zeros
-                for (int i = 0; i < flags.pending_leading_zeros; ++i)
-                    chars_written += emit_chars(0, '0', emit_context);
             }
+
+            if (flags.negative) {
+                flags.negative = 0;
+                chars_written += emit_chars(0, '-', emit_context);
+            } else if (flags.leading_plus) {
+                flags.leading_plus = 0;
+                chars_written += emit_chars(0, '+', emit_context);
+            }
+
+            // Write leading zeros
+            for (int i = 0; i < flags.pending_leading_zeros; ++i)
+                chars_written += emit_chars(0, '0', emit_context);
 
             //
             // Now print stuff...
@@ -495,29 +507,16 @@ static int formatter(
                 break;
 
             case arg_type_wchar_ptr:
-                // FIXME
-                for (size_t i = 0; flags.arg.char_ptr_value[i]; ++i)
-                    if (flags.arg.wchar_buf[i] <= 0xFF)
-                        chars_written += emit_chars(
-                                    0, flags.arg.char_ptr_value[i],
-                                    emit_context);
-                break;
-
-            case arg_type_char_buf:
-                chars_written += emit_chars(
-                            0, flags.arg.char_buf[0],
-                            emit_context);
-                break;
-
-            case arg_type_wchar_buf:
-                // FIXME:
-                if (flags.arg.wchar_buf[0] > 0xFF)
+                for (size_t i = 0; flags.arg.wchar_ptr_value[i]; ++i)
                     chars_written += emit_chars(
-                                0, '?', emit_context);
-                else
-                    chars_written += emit_chars(
-                                0, flags.arg.wchar_buf[0],
+                                0, flags.arg.wchar_ptr_value[i],
                                 emit_context);
+                break;
+
+            case arg_type_character:
+                chars_written += emit_chars(
+                            0, flags.arg.character,
+                            emit_context);
                 break;
 
             }
