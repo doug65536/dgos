@@ -1,3 +1,4 @@
+#pragma once
 
 #define CONSTRUCTOR_PRIORITY_DEVICE 1000
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 // Returns 0 on failure due to invalid UTF-8 or truncation due to insufficient buffer

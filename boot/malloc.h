@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 void *malloc(uint16_t bytes);

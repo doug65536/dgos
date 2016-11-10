@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 // The entries of the 4 levels of page tables are named:

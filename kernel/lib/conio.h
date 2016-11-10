@@ -1,3 +1,4 @@
+#pragma once
 
 #include "dev_text.h"
 

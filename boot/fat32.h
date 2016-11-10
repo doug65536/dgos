@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 // Handles advancing through the sectors of

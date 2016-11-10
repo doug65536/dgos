@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 extern uint8_t boot_drive;

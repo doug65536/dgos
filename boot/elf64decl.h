@@ -1,3 +1,5 @@
+#pragma once
+
 // https://uclibc.org/docs/elf-64-gen.pdf
 
 // Type names used in documentation

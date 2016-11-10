@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 typedef uint16_t ioport_t;

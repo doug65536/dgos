@@ -1,3 +1,4 @@
+#pragma once
 
 void cpu_init(void);
 int init_mp(void);

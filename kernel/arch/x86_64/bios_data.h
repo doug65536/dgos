@@ -1,3 +1,4 @@
+#pragma once
 // Macros to generalize reading from the BIOS data area
 // Allows it to be remapped without having to edit code
 

@@ -1,6 +1,4 @@
-#ifndef TYPES_H
-#define TYPES_H
-
+#pragma once
 
 typedef signed char int8_t;
 typedef signed short int16_t;
@@ -19,5 +17,3 @@ typedef uint16_t uintptr_t;
 typedef int16_t intptr_t;
 
 typedef int64_t off_t;
-
-#endif

@@ -1,4 +1,3 @@
-
 #pragma once
 
 // Text display interface

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "types.h"
 
 void lfsr113_seed(uint32_t seed);
