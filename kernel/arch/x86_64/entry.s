@@ -2,6 +2,11 @@
 
 .globl entry
 entry:
+	# Align stack
+	#and $-16,%rsp
+
+	lea 262144+kernel_stack(%rip),%rsp
+
 	jmp 1f
 	# Debugger hack
 	mov $0,%rbp
@@ -15,9 +20,6 @@ entry:
 	# passed in from bootloader
 	mov %rcx,phys_mem_map(%rip)
 
-	# Align stack
-	and $-16,%rsp
-
 	call cpu_init
 
 	call tls_init
@@ -26,6 +28,8 @@ entry:
 	lea ___init_st(%rip),%rdi
 	lea ___init_en(%rip),%rsi
 	call invoke_function_array
+
+	call mmu_init
 
 	call main
 

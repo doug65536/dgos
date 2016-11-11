@@ -183,7 +183,7 @@ static void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
-static void init_idt()
+static void idt_init()
 {
     for (size_t i = 0; i < 32; ++i) {
         idt[i].type_attr = IDT_PRESENT | IDT_INTR;
@@ -200,7 +200,7 @@ static void init_idt()
 void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 {
     if (idtr_64.base_lo == 0)
-        init_idt();
+        idt_init();
 
     uint16_t intf = disable_interrupts();
     uint16_t was_a20 = check_a20();

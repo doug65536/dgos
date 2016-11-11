@@ -1,3 +1,3 @@
 #pragma once
 
-void pit8254_init(void);
+void pit8254_enable(void);

@@ -15,8 +15,8 @@ typedef struct {
 #define PHYSMEM_TYPE_NVS            4
 #define PHYSMEM_TYPE_BAD            5
 
-physmem_range_t *phys_mem_map;
+extern physmem_range_t *phys_mem_map;
 
-int mmu_init(void);
+void mmu_init(void);
 
 void mmu_set_fsgsbase(void *fs_base, void *gs_base);

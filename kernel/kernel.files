@@ -59,3 +59,6 @@ lib/irq.h
 lib/irq.c
 arch/x86_64/atomic.h
 arch/x86_64/atomic.c
+arch/x86_64/isr.s
+arch/x86_64/interrupts.h
+arch/x86_64/interrupts.c

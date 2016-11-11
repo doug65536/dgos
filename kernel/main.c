@@ -2,8 +2,11 @@
 #include "cpu.h"
 #include "mm.h"
 #include "printk.h"
+#include "halt.h"
 
 int life_and_stuff = 42;
+
+char kernel_stack[262144];
 
 char buf[12];
 
@@ -15,7 +18,7 @@ __thread int tls_initialized_thing = 42;
 __thread int tls_initialized_thing_2 = 43;
 //__thread char tls_buf[10] = {24};
 
-volatile void *trick;
+void volatile *trick;
 
 static __attribute__((constructor)) void start_me_up()
 {
@@ -41,6 +44,14 @@ void (** volatile device_list)(void) = device_constructor_list;
 
 int main()
 {
+    while (1)
+        halt();
+
+    return 0;
+
+    //uint64_t *crash = (void*)0xfeedfacebeef0000;
+    //*crash = (uint64_t)0xfeedfeedfeedfeed;
+
     printk("Testing!\n");
     printk("Testing again!\n");
     for (int i = 0; i < 22; ++i)

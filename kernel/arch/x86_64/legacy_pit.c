@@ -2,6 +2,7 @@
 #include "ioport.h"
 #include "irq.h"
 #include "atomic.h"
+#include "interrupts.h"
 
 //
 // Command byte
@@ -84,16 +85,19 @@ static void pit8254_set_rate(int hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static void pit8254_handler(int irq)
+static void *pit8254_handler(int irq, void *stack_pointer)
 {
     (void)irq;
 
     atomic_inc_uint64(&timer_ticks);
+
+    return stack_pointer;
 }
 
-void pit8254_init(void)
+void pit8254_enable(void)
 {
-
-    pit8254_set_rate(1000);
+    pit8254_set_rate(20);
     irq_hook(0, pit8254_handler);
+    irq_setmask(0, 1);
+    interrupts_enable();
 }

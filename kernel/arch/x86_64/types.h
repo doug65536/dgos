@@ -28,3 +28,4 @@ typedef uint64_t uintmax_t;
 
 typedef int wchar_t;
 
+#define countof(arr) (sizeof(arr)/sizeof(*arr))

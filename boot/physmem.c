@@ -29,7 +29,7 @@ static uint16_t get_ram_region(physmem_range_t *range,
     return (uint16_t)eax;
 }
 
-uint16_t get_ram_regions(void)
+uint16_t get_ram_regions(uint32_t *ret_size)
 {
     physmem_range_t temp;
 
@@ -67,6 +67,8 @@ uint16_t get_ram_regions(void)
     far_result.offset = 0;
     far_copy(far_result, far_ptr((uint32_t)result), size);
     free(result);
+
+    *ret_size = size;
 
     print_line("Usable memory: %dMB", (int)(total_memory >> 20));
 

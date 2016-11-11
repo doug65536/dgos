@@ -26,8 +26,12 @@ void enter_kernel(uint64_t entry_point);
 
 void enter_kernel(uint64_t entry_point)
 {
+    uint32_t phys_mem_table_size = 0;
     uint32_t phys_mem_table =
-            (uint32_t)get_ram_regions() << 4;
+            (uint32_t)get_ram_regions(&phys_mem_table_size) << 4;
+
+    paging_map_range(phys_mem_table, phys_mem_table_size,
+                     phys_mem_table, PTE_PRESENT, 1);
 
     copy_or_enter(entry_point, 0, phys_mem_table);
 }

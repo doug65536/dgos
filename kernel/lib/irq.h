@@ -1,6 +1,8 @@
 #pragma once
 
-void irq_hook(int irq, void (*handler)(int));
-void irq_unhook(int irq, void (*handler)(int));
+extern void (*irq_setmask)(int irq, int unmask);
 
-void irq_invoke(int irq);
+void irq_hook(int irq, void *(*handler)(int, void*));
+void irq_unhook(int irq, void *(*handler)(int, void*));
+
+void *irq_invoke(int irq, void *stack_pointer);

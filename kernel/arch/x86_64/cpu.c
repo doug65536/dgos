@@ -2,6 +2,7 @@
 #include "cpu.h"
 #include "mmu.h"
 #include "gdt.h"
+#include "idt.h"
 #include "msr.h"
 #include "legacy_pic.h"
 #include "legacy_pit.h"
@@ -10,9 +11,6 @@
 
 void cpu_init(void)
 {
-    //init_gdt();
-    //mmu_init();
-
     cpu_cr0_change_bits(0,
                         CR0_WP |
                         CR0_NW);
@@ -37,20 +35,23 @@ void cpu_init(void)
 
     cpu_cr4_change_bits(CR4_TSD,
                         cr4 |
+                        CR4_OFXSR |
                         CR4_OSXMMEX);
 
-    if (cpuid_edx_bit(9, 1, 0)) {
+    //init_gdt();
+    idt_init();
+    mmu_init();
+
+    if (0 && cpuid_edx_bit(9, 1, 0)) {
         apic_init();
 
         // Still need to initialize in case of
         // spurious IRQs
-        timerpic_disable();
+        pic8259_disable();
 
         // Initialize APIC timer...
     } else {
-        timerpic_init();
-
-        pit8254_init();
+        pic8259_enable();
+        pit8254_enable();
     }
-
 }

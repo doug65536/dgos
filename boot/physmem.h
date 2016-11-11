@@ -15,4 +15,4 @@ typedef struct {
 #define PHYSMEM_TYPE_NVS            4
 #define PHYSMEM_TYPE_BAD            5
 
-uint16_t get_ram_regions(void);
+uint16_t get_ram_regions(uint32_t *ret_size);

@@ -1,12 +1,14 @@
 #include "legacy_pic.h"
 #include "ioport.h"
 #include "irq.h"
+#include "halt.h"
+#include "idt.h"
 
-// Implements legacy Programmable Interval Timer
-// and Programmable Interrupt Controller, used
-// if the APIC is not available
+// Implements legacy Programmable Interrupt Controller,
+// used if the APIC is not available
 //
 // The APIC replaces these functions when available
+// This still needs to handle spurious IRQs though
 
 #define PIC1_BASE   0x20
 #define PIC2_BASE   0xA0
@@ -18,7 +20,13 @@
 
 #define PIC_EOI     0x20
 
-static void pic8259_init(uint8_t pic1_irq_base, uint8_t pic2_irq_base)
+// PIC IRQ0 -> INT 32
+#define PIC_IRQ_BASE    32
+
+static uint16_t pic8259_mask;
+
+static void pic8259_init(uint8_t pic1_irq_base,
+                         uint8_t pic2_irq_base)
 {
     // Expect BIOS has configured master/slave
     outb(PIC1_CMD, 0x11);
@@ -76,8 +84,9 @@ static void pic8259_eoi(int slave)
 
 // Detect and discard spurious IRQ
 // or call IRQ handler and acknowledge IRQ
-static void pic8259_dispatcher(int irq)
+static void *pic8259_dispatcher(int irq, void *stack_pointer)
 {
+    void *returned_stack_pointer;
     uint8_t isr;
     int is_slave = (irq >= 8);
 
@@ -95,37 +104,49 @@ static void pic8259_dispatcher(int irq)
             if (irq >= 8)
                 pic8259_eoi(0);
 
-            return;
+            return stack_pointer;
         }
     }
 
     // If we made it here, it was not a spurious IRQ
 
     // Run IRQ handler
-    irq_invoke(irq);
+    returned_stack_pointer = irq_invoke(irq, stack_pointer);
 
     // Acknowledge IRQ
     pic8259_eoi(is_slave);
+
+    return returned_stack_pointer;
 }
 
-void timerpic_init(void)
+// Gets plugged into irq_setmask
+static void pic8259_setmask(int irq, int unmask)
 {
-    // Reprogram PIC to put IRQ0-15 at INT 0x20-0x2F
-    // and mask all IRQs
-    pic8259_init(0x20, 0x28);
+    if (unmask)
+        pic8259_mask &= ~(1 << irq);
+    else
+        pic8259_mask |= (1 << irq);
 
-    // Mask all IRQs except cascade and timer (IRQ0 and IRQ2)
-    outb(PIC1_DATA, ~(((1 << 0) | (1 << 2))) & 0xFF);
-    outb(PIC2_DATA, 0xFF);
+    if (irq < 8)
+        outb(PIC1_DATA, pic8259_mask & 0xFF);
+    else
+        outb(PIC2_DATA, (pic8259_mask >> 8) & 0xFF);
 }
 
-void timerpic_disable(void)
+void pic8259_disable(void)
 {
     // Need to move it to reasonable ISRs even if disabled
     // in case of spurious IRQs
-    timerpic_init();
+    pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
 
     // Mask all IRQs
     outb(PIC1_DATA, 0xFF);
     outb(PIC2_DATA, 0xFF);
+}
+
+void pic8259_enable(void)
+{
+    pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
+    irq_dispatcher = pic8259_dispatcher;
+    irq_setmask = pic8259_setmask;
 }

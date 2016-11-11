@@ -1,6 +1,6 @@
 # Make kernel
 
-BUILDROOT = $(realpath .)
+BUILDROOT := $(realpath .)
 export BUILDROOT
 
 CONFIG ?= x86_64
@@ -65,8 +65,6 @@ export CFLAGS
 
 ASFLAGS ?= --warn
 
-#-mcmodel=large
-
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
@@ -75,7 +73,8 @@ LINKERSCRIPT := kernel.ld
 
 KERNEL := $(BINDIR)/kernel
 
-LIBFILES := lib/libkernel.a \
+LIBFILES := \
+	lib/libkernel.a \
 	arch/$(ARCH)/libarch.a
 
 OUTPUTS = $(KERNEL)

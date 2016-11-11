@@ -18,9 +18,11 @@ CSRCS := cpu.c \
 	legacy_pit.c \
 	halt.c \
 	atomic.c \
+	interrupts.c \
 	$(DEVSRCS)
 
 ASRCS := entry.s \
+	isr.s \
 	generated_device_vtbl.s
 
 LIBNAME := arch

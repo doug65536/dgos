@@ -21,14 +21,14 @@ extern char ___tbss_en[];
 void tls_init(void)
 {
     // ??? Why doesn't this work
-    //if (&___main_teb_end != &___main_teb + 1) {
-    //    panic("Linker script wrong, &__main_teb_end != &__main_teb + 1");
-    //}
+    if (&___main_teb_end != &___main_teb + 1) {
+        panic("Linker script wrong, &__main_teb_end != &__main_teb + 1");
+    }
 
-    //if (((char*)&___main_teb - ___main_tls_bottom) !=
-    //        ___tbss_en - ___tdata_st) {
-    //    panic("Linker script wrong, wrong size for statically allocated TLS");
-    //}
+    if (((char*)&___main_teb - ___main_tls_bottom) !=
+            ___tbss_en - ___tdata_st) {
+        panic("Linker script wrong, wrong size for statically allocated TLS");
+    }
 
     // Initialize the statically allocated main thread's TLS
     memcpy(___main_tls_bottom, ___tdata_st,
