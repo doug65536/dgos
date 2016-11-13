@@ -64,7 +64,8 @@ struct text_display_vtbl_t {
     int (*draw)(text_display_base_t *,
                 char const *s);
     int (*draw_xy)(text_display_base_t *,
-                   int x, int y, char const *s);
+                   int x, int y,
+                   char const *s, int attrib);
 
     // Fill an area with a character, and optionally a color
     void (*fill)(text_display_base_t *,

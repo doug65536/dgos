@@ -3,6 +3,7 @@
 #include "irq.h"
 #include "halt.h"
 #include "idt.h"
+#include "interrupts.h"
 
 // Implements legacy Programmable Interrupt Controller,
 // used if the APIC is not available
@@ -45,6 +46,12 @@ static void pic8259_init(uint8_t pic1_irq_base,
     // 8086 mode
     outb(PIC1_DATA, 0x01);
     outb(PIC2_DATA, 0x01);
+
+    // Initially all IRQs masked
+    pic8259_mask = 0xFFFF;
+
+    outb(PIC1_DATA, pic8259_mask & 0xFF);
+    outb(PIC2_DATA, (pic8259_mask >> 8) & 0xFF);
 }
 
 // Get command port for master or slave
@@ -80,6 +87,9 @@ static void pic8259_eoi(int slave)
 {
     uint16_t port = pic8259_port_cmd(slave);
     outb(port, PIC_EOI);
+
+    if (slave)
+        outb(PIC1_BASE, PIC_EOI);
 }
 
 // Detect and discard spurious IRQ
@@ -127,6 +137,19 @@ static void pic8259_setmask(int irq, int unmask)
     else
         pic8259_mask |= (1 << irq);
 
+    // Update cascade mask
+    if (((pic8259_mask & 0xFF00) != 0xFF00) &&
+            (pic8259_mask & (1 << 2))) {
+        // Need to unmask cascade, IRQ2
+        pic8259_mask &= ~(1 << 2);
+        outb(PIC1_DATA, pic8259_mask & 0xFF);
+    } else if (((pic8259_mask & 0xFF00) == 0xFF00) &&
+            !(pic8259_mask & (1 << 2))) {
+        // Mask cascade, no upper IRQs enabled
+        pic8259_mask |= (1 << 2);
+        outb(PIC1_DATA, pic8259_mask & 0xFF);
+    }
+
     if (irq < 8)
         outb(PIC1_DATA, pic8259_mask & 0xFF);
     else
@@ -149,4 +172,5 @@ void pic8259_enable(void)
     pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
     irq_dispatcher = pic8259_dispatcher;
     irq_setmask = pic8259_setmask;
+    interrupts_enable();
 }

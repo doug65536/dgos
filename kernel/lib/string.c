@@ -97,6 +97,18 @@ void *memset(void *dest, int c, size_t n)
 
 void *memcpy(void *dest, void const *src, size_t n)
 {
+#ifdef __GNUC__
+    // If source and destination are aligned, copy 128 bits at a time
+    if (n >= 16 && !((intptr_t)dest & 0x0F) && !((intptr_t)src & 0x0F)) {
+        __ivec2 *vd = dest;
+        __ivec2 const *vs = src;
+        while (n >= sizeof(*vd)) {
+            *vd = *vs;
+            n -= sizeof(*vd);
+        }
+    }
+#endif
+
     char *d = dest;
     char const *s = src;
     while (n--)

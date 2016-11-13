@@ -3,6 +3,7 @@ utils/debug-kvm-commands.template
 utils/debug-kernel-kvm-commands.template
 utils/bochs-debugger-commands
 utils/bochs-debugger-boot-commands
+utils/watch.sh
 bootsect.c
 bootsect.h
 bootsect.ld
@@ -39,4 +40,3 @@ physmem.c
 physmem.h
 farptr.h
 farptr.c
-utils/watch-bochs.sh

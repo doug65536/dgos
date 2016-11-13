@@ -188,18 +188,19 @@ int munlock(
 #define MCL_FUTURE
 
 /// Lock all process memory
-int mlockall(int flags);
+int mlockall(int __flags);
 
 /// Unlock all process memory
 int munlockall(void);
 
 /// Set the program break to the specified value
-int brk(void *addr);
+int brk(void *__addr);
 
 /// Adjust the program break by specified value
-void *sbrk(intptr_t increment);
+void *sbrk(intptr_t __increment);
 
 /// Absolute minimum limits
+#ifndef _POSIX_ARG_MAX
 #define _POSIX_ARG_MAX (4096)
 #define _POSIX_CHILD_MAX (25)
 #define _POSIX_HOST_NAME_MAX (255)
@@ -210,6 +211,7 @@ void *sbrk(intptr_t increment);
 #define _POSIX_SYMLOOP_MAX (8)
 #define _POSIX_TTY_NAME_MAX (9)
 #define _POSIX_TZNAME_MAX (6)
+#endif
 
 /// Maximum number of arguments to exec functions
 #define _SC_ARG_MAX

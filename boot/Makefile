@@ -188,7 +188,21 @@ run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 #,guest_errors,unimp
 
 run: all bootable-disk
-	qemu-system-x86_64 -m 8G -drive file=$(DISKIMAGE),format=raw
+	qemu-system-x86_64 -m 8G -drive file=$(DISKIMAGE),format=raw \
+		-net user \
+		-net nic,model=rtl8139 \
+		-net nic,model=ne2k_pci \
+		-net nic,model=e1000
+
+#		-netdev user,id=mynet0,net=192.168.66.0/24,dhcpstart=192.168.66.9 \
+#		-net nic,model=i82551 \
+#		-net nic,model=i82557b \
+#		-net nic,model=i82559er \
+#		-net nic,model=pcnet \
+#		-net nic,model=smc91c111 \
+#		-net nic,model=lance \
+#		-net nic,model=ne2k_isa \
+#		-net nic,model=mcf_fec
 
 #
 # Debug in bochs

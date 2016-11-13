@@ -3,6 +3,8 @@
 #include "mm.h"
 #include "printk.h"
 #include "halt.h"
+#include "pci.h"
+#include "legacy_keyboard.h"
 
 int life_and_stuff = 42;
 
@@ -44,6 +46,9 @@ void (** volatile device_list)(void) = device_constructor_list;
 
 int main()
 {
+    pci_init();
+    keyb8042_init();
+
     while (1)
         halt();
 
@@ -63,9 +68,9 @@ int main()
     TEST_FORMAT("%d", int, 42);
     TEST_FORMAT("%ld", long, 42);
     TEST_FORMAT("%lld", long long, 42);
-    TEST_FORMAT("%jd", intmax_t, 42);
-    TEST_FORMAT("%zd", ssize_t, 42);
-    TEST_FORMAT("%td", ptrdiff_t, 42);
+    //TEST_FORMAT("%jd", intmax_t, 42);
+    //TEST_FORMAT("%zd", ssize_t, 42);
+    //TEST_FORMAT("%td", ptrdiff_t, 42);
 
     // Min-width only
     TEST_FORMAT("%5d", int, 42);
@@ -96,8 +101,8 @@ int main()
 
     TEST_FORMAT("%-5d", int, -42);
     TEST_FORMAT("%+5d", int, -42);
-    TEST_FORMAT("%+5.4td", ptrdiff_t, 42);
-    TEST_FORMAT("%+5.4td", ptrdiff_t, -42);
+    //TEST_FORMAT("%+5.4td", ptrdiff_t, 42);
+    //TEST_FORMAT("%+5.4td", ptrdiff_t, -42);
 
     return 42;
 }

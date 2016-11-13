@@ -7,6 +7,7 @@ CSRCS := mm.c \
 	dev_text.c \
 	conio.c \
 	string.c \
-	irq.c
+	irq.c \
+	time.c
 
 include $(BUILDROOT)/library.mk

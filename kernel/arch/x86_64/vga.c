@@ -23,6 +23,8 @@ struct text_display_t {
     int height;
 
     int attrib;
+
+    uint16_t shadow[80*25];
 };
 
 #define MAX_VGA_DISPLAYS 16
@@ -64,19 +66,24 @@ static void move_cursor_if_on(text_display_t *self)
                        self->cursor_y);
 }
 
-static void write_char_at(text_display_t *self,
-                   int x, int y, int character)
+static void write_char_at(
+        text_display_t *self,
+        int x, int y,
+        int character, int attrib)
 {
-    self->video_mem[y * self->width + x] =
-            (character & 0xFF) | (self->attrib << 8);
+    size_t place = y * self->width + x;
+    uint16_t pair = (character & 0xFF) | ((attrib & 0xFF) << 8);
+    self->shadow[place] = pair;
+    self->video_mem[place] = pair;
 }
 
 static void clear_screen(text_display_t *self)
 {
-    uint16_t *p = self->video_mem;
+    uint16_t *p = self->shadow;
     for (int y = 0; y < self->height; ++y)
         for (int x = 0; x < self->width; ++x)
             *p++ = ' ' | (self->attrib << 8);
+    memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
 }
 
 static void fill_region(text_display_t *self,
@@ -86,7 +93,7 @@ static void fill_region(text_display_t *self,
 {
     int row_count = ey - sy;
     int row_ofs;
-    uint16_t *dst = self->video_mem + (sy * self->width);
+    uint16_t *dst = self->shadow + (sy * self->width);
 
     character &= 0xFF;
     while (row_count--) {
@@ -94,6 +101,11 @@ static void fill_region(text_display_t *self,
             dst[row_ofs] = character | (self->attrib << 8);
         dst += self->width;
     }
+    memcpy(self->video_mem + self->width * sy,
+           self->shadow + self->width * sy,
+           sizeof(*self->video_mem) * (ey - sy + 1));
+
+
 }
 
 // negative x move the screen content left
@@ -136,8 +148,8 @@ static void scroll_screen(text_display_t *self, int x, int y)
 
     if (y <= 0) {
         // Up
-        src = self->video_mem - (y * self->width);
-        dst = self->video_mem;
+        src = self->shadow - (y * self->width);
+        dst = self->shadow;
         row_count = self->height + y;
         // Loop from top to bottom
         row_step = self->width;
@@ -146,8 +158,8 @@ static void scroll_screen(text_display_t *self, int x, int y)
         clear_start_row = clear_end_row + y;
     } else {
         // Down
-        dst = self->video_mem + ((self->height - 1) * self->width);
-        src = self->video_mem + ((self->height - y - 1) * self->width);
+        dst = self->shadow + ((self->height - 1) * self->width);
+        src = self->shadow + ((self->height - y - 1) * self->width);
         row_count = self->height - y;
         // Loop from bottom to top
         row_step = -self->width;
@@ -197,6 +209,8 @@ static void scroll_screen(text_display_t *self, int x, int y)
                     clear_start_row ? self->height : clear_start_row,
                     ' ');
     }
+
+    memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
 }
 
 // Move the cursor right one character, wrapping and
@@ -235,7 +249,7 @@ static void print_character(text_display_t *self, int ch)
         write_char_at(self,
                       self->cursor_x,
                       self->cursor_y,
-                      ch);
+                      ch, self->attrib);
         advance_cursor(self, 1);
         break;
     }
@@ -440,11 +454,20 @@ static int vga_draw(text_display_base_t *dev,
 }
 
 static int vga_draw_xy(text_display_base_t *dev,
-                       int x, int y, char const *s)
+                       int x, int y,
+                       char const *s, int attrib)
 {
-    TEXT_DEV_PTR_UNUSED(dev);
-    // FIXME
-    (void)x; (void)y; (void)s;
+    TEXT_DEV_PTR(dev);
+
+    while (*s) {
+        if (x >= self->width) {
+            x = 0;
+            if (++y >= self->height)
+                y = 0;
+        }
+
+        write_char_at(self, x++, y, *s++, attrib);
+    }
     return 0;
 }
 

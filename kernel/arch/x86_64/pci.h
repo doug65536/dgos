@@ -1,3 +1,4 @@
 #pragma once
+#include "types.h"
 
-int init_pci(void);
+int pci_init(void);

@@ -28,4 +28,16 @@ typedef uint64_t uintmax_t;
 
 typedef int wchar_t;
 
+/// SSE vectors
+typedef int8_t __ivec16 __attribute__((vector_size(16)));
+typedef int16_t __ivec8 __attribute__((vector_size(16)));
+typedef int32_t __ivec4 __attribute__((vector_size(16)));
+typedef int64_t __ivec2 __attribute__((vector_size(16)));
+typedef uint8_t __uvec16 __attribute__((vector_size(16)));
+typedef uint16_t __uvec8 __attribute__((vector_size(16)));
+typedef uint32_t __uvec4 __attribute__((vector_size(16)));
+typedef uint64_t __uvec2 __attribute__((vector_size(16)));
+typedef float __fvec4 __attribute__((vector_size(16)));
+typedef float __dvec2 __attribute__((vector_size(16)));
+
 #define countof(arr) (sizeof(arr)/sizeof(*arr))

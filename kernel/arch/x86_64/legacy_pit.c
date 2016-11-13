@@ -2,7 +2,10 @@
 #include "ioport.h"
 #include "irq.h"
 #include "atomic.h"
-#include "interrupts.h"
+#include "time.h"
+
+#include "conio.h"
+#include "printk.h"
 
 //
 // Command byte
@@ -53,28 +56,29 @@
 uint64_t volatile timer_ticks;
 
 // Exceeds 2^63 in about 292000 years
-uint64_t volatile timer_usecs;
+uint64_t volatile timer_ms;
 
-static int divisor;
-static int rate_hz;
-static int accumulator;
+static unsigned divisor;
+static unsigned rate_hz;
+static unsigned accumulator;
 
-static void pit8254_set_rate(int hz)
+static void pit8254_set_rate(unsigned hz)
 {
     // Reasonable upper limit, prevent 32 bit overflow
-    // This puts the inimum timeslice at 4 microseconds
+    // This puts the minimum timeslice at 16 microseconds
     // which is ridiculously short
-    if (hz > 250000)
-        hz = 250000;
+    // The divisor will never be below 19
+    if (hz > 62500U)
+        hz = 62500U;
 
     // Clamp to valid range
-    if (hz <= 18)
-        divisor = 0xFFFF;
+    if (hz <= 18U)
+        divisor = 0xFFFFU;
     else
-        divisor = 1193181666 / (hz * 1000);
+        divisor = 1193181666U / (hz * 1000U);
 
     rate_hz = hz;
-    accumulator = 0;
+    accumulator = 0U;
 
     outb(PIT_CMD,
          PIT_CHANNEL(0) |
@@ -91,13 +95,43 @@ static void *pit8254_handler(int irq, void *stack_pointer)
 
     atomic_inc_uint64(&timer_ticks);
 
+    // Accumulate crystal clock cycles
+    accumulator += divisor * 1000;
+
+    // Accumulated milliseconds
+
+    if (accumulator >= 1193181U) {
+        unsigned accum_ms = accumulator / 1193181U;
+        accumulator -= 1193181U * accum_ms;
+        atomic_add_uint64(&timer_ms, accum_ms);
+    }
+
+    // Test
+    static uint64_t last_time;
+    if (last_time + 1000 <= timer_ms) {
+        last_time = timer_ms;
+
+        char buf[10];
+        snprintf(buf, sizeof(buf), "%8ld ", last_time);
+
+        console_display_vtbl.draw_xy(
+                    console_display, 20, 0, buf, 7);
+
+    }
+
     return stack_pointer;
+}
+
+static uint64_t pit8254_time_ms(void)
+{
+    return timer_ms;
 }
 
 void pit8254_enable(void)
 {
-    pit8254_set_rate(20);
+    time_ms = pit8254_time_ms;
+
+    pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);
     irq_setmask(0, 1);
-    interrupts_enable();
 }

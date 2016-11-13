@@ -13,3 +13,4 @@ void halt_forever(void)
     while (1)
         halt();
 }
+

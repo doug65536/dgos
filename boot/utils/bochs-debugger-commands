@@ -1,8 +1,5 @@
 u switch-mode
 ldsym "bin/bochs-kernel-symbols"
-sba 26753576
-lb "entry"
 lb "exception_common"
-lb "isr_common"
-lb "isr_entry_32"
+lb "keyb8042_init"
 c

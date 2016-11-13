@@ -652,3 +652,12 @@ int vsnprintf(char *buf, size_t limit, const char *format, va_list ap)
 
     return formatter(format, ap, vsnprintf_emit_chars, &context);
 }
+
+int snprintf(char *buf, size_t limit, char const *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    int result = vsnprintf(buf, limit, format, ap);
+    va_end(ap);
+    return result;
+}
