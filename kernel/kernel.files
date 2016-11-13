@@ -64,3 +64,5 @@ arch/x86_64/interrupts.h
 arch/x86_64/interrupts.c
 lib/time.h
 lib/time.c
+lib/mouse.h
+lib/mouse.c

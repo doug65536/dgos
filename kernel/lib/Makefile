@@ -8,6 +8,7 @@ CSRCS := mm.c \
 	conio.c \
 	string.c \
 	irq.c \
-	time.c
+	time.c \
+	mouse.c
 
 include $(BUILDROOT)/library.mk
