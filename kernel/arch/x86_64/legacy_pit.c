@@ -115,7 +115,7 @@ static void *pit8254_handler(int irq, void *stack_pointer)
         snprintf(buf, sizeof(buf), "%8ld ", last_time);
 
         console_display_vtbl.draw_xy(
-                    console_display, 20, 0, buf, 7);
+                    console_display, 70, 0, buf, 7);
 
     }
 
