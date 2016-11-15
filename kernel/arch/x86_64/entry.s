@@ -3,7 +3,7 @@
 .globl entry
 entry:
 	# Align stack
-	#and $-16,%rsp
+	and $-16,%rsp
 
 	lea 262144+kernel_stack(%rip),%rsp
 
@@ -18,6 +18,10 @@ entry:
 
 	# Store the physical memory map address
 	# passed in from bootloader
+	mov %ecx,%edx
+	shr $20,%edx
+	mov %rdx,phys_mem_map_count(%rip)
+	and $0x000FFFFF,%rcx
 	mov %rcx,phys_mem_map(%rip)
 
 	call cpu_init

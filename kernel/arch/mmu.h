@@ -16,6 +16,7 @@ typedef struct {
 #define PHYSMEM_TYPE_BAD            5
 
 extern physmem_range_t *phys_mem_map;
+extern size_t phys_mem_map_count;
 
 void mmu_init(void);
 
