@@ -1,5 +1,11 @@
 #include "idt.h"
 #include "gdt.h"
+#include "conio.h"
+#include "printk.h"
+#include "halt.h"
+#include "time.h"
+#include "interrupts.h"
+#include "msr.h"
 
 idt_entry_64_t idt[0x80];
 
@@ -202,16 +208,164 @@ int idt_init(void)
     return 0;
 }
 
-static void *exception_handler(interrupt_info_t *info, void *stack_pointer)
+static void *unhandled_exception_handler(isr_full_context_t *ctx)
 {
-    (void)info;
-    return stack_pointer;
+    char fmt_buf[64];
+    int color = 0x0F;
+    static char const *reg_names[] = {
+        "rax",
+        "rbx",
+        "rcx",
+        "rdx",
+        "rsi",
+        "rdi",
+        "rbp",
+        " r8",
+        " r9",
+        "r10",
+        "r11",
+        "r12",
+        "r13",
+        "r14",
+        "r15"
+    };
+
+    static char const *seg_names[] = {
+        "ds", "es", "fs", "gs"
+    };
+
+    static char const reserved_exception[] = "Reserved";
+
+    static char const *exception_names[] = {
+        "#DE Divide Error",
+        "#DB Debug",
+        "NMI",
+        "#BP Breakpoint,"
+        "#OF Overflow",
+        "#BR BOUND Range Exceeded",
+        "#UD Invalid Opcode",
+        "#NM Device Not Available",
+        "#DF Double Fault",
+        reserved_exception,
+        "#TS Invalid TSS",
+        "#NP Segment Not Present",
+        "#SS Stack Fault",
+        "#GP General Protection",
+        "#PF Page Fault",
+        reserved_exception,
+        "#MF Floating-Point Error",
+        "#AC Alignment Check",
+        "#MC Machine Check",
+        "#XM SIMD",
+        "#VE Virtualization",
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception,
+        reserved_exception
+    };
+
+    for (int i = 0; i < 16; ++i) {
+        if (i < 15) {
+            // General register name
+            console_display->vtbl->draw_xy(console_display,
+                                           0, i, reg_names[i], color);
+            // General register value
+            snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx ", ctx->gpr->r[i]);
+            console_display->vtbl->draw_xy(console_display,
+                                           3, i, fmt_buf, color);
+        }
+
+        // XMM register name
+        snprintf(fmt_buf, sizeof(fmt_buf), " %sxmm%d",
+                 i < 10 ? " " : "",
+                 i);
+        console_display->vtbl->draw_xy(console_display,
+                                       29, i, fmt_buf, color);
+        // XMM register value
+        snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx%016lx ",
+                ctx->fpr->xmm[i].qword[0],
+                ctx->fpr->xmm[i].qword[1]);
+        console_display->vtbl->draw_xy(console_display,
+                                       35, i, fmt_buf, color);
+    }
+
+    for (int i = 0; i < 4; ++i) {
+        // Segment register name
+        console_display->vtbl->draw_xy(console_display,
+                                       37+i*8, 16, seg_names[i], color);
+        // Segment register value
+        snprintf(fmt_buf, sizeof(fmt_buf), "=%04x ",
+                 ctx->gpr->s[i]);
+        console_display->vtbl->draw_xy(console_display,
+                                       39+i*8, 16, fmt_buf, color);
+    }
+
+    // rsp
+    console_display->vtbl->draw_xy(console_display,
+                                   0, 15, "ss:rsp", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%016lx ",
+             ctx->gpr->ss, ctx->gpr->rsp);
+    console_display->vtbl->draw_xy(console_display,
+                                   6, 15, fmt_buf, color);
+
+    // cs:rip
+    console_display->vtbl->draw_xy(console_display,
+                                   0, 16, "cs:rip", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%016lx",
+             ctx->gpr->cs, (uint64_t)ctx->gpr->rip);
+    console_display->vtbl->draw_xy(console_display,
+                                   6, 16, fmt_buf, color);
+
+    // rflags
+    console_display->vtbl->draw_xy(console_display,
+                                   45, 17, "rflags", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx",
+             (uint64_t)ctx->gpr->rflags);
+    console_display->vtbl->draw_xy(console_display,
+                                   51, 17, fmt_buf, color);
+
+    // fault address
+    console_display->vtbl->draw_xy(console_display,
+                                   48, 18, "cr2", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx",
+             cpu_get_fault_address());
+    console_display->vtbl->draw_xy(console_display,
+                                   51, 18, fmt_buf, color);
+
+    // error code
+    console_display->vtbl->draw_xy(console_display,
+                                   0, 18, "Error code", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%016lx",
+             ctx->gpr->info.error_code);
+    console_display->vtbl->draw_xy(console_display,
+                                   10, 18, fmt_buf, color);
+
+    // exception
+    console_display->vtbl->draw_xy(console_display,
+                                   0, 17, "Exception", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
+             ctx->gpr->info.interrupt,
+             exception_names[ctx->gpr->info.interrupt]);
+    console_display->vtbl->draw_xy(console_display,
+                                   9, 17, fmt_buf, color);
+
+    halt_forever();
+
+    return ctx;
 }
 
 isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx)
 {
-    ctx->fpr->xmm[0].qword[0] = 0xfeedbaadbeeff00d;
-    ctx->fpr->xmm[1].word[5] = 0xface;
+    // FIXME: handle some exceptions like page faults sometime
+
+    unhandled_exception_handler(ctx);
     return ctx;
 }
 

@@ -41,11 +41,14 @@ typedef struct interrupt_info_t {
 
 // General register context
 typedef struct isr_gpr_context_t {
-    uint64_t r[16];
+    uint16_t s[4];
+    uint64_t r[15];
     interrupt_info_t info;
     void *rip;
     uint64_t cs;
     uint64_t rflags;
+    uint64_t rsp;
+    uint64_t ss;
 } isr_gpr_context_t;
 
 // FPU/SSE context
