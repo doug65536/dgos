@@ -5,6 +5,7 @@
 #include "mm.h"
 #include "string.h"
 #include "ioport.h"
+#include "time.h"
 
 DECLARE_text_display_DEVICE(vga);
 
@@ -27,12 +28,12 @@ struct text_display_t {
     uint16_t shadow[80*25];
 };
 
-#define MAX_VGA_DISPLAYS 16
+#define MAX_VGA_DISPLAYS 2
 
-#define VGA_CRT_CTRL    (self->io_base + 0x4)
+#define VGA_CRT_CTRL    (self->io_base)
 
-#define VGA_SET_CURSOR_LO(pos) (0x0F | ((pos) & 0xFF))
-#define VGA_SET_CURSOR_HI(pos) (0x0E | ((pos >> 8) & 0xFF))
+#define VGA_SET_CURSOR_LO(pos) (0x0F | (((pos) << 8) & 0xFF00))
+#define VGA_SET_CURSOR_HI(pos) (0x0E | ((pos) & 0xFF00))
 
 static text_display_t displays[MAX_VGA_DISPLAYS];
 
@@ -131,15 +132,8 @@ static void scroll_screen(text_display_t *self, int x, int y)
 
         // Cursor tries to move with content
 
-        if (x < self->width - self->cursor_x)
-            self->cursor_x += x;
-        else
-            self->cursor_x = self->width - 1;
-
-        if (y < self->height - self->cursor_y)
-            self->cursor_y += y;
-        else
-            self->cursor_y = self->height;
+        self->cursor_x += x;
+        self->cursor_y += y;
 
         cap_position(self, &self->cursor_x, &self->cursor_y);
         move_cursor_if_on(self);
@@ -213,8 +207,7 @@ static void scroll_screen(text_display_t *self, int x, int y)
     memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
 }
 
-// Move the cursor right one character, wrapping and
-// scrolling as necessary.
+// Advance the cursor, wrapping and scrolling as necessary.
 // Does not update hardware cursor.
 static void advance_cursor(text_display_t *self, int distance)
 {
@@ -260,7 +253,7 @@ static void print_character(text_display_t *self, int ch)
 static int vga_detect(text_display_base_t **result)
 {
     displays[0].vtbl = &vga_device_vtbl;
-    displays[0].io_base = READ_BIOS_DATA_AREA(uint16_t, 0x463) - 4;
+    displays[0].io_base = READ_BIOS_DATA_AREA(uint16_t, 0x463);
     displays[0].video_mem = (void*)0xB8000;
     displays[0].cursor_on = 1;
     displays[0].cursor_x = 0;
@@ -400,6 +393,7 @@ static void vga_putc(text_display_base_t *dev,
 {
     TEXT_DEV_PTR(dev);
     print_character(self, character);
+    move_cursor_if_on(self);
 }
 
 static void vga_putc_xy(text_display_base_t *dev,
