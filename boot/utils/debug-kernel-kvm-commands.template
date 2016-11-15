@@ -3,15 +3,19 @@ set architecture i386:x86-64
 target remote localhost:1234
 shell wmctrl -a kernel/boot
 layout src
+continue
+break
+set $ebp = 1
+continue
 
 define qq
 	kill inferior 1
 	quit
 end
 
-document qq
-Kills the inferior and quits, without prompting
-end
+#document qq
+#Kills the inferior and quits, without prompting
+#end
 
 define code16
 	set architecture i8086

@@ -57,6 +57,7 @@ endif
 CFLAGS ?= -g3 -O2 -ffreestanding \
 	-Wno-unused-function -fpic -mno-red-zone \
 	-ftls-model=$(TLS_MODEL) \
+	-fipa-icf \
 	$(WEVERYTHING)
 
 CFLAGS += $(INCLUDEARGS)

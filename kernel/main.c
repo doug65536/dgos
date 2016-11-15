@@ -49,6 +49,9 @@ int main()
     pci_init();
     keyb8042_init();
 
+    // Crash
+    //*(uint64_t*)0xfeedbeefbaadf00d = 0;
+
     while (1)
         halt();
 

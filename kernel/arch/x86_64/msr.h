@@ -92,3 +92,5 @@ uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set);
 
 // Returns new value of cr0
 uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set);
+
+uint64_t cpu_get_fault_address(void);

@@ -106,3 +106,13 @@ uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set)
     );
     return rax;
 }
+
+uint64_t cpu_get_fault_address(void)
+{
+    uint64_t addr;
+    __asm__ __volatile__ (
+        "mov %%cr2,%0\n\t"
+        : "=r" (addr)
+    );
+    return addr;
+}
