@@ -62,13 +62,15 @@ uint16_t get_ram_regions(uint32_t *ret_size)
     }
 
     far_ptr_t far_result;
+    // Allocate extra space in case entries get split
+    // Worst case is every entry overlaps and becomes 3 entries
     uint16_t size = (count + 1) * sizeof(*result);
-    far_result.segment = far_malloc(size);
+    far_result.segment = far_malloc(size * 3);
     far_result.offset = 0;
     far_copy(far_result, far_ptr((uint32_t)result), size);
     free(result);
 
-    *ret_size = size;
+    *ret_size = count;
 
     print_line("Usable memory: %dMB", (int)(total_memory >> 20));
 
