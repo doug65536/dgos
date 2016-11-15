@@ -27,7 +27,7 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-GDB ?= gdb-multiarch
+GDB ?= gdb
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
@@ -168,13 +168,11 @@ debuggable-kernel-disk: kernel bootable-disk inject-kernel
 
 $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
 	sed "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | \
-		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" | \
-		sort > $@
+		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
 $(BINDIR)/debug-kernel-kvm-gdbcommands: utils/debug-kernel-kvm-commands.template
 	sed "s|\$$SYMBOLFILE|$(KERNELSYMBOLFILE)|g" $< | \
-		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" | \
-		sort > $@
+		sed "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
 debug: all debuggable-disk $(BINDIR)/debug-kvm-gdbcommands
 	$(GDB) -x $(BINDIR)/debug-kvm-gdbcommands
