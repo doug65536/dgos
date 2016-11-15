@@ -90,13 +90,13 @@ static char const formatter_hexlookup[] = "0123456789ABCDEF";
 
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
-static int formatter(
+static intptr_t formatter(
         const char *format, va_list ap,
         int (*emit_chars)(char const *, int, void*),
         void *emit_context)
 {
     formatter_flags_t flags;
-    int chars_written = 0;
+    intptr_t chars_written = 0;
     int *output_arg;
     char digits[32], *digit_out;
 
@@ -617,16 +617,8 @@ static int vsnprintf_emit_chars(char const *s, int ch, void *context)
 
         ++count;
 
-        if (ctx->level + 1 == ctx->limit) {
-            // The last byte of space in the buffer,
-            // write guaranteed null terminator
-            if (ctx->buf)
-                ctx->buf[ctx->level] = 0;
-            ++ctx->level;
-        } else if (ctx->level < ctx->limit) {
-            // Within the buffer
-            if (ctx->buf)
-                ctx->buf[ctx->level] = ch;
+        if (ctx->level < ctx->limit - 1) {
+            ctx->buf[ctx->level] = ch;
             ++ctx->level;
         }
     } while (s);
@@ -650,7 +642,14 @@ int vsnprintf(char *buf, size_t limit, const char *format, va_list ap)
     context.limit = limit;
     context.level = 0;
 
-    return formatter(format, ap, vsnprintf_emit_chars, &context);
+    intptr_t chars_needed = formatter(format, ap, vsnprintf_emit_chars, &context);
+
+    if ((size_t)chars_needed < limit)
+        buf[chars_needed] = 0;
+    else
+        buf[limit-1] = 0;
+
+    return chars_needed;
 }
 
 int snprintf(char *buf, size_t limit, char const *format, ...)
