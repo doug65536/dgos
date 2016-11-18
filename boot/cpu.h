@@ -11,6 +11,42 @@ typedef struct gdt_entry_t {
     uint8_t base_high;
 } gdt_entry_t;
 
+#define GDT_ACCESS_PRESENT_BIT   7
+#define GDT_ACCESS_DPL_BIT       5
+#define GDT_ACCESS_EXEC_BIT      3
+#define GDT_ACCESS_DOWN_BIT      2
+#define GDT_ACCESS_RW_BIT        1
+
+#define GDT_ACCESS_PRESENT      (1 << GDT_ACCESS_PRESENT_BIT)
+#define GDT_ACCESS_EXEC         (1 << GDT_ACCESS_EXEC_BIT)
+#define GDT_ACCESS_DOWN         (1 << GDT_ACCESS_DOWN_BIT)
+#define GDT_ACCESS_RW           (1 << GDT_ACCESS_RW_BIT)
+
+#define GDT_ACCESS_DPL_BITS     2
+#define GDT_ACCESS_DPL_MASK     ((1 << GDT_ACCESS_DPL_BITS)-1)
+#define GDT_ACCESS_DPL          (GDT_ACCESS_DPL_MASK << GDT_ACCESS_DPL_BIT)
+#define GDT_ACCESS_DPL_n(dpl)   ((dpl) << GDT_ACCESS_DPL_BIT)
+
+#define GDT_FLAGS_GRAN_BIT      7
+#define GDT_FLAGS_IS32_BIT      6
+#define GDT_FLAGS_IS64_BIT      5
+
+#define GDT_FLAGS_GRAN          (1 << GDT_FLAGS_GRAN_BIT)
+#define GDT_FLAGS_IS32          (1 << GDT_FLAGS_IS32_BIT)
+#define GDT_FLAGS_IS64          (1 << GDT_FLAGS_IS64_BIT)
+
+#define GDT_LIMIT_LOW_MASK      0xFFFF
+#define GDT_BASE_LOW_MASK       0xFFFF
+
+#define GDT_BASE_MIDDLE_BIT     16
+#define GDT_BASE_MIDDLE         0xFF
+
+#define GDT_LIMIT_HIGH_BIT      16
+#define GDT_LIMIT_HIGH          0x0F
+
+#define GDT_BASE_HIGH_BIT       24
+#define GDT_BASE_HIGH           0xFF
+
 #define GDT_MAKE_SEGMENT_DESCRIPTOR(base, \
             limit, \
             present, \
@@ -22,24 +58,24 @@ typedef struct gdt_entry_t {
             is32, \
             is64) \
 { \
-    ((limit) & 0xFFFF), \
-    ((base) & 0xFFFF), \
-    (((base) >> 16) & 0xFF), \
+    ((limit) & GDT_LIMIT_LOW_MASK), \
+    ((base) & GDT_BASE_LOW_MASK), \
+    (((base) >> GDT_BASE_MIDDLE_BIT) & GDT_BASE_MIDDLE), \
     ( \
-        ((present) ? 1 << 7 : 0) | \
-        (((privilege) & 0x03) << 5) | \
+        ((present) ? GDT_ACCESS_PRESENT : 0) | \
+        GDT_ACCESS_DPL_n(privilege) | \
         (1 << 4) | \
-        ((executable) ? 1 << 3 : 0) | \
-        ((downward) ? 1 << 2 : 0) | \
-        ((rw) ? 1 << 1 : 0) \
+        ((executable) ? GDT_ACCESS_EXEC : 0) | \
+        ((downward) ? GDT_ACCESS_DOWN : 0) | \
+        ((rw) ? GDT_ACCESS_RW : 0) \
     ), \
     ( \
-        ((granularity) ? 1 << 7 : 0) | \
-        ((is32) ? 1 << 6 : 0) | \
-        ((is64) ? 1 << 5 : 0) | \
-        (((limit) >> 16) & 0x0F) \
+        ((granularity) ? GDT_FLAGS_GRAN : 0) | \
+        ((is32) ? GDT_FLAGS_IS32 : 0) | \
+        ((is64) ? GDT_FLAGS_IS64 : 0) | \
+        (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH) \
     ), \
-    (((base) >> 24) & 0xFF) \
+    (((base) >> GDT_BASE_HIGH_BIT) & GDT_BASE_HIGH) \
 }
 
 //
