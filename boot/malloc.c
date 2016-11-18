@@ -46,7 +46,7 @@ uint16_t far_malloc_aligned(uint32_t bytes)
 
 // This must be small enough to fit before first header
 // Maximum 13 bytes
-typedef struct {
+typedef struct alloc_state_t {
     uint8_t alloc_id;
     uint8_t heap_ready;
 

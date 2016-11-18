@@ -54,7 +54,7 @@ typedef struct
 // .Filename (padded with spaces)                                  .
 // .................................................................
 //
-typedef struct {
+typedef struct dir_entry_t {
     // offset = 0x00
     char name[11];
 
@@ -125,7 +125,7 @@ typedef struct {
 
 // https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#VFAT_long_file_names
 // encodes 13 UTF-16 codepoints per entry
-typedef struct {
+typedef struct long_dir_entry_t {
     // offset = 0x00
     uint8_t ordinal;
 
@@ -156,12 +156,12 @@ typedef union {
     long_dir_entry_t long_entry;
 } dir_union_t;
 
-typedef struct {
+typedef struct long_name_fragment_t {
     uint8_t ordinal;
     uint16_t fragment[13];
 } long_name_fragment_t;
 
-typedef struct {
+typedef struct filename_info_t {
     uint8_t lowercase_flags;
     uint8_t filename_length;
     uint8_t extension_length;

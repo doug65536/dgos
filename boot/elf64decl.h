@@ -12,7 +12,7 @@ typedef uint64_t Elf64_Xword;
 typedef int64_t Elf64_Sxword;
 
 // File header
-typedef struct {
+typedef struct Elf64_Ehdr {
     unsigned char e_ident[16]; /* ELF identification */
     Elf64_Half e_type; /* Object file type */
     Elf64_Half e_machine; /* Machine type */
@@ -71,7 +71,7 @@ char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
 #define SHN_ABS 0xFFF1 // Indicates that the corresponding reference is an absolute value
 #define SHN_COMMON 0xFFF2 // Indicates a symbol that has been declared as a common block
 
-typedef struct {
+typedef struct Elf64_Shdr {
     Elf64_Word sh_name; /* Section name */
     Elf64_Word sh_type; /* Section type */
     Elf64_Xword sh_flags; /* Section attributes */
@@ -127,7 +127,7 @@ typedef struct {
 //SHT_SYMTAB // Index of first non-local symbol (i.e., number of local symbols
 //SHT_DYNSYM // Index of first non-local symbol (i.e., number of local symbols
 
-typedef struct {
+typedef struct Elf64_Sym {
     Elf64_Word st_name; /* Symbol name */
     unsigned char st_info; /* Type and Binding attributes */
     unsigned char st_other; /* Reserved */
@@ -157,12 +157,12 @@ typedef struct {
 #define STT_HIPROC 15
 
 // Relocation
-typedef struct {
+typedef struct Elf64_Rel {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
 } Elf64_Rel;
 
-typedef struct {
+typedef struct Elf64_Rela {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
     Elf64_Sxword r_addend; /* Constant part of expression */

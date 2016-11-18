@@ -5,7 +5,7 @@
 // Handles advancing through the sectors of
 // a cluster and following the cluster chain
 // to the next cluster
-typedef struct {
+typedef struct sector_iterator_t {
     uint32_t start_cluster;
 
     // Cluster number of current position
@@ -23,7 +23,7 @@ typedef struct {
 
 // Handles iterating a directory and advancing
 // to the next dir_union_t
-typedef struct {
+typedef struct directory_iterator_t {
     // Directory file iterator
     sector_iterator_t dir_file;
 

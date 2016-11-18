@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-typedef struct {
+typedef struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
     uint8_t zero;       // unused, set to 0
@@ -10,7 +10,7 @@ typedef struct {
     uint16_t offset_hi; // offset bits 16..31
 } idt_entry_t;
 
-typedef struct {
+typedef struct idt_entry_64_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
     uint8_t zero;       // unused, set to 0

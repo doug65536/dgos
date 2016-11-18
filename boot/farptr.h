@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-typedef struct {
+typedef struct far_ptr_t {
     uint16_t offset;
     uint16_t segment;
 } far_ptr_t;

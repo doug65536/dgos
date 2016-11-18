@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-typedef struct {
+typedef struct physmem_range_t {
     uint64_t base;
     uint64_t size;
     uint32_t type;

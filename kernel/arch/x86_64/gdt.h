@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-typedef struct {
+typedef struct table_register_64_t {
     uint16_t limit;
     uint16_t base_lo;
     uint16_t base_hi;

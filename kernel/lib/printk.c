@@ -34,7 +34,7 @@ typedef union {
     uintptr_t uintptr_value;
 } arg_t;
 
-typedef struct {
+typedef struct formatter_flags_t {
     unsigned int left_justify : 1;
     unsigned int leading_plus : 1;
     unsigned int leading_zero : 1;

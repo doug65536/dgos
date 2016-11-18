@@ -54,7 +54,7 @@
 #define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
 #define PTE_PK              (PTE_PK_MASK << PTE_PK_BIT)
 
-//typedef struct {
+//typedef struct far_ptr_realmode_t {
 //    uint16_t offset;
 //    uint16_t seg;
 //} far_ptr_realmode_t;

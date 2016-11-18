@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-typedef struct {
+typedef struct gdt_entry_t {
     uint16_t limit_low;
     uint16_t base_low;
     uint8_t base_middle;
@@ -77,13 +77,13 @@ typedef struct {
 #define GDT_MAKE_DATASEG64(ring) \
     GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 0, 0)
 
-typedef struct {
+typedef struct table_register_t {
     uint16_t limit;
     uint16_t base_lo;
     uint16_t base_hi;
 } table_register_t;
 
-typedef struct {
+typedef struct table_register_64_t {
     uint16_t limit;
     uint16_t base_lo;
     uint16_t base_hi;
@@ -91,14 +91,14 @@ typedef struct {
     uint16_t base_hi2;
 } table_register_64_t;
 
-typedef struct {
+typedef struct cpuid_t {
     uint32_t eax;
     uint32_t ebx;
     uint32_t edx;
     uint32_t ecx;
 } cpuid_t;
 
-typedef struct {
+typedef struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
     uint8_t zero;       // unused, set to 0
@@ -106,7 +106,7 @@ typedef struct {
     uint16_t offset_hi; // offset bits 16..31
 } idt_entry_t;
 
-typedef struct {
+typedef struct idt_entry_64_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
     uint8_t zero;       // unused, set to 0
