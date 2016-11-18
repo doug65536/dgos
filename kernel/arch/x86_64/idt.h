@@ -33,6 +33,88 @@ typedef struct {
 #define IDT_INTR        0x0E
 #define IDT_TRAP        0x0F
 
+//
+// CPU context
+
+#define EFLAGS_CF_BIT   0
+#define EFLAGS_PF_BIT   2
+#define EFLAGS_AF_BIT   4
+#define EFLAGS_ZF_BIT   6
+#define EFLAGS_SF_BIT   7
+#define EFLAGS_TF_BIT   8
+#define EFLAGS_IF_BIT   9
+#define EFLAGS_DF_BIT   10
+#define EFLAGS_OF_BIT   11
+#define EFLAGS_IOPL_BIT 12
+#define EFLAGS_NT_BIT   14
+#define EFLAGS_RF_BIT   16
+#define EFLAGS_VM_BIT   17
+#define EFLAGS_AC_BIT   18
+#define EFLAGS_VIF_BIT  19
+#define EFLAGS_VIP_BIT  20
+#define EFLAGS_ID_BIT   21
+
+#define EFLAGS_CF       (1 << EFLAGS_CF_BIT)
+#define EFLAGS_PF       (1 << EFLAGS_PF_BIT)
+#define EFLAGS_AF       (1 << EFLAGS_AF_BIT)
+#define EFLAGS_ZF       (1 << EFLAGS_ZF_BIT)
+#define EFLAGS_SF       (1 << EFLAGS_SF_BIT)
+#define EFLAGS_TF       (1 << EFLAGS_TF_BIT)
+#define EFLAGS_IF       (1 << EFLAGS_IF_BIT)
+#define EFLAGS_DF       (1 << EFLAGS_DF_BIT)
+#define EFLAGS_OF       (1 << EFLAGS_OF_BIT)
+#define EFLAGS_NT       (1 << EFLAGS_NT_BIT)
+#define EFLAGS_RF       (1 << EFLAGS_RF_BIT)
+#define EFLAGS_VM       (1 << EFLAGS_VM_BIT)
+#define EFLAGS_AC       (1 << EFLAGS_AC_BIT)
+#define EFLAGS_VIF      (1 << EFLAGS_VIF_BIT)
+#define EFLAGS_VIP      (1 << EFLAGS_VIP_BIT)
+#define EFLAGS_ID       (1 << EFLAGS_ID_BIT)
+
+#define EFLAGS_IOPL_BITS    2
+#define EFLAGS_IOPL_MASK    ((1 << EFLAGS_IOPL_BITS)-1)
+#define EFLAGS_IOPL         (EFLAGS_IOPL_MASK << EFLAGS_IOPL_BIT)
+
+#define MXCSR_IE_BIT        0
+#define MXCSR_DE_BIT        1
+#define MXCSR_ZE_BIT        2
+#define MXCSR_OE_BIT        3
+#define MXCSR_UE_BIT        4
+#define MXCSR_PE_BIT        5
+#define MXCSR_DAZ_BIT       6
+#define MXCSR_IM_BIT        7
+#define MXCSR_DM_BIT        8
+#define MXCSR_ZM_BIT        9
+#define MXCSR_OM_BIT        10
+#define MXCSR_UM_BIT        11
+#define MXCSR_PM_BIT        12
+#define MXCSR_RC_BIT        13
+#define MXCSR_FZ_BIT        15
+
+#define MXCSR_RC_BITS       2
+#define MXCSR_RC_MASK       ((1 << MXCSR_RC_BITS)-1)
+#define MXCSR_RC            (MXCSR_RC_MASK << MXCSR_RC_BIT)
+
+typedef struct cpu_flag_info_t {
+    char const * const name;
+    int bit;
+    int mask;
+    char const * const *value_names;
+} cpu_flag_info_t;
+
+extern cpu_flag_info_t const cpu_eflags_info[];
+extern cpu_flag_info_t const cpu_mxcsr_info[];
+
+// Buffer large enough for worst case flags description
+#define CPU_MAX_FLAGS_DESCRIPTION    58
+
+size_t cpu_describe_eflags(char *buf, size_t buf_size, uint64_t rflags);
+size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr);
+
+size_t cpu_format_flags_register(
+        char *buf, size_t buf_size,
+        uint64_t rflags, cpu_flag_info_t const *info);
+
 // Passed by ISR handler
 typedef struct interrupt_info_t {
     uint64_t interrupt;

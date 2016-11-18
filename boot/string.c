@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "string.h"
 
 size_t strlen(char const *src)

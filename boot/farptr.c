@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "farptr.h"
 
 void far_zero(far_ptr_t dest, uint16_t paragraphs)

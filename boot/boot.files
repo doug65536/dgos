@@ -7,7 +7,6 @@ utils/watch.sh
 bootsect.c
 bootsect.h
 bootsect.ld
-code16gcc.h
 cpu.c
 cpu.h
 elf64.c
@@ -32,6 +31,7 @@ utf.c
 utf.h
 dump/bootsect.map
 dump/bootsect.dis
+dump/bootsect-debug.disasm
 dump/bootsect.hex
 elf64decl.h
 exception.s

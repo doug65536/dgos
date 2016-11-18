@@ -87,9 +87,37 @@ char *strstr(char const *str, char const *substr)
     return 0;
 }
 
+// Returns a pointer to after the last byte written!
+void *aligned16_memset(void *dest, int c, size_t n)
+{
+    char cc = (char)c;
+    __ivec16 v = {
+        cc, cc, cc, cc, cc, cc, cc, cc,
+        cc, cc, cc, cc, cc, cc, cc, cc
+    };
+    __ivec16 *vp = (__ivec16*)dest;
+    while (n >= sizeof(__ivec16)) {
+        *vp++ = v;
+        n -= sizeof(__ivec16);
+    }
+    return vp;
+}
+
 void *memset(void *dest, int c, size_t n)
 {
     char *p = dest;
+#ifdef __GNUC__
+    // Write bytes until aligned
+    while ((intptr_t)p & 0x0F && n) {
+        *p++ = (char)c;
+        --n;
+    }
+    // Write as many 128-bit chunks as possible
+    if (n > sizeof(__ivec16)) {
+        p = aligned16_memset(p, c, n);
+        n &= 15;
+    }
+#endif
     while (n--)
         *p++ = (char)c;
     return dest;

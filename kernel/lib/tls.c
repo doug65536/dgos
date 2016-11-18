@@ -1,7 +1,7 @@
 #include "tls.h"
 #include "printk.h"
 #include "string.h"
-#include "mmu.h"
+#include "control_regs.h"
 
 typedef struct thread_env_t thread_env_t;
 struct thread_env_t {
@@ -36,5 +36,5 @@ void tls_init(void)
 
     ___main_teb.self = &___main_teb;
 
-    mmu_set_fsgsbase(&___main_teb, 0);
+    cpu_set_fsgsbase(&___main_teb, 0);
 }

@@ -2,7 +2,7 @@
 
 #include "types.h"
 
-typedef struct {
+typedef struct physmem_range_t {
     uint64_t base;
     uint64_t size;
     uint32_t type;
@@ -19,5 +19,3 @@ extern physmem_range_t *phys_mem_map;
 extern size_t phys_mem_map_count;
 
 void mmu_init(void);
-
-void mmu_set_fsgsbase(void *fs_base, void *gs_base);

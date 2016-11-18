@@ -1,7 +1,8 @@
 #include "mmu.h"
-#include "msr.h"
+#include "control_regs.h"
 #include "printk.h"
 #include "time.h"
+#include "string.h"
 
 // Intel manual, page 2786
 
@@ -124,15 +125,14 @@ typedef uint64_t pte_t;
 //  0x7f8000000000
 
 // Linear addresses
-#define PT3_KBASEADDR   (0x7F8000000000L)
-#define PT3_UBASEADDR   (0x7F0000000000L)
+#define PT_KBASEADDR   (0x7F8000000000UL)
+#define PT_UBASEADDR   (0x7F0000000000UL)
 
 // The number of pte_t entries at each level
-#define PT3_ENTRIES     (0x080000000000L)
-#define PT2_ENTRIES     (0x000400000000L)
-#define PT1_ENTRIES     (0x000002000000L)
-#define PT0_ENTRIES     (0x000000010000L)
-#define PTR_ENTRIES     (0x000000000080L)
+#define PT3_ENTRIES     (0x400000000UL)
+#define PT2_ENTRIES     (0x2000000UL)
+#define PT1_ENTRIES     (0x10000UL)
+#define PT0_ENTRIES     (0x80UL)
 
 // The array index of the start of each level
 #define PT3_BASE        (0)
@@ -145,14 +145,32 @@ typedef uint64_t pte_t;
 #define PT2_PTR(base)  (PT3_PTR(base) + PT3_ENTRIES)
 #define PT1_PTR(base)  (PT2_PTR(base) + PT2_ENTRIES)
 #define PT0_PTR(base)  (PT1_PTR(base) + PT1_ENTRIES)
-#define PTD_PTR(base)  (PT0_PTR(base) + PT0_ENTRIES)
 
-static pte_t * const ptn_base[4] = {
-    PT3_PTR(0),
-    PT3_PTR(1),
-    PT3_PTR(2),
-    PT3_PTR(3)
+static pte_t * const ptk_base[4] = {
+    PT0_PTR(PT_KBASEADDR),
+    PT1_PTR(PT_KBASEADDR),
+    PT2_PTR(PT_KBASEADDR),
+    PT3_PTR(PT_KBASEADDR)
 };
+
+static pte_t * const ptu_base[4] = {
+    PT0_PTR(PT_UBASEADDR),
+    PT1_PTR(PT_UBASEADDR),
+    PT2_PTR(PT_UBASEADDR),
+    PT3_PTR(PT_UBASEADDR)
+};
+
+/// Physical page allocation map
+/// Consists of array of entries, one per physical page
+/// Each slot contains the index of the next slot,
+/// which forms a singly-linked list of pages.
+/// Free pages are linked into a chain, allowing for O(1)
+/// performance allocation and freeing of physical pages.
+///
+/// 2^32 pages is 2^(32+12-40) bytes = 16TB
+///
+/// This results in a 0.098% overhead for the physical page
+/// allocation map at 4 bytes per 4KB.
 
 physmem_range_t *phys_mem_map;
 size_t phys_mem_map_count;
@@ -168,13 +186,22 @@ static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
 // Align sizes to multiples of page size
 // Sort by base address
 // Fix overlaps
-static void mmu_fixup_mem_map(physmem_range_t *list)
+static size_t mmu_fixup_mem_map(physmem_range_t *list)
 {
     int did_something;
+    size_t usable_count;
 
     // Might need multiple passes to fully fixup the list
     do {
         did_something = 0;
+
+        // Make invalid and zero size entries get removed
+        for (size_t i = 1; i < phys_mem_map_count; ++i) {
+            if (list[i].size == 0 && !list[i].valid) {
+                list[i].base = ~0UL;
+                list[i].size = ~0UL;
+            }
+        }
 
         // Simple sort algorithm for small list.
         // Bubble sort is actually fast for nearly-sorted
@@ -214,67 +241,78 @@ static void mmu_fixup_mem_map(physmem_range_t *list)
             if (list[i-1].base + list[i-1].size > list[i].base) {
                 // Overlap
 
-                // If both same type, truncate first one
-                // and make second one cover combined range
+                did_something = 1;
+
+                // Compute bounds of prev
+                uint64_t prev_st = list[i-1].base;
+                uint64_t prev_en = prev_st + list[i-1].size;
+
+                // Compute bounds of this
+                uint64_t this_st = list[i].base;
+                uint64_t this_en = this_st + list[i].size;
+
+                // Start at lowest bound, end at highest bound
+                uint64_t st = prev_st < this_st ? prev_st : this_st;
+                uint64_t en = prev_en > this_en ? prev_en : this_en;
+
                 if (list[i-1].type == list[i].type) {
-                    // Handle every possible overlap case
+                    // Both same type,
+                    // make one cover combined range
 
-                    // Compute bounds of prev
-                    uint64_t prev_st = list[i-1].base;
-                    uint64_t prev_en = prev_st + list[i-1].size;
+                    printk("Combining overlapping ranges of same type\n");
 
-                    // Compute bounds of this
-                    uint64_t this_st = list[i].base;
-                    uint64_t this_en = this_st + list[i].size;
-
-                    // Start at lowest bound, end at highest bound
-                    uint64_t st = prev_st < this_st ? prev_st : this_st;
-                    uint64_t en = prev_en > this_en ? prev_en : this_en;
-
-                    // Make prev get dragged to the end of the list next pass
+                    // Remove previous entry
                     list[i-1].base = ~0UL;
                     list[i-1].size = ~0UL;
 
-                    // Keep the second one because it could get coalesced
-                    // with the next one
                     list[i].base = st;
                     list[i].size = en - st;
 
-                    // Need another pass
-                    did_something = 1;
+                    break;
                 } else if (list[i-1].type == PHYSMEM_TYPE_NORMAL) {
-                    // Truncate length of previous entry to avoid
-                    // overlapping current
+                    // This entry takes precedence over prev entry
 
-                    uint64_t new_size = list[i].base - list[i-1].base;
+                    if (st < this_st && en > this_en) {
+                        // Punching a hole in the prev entry
 
-                    if (new_size > 0) {
-                        list[i-1].size = new_size;
-                    } else {
-                        // Entry got eliminated
-                        list[i-1].base = ~0UL;
-                        list[i-1].size = ~0UL;
+                        printk("Punching hole in memory range\n");
+
+                        // Reduce size of prev one to not overlap
+                        list[i-1].size = this_st - prev_st;
+
+                        // Make new entry with normal memory after this one
+                        // Sort will put it in the right position later
+                        list[phys_mem_map_count].base = this_en;
+                        list[phys_mem_map_count].size = en - this_en;
+                        list[phys_mem_map_count].type = PHYSMEM_TYPE_NORMAL;
+                        list[phys_mem_map_count].valid = 1;
+                        ++phys_mem_map_count;
+
+                        break;
+                    } else if (st < this_st && en >= this_en) {
+                        // Prev entry partially overlaps this entry
+
+                        printk("Correcting overlap\n");
+
+                        list[i-1].size = this_st - prev_st;
                     }
+                } else {
+                    // Prev entry takes precedence over this entry
 
-                    // Need another pass
-                    did_something = 1;
-                } else if (list[i].type == PHYSMEM_TYPE_NORMAL) {
-                    // Move base forward to avoid previous entry
-
-                    uint64_t prev_en = list[i-1].base + list[i-1].size;
-                    uint64_t this_en = list[i].base + list[i].size;
-
-                    if (this_en > prev_en) {
-                        list[i].base = prev_en;
-                        list[i].size = this_en - prev_en;
-                    } else {
-                        // Entry got eliminated
+                    if (st < this_st && en > this_en) {
+                        // Prev entry eliminates this entry
                         list[i].base = ~0UL;
                         list[i].size = ~0UL;
-                    }
 
-                    // Need another pass
-                    did_something = 1;
+                        printk("Removing completely overlapped range\n");
+                    } else if (st < this_st && en >= this_en) {
+                        // Prev entry partially overlaps this entry
+
+                        printk("Correcting overlap\n");
+
+                        list[i].base = prev_en;
+                        list[i].size = this_en - prev_en;
+                    }
                 }
             }
         }
@@ -284,9 +322,13 @@ static void mmu_fixup_mem_map(physmem_range_t *list)
             continue;
         }
 
+        usable_count = 0;
+
         // Fixup page alignment
         for (size_t i = 0; i < phys_mem_map_count; ++i) {
             if (list[i].type == PHYSMEM_TYPE_NORMAL) {
+                ++usable_count;
+
                 uint64_t st = list[i].base;
                 uint64_t en = list[i].base + list[i].size;
 
@@ -318,33 +360,175 @@ static void mmu_fixup_mem_map(physmem_range_t *list)
     } while (did_something);
 
     printk("Memory map fixup complete\n");
+
+    return usable_count;
+}
+
+#define alloca __builtin_alloca
+
+static uint64_t init_take_page(physmem_range_t *ranges, size_t *usable_ranges)
+{
+    if (*usable_ranges == 0)
+        return ~0L;
+
+    physmem_range_t *last_range = ranges + *usable_ranges - 1;
+    uint64_t addr = last_range->base + last_range->size - PAGE_SIZE;
+
+    // Take a page off the size of the range
+    last_range->size -= PAGE_SIZE;
+
+    // If range exhausted, switch to next range
+    if (last_range->size == 0)
+        --*usable_ranges;
+
+    return addr;
+}
+
+static void path_from_addr(unsigned *path, uint64_t addr)
+{
+    unsigned slot = 0;
+    for (uint8_t shift = 39; shift >= 12; shift -= 9)
+        path[slot++] = (addr >> shift) & 0x1FF;
+}
+
+// Returns the linear addresses of the page tables for
+// the given path
+static void pages_from_path(pte_t **pte, unsigned *path)
+{
+    uint64_t base = path[0] < 0x80
+            ? PT_UBASEADDR
+            : PT_KBASEADDR;
+
+    uint64_t page_index =
+            ((uint64_t)path[0] << (9 * 3)) +
+            ((uint64_t)path[1] << (9 * 2)) +
+            ((uint64_t)path[2] << (9 * 1)) +
+            ((uint64_t)path[3] << (9 * 0));
+
+    uint64_t indices[4];
+
+    indices[0] = (page_index >> (9 * 3)) & (PT0_ENTRIES-1);
+    indices[1] = (page_index >> (9 * 2)) & (PT1_ENTRIES-1);
+    indices[2] = (page_index >> (9 * 1)) & (PT2_ENTRIES-1);
+    indices[3] = (page_index >> (9 * 0)) & (PT3_ENTRIES-1);
+
+    pte[0] = PT0_PTR(base) + indices[0];
+    pte[1] = PT1_PTR(base) + indices[1];
+    pte[2] = PT2_PTR(base) + indices[2];
+    pte[3] = PT3_PTR(base) + indices[3];
+}
+
+static pte_t *init_find_aliasing_pte(void)
+{
+    pte_t *pte = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
+    unsigned path[4];
+    path_from_addr(path, 0x800000000000 - PAGE_SIZE);
+
+    for (unsigned level = 0; level < 3; ++level)
+        pte = (pte_t*)(pte[path[level]] & PTE_ADDR);
+
+    return pte + path[3];
+}
+
+static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, uint64_t addr)
+{
+    static uint64_t cur_alias_addr;
+
+    uint64_t alias_addr = 0x800000000000 - PAGE_SIZE;
+
+    if (cur_alias_addr != addr) {
+        *aliasing_pte = ((*aliasing_pte & ~PTE_ADDR) | addr) |
+                PTE_PRESENT | PTE_WRITABLE;
+        cpu_invalidate_page(alias_addr);
+        cur_alias_addr = addr;
+    }
+
+    return (pte_t*)alias_addr;
+}
+
+// Pass phys_addr=~0UL to allocate a new table
+static void init_create_pt(
+        uint64_t root_physaddr,
+        pte_t *aliasing_pte,
+        uint64_t linear_addr,
+        uint64_t phys_addr,
+        physmem_range_t *ranges,
+        size_t *usable_ranges)
+{
+    printk("Creating page table for %lx...", linear_addr);
+
+    // Path to page table entry as page indices
+    unsigned path[4];
+    path_from_addr(path, linear_addr);
+
+    unsigned levels = (phys_addr == ~0UL) ? 4 : 3;
+
+    pte_t *iter;
+
+    // Map aliasing page to point to new page
+    iter = init_map_aliasing_pte(aliasing_pte, root_physaddr);
+
+    uint64_t addr;
+    for (unsigned level = 0; level < levels; ++level) {
+        addr = iter[path[level]] & PTE_ADDR;
+
+        if (!addr) {
+            // Allocate a new page table
+            addr = init_take_page(ranges, usable_ranges);
+
+            // Update current page table to point to new page
+            iter[path[level]] = addr | (PTE_PRESENT | PTE_WRITABLE);
+
+            // Map aliasing page to point to new page
+            iter = init_map_aliasing_pte(aliasing_pte, addr);
+
+            // Clear new page table
+            aligned16_memset(iter, 0, PAGE_SIZE);
+        } else {
+            // Descend into next page table
+            iter = init_map_aliasing_pte(aliasing_pte, addr);
+        }
+    }
+
+    if (levels == 3 && !(iter[path[3]] & PTE_PRESENT)) {
+        printk("[%u] at %lx\n", path[3], phys_addr);
+        iter[path[3]] = (phys_addr & PTE_ADDR) |
+            (PTE_PRESENT | PTE_WRITABLE);
+    } else {
+        printk("already existed\n");
+    }
 }
 
 void mmu_init(void)
 {
-    mmu_fixup_mem_map(phys_mem_map);
+    size_t usable_ranges = mmu_fixup_mem_map(phys_mem_map);
+
+    // Make private copy of just usable ranges for modification
+    physmem_range_t *ranges = alloca(
+                sizeof(physmem_range_t) * usable_ranges);
+    for (physmem_range_t *ranges_in = phys_mem_map, *ranges_out = ranges;
+         ranges_in < phys_mem_map + phys_mem_map_count;
+         ++ranges_in) {
+        if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
+            *ranges_out++ = *ranges_in;
+    }
 
     uint64_t usable_pages = 0;
     uint64_t highest_usable = 0;
-    for (physmem_range_t *mem = phys_mem_map;
-         mem->valid; ++mem) {
+    for (physmem_range_t *mem = ranges;
+         mem < ranges + usable_ranges; ++mem) {
         printk("Memory: addr=%lx size=%lx type=%x\n",
                mem->base, mem->size, mem->type);
 
         if (mem->base >= 0x100000) {
-            uint64_t rounded_size = mem->size;
-            uint64_t rounded_base = (mem->base + (PAGE_SIZE-1)) & (uint64_t)-PAGE_SIZE;
+            uint64_t end = mem->base + mem->size;
 
-            rounded_size -= rounded_base - mem->base;
-            rounded_size &= (uint64_t)-PAGE_SIZE;
+            if (PHYSMEM_TYPE_NORMAL) {
+                usable_pages += mem->size >> PAGE_SIZE_BIT;
 
-            uint64_t rounded_end = rounded_base + rounded_size;
-
-            if (highest_usable < rounded_end)
-                highest_usable = rounded_end;
-
-            if (PHYSMEM_TYPE_NORMAL)
-                usable_pages += rounded_size >> 12;
+                if (highest_usable < end)
+                    highest_usable = end;
+            }
         }
     }
 
@@ -356,24 +540,105 @@ void mmu_init(void)
     printk("Usable pages = %lu (%luMB) range_pages=%ld\n", usable_pages,
            usable_pages >> (20 - PAGE_SIZE_BIT), highest_usable);
 
-    /// Physical page allocation map
-    /// Consists of array of entries, one per physical page
-    /// Each slot contains the index of the next slot,
-    /// which forms a singly-linked list of pages.
-    /// Free pages are linked into a chain, allowing for O(1)
-    /// performance allocation and freeing of physical pages.
-    ///
-    /// 2^32 pages is 2^(32+12-40) bytes = 16TB
-    ///
-    /// This results in a 0.098% overhead for the physical page
-    /// allocation map at 4 bytes per 4KB.
-    ///
+    //
+    // Alias the existing page tables into the appropriate addresses
 
+    pte_t *aliasing_pte = init_find_aliasing_pte();
 
-}
+    // Create the new root
 
-void mmu_set_fsgsbase(void *fs_base, void *gs_base)
-{
-    msr_set(MSR_FSBASE, (uint64_t)fs_base);
-    msr_set(MSR_GSBASE, (uint64_t)gs_base);
+    // Get a page
+    uint64_t root_physaddr = init_take_page(ranges, &usable_ranges);
+
+    // Map page
+    pte_t *root = init_map_aliasing_pte(aliasing_pte, root_physaddr);
+
+    // Clear page
+    aligned16_memset(root, 0, PAGE_SIZE);
+
+    init_create_pt(root_physaddr, aliasing_pte,
+                   (uint64_t)PT0_PTR(PT_KBASEADDR),
+                   root_physaddr,
+                   ranges, &usable_ranges);
+
+    unsigned path[4];
+    uint64_t phys_addr[4];
+    pte_t *pt;
+
+    phys_addr[0] = cpu_get_page_directory() & PTE_ADDR;
+
+    for (path[0] = 0; path[0] < 512; ++path[0]) {
+        pt = init_map_aliasing_pte(aliasing_pte, phys_addr[0]);
+
+        // Skip if PT not present
+        if ((pt[path[0]] & PTE_PRESENT) == 0)
+            continue;
+
+        // Get address of next level PT
+        phys_addr[1] = pt[path[0]] & PTE_ADDR;
+
+        for (path[1] = 0; path[1] < 512; ++path[1]) {
+            pt = init_map_aliasing_pte(aliasing_pte, phys_addr[1]);
+
+            // Skip if PT not present
+            if ((pt[path[1]] & PTE_PRESENT) == 0)
+                continue;
+
+            // Get address of next level PT
+            phys_addr[2] = pt[path[1]] & PTE_ADDR;
+
+            for (path[2] = 0; path[2] < 512; ++path[2]) {
+                pt = init_map_aliasing_pte(aliasing_pte, phys_addr[2]);
+
+                // Skip if PT not present
+                if ((pt[path[2]] & PTE_PRESENT) == 0)
+                    continue;
+
+                // Get address of next level PT
+                phys_addr[3] = pt[path[2]] & PTE_ADDR;
+
+                for (path[3] = 0; path[3] < 512; ++path[3]) {
+                    pt = init_map_aliasing_pte(aliasing_pte, phys_addr[3]);
+
+                    pte_t pte = pt[path[3]];
+
+                    // Skip if PT not present
+                    if ((pte & PTE_PRESENT) == 0)
+                        continue;
+
+                    init_create_pt(root_physaddr, aliasing_pte,
+                            ((uint64_t)path[0] << (9 * 3 + 12)) |
+                            ((uint64_t)path[1] << (9 * 2 + 12)) |
+                            ((uint64_t)path[2] << (9 * 1 + 12)) |
+                            ((uint64_t)path[3] << (9 * 0 + 12)),
+                            pte & PTE_ADDR,
+                            ranges, &usable_ranges);
+
+                    pte_t *virtual_tables[4];
+                    pages_from_path(virtual_tables, path);
+
+                    for (unsigned i = 0; i < 4; ++i) {
+                        init_create_pt(root_physaddr, aliasing_pte,
+                                       (uint64_t)virtual_tables[i] & PTE_ADDR,
+                                       phys_addr[i],
+                                       ranges, &usable_ranges);
+                    }
+
+                    printk("Virtual tables for 0x%lx:\n",
+                           ((uint64_t)path[0] << (9 * 3 + 12)) +
+                           ((uint64_t)path[1] << (9 * 2 + 12)) +
+                           ((uint64_t)path[2] << (9 * 1 + 12)) +
+                           ((uint64_t)path[3] << (9 * 0 + 12)));
+                    printk("  %012lx %012lx %012lx %012lx\n",
+                           (uint64_t)virtual_tables[0],
+                           (uint64_t)virtual_tables[1],
+                           (uint64_t)virtual_tables[2],
+                           (uint64_t)virtual_tables[3]);
+                }
+            }
+        }
+    }
+
+    pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
+    cpu_set_page_directory(root_physaddr);
 }

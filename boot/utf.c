@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "utf.h"
 
 // Returns 0 on failure due to invalid UTF-8 or truncation due to insufficient buffer

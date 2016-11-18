@@ -1,4 +1,4 @@
-#include "msr.h"
+#include "control_regs.h"
 
 uint64_t msr_get(uint32_t msr)
 {
@@ -115,4 +115,39 @@ uint64_t cpu_get_fault_address(void)
         : "=r" (addr)
     );
     return addr;
+}
+
+void cpu_set_page_directory(uint64_t addr)
+{
+    __asm__ __volatile__ (
+        "mov %0,%%cr3\n\t"
+        :
+        : "r" (addr)
+    );
+}
+
+uint64_t cpu_get_page_directory(void)
+{
+    uint64_t addr;
+    __asm__ __volatile__ (
+        "mov %%cr3,%0\n\t"
+        : "=r" (addr)
+    );
+    return addr;
+}
+
+void cpu_set_fsgsbase(void *fs_base, void *gs_base)
+{
+    msr_set(MSR_FSBASE, (uint64_t)fs_base);
+    msr_set(MSR_GSBASE, (uint64_t)gs_base);
+}
+
+void cpu_invalidate_page(uint64_t addr)
+{
+    __asm__ __volatile__ (
+        "invlpg (%0)\n\t"
+        :
+        : "r" (addr)
+        : "memory"
+    );
 }

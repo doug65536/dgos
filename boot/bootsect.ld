@@ -9,7 +9,7 @@ SECTIONS {
         bootsect.o(.text.*)
         bootsect.o(.text.unlikely)
 
-		. = ALIGN(16);
+		. = ALIGN(4);
 		bootsect.o(.data)
         bootsect.o(.data.*)
         bootsect.o(.rodata)

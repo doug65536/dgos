@@ -16,14 +16,17 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
 # Compile commands for C and C++
-COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
-COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -c
+COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
+COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
 COMPILE.s = $(AS) $(ASFLAGS) $(TARGET_ARCH_AS) -c
 
 # Command to move generated dependency files into separate directory
 POSTCOMPILE = mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d
 
 OUTPUT_OPTION = -o $@
+
+# Everything depends upon Makefile
+$(OBJS): Makefile
 
 # Compile assembly
 %.o : %.s
@@ -33,44 +36,50 @@ OUTPUT_OPTION = -o $@
 # Compile C
 %.o : %.c
 %.o : %.c $(DEPDIR)/%.d
-	$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(COMPILE.c) $(OUTPUT_OPTION) -c $<
 	$(POSTCOMPILE)
 
 # Generate assembly dump for C
 $(DUMPDIR)/%.s : %.c
 $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
-	$(COMPILE.c) $(OUTPUT_OPTION) -S $<
+	$(COMPILE.c) $(OUTPUT_OPTION) -fverbose-asm -S $<
 	$(POSTCOMPILE)
 
 # Compile C++ with cc extension
 %.o : %.cc
 %.o : %.cc $(DEPDIR)/%.d
-	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+	$(COMPILE.cc) $(OUTPUT_OPTION) -c $<
 	$(POSTCOMPILE)
 
 # Compile C++ with cxx extension
 %.o : %.cxx
 %.o : %.cxx $(DEPDIR)/%.d
-	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+	$(COMPILE.cc) $(OUTPUT_OPTION) -c $<
 	$(POSTCOMPILE)
 
 # Compile C++ with cpp extension
 %.o : %.cpp
 %.o : %.cpp $(DEPDIR)/%.d
-	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+	$(COMPILE.cc) $(OUTPUT_OPTION) -c $<
 	$(POSTCOMPILE)
 
 ifdef DISASSEMBLEFLAGS
 # Disassemble
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin
-	objdump $(DISASSEMBLEFLAGS) $< > $@
+	$(OBJDUMP) $(DISASSEMBLEFLAGS) $< > $@
+endif
+
+ifdef DISASSEMBLEELFFLAGS
+$(DUMPDIR)/%.disasm : $(BINDIR)/%.bin
+$(DUMPDIR)/%.disasm : $(BINDIR)/%.bin
+	$(OBJDUMP) $(DISASSEMBLEELFFLAGS) $< > $@
 endif
 
 # Hex Dump
 $(DUMPDIR)/%.hex : $(BINDIR)/%.bin
 $(DUMPDIR)/%.hex : $(BINDIR)/%.bin
-	hexdump -C $< > $@
+	$(HEXDUMP) -C $< > $@
 
 
 # Tolerate the dependency files being missing

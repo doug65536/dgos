@@ -366,10 +366,12 @@ static int vga_bg_get(text_display_base_t *dev)
 
 // Show/hide cursor
 
-static void vga_cursor_toggle(text_display_base_t *dev,
+static int vga_cursor_toggle(text_display_base_t *dev,
                               int show)
 {
     TEXT_DEV_PTR(dev);
+    int was_shown = self->cursor_on;
+
     if (!show != !self->cursor_on) {
         self->cursor_on = show;
         if (!show)
@@ -377,6 +379,8 @@ static void vga_cursor_toggle(text_display_base_t *dev,
         else
             move_cursor_to(self, self->cursor_x, self->cursor_y);
     }
+
+    return was_shown;
 }
 
 static int vga_cursor_is_shown(text_display_base_t *dev)

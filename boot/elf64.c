@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "elf64.h"
 #include "elf64decl.h"
 #include "string.h"
@@ -33,8 +32,19 @@ void enter_kernel(uint64_t entry_point)
     paging_map_range(phys_mem_table, phys_mem_table_size,
                      phys_mem_table, PTE_PRESENT | PTE_WRITABLE, 1);
 
+    // Map a page that the kernel can use to manipulate
+    // arbitrary physical addresses by changing its pte
+    paging_map_range(0x800000000000 - PAGE_SIZE, PAGE_SIZE, 0,
+                     PTE_PRESENT | PTE_WRITABLE, 0);
+
+    // Map first 640KB
+    paging_map_range(0, 0xA0000, 0,
+                     PTE_PRESENT | PTE_WRITABLE, 2);
+
     // Pack the size into the high 12 bits
     phys_mem_table |= phys_mem_table_size << 20;
+
+    print_line("Entry point: %llx\n", entry_point);
 
     copy_or_enter(entry_point, 0, phys_mem_table);
 }

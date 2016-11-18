@@ -3,6 +3,7 @@
 LIBNAME := kernel
 CSRCS := mm.c \
 	tls.c \
+	thread.c \
 	printk.c \
 	dev_text.c \
 	conio.c \

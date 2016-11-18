@@ -1,6 +1,7 @@
 #include "time.h"
 #include "halt.h"
 #include "interrupts.h"
+#include "printk.h"
 
 static uint64_t time_ms_dummy(void);
 
@@ -16,6 +17,9 @@ void sleep(int ms)
 {
     interrupts_enable();
     uint64_t expiry = time_ms() + ms;
+    if (expiry == (uint64_t)ms)
+        printk("Can't sleep when timer not running yet\n");
+
     while (time_ms() < expiry)
         halt();
 }

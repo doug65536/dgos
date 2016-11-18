@@ -21,3 +21,4 @@ char *strcat(char *dest, char const *src);
 char *strncpy(char *dest, char const *src, size_t n);
 char *strncat(char *dest, char const *src, size_t n);
 
+void *aligned16_memset(void *dest, int c, size_t n);

@@ -1,5 +1,3 @@
-#include "code16gcc.h"
-
 #include "fat32.h"
 #include "malloc.h"
 #include "bootsect.h"
@@ -186,9 +184,9 @@ static uint16_t read_bpb(uint32_t partition_lba)
     // arbitrary sector size, until sector size is known
     sector_buffer = malloc(512);
 
-    uint16_t err = read_lba_sector(
+    uint16_t err = read_lba_sectors(
                 sector_buffer,
-                boot_drive, partition_lba);
+                boot_drive, partition_lba, 1);
     if (err)
         return err;
 
@@ -238,8 +236,8 @@ static int16_t sector_iterator_begin(
     if (!is_eof_cluster(cluster)) {
         int32_t lba = lba_from_cluster(cluster);
 
-        iter->err = read_lba_sector(
-                    sector, boot_drive, lba);
+        iter->err = read_lba_sectors(
+                    sector, boot_drive, lba, 1);
 
         if (!iter->err)
             return 1;
@@ -261,7 +259,7 @@ static uint32_t next_cluster(
     uint32_t const *fat_array = (uint32_t *)sector;
     uint32_t lba = bpb.first_fat_lba + fat_sector_index;
 
-    uint16_t err = read_lba_sector(sector, boot_drive, lba);
+    uint16_t err = read_lba_sectors(sector, boot_drive, lba, 1);
     if (err_ptr)
         *err_ptr = err;
     if (err)
@@ -275,7 +273,7 @@ static uint32_t next_cluster(
 
     lba = lba_from_cluster(current_cluster);
 
-    err = read_lba_sector(sector, boot_drive, lba);
+    err = read_lba_sectors(sector, boot_drive, lba, 1);
     if (err_ptr)
         *err_ptr = err;
     if (err)
@@ -315,8 +313,8 @@ static int16_t sector_iterator_next(
         uint32_t lba = lba_from_cluster(iter->cluster) +
                 iter->sector_offset;
 
-        iter->err = read_lba_sector(
-                    sector, boot_drive, lba);
+        iter->err = read_lba_sectors(
+                    sector, boot_drive, lba, 1);
 
         if (iter->err)
             return -1;

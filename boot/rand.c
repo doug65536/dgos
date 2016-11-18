@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "rand.h"
 
 static uint32_t seed_z1 = 12345;

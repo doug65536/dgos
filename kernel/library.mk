@@ -15,10 +15,10 @@ OBJS := $(AOBJS) $(COBJS)
 all: $(LIBFILENAME)
 
 clean:
-	@rm -f $(OBJS)
-	@rm -f $(LIBFILENAME)
+	@$(RM) -f $(OBJS)
+	@$(RM) -f $(LIBFILENAME)
 
 $(LIBFILENAME): $(OBJS)
-	ar -rcs $@ $^
+	$(AR) -rcs $@ $^
 
 include $(BUILDROOT)/autodep.mk

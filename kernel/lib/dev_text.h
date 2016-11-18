@@ -42,7 +42,7 @@ struct text_display_vtbl_t {
     int (*bg_get)(text_display_base_t *);
 
     // Show/hide cursor
-    void (*cursor_toggle)(text_display_base_t *,
+    int (*cursor_toggle)(text_display_base_t *,
                           int show);
     int (*cursor_is_shown)(text_display_base_t *);
 

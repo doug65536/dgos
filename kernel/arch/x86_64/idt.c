@@ -5,11 +5,58 @@
 #include "halt.h"
 #include "time.h"
 #include "interrupts.h"
-#include "msr.h"
+#include "control_regs.h"
+#include "string.h"
 
 idt_entry_64_t idt[0x80];
 
 void *(*irq_dispatcher)(int irq, void *stack_pointer);
+
+cpu_flag_info_t const cpu_eflags_info[] = {
+    { "ID",   EFLAGS_ID_BIT,   1, 0 },
+    { "VIP",  EFLAGS_VIP_BIT,  1, 0 },
+    { "VIF",  EFLAGS_VIF_BIT,  1, 0 },
+    { "AC",   EFLAGS_AC_BIT,   1, 0 },
+    { "VM",   EFLAGS_VM_BIT,   1, 0 },
+    { "RF",   EFLAGS_RF_BIT,   1, 0 },
+    { "NT",   EFLAGS_NT_BIT,   1, 0 },
+    { "IOPL", EFLAGS_IOPL_BIT, EFLAGS_IOPL_MASK, 0 },
+    { "OF",   EFLAGS_OF_BIT,   1, 0 },
+    { "DF",   EFLAGS_DF_BIT,   1, 0 },
+    { "IF",   EFLAGS_IF_BIT,   1, 0 },
+    { "TF",   EFLAGS_TF_BIT,   1, 0 },
+    { "SF",   EFLAGS_SF_BIT,   1, 0 },
+    { "ZF",   EFLAGS_ZF_BIT,   1, 0 },
+    { "AF",   EFLAGS_AF_BIT,   1, 0 },
+    { "PF",   EFLAGS_PF_BIT,   1, 0 },
+    { "CF",   EFLAGS_CF_BIT,   1, 0 },
+    { 0,      -1,             -1, 0 }
+};
+
+char const *cpu_mxcsr_rc[] = {
+    "Nearest",
+    "Down",
+    "Up",
+    "Truncate"
+};
+
+cpu_flag_info_t const cpu_mxcsr_info[] = {
+    { "IE",     MXCSR_IE_BIT, 1, 0 },
+    { "DE",     MXCSR_DE_BIT, 1, 0 },
+    { "ZE",     MXCSR_ZE_BIT, 1, 0 },
+    { "OE",     MXCSR_OE_BIT, 1, 0 },
+    { "UE",     MXCSR_UE_BIT, 1, 0 },
+    { "PE",     MXCSR_PE_BIT, 1, 0 },
+    { "DAZ",    MXCSR_DAZ_BIT, 1, 0 },
+    { "IM",     MXCSR_IM_BIT, 1, 0 },
+    { "DM",     MXCSR_DM_BIT, 1, 0 },
+    { "ZM",     MXCSR_ZM_BIT, 1, 0 },
+    { "OM",     MXCSR_OM_BIT, 1, 0 },
+    { "UM",     MXCSR_UM_BIT, 1, 0 },
+    { "PM",     MXCSR_PM_BIT, 1, 0 },
+    { "RC",     MXCSR_RC_BIT, MXCSR_RC_BITS, cpu_mxcsr_rc },
+    { "FZ",     MXCSR_FZ_BIT, 1, 0 }
+};
 
 // Exception handlers
 extern void isr_entry_0(void);
@@ -189,7 +236,8 @@ int idt_init(void)
         idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
         idt[i].offset_64_31 = (uint16_t)((addr >> 32) & 0xFFFFFFFF);
 
-        idt[i].type_attr = IDT_PRESENT | IDT_INTR;
+        idt[i].type_attr = IDT_PRESENT |
+                (i < 32 ? IDT_TRAP : IDT_INTR);
 
         idt[i].selector = IDT_SEL;
     }
@@ -208,10 +256,80 @@ int idt_init(void)
     return 0;
 }
 
+size_t cpu_format_flags_register(
+        char *buf, size_t buf_size,
+        uint64_t flags, cpu_flag_info_t const *info)
+{
+    size_t total_written = 0;
+    int chars_needed;
+
+    for (cpu_flag_info_t const *fi = info;
+         fi->name; ++fi) {
+        uint64_t value = (flags >> fi->bit) & fi->mask;
+
+        if (value != 0 ||
+                (fi->value_names && fi->value_names[0])) {
+            char const *prefix = total_written > 0 ? " " : "";
+            if (fi->value_names && fi->value_names[value]) {
+                // Text value
+                chars_needed = snprintf(
+                            buf + total_written,
+                            buf_size - total_written,
+                            "%s%s=%s", prefix, fi->name,
+                            fi->value_names[value]);
+            } else if (fi->mask == 1) {
+                // Single bit flag
+                chars_needed = snprintf(
+                            buf + total_written,
+                            buf_size - total_written,
+                            "%s%s", prefix, fi->name);
+            } else {
+                // Multi-bit flag
+                chars_needed = snprintf(
+                            buf + total_written,
+                            buf_size - total_written,
+                            "%s%s=%lX", prefix, fi->name, value);
+            }
+            if (chars_needed + total_written >= buf_size) {
+                if (buf_size > 3) {
+                    // Truncate with ellipsis
+                    strcpy(buf + buf_size - 4, "...");
+                    return buf_size - 1;
+                } else if (buf_size > 0) {
+                    // Truncate with * fill
+                    memset(buf, '*', buf_size-1);
+                    buf[buf_size-1] = 0;
+                    return buf_size - 1;
+                }
+                // Wow, no room for anything
+                return 0;
+            }
+
+            total_written += chars_needed;
+        }
+    }
+
+    return total_written;
+}
+
+size_t cpu_describe_eflags(char *buf, size_t buf_size, uint64_t rflags)
+{
+    return cpu_format_flags_register(buf, buf_size, rflags,
+                                     cpu_eflags_info);
+}
+
+size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr)
+{
+    return cpu_format_flags_register(buf, buf_size, mxcsr,
+                                     cpu_mxcsr_info);
+
+}
+
 static void *unhandled_exception_handler(isr_full_context_t *ctx)
 {
     char fmt_buf[64];
     int color = 0x0F;
+    int width;
     static char const *reg_names[] = {
         "rax",
         "rbx",
@@ -236,11 +354,11 @@ static void *unhandled_exception_handler(isr_full_context_t *ctx)
 
     static char const reserved_exception[] = "Reserved";
 
-    static char const *exception_names[] = {
+    static char const * const exception_names[] = {
         "#DE Divide Error",
         "#DB Debug",
         "NMI",
-        "#BP Breakpoint,"
+        "#BP Breakpoint,",
         "#OF Overflow",
         "#BR BOUND Range Exceeded",
         "#UD Invalid Opcode",
@@ -274,87 +392,87 @@ static void *unhandled_exception_handler(isr_full_context_t *ctx)
     for (int i = 0; i < 16; ++i) {
         if (i < 15) {
             // General register name
-            console_display->vtbl->draw_xy(console_display,
-                                           0, i, reg_names[i], color);
+            con_draw_xy(0, i, reg_names[i], color);
             // General register value
             snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx ", ctx->gpr->r[i]);
-            console_display->vtbl->draw_xy(console_display,
-                                           3, i, fmt_buf, color);
+            con_draw_xy(3, i, fmt_buf, color);
         }
 
         // XMM register name
         snprintf(fmt_buf, sizeof(fmt_buf), " %sxmm%d",
                  i < 10 ? " " : "",
                  i);
-        console_display->vtbl->draw_xy(console_display,
-                                       29, i, fmt_buf, color);
+        con_draw_xy(29, i, fmt_buf, color);
         // XMM register value
         snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx%016lx ",
                 ctx->fpr->xmm[i].qword[0],
                 ctx->fpr->xmm[i].qword[1]);
-        console_display->vtbl->draw_xy(console_display,
-                                       35, i, fmt_buf, color);
+        con_draw_xy(35, i, fmt_buf, color);
     }
 
     for (int i = 0; i < 4; ++i) {
         // Segment register name
-        console_display->vtbl->draw_xy(console_display,
-                                       37+i*8, 16, seg_names[i], color);
+        con_draw_xy(37+i*8, 18, seg_names[i], color);
         // Segment register value
         snprintf(fmt_buf, sizeof(fmt_buf), "=%04x ",
                  ctx->gpr->s[i]);
-        console_display->vtbl->draw_xy(console_display,
-                                       39+i*8, 16, fmt_buf, color);
+        con_draw_xy(39+i*8, 18, fmt_buf, color);
     }
 
     // rsp
-    console_display->vtbl->draw_xy(console_display,
-                                   0, 15, "ss:rsp", color);
+    con_draw_xy(0, 15, "ss:rsp", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%016lx ",
              ctx->gpr->ss, ctx->gpr->rsp);
-    console_display->vtbl->draw_xy(console_display,
-                                   6, 15, fmt_buf, color);
+    con_draw_xy(6, 15, fmt_buf, color);
 
     // cs:rip
-    console_display->vtbl->draw_xy(console_display,
+    con_draw_xy(
                                    0, 16, "cs:rip", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%016lx",
              ctx->gpr->cs, (uint64_t)ctx->gpr->rip);
-    console_display->vtbl->draw_xy(console_display,
-                                   6, 16, fmt_buf, color);
-
-    // rflags
-    console_display->vtbl->draw_xy(console_display,
-                                   45, 17, "rflags", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx",
-             (uint64_t)ctx->gpr->rflags);
-    console_display->vtbl->draw_xy(console_display,
-                                   51, 17, fmt_buf, color);
-
-    // fault address
-    console_display->vtbl->draw_xy(console_display,
-                                   48, 18, "cr2", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx",
-             cpu_get_fault_address());
-    console_display->vtbl->draw_xy(console_display,
-                                   51, 18, fmt_buf, color);
-
-    // error code
-    console_display->vtbl->draw_xy(console_display,
-                                   0, 18, "Error code", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%016lx",
-             ctx->gpr->info.error_code);
-    console_display->vtbl->draw_xy(console_display,
-                                   10, 18, fmt_buf, color);
+    con_draw_xy(6, 16, fmt_buf, color);
 
     // exception
-    console_display->vtbl->draw_xy(console_display,
+    con_draw_xy(
                                    0, 17, "Exception", color);
     snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
              ctx->gpr->info.interrupt,
              exception_names[ctx->gpr->info.interrupt]);
-    console_display->vtbl->draw_xy(console_display,
-                                   9, 17, fmt_buf, color);
+    con_draw_xy(9, 17, fmt_buf, color);
+
+    // MXCSR
+    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%04x",
+                     ctx->fpr->mxcsr);
+    con_draw_xy(63-width, 16, "mxcsr", color);
+    con_draw_xy(68-width, 16, fmt_buf, color);
+
+    // MXCSR description
+    width = cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
+                       ctx->fpr->mxcsr);
+    con_draw_xy(68-width, 17, fmt_buf, color);
+
+    // fault address
+    con_draw_xy(48, 19, "cr2", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx",
+             cpu_get_fault_address());
+    con_draw_xy(51, 19, fmt_buf, color);
+
+    // error code
+    con_draw_xy(0, 18, "Error code", color);
+    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%016lx",
+             ctx->gpr->info.error_code);
+    con_draw_xy(10, 18, fmt_buf, color);
+
+    // rflags (it's actually only 22 bits
+    con_draw_xy(0, 19, "rflags", color);
+    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%06lx ",
+             ctx->gpr->rflags);
+    con_draw_xy(6, 19, fmt_buf, color);
+
+    // rflags description
+    cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
+                       ctx->gpr->rflags);
+    con_draw_xy(6+width, 19, fmt_buf, color);
 
     halt_forever();
 

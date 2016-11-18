@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "cpu.h"
 #include "paging.h"
 #include "bootsect.h"
@@ -330,10 +329,8 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Enter kernel
         "2:\n\t"
-        "push %%rcx\n\t"
         "call *%%rdi\n\t"
         // Should not be possible to reach here
-        "add $8,%%rsp\n\t"
 
         "3:\n\t"
 

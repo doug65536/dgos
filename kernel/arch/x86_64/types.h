@@ -38,7 +38,7 @@ typedef uint16_t __uvec8 __attribute__((vector_size(16)));
 typedef uint32_t __uvec4 __attribute__((vector_size(16)));
 typedef uint64_t __uvec2 __attribute__((vector_size(16)));
 typedef float __fvec4 __attribute__((vector_size(16)));
-typedef float __dvec2 __attribute__((vector_size(16)));
+typedef double __dvec2 __attribute__((vector_size(16)));
 
 #define countof(arr) (sizeof(arr)/sizeof(*arr))
 

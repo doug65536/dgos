@@ -26,8 +26,8 @@ arch/x86_64/apic.c
 arch/x86_64/apic.h
 arch/x86_64/pci.c
 arch/x86_64/pci.h
-arch/x86_64/msr.c
-arch/x86_64/msr.h
+arch/x86_64/control_regs.c
+arch/x86_64/control_regs.h
 arch/x86_64/vga.c
 arch/x86_64/vga.h
 arch/x86_64/legacy_keyboard.c
@@ -66,3 +66,5 @@ lib/time.h
 lib/time.c
 lib/mouse.h
 lib/mouse.c
+lib/thread.h
+lib/thread.c

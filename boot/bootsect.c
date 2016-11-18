@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 asm (
     ".section .head\n"
     ".globl halt\n"
@@ -6,6 +5,23 @@ asm (
 "entry:\n"
     // Set cs to 0000
     "ljmp $0,$0f\n"
+    ".org entry+8\n\t"
+    ".globl bootinfo_primary_volume_desc\n\t"
+    "bootinfo_primary_volume_desc:"
+    ".space 4\n\t"
+    ".globl bootinfo_file_location\n\t"
+    "bootinfo_file_location:"
+    ".space 4\n\t"
+    ".globl bootinfo_file_length\n\t"
+    "bootinfo_file_length:"
+    ".space 4\n\t"
+    ".globl bootinfo_checksum\n\t"
+    "bootinfo_checksum:"
+    ".space 4\n\t"
+    ".globl bootinfo_reserved\n\t"
+    "bootinfo_reserved:"
+    ".space 10*4\n\t"
+
     "0:\n"
     // Set ds and es to 0000
     "xorw %ax,%ax\n"
@@ -28,9 +44,9 @@ asm (
 
     // Reset FPU
     "fninit\n"
-    "pushl $0xE3F\n"
-    "fldcw (%esp)\n"
-    "addl $4,%esp\n"
+    //"pushl $0xE3F\n"
+    //"fldcw (%esp)\n"
+    //"addl $4,%esp\n"
 
     // Call C
     "call init\n"
@@ -56,6 +72,48 @@ asm (
 #define __stdcall __attribute__((stdcall))
 #define __packed __attribute__((packed))
 
+uint8_t boot_drive;
+uint8_t fully_loaded;
+
+int init(void);
+
+// Using int13 extensions is 125 bytes less code
+#define USE_INT13EXT 1
+#if USE_INT13EXT
+typedef struct disk_address_packet_t {
+    uint8_t sizeof_packet;
+    uint8_t reserved;
+    uint16_t block_count;
+    uint32_t address;
+    uint64_t lba;
+} disk_address_packet_t;
+
+uint16_t read_lba_sectors(
+        char *buf, uint8_t drive,
+        uint32_t lba, uint16_t count)
+{
+    disk_address_packet_t pkt = {
+        sizeof(disk_address_packet_t),
+        0,
+        count,
+        (uint32_t)buf,
+        lba
+    };
+    uint16_t ax = 0x4200;
+    __asm__ __volatile__ (
+        "int $0x13\n\t"
+        "setc %%al\n\t"
+        "neg %%al\n"
+        "and %%al,%%ah\n"
+        "shr $8,%%ax\n"
+        : "+a" (ax)
+        : "d" (drive),
+          "S" (&pkt)
+        : "memory"
+    );
+    return ax;
+}
+#else
 typedef struct
 {
     uint8_t sectors;
@@ -70,45 +128,6 @@ typedef struct
 } chs_t;
 
 drive_geometry_t drive_geometry;
-uint8_t boot_drive;
-uint8_t fully_loaded;
-
-int init(void);
-
-//static void bochs_out(const char *msg)
-//{
-//    uint16_t ax = 0;
-//    uint16_t cx = 0;
-//    uint16_t dx = 0xE9;
-//    uint16_t si = (uint16_t)(uint32_t)msg;
-//    uint16_t di = (uint16_t)(uint32_t)msg;
-//    __asm__ __volatile__ (
-//        "decw %%cx\n\t"
-//        "repnz scasb\n\t"
-//
-//        "notw %%cx\n\t"
-//        "decw %%cx\n\t"
-//        "rep outsb\n\t"
-//
-//        "movb $0x0a,%%al\n\t"
-//        "outb %%al,$0xe9\n\t"
-//        : "=a" (ax), "=c" (cx), "=S" (si), "=D" (di)
-//        : "a" (ax), "c" (cx), "d" (dx), "S" (si), "D" (di)
-//        : "memory"
-//    );
-//}
-//
-//void bochs_int(uint32_t n)
-//{
-//    char buf[12], *p = buf + 12;
-//    *--p = 0;
-//    while (n != 0)
-//    {
-//        *--p = '0' + (n%10);
-//        n /= 10;
-//    }
-//    bochs_out(p);
-//}
 
 // INT 0x13
 // AH = 0x08
@@ -168,7 +187,7 @@ static uint16_t read_chs_sector(char *buf, uint8_t drive, chs_t chs)
         // clear AH if carry was not set
         "andb %b0,%h0\n\t"
         // zero extend AH into AX
-        "movzbw %h0,%w0\n\t"
+        "shr $8,%%ax\n\t"
         : "=a" (ax)
         : "a" (ax), "b" (buf), "c" (cx), "d" (dx)
         : "memory"
@@ -178,29 +197,40 @@ static uint16_t read_chs_sector(char *buf, uint8_t drive, chs_t chs)
     return ax;
 }
 
-uint16_t read_lba_sector(char *buf, uint8_t drive, uint32_t lba)
+uint16_t read_lba_sectors(char *buf, uint8_t drive,
+                          uint32_t lba, uint16_t count)
 {
-    return read_chs_sector(buf, drive, lba_to_chs(lba));
+    uint16_t err;
+    for (int off = 0; off < count; ++off,
+         buf += (1<<9), ++lba) {
+        if (0 != (err = read_chs_sector(
+                      buf,
+                      drive, lba_to_chs(lba))))
+            return err;
+    }
+    return 0;
 }
+#endif
 
 extern char __initialized_data_start[];
 extern char __initialized_data_end[];
 
 int init(void)
 {
+#if !USE_INT13EXT
     // Prepare to do LBA to CHS conversions
     drive_geometry = get_drive_geometry(boot_drive);
+#endif
 
     // Calculate how many more sectors to load
     uint16_t load_size = (__initialized_data_end - __initialized_data_start) >> 9;
 
-    // Load more sectors
-    for (uint32_t i = 1; i < load_size; ++i) {
-        uint16_t err = read_lba_sector((char*)(0x7c00u + (i << 9)), boot_drive, i);
+    uint16_t err = read_lba_sectors((char*)(0x7c00u + 512),
+                                   boot_drive, 1,
+                                   load_size - 1);
 
-        if (err != 0)
-            halt(0);
-    }
+    if (err != 0)
+        halt(0);
 
     fully_loaded = 1;
 

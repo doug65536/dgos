@@ -274,35 +274,43 @@ static intptr_t formatter(
                 switch (flags.length) {
                 case length_hh:
                     // signed char
-                    flags.arg.intptr_value = (signed char)va_arg(ap, int);
+                    flags.arg.intptr_value =
+                            (signed char)va_arg(ap, int);
                     break;
                 case length_h:
                     // short
-                    flags.arg.intptr_value = (short)va_arg(ap, int);
+                    flags.arg.intptr_value =
+                            (short)va_arg(ap, int);
                     break;
                 case length_none:
                     // int
-                    flags.arg.intptr_value = va_arg(ap, int);
+                    flags.arg.intptr_value =
+                            va_arg(ap, int);
                     break;
                 case length_l:
                     // long
-                    flags.arg.intptr_value = va_arg(ap, long);
+                    flags.arg.intptr_value =
+                            va_arg(ap, long);
                     break;
                 case length_ll:
                     // long long
-                    flags.arg.intptr_value = va_arg(ap, long long);
+                    flags.arg.intptr_value =
+                            va_arg(ap, long long);
                     break;
                 case length_j:
                     // intmax_t
-                    flags.arg.intptr_value = va_arg(ap, intmax_t);
+                    flags.arg.intptr_value =
+                            va_arg(ap, intmax_t);
                     break;
                 case length_z:
                     // signed size_t
-                    flags.arg.intptr_value = va_arg(ap, ssize_t);
+                    flags.arg.intptr_value =
+                            va_arg(ap, ssize_t);
                     break;
                 case length_t:
                     // ptrdiff_t
-                    flags.arg.intptr_value = va_arg(ap, ptrdiff_t);
+                    flags.arg.intptr_value =
+                            va_arg(ap, ptrdiff_t);
                     break;
                 default:
                     RETURN_FORMATTER_ERROR(chars_written);
@@ -320,42 +328,50 @@ static intptr_t formatter(
                 switch (flags.length) {
                 case length_hh:
                     // unsigned signed char
-                    flags.arg.uintptr_value = (unsigned char)va_arg(ap, unsigned int);
+                    flags.arg.uintptr_value =
+                            (unsigned char)va_arg(ap, unsigned int);
                     break;
 
                 case length_h:
                     // unsigned short
-                    flags.arg.uintptr_value = (unsigned short)va_arg(ap, unsigned int);
+                    flags.arg.uintptr_value =
+                            (unsigned short)va_arg(ap, unsigned int);
                     break;
 
                 case length_none:
                     // unsigned int
-                    flags.arg.uintptr_value = va_arg(ap, unsigned int);
+                    flags.arg.uintptr_value =
+                            va_arg(ap, unsigned int);
                     break;
 
                 case length_l:
                     // unsigned long
-                    flags.arg.uintptr_value = va_arg(ap, unsigned long);
+                    flags.arg.uintptr_value =
+                            va_arg(ap, unsigned long);
                     break;
 
                 case length_ll:
                     // unsigned long long
-                    flags.arg.uintptr_value = va_arg(ap, unsigned long long);
+                    flags.arg.uintptr_value =
+                            va_arg(ap, unsigned long long);
                     break;
 
                 case length_j:
                     // uintmax_t
-                    flags.arg.uintptr_value = va_arg(ap, uintmax_t);
+                    flags.arg.uintptr_value =
+                            va_arg(ap, uintmax_t);
                     break;
 
                 case length_z:
                     // ssize_t
-                    flags.arg.uintptr_value = va_arg(ap, size_t);
+                    flags.arg.uintptr_value =
+                            va_arg(ap, size_t);
                     break;
 
                 case length_t:
                     // uptrdiff_t
-                    flags.arg.uintptr_value = va_arg(ap, uptrdiff_t);
+                    flags.arg.uintptr_value =
+                            va_arg(ap, uptrdiff_t);
                     break;
                 default:
                     RETURN_FORMATTER_ERROR(chars_written);
@@ -367,7 +383,8 @@ static intptr_t formatter(
                 switch (flags.length) {
                 case length_none:
                     flags.arg_type = arg_type_uintptr_value;
-                    flags.arg.uintptr_value = (uintptr_t)va_arg(ap, void*);
+                    flags.arg.uintptr_value =
+                            (uintptr_t)va_arg(ap, void*);
                     break;
 
                 default:
@@ -551,13 +568,11 @@ static int vcprintf_emit_chars(char const *s, int c, void *unused)
 {
     (void)unused;
 
-    if (console_display) {
+    if (con_exists()) {
         if (s) {
-            return console_display_vtbl.print(
-                        console_display, s);
+            return con_print(s);
         } else if (c) {
-            console_display_vtbl.putc(
-                        console_display, c);
+            con_putc(c);
             return 1;
         }
     }
@@ -566,7 +581,16 @@ static int vcprintf_emit_chars(char const *s, int c, void *unused)
 
 int vcprintf(char const *format, va_list ap)
 {
-    return formatter(format, ap, vcprintf_emit_chars, 0);
+    int chars_written = 0;
+    if (con_exists()) {
+        int cursor_was_shown = con_cursor_toggle(0);
+
+        chars_written = formatter(format, ap,
+                                      vcprintf_emit_chars, 0);
+
+        con_cursor_toggle(cursor_was_shown);
+    }
+    return chars_written;
 }
 
 void printk(const char *format, ...)
@@ -642,7 +666,9 @@ int vsnprintf(char *buf, size_t limit, const char *format, va_list ap)
     context.limit = limit;
     context.level = 0;
 
-    intptr_t chars_needed = formatter(format, ap, vsnprintf_emit_chars, &context);
+    intptr_t chars_needed = formatter(
+                format, ap,
+                vsnprintf_emit_chars, &context);
 
     if ((size_t)chars_needed < limit)
         buf[chars_needed] = 0;

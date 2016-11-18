@@ -40,7 +40,7 @@ WEVERYTHING += -Wdouble-promotion
 WEVERYTHING += -Wformat=2
 WEVERYTHING += -Wfloat-equal
 WEVERYTHING += -Wundef
-WEVERYTHING += -Wbad-function-cast
+#overkill WEVERYTHING += -Wbad-function-cast
 #overkill WEVERYTHING += -Wcast-qual
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
@@ -57,8 +57,10 @@ endif
 CFLAGS ?= -g3 -O2 -ffreestanding \
 	-Wno-unused-function -fpic -mno-red-zone \
 	-ftls-model=$(TLS_MODEL) \
-	-fipa-icf \
+	-fomit-frame-pointer \
 	$(WEVERYTHING)
+
+#-fipa-icf
 
 CFLAGS += $(INCLUDEARGS)
 

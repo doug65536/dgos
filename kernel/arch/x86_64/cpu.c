@@ -3,7 +3,7 @@
 #include "mmu.h"
 #include "gdt.h"
 #include "idt.h"
-#include "msr.h"
+#include "control_regs.h"
 #include "legacy_pic.h"
 #include "legacy_pit.h"
 #include "apic.h"
@@ -40,7 +40,6 @@ void cpu_init(void)
 
     //init_gdt();
     idt_init();
-    mmu_init();
 
     if (0 && cpuid_edx_bit(9, 1, 0)) {
         apic_init();

@@ -1,4 +1,3 @@
-#include "code16gcc.h"
 #include "paging.h"
 #include "screen.h"
 #include "malloc.h"
@@ -171,6 +170,7 @@ void paging_alias_range(uint64_t alias_addr,
 
 // If keep is 1, then only advance phys_addr when a new
 // page was assigned, otherwise
+// If keep is 2, then always advance phys_addr
 uint64_t paging_map_range(
         uint64_t linear_base,
         uint64_t length,
@@ -183,7 +183,7 @@ uint64_t paging_map_range(
         if (paging_map_page(linear_base + offset,
                             phys_addr,
                             pte_flags,
-                            keep))
+                            keep) || keep > 1)
         {
             ++allocated;
             phys_addr += PAGE_SIZE;

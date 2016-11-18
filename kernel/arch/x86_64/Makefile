@@ -6,7 +6,7 @@ DEVOBJS := $(DEVSRCS:.c=.o)
 
 CSRCS := cpu.c \
 	cpuid.c \
-	msr.c \
+	control_regs.c \
 	ioport.c \
 	mmu.c \
 	gdt.c \
