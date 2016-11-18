@@ -102,9 +102,30 @@ typedef struct {
 #define MXCSR_RC_BIT        13
 #define MXCSR_FZ_BIT        15
 
+#define MXCSR_IE            (1 << MXCSR_IE_BIT)
+#define MXCSR_DE            (1 << MXCSR_DE_BIT)
+#define MXCSR_ZE            (1 << MXCSR_ZE_BIT)
+#define MXCSR_OE            (1 << MXCSR_OE_BIT)
+#define MXCSR_UE            (1 << MXCSR_UE_BIT)
+#define MXCSR_PE            (1 << MXCSR_PE_BIT)
+#define MXCSR_DAZ           (1 << MXCSR_DAZ_BIT)
+#define MXCSR_IM            (1 << MXCSR_IM_BIT)
+#define MXCSR_DM            (1 << MXCSR_DM_BIT)
+#define MXCSR_ZM            (1 << MXCSR_ZM_BIT)
+#define MXCSR_OM            (1 << MXCSR_OM_BIT)
+#define MXCSR_UM            (1 << MXCSR_UM_BIT)
+#define MXCSR_PM            (1 << MXCSR_PM_BIT)
+#define MXCSR_FZ            (1 << MXCSR_FZ_BIT)
+
+#define MXCSR_RC_NEAREST    0
+#define MXCSR_RC_DOWN       1
+#define MXCSR_RC_UP         2
+#define MXCSR_RC_TRUNCATE   3
+
 #define MXCSR_RC_BITS       2
 #define MXCSR_RC_MASK       ((1 << MXCSR_RC_BITS)-1)
 #define MXCSR_RC            (MXCSR_RC_MASK << MXCSR_RC_BIT)
+#define MXCSR_RC_n(rc)      (((rc) & MXCSR_RC_MASK) << MXCSR_RC_BIT)
 
 typedef struct cpu_flag_info_t {
     char const * const name;
