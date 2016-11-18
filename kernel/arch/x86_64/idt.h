@@ -24,14 +24,25 @@ typedef struct {
 // idt_entry_t selector field
 #define IDT_SEL         0x08
 // idt_entry_t type_attr field
-#define IDT_PRESENT     0x80
+#define IDT_PRESENT_BIT 7
 #define IDT_DPL_BIT     5
+#define IDT_TYPE_BIT    0
+
+#define IDT_TYPE_TASK   0x5
+#define IDT_TYPE_INTR   0xE
+#define IDT_TYPE_TRAP   0xF
+
+#define IDT_PRESENT     (1 << IDT_PRESENT_BIT)
+
 #define IDT_DPL_BITS    2
 #define IDT_DPL_MASK    ((1 << IDT_DPL_BITS)-1)
-#define IDT_DPL3        (3 << IDT_DPL_BIT)
-#define IDT_TASK        0x05
-#define IDT_INTR        0x0E
-#define IDT_TRAP        0x0F
+#define IDT_DPL         (IDT_DPL_MASK << IDT_DPL_BIT)
+
+#define IDT_DPL_n(dpl)  (((dpl) & IDT_DPL_MASK) << IDT_DPL_BIT)
+
+#define IDT_TASK        (IDT_TYPE_TASK << IDT_TYPE_BIT)
+#define IDT_INTR        (IDT_TYPE_INTR << IDT_TYPE_BIT)
+#define IDT_TRAP        (IDT_TYPE_TRAP << IDT_TYPE_BIT)
 
 //
 // CPU context
