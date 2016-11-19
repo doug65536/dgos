@@ -4,7 +4,7 @@
 #include "bios_data.h"
 #include "mm.h"
 #include "string.h"
-#include "ioport.h"
+#include "cpu/ioport.h"
 #include "time.h"
 
 DECLARE_text_display_DEVICE(vga);

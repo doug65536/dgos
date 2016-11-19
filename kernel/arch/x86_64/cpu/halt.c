@@ -1,4 +1,4 @@
-#include "halt.h"
+#include "cpu/halt.h"
 #include "interrupts.h"
 
 void halt(void)

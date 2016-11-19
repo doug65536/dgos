@@ -91,7 +91,7 @@ LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T kernel.ld -g
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 
-all: libs $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
+all: subdirs $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
 
 clean:
 	@rm -f $(BINDIR)/kernel
@@ -101,13 +101,13 @@ clean:
 	(cd lib && $(MAKE) clean)
 	(cd arch/$(ARCH) && $(MAKE) clean)
 
-$(LIBFILES) libs:
+subdirs $(LIBFILES):
 	(cd lib && $(MAKE))
 	(cd arch/$(ARCH) && $(MAKE))
 
-.PHONY: libs
+.PHONY: subdirs
 
-$(KERNEL): $(LIBFILES)  $(OBJS) $(LINKERSCRIPT)
+$(KERNEL): $(LIBFILES) $(OBJS) $(LINKERSCRIPT)
 	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
 		--start-group $(LIBFILES) --end-group \
 		> $(DUMPDIR)/kernel.map

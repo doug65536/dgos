@@ -1,5 +1,5 @@
 #include "pci.h"
-#include "ioport.h"
+#include "cpu/ioport.h"
 #include "printk.h"
 
 #define PCI_ADDR    0xCF8

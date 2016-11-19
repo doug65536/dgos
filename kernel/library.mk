@@ -10,6 +10,8 @@ LIBFILENAME := lib$(LIBNAME).a
 AOBJS := $(ASRCS:.s=.o)
 COBJS := $(CSRCS:.c=.o)
 
+SRCS := $(ASRCS) $(CSRCS)
+
 OBJS := $(AOBJS) $(COBJS)
 
 all: $(LIBFILENAME)
@@ -17,6 +19,7 @@ all: $(LIBFILENAME)
 clean:
 	@$(RM) -f $(OBJS)
 	@$(RM) -f $(LIBFILENAME)
+	@$(RM) -f $(patsubst %,$(DEPDIR)/%.d,$(notdir $(SRCS)))
 
 $(LIBFILENAME): $(OBJS)
 	$(AR) -rcs $@ $^

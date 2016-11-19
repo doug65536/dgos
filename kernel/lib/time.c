@@ -1,6 +1,6 @@
 #include "time.h"
-#include "halt.h"
-#include "interrupts.h"
+#include "cpu/halt.h"
+#include "cpu/interrupts.h"
 #include "printk.h"
 
 static uint64_t time_ms_dummy(void);

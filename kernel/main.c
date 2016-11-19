@@ -2,9 +2,9 @@
 #include "cpu.h"
 #include "mm.h"
 #include "printk.h"
-#include "halt.h"
-#include "pci.h"
-#include "legacy_keyboard.h"
+#include "cpu/halt.h"
+#include "device/pci.h"
+#include "device/legacy_keyboard.h"
 
 int life_and_stuff = 42;
 

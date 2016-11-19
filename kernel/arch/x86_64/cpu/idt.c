@@ -2,7 +2,7 @@
 #include "gdt.h"
 #include "conio.h"
 #include "printk.h"
-#include "halt.h"
+#include "cpu/halt.h"
 #include "time.h"
 #include "interrupts.h"
 #include "control_regs.h"

@@ -1,6 +1,6 @@
 #include "printk.h"
 #include "types.h"
-#include "halt.h"
+#include "cpu/halt.h"
 #include "string.h"
 #include "conio.h"
 

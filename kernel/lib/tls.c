@@ -1,7 +1,7 @@
 #include "tls.h"
 #include "printk.h"
 #include "string.h"
-#include "control_regs.h"
+#include "cpu/control_regs.h"
 
 typedef struct thread_env_t thread_env_t;
 struct thread_env_t {
