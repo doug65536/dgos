@@ -6,6 +6,7 @@ CSRCS := mm.c \
 	thread.c \
 	printk.c \
 	dev_text.c \
+	dev_storage.c \
 	conio.c \
 	string.c \
 	irq.c \

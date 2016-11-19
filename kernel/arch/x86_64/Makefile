@@ -1,6 +1,7 @@
 
 DEVSRCS := \
-	device/vga.c
+	device/vga.c \
+	device/ahci.c
 
 DEVOBJS := $(DEVSRCS:.c=.o)
 
@@ -20,7 +21,6 @@ CSRCS := \
 	cpu/legacy_pit.c \
 	device/pci.c \
 	device/legacy_keyboard.c \
-	device/ahci.c \
 	$(DEVSRCS)
 
 ASRCS := entry.s \

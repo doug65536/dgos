@@ -70,3 +70,5 @@ lib/printk.h
 lib/dev_text.h
 lib/dev_text.c
 lib/dev_registration.h
+lib/dev_storage.h
+lib/dev_storage.c
