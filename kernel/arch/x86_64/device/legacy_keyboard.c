@@ -212,7 +212,7 @@ static int keyb8042_scancode_us_0xE0[] = {
 };
 
 // The shifted character is stored immediately after
-// its cooresponding unshifted character
+// its corresponding unshifted character
 static char const keyb8042_shifted_lookup[] =
         "`~1!2@3#4$5%6^7&8*9(0)-_=+[{]};:'\"\\|,<.>/?";
 
