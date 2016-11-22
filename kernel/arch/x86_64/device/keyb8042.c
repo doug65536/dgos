@@ -1,10 +1,12 @@
-#include "legacy_keyboard.h"
+#include "keyb8042.h"
+#include "keyboard.h"
+#include "mouse.h"
+
 #include "irq.h"
 #include "cpu/ioport.h"
 #include "cpu/atomic.h"
 #include "printk.h"
 #include "time.h"
-#include "mouse.h"
 #include "string.h"
 
 // Read/write
@@ -67,154 +69,13 @@
 #define KEYB_CONFIG_CLKDIS_PORT2    (1 << KEYB_CONFIG_CLKDIS_PORT2_BIT)
 #define KEYB_CONFIG_XLAT_PORT1      (1 << KEYB_CONFIG_XLAT_PORT1_BIT)
 
-// Special keys are encoded as codepoints beyond
-// the unicode range
-typedef enum keyb8042_special_t {
-    SPECIAL_BASE = 0x120000,
-    LCTRL, RCTRL, LSHIFT, RSHIFT, LALT, RALT,
-    CAPSLOCK, NUMLOCK, SCRLOCK,
-    F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12,
-    NUMPAD_0,
-    NUMPAD_1, NUMPAD_2, NUMPAD_3,
-    NUMPAD_4, NUMPAD_5, NUMPAD_6,
-    NUMPAD_7, NUMPAD_8, NUMPAD_9,
-    NUMPAD_DOT,
-    NUMPAD_ENTER,
-    NUMPAD_PLUS,
-    NUMPAD_MINUS,
-    NUMPAD_STAR,
-    NUMPAD_SLASH,
-    HOME, END, PGUP, PGDN, INS, DEL,
-    UP, DOWN, LEFT, RIGHT,
-    LGUI, RGUI, MENU,
-    PRNSCR, PAUSE, SYSRQ,
+static keyb8042_layout_t *keyb8042_layout = &keyb8042_layout_us;
 
-    // Ranges
-    NUMPAD_ST = NUMPAD_0,
-    NUMPAD_EN = NUMPAD_SLASH
-} keyb8042_special_t;
-
-const char *keyb8042_special_text[] = {
-    "LCTRL", "RCTRL", "LSHIFT", "RSHIFT", "LALT", "RALT",
-    "CAPSLOCK", "NUMLOCK", "SCRLOCK",
-    "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
-    "NUMPAD_0",
-    "NUMPAD_1", "NUMPAD_2", "NUMPAD_3",
-    "NUMPAD_4", "NUMPAD_5", "NUMPAD_6",
-    "NUMPAD_7", "NUMPAD_8", "NUMPAD_9",
-    "NUMPAD_MINUS",
-    "NUMPAD_PLUS",
-    "NUMPAD_STAR",
-    "NUMPAD_SLASH",
-    "NUMPAD_DOT",
-    "NUMPAD_ENTER",
-    "HOME", "END", "PGUP", "PGDN", "INS", "DEL",
-    "UP", "DOWN", "LEFT", "RIGHT",
-    "LGUI", "RGUI", "MENU",
-    "PRNSCR", "PAUSE", "SYSRQ"
+// Lookup table of keyboard layouts
+static keyb8042_layout_t *keyb8042_layouts[] = {
+    &keyb8042_layout_us,
+    0
 };
-
-// Scancodes resolve to an ASCII equivalent, or,
-// a special code >= SPECIAL_BASE
-// These are all of the keys that existed on the original XT keyboard
-static int keyb8042_scancode_us[] = {
-    // 0x00
-    0, '\x1b',
-
-    // 0x02
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',
-
-    // 0x0F
-    '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\n',
-
-    // 0x1D
-    LCTRL, 'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ';', '\'', '`',
-
-    // 0x2A
-    LSHIFT, '\\',
-
-    // 0x2C
-    'Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '.', '/',
-
-    // 0x36
-    RSHIFT,
-
-    // 0x37
-    NUMPAD_STAR,
-
-    // 0x38
-    LALT, ' ',
-
-    // 0x3A
-    CAPSLOCK,
-
-    // 0x3B
-    F1, F2, F3, F4, F5, F6, F7, F8, F9, F10,
-
-    // 0x45
-    NUMLOCK, SCRLOCK,
-
-    // 0x47
-    NUMPAD_7, NUMPAD_8, NUMPAD_9, NUMPAD_MINUS,
-
-    // 0x4B
-    NUMPAD_4, NUMPAD_5, NUMPAD_6, NUMPAD_PLUS,
-
-    // 0x4F
-    NUMPAD_1, NUMPAD_2, NUMPAD_3,
-
-    // 0x52
-    NUMPAD_0, NUMPAD_DOT,
-
-    // 0x54
-    SYSRQ, 0, '\\',
-
-    // 0x57
-    F11, F12
-};
-
-static int keyb8042_scancode_us_0xE0[] = {
-    // 0x00
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    // 0x10
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    // 0x1C
-    NUMPAD_ENTER, RCTRL, 0, 0,
-
-    // 0x20
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    // 0x30
-    0, 0, 0, 0, 0, NUMPAD_SLASH, 0, PRNSCR,
-
-    // 0x38
-    RALT, 0, 0, 0, 0, 0, 0, 0,
-
-    // 0x40
-    0, 0, 0, 0, 0, NUMLOCK, 0, HOME,
-
-    // 0x48
-    UP, PGUP, 0, LEFT, 0, RIGHT, 0, END,
-
-    // 0x50
-    DOWN, PGDN, INS, DEL, 0, 0, 0, 0,
-
-    // 0x58
-    0, 0, 0, LGUI, RGUI, MENU, 0, 0,
-
-    // 0x60
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-
-    // 0x70
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
-// The shifted character is stored immediately after
-// its corresponding unshifted character
-static char const keyb8042_shifted_lookup[] =
-        "`~1!2@3#4$5%6^7&8*9(0)-_=+[{]};:'\"\\|,<.>/?";
 
 static char const keyb8042_passthru_lookup[] =
         " \b\n";
@@ -232,10 +93,10 @@ typedef enum keyb8042_key_state_t {
 // Bit positions for each shift key
 #define KEYB_LSHIFT_DOWN_BIT 0
 #define KEYB_RSHIFT_DOWN_BIT 1
-#define KEYB_LALT_DOWN_BIT   2
-#define KEYB_RALT_DOWN_BIT   3
-#define KEYB_LCTRL_DOWN_BIT  4
-#define KEYB_RCTRL_DOWN_BIT  5
+#define KEYB_LCTRL_DOWN_BIT  2
+#define KEYB_RCTRL_DOWN_BIT  3
+#define KEYB_LALT_DOWN_BIT   4
+#define KEYB_RALT_DOWN_BIT   5
 #define KEYB_LGUI_DOWN_BIT   6
 #define KEYB_RGUI_DOWN_BIT   7
 
@@ -251,12 +112,13 @@ typedef enum keyb8042_key_state_t {
 
 // Bitmasks for checking either left or right
 #define KEYB_SHIFT_DOWN     (KEYB_LSHIFT_DOWN | KEYB_RSHIFT_DOWN)
-#define KEYB_ALT_DOWN       (KEYB_LALT_DOWN | KEYB_RALT_DOWN)
 #define KEYB_CTRL_DOWN      (KEYB_LCTRL_DOWN | KEYB_RCTRL_DOWN)
+#define KEYB_ALT_DOWN       (KEYB_LALT_DOWN | KEYB_RALT_DOWN)
 #define KEYB_GUI_DOWN       (KEYB_LGUI_DOWN | KEYB_RGUI_DOWN)
 
 static keyb8042_key_state_t keyb8042_state = NORMAL;
-static int keyb8042_shift_state;
+static int volatile keyb8042_shift_state;
+static int keyb8042_alt_code;
 
 // Mouse packet data
 static uint64_t keyb8042_last_mouse_packet_time;
@@ -272,7 +134,7 @@ static void keyb8042_keyboard_handler(void)
     scancode = inb(KEYB_DATA);
     //printk("Key code = %02x\n", scancode);
 
-    uint32_t translated = 0;
+    int32_t vk = 0;
     int is_keyup = !!(scancode & 0x80);
 
     switch (keyb8042_state) {
@@ -286,14 +148,12 @@ static void keyb8042_keyboard_handler(void)
             break;
         }
         scancode &= 0x7F;
-        if (scancode < countof(keyb8042_scancode_us))
-            translated = keyb8042_scancode_us[scancode];
+        vk = keyb8042_layout->scancode[scancode];
         break;
 
     case IN_E0:
         scancode &= 0x7F;
-        if (scancode < countof(keyb8042_scancode_us_0xE0))
-            translated = keyb8042_scancode_us_0xE0[scancode];
+        vk = keyb8042_layout->scancode_0xE0[scancode];
         keyb8042_state = NORMAL;
         break;
 
@@ -303,7 +163,7 @@ static void keyb8042_keyboard_handler(void)
 
     case IN_E1_2:
         keyb8042_state = NORMAL;
-        translated = PAUSE;
+        vk = KEYB_VK_PAUSE;
         break;
 
     default:
@@ -311,35 +171,21 @@ static void keyb8042_keyboard_handler(void)
         break;
     }
 
-    //if (translated > 0 && translated < SPECIAL_BASE) {
-    //    //printk("Key = %d (%c) (%s)\n", translated,
-    //    //       translated >= ' ' ? translated : ' ',
-    //    //       is_keyup ? "released" : "pressed");
-    //} else if (translated > SPECIAL_BASE) {
-    //    //translated -= SPECIAL_BASE + 1;
-    //
-    //    //if (translated < countof(keyb8042_special_text)) {
-    //    //    printk("Key = %s (%s)\n",
-    //    //           keyb8042_special_text[translated],
-    //    //           is_keyup ? "released" : "pressed");
-    //    //}
-    //}
-
     //
     // Update shift state bits
 
-    if (translated > SPECIAL_BASE) {
+    if (vk > KEYB_VK_BASE) {
         int shift_mask;
 
         // Update shift state
-        switch (translated) {
+        switch (vk) {
         default: shift_mask = 0; break;
-        case LSHIFT: shift_mask = KEYB_LSHIFT_DOWN; break;
-        case RSHIFT: shift_mask = KEYB_RSHIFT_DOWN; break;
-        case LALT: shift_mask = KEYB_LALT_DOWN; break;
-        case RALT: shift_mask = KEYB_RALT_DOWN; break;
-        case LCTRL: shift_mask = KEYB_LCTRL_DOWN; break;
-        case RCTRL: shift_mask = KEYB_RCTRL_DOWN; break;
+        case KEYB_VK_LSHIFT: shift_mask = KEYB_LSHIFT_DOWN; break;
+        case KEYB_VK_RSHIFT: shift_mask = KEYB_RSHIFT_DOWN; break;
+        case KEYB_VK_LALT: shift_mask = KEYB_LALT_DOWN; break;
+        case KEYB_VK_RALT: shift_mask = KEYB_RALT_DOWN; break;
+        case KEYB_VK_LCTRL: shift_mask = KEYB_LCTRL_DOWN; break;
+        case KEYB_VK_RCTRL: shift_mask = KEYB_RCTRL_DOWN; break;
         }
 
         // Update shift state bit
@@ -352,35 +198,70 @@ static void keyb8042_keyboard_handler(void)
     //
     // Determine ASCII code
 
-    int ascii = 0;
-    if (!is_keyup) {
-        if (translated >= 'A' && translated <= 'Z') {
-            if (keyb8042_shift_state & KEYB_CTRL_DOWN) {
-                ascii = translated - 'A' + 1;
-            } else if (keyb8042_shift_state & KEYB_ALT_DOWN) {
-                // No ascii
-            } else if ((keyb8042_shift_state & KEYB_SHIFT_DOWN) == 0) {
-                // Not shifted
-                ascii = translated - 'A' + 'a';
-            } else {
-                ascii = translated;
+    int codepoint = 0;
+    if (vk >= 'A' && vk <= 'Z') {
+        if (keyb8042_shift_state & KEYB_ALT_DOWN) {
+            // No ascii
+        } else if (keyb8042_shift_state & KEYB_SHIFT_DOWN) {
+            codepoint = vk;
+        } else {
+            // Not shifted
+            codepoint = vk - 'A' + 'a';
+        }
+    } else if (vk >= KEYB_VK_NUMPAD_0 &&
+               vk <= KEYB_VK_NUMPAD_9) {
+        printk("shiftstate=%x altdown=%d\n", keyb8042_shift_state,
+               keyb8042_shift_state & KEYB_ALT_DOWN);
+        if (keyb8042_shift_state & KEYB_ALT_DOWN) {
+            if (is_keyup) {
+                // Add decimal digit to alt code
+                keyb8042_alt_code = keyb8042_alt_code * 10 +
+                        vk - KEYB_VK_NUMPAD_ST;
             }
-        } else if (translated >= NUMPAD_ST && translated <= NUMPAD_EN) {
-            ascii = keyb8042_numpad_ascii[translated - NUMPAD_ST];
-        } else if (strchr(keyb8042_passthru_lookup, translated)) {
-            ascii = translated;
-        } else if (translated < 0x100) {
-            char const *lookup = strchr(keyb8042_shifted_lookup, translated);
-            if (lookup) {
-                ascii = (keyb8042_shift_state & KEYB_SHIFT_DOWN)
-                        ? lookup[1]
-                        : lookup[0];
-            }
+        } else {
+            codepoint = keyb8042_numpad_ascii[vk - KEYB_VK_NUMPAD_ST];
+        }
+    } else if (strchr(keyb8042_passthru_lookup, vk)) {
+        codepoint = vk;
+    } else if (vk < 0x100) {
+        char const *lookup = strchr(keyb8042_layout->shifted_lookup,
+                                    vk);
+        if (lookup) {
+            codepoint = (keyb8042_shift_state & KEYB_SHIFT_DOWN)
+                    ? lookup[1]
+                    : lookup[0];
         }
     }
 
-    if (ascii != 0) {
-        printk("%c", ascii);
+    if (keyb8042_shift_state & KEYB_CTRL_DOWN)
+        codepoint &= 0x1F;
+
+    keyboard_event_t event;
+
+    if (vk || codepoint) {
+        event.codepoint = is_keyup ? -codepoint : codepoint;
+        event.vk = is_keyup ? -vk : vk;
+        keybd_event(event);
+    }
+
+    printk("is_keyup=%d vk=%d altcode=%d\n", is_keyup, vk, keyb8042_alt_code);
+
+    if (is_keyup && (vk == KEYB_VK_LALT || vk == KEYB_VK_RALT)) {
+        if (keyb8042_alt_code != 0) {
+            if (keyb8042_alt_code < 0x101000) {
+                event.vk = 0;
+
+                // Generate keydown and keyup event for entered codepoint
+
+                event.codepoint = keyb8042_alt_code;
+                keybd_event(event);
+
+                event.codepoint = -keyb8042_alt_code;
+                keybd_event(event);
+            }
+
+            keyb8042_alt_code = 0;
+        }
     }
 }
 
@@ -551,6 +432,43 @@ static int keyb8042_magic_sequence(uint8_t expected_id, size_t seq_length, ...)
 
     // Successfully detected
     return 1;
+}
+
+static int keyb8042_get_modifiers(void)
+{
+    int flags = 0;
+
+    int shift_state = keyb8042_shift_state;
+
+    if (shift_state & KEYB_SHIFT_DOWN)
+        flags |= KEYMODIFIER_FLAG_SHIFT;
+
+    if (shift_state & KEYB_CTRL_DOWN)
+        flags |= KEYMODIFIER_FLAG_CTRL;
+
+    if (shift_state & KEYB_ALT_DOWN)
+        flags |= KEYMODIFIER_FLAG_ALT;
+
+    if (shift_state & KEYB_GUI_DOWN)
+        flags |= KEYMODIFIER_FLAG_GUI;
+
+    return flags;
+}
+
+static int keyb8042_set_layout_name(char const *name)
+{
+    for (keyb8042_layout_t **layout = keyb8042_layouts;
+         *layout; ++layout) {
+        keyb8042_layout_t *this_layout = *layout;
+
+        if (!strcmp(this_layout->name, name)) {
+            keyb8042_layout = this_layout;
+            return 1;
+        }
+    }
+
+    // Not found
+    return 0;
 }
 
 void keyb8042_init(void)
@@ -730,6 +648,9 @@ void keyb8042_init(void)
         irq_hook(12, keyb8042_handler);
         irq_setmask(12, 1);
     }
+
+    keybd_get_modifiers = keyb8042_get_modifiers;
+    keybd_set_layout_name = keyb8042_set_layout_name;
 
     printk("Keyboard enabled\n");
 }

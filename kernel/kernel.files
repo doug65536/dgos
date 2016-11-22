@@ -40,8 +40,8 @@ arch/x86_64/cpu/interrupts.c
 arch/x86_64/cpu/cpu.c
 arch/x86_64/device/vga.c
 arch/x86_64/device/vga.h
-arch/x86_64/device/legacy_keyboard.c
-arch/x86_64/device/legacy_keyboard.h
+arch/x86_64/device/keyb8042.c
+arch/x86_64/device/keyb8042.h
 arch/x86_64/device/ahci.c
 arch/x86_64/device/ahci.h
 arch/x86_64/device/pci.c
@@ -72,3 +72,10 @@ lib/dev_text.c
 lib/dev_registration.h
 lib/dev_storage.h
 lib/dev_storage.c
+arch/x86_64/cpu/thread_impl.c
+arch/x86_64/device/keyb8042_layout/keyb8042_layout_us.c
+lib/keyboard.h
+lib/keyboard.c
+arch/x86_64/cpu/thread_impl.h
+lib/main.h
+arch/x86_64/cpu/isr.h

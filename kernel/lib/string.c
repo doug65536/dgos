@@ -125,22 +125,34 @@ void *memset(void *dest, int c, size_t n)
 
 void *memcpy(void *dest, void const *src, size_t n)
 {
+    char *d;
+    char const *s;
+
 #ifdef __GNUC__
     // If source and destination are aligned, copy 128 bits at a time
     if (n >= 16 && !((intptr_t)dest & 0x0F) && !((intptr_t)src & 0x0F)) {
         __ivec2 *vd = dest;
         __ivec2 const *vs = src;
         while (n >= sizeof(*vd)) {
-            *vd = *vs;
+            *vd++ = *vs++;
             n -= sizeof(*vd);
         }
+        // Do remainder as bytes
+        d = (char*)vd;
+        s = (char*)vs;
+    } else {
+        // Not big enough, or not aligned
+        d = (char*)dest;
+        s = (char*)src;
     }
+#else
+    d = dest;
+    s = src;
 #endif
 
-    char *d = dest;
-    char const *s = src;
     while (n--)
         *d++ = *s++;
+
     return dest;
 }
 
@@ -149,7 +161,9 @@ void *memmove(void *dest, void const *src, size_t n)
     char *d = dest;
     char const *s = src;
 
-    if (d < s || d + n <= s || s + n <= d)
+    // Can do forward copy if destination is before source,
+    // or the end of the source is before the destination
+    if (d < s || s + n <= d)
         return memcpy(d, s, n);
 
     if (d > s) {

@@ -90,6 +90,9 @@ SECTIONS {
 		___tbss_en = .;
 	}
 
+	. = ALIGN(4096);
+	___init_brk = .;
+
 	.debug_info    0 : { *(.debug_info)    }
 	.debug_abbrev  0 : { *(.debug_abbrev)  }
 	.debug_aranges 0 : { *(.debug_aranges) }

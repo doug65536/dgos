@@ -1,12 +1,15 @@
 #include "cpuid.h"
+#include "string.h"
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
     // Automatically check for support for the leaf
     if ((eax & 0x7FFFFFFF) != 0) {
         cpuid(output, eax & 0x80000000, 0);
-        if (output->eax < eax)
+        if (output->eax < eax) {
+            memset(output, 0, sizeof(*output));
             return 0;
+        }
     }
 
     __asm__ __volatile__ (

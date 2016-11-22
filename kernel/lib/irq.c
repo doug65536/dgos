@@ -14,9 +14,9 @@ void irq_unhook(int irq, void *(*handler)(int, void*))
         irq_handlers[irq] = 0;
 }
 
-void *irq_invoke(int irq, void *stack_pointer)
+void *irq_invoke(int irq, void *ctx)
 {
     if (irq_handlers[irq])
-        return irq_handlers[irq](irq, stack_pointer);
-    return stack_pointer;
+        return irq_handlers[irq](irq, ctx);
+    return ctx;
 }

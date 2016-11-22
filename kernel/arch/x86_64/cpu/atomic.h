@@ -33,9 +33,14 @@
 ///  INSN is one of:
 ///   cmpxchg
 ///   xadd
+///   xchg
 ///
 
-/// Forgive the macro abuse, this defines 112 functions
+/// Forgive the macro abuse, this defines 120 functions
+
+#ifndef ATOMIC_USE_BUILTINS
+#define ATOMIC_USE_BUILTINS 1
+#endif
 
 #define ATOMIC_DEFINE_UNARY(type, name, insn, suffix) \
     static inline void atomic_##name##_##type ( \
@@ -74,6 +79,21 @@
         return carry; \
     }
 
+#if ATOMIC_USE_BUILTINS
+#define ATOMIC_DEFINE_CMPXCHG(type, suffix) \
+    static inline type##_t atomic_cmpxchg_##type( \
+        type##_t volatile *value, \
+        type##_t expect,\
+        type##_t replacement) \
+    { \
+        return __sync_val_compare_and_swap(value, expect, replacement); \
+    }
+
+#define atomic_cmpxchg(value, expect, replacement) \
+    __sync_val_compare_and_swap(value, expect, replacement)
+
+#else
+
 #define ATOMIC_DEFINE_CMPXCHG(type, suffix) \
     static inline type##_t atomic_cmpxchg_##type ( \
         type##_t volatile *value, \
@@ -89,13 +109,28 @@
         return expect; \
     }
 
+#endif
+
+#define ATOMIC_DEFINE_XCHG(type, suffix) \
+    static inline type##_t atomic_xchg_##type ( \
+        type##_t volatile *value, \
+        type##_t replacement) \
+    { \
+        __asm__ __volatile__ ( \
+            "xchg" suffix " %[replacement],%[value]\n\t" \
+            : [value] "+m" (*value), \
+              [replacement] "+r" (replacement) \
+        ); \
+        return replacement; \
+    }
+
 #define ATOMIC_DEFINE_XADD(type, suffix) \
     static inline type##_t atomic_xadd_##type ( \
         type##_t volatile *value, \
         type##_t addend) \
     { \
         __asm__ __volatile__ ( \
-            "lock xadd" suffix " %[addend],(%[value])\n\t" \
+            "lock xadd" suffix " %[addend],%[value]\n\t" \
             : [value] "+m" (*value), \
               [addend] "+r" (addend) \
         ); \
@@ -131,6 +166,16 @@
     ATOMIC_DEFINE_BINARY_RC(int16, name, insn, "w") \
     ATOMIC_DEFINE_BINARY_RC(int32, name, insn, "l") \
     ATOMIC_DEFINE_BINARY_RC(int64, name, insn, "q")
+
+// Swap
+ATOMIC_DEFINE_XCHG(uint8, "b")
+ATOMIC_DEFINE_XCHG(uint16, "w")
+ATOMIC_DEFINE_XCHG(uint32, "l")
+ATOMIC_DEFINE_XCHG(uint64, "q")
+ATOMIC_DEFINE_XCHG(int8, "b")
+ATOMIC_DEFINE_XCHG(int16, "w")
+ATOMIC_DEFINE_XCHG(int32, "l")
+ATOMIC_DEFINE_XCHG(int64, "q")
 
 // Compare and swap
 ATOMIC_DEFINE_CMPXCHG(uint8, "b")
@@ -170,3 +215,9 @@ ATOMIC_DEFINE_BINARY_INSN(and, "and")
 ATOMIC_DEFINE_BINARY_INSN(or, "or")
 ATOMIC_DEFINE_BINARY_INSN(xor, "xor")
 
+// Technically not atomic but needed in cmpxchg loops
+
+static inline void pause(void)
+{
+    __asm__ __volatile__ ( "pause" );
+}

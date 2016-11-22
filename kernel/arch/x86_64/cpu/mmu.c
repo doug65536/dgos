@@ -1,8 +1,10 @@
 #include "mmu.h"
+#include "mm.h"
 #include "control_regs.h"
 #include "printk.h"
 #include "time.h"
 #include "string.h"
+#include "atomic.h"
 
 // Intel manual, page 2786
 
@@ -127,6 +129,7 @@ typedef uint64_t pte_t;
 // Linear addresses
 #define PT_KBASEADDR   (0x7F8000000000UL)
 #define PT_UBASEADDR   (0x7F0000000000UL)
+#define PT_MAX_ADDR    (0x800000000000UL)
 
 // The number of pte_t entries at each level
 #define PT3_ENTRIES     (0x400000000UL)
@@ -142,9 +145,9 @@ typedef uint64_t pte_t;
 
 // Addresses of start of page tables for each level
 #define PT3_PTR(base)  ((pte_t*)(base))
-#define PT2_PTR(base)  (PT3_PTR(base) + PT3_ENTRIES)
-#define PT1_PTR(base)  (PT2_PTR(base) + PT2_ENTRIES)
-#define PT0_PTR(base)  (PT1_PTR(base) + PT1_ENTRIES)
+#define PT2_PTR(base)  (PT3_PTR(base) + PT2_BASE)
+#define PT1_PTR(base)  (PT3_PTR(base) + PT1_BASE)
+#define PT0_PTR(base)  (PT3_PTR(base) + PT0_BASE)
 
 static pte_t * const ptk_base[4] = {
     PT0_PTR(PT_KBASEADDR),
@@ -174,6 +177,79 @@ static pte_t * const ptu_base[4] = {
 
 physmem_range_t *phys_mem_map;
 size_t phys_mem_map_count;
+
+// Simple physical memory allocator (until good one is done)
+physmem_range_t ranges[64];
+size_t usable_ranges;
+
+// Bitmask of available aliasing ptes
+static uint64_t volatile apte_map;
+
+// Take 64 page table entries at the top of memory
+// for use in breaking the catch-22 problem of
+// needing to manipulate the page tables to manipulate
+// the page tables :)
+//static void init_apte_list(void)
+//{
+//    // Mark them all present to make sure they don't get
+//    // used for something else
+//    pte_t *pte;
+//    for (unsigned i = 64; i > 0; --i) {
+//        pte = PT3_PTR(PT_KBASEADDR) + PT3_ENTRIES - i;
+//        *pte = PTE_PRESENT;
+//    }
+//}
+
+// Maps the specified physical address and returns a pointer
+// which you can use to modify that physical address
+static pte_t *take_apte(uint64_t address)
+{
+    pte_t *result;
+    uint64_t old_map = apte_map;
+    for (;;) {
+        if (~old_map) {
+            // __builtin_ctzl returns number of trailing zeros
+            unsigned first_available = __builtin_ctzl(~old_map);
+            uint64_t new_map = old_map | (1L << first_available);
+
+            if (atomic_cmpxchg_uint64(
+                        &apte_map,
+                        old_map,
+                        new_map) == old_map) {
+                // Successfully acquired entry
+
+                // Locate pte
+                result = PT3_PTR(PT_KBASEADDR) +
+                        PT3_ENTRIES - 64 +
+                        first_available;
+
+                // Modify pte
+                *result = (address & PTE_ADDR) |
+                        (PTE_PRESENT | PTE_WRITABLE);
+
+                // Calculate linear address for pte
+                result = (pte_t*)
+                        (PT_MAX_ADDR -
+                         (64  << PAGE_SIZE_BIT) +
+                         (first_available << PAGE_SIZE_BIT));
+
+                // Flush tlb for pte address range
+                cpu_invalidate_page((uint64_t)result);
+
+                // Return pointer to linear address
+                // which maps physical address
+                return result;
+            }
+        }
+        pause();
+    }
+}
+
+static void release_apte(pte_t *address)
+{
+    int bit = 64 - ((PT_MAX_ADDR - (uint64_t)address) >> PAGE_SIZE_BIT);
+    atomic_and_uint64(&apte_map, ~(1UL << bit));
+}
 
 static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
 {
@@ -395,12 +471,12 @@ static void path_from_addr(unsigned *path, uint64_t addr)
 // the given path
 static void pages_from_path(pte_t **pte, unsigned *path)
 {
-    uint64_t base = path[0] < 0x80
-            ? PT_UBASEADDR
-            : PT_KBASEADDR;
+    uint64_t base = path[0] >= 0x80
+            ? PT_KBASEADDR
+            : PT_UBASEADDR;
 
     uint64_t page_index =
-            ((uint64_t)path[0] << (9 * 3)) +
+            ((uint64_t)(path[0] & 0x3F) << (9 * 3)) +
             ((uint64_t)path[1] << (9 * 2)) +
             ((uint64_t)path[2] << (9 * 1)) +
             ((uint64_t)path[3] << (9 * 0));
@@ -452,6 +528,7 @@ static void init_create_pt(
         pte_t *aliasing_pte,
         uint64_t linear_addr,
         uint64_t phys_addr,
+        uint64_t *pt_physaddr,
         physmem_range_t *ranges,
         size_t *usable_ranges)
 {
@@ -467,6 +544,9 @@ static void init_create_pt(
 
     // Map aliasing page to point to new page
     iter = init_map_aliasing_pte(aliasing_pte, root_physaddr);
+
+    if (pt_physaddr)
+        pt_physaddr[0] = root_physaddr;
 
     uint64_t addr;
     for (unsigned level = 0; level < levels; ++level) {
@@ -488,6 +568,9 @@ static void init_create_pt(
             // Descend into next page table
             iter = init_map_aliasing_pte(aliasing_pte, addr);
         }
+
+        if (pt_physaddr)
+            pt_physaddr[level+1] = addr;
     }
 
     if (levels == 3 && !(iter[path[3]] & PTE_PRESENT)) {
@@ -503,14 +586,20 @@ void mmu_init(void)
 {
     size_t usable_ranges = mmu_fixup_mem_map(phys_mem_map);
 
-    // Make private copy of just usable ranges for modification
-    physmem_range_t *ranges = alloca(
-                sizeof(physmem_range_t) * usable_ranges);
+    if (usable_ranges > countof(ranges)) {
+        printk("Physical memory is incredibly fragmented!\n");
+        usable_ranges = countof(ranges);
+    }
+
     for (physmem_range_t *ranges_in = phys_mem_map, *ranges_out = ranges;
          ranges_in < phys_mem_map + phys_mem_map_count;
          ++ranges_in) {
         if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
             *ranges_out++ = *ranges_in;
+
+        // Cap
+        if (ranges_out > ranges + usable_ranges)
+            break;
     }
 
     uint64_t usable_pages = 0;
@@ -559,6 +648,7 @@ void mmu_init(void)
     init_create_pt(root_physaddr, aliasing_pte,
                    (uint64_t)PT0_PTR(PT_KBASEADDR),
                    root_physaddr,
+                   0,
                    ranges, &usable_ranges);
 
     unsigned path[4];
@@ -606,12 +696,15 @@ void mmu_init(void)
                     if ((pte & PTE_PRESENT) == 0)
                         continue;
 
+                    uint64_t pt_physaddr[4];
+
                     init_create_pt(root_physaddr, aliasing_pte,
                             ((uint64_t)path[0] << (9 * 3 + 12)) |
                             ((uint64_t)path[1] << (9 * 2 + 12)) |
                             ((uint64_t)path[2] << (9 * 1 + 12)) |
                             ((uint64_t)path[3] << (9 * 0 + 12)),
                             pte & PTE_ADDR,
+                            pt_physaddr,
                             ranges, &usable_ranges);
 
                     pte_t *virtual_tables[4];
@@ -619,8 +712,9 @@ void mmu_init(void)
 
                     for (unsigned i = 0; i < 4; ++i) {
                         init_create_pt(root_physaddr, aliasing_pte,
-                                       (uint64_t)virtual_tables[i] & PTE_ADDR,
-                                       phys_addr[i],
+                                       (uint64_t)virtual_tables[i],
+                                       pt_physaddr[i],
+                                       0,
                                        ranges, &usable_ranges);
                     }
 
@@ -639,6 +733,118 @@ void mmu_init(void)
         }
     }
 
-    pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
+    //pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
     cpu_set_page_directory(root_physaddr);
+
+    // Make zero page not present to catch null pointers
+    *PT3_PTR(PT_UBASEADDR) = 0;
+    cpu_invalidate_page(0);
+
+    //init_apte_list();
 }
+
+extern char ___init_brk[];
+static uint64_t volatile linear_allocator = (uint64_t)___init_brk;
+
+static uint64_t round_up(uint64_t n)
+{
+    return (n + PAGE_MASK) & -PAGE_SIZE;
+}
+
+static uint64_t take_linear(uint64_t size)
+{
+    if (size > 0) {
+        // Allocate 2 extra pages as guard pages
+        uint64_t addr = atomic_xadd_uint64(
+                    &linear_allocator,
+                    round_up(size) + PAGE_SIZE * 2);
+
+        return addr + PAGE_SIZE;
+    }
+    return 0;
+}
+
+static void make_pagetables_exist(pte_t **ptes, uint64_t flags)
+{
+    unsigned path[4];
+
+    for (unsigned i = 0; i < 4; ++i) {
+        // Get path to PTE page
+        path_from_addr(path, (uint64_t)ptes[i]);
+
+        pte_t *ptepte[4];
+        pages_from_path(ptepte, path);
+
+        int need_invlpg = 0;
+        for (unsigned k = 0; k < 4; ++k) {
+            if (!(*ptepte[i] & PTE_PRESENT)) {
+                // Assign physical page
+                uint64_t phys_addr = init_take_page(
+                            ranges, &usable_ranges);
+
+                pte_t *pt = take_apte(phys_addr);
+
+                aligned16_memset(pt, 0, PAGE_SIZE);
+
+                *ptepte[i] = phys_addr | flags;
+
+                release_apte(pt);
+
+                need_invlpg = 1;
+            }
+        }
+
+        if (need_invlpg)
+            cpu_invalidate_page((uint64_t)ptes[i]);
+    }
+}
+
+void *mmap(
+        void *addr,
+        size_t len,
+        int prot,
+        int flags,
+        int fd,
+        off_t offset)
+{
+    // Bomb out on unsupported stuff, for now
+    if (fd != -1 || offset != 0 || !len)
+        return 0;
+
+    uint64_t page_flags = PTE_PRESENT;
+
+    if (prot & PROT_WRITE)
+        page_flags |= PTE_WRITABLE;
+
+    // fixme check cpuid
+    //if (!(prot & PROT_EXEC))
+    //    flags |= PROT_EXEC;
+
+    uint64_t linear_addr = take_linear(len);
+
+    for (uint64_t ofs = 0; ofs < len + PAGE_SIZE; ofs += PAGE_SIZE)
+    {
+        unsigned path[4];
+        path_from_addr(path, linear_addr);
+
+        pte_t *ptes[4];
+        pages_from_path(ptes, path);
+
+        make_pagetables_exist(ptes, page_flags);
+
+        if (flags & MAP_PHYSICAL) {
+            // addr is a physical address, caller uses
+            // returned linear address to access it
+            *ptes[3] = ((uint64_t)addr + ofs) |
+                    PTE_PRESENT | PTE_WRITABLE;
+        } else {
+            // Allocate normal memory
+
+            *ptes[3] = init_take_page(ranges, &usable_ranges) |
+                    PTE_PRESENT | PTE_WRITABLE;
+        }
+    }
+
+    return (void*)linear_addr;
+}
+

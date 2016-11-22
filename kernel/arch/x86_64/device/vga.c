@@ -25,6 +25,10 @@ struct text_display_t {
 
     int attrib;
 
+    int mouse_x;
+    int mouse_y;
+    int mouse_on;
+
     uint16_t shadow[80*25];
 };
 
@@ -52,6 +56,59 @@ static void cap_position(text_display_t *self, int *px, int *py)
         *py = self->height - 1;
 }
 
+static int mouse_toggle(text_display_t *self,
+                 int show)
+{
+    if (!self->mouse_on != !show) {
+        // Invert color at mouse
+        size_t place = self->mouse_y *
+                self->width +
+                self->mouse_x;
+        uint8_t attr =
+                (self->shadow[place] >> 8) & 0xFF;
+        uint8_t set_attr = show
+                ? ((attr >> 4) | (attr << 4)) & 0xFF
+                : attr;
+
+        // Force visible if showing in cell with same color
+        // for foreground and background
+        if (show && ((set_attr >> 4) == (set_attr & 0x0F)))
+            set_attr ^= 7 << 4;
+
+        self->video_mem[place] =
+                      (self->shadow[place] & 0xFF) |
+                      (set_attr << 8);
+        self->mouse_on = !!show;
+        return !show;
+    }
+    return !!show;
+}
+
+static int mouse_hide_if_at(text_display_t *self,
+                            int x, int y)
+{
+    if (self->mouse_on &&
+            self->mouse_x == x &&
+            self->mouse_y == y) {
+        return mouse_toggle(self, 0);
+    }
+    return self->mouse_on;
+}
+
+static int mouse_hide_if_within(text_display_t *self,
+                                int sx, int sy,
+                                int ex, int ey)
+{
+    if (self->mouse_on &&
+            self->mouse_x >= sx &&
+            self->mouse_x < ex &&
+            self->mouse_y >= sy &&
+            self->mouse_y < ey) {
+        return mouse_toggle(self, 0);
+    }
+    return self->mouse_on;
+}
+
 static void move_cursor_to(text_display_t *self, int x, int y)
 {
     uint16_t position = y * self->width + x;
@@ -72,19 +129,23 @@ static void write_char_at(
         int x, int y,
         int character, int attrib)
 {
+    int mouse_was_shown = mouse_hide_if_at(self, x, y);
     size_t place = y * self->width + x;
     uint16_t pair = (character & 0xFF) | ((attrib & 0xFF) << 8);
     self->shadow[place] = pair;
     self->video_mem[place] = pair;
+    mouse_toggle(self, mouse_was_shown);
 }
 
 static void clear_screen(text_display_t *self)
 {
+    int mouse_was_shown = mouse_toggle(self, 0);
     uint16_t *p = self->shadow;
     for (int y = 0; y < self->height; ++y)
         for (int x = 0; x < self->width; ++x)
             *p++ = ' ' | (self->attrib << 8);
     memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
+    mouse_toggle(self, mouse_was_shown);
 }
 
 static void fill_region(text_display_t *self,
@@ -92,6 +153,8 @@ static void fill_region(text_display_t *self,
                         int ex, int ey,
                         int character)
 {
+    int mouse_was_shown = mouse_hide_if_within(
+                self, sx, sy, ex, ey);
     int row_count = ey - sy;
     int row_ofs;
     uint16_t *dst = self->shadow + (sy * self->width);
@@ -105,8 +168,7 @@ static void fill_region(text_display_t *self,
     memcpy(self->video_mem + self->width * sy,
            self->shadow + self->width * sy,
            sizeof(*self->video_mem) * (ey - sy + 1));
-
-
+    mouse_toggle(self, mouse_was_shown);
 }
 
 // negative x move the screen content left
@@ -204,7 +266,10 @@ static void scroll_screen(text_display_t *self, int x, int y)
                     ' ');
     }
 
-    memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
+    int mouse_was_shown = mouse_toggle(self, 0);
+    memcpy(self->video_mem, self->shadow,
+           self->width * self->height * sizeof(*self->shadow));
+    mouse_toggle(self, mouse_was_shown);
 }
 
 // Advance the cursor, wrapping and scrolling as necessary.
@@ -238,6 +303,11 @@ static void print_character(text_display_t *self, int ch)
         advance_cursor(self, advance);
         break;
 
+    case '\b':
+        if (self->cursor_x > 0)
+            advance_cursor(self, -1);
+        break;
+
     default:
         write_char_at(self,
                       self->cursor_x,
@@ -252,21 +322,25 @@ static void print_character(text_display_t *self, int ch)
 
 static int vga_detect(text_display_base_t **result)
 {
-    displays[0].vtbl = &vga_device_vtbl;
-    displays[0].io_base = READ_BIOS_DATA_AREA(uint16_t, 0x463);
-    displays[0].video_mem = (void*)0xB8000;
-    displays[0].cursor_on = 1;
-    displays[0].cursor_x = 0;
-    displays[0].cursor_y = 0;
-    displays[0].width = 80;
-    displays[0].height = 25;
-    displays[0].attrib = 0x07;
+    text_display_t *self = displays;
+    self->vtbl = &vga_device_vtbl;
+    self->io_base = READ_BIOS_DATA_AREA(uint16_t, 0x463);
+    self->video_mem = (void*)0xB8000;
+    self->cursor_on = 1;
+    self->cursor_x = 0;
+    self->cursor_y = 0;
+    self->width = 80;
+    self->height = 25;
+    self->attrib = 0x07;
+    self->mouse_on = 0;
+    self->mouse_x = 40;
+    self->mouse_y = 12;
+    mouse_toggle(self, 1);
 
-    *result = (text_display_base_t*)displays;
+    *result = (text_display_base_t*)self;
 
     return 1;
 }
-
 
 // Startup/shutdown
 
@@ -503,5 +577,65 @@ static void vga_scroll(text_display_base_t *dev,
     (void)clear;
 }
 
+
+// Returns 0 if mouse is not supported
+static int vga_mouse_supported(text_display_base_t *dev)
+{
+    TEXT_DEV_PTR_UNUSED(dev);
+    return 1;
+}
+
+// Show/hide mouse
+static int vga_mouse_is_shown(text_display_base_t *dev)
+{
+    TEXT_DEV_PTR(dev);
+    return self->mouse_on;
+}
+
+// Get mouse position
+static int vga_mouse_get_x(text_display_base_t *dev)
+{
+    TEXT_DEV_PTR(dev);
+    return self->mouse_x;
+}
+
+static int vga_mouse_get_y(text_display_base_t *dev)
+{
+    TEXT_DEV_PTR(dev);
+    return self->mouse_y;
+}
+
+// Show/hide mouse
+static int vga_mouse_toggle(text_display_base_t *dev,
+                    int show)
+{
+    TEXT_DEV_PTR(dev);
+    return mouse_toggle(self, show);
+}
+
+// Move mouse to position
+static void vga_mouse_goto_xy(text_display_base_t *dev,
+                     int x, int y)
+{
+    TEXT_DEV_PTR(dev);
+    int was_shown = mouse_toggle(self, 0);
+    cap_position(self, &x, &y);
+    self->mouse_x = x;
+    self->mouse_y = y;
+    mouse_toggle(self, was_shown);
+}
+
+static void vga_mouse_add_xy(text_display_base_t *dev,
+                     int x, int y)
+{
+    TEXT_DEV_PTR(dev);
+    int was_shown = mouse_toggle(self, 0);
+    x += self->mouse_x;
+    y += self->mouse_y;
+    cap_position(self, &x, &y);
+    self->mouse_x = x;
+    self->mouse_y = y;
+    mouse_toggle(self, was_shown);
+}
 
 REGISTER_text_display_DEVICE(vga)

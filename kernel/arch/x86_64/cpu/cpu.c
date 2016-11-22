@@ -6,6 +6,7 @@
 #include "control_regs.h"
 #include "legacy_pic.h"
 #include "legacy_pit.h"
+#include "thread_impl.h"
 #include "apic.h"
 #include "cpuid.h"
 
@@ -40,6 +41,7 @@ void cpu_init(void)
 
     //init_gdt();
     idt_init();
+    thread_init();
 
     if (0 && cpuid_edx_bit(9, 1, 0)) {
         apic_init();

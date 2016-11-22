@@ -79,14 +79,22 @@ isr_entry 0 0x7F
 
 isr_common:
 	# Save call-clobbered registers
+	# (in System-V parameter order in memory)
+	push %rax
 	push %r11
 	push %r10
 	push %r9
 	push %r8
-	push %rdi
-	push %rsi
-	push %rdx
 	push %rcx
+	push %rdx
+	push %rsi
+	push %rdi
+
+	# Save FSBASE MSR
+	movl $0xC0000100,%ecx
+	rdmsr
+	shl $32,%rdx
+	or %rdx,%rax
 	push %rax
 
 	# Save segment registers
@@ -96,17 +104,6 @@ isr_common:
 	movw %es,2(%rsp)
 	movw %ds,(%rsp)
 
-	# Make rax point to general register context
-	mov %rsp,%rax
-
-	# 16 byte align stack and make room for fxsave
-	and $-16,%rsp
-	sub $512,%rsp
-
-	# Save entire sse/fpu state
-	fxsave (%rsp)
-	push %rax
-
 	# Load segment registers with good 64-bit mode values
 	mov $0x10,%ecx
 	mov %ecx,%ds
@@ -114,10 +111,22 @@ isr_common:
 	mov %ecx,%fs
 	# we don't care about gs in isr
 
-	# Pass a pointer to the interrupt number and error code
-	# Pass the stack pointer
-	leaq 10*8(%rax),%rdi
-	mov %rsp,%rsi
+	# Save pointer to general registers and return information
+	mov %rsp,%rdi
+
+	# 16 byte align stack and make room for fxsave
+	and $-16,%rsp
+	sub $512,%rsp
+
+	# Save entire sse/fpu state
+	fxsave (%rsp)
+
+	# Make structure on the stack
+	push %rsp
+	push %rdi
+
+	# Pass pointer to the context structure to isr_handler
+	mov %rsp,%rdi
 	call isr_handler
 
 	# isr can return a new stack pointer, or just return
@@ -125,10 +134,10 @@ isr_common:
 	mov %rax,%rsp
 
 	# Pop the pointer to the general registers
-	pop %rax
-	fxrstor (%rsp)
+	pop %rdi
+	fxrstor 8(%rsp)
 
-	mov %rax,%rsp
+	mov %rdi,%rsp
 
 	movw (%rsp),%ds
 	movw 2(%rsp),%es
@@ -136,15 +145,22 @@ isr_common:
 	movw 6(%rsp),%gs
 	add $8,%rsp
 
+	# Restore FSBASE
 	pop %rax
-	pop %rcx
-	pop %rdx
-	pop %rsi
+	mov %rax,%rdx
+	shr $32,%rdx
+	mov $0xC0000100,%ecx
+	wrmsr
+
 	pop %rdi
+	pop %rsi
+	pop %rdx
+	pop %rcx
 	pop %r8
 	pop %r9
 	pop %r10
 	pop %r11
+	pop %rax
 
 	addq $16,%rsp
 
@@ -166,6 +182,13 @@ exception_common:
 	push %rdx
 	push %rcx
 	push %rbx
+	push %rax
+
+	# Save FSBASE MSR
+	movl $0xC0000100,%ecx
+	rdmsr
+	shl $32,%rdx
+	or %rdx,%rax
 	push %rax
 
 	sub $8,%rsp
@@ -220,6 +243,13 @@ exception_common:
 	mov 4(%rsp),%fs
 	mov 6(%rsp),%gs
 	add $8,%rsp
+
+	# Restore FSBASE
+	pop %rax
+	mov %rax,%rdx
+	shr $32,%rdx
+	mov $0xC0000100,%ecx
+	wrmsr
 
 	pop %rax
 	pop %rbx

@@ -123,6 +123,7 @@ void cpu_set_page_directory(uint64_t addr)
         "mov %0,%%cr3\n\t"
         :
         : "r" (addr)
+        : "memory"
     );
 }
 

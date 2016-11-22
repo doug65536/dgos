@@ -41,6 +41,7 @@ typedef float __fvec4 __attribute__((vector_size(16)));
 typedef double __dvec2 __attribute__((vector_size(16)));
 
 #define countof(arr) (sizeof(arr)/sizeof(*arr))
+#define offsetof(t, m) __builtin_offsetof(t, m)
 
 // LOL
 #define CHAR_BIT        8

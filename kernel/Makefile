@@ -54,11 +54,21 @@ ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
 
-CFLAGS ?= -g3 -O2 -ffreestanding \
-	-Wno-unused-function -fpic -mno-red-zone \
+CFLAGS ?= -g3 -ffreestanding \
+	-fpic -mno-red-zone \
+	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
-	-fomit-frame-pointer \
 	$(WEVERYTHING)
+
+ifdef OPTIMIZE
+CFLAGS += \
+	-O2 \
+	-fomit-frame-pointer
+else
+CFLAGS += \
+	-O0 \
+	-fno-omit-frame-pointer
+endif
 
 #-fipa-icf
 
@@ -108,10 +118,6 @@ subdirs:
 $(LIBFILES): subdirs
 
 .PHONY: subdirs
-
-#subdirs:
-#	(cd lib && $(MAKE))
-#	(cd arch/$(ARCH) && $(MAKE))
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES)
 	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \

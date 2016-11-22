@@ -109,7 +109,7 @@ void *memmove(void *dest, void const *src, size_t n)
     char *d = dest;
     char const *s = src;
 
-    if (d < s || d + n <= s || s + n <= d)
+    if (d < s || s + n <= d)
         return memcpy(d, s, n);
 
     if (d > s) {

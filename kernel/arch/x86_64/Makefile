@@ -11,6 +11,7 @@ CSRCS := \
 	cpu/atomic.c \
 	cpu/control_regs.c \
 	cpu/cpuid.c \
+	cpu/thread_impl.c \
 	cpu/gdt.c \
 	cpu/halt.c \
 	cpu/idt.c \
@@ -20,7 +21,8 @@ CSRCS := \
 	cpu/legacy_pic.c \
 	cpu/legacy_pit.c \
 	device/pci.c \
-	device/legacy_keyboard.c \
+	device/keyb8042.c \
+	device/keyb8042_layout/keyb8042_layout_us.c \
 	$(DEVSRCS)
 
 ASRCS := entry.s \

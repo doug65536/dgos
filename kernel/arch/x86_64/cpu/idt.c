@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "isr.h"
 #include "gdt.h"
 #include "conio.h"
 #include "printk.h"
@@ -10,7 +11,7 @@
 
 idt_entry_64_t idt[0x80];
 
-void *(*irq_dispatcher)(int irq, void *stack_pointer);
+void *(*irq_dispatcher)(int irq, isr_minimal_context_t *ctx);
 
 cpu_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
@@ -58,161 +59,29 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
     { "FZ",     MXCSR_FZ_BIT, 1, 0 }
 };
 
-// Exception handlers
-extern void isr_entry_0(void);
-extern void isr_entry_1(void);
-extern void isr_entry_2(void);
-extern void isr_entry_3(void);
-extern void isr_entry_4(void);
-extern void isr_entry_5(void);
-extern void isr_entry_6(void);
-extern void isr_entry_7(void);
-extern void isr_entry_8(void);
-extern void isr_entry_9(void);
-extern void isr_entry_10(void);
-extern void isr_entry_11(void);
-extern void isr_entry_12(void);
-extern void isr_entry_13(void);
-extern void isr_entry_14(void);
-extern void isr_entry_15(void);
-extern void isr_entry_16(void);
-extern void isr_entry_17(void);
-extern void isr_entry_18(void);
-extern void isr_entry_19(void);
-extern void isr_entry_20(void);
-extern void isr_entry_21(void);
-extern void isr_entry_22(void);
-extern void isr_entry_23(void);
-extern void isr_entry_24(void);
-extern void isr_entry_25(void);
-extern void isr_entry_26(void);
-extern void isr_entry_27(void);
-extern void isr_entry_28(void);
-extern void isr_entry_29(void);
-extern void isr_entry_30(void);
-extern void isr_entry_31(void);
-
-// PIC IRQs
-extern void isr_entry_32(void);
-extern void isr_entry_33(void);
-extern void isr_entry_34(void);
-extern void isr_entry_35(void);
-extern void isr_entry_36(void);
-extern void isr_entry_37(void);
-extern void isr_entry_38(void);
-extern void isr_entry_39(void);
-extern void isr_entry_40(void);
-extern void isr_entry_41(void);
-extern void isr_entry_42(void);
-extern void isr_entry_43(void);
-extern void isr_entry_44(void);
-extern void isr_entry_45(void);
-extern void isr_entry_46(void);
-extern void isr_entry_47(void);
-
-// APIC IRQs
-extern void isr_entry_48(void);
-extern void isr_entry_49(void);
-extern void isr_entry_50(void);
-extern void isr_entry_51(void);
-extern void isr_entry_52(void);
-extern void isr_entry_53(void);
-extern void isr_entry_54(void);
-extern void isr_entry_55(void);
-extern void isr_entry_56(void);
-extern void isr_entry_57(void);
-extern void isr_entry_58(void);
-extern void isr_entry_59(void);
-extern void isr_entry_60(void);
-extern void isr_entry_61(void);
-extern void isr_entry_62(void);
-extern void isr_entry_63(void);
-extern void isr_entry_64(void);
-extern void isr_entry_65(void);
-extern void isr_entry_66(void);
-extern void isr_entry_67(void);
-extern void isr_entry_68(void);
-extern void isr_entry_69(void);
-extern void isr_entry_70(void);
-extern void isr_entry_71(void);
-
 typedef void (*isr_entry_t)(void);
 
 const isr_entry_t isr_entry_points[72] = {
-    isr_entry_0,
-    isr_entry_1,
-    isr_entry_2,
-    isr_entry_3,
-    isr_entry_4,
-    isr_entry_5,
-    isr_entry_6,
-    isr_entry_7,
-    isr_entry_8,
-    isr_entry_9,
-    isr_entry_10,
-    isr_entry_11,
-    isr_entry_12,
-    isr_entry_13,
-    isr_entry_14,
-    isr_entry_15,
-    isr_entry_16,
-    isr_entry_17,
-    isr_entry_18,
-    isr_entry_19,
-    isr_entry_20,
-    isr_entry_21,
-    isr_entry_22,
-    isr_entry_23,
-    isr_entry_24,
-    isr_entry_25,
-    isr_entry_26,
-    isr_entry_27,
-    isr_entry_28,
-    isr_entry_29,
-    isr_entry_30,
-    isr_entry_31,
+    isr_entry_0,  isr_entry_1,  isr_entry_2,  isr_entry_3,
+    isr_entry_4,  isr_entry_5,  isr_entry_6,  isr_entry_7,
+    isr_entry_8,  isr_entry_9,  isr_entry_10, isr_entry_11,
+    isr_entry_12, isr_entry_13, isr_entry_14, isr_entry_15,
+    isr_entry_16, isr_entry_17, isr_entry_18, isr_entry_19,
+    isr_entry_20, isr_entry_21, isr_entry_22, isr_entry_23,
+    isr_entry_24, isr_entry_25, isr_entry_26, isr_entry_27,
+    isr_entry_28, isr_entry_29, isr_entry_30, isr_entry_31,
 
-    isr_entry_32,
-    isr_entry_33,
-    isr_entry_34,
-    isr_entry_35,
-    isr_entry_36,
-    isr_entry_37,
-    isr_entry_38,
-    isr_entry_39,
-    isr_entry_40,
-    isr_entry_41,
-    isr_entry_42,
-    isr_entry_43,
-    isr_entry_44,
-    isr_entry_45,
-    isr_entry_46,
-    isr_entry_47,
+    isr_entry_32, isr_entry_33, isr_entry_34, isr_entry_35,
+    isr_entry_36, isr_entry_37, isr_entry_38, isr_entry_39,
+    isr_entry_40, isr_entry_41, isr_entry_42, isr_entry_43,
+    isr_entry_44, isr_entry_45, isr_entry_46, isr_entry_47,
 
-    isr_entry_48,
-    isr_entry_49,
-    isr_entry_50,
-    isr_entry_51,
-    isr_entry_52,
-    isr_entry_53,
-    isr_entry_54,
-    isr_entry_55,
-    isr_entry_56,
-    isr_entry_57,
-    isr_entry_58,
-    isr_entry_59,
-    isr_entry_60,
-    isr_entry_61,
-    isr_entry_62,
-    isr_entry_63,
-    isr_entry_64,
-    isr_entry_65,
-    isr_entry_66,
-    isr_entry_67,
-    isr_entry_68,
-    isr_entry_69,
-    isr_entry_70,
-    isr_entry_71
+    isr_entry_48, isr_entry_49, isr_entry_50, isr_entry_51,
+    isr_entry_52, isr_entry_53, isr_entry_54, isr_entry_55,
+    isr_entry_56, isr_entry_57, isr_entry_58, isr_entry_59,
+    isr_entry_60, isr_entry_61, isr_entry_62, isr_entry_63,
+    isr_entry_64, isr_entry_65, isr_entry_66, isr_entry_67,
+    isr_entry_68, isr_entry_69, isr_entry_70, isr_entry_71
 };
 
 extern void isr_entry_0xC0(void);
@@ -421,15 +290,15 @@ static void *unhandled_exception_handler(isr_full_context_t *ctx)
 
     // rsp
     con_draw_xy(0, 15, "ss:rsp", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%016lx ",
-             ctx->gpr->ss, ctx->gpr->rsp);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012lx ",
+             ctx->gpr->iret.ss, ctx->gpr->iret.rsp);
     con_draw_xy(6, 15, fmt_buf, color);
 
     // cs:rip
     con_draw_xy(
                                    0, 16, "cs:rip", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%016lx",
-             ctx->gpr->cs, (uint64_t)ctx->gpr->rip);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012lx",
+             ctx->gpr->iret.cs, (uint64_t)ctx->gpr->iret.rip);
     con_draw_xy(6, 16, fmt_buf, color);
 
     // exception
@@ -453,26 +322,32 @@ static void *unhandled_exception_handler(isr_full_context_t *ctx)
 
     // fault address
     con_draw_xy(48, 19, "cr2", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%012lx",
              cpu_get_fault_address());
     con_draw_xy(51, 19, fmt_buf, color);
 
     // error code
     con_draw_xy(0, 18, "Error code", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%016lx",
+    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%012lx",
              ctx->gpr->info.error_code);
     con_draw_xy(10, 18, fmt_buf, color);
 
-    // rflags (it's actually only 22 bits
+    // rflags (it's actually only 22 bits)
     con_draw_xy(0, 19, "rflags", color);
     width = snprintf(fmt_buf, sizeof(fmt_buf), "=%06lx ",
-             ctx->gpr->rflags);
+             ctx->gpr->iret.rflags);
     con_draw_xy(6, 19, fmt_buf, color);
 
     // rflags description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
-                       ctx->gpr->rflags);
+                       ctx->gpr->iret.rflags);
     con_draw_xy(6+width, 19, fmt_buf, color);
+
+    // fsbase
+    con_draw_xy(0, 20, "fsbase", color);
+    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
+             (uint64_t)ctx->gpr->fsbase);
+    con_draw_xy(6, 20, fmt_buf, color);
 
     halt_forever();
 
@@ -487,25 +362,25 @@ isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx)
     return ctx;
 }
 
-void *isr_handler(interrupt_info_t *info, void *stack_pointer)
+void *isr_handler(isr_minimal_context_t *ctx)
 {
-    if (info->interrupt >= 32 &&
-               info->interrupt < 48) {
+    if (ctx->gpr->info.interrupt >= 32 &&
+               ctx->gpr->info.interrupt < 48) {
         //
         // PIC IRQ
-        stack_pointer = irq_dispatcher(
-                    info->interrupt - 32,
-                    stack_pointer);
-    } else if (info->interrupt >= 48 &&
-               info->interrupt < 72) {
+        ctx = irq_dispatcher(
+                    ctx->gpr->info.interrupt - 32,
+                    ctx);
+    } else if (ctx->gpr->info.interrupt >= 48 &&
+               ctx->gpr->info.interrupt < 72) {
         //
         // APIC IRQ
-        stack_pointer = irq_dispatcher(
-                    info->interrupt - 48,
-                    stack_pointer);
+        ctx = irq_dispatcher(
+                    ctx->gpr->info.interrupt - 48,
+                    ctx);
     } else {
         // System call later...
     }
 
-    return stack_pointer;
+    return ctx;
 }

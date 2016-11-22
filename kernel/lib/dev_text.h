@@ -83,32 +83,60 @@ struct text_display_vtbl_t {
                    int ex, int ey,
                    int xd, int yd,
                    int clear);
+
+    // Returns 0 if mouse is not supported
+    int (*mouse_supported)(text_display_base_t *);
+
+    int (*mouse_is_shown)(text_display_base_t *);
+
+    // Get mouse position
+    int (*mouse_get_x)(text_display_base_t *);
+    int (*mouse_get_y)(text_display_base_t *);
+
+    // Move mouse to position
+    void (*mouse_goto_xy)(text_display_base_t *,
+                         int x, int y);
+
+    // Move mouse by relative amount
+    void (*mouse_add_xy)(text_display_base_t *,
+                         int x, int y);
+
+    // Show/hide mouse
+    int (*mouse_toggle)(text_display_base_t *,
+                        int show);
 };
 
 #define MAKE_text_display_VTBL(name) { \
-    name##_detect,                \
-    name##_init,                  \
-    name##_cleanup,               \
-    name##_set_dimensions,        \
-    name##_get_dimensions,        \
-    name##_goto_xy,               \
-    name##_get_x,                 \
-    name##_get_y,                 \
-    name##_fg_set,                \
-    name##_fg_get,                \
-    name##_bg_set,                \
-    name##_bg_get,                \
-    name##_cursor_toggle,         \
-    name##_cursor_is_shown,       \
-    name##_putc,                  \
-    name##_putc_xy,               \
-    name##_print,                 \
-    name##_print_xy,              \
-    name##_draw,                  \
-    name##_draw_xy,               \
-    name##_fill,                  \
-    name##_clear,                 \
-    name##_scroll                 \
+    name##_detect,              \
+    name##_init,                \
+    name##_cleanup,             \
+    name##_set_dimensions,      \
+    name##_get_dimensions,      \
+    name##_goto_xy,             \
+    name##_get_x,               \
+    name##_get_y,               \
+    name##_fg_set,              \
+    name##_fg_get,              \
+    name##_bg_set,              \
+    name##_bg_get,              \
+    name##_cursor_toggle,       \
+    name##_cursor_is_shown,     \
+    name##_putc,                \
+    name##_putc_xy,             \
+    name##_print,               \
+    name##_print_xy,            \
+    name##_draw,                \
+    name##_draw_xy,             \
+    name##_fill,                \
+    name##_clear,               \
+    name##_scroll,              \
+    name##_mouse_supported,     \
+    name##_mouse_is_shown,      \
+    name##_mouse_get_x,         \
+    name##_mouse_get_y,         \
+    name##_mouse_goto_xy,       \
+    name##_mouse_add_xy,        \
+    name##_mouse_toggle         \
 }
 
 void register_text_display_device(char const *name,

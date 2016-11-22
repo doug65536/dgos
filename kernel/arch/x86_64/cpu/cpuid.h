@@ -16,3 +16,5 @@ int cpuid_eax_bit(int bit, uint32_t eax, uint32_t ecx);
 int cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx);
 int cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
 int cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
+
+#define CPUID_INFO_FEATURES     1

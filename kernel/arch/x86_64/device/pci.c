@@ -1,6 +1,7 @@
 #include "pci.h"
 #include "cpu/ioport.h"
 #include "printk.h"
+#include "string.h"
 
 #define PCI_ADDR    0xCF8
 #define PCI_DATA    0xCFC
@@ -9,41 +10,6 @@
     ((uintptr_t)&(((type*)0x10U)->member) - 0x10U)
 #define size_of(type, member) \
     sizeof(((type*)0x10U)->member)
-
-typedef struct pci_config_hdr_t {
-    uint16_t vendor;
-    uint16_t device;
-
-    uint16_t command;
-    uint16_t status;
-
-    uint8_t revision;
-    uint8_t prog_if;
-    uint8_t subclass;
-    uint8_t dev_class;
-
-    uint8_t cache_line_size;
-    uint8_t latency_timer;
-    uint8_t header_type;
-    uint8_t bist;
-
-    uint32_t base_addr[6];
-
-    uint32_t cardbus_cis_ptr;
-
-    uint16_t subsystem_vendor;
-    uint16_t subsystem_id;
-
-    uint32_t expansion_rom_addr;
-    uint8_t capabilities_ptr;
-
-    uint8_t reserved[7];
-
-    uint8_t irq_line;
-    uint8_t irq_pin;
-    uint8_t min_grant;
-    uint8_t max_latency;
-} pci_config_hdr_t;
 
 static char const *pci_device_class_text[] = {
     "No device class, must be old",
@@ -67,8 +33,8 @@ static char const *pci_device_class_text[] = {
 };
 
 static uint32_t pci_read_config(
-        uint32_t bus, uint32_t slot, uint32_t func,
-        uint32_t offset, uint32_t size)
+        int bus, int slot, int func,
+        int offset, int size)
 {
     if (bus < 256 && slot < 32 &&
             func < 8 && offset < 256) {
@@ -113,8 +79,6 @@ static void pci_enumerate(void)
     for (uint32_t bus = 0; bus < 256; ++bus) {
         for (uint32_t slot = 0; slot < 32; ++slot) {
             uint16_t vendor = pci_device_vendor(bus, slot, 0);
-
-            //printk("Checking PCI bus=%u slot=%u", bus, slot);
 
             if (vendor == 0xFFFF)
                 continue;
@@ -168,6 +132,77 @@ static void pci_enumerate(void)
             }
         }
     }
+}
+
+static void pci_enumerate_read(pci_config_hdr_t *config,
+                               int bus, int slot, int func)
+{
+    uint32_t values[16];
+
+    for (int ofs = 0; ofs < 16; ++ofs)
+        values[ofs] = pci_read_config(bus, slot, func,
+                                      ofs << 2, sizeof(uint32_t));
+
+    memcpy(config, values, sizeof(*config));
+}
+
+int pci_enumerate_next(pci_dev_iterator_t *iter)
+{
+    for (;;) {
+        ++iter->func;
+
+        if (((iter->header_type & 0x80) && iter->func < 8) ||
+                iter->func < 1) {
+            // Might be a device here
+            pci_enumerate_read(&iter->config,
+                               iter->bus, iter->slot, iter->func);
+
+            // Capture header type on function 0
+            if (iter->func == 0)
+                iter->header_type = iter->config.header_type;
+
+            // If device is here, return success
+            if (iter->dev_class != 0xFF &&
+                    iter->config.vendor != 0xFFFF)
+                return 1;
+
+            continue;
+        }
+
+        // Done with slot, carry to next slot
+        iter->func = -1;
+        if (++iter->slot >= 32) {
+            // Ran out of slots, carry to next bus
+            iter->slot = 0;
+            if (++iter->bus >= 256) {
+                // Ran out of busses, done
+                return 0;
+            }
+        }
+    }
+}
+
+int pci_enumerate_begin(pci_dev_iterator_t *iter,
+                        int dev_class, int subclass)
+{
+    iter->dev_class = dev_class;
+    iter->subclass = subclass;
+
+    iter->bus = 0;
+    iter->slot = 0;
+    iter->func = -1;
+
+    iter->header_type = 0;
+
+    int found;
+
+    while ((found = pci_enumerate_next(iter)) &&
+           (dev_class != -1 ||
+            iter->config.dev_class != dev_class) &&
+           (subclass != -1 ||
+            iter->config.subclass != subclass));
+
+    return found;
 }
 
 int pci_init(void)

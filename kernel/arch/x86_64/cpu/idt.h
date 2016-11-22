@@ -117,6 +117,9 @@ typedef struct idt_entry_64_t {
 #define MXCSR_PM            (1 << MXCSR_PM_BIT)
 #define MXCSR_FZ            (1 << MXCSR_FZ_BIT)
 
+#define MXCSR_MASK_ALL      (MXCSR_IM | MXCSR_DM | MXCSR_ZM | \
+                                MXCSR_OM | MXCSR_UM | MXCSR_PM)
+
 #define MXCSR_RC_NEAREST    0
 #define MXCSR_RC_DOWN       1
 #define MXCSR_RC_UP         2
@@ -153,16 +156,42 @@ typedef struct interrupt_info_t {
     uint64_t error_code;
 } interrupt_info_t;
 
-// General register context
-typedef struct isr_gpr_context_t {
-    uint16_t s[4];
-    uint64_t r[15];
-    interrupt_info_t info;
-    void *rip;
+typedef struct isr_ret_frame_t {
+    void (*ret_rip)(void);
+} isr_ret_frame_t;
+
+typedef struct isr_iret_frame_t {
+    int (*rip)(void*);
     uint64_t cs;
     uint64_t rflags;
     uint64_t rsp;
     uint64_t ss;
+} isr_iret_frame_t;
+
+// IRQ handler general registers
+typedef struct isr_irq_gpr_t {
+    uint16_t s[4];
+    void *fsbase;
+    uint64_t rdi;
+    uint64_t rsi;
+    uint64_t rdx;
+    uint64_t rcx;
+    uint64_t r8;
+    uint64_t r9;
+    uint64_t r10;
+    uint64_t r11;
+    uint64_t rax;
+    interrupt_info_t info;
+    isr_iret_frame_t iret;
+} isr_irq_gpr_t;
+
+// Exception handler context
+typedef struct isr_gpr_context_t {
+    uint16_t s[4];
+    void *fsbase;
+    uint64_t r[15];
+    interrupt_info_t info;
+    isr_iret_frame_t iret;
 } isr_gpr_context_t;
 
 // FPU/SSE context
@@ -207,14 +236,30 @@ typedef struct isr_fxsave_context_t {
     } xmm[16];
 } isr_fxsave_context_t;
 
+// IRQ handler C call parameter
+typedef struct isr_minimal_context_t {
+    isr_irq_gpr_t *gpr;
+    isr_fxsave_context_t *fpr;
+} isr_minimal_context_t;
+
+// Exception handler C call parameter
 typedef struct isr_full_context_t {
     isr_gpr_context_t * const gpr;
     isr_fxsave_context_t * const fpr;
 } isr_full_context_t;
 
-extern void *(*irq_dispatcher)(int irq, void *stack_pointer);
+// Note that fpr must lie on a 16-byte boundary
+typedef struct isr_start_context_t {
+    isr_minimal_context_t mc;
+    isr_fxsave_context_t fpr;
+    isr_irq_gpr_t gpr;
+    isr_ret_frame_t ret;
+} isr_start_context_t;
 
-void *isr_handler(interrupt_info_t *info, void *stack_pointer);
+extern void *(*irq_dispatcher)(
+        int irq, isr_minimal_context_t *ctx);
+
+void *isr_handler(isr_minimal_context_t *ctx);
 
 isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx);
 

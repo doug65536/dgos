@@ -66,6 +66,7 @@ static uint16_t pic8259_port_data(int slave)
     return slave ? PIC2_DATA : PIC1_DATA;
 }
 
+#if 0   // never used
 // Read Interrupt Request Register
 static uint8_t pic8259_get_IRR(int slave)
 {
@@ -73,6 +74,7 @@ static uint8_t pic8259_get_IRR(int slave)
     outb(port, 0x0A);
     return inb(port);
 }
+#endif
 
 // Read In Service Register
 static uint8_t pic8259_get_ISR(int slave)
@@ -94,9 +96,10 @@ static void pic8259_eoi(int slave)
 
 // Detect and discard spurious IRQ
 // or call IRQ handler and acknowledge IRQ
-static void *pic8259_dispatcher(int irq, void *stack_pointer)
+static void *pic8259_dispatcher(
+        int irq, isr_minimal_context_t *ctx)
 {
-    void *returned_stack_pointer;
+    isr_minimal_context_t *returned_stack_ctx;
     uint8_t isr;
     int is_slave = (irq >= 8);
 
@@ -114,19 +117,19 @@ static void *pic8259_dispatcher(int irq, void *stack_pointer)
             if (irq >= 8)
                 pic8259_eoi(0);
 
-            return stack_pointer;
+            return ctx;
         }
     }
 
     // If we made it here, it was not a spurious IRQ
 
     // Run IRQ handler
-    returned_stack_pointer = irq_invoke(irq, stack_pointer);
+    returned_stack_ctx = irq_invoke(irq, ctx);
 
     // Acknowledge IRQ
     pic8259_eoi(is_slave);
 
-    return returned_stack_pointer;
+    return returned_stack_ctx;
 }
 
 // Gets plugged into irq_setmask
@@ -150,10 +153,11 @@ static void pic8259_setmask(int irq, int unmask)
         outb(PIC1_DATA, pic8259_mask & 0xFF);
     }
 
-    if (irq < 8)
-        outb(PIC1_DATA, pic8259_mask & 0xFF);
-    else
-        outb(PIC2_DATA, (pic8259_mask >> 8) & 0xFF);
+    int is_slave = (irq >= 8);
+    uint8_t shift = is_slave << 3;
+    uint16_t port = pic8259_port_data(is_slave);
+
+    outb(port, (pic8259_mask >> shift) & 0xFF);
 }
 
 void pic8259_disable(void)

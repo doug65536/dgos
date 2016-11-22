@@ -1,13 +1,15 @@
-
+#include "main.h"
 #include "cpu.h"
 #include "mm.h"
 #include "printk.h"
 #include "cpu/halt.h"
+#include "thread.h"
 #include "device/pci.h"
-#include "device/legacy_keyboard.h"
+#include "device/keyb8042.h"
 
 int life_and_stuff = 42;
 
+size_t const kernel_stack_size = 262144;
 char kernel_stack[262144];
 
 char buf[12];
@@ -44,6 +46,18 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
+char shell_stack[65536];
+
+static int shell_thread(void *p)
+{
+    printk("From shell thread!! %016lx", (uint64_t)p);
+    while (1) {
+        ++*(char*)0xb8002;
+        halt();
+    }
+    return 0;
+}
+
 int main(void)
 {
     pci_init();
@@ -52,8 +66,13 @@ int main(void)
     // Crash
     //*(uint64_t*)0xfeedbeefbaadf00d = 0;
 
-    while (1)
+    thread_create(shell_thread, (void*)0xfeedbeeffacef00d,
+                  shell_stack, sizeof(shell_stack));
+
+    while (1) {
+        ++*(char*)0xb8000;
         halt();
+    }
 
     return 0;
 

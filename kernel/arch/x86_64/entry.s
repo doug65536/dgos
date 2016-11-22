@@ -7,7 +7,7 @@ entry:
 
 	lea 262144+kernel_stack(%rip),%rsp
 
-	jmp 1f
+	#jmp 1f
 	# Debugger hack
 	mov $0,%rbp
 	0:

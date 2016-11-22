@@ -3,6 +3,7 @@
 #include "irq.h"
 #include "atomic.h"
 #include "time.h"
+#include "cpu/thread_impl.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -89,7 +90,7 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static void *pit8254_handler(int irq, void *stack_pointer)
+static void *pit8254_handler(int irq, void *ctx)
 {
     (void)irq;
 
@@ -118,7 +119,7 @@ static void *pit8254_handler(int irq, void *stack_pointer)
 
     }
 
-    return stack_pointer;
+    return thread_schedule(ctx);
 }
 
 static uint64_t pit8254_time_ms(void)
