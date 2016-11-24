@@ -361,6 +361,14 @@ static void vga_cleanup(text_display_base_t *dev)
     TEXT_DEV_PTR_UNUSED(dev);
 }
 
+static void vga_remap_memory(text_display_base_t *dev)
+{
+    TEXT_DEV_PTR(dev);
+    self->video_mem = mmap((void*)0xb8000, 0x8000,
+                           PROT_READ | PROT_WRITE,
+                           MAP_PHYSICAL, -1, 0);
+}
+
 // Set/get dimensions
 
 static int vga_set_dimensions(text_display_base_t *dev,

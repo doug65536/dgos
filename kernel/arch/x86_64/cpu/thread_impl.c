@@ -200,6 +200,7 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
 
                 if (latest_count == old_count)
                     break;
+                pause();
                 old_count = latest_count;
             }
 

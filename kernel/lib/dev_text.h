@@ -19,6 +19,9 @@ struct text_display_vtbl_t {
     void (*init)(text_display_base_t *);
     void (*cleanup)(text_display_base_t *);
 
+    // MMU activated, remap physical memory
+    void (*remap_memory)(text_display_base_t *);
+
     // Set/get dimensions
     int (*set_dimensions)(text_display_base_t *,
                           int width, int height);
@@ -110,6 +113,7 @@ struct text_display_vtbl_t {
     name##_detect,              \
     name##_init,                \
     name##_cleanup,             \
+    name##_remap_memory,        \
     name##_set_dimensions,      \
     name##_get_dimensions,      \
     name##_goto_xy,             \
