@@ -47,6 +47,12 @@ SECTIONS {
 		*(.data)
 		*(.data.*)
 
+		/* Provide the highest address taken by kernel as
+		   a global variable */
+		. = ALIGN(8);
+		___top_physaddr = .;
+		QUAD((___init_brk - ___text_st) + 0x100000);
+
 		/* Statically allocate room for the main */
 		/* kernel thread TLS */
 		. = ALIGN(16);

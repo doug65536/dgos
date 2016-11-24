@@ -69,6 +69,13 @@
 #define KEYB_CONFIG_CLKDIS_PORT2    (1 << KEYB_CONFIG_CLKDIS_PORT2_BIT)
 #define KEYB_CONFIG_XLAT_PORT1      (1 << KEYB_CONFIG_XLAT_PORT1_BIT)
 
+#define KEYB8042_DEBUG  0
+#if KEYB8042_DEBUG
+#define KEYB8042_DEBUGMSG(p) printk p
+#else
+#define KEYB8042_DEBUGMSG(p) ((void)0)
+#endif
+
 static keyb8042_layout_t *keyb8042_layout = &keyb8042_layout_us;
 
 // Lookup table of keyboard layouts
@@ -132,7 +139,7 @@ static void keyb8042_keyboard_handler(void)
     uint8_t scancode = 0;
 
     scancode = inb(KEYB_DATA);
-    //printk("Key code = %02x\n", scancode);
+    //KEYB8042_DEBUGMSG(("Key code = %02x\n", scancode))
 
     int32_t vk = 0;
     int is_keyup = !!(scancode & 0x80);
@@ -210,8 +217,8 @@ static void keyb8042_keyboard_handler(void)
         }
     } else if (vk >= KEYB_VK_NUMPAD_0 &&
                vk <= KEYB_VK_NUMPAD_9) {
-        printk("shiftstate=%x altdown=%d\n", keyb8042_shift_state,
-               keyb8042_shift_state & KEYB_ALT_DOWN);
+        //printk("shiftstate=%x altdown=%d\n", keyb8042_shift_state,
+        //       keyb8042_shift_state & KEYB_ALT_DOWN);
         if (keyb8042_shift_state & KEYB_ALT_DOWN) {
             if (is_keyup) {
                 // Add decimal digit to alt code
@@ -244,7 +251,8 @@ static void keyb8042_keyboard_handler(void)
         keybd_event(event);
     }
 
-    printk("is_keyup=%d vk=%d altcode=%d\n", is_keyup, vk, keyb8042_alt_code);
+    //KEYB8042_DEBUGMSG(("is_keyup=%d vk=%d altcode=%d\n",
+    //                   is_keyup, vk, keyb8042_alt_code))
 
     if (is_keyup && (vk == KEYB_VK_LALT || vk == KEYB_VK_RALT)) {
         if (keyb8042_alt_code != 0) {
@@ -474,23 +482,23 @@ static int keyb8042_set_layout_name(char const *name)
 void keyb8042_init(void)
 {
     // Disable both ports
-    printk("Disabling keyboard controller ports\n");
+    KEYB8042_DEBUGMSG(("Disabling keyboard controller ports\n"));
     keyb8042_send_command(KEYB_CMD_DISABLE_PORT1);
     keyb8042_send_command(KEYB_CMD_DISABLE_PORT2);
 
     // Flush incoming byte, if any
-    printk("Flushing keyboard output buffer\n");
+    KEYB8042_DEBUGMSG(("Flushing keyboard output buffer\n"));
     inb(KEYB_DATA);
 
     // Read config
-    printk("Reading keyboard controller config\n");
+    KEYB8042_DEBUGMSG(("Reading keyboard controller config\n"));
     if (keyb8042_send_command(KEYB_CMD_RDCONFIG) < 0)
         return;
     int config = keyb8042_read_data();
     if (config < 0)
         return;
 
-    printk("Keyboard original config = %02x\n", config);
+    KEYB8042_DEBUGMSG(("Keyboard original config = %02x\n", config));
 
     // Disable IRQs and translation
     config &= ~(KEYB_CONFIG_IRQEN_PORT1 |
@@ -501,7 +509,7 @@ void keyb8042_init(void)
 //            !(config & KEYB_CONFIG_CLKDIS_PORT2);
 
     // Write config
-    printk("Writing keyboard controller config = %02x\n", config);
+    KEYB8042_DEBUGMSG(("Writing keyboard controller config = %02x\n", config));
     if (keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)
         return;
     if (keyb8042_write_data(config) < 0)
@@ -551,7 +559,7 @@ void keyb8042_init(void)
 #endif
 
     // Reset
-    printk("Resetting keyboard\n");
+    KEYB8042_DEBUGMSG(("Resetting keyboard\n"));
     if (keyb8042_write_data(0xFF) < 0)
         return;
 
@@ -561,16 +569,16 @@ void keyb8042_init(void)
     if (port1_test_result == KEYB_REPLY_RESETOK_1) {
         port1_test_result = keyb8042_read_data();
         if (port1_test_result != KEYB_REPLY_RESETOK_2) {
-            printk("Keyboard reset failed!\n");
+            KEYB8042_DEBUGMSG(("Keyboard reset failed!\n"));
             return;
         }
     }
 
-    printk("Enabling keyboard port\n");
+    KEYB8042_DEBUGMSG(("Enabling keyboard port\n"));
     if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT1) < 0)
         return;
 
-    printk("Enabling mouse port\n");
+    KEYB8042_DEBUGMSG(("Enabling mouse port\n"));
     if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT2) < 0)
         return;
 
@@ -581,32 +589,32 @@ void keyb8042_init(void)
         config |= KEYB_CONFIG_IRQEN_PORT2;
     }
 
-    printk("Writing keyboard controller config = %02x\n", config);
+    KEYB8042_DEBUGMSG(("Writing keyboard controller config = %02x\n", config));
     if (keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)
         return;
     if (keyb8042_write_data(config) < 0)
         return;
 
     // Reset mouse
-    printk("Resetting mouse\n");
+    KEYB8042_DEBUGMSG(("Resetting mouse\n"));
     if (keyb8042_retry_mouse_command(PS2MOUSE_RESET) < 0)
         return;
-    printk("Reading reset ok\n");
+    KEYB8042_DEBUGMSG(("Reading reset ok\n"));
     if (keyb8042_read_data() != KEYB_REPLY_RESETOK_2)
         printk("Mouse did not acknowledge\n");
-    printk("Reading reset result\n");
+    KEYB8042_DEBUGMSG(("Reading reset result\n"));
     if (keyb8042_read_data() != 0x00)
         printk("Mouse did not acknowledge\n");
 
     // Set mouse resolution
-    printk("Setting mouse resolution\n");
+    KEYB8042_DEBUGMSG(("Setting mouse resolution\n"));
     if (keyb8042_retry_mouse_command(PS2MOUSE_SETRES) < 0)
         return;
     if (keyb8042_retry_mouse_command(PS2MOUSE_RES_1CPMM) < 0)
         return;
 
     // Enable mouse stream mode
-    printk("Setting mouse to stream mode\n");
+    KEYB8042_DEBUGMSG(("Setting mouse to stream mode\n"));
     if (keyb8042_retry_mouse_command(PS2MOUSE_ENABLE) < 0)
         return;
 
@@ -632,7 +640,7 @@ void keyb8042_init(void)
     }
 
     // Set mouse sampling rate
-    printk("Setting mouse sampling rate\n");
+    KEYB8042_DEBUGMSG(("Setting mouse sampling rate\n"));
     if (keyb8042_retry_mouse_command(PS2MOUSE_SETSAMPLERATE) < 0)
         return;
     if (keyb8042_retry_mouse_command(100) < 0)

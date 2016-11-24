@@ -40,7 +40,7 @@ WEVERYTHING += -Wdouble-promotion
 WEVERYTHING += -Wformat=2
 WEVERYTHING += -Wfloat-equal
 WEVERYTHING += -Wundef
-#overkill WEVERYTHING += -Wbad-function-cast
+WEVERYTHING += -Wbad-function-cast
 #overkill WEVERYTHING += -Wcast-qual
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
@@ -59,6 +59,8 @@ CFLAGS ?= -g3 -ffreestanding \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
 	$(WEVERYTHING)
+
+OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \

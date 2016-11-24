@@ -61,7 +61,7 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
 
 typedef void (*isr_entry_t)(void);
 
-const isr_entry_t isr_entry_points[72] = {
+const isr_entry_t isr_entry_points[73] = {
     isr_entry_0,  isr_entry_1,  isr_entry_2,  isr_entry_3,
     isr_entry_4,  isr_entry_5,  isr_entry_6,  isr_entry_7,
     isr_entry_8,  isr_entry_9,  isr_entry_10, isr_entry_11,
@@ -81,7 +81,9 @@ const isr_entry_t isr_entry_points[72] = {
     isr_entry_56, isr_entry_57, isr_entry_58, isr_entry_59,
     isr_entry_60, isr_entry_61, isr_entry_62, isr_entry_63,
     isr_entry_64, isr_entry_65, isr_entry_66, isr_entry_67,
-    isr_entry_68, isr_entry_69, isr_entry_70, isr_entry_71
+    isr_entry_68, isr_entry_69, isr_entry_70, isr_entry_71,
+
+    isr_entry_72
 };
 
 extern void isr_entry_0xC0(void);
@@ -372,14 +374,13 @@ void *isr_handler(isr_minimal_context_t *ctx)
                     ctx->gpr->info.interrupt - 32,
                     ctx);
     } else if (ctx->gpr->info.interrupt >= 48 &&
-               ctx->gpr->info.interrupt < 72) {
+               ctx->gpr->info.interrupt <= 72) {
         //
-        // APIC IRQ
+        // APIC IRQ (and forced context switch)
         ctx = irq_dispatcher(
-                    ctx->gpr->info.interrupt - 48,
+                    ctx->gpr->info.interrupt - 32,
                     ctx);
     } else {
-        // System call later...
     }
 
     return ctx;

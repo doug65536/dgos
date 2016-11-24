@@ -94,29 +94,34 @@ static void *pit8254_handler(int irq, void *ctx)
 {
     (void)irq;
 
-    atomic_inc_uint64(&timer_ticks);
+    // This is also called from the forced
+    // context switch ISR
 
-    // Accumulate crystal clock cycles
-    accumulator += divisor * 1000;
+    if (irq == 0) {
+        atomic_inc_uint64(&timer_ticks);
 
-    // Accumulated milliseconds
+        // Accumulate crystal clock cycles
+        accumulator += divisor * 1000;
 
-    if (accumulator >= 1193181U) {
-        unsigned accum_ms = accumulator / 1193181U;
-        accumulator -= 1193181U * accum_ms;
-        atomic_add_uint64(&timer_ms, accum_ms);
-    }
+        // Accumulated milliseconds
 
-    // Test
-    static uint64_t last_time;
-    if (last_time + 1000 <= timer_ms) {
-        last_time = timer_ms;
+        if (accumulator >= 1193181U) {
+            unsigned accum_ms = accumulator / 1193181U;
+            accumulator -= 1193181U * accum_ms;
+            atomic_add_uint64(&timer_ms, accum_ms);
+        }
 
-        char buf[10];
-        snprintf(buf, sizeof(buf), "%8ld ", last_time);
+        // Test
+        static uint64_t last_time;
+        if (last_time + 1000 <= timer_ms) {
+            last_time = timer_ms;
 
-        con_draw_xy(70, 0, buf, 7);
+            char buf[10];
+            snprintf(buf, sizeof(buf), "%8ld ", last_time);
 
+            con_draw_xy(70, 0, buf, 7);
+
+        }
     }
 
     return thread_schedule(ctx);

@@ -136,9 +136,9 @@ static uint16_t paging_map_page(
     if (keep && (pte & PTE_ADDR))
         return 0;
 
-    print_line("mapping %llx to physaddr %llx pageseg=%x slot=%x",
-               linear_addr, phys_addr,
-               ref.segment, ref.slot);
+    //print_line("mapping %llx to physaddr %llx pageseg=%x slot=%x",
+    //           linear_addr, phys_addr,
+    //           ref.segment, ref.slot);
 
     write_pte(ref.segment, ref.slot, phys_addr | pte_flags);
 

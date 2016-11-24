@@ -53,7 +53,7 @@ static int shell_thread(void *p)
     printk("From shell thread!! %016lx", (uint64_t)p);
     while (1) {
         ++*(char*)0xb8002;
-        halt();
+        thread_yield();
     }
     return 0;
 }

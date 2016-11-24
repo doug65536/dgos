@@ -77,3 +77,6 @@ extern void isr_entry_68(void);
 extern void isr_entry_69(void);
 extern void isr_entry_70(void);
 extern void isr_entry_71(void);
+
+// Forced context switch
+extern void isr_entry_72(void);

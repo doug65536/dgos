@@ -27,7 +27,8 @@ typedef enum thread_state_t {
     THREAD_IS_SUSPENDED,
     THREAD_IS_READY,
     THREAD_IS_RUNNING,
-    THREAD_IS_DESTRUCTING
+    THREAD_IS_DESTRUCTING,
+    THREAD_IS_FINISHED
 } thread_state_t;
 
 typedef struct thread_info_t thread_info_t;
@@ -91,10 +92,9 @@ static thread_info_t *this_thread(void)
     return cpu->cur_thread;
 }
 
-static void thread_yield(void)
+void thread_yield(void)
 {
-    // FIXME: provoke immediate context switch here
-    halt();
+    __asm__ __volatile__ ("int $72\n\t");
 }
 
 static void thread_cleanup(void)
@@ -105,7 +105,7 @@ static void thread_cleanup(void)
     thread->priority = 0;
     thread->stack = 0;
     thread->stack_size = 0;
-    thread->state = THREAD_IS_UNINITIALIZED;
+    thread->state = THREAD_IS_FINISHED;
     thread_yield();
 }
 

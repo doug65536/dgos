@@ -11,3 +11,5 @@ typedef int (*thread_fn_t)(void*);
 thread_t thread_create(thread_fn_t fn, void *userdata,
                        void *stack, size_t stack_size);
 
+
+void thread_yield(void);

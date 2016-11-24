@@ -100,24 +100,28 @@ static void *pic8259_dispatcher(
         int irq, isr_minimal_context_t *ctx)
 {
     isr_minimal_context_t *returned_stack_ctx;
-    uint8_t isr;
+
     int is_slave = (irq >= 8);
 
-    // IRQ 7 or 15
-    int spurious_irq = (is_slave << 3) + 7;
+    if (irq < 16) {
+        uint8_t isr;
 
-    if (irq == spurious_irq) {
-        isr = pic8259_get_ISR(is_slave);
+        // IRQ 7 or 15
+        int spurious_irq = (is_slave << 3) + 7;
 
-        if ((isr & (1 << 7)) == 0) {
-            // Spurious IRQ!
+        if (irq == spurious_irq) {
+            isr = pic8259_get_ISR(is_slave);
 
-            // Still need to ack master on
-            // spurious slave IRQ
-            if (irq >= 8)
-                pic8259_eoi(0);
+            if ((isr & (1 << 7)) == 0) {
+                // Spurious IRQ!
 
-            return ctx;
+                // Still need to ack master on
+                // spurious slave IRQ
+                if (irq >= 8)
+                    pic8259_eoi(0);
+
+                return ctx;
+            }
         }
     }
 
@@ -126,8 +130,10 @@ static void *pic8259_dispatcher(
     // Run IRQ handler
     returned_stack_ctx = irq_invoke(irq, ctx);
 
-    // Acknowledge IRQ
-    pic8259_eoi(is_slave);
+    if (irq < 16) {
+        // Acknowledge IRQ
+        pic8259_eoi(is_slave);
+    }
 
     return returned_stack_ctx;
 }

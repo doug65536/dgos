@@ -74,8 +74,8 @@ isr_exception_entry 0 31
 	isr_entry 0 \int_num
 .endr
 
-# System call entry point
-isr_entry 0 0x7F
+# Forced context switch entry point
+isr_entry 0 72
 
 isr_common:
 	# Save call-clobbered registers

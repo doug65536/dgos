@@ -4,6 +4,7 @@
 set architecture i8086
 symbol-file $SYMBOLFILE
 set architecture i386:x86-64
+set radix 16
 target remote | exec qemu-system-x86_64 -m 6G -S -drive file=$DISKIMAGE,format=raw -gdb stdio -no-shutdown -no-reboot
 #-d int,cpu_reset
 set architecture i8086

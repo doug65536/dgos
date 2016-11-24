@@ -1,4 +1,5 @@
 symbol-file $SYMBOLFILE
+set radix 16
 set architecture i386:x86-64
 target remote localhost:1234
 shell wmctrl -a kernel/boot

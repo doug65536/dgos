@@ -216,8 +216,6 @@ debug-attach:
 		-ex 'set $$rbp=1' \
 		-ex 'b mmu_init'
 
-#		-ex 'break'
-
 run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 	$(QEMU) -drive file=$(DISKIMAGE),format=raw -no-shutdown \
 		-no-reboot -d cpu_reset -s -m 6G -machine q35
