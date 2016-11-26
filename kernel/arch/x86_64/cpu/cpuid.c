@@ -1,11 +1,23 @@
 #include "cpuid.h"
 #include "string.h"
 
+// max_leaf[0] holds max supported leaf
+// max_leaf[1] holds max supported extended leaf
+static uint32_t max_leaf[2];
+
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
     // Automatically check for support for the leaf
     if ((eax & 0x7FFFFFFF) != 0) {
-        cpuid(output, eax & 0x80000000, 0);
+        // Try to use cached information
+        uint32_t i = eax >> 31;
+        if (max_leaf[i] != 0) {
+            output->eax = max_leaf[i];
+        } else {
+            cpuid(output, eax & 0x80000000, 0);
+            max_leaf[i] = output->eax;
+        }
+
         if (output->eax < eax) {
             memset(output, 0, sizeof(*output));
             return 0;

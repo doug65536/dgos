@@ -39,6 +39,31 @@ SECTIONS {
 		. = ALIGN(64);
 		*(.rodata)
 		*(.rodata.*)
+
+		/* Provide the highest address taken by kernel as
+		   a global variable */
+		. = ALIGN(8);
+		___top_physaddr = .;
+		QUAD((___init_brk - ___text_st) + 0x100000);
+
+		/* Provide the TLS size as a global variable */
+		___tls_size = .;
+		QUAD(___tbss_en - ___tdata_st);
+
+		/* Provide the TLS address as a global variable */
+		___tls_init_data_ptr = .;
+		QUAD(___tdata_st);
+
+		/* Provide the initial TLS address
+		   as a global variable */
+		___tls_main_tls_bottom_ptr = .;
+		QUAD(___main_tls_bottom);
+
+		/* Provide the address of the main TEB
+		   as a global variable */
+		___main_teb_ptr = .;
+		QUAD(___main_teb);
+
 		PROVIDE(___text_en = .);
 	} = 0xCC
 
@@ -46,12 +71,6 @@ SECTIONS {
 	.data  : ALIGN(4096) {
 		*(.data)
 		*(.data.*)
-
-		/* Provide the highest address taken by kernel as
-		   a global variable */
-		. = ALIGN(8);
-		___top_physaddr = .;
-		QUAD((___init_brk - ___text_st) + 0x100000);
 
 		/* Statically allocate room for the main */
 		/* kernel thread TLS */

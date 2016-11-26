@@ -13,3 +13,6 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
 
 
 void thread_yield(void);
+void thread_sleep_until(uint64_t expiry);
+void thread_sleep_for(uint64_t ms);
+

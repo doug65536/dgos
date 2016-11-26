@@ -38,6 +38,11 @@ int con_draw_xy(int x, int y, const char *s, int attr)
                 console_display, x, y, s, attr);
 }
 
+void con_remap_memory(void)
+{
+    console_display_vtbl.remap_memory(console_display);
+}
+
 int con_exists()
 {
     return console_display != 0;

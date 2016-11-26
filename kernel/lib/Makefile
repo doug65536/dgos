@@ -14,7 +14,4 @@ CSRCS := mm.c \
 	irq.c \
 	time.c
 
-# TLS has memory references at address 0
-tls.o: CFLAGS += -mcmodel=large
-
 include $(BUILDROOT)/library.mk

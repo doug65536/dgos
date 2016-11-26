@@ -11,6 +11,13 @@ void mouse_event(mouse_raw_event_t event)
 
     con_move_cursor(accum_x / 45, accum_y / 80);
 
+    // Improve responsiveness by resetting accumulator
+    // when mouse reverses direction on that axis
+    if ((accum_x < 0) != (event.hdist < 0))
+        accum_x = 0;
+    if ((accum_y < 0) != (-event.vdist < 0))
+        accum_y = 0;
+
     accum_x %= 45;
     accum_y %= 80;
 

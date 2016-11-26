@@ -955,12 +955,14 @@ void mmu_init(void)
         }
     }
 
+    // Start using physical memory allocator
+    usable_ranges = 0;
+
     printk("%lu pages free (%luMB)\n",
            free_count,
            free_count >> (20 - PAGE_SIZE_BIT));
 }
 
-#if 1
 static size_t round_up(size_t n)
 {
     return (n + PAGE_MASK) & -PAGE_SIZE;
@@ -1008,7 +1010,7 @@ void *mmap(
 
     linaddr_t linear_addr = take_linear(len);
 
-    for (size_t ofs = 0; ofs < len + PAGE_SIZE; ofs += PAGE_SIZE)
+    for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
     {
         if (!(flags & MAP_PHYSICAL)) {
             // Allocate normal memory
@@ -1035,7 +1037,7 @@ int munmap(void *addr, size_t len)
 
     linaddr_t a = (linaddr_t)addr;
 
-    for (size_t ofs = 0; ofs < len + PAGE_SIZE; ofs += PAGE_SIZE)
+    for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
     {
         if (!mmu_path_present(path, pteptr))
             return -1;
@@ -1050,13 +1052,11 @@ int munmap(void *addr, size_t len)
 
         *pteptr[3] = 0;
 
-        a += PAGE_SIZE;
         cpu_invalidate_page(a);
 
+        a += PAGE_SIZE;
         path_inc(path);
     }
 
     return 0;
 }
-
-#endif

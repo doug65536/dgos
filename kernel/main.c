@@ -9,7 +9,7 @@
 
 int life_and_stuff = 42;
 
-size_t const kernel_stack_size = 262144;
+size_t const kernel_stack_size = 8192;
 char kernel_stack[262144];
 
 char buf[12];
@@ -46,14 +46,31 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-char shell_stack[65536];
+char shell_stack[4096];
 
 static int shell_thread(void *p)
 {
     printk("From shell thread!! %016lx", (uint64_t)p);
     while (1) {
         ++*(char*)0xb8002;
-        thread_yield();
+        thread_sleep_for(1000);
+    }
+    return 0;
+}
+
+//char test_stacks[4][4096];
+
+typedef struct test_thread_param_t {
+    char *p;
+    int sleep;
+} test_thread_param_t;
+
+static int other_thread(void *p)
+{
+    test_thread_param_t *tp = p;
+    while (1) {
+        ++(*tp->p);
+        thread_sleep_for(tp->sleep);
     }
     return 0;
 }
@@ -69,62 +86,25 @@ int main(void)
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d,
                   shell_stack, sizeof(shell_stack));
 
-    while (1) {
-        ++*(char*)0xb8000;
+    test_thread_param_t ttp[4] = {
+        { (char*)0xb8004, 953 },
+        { (char*)0xb8006, 701 },
+        { (char*)0xb8008, 556 },
+        { (char*)0xb800A, 299 }
+    };
+
+    char *test_stacks = mmap(
+                0, 4096 * 4,
+                PROT_READ | PROT_WRITE,
+                MAP_STACK, -1, 0);
+
+    thread_create(other_thread, ttp + 0, test_stacks + (0 << 12), 4096);
+    thread_create(other_thread, ttp + 1, test_stacks + (1 << 12), 4096);
+    thread_create(other_thread, ttp + 2, test_stacks + (2 << 12), 4096);
+    thread_create(other_thread, ttp + 3, test_stacks + (3 << 12), 4096);
+
+    while (1)
         halt();
-    }
 
     return 0;
-
-    //uint64_t *crash = (void*)0xfeedfacebeef0000;
-    //*crash = (uint64_t)0xfeedfeedfeedfeed;
-
-    //printk("Testing!\n");
-    //printk("Testing again!\n");
-    //for (int i = 0; i < 22; ++i)
-    //    printk("... and again!\n");
-    //
-    //// Check length specifiers and correct va_arg usage
-    //TEST_FORMAT("%hhd", signed char, 42);
-    //TEST_FORMAT("%hd", short, 42);
-    //TEST_FORMAT("%d", int, 42);
-    //TEST_FORMAT("%ld", long, 42);
-    //TEST_FORMAT("%lld", long long, 42);
-    ////TEST_FORMAT("%jd", intmax_t, 42);
-    ////TEST_FORMAT("%zd", ssize_t, 42);
-    ////TEST_FORMAT("%td", ptrdiff_t, 42);
-    //
-    //// Min-width only
-    //TEST_FORMAT("%5d", int, 42);
-    //
-    //// Min-width and precision
-    //TEST_FORMAT("%5.4d", int, 42);
-    //
-    //// Min-width < precision
-    //TEST_FORMAT("%4.5d", int, 42);
-    //
-    //// Min-width character
-    //TEST_FORMAT("%5c", int, '!');
-    //
-    //// Min-width hex
-    //TEST_FORMAT("%5x", int, 42);
-    //
-    //// Min-width hex with leading zeros
-    //TEST_FORMAT("%05x", int, 42);
-    //
-    //// Min-width hex with precision
-    //TEST_FORMAT("%5.3x", int, 42);
-    //
-    //// Left justified string with min-width
-    //TEST_FORMAT("%-5s", char*, "LJ");
-    //
-    //// Min-width decimal negative
-    //TEST_FORMAT("%5d", int, -42);
-    //
-    //TEST_FORMAT("%-5d", int, -42);
-    //TEST_FORMAT("%+5d", int, -42);
-    ////TEST_FORMAT("%+5.4td", ptrdiff_t, 42);
-    ////TEST_FORMAT("%+5.4td", ptrdiff_t, -42);
-    //
-    //return 42;
 }

@@ -138,5 +138,6 @@ void pit8254_enable(void)
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);
+    irq_hook(40, pit8254_handler);
     irq_setmask(0, 1);
 }
