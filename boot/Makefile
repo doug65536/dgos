@@ -16,6 +16,7 @@ CSRCS := \
 
 ASRCS := \
 	part.s \
+	mpentry.s \
 	exception.s
 
 BINDIR := bin
@@ -217,8 +218,9 @@ debug-attach:
 		-ex 'b mmu_init'
 
 run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
-	$(QEMU) -drive file=$(DISKIMAGE),format=raw -no-shutdown \
-		-no-reboot -d cpu_reset -s -m 6G -machine q35
+	$(QEMU) -drive file=$(DISKIMAGE),format=raw \
+		-no-shutdown -no-reboot -d cpu_reset \
+		-s -m 6G -machine q35 -smp cpus=2,cores=2
 
 #,guest_errors,unimp
 

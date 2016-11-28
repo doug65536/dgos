@@ -5,8 +5,6 @@ entry:
 	# Align stack
 	and $-16,%rsp
 
-	lea 262144+kernel_stack(%rip),%rsp
-
 	#jmp 1f
 	# Debugger hack
 	mov $0,%rbp
@@ -16,6 +14,21 @@ entry:
 	jz 0b
 	1:
 
+	push %rdx
+	push %rcx
+	mov $0x1B,%ecx
+	rdmsr
+	pop %rcx
+	pop %rdx
+	test $0x100,%eax
+	jnz 0f
+
+	# MP processor entry
+	jmp mp_main
+
+0:
+	lea 262144+kernel_stack(%rip),%rsp
+
 	# Store the physical memory map address
 	# passed in from bootloader
 	mov %ecx,%edx
@@ -24,7 +37,9 @@ entry:
 	and $0x000FFFFF,%rcx
 	mov %rcx,phys_mem_map(%rip)
 
+	xor %edi,%edi
 	call cpu_init
+	call cpu_hw_init
 
 	call tls_init
 
@@ -32,8 +47,6 @@ entry:
 	lea ___init_st(%rip),%rdi
 	lea ___init_en(%rip),%rsi
 	call invoke_function_array
-
-	call mmu_init
 
 	call main
 
@@ -66,4 +79,11 @@ invoke_function_array:
 0:
 	pop %rbp
 	pop %rbx
+	ret
+
+# Callout to initialize AP CPU
+.globl mp_main
+mp_main:
+	mov $'S',%edi
+	call callout_call
 	ret

@@ -80,3 +80,6 @@ extern void isr_entry_71(void);
 
 // Forced context switch
 extern void isr_entry_72(void);
+
+// SMP APIC timer context switch
+extern void isr_entry_73(void);

@@ -17,28 +17,37 @@ SECTIONS {
 
 		. = ALIGN(64);
 		*(.text)
-		*(.text.*)
+		*(SORT(.text.*))
 
 		. = ALIGN(64);
 		*(.text.unlikely)
 
 		. = ALIGN(64);
-		___init_st = .;
+		PROVIDE(___init_st = .);
 		*(.init_array)
-		*(.init_array.*)
-		___init_en = .;
+		*(SORT(.init_array.*))
+		PROVIDE(___init_en = .);
 
-		___fini_st = .;
+		PROVIDE(___fini_st = .);
 		*(.fini_array)
-		*(.fini_array.*)
-		___fini_en = .;
+		*(SORT(.fini_array.*))
+		PROVIDE(___fini_en = .);
+
+		. = ALIGN(16);
+
+		PROVIDE(___callout_array_st = .);
+		*(.callout_array)
+		*(SORT(.callout_array.*))
+		PROVIDE(___callout_array_en = .);
 
 		. = ALIGN(64);
 		*(.eh_frame)
 
 		. = ALIGN(64);
 		*(.rodata)
-		*(.rodata.*)
+		*(SORT(.rodata.*))
+
+		/* Expose addresses/sizes to kernel as initialized data */
 
 		/* Provide the highest address taken by kernel as
 		   a global variable */
@@ -70,17 +79,17 @@ SECTIONS {
 	/* Initialized data */
 	.data  : ALIGN(4096) {
 		*(.data)
-		*(.data.*)
+		*(SORT(.data.*))
 
 		/* Statically allocate room for the main */
 		/* kernel thread TLS */
 		. = ALIGN(16);
-		___main_tls_bottom = .;
-		. += ___tbss_en - ___tdata_st /*SIZEOF(.tdata) + SIZEOF(.tbss)*/;
-		___main_teb = .;
+		PROVIDE(___main_tls_bottom = .);
+		. += ___tbss_en - ___tdata_st;
+		PROVIDE(___main_teb = .);
 		/* 8 is sizeof thread_env_t! */
 		QUAD(___main_teb);
-		___main_teb_end = .;
+		PROVIDE(___main_teb_end = .);
 		. = ALIGN(16);
 	} = 0x00
 
@@ -88,7 +97,7 @@ SECTIONS {
 	.bss : ALIGN(4096) {
 		PROVIDE(___bss_st = .);
 		*(.bss)
-		*(.bss.*)
+		*(SORT(.bss.*))
 		*(COMMON)
 		PROVIDE(___bss_en = .);
 	}
@@ -101,22 +110,22 @@ SECTIONS {
 
 	/* Copy on write initialized thread_local */
 	.tdata : {
-		___tdata_st = .;
+		PROVIDE(___tdata_st = .);
 		*(.tdata)
 		. = ALIGN(16);
-		___tdata_en = .;
+		PROVIDE(___tdata_en = .);
 	}
 
 	/* Zero page pool initialized thread_local */
 	.tbss : {
-		___tbss_st = .;
+		PROVIDE(___tbss_st = .);
 		*(.tbss)
 		. = ALIGN(16);
-		___tbss_en = .;
+		PROVIDE(___tbss_en = .);
 	}
 
 	. = ALIGN(4096);
-	___init_brk = .;
+	PROVIDE(___init_brk = .);
 
 	.debug_info    0 : { *(.debug_info)    }
 	.debug_abbrev  0 : { *(.debug_abbrev)  }

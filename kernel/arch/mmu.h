@@ -18,4 +18,4 @@ typedef struct physmem_range_t {
 extern physmem_range_t *phys_mem_map;
 extern size_t phys_mem_map_count;
 
-void mmu_init(void);
+void mmu_init(int ap);

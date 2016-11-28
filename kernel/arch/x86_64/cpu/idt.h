@@ -244,8 +244,8 @@ typedef struct isr_minimal_context_t {
 
 // Exception handler C call parameter
 typedef struct isr_full_context_t {
-    isr_gpr_context_t * const gpr;
-    isr_fxsave_context_t * const fpr;
+    isr_gpr_context_t * gpr;
+    isr_fxsave_context_t * fpr;
 } isr_full_context_t;
 
 // Note that fpr must lie on a 16-byte boundary
@@ -263,4 +263,4 @@ void *isr_handler(isr_minimal_context_t *ctx);
 
 isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx);
 
-int idt_init(void);
+int idt_init(int ap);

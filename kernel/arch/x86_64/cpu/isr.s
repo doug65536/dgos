@@ -77,6 +77,9 @@ isr_exception_entry 0 31
 # Forced context switch entry point
 isr_entry 0 72
 
+# SMP APIC timer entry point
+isr_entry 0 73
+
 isr_common:
 	# Save call-clobbered registers
 	# (in System-V parameter order in memory)

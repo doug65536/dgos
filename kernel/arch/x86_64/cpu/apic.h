@@ -1,3 +1,3 @@
 #pragma once
 
-int apic_init(void);
+int apic_init(int ap);

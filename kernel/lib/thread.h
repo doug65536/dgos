@@ -11,7 +11,6 @@ typedef int (*thread_fn_t)(void*);
 thread_t thread_create(thread_fn_t fn, void *userdata,
                        void *stack, size_t stack_size);
 
-
 void thread_yield(void);
 void thread_sleep_until(uint64_t expiry);
 void thread_sleep_for(uint64_t ms);

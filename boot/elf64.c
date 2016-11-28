@@ -8,6 +8,8 @@
 #include "cpu.h"
 #include "bootsect.h"
 #include "physmem.h"
+#include "mpentry.h"
+#include "farptr.h"
 
 //static unsigned long elf64_hash(unsigned char const *name)
 //{
@@ -23,8 +25,27 @@
 
 void enter_kernel(uint64_t entry_point);
 
-void enter_kernel(uint64_t entry_point)
+// Save the entry point address for later MP processor startup
+uint64_t mp_enter_kernel;
+
+static void enter_kernel_initial(uint64_t entry_point)
 {
+    //
+    // Relocate MP entry trampoline to 4KB boundary
+
+    uint16_t mp_entry_seg = far_malloc_aligned(mp_entry_size);
+    far_ptr_t mp_entry_ptr = far_ptr2(mp_entry_seg, 0);
+
+    far_copy(mp_entry_ptr,
+             far_ptr2(0, (uint16_t)(uint32_t)mp_entry),
+             mp_entry_size);
+
+    // Write address of AP entrypoint to mp_entry_vector
+    mp_entry_vector = (uint32_t)mp_entry_seg << 4;
+
+    //
+    // Build physical memory table
+
     uint32_t phys_mem_table_size = 0;
     uint32_t phys_mem_table =
             ((uint32_t)get_ram_regions(&phys_mem_table_size) << 4);
@@ -47,6 +68,17 @@ void enter_kernel(uint64_t entry_point)
     print_line("Entry point: %llx\n", entry_point);
 
     copy_or_enter(entry_point, 0, phys_mem_table);
+}
+
+void enter_kernel(uint64_t entry_point)
+{
+    if (mp_enter_kernel == 0) {
+        mp_enter_kernel = entry_point;
+        enter_kernel_initial(entry_point);
+        return;
+    }
+
+    copy_or_enter(entry_point, 0, 0);
 }
 
 uint16_t elf64_run(char const *filename)

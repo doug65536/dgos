@@ -6,6 +6,7 @@
 #include "string.h"
 #include "cpu/ioport.h"
 #include "time.h"
+#include "callout.h"
 
 DECLARE_text_display_DEVICE(vga);
 
@@ -324,7 +325,7 @@ static int vga_detect(text_display_base_t **result)
 {
     text_display_t *self = displays;
     self->vtbl = &vga_device_vtbl;
-    self->io_base = READ_BIOS_DATA_AREA(uint16_t, 0x463);
+    self->io_base = *BIOS_DATA_AREA(uint16_t, 0x463);
     self->video_mem = (void*)0xB8000;
     self->cursor_on = 1;
     self->cursor_x = 0;
@@ -361,13 +362,17 @@ static void vga_cleanup(text_display_base_t *dev)
     TEXT_DEV_PTR_UNUSED(dev);
 }
 
-static void vga_remap_memory(text_display_base_t *dev)
+static void vga_remap_callback(void *arg)
 {
-    TEXT_DEV_PTR(dev);
-    self->video_mem = mmap((void*)0xb8000, 0x8000,
-                           PROT_READ | PROT_WRITE,
-                           MAP_PHYSICAL, -1, 0);
+    (void)arg;
+    for (size_t i = 0; i < countof(displays); ++i)
+        displays[i].video_mem = mmap(
+                    (void*)0xB8000, 0x8000,
+                    PROT_READ | PROT_WRITE,
+                    MAP_PHYSICAL, -1, 0);
 }
+
+REGISTER_CALLOUT(vga_remap_callback, 0, 'V', "000");
 
 // Set/get dimensions
 

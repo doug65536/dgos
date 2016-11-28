@@ -6,6 +6,7 @@
 #include "thread.h"
 #include "device/pci.h"
 #include "device/keyb8042.h"
+#include "callout.h"
 
 int life_and_stuff = 42;
 
@@ -23,6 +24,14 @@ __thread int tls_initialized_thing_2 = 43;
 //__thread char tls_buf[10] = {24};
 
 void volatile *trick;
+
+static void smp_main(void *arg)
+{
+    (void)arg;
+    cpu_init(1);
+}
+
+REGISTER_CALLOUT(smp_main, 0, 'S', "999");
 
 static __attribute__((constructor)) void start_me_up()
 {

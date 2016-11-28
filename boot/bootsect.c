@@ -4,7 +4,7 @@ asm (
     ".globl entry\n"
 "entry:\n"
     // Set cs to 0000
-    "ljmp $0,$0f\n"
+    "ljmp $0,$entry_start\n"
     ".org entry+8\n\t"
     ".globl bootinfo_primary_volume_desc\n\t"
     "bootinfo_primary_volume_desc:"
@@ -22,7 +22,15 @@ asm (
     "bootinfo_reserved:"
     ".space 10*4\n\t"
 
-    "0:\n"
+    // MP entry point vector at offset 64
+    ".globl mp_entry_vector\n"
+    "mp_entry_vector:\n\t"
+    ".int 0\n\t"
+
+    ".globl entry_start\n\t"
+    "entry_start:\n\t"
+
+    "0:\n\t"
     // Set ds and es to 0000
     "xorw %ax,%ax\n"
     "movw %ax,%ds\n"

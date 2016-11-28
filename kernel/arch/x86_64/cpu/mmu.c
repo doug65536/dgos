@@ -5,6 +5,8 @@
 #include "time.h"
 #include "string.h"
 #include "atomic.h"
+#include "bios_data.h"
+#include "callout.h"
 
 // Intel manual, page 2786
 
@@ -189,33 +191,18 @@ static pte_t * const ptu_base[4] = {
 physmem_range_t *phys_mem_map;
 size_t phys_mem_map_count;
 
-// Simple physical memory allocator (until good one is done)
+// Simple physical memory allocator
 physmem_range_t ranges[64];
 size_t usable_ranges;
+
+physaddr_t root_physaddr;
 
 // Bitmask of available aliasing ptes (top one taken already)
 static uint64_t volatile apte_map = 0x8000000000000000UL;
 
+
 unsigned *phys_alloc;
 unsigned phys_alloc_count;
-
-// Take 64 page table entries at the top of memory
-// for use in breaking the catch-22 problem of
-// needing to manipulate the page tables to manipulate
-// the page tables :)
-//static void init_apte_list(void)
-//{
-//    // Mark them all present to make sure they don't get
-//    // used for something else
-//    pte_t *pte;
-//    for (unsigned i = 64; i > 0; --i) {
-//        pte = PT3_PTR(PT_KBASEADDR) + PT3_ENTRIES - i;
-//        *pte = PTE_PRESENT;
-//    }
-//}
-
-//
-// Lock free physical memory allocation
 
 extern char ___init_brk[];
 extern uint64_t ___top_physaddr;
@@ -288,7 +275,7 @@ static void path_inc(unsigned *path)
 
 // Returns the linear addresses of the page tables for
 // the given path
-static void pages_from_path(pte_t **pte, unsigned *path)
+static void pte_from_path(pte_t **pte, unsigned *path)
 {
     linaddr_t base = path[0] >= 0x80
             ? PT_KBASEADDR
@@ -320,7 +307,7 @@ static int mmu_path_present(unsigned *path, pte_t **optional_pte_ret)
     if (!optional_pte_ret)
         optional_pte_ret = pteptr;
 
-    pages_from_path(optional_pte_ret, path);
+    pte_from_path(optional_pte_ret, path);
 
     return (*optional_pte_ret[0] & PTE_PRESENT) &&
             (*optional_pte_ret[1] & PTE_PRESENT) &&
@@ -366,7 +353,7 @@ static pte_t *take_apte(physaddr_t address)
                 path_from_addr(path, linaddr);
                 pte_t *pteptr[4];
 
-                pages_from_path(pteptr, path);
+                pte_from_path(pteptr, path);
 
                 result = pteptr[3];
 
@@ -754,7 +741,7 @@ static void mmu_map_page(
     path_from_addr(path, addr);
 
     pte_t *pte_linaddr[4];
-    pages_from_path(pte_linaddr, path);
+    pte_from_path(pte_linaddr, path);
 
     // Map the page tables for the region
     for (unsigned i = 0; i < 4; ++i) {
@@ -771,8 +758,13 @@ static void mmu_map_page(
 //
 // Initialization
 
-void mmu_init(void)
+void mmu_init(int ap)
 {
+    if (ap) {
+        cpu_set_page_directory(root_physaddr);
+        return;
+    }
+
     usable_ranges = mmu_fixup_mem_map(phys_mem_map);
 
     if (usable_ranges > countof(ranges)) {
@@ -826,7 +818,7 @@ void mmu_init(void)
     // Create the new root
 
     // Get a page
-    physaddr_t root_physaddr = init_take_page(ranges, &usable_ranges);
+    root_physaddr = init_take_page(ranges, &usable_ranges);
 
     // Map page
     pte_t *root = init_map_aliasing_pte(aliasing_pte, root_physaddr);
@@ -899,7 +891,7 @@ void mmu_init(void)
                             ranges, &usable_ranges);
 
                     pte_t *virtual_tables[4];
-                    pages_from_path(virtual_tables, path);
+                    pte_from_path(virtual_tables, path);
 
                     for (unsigned i = 0; i < 4; ++i) {
                         init_create_pt(root_physaddr, aliasing_pte,
@@ -909,17 +901,6 @@ void mmu_init(void)
                                        PTE_PRESENT | PTE_WRITABLE,
                                        ranges, &usable_ranges);
                     }
-
-                    //printk("Virtual tables for 0x%lx:\n",
-                    //       ((uint64_t)path[0] << (9 * 3 + 12)) +
-                    //       ((uint64_t)path[1] << (9 * 2 + 12)) +
-                    //       ((uint64_t)path[2] << (9 * 1 + 12)) +
-                    //       ((uint64_t)path[3] << (9 * 0 + 12)));
-                    //printk("  %012lx %012lx %012lx %012lx\n",
-                    //       (uint64_t)virtual_tables[0],
-                    //       (uint64_t)virtual_tables[1],
-                    //       (uint64_t)virtual_tables[2],
-                    //       (uint64_t)virtual_tables[3]);
                 }
             }
         }
@@ -961,6 +942,12 @@ void mmu_init(void)
     printk("%lu pages free (%luMB)\n",
            free_count,
            free_count >> (20 - PAGE_SIZE_BIT));
+
+    callout_call('V');
+
+    zero_page = mmap(
+                0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+                MAP_PHYSICAL, -1, 0);
 }
 
 static size_t round_up(size_t n)

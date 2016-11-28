@@ -7,10 +7,11 @@
 #include "legacy_pic.h"
 #include "legacy_pit.h"
 #include "thread_impl.h"
+#include "cmos.h"
 #include "apic.h"
 #include "cpuid.h"
 
-void cpu_init(void)
+void cpu_init(int ap)
 {
     cpu_cr0_change_bits(0,
                         CR0_WP |
@@ -39,12 +40,21 @@ void cpu_init(void)
                         CR4_OFXSR |
                         CR4_OSXMMEX);
 
-    //init_gdt();
-    idt_init();
-    thread_init();
+    idt_init(ap);
+    mmu_init(ap);
+    apic_init(ap);
+    thread_init(ap);
 
-    if (0 && cpuid_edx_bit(9, 1, 0)) {
-        apic_init();
+    //int have_apic = cpuid_edx_bit(9, 1, 0);
+    //if (have_apic)
+}
+
+void cpu_hw_init(void)
+{
+    cmos_init();
+
+    if (0) {
+        //apic_init();
 
         // Still need to initialize in case of
         // spurious IRQs

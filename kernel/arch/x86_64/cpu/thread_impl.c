@@ -11,6 +11,7 @@
 #include "types.h"
 #include "string.h"
 #include "time.h"
+#include "likely.h"
 
 // Implements platform independent thread.h
 
@@ -77,10 +78,13 @@ struct cpu_info_t {
     thread_info_t *cur_thread;
     uint64_t apic_id;
     int online;
+    thread_info_t *goto_thread;
 };
 
 #define MAX_CPUS    64
 static cpu_info_t cpus[MAX_CPUS];
+
+static volatile uint32_t cpu_count;
 
 // Get executing APIC ID
 static uint64_t get_apic_id(void)
@@ -134,9 +138,11 @@ static void thread_cleanup(void)
 
 // Returns threads array index or 0 on error
 // Minumum allowable stack space is 4KB
-thread_t thread_create(thread_fn_t fn, void *userdata,
-                       void *stack,
-                       size_t stack_size)
+static thread_t thread_create_with_state(
+        thread_fn_t fn, void *userdata,
+        void *stack,
+        size_t stack_size,
+        thread_state_t state)
 {
     if (stack_size < 4096)
         return 0;
@@ -217,7 +223,7 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
 
         thread->ctx = ctx;
 
-        thread->state = THREAD_IS_READY;
+        thread->state = state;
 
         // Atomically make sure thread_count > i
         size_t old_count = thread_count;
@@ -237,26 +243,75 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
     }
 }
 
-void thread_init(void)
+thread_t thread_create(thread_fn_t fn, void *userdata,
+                       void *stack,
+                       size_t stack_size)
 {
+    return thread_create_with_state(
+                fn, userdata,
+                stack, stack_size,
+                THREAD_IS_READY);
+}
+
+#if 0
+static void thread_monitor_mwait(void)
+{
+    uint64_t rax = 0;
+    __asm__ __volatile__ (
+        "lea timer_ms(%%rip),%%rax\n\t"
+        "monitor\n\t"
+        "mwait\n\t"
+        : "+a" (rax)
+        : "d" (0), "c" (0)
+        : "memory"
+    );
+}
+#endif
+
+static int smp_thread(void *arg)
+{
+    (void)arg;
+    while (1)
+        halt();
+    return 0;
+}
+
+void thread_init(int ap)
+{
+    uint32_t cpu_number = atomic_xadd_uint32(&cpu_count, 1);
+
     // First CPU is the BSP
-    cpu_info_t *cpu = cpus;
+    cpu_info_t *cpu = cpus + cpu_number;
 
     // First thread is this boot thread
-    thread_info_t *thread = threads;
-
-    thread->cpu = cpu;
-    thread->ctx = 0;
-    thread->state = THREAD_IS_RUNNING;
-    thread->priority = 0;
-    thread->stack = kernel_stack;
-    thread->stack_size = kernel_stack_size;
+    thread_info_t *thread = threads + cpu_number;
 
     cpu->apic_id = get_apic_id();
-    cpu->cur_thread = thread;
     cpu->online = 1;
 
-    thread_count = 1;
+    if (!ap) {
+        cpu->cur_thread = thread;
+        thread->cpu = cpu;
+        thread->ctx = 0;
+        thread->state = THREAD_IS_RUNNING;
+        thread->priority = 0;
+
+        thread->stack = kernel_stack;
+        thread->stack_size = kernel_stack_size;
+        thread_count = 1;
+    } else {
+        size_t stack_size = 4096;
+        void *stack = mmap(
+                    0, stack_size,
+                    PROT_READ | PROT_WRITE,
+                    MAP_STACK, -1, 0);
+        thread = threads + thread_create_with_state(
+                    smp_thread, 0, stack, stack_size,
+                    THREAD_IS_INITIALIZING);
+
+        cpu->goto_thread = thread;
+        thread_yield();
+    }
 }
 
 static thread_info_t *thread_choose_next(
@@ -305,6 +360,14 @@ void *thread_schedule(void *ctx)
 {
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
+
+    if (unlikely(cpu->goto_thread)) {
+        thread = cpu->goto_thread;
+        thread->state = THREAD_IS_RUNNING;
+        cpu->cur_thread = thread;
+        cpu->goto_thread = 0;
+        return thread->ctx;
+    }
 
     // Store context pointer for resume later
     if (thread->state != THREAD_IS_DESTRUCTING) {

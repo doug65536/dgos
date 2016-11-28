@@ -40,3 +40,5 @@ physmem.c
 physmem.h
 farptr.h
 farptr.c
+mpentry.s
+mpentry.h

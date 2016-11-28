@@ -90,38 +90,39 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
+static void *pit8254_context_switch_handler(int irq, void *ctx)
+{
+    (void)irq;
+    return thread_schedule(ctx);
+}
+
 static void *pit8254_handler(int irq, void *ctx)
 {
     (void)irq;
 
-    // This is also called from the forced
-    // context switch ISR
+    atomic_inc_uint64(&timer_ticks);
 
-    if (irq == 0) {
-        atomic_inc_uint64(&timer_ticks);
+    // Accumulate crystal clock cycles
+    accumulator += divisor * 1000;
 
-        // Accumulate crystal clock cycles
-        accumulator += divisor * 1000;
+    // Accumulated milliseconds
 
-        // Accumulated milliseconds
+    if (accumulator >= 1193181U) {
+        unsigned accum_ms = accumulator / 1193181U;
+        accumulator -= 1193181U * accum_ms;
+        atomic_add_uint64(&timer_ms, accum_ms);
+    }
 
-        if (accumulator >= 1193181U) {
-            unsigned accum_ms = accumulator / 1193181U;
-            accumulator -= 1193181U * accum_ms;
-            atomic_add_uint64(&timer_ms, accum_ms);
-        }
+    // Test
+    static uint64_t last_time;
+    if (last_time + 1000 <= timer_ms) {
+        last_time = timer_ms;
 
-        // Test
-        static uint64_t last_time;
-        if (last_time + 1000 <= timer_ms) {
-            last_time = timer_ms;
+        char buf[10];
+        snprintf(buf, sizeof(buf), "%8ld ", last_time);
 
-            char buf[10];
-            snprintf(buf, sizeof(buf), "%8ld ", last_time);
+        con_draw_xy(70, 0, buf, 7);
 
-            con_draw_xy(70, 0, buf, 7);
-
-        }
     }
 
     return thread_schedule(ctx);
@@ -138,6 +139,17 @@ void pit8254_enable(void)
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);
-    irq_hook(40, pit8254_handler);
+    irq_hook(40, pit8254_context_switch_handler);
     irq_setmask(0, 1);
 }
+
+//void pit8253_usleep(int us)
+//{
+//    outb(PIT_CMD,
+//         PIT_CHANNEL(2) |
+//         PIT_ACCESS_BOTH |
+//         PIT_MODE_ONESHOT |
+//         PIT_FORMAT_BINARY);
+//    outb(PIT_DATA(2), us & 0xFF);
+//    outb(PIT_DATA(2), (us >> 8) & 0xFF);
+//}

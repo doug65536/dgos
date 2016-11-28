@@ -4,6 +4,7 @@ LIBNAME := kernel
 CSRCS := mm.c \
 	tls.c \
 	thread.c \
+	callout.c \
 	printk.c \
 	dev_text.c \
 	dev_storage.c \

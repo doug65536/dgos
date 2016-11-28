@@ -1,6 +1,6 @@
 #include "irq.h"
 
-void *(*irq_handlers[73])(int, void*);
+void *(*irq_handlers[128])(int, void*);
 void (*irq_setmask)(int irq, int unmask);
 
 void irq_hook(int irq, void *(*handler)(int, void*))

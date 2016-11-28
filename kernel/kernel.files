@@ -79,3 +79,10 @@ lib/keyboard.c
 arch/x86_64/cpu/thread_impl.h
 lib/main.h
 arch/x86_64/cpu/isr.h
+arch/x86_64/device/keyb8042_layout/keyb8042_gentables.c
+arch/x86_64/cpu/cmos.c
+arch/x86_64/cpu/cmos.h
+arch/x86_64/bios_data.c
+lib/callout.h
+lib/callout.c
+lib/likely.h

@@ -155,7 +155,7 @@ uint16_t cpu_has_no_execute(void)
             (cpuinfo.edx & (1<<20));
 }
 
-static uint16_t disable_interrupts()
+static uint16_t disable_interrupts(void)
 {
     uint32_t int_enabled;
     __asm__ __volatile__ (
@@ -169,7 +169,7 @@ static uint16_t disable_interrupts()
     return !!int_enabled;
 }
 
-static void enable_interrupts()
+static void enable_interrupts(void)
 {
     __asm__ __volatile__ ("sti");
 }
@@ -182,7 +182,7 @@ static void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
-static void idt_init()
+static void idt_init(void)
 {
     for (size_t i = 0; i < 32; ++i) {
         idt[i].type_attr = IDT_PRESENT | IDT_INTR;

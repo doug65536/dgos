@@ -61,7 +61,7 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
 
 typedef void (*isr_entry_t)(void);
 
-const isr_entry_t isr_entry_points[73] = {
+const isr_entry_t isr_entry_points[74] = {
     isr_entry_0,  isr_entry_1,  isr_entry_2,  isr_entry_3,
     isr_entry_4,  isr_entry_5,  isr_entry_6,  isr_entry_7,
     isr_entry_8,  isr_entry_9,  isr_entry_10, isr_entry_11,
@@ -83,7 +83,7 @@ const isr_entry_t isr_entry_points[73] = {
     isr_entry_64, isr_entry_65, isr_entry_66, isr_entry_67,
     isr_entry_68, isr_entry_69, isr_entry_70, isr_entry_71,
 
-    isr_entry_72
+    isr_entry_72, isr_entry_73
 };
 
 extern void isr_entry_0xC0(void);
@@ -97,20 +97,22 @@ static void load_idtr(table_register_64_t *table_reg)
     );
 }
 
-int idt_init(void)
+int idt_init(int ap)
 {
     uint64_t addr;
 
-    for (size_t i = 0; i < countof(isr_entry_points); ++i) {
-        addr = (uint64_t)isr_entry_points[i];
-        idt[i].offset_lo = (uint16_t)(addr & 0xFFFF);
-        idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
-        idt[i].offset_64_31 = (uint16_t)((addr >> 32) & 0xFFFFFFFF);
+    if (!ap) {
+        for (size_t i = 0; i < countof(isr_entry_points); ++i) {
+            addr = (uint64_t)isr_entry_points[i];
+            idt[i].offset_lo = (uint16_t)(addr & 0xFFFF);
+            idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
+            idt[i].offset_64_31 = (uint16_t)((addr >> 32) & 0xFFFFFFFF);
 
-        idt[i].type_attr = IDT_PRESENT |
-                (i < 32 ? IDT_TRAP : IDT_INTR);
+            idt[i].type_attr = IDT_PRESENT |
+                    (i < 32 ? IDT_TRAP : IDT_INTR);
 
-        idt[i].selector = IDT_SEL;
+            idt[i].selector = IDT_SEL;
+        }
     }
 
     table_register_64_t idtr;
@@ -374,7 +376,7 @@ void *isr_handler(isr_minimal_context_t *ctx)
                     ctx->gpr->info.interrupt - 32,
                     ctx);
     } else if (ctx->gpr->info.interrupt >= 48 &&
-               ctx->gpr->info.interrupt <= 72) {
+               ctx->gpr->info.interrupt <= 128) {
         //
         // APIC IRQ (and forced context switch)
         ctx = irq_dispatcher(

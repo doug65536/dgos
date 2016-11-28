@@ -6,8 +6,10 @@ DEVSRCS := \
 DEVOBJS := $(DEVSRCS:.c=.o)
 
 CSRCS := \
+	bios_data.c \
 	cpu/cpu.c \
 	cpu/apic.c \
+	cpu/cmos.c \
 	cpu/atomic.c \
 	cpu/control_regs.c \
 	cpu/cpuid.c \

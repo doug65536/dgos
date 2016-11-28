@@ -7,6 +7,8 @@ layout src
 continue
 break
 set $ebp = 1
+b exception_isr_handler
+b thread_smp_entry
 continue
 
 define qq

@@ -12,4 +12,3 @@ void con_putc(int character);
 int con_print(char const *s);
 void con_move_cursor(int dx, int dy);
 int con_draw_xy(int x, int y, char const *s, int attr);
-void con_remap_memory(void);
