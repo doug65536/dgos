@@ -7,7 +7,6 @@
 #include "device/pci.h"
 #include "device/keyb8042.h"
 #include "callout.h"
-#include "rbtree.h"
 
 int life_and_stuff = 42;
 
@@ -89,8 +88,6 @@ int main(void)
 {
     pci_init();
     keyb8042_init();
-
-    //rbtree_test();
 
     // Crash
     //*(uint64_t*)0xfeedbeefbaadf00d = 0;
