@@ -42,8 +42,6 @@ arch/x86_64/device/vga.c
 arch/x86_64/device/vga.h
 arch/x86_64/device/keyb8042.c
 arch/x86_64/device/keyb8042.h
-arch/x86_64/device/ahci.c
-arch/x86_64/device/ahci.h
 arch/x86_64/device/pci.c
 arch/x86_64/device/pci.h
 arch/x86_64/cpu/ioport.c
