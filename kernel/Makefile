@@ -60,7 +60,7 @@ CFLAGS ?= -g3 -ffreestanding \
 	-ftls-model=$(TLS_MODEL) \
 	$(WEVERYTHING)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
