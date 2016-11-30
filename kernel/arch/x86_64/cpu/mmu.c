@@ -7,6 +7,7 @@
 #include "atomic.h"
 #include "bios_data.h"
 #include "callout.h"
+#include "likely.h"
 
 // Intel manual, page 2786
 
@@ -260,17 +261,20 @@ static void path_from_addr(unsigned *path, linaddr_t addr)
 
 static void path_inc(unsigned *path)
 {
-    uint64_t n = (linaddr_t)path[0] |
-            ((linaddr_t)path[1] << (9 * 1)) |
-            ((linaddr_t)path[2] << (9 * 2)) |
-            ((linaddr_t)path[3] << (9 * 3));
+    // Branchless algorithm
+
+    uint64_t n =
+            ((linaddr_t)path[0] << (9 * 3)) |
+            ((linaddr_t)path[1] << (9 * 2)) |
+            ((linaddr_t)path[2] << (9 * 1)) |
+            (linaddr_t)(path[3]);
 
     ++n;
 
-    path[0] = (unsigned)n & 511;
-    path[1] = (unsigned)(n >> (9 * 1)) & 511;
-    path[2] = (unsigned)(n >> (9 * 2)) & 511;
-    path[3] = (unsigned)(n >> (9 * 3)) & 511;
+    path[0] = (unsigned)(n >> (9 * 3)) & 511;
+    path[1] = (unsigned)(n >> (9 * 2)) & 511;
+    path[2] = (unsigned)(n >> (9 * 1)) & 511;
+    path[3] = (unsigned)n & 511;
 }
 
 // Returns the linear addresses of the page tables for
@@ -595,13 +599,12 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list)
 //
 // Initialization page allocator
 
-static physaddr_t init_take_page(
-        physmem_range_t *ranges, size_t *usable_ranges)
+static physaddr_t init_take_page(void)
 {
-    if (*usable_ranges == 0)
+    if (likely(usable_ranges == 0))
         return mmu_alloc_phys();
 
-    physmem_range_t *last_range = ranges + *usable_ranges - 1;
+    physmem_range_t *last_range = ranges + usable_ranges - 1;
     physaddr_t addr = last_range->base + last_range->size - PAGE_SIZE;
 
     // Take a page off the size of the range
@@ -609,7 +612,7 @@ static physaddr_t init_take_page(
 
     // If range exhausted, switch to next range
     if (last_range->size == 0)
-        --*usable_ranges;
+        --usable_ranges;
 
     return addr;
 }
@@ -664,9 +667,7 @@ static void init_create_pt(
         linaddr_t linear_addr,
         physaddr_t phys_addr,
         physaddr_t *pt_physaddr,
-        pte_t page_flags,
-        physmem_range_t *ranges,
-        size_t *usable_ranges)
+        pte_t page_flags)
 {
     //printk("Creating page table for %lx...", linear_addr);
 
@@ -690,7 +691,7 @@ static void init_create_pt(
 
         if (!addr) {
             // Allocate a new page table
-            addr = init_take_page(ranges, usable_ranges);
+            addr = init_take_page();
 
             // Update current page table to point to new page
             iter[path[level]] = addr | page_flags;
@@ -734,8 +735,7 @@ static void mmu_map_page(
     init_create_pt(root_physaddr, aliasing_pte,
                    addr, physaddr,
                    pt_physaddr,
-                   flags,
-                   ranges, &usable_ranges);
+                   flags);
 
     unsigned path[4];
     path_from_addr(path, addr);
@@ -748,8 +748,7 @@ static void mmu_map_page(
         init_create_pt(root_physaddr, aliasing_pte,
                        (linaddr_t)pte_linaddr[i],
                        pt_physaddr[i], 0,
-                       PTE_PRESENT | PTE_WRITABLE,
-                       ranges, &usable_ranges);
+                       PTE_PRESENT | PTE_WRITABLE);
     }
 
     release_apte(aliasing_pte);
@@ -818,7 +817,7 @@ void mmu_init(int ap)
     // Create the new root
 
     // Get a page
-    root_physaddr = init_take_page(ranges, &usable_ranges);
+    root_physaddr = init_take_page();
 
     // Map page
     pte_t *root = init_map_aliasing_pte(aliasing_pte, root_physaddr);
@@ -830,8 +829,7 @@ void mmu_init(int ap)
                    (linaddr_t)PT0_PTR(PT_KBASEADDR),
                    root_physaddr,
                    0,
-                   PTE_PRESENT | PTE_WRITABLE,
-                   ranges, &usable_ranges);
+                   PTE_PRESENT | PTE_WRITABLE);
 
     unsigned path[4];
     physaddr_t phys_addr[4];
@@ -887,8 +885,7 @@ void mmu_init(int ap)
                             ((uint64_t)path[3] << (9 * 0 + 12)),
                             pte & PTE_ADDR,
                             pt_physaddr,
-                            PTE_PRESENT | PTE_WRITABLE,
-                            ranges, &usable_ranges);
+                            PTE_PRESENT | PTE_WRITABLE);
 
                     pte_t *virtual_tables[4];
                     pte_from_path(virtual_tables, path);
@@ -898,8 +895,7 @@ void mmu_init(int ap)
                                        (linaddr_t)virtual_tables[i],
                                        pt_physaddr[i],
                                        0,
-                                       PTE_PRESENT | PTE_WRITABLE,
-                                       ranges, &usable_ranges);
+                                       PTE_PRESENT | PTE_WRITABLE);
                     }
                 }
             }
@@ -925,7 +921,7 @@ void mmu_init(int ap)
     // Put all of the remaining physical memory into the free list
     uint64_t free_count = 0;
     for (; ; ++free_count) {
-        physaddr_t addr = init_take_page(ranges, &usable_ranges);
+        physaddr_t addr = init_take_page();
         if (addr >= ___top_physaddr && addr < 0x8000000000000000UL) {
             addr -= 0x100000;
             addr >>= PAGE_SIZE_BIT;
@@ -988,41 +984,57 @@ void *mmap(
 
     pte_t page_flags = PTE_PRESENT;
 
-    if (prot & PROT_WRITE)
+    if (likely(prot & PROT_WRITE))
         page_flags |= PTE_WRITABLE;
 
     // fixme check cpuid
     //if (!(prot & PROT_EXEC))
     //    flags |= PTE_NX;
 
+    uint64_t misalignment = 0;
+
+    if (unlikely(flags & MAP_PHYSICAL)) {
+        misalignment = (uint64_t)addr & PAGE_MASK;
+        len += misalignment;
+    }
+
     linaddr_t linear_addr = take_linear(len);
 
     for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
     {
-        if (!(flags & MAP_PHYSICAL)) {
+        if (likely(!(flags & MAP_PHYSICAL))) {
             // Allocate normal memory
-            physaddr_t page = init_take_page(ranges, &usable_ranges);
+            physaddr_t page = init_take_page();
             mmu_map_page(linear_addr + ofs, page,
                          PTE_PRESENT | PTE_WRITABLE);
         } else {
             // addr is a physical address, caller uses
             // returned linear address to access it
-            mmu_map_page(linear_addr + ofs, (physaddr_t)addr + ofs,
-                         PTE_PRESENT | PTE_WRITABLE | PTE_PCD | PTE_PWT);
+            mmu_map_page(linear_addr + ofs,
+                         (physaddr_t)addr + ofs,
+                         PTE_PRESENT | PTE_WRITABLE |
+                         PTE_PCD | PTE_PWT |
+                         PTE_EX_PHYSICAL);
         }
     }
 
-    return (void*)linear_addr;
+    return (void*)(linear_addr + misalignment);
 }
 
 int munmap(void *addr, size_t len)
 {
+    linaddr_t a = (linaddr_t)addr;
+
+    uint64_t misalignment = 0;
+
+    misalignment = a & PAGE_MASK;
+    a -= misalignment;
+    len += misalignment;
+
     unsigned path[4];
-    path_from_addr(path, (linaddr_t)addr);
+    path_from_addr(path, a);
 
     pte_t *pteptr[4];
-
-    linaddr_t a = (linaddr_t)addr;
 
     for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
     {
@@ -1031,7 +1043,7 @@ int munmap(void *addr, size_t len)
 
         pte_t pte = *pteptr[3];
 
-        if (!(pte & PTE_EX_PHYSICAL)) {
+        if (likely(!(pte & PTE_EX_PHYSICAL))) {
             physaddr_t addr = pte & PTE_ADDR;
 
             mmu_free_phys(addr);

@@ -1,5 +1,5 @@
 .code16
-.section ".mp_entry"
+.text
 
 # This must be position independent code
 .globl mp_entry

@@ -13,6 +13,9 @@ CSRCS := mm.c \
 	keyboard.c \
 	string.c \
 	irq.c \
-	time.c
+	time.c \
+	stdlib.c \
+	rbtree.c \
+	assert.c
 
 include $(BUILDROOT)/library.mk

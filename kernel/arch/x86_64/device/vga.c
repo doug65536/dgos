@@ -68,7 +68,7 @@ static int mouse_toggle(text_display_t *self,
         uint8_t attr =
                 (self->shadow[place] >> 8) & 0xFF;
         uint8_t set_attr = show
-                ? ((attr >> 4) | (attr << 4)) & 0xFF
+                ? ((attr >> 4) | (attr << 4)) & 0x7F
                 : attr;
 
         // Force visible if showing in cell with same color

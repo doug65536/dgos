@@ -99,6 +99,7 @@ uint64_t cpu_get_page_directory(void);
 
 void cpu_set_page_directory(uint64_t addr);
 
-void cpu_set_fsgsbase(void *fs_base, void *gs_base);
+void cpu_set_fsbase(void *fs_base);
+void cpu_set_gsbase(void *gs_base);
 
 void cpu_invalidate_page(uint64_t addr);

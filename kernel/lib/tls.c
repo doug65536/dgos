@@ -28,5 +28,5 @@ void tls_init(void)
 
     ___main_teb_ptr->self = ___main_teb_ptr;
 
-    cpu_set_fsgsbase(___main_teb_ptr, 0);
+    cpu_set_fsbase(___main_teb_ptr);
 }

@@ -137,9 +137,13 @@ uint64_t cpu_get_page_directory(void)
     return addr;
 }
 
-void cpu_set_fsgsbase(void *fs_base, void *gs_base)
+void cpu_set_fsbase(void *fs_base)
 {
     msr_set(MSR_FSBASE, (uint64_t)fs_base);
+}
+
+void cpu_set_gsbase(void *gs_base)
+{
     msr_set(MSR_GSBASE, (uint64_t)gs_base);
 }
 

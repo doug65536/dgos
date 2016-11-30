@@ -5,11 +5,12 @@ target remote localhost:1234
 shell wmctrl -a kernel/boot
 layout src
 continue
-break
+shell sleep 1
+interrupt
 set $ebp = 1
 b exception_isr_handler
-b thread_smp_entry
-continue
+b assert_failed
+b rbtree_test
 
 define qq
 	kill inferior 1
@@ -33,4 +34,13 @@ end
 define code64
 	set architecture i386:x86-64
 	refresh
+end
+
+define asm
+	layout asm
+	layout regs
+end
+
+define src
+	layout src
 end
