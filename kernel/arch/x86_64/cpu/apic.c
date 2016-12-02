@@ -157,14 +157,29 @@ uint32_t volatile *apic_ptr;
 #define APIC_CMD_DEST_TYPE_OTHER    APIC_CMD_DEST_TYPE_n(3)
 
 // Divide configuration register
-#define APIC_LVT_DCR_BY_2          0
-#define APIC_LVT_DCR_BY_4          1
-#define APIC_LVT_DCR_BY_8          2
-#define APIC_LVT_DCR_BY_16         3
-#define APIC_LVT_DCR_BY_32         (8+0)
-#define APIC_LVT_DCR_BY_64         (8+1)
-#define APIC_LVT_DCR_BY_128        (8+2)
-#define APIC_LVT_DCR_BY_1          (8+3)
+#define APIC_LVT_DCR_BY_2           0
+#define APIC_LVT_DCR_BY_4           1
+#define APIC_LVT_DCR_BY_8           2
+#define APIC_LVT_DCR_BY_16          3
+#define APIC_LVT_DCR_BY_32          (8+0)
+#define APIC_LVT_DCR_BY_64          (8+1)
+#define APIC_LVT_DCR_BY_128         (8+2)
+#define APIC_LVT_DCR_BY_1           (8+3)
+
+#define APIC_SIR_APIC_ENABLE_BIT    8
+
+#define APIC_SIR_APIC_ENABLE        (1<<APIC_SIR_APIC_ENABLE_BIT)
+
+#define APIC_LVT_TR_MODE_BIT        17
+#define APIC_LVT_TR_MODE_BITS       2
+#define APIC_LVT_TR_VECTOR_BIT      0
+#define APIC_LVT_TR_MODE_MASK       ((1<<APIC_LVT_TR_MODE_BITS)-1)
+#define APIC_LVT_TR_MODE_n(n)       ((n)<<APIC_LVT_TR_MODE_BIT)
+#define APIC_LVT_TR_VECTOR_n(n)     ((n)<<APIC_LVT_TR_VECTOR_BIT)
+
+#define APIC_LVT_TR_MODE_ONESHOT    0
+#define APIC_LVT_TR_MODE_PERIODIC   1
+#define APIC_LVT_TR_MODE_DEADLINE   2
 
 #define APIC_BASE_MSR  0x1B
 
@@ -252,16 +267,33 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
                       APIC_CMD_DEST_MODE_NORMAL);
 }
 
+static void apic_enable(int enabled)
+{
+    if (enabled)
+        APIC_SIR |= APIC_SIR_APIC_ENABLE;
+    else
+        APIC_SIR &= ~APIC_SIR_APIC_ENABLE;
+}
+
+static void apic_configure_timer(
+        uint32_t dcr, uint32_t icr, uint8_t timer_mode,
+        uint8_t intr)
+{
+    APIC_LVT_DCR = dcr;
+    APIC_LVT_ICR = icr;
+    APIC_LVT_TR = APIC_LVT_TR_VECTOR_n(intr) |
+            APIC_LVT_TR_MODE_n(timer_mode);
+}
+
 int apic_init(int ap)
 {
     if (ap) {
-        // FIXME: make a function and defines
-        APIC_SIR |= (1<<8);
-        APIC_LVT_DCR = APIC_LVT_DCR_BY_128;
-        APIC_LVT_ICR = ((3600000000U>>7)/60);
-        APIC_LVT_TR = 73 | (1<<17);
-
+        apic_enable(1);
         intr_hook(73, apic_timer_handler);
+        apic_configure_timer(APIC_LVT_DCR_BY_128,
+                             ((3600000000U>>7)/60),
+                             APIC_LVT_TR_MODE_PERIODIC,
+                             73);
 
         return 1;
     }
