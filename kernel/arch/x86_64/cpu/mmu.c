@@ -940,10 +940,6 @@ void mmu_init(int ap)
            free_count >> (20 - PAGE_SIZE_BIT));
 
     callout_call('V');
-
-    zero_page = mmap(
-                0, PAGE_SIZE, PROT_READ | PROT_WRITE,
-                MAP_PHYSICAL, -1, 0);
 }
 
 static size_t round_up(size_t n)
