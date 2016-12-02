@@ -331,12 +331,15 @@ static thread_info_t *thread_choose_next(
                 now = time_ms();
 
             if (now >= threads[i].wake_time) {
+                // Race to transition it to ready
                 if (atomic_cmpxchg(
                             &threads[i].state,
                             THREAD_IS_SLEEPING,
                             THREAD_IS_READY) !=
-                        THREAD_IS_SLEEPING)
+                        THREAD_IS_SLEEPING) {
+                    // Another CPU beat us to it
                     continue;
+                }
             }
         } else if (threads[i].state != THREAD_IS_READY)
             continue;
@@ -377,11 +380,12 @@ void *thread_schedule(void *ctx)
     }
 
     // Change to ready if running
-    if (thread->state == THREAD_IS_RUNNING)
+    if (thread->state == THREAD_IS_RUNNING) {
         thread->state = THREAD_IS_READY;
 
-    // Not on a CPU now
-    thread->cpu = 0;
+    }
+
+    // At this point, any CPU might take thread
 
     // Retry because another CPU might steal this
     // thread after it transitions from sleeping to
@@ -400,6 +404,12 @@ void *thread_schedule(void *ctx)
 
     cpu->cur_thread = thread;
     thread->cpu = cpu;
+
+    if (1) {
+        size_t cpu_number = cpu - cpus;
+        uint16_t *addr = (uint16_t*)0xb8000 + 80 + 75;
+        addr[cpu_number] = ((addr[cpu_number] + 1) & 0xFF) | 0x0700;
+    }
 
     return thread->ctx;
 }
