@@ -42,3 +42,5 @@ farptr.h
 farptr.c
 mpentry.s
 mpentry.h
+vesa.c
+vesa.h
