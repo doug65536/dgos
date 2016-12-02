@@ -80,8 +80,8 @@ asm (
 #define __stdcall __attribute__((stdcall))
 #define __packed __attribute__((packed))
 
-uint8_t boot_drive;
-uint8_t fully_loaded;
+uint8_t boot_drive __attribute__((used));
+uint8_t fully_loaded __attribute__((used));
 
 int init(void);
 
@@ -223,7 +223,7 @@ uint16_t read_lba_sectors(char *buf, uint8_t drive,
 extern char __initialized_data_start[];
 extern char __initialized_data_end[];
 
-int init(void)
+__attribute__((used)) int init(void)
 {
 #if !USE_INT13EXT
     // Prepare to do LBA to CHS conversions
