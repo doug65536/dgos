@@ -96,8 +96,8 @@ uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set);
 uint64_t cpu_get_fault_address(void);
 
 uint64_t cpu_get_page_directory(void);
-
 void cpu_set_page_directory(uint64_t addr);
+void cpu_flush_tlb(void);
 
 void cpu_set_fsbase(void *fs_base);
 void cpu_set_gsbase(void *gs_base);

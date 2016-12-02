@@ -156,3 +156,8 @@ void cpu_invalidate_page(uint64_t addr)
         : "memory"
     );
 }
+
+void cpu_flush_tlb(void)
+{
+    cpu_set_page_directory(cpu_get_page_directory() & -4096L);
+}
