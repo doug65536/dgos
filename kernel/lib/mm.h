@@ -237,7 +237,7 @@ void *sbrk(intptr_t __increment);
 #define OPEN_MAX _SC_OPEN_MAX
 
 /// Size of page in bytes. Must be >= 1
-#define _SC_PAGESIZE
+#define _SC_PAGESIZE    4096
 #define PAGESIZE _SC_PAGESIZE
 
 /// The number of repeated occurrences of a BRE premitted by regex and regcomp
