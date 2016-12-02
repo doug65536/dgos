@@ -365,11 +365,14 @@ static void vga_cleanup(text_display_base_t *dev)
 static void vga_remap_callback(void *arg)
 {
     (void)arg;
-    for (size_t i = 0; i < countof(displays); ++i)
-        displays[i].video_mem = mmap(
-                    (void*)0xB8000, 0x8000,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PHYSICAL, -1, 0);
+    for (size_t i = 0; i < countof(displays); ++i) {
+        if (displays[i].video_mem) {
+            displays[i].video_mem = mmap(
+                        displays[i].video_mem, 0x8000,
+                        PROT_READ | PROT_WRITE,
+                        MAP_PHYSICAL, -1, 0);
+        }
+    }
 }
 
 REGISTER_CALLOUT(vga_remap_callback, 0, 'V', "000");
