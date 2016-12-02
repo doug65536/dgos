@@ -15,8 +15,7 @@
 // Sectors Per FAT	BPB_FATSz32	0x24	32 Bits	Depends on disk size
 // Root Directory First Cluster	BPB_RootClus	0x2C	32 Bits	Usually 0x00000002
 // Signature	(none)	0x1FE	16 Bits	Always 0xAA55
-typedef struct
-{
+typedef struct bpb_data_t {
     uint32_t root_dir_start;	// 0x2C LBA
     uint32_t sec_per_fat;		// 0x24 1 per 128 clusters
     uint16_t reserved_sectors;	// 0x0E Usually 32
@@ -151,7 +150,7 @@ typedef struct long_dir_entry_t {
     uint8_t name3[4];
 } long_dir_entry_t;
 
-typedef union {
+typedef union dir_union_t {
     dir_entry_t short_entry;
     long_dir_entry_t long_entry;
 } dir_union_t;
@@ -351,7 +350,7 @@ static int16_t sector_iterator_seek(
 // Returns 0 on end of directory
 // Returns 1 on success
 static int16_t read_directory_begin(
-        directory_iterator_t *iter,
+        dir_iterator_t *iter,
         char *sector,
         uint32_t cluster)
 {
@@ -379,7 +378,7 @@ static uint8_t lfn_checksum(char const *fcb_name)
 
 // Returns
 static dir_union_t const *read_directory_current(
-        directory_iterator_t const *iter,
+        dir_iterator_t const *iter,
         char const* sector)
 {
     if (iter->dir_file.err == 0)
@@ -388,7 +387,7 @@ static dir_union_t const *read_directory_current(
 }
 
 static int16_t read_directory_move_next(
-        directory_iterator_t *iter,
+        dir_iterator_t *iter,
         char *sector)
 {
     // Advance to next sector_index
@@ -704,7 +703,7 @@ static uint32_t find_file_by_name(char const *filename,
         lfn_entries = 0;
     }
 
-    directory_iterator_t dir;
+    dir_iterator_t dir;
     uint16_t match_index = 0;
     uint8_t checksum = 0;
     for (int16_t status = read_directory_begin(

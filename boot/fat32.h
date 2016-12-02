@@ -23,13 +23,13 @@ typedef struct sector_iterator_t {
 
 // Handles iterating a directory and advancing
 // to the next dir_union_t
-typedef struct directory_iterator_t {
+typedef struct dir_iterator_t {
     // Directory file iterator
     sector_iterator_t dir_file;
 
     // dir_entry_t index into sector
     uint16_t sector_index;
-} directory_iterator_t;
+} dir_iterator_t;
 
 void boot_partition(uint32_t partition_lba);
 

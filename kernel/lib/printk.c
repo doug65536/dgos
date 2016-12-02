@@ -4,7 +4,7 @@
 #include "string.h"
 #include "conio.h"
 
-typedef enum {
+typedef enum length_mod_t {
     length_none,
     length_hh,
     length_h,
@@ -16,7 +16,7 @@ typedef enum {
     length_L
 } length_mod_t;
 
-typedef enum {
+typedef enum arg_type_t {
     arg_type_none,
 
     arg_type_char_ptr,
@@ -26,7 +26,7 @@ typedef enum {
     arg_type_uintptr_value,
 } arg_type_t;
 
-typedef union {
+typedef union arg_t {
     char *char_ptr_value;
     wchar_t *wchar_ptr_value;
     int character;

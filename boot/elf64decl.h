@@ -169,8 +169,7 @@ typedef struct Elf64_Rela {
 } Elf64_Rela;
 
 // Program header
-typedef struct
-{
+typedef struct Elf64_Phdr {
     Elf64_Word p_type; /* Type of segment */
     Elf64_Word p_flags; /* Segment attributes */
     Elf64_Off p_offset; /* Offset in file */
@@ -201,8 +200,7 @@ typedef struct
 #define PF_MASKPROC 0xFF000000 // These flag bits are reserved for processor-specific use
 
 // Dynamic table
-typedef struct
-{
+typedef struct Elf64_Dyn {
     Elf64_Sxword d_tag;
     union {
         Elf64_Xword d_val;
