@@ -27,11 +27,13 @@ $(OBJS): Makefile
 
 # Compile assembly
 .s.o:
-	$(COMPILE.s) $(OUTPUT_OPTION) -c $<
+	$(COMPILE.s) $(OUTPUT_OPTION) \
+		-c $<
 
 # Compile C
 .c.o:
-	$(COMPILE.c) $(OUTPUT_OPTION) -c $<
+	$(COMPILE.c) \
+		$(OUTPUT_OPTION) -c $<
 
 # Generate assembly dump for C
 $(DUMPDIR)/%.s : %.c
