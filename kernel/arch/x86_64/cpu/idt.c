@@ -1,5 +1,6 @@
 #include "idt.h"
 #include "isr.h"
+#include "irq.h"
 #include "gdt.h"
 #include "conio.h"
 #include "printk.h"
@@ -370,19 +371,12 @@ void *isr_handler(isr_minimal_context_t *ctx)
 {
     if (ctx->gpr->info.interrupt >= 32 &&
                ctx->gpr->info.interrupt < 48) {
-        //
-        // PIC IRQ
-        ctx = irq_dispatcher(
-                    ctx->gpr->info.interrupt - 32,
-                    ctx);
-    } else if (ctx->gpr->info.interrupt >= 48 &&
-               ctx->gpr->info.interrupt <= 128) {
-        //
-        // APIC IRQ (and forced context switch)
-        ctx = irq_dispatcher(
-                    ctx->gpr->info.interrupt - 32,
-                    ctx);
+        // IRQ
+        ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
     } else {
+        //
+        // Other interrupts
+        ctx = intr_invoke(ctx->gpr->info.interrupt, ctx);
     }
 
     return ctx;

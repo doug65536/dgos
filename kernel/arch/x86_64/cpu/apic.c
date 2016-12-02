@@ -261,7 +261,7 @@ int apic_init(int ap)
         APIC_LVT_ICR = ((3600000000U>>7)/60);
         APIC_LVT_TR = 73 | (1<<17);
 
-        irq_hook(41, apic_timer_handler);
+        intr_hook(73, apic_timer_handler);
 
         return 1;
     }
