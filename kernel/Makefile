@@ -54,7 +54,7 @@ ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
 
-CFLAGS ?= -g3 -ffreestanding \
+CFLAGS ?= -g3 -fno-stack-protector \
 	-fpic -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
@@ -65,7 +65,7 @@ CFLAGS ?= -g3 -ffreestanding \
 ifdef OPTIMIZE
 CFLAGS += \
 	-O2 \
-	-fomit-frame-pointer
+	-fomit-frame-pointer -fbuiltin
 else
 CFLAGS += \
 	-O0 \
