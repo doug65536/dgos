@@ -55,12 +55,14 @@ ifdef DISASSEMBLEFLAGS
 # Disassemble
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin
+	mkdir -p $(dir $@)
 	$(OBJDUMP) $(DISASSEMBLEFLAGS) $< > $@
 endif
 
 ifdef DISASSEMBLEELFFLAGS
 $(DUMPDIR)/%.disasm : $(BINDIR)/%.bin
 $(DUMPDIR)/%.disasm : $(BINDIR)/%.bin
+	mkdir -p $(dir $@)
 	$(OBJDUMP) $(DISASSEMBLEELFFLAGS) $< > $@
 endif
 
