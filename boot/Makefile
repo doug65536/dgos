@@ -12,7 +12,8 @@ CSRCS := \
 	elf64.c \
 	rand.c \
 	physmem.c \
-	farptr.c
+	farptr.c \
+	vesa.c
 
 ASRCS := \
 	part.s \
