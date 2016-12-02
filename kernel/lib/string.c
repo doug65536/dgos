@@ -1,4 +1,6 @@
+#define __NO_STRING_BUILTIN
 #include "string.h"
+#undef __NO_STRING_BUILTIN
 
 size_t strlen(char const *src)
 {
