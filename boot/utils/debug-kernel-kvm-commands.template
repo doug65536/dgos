@@ -4,13 +4,12 @@ set architecture i386:x86-64
 target remote localhost:1234
 shell wmctrl -a kernel/boot
 layout src
-continue
-shell sleep 1
-interrupt
+#continue
+#shell sleep 1
+#interrupt
 set $ebp = 1
 b exception_isr_handler
 b assert_failed
-b rbtree_test
 
 define qq
 	kill inferior 1

@@ -161,3 +161,58 @@ void cpu_flush_tlb(void)
 {
     cpu_set_page_directory(cpu_get_page_directory() & -4096L);
 }
+
+table_register_64_t cpu_get_gdtr(void)
+{
+    table_register_64_t gdtr;
+    __asm__ __volatile__ (
+        "sgdtq %0\n\t"
+        : "=m" (gdtr)
+        :
+        : "memory"
+    );
+    return gdtr;
+}
+
+void cpu_set_gdtr(table_register_64_t gdtr)
+{
+    __asm__ __volatile__ (
+        "lgdtq (%0)\n\t"
+        :
+        : "r" (&gdtr)
+        : "memory"
+    );
+}
+
+uint16_t cpu_get_tr(void)
+{
+    uint16_t tr;
+    __asm__ __volatile__ (
+        "str %0\n\t"
+        : "=m" (tr)
+        :
+        : "memory"
+    );
+    return tr;
+}
+
+void cpu_set_tr(uint16_t tr)
+{
+    __asm__ __volatile__ (
+        "ltr %0\n\t"
+        :
+        : "m" (tr)
+        : "memory"
+    );
+}
+
+void cpu_irq_disable(void)
+{
+    __asm__ __volatile__ ( "cli" );
+}
+
+void cpu_irq_enable(void)
+{
+    __asm__ __volatile__ ( "sti" );
+}
+

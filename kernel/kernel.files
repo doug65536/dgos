@@ -90,3 +90,9 @@ lib/stdlib.h
 lib/stdlib.c
 lib/assert.h
 lib/assert.c
+lib/debug.h
+lib/debug.c
+arch/x86_64/device/e9debug.c
+arch/x86_64/device/e9debug.h
+arch/x86_64/cpu/spinlock.h
+arch/x86_64/cpu/spinlock.c

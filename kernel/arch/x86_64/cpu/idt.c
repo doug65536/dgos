@@ -10,7 +10,7 @@
 #include "control_regs.h"
 #include "string.h"
 
-idt_entry_64_t idt[0x80];
+idt_entry_64_t idt[128];
 
 void *(*irq_dispatcher)(int irq, isr_minimal_context_t *ctx);
 
@@ -62,29 +62,42 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
 
 typedef void (*isr_entry_t)(void);
 
-const isr_entry_t isr_entry_points[74] = {
-    isr_entry_0,  isr_entry_1,  isr_entry_2,  isr_entry_3,
-    isr_entry_4,  isr_entry_5,  isr_entry_6,  isr_entry_7,
-    isr_entry_8,  isr_entry_9,  isr_entry_10, isr_entry_11,
-    isr_entry_12, isr_entry_13, isr_entry_14, isr_entry_15,
-    isr_entry_16, isr_entry_17, isr_entry_18, isr_entry_19,
-    isr_entry_20, isr_entry_21, isr_entry_22, isr_entry_23,
-    isr_entry_24, isr_entry_25, isr_entry_26, isr_entry_27,
-    isr_entry_28, isr_entry_29, isr_entry_30, isr_entry_31,
+const isr_entry_t isr_entry_points[128] = {
+    isr_entry_0,   isr_entry_1,   isr_entry_2,   isr_entry_3,
+    isr_entry_4,   isr_entry_5,   isr_entry_6,   isr_entry_7,
+    isr_entry_8,   isr_entry_9,   isr_entry_10,  isr_entry_11,
+    isr_entry_12,  isr_entry_13,  isr_entry_14,  isr_entry_15,
+    isr_entry_16,  isr_entry_17,  isr_entry_18,  isr_entry_19,
+    isr_entry_20,  isr_entry_21,  isr_entry_22,  isr_entry_23,
+    isr_entry_24,  isr_entry_25,  isr_entry_26,  isr_entry_27,
+    isr_entry_28,  isr_entry_29,  isr_entry_30,  isr_entry_31,
 
-    isr_entry_32, isr_entry_33, isr_entry_34, isr_entry_35,
-    isr_entry_36, isr_entry_37, isr_entry_38, isr_entry_39,
-    isr_entry_40, isr_entry_41, isr_entry_42, isr_entry_43,
-    isr_entry_44, isr_entry_45, isr_entry_46, isr_entry_47,
+    isr_entry_32,  isr_entry_33,  isr_entry_34,  isr_entry_35,
+    isr_entry_36,  isr_entry_37,  isr_entry_38,  isr_entry_39,
+    isr_entry_40,  isr_entry_41,  isr_entry_42,  isr_entry_43,
+    isr_entry_44,  isr_entry_45,  isr_entry_46,  isr_entry_47,
 
-    isr_entry_48, isr_entry_49, isr_entry_50, isr_entry_51,
-    isr_entry_52, isr_entry_53, isr_entry_54, isr_entry_55,
-    isr_entry_56, isr_entry_57, isr_entry_58, isr_entry_59,
-    isr_entry_60, isr_entry_61, isr_entry_62, isr_entry_63,
-    isr_entry_64, isr_entry_65, isr_entry_66, isr_entry_67,
-    isr_entry_68, isr_entry_69, isr_entry_70, isr_entry_71,
+    isr_entry_48,  isr_entry_49,  isr_entry_50,  isr_entry_51,
+    isr_entry_52,  isr_entry_53,  isr_entry_54,  isr_entry_55,
+    isr_entry_56,  isr_entry_57,  isr_entry_58,  isr_entry_59,
+    isr_entry_60,  isr_entry_61,  isr_entry_62,  isr_entry_63,
+    isr_entry_64,  isr_entry_65,  isr_entry_66,  isr_entry_67,
+    isr_entry_68,  isr_entry_69,  isr_entry_70,  isr_entry_71,
 
-    isr_entry_72, isr_entry_73
+    isr_entry_72,  isr_entry_73,  isr_entry_74,  isr_entry_75,
+    isr_entry_76,  isr_entry_77,  isr_entry_78,  isr_entry_79,
+    isr_entry_80,  isr_entry_81,  isr_entry_82,  isr_entry_83,
+    isr_entry_84,  isr_entry_85,  isr_entry_86,  isr_entry_87,
+    isr_entry_88,  isr_entry_89,  isr_entry_90,  isr_entry_91,
+    isr_entry_92,  isr_entry_93,  isr_entry_94,  isr_entry_95,
+    isr_entry_96,  isr_entry_97,  isr_entry_98,  isr_entry_99,
+    isr_entry_100, isr_entry_101, isr_entry_102, isr_entry_103,
+    isr_entry_104, isr_entry_105, isr_entry_106, isr_entry_107,
+    isr_entry_108, isr_entry_109, isr_entry_110, isr_entry_111,
+    isr_entry_112, isr_entry_113, isr_entry_114, isr_entry_115,
+    isr_entry_116, isr_entry_117, isr_entry_118, isr_entry_119,
+    isr_entry_120, isr_entry_121, isr_entry_122, isr_entry_123,
+    isr_entry_124, isr_entry_125, isr_entry_126, isr_entry_127
 };
 
 extern void isr_entry_0xC0(void);

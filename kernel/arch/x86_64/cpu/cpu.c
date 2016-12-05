@@ -3,6 +3,7 @@
 #include "mmu.h"
 #include "gdt.h"
 #include "idt.h"
+#include "gdt.h"
 #include "control_regs.h"
 #include "legacy_pic.h"
 #include "legacy_pit.h"
@@ -10,6 +11,7 @@
 #include "cmos.h"
 #include "apic.h"
 #include "cpuid.h"
+#include "callout.h"
 
 void cpu_init(int ap)
 {
@@ -40,29 +42,36 @@ void cpu_init(int ap)
                         CR4_OFXSR |
                         CR4_OSXMMEX);
 
+    gdt_init();
     idt_init(ap);
     mmu_init(ap);
-    apic_init(ap);
-    thread_init(ap);
+    if (!ap)
+        thread_init(ap);
 
     //int have_apic = cpuid_edx_bit(9, 1, 0);
     //if (have_apic)
 }
 
-void cpu_hw_init(void)
+void cpu_hw_init(int ap)
 {
+    if (ap) {
+        gdt_load_tr(thread_cpus_started());
+    }
+
+    apic_init(ap);
     cmos_init();
 
-    if (0) {
-        //apic_init();
+    pic8259_enable();
+    pit8254_enable();
 
-        // Still need to initialize in case of
-        // spurious IRQs
-        pic8259_disable();
-
-        // Initialize APIC timer...
-    } else {
-        pic8259_enable();
-        pit8254_enable();
-    }
+    apic_start_smp();
 }
+
+static void cpu_init_smp_apic(void *arg)
+{
+    (void)arg;
+    apic_init(1);
+    thread_init(1);
+}
+
+REGISTER_CALLOUT(cpu_init_smp_apic, 0, 'S', "200");

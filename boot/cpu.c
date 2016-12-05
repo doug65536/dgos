@@ -3,6 +3,108 @@
 #include "bootsect.h"
 #include "exception.h"
 
+#define GDT_ACCESS_PRESENT_BIT   7
+#define GDT_ACCESS_DPL_BIT       5
+#define GDT_ACCESS_EXEC_BIT      3
+#define GDT_ACCESS_DOWN_BIT      2
+#define GDT_ACCESS_RW_BIT        1
+
+#define GDT_ACCESS_PRESENT      (1 << GDT_ACCESS_PRESENT_BIT)
+#define GDT_ACCESS_EXEC         (1 << GDT_ACCESS_EXEC_BIT)
+#define GDT_ACCESS_DOWN         (1 << GDT_ACCESS_DOWN_BIT)
+#define GDT_ACCESS_RW           (1 << GDT_ACCESS_RW_BIT)
+
+#define GDT_ACCESS_DPL_BITS     2
+#define GDT_ACCESS_DPL_MASK     ((1 << GDT_ACCESS_DPL_BITS)-1)
+#define GDT_ACCESS_DPL          (GDT_ACCESS_DPL_MASK << GDT_ACCESS_DPL_BIT)
+#define GDT_ACCESS_DPL_n(dpl)   ((dpl) << GDT_ACCESS_DPL_BIT)
+
+#define GDT_FLAGS_GRAN_BIT      7
+#define GDT_FLAGS_IS32_BIT      6
+#define GDT_FLAGS_IS64_BIT      5
+
+#define GDT_FLAGS_GRAN          (1 << GDT_FLAGS_GRAN_BIT)
+#define GDT_FLAGS_IS32          (1 << GDT_FLAGS_IS32_BIT)
+#define GDT_FLAGS_IS64          (1 << GDT_FLAGS_IS64_BIT)
+
+#define GDT_LIMIT_LOW_MASK      0xFFFF
+#define GDT_BASE_LOW_MASK       0xFFFF
+
+#define GDT_BASE_MIDDLE_BIT     16
+#define GDT_BASE_MIDDLE         0xFF
+
+#define GDT_LIMIT_HIGH_BIT      16
+#define GDT_LIMIT_HIGH          0x0F
+
+#define GDT_BASE_HIGH_BIT       24
+#define GDT_BASE_HIGH           0xFF
+
+#define GDT_MAKE_SEGMENT_DESCRIPTOR(base, \
+            limit, \
+            present, \
+            privilege, \
+            executable, \
+            downward, \
+            rw, \
+            granularity, \
+            is32, \
+            is64) \
+{ \
+    ((limit) & GDT_LIMIT_LOW_MASK), \
+    ((base) & GDT_BASE_LOW_MASK), \
+    (((base) >> GDT_BASE_MIDDLE_BIT) & GDT_BASE_MIDDLE), \
+    ( \
+        ((present) ? GDT_ACCESS_PRESENT : 0) | \
+        GDT_ACCESS_DPL_n(privilege) | \
+        (1 << 4) | \
+        ((executable) ? GDT_ACCESS_EXEC : 0) | \
+        ((downward) ? GDT_ACCESS_DOWN : 0) | \
+        ((rw) ? GDT_ACCESS_RW : 0) \
+    ), \
+    ( \
+        ((granularity) ? GDT_FLAGS_GRAN : 0) | \
+        ((is32) ? GDT_FLAGS_IS32 : 0) | \
+        ((is64) ? GDT_FLAGS_IS64 : 0) | \
+        (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH) \
+    ), \
+    (((base) >> GDT_BASE_HIGH_BIT) & GDT_BASE_HIGH) \
+}
+
+//
+// 32-bit selectors
+
+#define GDT_MAKE_EMPTY() \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+// Native code (32 bit)
+#define GDT_MAKE_CODESEG32(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 1, 0)
+
+// Native data (32 bit)
+#define GDT_MAKE_DATASEG32(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1, 0)
+
+// Foregn code (16 bit)
+#define GDT_MAKE_CODESEG16(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 1, 0, 1, 0, 0, 0)
+
+// Foreign data (16 bit)
+#define GDT_MAKE_DATASEG16(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
+
+//
+// 64-bit selectors
+
+// Native code (64 bit)
+#define GDT_MAKE_CODESEG64(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 0, 1)
+
+// Native data (64 bit)
+// 3.4.5 "When not in IA-32e mode or for non-code segments, bit 21 is
+// reserved and should always be set to 0"
+#define GDT_MAKE_DATASEG64(ring) \
+    GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 0, 0)
+
 gdt_entry_t gdt[] = {
     GDT_MAKE_EMPTY(),
     // 64 bit kernel code and data

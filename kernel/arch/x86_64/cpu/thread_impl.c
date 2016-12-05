@@ -1,4 +1,11 @@
 #include "cpu/thread_impl.h"
+#include "types.h"
+#include "interrupts.h"
+#include "atomic.h"
+#include "string.h"
+#include "assert.h"
+#include "likely.h"
+
 #include "thread.h"
 #include "tls.h"
 #include "main.h"
@@ -6,32 +13,30 @@
 #include "idt.h"
 #include "gdt.h"
 #include "cpuid.h"
-#include "atomic.h"
 #include "mm.h"
-#include "types.h"
-#include "string.h"
 #include "time.h"
-#include "likely.h"
+
+#include "printk.h"
 
 // Implements platform independent thread.h
 
-typedef struct link_t link_t;
-struct link_t {
-    link_t *next;
-    link_t *prev;
-};
-
-#define LINK_NEXT(T, curr) ((T*)((link_t*)curr->next))
-
 typedef enum thread_state_t {
-    THREAD_IS_UNINITIALIZED,
+    THREAD_IS_UNINITIALIZED = 0,
     THREAD_IS_INITIALIZING,
     THREAD_IS_SUSPENDED,
     THREAD_IS_READY,
     THREAD_IS_RUNNING,
     THREAD_IS_SLEEPING,
     THREAD_IS_DESTRUCTING,
-    THREAD_IS_FINISHED
+    THREAD_IS_FINISHED,
+
+    // Flag keeps other cpus from taking thread
+    // until after stack switch
+    THREAD_BUSY = (int)0x80000000,
+    THREAD_IS_SUSPENDED_BUSY = THREAD_IS_SUSPENDED | THREAD_BUSY,
+    THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
+    THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY,
+    THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY
 } thread_state_t;
 
 typedef struct thread_info_t thread_info_t;
@@ -70,9 +75,10 @@ struct thread_info_t {
 };
 
 // Store in a big array, for now
-#define MAX_THREADS 16
+#define MAX_THREADS 64
 static thread_info_t threads[MAX_THREADS];
 static size_t volatile thread_count;
+uint32_t volatile thread_smp_running;
 
 struct cpu_info_t {
     thread_info_t *cur_thread;
@@ -103,6 +109,7 @@ static cpu_info_t *cpu_from_apic_id(uint64_t apic_id)
         if (cpu->apic_id == apic_id)
             return cpu;
     }
+    assert(!"APIC ID not found!");
     // Failed
     return 0;
 }
@@ -121,12 +128,19 @@ static thread_info_t *this_thread(void)
 
 void thread_yield(void)
 {
-    __asm__ __volatile__ ("int $72\n\t");
+    __asm__ __volatile__ (
+        "int %[yield_intr]\n\t"
+        :
+        : [yield_intr] "i" (INTR_THREAD_YIELD)
+    );
 }
 
 static void thread_cleanup(void)
 {
     thread_info_t *thread = this_thread();
+
+    assert(thread->state == THREAD_IS_RUNNING);
+
     thread->state = THREAD_IS_DESTRUCTING;
     thread->cpu = 0;
     thread->priority = 0;
@@ -148,8 +162,10 @@ static thread_t thread_create_with_state(
         return 0;
 
     for (size_t i = 0; ; ++i) {
-        if (i >= MAX_THREADS)
+        if (i >= MAX_THREADS) {
+            thread_yield();
             i = 0;
+        }
 
         thread_info_t *thread = threads + i;
 
@@ -206,12 +222,13 @@ static thread_t thread_create_with_state(
         ctx->gpr.iret.rsp = (uint64_t)&ctx->ret;
         ctx->gpr.iret.rflags = EFLAGS_IF;
         ctx->gpr.iret.rip = fn;
-        ctx->gpr.iret.cs = GDT_SEG_KERNEL_CS;
-        ctx->gpr.iret.ss = GDT_SEG_KERNEL_DS;
-        ctx->gpr.s[0] = GDT_SEG_KERNEL_DS;
-        ctx->gpr.s[1] = GDT_SEG_KERNEL_DS;
-        ctx->gpr.s[2] = GDT_SEG_KERNEL_DS;
-        ctx->gpr.s[3] = GDT_SEG_KERNEL_DS;
+        ctx->gpr.iret.cs = GDT_SEL_KERNEL_CODE64;
+        // Not used in 64 bit mode
+        //ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
+        //ctx->gpr.s[0] = GDT_SEL_KERNEL_DATA64;
+        //ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
+        //ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
+        //ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.rdi = (uint64_t)userdata;
         ctx->gpr.fsbase = teb;
 
@@ -227,14 +244,13 @@ static thread_t thread_create_with_state(
 
         // Atomically make sure thread_count > i
         size_t old_count = thread_count;
-        for (;;) {
-            if (old_count > i)
-                break;
+        while (old_count <= i) {
             size_t latest_count = atomic_cmpxchg(
-                        &thread_count, old_count, old_count + 1);
+                        &thread_count, old_count, i + 1);
 
             if (latest_count == old_count)
                 break;
+
             pause();
             old_count = latest_count;
         }
@@ -270,6 +286,8 @@ static void thread_monitor_mwait(void)
 
 static int smp_thread(void *arg)
 {
+    printk("SMP thread running\n");
+    atomic_inc_uint32(&thread_smp_running);
     (void)arg;
     while (1)
         halt();
@@ -282,6 +300,8 @@ void thread_init(int ap)
 
     // First CPU is the BSP
     cpu_info_t *cpu = cpus + cpu_number;
+
+    assert(thread_count == cpu_number);
 
     // First thread is this boot thread
     thread_info_t *thread = threads + cpu_number;
@@ -300,7 +320,7 @@ void thread_init(int ap)
         thread->stack_size = kernel_stack_size;
         thread_count = 1;
     } else {
-        size_t stack_size = 4096;
+        size_t stack_size = 16 << 10;
         void *stack = mmap(
                     0, stack_size,
                     PROT_READ | PROT_WRITE,
@@ -315,33 +335,47 @@ void thread_init(int ap)
 }
 
 static thread_info_t *thread_choose_next(
-        thread_info_t *thread)
+        thread_info_t * const thread)
 {
     size_t i = thread - threads;
     thread_info_t *best = 0;
     uint64_t now = 0;
 
-    for (size_t checked = 0; ++i, checked < thread_count; ++checked) {
+    assert(i < countof(threads));
+
+    for (size_t checked = 0; ++i, checked <= thread_count; ++checked) {
         // Wrap
         if (i >= thread_count)
             i = 0;
 
-        if (threads[i].state == THREAD_IS_SLEEPING) {
+        //
+        // Expect states to have busy bit set if it is the outgoing thread
+
+        thread_state_t expected_sleep = (thread == threads + i)
+                ? THREAD_IS_SLEEPING_BUSY
+                : THREAD_IS_SLEEPING;
+
+        thread_state_t expected_ready = (thread == threads + i)
+                ? THREAD_IS_READY_BUSY
+                : THREAD_IS_READY;
+
+        if (threads[i].state == expected_sleep) {
             if (now == 0)
                 now = time_ms();
 
-            if (now >= threads[i].wake_time) {
-                // Race to transition it to ready
-                if (atomic_cmpxchg(
-                            &threads[i].state,
-                            THREAD_IS_SLEEPING,
-                            THREAD_IS_READY) !=
-                        THREAD_IS_SLEEPING) {
-                    // Another CPU beat us to it
-                    continue;
-                }
+            if (now < threads[i].wake_time)
+                continue;
+
+            // Race to transition it to ready
+            if (atomic_cmpxchg(
+                        &threads[i].state,
+                        expected_sleep,
+                        expected_ready) !=
+                    expected_sleep) {
+                // Another CPU beat us to it
+                continue;
             }
-        } else if (threads[i].state != THREAD_IS_READY)
+        } else if (threads[i].state != expected_ready)
             continue;
 
         if (best) {
@@ -350,19 +384,31 @@ static thread_info_t *thread_choose_next(
                 best = threads + i;
         } else {
             // Must be same or better than outgoing
-            if (thread->state == THREAD_IS_SLEEPING ||
+            if (thread->state == expected_sleep ||
                     threads[i].priority >= thread->priority)
                 best = threads + i;
         }
     }
 
+    assert(best
+           ? best >= threads && best <= threads + countof(threads)
+           : thread >= threads && thread <= threads + countof(threads));
+
     return best ? best : thread;
+}
+
+static void thread_clear_busy(void *outgoing)
+{
+    thread_info_t *thread = outgoing;
+    atomic_and_int32(&thread->state, ~THREAD_BUSY);
 }
 
 void *thread_schedule(void *ctx)
 {
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
+
+    thread_info_t *outgoing = thread;
 
     if (unlikely(cpu->goto_thread)) {
         thread = cpu->goto_thread;
@@ -376,29 +422,35 @@ void *thread_schedule(void *ctx)
     if (thread->state != THREAD_IS_DESTRUCTING) {
         thread->ctx = ctx;
     } else {
-        thread->state = THREAD_IS_FINISHED;
+        thread->cpu = 0;
+        thread->state = THREAD_IS_FINISHED_BUSY;
     }
 
     // Change to ready if running
     if (thread->state == THREAD_IS_RUNNING) {
-        thread->state = THREAD_IS_READY;
-
+        thread->cpu = 0;
+        thread->state = THREAD_IS_READY_BUSY;
     }
-
-    // At this point, any CPU might take thread
 
     // Retry because another CPU might steal this
     // thread after it transitions from sleeping to
     // ready
     for (;;) {
-        thread = thread_choose_next(thread);
+        thread = thread_choose_next(outgoing);
 
-        if (thread->state == THREAD_IS_READY &&
+        assert(thread >= threads &&
+               thread < threads + countof(threads));
+
+        if (thread == outgoing) {
+            thread->state = THREAD_IS_RUNNING;
+            break;
+        } else if (thread->state == THREAD_IS_READY &&
                 atomic_cmpxchg(&thread->state,
                            THREAD_IS_READY,
                            THREAD_IS_RUNNING) ==
-                THREAD_IS_READY)
+                THREAD_IS_READY) {
             break;
+        }
         pause();
     }
 
@@ -407,8 +459,19 @@ void *thread_schedule(void *ctx)
 
     if (1) {
         size_t cpu_number = cpu - cpus;
-        uint16_t *addr = (uint16_t*)0xb8000 + 80 + 75;
+        uint16_t *addr = (uint16_t*)0xb8000 + 80 + 70;
         addr[cpu_number] = ((addr[cpu_number] + 1) & 0xFF) | 0x0700;
+    }
+
+    if (thread != outgoing) {
+        // Add outgoing cleanup data at top of context
+        isr_resume_context_t *cleanup =
+                (isr_resume_context_t *)thread->ctx;
+
+        cleanup->cleanup = thread_clear_busy;
+        cleanup->cleanup_arg = outgoing;
+    } else {
+        assert(thread->state == THREAD_IS_RUNNING);
     }
 
     return thread->ctx;
@@ -420,11 +483,23 @@ void thread_sleep_until(uint64_t expiry)
     thread_info_t *thread = cpu->cur_thread;
 
     thread->wake_time = expiry;
-    thread->state = THREAD_IS_SLEEPING;
+    thread->state = THREAD_IS_SLEEPING_BUSY;
     thread_yield();
 }
 
 void thread_sleep_for(uint64_t ms)
 {
+    printdbg("Sleeping for %lu ms\n", ms);
+
     thread_sleep_until(time_ms() + ms);
+}
+
+uint32_t thread_cpu_count(void)
+{
+    return cpu_count;
+}
+
+uint32_t thread_cpus_started(void)
+{
+    return thread_smp_running + 1;
 }

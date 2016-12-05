@@ -11,7 +11,7 @@
 int life_and_stuff = 42;
 
 size_t const kernel_stack_size = 8192;
-char kernel_stack[262144];
+char kernel_stack[8192];
 
 char buf[12];
 
@@ -31,7 +31,7 @@ static void smp_main(void *arg)
     cpu_init(1);
 }
 
-REGISTER_CALLOUT(smp_main, 0, 'S', "999");
+REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 
 static __attribute__((constructor)) void start_me_up()
 {

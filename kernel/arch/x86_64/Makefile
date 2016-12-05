@@ -14,8 +14,9 @@ CSRCS := \
 	cpu/control_regs.c \
 	cpu/cpuid.c \
 	cpu/thread_impl.c \
-	cpu/gdt.c \
+	cpu/spinlock.c \
 	cpu/halt.c \
+	cpu/gdt.c \
 	cpu/idt.c \
 	cpu/interrupts.c \
 	cpu/ioport.c \
@@ -24,6 +25,7 @@ CSRCS := \
 	cpu/legacy_pit.c \
 	device/pci.c \
 	device/keyb8042.c \
+	device/e9debug.c \
 	device/keyb8042_layout/keyb8042_layout_us.c \
 	$(DEVSRCS)
 
@@ -32,6 +34,8 @@ ASRCS := entry.s \
 	generated_device_vtbl.s
 
 LIBNAME := arch
+
+CLEANOTHER += buildtool/keyb_tool
 
 include $(BUILDROOT)/library.mk
 
@@ -46,3 +50,9 @@ generated_device_vtbl.s: $(DEVOBJS)
 		nm $^ | grep -oP '\S+_register_device' | \
 			sed 's/.*/.quad &/' >> $@ && \
 		echo '.quad 0' >> $@
+
+buildtool/keyb_tool: device/keyb8042_layout/keyb8042_gentables.c
+	mkdir -p buildtool
+	$(CC) -Wall -Wextra -o $@ $^
+
+all: buildtool/keyb_tool

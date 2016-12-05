@@ -74,11 +74,63 @@ isr_exception_entry 0 31
 	isr_entry 0 \int_num
 .endr
 
-# Forced context switch entry point
+# Software interrupts
 isr_entry 0 72
-
-# SMP APIC timer entry point
 isr_entry 0 73
+isr_entry 0 74
+isr_entry 0 75
+isr_entry 0 76
+isr_entry 0 77
+isr_entry 0 78
+isr_entry 0 79
+isr_entry 0 80
+isr_entry 0 81
+isr_entry 0 82
+isr_entry 0 83
+isr_entry 0 84
+isr_entry 0 85
+isr_entry 0 86
+isr_entry 0 87
+isr_entry 0 88
+isr_entry 0 89
+isr_entry 0 90
+isr_entry 0 91
+isr_entry 0 92
+isr_entry 0 93
+isr_entry 0 94
+isr_entry 0 95
+isr_entry 0 96
+isr_entry 0 97
+isr_entry 0 98
+isr_entry 0 99
+isr_entry 0 100
+isr_entry 0 101
+isr_entry 0 102
+isr_entry 0 103
+isr_entry 0 104
+isr_entry 0 105
+isr_entry 0 106
+isr_entry 0 107
+isr_entry 0 108
+isr_entry 0 109
+isr_entry 0 110
+isr_entry 0 111
+isr_entry 0 112
+isr_entry 0 113
+isr_entry 0 114
+isr_entry 0 115
+isr_entry 0 116
+isr_entry 0 117
+isr_entry 0 118
+isr_entry 0 119
+isr_entry 0 120
+isr_entry 0 121
+isr_entry 0 122
+isr_entry 0 123
+isr_entry 0 124
+isr_entry 0 125
+isr_entry 0 126
+isr_entry 0 127
 
 isr_common:
 	# Save call-clobbered registers
@@ -93,6 +145,12 @@ isr_common:
 	push %rsi
 	push %rdi
 
+	# See if we're coming from 64 bit code
+	cmpl $8,12*8(%rsp)
+	jnz 9f
+
+	# ...yes, came from 64 bit code
+
 	# Save FSBASE MSR
 	movl $0xC0000100,%ecx
 	rdmsr
@@ -100,19 +158,10 @@ isr_common:
 	or %rdx,%rax
 	push %rax
 
-	# Save segment registers
-	sub $8,%rsp
-	movw %gs,6(%rsp)
-	movw %fs,4(%rsp)
-	movw %es,2(%rsp)
-	movw %ds,(%rsp)
+	# Push dummy segment registers
+	push $0
 
-	# Load segment registers with good 64-bit mode values
-	mov $0x10,%ecx
-	mov %ecx,%ds
-	mov %ecx,%es
-	mov %ecx,%fs
-	# we don't care about gs in isr
+8:
 
 	# Save pointer to general registers and return information
 	mov %rsp,%rdi
@@ -121,12 +170,15 @@ isr_common:
 	and $-16,%rsp
 	sub $512,%rsp
 
-	# Save entire sse/fpu state
+	# Save entire sse/mmx/fpu state
 	fxsave (%rsp)
 
 	# Make structure on the stack
 	push %rsp
 	push %rdi
+	xor %eax,%eax
+	push %rax
+	push %rax
 
 	# Pass pointer to the context structure to isr_handler
 	mov %rsp,%rdi
@@ -136,16 +188,28 @@ isr_common:
 	# the passed one to continue with this thread
 	mov %rax,%rsp
 
+	# Pop outgoing cleanup data
+	# Used to adjust outgoing thread state after switching stack
+	pop %rax
+	pop %rdi
+	test %rax,%rax
+	jz 0f
+	call *%rax
+0:
+
 	# Pop the pointer to the general registers
 	pop %rdi
 	fxrstor 8(%rsp)
 
 	mov %rdi,%rsp
 
-	movw (%rsp),%ds
-	movw 2(%rsp),%es
-	movw 4(%rsp),%fs
-	movw 6(%rsp),%gs
+	# See if we're returning to 64 bit code
+	cmp $8,14*8(%rsp)
+	jnz 7f
+
+	# ...yes, returning to 64 bit mode
+
+	# Discard segments
 	add $8,%rsp
 
 	# Restore FSBASE
@@ -155,6 +219,7 @@ isr_common:
 	mov $0xC0000100,%ecx
 	wrmsr
 
+6:
 	pop %rdi
 	pop %rsi
 	pop %rdx
@@ -168,6 +233,38 @@ isr_common:
 	addq $16,%rsp
 
 	iretq
+
+# Resuming into 32 bit mode, out of line
+7:
+	# Protect kernel mode gsbase from changes
+	swapgs
+
+	# Restore 32 bit segment registers
+	movw (%rsp),%ds
+	movw 2(%rsp),%es
+	movw 4(%rsp),%fs
+	movw 6(%rsp),%gs
+
+	# Discard segments and FSBASE
+	add $16,%rsp
+	jmp 6b
+
+# Saving context from 32 bit mode, out of line
+9:
+	# Push dummy FSBASE
+	push $0
+
+	# Save 32 bit segment registers
+	sub $8,%rsp
+	movw %gs,6(%rsp)
+	movw %fs,4(%rsp)
+	movw %es,2(%rsp)
+	movw %ds,(%rsp)
+
+	# Get kernel mode GSBASE back
+	swapgs
+
+	jmp 8b
 
 exception_common:
 	# Save complete context

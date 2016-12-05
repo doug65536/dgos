@@ -3,6 +3,7 @@
 #include "cpu/halt.h"
 #include "string.h"
 #include "conio.h"
+#include "debug.h"
 
 typedef enum length_mod_t {
     length_none,
@@ -685,4 +686,31 @@ int snprintf(char *buf, size_t limit, char const *format, ...)
     int result = vsnprintf(buf, limit, format, ap);
     va_end(ap);
     return result;
+}
+
+static int printdbg_emit_chars(char const *s, int ch, void *context)
+{
+    (void)context;
+
+    char encoded[5];
+
+    if (!s) {
+        ucs4_to_utf8(encoded, ch);
+        s = encoded;
+    }
+
+    return write_debug_str(s);
+}
+
+void vprintdbg(const char *format, va_list ap)
+{
+    formatter(format, ap, printdbg_emit_chars, 0);
+}
+
+void printdbg(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vprintdbg(format, ap);
+    va_end(ap);
 }

@@ -61,6 +61,9 @@ char *strcat(char *restrict dest, char const *restrict src);
 char *strncpy(char *dest, char const *src, size_t n);
 char *strncat(char *dest, char const *src, size_t n);
 
+int ucs4_to_utf8(char *out, int in);
+int utf8_to_ucs4(char *in, char **ret_end);
+
 #endif
 
 void *aligned16_memset(void *dest, int c, size_t n);

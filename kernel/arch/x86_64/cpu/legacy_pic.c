@@ -3,7 +3,7 @@
 #include "irq.h"
 #include "cpu/halt.h"
 #include "idt.h"
-#include "interrupts.h"
+#include "control_regs.h"
 
 // Implements legacy Programmable Interrupt Controller,
 // used if the APIC is not available
@@ -199,5 +199,5 @@ void pic8259_enable(void)
     irq_setmask = pic8259_setmask;
     irq_hook = pic8259_hook;
     irq_unhook = pic8259_unhook;
-    interrupts_enable();
+    cpu_irq_enable();
 }

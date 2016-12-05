@@ -32,7 +32,7 @@ void *strchr(char const *s, int ch)
 
 int strcmp(char const *lhs, char const *rhs)
 {
-    unsigned char cmp = 0;
+    int cmp = 0;
     do {
         cmp = (unsigned char)(*lhs) -
                 (unsigned char)(*rhs++);
@@ -218,3 +218,115 @@ char *strncat(char *dest, char const *src, size_t n)
 {
     return strncpy(dest + strlen(dest), src, n);
 }
+
+// out should have room for at least 5 bytes
+// if out is null, returns how many bytes it
+// would have wrote to out, not including null terminator
+// Returns 0 for values outside 0 <= in < 0x101000 range
+// Always writes null terminator if out is not null
+int ucs4_to_utf8(char *out, int in)
+{
+    int len;
+    if (in >= 0 && in < 0x80) {
+        *out++ = (char)in;
+        *out++ = 0;
+        return 1;
+    } else if (in < 0x80) {
+        len = 2;
+    } else if (in < 0x800) {
+        len = 3;
+    } else if (in < 0x10000) {
+        len = 4;
+    } else {
+        // Invalid
+        *out++ = 0;
+        return 0;
+    }
+
+    int shift = len - 1;
+    *out++ = (char)((signed char)0x80 >> shift) |
+            (in >> (6 * shift));
+
+    while (--shift >= 0)
+        *out++ = 0x80 | ((in >> (6 * shift)) & 0x3F);
+
+    *out++ = 0;
+
+    return len;
+}
+
+// Returns 32 bit wide character
+// Returns -1 on error
+// If ret_end is not null, pointer to first
+// byte after encoded character to *ret_end
+int utf8_to_ucs4(char *in, char **ret_end)
+{
+    int n;
+
+    if ((*in & 0x80) == 0) {
+        n = *in++ & 0x7F;
+    } else if ((*in & 0xE0) == 0xC0) {
+        n = (*in++ & 0x1F) << 6;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= *in++ & 0x3F;
+        else
+            n |= -1;
+    } else if ((*in & 0xF0) == 0xE0) {
+        n = (*in++ & 0x0F) << 12;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= (*in++ & 0x3F) << 6;
+        else
+            n |= -1;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= *in++ & 0x3F;
+        else
+            n |= -1;
+    } else if ((*in & 0xF8) == 0xF0) {
+        n = (*in++ & 0x07) << 18;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= (*in++ & 0x3F) << 12;
+        else
+            n |= -1;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= (*in++ & 0x3F) << 6;
+        else
+            n |= -1;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= *in++ & 0x3F;
+        else
+            n |= -1;
+    } else {
+        ++in;
+        n = -1;
+    }
+
+    if (ret_end)
+        *ret_end = in;
+
+    return n;
+}
+

@@ -1,5 +1,4 @@
 #pragma once
-
 #include "types.h"
 
 typedef struct idt_entry_t {
@@ -236,8 +235,15 @@ typedef struct isr_fxsave_context_t {
     } xmm[16];
 } isr_fxsave_context_t;
 
+// Added to top of context on stack when switching to a context
+typedef struct isr_resume_context_t {
+    void (*cleanup)(void*);
+    void *cleanup_arg;
+} isr_resume_context_t;
+
 // IRQ handler C call parameter
 typedef struct isr_minimal_context_t {
+    isr_resume_context_t resume;
     isr_irq_gpr_t *gpr;
     isr_fxsave_context_t *fpr;
 } isr_minimal_context_t;

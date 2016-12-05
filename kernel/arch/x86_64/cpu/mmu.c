@@ -1,6 +1,9 @@
 #include "mmu.h"
 #include "mm.h"
 #include "control_regs.h"
+#include "interrupts.h"
+#include "irq.h"
+#include "apic.h"
 #include "printk.h"
 #include "time.h"
 #include "string.h"
@@ -8,6 +11,7 @@
 #include "bios_data.h"
 #include "callout.h"
 #include "likely.h"
+#include "assert.h"
 
 // Intel manual, page 2786
 
@@ -754,6 +758,20 @@ static void mmu_map_page(
     release_apte(aliasing_pte);
 }
 
+// TLB shootdown IPI
+static void *mmu_tlb_shootdown(int intr, void *ctx)
+{
+    assert(intr == INTR_TLB_SHOOTDOWN);
+    cpu_flush_tlb();
+    apic_eoi(intr);
+    return ctx;
+}
+
+static void mmu_send_tlb_shootdown(void)
+{
+    apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+}
+
 //
 // Initialization
 
@@ -763,6 +781,9 @@ void mmu_init(int ap)
         cpu_set_page_directory(root_physaddr);
         return;
     }
+
+    // Hook IPI for TLB shootdown
+    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown);
 
     usable_ranges = mmu_fixup_mem_map(phys_mem_map);
 
@@ -1014,7 +1035,34 @@ void *mmap(
         }
     }
 
+    mmu_send_tlb_shootdown();
+
     return (void*)(linear_addr + misalignment);
+}
+
+void *mremap(
+        void *old_address,
+        size_t old_size,
+        size_t new_size,
+        int flags,
+        ... /* void *__new_address */)
+{
+    void *new_address = 0;
+
+    if (!(flags & MREMAP_FIXED)) {
+        va_list ap;
+        va_start(ap, flags);
+        new_address = va_arg(ap, void*);
+        va_end(ap);
+    }
+
+    /// FIXME: unfinished
+    (void)old_address;
+    (void)old_size;
+    (void)new_size;
+    (void)new_address;
+
+    return 0;
 }
 
 int munmap(void *addr, size_t len)
@@ -1052,6 +1100,8 @@ int munmap(void *addr, size_t len)
         a += PAGE_SIZE;
         path_inc(path);
     }
+
+    mmu_send_tlb_shootdown();
 
     return 0;
 }

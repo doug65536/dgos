@@ -133,9 +133,36 @@ static uint64_t pit8254_time_ms(void)
     return timer_ms;
 }
 
+static uint32_t pit8254_usleep(uint16_t microsec)
+{
+    uint64_t count = (uint64_t)microsec * 1000000 / 1193182;
+    if (count > 0xFFFF)
+        count = 0xFFFF;
+
+    outb(PIT_CMD,
+         PIT_CHANNEL(2) |
+         PIT_ACCESS_BOTH |
+         PIT_MODE_ONESHOT |
+         PIT_FORMAT_BINARY);
+    outb(PIT_DATA(2), count & 0xFF);
+    outb(PIT_DATA(2), (count >> 8) & 0xFF);
+
+    uint16_t readback;
+    do {
+        outb(PIT_CMD,
+            PIT_CHANNEL(2) |
+            PIT_ACCESS_LATCH);
+        readback = inb(PIT_DATA(2));
+        readback |= (uint16_t)inb(PIT_DATA(2));
+    } while (readback);
+
+    return microsec;
+}
+
 void pit8254_enable(void)
 {
     time_ms = pit8254_time_ms;
+    usleep = pit8254_usleep;
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);

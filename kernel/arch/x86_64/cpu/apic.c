@@ -1,7 +1,9 @@
 #include "apic.h"
 #include "types.h"
+#include "gdt.h"
 #include "bios_data.h"
 #include "control_regs.h"
+#include "interrupts.h"
 #include "irq.h"
 #include "thread_impl.h"
 #include "mm.h"
@@ -10,6 +12,11 @@
 #include "atomic.h"
 #include "printk.h"
 #include "likely.h"
+#include "time.h"
+#include "cpuid.h"
+
+//
+// MP Tables
 
 typedef struct mp_table_hdr_t {
     char sig[4];
@@ -20,10 +27,168 @@ typedef struct mp_table_hdr_t {
     uint8_t features[5];
 } mp_table_hdr_t;
 
+typedef struct mp_cfg_tbl_hdr_t {
+    char sig[4];
+    uint16_t base_tbl_len;
+    uint8_t spec_rev;
+    uint8_t checksum;
+    char oem_id_str[8];
+    char prod_id_str[12];
+    uint32_t oem_table_ptr;
+    uint16_t oem_table_size;
+    uint16_t entry_count;
+    uint32_t apic_addr;
+    uint16_t ext_tbl_len;
+    uint8_t ext_tbl_checksum;
+    uint8_t reserved;
+} mp_cfg_tbl_hdr_t;
+
+// entry_type 0
+typedef struct mp_cfg_cpu_t {
+    uint8_t entry_type;
+    uint8_t apic_id;
+    uint8_t apic_ver;
+    uint8_t flags;
+    uint32_t signature;
+    uint32_t features;
+    uint32_t reserved1;
+    uint32_t reserved2;
+} mp_cfg_cpu_t;
+
+#define MP_CPU_FLAGS_ENABLED_BIT    0
+#define MP_CPU_FLAGS_BSP_BIT        1
+
+#define MP_CPU_FLAGS_ENABLED        (1<<MP_CPU_FLAGS_ENABLED_BIT)
+#define MP_CPU_FLAGS_BSP            (1<<MP_CPU_FLAGS_BSP_BIT)
+
+// entry_type 1
+typedef struct mp_cfg_bus_t {
+    uint8_t entry_type;
+    uint8_t bus_id;
+    char type[6];
+} mp_cfg_bus_t;
+
+// entry_type 2
+typedef struct mp_cfg_ioapic_t {
+    uint8_t entry_type;
+    uint8_t id;
+    uint8_t ver;
+    uint8_t flags;
+    uint32_t addr;
+} mp_cfg_ioapic_t;
+
+#define MP_IOAPIC_FLAGS_ENABLED_BIT   0
+
+#define MP_IOAPIC_FLAGS_ENABLED       (1<<MP_IOAPIC_FLAGS_ENABLED_BIT)
+
+// entry_type 3
+typedef struct mp_cfg_iointr_t {
+    uint8_t entry_type;
+    uint8_t type;
+    uint16_t flags;
+    uint8_t source_bus;
+    uint8_t source_bus_irq;
+    uint8_t dest_ioapic_id;
+    uint8_t dest_ioapic_intin;
+} mp_cfg_iointr_t;
+
+// entry_type 4
+typedef struct mp_cfg_lintr_t {
+    uint8_t entry_type;
+    uint8_t type;
+    uint16_t flags;
+    uint8_t source_bus;
+    uint8_t source_bus_irq;
+    uint8_t dest_lapic_id;
+    uint8_t dest_lapic_lintin;
+} mp_cfg_lintr_t;
+
+// entry_type 128
+typedef struct mp_cfg_addrmap_t {
+    uint8_t entry_type;
+    uint8_t len;
+    uint8_t bus_id;
+    uint8_t addr_type;
+    uint32_t addr_lo;
+    uint32_t addr_hi;
+    uint32_t len_lo;
+    uint32_t len_hi;
+} mp_cfg_addrmap_t;
+
+// entry_type 129
+typedef struct mp_cfg_bushier_t {
+    uint8_t entry_type;
+    uint8_t len;
+    uint8_t bus_id;
+    uint8_t info;
+    uint8_t parent_bus;
+    uint8_t reserved[3];
+} mp_cfg_bushier_t;
+
+
+typedef struct mp_cfg_buscompat_t {
+    uint8_t entry_type;
+    uint8_t len;
+    uint8_t bus_id;
+    uint8_t bus_mod;
+    uint32_t predef_range_list;
+} mp_cfg_buscompat_t;
+
+typedef struct mp_bus_irq_mapping_t {
+    uint8_t device;
+    uint8_t irq;
+    uint8_t ioapic_id;
+    uint8_t intin;
+} mp_bus_irq_mapping_t;
+
+typedef struct mp_ioapic_t {
+    uint8_t id;
+    uint32_t addr;
+} mp_ioapic_t;
+
 static char *mp_tables;
+
+static unsigned mp_pci_bus_id;
+static unsigned mp_isa_bus_id;
+
+static mp_bus_irq_mapping_t pci_irq_list[64];
+static unsigned pci_irq_count;
+
+static mp_bus_irq_mapping_t isa_irq_list[16];
+static unsigned isa_irq_count;
+
+static mp_ioapic_t ioapic_list[16];
+static unsigned ioapic_count;
+
+unsigned isa_irq_lookup[16];
+
+static uint8_t apic_id_list[64];
+static unsigned apic_id_count;
+
+static uint8_t topo_thread_bits;
+static uint8_t topo_thread_count;
+static uint8_t topo_core_bits;
+static uint8_t topo_core_count;
+
+static uint8_t topo_cpu_count;
 
 static uint64_t apic_base;
 uint32_t volatile *apic_ptr;
+
+// Type 0 and 128 are 20 bytes, all others are 8 bytes
+#define MP_TABLE_TYPE_TO_SIZE(type) ((type) & 0x7F ? 8 : 20)
+
+#define MP_TABLE_TYPE_CPU       0
+#define MP_TABLE_TYPE_BUS       1
+#define MP_TABLE_TYPE_IOAPIC    2
+#define MP_TABLE_TYPE_IOINTR    3
+#define MP_TABLE_TYPE_LINTR     4
+#define MP_TABLE_TYPE_ADDRMAP   128
+#define MP_TABLE_TYPE_BUSHIER   129
+#define MP_TABLE_TYPE_BUSCOMPAT 130
+
+//
+// APIC
 
 #define APIC_REG(n)     apic_ptr[(n)>>2]
 #define APIC_BIT(r,n)   (APIC_REG((r) + (((n)>>5)<<2)) & \
@@ -106,6 +271,11 @@ uint32_t volatile *apic_ptr;
 
 #define APIC_CMD        APIC_ICR_LO
 #define APIC_DEST       APIC_ICR_HI
+
+#define APIC_DEST_BIT               24
+#define APIC_DEST_BITS              8
+#define APIC_DEST_MASK              ((1 << APIC_DEST_BITS)-1)
+#define APIC_DEST_n(n)              (((n) & APIC_DEST_MASK) << APIC_DEST_BIT)
 
 #define APIC_CMD_SIPI_PAGE_BIT      0
 #define APIC_CMD_VECTOR_BIT         0
@@ -217,15 +387,166 @@ static int parse_mp_tables(void)
         }
     }
 
+    if (mp_tables) {
+        mp_cfg_tbl_hdr_t *cth = mmap(mp_tables, sizeof(*cth),
+                                     PROT_READ, MAP_PHYSICAL,
+                                     -1, 0);
+
+        uint8_t *entry = (uint8_t*)(cth + 1);
+
+        // Reset to impossible values
+        mp_pci_bus_id = ~0U;
+        mp_isa_bus_id = ~0U;
+
+        // First slot reserved for BSP
+        apic_id_count = 1;
+
+        for (uint16_t i = 0; i < cth->entry_count; ++i) {
+            mp_cfg_cpu_t *entry_cpu;
+            mp_cfg_bus_t *entry_bus;
+            mp_cfg_ioapic_t *entry_ioapic;
+            mp_cfg_iointr_t *entry_iointr;
+            mp_cfg_lintr_t *entry_lintr;
+            mp_cfg_addrmap_t *entry_addrmap;
+            mp_cfg_bushier_t *entry_busheir;
+            mp_cfg_buscompat_t *entry_buscompat;
+            switch (*entry) {
+            case MP_TABLE_TYPE_CPU:
+                entry_cpu = (mp_cfg_cpu_t *)entry;
+
+                if ((entry_cpu->flags & MP_CPU_FLAGS_ENABLED) &&
+                        apic_id_count < countof(apic_id_list)) {
+                    if (entry_cpu->flags & MP_CPU_FLAGS_BSP)
+                        apic_id_list[0] = entry_cpu->apic_id;
+                    else
+                        apic_id_list[apic_id_count++] = entry_cpu->apic_id;
+                }
+
+                entry = (uint8_t*)(entry_cpu + 1);
+                break;
+
+            case MP_TABLE_TYPE_BUS:
+                entry_bus = (mp_cfg_bus_t *)entry;
+
+                if (!memcmp(entry_bus->type, "PCI", 3)) {
+                    mp_pci_bus_id = entry_bus->bus_id;
+                } else if (!memcmp(entry_bus->type, "ISA", 3)) {
+                    mp_isa_bus_id = entry_bus->bus_id;
+                } else {
+                    printk("Dropped! Unrecognized bus named \"%.*s\"\n",
+                           (int)sizeof(entry_bus->type), entry_bus->type);
+                }
+                entry = (uint8_t*)(entry_bus + 1);
+                break;
+
+            case MP_TABLE_TYPE_IOAPIC:
+                entry_ioapic = (mp_cfg_ioapic_t *)entry;
+
+                if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED &&
+                        ioapic_count < countof(ioapic_list)) {
+                    ioapic_list[ioapic_count].id = entry_ioapic->id;
+                    ioapic_list[ioapic_count].addr = entry_ioapic->addr;
+                    ++ioapic_count;
+                } else {
+                    printk("Dropped! Too many IOAPIC devices\n");
+                }
+
+                entry = (uint8_t*)(entry_ioapic + 1);
+                break;
+
+            case MP_TABLE_TYPE_IOINTR:
+                entry_iointr = (mp_cfg_iointr_t *)entry;
+
+                if (entry_iointr->source_bus == mp_pci_bus_id) {
+                    // PCI IRQ
+                    uint8_t device = entry_iointr->source_bus_irq >> 2;
+                    uint8_t pci_irq = entry_iointr->source_bus_irq;
+                    uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
+                    uint8_t intin = entry_iointr->dest_ioapic_intin;
+
+                    printk("PCI device %u INT_%c# -> IOAPIC ID %02x INTIN %d\n",
+                           device, (int)(pci_irq & 3) + 'A',
+                           ioapic_id, intin);
+
+                    if (pci_irq_count < countof(pci_irq_list)) {
+                        pci_irq_list[pci_irq_count].device = device;
+                        pci_irq_list[pci_irq_count].irq = pci_irq & 3;
+                        pci_irq_list[pci_irq_count].ioapic_id = ioapic_id;
+                        pci_irq_list[pci_irq_count].intin = intin;
+                        ++pci_irq_count;
+                    } else {
+                        printk("Dropped! Too many PCI IRQ mappings\n");
+                    }
+                } else if (entry_iointr->source_bus == mp_isa_bus_id) {
+                    // ISA IRQ
+
+                    uint8_t isa_irq = entry_iointr->source_bus_irq;
+                    uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
+                    uint8_t intin = entry_iointr->dest_ioapic_intin;
+
+                    printk("ISA IRQ %d -> APIC ID %02x INTIN %u\n",
+                           isa_irq, ioapic_id, intin);
+
+                    if (isa_irq_count < countof(isa_irq_list)) {
+                        isa_irq_list[isa_irq_count].device = 0;
+                        isa_irq_list[isa_irq_count].irq = isa_irq;
+                        isa_irq_list[isa_irq_count].ioapic_id = ioapic_id;
+                        isa_irq_list[isa_irq_count].intin = intin;
+                        ++isa_irq_count;
+                    } else {
+                        printk("Dropped! Too many ISA IRQ mappings\n");
+                    }
+                } else {
+                    // Unknown bus!
+                    printk("IRQ %d on unknown bus -> APIC ID %02x INTIN %u\n",
+                           entry_iointr->source_bus_irq,
+                           entry_iointr->dest_ioapic_id,
+                           entry_iointr->dest_ioapic_intin);
+                }
+
+                entry = (uint8_t*)(entry_iointr + 1);
+                break;
+
+            case MP_TABLE_TYPE_LINTR:
+                entry_lintr = (mp_cfg_lintr_t*)entry;
+                entry = (uint8_t*)(entry_lintr + 1);
+                break;
+
+            case MP_TABLE_TYPE_ADDRMAP:
+                entry_addrmap = (mp_cfg_addrmap_t*)entry;
+                entry = (uint8_t*)(entry_addrmap + 1);
+                break;
+
+            case MP_TABLE_TYPE_BUSHIER:
+                entry_busheir = (mp_cfg_bushier_t*)entry;
+                entry = (uint8_t*)(entry_busheir + 1);
+                break;
+
+            case MP_TABLE_TYPE_BUSCOMPAT:
+                entry_buscompat = (mp_cfg_buscompat_t*)entry;
+                entry = (uint8_t*)(entry_buscompat + 1);
+                break;
+
+            default:
+                printk("Unknown MP table entry_type!\n");
+                // Hope for the best here
+                entry += 8;
+                break;
+            }
+        }
+
+        munmap(cth, sizeof(*cth));
+    }
+
     if (ranges[2] != 0)
         munmap(ranges[2], 0x20000);
 
     return !!mp_tables;
 }
 
-static void *apic_timer_handler(int irq, void *ctx)
+static void *apic_timer_handler(int intr, void *ctx)
 {
-    APIC_EOI = irq + 48;
+    APIC_EOI = intr;
     return thread_schedule(ctx);
 }
 
@@ -248,11 +569,14 @@ static void apic_send_command(uint32_t dest, uint32_t cmd)
         pause();
 }
 
-// if target_apic_id is == -1, sends to other CPUs
 // if target_apic_id is <= -2, sends to all CPUs
+// if target_apic_id is == -1, sends to other CPUs
 // if target_apid_id is >= 0, sends to specific APIC ID
 void apic_send_ipi(int target_apic_id, uint8_t intr)
 {
+    if (unlikely(!apic_ptr))
+        return;
+
     uint32_t dest_type = target_apic_id < -1
             ? APIC_CMD_DEST_TYPE_ALL
             : target_apic_id < 0
@@ -265,6 +589,11 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
                       APIC_CMD_VECTOR_n(intr) |
                       dest_type |
                       APIC_CMD_DEST_MODE_NORMAL);
+}
+
+void apic_eoi(int intr)
+{
+    APIC_EOI = intr;
 }
 
 static void apic_enable(int enabled)
@@ -289,13 +618,15 @@ int apic_init(int ap)
 {
     if (ap) {
         apic_enable(1);
-        intr_hook(73, apic_timer_handler);
-        apic_configure_timer(APIC_LVT_DCR_BY_128,
-                             ((3600000000U>>7)/60),
+
+        apic_configure_timer(APIC_LVT_DCR_BY_1,
+                             ((2500000000U)/(60)),
                              APIC_LVT_TR_MODE_PERIODIC,
-                             73);
+                             INTR_APIC_TIMER);
 
         return 1;
+    } else {
+        intr_hook(INTR_APIC_TIMER, apic_timer_handler);
     }
 
     if (!parse_mp_tables())
@@ -308,23 +639,121 @@ int apic_init(int ap)
     apic_ptr = mmap((void*)apic_base, 4096,
          PROT_READ | PROT_WRITE, MAP_PHYSICAL, -1, 0);
 
+    return 1;
+}
+
+static void apic_detect_topology(void)
+{
+    cpuid_t info;
+
+    if (!cpuid(&info, 4, 0)) {
+        // Enable full CPUID
+        uint64_t misc_enables = msr_get(MSR_IA32_MISC_ENABLES);
+        if (misc_enables & (1L<<22)) {
+            // Enable more CPUID support and retry
+            misc_enables &= ~(1L<<22);
+            msr_set(MSR_IA32_MISC_ENABLES, misc_enables);
+        }
+    }
+
+    topo_thread_bits = 0;
+    topo_core_bits = 0;
+    topo_thread_count = 1;
+    topo_core_count = 1;
+
+    if (cpuid(&info, 1, 0)) {
+        if ((info.edx >> 28) & 1) {
+            // CPU supports hyperthreading
+
+            // Thread count
+            topo_thread_count = (info.ebx >> 16) & 0xFF;
+            while ((1U << topo_thread_bits) < topo_thread_count)
+                 ++topo_thread_bits;
+        }
+
+        if (cpuid(&info, 4, 0)) {
+            topo_core_count = ((info.eax >> 26) & 0x3F) + 1;
+            while ((1U << topo_core_bits) < topo_core_count)
+                 ++topo_core_bits;
+        }
+    }
+
+    if (topo_thread_bits >= topo_core_bits)
+        topo_thread_bits -= topo_core_bits;
+    else
+        topo_thread_bits = 0;
+
+    topo_thread_count /= topo_core_count;
+
+    topo_cpu_count = apic_id_count *
+            topo_core_count * topo_thread_count;
+}
+
+void apic_start_smp(void)
+{
+    printk("%d CPU packages\n", apic_id_count);
+
+    apic_detect_topology();
+
+    gdt_init_tss(topo_cpu_count);
+    gdt_load_tr(0);
+
+    // See if there are any other CPUs to start
+    if (topo_thread_count * topo_core_count == 1 &&
+            apic_id_count == 1)
+        return;
+
     // Read address of MP entry trampoline from boot sector
     uint32_t *mp_trampoline_ptr = (uint32_t*)0x7c40;
     uint32_t mp_trampoline_addr = *mp_trampoline_ptr;
     uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
-    // Send INIT to all other CPUs (FIXME)
+    // Send INIT to all other CPUs
     apic_send_command(0,
                       APIC_CMD_DEST_MODE_INIT |
                       APIC_CMD_DEST_LOGICAL |
                       APIC_CMD_DEST_TYPE_OTHER);
 
-    // Send SIPI to all other CPUs (FIXME)
-    apic_send_command(0,
-                      APIC_CMD_SIPI_PAGE_n(mp_trampoline_page) |
-                      APIC_CMD_DEST_MODE_SIPI |
-                      APIC_CMD_DEST_LOGICAL |
-                      APIC_CMD_DEST_TYPE_OTHER);
+    sleep(10);
 
-    return 1;
+    printk("%d hyperthread bits\n", topo_thread_bits);
+    printk("%d core bits\n", topo_core_bits);
+
+    printk("%d hyperthread count\n", topo_thread_count);
+    printk("%d core count\n", topo_core_count);
+
+    for (unsigned pkg = 0; pkg < apic_id_count; ++pkg) {
+        printk("Package base APIC ID = %u\n", apic_id_list[pkg]);
+
+        uint8_t cpus = topo_core_count *
+                topo_thread_count *
+                apic_id_count;
+        uint16_t stagger = 16666 - cpus;
+
+        uint32_t smp_expect = 0;
+        for (unsigned core = 0; core < topo_core_count; ++core) {
+            for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
+                uint8_t target = apic_id_list[pkg] +
+                        (thread | (core << topo_thread_bits));
+
+                // Don't try to start BSP
+                if (target == apic_id_list[0])
+                    continue;
+
+                printk("Sending IPI to APIC ID %u\n", target);
+
+                // Send SIPI to CPU
+                apic_send_command(APIC_DEST_n(target),
+                                  APIC_CMD_SIPI_PAGE_n(mp_trampoline_page) |
+                                  APIC_CMD_DEST_MODE_SIPI |
+                                  APIC_CMD_DEST_TYPE_BYID);
+
+                usleep(stagger);
+
+                ++smp_expect;
+                while (thread_smp_running < smp_expect)
+                    pause();
+            }
+        }
+    }
 }

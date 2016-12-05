@@ -3,6 +3,13 @@
 #include "printk.h"
 #include "string.h"
 
+#define PCI_DEBUG   0
+#if PCI_DEBUG
+#define PCI_DEBUGMSG(...) printk(__VA_ARGS__)
+#else
+#define PCI_DEBUGMSG(...) ((void)0)
+#endif
+
 #define PCI_ADDR    0xCF8
 #define PCI_DATA    0xCFC
 
@@ -11,6 +18,7 @@
 #define size_of(type, member) \
     sizeof(((type*)0x10U)->member)
 
+#if PCI_DEBUG
 static char const *pci_device_class_text[] = {
     "No device class, must be old",
     "Mass Storage Controller",
@@ -31,6 +39,7 @@ static char const *pci_device_class_text[] = {
     "Encryption/Decryption Controllers",
     "Data Acquisition and Signal Processing Controllers"
 };
+#endif
 
 static uint32_t pci_read_config(
         int bus, int slot, int func,
@@ -57,6 +66,7 @@ static uint32_t pci_read_config(
     return ~0U;
 }
 
+#if PCI_DEBUG
 #define PCI_DEFINE_CONFIG_GETTER(type, field) \
     static uint16_t pci_device_##field ( \
             uint32_t bus, uint32_t slot, uint32_t func) \
@@ -72,10 +82,12 @@ PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, dev_class)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, header_type)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, device)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, irq_line)
+#endif
 
 static void pci_enumerate(void)
 {
-    printk("Enumerating PCI devices\n");
+#if PCI_DEBUG
+    PCI_DEBUGMSG("Enumerating PCI devices\n");
     for (uint32_t bus = 0; bus < 256; ++bus) {
         for (uint32_t slot = 0; slot < 32; ++slot) {
             uint16_t vendor = pci_device_vendor(bus, slot, 0);
@@ -103,7 +115,7 @@ static void pci_enumerate(void)
 
                 uint8_t irq = pci_device_irq_line(bus, slot, func);
 
-                printk("Found device, vendor=%04x device=%04x irq=%d\n"
+                PCI_DEBUGMSG("Found device, vendor=%04x device=%04x irq=%d\n"
                        " bus=%d,"
                        " slot=%d,"
                        " func=%d,"
@@ -118,7 +130,7 @@ static void pci_enumerate(void)
 
                 if (vendor == 0x10EC && device == 0x8139) {
                     // RTL 8139
-                    printk("RTL8139 NIC\n");
+                    PCI_DEBUGMSG("RTL8139 NIC\n");
                     for (int i = 0; i < 6; ++i) {
                         uint32_t base_addr = pci_read_config(
                                     bus, slot, func,
@@ -126,12 +138,13 @@ static void pci_enumerate(void)
                                     sizeof(uint32_t) * i,
                                     sizeof(uint32_t));
 
-                        printk("base_addr[%d] = %x\n", i, base_addr);
+                        PCI_DEBUGMSG("base_addr[%d] = %x\n", i, base_addr);
                     }
                 }
             }
         }
     }
+#endif
 }
 
 static void pci_enumerate_read(pci_config_hdr_t *config,

@@ -30,7 +30,7 @@ void *strchr(char const *s, int ch)
 
 int strcmp(char const *lhs, char const *rhs)
 {
-    unsigned char cmp = 0;
+    int cmp = 0;
     do {
         cmp = (unsigned char)(*lhs) -
                 (unsigned char)(*rhs++);

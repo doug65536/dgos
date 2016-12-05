@@ -4,6 +4,9 @@
 
 #define MSR_FSBASE      0xC0000100
 #define MSR_GSBASE      0xC0000101
+#define MSR_KGSBASE     0xC0000102
+
+#define MSR_IA32_MISC_ENABLES   0x1A0
 
 #define CR0_PE_BIT 0	// Protected Mode
 #define CR0_MP_BIT 1	// Monitor co-processor
@@ -69,6 +72,20 @@
 #define CR4_SMAP            (1 << CR4_SMAP_BIT    )
 #define CR4_PKE             (1 << CR4_PKE_BIT     )
 
+typedef struct table_register_t {
+    uint16_t limit;
+    uint16_t base_lo;
+    uint16_t base_hi;
+} table_register_t;
+
+typedef struct table_register_64_t {
+    uint16_t limit;
+    uint16_t base_lo;
+    uint16_t base_hi;
+    uint16_t base_hi1;
+    uint16_t base_hi2;
+} table_register_64_t;
+
 // Get whole MSR register as a 64-bit value
 uint64_t msr_get(uint32_t msr);
 
@@ -103,3 +120,12 @@ void cpu_set_fsbase(void *fs_base);
 void cpu_set_gsbase(void *gs_base);
 
 void cpu_invalidate_page(uint64_t addr);
+
+table_register_64_t cpu_get_gdtr(void);
+void cpu_set_gdtr(table_register_64_t gdtr);
+
+uint16_t cpu_get_tr(void);
+void cpu_set_tr(uint16_t tr);
+
+void cpu_irq_disable(void);
+void cpu_irq_enable(void);

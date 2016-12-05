@@ -33,10 +33,9 @@ SECTIONS {
 		*(SORT(.fini_array.*))
 		PROVIDE(___fini_en = .);
 
-		. = ALIGN(16);
+		. = ALIGN(32);
 
 		PROVIDE(___callout_array_st = .);
-		*(.callout_array)
 		*(SORT(.callout_array.*))
 		PROVIDE(___callout_array_en = .);
 

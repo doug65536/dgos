@@ -58,6 +58,7 @@ CFLAGS ?= -g3 -fno-stack-protector \
 	-fpic -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
+	-fexceptions \
 	$(WEVERYTHING)
 
 #OPTIMIZE := 1
