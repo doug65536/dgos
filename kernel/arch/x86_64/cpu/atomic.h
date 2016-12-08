@@ -49,6 +49,8 @@
         __asm__ __volatile__ ( \
             "lock " insn suffix " %[value]\n\t" \
             : [value] "+m" (*value) \
+            : \
+            : "memory" \
         ); \
     }
 
@@ -60,6 +62,7 @@
             "lock " insn suffix " %[rhs],%[value]\n\t" \
             : [value] "+m" (*value) \
             : [rhs] "r" (rhs) \
+            : "memory" \
         ); \
     }
 
@@ -75,6 +78,7 @@
             : [value] "+m" (*value), \
               [carry] "=r" (carry) \
             : [rhs] "r" (rhs) \
+            : "memory" \
         ); \
         return carry; \
     }
@@ -120,6 +124,8 @@
             "xchg" suffix " %[replacement],%[value]\n\t" \
             : [value] "+m" (*value), \
               [replacement] "+r" (replacement) \
+            : \
+            : "memory" \
         ); \
         return replacement; \
     }
@@ -133,6 +139,8 @@
             "lock xadd" suffix " %[addend],%[value]\n\t" \
             : [value] "+m" (*value), \
               [addend] "+r" (addend) \
+            : \
+            : "memory" \
         ); \
         return addend; \
     }
@@ -219,5 +227,25 @@ ATOMIC_DEFINE_BINARY_INSN(xor, "xor")
 
 static inline void pause(void)
 {
-    __asm__ __volatile__ ( "pause" );
+    __asm__ __volatile__ ( "pause" : : : "memory" );
+}
+
+static inline void atomic_barrier(void)
+{
+    __asm__ __volatile__ ( "" : : : "memory" );
+}
+
+static inline void atomic_fence(void)
+{
+    __asm__ __volatile__ ( "mfence" : : : "memory" );
+}
+
+static inline void atomic_lfence(void)
+{
+    __asm__ __volatile__ ( "lfence" : : : "memory" );
+}
+
+static inline void atomic_sfence(void)
+{
+    __asm__ __volatile__ ( "sfence" : : : "memory" );
 }
