@@ -14,6 +14,7 @@
 #include "likely.h"
 #include "time.h"
 #include "cpuid.h"
+#include "spinlock.h"
 
 //
 // MP Tables
@@ -125,7 +126,7 @@ typedef struct mp_cfg_bushier_t {
     uint8_t reserved[3];
 } mp_cfg_bushier_t;
 
-
+// entry_type 130
 typedef struct mp_cfg_buscompat_t {
     uint8_t entry_type;
     uint8_t len;
@@ -144,6 +145,8 @@ typedef struct mp_bus_irq_mapping_t {
 typedef struct mp_ioapic_t {
     uint8_t id;
     uint32_t addr;
+    uint32_t *ptr;
+    spinlock_t lock;
 } mp_ioapic_t;
 
 static char *mp_tables;
@@ -160,7 +163,8 @@ static unsigned isa_irq_count;
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
 
-unsigned isa_irq_lookup[16];
+
+static unsigned isa_irq_lookup[16];
 
 static uint8_t apic_id_list[64];
 static unsigned apic_id_count;
@@ -173,10 +177,7 @@ static uint8_t topo_core_count;
 static uint8_t topo_cpu_count;
 
 static uint64_t apic_base;
-uint32_t volatile *apic_ptr;
-
-// Type 0 and 128 are 20 bytes, all others are 8 bytes
-#define MP_TABLE_TYPE_TO_SIZE(type) ((type) & 0x7F ? 8 : 20)
+static uint32_t volatile *apic_ptr;
 
 #define MP_TABLE_TYPE_CPU       0
 #define MP_TABLE_TYPE_BUS       1
@@ -442,15 +443,22 @@ static int parse_mp_tables(void)
             case MP_TABLE_TYPE_IOAPIC:
                 entry_ioapic = (mp_cfg_ioapic_t *)entry;
 
-                if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED &&
-                        ioapic_count < countof(ioapic_list)) {
-                    ioapic_list[ioapic_count].id = entry_ioapic->id;
-                    ioapic_list[ioapic_count].addr = entry_ioapic->addr;
-                    ++ioapic_count;
-                } else {
-                    printk("Dropped! Too many IOAPIC devices\n");
-                }
+                if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED) {
+                    if (ioapic_count < countof(ioapic_list)) {
+                        ioapic_list[ioapic_count].id = entry_ioapic->id;
+                        ioapic_list[ioapic_count].addr = entry_ioapic->addr;
 
+                        ioapic_list[ioapic_count].ptr = mmap(
+                                    (void*)(uintptr_t)entry_ioapic->addr,
+                                    32, PROT_READ | PROT_WRITE,
+                                    0, -1, 0);
+                        ioapic_list[ioapic_count].lock = 0;
+
+                        ++ioapic_count;
+                    } else {
+                        printk("Dropped! Too many IOAPIC devices\n");
+                    }
+                }
                 entry = (uint8_t*)(entry_ioapic + 1);
                 break;
 
@@ -484,10 +492,11 @@ static int parse_mp_tables(void)
                     uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
                     uint8_t intin = entry_iointr->dest_ioapic_intin;
 
-                    printk("ISA IRQ %d -> APIC ID %02x INTIN %u\n",
+                    printk("ISA IRQ %d -> IOAPIC ID %02x INTIN %u\n",
                            isa_irq, ioapic_id, intin);
 
                     if (isa_irq_count < countof(isa_irq_list)) {
+                        isa_irq_lookup[isa_irq] = isa_irq_count;
                         isa_irq_list[isa_irq_count].device = 0;
                         isa_irq_list[isa_irq_count].irq = isa_irq;
                         isa_irq_list[isa_irq_count].ioapic_id = ioapic_id;
@@ -498,7 +507,7 @@ static int parse_mp_tables(void)
                     }
                 } else {
                     // Unknown bus!
-                    printk("IRQ %d on unknown bus -> APIC ID %02x INTIN %u\n",
+                    printk("IRQ %d on unknown bus -> IOAPIC ID %02x INTIN %u\n",
                            entry_iointr->source_bus_irq,
                            entry_iointr->dest_ioapic_id,
                            entry_iointr->dest_ioapic_intin);
@@ -509,26 +518,48 @@ static int parse_mp_tables(void)
 
             case MP_TABLE_TYPE_LINTR:
                 entry_lintr = (mp_cfg_lintr_t*)entry;
+                if (entry_lintr->source_bus == mp_pci_bus_id) {
+                    uint8_t device = entry_lintr->source_bus_irq >> 2;
+                    uint8_t pci_irq = entry_lintr->source_bus_irq;
+                    uint8_t lapic_id = entry_lintr->dest_lapic_id;
+                    uint8_t intin = entry_lintr->dest_lapic_lintin;
+                    printk("PCI device %u INT_%c# -> LAPIC ID %02x INTIN %d\n",
+                           device, (int)(pci_irq & 3) + 'A',
+                           lapic_id, intin);
+                } else if (entry_lintr->source_bus == mp_isa_bus_id) {
+                    uint8_t isa_irq = entry_lintr->source_bus_irq;
+                    uint8_t lapic_id = entry_lintr->dest_lapic_id;
+                    uint8_t intin = entry_lintr->dest_lapic_lintin;
+
+                    printk("ISA IRQ %d -> LAPIC ID %02x INTIN %u\n",
+                           isa_irq, lapic_id, intin);
+                } else {
+                    // Unknown bus!
+                    printk("IRQ %d on unknown bus -> IOAPIC ID %02x INTIN %u\n",
+                           entry_lintr->source_bus_irq,
+                           entry_lintr->dest_lapic_id,
+                           entry_lintr->dest_lapic_lintin);
+                }
                 entry = (uint8_t*)(entry_lintr + 1);
                 break;
 
             case MP_TABLE_TYPE_ADDRMAP:
                 entry_addrmap = (mp_cfg_addrmap_t*)entry;
-                entry = (uint8_t*)(entry_addrmap + 1);
+                entry += entry_addrmap->len;
                 break;
 
             case MP_TABLE_TYPE_BUSHIER:
                 entry_busheir = (mp_cfg_bushier_t*)entry;
-                entry = (uint8_t*)(entry_busheir + 1);
+                entry += entry_busheir->len;
                 break;
 
             case MP_TABLE_TYPE_BUSCOMPAT:
-                entry_buscompat = (mp_cfg_buscompat_t*)entry;
-                entry = (uint8_t*)(entry_buscompat + 1);
+                entry_buscompat = (mp_cfg_buscompat_t*)entry;                
+                entry += entry_buscompat->len;
                 break;
 
             default:
-                printk("Unknown MP table entry_type!\n");
+                printk("Unknown MP table entry_type! Guessing size is 8\n");
                 // Hope for the best here
                 entry += 8;
                 break;
