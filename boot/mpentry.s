@@ -11,7 +11,7 @@ mp_entry:
 	movw %ax,%ds
 	movw %ax,%es
 	movw %ax,%ss
-	movl $0xFFFE,%esp
+	movl $0xFFF0,%esp
 	movl mp_enter_kernel,%eax
 	movl mp_enter_kernel+4,%edx
 	ljmp $0x0000,$enter_kernel

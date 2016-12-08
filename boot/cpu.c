@@ -431,8 +431,11 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Enter kernel
         "2:\n\t"
+        "mov %%rsp,%%r15\n\t"
+        "andq $-16,%%rsp\n\t"
         "call *%%rdi\n\t"
         // Should not be possible to reach here
+        "mov %%r15,%%rsp\n\t"
 
         "3:\n\t"
 
