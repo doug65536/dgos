@@ -15,9 +15,7 @@
 
 void cpu_init(int ap)
 {
-    cpu_cr0_change_bits(0,
-                        CR0_WP |
-                        CR0_NW);
+    cpu_cr0_change_bits(0, CR0_WP | CR0_NW);
 
     uint64_t cr4 = 0;
 
@@ -37,19 +35,13 @@ void cpu_init(int ap)
     if (cpuid_ecx_bit(26, 1, 0))
         cr4 |= CR4_OSXSAVE;
 
-    cpu_cr4_change_bits(CR4_TSD,
-                        cr4 |
-                        CR4_OFXSR |
-                        CR4_OSXMMEX);
+    cpu_cr4_change_bits(CR4_TSD, cr4 | CR4_OFXSR | CR4_OSXMMEX);
 
     gdt_init();
     idt_init(ap);
     mmu_init(ap);
     if (!ap)
         thread_init(ap);
-
-    //int have_apic = cpuid_edx_bit(9, 1, 0);
-    //if (have_apic)
 }
 
 void cpu_hw_init(int ap)
