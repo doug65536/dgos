@@ -762,8 +762,8 @@ void apic_start_smp(void)
         uint16_t stagger = 16666 - cpus;
 
         uint32_t smp_expect = 0;
-        for (unsigned core = 0; core < topo_core_count; ++core) {
-            for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
+        for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
+            for (unsigned core = 0; core < topo_core_count; ++core) {
                 uint8_t target = apic_id_list[pkg] +
                         (thread | (core << topo_thread_bits));
 
