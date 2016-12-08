@@ -2,8 +2,6 @@
 
 // Storage device interface
 
-#include "dev_storage.h"
-
 //
 // Storage Device
 
