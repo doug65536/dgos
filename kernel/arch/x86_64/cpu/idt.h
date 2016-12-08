@@ -167,23 +167,6 @@ typedef struct isr_iret_frame_t {
     uint64_t ss;
 } isr_iret_frame_t;
 
-// IRQ handler general registers
-typedef struct isr_irq_gpr_t {
-    uint16_t s[4];
-    void *fsbase;
-    uint64_t rdi;
-    uint64_t rsi;
-    uint64_t rdx;
-    uint64_t rcx;
-    uint64_t r8;
-    uint64_t r9;
-    uint64_t r10;
-    uint64_t r11;
-    uint64_t rax;
-    interrupt_info_t info;
-    isr_iret_frame_t iret;
-} isr_irq_gpr_t;
-
 // Exception handler context
 typedef struct isr_gpr_context_t {
     uint16_t s[4];
