@@ -127,5 +127,15 @@ void cpu_set_gdtr(table_register_64_t gdtr);
 uint16_t cpu_get_tr(void);
 void cpu_set_tr(uint16_t tr);
 
+static inline void *cpu_gs_read_ptr(void)
+{
+    void *ptr;
+    __asm__ __volatile__ (
+        "mov %%gs:0,%[ptr]\n\t"
+        : [ptr] "=r" (ptr)
+    );
+    return ptr;
+}
+
 void cpu_irq_disable(void);
 void cpu_irq_enable(void);
