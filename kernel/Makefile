@@ -55,18 +55,18 @@ TLS_MODEL := local-exec
 endif
 
 CFLAGS ?= -g3 -fno-stack-protector \
-	-fpic -mno-red-zone \
+	-fPIC -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
-	-fexceptions \
+	-fexceptions -fno-common  \
 	$(WEVERYTHING)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
-	-O2 \
-	-fomit-frame-pointer -fbuiltin
+	-O2 -ftree-vectorize \
+	-fomit-frame-pointer -fbuiltin -fno-schedule-insns -fno-schedule-insns2
 else
 CFLAGS += \
 	-O0 \
