@@ -30,7 +30,7 @@ struct text_display_t {
     int mouse_y;
     int mouse_on;
 
-    uint16_t shadow[80*25];
+    uint16_t *shadow;
 };
 
 #define MAX_VGA_DISPLAYS 2
@@ -145,7 +145,9 @@ static void clear_screen(text_display_t *self)
     for (int y = 0; y < self->height; ++y)
         for (int x = 0; x < self->width; ++x)
             *p++ = ' ' | (self->attrib << 8);
-    memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
+    memcpy(self->video_mem, self->shadow,
+           self->width * self->height *
+           sizeof(*self->shadow));
     mouse_toggle(self, mouse_was_shown);
 }
 
@@ -325,8 +327,14 @@ static int vga_detect(text_display_base_t **result)
 {
     text_display_t *self = displays;
     self->vtbl = &vga_device_vtbl;
-    self->io_base = *BIOS_DATA_AREA(uint16_t, 0x463);
-    self->video_mem = (void*)0xB8000;
+
+    // Get I/O port base from BIOS data area
+    self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
+
+    // Map frame buffer
+    self->video_mem = mmap((void*)0xB8000, 0x8000,
+                           PROT_READ | PROT_WRITE,
+                           MAP_PHYSICAL, -1, 0);
     self->cursor_on = 1;
     self->cursor_x = 0;
     self->cursor_y = 0;
@@ -334,8 +342,16 @@ static int vga_detect(text_display_base_t **result)
     self->height = 25;
     self->attrib = 0x07;
     self->mouse_on = 0;
-    self->mouse_x = 40;
-    self->mouse_y = 12;
+    self->mouse_x = self->width >> 1;
+    self->mouse_y = self->height >> 1;
+
+    // Off-screen shadow buffer
+    self->shadow = mmap(0,
+                        self->width * self->height *
+                        sizeof(*self->shadow),
+                        PROT_READ | PROT_WRITE,
+                        0, -1, 0);
+
     mouse_toggle(self, 1);
 
     *result = (text_display_base_t*)self;
@@ -365,14 +381,6 @@ static void vga_cleanup(text_display_base_t *dev)
 static void vga_remap_callback(void *arg)
 {
     (void)arg;
-    for (size_t i = 0; i < countof(displays); ++i) {
-        if (displays[i].video_mem) {
-            displays[i].video_mem = mmap(
-                        displays[i].video_mem, 0x8000,
-                        PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL, -1, 0);
-        }
-    }
 }
 
 REGISTER_CALLOUT(vga_remap_callback, 0, 'V', "000");
