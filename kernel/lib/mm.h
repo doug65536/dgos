@@ -181,6 +181,31 @@ int munlock(
         const void *addr,
         size_t len);
 
+// Return the physical address for the specified linear address
+// Page faults if the memory region is not mapped
+uintptr_t mphysaddr(void *addr);
+
+
+typedef struct mmphysrange_t {
+    uintptr_t physaddr;
+    size_t size;
+} mmphysrange_t;
+
+// Fill in an array of physical memory ranges corresponding to
+// the specified range of linear address space.
+// If ranges is null, returns the number of entries it would need.
+// ranges_count limits the number of ranges returned.
+// If any part of the linear address range is not mapped
+// then page fault.
+// max_size limits the size of an individual range,
+// if necessary a large contiguous range of physical
+// addresses will be split into smaller ranges with
+// sizes less than or equal to max_length
+size_t mphysranges(mmphysrange_t *ranges,
+                   size_t ranges_count,
+                   void *addr, size_t size,
+                   size_t max_size);
+
 /// Lock all process address space in memory
 #define MCL_CURRENT
 

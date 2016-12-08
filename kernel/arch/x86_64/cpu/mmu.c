@@ -1105,3 +1105,124 @@ int munmap(void *addr, size_t len)
 
     return 0;
 }
+
+inline uintptr_t mphysaddr(void *addr)
+{
+    linaddr_t linaddr = (linaddr_t)addr;
+
+    uint64_t misalignment = linaddr & ~(PTE_ADDR);
+
+    unsigned path[4];
+    path_from_addr(path, linaddr);
+
+    pte_t *pte[4];
+    pte_from_path(pte, path);
+
+    return (*pte[3] & PTE_ADDR) + misalignment;
+}
+
+static inline int mphysranges_enum(
+        void *addr, size_t size,
+        int (*callback)(mmphysrange_t, void*),
+        void *context)
+{
+    linaddr_t linaddr = (linaddr_t)addr;
+    size_t remaining_size = size;
+    physaddr_t page_end;
+    mmphysrange_t range;
+    int result;
+
+    do {
+        range.physaddr = mphysaddr((void*)linaddr);
+        page_end = round_up(range.physaddr);
+        range.size = page_end - range.physaddr;
+        if (unlikely(range.size > remaining_size))
+            range.size = remaining_size;
+    } while ((result = callback(range, context)) &&
+             (remaining_size -= range.size));
+
+    return result;
+}
+
+typedef struct mphysranges_state_t {
+    mmphysrange_t *range;
+    size_t ranges_count;
+    size_t count;
+    size_t max_size;
+    physaddr_t last_end;
+    mmphysrange_t cur_range;
+} mphysranges_state_t;
+
+static inline int mphysranges_callback(mmphysrange_t range, void *context)
+{
+    mphysranges_state_t *state = context;
+
+    // Keep looping until we have consumed the passed range
+    do {
+        if (range.physaddr !=
+                state->cur_range.physaddr + state->cur_range.size) {
+            // Non-contiguous, emit range and start a new one
+
+            if (state->cur_range.size) {
+                // The current range is not empty
+
+                // If we are not just counting ranges
+                if (state->range)
+                    *state->range++ = state->cur_range;
+
+                // Increase range count
+                ++state->count;
+            }
+
+            // Start new range
+            state->cur_range.physaddr = range.physaddr;
+            state->cur_range.size = 0;
+        }
+
+        size_t take;
+        if (state->cur_range.size + range.size < state->max_size) {
+            // Add whole range to current range
+            take = range.size;
+        } else {
+            // Add enough to reach max_size
+            take = state->max_size - state->cur_range.size;
+        }
+
+        // Increase size of current range
+        state->cur_range.size += take;
+
+        // Adjust range to consume taken range
+        range.physaddr += take;
+        range.size -= take;
+    } while (range.size > 0 && state->count < state->ranges_count);
+
+    return 1;
+}
+
+size_t mphysranges(mmphysrange_t *ranges,
+                   size_t ranges_count,
+                   void *addr, size_t size,
+                   size_t max_size)
+{
+    mphysranges_state_t state;
+
+    state.range = ranges;
+    state.ranges_count = ranges_count;
+    state.count = 0;
+    state.last_end = 0;
+    state.cur_range.physaddr = 0;
+    state.cur_range.size = 0;
+    state.max_size = max_size;
+
+    mphysranges_enum(addr, size, mphysranges_callback, &state);
+
+    if (state.count < ranges_count) {
+        // Flush last region
+        state.cur_range.physaddr = 0;
+        state.cur_range.size = 0;
+        mphysranges_callback(state.cur_range, &state);
+    }
+
+    return state.count;
+}
+
