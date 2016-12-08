@@ -7,6 +7,7 @@
 #include "likely.h"
 
 #include "thread.h"
+#include "control_regs.h"
 #include "tls.h"
 #include "main.h"
 #include "halt.h"
@@ -43,12 +44,12 @@ typedef struct thread_info_t thread_info_t;
 typedef struct cpu_info_t cpu_info_t;
 
 struct thread_info_t {
-    void *ctx;
-    cpu_info_t *cpu;
+    void * volatile ctx;
+    //cpu_info_t *cpu;
     void *stack;
     size_t stack_size;
 
-    uint64_t wake_time;
+    uint64_t volatile wake_time;
 
     // When state is equal to one of these:
     //  THREAD_IS_READY
@@ -71,7 +72,7 @@ struct thread_info_t {
     thread_state_t volatile state;
 
     // Higher numbers are higher priority
-    int priority;
+    int volatile priority;
 };
 
 // Store in a big array, for now
@@ -81,7 +82,8 @@ static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
 
 struct cpu_info_t {
-    thread_info_t *cur_thread;
+    cpu_info_t *self;
+    thread_info_t * volatile cur_thread;
     uint64_t apic_id;
     int online;
     thread_info_t *goto_thread;
@@ -101,23 +103,25 @@ static uint64_t get_apic_id(void)
     return apic_id;
 }
 
-static cpu_info_t *cpu_from_apic_id(uint64_t apic_id)
-{
-    for (cpu_info_t *cpu = cpus; cpu < cpus + MAX_CPUS; ++cpu) {
-        if (!cpu->online)
-            continue;
-        if (cpu->apic_id == apic_id)
-            return cpu;
-    }
-    assert(!"APIC ID not found!");
-    // Failed
-    return 0;
-}
+//static cpu_info_t *cpu_from_apic_id(uint64_t apic_id)
+//{
+//    for (cpu_info_t *cpu = cpus; cpu < cpus + MAX_CPUS; ++cpu) {
+//        if (!cpu->online)
+//            continue;
+//        if (cpu->apic_id == apic_id)
+//            return cpu;
+//    }
+//    assert(!"APIC ID not found!");
+//    // Failed
+//    return 0;
+//}
 
 static cpu_info_t *this_cpu(void)
 {
-    uint64_t apic_id = get_apic_id();
-    return cpu_from_apic_id(apic_id);
+    return cpu_gs_read_ptr();
+
+    //uint64_t apic_id = get_apic_id();
+    //return cpu_from_apic_id(apic_id);
 }
 
 static thread_info_t *this_thread(void)
@@ -142,10 +146,11 @@ static void thread_cleanup(void)
     assert(thread->state == THREAD_IS_RUNNING);
 
     thread->state = THREAD_IS_DESTRUCTING;
-    thread->cpu = 0;
+    atomic_barrier();
     thread->priority = 0;
     thread->stack = 0;
     thread->stack_size = 0;
+    atomic_barrier();
     thread->state = THREAD_IS_FINISHED;
     thread_yield();
 }
@@ -223,23 +228,18 @@ static thread_t thread_create_with_state(
         ctx->gpr.iret.rflags = EFLAGS_IF;
         ctx->gpr.iret.rip = fn;
         ctx->gpr.iret.cs = GDT_SEL_KERNEL_CODE64;
-        // Not used in 64 bit mode
-        //ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
-        //ctx->gpr.s[0] = GDT_SEL_KERNEL_DATA64;
-        //ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
-        //ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
-        //ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.rdi = (uint64_t)userdata;
+        ctx->gpr.r[0] = (uint64_t)userdata;
         ctx->gpr.fsbase = teb;
 
         ctx->fpr.mxcsr = MXCSR_MASK_ALL;
         ctx->fpr.mxcsr_mask = MXCSR_MASK_ALL;
 
-        ctx->mc.gpr = &ctx->gpr;
-        ctx->mc.fpr = &ctx->fpr;
+        ctx->ctx.gpr = &ctx->gpr;
+        ctx->ctx.fpr = &ctx->fpr;
 
         thread->ctx = ctx;
 
+        atomic_barrier();
         thread->state = state;
 
         // Atomically make sure thread_count > i
@@ -248,7 +248,7 @@ static thread_t thread_create_with_state(
             size_t latest_count = atomic_cmpxchg(
                         &thread_count, old_count, i + 1);
 
-            if (latest_count == old_count)
+            if (latest_count > i)
                 break;
 
             pause();
@@ -306,18 +306,20 @@ void thread_init(int ap)
     // First thread is this boot thread
     thread_info_t *thread = threads + cpu_number;
 
+    cpu->self = cpu;
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
+    cpu_set_gsbase(cpu);
+
     if (!ap) {
         cpu->cur_thread = thread;
-        thread->cpu = cpu;
         thread->ctx = 0;
-        thread->state = THREAD_IS_RUNNING;
         thread->priority = 0;
-
         thread->stack = kernel_stack;
         thread->stack_size = kernel_stack_size;
+        atomic_barrier();
+        thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
     } else {
         size_t stack_size = 16 << 10;
@@ -330,6 +332,7 @@ void thread_init(int ap)
                     THREAD_IS_INITIALIZING);
 
         cpu->goto_thread = thread;
+        atomic_barrier();
         thread_yield();
     }
 }
@@ -343,9 +346,11 @@ static thread_info_t *thread_choose_next(
 
     assert(i < countof(threads));
 
-    for (size_t checked = 0; ++i, checked <= thread_count; ++checked) {
+    size_t count = thread_count;
+
+    for (size_t checked = 0; ++i, checked <= count; ++checked) {
         // Wrap
-        if (i >= thread_count)
+        if (i >= count)
             i = 0;
 
         //
@@ -412,9 +417,10 @@ void *thread_schedule(void *ctx)
 
     if (unlikely(cpu->goto_thread)) {
         thread = cpu->goto_thread;
-        thread->state = THREAD_IS_RUNNING;
         cpu->cur_thread = thread;
         cpu->goto_thread = 0;
+        atomic_barrier();
+        thread->state = THREAD_IS_RUNNING;
         return thread->ctx;
     }
 
@@ -422,14 +428,18 @@ void *thread_schedule(void *ctx)
     if (thread->state != THREAD_IS_DESTRUCTING) {
         thread->ctx = ctx;
     } else {
-        thread->cpu = 0;
+        //thread->cpu = 0;
+        atomic_barrier();
         thread->state = THREAD_IS_FINISHED_BUSY;
+        atomic_barrier();
     }
 
     // Change to ready if running
     if (thread->state == THREAD_IS_RUNNING) {
-        thread->cpu = 0;
+        //thread->cpu = 0;
+        atomic_barrier();
         thread->state = THREAD_IS_READY_BUSY;
+        atomic_barrier();
     }
 
     // Retry because another CPU might steal this
@@ -442,6 +452,7 @@ void *thread_schedule(void *ctx)
                thread < threads + countof(threads));
 
         if (thread == outgoing) {
+            atomic_barrier();
             thread->state = THREAD_IS_RUNNING;
             break;
         } else if (thread->state == THREAD_IS_READY &&
@@ -453,9 +464,10 @@ void *thread_schedule(void *ctx)
         }
         pause();
     }
+    atomic_barrier();
 
     cpu->cur_thread = thread;
-    thread->cpu = cpu;
+    //thread->cpu = cpu;
 
     if (1) {
         size_t cpu_number = cpu - cpus;
@@ -483,6 +495,7 @@ void thread_sleep_until(uint64_t expiry)
     thread_info_t *thread = cpu->cur_thread;
 
     thread->wake_time = expiry;
+    atomic_barrier();
     thread->state = THREAD_IS_SLEEPING_BUSY;
     thread_yield();
 }

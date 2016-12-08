@@ -12,7 +12,7 @@
 
 idt_entry_64_t idt[128];
 
-void *(*irq_dispatcher)(int irq, isr_minimal_context_t *ctx);
+void *(*irq_dispatcher)(int irq, isr_context_t *ctx);
 
 cpu_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
@@ -212,21 +212,21 @@ size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr)
 
 }
 
-static void *unhandled_exception_handler(isr_full_context_t *ctx)
+static void *unhandled_exception_handler(isr_context_t *ctx)
 {
     char fmt_buf[64];
     int color = 0x0F;
     int width;
     static char const *reg_names[] = {
-        "rax",
-        "rbx",
-        "rcx",
-        "rdx",
-        "rsi",
         "rdi",
-        "rbp",
+        "rsi",
+        "rdx",
+        "rcx",
         " r8",
         " r9",
+        "rax",
+        "rbx",
+        "rbp",
         "r10",
         "r11",
         "r12",
@@ -372,7 +372,7 @@ static void *unhandled_exception_handler(isr_full_context_t *ctx)
     return ctx;
 }
 
-isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx)
+isr_context_t *exception_isr_handler(isr_context_t *ctx)
 {
     // FIXME: handle some exceptions like page faults sometime
 
@@ -380,7 +380,7 @@ isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx)
     return ctx;
 }
 
-void *isr_handler(isr_minimal_context_t *ctx)
+void *isr_handler(isr_context_t *ctx)
 {
     if (ctx->gpr->info.interrupt >= 32 &&
                ctx->gpr->info.interrupt < 48) {

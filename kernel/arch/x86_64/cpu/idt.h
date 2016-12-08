@@ -241,33 +241,27 @@ typedef struct isr_resume_context_t {
     void *cleanup_arg;
 } isr_resume_context_t;
 
-// IRQ handler C call parameter
-typedef struct isr_minimal_context_t {
-    isr_resume_context_t resume;
-    isr_irq_gpr_t *gpr;
-    isr_fxsave_context_t *fpr;
-} isr_minimal_context_t;
-
 // Exception handler C call parameter
-typedef struct isr_full_context_t {
+typedef struct isr_context_t {
+    isr_resume_context_t resume;
     isr_gpr_context_t * gpr;
     isr_fxsave_context_t * fpr;
-} isr_full_context_t;
+} isr_context_t;
 
 // Note that fpr must lie on a 16-byte boundary
 typedef struct isr_start_context_t {
-    isr_minimal_context_t mc;
+    isr_context_t ctx;
     isr_fxsave_context_t fpr;
-    isr_irq_gpr_t gpr;
+    isr_gpr_context_t gpr;
     isr_ret_frame_t ret;
 } isr_start_context_t;
 
 // Handle EOI and invoke irq handler
 extern void *(*irq_dispatcher)(
-        int intr, isr_minimal_context_t *ctx);
+        int intr, isr_context_t *ctx);
 
-void *isr_handler(isr_minimal_context_t *ctx);
+void *isr_handler(isr_context_t *ctx);
 
-isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx);
+isr_context_t *exception_isr_handler(isr_context_t *ctx);
 
 int idt_init(int ap);
