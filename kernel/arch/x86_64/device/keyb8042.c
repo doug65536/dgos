@@ -193,6 +193,8 @@ static void keyb8042_keyboard_handler(void)
         case KEYB_VK_RALT: shift_mask = KEYB_RALT_DOWN; break;
         case KEYB_VK_LCTRL: shift_mask = KEYB_LCTRL_DOWN; break;
         case KEYB_VK_RCTRL: shift_mask = KEYB_RCTRL_DOWN; break;
+        case KEYB_VK_LGUI: shift_mask = KEYB_LGUI_DOWN; break;
+        case KEYB_VK_RGUI: shift_mask = KEYB_RGUI_DOWN; break;
         }
 
         // Update shift state bit
