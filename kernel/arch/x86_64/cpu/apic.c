@@ -757,6 +757,7 @@ void apic_start_smp(void)
     printk("%d hyperthread count\n", topo_thread_count);
     printk("%d core count\n", topo_core_count);
 
+    uint32_t smp_expect = 0;
     for (unsigned pkg = 0; pkg < apic_id_count; ++pkg) {
         printk("Package base APIC ID = %u\n", apic_id_list[pkg]);
 
@@ -765,7 +766,6 @@ void apic_start_smp(void)
                 apic_id_count;
         uint16_t stagger = 16666 - cpus;
 
-        uint32_t smp_expect = 0;
         for (unsigned core = 0; core < topo_core_count; ++core) {
             for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
                 uint8_t target = apic_id_list[pkg] +
