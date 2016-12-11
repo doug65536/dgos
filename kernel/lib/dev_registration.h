@@ -9,7 +9,7 @@
 // Define the vtbl and define the constructor which
 // registers the device driver
 #define REGISTER_DEVICE(type, name) \
-    type##_vtbl_t name##_device_vtbl =\
+    type##_vtbl_t name##_device_vtbl = \
             MAKE_##type##_VTBL(name); \
     __attribute__((constructor(CONSTRUCTOR_PRIORITY_DEVICE))) \
     void name##_##type##_register_device(void); \

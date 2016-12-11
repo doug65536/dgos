@@ -206,9 +206,16 @@ void cpu_set_tr(uint16_t tr)
     );
 }
 
-void cpu_irq_disable(void)
+int cpu_irq_disable(void)
 {
-    __asm__ __volatile__ ( "cli" );
+    uint64_t rflags;
+    __asm__ __volatile__ (
+        "pushf\n\t"
+        "pop %[rflags]\n\t"
+        "cli\n\t"
+        : [rflags] "=r" (rflags)
+    );
+    return !!((rflags >> 9) & 1);
 }
 
 void cpu_irq_enable(void)
@@ -216,3 +223,11 @@ void cpu_irq_enable(void)
     __asm__ __volatile__ ( "sti" );
 }
 
+uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
+{
+    uint64_t n = msr_get(msr);
+    n &= ~((uint64_t)1 << bit);
+    n |= (uint64_t)!!set << bit;
+    msr_set(msr, n);
+    return n;
+}

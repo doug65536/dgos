@@ -1,5 +1,6 @@
 #include "pci.h"
 #include "cpu/ioport.h"
+#include "cpu/spinlock.h"
 #include "printk.h"
 #include "string.h"
 
@@ -9,6 +10,8 @@
 #else
 #define PCI_DEBUGMSG(...) ((void)0)
 #endif
+
+static spinlock_t pci_spinlock;
 
 #define PCI_ADDR    0xCF8
 #define PCI_DATA    0xCFC
@@ -41,10 +44,14 @@ static char const *pci_device_class_text[] = {
 };
 #endif
 
-static uint32_t pci_read_config(
+uint32_t pci_read_config(
         int bus, int slot, int func,
         int offset, int size)
 {
+    spinlock_lock(&pci_spinlock);
+
+    uint32_t data = ~(uint32_t)0;
+
     if (bus < 256 && slot < 32 &&
             func < 8 && offset < 256) {
         uint32_t pci_address = (1 << 31) |
@@ -54,16 +61,45 @@ static uint32_t pci_read_config(
                 (offset & ~(uint32_t)3);
 
         outd(PCI_ADDR, pci_address);
-        uint32_t data = ind(PCI_DATA);
+        data = ind(PCI_DATA);
 
         data >>= (offset & 3) << 3;
 
         if (size != sizeof(uint32_t))
             data &= ~(~(uint32_t)0 << (size << 3));
-
-        return data;
     }
-    return ~0U;
+
+    spinlock_unlock(&pci_spinlock);
+
+    return data;
+}
+
+uint32_t pci_write_config(
+        int bus, int slot, int func,
+        int offset, int value)
+{
+    spinlock_lock(&pci_spinlock);
+
+    uint32_t data = ~(uint32_t)0;
+
+    if (bus < 256 && slot < 32 &&
+            func < 8 && offset < 256) {
+        uint32_t pci_address = (1 << 31) |
+                (bus << 16) |
+                (slot << 11) |
+                (func << 8) |
+                (offset & ~(uint32_t)3);
+
+        outd(PCI_ADDR, pci_address);
+        outd(PCI_DATA, value);
+
+        outd(PCI_ADDR, pci_address);
+        data = ind(PCI_DATA);
+    }
+
+    spinlock_unlock(&pci_spinlock);
+
+    return data;
 }
 
 #if PCI_DEBUG
@@ -162,6 +198,14 @@ static void pci_enumerate_read(pci_config_hdr_t *config,
     memcpy(config, values, sizeof(*config));
 }
 
+static int pci_enumerate_is_match(pci_dev_iterator_t *iter)
+{
+    return (iter->dev_class == -1 ||
+            iter->config.dev_class == iter->dev_class) &&
+            (iter->subclass == -1 ||
+            iter->config.subclass == iter->subclass);
+}
+
 int pci_enumerate_next(pci_dev_iterator_t *iter)
 {
     for (;;) {
@@ -177,9 +221,13 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
             if (iter->func == 0)
                 iter->header_type = iter->config.header_type;
 
-            // If device is here, return success
-            if (iter->dev_class != 0xFF &&
-                    iter->config.vendor != 0xFFFF)
+            // If device is not there, then next
+            if (iter->config.dev_class == (uint8_t)~0 &&
+                    iter->config.vendor == (uint16_t)~0)
+                continue;
+
+            // If device matched, return true
+            if (pci_enumerate_is_match(iter))
                 return 1;
 
             continue;
@@ -215,15 +263,8 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
     int found;
 
     while ((found = pci_enumerate_next(iter)) != 0) {
-        // If filtering by dev_class and it doesn't match, continue
-        if (dev_class != -1 && iter->dev_class != dev_class)
-            continue;
-        // If filtering by subclass and it doesn't match, continue
-        if (subclass != -1 && iter->subclass != subclass)
-            continue;
-
-        // Match
-        break;
+        if (pci_enumerate_is_match(iter))
+            break;
     }
 
     return found;

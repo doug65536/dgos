@@ -20,5 +20,5 @@ void register_text_display_device(
     console_display_vtbl = *console_display->vtbl;
 
     console_display_vtbl.clear(console_display);
-    printk("%s\n", name);
+    printk("%s device registered\n", name);
 }

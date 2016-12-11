@@ -595,7 +595,9 @@ unsigned apic_get_id(void)
 static void apic_send_command(uint32_t dest, uint32_t cmd)
 {
     APIC_DEST = dest;
+    atomic_barrier();
     APIC_CMD = cmd;
+    atomic_barrier();
     while (APIC_CMD & APIC_CMD_PENDING)
         pause();
 }
@@ -640,7 +642,9 @@ static void apic_configure_timer(
         uint8_t intr)
 {
     APIC_LVT_DCR = dcr;
+    atomic_barrier();
     APIC_LVT_ICR = icr;
+    atomic_barrier();
     APIC_LVT_TR = APIC_LVT_TR_VECTOR_n(intr) |
             APIC_LVT_TR_MODE_n(timer_mode);
 }
@@ -762,8 +766,8 @@ void apic_start_smp(void)
         uint16_t stagger = 16666 - cpus;
 
         uint32_t smp_expect = 0;
-        for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
-            for (unsigned core = 0; core < topo_core_count; ++core) {
+        for (unsigned core = 0; core < topo_core_count; ++core) {
+            for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
                 uint8_t target = apic_id_list[pkg] +
                         (thread | (core << topo_thread_bits));
 
@@ -782,7 +786,7 @@ void apic_start_smp(void)
                 usleep(stagger);
 
                 ++smp_expect;
-                while (thread_smp_running < smp_expect)
+                while (thread_smp_running != smp_expect)
                     pause();
             }
         }

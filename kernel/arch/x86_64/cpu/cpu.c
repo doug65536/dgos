@@ -37,6 +37,10 @@ void cpu_init(int ap)
 
     cpu_cr4_change_bits(CR4_TSD, cr4 | CR4_OFXSR | CR4_OSXMMEX);
 
+    // Enable no-execute if feature available
+    if (cpuid_edx_bit(20, 0x80000001, 0))
+        msr_adj_bit(MSR_EFER, 11, 1);
+
     gdt_init();
     idt_init(ap);
     mmu_init(ap);

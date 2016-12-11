@@ -25,6 +25,11 @@ void *intr_invoke(int intr, void *ctx)
     return ctx;
 }
 
+int intr_has_handler(int intr)
+{
+    return intr_handlers[intr] != 0;
+}
+
 void *irq_invoke(int intr, int irq, void *ctx)
 {
     if (intr_handlers[intr])

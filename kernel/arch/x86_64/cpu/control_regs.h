@@ -5,6 +5,7 @@
 #define MSR_FSBASE      0xC0000100
 #define MSR_GSBASE      0xC0000101
 #define MSR_KGSBASE     0xC0000102
+#define MSR_EFER        0xC0000080
 
 #define MSR_IA32_MISC_ENABLES   0x1A0
 
@@ -104,6 +105,9 @@ void msr_set_lo(uint32_t msr, uint32_t value);
 // Update the low 32 bits of MSR, preserving the high 32 bits
 void msr_set_hi(uint32_t msr, uint32_t value);
 
+// Set the specified bit of the specified MSR
+uint64_t msr_adj_bit(uint32_t msr, int bit, int set);
+
 // Returns new value of cr0
 uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set);
 
@@ -137,5 +141,5 @@ static inline void *cpu_gs_read_ptr(void)
     return ptr;
 }
 
-void cpu_irq_disable(void);
+int cpu_irq_disable(void);
 void cpu_irq_enable(void);

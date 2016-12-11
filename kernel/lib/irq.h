@@ -28,3 +28,6 @@ void *intr_invoke(int intr, void *ctx);
 
 // Call the appropriate interrupt vector for the specified irq
 void *irq_invoke(int intr, int irq, void *ctx);
+
+// Returns true if there is an interrupt handler for the interrupt
+int intr_has_handler(int intr);

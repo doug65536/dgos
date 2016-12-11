@@ -223,12 +223,16 @@ ATOMIC_DEFINE_BINARY_INSN(and, "and")
 ATOMIC_DEFINE_BINARY_INSN(or, "or")
 ATOMIC_DEFINE_BINARY_INSN(xor, "xor")
 
+//
 // Technically not atomic but needed in cmpxchg loops
 
 static inline void pause(void)
 {
     __asm__ __volatile__ ( "pause" : : : "memory" );
 }
+
+//
+// Some other concurrent code helpers
 
 static inline void atomic_barrier(void)
 {

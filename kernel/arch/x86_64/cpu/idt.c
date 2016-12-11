@@ -374,23 +374,24 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
 
 isr_context_t *exception_isr_handler(isr_context_t *ctx)
 {
-    // FIXME: handle some exceptions like page faults sometime
+    if (!intr_has_handler(ctx->gpr->info.interrupt) ||
+            !intr_invoke(ctx->gpr->info.interrupt, ctx))
+        return unhandled_exception_handler(ctx);
 
-    unhandled_exception_handler(ctx);
     return ctx;
 }
 
 void *isr_handler(isr_context_t *ctx)
 {
-    if (ctx->gpr->info.interrupt >= 32 &&
-               ctx->gpr->info.interrupt < 48) {
-        // IRQ
-        ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
-    } else {
-        //
-        // Other interrupts
-        ctx = intr_invoke(ctx->gpr->info.interrupt, ctx);
-    }
+    // Exception
+    if (ctx->gpr->info.interrupt < 32)
+        return exception_isr_handler(ctx);
 
-    return ctx;
+    // IRQ
+    if (ctx->gpr->info.interrupt >= 32 && ctx->gpr->info.interrupt < 48)
+        return irq_dispatcher(ctx->gpr->info.interrupt, ctx);
+
+    //
+    // Other interrupts
+    return intr_invoke(ctx->gpr->info.interrupt, ctx);
 }

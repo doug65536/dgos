@@ -50,6 +50,9 @@
 /// Not file backed
 #define MAP_ANONYMOUS       0x00000200
 
+/// Kernel only: Write through
+#define MAP_WRITETHRU       0x20000000
+
 /// Kernel only: Disable caching
 #define MAP_NOCACHE         0x40000000
 
@@ -205,6 +208,9 @@ size_t mphysranges(mmphysrange_t *ranges,
                    size_t ranges_count,
                    void *addr, size_t size,
                    size_t max_size);
+
+// Return true if the address is present
+int mpresent(uintptr_t addr);
 
 /// Lock all process address space in memory
 #define MCL_CURRENT

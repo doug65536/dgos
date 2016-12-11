@@ -8,6 +8,7 @@
 #include "device/keyb8042.h"
 #include "callout.h"
 #include "device/ahci.h"
+#include "time.h"
 
 int life_and_stuff = 42;
 
@@ -79,8 +80,11 @@ static int other_thread(void *p)
 {
     test_thread_param_t *tp = p;
     while (1) {
-        ++(*tp->p);
-        thread_sleep_for(tp->sleep);
+        int odd = ++(*tp->p) & 1;
+        if (tp->sleep)
+            thread_sleep_for(tp->sleep);
+        else
+            thread_set_affinity(thread_get_id(), 1 << odd);
     }
     return 0;
 }
@@ -90,7 +94,7 @@ int main(void)
     pci_init();
     keyb8042_init();
 
-    ahci_init();
+    //ahci_init();
 
     // Crash
     //*(uint64_t*)0xfeedbeefbaadf00d = 0;
@@ -106,7 +110,7 @@ int main(void)
     };
 
     char *test_stacks = mmap(
-                0, 4096 * 4,
+                0, 4096 * 5,
                 PROT_READ | PROT_WRITE,
                 MAP_STACK, -1, 0);
 
@@ -114,6 +118,14 @@ int main(void)
     thread_create(other_thread, ttp + 1, test_stacks + (1 << 12), 4096);
     thread_create(other_thread, ttp + 2, test_stacks + (2 << 12), 4096);
     thread_create(other_thread, ttp + 3, test_stacks + (3 << 12), 4096);
+
+    sleep(2000);
+    test_thread_param_t *xx = mmap(0, 8<<20,
+                                   PROT_READ | PROT_WRITE,
+                                   0, -1, 0);
+    xx[4000].p = (char*)0xb801A;
+    xx[4000].sleep = 0;
+    thread_create(other_thread, xx + 4000, test_stacks + (4 << 12), 4096);
 
     while (1)
         halt();

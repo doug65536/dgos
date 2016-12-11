@@ -71,6 +71,8 @@ struct thread_info_t {
     //
     thread_state_t volatile state;
 
+    uint64_t cpu_affinity;
+
     // Higher numbers are higher priority
     int volatile priority;
 };
@@ -87,6 +89,9 @@ struct cpu_info_t {
     uint64_t apic_id;
     int online;
     thread_info_t *goto_thread;
+
+    // Used for lazy TLB shootdown
+    uint64_t mmu_seq;
 };
 
 #define MAX_CPUS    64
@@ -190,6 +195,7 @@ static thread_t thread_create_with_state(
         thread->stack = stack;
         thread->stack_size = stack_size;
         thread->priority = 0;
+        thread->cpu_affinity = ~0L;
 
         uintptr_t stack_addr = (uintptr_t)stack;
         uintptr_t stack_end = stack_addr +
@@ -318,6 +324,7 @@ void thread_init(int ap)
         thread->priority = 0;
         thread->stack = kernel_stack;
         thread->stack_size = kernel_stack_size;
+        thread->cpu_affinity = ~0L;
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
@@ -340,6 +347,8 @@ void thread_init(int ap)
 static thread_info_t *thread_choose_next(
         thread_info_t * const thread)
 {
+    cpu_info_t *cpu = this_cpu();
+    size_t cpu_number = cpu - cpus;
     size_t i = thread - threads;
     thread_info_t *best = 0;
     uint64_t now = 0;
@@ -363,6 +372,9 @@ static thread_info_t *thread_choose_next(
         thread_state_t expected_ready = (thread == threads + i)
                 ? THREAD_IS_READY_BUSY
                 : THREAD_IS_READY;
+
+        if (!(threads[i].cpu_affinity & (1 << cpu_number)))
+            continue;
 
         if (threads[i].state == expected_sleep) {
             if (now == 0)
@@ -515,4 +527,43 @@ uint32_t thread_cpu_count(void)
 uint32_t thread_cpus_started(void)
 {
     return thread_smp_running + 1;
+}
+
+uint64_t thread_get_cpu_mmu_seq(void)
+{
+    cpu_info_t *cpu = this_cpu();
+    return cpu->mmu_seq;
+}
+
+void thread_set_cpu_mmu_seq(uint64_t seq)
+{
+    cpu_info_t *cpu = this_cpu();
+    cpu->mmu_seq = seq;
+}
+
+thread_t thread_get_id(void)
+{
+    cpu_irq_disable();
+    cpu_info_t *cpu = this_cpu();
+    return cpu->cur_thread - threads;
+}
+
+uint64_t thread_get_affinity(int id)
+{
+    return threads[id].cpu_affinity;
+}
+
+void thread_set_affinity(int id, uint64_t affinity)
+{
+    cpu_info_t *cpu = this_cpu();
+    size_t cpu_number = cpu - cpus;
+
+    threads[id].cpu_affinity = affinity;
+
+    // Are we changing current thread affinity?
+    if (cpu->cur_thread == threads + id &&
+            !(affinity & (1 << cpu_number))) {
+        // Get off this CPU
+        thread_yield();
+    }
 }

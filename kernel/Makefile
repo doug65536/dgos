@@ -55,13 +55,13 @@ TLS_MODEL := local-exec
 endif
 
 CFLAGS ?= -g3 -fno-stack-protector \
-	-fPIC -mno-red-zone \
+	-fpic -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
 	-fexceptions -fno-common  \
 	$(WEVERYTHING)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
@@ -85,7 +85,7 @@ ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
 
-LINKERSCRIPT := kernel.ld
+LINKERSCRIPT := arch/$(ARCH)/kernel.ld
 
 KERNEL := $(BINDIR)/kernel
 
@@ -97,7 +97,7 @@ OUTPUTS = $(KERNEL)
 
 NEEDSMALLEST :=
 
-LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T kernel.ld -g
+LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T $(LINKERSCRIPT) -g
 
 #-m i386linux
 
