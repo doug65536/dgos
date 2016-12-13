@@ -29,6 +29,8 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
+CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
+
 GDB := gdb
 QEMU := qemu-system-x86_64
 SED := sed
@@ -66,13 +68,18 @@ TARGET_ARCH_AS := --32
 
 CFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
-	-falign-functions=1 -falign-labels=1 \
-	-falign-loops=1 -falign-jumps=1 \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions \
 	-mrtd \
-	-fno-schedule-insns -fno-schedule-insns2 \
-	-mregparm=3 -mno-align-stringops
+	-mregparm=3
+
+ifneq ($(CC_IS_CLANG),1)
+	CFLAGS += \
+		-falign-functions=1 -falign-labels=1 \
+		-falign-loops=1 -falign-jumps=1 \
+		-mno-align-stringops \
+		-fno-schedule-insns -fno-schedule-insns2
+endif
 
 #-fomit-frame-pointer
 #-mrtd
@@ -90,8 +97,11 @@ WEVERYTHING += -Wbad-function-cast
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
-WEVERYTHING += -Wunsuffixed-float-constants
 WEVERYTHING += -fstrict-aliasing
+
+ifneq ($(CC_IS_CLANG),1)
+	WEVERYTHING += -Wunsuffixed-float-constants
+endif
 
 CFLAGS += $(WEVERYTHING)
 

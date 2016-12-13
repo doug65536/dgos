@@ -18,6 +18,8 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
+CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
+
 AOBJS := $(ASRCS:.s=.o)
 COBJS := $(CSRCS:.c=.o)
 
@@ -45,7 +47,10 @@ WEVERYTHING += -Wbad-function-cast
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
-WEVERYTHING += -Wunsuffixed-float-constants
+
+ifneq ($(CC_IS_CLANG),1)
+	WEVERYTHING += -Wunsuffixed-float-constants
+endif
 
 # Strict overflow is noise
 WEVERYTHING += -Wno-strict-overflow
@@ -66,7 +71,7 @@ CFLAGS ?= -g3 -fno-stack-protector \
 ifdef OPTIMIZE
 CFLAGS += \
 	-O2 -ftree-vectorize \
-	-fomit-frame-pointer -fbuiltin -fno-schedule-insns -fno-schedule-insns2
+	-fomit-frame-pointer -fbuiltin
 else
 CFLAGS += \
 	-O0 \
@@ -85,8 +90,12 @@ ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
 
-LINKERSCRIPT := arch/$(ARCH)/kernel.ld
+LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
+LIBGCCDIR := $(dir $(LIBGCC))
+LIBGCCFILENAME = $(notdir $(LIBGCC))
+LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
 
+LINKERSCRIPT := arch/$(ARCH)/kernel.ld
 KERNEL := $(BINDIR)/kernel
 
 LIBFILES := \
@@ -125,6 +134,7 @@ $(LIBFILES): subdirs
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES)
 	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
 		--start-group $(LIBFILES) --end-group \
+		$(LIBGCC) \
 		> $(DUMPDIR)/kernel.map
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)

@@ -98,3 +98,5 @@ lib/debug.h
 lib/debug.c
 arch/x86_64/device/ide.h
 arch/x86_64/device/ide.c
+lib/bitsearch.h
+lib/bitsearch.c

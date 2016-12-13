@@ -16,6 +16,7 @@ CSRCS := mm.c \
 	time.c \
 	stdlib.c \
 	assert.c \
+	bitsearch.c \
 	debug.c
 
 include $(BUILDROOT)/library.mk
