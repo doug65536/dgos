@@ -169,19 +169,19 @@ typedef uintptr_t linaddr_t;
 #define PT1_PTR(base)   (PT3_PTR(base) + PT1_BASE)
 #define PT0_PTR(base)   (PT3_PTR(base) + PT0_BASE)
 
-static pte_t * const ptk_base[4] = {
-    PT0_PTR(PT_KBASEADDR),
-    PT1_PTR(PT_KBASEADDR),
-    PT2_PTR(PT_KBASEADDR),
-    PT3_PTR(PT_KBASEADDR)
-};
+//static pte_t * const ptk_base[4] = {
+//    PT0_PTR(PT_KBASEADDR),
+//    PT1_PTR(PT_KBASEADDR),
+//    PT2_PTR(PT_KBASEADDR),
+//    PT3_PTR(PT_KBASEADDR)
+//};
 
-static pte_t * const ptu_base[4] = {
-    PT0_PTR(PT_UBASEADDR),
-    PT1_PTR(PT_UBASEADDR),
-    PT2_PTR(PT_UBASEADDR),
-    PT3_PTR(PT_UBASEADDR)
-};
+//static pte_t * const ptu_base[4] = {
+//    PT0_PTR(PT_UBASEADDR),
+//    PT1_PTR(PT_UBASEADDR),
+//    PT2_PTR(PT_UBASEADDR),
+//    PT3_PTR(PT_UBASEADDR)
+//};
 
 /// Physical page allocation map
 /// Consists of array of entries, one per physical page
@@ -1200,7 +1200,7 @@ int munmap(void *addr, size_t len)
     return 0;
 }
 
-inline uintptr_t mphysaddr(void *addr)
+uintptr_t mphysaddr(void *addr)
 {
     linaddr_t linaddr = (linaddr_t)addr;
 
@@ -1265,51 +1265,22 @@ static inline int mphysranges_callback(mmphysrange_t range, void *context)
 {
     mphysranges_state_t *state = context;
 
-    // Keep looping until we have consumed the passed range
-    size_t take;
-    do {
-        // See if this range is immediately after the current range
-        if (range.physaddr !=
-                state->cur_range.physaddr + state->cur_range.size ||
-                state->cur_range.size == state->max_size) {
-            // Non-contiguous, emit range and start a new one
+    int contiguous = state->count > 0 &&
+            (state->range->physaddr + state->range->size == range.physaddr);
 
-            if (state->cur_range.size) {
-                // The current range is not empty
-
-                // If we are not just counting ranges
-                if (state->range) {
-                    // Write the current range into the result buffer
-                    *state->range++ = state->cur_range;
-                }
-
-                // Increase range count
-                ++state->count;
-            }
-
-            // Start new range
-            state->cur_range.physaddr = range.physaddr;
-            state->cur_range.size = 0;
-        }
-
-        if (range.size == 0)
-            break;
-
-        if (state->cur_range.size + range.size < state->max_size) {
-            // Add whole range to current range
-            take = range.size;
-        } else {
-            // Add enough to reach max_size
-            take = state->max_size - state->cur_range.size;
-        }
-
-        // Increase size of current range
-        state->cur_range.size += take;
-
-        // Adjust range to consume taken range
-        range.physaddr += take;
-        range.size -= take;
-    } while (state->count < state->ranges_count);
+    if (state->count == 0) {
+        // Initial range
+        *state->range = range;
+        ++state->count;
+    } else if (state->range->size < state->max_size && contiguous) {
+        // Extend the range
+        state->range->size += range.size;
+    } else if (state->ranges_count < state->ranges_count) {
+        *++state->range = range;
+        ++state->ranges_count;
+    } else {
+        return 0;
+    }
 
     return 1;
 }
