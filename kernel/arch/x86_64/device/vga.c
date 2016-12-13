@@ -35,10 +35,16 @@ struct text_display_t {
 
 #define MAX_VGA_DISPLAYS 2
 
-#define VGA_CRT_CTRL    (self->io_base)
+#define VGA_CRTC_PORT    (self->io_base)
 
-#define VGA_SET_CURSOR_LO(pos) (0x0F | (((pos) << 8) & 0xFF00))
-#define VGA_SET_CURSOR_HI(pos) (0x0E | ((pos) & 0xFF00))
+#define VGA_CRTC_CURSOR_LO  0x0F
+#define VGA_CRTC_CURSOR_HI  0x0E
+
+#define VGA_SET_CURSOR_LO(pos) (VGA_CRTC_CURSOR_LO | \
+    (((pos) << 8) & 0xFF00))
+
+#define VGA_SET_CURSOR_HI(pos) (VGA_CRTC_CURSOR_HI | \
+    ((pos) & 0xFF00))
 
 static text_display_t displays[MAX_VGA_DISPLAYS];
 
@@ -113,8 +119,8 @@ static int mouse_hide_if_within(text_display_t *self,
 static void move_cursor_to(text_display_t *self, int x, int y)
 {
     uint16_t position = y * self->width + x;
-    outw(VGA_CRT_CTRL, VGA_SET_CURSOR_LO(position));
-    outw(VGA_CRT_CTRL, VGA_SET_CURSOR_HI(position));
+    outw(VGA_CRTC_PORT, VGA_SET_CURSOR_LO(position));
+    outw(VGA_CRTC_PORT, VGA_SET_CURSOR_HI(position));
 }
 
 static void move_cursor_if_on(text_display_t *self)
