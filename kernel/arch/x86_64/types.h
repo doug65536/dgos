@@ -1,6 +1,12 @@
 #pragma once
 
 #if defined(__GNUC__)
+
+
+#ifndef __SIG_ATOMIC_TYPE__
+#define __SIG_ATOMIC_TYPE__ long int
+#endif
+
 typedef __SIZE_TYPE__ size_t;
 
 typedef __PTRDIFF_TYPE__ ptrdiff_t;
