@@ -1,10 +1,29 @@
 #include "device/ahci.h"
 #include "device/pci.h"
+#include "irq.h"
 #include "printk.h"
 #include "mm.h"
+#include "bitsearch.h"
 #include "assert.h"
+#include "thread.h"
+#include "string.h"
+#include "cpu/atomic.h"
 
-#if 0
+typedef enum ata_cmd_t {
+    ATA_CMD_READ_PIO        = 0x20,
+    ATA_CMD_READ_PIO_EXT    = 0x24,
+    ATA_CMD_READ_DMA        = 0xC8,
+    ATA_CMD_READ_DMA_EXT    = 0x25,
+    ATA_CMD_WRITE_PIO       = 0x30,
+    ATA_CMD_WRITE_PIO_EXT   = 0x34,
+    ATA_CMD_WRITE_DMA       = 0xCA,
+    ATA_CMD_WRITE_DMA_EXT   = 0x35,
+    ATA_CMD_CACHE_FLUSH     = 0xE7,
+    ATA_CMD_CACHE_FLUSH_EXT = 0xEA,
+    ATA_CMD_PACKET          = 0xA0,
+    ATA_CMD_IDENTIFY_PACKET = 0xA1,
+    ATA_CMD_IDENTIFY        = 0xEC
+} ata_cmd_t;
 
 typedef enum ahci_fis_type_t {
     // Register FIS - host to device
@@ -84,9 +103,9 @@ typedef struct ahci_fis_h2d_t {
     uint8_t rsv1[4];
 } ahci_fis_h2d_t;
 
-#define AHCI_FIS_CTL_PORTMUX_BIT    4
+#define AHCI_FIS_CTL_PORTMUX_BIT    0
 #define AHCI_FIS_CTL_PORTMUX_BITS   4
-#define AHCI_FIS_CTL_CMD_BIT        0
+#define AHCI_FIS_CTL_CMD_BIT        7
 
 #define AHCI_FIS_CTL_PORTMUX_MASK   ((1<<AHCI_FIS_CTL_PORTMUX_BITS)-1)
 #define AHCI_FIS_CTL_PORTMUX_n(n)   ((n)<<AHCI_FIS_CTL_PORTMUX_BITS)
@@ -103,7 +122,7 @@ typedef struct ahci_fis_d2h_t
     uint8_t ctl;
 
     // Status
-    uint8_t status;
+    uint8_t command;
 
     // Error
     uint8_t error;
@@ -131,10 +150,10 @@ typedef struct ahci_fis_d2h_t
 
     uint8_t rsv3[2];    // Reserved
 
-    uint32_t rsv4;    // Reserved
+    uint32_t rsv4;      // Reserved
 } ahci_fis_d2h_t;
 
-#define AHCI_FIS_CTL_INTR_BIT   1
+#define AHCI_FIS_CTL_INTR_BIT   6
 #define AHCI_FIS_CTL_INTR       (1<<AHCI_FIS_CTL_INTR_BIT)
 
 typedef struct ahci_pio_setup_t {
@@ -177,8 +196,7 @@ typedef struct ahci_pio_setup_t {
     uint16_t rsv4;
 } ahci_pio_setup_t;
 
-typedef struct ahci_dma_setup_t
-{
+typedef struct ahci_dma_setup_t {
     // FIS_TYPE_DMA_SETUP
     uint8_t	fis_type;
 
@@ -191,7 +209,7 @@ typedef struct ahci_dma_setup_t
     // DMA Buffer Identifier. Used to Identify DMA buffer in host memory.
     // SATA Spec says host specific and not in Spec.
     // Trying AHCI spec might work.
-    uint64_t dma_buf_id;
+    uint32_t dma_buf_id[2];
 
     // Reserved
     uint32_t rsv2;
@@ -206,8 +224,10 @@ typedef struct ahci_dma_setup_t
     uint32_t rsv3;
 } ahci_dma_setup_t;
 
-#define AHCI_FIS_CTL_DIR_BIT    2
-#define AHCI_FIS_CTL_AUTO_BIT   0
+C_ASSERT(sizeof(ahci_dma_setup_t) == 0x1C);
+
+#define AHCI_FIS_CTL_DIR_BIT    5
+#define AHCI_FIS_CTL_AUTO_BIT   7
 
 #define AHCI_FIS_CTL_DIR        (1<<AHCI_FIS_CTL_DIR_BIT)
 #define AHCI_FIS_AUTO_DIR       (1<<AHCI_FIS_CTL_AUTO_BIT)
@@ -227,6 +247,8 @@ typedef enum ahci_sig_t {
     // Port multiplier
     SATA_SIG_PM     = (int32_t)0x96690101
 } ahci_sig_t;
+
+C_ASSERT(sizeof(ahci_sig_t) == 4);
 
 typedef struct hba_port_t {
     // command list base address, 1K-byte aligned
@@ -266,10 +288,10 @@ typedef struct hba_port_t {
     // SATA error (SCR1:SError)
     uint32_t sata_err;
 
-    // SATA active (SCR3:SActive)
+    // SATA active (SCR3:SActive) (bitmask by port)
     uint32_t sata_act;
 
-    // command issue
+    // command issue (bitmask by port)
     uint32_t cmd_issue;
 
     // SATA notification (SCR4:SNotification)
@@ -284,6 +306,8 @@ typedef struct hba_port_t {
     // vendor specific
     uint32_t vendor[4];
 } hba_port_t;
+
+C_ASSERT(sizeof(hba_port_t) == 0x80);
 
 // 0x00 - 0x2B, Generic Host Control
 typedef struct hba_host_ctl_t
@@ -330,6 +354,9 @@ typedef struct hba_host_ctl_t
     // 0x100 - 0x10FF, Port control registers
     hba_port_t ports[32];	// 1 ~ 32
 } hba_host_ctl_t;
+
+C_ASSERT(offsetof(hba_host_ctl_t, rsv) == 0x2C);
+C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 
 //
 // hba_host_ctl::cap
@@ -515,8 +542,6 @@ typedef struct hba_host_ctl_t
 #define AHCI_HP_IS_PSS          (1<<AHCI_HP_IS_PSS_BIT)
 #define AHCI_HP_IS_DHRS         (1<<AHCI_HP_IS_DHRS_BIT)
 
-// 0000
-
 //
 // hba_port_t::intr_en
 
@@ -696,26 +721,43 @@ typedef struct hba_host_ctl_t
 
 #define AHCI_HP_TFD_ERR         (AHCI_HP_TFD_ERR_MASK << AHCI_HP_TFD_ERR_BIT)
 
+// 4.2.1
 typedef struct hba_fis_t {
+    // offset = 0x00
     ahci_dma_setup_t dsfis;
     uint8_t pad0[4];
 
+    // offset = 0x20
     ahci_pio_setup_t psfis;
     uint8_t pad1[12];
 
+    // offset = 0x40
     // Register – Device to Host FIS
     ahci_fis_d2h_t rfis;
     uint8_t pad2[4];
 
+    // offset = 0x58
     // 0x58 (not documented)
     uint8_t sdbfis[8];
 
+    // offset = 0x60
     // Unknown fis buffer
     uint8_t ufis[64];
 
     uint8_t rsv[0x100-0xA0];
 } hba_fis_t;
 
+C_ASSERT(offsetof(hba_fis_t, dsfis) == 0x00);
+C_ASSERT(offsetof(hba_fis_t, psfis) == 0x20);
+C_ASSERT(sizeof(ahci_pio_setup_t) == 0x14);
+C_ASSERT(offsetof(hba_fis_t, rfis) == 0x40);
+C_ASSERT(sizeof(ahci_fis_d2h_t) == 0x14);
+C_ASSERT(offsetof(hba_fis_t, sdbfis) == 0x58);
+C_ASSERT(offsetof(hba_fis_t, ufis) == 0x60);
+C_ASSERT(offsetof(hba_fis_t, rsv) == 0xA0);
+C_ASSERT(sizeof(hba_fis_t) == 0x100);
+
+// 4.2.2
 typedef struct hba_cmd_hdr_t {
     // Header
     uint16_t hdr;
@@ -731,6 +773,8 @@ typedef struct hba_cmd_hdr_t {
 
     uint32_t rsv[4];
 } hba_cmd_hdr_t;
+
+C_ASSERT(sizeof(hba_cmd_hdr_t) == 32);
 
 //
 // hba_cmd_hdr_t::hdr
@@ -773,6 +817,7 @@ typedef struct hba_cmd_hdr_t {
 // Data Byte Count
 #define AHCI_CH_DBC_n(n)    (((n) << 1) | 1)
 
+// 4.2.3.3 Physical Region Descriptor Table Entry
 typedef struct hba_prdt_ent_t {
     // Data Base Address
     uint64_t dba;
@@ -781,16 +826,55 @@ typedef struct hba_prdt_ent_t {
     uint32_t dbc_intr;
 } hba_prdt_ent_t;
 
+// Makes command table entry 1KB
+#define AHCI_CMD_TBL_ENT_MAX_PRD 56
+
+// 4.2.3 1KB command
+typedef struct hba_cmd_tbl_ent_t {
+    union {
+        ahci_fis_d2h_t d2h;
+        ahci_fis_h2d_t h2d;
+        char filler[64];
+    } cfis;
+    char atapi_fis[16];
+    char filler[0x80-0x50];
+
+    // At offset 0x80
+    hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
+} hba_cmd_tbl_ent_t;
+
+C_ASSERT(sizeof(hba_cmd_tbl_ent_t) == 1024);
+
+typedef struct async_callback_t {
+    void (*callback)(uintptr_t);
+    uintptr_t callback_arg;
+} async_callback_t;
+
+typedef struct hba_port_info_t {
+    hba_fis_t volatile *fis;
+    hba_cmd_hdr_t volatile *cmd_hdr;
+    hba_cmd_tbl_ent_t volatile *cmd_tbl;
+    async_callback_t callbacks[32];
+    uint32_t sector_size;
+} hba_port_info_t;
+
 #define AHCI_PE_INTR_BIT    31
 #define AHCI_PE_DBC_BIT     1
-#define AHCI_PE_DBC_n(n)    (((n) << AHCI_PE_DBC_BIT) | 1)
+#define AHCI_PE_DBC_n(n)    ((n) | 1)
 
 typedef struct ahci_dev_t {
     pci_config_hdr_t config;
+
+    // Linear addresses
     hba_host_ctl_t volatile *mmio_base;
-    hba_fis_t volatile *fis[32];
-    hba_cmd_hdr_t volatile *cmd[32];
-    hba_prdt_ent_t volatile *prd[32];
+
+    void *buffers;
+
+    hba_port_info_t port_info[32];
+
+    int irq;
+    int ports_impl;
+    int num_cmd_slots;
 } ahci_dev_t;
 
 #define AHCI_MAX_DEVICES    16
@@ -802,58 +886,220 @@ static int ahci_supports_64bit(ahci_dev_t *dev)
     return (dev->mmio_base->cap & AHCI_HC_CAP_S64A) != 0;
 }
 
+static void ahci_handle_port_irqs(ahci_dev_t *dev, int port_num)
+{
+    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+
+    // Read command slot interrupt status
+    int slot;
+    for (uint32_t intr_status = port->intr_status;
+         intr_status != 0; intr_status &= ~(1 << slot)) {
+        slot = bit_lsb_set_32(intr_status);
+
+        // Invoke completion callback
+        async_callback_t *callback = dev->port_info[port_num].callbacks + slot;
+        if (callback->callback) {
+            callback->callback(callback->callback_arg);
+            callback->callback = 0;
+            callback->callback_arg = 0;
+        }
+
+        // Acknowledge slot interrupt
+        port->intr_status |= (1 << slot);
+    }
+}
+
+static void *ahci_irq_handler(int irq, void *ctx)
+{
+    for (unsigned i = 0; i < ahci_count; ++i) {
+        ahci_dev_t *dev = ahci_devices + i;
+
+        if (dev->irq != irq)
+            continue;
+
+        // Call callback on every port that has an interrupt pending
+        int port;
+        for (uint32_t intr_status = dev->mmio_base->intr_status;
+             intr_status != 0; intr_status &= ~(1 << port)) {
+            // Look through each port
+            port = bit_lsb_set_32(intr_status);
+
+            ahci_handle_port_irqs(dev, port);
+
+            // Acknowledge the interrupt on the port
+            dev->mmio_base->intr_status = (1 << port);
+        }
+    }
+
+    return ctx;
+}
+
+static int volatile test_callback_received;
+
+static void test_callback(uintptr_t arg)
+{
+    char *data = (char*)(void*)arg;
+
+    printk("%08x\n", data[0]);
+
+    test_callback_received = 1;
+}
+
+static void ahci_port_stop(ahci_dev_t *dev, int port_num)
+{
+    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+
+    // Clear start bit
+    // Clear FIS receive enable bit
+    port->cmd &= ~(AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE);
+
+    // Wait until there is not a command running,
+    // and there is not a FIS receive running
+    while (port->cmd & (AHCI_HP_CMD_CR | AHCI_HP_CMD_FR))
+        thread_yield();
+}
+
+static void ahci_port_start(ahci_dev_t *dev, int port_num)
+{
+    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+
+    // Clear start bit
+
+    // Wait until there is not a command running, and
+    // there is not a FIS receive running
+    while (port->cmd & (AHCI_HP_CMD_CR | AHCI_HP_CMD_FR))
+        thread_yield();
+
+    // Set start and FIS receive enable bit
+    port->cmd |= AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE;
+}
+
+static void ahci_port_stop_all(ahci_dev_t *dev)
+{
+    uint32_t impl = dev->ports_impl;
+    for (uint32_t i = 0; i < 32; ++i)
+        if (impl & (1<<i))
+            ahci_port_stop(dev, i);
+}
+
+static void ahci_port_start_all(ahci_dev_t *dev)
+{
+    uint32_t impl = dev->ports_impl;
+    for (uint32_t i = 0; i < 32; ++i)
+        if (impl & (1<<i))
+            ahci_port_start(dev, i);
+}
+
+static void ahci_read(ahci_dev_t *dev, int port_num, uint64_t lba,
+                      void *data, uint32_t count)
+{
+    hba_port_info_t *pi = dev->port_info + port_num;
+    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+
+    mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
+    size_t ranges_count;
+
+    ranges_count = mphysranges(ranges, countof(ranges),
+                               data, count * pi->sector_size,
+                               2 << 20);
+
+    for (size_t i = 0; i < ranges_count; ++i) {
+        pi->cmd_tbl->prdts[i].dba = ranges[i].physaddr;
+        pi->cmd_tbl->prdts[i].dbc_intr = AHCI_PE_DBC_n(ranges[i].size);
+    }
+
+    pi->cmd_tbl->cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+    pi->cmd_tbl->cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+    pi->cmd_tbl->cfis.h2d.command = ATA_CMD_READ_DMA;
+    pi->cmd_tbl->cfis.h2d.lba0 = lba & 0xFFFF;
+    pi->cmd_tbl->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
+    pi->cmd_tbl->cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
+    pi->cmd_tbl->cfis.h2d.lba5 = (lba >> 40);
+    pi->cmd_tbl->cfis.h2d.count = count;
+
+    // LBA
+    pi->cmd_tbl->cfis.d2h.device = 1<<6;
+
+    pi->cmd_hdr->hdr = AHCI_CH_LEN_n(sizeof(pi->cmd_tbl->cfis.h2d) >> 2);
+    pi->cmd_hdr->prdbc = 0;
+    pi->cmd_hdr->prdtl = ranges_count;
+
+    port->cmd = AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE;
+
+    pi->callbacks[port_num].callback = test_callback;
+    pi->callbacks[port_num].callback_arg = (uintptr_t)data;
+
+    atomic_barrier();
+    port->cmd_issue = 1;
+}
+
 static void ahci_rebase(ahci_dev_t *dev)
 {
+    // Stop all ports
+    ahci_port_stop_all(dev);
+
     int addr_type = ahci_supports_64bit(dev)
             ? MAP_NOCACHE | MAP_WRITETHRU
             : MAP_32BIT | MAP_NOCACHE | MAP_WRITETHRU;
 
     // Loop through the implemented ports
-    uint32_t impl = dev->mmio_base->ports_impl;
+    uint32_t ports_impl = dev->ports_impl;
+    uint32_t slots_impl = dev->num_cmd_slots;
+
+    // debug hack
+    ports_impl = 1;
+
+    // Enable interrupts overall
+    dev->mmio_base->host_ctl |= AHCI_HC_HC_IE;
+
     for (int port_num = 0; port_num < 32; ++port_num) {
-        if (!(impl & (1 << port_num)))
+        if (!(ports_impl & (1 << port_num)))
             continue;
 
         hba_port_t volatile *port = dev->mmio_base->ports + port_num;
 
-        // Allocate space for FIS and command list
-        hba_fis_t volatile *fis = mmap(
-                    0, PAGESIZE,
-                    PROT_READ | PROT_WRITE,
-                    addr_type, -1, 0);
-        hba_cmd_hdr_t volatile *cmd = mmap(
-                    0, PAGESIZE,
-                    PROT_READ | PROT_WRITE,
-                    addr_type, -1, 0);
-        hba_prdt_ent_t volatile *prd = mmap(
-                    0, PAGESIZE,
-                    PROT_READ | PROT_WRITE,
-                    addr_type, -1, 0);
-
-        dev->fis[port_num] = fis;
-        dev->cmd[port_num] = cmd;
-        dev->prd[port_num] = prd;
-
-        port->cmd_list_base = mphysaddr((void*)cmd);
-        port->fis_base = mphysaddr((void*)fis);
-
+        // debug hack
         if (port->sig != SATA_SIG_ATA)
             continue;
 
-        fis->rfis.lba0 = 0;
-        fis->rfis.lba2 = 0;
-        fis->rfis.lba5 = 0;
-        fis->rfis.count = 1;
-        fis->rfis.fis_type = FIS_TYPE_REG_H2D;
-        fis->rfis.error = 0;
+        size_t port_buffer_size = 0;
 
-        cmd->prdbc = 0;
-        cmd->prdtl = 1;
-        cmd->hdr = AHCI_CH_LEN_n(sizeof(fis->rfis));
-        cmd->ctba = mphysaddr((void*)prd);
+        // 256 byte FIS buffer
+        port_buffer_size += sizeof(hba_fis_t);
+        port_buffer_size += sizeof(hba_cmd_hdr_t) * 32;
+        port_buffer_size += sizeof(hba_cmd_tbl_ent_t) * 32;
 
-        port[port_num].cmd = AHCI_HP_CMD_ST;
+        void *buffers = mmap(
+                    0, port_buffer_size, PROT_READ | PROT_WRITE,
+                    addr_type, -1, 0);
+        memset(buffers, 0, port_buffer_size);
+
+        hba_cmd_hdr_t volatile *cmd_hdr = buffers;
+        hba_cmd_tbl_ent_t volatile *cmd_tbl = (void*)(cmd_hdr + 32);
+        hba_fis_t volatile *fis = (void*)(cmd_tbl + 32);
+
+        // Store linear addresses for writing to buffers
+        dev->port_info[port_num].fis = fis;
+        dev->port_info[port_num].cmd_hdr = cmd_hdr;
+        dev->port_info[port_num].cmd_tbl = cmd_tbl;
+
+        // Hack
+        dev->port_info[port_num].sector_size = 512;
+
+        atomic_barrier();
+        port->cmd_list_base = mphysaddr((void*)cmd_hdr);
+        port->fis_base = mphysaddr((void*)fis);
+        atomic_barrier();
+
+        // Set command table base addresses (physical)
+        for (uint32_t slot = 0; slot < slots_impl; ++slot) {
+            cmd_hdr[slot].ctba = mphysaddr((void*)(cmd_tbl + slot));
+        }
+
+        port->intr_en = 1;
     }
+
+    ahci_port_start_all(dev);
 }
 
 void ahci_init(void)
@@ -882,25 +1128,44 @@ void ahci_init(void)
         }
 
         if (ahci_count < countof(ahci_devices)) {
-            ahci_devices[ahci_count].config = pci_iter.config;
+            ahci_dev_t *dev = ahci_devices + ahci_count++;
 
-            printk("SATA MMIO base %x\n", pci_iter.config.base_addr[5]);
+            dev->config = pci_iter.config;
 
-            ahci_devices[ahci_count].mmio_base =
+            dev->mmio_base =
                     mmap((void*)(uintptr_t)pci_iter.config.base_addr[5],
                     0x1100, PROT_READ | PROT_WRITE,
                     MAP_PHYSICAL, -1, 0);
 
-            printk("Ports implemented: %u\n",
-                   ahci_devices[ahci_count].mmio_base->ports_impl);
+            // Cache implemented port bitmask
+            dev->ports_impl = dev->mmio_base->ports_impl;
 
-            ahci_rebase(ahci_devices + ahci_count);
+            // Cache number of command slots per port
+            dev->num_cmd_slots = 1 + ((dev->mmio_base->cap >>
+                                  AHCI_HC_CAP_NCS_BIT) &
+                                  AHCI_HC_CAP_NCS_MASK);
 
-            ++ahci_count;
+            dev->irq = pci_iter.config.irq_line;
+
+            ahci_rebase(dev);
+
+
+            void *data = mmap(0, 4096,
+                              PROT_READ | PROT_WRITE,
+                              MAP_32BIT, -1, 0);
+
+            ahci_read(dev, 0, 0, data, 1);
+
+            irq_hook(dev->irq, ahci_irq_handler);
+            irq_setmask(dev->irq, 1);
+
+            while (!test_callback_received)
+                thread_yield();
+
+            test_callback_received++;
         }
         printk("\nIRQ line=%d, IRQ pin=%d\n",
                pci_iter.config.irq_line,
                pci_iter.config.irq_pin);
     } while (pci_enumerate_next(&pci_iter));
 }
-#endif
