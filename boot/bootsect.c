@@ -1,4 +1,4 @@
-asm (
+__asm__ (
     ".section .head\n"
     ".globl halt\n"
     ".globl entry\n"
