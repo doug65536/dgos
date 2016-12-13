@@ -17,7 +17,7 @@ typedef struct gdt_entry_tss_ldt_t {
 
 typedef union gdt_entry_combined_t {
     gdt_entry_t mem;
-    gdt_entry_t tss_ldt;
+    gdt_entry_tss_ldt_t tss_ldt;
 } gdt_entry_combined_t;
 
 #define GDT_ACCESS_PRESENT_BIT   7
