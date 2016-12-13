@@ -177,14 +177,14 @@ static uint16_t check_a20()
 static uint16_t toggle_a20(uint8_t enable)
 {
     uint8_t value;
+    enable = (enable != 0) << 1;
     __asm__ __volatile__ (
         "inb $0x92,%1\n\t"
         "andb $~2,%1\n\t"
         "orb %0,%1\n\t"
         "wbinvd\n\t"
         "outb %1,$0x92\n\t"
-        : "=c" (enable), "=a" (value)
-        : "0" ((enable != 0) << 1)
+        : "+c" (enable), "=a" (value)
     );
     return 0;
 }

@@ -81,13 +81,13 @@ uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set)
 {
     uint64_t rax;
     __asm__ __volatile__ (
-        "mov %%cr0,%[result]\n\t"
-        "and %[clear],%[result]\n\t"
-        "or %[set],%[result]\n\t"
-        "mov %[result],%%cr0\n\t"
-        : [result] "=&A" (rax)
-        : [clear] "ri" (~clear),
-        [set] "ri" (set)
+        "movq %%cr0,%[result]\n\t"
+        "andq %[clear],%[result]\n\t"
+        "orq %[set],%[result]\n\t"
+        "movq %[result],%%cr0\n\t"
+        : [result] "=&r" (rax)
+        : [clear] "r" (~clear),
+          [set] "r" (set)
     );
     return rax;
 }
@@ -96,13 +96,13 @@ uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set)
 {
     uint64_t rax;
     __asm__ __volatile__ (
-        "mov %%cr4,%[result]\n\t"
-        "and %[clear],%[result]\n\t"
-        "or %[set],%[result]\n\t"
-        "mov %[result],%%cr4\n\t"
-        : [result] "=&A" (rax)
-        : [clear] "ri" (~clear),
-        [set] "ri" (set)
+        "movq %%cr4,%[result]\n\t"
+        "andq %[clear],%[result]\n\t"
+        "orq %[set],%[result]\n\t"
+        "movq %[result],%%cr4\n\t"
+        : [result] "=&r" (rax)
+        : [clear] "r" (~clear),
+          [set] "r" (set)
     );
     return rax;
 }
