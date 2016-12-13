@@ -19,7 +19,7 @@ void *memchr(void const *mem, int ch, size_t count)
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-void *strchr(char const *s, int ch)
+char *strchr(char const *s, int ch)
 {
     for (;; ++s) {
         char c = *s;

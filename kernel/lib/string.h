@@ -44,7 +44,7 @@ DECLARE_BUILTIN_3(char *, strncat, char *, char const *, size_t)
 
 size_t strlen(char const *src);
 void *memchr(void const *mem, int ch, size_t count);
-void *strchr(char const *s, int ch);
+char *strchr(char const *s, int ch);
 
 int strcmp(char const *lhs, char const *rhs);
 int strncmp(char const *lhs, char const *rhs, size_t count);
