@@ -90,7 +90,7 @@ ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
 
-LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
+LIBGCC := $(shell $(CC) -print-libgcc-file-name)
 LIBGCCDIR := $(dir $(LIBGCC))
 LIBGCCFILENAME = $(notdir $(LIBGCC))
 LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
