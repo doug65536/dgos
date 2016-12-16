@@ -94,7 +94,9 @@ int main(void)
     pci_init();
     keyb8042_init();
 
-    ahci_init();
+    callout_call('L');
+
+    //ahci_init();
 
     // Crash
     //*(uint64_t*)0xfeedbeefbaadf00d = 0;

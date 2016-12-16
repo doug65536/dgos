@@ -100,3 +100,7 @@ arch/x86_64/device/ide.h
 arch/x86_64/device/ide.c
 lib/bitsearch.h
 lib/bitsearch.c
+lib/bsearch.h
+lib/bsearch.c
+lib/threadsync.h
+lib/threadsync.c

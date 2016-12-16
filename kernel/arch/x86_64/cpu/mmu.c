@@ -705,7 +705,8 @@ static void init_create_pt(
 
     unsigned levels = (phys_addr == ~0UL) ? 4 : 3;
 
-    pte_t *iter;
+    pte_t volatile *iter;
+    pte_t old_pte;
 
     // Map aliasing page to point to new page
     iter = mm_map_aliasing_pte(aliasing_pte, root_physaddr);
@@ -721,14 +722,21 @@ static void init_create_pt(
             // Allocate a new page table
             addr = init_take_page(1);
 
-            // Update current page table to point to new page
-            iter[path[level]] = addr | page_flags;
+            // Atomically update current page table to point to new page
+            old_pte = atomic_cmpxchg(iter + path[level],
+                                     0, addr | page_flags);
+            if (old_pte == 0) {
+                // Map aliasing page to point to new page
+                iter = init_map_aliasing_pte(aliasing_pte, addr);
 
-            // Map aliasing page to point to new page
-            iter = init_map_aliasing_pte(aliasing_pte, addr);
+                // Clear new page
+                //aligned16_memset((void*)iter, 0, PAGE_SIZE);
+            } else {
+                addr = old_pte & PTE_ADDR;
 
-            // Clear new page table
-            aligned16_memset(iter, 0, PAGE_SIZE);
+                // Return page to pool
+                mmu_free_phys(addr);
+            }
         } else {
             // Descend into next page table
             iter = init_map_aliasing_pte(aliasing_pte, addr);
@@ -739,12 +747,9 @@ static void init_create_pt(
     }
 
     if (levels == 3 && !(iter[path[3]] & PTE_PRESENT)) {
-        //printk("[%u] at %lx\n", path[3], phys_addr);
-        iter[path[3]] = (phys_addr & PTE_ADDR) |
-            page_flags;
+        old_pte = atomic_cmpxchg(iter + path[3],
+                0, (phys_addr & PTE_ADDR) | page_flags);
         cpu_invalidate_page(linear_addr);
-    } else {
-        //printk("already existed\n");
     }
 }
 
@@ -1004,6 +1009,8 @@ void mmu_init(int ap)
         }
     }
 
+    release_apte(aliasing_pte);
+
     // Start using physical memory allocator
     usable_ranges = 0;
 
@@ -1013,7 +1020,7 @@ void mmu_init(int ap)
 
     intr_hook(14, mmu_page_fault_handler);
 
-    callout_call('V');
+    callout_call('M');
 }
 
 static size_t round_up(size_t n)

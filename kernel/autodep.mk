@@ -40,6 +40,12 @@ $(DUMPDIR)/%.s : %.c
 $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
 	$(COMPILE.c) $(OUTPUT_OPTION) -fverbose-asm -S $<
 
+# Generate preprocessed source for C
+$(DUMPDIR)/%.i : %.c
+$(DUMPDIR)/%.i : %.c $(DEPDIR)/%.d
+	mkdir -p $(dir $@)
+	$(COMPILE.c) $(OUTPUT_OPTION) -E $<
+
 # Compile C++ with cc extension
 
 .cc.o:

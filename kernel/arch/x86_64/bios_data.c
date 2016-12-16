@@ -12,4 +12,4 @@ static void biosdata_remap(void *arg)
             MAP_PHYSICAL, -1, 0);
 }
 
-REGISTER_CALLOUT(biosdata_remap, 0, 'V', "000");
+REGISTER_CALLOUT(biosdata_remap, 0, 'M', "000");

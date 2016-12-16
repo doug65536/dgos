@@ -1,6 +1,5 @@
 #pragma once
 
-
-
-void ahci_init(void);
-
+#define STORAGE_DEV_NAME ahci
+#include "dev_storage.h"
+#undef STORAGE_DEV_NAME

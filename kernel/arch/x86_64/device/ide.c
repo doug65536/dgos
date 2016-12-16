@@ -1,4 +1,6 @@
+#define STORAGE_DEV_NAME ide
 #include "dev_storage.h"
+#undef STORAGE_DEV_NAME
 
 #include "cpu/ioport.h"
 #include "pci.h"
@@ -15,7 +17,7 @@ typedef struct ide_chan_ports_t {
     uint8_t irq;
 } ide_chan_ports_t;
 
-struct storage_if_t {
+struct ide_if_t {
     storage_if_vtbl_t *vtbl;
 
     ide_chan_ports_t ports[2];
@@ -23,7 +25,7 @@ struct storage_if_t {
 };
 
 #define IDE_MAX_IF 8
-static storage_if_t ide_if[IDE_MAX_IF];
+static ide_if_t ide_ifs[IDE_MAX_IF];
 static size_t ide_if_count;
 
 //
@@ -73,15 +75,16 @@ static size_t ide_if_count;
 #define      ATAPI_CMD_READ       0xA8
 #define      ATAPI_CMD_EJECT      0x1B
 
-static int ide_detect(storage_if_base_t **result)
+static storage_if_list_t ide_detect(void)
 {
+    storage_if_list_t list = {ide_ifs, sizeof(*ide_ifs), 0};
     pci_dev_iterator_t iter;
 
     if (!pci_enumerate_begin(&iter, 1, 1))
-        return 0;
+        return list;
 
     do {
-        storage_if_t *dev = ide_if + ide_if_count++;
+        ide_if_t *dev = ide_ifs + ide_if_count++;
 
         dev->ports[0].cmd = (iter.config.base_addr[0] <= 1)
                 ? 0x1F0
@@ -117,15 +120,9 @@ static int ide_detect(storage_if_base_t **result)
         }
     } while (pci_enumerate_next(&iter));
 
-    if (ide_if_count > 0)
-        *result = (storage_if_base_t*)ide_if;
+    list.count = ide_if_count;
 
-    return ide_if_count;
-}
-
-static void ide_init(storage_if_base_t *i)
-{
-    (void)i;
+    return list;
 }
 
 static void ide_cleanup(storage_if_base_t *i)
@@ -133,10 +130,11 @@ static void ide_cleanup(storage_if_base_t *i)
     (void)i;
 }
 
-static int ide_detect_devices(storage_dev_base_t **result)
+static storage_dev_list_t ide_detect_devices(storage_if_base_t *if_)
 {
-    (void)result;
-    return 0;
+    storage_dev_list_t list = {0, 0, 0};
+    (void)if_;
+    return list;
 }
 
 REGISTER_storage_if_DEVICE(ide)

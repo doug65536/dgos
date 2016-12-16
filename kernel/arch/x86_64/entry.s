@@ -2,9 +2,7 @@
 
 .globl entry
 entry:
-	# Align stack
-	and $-16,%rsp
-
+	# See if this is the bootstrap processor
 	push %rdx
 	push %rcx
 	mov $0x1B,%ecx
@@ -19,7 +17,7 @@ entry:
 
 0:
 
-	jmp 1f
+	#jmp 1f
 	# Debugger hack
 	mov $0,%rbp
 	0:
@@ -53,6 +51,10 @@ entry:
 
 	xor %edi,%edi
 	call cpu_hw_init
+
+	# Initialize early-initialized devices
+	mov $'E',%edi
+	call callout_call
 
 	call main
 

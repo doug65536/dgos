@@ -249,17 +249,7 @@ static thread_t thread_create_with_state(
         thread->state = state;
 
         // Atomically make sure thread_count > i
-        size_t old_count = thread_count;
-        while (old_count <= i) {
-            size_t latest_count = atomic_cmpxchg(
-                        &thread_count, old_count, i + 1);
-
-            if (latest_count > i)
-                break;
-
-            pause();
-            old_count = latest_count;
-        }
+        atomic_max(&thread_count, i + 1);
 
         return i;
     }
