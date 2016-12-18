@@ -108,19 +108,6 @@ static uint64_t get_apic_id(void)
     return apic_id;
 }
 
-//static cpu_info_t *cpu_from_apic_id(uint64_t apic_id)
-//{
-//    for (cpu_info_t *cpu = cpus; cpu < cpus + MAX_CPUS; ++cpu) {
-//        if (!cpu->online)
-//            continue;
-//        if (cpu->apic_id == apic_id)
-//            return cpu;
-//    }
-//    assert(!"APIC ID not found!");
-//    // Failed
-//    return 0;
-//}
-
 static cpu_info_t *this_cpu(void)
 {
     return cpu_gs_read_ptr();
@@ -509,6 +496,30 @@ void thread_sleep_for(uint64_t ms)
     thread_sleep_until(time_ms() + ms);
 }
 
+void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
+{
+    cpu_info_t *cpu = this_cpu();
+    thread_info_t *thread = cpu->cur_thread;
+
+    *thread_id = thread - threads;
+    atomic_barrier();
+
+    thread->state = THREAD_IS_SUSPENDED_BUSY;
+    atomic_barrier();
+    spinlock_unlock(lock);
+    thread_yield();
+    spinlock_lock(lock);
+}
+
+void thread_resume(thread_t thread)
+{
+    // Wait for it to reach suspended state in case of race
+    while (threads[thread].state != THREAD_IS_SUSPENDED)
+        pause();
+
+    threads[thread].state = THREAD_IS_READY;
+}
+
 uint32_t thread_cpu_count(void)
 {
     return cpu_count;
@@ -533,9 +544,17 @@ void thread_set_cpu_mmu_seq(uint64_t seq)
 
 thread_t thread_get_id(void)
 {
-    cpu_irq_disable();
+    thread_t thread_id;
+
+    int was_enabled = cpu_irq_disable();
+
     cpu_info_t *cpu = this_cpu();
-    return cpu->cur_thread - threads;
+    thread_id = cpu->cur_thread - threads;
+
+    if (was_enabled)
+        cpu_irq_enable();
+
+    return thread_id;
 }
 
 uint64_t thread_get_affinity(int id)
