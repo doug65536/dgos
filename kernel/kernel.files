@@ -104,3 +104,4 @@ lib/bsearch.h
 lib/bsearch.c
 lib/threadsync.h
 lib/threadsync.c
+.gitignore

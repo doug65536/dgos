@@ -44,3 +44,4 @@ mpentry.s
 mpentry.h
 vesa.c
 vesa.h
+.gitignore
