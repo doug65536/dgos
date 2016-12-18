@@ -1,3 +1,4 @@
+#define STORAGE_IMPL
 #define STORAGE_DEV_NAME ide
 #include "dev_storage.h"
 #undef STORAGE_DEV_NAME
@@ -75,7 +76,7 @@ static size_t ide_if_count;
 #define      ATAPI_CMD_READ       0xA8
 #define      ATAPI_CMD_EJECT      0x1B
 
-static storage_if_list_t ide_detect(void)
+static storage_if_list_t ide_if_detect(void)
 {
     storage_if_list_t list = {ide_ifs, sizeof(*ide_ifs), 0};
     pci_dev_iterator_t iter;
@@ -125,16 +126,16 @@ static storage_if_list_t ide_detect(void)
     return list;
 }
 
-static void ide_cleanup(storage_if_base_t *i)
+static void ide_if_cleanup(storage_if_base_t *i)
 {
     (void)i;
 }
 
-static storage_dev_list_t ide_detect_devices(storage_if_base_t *if_)
+static storage_dev_list_t ide_if_detect_devices(storage_if_base_t *if_)
 {
     storage_dev_list_t list = {0, 0, 0};
     (void)if_;
     return list;
 }
 
-REGISTER_storage_if_DEVICE(ide)
+REGISTER_storage_if_DEVICE(ide);

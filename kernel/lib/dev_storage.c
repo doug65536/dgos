@@ -12,7 +12,8 @@ int storage_if_count;
 storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
 int storage_dev_count;
 
-void register_storage_if_device(const char *name, storage_if_vtbl_t *vtbl)
+void register_storage_if_device(const char *name,
+                                storage_if_vtbl_t *vtbl)
 {
     // Get a list of storage devices of this type
     storage_if_list_t if_list = vtbl->detect();

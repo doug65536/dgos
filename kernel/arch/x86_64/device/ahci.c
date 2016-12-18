@@ -1,3 +1,4 @@
+#define STORAGE_IMPL
 #include "device/ahci.h"
 #include "device/pci.h"
 #include "irq.h"
@@ -13,6 +14,7 @@
 
 typedef struct ahci_if_t ahci_if_t;
 DECLARE_storage_if_DEVICE(ahci);
+DECLARE_storage_dev_DEVICE(ahci);
 
 typedef enum ata_cmd_t {
     ATA_CMD_READ_PIO        = 0x20,
@@ -1013,6 +1015,7 @@ typedef struct hba_port_info_t {
 #define AHCI_PE_DBC_BIT     1
 #define AHCI_PE_DBC_n(n)    ((n) | 1)
 
+// Drive interface
 struct ahci_if_t {
     storage_if_vtbl_t *vtbl;
 
@@ -1030,9 +1033,20 @@ struct ahci_if_t {
     int num_cmd_slots;
 };
 
+// Drive
+struct ahci_dev_t {
+    storage_dev_vtbl_t *vtbl;
+    ahci_if_t *if_;
+    int port;
+};
+
 #define AHCI_MAX_DEVICES    16
 static ahci_if_t ahci_devices[AHCI_MAX_DEVICES];
 static unsigned ahci_count;
+
+#define AHCI_MAX_DRIVES    64
+static ahci_dev_t ahci_drives[AHCI_MAX_DRIVES];
+static unsigned ahci_drive_count;
 
 static int ahci_supports_64bit(ahci_if_t *dev)
 {
@@ -1157,17 +1171,6 @@ static void *ahci_irq_handler(int irq, void *ctx)
     }
 
     return ctx;
-}
-
-static int volatile test_callback_received;
-
-static void test_callback(int error, uintptr_t arg)
-{
-    uint64_t *data = (void*)arg;
-
-    printk("Error=%d, Data=%016lx\n", error, data[0]);
-
-    test_callback_received = 1;
 }
 
 static void ahci_port_stop(ahci_if_t *dev, int port_num)
@@ -1422,7 +1425,7 @@ static void ahci_bios_handoff(ahci_if_t *dev)
         thread_yield();
 }
 
-static storage_if_list_t ahci_detect(void)
+static storage_if_list_t ahci_if_detect(void)
 {
     storage_if_list_t list = {ahci_devices, sizeof(*ahci_devices), 0};
     pci_dev_iterator_t pci_iter;
@@ -1455,7 +1458,7 @@ static storage_if_list_t ahci_detect(void)
         if (ahci_count < countof(ahci_devices)) {
             ahci_if_t *dev = ahci_devices + ahci_count++;
 
-            dev->vtbl = &ahci_device_vtbl;
+            dev->vtbl = &ahci_if_device_vtbl;
 
             dev->config = pci_iter.config;
 
@@ -1480,28 +1483,6 @@ static storage_if_list_t ahci_detect(void)
 
             irq_hook(dev->irq, ahci_irq_handler);
             irq_setmask(dev->irq, 1);
-
-            char *data = mmap(0, 4096,
-                              PROT_READ | PROT_WRITE,
-                              MAP_32BIT, -1, 0);
-
-            ahci_rw(dev, 0, 0, data, 1, 0,
-                      test_callback, (uintptr_t)data);
-
-            ahci_rw(dev, 0, 1, data + 0x200, 1, 0,
-                      test_callback, (uintptr_t)data);
-
-            ahci_rw(dev, 0, 2, data + 0x400, 1, 0,
-                      test_callback, (uintptr_t)data);
-
-            ahci_rw(dev, 0, 3, data + 0x600, 1, 0,
-                      test_callback, (uintptr_t)data);
-
-            ahci_rw(dev, 0, 4, data + 0x800, 1, 0,
-                      test_callback, (uintptr_t)data);
-
-            //ahci_read(dev, 0, 0x400000000000, data, 1,
-            //          test_callback, (uintptr_t)data);
         }
     } while (pci_enumerate_next(&pci_iter));
 
@@ -1513,16 +1494,99 @@ static storage_if_list_t ahci_detect(void)
 //
 // device registration
 
-static storage_dev_list_t ahci_detect_devices(storage_if_base_t *if_)
+static storage_dev_list_t ahci_if_detect_devices(storage_if_base_t *if_)
 {
-    storage_dev_list_t list = {0,0,0};
-    (void)if_;
+    storage_dev_list_t list = {ahci_drives,sizeof(*ahci_drives),0};
+    STORAGE_IF_DEV_PTR(if_);
+
+    for (int port_num = 0; port_num < 32; ++port_num) {
+        if (!self->ports_impl & (1U<<port_num))
+            continue;
+
+        hba_port_t volatile *port = self->mmio_base->ports + port_num;
+
+        if (port->sig == SATA_SIG_ATA) {
+            ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
+            drive->vtbl = &ahci_dev_device_vtbl;
+            drive->if_ = self;
+            drive->port = port_num;
+        }
+    }
+
+    list.count = ahci_drive_count;
+
     return list;
 }
 
-static void ahci_cleanup(storage_if_base_t *dev)
+static void ahci_if_cleanup(storage_if_base_t *dev)
 {
     (void)dev;
 }
 
-REGISTER_storage_if_DEVICE(ahci)
+static void ahci_dev_cleanup(storage_dev_base_t *dev)
+{
+    STORAGE_DEV_DEV_PTR_UNUSED(dev);
+}
+
+typedef struct ahci_blocking_io_t {
+    thread_t thread;
+    spinlock_hold_t hold;
+    spinlock_t lock;
+    int volatile err;
+    int volatile done;
+} ahci_blocking_io_t;
+
+static void ahci_async_complete(int error, uintptr_t arg)
+{
+    ahci_blocking_io_t *state = (void*)arg;
+    printdbg("Callback: Read completed, waiting for lock\n");
+    spinlock_lock(&state->lock);
+    state->err = error;
+    atomic_barrier();
+    state->done = 1;
+    atomic_barrier();
+    printdbg("Callback: Resuming blocked thread\n");
+    thread_resume(state->thread);
+    printdbg("Callback: Unlocking state\n");
+    spinlock_unlock(&state->lock);
+}
+
+static int ahci_dev_read(storage_dev_base_t *dev,
+               void *data, uint64_t count, uint64_t lba)
+{
+    STORAGE_DEV_DEV_PTR(dev);
+
+    ahci_blocking_io_t block_state;
+    memset(&block_state, 0, sizeof(block_state));
+
+    printdbg("Reader: acquire\n");
+    block_state.hold = spinlock_lock_noirq(&block_state.lock);
+
+    ahci_rw(self->if_, self->port, lba, data, count, 0,
+            ahci_async_complete, (uintptr_t)&block_state);
+
+    printdbg("Reader: Suspending\n");
+    thread_suspend_release(&block_state.lock, &block_state.thread);
+
+    printdbg("Reader: Unlocking\n");
+    spinlock_unlock_noirq(&block_state.lock, &block_state.hold);
+
+    return block_state.err;
+}
+
+static int ahci_dev_write(storage_dev_base_t *dev,
+                void *data, uint64_t count, uint64_t lba)
+{
+    STORAGE_DEV_DEV_PTR(dev);
+    ahci_rw(self->if_, self->port, lba, data, count, 0, 0, 0);
+    return 0;
+}
+
+static int ahci_dev_flush(storage_dev_base_t *dev)
+{
+    STORAGE_DEV_DEV_PTR_UNUSED(dev);
+    return 0;
+}
+
+REGISTER_storage_if_DEVICE(ahci);
+DEFINE_storage_dev_DEVICE(ahci);

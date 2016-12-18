@@ -668,4 +668,4 @@ static void vga_mouse_add_xy(text_display_base_t *dev,
     mouse_toggle(self, was_shown);
 }
 
-REGISTER_text_display_DEVICE(vga)
+REGISTER_text_display_DEVICE(vga);

@@ -9,6 +9,7 @@
 #include "callout.h"
 #include "device/ahci.h"
 #include "time.h"
+#include "dev_storage.h"
 
 int life_and_stuff = 42;
 
@@ -62,9 +63,16 @@ char shell_stack[4096];
 static int shell_thread(void *p)
 {
     printk("From shell thread!! %016lx", (uint64_t)p);
+
+    void *data = mmap(0, 65536, PROT_READ | PROT_WRITE,
+                      0, -1, 0);
+
     while (1) {
-        ++*(char*)0xb8002;
-        thread_sleep_for(1000);
+        ++*(char*)(0xb8000+80*2);
+        //thread_sleep_for(1000);
+
+        storage_devs[0]->vtbl->read(storage_devs[0],
+                data, 65536/512, 0);
     }
     return 0;
 }
