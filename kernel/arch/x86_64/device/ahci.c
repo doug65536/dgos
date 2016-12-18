@@ -1534,41 +1534,54 @@ typedef struct ahci_blocking_io_t {
     spinlock_t lock;
     int volatile err;
     int volatile done;
+    uint64_t lba;
 } ahci_blocking_io_t;
 
 static void ahci_async_complete(int error, uintptr_t arg)
 {
     ahci_blocking_io_t *state = (void*)arg;
-    printdbg("Callback: Read completed, waiting for lock\n");
+
+    char buf[64];
+    snprintf(buf, sizeof(buf), "Callback(%ld):", state->lba);
+
+    printdbg("%s Read completed, waiting for lock\n", buf);
+
     spinlock_lock(&state->lock);
     state->err = error;
+
     atomic_barrier();
     state->done = 1;
+
     atomic_barrier();
-    printdbg("Callback: Resuming blocked thread\n");
+    printdbg("%s Resuming blocked thread\n", buf);
     thread_resume(state->thread);
-    printdbg("Callback: Unlocking state\n");
+    printdbg("%s Unlocking state\n", buf);
     spinlock_unlock(&state->lock);
 }
 
 static int ahci_dev_read(storage_dev_base_t *dev,
                void *data, uint64_t count, uint64_t lba)
 {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "  Reader(%ld):", lba);
+
     STORAGE_DEV_DEV_PTR(dev);
 
     ahci_blocking_io_t block_state;
     memset(&block_state, 0, sizeof(block_state));
 
-    printdbg("Reader: acquire\n");
+    block_state.lba = lba;
+
+    printdbg("%s acquire\n", buf);
     block_state.hold = spinlock_lock_noirq(&block_state.lock);
 
     ahci_rw(self->if_, self->port, lba, data, count, 0,
             ahci_async_complete, (uintptr_t)&block_state);
 
-    printdbg("Reader: Suspending\n");
+    printdbg("%s Suspending\n", buf);
     thread_suspend_release(&block_state.lock, &block_state.thread);
 
-    printdbg("Reader: Unlocking\n");
+    printdbg("%s Unlocking\n", buf);
     spinlock_unlock_noirq(&block_state.lock, &block_state.hold);
 
     return block_state.err;
