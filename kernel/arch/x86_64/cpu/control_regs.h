@@ -80,11 +80,13 @@ typedef struct table_register_t {
 } table_register_t;
 
 typedef struct table_register_64_t {
+    // Dummy 16-bit field for alignment
+    uint16_t align;
+
+    // Actual beginning of register value
     uint16_t limit;
-    uint16_t base_lo;
-    uint16_t base_hi;
-    uint16_t base_hi1;
-    uint16_t base_hi2;
+    uint32_t base_lo;
+    uint32_t base_hi;
 } table_register_64_t;
 
 // Get whole MSR register as a 64-bit value

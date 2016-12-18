@@ -105,9 +105,9 @@ extern void isr_entry_0xC0(void);
 static void load_idtr(table_register_64_t *table_reg)
 {
     __asm__ __volatile__ (
-        "lidtq %[table_reg]\n\t"
+        "lidtq (%[table_reg])\n\t"
         :
-        : [table_reg] "m" (*table_reg)
+        : [table_reg] "r" (&table_reg->limit)
     );
 }
 
@@ -132,10 +132,8 @@ int idt_init(int ap)
     table_register_64_t idtr;
 
     addr = (uint64_t)idt;
-    idtr.base_lo = (uint16_t)(addr & 0xFFFF);
-    idtr.base_hi = (uint16_t)((addr >> 16) & 0xFFFF);
-    idtr.base_hi1 = (uint16_t)((addr >> 32) & 0xFFFF);
-    idtr.base_hi2 = (uint16_t)((addr >> 48) & 0xFFFF);
+    idtr.base_lo = (uint32_t)(addr & 0xFFFFFFFF);
+    idtr.base_hi = (uint32_t)((addr >> 32) & 0xFFFFFFFF);
     idtr.limit = sizeof(idt) - 1;
 
     load_idtr(&idtr);

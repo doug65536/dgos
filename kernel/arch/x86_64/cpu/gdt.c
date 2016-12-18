@@ -62,10 +62,8 @@ void gdt_init(void)
 {
     table_register_64_t gdtr;
     uintptr_t gdt_addr = (uintptr_t)gdt;
-    gdtr.base_lo = gdt_addr & 0xFFFF;
-    gdtr.base_hi = (gdt_addr >> 16) & 0xFFFF;
-    gdtr.base_hi1 = (gdt_addr >> 32) & 0xFFFF;
-    gdtr.base_hi2 = (gdt_addr >> 48) & 0xFFFF;
+    gdtr.base_lo = gdt_addr & 0xFFFFFFFF;
+    gdtr.base_hi = (gdt_addr >> 32) & 0xFFFFFFFF;
     gdtr.limit = sizeof(gdt) - 1;
     cpu_set_gdtr(gdtr);
 }

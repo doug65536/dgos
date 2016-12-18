@@ -166,9 +166,9 @@ table_register_64_t cpu_get_gdtr(void)
 {
     table_register_64_t gdtr;
     __asm__ __volatile__ (
-        "sgdtq %0\n\t"
-        : "=m" (gdtr)
+        "sgdtq (%0)\n\t"
         :
+        : "r" (&gdtr.limit)
         : "memory"
     );
     return gdtr;
@@ -179,7 +179,7 @@ void cpu_set_gdtr(table_register_64_t gdtr)
     __asm__ __volatile__ (
         "lgdtq (%0)\n\t"
         :
-        : "r" (&gdtr)
+        : "r" (&gdtr.limit)
         : "memory"
     );
 }
@@ -215,7 +215,7 @@ int cpu_irq_disable(void)
         "cli\n\t"
         : [rflags] "=r" (rflags)
     );
-    return !!((rflags >> 9) & 1);
+    return ((rflags >> 9) & 1);
 }
 
 void cpu_irq_enable(void)
