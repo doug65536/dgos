@@ -10,6 +10,7 @@
 #include "device/ahci.h"
 #include "time.h"
 #include "dev_storage.h"
+#include "rbtree.h"
 
 int life_and_stuff = 42;
 
@@ -101,6 +102,8 @@ int main(void)
 {
     pci_init();
     keyb8042_init();
+
+    rbtree_test();
 
     callout_call('L');
 

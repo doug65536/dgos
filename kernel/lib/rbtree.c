@@ -70,9 +70,11 @@ static void rbtree_dump(rbtree_t *tree)
 {
     printk("ROOT=%u\n", tree->root);
     for (rbtree_iter_t i = 1; i < tree->size; ++i)
-        printk("%u) left=%u right=%u parent=%u item=%d\n",
+        printk("%u) left=%u right=%u parent=%u c=%c item=%d\n",
                i, NODE(i)->left, NODE(i)->right,
-               NODE(i)->parent, *(int*)NODE(i)->item);
+               NODE(i)->parent,
+               NODE(i)->color == RED ? 'R' : 'B',
+               *(int*)NODE(i)->item);
     printk("---\n");
 }
 
@@ -135,15 +137,25 @@ static rbtree_iter_t rbtree_rotate_left(
 
     rbtree_iter_t g = NODE(p)->parent;
 
-    assert(g != 0);
+    //assert(g != 0);
 
     RBTREE_TRACE("Rotating left n=%u g=%u\n", p, g);
 
     rbtree_iter_t n = NODE(p)->right;
     rbtree_iter_t nl = NODE(n)->left;
-    NODE(g)->left = n;
+    if (g) {
+        NODE(g)->left = n;
+        NODE(n)->parent = g;
+    } else {
+        tree->root = n;
+        NODE(n)->parent = 0;
+    }
     NODE(p)->right = nl;
+    NODE(nl)->parent = p;
+
     NODE(n)->left = p;
+    NODE(p)->parent = n;
+
     p = NODE(n)->left;
     return p;
 }
@@ -155,15 +167,25 @@ static rbtree_iter_t rbtree_rotate_right(
 
     rbtree_iter_t g = NODE(p)->parent;
 
-    assert(g != 0);
+    //assert(g != 0);
 
     RBTREE_TRACE("Rotating right n=%u g=%u\n", p, g);
 
     rbtree_iter_t n = NODE(p)->left;
     rbtree_iter_t nr = NODE(n)->right;
-    NODE(g)->right = n;
+    if (g) {
+        NODE(g)->right = n;
+        NODE(n)->parent = g;
+    } else {
+        tree->root = n;
+        NODE(n)->parent = 0;
+    }
     NODE(p)->left = nr;
+    NODE(nr)->parent = p;
+
     NODE(n)->right = p;
+    NODE(p)->parent = n;
+
     p = NODE(n)->right;
     return p;
 }

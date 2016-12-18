@@ -94,6 +94,8 @@ lib/assert.h
 lib/assert.c
 lib/debug.h
 lib/debug.c
+lib/rbtree.h
+lib/rbtree.c
 arch/x86_64/device/ide.h
 arch/x86_64/device/ide.c
 lib/bitsearch.h
