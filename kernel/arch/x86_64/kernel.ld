@@ -16,6 +16,10 @@ SECTIONS {
 		*(.entry)
 
 		. = ALIGN(64);
+		*(.text.startup .text.startup.*)
+		*(.text.hot .text.hot.*)
+
+		. = ALIGN(64);
 		*(.text)
 		*(SORT(.text.*))
 
@@ -33,19 +37,19 @@ SECTIONS {
 		*(SORT(.fini_array.*))
 		PROVIDE(___fini_en = .);
 
-		. = ALIGN(16);
+		. = ALIGN(32);
 
 		PROVIDE(___callout_array_st = .);
-		*(.callout_array)
 		*(SORT(.callout_array.*))
 		PROVIDE(___callout_array_en = .);
 
 		. = ALIGN(64);
-		*(.eh_frame)
-
-		. = ALIGN(64);
 		*(.rodata)
 		*(SORT(.rodata.*))
+
+		*(.text .stub .text.* .gnu.linkonce.t.*)
+		/* .gnu.warning sections are handled specially by elf32.em.  */
+		*(.gnu.warning)
 
 		/* Expose addresses/sizes to kernel as initialized data */
 
@@ -76,6 +80,15 @@ SECTIONS {
 		PROVIDE(___text_en = .);
 	} = 0xCC
 
+	.eh_frame_hdr : ALIGN(4096) {
+		*(.eh_frame_hdr)
+		*(.eh_frame_entry .eh_frame_entry.*)
+	}
+	.eh_frame : ALIGN(4096) {
+		KEEP(*(.eh_frame))
+		*(.eh_frame.*)
+	}
+
 	/* Initialized data */
 	.data  : ALIGN(4096) {
 		*(.data)
@@ -102,8 +115,47 @@ SECTIONS {
 		PROVIDE(___bss_en = .);
 	}
 
-	.got.plt : ALIGN(4096) {
+	.got : ALIGN(4096) {
+		*(.got*)
 		*(.got.plt)
+	}
+
+	.rela.dyn : {
+		*(.rela.init)
+		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
+		*(.rela.fini)
+		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
+		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
+		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
+		*(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
+		*(.rela.ctors)
+		*(.rela.dtors)
+		*(.rela.got)
+		*(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
+		*(.rela.ldata .rela.ldata.* .rela.gnu.linkonce.l.*)
+		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
+		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
+		*(.rela.ifunc)
+	}
+
+	.rela.plt : {
+		*(.rela.plt)
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
+	}
+
+	.plt : {
+		*(.plt)
+		*(.iplt)
+	}
+
+	.plt.got : {
+		*(.plt.got)
+	}
+
+	.plt.bnd : {
+		*(.plt.bnd)
 	}
 
 	. = ALIGN(4096);
@@ -120,6 +172,7 @@ SECTIONS {
 	.tbss : {
 		PROVIDE(___tbss_st = .);
 		*(.tbss)
+		*(.tcommon)
 		. = ALIGN(16);
 		PROVIDE(___tbss_en = .);
 	}

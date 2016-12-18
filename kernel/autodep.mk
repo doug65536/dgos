@@ -27,16 +27,24 @@ $(OBJS): Makefile
 
 # Compile assembly
 .s.o:
-	$(COMPILE.s) $(OUTPUT_OPTION) -c $<
+	$(COMPILE.s) $(OUTPUT_OPTION) \
+		-c $<
 
 # Compile C
 .c.o:
-	$(COMPILE.c) $(OUTPUT_OPTION) -c $<
+	$(COMPILE.c) \
+		$(OUTPUT_OPTION) -c $<
 
 # Generate assembly dump for C
 $(DUMPDIR)/%.s : %.c
 $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
 	$(COMPILE.c) $(OUTPUT_OPTION) -fverbose-asm -S $<
+
+# Generate preprocessed source for C
+$(DUMPDIR)/%.i : %.c
+$(DUMPDIR)/%.i : %.c $(DEPDIR)/%.d
+	mkdir -p $(dir $@)
+	$(COMPILE.c) $(OUTPUT_OPTION) -E $<
 
 # Compile C++ with cc extension
 
@@ -55,12 +63,14 @@ ifdef DISASSEMBLEFLAGS
 # Disassemble
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin
 $(DUMPDIR)/%.dis : $(BINDIR)/%.bin
+	mkdir -p $(dir $@)
 	$(OBJDUMP) $(DISASSEMBLEFLAGS) $< > $@
 endif
 
 ifdef DISASSEMBLEELFFLAGS
 $(DUMPDIR)/%.disasm : $(BINDIR)/%.bin
 $(DUMPDIR)/%.disasm : $(BINDIR)/%.bin
+	mkdir -p $(dir $@)
 	$(OBJDUMP) $(DISASSEMBLEELFFLAGS) $< > $@
 endif
 

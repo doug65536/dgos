@@ -10,6 +10,7 @@
 #include "physmem.h"
 #include "mpentry.h"
 #include "farptr.h"
+#include "vesa.h"
 
 //static unsigned long elf64_hash(unsigned char const *name)
 //{
@@ -30,6 +31,8 @@ uint64_t mp_enter_kernel;
 
 static void enter_kernel_initial(uint64_t entry_point)
 {
+    vbe_set_mode(0, 0, 1);
+
     //
     // Relocate MP entry trampoline to 4KB boundary
 

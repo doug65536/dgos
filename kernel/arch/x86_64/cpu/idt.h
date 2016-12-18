@@ -1,5 +1,4 @@
 #pragma once
-
 #include "types.h"
 
 typedef struct idt_entry_t {
@@ -168,23 +167,6 @@ typedef struct isr_iret_frame_t {
     uint64_t ss;
 } isr_iret_frame_t;
 
-// IRQ handler general registers
-typedef struct isr_irq_gpr_t {
-    uint16_t s[4];
-    void *fsbase;
-    uint64_t rdi;
-    uint64_t rsi;
-    uint64_t rdx;
-    uint64_t rcx;
-    uint64_t r8;
-    uint64_t r9;
-    uint64_t r10;
-    uint64_t r11;
-    uint64_t rax;
-    interrupt_info_t info;
-    isr_iret_frame_t iret;
-} isr_irq_gpr_t;
-
 // Exception handler context
 typedef struct isr_gpr_context_t {
     uint16_t s[4];
@@ -236,31 +218,33 @@ typedef struct isr_fxsave_context_t {
     } xmm[16];
 } isr_fxsave_context_t;
 
-// IRQ handler C call parameter
-typedef struct isr_minimal_context_t {
-    isr_irq_gpr_t *gpr;
-    isr_fxsave_context_t *fpr;
-} isr_minimal_context_t;
+// Added to top of context on stack when switching to a context
+typedef struct isr_resume_context_t {
+    void (*cleanup)(void*);
+    void *cleanup_arg;
+} isr_resume_context_t;
 
 // Exception handler C call parameter
-typedef struct isr_full_context_t {
+typedef struct isr_context_t {
+    isr_resume_context_t resume;
     isr_gpr_context_t * gpr;
     isr_fxsave_context_t * fpr;
-} isr_full_context_t;
+} isr_context_t;
 
 // Note that fpr must lie on a 16-byte boundary
 typedef struct isr_start_context_t {
-    isr_minimal_context_t mc;
+    isr_context_t ctx;
     isr_fxsave_context_t fpr;
-    isr_irq_gpr_t gpr;
+    isr_gpr_context_t gpr;
     isr_ret_frame_t ret;
 } isr_start_context_t;
 
+// Handle EOI and invoke irq handler
 extern void *(*irq_dispatcher)(
-        int irq, isr_minimal_context_t *ctx);
+        int intr, isr_context_t *ctx);
 
-void *isr_handler(isr_minimal_context_t *ctx);
+void *isr_handler(isr_context_t *ctx);
 
-isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx);
+isr_context_t *exception_isr_handler(isr_context_t *ctx);
 
 int idt_init(int ap);

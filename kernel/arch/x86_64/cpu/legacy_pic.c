@@ -3,7 +3,7 @@
 #include "irq.h"
 #include "cpu/halt.h"
 #include "idt.h"
-#include "interrupts.h"
+#include "control_regs.h"
 
 // Implements legacy Programmable Interrupt Controller,
 // used if the APIC is not available
@@ -97,9 +97,11 @@ static void pic8259_eoi(int slave)
 // Detect and discard spurious IRQ
 // or call IRQ handler and acknowledge IRQ
 static void *pic8259_dispatcher(
-        int irq, isr_minimal_context_t *ctx)
+        int intr, isr_context_t *ctx)
 {
-    isr_minimal_context_t *returned_stack_ctx;
+    isr_context_t *returned_stack_ctx;
+
+    int irq = intr - PIC_IRQ_BASE;
 
     int is_slave = (irq >= 8);
 
@@ -128,7 +130,8 @@ static void *pic8259_dispatcher(
     // If we made it here, it was not a spurious IRQ
 
     // Run IRQ handler
-    returned_stack_ctx = irq_invoke(irq, ctx);
+    returned_stack_ctx = irq_invoke(irq + PIC_IRQ_BASE,
+                                    irq, ctx);
 
     if (irq < 16) {
         // Acknowledge IRQ
@@ -136,6 +139,17 @@ static void *pic8259_dispatcher(
     }
 
     return returned_stack_ctx;
+}
+
+void pic8259_disable(void)
+{
+    // Need to move it to reasonable ISRs even if disabled
+    // in case of spurious IRQs
+    pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
+
+    // Mask all IRQs
+    outb(PIC1_DATA, 0xFF);
+    outb(PIC2_DATA, 0xFF);
 }
 
 // Gets plugged into irq_setmask
@@ -166,15 +180,16 @@ static void pic8259_setmask(int irq, int unmask)
     outb(port, (pic8259_mask >> shift) & 0xFF);
 }
 
-void pic8259_disable(void)
+// Gets plugged into irq_hook
+static void pic8259_hook(int intr, intr_handler_t handler)
 {
-    // Need to move it to reasonable ISRs even if disabled
-    // in case of spurious IRQs
-    pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
+    intr_hook(intr + PIC_IRQ_BASE, handler);
+}
 
-    // Mask all IRQs
-    outb(PIC1_DATA, 0xFF);
-    outb(PIC2_DATA, 0xFF);
+// Gets plugged into irq_unhook
+static void pic8259_unhook(int intr, intr_handler_t handler)
+{
+    intr_unhook(intr + PIC_IRQ_BASE, handler);
 }
 
 void pic8259_enable(void)
@@ -182,5 +197,7 @@ void pic8259_enable(void)
     pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
     irq_dispatcher = pic8259_dispatcher;
     irq_setmask = pic8259_setmask;
-    interrupts_enable();
+    irq_hook = pic8259_hook;
+    irq_unhook = pic8259_unhook;
+    cpu_irq_enable();
 }

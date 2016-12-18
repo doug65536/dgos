@@ -1,7 +1,17 @@
 #include "pci.h"
 #include "cpu/ioport.h"
+#include "cpu/spinlock.h"
 #include "printk.h"
 #include "string.h"
+
+#define PCI_DEBUG   0
+#if PCI_DEBUG
+#define PCI_DEBUGMSG(...) printk(__VA_ARGS__)
+#else
+#define PCI_DEBUGMSG(...) ((void)0)
+#endif
+
+static spinlock_t pci_spinlock;
 
 #define PCI_ADDR    0xCF8
 #define PCI_DATA    0xCFC
@@ -11,6 +21,7 @@
 #define size_of(type, member) \
     sizeof(((type*)0x10U)->member)
 
+#if PCI_DEBUG
 static char const *pci_device_class_text[] = {
     "No device class, must be old",
     "Mass Storage Controller",
@@ -31,11 +42,16 @@ static char const *pci_device_class_text[] = {
     "Encryption/Decryption Controllers",
     "Data Acquisition and Signal Processing Controllers"
 };
+#endif
 
-static uint32_t pci_read_config(
+uint32_t pci_read_config(
         int bus, int slot, int func,
         int offset, int size)
 {
+    spinlock_lock(&pci_spinlock);
+
+    uint32_t data = ~(uint32_t)0;
+
     if (bus < 256 && slot < 32 &&
             func < 8 && offset < 256) {
         uint32_t pci_address = (1 << 31) |
@@ -45,18 +61,48 @@ static uint32_t pci_read_config(
                 (offset & ~(uint32_t)3);
 
         outd(PCI_ADDR, pci_address);
-        uint32_t data = ind(PCI_DATA);
+        data = ind(PCI_DATA);
 
         data >>= (offset & 3) << 3;
 
         if (size != sizeof(uint32_t))
             data &= ~(~(uint32_t)0 << (size << 3));
-
-        return data;
     }
-    return ~0U;
+
+    spinlock_unlock(&pci_spinlock);
+
+    return data;
 }
 
+uint32_t pci_write_config(
+        int bus, int slot, int func,
+        int offset, int value)
+{
+    spinlock_lock(&pci_spinlock);
+
+    uint32_t data = ~(uint32_t)0;
+
+    if (bus < 256 && slot < 32 &&
+            func < 8 && offset < 256) {
+        uint32_t pci_address = (1 << 31) |
+                (bus << 16) |
+                (slot << 11) |
+                (func << 8) |
+                (offset & ~(uint32_t)3);
+
+        outd(PCI_ADDR, pci_address);
+        outd(PCI_DATA, value);
+
+        outd(PCI_ADDR, pci_address);
+        data = ind(PCI_DATA);
+    }
+
+    spinlock_unlock(&pci_spinlock);
+
+    return data;
+}
+
+#if PCI_DEBUG
 #define PCI_DEFINE_CONFIG_GETTER(type, field) \
     static uint16_t pci_device_##field ( \
             uint32_t bus, uint32_t slot, uint32_t func) \
@@ -69,13 +115,14 @@ static uint32_t pci_read_config(
 
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, vendor)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, dev_class)
+PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, subclass)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, header_type)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, device)
 PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, irq_line)
 
 static void pci_enumerate(void)
 {
-    printk("Enumerating PCI devices\n");
+    PCI_DEBUGMSG("Enumerating PCI devices\n");
     for (uint32_t bus = 0; bus < 256; ++bus) {
         for (uint32_t slot = 0; slot < 32; ++slot) {
             uint16_t vendor = pci_device_vendor(bus, slot, 0);
@@ -92,10 +139,12 @@ static void pci_enumerate(void)
                 uint8_t dev_class = pci_device_dev_class(
                             bus, slot, func);
 
-                uint16_t device = pci_device_device(bus, slot, 0);
+                uint16_t device = pci_device_device(bus, slot, func);
 
                 if (dev_class == 0xFF)
                     break;
+
+                uint16_t subclass = pci_device_subclass(bus, slot, func);
 
                 char const *class_text = "<unknown>";
                 if (dev_class < countof(pci_device_class_text))
@@ -103,22 +152,24 @@ static void pci_enumerate(void)
 
                 uint8_t irq = pci_device_irq_line(bus, slot, func);
 
-                printk("Found device, vendor=%04x device=%04x irq=%d\n"
-                       " bus=%d,"
-                       " slot=%d,"
-                       " func=%d,"
-                       " class=%s"
-                       " (%d)\n",
-                       vendor, device, irq,
-                       bus,
-                       slot,
-                       func,
-                       class_text,
-                       dev_class);
+                PCI_DEBUGMSG("Found device, vendor=%04x device=%04x irq=%d\n"
+                             " bus=%d,"
+                             " slot=%d,"
+                             " func=%d,"
+                             " class=%s"
+                             " subclass=%x"
+                             " (%d)\n",
+                             vendor, device, irq,
+                             bus,
+                             slot,
+                             func,
+                             class_text,
+                             subclass,
+                             dev_class);
 
                 if (vendor == 0x10EC && device == 0x8139) {
                     // RTL 8139
-                    printk("RTL8139 NIC\n");
+                    PCI_DEBUGMSG("RTL8139 NIC\n");
                     for (int i = 0; i < 6; ++i) {
                         uint32_t base_addr = pci_read_config(
                                     bus, slot, func,
@@ -126,13 +177,14 @@ static void pci_enumerate(void)
                                     sizeof(uint32_t) * i,
                                     sizeof(uint32_t));
 
-                        printk("base_addr[%d] = %x\n", i, base_addr);
+                        PCI_DEBUGMSG("base_addr[%d] = %x\n", i, base_addr);
                     }
                 }
             }
         }
     }
 }
+#endif
 
 static void pci_enumerate_read(pci_config_hdr_t *config,
                                int bus, int slot, int func)
@@ -144,6 +196,14 @@ static void pci_enumerate_read(pci_config_hdr_t *config,
                                       ofs << 2, sizeof(uint32_t));
 
     memcpy(config, values, sizeof(*config));
+}
+
+static int pci_enumerate_is_match(pci_dev_iterator_t *iter)
+{
+    return (iter->dev_class == -1 ||
+            iter->config.dev_class == iter->dev_class) &&
+            (iter->subclass == -1 ||
+            iter->config.subclass == iter->subclass);
 }
 
 int pci_enumerate_next(pci_dev_iterator_t *iter)
@@ -161,9 +221,13 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
             if (iter->func == 0)
                 iter->header_type = iter->config.header_type;
 
-            // If device is here, return success
-            if (iter->dev_class != 0xFF &&
-                    iter->config.vendor != 0xFFFF)
+            // If device is not there, then next
+            if (iter->config.dev_class == (uint8_t)~0 &&
+                    iter->config.vendor == (uint16_t)~0)
+                continue;
+
+            // If device matched, return true
+            if (pci_enumerate_is_match(iter))
                 return 1;
 
             continue;
@@ -185,6 +249,8 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
                         int dev_class, int subclass)
 {
+    memset(iter, 0, sizeof(*iter));
+
     iter->dev_class = dev_class;
     iter->subclass = subclass;
 
@@ -196,17 +262,18 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
 
     int found;
 
-    while ((found = pci_enumerate_next(iter)) &&
-           (dev_class != -1 ||
-            iter->config.dev_class != dev_class) &&
-           (subclass != -1 ||
-            iter->config.subclass != subclass));
+    while ((found = pci_enumerate_next(iter)) != 0) {
+        if (pci_enumerate_is_match(iter))
+            break;
+    }
 
     return found;
 }
 
 int pci_init(void)
 {
+#if PCI_DEBUG
     pci_enumerate();
+#endif
     return 0;
 }

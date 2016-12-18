@@ -11,6 +11,7 @@ set architecture i8086
 shell wmctrl -a kernel/boot
 layout src
 b debug_break
+b assert_failed
 
 define remake
 	kill inferior 1

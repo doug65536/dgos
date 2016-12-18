@@ -12,7 +12,8 @@ CSRCS := \
 	elf64.c \
 	rand.c \
 	physmem.c \
-	farptr.c
+	farptr.c \
+	vesa.c
 
 ASRCS := \
 	part.s \
@@ -27,6 +28,8 @@ MOUNTDIR := disk
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
+
+CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
 
 GDB := gdb
 QEMU := qemu-system-x86_64
@@ -65,13 +68,18 @@ TARGET_ARCH_AS := --32
 
 CFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
-	-falign-functions=1 -falign-labels=1 \
-	-falign-loops=1 -falign-jumps=1 \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions \
 	-mrtd \
-	-fno-schedule-insns -fno-schedule-insns2 \
-	-mregparm=3 -mno-align-stringops
+	-mregparm=3
+
+ifneq ($(CC_IS_CLANG),1)
+	CFLAGS += \
+		-falign-functions=1 -falign-labels=1 \
+		-falign-loops=1 -falign-jumps=1 \
+		-mno-align-stringops \
+		-fno-schedule-insns -fno-schedule-insns2
+endif
 
 #-fomit-frame-pointer
 #-mrtd
@@ -89,13 +97,16 @@ WEVERYTHING += -Wbad-function-cast
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
-WEVERYTHING += -Wunsuffixed-float-constants
 WEVERYTHING += -fstrict-aliasing
+
+ifneq ($(CC_IS_CLANG),1)
+	WEVERYTHING += -Wunsuffixed-float-constants
+endif
 
 CFLAGS += $(WEVERYTHING)
 
 # Optimize
-CFLAGS += -O0 -DNDEBUG
+CFLAGS += -Os -DNDEBUG
 
 ASFLAGS := --warn
 
@@ -218,9 +229,32 @@ debug-attach:
 		-ex 'b mmu_init'
 
 run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
-	$(QEMU) -drive file=$(DISKIMAGE),format=raw \
+	$(QEMU) \
+		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset \
-		-s -m 6G -machine q35 -smp cpus=2,cores=2
+		-s -m 6G -machine q35 -smp cpus=8,cores=2,threads=2 \
+		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+		-device isa-debugcon,chardev=qemu-debug-out \
+		-net nic,model=rtl8139 \
+		-net nic,model=ne2k_pci \
+		-net nic,model=e1000
+
+# -drive file=$(DISKIMAGE),format=raw,if=ide
+
+run-debug-singlecpu: all bootable-disk debuggable-kernel-disk inject-kernel
+	$(QEMU) \
+		-drive file=$(DISKIMAGE),format=raw \
+		-no-shutdown -no-reboot -d cpu_reset \
+		-s -m 6G -machine q35 -smp cpus=1,cores=1,threads=1 \
+		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+		-device isa-debugcon,chardev=qemu-debug-out \
+		-net nic,model=rtl8139 \
+		-net nic,model=ne2k_pci \
+		-net nic,model=e1000
+
+#		-drive id=disk,file=$(DISKIMAGE),if=none \
+#		-device ahci,id=ahci \
+#		-device ide-drive,drive=disk,bus=ahci.0 \
 
 #,guest_errors,unimp
 

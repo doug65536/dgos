@@ -30,15 +30,21 @@ struct text_display_t {
     int mouse_y;
     int mouse_on;
 
-    uint16_t shadow[80*25];
+    uint16_t *shadow;
 };
 
 #define MAX_VGA_DISPLAYS 2
 
-#define VGA_CRT_CTRL    (self->io_base)
+#define VGA_CRTC_PORT    (self->io_base)
 
-#define VGA_SET_CURSOR_LO(pos) (0x0F | (((pos) << 8) & 0xFF00))
-#define VGA_SET_CURSOR_HI(pos) (0x0E | ((pos) & 0xFF00))
+#define VGA_CRTC_CURSOR_LO  0x0F
+#define VGA_CRTC_CURSOR_HI  0x0E
+
+#define VGA_SET_CURSOR_LO(pos) (VGA_CRTC_CURSOR_LO | \
+    (((pos) << 8) & 0xFF00))
+
+#define VGA_SET_CURSOR_HI(pos) (VGA_CRTC_CURSOR_HI | \
+    ((pos) & 0xFF00))
 
 static text_display_t displays[MAX_VGA_DISPLAYS];
 
@@ -68,7 +74,7 @@ static int mouse_toggle(text_display_t *self,
         uint8_t attr =
                 (self->shadow[place] >> 8) & 0xFF;
         uint8_t set_attr = show
-                ? ((attr >> 4) | (attr << 4)) & 0xFF
+                ? ((attr >> 4) | (attr << 4)) & 0x7F
                 : attr;
 
         // Force visible if showing in cell with same color
@@ -113,8 +119,8 @@ static int mouse_hide_if_within(text_display_t *self,
 static void move_cursor_to(text_display_t *self, int x, int y)
 {
     uint16_t position = y * self->width + x;
-    outw(VGA_CRT_CTRL, VGA_SET_CURSOR_LO(position));
-    outw(VGA_CRT_CTRL, VGA_SET_CURSOR_HI(position));
+    outw(VGA_CRTC_PORT, VGA_SET_CURSOR_LO(position));
+    outw(VGA_CRTC_PORT, VGA_SET_CURSOR_HI(position));
 }
 
 static void move_cursor_if_on(text_display_t *self)
@@ -145,7 +151,9 @@ static void clear_screen(text_display_t *self)
     for (int y = 0; y < self->height; ++y)
         for (int x = 0; x < self->width; ++x)
             *p++ = ' ' | (self->attrib << 8);
-    memcpy(self->video_mem, self->shadow, sizeof(self->shadow));
+    memcpy(self->video_mem, self->shadow,
+           self->width * self->height *
+           sizeof(*self->shadow));
     mouse_toggle(self, mouse_was_shown);
 }
 
@@ -325,8 +333,14 @@ static int vga_detect(text_display_base_t **result)
 {
     text_display_t *self = displays;
     self->vtbl = &vga_device_vtbl;
-    self->io_base = *BIOS_DATA_AREA(uint16_t, 0x463);
-    self->video_mem = (void*)0xB8000;
+
+    // Get I/O port base from BIOS data area
+    self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
+
+    // Map frame buffer
+    self->video_mem = mmap((void*)0xB8000, 0x8000,
+                           PROT_READ | PROT_WRITE,
+                           MAP_PHYSICAL, -1, 0);
     self->cursor_on = 1;
     self->cursor_x = 0;
     self->cursor_y = 0;
@@ -334,8 +348,16 @@ static int vga_detect(text_display_base_t **result)
     self->height = 25;
     self->attrib = 0x07;
     self->mouse_on = 0;
-    self->mouse_x = 40;
-    self->mouse_y = 12;
+    self->mouse_x = self->width >> 1;
+    self->mouse_y = self->height >> 1;
+
+    // Off-screen shadow buffer
+    self->shadow = mmap(0,
+                        self->width * self->height *
+                        sizeof(*self->shadow),
+                        PROT_READ | PROT_WRITE,
+                        0, -1, 0);
+
     mouse_toggle(self, 1);
 
     *result = (text_display_base_t*)self;
@@ -365,14 +387,9 @@ static void vga_cleanup(text_display_base_t *dev)
 static void vga_remap_callback(void *arg)
 {
     (void)arg;
-    for (size_t i = 0; i < countof(displays); ++i)
-        displays[i].video_mem = mmap(
-                    (void*)0xB8000, 0x8000,
-                    PROT_READ | PROT_WRITE,
-                    MAP_PHYSICAL, -1, 0);
 }
 
-REGISTER_CALLOUT(vga_remap_callback, 0, 'V', "000");
+REGISTER_CALLOUT(vga_remap_callback, 0, 'M', "000");
 
 // Set/get dimensions
 
@@ -651,4 +668,4 @@ static void vga_mouse_add_xy(text_display_base_t *dev,
     mouse_toggle(self, was_shown);
 }
 
-REGISTER_text_display_DEVICE(vga)
+REGISTER_text_display_DEVICE(vga);

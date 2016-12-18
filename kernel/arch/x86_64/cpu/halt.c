@@ -1,5 +1,5 @@
 #include "cpu/halt.h"
-#include "interrupts.h"
+#include "control_regs.h"
 
 void halt(void)
 {
@@ -8,7 +8,7 @@ void halt(void)
 
 void halt_forever(void)
 {
-    interrupts_disable();
+    cpu_irq_disable();
 
     while (1)
         halt();

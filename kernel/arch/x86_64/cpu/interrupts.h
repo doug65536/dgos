@@ -1,4 +1,5 @@
 #pragma once
 
-void interrupts_disable(void);
-void interrupts_enable(void);
+#define INTR_THREAD_YIELD   72
+#define INTR_APIC_TIMER     73
+#define INTR_TLB_SHOOTDOWN  74

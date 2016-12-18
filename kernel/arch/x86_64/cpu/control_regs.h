@@ -4,6 +4,10 @@
 
 #define MSR_FSBASE      0xC0000100
 #define MSR_GSBASE      0xC0000101
+#define MSR_KGSBASE     0xC0000102
+#define MSR_EFER        0xC0000080
+
+#define MSR_IA32_MISC_ENABLES   0x1A0
 
 #define CR0_PE_BIT 0	// Protected Mode
 #define CR0_MP_BIT 1	// Monitor co-processor
@@ -69,6 +73,22 @@
 #define CR4_SMAP            (1 << CR4_SMAP_BIT    )
 #define CR4_PKE             (1 << CR4_PKE_BIT     )
 
+typedef struct table_register_t {
+    uint16_t limit;
+    uint16_t base_lo;
+    uint16_t base_hi;
+} table_register_t;
+
+typedef struct table_register_64_t {
+    // Dummy 16-bit field for alignment
+    uint16_t align;
+
+    // Actual beginning of register value
+    uint16_t limit;
+    uint32_t base_lo;
+    uint32_t base_hi;
+} table_register_64_t;
+
 // Get whole MSR register as a 64-bit value
 uint64_t msr_get(uint32_t msr);
 
@@ -87,6 +107,9 @@ void msr_set_lo(uint32_t msr, uint32_t value);
 // Update the low 32 bits of MSR, preserving the high 32 bits
 void msr_set_hi(uint32_t msr, uint32_t value);
 
+// Set the specified bit of the specified MSR
+uint64_t msr_adj_bit(uint32_t msr, int bit, int set);
+
 // Returns new value of cr0
 uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set);
 
@@ -96,9 +119,29 @@ uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set);
 uint64_t cpu_get_fault_address(void);
 
 uint64_t cpu_get_page_directory(void);
-
 void cpu_set_page_directory(uint64_t addr);
+void cpu_flush_tlb(void);
 
-void cpu_set_fsgsbase(void *fs_base, void *gs_base);
+void cpu_set_fsbase(void *fs_base);
+void cpu_set_gsbase(void *gs_base);
 
 void cpu_invalidate_page(uint64_t addr);
+
+table_register_64_t cpu_get_gdtr(void);
+void cpu_set_gdtr(table_register_64_t gdtr);
+
+uint16_t cpu_get_tr(void);
+void cpu_set_tr(uint16_t tr);
+
+static inline void *cpu_gs_read_ptr(void)
+{
+    void *ptr;
+    __asm__ __volatile__ (
+        "mov %%gs:0,%[ptr]\n\t"
+        : [ptr] "=r" (ptr)
+    );
+    return ptr;
+}
+
+int cpu_irq_disable(void);
+void cpu_irq_enable(void);

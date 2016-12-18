@@ -1,6 +1,12 @@
 #pragma once
 #include "types.h"
 
+// Types:
+//  'M': VMM initialized
+//  'S': Initialize SMP CPU
+//  'L': Late initialized device
+//  'E': Early initialized device
+
 typedef struct callout_t {
     void (*fn)(void*);
     void *userarg;
@@ -9,8 +15,13 @@ typedef struct callout_t {
     int64_t reserved2;
 } callout_t;
 
+#define REGISTER_CALLOUT3(a,n)   a##n
+#define REGISTER_CALLOUT2(a,n)   REGISTER_CALLOUT3(a,n)
+
 #define REGISTER_CALLOUT(fn, arg, type, order) \
     __attribute__((section(".callout_array." order), used)) \
-    static callout_t callout_##__COUNTER__ = { (fn), (arg), (type), 0, 0 }
+    static callout_t REGISTER_CALLOUT2(callout_, __COUNTER__) = { \
+        (fn), (arg), (type), 0, 0 \
+    }
 
 size_t callout_call(int32_t type);

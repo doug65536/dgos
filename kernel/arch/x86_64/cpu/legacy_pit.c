@@ -4,6 +4,8 @@
 #include "atomic.h"
 #include "time.h"
 #include "cpu/thread_impl.h"
+#include "interrupts.h"
+#include "assert.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -90,9 +92,10 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static void *pit8254_context_switch_handler(int irq, void *ctx)
+static void *pit8254_context_switch_handler(int intr, void *ctx)
 {
-    (void)irq;
+    (void)intr;
+    assert(intr == INTR_THREAD_YIELD);
     return thread_schedule(ctx);
 }
 
@@ -133,13 +136,40 @@ static uint64_t pit8254_time_ms(void)
     return timer_ms;
 }
 
+static uint32_t pit8254_usleep(uint16_t microsec)
+{
+    uint64_t count = (uint64_t)microsec * 1000000 / 1193182;
+    if (count > 0xFFFF)
+        count = 0xFFFF;
+
+    outb(PIT_CMD,
+         PIT_CHANNEL(2) |
+         PIT_ACCESS_BOTH |
+         PIT_MODE_ONESHOT |
+         PIT_FORMAT_BINARY);
+    outb(PIT_DATA(2), count & 0xFF);
+    outb(PIT_DATA(2), (count >> 8) & 0xFF);
+
+    uint16_t readback;
+    do {
+        outb(PIT_CMD,
+            PIT_CHANNEL(2) |
+            PIT_ACCESS_LATCH);
+        readback = inb(PIT_DATA(2));
+        readback |= (uint16_t)inb(PIT_DATA(2));
+    } while (readback);
+
+    return microsec;
+}
+
 void pit8254_enable(void)
 {
     time_ms = pit8254_time_ms;
+    usleep = pit8254_usleep;
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);
-    irq_hook(40, pit8254_context_switch_handler);
+    intr_hook(INTR_THREAD_YIELD, pit8254_context_switch_handler);
     irq_setmask(0, 1);
 }
 

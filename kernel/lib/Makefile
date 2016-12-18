@@ -4,6 +4,7 @@ LIBNAME := kernel
 CSRCS := mm.c \
 	tls.c \
 	thread.c \
+	threadsync.c \
 	callout.c \
 	printk.c \
 	dev_text.c \
@@ -13,6 +14,11 @@ CSRCS := mm.c \
 	keyboard.c \
 	string.c \
 	irq.c \
-	time.c
+	time.c \
+	stdlib.c \
+	assert.c \
+	bitsearch.c \
+	bsearch.c \
+	debug.c
 
 include $(BUILDROOT)/library.mk

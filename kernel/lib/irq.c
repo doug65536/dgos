@@ -1,22 +1,38 @@
 #include "irq.h"
 
-void *(*irq_handlers[128])(int, void*);
+// Interrupt handler vectors
+static intr_handler_t intr_handlers[128];
+
 void (*irq_setmask)(int irq, int unmask);
+void (*irq_hook)(int irq, intr_handler_t handler);
+void (*irq_unhook)(int irq, intr_handler_t handler);
 
-void irq_hook(int irq, void *(*handler)(int, void*))
+void intr_hook(int intr, intr_handler_t handler)
 {
-    irq_handlers[irq] = handler;
+    intr_handlers[intr] = handler;
 }
 
-void irq_unhook(int irq, void *(*handler)(int, void*))
+void intr_unhook(int irq, intr_handler_t handler)
 {
-    if (irq_handlers[irq] == handler)
-        irq_handlers[irq] = 0;
+    if (intr_handlers[irq] == handler)
+        intr_handlers[irq] = 0;
 }
 
-void *irq_invoke(int irq, void *ctx)
+void *intr_invoke(int intr, void *ctx)
 {
-    if (irq_handlers[irq])
-        return irq_handlers[irq](irq, ctx);
+    if (intr_handlers[intr])
+        return intr_handlers[intr](intr, ctx);
+    return ctx;
+}
+
+int intr_has_handler(int intr)
+{
+    return intr_handlers[intr] != 0;
+}
+
+void *irq_invoke(int intr, int irq, void *ctx)
+{
+    if (intr_handlers[intr])
+        return intr_handlers[intr](irq, ctx);
     return ctx;
 }

@@ -50,6 +50,9 @@
 /// Not file backed
 #define MAP_ANONYMOUS       0x00000200
 
+/// Kernel only: Write through
+#define MAP_WRITETHRU       0x20000000
+
 /// Kernel only: Disable caching
 #define MAP_NOCACHE         0x40000000
 
@@ -86,11 +89,11 @@ int munmap(
 
 /// Permit a mapping to be moved to a new address
 /// Without this flag, mremap fails if it cannot be resized
-#define MREMAP_MAYMOVE
+#define MREMAP_MAYMOVE      0100000002
 
 /// Move the mapping to the specified __new_address
 /// Fail if not possible
-#define MREMAP_FIXED
+#define MREMAP_FIXED        0x00000001
 
 /// Move and/or resize a range of address space
 /// __old_address, address of mapping to be remapped
@@ -181,6 +184,34 @@ int munlock(
         const void *addr,
         size_t len);
 
+// Return the physical address for the specified linear address
+// Page faults if the memory region is not mapped
+uintptr_t mphysaddr(void *addr);
+
+
+typedef struct mmphysrange_t {
+    uintptr_t physaddr;
+    size_t size;
+} mmphysrange_t;
+
+// Fill in an array of physical memory ranges corresponding to
+// the specified range of linear address space.
+// If ranges is null, returns the number of entries it would need.
+// ranges_count limits the number of ranges returned.
+// If any part of the linear address range is not mapped
+// then page fault.
+// max_size limits the size of an individual range,
+// if necessary a large contiguous range of physical
+// addresses will be split into smaller ranges with
+// sizes less than or equal to max_length
+size_t mphysranges(mmphysrange_t *ranges,
+                   size_t ranges_count,
+                   void *addr, size_t size,
+                   size_t max_size);
+
+// Return true if the address is present
+int mpresent(uintptr_t addr);
+
 /// Lock all process address space in memory
 #define MCL_CURRENT
 
@@ -237,7 +268,7 @@ void *sbrk(intptr_t __increment);
 #define OPEN_MAX _SC_OPEN_MAX
 
 /// Size of page in bytes. Must be >= 1
-#define _SC_PAGESIZE
+#define _SC_PAGESIZE    4096
 #define PAGESIZE _SC_PAGESIZE
 
 /// The number of repeated occurrences of a BRE premitted by regex and regcomp

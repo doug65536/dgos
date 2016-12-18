@@ -3,8 +3,9 @@
 #include "cpu/halt.h"
 #include "string.h"
 #include "conio.h"
+#include "debug.h"
 
-typedef enum {
+typedef enum length_mod_t {
     length_none,
     length_hh,
     length_h,
@@ -16,7 +17,7 @@ typedef enum {
     length_L
 } length_mod_t;
 
-typedef enum {
+typedef enum arg_type_t {
     arg_type_none,
 
     arg_type_char_ptr,
@@ -26,7 +27,7 @@ typedef enum {
     arg_type_uintptr_value,
 } arg_type_t;
 
-typedef union {
+typedef union arg_t {
     char *char_ptr_value;
     wchar_t *wchar_ptr_value;
     int character;
@@ -685,4 +686,31 @@ int snprintf(char *buf, size_t limit, char const *format, ...)
     int result = vsnprintf(buf, limit, format, ap);
     va_end(ap);
     return result;
+}
+
+static int printdbg_emit_chars(char const *s, int ch, void *context)
+{
+    (void)context;
+
+    char encoded[5];
+
+    if (!s) {
+        ucs4_to_utf8(encoded, ch);
+        s = encoded;
+    }
+
+    return write_debug_str(s);
+}
+
+void vprintdbg(const char *format, va_list ap)
+{
+    formatter(format, ap, printdbg_emit_chars, 0);
+}
+
+void printdbg(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vprintdbg(format, ap);
+    va_end(ap);
 }

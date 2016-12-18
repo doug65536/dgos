@@ -1,5 +1,6 @@
 #include "idt.h"
 #include "isr.h"
+#include "irq.h"
 #include "gdt.h"
 #include "conio.h"
 #include "printk.h"
@@ -9,9 +10,9 @@
 #include "control_regs.h"
 #include "string.h"
 
-idt_entry_64_t idt[0x80];
+idt_entry_64_t idt[128];
 
-void *(*irq_dispatcher)(int irq, isr_minimal_context_t *ctx);
+void *(*irq_dispatcher)(int irq, isr_context_t *ctx);
 
 cpu_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
@@ -61,29 +62,42 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
 
 typedef void (*isr_entry_t)(void);
 
-const isr_entry_t isr_entry_points[74] = {
-    isr_entry_0,  isr_entry_1,  isr_entry_2,  isr_entry_3,
-    isr_entry_4,  isr_entry_5,  isr_entry_6,  isr_entry_7,
-    isr_entry_8,  isr_entry_9,  isr_entry_10, isr_entry_11,
-    isr_entry_12, isr_entry_13, isr_entry_14, isr_entry_15,
-    isr_entry_16, isr_entry_17, isr_entry_18, isr_entry_19,
-    isr_entry_20, isr_entry_21, isr_entry_22, isr_entry_23,
-    isr_entry_24, isr_entry_25, isr_entry_26, isr_entry_27,
-    isr_entry_28, isr_entry_29, isr_entry_30, isr_entry_31,
+const isr_entry_t isr_entry_points[128] = {
+    isr_entry_0,   isr_entry_1,   isr_entry_2,   isr_entry_3,
+    isr_entry_4,   isr_entry_5,   isr_entry_6,   isr_entry_7,
+    isr_entry_8,   isr_entry_9,   isr_entry_10,  isr_entry_11,
+    isr_entry_12,  isr_entry_13,  isr_entry_14,  isr_entry_15,
+    isr_entry_16,  isr_entry_17,  isr_entry_18,  isr_entry_19,
+    isr_entry_20,  isr_entry_21,  isr_entry_22,  isr_entry_23,
+    isr_entry_24,  isr_entry_25,  isr_entry_26,  isr_entry_27,
+    isr_entry_28,  isr_entry_29,  isr_entry_30,  isr_entry_31,
 
-    isr_entry_32, isr_entry_33, isr_entry_34, isr_entry_35,
-    isr_entry_36, isr_entry_37, isr_entry_38, isr_entry_39,
-    isr_entry_40, isr_entry_41, isr_entry_42, isr_entry_43,
-    isr_entry_44, isr_entry_45, isr_entry_46, isr_entry_47,
+    isr_entry_32,  isr_entry_33,  isr_entry_34,  isr_entry_35,
+    isr_entry_36,  isr_entry_37,  isr_entry_38,  isr_entry_39,
+    isr_entry_40,  isr_entry_41,  isr_entry_42,  isr_entry_43,
+    isr_entry_44,  isr_entry_45,  isr_entry_46,  isr_entry_47,
 
-    isr_entry_48, isr_entry_49, isr_entry_50, isr_entry_51,
-    isr_entry_52, isr_entry_53, isr_entry_54, isr_entry_55,
-    isr_entry_56, isr_entry_57, isr_entry_58, isr_entry_59,
-    isr_entry_60, isr_entry_61, isr_entry_62, isr_entry_63,
-    isr_entry_64, isr_entry_65, isr_entry_66, isr_entry_67,
-    isr_entry_68, isr_entry_69, isr_entry_70, isr_entry_71,
+    isr_entry_48,  isr_entry_49,  isr_entry_50,  isr_entry_51,
+    isr_entry_52,  isr_entry_53,  isr_entry_54,  isr_entry_55,
+    isr_entry_56,  isr_entry_57,  isr_entry_58,  isr_entry_59,
+    isr_entry_60,  isr_entry_61,  isr_entry_62,  isr_entry_63,
+    isr_entry_64,  isr_entry_65,  isr_entry_66,  isr_entry_67,
+    isr_entry_68,  isr_entry_69,  isr_entry_70,  isr_entry_71,
 
-    isr_entry_72, isr_entry_73
+    isr_entry_72,  isr_entry_73,  isr_entry_74,  isr_entry_75,
+    isr_entry_76,  isr_entry_77,  isr_entry_78,  isr_entry_79,
+    isr_entry_80,  isr_entry_81,  isr_entry_82,  isr_entry_83,
+    isr_entry_84,  isr_entry_85,  isr_entry_86,  isr_entry_87,
+    isr_entry_88,  isr_entry_89,  isr_entry_90,  isr_entry_91,
+    isr_entry_92,  isr_entry_93,  isr_entry_94,  isr_entry_95,
+    isr_entry_96,  isr_entry_97,  isr_entry_98,  isr_entry_99,
+    isr_entry_100, isr_entry_101, isr_entry_102, isr_entry_103,
+    isr_entry_104, isr_entry_105, isr_entry_106, isr_entry_107,
+    isr_entry_108, isr_entry_109, isr_entry_110, isr_entry_111,
+    isr_entry_112, isr_entry_113, isr_entry_114, isr_entry_115,
+    isr_entry_116, isr_entry_117, isr_entry_118, isr_entry_119,
+    isr_entry_120, isr_entry_121, isr_entry_122, isr_entry_123,
+    isr_entry_124, isr_entry_125, isr_entry_126, isr_entry_127
 };
 
 extern void isr_entry_0xC0(void);
@@ -91,9 +105,9 @@ extern void isr_entry_0xC0(void);
 static void load_idtr(table_register_64_t *table_reg)
 {
     __asm__ __volatile__ (
-        "lidtq %[table_reg]\n\t"
+        "lidtq (%[table_reg])\n\t"
         :
-        : [table_reg] "m" (*table_reg)
+        : [table_reg] "r" (&table_reg->limit)
     );
 }
 
@@ -118,10 +132,8 @@ int idt_init(int ap)
     table_register_64_t idtr;
 
     addr = (uint64_t)idt;
-    idtr.base_lo = (uint16_t)(addr & 0xFFFF);
-    idtr.base_hi = (uint16_t)((addr >> 16) & 0xFFFF);
-    idtr.base_hi1 = (uint16_t)((addr >> 32) & 0xFFFF);
-    idtr.base_hi2 = (uint16_t)((addr >> 48) & 0xFFFF);
+    idtr.base_lo = (uint32_t)(addr & 0xFFFFFFFF);
+    idtr.base_hi = (uint32_t)((addr >> 32) & 0xFFFFFFFF);
     idtr.limit = sizeof(idt) - 1;
 
     load_idtr(&idtr);
@@ -198,21 +210,21 @@ size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr)
 
 }
 
-static void *unhandled_exception_handler(isr_full_context_t *ctx)
+static void *unhandled_exception_handler(isr_context_t *ctx)
 {
     char fmt_buf[64];
     int color = 0x0F;
     int width;
     static char const *reg_names[] = {
-        "rax",
-        "rbx",
-        "rcx",
-        "rdx",
-        "rsi",
         "rdi",
-        "rbp",
+        "rsi",
+        "rdx",
+        "rcx",
         " r8",
         " r9",
+        "rax",
+        "rbx",
+        "rbp",
         "r10",
         "r11",
         "r12",
@@ -358,32 +370,26 @@ static void *unhandled_exception_handler(isr_full_context_t *ctx)
     return ctx;
 }
 
-isr_full_context_t *exception_isr_handler(isr_full_context_t *ctx)
+isr_context_t *exception_isr_handler(isr_context_t *ctx)
 {
-    // FIXME: handle some exceptions like page faults sometime
+    if (!intr_has_handler(ctx->gpr->info.interrupt) ||
+            !intr_invoke(ctx->gpr->info.interrupt, ctx))
+        return unhandled_exception_handler(ctx);
 
-    unhandled_exception_handler(ctx);
     return ctx;
 }
 
-void *isr_handler(isr_minimal_context_t *ctx)
+void *isr_handler(isr_context_t *ctx)
 {
-    if (ctx->gpr->info.interrupt >= 32 &&
-               ctx->gpr->info.interrupt < 48) {
-        //
-        // PIC IRQ
-        ctx = irq_dispatcher(
-                    ctx->gpr->info.interrupt - 32,
-                    ctx);
-    } else if (ctx->gpr->info.interrupt >= 48 &&
-               ctx->gpr->info.interrupt <= 128) {
-        //
-        // APIC IRQ (and forced context switch)
-        ctx = irq_dispatcher(
-                    ctx->gpr->info.interrupt - 32,
-                    ctx);
-    } else {
-    }
+    // Exception
+    if (ctx->gpr->info.interrupt < 32)
+        return exception_isr_handler(ctx);
 
-    return ctx;
+    // IRQ
+    if (ctx->gpr->info.interrupt >= 32 && ctx->gpr->info.interrupt < 48)
+        return irq_dispatcher(ctx->gpr->info.interrupt, ctx);
+
+    //
+    // Other interrupts
+    return intr_invoke(ctx->gpr->info.interrupt, ctx);
 }

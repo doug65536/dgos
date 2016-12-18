@@ -19,6 +19,7 @@ all: $(LIBFILENAME)
 clean:
 	@$(RM) -f $(OBJS)
 	@$(RM) -f $(LIBFILENAME)
+	if [ "$(CLEANOTHER)" != "" ]; then $(RM) $(CLEANOTHER); fi
 	@$(RM) -f $(patsubst %,$(DEPDIR)/%.d,$(notdir $(SRCS)))
 
 $(LIBFILENAME): $(OBJS)

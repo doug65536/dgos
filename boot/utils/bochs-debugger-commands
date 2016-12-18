@@ -1,5 +1,5 @@
 u switch-mode
 ldsym "bin/bochs-kernel-symbols"
 lb "exception_common"
-lb "keyb8042_init"
+lb "assert_failed"
 c

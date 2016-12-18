@@ -1,12 +1,19 @@
 #include "mmu.h"
 #include "mm.h"
 #include "control_regs.h"
+#include "interrupts.h"
+#include "irq.h"
+#include "apic.h"
 #include "printk.h"
 #include "time.h"
 #include "string.h"
 #include "atomic.h"
 #include "bios_data.h"
 #include "callout.h"
+#include "likely.h"
+#include "assert.h"
+#include "cpuid.h"
+#include "thread_impl.h"
 
 // Intel manual, page 2786
 
@@ -18,8 +25,8 @@
 
 // 4KB pages
 #define PAGE_SIZE_BIT       12
-#define PAGE_SIZE           (1U << PAGE_SIZE_BIT)
-#define PAGE_MASK           (PAGE_SIZE - 1U)
+#define PAGE_SIZE           (1UL << PAGE_SIZE_BIT)
+#define PAGE_MASK           (PAGE_SIZE - 1UL)
 
 // Page table entries
 #define PTE_PRESENT_BIT     0
@@ -162,19 +169,19 @@ typedef uintptr_t linaddr_t;
 #define PT1_PTR(base)   (PT3_PTR(base) + PT1_BASE)
 #define PT0_PTR(base)   (PT3_PTR(base) + PT0_BASE)
 
-static pte_t * const ptk_base[4] = {
-    PT0_PTR(PT_KBASEADDR),
-    PT1_PTR(PT_KBASEADDR),
-    PT2_PTR(PT_KBASEADDR),
-    PT3_PTR(PT_KBASEADDR)
-};
+//static pte_t * const ptk_base[4] = {
+//    PT0_PTR(PT_KBASEADDR),
+//    PT1_PTR(PT_KBASEADDR),
+//    PT2_PTR(PT_KBASEADDR),
+//    PT3_PTR(PT_KBASEADDR)
+//};
 
-static pte_t * const ptu_base[4] = {
-    PT0_PTR(PT_UBASEADDR),
-    PT1_PTR(PT_UBASEADDR),
-    PT2_PTR(PT_UBASEADDR),
-    PT3_PTR(PT_UBASEADDR)
-};
+//static pte_t * const ptu_base[4] = {
+//    PT0_PTR(PT_UBASEADDR),
+//    PT1_PTR(PT_UBASEADDR),
+//    PT2_PTR(PT_UBASEADDR),
+//    PT3_PTR(PT_UBASEADDR)
+//};
 
 /// Physical page allocation map
 /// Consists of array of entries, one per physical page
@@ -207,17 +214,27 @@ unsigned phys_alloc_count;
 extern char ___init_brk[];
 extern uint64_t ___top_physaddr;
 static linaddr_t volatile linear_allocator = (linaddr_t)___init_brk;
-static uint64_t volatile phys_next_free;
+
+// Maintain two free page chains,
+// because some hardware requires 32-bit memory addresses
+static uint32_t volatile phys_next_free_high;
+static uint32_t volatile phys_next_free_low;
+
+// Incremented every time the page tables are changed
+// Used to detect lazy TLB shootdown
+static uint64_t volatile mmu_seq;
 
 static void mmu_free_phys(physaddr_t addr)
 {
+    uint32_t volatile *chain = (addr >= 0x100000000L)
+            ? &phys_next_free_high
+            : &phys_next_free_low;
     uint64_t index = ((uint64_t)addr - 0x100000) >> PAGE_SIZE_BIT;
-    unsigned old_next = phys_next_free;
+    uint32_t old_next = *chain;
     for (;;) {
         phys_alloc[index] = old_next;
 
-        unsigned cur_next = atomic_cmpxchg(
-                    &phys_next_free, old_next, index);
+        uint32_t cur_next = atomic_cmpxchg(chain, old_next, index);
 
         if (cur_next == old_next)
             break;
@@ -228,14 +245,26 @@ static void mmu_free_phys(physaddr_t addr)
     }
 }
 
-static physaddr_t mmu_alloc_phys(void)
+static physaddr_t mmu_alloc_phys(int low)
 {
-    unsigned index = phys_next_free;
-    for (;;) {
-        unsigned new_next = phys_alloc[index];
+    uint32_t volatile *chain = !low
+            ? &phys_next_free_high
+            : &phys_next_free_low;
 
-        unsigned cur_next = atomic_cmpxchg(
-                    &phys_next_free, index, new_next);
+    uint32_t index = *chain;
+    for (;;) {
+        uint32_t new_next = phys_alloc[index];
+
+        if (!new_next) {
+            // Resort to low memory pages if high memory exhausted
+            if (!low)
+                return mmu_alloc_phys(1);
+
+            // Out of memory
+            return 0;
+        }
+
+        uint32_t cur_next = atomic_cmpxchg(chain, index, new_next);
 
         if (cur_next == index) {
             phys_alloc[index] = 0;
@@ -260,17 +289,20 @@ static void path_from_addr(unsigned *path, linaddr_t addr)
 
 static void path_inc(unsigned *path)
 {
-    uint64_t n = (linaddr_t)path[0] |
-            ((linaddr_t)path[1] << (9 * 1)) |
-            ((linaddr_t)path[2] << (9 * 2)) |
-            ((linaddr_t)path[3] << (9 * 3));
+    // Branchless algorithm
+
+    uint64_t n =
+            ((linaddr_t)path[0] << (9 * 3)) |
+            ((linaddr_t)path[1] << (9 * 2)) |
+            ((linaddr_t)path[2] << (9 * 1)) |
+            (linaddr_t)(path[3]);
 
     ++n;
 
-    path[0] = (unsigned)n & 511;
-    path[1] = (unsigned)(n >> (9 * 1)) & 511;
-    path[2] = (unsigned)(n >> (9 * 2)) & 511;
-    path[3] = (unsigned)(n >> (9 * 3)) & 511;
+    path[0] = (unsigned)(n >> (9 * 3)) & 511;
+    path[1] = (unsigned)(n >> (9 * 2)) & 511;
+    path[2] = (unsigned)(n >> (9 * 1)) & 511;
+    path[3] = (unsigned)n & 511;
 }
 
 // Returns the linear addresses of the page tables for
@@ -595,13 +627,12 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list)
 //
 // Initialization page allocator
 
-static physaddr_t init_take_page(
-        physmem_range_t *ranges, size_t *usable_ranges)
+static physaddr_t init_take_page(int low)
 {
-    if (*usable_ranges == 0)
-        return mmu_alloc_phys();
+    if (likely(usable_ranges == 0))
+        return mmu_alloc_phys(low);
 
-    physmem_range_t *last_range = ranges + *usable_ranges - 1;
+    physmem_range_t *last_range = ranges + usable_ranges - 1;
     physaddr_t addr = last_range->base + last_range->size - PAGE_SIZE;
 
     // Take a page off the size of the range
@@ -609,7 +640,7 @@ static physaddr_t init_take_page(
 
     // If range exhausted, switch to next range
     if (last_range->size == 0)
-        --*usable_ranges;
+        --usable_ranges;
 
     return addr;
 }
@@ -664,9 +695,7 @@ static void init_create_pt(
         linaddr_t linear_addr,
         physaddr_t phys_addr,
         physaddr_t *pt_physaddr,
-        pte_t page_flags,
-        physmem_range_t *ranges,
-        size_t *usable_ranges)
+        pte_t page_flags)
 {
     //printk("Creating page table for %lx...", linear_addr);
 
@@ -676,7 +705,8 @@ static void init_create_pt(
 
     unsigned levels = (phys_addr == ~0UL) ? 4 : 3;
 
-    pte_t *iter;
+    pte_t volatile *iter;
+    pte_t old_pte;
 
     // Map aliasing page to point to new page
     iter = mm_map_aliasing_pte(aliasing_pte, root_physaddr);
@@ -690,16 +720,23 @@ static void init_create_pt(
 
         if (!addr) {
             // Allocate a new page table
-            addr = init_take_page(ranges, usable_ranges);
+            addr = init_take_page(1);
 
-            // Update current page table to point to new page
-            iter[path[level]] = addr | page_flags;
+            // Atomically update current page table to point to new page
+            old_pte = atomic_cmpxchg(iter + path[level],
+                                     0, addr | page_flags);
+            if (old_pte == 0) {
+                // Map aliasing page to point to new page
+                iter = init_map_aliasing_pte(aliasing_pte, addr);
 
-            // Map aliasing page to point to new page
-            iter = init_map_aliasing_pte(aliasing_pte, addr);
+                // Clear new page
+                //aligned16_memset((void*)iter, 0, PAGE_SIZE);
+            } else {
+                addr = old_pte & PTE_ADDR;
 
-            // Clear new page table
-            aligned16_memset(iter, 0, PAGE_SIZE);
+                // Return page to pool
+                mmu_free_phys(addr);
+            }
         } else {
             // Descend into next page table
             iter = init_map_aliasing_pte(aliasing_pte, addr);
@@ -710,12 +747,9 @@ static void init_create_pt(
     }
 
     if (levels == 3 && !(iter[path[3]] & PTE_PRESENT)) {
-        //printk("[%u] at %lx\n", path[3], phys_addr);
-        iter[path[3]] = (phys_addr & PTE_ADDR) |
-            page_flags;
+        old_pte = atomic_cmpxchg(iter + path[3],
+                0, (phys_addr & PTE_ADDR) | page_flags);
         cpu_invalidate_page(linear_addr);
-    } else {
-        //printk("already existed\n");
     }
 }
 
@@ -734,8 +768,7 @@ static void mmu_map_page(
     init_create_pt(root_physaddr, aliasing_pte,
                    addr, physaddr,
                    pt_physaddr,
-                   flags,
-                   ranges, &usable_ranges);
+                   flags);
 
     unsigned path[4];
     path_from_addr(path, addr);
@@ -748,11 +781,49 @@ static void mmu_map_page(
         init_create_pt(root_physaddr, aliasing_pte,
                        (linaddr_t)pte_linaddr[i],
                        pt_physaddr[i], 0,
-                       PTE_PRESENT | PTE_WRITABLE,
-                       ranges, &usable_ranges);
+                       PTE_PRESENT | PTE_WRITABLE);
     }
 
     release_apte(aliasing_pte);
+}
+
+// TLB shootdown IPI
+static void *mmu_tlb_shootdown(int intr, void *ctx)
+{
+    assert(intr == INTR_TLB_SHOOTDOWN);
+    thread_set_cpu_mmu_seq(mmu_seq);
+    cpu_flush_tlb();
+    apic_eoi(intr);
+    return ctx;
+}
+
+static void mmu_send_tlb_shootdown(void)
+{
+    apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+}
+
+static void *mmu_lazy_tlb_shootdown(void *ctx)
+{
+    thread_set_cpu_mmu_seq(mmu_seq);
+    cpu_flush_tlb();
+
+    // Restart instruction
+    return ctx;
+}
+
+// Page fault
+static void *mmu_page_fault_handler(int intr, void *ctx)
+{
+    // Unused
+    (void)intr;
+
+    uint64_t fault_addr = cpu_get_fault_address();
+
+    // Check for lazy TLB shootdown
+    if (mpresent(fault_addr) && thread_get_cpu_mmu_seq() != mmu_seq)
+        return mmu_lazy_tlb_shootdown(ctx);
+
+    return 0;
 }
 
 //
@@ -764,6 +835,9 @@ void mmu_init(int ap)
         cpu_set_page_directory(root_physaddr);
         return;
     }
+
+    // Hook IPI for TLB shootdown
+    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown);
 
     usable_ranges = mmu_fixup_mem_map(phys_mem_map);
 
@@ -818,7 +892,7 @@ void mmu_init(int ap)
     // Create the new root
 
     // Get a page
-    root_physaddr = init_take_page(ranges, &usable_ranges);
+    root_physaddr = init_take_page(1);
 
     // Map page
     pte_t *root = init_map_aliasing_pte(aliasing_pte, root_physaddr);
@@ -830,8 +904,7 @@ void mmu_init(int ap)
                    (linaddr_t)PT0_PTR(PT_KBASEADDR),
                    root_physaddr,
                    0,
-                   PTE_PRESENT | PTE_WRITABLE,
-                   ranges, &usable_ranges);
+                   PTE_PRESENT | PTE_WRITABLE);
 
     unsigned path[4];
     physaddr_t phys_addr[4];
@@ -887,8 +960,7 @@ void mmu_init(int ap)
                             ((uint64_t)path[3] << (9 * 0 + 12)),
                             pte & PTE_ADDR,
                             pt_physaddr,
-                            PTE_PRESENT | PTE_WRITABLE,
-                            ranges, &usable_ranges);
+                            PTE_PRESENT | PTE_WRITABLE);
 
                     pte_t *virtual_tables[4];
                     pte_from_path(virtual_tables, path);
@@ -898,8 +970,7 @@ void mmu_init(int ap)
                                        (linaddr_t)virtual_tables[i],
                                        pt_physaddr[i],
                                        0,
-                                       PTE_PRESENT | PTE_WRITABLE,
-                                       ranges, &usable_ranges);
+                                       PTE_PRESENT | PTE_WRITABLE);
                     }
                 }
             }
@@ -917,24 +988,28 @@ void mmu_init(int ap)
     phys_alloc = mmap(0, phys_alloc_count * sizeof(unsigned),
          PROT_READ | PROT_WRITE, 0, -1, 0);
 
-
     printk("Building physical memory free list\n");
 
     memset(phys_alloc, 0, phys_alloc_count * sizeof(unsigned));
 
-    // Put all of the remaining physical memory into the free list
+    // Put all of the remaining physical memory into the free lists
     uint64_t free_count = 0;
     for (; ; ++free_count) {
-        physaddr_t addr = init_take_page(ranges, &usable_ranges);
+        physaddr_t addr = init_take_page(1);
         if (addr >= ___top_physaddr && addr < 0x8000000000000000UL) {
             addr -= 0x100000;
             addr >>= PAGE_SIZE_BIT;
-            phys_alloc[addr] = phys_next_free;
-            phys_next_free = addr;
+            uint32_t volatile *chain = addr >= 0x100000000L
+                    ? &phys_next_free_high
+                    : &phys_next_free_low;
+            phys_alloc[addr] = *chain;
+            *chain = addr;
         } else {
             break;
         }
     }
+
+    release_apte(aliasing_pte);
 
     // Start using physical memory allocator
     usable_ranges = 0;
@@ -943,16 +1018,19 @@ void mmu_init(int ap)
            free_count,
            free_count >> (20 - PAGE_SIZE_BIT));
 
-    callout_call('V');
+    intr_hook(14, mmu_page_fault_handler);
 
-    zero_page = mmap(
-                0, PAGE_SIZE, PROT_READ | PROT_WRITE,
-                MAP_PHYSICAL, -1, 0);
+    callout_call('M');
 }
 
 static size_t round_up(size_t n)
 {
     return (n + PAGE_MASK) & -PAGE_SIZE;
+}
+
+static size_t round_down(size_t n)
+{
+    return n & ~PAGE_MASK;
 }
 
 //
@@ -971,8 +1049,38 @@ static linaddr_t take_linear(size_t size)
     return 0;
 }
 
+static int mmu_have_nx(void)
+{
+    // 0 == unknown, 1 == supported, -1 == not supported
+    static int supported;
+    if (supported != 0)
+        return supported > 0;
+
+    cpuid_t info;
+    supported = (cpuid(&info, 0x80000001, 0) &&
+                 !!(info.edx & (1<<20)))
+            ? 1
+            : -1;
+
+    return supported > 0;
+}
+
 //
 // Public API
+
+int mpresent(uintptr_t addr)
+{
+    unsigned path[4];
+    path_from_addr(path, addr);
+
+    pte_t *ptes[4];
+    pte_from_path(ptes, path);
+
+    return (*ptes[0] & PTE_PRESENT) &&
+            (*ptes[1] && PTE_PRESENT) &&
+            (*ptes[2] && PTE_PRESENT) &&
+            (*ptes[3] && PTE_PRESENT);
+}
 
 void *mmap(
         void *addr,
@@ -991,38 +1099,87 @@ void *mmap(
     if (prot & PROT_WRITE)
         page_flags |= PTE_WRITABLE;
 
-    // fixme check cpuid
-    //if (!(prot & PROT_EXEC))
-    //    flags |= PTE_NX;
+    if (flags & MAP_PHYSICAL)
+        page_flags |= PTE_PCD | PTE_PWT | PTE_EX_PHYSICAL;
+
+    if (flags & MAP_NOCACHE)
+        page_flags |= PTE_PCD;
+
+    if (flags & MAP_WRITETHRU)
+        page_flags |= PTE_PWT;
+
+    if (!(prot & PROT_EXEC) && mmu_have_nx())
+        page_flags |= PTE_NX;
+
+    uint64_t misalignment = 0;
+
+    if (unlikely(flags & MAP_PHYSICAL)) {
+        misalignment = (uint64_t)addr & PAGE_MASK;
+        len += misalignment;
+    }
 
     linaddr_t linear_addr = take_linear(len);
 
-    for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
+    for (size_t ofs = 0; ofs < len; ofs += PAGE_SIZE)
     {
-        if (!(flags & MAP_PHYSICAL)) {
+        if (likely(!(flags & MAP_PHYSICAL))) {
             // Allocate normal memory
-            physaddr_t page = init_take_page(ranges, &usable_ranges);
-            mmu_map_page(linear_addr + ofs, page,
-                         PTE_PRESENT | PTE_WRITABLE);
+            physaddr_t page = init_take_page(!(flags & MAP_32BIT));
+            mmu_map_page(linear_addr + ofs, page, page_flags);
         } else {
             // addr is a physical address, caller uses
             // returned linear address to access it
-            mmu_map_page(linear_addr + ofs, (physaddr_t)addr + ofs,
-                         PTE_PRESENT | PTE_WRITABLE | PTE_PCD | PTE_PWT);
+            mmu_map_page(linear_addr + ofs,
+                         (((physaddr_t)addr) + ofs) & PTE_ADDR,
+                         page_flags);
         }
     }
 
-    return (void*)linear_addr;
+    atomic_inc_uint64(&mmu_seq);
+    //mmu_send_tlb_shootdown();
+
+    return (void*)(linear_addr + misalignment);
+}
+
+void *mremap(
+        void *old_address,
+        size_t old_size,
+        size_t new_size,
+        int flags,
+        ... /* void *__new_address */)
+{
+    void *new_address = 0;
+
+    if (!(flags & MREMAP_FIXED)) {
+        va_list ap;
+        va_start(ap, flags);
+        new_address = va_arg(ap, void*);
+        va_end(ap);
+    }
+
+    /// FIXME: unfinished
+    (void)old_address;
+    (void)old_size;
+    (void)new_size;
+    (void)new_address;
+
+    return 0;
 }
 
 int munmap(void *addr, size_t len)
 {
+    linaddr_t a = (linaddr_t)addr;
+
+    uint64_t misalignment = 0;
+
+    misalignment = a & PAGE_MASK;
+    a -= misalignment;
+    len += misalignment;
+
     unsigned path[4];
-    path_from_addr(path, (linaddr_t)addr);
+    path_from_addr(path, a);
 
     pte_t *pteptr[4];
-
-    linaddr_t a = (linaddr_t)addr;
 
     for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
     {
@@ -1031,7 +1188,7 @@ int munmap(void *addr, size_t len)
 
         pte_t pte = *pteptr[3];
 
-        if (!(pte & PTE_EX_PHYSICAL)) {
+        if (likely(!(pte & PTE_EX_PHYSICAL))) {
             physaddr_t addr = pte & PTE_ADDR;
 
             mmu_free_phys(addr);
@@ -1045,5 +1202,123 @@ int munmap(void *addr, size_t len)
         path_inc(path);
     }
 
+    mmu_send_tlb_shootdown();
+
     return 0;
 }
+
+uintptr_t mphysaddr(void *addr)
+{
+    linaddr_t linaddr = (linaddr_t)addr;
+
+    uint64_t misalignment = linaddr & PAGE_MASK;
+
+    unsigned path[4];
+    path_from_addr(path, linaddr);
+
+    pte_t *pte[4];
+    pte_from_path(pte, path);
+
+    return ((*pte[3]) & PTE_ADDR) + misalignment;
+}
+
+static inline int mphysranges_enum(
+        void *addr, size_t size,
+        int (*callback)(mmphysrange_t, void*),
+        void *context)
+{
+    linaddr_t linaddr = (linaddr_t)addr;
+    size_t remaining_size = size;
+    physaddr_t page_end;
+    mmphysrange_t range;
+    int result;
+
+    do {
+        // Get physical address for this linear address
+        range.physaddr = mphysaddr((void*)linaddr);
+
+        // Calculate physical address of the end of the page
+        page_end = round_down(range.physaddr + PAGE_SIZE);
+
+        // Calculate size of data until end of page
+        range.size = page_end - range.physaddr;
+
+        // Cap at requested maximum
+        if (unlikely(range.size > remaining_size))
+            range.size = remaining_size;
+
+        // Advance the current linear address
+        // Pass this range to the callback
+        // Remember the callback return value
+        // Loop again if the callback did not return 0 and
+        // the remaining size is not equal to zero
+    } while (linaddr += range.size,
+             ((result = callback(range, context)) &&
+             (remaining_size -= range.size)));
+
+    return result;
+}
+
+typedef struct mphysranges_state_t {
+    mmphysrange_t *range;
+    size_t ranges_count;
+    size_t count;
+    size_t max_size;
+    physaddr_t last_end;
+    mmphysrange_t cur_range;
+} mphysranges_state_t;
+
+static inline int mphysranges_callback(mmphysrange_t range, void *context)
+{
+    mphysranges_state_t *state = context;
+
+    int contiguous = state->count > 0 &&
+            (state->range->physaddr + state->range->size == range.physaddr);
+
+    if (state->count == 0) {
+        // Initial range
+        *state->range = range;
+        ++state->count;
+    } else if (state->range->size < state->max_size && contiguous) {
+        // Extend the range
+        state->range->size += range.size;
+    } else if (state->ranges_count < state->ranges_count) {
+        *++state->range = range;
+        ++state->ranges_count;
+    } else {
+        return 0;
+    }
+
+    return 1;
+}
+
+size_t mphysranges(mmphysrange_t *ranges,
+                   size_t ranges_count,
+                   void *addr, size_t size,
+                   size_t max_size)
+{
+    mphysranges_state_t state;
+
+    // Request data
+    state.ranges_count = ranges_count;
+    state.max_size = max_size;
+
+    // Result data
+    state.range = ranges;
+    state.count = 0;
+    state.last_end = 0;
+    state.cur_range.physaddr = 0;
+    state.cur_range.size = 0;
+
+    mphysranges_enum(addr, size, mphysranges_callback, &state);
+
+    if (state.count < ranges_count) {
+        // Flush last region
+        state.cur_range.physaddr = ~0UL;
+        state.cur_range.size = 0;
+        mphysranges_callback(state.cur_range, &state);
+    }
+
+    return state.count;
+}
+

@@ -2,18 +2,7 @@
 
 .globl entry
 entry:
-	# Align stack
-	and $-16,%rsp
-
-	#jmp 1f
-	# Debugger hack
-	mov $0,%rbp
-	0:
-	test %rbp,%rbp
-	pause
-	jz 0b
-	1:
-
+	# See if this is the bootstrap processor
 	push %rdx
 	push %rcx
 	mov $0x1B,%ecx
@@ -27,7 +16,19 @@ entry:
 	jmp mp_main
 
 0:
-	lea 262144+kernel_stack(%rip),%rsp
+
+	#jmp 1f
+	# Debugger hack
+	mov $0,%rbp
+	0:
+	test %rbp,%rbp
+	pause
+	jz 0b
+1:
+
+	lea kernel_stack(%rip),%rax
+	add kernel_stack_size(%rip),%rax
+	mov %rax,%rsp
 
 	# Store the physical memory map address
 	# passed in from bootloader
@@ -37,16 +38,23 @@ entry:
 	and $0x000FFFFF,%rcx
 	mov %rcx,phys_mem_map(%rip)
 
+	call e9debug_init
+
 	xor %edi,%edi
 	call cpu_init
-	call cpu_hw_init
-
 	call tls_init
 
 	# Call the constructors
 	lea ___init_st(%rip),%rdi
 	lea ___init_en(%rip),%rsi
 	call invoke_function_array
+
+	xor %edi,%edi
+	call cpu_hw_init
+
+	# Initialize early-initialized devices
+	mov $'E',%edi
+	call callout_call
 
 	call main
 

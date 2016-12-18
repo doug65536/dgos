@@ -73,3 +73,6 @@ Thumbs.db
 # Autodependencies
 # ----------------
 .d/*
+
+# Annoying qtcreator file
+boot/boot.creator.user

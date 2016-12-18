@@ -1,4 +1,6 @@
+#define __NO_STRING_BUILTIN
 #include "string.h"
+#undef __NO_STRING_BUILTIN
 
 size_t strlen(char const *src)
 {
@@ -17,7 +19,7 @@ void *memchr(void const *mem, int ch, size_t count)
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-void *strchr(char const *s, int ch)
+char *strchr(char const *s, int ch)
 {
     for (;; ++s) {
         char c = *s;
@@ -30,7 +32,7 @@ void *strchr(char const *s, int ch)
 
 int strcmp(char const *lhs, char const *rhs)
 {
-    unsigned char cmp = 0;
+    int cmp = 0;
     do {
         cmp = (unsigned char)(*lhs) -
                 (unsigned char)(*rhs++);
@@ -90,6 +92,7 @@ char *strstr(char const *str, char const *substr)
 // Returns a pointer to after the last byte written!
 void *aligned16_memset(void *dest, int c, size_t n)
 {
+#ifdef __OPTIMIZE__
     char cc = (char)c;
     __ivec16 v = {
         cc, cc, cc, cc, cc, cc, cc, cc,
@@ -101,12 +104,15 @@ void *aligned16_memset(void *dest, int c, size_t n)
         n -= sizeof(__ivec16);
     }
     return vp;
+#else
+    return (char*)memset(dest, c, n) + n;
+#endif
 }
 
 void *memset(void *dest, int c, size_t n)
 {
     char *p = dest;
-#ifdef __GNUC__
+#if defined(__GNUC__) && defined(__OPTIMIZE__)
     // Write bytes until aligned
     while ((intptr_t)p & 0x0F && n) {
         *p++ = (char)c;
@@ -167,7 +173,7 @@ void *memmove(void *dest, void const *src, size_t n)
         return memcpy(d, s, n);
 
     if (d > s) {
-        for (size_t i = n; i; --n)
+        for (size_t i = n; i; --i)
             d[i-1] = s[i-1];
     }
 
@@ -216,3 +222,115 @@ char *strncat(char *dest, char const *src, size_t n)
 {
     return strncpy(dest + strlen(dest), src, n);
 }
+
+// out should have room for at least 5 bytes
+// if out is null, returns how many bytes it
+// would have wrote to out, not including null terminator
+// Returns 0 for values outside 0 <= in < 0x101000 range
+// Always writes null terminator if out is not null
+int ucs4_to_utf8(char *out, int in)
+{
+    int len;
+    if (in >= 0 && in < 0x80) {
+        *out++ = (char)in;
+        *out++ = 0;
+        return 1;
+    } else if (in < 0x80) {
+        len = 2;
+    } else if (in < 0x800) {
+        len = 3;
+    } else if (in < 0x10000) {
+        len = 4;
+    } else {
+        // Invalid
+        *out++ = 0;
+        return 0;
+    }
+
+    int shift = len - 1;
+    *out++ = (char)((signed char)0x80 >> shift) |
+            (in >> (6 * shift));
+
+    while (--shift >= 0)
+        *out++ = 0x80 | ((in >> (6 * shift)) & 0x3F);
+
+    *out++ = 0;
+
+    return len;
+}
+
+// Returns 32 bit wide character
+// Returns -1 on error
+// If ret_end is not null, pointer to first
+// byte after encoded character to *ret_end
+int utf8_to_ucs4(char *in, char **ret_end)
+{
+    int n;
+
+    if ((*in & 0x80) == 0) {
+        n = *in++ & 0x7F;
+    } else if ((*in & 0xE0) == 0xC0) {
+        n = (*in++ & 0x1F) << 6;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= *in++ & 0x3F;
+        else
+            n |= -1;
+    } else if ((*in & 0xF0) == 0xE0) {
+        n = (*in++ & 0x0F) << 12;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= (*in++ & 0x3F) << 6;
+        else
+            n |= -1;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= *in++ & 0x3F;
+        else
+            n |= -1;
+    } else if ((*in & 0xF8) == 0xF0) {
+        n = (*in++ & 0x07) << 18;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= (*in++ & 0x3F) << 12;
+        else
+            n |= -1;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= (*in++ & 0x3F) << 6;
+        else
+            n |= -1;
+
+        if ((*in & 0xC0) != 0x80)
+            n |= -1;
+
+        if (*in != 0)
+            n |= *in++ & 0x3F;
+        else
+            n |= -1;
+    } else {
+        ++in;
+        n = -1;
+    }
+
+    if (ret_end)
+        *ret_end = in;
+
+    return n;
+}
+

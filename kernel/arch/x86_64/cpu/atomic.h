@@ -1,6 +1,29 @@
 #pragma once
 #include "types.h"
 
+//
+// Some other concurrent code helpers
+
+static inline void atomic_barrier(void)
+{
+    __asm__ __volatile__ ( "" : : : "memory" );
+}
+
+static inline void atomic_fence(void)
+{
+    __asm__ __volatile__ ( "mfence" : : : "memory" );
+}
+
+static inline void atomic_lfence(void)
+{
+    __asm__ __volatile__ ( "lfence" : : : "memory" );
+}
+
+static inline void atomic_sfence(void)
+{
+    __asm__ __volatile__ ( "sfence" : : : "memory" );
+}
+
 /// In the following definitions
 ///  S is one of
 ///   int
@@ -49,6 +72,8 @@
         __asm__ __volatile__ ( \
             "lock " insn suffix " %[value]\n\t" \
             : [value] "+m" (*value) \
+            : \
+            : "memory" \
         ); \
     }
 
@@ -60,6 +85,7 @@
             "lock " insn suffix " %[rhs],%[value]\n\t" \
             : [value] "+m" (*value) \
             : [rhs] "r" (rhs) \
+            : "memory" \
         ); \
     }
 
@@ -75,6 +101,7 @@
             : [value] "+m" (*value), \
               [carry] "=r" (carry) \
             : [rhs] "r" (rhs) \
+            : "memory" \
         ); \
         return carry; \
     }
@@ -86,6 +113,7 @@
         type##_t expect,\
         type##_t replacement) \
     { \
+        atomic_barrier(); \
         return __sync_val_compare_and_swap(value, expect, replacement); \
     }
 
@@ -120,6 +148,8 @@
             "xchg" suffix " %[replacement],%[value]\n\t" \
             : [value] "+m" (*value), \
               [replacement] "+r" (replacement) \
+            : \
+            : "memory" \
         ); \
         return replacement; \
     }
@@ -133,6 +163,8 @@
             "lock xadd" suffix " %[addend],%[value]\n\t" \
             : [value] "+m" (*value), \
               [addend] "+r" (addend) \
+            : \
+            : "memory" \
         ); \
         return addend; \
     }
@@ -215,9 +247,79 @@ ATOMIC_DEFINE_BINARY_INSN(and, "and")
 ATOMIC_DEFINE_BINARY_INSN(or, "or")
 ATOMIC_DEFINE_BINARY_INSN(xor, "xor")
 
+//
 // Technically not atomic but needed in cmpxchg loops
 
 static inline void pause(void)
 {
-    __asm__ __volatile__ ( "pause" );
+    __asm__ __volatile__ ( "pause" : : : "memory" );
 }
+
+//
+// Atomic update helpers
+
+// Replace the value with n if the value is > n
+// Returns n if replacement occurred, otherwise
+// returns latest value (which is < n)
+#define atomic_min(value_ptr, n) __extension__ ({\
+    atomic_barrier(); \
+    __typeof__(value_ptr) _value_ptr = (value_ptr); \
+    __typeof__(n) _n = (n); \
+    \
+    __typeof__(*_value_ptr) _last_value = *_value_ptr; \
+    \
+    if (_last_value > _n) { \
+        for (;;) { \
+            __typeof__(*_value_ptr) _curr_value = atomic_cmpxchg( \
+                        _value_ptr, _last_value, _n); \
+            \
+            /* If it got updated, return n */ \
+            if (_curr_value == _last_value) { \
+                _last_value = _n; \
+                break; \
+            } \
+            /* If it is already greater, return what it is now */ \
+            if (_curr_value < _n) { \
+                _last_value = _curr_value; \
+                break; \
+            } \
+            \
+            _last_value = _curr_value; \
+            pause(); \
+        } \
+    } \
+    _last_value; \
+})
+
+// Replace the value with n if the value is < n
+// Returns n if replacement occurred, otherwise
+// returns latest value (which is > n)
+#define atomic_max(value_ptr, n) __extension__ ({\
+    atomic_barrier(); \
+    __typeof__(value_ptr) _value_ptr = (value_ptr); \
+    __typeof__(n) _n = (n); \
+    \
+    __typeof__(*_value_ptr) _last_value = *_value_ptr; \
+    \
+    if (_last_value < _n) { \
+        for (;;) { \
+            __typeof__(*_value_ptr) _curr_value = atomic_cmpxchg( \
+                        _value_ptr, _last_value, _n); \
+            \
+            /* If it got updated, return n */ \
+            if (_curr_value == _last_value) { \
+                _last_value = _n; \
+                break; \
+            } \
+            /* If it is already less, return what it is now */ \
+            if (_curr_value > _n) { \
+                _last_value = _curr_value; \
+                break; \
+            } \
+            \
+            _last_value = _curr_value; \
+            pause(); \
+        } \
+    } \
+    _last_value; \
+})

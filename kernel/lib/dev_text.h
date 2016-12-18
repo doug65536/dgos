@@ -146,7 +146,7 @@ void register_text_display_device(char const *name,
     DECLARE_DEVICE(text_display, name)
 
 #define REGISTER_text_display_DEVICE(name) \
-    REGISTER_DEVICE(text_display, name)
+    REGISTER_DEVICE(text_display, name, 'E')
 
 #define TEXT_DEV_PTR(dev) DEVICE_PTR(text_display, dev)
 

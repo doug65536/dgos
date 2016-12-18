@@ -18,6 +18,8 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
+CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
+
 AOBJS := $(ASRCS:.s=.o)
 COBJS := $(CSRCS:.c=.o)
 
@@ -45,7 +47,10 @@ WEVERYTHING += -Wbad-function-cast
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
-WEVERYTHING += -Wunsuffixed-float-constants
+
+ifneq ($(CC_IS_CLANG),1)
+	WEVERYTHING += -Wunsuffixed-float-constants
+endif
 
 # Strict overflow is noise
 WEVERYTHING += -Wno-strict-overflow
@@ -54,18 +59,19 @@ ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
 
-CFLAGS ?= -g3 -ffreestanding \
+CFLAGS ?= -g3 -fno-stack-protector \
 	-fpic -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
+	-fexceptions -fno-common  \
 	$(WEVERYTHING)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
-	-O2 \
-	-fomit-frame-pointer
+	-O2 -ftree-vectorize \
+	-fomit-frame-pointer -fbuiltin
 else
 CFLAGS += \
 	-O0 \
@@ -84,8 +90,12 @@ ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
 endif
 
-LINKERSCRIPT := kernel.ld
+LIBGCC := $(shell $(CC) -print-libgcc-file-name)
+LIBGCCDIR := $(dir $(LIBGCC))
+LIBGCCFILENAME = $(notdir $(LIBGCC))
+LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
 
+LINKERSCRIPT := arch/$(ARCH)/kernel.ld
 KERNEL := $(BINDIR)/kernel
 
 LIBFILES := \
@@ -96,7 +106,7 @@ OUTPUTS = $(KERNEL)
 
 NEEDSMALLEST :=
 
-LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T kernel.ld -g
+LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T $(LINKERSCRIPT) -g
 
 #-m i386linux
 
@@ -124,6 +134,7 @@ $(LIBFILES): subdirs
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES)
 	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
 		--start-group $(LIBFILES) --end-group \
+		$(LIBGCC) \
 		> $(DUMPDIR)/kernel.map
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)

@@ -39,8 +39,8 @@ typedef struct pci_config_hdr_t {
 typedef struct pci_dev_iterator_t {
     pci_config_hdr_t config;
 
-    uint8_t dev_class;
-    uint8_t subclass;
+    int dev_class;
+    int subclass;
 
     int bus;
     int slot;
@@ -54,3 +54,11 @@ int pci_init(void);
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
                         int dev_class, int subclass);
 int pci_enumerate_next(pci_dev_iterator_t *iter);
+
+uint32_t pci_read_config(
+        int bus, int slot, int func,
+        int offset, int size);
+
+uint32_t pci_write_config(
+        int bus, int slot, int func,
+        int offset, int value);
