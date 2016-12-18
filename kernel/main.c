@@ -104,11 +104,6 @@ int main(void)
 
     callout_call('L');
 
-    //ahci_init();
-
-    // Crash
-    //*(uint64_t*)0xfeedbeefbaadf00d = 0;
-
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d,
                   shell_stack, sizeof(shell_stack));
 
