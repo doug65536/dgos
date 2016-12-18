@@ -4,6 +4,8 @@
 #include "atomic.h"
 #include "time.h"
 #include "cpu/thread_impl.h"
+#include "interrupts.h"
+#include "assert.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -90,9 +92,10 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static void *pit8254_context_switch_handler(int irq, void *ctx)
+static void *pit8254_context_switch_handler(int intr, void *ctx)
 {
-    (void)irq;
+    (void)intr;
+    assert(intr == INTR_THREAD_YIELD);
     return thread_schedule(ctx);
 }
 
@@ -166,7 +169,7 @@ void pit8254_enable(void)
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);
-    irq_hook(40, pit8254_context_switch_handler);
+    intr_hook(INTR_THREAD_YIELD, pit8254_context_switch_handler);
     irq_setmask(0, 1);
 }
 
