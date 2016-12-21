@@ -92,15 +92,25 @@ void gdt_init_tss(int cpu_count)
     for (int i = 0; i < cpu_count; ++i) {
         gdt_set_tss_base(i, tss_list + i);
 
-        void *stack = mmap(0, TSS_STACK_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           0, -1, 0);
+        for (int st = 0; st < 8; ++st) {
+            void *stack = mmap(0, TSS_STACK_SIZE,
+                               PROT_READ | PROT_WRITE,
+                               0, -1, 0);
 
-        tss_list[i].stack_0 = stack;
-        tss_list[i].rsp0_lo =
-                (uint32_t)(uintptr_t)stack + TSS_STACK_SIZE;
-        tss_list[i].rsp0_hi =
-                (uint32_t)(((uintptr_t)stack + TSS_STACK_SIZE) >> 32);
+            tss_list[i].stack[st] = stack;
+
+            if (st) {
+                tss_list[i].ist[st].lo = (uint32_t)
+                        (uintptr_t)stack + TSS_STACK_SIZE;
+                tss_list[i].rsp[st].hi = (uint32_t)
+                        (((uintptr_t)stack + TSS_STACK_SIZE) >> 32);
+            } else {
+                tss_list[i].rsp[0].lo = (uint32_t)
+                        (uintptr_t)stack + TSS_STACK_SIZE;
+                tss_list[i].rsp[0].hi = (uint32_t)
+                        (((uintptr_t)stack + TSS_STACK_SIZE) >> 32);
+            }
+        }
     }
 }
 

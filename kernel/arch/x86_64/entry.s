@@ -2,9 +2,22 @@
 
 .globl entry
 entry:
-	# See if this is the bootstrap processor
+	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions CR4_OSXMMEX)
+	# This must be done before jumping into C code
+	mov %cr4,%rax
+	or $0x600,%rax
+	mov %rax,%cr4
+
 	push %rdx
 	push %rcx
+
+	# Enable last branch records
+	mov $0x1D9,%ecx
+	rdmsr
+	or $1,%eax
+	wrmsr
+
+	# See if this is the bootstrap processor
 	mov $0x1B,%ecx
 	rdmsr
 	pop %rcx
@@ -17,7 +30,7 @@ entry:
 
 0:
 
-	#jmp 1f
+	jmp 1f
 	# Debugger hack
 	mov $0,%rbp
 	0:

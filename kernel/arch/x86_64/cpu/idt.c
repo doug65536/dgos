@@ -120,14 +120,22 @@ int idt_init(int ap)
             addr = (uint64_t)isr_entry_points[i];
             idt[i].offset_lo = (uint16_t)(addr & 0xFFFF);
             idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
-            idt[i].offset_64_31 = (uint16_t)((addr >> 32) & 0xFFFFFFFF);
+            idt[i].offset_64_31 = (uint16_t)
+                    ((addr >> 32) & 0xFFFFFFFF);
 
-            idt[i].type_attr = IDT_PRESENT |
-                    (i < 32 ? IDT_TRAP : IDT_INTR);
+            idt[i].type_attr = IDT_PRESENT | IDT_INTR;
+                    //(i < 32 ? IDT_TRAP : IDT_INTR);
 
             idt[i].selector = IDT_SEL;
         }
     }
+
+    // Assign IST entries to interrupts
+    idt[INTR_EX_STACK].ist = 1;
+    idt[INTR_EX_DBLFAULT].ist = 2;
+    idt[INTR_EX_TSS].ist = 3;
+    idt[INTR_EX_GPF].ist = 4;
+    idt[INTR_EX_PAGE].ist = 5;
 
     table_register_64_t idtr;
 
@@ -242,7 +250,7 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
     static char const * const exception_names[] = {
         "#DE Divide Error",
         "#DB Debug",
-        "NMI",
+        "#NM NMI",
         "#BP Breakpoint,",
         "#OF Overflow",
         "#BR BOUND Range Exceeded",
@@ -279,7 +287,8 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
             // General register name
             con_draw_xy(0, i, reg_names[i], color);
             // General register value
-            snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx ", ctx->gpr->r[i]);
+            snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx ",
+                     ctx->gpr->r[i]);
             con_draw_xy(3, i, fmt_buf, color);
         }
 
@@ -365,6 +374,12 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
              (uint64_t)ctx->gpr->fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
+    // last branch
+    con_draw_xy(0, 21, "lastbr", color);
+    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
+                     msr_get(0x1DD));
+    con_draw_xy(6, 21, fmt_buf, color);
+
     halt_forever();
 
     return ctx;
@@ -386,7 +401,8 @@ void *isr_handler(isr_context_t *ctx)
         return exception_isr_handler(ctx);
 
     // IRQ
-    if (ctx->gpr->info.interrupt >= 32 && ctx->gpr->info.interrupt < 48)
+    if (ctx->gpr->info.interrupt >= 32 &&
+            ctx->gpr->info.interrupt < 48)
         return irq_dispatcher(ctx->gpr->info.interrupt, ctx);
 
     //

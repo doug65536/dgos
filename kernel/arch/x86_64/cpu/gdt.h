@@ -163,38 +163,22 @@ typedef union gdt_entry_combined_t {
 
 #define GDT_SEL_TSS_n(n)        (GDT_SEL_TSS + ((n) << 4))
 
+typedef struct tss_stack_t {
+    uint32_t lo;
+    uint32_t hi;
+} tss_stack_t;
+
 // Task State Segment (64-bit)
 typedef struct tss_t {
     uint32_t reserved0;
-    uint32_t rsp0_lo;
-    uint32_t rsp0_hi;
-    uint32_t rsp1_lo;
-    uint32_t rsp1_hi;
-    uint32_t rsp2_lo;
-    uint32_t rsp2_hi;
-    uint32_t reserved1;
-    uint32_t reserved2;
-    uint32_t ist0_lo;
-    uint32_t ist0_hi;
-    uint32_t ist1_lo;
-    uint32_t ist1_hi;
-    uint32_t ist2_lo;
-    uint32_t ist2_hi;
-    uint32_t ist3_lo;
-    uint32_t ist3_hi;
-    uint32_t ist4_lo;
-    uint32_t ist4_hi;
-    uint32_t ist5_lo;
-    uint32_t ist5_hi;
-    uint32_t ist6_lo;
-    uint32_t ist6_hi;
-    uint32_t ist7_lo;
-    uint32_t ist7_hi;
+    tss_stack_t rsp[3];
+    tss_stack_t ist[8];
     uint32_t reserved3;
     uint32_t reserved4;
     uint16_t reserved5;
     uint16_t iomap_base;
-    void *stack_0;
+    // entry 0 is rsp[0], rest are ist stacks
+    void *stack[8];
 } tss_t;
 
 void gdt_init(void);
