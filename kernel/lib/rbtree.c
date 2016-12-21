@@ -4,7 +4,6 @@
 #include "likely.h"
 #include "assert.h"
 
-#include "printk.h"
 
 // Red-Black Tree Properties
 //  0. The root is black
@@ -14,14 +13,16 @@
 //  4. Every path from the root to a nil node
 //     has the same number of black nodes
 
-#define RBTREE_TRACE_ON    1
+#define RBTREE_TRACE_ON    0
 #if RBTREE_TRACE_ON
+#include "printk.h"
 #define RBTREE_TRACE(...) printk (__VA_ARGS__)
 #else
 #define RBTREE_TRACE(...) ((void)0)
 #endif
 
 typedef enum rbtree_color_t {
+    NOCOLOR,
     BLACK,
     RED
 } rbtree_color_t;
@@ -68,14 +69,14 @@ struct rbtree_t {
 
 static void rbtree_dump(rbtree_t *tree)
 {
-    printk("ROOT=%u\n", tree->root);
+    RBTREE_TRACE("ROOT=%u\n", tree->root);
     for (rbtree_iter_t i = 1; i < tree->size; ++i)
-        printk("%u) left=%u right=%u parent=%u c=%c item=%d\n",
+        RBTREE_TRACE("%u) left=%u right=%u parent=%u c=%c item=%d\n",
                i, NODE(i)->left, NODE(i)->right,
                NODE(i)->parent,
                NODE(i)->color == RED ? 'R' : 'B',
                *(int*)NODE(i)->item);
-    printk("---\n");
+    RBTREE_TRACE("---\n");
 }
 
 static rbtree_iter_t rbtree_grandparent(
@@ -99,123 +100,70 @@ static rbtree_iter_t rbtree_uncle(
     return 0;
 }
 
-//static int rbtree_is_root(
-//        rbtree_t *tree, rbtree_iter_t n)
-//{
-//    return n && NODE(n)->parent == 0;
-//}
-//
-//static int rbtree_is_left_child(
-//        rbtree_t *tree, rbtree_iter_t n)
-//{
-//    return !rbtree_is_root(tree, n) &&
-//            NODE(NODE(n)->parent)->left == n;
-//}
-//
-//static int rbtree_is_right_child(
-//        rbtree_t *tree, rbtree_iter_t n)
-//{
-//    return !rbtree_is_root(tree, n) &&
-//            NODE(NODE(n)->parent)->right == n;
-//}
-
 static void rbtree_insert_case1(rbtree_t *tree, rbtree_iter_t n);
 static void rbtree_insert_case2(rbtree_t *tree, rbtree_iter_t n);
 static void rbtree_insert_case3(rbtree_t *tree, rbtree_iter_t n);
 static void rbtree_insert_case4(rbtree_t *tree, rbtree_iter_t n);
 static void rbtree_insert_case5(rbtree_t *tree, rbtree_iter_t n);
 
-// Rotate p left,
-// n is right child of p
-// n replaces p,
-// p becomes left child of n
-// left child of n becomes right child of p
-static rbtree_iter_t rbtree_rotate_left(
-        rbtree_t *tree, rbtree_iter_t p)
+static void rbtree_replace_node(
+        rbtree_t *tree, rbtree_iter_t oldn,
+        rbtree_iter_t newn)
 {
-    assert(p != 0);
+    assert(oldn != 0);
 
-    rbtree_iter_t g = NODE(p)->parent;
+    rbtree_iter_t oldp = NODE(oldn)->parent;
 
-    //assert(g != 0);
+    if (oldp == 0) {
+        tree->root = newn;
+    } else {
+        if (oldn == NODE(oldp)->left)
+            NODE(oldp)->left = newn;
+        else
+            NODE(oldp)->right = newn;
+    }
 
-    RBTREE_TRACE("Rotating left n=%u g=%u\n", p, g);
+    if (newn)
+        NODE(newn)->parent = oldp;
+}
 
-    rbtree_iter_t n = NODE(p)->right;
+static void rbtree_rotate_left(
+        rbtree_t *tree, rbtree_iter_t n)
+{
+    assert(n != 0);
+
+    rbtree_iter_t r = NODE(n)->right;
+
+    rbtree_replace_node(tree, n, r);
+    NODE(n)->right = NODE(r)->left;
+
+    rbtree_iter_t rl = NODE(r)->left;
+
+    if (rl)
+        NODE(rl)->parent = n;
+
+    NODE(r)->left = n;
+    NODE(n)->parent = r;
+}
+
+static void rbtree_rotate_right(
+        rbtree_t *tree, rbtree_iter_t n)
+{
+    assert(n != 0);
+
     rbtree_iter_t nl = NODE(n)->left;
-    if (g) {
-        NODE(g)->left = n;
-        NODE(n)->parent = g;
-    } else {
-        tree->root = n;
-        NODE(n)->parent = 0;
-    }
-    NODE(p)->right = nl;
-    NODE(nl)->parent = p;
 
-    NODE(n)->left = p;
-    NODE(p)->parent = n;
+    rbtree_replace_node(tree, n, nl);
+    NODE(n)->left = NODE(nl)->right;
 
-    p = NODE(n)->left;
-    return p;
+    rbtree_iter_t lr = NODE(nl)->right;
+
+    if (lr)
+        NODE(lr)->parent = n;
+
+    NODE(nl)->right = n;
+    NODE(n)->parent = nl;
 }
-
-static rbtree_iter_t rbtree_rotate_right(
-        rbtree_t *tree, rbtree_iter_t p)
-{
-    assert(p != 0);
-
-    rbtree_iter_t g = NODE(p)->parent;
-
-    //assert(g != 0);
-
-    RBTREE_TRACE("Rotating right n=%u g=%u\n", p, g);
-
-    rbtree_iter_t n = NODE(p)->left;
-    rbtree_iter_t nr = NODE(n)->right;
-    if (g) {
-        NODE(g)->right = n;
-        NODE(n)->parent = g;
-    } else {
-        tree->root = n;
-        NODE(n)->parent = 0;
-    }
-    NODE(p)->left = nr;
-    NODE(nr)->parent = p;
-
-    NODE(n)->right = p;
-    NODE(p)->parent = n;
-
-    p = NODE(n)->right;
-    return p;
-}
-
-//static rbtree_iter_t rbtree_rotate_left(
-//        rbtree_t *tree, rbtree_iter_t c, rbtree_iter_t g)
-//{
-//    RBTREE_TRACE("Rotating left\n");
-
-//    rbtree_iter_t sp = NODE(g)->left;
-//    rbtree_iter_t sl = NODE(c)->left;
-//    NODE(g)->left = c;
-//    NODE(c)->left = sp;
-//    NODE(sp)->right = sl;
-//    c = NODE(c)->left;
-//    return c;
-//}
-
-//static rbtree_iter_t rbtree_rotate_right(
-//        rbtree_t *tree, rbtree_iter_t c, rbtree_iter_t g)
-//{
-//    RBTREE_TRACE("Rotating right\n");
-
-//    rbtree_iter_t sp = NODE(g)->right;
-//    rbtree_iter_t sr = NODE(c)->right;
-//    NODE(g)->right = sp;
-//    NODE(sp)->left = sr;
-//    c = NODE(c)->right;
-//    return c;
-//}
 
 // Root can become black at any time, root must always be black
 static void rbtree_insert_case1(rbtree_t *tree, rbtree_iter_t n)
@@ -263,10 +211,12 @@ static void rbtree_insert_case4(rbtree_t *tree, rbtree_iter_t n)
 
     if ((n == NODE(NODE(n)->parent)->right &&
          (NODE(n)->parent == NODE(g)->left))) {
-        n = rbtree_rotate_left(tree, NODE(n)->parent);
+        rbtree_rotate_left(tree, NODE(n)->parent);
+        n = NODE(n)->left;
     } else if ((n == NODE(NODE(n)->parent)->left) &&
                (NODE(n)->parent == NODE(g)->right)) {
-        n = rbtree_rotate_right(tree, NODE(n)->parent);
+        rbtree_rotate_right(tree, NODE(n)->parent);
+        n = NODE(n)->right;
     }
     rbtree_insert_case5(tree, n);
 }
@@ -338,7 +288,9 @@ static int rbtree_walk_impl(rbtree_t *tree,
 
     // Visit left subtree
     if (NODE(n)->left) {
-        result = rbtree_walk_impl(tree, callback, p, NODE(n)->left);
+        assert(NODE(NODE(n)->left)->parent == n);
+        result = rbtree_walk_impl(tree, callback,
+                                  p, NODE(n)->left);
         if (result)
             return result;
     }
@@ -350,7 +302,9 @@ static int rbtree_walk_impl(rbtree_t *tree,
 
     // Visit right subtree
     if (NODE(n)->right) {
-        result = rbtree_walk_impl(tree, callback, p, NODE(n)->right);
+        assert(NODE(NODE(n)->right)->parent == n);
+        result = rbtree_walk_impl(tree, callback,
+                                  p, NODE(n)->right);
         if (result)
             return result;
     }
@@ -385,6 +339,7 @@ rbtree_t *rbtree_create(rbtree_cmp_t cmp,
 
         // Clear nil node
         memset(tree->nodes, 0, sizeof(*tree->nodes));
+        tree->nodes[0].color = BLACK;
     }
 
     return tree;
@@ -515,9 +470,73 @@ static int rbtree_test_visit(rbtree_t *tree, void *item, void *p)
 {
     (void)tree;
     (void)p;
-    int *a = item;
-    printk("Item: %d\n", *a);
+    (void)item;
+    RBTREE_TRACE("Item: %d\n", *(int*)item);
     return 0;
+}
+
+int rbtree_validate(rbtree_t *tree)
+{
+    if (NODE(0)->left != 0) {
+        assert(!"Nil node has left child");
+        return 0;
+    }
+
+    if (NODE(0)->parent != 0) {
+        assert(!"Nil node has parent");
+        return 0;
+    }
+
+    if (NODE(0)->right != 0) {
+        assert(!"Nil node has right child");
+        return 0;
+    }
+
+    if (NODE(0)->item != 0) {
+        assert(!"Nil node has item");
+        return 0;
+    }
+
+    if (NODE(0)->color != BLACK) {
+        assert(!"Nil node is not black");
+        return 0;
+    }
+
+    for (size_t i = 1; i < tree->size; ++i) {
+        int left = NODE(i)->left;
+        int right = NODE(i)->right;
+
+        if (left) {
+            if (NODE(left)->parent != i) {
+                assert(!"Left child parent link is incorrect");
+                return 0;
+            }
+
+            if (tree->cmp(NODE(left)->item, NODE(i)->item, tree->p) >= 0) {
+                assert(!"Left child is >= its parent");
+                return 0;
+            }
+        }
+
+        if (right) {
+            if (NODE(right)->parent != i) {
+                assert(!"Right child parent link is incorrect");
+                return 0;
+            }
+
+            if (tree->cmp(NODE(right)->item, NODE(i)->item, tree->p) < 0) {
+                assert(!"Right child is < its parent");
+                return 0;
+            }
+        }
+
+        if (NODE(i)->color != BLACK && NODE(i)->color != RED) {
+            assert(!"Node has invalid color");
+            return 0;
+        }
+    }
+
+    return 1;
 }
 
 int rbtree_test(void)
@@ -544,7 +563,7 @@ int rbtree_test(void)
             scenario[2] = orders[order][(2 + pass) & 3];
             scenario[3] = orders[order][(3 + pass) & 3];
 
-            printk("Trying %2d %2d %2d %2d\n",
+            RBTREE_TRACE("Trying %2d %2d %2d %2d\n",
                    values[scenario[0]],
                    values[scenario[1]],
                    values[scenario[2]],
@@ -559,9 +578,31 @@ int rbtree_test(void)
 
             rbtree_destroy(tree);
 
-            printk("---\n");
+            RBTREE_TRACE("---\n");
         }
     }
 
+    int seq[24];
+    for (int dist = 4; dist <= 24; ++dist) {
+        for (int pass = 0; pass < 2; ++pass) {
+            rbtree_t *tree = rbtree_create(rbtree_test_cmp, 0, 0);
+
+            for (int i = 0; i < dist; ++i) {
+                if (!pass)
+                    seq[i] = i + 3;
+                else
+                    seq[i] = 27 - i;
+
+                rbtree_insert(tree, seq + i, 0);
+                rbtree_validate(tree);
+            }
+
+            rbtree_walk(tree, rbtree_test_visit, 0);
+
+            rbtree_destroy(tree);
+
+            RBTREE_TRACE("---\n");
+        }
+    }
     return 0;
 }

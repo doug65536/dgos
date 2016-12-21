@@ -21,5 +21,6 @@ void *rbtree_item(rbtree_t *tree, rbtree_iter_t iter);
 
 rbtree_iter_t rbtree_count(rbtree_t *tree);
 int rbtree_walk(rbtree_t *tree, rbtree_visitor_t callback, void *p);
+int rbtree_validate(rbtree_t *tree);
 
 int rbtree_test(void);
