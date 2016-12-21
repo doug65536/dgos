@@ -59,7 +59,7 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-char shell_stack[4096];
+char shell_stack[16384];
 
 static int shell_thread(void *p)
 {
@@ -117,23 +117,23 @@ int main(void)
         { (char*)0xb800A, 299 }
     };
 
-    char *test_stacks = mmap(
-                0, 4096 * 5,
-                PROT_READ | PROT_WRITE,
-                MAP_STACK, -1, 0);
+    for (int i = 0; i < 4; ++i) {
+        char *test_stack = mmap(
+                    0, 1 << 14,
+                    PROT_READ | PROT_WRITE,
+                    MAP_STACK, -1, 0);
 
-    thread_create(other_thread, ttp + 0, test_stacks + (0 << 12), 4096);
-    thread_create(other_thread, ttp + 1, test_stacks + (1 << 12), 4096);
-    thread_create(other_thread, ttp + 2, test_stacks + (2 << 12), 4096);
-    thread_create(other_thread, ttp + 3, test_stacks + (3 << 12), 4096);
+        thread_create(other_thread, ttp + i,
+                      test_stack, 1 << 14);
+    }
 
-    sleep(2000);
-    test_thread_param_t *xx = mmap(0, 8<<20,
-                                   PROT_READ | PROT_WRITE,
-                                   0, -1, 0);
-    xx[4000].p = (char*)0xb801A;
-    xx[4000].sleep = 0;
-    thread_create(other_thread, xx + 4000, test_stacks + (4 << 12), 4096);
+    //sleep(2000);
+    //test_thread_param_t *xx = mmap(0, 8<<20,
+    //                               PROT_READ | PROT_WRITE,
+    //                               0, -1, 0);
+    //xx[4000].p = (char*)0xb801A;
+    //xx[4000].sleep = 0;
+    //thread_create(other_thread, xx + 4000, test_stacks + (4 << 12), 4096);
 
     while (1)
         halt();

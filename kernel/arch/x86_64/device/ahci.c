@@ -1219,7 +1219,7 @@ static void ahci_port_start_all(ahci_if_t *dev)
 }
 
 static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
-                      void *data, uint32_t count, int write,
+                      void *data, uint32_t count, int is_read,
                       void (*callback)(int error, uintptr_t arg),
                       uintptr_t callback_arg)
 {
@@ -1254,9 +1254,9 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
     cmd_tbl_ent->cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
     cmd_tbl_ent->cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
-    cmd_tbl_ent->cfis.h2d.command = write
-            ? ATA_CMD_WRITE_DMA_EXT
-            : ATA_CMD_READ_DMA_EXT;
+    cmd_tbl_ent->cfis.h2d.command = is_read
+            ? ATA_CMD_READ_DMA_EXT
+            : ATA_CMD_WRITE_DMA_EXT;
     cmd_tbl_ent->cfis.h2d.lba0 = lba & 0xFFFF;
     cmd_tbl_ent->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
     cmd_tbl_ent->cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
@@ -1273,10 +1273,6 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
     pi->callbacks[port_num].callback = callback;
     pi->callbacks[port_num].callback_arg = callback_arg;
-
-    // Mark command issued
-    //atomic_barrier();
-    //atomic_or_uint32(&pi->cmd_issued, (1U<<slot));
 
     atomic_barrier();
     port->cmd_issue = (1U<<slot);
@@ -1559,8 +1555,9 @@ static void ahci_async_complete(int error, uintptr_t arg)
     spinlock_unlock(&state->lock);
 }
 
-static int ahci_dev_read(storage_dev_base_t *dev,
-               void *data, uint64_t count, uint64_t lba)
+static int ahci_dev_io(storage_dev_base_t *dev,
+                       void *data, uint64_t count, uint64_t lba,
+                       int is_read)
 {
     char buf[64];
     snprintf(buf, sizeof(buf), "  Reader(%ld):", lba);
@@ -1575,7 +1572,7 @@ static int ahci_dev_read(storage_dev_base_t *dev,
     printdbg("%s acquire\n", buf);
     block_state.hold = spinlock_lock_noirq(&block_state.lock);
 
-    ahci_rw(self->if_, self->port, lba, data, count, 0,
+    ahci_rw(self->if_, self->port, lba, data, count, is_read,
             ahci_async_complete, (uintptr_t)&block_state);
 
     printdbg("%s Suspending\n", buf);
@@ -1587,12 +1584,17 @@ static int ahci_dev_read(storage_dev_base_t *dev,
     return block_state.err;
 }
 
+static int ahci_dev_read(storage_dev_base_t *dev,
+                         void *data, uint64_t count,
+                         uint64_t lba)
+{
+    return ahci_dev_io(dev, data, count, lba, 1);
+}
+
 static int ahci_dev_write(storage_dev_base_t *dev,
                 void *data, uint64_t count, uint64_t lba)
 {
-    STORAGE_DEV_DEV_PTR(dev);
-    ahci_rw(self->if_, self->port, lba, data, count, 0, 0, 0);
-    return 0;
+    return ahci_dev_io(dev, data, count, lba, 0);
 }
 
 static int ahci_dev_flush(storage_dev_base_t *dev)

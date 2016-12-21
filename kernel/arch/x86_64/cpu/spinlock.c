@@ -70,6 +70,8 @@ void spinlock_unlock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
     assert(*lock != 0);
     *lock = 0;
 
+    atomic_barrier();
+
     if (hold->intr_enabled)
         cpu_irq_enable();
 }

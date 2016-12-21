@@ -48,6 +48,8 @@ arch/x86_64/cpu/cmos.c
 arch/x86_64/cpu/cmos.h
 arch/x86_64/cpu/spinlock.h
 arch/x86_64/cpu/spinlock.c
+arch/x86_64/device/ahci.c
+arch/x86_64/device/ahci.h
 arch/x86_64/device/vga.c
 arch/x86_64/device/vga.h
 arch/x86_64/device/keyb8042.c

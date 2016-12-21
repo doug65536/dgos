@@ -8,13 +8,14 @@ static spinlock_t e9debug_lock;
 
 static int e9debug_write_debug_str(char const *str)
 {
+    spinlock_hold_t hold;
     int n = 0;
-    spinlock_lock(&e9debug_lock);
+    hold = spinlock_lock_noirq(&e9debug_lock);
     while (*str) {
         outb(0xE9, *str++);
         ++n;
     }
-    spinlock_unlock(&e9debug_lock);
+    spinlock_unlock_noirq(&e9debug_lock, &hold);
     return n;
 }
 

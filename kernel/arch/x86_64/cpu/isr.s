@@ -127,25 +127,26 @@ isr_common:
 
 	# Save call-clobbered registers
 	# (in System-V parameter order in memory)
-	push_cfi %r15
-	push_cfi %r14
-	push_cfi %r13
-	push_cfi %r12
-	push_cfi %r11
-	push_cfi %r10
-	push_cfi %rbp
-	push_cfi %rbx
-	push_cfi %rax
-	push_cfi %r9
-	push_cfi %r8
-	push_cfi %rcx
-	push_cfi %rdx
-	push_cfi %rsi
-	push_cfi %rdi
+	adj_rsp -120
+	movq %rdi,    (%rsp)
+	movq %rsi, 1*8(%rsp)
+	movq %rdx, 2*8(%rsp)
+	movq %rcx, 3*8(%rsp)
+	movq %r8 , 4*8(%rsp)
+	movq %r9 , 5*8(%rsp)
+	movq %rax, 6*8(%rsp)
+	movq %rbx, 7*8(%rsp)
+	movq %rbp, 8*8(%rsp)
+	movq %r10, 9*8(%rsp)
+	movq %r11,10*8(%rsp)
+	movq %r12,11*8(%rsp)
+	movq %r13,12*8(%rsp)
+	movq %r14,13*8(%rsp)
+	movq %r15,14*8(%rsp)
 
 	# See if we're coming from 64 bit code
 	cmpq $8,18*8(%rsp)
-	jne 9f
+	jne isr_save_32
 
 	# ...yes, came from 64 bit code
 
@@ -205,7 +206,7 @@ isr_common:
 
 	# See if we're returning to 64 bit code
 	cmp $8,20*8(%rsp)
-	jnz 7f
+	jnz isr_restore_32
 
 	# ...yes, returning to 64 bit mode
 
@@ -220,29 +221,29 @@ isr_common:
 	wrmsr
 
 6:
-	pop_cfi %rdi
-	pop_cfi %rsi
-	pop_cfi %rdx
-	pop_cfi %rcx
-	pop_cfi %r8
-	pop_cfi %r9
-	pop_cfi %rax
-	pop_cfi %rbx
-	pop_cfi %rbp
-	pop_cfi %r10
-	pop_cfi %r11
-	pop_cfi %r12
-	pop_cfi %r13
-	pop_cfi %r14
-	pop_cfi %r15
+	movq     (%rsp),%rdi
+	movq  1*8(%rsp),%rsi
+	movq  2*8(%rsp),%rdx
+	movq  3*8(%rsp),%rcx
+	movq  4*8(%rsp),%r8
+	movq  5*8(%rsp),%r9
+	movq  6*8(%rsp),%rax
+	movq  7*8(%rsp),%rbx
+	movq  8*8(%rsp),%rbp
+	movq  9*8(%rsp),%r10
+	movq 10*8(%rsp),%r11
+	movq 11*8(%rsp),%r12
+	movq 12*8(%rsp),%r13
+	movq 13*8(%rsp),%r14
+	movq 14*8(%rsp),%r15
 
-	addq $16,%rsp
+	addq $16+8*15,%rsp
 	.cfi_def_cfa_offset 8
 
 	iretq
 
 # Saving context from 32 bit mode, out of line
-9:
+isr_save_32:
 	# Push dummy FSBASE
 	push_cfi $0
 
@@ -259,7 +260,7 @@ isr_common:
 	jmp 8b
 
 # Resuming into 32 bit mode, out of line
-7:
+isr_restore_32:
 	# Protect kernel mode gsbase from changes
 	swapgs
 

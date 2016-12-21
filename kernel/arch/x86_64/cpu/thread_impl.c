@@ -45,11 +45,12 @@ typedef struct cpu_info_t cpu_info_t;
 
 struct thread_info_t {
     void * volatile ctx;
-    //cpu_info_t *cpu;
+    uint64_t volatile wake_time;
+
+    uint64_t cpu_affinity;
+
     void *stack;
     size_t stack_size;
-
-    uint64_t volatile wake_time;
 
     // When state is equal to one of these:
     //  THREAD_IS_READY
@@ -71,11 +72,13 @@ struct thread_info_t {
     //
     thread_state_t volatile state;
 
-    uint64_t cpu_affinity;
-
     // Higher numbers are higher priority
     int volatile priority;
+
+    uint64_t align[2];
 };
+
+C_ASSERT(sizeof(thread_info_t) == 64);
 
 // Store in a big array, for now
 #define MAX_THREADS 64
@@ -110,7 +113,9 @@ static uint64_t get_apic_id(void)
 
 static cpu_info_t *this_cpu(void)
 {
-    return cpu_gs_read_ptr();
+    cpu_info_t *cpu = cpu_gs_read_ptr();
+    assert(cpu >= cpus && cpu < cpus + countof(cpus));
+    return cpu;
 
     //uint64_t apic_id = get_apic_id();
     //return cpu_from_apic_id(apic_id);
@@ -155,8 +160,8 @@ static thread_t thread_create_with_state(
         size_t stack_size,
         thread_state_t state)
 {
-    if (stack_size < 4096)
-        return 0;
+    if (stack_size < 16384)
+        return -1;
 
     for (size_t i = 0; ; ++i) {
         if (i >= MAX_THREADS) {
@@ -322,12 +327,13 @@ void thread_init(int ap)
 }
 
 static thread_info_t *thread_choose_next(
-        thread_info_t * const thread)
+        thread_info_t * const outgoing)
 {
     cpu_info_t *cpu = this_cpu();
     size_t cpu_number = cpu - cpus;
-    size_t i = thread - threads;
+    size_t i = outgoing - threads;
     thread_info_t *best = 0;
+    thread_info_t *candidate;
     uint64_t now = 0;
 
     assert(i < countof(threads));
@@ -339,56 +345,62 @@ static thread_info_t *thread_choose_next(
         if (i >= count)
             i = 0;
 
+        candidate = threads + i;
+
         //
         // Expect states to have busy bit set if it is the outgoing thread
 
-        thread_state_t expected_sleep = (thread == threads + i)
-                ? THREAD_IS_SLEEPING_BUSY
-                : THREAD_IS_SLEEPING;
+        thread_state_t expected_sleep = (outgoing != threads + i)
+                ? THREAD_IS_SLEEPING
+                : THREAD_IS_SLEEPING_BUSY;
 
-        thread_state_t expected_ready = (thread == threads + i)
-                ? THREAD_IS_READY_BUSY
-                : THREAD_IS_READY;
+        thread_state_t expected_ready = (outgoing != threads + i)
+                ? THREAD_IS_READY
+                : THREAD_IS_READY_BUSY;
 
-        if (!(threads[i].cpu_affinity & (1 << cpu_number)))
+        // If this thread is not allowed to run on this CPU
+        // then skip it
+        if (!(candidate->cpu_affinity & (1 << cpu_number)))
             continue;
 
-        if (threads[i].state == expected_sleep) {
+        if (candidate->state == expected_sleep) {
+            // The thread is sleeping, see if it should wake up yet
+
+            // If we didn't get current time yet, get it
             if (now == 0)
                 now = time_ms();
 
-            if (now < threads[i].wake_time)
+            if (now < candidate->wake_time)
                 continue;
 
             // Race to transition it to ready
             if (atomic_cmpxchg(
-                        &threads[i].state,
+                        &candidate->state,
                         expected_sleep,
                         expected_ready) !=
                     expected_sleep) {
                 // Another CPU beat us to it
                 continue;
             }
-        } else if (threads[i].state != expected_ready)
+        } else if (candidate->state != expected_ready)
             continue;
+
+        assert(candidate->state == expected_ready);
 
         if (best) {
             // Must be better than best
-            if (threads[i].priority > best->priority)
-                best = threads + i;
+            if (candidate->priority > best->priority)
+                best = candidate;
         } else {
-            // Must be same or better than outgoing
-            if (thread->state == expected_sleep ||
-                    threads[i].priority >= thread->priority)
-                best = threads + i;
+            best = candidate;
         }
     }
 
     assert(best
            ? best >= threads && best <= threads + countof(threads)
-           : thread >= threads && thread <= threads + countof(threads));
+           : outgoing >= threads && outgoing <= threads + countof(threads));
 
-    return best ? best : thread;
+    return best ? best : outgoing;
 }
 
 static void thread_clear_busy(void *outgoing)
@@ -508,6 +520,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     atomic_barrier();
     spinlock_unlock(lock);
     thread_yield();
+    assert(thread->state == THREAD_IS_RUNNING);
     spinlock_lock(lock);
 }
 
