@@ -241,11 +241,11 @@ run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 
 # -drive file=$(DISKIMAGE),format=raw,if=ide
 
-run-debug-singlecpu: all bootable-disk debuggable-kernel-disk inject-kernel
-	$(QEMU) \
+run-debug-singlecpu: all debuggable-kernel-disk
+	$(QEMU) -s \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset \
-		-s -m 6G -machine q35 -smp cpus=1,cores=1,threads=1 \
+		-m 6G -machine q35 -smp cpus=1,cores=1,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
 		-net nic,model=rtl8139 \
@@ -256,7 +256,18 @@ run-debug-singlecpu: all bootable-disk debuggable-kernel-disk inject-kernel
 #		-device ahci,id=ahci \
 #		-device ide-drive,drive=disk,bus=ahci.0 \
 
-#,guest_errors,unimp
+run-debug-wait: all debuggable-kernel-disk
+	$(QEMU) -s -S  \
+		-drive file=$(DISKIMAGE),format=raw \
+		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
+		-m 6G -machine q35 -smp cpus=1,cores=1,threads=1 \
+		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+		-device isa-debugcon,chardev=qemu-debug-out \
+		-net nic,model=rtl8139 \
+		-net nic,model=ne2k_pci \
+		-net nic,model=e1000
+
+#,guest_errors,unimp -enable-kvm
 
 run: all bootable-disk
 	$(QEMU) -m 5G -drive file=$(DISKIMAGE),format=raw \
