@@ -14,8 +14,8 @@
 
 int life_and_stuff = 42;
 
-size_t const kernel_stack_size = 8192;
-char kernel_stack[8192];
+size_t const kernel_stack_size = 16384;
+char kernel_stack[16384];
 
 char buf[12];
 
@@ -74,6 +74,8 @@ static int shell_thread(void *p)
 
         storage_devs[0]->vtbl->read(storage_devs[0],
                 data, 65536/512, 0);
+
+        sleep(100);
     }
     return 0;
 }

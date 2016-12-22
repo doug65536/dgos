@@ -129,11 +129,26 @@ static thread_info_t *this_thread(void)
 
 void thread_yield(void)
 {
+#if 1
+    __asm__ __volatile__ (
+        "movq %%rsp,%%rax\n\t"
+        "pushq $0\n\t"
+        "push %%rax\n\t"
+        "pushfq\n\t"
+        "cli\n\t"
+        "push $0x8\n\t"
+        "call isr_entry_%c[yield]\n\t"
+        :
+        : [yield] "i" (INTR_THREAD_YIELD)
+        : "%rax"
+    );
+#else
     __asm__ __volatile__ (
         "int %[yield_intr]\n\t"
         :
         : [yield_intr] "i" (INTR_THREAD_YIELD)
     );
+#endif
 }
 
 static void thread_cleanup(void)
@@ -158,7 +173,8 @@ static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata,
         void *stack,
         size_t stack_size,
-        thread_state_t state)
+        thread_state_t state,
+        uint64_t affinity)
 {
     if (stack_size < 16384)
         return -1;
@@ -187,7 +203,7 @@ static thread_t thread_create_with_state(
         thread->stack = stack;
         thread->stack_size = stack_size;
         thread->priority = 0;
-        thread->cpu_affinity = ~0L;
+        thread->cpu_affinity = affinity ? affinity : ~0L;
 
         uintptr_t stack_addr = (uintptr_t)stack;
         uintptr_t stack_end = stack_addr +
@@ -254,7 +270,7 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
     return thread_create_with_state(
                 fn, userdata,
                 stack, stack_size,
-                THREAD_IS_READY);
+                THREAD_IS_READY, 0);
 }
 
 #if 0
@@ -306,7 +322,7 @@ void thread_init(int ap)
         thread->priority = 0;
         thread->stack = kernel_stack;
         thread->stack_size = kernel_stack_size;
-        thread->cpu_affinity = ~0L;
+        thread->cpu_affinity = 1;
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
@@ -318,7 +334,8 @@ void thread_init(int ap)
                     MAP_STACK, -1, 0);
         thread = threads + thread_create_with_state(
                     smp_thread, 0, stack, stack_size,
-                    THREAD_IS_INITIALIZING);
+                    THREAD_IS_INITIALIZING,
+                    1 << cpu_number);
 
         cpu->goto_thread = thread;
         atomic_barrier();
@@ -385,8 +402,6 @@ static thread_info_t *thread_choose_next(
         } else if (candidate->state != expected_ready)
             continue;
 
-        assert(candidate->state == expected_ready);
-
         if (best) {
             // Must be better than best
             if (candidate->priority > best->priority)
@@ -446,13 +461,15 @@ void *thread_schedule(void *ctx)
     // Retry because another CPU might steal this
     // thread after it transitions from sleeping to
     // ready
-    for (;;) {
+    int retries = 0;
+    for ( ; ; ++retries) {
         thread = thread_choose_next(outgoing);
 
         assert(thread >= threads &&
                thread < threads + countof(threads));
 
-        if (thread == outgoing) {
+        if (thread == outgoing &&
+                thread->state == THREAD_IS_READY_BUSY) {
             atomic_barrier();
             thread->state = THREAD_IS_RUNNING;
             break;
@@ -465,6 +482,8 @@ void *thread_schedule(void *ctx)
         }
         pause();
     }
+    if (retries > 0)
+        printdbg("Scheduler retries: %d\n", retries);
     atomic_barrier();
 
     cpu->cur_thread = thread;
@@ -503,7 +522,7 @@ void thread_sleep_until(uint64_t expiry)
 
 void thread_sleep_for(uint64_t ms)
 {
-    printdbg("Sleeping for %lu ms\n", ms);
+    //printdbg("Sleeping for %lu ms\n", ms);
 
     thread_sleep_until(time_ms() + ms);
 }

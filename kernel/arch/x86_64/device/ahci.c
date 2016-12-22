@@ -1540,7 +1540,7 @@ static void ahci_async_complete(int error, uintptr_t arg)
     char buf[64];
     snprintf(buf, sizeof(buf), "Callback(%ld):", state->lba);
 
-    printdbg("%s Read completed, waiting for lock\n", buf);
+    //printdbg("%s Read completed, waiting for lock\n", buf);
 
     spinlock_lock(&state->lock);
     state->err = error;
@@ -1549,9 +1549,9 @@ static void ahci_async_complete(int error, uintptr_t arg)
     state->done = 1;
 
     atomic_barrier();
-    printdbg("%s Resuming blocked thread\n", buf);
+    //printdbg("%s Resuming blocked thread\n", buf);
     thread_resume(state->thread);
-    printdbg("%s Unlocking state\n", buf);
+    //printdbg("%s Unlocking state\n", buf);
     spinlock_unlock(&state->lock);
 }
 
@@ -1569,16 +1569,16 @@ static int ahci_dev_io(storage_dev_base_t *dev,
 
     block_state.lba = lba;
 
-    printdbg("%s acquire\n", buf);
+    //printdbg("%s acquire\n", buf);
     block_state.hold = spinlock_lock_noirq(&block_state.lock);
 
     ahci_rw(self->if_, self->port, lba, data, count, is_read,
             ahci_async_complete, (uintptr_t)&block_state);
 
-    printdbg("%s Suspending\n", buf);
+    //printdbg("%s Suspending\n", buf);
     thread_suspend_release(&block_state.lock, &block_state.thread);
 
-    printdbg("%s Unlocking\n", buf);
+    //printdbg("%s Unlocking\n", buf);
     spinlock_unlock_noirq(&block_state.lock, &block_state.hold);
 
     return block_state.err;

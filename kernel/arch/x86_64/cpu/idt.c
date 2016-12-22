@@ -135,7 +135,7 @@ int idt_init(int ap)
     idt[INTR_EX_DBLFAULT].ist = 2;
     idt[INTR_EX_TSS].ist = 3;
     idt[INTR_EX_GPF].ist = 4;
-    idt[INTR_EX_PAGE].ist = 5;
+    //idt[INTR_EX_PAGE].ist = 5;
 
     table_register_64_t idtr;
 

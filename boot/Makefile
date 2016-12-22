@@ -260,6 +260,17 @@ run-debug-wait: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
+		-m 6G -machine q35 -smp cpus=8,cores=4,threads=2 \
+		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+		-device isa-debugcon,chardev=qemu-debug-out \
+		-net nic,model=rtl8139 \
+		-net nic,model=ne2k_pci \
+		-net nic,model=e1000
+
+run-debug-wait-singlecpu: all debuggable-kernel-disk
+	$(QEMU) -s -S  \
+		-drive file=$(DISKIMAGE),format=raw \
+		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
 		-m 6G -machine q35 -smp cpus=1,cores=1,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
