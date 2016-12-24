@@ -46,59 +46,58 @@ isr_entry 1 30
 isr_entry 0 31
 
 isr_common:
-	# Save call-clobbered registers
-	push %rax
-	push %rcx
-	push %rdx
-	push %rsi
-	push %rdi
-	push %r8
-	push %r9
-	push %r10
+	# Save registers
+	push %r15
+	push %r14
+	push %r13
+	push %r12
 	push %r11
+	push %r10
+	push %r9
+	push %r8
+	push %rbp
+	push %rdi
+	push %rsi
+	push %rdx
+	push %rcx
+	push %rbx
+	push %rax
 
 	# Save segment registers
-	movl %ds,%eax
-	push %rax
-	movl %ds,%eax
-	push %rax
-	movl %es,%eax
-	push %rax
-	movl %fs,%eax
-	push %rax
-
-	# Load segment registers with good values
-	movl $0x10,%eax
-	movl %eax,%ds
-	movl %eax,%es
-	movl %eax,%fs
+	sub $8,%rsp
+	movw %ds,(%rsp)
+	movw %es,2(%rsp)
+	movw %fs,4(%rsp)
+	movw %gs,6(%rsp)
 
 	# Pass a pointer to the interrupt number and error code
-	leaq 13*8(%rsp),%rax
-	push %rax
+	mov %rsp,%r10
 	call isr_handler
-	pop %rax
+
+	movw (%rsp),%ds
+	movw 2(%rsp),%es
+	movw 4(%rsp),%fs
+	movw 6(%rsp),%gs
 
 	pop %rax
-	mov %eax,%fs
-	pop %rax
-	mov %eax,%es
-	pop %rax
-	mov %eax,%ds
-
-	pop %r11
-	pop %r10
-	pop %r9
-	pop %r8
-	pop %rdi
-	pop %rsi
-	pop %rdx
+	pop %rbx
 	pop %rcx
-	pop %rax
+	pop %rdx
+	pop %rsi
+	pop %rdi
+	pop %rbp
+	pop %r8
+	pop %r9
+	pop %r10
+	pop %r11
+	pop %r12
+	pop %r13
+	pop %r14
+	pop %r15
 
 	addq $16,%rsp
 
-	iret
+	iretq
 
 .align 8
 
@@ -115,8 +114,6 @@ msg_CR2:
 	.string " CR2=0x"
 
 isr_handler:
-	movq 8(%rsp),%r10
-
 	# Black on red
 	movb $0x0C,%ah
 	# Text video memory
@@ -127,7 +124,7 @@ isr_handler:
 	call text_out
 
 	# Exception number
-	movq 0(%r10),%rsi
+	movq 16*8(%r10),%rsi
 	call hex2_out
 
 	# Code=
@@ -135,7 +132,7 @@ isr_handler:
 	call text_out
 
 	# Error code
-	movq 8(%r10),%rsi
+	movq 17*8(%r10),%rsi
 	call hex8_out
 
 	# Addr=
@@ -143,7 +140,7 @@ isr_handler:
 	call text_out
 
 	# Address
-	movq 16(%r10),%rsi
+	movq 18*8(%r10),%rsi
 	call hex16_out
 
 	# CR2=
@@ -159,7 +156,7 @@ isr_handler:
 	movl $(0xb8000 + 80*2),%edi
 
 	# Name of exception
-	movzbq 0(%r10),%r12
+	movzbq 16*8(%r10),%r12
 	movl $isr_name_invalid,%esi
 	cmpl $32,%r12d
 	ja 0f
@@ -167,6 +164,30 @@ isr_handler:
 	movzwl (%r11,%r12,2),%esi
 0:
 	call text_out
+
+	# Registers
+
+	xor %r13d,%r13d
+1:
+	# Line
+	imul $160,%r13d,%edi
+	add $0xb8000 + 80*4,%edi
+
+	# Register name
+	movl $reg_names,%r14d
+	lea (%r14,%r13,4),%rsi
+	call text_out
+
+	mov $equal_separator,%esi
+	call text_out
+
+	# Register value
+	mov 8(%r10,%r13,8),%rsi
+	call hex16_out
+
+	inc %r13d
+	cmp $14,%r13d
+	jb 1b
 
 0:
 	hlt
@@ -312,3 +333,22 @@ isr_names:
 .word isr_name_reserved
 .word isr_name_reserved
 .word isr_name_reserved
+
+# Register names
+reg_names:
+.string "rax"
+.string "rbx"
+.string "rcx"
+.string "rdx"
+.string "rsi"
+.string "rdi"
+.string "rbp"
+.string "r8 "
+.string "r9 "
+.string "r10"
+.string "r12"
+.string "r13"
+.string "r14"
+.string "r15"
+equal_separator:
+.string "="
