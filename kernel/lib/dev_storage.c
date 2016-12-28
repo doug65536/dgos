@@ -12,7 +12,7 @@ static int storage_if_count;
 static storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
 static int storage_dev_count;
 
-storage_dev_base_t *open_storage_dev(size_t dev)
+storage_dev_base_t *open_storage_dev(dev_t dev)
 {
     return storage_devs[dev];
 }
@@ -22,7 +22,7 @@ void close_storage_dev(storage_dev_base_t *dev)
     (void)dev;
 }
 
-void register_storage_if_device(const char *name,
+void register_storage_if_device(char const *name,
                                 storage_if_vtbl_t *vtbl)
 {
     // Get a list of storage devices of this type

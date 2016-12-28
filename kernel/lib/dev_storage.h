@@ -120,7 +120,9 @@ void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
 
 #endif
 
-storage_dev_base_t *open_storage_dev(size_t dev);
+typedef int dev_t;
+
+storage_dev_base_t *open_storage_dev(dev_t dev);
 void close_storage_dev(storage_dev_base_t *dev);
 
 //
@@ -148,6 +150,56 @@ typedef uint64_t fs_timespec_t;
 typedef uint64_t fs_dev_t;
 
 typedef struct fs_pollhandle_t fs_pollhandle_t;
+
+struct fs_init_info {
+    storage_dev_base_t *drive;
+
+    // Partition start LBA
+    uint64_t part_st;
+    uint64_t part_len;
+};
+
+typedef uint64_t ino_t;
+typedef uint16_t mode_t;
+typedef uint32_t nlink_t;
+typedef int32_t uid_t;
+typedef int32_t gid_t;
+typedef uint64_t blksize_t;
+typedef uint64_t blkcnt_t;
+typedef uint64_t time_t;
+
+struct fs_stat_t {
+    dev_t     st_dev;       /* ID of device containing file */
+    ino_t     st_ino;       /* inode number */
+    mode_t    st_mode;      /* protection */
+    nlink_t   st_nlink;     /* number of hard links */
+    uid_t     st_uid;       /* user ID of owner */
+    gid_t     st_gid;       /* group ID of owner */
+    dev_t     st_rdev;      /* device ID (if special file) */
+    off_t     st_size;      /* total size, in bytes */
+    blksize_t st_blksize;   /* blocksize for file system I/O */
+    blkcnt_t  st_blocks;    /* number of 512B blocks allocated */
+    time_t    st_atime;     /* time of last access */
+    time_t    st_mtime;     /* time of last modification */
+    time_t    st_ctime;     /* time of last status change */
+};
+
+typedef uint64_t fsblkcnt_t;
+typedef uint64_t fsfilcnt_t;
+
+struct fs_statvfs_t {
+    uint64_t   f_bsize;     /* file system block size */
+    uint64_t   f_frsize;    /* fragment size */
+    fsblkcnt_t f_blocks;    /* size of fs in f_frsize units */
+    fsblkcnt_t f_bfree;     /* # free blocks */
+    fsblkcnt_t f_bavail;    /* # free blocks for unprivileged users */
+    fsfilcnt_t f_files;     /* # inodes */
+    fsfilcnt_t f_ffree;     /* # free inodes */
+    fsfilcnt_t f_favail;    /* # free inodes for unprivileged users */
+    uint64_t   f_fsid;      /* file system ID */
+    uint64_t   f_flag;      /* mount flags */
+    uint64_t   f_namemax;   /* maximum filename length */
+};
 
 struct fs_vtbl_t {
     //
@@ -179,7 +231,7 @@ struct fs_vtbl_t {
     int (*unlink)(fs_cpath_t path);
 
     //
-    // Modiy directory entries
+    // Modify directory entries
     int (*chmod)(fs_cpath_t path, fs_mode_t mode);
     int (*chown)(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid);
     int (*truncate)(fs_cpath_t path, off_t size);
@@ -224,13 +276,13 @@ struct fs_vtbl_t {
     //
     // Read/Write/Enumerate extended attributes
     int (*setxattr)(fs_cpath_t path,
-                    const char* name, const char* value,
+                    char const* name, char const* value,
                     size_t size, int flags);
     int (*getxattr)(fs_cpath_t path,
-                    const char* name, char* value,
+                    char const* name, char* value,
                     size_t size);
     int (*listxattr)(fs_cpath_t path,
-                     const char* list, size_t size);
+                     char const* list, size_t size);
 
     //
     // ioctl API
