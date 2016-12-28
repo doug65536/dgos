@@ -15,9 +15,14 @@
 
 void cpu_init(int ap)
 {
-    cpu_cr0_change_bits(0, CR0_WP | CR0_NW);
+    // Enable write protection
+    cpu_cr0_change_bits(0, CR0_WP);
 
     uint64_t cr4 = 0;
+
+    // Supervisor Mode Execution Prevention (SMEP)
+    if (cpuid_ebx_bit(7, 7, 0))
+        cr4 |= CR4_SMEP;
 
     // Enable global pages feature if available
     if (cpuid_edx_bit(13, 1, 0))
