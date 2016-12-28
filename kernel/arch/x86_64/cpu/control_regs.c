@@ -223,6 +223,21 @@ void cpu_irq_enable(void)
     __asm__ __volatile__ ( "sti" );
 }
 
+void cpu_irq_toggle(int enable)
+{
+    uint64_t temp;
+    __asm__ __volatile__ (
+        "pushfq\n\t"
+        "pop %q[temp]\n\t"
+        "and $~(1<<9),%k[temp]\n\t"
+        "or %k[enable],%k[temp]\n\t"
+        "push %q[temp]\n\t"
+        "popfq\n\t"
+        : [temp] "=&r" (temp)
+        : [enable] "r" ((!!enable) << 9)
+    );
+}
+
 uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
 {
     uint64_t n = msr_get(msr);
@@ -231,3 +246,21 @@ uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
     msr_set(msr, n);
     return n;
 }
+
+void *cpu_get_stack_ptr(void)
+{
+    void *rsp;
+    __asm__ __volatile__ (
+        "mov %%rsp,%[rsp]\n\t"
+        : [rsp] "=r" (rsp)
+    );
+    return rsp;
+}
+
+void cpu_crash(void)
+{
+    __asm__ __volatile__ (
+        "ud2"
+    );
+}
+

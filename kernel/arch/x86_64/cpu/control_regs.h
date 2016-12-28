@@ -145,3 +145,7 @@ static inline void *cpu_gs_read_ptr(void)
 
 int cpu_irq_disable(void);
 void cpu_irq_enable(void);
+void cpu_irq_toggle(int enable);
+
+void *cpu_get_stack_ptr(void);
+void cpu_crash(void);
