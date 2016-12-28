@@ -100,7 +100,7 @@ void gdt_init_tss(int cpu_count)
             tss_list[i].stack[st] = stack;
 
             if (st) {
-                tss_list[i].ist[st].lo = (uint32_t)
+                tss_list[i].rsp[st].lo = (uint32_t)
                         (uintptr_t)stack + TSS_STACK_SIZE;
                 tss_list[i].rsp[st].hi = (uint32_t)
                         (((uintptr_t)stack + TSS_STACK_SIZE) >> 32);
