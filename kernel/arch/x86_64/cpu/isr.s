@@ -157,8 +157,9 @@ isr_common:
 	or %rdx,%rax
 	push_cfi %rax
 
-	# Push dummy segment registers
-	push_cfi $0
+	# Push segment registers
+	movabs $0x0010001000100010,%rax
+	push_cfi %rax
 
 8:
 	# Save pointer to general registers and return information
