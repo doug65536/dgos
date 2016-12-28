@@ -995,13 +995,13 @@ void mmu_init(int ap)
     // Put all of the remaining physical memory into the free lists
     uint64_t free_count = 0;
     for (; ; ++free_count) {
-        physaddr_t addr = init_take_page(1);
+        physaddr_t addr = init_take_page(0);
         if (addr >= ___top_physaddr && addr < 0x8000000000000000UL) {
-            addr -= 0x100000;
-            addr >>= PAGE_SIZE_BIT;
-            uint32_t volatile *chain = addr >= 0x100000000L
+            uint32_t volatile *chain = (addr >= 0x100000000UL)
                     ? &phys_next_free_high
                     : &phys_next_free_low;
+            addr -= 0x100000U;
+            addr >>= PAGE_SIZE_BIT;
             phys_alloc[addr] = *chain;
             *chain = addr;
         } else {
@@ -1124,7 +1124,7 @@ void *mmap(
     {
         if (likely(!(flags & MAP_PHYSICAL))) {
             // Allocate normal memory
-            physaddr_t page = init_take_page(!(flags & MAP_32BIT));
+            physaddr_t page = init_take_page(!!(flags & MAP_32BIT));
             mmu_map_page(linear_addr + ofs, page, page_flags);
         } else {
             // addr is a physical address, caller uses
@@ -1282,9 +1282,9 @@ static inline int mphysranges_callback(mmphysrange_t range, void *context)
     } else if (state->range->size < state->max_size && contiguous) {
         // Extend the range
         state->range->size += range.size;
-    } else if (state->ranges_count < state->ranges_count) {
+    } else if (state->count < state->ranges_count && range.size > 0) {
         *++state->range = range;
-        ++state->ranges_count;
+        ++state->count;
     } else {
         return 0;
     }
