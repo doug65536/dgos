@@ -144,6 +144,9 @@ isr_common:
 	movq %r14,13*8(%rsp)
 	movq %r15,14*8(%rsp)
 
+	# C code requires that the direction flag is clear
+	cld
+
 	# See if we're coming from 64 bit code
 	cmpq $8,18*8(%rsp)
 	jne isr_save_32
