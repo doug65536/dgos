@@ -3,7 +3,7 @@
 #include "printk.h"
 
 void register_text_display_device(
-        const char *name, text_display_vtbl_t *vtbl)
+        char const *name, text_display_vtbl_t *vtbl)
 {
     text_display_base_t *devices;
     int device_count;

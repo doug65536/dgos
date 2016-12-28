@@ -93,7 +93,7 @@ static char const formatter_hexlookup[] = "0123456789ABCDEF";
 /// or, a pointer to null terminated string and a 0
 /// or, a pointer to an unterminated string and a length
 static intptr_t formatter(
-        const char *format, va_list ap,
+        char const *format, va_list ap,
         int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
@@ -605,7 +605,7 @@ int vcprintf(char const *format, va_list ap)
     return chars_written;
 }
 
-void printk(const char *format, ...)
+void printk(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -618,7 +618,7 @@ void vprintk(char const *format, va_list ap)
     vcprintf(format, ap);
 }
 
-void panic(const char *format, ...)
+void panic(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -674,7 +674,7 @@ static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 // "buf".
 // "buf" is guaranteed to be null terminated upon
 // returning, if limit > 0.
-int vsnprintf(char *buf, size_t limit, const char *format, va_list ap)
+int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
 {
     vsnprintf_context_t context;
     context.buf = buf;
@@ -718,12 +718,12 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
     return write_debug_str(s, ch);
 }
 
-void vprintdbg(const char *format, va_list ap)
+void vprintdbg(char const *format, va_list ap)
 {
     formatter(format, ap, printdbg_emit_chars, 0);
 }
 
-void printdbg(const char *format, ...)
+void printdbg(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);

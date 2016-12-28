@@ -20,7 +20,7 @@ void con_putc(int character)
                 console_display, character);
 }
 
-int con_print(const char *s)
+int con_print(char const *s)
 {
     return console_display_vtbl.print(
                 console_display, s);
@@ -38,7 +38,7 @@ void con_move_cursor(int dx, int dy)
                 console_display, dx, dy);
 }
 
-int con_draw_xy(int x, int y, const char *s, int attr)
+int con_draw_xy(int x, int y, char const *s, int attr)
 {
     return console_display_vtbl.draw_xy(
                 console_display, x, y, s, attr);

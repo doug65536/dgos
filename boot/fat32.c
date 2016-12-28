@@ -777,7 +777,7 @@ static int find_available_file_handle()
     return -1;
 }
 
-int boot_open(const char *filename)
+int boot_open(char const *filename)
 {
     uint32_t cluster;
 
