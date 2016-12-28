@@ -8,12 +8,14 @@
 
 void spinlock_lock(spinlock_t *lock)
 {
+    atomic_lfence();
     while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
         pause();
 }
 
 int spinlock_try_lock(spinlock_t *lock)
 {
+    atomic_lfence();
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
         return 0;
     return 1;
@@ -23,6 +25,7 @@ void spinlock_unlock(spinlock_t *lock)
 {
     assert(*lock != 0);
     *lock = 0;
+    atomic_fence();
 }
 
 // Spin to acquire lock, return with IRQs disable
@@ -33,16 +36,17 @@ spinlock_hold_t spinlock_lock_noirq(spinlock_t *lock)
     // Disable IRQs
     hold.intr_enabled = cpu_irq_disable();
 
+    atomic_lfence();
     while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
         // Allow IRQs if they were enabled
-        if (hold.intr_enabled)
-            cpu_irq_enable();
+        cpu_irq_toggle(hold.intr_enabled);
 
+        atomic_barrier();
         pause();
+        atomic_barrier();
 
-        // Disable IRQs if they were enabled
-        if (hold.intr_enabled)
-            cpu_irq_disable();
+        // Disable IRQs
+        cpu_irq_disable();
     }
 
     // Return with interrupts disabled
@@ -55,9 +59,9 @@ int spinlock_try_lock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
 {
     hold->intr_enabled = cpu_irq_disable();
 
+    atomic_lfence();
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
-        if (hold->intr_enabled)
-            cpu_irq_enable();
+        cpu_irq_toggle(hold->intr_enabled);
 
         return 0;
     }
@@ -69,11 +73,8 @@ void spinlock_unlock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
 {
     assert(*lock != 0);
     *lock = 0;
-
-    atomic_barrier();
-
-    if (hold->intr_enabled)
-        cpu_irq_enable();
+    cpu_irq_toggle(hold->intr_enabled);
+    atomic_fence();
 }
 
 //
@@ -81,18 +82,21 @@ void spinlock_unlock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
 
 void rwspinlock_ex_lock(rwspinlock_t *lock)
 {
+    atomic_lfence();
     while (*lock != 0 || atomic_cmpxchg(lock, 0, -1) != 0)
         pause();
 }
 
 void rwspinlock_ex_unlock(rwspinlock_t *lock)
 {
-    assert(*lock == -1);
+    assert((atomic_lfence(), *lock == -1));
     *lock = 0;
+    atomic_fence();
 }
 
 void rwspinlock_sh_lock(rwspinlock_t *lock)
 {
+    atomic_lfence();
     rwspinlock_t old_value = *lock;
     for (;;) {
         if (old_value >= 0) {
@@ -120,6 +124,7 @@ void rwspinlock_sh_lock(rwspinlock_t *lock)
 
 void rwspinlock_sh_unlock(rwspinlock_t *lock)
 {
+    atomic_lfence();
     rwspinlock_t old_value = *lock;
     for (;;) {
         if (old_value > 0) {

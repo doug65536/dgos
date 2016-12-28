@@ -111,6 +111,11 @@ char const *keybd_special_text(int codepoint);
 // Called from drivers to add a keyboard event
 int keybd_event(keyboard_event_t event);
 
+// Called to read the keyboard queue
+keyboard_event_t keybd_waitevent(void);
+
 // Plugged in by drivers
 extern int (*keybd_set_layout_name)(char const *name);
 extern int (*keybd_get_modifiers)(void);
+
+void keybd_init(void);

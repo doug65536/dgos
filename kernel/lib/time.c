@@ -27,7 +27,6 @@ static uint32_t usleep_dummy(uint16_t microsec)
 
 void sleep(int ms)
 {
-    cpu_irq_enable();
     uint64_t expiry = time_ms() + ms;
 
     while (time_ms() < expiry)

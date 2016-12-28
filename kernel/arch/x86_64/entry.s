@@ -11,11 +11,18 @@ entry:
 	push %rdx
 	push %rcx
 
-	# Enable last branch records
-	mov $0x1D9,%ecx
-	rdmsr
-	or $1,%eax
-	wrmsr
+	# See if branch trace is available
+#	mov $0x1A0,%ecx
+#	rdmsr
+#	test $0x800,%eax
+#	jz 0f
+#
+#	# Enable last branch records
+#	mov $0x1D9,%ecx
+#	rdmsr
+#	or $1,%eax
+#	wrmsr
+#0:
 
 	# See if this is the bootstrap processor
 	mov $0x1B,%ecx

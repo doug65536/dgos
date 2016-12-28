@@ -76,9 +76,9 @@ static size_t ide_if_count;
 #define      ATAPI_CMD_READ       0xA8
 #define      ATAPI_CMD_EJECT      0x1B
 
-static storage_if_list_t ide_if_detect(void)
+static if_list_t ide_if_detect(void)
 {
-    storage_if_list_t list = {ide_ifs, sizeof(*ide_ifs), 0};
+    if_list_t list = {ide_ifs, sizeof(*ide_ifs), 0};
     pci_dev_iterator_t iter;
 
     if (!pci_enumerate_begin(&iter, 1, 1))

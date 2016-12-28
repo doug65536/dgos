@@ -6,6 +6,8 @@
 
 typedef int thread_t;
 
+typedef int16_t thread_priority_t;
+
 typedef int (*thread_fn_t)(void*);
 
 // Implemented in arch
@@ -26,3 +28,6 @@ thread_t thread_get_id(void);
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id);
 
 void thread_resume(thread_t thread);
+
+thread_priority_t thread_get_priority(thread_t thread_id);
+void thread_set_priority(thread_t thread_id, thread_priority_t priority);

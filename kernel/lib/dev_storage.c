@@ -5,18 +5,28 @@
 #include "printk.h"
 
 #define MAX_STORAGE_IFS 64
-storage_if_base_t *storage_ifs[MAX_STORAGE_IFS];
-int storage_if_count;
+static storage_if_base_t *storage_ifs[MAX_STORAGE_IFS];
+static int storage_if_count;
 
 #define MAX_STORAGE_DEVS 64
-storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
-int storage_dev_count;
+static storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
+static int storage_dev_count;
+
+storage_dev_base_t *open_storage_dev(size_t dev)
+{
+    return storage_devs[dev];
+}
+
+void close_storage_dev(storage_dev_base_t *dev)
+{
+    (void)dev;
+}
 
 void register_storage_if_device(const char *name,
                                 storage_if_vtbl_t *vtbl)
 {
     // Get a list of storage devices of this type
-    storage_if_list_t if_list = vtbl->detect();
+    if_list_t if_list = vtbl->detect();
 
     for (unsigned i = 0; i < if_list.count; ++i) {
         // Calculate pointer to storage interface instance

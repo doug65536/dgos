@@ -235,7 +235,9 @@ int ucs4_to_utf8(char *out, int in)
         *out++ = (char)in;
         *out++ = 0;
         return 1;
-    } else if (in < 0x80) {
+    }
+
+    if (in < 0x80) {
         len = 2;
     } else if (in < 0x800) {
         len = 3;

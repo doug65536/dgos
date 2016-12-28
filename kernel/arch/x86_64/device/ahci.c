@@ -11,6 +11,8 @@
 #include "cpu/atomic.h"
 #include "time.h"
 #include "cpu/spinlock.h"
+#include "threadsync.h"
+#include "cpu/control_regs.h"
 
 typedef struct ahci_if_t ahci_if_t;
 DECLARE_storage_if_DEVICE(ahci);
@@ -1312,8 +1314,8 @@ static void ahci_rebase(ahci_if_t *dev)
     ahci_port_stop_all(dev);
 
     int addr_type = ahci_supports_64bit(dev)
-            ? MAP_NOCACHE | MAP_WRITETHRU
-            : MAP_32BIT | MAP_NOCACHE | MAP_WRITETHRU;
+            ? MAP_WRITETHRU | MAP_NOCACHE
+            : MAP_32BIT | MAP_WRITETHRU | MAP_NOCACHE;
 
     // Loop through the implemented ports
     uint32_t ports_impl = dev->ports_impl;
@@ -1421,9 +1423,9 @@ static void ahci_bios_handoff(ahci_if_t *dev)
         thread_yield();
 }
 
-static storage_if_list_t ahci_if_detect(void)
+static if_list_t ahci_if_detect(void)
 {
-    storage_if_list_t list = {ahci_devices, sizeof(*ahci_devices), 0};
+    if_list_t list = {ahci_devices, sizeof(*ahci_devices), 0};
     pci_dev_iterator_t pci_iter;
 
     if (!pci_enumerate_begin(&pci_iter, 1, 6))
@@ -1496,7 +1498,7 @@ static storage_dev_list_t ahci_if_detect_devices(storage_if_base_t *if_)
     STORAGE_IF_DEV_PTR(if_);
 
     for (int port_num = 0; port_num < 32; ++port_num) {
-        if (!self->ports_impl & (1U<<port_num))
+        if (!(self->ports_impl & (1U<<port_num)))
             continue;
 
         hba_port_t volatile *port = self->mmio_base->ports + port_num;
@@ -1525,11 +1527,11 @@ static void ahci_dev_cleanup(storage_dev_base_t *dev)
 }
 
 typedef struct ahci_blocking_io_t {
-    thread_t thread;
-    spinlock_hold_t hold;
-    spinlock_t lock;
-    int volatile err;
-    int volatile done;
+    mutex_t lock;
+    condition_var_t done_cond;
+
+    int done;
+    int err;
     uint64_t lba;
 } ahci_blocking_io_t;
 
@@ -1537,49 +1539,43 @@ static void ahci_async_complete(int error, uintptr_t arg)
 {
     ahci_blocking_io_t *state = (void*)arg;
 
-    char buf[64];
-    snprintf(buf, sizeof(buf), "Callback(%ld):", state->lba);
-
-    //printdbg("%s Read completed, waiting for lock\n", buf);
-
-    spinlock_lock(&state->lock);
+    mutex_lock_noyield(&state->lock);
     state->err = error;
-
-    atomic_barrier();
     state->done = 1;
-
-    atomic_barrier();
-    //printdbg("%s Resuming blocked thread\n", buf);
-    thread_resume(state->thread);
-    //printdbg("%s Unlocking state\n", buf);
-    spinlock_unlock(&state->lock);
+    mutex_unlock(&state->lock);
+    condvar_wake_one(&state->done_cond);
 }
 
 static int ahci_dev_io(storage_dev_base_t *dev,
-                       void *data, uint64_t count, uint64_t lba,
-                       int is_read)
+                       void *data, uint64_t count,
+                       uint64_t lba, int is_read)
 {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "  Reader(%ld):", lba);
-
     STORAGE_DEV_DEV_PTR(dev);
 
     ahci_blocking_io_t block_state;
     memset(&block_state, 0, sizeof(block_state));
 
-    block_state.lba = lba;
+    mutex_init(&block_state.lock);
+    condvar_init(&block_state.done_cond);
 
-    //printdbg("%s acquire\n", buf);
-    block_state.hold = spinlock_lock_noirq(&block_state.lock);
+    int intr_were_enabled = cpu_irq_disable();
+
+    mutex_lock(&block_state.lock);
+
+    block_state.lba = lba;
 
     ahci_rw(self->if_, self->port, lba, data, count, is_read,
             ahci_async_complete, (uintptr_t)&block_state);
 
-    //printdbg("%s Suspending\n", buf);
-    thread_suspend_release(&block_state.lock, &block_state.thread);
+    while (!block_state.done)
+        condvar_wait(&block_state.done_cond, &block_state.lock);
 
-    //printdbg("%s Unlocking\n", buf);
-    spinlock_unlock_noirq(&block_state.lock, &block_state.hold);
+    mutex_unlock(&block_state.lock);
+
+    condvar_destroy(&block_state.done_cond);
+    mutex_destroy(&block_state.lock);
+
+    cpu_irq_toggle(intr_were_enabled);
 
     return block_state.err;
 }

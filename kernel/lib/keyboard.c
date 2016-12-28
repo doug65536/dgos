@@ -1,10 +1,15 @@
 #include "keyboard.h"
 #include "printk.h"
+#include "threadsync.h"
+#include "cpu/control_regs.h"
 
 typedef struct keyboard_buffer_t {
-    keyboard_event_t buffer[128];
+    keyboard_event_t buffer[16];
     size_t head;
     size_t tail;
+
+    mutex_t lock;
+    condition_var_t not_empty;
 } keyboard_buffer_t;
 
 static keyboard_buffer_t keybd_buffer;
@@ -81,10 +86,21 @@ static char const *keyboard_special_text[] = {
     "KEYB_VK_TOUCHPAD_TOGGLE", "KEYB_VK_KEYLIGHT_TOGGLE",
 };
 
+static size_t keybd_queue_next(size_t index)
+{
+    if (++index >= countof(keybd_buffer.buffer))
+        index = 0;
+    return index;
+}
+
 int keybd_event(keyboard_event_t event)
 {
-    if (keybd_buffer.head + 1 == keybd_buffer.tail) {
+    mutex_lock(&keybd_buffer.lock);
+
+    size_t next_head = keybd_queue_next(keybd_buffer.head);
+    if (next_head == keybd_buffer.tail) {
         // Buffer is full
+        mutex_unlock(&keybd_buffer.lock);
         return 0;
     }
 
@@ -92,22 +108,43 @@ int keybd_event(keyboard_event_t event)
     keybd_buffer.buffer[keybd_buffer.head] = event;
 
     // Advance head
-    if (keybd_buffer.head + 1 < sizeof(keybd_buffer.buffer))
-        ++keybd_buffer.head;
-    else
-        keybd_buffer.head = 0;
+    keybd_buffer.head = keybd_queue_next(keybd_buffer.head);
 
-    char const *special_text = keybd_special_text(event.vk);
+    //char const *special_text = keybd_special_text(event.vk);
+    //
+    //printk("%8d (%c) vk=%8x (%s)\n",
+    //       event.codepoint,
+    //       event.codepoint >= 0 ?
+    //           event.codepoint :
+    //           -event.codepoint,
+    //       event.vk,
+    //       special_text);
 
-    printk("%8d (%c) vk=%8x (%s)\n",
-           event.codepoint,
-           event.codepoint >= 0 ?
-               event.codepoint :
-               -event.codepoint,
-           event.vk,
-           special_text);
+    mutex_unlock(&keybd_buffer.lock);
+    condvar_wake_one(&keybd_buffer.not_empty);
 
     return 1;
+}
+
+keyboard_event_t keybd_waitevent(void)
+{
+    keyboard_event_t event;
+    int intr_was_enabled = cpu_irq_disable();
+
+    mutex_lock(&keybd_buffer.lock);
+
+    while (keybd_buffer.head == keybd_buffer.tail)
+        condvar_wait(&keybd_buffer.not_empty,
+                     &keybd_buffer.lock);
+
+    event = keybd_buffer.buffer[keybd_buffer.tail];
+
+    keybd_buffer.tail = keybd_queue_next(keybd_buffer.tail);
+
+    mutex_unlock(&keybd_buffer.lock);
+    cpu_irq_toggle(intr_was_enabled);
+
+    return event;
 }
 
 char const *keybd_special_text(int codepoint)
@@ -121,4 +158,10 @@ char const *keybd_special_text(int codepoint)
     } else if (codepoint < 0x101000)
         return "";
     return 0;
+}
+
+void keybd_init(void)
+{
+    mutex_init(&keybd_buffer.lock);
+    condvar_init(&keybd_buffer.not_empty);
 }

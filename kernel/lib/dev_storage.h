@@ -63,14 +63,14 @@ struct storage_if_base_t {
     storage_if_vtbl_t *vtbl;
 };
 
-typedef struct storage_if_list_t {
+typedef struct if_list_t {
     void *base;
     unsigned stride;
     unsigned count;
-} storage_if_list_t;
+} if_list_t;
 
 struct storage_if_vtbl_t {
-    storage_if_list_t (*detect)(void);
+    if_list_t (*detect)(void);
 
     void (*cleanup)(storage_if_base_t *if_);
 
@@ -120,8 +120,184 @@ void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
 
 #endif
 
-extern storage_if_base_t *storage_ifs[];
-extern int storage_if_count;
+storage_dev_base_t *open_storage_dev(size_t dev);
+void close_storage_dev(storage_dev_base_t *dev);
 
-extern storage_dev_base_t *storage_devs[];
-extern int storage_dev_count;
+//
+// Filesystem
+
+typedef struct fs_vtbl_t fs_vtbl_t;
+
+typedef char const *fs_cpath_t;
+
+typedef uint16_t fs_mode_t;
+typedef uint32_t fs_uid_t;
+typedef uint32_t fs_gid_t;
+
+typedef struct fs_init_info fs_init_info;
+
+typedef struct fs_stat_t fs_stat_t;
+typedef struct fs_file_info_t fs_file_info_t;
+
+typedef struct fs_statvfs_t fs_statvfs_t;
+
+typedef struct fs_flock_t fs_flock_t;
+
+typedef uint64_t fs_timespec_t;
+
+typedef uint64_t fs_dev_t;
+
+typedef struct fs_pollhandle_t fs_pollhandle_t;
+
+struct fs_vtbl_t {
+    //
+    // Startup and shutdown
+    void* (*init)(fs_init_info *conn);
+    void (*destroy)(void* private_data);
+
+    //
+    // Read directory entry information
+    int (*getattr)(fs_cpath_t path, fs_stat_t* stbuf);
+    int (*access)(fs_cpath_t path, int mask);
+    int (*readlink)(fs_cpath_t path, char* buf, size_t size);
+
+    //
+    // Scan directories
+    int (*opendir)(fs_cpath_t path, fs_file_info_t* fi);
+    int (*readdir)(fs_cpath_t path, void* buf, off_t offset,
+                   fs_file_info_t* fi);
+    int (*releasedir)(fs_cpath_t path, fs_file_info_t *fi);
+
+    //
+    // Modify directories
+    int (*mknod)(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev);
+    int (*mkdir)(fs_cpath_t path, fs_mode_t mode);
+    int (*rmdir)(fs_cpath_t path);
+    int (*symlink)(fs_cpath_t to, fs_cpath_t from);
+    int (*rename)(fs_cpath_t from, fs_cpath_t to);
+    int (*link)(fs_cpath_t from, fs_cpath_t to);
+    int (*unlink)(fs_cpath_t path);
+
+    //
+    // Modiy directory entries
+    int (*chmod)(fs_cpath_t path, fs_mode_t mode);
+    int (*chown)(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid);
+    int (*truncate)(fs_cpath_t path, off_t size);
+    int (*utimens)(fs_cpath_t path, const fs_timespec_t *ts);
+
+    //
+    // Open/close files
+    int (*open)(fs_cpath_t path, fs_file_info_t* fi);
+    int (*release)(fs_cpath_t path, fs_file_info_t *fi);
+
+    //
+    // Read/write files
+    int (*read)(fs_cpath_t path, char *buf,
+                size_t size, off_t offset,
+                fs_file_info_t* fi);
+    int (*write)(fs_cpath_t path, char *buf,
+                 size_t size, off_t offset,
+                 fs_file_info_t* fi);
+
+    //
+    // Sync files and directories and flush buffers
+    int (*fsync)(fs_cpath_t path, int isdatasync,
+                 fs_file_info_t* fi);
+    int (*fsyncdir)(fs_cpath_t path, int isdatasync,
+                    fs_file_info_t* fi);
+    int (*flush)(fs_cpath_t path, fs_file_info_t* fi);
+
+    //
+    // Get filesystem information
+    int (*statfs)(fs_cpath_t path, fs_statvfs_t* stbuf);
+
+    //
+    // lock/unlock file
+    int (*lock)(fs_cpath_t path, fs_file_info_t* fi,
+                int cmd, fs_flock_t* locks);
+
+    //
+    // Get block map
+    int (*bmap)(fs_cpath_t path, size_t blocksize,
+                uint64_t* blockno);
+
+    //
+    // Read/Write/Enumerate extended attributes
+    int (*setxattr)(fs_cpath_t path,
+                    const char* name, const char* value,
+                    size_t size, int flags);
+    int (*getxattr)(fs_cpath_t path,
+                    const char* name, char* value,
+                    size_t size);
+    int (*listxattr)(fs_cpath_t path,
+                     const char* list, size_t size);
+
+    //
+    // ioctl API
+    int (*ioctl)(fs_cpath_t path, int cmd, void* arg,
+                 fs_file_info_t* fi,
+                 unsigned int flags, void* data);
+
+    //
+    //
+    int (*poll)(fs_cpath_t path,
+                fs_file_info_t* fi,
+                fs_pollhandle_t* ph, unsigned* reventsp);
+};
+
+#define MAKE_fs_VTBL(name) { \
+    name##_init,        \
+    name##_destroy,     \
+                        \
+    name##_getattr,     \
+    name##_access,      \
+    name##_readlink,    \
+                        \
+    name##_opendir,     \
+    name##_readdir,     \
+    name##_releasedir,  \
+                        \
+    name##_mknod,       \
+    name##_mkdir,       \
+    name##_rmdir,       \
+    name##_symlink,     \
+    name##_rename,      \
+    name##_link,        \
+    name##_unlink,      \
+                        \
+    name##_chmod,       \
+    name##_chown,       \
+    name##_truncate,    \
+    name##_utimens,     \
+                        \
+    name##_open,        \
+    name##_release,     \
+    name##_read,        \
+    name##_write,       \
+                        \
+    name##_fsync,       \
+    name##_fsyncdir,    \
+    name##_flush,       \
+                        \
+    name##_statfs,      \
+                        \
+    name##_lock,        \
+    name##_bmap,        \
+                        \
+    name##_setxattr,    \
+    name##_getxattr,    \
+    name##_listxattr,   \
+                        \
+    name##_ioctl,       \
+    name##_poll         \
+}
+
+#define DECLARE_fs_DEVICE(name) \
+    DECLARE_DEVICE(fs, name ## _if)
+
+#define REGISTER_fs_DEVICE(name) \
+    REGISTER_DEVICE(fs, name ## _if, 'F')
+
+#define FS_DEV_PTR(dev) STORAGE_IF_T *self = (void*)dev
+
+#define FS_DEV_PTR_UNUSED(dev) (void)dev

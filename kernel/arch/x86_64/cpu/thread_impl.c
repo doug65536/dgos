@@ -44,7 +44,7 @@ typedef struct thread_info_t thread_info_t;
 typedef struct cpu_info_t cpu_info_t;
 
 struct thread_info_t {
-    void * volatile ctx;
+    isr_context_t * volatile ctx;
     uint64_t volatile wake_time;
 
     uint64_t cpu_affinity;
@@ -73,10 +73,16 @@ struct thread_info_t {
     thread_state_t volatile state;
 
     // Higher numbers are higher priority
-    int volatile priority;
+    thread_priority_t volatile priority;
+    thread_priority_t volatile priority_boost;
 
-    uint64_t align[2];
+    uint64_t flags;
+
+    uint64_t align;
 };
+
+#define THREAD_FLAG_OWNEDSTACK_BIT  1
+#define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
 
 C_ASSERT(sizeof(thread_info_t) == 64);
 
@@ -132,7 +138,7 @@ void thread_yield(void)
 #if 1
     __asm__ __volatile__ (
         "movq %%rsp,%%rax\n\t"
-        "pushq $0\n\t"
+        "pushq $0x10\n\t"
         "push %%rax\n\t"
         "pushfq\n\t"
         "cli\n\t"
@@ -160,6 +166,7 @@ static void thread_cleanup(void)
     thread->state = THREAD_IS_DESTRUCTING;
     atomic_barrier();
     thread->priority = 0;
+    thread->priority_boost = 0;
     thread->stack = 0;
     thread->stack_size = 0;
     atomic_barrier();
@@ -168,15 +175,17 @@ static void thread_cleanup(void)
 }
 
 // Returns threads array index or 0 on error
-// Minumum allowable stack space is 4KB
+// Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata,
-        void *stack,
-        size_t stack_size,
+        void *stack, size_t stack_size,
         thread_state_t state,
-        uint64_t affinity)
+        uint64_t affinity,
+        thread_priority_t priority)
 {
-    if (stack_size < 16384)
+    if (stack_size == 0)
+        stack_size = 65536;
+    else if (stack_size < 65536)
         return -1;
 
     for (size_t i = 0; ; ++i) {
@@ -200,10 +209,20 @@ static thread_t thread_create_with_state(
             continue;
         }
 
+        thread->flags = 0;
+
+        if (!stack) {
+            stack = mmap(0, stack_size,
+                         PROT_READ | PROT_WRITE,
+                         MAP_STACK, -1, 0);
+            thread->flags |= THREAD_FLAG_OWNEDSTACK;
+        }
+
         thread->stack = stack;
         thread->stack_size = stack_size;
-        thread->priority = 0;
-        thread->cpu_affinity = affinity ? affinity : ~0L;
+        thread->priority = priority;
+        thread->priority_boost = 0;
+        thread->cpu_affinity = affinity ? affinity : ~0UL;
 
         uintptr_t stack_addr = (uintptr_t)stack;
         uintptr_t stack_end = stack_addr +
@@ -211,7 +230,7 @@ static thread_t thread_create_with_state(
 
         size_t tls_data_size = tls_size();
         uintptr_t thread_env_addr = stack_end -
-                tls_data_size;
+                sizeof(thread_env_t);
 
         // Align thread environment block
         thread_env_addr &= -16;
@@ -220,8 +239,7 @@ static thread_t thread_create_with_state(
         teb->self = teb;
 
         // Make room for TLS
-        uintptr_t tls_end = thread_env_addr -
-                tls_data_size;
+        uintptr_t tls_end = thread_env_addr - tls_data_size;
 
         memcpy((void*)tls_end, tls_init_data(), tls_data_size);
 
@@ -239,9 +257,14 @@ static thread_t thread_create_with_state(
         memset(ctx, 0, sizeof(*ctx));
         ctx->ret.ret_rip = thread_cleanup;
         ctx->gpr.iret.rsp = (uint64_t)&ctx->ret;
+        ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.iret.rflags = EFLAGS_IF;
         ctx->gpr.iret.rip = fn;
         ctx->gpr.iret.cs = GDT_SEL_KERNEL_CODE64;
+        ctx->gpr.s[0] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.r[0] = (uint64_t)userdata;
         ctx->gpr.fsbase = teb;
 
@@ -251,7 +274,14 @@ static thread_t thread_create_with_state(
         ctx->ctx.gpr = &ctx->gpr;
         ctx->ctx.fpr = &ctx->fpr;
 
-        thread->ctx = ctx;
+        thread->ctx = &ctx->ctx;
+
+        ptrdiff_t free_stack_space = (char*)thread->ctx -
+                (char*)thread->stack;
+
+        printk("New thread free stack space: %zd\n", free_stack_space);
+
+        assert(free_stack_space > 4096);
 
         atomic_barrier();
         thread->state = state;
@@ -270,7 +300,7 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
     return thread_create_with_state(
                 fn, userdata,
                 stack, stack_size,
-                THREAD_IS_READY, 0);
+                THREAD_IS_READY, 0, 0);
 }
 
 #if 0
@@ -293,6 +323,7 @@ static int smp_thread(void *arg)
     printk("SMP thread running\n");
     atomic_inc_uint32(&thread_smp_running);
     (void)arg;
+    thread_check_stack();
     while (1)
         halt();
     return 0;
@@ -319,7 +350,7 @@ void thread_init(int ap)
     if (!ap) {
         cpu->cur_thread = thread;
         thread->ctx = 0;
-        thread->priority = 0;
+        thread->priority = -256;
         thread->stack = kernel_stack;
         thread->stack_size = kernel_stack_size;
         thread->cpu_affinity = 1;
@@ -327,15 +358,11 @@ void thread_init(int ap)
         thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
     } else {
-        size_t stack_size = 16 << 10;
-        void *stack = mmap(
-                    0, stack_size,
-                    PROT_READ | PROT_WRITE,
-                    MAP_STACK, -1, 0);
         thread = threads + thread_create_with_state(
-                    smp_thread, 0, stack, stack_size,
+                    smp_thread, 0, 0, 0,
                     THREAD_IS_INITIALIZING,
-                    1 << cpu_number);
+                    1 << cpu_number,
+                    -256);
 
         cpu->goto_thread = thread;
         atomic_barrier();
@@ -364,6 +391,11 @@ static thread_info_t *thread_choose_next(
 
         candidate = threads + i;
 
+        // If this thread is not allowed to run on this CPU
+        // then skip it
+        if (!(candidate->cpu_affinity & (1 << cpu_number)))
+            continue;
+
         //
         // Expect states to have busy bit set if it is the outgoing thread
 
@@ -374,11 +406,6 @@ static thread_info_t *thread_choose_next(
         thread_state_t expected_ready = (outgoing != threads + i)
                 ? THREAD_IS_READY
                 : THREAD_IS_READY_BUSY;
-
-        // If this thread is not allowed to run on this CPU
-        // then skip it
-        if (!(candidate->cpu_affinity & (1 << cpu_number)))
-            continue;
 
         if (candidate->state == expected_sleep) {
             // The thread is sleeping, see if it should wake up yet
@@ -404,7 +431,8 @@ static thread_info_t *thread_choose_next(
 
         if (best) {
             // Must be better than best
-            if (candidate->priority > best->priority)
+            if (candidate->priority + candidate->priority_boost >
+                    best->priority + best->priority_boost)
                 best = candidate;
         } else {
             best = candidate;
@@ -486,8 +514,13 @@ void *thread_schedule(void *ctx)
         printdbg("Scheduler retries: %d\n", retries);
     atomic_barrier();
 
+    // Thread loses its priority boost when it is scheduled
+    thread->priority_boost = 0;
+
+    assert(thread->state == THREAD_IS_RUNNING);
+
+    ctx = thread->ctx;
     cpu->cur_thread = thread;
-    //thread->cpu = cpu;
 
     if (1) {
         size_t cpu_number = cpu - cpus;
@@ -495,10 +528,15 @@ void *thread_schedule(void *ctx)
         addr[cpu_number] = ((addr[cpu_number] + 1) & 0xFF) | 0x0700;
     }
 
+    isr_context_t *isrctx = (isr_context_t*)ctx;
+
+    assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
+    assert(isrctx->gpr->iret.rsp <
+           (uintptr_t)thread->stack + thread->stack_size);
+
     if (thread != outgoing) {
         // Add outgoing cleanup data at top of context
-        isr_resume_context_t *cleanup =
-                (isr_resume_context_t *)thread->ctx;
+        isr_resume_context_t *cleanup = &isrctx->resume;
 
         cleanup->cleanup = thread_clear_busy;
         cleanup->cleanup_arg = outgoing;
@@ -506,7 +544,7 @@ void *thread_schedule(void *ctx)
         assert(thread->state == THREAD_IS_RUNNING);
     }
 
-    return thread->ctx;
+    return ctx;
 }
 
 void thread_sleep_until(uint64_t expiry)
@@ -546,9 +584,15 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 void thread_resume(thread_t thread)
 {
     // Wait for it to reach suspended state in case of race
-    while (threads[thread].state != THREAD_IS_SUSPENDED)
+    int wait_count = 0;
+    for ( ; threads[thread].state != THREAD_IS_SUSPENDED;
+          ++wait_count)
         pause();
 
+    printdbg("Resuming thread %d with old state %x, waited %d\n",
+             thread, threads[thread].state, wait_count);
+
+    threads[thread].priority_boost = 128;
     threads[thread].state = THREAD_IS_READY;
 }
 
@@ -583,8 +627,7 @@ thread_t thread_get_id(void)
     cpu_info_t *cpu = this_cpu();
     thread_id = cpu->cur_thread - threads;
 
-    if (was_enabled)
-        cpu_irq_enable();
+    cpu_irq_toggle(was_enabled);
 
     return thread_id;
 }
@@ -607,4 +650,25 @@ void thread_set_affinity(int id, uint64_t affinity)
         // Get off this CPU
         thread_yield();
     }
+}
+
+thread_priority_t thread_get_priority(thread_t thread_id)
+{
+    return threads[thread_id].priority;
+}
+
+void thread_set_priority(thread_t thread_id, thread_priority_t priority)
+{
+    threads[thread_id].priority = priority;
+}
+
+void thread_check_stack(void)
+{
+    thread_info_t *thread = this_thread();
+
+    void *sp = cpu_get_stack_ptr();
+
+    if (sp < thread->stack ||
+            (char*)sp > (char*)thread->stack + thread->stack_size)
+        cpu_crash();
 }
