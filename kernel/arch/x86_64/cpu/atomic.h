@@ -133,6 +133,7 @@ static inline void atomic_sfence(void)
             : [value] "+m" (*value) \
             : [expect] "a" (expect), \
               [replacement] "r" (replacement) \
+            : "memory" \
         ); \
         return expect; \
     }
