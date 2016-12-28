@@ -374,11 +374,17 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
              (uint64_t)ctx->gpr->fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
+    // gsbase
+    con_draw_xy(0, 21, "gsbase", color);
+    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
+                     msr_get(MSR_GSBASE));
+    con_draw_xy(6, 21, fmt_buf, color);
+
     // last branch
-    con_draw_xy(0, 21, "lastbr", color);
+    con_draw_xy(0, 22, "lastbr", color);
     width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
                      msr_get(0x1DD));
-    con_draw_xy(6, 21, fmt_buf, color);
+    con_draw_xy(6, 22, fmt_buf, color);
 
     halt_forever();
 
