@@ -536,6 +536,22 @@ static int vga_print(text_display_base_t *dev,
     return written;
 }
 
+static int vga_write(text_display_base_t *dev,
+                     char const *s, intptr_t len)
+{
+    TEXT_DEV_PTR(dev);
+
+    int written = 0;
+    while (len--) {
+        ++written;
+        print_character(self, *s++);
+    }
+
+    move_cursor_if_on(self);
+
+    return written;
+}
+
 static int vga_print_xy(text_display_base_t *dev,
                         int x, int y, char const *s)
 {

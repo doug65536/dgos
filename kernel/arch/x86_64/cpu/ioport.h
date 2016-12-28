@@ -67,3 +67,77 @@ static inline void outd(ioport_t port, uint32_t value)
     );
 }
 
+//
+// Block I/O
+
+static inline void insb(ioport_t port,
+                         void const *values, intptr_t count)
+{
+    __asm__ __volatile__ (
+        "rep insb\n\t"
+        :
+        : [value] "D" (values),
+          [count] "c" (count),
+          [port] "Nd" (port)
+    );
+}
+
+static inline void insw(ioport_t port,
+                         void const *values, intptr_t count)
+{
+    __asm__ __volatile__ (
+        "rep insw\n\t"
+        :
+        : [value] "D" (values),
+          [count] "c" (count),
+          [port] "Nd" (port)
+    );
+}
+
+static inline void insd(ioport_t port,
+                         void const *values, intptr_t count)
+{
+    __asm__ __volatile__ (
+        "rep insl\n\t"
+        :
+        : [value] "D" (values),
+          [count] "c" (count),
+          [port] "Nd" (port)
+    );
+}
+
+static inline void outsb(ioport_t port,
+                         void const *values, intptr_t count)
+{
+    __asm__ __volatile__ (
+        "rep outsb\n\t"
+        :
+        : [value] "S" (values),
+          [count] "c" (count),
+          [port] "Nd" (port)
+    );
+}
+
+static inline void outsw(ioport_t port,
+                         void const *values, intptr_t count)
+{
+    __asm__ __volatile__ (
+        "rep outsw\n\t"
+        :
+        : [value] "S" (values),
+          [count] "c" (count),
+          [port] "Nd" (port)
+    );
+}
+
+static inline void outsd(ioport_t port,
+                         void const *values, intptr_t count)
+{
+    __asm__ __volatile__ (
+        "rep outsl\n\t"
+        :
+        : [value] "S" (values),
+          [count] "c" (count),
+          [port] "Nd" (port)
+    );
+}

@@ -57,6 +57,8 @@ struct text_display_vtbl_t {
     // possibly scrolling the screen content up
     int (*print)(text_display_base_t *,
                  char const *s);
+    int (*write)(text_display_base_t *,
+                 char const *s, intptr_t len);
     int (*print_xy)(text_display_base_t *,
                     int x, int y, char const *s);
 
@@ -124,6 +126,7 @@ struct text_display_vtbl_t {
     name##_putc,                \
     name##_putc_xy,             \
     name##_print,               \
+    name##_write,               \
     name##_print_xy,            \
     name##_draw,                \
     name##_draw_xy,             \

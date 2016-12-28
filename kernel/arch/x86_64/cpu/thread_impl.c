@@ -184,8 +184,8 @@ static thread_t thread_create_with_state(
         thread_priority_t priority)
 {
     if (stack_size == 0)
-        stack_size = 65536;
-    else if (stack_size < 65536)
+        stack_size = 16384;
+    else if (stack_size < 16384)
         return -1;
 
     for (size_t i = 0; ; ++i) {

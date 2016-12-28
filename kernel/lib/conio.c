@@ -26,6 +26,12 @@ int con_print(const char *s)
                 console_display, s);
 }
 
+int con_write(char const *s, intptr_t len)
+{
+    return console_display_vtbl.write(
+                console_display, s, len);
+}
+
 void con_move_cursor(int dx, int dy)
 {
     console_display_vtbl.mouse_add_xy(

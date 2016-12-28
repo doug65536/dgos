@@ -18,7 +18,10 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
+CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | \
+	head -n 1 | \
+	grep clang > /dev/null) && \
+	echo 1)
 
 AOBJS := $(ASRCS:.s=.o)
 COBJS := $(CSRCS:.c=.o)

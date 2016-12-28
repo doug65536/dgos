@@ -91,21 +91,36 @@ static char const formatter_hexlookup[] = "0123456789ABCDEF";
 
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
+/// or, a pointer to an unterminated string and a length
 static intptr_t formatter(
         const char *format, va_list ap,
-        int (*emit_chars)(char const *, int, void*),
+        int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
     formatter_flags_t flags;
     intptr_t chars_written = 0;
     int *output_arg;
     char digits[32], *digit_out;
+    char const *literal_st = 0;
 
-    for (char const *fp = format; *fp; ++fp) {
+    for (char const *fp = format; ; ++fp) {
         char ch = *fp;
 
-        switch (ch) {
-        case '%':
+        if (ch == 0 || ch == '%') {
+            if (literal_st) {
+                chars_written += emit_chars(
+                            literal_st,  fp - literal_st,
+                            emit_context);
+                literal_st = 0;
+            }
+
+            if (ch == 0)
+                break;
+        } else if (!literal_st) {
+            literal_st = fp;
+        }
+
+        if (ch == '%') {
             flags = empty_formatter_flags;
 
             ch = *++fp;
@@ -544,12 +559,6 @@ static intptr_t formatter(
                 for (int i = 0; i < flags.pending_padding; ++i)
                     chars_written += emit_chars(0, ' ', emit_context);
             }
-            break;
-
-        default:
-            chars_written += emit_chars(0, ch, emit_context);
-            break;
-
         }
     }
 
@@ -565,12 +574,14 @@ int cprintf(char const *format, ...)
     return result;
 }
 
-static int vcprintf_emit_chars(char const *s, int c, void *unused)
+static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
 {
     (void)unused;
 
     if (con_exists()) {
         if (s) {
+            if (c)
+                return con_write(s, c);
             return con_print(s);
         } else if (c) {
             con_putc(c);
@@ -587,7 +598,7 @@ int vcprintf(char const *format, va_list ap)
         int cursor_was_shown = con_cursor_toggle(0);
 
         chars_written = formatter(format, ap,
-                                      vcprintf_emit_chars, 0);
+                                  vcprintf_emit_chars, 0);
 
         con_cursor_toggle(cursor_was_shown);
     }
@@ -628,7 +639,7 @@ typedef struct vsnprintf_context_t {
     size_t level;
 } vsnprintf_context_t;
 
-static int vsnprintf_emit_chars(char const *s, int ch, void *context)
+static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 {
     vsnprintf_context_t *ctx = context;
     int count = 0;
@@ -641,6 +652,9 @@ static int vsnprintf_emit_chars(char const *s, int ch, void *context)
         }
 
         ++count;
+
+        if (s && ch && count == ch)
+            break;
 
         if (ctx->level < ctx->limit - 1) {
             ctx->buf[ctx->level] = ch;
@@ -688,18 +702,20 @@ int snprintf(char *buf, size_t limit, char const *format, ...)
     return result;
 }
 
-static int printdbg_emit_chars(char const *s, int ch, void *context)
+static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
 {
     (void)context;
 
     char encoded[5];
 
     if (!s) {
-        ucs4_to_utf8(encoded, ch);
+        ch = ucs4_to_utf8(encoded, ch);
         s = encoded;
+    } else if (ch == 0) {
+        ch = strlen(s);
     }
 
-    return write_debug_str(s);
+    return write_debug_str(s, ch);
 }
 
 void vprintdbg(const char *format, va_list ap)
