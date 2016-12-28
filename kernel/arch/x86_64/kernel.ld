@@ -160,7 +160,6 @@ SECTIONS {
 
 	. = ALIGN(4096);
 
-	/* Copy on write initialized thread_local */
 	.tdata : {
 		PROVIDE(___tdata_st = .);
 		*(.tdata)
@@ -168,7 +167,6 @@ SECTIONS {
 		PROVIDE(___tdata_en = .);
 	}
 
-	/* Zero page pool initialized thread_local */
 	.tbss : {
 		PROVIDE(___tbss_st = .);
 		*(.tbss)
