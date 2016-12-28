@@ -55,6 +55,9 @@ endif
 # Strict overflow is noise
 WEVERYTHING += -Wno-strict-overflow
 
+# Oh come on, interferes with inline assembly
+WEVERYTHING += -Wno-overlength-strings
+
 ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
