@@ -131,9 +131,9 @@ static void ide_if_cleanup(storage_if_base_t *i)
     (void)i;
 }
 
-static storage_dev_list_t ide_if_detect_devices(storage_if_base_t *if_)
+static if_list_t ide_if_detect_devices(storage_if_base_t *if_)
 {
-    storage_dev_list_t list = {0, 0, 0};
+    if_list_t list = {0, 0, 0};
     (void)if_;
     return list;
 }

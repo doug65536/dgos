@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-// Storage device interface
+// Storage device interface (IDE, AHCI, etc)
 
 #include "dev_registration.h"
 
@@ -27,19 +27,19 @@ typedef struct storage_if_vtbl_t storage_if_vtbl_t;
 typedef struct storage_dev_base_t storage_dev_base_t;
 typedef struct storage_if_base_t storage_if_base_t;
 
+typedef struct if_list_t {
+    void *base;
+    unsigned stride;
+    unsigned count;
+} if_list_t;
+
 //
-// Storage Device
+// Storage Device (hard drive, CDROM, etc)
 
 struct storage_dev_base_t {
     storage_dev_vtbl_t *vtbl;
     storage_if_base_t *if_;
 };
-
-typedef struct storage_dev_list_t {
-    void *base;
-    unsigned stride;
-    unsigned count;
-} storage_dev_list_t;
 
 struct storage_dev_vtbl_t {
     // Startup/shutdown
@@ -57,24 +57,18 @@ struct storage_dev_vtbl_t {
 };
 
 //
-// Storage Interface
+// Storage Interface (IDE, AHCI, etc)
 
 struct storage_if_base_t {
     storage_if_vtbl_t *vtbl;
 };
-
-typedef struct if_list_t {
-    void *base;
-    unsigned stride;
-    unsigned count;
-} if_list_t;
 
 struct storage_if_vtbl_t {
     if_list_t (*detect)(void);
 
     void (*cleanup)(storage_if_base_t *if_);
 
-    storage_dev_list_t (*detect_devices)(storage_if_base_t *if_);
+    if_list_t (*detect_devices)(storage_if_base_t *if_);
 };
 
 void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
@@ -126,7 +120,7 @@ storage_dev_base_t *open_storage_dev(dev_t dev);
 void close_storage_dev(storage_dev_base_t *dev);
 
 //
-// Filesystem
+// Filesystem (FAT32, etc)
 
 typedef struct fs_vtbl_t fs_vtbl_t;
 
@@ -204,17 +198,20 @@ struct fs_statvfs_t {
 struct fs_vtbl_t {
     //
     // Startup and shutdown
+
     void* (*init)(fs_init_info *conn);
     void (*destroy)(void* private_data);
 
     //
     // Read directory entry information
+
     int (*getattr)(fs_cpath_t path, fs_stat_t* stbuf);
     int (*access)(fs_cpath_t path, int mask);
     int (*readlink)(fs_cpath_t path, char* buf, size_t size);
 
     //
     // Scan directories
+
     int (*opendir)(fs_cpath_t path, fs_file_info_t* fi);
     int (*readdir)(fs_cpath_t path, void* buf, off_t offset,
                    fs_file_info_t* fi);
@@ -222,6 +219,7 @@ struct fs_vtbl_t {
 
     //
     // Modify directories
+
     int (*mknod)(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev);
     int (*mkdir)(fs_cpath_t path, fs_mode_t mode);
     int (*rmdir)(fs_cpath_t path);
@@ -232,6 +230,7 @@ struct fs_vtbl_t {
 
     //
     // Modify directory entries
+
     int (*chmod)(fs_cpath_t path, fs_mode_t mode);
     int (*chown)(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid);
     int (*truncate)(fs_cpath_t path, off_t size);
@@ -239,11 +238,13 @@ struct fs_vtbl_t {
 
     //
     // Open/close files
+
     int (*open)(fs_cpath_t path, fs_file_info_t* fi);
     int (*release)(fs_cpath_t path, fs_file_info_t *fi);
 
     //
     // Read/write files
+
     int (*read)(fs_cpath_t path, char *buf,
                 size_t size, off_t offset,
                 fs_file_info_t* fi);
@@ -253,6 +254,7 @@ struct fs_vtbl_t {
 
     //
     // Sync files and directories and flush buffers
+
     int (*fsync)(fs_cpath_t path, int isdatasync,
                  fs_file_info_t* fi);
     int (*fsyncdir)(fs_cpath_t path, int isdatasync,
@@ -261,20 +263,24 @@ struct fs_vtbl_t {
 
     //
     // Get filesystem information
+
     int (*statfs)(fs_cpath_t path, fs_statvfs_t* stbuf);
 
     //
     // lock/unlock file
+
     int (*lock)(fs_cpath_t path, fs_file_info_t* fi,
                 int cmd, fs_flock_t* locks);
 
     //
     // Get block map
+
     int (*bmap)(fs_cpath_t path, size_t blocksize,
                 uint64_t* blockno);
 
     //
     // Read/Write/Enumerate extended attributes
+
     int (*setxattr)(fs_cpath_t path,
                     char const* name, char const* value,
                     size_t size, int flags);
@@ -286,12 +292,14 @@ struct fs_vtbl_t {
 
     //
     // ioctl API
+
     int (*ioctl)(fs_cpath_t path, int cmd, void* arg,
                  fs_file_info_t* fi,
                  unsigned int flags, void* data);
 
     //
     //
+
     int (*poll)(fs_cpath_t path,
                 fs_file_info_t* fi,
                 fs_pollhandle_t* ph, unsigned* reventsp);
@@ -353,3 +361,9 @@ struct fs_vtbl_t {
 #define FS_DEV_PTR(dev) STORAGE_IF_T *self = (void*)dev
 
 #define FS_DEV_PTR_UNUSED(dev) (void)dev
+
+
+//
+// Partitioning scheme (MBR, UEFI, etc)
+
+typedef struct part_scheme_vtbl_t part_scheme_vtbl_t;

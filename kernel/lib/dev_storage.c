@@ -36,7 +36,7 @@ void register_storage_if_device(char const *name,
         storage_ifs[storage_if_count++] = if_;
 
         // Get a list of storage devices on this interface
-        storage_dev_list_t dev_list;
+        if_list_t dev_list;
         dev_list = if_->vtbl->detect_devices(if_);
 
         for (unsigned i = 0; i < dev_list.count; ++i) {

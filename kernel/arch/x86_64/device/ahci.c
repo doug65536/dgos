@@ -1204,20 +1204,26 @@ static void ahci_port_start(ahci_if_t *dev, int port_num)
     port->cmd |= AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE;
 }
 
+// Stop each implemented port
 static void ahci_port_stop_all(ahci_if_t *dev)
 {
-    uint32_t impl = dev->ports_impl;
-    for (uint32_t i = 0; i < 32; ++i)
-        if (impl & (1U<<i))
-            ahci_port_stop(dev, i);
+    int port;
+    for (uint32_t impl = dev->ports_impl;
+         impl != 0; impl &= ~(1U<<port)) {
+        port = bit_lsb_set_32(impl);
+        ahci_port_stop(dev, port);
+    }
 }
 
+// Start each implemented port
 static void ahci_port_start_all(ahci_if_t *dev)
 {
-    uint32_t impl = dev->ports_impl;
-    for (uint32_t i = 0; i < 32; ++i)
-        if (impl & (1U<<i))
-            ahci_port_start(dev, i);
+    int port;
+    for (uint32_t impl = dev->ports_impl;
+         impl != 0; impl &= ~(1U<<port)) {
+        port = bit_lsb_set_32(impl);
+        ahci_port_start(dev, port);
+    }
 }
 
 static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
@@ -1238,7 +1244,10 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
         slot = ahci_acquire_slot(dev, port_num);
         if (slot >= 0)
             break;
+
+        spinlock_unlock_noirq(&pi->lock, &hold);
         thread_yield();
+        hold = spinlock_lock_noirq(&pi->lock);
     }
 
     hba_cmd_hdr_t volatile *cmd_hdr = pi->cmd_hdr + slot;
@@ -1273,8 +1282,8 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
     cmd_hdr->prdbc = 0;
     cmd_hdr->prdtl = ranges_count;
 
-    pi->callbacks[port_num].callback = callback;
-    pi->callbacks[port_num].callback_arg = callback_arg;
+    pi->callbacks[slot].callback = callback;
+    pi->callbacks[slot].callback_arg = callback_arg;
 
     atomic_barrier();
     port->cmd_issue = (1U<<slot);
@@ -1314,8 +1323,9 @@ static void ahci_rebase(ahci_if_t *dev)
     ahci_port_stop_all(dev);
 
     int addr_type = ahci_supports_64bit(dev)
-            ? MAP_WRITETHRU | MAP_NOCACHE
-            : MAP_32BIT | MAP_WRITETHRU | MAP_NOCACHE;
+            ? 0 //MAP_WRITETHRU | MAP_NOCACHE
+            : MAP_32BIT //| MAP_WRITETHRU | MAP_NOCACHE
+            ;
 
     // Loop through the implemented ports
     uint32_t ports_impl = dev->ports_impl;
@@ -1326,9 +1336,6 @@ static void ahci_rebase(ahci_if_t *dev)
     uint32_t init_busy_mask = (slots_impl == 32)
             ? 0
             : ((uint32_t)~0<<slots_impl);
-
-    // Enable interrupts overall
-    dev->mmio_base->host_ctl |= AHCI_HC_HC_IE;
 
     for (int port_num = 0; port_num < 32; ++port_num) {
         if (!(ports_impl & (1U<<port_num)))
@@ -1383,9 +1390,8 @@ static void ahci_rebase(ahci_if_t *dev)
         atomic_barrier();
 
         // Set command table base addresses (physical)
-        for (uint32_t slot = 0; slot < slots_impl; ++slot) {
+        for (uint32_t slot = 0; slot < slots_impl; ++slot)
             cmd_hdr[slot].ctba = mphysaddr((void*)(cmd_tbl + slot));
-        }
 
         port->intr_en = AHCI_HP_IE_TFES |
                 AHCI_HP_IE_HBFS |
@@ -1404,6 +1410,9 @@ static void ahci_rebase(ahci_if_t *dev)
     }
 
     ahci_port_start_all(dev);
+
+    // Enable interrupts overall
+    dev->mmio_base->host_ctl |= AHCI_HC_HC_IE;
 }
 
 static void ahci_bios_handoff(ahci_if_t *dev)
@@ -1492,9 +1501,9 @@ static if_list_t ahci_if_detect(void)
 //
 // device registration
 
-static storage_dev_list_t ahci_if_detect_devices(storage_if_base_t *if_)
+static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
 {
-    storage_dev_list_t list = {ahci_drives,sizeof(*ahci_drives),0};
+    if_list_t list = {ahci_drives,sizeof(*ahci_drives),0};
     STORAGE_IF_DEV_PTR(if_);
 
     for (int port_num = 0; port_num < 32; ++port_num) {
