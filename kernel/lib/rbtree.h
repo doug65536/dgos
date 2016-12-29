@@ -18,6 +18,7 @@ void *rbtree_next(rbtree_t *tree, rbtree_iter_t *iter);
 void *rbtree_prev(rbtree_t *tree, rbtree_iter_t *iter);
 void *rbtree_last(rbtree_t *tree, rbtree_iter_t *iter);
 void *rbtree_item(rbtree_t *tree, rbtree_iter_t iter);
+void rbtree_delete(rbtree_t *tree, void *item);
 
 rbtree_iter_t rbtree_count(rbtree_t *tree);
 int rbtree_walk(rbtree_t *tree, rbtree_visitor_t callback, void *p);

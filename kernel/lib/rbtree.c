@@ -422,7 +422,7 @@ void *rbtree_first(rbtree_t *tree, rbtree_iter_t *iter)
 
 void *rbtree_last(rbtree_t *tree, rbtree_iter_t *iter)
 {
-    rbtree_iter_t i = tree->root;
+    rbtree_iter_t i = iter ? *iter : tree->root;
 
     if (i) {
         while (NODE(i)->right)
@@ -438,6 +438,197 @@ void *rbtree_last(rbtree_t *tree, rbtree_iter_t *iter)
         *iter = 0;
 
     return 0;
+}
+
+static void *rbtree_find(rbtree_t *tree, void *key,
+                  rbtree_iter_t *iter)
+{
+    rbtree_iter_t n = tree->root;
+    rbtree_iter_t next;
+    int cmp = -1;
+
+    for (n = tree->root; n; n = next) {
+        cmp = tree->cmp(key, NODE(n)->item, tree->p);
+
+        if (cmp == 0)
+            break;
+
+        if (cmp < 0)
+            next = NODE(n)->left;
+        else
+            next = NODE(n)->right;
+
+        if (!next)
+            break;
+    }
+
+    if (iter)
+        *iter = n;
+
+    return cmp ? 0 : NODE(n)->item;
+}
+
+//
+// Delete
+
+static rbtree_iter_t rbtree_sibling(rbtree_t *tree, rbtree_iter_t n)
+{
+    assert(n);
+
+    rbtree_iter_t parent = NODE(n)->parent;
+
+    assert(parent);
+
+    if (NODE(parent)->left == n)
+        return NODE(parent)->right;
+    return NODE(parent)->left;
+}
+
+static void rbtree_delete_case6(rbtree_t *tree, rbtree_iter_t n);
+static void rbtree_delete_case5(rbtree_t *tree, rbtree_iter_t n);
+static void rbtree_delete_case4(rbtree_t *tree, rbtree_iter_t n);
+static void rbtree_delete_case3(rbtree_t *tree, rbtree_iter_t n);
+static void rbtree_delete_case2(rbtree_t *tree, rbtree_iter_t n);
+static void rbtree_delete_case1(rbtree_t *tree, rbtree_iter_t n);
+
+static void rbtree_delete_case6(rbtree_t *tree, rbtree_iter_t n)
+{
+    rbtree_iter_t nparent = NODE(n)->parent;
+    rbtree_iter_t nsib = rbtree_sibling(tree, n);
+
+    NODE(n)->color = NODE(nparent)->color;
+    NODE(nparent)->color = BLACK;
+    if (n == NODE(nparent)->left) {
+        assert(NODE(nsib)->right == RED);
+        NODE(NODE(nsib)->right)->color = BLACK;
+        rbtree_rotate_left(tree, nparent);
+    } else {
+        assert(NODE(nsib)->left == RED);
+        NODE(NODE(nsib)->left)->color = BLACK;
+        rbtree_rotate_left(tree, nparent);
+    }
+}
+
+static void rbtree_delete_case5(rbtree_t *tree, rbtree_iter_t n)
+{
+    rbtree_iter_t nparent = NODE(n)->parent;
+    rbtree_iter_t nsib = rbtree_sibling(tree, n);
+
+    if (n == NODE(nparent)->left &&
+            NODE(nsib)->color == BLACK &&
+            NODE(NODE(nsib)->left)->color == RED &&
+            NODE(NODE(nsib)->right)->color == BLACK) {
+        NODE(nsib)->color = RED;
+        NODE(NODE(nsib)->left)->color = BLACK;
+        rbtree_rotate_right(tree, nsib);
+    } else if (n == NODE(nparent)->left &&
+               NODE(nsib)->color == BLACK &&
+               NODE(NODE(nsib)->left)->color == RED &&
+               NODE(NODE(nsib)->right)->color == BLACK) {
+        NODE(nsib)->color = RED;
+        NODE(NODE(nsib)->right)->color = BLACK;
+        rbtree_rotate_left(tree, nsib);
+    }
+    rbtree_delete_case6(tree, n);
+}
+
+static void rbtree_delete_case4(rbtree_t *tree, rbtree_iter_t n)
+{
+    rbtree_iter_t nparent = NODE(n)->parent;
+    rbtree_iter_t nsib = rbtree_sibling(tree, n);
+
+    if (NODE(nparent)->color == RED &&
+            NODE(nsib)->color == BLACK &&
+            NODE(NODE(nsib)->left)->color == BLACK &&
+            NODE(NODE(nsib)->right)->color == BLACK) {
+        NODE(nsib)->color = RED;
+        NODE(nparent)->color = BLACK;
+    } else {
+        rbtree_delete_case5(tree, n);
+    }
+}
+
+static void rbtree_delete_case3(rbtree_t *tree, rbtree_iter_t n)
+{
+    rbtree_iter_t nparent = NODE(n)->parent;
+    rbtree_iter_t nsib = rbtree_sibling(tree, n);
+
+    if (NODE(nparent)->color == BLACK &&
+            NODE(nsib)->color == BLACK &&
+            NODE(NODE(nsib)->left)->color == BLACK &&
+            NODE(NODE(nsib)->right)->color == BLACK) {
+        NODE(nsib)->color = RED;
+        rbtree_delete_case1(tree, nparent);
+    } else {
+        rbtree_delete_case4(tree, n);
+    }
+}
+
+static void rbtree_delete_case2(rbtree_t *tree, rbtree_iter_t n)
+{
+    rbtree_iter_t sib = rbtree_sibling(tree, n);
+
+    if (NODE(sib)->color == RED) {
+        rbtree_iter_t nparent = NODE(n)->parent;
+        NODE(nparent)->color = RED;
+        NODE(sib)->color = BLACK;
+        if (n == NODE(nparent)->left)
+            rbtree_rotate_left(tree, nparent);
+        else
+            rbtree_rotate_right(tree, nparent);
+    }
+    rbtree_delete_case3(tree, n);
+}
+
+static void rbtree_delete_case1(rbtree_t *tree, rbtree_iter_t n)
+{
+    if (NODE(n)->parent)
+        rbtree_delete_case2(tree, n);
+}
+
+static void rbtree_free_node(rbtree_t *tree, rbtree_iter_t n)
+{
+    // TODO: implement free node
+    (void)tree;
+    (void)n;
+}
+
+void rbtree_delete(rbtree_t *tree, void *item)
+{
+    rbtree_iter_t child;
+    rbtree_iter_t n;
+    rbtree_iter_t left;
+    rbtree_iter_t right;
+
+    if (!rbtree_find(tree, item, &n))
+        return;
+
+    left = NODE(n)->left;
+    right = NODE(n)->right;
+
+    if (left && right) {
+        // Find highest value in left subtree
+        rbtree_iter_t pred = left;
+        rbtree_last(tree, &pred);
+
+        // Move the highest node in the left child
+        // to this node and delete that node
+        NODE(n)->item = NODE(pred)->item;
+        n = pred;
+        left = NODE(n)->left;
+        right = NODE(n)->right;
+    }
+
+    assert(!left || !right);
+    child = !right ? left : right;
+    if (NODE(n)->color == BLACK) {
+        NODE(n)->color = NODE(child)->color;
+        rbtree_delete_case1(tree, n);
+    }
+    rbtree_replace_node(tree, n, child);
+    if (!NODE(n)->parent && child)
+        NODE(child)->color = BLACK;
+    rbtree_free_node(tree, n);
 }
 
 int rbtree_walk(rbtree_t *tree,
