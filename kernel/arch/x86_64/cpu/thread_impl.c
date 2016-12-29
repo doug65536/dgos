@@ -589,8 +589,10 @@ void thread_resume(thread_t thread)
           ++wait_count)
         pause();
 
-    printdbg("Resuming thread %d with old state %x, waited %d\n",
-             thread, threads[thread].state, wait_count);
+    if (wait_count > 0) {
+        printdbg("Resuming thread %d with old state %x, waited %d\n",
+                 thread, threads[thread].state, wait_count);
+    }
 
     threads[thread].priority_boost = 128;
     threads[thread].state = THREAD_IS_READY;
