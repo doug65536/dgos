@@ -115,58 +115,58 @@ void *mremap(
 int mprotect(void *__addr, size_t __len, int __prot);
 
 /// Advise normal behavior
-#define MADV_NORMAL         0
+#define MADV_NORMAL         (0)
 
 /// Advise that read-ahead is probably useful
-#define MADV_SEQUENTIAL     1
+#define MADV_SEQUENTIAL     (1)
 
 /// Advise that read-ahead probably won't help
-#define MADV_RANDOM         101
+#define MADV_RANDOM         (-1)
 
 /// Advise that this range is going to be needed soon
-#define MADV_WILLNEED       2
+#define MADV_WILLNEED       (2)
 
 /// Advise that this region can be discarded, and replaced
 /// with zero pages or reread from the backing file if it
 /// is touched again
-#define MADV_DONTNEED       102
+#define MADV_DONTNEED       (-2)
 
 /// Advise that this region can be discarded and deleted
 /// from the backing file
-#define MADV_REMOVE         7
+#define MADV_REMOVE         (7)
 
 /// Advise that this region should be cloned when forking
-#define MADV_DOFORK         3
+#define MADV_DOFORK         (3)
 
 /// Advise that this region should not be cloned when forking
-#define MADV_DONTFORK       103
+#define MADV_DONTFORK       (-3)
 
 /// Advise that there is something wrong with the RAM in this region
-#define MADV_HWPOISON       8
+#define MADV_HWPOISON       (8)
 
 /// Advise that we should pretend that there is something wrong with
 /// the RAM in this region
-#define MADV_SOFT_OFFLINE   108
+#define MADV_SOFT_OFFLINE   (-8)
 
 /// Advise that this page should be considered in background page
 /// deduplication
-#define MADV_MERGEABLE      4
+#define MADV_MERGEABLE      (4)
 
 /// Advise that this page should not be considered in background page
 /// deduplication
-#define MADV_UNMERGEABLE    104
+#define MADV_UNMERGEABLE    (-4)
 
 /// Advise that this region is a good candidate for huge pages
-#define MADV_HUGEPAGE       5
+#define MADV_HUGEPAGE       (5)
 
 /// Advise that this region is not a good candidate for huge pages
-#define MADV_NOHUGEPAGE     105
+#define MADV_NOHUGEPAGE     (-5)
 
 // Advise that this region is probably useful in core dumps
-#define MADV_DODUMP         6
+#define MADV_DODUMP         (6)
 
 /// Advise that this region is probably not useful in core dumps
-#define MADV_DONTDUMP       106
+#define MADV_DONTDUMP       (-6)
 
 /// Set hints about a range of address space
 /// __addr, address, start of range
@@ -184,26 +184,25 @@ int munlock(
         const void *addr,
         size_t len);
 
-// Return the physical address for the specified linear address
-// Page faults if the memory region is not mapped
+/// Return the physical address for the specified linear address
+/// Page faults if the memory region is not mapped
 uintptr_t mphysaddr(void *addr);
-
 
 typedef struct mmphysrange_t {
     uintptr_t physaddr;
     size_t size;
 } mmphysrange_t;
 
-// Fill in an array of physical memory ranges corresponding to
-// the specified range of linear address space.
-// If ranges is null, returns the number of entries it would need.
-// ranges_count limits the number of ranges returned.
-// If any part of the linear address range is not mapped
-// then page fault.
-// max_size limits the size of an individual range,
-// if necessary a large contiguous range of physical
-// addresses will be split into smaller ranges with
-// sizes less than or equal to max_length
+/// Fill in an array of physical memory ranges corresponding to
+/// the specified range of linear address space.
+/// If ranges is null, returns the number of entries it would need.
+/// ranges_count limits the number of ranges returned.
+/// If any part of the linear address range is not mapped
+/// then page fault.
+/// max_size limits the size of an individual range,
+/// if necessary a large contiguous range of physical
+/// addresses will be split into smaller ranges with
+/// sizes less than or equal to max_length
 size_t mphysranges(mmphysrange_t *ranges,
                    size_t ranges_count,
                    void *addr, size_t size,
