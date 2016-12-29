@@ -5,15 +5,15 @@
 #include "printk.h"
 #include "time.h"
 
-#define DEBUG_MUTEX 1
-#ifdef DEBUG_MUTEX
+#define DEBUG_MUTEX 0
+#if DEBUG_MUTEX
 #define MUTEX_DTRACE(...) printdbg("mutex: " __VA_ARGS__)
 #else
 #define MUTEX_DTRACE(...) ((void)0)
 #endif
 
-#define DEBUG_CONDVAR 1
-#ifdef DEBUG_CONDVAR
+#define DEBUG_CONDVAR 0
+#if DEBUG_CONDVAR
 #define CONDVAR_DTRACE(...) printdbg("condvar: " __VA_ARGS__)
 #else
 #define CONDVAR_DTRACE(...) ((void)0)
@@ -26,10 +26,11 @@ static void thread_wait_add(thread_wait_link_t volatile *root,
                             thread_wait_link_t volatile *node)
 {
     atomic_barrier();
+    thread_wait_link_t volatile *insafter = root->prev;
     node->next = root;
-    node->prev = root->prev;
-    node->prev->next = node;
-    node->next->prev = node;
+    node->prev = insafter;
+    insafter->next = node;
+    root->prev = node;
     atomic_barrier();
 }
 
@@ -38,8 +39,9 @@ static thread_wait_link_t volatile *thread_wait_del(
 {
     atomic_barrier();
     thread_wait_link_t volatile *next = node->next;
-    node->prev->next = next;
-    node->next->prev = node->prev;
+    thread_wait_link_t volatile *prev = node->prev;
+    prev->next = next;
+    next->prev = prev;
     node->next = 0;
     node->prev = 0;
     atomic_barrier();
@@ -98,12 +100,6 @@ void mutex_lock(mutex_t *mutex)
         assert(wait.link.next == 0);
         assert(wait.link.prev == 0);
         assert(mutex->owner == wait.thread);
-
-        // Take ownership
-        //mutex->owner = wait.thread;
-
-        // Remove state from mutex wait chain
-        //thread_wait_del(&wait.link);
     }
 
     // Release lock
@@ -121,7 +117,7 @@ void mutex_unlock(mutex_t *mutex)
     // See if any threads are waiting
     if (mutex->link.next != &mutex->link) {
         // Wake up the first waiter
-        printdbg("Mutex unlock waking waiter\n");
+        MUTEX_DTRACE("Mutex unlock waking waiter\n");
         thread_wait_t *waiter = (void*)mutex->link.next;
         thread_wait_del(&waiter->link);
         mutex->owner = waiter->thread;
