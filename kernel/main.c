@@ -434,9 +434,11 @@ int main(void)
     for (int i = 0; i < 4; ++i)
         thread_create(other_thread, ttp + i, 0, 0);
 
-    thread_t stress_threads[2];
+    thread_t stress_threads[4];
     stress_threads[0] = thread_create(read_stress, (char*)(0xb8000+80*2), 0, 0);
-    //stress_threads[1] = thread_create(read_stress, (char*)(0xb8000+80*2+2), 0, 0);
+    stress_threads[1] = thread_create(read_stress, (char*)(0xb8000+80*2+2), 0, 0);
+    stress_threads[2] = thread_create(read_stress, (char*)(0xb8000+80*2+4), 0, 0);
+    stress_threads[3] = thread_create(read_stress, (char*)(0xb8000+80*2+6), 0, 0);
     //thread_set_affinity(stress_threads[0], 1);
     //thread_set_affinity(stress_threads[0], 4);
 
@@ -450,13 +452,13 @@ int main(void)
 
     thread_create(register_check, (void*)0xDEADFEEDF00DD00D, 0, 0);
     thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
-    thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
-    thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
+    //thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
+    //thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
 
     mutex_init(&stress_lock);
     thread_create(stress_mutex, 0, 0, 0);
     thread_create(stress_mutex, 0, 0, 0);
-    thread_create(stress_mutex, 0, 0, 0);
+    //thread_create(stress_mutex, 0, 0, 0);
 
     while (1)
         halt();
