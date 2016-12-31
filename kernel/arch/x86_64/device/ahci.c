@@ -21,16 +21,25 @@ DECLARE_storage_dev_DEVICE(ahci);
 typedef enum ata_cmd_t {
     ATA_CMD_READ_PIO        = 0x20,
     ATA_CMD_READ_PIO_EXT    = 0x24,
+
     ATA_CMD_READ_DMA        = 0xC8,
     ATA_CMD_READ_DMA_EXT    = 0x25,
+
     ATA_CMD_WRITE_PIO       = 0x30,
     ATA_CMD_WRITE_PIO_EXT   = 0x34,
+
     ATA_CMD_WRITE_DMA       = 0xCA,
     ATA_CMD_WRITE_DMA_EXT   = 0x35,
+
+    ATA_CMD_READ_DMA_NCQ    = 0x60,
+    ATA_CMD_WRITE_DMA_NCQ   = 0x61,
+
     ATA_CMD_CACHE_FLUSH     = 0xE7,
     ATA_CMD_CACHE_FLUSH_EXT = 0xEA,
+
     ATA_CMD_PACKET          = 0xA0,
     ATA_CMD_IDENTIFY_PACKET = 0xA1,
+
     ATA_CMD_IDENTIFY        = 0xEC
 } ata_cmd_t;
 
@@ -60,6 +69,7 @@ typedef enum ahci_fis_type_t {
     FIS_TYPE_DEV_BITS   = 0xA1,
 } ahci_fis_type_t;
 
+// Host-to-Device
 typedef struct ahci_fis_h2d_t {
     // FIS_TYPE_REG_H2D
     uint8_t fis_type;
@@ -121,6 +131,94 @@ typedef struct ahci_fis_h2d_t {
 
 #define AHCI_FIS_CTL_CMD            (1U<<AHCI_FIS_CTL_CMD_BIT)
 #define AHCI_FIS_CTL_CTL            (0U<<AHCI_FIS_CTL_CMD_BIT)
+
+// Native Command Queuing
+typedef struct ahci_fis_ncq_t {
+    // FIS_TYPE_REG_H2D
+    uint8_t fis_type;
+
+    // PORTMUX and CMD
+    uint8_t ctl;
+
+    // Command register
+    uint8_t command;
+
+    // Count register, 7:0
+    uint8_t count_lo;
+
+    // LBA low register, 7:0
+    uint8_t lba0;
+
+    // LBA mid register, 15:8
+    uint8_t lba1;
+
+    // LBA high register, 23:16
+    uint8_t lba2;
+
+    // Force Unit Access (bit 7)
+    uint8_t fua;
+
+    // LBA register, 31:24
+    uint8_t lba3;
+
+    // LBA register, 39:32
+    uint8_t lba4;
+
+    // LBA register, 47:40
+    uint8_t lba5;
+
+    // Count register, 15:8
+    uint8_t count_hi;
+
+    // Tag register 7:3, RARC bit 0
+    uint8_t tag;
+
+    // Priority register (7:6)
+    uint8_t prio;
+
+    // Isochronous command completion
+    uint8_t icc;
+
+    // Control register
+    uint8_t control;
+
+    // Auxiliary
+    uint32_t aux;
+} ahci_fis_ncq_t;
+
+//
+// ahci_fis_ncq_t::tag
+
+// NCQ tag
+#define AHCI_FIS_TAG_TAG_BIT    3
+#define AHCI_FIS_TAG_TAG_BITS   5
+
+// Rebuild Assist
+#define AHCI_FIS_TAG_RARC_BIT   0
+
+#define AHCI_FIS_TAG_TAG_n(n)   ((n)<<AHCI_FIS_TAG_TAG_BIT)
+#define AHCI_FIS_TAG_TAG_MASK   ((1U<<AHCI_FIS_TAG_TAG_BITS)-1)
+#define AHCI_FIS_TAG_TAG        (AHCI_FIS_TAG_TAG_MASK<<AHCI_FIS_TAG_TAG_BIT)
+
+#define AHCI_FIS_TAG_RARC       (1U<<AHCI_FIS_TAG_RARC_BIT)
+
+//
+// ahci_fis_ncq_t::prio
+
+#define AHCI_FIS_PRIO_BIT       6
+#define AHCI_FIS_PRIO_BITS      2
+#define AHCI_FIS_PRIO_MASK      ((1U<<AHCI_FIS_PRIO_BIT)-1)
+#define AHCI_FIS_PRIO_MASK_n(n) ((n)<<AHCI_FIS_PRIO_BIT)
+#define AHCI_FIS_PRIO           (AHCI_FIS_PRIO_MASK<<AHCI_FIS_PRIO_BIT)
+
+//
+// ahci_fis_ncq_t::fua
+
+#define AHCI_FIS_FUA_FUA_BIT    7
+#define AHCI_FIS_FUA_LBA_BIT    6
+
+#define AHCI_FIS_FUA_FUA        (1U<<AHCI_FIS_FUA_FUA_BIT)
+#define AHCI_FIS_FUA_LBA        (1U<<AHCI_FIS_FUA_LBA_BIT)
 
 typedef struct ahci_fis_d2h_t
 {
@@ -982,6 +1080,7 @@ typedef struct hba_cmd_tbl_ent_t {
     union {
         ahci_fis_d2h_t d2h;
         ahci_fis_h2d_t h2d;
+        ahci_fis_ncq_t ncq;
         char filler[64];
     } cfis;
     char atapi_fis[16];
@@ -993,8 +1092,10 @@ typedef struct hba_cmd_tbl_ent_t {
 
 C_ASSERT(sizeof(hba_cmd_tbl_ent_t) == 1024);
 
+typedef void (*async_callback_fn_t)(int error, uintptr_t arg);
+
 typedef struct async_callback_t {
-    void (*callback)(int error, uintptr_t arg);
+    async_callback_fn_t callback;
     uintptr_t callback_arg;
 } async_callback_t;
 
@@ -1033,6 +1134,7 @@ struct ahci_if_t {
     int irq;
     int ports_impl;
     int num_cmd_slots;
+    int use_ncq;
 };
 
 // Drive
@@ -1065,10 +1167,14 @@ static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
     // Make sure it was really acquired
     assert(pi->cmd_issued & (1U<<slot));
 
-    // Make sure this was really the oldest command
-    assert(pi->issue_queue[pi->issue_tail] == slot);
-    // Advance queue tail
-    pi->issue_tail = (pi->issue_tail + 1) & 31;
+    if (dev->use_ncq) {
+
+    } else {
+        // Make sure this was really the oldest command
+        assert(pi->issue_queue[pi->issue_tail] == slot);
+        // Advance queue tail
+        pi->issue_tail = (pi->issue_tail + 1) & 31;
+    }
 
     // Mark slot as not in use
     atomic_and_uint32(&pi->cmd_issued, ~(1U<<slot));
@@ -1100,9 +1206,11 @@ static int ahci_acquire_slot(ahci_if_t *dev, int port_num)
             if (old_busy == atomic_cmpxchg(
                         &pi->cmd_issued, old_busy,
                         old_busy | (1U<<slot))) {
-                // Write slot number to issue queue
-                pi->issue_queue[pi->issue_head] = slot;
-                pi->issue_head = (pi->issue_head + 1) & 31;
+                if (!dev->use_ncq) {
+                    // Write slot number to issue queue
+                    pi->issue_queue[pi->issue_head] = slot;
+                    pi->issue_head = (pi->issue_head + 1) & 31;
+                }
 
                 return slot;
             }
@@ -1119,33 +1227,53 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
 
     // Read command slot interrupt status
-    int slot = pi->issue_queue[pi->issue_tail];
+    int slot;
 
-    int error = 0;
+    if (dev->use_ncq) {
+        for (uint32_t done_slots = pi->cmd_issued &
+             (pi->cmd_issued ^ port->sata_act);
+             done_slots; done_slots &= ~(1U << slot)) {
+            slot = bit_lsb_set_32(done_slots);
 
-    if (port->sata_err != 0)
-        error = 1;
+            // FIXME: check error
+            int error = (port->sata_err != 0);
 
-    if ((port->taskfile_data & AHCI_HP_TFD_ERR) ||
-            (port->taskfile_data & AHCI_HP_TFD_SERR_BIT))
-        error = 2;
+            // Invoke completion callback
+            async_callback_t volatile *callback_info = pi->callbacks + slot;
+            async_callback_fn_t callback = callback_info->callback;
+            if (callback) {
+                callback(error, callback_info->callback_arg);
+                callback_info->callback = 0;
+                callback_info->callback_arg = 0;
+            }
 
-    // Invoke completion callback
-    async_callback_t *callback = dev->port_info[port_num].callbacks + slot;
-    if (callback->callback) {
-        callback->callback(error, callback->callback_arg);
-        callback->callback = 0;
-        callback->callback_arg = 0;
+            ahci_release_slot(dev, port_num, slot);
+        }
+    } else {
+        slot = pi->issue_queue[pi->issue_tail];
+
+        int error = 0;
+
+        if (port->sata_err != 0)
+            error = 1;
+
+        if ((port->taskfile_data & AHCI_HP_TFD_ERR) ||
+                (port->taskfile_data & AHCI_HP_TFD_SERR_BIT))
+            error = 2;
+
+        // Invoke completion callback
+        async_callback_t volatile *callback = pi->callbacks + slot;
+        if (callback->callback) {
+            callback->callback(error, callback->callback_arg);
+            callback->callback = 0;
+            callback->callback_arg = 0;
+        }
+
+        ahci_release_slot(dev, port_num, slot);
     }
-
 
     // Acknowledge slot interrupt
     port->intr_status |= port->intr_status;
-
-    ahci_release_slot(dev, port_num, slot);
-
-    // Mark slots completed
-    //atomic_and_uint32(&pi->cmd_issued, ~(1U<<slot));
 
     spinlock_unlock_noirq(&pi->lock, &hold);
 }
@@ -1263,22 +1391,44 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
     }
     atomic_barrier();
 
-    cmd_tbl_ent->cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
-    cmd_tbl_ent->cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
-    cmd_tbl_ent->cfis.h2d.command = is_read
-            ? ATA_CMD_READ_DMA_EXT
-            : ATA_CMD_WRITE_DMA_EXT;
-    cmd_tbl_ent->cfis.h2d.lba0 = lba & 0xFFFF;
-    cmd_tbl_ent->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
-    cmd_tbl_ent->cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
-    cmd_tbl_ent->cfis.h2d.lba5 = (lba >> 40);
-    cmd_tbl_ent->cfis.h2d.count = count;
+    if (dev->use_ncq) {
+        cmd_tbl_ent->cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
+        cmd_tbl_ent->cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
+        cmd_tbl_ent->cfis.ncq.command = is_read
+                ? ATA_CMD_READ_DMA_NCQ
+                : ATA_CMD_WRITE_DMA_NCQ;
+        cmd_tbl_ent->cfis.ncq.lba0 = lba & 0xFFFF;
+        cmd_tbl_ent->cfis.ncq.lba2 = (lba >> 16) & 0xFF;
+        cmd_tbl_ent->cfis.ncq.lba3 = (lba >> 24) & 0xFFFF;
+        cmd_tbl_ent->cfis.ncq.lba5 = (lba >> 40);
+        cmd_tbl_ent->cfis.ncq.count_lo = count & 0xFF;
+        cmd_tbl_ent->cfis.ncq.count_hi = (count >> 8) & 0xFF;
+        cmd_tbl_ent->cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
+        cmd_tbl_ent->cfis.ncq.fua = AHCI_FIS_FUA_LBA |
+                (!is_read ? AHCI_FIS_FUA_FUA : 0);
+        cmd_tbl_ent->cfis.ncq.prio = 0;
+        cmd_tbl_ent->cfis.ncq.aux = 0;
 
-    // LBA
-    cmd_tbl_ent->cfis.d2h.device = 1U<<6;
+        port->sata_act = (1U<<slot);
+    } else {
+        cmd_tbl_ent->cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+        cmd_tbl_ent->cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+        cmd_tbl_ent->cfis.h2d.command = is_read
+                ? ATA_CMD_READ_DMA_EXT
+                : ATA_CMD_WRITE_DMA_EXT;
+        cmd_tbl_ent->cfis.h2d.lba0 = lba & 0xFFFF;
+        cmd_tbl_ent->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
+        cmd_tbl_ent->cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
+        cmd_tbl_ent->cfis.h2d.lba5 = (lba >> 40);
+        cmd_tbl_ent->cfis.h2d.count = count;
+
+        // LBA
+        cmd_tbl_ent->cfis.d2h.device = AHCI_FIS_FUA_LBA;
+    }
     atomic_barrier();
 
-    cmd_hdr->hdr = AHCI_CH_LEN_n(sizeof(pi->cmd_tbl->cfis.h2d) >> 2);
+    cmd_hdr->hdr = AHCI_CH_LEN_n(sizeof(pi->cmd_tbl->cfis.h2d) >> 2) |
+            (!is_read ? AHCI_CH_WR : 0);
     cmd_hdr->prdbc = 0;
     cmd_hdr->prdtl = ranges_count;
 
@@ -1485,6 +1635,8 @@ static if_list_t ahci_if_detect(void)
                                   AHCI_HC_CAP_NCS_MASK);
 
             dev->irq = pci_iter.config.irq_line;
+
+            dev->use_ncq = dev->mmio_base->cap & AHCI_HC_CAP_SNCQ;
 
             ahci_rebase(dev);
 
