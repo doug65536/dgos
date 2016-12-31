@@ -37,15 +37,6 @@ entry:
 
 0:
 
-	jmp 1f
-	# Debugger hack
-	mov $0,%rbp
-	0:
-	test %rbp,%rbp
-	pause
-	jz 0b
-1:
-
 	lea kernel_stack(%rip),%rax
 	add kernel_stack_size(%rip),%rax
 	mov %rax,%rsp
