@@ -48,7 +48,6 @@ uint32_t pci_read_config(
         int bus, int slot, int func,
         int offset, int size)
 {
-    spinlock_lock(&pci_spinlock);
 
     uint32_t data = ~(uint32_t)0;
 
@@ -60,8 +59,13 @@ uint32_t pci_read_config(
                 (func << 8) |
                 (offset & ~(uint32_t)3);
 
+        spinlock_hold_t hold;
+        hold = spinlock_lock_noirq(&pci_spinlock);
+
         outd(PCI_ADDR, pci_address);
         data = ind(PCI_DATA);
+
+        spinlock_unlock_noirq(&pci_spinlock, &hold);
 
         data >>= (offset & 3) << 3;
 
@@ -69,35 +73,35 @@ uint32_t pci_read_config(
             data &= ~(~(uint32_t)0 << (size << 3));
     }
 
-    spinlock_unlock(&pci_spinlock);
-
     return data;
 }
 
 uint32_t pci_write_config(
         int bus, int slot, int func,
         int offset, int value)
-{
-    spinlock_lock(&pci_spinlock);
-
+{    
     uint32_t data = ~(uint32_t)0;
 
     if (bus < 256 && slot < 32 &&
             func < 8 && offset < 256) {
+
         uint32_t pci_address = (1 << 31) |
                 (bus << 16) |
                 (slot << 11) |
                 (func << 8) |
                 (offset & ~(uint32_t)3);
 
+        spinlock_hold_t hold;
+        hold = spinlock_lock_noirq(&pci_spinlock);
+
         outd(PCI_ADDR, pci_address);
         outd(PCI_DATA, value);
 
         outd(PCI_ADDR, pci_address);
         data = ind(PCI_DATA);
-    }
 
-    spinlock_unlock(&pci_spinlock);
+        spinlock_unlock_noirq(&pci_spinlock, &hold);
+    }
 
     return data;
 }
