@@ -74,19 +74,18 @@
 #define CR4_PKE             (1 << CR4_PKE_BIT     )
 
 typedef struct table_register_t {
+    uint16_t align;
     uint16_t limit;
-    uint16_t base_lo;
-    uint16_t base_hi;
+    uint32_t base;
 } table_register_t;
 
 typedef struct table_register_64_t {
     // Dummy 16-bit field for alignment
-    uint16_t align;
+    uint8_t align[sizeof(uintptr_t)-sizeof(uint16_t)];
 
     // Actual beginning of register value
     uint16_t limit;
-    uint32_t base_lo;
-    uint32_t base_hi;
+    uintptr_t base;
 } table_register_64_t;
 
 // Get whole MSR register as a 64-bit value
@@ -111,21 +110,21 @@ void msr_set_hi(uint32_t msr, uint32_t value);
 uint64_t msr_adj_bit(uint32_t msr, int bit, int set);
 
 // Returns new value of cr0
-uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set);
+uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set);
 
 // Returns new value of cr0
-uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set);
+uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set);
 
-uint64_t cpu_get_fault_address(void);
+uintptr_t cpu_get_fault_address(void);
 
-uint64_t cpu_get_page_directory(void);
-void cpu_set_page_directory(uint64_t addr);
+uintptr_t cpu_get_page_directory(void);
+void cpu_set_page_directory(uintptr_t addr);
 void cpu_flush_tlb(void);
 
 void cpu_set_fsbase(void *fs_base);
 void cpu_set_gsbase(void *gs_base);
 
-void cpu_invalidate_page(uint64_t addr);
+void cpu_invalidate_page(uintptr_t addr);
 
 table_register_64_t cpu_get_gdtr(void);
 void cpu_set_gdtr(table_register_64_t gdtr);

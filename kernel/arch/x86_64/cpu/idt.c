@@ -140,8 +140,7 @@ int idt_init(int ap)
     table_register_64_t idtr;
 
     addr = (uint64_t)idt;
-    idtr.base_lo = (uint32_t)(addr & 0xFFFFFFFF);
-    idtr.base_hi = (uint32_t)((addr >> 32) & 0xFFFFFFFF);
+    idtr.base = addr;
     idtr.limit = sizeof(idt) - 1;
 
     load_idtr(&idtr);

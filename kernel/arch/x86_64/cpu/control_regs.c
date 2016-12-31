@@ -77,14 +77,14 @@ void msr_set_hi(uint32_t msr, uint32_t value)
     );
 }
 
-uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set)
+uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
 {
-    uint64_t rax;
+    uintptr_t rax;
     __asm__ __volatile__ (
-        "movq %%cr0,%[result]\n\t"
-        "andq %[clear],%[result]\n\t"
-        "orq %[set],%[result]\n\t"
-        "movq %[result],%%cr0\n\t"
+        "mov %%cr0,%[result]\n\t"
+        "and %[clear],%[result]\n\t"
+        "or %[set],%[result]\n\t"
+        "mov %[result],%%cr0\n\t"
         : [result] "=&r" (rax)
         : [clear] "r" (~clear),
           [set] "r" (set)
@@ -92,9 +92,9 @@ uint64_t cpu_cr0_change_bits(uint64_t clear, uint64_t set)
     return rax;
 }
 
-uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set)
+uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
 {
-    uint64_t rax;
+    uintptr_t rax;
     __asm__ __volatile__ (
         "movq %%cr4,%[result]\n\t"
         "andq %[clear],%[result]\n\t"
@@ -107,9 +107,9 @@ uint64_t cpu_cr4_change_bits(uint64_t clear, uint64_t set)
     return rax;
 }
 
-uint64_t cpu_get_fault_address(void)
+uintptr_t cpu_get_fault_address(void)
 {
-    uint64_t addr;
+    uintptr_t addr;
     __asm__ __volatile__ (
         "mov %%cr2,%0\n\t"
         : "=r" (addr)
@@ -117,7 +117,7 @@ uint64_t cpu_get_fault_address(void)
     return addr;
 }
 
-void cpu_set_page_directory(uint64_t addr)
+void cpu_set_page_directory(uintptr_t addr)
 {
     __asm__ __volatile__ (
         "mov %0,%%cr3\n\t"
@@ -127,7 +127,7 @@ void cpu_set_page_directory(uint64_t addr)
     );
 }
 
-uint64_t cpu_get_page_directory(void)
+uintptr_t cpu_get_page_directory(void)
 {
     uint64_t addr;
     __asm__ __volatile__ (
@@ -139,15 +139,15 @@ uint64_t cpu_get_page_directory(void)
 
 void cpu_set_fsbase(void *fs_base)
 {
-    msr_set(MSR_FSBASE, (uint64_t)fs_base);
+    msr_set(MSR_FSBASE, (uintptr_t)fs_base);
 }
 
 void cpu_set_gsbase(void *gs_base)
 {
-    msr_set(MSR_GSBASE, (uint64_t)gs_base);
+    msr_set(MSR_GSBASE, (uintptr_t)gs_base);
 }
 
-void cpu_invalidate_page(uint64_t addr)
+void cpu_invalidate_page(uintptr_t addr)
 {
     __asm__ __volatile__ (
         "invlpg (%0)\n\t"
@@ -189,7 +189,7 @@ uint16_t cpu_get_tr(void)
     uint16_t tr;
     __asm__ __volatile__ (
         "str %0\n\t"
-        : "=m" (tr)
+        : "=r" (tr)
         :
         : "memory"
     );
@@ -199,9 +199,9 @@ uint16_t cpu_get_tr(void)
 void cpu_set_tr(uint16_t tr)
 {
     __asm__ __volatile__ (
-        "ltr %0\n\t"
+        "ltr %w0\n\t"
         :
-        : "m" (tr)
+        : "r" (tr)
         : "memory"
     );
 }
