@@ -172,14 +172,3 @@ void pit8254_enable(void)
     intr_hook(INTR_THREAD_YIELD, pit8254_context_switch_handler);
     irq_setmask(0, 1);
 }
-
-//void pit8253_usleep(int us)
-//{
-//    outb(PIT_CMD,
-//         PIT_CHANNEL(2) |
-//         PIT_ACCESS_BOTH |
-//         PIT_MODE_ONESHOT |
-//         PIT_FORMAT_BINARY);
-//    outb(PIT_DATA(2), us & 0xFF);
-//    outb(PIT_DATA(2), (us >> 8) & 0xFF);
-//}
