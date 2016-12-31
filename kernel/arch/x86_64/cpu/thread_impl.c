@@ -167,6 +167,8 @@ static void thread_cleanup(void)
     atomic_barrier();
     thread->priority = 0;
     thread->priority_boost = 0;
+    if (thread->flags & THREAD_FLAG_OWNEDSTACK)
+        munmap(thread->stack, thread->stack_size);
     thread->stack = 0;
     thread->stack_size = 0;
     atomic_barrier();
