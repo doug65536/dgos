@@ -279,7 +279,7 @@ static thread_t thread_create_with_state(
         ptrdiff_t free_stack_space = (char*)thread->ctx -
                 (char*)thread->stack;
 
-        printk("New thread free stack space: %zd\n", free_stack_space);
+        //printk("New thread free stack space: %zd\n", free_stack_space);
 
         assert(free_stack_space > 4096);
 
@@ -555,13 +555,12 @@ void thread_sleep_until(uint64_t expiry)
     thread->wake_time = expiry;
     atomic_barrier();
     thread->state = THREAD_IS_SLEEPING_BUSY;
+    thread->priority_boost = 100;
     thread_yield();
 }
 
 void thread_sleep_for(uint64_t ms)
 {
-    //printdbg("Sleeping for %lu ms\n", ms);
-
     thread_sleep_until(time_ms() + ms);
 }
 

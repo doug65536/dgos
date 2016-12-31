@@ -15,6 +15,7 @@
 #include "threadsync.h"
 #include "assert.h"
 #include "cpu/atomic.h"
+#include "cpu/control_regs.h"
 
 size_t const kernel_stack_size = 65536;
 char kernel_stack[65536];
@@ -82,7 +83,7 @@ static int read_stress(void *p)
 
     storage_dev_base_t *drive = open_storage_dev(0);
 
-    char *data = mmap(0, 65536*3, PROT_READ | PROT_WRITE,
+    char *data = mmap(0, 65536, PROT_READ | PROT_WRITE,
                       0, -1, 0);
 
     printk("read buffer at %lx\n", (uint64_t)data);
@@ -91,9 +92,9 @@ static int read_stress(void *p)
         ++*(char*)p;
         //thread_sleep_for(1000);
 
-        drive->vtbl->read(drive, data+65536, 65536/512, 0);
+        drive->vtbl->read(drive, data, 65536/512, 0);
 
-        sleep(1);
+        //sleep(1);
     }
 
     return 0;
@@ -412,19 +413,22 @@ static int register_check(void *p)
     return 0;
 }
 
-int main(void)
+static int init_thread(void *p)
 {
-    pci_init();
-    keybd_init();
-    keyb8042_init();
+    (void)p;
 
-    rbtree_test();
-
+    // Run late initializations
     callout_call('L');
+
+    // Register filesystems
+    callout_call('F');
+
+    // Register partition schemes
+    callout_call('P');
 
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0);
 
-    test_thread_param_t ttp[4] = {
+    static test_thread_param_t ttp[4] = {
         { (char*)0xb8004, 953 },
         { (char*)0xb8006, 701 },
         { (char*)0xb8008, 556 },
@@ -434,11 +438,13 @@ int main(void)
     for (int i = 0; i < 4; ++i)
         thread_create(other_thread, ttp + i, 0, 0);
 
-    thread_t stress_threads[4];
-    stress_threads[0] = thread_create(read_stress, (char*)(0xb8000+80*2), 0, 0);
-    stress_threads[1] = thread_create(read_stress, (char*)(0xb8000+80*2+2), 0, 0);
-    stress_threads[2] = thread_create(read_stress, (char*)(0xb8000+80*2+4), 0, 0);
-    stress_threads[3] = thread_create(read_stress, (char*)(0xb8000+80*2+6), 0, 0);
+    thread_t stress_threads[32];
+    for (int i = 0; i < 32; ++i) {
+        stress_threads[i] = thread_create(
+                    read_stress, (char*)(uintptr_t)
+                    (0xb8000+ 80*2 + 2*i), 0, 0);
+    }
+
     //thread_set_affinity(stress_threads[0], 1);
     //thread_set_affinity(stress_threads[0], 4);
 
@@ -459,6 +465,19 @@ int main(void)
     thread_create(stress_mutex, 0, 0, 0);
     thread_create(stress_mutex, 0, 0, 0);
     //thread_create(stress_mutex, 0, 0, 0);
+
+    return 0;
+}
+
+int main(void)
+{
+    pci_init();
+    keybd_init();
+    keyb8042_init();
+
+    rbtree_test();
+
+    thread_create(init_thread, 0, 0, 0);
 
     while (1)
         halt();

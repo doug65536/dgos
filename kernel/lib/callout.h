@@ -4,8 +4,10 @@
 // Types:
 //  'M': VMM initialized
 //  'S': Initialize SMP CPU
-//  'L': Late initialized device
 //  'E': Early initialized device
+//  'L': Late initialized device
+//  'P': Partition scanner
+//  'F': Filesystem implementation
 
 typedef struct callout_t {
     void (*fn)(void*);

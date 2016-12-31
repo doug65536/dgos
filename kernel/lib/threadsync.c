@@ -195,8 +195,6 @@ void condvar_wait(condition_var_t *var, mutex_t *mutex)
     assert(wait.link.next == 0);
     assert(wait.link.prev == 0);
 
-    //thread_wait_del(&wait.link);
-
     spinlock_unlock_noirq(&var->lock, &hold);
 }
 

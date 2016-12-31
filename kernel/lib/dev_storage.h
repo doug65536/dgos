@@ -86,7 +86,7 @@ void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
     name##_flush \
 }
 
-#ifdef STORAGE_IMPL
+#ifdef STORAGE_DEV_NAME
 #define DECLARE_storage_if_DEVICE(name) \
     DECLARE_DEVICE(storage_if, name ## _if)
 
@@ -123,6 +123,8 @@ void close_storage_dev(storage_dev_base_t *dev);
 // Filesystem (FAT32, etc)
 
 typedef struct fs_vtbl_t fs_vtbl_t;
+
+typedef struct fs_base_t fs_base_t;
 
 typedef char const *fs_cpath_t;
 
@@ -199,108 +201,140 @@ struct fs_vtbl_t {
     //
     // Startup and shutdown
 
-    void* (*init)(fs_init_info *conn);
-    void (*destroy)(void* private_data);
+    void* (*init)(fs_base_t *dev, fs_init_info *conn);
+    void (*destroy)(fs_base_t *dev, void* private_data);
 
     //
     // Read directory entry information
 
-    int (*getattr)(fs_cpath_t path, fs_stat_t* stbuf);
-    int (*access)(fs_cpath_t path, int mask);
-    int (*readlink)(fs_cpath_t path, char* buf, size_t size);
+    int (*getattr)(fs_base_t *dev,
+                   fs_cpath_t path, fs_stat_t* stbuf);
+    int (*access)(fs_base_t *dev,
+                  fs_cpath_t path, int mask);
+    int (*readlink)(fs_base_t *dev,
+                    fs_cpath_t path, char* buf, size_t size);
 
     //
     // Scan directories
 
-    int (*opendir)(fs_cpath_t path, fs_file_info_t* fi);
-    int (*readdir)(fs_cpath_t path, void* buf, off_t offset,
+    int (*opendir)(fs_base_t *dev,
+                   fs_cpath_t path, fs_file_info_t* fi);
+    int (*readdir)(fs_base_t *dev,
+                   fs_cpath_t path, void* buf, off_t offset,
                    fs_file_info_t* fi);
-    int (*releasedir)(fs_cpath_t path, fs_file_info_t *fi);
+    int (*releasedir)(fs_base_t *dev,
+                      fs_cpath_t path, fs_file_info_t *fi);
 
     //
     // Modify directories
 
-    int (*mknod)(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev);
-    int (*mkdir)(fs_cpath_t path, fs_mode_t mode);
-    int (*rmdir)(fs_cpath_t path);
-    int (*symlink)(fs_cpath_t to, fs_cpath_t from);
-    int (*rename)(fs_cpath_t from, fs_cpath_t to);
-    int (*link)(fs_cpath_t from, fs_cpath_t to);
-    int (*unlink)(fs_cpath_t path);
+    int (*mknod)(fs_base_t *dev,
+                 fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev);
+    int (*mkdir)(fs_base_t *dev,
+                 fs_cpath_t path, fs_mode_t mode);
+    int (*rmdir)(fs_base_t *dev,
+                 fs_cpath_t path);
+    int (*symlink)(fs_base_t *dev,
+                   fs_cpath_t to, fs_cpath_t from);
+    int (*rename)(fs_base_t *dev,
+                  fs_cpath_t from, fs_cpath_t to);
+    int (*link)(fs_base_t *dev,
+                fs_cpath_t from, fs_cpath_t to);
+    int (*unlink)(fs_base_t *dev,
+                  fs_cpath_t path);
 
     //
     // Modify directory entries
 
-    int (*chmod)(fs_cpath_t path, fs_mode_t mode);
-    int (*chown)(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid);
-    int (*truncate)(fs_cpath_t path, off_t size);
-    int (*utimens)(fs_cpath_t path, const fs_timespec_t *ts);
+    int (*chmod)(fs_base_t *dev,
+                 fs_cpath_t path, fs_mode_t mode);
+    int (*chown)(fs_base_t *dev,
+                 fs_cpath_t path, fs_uid_t uid, fs_gid_t gid);
+    int (*truncate)(fs_base_t *dev,
+                    fs_cpath_t path, off_t size);
+    int (*utimens)(fs_base_t *dev,
+                   fs_cpath_t path, const fs_timespec_t *ts);
 
     //
     // Open/close files
 
-    int (*open)(fs_cpath_t path, fs_file_info_t* fi);
-    int (*release)(fs_cpath_t path, fs_file_info_t *fi);
+    int (*open)(fs_base_t *dev,
+                fs_cpath_t path, fs_file_info_t* fi);
+    int (*release)(fs_base_t *dev,
+                   fs_cpath_t path, fs_file_info_t *fi);
 
     //
     // Read/write files
 
-    int (*read)(fs_cpath_t path, char *buf,
+    int (*read)(fs_base_t *dev,
+                fs_cpath_t path, char *buf,
                 size_t size, off_t offset,
                 fs_file_info_t* fi);
-    int (*write)(fs_cpath_t path, char *buf,
+    int (*write)(fs_base_t *dev,
+                 fs_cpath_t path, char *buf,
                  size_t size, off_t offset,
                  fs_file_info_t* fi);
 
     //
     // Sync files and directories and flush buffers
 
-    int (*fsync)(fs_cpath_t path, int isdatasync,
+    int (*fsync)(fs_base_t *dev,
+                 fs_cpath_t path, int isdatasync,
                  fs_file_info_t* fi);
-    int (*fsyncdir)(fs_cpath_t path, int isdatasync,
+    int (*fsyncdir)(fs_base_t *dev,
+                    fs_cpath_t path, int isdatasync,
                     fs_file_info_t* fi);
-    int (*flush)(fs_cpath_t path, fs_file_info_t* fi);
+    int (*flush)(fs_base_t *dev,
+                 fs_cpath_t path, fs_file_info_t* fi);
 
     //
     // Get filesystem information
 
-    int (*statfs)(fs_cpath_t path, fs_statvfs_t* stbuf);
+    int (*statfs)(fs_base_t *dev,
+                  fs_cpath_t path, fs_statvfs_t* stbuf);
 
     //
     // lock/unlock file
 
-    int (*lock)(fs_cpath_t path, fs_file_info_t* fi,
+    int (*lock)(fs_base_t *dev,
+                fs_cpath_t path, fs_file_info_t* fi,
                 int cmd, fs_flock_t* locks);
 
     //
     // Get block map
 
-    int (*bmap)(fs_cpath_t path, size_t blocksize,
+    int (*bmap)(fs_base_t *dev,
+                fs_cpath_t path, size_t blocksize,
                 uint64_t* blockno);
 
     //
     // Read/Write/Enumerate extended attributes
 
-    int (*setxattr)(fs_cpath_t path,
+    int (*setxattr)(fs_base_t *dev,
+                    fs_cpath_t path,
                     char const* name, char const* value,
                     size_t size, int flags);
-    int (*getxattr)(fs_cpath_t path,
+    int (*getxattr)(fs_base_t *dev,
+                    fs_cpath_t path,
                     char const* name, char* value,
                     size_t size);
-    int (*listxattr)(fs_cpath_t path,
+    int (*listxattr)(fs_base_t *dev,
+                     fs_cpath_t path,
                      char const* list, size_t size);
 
     //
     // ioctl API
 
-    int (*ioctl)(fs_cpath_t path, int cmd, void* arg,
+    int (*ioctl)(fs_base_t *dev,
+                 fs_cpath_t path, int cmd, void* arg,
                  fs_file_info_t* fi,
                  unsigned int flags, void* data);
 
     //
     //
 
-    int (*poll)(fs_cpath_t path,
+    int (*poll)(fs_base_t *dev,
+                fs_cpath_t path,
                 fs_file_info_t* fi,
                 fs_pollhandle_t* ph, unsigned* reventsp);
 };
@@ -352,18 +386,45 @@ struct fs_vtbl_t {
     name##_poll         \
 }
 
+#ifdef FS_NAME
+#define FS_T FS_NAME ## _fs_t
+
 #define DECLARE_fs_DEVICE(name) \
     DECLARE_DEVICE(fs, name ## _if)
 
 #define REGISTER_fs_DEVICE(name) \
     REGISTER_DEVICE(fs, name ## _if, 'F')
 
-#define FS_DEV_PTR(dev) STORAGE_IF_T *self = (void*)dev
+#define DEFINE_fs_DEVICE(name) \
+    DEFINE_DEVICE(fs, name)
+
+#define FS_DEV_PTR(dev) FS_T *self = (void*)dev
 
 #define FS_DEV_PTR_UNUSED(dev) (void)dev
-
+#endif
 
 //
 // Partitioning scheme (MBR, UEFI, etc)
 
-typedef struct part_scheme_vtbl_t part_scheme_vtbl_t;
+typedef struct part_vtbl_t part_vtbl_t;
+
+struct part_vtbl_t {
+    if_list_t (*detect)(storage_dev_base_t *drive);
+};
+
+#define MAKE_part_VTBL(name) { \
+    name##_detect \
+}
+
+#define DECLARE_part_DEVICE(name) \
+    DECLARE_DEVICE(part, name)
+
+#define REGISTER_part_DEVICE(name) \
+    REGISTER_DEVICE(part, name, 'P')
+
+#define DEFINE_part_DEVICE(name) \
+    DEFINE_DEVICE(part, name)
+
+#define PART_DEV_PTR(dev) PART_T *self
+
+void register_part_device(char const *name, part_vtbl_t *vtbl);

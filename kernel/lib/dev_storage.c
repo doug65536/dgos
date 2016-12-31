@@ -12,6 +12,10 @@ static int storage_if_count;
 static storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
 static int storage_dev_count;
 
+#define MAX_PART_DEVS   4
+static part_vtbl_t *part_devs[MAX_PART_DEVS];
+static int part_dev_count;
+
 storage_dev_base_t *open_storage_dev(dev_t dev)
 {
     return storage_devs[dev];
@@ -47,6 +51,17 @@ void register_storage_if_device(char const *name,
             // Store device instance
             storage_devs[storage_dev_count++] = dev;
         }
+    }
+    printk("%s device registered\n", name);
+}
+
+void register_part_device(const char *name, part_vtbl_t *vtbl)
+{
+    if (part_dev_count < MAX_PART_DEVS) {
+        part_devs[part_dev_count++] = vtbl;
+
+        storage_dev_base_t *drive = open_storage_dev(0);
+        vtbl->detect(drive);
     }
     printk("%s device registered\n", name);
 }

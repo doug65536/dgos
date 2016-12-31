@@ -496,16 +496,16 @@ static void rbtree_delete_case6(rbtree_t *tree, rbtree_iter_t n)
     rbtree_iter_t nparent = NODE(n)->parent;
     rbtree_iter_t nsib = rbtree_sibling(tree, n);
 
-    NODE(n)->color = NODE(nparent)->color;
+    NODE(nsib)->color = NODE(nparent)->color;
     NODE(nparent)->color = BLACK;
     if (n == NODE(nparent)->left) {
-        assert(NODE(nsib)->right == RED);
+        assert(NODE(NODE(nsib)->right)->color == RED);
         NODE(NODE(nsib)->right)->color = BLACK;
         rbtree_rotate_left(tree, nparent);
     } else {
-        assert(NODE(nsib)->left == RED);
+        assert(NODE(NODE(nsib)->left)->color == RED);
         NODE(NODE(nsib)->left)->color = BLACK;
-        rbtree_rotate_left(tree, nparent);
+        rbtree_rotate_right(tree, nparent);
     }
 }
 
@@ -521,10 +521,10 @@ static void rbtree_delete_case5(rbtree_t *tree, rbtree_iter_t n)
         NODE(nsib)->color = RED;
         NODE(NODE(nsib)->left)->color = BLACK;
         rbtree_rotate_right(tree, nsib);
-    } else if (n == NODE(nparent)->left &&
+    } else if (n == NODE(nparent)->right &&
                NODE(nsib)->color == BLACK &&
-               NODE(NODE(nsib)->left)->color == RED &&
-               NODE(NODE(nsib)->right)->color == BLACK) {
+               NODE(NODE(nsib)->right)->color == RED &&
+               NODE(NODE(nsib)->left)->color == BLACK) {
         NODE(nsib)->color = RED;
         NODE(NODE(nsib)->right)->color = BLACK;
         rbtree_rotate_left(tree, nsib);
@@ -566,12 +566,12 @@ static void rbtree_delete_case3(rbtree_t *tree, rbtree_iter_t n)
 
 static void rbtree_delete_case2(rbtree_t *tree, rbtree_iter_t n)
 {
-    rbtree_iter_t sib = rbtree_sibling(tree, n);
+    rbtree_iter_t nsib = rbtree_sibling(tree, n);
 
-    if (NODE(sib)->color == RED) {
+    if (NODE(nsib)->color == RED) {
         rbtree_iter_t nparent = NODE(n)->parent;
         NODE(nparent)->color = RED;
-        NODE(sib)->color = BLACK;
+        NODE(nsib)->color = BLACK;
         if (n == NODE(nparent)->left)
             rbtree_rotate_left(tree, nparent);
         else
@@ -703,7 +703,8 @@ int rbtree_validate(rbtree_t *tree)
                 return 0;
             }
 
-            if (tree->cmp(NODE(left)->item, NODE(i)->item, tree->p) >= 0) {
+            if (tree->cmp(NODE(left)->item,
+                          NODE(i)->item, tree->p) >= 0) {
                 assert(!"Left child is >= its parent");
                 return 0;
             }
@@ -715,7 +716,8 @@ int rbtree_validate(rbtree_t *tree)
                 return 0;
             }
 
-            if (tree->cmp(NODE(right)->item, NODE(i)->item, tree->p) < 0) {
+            if (tree->cmp(NODE(right)->item,
+                          NODE(i)->item, tree->p) < 0) {
                 assert(!"Right child is < its parent");
                 return 0;
             }
@@ -767,9 +769,17 @@ int rbtree_test(void)
 
             rbtree_walk(tree, rbtree_test_visit, 0);
 
-            rbtree_destroy(tree);
-
             RBTREE_TRACE("---\n");
+
+            for (int del = 0; del < 4; ++del) {
+                RBTREE_TRACE("Delete %d\n", values[scenario[del]]);
+                rbtree_delete(tree, values + scenario[del]);
+                rbtree_dump(tree);
+                rbtree_walk(tree, rbtree_test_visit, 0);
+                RBTREE_TRACE("---\n");
+            }
+
+            rbtree_destroy(tree);
         }
     }
 

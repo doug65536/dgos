@@ -179,7 +179,7 @@ deletedisk:
 # Create disk image
 $(DISKIMAGE):
 	# Make an 8GB FAT32 partition in a file
-	$(MKFS) -C -D 0x80 -F 32 -s 8 -h 128 $(DISKIMAGE) 8388608
+	$(MKFS) -C -D 0x80 -F 32 -s 8 -h 128 $(DISKIMAGE) 16384
 	#
 	# Convert partition into device
 	# By copying first 64KB forward by 64KB,
@@ -191,12 +191,12 @@ $(DISKIMAGE):
 	$(DD) if=$(DISKIMAGE) of=$(DISKIMAGE) bs=512 count=128 seek=128
 	# Clear first 64KB
 	$(DD) if=/dev/zero of=$(DISKIMAGE) bs=512 count=128 conv=notrunc
-	# Add 64KB to the end of the file (16777216+128) + 100 hack
-	$(DD) if=/dev/zero of=$(DISKIMAGE) bs=512 count=0 seek=16777414
+	# Add 64KB to the end of the file
+	$(DD) if=/dev/zero of=$(DISKIMAGE) bs=512 count=0 seek=32896
 
 bootable-disk: $(DISKIMAGE) $(BOOTSECTORS)
 	# Inject boot sector (up to 64KB)
-	$(DD) if=$(BOOTSECTORS) of=$(DISKIMAGE) bs=1 count=65536 conv=notrunc
+	$(DD) if=$(BOOTSECTORS) of=$(DISKIMAGE) bs=512 count=128 conv=notrunc
 
 debuggable-disk: bootable-disk $(SYMBOLFILE)
 

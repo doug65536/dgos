@@ -107,3 +107,8 @@ lib/bsearch.c
 lib/threadsync.h
 lib/threadsync.c
 .gitignore
+fs/mbr.c
+fs/mbr.h
+fs/Makefile
+fs/fat32.c
+fs/fat32.h

@@ -6,3 +6,4 @@ config
 arch/x86_64/cpu
 arch/x86_64/device/keyb8042_layout
 arch/x86_64/device
+fs

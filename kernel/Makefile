@@ -31,7 +31,7 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m64
 TARGET_ARCH_AS := --64
 
-INCS := arch arch/$(ARCH) lib
+INCS := arch arch/$(ARCH) lib fs
 INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
 
@@ -106,7 +106,8 @@ KERNEL := $(BINDIR)/kernel
 
 LIBFILES := \
 	lib/libkernel.a \
-	arch/$(ARCH)/libarch.a
+	arch/$(ARCH)/libarch.a \
+	fs/libfs.a
 
 OUTPUTS = $(KERNEL)
 
@@ -127,10 +128,12 @@ clean:
 	@rm -f $(DUMPDIR)/*.map
 	@rm -f $(OUTPUTS)
 	(cd lib && $(MAKE) clean)
+	(cd fs && $(MAKE) clean)
 	(cd arch/$(ARCH) && $(MAKE) clean)
 
 subdirs:
 	+(cd lib && $(MAKE))
+	+(cd fs && $(MAKE))
 	+(cd arch/$(ARCH) && $(MAKE))
 
 $(LIBFILES): subdirs
@@ -139,7 +142,9 @@ $(LIBFILES): subdirs
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES)
 	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
+		--whole-archive \
 		--start-group $(LIBFILES) --end-group \
+		--no-whole-archive \
 		$(LIBGCC) \
 		> $(DUMPDIR)/kernel.map
 

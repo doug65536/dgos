@@ -642,27 +642,26 @@ typedef struct vsnprintf_context_t {
 static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 {
     vsnprintf_context_t *ctx = context;
-    int count = 0;
+    char buf[5];
 
-    do {
-        if (s) {
-            ch = *s++;
-            if (!ch)
-                break;
-        }
+    intptr_t len = 0;
+    if (!s) {
+        len = ucs4_to_utf8(buf, ch);
+        s = buf;
+    } else if (!ch) {
+        len = strlen(s);
+    } else {
+        len = ch;
+    }
 
-        ++count;
-
-        if (s && ch && count == ch)
+    for (intptr_t i = 0; i < len; ++i) {
+        if (ctx->level >= ctx->limit)
             break;
 
-        if (ctx->level < ctx->limit - 1) {
-            ctx->buf[ctx->level] = ch;
-            ++ctx->level;
-        }
-    } while (s);
+        ctx->buf[ctx->level++] = s[i];
+    }
 
-    return count;
+    return len;
 }
 
 // Write up to "limit" bytes to "buf" using format string.

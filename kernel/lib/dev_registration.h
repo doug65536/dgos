@@ -15,9 +15,7 @@
 // registers the device driver
 #define REGISTER_DEVICE(type, name, id) \
     DEFINE_DEVICE(type, name); \
-    /*__attribute__((constructor(CONSTRUCTOR_PRIORITY_DEVICE)))*/ \
     void name##_##type##_register_device(void *arg); \
-    /*__attribute__((constructor(CONSTRUCTOR_PRIORITY_DEVICE)))*/ \
     void name##_##type##_register_device(void *arg) \
     { \
         (void)arg; \
