@@ -37,7 +37,8 @@ typedef enum thread_state_t {
     THREAD_IS_SUSPENDED_BUSY = THREAD_IS_SUSPENDED | THREAD_BUSY,
     THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
     THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY,
-    THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY
+    THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
+    THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY
 } thread_state_t;
 
 typedef struct thread_info_t thread_info_t;
@@ -163,16 +164,13 @@ static void thread_cleanup(void)
 
     assert(thread->state == THREAD_IS_RUNNING);
 
-    thread->state = THREAD_IS_DESTRUCTING;
     atomic_barrier();
     thread->priority = 0;
     thread->priority_boost = 0;
-    if (thread->flags & THREAD_FLAG_OWNEDSTACK)
-        munmap(thread->stack, thread->stack_size);
     thread->stack = 0;
     thread->stack_size = 0;
     atomic_barrier();
-    thread->state = THREAD_IS_FINISHED;
+    thread->state = THREAD_IS_DESTRUCTING_BUSY;
     thread_yield();
 }
 
@@ -471,14 +469,7 @@ void *thread_schedule(void *ctx)
     }
 
     // Store context pointer for resume later
-    if (thread->state != THREAD_IS_DESTRUCTING) {
-        thread->ctx = ctx;
-    } else {
-        //thread->cpu = 0;
-        atomic_barrier();
-        thread->state = THREAD_IS_FINISHED_BUSY;
-        atomic_barrier();
-    }
+    thread->ctx = ctx;
 
     // Change to ready if running
     if (thread->state == THREAD_IS_RUNNING) {
@@ -486,6 +477,10 @@ void *thread_schedule(void *ctx)
         atomic_barrier();
         thread->state = THREAD_IS_READY_BUSY;
         atomic_barrier();
+    } else if (thread->state == THREAD_IS_DESTRUCTING) {
+        if (thread->flags & THREAD_FLAG_OWNEDSTACK)
+            munmap(thread->stack, thread->stack_size);
+        thread->state = THREAD_IS_FINISHED;
     }
 
     // Retry because another CPU might steal this
