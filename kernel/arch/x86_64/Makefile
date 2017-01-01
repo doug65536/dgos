@@ -47,6 +47,7 @@ generated_device_vtbl.s: $(DEVOBJS)
 		echo '# DO NOT BOTHER EDITING IT' >> $@ && \
 		echo '# See arch/x86_64/Makefile' >> $@ && \
 		echo '.globl device_constructor_list' >> $@ && \
+		echo '.hidden device_constructor_list' >> $@ && \
 		echo 'device_constructor_list:' >> $@ && \
 		nm $^ | grep -oP '\S+_register_device' | \
 			sed 's/.*/.quad &/' >> $@ && \

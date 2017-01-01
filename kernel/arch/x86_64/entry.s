@@ -1,6 +1,7 @@
 .section .entry
 
 .globl entry
+.hidden entry
 entry:
 	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions CR4_OSXMMEX)
 	# This must be done before jumping into C code
@@ -73,6 +74,7 @@ entry:
 	call exit
 
 .globl exit
+.hidden exit
 exit:
 	# Ignore exitcode
 	# Kernel exit just calls destructors
@@ -102,6 +104,7 @@ invoke_function_array:
 
 # Callout to initialize AP CPU
 .globl mp_main
+.hidden mp_main
 mp_main:
 	mov $'S',%edi
 	call callout_call

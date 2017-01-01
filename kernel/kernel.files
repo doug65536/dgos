@@ -112,3 +112,6 @@ fs/mbr.h
 fs/Makefile
 fs/fat32.c
 fs/fat32.h
+lib/export.h
+lib/rand.h
+lib/rand.c

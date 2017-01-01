@@ -12,7 +12,7 @@ SECTIONS {
 
 	/* Code and read-only data */
 	.text 0x0000400000000000 : {
-		PROVIDE(___text_st = .);
+		PROVIDE_HIDDEN(___text_st = .);
 		*(.entry)
 
 		. = ALIGN(64);
@@ -27,21 +27,21 @@ SECTIONS {
 		*(.text.unlikely)
 
 		. = ALIGN(64);
-		PROVIDE(___init_st = .);
+		PROVIDE_HIDDEN(___init_st = .);
 		*(.init_array)
 		*(SORT(.init_array.*))
-		PROVIDE(___init_en = .);
+		PROVIDE_HIDDEN(___init_en = .);
 
-		PROVIDE(___fini_st = .);
+		PROVIDE_HIDDEN(___fini_st = .);
 		*(.fini_array)
 		*(SORT(.fini_array.*))
-		PROVIDE(___fini_en = .);
+		PROVIDE_HIDDEN(___fini_en = .);
 
 		. = ALIGN(32);
 
-		PROVIDE(___callout_array_st = .);
+		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
-		PROVIDE(___callout_array_en = .);
+		PROVIDE_HIDDEN(___callout_array_en = .);
 
 		. = ALIGN(64);
 		*(.rodata)
@@ -56,28 +56,28 @@ SECTIONS {
 		/* Provide the highest address taken by kernel as
 		   a global variable */
 		. = ALIGN(8);
-		___top_physaddr = .;
+		PROVIDE_HIDDEN(___top_physaddr = .);
 		QUAD((___init_brk - ___text_st) + 0x100000);
 
 		/* Provide the TLS size as a global variable */
-		___tls_size = .;
+		PROVIDE_HIDDEN(___tls_size = .);
 		QUAD(___tbss_en - ___tdata_st);
 
 		/* Provide the TLS address as a global variable */
-		___tls_init_data_ptr = .;
+		PROVIDE_HIDDEN(___tls_init_data_ptr = .);
 		QUAD(___tdata_st);
 
 		/* Provide the initial TLS address
 		   as a global variable */
-		___tls_main_tls_bottom_ptr = .;
+		PROVIDE_HIDDEN(___tls_main_tls_bottom_ptr = .);
 		QUAD(___main_tls_bottom);
 
 		/* Provide the address of the main TEB
 		   as a global variable */
-		___main_teb_ptr = .;
+		PROVIDE_HIDDEN(___main_teb_ptr = .);
 		QUAD(___main_teb);
 
-		PROVIDE(___text_en = .);
+		PROVIDE_HIDDEN(___text_en = .);
 	} = 0xCC
 
 	.eh_frame_hdr : ALIGN(4096) {
@@ -89,6 +89,26 @@ SECTIONS {
 		*(.eh_frame.*)
 	}
 
+	.interp : ALIGN(4096) {
+		*(.interp);
+	}
+
+	.hash : ALIGN(4096) {
+		*(.hash);
+	}
+
+	.dynsym : ALIGN(4096) {
+		*(.dynsym);
+	}
+
+	.dynstr : ALIGN(4096) {
+		*(.dynstr);
+	}
+
+	.dynamic : ALIGN(4096) {
+		*(.dynamic);
+	}
+
 	/* Initialized data */
 	.data  : ALIGN(4096) {
 		*(.data)
@@ -97,22 +117,22 @@ SECTIONS {
 		/* Statically allocate room for the main */
 		/* kernel thread TLS */
 		. = ALIGN(16);
-		PROVIDE(___main_tls_bottom = .);
+		PROVIDE_HIDDEN(___main_tls_bottom = .);
 		. += ___tbss_en - ___tdata_st;
-		PROVIDE(___main_teb = .);
+		PROVIDE_HIDDEN(___main_teb = .);
 		/* 8 is sizeof thread_env_t! */
 		QUAD(___main_teb);
-		PROVIDE(___main_teb_end = .);
+		PROVIDE_HIDDEN(___main_teb_end = .);
 		. = ALIGN(16);
 	} = 0x00
 
 	/* Zero page pool initialized */
 	.bss : ALIGN(4096) {
-		PROVIDE(___bss_st = .);
+		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(SORT(.bss.*))
 		*(COMMON)
-		PROVIDE(___bss_en = .);
+		PROVIDE_HIDDEN(___bss_en = .);
 	}
 
 	.got : ALIGN(4096) {
@@ -161,22 +181,22 @@ SECTIONS {
 	. = ALIGN(4096);
 
 	.tdata : {
-		PROVIDE(___tdata_st = .);
+		PROVIDE_HIDDEN(___tdata_st = .);
 		*(.tdata)
 		. = ALIGN(16);
-		PROVIDE(___tdata_en = .);
+		PROVIDE_HIDDEN(___tdata_en = .);
 	}
 
 	.tbss : {
-		PROVIDE(___tbss_st = .);
+		PROVIDE_HIDDEN(___tbss_st = .);
 		*(.tbss)
 		*(.tcommon)
 		. = ALIGN(16);
-		PROVIDE(___tbss_en = .);
+		PROVIDE_HIDDEN(___tbss_en = .);
 	}
 
 	. = ALIGN(4096);
-	PROVIDE(___init_brk = .);
+	PROVIDE_HIDDEN(___init_brk = .);
 
 	.debug_info    0 : { *(.debug_info)    }
 	.debug_abbrev  0 : { *(.debug_abbrev)  }

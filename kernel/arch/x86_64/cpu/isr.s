@@ -15,24 +15,9 @@
 	.cfi_adjust_cfa_offset -(\ofs)
 .endm
 
-# Handler that pushes whole state
-.macro isr_exception_entry has_code int_num
-.globl isr_entry_\int_num\()
-isr_entry_\int_num\():
-	.cfi_startproc
-	.if \has_code == 0
-		.cfi_def_cfa_offset 8
-		push_cfi $0
-	.else
-		.cfi_def_cfa_offset 16
-	.endif
-	push_cfi $\int_num
-	jmp exception_common
-	.cfi_endproc
-.endm
-
 .macro isr_entry has_code int_num
 .globl isr_entry_\int_num\()
+.hidden isr_entry_\int_num\()
 isr_entry_\int_num\():
 	.cfi_startproc
 	.if \has_code == 0
