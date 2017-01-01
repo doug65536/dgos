@@ -134,7 +134,7 @@ void mutex_unlock(mutex_t *mutex)
 void mutex_lock_noyield(mutex_t *mutex)
 {
     spinlock_hold_t hold;
-    for (;; pause()) {
+    for (int done = 0; ; pause()) {
         if (mutex->owner >= 0)
             continue;
 
@@ -142,13 +142,14 @@ void mutex_lock_noyield(mutex_t *mutex)
 
         if (mutex->owner < 0) {
             mutex->owner = thread_get_id();
-            break;
+            done = 1;
         }
 
         spinlock_unlock_noirq(&mutex->lock, &hold);
-    }
 
-    spinlock_unlock_noirq(&mutex->lock, &hold);
+        if (done)
+            break;
+    }
 }
 
 void mutex_destroy(mutex_t *mutex)
@@ -223,7 +224,7 @@ void condvar_wake_all(condition_var_t *var)
 
     for (thread_wait_t *wait = (void*)var->link.next;
          wait != (void*)&var->link;
-         wait = (void*)wait->link.next) {
+         wait = (void*)thread_wait_del(&wait->link)) {
         // FIXME: unlink thread_wait_t
         thread_resume(wait->thread);
     }

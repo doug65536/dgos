@@ -31,3 +31,5 @@ void thread_resume(thread_t thread);
 
 thread_priority_t thread_get_priority(thread_t thread_id);
 void thread_set_priority(thread_t thread_id, thread_priority_t priority);
+
+int thread_wait(thread_t thread_id);

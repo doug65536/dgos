@@ -16,6 +16,7 @@
 #include "cpuid.h"
 #include "mm.h"
 #include "time.h"
+#include "threadsync.h"
 
 #include "printk.h"
 
@@ -44,48 +45,53 @@ typedef enum thread_state_t {
 typedef struct thread_info_t thread_info_t;
 typedef struct cpu_info_t cpu_info_t;
 
+// When state is equal to one of these:
+//  THREAD_IS_READY
+// any CPU can transition it to THREAD_IS_RUNNING.
+//
+// When state is equal to one of these:
+//  THREAD_IS_SLEEPING
+// any CPU can transition it to THREAD_IS_READY
+//
+// When state is equal to one of these:
+//  THREAD_IS_UNINITIALIZED
+// any CPU can transition it to THREAD_IS_INITIALIZING
+//
+// Put another way, another CPU can only change
+// the state if it is currently one of these:
+//  THREAD_IS_READY
+//  THREAD_IS_SLEEPING
+//  THREAD_IS_UNINITIALIZED
+//
+
 struct thread_info_t {
     isr_context_t * volatile ctx;
-    uint64_t volatile wake_time;
-
-    uint64_t cpu_affinity;
-
-    void *stack;
-    size_t stack_size;
-
-    // When state is equal to one of these:
-    //  THREAD_IS_READY
-    // any CPU can transition it to THREAD_IS_RUNNING.
-    //
-    // When state is equal to one of these:
-    //  THREAD_IS_SLEEPING
-    // any CPU can transition it to THREAD_IS_READY
-    //
-    // When state is equal to one of these:
-    //  THREAD_IS_UNINITIALIZED
-    // any CPU can transition it to THREAD_IS_INITIALIZING
-    //
-    // Put another way, another CPU can only change
-    // the state if it is currently one of these:
-    //  THREAD_IS_READY
-    //  THREAD_IS_SLEEPING
-    //  THREAD_IS_UNINITIALIZED
-    //
-    thread_state_t volatile state;
 
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
     thread_priority_t volatile priority_boost;
 
-    uint64_t flags;
+    thread_state_t volatile state;
+    uint32_t flags;
 
-    uint64_t align;
+    uint64_t volatile wake_time;
+
+    uint64_t cpu_affinity;
+
+    void *stack;
+    uint64_t stack_size;
+
+    mutex_t lock;
+    condition_var_t done_cond;
+    int exit_code;
+
+    int align[3];
 };
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
 
-C_ASSERT(sizeof(thread_info_t) == 64);
+C_ASSERT(sizeof(thread_info_t) == 128);
 
 // Store in a big array, for now
 #define MAX_THREADS 64
@@ -480,7 +486,11 @@ void *thread_schedule(void *ctx)
     } else if (thread->state == THREAD_IS_DESTRUCTING) {
         if (thread->flags & THREAD_FLAG_OWNEDSTACK)
             munmap(thread->stack, thread->stack_size);
+
+        mutex_lock_noyield(&thread->lock);
         thread->state = THREAD_IS_FINISHED;
+        mutex_unlock(&thread->lock);
+        condvar_wake_all(&thread->done_cond);
     }
 
     // Retry because another CPU might steal this
@@ -592,6 +602,16 @@ void thread_resume(thread_t thread)
 
     threads[thread].priority_boost = 128;
     threads[thread].state = THREAD_IS_READY;
+}
+
+int thread_wait(thread_t thread_id)
+{
+    thread_info_t *thread = threads + thread_id;
+    mutex_lock(&thread->lock);
+    if (thread->state != THREAD_IS_FINISHED)
+        condvar_wait(&thread->done_cond, &thread->lock);
+    mutex_unlock(&thread->lock);
+    return thread->exit_code;
 }
 
 uint32_t thread_cpu_count(void)
