@@ -111,8 +111,8 @@ uintptr_t cpu_get_fault_address(void)
 {
     uintptr_t addr;
     __asm__ __volatile__ (
-        "mov %%cr2,%0\n\t"
-        : "=r" (addr)
+        "mov %%cr2,%[addr]\n\t"
+        : [addr] "=r" (addr)
     );
     return addr;
 }
@@ -120,9 +120,9 @@ uintptr_t cpu_get_fault_address(void)
 void cpu_set_page_directory(uintptr_t addr)
 {
     __asm__ __volatile__ (
-        "mov %0,%%cr3\n\t"
+        "mov %[addr],%%cr3\n\t"
         :
-        : "r" (addr)
+        : [addr] "r" (addr)
         : "memory"
     );
 }
@@ -131,8 +131,8 @@ uintptr_t cpu_get_page_directory(void)
 {
     uint64_t addr;
     __asm__ __volatile__ (
-        "mov %%cr3,%0\n\t"
-        : "=r" (addr)
+        "mov %%cr3,%[addr]\n\t"
+        : [addr] "=r" (addr)
     );
     return addr;
 }
