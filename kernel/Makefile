@@ -69,7 +69,8 @@ CFLAGS ?= -g3 -fno-stack-protector \
 	-fpic -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
-	-fexceptions -fno-common  \
+	-fexceptions -fno-common \
+	-fvisibility=hidden \
 	$(WEVERYTHING)
 
 #OPTIMIZE := 1
@@ -113,7 +114,8 @@ OUTPUTS = $(KERNEL)
 
 NEEDSMALLEST :=
 
-LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M -T $(LINKERSCRIPT) -g
+LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M \
+	-T $(LINKERSCRIPT) -g -export-dynamic
 
 #-m i386linux
 

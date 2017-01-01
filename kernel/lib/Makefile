@@ -20,6 +20,7 @@ CSRCS := mm.c \
 	bitsearch.c \
 	bsearch.c \
 	rbtree.c \
-	debug.c
+	debug.c \
+	rand.c
 
 include $(BUILDROOT)/library.mk
