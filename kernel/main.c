@@ -38,20 +38,6 @@ static void smp_main(void *arg)
 
 REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 
-//static __attribute__((constructor)) void start_me_up()
-//{
-//    tls_thing = 1;
-//    //tls_thing_2 = 23;
-//    tls_initialized_thing = 2;
-//    tls_initialized_thing_2 = 3;
-//    trick = &tls_initialized_thing;
-//}
-
-static __attribute__((destructor)) void goin_down()
-{
-    //tls_thing = -22;
-}
-
 // Pull in the device constructors
 // to cause them to be initialized
 void (** volatile device_list)(void) = device_constructor_list;
