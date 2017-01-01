@@ -150,9 +150,9 @@ void cpu_set_gsbase(void *gs_base)
 void cpu_invalidate_page(uintptr_t addr)
 {
     __asm__ __volatile__ (
-        "invlpg (%0)\n\t"
+        "invlpg (%[addr])\n\t"
         :
-        : "r" (addr)
+        : [addr] "r" (addr)
         : "memory"
     );
 }
@@ -166,9 +166,9 @@ table_register_64_t cpu_get_gdtr(void)
 {
     table_register_64_t gdtr;
     __asm__ __volatile__ (
-        "sgdtq (%0)\n\t"
+        "sgdtq (%[gdtr])\n\t"
         :
-        : "r" (&gdtr.limit)
+        : [gdtr] "r" (&gdtr.limit)
         : "memory"
     );
     return gdtr;
@@ -177,9 +177,9 @@ table_register_64_t cpu_get_gdtr(void)
 void cpu_set_gdtr(table_register_64_t gdtr)
 {
     __asm__ __volatile__ (
-        "lgdtq (%0)\n\t"
+        "lgdtq (%[gdtr])\n\t"
         :
-        : "r" (&gdtr.limit)
+        : [gdtr] "r" (&gdtr.limit)
         : "memory"
     );
 }
@@ -188,8 +188,8 @@ uint16_t cpu_get_tr(void)
 {
     uint16_t tr;
     __asm__ __volatile__ (
-        "str %0\n\t"
-        : "=r" (tr)
+        "str %w[tr]\n\t"
+        : [tr] "=r" (tr)
         :
         : "memory"
     );
@@ -199,9 +199,9 @@ uint16_t cpu_get_tr(void)
 void cpu_set_tr(uint16_t tr)
 {
     __asm__ __volatile__ (
-        "ltr %w0\n\t"
+        "ltr %w[tr]\n\t"
         :
-        : "r" (tr)
+        : [tr] "r" (tr)
         : "memory"
     );
 }
