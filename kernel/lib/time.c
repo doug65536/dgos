@@ -31,7 +31,7 @@ void time_ms_set_handler(uint64_t (*vec)(void))
     time_ms_vec = vec;
 }
 
-uint64_t time_ms(void)
+EXPORT uint64_t time_ms(void)
 {
     return time_ms_vec();
 }
@@ -41,7 +41,7 @@ void usleep_set_handler(uint32_t (*vec)(uint16_t microsec))
     usleep_vec = vec;
 }
 
-uint32_t usleep(uint16_t microsec)
+EXPORT uint32_t usleep(uint16_t microsec)
 {
     return usleep_vec(microsec);
 }
