@@ -12,7 +12,7 @@
 
 idt_entry_64_t idt[128];
 
-void *(*irq_dispatcher)(int irq, isr_context_t *ctx);
+static void *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
 
 cpu_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
@@ -101,6 +101,16 @@ const isr_entry_t isr_entry_points[128] = {
 };
 
 extern void isr_entry_0xC0(void);
+
+void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler)
+{
+    irq_dispatcher_vec = handler;
+}
+
+void *irq_dispatcher(int irq, isr_context_t *ctx)
+{
+    return irq_dispatcher_vec(irq, ctx);
+}
 
 static void load_idtr(table_register_64_t *table_reg)
 {

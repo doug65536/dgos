@@ -239,9 +239,13 @@ typedef struct isr_start_context_t {
     isr_ret_frame_t ret;
 } isr_start_context_t;
 
-// Handle EOI and invoke irq handler
-extern void *(*irq_dispatcher)(
+typedef void *(*irq_dispatcher_handler_t)(
         int intr, isr_context_t *ctx);
+
+void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler);
+
+// Handle EOI and invoke irq handler
+void *irq_dispatcher(int intr, isr_context_t *ctx);
 
 void *isr_handler(isr_context_t *ctx);
 

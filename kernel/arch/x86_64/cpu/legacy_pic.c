@@ -195,9 +195,9 @@ static void pic8259_unhook(int intr, intr_handler_t handler)
 void pic8259_enable(void)
 {
     pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
-    irq_dispatcher = pic8259_dispatcher;
-    irq_setmask = pic8259_setmask;
-    irq_hook = pic8259_hook;
-    irq_unhook = pic8259_unhook;
+    irq_dispatcher_set_handler(pic8259_dispatcher);
+    irq_setmask_set_handler(pic8259_setmask);
+    irq_hook_set_handler(pic8259_hook);
+    irq_unhook_set_handler(pic8259_unhook);
     cpu_irq_enable();
 }
