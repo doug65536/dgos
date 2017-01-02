@@ -164,8 +164,8 @@ static uint32_t pit8254_usleep(uint16_t microsec)
 
 void pit8254_enable(void)
 {
-    time_ms = pit8254_time_ms;
-    usleep = pit8254_usleep;
+    time_ms_set_handler(pit8254_time_ms);
+    usleep_set_handler(pit8254_usleep);
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);
