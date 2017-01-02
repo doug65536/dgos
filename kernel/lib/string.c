@@ -1,15 +1,16 @@
 #define __NO_STRING_BUILTIN
 #include "string.h"
 #undef __NO_STRING_BUILTIN
+#include "export.h"
 
-size_t strlen(char const *src)
+EXPORT size_t strlen(char const *src)
 {
     size_t len = 0;
     for ( ; src[len]; ++len);
     return len;
 }
 
-void *memchr(void const *mem, int ch, size_t count)
+EXPORT void *memchr(void const *mem, int ch, size_t count)
 {
     for (char const *p = mem; count--; ++p)
         if (*p == (char)ch)
@@ -19,7 +20,7 @@ void *memchr(void const *mem, int ch, size_t count)
 
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-char *strchr(char const *s, int ch)
+EXPORT char *strchr(char const *s, int ch)
 {
     for (;; ++s) {
         char c = *s;
@@ -30,7 +31,7 @@ char *strchr(char const *s, int ch)
     }
 }
 
-int strcmp(char const *lhs, char const *rhs)
+EXPORT int strcmp(char const *lhs, char const *rhs)
 {
     int cmp = 0;
     do {
@@ -40,7 +41,7 @@ int strcmp(char const *lhs, char const *rhs)
     return cmp;
 }
 
-int strncmp(char const *lhs, char const *rhs, size_t count)
+EXPORT int strncmp(char const *lhs, char const *rhs, size_t count)
 {
     unsigned char cmp = 0;
     if (count) {
@@ -52,7 +53,7 @@ int strncmp(char const *lhs, char const *rhs, size_t count)
     return cmp;
 }
 
-int memcmp(void const *lhs, void const *rhs, size_t count)
+EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
 {
     unsigned char const *lp = lhs;
     unsigned char const *rp = rhs;
@@ -65,7 +66,7 @@ int memcmp(void const *lhs, void const *rhs, size_t count)
     return cmp;
 }
 
-char *strstr(char const *str, char const *substr)
+EXPORT char *strstr(char const *str, char const *substr)
 {
     // If substr is empty string, return str
     if (*substr == 0)
@@ -90,7 +91,7 @@ char *strstr(char const *str, char const *substr)
 }
 
 // Returns a pointer to after the last byte written!
-void *aligned16_memset(void *dest, int c, size_t n)
+EXPORT void *aligned16_memset(void *dest, int c, size_t n)
 {
 #ifdef __OPTIMIZE__
     char cc = (char)c;
@@ -109,7 +110,7 @@ void *aligned16_memset(void *dest, int c, size_t n)
 #endif
 }
 
-void *memset(void *dest, int c, size_t n)
+EXPORT void *memset(void *dest, int c, size_t n)
 {
     char *p = dest;
 #if defined(__GNUC__) && defined(__OPTIMIZE__)
@@ -129,7 +130,7 @@ void *memset(void *dest, int c, size_t n)
     return dest;
 }
 
-void *memcpy(void *dest, void const *src, size_t n)
+EXPORT void *memcpy(void *dest, void const *src, size_t n)
 {
     char *d;
     char const *s;
@@ -162,7 +163,7 @@ void *memcpy(void *dest, void const *src, size_t n)
     return dest;
 }
 
-void *memmove(void *dest, void const *src, size_t n)
+EXPORT void *memmove(void *dest, void const *src, size_t n)
 {
     char *d = dest;
     char const *s = src;
@@ -180,20 +181,20 @@ void *memmove(void *dest, void const *src, size_t n)
     return dest;
 }
 
-char *strcpy(char *dest, char const *src)
+EXPORT char *strcpy(char *dest, char const *src)
 {
     char *d = dest;
     while ((*d++ = *src++) != 0);
     return dest;
 }
 
-char *strcat(char *dest, char const *src)
+EXPORT char *strcat(char *dest, char const *src)
 {
     strcpy(dest + strlen(dest), src);
     return dest;
 }
 
-char *strncpy(char *dest, char const *src, size_t n)
+EXPORT char *strncpy(char *dest, char const *src, size_t n)
 {
     char *d = dest;
 
@@ -218,7 +219,7 @@ char *strncpy(char *dest, char const *src, size_t n)
 // behavior is undefined if either dest is not a pointer
 // to a null-terminated byte string or src is not a
 // pointer to a character array.
-char *strncat(char *dest, char const *src, size_t n)
+EXPORT char *strncat(char *dest, char const *src, size_t n)
 {
     return strncpy(dest + strlen(dest), src, n);
 }
@@ -228,7 +229,7 @@ char *strncat(char *dest, char const *src, size_t n)
 // would have wrote to out, not including null terminator
 // Returns 0 for values outside 0 <= in < 0x101000 range
 // Always writes null terminator if out is not null
-int ucs4_to_utf8(char *out, int in)
+EXPORT int ucs4_to_utf8(char *out, int in)
 {
     int len;
     if (in >= 0 && in < 0x80) {
@@ -265,7 +266,7 @@ int ucs4_to_utf8(char *out, int in)
 // Returns -1 on error
 // If ret_end is not null, pointer to first
 // byte after encoded character to *ret_end
-int utf8_to_ucs4(char *in, char **ret_end)
+EXPORT int utf8_to_ucs4(char *in, char **ret_end)
 {
     int n;
 
