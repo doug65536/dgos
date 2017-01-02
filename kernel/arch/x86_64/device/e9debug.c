@@ -11,7 +11,7 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
     spinlock_hold_t hold;
     int n = 0;
     hold = spinlock_lock_noirq(&e9debug_lock);
-    if (len) {
+    if (len && str) {
         outsb(0xE9, str, len);
     } else {
         while (*str) {
@@ -25,5 +25,5 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
 
 void e9debug_init(void)
 {
-    write_debug_str = e9debug_write_debug_str;
+    write_debug_str_set_handler(e9debug_write_debug_str);
 }
