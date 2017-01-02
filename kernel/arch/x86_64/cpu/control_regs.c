@@ -264,3 +264,12 @@ void cpu_crash(void)
     );
 }
 
+uint64_t cpu_rdtsc(void)
+{
+    uint64_t tsc;
+    __asm__ __volatile__ (
+        "rdtsc\n\t"
+        : "=A" (tsc)
+    );
+    return tsc;
+}

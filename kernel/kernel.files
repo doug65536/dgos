@@ -115,3 +115,4 @@ fs/fat32.h
 lib/export.h
 lib/rand.h
 lib/rand.c
+arch/x86_64/nano_time.c

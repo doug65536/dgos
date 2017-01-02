@@ -148,3 +148,5 @@ void cpu_irq_toggle(int enable);
 
 void *cpu_get_stack_ptr(void);
 void cpu_crash(void);
+
+uint64_t cpu_rdtsc(void);

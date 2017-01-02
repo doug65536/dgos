@@ -8,6 +8,7 @@ DEVOBJS := $(DEVSRCS:.c=.o)
 
 CSRCS := \
 	bios_data.c \
+	nano_time.c \
 	cpu/cpu.c \
 	cpu/apic.c \
 	cpu/cmos.c \
