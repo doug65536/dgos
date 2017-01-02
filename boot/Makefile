@@ -278,7 +278,8 @@ run-debug-wait-singlecpu: all debuggable-kernel-disk
 		-net nic,model=ne2k_pci \
 		-net nic,model=e1000
 
-#,guest_errors,unimp -enable-kvm
+monitor-debug-output:
+	while true; do cat dump/qemu-debug-out; done
 
 run: all bootable-disk
 	$(QEMU) -m 5G -drive file=$(DISKIMAGE),format=raw \
