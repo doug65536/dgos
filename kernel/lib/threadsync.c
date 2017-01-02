@@ -4,6 +4,7 @@
 #include "cpu/atomic.h"
 #include "printk.h"
 #include "time.h"
+#include "export.h"
 
 #define DEBUG_MUTEX 0
 #if DEBUG_MUTEX
@@ -48,7 +49,7 @@ static thread_wait_link_t volatile *thread_wait_del(
     return next;
 }
 
-void mutex_init(mutex_t *mutex)
+EXPORT void mutex_init(mutex_t *mutex)
 {
     mutex->owner = -1;
     mutex->lock = 0;
@@ -57,7 +58,7 @@ void mutex_init(mutex_t *mutex)
     mutex->link.prev = &mutex->link;
 }
 
-void mutex_lock(mutex_t *mutex)
+EXPORT void mutex_lock(mutex_t *mutex)
 {
     for (int spin = 0; spin < mutex->spin_count &&
          mutex->owner >= 0; ++spin)
@@ -106,7 +107,7 @@ void mutex_lock(mutex_t *mutex)
     spinlock_unlock_noirq(&mutex->lock, &hold);
 }
 
-void mutex_unlock(mutex_t *mutex)
+EXPORT void mutex_unlock(mutex_t *mutex)
 {
     spinlock_hold_t hold;
     hold = spinlock_lock_noirq(&mutex->lock);
@@ -131,7 +132,7 @@ void mutex_unlock(mutex_t *mutex)
     }
 }
 
-void mutex_lock_noyield(mutex_t *mutex)
+EXPORT void mutex_lock_noyield(mutex_t *mutex)
 {
     spinlock_hold_t hold;
     for (int done = 0; ; pause()) {
@@ -152,12 +153,12 @@ void mutex_lock_noyield(mutex_t *mutex)
     }
 }
 
-void mutex_destroy(mutex_t *mutex)
+EXPORT void mutex_destroy(mutex_t *mutex)
 {
     assert(mutex->link.next == mutex->link.prev);
 }
 
-void condvar_init(condition_var_t *var)
+EXPORT void condvar_init(condition_var_t *var)
 {
     var->lock = 0;
     var->link.next = &var->link;
@@ -165,7 +166,7 @@ void condvar_init(condition_var_t *var)
     atomic_barrier();
 }
 
-void condvar_destroy(condition_var_t *var)
+EXPORT void condvar_destroy(condition_var_t *var)
 {
     if (var->link.prev != &var->link) {
         spinlock_hold_t hold = spinlock_lock_noirq(&var->lock);
@@ -177,7 +178,7 @@ void condvar_destroy(condition_var_t *var)
     assert(var->link.prev == &var->link);
 }
 
-void condvar_wait(condition_var_t *var, mutex_t *mutex)
+EXPORT void condvar_wait(condition_var_t *var, mutex_t *mutex)
 {
     assert(mutex->owner >= 0);
 
@@ -199,7 +200,7 @@ void condvar_wait(condition_var_t *var, mutex_t *mutex)
     spinlock_unlock_noirq(&var->lock, &hold);
 }
 
-void condvar_wake_one(condition_var_t *var)
+EXPORT void condvar_wake_one(condition_var_t *var)
 {
     spinlock_hold_t hold;
     hold = spinlock_lock_noirq(&var->lock);
@@ -217,7 +218,7 @@ void condvar_wake_one(condition_var_t *var)
     spinlock_unlock_noirq(&var->lock, &hold);
 }
 
-void condvar_wake_all(condition_var_t *var)
+EXPORT void condvar_wake_all(condition_var_t *var)
 {
     spinlock_hold_t hold;
     hold = spinlock_lock_noirq(&var->lock);

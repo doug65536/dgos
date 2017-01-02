@@ -17,6 +17,7 @@
 #include "mm.h"
 #include "time.h"
 #include "threadsync.h"
+#include "export.h"
 
 #include "printk.h"
 
@@ -94,7 +95,7 @@ struct thread_info_t {
 C_ASSERT(sizeof(thread_info_t) == 128);
 
 // Store in a big array, for now
-#define MAX_THREADS 64
+#define MAX_THREADS 512
 static thread_info_t threads[MAX_THREADS];
 static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
@@ -140,7 +141,7 @@ static thread_info_t *this_thread(void)
     return cpu->cur_thread;
 }
 
-void thread_yield(void)
+EXPORT void thread_yield(void)
 {
 #if 1
     __asm__ __volatile__ (
@@ -299,7 +300,7 @@ static thread_t thread_create_with_state(
     }
 }
 
-thread_t thread_create(thread_fn_t fn, void *userdata,
+EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
                        void *stack,
                        size_t stack_size)
 {
@@ -554,7 +555,7 @@ void *thread_schedule(void *ctx)
     return ctx;
 }
 
-void thread_sleep_until(uint64_t expiry)
+EXPORT void thread_sleep_until(uint64_t expiry)
 {
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
@@ -566,7 +567,7 @@ void thread_sleep_until(uint64_t expiry)
     thread_yield();
 }
 
-void thread_sleep_for(uint64_t ms)
+EXPORT void thread_sleep_for(uint64_t ms)
 {
     thread_sleep_until(time_ms() + ms);
 }
@@ -587,7 +588,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     spinlock_lock(lock);
 }
 
-void thread_resume(thread_t thread)
+EXPORT void thread_resume(thread_t thread)
 {
     // Wait for it to reach suspended state in case of race
     int wait_count = 0;
@@ -604,7 +605,7 @@ void thread_resume(thread_t thread)
     threads[thread].state = THREAD_IS_READY;
 }
 
-int thread_wait(thread_t thread_id)
+EXPORT int thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
     mutex_lock(&thread->lock);
@@ -636,7 +637,7 @@ void thread_set_cpu_mmu_seq(uint64_t seq)
     cpu->mmu_seq = seq;
 }
 
-thread_t thread_get_id(void)
+EXPORT thread_t thread_get_id(void)
 {
     thread_t thread_id;
 
@@ -650,12 +651,12 @@ thread_t thread_get_id(void)
     return thread_id;
 }
 
-uint64_t thread_get_affinity(int id)
+EXPORT uint64_t thread_get_affinity(int id)
 {
     return threads[id].cpu_affinity;
 }
 
-void thread_set_affinity(int id, uint64_t affinity)
+EXPORT void thread_set_affinity(int id, uint64_t affinity)
 {
     cpu_info_t *cpu = this_cpu();
     size_t cpu_number = cpu - cpus;
@@ -670,12 +671,13 @@ void thread_set_affinity(int id, uint64_t affinity)
     }
 }
 
-thread_priority_t thread_get_priority(thread_t thread_id)
+EXPORT thread_priority_t thread_get_priority(thread_t thread_id)
 {
     return threads[thread_id].priority;
 }
 
-void thread_set_priority(thread_t thread_id, thread_priority_t priority)
+EXPORT void thread_set_priority(thread_t thread_id,
+                                thread_priority_t priority)
 {
     threads[thread_id].priority = priority;
 }
