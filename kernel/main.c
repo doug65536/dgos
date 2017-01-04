@@ -69,8 +69,10 @@ static int read_stress(void *p)
 
     storage_dev_base_t *drive = open_storage_dev(0);
 
+    // FIXME: lock the pages in the driver instead of
+    // requiring MAP_POPULATE
     char *data = mmap(0, 65536, PROT_READ | PROT_WRITE,
-                      0, -1, 0);
+                      MAP_POPULATE, -1, 0);
 
     printk("read buffer at %lx\n", (uint64_t)data);
 

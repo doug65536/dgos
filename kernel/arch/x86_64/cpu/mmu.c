@@ -14,6 +14,8 @@
 #include "assert.h"
 #include "cpuid.h"
 #include "thread_impl.h"
+#include "threadsync.h"
+#include "rbtree.h"
 
 // Intel manual, page 2786
 
@@ -45,7 +47,7 @@
 
 // Always ignored areas 11:9 58:52
 #define PTE_AVAIL1_BIT      9
-#define PTE_AVAIL2_BIT      51
+#define PTE_AVAIL2_BIT      52
 
 // Assigned usage of available bits
 #define PTE_EX_PHYSICAL_BIT (PTE_AVAIL1_BIT+0)
@@ -53,7 +55,7 @@
 
 // Size of multi-bit fields
 #define PTE_PK_BITS         4
-#define PTE_ADDR_BITS       28
+#define PTE_ADDR_BITS       40
 #define PTE_AVAIL1_BITS     3
 #define PTE_AVAIL2_BITS     7
 
@@ -129,7 +131,7 @@
 // Page table entries don't have a structure, they
 // are a bunch of bitfields. Use uint64_t and the
 // constants above
-typedef uint64_t pte_t;
+typedef uintptr_t pte_t;
 
 typedef uintptr_t physaddr_t;
 typedef uintptr_t linaddr_t;
@@ -147,15 +149,14 @@ typedef uintptr_t linaddr_t;
 //  0x7f8000000000
 
 // Linear addresses
-#define PT_KBASEADDR   (0x7F8000000000UL)
-#define PT_UBASEADDR   (0x7F0000000000UL)
+#define PT_BASEADDR   (0x7F0000000000UL)
 #define PT_MAX_ADDR    (0x800000000000UL)
 
 // The number of pte_t entries at each level
-#define PT3_ENTRIES     (0x400000000UL)
-#define PT2_ENTRIES     (0x2000000UL)
-#define PT1_ENTRIES     (0x10000UL)
-#define PT0_ENTRIES     (0x80UL)
+#define PT3_ENTRIES     (0x800000000UL)
+#define PT2_ENTRIES     (0x4000000UL)
+#define PT1_ENTRIES     (0x20000UL)
+#define PT0_ENTRIES     (0x100UL)
 
 // The array index of the start of each level
 #define PT3_BASE        (0)
@@ -168,20 +169,6 @@ typedef uintptr_t linaddr_t;
 #define PT2_PTR(base)   (PT3_PTR(base) + PT2_BASE)
 #define PT1_PTR(base)   (PT3_PTR(base) + PT1_BASE)
 #define PT0_PTR(base)   (PT3_PTR(base) + PT0_BASE)
-
-//static pte_t * const ptk_base[4] = {
-//    PT0_PTR(PT_KBASEADDR),
-//    PT1_PTR(PT_KBASEADDR),
-//    PT2_PTR(PT_KBASEADDR),
-//    PT3_PTR(PT_KBASEADDR)
-//};
-
-//static pte_t * const ptu_base[4] = {
-//    PT0_PTR(PT_UBASEADDR),
-//    PT1_PTR(PT_UBASEADDR),
-//    PT2_PTR(PT_UBASEADDR),
-//    PT3_PTR(PT_UBASEADDR)
-//};
 
 /// Physical page allocation map
 /// Consists of array of entries, one per physical page
@@ -207,7 +194,6 @@ physaddr_t root_physaddr;
 // Bitmask of available aliasing ptes (top one taken already)
 static uint64_t volatile apte_map = 0x8000000000000000UL;
 
-
 unsigned *phys_alloc;
 unsigned phys_alloc_count;
 
@@ -223,6 +209,10 @@ static uint32_t volatile phys_next_free_low;
 // Incremented every time the page tables are changed
 // Used to detect lazy TLB shootdown
 static uint64_t volatile mmu_seq;
+
+// Free address space management
+//static mutex_t free_addr_lock;
+//static rbtree_t *free_addr;
 
 static void mmu_free_phys(physaddr_t addr)
 {
@@ -268,7 +258,7 @@ static physaddr_t mmu_alloc_phys(int low)
 
         if (cur_next == index) {
             phys_alloc[index] = 0;
-            return ((physaddr_t)index << PAGE_SIZE_BIT) + 0x100000;
+            return (((physaddr_t)index) << PAGE_SIZE_BIT) + 0x100000;
         }
 
         index = cur_next;
@@ -299,25 +289,23 @@ static void path_inc(unsigned *path)
 
     ++n;
 
-    path[0] = (unsigned)(n >> (9 * 3)) & 511;
-    path[1] = (unsigned)(n >> (9 * 2)) & 511;
-    path[2] = (unsigned)(n >> (9 * 1)) & 511;
-    path[3] = (unsigned)n & 511;
+    path[0] = (unsigned)(n >> (9 * 3)) & 0x1FF;
+    path[1] = (unsigned)(n >> (9 * 2)) & 0x1FF;
+    path[2] = (unsigned)(n >> (9 * 1)) & 0x1FF;
+    path[3] = (unsigned)n & 0x1FF;
 }
 
 // Returns the linear addresses of the page tables for
 // the given path
 static void pte_from_path(pte_t **pte, unsigned *path)
 {
-    linaddr_t base = path[0] >= 0x80
-            ? PT_KBASEADDR
-            : PT_UBASEADDR;
+    linaddr_t base = PT_BASEADDR;
 
     uint64_t page_index =
-            ((uint64_t)(path[0]) << (9 * 3)) +
-            ((uint64_t)path[1] << (9 * 2)) +
-            ((uint64_t)path[2] << (9 * 1)) +
-            ((uint64_t)path[3] << (9 * 0));
+            (((uint64_t)path[0]) << (9 * 3)) +
+            (((uint64_t)path[1]) << (9 * 2)) +
+            (((uint64_t)path[2]) << (9 * 1)) +
+            (((uint64_t)path[3]) << (9 * 0));
 
     uint64_t indices[4];
 
@@ -347,13 +335,6 @@ static int mmu_path_present(unsigned *path, pte_t **optional_pte_ret)
             (*optional_pte_ret[3] & PTE_PRESENT);
 }
 
-//static int mmu_linaddr_present(linaddr_t addr, pte_t **optional_pte_ret)
-//{
-//    unsigned path[4];
-//    path_from_addr(path, addr);
-//    return mmu_path_present(path, optional_pte_ret);
-//}
-
 //
 // Aliasing page allocator
 
@@ -378,7 +359,7 @@ static pte_t *take_apte(physaddr_t address)
 
                 linaddr_t linaddr = 0x800000000000UL -
                         (64 << PAGE_SIZE_BIT) +
-                        (first_available << PAGE_SIZE_BIT);
+                        (((linaddr_t)first_available) << PAGE_SIZE_BIT);
 
                 // Locate pte
                 unsigned path[4];
@@ -421,10 +402,10 @@ static pte_t *take_apte(physaddr_t address)
 static void release_apte(pte_t *address)
 {
     int bit;
-    if (address >= PT3_PTR(PT_KBASEADDR) + PT3_ENTRIES - 64 &&
-            address < PT3_PTR(PT_KBASEADDR) + PT3_ENTRIES) {
+    if (address >= PT3_PTR(PT_BASEADDR) + PT3_ENTRIES - 64 &&
+            address < PT3_PTR(PT_BASEADDR) + PT3_ENTRIES) {
         // Address refers to a page table entry
-        bit = address - (PT3_PTR(PT_KBASEADDR) + PT3_ENTRIES - 64);
+        bit = address - (PT3_PTR(PT_BASEADDR) + PT3_ENTRIES - 64);
     } else {
         // Address refers to a mapped page table entry
         bit = 64 - ((PT_MAX_ADDR - (linaddr_t)address) >> PAGE_SIZE_BIT);
@@ -664,9 +645,9 @@ static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 {
     uint64_t linaddr;
 
-    if ((linaddr_t)aliasing_pte >= PT_UBASEADDR) {
-        uint64_t pt3_index = aliasing_pte - PT3_PTR(PT_KBASEADDR);
-        linaddr = 0x400000000000 + (pt3_index << PAGE_SIZE_BIT);
+    if ((linaddr_t)aliasing_pte >= PT_BASEADDR) {
+        uint64_t pt3_index = aliasing_pte - PT3_PTR(PT_BASEADDR);
+        linaddr = (pt3_index << PAGE_SIZE_BIT);
     } else {
         linaddr = 0x800000000000 - PAGE_SIZE;
     }
@@ -697,8 +678,6 @@ static void init_create_pt(
         physaddr_t *pt_physaddr,
         pte_t page_flags)
 {
-    //printk("Creating page table for %lx...", linear_addr);
-
     // Path to page table entry as page indices
     unsigned path[4];
     path_from_addr(path, linear_addr);
@@ -720,22 +699,25 @@ static void init_create_pt(
 
         if (!addr) {
             // Allocate a new page table
-            addr = init_take_page(1);
+            addr = init_take_page(0);
 
             // Atomically update current page table to point to new page
             old_pte = atomic_cmpxchg(iter + path[level],
-                                     0, addr | page_flags);
+                                     0, addr | page_flags | PTE_PRESENT);
             if (old_pte == 0) {
                 // Map aliasing page to point to new page
                 iter = init_map_aliasing_pte(aliasing_pte, addr);
 
                 // Clear new page
-                //aligned16_memset((void*)iter, 0, PAGE_SIZE);
+                aligned16_memset((void*)iter, 0, PAGE_SIZE);
             } else {
-                addr = old_pte & PTE_ADDR;
-
                 // Return page to pool
                 mmu_free_phys(addr);
+
+                addr = old_pte & PTE_ADDR;
+
+                // Descend into next page table
+                iter = init_map_aliasing_pte(aliasing_pte, addr);
             }
         } else {
             // Descend into next page table
@@ -759,7 +741,6 @@ static void mmu_map_page(
 {
     // Read root physical address from page tables
     physaddr_t root_physaddr = cpu_get_page_directory();
-    //*PT0_PTR(PT_KBASEADDR) & PTE_ADDR;
 
     // Get a free aliasing PTE
     pte_t *aliasing_pte = take_apte(~0UL);
@@ -785,6 +766,17 @@ static void mmu_map_page(
     }
 
     release_apte(aliasing_pte);
+}
+
+static int path_present(unsigned *path, pte_t **ptes, uintptr_t addr)
+{
+    path_from_addr(path, addr);
+    pte_from_path(ptes, path);
+
+    return (*ptes[0] & PTE_PRESENT) |
+            ((*ptes[1] & PTE_PRESENT) << 1) |
+            ((*ptes[2] & PTE_PRESENT) << 2) |
+            ((*ptes[3] & PTE_PRESENT) << 3);
 }
 
 // TLB shootdown IPI
@@ -817,11 +809,39 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     // Unused
     (void)intr;
 
-    uint64_t fault_addr = cpu_get_fault_address();
+    uintptr_t fault_addr = cpu_get_fault_address();
+
+    unsigned path[4];
+    pte_t *ptes[4];
+
+    int present_mask = path_present(path, ptes, fault_addr);
 
     // Check for lazy TLB shootdown
-    if (mpresent(fault_addr) && thread_get_cpu_mmu_seq() != mmu_seq)
+    if (present_mask == 0x0F && thread_get_cpu_mmu_seq() != mmu_seq)
         return mmu_lazy_tlb_shootdown(ctx);
+
+    // If the page table exists
+    if (present_mask == 0x07) {
+        // If it is lazy allocated
+        if ((*ptes[3] & PTE_ADDR) == PTE_ADDR) {
+            // Allocate a page
+            physaddr_t page = init_take_page(0);
+
+            // Update PTE
+            *ptes[3] = (*ptes[3] & ~PTE_ADDR) |
+                    (page & PTE_ADDR) |
+                    PTE_PRESENT;
+
+            cpu_invalidate_page(fault_addr);
+
+            // Restart instruction
+            return ctx;
+        } else {
+            assert(!"Invalid page fault");
+        }
+    } else {
+        assert(!"Invalid page fault path");
+    }
 
     return 0;
 }
@@ -892,7 +912,7 @@ void mmu_init(int ap)
     // Create the new root
 
     // Get a page
-    root_physaddr = init_take_page(1);
+    root_physaddr = init_take_page(0);
 
     // Map page
     pte_t *root = init_map_aliasing_pte(aliasing_pte, root_physaddr);
@@ -901,7 +921,7 @@ void mmu_init(int ap)
     aligned16_memset(root, 0, PAGE_SIZE);
 
     init_create_pt(root_physaddr, aliasing_pte,
-                   (linaddr_t)PT0_PTR(PT_KBASEADDR),
+                   (linaddr_t)PT0_PTR(PT_BASEADDR),
                    root_physaddr,
                    0,
                    PTE_PRESENT | PTE_WRITABLE);
@@ -981,12 +1001,12 @@ void mmu_init(int ap)
     cpu_set_page_directory(root_physaddr);
 
     // Make zero page not present to catch null pointers
-    *PT3_PTR(PT_UBASEADDR) = 0;
+    *PT3_PTR(PT_BASEADDR) = 0;
     cpu_invalidate_page(0);
 
     phys_alloc_count = highest_usable;
     phys_alloc = mmap(0, phys_alloc_count * sizeof(unsigned),
-         PROT_READ | PROT_WRITE, 0, -1, 0);
+         PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
 
     printk("Building physical memory free list\n");
 
@@ -1018,7 +1038,7 @@ void mmu_init(int ap)
            free_count,
            free_count >> (20 - PAGE_SIZE_BIT));
 
-    intr_hook(14, mmu_page_fault_handler);
+    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler);
 
     callout_call('M');
 }
@@ -1071,15 +1091,8 @@ static int mmu_have_nx(void)
 int mpresent(uintptr_t addr)
 {
     unsigned path[4];
-    path_from_addr(path, addr);
-
     pte_t *ptes[4];
-    pte_from_path(ptes, path);
-
-    return (*ptes[0] & PTE_PRESENT) &&
-            (*ptes[1] && PTE_PRESENT) &&
-            (*ptes[2] && PTE_PRESENT) &&
-            (*ptes[3] && PTE_PRESENT);
+    return path_present(path, ptes, addr);
 }
 
 void *mmap(
@@ -1094,19 +1107,22 @@ void *mmap(
     if (fd != -1 || offset != 0 || !len)
         return 0;
 
-    pte_t page_flags = PTE_PRESENT;
-
-    if (prot & PROT_WRITE)
-        page_flags |= PTE_WRITABLE;
+    pte_t page_flags = 0;
 
     if (flags & MAP_PHYSICAL)
-        page_flags |= PTE_PCD | PTE_PWT | PTE_EX_PHYSICAL;
+        page_flags |= PTE_PCD | PTE_PWT | PTE_EX_PHYSICAL | PTE_PRESENT;
 
     if (flags & MAP_NOCACHE)
         page_flags |= PTE_PCD;
 
     if (flags & MAP_WRITETHRU)
         page_flags |= PTE_PWT;
+
+    if (flags & MAP_POPULATE)
+        page_flags |= PTE_PRESENT;
+
+    if (prot & PROT_WRITE)
+        page_flags |= PTE_WRITABLE;
 
     if (!(prot & PROT_EXEC) && mmu_have_nx())
         page_flags |= PTE_NX;
@@ -1124,7 +1140,14 @@ void *mmap(
     {
         if (likely(!(flags & MAP_PHYSICAL))) {
             // Allocate normal memory
-            physaddr_t page = init_take_page(!!(flags & MAP_32BIT));
+
+            // Not present pages with max physaddr are demand committed
+            physaddr_t page = PTE_ADDR;
+
+            // If populating, assign physical memory immediately
+            if (flags & MAP_POPULATE)
+                page = init_take_page(!!(flags & MAP_32BIT));
+
             mmu_map_page(linear_addr + ofs, page, page_flags);
         } else {
             // addr is a physical address, caller uses
@@ -1157,11 +1180,40 @@ void *mremap(
         va_end(ap);
     }
 
-    /// FIXME: unfinished
-    (void)old_address;
-    (void)old_size;
-    (void)new_size;
-    (void)new_address;
+    old_size = round_up(old_size);
+    new_size = round_up(new_size);
+
+    // Convert pointer to address
+    uintptr_t old_st = (uintptr_t)old_address;
+
+    if (new_size < old_size) {
+        //
+        // Got smaller
+
+        uintptr_t freed_size = old_size - new_size;
+
+        // Release space at the end
+        munmap((void*)(old_st + new_size), freed_size);
+    } else if (new_size > old_size) {
+        //
+        // Got bigger
+
+        linaddr_t new_linear;
+
+        new_linear = take_linear(new_size);
+
+        unsigned path[4];
+        path_from_addr(path, new_linear);
+
+        pte_t *new_pte[4];
+        pte_from_path(new_pte, path);
+
+        pte_t *old_pte[4];
+        path_from_addr(path, old_st);
+        pte_from_path(old_pte, path);
+
+        // FIXME: Move PTEs...
+    }
 
     return 0;
 }
