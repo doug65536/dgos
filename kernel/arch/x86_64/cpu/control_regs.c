@@ -266,10 +266,11 @@ void cpu_crash(void)
 
 uint64_t cpu_rdtsc(void)
 {
-    uint64_t tsc;
+    uint32_t tsc_lo;
+    uint32_t tsc_hi;
     __asm__ __volatile__ (
         "rdtsc\n\t"
-        : "=A" (tsc)
+        : "=a" (tsc_lo), "=d" (tsc_hi)
     );
-    return tsc;
+    return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
