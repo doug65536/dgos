@@ -214,6 +214,8 @@ static uint64_t volatile mmu_seq;
 //static mutex_t free_addr_lock;
 //static rbtree_t *free_addr;
 
+static uint64_t volatile page_fault_count;
+
 static void mmu_free_phys(physaddr_t addr)
 {
     uint32_t volatile *chain = (addr >= 0x100000000L)
@@ -809,7 +811,11 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     // Unused
     (void)intr;
 
+    atomic_inc_uint64(&page_fault_count);
+
     uintptr_t fault_addr = cpu_get_fault_address();
+
+    printdbg("Page fault at %lx\n", fault_addr);
 
     unsigned path[4];
     pte_t *ptes[4];
