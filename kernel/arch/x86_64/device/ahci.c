@@ -1075,14 +1075,16 @@ typedef struct hba_prdt_ent_t {
 // Makes command table entry 1KB
 #define AHCI_CMD_TBL_ENT_MAX_PRD 56
 
+typedef union hba_cmd_cfis_t {
+    ahci_fis_d2h_t d2h;
+    ahci_fis_h2d_t h2d;
+    ahci_fis_ncq_t ncq;
+    char filler[64];
+} hba_cmd_cfis_t;
+
 // 4.2.3 1KB command
 typedef struct hba_cmd_tbl_ent_t {
-    union {
-        ahci_fis_d2h_t d2h;
-        ahci_fis_h2d_t h2d;
-        ahci_fis_ncq_t ncq;
-        char filler[64];
-    } cfis;
+    hba_cmd_cfis_t cfis;
     char atapi_fis[16];
     char filler[0x80-0x50];
 
@@ -1100,9 +1102,9 @@ typedef struct async_callback_t {
 } async_callback_t;
 
 typedef struct hba_port_info_t {
-    hba_fis_t volatile *fis;
-    hba_cmd_hdr_t volatile *cmd_hdr;
-    hba_cmd_tbl_ent_t volatile *cmd_tbl;
+    hba_fis_t *fis;
+    hba_cmd_hdr_t *cmd_hdr;
+    hba_cmd_tbl_ent_t *cmd_tbl;
     async_callback_t callbacks[32];
     uint32_t sector_size;
     uint32_t volatile cmd_issued;
@@ -1112,13 +1114,16 @@ typedef struct hba_port_info_t {
     uint8_t issue_queue[32];
     uint8_t issue_head;
     uint8_t issue_tail;
+
+    mutex_t slotalloc_lock;
+    condition_var_t slotalloc_avail;
 } hba_port_info_t;
 
 #define AHCI_PE_INTR_BIT    31
 #define AHCI_PE_DBC_BIT     1
-#define AHCI_PE_DBC_n(n)    ((n) | 1)
+#define AHCI_PE_DBC_n(n)    ((n)-1)
 
-// Drive interface
+// AHCI interface instance
 struct ahci_if_t {
     storage_if_vtbl_t *vtbl;
 
@@ -1135,6 +1140,7 @@ struct ahci_if_t {
     int ports_impl;
     int num_cmd_slots;
     int use_ncq;
+    int use_64;
 };
 
 // Drive
@@ -1164,12 +1170,12 @@ static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
 
     hba_port_info_t *pi = dev->port_info + port_num;
 
+    mutex_lock_noyield(&pi->slotalloc_lock);
+
     // Make sure it was really acquired
     assert(pi->cmd_issued & (1U<<slot));
 
-    if (dev->use_ncq) {
-
-    } else {
+    if (!dev->use_ncq) {
         // Make sure this was really the oldest command
         assert(pi->issue_queue[pi->issue_tail] == slot);
         // Advance queue tail
@@ -1178,6 +1184,9 @@ static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
 
     // Mark slot as not in use
     atomic_and_uint32(&pi->cmd_issued, ~(1U<<slot));
+
+    mutex_unlock(&pi->slotalloc_lock);
+    condvar_wake_one(&pi->slotalloc_avail);
 }
 
 // Acquire slot that is not in use
@@ -1186,7 +1195,6 @@ static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
 static int ahci_acquire_slot(ahci_if_t *dev, int port_num)
 {
     hba_port_info_t *pi = dev->port_info + port_num;
-    //hba_port_t volatile *port = dev->mmio_base->ports + port_num;
 
     for (;;) {
         // Build bitmask of slots in use
@@ -1354,80 +1362,24 @@ static void ahci_port_start_all(ahci_if_t *dev)
     }
 }
 
-static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
-                      void *data, uint32_t count, int is_read,
-                      void (*callback)(int error, uintptr_t arg),
-                      uintptr_t callback_arg)
+static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
+                           hba_cmd_cfis_t *cfis, size_t fis_size,
+                           hba_prdt_ent_t *prdts, size_t ranges_count,
+                           int is_read,
+                           void (*callback)(int error, uintptr_t arg),
+                           uintptr_t callback_arg)
 {
     hba_port_info_t *pi = dev->port_info + port_num;
     hba_port_t volatile *port = dev->mmio_base->ports + port_num;
 
-    mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
-    size_t ranges_count;
+    hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
+    hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
 
-    spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
+    memcpy(cmd_tbl_ent->prdts, prdts, sizeof(*prdts) * ranges_count);
 
-    int slot;
-    for (;;) {
-        slot = ahci_acquire_slot(dev, port_num);
-        if (slot >= 0)
-            break;
+    memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
 
-        spinlock_unlock_noirq(&pi->lock, &hold);
-        thread_yield();
-        hold = spinlock_lock_noirq(&pi->lock);
-    }
-
-    hba_cmd_hdr_t volatile *cmd_hdr = pi->cmd_hdr + slot;
-    hba_cmd_tbl_ent_t volatile *cmd_tbl_ent = pi->cmd_tbl + slot;
-
-    ranges_count = mphysranges(ranges, countof(ranges),
-                               data, count * pi->sector_size,
-                               2<<20);
-
-    for (size_t i = 0; i < ranges_count; ++i) {
-        cmd_tbl_ent->prdts[i].dba = ranges[i].physaddr;
-        cmd_tbl_ent->prdts[i].dbc_intr = AHCI_PE_DBC_n(ranges[i].size);
-    }
-    atomic_barrier();
-
-    if (dev->use_ncq) {
-        cmd_tbl_ent->cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
-        cmd_tbl_ent->cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
-        cmd_tbl_ent->cfis.ncq.command = is_read
-                ? ATA_CMD_READ_DMA_NCQ
-                : ATA_CMD_WRITE_DMA_NCQ;
-        cmd_tbl_ent->cfis.ncq.lba0 = lba & 0xFFFF;
-        cmd_tbl_ent->cfis.ncq.lba2 = (lba >> 16) & 0xFF;
-        cmd_tbl_ent->cfis.ncq.lba3 = (lba >> 24) & 0xFFFF;
-        cmd_tbl_ent->cfis.ncq.lba5 = (lba >> 40);
-        cmd_tbl_ent->cfis.ncq.count_lo = count & 0xFF;
-        cmd_tbl_ent->cfis.ncq.count_hi = (count >> 8) & 0xFF;
-        cmd_tbl_ent->cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
-        cmd_tbl_ent->cfis.ncq.fua = AHCI_FIS_FUA_LBA |
-                (!is_read ? AHCI_FIS_FUA_FUA : 0);
-        cmd_tbl_ent->cfis.ncq.prio = 0;
-        cmd_tbl_ent->cfis.ncq.aux = 0;
-
-        port->sata_act = (1U<<slot);
-    } else {
-        cmd_tbl_ent->cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
-        cmd_tbl_ent->cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
-        cmd_tbl_ent->cfis.h2d.command = is_read
-                ? ATA_CMD_READ_DMA_EXT
-                : ATA_CMD_WRITE_DMA_EXT;
-        cmd_tbl_ent->cfis.h2d.lba0 = lba & 0xFFFF;
-        cmd_tbl_ent->cfis.h2d.lba2 = (lba >> 16) & 0xFF;
-        cmd_tbl_ent->cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
-        cmd_tbl_ent->cfis.h2d.lba5 = (lba >> 40);
-        cmd_tbl_ent->cfis.h2d.count = count;
-
-        // LBA
-        cmd_tbl_ent->cfis.d2h.device = AHCI_FIS_FUA_LBA;
-    }
-    atomic_barrier();
-
-    cmd_hdr->hdr = AHCI_CH_LEN_n(sizeof(pi->cmd_tbl->cfis.h2d) >> 2) |
+    cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
             (!is_read ? AHCI_CH_WR : 0);
     cmd_hdr->prdbc = 0;
     cmd_hdr->prdtl = ranges_count;
@@ -1436,9 +1388,98 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
     pi->callbacks[slot].callback_arg = callback_arg;
 
     atomic_barrier();
+    spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
+
+    if (dev->use_ncq)
+        port->sata_act = (1U<<slot);
+
+    atomic_barrier();
     port->cmd_issue = (1U<<slot);
 
     spinlock_unlock_noirq(&pi->lock, &hold);
+}
+
+static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
+                      void *data, uint32_t count, int is_read,
+                      void (*callback)(int error, uintptr_t arg),
+                      uintptr_t callback_arg)
+{
+    mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
+    size_t ranges_count;
+
+    hba_port_info_t *pi = dev->port_info + port_num;
+
+    ranges_count = mphysranges(ranges, countof(ranges),
+                               data, count * pi->sector_size,
+                               2<<20);
+
+    hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
+
+    memset(prdts, 0, sizeof(*prdts) * ranges_count);
+    for (size_t i = 0; i < ranges_count; ++i) {
+        prdts[i].dba = ranges[i].physaddr;
+        prdts[i].dbc_intr = AHCI_PE_DBC_n(ranges[i].size);
+    }
+
+    // Wait for a slot
+    mutex_lock(&pi->slotalloc_lock);
+    int slot;
+    for (;;) {
+        slot = ahci_acquire_slot(dev, port_num);
+        if (slot >= 0)
+            break;
+
+        condvar_wait(&pi->slotalloc_avail, &pi->slotalloc_lock);
+    }
+    mutex_unlock(&pi->slotalloc_lock);
+
+    hba_cmd_cfis_t cfis;
+    size_t fis_size;
+
+    memset(&cfis, 0, sizeof(cfis));
+
+    if (dev->use_ncq) {
+        fis_size = sizeof(cfis.ncq);
+
+        cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
+        cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
+        cfis.ncq.command = is_read
+                ? ATA_CMD_READ_DMA_NCQ
+                : ATA_CMD_WRITE_DMA_NCQ;
+        cfis.ncq.lba0 = lba & 0xFFFF;
+        cfis.ncq.lba2 = (lba >> 16) & 0xFF;
+        cfis.ncq.lba3 = (lba >> 24) & 0xFFFF;
+        cfis.ncq.lba5 = (lba >> 40);
+        cfis.ncq.count_lo = count & 0xFF;
+        cfis.ncq.count_hi = (count >> 8) & 0xFF;
+        cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
+        cfis.ncq.fua = AHCI_FIS_FUA_LBA |
+                (!is_read ? AHCI_FIS_FUA_FUA : 0);
+        cfis.ncq.prio = 0;
+        cfis.ncq.aux = 0;
+    } else {
+        fis_size = sizeof(cfis.h2d);
+
+        cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+        cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+        cfis.h2d.command = is_read
+                ? ATA_CMD_READ_DMA_EXT
+                : ATA_CMD_WRITE_DMA_EXT;
+        cfis.h2d.lba0 = lba & 0xFFFF;
+        cfis.h2d.lba2 = (lba >> 16) & 0xFF;
+        cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
+        cfis.h2d.lba5 = (lba >> 40);
+        cfis.h2d.count = count;
+
+        // LBA
+        cfis.d2h.device = AHCI_FIS_FUA_LBA;
+    }
+
+    atomic_barrier();
+
+    ahci_cmd_issue(dev, port_num, (unsigned)slot, &cfis, fis_size,
+                   prdts, ranges_count, is_read,
+                   callback, callback_arg);
 }
 
 // The command engine must be stopped before calling ahci_perform_detect
@@ -1494,7 +1535,10 @@ static void ahci_rebase(ahci_if_t *dev)
         printk("Initializing AHCI device port %d\n", port_num);
 
         hba_port_t volatile *port = dev->mmio_base->ports + port_num;
-        hba_port_info_t volatile *pi = dev->port_info + port_num;
+        hba_port_info_t *pi = dev->port_info + port_num;
+
+        mutex_init(&pi->slotalloc_lock);
+        condvar_init(&pi->slotalloc_avail);
 
         ahci_perform_detect(dev, port_num);
 
@@ -1516,9 +1560,9 @@ static void ahci_rebase(ahci_if_t *dev)
                     addr_type, -1, 0);
         memset(buffers, 0, port_buffer_size);
 
-        hba_cmd_hdr_t volatile *cmd_hdr = buffers;
-        hba_cmd_tbl_ent_t volatile *cmd_tbl = (void*)(cmd_hdr + 32);
-        hba_fis_t volatile *fis = (void*)(cmd_tbl + 32);
+        hba_cmd_hdr_t *cmd_hdr = buffers;
+        hba_cmd_tbl_ent_t *cmd_tbl = (void*)(cmd_hdr + 32);
+        hba_fis_t *fis = (void*)(cmd_tbl + 32);
 
         // Store linear addresses for writing to buffers
         pi->fis = fis;
@@ -1567,6 +1611,7 @@ static void ahci_rebase(ahci_if_t *dev)
 
 static void ahci_bios_handoff(ahci_if_t *dev)
 {
+    // If BIOS handoff is not supported then return
     if ((dev->mmio_base->cap2 & AHCI_HC_CAP2_BOH) == 0)
         return;
 
@@ -1636,7 +1681,9 @@ static if_list_t ahci_if_detect(void)
 
             dev->irq = pci_iter.config.irq_line;
 
-            dev->use_ncq = dev->mmio_base->cap & AHCI_HC_CAP_SNCQ;
+            dev->use_64 = !!(dev->mmio_base->cap & AHCI_HC_CAP_S64A);
+            //dev->use_ncq = !!(dev->mmio_base->cap & AHCI_HC_CAP_SNCQ);
+            dev->use_ncq = 0;
 
             ahci_rebase(dev);
 
