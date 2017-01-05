@@ -29,8 +29,7 @@ typedef enum rbtree_color_t {
 
 typedef struct rbtree_node_t rbtree_node_t;
 struct rbtree_node_t {
-    rbtree_key_t key;
-    rbtree_val_t val;
+    rbtree_kvp_t kvp;
 
     rbtree_iter_t parent;
     rbtree_iter_t left;
@@ -42,7 +41,7 @@ struct rbtree_t {
     // Comparator
     rbtree_node_t *nodes;
 
-    int (*cmp)(rbtree_key_t a, rbtree_key_t b, void *p);
+    rbtree_cmp_t cmp;
     void *p;
 
     // Size includes nil node at index 0
@@ -109,8 +108,8 @@ static void rbtree_free_node(rbtree_t *tree, rbtree_iter_t n)
 {
     rbtree_node_t *freed = NODE(n);
 
-    freed->key = 0;
-    freed->val = 0;
+    freed->kvp.key = 0;
+    freed->kvp.val = 0;
     freed->parent = 0;
     freed->left = 0;
     freed->right = tree->free;
@@ -288,8 +287,7 @@ static void rbtree_insert_case5(rbtree_t *tree, rbtree_iter_t n)
 }
 
 static rbtree_iter_t rbtree_new_node(rbtree_t *tree,
-                                     rbtree_key_t key,
-                                     rbtree_val_t val)
+                                     rbtree_kvp_t *kvp)
 {
     rbtree_iter_t p = 0;
     rbtree_iter_t i = tree->root;
@@ -297,7 +295,9 @@ static rbtree_iter_t rbtree_new_node(rbtree_t *tree,
     if (i) {
         int cmp;
         for (;;) {
-            cmp = tree->cmp(key, NODE(i)->key, tree->p);
+            cmp = tree->cmp(kvp,
+                            &NODE(i)->kvp,
+                            tree->p);
             p = i;
             if (cmp < 0) {
                 // item < node
@@ -328,8 +328,7 @@ static rbtree_iter_t rbtree_new_node(rbtree_t *tree,
     NODE(i)->left = 0;
     NODE(i)->right = 0;
     NODE(i)->color = RED;
-    NODE(i)->key = key;
-    NODE(i)->val = val;
+    NODE(i)->kvp = *kvp;
     return i;
 }
 
@@ -352,7 +351,7 @@ static int rbtree_walk_impl(rbtree_t *tree,
     }
 
     // Visit this node
-    result = callback(tree, NODE(n)->key, NODE(n)->val, p);
+    result = callback(tree, &NODE(n)->kvp, p);
     if (result)
         return result;
 
@@ -408,52 +407,91 @@ void rbtree_destroy(rbtree_t *tree)
     free(tree);
 }
 
-//void *rbtree_lower_bound(void *item, rbtree_iter_t *iter)
-//{
-//
-//}
-//
+rbtree_iter_t rbtree_lower_bound_pair(rbtree_t *tree,
+                                      rbtree_kvp_t *kvp)
+{
+    rbtree_iter_t iter = 0;
+    rbtree_find(tree, kvp, &iter);
+    return iter;
+}
+
+rbtree_iter_t rbtree_lower_bound(rbtree_t *tree,
+                                 rbtree_key_t key,
+                                 rbtree_val_t val)
+{
+    rbtree_kvp_t kvp = { key, val };
+    return rbtree_lower_bound_pair(tree, &kvp);
+}
+
 //void *rbtree_upper_bound(void *item, rbtree_iter_t *iter)
 //{
 //
 //}
 
-rbtree_iter_t rbtree_insert(rbtree_t *tree,
-                            rbtree_key_t key,
-                            rbtree_val_t val)
+rbtree_iter_t rbtree_insert_pair(rbtree_t *tree,
+                                 rbtree_kvp_t *kvp)
 {
-    rbtree_iter_t i = rbtree_new_node(tree, key, val);
+    rbtree_iter_t i = rbtree_new_node(tree, kvp);
     rbtree_insert_case1(tree, i);
     rbtree_dump(tree);
     return i;
 }
 
-//void *rbtree_next(rbtree_t *tree, rbtree_iter_t *iter)
-//{
-//    rbtree_iter_t i = *iter;
-//
-//    if (NODE(i)->right) {
-//        // Find lowest value in right subtree
-//        i = NODE(i)->right;
-//        while (NODE(i)->left)
-//            i = NODE(i)->left;
-//        if (iter)
-//            *iter = i;
-//        return NODE(i)->item;
-//    } else {
-//        i = NODE(i)->parent;
-//    }
-//}
-//
-//void *rbtree_prev(rbtree_t *tree, rbtree_iter_t *iter)
-//{
-//
-//}
-
-rbtree_val_t rbtree_item(rbtree_t *tree, rbtree_iter_t iter)
+rbtree_iter_t rbtree_insert(rbtree_t *tree,
+                            rbtree_key_t key,
+                            rbtree_val_t val)
 {
-    rbtree_iter_t i = iter;
-    return i ? tree->nodes[i].val : 0;
+    rbtree_kvp_t kvp = { key, val };
+    return rbtree_insert_pair(tree, &kvp);
+}
+
+rbtree_iter_t rbtree_next(rbtree_t *tree, rbtree_iter_t n)
+{
+    if (!n)
+        return 0;
+
+    if (NODE(n)->right) {
+        // Find lowest value in right subtree
+        n = NODE(n)->right;
+        while (NODE(n)->left)
+            n = NODE(n)->left;
+
+        return n;
+    }
+
+    rbtree_iter_t p = NODE(n)->parent;
+    while (p && n == NODE(p)->right) {
+        n = p;
+        p = NODE(n)->parent;
+    }
+    return p;
+}
+
+rbtree_iter_t rbtree_prev(rbtree_t *tree, rbtree_iter_t n)
+{
+    if (!n)
+        return 0;
+
+    if (NODE(n)->left) {
+        // Find highest value in right subtree
+        n = NODE(n)->left;
+        while (NODE(n)->right)
+            n = NODE(n)->right;
+
+        return n;
+    }
+
+    rbtree_iter_t p = NODE(n)->parent;
+    while (p && n == NODE(p)->left) {
+        n = p;
+        p = NODE(n)->parent;
+    }
+    return p;
+}
+
+rbtree_kvp_t rbtree_item(rbtree_t *tree, rbtree_iter_t iter)
+{
+    return tree->nodes[iter].kvp;
 }
 
 rbtree_iter_t rbtree_first(rbtree_t *tree, rbtree_iter_t start)
@@ -484,16 +522,18 @@ rbtree_iter_t rbtree_last(rbtree_t *tree, rbtree_iter_t start)
     return 0;
 }
 
-static rbtree_val_t rbtree_find(rbtree_t *tree,
-                                rbtree_key_t key,
-                                rbtree_iter_t *iter)
+rbtree_kvp_t *rbtree_find(rbtree_t *tree,
+                         rbtree_kvp_t *kvp,
+                         rbtree_iter_t *iter)
 {
     rbtree_iter_t n = tree->root;
     rbtree_iter_t next;
     int cmp = -1;
 
     for (n = tree->root; n; n = next) {
-        cmp = tree->cmp(key, NODE(n)->key, tree->p);
+        cmp = tree->cmp(kvp,
+                        &NODE(n)->kvp,
+                        tree->p);
 
         if (cmp == 0)
             break;
@@ -510,7 +550,7 @@ static rbtree_val_t rbtree_find(rbtree_t *tree,
     if (iter)
         *iter = n;
 
-    return cmp ? 0 : NODE(n)->val;
+    return cmp ? 0 : &NODE(n)->kvp;
 }
 
 //
@@ -631,15 +671,11 @@ static void rbtree_delete_case1(rbtree_t *tree, rbtree_iter_t n)
         rbtree_delete_case2(tree, n);
 }
 
-int rbtree_delete(rbtree_t *tree, rbtree_key_t key)
+int rbtree_delete_at(rbtree_t *tree, rbtree_iter_t n)
 {
     rbtree_iter_t child;
-    rbtree_iter_t n;
     rbtree_iter_t left;
     rbtree_iter_t right;
-
-    if (!rbtree_find(tree, key, &n))
-        return 0;
 
     left = NODE(n)->left;
     right = NODE(n)->right;
@@ -650,8 +686,8 @@ int rbtree_delete(rbtree_t *tree, rbtree_key_t key)
 
         // Move the highest node in the left child
         // to this node and delete that node
-        NODE(n)->key = NODE(pred)->key;
-        NODE(n)->val = NODE(pred)->val;
+        NODE(n)->kvp.key = NODE(pred)->kvp.key;
+        NODE(n)->kvp.val = NODE(pred)->kvp.val;
         n = pred;
         left = NODE(n)->left;
         right = NODE(n)->right;
@@ -669,6 +705,22 @@ int rbtree_delete(rbtree_t *tree, rbtree_key_t key)
     rbtree_free_node(tree, n);
 
     return 1;
+}
+
+int rbtree_delete_pair(rbtree_t *tree, rbtree_kvp_t *kvp)
+{
+    rbtree_iter_t n;
+    if (rbtree_find(tree, kvp, &n))
+        return rbtree_delete_at(tree, n);
+    return 0;
+}
+
+int rbtree_delete(rbtree_t *tree,
+                  rbtree_key_t key,
+                  rbtree_val_t val)
+{
+    rbtree_kvp_t kvp = { key, val };
+    return rbtree_delete_pair(tree, &kvp);
 }
 
 int rbtree_walk(rbtree_t *tree,
@@ -689,22 +741,27 @@ rbtree_iter_t rbtree_count(rbtree_t *tree)
 //
 // Test
 
-static int rbtree_test_cmp(rbtree_key_t lhs, rbtree_key_t rhs, void *p)
+static int rbtree_test_cmp(
+        rbtree_kvp_t *lhs,
+        rbtree_kvp_t *rhs,
+        void *p)
 {
     (void)p;
-    return lhs < rhs ? -1 : lhs > rhs ? 1 : 0;
+    return lhs->key < rhs->key ? -1 :
+            rhs->key < lhs->key ? 1 :
+            lhs->val < rhs->val ? -1 :
+            rhs->val < lhs->val ? -1 :
+            0;
 }
 
 static int rbtree_test_visit(rbtree_t *tree,
-                             rbtree_key_t key,
-                             rbtree_val_t val,
+                             rbtree_kvp_t *kvp,
                              void *p)
 {
     (void)tree;
-    (void)key;
-    (void)val;
+    (void)kvp;
     (void)p;
-    RBTREE_TRACE("Item: key=%d val=%d\n", key, val);
+    RBTREE_TRACE("Item: key=%d val=%d\n", kvp->key, kvp->val);
     return 0;
 }
 
@@ -725,12 +782,12 @@ int rbtree_validate(rbtree_t *tree)
         return 0;
     }
 
-    if (NODE(0)->key != 0) {
+    if (NODE(0)->kvp.key != 0) {
         assert(!"Nil node has key");
         return 0;
     }
 
-    if (NODE(0)->val != 0) {
+    if (NODE(0)->kvp.val != 0) {
         assert(!"Nil node has val");
         return 0;
     }
@@ -750,8 +807,9 @@ int rbtree_validate(rbtree_t *tree)
                 return 0;
             }
 
-            if (tree->cmp(NODE(left)->key,
-                          NODE(i)->key, tree->p) >= 0) {
+            if (tree->cmp(&NODE(left)->kvp,
+                          &NODE(i)->kvp,
+                          tree->p) >= 0) {
                 assert(!"Left child is >= its parent");
                 return 0;
             }
@@ -763,8 +821,8 @@ int rbtree_validate(rbtree_t *tree)
                 return 0;
             }
 
-            if (tree->cmp(NODE(right)->key,
-                          NODE(i)->key, tree->p) < 0) {
+            if (tree->cmp(&NODE(right)->kvp,
+                          &NODE(i)->kvp, tree->p) < 0) {
                 assert(!"Right child is < its parent");
                 return 0;
             }
@@ -820,7 +878,7 @@ int rbtree_test(void)
 
             for (int del = 0; del < 4; ++del) {
                 RBTREE_TRACE("Delete %d\n", values[scenario[del]]);
-                rbtree_delete(tree, values[scenario[del]]);
+                rbtree_delete(tree, values[scenario[del]], 0);
                 rbtree_dump(tree);
                 rbtree_walk(tree, rbtree_test_visit, 0);
                 RBTREE_TRACE("---\n");

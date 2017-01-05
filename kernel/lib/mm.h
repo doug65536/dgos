@@ -83,9 +83,8 @@ void *mmap(
 
 /// Unmap a range of address space
 /// Unmap the range from __addr to __len
-int munmap(
-        void *__addr,
-        size_t __len);
+int munmap(void *__addr,
+        size_t size);
 
 /// Permit a mapping to be moved to a new address
 /// Without this flag, mremap fails if it cannot be resized

@@ -211,8 +211,17 @@ static uint32_t volatile phys_next_free_low;
 static uint64_t volatile mmu_seq;
 
 // Free address space management
-//static mutex_t free_addr_lock;
-//static rbtree_t *free_addr;
+static mutex_t free_addr_lock;
+static rbtree_t *free_addr_by_size;
+static rbtree_t *free_addr_by_addr;
+
+static linaddr_t take_linear(size_t size);
+static void release_linear(linaddr_t addr, size_t size);
+
+static int take_linear_cmp(
+        rbtree_kvp_t *lhs,
+        rbtree_kvp_t *rhs,
+        void *p);
 
 static uint64_t volatile page_fault_count;
 
@@ -1047,6 +1056,21 @@ void mmu_init(int ap)
     intr_hook(INTR_EX_PAGE, mmu_page_fault_handler);
 
     callout_call('M');
+
+    // Allocate guard page
+    take_linear(0);
+
+    mutex_init(&free_addr_lock);
+
+    free_addr_by_addr = rbtree_create(take_linear_cmp, 0, 1 << 20);
+    free_addr_by_size = rbtree_create(take_linear_cmp, 0, 1 << 20);
+
+    rbtree_insert(free_addr_by_size,
+                  PT_BASEADDR - linear_allocator,
+                  linear_allocator);
+    rbtree_insert(free_addr_by_addr,
+                  linear_allocator,
+                  PT_BASEADDR - linear_allocator);
 }
 
 static size_t round_up(size_t n)
@@ -1062,17 +1086,108 @@ static size_t round_down(size_t n)
 //
 // Linear address allocator
 
+static int take_linear_cmp(
+        rbtree_kvp_t *lhs,
+        rbtree_kvp_t *rhs,
+        void *p)
+{
+    (void)p;
+    return lhs->key < rhs->key ? -1 :
+            rhs->key < lhs->key ? 1 :
+            lhs->val < rhs->val ? -1 :
+            rhs->val < lhs->val ? 1 :
+            0;
+}
+
 static linaddr_t take_linear(size_t size)
 {
-    if (size > 0) {
-        // Allocate 2 extra pages as guard pages
-        linaddr_t addr = atomic_xadd_uint64(
-                    &linear_allocator,
-                    round_up(size) + PAGE_SIZE * 2);
+    // Round up to a multiple of the page size
+    size = round_up(size);
 
-        return addr + PAGE_SIZE;
+    linaddr_t addr;
+
+    if (free_addr_by_size) {
+        mutex_lock(&free_addr_lock);
+
+        // Find the lowest address item that is big enough
+        rbtree_iter_t place = rbtree_lower_bound(
+                    free_addr_by_size, size, 0);
+
+        rbtree_kvp_t by_size = rbtree_item(free_addr_by_size, place);
+        rbtree_delete_at(free_addr_by_size, place);
+
+        // Delete corresponding entry by address
+        rbtree_delete(free_addr_by_addr, by_size.val, by_size.key);
+
+        if (by_size.key > size) {
+            // Insert remainder by size
+            rbtree_insert(free_addr_by_size,
+                          by_size.key - size,
+                          by_size.val + size);
+
+            // Insert remainder by address
+            rbtree_insert(free_addr_by_addr,
+                          by_size.val + size,
+                          by_size.key - size);
+        }
+
+        addr = by_size.val;
+
+        mutex_unlock(&free_addr_lock);
+    } else {
+        addr = atomic_xadd_uint64(&linear_allocator, size);
     }
-    return 0;
+
+    return addr;
+}
+
+static void release_linear(linaddr_t addr, size_t size)
+{
+    // Round address down to page boundary
+    size_t misalignment = addr & PAGE_MASK;
+    addr -= misalignment;
+    size += misalignment;
+
+    // Round size up to multiple of page size
+    size = round_up(size);
+
+    linaddr_t end = addr + size;
+
+    mutex_lock(&free_addr_lock);
+
+    // Find the nearest free block before the freed range
+    rbtree_iter_t pred_it = rbtree_lower_bound(
+                free_addr_by_addr, addr, 0);
+
+    // Find the nearest free block after the freed range
+    rbtree_iter_t succ_it = rbtree_lower_bound(
+                free_addr_by_addr, end, 0);
+
+    rbtree_kvp_t pred = rbtree_item(free_addr_by_addr, pred_it);
+    rbtree_kvp_t succ = rbtree_item(free_addr_by_addr, succ_it);
+
+    int coalesce_pred = ((pred.key + pred.val) == addr);
+    int coalesce_succ = (succ.key == end);
+
+    if (coalesce_pred) {
+        addr -= pred.val;
+        size += pred.val;
+        rbtree_delete_at(free_addr_by_addr, pred_it);
+
+        rbtree_delete(free_addr_by_size, pred.val, pred.key);
+    }
+
+    if (coalesce_succ) {
+        size += succ.val;
+        rbtree_delete_at(free_addr_by_addr, succ_it);
+
+        rbtree_delete(free_addr_by_size, succ.val, succ.key);
+    }
+
+    rbtree_insert(free_addr_by_size, size, addr);
+    rbtree_insert(free_addr_by_addr, addr, size);
+
+    mutex_unlock(&free_addr_lock);
 }
 
 static int mmu_have_nx(void)
@@ -1224,7 +1339,7 @@ void *mremap(
     return 0;
 }
 
-int munmap(void *addr, size_t len)
+int munmap(void *addr, size_t size)
 {
     linaddr_t a = (linaddr_t)addr;
 
@@ -1232,14 +1347,14 @@ int munmap(void *addr, size_t len)
 
     misalignment = a & PAGE_MASK;
     a -= misalignment;
-    len += misalignment;
+    size += misalignment;
 
     unsigned path[4];
     path_from_addr(path, a);
 
     pte_t *pteptr[4];
 
-    for (size_t ofs = 0; ofs < len + PAGE_MASK; ofs += PAGE_SIZE)
+    for (size_t ofs = 0; ofs < size + PAGE_MASK; ofs += PAGE_SIZE)
     {
         if (!mmu_path_present(path, pteptr))
             return -1;
@@ -1261,6 +1376,8 @@ int munmap(void *addr, size_t len)
     }
 
     mmu_send_tlb_shootdown();
+
+    release_linear(a, size);
 
     return 0;
 }
