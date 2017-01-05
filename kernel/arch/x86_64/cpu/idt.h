@@ -236,7 +236,7 @@ typedef struct isr_start_context_t {
     isr_context_t ctx;
     isr_fxsave_context_t fpr;
     isr_gpr_context_t gpr;
-    isr_ret_frame_t ret;
+    void *align;
 } isr_start_context_t;
 
 typedef void *(*irq_dispatcher_handler_t)(
