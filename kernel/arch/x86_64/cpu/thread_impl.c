@@ -181,6 +181,12 @@ static void thread_cleanup(void)
     thread_yield();
 }
 
+static void thread_startup(thread_fn_t fn, void *p, thread_t id)
+{
+    threads[id].exit_code = fn(p);
+    thread_cleanup();
+}
+
 // Returns threads array index or 0 on error
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
@@ -262,17 +268,18 @@ static thread_t thread_create_with_state(
         isr_start_context_t *ctx =
                 (isr_start_context_t*)ctx_addr;
         memset(ctx, 0, sizeof(*ctx));
-        ctx->ret.ret_rip = thread_cleanup;
-        ctx->gpr.iret.rsp = (uint64_t)&ctx->ret;
+        ctx->gpr.iret.rsp = (uint64_t)(ctx + 1);
         ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.iret.rflags = EFLAGS_IF;
-        ctx->gpr.iret.rip = fn;
+        ctx->gpr.iret.rip = (thread_fn_t)(void*)thread_startup;
         ctx->gpr.iret.cs = GDT_SEL_KERNEL_CODE64;
         ctx->gpr.s[0] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.r[0] = (uint64_t)userdata;
+        ctx->gpr.r[0] = (uint64_t)(void*)fn;
+        ctx->gpr.r[1] = (uint64_t)userdata;
+        ctx->gpr.r[2] = (uint64_t)i;
         ctx->gpr.fsbase = teb;
 
         ctx->fpr.mxcsr = MXCSR_MASK_ALL;
