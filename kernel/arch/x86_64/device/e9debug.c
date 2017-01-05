@@ -1,6 +1,7 @@
 #include "e9debug.h"
 #include "debug.h"
 #include "cpu/ioport.h"
+#include "printk.h"
 
 #include "cpu/spinlock.h"
 
@@ -26,4 +27,7 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
 void e9debug_init(void)
 {
     write_debug_str_set_handler(e9debug_write_debug_str);
+    printdbg("----------------------------------------------------\n"
+             "DebugLog Started...\n"
+             "----------------------------------------------------\n");
 }
