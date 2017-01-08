@@ -210,3 +210,17 @@ void paging_init(void)
     paging_map_range(0, 0x10000, 0,
                      PTE_PRESENT | PTE_WRITABLE, 0);
 }
+
+void paging_modify_flags(uint64_t addr, uint64_t size,
+                         uint64_t clear, uint64_t set)
+{
+    for (uint64_t offset = 0; offset < size; offset += PAGE_SIZE) {
+        pte_ref_t original = paging_find_pte(addr + offset, 0);
+        if (original.segment) {
+            uint64_t pte = read_pte(original.segment, original.slot);
+            pte &= ~clear;
+            pte |= set;
+            write_pte(original.segment, original.slot, pte);
+        }
+    }
+}

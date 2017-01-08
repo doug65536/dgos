@@ -78,3 +78,6 @@ void paging_alias_range(uint64_t alias_addr,
                         uint64_t linear_addr,
                         uint64_t size,
                         uint64_t alias_flags);
+
+void paging_modify_flags(uint64_t addr, uint64_t size,
+                         uint64_t clear, uint64_t set);

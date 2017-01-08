@@ -233,6 +233,12 @@ uint16_t elf64_run(char const *filename)
                           (uint32_t)read_buffer, read_size);
         }
 
+        // Clear modified bits if uninitialized data
+        if (sec->sh_type == SHT_NOBITS) {
+            paging_modify_flags(sec->sh_addr, sec->sh_size,
+                                PTE_DIRTY | PTE_ACCESSED, 0);
+        }
+
         // If we don't read whole section, something went wrong
         if (remain)
             failed = 1;
