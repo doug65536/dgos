@@ -150,3 +150,5 @@ void *cpu_get_stack_ptr(void);
 void cpu_crash(void);
 
 uint64_t cpu_rdtsc(void);
+
+uint32_t cpu_get_default_mxcsr_mask(void);

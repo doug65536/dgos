@@ -274,3 +274,18 @@ uint64_t cpu_rdtsc(void)
     );
     return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
+
+uint32_t cpu_get_default_mxcsr_mask(void)
+{
+    char save_area[512+16] = "";
+    char *save_area_ptr = save_area + 15;
+    uint32_t mxcsr_mask;
+    __asm__ __volatile__ (
+        "and $-16,%[save_area_ptr]\n\t"
+        "fxsave (%[save_area_ptr])\n\t"
+        "mov 0x1C(%[save_area_ptr]),%[mxcsr_mask]\n\t"
+        : [mxcsr_mask] "=r" (mxcsr_mask),
+          [save_area_ptr] "+r" (save_area_ptr)
+    );
+    return mxcsr_mask;
+}
