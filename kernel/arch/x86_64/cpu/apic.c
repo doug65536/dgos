@@ -451,7 +451,7 @@ static int parse_mp_tables(void)
                         ioapic_list[ioapic_count].ptr = mmap(
                                     (void*)(uintptr_t)entry_ioapic->addr,
                                     32, PROT_READ | PROT_WRITE,
-                                    0, -1, 0);
+                                    MAP_PHYSICAL, -1, 0);
                         ioapic_list[ioapic_count].lock = 0;
 
                         ++ioapic_count;
