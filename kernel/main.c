@@ -425,8 +425,6 @@ static int register_check(void *p)
 #if STRESS_MMAP_THREAD > 0
 static int stress_mmap_thread(void *p)
 {
-    cpu_irq_disable();
-
     (void)p;
     void *blocks[STRESS_MMAP_THREAD];
     for (;;) {
