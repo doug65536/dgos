@@ -106,6 +106,8 @@ static rbtree_iter_t rbtree_alloc_node(rbtree_t *tree)
 
 static void rbtree_free_node(rbtree_t *tree, rbtree_iter_t n)
 {
+    --tree->count;
+
     rbtree_node_t *freed = NODE(n);
 
     freed->kvp.key = 0;
