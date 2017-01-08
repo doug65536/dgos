@@ -116,6 +116,8 @@ static cpu_info_t cpus[MAX_CPUS];
 
 static volatile uint32_t cpu_count;
 
+static uint32_t default_mxcsr_mask;
+
 // Get executing APIC ID
 static uint64_t get_apic_id(void)
 {
@@ -169,6 +171,8 @@ static void thread_cleanup(void)
 {
     thread_info_t *thread = this_thread();
 
+    cpu_irq_disable();
+
     assert(thread->state == THREAD_IS_RUNNING);
 
     atomic_barrier();
@@ -176,7 +180,6 @@ static void thread_cleanup(void)
     thread->priority_boost = 0;
     thread->stack = 0;
     thread->stack_size = 0;
-    atomic_barrier();
     thread->state = THREAD_IS_DESTRUCTING_BUSY;
     thread_yield();
 }
@@ -283,7 +286,7 @@ static thread_t thread_create_with_state(
         ctx->gpr.fsbase = teb;
 
         ctx->fpr.mxcsr = MXCSR_MASK_ALL;
-        ctx->fpr.mxcsr_mask = MXCSR_MASK_ALL;
+        ctx->fpr.mxcsr_mask = default_mxcsr_mask;
 
         ctx->ctx.gpr = &ctx->gpr;
         ctx->ctx.fpr = &ctx->fpr;
@@ -362,6 +365,10 @@ void thread_init(int ap)
     cpu_set_gsbase(cpu);
 
     if (!ap) {
+        default_mxcsr_mask = cpu_get_default_mxcsr_mask();
+
+        printdbg("default mxcsr_mask=%x\n", default_mxcsr_mask);
+
         cpu->cur_thread = thread;
         thread->ctx = 0;
         thread->priority = -256;
