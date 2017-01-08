@@ -190,6 +190,8 @@ size_t phys_mem_map_count;
 physmem_range_t ranges[64];
 size_t usable_ranges;
 
+#define DEBUG_ADDR_ALLOC    0
+
 physaddr_t root_physaddr;
 
 // Bitmask of available aliasing ptes (top one taken already)
@@ -885,6 +887,26 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     return 0;
 }
 
+#if DEBUG_ADDR_ALLOC
+static int dump_addr_node(rbtree_t *tree,
+                           rbtree_kvp_t *kvp,
+                           void *p)
+{
+    (void)tree;
+    (void)p;
+    printdbg("key=%12lx val=%12lx\n",
+             kvp->key, kvp->val);
+    return 0;
+}
+
+static void dump_addr_tree(rbtree_t *tree, char const *name)
+{
+    printdbg("%s dump\n", name);
+    rbtree_walk(tree, dump_addr_node, 0);
+    printdbg("---------------------------------\n");
+}
+#endif
+
 //
 // Initialization
 
@@ -1134,6 +1156,12 @@ static linaddr_t take_linear(size_t size)
     if (free_addr_by_addr && free_addr_by_size) {
         mutex_lock(&free_addr_lock);
 
+#if DEBUG_ADDR_ALLOC
+        printdbg("---- Alloc %lx\n", size);
+        dump_addr_tree(free_addr_by_addr, "Addr map by addr (before alloc)");
+        //dump_addr_tree(free_addr_by_size, "Addr map by size (before alloc)");
+#endif
+
         // Find the lowest address item that is big enough
         rbtree_iter_t place = rbtree_lower_bound(
                     free_addr_by_size, size, 0);
@@ -1158,6 +1186,13 @@ static linaddr_t take_linear(size_t size)
 
         addr = by_size.val;
 
+#if DEBUG_ADDR_ALLOC
+        dump_addr_tree(free_addr_by_addr, "Addr map by addr (after alloc)");
+        //dump_addr_tree(free_addr_by_size, "Addr map by size (after alloc)");
+
+        printdbg("%lx ----\n", addr);
+#endif
+
         mutex_unlock(&free_addr_lock);
     } else {
         addr = atomic_xadd_uint64(&linear_allocator, size);
@@ -1179,6 +1214,12 @@ static void release_linear(linaddr_t addr, size_t size)
     linaddr_t end = addr + size;
 
     mutex_lock(&free_addr_lock);
+
+#if DEBUG_ADDR_ALLOC
+    printdbg("---- Free %lx @ %lx\n", size, addr);
+    dump_addr_tree(free_addr_by_addr, "Addr map by addr (before free)");
+    //dump_addr_tree(free_addr_by_size, "Addr map by size (before free)");
+#endif
 
     // Find the nearest free block before the freed range
     rbtree_iter_t pred_it = rbtree_lower_bound(
@@ -1211,6 +1252,11 @@ static void release_linear(linaddr_t addr, size_t size)
 
     rbtree_insert(free_addr_by_size, size, addr);
     rbtree_insert(free_addr_by_addr, addr, size);
+
+#if DEBUG_ADDR_ALLOC
+    dump_addr_tree(free_addr_by_addr, "Addr map by addr (after free)");
+    //dump_addr_tree(free_addr_by_size, "Addr map by size (after free)");
+#endif
 
     mutex_unlock(&free_addr_lock);
 }
@@ -1407,7 +1453,7 @@ int munmap(void *addr, size_t size)
 
     mmu_send_tlb_shootdown();
 
-    release_linear(a, size);
+    release_linear((linaddr_t)addr, size);
 
     return 0;
 }
