@@ -958,6 +958,15 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 // Disable the ATA interface
 #define AHCI_HP_SC_DET_OFFLINE  4
 
+// Identify fields
+#define ATA_IDENT_NCQ_DEP_IDX   75
+#define ATA_IDENT_CAPS_IDX      76
+
+#define ATA_IDENT_NCQ_DEP_BIT   0
+#define ATA_IDENT_NCQ_DEP_BITS  5
+#define ATA_IDENT_NCQ_DEP_MASK  (1<<ATA_IDENT_NCQ_DEP_BITS)
+#define ATA_IDENT_NCQ_DEP_n(n)  (((n) & ATA_IDENT_NCQ_DEP_MASK) + 1)
+
 // 4.2.1
 typedef struct hba_fis_t {
     // offset = 0x00
@@ -1246,6 +1255,8 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
             // FIXME: check error
             int error = (port->sata_err != 0);
 
+            assert(error == 0);
+
             // Invoke completion callback
             async_callback_t volatile *callback_info = pi->callbacks + slot;
             async_callback_fn_t callback = callback_info->callback;
@@ -1375,6 +1386,8 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
     hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
 
+    spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
+
     memcpy(cmd_tbl_ent->prdts, prdts, sizeof(*prdts) * ranges_count);
 
     memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
@@ -1388,7 +1401,6 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     pi->callbacks[slot].callback_arg = callback_arg;
 
     atomic_barrier();
-    spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
 
     if (dev->use_ncq)
         port->sata_act = (1U<<slot);
@@ -1411,7 +1423,7 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
     ranges_count = mphysranges(ranges, countof(ranges),
                                data, count * pi->sector_size,
-                               2<<20);
+                               4<<20);
 
     hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
 
@@ -1514,8 +1526,8 @@ static void ahci_rebase(ahci_if_t *dev)
     ahci_port_stop_all(dev);
 
     int addr_type = ahci_supports_64bit(dev)
-            ? 0 //MAP_WRITETHRU | MAP_NOCACHE
-            : MAP_32BIT //| MAP_WRITETHRU | MAP_NOCACHE
+            ? MAP_POPULATE
+            : MAP_POPULATE | MAP_32BIT
             ;
 
     // Loop through the implemented ports
@@ -1555,9 +1567,9 @@ static void ahci_rebase(ahci_if_t *dev)
         // One cmd tbl per slot
         port_buffer_size += sizeof(hba_cmd_tbl_ent_t) * 32;
 
-        void *buffers = mmap(
-                    0, port_buffer_size, PROT_READ | PROT_WRITE,
-                    addr_type, -1, 0);
+        void *buffers = mmap(0, port_buffer_size,
+                             PROT_READ | PROT_WRITE,
+                             addr_type, -1, 0);
         memset(buffers, 0, port_buffer_size);
 
         hba_cmd_hdr_t *cmd_hdr = buffers;
