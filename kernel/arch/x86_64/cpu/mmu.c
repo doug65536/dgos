@@ -16,6 +16,7 @@
 #include "thread_impl.h"
 #include "threadsync.h"
 #include "rbtree.h"
+#include "idt.h"
 
 // Intel manual, page 2786
 
@@ -194,7 +195,7 @@ physaddr_t root_physaddr;
 // Bitmask of available aliasing ptes (top one taken already)
 static uint64_t volatile apte_map = 0x8000000000000000UL;
 
-unsigned *phys_alloc;
+uint32_t *phys_alloc;
 unsigned phys_alloc_count;
 
 extern char ___init_brk[];
@@ -203,8 +204,9 @@ static linaddr_t volatile linear_allocator = (linaddr_t)___init_brk;
 
 // Maintain two free page chains,
 // because some hardware requires 32-bit memory addresses
-static uint32_t volatile phys_next_free_high;
-static uint32_t volatile phys_next_free_low;
+// [0] is the chain >= 4GB
+// [1] is the chain < 4GB
+static uint32_t volatile phys_next_free[2];
 
 // Incremented every time the page tables are changed
 // Used to detect lazy TLB shootdown
@@ -227,10 +229,8 @@ static uint64_t volatile page_fault_count;
 
 static void mmu_free_phys(physaddr_t addr)
 {
-    uint32_t volatile *chain = (addr >= 0x100000000L)
-            ? &phys_next_free_high
-            : &phys_next_free_low;
-    uint64_t index = ((uint64_t)addr - 0x100000) >> PAGE_SIZE_BIT;
+    uint32_t volatile *chain = phys_next_free + (addr < 0x100000000UL);
+    uint64_t index = (addr - 0x100000UL) >> PAGE_SIZE_BIT;
     uint32_t old_next = *chain;
     for (;;) {
         phys_alloc[index] = old_next;
@@ -248,13 +248,13 @@ static void mmu_free_phys(physaddr_t addr)
 
 static physaddr_t mmu_alloc_phys(int low)
 {
-    uint32_t volatile *chain = !low
-            ? &phys_next_free_high
-            : &phys_next_free_low;
+    uint32_t volatile *chain = phys_next_free + !!low;
 
     uint32_t index = *chain;
     for (;;) {
         uint32_t new_next = phys_alloc[index];
+
+        assert(new_next);
 
         if (!new_next) {
             // Resort to low memory pages if high memory exhausted
@@ -329,21 +329,6 @@ static void pte_from_path(pte_t **pte, unsigned *path)
     pte[1] = PT1_PTR(base) + indices[1];
     pte[2] = PT2_PTR(base) + indices[2];
     pte[3] = PT3_PTR(base) + indices[3];
-}
-
-static int mmu_path_present(unsigned *path, pte_t **optional_pte_ret)
-{
-    pte_t *pteptr[4];
-
-    if (!optional_pte_ret)
-        optional_pte_ret = pteptr;
-
-    pte_from_path(optional_pte_ret, path);
-
-    return (*optional_pte_ret[0] & PTE_PRESENT) &&
-            (*optional_pte_ret[1] & PTE_PRESENT) &&
-            (*optional_pte_ret[2] & PTE_PRESENT) &&
-            (*optional_pte_ret[3] & PTE_PRESENT);
 }
 
 //
@@ -624,6 +609,8 @@ static physaddr_t init_take_page(int low)
     if (likely(usable_ranges == 0))
         return mmu_alloc_phys(low);
 
+    assert(usable_ranges > 0);
+
     physmem_range_t *last_range = ranges + usable_ranges - 1;
     physaddr_t addr = last_range->base + last_range->size - PAGE_SIZE;
 
@@ -779,15 +766,34 @@ static void mmu_map_page(
     release_apte(aliasing_pte);
 }
 
-static int path_present(unsigned *path, pte_t **ptes, uintptr_t addr)
+static int ptes_present(pte_t **ptes)
+{
+    int present_mask;
+
+    present_mask = (*ptes[0] & PTE_PRESENT);
+
+    if (present_mask == 1)
+        present_mask |= (*ptes[1] & PTE_PRESENT) << 1;
+
+    if (present_mask == 3)
+        present_mask |= (*ptes[2] & PTE_PRESENT) << 2;
+
+    if (present_mask == 7)
+        present_mask |= (*ptes[3] & PTE_PRESENT) << 3;
+
+    return present_mask;
+}
+
+static int path_present(unsigned *path, pte_t **ptes)
+{
+    pte_from_path(ptes, path);
+    return ptes_present(ptes);
+}
+
+static int addr_present(uintptr_t addr, unsigned *path, pte_t **ptes)
 {
     path_from_addr(path, addr);
-    pte_from_path(ptes, path);
-
-    return (*ptes[0] & PTE_PRESENT) |
-            ((*ptes[1] & PTE_PRESENT) << 1) |
-            ((*ptes[2] & PTE_PRESENT) << 2) |
-            ((*ptes[3] & PTE_PRESENT) << 3);
+    return path_present(path, ptes);
 }
 
 // TLB shootdown IPI
@@ -817,10 +823,12 @@ static void *mmu_lazy_tlb_shootdown(void *ctx)
 // Page fault
 static void *mmu_page_fault_handler(int intr, void *ctx)
 {
-    // Unused
     (void)intr;
+    assert(intr == INTR_EX_PAGE);
 
     atomic_inc_uint64(&page_fault_count);
+
+    isr_context_t *ic = ctx;
 
     uintptr_t fault_addr = cpu_get_fault_address();
 
@@ -829,33 +837,49 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     unsigned path[4];
     pte_t *ptes[4];
 
-    int present_mask = path_present(path, ptes, fault_addr);
+    int present_mask = addr_present(fault_addr, path, ptes);
 
     // Check for lazy TLB shootdown
     if (present_mask == 0x0F && thread_get_cpu_mmu_seq() != mmu_seq)
         return mmu_lazy_tlb_shootdown(ctx);
 
+    pte_t pte = *ptes[3];
+
     // If the page table exists
     if (present_mask == 0x07) {
         // If it is lazy allocated
-        if ((*ptes[3] & PTE_ADDR) == PTE_ADDR) {
+        if ((pte & PTE_ADDR) == PTE_ADDR) {
             // Allocate a page
             physaddr_t page = init_take_page(0);
 
-            // Update PTE
-            *ptes[3] = (*ptes[3] & ~PTE_ADDR) |
-                    (page & PTE_ADDR) |
-                    PTE_PRESENT;
+            printdbg("Assigning %lx with page %lx\n",
+                     fault_addr, page);
 
-            cpu_invalidate_page(fault_addr);
+            pte_t page_flags;
 
-            // Restart instruction
+            if (ic->gpr->info.error_code & CTX_ERRCODE_PF_W)
+                page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
+            else
+                page_flags = PTE_PRESENT | PTE_ACCESSED;
+
+            // Update PTE and restart instruction
+            if (atomic_cmpxchg(ptes[3], pte,
+                               (pte & ~PTE_ADDR) |
+                               (page & PTE_ADDR) |
+                               page_flags) != pte) {
+                // Another thread beat us to it
+                mmu_free_phys(page);
+                cpu_invalidate_page(fault_addr);
+            }
+
             return ctx;
         } else {
             assert(!"Invalid page fault");
         }
-    } else {
+    } else if (present_mask != 0x0F) {
         assert(!"Invalid page fault path");
+    } else {
+        assert(!"Unexpected page fault");
     }
 
     return 0;
@@ -877,7 +901,7 @@ void mmu_init(int ap)
     usable_ranges = mmu_fixup_mem_map(phys_mem_map);
 
     if (usable_ranges > countof(ranges)) {
-        printk("Physical memory is incredibly fragmented!\n");
+        printdbg("Physical memory is incredibly fragmented!\n");
         usable_ranges = countof(ranges);
     }
 
@@ -896,7 +920,7 @@ void mmu_init(int ap)
     physaddr_t highest_usable = 0;
     for (physmem_range_t *mem = ranges;
          mem < ranges + usable_ranges; ++mem) {
-        printk("Memory: addr=%lx size=%lx type=%x\n",
+        printdbg("Memory: addr=%lx size=%lx type=%x\n",
                mem->base, mem->size, mem->type);
 
         if (mem->base >= 0x100000) {
@@ -916,7 +940,7 @@ void mmu_init(int ap)
 
     // Compute number of slots needed
     highest_usable >>= PAGE_SIZE_BIT;
-    printk("Usable pages = %lu (%luMB) range_pages=%ld\n", usable_pages,
+    printdbg("Usable pages = %lu (%luMB) range_pages=%ld\n", usable_pages,
            usable_pages >> (20 - PAGE_SIZE_BIT), highest_usable);
 
     //
@@ -1020,23 +1044,24 @@ void mmu_init(int ap)
     cpu_invalidate_page(0);
 
     phys_alloc_count = highest_usable;
-    phys_alloc = mmap(0, phys_alloc_count * sizeof(unsigned),
+    phys_alloc = mmap(0, phys_alloc_count * sizeof(*phys_alloc),
          PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
 
-    printk("Building physical memory free list\n");
+    printdbg("Building physical memory free list\n");
 
-    memset(phys_alloc, 0, phys_alloc_count * sizeof(unsigned));
+    memset(phys_alloc, 0, phys_alloc_count * sizeof(*phys_alloc));
 
     // Put all of the remaining physical memory into the free lists
     uint64_t free_count = 0;
     for (; ; ++free_count) {
         physaddr_t addr = init_take_page(0);
-        if (addr >= ___top_physaddr && addr < 0x8000000000000000UL) {
-            uint32_t volatile *chain = (addr >= 0x100000000UL)
-                    ? &phys_next_free_high
-                    : &phys_next_free_low;
+        if (addr >= ___top_physaddr && addr <
+                0x8000000000000000UL) {
+            uint32_t volatile *chain = phys_next_free +
+                    (addr < 0x100000000UL);
             addr -= 0x100000U;
             addr >>= PAGE_SIZE_BIT;
+            assert(addr < phys_alloc_count);
             phys_alloc[addr] = *chain;
             *chain = addr;
         } else {
@@ -1049,7 +1074,7 @@ void mmu_init(int ap)
     // Start using physical memory allocator
     usable_ranges = 0;
 
-    printk("%lu pages free (%luMB)\n",
+    printdbg("%lu pages free (%luMB)\n",
            free_count,
            free_count >> (20 - PAGE_SIZE_BIT));
 
@@ -1058,7 +1083,7 @@ void mmu_init(int ap)
     callout_call('M');
 
     // Allocate guard page
-    take_linear(0);
+    take_linear(PAGE_SIZE);
 
     mutex_init(&free_addr_lock);
 
@@ -1106,7 +1131,7 @@ static linaddr_t take_linear(size_t size)
 
     linaddr_t addr;
 
-    if (free_addr_by_size) {
+    if (free_addr_by_addr && free_addr_by_size) {
         mutex_lock(&free_addr_lock);
 
         // Find the lowest address item that is big enough
@@ -1213,7 +1238,7 @@ int mpresent(uintptr_t addr)
 {
     unsigned path[4];
     pte_t *ptes[4];
-    return path_present(path, ptes, addr);
+    return addr_present(addr, path, ptes) == 0x0F;
 }
 
 void *mmap(
@@ -1229,6 +1254,9 @@ void *mmap(
         return 0;
 
     pte_t page_flags = 0;
+
+    if (flags & MAP_STACK)
+        flags |= MAP_POPULATE;
 
     if (flags & MAP_PHYSICAL)
         page_flags |= PTE_PCD | PTE_PWT | PTE_EX_PHYSICAL | PTE_PRESENT;
@@ -1356,20 +1384,22 @@ int munmap(void *addr, size_t size)
 
     for (size_t ofs = 0; ofs < size + PAGE_MASK; ofs += PAGE_SIZE)
     {
-        if (!mmu_path_present(path, pteptr))
+        int present_mask = path_present(path, pteptr);
+        if ((present_mask & 0x07) != 0x07)
             return -1;
 
-        pte_t pte = *pteptr[3];
+        if (present_mask == 0x0F) {
+            pte_t pte = atomic_xchg(pteptr[3], 0);
 
-        if (likely(!(pte & PTE_EX_PHYSICAL))) {
-            physaddr_t addr = pte & PTE_ADDR;
+            if (!(pte & PTE_EX_PHYSICAL)) {
+                physaddr_t physaddr = pte & PTE_ADDR;
 
-            mmu_free_phys(addr);
+                if (physaddr && (physaddr != PTE_ADDR))
+                    mmu_free_phys(physaddr);
+            }
+
+            cpu_invalidate_page(a);
         }
-
-        *pteptr[3] = 0;
-
-        cpu_invalidate_page(a);
 
         a += PAGE_SIZE;
         path_inc(path);
