@@ -1,5 +1,7 @@
 #include "rand.h"
+#include "time.h"
 
+static __thread int seed_done;
 static __thread uint32_t seed_z1 = 12345;
 static __thread uint32_t seed_z2 = 12345;
 static __thread uint32_t seed_z3 = 12345;
@@ -11,6 +13,15 @@ void lfsr113_seed(uint32_t seed)
     seed_z2 = seed;
     seed_z3 = seed;
     seed_z4 = seed;
+    seed_done = 1;
+}
+
+void lfsr113_autoseed(void)
+{
+    if (seed_done)
+        return;
+
+    lfsr113_seed((uint32_t)nano_time());
 }
 
 uint32_t lfsr113_rand(void)
