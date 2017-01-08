@@ -191,6 +191,8 @@ physmem_range_t ranges[64];
 size_t usable_ranges;
 
 #define DEBUG_ADDR_ALLOC    0
+#define DEBUG_PHYS_ALLOC    0
+#define DEBUG_PAGE_FAULT    0
 
 physaddr_t root_physaddr;
 
@@ -834,7 +836,9 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
 
     uintptr_t fault_addr = cpu_get_fault_address();
 
+#if DEBUG_PAGE_FAULT
     printdbg("Page fault at %lx\n", fault_addr);
+#endif
 
     unsigned path[4];
     pte_t *ptes[4];
@@ -854,8 +858,10 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
             // Allocate a page
             physaddr_t page = init_take_page(0);
 
+#if DEBUG_PAGE_FAULT
             printdbg("Assigning %lx with page %lx\n",
                      fault_addr, page);
+#endif
 
             pte_t page_flags;
 
