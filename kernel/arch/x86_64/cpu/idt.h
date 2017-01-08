@@ -129,6 +129,30 @@ typedef struct idt_entry_64_t {
 #define MXCSR_RC            (MXCSR_RC_MASK << MXCSR_RC_BIT)
 #define MXCSR_RC_n(rc)      (((rc) & MXCSR_RC_MASK) << MXCSR_RC_BIT)
 
+//
+// Exception error code
+
+#define CTX_ERRCODE_PF_P_BIT    0
+#define CTX_ERRCODE_PF_W_BIT    1
+#define CTX_ERRCODE_PF_U_BIT    2
+#define CTX_ERRCODE_PF_R_BIT    3
+#define CTX_ERRCODE_PF_I_BIT    4
+
+// Page fault because page not present
+#define CTX_ERRCODE_PF_P        (1<<CTX_ERRCODE_PF_P_BIT)
+
+// Page fault was a write
+#define CTX_ERRCODE_PF_W        (1<<CTX_ERRCODE_PF_W_BIT)
+
+// Page fault occurred in user mode
+#define CTX_ERRCODE_PF_U        (1<<CTX_ERRCODE_PF_U_BIT)
+
+// Page fault because reserved PTE field was 1
+#define CTX_ERRCODE_PF_R        (1<<CTX_ERRCODE_PF_R_BIT)
+
+// Page fault was instruction fetch
+#define CTX_ERRCODE_PF_I        (1<<CTX_ERRCODE_PF_I_BIT)
+
 typedef struct cpu_flag_info_t {
     char const * const name;
     int bit;
