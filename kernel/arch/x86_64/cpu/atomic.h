@@ -155,6 +155,20 @@ static inline void atomic_sfence(void)
         return replacement; \
     }
 
+#if ATOMIC_USE_BUILTINS
+
+#define atomic_xchg(value, replacement) __extension__ ({ \
+    __typeof__(*value) v = (replacement); \
+    __asm__ __volatile__ ( \
+        "xchg %0,%1\n\t" \
+        : "+r" (v) \
+        : "m" (*value) \
+    ); \
+    v; \
+})
+
+#endif
+
 #define ATOMIC_DEFINE_XADD(type, suffix) \
     static inline type##_t atomic_xadd_##type ( \
         type##_t volatile *value, \
