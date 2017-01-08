@@ -85,7 +85,8 @@ static void gdt_set_tss_base(int cpu_number, tss_t *base)
 void gdt_init_tss(int cpu_count)
 {
     tss_t *tss_list = mmap(0, sizeof(*tss_list) * cpu_count,
-                      PROT_READ | PROT_WRITE, 0, -1, 0);
+                           PROT_READ | PROT_WRITE,
+                           MAP_POPULATE, -1, 0);
     memset(tss_list, 0, sizeof(*tss_list) * cpu_count);
 
     for (int i = 0; i < cpu_count; ++i) {
@@ -94,7 +95,7 @@ void gdt_init_tss(int cpu_count)
         for (int st = 0; st < 8; ++st) {
             void *stack = mmap(0, TSS_STACK_SIZE,
                                PROT_READ | PROT_WRITE,
-                               0, -1, 0);
+                               MAP_POPULATE, -1, 0);
 
             tss_list[i].stack[st] = stack;
 
