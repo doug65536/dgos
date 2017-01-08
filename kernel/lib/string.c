@@ -127,6 +127,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
 #endif
     while (n--)
         *p++ = (char)c;
+
     return dest;
 }
 
