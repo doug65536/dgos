@@ -79,12 +79,64 @@ void spinlock_unlock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
 
 //
 // Shared lock. 0 is unlocked, -1 is exclusive, >= 1 is shared lock
+// When a writer tries to acquire a lock, it sets bit 30
+// to lock out readers
 
 void rwspinlock_ex_lock(rwspinlock_t *lock)
 {
     atomic_barrier();
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, -1) != 0)
-        pause();
+
+    int own_bit30 = 0;
+
+    for (rwspinlock_t old_value = *lock; ; pause()) {
+        rwspinlock_t upd_value;
+
+        if (!own_bit30) {
+            //
+            // We haven't locked out readers yet
+
+            // Simple scenario, acquire unowned lock
+            if (old_value == 0 && atomic_cmpxchg(lock, 0, -1) == 0)
+                break;
+
+            // Try to acquire ownership of bit 30
+            if (old_value < (1 << 30) && old_value > 0) {
+                upd_value = atomic_cmpxchg(
+                        lock, old_value, old_value | (1<<30));
+
+                if (upd_value == old_value)
+                    own_bit30 = 1;
+
+                old_value = upd_value;
+                continue;
+            }
+
+            // Another writer already acquired bit 30...
+
+        } else {
+            //
+            // We have acquired ownership of bit 30, which
+            // locks out readers
+
+            // Wait for readers to drain out and acquire
+            // exclusive lock when they have
+            if (old_value == (1<<30)) {
+                //
+                // All readers drained out
+
+                upd_value = atomic_cmpxchg(
+                        lock, old_value, -1);
+
+                if (upd_value == old_value)
+                    break;
+
+                old_value = upd_value;
+                continue;
+            }
+        }
+
+        old_value = *lock;
+    }
 }
 
 void rwspinlock_ex_unlock(rwspinlock_t *lock)
@@ -99,8 +151,9 @@ void rwspinlock_sh_lock(rwspinlock_t *lock)
     atomic_barrier();
     rwspinlock_t old_value = *lock;
     for (;;) {
-        if (old_value >= 0) {
+        if (old_value >= 0 && old_value < (1<<30)) {
             // It is unlocked or already shared
+            // and no writer has acquired bit 30
             // Try to increase shared count
             rwspinlock_t new_value = old_value + 1;
             rwspinlock_t cur_value = atomic_cmpxchg(
