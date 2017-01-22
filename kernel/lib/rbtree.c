@@ -378,8 +378,12 @@ rbtree_t *rbtree_create(rbtree_cmp_t cmp,
 {
     if (capacity == 0)
         capacity = RBTREE_CAPACITY_FROM_BYTES(PAGE_SIZE - _MALLOC_OVERHEAD);
+    else
+        capacity -= ((sizeof(rbtree_t) + _MALLOC_OVERHEAD) +
+                ((sizeof(rbtree_t) + _MALLOC_OVERHEAD) - 1)) /
+                sizeof(rbtree_node_t);
 
-    rbtree_t *tree = malloc(sizeof(*tree) +
+    rbtree_t *tree = calloc(1, sizeof(*tree) +
                             sizeof(*tree->nodes) *
                             capacity);
 
@@ -532,18 +536,20 @@ rbtree_kvp_t *rbtree_find(rbtree_t *tree,
     rbtree_iter_t next;
     int cmp = -1;
 
-    for (n = tree->root; n; n = next) {
+    for (; n; n = next) {
+        rbtree_node_t const *node = NODE(n);
+
         cmp = tree->cmp(kvp,
-                        &NODE(n)->kvp,
+                        &node->kvp,
                         tree->p);
 
         if (cmp == 0)
             break;
 
         if (cmp < 0)
-            next = NODE(n)->left;
+            next = node->left;
         else
-            next = NODE(n)->right;
+            next = node->right;
 
         if (!next)
             break;
@@ -744,8 +750,8 @@ rbtree_iter_t rbtree_count(rbtree_t *tree)
 // Test
 
 static int rbtree_test_cmp(
-        rbtree_kvp_t *lhs,
-        rbtree_kvp_t *rhs,
+        rbtree_kvp_t const *lhs,
+        rbtree_kvp_t const *rhs,
         void *p)
 {
     (void)p;

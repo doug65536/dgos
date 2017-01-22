@@ -129,7 +129,7 @@ void cpu_set_page_directory(uintptr_t addr)
 
 uintptr_t cpu_get_page_directory(void)
 {
-    uint64_t addr;
+    uintptr_t addr;
     __asm__ __volatile__ (
         "mov %%cr3,%[addr]\n\t"
         : [addr] "=r" (addr)
@@ -166,7 +166,7 @@ table_register_64_t cpu_get_gdtr(void)
 {
     table_register_64_t gdtr;
     __asm__ __volatile__ (
-        "sgdtq (%[gdtr])\n\t"
+        "sgdt (%[gdtr])\n\t"
         :
         : [gdtr] "r" (&gdtr.limit)
         : "memory"
@@ -177,7 +177,7 @@ table_register_64_t cpu_get_gdtr(void)
 void cpu_set_gdtr(table_register_64_t gdtr)
 {
     __asm__ __volatile__ (
-        "lgdtq (%[gdtr])\n\t"
+        "lgdt (%[gdtr])\n\t"
         :
         : [gdtr] "r" (&gdtr.limit)
         : "memory"
@@ -208,7 +208,7 @@ void cpu_set_tr(uint16_t tr)
 
 int cpu_irq_disable(void)
 {
-    uint64_t rflags;
+    uintptr_t rflags;
     __asm__ __volatile__ (
         "pushf\n\t"
         "pop %[rflags]\n\t"
@@ -225,7 +225,7 @@ void cpu_irq_enable(void)
 
 void cpu_irq_toggle(int enable)
 {
-    uint64_t temp;
+    uintptr_t temp;
     __asm__ __volatile__ (
         "pushfq\n\t"
         "pop %q[temp]\n\t"

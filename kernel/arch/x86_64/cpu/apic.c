@@ -415,6 +415,9 @@ static int parse_mp_tables(void)
             case MP_TABLE_TYPE_CPU:
                 entry_cpu = (mp_cfg_cpu_t *)entry;
 
+                printdbg("CPU package found, base apic id=%u ver=0x%x\n",
+                         entry_cpu->apic_id, entry_cpu->apic_ver);
+
                 if ((entry_cpu->flags & MP_CPU_FLAGS_ENABLED) &&
                         apic_id_count < countof(apic_id_list)) {
                     if (entry_cpu->flags & MP_CPU_FLAGS_BSP)
@@ -429,12 +432,16 @@ static int parse_mp_tables(void)
             case MP_TABLE_TYPE_BUS:
                 entry_bus = (mp_cfg_bus_t *)entry;
 
+                printdbg("%.*s bus found, id=%u\n",
+                         (int)sizeof(entry_bus->type),
+                         entry_bus->type, entry_bus->bus_id);
+
                 if (!memcmp(entry_bus->type, "PCI", 3)) {
                     mp_pci_bus_id = entry_bus->bus_id;
                 } else if (!memcmp(entry_bus->type, "ISA", 3)) {
                     mp_isa_bus_id = entry_bus->bus_id;
                 } else {
-                    printk("Dropped! Unrecognized bus named \"%.*s\"\n",
+                    printdbg("Dropped! Unrecognized bus named \"%.*s\"\n",
                            (int)sizeof(entry_bus->type), entry_bus->type);
                 }
                 entry = (uint8_t*)(entry_bus + 1);
@@ -445,6 +452,12 @@ static int parse_mp_tables(void)
 
                 if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED) {
                     if (ioapic_count < countof(ioapic_list)) {
+                        printdbg("IOAPIC id=%d, addr=0x%x, flags=0x%x, ver=0x%x\n",
+                                 entry_ioapic->id,
+                                 entry_ioapic->addr,
+                                 entry_ioapic->flags,
+                                 entry_ioapic->ver);
+
                         ioapic_list[ioapic_count].id = entry_ioapic->id;
                         ioapic_list[ioapic_count].addr = entry_ioapic->addr;
 
@@ -456,7 +469,7 @@ static int parse_mp_tables(void)
 
                         ++ioapic_count;
                     } else {
-                        printk("Dropped! Too many IOAPIC devices\n");
+                        printdbg("Dropped! Too many IOAPIC devices\n");
                     }
                 }
                 entry = (uint8_t*)(entry_ioapic + 1);
@@ -472,7 +485,7 @@ static int parse_mp_tables(void)
                     uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
                     uint8_t intin = entry_iointr->dest_ioapic_intin;
 
-                    printk("PCI device %u INT_%c# -> IOAPIC ID %02x INTIN %d\n",
+                    printdbg("PCI device %u INT_%c# -> IOAPIC ID 0x%02x INTIN %d\n",
                            device, (int)(pci_irq & 3) + 'A',
                            ioapic_id, intin);
 
@@ -483,7 +496,7 @@ static int parse_mp_tables(void)
                         pci_irq_list[pci_irq_count].intin = intin;
                         ++pci_irq_count;
                     } else {
-                        printk("Dropped! Too many PCI IRQ mappings\n");
+                        printdbg("Dropped! Too many PCI IRQ mappings\n");
                     }
                 } else if (entry_iointr->source_bus == mp_isa_bus_id) {
                     // ISA IRQ
@@ -492,7 +505,7 @@ static int parse_mp_tables(void)
                     uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
                     uint8_t intin = entry_iointr->dest_ioapic_intin;
 
-                    printk("ISA IRQ %d -> IOAPIC ID %02x INTIN %u\n",
+                    printdbg("ISA IRQ %d -> IOAPIC ID 0x%02x INTIN %u\n",
                            isa_irq, ioapic_id, intin);
 
                     if (isa_irq_count < countof(isa_irq_list)) {
@@ -503,11 +516,11 @@ static int parse_mp_tables(void)
                         isa_irq_list[isa_irq_count].intin = intin;
                         ++isa_irq_count;
                     } else {
-                        printk("Dropped! Too many ISA IRQ mappings\n");
+                        printdbg("Dropped! Too many ISA IRQ mappings\n");
                     }
                 } else {
                     // Unknown bus!
-                    printk("IRQ %d on unknown bus -> IOAPIC ID %02x INTIN %u\n",
+                    printdbg("IRQ %d on unknown bus -> IOAPIC ID 0x%02x INTIN %u\n",
                            entry_iointr->source_bus_irq,
                            entry_iointr->dest_ioapic_id,
                            entry_iointr->dest_ioapic_intin);
@@ -523,7 +536,7 @@ static int parse_mp_tables(void)
                     uint8_t pci_irq = entry_lintr->source_bus_irq;
                     uint8_t lapic_id = entry_lintr->dest_lapic_id;
                     uint8_t intin = entry_lintr->dest_lapic_lintin;
-                    printk("PCI device %u INT_%c# -> LAPIC ID %02x INTIN %d\n",
+                    printdbg("PCI device %u INT_%c# -> LAPIC ID 0x%02x INTIN %d\n",
                            device, (int)(pci_irq & 3) + 'A',
                            lapic_id, intin);
                 } else if (entry_lintr->source_bus == mp_isa_bus_id) {
@@ -531,11 +544,11 @@ static int parse_mp_tables(void)
                     uint8_t lapic_id = entry_lintr->dest_lapic_id;
                     uint8_t intin = entry_lintr->dest_lapic_lintin;
 
-                    printk("ISA IRQ %d -> LAPIC ID %02x INTIN %u\n",
+                    printdbg("ISA IRQ %d -> LAPIC ID 0x%02x INTIN %u\n",
                            isa_irq, lapic_id, intin);
                 } else {
                     // Unknown bus!
-                    printk("IRQ %d on unknown bus -> IOAPIC ID %02x INTIN %u\n",
+                    printdbg("IRQ %d on unknown bus -> IOAPIC ID 0x%02x INTIN %u\n",
                            entry_lintr->source_bus_irq,
                            entry_lintr->dest_lapic_id,
                            entry_lintr->dest_lapic_lintin);
@@ -559,7 +572,7 @@ static int parse_mp_tables(void)
                 break;
 
             default:
-                printk("Unknown MP table entry_type! Guessing size is 8\n");
+                printdbg("Unknown MP table entry_type! Guessing size is 8\n");
                 // Hope for the best here
                 entry += 8;
                 break;
@@ -667,7 +680,7 @@ int apic_init(int ap)
     if (!parse_mp_tables())
         return 0;
 
-    printk("Found MP tables\n");
+    printdbg("Found MP tables\n");
 
     apic_base = msr_get(APIC_BASE_MSR) & -(intptr_t)4096;
 
@@ -726,7 +739,7 @@ static void apic_detect_topology(void)
 
 void apic_start_smp(void)
 {
-    printk("%d CPU packages\n", apic_id_count);
+    printdbg("%d CPU packages\n", apic_id_count);
 
     apic_detect_topology();
 
@@ -751,15 +764,15 @@ void apic_start_smp(void)
 
     sleep(10);
 
-    printk("%d hyperthread bits\n", topo_thread_bits);
-    printk("%d core bits\n", topo_core_bits);
+    printdbg("%d hyperthread bits\n", topo_thread_bits);
+    printdbg("%d core bits\n", topo_core_bits);
 
-    printk("%d hyperthread count\n", topo_thread_count);
-    printk("%d core count\n", topo_core_count);
+    printdbg("%d hyperthread count\n", topo_thread_count);
+    printdbg("%d core count\n", topo_core_count);
 
     uint32_t smp_expect = 0;
     for (unsigned pkg = 0; pkg < apic_id_count; ++pkg) {
-        printk("Package base APIC ID = %u\n", apic_id_list[pkg]);
+        printdbg("Package base APIC ID = %u\n", apic_id_list[pkg]);
 
         uint8_t cpus = topo_core_count *
                 topo_thread_count *
@@ -775,7 +788,7 @@ void apic_start_smp(void)
                 if (target == apic_id_list[0])
                     continue;
 
-                printk("Sending IPI to APIC ID %u\n", target);
+                printdbg("Sending IPI to APIC ID %u\n", target);
 
                 // Send SIPI to CPU
                 apic_send_command(APIC_DEST_n(target),

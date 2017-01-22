@@ -3,7 +3,9 @@
 CSRCS := \
 	bootsect.c \
 	screen.c \
+	fs.c \
 	fat32.c \
+	iso9660.c \
 	cpu.c \
 	malloc.c \
 	string.c \
@@ -13,7 +15,8 @@ CSRCS := \
 	rand.c \
 	physmem.c \
 	farptr.c \
-	vesa.c
+	vesa.c \
+	progressbar.c
 
 ASRCS := \
 	part.s \
@@ -48,6 +51,13 @@ SUDO := sudo
 CAT := cat
 OBJDUMP := objdump
 HEXDUMP := hexdump
+GENISOIMAGE := genisoimage
+ISO_STAGE := cdstage
+ISO_FILE := dgos.iso
+
+QEMU_MACHINE := q35
+QEMU_CPU := Haswell
+QEMU_RAM := 512M
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
@@ -77,8 +87,7 @@ ifneq ($(CC_IS_CLANG),1)
 	CFLAGS += \
 		-falign-functions=1 -falign-labels=1 \
 		-falign-loops=1 -falign-jumps=1 \
-		-mno-align-stringops \
-		-fno-schedule-insns -fno-schedule-insns2
+		-mno-align-stringops
 endif
 
 #-fomit-frame-pointer
@@ -106,7 +115,7 @@ endif
 CFLAGS += $(WEVERYTHING)
 
 # Optimize
-CFLAGS += -Os -DNDEBUG
+#CFLAGS += -Os -DNDEBUG
 
 ASFLAGS := --warn
 
@@ -123,13 +132,13 @@ BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
 BOCHSKERNELSYMBOLS = $(BINDIR)/bochs-kernel-symbols
 BOCHSCOMBINEDSYMBOLS = $(BINDIR)/bochs-combined-symbols
 
-OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) \
+OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect.dis \
 	$(DUMPDIR)/bootsect-debug.disasm \
 	$(DUMPDIR)/bootsect.hex
 
 NEEDSMALLEST := bootsect.c
-
+NOOPTIMIZE := iso9660.c elf64.c
 
 DISKIMAGE := $(DISKIMGDIR)/dgos.fat32.raw
 
@@ -137,6 +146,7 @@ LDFLAGS := -m i386linux -no-stdlib -M -T bootsect.ld
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
+$(NOOPTIMIZE:.c=.o): CFLAGS += -O0
 
 #
 # Standard targets
@@ -148,6 +158,7 @@ clean:
 	@$(RM) -f $(OBJS)
 	@$(RM) -f $(DUMPDIR)/*.map
 	@$(RM) -f $(OUTPUTS)
+	@$(RM) -rf $(ISO_STAGE)
 	(cd ../kernel && $(MAKE) clean)
 
 cleaner: clean deletedisk
@@ -203,6 +214,48 @@ debuggable-disk: bootable-disk $(SYMBOLFILE)
 debuggable-kernel-disk: kernel bootable-disk inject-kernel
 
 #
+# ISO
+
+$(ISO_STAGE)/bootsect.bin: $(BOOTSECTORS)
+	@mkdir -p $(@D)
+	$(CP) $< $@
+
+$(ISO_STAGE)/dgos_kernel: kernel $(KERNELSYMBOLFILE)
+	@mkdir -p $(@D)
+	$(CP) $(KERNELSYMBOLFILE) $@
+
+$(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos_kernel
+	# Do some gymnastics to get the number of 512-byte
+	# blocks for -boot-load-size
+	( \
+		export size=$$(wc -c < "$(ISO_STAGE)/bootsect.bin") && \
+		export blocks=$$(( (size + 511) / 512 )) && \
+		\
+		$(GENISOIMAGE) -input-charset utf8 \
+			-o $(ISO_FILE) \
+			-b bootsect.bin \
+			-iso-level 2 \
+			-no-emul-boot \
+			-boot-load-size $$blocks \
+			-boot-info-table \
+			-r -J \
+			$(ISO_STAGE) \
+	)
+
+debug-iso-boot: $(ISO_FILE)
+	 $(GDB) --symbols $(SYMBOLFILE) --tui \
+		-ex 'b iso9660_boot_partition' \
+		-ex 'b iso9660_boot_open' \
+		-ex 'b iso9660_boot_close' \
+		-ex 'b iso9660_boot_pread' \
+		-ex 'target remote | exec $(QEMU) -m 6G -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+
+debug-iso-kernel: $(ISO_FILE)
+	 $(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
+		-ex 'b *0x400000000000' \
+		-ex 'target remote | exec $(QEMU) -m 6G -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+
+#
 # Debug in KVM
 
 $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
@@ -232,8 +285,8 @@ run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 	$(QEMU) \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset \
-		-machine q35 -cpu Haswell \
-		-s -m 3G -smp cpus=8,cores=4,threads=1 \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-s -m $(QEMU_RAM) -smp cpus=8,cores=4,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
 		-net nic,model=rtl8139 \
@@ -246,8 +299,8 @@ run-debug-singlecpu: all debuggable-kernel-disk
 	$(QEMU) -s \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset \
-		-machine q35 -cpu Haswell \
-		-m 3G -smp cpus=1,cores=1,threads=1 \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-m $(QEMU_RAM) -smp cpus=1,cores=1,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
 		-net nic,model=rtl8139 \
@@ -262,8 +315,8 @@ run-debug-wait: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine q35 -cpu Haswell \
-		-m 3G -smp cpus=8,cores=8,threads=1 \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-m $(QEMU_RAM) -smp cpus=8,cores=8,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
 		-net nic,model=rtl8139 \
@@ -274,8 +327,8 @@ run-debug-wait-singlecpu: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine q35 -cpu Haswell \
-		-m 3G -smp cpus=1,cores=1,threads=1 \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-m $(QEMU_RAM) -smp cpus=1,cores=1,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
 		-net nic,model=rtl8139 \
@@ -358,12 +411,13 @@ umountdisk:
 inject-kernel: all
 	$(MAKE) mountdisk
 	(cd ../kernel && $(MAKE))
-	$(CP) ../kernel/bin/kernel disk/dgos-kernel
+	$(CP) ../kernel/bin/kernel disk/dgos_kernel
 	$(MAKE) umountdisk
 
 .PHONY: all clean run debug-bochs debug bochs-symbols
 .PHONY: deletedisk bootable-disk debuggable-disk mountdisk umountdisk
 .PHONY: kernel debuggable-kernel-disk
+.PHONY: debug-iso-boot debug-iso-kernel
 
 .PRECIOUS: $(DISKIMAGE)
 

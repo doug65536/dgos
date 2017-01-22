@@ -1,7 +1,7 @@
 #include "elf64.h"
 #include "elf64decl.h"
 #include "string.h"
-#include "fat32.h"
+#include "fs.h"
 #include "screen.h"
 #include "malloc.h"
 #include "paging.h"
@@ -11,6 +11,7 @@
 #include "mpentry.h"
 #include "farptr.h"
 #include "vesa.h"
+#include "progressbar.h"
 
 //static unsigned long elf64_hash(unsigned char const *name)
 //{
@@ -123,6 +124,11 @@ uint16_t elf64_run(char const *filename)
                 file_hdr.e_shoff))
         return 0;
 
+    uint64_t total_bytes = 0;
+    for (uint16_t i = 0; i < file_hdr.e_shnum; ++i)
+        if (section_hdrs[i].sh_addr)
+            total_bytes += section_hdrs[i].sh_size;
+
     // Load section names
     char *section_names;
     read_size = section_hdrs[file_hdr.e_shstrndx].sh_size;
@@ -151,24 +157,26 @@ uint16_t elf64_run(char const *filename)
     uint32_t address_window =
             (uint32_t)far_malloc_aligned(PAGE_SIZE << 1) << 4;
 
+    uint64_t done_bytes = 0;
+
     // For each section
     for (size_t i = 1; !failed && i < file_hdr.e_shnum; ++i) {
         Elf64_Shdr *sec = section_hdrs + i;
 
-        print_line("section %d:"
-                   " name=%s"
-                   " addr=%llx"
-                   " size=%llx"
-                   " off=%llx"
-                   " flags=%llx"
-                   " type=%x",
-                   i,
-                   section_names + sec->sh_name,
-                   sec->sh_addr,
-                   sec->sh_size,
-                   sec->sh_offset,
-                   sec->sh_flags,
-                   sec->sh_type);
+        //print_line("section %d:"
+        //           " name=%s"
+        //           " addr=%llx"
+        //           " size=%llx"
+        //           " off=%llx"
+        //           " flags=%llx"
+        //           " type=%x",
+        //           i,
+        //           section_names + sec->sh_name,
+        //           sec->sh_addr,
+        //           sec->sh_size,
+        //           sec->sh_offset,
+        //           sec->sh_flags,
+        //           sec->sh_type);
 
         uint64_t page_flags = 0;
 
@@ -207,6 +215,9 @@ uint16_t elf64_run(char const *filename)
             if (read_size > remain)
                 read_size = remain;
 
+            if (sec->sh_addr)
+                done_bytes += read_size;
+
             // Read from disk if program section
             if (sec->sh_type == SHT_PROGBITS) {
                 if (read_size != boot_pread(
@@ -231,6 +242,8 @@ uint16_t elf64_run(char const *filename)
             // Add misalignment offset
             copy_or_enter(address_window + (addr & (PAGE_SIZE-1)),
                           (uint32_t)read_buffer, read_size);
+
+            progress_bar_draw(20, 10, 70, 100 * (double)done_bytes / (double)total_bytes);
         }
 
         // Clear modified bits if uninitialized data
@@ -244,6 +257,9 @@ uint16_t elf64_run(char const *filename)
             failed = 1;
     }
     boot_close(file);
+
+    paging_modify_flags(address_window, PAGE_SIZE << 1,
+                        ~(uint64_t)0, 0);
 
     free(section_names);
     free(section_hdrs);

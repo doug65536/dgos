@@ -102,8 +102,8 @@ static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create)
                 break;
             }
 
-            print_line("Creating page directory for %llx",
-                       (uint64_t)(linear_addr >> shift) << shift);
+            //print_line("Creating page directory for %llx",
+            //           (uint64_t)(linear_addr >> shift) << shift);
 
             // Allocate a page table on first use
             next_segment = allocate_page_table();

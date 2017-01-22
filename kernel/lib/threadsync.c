@@ -226,7 +226,6 @@ EXPORT void condvar_wake_all(condition_var_t *var)
     for (thread_wait_t *wait = (void*)var->link.next;
          wait != (void*)&var->link;
          wait = (void*)thread_wait_del(&wait->link)) {
-        // FIXME: unlink thread_wait_t
         thread_resume(wait->thread);
     }
 

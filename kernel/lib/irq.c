@@ -1,7 +1,29 @@
 #include "irq.h"
+#include "types.h"
+#include "string.h"
+#include "cpu/spinlock.h"
+#include "cpu/atomic.h"
+
+typedef int16_t intr_link_t;
+
+typedef struct intr_handler_reg_t {
+    intr_link_t next;
+    int16_t refcount;
+    int16_t intr;
+    int16_t eoi_handler;
+    intr_handler_t handler;
+} intr_handler_reg_t;
+
+// Singly linked list head for each interrupt
+static intr_link_t intr_first[256];
 
 // Interrupt handler vectors
-static intr_handler_t intr_handlers[128];
+#define MAX_INTR_HANDLERS   256
+static intr_link_t intr_first_free;
+static intr_link_t intr_handlers_count;
+static intr_handler_reg_t intr_handlers[128];
+
+static spinlock_t intr_handler_reg_lock;
 
 static void (*irq_setmask_vec)(int irq, int unmask);
 static void (*irq_hook_vec)(int irq, intr_handler_t handler);
@@ -37,32 +59,124 @@ void irq_unhook(int irq, intr_handler_t handler)
     irq_unhook_vec(irq, handler);
 }
 
+static intr_handler_reg_t *intr_alloc(void)
+{
+    intr_handler_reg_t *entry;
+
+    if (intr_handlers_count == 0 || intr_first_free < 0) {
+        entry = intr_handlers + intr_handlers_count++;
+    } else {
+        entry = intr_handlers + intr_first_free;
+        intr_first_free = entry->next;
+    }
+
+    return entry;
+}
+
 void intr_hook(int intr, intr_handler_t handler)
 {
-    intr_handlers[intr] = handler;
+    spinlock_hold_t hold = spinlock_lock_noirq(
+                &intr_handler_reg_lock);
+
+    if (intr_handlers_count == 0) {
+        // First time initialization
+        intr_first_free = -1;
+        memset(intr_first, -1, sizeof(intr_first));
+    }
+
+    intr_link_t *prev_link = &intr_first[intr];
+
+    intr_handler_reg_t *entry = 0;
+    while (*prev_link >= 0) {
+        entry = intr_handlers + *prev_link;
+
+        if (entry->intr == intr &&
+                entry->handler == handler) {
+            ++entry->refcount;
+            break;
+        }
+
+        prev_link = &entry->next;
+
+        entry = 0;
+    }
+
+    if (!entry) {
+        entry = intr_alloc();
+
+        entry->next = -1;
+        entry->refcount = 1;
+        entry->intr = intr;
+        entry->eoi_handler = 0;
+        entry->handler = handler;
+
+        atomic_barrier();
+        *prev_link = entry - intr_handlers;
+    }
+
+    spinlock_unlock_noirq(&intr_handler_reg_lock, &hold);
 }
 
-void intr_unhook(int irq, intr_handler_t handler)
+static void intr_delete(intr_link_t *prev_link,
+                        intr_handler_reg_t *entry)
 {
-    if (intr_handlers[irq] == handler)
-        intr_handlers[irq] = 0;
+    *prev_link = entry->next;
+    entry->next = intr_first_free;
+    intr_first_free = entry - intr_handlers;
 }
 
-void *intr_invoke(int intr, void *ctx)
+void intr_unhook(int intr, intr_handler_t handler)
 {
-    if (intr_handlers[intr])
-        return intr_handlers[intr](intr, ctx);
-    return ctx;
+    spinlock_hold_t hold = spinlock_lock_noirq(
+                &intr_handler_reg_lock);
+
+    intr_link_t *prev_link = &intr_first[intr];
+
+    intr_handler_reg_t *entry = 0;
+    while (*prev_link != 0) {
+        entry = intr_handlers + *prev_link;
+
+        if (entry->intr == intr && entry->handler == handler) {
+            if (--entry->refcount)
+                intr_delete(prev_link, entry);
+            break;
+        }
+
+        prev_link = &entry->next;
+
+        entry = 0;
+    }
+
+    spinlock_unlock_noirq(&intr_handler_reg_lock, &hold);
 }
 
 int intr_has_handler(int intr)
 {
-    return intr_handlers[intr] != 0;
+    return intr_handlers_count > 0 && intr_first[intr] >= 0;
+}
+
+void *intr_invoke(int intr, void *ctx)
+{
+    if (intr_has_handler(intr)) {
+        intr_handler_reg_t *entry;
+        for (intr_link_t i = intr_first[intr];
+             i >= 0; i = entry->next) {
+            entry = intr_handlers + i;
+            ctx = entry->handler(intr, ctx);
+        }
+    }
+    return ctx;
 }
 
 void *irq_invoke(int intr, int irq, void *ctx)
 {
-    if (intr_handlers[intr])
-        return intr_handlers[intr](irq, ctx);
+    if (intr_has_handler(intr)) {
+        intr_handler_reg_t *entry;
+        for (intr_link_t i = intr_first[intr];
+             i >= 0; i = entry->next) {
+            entry = intr_handlers + i;
+            ctx = entry->handler(irq, ctx);
+        }
+    }
     return ctx;
 }

@@ -7,6 +7,7 @@
 #include "paging.h"
 #include "utf.h"
 #include "elf64.h"
+#include "fs.h"
 
 // Bytes Per Sector	BPB_BytsPerSec	0x0B	16 Bits	Always 512 Bytes
 // Sectors Per Cluster	BPB_SecPerClus	0x0D	8 Bits	1,2,4,8,16,32,64,128
@@ -168,11 +169,11 @@ typedef struct filename_info_t {
 
 // ===========================================================================
 
-bpb_data_t bpb;
-sector_iterator_t *file_handles;
+static bpb_data_t bpb;
+static fat32_sector_iterator_t *file_handles;
 #define MAX_HANDLES 5
 
-char *sector_buffer;
+static char *sector_buffer;
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
@@ -221,8 +222,8 @@ static uint16_t is_eof_cluster(uint32_t cluster)
 // Returns -1 on error
 // Returns 0 on EOF
 // Returns 1 on success
-static int16_t sector_iterator_begin(
-        sector_iterator_t *iter,
+static int16_t fat32_sector_iterator_begin(
+        fat32_sector_iterator_t *iter,
         char *sector,
         uint32_t cluster)
 {
@@ -285,7 +286,7 @@ static uint32_t next_cluster(
 // Returns 0 on EOF
 // Returns 1 if successfully advanced to next sector
 static int16_t sector_iterator_next(
-        sector_iterator_t *iter,
+        fat32_sector_iterator_t *iter,
         char *sector,
         uint16_t read_data)
 {
@@ -323,7 +324,7 @@ static int16_t sector_iterator_next(
 }
 
 static int16_t sector_iterator_seek(
-        sector_iterator_t *iter,
+        fat32_sector_iterator_t *iter,
         uint32_t sector_offset,
         char *sector)
 {
@@ -334,7 +335,7 @@ static int16_t sector_iterator_seek(
         return is_eof_now ? 0 : 1;
     }
 
-    int16_t status = sector_iterator_begin(
+    int16_t status = fat32_sector_iterator_begin(
                 iter, sector, iter->start_cluster);
 
     while (status > 0 && sector_offset--)
@@ -354,7 +355,7 @@ static int16_t read_directory_begin(
         char *sector,
         uint32_t cluster)
 {
-    int16_t status = sector_iterator_begin(
+    int16_t status = fat32_sector_iterator_begin(
                 &iter->dir_file, sector, cluster);
     iter->sector_index = 0;
 
@@ -740,35 +741,7 @@ static uint32_t find_file_by_name(char const *filename,
     return 0;
 }
 
-void boot_partition(uint32_t partition_lba)
-{
-    file_handles = calloc(MAX_HANDLES, sizeof(*file_handles));
-
-    paging_init();
-
-    print_line("Booting partition at LBA %u", partition_lba);
-
-    uint16_t err = read_bpb(partition_lba);
-    if (err) {
-        print_line("Error reading BPB!");
-        return;
-    }
-
-    print_line("root_dir_start:	  %d", bpb.root_dir_start);     // 0x2C LBA
-    print_line("sec_per_fat:      %d", bpb.sec_per_fat);        // 0x24 1 per 128 clusters
-    print_line("reserved_sectors: %d", bpb.reserved_sectors);	// 0x0E Usually 32
-    print_line("bytes_per_sec:	  %d", bpb.bytes_per_sec);		// 0x0B Always 512
-    print_line("signature:		  %x", bpb.signature);			// 0x1FE Always 0xAA55
-    print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);    // 0x0D 8=4KB cluster
-    print_line("number_of_fats:	  %d", bpb.number_of_fats);		// 0x10 Always 2
-
-    //uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
-    //print_line("kernel start=%d", root);
-
-    elf64_run("dgos-kernel");
-}
-
-static int find_available_file_handle()
+static int fat32_find_available_file_handle(void)
 {
     for (size_t i = 0; i < MAX_HANDLES; ++i) {
         if (file_handles[i].start_cluster == 0)
@@ -777,7 +750,7 @@ static int find_available_file_handle()
     return -1;
 }
 
-int boot_open(char const *filename)
+static int fat32_boot_open(char const *filename)
 {
     uint32_t cluster;
 
@@ -787,12 +760,12 @@ int boot_open(char const *filename)
         return -1;
 
     // Allocate a file handle
-    int file = find_available_file_handle();
+    int file = fat32_find_available_file_handle();
     if (file < 0)
         return -1;
 
     // Get ready to read the file
-    int16_t status = sector_iterator_begin(
+    int16_t status = fat32_sector_iterator_begin(
                 file_handles + file, sector_buffer, cluster);
     if (status < 0)
         return -1;
@@ -801,7 +774,7 @@ int boot_open(char const *filename)
     return file;
 }
 
-int boot_close(int file)
+static int fat32_boot_close(int file)
 {
     if (file < 0 || file >= MAX_HANDLES)
         return -1;
@@ -818,7 +791,7 @@ int boot_close(int file)
     return result;
 }
 
-int boot_pread(int file, void *buf, size_t bytes, off_t ofs)
+static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 {
     if (file < 0 || file >= MAX_HANDLES)
         return -1;
@@ -866,4 +839,36 @@ int boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     }
 
     return total;
+}
+
+void fat32_boot_partition(uint32_t partition_lba)
+{
+    file_handles = calloc(MAX_HANDLES, sizeof(*file_handles));
+
+    paging_init();
+
+    print_line("Booting partition at LBA %u", partition_lba);
+
+    uint16_t err = read_bpb(partition_lba);
+    if (err) {
+        print_line("Error reading BPB!");
+        return;
+    }
+
+    print_line("root_dir_start:	  %d", bpb.root_dir_start);     // 0x2C LBA
+    print_line("sec_per_fat:      %d", bpb.sec_per_fat);        // 0x24 1 per 128 clusters
+    print_line("reserved_sectors: %d", bpb.reserved_sectors);	// 0x0E Usually 32
+    print_line("bytes_per_sec:	  %d", bpb.bytes_per_sec);		// 0x0B Always 512
+    print_line("signature:		  %x", bpb.signature);			// 0x1FE Always 0xAA55
+    print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);    // 0x0D 8=4KB cluster
+    print_line("number_of_fats:	  %d", bpb.number_of_fats);		// 0x10 Always 2
+
+    //uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
+    //print_line("kernel start=%d", root);
+
+    fs_api.boot_open = fat32_boot_open;
+    fs_api.boot_close = fat32_boot_close;
+    fs_api.boot_pread = fat32_boot_pread;
+
+    elf64_run("dgos_kernel");
 }

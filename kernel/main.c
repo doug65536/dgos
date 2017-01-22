@@ -48,14 +48,14 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD     0
-#define ENABLE_STRESS_THREAD    0
-#define ENABLE_SLEEP_THREAD     0
-#define ENABLE_MUTEX_THREAD     0
-#define ENABLE_REGISTER_THREAD  0
-#define STRESS_MMAP_THREAD      8
+#define ENABLE_SHELL_THREAD         0
+#define ENABLE_AHCI_STRESS_THREAD   0
+#define ENABLE_SLEEP_THREAD         0
+#define ENABLE_MUTEX_THREAD         0
+#define ENABLE_REGISTER_THREAD      0
+#define ENABLE_STRESS_MMAP_THREAD   4
 
-#if ENABLE_SHELL_THREAD
+#if ENABLE_SHELL_THREAD > 0
 static int shell_thread(void *p)
 {
     (void)p;
@@ -74,7 +74,7 @@ static int shell_thread(void *p)
 }
 #endif
 
-#if ENABLE_STRESS_THREAD > 0
+#if ENABLE_AHCI_STRESS_THREAD > 0
 static int read_stress(void *p)
 {
     (void)p;
@@ -90,13 +90,9 @@ static int read_stress(void *p)
 
     while (1) {
         ++*(char*)p;
-        //thread_sleep_for(1000);
-
         uint64_t lba = rand_range(0, 32000);
 
         drive->vtbl->read(drive, data, 65536/512, lba);
-
-        //sleep(1);
     }
 
     return 0;
@@ -105,7 +101,7 @@ static int read_stress(void *p)
 
 #if ENABLE_SLEEP_THREAD
 typedef struct test_thread_param_t {
-    char *p;
+    uint16_t *p;
     int sleep;
 } test_thread_param_t;
 
@@ -422,24 +418,21 @@ static int register_check(void *p)
 }
 #endif
 
-#if STRESS_MMAP_THREAD > 0
+#if ENABLE_STRESS_MMAP_THREAD > 0
 static int stress_mmap_thread(void *p)
 {
     (void)p;
-    void *blocks[STRESS_MMAP_THREAD];
-    for (;;) {
-        for (int i = 0; i < STRESS_MMAP_THREAD; ++i) {
-            blocks[i] = mmap(0, 1 << 20,
-                             PROT_READ | PROT_WRITE,
-                             0, -1, 0);
-        }
-        for (int i = 0; i < STRESS_MMAP_THREAD; ++i) {
-            memset(blocks[i], 0, 1 << 20);
-        }
-        for (int i = 0; i < STRESS_MMAP_THREAD; ++i) {
-            munmap(blocks[i], 1 << 20);
-        }
-        printdbg("Allocated and freed %dMB\n", STRESS_MMAP_THREAD);
+    void *block;
+    for (unsigned iter = 0; iter < 50; ++iter) {
+        block = mmap(0, 1 << 12,
+                     PROT_READ | PROT_WRITE,
+                     0, -1, 0);
+
+        memset(block, 0, 1 << 12);
+
+        munmap(block, 1 << 12);
+
+        //printdbg("Ran mmap test iteration %u\n", iter);
     }
     return 0;
 }
@@ -458,50 +451,46 @@ static int init_thread(void *p)
     // Register partition schemes
     callout_call('P');
 
-#if ENABLE_SHELL_THREAD
+#if ENABLE_SHELL_THREAD > 0
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0);
 #endif
 
 #if ENABLE_SLEEP_THREAD
-    static test_thread_param_t ttp[4] = {
-        { (char*)0xb8004, 953 },
-        { (char*)0xb8006, 701 },
-        { (char*)0xb8008, 556 },
-        { (char*)0xb800A, 299 }
-    };
+    static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
 
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
+        ttp[i].sleep = i * 100;
+        ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
         thread_create(other_thread, ttp + i, 0, 0);
-#endif
-
-#if ENABLE_STRESS_THREAD > 0
-    thread_t stress_threads[ENABLE_STRESS_THREAD];
-    for (int i = 0; i < ENABLE_STRESS_THREAD; ++i) {
-        stress_threads[i] = thread_create(
-                    read_stress, (char*)(uintptr_t)
-                    (0xb8000+ 80*2 + 2*i), 0, 0);
     }
-
-    //thread_set_affinity(stress_threads[0], 1);
-    //thread_set_affinity(stress_threads[0], 4);
 #endif
 
-#if ENABLE_REGISTER_THREAD
-    thread_create(register_check, (void*)0xDEADFEEDF00DD00D, 0, 0);
-    thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
-    thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
-    thread_create(register_check, (void*)0xFEEDBEEFFACEF00D, 0, 0);
+#if ENABLE_AHCI_STRESS_THREAD > 0
+    for (int i = 0; i < ENABLE_AHCI_STRESS_THREAD; ++i) {
+        thread_create(read_stress, (char*)(uintptr_t)
+                      (0xb8000+ 80*2 + 2*i), 0, 0);
+    }
 #endif
 
-#if ENABLE_MUTEX_THREAD
+#if ENABLE_REGISTER_THREAD > 0
+    for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
+        thread_create(register_check, (void*)
+                      (0xDEADFEEDF00DD00D +
+                       (1<<ENABLE_AHCI_STRESS_THREAD)), 0, 0);
+    }
+#endif
+
+#if ENABLE_MUTEX_THREAD > 0
     mutex_init(&stress_lock);
-    thread_create(stress_mutex, 0, 0, 0);
-    thread_create(stress_mutex, 0, 0, 0);
-    thread_create(stress_mutex, 0, 0, 0);
+    for (int i = 0; i < ENABLE_MUTEX_THREAD; ++i) {
+        thread_create(stress_mutex, 0, 0, 0);
+    }
 #endif
 
-#if STRESS_MMAP_THREAD
-    thread_create(stress_mmap_thread, 0, 0, 0);
+#if ENABLE_STRESS_MMAP_THREAD > 0
+    for (int i = 0; ENABLE_STRESS_MMAP_THREAD; ++i) {
+        thread_create(stress_mmap_thread, 0, 0, 0);
+    }
 #endif
 
     return 0;
@@ -513,6 +502,14 @@ int main(void)
     keybd_init();
     keyb8042_init();
 
+    void *a = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
+    void *b = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
+    void *c = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
+    munmap(b, 1 << 12);
+    munmap(a, 1 << 12);
+    munmap(c, 1 << 12);
+
+    (void)init_thread;
     rbtree_test();
 
     thread_create(init_thread, 0, 0, 0);

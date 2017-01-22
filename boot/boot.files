@@ -45,3 +45,9 @@ mpentry.h
 vesa.c
 vesa.h
 .gitignore
+progressbar.c
+progressbar.h
+iso9660.c
+iso9660.h
+fs.h
+fs.c

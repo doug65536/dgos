@@ -61,7 +61,8 @@ void register_part_device(const char *name, part_vtbl_t *vtbl)
         part_devs[part_dev_count++] = vtbl;
 
         storage_dev_base_t *drive = open_storage_dev(0);
-        vtbl->detect(drive);
+        if (drive)
+            vtbl->detect(drive);
     }
     printk("%s device registered\n", name);
 }

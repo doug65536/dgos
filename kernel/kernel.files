@@ -116,3 +116,6 @@ lib/export.h
 lib/rand.h
 lib/rand.c
 arch/x86_64/nano_time.c
+arch/x86_64/cpu/syscall.s
+arch/x86_64/cpu/syscall_dispatch.c
+arch/x86_64/cpu/syscall_dispatch.h

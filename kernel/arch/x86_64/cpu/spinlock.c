@@ -171,6 +171,8 @@ void rwspinlock_sh_lock(rwspinlock_t *lock)
                 pause();
                 old_value = *lock;
             } while (old_value < 0);
+        } else {
+            pause();
         }
     }
 }
@@ -179,18 +181,16 @@ void rwspinlock_sh_unlock(rwspinlock_t *lock)
 {
     atomic_barrier();
     rwspinlock_t old_value = *lock;
-    for (;;) {
+    for (;; pause()) {
         if (old_value > 0) {
             // Try to decrease shared count
-            rwspinlock_t new_value = old_value - 1;
             rwspinlock_t cur_value = atomic_cmpxchg(
-                        lock, old_value, new_value);
+                        lock, old_value, old_value - 1);
 
             if (cur_value == old_value)
                 break;
 
             old_value = cur_value;
-            pause();
         } else {
             // Make sure shared lock is actually held
             assert(old_value > 0);

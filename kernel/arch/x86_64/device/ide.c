@@ -84,24 +84,43 @@ static if_list_t ide_if_detect(void)
     if (!pci_enumerate_begin(&iter, 1, 1))
         return list;
 
+    static ioport_t std_ports[] = {
+        0x1F0, 0x3F6,
+        0x170, 0x376,
+        0x1E8, 0x3EE,
+        0x168, 0x36E
+    };
+
+    size_t std_idx = 0;
+
     do {
         ide_if_t *dev = ide_ifs + ide_if_count++;
 
-        dev->ports[0].cmd = (iter.config.base_addr[0] <= 1)
-                ? 0x1F0
-                : iter.config.base_addr[0];
+        dev->vtbl = &ide_if_device_vtbl;
 
-        dev->ports[0].ctl = (iter.config.base_addr[1] <= 1)
-                ? 0x3F6
-                : iter.config.base_addr[1];
+        dev->ports[0].cmd = (iter.config.base_addr[0] > 1)
+                ? iter.config.base_addr[0]
+                : std_idx < countof(std_ports)
+                ? std_ports[std_idx++]
+                : 0;
 
-        dev->ports[1].cmd = (iter.config.base_addr[2] <= 1)
-                ? 0x170
-                : iter.config.base_addr[2];
+        dev->ports[0].ctl = (iter.config.base_addr[1] > 1)
+                ? iter.config.base_addr[1]
+                : std_idx < countof(std_ports)
+                ? std_ports[std_idx++]
+                : 0;
 
-        dev->ports[1].ctl = (iter.config.base_addr[3] <= 1)
-                ? 0x376
-                : iter.config.base_addr[3];
+        dev->ports[1].cmd = (iter.config.base_addr[2] > 1)
+                ? iter.config.base_addr[2]
+                : std_idx < countof(std_ports)
+                ? std_ports[std_idx++]
+                : 0;
+
+        dev->ports[1].ctl = (iter.config.base_addr[3] > 1)
+                ? iter.config.base_addr[3]
+                : std_idx < countof(std_ports)
+                ? std_ports[std_idx++]
+                : 0;
 
         dev->bmdma_base = iter.config.base_addr[4];
 
@@ -119,6 +138,12 @@ static if_list_t ide_if_detect(void)
                            offsetof(pci_config_hdr_t, irq_line),
                            14);
         }
+
+        // Sanity check ports, reject entry if any are zero
+        if (dev->ports[0].cmd == 0 || dev->ports[0].ctl == 0 ||
+                dev->ports[1].cmd == 0 || dev->ports[1].ctl == 0)
+            --ide_if_count;
+
     } while (pci_enumerate_next(&iter));
 
     list.count = ide_if_count;

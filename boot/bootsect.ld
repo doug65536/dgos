@@ -32,7 +32,7 @@ SECTIONS {
         *(.rodata.*)
 
 		/* sector align end */
-        . = ALIGN(512);
+		. = ALIGN(2048) + 1024;
 		__initialized_data_end = .;
 	} = 0xCC
 
@@ -42,8 +42,6 @@ SECTIONS {
         *(.bss.*)
         *(COMMON)
 		___bss_en = .;
-
-		. = ALIGN(16);
 	}
 
 	__initial_stack = 0xfff0;

@@ -11,7 +11,7 @@ SECTIONS {
 	 */
 
 	/* Code and read-only data */
-	.text 0x0000400000000000 : {
+	.text 0x400000000000 : {
 		PROVIDE_HIDDEN(___text_st = .);
 		*(.entry)
 
@@ -44,10 +44,11 @@ SECTIONS {
 		PROVIDE_HIDDEN(___callout_array_en = .);
 
 		. = ALIGN(64);
+		PROVIDE_HIDDEN(___rodata = .);
 		*(.rodata)
 		*(SORT(.rodata.*))
 
-		*(.text .stub .text.* .gnu.linkonce.t.*)
+		*(.stub .text.* .gnu.linkonce.t.*)
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
 
@@ -136,11 +137,13 @@ SECTIONS {
 	}
 
 	.got : ALIGN(4096) {
+		PROVIDE_HIDDEN(___got = .);
 		*(.got*)
 		*(.got.plt)
 	}
 
 	.rela.dyn : {
+		PROVIDE_HIDDEN(___rela_dyn = .);
 		*(.rela.init)
 		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
 		*(.rela.fini)
@@ -159,6 +162,7 @@ SECTIONS {
 	}
 
 	.rela.plt : {
+		PROVIDE_HIDDEN(___rela_plt = .);
 		*(.rela.plt)
 		PROVIDE_HIDDEN (__rela_iplt_start = .);
 		*(.rela.iplt)
@@ -166,15 +170,18 @@ SECTIONS {
 	}
 
 	.plt : {
+		PROVIDE_HIDDEN(___plt = .);
 		*(.plt)
 		*(.iplt)
 	}
 
 	.plt.got : {
+		PROVIDE_HIDDEN(___plt_got = .);
 		*(.plt.got)
 	}
 
 	.plt.bnd : {
+		PROVIDE_HIDDEN(___plt_bnd = .);
 		*(.plt.bnd)
 	}
 

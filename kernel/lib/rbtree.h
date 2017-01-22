@@ -17,8 +17,8 @@ typedef int (*rbtree_visitor_t)(rbtree_t *tree,
                                 void *p);
 
 typedef int (*rbtree_cmp_t)(
-        rbtree_kvp_t *lhs,
-        rbtree_kvp_t *rhs,
+        rbtree_kvp_t const *lhs,
+        rbtree_kvp_t const *rhs,
         void *p);
 
 rbtree_t *rbtree_create(rbtree_cmp_t cmp, void *p, size_t capacity);

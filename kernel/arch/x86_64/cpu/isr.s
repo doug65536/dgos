@@ -16,7 +16,7 @@
 .endm
 
 .macro isr_entry has_code int_num
-.globl isr_entry_\int_num\()
+.global isr_entry_\int_num\()
 .hidden isr_entry_\int_num\()
 isr_entry_\int_num\():
 	.cfi_startproc
@@ -65,7 +65,6 @@ isr_entry 0 28
 isr_entry 0 29
 isr_entry 1 30
 isr_entry 0 31
-
 
 # PIC IRQ handlers (16 IRQs)
 .irp int_num,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47

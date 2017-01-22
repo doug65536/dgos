@@ -18,6 +18,9 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
+CC := clang
+export CC
+
 CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | \
 	head -n 1 | \
 	grep clang > /dev/null) && \
@@ -78,7 +81,7 @@ CFLAGS ?= -g3 -fno-stack-protector \
 ifdef OPTIMIZE
 CFLAGS += \
 	-O2 -ftree-vectorize \
-	-fomit-frame-pointer -fbuiltin
+	-fno-omit-frame-pointer -fbuiltin
 else
 CFLAGS += \
 	-O0 \

@@ -18,6 +18,11 @@
 #include "rbtree.h"
 #include "idt.h"
 
+#define DEBUG_ADDR_ALLOC    1
+#define DEBUG_PHYS_ALLOC    1
+#define DEBUG_PAGE_TABLES   1
+#define DEBUG_PAGE_FAULT    0
+
 // Intel manual, page 2786
 
 // The entries of the 4 levels of page tables are named:
@@ -137,23 +142,15 @@ typedef uintptr_t pte_t;
 typedef uintptr_t physaddr_t;
 typedef uintptr_t linaddr_t;
 
-// Root directory entry 254 and 255 are reserved
-// for mapping page tables. 255 maps the kernel
-// page tables, 254 maps the process page tables.
-// This allows processes mappings to trivially
-// share the kernel mapping by copying entry 255
-// of the root directory entry.
-//
-// The user page tables are mapped at
+// The page tables are mapped at
 //  0x7f0000000000
-// The kernel page tables are mapped at
-//  0x7f8000000000
 
 // Linear addresses
 #define PT_BASEADDR   (0x7F0000000000UL)
 #define PT_MAX_ADDR    (0x800000000000UL)
 
 // The number of pte_t entries at each level
+// Total data 275,415,828,480 bytes
 #define PT3_ENTRIES     (0x800000000UL)
 #define PT2_ENTRIES     (0x4000000UL)
 #define PT1_ENTRIES     (0x20000UL)
@@ -190,10 +187,6 @@ size_t phys_mem_map_count;
 physmem_range_t ranges[64];
 size_t usable_ranges;
 
-#define DEBUG_ADDR_ALLOC    0
-#define DEBUG_PHYS_ALLOC    0
-#define DEBUG_PAGE_FAULT    0
-
 physaddr_t root_physaddr;
 
 // Bitmask of available aliasing ptes (top one taken already)
@@ -210,7 +203,7 @@ static linaddr_t volatile linear_allocator = (linaddr_t)___init_brk;
 // because some hardware requires 32-bit memory addresses
 // [0] is the chain >= 4GB
 // [1] is the chain < 4GB
-static uint32_t volatile phys_next_free[2];
+static uint64_t volatile phys_next_free[2];
 
 // Incremented every time the page tables are changed
 // Used to detect lazy TLB shootdown
@@ -224,25 +217,41 @@ static rbtree_t *free_addr_by_addr;
 static linaddr_t take_linear(size_t size);
 static void release_linear(linaddr_t addr, size_t size);
 
-static int take_linear_cmp(
-        rbtree_kvp_t *lhs,
-        rbtree_kvp_t *rhs,
+static int take_linear_cmp_key(
+        rbtree_kvp_t const *lhs,
+        rbtree_kvp_t const *rhs,
+        void *p);
+
+static int take_linear_cmp_both(
+        rbtree_kvp_t const *lhs,
+        rbtree_kvp_t const *rhs,
         void *p);
 
 static uint64_t volatile page_fault_count;
 
+static int64_t volatile free_page_count;
+
 static void mmu_free_phys(physaddr_t addr)
 {
-    uint32_t volatile *chain = phys_next_free + (addr < 0x100000000UL);
+    uint64_t volatile *chain = phys_next_free + (addr < 0x100000000UL);
     uint64_t index = (addr - 0x100000UL) >> PAGE_SIZE_BIT;
-    uint32_t old_next = *chain;
+    uint64_t old_next = *chain;
     for (;;) {
-        phys_alloc[index] = old_next;
+        assert(index < phys_alloc_count);
+        phys_alloc[index] = (int32_t)old_next;
+        uint64_t next_version = (old_next & 0xFFFFFFFF00000000UL) +
+                0x100000000UL;
 
-        uint32_t cur_next = atomic_cmpxchg(chain, old_next, index);
+        uint64_t cur_next = atomic_cmpxchg(chain, old_next, index | next_version);
 
-        if (cur_next == old_next)
+        if (cur_next == old_next) {
+            atomic_inc_int64(&free_page_count);
+
+#if DEBUG_PHYS_ALLOC
+            printdbg("Free phys page addr=%lx\n", addr);
+#endif
             break;
+        }
 
         old_next = cur_next;
 
@@ -252,13 +261,22 @@ static void mmu_free_phys(physaddr_t addr)
 
 static physaddr_t mmu_alloc_phys(int low)
 {
-    uint32_t volatile *chain = phys_next_free + !!low;
+    // Use low memory immediately if high
+    // memory is exhausted
+    low |= (phys_next_free[0] == 0);
 
-    uint32_t index = *chain;
+    uint64_t volatile *chain = phys_next_free + !!low;
+
+    uint64_t index_version = *chain;
     for (;;) {
-        uint32_t new_next = phys_alloc[index];
+        uint64_t next_version = (index_version & 0xFFFFFFFF00000000UL) +
+                0x100000000UL;
+        uint32_t index = (uint32_t)index_version;
+        uint64_t new_next = index ? phys_alloc[index] : 0;
 
-        assert(new_next);
+        assert(index < phys_alloc_count);
+
+        new_next |= next_version;
 
         if (!new_next) {
             // Resort to low memory pages if high memory exhausted
@@ -269,14 +287,25 @@ static physaddr_t mmu_alloc_phys(int low)
             return 0;
         }
 
-        uint32_t cur_next = atomic_cmpxchg(chain, index, new_next);
+        assert((new_next & 0xFFFFFFFFUL) < phys_alloc_count);
 
-        if (cur_next == index) {
+        uint64_t cur_next = atomic_cmpxchg(chain, index_version, new_next);
+
+        if (cur_next == index_version) {
+            atomic_dec_int64(&free_page_count);
+
             phys_alloc[index] = 0;
-            return (((physaddr_t)index) << PAGE_SIZE_BIT) + 0x100000;
+            physaddr_t addr = (((physaddr_t)index) <<
+                               PAGE_SIZE_BIT) + 0x100000;
+
+#if DEBUG_PHYS_ALLOC
+            printdbg("Allocated phys page addr=%lx\n", addr);
+#endif
+
+            return addr;
         }
 
-        index = cur_next;
+        index_version = cur_next;
 
         pause();
     }
@@ -625,6 +654,10 @@ static physaddr_t init_take_page(int low)
     if (last_range->size == 0)
         --usable_ranges;
 
+#if DEBUG_PHYS_ALLOC
+    printdbg("Took early page @ %lx\n", addr);
+#endif
+
     return addr;
 }
 
@@ -645,7 +678,7 @@ static pte_t *init_find_aliasing_pte(void)
 
 static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 {
-    uint64_t linaddr;
+    linaddr_t linaddr;
 
     if ((linaddr_t)aliasing_pte >= PT_BASEADDR) {
         uint64_t pt3_index = aliasing_pte - PT3_PTR(PT_BASEADDR);
@@ -703,16 +736,32 @@ static void init_create_pt(
             // Allocate a new page table
             addr = init_take_page(0);
 
+            assert(addr != 0);
+
             // Atomically update current page table to point to new page
             old_pte = atomic_cmpxchg(iter + path[level],
                                      0, addr | page_flags | PTE_PRESENT);
             if (old_pte == 0) {
+#if DEBUG_PHYS_ALLOC
+                printdbg("Assigned page table for level=%u"
+                         " %3u/%3u/%3u/%3u %12lx @ %13lx\n",
+                         level, path[0], path[1], path[2], path[3],
+                        linear_addr, addr);
+#endif
+
                 // Map aliasing page to point to new page
                 iter = init_map_aliasing_pte(aliasing_pte, addr);
 
                 // Clear new page
                 aligned16_memset((void*)iter, 0, PAGE_SIZE);
             } else {
+#if DEBUG_PHYS_ALLOC
+                printdbg("Racing thread already assigned page table for level=%u"
+                         " %3u/%3u/%3u/%3u %12lx @ %13lx\n",
+                         level, path[0], path[1], path[2], path[3],
+                        linear_addr, addr);
+#endif
+
                 // Return page to pool
                 mmu_free_phys(addr);
 
@@ -733,6 +782,16 @@ static void init_create_pt(
     if (levels == 3 && !(iter[path[3]] & PTE_PRESENT)) {
         old_pte = atomic_cmpxchg(iter + path[3],
                 0, (phys_addr & PTE_ADDR) | page_flags);
+
+        assert(old_pte == 0);
+
+#if DEBUG_PHYS_ALLOC
+        printdbg("Assigned page table for level=%u"
+                 " %3u/%3u/%3u/%3u %12lx @ %13lx\n",
+                 3, path[0], path[1], path[2], path[3],
+                linear_addr, phys_addr);
+#endif
+
         cpu_invalidate_page(linear_addr);
     }
 }
@@ -775,15 +834,12 @@ static int ptes_present(pte_t **ptes)
     int present_mask;
 
     present_mask = (*ptes[0] & PTE_PRESENT);
-
-    if (present_mask == 1)
-        present_mask |= (*ptes[1] & PTE_PRESENT) << 1;
-
-    if (present_mask == 3)
-        present_mask |= (*ptes[2] & PTE_PRESENT) << 2;
-
-    if (present_mask == 7)
-        present_mask |= (*ptes[3] & PTE_PRESENT) << 3;
+    present_mask |= (present_mask == 1 &&
+                     (*ptes[1] & PTE_PRESENT)) << 1;
+    present_mask |= (present_mask == 3 &&
+                     (*ptes[2] & PTE_PRESENT)) << 2;
+    present_mask |= (present_mask == 7 &&
+                     (*ptes[3] & PTE_PRESENT)) << 3;
 
     return present_mask;
 }
@@ -858,6 +914,8 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
             // Allocate a page
             physaddr_t page = init_take_page(0);
 
+            assert(page != 0);
+
 #if DEBUG_PAGE_FAULT
             printdbg("Assigning %lx with page %lx\n",
                      fault_addr, page);
@@ -876,6 +934,10 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
                                (page & PTE_ADDR) |
                                page_flags) != pte) {
                 // Another thread beat us to it
+                printdbg("Racing thread already assigned page"
+                         " for %lx, freeing page %lx\n",
+                         fault_addr, page);
+
                 mmu_free_phys(page);
                 cpu_invalidate_page(fault_addr);
             }
@@ -981,6 +1043,8 @@ void mmu_init(int ap)
     // Get a page
     root_physaddr = init_take_page(0);
 
+    assert(root_physaddr != 0);
+
     // Map page
     pte_t *root = init_map_aliasing_pte(aliasing_pte, root_physaddr);
 
@@ -1081,18 +1145,26 @@ void mmu_init(int ap)
 
     // Put all of the remaining physical memory into the free lists
     uint64_t free_count = 0;
+    physaddr_t top_of_kernel = ___top_physaddr;
     for (; ; ++free_count) {
         physaddr_t addr = init_take_page(0);
-        if (addr >= ___top_physaddr && addr <
-                0x8000000000000000UL) {
-            uint32_t volatile *chain = phys_next_free +
+
+        assert(addr != 0);
+
+        if (addr > top_of_kernel &&
+                addr < 0x8000000000000000UL) {
+            uint64_t volatile *chain = phys_next_free +
                     (addr < 0x100000000UL);
             addr -= 0x100000U;
             addr >>= PAGE_SIZE_BIT;
             assert(addr < phys_alloc_count);
             phys_alloc[addr] = *chain;
             *chain = addr;
+
+            ++free_page_count;
         } else {
+            //for (unsigned i = 0; i < phys_alloc_count; ++i)
+            //    printdbg("[%x]: %x\n", i, phys_alloc[i]);
             break;
         }
     }
@@ -1115,8 +1187,8 @@ void mmu_init(int ap)
 
     mutex_init(&free_addr_lock);
 
-    free_addr_by_addr = rbtree_create(take_linear_cmp, 0, 1 << 20);
-    free_addr_by_size = rbtree_create(take_linear_cmp, 0, 1 << 20);
+    free_addr_by_addr = rbtree_create(take_linear_cmp_key, 0, 1 << 20);
+    free_addr_by_size = rbtree_create(take_linear_cmp_both, 0, 1 << 20);
 
     rbtree_insert(free_addr_by_size,
                   PT_BASEADDR - linear_allocator,
@@ -1139,9 +1211,20 @@ static size_t round_down(size_t n)
 //
 // Linear address allocator
 
-static int take_linear_cmp(
-        rbtree_kvp_t *lhs,
-        rbtree_kvp_t *rhs,
+static int take_linear_cmp_key(
+        rbtree_kvp_t const *lhs,
+        rbtree_kvp_t const *rhs,
+        void *p)
+{
+    (void)p;
+    return lhs->key < rhs->key ? -1 :
+            rhs->key < lhs->key ? 1 :
+            0;
+}
+
+static int take_linear_cmp_both(
+        rbtree_kvp_t const *lhs,
+        rbtree_kvp_t const *rhs,
         void *p)
 {
     (void)p;
@@ -1152,6 +1235,37 @@ static int take_linear_cmp(
             0;
 }
 
+static void sanity_check_by_size(rbtree_t *tree)
+{
+    static int call = 0;
+    ++call;
+
+    rbtree_kvp_t prev = { 0, 0 };
+    rbtree_kvp_t curr = { 0, 0 };
+
+    for (rbtree_iter_t it = rbtree_first(tree, 0);
+         it;
+         it = rbtree_next(tree, it)) {
+        curr = rbtree_item(tree, it);
+        assert(prev.val + prev.key != curr.val);
+        prev = curr;
+    }
+}
+
+static void sanity_check_by_addr(rbtree_t *tree)
+{
+    rbtree_kvp_t prev = { 0, 0 };
+    rbtree_kvp_t curr = { 0, 0 };
+
+    for (rbtree_iter_t it = rbtree_first(tree, 0);
+         it;
+         it = rbtree_next(tree, it)) {
+        curr = rbtree_item(tree, it);
+        assert(prev.key + prev.val != curr.key);
+        prev = curr;
+    }
+}
+
 static linaddr_t take_linear(size_t size)
 {
     // Round up to a multiple of the page size
@@ -1160,6 +1274,10 @@ static linaddr_t take_linear(size_t size)
     linaddr_t addr;
 
     if (free_addr_by_addr && free_addr_by_size) {
+        static int call;
+        if (++call == 205) {
+            assert(!"stop ffs");
+        }
         mutex_lock(&free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
@@ -1173,6 +1291,12 @@ static linaddr_t take_linear(size_t size)
                     free_addr_by_size, size, 0);
 
         rbtree_kvp_t by_size = rbtree_item(free_addr_by_size, place);
+
+        if (by_size.key < size) {
+            place = rbtree_next(free_addr_by_size, place);
+            by_size = rbtree_item(free_addr_by_size, place);
+        }
+
         rbtree_delete_at(free_addr_by_size, place);
 
         // Delete corresponding entry by address
@@ -1200,6 +1324,9 @@ static linaddr_t take_linear(size_t size)
 #endif
 
         mutex_unlock(&free_addr_lock);
+
+        sanity_check_by_size(free_addr_by_size);
+        sanity_check_by_addr(free_addr_by_addr);
     } else {
         addr = atomic_xadd_uint64(&linear_allocator, size);
     }
@@ -1233,7 +1360,7 @@ static void release_linear(linaddr_t addr, size_t size)
 
     // Find the nearest free block after the freed range
     rbtree_iter_t succ_it = rbtree_lower_bound(
-                free_addr_by_addr, end, 0);
+                free_addr_by_addr, end, ~0UL);
 
     rbtree_kvp_t pred = rbtree_item(free_addr_by_addr, pred_it);
     rbtree_kvp_t succ = rbtree_item(free_addr_by_addr, succ_it);
@@ -1283,6 +1410,57 @@ static int mmu_have_nx(void)
     return supported > 0;
 }
 
+#if 0
+void map_page_tables(linaddr_t addr_st, size_t len)
+{
+    // Inclusive end
+    linaddr_t addr_en = addr_st + len - 1;
+
+    //
+    // Start and end paths and ptes for mapped region
+
+    unsigned path_st[4];
+    pte_t *pte_st[4];
+
+    unsigned path_en[4];
+    pte_t *pte_en[4];
+
+    path_from_addr(path_st, addr_st);
+    path_from_addr(path_en, addr_en);
+
+    pte_from_path(pte_st, path_st);
+    pte_from_path(pte_en, path_en);
+
+    //
+    // Start and end paths and ptes for page tables for region
+
+    unsigned pte_path_st[4];
+    pte_t *pte_pte_st[4];
+
+    unsigned pte_path_en[4];
+    pte_t *pte_pte_en[4];
+
+    for (int pt_pt_level = 0; pt_pt_level < 4; ++pt_pt_level) {
+        path_from_addr(pte_path_st, (linaddr_t)pte_st[pt_pt_level]);
+        path_from_addr(pte_path_en, (linaddr_t)pte_en[pt_pt_level]);
+
+        pte_from_path(pte_pte_st, pte_path_st);
+        pte_from_path(pte_pte_en, pte_path_en);
+
+        for (pte_t *slot = pte_pte_st[pt_pt_level];
+             slot <= pte_pte_en[pt_pt_level]; ++slot) {
+
+            for (int pt_level; pt_level < 4; ++pt_level) {
+                if (*slot == 0) {
+                    physaddr_t page = init_take_page(0);
+                    *slot = page | PTE_PRESENT | PTE_WRITABLE;
+                }
+            }
+        }
+    }
+}
+#endif
+
 //
 // Public API
 
@@ -1293,25 +1471,27 @@ int mpresent(uintptr_t addr)
     return addr_present(addr, path, ptes) == 0x0F;
 }
 
-void *mmap(
-        void *addr,
-        size_t len,
-        int prot,
-        int flags,
-        int fd,
-        off_t offset)
+void *mmap(void *addr, size_t len,
+           int prot, int flags,
+           int fd, off_t offset)
 {
     // Bomb out on unsupported stuff, for now
     if (fd != -1 || offset != 0 || !len)
         return 0;
 
+#if DEBUG_PAGE_TABLES
+    printdbg("Mapping len=%zx prot=%x flags=%x addr=%lx\n",
+             len, prot, flags, (uintptr_t)addr);
+#endif
+
     pte_t page_flags = 0;
 
-    if (flags & MAP_STACK)
+    if (flags & (MAP_STACK | MAP_32BIT))
         flags |= MAP_POPULATE;
 
     if (flags & MAP_PHYSICAL)
-        page_flags |= PTE_PCD | PTE_PWT | PTE_EX_PHYSICAL | PTE_PRESENT;
+        page_flags |= PTE_PCD | PTE_PWT |
+                PTE_EX_PHYSICAL | PTE_PRESENT;
 
     if (flags & MAP_NOCACHE)
         page_flags |= PTE_PCD;
@@ -1337,6 +1517,8 @@ void *mmap(
 
     linaddr_t linear_addr = take_linear(len);
 
+    assert(linear_addr > 0x100000);
+
     for (size_t ofs = 0; ofs < len; ofs += PAGE_SIZE)
     {
         if (likely(!(flags & MAP_PHYSICAL))) {
@@ -1346,8 +1528,10 @@ void *mmap(
             physaddr_t page = PTE_ADDR;
 
             // If populating, assign physical memory immediately
-            if (flags & MAP_POPULATE)
+            if (flags & MAP_POPULATE) {
                 page = init_take_page(!!(flags & MAP_32BIT));
+                assert(page != 0);
+            }
 
             mmu_map_page(linear_addr + ofs, page, page_flags);
         } else {
@@ -1362,6 +1546,8 @@ void *mmap(
     atomic_inc_uint64(&mmu_seq);
     //mmu_send_tlb_shootdown();
 
+    assert(linear_addr > 0x100000);
+
     return (void*)(linear_addr + misalignment);
 }
 
@@ -1373,6 +1559,7 @@ void *mremap(
         ... /* void *__new_address */)
 {
     void *new_address = 0;
+    (void)new_address;
 
     if (!(flags & MREMAP_FIXED)) {
         va_list ap;
@@ -1423,24 +1610,22 @@ int munmap(void *addr, size_t size)
 {
     linaddr_t a = (linaddr_t)addr;
 
-    uint64_t misalignment = 0;
+    uintptr_t misalignment = 0;
 
     misalignment = a & PAGE_MASK;
     a -= misalignment;
     size += misalignment;
+    size = round_up(size);
 
     unsigned path[4];
     path_from_addr(path, a);
 
     pte_t *pteptr[4];
 
-    for (size_t ofs = 0; ofs < size + PAGE_MASK; ofs += PAGE_SIZE)
+    for (size_t ofs = 0; ofs < size; ofs += PAGE_SIZE)
     {
         int present_mask = path_present(path, pteptr);
-        if ((present_mask & 0x07) != 0x07)
-            return -1;
-
-        if (present_mask == 0x0F) {
+        if ((present_mask & 0x07) == 0x07) {
             pte_t pte = atomic_xchg(pteptr[3], 0);
 
             if (!(pte & PTE_EX_PHYSICAL)) {
@@ -1450,7 +1635,8 @@ int munmap(void *addr, size_t size)
                     mmu_free_phys(physaddr);
             }
 
-            cpu_invalidate_page(a);
+            if (present_mask == 0x0F)
+                cpu_invalidate_page(a);
         }
 
         a += PAGE_SIZE;
@@ -1459,7 +1645,7 @@ int munmap(void *addr, size_t size)
 
     mmu_send_tlb_shootdown();
 
-    release_linear((linaddr_t)addr, size);
+    release_linear((linaddr_t)addr - misalignment, size);
 
     return 0;
 }

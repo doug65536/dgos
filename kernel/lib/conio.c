@@ -1,4 +1,5 @@
 #include "conio.h"
+#include "assert.h"
 
 text_display_base_t *console_display;
 text_display_vtbl_t console_display_vtbl;
@@ -40,6 +41,7 @@ void con_move_cursor(int dx, int dy)
 
 int con_draw_xy(int x, int y, char const *s, int attr)
 {
+    assert(console_display_vtbl.draw_xy);
     return console_display_vtbl.draw_xy(
                 console_display, x, y, s, attr);
 }

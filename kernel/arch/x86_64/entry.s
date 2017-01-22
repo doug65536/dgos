@@ -1,8 +1,10 @@
 .section .entry
 
-.globl entry
+.global entry
 .hidden entry
 entry:
+	xor %ebp,%ebp
+
 	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions CR4_OSXMMEX)
 	# This must be done before jumping into C code
 	mov %cr4,%rax
@@ -32,6 +34,10 @@ entry:
 	pop %rdx
 	test $0x100,%eax
 	jnz 0f
+
+	# Align stack
+	xor %ebp,%ebp
+	push $0
 
 	# MP processor entry
 	jmp mp_main
@@ -73,7 +79,7 @@ entry:
 	mov %rax,%rdi
 	call exit
 
-.globl exit
+.global exit
 .hidden exit
 exit:
 	# Ignore exitcode
@@ -103,7 +109,7 @@ invoke_function_array:
 	ret
 
 # Callout to initialize AP CPU
-.globl mp_main
+.global mp_main
 .hidden mp_main
 mp_main:
 	mov $'S',%edi

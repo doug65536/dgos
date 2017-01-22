@@ -5,7 +5,7 @@
 // Handles advancing through the sectors of
 // a cluster and following the cluster chain
 // to the next cluster
-typedef struct sector_iterator_t {
+typedef struct fat32_sector_iterator_t {
     uint32_t start_cluster;
 
     // Cluster number of current position
@@ -19,21 +19,16 @@ typedef struct sector_iterator_t {
     uint16_t sector_offset;
 
     uint16_t err;
-} sector_iterator_t;
+} fat32_sector_iterator_t;
 
 // Handles iterating a directory and advancing
 // to the next dir_union_t
 typedef struct dir_iterator_t {
     // Directory file iterator
-    sector_iterator_t dir_file;
+    fat32_sector_iterator_t dir_file;
 
     // dir_entry_t index into sector
     uint16_t sector_index;
 } dir_iterator_t;
 
-void boot_partition(uint32_t partition_lba);
-
-// Open/close/read file on the boot drive
-int boot_open(char const *filename);
-int boot_close(int file);
-int boot_pread(int file, void *buf, size_t bytes, off_t ofs);
+void fat32_boot_partition(uint32_t partition_lba);

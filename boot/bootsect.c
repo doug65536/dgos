@@ -73,9 +73,16 @@ __asm__ (
     ".section .text\n"
 );
 
+#include "types.h"
+
+// If this is nonzero, then we are booting from CD
+extern uint32_t bootinfo_file_location;
+extern uint32_t bootinfo_primary_volume_desc;
+
 #include "bootsect.h"
 #include "part.h"
 #include "fat32.h"
+#include "iso9660.h"
 
 #define __stdcall __attribute__((stdcall))
 #define __packed __attribute__((packed))
@@ -230,19 +237,24 @@ __attribute__((used)) int init(void)
     drive_geometry = get_drive_geometry(boot_drive);
 #endif
 
-    // Calculate how many more sectors to load
-    uint16_t load_size = (__initialized_data_end - __initialized_data_start) >> 9;
+    if (bootinfo_file_location == 0) {
+        // Calculate how many more sectors to load
+        uint16_t load_size = (__initialized_data_end - __initialized_data_start) >> 9;
 
-    uint16_t err = read_lba_sectors((char*)(0x7c00u + 512),
-                                   boot_drive, 1,
-                                   load_size - 1);
+        uint16_t err = read_lba_sectors((char*)(0x7c00u + 512),
+                                       boot_drive, 1,
+                                       load_size - 1);
 
-    if (err != 0)
-        halt(0);
+        if (err != 0)
+            halt(0);
+    }
 
     fully_loaded = 1;
 
-    boot_partition(partition_table[0].start_lba);
+    if (bootinfo_file_location == 0)
+        fat32_boot_partition(partition_table[0].start_lba);
+    else
+        iso9660_boot_partition(bootinfo_primary_volume_desc);
 
     return 0;
 }

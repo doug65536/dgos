@@ -68,6 +68,8 @@ typedef struct cpu_info_t cpu_info_t;
 struct thread_info_t {
     isr_context_t * volatile ctx;
 
+    void *syscall_stack;
+
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
     thread_priority_t volatile priority_boost;
@@ -86,7 +88,7 @@ struct thread_info_t {
     condition_var_t done_cond;
     int exit_code;
 
-    int align[3];
+    int align[1];
 };
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
@@ -234,6 +236,11 @@ static thread_t thread_create_with_state(
             thread->flags |= THREAD_FLAG_OWNEDSTACK;
         }
 
+        // Syscall stack
+        thread->syscall_stack = (char*)mmap(
+                    0, 1 << 14, PROT_READ | PROT_WRITE,
+                    MAP_STACK, -1, 0) + (1 << 14);
+
         thread->stack = stack;
         thread->stack_size = stack_size;
         thread->priority = priority;
@@ -274,13 +281,13 @@ static thread_t thread_create_with_state(
         ctx->gpr.iret.rsp = (uint64_t)(ctx + 1);
         ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.iret.rflags = EFLAGS_IF;
-        ctx->gpr.iret.rip = (thread_fn_t)(void*)thread_startup;
+        ctx->gpr.iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
         ctx->gpr.iret.cs = GDT_SEL_KERNEL_CODE64;
         ctx->gpr.s[0] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.r[0] = (uint64_t)(void*)fn;
+        ctx->gpr.r[0] = (uint64_t)(uintptr_t)fn;
         ctx->gpr.r[1] = (uint64_t)userdata;
         ctx->gpr.r[2] = (uint64_t)i;
         ctx->gpr.fsbase = teb;
@@ -290,6 +297,7 @@ static thread_t thread_create_with_state(
 
         ctx->ctx.gpr = &ctx->gpr;
         ctx->ctx.fpr = &ctx->fpr;
+        ctx->align = 0;
 
         thread->ctx = &ctx->ctx;
 
