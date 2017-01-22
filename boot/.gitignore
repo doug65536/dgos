@@ -2,3 +2,7 @@
 bin
 dump
 diskimg
+cdstage/
+dgos.iso
+Makefile.user
+Makefile.user.user

@@ -2,6 +2,7 @@
 #include "string.h"
 #include "mm.h"
 #include "assert.h"
+#include "printk.h"
 
 typedef struct blk_hdr_t {
     size_t sig;
@@ -26,6 +27,8 @@ void *malloc(size_t size)
                         PROT_READ | PROT_WRITE,
                         0, -1, 0);
 
+    printdbg("malloc %lx\n", (uintptr_t)p);
+
     p->size = size;
     set_sig(p);
 
@@ -36,8 +39,8 @@ void *calloc(size_t num, size_t size)
 {
     size_t bytes = num * size;
     void *p = malloc(bytes);
-    if (p)
-        memset(p, 0, bytes);
+    //if (p)
+    //    memset(p, 0, bytes);
     return p;
 }
 

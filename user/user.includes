@@ -1,0 +1,5 @@
+libc
+libc/include
+libc/src
+libc/syscall
+.

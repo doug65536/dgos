@@ -1,0 +1,12 @@
+Makefile
+libc/syscall/syscall.h
+libc/include/string.h
+libc/src/memcpy.c
+libc/syscall/x86_64/syscall1.c
+libc/syscall/x86_64/syscall2.c
+libc/syscall/x86_64/syscall3.c
+libc/syscall/x86_64/syscall4.c
+libc/syscall/x86_64/syscall5.c
+libc/syscall/x86_64/syscall6.c
+libc/syscall/x86_64/syscall0.c
+.gitignore
