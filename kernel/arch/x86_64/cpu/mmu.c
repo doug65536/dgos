@@ -655,7 +655,7 @@ static physaddr_t init_take_page(int low)
         --usable_ranges;
 
 #if DEBUG_PHYS_ALLOC
-    printdbg("Took early page @ %lx\n", addr);
+    //printdbg("Took early page @ %lx\n", addr);
 #endif
 
     return addr;
