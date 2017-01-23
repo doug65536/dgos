@@ -870,5 +870,5 @@ void fat32_boot_partition(uint32_t partition_lba)
     fs_api.boot_close = fat32_boot_close;
     fs_api.boot_pread = fat32_boot_pread;
 
-    elf64_run("dgos_kernel");
+    elf64_run("dgos-kernel");
 }

@@ -220,11 +220,11 @@ $(ISO_STAGE)/bootsect.bin: $(BOOTSECTORS)
 	@mkdir -p $(@D)
 	$(CP) $< $@
 
-$(ISO_STAGE)/dgos_kernel: kernel $(KERNELSYMBOLFILE)
+$(ISO_STAGE)/dgos-kernel: $(KERNELSYMBOLFILE)
 	@mkdir -p $(@D)
 	$(CP) $(KERNELSYMBOLFILE) $@
 
-$(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos_kernel
+$(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos-kernel
 	# Do some gymnastics to get the number of 512-byte
 	# blocks for -boot-load-size
 	( \
@@ -242,18 +242,29 @@ $(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos_kernel
 			$(ISO_STAGE) \
 	)
 
+run-iso-singlecpu: $(ISO_FILE)
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+		-device isa-debugcon,chardev=qemu-debug-out
+
+run-iso: $(ISO_FILE)
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+		-device isa-debugcon,chardev=qemu-debug-out \
+		-smp cpus=8,cores=4,threads=1
+
 debug-iso-boot: $(ISO_FILE)
 	 $(GDB) --symbols $(SYMBOLFILE) --tui \
 		-ex 'b iso9660_boot_partition' \
 		-ex 'b iso9660_boot_open' \
 		-ex 'b iso9660_boot_close' \
 		-ex 'b iso9660_boot_pread' \
-		-ex 'target remote | exec $(QEMU) -m 6G -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
 
 debug-iso-kernel: $(ISO_FILE)
 	 $(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
 		-ex 'b *0x400000000000' \
-		-ex 'target remote | exec $(QEMU) -m 6G -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
 
 #
 # Debug in KVM
@@ -286,7 +297,8 @@ run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-s -m $(QEMU_RAM) -smp cpus=8,cores=4,threads=1 \
+		-s -m $(QEMU_RAM) \
+		-smp cpus=8,cores=4,threads=1 \
 		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 		-device isa-debugcon,chardev=qemu-debug-out \
 		-net nic,model=rtl8139 \
@@ -411,7 +423,7 @@ umountdisk:
 inject-kernel: all
 	$(MAKE) mountdisk
 	(cd ../kernel && $(MAKE))
-	$(CP) ../kernel/bin/kernel disk/dgos_kernel
+	$(CP) ../kernel/bin/kernel disk/dgos-kernel
 	$(MAKE) umountdisk
 
 .PHONY: all clean run debug-bochs debug bochs-symbols

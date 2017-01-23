@@ -203,11 +203,25 @@ typedef struct iso9660_sector_iterator_t {
 #define MAX_HANDLES 5
 iso9660_sector_iterator_t *file_handles;
 
-static char *sector_buffer;
+static char *iso9660_sector_buffer;
 
-static uint32_t root_dir_lba;
-static uint32_t root_dir_size;
+typedef int (*iso9660_name_cmp_t)(
+        void const *candidate, void const *goal, size_t len);
 
+typedef void *(*iso9660_name_search_t)(
+        void const *candidate, int c, size_t len);
+
+static int iso9660_lvl2_cmp(void const *candidate,
+                              void const *goal,
+                              size_t len);
+
+static iso9660_name_search_t iso9660_name_search = memchr;
+static iso9660_name_cmp_t iso9660_name_comparer = iso9660_lvl2_cmp;
+
+static uint32_t iso9660_root_dir_lba;
+static uint32_t iso9660_root_dir_size;
+
+static uint8_t iso9660_char_shift;
 
 static int iso9660_find_available_file_handle(void)
 {
@@ -218,6 +232,55 @@ static int iso9660_find_available_file_handle(void)
     return -1;
 }
 
+static uint16_t bswap_16(uint16_t n)
+{
+    return (n >> 8) | (n << 8);
+}
+
+static int iso9660_lvl2_cmp(void const *candidate,
+                              void const *goal,
+                              size_t len)
+{
+    uint8_t const *g = goal;
+    uint8_t const *c = candidate;
+    if (c[len-1] == '.')
+        --len;
+    for (size_t i = 0; i < len; ++i) {
+        int8_t expect = *g;
+        if (expect >= 'a' && expect <= 'z')
+            expect += 'A' - 'a';
+       int diff = g[i] - expect;
+        if (diff)
+            return diff;
+    }
+    return 0;
+}
+
+static int iso9660_joliet_compare(void const *candidate,
+                           void const *goal,
+                           size_t len)
+{
+    char const *g = goal;
+    uint16_t const *c = candidate;
+    for (size_t i = 0; i < len; ++i) {
+        int diff = g[i] - bswap_16(c[i]);
+        if (diff)
+            return diff;
+    }
+    return 0;
+}
+
+static void *iso9660_joliet_search(void const *candidate,
+                            int c,
+                            size_t len)
+{
+    uint16_t const *can = candidate;
+    for (size_t i = 0; i < len; ++i)
+        if (bswap_16(can[i]) == c)
+            return (void*)can;
+    return 0;
+}
+
 static uint32_t find_file_by_name(char const *filename,
                                   uint32_t dir_lba,
                                   uint32_t dir_size,
@@ -226,19 +289,21 @@ static uint32_t find_file_by_name(char const *filename,
     size_t filename_len = strlen(filename);
 
     for (uint32_t ofs = 0; ofs < (dir_size >> 11); ++ofs) {
-        memset(sector_buffer, 0, 2048);
-        read_lba_sectors(sector_buffer, boot_drive, dir_lba + ofs, 1);
+        read_lba_sectors(iso9660_sector_buffer, boot_drive, dir_lba + ofs, 1);
 
-        iso9660_dir_ent_t *de = (void*)sector_buffer;
+        iso9660_dir_ent_t *de = (void*)iso9660_sector_buffer;
         iso9660_dir_ent_t *de_end = (void*)((char*)de + 2048);
 
         do {
             if (de->len >= sizeof(*de)) {
                 char *name = de->name;
-                char *name_end = memchr(name, ';', de->filename_len);
+                char *name_end = iso9660_name_search(name, ';', de->filename_len);
                 size_t name_len = name_end - name;
+                if (name_len > de->filename_len)
+                    name_len = de->filename_len;
+                name_len >>= iso9660_char_shift;
                 if (filename_len == name_len &&
-                        !memcmp(name, filename, name_len)) {
+                        !iso9660_name_comparer(name, filename, name_len)) {
                     *file_size = de->size_lo_le |
                             (de->size_hi_le << 16);
                     return de->lba_lo_le | (de->lba_hi_le << 16);
@@ -274,8 +339,9 @@ static int iso9660_boot_open(char const *filename)
     uint32_t file_size;
 
     // Find the start of the file
-    cluster = find_file_by_name(filename, root_dir_lba, root_dir_size,
-                                &file_size);
+    cluster = find_file_by_name(
+                filename, iso9660_root_dir_lba,
+                iso9660_root_dir_size, &file_size);
     if (cluster == 0)
         return -1;
 
@@ -286,7 +352,7 @@ static int iso9660_boot_open(char const *filename)
 
     // Get ready to read the file
     int16_t status = iso9660_sector_iterator_begin(
-                file_handles + file, sector_buffer,
+                file_handles + file, iso9660_sector_buffer,
                 cluster, file_size);
     if (status < 0)
         return -1;
@@ -324,7 +390,7 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 
     int16_t status;
 
-    status = read_lba_sectors(sector_buffer, boot_drive,
+    status = read_lba_sectors(iso9660_sector_buffer, boot_drive,
                      file_handles[file].lba +
                      sector_offset, 1);
 
@@ -346,7 +412,7 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
             break;
 
         // Copy data from sector buffer
-        memcpy(output, sector_buffer + byte_offset, limit);
+        memcpy(output, iso9660_sector_buffer + byte_offset, limit);
 
         bytes -= limit;
         output += limit;
@@ -355,9 +421,9 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         byte_offset = 0;
 
         if (bytes > 0) {
-            status = read_lba_sectors(sector_buffer, boot_drive,
-                                      file_handles[file].lba +
-                                      (++sector_offset), 1);
+            status = read_lba_sectors(
+                        iso9660_sector_buffer, boot_drive,
+                        file_handles[file].lba + (++sector_offset), 1);
         }
     }
 
@@ -370,21 +436,37 @@ void iso9660_boot_partition(uint32_t pvd_lba)
 
     paging_init();
 
-    sector_buffer = malloc(2048);
+    iso9660_sector_buffer = malloc(2048);
 
-    iso9660_pvd_t *pvd = (void*)sector_buffer;
+    iso9660_pvd_t *pvd = (void*)iso9660_sector_buffer;
+    uint32_t best_ofs = 0;
 
-    read_lba_sectors(sector_buffer, boot_drive, pvd_lba, 1);
+    for (uint32_t ofs = 0; ofs < 4; ++ofs) {
+        read_lba_sectors(iso9660_sector_buffer,
+                         boot_drive, pvd_lba + ofs, 1);
 
-    root_dir_lba = pvd->root_dirent.lba_lo_le |
+        if (pvd->type_code == 2) {
+            best_ofs = ofs;
+            iso9660_name_search = iso9660_joliet_search;
+            iso9660_name_comparer = iso9660_joliet_compare;
+            iso9660_char_shift = 1;
+            break;
+        }
+    }
+
+    if (best_ofs == 0)
+        read_lba_sectors(iso9660_sector_buffer,
+                         boot_drive, pvd_lba + best_ofs, 1);
+
+    iso9660_root_dir_lba = pvd->root_dirent.lba_lo_le |
             (pvd->root_dirent.lba_hi_le << 16);
 
-    root_dir_size = pvd->root_dirent.size_lo_le |
+    iso9660_root_dir_size = pvd->root_dirent.size_lo_le |
             (pvd->root_dirent.size_hi_le << 16);
 
     fs_api.boot_open = iso9660_boot_open;
     fs_api.boot_close = iso9660_boot_close;
     fs_api.boot_pread = iso9660_boot_pread;
 
-    elf64_run("DGOS_KERNEL.");
+    elf64_run("dgos-kernel");
 }
