@@ -119,3 +119,6 @@ arch/x86_64/nano_time.c
 arch/x86_64/cpu/syscall.s
 arch/x86_64/cpu/syscall_dispatch.c
 arch/x86_64/cpu/syscall_dispatch.h
+fs/iso9660.c
+fs/iso9660.h
+fs/iso9660_decl.h

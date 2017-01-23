@@ -49,7 +49,7 @@ void (** volatile device_list)(void) = device_constructor_list;
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         0
-#define ENABLE_AHCI_STRESS_THREAD   0
+#define ENABLE_AHCI_STRESS_THREAD   1
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -88,11 +88,14 @@ static int read_stress(void *p)
 
     printk("read buffer at %lx\n", (uint64_t)data);
 
+    uint64_t lba = 16;//rand_range(16, 32);
     while (1) {
         ++*(char*)p;
-        uint64_t lba = rand_range(0, 32000);
 
-        drive->vtbl->read(drive, data, 65536/512, lba);
+        drive->vtbl->read(drive, data, 1, lba);
+
+        if (++lba > 32)
+            lba = 16;
     }
 
     return 0;

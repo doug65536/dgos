@@ -38,24 +38,28 @@ static size_t partition_count;
 
 static if_list_t mbr_detect(storage_dev_base_t *drive)
 {
-    char sector[512];
+    long sector_size = drive->vtbl->info(drive, STORAGE_INFO_BLOCKSIZE);
     char sig[2];
 
-    drive->vtbl->read(drive, sector, 1, 0);
+    if (sector_size >= 512) {
+        char sector[sector_size];
 
-    memcpy(sig, sector + sizeof(sector) - sizeof(sig), sizeof(sig));
+        drive->vtbl->read(drive, sector, 1, 0);
 
-    partition_tbl_ent_t ptbl[4];
-    memcpy(ptbl, sector + 446, sizeof(ptbl));
+        memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
 
-    for (int i = 0;
-         i < 4 && partition_count < MAX_PARTITIONS; ++i) {
-        if (ptbl[i].system_id == 0x0C) {
-            part_dev_t *part = partitions + partition_count++;
-            part->drive = drive;
-            part->vtbl = &mbr_device_vtbl;
-            part->lba_st = ptbl[i].start_lba;
-            part->lba_len = ptbl[i].total_sectors;
+        partition_tbl_ent_t ptbl[4];
+        memcpy(ptbl, sector + 446, sizeof(ptbl));
+
+        for (int i = 0;
+             i < 4 && partition_count < MAX_PARTITIONS; ++i) {
+            if (ptbl[i].system_id == 0x0C) {
+                part_dev_t *part = partitions + partition_count++;
+                part->drive = drive;
+                part->vtbl = &mbr_device_vtbl;
+                part->lba_st = ptbl[i].start_lba;
+                part->lba_len = ptbl[i].total_sectors;
+            }
         }
     }
 

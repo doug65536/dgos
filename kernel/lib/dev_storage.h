@@ -41,6 +41,12 @@ struct storage_dev_base_t {
     storage_if_base_t *if_;
 };
 
+typedef enum storage_dev_info_t {
+    STORAGE_INFO_NONE = 0,
+    STORAGE_INFO_BLOCKSIZE = 1,
+    STORAGE_INFO_MAX = 0x7FFFFFFF
+} storage_dev_info_t;
+
 struct storage_dev_vtbl_t {
     // Startup/shutdown
     void (*cleanup)(storage_dev_base_t *);
@@ -54,6 +60,9 @@ struct storage_dev_vtbl_t {
                  uint64_t lba);
 
     int (*flush)(storage_dev_base_t *dev);
+
+    long (*info)(storage_dev_base_t *dev,
+                 storage_dev_info_t key);
 };
 
 //
@@ -83,7 +92,8 @@ void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
     name##_cleanup, \
     name##_read, \
     name##_write, \
-    name##_flush \
+    name##_flush, \
+    name##_info \
 }
 
 #ifdef STORAGE_DEV_NAME

@@ -216,6 +216,8 @@ debuggable-kernel-disk: kernel bootable-disk inject-kernel
 #
 # ISO
 
+iso: $(ISO_FILE)
+
 $(ISO_STAGE)/bootsect.bin: $(BOOTSECTORS)
 	@mkdir -p $(@D)
 	$(CP) $< $@
@@ -262,9 +264,16 @@ debug-iso-boot: $(ISO_FILE)
 		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
 
 debug-iso-kernel: $(ISO_FILE)
-	 $(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
+	$(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-m $(QEMU_RAM) \
 		-ex 'b *0x400000000000' \
 		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+
+debug-iso-wait: $(ISO_FILE)
+	 $(QEMU) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot
 
 #
 # Debug in KVM
@@ -429,7 +438,7 @@ inject-kernel: all
 .PHONY: all clean run debug-bochs debug bochs-symbols
 .PHONY: deletedisk bootable-disk debuggable-disk mountdisk umountdisk
 .PHONY: kernel debuggable-kernel-disk
-.PHONY: debug-iso-boot debug-iso-kernel
+.PHONY: iso debug-iso-boot debug-iso-kernel
 
 .PRECIOUS: $(DISKIMAGE)
 

@@ -880,6 +880,7 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 #define AHCI_HP_TFD_ERR_MASK    ((1U<<AHCI_HP_TFD_ERR_BITS)-1)
 
 #define AHCI_HP_TFD_ERR         (AHCI_HP_TFD_ERR_MASK<<AHCI_HP_TFD_ERR_BIT)
+#define AHCI_HP_TFD_SERR        (1U<<AHCI_HP_TFD_SERR_BIT)
 
 //
 // hba_port_t::sata_ctl
@@ -1115,6 +1116,7 @@ typedef struct hba_port_info_t {
     hba_cmd_hdr_t *cmd_hdr;
     hba_cmd_tbl_ent_t *cmd_tbl;
     async_callback_t callbacks[32];
+    uint32_t is_atapi;
     uint32_t sector_size;
     uint32_t volatile cmd_issued;
 
@@ -1157,6 +1159,7 @@ struct ahci_dev_t {
     storage_dev_vtbl_t *vtbl;
     ahci_if_t *if_;
     int port;
+    int is_atapi;
 };
 
 #define AHCI_MAX_DEVICES    16
@@ -1277,7 +1280,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
             error = 1;
 
         if ((port->taskfile_data & AHCI_HP_TFD_ERR) ||
-                (port->taskfile_data & AHCI_HP_TFD_SERR_BIT))
+                (port->taskfile_data & AHCI_HP_TFD_SERR))
             error = 2;
 
         // Invoke completion callback
@@ -1374,7 +1377,8 @@ static void ahci_port_start_all(ahci_if_t *dev)
 }
 
 static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
-                           hba_cmd_cfis_t *cfis, size_t fis_size,
+                           hba_cmd_cfis_t *cfis, void *atapi_fis,
+                           size_t fis_size,
                            hba_prdt_ent_t *prdts, size_t ranges_count,
                            int is_read,
                            void (*callback)(int error, uintptr_t arg),
@@ -1388,12 +1392,18 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
 
     spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
 
-    memcpy(cmd_tbl_ent->prdts, prdts, sizeof(*prdts) * ranges_count);
+    memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
 
     memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
 
+    if (atapi_fis) {
+        memcpy(cmd_tbl_ent->atapi_fis, atapi_fis,
+               sizeof(cmd_tbl_ent->atapi_fis));
+    }
+
     cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
-            (!is_read ? AHCI_CH_WR : 0);
+            (!is_read ? AHCI_CH_WR : 0) |
+            (atapi_fis ? AHCI_CH_ATAPI : 0);
     cmd_hdr->prdbc = 0;
     cmd_hdr->prdtl = ranges_count;
 
@@ -1427,7 +1437,7 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
     hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
 
-    memset(prdts, 0, sizeof(*prdts) * ranges_count);
+    memset(prdts, 0, sizeof(prdts));
     for (size_t i = 0; i < ranges_count; ++i) {
         prdts[i].dba = ranges[i].physaddr;
         prdts[i].dbc_intr = AHCI_PE_DBC_n(ranges[i].size);
@@ -1450,7 +1460,43 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
     memset(&cfis, 0, sizeof(cfis));
 
-    if (dev->use_ncq) {
+    uint8_t atapifis[16];
+
+    if (pi->is_atapi) {
+        //atapifis[0] = 0x8A;
+        atapifis[0] = 0x28;
+        atapifis[1] = 0;
+        atapifis[2] = (lba >> 24) & 0xFF;
+        atapifis[3] = (lba >> 16) & 0xFF;
+        atapifis[4] = (lba >>  8) & 0xFF;
+        atapifis[5] = (lba >>  0) & 0xFF;
+        atapifis[6] = 0;
+        atapifis[7] = (count >> 8) & 0xFF;
+        atapifis[8] = (count >> 0) & 0xFF;
+        atapifis[9] = 0;
+        atapifis[10] = 0;
+        atapifis[11] = 0;
+
+        atapifis[12] = 0;
+        atapifis[13] = 0;
+        atapifis[14] = 0;
+        atapifis[15] = 0;
+
+        fis_size = sizeof(cfis.h2d);
+
+        cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+        cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+        cfis.h2d.command = ATA_CMD_PACKET;
+        cfis.h2d.feature_lo = 1;    // DMA
+        cfis.h2d.lba0 = 0;
+        cfis.h2d.lba2 = 0;
+        cfis.h2d.lba3 = 2048 >> 8;
+        cfis.h2d.lba5 = 0;
+        cfis.h2d.count = 0;
+
+        // LBA
+        cfis.d2h.device = 0;
+    } else if (dev->use_ncq) {
         fis_size = sizeof(cfis.ncq);
 
         cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
@@ -1482,6 +1528,7 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
         cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
         cfis.h2d.lba5 = (lba >> 40);
         cfis.h2d.count = count;
+        cfis.h2d.feature_lo = 1;
 
         // LBA
         cfis.d2h.device = AHCI_FIS_FUA_LBA;
@@ -1489,7 +1536,10 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
     atomic_barrier();
 
-    ahci_cmd_issue(dev, port_num, (unsigned)slot, &cfis, fis_size,
+    ahci_cmd_issue(dev, port_num, (unsigned)slot,
+                   &cfis,
+                   pi->is_atapi ? atapifis : 0,
+                   fis_size,
                    prdts, ranges_count, is_read,
                    callback, callback_arg);
 }
@@ -1554,9 +1604,17 @@ static void ahci_rebase(ahci_if_t *dev)
 
         ahci_perform_detect(dev, port_num);
 
-        // debug hack
-        if (port->sig != SATA_SIG_ATA)
+        // FIXME: do IDENTIFY instead of assuming 2KB/512B
+        if (port->sig == SATA_SIG_ATAPI) {
+            pi->is_atapi = 1;
+            pi->sector_size = 2048;
+            port->cmd |= AHCI_HP_CMD_ATAPI;
+        } else if (port->sig == SATA_SIG_ATA) {
+            pi->is_atapi = 0;
+            pi->sector_size = 512;
+        } else {
             continue;
+        }
 
         size_t port_buffer_size = 0;
 
@@ -1586,9 +1644,6 @@ static void ahci_rebase(ahci_if_t *dev)
         // Initialize with all unimplemented slots busy
         // (Workaround initially active slot on QEMU)
         pi->cmd_issued = init_busy_mask;
-
-        // Hack
-        dev->port_info[port_num].sector_size = 512;
 
         atomic_barrier();
         port->cmd_list_base = mphysaddr((void*)cmd_hdr);
@@ -1723,11 +1778,12 @@ static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
 
         hba_port_t volatile *port = self->mmio_base->ports + port_num;
 
-        if (port->sig == SATA_SIG_ATA) {
+        if (port->sig == SATA_SIG_ATA || port->sig == SATA_SIG_ATAPI) {
             ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
             drive->vtbl = &ahci_dev_device_vtbl;
             drive->if_ = self;
             drive->port = port_num;
+            drive->is_atapi = (port->sig == SATA_SIG_ATAPI);
         }
     }
 
@@ -1817,6 +1873,19 @@ static int ahci_dev_flush(storage_dev_base_t *dev)
 {
     STORAGE_DEV_DEV_PTR_UNUSED(dev);
     return 0;
+}
+
+static long ahci_dev_info(storage_dev_base_t *dev,
+                          storage_dev_info_t key)
+{
+    STORAGE_DEV_DEV_PTR(dev);
+    switch (key) {
+    case STORAGE_INFO_BLOCKSIZE:
+        return self->if_->port_info[self->port].sector_size;
+
+    default:
+        return 0;
+    }
 }
 
 REGISTER_storage_if_DEVICE(ahci);

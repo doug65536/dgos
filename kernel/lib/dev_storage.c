@@ -60,9 +60,12 @@ void register_part_device(const char *name, part_vtbl_t *vtbl)
     if (part_dev_count < MAX_PART_DEVS) {
         part_devs[part_dev_count++] = vtbl;
 
-        storage_dev_base_t *drive = open_storage_dev(0);
-        if (drive)
-            vtbl->detect(drive);
+        for (int dev = 0; dev < storage_dev_count; ++dev) {
+            storage_dev_base_t *drive = open_storage_dev(dev);
+            if (drive)
+                vtbl->detect(drive);
+            close_storage_dev(drive);
+        }
     }
     printk("%s device registered\n", name);
 }
