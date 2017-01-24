@@ -1104,10 +1104,11 @@ typedef struct hba_cmd_tbl_ent_t {
 
 C_ASSERT(sizeof(hba_cmd_tbl_ent_t) == 1024);
 
-typedef void (*async_callback_fn_t)(int error, uintptr_t arg);
+typedef void (*async_callback_fn_t)(int error, int done, uintptr_t arg);
 
 typedef struct async_callback_t {
     async_callback_fn_t callback;
+    int done;
     uintptr_t callback_arg;
 } async_callback_t;
 
@@ -1264,7 +1265,9 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
             async_callback_t volatile *callback_info = pi->callbacks + slot;
             async_callback_fn_t callback = callback_info->callback;
             if (callback) {
-                callback(error, callback_info->callback_arg);
+                callback(error,
+                         callback_info->done,
+                         callback_info->callback_arg);
                 callback_info->callback = 0;
                 callback_info->callback_arg = 0;
             }
@@ -1286,7 +1289,9 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
         // Invoke completion callback
         async_callback_t volatile *callback = pi->callbacks + slot;
         if (callback->callback) {
-            callback->callback(error, callback->callback_arg);
+            callback->callback(error,
+                               callback->done,
+                               callback->callback_arg);
             callback->callback = 0;
             callback->callback_arg = 0;
         }
@@ -1381,7 +1386,8 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
                            size_t fis_size,
                            hba_prdt_ent_t *prdts, size_t ranges_count,
                            int is_read,
-                           void (*callback)(int error, uintptr_t arg),
+                           async_callback_fn_t callback,
+                           int done,
                            uintptr_t callback_arg)
 {
     hba_port_info_t *pi = dev->port_info + port_num;
@@ -1408,6 +1414,7 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     cmd_hdr->prdtl = ranges_count;
 
     pi->callbacks[slot].callback = callback;
+    pi->callbacks[slot].done = done;
     pi->callbacks[slot].callback_arg = callback_arg;
 
     atomic_barrier();
@@ -1423,125 +1430,138 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
 
 static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
                       void *data, uint32_t count, int is_read,
-                      void (*callback)(int error, uintptr_t arg),
+                      async_callback_fn_t callback,
                       uintptr_t callback_arg)
 {
     mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
     size_t ranges_count;
 
-    hba_port_info_t *pi = dev->port_info + port_num;
-
-    ranges_count = mphysranges(ranges, countof(ranges),
-                               data, count * pi->sector_size,
-                               4<<20);
-
     hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
 
-    memset(prdts, 0, sizeof(prdts));
-    for (size_t i = 0; i < ranges_count; ++i) {
-        prdts[i].dba = ranges[i].physaddr;
-        prdts[i].dbc_intr = AHCI_PE_DBC_n(ranges[i].size);
-    }
+    hba_port_info_t *pi = dev->port_info + port_num;
 
-    // Wait for a slot
-    mutex_lock(&pi->slotalloc_lock);
-    int slot;
-    for (;;) {
-        slot = ahci_acquire_slot(dev, port_num);
-        if (slot >= 0)
-            break;
+    do {
+        ranges_count = mphysranges(ranges, countof(ranges),
+                                   data, count * pi->sector_size,
+                                   4<<20);
 
-        condvar_wait(&pi->slotalloc_avail, &pi->slotalloc_lock);
-    }
-    mutex_unlock(&pi->slotalloc_lock);
+        size_t transferred = 0;
 
-    hba_cmd_cfis_t cfis;
-    size_t fis_size;
+        memset(prdts, 0, sizeof(prdts));
+        for (size_t i = 0; i < ranges_count; ++i) {
+            prdts[i].dba = ranges[i].physaddr;
+            prdts[i].dbc_intr = AHCI_PE_DBC_n(ranges[i].size);
 
-    memset(&cfis, 0, sizeof(cfis));
+            transferred += ranges[i].size;
+        }
 
-    uint8_t atapifis[16];
+        size_t transferred_blocks = transferred / pi->sector_size;
 
-    if (pi->is_atapi) {
-        //atapifis[0] = 0x8A;
-        atapifis[0] = 0x28;
-        atapifis[1] = 0;
-        atapifis[2] = (lba >> 24) & 0xFF;
-        atapifis[3] = (lba >> 16) & 0xFF;
-        atapifis[4] = (lba >>  8) & 0xFF;
-        atapifis[5] = (lba >>  0) & 0xFF;
-        atapifis[6] = 0;
-        atapifis[7] = (count >> 8) & 0xFF;
-        atapifis[8] = (count >> 0) & 0xFF;
-        atapifis[9] = 0;
-        atapifis[10] = 0;
-        atapifis[11] = 0;
+        // Wait for a slot
+        mutex_lock(&pi->slotalloc_lock);
+        int slot;
+        for (;;) {
+            slot = ahci_acquire_slot(dev, port_num);
+            if (slot >= 0)
+                break;
 
-        atapifis[12] = 0;
-        atapifis[13] = 0;
-        atapifis[14] = 0;
-        atapifis[15] = 0;
+            condvar_wait(&pi->slotalloc_avail, &pi->slotalloc_lock);
+        }
+        mutex_unlock(&pi->slotalloc_lock);
 
-        fis_size = sizeof(cfis.h2d);
+        hba_cmd_cfis_t cfis;
+        size_t fis_size;
 
-        cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
-        cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
-        cfis.h2d.command = ATA_CMD_PACKET;
-        cfis.h2d.feature_lo = 1;    // DMA
-        cfis.h2d.lba0 = 0;
-        cfis.h2d.lba2 = 0;
-        cfis.h2d.lba3 = 2048 >> 8;
-        cfis.h2d.lba5 = 0;
-        cfis.h2d.count = 0;
+        memset(&cfis, 0, sizeof(cfis));
 
-        // LBA
-        cfis.d2h.device = 0;
-    } else if (dev->use_ncq) {
-        fis_size = sizeof(cfis.ncq);
+        uint8_t atapifis[16];
 
-        cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
-        cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
-        cfis.ncq.command = is_read
-                ? ATA_CMD_READ_DMA_NCQ
-                : ATA_CMD_WRITE_DMA_NCQ;
-        cfis.ncq.lba0 = lba & 0xFFFF;
-        cfis.ncq.lba2 = (lba >> 16) & 0xFF;
-        cfis.ncq.lba3 = (lba >> 24) & 0xFFFF;
-        cfis.ncq.lba5 = (lba >> 40);
-        cfis.ncq.count_lo = count & 0xFF;
-        cfis.ncq.count_hi = (count >> 8) & 0xFF;
-        cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
-        cfis.ncq.fua = AHCI_FIS_FUA_LBA |
-                (!is_read ? AHCI_FIS_FUA_FUA : 0);
-        cfis.ncq.prio = 0;
-        cfis.ncq.aux = 0;
-    } else {
-        fis_size = sizeof(cfis.h2d);
+        if (pi->is_atapi) {
+            atapifis[0] = 0xA8;
+            atapifis[1] = 0;
+            atapifis[2] = (lba >> 24) & 0xFF;
+            atapifis[3] = (lba >> 16) & 0xFF;
+            atapifis[4] = (lba >>  8) & 0xFF;
+            atapifis[5] = (lba >>  0) & 0xFF;
+            atapifis[6] = (transferred_blocks >> 24) & 0xFF;
+            atapifis[7] = (transferred_blocks >> 16) & 0xFF;
+            atapifis[8] = (transferred_blocks >>  8) & 0xFF;
+            atapifis[9] = (transferred_blocks >>  0) & 0xFF;
+            atapifis[10] = 0;
+            atapifis[11] = 0;
 
-        cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
-        cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
-        cfis.h2d.command = is_read
-                ? ATA_CMD_READ_DMA_EXT
-                : ATA_CMD_WRITE_DMA_EXT;
-        cfis.h2d.lba0 = lba & 0xFFFF;
-        cfis.h2d.lba2 = (lba >> 16) & 0xFF;
-        cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
-        cfis.h2d.lba5 = (lba >> 40);
-        cfis.h2d.count = count;
-        cfis.h2d.feature_lo = 1;
+            atapifis[12] = 0;
+            atapifis[13] = 0;
+            atapifis[14] = 0;
+            atapifis[15] = 0;
 
-        // LBA
-        cfis.d2h.device = AHCI_FIS_FUA_LBA;
-    }
+            fis_size = sizeof(cfis.h2d);
 
-    atomic_barrier();
+            cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+            cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+            cfis.h2d.command = ATA_CMD_PACKET;
+            cfis.h2d.feature_lo = 1;    // DMA
+            cfis.h2d.lba0 = 0;
+            cfis.h2d.lba2 = 0;
+            cfis.h2d.lba3 = 2048 >> 8;
+            cfis.h2d.lba5 = 0;
+            cfis.h2d.count = 0;
 
-    ahci_cmd_issue(dev, port_num, (unsigned)slot,
-                   &cfis,
-                   pi->is_atapi ? atapifis : 0,
-                   fis_size,
-                   prdts, ranges_count, is_read,
-                   callback, callback_arg);
+            // LBA
+            cfis.d2h.device = 0;
+        } else if (dev->use_ncq) {
+            fis_size = sizeof(cfis.ncq);
+
+            cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
+            cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
+            cfis.ncq.command = is_read
+                    ? ATA_CMD_READ_DMA_NCQ
+                    : ATA_CMD_WRITE_DMA_NCQ;
+            cfis.ncq.lba0 = lba & 0xFFFF;
+            cfis.ncq.lba2 = (lba >> 16) & 0xFF;
+            cfis.ncq.lba3 = (lba >> 24) & 0xFFFF;
+            cfis.ncq.lba5 = (lba >> 40);
+            cfis.ncq.count_lo = transferred_blocks & 0xFF;
+            cfis.ncq.count_hi = (transferred_blocks >> 8) & 0xFF;
+            cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
+            cfis.ncq.fua = AHCI_FIS_FUA_LBA |
+                    (!is_read ? AHCI_FIS_FUA_FUA : 0);
+            cfis.ncq.prio = 0;
+            cfis.ncq.aux = 0;
+        } else {
+            fis_size = sizeof(cfis.h2d);
+
+            cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+            cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+            cfis.h2d.command = is_read
+                    ? ATA_CMD_READ_DMA_EXT
+                    : ATA_CMD_WRITE_DMA_EXT;
+            cfis.h2d.lba0 = lba & 0xFFFF;
+            cfis.h2d.lba2 = (lba >> 16) & 0xFF;
+            cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
+            cfis.h2d.lba5 = (lba >> 40);
+            cfis.h2d.count = transferred_blocks;
+            cfis.h2d.feature_lo = 1;
+
+            // LBA
+            cfis.d2h.device = AHCI_FIS_FUA_LBA;
+        }
+
+        atomic_barrier();
+
+        ahci_cmd_issue(dev, port_num, (unsigned)slot,
+                       &cfis,
+                       pi->is_atapi ? atapifis : 0,
+                       fis_size,
+                       prdts, ranges_count, is_read,
+                       callback,
+                       count == transferred_blocks,
+                       callback_arg);
+
+        data = (char*)data + transferred;
+        lba += transferred_blocks;
+        count -= transferred_blocks;
+    } while (count > 0);
 }
 
 // The command engine must be stopped before calling ahci_perform_detect
@@ -1811,15 +1831,19 @@ typedef struct ahci_blocking_io_t {
     uint64_t lba;
 } ahci_blocking_io_t;
 
-static void ahci_async_complete(int error, uintptr_t arg)
+static void ahci_async_complete(int error,
+                                int done,
+                                uintptr_t arg)
 {
     ahci_blocking_io_t *state = (void*)arg;
 
     mutex_lock_noyield(&state->lock);
-    state->err = error;
-    state->done = 1;
+    if (error)
+        state->err = error;
+    state->done = done;
     mutex_unlock(&state->lock);
-    condvar_wake_one(&state->done_cond);
+    if (done)
+        condvar_wake_one(&state->done_cond);
 }
 
 static int ahci_dev_io(storage_dev_base_t *dev,
@@ -1856,17 +1880,20 @@ static int ahci_dev_io(storage_dev_base_t *dev,
     return block_state.err;
 }
 
-static int ahci_dev_read(storage_dev_base_t *dev,
-                         void *data, uint64_t count,
-                         uint64_t lba)
+static int ahci_dev_read_blocks(
+        storage_dev_base_t *dev,
+        void *data, uint64_t count,
+        uint64_t lba)
 {
     return ahci_dev_io(dev, data, count, lba, 1);
 }
 
-static int ahci_dev_write(storage_dev_base_t *dev,
-                void *data, uint64_t count, uint64_t lba)
+static int ahci_dev_write_blocks(
+        storage_dev_base_t *dev,
+        void const *data, uint64_t count,
+        uint64_t lba)
 {
-    return ahci_dev_io(dev, data, count, lba, 0);
+    return ahci_dev_io(dev, (void*)data, count, lba, 0);
 }
 
 static int ahci_dev_flush(storage_dev_base_t *dev)

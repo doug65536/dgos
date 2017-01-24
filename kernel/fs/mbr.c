@@ -44,7 +44,7 @@ static if_list_t mbr_detect(storage_dev_base_t *drive)
     if (sector_size >= 512) {
         char sector[sector_size];
 
-        drive->vtbl->read(drive, sector, 1, 0);
+        drive->vtbl->read_blocks(drive, sector, 1, 0);
 
         memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
 

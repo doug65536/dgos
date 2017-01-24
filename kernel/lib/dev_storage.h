@@ -51,13 +51,14 @@ struct storage_dev_vtbl_t {
     // Startup/shutdown
     void (*cleanup)(storage_dev_base_t *);
 
-    int (*read)(storage_dev_base_t *dev,
+    int (*read_blocks)(storage_dev_base_t *dev,
                 void *data, uint64_t count,
                 uint64_t lba);
 
-    int (*write)(storage_dev_base_t *dev,
-                 void *data, uint64_t count,
-                 uint64_t lba);
+    int (*write_blocks)(
+            storage_dev_base_t *dev,
+            void const *data, uint64_t count,
+            uint64_t lba);
 
     int (*flush)(storage_dev_base_t *dev);
 
@@ -90,8 +91,8 @@ void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
 
 #define MAKE_storage_dev_VTBL(name) { \
     name##_cleanup, \
-    name##_read, \
-    name##_write, \
+    name##_read_blocks, \
+    name##_write_blocks, \
     name##_flush, \
     name##_info \
 }

@@ -49,11 +49,11 @@ void (** volatile device_list)(void) = device_constructor_list;
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         0
-#define ENABLE_AHCI_STRESS_THREAD   1
+#define ENABLE_AHCI_STRESS_THREAD   38
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_STRESS_MMAP_THREAD   4
+#define ENABLE_STRESS_MMAP_THREAD   0
 
 #if ENABLE_SHELL_THREAD > 0
 static int shell_thread(void *p)
@@ -92,7 +92,7 @@ static int read_stress(void *p)
     while (1) {
         ++*(char*)p;
 
-        drive->vtbl->read(drive, data, 1, lba);
+        drive->vtbl->read_blocks(drive, data, 1, lba);
 
         if (++lba > 32)
             lba = 16;
