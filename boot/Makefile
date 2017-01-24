@@ -56,7 +56,7 @@ ISO_STAGE := cdstage
 ISO_FILE := dgos.iso
 
 QEMU_MACHINE := q35
-QEMU_CPU := Haswell
+QEMU_CPU := kvm64
 QEMU_RAM := 512M
 
 # Linking libgcc.a crashes my linker
@@ -270,9 +270,15 @@ debug-iso-kernel: $(ISO_FILE)
 		-ex 'b *0x400000000000' \
 		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
 
+debug-iso-wait-singlecpu: $(ISO_FILE)
+	 $(QEMU) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot
+
 debug-iso-wait: $(ISO_FILE)
 	 $(QEMU) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -smp cpus=8,cores=4,threads=1 \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot
 
 #
