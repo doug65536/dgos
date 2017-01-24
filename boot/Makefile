@@ -261,14 +261,18 @@ debug-iso-boot: $(ISO_FILE)
 		-ex 'b iso9660_boot_open' \
 		-ex 'b iso9660_boot_close' \
 		-ex 'b iso9660_boot_pread' \
-		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+		-ex 'target remote | exec $(QEMU) \
+			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
+			-gdb stdio -no-shutdown -no-reboot'
 
 debug-iso-kernel: $(ISO_FILE)
 	$(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		-m $(QEMU_RAM) \
 		-ex 'b *0x400000000000' \
-		-ex 'target remote | exec $(QEMU) -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -gdb stdio -no-shutdown -no-reboot'
+		-ex 'target remote | exec $(QEMU) \
+			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
+			-gdb stdio -no-shutdown -no-reboot'
 
 debug-iso-wait-singlecpu: $(ISO_FILE)
 	 $(QEMU) \
