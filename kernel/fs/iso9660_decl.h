@@ -267,3 +267,6 @@ typedef struct iso9660_sector_iterator_t {
     uint32_t size;
     uint16_t err;
 } iso9660_sector_iterator_t;
+
+// Maximum length of a name, not including null, if any
+#define ISO9660_MAX_NAME    110
