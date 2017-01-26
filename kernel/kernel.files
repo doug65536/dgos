@@ -122,3 +122,7 @@ arch/x86_64/cpu/syscall_dispatch.h
 fs/iso9660.c
 fs/iso9660.h
 fs/iso9660_decl.h
+fs/tmpfs.c
+fs/tmpfs.h
+fs/iso9660_part.c
+fs/iso9660_part.h

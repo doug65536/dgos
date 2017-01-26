@@ -8,13 +8,6 @@ DECLARE_part_DEVICE(mbr);
 
 typedef struct part_dev_t part_dev_t;
 
-struct part_dev_t {
-    part_vtbl_t *vtbl;
-    storage_dev_base_t *drive;
-    uint64_t lba_st;
-    uint64_t lba_len;
-};
-
 typedef struct partition_tbl_ent_t {
     uint8_t  boot;					//0: Boot indicator bit flag: 0 = no, 0x80 = bootable (or "active")
     uint8_t  start_head;			// H
@@ -36,7 +29,7 @@ typedef struct partition_tbl_ent_t {
 static part_dev_t partitions[MAX_PARTITIONS];
 static size_t partition_count;
 
-static if_list_t mbr_detect(storage_dev_base_t *drive)
+static if_list_t mbr_part_detect(storage_dev_base_t *drive)
 {
     long sector_size = drive->vtbl->info(drive, STORAGE_INFO_BLOCKSIZE);
     char sig[2];
@@ -56,9 +49,10 @@ static if_list_t mbr_detect(storage_dev_base_t *drive)
             if (ptbl[i].system_id == 0x0C) {
                 part_dev_t *part = partitions + partition_count++;
                 part->drive = drive;
-                part->vtbl = &mbr_device_vtbl;
+                part->vtbl = &mbr_part_device_vtbl;
                 part->lba_st = ptbl[i].start_lba;
                 part->lba_len = ptbl[i].total_sectors;
+                part->name = "fat32";
             }
         }
     }

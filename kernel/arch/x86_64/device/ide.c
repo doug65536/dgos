@@ -96,7 +96,7 @@ static if_list_t ide_if_detect(void)
     do {
         ide_if_t *dev = ide_ifs + ide_if_count++;
 
-        dev->vtbl = &ide_if_device_vtbl;
+        dev->vtbl = &ide_storage_if_device_vtbl;
 
         dev->ports[0].cmd = (iter.config.base_addr[0] > 1)
                 ? iter.config.base_addr[0]

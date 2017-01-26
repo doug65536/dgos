@@ -1747,7 +1747,7 @@ static if_list_t ahci_if_detect(void)
         if (ahci_count < countof(ahci_devices)) {
             ahci_if_t *dev = ahci_devices + ahci_count++;
 
-            dev->vtbl = &ahci_if_device_vtbl;
+            dev->vtbl = &ahci_storage_if_device_vtbl;
 
             dev->config = pci_iter.config;
 
@@ -1800,7 +1800,7 @@ static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
 
         if (port->sig == SATA_SIG_ATA || port->sig == SATA_SIG_ATAPI) {
             ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
-            drive->vtbl = &ahci_dev_device_vtbl;
+            drive->vtbl = &ahci_storage_dev_device_vtbl;
             drive->if_ = self;
             drive->port = port_num;
             drive->is_atapi = (port->sig == SATA_SIG_ATAPI);
@@ -1862,6 +1862,7 @@ static int ahci_dev_io(storage_dev_base_t *dev,
 
     mutex_lock(&block_state.lock);
 
+    block_state.err = 0;
     block_state.lba = lba;
 
     ahci_rw(self->if_, self->port, lba, data, count, is_read,

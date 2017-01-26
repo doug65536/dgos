@@ -83,26 +83,26 @@ struct storage_if_vtbl_t {
 
 void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
 
-#define MAKE_storage_if_VTBL(name) { \
-    name##_detect, \
-    name##_cleanup, \
-    name##_detect_devices \
+#define MAKE_storage_if_VTBL(type, name) { \
+    name##_if_detect, \
+    name##_if_cleanup, \
+    name##_if_detect_devices \
 }
 
-#define MAKE_storage_dev_VTBL(name) { \
-    name##_cleanup, \
-    name##_read_blocks, \
-    name##_write_blocks, \
-    name##_flush, \
-    name##_info \
+#define MAKE_storage_dev_VTBL(type, name) { \
+    name##_dev_cleanup, \
+    name##_dev_read_blocks, \
+    name##_dev_write_blocks, \
+    name##_dev_flush, \
+    name##_dev_info \
 }
 
 #ifdef STORAGE_DEV_NAME
 #define DECLARE_storage_if_DEVICE(name) \
-    DECLARE_DEVICE(storage_if, name ## _if)
+    DECLARE_DEVICE(storage_if, name)
 
 #define REGISTER_storage_if_DEVICE(name) \
-    REGISTER_DEVICE(storage_if, name ## _if, 'L')
+    REGISTER_DEVICE(storage_if, name, 'L')
 
 #define STORAGE_IF_DEV_PTR(dev) STORAGE_IF_T *self = (void*)dev
 
@@ -111,13 +111,13 @@ void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
 //
 
 #define DECLARE_storage_dev_DEVICE(name) \
-    DECLARE_DEVICE(storage_dev, name ## _dev)
+    DECLARE_DEVICE(storage_dev, name)
 
 #define REGISTER_storage_dev_DEVICE(name) \
-    REGISTER_DEVICE(storage_dev, name ## _dev, 'L')
+    REGISTER_DEVICE(storage_dev, name, 'L')
 
 #define DEFINE_storage_dev_DEVICE(name) \
-    DEFINE_DEVICE(storage_dev, name ## _dev)
+    DEFINE_DEVICE(storage_dev, name)
 
 #define STORAGE_DEV_DEV_PTR(dev) STORAGE_DEV_T *self = (void*)dev
 
@@ -143,7 +143,7 @@ typedef uint16_t fs_mode_t;
 typedef uint32_t fs_uid_t;
 typedef uint32_t fs_gid_t;
 
-typedef struct fs_init_info fs_init_info;
+typedef struct fs_init_info_t fs_init_info_t;
 
 typedef struct fs_stat_t fs_stat_t;
 typedef struct fs_file_info_t fs_file_info_t;
@@ -158,7 +158,7 @@ typedef uint64_t fs_dev_t;
 
 typedef struct fs_pollhandle_t fs_pollhandle_t;
 
-struct fs_init_info {
+struct fs_init_info_t {
     storage_dev_base_t *drive;
 
     // Partition start LBA
@@ -212,8 +212,9 @@ struct fs_vtbl_t {
     //
     // Startup and shutdown
 
-    void* (*init)(fs_base_t *dev, fs_init_info *conn);
-    void (*destroy)(fs_base_t *dev, void* private_data);
+    // Returns extended fs_base_t
+    void *(*mount)(fs_init_info_t *conn);
+    void (*unmount)(fs_base_t *dev);
 
     //
     // Read directory entry information
@@ -350,9 +351,13 @@ struct fs_vtbl_t {
                 fs_pollhandle_t* ph, unsigned* reventsp);
 };
 
-#define MAKE_fs_VTBL(name) { \
-    name##_init,        \
-    name##_destroy,     \
+struct fs_base_t {
+    fs_vtbl_t *vtbl;
+};
+
+#define MAKE_fs_VTBL(type, name) { \
+    name##_mount,       \
+    name##_unmount,     \
                         \
     name##_getattr,     \
     name##_access,      \
@@ -398,13 +403,17 @@ struct fs_vtbl_t {
 }
 
 #ifdef FS_NAME
-#define FS_T FS_NAME ## _fs_t
+#define FS_T_EXPAND2(v) v ## _fs_t
+#define FS_T_EXPAND(v) FS_T_EXPAND2(v)
+#define FS_T FS_T_EXPAND(FS_NAME)
+
+typedef struct FS_T FS_T;
 
 #define DECLARE_fs_DEVICE(name) \
-    DECLARE_DEVICE(fs, name ## _if)
+    DECLARE_DEVICE(fs, name)
 
 #define REGISTER_fs_DEVICE(name) \
-    REGISTER_DEVICE(fs, name ## _if, 'F')
+    REGISTER_DEVICE(fs, name, 'F')
 
 #define DEFINE_fs_DEVICE(name) \
     DEFINE_DEVICE(fs, name)
@@ -413,6 +422,8 @@ struct fs_vtbl_t {
 
 #define FS_DEV_PTR_UNUSED(dev) (void)dev
 #endif
+
+void register_fs_device(char const *name, fs_vtbl_t *vtbl);
 
 //
 // Partitioning scheme (MBR, UEFI, etc)
@@ -423,8 +434,18 @@ struct part_vtbl_t {
     if_list_t (*detect)(storage_dev_base_t *drive);
 };
 
-#define MAKE_part_VTBL(name) { \
-    name##_detect \
+typedef struct part_dev_t part_dev_t;
+
+struct part_dev_t {
+    part_vtbl_t *vtbl;
+    storage_dev_base_t *drive;
+    uint64_t lba_st;
+    uint64_t lba_len;
+    char const *name;
+};
+
+#define MAKE_part_VTBL(type, name) { \
+    name##_##type##_detect \
 }
 
 #define DECLARE_part_DEVICE(name) \
@@ -439,3 +460,5 @@ struct part_vtbl_t {
 #define PART_DEV_PTR(dev) PART_T *self
 
 void register_part_device(char const *name, part_vtbl_t *vtbl);
+
+void mount_fs(char const *fs_name, fs_init_info_t *info);

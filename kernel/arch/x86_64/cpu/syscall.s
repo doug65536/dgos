@@ -1,7 +1,5 @@
 .text
 
-
-
 .global syscall_entry
 .hidden syscall_entry
 syscall_entry:
@@ -10,7 +8,7 @@ syscall_entry:
 	# return rax
 
 	# Range check syscall number
-	cmp $256,%rax
+	cmp $314,%rax
 	jae 0f
 
 	# CPU puts rflags in r11

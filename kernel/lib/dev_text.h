@@ -108,7 +108,7 @@ struct text_display_vtbl_t {
                         int show);
 };
 
-#define MAKE_text_display_VTBL(name) { \
+#define MAKE_text_display_VTBL(type, name) { \
     name##_detect,              \
     name##_init,                \
     name##_cleanup,             \

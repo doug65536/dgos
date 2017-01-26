@@ -1,0 +1,57 @@
+#define PART_T iso9660
+#define STORAGE_IMPL
+#include "string.h"
+#include "iso9660_part.h"
+#include "dev_storage.h"
+
+DECLARE_part_DEVICE(iso9660);
+
+#include "iso9660_decl.h"
+
+//typedef struct part_dev_t part_dev_t;
+
+#define MAX_PARTITIONS  128
+static part_dev_t partitions[MAX_PARTITIONS];
+static size_t partition_count;
+
+static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
+{
+    long sector_size = drive->vtbl->info(drive, STORAGE_INFO_BLOCKSIZE);
+    char sig[5];
+
+    long sector_mul = 2048 / sector_size;
+
+    if (sector_mul < 1)
+        sector_mul = 0;
+
+    char sector[sector_size * sector_mul];
+    iso9660_pvd_t *pvd = (void*)sector;
+
+    drive->vtbl->read_blocks(drive, sector,
+                             1 * sector_mul,
+                             16 * sector_mul);
+
+    memcpy(sig, sector + 1, sizeof(sig));
+
+    if (!memcmp(sig, "CD001", 5)) {
+        part_dev_t *part = partitions + partition_count++;
+
+        part->drive = drive;
+        part->vtbl = &iso9660_part_device_vtbl;
+        part->lba_st = 0;
+        part->lba_len = pvd->block_count.le;
+        part->name = "iso9660";
+    }
+
+    // Returns list of all ISO9660 partitions,
+    // not just the partitions for this drive!
+    if_list_t list;
+    list.stride = sizeof(part_dev_t);
+    list.base = partitions;
+    list.count = partition_count;
+
+    return list;
+}
+
+REGISTER_part_DEVICE(iso9660);
+

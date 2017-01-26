@@ -1,5 +1,8 @@
 #pragma once
 
+#include "types.h"
+#include "assert.h"
+
 typedef struct uint8_both_t {
     uint8_t le;
     uint8_t be;
@@ -40,6 +43,7 @@ typedef struct int64_both_t {
     int64_t be;
 } int64_both_t;
 
+// 17 bytes
 typedef struct iso9660_pvd_datetime_t {
     char year[4];
     char month[2];
@@ -51,6 +55,7 @@ typedef struct iso9660_pvd_datetime_t {
     int8_t tzofs;
 } iso9660_pvd_datetime_t;
 
+// 7 bytes
 typedef struct iso9660_datetime_t {
     // Since 1900
     uint8_t year;
@@ -115,6 +120,8 @@ typedef struct iso9660_dir_ent_t {
     // use len field to find next dir entry
 } iso9660_dir_ent_t;
 
+C_ASSERT(sizeof(iso9660_dir_ent_t) == 34);
+
 // Primary Volume Descriptor
 typedef struct iso9660_pvd_t {
     uint8_t type_code;
@@ -157,7 +164,6 @@ typedef struct iso9660_pvd_t {
 
     // 34 bytes! watch out!
     iso9660_dir_ent_t root_dirent;
-    char root_dirent_name[2];
 
     char volume_set_id[128];
 
@@ -187,6 +193,74 @@ typedef struct iso9660_pvd_t {
 
     char reserved[653];
 } iso9660_pvd_t;
+
+C_ASSERT(sizeof(iso9660_pvd_t) == 2048);
+
+// Path table record. Always begins at a 16-bit boundary
+typedef struct iso9660_pt_rec_t {
+    uint8_t di_len;
+    uint8_t ea_len;
+    uint16_t lba_lo;
+    uint16_t lba_hi;
+    uint16_t parent_dn;
+    char name[2];
+} iso9660_pt_rec_t;
+
+// Extended attribute record
+typedef struct iso9660_ea_rec_t {
+    uint32_t owner_id;
+    uint32_t group_id;
+    uint16_t permissions;
+
+    iso9660_pvd_datetime_t created_datetime;
+    iso9660_pvd_datetime_t modified_datetime;
+    iso9660_pvd_datetime_t expiry_datetime;
+    iso9660_pvd_datetime_t effective_datetime;
+    uint8_t record_format;
+    uint8_t record_attr;
+    uint32_t record_len;
+
+    // ofs=84
+    char system_id[32];
+    char system_used[64];
+
+    // ofs=180
+    uint8_t ea_rec_ver;
+    uint8_t esc_len;
+    char reserved[64];
+
+    // ofs=246
+    uint16_t app_use_len_lo;
+    uint16_t app_use_len_hi;
+
+    // App use data and escape sequence data
+    char data[1798];
+} iso9660_ea_rec_t;
+
+#define ISO9660_EA_PERM_SYS_NO_OR_BIT   0
+#define ISO9660_EA_PERM_SYS_NO_OX_BIT   2
+#define ISO9660_EA_PERM_NO_OR_BIT       4
+#define ISO9660_EA_PERM_NO_OX_BIT       6
+#define ISO9660_EA_PERM_NO_GR_BIT       8
+#define ISO9660_EA_PERM_NO_GX_BIT       10
+#define ISO9660_EA_PERM_NO_WR_BIT       12
+#define ISO9660_EA_PERM_NO_WX_BIT       14
+
+#define ISO9660_EA_PERM_SYS_NO_OR (1<<ISO9660_EA_PERM_SYS_NO_OR_BIT)
+#define ISO9660_EA_PERM_SYS_NO_OX (1<<ISO9660_EA_PERM_SYS_NO_OX_BIT)
+#define ISO9660_EA_PERM_NO_OR     (1<<ISO9660_EA_PERM_NO_OR_BIT)
+#define ISO9660_EA_PERM_NO_OX     (1<<ISO9660_EA_PERM_NO_OX_BIT)
+#define ISO9660_EA_PERM_NO_GR     (1<<ISO9660_EA_PERM_NO_GR_BIT)
+#define ISO9660_EA_PERM_NO_GX     (1<<ISO9660_EA_PERM_NO_GX_BIT)
+#define ISO9660_EA_PERM_NO_WR     (1<<ISO9660_EA_PERM_NO_WR_BIT)
+#define ISO9660_EA_PERM_NO_WX     (1<<ISO9660_EA_PERM_NO_WX_BIT)
+
+#define ISO9660_EA_PERM_ONES      0xAA
+
+C_ASSERT(sizeof(iso9660_ea_rec_t) == 2048);
+C_ASSERT(offsetof(iso9660_ea_rec_t, system_id) == 84);
+C_ASSERT(offsetof(iso9660_ea_rec_t, ea_rec_ver) == 180);
+C_ASSERT(offsetof(iso9660_ea_rec_t, app_use_len_lo) == 246);
 
 typedef struct iso9660_sector_iterator_t {
     uint32_t lba;

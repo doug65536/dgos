@@ -332,7 +332,7 @@ static void print_character(text_display_t *self, int ch)
 static int vga_detect(text_display_base_t **result)
 {
     text_display_t *self = displays;
-    self->vtbl = &vga_device_vtbl;
+    self->vtbl = &vga_text_display_device_vtbl;
 
     // Get I/O port base from BIOS data area
     self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);

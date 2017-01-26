@@ -48,8 +48,8 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         0
-#define ENABLE_AHCI_STRESS_THREAD   38
+#define ENABLE_SHELL_THREAD         1
+#define ENABLE_AHCI_STRESS_THREAD   1
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0

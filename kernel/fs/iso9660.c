@@ -1,27 +1,162 @@
-#define FS_NAME fat_fs_t
+#define FS_NAME iso9660
 #define STORAGE_IMPL
 #include "dev_storage.h"
+DECLARE_fs_DEVICE(iso9660);
 
 #include "iso9660_decl.h"
+#include "threadsync.h"
+#include "bitsearch.h"
+#include "mm.h"
 
-DECLARE_fs_DEVICE(iso9660);
+struct iso9660_fs_t {
+    fs_vtbl_t *vtbl;
+
+    storage_dev_base_t *drive;
+
+    // From the drive
+    long sector_size;
+
+    // >= 2KB
+    long block_size;
+
+    // Root
+    uint32_t root_lba;
+    uint32_t root_bytes;
+
+    // Path table
+    uint32_t pt_lba;
+    uint32_t pt_bytes;
+
+    iso9660_pt_rec_t *pt;
+    iso9660_pt_rec_t **pt_ptrs;
+
+    uint32_t pt_alloc_size;
+    uint32_t pt_count;
+
+    uint8_t sector_shift;
+    uint8_t block_shift;
+};
+
+iso9660_fs_t iso9660_mounts[16];
+unsigned iso9660_mount_count;
 
 //
 // Startup and shutdown
 
-static void* iso9660_init(fs_base_t *dev,
-                        fs_init_info *conn)
+static uint32_t iso9660_round_up(uint32_t n, uint8_t log2_size)
 {
-    FS_DEV_PTR_UNUSED(dev);
-    (void)conn;
-    return 0;
+    uint32_t size = 1U << log2_size;
+    uint32_t mask = size - 1;
+    return (n + mask) & ~mask;
 }
 
-static void iso9660_destroy(fs_base_t *dev,
-                          void* private_data)
+static uint32_t iso9660_walk_pt(
+        iso9660_fs_t *self,
+        void (*cb)(uint32_t i, iso9660_pt_rec_t *rec, void *p),
+        void *p)
 {
-    FS_DEV_PTR_UNUSED(dev);
-    (void)private_data;
+    uint32_t i = 0;
+    for (iso9660_pt_rec_t *pt_rec = self->pt,
+         *pt_end = (void*)((char*)self->pt + self->pt_bytes);
+         pt_rec < pt_end;
+         ++i,
+         pt_rec = (void*)((char*)pt_rec +
+                          (offsetof(iso9660_pt_rec_t, name) +
+                          pt_rec->di_len + 1 & -2))) {
+        if (cb)
+            cb(i, pt_rec, p);
+    }
+    return i;
+}
+
+static void iso9660_pt_fill(
+        uint32_t i, iso9660_pt_rec_t *rec, void *p)
+{
+    iso9660_fs_t *self = p;
+
+    if (self)
+        self->pt_ptrs[i] = rec;
+}
+
+static void* iso9660_mount(fs_init_info_t *conn)
+{
+    iso9660_fs_t *self = iso9660_mounts + iso9660_mount_count++;
+
+    self->vtbl = &iso9660_fs_device_vtbl;
+
+    self->drive = conn->drive;
+
+    self->sector_size = self->drive->vtbl->info(
+                self->drive, STORAGE_INFO_BLOCKSIZE);
+
+    self->sector_shift = bit_log2_n_32(self->sector_size);
+    self->block_shift = 11 - self->sector_shift;
+    self->block_size = self->sector_size << self->block_size;
+
+    iso9660_pvd_t pvd;
+    uint32_t best_ofs = 0;
+
+    for (uint32_t ofs = 0; ofs < 4; ++ofs) {
+        // Read logical block 16
+        self->drive->vtbl->read_blocks(
+                    self->drive, &pvd,
+                    1 << self->block_size,
+                    (16 + ofs) << self->block_shift);
+
+        if (pvd.type_code == 2) {
+            // Prefer joliet pvd
+            best_ofs = ofs;
+            break;
+        }
+    }
+
+    if (best_ofs == 0) {
+        self->drive->vtbl->read_blocks(
+                    self->drive, &pvd,
+                    1 << self->block_size,
+                    16 << self->block_shift);
+    }
+
+    self->root_lba = pvd.root_dirent.lba_lo_le |
+            (pvd.root_dirent.lba_hi_le << 16);
+
+    self->root_bytes = pvd.root_dirent.size_lo_le |
+            (pvd.root_dirent.size_hi_le << 16);
+
+    self->pt_lba = pvd.path_table_le_lba;
+    self->pt_bytes = pvd.path_table_bytes.le;
+
+    self->pt_alloc_size = iso9660_round_up(
+                self->pt_bytes, self->sector_shift);
+
+    self->pt = mmap(0, self->pt_alloc_size,
+                    PROT_READ | PROT_WRITE,
+                    MAP_POPULATE, -1, 0);
+
+    self->drive->vtbl->read_blocks(
+                self->drive, self->pt,
+                self->pt_alloc_size >> self->sector_shift,
+                self->pt_lba);
+
+    // Count the path table entries
+    self->pt_count = iso9660_walk_pt(self, 0, 0);
+
+    // Allocate path table entry pointer array
+    self->pt_ptrs = mmap(0, sizeof(*self->pt_ptrs) * self->pt_count,
+                         PROT_READ | PROT_WRITE, 0, -1, 0);
+
+    // Populate path table entry pointer array
+    iso9660_walk_pt(self, iso9660_pt_fill, self);
+
+    return self;
+}
+
+static void iso9660_unmount(fs_base_t *dev)
+{
+    FS_DEV_PTR(dev);
+
+    munmap(self->pt, self->pt_bytes);
+    munmap(self->pt_ptrs, sizeof(*self->pt_ptrs) * self->pt_count);
 }
 
 //
@@ -100,7 +235,8 @@ static int iso9660_mknod(fs_base_t *dev,
     (void)path;
     (void)mode;
     (void)rdev;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_mkdir(fs_base_t *dev,
@@ -109,7 +245,8 @@ static int iso9660_mkdir(fs_base_t *dev,
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)mode;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_rmdir(fs_base_t *dev,
@@ -117,7 +254,8 @@ static int iso9660_rmdir(fs_base_t *dev,
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_symlink(fs_base_t *dev,
@@ -126,7 +264,8 @@ static int iso9660_symlink(fs_base_t *dev,
     FS_DEV_PTR_UNUSED(dev);
     (void)to;
     (void)from;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_rename(fs_base_t *dev,
@@ -135,7 +274,8 @@ static int iso9660_rename(fs_base_t *dev,
     FS_DEV_PTR_UNUSED(dev);
     (void)from;
     (void)to;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_link(fs_base_t *dev,
@@ -144,7 +284,8 @@ static int iso9660_link(fs_base_t *dev,
     FS_DEV_PTR_UNUSED(dev);
     (void)from;
     (void)to;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_unlink(fs_base_t *dev,
@@ -152,7 +293,8 @@ static int iso9660_unlink(fs_base_t *dev,
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 //
@@ -164,7 +306,8 @@ static int iso9660_chmod(fs_base_t *dev,
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)mode;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_chown(fs_base_t *dev,
@@ -246,7 +389,8 @@ static int iso9660_write(fs_base_t *dev,
     (void)size;
     (void)offset;
     (void)fi;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 
@@ -339,7 +483,8 @@ static int iso9660_setxattr(fs_base_t *dev,
     (void)value;
     (void)size;
     (void)flags;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_getxattr(fs_base_t *dev,
@@ -400,4 +545,4 @@ static int iso9660_poll(fs_base_t *dev,
     return 0;
 }
 
-DEFINE_fs_DEVICE(iso9660);
+REGISTER_fs_DEVICE(iso9660);

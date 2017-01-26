@@ -163,7 +163,6 @@ typedef struct iso9660_pvd_t {
 
     // 34 bytes! watch out!
     iso9660_dir_ent_t root_dirent;
-    char root_dirent_name[2];
 
     char volume_set_id[128];
 

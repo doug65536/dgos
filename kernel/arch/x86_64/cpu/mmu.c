@@ -912,7 +912,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
         // If it is lazy allocated
         if ((pte & PTE_ADDR) == PTE_ADDR) {
             // Allocate a page
-            physaddr_t page = init_take_page(0);
+            physaddr_t page = mmu_alloc_phys(0);
 
             assert(page != 0);
 
