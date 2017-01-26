@@ -1,4 +1,6 @@
 Makefile
+lib/bswap.c
+lib/bswap.h
 library.mk
 autodep.mk
 config/x86_64.mk

@@ -62,7 +62,8 @@ char *strncpy(char *dest, char const *src, size_t n);
 char *strncat(char *dest, char const *src, size_t n);
 
 int ucs4_to_utf8(char *out, int in);
-int utf8_to_ucs4(char *in, char **ret_end);
+int ucs4_to_utf16(uint16_t *out, int in);
+int utf8_to_ucs4(char const *in, char const **ret_end);
 
 #endif
 

@@ -263,11 +263,30 @@ EXPORT int ucs4_to_utf8(char *out, int in)
     return len;
 }
 
+EXPORT int ucs4_to_utf16(uint16_t *out, int in)
+{
+    if ((in > 0 && in < 0xD800) ||
+            (in > 0xDFFF && in < 0x10000)) {
+        *out++ = (uint16_t)in;
+        *out = 0;
+        return 1;
+    } else if (in > 0xFFFF && in < 0x110000) {
+        in -= 0x10000;
+        *out++ = 0xD800 + ((in >> 10) & 0x3FF);
+        *out++ = 0xDC00 + (in & 0x3FF);
+        *out = 0;
+        return 2;
+    }
+    // Codepoint out of range or in surrogate range
+    *out = 0;
+    return 0;
+}
+
 // Returns 32 bit wide character
 // Returns -1 on error
 // If ret_end is not null, pointer to first
 // byte after encoded character to *ret_end
-EXPORT int utf8_to_ucs4(char *in, char **ret_end)
+EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
 {
     int n;
 
