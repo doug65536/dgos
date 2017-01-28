@@ -118,7 +118,9 @@ OUTPUTS = $(KERNEL)
 NEEDSMALLEST :=
 
 LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M \
-	-T $(LINKERSCRIPT) -g -export-dynamic
+	-T $(LINKERSCRIPT) -g
+
+#-export-dynamic
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
