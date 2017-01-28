@@ -27,11 +27,11 @@ do
 			kill $CHILDPID
 		fi
 
-		make debuggable-kernel-disk
+		#make debuggable-kernel-disk
 		nice -n 19 make $TARGET &
 		CHILDPID=$!
 	else
-		make kernel
+		make kernel > /dev/null
 	fi
 
 	sleep 1
