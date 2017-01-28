@@ -64,8 +64,7 @@ QEMU_RAM := 512M
 #LIBGCCDIR := $(dir $(LIBGCC))
 #LIBGCCFILENAME = $(notdir $(LIBGCC))
 #LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
-
-$(info $(LIBGCCNAME))
+#$(info $(LIBGCCNAME))
 
 AOBJS := $(ASRCS:.s=.o)
 COBJS := $(CSRCS:.c=.o)
@@ -131,6 +130,12 @@ BOOTSECTORS = $(BINDIR)/bootsect.bin
 BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
 BOCHSKERNELSYMBOLS = $(BINDIR)/bochs-kernel-symbols
 BOCHSCOMBINEDSYMBOLS = $(BINDIR)/bochs-combined-symbols
+
+QEMU_DEBUGCON := \
+	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+	-device isa-debugcon,chardev=qemu-debug-out
+
+QEMU_SMP := -smp cpus=4,cores=4,threads=1
 
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect.dis \
@@ -246,14 +251,12 @@ $(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos-kernel
 
 run-iso-singlecpu: $(ISO_FILE)
 	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
-		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-		-device isa-debugcon,chardev=qemu-debug-out
+		$(QEMU_DEBUGCON)
 
 run-iso: $(ISO_FILE)
 	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
-		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-		-device isa-debugcon,chardev=qemu-debug-out \
-		-smp cpus=8,cores=4,threads=1
+		$(QEMU_DEBUGCON) \
+		$(QEMU_SMP)
 
 debug-iso-boot: $(ISO_FILE)
 	 $(GDB) --symbols $(SYMBOLFILE) --tui \
@@ -277,13 +280,23 @@ debug-iso-kernel: $(ISO_FILE)
 debug-iso-wait-singlecpu: $(ISO_FILE)
 	 $(QEMU) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 $(QEMU_DEBUGCON)
 
 debug-iso-wait: $(ISO_FILE)
 	 $(QEMU) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 -smp cpus=8,cores=4,threads=1 \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot
+		 $(QEMU_SMP) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 $(QEMU_DEBUGCON)
+
+debug-iso-wait-kvm: $(ISO_FILE)
+	 $(QEMU) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 $(QEMU_SMP) \
+		 $(QEMU_DEBUGCON) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 -enable-kvm
 
 #
 # Debug in KVM
@@ -317,9 +330,8 @@ run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 		-no-shutdown -no-reboot -d cpu_reset \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		-s -m $(QEMU_RAM) \
-		-smp cpus=8,cores=4,threads=1 \
-		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-		-device isa-debugcon,chardev=qemu-debug-out \
+		$(QEMU_SMP) \
+		$(QEMU_DEBUGCON) \
 		-net nic,model=rtl8139 \
 		-net nic,model=ne2k_pci \
 		-net nic,model=e1000
@@ -331,9 +343,8 @@ run-debug-singlecpu: all debuggable-kernel-disk
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) -smp cpus=1,cores=1,threads=1 \
-		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-		-device isa-debugcon,chardev=qemu-debug-out \
+		-m $(QEMU_RAM) \
+		$(QEMU_DEBUGCON) \
 		-net nic,model=rtl8139 \
 		-net nic,model=ne2k_pci \
 		-net nic,model=e1000
@@ -347,9 +358,9 @@ run-debug-wait: all debuggable-kernel-disk
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) -smp cpus=8,cores=8,threads=1 \
-		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-		-device isa-debugcon,chardev=qemu-debug-out \
+		-m $(QEMU_RAM) \
+		$(QEMU_SMP) \
+		$(QEMU_DEBUGCON) \
 		-net nic,model=rtl8139 \
 		-net nic,model=ne2k_pci \
 		-net nic,model=e1000
@@ -359,9 +370,8 @@ run-debug-wait-singlecpu: all debuggable-kernel-disk
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) -smp cpus=1,cores=1,threads=1 \
-		-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-		-device isa-debugcon,chardev=qemu-debug-out \
+		-m $(QEMU_RAM) \
+		$(QEMU_DEBUGCON) \
 		-net nic,model=rtl8139 \
 		-net nic,model=ne2k_pci \
 		-net nic,model=e1000
@@ -410,12 +420,12 @@ $(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
 	$(SED) "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | \
 		$(SED) "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug-bochs: all bochs-symbols debuggable-kernel-disk $(BINDIR)/bochs-config.bxrc
+debug-bochs: all bochs-symbols iso $(BINDIR)/bochs-config.bxrc
 	$(BOCHS) \
 		-qf $(BINDIR)/bochs-config.bxrc \
 		-rc utils/bochs-debugger-commands
 
-debug-bochs-boot: all bochs-symbols debuggable-disk $(BINDIR)/bochs-config.bxrc
+debug-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-config.bxrc
 	$(BOCHS) \
 		-qf $(BINDIR)/bochs-config.bxrc \
 		-rc utils/bochs-debugger-boot-commands
