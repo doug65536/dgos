@@ -102,6 +102,7 @@ static void *pit8254_context_switch_handler(int intr, void *ctx)
 static void *pit8254_handler(int irq, void *ctx)
 {
     (void)irq;
+    assert(irq == 0);
 
     atomic_inc_uint64(&timer_ticks);
 
@@ -128,7 +129,7 @@ static void *pit8254_handler(int irq, void *ctx)
 
     }
 
-    return thread_schedule(ctx);
+    return ctx;//thread_schedule(ctx);
 }
 
 static uint64_t pit8254_time_ms(void)

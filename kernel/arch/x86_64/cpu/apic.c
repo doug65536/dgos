@@ -15,6 +15,7 @@
 #include "time.h"
 #include "cpuid.h"
 #include "spinlock.h"
+#include "assert.h"
 
 //
 // MP Tables
@@ -275,7 +276,7 @@ static uint32_t volatile *apic_ptr;
 
 #define APIC_DEST_BIT               24
 #define APIC_DEST_BITS              8
-#define APIC_DEST_MASK              ((1 << APIC_DEST_BITS)-1)
+#define APIC_DEST_MASK              ((1U << APIC_DEST_BITS)-1U)
 #define APIC_DEST_n(n)              (((n) & APIC_DEST_MASK) << APIC_DEST_BIT)
 
 #define APIC_CMD_SIPI_PAGE_BIT      0
@@ -308,12 +309,12 @@ static uint32_t volatile *apic_ptr;
 
 #define APIC_CMD_VECTOR_n(n)    (((n) & APIC_CMD_VECTOR_MASK) << APIC_CMD_VECTOR_BIT)
 
-#define APIC_CMD_VECTOR         (1 << APIC_CMD_VECTOR_BIT)
-#define APIC_CMD_DEST_LOGICAL   (1 << APIC_CMD_DEST_LOGICAL_BIT)
-#define APIC_CMD_PENDING        (1 << APIC_CMD_PENDING_BIT)
-#define APIC_CMD_ILD_CLR        (1 << APIC_CMD_ILD_CLR_BIT)
-#define APIC_CMD_ILD_SET        (1 << APIC_CMD_ILD_SET_BIT)
-#define APIC_CMD_DEST_TYPE      (1 << APIC_CMD_DEST_TYPE_BIT)
+#define APIC_CMD_VECTOR         (1U << APIC_CMD_VECTOR_BIT)
+#define APIC_CMD_DEST_LOGICAL   (1U << APIC_CMD_DEST_LOGICAL_BIT)
+#define APIC_CMD_PENDING        (1U << APIC_CMD_PENDING_BIT)
+#define APIC_CMD_ILD_CLR        (1U << APIC_CMD_ILD_CLR_BIT)
+#define APIC_CMD_ILD_SET        (1U << APIC_CMD_ILD_SET_BIT)
+#define APIC_CMD_DEST_TYPE      (1U << APIC_CMD_DEST_TYPE_BIT)
 
 #define APIC_CMD_DEST_MODE_NORMAL   APIC_CMD_DEST_MODE_n(0)
 #define APIC_CMD_DEST_MODE_LOWPRI   APIC_CMD_DEST_MODE_n(1)
@@ -338,21 +339,55 @@ static uint32_t volatile *apic_ptr;
 #define APIC_LVT_DCR_BY_1           (8+3)
 
 #define APIC_SIR_APIC_ENABLE_BIT    8
-
 #define APIC_SIR_APIC_ENABLE        (1<<APIC_SIR_APIC_ENABLE_BIT)
 
 #define APIC_LVT_TR_MODE_BIT        17
 #define APIC_LVT_TR_MODE_BITS       2
-#define APIC_LVT_TR_VECTOR_BIT      0
-#define APIC_LVT_TR_MODE_MASK       ((1<<APIC_LVT_TR_MODE_BITS)-1)
+#define APIC_LVT_TR_MODE_MASK       ((1U<<APIC_LVT_TR_MODE_BITS)-1U)
 #define APIC_LVT_TR_MODE_n(n)       ((n)<<APIC_LVT_TR_MODE_BIT)
-#define APIC_LVT_TR_VECTOR_n(n)     ((n)<<APIC_LVT_TR_VECTOR_BIT)
 
 #define APIC_LVT_TR_MODE_ONESHOT    0
 #define APIC_LVT_TR_MODE_PERIODIC   1
 #define APIC_LVT_TR_MODE_DEADLINE   2
 
+#define APIC_LVT_MASK_BIT       16
+#define APIC_LVT_PENDING_BIT    12
+#define APIC_LVT_LEVEL_BIT      15
+#define APIC_LVT_REMOTEIRR_BIT  14
+#define APIC_LVT_ACTIVELOW_BIT  13
+#define APIC_LVT_DELIVERY_BIT   8
+#define APIC_LVT_DELIVERY_BITS  3
+
+#define APIC_LVT_MASK           (1U<<APIC_LVT_MASK_BIT)
+#define APIC_LVT_PENDING        (1U<<APIC_LVT_PENDING_BIT)
+#define APIC_LVT_LEVEL          (1U<<APIC_LVT_LEVEL_BIT)
+#define APIC_LVT_REMOTEIRR      (1U<<APIC_LVT_REMOTEIRR_BIT)
+#define APIC_LVT_ACTIVELOW      (1U<<APIC_LVT_ACTIVELOW_BIT)
+#define APIC_LVT_DELIVERY_MASK  ((1U<<APIC_LVT_DELIVERY_BITS)-1)
+#define APIC_LVT_DELIVERY_n(n)  ((n)<<APIC_LVT_DELIVERY_BIT)
+
+#define APIC_LVT_DELIVERY_FIXED 0
+#define APIC_LVT_DELIVERY_SMI   2
+#define APIC_LVT_DELIVERY_NMI   4
+#define APIC_LVT_DELIVERY_EXINT 7
+#define APIC_LVT_DELIVERY_INIT  5
+
+#define APIC_LVT_VECTOR_BIT     0
+#define APIC_LVT_VECTOR_BITS    8
+#define APIC_LVT_VECTOR_MASK    ((1U<<APIC_LVT_VECTOR_BITS)-1U)
+#define APIC_LVT_VECTOR_n(n)    ((n)<<APIC_LVT_VECTOR_BIT)
+
 #define APIC_BASE_MSR  0x1B
+
+#define APIC_BASE_ADDR_BIT      12
+#define APIC_BASE_ADDR_BITS     40
+#define APIC_BASE_GENABLE_BIT   11
+#define APIC_BASE_BSP_BIT       8
+
+#define APIC_BASE_GENABLE       (1UL<<APIC_BASE_GENABLE_BIT)
+#define APIC_BASE_BSP           (1UL<<APIC_BASE_BSP_BIT)
+#define APIC_BASE_ADDR_MASK     ((1UL<<APIC_BASE_ADDR_BITS)-1)
+#define APIC_BASE_ADDR          (APIC_BASE_ADDR_MASK<<APIC_BASE_ADDR_BIT)
 
 static int parse_mp_tables(void)
 {
@@ -590,8 +625,15 @@ static int parse_mp_tables(void)
 
 static void *apic_timer_handler(int intr, void *ctx)
 {
-    APIC_EOI = intr;
+    apic_eoi(intr);
     return thread_schedule(ctx);
+}
+
+static void *apic_spurious_handler(int intr, void *ctx)
+{
+    apic_eoi(intr);
+    printdbg("Spurious APIC interrupt!\n");
+    return ctx;
 }
 
 unsigned apic_get_id(void)
@@ -642,12 +684,53 @@ void apic_eoi(int intr)
     APIC_EOI = intr;
 }
 
-static void apic_enable(int enabled)
+static void apic_enable(int enabled, int spurious_intr)
 {
+    uint32_t sir = APIC_SIR;
+
     if (enabled)
-        APIC_SIR |= APIC_SIR_APIC_ENABLE;
+        sir |= APIC_SIR_APIC_ENABLE;
     else
-        APIC_SIR &= ~APIC_SIR_APIC_ENABLE;
+        sir &= ~APIC_SIR_APIC_ENABLE;
+
+    if (spurious_intr >= 32)
+        sir = (sir & -256) | spurious_intr;
+
+    APIC_SIR = sir;
+}
+
+static int apic_dump_impl(int reg)
+{
+    // Reserved registers:
+    //  0x00, 0x10,
+    return (reg & 0xF) == 0 &&
+            !(reg >= 0x000 && reg <= 0x010) &&
+            !(reg >= 0x040 && reg <= 0x070) &&
+            !(reg >= 0x290 && reg <= 0x2E0) &&
+            !(reg >= 0x3A0 && reg <= 0x3D0) &&
+            !(reg == 0x3F0) &&
+            (reg < 0x400) &&
+            (reg >= 0) &&
+            // Bochs does not like these
+            (reg != 0x0C0) &&
+            (reg != 0x2F0);
+}
+
+static void apic_dump_regs(int ap)
+{
+    for (int i = 0; i < 256; i += 16) {
+        printdbg("ap=%d APIC: ", ap);
+        for (int x = 0; x < 16; x += 4) {
+            if (apic_dump_impl((i + x) * 4)) {
+                printdbg("[%3x]=%08x%s", (i + x) * 4,
+                         apic_ptr[i + x],
+                        x == 12 ? "\n" : " ");
+            } else {
+                printdbg("[%3x]=--------%s", (i + x) * 4,
+                        x == 12 ? "\n" : " ");
+            }
+        }
+    }
 }
 
 static void apic_configure_timer(
@@ -656,39 +739,73 @@ static void apic_configure_timer(
 {
     APIC_LVT_DCR = dcr;
     atomic_barrier();
-    APIC_LVT_ICR = icr;
-    atomic_barrier();
-    APIC_LVT_TR = APIC_LVT_TR_VECTOR_n(intr) |
+    APIC_LVT_TR = APIC_LVT_VECTOR_n(intr) |
             APIC_LVT_TR_MODE_n(timer_mode);
+    atomic_barrier();
+    APIC_LVT_ICR = icr;
 }
 
 int apic_init(int ap)
 {
-    if (ap) {
-        apic_enable(1);
+    if (!ap) {
+        // Bootstrap CPU only
 
-        apic_configure_timer(APIC_LVT_DCR_BY_1,
-                             ((2500000000U)/(60)),
-                             APIC_LVT_TR_MODE_PERIODIC,
-                             INTR_APIC_TIMER);
+        assert(apic_base == 0);
+        apic_base = msr_get(APIC_BASE_MSR);
 
-        return 1;
-    } else {
+        // Set global enable if it is clear
+        if (!(apic_base & APIC_BASE_GENABLE)) {
+            printdbg("APIC was globally disabled!"
+                     " Enabling...\n");
+            msr_set(APIC_BASE_MSR, apic_base |
+                    APIC_BASE_GENABLE);
+        }
+
+        apic_base &= APIC_BASE_ADDR;
+
+        assert(apic_ptr == 0);
+        apic_ptr = mmap((void*)apic_base, 4096,
+                        PROT_READ | PROT_WRITE,
+                        MAP_PHYSICAL |
+                        MAP_NOCACHE |
+                        MAP_WRITETHRU, -1, 0);
+
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
+        intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
+
+        parse_mp_tables();
     }
 
-    if (!parse_mp_tables())
-        return 0;
+    apic_enable(1, INTR_APIC_SPURIOUS);
 
-    printdbg("Found MP tables\n");
+    APIC_TPR = 0;
 
-    apic_base = msr_get(APIC_BASE_MSR) & -(intptr_t)4096;
+    apic_configure_timer(APIC_LVT_DCR_BY_1,
+                         ((1000000000U)/(60)),
+                         APIC_LVT_TR_MODE_PERIODIC,
+                         INTR_APIC_TIMER);
 
-    apic_ptr = mmap((void*)apic_base, 4096,
-         PROT_READ | PROT_WRITE, MAP_PHYSICAL, -1, 0);
+    assert(apic_base == (msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
+
+    apic_dump_regs(ap);
 
     return 1;
 }
+
+//APIC_LVT_LNT0 |= APIC_LVT_MASK;
+//APIC_LVT_LNT1 |= APIC_LVT_MASK;
+//APIC_LVT_ERR |= APIC_LVT_MASK;
+//APIC_LVT_PMCR |= APIC_LVT_MASK;
+//APIC_LVT_TSR |= APIC_LVT_MASK;
+
+//uint32_t last_count = apic_timer_count();
+//uint32_t this_count;
+//do {
+//    this_count = apic_timer_count();
+//    if (this_count > last_count)
+//        printdbg("Tick\n");
+//    last_count = this_count;
+//} while(1);
 
 static void apic_detect_topology(void)
 {
@@ -804,4 +921,9 @@ void apic_start_smp(void)
             }
         }
     }
+}
+
+uint32_t apic_timer_count(void)
+{
+    return APIC_LVT_CCR;
 }
