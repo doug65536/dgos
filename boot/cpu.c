@@ -402,7 +402,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         ".code64\n\t"
         "0:\n\t"
 
-        "lidt (%%eax)\n\t"
+        "lidtq (%%eax)\n\t"
 
         // Deliberate crash to test exception handlers
         //"movl $0x56363,%%eax\n\t"
