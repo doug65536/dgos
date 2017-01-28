@@ -18,9 +18,9 @@
 #include "rbtree.h"
 #include "idt.h"
 
-#define DEBUG_ADDR_ALLOC    1
-#define DEBUG_PHYS_ALLOC    1
-#define DEBUG_PAGE_TABLES   1
+#define DEBUG_ADDR_ALLOC    0
+#define DEBUG_PHYS_ALLOC    0
+#define DEBUG_PAGE_TABLES   0
 #define DEBUG_PAGE_FAULT    0
 
 // Intel manual, page 2786
@@ -860,6 +860,7 @@ static int addr_present(uintptr_t addr, unsigned *path, pte_t **ptes)
 static void *mmu_tlb_shootdown(int intr, void *ctx)
 {
     assert(intr == INTR_TLB_SHOOTDOWN);
+    //printdbg("Received TLB shootdown\n");
     thread_set_cpu_mmu_seq(mmu_seq);
     cpu_flush_tlb();
     apic_eoi(intr);
