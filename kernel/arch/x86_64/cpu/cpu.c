@@ -55,9 +55,9 @@ void cpu_init(int ap)
 
 void cpu_hw_init(int ap)
 {
-    if (ap) {
-        gdt_load_tr(thread_cpus_started());
-    }
+    //if (ap) {
+    //    gdt_load_tr(thread_cpus_started());
+    //}
 
     apic_init(ap);
     cmos_init();

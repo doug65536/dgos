@@ -345,7 +345,7 @@ static void thread_monitor_mwait(void)
 
 static int smp_thread(void *arg)
 {
-    printk("SMP thread running\n");
+    printdbg("SMP thread running\n");
     atomic_inc_uint32(&thread_smp_running);
     (void)arg;
     thread_check_stack();
@@ -357,6 +357,9 @@ static int smp_thread(void *arg)
 void thread_init(int ap)
 {
     uint32_t cpu_number = atomic_xadd_uint32(&cpu_count, 1);
+
+    if (cpu_number > 0)
+        gdt_load_tr(cpu_number);
 
     // First CPU is the BSP
     cpu_info_t *cpu = cpus + cpu_number;
