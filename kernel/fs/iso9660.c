@@ -59,16 +59,24 @@ static int iso9660_name_to_ascii(
     char *ascii = ascii_buf;
     int codepoint;
     int out = 0;
+    char *lastdot = 0;
 
     for (int i = 0; *utf8 && i < ISO9660_MAX_NAME; ++i) {
         codepoint = utf8_to_ucs4(utf8, &utf8);
+
+        if (codepoint == '.') {
+            if (lastdot)
+                *lastdot = '_';
+            lastdot = ascii + out;
+        }
 
         if (codepoint >= 'a' && codepoint <= 'z')
             codepoint += 'A' - 'a';
 
         if ((codepoint >= '0' && codepoint <= '9') ||
-                (codepoint >= 'A' && codepoint <= 'Z'))
-            ascii[out++] = codepoint;
+                (codepoint >= 'A' && codepoint <= 'Z') ||
+                (codepoint == '.'))
+            ascii[out++] = (char)codepoint;
         else
             ascii[out++] = '_';
     }
@@ -96,6 +104,7 @@ static int iso9660_name_to_utf16be(
         if (utf16sz > 1)
             utf16be[out++] = htons(utf16buf[1]);
     }
+
     return out;
 }
 
@@ -223,7 +232,10 @@ static void iso9660_unmount(fs_base_t *dev)
     FS_DEV_PTR(dev);
 
     munmap(self->pt, self->pt_bytes);
+    self->pt = 0;
+
     munmap(self->pt_ptrs, sizeof(*self->pt_ptrs) * self->pt_count);
+    self->pt_ptrs = 0;
 }
 
 //
