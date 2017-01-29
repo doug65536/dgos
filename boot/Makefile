@@ -135,7 +135,7 @@ QEMU_DEBUGCON := \
 	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 	-device isa-debugcon,chardev=qemu-debug-out
 
-QEMU_SMP := -smp cpus=4,cores=4,threads=1
+QEMU_SMP := -smp cpus=4,cores=2,threads=1
 
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect.dis \
@@ -255,8 +255,38 @@ run-iso-singlecpu: $(ISO_FILE)
 
 run-iso: $(ISO_FILE)
 	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP)
+
+run-iso-singlecpu-kvm: $(ISO_FILE)
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		$(QEMU_DEBUGCON) \
+		-enable-kvm
+
+run-iso-kvm: $(ISO_FILE)
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		$(QEMU_DEBUGCON) \
+		$(QEMU_SMP) \
+		-enable-kvm
+
+run-iso-numa-kvm: $(ISO_FILE)
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		$(QEMU_DEBUGCON) \
+		$(QEMU_SMP) \
+		-numa node,mem=256M,cpus=0-1 \
+		-numa node,mem=256M,cpus=2-3 \
+		-enable-kvm
+
+run-iso-numa: $(ISO_FILE)
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		$(QEMU_DEBUGCON) \
+		$(QEMU_SMP) \
+		-numa node,mem=256M,cpus=0-1 \
+		-numa node,mem=256M,cpus=2-3
 
 debug-iso-boot: $(ISO_FILE)
 	 $(GDB) --symbols $(SYMBOLFILE) --tui \
@@ -265,6 +295,7 @@ debug-iso-boot: $(ISO_FILE)
 		-ex 'b iso9660_boot_close' \
 		-ex 'b iso9660_boot_pread' \
 		-ex 'target remote | exec $(QEMU) \
+			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
 			-gdb stdio -no-shutdown -no-reboot'
 
