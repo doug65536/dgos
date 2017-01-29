@@ -3,6 +3,7 @@
 #include "string.h"
 #include "cpu/spinlock.h"
 #include "cpu/atomic.h"
+#include "assert.h"
 
 typedef int16_t intr_link_t;
 
@@ -21,7 +22,7 @@ static intr_link_t intr_first[256];
 #define MAX_INTR_HANDLERS   256
 static intr_link_t intr_first_free;
 static intr_link_t intr_handlers_count;
-static intr_handler_reg_t intr_handlers[128];
+static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
 static spinlock_t intr_handler_reg_lock;
 
@@ -159,8 +160,10 @@ void *intr_invoke(int intr, void *ctx)
 {
     if (intr_has_handler(intr)) {
         intr_handler_reg_t *entry;
-        for (intr_link_t i = intr_first[intr];
-             i >= 0; i = entry->next) {
+        intr_link_t i = intr_first[intr];
+        // assert not empty handler list
+        assert(i >= 0);
+        for ( ; i >= 0; i = entry->next) {
             entry = intr_handlers + i;
             ctx = entry->handler(intr, ctx);
         }

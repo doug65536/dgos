@@ -558,10 +558,18 @@ void *thread_schedule(void *ctx)
     if (1) {
         size_t cpu_number = cpu - cpus;
         uint16_t *addr = (uint16_t*)0xb8000 + 80 + 70;
-        addr[cpu_number] = ((addr[cpu_number] + 1) & 0xFF) | 0x0700;
+        if ((addr[cpu_number] = ((addr[cpu_number] + 1) & 0xFF) | 0x0700) == 0x0700)
+            addr[cpu_number+80] = ((addr[cpu_number+80] + 1) & 0xFF) | 0x0700;
     }
 
     isr_context_t *isrctx = (isr_context_t*)ctx;
+
+    assert(isrctx->gpr->iret.cs == 0x8);
+    assert(isrctx->gpr->iret.ss == 0x10);
+    assert(isrctx->gpr->s[0] == 0x10);
+    assert(isrctx->gpr->s[1] == 0x10);
+    assert(isrctx->gpr->s[2] == 0x10);
+    assert(isrctx->gpr->s[3] == 0x10);
 
     assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
     assert(isrctx->gpr->iret.rsp <

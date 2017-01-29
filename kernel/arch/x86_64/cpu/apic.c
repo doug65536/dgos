@@ -83,6 +83,110 @@ typedef struct mp_cfg_ioapic_t {
 
 #define MP_IOAPIC_FLAGS_ENABLED       (1<<MP_IOAPIC_FLAGS_ENABLED_BIT)
 
+// entry_type 3 and 4 flags
+
+#define MP_INTR_FLAGS_POLARITY_BIT    0
+#define MP_INTR_FLAGS_POLARITY_BITS   2
+#define MP_INTR_FLAGS_TRIGGER_BIT     2
+#define MP_INTR_FLAGS_TRIGGER_BITS    2
+
+#define MP_INTR_FLAGS_TRIGGER_MASK \
+        ((1<<MP_INTR_FLAGS_TRIGGER_BITS)-1)
+
+#define MP_INTR_FLAGS_POLARITY_MASK   \
+        ((1<<MP_INTR_FLAGS_POLARITY_BITS)-1)
+
+#define MP_INTR_FLAGS_TRIGGER \
+        ((1<<MP_INTR_FLAGS_TRIGGER_BITS)-1)
+
+#define MP_INTR_FLAGS_POLARITY \
+        (MP_INTR_FLAGS_POLARITY_MASK << \
+        MP_INTR_FLAGS_POLARITY_BITS)
+
+#define MP_INTR_FLAGS_POLARITY_DEFAULT    0
+#define MP_INTR_FLAGS_POLARITY_ACTIVEHI   1
+#define MP_INTR_FLAGS_POLARITY_ACTIVELO   3
+
+#define MP_INTR_FLAGS_TRIGGER_DEFAULT     0
+#define MP_INTR_FLAGS_TRIGGER_EDGE        1
+#define MP_INTR_FLAGS_TRIGGER_LEVEL       3
+
+#define MP_INTR_FLAGS_POLARITY_n(n)   ((n)<<MP_INTR_FLAGS_POLARITY)
+#define MP_INTR_FLAGS_TRIGGER_n(n)    ((n)<<MP_INTR_FLAGS_TRIGGER)
+
+#define MP_INTR_TYPE_APIC   0
+#define MP_INTR_TYPE_NMI    1
+#define MP_INTR_TYPE_SMI    2
+#define MP_INTR_TYPE_EXTINT 3
+
+//
+// IOAPIC registers
+
+#define IOAPIC_REG_ID           0
+#define IOAPIC_REG_VER          1
+#define IOAPIC_REG_ARB          2
+
+#define IOAPIC_RED_LO_n(n)      (0x10 + (n) * 2)
+#define IOAPIC_RED_HI_n(n)      (0x10 + (n) * 2 + 1)
+
+#define IOAPIC_REDLO_VECTOR_BIT     0
+#define IOAPIC_REDLO_DELIVERY_BIT   8
+#define IOAPIC_REDLO_DESTMODE_BIT   11
+#define IOAPIC_REDLO_STATUS_BIT     12
+#define IOAPIC_REDLO_POLARITY_BIT   13
+#define IOAPIC_REDLO_REMOTEIRR_BIT  14
+#define IOAPIC_REDLO_TRIGGER_BIT    15
+#define IOAPIC_REDLO_MASKIRQ_BIT       16
+#define IOAPIC_REDHI_DEST_BIT       (56-32)
+
+#define IOAPIC_REDLO_DESTMODE       (1<<IOAPIC_REDLO_DESTMODE_BIT)
+#define IOAPIC_REDLO_STATUS         (1<<IOAPIC_REDLO_STATUS_BIT)
+#define IOAPIC_REDLO_POLARITY       (1<<IOAPIC_REDLO_POLARITY_BIT)
+#define IOAPIC_REDLO_REMOTEIRR      (1<<IOAPIC_REDLO_REMOTEIRR_BIT)
+#define IOAPIC_REDLO_TRIGGER        (1<<IOAPIC_REDLO_TRIGGER_BIT)
+#define IOAPIC_REDLO_MASKIRQ        (1<<IOAPIC_REDLO_MASKIRQ_BIT)
+
+#define IOAPIC_REDLO_VECTOR_BITS    8
+#define IOAPIC_REDLO_DELVERY_BITS   3
+#define IOAPIC_REDHI_DEST_BITS      8
+
+#define IOAPIC_REDLO_VECTOR_MASK    ((1<<IOAPIC_REDLO_VECTOR_BITS)-1)
+#define IOAPIC_REDLO_DELVERY_MASK   ((1<<IOAPIC_REDLO_DELVERY_BITS)-1)
+#define IOAPIC_REDHI_DEST_MASK      ((1<<IOAPIC_REDHI_DEST_BITS)-1)
+
+#define IOAPIC_REDLO_VECTOR \
+    (IOAPIC_REDLO_VECTOR_MASK<<IOAPIC_REDLO_VECTOR_BITS)
+#define IOAPIC_REDLO_DELVERY \
+    (IOAPIC_REDLO_DELVERY_MASK<<IOAPIC_REDLO_DELVERY_BITS)
+#define IOAPIC_REDHI_DEST \
+    (IOAPIC_REDHI_DEST_MASK<<IOAPIC_REDHI_DEST_BITS)
+
+#define IOAPIC_REDLO_VECTOR_n(n)    ((n)<<IOAPIC_REDLO_VECTOR_BIT)
+#define IOAPIC_REDLO_DELIVERY_n(n)  ((n)<<IOAPIC_REDLO_DELIVERY_BIT)
+#define IOAPIC_REDLO_TRIGGER_n(n)   ((n)<<IOAPIC_REDLO_TRIGGER_BIT)
+#define IOAPIC_REDHI_DEST_n(n)      ((n)<<IOAPIC_REDHI_DEST_BIT)
+#define IOAPIC_REDLO_POLARITY_n(n)  ((n)<<IOAPIC_REDLO_POLARITY_BIT)
+
+#define IOAPIC_REDLO_DELIVERY_APIC      0
+#define IOAPIC_REDLO_DELIVERY_LOWPRI    1
+#define IOAPIC_REDLO_DELIVERY_SMI       2
+#define IOAPIC_REDLO_DELIVERY_NMI       4
+#define IOAPIC_REDLO_DELIVERY_INIT      5
+#define IOAPIC_REDLO_DELIVERY_EXTINT    7
+
+#define IOAPIC_REDLO_TRIGGER_EDGE   0
+#define IOAPIC_REDLO_TRIGGER_LEVEL  1
+
+#define IOAPIC_REDLO_POLARITY_ACTIVELO  1
+#define IOAPIC_REDLO_POLARITY_ACTIVEHI  0
+
+static char const * const intr_type_text[] = {
+    "APIC",
+    "NMI",
+    "SMI",
+    "EXTINT"
+};
+
 // entry_type 3
 typedef struct mp_cfg_iointr_t {
     uint8_t entry_type;
@@ -137,6 +241,9 @@ typedef struct mp_cfg_buscompat_t {
 } mp_cfg_buscompat_t;
 
 typedef struct mp_bus_irq_mapping_t {
+    uint8_t bus;
+    uint8_t intr_type;
+    uint8_t flags;
     uint8_t device;
     uint8_t irq;
     uint8_t ioapic_id;
@@ -155,15 +262,11 @@ static char *mp_tables;
 static unsigned mp_pci_bus_id;
 static unsigned mp_isa_bus_id;
 
-static mp_bus_irq_mapping_t pci_irq_list[64];
-static unsigned pci_irq_count;
-
-static mp_bus_irq_mapping_t isa_irq_list[16];
-static unsigned isa_irq_count;
+static mp_bus_irq_mapping_t bus_irq_list[64];
+static unsigned bus_irq_count;
 
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
-
 
 static unsigned isa_irq_lookup[16];
 
@@ -277,7 +380,8 @@ static uint32_t volatile *apic_ptr;
 #define APIC_DEST_BIT               24
 #define APIC_DEST_BITS              8
 #define APIC_DEST_MASK              ((1U << APIC_DEST_BITS)-1U)
-#define APIC_DEST_n(n)              (((n) & APIC_DEST_MASK) << APIC_DEST_BIT)
+#define APIC_DEST_n(n)              \
+    (((n) & APIC_DEST_MASK) << APIC_DEST_BIT)
 
 #define APIC_CMD_SIPI_PAGE_BIT      0
 #define APIC_CMD_VECTOR_BIT         0
@@ -298,16 +402,20 @@ static uint32_t volatile *apic_ptr;
 #define APIC_CMD_DEST_MODE_MASK     ((1 << APIC_CMD_DEST_MODE_BITS)-1)
 #define APIC_CMD_DEST_TYPE_MASK     ((1 << APIC_CMD_DEST_TYPE_BITS)-1)
 
-#define APIC_CMD_SIPI_PAGE      (APIC_CMD_SIPI_PAGE_MASK << APIC_CMD_SIPI_PAGE_BIT)
-#define APIC_CMD_DEST_MODE      (APIC_CMD_DEST_MODE_MASK << APIC_CMD_DEST_MODE_BIT)
-#define APIC_CMD_SIPI_PAGE      (APIC_CMD_SIPI_PAGE_MASK << APIC_CMD_SIPI_PAGE_BIT)
+#define APIC_CMD_SIPI_PAGE      \
+    (APIC_CMD_SIPI_PAGE_MASK << APIC_CMD_SIPI_PAGE_BIT)
+#define APIC_CMD_DEST_MODE      \
+    (APIC_CMD_DEST_MODE_MASK << APIC_CMD_DEST_MODE_BIT)
+#define APIC_CMD_SIPI_PAGE      \
+    (APIC_CMD_SIPI_PAGE_MASK << APIC_CMD_SIPI_PAGE_BIT)
 
 #define APIC_CMD_SIPI_PAGE_n(n) ((n) << APIC_CMD_SIPI_PAGE_BIT)
 #define APIC_CMD_DEST_MODE_n(n) ((n) << APIC_CMD_DEST_MODE_BIT)
 #define APIC_CMD_DEST_TYPE_n(n) ((n) << APIC_CMD_DEST_TYPE_BIT)
 #define APIC_CMD_SIPI_PAGE_n(n) ((n) << APIC_CMD_SIPI_PAGE_BIT)
 
-#define APIC_CMD_VECTOR_n(n)    (((n) & APIC_CMD_VECTOR_MASK) << APIC_CMD_VECTOR_BIT)
+#define APIC_CMD_VECTOR_n(n)    \
+    (((n) & APIC_CMD_VECTOR_MASK) << APIC_CMD_VECTOR_BIT)
 
 #define APIC_CMD_VECTOR         (1U << APIC_CMD_VECTOR_BIT)
 #define APIC_CMD_DEST_LOGICAL   (1U << APIC_CMD_DEST_LOGICAL_BIT)
@@ -499,7 +607,9 @@ static int parse_mp_tables(void)
                         ioapic_list[ioapic_count].ptr = mmap(
                                     (void*)(uintptr_t)entry_ioapic->addr,
                                     32, PROT_READ | PROT_WRITE,
-                                    MAP_PHYSICAL, -1, 0);
+                                    MAP_PHYSICAL |
+                                    MAP_NOCACHE |
+                                    MAP_WRITETHRU, -1, 0);
                         ioapic_list[ioapic_count].lock = 0;
 
                         ++ioapic_count;
@@ -515,50 +625,71 @@ static int parse_mp_tables(void)
 
                 if (entry_iointr->source_bus == mp_pci_bus_id) {
                     // PCI IRQ
+                    uint8_t bus = entry_iointr->source_bus;
+                    uint8_t intr_type = entry_iointr->type;
+                    uint8_t intr_flags = entry_iointr->flags;
                     uint8_t device = entry_iointr->source_bus_irq >> 2;
-                    uint8_t pci_irq = entry_iointr->source_bus_irq;
+                    uint8_t pci_irq = entry_iointr->source_bus_irq & 3;
                     uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
                     uint8_t intin = entry_iointr->dest_ioapic_intin;
 
-                    printdbg("PCI device %u INT_%c# -> IOAPIC ID 0x%02x INTIN %d\n",
-                           device, (int)(pci_irq & 3) + 'A',
-                           ioapic_id, intin);
+                    printdbg("PCI device %u INT_%c# ->"
+                             " IOAPIC ID 0x%02x INTIN %d %s\n",
+                           device, (int)(pci_irq) + 'A',
+                           ioapic_id, intin,
+                             intr_type < countof(intr_type_text) ?
+                                 intr_type_text[intr_type] :
+                                 "(invalid type!)");
 
-                    if (pci_irq_count < countof(pci_irq_list)) {
-                        pci_irq_list[pci_irq_count].device = device;
-                        pci_irq_list[pci_irq_count].irq = pci_irq & 3;
-                        pci_irq_list[pci_irq_count].ioapic_id = ioapic_id;
-                        pci_irq_list[pci_irq_count].intin = intin;
-                        ++pci_irq_count;
+                    if (bus_irq_count < countof(bus_irq_list)) {
+                        bus_irq_list[bus_irq_count].bus = bus;
+                        bus_irq_list[bus_irq_count].intr_type = intr_type;
+                        bus_irq_list[bus_irq_count].flags = intr_flags;
+                        bus_irq_list[bus_irq_count].device = device;
+                        bus_irq_list[bus_irq_count].irq = pci_irq & 3;
+                        bus_irq_list[bus_irq_count].ioapic_id = ioapic_id;
+                        bus_irq_list[bus_irq_count].intin = intin;
+                        ++bus_irq_count;
                     } else {
                         printdbg("Dropped! Too many PCI IRQ mappings\n");
                     }
                 } else if (entry_iointr->source_bus == mp_isa_bus_id) {
                     // ISA IRQ
 
+                    uint8_t bus =  entry_iointr->source_bus;
+                    uint8_t intr_type = entry_iointr->type;
+                    uint8_t intr_flags = entry_iointr->flags;
                     uint8_t isa_irq = entry_iointr->source_bus_irq;
                     uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
                     uint8_t intin = entry_iointr->dest_ioapic_intin;
 
-                    printdbg("ISA IRQ %d -> IOAPIC ID 0x%02x INTIN %u\n",
-                           isa_irq, ioapic_id, intin);
+                    printdbg("ISA IRQ %d -> IOAPIC ID 0x%02x INTIN %u %s\n",
+                           isa_irq, ioapic_id, intin,
+                             intr_type < countof(intr_type_text) ?
+                                 intr_type_text[intr_type] :
+                                 "(invalid type!)");
 
-                    if (isa_irq_count < countof(isa_irq_list)) {
-                        isa_irq_lookup[isa_irq] = isa_irq_count;
-                        isa_irq_list[isa_irq_count].device = 0;
-                        isa_irq_list[isa_irq_count].irq = isa_irq;
-                        isa_irq_list[isa_irq_count].ioapic_id = ioapic_id;
-                        isa_irq_list[isa_irq_count].intin = intin;
-                        ++isa_irq_count;
+                    if (bus_irq_count < countof(bus_irq_list)) {
+                        isa_irq_lookup[isa_irq] = bus_irq_count;
+                        bus_irq_list[bus_irq_count].bus = bus;
+                        bus_irq_list[bus_irq_count].intr_type = intr_type;
+                        bus_irq_list[bus_irq_count].flags = intr_flags;
+                        bus_irq_list[bus_irq_count].device = 0;
+                        bus_irq_list[bus_irq_count].irq = isa_irq;
+                        bus_irq_list[bus_irq_count].ioapic_id = ioapic_id;
+                        bus_irq_list[bus_irq_count].intin = intin;
+                        ++bus_irq_count;
                     } else {
                         printdbg("Dropped! Too many ISA IRQ mappings\n");
                     }
                 } else {
                     // Unknown bus!
-                    printdbg("IRQ %d on unknown bus -> IOAPIC ID 0x%02x INTIN %u\n",
+                    printdbg("IRQ %d on unknown bus ->"
+                             " IOAPIC ID 0x%02x INTIN %u type=%d\n",
                            entry_iointr->source_bus_irq,
                            entry_iointr->dest_ioapic_id,
-                           entry_iointr->dest_ioapic_intin);
+                           entry_iointr->dest_ioapic_intin,
+                           entry_iointr->type);
                 }
 
                 entry = (uint8_t*)(entry_iointr + 1);
@@ -593,16 +724,40 @@ static int parse_mp_tables(void)
 
             case MP_TABLE_TYPE_ADDRMAP:
                 entry_addrmap = (mp_cfg_addrmap_t*)entry;
+                uint8_t bus = entry_addrmap->bus_id;
+                uint64_t addr =  entry_addrmap->addr_lo |
+                        ((uint64_t)entry_addrmap->addr_hi << 32);
+                uint64_t len =  entry_addrmap->addr_lo |
+                        ((uint64_t)entry_addrmap->addr_hi << 32);
+
+                printdbg("Address map, bus=%d, addr=%lx, len=%lx\n",
+                         bus, addr, len);
+
                 entry += entry_addrmap->len;
                 break;
 
             case MP_TABLE_TYPE_BUSHIER:
                 entry_busheir = (mp_cfg_bushier_t*)entry;
+                bus = entry_busheir->bus_id;
+                uint8_t parent_bus = entry_busheir->parent_bus;
+                uint8_t info = entry_busheir->info;
+
+                printdbg("Bus hierarchy, bus=%d, parent=%d, info=%x\n",
+                         bus, parent_bus, info);
+
                 entry += entry_busheir->len;
                 break;
 
             case MP_TABLE_TYPE_BUSCOMPAT:
-                entry_buscompat = (mp_cfg_buscompat_t*)entry;                
+                entry_buscompat = (mp_cfg_buscompat_t*)entry;
+                bus = entry_buscompat->bus_id;
+                uint8_t bus_mod = entry_buscompat->bus_mod;
+                uint32_t bus_predef = entry_buscompat->predef_range_list;
+
+                printdbg("Bus compat, bus=%d, mod=%d,"
+                         " predefined_range_list=%x\n",
+                         bus, bus_mod, bus_predef);
+
                 entry += entry_buscompat->len;
                 break;
 
@@ -716,7 +871,7 @@ static int apic_dump_impl(int reg)
             (reg != 0x2F0);
 }
 
-static void apic_dump_regs(int ap)
+void apic_dump_regs(int ap)
 {
     for (int i = 0; i < 256; i += 16) {
         printdbg("ap=%d APIC: ", ap);
@@ -781,7 +936,7 @@ int apic_init(int ap)
     APIC_TPR = 0;
 
     apic_configure_timer(APIC_LVT_DCR_BY_1,
-                         ((1000000000U)/(60)),
+                         ((1000000000U)/(2000)),
                          APIC_LVT_TR_MODE_PERIODIC,
                          INTR_APIC_TIMER);
 
@@ -897,7 +1052,8 @@ void apic_start_smp(void)
         uint16_t stagger = 16666 - cpus;
 
         for (unsigned core = 0; core < topo_core_count; ++core) {
-            for (unsigned thread = 0; thread < topo_thread_count; ++thread) {
+            for (unsigned thread = 0;
+                 thread < topo_thread_count; ++thread) {
                 uint8_t target = apic_id_list[pkg] +
                         (thread | (core << topo_thread_bits));
 
@@ -926,4 +1082,121 @@ void apic_start_smp(void)
 uint32_t apic_timer_count(void)
 {
     return APIC_LVT_CCR;
+}
+
+//
+// IOAPIC
+
+unsigned ioapic_isa_bus(void)
+{
+    return mp_isa_bus_id;
+}
+
+static mp_ioapic_t *ioapic_by_id(uint8_t id)
+{
+    for (unsigned i = 0; i < ioapic_count; ++i) {
+        if (ioapic_list[i].id == id)
+            return ioapic_list + i;
+    }
+    return 0;
+}
+
+// Returns 1 on success
+// device should be 0 for ISA IRQs
+int ioapic_map_irq(int bus, int device, int irq, int intr)
+{
+    mp_bus_irq_mapping_t *ent;
+    unsigned i;
+    for (i = 0; i < bus_irq_count; ++i) {
+        ent = bus_irq_list + i;
+        if (ent->bus == bus &&
+                ent->device == device &&
+                ent->irq == irq)
+            break;
+    }
+    if (i == bus_irq_count) {
+        printdbg("IRQ mapping not found!"
+                 " bus=%d, device=%d, irq=%d",
+                 bus, device, irq);
+        return 0;
+    }
+
+    // Find the IOAPIC
+    mp_ioapic_t *ioapic = ioapic_by_id(ent->ioapic_id);
+    if (!ioapic) {
+        printdbg("IOAPIC ID not found! id=%d",
+                 ent->ioapic_id);
+        return 0;
+    }
+
+    uint8_t delivery;
+
+    switch (ent->intr_type) {
+    case MP_INTR_TYPE_APIC:
+        delivery = IOAPIC_REDLO_DELIVERY_APIC;
+        break;
+
+    case MP_INTR_TYPE_NMI:
+        delivery = IOAPIC_REDLO_DELIVERY_NMI;
+        break;
+
+    case MP_INTR_TYPE_SMI:
+        delivery = IOAPIC_REDLO_DELIVERY_SMI;
+        break;
+
+    case MP_INTR_TYPE_EXTINT:
+        delivery = IOAPIC_REDLO_DELIVERY_EXTINT;
+        break;
+
+    default:
+        delivery = IOAPIC_REDLO_DELIVERY_APIC;
+        break;
+    }
+
+    uint8_t polarity;
+
+    switch (ent->flags & MP_INTR_FLAGS_POLARITY) {
+    default:
+    case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVELO):
+        polarity = IOAPIC_REDLO_POLARITY_ACTIVELO;
+        break;
+    case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVEHI):
+        polarity = IOAPIC_REDLO_POLARITY_ACTIVEHI;
+        break;
+    }
+
+    uint8_t trigger;
+
+    switch (ent->flags & MP_INTR_FLAGS_TRIGGER) {
+    default:
+    case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_EDGE):
+        trigger = IOAPIC_REDLO_TRIGGER_EDGE;
+        break;
+
+    case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_LEVEL):
+        trigger = IOAPIC_REDLO_TRIGGER_LEVEL;
+        break;
+
+    }
+
+    uint32_t iored_lo =
+            IOAPIC_REDLO_VECTOR_n(intr) |
+            IOAPIC_REDLO_DELIVERY_n(delivery) |
+            IOAPIC_REDLO_POLARITY_n(polarity) |
+            IOAPIC_REDLO_TRIGGER_n(trigger);
+
+    uint32_t iored_hi = IOAPIC_REDHI_DEST_n(intr);
+
+    // Write low part with mask set
+    ioapic->ptr[IOAPIC_RED_LO_n(ent->intin)] = iored_lo |
+            IOAPIC_REDLO_MASKIRQ;
+
+    // Write high part
+    ioapic->ptr[IOAPIC_RED_HI_n(ent->intin)] = iored_hi;
+
+    // If not masked, write low part without mask
+    if (!(iored_lo & IOAPIC_REDLO_MASKIRQ))
+        ioapic->ptr[IOAPIC_RED_LO_n(ent->intin)] = iored_lo;
+
+    return 1;
 }

@@ -9,8 +9,12 @@
 #include "interrupts.h"
 #include "control_regs.h"
 #include "string.h"
+#include "assert.h"
 
-idt_entry_64_t idt[128];
+// debug hack
+#include "apic.h"
+
+idt_entry_64_t idt[256];
 
 static void *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
 
@@ -62,7 +66,7 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
 
 typedef void (*isr_entry_t)(void);
 
-const isr_entry_t isr_entry_points[128] = {
+const isr_entry_t isr_entry_points[256] = {
     isr_entry_0,   isr_entry_1,   isr_entry_2,   isr_entry_3,
     isr_entry_4,   isr_entry_5,   isr_entry_6,   isr_entry_7,
     isr_entry_8,   isr_entry_9,   isr_entry_10,  isr_entry_11,
@@ -97,10 +101,40 @@ const isr_entry_t isr_entry_points[128] = {
     isr_entry_112, isr_entry_113, isr_entry_114, isr_entry_115,
     isr_entry_116, isr_entry_117, isr_entry_118, isr_entry_119,
     isr_entry_120, isr_entry_121, isr_entry_122, isr_entry_123,
-    isr_entry_124, isr_entry_125, isr_entry_126, isr_entry_127
+    isr_entry_124, isr_entry_125, isr_entry_126, isr_entry_127,
+    isr_entry_128, isr_entry_129, isr_entry_130, isr_entry_131,
+    isr_entry_132, isr_entry_133, isr_entry_134, isr_entry_135,
+    isr_entry_136, isr_entry_137, isr_entry_138, isr_entry_139,
+    isr_entry_140, isr_entry_141, isr_entry_142, isr_entry_143,
+    isr_entry_144, isr_entry_145, isr_entry_146, isr_entry_147,
+    isr_entry_148, isr_entry_149, isr_entry_150, isr_entry_151,
+    isr_entry_152, isr_entry_153, isr_entry_154, isr_entry_155,
+    isr_entry_156, isr_entry_157, isr_entry_158, isr_entry_159,
+    isr_entry_160, isr_entry_161, isr_entry_162, isr_entry_163,
+    isr_entry_164, isr_entry_165, isr_entry_166, isr_entry_167,
+    isr_entry_168, isr_entry_169, isr_entry_170, isr_entry_171,
+    isr_entry_172, isr_entry_173, isr_entry_174, isr_entry_175,
+    isr_entry_176, isr_entry_177, isr_entry_178, isr_entry_179,
+    isr_entry_180, isr_entry_181, isr_entry_182, isr_entry_183,
+    isr_entry_184, isr_entry_185, isr_entry_186, isr_entry_187,
+    isr_entry_188, isr_entry_189, isr_entry_190, isr_entry_191,
+    isr_entry_192, isr_entry_193, isr_entry_194, isr_entry_195,
+    isr_entry_196, isr_entry_197, isr_entry_198, isr_entry_199,
+    isr_entry_200, isr_entry_201, isr_entry_202, isr_entry_203,
+    isr_entry_204, isr_entry_205, isr_entry_206, isr_entry_207,
+    isr_entry_208, isr_entry_209, isr_entry_210, isr_entry_211,
+    isr_entry_212, isr_entry_213, isr_entry_214, isr_entry_215,
+    isr_entry_216, isr_entry_217, isr_entry_218, isr_entry_219,
+    isr_entry_220, isr_entry_221, isr_entry_222, isr_entry_223,
+    isr_entry_224, isr_entry_225, isr_entry_226, isr_entry_227,
+    isr_entry_228, isr_entry_229, isr_entry_230, isr_entry_231,
+    isr_entry_232, isr_entry_233, isr_entry_234, isr_entry_235,
+    isr_entry_236, isr_entry_237, isr_entry_238, isr_entry_239,
+    isr_entry_240, isr_entry_241, isr_entry_242, isr_entry_243,
+    isr_entry_244, isr_entry_245, isr_entry_246, isr_entry_247,
+    isr_entry_248, isr_entry_249, isr_entry_250, isr_entry_251,
+    isr_entry_252, isr_entry_253, isr_entry_254, isr_entry_255
 };
-
-extern void isr_entry_0xC0(void);
 
 void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler)
 {
@@ -227,7 +261,7 @@ size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr)
 
 }
 
-static void *unhandled_exception_handler(isr_context_t *ctx)
+static void dump_context(isr_context_t *ctx, int to_screen)
 {
     char fmt_buf[64];
     int color = 0x0F;
@@ -291,6 +325,91 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
         reserved_exception
     };
 
+    //
+    // Dump context to debug console
+
+    printdbg_lock();
+    printdbg("- Exception -------------------------------\n");
+
+    // General registers (except rsp)
+    for (int i = 0; i < 15; ++i) {
+        printdbg("%s=%016lx\n",
+                 reg_names[i],
+                 ctx->gpr->r[i]);
+    }
+
+    // xmm registers
+    for (int i = 0; i < 16; ++i) {
+        printdbg("%sxmm%d=%016lx%016lx\n",
+                 i > 9 ? "" : " ", i,
+                 ctx->fpr->xmm[i].qword[0],
+                ctx->fpr->xmm[i].qword[1]);
+    }
+
+    // Segment registers
+    for (int i = 0; i < 4; ++i) {
+        printdbg("%s=%04x\n",
+                 seg_names[i],
+                 ctx->gpr->s[i]);
+    }
+
+    // ss:rsp
+    printdbg("ss:rsp=%04lx:%012lx\n",
+             ctx->gpr->iret.ss,
+             ctx->gpr->iret.rsp);
+    // cs:rip
+    printdbg("cs:rip=%04lx:%012lx\n",
+             ctx->gpr->iret.cs,
+             (uintptr_t)ctx->gpr->iret.rip);
+
+    // Exception
+    if (ctx->gpr->info.interrupt < 32) {
+        printdbg("Exception 0x%02lx %s\n",
+                 ctx->gpr->info.interrupt,
+                 exception_names[ctx->gpr->info.interrupt]);
+    } else {
+        printdbg("Interrupt 0x%02lx\n",
+                 ctx->gpr->info.interrupt);
+    }
+
+    // mxcsr and description
+    width = cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
+                               ctx->fpr->mxcsr);
+    printdbg("mxcsr=%04x %s\n",
+             ctx->fpr->mxcsr, fmt_buf);
+
+    // fault address
+    printdbg("cr2=%012lx\n",
+             cpu_get_fault_address());
+
+    // error code
+    printdbg("Error code 0x%012lx\n",
+             ctx->gpr->info.error_code);
+
+    // rflags (it's actually only 22 bits) and description
+    cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
+                       ctx->gpr->iret.rflags);
+    printdbg("rflags=%06lx %s\n",
+             ctx->gpr->iret.rflags,
+             fmt_buf);
+
+    // fsbase
+    printdbg("fsbase=%12lx\n",
+             (uint64_t)ctx->gpr->fsbase);
+
+    // gsbase
+    printdbg("gsbase=%12lx\n",
+             msr_get(MSR_GSBASE));
+
+    printdbg("-------------------------------------------\n");
+    printdbg_unlock();
+
+    //
+    // Dump context to screen
+
+    if (!to_screen)
+        return;
+
     for (int i = 0; i < 16; ++i) {
         if (i < 15) {
             // General register name
@@ -322,7 +441,7 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
         con_draw_xy(39+i*8, 18, fmt_buf, color);
     }
 
-    // rsp
+    // ss:rsp
     con_draw_xy(0, 15, "ss:rsp", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012lx ",
              ctx->gpr->iret.ss, ctx->gpr->iret.rsp);
@@ -335,13 +454,21 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
              ctx->gpr->iret.cs, (uint64_t)ctx->gpr->iret.rip);
     con_draw_xy(6, 16, fmt_buf, color);
 
-    // exception
-    con_draw_xy(
-                                   0, 17, "Exception", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
-             ctx->gpr->info.interrupt,
-             exception_names[ctx->gpr->info.interrupt]);
-    con_draw_xy(9, 17, fmt_buf, color);
+    if (ctx->gpr->info.interrupt < 32) {
+        // exception
+        con_draw_xy(
+                                       0, 17, "Exception", color);
+        snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
+                 ctx->gpr->info.interrupt,
+                 exception_names[ctx->gpr->info.interrupt]);
+        con_draw_xy(9, 17, fmt_buf, color);
+    } else {
+        con_draw_xy(
+                                       0, 17, "Interrupt", color);
+        snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx",
+                 ctx->gpr->info.interrupt);
+        con_draw_xy(9, 17, fmt_buf, color);
+    }
 
     // MXCSR
     width = snprintf(fmt_buf, sizeof(fmt_buf), "=%04x",
@@ -395,8 +522,14 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
                      msr_get(0x1DD));
     con_draw_xy(6, 22, fmt_buf, color);
 
-    halt_forever();
+    if (ctx->gpr->info.interrupt == INTR_EX_GPF)
+        apic_dump_regs(0);
+}
 
+static void *unhandled_exception_handler(isr_context_t *ctx)
+{
+    dump_context(ctx, 1);
+    halt_forever();
     return ctx;
 }
 
@@ -411,16 +544,23 @@ isr_context_t *exception_isr_handler(isr_context_t *ctx)
 
 void *isr_handler(isr_context_t *ctx)
 {
-    // Exception
-    if (ctx->gpr->info.interrupt < 32)
-        return exception_isr_handler(ctx);
+    if (ctx->gpr->info.interrupt < 32) {
+        // Exception
+        ctx = exception_isr_handler(ctx);
+    } else if (ctx->gpr->info.interrupt >= 32 &&
+               ctx->gpr->info.interrupt < 48) {
+        // IRQ
+        ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
+    } else {
+        //
+        // Other interrupts
+        ctx = intr_invoke(ctx->gpr->info.interrupt, ctx);
+    }
 
-    // IRQ
-    if (ctx->gpr->info.interrupt >= 32 &&
-            ctx->gpr->info.interrupt < 48)
-        return irq_dispatcher(ctx->gpr->info.interrupt, ctx);
+    assert(ctx->gpr->iret.cs == 0x8);
+    assert(ctx->gpr->s[0] == 0x10);
+    assert(ctx->gpr->s[1] == 0x10);
+    assert(ctx->gpr->iret.ss == 0x10);
 
-    //
-    // Other interrupts
-    return intr_invoke(ctx->gpr->info.interrupt, ctx);
+    return ctx;
 }
