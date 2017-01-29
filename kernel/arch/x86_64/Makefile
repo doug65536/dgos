@@ -32,6 +32,9 @@ CSRCS := \
 	device/keyb8042_layout/keyb8042_layout_us.c \
 	$(DEVSRCS)
 
+OPTIMIZEDSRCS := cpu/thread_impl.c
+$(OPTIMIZEDSRCS:.c=.o): CFLAGS += -O2
+
 ASRCS := entry.s \
 	cpu/syscall.s \
 	cpu/isr.s \
