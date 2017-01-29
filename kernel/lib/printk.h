@@ -27,6 +27,9 @@ void vprintk(char const *format, va_list ap);
 void printdbg(char const *format, ...)
     ATTRIBUTE_FORMAT(1, 2);
 
+void printdbg_lock(void);
+void printdbg_unlock(void);
+
 void vprintdbg(char const *format, va_list ap);
 
 int cprintf(char const *format, ...)

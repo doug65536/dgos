@@ -4,6 +4,7 @@
 #include "string.h"
 #include "conio.h"
 #include "debug.h"
+#include "cpu/spinlock.h"
 
 typedef enum length_mod_t {
     length_none,
@@ -699,6 +700,18 @@ int snprintf(char *buf, size_t limit, char const *format, ...)
     int result = vsnprintf(buf, limit, format, ap);
     va_end(ap);
     return result;
+}
+
+static spinlock_t printdbg_user_lock;
+
+void printdbg_lock(void)
+{
+    spinlock_lock(&printdbg_user_lock);
+}
+
+void printdbg_unlock(void)
+{
+    spinlock_unlock(&printdbg_user_lock);
 }
 
 static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
