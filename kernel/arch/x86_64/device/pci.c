@@ -233,7 +233,13 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
             // If device is bridge, add bus to todo list
             if (iter->config.dev_class == 0x06 &&
                     iter->config.subclass == 4) {
-
+                if (iter->bus_todo_len < countof(iter->bus_todo)) {
+                     uint8_t secondary_bus =
+                             (iter->config.base_addr[2] >> 8) & 0xFF;
+                     iter->bus_todo[iter->bus_todo_len++] = secondary_bus;
+                } else {
+                    printdbg("Too many PCI bridges! Droppped one\n");
+                }
             }
 
             // If device matched, return true

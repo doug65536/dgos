@@ -314,12 +314,33 @@ debug-iso-wait-singlecpu: $(ISO_FILE)
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
 		 $(QEMU_DEBUGCON)
 
+debug-iso-wait-singlecpu-kvm: $(ISO_FILE)
+	 $(QEMU) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 $(QEMU_DEBUGCON) \
+		 -enable-kvm
+
 debug-iso-wait: $(ISO_FILE)
 	 $(QEMU) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 $(QEMU_SMP) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
 		 $(QEMU_DEBUGCON)
+
+debug-iso-bridge-test-wait: $(ISO_FILE)
+	 $(QEMU) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 $(QEMU_SMP) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 $(QEMU_DEBUGCON) \
+		 -device i82801b11-bridge,bus=pcie.0,id=pcie.1 \
+		 -device i82801b11-bridge,bus=pcie.1,id=pcie.2 \
+		 -device i82801b11-bridge,bus=pcie.2,id=pcie.3 \
+		 -device i82801b11-bridge,bus=pcie.3,id=pcie.4 \
+		 -device i82801b11-bridge,bus=pcie.4,id=pcie.5 \
+		 -device i82801b11-bridge,bus=pcie.5,id=pcie.6 \
+		 -device ich9-ahci,bus=pcie.6
 
 debug-iso-wait-kvm: $(ISO_FILE)
 	 $(QEMU) \
