@@ -181,15 +181,15 @@ static void pic8259_setmask(int irq, int unmask)
 }
 
 // Gets plugged into irq_hook
-static void pic8259_hook(int intr, intr_handler_t handler)
+static void pic8259_hook(int irq, intr_handler_t handler)
 {
-    intr_hook(intr + PIC_IRQ_BASE, handler);
+    intr_hook(irq + PIC_IRQ_BASE, handler);
 }
 
 // Gets plugged into irq_unhook
-static void pic8259_unhook(int intr, intr_handler_t handler)
+static void pic8259_unhook(int irq, intr_handler_t handler)
 {
-    intr_unhook(intr + PIC_IRQ_BASE, handler);
+    intr_unhook(irq + PIC_IRQ_BASE, handler);
 }
 
 void pic8259_enable(void)

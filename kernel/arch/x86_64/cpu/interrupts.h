@@ -24,4 +24,10 @@
 #define INTR_THREAD_YIELD   72
 #define INTR_APIC_TIMER     73
 #define INTR_TLB_SHOOTDOWN  74
+
+// IOAPIC interrupt vectors are allocated
+// below 0xFF. Variable count depending upon
+// the number of IOAPICs and their redirection
+// table size
+
 #define INTR_APIC_SPURIOUS  0xFF

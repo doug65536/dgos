@@ -5,6 +5,7 @@
 #include "control_regs.h"
 #include "interrupts.h"
 #include "irq.h"
+#include "idt.h"
 #include "thread_impl.h"
 #include "mm.h"
 #include "cpuid.h"
@@ -97,7 +98,7 @@ typedef struct mp_cfg_ioapic_t {
         ((1<<MP_INTR_FLAGS_POLARITY_BITS)-1)
 
 #define MP_INTR_FLAGS_TRIGGER \
-        ((1<<MP_INTR_FLAGS_TRIGGER_BITS)-1)
+        (MP_INTR_FLAGS_TRIGGER_MASK<<MP_INTR_FLAGS_TRIGGER_BITS)
 
 #define MP_INTR_FLAGS_POLARITY \
         (MP_INTR_FLAGS_POLARITY_MASK << \
@@ -111,8 +112,8 @@ typedef struct mp_cfg_ioapic_t {
 #define MP_INTR_FLAGS_TRIGGER_EDGE        1
 #define MP_INTR_FLAGS_TRIGGER_LEVEL       3
 
-#define MP_INTR_FLAGS_POLARITY_n(n)   ((n)<<MP_INTR_FLAGS_POLARITY)
-#define MP_INTR_FLAGS_TRIGGER_n(n)    ((n)<<MP_INTR_FLAGS_TRIGGER)
+#define MP_INTR_FLAGS_POLARITY_n(n)   ((n)<<MP_INTR_FLAGS_POLARITY_BIT)
+#define MP_INTR_FLAGS_TRIGGER_n(n)    ((n)<<MP_INTR_FLAGS_TRIGGER_BIT)
 
 #define MP_INTR_TYPE_APIC   0
 #define MP_INTR_TYPE_NMI    1
@@ -122,9 +123,26 @@ typedef struct mp_cfg_ioapic_t {
 //
 // IOAPIC registers
 
+#define IOAPIC_IOREGSEL         0
+#define IOAPIC_IOREGWIN         4
+
 #define IOAPIC_REG_ID           0
 #define IOAPIC_REG_VER          1
 #define IOAPIC_REG_ARB          2
+
+#define IOAPIC_VER_VERSION_BIT  0
+#define IOAPIC_VER_VERSION_BITS 8
+#define IOAPIC_VER_VERSION_MASK ((1<<IOAPIC_VER_VERSION_BITS)-1)
+#define IOAPIC_VER_VERSION      \
+    (IOAPIC_VER_VERSION_MASK<<IOAPIC_VER_VERSION_BIT)
+#define IOAPIC_VER_VERSION_n(n) ((n)<<IOAPIC_VER_VERSION_BIT)
+
+#define IOAPIC_VER_ENTRIES_BIT  16
+#define IOAPIC_VER_ENTRIES_BITS 8
+#define IOAPIC_VER_ENTRIES_MASK ((1<<IOAPIC_VER_ENTRIES_BITS)-1)
+#define IOAPIC_VER_ENTRIES      \
+    (IOAPIC_VER_ENTRIES_MASK<<IOAPIC_VER_ENTRIES_BIT)
+#define IOAPIC_VER_ENTRIES_n(n) ((n)<<IOAPIC_VER_ENTRIES_BIT)
 
 #define IOAPIC_RED_LO_n(n)      (0x10 + (n) * 2)
 #define IOAPIC_RED_HI_n(n)      (0x10 + (n) * 2 + 1)
@@ -252,23 +270,33 @@ typedef struct mp_bus_irq_mapping_t {
 
 typedef struct mp_ioapic_t {
     uint8_t id;
+    uint8_t base_intr;
+    uint8_t vector_count;
+    uint8_t base_irq;
     uint32_t addr;
-    uint32_t *ptr;
+    uint32_t volatile *ptr;
     spinlock_t lock;
 } mp_ioapic_t;
 
 static char *mp_tables;
 
-static unsigned mp_pci_bus_id;
-static unsigned mp_isa_bus_id;
+#define MAX_PCI_BUSSES 16
+static uint8_t mp_pci_bus_ids[MAX_PCI_BUSSES];
+static uint8_t mp_pci_bus_count;
+static uint16_t mp_isa_bus_id;
 
 static mp_bus_irq_mapping_t bus_irq_list[64];
-static unsigned bus_irq_count;
+static uint8_t bus_irq_count;
+
+static uint8_t bus_irq_to_mapping[64];
 
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
 
-static unsigned isa_irq_lookup[16];
+static uint8_t ioapic_next_free_vector = INTR_APIC_SPURIOUS - 1;
+static uint8_t ioapic_next_irq_base = 16;
+
+static uint8_t isa_irq_lookup[16];
 
 static uint8_t apic_id_list[64];
 static unsigned apic_id_count;
@@ -280,7 +308,7 @@ static uint8_t topo_core_count;
 
 static uint8_t topo_cpu_count;
 
-static uint64_t apic_base;
+static uintptr_t apic_base;
 static uint32_t volatile *apic_ptr;
 
 #define MP_TABLE_TYPE_CPU       0
@@ -539,8 +567,7 @@ static int parse_mp_tables(void)
         uint8_t *entry = (uint8_t*)(cth + 1);
 
         // Reset to impossible values
-        mp_pci_bus_id = ~0U;
-        mp_isa_bus_id = ~0U;
+        mp_isa_bus_id = -1;
 
         // First slot reserved for BSP
         apic_id_count = 1;
@@ -579,10 +606,18 @@ static int parse_mp_tables(void)
                          (int)sizeof(entry_bus->type),
                          entry_bus->type, entry_bus->bus_id);
 
-                if (!memcmp(entry_bus->type, "PCI", 3)) {
-                    mp_pci_bus_id = entry_bus->bus_id;
-                } else if (!memcmp(entry_bus->type, "ISA", 3)) {
-                    mp_isa_bus_id = entry_bus->bus_id;
+                if (!memcmp(entry_bus->type, "PCI   ", 6)) {
+                    if (mp_pci_bus_count < MAX_PCI_BUSSES) {
+                        mp_pci_bus_ids[mp_pci_bus_count++] =
+                                entry_bus->bus_id;
+                    } else {
+                        printdbg("Too many PCI busses!\n");
+                    }
+                } else if (!memcmp(entry_bus->type, "ISA   ", 6)) {
+                    if (mp_isa_bus_id == 0xFFFF)
+                        mp_isa_bus_id = entry_bus->bus_id;
+                    else
+                        printdbg("Too many ISA busses, only one supported\n");
                 } else {
                     printdbg("Dropped! Unrecognized bus named \"%.*s\"\n",
                            (int)sizeof(entry_bus->type), entry_bus->type);
@@ -594,28 +629,50 @@ static int parse_mp_tables(void)
                 entry_ioapic = (mp_cfg_ioapic_t *)entry;
 
                 if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED) {
-                    if (ioapic_count < countof(ioapic_list)) {
-                        printdbg("IOAPIC id=%d, addr=0x%x, flags=0x%x, ver=0x%x\n",
-                                 entry_ioapic->id,
-                                 entry_ioapic->addr,
-                                 entry_ioapic->flags,
-                                 entry_ioapic->ver);
-
-                        ioapic_list[ioapic_count].id = entry_ioapic->id;
-                        ioapic_list[ioapic_count].addr = entry_ioapic->addr;
-
-                        ioapic_list[ioapic_count].ptr = mmap(
-                                    (void*)(uintptr_t)entry_ioapic->addr,
-                                    32, PROT_READ | PROT_WRITE,
-                                    MAP_PHYSICAL |
-                                    MAP_NOCACHE |
-                                    MAP_WRITETHRU, -1, 0);
-                        ioapic_list[ioapic_count].lock = 0;
-
-                        ++ioapic_count;
-                    } else {
+                    if (ioapic_count >= countof(ioapic_list)) {
                         printdbg("Dropped! Too many IOAPIC devices\n");
+                        break;
                     }
+
+                    printdbg("IOAPIC id=%d, addr=0x%x, flags=0x%x, ver=0x%x\n",
+                             entry_ioapic->id,
+                             entry_ioapic->addr,
+                             entry_ioapic->flags,
+                             entry_ioapic->ver);
+
+                    mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
+
+                    ioapic->id = entry_ioapic->id;
+                    ioapic->addr = entry_ioapic->addr;
+
+                    uint32_t volatile *ioapic_ptr = mmap(
+                                (void*)(uintptr_t)entry_ioapic->addr,
+                                12, PROT_READ | PROT_WRITE,
+                                MAP_PHYSICAL |
+                                MAP_NOCACHE |
+                                MAP_WRITETHRU, -1, 0);
+
+                    ioapic->ptr = ioapic_ptr;
+
+                    // Read redirection table size
+
+                    ioapic_ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
+                    uint32_t ioapic_ver = ioapic_ptr[IOAPIC_IOREGWIN];
+
+                    uint8_t ioapic_intr_count =
+                            (ioapic_ver >> IOAPIC_VER_ENTRIES_BIT) &
+                            IOAPIC_VER_ENTRIES_MASK;
+
+                    // Allocate virtual IRQ numbers
+                    ioapic->base_irq = ioapic_next_irq_base;
+                    ioapic_next_irq_base += ioapic_intr_count;
+
+                    // Allocate vectors assign range to IOAPIC
+                    ioapic_next_free_vector -= ioapic_intr_count;
+                    ioapic->base_intr = ioapic_next_free_vector;
+                    ioapic->vector_count = ioapic_intr_count;
+
+                    ioapic->lock = 0;
                 }
                 entry = (uint8_t*)(entry_ioapic + 1);
                 break;
@@ -623,7 +680,8 @@ static int parse_mp_tables(void)
             case MP_TABLE_TYPE_IOINTR:
                 entry_iointr = (mp_cfg_iointr_t *)entry;
 
-                if (entry_iointr->source_bus == mp_pci_bus_id) {
+                if (memchr(mp_pci_bus_ids, entry_iointr->source_bus,
+                            mp_pci_bus_count)) {
                     // PCI IRQ
                     uint8_t bus = entry_iointr->source_bus;
                     uint8_t intr_type = entry_iointr->type;
@@ -697,7 +755,8 @@ static int parse_mp_tables(void)
 
             case MP_TABLE_TYPE_LINTR:
                 entry_lintr = (mp_cfg_lintr_t*)entry;
-                if (entry_lintr->source_bus == mp_pci_bus_id) {
+                if (memchr(mp_pci_bus_ids, entry_lintr->source_bus,
+                            mp_pci_bus_count)) {
                     uint8_t device = entry_lintr->source_bus_irq >> 2;
                     uint8_t pci_irq = entry_lintr->source_bus_irq;
                     uint8_t lapic_id = entry_lintr->dest_lapic_id;
@@ -839,7 +898,7 @@ void apic_eoi(int intr)
     APIC_EOI = intr;
 }
 
-static void apic_enable(int enabled, int spurious_intr)
+static void apic_online(int enabled, int spurious_intr)
 {
     uint32_t sir = APIC_SIR;
 
@@ -931,12 +990,12 @@ int apic_init(int ap)
         parse_mp_tables();
     }
 
-    apic_enable(1, INTR_APIC_SPURIOUS);
+    apic_online(1, INTR_APIC_SPURIOUS);
 
     APIC_TPR = 0;
 
     apic_configure_timer(APIC_LVT_DCR_BY_1,
-                         ((1000000000U)/(2000)),
+                         ((1000000000U)/(60)),
                          APIC_LVT_TR_MODE_PERIODIC,
                          INTR_APIC_TIMER);
 
@@ -946,21 +1005,6 @@ int apic_init(int ap)
 
     return 1;
 }
-
-//APIC_LVT_LNT0 |= APIC_LVT_MASK;
-//APIC_LVT_LNT1 |= APIC_LVT_MASK;
-//APIC_LVT_ERR |= APIC_LVT_MASK;
-//APIC_LVT_PMCR |= APIC_LVT_MASK;
-//APIC_LVT_TSR |= APIC_LVT_MASK;
-
-//uint32_t last_count = apic_timer_count();
-//uint32_t this_count;
-//do {
-//    this_count = apic_timer_count();
-//    if (this_count > last_count)
-//        printdbg("Tick\n");
-//    last_count = this_count;
-//} while(1);
 
 static void apic_detect_topology(void)
 {
@@ -1087,9 +1131,27 @@ uint32_t apic_timer_count(void)
 //
 // IOAPIC
 
-unsigned ioapic_isa_bus(void)
+static void ioapic_lock(mp_ioapic_t *ioapic)
 {
-    return mp_isa_bus_id;
+    spinlock_lock(&ioapic->lock);
+}
+
+static void ioapic_unlock(mp_ioapic_t *ioapic)
+{
+    spinlock_unlock(&ioapic->lock);
+}
+
+static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg)
+{
+    ioapic->ptr[IOAPIC_IOREGSEL] = reg;
+    return ioapic->ptr[IOAPIC_IOREGWIN];
+}
+
+static void ioapic_write(mp_ioapic_t *ioapic,
+                             uint32_t reg, uint32_t value)
+{
+    ioapic->ptr[IOAPIC_IOREGSEL] = reg;
+    ioapic->ptr[IOAPIC_IOREGWIN] = value;
 }
 
 static mp_ioapic_t *ioapic_by_id(uint8_t id)
@@ -1103,35 +1165,12 @@ static mp_ioapic_t *ioapic_by_id(uint8_t id)
 
 // Returns 1 on success
 // device should be 0 for ISA IRQs
-int ioapic_map_irq(int bus, int device, int irq, int intr)
+static void ioapic_map(mp_ioapic_t *ioapic,
+                       mp_bus_irq_mapping_t *mapping)
 {
-    mp_bus_irq_mapping_t *ent;
-    unsigned i;
-    for (i = 0; i < bus_irq_count; ++i) {
-        ent = bus_irq_list + i;
-        if (ent->bus == bus &&
-                ent->device == device &&
-                ent->irq == irq)
-            break;
-    }
-    if (i == bus_irq_count) {
-        printdbg("IRQ mapping not found!"
-                 " bus=%d, device=%d, irq=%d",
-                 bus, device, irq);
-        return 0;
-    }
-
-    // Find the IOAPIC
-    mp_ioapic_t *ioapic = ioapic_by_id(ent->ioapic_id);
-    if (!ioapic) {
-        printdbg("IOAPIC ID not found! id=%d",
-                 ent->ioapic_id);
-        return 0;
-    }
-
     uint8_t delivery;
 
-    switch (ent->intr_type) {
+    switch (mapping->intr_type) {
     case MP_INTR_TYPE_APIC:
         delivery = IOAPIC_REDLO_DELIVERY_APIC;
         break;
@@ -1149,26 +1188,32 @@ int ioapic_map_irq(int bus, int device, int irq, int intr)
         break;
 
     default:
+        printdbg("MP: Unrecognized interrupt delivery type!"
+                 " Guessing APIC\n");
         delivery = IOAPIC_REDLO_DELIVERY_APIC;
         break;
     }
 
     uint8_t polarity;
 
-    switch (ent->flags & MP_INTR_FLAGS_POLARITY) {
+    switch (mapping->flags & MP_INTR_FLAGS_POLARITY) {
     default:
-    case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVELO):
-        polarity = IOAPIC_REDLO_POLARITY_ACTIVELO;
-        break;
     case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVEHI):
         polarity = IOAPIC_REDLO_POLARITY_ACTIVEHI;
+        break;
+    case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVELO):
+        polarity = IOAPIC_REDLO_POLARITY_ACTIVELO;
         break;
     }
 
     uint8_t trigger;
 
-    switch (ent->flags & MP_INTR_FLAGS_TRIGGER) {
+    switch (mapping->flags & MP_INTR_FLAGS_TRIGGER) {
     default:
+        printdbg("MP: Unrecognized IRQ trigger type!"
+                 " Guessing edge\n");
+        // fall through...
+    case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_DEFAULT):
     case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_EDGE):
         trigger = IOAPIC_REDLO_TRIGGER_EDGE;
         break;
@@ -1179,24 +1224,152 @@ int ioapic_map_irq(int bus, int device, int irq, int intr)
 
     }
 
+    uint8_t intr = ioapic->base_intr + mapping->intin;
+
     uint32_t iored_lo =
             IOAPIC_REDLO_VECTOR_n(intr) |
             IOAPIC_REDLO_DELIVERY_n(delivery) |
             IOAPIC_REDLO_POLARITY_n(polarity) |
             IOAPIC_REDLO_TRIGGER_n(trigger);
 
-    uint32_t iored_hi = IOAPIC_REDHI_DEST_n(intr);
+    uint32_t iored_hi = IOAPIC_REDHI_DEST_n(0);
+
+    ioapic_lock(ioapic);
 
     // Write low part with mask set
-    ioapic->ptr[IOAPIC_RED_LO_n(ent->intin)] = iored_lo |
-            IOAPIC_REDLO_MASKIRQ;
+    ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin),
+                 iored_lo | IOAPIC_REDLO_MASKIRQ);
+
+    atomic_barrier();
 
     // Write high part
-    ioapic->ptr[IOAPIC_RED_HI_n(ent->intin)] = iored_hi;
+    ioapic_write(ioapic, IOAPIC_RED_HI_n(mapping->intin), iored_hi);
 
-    // If not masked, write low part without mask
-    if (!(iored_lo & IOAPIC_REDLO_MASKIRQ))
-        ioapic->ptr[IOAPIC_RED_LO_n(ent->intin)] = iored_lo;
+    atomic_barrier();
+
+    ioapic_unlock(ioapic);
+}
+
+//
+//
+
+static mp_ioapic_t *ioapic_from_intr(int intr)
+{
+    for (unsigned i = 0; i < ioapic_count; ++i) {
+        mp_ioapic_t *ioapic = ioapic_list + i;
+        if (intr >= ioapic->base_intr &&
+                intr < ioapic->base_intr +
+                ioapic->vector_count) {
+            return ioapic;
+        }
+    }
+    return 0;
+}
+
+static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)
+{
+    return bus_irq_list + bus_irq_to_mapping[irq];
+}
+
+static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
+{
+    mp_ioapic_t *ioapic = ioapic_from_intr(intr);
+    assert(ioapic);
+    if (ioapic) {
+        apic_eoi(intr);
+
+        unsigned i;
+        mp_bus_irq_mapping_t *mapping = bus_irq_list;
+        uint8_t intin = intr - ioapic->base_intr;
+        for (i = 0; i < bus_irq_count; ++i, ++mapping) {
+            if (mapping->ioapic_id == ioapic->id &&
+                    mapping->intin == intin)
+                break;
+        }
+
+        // Reverse map ISA IRQ
+        uint8_t *isa_match = memchr(isa_irq_lookup, i,
+                                    sizeof(isa_irq_lookup));
+
+        if (isa_match)
+            i = isa_match - isa_irq_lookup;
+        else
+            i = ioapic->base_irq + intin;
+
+        return irq_invoke(intr, i, ctx);
+    }
+    return ctx;
+}
+
+static void ioapic_setmask(int irq, int unmask)
+{
+    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
+    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+
+    ioapic_lock(ioapic);
+
+    uint32_t ent = ioapic_read(
+                ioapic, IOAPIC_RED_LO_n(mapping->intin));
+
+    if (unmask)
+        ent &= ~IOAPIC_REDLO_MASKIRQ;
+    else
+        ent |= IOAPIC_REDLO_MASKIRQ;
+
+    ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin),
+                 ent);
+
+    ioapic_unlock(ioapic);
+}
+
+static void ioapic_hook(int irq, intr_handler_t handler)
+{
+    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
+    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+    uint8_t intr = ioapic->base_intr + mapping->intin;
+    intr_hook(intr, handler);
+}
+
+static void ioapic_unhook(int irq, intr_handler_t handler)
+{
+    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
+    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+    uint8_t intr = ioapic->base_intr + mapping->intin;
+    intr_unhook(intr, handler);
+}
+
+static void ioapic_map_all(void)
+{
+    mp_bus_irq_mapping_t *mapping;
+
+    for (unsigned i = 0; i < 16; ++i)
+        bus_irq_to_mapping[i] = isa_irq_lookup[i];
+
+    for (unsigned i = 0; i < bus_irq_count; ++i) {
+        mapping = bus_irq_list + i;
+        if (mapping->bus != mp_isa_bus_id) {
+            mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+            uint8_t irq = ioapic->base_irq + mapping->intin;
+            bus_irq_to_mapping[irq] = i;
+        }
+
+        mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+
+        ioapic_map(ioapic, mapping);
+    }
+}
+
+int apic_enable(void)
+{
+    if (!mp_tables)
+        return 0;
+
+    ioapic_map_all();
+
+    irq_dispatcher_set_handler(ioapic_dispatcher);
+    irq_setmask_set_handler(ioapic_setmask);
+    irq_hook_set_handler(ioapic_hook);
+    irq_unhook_set_handler(ioapic_unhook);
 
     return 1;
 }

@@ -141,9 +141,9 @@ void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler)
     irq_dispatcher_vec = handler;
 }
 
-void *irq_dispatcher(int irq, isr_context_t *ctx)
+void *irq_dispatcher(int intr, isr_context_t *ctx)
 {
-    return irq_dispatcher_vec(irq, ctx);
+    return irq_dispatcher_vec(intr, ctx);
 }
 
 static void load_idtr(table_register_64_t *table_reg)
@@ -547,8 +547,10 @@ void *isr_handler(isr_context_t *ctx)
     if (ctx->gpr->info.interrupt < 32) {
         // Exception
         ctx = exception_isr_handler(ctx);
-    } else if (ctx->gpr->info.interrupt >= 32 &&
-               ctx->gpr->info.interrupt < 48) {
+    } else if ((ctx->gpr->info.interrupt >= 32 &&
+               ctx->gpr->info.interrupt < 48) ||
+               (ctx->gpr->info.interrupt > 0x80 &&
+               ctx->gpr->info.interrupt < 0xFF)) {
         // IRQ
         ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
     } else {

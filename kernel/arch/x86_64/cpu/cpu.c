@@ -55,15 +55,18 @@ void cpu_init(int ap)
 
 void cpu_hw_init(int ap)
 {
-    //if (ap) {
-    //    gdt_load_tr(thread_cpus_started());
-    //}
-
     apic_init(ap);
     cmos_init();
 
-    pic8259_enable();
+    // Initialize APIC, but fallback to 8259 if no MP tables
+    if (!apic_enable())
+        pic8259_enable();
+    else
+        pic8259_disable();
+
     pit8254_enable();
+
+    cpu_irq_enable();
 
     apic_start_smp();
 }
