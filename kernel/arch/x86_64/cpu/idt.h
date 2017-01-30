@@ -166,17 +166,17 @@ extern cpu_flag_info_t const cpu_mxcsr_info[];
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58
 
-size_t cpu_describe_eflags(char *buf, size_t buf_size, uint64_t rflags);
-size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr);
+size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags);
+size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr);
 
 size_t cpu_format_flags_register(
         char *buf, size_t buf_size,
-        uint64_t rflags, cpu_flag_info_t const *info);
+        uintptr_t rflags, cpu_flag_info_t const *info);
 
 // Passed by ISR handler
 typedef struct interrupt_info_t {
-    uint64_t interrupt;
-    uint64_t error_code;
+    uintptr_t interrupt;
+    uintptr_t error_code;
 } interrupt_info_t;
 
 typedef struct isr_ret_frame_t {
@@ -185,17 +185,17 @@ typedef struct isr_ret_frame_t {
 
 typedef struct isr_iret_frame_t {
     int (*rip)(void*);
-    uint64_t cs;
-    uint64_t rflags;
-    uint64_t rsp;
-    uint64_t ss;
+    uintptr_t cs;
+    uintptr_t rflags;
+    uintptr_t rsp;
+    uintptr_t ss;
 } isr_iret_frame_t;
 
 // Exception handler context
 typedef struct isr_gpr_context_t {
     uint16_t s[4];
     void *fsbase;
-    uint64_t r[15];
+    uintptr_t r[15];
     interrupt_info_t info;
     isr_iret_frame_t iret;
 } isr_gpr_context_t;

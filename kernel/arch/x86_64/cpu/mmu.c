@@ -196,7 +196,7 @@ uint32_t *phys_alloc;
 unsigned phys_alloc_count;
 
 extern char ___init_brk[];
-extern uint64_t ___top_physaddr;
+extern uintptr_t ___top_physaddr;
 static linaddr_t volatile linear_allocator = (linaddr_t)___init_brk;
 
 // Maintain two free page chains,
@@ -242,7 +242,10 @@ static void mmu_free_phys(physaddr_t addr)
         uint64_t next_version = (old_next & 0xFFFFFFFF00000000UL) +
                 0x100000000UL;
 
-        uint64_t cur_next = atomic_cmpxchg(chain, old_next, index | next_version);
+        uint64_t cur_next = atomic_cmpxchg(
+                    chain,
+                    old_next,
+                    index | next_version);
 
         if (cur_next == old_next) {
             atomic_inc_int64(&free_page_count);
@@ -325,7 +328,7 @@ static void path_inc(unsigned *path)
 {
     // Branchless algorithm
 
-    uint64_t n =
+    uintptr_t n =
             ((linaddr_t)path[0] << (9 * 3)) |
             ((linaddr_t)path[1] << (9 * 2)) |
             ((linaddr_t)path[2] << (9 * 1)) |
@@ -345,13 +348,13 @@ static void pte_from_path(pte_t **pte, unsigned *path)
 {
     linaddr_t base = PT_BASEADDR;
 
-    uint64_t page_index =
-            (((uint64_t)path[0]) << (9 * 3)) +
-            (((uint64_t)path[1]) << (9 * 2)) +
-            (((uint64_t)path[2]) << (9 * 1)) +
-            (((uint64_t)path[3]) << (9 * 0));
+    uintptr_t page_index =
+            (((uintptr_t)path[0]) << (9 * 3)) +
+            (((uintptr_t)path[1]) << (9 * 2)) +
+            (((uintptr_t)path[2]) << (9 * 1)) +
+            (((uintptr_t)path[3]) << (9 * 0));
 
-    uint64_t indices[4];
+    uintptr_t indices[4];
 
     indices[0] = (page_index >> (9 * 3)) & (PT0_ENTRIES-1);
     indices[1] = (page_index >> (9 * 2)) & (PT1_ENTRIES-1);
@@ -681,7 +684,7 @@ static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
     linaddr_t linaddr;
 
     if ((linaddr_t)aliasing_pte >= PT_BASEADDR) {
-        uint64_t pt3_index = aliasing_pte - PT3_PTR(PT_BASEADDR);
+        uintptr_t pt3_index = aliasing_pte - PT3_PTR(PT_BASEADDR);
         linaddr = (pt3_index << PAGE_SIZE_BIT);
     } else {
         linaddr = 0x800000000000 - PAGE_SIZE;
@@ -1106,10 +1109,10 @@ void mmu_init(int ap)
                     physaddr_t pt_physaddr[4];
 
                     init_create_pt(root_physaddr, aliasing_pte,
-                            ((uint64_t)path[0] << (9 * 3 + 12)) |
-                            ((uint64_t)path[1] << (9 * 2 + 12)) |
-                            ((uint64_t)path[2] << (9 * 1 + 12)) |
-                            ((uint64_t)path[3] << (9 * 0 + 12)),
+                            ((uintptr_t)path[0] << (9 * 3 + 12)) |
+                            ((uintptr_t)path[1] << (9 * 2 + 12)) |
+                            ((uintptr_t)path[2] << (9 * 1 + 12)) |
+                            ((uintptr_t)path[3] << (9 * 0 + 12)),
                             pte & PTE_ADDR,
                             pt_physaddr,
                             PTE_PRESENT | PTE_WRITABLE);
@@ -1145,7 +1148,7 @@ void mmu_init(int ap)
     memset(phys_alloc, 0, phys_alloc_count * sizeof(*phys_alloc));
 
     // Put all of the remaining physical memory into the free lists
-    uint64_t free_count = 0;
+    uintptr_t free_count = 0;
     physaddr_t top_of_kernel = ___top_physaddr;
     for (; ; ++free_count) {
         physaddr_t addr = init_take_page(0);
@@ -1509,10 +1512,10 @@ void *mmap(void *addr, size_t len,
     if (!(prot & PROT_EXEC) && mmu_have_nx())
         page_flags |= PTE_NX;
 
-    uint64_t misalignment = 0;
+    uintptr_t misalignment = 0;
 
     if (unlikely(flags & MAP_PHYSICAL)) {
-        misalignment = (uint64_t)addr & PAGE_MASK;
+        misalignment = (uintptr_t)addr & PAGE_MASK;
         len += misalignment;
     }
 
@@ -1655,7 +1658,7 @@ uintptr_t mphysaddr(void *addr)
 {
     linaddr_t linaddr = (linaddr_t)addr;
 
-    uint64_t misalignment = linaddr & PAGE_MASK;
+    uintptr_t misalignment = linaddr & PAGE_MASK;
 
     unsigned path[4];
     path_from_addr(path, linaddr);

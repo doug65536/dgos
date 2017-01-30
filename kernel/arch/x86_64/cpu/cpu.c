@@ -18,7 +18,7 @@ void cpu_init(int ap)
     // Enable write protection
     cpu_cr0_change_bits(0, CR0_WP);
 
-    uint64_t cr4 = 0;
+    uintptr_t cr4 = 0;
 
     // Supervisor Mode Execution Prevention (SMEP)
     if (cpuid_ebx_bit(7, 7, 0))

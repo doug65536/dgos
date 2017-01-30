@@ -47,6 +47,9 @@ typedef struct pci_dev_iterator_t {
     int func;
 
     uint8_t header_type;
+
+    uint8_t bus_todo_len;
+    uint8_t bus_todo[64];
 } pci_dev_iterator_t;
 
 int pci_init(void);

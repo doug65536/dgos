@@ -82,7 +82,7 @@ struct thread_info_t {
     uint64_t cpu_affinity;
 
     void *stack;
-    uint64_t stack_size;
+    uintptr_t stack_size;
 
     mutex_t lock;
     condition_var_t done_cond;
@@ -105,7 +105,7 @@ uint32_t volatile thread_smp_running;
 struct cpu_info_t {
     cpu_info_t *self;
     thread_info_t * volatile cur_thread;
-    uint64_t apic_id;
+    uint32_t apic_id;
     int online;
     thread_info_t *goto_thread;
 
@@ -121,11 +121,11 @@ static volatile uint32_t cpu_count;
 static uint32_t default_mxcsr_mask;
 
 // Get executing APIC ID
-static uint64_t get_apic_id(void)
+static uint32_t get_apic_id(void)
 {
     cpuid_t cpuid_info;
     cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
-    uint64_t apic_id = cpuid_info.ebx >> 24;
+    uint32_t apic_id = cpuid_info.ebx >> 24;
     return apic_id;
 }
 
@@ -278,7 +278,7 @@ static thread_t thread_create_with_state(
         isr_start_context_t *ctx =
                 (isr_start_context_t*)ctx_addr;
         memset(ctx, 0, sizeof(*ctx));
-        ctx->gpr.iret.rsp = (uint64_t)(ctx + 1);
+        ctx->gpr.iret.rsp = (uintptr_t)(ctx + 1);
         ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.iret.rflags = EFLAGS_IF;
         ctx->gpr.iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
@@ -287,9 +287,9 @@ static thread_t thread_create_with_state(
         ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
         ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.r[0] = (uint64_t)(uintptr_t)fn;
-        ctx->gpr.r[1] = (uint64_t)userdata;
-        ctx->gpr.r[2] = (uint64_t)i;
+        ctx->gpr.r[0] = (uintptr_t)fn;
+        ctx->gpr.r[1] = (uintptr_t)userdata;
+        ctx->gpr.r[2] = (uintptr_t)i;
         ctx->gpr.fsbase = teb;
 
         ctx->fpr.mxcsr = MXCSR_MASK_ALL;

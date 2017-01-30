@@ -6,7 +6,7 @@
 extern char ___main_tls_bottom[];
 extern thread_env_t *___main_teb_ptr;
 
-extern uint64_t ___tls_size;
+extern uintptr_t ___tls_size;
 extern void *___tls_init_data_ptr;
 extern void *___tls_main_tls_bottom_ptr;
 

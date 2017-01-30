@@ -230,6 +230,12 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
                     iter->config.vendor == (uint16_t)~0)
                 continue;
 
+            // If device is bridge, add bus to todo list
+            if (iter->config.dev_class == 0x06 &&
+                    iter->config.subclass == 4) {
+
+            }
+
             // If device matched, return true
             if (pci_enumerate_is_match(iter))
                 return 1;
@@ -242,7 +248,11 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
         if (++iter->slot >= 32) {
             // Ran out of slots, carry to next bus
             iter->slot = 0;
-            if (++iter->bus >= 256) {
+
+            if (iter->bus_todo_len > 0) {
+                // Pop bridge bus off of the todo list
+                iter->bus = iter->bus_todo[--iter->bus_todo_len];
+            } else {
                 // Ran out of busses, done
                 return 0;
             }
@@ -263,6 +273,8 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
     iter->func = -1;
 
     iter->header_type = 0;
+
+    iter->bus_todo_len = 0;
 
     int found;
 

@@ -157,11 +157,11 @@ static void load_idtr(table_register_64_t *table_reg)
 
 int idt_init(int ap)
 {
-    uint64_t addr;
+    uintptr_t addr;
 
     if (!ap) {
         for (size_t i = 0; i < countof(isr_entry_points); ++i) {
-            addr = (uint64_t)isr_entry_points[i];
+            addr = (uintptr_t)isr_entry_points[i];
             idt[i].offset_lo = (uint16_t)(addr & 0xFFFF);
             idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
             idt[i].offset_64_31 = (uint16_t)
@@ -183,7 +183,7 @@ int idt_init(int ap)
 
     table_register_64_t idtr;
 
-    addr = (uint64_t)idt;
+    addr = (uintptr_t)idt;
     idtr.base = addr;
     idtr.limit = sizeof(idt) - 1;
 
@@ -194,14 +194,14 @@ int idt_init(int ap)
 
 size_t cpu_format_flags_register(
         char *buf, size_t buf_size,
-        uint64_t flags, cpu_flag_info_t const *info)
+        uintptr_t flags, cpu_flag_info_t const *info)
 {
     size_t total_written = 0;
     int chars_needed;
 
     for (cpu_flag_info_t const *fi = info;
          fi->name; ++fi) {
-        uint64_t value = (flags >> fi->bit) & fi->mask;
+        uintptr_t value = (flags >> fi->bit) & fi->mask;
 
         if (value != 0 ||
                 (fi->value_names && fi->value_names[0])) {
@@ -248,13 +248,13 @@ size_t cpu_format_flags_register(
     return total_written;
 }
 
-size_t cpu_describe_eflags(char *buf, size_t buf_size, uint64_t rflags)
+size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags)
 {
     return cpu_format_flags_register(buf, buf_size, rflags,
                                      cpu_eflags_info);
 }
 
-size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uint64_t mxcsr)
+size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr)
 {
     return cpu_format_flags_register(buf, buf_size, mxcsr,
                                      cpu_mxcsr_info);
@@ -394,8 +394,8 @@ static void dump_context(isr_context_t *ctx, int to_screen)
              fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%12lx\n",
-             (uint64_t)ctx->gpr->fsbase);
+    printdbg("fsbase=%12zx\n",
+             (uintptr_t)ctx->gpr->fsbase);
 
     // gsbase
     printdbg("gsbase=%12lx\n",
@@ -450,8 +450,8 @@ static void dump_context(isr_context_t *ctx, int to_screen)
     // cs:rip
     con_draw_xy(
                                    0, 16, "cs:rip", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012lx",
-             ctx->gpr->iret.cs, (uint64_t)ctx->gpr->iret.rip);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012zx",
+             ctx->gpr->iret.cs, (uintptr_t)ctx->gpr->iret.rip);
     con_draw_xy(6, 16, fmt_buf, color);
 
     if (ctx->gpr->info.interrupt < 32) {
@@ -506,8 +506,8 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
-             (uint64_t)ctx->gpr->fsbase);
+    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12zx ",
+             (uintptr_t)ctx->gpr->fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase

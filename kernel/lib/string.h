@@ -69,7 +69,7 @@ int utf8_to_ucs4(char const *in, char const **ret_end);
 
 void *aligned16_memset(void *dest, int c, size_t n);
 
-// Aligned fill of
+// Aligned fill of naturally aligned values
 void *memfill_16(void *dest, uint16_t v, size_t count);
 void *memfill_32(void *dest, uint32_t v, size_t count);
 void *memfill_64(void *dest, uint64_t v, size_t count);
