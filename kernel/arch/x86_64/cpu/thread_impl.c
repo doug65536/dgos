@@ -101,6 +101,7 @@ C_ASSERT(sizeof(thread_info_t) == 128);
 static thread_info_t threads[MAX_THREADS];
 static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
+int thread_idle_ready;
 
 struct cpu_info_t {
     cpu_info_t *self;
@@ -588,16 +589,26 @@ void *thread_schedule(void *ctx)
     return ctx;
 }
 
+static void thread_early_sleep(uint64_t expiry)
+{
+    while (time_ms() < expiry)
+        halt();
+}
+
 EXPORT void thread_sleep_until(uint64_t expiry)
 {
-    cpu_info_t *cpu = this_cpu();
-    thread_info_t *thread = cpu->cur_thread;
+    if (thread_idle_ready) {
+        cpu_info_t *cpu = this_cpu();
+        thread_info_t *thread = cpu->cur_thread;
 
-    thread->wake_time = expiry;
-    atomic_barrier();
-    thread->state = THREAD_IS_SLEEPING_BUSY;
-    thread->priority_boost = 100;
-    thread_yield();
+        thread->wake_time = expiry;
+        atomic_barrier();
+        thread->state = THREAD_IS_SLEEPING_BUSY;
+        thread->priority_boost = 100;
+        thread_yield();
+    } else {
+        thread_early_sleep(expiry);
+    }
 }
 
 EXPORT void thread_sleep_for(uint64_t ms)
@@ -724,4 +735,9 @@ void thread_check_stack(void)
     if (sp < thread->stack ||
             (char*)sp > (char*)thread->stack + thread->stack_size)
         cpu_crash();
+}
+
+void thread_idle_set_ready(void)
+{
+    thread_idle_ready = 1;
 }

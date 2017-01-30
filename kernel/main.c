@@ -517,6 +517,8 @@ int main(void)
 
     thread_create(init_thread, 0, 0, 0);
 
+    thread_idle_set_ready();
+
     while (1)
         halt();
 

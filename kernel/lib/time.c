@@ -1,6 +1,7 @@
 #include "time.h"
 #include "cpu/halt.h"
 #include "cpu/control_regs.h"
+#include "thread.h"
 #include "printk.h"
 #include "export.h"
 
@@ -48,8 +49,5 @@ EXPORT uint32_t usleep(uint16_t microsec)
 
 EXPORT void sleep(int ms)
 {
-    uint64_t expiry = time_ms() + ms;
-
-    while (time_ms() < expiry)
-        halt();
+    thread_sleep_for(ms);
 }
