@@ -27,13 +27,14 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
     char sector[sector_size * sector_mul];
     iso9660_pvd_t *pvd = (void*)sector;
 
-    drive->vtbl->read_blocks(drive, sector,
+    int err = drive->vtbl->read_blocks(drive, sector,
                              1 * sector_mul,
                              16 * sector_mul);
 
-    memcpy(sig, sector + 1, sizeof(sig));
+    if (err == 0)
+        memcpy(sig, sector + 1, sizeof(sig));
 
-    if (!memcmp(sig, "CD001", 5)) {
+    if (err == 0 && !memcmp(sig, "CD001", 5)) {
         part_dev_t *part = partitions + partition_count++;
 
         part->drive = drive;
