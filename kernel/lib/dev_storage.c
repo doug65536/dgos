@@ -4,14 +4,15 @@
 
 #include "printk.h"
 #include "string.h"
+#include "assert.h"
 
 #define MAX_STORAGE_IFS 64
 static storage_if_base_t *storage_ifs[MAX_STORAGE_IFS];
-static int storage_if_count;
+static unsigned storage_if_count;
 
 #define MAX_STORAGE_DEVS 64
 static storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
-static int storage_dev_count;
+static unsigned storage_dev_count;
 
 #define MAX_PART_DEVS   4
 static part_vtbl_t *part_devs[MAX_PART_DEVS];
@@ -37,6 +38,7 @@ static unsigned fs_mount_count;
 
 storage_dev_base_t *open_storage_dev(dev_t dev)
 {
+    assert(dev >= 0 && (unsigned)dev < storage_dev_count);
     return storage_devs[dev];
 }
 
@@ -55,6 +57,9 @@ void register_storage_if_device(char const *name,
         // Calculate pointer to storage interface instance
         storage_if_base_t *if_ = (void*)
                 ((char*)if_list.base + i * if_list.stride);
+
+        assert(storage_if_count < countof(storage_ifs));
+
         // Store interface instance
         storage_ifs[storage_if_count++] = if_;
 
@@ -67,6 +72,8 @@ void register_storage_if_device(char const *name,
             storage_dev_base_t *dev = (void*)
                     ((char*)dev_list.base +
                     i * dev_list.count);
+            assert(storage_dev_count < countof(storage_devs));
+
             // Store device instance
             storage_devs[storage_dev_count++] = dev;
         }
@@ -99,6 +106,12 @@ void mount_fs(char const *fs_name, fs_init_info_t *info)
 {
     fs_reg_t *fs_reg = find_fs(fs_name);
 
+    // FIXME: why is this needed
+    if (fs_reg == 0)
+        return;
+
+    assert(fs_reg != 0);
+
     fs_base_t *mfs = fs_reg->vtbl->mount(info);
     if (mfs && fs_mount_count < countof(fs_mounts)) {
         fs_mounts[fs_mount_count].fs = mfs;
@@ -112,7 +125,7 @@ void register_part_device(const char *name, part_vtbl_t *vtbl)
     if (part_dev_count < MAX_PART_DEVS) {
         part_devs[part_dev_count++] = vtbl;
 
-        for (int dev = 0; dev < storage_dev_count; ++dev) {
+        for (unsigned dev = 0; dev < storage_dev_count; ++dev) {
             storage_dev_base_t *drive = open_storage_dev(dev);
             if (drive) {
                 if_list_t part_list = vtbl->detect(drive);
