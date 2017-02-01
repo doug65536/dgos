@@ -602,6 +602,8 @@ int vcprintf(char const *format, va_list ap)
                                   vcprintf_emit_chars, 0);
 
         con_cursor_toggle(cursor_was_shown);
+    } else {
+        vprintdbg(format, ap);
     }
     return chars_written;
 }
