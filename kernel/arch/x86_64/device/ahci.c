@@ -468,90 +468,89 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 
 //
 // hba_host_ctl::cap
-
-// 64 bit capable
 #define AHCI_HC_CAP_S64A_BIT    31
-
-// Supports Native Command Queuing
 #define AHCI_HC_CAP_SNCQ_BIT    30
-
-// Supports SNotification Register
 #define AHCI_HC_CAP_SSNTF_BIT   29
-
-// Supports mechanical presence switch
 #define AHCI_HC_CAP_SMPS_BIT    28
-
-// Supports Staggered Spinup
 #define AHCI_HC_CAP_SSS_BIT     27
-
-// Supports Aggressive Link Power management
 #define AHCI_HC_CAP_SALP_BIT    26
-
-// Supports Activity LED
 #define AHCI_HC_CAP_SAL_BIT     25
-
-// Supports Command List Override
 #define AHCI_HC_CAP_SCLO_BIT    24
-
-// Interface speed support
 #define AHCI_HC_CAP_ISS_BIT     20
-
-// Supports AHCI Mode only
 #define AHCI_HC_CAP_SAM_BIT     18
-
-// Supports Port Multiplier
 #define AHCI_HC_CAP_SPM_BIT     17
-
-// FIS Based Switching Supported
 #define AHCI_HC_CAP_FBSS_BIT    16
-
-// PIO Multiple DRQ Block
 #define AHCI_HC_CAP_PMD_BIT     15
-
-// Slumber State Capable
 #define AHCI_HC_CAP_SSC_BIT     14
-
-// Partial State Capable
 #define AHCI_HC_CAP_PSC_BIT     13
-
-// Number of Command Slots
 #define AHCI_HC_CAP_NCS_BIT     8
-
-// Command Completetion Coalescing Supported
 #define AHCI_HC_CAP_CCCS_BIT    7
-
-// Enclosure Management Supported
 #define AHCI_HC_CAP_EMS_BIT     6
-
-// Supports eXternal SATA
 #define AHCI_HC_CAP_SXS_BIT     5
-
-// Number of Ports
 #define AHCI_HC_CAP_NP_BIT      0
 
 #define AHCI_HC_CAP_NCS_BITS    5
 #define AHCI_HC_CAP_ISS_BITS    4
 #define AHCI_HC_CAP_NP_BITS     5
 
+// 64 bit capable
 #define AHCI_HC_CAP_S64A        (1U<<AHCI_HC_CAP_S64A_BIT)
+
+// Supports Native Command Queuing
 #define AHCI_HC_CAP_SNCQ        (1U<<AHCI_HC_CAP_SNCQ_BIT)
+
+// Supports SNotification Register
 #define AHCI_HC_CAP_SSNTF       (1U<<AHCI_HC_CAP_SSNTF_BIT)
+
+// Supports mechanical presence switch
 #define AHCI_HC_CAP_SMPS        (1U<<AHCI_HC_CAP_SMPS_BIT)
+
+// Supports Staggered Spinup
 #define AHCI_HC_CAP_SSS         (1U<<AHCI_HC_CAP_SSS_BIT)
+
+// Supports Aggressive Link Power management
 #define AHCI_HC_CAP_SALP        (1U<<AHCI_HC_CAP_SALP_BIT)
+
+// Supports Activity LED
 #define AHCI_HC_CAP_SAL         (1U<<AHCI_HC_CAP_SAL_BIT)
+
+// Supports Command List Override
 #define AHCI_HC_CAP_SCLO        (1U<<AHCI_HC_CAP_SCLO_BIT)
+
+// Interface speed support
 #define AHCI_HC_CAP_ISS         (1U<<AHCI_HC_CAP_ISS_BIT)
+
+// Supports AHCI Mode only
 #define AHCI_HC_CAP_SAM         (1U<<AHCI_HC_CAP_SAM_BIT)
+
+// Supports Port Multiplier
 #define AHCI_HC_CAP_SPM         (1U<<AHCI_HC_CAP_SPM_BIT)
+
+// FIS Based Switching Supported
 #define AHCI_HC_CAP_FBSS        (1U<<AHCI_HC_CAP_FBSS_BIT)
+
+// PIO Multiple DRQ Block
 #define AHCI_HC_CAP_PMD         (1U<<AHCI_HC_CAP_PMD_BIT)
+
+// Slumber State Capable
 #define AHCI_HC_CAP_SSC         (1U<<AHCI_HC_CAP_SSC_BIT)
+
+// Partial State Capable
 #define AHCI_HC_CAP_PSC         (1U<<AHCI_HC_CAP_PSC_BIT)
+
+// Number of Command Slots
 #define AHCI_HC_CAP_NCS         (1U<<AHCI_HC_CAP_NCS_BIT)
+
+// Command Completetion Coalescing Supported
 #define AHCI_HC_CAP_CCCS        (1U<<AHCI_HC_CAP_CCCS_BIT)
+
+// Enclosure Management Supported
 #define AHCI_HC_CAP_EMS         (1U<<AHCI_HC_CAP_EMS_BIT)
+
+// Supports eXternal SATA
 #define AHCI_HC_CAP_SXS         (1U<<AHCI_HC_CAP_SXS_BIT)
+
+// Number of Ports
 #define AHCI_HC_CAP_NP          (1U<<AHCI_HC_CAP_NP_BIT)
 
 #define AHCI_HC_CAP_ISS_MASK    ((1U<<AHCI_HC_CAP_ISS_BITS)-1)
@@ -560,310 +559,304 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 
 //
 // hba_host_ctl::cap2
-
-// DevSleep Entrance From Slumber Only
 #define AHCI_HC_CAP2_DESO_BIT   5
-
-// Supports Aggressive Device sleep Management
 #define AHCI_HC_CAP2_SADM_BIT   4
-
-// Supports Device Sleep
 #define AHCI_HC_CAP2_SDS_BIT    3
-
-// Automatic Partial Slumber Transitions
 #define AHCI_HC_CAP2_APST_BIT   2
-
-// NVMHCI Present
 #define AHCI_HC_CAP2_NVMP_BIT   1
-
-// BIOS/OS Handoff
 #define AHCI_HC_CAP2_BOH_BIT    0
 
+// DevSleep Entrance From Slumber Only
 #define AHCI_HC_CAP2_DESO       (1U<<AHCI_HC_CAP2_DESO_BIT)
+
+// Supports Aggressive Device sleep Management
 #define AHCI_HC_CAP2_SADM       (1U<<AHCI_HC_CAP2_SADM_BIT)
+
+// Supports Device Sleep
 #define AHCI_HC_CAP2_SDS        (1U<<AHCI_HC_CAP2_SDS_BIT)
+
+// Automatic Partial Slumber Transitions
 #define AHCI_HC_CAP2_APST       (1U<<AHCI_HC_CAP2_APST_BIT)
+
+// NVMHCI Present
 #define AHCI_HC_CAP2_NVMP       (1U<<AHCI_HC_CAP2_NVMP_BIT)
+
+// BIOS/OS Handoff
 #define AHCI_HC_CAP2_BOH        (1U<<AHCI_HC_CAP2_BOH_BIT)
 
 //
 // hba_host_ctl::bios_handoff
-
-// BIOS Busy
 #define AHCI_HC_BOH_BB_BIT      4
-
-// OS Ownership Change
 #define AHCI_HC_BOH_OOC_BIT     3
-
-// SMI on OS Ownership Change
 #define AHCI_HC_BOH_SOOE_BIT    2
-
-// OS Owned Semaphore
 #define AHCI_HC_BOH_OOS_BIT     1
-
-// BIOS Owned Semaphore
 #define AHCI_HC_BOH_BOS_BIT     0
 
+// BIOS Busy
 #define AHCI_HC_BOH_BB          (1U<<AHCI_HC_BOH_BB_BIT)
+
+// OS Ownership Change
 #define AHCI_HC_BOH_OOC         (1U<<AHCI_HC_BOH_OOC_BIT)
+
+// SMI on OS Ownership Change
 #define AHCI_HC_BOH_SOOE        (1U<<AHCI_HC_BOH_SOOE_BIT)
+
+// OS Owned Semaphore
 #define AHCI_HC_BOH_OOS         (1U<<AHCI_HC_BOH_OOS_BIT)
+
+// BIOS Owned Semaphore
 #define AHCI_HC_BOH_BOS         (1U<<AHCI_HC_BOH_BOS_BIT)
 
 //
 // hba_host_ctl::host_ctl
-
-// AHCI Enable
 #define AHCI_HC_HC_AE_BIT       31
-
-// MSI Revert to Single Message
 #define AHCI_HC_HC_MRSM_BIT     2
-
-// Interrupt Enable
 #define AHCI_HC_HC_IE_BIT       1
-
-// HBA Reset
 #define AHCI_HC_HC_HR_BIT       0
 
+// AHCI Enable
 #define AHCI_HC_HC_AE           (1U<<AHCI_HC_HC_AE_BIT)
+
+// MSI Revert to Single Message
 #define AHCI_HC_HC_MRSM         (1U<<AHCI_HC_HC_MRSM_BIT)
+
+// Interrupt Enable
 #define AHCI_HC_HC_IE           (1U<<AHCI_HC_HC_IE_BIT)
+
+// HBA Reset
 #define AHCI_HC_HC_HR           (1U<<AHCI_HC_HC_HR_BIT)
 
 //
 // hba_port_t::intr_status
-
-// Cold Port Detect Status
 #define AHCI_HP_IS_CPDS_BIT     31
-
-// Task File Error Status
 #define AHCI_HP_IS_TFES_BIT     30
-
-// Host Bus Fatal Error Status
 #define AHCI_HP_IS_HBFS_BIT     29
-
-// Host Bus Data Error Status
 #define AHCI_HP_IS_HBDS_BIT     28
-
-// Interface Fatal Error Status
 #define AHCI_HP_IS_IFS_BIT      27
-
-// Interface Non-fatal Error Status
 #define AHCI_HP_IS_INFS_BIT     26
-
-// Overflow Status
 #define AHCI_HP_IS_OFS_BIT      24
-
-// Incorrect Port Multiplier Status
 #define AHCI_HP_IS_IPMS_BIT     23
-
-// PhyRdy Change Status
 #define AHCI_HP_IS_PRCS_BIT     22
-
-// Device Mechanical Presence Status
 #define AHCI_HP_IS_DMPS_BIT     7
-
-// Port Connect Change Status
 #define AHCI_HP_IS_PCS_BIT      6
-
-// Descriptor Processed Status
 #define AHCI_HP_IS_DPS_BIT      5
-
-// Unknown FIS Interrupt
 #define AHCI_HP_IS_UFS_BIT      4
-
-// Set Device Bits Interrupt
 #define AHCI_HP_IS_SDBS_BIT     3
-
-// DMA Setup FIS Interrupt
 #define AHCI_HP_IS_DSS_BIT      2
-
-// PIO Setup FIS Interrupt
 #define AHCI_HP_IS_PSS_BIT      1
-
-// Device to Host Register FIS Interrupt
 #define AHCI_HP_IS_DHRS_BIT     0
 
+// Cold Port Detect Status
 #define AHCI_HP_IS_CPDS         (1U<<AHCI_HP_IS_CPDS_BIT)
+
+// Task File Error Status
 #define AHCI_HP_IS_TFES         (1U<<AHCI_HP_IS_TFES_BIT)
+
+// Host Bus Fatal Error Status
 #define AHCI_HP_IS_HBFS         (1U<<AHCI_HP_IS_HBFS_BIT)
+
+// Host Bus Data Error Status
 #define AHCI_HP_IS_HBDS         (1U<<AHCI_HP_IS_HBDS_BIT)
+
+// Interface Fatal Error Status
 #define AHCI_HP_IS_IFS          (1U<<AHCI_HP_IS_IFS_BIT)
+
+// Interface Non-fatal Error Status
 #define AHCI_HP_IS_INFS         (1U<<AHCI_HP_IS_INFS_BIT)
+
+// Overflow Status
 #define AHCI_HP_IS_OFS          (1U<<AHCI_HP_IS_OFS_BIT)
+
+// Incorrect Port Multiplier Status
 #define AHCI_HP_IS_IPMS         (1U<<AHCI_HP_IS_IPMS_BIT)
+
+// PhyRdy Change Status
 #define AHCI_HP_IS_PRCS         (1U<<AHCI_HP_IS_PRCS_BIT)
+
+// Device Mechanical Presence Status
 #define AHCI_HP_IS_DMPS         (1U<<AHCI_HP_IS_DMPS_BIT)
+
+// Port Connect Change Status
 #define AHCI_HP_IS_PCS          (1U<<AHCI_HP_IS_PCS_BIT)
+
+// Descriptor Processed Status
 #define AHCI_HP_IS_DPS          (1U<<AHCI_HP_IS_DPS_BIT)
+
+// Unknown FIS Interrupt
 #define AHCI_HP_IS_UFS          (1U<<AHCI_HP_IS_UFS_BIT)
+
+// Set Device Bits Interrupt
 #define AHCI_HP_IS_SDBS         (1U<<AHCI_HP_IS_SDBS_BIT)
+
+// DMA Setup FIS Interrupt
 #define AHCI_HP_IS_DSS          (1U<<AHCI_HP_IS_DSS_BIT)
+
+// PIO Setup FIS Interrupt
 #define AHCI_HP_IS_PSS          (1U<<AHCI_HP_IS_PSS_BIT)
+
+// Device to Host Register FIS Interrupt
 #define AHCI_HP_IS_DHRS         (1U<<AHCI_HP_IS_DHRS_BIT)
 
 //
 // hba_port_t::intr_en
-
-// Cold Port Detect interrupt enable
 #define AHCI_HP_IE_CPDS_BIT     31
-
-// Task File Error interrupt enable
 #define AHCI_HP_IE_TFES_BIT     30
-
-// Host Bus Fatal Error interrupt enable
 #define AHCI_HP_IE_HBFS_BIT     29
-
-// Host Bus Data Error interrupt enable
 #define AHCI_HP_IE_HBDS_BIT     28
-
-// Interface Fatal Error interrupt enable
 #define AHCI_HP_IE_IFS_BIT      27
-
-// Interface Non-fatal Error interrupt enable
 #define AHCI_HP_IE_INFS_BIT     26
-
-// Overflow interrupt enable
 #define AHCI_HP_IE_OFS_BIT      24
-
-// Incorrect Port Multiplier interrupt enable
 #define AHCI_HP_IE_IPMS_BIT     23
-
-// PhyRdy Change interrupt enable
 #define AHCI_HP_IE_PRCS_BIT     22
-
-// Device Mechanical Presence interrupt enable
 #define AHCI_HP_IE_DMPS_BIT     7
-
-// Port Connect Change interrupt enable
 #define AHCI_HP_IE_PCS_BIT      6
-
-// Descriptor Processed interrupt enable
 #define AHCI_HP_IE_DPS_BIT      5
-
-// Unknown FIS interrupt enable
 #define AHCI_HP_IE_UFS_BIT      4
-
-// Set Device Bits interrupt enable
 #define AHCI_HP_IE_SDBS_BIT     3
-
-// DMA Setup FIS interrupt enable
 #define AHCI_HP_IE_DSS_BIT      2
-
-// PIO Setup FIS interrupt enable
 #define AHCI_HP_IE_PSS_BIT      1
-
-// Device to Host Register FIS interrupt enable
 #define AHCI_HP_IE_DHRS_BIT     0
 
+// Cold Port Detect interrupt enable
 #define AHCI_HP_IE_CPDS         (1U<<AHCI_HP_IE_CPDS_BIT)
+
+// Task File Error interrupt enable
 #define AHCI_HP_IE_TFES         (1U<<AHCI_HP_IE_TFES_BIT)
+
+// Host Bus Fatal Error interrupt enable
 #define AHCI_HP_IE_HBFS         (1U<<AHCI_HP_IE_HBFS_BIT)
+
+// Host Bus Data Error interrupt enable
 #define AHCI_HP_IE_HBDS         (1U<<AHCI_HP_IE_HBDS_BIT)
+
+// Interface Fatal Error interrupt enable
 #define AHCI_HP_IE_IFS          (1U<<AHCI_HP_IE_IFS_BIT)
+
+// Interface Non-fatal Error interrupt enable
 #define AHCI_HP_IE_INFS         (1U<<AHCI_HP_IE_INFS_BIT)
+
+// Overflow interrupt enable
 #define AHCI_HP_IE_OFS          (1U<<AHCI_HP_IE_OFS_BIT)
+
+// Incorrect Port Multiplier interrupt enable
 #define AHCI_HP_IE_IPMS         (1U<<AHCI_HP_IE_IPMS_BIT)
+
+// PhyRdy Change interrupt enable
 #define AHCI_HP_IE_PRCS         (1U<<AHCI_HP_IE_PRCS_BIT)
+
+// Device Mechanical Presence interrupt enable
 #define AHCI_HP_IE_DMPS         (1U<<AHCI_HP_IE_DMPS_BIT)
+
+// Port Connect Change interrupt enable
 #define AHCI_HP_IE_PCS          (1U<<AHCI_HP_IE_PCS_BIT)
+
+// Descriptor Processed interrupt enable
 #define AHCI_HP_IE_DPS          (1U<<AHCI_HP_IE_DPS_BIT)
+
+// Unknown FIS interrupt enable
 #define AHCI_HP_IE_UFS          (1U<<AHCI_HP_IE_UFS_BIT)
+
+// Set Device Bits interrupt enable
 #define AHCI_HP_IE_SDBS         (1U<<AHCI_HP_IE_SDBS_BIT)
+
+// DMA Setup FIS interrupt enable
 #define AHCI_HP_IE_DSS          (1U<<AHCI_HP_IE_DSS_BIT)
+
+// PIO Setup FIS interrupt enable
 #define AHCI_HP_IE_PSS          (1U<<AHCI_HP_IE_PSS_BIT)
+
+// Device to Host Register FIS interrupt enable
 #define AHCI_HP_IE_DHRS         (1U<<AHCI_HP_IE_DHRS_BIT)
 
 //
 // hba_port_t::cmd
-
-// Interface Communication Control
 #define AHCI_HP_CMD_ICC_BIT     28
-
-// Aggressive Slumber / Partial
 #define AHCI_HP_CMD_ASP_BIT     27
-
-// Aggressive Link Power Manager Enable
 #define AHCI_HP_CMD_ALPE_BIT    26
-
-// Drive LED on ATAPI Enablr
 #define AHCI_HP_CMD_DLAE_BIT    25
-
-// Device is ATAPI
 #define AHCI_HP_CMD_ATAPI_BIT   24
-
-// Automatic Partial to Slumber Transitions Enabled
 #define AHCI_HP_CMD_APSTE_BIT   23
-
-// FIS Based Switching Capable Port
 #define AHCI_HP_CMD_FBSCP_BIT   22
-
-// External SATA Port
 #define AHCI_HP_CMD_ESP_BIT     21
-
-// Cold Presence Detect
 #define AHCI_HP_CMD_CPD_BIT     20
-
-// Mechanical Presence Switch attached to Port
 #define AHCI_HP_CMD_MPSP_BIT    19
-
-// Hot Plug Capable Port
 #define AHCI_HP_CMD_HPCP_BIT    18
-
-// Port Multiplier Attached
 #define AHCI_HP_CMD_PMA_BIT     17
-
-// Cold Presence State
 #define AHCI_HP_CMD_CPS_BIT     16
-
-// Command List Running
 #define AHCI_HP_CMD_CR_BIT      15
-
-// FIS Receive Running
 #define AHCI_HP_CMD_FR_BIT      14
-
-// Mechanical Presense Switch State
 #define AHCI_HP_CMD_MPSS_BIT    13
-
-// Current Command Slot
 #define AHCI_HP_CMD_CCS_BIT     8
-
-// FIS Receive Enable
 #define AHCI_HP_CMD_FRE_BIT     4
-
-// Command List Override
 #define AHCI_HP_CMD_CLO_BIT     3
-
-// Power On Device
 #define AHCI_HP_CMD_POD_BIT     2
-
-// Spin Up Device
 #define AHCI_HP_CMD_SUD_BIT     1
-
-// Start
 #define AHCI_HP_CMD_ST_BIT      0
 
+// Interface Communication Control
 #define AHCI_HP_CMD_ICC         (1U<<AHCI_HP_CMD_ICC_BIT)
+
+// Aggressive Slumber / Partial
 #define AHCI_HP_CMD_ASP         (1U<<AHCI_HP_CMD_ASP_BIT)
+
+// Aggressive Link Power Manager Enable
 #define AHCI_HP_CMD_ALPE        (1U<<AHCI_HP_CMD_ALPE_BIT)
+
+// Drive LED on ATAPI Enablr
 #define AHCI_HP_CMD_DLAE        (1U<<AHCI_HP_CMD_DLAE_BIT)
+
+// Device is ATAPI
 #define AHCI_HP_CMD_ATAPI       (1U<<AHCI_HP_CMD_ATAPI_BIT)
+
+// Automatic Partial to Slumber Transitions Enabled
 #define AHCI_HP_CMD_APSTE       (1U<<AHCI_HP_CMD_APSTE_BIT)
+
+// FIS Based Switching Capable Port
 #define AHCI_HP_CMD_FBSCP       (1U<<AHCI_HP_CMD_FBSCP_BIT)
+
+// External SATA Port
 #define AHCI_HP_CMD_ESP         (1U<<AHCI_HP_CMD_ESP_BIT)
+
+// Cold Presence Detect
 #define AHCI_HP_CMD_CPD         (1U<<AHCI_HP_CMD_CPD_BIT)
+
+// Mechanical Presence Switch attached to Port
 #define AHCI_HP_CMD_MPSP        (1U<<AHCI_HP_CMD_MPSP_BIT)
+
+// Hot Plug Capable Port
 #define AHCI_HP_CMD_HPCP        (1U<<AHCI_HP_CMD_HPCP_BIT)
+
+// Port Multiplier Attached
 #define AHCI_HP_CMD_PMA         (1U<<AHCI_HP_CMD_PMA_BIT)
+
+// Cold Presence State
 #define AHCI_HP_CMD_CPS         (1U<<AHCI_HP_CMD_CPS_BIT)
+
+// Command List Running
 #define AHCI_HP_CMD_CR          (1U<<AHCI_HP_CMD_CR_BIT)
+
+// FIS Receive Running
 #define AHCI_HP_CMD_FR          (1U<<AHCI_HP_CMD_FR_BIT)
+
+// Mechanical Presense Switch State
 #define AHCI_HP_CMD_MPSS        (1U<<AHCI_HP_CMD_MPSS_BIT)
+
+// Current Command Slot
 #define AHCI_HP_CMD_CCS         (1U<<AHCI_HP_CMD_CCS_BIT)
+
+// FIS Receive Enable
 #define AHCI_HP_CMD_FRE         (1U<<AHCI_HP_CMD_FRE_BIT)
+
+// Command List Override
 #define AHCI_HP_CMD_CLO         (1U<<AHCI_HP_CMD_CLO_BIT)
+
+// Power On Device
 #define AHCI_HP_CMD_POD         (1U<<AHCI_HP_CMD_POD_BIT)
+
+// Spin Up Device
 #define AHCI_HP_CMD_SUD         (1U<<AHCI_HP_CMD_SUD_BIT)
+
+// Start
 #define AHCI_HP_CMD_ST          (1U<<AHCI_HP_CMD_ST_BIT)
 
 //
@@ -1592,13 +1585,18 @@ static void ahci_perform_detect(ahci_if_t *dev, int port_num)
 
 static void ahci_rebase(ahci_if_t *dev)
 {
+    printk("Stopping all ports\n");
     // Stop all ports
     ahci_port_stop_all(dev);
 
-    int addr_type = ahci_supports_64bit(dev)
+    int support_64bit = ahci_supports_64bit(dev);
+
+    int addr_type = support_64bit
             ? MAP_POPULATE
             : MAP_POPULATE | MAP_32BIT
             ;
+
+    printk("64 bit support: %d\n", support_64bit);
 
     // Loop through the implemented ports
     uint32_t ports_impl = dev->ports_impl;
@@ -1610,7 +1608,7 @@ static void ahci_rebase(ahci_if_t *dev)
             ? 0
             : ((uint32_t)~0<<slots_impl);
 
-    for (int port_num = 0; port_num < 32; ++port_num) {
+    for (uint32_t port_num = 0; port_num < 32; ++port_num) {
         if (!(ports_impl & (1U<<port_num)))
             continue;
 
@@ -1622,6 +1620,7 @@ static void ahci_rebase(ahci_if_t *dev)
         mutex_init(&pi->slotalloc_lock);
         condvar_init(&pi->slotalloc_avail);
 
+        printk("Performing detection, port %d\n", port_num);
         ahci_perform_detect(dev, port_num);
 
         // FIXME: do IDENTIFY instead of assuming 2KB/512B
@@ -1665,6 +1664,8 @@ static void ahci_rebase(ahci_if_t *dev)
         // (Workaround initially active slot on QEMU)
         pi->cmd_issued = init_busy_mask;
 
+        printk("Setting cmd/FIS buffer addresses\n");
+
         atomic_barrier();
         port->cmd_list_base = mphysaddr((void*)cmd_hdr);
         port->fis_base = mphysaddr((void*)fis);
@@ -1673,6 +1674,11 @@ static void ahci_rebase(ahci_if_t *dev)
         // Set command table base addresses (physical)
         for (uint32_t slot = 0; slot < slots_impl; ++slot)
             cmd_hdr[slot].ctba = mphysaddr((void*)(cmd_tbl + slot));
+
+        // Acknowledging interrupts
+        port->intr_status = port->intr_status;
+
+        printk("Unmasking interrupts\n");
 
         port->intr_en = AHCI_HP_IE_TFES |
                 AHCI_HP_IE_HBFS |
@@ -1690,10 +1696,19 @@ static void ahci_rebase(ahci_if_t *dev)
                 AHCI_HP_IE_DHRS;
     }
 
+    printk("Starting ports\n");
     ahci_port_start_all(dev);
+
+    // Acknowledge all IRQs
+    printk("Acknowledging top level IRQ\n");
+    dev->mmio_base->intr_status = dev->mmio_base->intr_status;
+
+    printk("Enabling IRQ\n");
 
     // Enable interrupts overall
     dev->mmio_base->host_ctl |= AHCI_HC_HC_IE;
+
+    printk("Rebase done\n");
 }
 
 static void ahci_bios_handoff(ahci_if_t *dev)
@@ -1718,6 +1733,9 @@ static if_list_t ahci_if_detect(void)
 {
     if_list_t list = {ahci_devices, sizeof(*ahci_devices), 0};
     pci_dev_iterator_t pci_iter;
+
+    printk("Enumerating PCI busses for AHCI...\n");
+    sleep(3000);
 
     if (!pci_enumerate_begin(&pci_iter, 1, 6))
         return list;
@@ -1744,6 +1762,10 @@ static if_list_t ahci_if_detect(void)
                pci_iter.config.irq_line,
                pci_iter.config.irq_pin);
 
+        printk("Initializing AHCI interface...\n");
+
+        sleep(3000);
+
         if (ahci_count < countof(ahci_devices)) {
             ahci_if_t *dev = ahci_devices + ahci_count++;
 
@@ -1756,6 +1778,7 @@ static if_list_t ahci_if_detect(void)
                     0x1100, PROT_READ | PROT_WRITE,
                     MAP_PHYSICAL, -1, 0);
 
+            printk("Performing BIOS handoff\n");
             ahci_bios_handoff(dev);
 
             // Cache implemented port bitmask
@@ -1777,6 +1800,10 @@ static if_list_t ahci_if_detect(void)
             irq_hook(dev->irq, ahci_irq_handler);
             irq_setmask(dev->irq, 1);
         }
+
+        printk("Finding next AHCI device...\n");
+        //sleep(3000);
+
     } while (pci_enumerate_next(&pci_iter));
 
     list.count = ahci_count;
