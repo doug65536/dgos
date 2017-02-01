@@ -56,7 +56,8 @@ ISO_STAGE := cdstage
 ISO_FILE := dgos.iso
 
 QEMU_MACHINE := q35
-QEMU_CPU := kvm64
+QEMU_CPU := Haswell
+#kvm64
 QEMU_RAM := 512M
 
 # Linking libgcc.a crashes my linker
@@ -340,6 +341,12 @@ debug-iso-bridge-test-wait: $(ISO_FILE)
 		 -device i82801b11-bridge,bus=pcie.3,id=pcie.4 \
 		 -device i82801b11-bridge,bus=pcie.4,id=pcie.5 \
 		 -device i82801b11-bridge,bus=pcie.5,id=pcie.6 \
+		 -device ich9-ahci,bus=pcie.1 \
+		 -device ich9-ahci,bus=pcie.2 \
+		 -device ich9-ahci,bus=pcie.2 \
+		 -device ich9-ahci,bus=pcie.4 \
+		 -device ich9-ahci,bus=pcie.5 \
+		 -device ich9-ahci,bus=pcie.6 \
 		 -device ich9-ahci,bus=pcie.6
 
 debug-iso-wait-kvm: $(ISO_FILE)
@@ -373,8 +380,8 @@ debug-attach:
 		-ex 'target remote localhost:1234' \
 		-ex 'layout regs' \
 		-ex 'set radix 16' \
-		-ex 'set $$rbp=1' \
-		-ex 'b mmu_init'
+		-ex 'b assert_failed' \
+		-ex 'b unhandled_exception_handler'
 
 run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 	$(QEMU) \
