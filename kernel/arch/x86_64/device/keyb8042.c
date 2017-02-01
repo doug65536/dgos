@@ -365,7 +365,7 @@ static int keyb8042_send_command(uint8_t command)
     if (max_tries > 0)
         outb(KEYB_CMD, command);
 
-    return max_tries == 0 ? -1 : 0;
+    return max_tries != 0 ? 0 : -1;
 }
 
 // Prints error message and returns -1 on timeout
@@ -392,6 +392,8 @@ static int keyb8042_write_data(uint8_t data)
 
     if (max_tries > 0)
         outb(KEYB_DATA, data);
+    else if (!max_tries)
+        printk("Timeout writing keyboard\n");
 
     return max_tries > 0 ? 0 : -1;
 }
@@ -400,7 +402,7 @@ static int keyb8042_retry_mouse_command(uint8_t command)
 {
     int last_data;
 
-    int max_tries = 100;
+    int max_tries = 4;
     do {
         if (keyb8042_send_command(KEYB_CMD_MOUSECMD) < 0)
             return -1;
@@ -416,7 +418,7 @@ static int keyb8042_retry_mouse_command(uint8_t command)
         printk("Mouse did not acknowledge\n");
     } while (--max_tries);
 
-    return last_data;
+    return max_tries != 0 ? last_data : -1;
 }
 
 static int keyb8042_magic_sequence(uint8_t expected_id, size_t seq_length, ...)
@@ -507,8 +509,8 @@ void keyb8042_init(void)
                 KEYB_CONFIG_IRQEN_PORT2 |
                 KEYB_CONFIG_XLAT_PORT1);
 
-    int port2_exists = 1;
-//            !(config & KEYB_CONFIG_CLKDIS_PORT2);
+    int port2_exists = //1;
+            !(config & KEYB_CONFIG_CLKDIS_PORT2);
 
     // Write config
     KEYB8042_DEBUGMSG(("Writing keyboard controller config = %02x\n", config));
