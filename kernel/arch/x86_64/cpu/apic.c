@@ -272,7 +272,7 @@ typedef struct mp_ioapic_t {
     uint8_t id;
     uint8_t base_intr;
     uint8_t vector_count;
-    uint8_t base_irq;
+    uint8_t irq_base;
     uint32_t addr;
     uint32_t volatile *ptr;
     spinlock_t lock;
@@ -525,6 +525,264 @@ static uint32_t volatile *apic_ptr;
 #define APIC_BASE_ADDR_MASK     ((1UL<<APIC_BASE_ADDR_BITS)-1)
 #define APIC_BASE_ADDR          (APIC_BASE_ADDR_MASK<<APIC_BASE_ADDR_BIT)
 
+//
+// ACPI
+
+// Root System Description Pointer (ACPI 1.0)
+typedef struct acpi_rsdp_t {
+    char sig[8];
+    uint8_t checksum;
+    char oem_id[6];
+    uint8_t rev;
+    uint32_t rsdt_addr;
+} acpi_rsdp_t;
+
+C_ASSERT(sizeof(acpi_rsdp_t) == 20);
+
+// Root System Description Pointer (ACPI 2.0+)
+typedef struct acpi_rsdp2_t {
+    acpi_rsdp_t rsdp1;
+
+    uint32_t length;
+    uint32_t xsdt_addr_lo;
+    uint32_t xsdt_addr_hi;
+    uint8_t checksum;
+    uint8_t reserved[3];
+} acpi_rsdp2_t;
+
+C_ASSERT(sizeof(acpi_rsdp2_t) == 36);
+
+// Root System Description Table
+typedef struct acpi_sdt_hdr_t {
+    char sig[4];
+    uint32_t len;
+    uint8_t rev;
+    uint8_t checksum;
+    char oem_id[6];
+    char oem_table_id[8];
+    uint32_t oem_rev;
+    uint32_t creator_id;
+    uint32_t creator_rev;
+} __attribute__((packed)) acpi_sdt_hdr_t;
+
+C_ASSERT(sizeof(acpi_sdt_hdr_t) == 36);
+
+// Generic Address Structure
+typedef struct acpi_gas_t {
+    uint8_t addr_space;
+    uint8_t bit_width;
+    uint8_t bit_offset;
+    uint8_t access_size;
+    uint32_t addr_lo;
+    uint32_t addr_hi;
+} acpi_gas_t;
+
+C_ASSERT(sizeof(acpi_gas_t) == 12);
+
+#define ACPI_GAS_ADDR_SYSMEM    0
+#define ACPI_GAS_ADDR_SYSIO     1
+#define ACPI_GAS_ADDR_PCICFG    2
+#define ACPI_GAS_ADDR_EMBED     3
+#define ACPI_GAS_ADDR_SMBUS     4
+#define ACPI_GAS_ADDR_FIXED     0x7F
+
+#define ACPI_GAS_ASZ_UNDEF  0
+#define ACPI_GAS_ASZ_8      0
+#define ACPI_GAS_ASZ_16     0
+#define ACPI_GAS_ASZ_32     0
+#define ACPI_GAS_ASZ_64     0
+
+typedef struct acpi_fadt_t {
+    acpi_sdt_hdr_t hdr;
+    uint32_t fw_ctl;
+    uint32_t dsdt;
+
+    // field used in ACPI 1.0; no longer in use, for compatibility only
+    uint8_t  reserved;
+
+    uint8_t  preferred_pm_profile;
+    uint16_t sci_irq;
+    uint32_t smi_cmd_port;
+    uint8_t  acpi_enable;
+    uint8_t  acpi_disable;
+    uint8_t  s4_bios_req;
+    uint8_t  pstate_ctl;
+    uint32_t pm1a_event_block;
+    uint32_t pm1b_event_block;
+    uint32_t pm1a_ctl_block;
+    uint32_t pm1b_ctl_block;
+    uint32_t pm2_ctl_block;
+    uint32_t pm_timer_block;
+    uint32_t gpe0_block;
+    uint32_t gpe1_block;
+    uint8_t  pm1_event_len;
+    uint8_t  pm1_ctl_len;
+    uint8_t  pm2_ctl_len;
+    uint8_t  pm_timer_len;
+    uint8_t  gpe0_len;
+    uint8_t  gpe1_len;
+    uint8_t  gpe1_base;
+    uint8_t  cstate_ctl;
+    uint16_t worst_c2_lat;
+    uint16_t worst_c3_lat;
+    uint16_t flush_size;
+    uint16_t flush_stride;
+    uint8_t  duty_ofs;
+    uint8_t  duty_width;
+    uint8_t  day_alarm;
+    uint8_t  month_alarm;
+    uint8_t  century;
+
+    // reserved in ACPI 1.0; used since ACPI 2.0+
+    uint16_t boot_arch_flags;
+
+    uint8_t  reserved2;
+    uint32_t flags;
+
+    // 12 byte structure; see below for details
+    acpi_gas_t reset_reg;
+
+    uint8_t  reset_value;
+    uint8_t  reserved3[3];
+
+    // 64bit pointers - Available on ACPI 2.0+
+    uint64_t x_fw_ctl;
+    uint64_t x_dsdt;
+
+    acpi_gas_t x_pm1a_event_block;
+    acpi_gas_t x_pm1b_event_block;
+    acpi_gas_t x_pm1a_control_block;
+    acpi_gas_t x_pm1b_control_block;
+    acpi_gas_t x_pm2Control_block;
+    acpi_gas_t x_pm_timer_block;
+    acpi_gas_t x_gpe0_block;
+    acpi_gas_t x_gpe1_block;
+} __attribute__((packed)) acpi_fadt_t;
+
+typedef struct acpi_ssdt_t {
+    // sig == ?
+    acpi_sdt_hdr_t hdr;
+} __attribute__((packed)) acpi_ssdt_t;
+
+typedef struct acpi_madt_rec_hdr_t {
+    uint8_t entry_type;
+    uint8_t record_len;
+} acpi_madt_rec_hdr_t;
+
+#define ACPI_MADT_REC_TYPE_LAPIC    0
+#define ACPI_MADT_REC_TYPE_IOAPIC   1
+#define ACPI_MADT_REC_TYPE_IRQ      2
+
+typedef struct acpi_madt_lapic_t {
+    acpi_madt_rec_hdr_t hdr;
+    uint8_t cpu_id;
+    uint8_t apic_id;
+    uint32_t flags;
+} __attribute__((packed)) acpi_madt_lapic_t;
+
+typedef struct acpi_madt_ioapic_t {
+    acpi_madt_rec_hdr_t hdr;
+    uint8_t apic_id;
+    uint8_t reserved;
+    uint32_t addr;
+    uint32_t irq_base;
+} __attribute__((packed)) acpi_madt_ioapic_t;
+
+typedef struct acpi_madt_irqsrc_t {
+    acpi_madt_rec_hdr_t hdr;
+    uint8_t bus;
+    uint8_t irq_src;
+    uint32_t gsi;
+    uint16_t flags;
+} __attribute__((packed)) acpi_madt_irqsrc_t;
+
+typedef union acpi_madt_ent_t {
+    acpi_madt_rec_hdr_t hdr;
+    acpi_madt_lapic_t lapic;
+    acpi_madt_ioapic_t ioapic;
+    acpi_madt_irqsrc_t irq_src;
+} __attribute__((packed)) acpi_madt_ent_t;
+
+typedef struct acpi_madt_t {
+    // sig == "APIC"
+    acpi_sdt_hdr_t hdr;
+
+    uint32_t lapic_address;
+
+    // 1 = Dual 8259 PICs installed
+    uint32_t flags;
+} __attribute__((packed)) acpi_madt_t;
+
+static uint64_t acpi_rsdp_addr;
+
+static uint8_t checksum_bytes(char const *bytes, size_t len)
+{
+    uint8_t sum = 0;
+    for (size_t i = 0; i < len; ++i)
+        sum += (uint8_t)bytes[i];
+    return sum;
+}
+
+static void apic_process_fadt(acpi_fadt_t *fadt_hdr)
+{
+    (void)fadt_hdr;
+}
+
+static void apic_process_madt(acpi_madt_t *madt_hdr)
+{
+    acpi_madt_ent_t *ent = (void*)(madt_hdr + 1);
+    acpi_madt_ent_t *end = (void*)((char*)madt_hdr + madt_hdr->hdr.len);
+
+    for ( ; ent < end;
+          ent = (void*)((char*)ent + ent->ioapic.hdr.record_len)) {
+        switch (ent->hdr.entry_type) {
+        case ACPI_MADT_REC_TYPE_LAPIC:
+            if (apic_id_count < countof(apic_id_list)) {
+                if (ent->lapic.flags == 1)
+                    apic_id_list[apic_id_count++] = ent->lapic.apic_id;
+                else
+                    printk("Disabled processor detected\n");
+            } else {
+                printk("Too many CPU packages! Dropped one\n");
+            }
+            break;
+
+        case ACPI_MADT_REC_TYPE_IOAPIC:
+            if (ioapic_count < countof(ioapic_list)) {
+                mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
+                ioapic->addr = ent->ioapic.addr;
+                ioapic->irq_base = ent->ioapic.irq_base;
+                ioapic->id = ent->ioapic.apic_id;
+                ioapic->ptr = mmap((void*)(uintptr_t)ent->ioapic.addr, 12,
+                                   PROT_READ | PROT_WRITE,
+                                   MAP_PHYSICAL |
+                                   MAP_NOCACHE |
+                                   MAP_WRITETHRU, -1, 0);
+
+                // FIXME: fill in ioapic->vector_count
+            }
+            break;
+
+        case ACPI_MADT_REC_TYPE_IRQ:
+            if (bus_irq_count == 0) {
+                for (int i = 0; i < 16; ++i) {
+                    mp_bus_irq_mapping_t *mapping = bus_irq_list + i;
+                    mapping->bus = ent->irq_src.bus;
+                    mapping->intin = i;
+                    mapping->irq = i;
+                }
+            }
+            bus_irq_count = 16;
+
+            mp_bus_irq_mapping_t *mapping = bus_irq_list + ent->irq_src.gsi;
+            mapping->bus = ent->irq_src.bus;
+            mapping->irq = ent->irq_src.irq_src;
+            mapping->flags = ent->irq_src.flags;
+            break;
+        }
+    }
+}
+
 static int parse_mp_tables(void)
 {
     void *mem_top =
@@ -534,7 +792,9 @@ static int parse_mp_tables(void)
         mem_top, (uint32_t*)0xA0000,
         0, 0
     };
-    for (size_t pass = 0; !mp_tables && pass < 4; pass += 2) {
+    for (size_t pass = 0;
+         !mp_tables && !acpi_rsdp_addr && pass < 4;
+         pass += 2) {
         if (pass == 2) {
             ranges[2] = mmap((void*)0xE0000, 0x20000, PROT_READ,
                              MAP_PHYSICAL, -1, 0);
@@ -542,25 +802,100 @@ static int parse_mp_tables(void)
         }
         for (mp_table_hdr_t const* sig_srch = ranges[pass];
              (void*)sig_srch < ranges[pass+1]; ++sig_srch) {
-            // Check signature
-            if (memcmp(sig_srch->sig, "_MP_", 4))
-                continue;
+            // Check for ACPI 2.0+ RSDP
+            acpi_rsdp2_t *rsdp2 = (void*)sig_srch;
+            if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
+                // Check checksum
+                if (rsdp2->rsdp1.rev != 0 &&
+                        checksum_bytes((char*)rsdp2,
+                                   sizeof(*rsdp2)) == 0 &&
+                        checksum_bytes((char*)&rsdp2->rsdp1,
+                                       sizeof(rsdp2->rsdp1)) == 0) {
+                    if (rsdp2->xsdt_addr_lo | rsdp2->xsdt_addr_hi)
+                        acpi_rsdp_addr = rsdp2->xsdt_addr_lo |
+                                ((uint64_t)rsdp2->xsdt_addr_hi << 32);
+                    else
+                        acpi_rsdp_addr = rsdp2->rsdp1.rsdt_addr;
+                    break;
+                }
+            }
 
-            // Check checksum
-            char *checked_sum_ptr = (char*)sig_srch;
-            uint8_t checked_sum = 0;
-            for (size_t i = 0; i < sizeof(*sig_srch); ++i)
-                checked_sum += *checked_sum_ptr++;
-            if (checked_sum != 0)
-                continue;
+            // Check for ACPI 1.0 RSDP
+            acpi_rsdp_t *rsdp = (void*)sig_srch;
+            if (rsdp->rev == 0 &&
+                    !memcmp(rsdp->sig, "RSD PTR ", 8)) {
+                // Check checksum
+                if (checksum_bytes((char*)rsdp, sizeof(*rsdp)) == 0) {
+                    acpi_rsdp_addr = rsdp->rsdt_addr;
+                    break;
+                }
+            }
 
-            mp_tables = (char*)(uintptr_t)sig_srch->phys_addr;
-            break;
+            // Check for MP tables signature
+            if (!memcmp(sig_srch->sig, "_MP_", 4)) {
+                // Check checksum
+                if (checksum_bytes((char*)sig_srch,
+                                   sizeof(*sig_srch)) == 0) {
+                    mp_tables = (char*)(uintptr_t)sig_srch->phys_addr;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (acpi_rsdp_addr) {
+        acpi_sdt_hdr_t *rsdt_hdr = mmap(
+                    (void*)acpi_rsdp_addr, 64 << 10,
+                    PROT_READ,
+                    MAP_PHYSICAL, -1, 0);
+
+        if (checksum_bytes((char*)rsdt_hdr, rsdt_hdr->len) != 0) {
+            printk("ACPI RSDT checksum mismatch!\n");
+            return 0;
+        }
+
+        uint32_t *rsdp_ptrs = (void*)(rsdt_hdr + 1);
+        uint32_t *rsdp_end = (void*)((char*)rsdt_hdr + rsdt_hdr->len);
+
+        for (uint32_t *rsdp_ptr = rsdp_ptrs;
+             rsdp_ptr < rsdp_end; ++rsdp_ptr) {
+            uint32_t hdr_addr = *rsdp_ptr;
+            acpi_sdt_hdr_t *hdr = mmap((void*)(uintptr_t)hdr_addr, 64 << 10,
+                                       PROT_READ,
+                                       MAP_PHYSICAL, -1, 0);
+
+            if (!memcmp(hdr->sig, "FACP", 4)) {
+                acpi_fadt_t *fadt_hdr = (void*)hdr;
+
+                if (checksum_bytes((void*)fadt_hdr, fadt_hdr->hdr.len) != 0) {
+                    printk("ACPI FADT checksum mismatch!\n");
+                } else {
+                    printk("ACPI FADT found\n");
+                    apic_process_fadt(fadt_hdr);
+                }
+            } else if (!memcmp(hdr->sig, "APIC", 4)) {
+                acpi_madt_t *madt_hdr = (void*)hdr;
+
+                if (checksum_bytes((void*)madt_hdr, madt_hdr->hdr.len) != 0) {
+                    printk("ACPI MADT checksum mismatch!\n");
+                } else {
+                    printk("ACPI MADT found\n");
+                    apic_process_madt(madt_hdr);
+                }
+            } else {
+                if (checksum_bytes((void*)hdr, hdr->len) != 0) {
+                    printk("ACPI %4.4s checksum mismatch! (ignored anyway)\n", hdr->sig);
+                } else {
+                    printk("ACPI %4.4s ignored\n", hdr->sig);
+                }
+            }
+
+            munmap(hdr, 64 << 10);
         }
     }
 
     if (mp_tables) {
-        mp_cfg_tbl_hdr_t *cth = mmap(mp_tables, sizeof(*cth),
+        mp_cfg_tbl_hdr_t *cth = mmap(mp_tables, 0x10000,
                                      PROT_READ, MAP_PHYSICAL,
                                      -1, 0);
 
@@ -664,7 +999,7 @@ static int parse_mp_tables(void)
                             IOAPIC_VER_ENTRIES_MASK;
 
                     // Allocate virtual IRQ numbers
-                    ioapic->base_irq = ioapic_next_irq_base;
+                    ioapic->irq_base = ioapic_next_irq_base;
                     ioapic_next_irq_base += ioapic_intr_count;
 
                     // Allocate vectors assign range to IOAPIC
@@ -828,7 +1163,7 @@ static int parse_mp_tables(void)
             }
         }
 
-        munmap(cth, sizeof(*cth));
+        munmap(cth, 0x10000);
     }
 
     if (ranges[2] != 0)
@@ -947,6 +1282,20 @@ void apic_dump_regs(int ap)
     }
 }
 
+static uint64_t apic_get_timer_freq(void)
+{
+    // Intel combined manual, page 770
+    cpuid_t info;
+    uint64_t freq = 1000000000;
+
+    if (cpuid(&info, 0x16, 0)) {
+        freq = info.ecx;
+    } else if (cpuid(&info, 0x15, 0)) {
+        freq = (uint64_t)info.ecx * info.ebx / info.eax;
+    }
+    return freq;
+}
+
 static void apic_configure_timer(
         uint32_t dcr, uint32_t icr, uint8_t timer_mode,
         uint8_t intr)
@@ -994,8 +1343,10 @@ int apic_init(int ap)
 
     APIC_TPR = 0;
 
+    uint64_t timer_freq = apic_get_timer_freq();
+
     apic_configure_timer(APIC_LVT_DCR_BY_1,
-                         ((1000000000U)/(60)),
+                         timer_freq/ 60,
                          APIC_LVT_TR_MODE_PERIODIC,
                          INTR_APIC_TIMER);
 
@@ -1057,7 +1408,16 @@ void apic_start_smp(void)
 {
     printdbg("%d CPU packages\n", apic_id_count);
 
-    apic_detect_topology();
+    if (!acpi_rsdp_addr)
+        apic_detect_topology();
+    else {
+        // Treat as N cpu packages
+        topo_cpu_count = apic_id_count;
+        topo_core_bits = 0;
+        topo_thread_bits = 0;
+        topo_core_count = 1;
+        topo_thread_count = 1;
+    }
 
     gdt_init_tss(topo_cpu_count);
     gdt_load_tr(0);
@@ -1226,11 +1586,16 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 
     uint8_t intr = ioapic->base_intr + mapping->intin;
 
+    delivery = IOAPIC_REDLO_DELIVERY_LOWPRI;
+
     uint32_t iored_lo =
             IOAPIC_REDLO_VECTOR_n(intr) |
             IOAPIC_REDLO_DELIVERY_n(delivery) |
             IOAPIC_REDLO_POLARITY_n(polarity) |
             IOAPIC_REDLO_TRIGGER_n(trigger);
+
+    // Try to allow all CPUs to handle all IRQs
+    //iored_lo |= IOAPIC_REDLO_DESTMODE;
 
     uint32_t iored_hi = IOAPIC_REDHI_DEST_n(0);
 
@@ -1294,7 +1659,7 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
         if (isa_match)
             i = isa_match - isa_irq_lookup;
         else
-            i = ioapic->base_irq + intin;
+            i = ioapic->irq_base + intin;
 
         return irq_invoke(intr, i, ctx);
     }
@@ -1349,7 +1714,7 @@ static void ioapic_map_all(void)
         mapping = bus_irq_list + i;
         if (mapping->bus != mp_isa_bus_id) {
             mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-            uint8_t irq = ioapic->base_irq + mapping->intin;
+            uint8_t irq = ioapic->irq_base + mapping->intin;
             bus_irq_to_mapping[irq] = i;
         }
 
