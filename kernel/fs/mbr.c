@@ -41,18 +41,21 @@ static if_list_t mbr_part_detect(storage_dev_base_t *drive)
 
         memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
 
-        partition_tbl_ent_t ptbl[4];
-        memcpy(ptbl, sector + 446, sizeof(ptbl));
+        if ((unsigned)sector[510] == 0x55 &&
+                (unsigned)sector[511] == 0xAA) {
+            partition_tbl_ent_t ptbl[4];
+            memcpy(ptbl, sector + 446, sizeof(ptbl));
 
-        for (int i = 0;
-             i < 4 && partition_count < MAX_PARTITIONS; ++i) {
-            if (ptbl[i].system_id == 0x0C) {
-                part_dev_t *part = partitions + partition_count++;
-                part->drive = drive;
-                part->vtbl = &mbr_part_device_vtbl;
-                part->lba_st = ptbl[i].start_lba;
-                part->lba_len = ptbl[i].total_sectors;
-                part->name = "fat32";
+            for (int i = 0;
+                 i < 4 && partition_count < MAX_PARTITIONS; ++i) {
+                if (ptbl[i].system_id == 0x0C) {
+                    part_dev_t *part = partitions + partition_count++;
+                    part->drive = drive;
+                    part->vtbl = &mbr_part_device_vtbl;
+                    part->lba_st = ptbl[i].start_lba;
+                    part->lba_len = ptbl[i].total_sectors;
+                    part->name = "fat32";
+                }
             }
         }
     }
