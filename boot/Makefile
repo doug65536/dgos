@@ -59,6 +59,7 @@ QEMU_MACHINE := q35
 QEMU_CPU := Haswell
 #kvm64
 QEMU_RAM := 512M
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp,cpu_reset
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
@@ -251,29 +252,29 @@ $(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos-kernel
 	)
 
 run-iso-singlecpu: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		$(QEMU_DEBUGCON)
 
 run-iso: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP)
 
 run-iso-singlecpu-kvm: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		$(QEMU_DEBUGCON) \
 		-enable-kvm
 
 run-iso-kvm: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
 		-enable-kvm
 
 run-iso-numa-kvm: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
@@ -282,7 +283,7 @@ run-iso-numa-kvm: $(ISO_FILE)
 		-enable-kvm
 
 run-iso-numa: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) -no-shutdown -no-reboot \
+	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
@@ -295,45 +296,61 @@ debug-iso-boot: $(ISO_FILE)
 		-ex 'b iso9660_boot_open' \
 		-ex 'b iso9660_boot_close' \
 		-ex 'b iso9660_boot_pread' \
-		-ex 'target remote | exec $(QEMU) \
+		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio -no-shutdown -no-reboot'
+			-gdb stdio'
 
 debug-iso-kernel: $(ISO_FILE)
 	$(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		-m $(QEMU_RAM) \
 		-ex 'b *0x400000000000' \
-		-ex 'target remote | exec $(QEMU) \
+		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio -no-shutdown -no-reboot'
+			-gdb stdio'
 
 debug-iso-wait-singlecpu: $(ISO_FILE)
-	 $(QEMU) \
+	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 $(QEMU_DEBUGCON)
 
 debug-iso-wait-singlecpu-kvm: $(ISO_FILE)
-	 $(QEMU) \
+	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 $(QEMU_DEBUGCON) \
 		 -enable-kvm
 
-debug-iso-wait: $(ISO_FILE)
-	 $(QEMU) \
+bin/mem-garbage:
+	dd if=/dev/urandom of=bin/mem-garbage bs=1048576 count=512
+
+debug-iso-wait: $(ISO_FILE) #bin/mem-garbage
+	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 $(QEMU_SMP) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 $(QEMU_DEBUGCON)
 
-debug-iso-bridge-test-wait: $(ISO_FILE)
-	 $(QEMU) \
+#		 -object memory-backend-file,id=mem,size=512M,mem-path=bin/mem-garbage,share=on \
+#		 -numa node,memdev=mem
+
+debug-iso-wait-many-ahci: $(ISO_FILE)
+	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 $(QEMU_SMP) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
+		 $(QEMU_DEBUGCON) \
+		 -device ich9-ahci,id=ahci2 \
+		 -device ich9-ahci,id=ahci3 \
+		 -device ich9-ahci,id=ahci4
+
+debug-iso-bridge-test-wait: $(ISO_FILE)
+	 $(QEMU) $(QEMU_FLAGS) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 $(QEMU_SMP) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 $(QEMU_DEBUGCON) \
 		 -device i82801b11-bridge,bus=pcie.0,id=pcie.1 \
 		 -device i82801b11-bridge,bus=pcie.1,id=pcie.2 \
@@ -341,20 +358,20 @@ debug-iso-bridge-test-wait: $(ISO_FILE)
 		 -device i82801b11-bridge,bus=pcie.3,id=pcie.4 \
 		 -device i82801b11-bridge,bus=pcie.4,id=pcie.5 \
 		 -device i82801b11-bridge,bus=pcie.5,id=pcie.6 \
-		 -device ich9-ahci,bus=pcie.1 \
-		 -device ich9-ahci,bus=pcie.2 \
-		 -device ich9-ahci,bus=pcie.2 \
-		 -device ich9-ahci,bus=pcie.4 \
-		 -device ich9-ahci,bus=pcie.5 \
-		 -device ich9-ahci,bus=pcie.6 \
-		 -device ich9-ahci,bus=pcie.6
+		 -device ich9-ahci,bus=pcie.1,id=ahci2 \
+		 -device ich9-ahci,bus=pcie.2,id=ahci3 \
+		 -device ich9-ahci,bus=pcie.2,id=ahci4 \
+		 -device ich9-ahci,bus=pcie.4,id=ahci5 \
+		 -device ich9-ahci,bus=pcie.5,id=ahci6 \
+		 -device ich9-ahci,bus=pcie.6,id=ahci7 \
+		 -device ich9-ahci,bus=pcie.6,id=ahci8
 
 debug-iso-wait-kvm: $(ISO_FILE)
-	 $(QEMU) \
+	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 $(QEMU_SMP) \
 		 $(QEMU_DEBUGCON) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S -no-shutdown -no-reboot \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 -enable-kvm
 
 #
@@ -382,6 +399,14 @@ debug-attach:
 		-ex 'set radix 16' \
 		-ex 'b assert_failed' \
 		-ex 'b unhandled_exception_handler'
+
+debug-boot-attach:
+	$(GDB) --symbols $(SYMBOLFILE) --tui \
+		-iex 'set architecture i8086' \
+		-ex 'target remote localhost:1234' \
+		-ex 'layout regs' \
+		-ex 'set radix 16' \
+		-ex 'b *0x7C00'
 
 run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 	$(QEMU) \
