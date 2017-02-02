@@ -696,6 +696,49 @@ typedef struct acpi_madt_irqsrc_t {
     uint16_t flags;
 } __attribute__((packed)) acpi_madt_irqsrc_t;
 
+//
+// The IRQ routing flags are identical to MPS flags
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_BIT \
+    MP_INTR_FLAGS_POLARITY_BIT
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_BITS \
+    MP_INTR_FLAGS_POLARITY_BITS
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_BIT \
+    MP_INTR_FLAGS_TRIGGER_BIT
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_BITS \
+    MP_INTR_FLAGS_TRIGGER_BITS
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_MASK \
+    MP_INTR_FLAGS_TRIGGER_MASK
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_MASK \
+    MP_INTR_FLAGS_POLARITY_MASK
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER \
+    MP_INTR_FLAGS_TRIGGER
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY \
+    MP_INTR_FLAGS_POLARITY
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_DEFAULT \
+    MP_INTR_FLAGS_POLARITY_DEFAULT
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI \
+    MP_INTR_FLAGS_POLARITY_ACTIVEHI
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO \
+    MP_INTR_FLAGS_POLARITY_ACTIVELO
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_DEFAULT \
+    MP_INTR_FLAGS_TRIGGER_DEFAULT
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE \
+    MP_INTR_FLAGS_TRIGGER_EDGE
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL \
+    MP_INTR_FLAGS_TRIGGER_LEVEL
+
+#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(n) \
+    MP_INTR_FLAGS_POLARITY_n(n)
+#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(n) \
+    MP_INTR_FLAGS_TRIGGER_n(n)
+
 typedef union acpi_madt_ent_t {
     acpi_madt_rec_hdr_t hdr;
     acpi_madt_lapic_t lapic;
@@ -713,6 +756,60 @@ typedef struct acpi_madt_t {
     uint32_t flags;
 } __attribute__((packed)) acpi_madt_t;
 
+//
+// HPET ACPI info
+
+typedef struct acpi_hpet_t {
+    acpi_sdt_hdr_t hdr;
+
+    uint32_t blk_id;
+    acpi_gas_t addr;
+    uint8_t number;
+    uint16_t min_tick_count;
+    uint8_t page_prot;
+} acpi_hpet_t;
+
+#define ACPI_HPET_BLKID_PCI_VEN_BIT     16
+#define ACPI_HPET_BLKID_LEGACY_CAP_BIT  15
+#define ACPI_HPET_BLKID_COUNTER_SZ_BIT  13
+#define ACPI_HPET_BLKID_NUM_CMP_BIT     8
+#define ACPI_HPET_BLKID_REV_ID_BIT      0
+
+#define ACPI_HPET_BLKID_PCI_VEN_BITS    16
+#define ACPI_HPET_BLKID_NUM_CMP_BITS    8
+#define ACPI_HPET_BLKID_REV_ID_BITS     8
+
+#define ACPI_HPET_BLKID_PCI_VEN_MASK \
+    ((1<<ACPI_HPET_BLKID_PCI_VEN_BITS)-1)
+#define ACPI_HPET_BLKID_NUM_CMP_MASK \
+    ((1<<ACPI_HPET_BLKID_NUM_CMP_BITS)-1)
+#define ACPI_HPET_BLKID_REV_ID_MASK \
+    ((1<<ACPI_HPET_BLKID_REV_ID_BITS)-1)
+
+// LegacyReplacement IRQ Routing Capable
+#define ACPI_HPET_BLKID_LEGACY_CAP \
+    (1<<ACPI_HPET_BLKID_LEGACY_CAP_BIT)
+
+// 64-bit counters
+#define ACPI_HPET_BLKID_COUNTER_SZ \
+    (1<<ACPI_HPET_BLKID_COUNTER_SZ_BIT)
+
+// PCI Vendor ID
+#define ACPI_HPET_BLKID_PCI_VEN \
+    (ACPI_HPET_BLKID_PCI_VEN_MASK<<ACPI_HPET_BLKID_PCI_VEN_BIT)
+
+// Number of comparators in 1st block
+#define ACPI_HPET_BLKID_NUM_CMP \
+    (ACPI_HPET_BLKID_NUM_CMP_MASK<<ACPI_HPET_BLKID_NUM_CMP_BIT)
+
+// Hardware revision ID
+#define ACPI_HPET_BLKID_REV_ID \
+    (ACPI_HPET_BLKID_REV_ID_BITS<<ACPI_HPET_BLKID_REV_ID_BIT)
+
+#define ACPI_MAX_HPET 4
+static acpi_gas_t acpi_hpet_list[ACPI_MAX_HPET];
+static unsigned acpi_hpet_count;
+
 static uint64_t acpi_rsdp_addr;
 
 static uint8_t checksum_bytes(char const *bytes, size_t len)
@@ -723,21 +820,24 @@ static uint8_t checksum_bytes(char const *bytes, size_t len)
     return sum;
 }
 
-static void apic_process_fadt(acpi_fadt_t *fadt_hdr)
+static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
 {
     (void)fadt_hdr;
 }
 
-static void apic_process_madt(acpi_madt_t *madt_hdr)
+static void acpi_process_madt(acpi_madt_t *madt_hdr)
 {
     acpi_madt_ent_t *ent = (void*)(madt_hdr + 1);
     acpi_madt_ent_t *end = (void*)((char*)madt_hdr + madt_hdr->hdr.len);
+
+    apic_base = madt_hdr->lapic_address;
 
     for ( ; ent < end;
           ent = (void*)((char*)ent + ent->ioapic.hdr.record_len)) {
         switch (ent->hdr.entry_type) {
         case ACPI_MADT_REC_TYPE_LAPIC:
             if (apic_id_count < countof(apic_id_list)) {
+                // If processor is enabled
                 if (ent->lapic.flags == 1)
                     apic_id_list[apic_id_count++] = ent->lapic.apic_id;
                 else
@@ -759,7 +859,14 @@ static void apic_process_madt(acpi_madt_t *madt_hdr)
                                    MAP_NOCACHE |
                                    MAP_WRITETHRU, -1, 0);
 
-                // FIXME: fill in ioapic->vector_count
+                ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
+                uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
+                entries >>= IOAPIC_VER_ENTRIES_BIT;
+                entries &= IOAPIC_VER_ENTRIES_MASK;
+
+                ioapic_next_free_vector -= entries;
+                ioapic->vector_count = entries;
+                ioapic->base_intr = ioapic_next_free_vector;
             }
             break;
 
@@ -770,6 +877,10 @@ static void apic_process_madt(acpi_madt_t *madt_hdr)
                     mapping->bus = ent->irq_src.bus;
                     mapping->intin = i;
                     mapping->irq = i;
+                    mapping->flags = \
+                            ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI |
+                            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE;
+                    isa_irq_lookup[i] = i;
                 }
             }
             bus_irq_count = 16;
@@ -778,9 +889,22 @@ static void apic_process_madt(acpi_madt_t *madt_hdr)
             mapping->bus = ent->irq_src.bus;
             mapping->irq = ent->irq_src.irq_src;
             mapping->flags = ent->irq_src.flags;
+            isa_irq_lookup[ent->irq_src.irq_src] = ent->irq_src.gsi;
             break;
         }
     }
+}
+
+static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
+{
+    if (acpi_hpet_count < ACPI_MAX_HPET) {
+        acpi_hpet_list[acpi_hpet_count++] = acpi_hdr->addr;
+    }
+}
+
+static uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
+{
+    return checksum_bytes((void*)hdr, hdr->len);
 }
 
 static int parse_mp_tables(void)
@@ -849,7 +973,7 @@ static int parse_mp_tables(void)
                     PROT_READ,
                     MAP_PHYSICAL, -1, 0);
 
-        if (checksum_bytes((char*)rsdt_hdr, rsdt_hdr->len) != 0) {
+        if (acpi_chk_hdr(rsdt_hdr) != 0) {
             printk("ACPI RSDT checksum mismatch!\n");
             return 0;
         }
@@ -867,26 +991,35 @@ static int parse_mp_tables(void)
             if (!memcmp(hdr->sig, "FACP", 4)) {
                 acpi_fadt_t *fadt_hdr = (void*)hdr;
 
-                if (checksum_bytes((void*)fadt_hdr, fadt_hdr->hdr.len) != 0) {
-                    printk("ACPI FADT checksum mismatch!\n");
-                } else {
+                if (acpi_chk_hdr(&fadt_hdr->hdr) == 0) {
                     printk("ACPI FADT found\n");
-                    apic_process_fadt(fadt_hdr);
+                    acpi_process_fadt(fadt_hdr);
+                } else {
+                    printk("ACPI FADT checksum mismatch!\n");
                 }
             } else if (!memcmp(hdr->sig, "APIC", 4)) {
                 acpi_madt_t *madt_hdr = (void*)hdr;
 
-                if (checksum_bytes((void*)madt_hdr, madt_hdr->hdr.len) != 0) {
-                    printk("ACPI MADT checksum mismatch!\n");
-                } else {
+                if (acpi_chk_hdr(&madt_hdr->hdr) == 0) {
                     printk("ACPI MADT found\n");
-                    apic_process_madt(madt_hdr);
+                    acpi_process_madt(madt_hdr);
+                } else {
+                    printk("ACPI MADT checksum mismatch!\n");
+                }
+            } else if (!memcmp(hdr->sig, "HPET", 4)) {
+                acpi_hpet_t *hpet_hdr = (void*)hdr;
+
+                if (acpi_chk_hdr(&hpet_hdr->hdr) == 0) {
+                    printk("ACPI HPET found\n");
+                    acpi_process_hpet(hpet_hdr);
+                } else {
+                    printk("ACPI MADT checksum mismatch!\n");
                 }
             } else {
-                if (checksum_bytes((void*)hdr, hdr->len) != 0) {
-                    printk("ACPI %4.4s checksum mismatch! (ignored anyway)\n", hdr->sig);
-                } else {
+                if (acpi_chk_hdr(hdr) == 0) {
                     printk("ACPI %4.4s ignored\n", hdr->sig);
+                } else {
+                    printk("ACPI %4.4s checksum mismatch! (ignored anyway)\n", hdr->sig);
                 }
             }
 
@@ -1245,6 +1378,7 @@ static void apic_online(int enabled, int spurious_intr)
     if (spurious_intr >= 32)
         sir = (sir & -256) | spurious_intr;
 
+    APIC_LDR = 0xFFFFFFFF;
     APIC_SIR = sir;
 }
 
@@ -1313,8 +1447,8 @@ int apic_init(int ap)
     if (!ap) {
         // Bootstrap CPU only
 
-        assert(apic_base == 0);
-        apic_base = msr_get(APIC_BASE_MSR);
+        if (apic_base == 0)
+            apic_base = msr_get(APIC_BASE_MSR);
 
         // Set global enable if it is clear
         if (!(apic_base & APIC_BASE_GENABLE)) {
@@ -1341,7 +1475,7 @@ int apic_init(int ap)
 
     apic_online(1, INTR_APIC_SPURIOUS);
 
-    APIC_TPR = 0;
+    APIC_TPR = 0x0;
 
     uint64_t timer_freq = apic_get_timer_freq();
 
@@ -1481,6 +1615,8 @@ void apic_start_smp(void)
             }
         }
     }
+
+    ioapic_irq_cpu(0, 1);
 }
 
 uint32_t apic_timer_count(void)
@@ -1556,29 +1692,34 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 
     uint8_t polarity;
 
-    switch (mapping->flags & MP_INTR_FLAGS_POLARITY) {
+    switch (mapping->flags & ACPI_MADT_ENT_IRQ_FLAGS_POLARITY) {
     default:
-    case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVEHI):
+    case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(
+            ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI):
         polarity = IOAPIC_REDLO_POLARITY_ACTIVEHI;
         break;
-    case MP_INTR_FLAGS_POLARITY_n(MP_INTR_FLAGS_POLARITY_ACTIVELO):
+    case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(
+            ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO):
         polarity = IOAPIC_REDLO_POLARITY_ACTIVELO;
         break;
     }
 
     uint8_t trigger;
 
-    switch (mapping->flags & MP_INTR_FLAGS_TRIGGER) {
+    switch (mapping->flags & ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER) {
     default:
         printdbg("MP: Unrecognized IRQ trigger type!"
                  " Guessing edge\n");
         // fall through...
-    case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_DEFAULT):
-    case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_EDGE):
+    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
+            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_DEFAULT):
+    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
+            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE):
         trigger = IOAPIC_REDLO_TRIGGER_EDGE;
         break;
 
-    case MP_INTR_FLAGS_TRIGGER_n(MP_INTR_FLAGS_TRIGGER_LEVEL):
+    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
+            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL):
         trigger = IOAPIC_REDLO_TRIGGER_LEVEL;
         break;
 
@@ -1586,7 +1727,7 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 
     uint8_t intr = ioapic->base_intr + mapping->intin;
 
-    delivery = IOAPIC_REDLO_DELIVERY_LOWPRI;
+    delivery = IOAPIC_REDLO_DELIVERY_APIC;
 
     uint32_t iored_lo =
             IOAPIC_REDLO_VECTOR_n(intr) |
@@ -1641,8 +1782,6 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
     mp_ioapic_t *ioapic = ioapic_from_intr(intr);
     assert(ioapic);
     if (ioapic) {
-        apic_eoi(intr);
-
         unsigned i;
         mp_bus_irq_mapping_t *mapping = bus_irq_list;
         uint8_t intin = intr - ioapic->base_intr;
@@ -1661,7 +1800,9 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
         else
             i = ioapic->irq_base + intin;
 
-        return irq_invoke(intr, i, ctx);
+        ctx = irq_invoke(intr, i, ctx);
+
+        apic_eoi(intr);
     }
     return ctx;
 }
@@ -1724,9 +1865,27 @@ static void ioapic_map_all(void)
     }
 }
 
+// Pass negative cpu value to get highest CPU number
+// Returns 0 on failure, 1 on success
+int ioapic_irq_cpu(int irq, int cpu)
+{
+    if (cpu < 0)
+        return ioapic_count;
+    if ((unsigned)cpu >= apic_id_count)
+        return 0;
+
+    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
+    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+    ioapic_lock(ioapic);
+    ioapic_write(ioapic, IOAPIC_RED_HI_n(mapping->intin),
+                 IOAPIC_REDHI_DEST_n(apic_id_list[cpu]));
+    ioapic_unlock(ioapic);
+    return 1;
+}
+
 int apic_enable(void)
 {
-    if (!mp_tables)
+    if (!mp_tables && !acpi_rsdp_addr)
         return 0;
 
     ioapic_map_all();

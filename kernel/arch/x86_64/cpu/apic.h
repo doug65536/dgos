@@ -10,3 +10,4 @@ uint32_t apic_timer_count(void);
 void apic_dump_regs(int ap);
 
 int apic_enable(void);
+int ioapic_irq_cpu(int irq, int cpu);
