@@ -31,6 +31,14 @@ static size_t partition_count;
 
 static if_list_t mbr_part_detect(storage_dev_base_t *drive)
 {
+    unsigned start_at = partition_count;
+
+    if_list_t list = {
+        partitions + start_at,
+        sizeof(*partitions),
+        0
+    };
+
     long sector_size = drive->vtbl->info(drive, STORAGE_INFO_BLOCKSIZE);
     char sig[2];
 
@@ -60,12 +68,7 @@ static if_list_t mbr_part_detect(storage_dev_base_t *drive)
         }
     }
 
-    // Returns list of all partitions, not just the partitions
-    // for this drive!
-    if_list_t list;
-    list.stride = sizeof(part_dev_t);
-    list.base = partitions;
-    list.count = partition_count;
+    list.count = partition_count - start_at;
 
     return list;
 }

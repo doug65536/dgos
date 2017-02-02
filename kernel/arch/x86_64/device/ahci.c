@@ -1731,7 +1731,14 @@ static void ahci_bios_handoff(ahci_if_t *dev)
 
 static if_list_t ahci_if_detect(void)
 {
-    if_list_t list = {ahci_devices, sizeof(*ahci_devices), 0};
+    unsigned start_at = ahci_count;
+
+    if_list_t list = {
+        ahci_devices + start_at,
+        sizeof(*ahci_devices),
+        0
+    };
+
     pci_dev_iterator_t pci_iter;
 
     printk("Enumerating PCI busses for AHCI...\n");
@@ -1806,7 +1813,7 @@ static if_list_t ahci_if_detect(void)
 
     } while (pci_enumerate_next(&pci_iter));
 
-    list.count = ahci_count;
+    list.count = ahci_count - start_at;
 
     return list;
 }
@@ -1816,8 +1823,15 @@ static if_list_t ahci_if_detect(void)
 
 static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
 {
-    if_list_t list = {ahci_drives,sizeof(*ahci_drives),0};
     STORAGE_IF_DEV_PTR(if_);
+
+    unsigned start_at = ahci_drive_count;
+
+    if_list_t list = {
+        ahci_drives + start_at,
+        sizeof(*ahci_drives),
+        0
+    };
 
     for (int port_num = 0; port_num < 32; ++port_num) {
         if (!(self->ports_impl & (1U<<port_num)))
@@ -1834,7 +1848,7 @@ static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
         }
     }
 
-    list.count = ahci_drive_count;
+    list.count = ahci_drive_count - start_at;
 
     return list;
 }

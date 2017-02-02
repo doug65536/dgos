@@ -16,6 +16,14 @@ static size_t partition_count;
 
 static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
 {
+    unsigned start_at = partition_count;
+
+    if_list_t list = {
+        partitions + start_at,
+        sizeof(*partitions),
+        0
+    };
+
     long sector_size = drive->vtbl->info(drive, STORAGE_INFO_BLOCKSIZE);
     char sig[5];
 
@@ -44,12 +52,7 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
         part->name = "iso9660";
     }
 
-    // Returns list of all ISO9660 partitions,
-    // not just the partitions for this drive!
-    if_list_t list;
-    list.stride = sizeof(part_dev_t);
-    list.base = partitions;
-    list.count = partition_count;
+    list.count = partition_count - start_at;
 
     return list;
 }

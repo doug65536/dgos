@@ -78,7 +78,14 @@ static size_t ide_if_count;
 
 static if_list_t ide_if_detect(void)
 {
-    if_list_t list = {ide_ifs, sizeof(*ide_ifs), 0};
+    unsigned start_at = ide_if_count;
+
+    if_list_t list = {
+        ide_ifs + start_at,
+        sizeof(*ide_ifs),
+        0
+    };
+
     pci_dev_iterator_t iter;
 
     if (!pci_enumerate_begin(&iter, 1, 1))
@@ -146,7 +153,7 @@ static if_list_t ide_if_detect(void)
 
     } while (pci_enumerate_next(&iter));
 
-    list.count = ide_if_count;
+    list.count = ide_if_count - start_at;
 
     return list;
 }
