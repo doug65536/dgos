@@ -18,6 +18,7 @@
 .macro isr_entry has_code int_num
 .global isr_entry_\int_num\()
 .hidden isr_entry_\int_num\()
+.align 16
 isr_entry_\int_num\():
 	.cfi_startproc
 	.if \has_code == 0
@@ -152,28 +153,29 @@ isr_entry 0 31
 .irp int_num,248,249,250,251,252,253,254,255
 	isr_entry 0 \int_num
 .endr
+
+.align 16
 isr_common:
 	.cfi_startproc
 	.cfi_def_cfa_offset 24
 
 	# Save call-clobbered registers
 	# (in System-V parameter order in memory)
-	adj_rsp -120
-	movq %rdi,    (%rsp)
-	movq %rsi, 1*8(%rsp)
-	movq %rdx, 2*8(%rsp)
-	movq %rcx, 3*8(%rsp)
-	movq %r8 , 4*8(%rsp)
-	movq %r9 , 5*8(%rsp)
-	movq %rax, 6*8(%rsp)
-	movq %rbx, 7*8(%rsp)
-	movq %rbp, 8*8(%rsp)
-	movq %r10, 9*8(%rsp)
-	movq %r11,10*8(%rsp)
-	movq %r12,11*8(%rsp)
-	movq %r13,12*8(%rsp)
-	movq %r14,13*8(%rsp)
-	movq %r15,14*8(%rsp)
+	push_cfi %r15
+	push_cfi %r14
+	push_cfi %r13
+	push_cfi %r12
+	push_cfi %r11
+	push_cfi %r10
+	push_cfi %rbp
+	push_cfi %rbx
+	push_cfi %rax
+	push_cfi %r9
+	push_cfi %r8
+	push_cfi %rcx
+	push_cfi %rdx
+	push_cfi %rsi
+	push_cfi %rdi
 
 	# C code requires that the direction flag is clear
 	cld
@@ -191,10 +193,15 @@ isr_common:
 	or %rdx,%rax
 	push_cfi %rax
 
+	# Really store segment registers if it is a #GP fault
+	cmp $0x0D,16*8(%rsp)
+	jz isr_save_real_segs
+
 	# Push segment registers
 	movabs $0x0010001000100010,%rax
 	push_cfi %rax
 
+	.align 16
 8:
 	# Save pointer to general registers and return information
 	mov %rsp,%rdi
@@ -256,26 +263,34 @@ isr_common:
 	wrmsr
 
 6:
-	movq     (%rsp),%rdi
-	movq  1*8(%rsp),%rsi
-	movq  2*8(%rsp),%rdx
-	movq  3*8(%rsp),%rcx
-	movq  4*8(%rsp),%r8
-	movq  5*8(%rsp),%r9
-	movq  6*8(%rsp),%rax
-	movq  7*8(%rsp),%rbx
-	movq  8*8(%rsp),%rbp
-	movq  9*8(%rsp),%r10
-	movq 10*8(%rsp),%r11
-	movq 11*8(%rsp),%r12
-	movq 12*8(%rsp),%r13
-	movq 13*8(%rsp),%r14
-	movq 14*8(%rsp),%r15
+	pop_cfi %rdi
+	pop_cfi %rsi
+	pop_cfi %rdx
+	pop_cfi %rcx
+	pop_cfi %r8
+	pop_cfi %r9
+	pop_cfi %rax
+	pop_cfi %rbx
+	pop_cfi %rbp
+	pop_cfi %r10
+	pop_cfi %r11
+	pop_cfi %r12
+	pop_cfi %r13
+	pop_cfi %r14
+	pop_cfi %r15
 
-	addq $16+8*15,%rsp
+	addq $16,%rsp
 	.cfi_def_cfa_offset 8
 
 	iretq
+
+isr_save_real_segs:
+	sub $8,%rsp
+	mov %gs,6(%rsp)
+	mov %fs,4(%rsp)
+	mov %es,2(%rsp)
+	mov %ds,(%rsp)
+	jmp 8b
 
 # Saving context from 32 bit mode, out of line
 isr_save_32:
