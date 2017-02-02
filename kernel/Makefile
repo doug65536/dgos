@@ -94,7 +94,7 @@ CFLAGS += $(INCLUDEARGS)
 
 export CFLAGS
 
-ASFLAGS ?= --warn
+ASFLAGS :=
 
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)

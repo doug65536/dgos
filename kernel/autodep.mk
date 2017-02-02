@@ -18,7 +18,7 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$(notdir $<).d
 # Compile commands for C and C++
 COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
 COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
-COMPILE.s = $(AS) $(ASFLAGS) $(TARGET_ARCH_AS)
+COMPILE.s = $(AS) $(ASFLAGS) $(TARGET_ARCH_AS) --warn -g
 
 OUTPUT_OPTION = -o $@
 
