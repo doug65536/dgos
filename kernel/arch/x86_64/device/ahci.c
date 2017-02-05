@@ -1101,8 +1101,9 @@ typedef void (*async_callback_fn_t)(int error, int done, uintptr_t arg);
 
 typedef struct async_callback_t {
     async_callback_fn_t callback;
-    int done;
     uintptr_t callback_arg;
+    int done;
+    int error;
 } async_callback_t;
 
 typedef struct hba_port_info_t {
@@ -1141,7 +1142,9 @@ struct ahci_if_t {
 
     hba_port_info_t port_info[32];
 
-    int irq;
+    int use_msi;
+    int irq_base;
+    int irq_count;
     int ports_impl;
     int num_cmd_slots;
     int use_ncq;
@@ -1238,6 +1241,9 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     hba_port_t volatile *port = hba->ports + port_num;
     hba_port_info_t volatile *pi = dev->port_info + port_num;
 
+    async_callback_t pending_callbacks[32];
+    unsigned callback_count = 0;
+
     spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
 
     // Read command slot interrupt status
@@ -1251,19 +1257,18 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
 
             // FIXME: check error
             int error = (port->sata_err != 0);
-
             assert(error == 0);
 
+            pi->callbacks[slot].error = error;
+
             // Invoke completion callback
-            async_callback_t volatile *callback_info = pi->callbacks + slot;
-            async_callback_fn_t callback = callback_info->callback;
-            if (callback) {
-                callback(error,
-                         callback_info->done,
-                         callback_info->callback_arg);
-                callback_info->callback = 0;
-                callback_info->callback_arg = 0;
-            }
+            assert(pi->callbacks[slot].callback);
+            assert(callback_count < countof(pending_callbacks));
+            pending_callbacks[callback_count++] = pi->callbacks[slot];
+            pi->callbacks[slot].callback = 0;
+            pi->callbacks[slot].callback_arg = 0;
+            pi->callbacks[slot].done = 0;
+            pi->callbacks[slot].error = 0;
 
             ahci_release_slot(dev, port_num, slot);
         }
@@ -1279,15 +1284,18 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
                 (port->taskfile_data & AHCI_HP_TFD_SERR))
             error = 2;
 
+        assert(error == 0);
+
+        pi->callbacks[slot].error = error;
+
         // Invoke completion callback
-        async_callback_t volatile *callback = pi->callbacks + slot;
-        if (callback->callback) {
-            callback->callback(error,
-                               callback->done,
-                               callback->callback_arg);
-            callback->callback = 0;
-            callback->callback_arg = 0;
-        }
+        assert(pi->callbacks[slot].callback);
+        assert(callback_count < countof(pending_callbacks));
+        pending_callbacks[callback_count++] = pi->callbacks[slot];
+        pi->callbacks[slot].callback = 0;
+        pi->callbacks[slot].callback_arg = 0;
+        pi->callbacks[slot].done = 0;
+        pi->callbacks[slot].error = 0;
 
         ahci_release_slot(dev, port_num, slot);
     }
@@ -1296,6 +1304,16 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     port->intr_status |= port->intr_status;
 
     spinlock_unlock_noirq(&pi->lock, &hold);
+
+    // Make all callbacks outside lock
+    for (unsigned i = 0; i < callback_count; ++i) {
+        async_callback_t *callback = pending_callbacks + i;
+        if (callback->callback) {
+            callback->callback(callback->error,
+                               callback->done,
+                               callback->callback_arg);
+        }
+    }
 }
 
 static void *ahci_irq_handler(int irq, void *ctx)
@@ -1303,7 +1321,7 @@ static void *ahci_irq_handler(int irq, void *ctx)
     for (unsigned i = 0; i < ahci_count; ++i) {
         ahci_if_t *dev = ahci_devices + i;
 
-        if (dev->irq != irq)
+        if (dev->irq_base != irq)
             continue;
 
         // Call callback on every port that has an interrupt pending
@@ -1407,8 +1425,9 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     cmd_hdr->prdtl = ranges_count;
 
     pi->callbacks[slot].callback = callback;
-    pi->callbacks[slot].done = done;
     pi->callbacks[slot].callback_arg = callback_arg;
+    pi->callbacks[slot].done = done;
+    pi->callbacks[slot].error = 0;
 
     atomic_barrier();
 
@@ -1796,16 +1815,32 @@ static if_list_t ahci_if_detect(void)
                                   AHCI_HC_CAP_NCS_BIT) &
                                   AHCI_HC_CAP_NCS_MASK);
 
-            dev->irq = pci_iter.config.irq_line;
-
             dev->use_64 = !!(dev->mmio_base->cap & AHCI_HC_CAP_S64A);
             //dev->use_ncq = !!(dev->mmio_base->cap & AHCI_HC_CAP_SNCQ);
             dev->use_ncq = 0;
 
             ahci_rebase(dev);
 
-            irq_hook(dev->irq, ahci_irq_handler);
-            irq_setmask(dev->irq, 1);
+            // Assume legacy IRQ pin usage until MSI succeeds
+            pci_irq_range_t irq_range = {
+                pci_iter.config.irq_line,
+                1
+            };
+
+            // Try to use MSI IRQ
+            dev->use_msi = pci_set_msi_irq(
+                        pci_iter.bus, pci_iter.slot, pci_iter.func,
+                        &irq_range, 1, 1, 1,
+                        ahci_irq_handler);
+
+            dev->irq_base = irq_range.base;
+            dev->irq_count = irq_range.count;
+
+            if (!dev->use_msi) {
+                // Fall back to pin based IRQ
+                irq_hook(dev->irq_base, ahci_irq_handler);
+                irq_setmask(dev->irq_base, 1);
+            }
         }
 
         printk("Finding next AHCI device...\n");
