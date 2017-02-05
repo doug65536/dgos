@@ -41,9 +41,7 @@ spinlock_hold_t spinlock_lock_noirq(spinlock_t *lock)
         // Allow IRQs if they were enabled
         cpu_irq_toggle(hold.intr_enabled);
 
-        atomic_barrier();
         pause();
-        atomic_barrier();
 
         // Disable IRQs
         cpu_irq_disable();
