@@ -53,6 +53,7 @@ WEVERYTHING += -Wbad-function-cast
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
+WEVERYTHING += -Wshadow
 
 ifneq ($(CC_IS_CLANG),1)
 	WEVERYTHING += -Wunsuffixed-float-constants

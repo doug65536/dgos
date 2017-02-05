@@ -183,9 +183,9 @@ typedef uintptr_t linaddr_t;
 physmem_range_t *phys_mem_map;
 size_t phys_mem_map_count;
 
-// Simple physical memory allocator
-physmem_range_t ranges[64];
-size_t usable_ranges;
+// Memory map
+physmem_range_t mem_ranges[64];
+size_t usable_mem_ranges;
 
 physaddr_t root_physaddr;
 
@@ -642,12 +642,12 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list)
 
 static physaddr_t init_take_page(int low)
 {
-    if (likely(usable_ranges == 0))
+    if (likely(usable_mem_ranges == 0))
         return mmu_alloc_phys(low);
 
-    assert(usable_ranges > 0);
+    assert(usable_mem_ranges > 0);
 
-    physmem_range_t *last_range = ranges + usable_ranges - 1;
+    physmem_range_t *last_range = mem_ranges + usable_mem_ranges - 1;
     physaddr_t addr = last_range->base + last_range->size - PAGE_SIZE;
 
     // Take a page off the size of the range
@@ -655,7 +655,7 @@ static physaddr_t init_take_page(int low)
 
     // If range exhausted, switch to next range
     if (last_range->size == 0)
-        --usable_ranges;
+        --usable_mem_ranges;
 
 #if DEBUG_PHYS_ALLOC
     //printdbg("Took early page @ %lx\n", addr);
@@ -709,7 +709,7 @@ static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 
 // Pass phys_addr=~0UL to allocate a new table
 static void init_create_pt(
-        physaddr_t root_physaddr,
+        physaddr_t root,
         pte_t *aliasing_pte,
         linaddr_t linear_addr,
         physaddr_t phys_addr,
@@ -726,10 +726,10 @@ static void init_create_pt(
     pte_t old_pte;
 
     // Map aliasing page to point to new page
-    iter = mm_map_aliasing_pte(aliasing_pte, root_physaddr);
+    iter = mm_map_aliasing_pte(aliasing_pte, root);
 
     if (pt_physaddr)
-        pt_physaddr[0] = root_physaddr;
+        pt_physaddr[0] = root;
 
     physaddr_t addr;
     for (unsigned level = 0; level < levels; ++level) {
@@ -804,13 +804,13 @@ static void mmu_map_page(
         physaddr_t physaddr, pte_t flags)
 {
     // Read root physical address from page tables
-    physaddr_t root_physaddr = cpu_get_page_directory();
+    physaddr_t root = cpu_get_page_directory();
 
     // Get a free aliasing PTE
     pte_t *aliasing_pte = take_apte(~0UL);
 
     physaddr_t pt_physaddr[4];
-    init_create_pt(root_physaddr, aliasing_pte,
+    init_create_pt(root, aliasing_pte,
                    addr, physaddr,
                    pt_physaddr,
                    flags);
@@ -823,7 +823,7 @@ static void mmu_map_page(
 
     // Map the page tables for the region
     for (unsigned i = 0; i < 4; ++i) {
-        init_create_pt(root_physaddr, aliasing_pte,
+        init_create_pt(root, aliasing_pte,
                        (linaddr_t)pte_linaddr[i],
                        pt_physaddr[i], 0,
                        PTE_PRESENT | PTE_WRITABLE);
@@ -992,28 +992,28 @@ void mmu_init(int ap)
     // Hook IPI for TLB shootdown
     intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown);
 
-    usable_ranges = mmu_fixup_mem_map(phys_mem_map);
+    usable_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
 
-    if (usable_ranges > countof(ranges)) {
+    if (usable_mem_ranges > countof(mem_ranges)) {
         printdbg("Physical memory is incredibly fragmented!\n");
-        usable_ranges = countof(ranges);
+        usable_mem_ranges = countof(mem_ranges);
     }
 
-    for (physmem_range_t *ranges_in = phys_mem_map, *ranges_out = ranges;
+    for (physmem_range_t *ranges_in = phys_mem_map, *ranges_out = mem_ranges;
          ranges_in < phys_mem_map + phys_mem_map_count;
          ++ranges_in) {
         if (ranges_in->type == PHYSMEM_TYPE_NORMAL)
             *ranges_out++ = *ranges_in;
 
         // Cap
-        if (ranges_out >= ranges + usable_ranges)
+        if (ranges_out >= mem_ranges + usable_mem_ranges)
             break;
     }
 
     size_t usable_pages = 0;
     physaddr_t highest_usable = 0;
-    for (physmem_range_t *mem = ranges;
-         mem < ranges + usable_ranges; ++mem) {
+    for (physmem_range_t *mem = mem_ranges;
+         mem < mem_ranges + usable_mem_ranges; ++mem) {
         printdbg("Memory: addr=%lx size=%lx type=%x\n",
                mem->base, mem->size, mem->type);
 
@@ -1176,7 +1176,7 @@ void mmu_init(int ap)
     release_apte(aliasing_pte);
 
     // Start using physical memory allocator
-    usable_ranges = 0;
+    usable_mem_ranges = 0;
 
     printdbg("%lu pages free (%luMB)\n",
            free_count,
@@ -1278,10 +1278,6 @@ static linaddr_t take_linear(size_t size)
     linaddr_t addr;
 
     if (free_addr_by_addr && free_addr_by_size) {
-        static int call;
-        if (++call == 205) {
-            assert(!"stop ffs");
-        }
         mutex_lock(&free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC

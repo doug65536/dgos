@@ -67,11 +67,11 @@ void register_storage_if_device(char const *name,
         if_list_t dev_list;
         dev_list = if_->vtbl->detect_devices(if_);
 
-        for (unsigned i = 0; i < dev_list.count; ++i) {
+        for (unsigned k = 0; k < dev_list.count; ++k) {
             // Calculate pointer to storage device instance
             storage_dev_base_t *dev = (void*)
                     ((char*)dev_list.base +
-                    i * dev_list.count);
+                    k * dev_list.count);
             assert(storage_dev_count < countof(storage_devs));
 
             // Store device instance
