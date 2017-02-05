@@ -26,9 +26,11 @@ static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
 static spinlock_t intr_handler_reg_lock;
 
-static void (*irq_setmask_vec)(int irq, int unmask);
-static void (*irq_hook_vec)(int irq, intr_handler_t handler);
-static void (*irq_unhook_vec)(int irq, intr_handler_t handler);
+// Vectors
+static irq_setmask_handler_t irq_setmask_vec;
+static irq_hook_handler_t irq_hook_vec;
+static irq_unhook_handler_t irq_unhook_vec;
+static msi_irq_alloc_handler_t msi_irq_alloc_vec;
 
 void irq_setmask_set_handler(irq_setmask_handler_t handler)
 {
@@ -43,6 +45,11 @@ void irq_hook_set_handler(irq_hook_handler_t handler)
 void irq_unhook_set_handler(irq_unhook_handler_t handler)
 {
     irq_unhook_vec = handler;
+}
+
+void msi_irq_alloc_set_handler(msi_irq_alloc_handler_t handler)
+{
+    msi_irq_alloc_vec = handler;
 }
 
 void irq_setmask(int irq, int unmask)
@@ -182,4 +189,14 @@ void *irq_invoke(int intr, int irq, void *ctx)
         }
     }
     return ctx;
+}
+
+int msi_irq_alloc(msi_irq_mem_t *results, int count,
+                  int cpu, int distribute)
+{
+    if (msi_irq_alloc_vec)
+        return msi_irq_alloc_vec(results, count, cpu, distribute);
+
+    // Not possible
+    return 0;
 }

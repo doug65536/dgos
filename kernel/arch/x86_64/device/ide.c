@@ -141,9 +141,9 @@ static if_list_t ide_if_detect(void)
         } else {
             dev->ports[0].irq = 14;
             dev->ports[1].irq = 14;
-            pci_write_config(iter.bus, iter.slot, iter.func,
+            pci_config_write(iter.bus, iter.slot, iter.func,
                            offsetof(pci_config_hdr_t, irq_line),
-                           14);
+                           &dev->ports[0].irq, sizeof(uint8_t));
         }
 
         // Sanity check ports, reject entry if any are zero

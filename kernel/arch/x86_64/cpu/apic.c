@@ -293,8 +293,12 @@ static uint8_t bus_irq_to_mapping[64];
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
 
-static uint8_t ioapic_next_free_vector = INTR_APIC_SPURIOUS - 1;
+static uint8_t ioapic_next_free_vector = INTR_APIC_IRQ_BASE;
 static uint8_t ioapic_next_irq_base = 16;
+
+// First vector after last IOAPIC
+static uint8_t ioapic_msi_base_intr;
+static uint8_t ioapic_msi_base_irq;
 
 static uint8_t isa_irq_lookup[16];
 
@@ -812,6 +816,14 @@ static unsigned acpi_hpet_count;
 
 static uint64_t acpi_rsdp_addr;
 
+// Returns 0 on failure
+static uint8_t ioapic_alloc_vectors(uint8_t count)
+{
+    if (ioapic_next_free_vector + count <= INTR_APIC_SPURIOUS)
+        return (ioapic_next_free_vector += count) - count;
+    return 0;
+}
+
 static uint8_t checksum_bytes(char const *bytes, size_t len)
 {
     uint8_t sum = 0;
@@ -853,7 +865,8 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                 ioapic->addr = ent->ioapic.addr;
                 ioapic->irq_base = ent->ioapic.irq_base;
                 ioapic->id = ent->ioapic.apic_id;
-                ioapic->ptr = mmap((void*)(uintptr_t)ent->ioapic.addr, 12,
+                ioapic->ptr = mmap((void*)(uintptr_t)ent->ioapic.addr,
+                                   12,
                                    PROT_READ | PROT_WRITE,
                                    MAP_PHYSICAL |
                                    MAP_NOCACHE |
@@ -864,9 +877,8 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                 entries >>= IOAPIC_VER_ENTRIES_BIT;
                 entries &= IOAPIC_VER_ENTRIES_MASK;
 
-                ioapic_next_free_vector -= entries;
                 ioapic->vector_count = entries;
-                ioapic->base_intr = ioapic_next_free_vector;
+                ioapic->base_intr = ioapic_alloc_vectors(entries);
             }
             break;
 
@@ -984,7 +996,8 @@ static int parse_mp_tables(void)
         for (uint32_t *rsdp_ptr = rsdp_ptrs;
              rsdp_ptr < rsdp_end; ++rsdp_ptr) {
             uint32_t hdr_addr = *rsdp_ptr;
-            acpi_sdt_hdr_t *hdr = mmap((void*)(uintptr_t)hdr_addr, 64 << 10,
+            acpi_sdt_hdr_t *hdr = mmap((void*)(uintptr_t)hdr_addr,
+                                       64 << 10,
                                        PROT_READ,
                                        MAP_PHYSICAL, -1, 0);
 
@@ -1019,7 +1032,8 @@ static int parse_mp_tables(void)
                 if (acpi_chk_hdr(hdr) == 0) {
                     printk("ACPI %4.4s ignored\n", hdr->sig);
                 } else {
-                    printk("ACPI %4.4s checksum mismatch! (ignored anyway)\n", hdr->sig);
+                    printk("ACPI %4.4s checksum mismatch!"
+                           " (ignored anyway)\n", hdr->sig);
                 }
             }
 
@@ -1053,7 +1067,8 @@ static int parse_mp_tables(void)
             case MP_TABLE_TYPE_CPU:
                 entry_cpu = (mp_cfg_cpu_t *)entry;
 
-                printdbg("CPU package found, base apic id=%u ver=0x%x\n",
+                printdbg("CPU package found,"
+                         " base apic id=%u ver=0x%x\n",
                          entry_cpu->apic_id, entry_cpu->apic_ver);
 
                 if ((entry_cpu->flags & MP_CPU_FLAGS_ENABLED) &&
@@ -1085,7 +1100,8 @@ static int parse_mp_tables(void)
                     if (mp_isa_bus_id == 0xFFFF)
                         mp_isa_bus_id = entry_bus->bus_id;
                     else
-                        printdbg("Too many ISA busses, only one supported\n");
+                        printdbg("Too many ISA busses,"
+                                 " only one supported\n");
                 } else {
                     printdbg("Dropped! Unrecognized bus named \"%.*s\"\n",
                            (int)sizeof(entry_bus->type), entry_bus->type);
@@ -1102,7 +1118,8 @@ static int parse_mp_tables(void)
                         break;
                     }
 
-                    printdbg("IOAPIC id=%d, addr=0x%x, flags=0x%x, ver=0x%x\n",
+                    printdbg("IOAPIC id=%d, addr=0x%x,"
+                             " flags=0x%x, ver=0x%x\n",
                              entry_ioapic->id,
                              entry_ioapic->addr,
                              entry_ioapic->flags,
@@ -1135,10 +1152,10 @@ static int parse_mp_tables(void)
                     ioapic->irq_base = ioapic_next_irq_base;
                     ioapic_next_irq_base += ioapic_intr_count;
 
-                    // Allocate vectors assign range to IOAPIC
-                    ioapic_next_free_vector -= ioapic_intr_count;
-                    ioapic->base_intr = ioapic_next_free_vector;
+                    // Allocate vectors, assign range to IOAPIC
                     ioapic->vector_count = ioapic_intr_count;
+                    ioapic->base_intr = ioapic_alloc_vectors(
+                                ioapic_intr_count);;
 
                     ioapic->lock = 0;
                 }
@@ -1229,7 +1246,8 @@ static int parse_mp_tables(void)
                     uint8_t pci_irq = entry_lintr->source_bus_irq;
                     uint8_t lapic_id = entry_lintr->dest_lapic_id;
                     uint8_t intin = entry_lintr->dest_lapic_lintin;
-                    printdbg("PCI device %u INT_%c# -> LAPIC ID 0x%02x INTIN %d\n",
+                    printdbg("PCI device %u INT_%c# ->"
+                             " LAPIC ID 0x%02x INTIN %d\n",
                            device, (int)(pci_irq & 3) + 'A',
                            lapic_id, intin);
                 } else if (entry_lintr->source_bus == mp_isa_bus_id) {
@@ -1241,7 +1259,8 @@ static int parse_mp_tables(void)
                            isa_irq, lapic_id, intin);
                 } else {
                     // Unknown bus!
-                    printdbg("IRQ %d on unknown bus -> IOAPIC ID 0x%02x INTIN %u\n",
+                    printdbg("IRQ %d on unknown bus ->"
+                             " IOAPIC ID 0x%02x INTIN %u\n",
                            entry_lintr->source_bus_irq,
                            entry_lintr->dest_lapic_id,
                            entry_lintr->dest_lapic_lintin);
@@ -1289,7 +1308,8 @@ static int parse_mp_tables(void)
                 break;
 
             default:
-                printdbg("Unknown MP table entry_type! Guessing size is 8\n");
+                printdbg("Unknown MP table entry_type!"
+                         " Guessing size is 8\n");
                 // Hope for the best here
                 entry += 8;
                 break;
@@ -1603,7 +1623,8 @@ void apic_start_smp(void)
 
                 // Send SIPI to CPU
                 apic_send_command(APIC_DEST_n(target),
-                                  APIC_CMD_SIPI_PAGE_n(mp_trampoline_page) |
+                                  APIC_CMD_SIPI_PAGE_n(
+                                      mp_trampoline_page) |
                                   APIC_CMD_DEST_MODE_SIPI |
                                   APIC_CMD_DEST_TYPE_BYID);
 
@@ -1779,31 +1800,41 @@ static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)
 
 static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
 {
-    mp_ioapic_t *ioapic = ioapic_from_intr(intr);
-    assert(ioapic);
-    if (ioapic) {
-        unsigned i;
+    uint8_t irq;
+    if (intr >= ioapic_msi_base_intr &&
+            intr < ioapic_next_free_vector) {
+        // MSI IRQ
+        irq = intr - ioapic_msi_base_intr + ioapic_msi_base_irq;
+    } else {
+        mp_ioapic_t *ioapic = ioapic_from_intr(intr);
+        assert(ioapic);
+        if (!ioapic)
+            return ctx;
+
+        // IOAPIC IRQ
+
         mp_bus_irq_mapping_t *mapping = bus_irq_list;
         uint8_t intin = intr - ioapic->base_intr;
-        for (i = 0; i < bus_irq_count; ++i, ++mapping) {
+        for (irq = 0; irq < bus_irq_count; ++irq, ++mapping) {
             if (mapping->ioapic_id == ioapic->id &&
                     mapping->intin == intin)
                 break;
         }
 
         // Reverse map ISA IRQ
-        uint8_t *isa_match = memchr(isa_irq_lookup, i,
+        uint8_t *isa_match = memchr(isa_irq_lookup, irq,
                                     sizeof(isa_irq_lookup));
 
         if (isa_match)
-            i = isa_match - isa_irq_lookup;
+            irq = isa_match - isa_irq_lookup;
         else
-            i = ioapic->irq_base + intin;
-
-        ctx = irq_invoke(intr, i, ctx);
-
-        apic_eoi(intr);
+            irq = ioapic->irq_base + intin;
     }
+
+    ctx = irq_invoke(intr, irq, ctx);
+
+    apic_eoi(intr);
+
     return ctx;
 }
 
@@ -1830,9 +1861,16 @@ static void ioapic_setmask(int irq, int unmask)
 
 static void ioapic_hook(int irq, intr_handler_t handler)
 {
-    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
-    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-    uint8_t intr = ioapic->base_intr + mapping->intin;
+    uint8_t intr;
+    if (irq >= ioapic_msi_base_irq) {
+        // MSI IRQ
+        intr = irq - ioapic_msi_base_irq + ioapic_msi_base_intr;
+    } else {
+        // IOAPIC IRQ
+        mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
+        mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+        intr = ioapic->base_intr + mapping->intin;
+    }
     intr_hook(intr, handler);
 }
 
@@ -1847,22 +1885,28 @@ static void ioapic_unhook(int irq, intr_handler_t handler)
 static void ioapic_map_all(void)
 {
     mp_bus_irq_mapping_t *mapping;
+    mp_ioapic_t *ioapic;
 
     for (unsigned i = 0; i < 16; ++i)
         bus_irq_to_mapping[i] = isa_irq_lookup[i];
 
     for (unsigned i = 0; i < bus_irq_count; ++i) {
         mapping = bus_irq_list + i;
+        ioapic = ioapic_by_id(mapping->ioapic_id);
         if (mapping->bus != mp_isa_bus_id) {
-            mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
             uint8_t irq = ioapic->irq_base + mapping->intin;
             bus_irq_to_mapping[irq] = i;
         }
 
-        mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-
         ioapic_map(ioapic, mapping);
     }
+
+    // MSI IRQs start after last IOAPIC
+    ioapic = &ioapic_list[ioapic_count-1];
+    ioapic_msi_base_intr = ioapic->base_intr +
+            ioapic->vector_count;
+    ioapic_msi_base_irq = ioapic->irq_base +
+            ioapic->vector_count;
 }
 
 // Pass negative cpu value to get highest CPU number
@@ -1885,7 +1929,7 @@ int ioapic_irq_cpu(int irq, int cpu)
 
 int apic_enable(void)
 {
-    if (!mp_tables && !acpi_rsdp_addr)
+    if (ioapic_count == 0)
         return 0;
 
     ioapic_map_all();
@@ -1896,4 +1940,48 @@ int apic_enable(void)
     irq_unhook_set_handler(ioapic_unhook);
 
     return 1;
+}
+
+//
+// MSI IRQ
+
+// Returns the starting IRQ number of allocated range
+// Returns 0 for failure
+int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
+                       int cpu, int distribute,
+                       intr_handler_t handler)
+{
+    // Don't try to use MSI if there are no IOAPIC devices
+    if (ioapic_count == 0)
+        return 0;
+
+    // If out of range starting CPU number, force to zero
+    if (cpu < 0 || (unsigned)cpu >= apic_id_count)
+        cpu = 0;
+
+    // Only allow distribute to be 0 or 1, fail otherwise
+    if (distribute < 0 || distribute > 1)
+        return 0;
+
+    uint8_t vector_base = ioapic_alloc_vectors(count);
+
+    // See if we ran out of vectors
+    if (vector_base == 0)
+        return 0;
+
+    for (int i = 0; i < count; ++i) {
+        results[i].addr = (0xFEEU << 20) |
+                (apic_id_list[cpu] << 12);
+        results[i].data = (vector_base + i);
+
+        irq_hook(vector_base + i - ioapic_msi_base_intr +
+                 ioapic_msi_base_irq,
+                 handler);
+
+        // It will always be edge triggered
+        // (!!activehi << 14) |
+        // (!!level << 15);
+    }
+
+    return vector_base - INTR_APIC_IRQ_BASE;
 }

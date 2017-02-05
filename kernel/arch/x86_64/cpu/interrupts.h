@@ -26,8 +26,9 @@
 #define INTR_TLB_SHOOTDOWN  74
 
 // IOAPIC interrupt vectors are allocated
-// below 0xFF. Variable count depending upon
+// starting at 0x80. Variable count depending upon
 // the number of IOAPICs and their redirection
 // table size
+#define INTR_APIC_IRQ_BASE  0x80
 
 #define INTR_APIC_SPURIOUS  0xFF
