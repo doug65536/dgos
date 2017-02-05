@@ -509,8 +509,8 @@ void keyb8042_init(void)
                 KEYB_CONFIG_IRQEN_PORT2 |
                 KEYB_CONFIG_XLAT_PORT1);
 
-    int port2_exists = //1;
-            !(config & KEYB_CONFIG_CLKDIS_PORT2);
+    int port2_exists = 1;
+            //!(config & KEYB_CONFIG_CLKDIS_PORT2);
 
     // Write config
     KEYB8042_DEBUGMSG(("Writing keyboard controller config = %02x\n", config));
