@@ -734,7 +734,9 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
 
 void vprintdbg(char const *format, va_list ap)
 {
+    printdbg_lock();
     formatter(format, ap, printdbg_emit_chars, 0);
+    printdbg_unlock();
 }
 
 void printdbg(char const *format, ...)
