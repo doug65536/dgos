@@ -30,7 +30,7 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
     long sector_mul = 2048 / sector_size;
 
     if (sector_mul < 1)
-        sector_mul = 0;
+        sector_mul = 1;
 
     char sector[sector_size * sector_mul];
     iso9660_pvd_t *pvd = (void*)sector;

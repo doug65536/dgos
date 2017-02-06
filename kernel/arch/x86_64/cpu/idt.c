@@ -373,8 +373,8 @@ static void dump_context(isr_context_t *ctx, int to_screen)
     }
 
     // mxcsr and description
-    width = cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
-                               ctx->fpr->mxcsr);
+    cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
+                       ctx->fpr->mxcsr);
     printdbg("mxcsr=%04x %s\n",
              ctx->fpr->mxcsr, fmt_buf);
 
@@ -506,19 +506,19 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12zx ",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%12zx ",
              (uintptr_t)ctx->gpr->fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
-    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
                      msr_get(MSR_GSBASE));
     con_draw_xy(6, 21, fmt_buf, color);
 
     // last branch
     con_draw_xy(0, 22, "lastbr", color);
-    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
                      msr_get(0x1DD));
     con_draw_xy(6, 22, fmt_buf, color);
 
@@ -552,7 +552,12 @@ void *isr_handler(isr_context_t *ctx)
                (ctx->gpr->info.interrupt > 0x80 &&
                ctx->gpr->info.interrupt < 0xFF)) {
         // IRQ
+        uint64_t st = cpu_rdtsc();
         ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
+        uint64_t en = cpu_rdtsc();
+        printdbg("IRQ interrupt %ld took %ld cycles\n",
+                 ctx->gpr->info.interrupt - INTR_APIC_IRQ_BASE,
+                 en-st);
     } else {
         //
         // Other interrupts

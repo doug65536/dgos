@@ -83,6 +83,7 @@ int main(void)
                iso_keys[i].iso_code, iso_keys[i].key_code);
 
     printf("lines = %zd\n", lines);
+    free(line);
 
     return 1;
 }

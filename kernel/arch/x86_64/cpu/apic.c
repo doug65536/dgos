@@ -1748,16 +1748,11 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 
     uint8_t intr = ioapic->base_intr + mapping->intin;
 
-    delivery = IOAPIC_REDLO_DELIVERY_APIC;
-
     uint32_t iored_lo =
             IOAPIC_REDLO_VECTOR_n(intr) |
             IOAPIC_REDLO_DELIVERY_n(delivery) |
             IOAPIC_REDLO_POLARITY_n(polarity) |
             IOAPIC_REDLO_TRIGGER_n(trigger);
-
-    // Try to allow all CPUs to handle all IRQs
-    //iored_lo |= IOAPIC_REDLO_DESTMODE;
 
     uint32_t iored_hi = IOAPIC_REDHI_DEST_n(0);
 

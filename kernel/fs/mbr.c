@@ -43,14 +43,14 @@ static if_list_t mbr_part_detect(storage_dev_base_t *drive)
     char sig[2];
 
     if (sector_size >= 512) {
-        char sector[sector_size];
+        uint8_t sector[sector_size];
 
         drive->vtbl->read_blocks(drive, sector, 1, 0);
 
         memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
 
-        if ((unsigned)sector[510] == 0x55 &&
-                (unsigned)sector[511] == 0xAA) {
+        if (sector[510] == 0x55 &&
+                sector[511] == 0xAAU) {
             partition_tbl_ent_t ptbl[4];
             memcpy(ptbl, sector + 446, sizeof(ptbl));
 

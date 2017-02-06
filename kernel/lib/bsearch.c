@@ -10,7 +10,7 @@ intptr_t binary_search(void *va, size_t count, size_t item_size,
     size_t st = 0;
     size_t en = count;
     size_t mid;
-    int diff;
+    int diff = -1;
 
     while (st < en) {
         // Compute middle point

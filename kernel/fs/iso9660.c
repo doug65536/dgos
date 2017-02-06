@@ -130,8 +130,8 @@ static uint32_t iso9660_walk_pt(
          pt_rec < pt_end;
          ++i,
          pt_rec = (void*)((char*)pt_rec +
-                          (offsetof(iso9660_pt_rec_t, name) +
-                          pt_rec->di_len + 1 & -2))) {
+                          ((offsetof(iso9660_pt_rec_t, name) +
+                          pt_rec->di_len + 1) & -2))) {
         if (cb)
             cb(i, pt_rec, p);
     }

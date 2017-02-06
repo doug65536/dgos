@@ -1245,7 +1245,7 @@ static void sanity_check_by_size(rbtree_t *tree)
     ++call;
 
     rbtree_kvp_t prev = { 0, 0 };
-    rbtree_kvp_t curr = { 0, 0 };
+    rbtree_kvp_t curr;
 
     for (rbtree_iter_t it = rbtree_first(tree, 0);
          it;
@@ -1259,7 +1259,7 @@ static void sanity_check_by_size(rbtree_t *tree)
 static void sanity_check_by_addr(rbtree_t *tree)
 {
     rbtree_kvp_t prev = { 0, 0 };
-    rbtree_kvp_t curr = { 0, 0 };
+    rbtree_kvp_t curr;
 
     for (rbtree_iter_t it = rbtree_first(tree, 0);
          it;
@@ -1559,7 +1559,6 @@ void *mremap(
         ... /* void *__new_address */)
 {
     void *new_address = 0;
-    (void)new_address;
 
     if (!(flags & MREMAP_FIXED)) {
         va_list ap;
@@ -1601,6 +1600,7 @@ void *mremap(
         pte_from_path(old_pte, path);
 
         // FIXME: Move PTEs...
+
     }
 
     return 0;
