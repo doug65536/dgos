@@ -12,6 +12,7 @@
 #include "apic.h"
 #include "cpuid.h"
 #include "callout.h"
+#include "printk.h"
 
 void cpu_init(int ap)
 {
@@ -61,8 +62,10 @@ void cpu_hw_init(int ap)
     // Initialize APIC, but fallback to 8259 if no MP tables
     if (!apic_enable())
         pic8259_enable();
-    else
+    else if (acpi_have8259pic())
         pic8259_disable();
+    else
+        panic("No IOAPICs, no MPS, and no 8259! Can't use IRQs! Halting.");
 
     pit8254_enable();
 

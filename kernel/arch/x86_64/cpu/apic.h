@@ -15,3 +15,5 @@ int ioapic_irq_cpu(int irq, int cpu);
 
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, int distribute, intr_handler_t handler);
+
+int acpi_have8259pic(void);

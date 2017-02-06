@@ -760,6 +760,9 @@ typedef struct acpi_madt_t {
     uint32_t flags;
 } __attribute__((packed)) acpi_madt_t;
 
+#define ACPI_MADT_FLAGS_HAVE_PIC_BIT    0
+#define ACPI_MADT_FLAGS_HAVE_PIC        (1<<ACPI_MADT_FLAGS_HAVE_PIC_BIT)
+
 //
 // HPET ACPI info
 
@@ -813,8 +816,14 @@ typedef struct acpi_hpet_t {
 #define ACPI_MAX_HPET 4
 static acpi_gas_t acpi_hpet_list[ACPI_MAX_HPET];
 static unsigned acpi_hpet_count;
+static int acpi_madt_flags;
 
 static uint64_t acpi_rsdp_addr;
+
+int acpi_have8259pic(void)
+{
+    return !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
+}
 
 // Returns 0 on failure
 static uint8_t ioapic_alloc_vectors(uint8_t count)
@@ -843,6 +852,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
     acpi_madt_ent_t *end = (void*)((char*)madt_hdr + madt_hdr->hdr.len);
 
     apic_base = madt_hdr->lapic_address;
+    acpi_madt_flags = madt_hdr->flags & 1;
 
     for ( ; ent < end;
           ent = (void*)((char*)ent + ent->ioapic.hdr.record_len)) {
@@ -1333,7 +1343,8 @@ static void *apic_timer_handler(int intr, void *ctx)
 
 static void *apic_spurious_handler(int intr, void *ctx)
 {
-    apic_eoi(intr);
+    (void)intr;
+    assert(intr == INTR_APIC_SPURIOUS);
     printdbg("Spurious APIC interrupt!\n");
     return ctx;
 }
