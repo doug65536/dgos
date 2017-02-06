@@ -78,7 +78,7 @@ static inline void insb(ioport_t port,
         :
         : [value] "D" (values),
           [count] "c" (count),
-          [port] "Nd" (port)
+          [port] "d" (port)
     );
 }
 
@@ -90,7 +90,7 @@ static inline void insw(ioport_t port,
         :
         : [value] "D" (values),
           [count] "c" (count),
-          [port] "Nd" (port)
+          [port] "d" (port)
     );
 }
 
@@ -102,7 +102,7 @@ static inline void insd(ioport_t port,
         :
         : [value] "D" (values),
           [count] "c" (count),
-          [port] "Nd" (port)
+          [port] "d" (port)
     );
 }
 
@@ -114,7 +114,7 @@ static inline void outsb(ioport_t port,
         :
         : [value] "S" (values),
           [count] "c" (count),
-          [port] "Nd" (port)
+          [port] "d" (port)
     );
 }
 
@@ -126,7 +126,7 @@ static inline void outsw(ioport_t port,
         :
         : [value] "S" (values),
           [count] "c" (count),
-          [port] "Nd" (port)
+          [port] "d" (port)
     );
 }
 
@@ -138,6 +138,6 @@ static inline void outsd(ioport_t port,
         :
         : [value] "S" (values),
           [count] "c" (count),
-          [port] "Nd" (port)
+          [port] "d" (port)
     );
 }
