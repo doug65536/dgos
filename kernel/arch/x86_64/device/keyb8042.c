@@ -134,6 +134,27 @@ static size_t keyb8042_mouse_packet_size;
 static size_t keyb8042_mouse_button_count;
 static uint8_t keyb8042_mouse_packet[5];
 
+static int keyb8042_get_modifiers(void)
+{
+    int flags = 0;
+
+    int shift_state = keyb8042_shift_state;
+
+    if (shift_state & KEYB_SHIFT_DOWN)
+        flags |= KEYMODIFIER_FLAG_SHIFT;
+
+    if (shift_state & KEYB_CTRL_DOWN)
+        flags |= KEYMODIFIER_FLAG_CTRL;
+
+    if (shift_state & KEYB_ALT_DOWN)
+        flags |= KEYMODIFIER_FLAG_ALT;
+
+    if (shift_state & KEYB_GUI_DOWN)
+        flags |= KEYMODIFIER_FLAG_GUI;
+
+    return flags;
+}
+
 static void keyb8042_keyboard_handler(void)
 {
     uint8_t scancode = 0;
@@ -246,6 +267,8 @@ static void keyb8042_keyboard_handler(void)
         codepoint &= 0x1F;
 
     keyboard_event_t event;
+
+    event.flags = keyb8042_get_modifiers();
 
     if (vk || codepoint) {
         event.codepoint = is_keyup ? -codepoint : codepoint;
@@ -444,27 +467,6 @@ static int keyb8042_magic_sequence(uint8_t expected_id, size_t seq_length, ...)
 
     // Successfully detected
     return 1;
-}
-
-static int keyb8042_get_modifiers(void)
-{
-    int flags = 0;
-
-    int shift_state = keyb8042_shift_state;
-
-    if (shift_state & KEYB_SHIFT_DOWN)
-        flags |= KEYMODIFIER_FLAG_SHIFT;
-
-    if (shift_state & KEYB_CTRL_DOWN)
-        flags |= KEYMODIFIER_FLAG_CTRL;
-
-    if (shift_state & KEYB_ALT_DOWN)
-        flags |= KEYMODIFIER_FLAG_ALT;
-
-    if (shift_state & KEYB_GUI_DOWN)
-        flags |= KEYMODIFIER_FLAG_GUI;
-
-    return flags;
 }
 
 static int keyb8042_set_layout_name(char const *name)
