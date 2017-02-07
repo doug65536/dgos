@@ -158,6 +158,11 @@ EXPORT void mutex_destroy(mutex_t *mutex)
     assert(mutex->link.next == mutex->link.prev);
 }
 
+EXPORT int mutex_held(mutex_t *mutex)
+{
+    return mutex->owner == thread_get_id();
+}
+
 EXPORT void condvar_init(condition_var_t *var)
 {
     var->lock = 0;
