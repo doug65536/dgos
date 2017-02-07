@@ -453,23 +453,20 @@ static void dump_context(isr_context_t *ctx, int to_screen)
     con_draw_xy(6, 15, fmt_buf, color);
 
     // cs:rip
-    con_draw_xy(
-                                   0, 16, "cs:rip", color);
+    con_draw_xy(0, 16, "cs:rip", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012zx",
              ctx->gpr->iret.cs, (uintptr_t)ctx->gpr->iret.rip);
     con_draw_xy(6, 16, fmt_buf, color);
 
     if (ctx->gpr->info.interrupt < 32) {
         // exception
-        con_draw_xy(
-                                       0, 17, "Exception", color);
+        con_draw_xy(0, 17, "Exception", color);
         snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
                  ctx->gpr->info.interrupt,
                  exception_names[ctx->gpr->info.interrupt]);
         con_draw_xy(9, 17, fmt_buf, color);
     } else {
-        con_draw_xy(
-                                       0, 17, "Interrupt", color);
+        con_draw_xy(0, 17, "Interrupt", color);
         snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx",
                  ctx->gpr->info.interrupt);
         con_draw_xy(9, 17, fmt_buf, color);
