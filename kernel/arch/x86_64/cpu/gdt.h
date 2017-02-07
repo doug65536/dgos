@@ -161,8 +161,6 @@ typedef union gdt_entry_combined_t {
 #define GDT_SEL_USER_DATA32     0x50
 #define GDT_SEL_TSS             0x60
 
-#define GDT_SEL_TSS_n(n)        (GDT_SEL_TSS + ((n) << 4))
-
 typedef struct tss_stack_t {
     uint32_t lo;
     uint32_t hi;

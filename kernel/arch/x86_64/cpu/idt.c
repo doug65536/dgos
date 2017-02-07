@@ -182,8 +182,8 @@ int idt_init(int ap)
     }
 
     // Assign IST entries to interrupts
-    //idt[INTR_EX_STACK].ist = 1;
-    //idt[INTR_EX_DBLFAULT].ist = 2;
+    idt[INTR_EX_STACK].ist = 1;
+    idt[INTR_EX_DBLFAULT].ist = 2;
     //idt[INTR_EX_TSS].ist = 3;
     //idt[INTR_EX_GPF].ist = 4;
     //idt[INTR_EX_PAGE].ist = 5;
@@ -335,7 +335,6 @@ static void dump_context(isr_context_t *ctx, int to_screen)
     //
     // Dump context to debug console
 
-    printdbg_lock();
     printdbg("- Exception -------------------------------\n");
 
     // General registers (except rsp)
@@ -409,7 +408,6 @@ static void dump_context(isr_context_t *ctx, int to_screen)
              msr_get(MSR_GSBASE));
 
     printdbg("-------------------------------------------\n");
-    printdbg_unlock();
 
     //
     // Dump context to screen
