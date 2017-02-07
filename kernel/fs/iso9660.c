@@ -49,9 +49,6 @@ struct iso9660_fs_t {
 iso9660_fs_t iso9660_mounts[16];
 unsigned iso9660_mount_count;
 
-//
-// Startup and shutdown
-
 static int iso9660_name_to_ascii(
         void *ascii_buf,
         char const *utf8)
@@ -148,6 +145,9 @@ static void iso9660_pt_fill(
     if (self)
         self->pt_ptrs[i] = rec;
 }
+
+//
+// Startup and shutdown
 
 static void* iso9660_mount(fs_init_info_t *conn)
 {
