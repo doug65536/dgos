@@ -863,9 +863,9 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                 if (ent->lapic.flags == 1)
                     apic_id_list[apic_id_count++] = ent->lapic.apic_id;
                 else
-                    printk("Disabled processor detected\n");
+                    printdbg("Disabled processor detected\n");
             } else {
-                printk("Too many CPU packages! Dropped one\n");
+                printdbg("Too many CPU packages! Dropped one\n");
             }
             break;
 
@@ -921,6 +921,8 @@ static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
 {
     if (acpi_hpet_count < ACPI_MAX_HPET) {
         acpi_hpet_list[acpi_hpet_count++] = acpi_hdr->addr;
+    } else {
+        printdbg("Too many HPETs! Dropped one\n");
     }
 }
 
@@ -996,7 +998,7 @@ static int parse_mp_tables(void)
                     MAP_PHYSICAL, -1, 0);
 
         if (acpi_chk_hdr(rsdt_hdr) != 0) {
-            printk("ACPI RSDT checksum mismatch!\n");
+            printdbg("ACPI RSDT checksum mismatch!\n");
             return 0;
         }
 
@@ -1015,34 +1017,34 @@ static int parse_mp_tables(void)
                 acpi_fadt_t *fadt_hdr = (void*)hdr;
 
                 if (acpi_chk_hdr(&fadt_hdr->hdr) == 0) {
-                    printk("ACPI FADT found\n");
+                    printdbg("ACPI FADT found\n");
                     acpi_process_fadt(fadt_hdr);
                 } else {
-                    printk("ACPI FADT checksum mismatch!\n");
+                    printdbg("ACPI FADT checksum mismatch!\n");
                 }
             } else if (!memcmp(hdr->sig, "APIC", 4)) {
                 acpi_madt_t *madt_hdr = (void*)hdr;
 
                 if (acpi_chk_hdr(&madt_hdr->hdr) == 0) {
-                    printk("ACPI MADT found\n");
+                    printdbg("ACPI MADT found\n");
                     acpi_process_madt(madt_hdr);
                 } else {
-                    printk("ACPI MADT checksum mismatch!\n");
+                    printdbg("ACPI MADT checksum mismatch!\n");
                 }
             } else if (!memcmp(hdr->sig, "HPET", 4)) {
                 acpi_hpet_t *hpet_hdr = (void*)hdr;
 
                 if (acpi_chk_hdr(&hpet_hdr->hdr) == 0) {
-                    printk("ACPI HPET found\n");
+                    printdbg("ACPI HPET found\n");
                     acpi_process_hpet(hpet_hdr);
                 } else {
-                    printk("ACPI MADT checksum mismatch!\n");
+                    printdbg("ACPI MADT checksum mismatch!\n");
                 }
             } else {
                 if (acpi_chk_hdr(hdr) == 0) {
-                    printk("ACPI %4.4s ignored\n", hdr->sig);
+                    printdbg("ACPI %4.4s ignored\n", hdr->sig);
                 } else {
-                    printk("ACPI %4.4s checksum mismatch!"
+                    printdbg("ACPI %4.4s checksum mismatch!"
                            " (ignored anyway)\n", hdr->sig);
                 }
             }
