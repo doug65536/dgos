@@ -11,6 +11,13 @@
 #include "string.h"
 #include "assert.h"
 
+#define PROFILE_IRQ         0
+#if PROFILE_IRQ
+#define PROFILE_IRQ_ONLY(p) p
+#else
+#define PROFILE_IRQ_ONLY(p) (void)0
+#endif
+
 // debug hack
 #include "apic.h"
 
@@ -552,12 +559,14 @@ void *isr_handler(isr_context_t *ctx)
                (ctx->gpr->info.interrupt > 0x80 &&
                ctx->gpr->info.interrupt < 0xFF)) {
         // IRQ
-        uint64_t st = cpu_rdtsc();
+        PROFILE_IRQ_ONLY( uint64_t st = cpu_rdtsc() );
+
         ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
-        uint64_t en = cpu_rdtsc();
-        printdbg("IRQ interrupt %ld took %ld cycles\n",
+
+        PROFILE_IRQ_ONLY( uint64_t en = cpu_rdtsc() );
+        PROFILE_IRQ_ONLY( printdbg("IRQ interrupt %ld took %ld cycles\n",
                  ctx->gpr->info.interrupt - INTR_APIC_IRQ_BASE,
-                 en-st);
+                 en-st) );
     } else {
         //
         // Other interrupts
