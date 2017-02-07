@@ -5,6 +5,7 @@
 #include "conio.h"
 #include "debug.h"
 #include "cpu/spinlock.h"
+#include "export.h"
 
 typedef enum length_mod_t {
     length_none,
@@ -566,7 +567,7 @@ static intptr_t formatter(
     return chars_written;
 }
 
-int cprintf(char const *format, ...)
+EXPORT int cprintf(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -592,7 +593,7 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
     return 0;
 }
 
-int vcprintf(char const *format, va_list ap)
+EXPORT int vcprintf(char const *format, va_list ap)
 {
     int chars_written = 0;
     if (con_exists()) {
@@ -608,7 +609,7 @@ int vcprintf(char const *format, va_list ap)
     return chars_written;
 }
 
-void printk(char const *format, ...)
+EXPORT void printk(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -616,12 +617,12 @@ void printk(char const *format, ...)
     va_end(ap);
 }
 
-void vprintk(char const *format, va_list ap)
+EXPORT void vprintk(char const *format, va_list ap)
 {
     vcprintf(format, ap);
 }
 
-void panic(char const *format, ...)
+EXPORT void panic(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -629,7 +630,7 @@ void panic(char const *format, ...)
     va_end(ap);
 }
 
-void vpanic(char const *format, va_list ap)
+EXPORT void vpanic(char const *format, va_list ap)
 {
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
@@ -676,7 +677,7 @@ static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 // "buf".
 // "buf" is guaranteed to be null terminated upon
 // returning, if limit > 0.
-int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
+EXPORT int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
 {
     vsnprintf_context_t context;
     context.buf = buf;
@@ -695,7 +696,7 @@ int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
     return chars_needed;
 }
 
-int snprintf(char *buf, size_t limit, char const *format, ...)
+EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -706,12 +707,12 @@ int snprintf(char *buf, size_t limit, char const *format, ...)
 
 static spinlock_t printdbg_user_lock;
 
-void printdbg_lock(void)
+EXPORT void printdbg_lock(void)
 {
     spinlock_lock(&printdbg_user_lock);
 }
 
-void printdbg_unlock(void)
+EXPORT void printdbg_unlock(void)
 {
     spinlock_unlock(&printdbg_user_lock);
 }
@@ -732,14 +733,14 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
     return write_debug_str(s, ch);
 }
 
-void vprintdbg(char const *format, va_list ap)
+EXPORT void vprintdbg(char const *format, va_list ap)
 {
     printdbg_lock();
     formatter(format, ap, printdbg_emit_chars, 0);
     printdbg_unlock();
 }
 
-void printdbg(char const *format, ...)
+EXPORT void printdbg(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
