@@ -3,3 +3,4 @@ libc/include
 libc/src
 libc/syscall
 .
+shell

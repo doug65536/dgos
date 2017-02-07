@@ -1,3 +1,5 @@
+arch/x86_64/module.ld
+module.mk
 Makefile
 lib/bswap.c
 lib/bswap.h

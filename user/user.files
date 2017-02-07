@@ -1,4 +1,6 @@
+shell/Makefile
 Makefile
+libc/Makefile
 libc/syscall/syscall.h
 libc/include/string.h
 libc/src/memcpy.c
