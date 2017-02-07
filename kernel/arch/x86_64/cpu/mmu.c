@@ -70,24 +70,24 @@
 
 // Bitmask for multi-bit field values
 // Aligned to bit 0
-#define PTE_PK_MASK         ((1ULL << PTE_PK_BITS) - 1U)
-#define PTE_ADDR_MASK       ((1ULL << PTE_ADDR_BITS) - 1U)
-#define PTE_AVAIL1_MASK     ((1ULL << PTE_AVAIL1_BITS) - 1U)
-#define PTE_AVAIL2_MASK     ((1ULL << PTE_AVAIL2_BITS) - 1U)
-#define PTE_FULL_ADDR_MASK  ((1ULL << PTE_FULL_ADDR_BITS) - 1U)
+#define PTE_PK_MASK         ((1UL << PTE_PK_BITS) - 1U)
+#define PTE_ADDR_MASK       ((1UL << PTE_ADDR_BITS) - 1U)
+#define PTE_AVAIL1_MASK     ((1UL << PTE_AVAIL1_BITS) - 1U)
+#define PTE_AVAIL2_MASK     ((1UL << PTE_AVAIL2_BITS) - 1U)
+#define PTE_FULL_ADDR_MASK  ((1UL << PTE_FULL_ADDR_BITS) - 1U)
 
 // Values of bits
-#define PTE_PRESENT         (1ULL << PTE_PRESENT_BIT)
-#define PTE_WRITABLE        (1ULL << PTE_WRITABLE_BIT)
-#define PTE_USER            (1ULL << PTE_USER_BIT)
-#define PTE_PWT             (1ULL << PTE_PWT_BIT)
-#define PTE_PCD             (1ULL << PTE_PCD_BIT)
-#define PTE_ACCESSED        (1ULL << PTE_ACCESSED_BIT)
-#define PTE_DIRTY           (1ULL << PTE_DIRTY_BIT)
-#define PTE_PAGESIZE        (1ULL << PTE_PAGESIZE_BIT)
-#define PTE_GLOBAL          (1ULL << PTE_GLOBAL_BIT)
-#define PTE_PAT             (1ULL << PTE_PAT_BIT)
-#define PTE_NX              (1ULL << PTE_NX_BIT)
+#define PTE_PRESENT         (1UL << PTE_PRESENT_BIT)
+#define PTE_WRITABLE        (1UL << PTE_WRITABLE_BIT)
+#define PTE_USER            (1UL << PTE_USER_BIT)
+#define PTE_PWT             (1UL << PTE_PWT_BIT)
+#define PTE_PCD             (1UL << PTE_PCD_BIT)
+#define PTE_ACCESSED        (1UL << PTE_ACCESSED_BIT)
+#define PTE_DIRTY           (1UL << PTE_DIRTY_BIT)
+#define PTE_PAGESIZE        (1UL << PTE_PAGESIZE_BIT)
+#define PTE_GLOBAL          (1UL << PTE_GLOBAL_BIT)
+#define PTE_PAT             (1UL << PTE_PAT_BIT)
+#define PTE_NX              (1UL << PTE_NX_BIT)
 
 // Multi-bit field masks, in place
 #define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
@@ -96,8 +96,8 @@
 #define PTE_AVAIL2          (PTE_AVAIL2_MASK << PTE_AVAIL2_BIT)
 
 // Assigned usage of available PTE bits
-#define PTE_EX_PHYSICAL     (1ULL << PTE_EX_PHYSICAL_BIT)
-#define PTE_EX_LOCKED       (1ULL << PTE_EX_LOCKED_BIT)
+#define PTE_EX_PHYSICAL     (1UL << PTE_EX_PHYSICAL_BIT)
+#define PTE_EX_LOCKED       (1UL << PTE_EX_LOCKED_BIT)
 
 // Get field
 #define GF(pte, field) \
@@ -714,7 +714,7 @@ static void init_create_pt(
         linaddr_t linear_addr,
         physaddr_t phys_addr,
         physaddr_t *pt_physaddr,
-        pte_t page_flags)
+        pte_t end_page_flags)
 {
     // Path to page table entry as page indices
     unsigned path[4];
@@ -731,9 +731,15 @@ static void init_create_pt(
     if (pt_physaddr)
         pt_physaddr[0] = root;
 
+    pte_t page_flags = PTE_PRESENT | PTE_WRITABLE |
+            (end_page_flags & PTE_USER);
+
     physaddr_t addr;
     for (unsigned level = 0; level < levels; ++level) {
         addr = iter[path[level]] & PTE_ADDR;
+
+        if (level == 3)
+            page_flags = end_page_flags;
 
         if (!addr) {
             // Allocate a new page table
@@ -743,7 +749,8 @@ static void init_create_pt(
 
             // Atomically update current page table to point to new page
             old_pte = atomic_cmpxchg(iter + path[level],
-                                     0, addr | page_flags | PTE_PRESENT);
+                                     0, addr |
+                                     page_flags);
             if (old_pte == 0) {
 #if DEBUG_PHYS_ALLOC
                 printdbg("Assigned page table for level=%u"
@@ -784,7 +791,7 @@ static void init_create_pt(
 
     if (levels == 3 && !(iter[path[3]] & PTE_PRESENT)) {
         old_pte = atomic_cmpxchg(iter + path[3],
-                0, (phys_addr & PTE_ADDR) | page_flags);
+                0, (phys_addr & PTE_ADDR) | end_page_flags);
 
         assert(old_pte == 0);
 
@@ -905,11 +912,13 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
 
     int present_mask = addr_present(fault_addr, path, ptes);
 
-    // Check for lazy TLB shootdown
-    if (present_mask == 0x0F && thread_get_cpu_mmu_seq() != mmu_seq)
-        return mmu_lazy_tlb_shootdown(ctx);
-
     pte_t pte = *ptes[3];
+
+    // Check for lazy TLB shootdown
+    if (present_mask == 0x0F &&
+            (pte & PTE_ADDR) != PTE_ADDR &&
+            thread_get_cpu_mmu_seq() != mmu_seq)
+        return mmu_lazy_tlb_shootdown(ctx);
 
     // If the page table exists
     if (present_mask == 0x07) {
@@ -953,6 +962,44 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     } else if (present_mask != 0x0F) {
         assert(!"Invalid page fault path");
     } else {
+        printdbg("#PF: present=%d\n"
+                 "     write=%d\n"
+                 "     user=%d\n"
+                 "     reserved bit violation=%d\n"
+                 "     instruction fetch=%d\n"
+                 "     protection key violation=%d\n"
+                 "     SGX violation=%d\n"
+                 "PTE: present=%d\n"
+                 "     writable=%d\n"
+                 "     user=%d\n"
+                 "     write through=%d\n"
+                 "     cache disable=%d\n"
+                 "     accessed=%d\n"
+                 "     dirty=%d\n"
+                 "     PAT=%d\n"
+                 "     global=%d\n"
+                 "     physaddr=%lx\n"
+                 "     no execute=%d\n"
+                 "------------------\n",
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_P),
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_W),
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_U),
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_R),
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_I),
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_PK),
+                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
+                 !!(pte & PTE_PRESENT),
+                 !!(pte & PTE_WRITABLE),
+                 !!(pte & PTE_USER),
+                 !!(pte & PTE_PWT),
+                 !!(pte & PTE_PCD),
+                 !!(pte & PTE_ACCESSED),
+                 !!(pte & PTE_DIRTY),
+                 !!(pte & PTE_PAT),
+                 !!(pte & PTE_GLOBAL),
+                 (pte & PTE_ADDR),
+                 !!(pte & PTE_NX));
+
         assert(!"Unexpected page fault");
     }
 

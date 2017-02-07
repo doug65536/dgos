@@ -137,6 +137,8 @@ typedef struct idt_entry_64_t {
 #define CTX_ERRCODE_PF_U_BIT    2
 #define CTX_ERRCODE_PF_R_BIT    3
 #define CTX_ERRCODE_PF_I_BIT    4
+#define CTX_ERRCODE_PF_PK_BIT   5
+#define CTX_ERRCODE_PF_SGX_BIT  15
 
 // Page fault because page not present
 #define CTX_ERRCODE_PF_P        (1<<CTX_ERRCODE_PF_P_BIT)
@@ -152,6 +154,12 @@ typedef struct idt_entry_64_t {
 
 // Page fault was instruction fetch
 #define CTX_ERRCODE_PF_I        (1<<CTX_ERRCODE_PF_I_BIT)
+
+// Page fault was protection keys violation
+#define CTX_ERRCODE_PF_PK       (1<<CTX_ERRCODE_PF_PK_BIT)
+
+// Page fault was instruction fetch
+#define CTX_ERRCODE_PF_SGX      (1<<CTX_ERRCODE_PF_SGX_BIT)
 
 typedef struct cpu_flag_info_t {
     char const * const name;
