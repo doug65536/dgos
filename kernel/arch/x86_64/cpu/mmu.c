@@ -1659,12 +1659,14 @@ void *mmap(void *addr, size_t len,
             physaddr_t page = PTE_ADDR;
 
             // If populating, assign physical memory immediately
-            if (flags & MAP_POPULATE) {
+            // Always commit first page immediately
+            if ((flags & MAP_POPULATE) || !ofs) {
                 page = init_take_page(!!(flags & MAP_32BIT));
                 assert(page != 0);
             }
 
-            mmu_map_page(linear_addr + ofs, page, page_flags);
+            mmu_map_page(linear_addr + ofs, page, page_flags |
+                         (!ofs & PTE_PRESENT));
         } else {
             // addr is a physical address, caller uses
             // returned linear address to access it
