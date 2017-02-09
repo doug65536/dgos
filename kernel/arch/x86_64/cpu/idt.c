@@ -551,7 +551,7 @@ void *isr_handler(isr_context_t *ctx)
         ctx = exception_isr_handler(ctx);
     } else if ((ctx->gpr->info.interrupt >= 32 &&
                ctx->gpr->info.interrupt < 48) ||
-               (ctx->gpr->info.interrupt > 0x80 &&
+               (ctx->gpr->info.interrupt >= 0x80 &&
                ctx->gpr->info.interrupt < 0xFF)) {
         // IRQ
         PROFILE_IRQ_ONLY( uint64_t st = cpu_rdtsc() );
