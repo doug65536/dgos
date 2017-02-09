@@ -645,8 +645,13 @@ static int iso9660_opendir(
 
     iso9660_pt_rec_t *pt = iso9660_lookup_path(self, path, -1);
 
-    (void)pt;
-    (void)fi;
+    iso9660_dir_handle_t *dir = pool_alloc(&iso9660_handles);
+    dir->fs = self;
+    dir->dirent = iso9660_lookup_sector(
+                self, iso9660_pt_rec_lba(pt));
+    dir->content = (void*)dir->dirent;
+    *fi = dir;
+
     return 0;
 }
 
