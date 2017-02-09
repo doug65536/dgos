@@ -58,8 +58,8 @@ ISO_FILE := dgos.iso
 QEMU_MACHINE := q35
 QEMU_CPU := Haswell
 #kvm64
-QEMU_RAM := 512M
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp,cpu_reset
+QEMU_RAM := 5G
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
@@ -188,6 +188,8 @@ $(BOOTSECTORS): $(OBJS) $(LINKERSCRIPT)
 kernel:
 	(cd ../kernel && $(MAKE))
 
+$(KERNELSYMBOLFILE): kernel
+
 #
 # Create/delete disk image
 
@@ -228,6 +230,42 @@ iso: $(ISO_FILE)
 $(ISO_STAGE)/bootsect.bin: $(BOOTSECTORS)
 	@mkdir -p $(@D)
 	$(CP) $< $@
+	mkdir -p $(ISO_STAGE)/bin
+	mkdir -p $(ISO_STAGE)/boot
+	mkdir -p $(ISO_STAGE)/dev
+	mkdir -p $(ISO_STAGE)/etc
+	mkdir -p $(ISO_STAGE)/home
+	mkdir -p $(ISO_STAGE)/lib
+	mkdir -p $(ISO_STAGE)/media
+	mkdir -p $(ISO_STAGE)/mnt
+	mkdir -p $(ISO_STAGE)/opt
+	mkdir -p $(ISO_STAGE)/proc
+	mkdir -p $(ISO_STAGE)/root
+	mkdir -p $(ISO_STAGE)/run
+	mkdir -p $(ISO_STAGE)/include
+	mkdir -p $(ISO_STAGE)/sbin
+	mkdir -p $(ISO_STAGE)/srv
+	mkdir -p $(ISO_STAGE)/sys
+	mkdir -p $(ISO_STAGE)/tmp
+	mkdir -p $(ISO_STAGE)/usr
+	mkdir -p $(ISO_STAGE)/usr/bin
+	mkdir -p $(ISO_STAGE)/usr/include
+	mkdir -p $(ISO_STAGE)/usr/local
+	mkdir -p $(ISO_STAGE)/usr/sbin
+	mkdir -p $(ISO_STAGE)/usr/share
+	mkdir -p $(ISO_STAGE)/usr/src
+	mkdir -p $(ISO_STAGE)/var
+	mkdir -p $(ISO_STAGE)/var/cache
+	mkdir -p $(ISO_STAGE)/var/lib
+	mkdir -p $(ISO_STAGE)/var/lock
+	mkdir -p $(ISO_STAGE)/var/log
+	mkdir -p $(ISO_STAGE)/var/mail
+	mkdir -p $(ISO_STAGE)/var/opt
+	mkdir -p $(ISO_STAGE)/var/run
+	mkdir -p $(ISO_STAGE)/var/spool
+	mkdir -p $(ISO_STAGE)/var/tmp
+	mkdir -p $(ISO_STAGE)/dev
+	echo Hello! >> $(ISO_STAGE)/root/hello.txt
 
 $(ISO_STAGE)/dgos-kernel: $(KERNELSYMBOLFILE)
 	@mkdir -p $(@D)
