@@ -406,6 +406,9 @@ static iso9660_dir_ent_t *iso9660_lookup_dirent(
                 self,
                 iso9660_pt_rec_lba(pt_rec));
 
+    if (!dir)
+        return 0;
+
     size_t dir_len = iso9660_dirent_size(dir);
 
     iso9660_dir_ent_t *dir_end = (void*)((char*)dir + dir_len);
