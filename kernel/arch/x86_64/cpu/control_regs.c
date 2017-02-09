@@ -214,13 +214,15 @@ int cpu_irq_disable(void)
         "pop %[rflags]\n\t"
         "cli\n\t"
         : [rflags] "=r" (rflags)
+        :
+        : "memory"
     );
     return ((rflags >> 9) & 1);
 }
 
 void cpu_irq_enable(void)
 {
-    __asm__ __volatile__ ( "sti" );
+    __asm__ __volatile__ ( "sti" : : : "memory" );
 }
 
 void cpu_irq_toggle(int enable)
@@ -235,6 +237,7 @@ void cpu_irq_toggle(int enable)
         "popfq\n\t"
         : [temp] "=&r" (temp)
         : [enable] "r" ((!!enable) << 9)
+        : "memory"
     );
 }
 
