@@ -1761,7 +1761,7 @@ static if_list_t ahci_if_detect(void)
     pci_dev_iterator_t pci_iter;
 
     printk("Enumerating PCI busses for AHCI...\n");
-    sleep(3000);
+    //sleep(3000);
 
     if (!pci_enumerate_begin(&pci_iter, 1, 6))
         return list;
@@ -1790,7 +1790,7 @@ static if_list_t ahci_if_detect(void)
 
         printk("Initializing AHCI interface...\n");
 
-        sleep(3000);
+        //sleep(3000);
 
         if (ahci_count < countof(ahci_devices)) {
             ahci_if_t *dev = ahci_devices + ahci_count++;
