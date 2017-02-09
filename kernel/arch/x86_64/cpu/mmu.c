@@ -23,6 +23,7 @@
 #define DEBUG_PHYS_ALLOC    0
 #define DEBUG_PAGE_TABLES   0
 #define DEBUG_PAGE_FAULT    0
+#define DEBUG_LINEAR_SANITY 0
 
 // Intel manual, page 2786
 
@@ -1355,6 +1356,7 @@ static int take_linear_cmp_both(
             0;
 }
 
+#if DEBUG_LINEAR_SANITY
 static void sanity_check_by_size(rbtree_t *tree)
 {
     static int call = 0;
@@ -1385,6 +1387,7 @@ static void sanity_check_by_addr(rbtree_t *tree)
         prev = curr;
     }
 }
+#endif
 
 static linaddr_t take_linear(size_t size)
 {
@@ -1439,10 +1442,12 @@ static linaddr_t take_linear(size_t size)
         printdbg("%lx ----\n", addr);
 #endif
 
-        mutex_unlock(&free_addr_lock);
-
+#if DEBUG_LINEAR_SANITY
         sanity_check_by_size(free_addr_by_size);
         sanity_check_by_addr(free_addr_by_addr);
+#endif
+
+        mutex_unlock(&free_addr_lock);
     } else {
         addr = atomic_xadd_uint64(&linear_allocator, size);
     }
