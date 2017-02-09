@@ -1,4 +1,6 @@
 arch/x86_64/module.ld
+lib/heap.c
+lib/heap.h
 lib/pool.c
 lib/pool.h
 module.mk

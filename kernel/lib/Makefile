@@ -23,6 +23,7 @@ CSRCS := mm.c \
 	debug.c \
 	rand.c \
 	bswap.c \
-	pool.c
+	pool.c \
+	heap.c
 
 include $(BUILDROOT)/library.mk

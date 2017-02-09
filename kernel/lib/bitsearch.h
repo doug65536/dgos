@@ -22,7 +22,7 @@ static inline uint8_t bit_msb_set_32(int32_t n)
 // Return bit number of most significant set bit
 static inline uint8_t bit_msb_set_64(int64_t n)
 {
-    return 31 - __builtin_clzl(n);
+    return 63 - __builtin_clzl(n);
 }
 
 // return ceil(log(n) / log(2))

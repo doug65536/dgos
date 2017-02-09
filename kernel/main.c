@@ -18,6 +18,7 @@
 #include "cpu/control_regs.h"
 #include "rand.h"
 #include "string.h"
+#include "heap.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -48,12 +49,16 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         1
+#define ENABLE_SHELL_THREAD         0
 #define ENABLE_AHCI_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
+#define ENABLE_STRESS_HEAP_THREAD   1
+
+#define STRESS_HEAP_MINSIZE     4096
+#define STRESS_HEAP_MAXSIZE     16384
 
 #if ENABLE_SHELL_THREAD > 0
 static int shell_thread(void *p)
@@ -441,6 +446,48 @@ static int stress_mmap_thread(void *p)
 }
 #endif
 
+#if ENABLE_STRESS_HEAP_THREAD > 0
+static int stress_heap_thread(void *p)
+{
+    (void)p;
+
+
+    heap_t *heap = heap_create();
+    uint64_t min_el;
+    uint64_t max_el;
+    uint64_t tot_el;
+    while (1) {
+        for (int pass = 0; pass < 16; ++pass) {
+            tot_el = 0;
+            max_el = 0;
+            min_el = ~0;
+            int size;
+            for (size = STRESS_HEAP_MINSIZE;
+                 size < STRESS_HEAP_MAXSIZE; ++size) {
+                cpu_irq_disable();
+                uint64_t st = cpu_rdtsc();
+                void *block = heap_alloc(heap, size);
+                //memset(block, size, size);
+                heap_free(heap, block);
+                uint64_t el = cpu_rdtsc() - st;
+                cpu_irq_enable();
+                if (el < 500000000 && max_el < el)
+                    max_el = el;
+                if (min_el > el)
+                    min_el = el;
+                tot_el += el;
+            }
+            printdbg("heap_alloc+memset+heap_free:"
+                     " min=%12ld,"
+                     " max=%12ld,"
+                     " avg=%12ld cycles\n",
+                     min_el, max_el, tot_el / size);
+        }
+    }
+    heap_destroy(heap);
+}
+#endif
+
 static int init_thread(void *p)
 {
     (void)p;
@@ -496,6 +543,12 @@ static int init_thread(void *p)
     }
 #endif
 
+#if ENABLE_STRESS_HEAP_THREAD > 0
+    for (int i = 0; i < ENABLE_STRESS_HEAP_THREAD; ++i) {
+        thread_create(stress_heap_thread, 0, 0, 0);
+    }
+#endif
+
     return 0;
 }
 
@@ -513,7 +566,7 @@ int main(void)
     munmap(c, 1 << 12);
 
     (void)init_thread;
-    rbtree_test();
+    //rbtree_test();
 
     thread_create(init_thread, 0, 0, 0);
 
