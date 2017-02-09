@@ -17,6 +17,7 @@
 #include "threadsync.h"
 #include "rbtree.h"
 #include "idt.h"
+#include "bsearch.h"
 
 #define DEBUG_ADDR_ALLOC    0
 #define DEBUG_PHYS_ALLOC    0
@@ -58,6 +59,7 @@
 // Assigned usage of available bits
 #define PTE_EX_PHYSICAL_BIT (PTE_AVAIL1_BIT+0)
 #define PTE_EX_LOCKED_BIT   (PTE_AVAIL1_BIT+1)
+#define PTE_EX_DEVICE_BIT   (PTE_AVAIL1_BIT+2)
 
 // Size of multi-bit fields
 #define PTE_PK_BITS         4
@@ -98,6 +100,7 @@
 // Assigned usage of available PTE bits
 #define PTE_EX_PHYSICAL     (1UL << PTE_EX_PHYSICAL_BIT)
 #define PTE_EX_LOCKED       (1UL << PTE_EX_LOCKED_BIT)
+#define PTE_EX_DEVICE       (1UL << PTE_EX_DEVICE_BIT)
 
 // Get field
 #define GF(pte, field) \
@@ -167,6 +170,21 @@ typedef uintptr_t linaddr_t;
 #define PT2_PTR(base)   (PT3_PTR(base) + PT2_BASE)
 #define PT1_PTR(base)   (PT3_PTR(base) + PT1_BASE)
 #define PT0_PTR(base)   (PT3_PTR(base) + PT0_BASE)
+
+// Device registration for memory mapped device
+typedef struct mmap_device_mapping_t {
+    void *base_addr;
+    uint64_t len;
+    mm_dev_mapping_callback_t callback;
+    void *context;
+} mmap_device_mapping_t;
+
+static int mm_dev_map_search(void const *v, void const *k, void *s);
+
+#define MM_MAX_DEVICE_MAPPINGS  16
+static mmap_device_mapping_t mm_dev_mappings[MM_MAX_DEVICE_MAPPINGS];
+static unsigned mm_dev_mapping_count;
+static spinlock_t mm_dev_mapping_lock;
 
 /// Physical page allocation map
 /// Consists of array of entries, one per physical page
@@ -923,7 +941,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     // If the page table exists
     if (present_mask == 0x07) {
         // If it is lazy allocated
-        if ((pte & PTE_ADDR) == PTE_ADDR) {
+        if ((pte & (PTE_ADDR | PTE_EX_DEVICE)) == PTE_ADDR) {
             // Allocate a page
             physaddr_t page = mmu_alloc_phys(0);
 
@@ -956,6 +974,57 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
             }
 
             return ctx;
+        } else if (pte & PTE_EX_DEVICE) {
+            // Device mapping
+
+            // Attempt to be the first CPU to start reading
+            // the block
+            pte_t volatile *vpte = ptes[3];
+            for (pte_t old_pte = *vpte; ; pause()) {
+                // If another thread finished reading,
+                // restart the faulting instruction
+                if (old_pte & PTE_PRESENT)
+                    return ctx;
+
+                // If nobody has started this read yet
+                if ((old_pte & (PTE_ADDR | PTE_PRESENT)) == PTE_ADDR) {
+                    // If this thread is the first to zero the
+                    // physical address field, then this
+                    // thread is going to do the callback
+                    pte_t upd_pte = atomic_cmpxchg(
+                                vpte, old_pte,
+                                old_pte & ~PTE_ADDR);
+
+                    if (old_pte == upd_pte)
+                        break;
+
+                    old_pte = upd_pte;
+                }
+            }
+
+            physaddr_t addr = mmu_alloc_phys(1);
+
+            // Write the physical address into the PTE
+            // but still not present
+            *vpte |= addr;
+
+            // Lookup the device mapping
+            intptr_t device = binary_search(
+                        mm_dev_mappings, mm_dev_mapping_count,
+                        sizeof(*mm_dev_mappings), (void*)fault_addr,
+                        mm_dev_map_search, 0, 1);
+
+            mmap_device_mapping_t *mapping = mm_dev_mappings + device;
+            if (device >= 0) {
+                mapping->callback(mapping->context, mapping->base_addr,
+                                  (char*)fault_addr -
+                                  (char*)mapping->base_addr);
+
+                *vpte |= PTE_PRESENT;
+
+                // Restart the instruction
+                return ctx;
+            }
         } else {
             assert(!"Invalid page fault");
         }
@@ -1522,9 +1591,13 @@ void *mmap(void *addr, size_t len,
            int prot, int flags,
            int fd, off_t offset)
 {
-    // Bomb out on unsupported stuff, for now
-    if (fd != -1 || offset != 0 || !len)
-        return 0;
+    // Must pass MAP_DEVICE if passing a device registration index
+    assert((flags & MAP_DEVICE) || (fd < 0));
+
+    // Not used (yet)
+    assert(offset == 0);
+
+    assert(len > 0);
 
 #if DEBUG_PAGE_TABLES
     printdbg("Mapping len=%zx prot=%x flags=%x addr=%lx\n",
@@ -1549,6 +1622,9 @@ void *mmap(void *addr, size_t len,
     if (flags & MAP_POPULATE)
         page_flags |= PTE_PRESENT;
 
+    if (flags & MAP_DEVICE)
+        page_flags |= PTE_EX_DEVICE;
+
     if (prot & PROT_WRITE)
         page_flags |= PTE_WRITABLE;
 
@@ -1557,7 +1633,7 @@ void *mmap(void *addr, size_t len,
 
     uintptr_t misalignment = 0;
 
-    if (unlikely(flags & MAP_PHYSICAL)) {
+    if (flags & MAP_PHYSICAL) {
         misalignment = (uintptr_t)addr & PAGE_MASK;
         len += misalignment;
     }
@@ -1812,3 +1888,39 @@ size_t mphysranges(mmphysrange_t *ranges,
     return state.count;
 }
 
+void *mmap_register_device(void *context,
+                           uint64_t block_size,
+                           uint64_t block_count,
+                           int prot,
+                           mm_dev_mapping_callback_t callback)
+{
+    spinlock_hold_t hold = spinlock_lock_noirq(&mm_dev_mapping_lock);
+
+    mmap_device_mapping_t *mapping = 0;
+    if (mm_dev_mapping_count < countof(mm_dev_mappings)) {
+        mapping = mm_dev_mappings + mm_dev_mapping_count++;
+        mapping->base_addr = mmap(0, block_size * block_count,
+                                  prot, MAP_DEVICE,
+                                  mapping - mm_dev_mappings,
+                                  0);
+        mapping->context = context;
+        mapping->len = block_size * block_count;
+        mapping->callback = callback;
+    }
+
+    spinlock_unlock_noirq(&mm_dev_mapping_lock, &hold);
+
+    return mapping->base_addr;
+}
+
+static int mm_dev_map_search(void const *v, void const *k, void *s)
+{
+    (void)s;
+    mmap_device_mapping_t const *mapping = v;
+    if (k < mapping->base_addr)
+        return -1;
+    void const *mapping_end = (char*)mapping->base_addr + mapping->len;
+    if (k > mapping_end)
+        return 1;
+    return 0;
+}

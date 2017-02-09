@@ -50,6 +50,9 @@
 /// Not file backed
 #define MAP_ANONYMOUS       0x00000200
 
+/// Kernel only: Map a device mapping
+#define MAP_DEVICE          0x10000000
+
 /// Kernel only: Write through
 #define MAP_WRITETHRU       0x20000000
 
@@ -307,3 +310,12 @@ void *sbrk(intptr_t __increment);
 
 /// Query system configuration
 long sysconf(int __name);
+
+typedef int (*mm_dev_mapping_callback_t)(
+        void *context, void *base_addr, uint64_t offset);
+
+void *mmap_register_device(void *context,
+                         uint64_t block_size,
+                         uint64_t block_count,
+                         int prot,
+                         mm_dev_mapping_callback_t callback);

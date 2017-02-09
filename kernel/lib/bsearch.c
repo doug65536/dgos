@@ -3,9 +3,14 @@
 // Returns the index of the matching item,
 // Otherwise returns the ones complement of the insertion point
 // The array is not really accessed, it does have to point to memory
+// Pass nonzero value in unique to early-out on equal comparison
 intptr_t binary_search(void *va, size_t count, size_t item_size,
-                     void *k, int (*cmp)(void *v, void *k, void *c),
-                     void *c)
+                       void const *k,
+                       int (*cmp)(void const *v,
+                                  void const *k,
+                                  void *c),
+                       void *c,
+                       int unique)
 {
     size_t st = 0;
     size_t en = count;
@@ -19,10 +24,13 @@ intptr_t binary_search(void *va, size_t count, size_t item_size,
         // Comparator returns negative value if item < key
         diff = cmp((char*)va + (mid * item_size), k, c);
 
-        if (diff < 0)
+        if (diff == 0 && unique)
+            return mid;
+
+        if (diff <= 0)
             en = mid;
         else
-            st = mid;
+            st = mid + 1;
     }
 
     if (st < count)
