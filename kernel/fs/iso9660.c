@@ -9,11 +9,18 @@ DECLARE_fs_DEVICE(iso9660);
 #include "mm.h"
 #include "bswap.h"
 #include "string.h"
+#include "pool.h"
+#include "bsearch.h"
+#include "printk.h"
 
 struct iso9660_fs_t {
     fs_vtbl_t *vtbl;
 
     storage_dev_base_t *drive;
+
+    // Partition range
+    uint64_t lba_st;
+    uint64_t lba_len;
 
     // Root
     uint32_t root_lba;
@@ -23,8 +30,14 @@ struct iso9660_fs_t {
     uint32_t pt_lba;
     uint32_t pt_bytes;
 
-    int (*convert_name)(void *ascii_buf,
+    int (*name_convert)(void *encoded_buf,
                         char const *utf8);
+    int (*lookup_path_cmp)(void const *v,
+                           void const *k,
+                           void *s);
+    int (*name_compare)(void const *name, size_t name_len,
+                        char const *find, size_t find_len);
+    void (*name_copy)(char *out, void *in, size_t len);
 
     // Path table and path table lookup table
     iso9660_pt_rec_t *pt;
@@ -39,6 +52,9 @@ struct iso9660_fs_t {
     // >= 2KB
     uint32_t block_size;
 
+    // Device memory mapping
+    char *mm_dev;
+
     // log2(sector_size)
     uint8_t sector_shift;
 
@@ -46,8 +62,62 @@ struct iso9660_fs_t {
     uint8_t block_shift;
 };
 
-iso9660_fs_t iso9660_mounts[16];
-unsigned iso9660_mount_count;
+static iso9660_fs_t iso9660_mounts[16];
+static unsigned iso9660_mount_count;
+
+static pool_t iso9660_handles;
+
+typedef struct iso9660_dir_handle_t {
+    iso9660_fs_t *fs;
+    iso9660_dir_ent_t *dirent;
+    char *content;
+} iso9660_dir_handle_t;
+
+typedef struct iso9660_file_handle_t {
+    iso9660_fs_t *fs;
+    iso9660_dir_ent_t *dirent;
+    char *content;
+} iso9660_file_handle_t;
+
+typedef union iso9660_handle_t {
+    iso9660_fs_t *fs;
+    iso9660_file_handle_t file;
+    iso9660_dir_handle_t dir;
+} iso9660_handle_t;
+
+typedef struct iso9660_path_key_t {
+    char const *name;
+    size_t len;
+    size_t parent;
+} iso9660_path_key_t;
+
+static uint64_t iso9660_dirent_size(iso9660_dir_ent_t const *de)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return (de->size_hi_le << 16) |
+            de->size_lo_le;
+#else
+    return (de->size_hi_be << 16) |
+            de->size_lo_be;
+#endif
+}
+
+static uint64_t iso9660_dirent_lba(iso9660_dir_ent_t const *de)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return (de->lba_hi_le << 16) |
+            de->lba_lo_le;
+#else
+    return (de->lba_hi_be << 16) |
+            de->lba_lo_be;
+#endif
+}
+
+static uint64_t iso9660_pt_rec_lba(iso9660_pt_rec_t const *pt_rec)
+{
+    return (pt_rec->lba_hi << 16) |
+            pt_rec->lba_lo;
+}
 
 static int iso9660_name_to_ascii(
         void *ascii_buf,
@@ -105,6 +175,26 @@ static int iso9660_name_to_utf16be(
     return out;
 }
 
+static void iso9660_name_copy_ascii(
+        char *out, void *in, size_t len)
+{
+    memcpy(out, in, len);
+    out[len] = 0;
+}
+
+static void iso9660_name_copy_utf16be(
+        char *out, void *in, size_t len)
+{
+    uint16_t const *name = in;
+    size_t name_len = len >> 1;
+    uint16_t const *name_end = name + name_len;
+
+    while (name < name_end) {
+        int codepoint = utf16be_to_ucs4(name, &name);
+        out += ucs4_to_utf8(out, codepoint);
+    }
+}
+
 static uint32_t iso9660_round_up(
         uint32_t n,
         uint8_t log2_size)
@@ -146,11 +236,215 @@ static void iso9660_pt_fill(
         self->pt_ptrs[i] = rec;
 }
 
+static int iso9660_name_compare_ascii(
+        void const *name, size_t name_len,
+        char const *find, size_t find_len)
+{
+    char const *chk = name;
+    char const *find_limit = memrchr(find, '.', find_len);
+    char const *chk_limit = memrchr(chk, '.', name_len);
+    char const *find_end = find + find_len;
+    char const *chk_end = memrchr(chk, ';', name_len);
+
+    // ISO9660 uses a goofy DOS-like algorithm where the
+    // shorter name is space-padded to the length of the
+    // longer name, and the extension is space-padded
+    // to the length of the longer extension
+
+    int cmp = 0;
+
+    for (int pass = 0; pass < 2; ++pass) {
+        while (find < find_limit || chk < chk_limit) {
+            int key_codepoint = find < find_limit
+                    ? utf8_to_ucs4(find, &find)
+                    : ' ';
+            int chk_codepoint = chk < chk_limit
+                    ? *chk
+                    : ' ';
+
+            cmp = chk_codepoint - key_codepoint;
+
+            if (cmp)
+                return cmp;
+        }
+
+        find_limit = find_end;
+        chk_limit = chk_end;
+    }
+
+    return cmp;
+}
+
+static int iso9660_name_compare_utf16be(
+        void const *name, size_t name_len,
+        char const *find, size_t find_len)
+{
+    char const *find_end = find + find_len;
+    uint16_t const *chk = name;
+    uint16_t const *chk_end = chk + (name_len >> 1);
+
+    int cmp = 0;
+    while (find < find_end || chk < chk_end) {
+        int key_codepoint = utf8_to_ucs4(find, &find);
+        int chk_codepoint = utf16be_to_ucs4(chk, &chk);
+
+        cmp = key_codepoint - chk_codepoint;
+
+        if (cmp)
+            break;
+    }
+    return cmp;
+}
+
+static int iso9660_lookup_path_cmp_ascii(
+        void const *v, void const *k, void *s)
+{
+    (void)s;
+    iso9660_pt_rec_t const *rec = *(iso9660_pt_rec_t const **)v;
+    iso9660_path_key_t const *key = k;
+
+    if (rec->parent_dn != key->parent)
+        return key->parent - rec->parent_dn;
+
+    size_t name_len = (rec->di_len - offsetof(
+                iso9660_pt_rec_t, name));
+
+    return iso9660_name_compare_ascii(
+                rec->name, name_len,
+                key->name, key->len);
+}
+
+static int iso9660_lookup_path_cmp_utf16be(
+        void const *v, void const *k, void *s)
+{
+    (void)s;
+    iso9660_pt_rec_t const *rec = *(iso9660_pt_rec_t const**)v;
+    iso9660_path_key_t const *key = k;
+
+    if (rec->parent_dn != key->parent)
+        return key->parent - rec->parent_dn;
+
+    return iso9660_name_compare_utf16be(
+                rec->name, rec->di_len,
+                key->name, key->len);
+}
+
+static iso9660_pt_rec_t *iso9660_lookup_path(
+        iso9660_fs_t *self, char const *path, int path_len)
+{
+    iso9660_path_key_t key;
+
+    if (path_len < 0)
+        path_len = strlen(path);
+
+    key.parent = 1;
+    key.name = path;
+
+    intptr_t match = -1;
+    int done;
+    do {
+        char *sep = memchr(key.name, '/', path_len);
+        done = !sep;
+        if (!done)
+            key.len = sep - key.name;
+        else
+            key.len = (path + path_len) - key.name;
+
+        match = binary_search(
+                    self->pt_ptrs, self->pt_count,
+                    sizeof(*self->pt_ptrs), &key,
+                    self->lookup_path_cmp, self, 1);
+
+        if (match < 0)
+            return 0;
+
+        key.parent = match + 1;
+        key.name += key.len + 1;
+    } while(!done);
+
+    return match >= 0 ? self->pt_ptrs[match] : 0;
+}
+
+static void *iso9660_lookup_sector(iso9660_fs_t *self, uint64_t lba)
+{
+    return self->mm_dev + (lba << self->sector_shift);
+}
+
+static iso9660_dir_ent_t *iso9660_lookup_dirent(
+        iso9660_fs_t *self, char const *pathname)
+{
+    // Get length of whole path
+    size_t pathname_len = strlen(pathname);
+
+    // Find last path separator
+    char const *sep = memrchr(pathname, '/', pathname_len);
+
+    size_t path_len;
+    size_t name_len;
+    char const *name;
+
+    if (sep) {
+        path_len = sep - pathname;
+        name = sep + 1;
+        name_len = pathname_len - path_len - 1;
+    } else {
+        path_len = 0;
+        name = pathname;
+        name_len = pathname_len;
+    }
+
+    iso9660_pt_rec_t *pt_rec;
+
+    if (path_len > 0) {
+        pt_rec = iso9660_lookup_path(
+                    self, pathname, path_len);
+    } else {
+        pt_rec = self->pt_ptrs[0];
+    }
+
+    iso9660_dir_ent_t *dir = iso9660_lookup_sector(
+                self,
+                iso9660_pt_rec_lba(pt_rec));
+
+    size_t dir_len = iso9660_dirent_size(dir);
+
+    iso9660_dir_ent_t *dir_end = (void*)((char*)dir + dir_len);
+
+    iso9660_dir_ent_t *result = 0;
+    for (iso9660_dir_ent_t *de = dir; de < dir_end;
+         de = (void*)((char*)de + ((de->len + 1) & -2))) {
+        int cmp = self->name_compare(
+                    de->name, de->filename_len,
+                    name, name_len);
+        if (cmp == 0) {
+            result = de;
+            break;
+        }
+    }
+
+    return result;
+}
+
+static int iso9660_mm_fault_handler(
+        void *dev, void *base_addr, uint64_t offset)
+{
+    FS_DEV_PTR(dev);
+
+    uint64_t lba = self->lba_st + (offset >> self->sector_shift);
+    char *addr = (char*)base_addr + (lba << self->sector_shift);
+
+    return self->drive->vtbl->read_blocks(self->drive, addr, 1, lba);
+}
+
 //
 // Startup and shutdown
 
 static void* iso9660_mount(fs_init_info_t *conn)
 {
+    if (iso9660_mount_count == 0) {
+        pool_create(&iso9660_handles, sizeof(iso9660_handle_t), 512);
+    }
+
     iso9660_fs_t *self = iso9660_mounts + iso9660_mount_count++;
 
     self->vtbl = &iso9660_fs_device_vtbl;
@@ -167,7 +461,10 @@ static void* iso9660_mount(fs_init_info_t *conn)
     iso9660_pvd_t pvd;
     uint32_t best_ofs = 0;
 
-    self->convert_name = iso9660_name_to_ascii;
+    self->name_convert = iso9660_name_to_ascii;
+    self->lookup_path_cmp = iso9660_lookup_path_cmp_ascii;
+    self->name_compare = iso9660_name_compare_ascii;
+    self->name_copy = iso9660_name_copy_ascii;
 
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {
         // Read logical block 16
@@ -178,7 +475,10 @@ static void* iso9660_mount(fs_init_info_t *conn)
 
         if (pvd.type_code == 2) {
             // Prefer joliet pvd
-            self->convert_name = iso9660_name_to_utf16be;
+            self->name_convert = iso9660_name_to_utf16be;
+            self->lookup_path_cmp = iso9660_lookup_path_cmp_utf16be;
+            self->name_compare = iso9660_name_compare_utf16be;
+            self->name_copy = iso9660_name_copy_utf16be;
             best_ofs = ofs;
             break;
         }
@@ -192,11 +492,9 @@ static void* iso9660_mount(fs_init_info_t *conn)
                     16 << self->block_shift);
     }
 
-    self->root_lba = pvd.root_dirent.lba_lo_le |
-            (pvd.root_dirent.lba_hi_le << 16);
+    self->root_lba = iso9660_dirent_lba(&pvd.root_dirent);
 
-    self->root_bytes = pvd.root_dirent.size_lo_le |
-            (pvd.root_dirent.size_hi_le << 16);
+    self->root_bytes = iso9660_dirent_size(&pvd.root_dirent);
 
     self->pt_lba = pvd.path_table_le_lba;
     self->pt_bytes = pvd.path_table_bytes.le;
@@ -224,6 +522,22 @@ static void* iso9660_mount(fs_init_info_t *conn)
     // Populate path table entry pointer array
     iso9660_walk_pt(self, iso9660_pt_fill, self);
 
+    self->lba_st = conn->part_st;
+    self->lba_len = conn->part_len;
+
+    self->mm_dev = mmap_register_device(
+                self, self->block_size, conn->part_len,
+                PROT_READ, iso9660_mm_fault_handler);
+
+    iso9660_lookup_path(self, "usr/include", -1);
+
+    iso9660_dir_ent_t *de = iso9660_lookup_dirent(self, "root/hello.txt");
+    if (de) {
+        char *content = iso9660_lookup_sector(
+                    self, iso9660_dirent_lba(de));
+        printdbg("%*s\n", de->size_lo_le, content);
+    }
+
     return self;
 }
 
@@ -246,9 +560,52 @@ static int iso9660_getattr(
         fs_cpath_t path,
         fs_stat_t* stbuf)
 {
-    FS_DEV_PTR_UNUSED(dev);
-    (void)path;
-    (void)stbuf;
+    FS_DEV_PTR(dev);
+
+    iso9660_dir_ent_t *de = iso9660_lookup_dirent(self, path);
+
+    // Device ID of device containing file.
+    stbuf->st_dev = 0;
+
+    // File serial number.
+    stbuf->st_ino = 0;
+
+    // Mode of file (see below)
+    stbuf->st_mode = 0;
+
+    // Number of hard links to the file
+    stbuf->st_nlink = 0;
+
+    // User ID of file
+    stbuf->st_uid = 0;
+
+    // Group ID of file
+    stbuf->st_gid = 0;
+
+    // Device ID (if file is character or block special)
+    stbuf->st_rdev = 0;
+
+    // For regular files, the file size in bytes.
+    // For symbolic links, the length in bytes of the
+    // pathname contained in the symbolic link.
+    // For other file types, the use of this field is
+    // unspecified.
+    stbuf->st_size = iso9660_dirent_size(de);
+
+    // Last data modification timestamp
+    stbuf->st_mtime = 0;
+    // Last file status change timestamp
+    stbuf->st_ctime = 0;
+
+    // A file system-specific preferred I/O block size
+    // for this object. In some file system types, this
+    // may vary from file to file.
+    stbuf->st_blksize = 0;
+
+    // Number of blocks allocated for this object.
+    stbuf->st_blocks = iso9660_dirent_size(de)
+            >> (self->sector_shift + self->block_shift);
+
     return 0;
 }
 
@@ -282,26 +639,33 @@ static int iso9660_readlink(
 static int iso9660_opendir(
         fs_base_t *dev,
         fs_cpath_t path,
-        fs_file_info_t* fi)
+        fs_file_info_t **fi)
 {
-    FS_DEV_PTR_UNUSED(dev);
-    (void)path;
+    FS_DEV_PTR(dev);
+
+    iso9660_pt_rec_t *pt = iso9660_lookup_path(self, path, -1);
+
+    (void)pt;
     (void)fi;
     return 0;
 }
 
-static int iso9660_readdir(
+static ssize_t iso9660_readdir(
         fs_base_t *dev,
         fs_cpath_t path,
         void* buf,
         off_t offset,
-        fs_file_info_t* fi)
+        fs_file_info_t *fi)
 {
-    FS_DEV_PTR_UNUSED(dev);
+    FS_DEV_PTR(dev);
+
+    iso9660_dir_handle_t *dir = fi;
+
+    iso9660_dir_ent_t *de = (void*)(dir->content + offset);
+
+    self->name_copy(buf, de->name, de->filename_len);
+
     (void)path;
-    (void)buf;
-    (void)offset;
-    (void)fi;
     return 0;
 }
 
@@ -313,6 +677,7 @@ static int iso9660_releasedir(
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)fi;
+    pool_free(&iso9660_handles, fi);
     return 0;
 }
 
@@ -427,7 +792,8 @@ static int iso9660_chown(
     (void)path;
     (void)uid;
     (void)gid;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_truncate(
@@ -438,7 +804,8 @@ static int iso9660_truncate(
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)size;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 static int iso9660_utimens(
@@ -449,7 +816,8 @@ static int iso9660_utimens(
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)ts;
-    return 0;
+    // Fail, read only
+    return -1;
 }
 
 
@@ -459,11 +827,18 @@ static int iso9660_utimens(
 static int iso9660_open(
         fs_base_t *dev,
         fs_cpath_t path,
-        fs_file_info_t* fi)
+        fs_file_info_t **fi)
 {
-    FS_DEV_PTR_UNUSED(dev);
-    (void)path;
-    (void)fi;
+    FS_DEV_PTR(dev);
+
+    iso9660_file_handle_t *file = pool_alloc(&iso9660_handles);
+    *fi = file;
+
+    file->dirent = iso9660_lookup_dirent(self, path);
+    file->content = iso9660_lookup_sector(
+                self, (file->dirent->lba_hi_le << 16) |
+                file->dirent->lba_lo_le);
+
     return 0;
 }
 
@@ -475,6 +850,7 @@ static int iso9660_release(
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)fi;
+    pool_free(&iso9660_handles, fi);
     return 0;
 }
 
@@ -482,30 +858,43 @@ static int iso9660_release(
 //
 // Read/write files
 
-static int iso9660_read(
+static ssize_t iso9660_read(
         fs_base_t *dev,
         fs_cpath_t path,
         char *buf,
         size_t size,
         off_t offset,
-        fs_file_info_t* fi)
+        fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
+
+    iso9660_file_handle_t *file = fi;
+
+    size_t file_size = (file->dirent->lba_hi_le << 16) |
+            file->dirent->lba_lo_le;
+
+    if (offset < 0)
+        return -1;
+
+    if ((size_t)offset >= file_size)
+        return 0;
+
+    if (offset + size > file_size)
+        size = file_size - offset;
+
+    memcpy(buf, file->content + offset, size);
+
     (void)path;
-    (void)buf;
-    (void)size;
-    (void)offset;
-    (void)fi;
     return 0;
 }
 
-static int iso9660_write(
+static ssize_t iso9660_write(
         fs_base_t *dev,
         fs_cpath_t path,
         char *buf,
         size_t size,
         off_t offset,
-        fs_file_info_t* fi)
+        fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -525,12 +914,13 @@ static int iso9660_fsync(
         fs_base_t *dev,
         fs_cpath_t path,
         int isdatasync,
-        fs_file_info_t* fi)
+        fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)isdatasync;
     (void)fi;
+    // Read only device, do nothing
     return 0;
 }
 
@@ -538,23 +928,25 @@ static int iso9660_fsyncdir(
         fs_base_t *dev,
         fs_cpath_t path,
         int isdatasync,
-        fs_file_info_t* fi)
+        fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)isdatasync;
     (void)fi;
+    // Ignore, read only
     return 0;
 }
 
 static int iso9660_flush(
         fs_base_t *dev,
         fs_cpath_t path,
-        fs_file_info_t* fi)
+        fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)fi;
+    // Do nothing, read only
     return 0;
 }
 
@@ -566,9 +958,42 @@ static int iso9660_statfs(
         fs_cpath_t path,
         fs_statvfs_t* stbuf)
 {
-    FS_DEV_PTR_UNUSED(dev);
+    FS_DEV_PTR(dev);
+
+    // Filesystem block size
+    stbuf->f_bsize = 1UL << (self->sector_shift + self->block_shift);
+
+    // Fragment size
+    stbuf->f_frsize = stbuf->f_bsize;
+
+    // Size of filesystem in f_frsize units
+    stbuf->f_blocks = self->lba_len;
+
+    // free blocks
+    stbuf->f_bfree = 0;
+
+    // free blocks for unprivileged users
+    stbuf->f_bavail = 0;
+
+    // inodes
+    stbuf->f_files = 0;
+
+    // Free inodes
+    stbuf->f_ffree = 0;
+
+    // Free inodes for unprivileged users
+    stbuf->f_favail = 0;
+
+    // Filesystem ID
+    stbuf->f_fsid = 0xCD;
+
+    // Mount flags
+    stbuf->f_flag = 1;//ST_RDONLY;
+
+    // Maximum filename length
+    stbuf->f_namemax = ISO9660_MAX_NAME;
+
     (void)path;
-    (void)stbuf;
     return 0;
 }
 
@@ -578,7 +1003,7 @@ static int iso9660_statfs(
 static int iso9660_lock(
         fs_base_t *dev,
         fs_cpath_t path,
-        fs_file_info_t* fi,
+        fs_file_info_t *fi,
         int cmd,
         fs_flock_t* locks)
 {
@@ -603,7 +1028,8 @@ static int iso9660_bmap(
     (void)path;
     (void)blocksize;
     (void)blockno;
-    return 0;
+    // No idea what this does
+    return -1;
 }
 
 //
@@ -663,7 +1089,7 @@ static int iso9660_ioctl(
         fs_cpath_t path,
         int cmd,
         void* arg,
-        fs_file_info_t* fi,
+        fs_file_info_t *fi,
         unsigned int flags,
         void* data)
 {
@@ -683,7 +1109,7 @@ static int iso9660_ioctl(
 static int iso9660_poll(
         fs_base_t *dev,
         fs_cpath_t path,
-        fs_file_info_t* fi,
+        fs_file_info_t *fi,
         fs_pollhandle_t* ph,
         unsigned* reventsp)
 {

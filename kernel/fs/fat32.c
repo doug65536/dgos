@@ -53,7 +53,8 @@ static int fat32_readlink(fs_base_t *dev,
 // Scan directories
 
 static int fat32_opendir(fs_base_t *dev,
-                         fs_cpath_t path, fs_file_info_t* fi)
+                         fs_cpath_t path,
+                         fs_file_info_t **fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -61,9 +62,9 @@ static int fat32_opendir(fs_base_t *dev,
     return 0;
 }
 
-static int fat32_readdir(fs_base_t *dev,
+static ssize_t fat32_readdir(fs_base_t *dev,
                          fs_cpath_t path, void* buf, off_t offset,
-                         fs_file_info_t* fi)
+                         fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -74,7 +75,8 @@ static int fat32_readdir(fs_base_t *dev,
 }
 
 static int fat32_releasedir(fs_base_t *dev,
-                            fs_cpath_t path, fs_file_info_t *fi)
+                            fs_cpath_t path,
+                            fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -194,7 +196,7 @@ static int fat32_utimens(fs_base_t *dev,
 // Open/close files
 
 static int fat32_open(fs_base_t *dev,
-                      fs_cpath_t path, fs_file_info_t* fi)
+                      fs_cpath_t path, fs_file_info_t **fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -215,10 +217,10 @@ static int fat32_release(fs_base_t *dev,
 //
 // Read/write files
 
-static int fat32_read(fs_base_t *dev,
+static ssize_t fat32_read(fs_base_t *dev,
                       fs_cpath_t path, char *buf,
                       size_t size, off_t offset,
-                      fs_file_info_t* fi)
+                      fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -229,10 +231,10 @@ static int fat32_read(fs_base_t *dev,
     return 0;
 }
 
-static int fat32_write(fs_base_t *dev,
+static ssize_t fat32_write(fs_base_t *dev,
                        fs_cpath_t path, char *buf,
                        size_t size, off_t offset,
-                       fs_file_info_t* fi)
+                       fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -249,7 +251,7 @@ static int fat32_write(fs_base_t *dev,
 
 static int fat32_fsync(fs_base_t *dev,
                        fs_cpath_t path, int isdatasync,
-                       fs_file_info_t* fi)
+                       fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -260,7 +262,7 @@ static int fat32_fsync(fs_base_t *dev,
 
 static int fat32_fsyncdir(fs_base_t *dev,
                           fs_cpath_t path, int isdatasync,
-                          fs_file_info_t* fi)
+                          fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -270,7 +272,7 @@ static int fat32_fsyncdir(fs_base_t *dev,
 }
 
 static int fat32_flush(fs_base_t *dev,
-                       fs_cpath_t path, fs_file_info_t* fi)
+                       fs_cpath_t path, fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -294,7 +296,7 @@ static int fat32_statfs(fs_base_t *dev,
 // lock/unlock file
 
 static int fat32_lock(fs_base_t *dev,
-                      fs_cpath_t path, fs_file_info_t* fi,
+                      fs_cpath_t path, fs_file_info_t *fi,
                       int cmd, fs_flock_t* locks)
 {
     FS_DEV_PTR_UNUSED(dev);
@@ -365,7 +367,7 @@ static int fat32_listxattr(fs_base_t *dev,
 
 static int fat32_ioctl(fs_base_t *dev,
                        fs_cpath_t path, int cmd, void* arg,
-                       fs_file_info_t* fi,
+                       fs_file_info_t *fi,
                        unsigned int flags, void* data)
 {
     FS_DEV_PTR_UNUSED(dev);
@@ -383,7 +385,7 @@ static int fat32_ioctl(fs_base_t *dev,
 
 static int fat32_poll(fs_base_t *dev,
                       fs_cpath_t path,
-                      fs_file_info_t* fi,
+                      fs_file_info_t *fi,
                       fs_pollhandle_t* ph, unsigned* reventsp)
 {
     FS_DEV_PTR_UNUSED(dev);

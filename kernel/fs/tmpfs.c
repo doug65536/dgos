@@ -55,7 +55,8 @@ static int tmpfs_readlink(fs_base_t *dev,
 // Scan directories
 
 static int tmpfs_opendir(fs_base_t *dev,
-                         fs_cpath_t path, fs_file_info_t* fi)
+                         fs_cpath_t path,
+                         fs_file_info_t **fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -63,9 +64,9 @@ static int tmpfs_opendir(fs_base_t *dev,
     return 0;
 }
 
-static int tmpfs_readdir(fs_base_t *dev,
+static ssize_t tmpfs_readdir(fs_base_t *dev,
                          fs_cpath_t path, void* buf, off_t offset,
-                         fs_file_info_t* fi)
+                         fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -196,7 +197,8 @@ static int tmpfs_utimens(fs_base_t *dev,
 // Open/close files
 
 static int tmpfs_open(fs_base_t *dev,
-                      fs_cpath_t path, fs_file_info_t* fi)
+                      fs_cpath_t path,
+                      fs_file_info_t **fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -217,10 +219,10 @@ static int tmpfs_release(fs_base_t *dev,
 //
 // Read/write files
 
-static int tmpfs_read(fs_base_t *dev,
+static ssize_t tmpfs_read(fs_base_t *dev,
                       fs_cpath_t path, char *buf,
                       size_t size, off_t offset,
-                      fs_file_info_t* fi)
+                      fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -231,10 +233,10 @@ static int tmpfs_read(fs_base_t *dev,
     return 0;
 }
 
-static int tmpfs_write(fs_base_t *dev,
+static ssize_t tmpfs_write(fs_base_t *dev,
                        fs_cpath_t path, char *buf,
                        size_t size, off_t offset,
-                       fs_file_info_t* fi)
+                       fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -251,7 +253,7 @@ static int tmpfs_write(fs_base_t *dev,
 
 static int tmpfs_fsync(fs_base_t *dev,
                        fs_cpath_t path, int isdatasync,
-                       fs_file_info_t* fi)
+                       fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -262,7 +264,7 @@ static int tmpfs_fsync(fs_base_t *dev,
 
 static int tmpfs_fsyncdir(fs_base_t *dev,
                           fs_cpath_t path, int isdatasync,
-                          fs_file_info_t* fi)
+                          fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -272,7 +274,7 @@ static int tmpfs_fsyncdir(fs_base_t *dev,
 }
 
 static int tmpfs_flush(fs_base_t *dev,
-                       fs_cpath_t path, fs_file_info_t* fi)
+                       fs_cpath_t path, fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -296,7 +298,7 @@ static int tmpfs_statfs(fs_base_t *dev,
 // lock/unlock file
 
 static int tmpfs_lock(fs_base_t *dev,
-                      fs_cpath_t path, fs_file_info_t* fi,
+                      fs_cpath_t path, fs_file_info_t *fi,
                       int cmd, fs_flock_t* locks)
 {
     FS_DEV_PTR_UNUSED(dev);
@@ -367,7 +369,7 @@ static int tmpfs_listxattr(fs_base_t *dev,
 
 static int tmpfs_ioctl(fs_base_t *dev,
                        fs_cpath_t path, int cmd, void* arg,
-                       fs_file_info_t* fi,
+                       fs_file_info_t *fi,
                        unsigned int flags, void* data)
 {
     FS_DEV_PTR_UNUSED(dev);
@@ -385,7 +387,7 @@ static int tmpfs_ioctl(fs_base_t *dev,
 
 static int tmpfs_poll(fs_base_t *dev,
                       fs_cpath_t path,
-                      fs_file_info_t* fi,
+                      fs_file_info_t *fi,
                       fs_pollhandle_t* ph, unsigned* reventsp)
 {
     FS_DEV_PTR_UNUSED(dev);

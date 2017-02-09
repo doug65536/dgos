@@ -146,7 +146,7 @@ typedef uint32_t fs_gid_t;
 typedef struct fs_init_info_t fs_init_info_t;
 
 typedef struct fs_stat_t fs_stat_t;
-typedef struct fs_file_info_t fs_file_info_t;
+typedef void fs_file_info_t;
 
 typedef struct fs_statvfs_t fs_statvfs_t;
 
@@ -230,10 +230,10 @@ struct fs_vtbl_t {
     // Scan directories
 
     int (*opendir)(fs_base_t *dev,
-                   fs_cpath_t path, fs_file_info_t* fi);
-    int (*readdir)(fs_base_t *dev,
-                   fs_cpath_t path, void* buf, off_t offset,
-                   fs_file_info_t* fi);
+                   fs_cpath_t path, fs_file_info_t **fi);
+    ssize_t (*readdir)(fs_base_t *dev,
+                       fs_cpath_t path, void* buf, off_t offset,
+                       fs_file_info_t *fi);
     int (*releasedir)(fs_base_t *dev,
                       fs_cpath_t path, fs_file_info_t *fi);
 
@@ -271,33 +271,33 @@ struct fs_vtbl_t {
     // Open/close files
 
     int (*open)(fs_base_t *dev,
-                fs_cpath_t path, fs_file_info_t* fi);
+                fs_cpath_t path, fs_file_info_t **fi);
     int (*release)(fs_base_t *dev,
                    fs_cpath_t path, fs_file_info_t *fi);
 
     //
     // Read/write files
 
-    int (*read)(fs_base_t *dev,
+    ssize_t (*read)(fs_base_t *dev,
                 fs_cpath_t path, char *buf,
                 size_t size, off_t offset,
-                fs_file_info_t* fi);
-    int (*write)(fs_base_t *dev,
+                fs_file_info_t *fi);
+    ssize_t (*write)(fs_base_t *dev,
                  fs_cpath_t path, char *buf,
                  size_t size, off_t offset,
-                 fs_file_info_t* fi);
+                 fs_file_info_t *fi);
 
     //
     // Sync files and directories and flush buffers
 
     int (*fsync)(fs_base_t *dev,
                  fs_cpath_t path, int isdatasync,
-                 fs_file_info_t* fi);
+                 fs_file_info_t *fi);
     int (*fsyncdir)(fs_base_t *dev,
                     fs_cpath_t path, int isdatasync,
-                    fs_file_info_t* fi);
+                    fs_file_info_t *fi);
     int (*flush)(fs_base_t *dev,
-                 fs_cpath_t path, fs_file_info_t* fi);
+                 fs_cpath_t path, fs_file_info_t *fi);
 
     //
     // Get filesystem information
@@ -309,7 +309,7 @@ struct fs_vtbl_t {
     // lock/unlock file
 
     int (*lock)(fs_base_t *dev,
-                fs_cpath_t path, fs_file_info_t* fi,
+                fs_cpath_t path, fs_file_info_t *fi,
                 int cmd, fs_flock_t* locks);
 
     //
@@ -339,7 +339,7 @@ struct fs_vtbl_t {
 
     int (*ioctl)(fs_base_t *dev,
                  fs_cpath_t path, int cmd, void* arg,
-                 fs_file_info_t* fi,
+                 fs_file_info_t *fi,
                  unsigned int flags, void* data);
 
     //
@@ -347,7 +347,7 @@ struct fs_vtbl_t {
 
     int (*poll)(fs_base_t *dev,
                 fs_cpath_t path,
-                fs_file_info_t* fi,
+                fs_file_info_t *fi,
                 fs_pollhandle_t* ph, unsigned* reventsp);
 };
 
