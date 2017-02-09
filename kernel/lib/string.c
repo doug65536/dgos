@@ -2,6 +2,7 @@
 #include "string.h"
 #undef __NO_STRING_BUILTIN
 #include "export.h"
+#include "bswap.h"
 
 EXPORT size_t strlen(char const *src)
 {
@@ -18,6 +19,14 @@ EXPORT void *memchr(void const *mem, int ch, size_t count)
    return 0;
 }
 
+EXPORT void *memrchr(const void *mem, int ch, size_t count)
+{
+    for (char const *p = (char const *)mem + count; count--; --p)
+        if (p[-1] == (char)ch)
+            return (void*)(p - 1);
+   return 0;
+}
+
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
 EXPORT char *strchr(char const *s, int ch)
@@ -29,6 +38,17 @@ EXPORT char *strchr(char const *s, int ch)
         if (c == 0)
             return 0;
     }
+}
+
+// The terminating null character is considered to be a part
+// of the string and can be found when searching for '\0'.
+EXPORT char *strrchr(char const *s, int ch)
+{
+    for (char const *p = s + strlen(s); p >= s; --p) {
+        if ((char)*p == (char)ch)
+            return (char*)p;
+    }
+    return 0;
 }
 
 EXPORT int strcmp(char const *lhs, char const *rhs)
@@ -234,8 +254,10 @@ EXPORT int ucs4_to_utf8(char *out, int in)
 {
     int len;
     if (in >= 0 && in < 0x80) {
-        *out++ = (char)in;
-        *out++ = 0;
+        if (out) {
+            *out++ = (char)in;
+            *out++ = 0;
+        }
         return 1;
     }
 
@@ -247,18 +269,22 @@ EXPORT int ucs4_to_utf8(char *out, int in)
         len = 4;
     } else {
         // Invalid
-        *out++ = 0;
+        if (out)
+            *out++ = 0;
         return 0;
     }
 
-    int shift = len - 1;
-    *out++ = (char)((signed char)0x80 >> shift) |
-            (in >> (6 * shift));
+    if (out) {
+        int shift = len - 1;
 
-    while (--shift >= 0)
-        *out++ = 0x80 | ((in >> (6 * shift)) & 0x3F);
+        *out++ = (char)((signed char)0x80 >> shift) |
+                (in >> (6 * shift));
 
-    *out++ = 0;
+        while (--shift >= 0)
+            *out++ = 0x80 | ((in >> (6 * shift)) & 0x3F);
+
+        *out++ = 0;
+    }
 
     return len;
 }
@@ -267,18 +293,25 @@ EXPORT int ucs4_to_utf16(uint16_t *out, int in)
 {
     if ((in > 0 && in < 0xD800) ||
             (in > 0xDFFF && in < 0x10000)) {
-        *out++ = (uint16_t)in;
-        *out = 0;
+        if (out) {
+            *out++ = (uint16_t)in;
+            *out = 0;
+        }
         return 1;
     } else if (in > 0xFFFF && in < 0x110000) {
         in -= 0x10000;
-        *out++ = 0xD800 + ((in >> 10) & 0x3FF);
-        *out++ = 0xDC00 + (in & 0x3FF);
-        *out = 0;
+        if (out) {
+            *out++ = 0xD800 + ((in >> 10) & 0x3FF);
+            *out++ = 0xDC00 + (in & 0x3FF);
+            *out = 0;
+        }
         return 2;
     }
+
     // Codepoint out of range or in surrogate range
-    *out = 0;
+    if (out)
+        *out = 0;
+
     return 0;
 }
 
@@ -286,6 +319,9 @@ EXPORT int ucs4_to_utf16(uint16_t *out, int in)
 // Returns -1 on error
 // If ret_end is not null, pointer to first
 // byte after encoded character to *ret_end
+// If the input is a null byte, and ret_end is not null,
+// then *ret_end is set to point to the null byte, it
+// is not advanced
 EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
 {
     int n;
@@ -355,5 +391,89 @@ EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
         *ret_end = in;
 
     return n;
+}
+
+// Same semantics as utf8_to_ucs4
+EXPORT int utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
+{
+    if (in[0] < 0xD800 || in[0] > 0xDFFF) {
+        if (ret_end)
+            *ret_end = in + (*in != 0);
+        return *in;
+    } else if (in[0] >= 0xD800 && in[0] <= 0xDBFF &&
+            in[1] >= 0xDC00 && in[1] <= 0xDFFF) {
+        if (ret_end)
+            *ret_end = in + 2;
+        return ((in[0] - 0xD800) << 10) |
+                ((in[1] - 0xDC00) & 0x3FF);
+    }
+    // Invalid surrogate pair
+    return 0;
+}
+
+// Same semantics as utf8_to_ucs4
+EXPORT int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
+{
+    uint16_t in0 = ntohs(in[0]);
+
+    if (in0 < 0xD800 || in0 > 0xDFFF) {
+        if (ret_end)
+            *ret_end = in + (in0 != 0);
+
+        return in0;
+    } else {
+        uint16_t in1 = ntohs(in[1]);
+
+        if (in0 >= 0xD800 && in0 <= 0xDBFF &&
+                in1 >= 0xDC00 && in1 <= 0xDFFF) {
+            if (ret_end)
+                *ret_end = in + 2;
+
+            return ((in0 - 0xD800) << 10) |
+                    ((in1 - 0xDC00) & 0x3FF);
+        }
+    }
+    // Invalid surrogate pair
+    return 0;
+}
+
+void *memfill_16(void *dest, uint16_t v, size_t count)
+{
+    uint16_t *d = dest;
+    for (size_t i = 0; i < count; ++i)
+        d[i] = v;
+    return dest;
+}
+
+void *memfill_32(void *dest, uint32_t v, size_t count)
+{
+    uint32_t *d = dest;
+    for (size_t i = 0; i < count; ++i)
+        d[i] = v;
+    return dest;
+}
+
+void *memfill_64(void *dest, uint64_t v, size_t count)
+{
+    uint64_t *d = dest;
+    for (size_t i = 0; i < count; ++i)
+        d[i] = v;
+    return dest;
+}
+
+size_t utf8_count(char const *in)
+{
+    size_t count = 0;
+    for (char const *p = in; *p; utf8_to_ucs4(p, &p))
+        ++count;
+    return count;
+}
+
+size_t utf16_count(uint16_t const *in)
+{
+    size_t count;
+    for (count = 0; *in; utf16_to_ucs4(in, &in))
+        ++count;
+    return count;
 }
 
