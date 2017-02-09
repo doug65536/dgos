@@ -1625,6 +1625,9 @@ void *mmap(void *addr, size_t len,
     if (flags & MAP_DEVICE)
         page_flags |= PTE_EX_DEVICE;
 
+    if (flags & MAP_USER)
+        page_flags |= PTE_USER;
+
     if (prot & PROT_WRITE)
         page_flags |= PTE_WRITABLE;
 

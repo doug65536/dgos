@@ -50,6 +50,9 @@
 /// Not file backed
 #define MAP_ANONYMOUS       0x00000200
 
+/// Kernel only: Map user mode pages
+#define MAP_USER            0x08000000
+
 /// Kernel only: Map a device mapping
 #define MAP_DEVICE          0x10000000
 
