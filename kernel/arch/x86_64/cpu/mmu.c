@@ -150,8 +150,8 @@ typedef uintptr_t linaddr_t;
 //  0x7f0000000000
 
 // Linear addresses
-#define PT_BASEADDR   (0x7F0000000000UL)
-#define PT_MAX_ADDR    (0x800000000000UL)
+#define PT_BASEADDR     (0x7F0000000000UL)
+#define PT_MAX_ADDR     (0x800000000000UL)
 
 // The number of pte_t entries at each level
 // Total data 275,415,828,480 bytes
@@ -385,9 +385,6 @@ static void pte_from_path(pte_t **pte, unsigned *path)
     pte[2] = PT2_PTR(base) + indices[2];
     pte[3] = PT3_PTR(base) + indices[3];
 }
-
-//
-// Aliasing page allocator
 
 // Maps the specified physical address and returns a pointer
 // which you can use to modify that physical address
