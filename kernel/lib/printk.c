@@ -707,14 +707,14 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
 
 static spinlock_t printdbg_user_lock;
 
-EXPORT void printdbg_lock(void)
+static spinlock_hold_t printdbg_lock_noirq(void)
 {
-    spinlock_lock(&printdbg_user_lock);
+    return spinlock_lock_noirq(&printdbg_user_lock);
 }
 
-EXPORT void printdbg_unlock(void)
+static void printdbg_unlock_noirq(spinlock_hold_t *hold)
 {
-    spinlock_unlock(&printdbg_user_lock);
+    spinlock_unlock_noirq(&printdbg_user_lock, hold);
 }
 
 static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
@@ -735,9 +735,9 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
 
 EXPORT void vprintdbg(char const *format, va_list ap)
 {
-    printdbg_lock();
+    spinlock_hold_t hold = printdbg_lock_noirq();
     formatter(format, ap, printdbg_emit_chars, 0);
-    printdbg_unlock();
+    printdbg_unlock_noirq(&hold);
 }
 
 EXPORT void printdbg(char const *format, ...)
