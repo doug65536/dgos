@@ -488,3 +488,31 @@ int pci_set_msi_irq(int bus, int slot, int func,
 
     return 1;
 }
+
+static void pci_adj_bits_16(int bus, int slot, int func,
+                            int offset,
+                            uint16_t set, uint16_t clr)
+{
+    if (set || clr) {
+        uint16_t reg;
+        uint16_t new_reg;
+
+        pci_config_copy(bus, slot, func, &reg, offset,
+                        sizeof(reg));
+
+        new_reg = (reg | set) & ~clr;
+
+        if (new_reg != reg) {
+            pci_config_write(bus, slot, func, offset,
+                             &new_reg, sizeof(new_reg));
+        }
+    }
+}
+
+void pci_adj_control_bits(int bus, int slot, int func,
+                          uint16_t set, uint16_t clr)
+{
+    pci_adj_bits_16(bus, slot, func,
+                    offsetof(pci_config_hdr_t, command),
+                    set, clr);
+}

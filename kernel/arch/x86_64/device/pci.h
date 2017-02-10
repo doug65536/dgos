@@ -38,6 +38,65 @@ typedef struct pci_config_hdr_t {
     uint8_t max_latency;
 } pci_config_hdr_t;
 
+// PCI config command register
+#define PCI_CMD_IOEN_BIT            0
+#define PCI_CMD_MEMEN_BIT           1
+#define PCI_CMD_BUSMASTER_BIT       2
+#define PCI_CMD_SPECIALCYCLE_BIT    3
+#define PCI_CMD_MEMWRINVEN_BIT      4
+#define PCI_CMD_VGASNOOP_BIT        5
+#define PCI_CMD_PARITYERR_BIT       6
+#define PCI_CMD_STEPPING_BIT        7
+#define PCI_CMD_SERR_BIT            8
+#define PCI_CMD_FASTB2B_BIT         9
+
+#define PCI_CMD_IOEN                (1<<PCI_CMD_IOEN_BIT)
+#define PCI_CMD_MEMEN               (1<<PCI_CMD_MEMEN_BIT)
+#define PCI_CMD_BUSMASTER           (1<<PCI_CMD_BUSMASTER_BIT)
+#define PCI_CMD_SPECIALCYCLE        (1<<PCI_CMD_SPECIALCYCLE_BIT)
+#define PCI_CMD_MEMWRINVEN          (1<<PCI_CMD_MEMWRINVEN_BIT)
+#define PCI_CMD_VGASNOOP            (1<<PCI_CMD_VGASNOOP_BIT)
+#define PCI_CMD_PARITYERR           (1<<PCI_CMD_PARITYERR_BIT)
+#define PCI_CMD_STEPPING            (1<<PCI_CMD_STEPPING_BIT)
+#define PCI_CMD_SERR                (1<<PCI_CMD_SERR_BIT)
+#define PCI_CMD_FASTB2B             (1<<PCI_CMD_FASTB2B_BIT)
+
+#define PCI_DEV_CLASS_UNCLASSIFIED      0x00
+#define PCI_DEV_CLASS_STORAGE           0x01
+#define PCI_DEV_CLASS_NETWORK           0x02
+#define PCI_DEV_CLASS_DISPLAY           0x03
+#define PCI_DEV_CLASS_MULTIMEDIA        0x04
+#define PCI_DEV_CLASS_MEMORY            0x05
+#define PCI_DEV_CLASS_BRIDGE            0x06
+#define PCI_DEV_CLASS_COMMUNICATION     0x07
+#define PCI_DEV_CLASS_SYSTEM            0x08
+#define PCI_DEV_CLASS_INPUT             0x09
+#define PCI_DEV_CLASS_DOCKING           0x0A
+#define PCI_DEV_CLASS_PROCESSOR         0x0B
+#define PCI_DEV_CLASS_SERIAL            0x0C
+#define PCI_DEV_CLASS_WIRELESS          0x0D
+#define PCI_DEV_CLASS_INTELLIGENT       0x0E
+#define PCI_DEV_CLASS_SATELLITE         0x0F
+#define PCI_DEV_CLASS_ENCRYPTION        0x10
+#define PCI_DEV_CLASS_DSP               0x11
+#define PCI_DEV_CLASS_ACCELERATOR       0x12
+#define PCI_DEV_CLASS_INSTRUMENTATION   0x13
+#define PCI_DEV_CLASS_COPROCESSOR       0x40
+#define PCI_DEV_CLASS_UNASSIGNED        0xFF
+
+#define PCI_SUBCLASS_NETWORK_ETHERNET   0x00
+
+#define PCI_SUBCLASS_STORAGE_SCSI       0x00
+#define PCI_SUBCLASS_STORAGE_IDE        0x01
+#define PCI_SUBCLASS_STORAGE_FLOPPY     0x02
+#define PCI_SUBCLASS_STORAGE_IPIBUS     0x03
+#define PCI_SUBCLASS_STORAGE_RAID       0x04
+#define PCI_SUBCLASS_STORAGE_ATA        0x05
+#define PCI_SUBCLASS_STORAGE_SATA       0x06
+#define PCI_SUBCLASS_STORAGE_SAS        0x07
+#define PCI_SUBCLASS_STORAGE_NVM        0x08
+#define PCI_SUBCLASS_STORAGE_MASS       0x80
+
 C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 
 #define PCI_CFG_STATUS_CAPLIST_BIT  4
@@ -155,3 +214,6 @@ int pci_set_msi_irq(int bus, int slot, int func,
                     pci_irq_range_t *irq_range,
                     int cpu, int distribute, int multiple,
                     intr_handler_t handler);
+
+void pci_adj_control_bits(int bus, int slot, int func,
+                          uint16_t set, uint16_t clr);
