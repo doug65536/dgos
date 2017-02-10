@@ -19,6 +19,7 @@
 #include "idt.h"
 #include "bsearch.h"
 
+#define DEBUG_CREATE_PT     0
 #define DEBUG_ADDR_ALLOC    0
 #define DEBUG_PHYS_ALLOC    0
 #define DEBUG_PAGE_TABLES   0
@@ -216,7 +217,7 @@ unsigned phys_alloc_count;
 
 extern char ___init_brk[];
 extern uintptr_t ___top_physaddr;
-static linaddr_t volatile linear_allocator = (linaddr_t)___init_brk;
+static linaddr_t volatile linear_base = (linaddr_t)___init_brk;
 
 // Maintain two free page chains,
 // because some hardware requires 32-bit memory addresses
@@ -229,12 +230,9 @@ static uint64_t volatile phys_next_free[2];
 static uint64_t volatile mmu_seq;
 
 // Free address space management
-static mutex_t free_addr_lock;
-static rbtree_t *free_addr_by_size;
-static rbtree_t *free_addr_by_addr;
-
-static linaddr_t take_linear(size_t size);
-static void release_linear(linaddr_t addr, size_t size);
+//static mutex_t free_addr_lock;
+//static rbtree_t *free_addr_by_size;
+//static rbtree_t *free_addr_by_addr;
 
 static int take_linear_cmp_key(
         rbtree_kvp_t const *lhs,
@@ -250,15 +248,56 @@ static uint64_t volatile page_fault_count;
 
 static int64_t volatile free_page_count;
 
+//
+// Contiguous allocator
+
+typedef struct contiguous_allocator_t {
+    mutex_t free_addr_lock;
+    rbtree_t *free_addr_by_size;
+    rbtree_t *free_addr_by_addr;
+} contiguous_allocator_t;
+
+static void contiguous_allocator_create(contiguous_allocator_t *allocator,
+        linaddr_t *addr, size_t size, size_t capacity);
+
+static uintptr_t take_linear(
+        contiguous_allocator_t *allocator,
+        size_t size);
+static void release_linear(contiguous_allocator_t *allocator,
+        uintptr_t addr, size_t size);
+
+static contiguous_allocator_t linear_allocator;
+static contiguous_allocator_t contig_phys_allocator;
+
+//
+// Contiguous physical memory allocator
+
+void *mm_alloc_contiguous(size_t size)
+{
+    return (void*)(uint64_t)
+            take_linear(&contig_phys_allocator, size);
+}
+
+void mm_free_contiguous(void *addr, size_t size)
+{
+    release_linear(&contig_phys_allocator,
+                   (linaddr_t)addr, size);
+}
+
+//
+// Physical page memory allocator
+
 static void mmu_free_phys(physaddr_t addr)
 {
-    uint64_t volatile *chain = phys_next_free + (addr < 0x100000000UL);
+    uint64_t volatile *chain =
+            phys_next_free + (addr < 0x100000000UL);
     uint64_t index = (addr - 0x100000UL) >> PAGE_SIZE_BIT;
     uint64_t old_next = *chain;
     for (;;) {
         assert(index < phys_alloc_count);
         phys_alloc[index] = (int32_t)old_next;
-        uint64_t next_version = (old_next & 0xFFFFFFFF00000000UL) +
+        uint64_t next_version =
+                (old_next & 0xFFFFFFFF00000000UL) +
                 0x100000000UL;
 
         uint64_t cur_next = atomic_cmpxchg(
@@ -291,7 +330,8 @@ static physaddr_t mmu_alloc_phys(int low)
 
     uint64_t index_version = *chain;
     for (;;) {
-        uint64_t next_version = (index_version & 0xFFFFFFFF00000000UL) +
+        uint64_t next_version =
+                (index_version & 0xFFFFFFFF00000000UL) +
                 0x100000000UL;
         uint32_t index = (uint32_t)index_version;
         uint64_t new_next = index ? phys_alloc[index] : 0;
@@ -311,7 +351,8 @@ static physaddr_t mmu_alloc_phys(int low)
 
         assert((new_next & 0xFFFFFFFFUL) < phys_alloc_count);
 
-        uint64_t cur_next = atomic_cmpxchg(chain, index_version, new_next);
+        uint64_t cur_next = atomic_cmpxchg(
+                    chain, index_version, new_next);
 
         if (cur_next == index_version) {
             atomic_dec_int64(&free_page_count);
@@ -407,7 +448,8 @@ static pte_t *take_apte(physaddr_t address)
 
                 linaddr_t linaddr = 0x800000000000UL -
                         (64 << PAGE_SIZE_BIT) +
-                        (((linaddr_t)first_available) << PAGE_SIZE_BIT);
+                        (((linaddr_t)first_available)
+                         << PAGE_SIZE_BIT);
 
                 // Locate pte
                 unsigned path[4];
@@ -663,8 +705,10 @@ static physaddr_t init_take_page(int low)
 
     assert(usable_mem_ranges > 0);
 
-    physmem_range_t *last_range = mem_ranges + usable_mem_ranges - 1;
-    physaddr_t addr = last_range->base + last_range->size - PAGE_SIZE;
+    physmem_range_t *last_range = mem_ranges +
+            usable_mem_ranges - 1;
+    physaddr_t addr = last_range->base +
+            last_range->size - PAGE_SIZE;
 
     // Take a page off the size of the range
     last_range->size -= PAGE_SIZE;
@@ -695,7 +739,8 @@ static pte_t *init_find_aliasing_pte(void)
 //
 // Aliasing page table mapping
 
-static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
+static pte_t *mm_map_aliasing_pte(
+        pte_t *aliasing_pte, physaddr_t addr)
 {
     linaddr_t linaddr;
 
@@ -715,7 +760,8 @@ static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
     return (pte_t*)linaddr;
 }
 
-static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
+static pte_t *init_map_aliasing_pte(
+        pte_t *aliasing_pte, physaddr_t addr)
 {
     return mm_map_aliasing_pte(aliasing_pte, addr);
 }
@@ -732,6 +778,13 @@ static void init_create_pt(
         physaddr_t *pt_physaddr,
         pte_t end_page_flags)
 {
+
+#if DEBUG_CREATE_PT
+    printdbg("Creating pagetables linear=%lx physical=%lx\n",
+             linear_addr, phys_addr);
+#endif
+    assert((linear_addr & PAGE_MASK) == 0);
+
     // Path to page table entry as page indices
     unsigned path[4];
     path_from_addr(path, linear_addr);
@@ -761,9 +814,11 @@ static void init_create_pt(
             // Allocate a new page table
             addr = init_take_page(0);
 
-            assert(addr != 0);
+            assert_msg(addr != 0,
+                       "Failed to get physical memory");
 
-            // Atomically update current page table to point to new page
+            // Atomically update current page
+            // table to point to new page
             old_pte = atomic_cmpxchg(iter + path[level],
                                      0, addr |
                                      page_flags);
@@ -809,6 +864,11 @@ static void init_create_pt(
         old_pte = atomic_cmpxchg(iter + path[3],
                 0, (phys_addr & PTE_ADDR) | end_page_flags);
 
+        if (old_pte) {
+            printdbg("Nonsense at physaddr %lx is %lx\n",
+                     addr, old_pte);
+        }
+
         assert(old_pte == 0);
 
 #if DEBUG_PHYS_ALLOC
@@ -847,7 +907,8 @@ static void mmu_map_page(
     // Map the page tables for the region
     for (unsigned i = 0; i < 4; ++i) {
         init_create_pt(root, aliasing_pte,
-                       (linaddr_t)pte_linaddr[i],
+                       (linaddr_t)pte_linaddr[i] &
+                       (int)-PAGE_SIZE,
                        pt_physaddr[i], 0,
                        PTE_PRESENT | PTE_WRITABLE);
     }
@@ -876,7 +937,8 @@ static int path_present(unsigned *path, pte_t **ptes)
     return ptes_present(ptes);
 }
 
-static int addr_present(uintptr_t addr, unsigned *path, pte_t **ptes)
+static int addr_present(uintptr_t addr,
+                        unsigned *path, pte_t **ptes)
 {
     path_from_addr(path, addr);
     return path_present(path, ptes);
@@ -1148,8 +1210,9 @@ void mmu_init(int ap)
 
     // Compute number of slots needed
     highest_usable >>= PAGE_SIZE_BIT;
-    printdbg("Usable pages = %lu (%luMB) range_pages=%ld\n", usable_pages,
-           usable_pages >> (20 - PAGE_SIZE_BIT), highest_usable);
+    printdbg("Usable pages = %lu (%luMB) range_pages=%ld\n",
+             usable_pages, usable_pages >> (20 - PAGE_SIZE_BIT),
+             highest_usable);
 
     //
     // Alias the existing page tables into the appropriate addresses
@@ -1169,7 +1232,7 @@ void mmu_init(int ap)
     // Clear page
     aligned16_memset(root, 0, PAGE_SIZE);
 
-    init_create_pt(root_physaddr, aliasing_pte,
+    init_create_pt(root_physaddr, aliasing_pte, //1
                    (linaddr_t)PT0_PTR(PT_BASEADDR),
                    root_physaddr,
                    0,
@@ -1211,6 +1274,7 @@ void mmu_init(int ap)
                 // Get address of next level PT
                 phys_addr[3] = pt[path[2]] & PTE_ADDR;
 
+                int pt_pt_mapped = 0;
                 for (path[3] = 0; path[3] < 512; ++path[3]) {
                     pt = init_map_aliasing_pte(aliasing_pte, phys_addr[3]);
 
@@ -1222,7 +1286,7 @@ void mmu_init(int ap)
 
                     physaddr_t pt_physaddr[4];
 
-                    init_create_pt(root_physaddr, aliasing_pte,
+                    init_create_pt(root_physaddr, aliasing_pte, //2
                             ((uintptr_t)path[0] << (9 * 3 + 12)) |
                             ((uintptr_t)path[1] << (9 * 2 + 12)) |
                             ((uintptr_t)path[2] << (9 * 1 + 12)) |
@@ -1231,15 +1295,19 @@ void mmu_init(int ap)
                             pt_physaddr,
                             PTE_PRESENT | PTE_WRITABLE);
 
-                    pte_t *virtual_tables[4];
-                    pte_from_path(virtual_tables, path);
+                    if (!pt_pt_mapped) {
+                        pt_pt_mapped = 1;
+                        pte_t *virtual_tables[4];
+                        pte_from_path(virtual_tables, path);
 
-                    for (unsigned i = 0; i < 4; ++i) {
-                        init_create_pt(root_physaddr, aliasing_pte,
-                                       (linaddr_t)virtual_tables[i],
-                                       pt_physaddr[i],
-                                       0,
-                                       PTE_PRESENT | PTE_WRITABLE);
+                        for (unsigned i = 0; i < 4; ++i) {
+                            init_create_pt(root_physaddr, aliasing_pte, //3
+                                           (linaddr_t)virtual_tables[i] &
+                                           -(int)PAGE_SIZE,
+                                           pt_physaddr[i],
+                                           0,
+                                           PTE_PRESENT | PTE_WRITABLE);
+                        }
                     }
                 }
             }
@@ -1261,9 +1329,16 @@ void mmu_init(int ap)
 
     memset(phys_alloc, 0, phys_alloc_count * sizeof(*phys_alloc));
 
+    // Get the highest address taken by the kernel
+    physaddr_t top_of_kernel = ___top_physaddr;
+
+    // Reserve 4MB low memory for contiguous
+    // physical allocator
+    physaddr_t contiguous_start = top_of_kernel;
+    top_of_kernel += 4 << 16;
+
     // Put all of the remaining physical memory into the free lists
     uintptr_t free_count = 0;
-    physaddr_t top_of_kernel = ___top_physaddr;
     for (; ; ++free_count) {
         physaddr_t addr = init_take_page(0);
 
@@ -1300,20 +1375,19 @@ void mmu_init(int ap)
 
     callout_call('M');
 
+    // Prepare 4MB contiguous physical memory
+    // allocator with a capacity of 128
+    contiguous_allocator_create(
+                &contig_phys_allocator,
+                &contiguous_start, 4 << 20, 128);
+
+    contiguous_allocator_create(&linear_allocator,
+                                (void*)&linear_base,
+                                PT_BASEADDR - linear_base,
+                                1 << 20);
+
     // Allocate guard page
-    take_linear(PAGE_SIZE);
-
-    mutex_init(&free_addr_lock);
-
-    free_addr_by_addr = rbtree_create(take_linear_cmp_key, 0, 1 << 20);
-    free_addr_by_size = rbtree_create(take_linear_cmp_both, 0, 1 << 20);
-
-    rbtree_insert(free_addr_by_size,
-                  PT_BASEADDR - linear_allocator,
-                  linear_allocator);
-    rbtree_insert(free_addr_by_addr,
-                  linear_allocator,
-                  PT_BASEADDR - linear_allocator);
+    take_linear(&linear_allocator, PAGE_SIZE);
 }
 
 static size_t round_up(size_t n)
@@ -1386,46 +1460,79 @@ static void sanity_check_by_addr(rbtree_t *tree)
 }
 #endif
 
-static linaddr_t take_linear(size_t size)
+static void contiguous_allocator_create(
+        contiguous_allocator_t *allocator,
+        linaddr_t *addr, size_t size, size_t capacity)
+{
+    linaddr_t initial_addr = *addr;
+
+    mutex_init(&allocator->free_addr_lock);
+    allocator->free_addr_by_addr = rbtree_create(
+                take_linear_cmp_key, 0, capacity);
+    allocator->free_addr_by_size = rbtree_create(
+                take_linear_cmp_both, 0, capacity);
+
+    // Account for space taken creating trees
+
+    size_t size_adj = *addr - initial_addr;
+    size -= size_adj;
+
+    rbtree_insert(allocator->free_addr_by_size,
+                  size, *addr);
+    rbtree_insert(allocator->free_addr_by_addr,
+                  *addr, size);
+}
+
+static uintptr_t take_linear(
+        contiguous_allocator_t *allocator,
+        size_t size)
 {
     // Round up to a multiple of the page size
     size = round_up(size);
 
     linaddr_t addr;
 
-    if (free_addr_by_addr && free_addr_by_size) {
-        mutex_lock(&free_addr_lock);
+    if (allocator->free_addr_by_addr &&
+            allocator->free_addr_by_size) {
+        mutex_lock(&allocator->free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
         printdbg("---- Alloc %lx\n", size);
-        dump_addr_tree(free_addr_by_addr, "Addr map by addr (before alloc)");
-        //dump_addr_tree(free_addr_by_size, "Addr map by size (before alloc)");
+        dump_addr_tree(allocator->free_addr_by_addr,
+                       "Addr map by addr (before alloc)");
+        //dump_addr_tree(allocator->free_addr_by_size,
+        //               "Addr map by size (before alloc)");
 #endif
 
         // Find the lowest address item that is big enough
         rbtree_iter_t place = rbtree_lower_bound(
-                    free_addr_by_size, size, 0);
+                    allocator->free_addr_by_size, size, 0);
 
-        rbtree_kvp_t by_size = rbtree_item(free_addr_by_size, place);
+        rbtree_kvp_t by_size = rbtree_item(
+                    allocator->free_addr_by_size, place);
 
         if (by_size.key < size) {
-            place = rbtree_next(free_addr_by_size, place);
-            by_size = rbtree_item(free_addr_by_size, place);
+            place = rbtree_next(
+                        allocator->free_addr_by_size, place);
+            by_size = rbtree_item(
+                        allocator->free_addr_by_size, place);
         }
 
-        rbtree_delete_at(free_addr_by_size, place);
+        rbtree_delete_at(allocator->free_addr_by_size,
+                         place);
 
         // Delete corresponding entry by address
-        rbtree_delete(free_addr_by_addr, by_size.val, by_size.key);
+        rbtree_delete(allocator->free_addr_by_addr,
+                      by_size.val, by_size.key);
 
         if (by_size.key > size) {
             // Insert remainder by size
-            rbtree_insert(free_addr_by_size,
+            rbtree_insert(allocator->free_addr_by_size,
                           by_size.key - size,
                           by_size.val + size);
 
             // Insert remainder by address
-            rbtree_insert(free_addr_by_addr,
+            rbtree_insert(allocator->free_addr_by_addr,
                           by_size.val + size,
                           by_size.key - size);
         }
@@ -1433,26 +1540,35 @@ static linaddr_t take_linear(size_t size)
         addr = by_size.val;
 
 #if DEBUG_ADDR_ALLOC
-        dump_addr_tree(free_addr_by_addr, "Addr map by addr (after alloc)");
-        //dump_addr_tree(free_addr_by_size, "Addr map by size (after alloc)");
+        dump_addr_tree(allocator->free_addr_by_addr,
+                       "Addr map by addr (after alloc)");
+        //dump_addr_tree(allocator->free_addr_by_size,
+        //    "Addr map by size (after alloc)");
 
         printdbg("%lx ----\n", addr);
 #endif
 
 #if DEBUG_LINEAR_SANITY
-        sanity_check_by_size(free_addr_by_size);
-        sanity_check_by_addr(free_addr_by_addr);
+        sanity_check_by_size(allocator->free_addr_by_size);
+        sanity_check_by_addr(allocator->free_addr_by_addr);
 #endif
+        printdbg("Took address space @ %lx,"
+                 " size=%lx\n", addr, size);
 
-        mutex_unlock(&free_addr_lock);
+        mutex_unlock(&allocator->free_addr_lock);
     } else {
-        addr = atomic_xadd_uint64(&linear_allocator, size);
+        addr = atomic_xadd_uint64(&linear_base, size);
+        printdbg("Took early address space @ %lx,"
+                 " size=%lx,"
+                 " new linear_base=%lx\n", addr, size, linear_base);
     }
 
     return addr;
 }
 
-static void release_linear(linaddr_t addr, size_t size)
+static void release_linear(
+        contiguous_allocator_t *allocator,
+        uintptr_t addr, size_t size)
 {
     // Round address down to page boundary
     size_t misalignment = addr & PAGE_MASK;
@@ -1464,24 +1580,28 @@ static void release_linear(linaddr_t addr, size_t size)
 
     linaddr_t end = addr + size;
 
-    mutex_lock(&free_addr_lock);
+    mutex_lock(&allocator->free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
     printdbg("---- Free %lx @ %lx\n", size, addr);
-    dump_addr_tree(free_addr_by_addr, "Addr map by addr (before free)");
-    //dump_addr_tree(free_addr_by_size, "Addr map by size (before free)");
+    dump_addr_tree(allocator->free_addr_by_addr,
+                   "Addr map by addr (before free)");
+    //dump_addr_tree(allocator->free_addr_by_size,
+    //               "Addr map by size (before free)");
 #endif
 
     // Find the nearest free block before the freed range
     rbtree_iter_t pred_it = rbtree_lower_bound(
-                free_addr_by_addr, addr, 0);
+                allocator->free_addr_by_addr, addr, 0);
 
     // Find the nearest free block after the freed range
     rbtree_iter_t succ_it = rbtree_lower_bound(
-                free_addr_by_addr, end, ~0UL);
+                allocator->free_addr_by_addr, end, ~0UL);
 
-    rbtree_kvp_t pred = rbtree_item(free_addr_by_addr, pred_it);
-    rbtree_kvp_t succ = rbtree_item(free_addr_by_addr, succ_it);
+    rbtree_kvp_t pred = rbtree_item(
+                allocator->free_addr_by_addr, pred_it);
+    rbtree_kvp_t succ = rbtree_item(
+                allocator->free_addr_by_addr, succ_it);
 
     int coalesce_pred = ((pred.key + pred.val) == addr);
     int coalesce_succ = (succ.key == end);
@@ -1489,27 +1609,35 @@ static void release_linear(linaddr_t addr, size_t size)
     if (coalesce_pred) {
         addr -= pred.val;
         size += pred.val;
-        rbtree_delete_at(free_addr_by_addr, pred_it);
+        rbtree_delete_at(allocator->free_addr_by_addr,
+                         pred_it);
 
-        rbtree_delete(free_addr_by_size, pred.val, pred.key);
+        rbtree_delete(allocator->free_addr_by_size,
+                      pred.val, pred.key);
     }
 
     if (coalesce_succ) {
         size += succ.val;
-        rbtree_delete_at(free_addr_by_addr, succ_it);
+        rbtree_delete_at(allocator->free_addr_by_addr,
+                         succ_it);
 
-        rbtree_delete(free_addr_by_size, succ.val, succ.key);
+        rbtree_delete(allocator->free_addr_by_size,
+                      succ.val, succ.key);
     }
 
-    rbtree_insert(free_addr_by_size, size, addr);
-    rbtree_insert(free_addr_by_addr, addr, size);
+    rbtree_insert(allocator->free_addr_by_size,
+                  size, addr);
+    rbtree_insert(allocator->free_addr_by_addr,
+                  addr, size);
 
 #if DEBUG_ADDR_ALLOC
-    dump_addr_tree(free_addr_by_addr, "Addr map by addr (after free)");
-    //dump_addr_tree(free_addr_by_size, "Addr map by size (after free)");
+    dump_addr_tree(allocator->free_addr_by_addr,
+                   "Addr map by addr (after free)");
+    //dump_addr_tree(allocator->free_addr_by_size,
+    /                "Addr map by size (after free)");
 #endif
 
-    mutex_unlock(&free_addr_lock);
+    mutex_unlock(&allocator->free_addr_lock);
 }
 
 static int mmu_have_nx(void)
@@ -1643,7 +1771,7 @@ void *mmap(void *addr, size_t len,
         len += misalignment;
     }
 
-    linaddr_t linear_addr = take_linear(len);
+    linaddr_t linear_addr = take_linear(&linear_allocator, len);
 
     assert(linear_addr > 0x100000);
 
@@ -1717,7 +1845,7 @@ void *mremap(
 
         linaddr_t new_linear;
 
-        new_linear = take_linear(new_size);
+        new_linear = take_linear(&linear_allocator, new_size);
 
         unsigned path[4];
         path_from_addr(path, new_linear);
@@ -1775,7 +1903,9 @@ int munmap(void *addr, size_t size)
 
     mmu_send_tlb_shootdown();
 
-    release_linear((linaddr_t)addr - misalignment, size);
+    release_linear(&linear_allocator,
+                   (linaddr_t)addr - misalignment,
+                   size);
 
     return 0;
 }
