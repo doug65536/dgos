@@ -2,6 +2,8 @@
 #include "atomic.h"
 #include "assert.h"
 #include "control_regs.h"
+#include "thread.h"
+#include "printk.h"
 
 //
 // Exclusive lock. 0 is unlocked, 1 is locked
@@ -9,8 +11,16 @@
 void spinlock_lock(spinlock_t *lock)
 {
     atomic_barrier();
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
-        pause();
+    int spins = 0;
+    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
+        if ((++spins & 0x1FF) == 0x1FF)
+            thread_yield();
+        else
+            pause();
+    }
+
+    if (spins > 0)
+        printdbg("Spinlock spun %d times\n", spins);
 }
 
 int spinlock_try_lock(spinlock_t *lock)
@@ -37,15 +47,23 @@ spinlock_hold_t spinlock_lock_noirq(spinlock_t *lock)
     hold.intr_enabled = cpu_irq_disable();
 
     atomic_barrier();
+    int spins = 0;
     while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
         // Allow IRQs if they were enabled
         cpu_irq_toggle(hold.intr_enabled);
 
-        pause();
+        ++spins;
+//        if ((++spins & 0xFF) == 0xFF)
+//            thread_yield();
+//        else
+            pause();
 
         // Disable IRQs
         cpu_irq_disable();
     }
+
+    if (spins > 0)
+        printdbg("High noirq spin count: %d\n", spins);
 
     // Return with interrupts disabled
     return hold;
