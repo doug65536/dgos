@@ -3,95 +3,35 @@
 #include "mm.h"
 #include "assert.h"
 #include "printk.h"
+#include "heap.h"
+#include "callout.h"
 
-typedef struct blk_hdr_t {
-    size_t sig;
-    size_t size;
-} blk_hdr_t;
+static heap_t *default_heap;
 
-C_ASSERT(sizeof(blk_hdr_t) == _MALLOC_OVERHEAD);
-
-static void chk_sig(blk_hdr_t *p)
+static void malloc_startup(void *p)
 {
-    assert(p->sig == (~p->size ^ (uintptr_t)p));
+    (void)p;
+    default_heap = heap_create();
 }
 
-static void set_sig(blk_hdr_t *p)
+REGISTER_CALLOUT(malloc_startup, 0, 'M', "000");
+
+void *calloc(size_t num, size_t size)
 {
-    p->sig = ~p->size ^ (uintptr_t)p;
+    return heap_calloc(default_heap, num, size);
 }
 
 void *malloc(size_t size)
 {
-    blk_hdr_t *p = mmap(0, size + sizeof(*p),
-                        PROT_READ | PROT_WRITE,
-                        0, -1, 0);
-
-    printdbg("malloc %lx\n", (uintptr_t)p);
-
-    p->size = size;
-    set_sig(p);
-
-    return p + 1;
-}
-
-void *calloc(size_t num, size_t size)
-{
-    size_t bytes = num * size;
-    void *p = malloc(bytes);
-    //if (p)
-    //    memset(p, 0, bytes);
-    return p;
+    return heap_alloc(default_heap, size);
 }
 
 void *realloc(void *p, size_t new_size)
 {
-    // Call malloc if the old pointer is null
-    if (!p)
-        return malloc(new_size);
-
-    blk_hdr_t *h = (blk_hdr_t*)p - 1;
-
-    // Do nothing if size didn't actually change
-    if (new_size == h->size)
-        return p;
-
-    chk_sig(h);
-
-    // Get old and new page count
-    size_t old_pagecount = (h->size + (PAGE_SIZE - 1)) >> PAGE_SCALE;
-    size_t new_pagecount = (new_size + (PAGE_SIZE - 1)) >> PAGE_SCALE;
-
-    if (old_pagecount != new_pagecount) {
-        // Size changed significantly
-
-        // Remap pages
-        p = mremap(h,
-                   old_pagecount << PAGE_SCALE,
-                   new_pagecount << PAGE_SCALE,
-                   MREMAP_MAYMOVE);
-
-        if (!p)
-            return 0;
-
-        h = (blk_hdr_t*)p - 1;
-        h->size = new_size;
-    } else {
-        h->size = new_size;
-    }
-    set_sig(h);
-
-    return p;
+    return heap_realloc(default_heap, p, new_size);
 }
 
 void free(void *p)
 {
-    blk_hdr_t *h = (blk_hdr_t*)p - 1;
-
-    if (h->sig != (~h->size ^ (uintptr_t)p)) {
-        munmap(h, h->size + sizeof(*h));
-        return;
-    }
-
-    // Panic!
+    heap_free(default_heap, p);
 }
