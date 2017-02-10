@@ -59,7 +59,7 @@ QEMU_MACHINE := q35
 QEMU_CPU := Haswell
 #kvm64
 QEMU_RAM := 5G
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -net nic,model=rtl8139 -net user
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
