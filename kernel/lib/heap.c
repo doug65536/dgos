@@ -112,9 +112,9 @@ static void *heap_large_alloc(size_t size)
     return hdr + 1;
 }
 
-static void heap_large_free(void *block, size_t size)
+static void heap_large_free(heap_hdr_t *hdr, size_t size)
 {
-    munmap(block, size);
+    munmap(hdr, size);
 }
 
 void *heap_alloc(heap_t *heap, size_t size)
@@ -147,13 +147,13 @@ void *heap_alloc(heap_t *heap, size_t size)
         return heap_large_alloc(orig_size);
     }
 
-    if (first_free) {
-        // Remove most recently freed block from chain
-        heap->free_chains[bucket] = (void*)first_free->size_next;
-    } else {
+    if (!first_free) {
         // Create a new bucket
         first_free = heap_create_bucket(heap, log2size);
     }
+
+    // Remove block from chain
+    heap->free_chains[bucket] = (void*)first_free->size_next;
 
     mutex_unlock(&heap->lock);
 
@@ -178,6 +178,7 @@ void heap_free(heap_t *heap, void *block)
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
 
     uint8_t log2size = bit_log2_n_32((int32_t)hdr->size_next);
+    assert(log2size >= 5 && log2size < 32);
     size_t bucket = log2size - 5;
 
     if (bucket < HEAP_BUCKET_COUNT) {
