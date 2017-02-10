@@ -45,3 +45,14 @@ uint32_t rand_range(uint32_t st, uint32_t en)
     n += st;
     return n;
 }
+
+int rand_r(uint64_t *seed)
+{
+    return (int)((*seed = *seed *
+            6364136223846793005ULL + 1U) >> 33);
+}
+
+int rand_r_range(uint64_t *seed, int min, int max)
+{
+    return (((int64_t)rand_r(seed) * (max-min)) >> 31) + min;
+}
