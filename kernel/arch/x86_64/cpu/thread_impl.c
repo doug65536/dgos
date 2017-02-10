@@ -683,16 +683,21 @@ void thread_set_cpu_mmu_seq(uint64_t seq)
 
 EXPORT thread_t thread_get_id(void)
 {
-    thread_t thread_id;
+    if (thread_count) {
+        thread_t thread_id;
 
-    int was_enabled = cpu_irq_disable();
+        int was_enabled = cpu_irq_disable();
 
-    cpu_info_t *cpu = this_cpu();
-    thread_id = cpu->cur_thread - threads;
+        cpu_info_t *cpu = this_cpu();
+        thread_id = cpu->cur_thread - threads;
 
-    cpu_irq_toggle(was_enabled);
+        cpu_irq_toggle(was_enabled);
 
-    return thread_id;
+        return thread_id;
+    }
+
+    // Too early to get a thread ID
+    return 0;
 }
 
 EXPORT uint64_t thread_get_affinity(int id)
