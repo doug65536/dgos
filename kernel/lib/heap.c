@@ -97,7 +97,12 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
 {
     size *= num;
     void *block = heap_alloc(heap, size);
-    return memset(block, 0, size);
+
+    if (size < HEAP_MMAP_THRESHOLD)
+        return memset(block, 0, size);
+
+    // mmap already guarantees cleared pages
+    return block;
 }
 
 static void *heap_large_alloc(size_t size)
