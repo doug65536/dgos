@@ -57,8 +57,8 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_STRESS_HEAP_THREAD   1
 
-#define STRESS_HEAP_MINSIZE     4096
-#define STRESS_HEAP_MAXSIZE     16384
+#define STRESS_HEAP_MINSIZE     64
+#define STRESS_HEAP_MAXSIZE     4080
 
 #if ENABLE_SHELL_THREAD > 0
 static int shell_thread(void *p)
@@ -456,32 +456,54 @@ static int stress_heap_thread(void *p)
     uint64_t min_el;
     uint64_t max_el;
     uint64_t tot_el;
+    uint64_t seed = 42;
     while (1) {
         for (int pass = 0; pass < 16; ++pass) {
             tot_el = 0;
             max_el = 0;
-            min_el = ~0;
+            min_el = ~0L;
+
+            void *history[16];
+            int history_index = 0;
+            memset(history, 0, sizeof(history));
+
+            int count = 0;
             int size;
-            for (size = STRESS_HEAP_MINSIZE;
-                 size < STRESS_HEAP_MAXSIZE; ++size) {
+            for (count = 0; count < 0x1000; ++count) {
+                size = rand_r_range(&seed,
+                                    STRESS_HEAP_MINSIZE,
+                                    STRESS_HEAP_MAXSIZE);
+
+                heap_free(heap, history[history_index]);
+
                 cpu_irq_disable();
+
                 uint64_t st = cpu_rdtsc();
                 void *block = heap_alloc(heap, size);
-                //memset(block, size, size);
-                heap_free(heap, block);
                 uint64_t el = cpu_rdtsc() - st;
+
                 cpu_irq_enable();
-                if (el < 500000000 && max_el < el)
+
+                history[history_index++] = block;
+                history_index &= countof(history)-1;
+
+                if (max_el < el)
                     max_el = el;
                 if (min_el > el)
                     min_el = el;
                 tot_el += el;
             }
+
+            for (int i = 0; i < (int)countof(history); ++i) {
+                heap_free(heap, history[i]);
+                history[i] = 0;
+            }
+
             printdbg("heap_alloc+memset+heap_free:"
                      " min=%12ld,"
                      " max=%12ld,"
                      " avg=%12ld cycles\n",
-                     min_el, max_el, tot_el / size);
+                     min_el, max_el, tot_el / count);
         }
     }
     heap_destroy(heap);
