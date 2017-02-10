@@ -34,8 +34,9 @@ clock: sync=none, time0=utc, rtc_sync=0
 # no loader
 log: -
 logprefix: %t%e%d
-debug: action=ignore, ioapic=report
-#apic0=report, apic1=report
+debug: action=ignore
+#, ioapic=report
+#, apic0=report, apic1=report
 info: action=report
 error: action=ask
 panic: action=ask
