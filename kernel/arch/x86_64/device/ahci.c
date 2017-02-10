@@ -1763,7 +1763,10 @@ static if_list_t ahci_if_detect(void)
     printk("Enumerating PCI busses for AHCI...\n");
     //sleep(3000);
 
-    if (!pci_enumerate_begin(&pci_iter, 1, 6))
+    if (!pci_enumerate_begin(
+                &pci_iter,
+                PCI_DEV_CLASS_STORAGE,
+                PCI_SUBCLASS_STORAGE_SATA))
         return list;
 
     do {

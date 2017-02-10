@@ -88,7 +88,10 @@ static if_list_t ide_if_detect(void)
 
     pci_dev_iterator_t iter;
 
-    if (!pci_enumerate_begin(&iter, 1, 1))
+    if (!pci_enumerate_begin(
+                &iter,
+                PCI_DEV_CLASS_STORAGE,
+                PCI_SUBCLASS_STORAGE_IDE))
         return list;
 
     static ioport_t std_ports[] = {
