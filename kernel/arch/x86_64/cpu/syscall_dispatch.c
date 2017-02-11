@@ -6,8 +6,6 @@ typedef struct fd_t {
     off_t seek_pos;
 } fd_t;
 
-fd_t handles[1024];
-
 static long sys_read(
         long fd, long bufaddr, long count,
         long p3, long p4, long p5)
