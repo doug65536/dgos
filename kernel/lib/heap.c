@@ -23,26 +23,46 @@ typedef struct heap_hdr_t {
 /// [ 5] ->    1024
 /// [ 6] ->    2048
 /// [ 7] ->    4096
+/// [ 8] ->    8096
+/// [ 9] ->   16384
+/// [10] ->   32768
+/// [11] ->   65536
 /// .... -> use mmap
 
-#define HEAP_BUCKET_COUNT   8
+#define HEAP_BUCKET_COUNT   12
 #define HEAP_MMAP_THRESHOLD (1<<(5+HEAP_BUCKET_COUNT-1))
 
-#define HEAP_BUCKET_SIZE    (1<<14)
+#define HEAP_BUCKET_SIZE    (1<<(HEAP_BUCKET_COUNT+5-1))
 #define HEAP_MAX_ARENAS \
-    (((4096 - \
+    (((PAGESIZE - \
     sizeof(void*) * HEAP_BUCKET_COUNT - \
+    sizeof(heap_ext_arena_t*) - \
     sizeof(mutex_t)) / \
     sizeof(void*)) - 1)
 
-struct heap_t {
-    heap_hdr_t *free_chains[HEAP_BUCKET_COUNT];
-    void *arenas[HEAP_MAX_ARENAS];
+// When the main heap_t::arenas array overflows, an additional
+// page is allocated to hold additional arena pointers.
+typedef struct heap_ext_arena_t heap_ext_arena_t;
+struct heap_ext_arena_t {
+    heap_ext_arena_t *prev;
     size_t arena_count;
-    mutex_t lock;
+    void *arenas[(PAGESIZE - sizeof(heap_ext_arena_t*) -
+                  sizeof(size_t)) / sizeof(void*)];
 };
 
-C_ASSERT(sizeof(heap_t) == 4096);
+struct heap_t {
+    heap_hdr_t *free_chains[HEAP_BUCKET_COUNT];    
+    mutex_t lock;
+
+    // The first HEAP_MAX_ARENAS arena pointers are here
+    void *arenas[HEAP_MAX_ARENAS];
+    size_t arena_count;
+
+    // Singly linked list of overflow arena pointer pages
+    heap_ext_arena_t *last_ext_arena;
+};
+
+C_ASSERT(sizeof(heap_t) == PAGESIZE);
 
 heap_t *heap_create(void)
 {
@@ -51,6 +71,7 @@ heap_t *heap_create(void)
     memset(heap->free_chains, 0, sizeof(heap->free_chains));
     memset(heap->arenas, 0, sizeof(heap->arenas));
     heap->arena_count = 0;
+    heap->last_ext_arena = 0;
     mutex_init(&heap->lock);
     return heap;
 }
@@ -58,39 +79,78 @@ heap_t *heap_create(void)
 void heap_destroy(heap_t *heap)
 {
     mutex_lock(&heap->lock);
-    for (size_t i = 0; i < heap->arena_count; ++i)
-        munmap(heap->arenas[i], HEAP_BUCKET_SIZE);
-    mutex_unlock(&heap->lock);
-    mutex_destroy(&heap->lock);
-}
 
-static heap_hdr_t *heap_create_bucket(heap_t *heap, uint8_t log2size)
-{
-    if (heap->arena_count < countof(heap->arenas)) {
-        size_t bucket = log2size - 5;
-
-        char *arena = mmap(0, HEAP_BUCKET_SIZE,
-                           PROT_READ | PROT_WRITE,
-                           MAP_POPULATE, -1, 0);
-        char *arena_end = arena + HEAP_BUCKET_SIZE;
-
-        heap->arenas[heap->arena_count++] = arena;
-
-        size_t size = 1 << log2size;
-
-        heap_hdr_t *hdr;
-        for (char *fill = arena_end - size; fill >= arena; fill -= size) {
-            hdr = (void*)fill;
-            hdr->size_next = (uintptr_t)heap->free_chains[bucket];
-            heap->free_chains[bucket] = hdr;
-        }
-
-        return hdr;
+    // Free buckets in extended arena lists
+    // and the extended arena lists themselves
+    heap_ext_arena_t *ext_arena = heap->last_ext_arena;
+    while (ext_arena) {
+        for (size_t i = 0; i < ext_arena->arena_count; ++i)
+            munmap(ext_arena->arenas[i], HEAP_BUCKET_SIZE);
+        ext_arena = ext_arena->prev;
+        munmap(ext_arena, PAGESIZE);
     }
 
-    printdbg("Too many arenas in heap %lx!", (uintptr_t)heap);
+    // Free the buckets in the main arena list
+    for (size_t i = 0; i < heap->arena_count; ++i)
+        munmap(heap->arenas[i], HEAP_BUCKET_SIZE);
 
-    return 0;
+    mutex_unlock(&heap->lock);
+    mutex_destroy(&heap->lock);
+
+    munmap(heap, sizeof(*heap));
+}
+
+static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
+{
+    size_t *arena_count_ptr;
+    void **arena_list_ptr;
+
+    if (heap->arena_count < countof(heap->arenas)) {
+        // Main arena list
+        arena_count_ptr = &heap->arena_count;
+        arena_list_ptr = heap->arenas;
+    } else if (heap->last_ext_arena &&
+               heap->last_ext_arena->arena_count <
+               countof(heap->last_ext_arena->arenas)) {
+        // Last overflow arena has room
+        arena_count_ptr = &heap->last_ext_arena->arena_count;
+        arena_list_ptr = heap->last_ext_arena->arenas;
+    } else {
+        // Create a new arena overflow page
+        heap_ext_arena_t *new_list;
+
+        new_list = mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
+                        0, -1, 0);
+        if (!new_list || new_list == MAP_FAILED)
+            return 0;
+
+        new_list->prev = heap->last_ext_arena;
+        new_list->arena_count = 0;
+        heap->last_ext_arena = new_list;
+
+        arena_count_ptr = &new_list->arena_count;
+        arena_list_ptr = new_list->arenas;
+    }
+
+    size_t bucket = log2size - 5;
+
+    char *arena = mmap(0, HEAP_BUCKET_SIZE,
+                       PROT_READ | PROT_WRITE,
+                       MAP_POPULATE, -1, 0);
+    char *arena_end = arena + HEAP_BUCKET_SIZE;
+
+    arena_list_ptr[(*arena_count_ptr)++] = arena;
+
+    size_t size = 1 << log2size;
+
+    heap_hdr_t *hdr;
+    for (char *fill = arena_end - size; fill >= arena; fill -= size) {
+        hdr = (void*)fill;
+        hdr->size_next = (uintptr_t)heap->free_chains[bucket];
+        heap->free_chains[bucket] = hdr;
+    }
+
+    return hdr;
 }
 
 void *heap_calloc(heap_t *heap, size_t num, size_t size)
@@ -154,7 +214,7 @@ void *heap_alloc(heap_t *heap, size_t size)
 
     if (!first_free) {
         // Create a new bucket
-        first_free = heap_create_bucket(heap, log2size);
+        first_free = heap_create_arena(heap, log2size);
     }
 
     // Remove block from chain
