@@ -201,15 +201,18 @@ void heap_free(heap_t *heap, void *block)
 
 void *heap_realloc(heap_t *heap, void *block, size_t size)
 {
-    heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
-    uint8_t newlog2size = bit_log2_n_32((int32_t)size);
-    size_t new_size = 1 << newlog2size;
-    if (hdr->size_next >= new_size) {
-        void *new_block = heap_alloc(heap, size);
-        memcpy(new_block, block, hdr->size_next);
-        heap_free(heap, block);
-        block = new_block;
+    if (block) {
+        heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
+        uint8_t newlog2size = bit_log2_n_32((int32_t)size);
+        size_t new_size = 1 << newlog2size;
+        if (hdr->size_next >= new_size) {
+            void *new_block = heap_alloc(heap, size);
+            memcpy(new_block, block, hdr->size_next);
+            heap_free(heap, block);
+            block = new_block;
+        }
+        return block;
     }
-    return block;
+    return heap_alloc(heap, size);
 }
 
