@@ -1,7 +1,7 @@
 #include "ipv4.h"
 #include "bswap.h"
 
-uint16_t ipv4_checksum(ipv4_hdr_t *hdr, size_t size)
+uint16_t ipv4_checksum(ipv4_hdr_t const *hdr, size_t size)
 {
     uint16_t *in = (void*)&hdr->ver_ihl;
 

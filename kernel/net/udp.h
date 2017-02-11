@@ -9,4 +9,4 @@ typedef struct udp_hdr_t {
     uint16_t checksum;
 } __attribute__((packed)) udp_hdr_t;
 
-uint16_t udp_checksum(ipv4_hdr_t *hdr);
+uint16_t udp_checksum(const udp_hdr_t *hdr);

@@ -800,8 +800,6 @@ static void rtl8139_startup_hack(void *p)
     discover.udp_hdr.s_port = htons(68);
     discover.udp_hdr.len = htons(sizeof(discover) -
             sizeof(discover.udp_hdr.ipv4_hdr));
-    discover.udp_hdr.checksum =
-            udp_checksum(&discover.udp_hdr.ipv4_hdr);
 
     //
     // DHCP
@@ -828,6 +826,9 @@ static void rtl8139_startup_hack(void *p)
     discover.options[opt++] = 15;
     discover.options[opt++] = 6;
     discover.options[opt++] = 255;
+
+    discover.udp_hdr.checksum =
+            udp_checksum(&discover.udp_hdr);
 
     rtl8139_tx_packet(self, 0, &discover, sizeof(discover));
 
