@@ -56,3 +56,5 @@ typedef struct dhcp_pkt_t {
     //  15: (Domain name)
     //  6: (DNS server), offer=dns server list
 } __attribute__((packed)) dhcp_pkt_t;
+
+ssize_t dhcp_build_discover(void *buf, size_t buf_size, uint8_t *src_mac_addr);

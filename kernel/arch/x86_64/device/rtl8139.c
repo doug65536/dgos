@@ -748,91 +748,10 @@ static void rtl8139_startup_hack(void *p)
 
     // Send a DHCP discover
     dhcp_pkt_t discover;
+    ssize_t packet_size = dhcp_build_discover(
+                &discover, sizeof(discover), self->mac_addr);
 
-    memset(&discover, 0, sizeof(discover));
-
-    //
-    // Ethernet
-
-    // Destination MAC FF:FF:FF:FF:FF:FF
-    memset(discover.udp_hdr.ipv4_hdr.eth_hdr.d_mac, 0xFF,
-           sizeof(discover.udp_hdr.ipv4_hdr.eth_hdr.d_mac));
-
-    // Source MAC from NIC
-    memcpy(discover.udp_hdr.ipv4_hdr.eth_hdr.s_mac,
-           self->mac_addr,
-           sizeof(discover.udp_hdr.ipv4_hdr.eth_hdr.s_mac));
-
-    // Ethernet length field
-    discover.udp_hdr.ipv4_hdr.eth_hdr.len_ethertype = htons(0x800);
-            //htons(sizeof(discover)-sizeof(discover.udp_hdr.ipv4_hdr.eth_hdr));
-
-    //
-    // IPv4
-
-    // IPv4 destination IP 255.255.255.255
-    memset(discover.udp_hdr.ipv4_hdr.d_ip, 0xFF,
-           sizeof(discover.udp_hdr.ipv4_hdr.d_ip));
-
-    discover.udp_hdr.ipv4_hdr.ver_ihl = 0x45;
-    discover.udp_hdr.ipv4_hdr.dscp_ecn = 0;
-    discover.udp_hdr.ipv4_hdr.len = htons(sizeof(discover) -
-            sizeof(discover.udp_hdr.ipv4_hdr.eth_hdr));
-    discover.udp_hdr.ipv4_hdr.id = 0;
-    discover.udp_hdr.ipv4_hdr.flags_fragofs = 0;
-    discover.udp_hdr.ipv4_hdr.ttl = 64;
-    discover.udp_hdr.ipv4_hdr.protocol = IPV4_PROTO_UDP;
-    discover.udp_hdr.ipv4_hdr.hdr_checksum =
-            ipv4_checksum(&discover.udp_hdr.ipv4_hdr, 0);
-
-    // 0.0.0.0
-    memset(discover.udp_hdr.ipv4_hdr.s_ip, 0,
-           sizeof(discover.udp_hdr.ipv4_hdr.s_ip));
-
-    // 255.255.255.255
-    memset(discover.udp_hdr.ipv4_hdr.d_ip, 255,
-           sizeof(discover.udp_hdr.ipv4_hdr.d_ip));
-
-    //
-    // UDP
-
-    discover.udp_hdr.d_port = htons(67);
-    discover.udp_hdr.s_port = htons(68);
-    discover.udp_hdr.len = htons(sizeof(discover) -
-            sizeof(discover.udp_hdr.ipv4_hdr));
-
-    //
-    // DHCP
-
-    discover.op = 1;
-    discover.htype = 1;
-    discover.hlen = 6;
-    discover.hops = 0;
-    discover.xid = htonl(0x3903f326);
-    discover.secs = 0;
-    discover.flags = htons(0x8000);
-    memcpy(discover.ch_addr, self->mac_addr, discover.hlen);
-    discover.magic_cookie = htonl(0x63825363);
-
-    int opt = 0;
-    discover.options[opt++] = 53;
-    discover.options[opt++] = 1;
-    discover.options[opt++] = 1;
-    discover.options[opt++] = 0;
-    discover.options[opt++] = 55;
-    discover.options[opt++] = 4;
-    discover.options[opt++] = 1;
-    discover.options[opt++] = 3;
-    discover.options[opt++] = 15;
-    discover.options[opt++] = 6;
-    discover.options[opt++] = 255;
-
-    discover.udp_hdr.checksum =
-            udp_checksum(&discover.udp_hdr);
-
-    rtl8139_tx_packet(self, 0, &discover, sizeof(discover));
-
-    //rtl8139_tx_packet(self, 1, &discover, sizeof(discover));
+    rtl8139_tx_packet(self, 0, &discover, packet_size);
 }
 
 REGISTER_CALLOUT(rtl8139_startup_hack, 0, 'L', "000");

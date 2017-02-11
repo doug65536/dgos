@@ -3,6 +3,7 @@
 LIBNAME := net
 CSRCS := \
 	ipv4.c \
-	udp.c
+	udp.c \
+	dhcp.c
 
 include $(BUILDROOT)/library.mk
