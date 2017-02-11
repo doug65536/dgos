@@ -34,7 +34,7 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m64
 TARGET_ARCH_AS := --64
 
-INCS := arch arch/$(ARCH) lib fs
+INCS := $(BUILDROOT) arch arch/$(ARCH) lib fs net
 INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
 
@@ -112,7 +112,8 @@ KERNEL := $(BINDIR)/kernel
 LIBFILES := \
 	lib/libkernel.a \
 	arch/$(ARCH)/libarch.a \
-	fs/libfs.a
+	fs/libfs.a \
+	net/libnet.a
 
 OUTPUTS = $(KERNEL)
 
@@ -132,11 +133,13 @@ clean:
 	@rm -f $(DUMPDIR)/*.map
 	@rm -f $(OUTPUTS)
 	(cd lib && $(MAKE) clean)
+	(cd net && $(MAKE) clean)
 	(cd fs && $(MAKE) clean)
 	(cd arch/$(ARCH) && $(MAKE) clean)
 
 subdirs:
 	+(cd lib && $(MAKE))
+	+(cd net && $(MAKE))
 	+(cd fs && $(MAKE))
 	+(cd arch/$(ARCH) && $(MAKE))
 

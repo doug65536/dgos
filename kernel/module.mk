@@ -20,7 +20,7 @@ OBJS := $(AOBJS) $(COBJS)
 
 LINKERSCRIPT ?= $(BUILDROOT)/arch/$(ARCH)/module.ld
 
-KERNELINCLUDES := lib arch/$(ARCH)
+KERNELINCLUDES := arch/$(ARCH) lib net $(BUILDROOT)
 INCS := $(INCS) $(patsubst %,$(BUILDROOT)/%,$(KERNELINCLUDES))
 INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))

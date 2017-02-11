@@ -489,6 +489,22 @@ int pci_set_msi_irq(int bus, int slot, int func,
     return 1;
 }
 
+void pci_set_irq_line(int bus, int slot, int func,
+                     uint8_t irq_line)
+{
+    pci_config_write(bus, slot, func,
+                     offsetof(pci_config_hdr_t, irq_line),
+                     &irq_line, sizeof(irq_line));
+}
+
+void pci_set_irq_pin(int bus, int slot, int func,
+                     uint8_t irq_pin)
+{
+    pci_config_write(bus, slot, func,
+                     offsetof(pci_config_hdr_t, irq_pin),
+                     &irq_pin, sizeof(irq_pin));
+}
+
 static void pci_adj_bits_16(int bus, int slot, int func,
                             int offset,
                             uint16_t set, uint16_t clr)

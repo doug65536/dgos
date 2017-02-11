@@ -1552,8 +1552,11 @@ static uintptr_t take_linear(
         sanity_check_by_size(allocator->free_addr_by_size);
         sanity_check_by_addr(allocator->free_addr_by_addr);
 #endif
+
+#if DEBUG_ADDR_ALLOC
         printdbg("Took address space @ %lx,"
                  " size=%lx\n", addr, size);
+#endif
 
         mutex_unlock(&allocator->free_addr_lock);
     } else {

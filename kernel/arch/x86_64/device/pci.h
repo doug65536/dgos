@@ -215,5 +215,11 @@ int pci_set_msi_irq(int bus, int slot, int func,
                     int cpu, int distribute, int multiple,
                     intr_handler_t handler);
 
+void pci_set_irq_line(int bus, int slot, int func,
+                      uint8_t irq_line);
+
+void pci_set_irq_pin(int bus, int slot, int func,
+                     uint8_t irq_pin);
+
 void pci_adj_control_bits(int bus, int slot, int func,
                           uint16_t set, uint16_t clr);

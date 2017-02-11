@@ -56,10 +56,14 @@ ISO_STAGE := cdstage
 ISO_FILE := dgos.iso
 
 QEMU_MACHINE := q35
-QEMU_CPU := Haswell
+QEMU_CPU := kvm64
+#Haswell
 #kvm64
 QEMU_RAM := 5G
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -net nic,model=rtl8139 -net user
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp \
+	-net nic,model=rtl8139 \
+	-net user \
+	-net dump,file=dump/netdump
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)

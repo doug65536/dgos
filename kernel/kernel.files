@@ -1,3 +1,11 @@
+net/Makefile
+net/ipv4.c
+net/udp.c
+net/udp.h
+net/ipv4.h
+net/arp.h
+net/dhcp.h
+net/ethernet.h
 arch/x86_64/device/rtl8139.c
 arch/x86_64/device/rtl8139.h
 arch/x86_64/module.ld
