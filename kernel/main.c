@@ -49,16 +49,30 @@ void (** volatile device_list)(void) = device_constructor_list;
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         0
+#define ENABLE_SHELL_THREAD         1
 #define ENABLE_AHCI_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
-#define ENABLE_STRESS_HEAP_THREAD   1
+#define ENABLE_STRESS_HEAP_THREAD   0
 
+#define ENABLE_STRESS_HEAP_SMALL    0
+#define ENABLE_STRESS_HEAP_LARGE    0
+#define ENABLE_STRESS_HEAP_BOTH     0
+
+#if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE     64
 #define STRESS_HEAP_MAXSIZE     4080
+#elif ENABLE_STRESS_HEAP_LARGE
+#define STRESS_HEAP_MINSIZE     4096
+#define STRESS_HEAP_MAXSIZE     16384
+#elif ENABLE_STRESS_HEAP_BOTH
+#define STRESS_HEAP_MINSIZE     64
+#define STRESS_HEAP_MAXSIZE     16384
+#elif ENABLE_STRESS_HEAP_THREAD
+#error Must enable a size range
+#endif
 
 #if ENABLE_SHELL_THREAD > 0
 static int shell_thread(void *p)
@@ -588,7 +602,7 @@ int main(void)
     munmap(c, 1 << 12);
 
     (void)init_thread;
-    //rbtree_test();
+    rbtree_test();
 
     thread_create(init_thread, 0, 0, 0);
 
