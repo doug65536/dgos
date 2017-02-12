@@ -1,5 +1,7 @@
 net/Makefile
 net/dhcp.c
+net/eth_q.c
+net/eth_q.h
 net/ipv4.c
 net/udp.c
 net/udp.h

@@ -10,6 +10,7 @@
 #include "threadsync.h"
 #include "string.h"
 #include "bswap.h"
+#include "eth_q.h"
 
 // test
 #include "net/dhcp.h"
@@ -21,9 +22,8 @@ struct rtl8139_dev_t {
     uintptr_t mmio_physaddr;
     void volatile *mmio;
     void *rx_buffer_physaddr;
-    void *tx_buffer_physaddr;
+    void *tx_pkts[4];
     void *rx_buffer;
-    void *tx_buffer;
     int use_msi;
     int irq;
 
@@ -518,6 +518,18 @@ static inline uint32_t rtl8139_mm_in_32(rtl8139_dev_t *self,
 //
 // IRQ handler
 
+static void rtl8139_rx_irq_handler(rtl8139_dev_t *self)
+{
+    (void)self;
+    printdbg("RTL8139 IRQ: Rx OK\n");
+}
+
+static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
+{
+    (void)self;
+    printdbg("RTL8139 IRQ: Tx OK\n");
+}
+
 static void *rtl8139_irq_handler(int irq, void *ctx)
 {
     for (size_t i = 0; i < rtl8139_device_count; ++i) {
@@ -532,18 +544,25 @@ static void *rtl8139_irq_handler(int irq, void *ctx)
 
         if (isr & RTL8139_IxR_SERR)
             printdbg("RTL8139 IRQ: System Error\n");
+
         if (isr & RTL8139_IxR_TOK)
-            printdbg("RTL8139 IRQ: Tx OK\n");
+            rtl8139_tx_irq_handler(self);
+
         if (isr & RTL8139_IxR_ROK)
-            printdbg("RTL8139 IRQ: Rx OK\n");
+            rtl8139_rx_irq_handler(self);
+
         if (isr & RTL8139_IxR_FOVW)
             printdbg("RTL8139 IRQ: Rx FIFO overflow\n");
+
         if (isr & RTL8139_IxR_TER)
             printdbg("RTL8139 IRQ: Tx Error\n");
+
         if (isr & RTL8139_IxR_RER)
             printdbg("RTL8139 IRQ: Rx Error\n");
+
         if (isr & RTL8139_IxR_RXOVW)
             printdbg("RTL8139 IRQ: Rx Overflow Error\n");
+
         if (isr & RTL8139_IxR_SERR)
             printdbg("RTL8139 IRQ: System Error\n");
 
@@ -569,6 +588,10 @@ static void rtl8139_detect(void)
         if (pci_iter.config.vendor != 0x10EC ||
                 pci_iter.config.device != 0x8139)
             continue;
+
+        // Make sure we have an ethernet packet pool
+        if (!ethq_init())
+            panic("Out of memory!\n");
 
         printdbg("Detected RTL8139 %d/%d/%d"
                  " %x %x %x %x %x %x irq=%d\n",
@@ -615,16 +638,8 @@ static void rtl8139_detect(void)
         // Allocate contiguous rx buffer
         self->rx_buffer_physaddr = mm_alloc_contiguous(16384 + 16);
 
-        // Allocate contiguous rx buffer
-        self->tx_buffer_physaddr = mm_alloc_contiguous(1536*4);
-
         // Map rx buffer physical memory
         self->rx_buffer = mmap(self->rx_buffer_physaddr, 16384 + 16,
-                               PROT_READ | PROT_WRITE, MAP_PHYSICAL,
-                               -1, 0);
-
-        // Map tx buffer physical memory
-        self->tx_buffer = mmap(self->tx_buffer_physaddr, 1536*4,
                                PROT_READ | PROT_WRITE, MAP_PHYSICAL,
                                -1, 0);
 
@@ -638,9 +653,6 @@ static void rtl8139_detect(void)
         uint32_t mac_lo;
         mac_hi = rtl8139_mm_in_32(self, RTL8139_IO_IDR_HI);
         mac_lo = rtl8139_mm_in_32(self, RTL8139_IO_IDR_LO);
-
-        //mac_hi = htonl(mac_hi);
-        //mac_lo = htons(mac_lo);
 
         memcpy(self->mac_addr + 4, &mac_lo, sizeof(uint16_t));
         memcpy(self->mac_addr, &mac_hi, sizeof(uint32_t));
@@ -676,11 +688,8 @@ static void rtl8139_detect(void)
                          (uint32_t)self->rx_buffer_physaddr);
 
         // Set tx buffer physical addresses
-        for (unsigned i = 0; i < 4; ++i) {
-            RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(i),
-                             (uint32_t)self->tx_buffer_physaddr +
-                             i * 1536);
-        }
+        for (unsigned i = 0; i < 4; ++i)
+            RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(i), 0);
 
         // Enable rx and tx
         RTL8139_MM_WR_8(RTL8139_IO_CR,
@@ -726,14 +735,12 @@ static void rtl8139_detect(void)
 }
 
 static void rtl8139_tx_packet(rtl8139_dev_t *self,
-                              int slot,
-                              void *pkt, size_t size)
+                              int slot, ethq_pkt_t *pkt)
 {
     assert(slot < 3);
-    memcpy((char*)self->tx_buffer + 1536*slot, pkt, size);
-    atomic_barrier();
 
-    RTL8139_MM_WR_32(RTL8139_IO_TSD_n(slot), size);
+    RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(slot), pkt->pkt_physaddr);
+    RTL8139_MM_WR_32(RTL8139_IO_TSD_n(slot), pkt->pkt_size);
 }
 
 static void rtl8139_startup_hack(void *p)
@@ -747,11 +754,12 @@ static void rtl8139_startup_hack(void *p)
     rtl8139_dev_t *self = rtl8139_devices[0];
 
     // Send a DHCP discover
-    dhcp_pkt_t discover;
-    ssize_t packet_size = dhcp_build_discover(
-                &discover, sizeof(discover), self->mac_addr);
+    ethq_pkt_t *pkt = ethq_pkt_acquire();
+    dhcp_pkt_t *discover = (void*)&pkt->pkt;
+    pkt->pkt_size = dhcp_build_discover(
+                discover, sizeof(pkt->pkt), self->mac_addr);
 
-    rtl8139_tx_packet(self, 0, &discover, packet_size);
+    rtl8139_tx_packet(self, 0, pkt);
 }
 
 REGISTER_CALLOUT(rtl8139_startup_hack, 0, 'L', "000");
