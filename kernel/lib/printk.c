@@ -707,11 +707,13 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
 
 static spinlock_t printdbg_user_lock;
 
+__attribute__((used))
 static spinlock_hold_t printdbg_lock_noirq(void)
 {
     return spinlock_lock_noirq(&printdbg_user_lock);
 }
 
+__attribute__((used))
 static void printdbg_unlock_noirq(spinlock_hold_t *hold)
 {
     spinlock_unlock_noirq(&printdbg_user_lock, hold);
@@ -735,9 +737,9 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
 
 EXPORT void vprintdbg(char const *format, va_list ap)
 {
-    spinlock_hold_t hold = printdbg_lock_noirq();
+    //spinlock_hold_t hold = printdbg_lock_noirq();
     formatter(format, ap, printdbg_emit_chars, 0);
-    printdbg_unlock_noirq(&hold);
+    //printdbg_unlock_noirq(&hold);
 }
 
 EXPORT void printdbg(char const *format, ...)

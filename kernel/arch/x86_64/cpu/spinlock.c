@@ -19,8 +19,8 @@ void spinlock_lock(spinlock_t *lock)
             pause();
     }
 
-    if (spins > 0)
-        printdbg("Spinlock spun %d times\n", spins);
+    //if (spins > 0)
+    //    printdbg("Spinlock spun %d times\n", spins);
 }
 
 int spinlock_try_lock(spinlock_t *lock)
@@ -62,8 +62,8 @@ spinlock_hold_t spinlock_lock_noirq(spinlock_t *lock)
         cpu_irq_disable();
     }
 
-    if (spins > 0)
-        printdbg("High noirq spin count: %d\n", spins);
+    //if (spins > 0)
+    //    printdbg("High noirq spin count: %d\n", spins);
 
     // Return with interrupts disabled
     return hold;
