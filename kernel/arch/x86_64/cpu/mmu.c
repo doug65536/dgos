@@ -306,7 +306,7 @@ static void mmu_free_phys(physaddr_t addr)
                     index | next_version);
 
         if (cur_next == old_next) {
-            atomic_inc_int64(&free_page_count);
+            atomic_inc(&free_page_count);
 
 #if DEBUG_PHYS_ALLOC
             printdbg("Free phys page addr=%lx\n", addr);
@@ -355,7 +355,7 @@ static physaddr_t mmu_alloc_phys(int low)
                     chain, index_version, new_next);
 
         if (cur_next == index_version) {
-            atomic_dec_int64(&free_page_count);
+            atomic_dec(&free_page_count);
 
             phys_alloc[index] = 0;
             physaddr_t addr = (((physaddr_t)index) <<
@@ -440,7 +440,7 @@ static pte_t *take_apte(physaddr_t address)
             unsigned first_available = __builtin_ctzl(~old_map);
             uint64_t new_map = old_map | (1L << first_available);
 
-            if (atomic_cmpxchg_uint64(
+            if (atomic_cmpxchg(
                         &apte_map,
                         old_map,
                         new_map) == old_map) {
@@ -500,7 +500,7 @@ static void release_apte(pte_t *address)
         // Address refers to a mapped page table entry
         bit = 64 - ((PT_MAX_ADDR - (linaddr_t)address) >> PAGE_SIZE_BIT);
     }
-    atomic_and_uint64(&apte_map, ~(1UL << bit));
+    atomic_and(&apte_map, ~(1UL << bit));
 }
 
 static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
@@ -975,7 +975,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     (void)intr;
     assert(intr == INTR_EX_PAGE);
 
-    atomic_inc_uint64(&page_fault_count);
+    atomic_inc(&page_fault_count);
 
     isr_context_t *ic = ctx;
 
@@ -1560,7 +1560,7 @@ static uintptr_t take_linear(
 
         mutex_unlock(&allocator->free_addr_lock);
     } else {
-        addr = atomic_xadd_uint64(&linear_base, size);
+        addr = atomic_xadd(&linear_base, size);
         printdbg("Took early address space @ %lx,"
                  " size=%lx,"
                  " new linear_base=%lx\n", addr, size, linear_base);
@@ -1804,7 +1804,7 @@ void *mmap(void *addr, size_t len,
         }
     }
 
-    atomic_inc_uint64(&mmu_seq);
+    atomic_inc(&mmu_seq);
     //mmu_send_tlb_shootdown();
 
     assert(linear_addr > 0x100000);

@@ -347,7 +347,7 @@ static void thread_monitor_mwait(void)
 static int smp_thread(void *arg)
 {
     printdbg("SMP thread running\n");
-    atomic_inc_uint32(&thread_smp_running);
+    atomic_inc(&thread_smp_running);
     (void)arg;
     thread_check_stack();
     while (1)
@@ -357,7 +357,7 @@ static int smp_thread(void *arg)
 
 void thread_init(int ap)
 {
-    uint32_t cpu_number = atomic_xadd_uint32(&cpu_count, 1);
+    uint32_t cpu_number = atomic_xadd(&cpu_count, 1);
 
     if (cpu_number > 0)
         gdt_load_tr(cpu_number);
@@ -482,7 +482,7 @@ static thread_info_t *thread_choose_next(
 static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = outgoing;
-    atomic_and_int32(&thread->state, ~THREAD_BUSY);
+    atomic_and(&thread->state, ~THREAD_BUSY);
 }
 
 void *thread_schedule(void *ctx)

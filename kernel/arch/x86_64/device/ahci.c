@@ -1192,7 +1192,7 @@ static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
     }
 
     // Mark slot as not in use
-    atomic_and_uint32(&pi->cmd_issued, ~(1U<<slot));
+    atomic_and(&pi->cmd_issued, ~(1U<<slot));
 
     mutex_unlock(&pi->slotalloc_lock);
     condvar_wake_one(&pi->slotalloc_avail);

@@ -104,7 +104,7 @@ static void *pit8254_handler(int irq, void *ctx)
     (void)irq;
     assert(irq == 0);
 
-    atomic_inc_uint64(&timer_ticks);
+    atomic_inc(&timer_ticks);
 
     // Accumulate crystal clock cycles
     accumulator += divisor * 1000;
@@ -114,7 +114,7 @@ static void *pit8254_handler(int irq, void *ctx)
     if (accumulator >= 1193181U) {
         unsigned accum_ms = accumulator / 1193181U;
         accumulator -= 1193181U * accum_ms;
-        atomic_add_uint64(&timer_ms, accum_ms);
+        atomic_add(&timer_ms, accum_ms);
     }
 
     // Test
