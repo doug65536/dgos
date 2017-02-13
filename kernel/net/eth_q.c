@@ -48,7 +48,7 @@ int ethq_init(void)
         else
             physaddr += sizeof(ethq_pkt2K_t);
 
-        ethq_pkts[i].pkt.pkt_physaddr = physaddr;
+        ethq_pkts[i].pkt.physaddr = physaddr;
 
         ethq_pkt_list[i] = &ethq_pkts[i].pkt;
     }
@@ -124,8 +124,6 @@ void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
 {
     pkt->next = 0;
 
-    spinlock_hold_t hold = spinlock_lock_noirq(&queue->lock);
-
     ethq_pkt_t *head = queue->head;
     ethq_pkt_t *tail = queue->tail;
 
@@ -138,14 +136,10 @@ void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
     }
 
     ++queue->count;
-
-    spinlock_unlock_noirq(&queue->lock, &hold);
 }
 
 ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(&queue->lock);
-
     ethq_pkt_t *head = queue->head;
     ethq_pkt_t *tail = queue->tail;
 
@@ -157,8 +151,6 @@ ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
         queue->head = 0;
         --queue->count;
     }
-
-    spinlock_unlock_noirq(&queue->lock, &hold);
 
     return tail;
 }

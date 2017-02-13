@@ -57,4 +57,18 @@ typedef struct dhcp_pkt_t {
     //  6: (DNS server), offer=dns server list
 } __attribute__((packed)) dhcp_pkt_t;
 
-ssize_t dhcp_build_discover(void *buf, size_t buf_size, uint8_t *src_mac_addr);
+void dhcp_builder_begin(void *buf);
+void dhcp_builder_s_mac(void *buf, uint8_t const *mac_addr);
+void dhcp_builder_d_mac(void *buf, uint8_t const *mac_addr);
+void dhcp_builder_set_op(void *buf, uint8_t op);
+void dhcp_builder_set_client_ip(void *buf, uint32_t ip_addr);
+void dhcp_builder_set_your_ip(void *buf, uint32_t ip_addr);
+void dhcp_builder_set_server_ip(void *buf, uint32_t ip_addr);
+void dhcp_builder_set_gateway_ip(void *buf, uint32_t ip_addr);
+int dhcp_builder_add_option(void *buf, uint8_t option);
+int dhcp_builder_add_option_param(void *buf,uint8_t option, uint8_t param);
+int dhcp_builder_add_option_params(void *buf, uint8_t option,
+                                    const void *data, size_t bytes);
+uint16_t dhcp_builder_finalize(void *buf);
+
+//ssize_t dhcp_build_discover(void *buf, size_t buf_size, uint8_t *src_mac_addr);
