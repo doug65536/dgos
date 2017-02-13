@@ -169,18 +169,7 @@ uint16_t dhcp_builder_finalize(void *buf)
 
     char const *end = (void*)&pkt->options[option_len];
 
-    uint16_t udp_size = end - (char*)(&pkt->udp_hdr.ipv4_hdr + 1);
-    uint16_t ipv4_size = end - (char*)(&pkt->udp_hdr.ipv4_hdr.ver_ihl);
-
-    pkt->udp_hdr.len = htons(udp_size);
-
-    pkt->udp_hdr.ipv4_hdr.len = htons(ipv4_size);
-
-    pkt->udp_hdr.ipv4_hdr.hdr_checksum =
-            ipv4_checksum(&pkt->udp_hdr.ipv4_hdr, 0);
-
-    pkt->udp_hdr.checksum =
-            udp_checksum(&pkt->udp_hdr);
+    udp_finalize(&pkt->udp_hdr, end);
 
     return end - (char*)pkt;
 }

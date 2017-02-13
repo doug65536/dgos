@@ -18,3 +18,5 @@ typedef struct ipv4_hdr_t {
 #define IPV4_PROTO_UDP    0x11
 
 uint16_t ipv4_checksum(const ipv4_hdr_t *hdr, size_t size);
+
+void ipv4_finalize(ipv4_hdr_t *hdr, void const *end);

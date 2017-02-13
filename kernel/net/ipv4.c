@@ -17,3 +17,10 @@ uint16_t ipv4_checksum(ipv4_hdr_t const *hdr, size_t size)
 
     return htons(~total);
 }
+
+void ipv4_finalize(ipv4_hdr_t *hdr, void const *end)
+{
+    uint16_t ipv4_size = (char*)end - (char*)(&hdr->ver_ihl);
+    hdr->len = htons(ipv4_size);
+    hdr->hdr_checksum = ipv4_checksum(hdr, 0);
+}

@@ -32,3 +32,14 @@ uint16_t udp_checksum(udp_hdr_t const *hdr)
 
     return total ? htons(total) : 0xFFFF;
 }
+
+uint16_t udp_finalize(udp_hdr_t *hdr, void const *end)
+{
+    ipv4_finalize(&hdr->ipv4_hdr, end);
+
+    uint16_t udp_size = (char*)end - (char*)(&hdr->ipv4_hdr + 1);
+    hdr->len = htons(udp_size);
+    hdr->checksum = udp_checksum(hdr);
+
+    return (char*)end - (char*)&hdr->ipv4_hdr.eth_hdr;
+}
