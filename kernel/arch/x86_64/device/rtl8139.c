@@ -954,8 +954,6 @@ static void rtl8139_detect(void)
                          RTL8139_RCR_RBLEN_n(3) |
                          // Max rx DMA 7=unlimited
                          RTL8139_RCR_MXDMA_n(7) |
-                         // DON'T Allow receive packet to overflow
-                         //RTL8139_RCR_WRAP |
                          // Accept broadcast
                          RTL8139_RCR_AB |
                          // Accept multicast
@@ -1006,25 +1004,7 @@ static void rtl8139_startup_hack(void *p)
         ethq_pkt_t *pkt = ethq_pkt_acquire();
         dhcp_pkt_t *discover = (void*)&pkt->pkt;
 
-        dhcp_builder_begin(discover);
-        dhcp_builder_s_mac(discover, self->mac_addr);
-
-        dhcp_builder_add_option(discover, 53);
-        dhcp_builder_add_option_param(discover, 53, 1);
-
-        dhcp_builder_add_option(discover, 55);
-        dhcp_builder_add_option_param(discover, 55, 3);
-        dhcp_builder_add_option_param(discover, 55, 1);
-        dhcp_builder_add_option_param(discover, 55, 15);
-        dhcp_builder_add_option_param(discover, 55, 6);
-        dhcp_builder_add_option_param(discover, 55, 23);
-        dhcp_builder_add_option_param(discover, 55, 12);
-        dhcp_builder_add_option_param(discover, 55, 51);
-
-        pkt->size = dhcp_builder_finalize(discover);
-
-        //pkt->size = dhcp_build_discover(
-        //            discover, sizeof(pkt->pkt), self->mac_addr);
+        pkt->size = dhcp_build_discover(discover, self->mac_addr);
 
         RTL8139_TRACE("Sending pkt 0x%p\n", (void*)pkt);
 

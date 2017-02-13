@@ -20,3 +20,10 @@ typedef struct ethernet_pkt_t {
     // 1500 byte packet plus room for CRC
     uint8_t packet[1500 + sizeof(uint32_t)];
 } __attribute__((packed)) ethernet_pkt_t;
+
+#define ETHERTYPE_IPv4      0x0800
+#define ETHERTYPE_ARP       0x0806
+#define ETHERTYPE_WOL       0x0842
+#define ETHERTYPE_RARP      0x8035
+#define ETHERTYPE_IPv6      0x86DD
+#define ETHERTYPE_FLOWCTL   0x8808

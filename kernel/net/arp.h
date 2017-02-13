@@ -8,7 +8,7 @@ typedef struct arp_packet_t {
     // Ethernet = 1
     uint16_t htype;
 
-    // IPv4 = 0x0800
+    // ETHERTYPE_IPv4
     uint16_t ptype;
 
     // Ethernet = 6
