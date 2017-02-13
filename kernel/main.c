@@ -59,17 +59,17 @@ void (** volatile device_list)(void) = device_constructor_list;
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    0
-#define ENABLE_STRESS_HEAP_BOTH     0
+#define ENABLE_STRESS_HEAP_BOTH     1
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE     64
 #define STRESS_HEAP_MAXSIZE     4080
 #elif ENABLE_STRESS_HEAP_LARGE
-#define STRESS_HEAP_MINSIZE     4096
-#define STRESS_HEAP_MAXSIZE     16384
+#define STRESS_HEAP_MINSIZE     65536
+#define STRESS_HEAP_MAXSIZE     262144
 #elif ENABLE_STRESS_HEAP_BOTH
 #define STRESS_HEAP_MINSIZE     64
-#define STRESS_HEAP_MAXSIZE     16384
+#define STRESS_HEAP_MAXSIZE     65536
 #elif ENABLE_STRESS_HEAP_THREAD
 #error Must enable a size range
 #endif
