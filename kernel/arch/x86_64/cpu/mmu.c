@@ -19,12 +19,33 @@
 #include "idt.h"
 #include "bsearch.h"
 
-#define DEBUG_CREATE_PT     0
-#define DEBUG_ADDR_ALLOC    0
-#define DEBUG_PHYS_ALLOC    0
-#define DEBUG_PAGE_TABLES   0
-#define DEBUG_PAGE_FAULT    0
-#define DEBUG_LINEAR_SANITY 0
+#define DEBUG_CREATE_PT         0
+#define DEBUG_ADDR_ALLOC        0
+#define DEBUG_PHYS_ALLOC        0
+#define DEBUG_PAGE_TABLES       0
+#define DEBUG_PAGE_FAULT        0
+#define DEBUG_LINEAR_SANITY     0
+
+#define PROFILE_PHYS_ALLOC      0
+#if PROFILE_PHYS_ALLOC
+#define PROFILE_PHYS_ALLOC_ONLY(p) p
+#else
+#define PROFILE_PHYS_ALLOC_ONLY(p)
+#endif
+
+#define PROFILE_LINEAR_ALLOC    0
+#if PROFILE_LINEAR_ALLOC
+#define PROFILE_LINEAR_ALLOC_ONLY(p) p
+#else
+#define PROFILE_LINEAR_ALLOC_ONLY(p)
+#endif
+
+#define PROFILE_MMAP            0
+#if PROFILE_MMAP
+#define PROFILE_MMAP_ONLY(p) p
+#else
+#define PROFILE_MMAP_ONLY(p)
+#endif
 
 // Intel manual, page 2786
 
@@ -289,6 +310,8 @@ void mm_free_contiguous(void *addr, size_t size)
 
 static void mmu_free_phys(physaddr_t addr)
 {
+    PROFILE_PHYS_ALLOC_ONLY( uint64_t profile_st = cpu_rdtsc() );
+
     uint64_t volatile *chain =
             phys_next_free + (addr < 0x100000000UL);
     uint64_t index = (addr - 0x100000UL) >> PAGE_SIZE_BIT;
@@ -318,10 +341,15 @@ static void mmu_free_phys(physaddr_t addr)
 
         pause();
     }
+
+    PROFILE_PHYS_ALLOC_ONLY( printdbg("Free phys page %ld cycles\n",
+                                      cpu_rdtsc() - profile_st) );
 }
 
 static physaddr_t mmu_alloc_phys(int low)
 {
+    PROFILE_PHYS_ALLOC_ONLY( uint64_t profile_st = cpu_rdtsc() );
+
     // Use low memory immediately if high
     // memory is exhausted
     low |= (phys_next_free[0] == 0);
@@ -364,6 +392,10 @@ static physaddr_t mmu_alloc_phys(int low)
 #if DEBUG_PHYS_ALLOC
             printdbg("Allocated phys page addr=%lx\n", addr);
 #endif
+
+            PROFILE_PHYS_ALLOC_ONLY(
+                        printdbg("Alloc phys page %ld cycles\n",
+                                 cpu_rdtsc() - profile_st) );
 
             return addr;
         }
@@ -882,40 +914,6 @@ static void init_create_pt(
     }
 }
 
-static void mmu_map_page(
-        linaddr_t addr,
-        physaddr_t physaddr, pte_t flags)
-{
-    // Read root physical address from page tables
-    physaddr_t root = cpu_get_page_directory();
-
-    // Get a free aliasing PTE
-    pte_t *aliasing_pte = take_apte(~0UL);
-
-    physaddr_t pt_physaddr[4];
-    init_create_pt(root, aliasing_pte,
-                   addr, physaddr,
-                   pt_physaddr,
-                   flags);
-
-    unsigned path[4];
-    path_from_addr(path, addr);
-
-    pte_t *pte_linaddr[4];
-    pte_from_path(pte_linaddr, path);
-
-    // Map the page tables for the region
-    for (unsigned i = 0; i < 4; ++i) {
-        init_create_pt(root, aliasing_pte,
-                       (linaddr_t)pte_linaddr[i] &
-                       (int)-PAGE_SIZE,
-                       pt_physaddr[i], 0,
-                       PTE_PRESENT | PTE_WRITABLE);
-    }
-
-    release_apte(aliasing_pte);
-}
-
 static int ptes_present(pte_t **ptes)
 {
     int present_mask;
@@ -942,6 +940,47 @@ static int addr_present(uintptr_t addr,
 {
     path_from_addr(path, addr);
     return path_present(path, ptes);
+}
+
+static void mmu_map_page(
+        linaddr_t addr,
+        physaddr_t physaddr, pte_t flags)
+{
+    unsigned path[4];
+    pte_t *pte_linaddr[4];
+    path_from_addr(path, addr);
+    int present_mask = path_present(path, pte_linaddr);
+
+    // Fastpath
+    if ((present_mask & 0x07) == 0x07) {
+        *pte_linaddr[3] = (physaddr & PTE_ADDR) | flags;
+        return;
+    }
+
+    // Read root physical address from page tables
+    physaddr_t root = cpu_get_page_directory();
+
+    // Get a free aliasing PTE
+    pte_t *aliasing_pte = take_apte(~0UL);
+
+    physaddr_t pt_physaddr[4];
+    init_create_pt(root, aliasing_pte,
+                   addr, physaddr,
+                   pt_physaddr,
+                   flags);
+
+    pte_from_path(pte_linaddr, path);
+
+    // Map the page tables for the region
+    for (unsigned i = 0; i < 4; ++i) {
+        init_create_pt(root, aliasing_pte,
+                       (linaddr_t)pte_linaddr[i] &
+                       (int)-PAGE_SIZE,
+                       pt_physaddr[i], 0,
+                       PTE_PRESENT | PTE_WRITABLE);
+    }
+
+    release_apte(aliasing_pte);
 }
 
 // TLB shootdown IPI
@@ -1724,6 +1763,8 @@ void *mmap(void *addr, size_t len,
            int prot, int flags,
            int fd, off_t offset)
 {
+    PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
+
     // Must pass MAP_DEVICE if passing a device registration index
     assert((flags & MAP_DEVICE) || (fd < 0));
 
@@ -1808,6 +1849,9 @@ void *mmap(void *addr, size_t len,
     //mmu_send_tlb_shootdown();
 
     assert(linear_addr > 0x100000);
+
+    PROFILE_MMAP_ONLY( printdbg("mmap of %zd bytes took %ld cycles\n",
+                                len, cpu_rdtsc() - profile_st); );
 
     return (void*)(linear_addr + misalignment);
 }
