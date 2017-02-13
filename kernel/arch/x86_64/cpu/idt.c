@@ -18,6 +18,13 @@
 #define PROFILE_IRQ_ONLY(p) (void)0
 #endif
 
+#define PROFILE_EXCEPTION   1
+#if PROFILE_EXCEPTION
+#define PROFILE_EXCEPTION_ONLY(p) p
+#else
+#define PROFILE_EXCEPTION_ONLY(p) (void)0
+#endif
+
 // debug hack
 #include "apic.h"
 
@@ -548,7 +555,11 @@ void *isr_handler(isr_context_t *ctx)
 {
     if (ctx->gpr->info.interrupt < 32) {
         // Exception
+        PROFILE_EXCEPTION_ONLY( uint64_t st = cpu_rdtsc() );
         ctx = exception_isr_handler(ctx);
+        PROFILE_EXCEPTION_ONLY( uint64_t en = cpu_rdtsc() );
+        PROFILE_EXCEPTION_ONLY( printdbg("Exception %ld took %ld cycles\n",
+                 ctx->gpr->info.interrupt, en-st) );
     } else if ((ctx->gpr->info.interrupt >= 32 &&
                ctx->gpr->info.interrupt < 48) ||
                (ctx->gpr->info.interrupt >= 0x80 &&
@@ -560,8 +571,7 @@ void *isr_handler(isr_context_t *ctx)
 
         PROFILE_IRQ_ONLY( uint64_t en = cpu_rdtsc() );
         PROFILE_IRQ_ONLY( printdbg("IRQ interrupt %ld took %ld cycles\n",
-                 ctx->gpr->info.interrupt - INTR_APIC_IRQ_BASE,
-                 en-st) );
+                 ctx->gpr->info.interrupt - INTR_APIC_IRQ_BASE, en-st) );
     } else {
         //
         // Other interrupts
