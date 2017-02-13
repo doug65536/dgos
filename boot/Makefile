@@ -60,10 +60,17 @@ QEMU_CPU := kvm64
 #Haswell
 #kvm64
 QEMU_RAM := 5G
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp \
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp
+
+QEMU_BRIDGE :=
+
+QEMU_NET := \
 	-net nic,model=rtl8139 \
-	-net user \
+	-net nic,model=ne2k_pci \
+	-net nic,model=e1000 \
+	$(QEMU_BRIDGE) \
 	-net dump,file=dump/netdump
+
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
@@ -295,17 +302,20 @@ $(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos-kernel
 
 run-iso-singlecpu: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		$(QEMU_DEBUGCON)
+		$(QEMU_DEBUGCON) \
+		$(QEMU_NET)
 
 run-iso: $(ISO_FILE)
 	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
-		$(QEMU_SMP)
+		$(QEMU_SMP) \
+		$(QEMU_NET)
 
 run-iso-singlecpu-kvm: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		$(QEMU_DEBUGCON) \
+		$(QEMU_NET) \
 		-enable-kvm
 
 run-iso-kvm: $(ISO_FILE)
@@ -313,6 +323,7 @@ run-iso-kvm: $(ISO_FILE)
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
+		$(QEMU_NET) \
 		-enable-kvm
 
 run-iso-numa-kvm: $(ISO_FILE)
@@ -322,6 +333,7 @@ run-iso-numa-kvm: $(ISO_FILE)
 		$(QEMU_SMP) \
 		-numa node,mem=256M,cpus=0-1 \
 		-numa node,mem=256M,cpus=2-3 \
+		$(QEMU_NET) \
 		-enable-kvm
 
 run-iso-numa: $(ISO_FILE)
@@ -330,7 +342,8 @@ run-iso-numa: $(ISO_FILE)
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
 		-numa node,mem=256M,cpus=0-1 \
-		-numa node,mem=256M,cpus=2-3
+		-numa node,mem=256M,cpus=2-3 \
+		$(QEMU_NET)
 
 debug-iso-boot: $(ISO_FILE)
 	 $(GDB) --symbols $(SYMBOLFILE) --tui \
@@ -341,7 +354,8 @@ debug-iso-boot: $(ISO_FILE)
 		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio'
+			-gdb stdio' \
+			$(QEMU_NET)
 
 debug-iso-kernel: $(ISO_FILE)
 	$(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
@@ -350,19 +364,22 @@ debug-iso-kernel: $(ISO_FILE)
 		-ex 'b *0x400000000000' \
 		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio'
+			-gdb stdio' \
+			$(QEMU_NET)
 
 debug-iso-wait-singlecpu: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON)
+		 $(QEMU_DEBUGCON) \
+		 $(QEMU_NET)
 
 debug-iso-wait-singlecpu-kvm: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 $(QEMU_DEBUGCON) \
+		 $(QEMU_NET) \
 		 -enable-kvm
 
 bin/mem-garbage:
@@ -458,9 +475,7 @@ run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
 		-s -m $(QEMU_RAM) \
 		$(QEMU_SMP) \
 		$(QEMU_DEBUGCON) \
-		-net nic,model=rtl8139 \
-		-net nic,model=ne2k_pci \
-		-net nic,model=e1000
+		$(QEMU_NET)
 
 # -drive file=$(DISKIMAGE),format=raw,if=ide
 
@@ -471,9 +486,7 @@ run-debug-singlecpu: all debuggable-kernel-disk
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		-m $(QEMU_RAM) \
 		$(QEMU_DEBUGCON) \
-		-net nic,model=rtl8139 \
-		-net nic,model=ne2k_pci \
-		-net nic,model=e1000
+		$(QEMU_NET)
 
 #		-drive id=disk,file=$(DISKIMAGE),if=none \
 #		-device ahci,id=ahci \
@@ -487,9 +500,7 @@ run-debug-wait: all debuggable-kernel-disk
 		-m $(QEMU_RAM) \
 		$(QEMU_SMP) \
 		$(QEMU_DEBUGCON) \
-		-net nic,model=rtl8139 \
-		-net nic,model=ne2k_pci \
-		-net nic,model=e1000
+		$(QEMU_NET)
 
 run-debug-wait-singlecpu: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
@@ -498,19 +509,14 @@ run-debug-wait-singlecpu: all debuggable-kernel-disk
 		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		-m $(QEMU_RAM) \
 		$(QEMU_DEBUGCON) \
-		-net nic,model=rtl8139 \
-		-net nic,model=ne2k_pci \
-		-net nic,model=e1000
+		$(QEMU_NET)
 
 monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
 
 run: all bootable-disk
 	$(QEMU) -m 5G -drive file=$(DISKIMAGE),format=raw \
-		-net user \
-		-net nic,model=rtl8139 \
-		-net nic,model=ne2k_pci \
-		-net nic,model=e1000
+		$(QEMU_NET)
 
 #		-netdev user,id=mynet0,net=192.168.66.0/24,dhcpstart=192.168.66.9 \
 #		-net nic,model=i82551 \
