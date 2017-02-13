@@ -532,3 +532,11 @@ void pci_adj_control_bits(int bus, int slot, int func,
                     offsetof(pci_config_hdr_t, command),
                     set, clr);
 }
+
+void pci_clear_status_bits(int bus, int slot, int func,
+                           uint16_t bits)
+{
+    pci_config_write(bus, slot, func,
+                     offsetof(pci_config_hdr_t, status),
+                     &bits, sizeof(bits));
+}

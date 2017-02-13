@@ -223,3 +223,6 @@ void pci_set_irq_pin(int bus, int slot, int func,
 
 void pci_adj_control_bits(int bus, int slot, int func,
                           uint16_t set, uint16_t clr);
+
+void pci_clear_status_bits(int bus, int slot, int func,
+                           uint16_t bits);
