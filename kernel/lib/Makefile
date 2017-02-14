@@ -9,6 +9,7 @@ CSRCS := mm.c \
 	printk.c \
 	dev_text.c \
 	dev_storage.c \
+	dev_eth.c \
 	conio.c \
 	mouse.c \
 	keyboard.c \
@@ -24,6 +25,8 @@ CSRCS := mm.c \
 	rand.c \
 	bswap.c \
 	pool.c \
-	heap.c
+	heap.c \
+	hash.c \
+	hash_table.c
 
 include $(BUILDROOT)/library.mk

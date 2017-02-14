@@ -537,6 +537,9 @@ static int init_thread(void *p)
     // Register partition schemes
     callout_call('P');
 
+    // Register network interfaces
+    callout_call('N');
+
 #if ENABLE_SHELL_THREAD > 0
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0);
 #endif

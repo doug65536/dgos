@@ -55,4 +55,6 @@ void condvar_wake_one(condition_var_t *var);
 void condvar_wake_all(condition_var_t *var);
 
 void condvar_wait_spinlock(condition_var_t *var,
-                                  spinlock_t *spinlock);
+                           spinlock_t *spinlock);
+
+void condvar_wait_noyield(condition_var_t *var, mutex_t *mutex);

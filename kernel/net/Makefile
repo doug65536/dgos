@@ -2,9 +2,16 @@
 
 LIBNAME := net
 CSRCS := \
+	eth_q.c \
+	eth_frame.c \
+	arp_frame.c \
+	ipv4_frame.c \
+	tcp_frame.c \
+	udp_frame.c \
+	icmp_frame.c \
 	ipv4.c \
 	udp.c \
-	dhcp.c \
-	eth_q.c
+	tcp.c \
+	dhcp.c
 
 include $(BUILDROOT)/library.mk

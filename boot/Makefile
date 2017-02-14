@@ -390,7 +390,8 @@ debug-iso-wait: $(ISO_FILE) #bin/mem-garbage
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 		 $(QEMU_SMP) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON)
+		 $(QEMU_DEBUGCON) \
+		 $(QEMU_NET)
 
 #		 -object memory-backend-file,id=mem,size=512M,mem-path=bin/mem-garbage,share=on \
 #		 -numa node,memdev=mem

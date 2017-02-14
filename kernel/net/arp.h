@@ -1,6 +1,6 @@
 #pragma once
 
-#include "net/ethernet.h"
+#include "eth_q.h"
 
 typedef struct arp_packet_t {
     ethernet_hdr_t eth_hdr;
@@ -26,6 +26,9 @@ typedef struct arp_packet_t {
     // Sender IPv4 address
     uint8_t sender_ip[4];
 
+    // Source MAC
+    uint8_t d_addr[6];
+
     // Target IPv4 address
-    char target_ip[4];
+    uint8_t target_ip[4];
 } arp_packet_t;

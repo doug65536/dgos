@@ -43,3 +43,19 @@ uint16_t udp_finalize(udp_hdr_t *hdr, void const *end)
 
     return (char*)end - (char*)&hdr->ipv4_hdr.eth_hdr;
 }
+
+void udp_port_get(ipv4_addr_pair_t *addr, const udp_hdr_t *hdr)
+{
+    memcpy(&addr->s.port, &hdr->s_port, sizeof(addr->s.port));
+    memcpy(&addr->d.port, &hdr->d_port, sizeof(addr->d.port));
+    addr->s.port = ntohs(addr->s.port);
+    addr->d.port = ntohs(addr->d.port);
+}
+
+void udp_port_set(udp_hdr_t *hdr, ipv4_addr_pair_t const *addr)
+{
+    memcpy(&hdr->d_port, &addr->d.port, sizeof(hdr->d_port));
+    memcpy(&hdr->s_port, &addr->s.port, sizeof(hdr->s_port));
+    hdr->d_port = htons(hdr->d_port);
+    hdr->s_port = htons(hdr->s_port);
+}

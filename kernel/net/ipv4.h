@@ -15,8 +15,24 @@ typedef struct ipv4_hdr_t {
     uint8_t d_ip[4];
 } __attribute__((packed)) ipv4_hdr_t;
 
-#define IPV4_PROTO_UDP    0x11
+#define IPV4_PROTO_ICMP     0x01
+#define IPV4_PROTO_TCP      0x06
+#define IPV4_PROTO_UDP      0x11
 
-uint16_t ipv4_checksum(const ipv4_hdr_t *hdr, size_t size);
+#define IPV4_ADDR32(a,b,c,d) (((a)<<24)|((b)<<16)|((c)<<8)|(d))
+
+typedef struct ipv4_addr_t {
+    uint32_t ip;
+    uint16_t port;
+    uint16_t align;
+} ipv4_addr_t;
+
+typedef struct ipv4_addr_pair_t {
+    ipv4_addr_t s;
+    ipv4_addr_t d;
+} ipv4_addr_pair_t;
+
+uint16_t ipv4_checksum(ipv4_hdr_t const *hdr, size_t size);
+void ipv4_ip_get(ipv4_addr_pair_t *addr, ipv4_hdr_t const *hdr);
 
 void ipv4_finalize(ipv4_hdr_t *hdr, void const *end);

@@ -8,6 +8,7 @@
 //  'L': Late initialized device
 //  'P': Partition scanner
 //  'F': Filesystem implementation
+//  'N': Network interface
 
 typedef struct callout_t {
     void (*fn)(void*);

@@ -6,8 +6,8 @@
 #include "time.h"
 #include "export.h"
 
-#define DEBUG_MUTEX 0
-#if DEBUG_MUTEX
+#define MUTEX_DEBUG 0
+#if MUTEX_DEBUG
 #define MUTEX_DTRACE(...) printdbg("mutex: " __VA_ARGS__)
 #else
 #define MUTEX_DTRACE(...) ((void)0)
@@ -200,6 +200,11 @@ static void condvar_unlock_spinlock(void *mutex)
     spinlock_unlock_noirq(state->lock, &state->hold);
 }
 
+static void condvar_lock_mutex_noyield(void *mutex)
+{
+    mutex_lock_noyield(mutex);
+}
+
 static void condvar_lock_mutex(void *mutex)
 {
     mutex_lock(mutex);
@@ -246,6 +251,14 @@ EXPORT void condvar_wait(condition_var_t *var, mutex_t *mutex)
 {
     assert(mutex->owner >= 0);
     condvar_wait_ex(var, condvar_lock_mutex,
+                    condvar_unlock_mutex, mutex);
+}
+
+EXPORT void condvar_wait_noyield(condition_var_t *var,
+                                 mutex_t *mutex)
+{
+    assert(mutex->owner >= 0);
+    condvar_wait_ex(var, condvar_lock_mutex_noyield,
                     condvar_unlock_mutex, mutex);
 }
 

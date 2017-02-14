@@ -12,3 +12,6 @@ typedef struct udp_hdr_t {
 uint16_t udp_checksum(const udp_hdr_t *hdr);
 
 uint16_t udp_finalize(udp_hdr_t *hdr, void const *end);
+
+void udp_port_get(ipv4_addr_pair_t *addr, udp_hdr_t const *hdr);
+void udp_port_set(udp_hdr_t *hdr, ipv4_addr_pair_t const *addr);

@@ -1,6 +1,8 @@
 #pragma once
 #include "net/udp.h"
 
+// TODO: Move this to user mode
+
 typedef struct dhcp_pkt_t {
     udp_hdr_t udp_hdr;
 

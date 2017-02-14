@@ -98,7 +98,8 @@ void spinlock_unlock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
 // When a writer tries to acquire a lock, it sets bit 30
 // to lock out readers
 
-void rwspinlock_ex_lock(rwspinlock_t *lock)
+// Expect 0 when acquring, expect 1 when upgrading
+static void rwspinlock_ex_lock_impl(rwspinlock_t *lock, int expect)
 {
     atomic_barrier();
 
@@ -112,7 +113,8 @@ void rwspinlock_ex_lock(rwspinlock_t *lock)
             // We haven't locked out readers yet
 
             // Simple scenario, acquire unowned lock
-            if (old_value == 0 && atomic_cmpxchg(lock, 0, -1) == 0)
+            if (old_value == expect &&
+                    atomic_cmpxchg(lock, expect, -1) == expect)
                 break;
 
             // Try to acquire ownership of bit 30
@@ -153,6 +155,25 @@ void rwspinlock_ex_lock(rwspinlock_t *lock)
 
         old_value = *lock;
     }
+}
+
+void rwspinlock_ex_lock(rwspinlock_t *lock)
+{
+    rwspinlock_ex_lock_impl(lock, 0);
+}
+
+// Upgrade from shared lock to exclusive lock
+void rwspinlock_upgrade(rwspinlock_t *lock)
+{
+    assert(*lock > 0);
+    rwspinlock_ex_lock_impl(lock, 1);
+}
+
+// Downgrade from exclusive lock to shared lock
+void rwspinlock_downgrade(rwspinlock_t *lock)
+{
+    assert(*lock == -1);
+    *lock = 1;
 }
 
 void rwspinlock_ex_unlock(rwspinlock_t *lock)

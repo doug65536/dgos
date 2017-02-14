@@ -1,3 +1,4 @@
+#define ETH_DEV_NAME rtl8139
 #include "rtl8139.h"
 #include "pci.h"
 #include "callout.h"
@@ -5,13 +6,15 @@
 #include "stdlib.h"
 #include "cpu/atomic.h"
 #include "mm.h"
-#include "cpu/atomic.h"
 #include "irq.h"
 #include "threadsync.h"
 #include "string.h"
 #include "bswap.h"
 #include "eth_q.h"
+#include "eth_frame.h"
 #include "time.h"
+#include "udp_frame.h"
+#include "dev_eth.h"
 
 // test
 #include "net/dhcp.h"
@@ -23,10 +26,11 @@
 #define RTL8139_TRACE(...) (void)0
 #endif
 
+DECLARE_eth_dev_DEVICE(rtl8139);
 
 typedef struct rtl8139_dev_t rtl8139_dev_t;
 struct rtl8139_dev_t {
-    void *vtbl;
+    eth_dev_vtbl_t *vtbl;
 
     uintptr_t mmio_physaddr;
     void volatile *mmio;
@@ -40,7 +44,6 @@ struct rtl8139_dev_t {
     spinlock_t lock;
 
     ethq_queue_t tx_queue;
-    ethq_queue_t rx_queue;
 
     // Actually 6 bytes
     uint8_t mac_addr[8];
@@ -469,7 +472,7 @@ static size_t rtl8139_device_count;
 #define RTL8139_TSAD_TUN_n(n)       (1U<<((n)+RTL8139_TSAD_TUN_BIT))
 #define RTL8139_TSAD_TOK_n(n)       (1U<<((n)+RTL8139_TSAD_TOK_BIT))
 
-// Received packet header
+// Rx packet header
 typedef struct rtl8139_rx_hdr_t {
     uint16_t status;
     uint16_t len;
@@ -640,6 +643,8 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
                        hdr.len - partial);
             }
 
+            uint16_t ether_type = ntohs(pkt->pkt.hdr.len_ethertype);
+
             RTL8139_TRACE("Received packet from"
                           " %02x:%02x:%02x:%02x:%02x:%02x"
                           " %s=%04x\n",
@@ -649,14 +654,14 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
                     pkt->pkt.hdr.s_mac[3],
                     pkt->pkt.hdr.s_mac[4],
                     pkt->pkt.hdr.s_mac[5],
-                    pkt->pkt.hdr.len_ethertype >= 1536
+                    ether_type >= 1536
                         ? "ethertype="
-                        : pkt->pkt.hdr.len_ethertype <= 1500
+                        : ether_type <= 1500
                         ? "size="
                         : "?""?""?=",
-                    pkt->pkt.hdr.len_ethertype);
+                    ether_type);
 
-            ethq_enqueue(&self->rx_queue, pkt);
+            eth_frame_received(pkt);
         }
 
         // Advance to next packet, skipping header, CRC,
@@ -802,8 +807,10 @@ static void *rtl8139_irq_handler(int irq, void *ctx)
     return ctx;
 }
 
-static void rtl8139_send(rtl8139_dev_t *self, ethq_pkt_t *pkt)
+static int rtl8139_send(eth_dev_base_t *dev, ethq_pkt_t *pkt)
 {
+    ETH_DEV_PTR(dev);
+
     spinlock_hold_t hold = spinlock_lock_noirq(&self->lock);
 
     int slot;
@@ -818,12 +825,14 @@ static void rtl8139_send(rtl8139_dev_t *self, ethq_pkt_t *pkt)
         ethq_enqueue(&self->tx_queue, pkt);
 
     spinlock_unlock_noirq(&self->lock, &hold);
+
+    return 1;
 }
 
 //
 // Initialization
 
-static void rtl8139_detect(void)
+static int rtl8139_detect(eth_dev_base_t ***devices)
 {
     pci_dev_iterator_t pci_iter;
 
@@ -854,6 +863,8 @@ static void rtl8139_detect(void)
                  pci_iter.config.irq_line);
 
         rtl8139_dev_t *self = calloc(1, sizeof(rtl8139_dev_t));
+
+        self->vtbl = &rtl8139_eth_dev_device_vtbl;
 
         rtl8139_devices = realloc(rtl8139_devices,
                                   sizeof(rtl8139_devices) *
@@ -895,8 +906,8 @@ static void rtl8139_detect(void)
         // Read MAC address
         uint32_t mac_hi;
         uint32_t mac_lo;
-        mac_hi = rtl8139_mm_in_32(self, RTL8139_IO_IDR_HI);
-        mac_lo = rtl8139_mm_in_32(self, RTL8139_IO_IDR_LO);
+        mac_hi = RTL8139_MM_RD_32(RTL8139_IO_IDR_HI);
+        mac_lo = RTL8139_MM_RD_32(RTL8139_IO_IDR_LO);
 
         memcpy(self->mac_addr + 4, &mac_lo, sizeof(uint16_t));
         memcpy(self->mac_addr, &mac_hi, sizeof(uint32_t));
@@ -986,9 +997,54 @@ static void rtl8139_detect(void)
         // Unmask IRQs
         RTL8139_MM_WR_16(RTL8139_IO_IMR, unmask);
     } while (pci_enumerate_next(&pci_iter));
+
+    *devices = (void*)rtl8139_devices;
+    return rtl8139_device_count;
 }
 
+static void rtl8139_get_mac(eth_dev_base_t *dev, void *mac_addr)
+{
+    ETH_DEV_PTR(dev);
 
+    memcpy(mac_addr, self->mac_addr, 6);
+}
+
+static void rtl8139_set_mac(eth_dev_base_t *dev, void const *mac_addr)
+{
+    ETH_DEV_PTR(dev);
+
+    memcpy(self->mac_addr, mac_addr, 6);
+
+    uint32_t mac_hi;
+    uint32_t mac_lo;
+
+    memcpy(&mac_lo, self->mac_addr + 4, sizeof(uint16_t));
+    memcpy(&mac_hi, self->mac_addr, sizeof(uint32_t));
+
+    RTL8139_MM_WR_32(RTL8139_IO_IDR_HI, mac_hi);
+    RTL8139_MM_WR_32(RTL8139_IO_IDR_LO, mac_lo);
+}
+
+static int rtl8139_get_promiscuous(eth_dev_base_t *dev)
+{
+    ETH_DEV_PTR(dev);
+
+    return !!(RTL8139_MM_RD_32(RTL8139_IO_RCR) &
+            RTL8139_RCR_AAP);
+}
+
+static void rtl8139_set_promiscuous(eth_dev_base_t *dev,
+                                    int promiscuous)
+{
+    ETH_DEV_PTR(dev);
+
+    RTL8139_MM_WR_32(RTL8139_IO_RCR,
+                     (RTL8139_MM_RD_32(RTL8139_IO_RCR) &
+                     ~RTL8139_RCR_AAP) |
+                     (!!promiscuous) << RTL8139_RCR_AAP_BIT);
+}
+
+#if 0
 static void rtl8139_startup_hack(void *p)
 {
     (void)p;
@@ -996,6 +1052,15 @@ static void rtl8139_startup_hack(void *p)
 
     if (rtl8139_device_count == 0)
         return;
+
+    ipv4_addr_pair_t bind = {
+        { IPV4_ADDR32(255,255,255,255), 67, 0 },
+        { IPV4_ADDR32(255,255,255,255), 68, 0 }
+    };
+
+    int handle = udp_bind(&bind);
+
+    (void)handle;
 
     rtl8139_dev_t *self = rtl8139_devices[0];
 
@@ -1012,5 +1077,7 @@ static void rtl8139_startup_hack(void *p)
         rtl8139_send(self, pkt);
     }
 }
-
 REGISTER_CALLOUT(rtl8139_startup_hack, 0, 'L', "000");
+#endif
+
+REGISTER_eth_dev_DEVICE(rtl8139);

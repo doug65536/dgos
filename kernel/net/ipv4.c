@@ -1,5 +1,6 @@
 #include "ipv4.h"
 #include "bswap.h"
+#include "memory.h"
 
 uint16_t ipv4_checksum(ipv4_hdr_t const *hdr, size_t size)
 {
@@ -23,4 +24,12 @@ void ipv4_finalize(ipv4_hdr_t *hdr, void const *end)
     uint16_t ipv4_size = (char*)end - (char*)(&hdr->ver_ihl);
     hdr->len = htons(ipv4_size);
     hdr->hdr_checksum = ipv4_checksum(hdr, 0);
+}
+
+void ipv4_ip_get(ipv4_addr_pair_t *addr, ipv4_hdr_t const *hdr)
+{
+    memcpy(&addr->s.ip, hdr->s_ip, sizeof(addr->s.ip));
+    memcpy(&addr->d.ip, hdr->d_ip, sizeof(addr->d.ip));
+    addr->s.ip = ntohl(addr->s.ip);
+    addr->s.ip = ntohl(addr->d.ip);
 }
