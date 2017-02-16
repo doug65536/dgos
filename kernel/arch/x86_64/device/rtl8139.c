@@ -40,10 +40,15 @@ struct rtl8139_dev_t {
     size_t rx_offset;
 
     ethq_pkt_t *tx_pkts[4];
+    ethq_pkt_t *tx_next[4];
+
+    unsigned tx_head;
+    unsigned tx_tail;
 
     spinlock_t lock;
 
     ethq_queue_t tx_queue;
+    ethq_queue_t rx_queue;
 
     // Actually 6 bytes
     uint8_t mac_addr[8];
@@ -264,6 +269,13 @@ static size_t rtl8139_device_count;
 // Tx packet size
 #define RTL8139_TSD_SIZE \
     (RTL8139_TSD_SIZE_MASK<<RTL8139_TSD_SIZE_BIT)
+
+// Early tx threshold (in units of 8 bytes, 0=8 bytes, max 2KB)
+#define RTL8139_TSD_ERTXTH_n(n) ((n)<<RTL8139_TSD_ERTXTH_BIT)
+
+// Tx packet size
+#define RTL8139_TSD_SIZE_n(n)   ((n)<<RTL8139_TSD_SIZE_BIT)
+#define RTL8139_TSD_SIZE_MAX    1792
 
 //
 // RTL8139_IO_IMR and RTL8139_IO_ISR: Interrupt Mask/Status Registers
@@ -519,7 +531,7 @@ typedef struct rtl8139_rx_hdr_t {
 // MMIO
 
 #define RTL8139_MMIO_PTR(ptr, type, reg) \
-    (*(type volatile *)((char*)(ptr)->mmio + reg))
+    (*(type volatile *)(((char*)(ptr)->mmio) + (reg)))
 
 #define RTL8139_MMIO(type, reg)     RTL8139_MMIO_PTR(self, type, reg)
 
@@ -593,14 +605,23 @@ static void rtl8139_tx_packet(rtl8139_dev_t *self,
                               int slot, ethq_pkt_t *pkt)
 {
     assert(slot >= 0 && slot < 4);
+    assert(pkt->size <= RTL8139_TSD_SIZE_MAX);
 
+    if (pkt->size < 64) {
+        memset((char*)&pkt->pkt + pkt->size, 0, 64 - pkt->size);
+        pkt->size = 64;
+    }
+
+    assert(!self->tx_pkts[slot]);
     self->tx_pkts[slot] = pkt;
 
-    RTL8139_TRACE("Transmitting packet addr=%p, len=%d\n",
-             (void*)pkt->physaddr, pkt->size);
+    RTL8139_TRACE("Transmitting packet addr=%p, len=%d slot=%d\n",
+             (void*)pkt->physaddr, pkt->size, slot);
 
     RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(slot), pkt->physaddr);
-    RTL8139_MM_WR_32(RTL8139_IO_TSD_n(slot), pkt->size);
+
+    RTL8139_MM_WR_32(RTL8139_IO_TSD_n(slot),
+                     RTL8139_TSD_SIZE_n(pkt->size));
 }
 
 //
@@ -612,9 +633,9 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
 
     if (isr & RTL8139_IxR_RXOVW) {
         RTL8139_TRACE("IRQ Rx: RXOVW\n");
-        self->rx_offset = 0;
-        RTL8139_MM_WR_16(RTL8139_IO_CAPR,
-                         (uint16_t)self->rx_offset);
+        //self->rx_offset = 0;
+        //RTL8139_MM_WR_16(RTL8139_IO_CAPR,
+        //                 (uint16_t)self->rx_offset);
     }
 
     rtl8139_rx_hdr_t hdr;
@@ -633,6 +654,8 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
                      hdr.len);
 
             char const *pkt_st = (char const*)(hdr_ptr + 1);
+
+            pkt->size = hdr.len - 4;
 
             if (self->rx_offset + hdr.len + 4 < 65536) {
                 memcpy(&pkt->pkt, pkt_st, hdr.len);
@@ -661,7 +684,9 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
                         : "?""?""?=",
                     ether_type);
 
-            eth_frame_received(pkt);
+            pkt->nic = (void*)self;
+
+            ethq_enqueue(&self->rx_queue, pkt);
         }
 
         // Advance to next packet, skipping header, CRC,
@@ -684,18 +709,26 @@ static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
     RTL8139_TRACE("IRQ: Tx OK\n");
 
     // Transmit status of all descriptors
-    uint32_t tsad = RTL8139_MM_RD_16(RTL8139_IO_TSAD);
+    uint16_t tsad = RTL8139_MM_RD_16(RTL8139_IO_TSAD);
 
-    for (int slot = 0; slot < 4; ++slot) {
-        ethq_pkt_t *pkt = self->tx_pkts[slot];
+    RTL8139_TRACE("RX IRQ TSAD=%x\n", tsad);
 
-        if (tsad & RTL8139_TSAD_TOK_n(slot)) {
-            RTL8139_TRACE("IRQ: TOK slot=%d\n", slot);
+    for (int i = 0; i < 4; ++i,
+         (self->tx_tail = ((self->tx_tail + 1) & 3))) {
+        ethq_pkt_t *pkt = self->tx_pkts[self->tx_tail];
+
+        if (!pkt)
+            break;
+
+        if (tsad & RTL8139_TSAD_TOK_n(self->tx_tail)) {
+            self->tx_pkts[self->tx_tail] = 0;
+
+            RTL8139_TRACE("IRQ: TOK slot=%d\n", self->tx_tail);
 
             // Ignore slots that are not transmitting a packet
             if (!pkt) {
-                RTL8139_TRACE("Spurious Tx OK IRQ"
-                         " for slot=%d\n", slot);
+                RTL8139_TRACE("*** Spurious Tx OK IRQ"
+                         " for slot=%d\n", self->tx_tail);
                 continue;
             }
 
@@ -709,50 +742,48 @@ static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
             // Get another outgoing packet
             pkt = ethq_dequeue(&self->tx_queue);
 
-            // Transmit new packet in this slot
-            if (pkt)
-                rtl8139_tx_packet(self, slot, pkt);
-            else {
-                self->tx_pkts[slot] = 0;
-            }
+            //RTL8139_MM_WR_32(RTL8139_IO_TSD_n(self->tx_tail),
+            //                 0);
 
-            continue;
+            // Transmit new packet
+            if (pkt) {
+                assert(!self->tx_next[i]);
+                self->tx_next[i] = pkt;
+            }
         }
 
-        if (tsad & RTL8139_TSAD_TABT_n(slot)) {
+        if (tsad & RTL8139_TSAD_TABT_n(self->tx_tail)) {
             // Transmit aborted?
 
             // Ignore slots that are not transmitting a packet
             if (!pkt) {
-                RTL8139_TRACE("Spurious transmit aborted IRQ"
-                         " for slot=%d\n", slot);
+                RTL8139_TRACE("*** Spurious transmit aborted IRQ"
+                         " for slot=%d\n", self->tx_tail);
                 continue;
             }
 
-            RTL8139_TRACE("Transmit aborted?!\n");
+            RTL8139_TRACE("*** Transmit aborted?!\n");
 
             // Clear transmit abort
             RTL8139_MM_WR_32(RTL8139_IO_TCR,
-                             RTL8139_MM_RD_16(RTL8139_IO_TCR) |
+                             RTL8139_MM_RD_32(RTL8139_IO_TCR) |
                              RTL8139_TCR_CLRABT);
 
             if (pkt->callback)
                 pkt->callback(pkt, 1, pkt->callback_arg);
-
-            continue;
         }
 
-        if (tsad & RTL8139_TSAD_TUN_n(slot)) {
+        if (tsad & RTL8139_TSAD_TUN_n(self->tx_tail)) {
             // Transmit underrun?
 
             // Ignore slots that are not transmitting a packet
             if (!pkt) {
-                RTL8139_TRACE("Spurious transmit aborted IRQ"
-                         " for slot=%d\n", slot);
+                RTL8139_TRACE("*** Spurious transmit aborted IRQ"
+                         " for slot=%d\n", self->tx_tail);
                 continue;
             }
 
-            RTL8139_TRACE("transmit underrun?!\n");
+            RTL8139_TRACE("*** transmit underrun?!\n");
 
             if (pkt->callback)
                 pkt->callback(pkt, 1, pkt->callback_arg);
@@ -772,36 +803,68 @@ static void *rtl8139_irq_handler(int irq, void *ctx)
 
         uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
 
-        // Acknowledge IRQ
+        // Acknowledge everything
         RTL8139_MM_WR_16(RTL8139_IO_ISR, isr);
 
-        RTL8139_TRACE("IRQ status = %x\n", isr);
+        ethq_pkt_t *rx_first = 0;
 
-        if (isr & RTL8139_IxR_SERR)
-            RTL8139_TRACE("IRQ: System Error\n");
+        if (isr != 0) {
+            RTL8139_TRACE("IRQ status = %x\n", isr);
 
-        if (isr & RTL8139_IxR_TOK)
-            rtl8139_tx_irq_handler(self);
+            if (isr & RTL8139_IxR_SERR) {
+                RTL8139_TRACE("*** IRQ: System Error\n");
+            }
 
-        if (isr & RTL8139_IxR_ROK)
-            rtl8139_rx_irq_handler(self, isr);
+            if (isr & RTL8139_IxR_TOK) {
+                rtl8139_tx_irq_handler(self);
+            }
 
-        if (isr & RTL8139_IxR_FOVW)
-            RTL8139_TRACE("IRQ: Rx FIFO overflow\n");
+            if (isr & RTL8139_IxR_ROK) {
+                rtl8139_rx_irq_handler(self, isr);
+            }
 
-        if (isr & RTL8139_IxR_TER)
-            RTL8139_TRACE("IRQ: Tx Error\n");
+            if (isr & RTL8139_IxR_FOVW) {
+                RTL8139_TRACE("*** IRQ: Rx FIFO overflow\n");
+            }
 
-        if (isr & RTL8139_IxR_RER)
-            RTL8139_TRACE("IRQ: Rx Error\n");
+            if (isr & RTL8139_IxR_TER) {
+                RTL8139_TRACE("*** IRQ: Tx Error\n");
+            }
 
-        if (isr & RTL8139_IxR_RXOVW)
-            RTL8139_TRACE("IRQ: Rx Overflow Error\n");
+            if (isr & RTL8139_IxR_RER) {
+                RTL8139_TRACE("*** IRQ: Rx Error\n");
+            }
 
-        if (isr & RTL8139_IxR_SERR)
-            RTL8139_TRACE("IRQ: System Error\n");
+            if (isr & RTL8139_IxR_RXOVW) {
+                RTL8139_TRACE("*** IRQ: Rx Overflow Error\n");
+            }
+
+            // Dequeue all received packets inside spinlock
+            rx_first = ethq_dequeue_all(&self->rx_queue);
+
+            for (int n = 0; n < 4; ++n) {
+                if (!self->tx_next[n])
+                    continue;
+
+                self->tx_pkts[self->tx_head] = self->tx_next[n];
+                rtl8139_tx_packet(self, self->tx_head, self->tx_next[n]);
+                self->tx_next[n] = 0;
+                self->tx_head = ((self->tx_head + 1) & 3);
+            }
+        }
 
         spinlock_unlock(&self->lock);
+
+        // Service the receive queue outside spinlock
+        if (rx_first) {
+            ethq_pkt_t *rx_next;
+            for (ethq_pkt_t *rx_packet = rx_first; rx_packet;
+                 rx_packet = rx_next) {
+                rx_next = rx_packet->next;
+                eth_frame_received(rx_packet);
+                ethq_pkt_release(rx_packet);
+            }
+        }
     }
 
     return ctx;
@@ -813,16 +876,14 @@ static int rtl8139_send(eth_dev_base_t *dev, ethq_pkt_t *pkt)
 
     spinlock_hold_t hold = spinlock_lock_noirq(&self->lock);
 
-    int slot;
-    for (slot = 0; slot < 4; ++slot) {
-        if (self->tx_pkts[slot] == 0)
-            break;
-    }
+    memcpy(pkt->pkt.hdr.s_mac, self->mac_addr, 6);
 
-    if (slot < 4)
-        rtl8139_tx_packet(self, slot, pkt);
-    else
+    if (!self->tx_pkts[self->tx_head]) {
+        rtl8139_tx_packet(self, self->tx_head, pkt);
+        self->tx_head = (self->tx_head + 1) & 3;
+    } else {
         ethq_enqueue(&self->tx_queue, pkt);
+    }
 
     spinlock_unlock_noirq(&self->lock, &hold);
 
@@ -955,11 +1016,10 @@ static int rtl8139_detect(eth_dev_base_t ***devices)
                         RTL8139_CR_RXEN |
                         RTL8139_CR_TXEN);
 
-        // Rx configuration
         RTL8139_MM_WR_32(RTL8139_IO_RCR,
-                         // Early rx threshold 0=none
+                         // Early rx threshold 8=50%
                          RTL8139_RCR_ERTH_n(8) |
-                         // Rx FIFO threshold 7=none
+                         // Rx FIFO threshold 5=512 bytes
                          RTL8139_RCR_RXFTH_n(5) |
                          // Receive buffer length 3=64KB+16
                          RTL8139_RCR_RBLEN_n(3) |
@@ -992,7 +1052,7 @@ static int rtl8139_detect(eth_dev_base_t ***devices)
                 RTL8139_IxR_ROK;
 
         // Acknowledge IRQs
-        RTL8139_MM_WR_16(RTL8139_IO_ISR, unmask);
+        //RTL8139_MM_WR_16(RTL8139_IO_ISR, unmask);
 
         // Unmask IRQs
         RTL8139_MM_WR_16(RTL8139_IO_IMR, unmask);
