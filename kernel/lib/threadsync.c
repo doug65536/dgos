@@ -65,8 +65,7 @@ EXPORT void mutex_lock(mutex_t *mutex)
         pause();
 
     // Lock the mutex to acquire it or manipulate wait chain
-    spinlock_hold_t hold;
-    hold = spinlock_lock_noirq(&mutex->lock);
+    spinlock_lock_noirq(&mutex->lock);
 
     if (mutex->owner < 0) {
         // Take ownership
@@ -104,13 +103,12 @@ EXPORT void mutex_lock(mutex_t *mutex)
     }
 
     // Release lock
-    spinlock_unlock_noirq(&mutex->lock, &hold);
+    spinlock_unlock_noirq(&mutex->lock);
 }
 
 EXPORT void mutex_unlock(mutex_t *mutex)
 {
-    spinlock_hold_t hold;
-    hold = spinlock_lock_noirq(&mutex->lock);
+    spinlock_lock_noirq(&mutex->lock);
 
     atomic_barrier();
     assert(mutex->owner == thread_get_id());
@@ -122,31 +120,30 @@ EXPORT void mutex_unlock(mutex_t *mutex)
         thread_wait_t *waiter = (void*)mutex->link.next;
         thread_wait_del(&waiter->link);
         mutex->owner = waiter->thread;
-        spinlock_unlock_noirq(&mutex->lock, &hold);
+        spinlock_unlock_noirq(&mutex->lock);
         thread_resume(waiter->thread);
     } else {
         // No waiters
         mutex->owner = -1;
         atomic_barrier();
-        spinlock_unlock_noirq(&mutex->lock, &hold);
+        spinlock_unlock_noirq(&mutex->lock);
     }
 }
 
 EXPORT void mutex_lock_noyield(mutex_t *mutex)
 {
-    spinlock_hold_t hold;
     for (int done = 0; ; pause()) {
         if (mutex->owner >= 0)
             continue;
 
-        hold = spinlock_lock_noirq(&mutex->lock);
+        spinlock_lock_noirq(&mutex->lock);
 
         if (mutex->owner < 0) {
             mutex->owner = thread_get_id();
             done = 1;
         }
 
-        spinlock_unlock_noirq(&mutex->lock, &hold);
+        spinlock_unlock_noirq(&mutex->lock);
 
         if (done)
             break;
@@ -174,17 +171,16 @@ EXPORT void condvar_init(condition_var_t *var)
 EXPORT void condvar_destroy(condition_var_t *var)
 {
     if (var->link.prev != &var->link) {
-        spinlock_hold_t hold = spinlock_lock_noirq(&var->lock);
+        spinlock_lock_noirq(&var->lock);
         for (thread_wait_link_t volatile *node = var->link.next;
              node != &var->link; node = thread_wait_del(node));
-        spinlock_unlock_noirq(&var->lock, &hold);
+        spinlock_unlock_noirq(&var->lock);
     }
     assert(var->link.next == &var->link);
     assert(var->link.prev == &var->link);
 }
 
 typedef struct condvar_spinlock_t {
-    spinlock_hold_t hold;
     spinlock_t *lock;
 } condvar_spinlock_t;
 
@@ -197,7 +193,7 @@ static void condvar_lock_spinlock(void *mutex)
 static void condvar_unlock_spinlock(void *mutex)
 {
     condvar_spinlock_t *state = mutex;
-    spinlock_unlock_noirq(state->lock, &state->hold);
+    spinlock_unlock_noirq(state->lock);
 }
 
 static void condvar_lock_mutex_noyield(void *mutex)
@@ -220,8 +216,7 @@ static void condvar_wait_ex(condition_var_t *var,
                             void (*unlock)(void*),
                             void *mutex)
 {
-    spinlock_hold_t hold;
-    hold = spinlock_lock_noirq(&var->lock);
+    spinlock_lock_noirq(&var->lock);
 
     thread_wait_t wait;
     thread_wait_add(&var->link, &wait.link);
@@ -235,7 +230,7 @@ static void condvar_wait_ex(condition_var_t *var,
     assert(wait.link.next == 0);
     assert(wait.link.prev == 0);
 
-    spinlock_unlock_noirq(&var->lock, &hold);
+    spinlock_unlock_noirq(&var->lock);
 }
 
 EXPORT void condvar_wait_spinlock(condition_var_t *var,
@@ -264,8 +259,7 @@ EXPORT void condvar_wait_noyield(condition_var_t *var,
 
 EXPORT void condvar_wake_one(condition_var_t *var)
 {
-    spinlock_hold_t hold;
-    hold = spinlock_lock_noirq(&var->lock);
+    spinlock_lock_noirq(&var->lock);
     atomic_barrier();
 
     thread_wait_t volatile *wait = (void*)var->link.next;
@@ -277,13 +271,12 @@ EXPORT void condvar_wake_one(condition_var_t *var)
     } else {
         CONDVAR_DTRACE("No waiters when waking\n");
     }
-    spinlock_unlock_noirq(&var->lock, &hold);
+    spinlock_unlock_noirq(&var->lock);
 }
 
 EXPORT void condvar_wake_all(condition_var_t *var)
 {
-    spinlock_hold_t hold;
-    hold = spinlock_lock_noirq(&var->lock);
+    spinlock_lock_noirq(&var->lock);
 
     for (thread_wait_t *wait = (void*)var->link.next;
          wait != (void*)&var->link;
@@ -292,6 +285,6 @@ EXPORT void condvar_wake_all(condition_var_t *var)
         thread_resume(wait->thread);
     }
 
-    spinlock_unlock_noirq(&var->lock, &hold);
+    spinlock_unlock_noirq(&var->lock);
 }
 

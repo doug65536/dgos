@@ -61,13 +61,12 @@ uint32_t pci_config_read(
                 (func << 8) |
                 (offset & -4);
 
-        spinlock_hold_t hold;
-        hold = spinlock_lock_noirq(&pci_spinlock);
+        spinlock_lock_noirq(&pci_spinlock);
 
         outd(PCI_ADDR, pci_address);
         data = ind(PCI_DATA);
 
-        spinlock_unlock_noirq(&pci_spinlock, &hold);
+        spinlock_unlock_noirq(&pci_spinlock);
 
         data >>= (offset & 3) << 3;
 
@@ -98,8 +97,7 @@ int pci_config_write(
             (slot << 11) |
             (func << 8);
 
-    spinlock_hold_t hold;
-    hold = spinlock_lock_noirq(&pci_spinlock);
+    spinlock_lock_noirq(&pci_spinlock);
 
     while (size > 0) {
         // Choose an I/O size that will realign
@@ -151,7 +149,7 @@ int pci_config_write(
         outd(PCI_DATA, write);
     }
 
-    spinlock_unlock_noirq(&pci_spinlock, &hold);
+    spinlock_unlock_noirq(&pci_spinlock);
 
     return 1;
 }

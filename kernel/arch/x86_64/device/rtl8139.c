@@ -874,7 +874,7 @@ static int rtl8139_send(eth_dev_base_t *dev, ethq_pkt_t *pkt)
 {
     ETH_DEV_PTR(dev);
 
-    spinlock_hold_t hold = spinlock_lock_noirq(&self->lock);
+    spinlock_lock_noirq(&self->lock);
 
     memcpy(pkt->pkt.hdr.s_mac, self->mac_addr, 6);
 
@@ -885,7 +885,7 @@ static int rtl8139_send(eth_dev_base_t *dev, ethq_pkt_t *pkt)
         ethq_enqueue(&self->tx_queue, pkt);
     }
 
-    spinlock_unlock_noirq(&self->lock, &hold);
+    spinlock_unlock_noirq(&self->lock);
 
     return 1;
 }

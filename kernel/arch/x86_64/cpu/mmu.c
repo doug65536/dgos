@@ -2078,7 +2078,7 @@ void *mmap_register_device(void *context,
                            int prot,
                            mm_dev_mapping_callback_t callback)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(&mm_dev_mapping_lock);
+    spinlock_lock_noirq(&mm_dev_mapping_lock);
 
     mmap_device_mapping_t *mapping = 0;
     if (mm_dev_mapping_count < countof(mm_dev_mappings)) {
@@ -2092,7 +2092,7 @@ void *mmap_register_device(void *context,
         mapping->callback = callback;
     }
 
-    spinlock_unlock_noirq(&mm_dev_mapping_lock, &hold);
+    spinlock_unlock_noirq(&mm_dev_mapping_lock);
 
     return mapping->base_addr;
 }

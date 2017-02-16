@@ -708,15 +708,15 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
 static spinlock_t printdbg_user_lock;
 
 __attribute__((used))
-static spinlock_hold_t printdbg_lock_noirq(void)
+static void printdbg_lock_noirq(void)
 {
-    return spinlock_lock_noirq(&printdbg_user_lock);
+    spinlock_lock_noirq(&printdbg_user_lock);
 }
 
 __attribute__((used))
-static void printdbg_unlock_noirq(spinlock_hold_t *hold)
+static void printdbg_unlock_noirq()
 {
-    spinlock_unlock_noirq(&printdbg_user_lock, hold);
+    spinlock_unlock_noirq(&printdbg_user_lock);
 }
 
 static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)

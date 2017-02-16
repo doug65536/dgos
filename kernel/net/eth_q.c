@@ -104,24 +104,24 @@ int ethq_init(void)
 static spinlock_t ethq_lock;
 ethq_pkt_t *ethq_pkt_acquire(void)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(&ethq_lock);
+    spinlock_lock_noirq(&ethq_lock);
 
     ethq_pkt_t *pkt = ethq_first_free;
     ethq_first_free = pkt->next;
 
-    spinlock_unlock_noirq(&ethq_lock, &hold);
+    spinlock_unlock_noirq(&ethq_lock);
 
     return pkt;
 }
 
 void ethq_pkt_release(ethq_pkt_t *pkt)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(&ethq_lock);
+    spinlock_lock_noirq(&ethq_lock);
 
     pkt->next = ethq_first_free;
     ethq_first_free = pkt;
 
-    spinlock_unlock_noirq(&ethq_lock, &hold);
+    spinlock_unlock_noirq(&ethq_lock);
 }
 
 #else

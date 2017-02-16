@@ -38,46 +38,40 @@ void spinlock_unlock(spinlock_t *lock)
     atomic_barrier();
 }
 
-// Spin to acquire lock, return with IRQs disable
-spinlock_hold_t spinlock_lock_noirq(spinlock_t *lock)
+// Spin to acquire lock, return with IRQs disabled
+void spinlock_lock_noirq(spinlock_t *lock)
 {
-    spinlock_hold_t hold;
-
     // Disable IRQs
-    hold.intr_enabled = cpu_irq_disable();
+    int intr_enabled = cpu_irq_disable() << 1;
 
     atomic_barrier();
     int spins = 0;
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
+    while (*lock != 0 ||
+           atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         // Allow IRQs if they were enabled
-        cpu_irq_toggle(hold.intr_enabled);
+        cpu_irq_toggle(intr_enabled);
 
         ++spins;
-//        if ((++spins & 0xFF) == 0xFF)
-//            thread_yield();
-//        else
-            pause();
+
+        pause();
 
         // Disable IRQs
         cpu_irq_disable();
     }
 
-    //if (spins > 0)
-    //    printdbg("High noirq spin count: %d\n", spins);
-
     // Return with interrupts disabled
-    return hold;
 }
 
 // Returns 1 with interrupts disabled if lock was acquired
 // Returns 0 with interrupts preserved if lock was not acquired
-int spinlock_try_lock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
+int spinlock_try_lock_noirq(spinlock_t *lock)
 {
-    hold->intr_enabled = cpu_irq_disable();
+    int intr_enabled = cpu_irq_disable() << 1;
 
     atomic_barrier();
-    if (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
-        cpu_irq_toggle(hold->intr_enabled);
+    if (*lock != 0 ||
+            atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
+        cpu_irq_toggle(intr_enabled);
 
         return 0;
     }
@@ -85,11 +79,12 @@ int spinlock_try_lock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
     return 1;
 }
 
-void spinlock_unlock_noirq(spinlock_t *lock, spinlock_hold_t *hold)
+void spinlock_unlock_noirq(spinlock_t *lock)
 {
-    assert(*lock != 0);
+    int intr_enabled = *lock >> 1;
+    assert(*lock & 1);
     *lock = 0;
-    cpu_irq_toggle(hold->intr_enabled);
+    cpu_irq_toggle(intr_enabled);
     atomic_barrier();
 }
 

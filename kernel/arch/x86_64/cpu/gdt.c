@@ -93,10 +93,10 @@ void gdt_init_tss(int cpu_count)
 
 void gdt_load_tr(int cpu_number)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(&gdt_tss_lock);
+    spinlock_lock_noirq(&gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
     cpu_set_tr(GDT_SEL_TSS);
 
-    spinlock_unlock_noirq(&gdt_tss_lock, &hold);
+    spinlock_unlock_noirq(&gdt_tss_lock);
 }

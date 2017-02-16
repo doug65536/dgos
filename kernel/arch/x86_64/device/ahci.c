@@ -1244,7 +1244,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     async_callback_t pending_callbacks[32];
     unsigned callback_count = 0;
 
-    spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
+    spinlock_lock_noirq(&pi->lock);
 
     // Read command slot interrupt status
     int slot;
@@ -1303,7 +1303,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     // Acknowledge slot interrupt
     port->intr_status |= port->intr_status;
 
-    spinlock_unlock_noirq(&pi->lock, &hold);
+    spinlock_unlock_noirq(&pi->lock);
 
     // Make all callbacks outside lock
     for (unsigned i = 0; i < callback_count; ++i) {
@@ -1407,7 +1407,7 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
     hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
 
-    spinlock_hold_t hold = spinlock_lock_noirq(&pi->lock);
+    spinlock_lock_noirq(&pi->lock);
 
     memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
 
@@ -1437,7 +1437,7 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     atomic_barrier();
     port->cmd_issue = (1U<<slot);
 
-    spinlock_unlock_noirq(&pi->lock, &hold);
+    spinlock_unlock_noirq(&pi->lock);
 }
 
 static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,

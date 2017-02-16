@@ -83,8 +83,7 @@ static intr_handler_reg_t *intr_alloc(void)
 
 void intr_hook(int intr, intr_handler_t handler)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(
-                &intr_handler_reg_lock);
+    spinlock_lock_noirq(&intr_handler_reg_lock);
 
     if (intr_handlers_count == 0) {
         // First time initialization
@@ -122,7 +121,7 @@ void intr_hook(int intr, intr_handler_t handler)
         *prev_link = entry - intr_handlers;
     }
 
-    spinlock_unlock_noirq(&intr_handler_reg_lock, &hold);
+    spinlock_unlock_noirq(&intr_handler_reg_lock);
 }
 
 static void intr_delete(intr_link_t *prev_link,
@@ -135,8 +134,7 @@ static void intr_delete(intr_link_t *prev_link,
 
 void intr_unhook(int intr, intr_handler_t handler)
 {
-    spinlock_hold_t hold = spinlock_lock_noirq(
-                &intr_handler_reg_lock);
+    spinlock_lock_noirq(&intr_handler_reg_lock);
 
     intr_link_t *prev_link = &intr_first[intr];
 
@@ -155,7 +153,7 @@ void intr_unhook(int intr, intr_handler_t handler)
         entry = 0;
     }
 
-    spinlock_unlock_noirq(&intr_handler_reg_lock, &hold);
+    spinlock_unlock_noirq(&intr_handler_reg_lock);
 }
 
 int intr_has_handler(int intr)

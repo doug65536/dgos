@@ -1661,15 +1661,14 @@ uint32_t apic_timer_count(void)
 //
 // IOAPIC
 
-static spinlock_hold_t ioapic_lock_noirq(mp_ioapic_t *ioapic)
+static void ioapic_lock_noirq(mp_ioapic_t *ioapic)
 {
-    return spinlock_lock_noirq(&ioapic->lock);
+    spinlock_lock_noirq(&ioapic->lock);
 }
 
-static void ioapic_unlock_noirq(mp_ioapic_t *ioapic,
-                                spinlock_hold_t *hold)
+static void ioapic_unlock_noirq(mp_ioapic_t *ioapic)
 {
-    spinlock_unlock_noirq(&ioapic->lock, hold);
+    spinlock_unlock_noirq(&ioapic->lock);
 }
 
 static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg)
@@ -1770,7 +1769,7 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 
     uint32_t iored_hi = IOAPIC_REDHI_DEST_n(0);
 
-    spinlock_hold_t hold = ioapic_lock_noirq(ioapic);
+    ioapic_lock_noirq(ioapic);
 
     // Write low part with mask set
     ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin),
@@ -1783,7 +1782,7 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 
     atomic_barrier();
 
-    ioapic_unlock_noirq(ioapic, &hold);
+    ioapic_unlock_noirq(ioapic);
 }
 
 //
@@ -1851,7 +1850,7 @@ static void ioapic_setmask(int irq, int unmask)
     mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
     mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
 
-    spinlock_hold_t hold = ioapic_lock_noirq(ioapic);
+    ioapic_lock_noirq(ioapic);
 
     uint32_t ent = ioapic_read(
                 ioapic, IOAPIC_RED_LO_n(mapping->intin));
@@ -1864,7 +1863,7 @@ static void ioapic_setmask(int irq, int unmask)
     ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin),
                  ent);
 
-    ioapic_unlock_noirq(ioapic, &hold);
+    ioapic_unlock_noirq(ioapic);
 }
 
 static void ioapic_hook(int irq, intr_handler_t handler)
@@ -1928,10 +1927,10 @@ int ioapic_irq_cpu(int irq, int cpu)
 
     mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
     mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-    spinlock_hold_t hold = ioapic_lock_noirq(ioapic);
+    ioapic_lock_noirq(ioapic);
     ioapic_write(ioapic, IOAPIC_RED_HI_n(mapping->intin),
                  IOAPIC_REDHI_DEST_n(apic_id_list[cpu]));
-    ioapic_unlock_noirq(ioapic, &hold);
+    ioapic_unlock_noirq(ioapic);
     return 1;
 }
 
