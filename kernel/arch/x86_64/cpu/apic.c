@@ -1840,9 +1840,8 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
             irq = ioapic->irq_base + intin;
     }
 
-    ctx = irq_invoke(intr, irq, ctx);
-
     apic_eoi(intr);
+    ctx = irq_invoke(intr, irq, ctx);
 
     return ctx;
 }
