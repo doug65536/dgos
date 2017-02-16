@@ -32,7 +32,9 @@ typedef struct ipv4_addr_pair_t {
     ipv4_addr_t d;
 } ipv4_addr_pair_t;
 
-uint16_t ipv4_checksum(ipv4_hdr_t const *hdr, size_t size);
+uint16_t ipv4_checksum(ipv4_hdr_t const *hdr);
 void ipv4_ip_get(ipv4_addr_pair_t *addr, ipv4_hdr_t const *hdr);
+
+void const *ipv4_end_get(ipv4_hdr_t const *hdr);
 
 void ipv4_finalize(ipv4_hdr_t *hdr, void const *end);

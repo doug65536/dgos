@@ -21,14 +21,14 @@ typedef struct arp_packet_t {
     uint16_t oper;
 
     // Source MAC
-    uint8_t s_addr[6];
+    uint8_t source_mac[6];
 
-    // Sender IPv4 address
+    // Source IPv4 address
     uint8_t sender_ip[4];
 
-    // Source MAC
-    uint8_t d_addr[6];
+    // Target MAC
+    uint8_t target_mac[6];
 
     // Target IPv4 address
     uint8_t target_ip[4];
-} arp_packet_t;
+} __attribute__((packed)) arp_packet_t;

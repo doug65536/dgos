@@ -37,7 +37,8 @@ uint16_t udp_finalize(udp_hdr_t *hdr, void const *end)
 {
     ipv4_finalize(&hdr->ipv4_hdr, end);
 
-    uint16_t udp_size = (char*)end - (char*)(&hdr->ipv4_hdr + 1);
+    uint16_t udp_size = (char*)end -
+            ((char*)&hdr->ipv4_hdr + (hdr->ipv4_hdr.ver_ihl & 0xF) * 4);
     hdr->len = htons(udp_size);
     hdr->checksum = udp_checksum(hdr);
 
