@@ -19,6 +19,7 @@
 #include "rand.h"
 #include "string.h"
 #include "heap.h"
+#include "elf64.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -55,11 +56,12 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
-#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_CTXSW_STRESS_THREAD  0
 
+#define ENABLE_STRESS_HEAP_THREAD   0
 #define ENABLE_STRESS_HEAP_SMALL    0
-#define ENABLE_STRESS_HEAP_LARGE    0
-#define ENABLE_STRESS_HEAP_BOTH     1
+#define ENABLE_STRESS_HEAP_LARGE    1
+#define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE     64
@@ -72,6 +74,16 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define STRESS_HEAP_MAXSIZE     65536
 #elif ENABLE_STRESS_HEAP_THREAD
 #error Must enable a size range
+#endif
+
+#if ENABLE_CTXSW_STRESS_THREAD > 0
+static int ctx_sw_thread(void *p)
+{
+    (void)p;
+    while (1)
+        thread_yield();
+}
+
 #endif
 
 #if ENABLE_SHELL_THREAD > 0
@@ -445,16 +457,23 @@ static int stress_mmap_thread(void *p)
 {
     (void)p;
     void *block;
-    for (unsigned iter = 0; iter < 50; ++iter) {
-        block = mmap(0, 1 << 12,
-                     PROT_READ | PROT_WRITE,
-                     0, -1, 0);
+    uint64_t seed = 42;
+    for (;;) {
+        for (unsigned iter = 0; iter < 50; ++iter) {
+            int size = rand_r_range(&seed, 1, 131072);
+            assert(size >= 1);
+            assert(size < 131072);
 
-        memset(block, 0, 1 << 12);
+            block = mmap(0, size,
+                         PROT_READ | PROT_WRITE,
+                         0, -1, 0);
 
-        munmap(block, 1 << 12);
+            memset(block, 0, size);
 
-        //printdbg("Ran mmap test iteration %u\n", iter);
+            munmap(block, size);
+
+            //printdbg("Ran mmap test iteration %u\n", iter);
+        }
     }
     return 0;
 }
@@ -489,14 +508,12 @@ static int stress_heap_thread(void *p)
                                     STRESS_HEAP_MAXSIZE);
 
                 heap_free(heap, history[history_index]);
-
-                cpu_irq_disable();
+                history[history_index] = 0;
 
                 uint64_t st = cpu_rdtsc();
                 void *block = heap_alloc(heap, size);
+                printdbg("Allocated size=%d\n", size);
                 uint64_t el = cpu_rdtsc() - st;
-
-                cpu_irq_enable();
 
                 history[history_index++] = block;
                 history_index &= countof(history)-1;
@@ -539,6 +556,14 @@ static int init_thread(void *p)
 
     // Register network interfaces
     callout_call('N');
+
+    modload_init();
+
+#if ENABLE_CTXSW_STRESS_THREAD > 0
+    for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
+        thread_create(ctx_sw_thread, 0, 0, 0);
+    }
+#endif
 
 #if ENABLE_SHELL_THREAD > 0
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0);

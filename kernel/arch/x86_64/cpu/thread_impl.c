@@ -159,7 +159,7 @@ EXPORT void thread_yield(void)
         "call isr_entry_%c[yield]\n\t"
         :
         : [yield] "i" (INTR_THREAD_YIELD)
-        : "%rax"
+        : "%rax", "memory"
     );
 #else
     __asm__ __volatile__ (
@@ -227,6 +227,8 @@ static thread_t thread_create_with_state(
             pause();
             continue;
         }
+
+        atomic_barrier();
 
         thread->flags = 0;
 

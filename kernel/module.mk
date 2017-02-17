@@ -37,7 +37,7 @@ clean:
 	@$(RM) -f $(patsubst %,$(DEPDIR)/%.d,$(notdir $(SRCS)))
 
 $(MODFILENAME): $(OBJS) $(LINKERSCRIPT) $(BUILDROOT)/module.mk
-	$(LD) -shared -melf_x86_64 -z max-page-size=4096 \
+	$(LD) -r -melf_x86_64 -z max-page-size=4096 \
 		$(LDFLAGS) -T $(LINKERSCRIPT) \
 		-o $@ \
 		$(OBJS)
