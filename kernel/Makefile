@@ -73,11 +73,11 @@ CFLAGS ?= -g3 -fno-stack-protector \
 	-fpic -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
-	-fexceptions -fno-common \
+	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
 	$(WEVERYTHING)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
@@ -119,6 +119,8 @@ OUTPUTS = $(KERNEL)
 
 NEEDSMALLEST :=
 
+LD := ld
+
 LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M \
 	-T $(LINKERSCRIPT) -g -export-dynamic
 
@@ -148,7 +150,7 @@ $(LIBFILES): subdirs
 .PHONY: subdirs
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES)
-	ld -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
+	$(LD) --trace -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
 		--whole-archive \
 		--start-group $(LIBFILES) --end-group \
 		--no-whole-archive \
