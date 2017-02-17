@@ -38,6 +38,7 @@ $(OBJS): Makefile
 # Generate assembly dump for C
 $(DUMPDIR)/%.s : %.c
 $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
+	mkdir -p $(@D)
 	$(COMPILE.c) $(OUTPUT_OPTION) -fverbose-asm -S $<
 
 # Generate preprocessed source for C

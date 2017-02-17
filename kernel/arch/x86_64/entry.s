@@ -1,4 +1,4 @@
-.section .entry
+.section .entry, "ax"
 
 .global entry
 .hidden entry

@@ -194,9 +194,9 @@ typedef struct Elf64_Phdr {
 #define PT_HIPROC 0x7FFFFFFF
 
 // Segment attributes
-#define PF_W 0x1 // Write permission
-#define PF_R 0x2 // Read permission
-#define PF_X 0x4 // Execute permission
+#define PF_R 0x4 // Read permission
+#define PF_W 0x2 // Write permission
+#define PF_X 0x1 // Execute permission
 #define PF_MASKOS 0x00FF0000 // These flag bits are reserved for environment-specific use
 #define PF_MASKPROC 0xFF000000 // These flag bits are reserved for processor-specific use
 

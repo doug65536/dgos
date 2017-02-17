@@ -1,4 +1,4 @@
-.text
+.section .text, "ax"
 
 .macro push_cfi val
 	pushq \val

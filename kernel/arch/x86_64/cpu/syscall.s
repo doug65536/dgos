@@ -1,4 +1,4 @@
-.text
+.section .text, "ax"
 
 .global syscall_entry
 .hidden syscall_entry

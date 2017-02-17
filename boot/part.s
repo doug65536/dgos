@@ -1,4 +1,4 @@
-.section ".parttab"
+.section ".parttab", "ax"
 
 .macro partition_table_entry active,lba_start,lba_sectors,type
 	.if \active != 0
