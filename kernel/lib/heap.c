@@ -242,21 +242,24 @@ void heap_free(heap_t *heap, void *block)
 
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
 
+    assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
+
     uint8_t log2size = bit_log2_n_32((int32_t)hdr->size_next);
     assert(log2size >= 5 && log2size < 32);
     size_t bucket = log2size - 5;
 
     if (bucket < HEAP_BUCKET_COUNT) {
-        assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
         assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ (1 << log2size)));
 
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
+        mutex_lock(&heap->lock);
         hdr->size_next = (uintptr_t)heap->free_chains[bucket];
         heap->free_chains[bucket] = hdr;
+        mutex_unlock(&heap->lock);
     } else {
         heap_large_free(hdr, hdr->size_next);
-    }
+    }    
 }
 
 void *heap_realloc(heap_t *heap, void *block, size_t size)
