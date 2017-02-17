@@ -143,7 +143,7 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
 
     size_t size = 1 << log2size;
 
-    heap_hdr_t *hdr;
+    heap_hdr_t *hdr = 0;
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
         hdr = (void*)fill;
         hdr->size_next = (uintptr_t)heap->free_chains[bucket];

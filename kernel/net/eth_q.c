@@ -50,7 +50,7 @@ int ethq_init(void)
     ethq_pkt_list = (void*)(ethq_pkts + ethq_pkt_count);
     ethq_free_chain = (void*)(ethq_pkt_list + ethq_pkt_count);
 
-    uintptr_t physaddr;
+    uintptr_t physaddr = 0;
     for (size_t i = 0; i < ethq_pkt_count; ++i) {
         if (!(i & 1))
             physaddr = mphysaddr(&ethq_pkts->pkt);

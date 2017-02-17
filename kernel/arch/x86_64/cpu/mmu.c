@@ -33,7 +33,7 @@
 #define PROFILE_PHYS_ALLOC_ONLY(p)
 #endif
 
-#define PROFILE_LINEAR_ALLOC    1
+#define PROFILE_LINEAR_ALLOC    0
 #if PROFILE_LINEAR_ALLOC
 #define PROFILE_LINEAR_ALLOC_ONLY(p) p
 #else
@@ -1888,6 +1888,7 @@ void *mremap(
         new_address = va_arg(ap, void*);
         va_end(ap);
     }
+    (void)new_address;
 
     old_size = round_up(old_size);
     new_size = round_up(new_size);

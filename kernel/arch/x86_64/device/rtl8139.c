@@ -1005,7 +1005,7 @@ static int rtl8139_detect(eth_dev_base_t ***devices)
 
         // Set rx buffer physical address
         RTL8139_MM_WR_32(RTL8139_IO_RBSTART,
-                         (uint32_t)self->rx_buffer_physaddr);
+                         (uint32_t)(uintptr_t)self->rx_buffer_physaddr);
 
         // Set tx buffer physical addresses
         for (unsigned i = 0; i < 4; ++i)

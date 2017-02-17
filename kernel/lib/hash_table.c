@@ -113,7 +113,7 @@ int htbl_insert(hashtbl_t *self, void *item)
     rwspinlock_ex_lock(&self->lock);
 
     if (!self->items ||
-            self->count >= ((1<<self->log2_capacity) * 3) >> 2) {
+            self->count >= ((1U<<self->log2_capacity) * 3U) >> 2) {
         if (!htbl_rehash(self)) {
             rwspinlock_ex_unlock(&self->lock);
             return 0;
