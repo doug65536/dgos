@@ -1,5 +1,5 @@
 __asm__ (
-    ".section .head\n"
+    ".section .head, \"ax\"\n"
     ".globl halt\n"
     ".globl entry\n"
 "entry:\n"
@@ -78,7 +78,7 @@ __asm__ (
 "0:\n"
     "hlt\n"
     "jmp 0b\n"
-    ".section .text\n"
+    ".section .text, \"ax\"\n"
 );
 
 #include "types.h"
