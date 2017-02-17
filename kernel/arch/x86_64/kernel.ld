@@ -1,17 +1,10 @@
 ENTRY(entry)
 
 SECTIONS {
-	/*
-	 * Total address space is 256TB
-	 * 64TB of address space is reserved for user mode programs
-	 * 64TB is reserved for the kernel
-	 * This sidesteps any issues with dealing with canonical addresses
-	 * By 2024 we should have about 1TB of ram
-	 * By 2033 we might have a problem with 64TB limit
-	 */
+	. = 0xFFFF800000000000;
 
 	/* Code and read-only data */
-	.text 0x400000000000 : {
+	.text : AT(0x100000) {
 		PROVIDE_HIDDEN(___text_st = .);
 		*(.entry)
 
@@ -90,24 +83,31 @@ SECTIONS {
 		*(.eh_frame.*)
 	}
 
-	.interp : ALIGN(4096) {
-		*(.interp);
-	}
-
 	.hash : ALIGN(4096) {
+		PROVIDE_HIDDEN(___hash_st = .);
 		*(.hash);
+		PROVIDE_HIDDEN(___hash_en = .);
 	}
 
 	.dynsym : ALIGN(4096) {
+		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
+		PROVIDE_HIDDEN(___dynsym_en = .);
+		. = ALIGN(4096);
 	}
 
 	.dynstr : ALIGN(4096) {
+		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
+		PROVIDE_HIDDEN(___dynstr_en = .);
+		. = ALIGN(4096);
 	}
 
 	.dynamic : ALIGN(4096) {
+		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
+		PROVIDE_HIDDEN(___dynamic_en = .);
+		. = ALIGN(4096);
 	}
 
 	/* Initialized data */
@@ -205,6 +205,7 @@ SECTIONS {
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
+	/discard/        : { *(.interp)        }
 	.debug_info    0 : { *(.debug_info)    }
 	.debug_abbrev  0 : { *(.debug_abbrev)  }
 	.debug_aranges 0 : { *(.debug_aranges) }

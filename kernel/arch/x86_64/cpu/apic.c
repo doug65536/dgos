@@ -822,7 +822,8 @@ static uint64_t acpi_rsdp_addr;
 
 int acpi_have8259pic(void)
 {
-    return !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
+    return !acpi_rsdp_addr ||
+            !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
 }
 
 // Returns 0 on failure
@@ -1364,12 +1365,14 @@ unsigned apic_get_id(void)
 
 static void apic_send_command(uint32_t dest, uint32_t cmd)
 {
+    int intr_enabled = cpu_irq_disable();
     APIC_DEST = dest;
     atomic_barrier();
     APIC_CMD = cmd;
     atomic_barrier();
     while (APIC_CMD & APIC_CMD_PENDING)
         pause();
+    cpu_irq_toggle(intr_enabled);
 }
 
 // if target_apic_id is <= -2, sends to all CPUs

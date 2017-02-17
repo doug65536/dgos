@@ -59,7 +59,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
-    paging_map_range(0x800000000000 - PAGE_SIZE, PAGE_SIZE, 0,
+    paging_map_range(0ULL - PAGE_SIZE, PAGE_SIZE, 0,
                      PTE_PRESENT | PTE_WRITABLE, 0);
 
     // Map first 640KB
@@ -111,39 +111,22 @@ uint16_t elf64_run(char const *filename)
                elf_magic, sizeof(elf_magic)))
         return 0;
 
-    // Load section headers
-    Elf64_Shdr *section_hdrs;
-    read_size = sizeof(*section_hdrs) * file_hdr.e_shnum;
-    section_hdrs = malloc(read_size);
-    if (!section_hdrs)
+    // Load program headers
+    Elf64_Phdr *program_hdrs;
+    read_size = sizeof(*program_hdrs) * file_hdr.e_phnum;
+    program_hdrs = malloc(read_size);
+    if (!program_hdrs)
         return 0;
     if (read_size != boot_pread(
                 file,
-                section_hdrs,
+                program_hdrs,
                 read_size,
-                file_hdr.e_shoff))
+                file_hdr.e_phoff))
         return 0;
 
     uint64_t total_bytes = 0;
-    for (uint16_t i = 0; i < file_hdr.e_shnum; ++i)
-        if (section_hdrs[i].sh_addr)
-            total_bytes += section_hdrs[i].sh_size;
-
-    // Load section names
-    char *section_names;
-    read_size = section_hdrs[file_hdr.e_shstrndx].sh_size;
-    section_names = malloc(read_size);
-    if (!section_names)
-        return 0;
-    if (read_size != boot_pread(
-                file,
-                section_names,
-                read_size,
-                section_hdrs[file_hdr.e_shstrndx].sh_offset))
-        return 0;
-
-    // Allocate physical pages above 1MB line
-    uint64_t page_alloc = 0x100000;
+    for (uint16_t i = 0; i < file_hdr.e_phnum; ++i)
+        total_bytes += program_hdrs[i].p_memsz;
 
     uint16_t failed = 0;
 
@@ -160,70 +143,59 @@ uint16_t elf64_run(char const *filename)
     uint64_t done_bytes = 0;
 
     // For each section
-    for (size_t i = 1; !failed && i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr *sec = section_hdrs + i;
-
-        //print_line("section %d:"
-        //           " name=%s"
-        //           " addr=%llx"
-        //           " size=%llx"
-        //           " off=%llx"
-        //           " flags=%llx"
-        //           " type=%x",
-        //           i,
-        //           section_names + sec->sh_name,
-        //           sec->sh_addr,
-        //           sec->sh_size,
-        //           sec->sh_offset,
-        //           sec->sh_flags,
-        //           sec->sh_type);
+    for (size_t i = 0; !failed && i < file_hdr.e_phnum; ++i) {
+        Elf64_Phdr *blk = program_hdrs + i;
 
         uint64_t page_flags = 0;
 
         // If it is not readable, writable or executable, ignore
-        if ((sec->sh_flags & (PF_R | PF_W | PF_X)) == 0)
-            continue;
-
-        // If address is 0, definitely no load
-        if (sec->sh_addr == 0)
+        if ((blk->p_flags & (PF_R | PF_W | PF_X)) == 0)
             continue;
 
         // Pages present
         page_flags |= PTE_PRESENT;
 
         // If not executable, mark as no execute
-        if ((sec->sh_flags & PF_X) == 0)
+        if ((blk->p_flags & PF_X) == 0)
             page_flags |= nx_page_flags;
 
         // Writable
-        if ((sec->sh_flags & PF_W) != 0)
+        if ((blk->p_flags & PF_W) != 0)
             page_flags |= PTE_WRITABLE;
 
         char read_buffer[PAGE_SIZE];
 
-        // Use zeroed buffer for zero initialized sections
-        if (sec->sh_type == SHT_NOBITS)
-            memset(read_buffer, 0, PAGE_SIZE);
+        uint64_t page_alloc = blk->p_paddr;
 
-        size_t read_size;
-        uint64_t addr = sec->sh_addr;
-        uint64_t remain = sec->sh_size;
-        for (off_t ofs = sec->sh_offset,
-             end = sec->sh_offset + sec->sh_size; ofs < end;
-             ofs += read_size, remain -= read_size) {
-            read_size = PAGE_SIZE;
-            if (read_size > remain)
-                read_size = remain;
+        size_t chunk_size;
+        uint64_t addr = blk->p_vaddr;
+        uint64_t remain = blk->p_memsz;
+        uint64_t file_remain = blk->p_filesz;
+        Elf64_Off bss_ofs = blk->p_offset + blk->p_filesz;
+        Elf64_Off bss_remain = blk->p_memsz - blk->p_filesz;
+        for (Elf64_Off ofs = blk->p_offset,
+             end = blk->p_offset + blk->p_memsz; ofs < end;
+             ofs += chunk_size, remain -= chunk_size) {
+            chunk_size = PAGE_SIZE;
 
-            if (sec->sh_addr)
-                done_bytes += read_size;
+            // Handle partial read/zero
+            if (ofs < bss_ofs && chunk_size > file_remain) {
+                chunk_size = file_remain;
+                file_remain -= chunk_size;
+            } else if (ofs >= bss_ofs && chunk_size > bss_remain) {
+                chunk_size = bss_remain;
+                bss_remain -= chunk_size;
+            }
 
-            // Read from disk if program section
-            if (sec->sh_type == SHT_PROGBITS) {
-                if (read_size != boot_pread(
+            done_bytes += chunk_size;
+
+            if (ofs < bss_ofs) {
+                if (chunk_size != boot_pread(
                             file, read_buffer,
-                            read_size, ofs))
+                            chunk_size, ofs))
                     break;
+            } else if (ofs == bss_ofs) {
+                memset(read_buffer, 0, chunk_size);
             }
 
             // Map pages
@@ -236,33 +208,31 @@ uint16_t elf64_run(char const *filename)
             paging_alias_range(address_window, addr, PAGE_SIZE,
                                PTE_PRESENT | PTE_WRITABLE);
 
-            addr += PAGE_SIZE;
+            addr += chunk_size;
 
             // Copy to alias region
             // Add misalignment offset
             copy_or_enter(address_window + (addr & (PAGE_SIZE-1)),
-                          (uint32_t)read_buffer, read_size);
+                          (uint32_t)read_buffer, chunk_size);
 
-            progress_bar_draw(20, 10, 70, 100 * (double)done_bytes / (double)total_bytes);
+            progress_bar_draw(20, 10, 70, 100 *
+                              (double)done_bytes /
+                              (double)total_bytes);
         }
 
         // Clear modified bits if uninitialized data
-        if (sec->sh_type == SHT_NOBITS) {
-            paging_modify_flags(sec->sh_addr, sec->sh_size,
+        if (blk->p_memsz > blk->p_filesz) {
+            paging_modify_flags(blk->p_vaddr + blk->p_filesz,
+                                blk->p_memsz - blk->p_filesz,
                                 PTE_DIRTY | PTE_ACCESSED, 0);
         }
-
-        // If we don't read whole section, something went wrong
-        if (remain)
-            failed = 1;
     }
     boot_close(file);
 
     paging_modify_flags(address_window, PAGE_SIZE << 1,
                         ~(uint64_t)0, 0);
 
-    free(section_names);
-    free(section_hdrs);
+    free(program_hdrs);
 
     print_line("Entering kernel");
 

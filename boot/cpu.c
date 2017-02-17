@@ -228,15 +228,15 @@ uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
     // Automatically check for support for the leaf
     if ((eax & 0x7FFFFFFF) != 0) {
-        cpuid(output, eax & 0x80000000, 0);
+        cpuid(output, eax & 0x80000000U, 0);
         if (output->eax < eax)
             return 0;
     }
 
     __asm__ __volatile__ (
         "cpuid"
-        : "=a" (output->eax), "=b" (output->ebx),
-          "=d" (output->edx), "=c" (output->ecx)
+        : "=a" (output->eax), "=c" (output->ecx),
+          "=d" (output->edx), "=b" (output->ebx)
         : "a" (eax), "c" (ecx)
     );
 
@@ -246,14 +246,14 @@ uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 uint16_t cpu_has_long_mode(void)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, 0x80000001, 0) &&
+    return cpuid(&cpuinfo, 0x80000001U, 0) &&
             (cpuinfo.edx & (1<<29));
 }
 
 uint16_t cpu_has_no_execute(void)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, 0x8000001, 0) &&
+    return cpuid(&cpuinfo, 0x80000001U, 0) &&
             (cpuinfo.edx & (1<<20));
 }
 

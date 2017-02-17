@@ -33,7 +33,7 @@
 #define PROFILE_PHYS_ALLOC_ONLY(p)
 #endif
 
-#define PROFILE_LINEAR_ALLOC    0
+#define PROFILE_LINEAR_ALLOC    1
 #if PROFILE_LINEAR_ALLOC
 #define PROFILE_LINEAR_ALLOC_ONLY(p) p
 #else
@@ -45,6 +45,13 @@
 #define PROFILE_MMAP_ONLY(p) p
 #else
 #define PROFILE_MMAP_ONLY(p)
+#endif
+
+#define PROFILE_SLOWPATH    0
+#if PROFILE_SLOWPATH
+#define PROFILE_SLOWPATH_ONLY(p) p
+#else
+#define PROFILE_SLOWPATH_ONLY(p)
 #endif
 
 // Intel manual, page 2786
@@ -144,21 +151,24 @@
 /// a linear address, the top of linear address space is
 /// reserved for mapping the page tables.
 ///
-/// The kernel has a map for the range
-/// 0x400000000000 to 0x800000000000
-/// This range is 70,368,744,177,664 bytes
+/// The full address space is 256TB
+/// The low 128TB are user space
+/// The upper 128TB are kernel space
+/// The kernel has a map for the (non-canonical) range
+/// 0x000000000000 to 0xFFFFFFFFFFFF
+/// This range is 281,474,976,710,656 bytes
 ///
-/// One page maps 2MB: 33554432 pages (0x2000000)
-/// plus
-/// One page maps 1GB: 65536 pages (0x10000)
-/// plus
-/// One page maps 512GB: 128 pages (0x00080)
+/// This is:
+///  0x1000000000   4KB pages, plus
+///  0x0008000000   2MB pages, plus
+///  0x0000040000   1GB pages, plus
+///  0x0000000200 512GB pages
+///  ------------
+///  0x1008040200 total PTEs
 ///
-/// 33554432 + 65536 + 128 = 33620096 pages
-///  (0x2000000 + 0x10000 + 0x80)
+/// 550,831,656,960 bytes
 ///
-/// 33620096 pages = 137,707,913,216 bytes
-///
+/// Starting the page tables at 0xFFFFFF7F00000000 uses 516GB
 
 // Page table entries don't have a structure, they
 // are a bunch of bitfields. Use uint64_t and the
@@ -172,15 +182,15 @@ typedef uintptr_t linaddr_t;
 //  0x7f0000000000
 
 // Linear addresses
-#define PT_BASEADDR     (0x7F0000000000UL)
-#define PT_MAX_ADDR     (0x800000000000UL)
+#define PT_BASEADDR     (0xFFFFFF7F00000000UL)
+#define PT_MAX_ADDR     (0UL)
 
 // The number of pte_t entries at each level
 // Total data 275,415,828,480 bytes
-#define PT3_ENTRIES     (0x800000000UL)
-#define PT2_ENTRIES     (0x4000000UL)
-#define PT1_ENTRIES     (0x20000UL)
-#define PT0_ENTRIES     (0x100UL)
+#define PT3_ENTRIES     (0x1000000000UL)
+#define PT2_ENTRIES     (0x8000000UL)
+#define PT1_ENTRIES     (0x40000UL)
+#define PT0_ENTRIES     (0x200UL)
 
 // The array index of the start of each level
 #define PT3_BASE        (0)
@@ -411,9 +421,10 @@ static physaddr_t mmu_alloc_phys(int low)
 
 static void path_from_addr(unsigned *path, linaddr_t addr)
 {
-    unsigned slot = 0;
-    for (uint8_t shift = 39; shift >= 12; shift -= 9)
-        path[slot++] = (addr >> shift) & 0x1FF;
+    path[0] = (addr >> 39) & 0x1FF;
+    path[1] = (addr >> 30) & 0x1FF;
+    path[2] = (addr >> 21) & 0x1FF;
+    path[3] = (addr >> 12) & 0x1FF;
 }
 
 static void path_inc(unsigned *path)
@@ -478,7 +489,7 @@ static pte_t *take_apte(physaddr_t address)
                         new_map) == old_map) {
                 // Successfully acquired entry
 
-                linaddr_t linaddr = 0x800000000000UL -
+                linaddr_t linaddr = 0UL -
                         (64 << PAGE_SIZE_BIT) +
                         (((linaddr_t)first_available)
                          << PAGE_SIZE_BIT);
@@ -760,7 +771,7 @@ static pte_t *init_find_aliasing_pte(void)
 {
     pte_t *pte = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
     unsigned path[4];
-    path_from_addr(path, 0x800000000000 - PAGE_SIZE);
+    path_from_addr(path, 0UL - PAGE_SIZE);
 
     for (unsigned level = 0; level < 3; ++level)
         pte = (pte_t*)(pte[path[level]] & PTE_ADDR);
@@ -779,8 +790,9 @@ static pte_t *mm_map_aliasing_pte(
     if ((linaddr_t)aliasing_pte >= PT_BASEADDR) {
         uintptr_t pt3_index = aliasing_pte - PT3_PTR(PT_BASEADDR);
         linaddr = (pt3_index << PAGE_SIZE_BIT);
+        linaddr |= -(linaddr >> 47) << 47;
     } else {
-        linaddr = 0x800000000000 - PAGE_SIZE;
+        linaddr = 0UL - PAGE_SIZE;
     }
 
     *aliasing_pte = (*aliasing_pte & ~PTE_ADDR) |
@@ -957,6 +969,8 @@ static void mmu_map_page(
         return;
     }
 
+    PROFILE_SLOWPATH_ONLY( printdbg("mmu_map_page slow path!\n") );
+
     // Read root physical address from page tables
     physaddr_t root = cpu_get_page_directory();
 
@@ -969,7 +983,7 @@ static void mmu_map_page(
                    pt_physaddr,
                    flags);
 
-    pte_from_path(pte_linaddr, path);
+    //pte_from_path(pte_linaddr, path);
 
     // Map the page tables for the region
     for (unsigned i = 0; i < 4; ++i) {
@@ -1384,7 +1398,7 @@ void mmu_init(int ap)
         assert(addr != 0);
 
         if (addr > top_of_kernel &&
-                addr < 0x8000000000000000UL) {
+                addr < 0xFFFFFFFFFFFFFFFFUL) {
             uint64_t volatile *chain = phys_next_free +
                     (addr < 0x100000000UL);
             addr -= 0x100000U;
@@ -1431,12 +1445,12 @@ void mmu_init(int ap)
 
 static size_t round_up(size_t n)
 {
-    return (n + PAGE_MASK) & -PAGE_SIZE;
+    return (n + PAGE_MASK) & (int)-PAGE_SIZE;
 }
 
 static size_t round_down(size_t n)
 {
-    return n & ~PAGE_MASK;
+    return n & (int)-PAGE_MASK;
 }
 
 //
@@ -1780,23 +1794,23 @@ void *mmap(void *addr, size_t len,
 
     pte_t page_flags = 0;
 
-    if (flags & (MAP_STACK | MAP_32BIT))
+    if (unlikely(flags & (MAP_STACK | MAP_32BIT)))
         flags |= MAP_POPULATE;
 
-    if (flags & MAP_PHYSICAL)
+    if (unlikely(flags & MAP_PHYSICAL))
         page_flags |= PTE_PCD | PTE_PWT |
                 PTE_EX_PHYSICAL | PTE_PRESENT;
 
-    if (flags & MAP_NOCACHE)
+    if (unlikely(flags & MAP_NOCACHE))
         page_flags |= PTE_PCD;
 
-    if (flags & MAP_WRITETHRU)
+    if (unlikely(flags & MAP_WRITETHRU))
         page_flags |= PTE_PWT;
 
     if (flags & MAP_POPULATE)
         page_flags |= PTE_PRESENT;
 
-    if (flags & MAP_DEVICE)
+    if (unlikely(flags & MAP_DEVICE))
         page_flags |= PTE_EX_DEVICE;
 
     if (flags & MAP_USER)
@@ -1810,12 +1824,16 @@ void *mmap(void *addr, size_t len,
 
     uintptr_t misalignment = 0;
 
-    if (flags & MAP_PHYSICAL) {
+    if (unlikely(flags & MAP_PHYSICAL)) {
         misalignment = (uintptr_t)addr & PAGE_MASK;
         len += misalignment;
     }
 
+    PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
     linaddr_t linear_addr = take_linear(&linear_allocator, len);
+    PROFILE_LINEAR_ALLOC_ONLY( printdbg("Allocation of %lu bytes of"
+                                        " address space took %lu cycles\n",
+                                        len, cpu_rdtsc() - profile_linear_st) );
 
     assert(linear_addr > 0x100000);
 
@@ -1829,10 +1847,14 @@ void *mmap(void *addr, size_t len,
 
             // If populating, assign physical memory immediately
             // Always commit first page immediately
-            if ((flags & MAP_POPULATE) || !ofs) {
+            if (!ofs || unlikely(flags & MAP_POPULATE)) {
                 page = init_take_page(!!(flags & MAP_32BIT));
                 assert(page != 0);
             }
+
+            printdbg("Mapping virt %p to phys %p\n",
+                     (void*)(linear_addr + ofs),
+                     (void*)page);
 
             mmu_map_page(linear_addr + ofs, page, page_flags |
                          (!ofs & PTE_PRESENT));

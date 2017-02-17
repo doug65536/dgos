@@ -156,7 +156,7 @@ OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect.hex
 
 NEEDSMALLEST := bootsect.c
-NOOPTIMIZE := iso9660.c elf64.c
+NOOPTIMIZE := iso9660.c elf64.c cpu.c
 
 DISKIMAGE := $(DISKIMGDIR)/dgos.fat32.raw
 
@@ -347,25 +347,21 @@ run-iso-numa: $(ISO_FILE)
 
 debug-iso-boot: $(ISO_FILE)
 	 $(GDB) --symbols $(SYMBOLFILE) --tui \
-		-ex 'b iso9660_boot_partition' \
-		-ex 'b iso9660_boot_open' \
-		-ex 'b iso9660_boot_close' \
-		-ex 'b iso9660_boot_pread' \
+		-ex 'b elf64_run' \
 		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio' \
-			$(QEMU_NET)
+			-gdb stdio \
+			$(QEMU_NET)'
 
 debug-iso-kernel: $(ISO_FILE)
 	$(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) \
-		-ex 'b *0x400000000000' \
+		-ex 'b entry' \
 		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
+			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio' \
-			$(QEMU_NET)
+			-gdb stdio \
+			$(QEMU_NET)'
 
 debug-iso-wait-singlecpu: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \

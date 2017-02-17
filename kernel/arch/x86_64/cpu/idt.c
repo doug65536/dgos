@@ -18,7 +18,7 @@
 #define PROFILE_IRQ_ONLY(p) (void)0
 #endif
 
-#define PROFILE_EXCEPTION   1
+#define PROFILE_EXCEPTION   0
 #if PROFILE_EXCEPTION
 #define PROFILE_EXCEPTION_ONLY(p) p
 #else
@@ -178,7 +178,7 @@ int idt_init(int ap)
             addr = (uintptr_t)isr_entry_points[i];
             idt[i].offset_lo = (uint16_t)(addr & 0xFFFF);
             idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
-            idt[i].offset_64_31 = (uint16_t)
+            idt[i].offset_64_31 = (uint32_t)
                     ((addr >> 32) & 0xFFFFFFFF);
 
             idt[i].type_attr = IDT_PRESENT | IDT_INTR;
