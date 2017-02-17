@@ -1852,10 +1852,6 @@ void *mmap(void *addr, size_t len,
                 assert(page != 0);
             }
 
-            printdbg("Mapping virt %p to phys %p\n",
-                     (void*)(linear_addr + ofs),
-                     (void*)page);
-
             mmu_map_page(linear_addr + ofs, page, page_flags |
                          (!ofs & PTE_PRESENT));
         } else {
@@ -1868,7 +1864,6 @@ void *mmap(void *addr, size_t len,
     }
 
     atomic_inc(&mmu_seq);
-    //mmu_send_tlb_shootdown();
 
     assert(linear_addr > 0x100000);
 
