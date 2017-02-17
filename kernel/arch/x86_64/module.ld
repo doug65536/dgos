@@ -2,7 +2,7 @@ ENTRY(entry)
 
 SECTIONS {
 	/* Code and read-only data */
-	.text 0x600000000000 : ALIGN(4096) {
+	.text : ALIGN(4096) {
 		. = SIZEOF_HEADERS;
 
 		PROVIDE_HIDDEN(___text_st = .);
