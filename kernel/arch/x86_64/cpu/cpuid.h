@@ -4,9 +4,9 @@
 
 typedef struct cpuid_t {
     uint32_t eax;
-    uint32_t ebx;
-    uint32_t edx;
     uint32_t ecx;
+    uint32_t edx;
+    uint32_t ebx;
 } cpuid_t;
 
 // Returns true if the CPU supports that leaf

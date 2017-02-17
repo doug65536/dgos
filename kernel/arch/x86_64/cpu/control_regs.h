@@ -115,7 +115,15 @@ uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set);
 // Returns new value of cr0
 uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set);
 
-uintptr_t cpu_get_fault_address(void);
+static inline uintptr_t cpu_get_fault_address(void)
+{
+    uintptr_t addr;
+    __asm__ __volatile__ (
+        "mov %%cr2,%[addr]\n\t"
+        : [addr] "=r" (addr)
+    );
+    return addr;
+}
 
 uintptr_t cpu_get_page_directory(void);
 void cpu_set_page_directory(uintptr_t addr);
@@ -124,7 +132,15 @@ void cpu_flush_tlb(void);
 void cpu_set_fsbase(void *fs_base);
 void cpu_set_gsbase(void *gs_base);
 
-void cpu_invalidate_page(uintptr_t addr);
+static inline void cpu_invalidate_page(uintptr_t addr)
+{
+    __asm__ __volatile__ (
+        "invlpg (%[addr])\n\t"
+        :
+        : [addr] "r" (addr)
+        : "memory"
+    );
+}
 
 table_register_64_t cpu_get_gdtr(void);
 void cpu_set_gdtr(table_register_64_t gdtr);
@@ -142,13 +158,53 @@ static inline void *cpu_gs_read_ptr(void)
     return ptr;
 }
 
-int cpu_irq_disable(void);
-void cpu_irq_enable(void);
-void cpu_irq_toggle(int enable);
+static inline int cpu_irq_disable(void)
+{
+    uintptr_t rflags;
+    __asm__ __volatile__ (
+        "pushf\n\t"
+        "pop %[rflags]\n\t"
+        "cli\n\t"
+        : [rflags] "=r" (rflags)
+        :
+        : "memory"
+    );
+    return ((rflags >> 9) & 1);
+}
+
+static inline void cpu_irq_enable(void)
+{
+    __asm__ __volatile__ ( "sti" : : : "memory" );
+}
+
+static inline void cpu_irq_toggle(int enable)
+{
+    uintptr_t temp;
+    __asm__ __volatile__ (
+        "pushfq\n\t"
+        "pop %q[temp]\n\t"
+        "and $~(1<<9),%k[temp]\n\t"
+        "or %k[enable],%k[temp]\n\t"
+        "push %q[temp]\n\t"
+        "popfq\n\t"
+        : [temp] "=&r" (temp)
+        : [enable] "r" ((!!enable) << 9)
+        : "memory"
+    );
+}
 
 void *cpu_get_stack_ptr(void);
 void cpu_crash(void);
 
-uint64_t cpu_rdtsc(void);
+static inline uint64_t cpu_rdtsc(void)
+{
+    uint32_t tsc_lo;
+    uint32_t tsc_hi;
+    __asm__ __volatile__ (
+        "rdtsc\n\t"
+        : "=a" (tsc_lo), "=d" (tsc_hi)
+    );
+    return tsc_lo | ((uint64_t)tsc_hi << 32);
+}
 
 uint32_t cpu_get_default_mxcsr_mask(void);

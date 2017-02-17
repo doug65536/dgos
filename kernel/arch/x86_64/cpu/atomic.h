@@ -48,7 +48,7 @@ static inline void pause(void)
     __typeof__(*_value_ptr) _last_value = *_value_ptr; \
     \
     if (_last_value > _n) { \
-        for (;;) { \
+        for (;; pause()) { \
             __typeof__(*_value_ptr) _curr_value = atomic_cmpxchg( \
                         _value_ptr, _last_value, _n); \
             \
@@ -64,7 +64,6 @@ static inline void pause(void)
             } \
             \
             _last_value = _curr_value; \
-            pause(); \
         } \
     } \
     _last_value; \
@@ -81,7 +80,7 @@ static inline void pause(void)
     __typeof__(*_value_ptr) _last_value = *_value_ptr; \
     \
     if (_last_value < _n) { \
-        for (;;) { \
+        for (;; pause()) { \
             __typeof__(*_value_ptr) _curr_value = atomic_cmpxchg( \
                         _value_ptr, _last_value, _n); \
             \
@@ -97,7 +96,6 @@ static inline void pause(void)
             } \
             \
             _last_value = _curr_value; \
-            pause(); \
         } \
     } \
     _last_value; \

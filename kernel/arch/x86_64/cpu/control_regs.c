@@ -107,16 +107,6 @@ uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
     return rax;
 }
 
-uintptr_t cpu_get_fault_address(void)
-{
-    uintptr_t addr;
-    __asm__ __volatile__ (
-        "mov %%cr2,%[addr]\n\t"
-        : [addr] "=r" (addr)
-    );
-    return addr;
-}
-
 void cpu_set_page_directory(uintptr_t addr)
 {
     __asm__ __volatile__ (
@@ -145,16 +135,6 @@ void cpu_set_fsbase(void *fs_base)
 void cpu_set_gsbase(void *gs_base)
 {
     msr_set(MSR_GSBASE, (uintptr_t)gs_base);
-}
-
-void cpu_invalidate_page(uintptr_t addr)
-{
-    __asm__ __volatile__ (
-        "invlpg (%[addr])\n\t"
-        :
-        : [addr] "r" (addr)
-        : "memory"
-    );
 }
 
 void cpu_flush_tlb(void)
@@ -206,40 +186,7 @@ void cpu_set_tr(uint16_t tr)
     );
 }
 
-int cpu_irq_disable(void)
-{
-    uintptr_t rflags;
-    __asm__ __volatile__ (
-        "pushf\n\t"
-        "pop %[rflags]\n\t"
-        "cli\n\t"
-        : [rflags] "=r" (rflags)
-        :
-        : "memory"
-    );
-    return ((rflags >> 9) & 1);
-}
 
-void cpu_irq_enable(void)
-{
-    __asm__ __volatile__ ( "sti" : : : "memory" );
-}
-
-void cpu_irq_toggle(int enable)
-{
-    uintptr_t temp;
-    __asm__ __volatile__ (
-        "pushfq\n\t"
-        "pop %q[temp]\n\t"
-        "and $~(1<<9),%k[temp]\n\t"
-        "or %k[enable],%k[temp]\n\t"
-        "push %q[temp]\n\t"
-        "popfq\n\t"
-        : [temp] "=&r" (temp)
-        : [enable] "r" ((!!enable) << 9)
-        : "memory"
-    );
-}
 
 uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
 {
@@ -265,17 +212,6 @@ void cpu_crash(void)
     __asm__ __volatile__ (
         "ud2"
     );
-}
-
-uint64_t cpu_rdtsc(void)
-{
-    uint32_t tsc_lo;
-    uint32_t tsc_hi;
-    __asm__ __volatile__ (
-        "rdtsc\n\t"
-        : "=a" (tsc_lo), "=d" (tsc_hi)
-    );
-    return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
 
 uint32_t cpu_get_default_mxcsr_mask(void)

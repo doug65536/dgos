@@ -11,16 +11,8 @@
 void spinlock_lock(spinlock_t *lock)
 {
     atomic_barrier();
-    int spins = 0;
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
-        if ((++spins & 0x1FF) == 0x1FF)
-            thread_yield();
-        else
-            pause();
-    }
-
-    //if (spins > 0)
-    //    printdbg("Spinlock spun %d times\n", spins);
+    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
+        pause();
 }
 
 int spinlock_try_lock(spinlock_t *lock)
@@ -45,13 +37,10 @@ void spinlock_lock_noirq(spinlock_t *lock)
     int intr_enabled = cpu_irq_disable() << 1;
 
     atomic_barrier();
-    int spins = 0;
     while (*lock != 0 ||
            atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         // Allow IRQs if they were enabled
         cpu_irq_toggle(intr_enabled);
-
-        ++spins;
 
         pause();
 

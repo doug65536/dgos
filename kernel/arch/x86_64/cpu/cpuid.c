@@ -25,11 +25,11 @@ int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
     }
 
     __asm__ __volatile__ (
-                "cpuid"
-                : "=a" (output->eax), "=b" (output->ebx),
-                "=d" (output->edx), "=c" (output->ecx)
-                : "a" (eax), "c" (ecx)
-                );
+        "cpuid"
+        : "=a" (output->eax), "=c" (output->ecx),
+          "=d" (output->edx), "=b" (output->ebx)
+        : "a" (eax), "c" (ecx)
+    );
 
     return 1;
 }

@@ -20,8 +20,8 @@
 #define CONDVAR_DTRACE(...) ((void)0)
 #endif
 
-#define SPINCOUNT_MAX   512
-#define SPINCOUNT_MIN   16
+#define SPINCOUNT_MAX   1048576
+#define SPINCOUNT_MIN   131072
 
 static void thread_wait_add(thread_wait_link_t volatile *root,
                             thread_wait_link_t volatile *node)
@@ -53,7 +53,8 @@ EXPORT void mutex_init(mutex_t *mutex)
 {
     mutex->owner = -1;
     mutex->lock = 0;
-    mutex->spin_count = 64;
+    mutex->spin_count = SPINCOUNT_MIN +
+            ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1);
     mutex->link.next = &mutex->link;
     mutex->link.prev = &mutex->link;
 }
