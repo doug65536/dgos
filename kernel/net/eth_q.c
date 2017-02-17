@@ -232,6 +232,7 @@ ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
 ethq_pkt_t *ethq_dequeue_all(ethq_queue_t *queue)
 {
     ethq_pkt_t *all = queue->head;
+    queue->tail->next = 0;
     queue->head = 0;
     queue->tail = 0;
     queue->count = 0;
