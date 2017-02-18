@@ -21,18 +21,22 @@ static inline void pause(void)
 #define atomic_lfence() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 #define atomic_sfence() __atomic_thread_fence(__ATOMIC_RELEASE)
 
-#define atomic_add(value, rhs) __atomic_add_fetch(value, rhs, __ATOMIC_SEQ_CST)
-#define atomic_xadd(value, rhs) __atomic_fetch_add(value, rhs, __ATOMIC_SEQ_CST)
-#define atomic_inc(value) __atomic_add_fetch(value, 1, __ATOMIC_SEQ_CST)
-#define atomic_dec(value) __atomic_sub_fetch(value, 1, __ATOMIC_SEQ_CST)
-#define atomic_sub(value, rhs) __atomic_sub_fetch(value, rhs, __ATOMIC_SEQ_CST)
-#define atomic_and(value, rhs) __atomic_and_fetch(value, rhs, __ATOMIC_SEQ_CST)
-#define atomic_xor(value, rhs) __atomic_xor_fetch(value, rhs, __ATOMIC_SEQ_CST)
-#define atomic_or(value, rhs)  __atomic_or_fetch(value, rhs, __ATOMIC_SEQ_CST)
-#define atomic_xchg(value, rhs) __atomic_exchange_n(value, rhs, __ATOMIC_SEQ_CST)
+#define atomic_add(value, rhs) __atomic_add_fetch((value), (rhs), __ATOMIC_SEQ_CST)
+#define atomic_xadd(value, rhs) __atomic_fetch_add((value), (rhs), __ATOMIC_SEQ_CST)
+#define atomic_inc(value) __atomic_add_fetch((value), 1, __ATOMIC_SEQ_CST)
+#define atomic_dec(value) __atomic_sub_fetch((value), 1, __ATOMIC_SEQ_CST)
+#define atomic_sub(value, rhs) __atomic_sub_fetch((value), (rhs), __ATOMIC_SEQ_CST)
+#define atomic_and(value, rhs) __atomic_and_fetch((value), (rhs), __ATOMIC_SEQ_CST)
+#define atomic_xor(value, rhs) __atomic_xor_fetch((value), (rhs), __ATOMIC_SEQ_CST)
+#define atomic_or(value, rhs)  __atomic_or_fetch((value), (rhs), __ATOMIC_SEQ_CST)
+#define atomic_xchg(value, rhs) __atomic_exchange_n((value), (rhs), __ATOMIC_SEQ_CST)
 
 #define atomic_cmpxchg(value, expect, replacement) \
-    __sync_val_compare_and_swap(value, expect, replacement)
+    __sync_val_compare_and_swap((value), (expect), (replacement))
+
+#define atomic_cmpxchg_upd(value, expect, replacement) \
+    __atomic_compare_exchange_n((value), (expect), (replacement), \
+        0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 
 //
 // Atomic update helpers

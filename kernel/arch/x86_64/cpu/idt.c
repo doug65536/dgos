@@ -10,6 +10,7 @@
 #include "control_regs.h"
 #include "string.h"
 #include "assert.h"
+#include "except.h"
 
 #define PROFILE_IRQ         0
 #if PROFILE_IRQ
@@ -545,8 +546,10 @@ static void *unhandled_exception_handler(isr_context_t *ctx)
 isr_context_t *exception_isr_handler(isr_context_t *ctx)
 {
     if (!intr_has_handler(ctx->gpr->info.interrupt) ||
-            !intr_invoke(ctx->gpr->info.interrupt, ctx))
-        return unhandled_exception_handler(ctx);
+            !intr_invoke(ctx->gpr->info.interrupt, ctx)) {
+        if (__exception_handler_invoke(ctx->gpr->info.interrupt))
+            return unhandled_exception_handler(ctx);
+    }
 
     return ctx;
 }

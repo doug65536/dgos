@@ -57,8 +57,8 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
+#define ENABLE_STRESS_HEAP_THREAD   1
 
-#define ENABLE_STRESS_HEAP_THREAD   0
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    1
 #define ENABLE_STRESS_HEAP_BOTH     0
@@ -179,6 +179,42 @@ static int stress_mutex(void *p)
 
         mutex_unlock(&stress_lock);
     }
+    return 0;
+}
+#endif
+
+#include "cpu/except.h"
+
+#if 1
+static int mprotect_check(void *p)
+{
+    (void)p;
+
+    char *mem = mmap(0, 256 << 20, PROT_NONE, 0, -1, 0);
+
+    __try {
+        *mem = 'H';
+    }
+    __catch {
+        printdbg("Caught!!\n");
+    }
+
+    if (-1 != mprotect(0, 42, PROT_NONE))
+        assert_msg(0, "Expected error");
+
+    if (1 != mprotect(mem, 42, PROT_NONE))
+        assert_msg(0, "Expected success");
+
+    if (1 != mprotect(mem + 8192, 16384, PROT_NONE))
+        assert_msg(0, "Expected success");
+
+    if (1 != mprotect(mem, 256 << 20, PROT_READ | PROT_WRITE))
+        assert_msg(0, "Expected success");
+
+    memset(mem, 0, 2 << 20);
+
+    munmap(mem, 256 << 20);
+
     return 0;
 }
 #endif
@@ -512,7 +548,7 @@ static int stress_heap_thread(void *p)
 
                 uint64_t st = cpu_rdtsc();
                 void *block = heap_alloc(heap, size);
-                printdbg("Allocated size=%d\n", size);
+                //printdbg("Allocated size=%d\n", size);
                 uint64_t el = cpu_rdtsc() - st;
 
                 history[history_index++] = block;
@@ -538,6 +574,7 @@ static int stress_heap_thread(void *p)
         }
     }
     heap_destroy(heap);
+    return 0;
 }
 #endif
 
@@ -621,6 +658,8 @@ int main(void)
     pci_init();
     keybd_init();
     keyb8042_init();
+
+    mprotect_check(0);
 
     void *a = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
     void *b = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);

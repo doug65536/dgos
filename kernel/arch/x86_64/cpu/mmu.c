@@ -419,7 +419,7 @@ static physaddr_t mmu_alloc_phys(int low)
 //
 // Path to PTE
 
-static void path_from_addr(unsigned *path, linaddr_t addr)
+static inline void path_from_addr(unsigned *path, linaddr_t addr)
 {
     path[0] = (addr >> 39) & 0x1FF;
     path[1] = (addr >> 30) & 0x1FF;
@@ -427,7 +427,8 @@ static void path_from_addr(unsigned *path, linaddr_t addr)
     path[3] = (addr >> 12) & 0x1FF;
 }
 
-static void path_inc(unsigned *path)
+// Returns true on innermost level carry
+static inline int path_inc(unsigned *path)
 {
     // Branchless algorithm
 
@@ -443,11 +444,13 @@ static void path_inc(unsigned *path)
     path[1] = (unsigned)(n >> (9 * 2)) & 0x1FF;
     path[2] = (unsigned)(n >> (9 * 1)) & 0x1FF;
     path[3] = (unsigned)n & 0x1FF;
+
+    return path[3] == 0;
 }
 
 // Returns the linear addresses of the page tables for
 // the given path
-static void pte_from_path(pte_t **pte, unsigned *path)
+static inline void pte_from_path(pte_t **pte, unsigned *path)
 {
     linaddr_t base = PT_BASEADDR;
 
@@ -1973,6 +1976,112 @@ int munmap(void *addr, size_t size)
                    size);
 
     return 0;
+}
+
+int mprotect(void *addr, size_t len, int prot)
+{
+    // Fail on invalid protection mask
+    if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
+        return -1;
+
+    // Fail on invalid address
+    if (!addr)
+        return -1;
+
+    unsigned misalignment = (uintptr_t)addr & PAGE_MASK;
+    addr = (char*)addr - misalignment;
+    len += misalignment;
+
+    if (unlikely(len == 0))
+        return 0;
+
+    /// Demand paged PTE, readable
+    ///  present=0, addr=PTE_ADDR
+    /// Demand paged PTE, not readable
+    ///  present=0, addr=(PTE_ADDR>>1)&PTE_ADDR
+
+    // Only the MSB of the physical address set
+    pte_t const demand_no_read = (PTE_ADDR >> 1) & PTE_ADDR;
+
+    pte_t no_exec = mmu_have_nx() ? PTE_NX : 0;
+
+    // Bits to set in PTE
+    pte_t set_bits =
+            ((prot & PROT_EXEC)
+             ? 0
+             : no_exec) |
+            ((prot & PROT_READ)
+             ? PTE_PRESENT
+             : 0) |
+            ((prot & PROT_WRITE)
+             ? PTE_WRITABLE
+             : 0);
+
+    // Bits to clear in PTE
+    // If the protection is no-read,
+    // we clear the highest bit in the physical address.
+    // This invalidates the demand paging value without
+    // invalidating the
+    pte_t clr_bits =
+            ((prot & PROT_EXEC)
+             ? no_exec
+             : 0) |
+            ((prot & PROT_READ)
+             ? 0
+             : PTE_PRESENT) |
+            ((prot & PROT_WRITE)
+             ? 0
+             : PTE_WRITABLE);
+
+    unsigned path[4];
+    unsigned path_en[4];
+
+    path_from_addr(path, (linaddr_t)addr);
+    path_from_addr(path_en, (linaddr_t)addr + len - 1);
+
+    pte_t *pt[4];
+    pte_t *pt_en[4];
+    pte_from_path(pt, path);
+    pte_from_path(pt_en, path_en);
+
+    while (((pt[0] <= pt_en[0]) &
+            (pt[1] <= pt_en[1]) &
+            (pt[2] <= pt_en[2]) &
+            (pt[3] <= pt_en[3])) &&
+           (*pt[0] & PTE_PRESENT) &&
+           (*pt[1] & PTE_PRESENT) &&
+           (*pt[2] & PTE_PRESENT)) {
+        pte_t replace;
+        for (pte_t expect = *pt[3]; ; pause()) {
+            int demand_paged = ((expect & demand_no_read) == demand_no_read);
+            if (expect == 0)
+                return -1;
+            else if (demand_paged && (prot & PROT_READ))
+                // We are enabling read on demand paged entry
+                replace = (expect & ~clr_bits) |
+                        ((set_bits & ~PTE_PRESENT) | PTE_ADDR);
+            else if (demand_paged && !(prot & PROT_READ))
+                // We are disabling read on a demand paged entry
+                replace = (expect & demand_no_read & ~clr_bits) |
+                        (set_bits & ~PTE_PRESENT);
+            else
+                // Just change permission bits
+                replace = (expect & ~clr_bits) | set_bits;
+
+            // Try to update PTE
+            if (atomic_cmpxchg_upd(pt[3], &expect, replace))
+                break;
+        }
+
+        cpu_invalidate_page((uintptr_t)addr);
+        addr = (char*)addr + PAGE_SIZE;
+
+        ++pt[3];
+        path_inc(path);
+        pte_from_path(pt, path);
+    }
+
+    return 1;
 }
 
 uintptr_t mphysaddr(void *addr)

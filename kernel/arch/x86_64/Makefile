@@ -26,6 +26,7 @@ CSRCS := \
 	cpu/mmu.c \
 	cpu/legacy_pic.c \
 	cpu/legacy_pit.c \
+	cpu/except.c \
 	device/pci.c \
 	device/keyb8042.c \
 	device/e9debug.c \
@@ -40,6 +41,7 @@ $(OPTIMIZEDSRCS:.c=.o): CFLAGS += -O2
 ASRCS := entry.s \
 	cpu/syscall.s \
 	cpu/isr.s \
+	cpu/except_asm.s \
 	generated_device_vtbl.s
 
 LIBNAME := arch
