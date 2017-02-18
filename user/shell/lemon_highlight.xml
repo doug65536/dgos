@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?> <!DOCTYPE language SYSTEM "language.dtd">
+<language name="Lemon" version="1.00" kateversion="2.4" section="Sources" extensions="*.y" >
+	<highlighting>
+		<list name="directives">
+			<item> %destructor		 </item>
+			<item> %extra_argument	 </item>
+			<item> %include			 </item>
+			<item> %left			 </item>
+			<item> %name			 </item>
+			<item> %nonassoc		 </item>
+			<item> %parse_accept	 </item>
+			<item> %parse_failure	 </item>
+			<item> %right			 </item>
+			<item> %stack_overflow	 </item>
+			<item> %stack_size		 </item>
+			<item> %start_symbol	 </item>
+			<item> %syntax_error	 </item>
+			<item> %token_destructor </item>
+			<item> %token_prefix	 </item>
+			<item> %token_type		 </item>
+			<item> %type			 </item>
+		</list>
+		<contexts>
+			<context attribute="Normal Text" lineEndContext="#pop" name="Normal Text" >
+				<keyword attribute="Keyword" context="#stay" String="somename" />
+				<DetectChar attribute="String" context="string" char="%" />
+			</context>
+			<context attribute="String" lineEndContext="#stay" name="string" >
+				<DetectChar attribute="String" context="#pop" char="&quot;" />
+			</context>
+		</contexts>
+		<itemDatas>
+			<itemData name="Normal Text" defStyleNum="dsNormal" />
+			<itemData name="Keyword" defStyleNum="dsKeyword" />
+			<itemData name="String" defStyleNum="dsString" />
+		</itemDatas>
+	</highlighting>
+</language>

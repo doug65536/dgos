@@ -1,12 +1,16 @@
 BUILDROOT := $(realpath ../kernel)
 export BUILDROOT
 
-all: libc
+all: libc shell
 
 clean:
-	(cd libc && $(MAKE))
+	(cd libc && $(MAKE) clean)
+	(cd shell && $(MAKE) clean)
 
 libc:
 	(cd libc && $(MAKE))
 
-.PHONY: all clean
+shell:
+	(cd shell && $(MAKE))
+
+.PHONY: all clean libc shell
