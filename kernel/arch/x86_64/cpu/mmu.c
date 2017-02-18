@@ -2044,10 +2044,8 @@ int mprotect(void *addr, size_t len, int prot)
     pte_from_path(pt, path);
     pte_from_path(pt_en, path_en);
 
-    while (((pt[0] <= pt_en[0]) &
-            (pt[1] <= pt_en[1]) &
-            (pt[2] <= pt_en[2]) &
-            (pt[3] <= pt_en[3])) &&
+    while (((pt[0] != pt_en[0]) | (pt[1] != pt_en[1]) |
+            (pt[2] != pt_en[2]) | (pt[3] != pt_en[3])) &&
            (*pt[0] & PTE_PRESENT) &&
            (*pt[1] & PTE_PRESENT) &&
            (*pt[2] & PTE_PRESENT)) {
@@ -2082,6 +2080,54 @@ int mprotect(void *addr, size_t len, int prot)
     }
 
     return 1;
+}
+
+// Support discarding pages and reverting to demand
+// paged state with MADV_DONTNEED.
+// All other advice is ignored.
+int madvise(void *addr, size_t len, int advice)
+{
+    unsigned path[4];
+    unsigned path_en[4];
+
+    if (unlikely(len == 0))
+        return 0;
+
+    if (advice != MADV_DONTNEED)
+        return 0;
+
+    path_from_addr(path, (linaddr_t)addr);
+    path_from_addr(path_en, (linaddr_t)addr + len - 1);
+
+    pte_t *pt[4];
+    pte_from_path(pt, path);
+
+    pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
+
+    while (((path[0] != path_en[0]) | (path[1] != path_en[1]) |
+            (path[2] != path_en[2]) | (path[3] != path_en[3])) &&
+           (*pt[0] & PTE_PRESENT) &&
+           (*pt[1] & PTE_PRESENT) &&
+           (*pt[2] & PTE_PRESENT)) {
+        pte_t replace;
+        for (pte_t expect = *pt[3]; ; pause()) {
+            physaddr_t page = 0;
+            if (expect && (expect & demand_mask) != demand_mask) {
+                page = expect & PTE_ADDR;
+                replace = expect | PTE_ADDR;
+
+                if (atomic_cmpxchg_upd(pt[3], &expect, replace)) {
+                    mmu_free_phys(page);
+                    break;
+                }
+            }
+        }
+
+        path_inc(path);
+        pte_from_path(pt, path);
+    }
+
+    return 0;
 }
 
 uintptr_t mphysaddr(void *addr)
