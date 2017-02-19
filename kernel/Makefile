@@ -77,7 +77,7 @@ CFLAGS ?= -g3 -fno-stack-protector \
 	-fvisibility=hidden \
 	$(WEVERYTHING)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
@@ -111,7 +111,9 @@ KERNEL := $(BINDIR)/kernel
 
 LIBFILES := \
 	lib/libkernel.a \
-	arch/$(ARCH)/libarch.a \
+	arch/$(ARCH)/libarch.a
+
+LIBFILES_WHOLE := \
 	fs/libfs.a \
 	net/libnet.a
 
@@ -149,11 +151,14 @@ $(LIBFILES): subdirs
 
 .PHONY: subdirs
 
-$(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES)
+$(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(LIBFILES_WHOLE)
 	$(LD) --trace -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
+		--start-group \
+		$(LIBFILES) \
 		--whole-archive \
-		--start-group $(LIBFILES) --end-group \
+		$(LIBFILES_WHOLE) \
 		--no-whole-archive \
+		--end-group \
 		$(LIBGCC) \
 		> $(DUMPDIR)/kernel.map
 

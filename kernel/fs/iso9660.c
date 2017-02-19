@@ -639,10 +639,9 @@ static int iso9660_readlink(
 //
 // Scan directories
 
-static int iso9660_opendir(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t **fi)
+static int iso9660_opendir(fs_base_t *dev,
+                           fs_file_info_t **fi,
+                           fs_cpath_t path)
 {
     FS_DEV_PTR(dev);
 
@@ -658,12 +657,10 @@ static int iso9660_opendir(
     return 0;
 }
 
-static ssize_t iso9660_readdir(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        void* buf,
-        off_t offset,
-        fs_file_info_t *fi)
+static ssize_t iso9660_readdir(fs_base_t *dev,
+                               fs_file_info_t *fi,
+                               void* buf,
+                               off_t offset)
 {
     FS_DEV_PTR(dev);
 
@@ -673,17 +670,13 @@ static ssize_t iso9660_readdir(
 
     self->name_copy(buf, de->name, de->filename_len);
 
-    (void)path;
     return 0;
 }
 
-static int iso9660_releasedir(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t *fi)
+static int iso9660_releasedir(fs_base_t *dev,
+                              fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)fi;
     pool_free(&iso9660_handles, fi);
     return 0;
@@ -693,11 +686,10 @@ static int iso9660_releasedir(
 //
 // Modify directories
 
-static int iso9660_mknod(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_mode_t mode,
-        fs_dev_t rdev)
+static int iso9660_mknod(fs_base_t *dev,
+                         fs_cpath_t path,
+                         fs_mode_t mode,
+                         fs_dev_t rdev)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -707,10 +699,9 @@ static int iso9660_mknod(
     return -1;
 }
 
-static int iso9660_mkdir(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_mode_t mode)
+static int iso9660_mkdir(fs_base_t *dev,
+                         fs_cpath_t path,
+                         fs_mode_t mode)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -719,9 +710,8 @@ static int iso9660_mkdir(
     return -1;
 }
 
-static int iso9660_rmdir(
-        fs_base_t *dev,
-        fs_cpath_t path)
+static int iso9660_rmdir(fs_base_t *dev,
+                         fs_cpath_t path)
 {
     FS_DEV_PTR_UNUSED(dev);
     (void)path;
@@ -832,10 +822,9 @@ static int iso9660_utimens(
 //
 // Open/close files
 
-static int iso9660_open(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t **fi)
+static int iso9660_open(fs_base_t *dev,
+                        fs_file_info_t **fi,
+                        fs_cpath_t path)
 {
     FS_DEV_PTR(dev);
 
@@ -850,13 +839,10 @@ static int iso9660_open(
     return 0;
 }
 
-static int iso9660_release(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t *fi)
+static int iso9660_release(fs_base_t *dev,
+                           fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)fi;
     pool_free(&iso9660_handles, fi);
     return 0;
@@ -866,13 +852,11 @@ static int iso9660_release(
 //
 // Read/write files
 
-static ssize_t iso9660_read(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        char *buf,
-        size_t size,
-        off_t offset,
-        fs_file_info_t *fi)
+static ssize_t iso9660_read(fs_base_t *dev,
+                            fs_file_info_t *fi,
+                            char *buf,
+                            size_t size,
+                            off_t offset)
 {
     FS_DEV_PTR_UNUSED(dev);
 
@@ -892,20 +876,16 @@ static ssize_t iso9660_read(
 
     memcpy(buf, file->content + offset, size);
 
-    (void)path;
     return 0;
 }
 
-static ssize_t iso9660_write(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        char *buf,
-        size_t size,
-        off_t offset,
-        fs_file_info_t *fi)
+static ssize_t iso9660_write(fs_base_t *dev,
+                             fs_file_info_t *fi,
+                             char *buf,
+                             size_t size,
+                             off_t offset)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)buf;
     (void)size;
     (void)offset;
@@ -918,41 +898,32 @@ static ssize_t iso9660_write(
 //
 // Sync files and directories and flush buffers
 
-static int iso9660_fsync(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        int isdatasync,
-        fs_file_info_t *fi)
+static int iso9660_fsync(fs_base_t *dev,
+                         fs_file_info_t *fi,
+                         int isdatasync)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)isdatasync;
     (void)fi;
     // Read only device, do nothing
     return 0;
 }
 
-static int iso9660_fsyncdir(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        int isdatasync,
-        fs_file_info_t *fi)
+static int iso9660_fsyncdir(fs_base_t *dev,
+                            fs_file_info_t *fi,
+                            int isdatasync)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)isdatasync;
     (void)fi;
     // Ignore, read only
     return 0;
 }
 
-static int iso9660_flush(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t *fi)
+static int iso9660_flush(fs_base_t *dev,
+                         fs_file_info_t *fi)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)fi;
     // Do nothing, read only
     return 0;
@@ -961,10 +932,8 @@ static int iso9660_flush(
 //
 // Get filesystem information
 
-static int iso9660_statfs(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_statvfs_t* stbuf)
+static int iso9660_statfs(fs_base_t *dev,
+                          fs_statvfs_t* stbuf)
 {
     FS_DEV_PTR(dev);
 
@@ -1001,22 +970,18 @@ static int iso9660_statfs(
     // Maximum filename length
     stbuf->f_namemax = ISO9660_MAX_NAME;
 
-    (void)path;
     return 0;
 }
 
 //
 // lock/unlock file
 
-static int iso9660_lock(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t *fi,
-        int cmd,
-        fs_flock_t* locks)
+static int iso9660_lock(fs_base_t *dev,
+                        fs_file_info_t *fi,
+                        int cmd,
+                        fs_flock_t* locks)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)fi;
     (void)cmd;
     (void)locks;
@@ -1092,17 +1057,14 @@ static int iso9660_listxattr(
 //
 // ioctl API
 
-static int iso9660_ioctl(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        int cmd,
-        void* arg,
-        fs_file_info_t *fi,
-        unsigned int flags,
-        void* data)
+static int iso9660_ioctl(fs_base_t *dev,
+                         fs_file_info_t *fi,
+                         int cmd,
+                         void* arg,
+                         unsigned int flags,
+                         void* data)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)cmd;
     (void)arg;
     (void)fi;
@@ -1114,15 +1076,12 @@ static int iso9660_ioctl(
 //
 //
 
-static int iso9660_poll(
-        fs_base_t *dev,
-        fs_cpath_t path,
-        fs_file_info_t *fi,
-        fs_pollhandle_t* ph,
-        unsigned* reventsp)
+static int iso9660_poll(fs_base_t *dev,
+                        fs_file_info_t *fi,
+                        fs_pollhandle_t* ph,
+                        unsigned* reventsp)
 {
     FS_DEV_PTR_UNUSED(dev);
-    (void)path;
     (void)fi;
     (void)ph;
     (void)reventsp;
