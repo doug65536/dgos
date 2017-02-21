@@ -18,7 +18,7 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-CC := clang
+#CC := clang
 export CC
 
 CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | \
@@ -70,11 +70,12 @@ TLS_MODEL := local-exec
 endif
 
 CFLAGS ?= -g3 -fno-stack-protector \
-	-fpic -mno-red-zone \
+	-mcmodel=kernel -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
 	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
+	-std=c11 \
 	$(WEVERYTHING)
 
 #OPTIMIZE := 1
@@ -123,7 +124,8 @@ NEEDSMALLEST :=
 
 LD := ld
 
-LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib -M \
+LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib \
+	-Map $(DUMPDIR)/kernel.map \
 	-T $(LINKERSCRIPT) -g -export-dynamic
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
@@ -152,15 +154,14 @@ $(LIBFILES): subdirs
 .PHONY: subdirs
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(LIBFILES_WHOLE)
-	$(LD) --trace -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
+	$(LD) -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
 		--start-group \
 		$(LIBFILES) \
 		--whole-archive \
 		$(LIBFILES_WHOLE) \
 		--no-whole-archive \
 		--end-group \
-		$(LIBGCC) \
-		> $(DUMPDIR)/kernel.map
+		$(LIBGCC)
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)
 	objdump --all-headers $< > $@

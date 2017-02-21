@@ -13,18 +13,6 @@
 #include "vesa.h"
 #include "progressbar.h"
 
-//static unsigned long elf64_hash(unsigned char const *name)
-//{
-//    unsigned long h = 0, g;
-//    while (*name) {
-//        h = (h << 4) + *name++;
-//        g = h & 0xf0000000;
-//        h ^= g >> 24;
-//        h &= 0x0fffffff;
-//    }
-//    return h;
-//}
-
 void enter_kernel(uint64_t entry_point);
 
 // Save the entry point address for later MP processor startup
@@ -59,7 +47,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
-    paging_map_range(0ULL - PAGE_SIZE, PAGE_SIZE, 0,
+    paging_map_range(0xFFFFFFFF7FFFF000ULL - PAGE_SIZE, PAGE_SIZE, 0,
                      PTE_PRESENT | PTE_WRITABLE, 0);
 
     // Map first 640KB

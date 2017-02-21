@@ -8,18 +8,18 @@ PHDRS {
 }
 
 SECTIONS {
-	. = 0xFFFF800000000000;
+	. = 0xFFFFFFFF80000000;
 
 	PROVIDE_HIDDEN(___text_st = .);
 
 	/* Code and read-only data */
 	.text : AT (0x100000) ALIGN(4096) {
+		*(.entry)
 		*(.text)
 		*(.text.startup .text.startup.*)
 		*(.text.hot .text.hot.*)
 		*(SORT(.text.*))
 		*(.text.unlikely)
-		*(.entry)
 	} :text
 
 	.rodata : ALIGN(4096) {
@@ -28,11 +28,13 @@ SECTIONS {
 		*(SORT(.init_array.*))
 		PROVIDE_HIDDEN(___init_en = .);
 
+		. = ALIGN(16);
 		PROVIDE_HIDDEN(___fini_st = .);
 		*(.fini_array)
 		*(SORT(.fini_array.*))
 		PROVIDE_HIDDEN(___fini_en = .);
 
+		. = ALIGN(16);
 		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
 		PROVIDE_HIDDEN(___callout_array_en = .);
@@ -54,9 +56,11 @@ SECTIONS {
 		PROVIDE_HIDDEN(___top_physaddr = .);
 		QUAD((___init_brk - ___text_st) + 0x100000);
 
-		/* Provide the TLS size as a global variable *
+		/* Provide the TLS size as a global variable */
 		PROVIDE_HIDDEN(___tls_size = .);
-		QUAD(___tbss_en - ___tdata_st);  */
+		QUAD(___tbss_en - ___tdata_st);
+		PROVIDE_HIDDEN(___tls_init_size = .);
+		QUAD(___tdata_en - ___tdata_st);
 
 		/* Provide the TLS address as a global variable */
 		PROVIDE_HIDDEN(___tls_init_data_ptr = .);
@@ -210,7 +214,6 @@ SECTIONS {
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
-/*
 	/DISCARD/        : { *(.interp)        }
 	.debug_info    0 : { *(.debug_info)    }
 	.debug_abbrev  0 : { *(.debug_abbrev)  }
@@ -218,5 +221,5 @@ SECTIONS {
 	.debug_macro   0 : { *(.debug_macro)   }
 	.debug_line    0 : { *(.debug_line)    }
 	.debug_str     0 : { *(.debug_str)     }
-	.comment       0 : { *(.comment)       } */
+	.comment       0 : { *(.comment)       }
 }

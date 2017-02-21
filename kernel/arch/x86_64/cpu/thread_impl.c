@@ -150,6 +150,7 @@ EXPORT void thread_yield(void)
 {
 #if 1
     __asm__ __volatile__ (
+        "mfence\n\t"
         "movq %%rsp,%%rax\n\t"
         "pushq $0x10\n\t"
         "push %%rax\n\t"
@@ -254,9 +255,11 @@ static thread_t thread_create_with_state(
         uintptr_t stack_end = stack_addr +
                 stack_size;
 
-        size_t tls_data_size = tls_size();
+        size_t tls_area_size = tls_size();
         uintptr_t thread_env_addr = stack_end -
                 sizeof(thread_env_t);
+
+        size_t tls_data_size = tls_init_size();
 
         // Align thread environment block
         thread_env_addr &= -16;
@@ -265,9 +268,11 @@ static thread_t thread_create_with_state(
         teb->self = teb;
 
         // Make room for TLS
-        uintptr_t tls_end = thread_env_addr - tls_data_size;
+        uintptr_t tls_end = thread_env_addr - tls_area_size;
 
         memcpy((void*)tls_end, tls_init_data(), tls_data_size);
+        memset((char*)tls_end + tls_data_size, 0,
+               tls_area_size - tls_data_size);
 
         uintptr_t ctx_addr = tls_end -
                 sizeof(isr_start_context_t);

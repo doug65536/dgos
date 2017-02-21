@@ -3,8 +3,6 @@ ENTRY(entry)
 SECTIONS {
 	/* Code and read-only data */
 	.text : ALIGN(4096) {
-		. = SIZEOF_HEADERS;
-
 		PROVIDE_HIDDEN(___text_st = .);
 		*(.entry)
 
@@ -56,6 +54,8 @@ SECTIONS {
 		/* Provide the TLS size as a global variable */
 		PROVIDE_HIDDEN(___tls_size = .);
 		QUAD(___tbss_en - ___tdata_st);
+		PROVIDE_HIDDEN(___tls_init_size = .);
+		QUAD(___tdata_en - ___tdata_st);
 
 		/* Provide the TLS address as a global variable */
 		PROVIDE_HIDDEN(___tls_init_data_ptr = .);

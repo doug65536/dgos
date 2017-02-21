@@ -182,8 +182,8 @@ typedef uintptr_t linaddr_t;
 //  0x7f0000000000
 
 // Linear addresses
-#define PT_BASEADDR     (0xFFFFFF7F00000000UL)
-#define PT_MAX_ADDR     (0UL)
+#define PT_BASEADDR     (0xFFFFFF4000000000UL)
+#define PT_MAX_ADDR     (0xFFFFFFFF80000000UL)
 
 // The number of pte_t entries at each level
 // Total data 275,415,828,480 bytes
@@ -191,6 +191,11 @@ typedef uintptr_t linaddr_t;
 #define PT2_ENTRIES     (0x8000000UL)
 #define PT1_ENTRIES     (0x40000UL)
 #define PT0_ENTRIES     (0x200UL)
+
+C_ASSERT(PT_MAX_ADDR - (64 << 12) -
+         ((PT0_ENTRIES + PT1_ENTRIES +
+           PT2_ENTRIES + PT3_ENTRIES) << 3)
+         > PT_BASEADDR);
 
 // The array index of the start of each level
 #define PT3_BASE        (0)
@@ -248,7 +253,8 @@ unsigned phys_alloc_count;
 
 extern char ___init_brk[];
 extern uintptr_t ___top_physaddr;
-static linaddr_t volatile linear_base = (linaddr_t)___init_brk;
+static linaddr_t near_base = (linaddr_t)___init_brk;
+static linaddr_t volatile linear_base = (linaddr_t)0xFFFF800000000000;
 
 // Maintain two free page chains,
 // because some hardware requires 32-bit memory addresses
@@ -298,6 +304,7 @@ static void release_linear(contiguous_allocator_t *allocator,
         uintptr_t addr, size_t size);
 
 static contiguous_allocator_t linear_allocator;
+static contiguous_allocator_t near_allocator;
 static contiguous_allocator_t contig_phys_allocator;
 
 //
@@ -492,7 +499,7 @@ static pte_t *take_apte(physaddr_t address)
                         new_map) == old_map) {
                 // Successfully acquired entry
 
-                linaddr_t linaddr = 0UL -
+                linaddr_t linaddr = PT_MAX_ADDR -
                         (64 << PAGE_SIZE_BIT) +
                         (((linaddr_t)first_available)
                          << PAGE_SIZE_BIT);
@@ -774,7 +781,7 @@ static pte_t *init_find_aliasing_pte(void)
 {
     pte_t *pte = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
     unsigned path[4];
-    path_from_addr(path, 0UL - PAGE_SIZE);
+    path_from_addr(path, PT_MAX_ADDR - PAGE_SIZE);
 
     for (unsigned level = 0; level < 3; ++level)
         pte = (pte_t*)(pte[path[level]] & PTE_ADDR);
@@ -795,7 +802,7 @@ static pte_t *mm_map_aliasing_pte(
         linaddr = (pt3_index << PAGE_SIZE_BIT);
         linaddr |= -(linaddr >> 47) << 47;
     } else {
-        linaddr = 0UL - PAGE_SIZE;
+        linaddr = PT_MAX_ADDR - PAGE_SIZE;
     }
 
     *aliasing_pte = (*aliasing_pte & ~PTE_ADDR) |
@@ -1046,7 +1053,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
 
     int present_mask = addr_present(fault_addr, path, ptes);
 
-    pte_t pte = *ptes[3];
+    pte_t pte = present_mask == 0x07 ? *ptes[3] : 0;
 
     // Check for lazy TLB shootdown
     if (present_mask == 0x0F &&
@@ -1124,16 +1131,19 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
             // but still not present
             *vpte |= addr;
 
+            linaddr_t rounded_addr = (linaddr_t)fault_addr & -(intptr_t)PAGE_SIZE;
+
             // Lookup the device mapping
             intptr_t device = binary_search(
                         mm_dev_mappings, mm_dev_mapping_count,
-                        sizeof(*mm_dev_mappings), (void*)fault_addr,
+                        sizeof(*mm_dev_mappings),
+                        (void*)rounded_addr,
                         mm_dev_map_search, 0, 1);
 
             mmap_device_mapping_t *mapping = mm_dev_mappings + device;
             if (device >= 0) {
                 mapping->callback(mapping->context, mapping->base_addr,
-                                  (char*)fault_addr -
+                                  (char*)rounded_addr -
                                   (char*)mapping->base_addr);
 
                 *vpte |= PTE_PRESENT;
@@ -1391,7 +1401,7 @@ void mmu_init(int ap)
     // Reserve 4MB low memory for contiguous
     // physical allocator
     physaddr_t contiguous_start = top_of_kernel;
-    top_of_kernel += 4 << 16;
+    top_of_kernel += 4 << 20;
 
     // Put all of the remaining physical memory into the free lists
     uintptr_t free_count = 0;
@@ -1441,6 +1451,11 @@ void mmu_init(int ap)
                                 (void*)&linear_base,
                                 PT_BASEADDR - linear_base,
                                 1 << 20);
+
+    contiguous_allocator_create(&near_allocator,
+                                (void*)&near_base,
+                                0ULL - near_base,
+                                128);
 
     // Allocate guard page
     take_linear(&linear_allocator, PAGE_SIZE);
@@ -1833,7 +1848,11 @@ void *mmap(void *addr, size_t len,
     }
 
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
-    linaddr_t linear_addr = take_linear(&linear_allocator, len);
+    linaddr_t linear_addr;
+    if (!(flags & MAP_NEAR))
+        linear_addr = take_linear(&linear_allocator, len);
+    else
+        linear_addr = take_linear(&near_allocator, len);
     PROFILE_LINEAR_ALLOC_ONLY( printdbg("Allocation of %lu bytes of"
                                         " address space took %lu cycles\n",
                                         len, cpu_rdtsc() - profile_linear_st) );
@@ -1992,6 +2011,8 @@ int mprotect(void *addr, size_t len, int prot)
     addr = (char*)addr - misalignment;
     len += misalignment;
 
+    len = (len + PAGE_MASK) & -(int)PAGE_SIZE;
+
     if (unlikely(len == 0))
         return 0;
 
@@ -2037,7 +2058,7 @@ int mprotect(void *addr, size_t len, int prot)
     unsigned path_en[4];
 
     path_from_addr(path, (linaddr_t)addr);
-    path_from_addr(path_en, (linaddr_t)addr + len - 1);
+    path_from_addr(path_en, (linaddr_t)addr + len);
 
     pte_t *pt[4];
     pte_t *pt_en[4];

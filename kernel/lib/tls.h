@@ -11,4 +11,5 @@ struct thread_env_t {
 
 void tls_init(void);
 size_t tls_size(void);
+size_t tls_init_size(void);
 void *tls_init_data(void);
