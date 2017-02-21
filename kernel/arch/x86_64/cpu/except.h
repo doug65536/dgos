@@ -9,9 +9,5 @@ int __exception_handler_invoke(int exception_code);
 
 __exception_jmp_buf_t *__exception_handler_add(void);
 
-int __exception_handler_remove(void);
-int __exception_handler_invoke(int exception_code);
-
-
 #define __try if (__exception_setjmp(__exception_handler_add()) == 0)
 #define __catch if (__exception_handler_remove())
