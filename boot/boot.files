@@ -1,3 +1,5 @@
+driveinfo.c
+driveinfo.h
 utils/bochs-config.bxrc.template
 utils/debug-kvm-commands.template
 utils/debug-kernel-kvm-commands.template

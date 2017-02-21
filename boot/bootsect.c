@@ -37,6 +37,12 @@ __asm__ (
     "mp_entry_vector:\n\t"
     ".int 0\n\t"
 
+    // The kernel finds the boot device information by reading this vector
+    // Int 13h, AH=48h Get drive parameters
+    ".globl boot_device_info_vector\n\t"
+    "boot_device_info_vector:\n\t"
+    ".int 0\n\t"
+
     // The bootstrap code starts here
     ".globl entry_start\n\t"
     "entry_start:\n\t"
@@ -91,6 +97,7 @@ extern uint32_t bootinfo_primary_volume_desc;
 #include "part.h"
 #include "fat32.h"
 #include "iso9660.h"
+#include "driveinfo.h"
 
 #define __stdcall __attribute__((stdcall))
 #define __packed __attribute__((packed))
@@ -154,6 +161,8 @@ __attribute__((used)) int init(void)
     }
 
     fully_loaded = 1;
+
+    driveinfo();
 
     if (bootinfo_file_location == 0)
         fat32_boot_partition(partition_table[0].start_lba);

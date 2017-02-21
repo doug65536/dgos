@@ -1,3 +1,5 @@
+arch/x86_64/bootdev.c
+arch/x86_64/bootdev.h
 arch/x86_64/cpu/except.c
 arch/x86_64/cpu/except.h
 arch/x86_64/cpu/except_asm.h

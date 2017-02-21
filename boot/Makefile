@@ -16,7 +16,8 @@ CSRCS := \
 	physmem.c \
 	farptr.c \
 	vesa.c \
-	progressbar.c
+	progressbar.c \
+	driveinfo.c
 
 ASRCS := \
 	part.s \
@@ -92,8 +93,8 @@ CFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
 	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions \
-	-mrtd \
-	-mregparm=3
+	-mrtd -mregparm=3 \
+	-std=c11
 
 ifneq ($(CC_IS_CLANG),1)
 	CFLAGS += \
@@ -104,9 +105,6 @@ endif
 
 #-fomit-frame-pointer
 #-mrtd
-
-#
-#
 
 # Max warnings
 #too many false positives WEVERYTHING  = -Wconversion
@@ -165,6 +163,9 @@ LDFLAGS := -m i386linux -no-stdlib -M -T bootsect.ld
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 $(NOOPTIMIZE:.c=.o): CFLAGS += -O0
+
+ISO_DEPENDS := bootsect.bin dgos-kernel hello.km
+ISO_TARGETS := $(patsubst %,$(ISO_STAGE)/%,$(ISO_DEPENDS))
 
 #
 # Standard targets
@@ -278,11 +279,18 @@ $(ISO_STAGE)/bootsect.bin: $(BOOTSECTORS)
 	mkdir -p $(ISO_STAGE)/dev
 	echo Hello! >> $(ISO_STAGE)/root/hello.txt
 
+stagedir: $(ISO_STAGE)/bootsect.bin modules
+
+modules: $(ISO_STAGE)/hello.km
+
+$(ISO_STAGE)/hello.km: ../modules/hello/hello.km
+	cp ../modules/hello/hello.km $(ISO_STAGE)
+
 $(ISO_STAGE)/dgos-kernel: $(KERNELSYMBOLFILE)
 	@mkdir -p $(@D)
 	$(CP) $(KERNELSYMBOLFILE) $@
 
-$(ISO_FILE): $(ISO_STAGE)/bootsect.bin $(ISO_STAGE)/dgos-kernel
+$(ISO_FILE): $(ISO_TARGETS)
 	# Do some gymnastics to get the number of 512-byte
 	# blocks for -boot-load-size
 	( \
@@ -588,6 +596,7 @@ inject-kernel: all
 .PHONY: deletedisk bootable-disk debuggable-disk mountdisk umountdisk
 .PHONY: kernel debuggable-kernel-disk
 .PHONY: iso debug-iso-boot debug-iso-kernel
+.PHONY: stagedir modules
 
 .PRECIOUS: $(DISKIMAGE)
 

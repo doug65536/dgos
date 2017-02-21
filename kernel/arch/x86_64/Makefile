@@ -32,6 +32,7 @@ CSRCS := \
 	device/e9debug.c \
 	device/rtl8139.c \
 	device/keyb8042_layout/keyb8042_layout_us.c \
+	bootdev.c \
 	elf64.c \
 	$(DEVSRCS)
 
