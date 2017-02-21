@@ -293,9 +293,19 @@ struct fs_vtbl_t {
                     off_t offset);
     ssize_t (*write)(fs_base_t *dev,
                      fs_file_info_t *fi,
-                     char *buf,
+                     char const *buf,
                      size_t size,
                      off_t offset);
+    int (*ftruncate)(fs_base_t *dev,
+                     fs_file_info_t *fi,
+                     off_t offset);
+
+    //
+    // Query open file
+
+    int (*fstat)(fs_base_t *dev,
+                 fs_file_info_t *fi,
+                 fs_stat_t *st);
 
     //
     // Sync files and directories and flush buffers
@@ -391,8 +401,12 @@ struct fs_base_t {
                         \
     name##_open,        \
     name##_release,     \
+                        \
     name##_read,        \
     name##_write,       \
+    name##_ftruncate,   \
+                        \
+    name##_fstat,       \
                         \
     name##_fsync,       \
     name##_fsyncdir,    \
@@ -470,4 +484,5 @@ struct part_dev_t {
 
 void register_part_device(char const *name, part_vtbl_t *vtbl);
 
-void mount_fs(char const *fs_name, fs_init_info_t *info);
+void fs_mount(char const *fs_name, fs_init_info_t *info);
+fs_base_t *fs_from_id(size_t id);

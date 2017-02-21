@@ -28,7 +28,7 @@ typedef struct Elf64_Ehdr {
     Elf64_Half e_shentsize; /* Size of section header entry */
     Elf64_Half e_shnum; /* Number of section header entries */
     Elf64_Half e_shstrndx; /* Section name string table index */
-} Elf64_Ehdr;
+} __attribute__((packed)) Elf64_Ehdr;
 
 #define EI_MAG0 0 // File identification
 #define EI_MAG1 1
@@ -83,7 +83,7 @@ typedef struct Elf64_Shdr {
     Elf64_Word sh_info; /* Miscellaneous information */
     Elf64_Xword sh_addralign; /* Address alignment boundary */
     Elf64_Xword sh_entsize; /* Size of entries, if section has table */
-} Elf64_Shdr;
+} __attribute__((packed)) Elf64_Shdr;
 
 // sh_type
 #define SHT_NULL 0 // Marks an unused section header
@@ -135,7 +135,7 @@ typedef struct Elf64_Sym {
     Elf64_Half st_shndx; /* Section table index */
     Elf64_Addr st_value; /* Symbol value */
     Elf64_Xword st_size; /* Size of object (e.g., common) */
-} Elf64_Sym;
+} __attribute__((packed)) Elf64_Sym;
 
 // Symbol bindings
 #define STB_LOCAL 0 Not visible outside the object file
@@ -161,13 +161,17 @@ typedef struct Elf64_Sym {
 typedef struct Elf64_Rel {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
-} Elf64_Rel;
+} __attribute__((packed)) Elf64_Rel;
 
 typedef struct Elf64_Rela {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
     Elf64_Sxword r_addend; /* Constant part of expression */
-} Elf64_Rela;
+} __attribute__((packed)) Elf64_Rela;
+
+#define ELF64_R_SYM(i)      ((i) >> 32)
+#define ELF64_R_TYPE(i)     ((i) & 0xFFFFFFFFL)
+#define ELF64_R_INFO(s, t)  (((s) << 32) + ((t) & 0xFFFFFFFFL))
 
 // Program header
 typedef struct Elf64_Phdr {
@@ -179,7 +183,7 @@ typedef struct Elf64_Phdr {
     Elf64_Xword p_filesz; /* Size of segment in file */
     Elf64_Xword p_memsz; /* Size of segment in memory */
     Elf64_Xword p_align; /* Alignment of segment */
-} Elf64_Phdr;
+} __attribute__((packed)) Elf64_Phdr;
 
 #define PT_NULL 0 // Unused entry
 #define PT_LOAD 1 // Loadable segment
@@ -207,7 +211,7 @@ typedef struct Elf64_Dyn {
         Elf64_Xword d_val;
         Elf64_Addr d_ptr;
     } d_un;
-} Elf64_Dyn;
+} __attribute__((packed)) Elf64_Dyn;
 
 #define DT_NULL 0  // ignored Marks the end of the dynamic array
 #define DT_NEEDED 1  // d_val The string table offset of the name of a needed library
@@ -242,3 +246,66 @@ typedef struct Elf64_Dyn {
 #define DT_HIOS 0x6FFFFFFF
 #define DT_LOPROC 0x70000000  // Defines a range of dynamic table tags that are reserved for processor-specific use.
 #define DT_HIPROC 0x7FFFFFFF
+
+//
+// Relocations
+
+// A: The addend used to compute the value of the relocatable field.
+// B: The base address at which a shared object is loaded into memory during
+//    execution. Generally, a shared object file is built with a base virtual
+//    address of 0. However, the execution address of the shared object is
+//    different. See Program Header.
+// G: The offset into the global offset table at which the address of the
+//    relocation entry's symbol resides during execution.
+//    See Global Offset Table (Processor-Specific).
+// GOT: The address of the global offset table.
+//    See Global Offset Table (Processor-Specific).
+// L: The section offset or address of the procedure linkage table entry for
+//    a symbol. See Procedure Linkage Table (Processor-Specific).
+// P: The section offset or address of the storage unit being relocated,
+//    computed using r_offset.
+// S: The value of the symbol whose index resides in the relocation entry.
+// Z: The size of the symbol whose index resides in the relocation entry.
+
+#define R_AMD64_NONE        0   // None    None
+
+#define R_AMD64_64          1   // word64  S + A
+#define R_AMD64_32S         11  // word32  S + A
+#define R_AMD64_32          10  // word32  S + A
+#define R_AMD64_16          12  // word16  S + A
+#define R_AMD64_8           14  // word8   S + A
+
+#define R_AMD64_PC64        24  // word64  S + A - P
+#define R_AMD64_PC32        2   // word32  S + A - P
+#define R_AMD64_PC16        13  // word16  S + A - P
+#define R_AMD64_PC8         15  // word8   S + A - P
+
+#define R_AMD64_GOT32       3   // word32  G + A
+#define R_AMD64_PLT32       4   // word32  L + A - P
+#define R_AMD64_COPY        5   // None    Refer to the explanation following this table.
+
+#define R_AMD64_GLOB_DAT    6   // word64  S
+#define R_AMD64_JUMP_SLOT   7   // word64  S
+
+#define R_AMD64_RELATIVE    8   // word64  B + A
+#define R_AMD64_GOTPCREL    9   // word32  G + GOT + A - P
+
+#define R_AMD64_GOTOFF64    25  // word64  S + A - GOT
+#define R_AMD64_GOTPC32     26  // word32  GOT + A + P
+
+#define R_AMD64_SIZE32      32  // word32  Z + A
+#define R_AMD64_SIZE64      33  // word64  Z + A
+
+#define R_AMD64_REX_GOTPCRELX   42  // ?
+
+static inline unsigned long elf64_hash(unsigned char const *name)
+{
+    unsigned long h = 0, g;
+    while (*name) {
+        h = (h << 4) + *name++;
+        g = h & 0xf0000000;
+        h ^= g >> 24;
+        h &= 0x0fffffff;
+    }
+    return h;
+}

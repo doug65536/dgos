@@ -370,6 +370,15 @@ static void *iso9660_lookup_sector(iso9660_fs_t *self, uint64_t lba)
     return self->mm_dev + (lba << self->sector_shift);
 }
 
+static size_t iso9660_next_dirent(iso9660_fs_t *self,
+                                  iso9660_dir_ent_t *dir, size_t ofs)
+{
+    iso9660_dir_ent_t *de = (void*)((char*)dir + ofs);
+    if (de->len != 0)
+        return ofs + ((de->len + 1) & -2);
+    return (ofs + (self->sector_size - 1)) & -(int)self->sector_size;
+}
+
 static iso9660_dir_ent_t *iso9660_lookup_dirent(
         iso9660_fs_t *self, char const *pathname)
 {
@@ -411,11 +420,11 @@ static iso9660_dir_ent_t *iso9660_lookup_dirent(
 
     size_t dir_len = iso9660_dirent_size(dir);
 
-    iso9660_dir_ent_t *dir_end = (void*)((char*)dir + dir_len);
-
     iso9660_dir_ent_t *result = 0;
-    for (iso9660_dir_ent_t *de = dir; de < dir_end;
-         de = (void*)((char*)de + ((de->len + 1) & -2))) {
+    for (size_t ofs = 0; ofs < dir_len;
+         ofs = iso9660_next_dirent(self, dir, ofs)) {
+        iso9660_dir_ent_t *de = (void*)((char*)dir + ofs);
+
         int cmp = self->name_compare(
                     de->name, de->filename_len,
                     name, name_len);
@@ -436,7 +445,10 @@ static int iso9660_mm_fault_handler(
     uint64_t lba = self->lba_st + (offset >> self->sector_shift);
     char *addr = (char*)base_addr + (lba << self->sector_shift);
 
-    return self->drive->vtbl->read_blocks(self->drive, addr, 1, lba);
+    printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
+
+    return self->drive->vtbl->read_blocks(self->drive, addr,
+                                          PAGESIZE >> self->sector_shift, lba);
 }
 
 //
@@ -833,8 +845,7 @@ static int iso9660_open(fs_base_t *dev,
 
     file->dirent = iso9660_lookup_dirent(self, path);
     file->content = iso9660_lookup_sector(
-                self, (file->dirent->lba_hi_le << 16) |
-                file->dirent->lba_lo_le);
+                self, iso9660_dirent_lba(file->dirent));
 
     return 0;
 }
@@ -862,8 +873,7 @@ static ssize_t iso9660_read(fs_base_t *dev,
 
     iso9660_file_handle_t *file = fi;
 
-    size_t file_size = (file->dirent->lba_hi_le << 16) |
-            file->dirent->lba_lo_le;
+    size_t file_size = iso9660_dirent_size(file->dirent);
 
     if (offset < 0)
         return -1;
@@ -876,12 +886,12 @@ static ssize_t iso9660_read(fs_base_t *dev,
 
     memcpy(buf, file->content + offset, size);
 
-    return 0;
+    return size;
 }
 
 static ssize_t iso9660_write(fs_base_t *dev,
                              fs_file_info_t *fi,
-                             char *buf,
+                             char const *buf,
                              size_t size,
                              off_t offset)
 {
@@ -894,6 +904,36 @@ static ssize_t iso9660_write(fs_base_t *dev,
     return -1;
 }
 
+static int iso9660_ftruncate(fs_base_t *dev,
+                             fs_file_info_t *fi,
+                             off_t offset)
+{
+    FS_DEV_PTR_UNUSED(dev);
+    (void)offset;
+    (void)fi;
+    // Fail, read only
+    return -1;
+}
+
+//
+// Query open file
+
+static int iso9660_fstat(fs_base_t *dev,
+                         fs_file_info_t *fi,
+                         fs_stat_t *st)
+{
+    FS_DEV_PTR_UNUSED(dev);
+
+    iso9660_file_handle_t *file = fi;
+
+    size_t file_size = iso9660_dirent_size(file->dirent);
+
+    memset(st, 0, sizeof(*st));
+    // FIXME: fill in more fields
+    st->st_size = file_size;
+
+    return 0;
+}
 
 //
 // Sync files and directories and flush buffers

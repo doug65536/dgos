@@ -233,7 +233,7 @@ static ssize_t tmpfs_read(fs_base_t *dev,
 
 static ssize_t tmpfs_write(fs_base_t *dev,
                            fs_file_info_t *fi,
-                           char *buf,
+                           char const *buf,
                            size_t size,
                            off_t offset)
 {
@@ -245,6 +245,29 @@ static ssize_t tmpfs_write(fs_base_t *dev,
     return 0;
 }
 
+static int tmpfs_ftruncate(fs_base_t *dev,
+                           fs_file_info_t *fi,
+                           off_t offset)
+{
+    FS_DEV_PTR_UNUSED(dev);
+    (void)offset;
+    (void)fi;
+    // Fail, read only
+    return -1;
+}
+
+//
+// Query open files
+
+static int tmpfs_fstat(fs_base_t *dev,
+                       fs_file_info_t *fi,
+                       fs_stat_t *st)
+{
+    FS_DEV_PTR_UNUSED(dev);
+    (void)fi;
+    (void)st;
+    return 0;
+}
 
 //
 // Sync files and directories and flush buffers

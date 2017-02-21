@@ -4,6 +4,8 @@
 #include "export.h"
 #include "bswap.h"
 
+#define USE_REP_STRING 1
+
 EXPORT size_t strlen(char const *src)
 {
     size_t len = 0;
@@ -113,6 +115,9 @@ EXPORT char *strstr(char const *str, char const *substr)
 // Returns a pointer to after the last byte written!
 EXPORT void *aligned16_memset(void *dest, int c, size_t n)
 {
+#if USE_REP_STRING
+    return memset(dest, c, n);
+#else
 #ifdef __OPTIMIZE__
     char cc = (char)c;
     __ivec16 v = {
@@ -128,10 +133,21 @@ EXPORT void *aligned16_memset(void *dest, int c, size_t n)
 #else
     return (char*)memset(dest, c, n) + n;
 #endif
+#endif
 }
 
 EXPORT void *memset(void *dest, int c, size_t n)
 {
+#ifdef USE_REP_STRING
+    char *d = dest;
+    __asm__ __volatile__ (
+        "rep stosb\n\t"
+        : "+D" (d), "+c" (n)
+        : "a" ((uint8_t)c)
+        : "memory"
+    );
+    return dest;
+#else
     char *p = dest;
 #if defined(__GNUC__) && defined(__OPTIMIZE__)
     // Write bytes until aligned
@@ -149,6 +165,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
         *p++ = (char)c;
 
     return dest;
+#endif
 }
 
 EXPORT void *memcpy(void *dest, void const *src, size_t n)

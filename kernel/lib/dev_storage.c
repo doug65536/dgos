@@ -102,7 +102,7 @@ static fs_reg_t *find_fs(char const *name)
     return 0;
 }
 
-void mount_fs(char const *fs_name, fs_init_info_t *info)
+void fs_mount(char const *fs_name, fs_init_info_t *info)
 {
     fs_reg_t *fs_reg = find_fs(fs_name);
 
@@ -118,6 +118,11 @@ void mount_fs(char const *fs_name, fs_init_info_t *info)
         fs_mounts[fs_mount_count].reg = fs_reg;
         ++fs_mount_count;
     }
+}
+
+fs_base_t *fs_from_id(size_t id)
+{
+    return fs_mounts[id].fs;
 }
 
 void register_part_device(const char *name, part_vtbl_t *vtbl)
@@ -138,7 +143,7 @@ void register_part_device(const char *name, part_vtbl_t *vtbl)
                     info.drive = drive;
                     info.part_st = part->lba_st;
                     info.part_len = part->lba_len;
-                    mount_fs(part->name, &info);
+                    fs_mount(part->name, &info);
                 }
             }
             close_storage_dev(drive);

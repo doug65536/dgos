@@ -19,12 +19,13 @@ int pool_create(pool_t *pool, uint32_t item_size, uint32_t capacity)
     size_t ext_cap = item_size * capacity;
     size_t size = hdr_size + ext_cap;
 
-    pool = mmap(0, size, PROT_READ | PROT_WRITE, 0, -1, 0);
+    void *items = mmap(0, size, PROT_READ | PROT_WRITE, 0, -1, 0);
 
     if (!pool || pool == MAP_FAILED)
         return 0;
 
-    pool->items = (char*)pool + hdr_size;
+    pool->items = (char*)items + hdr_size;
+    pool->item_count = 1;
     pool->item_capacity = capacity;
     pool->item_size = item_size;
     pool->first_free = ~0;
@@ -59,7 +60,7 @@ void *pool_alloc(pool_t *pool)
 
     mutex_lock(&pool->lock);
 
-    if (pool->first_free != ~0U) {
+    if (pool->first_free && pool->first_free != ~0U) {
         // Reuse freed item
         slot = pool_item(pool, pool->first_free);
         pool->first_free = *slot;

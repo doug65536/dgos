@@ -21,3 +21,8 @@ void *realloc(void *p, size_t new_size);
 
 void free(void *p);
 
+char *strdup(char const *s);
+
+void auto_free(void *mem);
+
+#define autofree __attribute__((cleanup(auto_free)))

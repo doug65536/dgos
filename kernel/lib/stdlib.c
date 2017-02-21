@@ -35,3 +35,19 @@ void free(void *p)
 {
     heap_free(default_heap, p);
 }
+
+char *strdup(const char *s)
+{
+    size_t len = strlen(s);
+    char *b = malloc(len+1);
+    return memcpy(b, s, len+1);
+}
+
+void auto_free(void *mem)
+{
+    void *blk = *(void**)mem;
+    if (blk) {
+        free(blk);
+        *(void**)mem = 0;
+    }
+}

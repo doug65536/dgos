@@ -7,6 +7,9 @@ CSRCS := hello.c
 
 ASRCS :=
 
-CFLAGS := -fpic
+CFLAGS := -mcmodel=kernel -g \
+	-std=c11
+
+LDFLAGS := -g
 
 include $(BUILDROOT)/module.mk

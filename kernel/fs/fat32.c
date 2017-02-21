@@ -231,7 +231,7 @@ static ssize_t fat32_read(fs_base_t *dev,
 
 static ssize_t fat32_write(fs_base_t *dev,
                            fs_file_info_t *fi,
-                           char *buf,
+                           char const *buf,
                            size_t size,
                            off_t offset)
 {
@@ -243,6 +243,28 @@ static ssize_t fat32_write(fs_base_t *dev,
     return 0;
 }
 
+static int fat32_ftruncate(fs_base_t *dev,
+                               fs_file_info_t *fi,
+                               off_t offset)
+{
+    FS_DEV_PTR_UNUSED(dev);
+    (void)offset;
+    (void)fi;
+    return 0;
+}
+
+//
+// Query open file
+
+static int fat32_fstat(fs_base_t *dev,
+                       fs_file_info_t *fi,
+                       fs_stat_t *st)
+{
+    FS_DEV_PTR_UNUSED(dev);
+    (void)fi;
+    (void)st;
+    return 0;
+}
 
 //
 // Sync files and directories and flush buffers
