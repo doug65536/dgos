@@ -20,6 +20,8 @@
 #include "string.h"
 #include "heap.h"
 #include "elf64.h"
+#include "fileio.h"
+#include "bootdev.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -186,9 +188,10 @@ static int stress_mutex(void *p)
 #include "cpu/except.h"
 
 #if 1
-static int mprotect_check(void *p)
+static int mprotect_test(void *p)
 {
     (void)p;
+    return 0;
 
     char *mem = mmap(0, 256 << 20, PROT_NONE, 0, -1, 0);
 
@@ -594,7 +597,19 @@ static int init_thread(void *p)
     // Register network interfaces
     callout_call('N');
 
+    bootdev_info(0, 0, 0);
+
     modload_init();
+
+    int fd = file_open("root/hello.txt");
+    off_t size = file_seek(fd, 0, SEEK_END);
+    printdbg("File size = %lx\n", size);
+    file_seek(fd, 0, SEEK_SET);
+    char buf[16];
+    ssize_t readsize = file_read(fd, buf, sizeof(buf)-1);
+    buf[sizeof(buf)-1] = 0;
+    printdbg("File read, size = %ld, data = %s\n", readsize, buf);
+    file_close(fd);
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
@@ -659,7 +674,7 @@ int main(void)
     keybd_init();
     keyb8042_init();
 
-    mprotect_check(0);
+    mprotect_test(0);
 
     void *a = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
     void *b = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
