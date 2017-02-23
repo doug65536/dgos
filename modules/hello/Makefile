@@ -8,7 +8,7 @@ CSRCS := hello.c
 ASRCS :=
 
 CFLAGS := -mcmodel=kernel -g \
-	-std=c11
+	-std=c11 -fno-common -fno-exceptions
 
 LDFLAGS := -g
 

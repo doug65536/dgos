@@ -9,8 +9,10 @@
 #define ATTRIBUTE_FORMAT(m,n)
 #endif
 
+__attribute__((noreturn))
 void vpanic(char const *format, va_list ap);
 
+__attribute__((noreturn))
 void panic(char const *format, ...)
     ATTRIBUTE_FORMAT(1, 2);
 

@@ -581,6 +581,9 @@ static int stress_heap_thread(void *p)
 }
 #endif
 
+extern void usbxhci_detect(void*);
+void (*usbxhci_pull_in)(void*) = usbxhci_detect;
+
 static int init_thread(void *p)
 {
     (void)p;
@@ -597,9 +600,12 @@ static int init_thread(void *p)
     // Register network interfaces
     callout_call('N');
 
+    // Register USB interfaces
+    callout_call('U');
+
     bootdev_info(0, 0, 0);
 
-    modload_init();
+    //modload_init();
 
     int fd = file_open("root/hello.txt");
     off_t size = file_seek(fd, 0, SEEK_END);

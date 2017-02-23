@@ -28,6 +28,7 @@ CSRCS := mm.c \
 	heap.c \
 	hash.c \
 	hash_table.c \
-	fileio.c
+	fileio.c \
+	process.c
 
 include $(BUILDROOT)/library.mk

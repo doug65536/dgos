@@ -9,6 +9,7 @@
 //  'P': Partition scanner
 //  'F': Filesystem implementation
 //  'N': Network interface
+//  'U': USB interface
 
 typedef struct callout_t {
     void (*fn)(void*);

@@ -1770,8 +1770,12 @@ static if_list_t ahci_if_detect(void)
         return list;
 
     do {
-        assert(pci_iter.dev_class == 1);
-        assert(pci_iter.subclass == 6);
+        assert(pci_iter.dev_class == PCI_DEV_CLASS_STORAGE);
+        assert(pci_iter.subclass == PCI_SUBCLASS_STORAGE_SATA);
+
+        // Make sure it is an AHCI device
+        if (pci_iter.config.prog_if != PCI_PROGIF_STORAGE_SATA_AHCI)
+            continue;
 
         // Ignore controllers with AHCI base address not set
         if (pci_iter.config.base_addr[5] == 0)

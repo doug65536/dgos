@@ -61,7 +61,7 @@ QEMU_CPU := kvm64
 #Haswell
 #kvm64
 QEMU_RAM := 5G
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -device nec-usb-xhci
 
 QEMU_BRIDGE :=
 
