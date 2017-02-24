@@ -35,3 +35,6 @@ void thread_set_priority(thread_t thread_id, thread_priority_t priority);
 int thread_wait(thread_t thread_id);
 
 void thread_idle_set_ready(void);
+
+void *thread_get_exception_top(void);
+void *thread_set_exception_top(void *chain);

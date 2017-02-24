@@ -2,7 +2,6 @@
 
 LIBNAME := kernel
 CSRCS := mm.c \
-	tls.c \
 	thread.c \
 	threadsync.c \
 	callout.c \

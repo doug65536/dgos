@@ -3,7 +3,6 @@ ENTRY(entry)
 PHDRS {
 	text PT_LOAD FLAGS(5);
 	readonly PT_LOAD FLAGS(4);
-	plt PT_LOAD FLAGS(7);
 	data PT_LOAD FLAGS(6);
 	tls PT_LOAD FLAGS(6);
 }
@@ -57,26 +56,6 @@ SECTIONS {
 		. = ALIGN(8);
 		PROVIDE_HIDDEN(___top_physaddr = .);
 		QUAD((___init_brk - ___text_st) + 0x100000);
-
-		/* Provide the TLS size as a global variable */
-		PROVIDE_HIDDEN(___tls_size = .);
-		QUAD(___tbss_en - ___tdata_st);
-		PROVIDE_HIDDEN(___tls_init_size = .);
-		QUAD(___tdata_en - ___tdata_st);
-
-		/* Provide the TLS address as a global variable */
-		PROVIDE_HIDDEN(___tls_init_data_ptr = .);
-		QUAD(___tdata_st);
-
-		/* Provide the initial TLS address
-		   as a global variable */
-		PROVIDE_HIDDEN(___tls_main_tls_bottom_ptr = .);
-		QUAD(___main_tls_bottom);
-
-		/* Provide the address of the main TEB
-		   as a global variable */
-		PROVIDE_HIDDEN(___main_teb_ptr = .);
-		QUAD(___main_teb);
 
 		PROVIDE_HIDDEN(___text_en = .);
 	} :readonly
@@ -156,29 +135,12 @@ SECTIONS {
 		PROVIDE_HIDDEN(___plt = .);
 		*(.plt)
 		*(.iplt)
-	} :plt
+	} :readonly
 
 	.dynamic : ALIGN(4096) {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
-	} :data
-
-	/* Initialized data */
-	.data  : ALIGN(4096) {
-		*(.data)
-		*(SORT(.data.*))
-
-		/* Statically allocate room for the main */
-		/* kernel thread TLS */
-		. = ALIGN(16);
-		PROVIDE_HIDDEN(___main_tls_bottom = .);
-		. += ___tbss_en - ___tdata_st;
-		PROVIDE_HIDDEN(___main_teb = .);
-		/* 8 is sizeof thread_env_t! */
-		QUAD(___main_teb);
-		PROVIDE_HIDDEN(___main_teb_end = .);
-		. = ALIGN(16);
 	} :data
 
 	.got : ALIGN(4096) {
@@ -187,7 +149,13 @@ SECTIONS {
 		*(.got.plt)
 	} :data
 
-	.bss : ALIGN(4096) {
+	/* Initialized data */
+	.data  : ALIGN(4096) {
+		*(.data)
+		*(SORT(.data.*))
+	} :data
+
+	.bss : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(SORT(.bss.*))
@@ -203,7 +171,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___tdata_en = .);
 	} :tls
 
-	.tbss : ALIGN(4096) {
+	.tbss : {
 		PROVIDE_HIDDEN(___tbss_st = .);
 		*(.tbss)
 		*(.tcommon)

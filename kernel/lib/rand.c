@@ -1,46 +1,37 @@
 #include "rand.h"
 #include "time.h"
 
-static __thread int seed_done;
-static __thread uint32_t seed_z1 = 12345;
-static __thread uint32_t seed_z2 = 12345;
-static __thread uint32_t seed_z3 = 12345;
-static __thread uint32_t seed_z4 = 12345;
-
-void lfsr113_seed(uint32_t seed)
+void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
 {
-    seed_z1 = seed;
-    seed_z2 = seed;
-    seed_z3 = seed;
-    seed_z4 = seed;
-    seed_done = 1;
+    state->seed_z1 = seed;
+    state->seed_z2 = seed;
+    state->seed_z3 = seed;
+    state->seed_z4 = seed;
 }
 
-void lfsr113_autoseed(void)
+void lfsr113_autoseed(lfsr113_state_t *state)
 {
-    if (seed_done)
-        return;
-
-    lfsr113_seed((uint32_t)nano_time());
+    lfsr113_seed(state, (uint32_t)nano_time());
 }
 
-uint32_t lfsr113_rand(void)
+uint32_t lfsr113_rand(lfsr113_state_t *state)
 {
    unsigned int b;
-   b  = ((seed_z1 << 6) ^ seed_z1) >> 13;
-   seed_z1 = ((seed_z1 & 0xFFFFFFFEU) << 18) ^ b;
-   b  = ((seed_z2 << 2) ^ seed_z2) >> 27;
-   seed_z2 = ((seed_z2 & 0xFFFFFFF8U) << 2) ^ b;
-   b  = ((seed_z3 << 13) ^ seed_z3) >> 21;
-   seed_z3 = ((seed_z3 & 0xFFFFFFF0U) << 7) ^ b;
-   b  = ((seed_z4 << 3) ^ seed_z4) >> 12;
-   seed_z4 = ((seed_z4 & 0xFFFFFF80U) << 13) ^ b;
-   return (seed_z1 ^ seed_z2 ^ seed_z3 ^ seed_z4);
+   b  = ((state->seed_z1 << 6) ^ state->seed_z1) >> 13;
+   state->seed_z1 = ((state->seed_z1 & 0xFFFFFFFEU) << 18) ^ b;
+   b  = ((state->seed_z2 << 2) ^ state->seed_z2) >> 27;
+   state->seed_z2 = ((state->seed_z2 & 0xFFFFFFF8U) << 2) ^ b;
+   b  = ((state->seed_z3 << 13) ^ state->seed_z3) >> 21;
+   state->seed_z3 = ((state->seed_z3 & 0xFFFFFFF0U) << 7) ^ b;
+   b  = ((state->seed_z4 << 3) ^ state->seed_z4) >> 12;
+   state->seed_z4 = ((state->seed_z4 & 0xFFFFFF80U) << 13) ^ b;
+   return (state->seed_z1 ^ state->seed_z2 ^
+           state->seed_z3 ^ state->seed_z4);
 }
 
-uint32_t rand_range(uint32_t st, uint32_t en)
+uint32_t rand_range(lfsr113_state_t *state, uint32_t st, uint32_t en)
 {
-    uint32_t n = lfsr113_rand();
+    uint32_t n = lfsr113_rand(state);
     n %= (en - st);
     n += st;
     return n;

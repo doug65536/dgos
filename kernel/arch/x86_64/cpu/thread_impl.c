@@ -8,7 +8,6 @@
 
 #include "thread.h"
 #include "control_regs.h"
-#include "tls.h"
 #include "main.h"
 #include "halt.h"
 #include "idt.h"
@@ -81,14 +80,16 @@ struct thread_info_t {
 
     uint64_t cpu_affinity;
 
+    void *exception_chain;
+
     void *stack;
-    uintptr_t stack_size;
+    uint32_t stack_size;
+    int exit_code;
 
     mutex_t lock;
     condition_var_t done_cond;
-    int exit_code;
 
-    int align[1];
+    //int align[1];
 };
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
@@ -255,26 +256,7 @@ static thread_t thread_create_with_state(
         uintptr_t stack_end = stack_addr +
                 stack_size;
 
-        size_t tls_area_size = tls_size();
-        uintptr_t thread_env_addr = stack_end -
-                sizeof(thread_env_t);
-
-        size_t tls_data_size = tls_init_size();
-
-        // Align thread environment block
-        thread_env_addr &= -16;
-
-        thread_env_t *teb = (thread_env_t*)thread_env_addr;
-        teb->self = teb;
-
-        // Make room for TLS
-        uintptr_t tls_end = thread_env_addr - tls_area_size;
-
-        memcpy((void*)tls_end, tls_init_data(), tls_data_size);
-        memset((char*)tls_end + tls_data_size, 0,
-               tls_area_size - tls_data_size);
-
-        uintptr_t ctx_addr = tls_end -
+        uintptr_t ctx_addr = stack_end -
                 sizeof(isr_start_context_t);
 
         size_t misalignment = (ctx_addr +
@@ -298,7 +280,7 @@ static thread_t thread_create_with_state(
         ctx->gpr.r[0] = (uintptr_t)fn;
         ctx->gpr.r[1] = (uintptr_t)userdata;
         ctx->gpr.r[2] = (uintptr_t)i;
-        ctx->gpr.fsbase = teb;
+        ctx->gpr.fsbase = 0;
 
         ctx->fpr.mxcsr = MXCSR_MASK_ALL;
         ctx->fpr.mxcsr_mask = default_mxcsr_mask;
@@ -752,4 +734,18 @@ void thread_check_stack(void)
 void thread_idle_set_ready(void)
 {
     thread_idle_ready = 1;
+}
+
+void *thread_get_exception_top(void)
+{
+    thread_info_t *thread = this_thread();
+    return thread->exception_chain;
+}
+
+void *thread_set_exception_top(void *chain)
+{
+    thread_info_t *thread = this_thread();
+    void *old = thread->exception_chain;
+    thread->exception_chain = chain;
+    return old;
 }

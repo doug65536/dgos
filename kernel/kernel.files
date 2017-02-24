@@ -134,8 +134,6 @@ lib/string.c
 lib/string.h
 lib/conio.h
 lib/conio.c
-lib/tls.c
-lib/tls.h
 lib/printk.c
 lib/printk.h
 lib/dev_text.h

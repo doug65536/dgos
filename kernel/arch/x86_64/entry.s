@@ -60,7 +60,6 @@ entry:
 
 	xor %edi,%edi
 	call cpu_init
-	call tls_init
 
 	# Call the constructors
 	lea ___init_st(%rip),%rdi
