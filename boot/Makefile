@@ -17,7 +17,8 @@ CSRCS := \
 	farptr.c \
 	vesa.c \
 	progressbar.c \
-	driveinfo.c
+	driveinfo.c \
+	debug.c
 
 ASRCS := \
 	part.s \
@@ -354,7 +355,7 @@ run-iso-numa: $(ISO_FILE)
 		$(QEMU_NET)
 
 debug-iso-boot: $(ISO_FILE)
-	 $(GDB) --symbols $(SYMBOLFILE) --tui \
+	 $(GDB) $(SYMBOLFILE) --tui \
 		-ex 'b elf64_run' \
 		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
@@ -601,6 +602,6 @@ inject-kernel: all
 .PRECIOUS: $(DISKIMAGE)
 
 DISASSEMBLEFLAGS := --adjust-vma=0x7C00 -D -b binary -mi386 -Maddr16,data16
-DISASSEMBLEELFFLAGS := -mi386 -Maddr16,data16 --disassemble --source
+DISASSEMBLEELFFLAGS := -mi386 -Maddr16,data16 --disassemble-all --source
 
 include ../kernel/autodep.mk

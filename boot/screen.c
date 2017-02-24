@@ -1,5 +1,6 @@
-#include <stdarg.h>
 #include "screen.h"
+#include <stdarg.h>
+#include "debug.h"
 
 #define DIRECT_VGA 0
 #if DIRECT_VGA
@@ -164,6 +165,7 @@ static void buffer_char(char *buf, char **pptr, char c)
         scroll_screen();
         *(*pptr) = 0;
         print_at(24, 0, 0x07, *pptr - buf, buf);
+        debug_out(buf, *pptr - buf);
         *pptr = buf;
     }
     if (c >= 32)
@@ -345,6 +347,8 @@ void print_line(char const* format, ...)
     }
     if (out != buf) {
         print_at(24, 0, 0x07, out - buf, buf);
+        debug_out(buf, out - buf);
+
         scroll_screen();
     }
 
