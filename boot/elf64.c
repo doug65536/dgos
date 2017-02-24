@@ -130,6 +130,8 @@ uint16_t elf64_run(char const *filename)
 
     uint64_t done_bytes = 0;
 
+    print_line("Loading kernel...");
+
     // For each section
     for (size_t i = 0; !failed && i < file_hdr.e_phnum; ++i) {
         Elf64_Phdr *blk = program_hdrs + i;
@@ -138,6 +140,15 @@ uint16_t elf64_run(char const *filename)
 
         // If it is not readable, writable or executable, ignore
         if ((blk->p_flags & (PF_R | PF_W | PF_X)) == 0)
+            continue;
+
+        print_line("vaddr=%llx, filesz=%llx, memsz=%llx, paddr=%llx",
+                   blk->p_vaddr,
+                   blk->p_filesz,
+                   blk->p_memsz,
+                   blk->p_paddr);
+
+        if (blk->p_memsz == 0)
             continue;
 
         // Pages present
@@ -162,46 +173,58 @@ uint16_t elf64_run(char const *filename)
         Elf64_Off bss_ofs = blk->p_offset + blk->p_filesz;
         Elf64_Off bss_remain = blk->p_memsz - blk->p_filesz;
         for (Elf64_Off ofs = blk->p_offset,
-             end = blk->p_offset + blk->p_memsz; ofs < end;
+             end = blk->p_offset + remain; ofs < end;
              ofs += chunk_size, remain -= chunk_size) {
             chunk_size = PAGE_SIZE;
 
+            // Handle partial page,
+            // limit chunk to realign to page on next iteration
+            chunk_size -= (addr & PAGE_MASK);
+
             // Handle partial read/zero
-            if (ofs < bss_ofs && chunk_size > file_remain) {
-                chunk_size = file_remain;
+            if (ofs < bss_ofs) {
+                if (chunk_size > file_remain)
+                    chunk_size = file_remain;
                 file_remain -= chunk_size;
-            } else if (ofs >= bss_ofs && chunk_size > bss_remain) {
-                chunk_size = bss_remain;
+            } else if (ofs >= bss_ofs) {
+                if (chunk_size > bss_remain)
+                    chunk_size = bss_remain;
                 bss_remain -= chunk_size;
             }
 
             done_bytes += chunk_size;
 
             if (ofs < bss_ofs) {
+                print_line("Reading %u byte chunk at offset %llx",
+                           chunk_size, ofs);
                 if (chunk_size != boot_pread(
                             file, read_buffer,
                             chunk_size, ofs))
                     break;
             } else if (ofs == bss_ofs) {
-                memset(read_buffer, 0, chunk_size);
+                print_line("Clearing buffer for bss");
+                memset(read_buffer, 0, sizeof(read_buffer));
             }
 
+            uint64_t round_addr = addr & (int)-PAGE_SIZE;
+
             // Map pages
-            // If it is not page aligned, map two pages
             page_alloc += paging_map_range(
-                        addr, PAGE_SIZE + (addr & (PAGE_SIZE-1)),
+                        round_addr, PAGE_SIZE,
                         page_alloc,
                         page_flags, 1) << PAGE_SIZE_BIT;
 
-            paging_alias_range(address_window, addr, PAGE_SIZE,
+            paging_alias_range(address_window, round_addr, PAGE_SIZE,
                                PTE_PRESENT | PTE_WRITABLE);
 
-            addr += chunk_size;
+            print_line("Copying %d bytes to %llx", chunk_size, round_addr);
 
             // Copy to alias region
             // Add misalignment offset
-            copy_or_enter(address_window + (addr & (PAGE_SIZE-1)),
+            copy_or_enter(address_window + (addr & PAGE_MASK),
                           (uint32_t)read_buffer, chunk_size);
+
+            addr += chunk_size;
 
             progress_bar_draw(20, 10, 70, 100 *
                               (double)done_bytes /
