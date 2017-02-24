@@ -2,8 +2,8 @@
 
 int worked(void);
 
-int takespace_data[16] = { 99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,99 };
-int takespace_bss[12];
+//int takespace_data[16] = { 99,99,99,99,99,99,99,99,99,99,99,99,99,99,99,99 };
+//int takespace_bss[12];
 
 int volatile bss_val;
 int volatile data_val = 148;

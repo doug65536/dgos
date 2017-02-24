@@ -7,9 +7,9 @@ CSRCS := hello.c
 
 ASRCS :=
 
-CFLAGS := -mcmodel=kernel -g \
-	-std=c11 -fno-common -fno-exceptions
+CFLAGS := -g -mcmodel=kernel \
+	-std=c11 -fno-common -fno-exceptions -fno-asynchronous-unwind-tables
 
-LDFLAGS := -g
+LDFLAGS := -g -r
 
 include $(BUILDROOT)/module.mk

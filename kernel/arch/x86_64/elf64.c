@@ -111,11 +111,15 @@ module_entry_fn_t modload_load(char const *path)
         if (hdr->sh_type == SHT_NULL || hdr->sh_size == 0)
             continue;
 
-        Elf64_Xword addr = hdr->sh_addr + hdr->sh_size;
+        Elf64_Xword addr;
+
+        addr = hdr->sh_addr + hdr->sh_size;
         if (max_addr < addr)
             max_addr = addr;
-        if (min_addr > hdr->sh_addr)
-            min_addr = hdr->sh_addr;
+
+        addr = hdr->sh_addr;
+        if (min_addr > addr)
+            min_addr = addr;
 
         switch (hdr->sh_type) {
         case SHT_SYMTAB:
@@ -260,13 +264,18 @@ module_entry_fn_t modload_load(char const *path)
                 Elf64_Sym *sym = symdata + symtab_idx;
                 char const *name = strdata + sym->st_name;
 
-                Elf64_Sym const *match = modload_lookup_name(&export_ht, name);
+                Elf64_Sym const *match = 0;
 
                 int internal = 0;
-                if (!match) {
-                    internal = 1;
-                    match = modload_lookup_in_module(
-                                mod_sym, mod_sym_end, mod_str, name);
+
+                if (name[0]) {
+                    if (sym->st_shndx == SHN_UNDEF) {
+                        match = modload_lookup_name(&export_ht, name);
+                    } else  {
+                        internal = 1;
+                        match = modload_lookup_in_module(
+                                    mod_sym, mod_sym_end, mod_str, name);
+                    }
                 }
 
                 void *fixup_addr = (void*)(scn_base + r->r_offset);
@@ -283,7 +292,9 @@ module_entry_fn_t modload_load(char const *path)
                     break;
 
                 case R_AMD64_32S:   // S + A
-                    *(uint32_t*)fixup_addr = (uint64_t)module + r->r_addend;
+                    *(uint32_t*)fixup_addr = (uint64_t)module +
+                            scn_hdrs[sym->st_shndx].sh_addr +
+                            r->r_addend;
                     break;
 
                 case R_AMD64_PC32:  // S + A - P
@@ -294,8 +305,9 @@ module_entry_fn_t modload_load(char const *path)
                                 r->r_addend;
                     } else {
                         *(uint32_t*)fixup_addr = match->st_value +
+                                scn_hdrs[match->st_shndx].sh_addr +
                                 (internal
-                                 ? scn_hdrs[match->st_shndx].sh_addr
+                                 ? 0
                                  : -scn_base) +
                                 r->r_addend -
                                 ((Elf64_Addr)r->r_offset);
@@ -305,7 +317,7 @@ module_entry_fn_t modload_load(char const *path)
                 case R_AMD64_64:
                     *(uint64_t*)fixup_addr =
                             (internal
-                             ? scn_base
+                             ? (uint64_t)module + scn_hdrs[sym->st_shndx].sh_addr
                              : ((uint64_t)module +
                                 scn_hdrs[match->st_shndx].sh_addr)) +
                             r->r_addend + match->st_value;

@@ -3,6 +3,7 @@ ENTRY(entry)
 PHDRS {
 	text PT_LOAD FLAGS(5);
 	readonly PT_LOAD FLAGS(4);
+	plt PT_LOAD FLAGS(7);
 	data PT_LOAD FLAGS(6);
 	tls PT_LOAD FLAGS(6);
 }
@@ -34,7 +35,8 @@ SECTIONS {
 		*(SORT(.fini_array.*))
 		PROVIDE_HIDDEN(___fini_en = .);
 
-		. = ALIGN(16);
+		. = ALIGN(32);
+
 		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
 		PROVIDE_HIDDEN(___callout_array_en = .);
@@ -105,7 +107,6 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
 		PROVIDE_HIDDEN(___dynstr_en = .);
-		. = ALIGN(4096);
 	} :readonly
 
 	.got : ALIGN(4096) {
@@ -141,12 +142,6 @@ SECTIONS {
 		PROVIDE_HIDDEN (__rela_iplt_end = .);
 	} :readonly
 
-	.plt : {
-		PROVIDE_HIDDEN(___plt = .);
-		*(.plt)
-		*(.iplt)
-	} :readonly
-
 	.plt.got : {
 		PROVIDE_HIDDEN(___plt_got = .);
 		*(.plt.got)
@@ -157,11 +152,16 @@ SECTIONS {
 		*(.plt.bnd)
 	} :readonly
 
+	.plt : ALIGN(4096) {
+		PROVIDE_HIDDEN(___plt = .);
+		*(.plt)
+		*(.iplt)
+	} :plt
+
 	.dynamic : ALIGN(4096) {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
-		. = ALIGN(4096);
 	} :data
 
 	/* Initialized data */
@@ -214,12 +214,13 @@ SECTIONS {
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
-	/DISCARD/        : { *(.interp)        }
-	.debug_info    0 : { *(.debug_info)    }
-	.debug_abbrev  0 : { *(.debug_abbrev)  }
-	.debug_aranges 0 : { *(.debug_aranges) }
-	.debug_macro   0 : { *(.debug_macro)   }
-	.debug_line    0 : { *(.debug_line)    }
-	.debug_str     0 : { *(.debug_str)     }
-	.comment       0 : { *(.comment)       }
+	.debug_info		0 : { *(.debug_info)    }
+	.debug_abbrev	0 : { *(.debug_abbrev)  }
+	.debug_aranges	0 : { *(.debug_aranges) }
+	.debug_macro	0 : { *(.debug_macro)   }
+	.debug_line		0 : { *(.debug_line)    }
+	.debug_str		0 : { *(.debug_str)     }
+
+	/DISCARD/		: { *(.interp)        }
+	/DISCARD/		: { *(.comment)       }
 }

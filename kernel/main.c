@@ -605,7 +605,7 @@ static int init_thread(void *p)
 
     bootdev_info(0, 0, 0);
 
-    //modload_init();
+    modload_init();
 
     int fd = file_open("root/hello.txt");
     off_t size = file_seek(fd, 0, SEEK_END);
