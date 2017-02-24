@@ -139,7 +139,7 @@ EXPORT void *aligned16_memset(void *dest, int c, size_t n)
 
 EXPORT void *memset(void *dest, int c, size_t n)
 {
-    assert(n < 0xFFFFFFFF00000000);
+    assert(n < 0x0000700000000000L);
 #ifdef USE_REP_STRING
     char *d = dest;
     __asm__ __volatile__ (
