@@ -3,6 +3,7 @@
 #undef __NO_STRING_BUILTIN
 #include "export.h"
 #include "bswap.h"
+#include "assert.h"
 
 #define USE_REP_STRING 1
 
@@ -138,6 +139,7 @@ EXPORT void *aligned16_memset(void *dest, int c, size_t n)
 
 EXPORT void *memset(void *dest, int c, size_t n)
 {
+    assert(n < 0xFFFFFFFF00000000);
 #ifdef USE_REP_STRING
     char *d = dest;
     __asm__ __volatile__ (
