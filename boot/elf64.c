@@ -13,6 +13,13 @@
 #include "vesa.h"
 #include "progressbar.h"
 
+#define ELF64_DEBUG     1
+#if ELF64_DEBUG
+#define ELF64_TRACE(...) print_line("elf64: " __VA_ARGS__)
+#else
+#define ELF64_TRACE(...) ((void)0)
+#endif
+
 void enter_kernel(uint64_t entry_point);
 
 // Save the entry point address for later MP processor startup
@@ -57,7 +64,7 @@ static void enter_kernel_initial(uint64_t entry_point)
     // Pack the size into the high 12 bits
     phys_mem_table |= phys_mem_table_size << 20;
 
-    print_line("Entry point: %llx\n", entry_point);
+    ELF64_TRACE("Entry point: %llx\n", entry_point);
 
     copy_or_enter(entry_point, 0, phys_mem_table);
 }
@@ -142,7 +149,7 @@ uint16_t elf64_run(char const *filename)
         if ((blk->p_flags & (PF_R | PF_W | PF_X)) == 0)
             continue;
 
-        print_line("vaddr=%llx, filesz=%llx, memsz=%llx, paddr=%llx",
+        ELF64_TRACE("vaddr=%llx, filesz=%llx, memsz=%llx, paddr=%llx",
                    blk->p_vaddr,
                    blk->p_filesz,
                    blk->p_memsz,
@@ -195,14 +202,14 @@ uint16_t elf64_run(char const *filename)
             done_bytes += chunk_size;
 
             if (ofs < bss_ofs) {
-                print_line("Reading %u byte chunk at offset %llx",
+                ELF64_TRACE("Reading %u byte chunk at offset %llx",
                            chunk_size, ofs);
                 if (chunk_size != boot_pread(
                             file, read_buffer,
                             chunk_size, ofs))
                     break;
             } else if (ofs == bss_ofs) {
-                print_line("Clearing buffer for bss");
+                ELF64_TRACE("Clearing buffer for bss");
                 memset(read_buffer, 0, sizeof(read_buffer));
             }
 
@@ -217,7 +224,7 @@ uint16_t elf64_run(char const *filename)
             paging_alias_range(address_window, round_addr, PAGE_SIZE,
                                PTE_PRESENT | PTE_WRITABLE);
 
-            print_line("Copying %d bytes to %llx", chunk_size, round_addr);
+            ELF64_TRACE("Copying %d bytes to %llx", chunk_size, round_addr);
 
             // Copy to alias region
             // Add misalignment offset
@@ -245,7 +252,7 @@ uint16_t elf64_run(char const *filename)
 
     free(program_hdrs);
 
-    print_line("Entering kernel");
+    ELF64_TRACE("Entering kernel");
 
     if (!failed)
         enter_kernel(file_hdr.e_entry);
