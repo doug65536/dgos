@@ -5,6 +5,7 @@
 #include "printk.h"
 #include "stdlib.h"
 #include "mm.h"
+#include "cpu/atomic.h"
 
 #define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
@@ -17,33 +18,33 @@
 // 5.3 Host Controller Capability Registers
 
 typedef struct usbxhci_capreg_t {
-    // 00h Capability register length
+    // 5.3.1 00h Capability register length
     uint8_t caplength;
 
     uint8_t rsvd1;
 
-    // 02h Interface version number
+    // 5.3.2 02h Interface version number
     uint16_t hciversion;
 
-    // 04h Structural Parameters 1
+    // 5.3.3 04h Structural Parameters 1
     uint32_t hcsparams1;
 
-    // 08h Structural Parameters 2
+    // 5.3.4 08h Structural Parameters 2
     uint32_t hcsparams2;
 
-    // 0Ch Structural Parameters 3
+    // 5.3.5 0Ch Structural Parameters 3
     uint32_t hcsparams3;
 
-    // 10h Capability Parameters 1
+    // 5.3.6 10h Capability Parameters 1
     uint32_t hccparams1;
 
-    // 14h Doorbell offset
+    // 5.3.7 14h Doorbell offset
     uint32_t dboff;
 
-    // 18h Runtime Register Space offset
+    // 5.3.8 18h Runtime Register Space offset
     uint32_t rtsoff;
 
-    // 1Ch Capability Parameters 2
+    // 5.3.9 1Ch Capability Parameters 2
     uint32_t hccparams2;
 } __attribute__((packed)) usbxhci_capreg_t;
 
@@ -83,22 +84,38 @@ C_ASSERT(sizeof(usbxhci_capreg_t) == 0x20);
     (USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_MASK<< \
     USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BIT)
 
+// 5.5.2 Interrupt Register Set
+
 typedef struct usbxhci_intr_t {
+    // 5.5.2.1 Interrupt Management Register
     uint32_t iman;
+
+    // 5.5.2.2 Interrupt Moderation Register
     uint32_t imon;
+
+    // 5.5.2.3 Event Ring Segment Table Size Register
     uint32_t erstsz;
+
     uint32_t rsvdP;
+
+    // 5.5.2.3.2 Event Ring Segment Table Base Address Register
     uint64_t erstba;
+
+    // 5.5.2.3.3 Event Ring Dequeue Pointer Register
     uint64_t erdp;
 } __attribute__((packed)) usbxhci_intr_t;
 
 C_ASSERT(sizeof(usbxhci_intr_t) == 0x20);
 
+// 5.5 Host Controller Runtime Registers
+
 typedef struct usbxhci_rtreg_t  {
+    // 5.5.1 Microframe Index Register
     uint32_t mfindex;
 
     uint8_t rsvdz[0x20-0x04];
 
+    // 5.5.2 Interrupter Register Set
     usbxhci_intr_t ir[1023];
 } __attribute__((packed)) usbxhci_rtreg_t;
 
@@ -106,54 +123,57 @@ C_ASSERT(sizeof(usbxhci_rtreg_t) == 0x8000);
 
 typedef uint32_t usbxhci_dbreg_t;
 
+
+
 typedef struct usbxhci_portreg_t {
-    // 0h Port Status and Control
+    // 5.4.8 0h Port Status and Control
     uint32_t portsc;
 
-    // 4h Port Power Management Status and Control
+    // 5.4.9 4h Port Power Management Status and Control
     uint32_t portpmsc;
 
-    // 8h Port Link Info
+    // 5.4.10 8h Port Link Info
     uint32_t portli;
 
-    // Ch Port Hardware LPM Control
+    // 5.4.11 Ch Port Hardware LPM Control
     uint32_t porthlpmc;
 } __attribute__((packed)) usbxhci_portreg_t;
 
 C_ASSERT(sizeof(usbxhci_portreg_t) == 0x10);
 
 typedef struct usbxhci_opreg_t {
-    // 0x00 USB Command
+    // 5.4.1 0x00 USB Command
     uint32_t usbcmd;
 
-    // 0x04 USB Status
+    // 5.4.2 0x04 USB Status
     uint32_t usbsts;
 
-    // 0x08 Page Size
+    // 5.4.3 0x08 Page Size
     uint32_t pagesize;
 
     // 0x0C 0x13 RsvdZ
     uint8_t rsvd1[0x14-0x0C];
 
-    // 0x14 Device Notification Control
+    // 5.4.4 0x14 Device Notification Control
     uint32_t dnctrl;
 
-    // 0x18 Command Ring Control
+    // 5.4.5 0x18 Command Ring Control
     uint64_t crcr;
 
     // 0x20 0x2F RsvdZ
     uint8_t rsvd2[0x30-0x20];
 
-    // 0x30 Device Context Base Address Array Pointer
+    // 5.4.6 0x30 Device Context Base Address Array Pointer
     uint64_t dcbaap;
 
-    // 0x38 Configure
+    // 5.4.7 0x38 Configure
     uint32_t config;
 
     // 0x3C 0x3FF RsvdZ
     uint8_t rsvd3[0x400-0x3C];
 
-    // 0x400 0x13FF Port Register Set 1-MaxPorts
+    // 5.4.8 0x400 0x13FF Port Register Set 1-MaxPorts
+    // The actual number of ports is in HCSPARAMS1
     usbxhci_portreg_t ports[256];
 } __attribute__((packed)) usbxhci_opreg_t;
 
@@ -535,6 +555,8 @@ C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
 #define USBXHCI_PORTHLPMC_BESLD \
     (USBXHCI_PORTHLPMC_BESLD_MASK<<USBXHCI_PORTHLPMC_BESLD_BIT)
 
+// 6.2.2 Slot Context
+
 typedef struct usbxhci_slotctx_t {
     uint32_t rsmhc;
 
@@ -602,6 +624,8 @@ C_ASSERT(sizeof(usbxhci_slotctx_t) == 0x20);
 #define USBXHCI_SLOTCTX_3_SLOTSTATE \
     (USBXHCI_SLOTCTX_3_SLOTSTATE_MASK<<USBXHCI_SLOTCTX_3_SLOTSTATE_BIT)
 
+// 6.2.3 Endpoint Context
+
 typedef struct usbxhci_ep_ctx_t {
     uint32_t ctx[5];
     uint32_t rsvd[3];
@@ -643,6 +667,7 @@ C_ASSERT(sizeof(usbxhci_ep_ctx_t) == 0x20);
 #define USBXHCI_EPCTX_4_MAXESITLO_BITS      16
 
 // 6.2.1 Device Context
+
 typedef struct usbxhci_devctx_t {
     usbxhci_slotctx_t slotctx;
     usbxhci_ep_ctx_t epctx[16];
@@ -669,6 +694,8 @@ typedef struct usbxhci_evtring_seg_t {
 
 //
 //
+
+// 6.4.2 Event TRBs
 
 typedef struct usbxhci_evt_t {
     uint32_t data[3];
@@ -809,6 +836,7 @@ typedef struct usbxhci_dev_t {
     usbxhci_rtreg_t volatile *mmio_rt;
     usbxhci_dbreg_t volatile *mmio_db;
 
+    uint64_t volatile *dev_ctx_ptrs;
     usbxhci_devctx_t volatile *dev_ctx;
     usbxhci_cmd_trb_t volatile *dev_cmd_ring;
 
@@ -830,10 +858,26 @@ static void usbxhci_init(usbxhci_dev_t *dev)
 {
     // 4.2 Host Controller Initialization
 
+    uint32_t enabled_slots = 16;
+
+    // Stop the controller
+    dev->mmio_op->usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
+
+    // Wait for controller to stop
+    while (!(dev->mmio_op->usbsts & USBXHCI_USBSTS_HCH))
+        pause();
+
+    // Reset the controller
+    dev->mmio_op->usbcmd |= USBXHCI_USBCMD_HCRST;
+
+    // Wait for reset to complete
+    while (dev->mmio_op->usbcmd & USBXHCI_USBCMD_HCRST)
+        pause();
+
     // Set maximum device contexts to 64
     dev->mmio_op->config = (dev->mmio_op->config &
             ~USBXHCI_CONFIG_MAXSLOTSEN) |
-            USBXHCI_CONFIG_MAXSLOTSEN_n(64);
+            USBXHCI_CONFIG_MAXSLOTSEN_n(enabled_slots);
 
     uint32_t hcsparams1 = dev->mmio_cap->hcsparams1;
     uint32_t devslots = (hcsparams1 >>
@@ -850,24 +894,35 @@ static void usbxhci_init(usbxhci_dev_t *dev)
                   devslots, maxintr, maxports);
 
     // Program device context address array pointer
-    dev->dev_ctx = mmap(0, sizeof(*dev->dev_ctx) * 256,
+    dev->dev_ctx_ptrs = mmap(0, sizeof(*dev->dev_ctx) * enabled_slots,
                         PROT_READ | PROT_WRITE,
                         MAP_POPULATE, -1, 0);
 
-    // Device Context Base Address Array Pointer
-    dev->mmio_op->dcbaap = mphysaddr((void*)dev->dev_ctx);
+    dev->dev_ctx = mmap(0, sizeof(*dev->dev_ctx) * enabled_slots,
+                        PROT_READ | PROT_WRITE,
+                        MAP_POPULATE, -1, 0);
 
-    // Command Ring Control Register
-    dev->dev_cmd_ring = mmap(0, sizeof(usbxhci_cmd_trb_t) * 256,
+    // Device Context Base Address Array
+    for (size_t i = 0; i < enabled_slots; ++i)
+        dev->dev_ctx_ptrs[i] = mphysaddr((void*)(dev->dev_ctx + i));
+
+    // Device Context Base Address Array Pointer
+    dev->mmio_op->dcbaap = mphysaddr((void*)dev->dev_ctx_ptrs);
+
+    // Command Ring
+    dev->dev_cmd_ring = mmap(0, sizeof(usbxhci_cmd_trb_t) * enabled_slots,
                              PROT_READ | PROT_WRITE,
                              MAP_POPULATE, -1, 0);
 
+    // Command Ring Control Register
     dev->mmio_op->crcr = mphysaddr((void*)dev->dev_cmd_ring);
 
+    // Event segments
     dev->dev_evt_segs = mmap(0, sizeof(*dev->dev_evt_segs),
                              PROT_READ | PROT_WRITE,
                              MAP_POPULATE, -1, 0);
 
+    // Event ring
     dev->dev_evt_ring = mmap(0, 4096,
                              PROT_READ | PROT_WRITE,
                              MAP_POPULATE, -1, 0);
@@ -875,10 +930,23 @@ static void usbxhci_init(usbxhci_dev_t *dev)
     dev->dev_evt_segs[0].base = mphysaddr((void*)dev->dev_evt_ring);
     dev->dev_evt_segs[0].trb_count = 4096 / sizeof(*dev->dev_evt_ring);
 
-    dev->mmio_op->crcr = mphysaddr((void*)dev->dev_evt_segs);
+    //command! dev->mmio_op->crcr = mphysaddr((void*)dev->dev_evt_segs);
+
+    // Event ring segment table size
+    dev->mmio_rt->ir[0].erstsz = 1;
+
+    //
+    dev->mmio_rt->ir[0].erdp = dev->mmio_rt->ir[0].erstba;
+    dev->mmio_rt->ir[0].erstba = mphysaddr((void*)dev->dev_evt_segs);
+
+    // Set interrupt moderation rate
+    dev->mmio_rt->ir[0].imon = 0;
+
+    dev->mmio_op->usbcmd |= USBXHCI_USBCMD_INTE;
+
+    dev->mmio_op->usbcmd |= USBXHCI_USBCMD_RUNSTOP;
 
     dev->port_count = 0;
-
 }
 
 static void *usbxhci_irq_handler(int irq, void *ctx)
