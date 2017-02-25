@@ -148,7 +148,6 @@ EXPORT void *memset(void *dest, int c, size_t n)
         : "a" ((uint8_t)c)
         : "memory"
     );
-    return dest;
 #else
     char *p = dest;
 #if defined(__GNUC__) && defined(__OPTIMIZE__)
@@ -165,13 +164,22 @@ EXPORT void *memset(void *dest, int c, size_t n)
 #endif
     while (n--)
         *p++ = (char)c;
+#endif
 
     return dest;
-#endif
 }
 
 EXPORT void *memcpy(void *dest, void const *src, size_t n)
 {
+#ifdef USE_REP_STRING
+    char *d = dest;
+    __asm__ __volatile__ (
+        "rep movsb\n\t"
+        : "+D" (d), "+S" (src), "+c" (n)
+        :
+        : "memory"
+    );
+#else
     char *d;
     char const *s;
 
@@ -199,8 +207,26 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
 
     while (n--)
         *d++ = *s++;
+#endif
 
     return dest;
+}
+
+static inline void memcpy_reverse(void *dest, void const *src, size_t n)
+{
+#if USE_REP_STRING
+    __asm__ __volatile__ (
+        "std\n\t"
+        "rep movsb\n\t"
+        "cld\n\t"
+        : "+D" (dest), "+S" (src), "+c" (n)
+        :
+        : "memory"
+    );
+#else
+    for (size_t i = n; i; --i)
+        dest[i-1] = src[i-1];
+#endif
 }
 
 EXPORT void *memmove(void *dest, void const *src, size_t n)
@@ -213,10 +239,8 @@ EXPORT void *memmove(void *dest, void const *src, size_t n)
     if (d < s || s + n <= d)
         return memcpy(d, s, n);
 
-    if (d > s) {
-        for (size_t i = n; i; --i)
-            d[i-1] = s[i-1];
-    }
+    if (d > s)
+        memcpy_reverse(d + n - 1, s + n - 1, n);
 
     return dest;
 }
