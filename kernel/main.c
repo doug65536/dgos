@@ -28,12 +28,6 @@ char kernel_stack[16384];
 
 extern void (*device_constructor_list[])(void);
 
-__thread int tls_thing;
-//__thread int tls_thing_2;
-//__thread int tls_initialized_thing = 42;
-//__thread int tls_initialized_thing_2 = 43;
-//__thread char tls_buf[10] = {24};
-
 void volatile *trick;
 
 static void smp_main(void *arg)
@@ -59,7 +53,7 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   1
+#define ENABLE_STRESS_HEAP_THREAD   0
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    1
@@ -605,7 +599,7 @@ static int init_thread(void *p)
 
     bootdev_info(0, 0, 0);
 
-    modload_init();
+    //modload_init();
 
     int fd = file_open("root/hello.txt");
     off_t size = file_seek(fd, 0, SEEK_END);
