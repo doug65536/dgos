@@ -1143,8 +1143,7 @@ struct ahci_if_t {
     hba_port_info_t port_info[32];
 
     int use_msi;
-    int irq_base;
-    int irq_count;
+    pci_irq_range_t irq_range;
     int ports_impl;
     int num_cmd_slots;
     int use_ncq;
@@ -1321,7 +1320,9 @@ static void *ahci_irq_handler(int irq, void *ctx)
     for (unsigned i = 0; i < ahci_count; ++i) {
         ahci_if_t *dev = ahci_devices + i;
 
-        if (dev->irq_base != irq)
+        int irq_offset = irq - dev->irq_range.base;
+
+        if (irq_offset < 0 || irq_offset > dev->irq_range.count)
             continue;
 
         // Call callback on every port that has an interrupt pending
@@ -1800,53 +1801,48 @@ static if_list_t ahci_if_detect(void)
         //sleep(3000);
 
         if (ahci_count < countof(ahci_devices)) {
-            ahci_if_t *dev = ahci_devices + ahci_count++;
+            ahci_if_t *self = ahci_devices + ahci_count++;
 
-            dev->vtbl = &ahci_storage_if_device_vtbl;
+            self->vtbl = &ahci_storage_if_device_vtbl;
 
-            dev->config = pci_iter.config;
+            self->config = pci_iter.config;
 
-            dev->mmio_base =
+            self->mmio_base =
                     mmap((void*)(uintptr_t)pci_iter.config.base_addr[5],
                     0x1100, PROT_READ | PROT_WRITE,
                     MAP_PHYSICAL, -1, 0);
 
             printk("Performing BIOS handoff\n");
-            ahci_bios_handoff(dev);
+            ahci_bios_handoff(self);
 
             // Cache implemented port bitmask
-            dev->ports_impl = dev->mmio_base->ports_impl;
+            self->ports_impl = self->mmio_base->ports_impl;
 
             // Cache number of command slots per port
-            dev->num_cmd_slots = 1 + ((dev->mmio_base->cap >>
+            self->num_cmd_slots = 1 + ((self->mmio_base->cap >>
                                   AHCI_HC_CAP_NCS_BIT) &
                                   AHCI_HC_CAP_NCS_MASK);
 
-            dev->use_64 = !!(dev->mmio_base->cap & AHCI_HC_CAP_S64A);
+            self->use_64 = !!(self->mmio_base->cap & AHCI_HC_CAP_S64A);
             //dev->use_ncq = !!(dev->mmio_base->cap & AHCI_HC_CAP_SNCQ);
-            dev->use_ncq = 0;
+            self->use_ncq = 0;
 
-            ahci_rebase(dev);
+            ahci_rebase(self);
 
             // Assume legacy IRQ pin usage until MSI succeeds
-            pci_irq_range_t irq_range = {
-                pci_iter.config.irq_line,
-                1
-            };
+            self->irq_range.base = pci_iter.config.irq_line;
+            self->irq_range.count = 1;
 
             // Try to use MSI IRQ
-            dev->use_msi = pci_set_msi_irq(
+            self->use_msi = pci_set_msi_irq(
                         pci_iter.bus, pci_iter.slot, pci_iter.func,
-                        &irq_range, 1, 1, 1,
+                        &self->irq_range, 1, 1, 1,
                         ahci_irq_handler);
 
-            dev->irq_base = irq_range.base;
-            dev->irq_count = irq_range.count;
-
-            if (!dev->use_msi) {
+            if (!self->use_msi) {
                 // Fall back to pin based IRQ
-                irq_hook(dev->irq_base, ahci_irq_handler);
-                irq_setmask(dev->irq_base, 1);
+                irq_hook(self->irq_range.base, ahci_irq_handler);
+                irq_setmask(self->irq_range.base, 1);
             }
         }
 
