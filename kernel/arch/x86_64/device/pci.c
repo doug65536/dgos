@@ -80,7 +80,7 @@ uint32_t pci_config_read(
 int pci_config_write(
         int bus, int slot, int func,
         size_t offset, void *values, size_t size)
-{    
+{
     // Validate
     if (!(bus >= 0 && bus < 256 &&
           slot >= 0 && slot < 32 &&
@@ -435,7 +435,7 @@ int pci_set_msi_irq(int bus, int slot, int func,
     assert(multi_cap <= 32);
 
     // Limit it to highest documented value (as at PCI v2.2)
-    if (multi_cap > 32)
+    if (unlikely(multi_cap > 32))
         multi_cap = 32;
 
     uint8_t multi_en = multiple ? multi_exp : 1;
@@ -446,16 +446,11 @@ int pci_set_msi_irq(int bus, int slot, int func,
 
     // Allocate IRQs
     msi_irq_mem_t mem[32];
+    irq_range->count = 1 << multi_en;
     irq_range->base = apic_msi_irq_alloc(
-                mem, multi_cap,
+                mem, irq_range->count,
                 cpu, distribute,
                 handler);
-    irq_range->count = multi_en;
-
-    //// Write msg_ctrl (temporarily 1st!!)
-    //pci_config_write(bus, slot, func, msicap_config +
-    //                 offsetof(pci_msi_caps_hdr_t, msg_ctrl),
-    //                 &caps.msg_ctrl, sizeof(caps.msg_ctrl));
 
     // Use 32-bit or 64-bit according to capability
     if (caps.msg_ctrl & PCI_MSI_HDR_64) {

@@ -17,6 +17,7 @@
 #include "cpuid.h"
 #include "spinlock.h"
 #include "assert.h"
+#include "bitsearch.h"
 
 //
 // MP Tables
@@ -293,7 +294,15 @@ static uint8_t bus_irq_to_mapping[64];
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
 
-static uint8_t ioapic_next_free_vector = INTR_APIC_IRQ_BASE;
+static spinlock_t ioapic_msi_alloc_lock;
+static uint8_t ioapic_msi_next_irq = INTR_APIC_IRQ_BASE;
+static uint64_t ioapic_msi_alloc_map[] = {
+    0x0000000000000000L,
+    0x0000000000000000L,
+    0x0000000000000000L,
+    0x8000000000000000L
+};
+
 static uint8_t ioapic_next_irq_base = 16;
 
 // First vector after last IOAPIC
@@ -826,12 +835,53 @@ int acpi_have8259pic(void)
             !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
 }
 
-// Returns 0 on failure
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {
-    if (ioapic_next_free_vector + count <= INTR_APIC_SPURIOUS)
-        return (ioapic_next_free_vector += count) - count;
-    return 0;
+    spinlock_lock_noirq(&ioapic_msi_alloc_lock);
+
+    uint8_t base = ioapic_msi_next_irq;
+
+    for (size_t intr = base - INTR_APIC_IRQ_BASE, end = intr + count;
+         intr < end; ++intr) {
+        ioapic_msi_alloc_map[intr >> 6] |= (1UL << (intr & 0x3F));
+    }
+
+    spinlock_unlock_noirq(&ioapic_msi_alloc_lock);
+
+    return base;
+}
+
+// Returns 0 on failure
+// Pass 0 to allocate 1 vector, 1 to allocate 2 vectors,
+// 4 to allocate 16 vectors, etc.
+// Returns a vector with log2n LSB bits clear.
+static uint8_t ioapic_aligned_vectors(uint8_t log2n)
+{
+    int count = 1 << log2n;
+
+    uint64_t mask = ~(-1UL << count);
+    uint64_t checked = mask;
+    uint8_t result = 0;
+
+    spinlock_lock_noirq(&ioapic_msi_alloc_lock);
+
+    for (size_t bit = 0; bit < 128; bit += count)
+    {
+        size_t i = bit >> 6;
+
+        if (!(ioapic_msi_alloc_map[i] & checked)) {
+            ioapic_msi_alloc_map[i] |= checked;
+            result = bit + INTR_APIC_IRQ_BASE;
+            break;
+        }
+        checked <<= count;
+        if (!checked)
+            checked = mask;
+    }
+
+    spinlock_unlock_noirq(&ioapic_msi_alloc_lock);
+
+    return result;
 }
 
 static uint8_t checksum_bytes(char const *bytes, size_t len)
@@ -1813,7 +1863,7 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
 {
     uint8_t irq;
     if (intr >= ioapic_msi_base_intr &&
-            intr < ioapic_next_free_vector) {
+            intr < INTR_APIC_SPURIOUS) {
         // MSI IRQ
         irq = intr - ioapic_msi_base_intr + ioapic_msi_base_irq;
     } else {
@@ -1973,7 +2023,7 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     if (distribute < 0 || distribute > 1)
         return 0;
 
-    uint8_t vector_base = ioapic_alloc_vectors(count);
+    uint8_t vector_base = ioapic_aligned_vectors(bit_log2_n_32(count));
 
     // See if we ran out of vectors
     if (vector_base == 0)

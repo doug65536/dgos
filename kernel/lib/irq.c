@@ -4,6 +4,7 @@
 #include "cpu/spinlock.h"
 #include "cpu/atomic.h"
 #include "assert.h"
+#include "printk.h"
 
 typedef int16_t intr_link_t;
 
@@ -185,6 +186,8 @@ void *irq_invoke(int intr, int irq, void *ctx)
             entry = intr_handlers + i;
             ctx = entry->handler(irq, ctx);
         }
+    } else {
+        printdbg("Ignored IRQ %d INTR %d!\n", irq, intr);
     }
     return ctx;
 }

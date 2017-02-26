@@ -198,17 +198,17 @@ typedef struct pci_msi_hdr_t {
 #define PCI_MSI_HDR_MME_BITS    3
 
 // Multiple Message Capable (log2 N)
-#define PCI_MSI_HDR_MMC_BIT     4
+#define PCI_MSI_HDR_MMC_BIT     1
 #define PCI_MSI_HDR_MMC_BITS    3
 
 // Enable
 #define PCI_MSI_HDR_EN_BIT      0
 
-#define PCI_MSI_HDR_MMC_MASK    ((1<<PCI_MSI_HDR_MMC_BITS)-1)
-#define PCI_MSI_HDR_MME_MASK    ((1<<PCI_MSI_HDR_MME_BITS)-1)
+#define PCI_MSI_HDR_MMC_MASK    ((1U<<PCI_MSI_HDR_MMC_BITS)-1)
+#define PCI_MSI_HDR_MME_MASK    ((1U<<PCI_MSI_HDR_MME_BITS)-1)
 
-#define PCI_MSI_HDR_64          (1<<PCI_MSI_HDR_64_BIT)
-#define PCI_MSI_HDR_EN          (1<<PCI_MSI_HDR_EN_BIT)
+#define PCI_MSI_HDR_64          (1U<<PCI_MSI_HDR_64_BIT)
+#define PCI_MSI_HDR_EN          (1U<<PCI_MSI_HDR_EN_BIT)
 
 #define PCI_MSI_HDR_MMC         (PCI_MSI_HDR_MMC_MASK<<PCI_MSI_HDR_MMC_BIT)
 #define PCI_MSI_HDR_MME         (PCI_MSI_HDR_MME_MASK<<PCI_MSI_HDR_MME_BIT)
