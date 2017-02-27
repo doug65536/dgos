@@ -195,7 +195,7 @@ int munlock(
 
 /// Return the physical address for the specified linear address
 /// Page faults if the memory region is not mapped
-uintptr_t mphysaddr(void *addr);
+uintptr_t mphysaddr(volatile void *addr);
 
 typedef struct mmphysrange_t {
     uintptr_t physaddr;

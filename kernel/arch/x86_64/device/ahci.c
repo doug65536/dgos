@@ -1687,13 +1687,13 @@ static void ahci_rebase(ahci_if_t *dev)
         printk("Setting cmd/FIS buffer addresses\n");
 
         atomic_barrier();
-        port->cmd_list_base = mphysaddr((void*)cmd_hdr);
+        port->cmd_list_base = mphysaddr(cmd_hdr);
         port->fis_base = mphysaddr((void*)fis);
         atomic_barrier();
 
         // Set command table base addresses (physical)
         for (uint32_t slot = 0; slot < slots_impl; ++slot)
-            cmd_hdr[slot].ctba = mphysaddr((void*)(cmd_tbl + slot));
+            cmd_hdr[slot].ctba = mphysaddr(cmd_tbl + slot);
 
         // Acknowledging interrupts
         port->intr_status = port->intr_status;

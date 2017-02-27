@@ -2151,7 +2151,7 @@ int madvise(void *addr, size_t len, int advice)
     return 0;
 }
 
-uintptr_t mphysaddr(void *addr)
+uintptr_t mphysaddr(void volatile *addr)
 {
     linaddr_t linaddr = (linaddr_t)addr;
 
