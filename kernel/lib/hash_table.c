@@ -164,6 +164,7 @@ void htbl_delete(hashtbl_t *self, void *key)
                         self->items[hash] = 0;
                         --self->count;
                     }
+                    break;
                 }
             } else if (!self->items[hash]) {
                 break;
