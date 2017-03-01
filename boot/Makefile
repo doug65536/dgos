@@ -127,7 +127,7 @@ endif
 CFLAGS += $(WEVERYTHING)
 
 # Optimize
-#CFLAGS += -Os -DNDEBUG
+CFLAGS += -Os -DNDEBUG
 
 ASFLAGS := --warn
 
