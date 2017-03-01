@@ -5,6 +5,7 @@
 #include "threadsync.h"
 #include "bitsearch.h"
 #include "printk.h"
+#include "cpu/control_regs.h"
 
 typedef struct heap_hdr_t {
     uintptr_t size_next;
@@ -202,8 +203,10 @@ void *heap_alloc(heap_t *heap, size_t size)
     size_t bucket = log2size - 5;
 
     heap_hdr_t *first_free;
+    int intr_enabled;
 
     if (bucket < HEAP_BUCKET_COUNT) {
+        intr_enabled = cpu_irq_disable();
         mutex_lock(&heap->lock);
 
         // Try to take a free item
@@ -221,6 +224,7 @@ void *heap_alloc(heap_t *heap, size_t size)
     heap->free_chains[bucket] = (void*)first_free->size_next;
 
     mutex_unlock(&heap->lock);
+    cpu_irq_toggle(intr_enabled);
 
     if (first_free) {
         // Store size in header
@@ -253,10 +257,12 @@ void heap_free(heap_t *heap, void *block)
 
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
+        int intr_enabled = cpu_irq_disable();
         mutex_lock(&heap->lock);
         hdr->size_next = (uintptr_t)heap->free_chains[bucket];
         heap->free_chains[bucket] = hdr;
         mutex_unlock(&heap->lock);
+        cpu_irq_toggle(intr_enabled);
     } else {
         heap_large_free(hdr, hdr->size_next);
     }    
