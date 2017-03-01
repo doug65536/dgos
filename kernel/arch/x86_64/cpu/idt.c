@@ -167,6 +167,7 @@ static void load_idtr(table_register_64_t *table_reg)
         "lidtq (%[table_reg])\n\t"
         :
         : [table_reg] "r" (&table_reg->limit)
+        : "memory"
     );
 }
 
