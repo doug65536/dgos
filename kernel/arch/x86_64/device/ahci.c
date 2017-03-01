@@ -14,6 +14,13 @@
 #include "threadsync.h"
 #include "cpu/control_regs.h"
 
+#define AHCI_DEBUG  1
+#if AHCI_DEBUG
+#define AHCI_TRACE(...) printdbg("ahci: " __VA_ARGS__)
+#else
+#define AHCI_TRACE(...) ((void)0)
+#endif
+
 typedef struct ahci_if_t ahci_if_t;
 DECLARE_storage_if_DEVICE(ahci);
 DECLARE_storage_dev_DEVICE(ahci);
@@ -1605,7 +1612,7 @@ static void ahci_perform_detect(ahci_if_t *dev, int port_num)
 
 static void ahci_rebase(ahci_if_t *dev)
 {
-    printk("Stopping all ports\n");
+    AHCI_TRACE("Stopping all ports\n");
     // Stop all ports
     ahci_port_stop_all(dev);
 
@@ -1616,7 +1623,7 @@ static void ahci_rebase(ahci_if_t *dev)
             : MAP_POPULATE | MAP_32BIT
             ;
 
-    printk("64 bit support: %d\n", support_64bit);
+    AHCI_TRACE("64 bit support: %d\n", support_64bit);
 
     // Loop through the implemented ports
     uint32_t ports_impl = dev->ports_impl;
@@ -1632,7 +1639,7 @@ static void ahci_rebase(ahci_if_t *dev)
         if (!(ports_impl & (1U<<port_num)))
             continue;
 
-        printk("Initializing AHCI device port %d\n", port_num);
+        AHCI_TRACE("Initializing AHCI device port %d\n", port_num);
 
         hba_port_t volatile *port = dev->mmio_base->ports + port_num;
         hba_port_info_t *pi = dev->port_info + port_num;
@@ -1640,7 +1647,7 @@ static void ahci_rebase(ahci_if_t *dev)
         mutex_init(&pi->slotalloc_lock);
         condvar_init(&pi->slotalloc_avail);
 
-        printk("Performing detection, port %d\n", port_num);
+        AHCI_TRACE("Performing detection, port %d\n", port_num);
         ahci_perform_detect(dev, port_num);
 
         // FIXME: do IDENTIFY instead of assuming 2KB/512B
@@ -1684,7 +1691,7 @@ static void ahci_rebase(ahci_if_t *dev)
         // (Workaround initially active slot on QEMU)
         pi->cmd_issued = init_busy_mask;
 
-        printk("Setting cmd/FIS buffer addresses\n");
+        AHCI_TRACE("Setting cmd/FIS buffer addresses\n");
 
         atomic_barrier();
         port->cmd_list_base = mphysaddr(cmd_hdr);
@@ -1698,7 +1705,7 @@ static void ahci_rebase(ahci_if_t *dev)
         // Acknowledging interrupts
         port->intr_status = port->intr_status;
 
-        printk("Unmasking interrupts\n");
+        AHCI_TRACE("Unmasking interrupts\n");
 
         port->intr_en = AHCI_HP_IE_TFES |
                 AHCI_HP_IE_HBFS |
@@ -1716,19 +1723,19 @@ static void ahci_rebase(ahci_if_t *dev)
                 AHCI_HP_IE_DHRS;
     }
 
-    printk("Starting ports\n");
+    AHCI_TRACE("Starting ports\n");
     ahci_port_start_all(dev);
 
     // Acknowledge all IRQs
-    printk("Acknowledging top level IRQ\n");
+    AHCI_TRACE("Acknowledging top level IRQ\n");
     dev->mmio_base->intr_status = dev->mmio_base->intr_status;
 
-    printk("Enabling IRQ\n");
+    AHCI_TRACE("Enabling IRQ\n");
 
     // Enable interrupts overall
     dev->mmio_base->host_ctl |= AHCI_HC_HC_IE;
 
-    printk("Rebase done\n");
+    AHCI_TRACE("Rebase done\n");
 }
 
 static void ahci_bios_handoff(ahci_if_t *dev)
@@ -1761,7 +1768,7 @@ static if_list_t ahci_if_detect(void)
 
     pci_dev_iterator_t pci_iter;
 
-    printk("Enumerating PCI busses for AHCI...\n");
+    AHCI_TRACE("Enumerating PCI busses for AHCI...\n");
     //sleep(3000);
 
     if (!pci_enumerate_begin(
@@ -1782,21 +1789,23 @@ static if_list_t ahci_if_detect(void)
         if (pci_iter.config.base_addr[5] == 0)
             continue;
 
-        printk("Found AHCI Device BAR ht=%x %u/%u/%u d=%x s=%x: ",
-               pci_iter.config.header_type,
-               pci_iter.bus, pci_iter.slot, pci_iter.func,
-               pci_iter.dev_class, pci_iter.subclass);
+        AHCI_TRACE("Found AHCI Device BAR ht=%x %u/%u/%u d=%x s=%x:"
+                   " %x %x %x %x %x %x\n",
+                   pci_iter.config.header_type,
+                   pci_iter.bus, pci_iter.slot, pci_iter.func,
+                   pci_iter.dev_class, pci_iter.subclass,
+                   pci_iter.config.base_addr[0],
+                pci_iter.config.base_addr[1],
+                pci_iter.config.base_addr[2],
+                pci_iter.config.base_addr[3],
+                pci_iter.config.base_addr[4],
+                pci_iter.config.base_addr[5]);
 
-        for (int i = 0; i < 6; ++i) {
-            printk("%x ",
-                   pci_iter.config.base_addr[i]);
-        }
-
-        printk("\nIRQ line=%d, IRQ pin=%d\n",
+        AHCI_TRACE("IRQ line=%d, IRQ pin=%d\n",
                pci_iter.config.irq_line,
                pci_iter.config.irq_pin);
 
-        printk("Initializing AHCI interface...\n");
+        AHCI_TRACE("Initializing AHCI interface...\n");
 
         //sleep(3000);
 
@@ -1812,7 +1821,7 @@ static if_list_t ahci_if_detect(void)
                     0x1100, PROT_READ | PROT_WRITE,
                     MAP_PHYSICAL, -1, 0);
 
-            printk("Performing BIOS handoff\n");
+            AHCI_TRACE("Performing BIOS handoff\n");
             ahci_bios_handoff(self);
 
             // Cache implemented port bitmask
@@ -1846,7 +1855,7 @@ static if_list_t ahci_if_detect(void)
             }
         }
 
-        printk("Finding next AHCI device...\n");
+        AHCI_TRACE("Finding next AHCI device...\n");
         //sleep(3000);
 
     } while (pci_enumerate_next(&pci_iter));
