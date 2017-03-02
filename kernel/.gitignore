@@ -3,3 +3,4 @@ bin/
 dump/
 Makefile.user
 kernel.creator.user
+extern/
