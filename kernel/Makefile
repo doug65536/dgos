@@ -34,9 +34,11 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m64
 TARGET_ARCH_AS := --64
 
-INCS := $(BUILDROOT) arch arch/$(ARCH) lib fs net
-INCLUDEPATHS := $(realpath $(INCS))
+INCS := . arch arch/$(ARCH) lib fs net extern/include
+INCLUDEPATHS := $(patsubst %,$(BUILDROOT)/%,$(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
+
+$(info Include paths: $(INCLUDEARGS))
 
 # Max warnings
 WEVERYTHING := -Wall
@@ -78,7 +80,7 @@ CFLAGS := -g3 -fno-stack-protector \
 	-std=c11 \
 	$(WEVERYTHING)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 #LTO := 1
 
 ifdef OPTIMIZE
@@ -129,6 +131,9 @@ LIBFILES := \
 	lib/libkernel.a \
 	arch/$(ARCH)/libarch.a
 
+EXTERNLIBFILES := \
+	extern/zlib-src/build/libz.a
+
 LIBFILES_WHOLE := \
 	fs/libfs.a \
 	net/libnet.a
@@ -146,17 +151,21 @@ LDFLAGS ?=  --oformat elf64-x86-64 \
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 
-all: subdirs $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
+all: subdirs $(EXTERNLIBFILES) $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
 
 clean:
 	@rm -f $(BINDIR)/kernel
 	@rm -f $(OBJS)
 	@rm -f $(DUMPDIR)/*.map
 	@rm -f $(OUTPUTS)
+	@rm -rf extern/include $(EXTERNLIBFILES)
 	(cd lib && $(MAKE) clean)
 	(cd net && $(MAKE) clean)
 	(cd fs && $(MAKE) clean)
 	(cd arch/$(ARCH) && $(MAKE) clean)
+
+distclean: clean
+	@rm -rf extern
 
 subdirs:
 	+(cd lib && $(MAKE))
@@ -170,17 +179,7 @@ $(LIBFILES): subdirs
 
 WLPREFIX := -Wl,
 
-#	$(LD) -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
-#		--start-group \
-#		$(LIBFILES) \
-#		--whole-archive \
-#		$(LIBFILES_WHOLE) \
-#		--no-whole-archive \
-#		--end-group \
-#		$(LIBGCC)
-#
-
-$(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(LIBFILES_WHOLE)
+$(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOLE)
 	$(CC) $(CFLAGS) $(OUTPUT_OPTION) \
 		-T $(LINKERSCRIPT) \
 		-fuse-linker-plugin \
@@ -189,6 +188,7 @@ $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(LIBFILES_WHOLE)
 		$(OBJS) \
 		-Wl,--start-group \
 		$(LIBFILES) \
+		$(EXTERNLIBFILES) \
 		-Wl,--whole-archive $(LIBFILES_WHOLE) -Wl,--no-whole-archive \
 		-Wl,--end-group \
 		-Wl,-build-id=none
@@ -200,5 +200,7 @@ $(DUMPDIR)/kernel-headers: $(KERNEL)
 
 $(DUMPDIR)/kernel.dis: $(KERNEL)
 	objdump --disassemble --source $^ > $@
+
+include dep-zlib.mk
 
 include autodep.mk

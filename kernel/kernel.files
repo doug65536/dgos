@@ -20,6 +20,8 @@ lib/hash_table.c
 lib/hash_table.h
 lib/process.c
 lib/process.h
+lib/sys/types.h
+lib/unistd.h
 net/tcp.c
 net/tcp.h
 net/tcp_frame.c

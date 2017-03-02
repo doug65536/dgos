@@ -22,6 +22,8 @@
 #include "elf64.h"
 #include "fileio.h"
 #include "bootdev.h"
+#include "zlib/zlib.h"
+#include "stdlib.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -668,11 +670,49 @@ static int init_thread(void *p)
     return 0;
 }
 
+static void *zlib_malloc(void *opaque, unsigned items, unsigned size)
+{
+    (void)opaque;
+    return malloc(items * size);
+}
+
+static void zlib_free(void *opaque, void *p)
+{
+    (void)opaque;
+    free(p);
+}
+
+__attribute__((used))
+static void zlib_test(void)
+{
+    z_stream strm;
+    memset(&strm, 0, sizeof(strm));
+    strm.zalloc = zlib_malloc;
+    strm.zfree = zlib_free;
+    deflateInit(&strm, Z_BEST_COMPRESSION);
+
+    char input[16] = "hello!";
+    char output[32];
+
+    strm.avail_in = strlen(input);
+    strm.next_in = (void*)input;
+    strm.avail_out = sizeof(output);
+    strm.next_out = (void*)output;
+
+    int status = deflate(&strm, Z_FINISH);
+
+    assert(status == Z_STREAM_END);
+
+    deflateEnd(&strm);
+}
+
 int main(void)
 {
     pci_init();
     keybd_init();
     keyb8042_init();
+
+    //zlib_test();
 
     mprotect_test(0);
 
