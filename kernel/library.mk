@@ -17,10 +17,10 @@ OBJS := $(AOBJS) $(COBJS)
 all: $(LIBFILENAME)
 
 clean:
-	@$(RM) -f $(OBJS)
-	@$(RM) -f $(LIBFILENAME)
+	$(RM) -f $(OBJS)
+	$(RM) -f $(LIBFILENAME)
 	if [ "$(CLEANOTHER)" != "" ]; then $(RM) $(CLEANOTHER); fi
-	@$(RM) -f $(patsubst %,$(DEPDIR)/%.d,$(notdir $(SRCS)))
+	$(RM) -f $(patsubst %,$(DEPDIR)/%.d,$(notdir $(SRCS)))
 
 $(LIBFILENAME): $(OBJS)
 	$(AR) -rcs $@ $^

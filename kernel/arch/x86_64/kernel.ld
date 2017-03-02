@@ -182,13 +182,14 @@ SECTIONS {
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
-	.debug_info		0 : { *(.debug_info)    }
-	.debug_abbrev	0 : { *(.debug_abbrev)  }
-	.debug_aranges	0 : { *(.debug_aranges) }
-	.debug_macro	0 : { *(.debug_macro)   }
-	.debug_line		0 : { *(.debug_line)    }
-	.debug_str		0 : { *(.debug_str)     }
+	.debug_info		0 : { *(.debug_info)		}
+	.debug_abbrev	0 : { *(.debug_abbrev)		}
+	.debug_aranges	0 : { *(.debug_aranges)		}
+	.debug_macro	0 : { *(.debug_macro)		}
+	.debug_line		0 : { *(.debug_line)		}
+	.debug_str		0 : { *(.debug_str)			}
 
-	/DISCARD/		: { *(.interp)        }
-	/DISCARD/		: { *(.comment)       }
+	/DISCARD/		: { *(.interp)				}
+	/DISCARD/		: { *(.comment)				}
+	/DISCARD/		: { *(.note.gnu.build-id)	}
 }

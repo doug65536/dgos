@@ -69,7 +69,7 @@ ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
 
-CFLAGS ?= -g3 -fno-stack-protector \
+CFLAGS := -g3 -fno-stack-protector \
 	-mcmodel=kernel -mno-red-zone \
 	-msse -msse2 \
 	-ftls-model=$(TLS_MODEL) \
@@ -78,9 +78,11 @@ CFLAGS ?= -g3 -fno-stack-protector \
 	-std=c11 \
 	$(WEVERYTHING)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
+#LTO := 1
 
 ifdef OPTIMIZE
+$(info Optimizing...)
 CFLAGS += \
 	-O2 -ftree-vectorize \
 	-fno-omit-frame-pointer -fbuiltin
@@ -89,6 +91,19 @@ CFLAGS += \
 	-O0 \
 	-fno-omit-frame-pointer
 endif
+
+RANLIB := gcc-ranlib
+AR := gcc-ar
+NM := gcc-nm
+export RANLIB
+export AR
+export NM
+
+ifdef LTO
+CFLAGS += -flto
+endif
+
+CFLAGS += $(OPTIMIZATIONFLAGS)
 
 #-fipa-icf
 
@@ -124,9 +139,9 @@ NEEDSMALLEST :=
 
 LD := ld
 
-LDFLAGS ?=  --oformat elf64-x86-64 -no-stdlib \
+LDFLAGS ?=  --oformat elf64-x86-64 \
 	-Map $(DUMPDIR)/kernel.map \
-	-T $(LINKERSCRIPT) -g -export-dynamic
+	 -g -export-dynamic
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
@@ -153,15 +168,32 @@ $(LIBFILES): subdirs
 
 .PHONY: subdirs
 
+WLPREFIX := -Wl,
+
+#	$(LD) -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
+#		--start-group \
+#		$(LIBFILES) \
+#		--whole-archive \
+#		$(LIBFILES_WHOLE) \
+#		--no-whole-archive \
+#		--end-group \
+#		$(LIBGCC)
+#
+
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(LIBFILES_WHOLE)
-	$(LD) -melf_x86_64 $(LDFLAGS) $(OUTPUT_OPTION) $(OBJS) \
-		--start-group \
+	$(CC) $(CFLAGS) $(OUTPUT_OPTION) \
+		-T $(LINKERSCRIPT) \
+		-fuse-linker-plugin \
+		-nostdlib -Wl,-melf_x86_64 \
+		$(patsubst %,$(WLPREFIX)%,$(LDFLAGS)) \
+		$(OBJS) \
+		-Wl,--start-group \
 		$(LIBFILES) \
-		--whole-archive \
-		$(LIBFILES_WHOLE) \
-		--no-whole-archive \
-		--end-group \
-		$(LIBGCC)
+		-Wl,--whole-archive $(LIBFILES_WHOLE) -Wl,--no-whole-archive \
+		-Wl,--end-group \
+		-Wl,-build-id=none
+
+#$(LIBGCC) \
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)
 	objdump --all-headers $< > $@

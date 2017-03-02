@@ -1,6 +1,7 @@
 #pragma once
 #include "likely.h"
 
+__attribute__((noinline))
 void assert_failed(char const *expr,
                    char const *msg,
                    char const *file,

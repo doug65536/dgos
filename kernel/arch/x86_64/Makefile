@@ -61,7 +61,7 @@ generated_device_vtbl.s: $(DEVOBJS)
 		echo '.global device_constructor_list' >> $@ && \
 		echo '.hidden device_constructor_list' >> $@ && \
 		echo 'device_constructor_list:' >> $@ && \
-		nm $^ | grep -oP '\S+_register_device' | \
+		$(NM) $^ | grep -oP '\S+_register_device' | \
 			sed 's/.*/.quad &/' >> $@ && \
 		echo '.quad 0' >> $@
 
