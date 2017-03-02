@@ -145,11 +145,13 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
     size_t size = 1 << log2size;
 
     heap_hdr_t *hdr = 0;
+    heap_hdr_t *first_free = heap->free_chains[bucket];
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
         hdr = (void*)fill;
-        hdr->size_next = (uintptr_t)heap->free_chains[bucket];
-        heap->free_chains[bucket] = hdr;
+        hdr->size_next = (uintptr_t)first_free;
+        first_free = hdr;
     }
+    heap->free_chains[bucket] = first_free;
 
     return hdr;
 }
@@ -274,7 +276,7 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
         heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
         uint8_t newlog2size = bit_log2_n_32((int32_t)size);
         size_t new_size = 1 << newlog2size;
-        if (hdr->size_next >= new_size) {
+        if (hdr->size_next < new_size) {
             void *new_block = heap_alloc(heap, size);
             memcpy(new_block, block, hdr->size_next);
             heap_free(heap, block);
