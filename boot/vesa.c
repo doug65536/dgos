@@ -22,7 +22,7 @@ typedef struct vbe_info_t {
     far_ptr_t product_rev_str;
     char reserved[222];
     char oemdata[256];
-} vbe_info_t;
+} __attribute__((packed)) vbe_info_t;
 
 // 256 bytes
 typedef struct vbe_mode_info_t {
@@ -65,7 +65,7 @@ typedef struct vbe_mode_info_t {
     uint32_t offscreen_mem_offset;
     uint16_t offscreen_mem_size_kb;
     char reserved2[206];
-} vbe_mode_info_t;
+} __attribute__((packed)) vbe_mode_info_t;
 
 static uint16_t vbe_get_info(void *info, uint16_t ax, uint16_t cx)
 {
@@ -93,7 +93,26 @@ static int vbe_mode_info(vbe_mode_info_t *info, uint16_t mode)
     return vbe_get_info(info, 0x4F01, mode) == 0x4F;
 }
 
-uint32_t vbe_set_mode(int width, int height, int verbose)
+static uint16_t gcd(uint16_t a, uint16_t b)
+{
+    while (a != b) {
+        if (a > b)
+            a -= b;
+        else
+            b -= a;
+    }
+
+    return a;
+}
+
+static void aspect_ratio(uint16_t *n, uint16_t *d, uint16_t w, uint16_t h)
+{
+    uint16_t div = gcd(w, h);
+    *n = w / div;
+    *d = h / div;
+}
+
+uint32_t vbe_set_mode(uint16_t width, uint16_t height, uint16_t verbose)
 {
     vbe_info_t *info;
     vbe_mode_info_t *mode_info;
@@ -116,11 +135,30 @@ uint32_t vbe_set_mode(int width, int height, int verbose)
             // Get mode information
             if (vbe_mode_info(mode_info, mode)) {
                 if (verbose) {
-                    print_line("vbe mode %u w=%u h=%u phys_addr=%x",
+                    // Ignore palette modes
+                    if (!mode_info->mask_size_r &&
+                            !mode_info->mask_size_g &&
+                            !mode_info->mask_size_b &&
+                            !mode_info->mask_size_rsvd)
+                        continue;
+
+                    uint16_t aspect_n;
+                    uint16_t aspect_d;
+                    aspect_ratio(&aspect_n, &aspect_d,
+                                 mode_info->res_x,
+                                 mode_info->res_y);
+
+                    print_line("vbe mode %u w=%u h=%u"
+                               " %d:%d:%d:%d phys_addr=%x %d:%d",
                                mode,
                                mode_info->res_x,
                                mode_info->res_y,
-                               mode_info->phys_base_ptr);
+                               mode_info->mask_size_r,
+                               mode_info->mask_size_g,
+                               mode_info->mask_size_b,
+                               mode_info->mask_size_rsvd,
+                               mode_info->phys_base_ptr,
+                               aspect_n, aspect_d);
                 }
 
                 if (mode_info->res_x == width &&
