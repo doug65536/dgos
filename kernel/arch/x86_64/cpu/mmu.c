@@ -573,7 +573,7 @@ static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
 static size_t mmu_fixup_mem_map(physmem_range_t *list)
 {
     int did_something;
-    size_t usable_count;
+    size_t usable_count = 0;
 
     // Might need multiple passes to fully fixup the list
     do {
@@ -857,7 +857,7 @@ static void init_create_pt(
     pte_t page_flags = PTE_PRESENT | PTE_WRITABLE |
             (end_page_flags & PTE_USER);
 
-    physaddr_t addr;
+    physaddr_t addr = 0;
     for (unsigned level = 0; level < levels; ++level) {
         addr = iter[path[level]] & PTE_ADDR;
 
