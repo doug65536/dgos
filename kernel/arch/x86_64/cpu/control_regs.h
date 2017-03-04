@@ -9,6 +9,30 @@
 
 #define MSR_IA32_MISC_ENABLES   0x1A0
 
+// PAT MSR
+
+#define MSR_IA32_PAT    0x277
+
+// Uncacheable
+#define MSR_IA32_PAT_UC     0
+
+// Write Combining
+#define MSR_IA32_PAT_WC     1
+
+// Write Through
+#define MSR_IA32_PAT_WT     4
+
+// Write Protected
+#define MSR_IA32_PAT_WP     5
+
+// Writeback
+#define MSR_IA32_PAT_WB     6
+
+// Uncacheable and allow MTRR override
+#define MSR_IA32_PAT_UCW    7
+
+#define MSR_IA32_PAT_n(n,v) ((uint64_t)(v) << ((n) << 3))
+
 #define CR0_PE_BIT 0	// Protected Mode
 #define CR0_MP_BIT 1	// Monitor co-processor
 #define CR0_EM_BIT 2	// Emulation

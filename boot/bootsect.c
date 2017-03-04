@@ -39,8 +39,15 @@ __asm__ (
 
     // The kernel finds the boot device information by reading this vector
     // Int 13h, AH=48h Get drive parameters
+    // Vector at offset 68
     ".globl boot_device_info_vector\n\t"
     "boot_device_info_vector:\n\t"
+    ".int 0\n\t"
+
+    // The kernel finds the VBE information by reading this vector
+    // Vector at offset 72
+    ".globl vbe_info_vector\n\t"
+    "vbe_info_vector:\n\t"
     ".int 0\n\t"
 
     // The bootstrap code starts here

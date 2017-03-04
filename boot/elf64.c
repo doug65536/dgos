@@ -27,7 +27,8 @@ uint64_t mp_enter_kernel;
 
 static void enter_kernel_initial(uint64_t entry_point)
 {
-    vbe_set_mode(0, 0, 1);
+    //vbe_info_vector = vbe_select_mode(1280, 800, 1) << 4;
+    vbe_info_vector = vbe_select_mode(1920, 1080, 1) << 4;
 
     //
     // Relocate MP entry trampoline to 4KB boundary

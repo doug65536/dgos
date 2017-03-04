@@ -178,6 +178,11 @@ uint64_t paging_map_range(
         uint64_t pte_flags,
         uint16_t keep)
 {
+    uint16_t misalignment = linear_base & PAGE_MASK;
+    linear_base -= misalignment;
+    length += misalignment;
+    length = (length + PAGE_MASK) & -(int)PAGE_SIZE;
+
     uint64_t allocated = 0;
     for (uint64_t offset = 0; offset < length; offset += PAGE_SIZE) {
         if (paging_map_page(linear_base + offset,

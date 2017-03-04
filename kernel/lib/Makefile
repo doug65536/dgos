@@ -28,6 +28,8 @@ CSRCS := mm.c \
 	hash.c \
 	hash_table.c \
 	fileio.c \
-	process.c
+	process.c \
+	png.c \
+	zlib_helper.c
 
 include $(BUILDROOT)/library.mk

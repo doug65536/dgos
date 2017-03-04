@@ -23,7 +23,9 @@
 #include "fileio.h"
 #include "bootdev.h"
 #include "zlib/zlib.h"
+#include "zlib_helper.h"
 #include "stdlib.h"
+#include "png.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -80,6 +82,7 @@ static int ctx_sw_thread(void *p)
     (void)p;
     while (1)
         thread_yield();
+    return 0;
 }
 
 #endif
@@ -580,6 +583,37 @@ static int stress_heap_thread(void *p)
 extern void usbxhci_detect(void*);
 void (*usbxhci_pull_in)(void*) = usbxhci_detect;
 
+static uint8_t sum_bytes(char *st, size_t len)
+{
+    uint8_t sum = 0;
+    for (size_t i = 0; i < len; ++i)
+        sum += st[i];
+    return sum;
+}
+
+static int find_vbe(void *p)
+{
+    char *bios = mmap(p, 0x10000, PROT_READ, MAP_PHYSICAL, -1, 0);
+
+    int i;
+    for (i = 0; i < 0x8000 - 20; ++i) {
+        if (bios[i] == 'D' &&
+                bios[i+1] == 'I' &&
+                bios[i+2] == 'M' &&
+                bios[i+3] == 'P' &&
+                sum_bytes(bios + i, 20) == 0) {
+            printdbg("Found VBE PM Interface at %x!\n", (uint32_t)(uintptr_t)p + i);
+            break;
+        }
+    }
+
+    if (i == 0x8000 - 20)
+        printdbg("No VBE PM Interface at %p\n", p);
+
+    munmap(bios, 0x8000);
+    return 0;
+}
+
 static int init_thread(void *p)
 {
     (void)p;
@@ -601,6 +635,14 @@ static int init_thread(void *p)
 
     bootdev_info(0, 0, 0);
 
+    png_image_t *img = png_load("background.png");
+
+    void *vbe_data = (void*)(uintptr_t)*(uint32_t*)(uintptr_t)(0x7C00 + 72);
+    void *screen = (void*)(uintptr_t)*(uint32_t*)vbe_data;
+    memcpy(screen, png_pixels(img), 1920*1080*4);
+
+    free(img);
+
     //modload_init();
 
     int fd = file_open("root/hello.txt");
@@ -612,6 +654,9 @@ static int init_thread(void *p)
     buf[sizeof(buf)-1] = 0;
     printdbg("File read, size = %ld, data = %s\n", readsize, buf);
     file_close(fd);
+
+    thread_create(find_vbe, (void*)0xC0000, 0, 0);
+    thread_create(find_vbe, (void*)0xF0000, 0, 0);
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
@@ -670,18 +715,6 @@ static int init_thread(void *p)
     return 0;
 }
 
-static void *zlib_malloc(void *opaque, unsigned items, unsigned size)
-{
-    (void)opaque;
-    return malloc(items * size);
-}
-
-static void zlib_free(void *opaque, void *p)
-{
-    (void)opaque;
-    free(p);
-}
-
 __attribute__((used))
 static void zlib_test(void)
 {
@@ -689,7 +722,7 @@ static void zlib_test(void)
     memset(&strm, 0, sizeof(strm));
     strm.zalloc = zlib_malloc;
     strm.zfree = zlib_free;
-    deflateInit(&strm, Z_BEST_COMPRESSION);
+    deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 9, Z_DEFAULT_STRATEGY);
 
     char input[16] = "hello!";
     char output[32];
@@ -712,7 +745,7 @@ int main(void)
     keybd_init();
     keyb8042_init();
 
-    //zlib_test();
+    zlib_test();
 
     mprotect_test(0);
 

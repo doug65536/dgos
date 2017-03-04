@@ -1,8 +1,17 @@
 #include "vesa.h"
+#include "vesainfo.h"
 #include "farptr.h"
 #include "string.h"
 #include "malloc.h"
 #include "screen.h"
+#include "paging.h"
+
+#define VESA_DEBUG 1
+#if VESA_DEBUG
+#define VESA_TRACE(...) print_line("vesa: " __VA_ARGS__)
+#else
+#define VESA_TRACE(...) ((void)0)
+#endif
 
 // All VBE BIOS calls have AH=4Fh
 // Successful VBE calls return with AX=4F00h
@@ -93,6 +102,19 @@ static int vbe_mode_info(vbe_mode_info_t *info, uint16_t mode)
     return vbe_get_info(info, 0x4F01, mode) == 0x4F;
 }
 
+static uint16_t vbe_set_mode(uint16_t mode)
+{
+    uint16_t ax = 0x4F02;
+    // 0x4000 means use linear framebuffer
+    uint16_t bx = 0x4000 | mode;
+    __asm__ __volatile__ (
+        "int $0x10\n\t"
+        : "+a" (ax)
+        : "b" (bx)
+    );
+    return ax == 0x4F;
+}
+
 static uint16_t gcd(uint16_t a, uint16_t b)
 {
     while (a != b) {
@@ -112,7 +134,7 @@ static void aspect_ratio(uint16_t *n, uint16_t *d, uint16_t w, uint16_t h)
     *d = h / div;
 }
 
-uint32_t vbe_set_mode(uint16_t width, uint16_t height, uint16_t verbose)
+uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
 {
     vbe_info_t *info;
     vbe_mode_info_t *mode_info;
@@ -120,9 +142,13 @@ uint32_t vbe_set_mode(uint16_t width, uint16_t height, uint16_t verbose)
     info = malloc(sizeof(*info));
     mode_info = malloc(sizeof(*mode_info));
 
+    vbe_selected_mode_t sel;
+
     uint16_t mode;
     uint16_t done = 0;
     if (vbe_detect(info)) {
+        VESA_TRACE("VBE Memory %dMB\n", info->mem_size_64k >> 4);
+
         for (uint16_t ofs = 0; !done; ofs += sizeof(uint16_t)) {
             // Get mode number
             far_copy_to(&mode,
@@ -134,21 +160,19 @@ uint32_t vbe_set_mode(uint16_t width, uint16_t height, uint16_t verbose)
 
             // Get mode information
             if (vbe_mode_info(mode_info, mode)) {
+                // Ignore palette modes
+                if (!mode_info->mask_size_r &&
+                        !mode_info->mask_size_g &&
+                        !mode_info->mask_size_b &&
+                        !mode_info->mask_size_rsvd)
+                    continue;
+
+                aspect_ratio(&sel.aspect_n, &sel.aspect_d,
+                             mode_info->res_x,
+                             mode_info->res_y);
+
                 if (verbose) {
-                    // Ignore palette modes
-                    if (!mode_info->mask_size_r &&
-                            !mode_info->mask_size_g &&
-                            !mode_info->mask_size_b &&
-                            !mode_info->mask_size_rsvd)
-                        continue;
-
-                    uint16_t aspect_n;
-                    uint16_t aspect_d;
-                    aspect_ratio(&aspect_n, &aspect_d,
-                                 mode_info->res_x,
-                                 mode_info->res_y);
-
-                    print_line("vbe mode %u w=%u h=%u"
+                    VESA_TRACE("vbe mode %u w=%u h=%u"
                                " %d:%d:%d:%d phys_addr=%x %d:%d",
                                mode,
                                mode_info->res_x,
@@ -158,27 +182,51 @@ uint32_t vbe_set_mode(uint16_t width, uint16_t height, uint16_t verbose)
                                mode_info->mask_size_b,
                                mode_info->mask_size_rsvd,
                                mode_info->phys_base_ptr,
-                               aspect_n, aspect_d);
+                               sel.aspect_n, sel.aspect_d);
                 }
 
                 if (mode_info->res_x == width &&
                         mode_info->res_y == height &&
-                        mode_info->bpp ==
-                        mode_info->mask_size_r +
-                        mode_info->mask_size_g +
-                        mode_info->mask_size_b +
-                        mode_info->mask_size_rsvd) {
+                        mode_info->bpp == 32) {
+                    sel.width = mode_info->res_x;
+                    sel.height = mode_info->res_y;
+                    sel.pitch = mode_info->bytes_scanline;
+                    sel.framebuffer_addr = mode_info->phys_base_ptr;
+                    sel.framebuffer_bytes = info->mem_size_64k << 16;
+                    sel.mask_size_r = mode_info->mask_size_r;
+                    sel.mask_size_g = mode_info->mask_size_g;
+                    sel.mask_size_b = mode_info->mask_size_b;
+                    sel.mask_size_a = mode_info->mask_size_rsvd;
+                    sel.mask_pos_r = mode_info->mask_pos_r;
+                    sel.mask_pos_g = mode_info->mask_pos_g;
+                    sel.mask_pos_b = mode_info->mask_pos_b;
+                    sel.mask_pos_a = mode_info->mask_pos_rsvd;
+                    memset(sel.reserved, 0, sizeof(sel.reserved));
                     done = 1;
+                    vbe_set_mode(mode);
                     break;
                 }
             }
         }
     }
 
-    uint32_t physaddr = done ? mode_info->phys_base_ptr : 0;
+    far_ptr_t kernel_data;
+    if (done) {
+        kernel_data.segment = far_malloc(sizeof(sel));
+        kernel_data.offset = 0;
+        far_copy_from(kernel_data, &sel, sizeof(sel));
+    }
+
+    paging_map_range(kernel_data.segment << 4, sizeof(sel),
+                     kernel_data.segment << 4,
+                     PTE_PRESENT | PTE_WRITABLE, 2);
+
+    paging_map_range(sel.framebuffer_addr, sel.framebuffer_bytes,
+                     sel.framebuffer_addr,
+                     PTE_PRESENT | PTE_WRITABLE, 2);
 
     free(mode_info);
     free(info);
 
-    return physaddr;
+    return kernel_data.segment;
 }

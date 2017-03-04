@@ -3,6 +3,7 @@
 #include "types.h"
 
 extern uint8_t boot_drive;
+extern uint32_t vbe_info_vector;
 
 void halt(char const*);
 

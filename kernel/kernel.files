@@ -6,6 +6,8 @@ arch/x86_64/cpu/except_asm.h
 arch/x86_64/cpu/except_asm.s
 arch/x86_64/device/usb_xhci.c
 arch/x86_64/device/usb_xhci.h
+arch/x86_64/device/vbe.c
+arch/x86_64/device/vbe.h
 arch/x86_64/elf64.c
 arch/x86_64/elf64.h
 arch/x86_64/elf64_decl.h
@@ -18,10 +20,15 @@ lib/hash.c
 lib/hash.h
 lib/hash_table.c
 lib/hash_table.h
+lib/png.c
+lib/png.h
 lib/process.c
 lib/process.h
+lib/stddef.h
 lib/sys/types.h
 lib/unistd.h
+lib/zlib_helper.c
+lib/zlib_helper.h
 net/tcp.c
 net/tcp.h
 net/tcp_frame.c

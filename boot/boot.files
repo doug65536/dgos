@@ -1,3 +1,4 @@
+vesainfo.h
 debug.c
 debug.h
 driveinfo.c

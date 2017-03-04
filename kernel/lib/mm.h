@@ -51,11 +51,17 @@
 /// Not file backed
 #define MAP_ANONYMOUS       0x00000200
 
+// Undefined flag mask
+#define MAP_INVALID_MASK    0x01FFFC00
+
 /// Kernel only: Map near the kernel (modules)
-#define MAP_NEAR            0x04000000
+#define MAP_NEAR            0x02000000
 
 /// Kernel only: Map user mode pages
-#define MAP_USER            0x08000000
+#define MAP_USER            0x04000000
+
+/// Kernel only: Request weakly ordered memory
+#define MAP_WEAKORDER       0x08000000
 
 /// Kernel only: Map a device mapping
 #define MAP_DEVICE          0x10000000

@@ -80,7 +80,7 @@ CFLAGS := -g3 -fno-stack-protector \
 	-std=c11 \
 	$(WEVERYTHING)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
 #LTO := 1
 
 ifdef OPTIMIZE
@@ -167,7 +167,7 @@ clean:
 distclean: clean
 	@rm -rf extern
 
-subdirs:
+subdirs: $(EXTERNLIBFILES)
 	+(cd lib && $(MAKE))
 	+(cd net && $(MAKE))
 	+(cd fs && $(MAKE))

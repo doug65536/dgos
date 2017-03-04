@@ -127,7 +127,7 @@ endif
 CFLAGS += $(WEVERYTHING)
 
 # Optimize
-CFLAGS += -Os -DNDEBUG
+#CFLAGS += -Os -DNDEBUG
 
 ASFLAGS := --warn
 
@@ -166,7 +166,7 @@ LDFLAGS := -m i386linux -no-stdlib -M -T bootsect.ld
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
 $(NOOPTIMIZE:.c=.o): CFLAGS += -O0
 
-ISO_DEPENDS := bootsect.bin dgos-kernel hello.km
+ISO_DEPENDS := bootsect.bin dgos-kernel hello.km background.png
 ISO_TARGETS := $(patsubst %,$(ISO_STAGE)/%,$(ISO_DEPENDS))
 
 #
@@ -287,6 +287,9 @@ modules: $(ISO_STAGE)/hello.km
 
 $(ISO_STAGE)/hello.km: ../modules/hello/hello.km
 	cp ../modules/hello/hello.km $(ISO_STAGE)
+
+$(ISO_STAGE)/background.png: ../user/background.png
+	cp ../user/background.png $(ISO_STAGE)
 
 $(ISO_STAGE)/dgos-kernel: $(KERNELSYMBOLFILE)
 	@mkdir -p $(@D)
@@ -467,7 +470,7 @@ debug-attach:
 		-ex 'b unhandled_exception_handler'
 
 debug-boot-attach:
-	$(GDB) --symbols $(SYMBOLFILE) --tui \
+	$(GDB) $(SYMBOLFILE) --tui \
 		-iex 'set architecture i8086' \
 		-ex 'target remote localhost:1234' \
 		-ex 'layout regs' \

@@ -77,7 +77,8 @@
 #define PTE_DIRTY_BIT       6
 #define PTE_PAGESIZE_BIT    7
 #define PTE_GLOBAL_BIT      8
-#define PTE_PAT_BIT         12  // only PDPTE and PDE
+#define PTE_PDEPAT_BIT      12  // only PDPTE and PDE
+#define PTE_PTEPAT_BIT      7  // only PTE
 #define PTE_ADDR_BIT        12
 #define PTE_PK_BIT          59
 #define PTE_NX_BIT          63
@@ -118,8 +119,10 @@
 #define PTE_DIRTY           (1UL << PTE_DIRTY_BIT)
 #define PTE_PAGESIZE        (1UL << PTE_PAGESIZE_BIT)
 #define PTE_GLOBAL          (1UL << PTE_GLOBAL_BIT)
-#define PTE_PAT             (1UL << PTE_PAT_BIT)
+#define PTE_PDEPAT          (1UL << PTE_PDEPAT_BIT)
 #define PTE_NX              (1UL << PTE_NX_BIT)
+#define PTE_PDEPAT          (1UL << PTE_PDEPAT_BIT)
+#define PTE_PTEPAT          (1UL << PTE_PTEPAT_BIT)
 
 // Multi-bit field masks, in place
 #define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
@@ -143,6 +146,32 @@
 
 // Write field
 #define WF(pte, field, value) ((pte) = SF((pte), (field), (value)))
+
+// PAT configuration
+#define PAT_IDX_WB  0
+#define PAT_IDX_WT  1
+#define PAT_IDX_UCW 2
+#define PAT_IDX_UC  3
+#define PAT_IDX_WC  4
+#define PAT_IDX_WP  5
+
+#define PAT_CFG \
+    (MSR_IA32_PAT_n(PAT_IDX_WB, MSR_IA32_PAT_WB) | \
+    MSR_IA32_PAT_n(PAT_IDX_WT, MSR_IA32_PAT_WT) | \
+    MSR_IA32_PAT_n(PAT_IDX_UCW, MSR_IA32_PAT_UCW) | \
+    MSR_IA32_PAT_n(PAT_IDX_UC, MSR_IA32_PAT_UC) | \
+    MSR_IA32_PAT_n(PAT_IDX_WC, MSR_IA32_PAT_WC) | \
+    MSR_IA32_PAT_n(PAT_IDX_WP, MSR_IA32_PAT_WP))
+
+#define PTE_PDEPAT_n(idx) \
+    ((PTE_PDEPAT & !!(idx & 4)) | \
+    (PTE_PCD & !!(idx & 2)) | \
+    (PTE_PWT & !!(idx & 1)))
+
+#define PTE_PTEPAT_n(idx) \
+    ((PTE_PTEPAT & -!!(idx & 4)) | \
+    (PTE_PCD & -!!(idx & 2)) | \
+    (PTE_PWT & -!!(idx & 1)))
 
 /// Mapping the page tables
 /// -----------------------
@@ -1190,7 +1219,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
                  !!(pte & PTE_PCD),
                  !!(pte & PTE_ACCESSED),
                  !!(pte & PTE_DIRTY),
-                 !!(pte & PTE_PAT),
+                 !!(pte & PTE_PTEPAT),
                  !!(pte & PTE_GLOBAL),
                  (pte & PTE_ADDR),
                  !!(pte & PTE_NX));
@@ -1223,6 +1252,37 @@ static void dump_addr_tree(rbtree_t *tree, char const *name)
 
 //
 // Initialization
+
+
+static int mmu_have_pat(void)
+{
+    // 0 == unknown, 1 == supported, -1 == not supported
+    static int supported;
+    if (likely(supported != 0))
+        return supported > 0;
+
+    supported = (cpuid_edx_bit(16, 1, 0) << 1) - 1;
+
+    return supported > 0;
+}
+
+static int mmu_have_nx(void)
+{
+    // 0 == unknown, 1 == supported, -1 == not supported
+    static int supported;
+    if (likely(supported != 0))
+        return supported > 0;
+
+    supported = (cpuid_edx_bit(20, 0x80000001, 0) << 1) - 1;
+
+    return supported > 0;
+}
+
+static void mmu_configure_pat(void)
+{
+    if (likely(mmu_have_pat()))
+        msr_set(MSR_IA32_PAT, PAT_CFG);
+}
 
 void mmu_init(int ap)
 {
@@ -1379,6 +1439,8 @@ void mmu_init(int ap)
             }
         }
     }
+
+    mmu_configure_pat();
 
     //pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
     cpu_set_page_directory(root_physaddr);
@@ -1714,22 +1776,6 @@ static void release_linear(
     mutex_unlock(&allocator->free_addr_lock);
 }
 
-static int mmu_have_nx(void)
-{
-    // 0 == unknown, 1 == supported, -1 == not supported
-    static int supported;
-    if (supported != 0)
-        return supported > 0;
-
-    cpuid_t info;
-    supported = (cpuid(&info, 0x80000001, 0) &&
-                 !!(info.edx & (1<<20)))
-            ? 1
-            : -1;
-
-    return supported > 0;
-}
-
 #if 0
 void map_page_tables(linaddr_t addr_st, size_t len)
 {
@@ -1812,18 +1858,27 @@ void *mmap(void *addr, size_t len,
 
     pte_t page_flags = 0;
 
+    if (unlikely(flags & MAP_INVALID_MASK))
+        return 0;
+
     if (unlikely(flags & (MAP_STACK | MAP_32BIT)))
         flags |= MAP_POPULATE;
 
     if (unlikely(flags & MAP_PHYSICAL))
-        page_flags |= PTE_PCD | PTE_PWT |
-                PTE_EX_PHYSICAL | PTE_PRESENT;
+        page_flags |= PTE_EX_PHYSICAL | PTE_PRESENT;
 
-    if (unlikely(flags & MAP_NOCACHE))
-        page_flags |= PTE_PCD;
+    if (unlikely(flags & MAP_WEAKORDER)) {
+        if (likely(mmu_have_pat()))
+            page_flags |= PTE_PTEPAT_n(PAT_IDX_WC);
+        else
+            page_flags |= PTE_PCD | PTE_PWT;
+    } else {
+        if (unlikely(flags & MAP_NOCACHE))
+            page_flags |= PTE_PCD;
 
-    if (unlikely(flags & MAP_WRITETHRU))
-        page_flags |= PTE_PWT;
+        if (unlikely(flags & MAP_WRITETHRU))
+            page_flags |= PTE_PWT;
+    }
 
     if (flags & MAP_POPULATE)
         page_flags |= PTE_PRESENT;
