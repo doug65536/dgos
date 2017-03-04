@@ -47,7 +47,7 @@
 #define PROFILE_MMAP_ONLY(p)
 #endif
 
-#define PROFILE_SLOWPATH    0
+#define PROFILE_SLOWPATH        0
 #if PROFILE_SLOWPATH
 #define PROFILE_SLOWPATH_ONLY(p) p
 #else
@@ -1775,57 +1775,6 @@ static void release_linear(
 
     mutex_unlock(&allocator->free_addr_lock);
 }
-
-#if 0
-void map_page_tables(linaddr_t addr_st, size_t len)
-{
-    // Inclusive end
-    linaddr_t addr_en = addr_st + len - 1;
-
-    //
-    // Start and end paths and ptes for mapped region
-
-    unsigned path_st[4];
-    pte_t *pte_st[4];
-
-    unsigned path_en[4];
-    pte_t *pte_en[4];
-
-    path_from_addr(path_st, addr_st);
-    path_from_addr(path_en, addr_en);
-
-    pte_from_path(pte_st, path_st);
-    pte_from_path(pte_en, path_en);
-
-    //
-    // Start and end paths and ptes for page tables for region
-
-    unsigned pte_path_st[4];
-    pte_t *pte_pte_st[4];
-
-    unsigned pte_path_en[4];
-    pte_t *pte_pte_en[4];
-
-    for (int pt_pt_level = 0; pt_pt_level < 4; ++pt_pt_level) {
-        path_from_addr(pte_path_st, (linaddr_t)pte_st[pt_pt_level]);
-        path_from_addr(pte_path_en, (linaddr_t)pte_en[pt_pt_level]);
-
-        pte_from_path(pte_pte_st, pte_path_st);
-        pte_from_path(pte_pte_en, pte_path_en);
-
-        for (pte_t *slot = pte_pte_st[pt_pt_level];
-             slot <= pte_pte_en[pt_pt_level]; ++slot) {
-
-            for (int pt_level; pt_level < 4; ++pt_level) {
-                if (*slot == 0) {
-                    physaddr_t page = init_take_page(0);
-                    *slot = page | PTE_PRESENT | PTE_WRITABLE;
-                }
-            }
-        }
-    }
-}
-#endif
 
 //
 // Public API
