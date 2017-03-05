@@ -438,7 +438,8 @@ static iso9660_dir_ent_t *iso9660_lookup_dirent(
 }
 
 static int iso9660_mm_fault_handler(
-        void *dev, void *base_addr, uint64_t offset)
+        void *dev, void *base_addr,
+        uint64_t offset, uint64_t length)
 {
     FS_DEV_PTR(dev);
 
@@ -447,8 +448,8 @@ static int iso9660_mm_fault_handler(
 
     printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
 
-    return self->drive->vtbl->read_blocks(self->drive, addr,
-                                          PAGESIZE >> self->sector_shift, lba);
+    return self->drive->vtbl->read_blocks(
+                self->drive, addr, length >> self->sector_shift, lba);
 }
 
 //

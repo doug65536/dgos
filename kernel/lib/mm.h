@@ -190,14 +190,10 @@ int mprotect(void *__addr, size_t __len, int __prot);
 int madvise(void *__addr, size_t __len, int __advice);
 
 /// Lock a range of address space in memory
-int mlock(
-        void const *addr,
-        size_t len);
+int mlock(void const *addr, size_t len);
 
 /// Unlock a range of address space
-int munlock(
-        const void *addr,
-        size_t len);
+int munlock(void const *addr, size_t len);
 
 /// Return the physical address for the specified linear address
 /// Page faults if the memory region is not mapped
@@ -325,7 +321,8 @@ void *sbrk(intptr_t __increment);
 long sysconf(int __name);
 
 typedef int (*mm_dev_mapping_callback_t)(
-        void *context, void *base_addr, uint64_t offset);
+        void *context, void *base_addr,
+        uint64_t offset, uint64_t length);
 
 void *mmap_register_device(void *context,
                          uint64_t block_size,

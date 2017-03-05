@@ -244,6 +244,9 @@ typedef struct mmap_device_mapping_t {
     uint64_t len;
     mm_dev_mapping_callback_t callback;
     void *context;
+    mutex_t lock;
+    condition_var_t done_cond;
+    int64_t active_read;
 } mmap_device_mapping_t;
 
 static int mm_dev_map_search(void const *v, void const *k, void *s);
@@ -1129,38 +1132,8 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
         } else if (pte & PTE_EX_DEVICE) {
             // Device mapping
 
-            // Attempt to be the first CPU to start reading
-            // the block
-            pte_t volatile *vpte = ptes[3];
-            for (pte_t old_pte = *vpte; ; pause()) {
-                // If another thread finished reading,
-                // restart the faulting instruction
-                if (old_pte & PTE_PRESENT)
-                    return ctx;
-
-                // If nobody has started this read yet
-                if ((old_pte & (PTE_ADDR | PTE_PRESENT)) == PTE_ADDR) {
-                    // If this thread is the first to zero the
-                    // physical address field, then this
-                    // thread is going to do the callback
-                    pte_t upd_pte = atomic_cmpxchg(
-                                vpte, old_pte,
-                                old_pte & ~PTE_ADDR);
-
-                    if (old_pte == upd_pte)
-                        break;
-
-                    old_pte = upd_pte;
-                }
-            }
-
-            physaddr_t addr = mmu_alloc_phys(1);
-
-            // Write the physical address into the PTE
-            // but still not present
-            *vpte |= addr;
-
-            linaddr_t rounded_addr = (linaddr_t)fault_addr & -(intptr_t)PAGE_SIZE;
+            linaddr_t rounded_addr = (linaddr_t)fault_addr &
+                    -(intptr_t)PAGE_SIZE;
 
             // Lookup the device mapping
             intptr_t device = binary_search(
@@ -1168,19 +1141,53 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
                         sizeof(*mm_dev_mappings),
                         (void*)rounded_addr,
                         mm_dev_map_search, 0, 1);
+            if (unlikely(device < 0))
+                return 0;
 
             mmap_device_mapping_t *mapping = mm_dev_mappings + device;
-            if (device >= 0) {
-                mapping->callback(mapping->context, mapping->base_addr,
-                                  (char*)rounded_addr -
-                                  (char*)mapping->base_addr);
 
-                *vpte |= PTE_PRESENT;
+            uint64_t mapping_offset = (char*)rounded_addr -
+                    (char*)mapping->base_addr;
 
-                // Restart the instruction
+            // Round down to nearest 64KB boundary
+            mapping_offset &= -0x10000;
+
+            pte_t volatile *vpte = ptes[3];
+
+            // Attempt to be the first CPU to start reading a block
+            mutex_lock(&mapping->lock);
+            while (mapping->active_read >= 0 &&
+                   !(*vpte & PTE_PRESENT))
+                condvar_wait(&mapping->done_cond, &mapping->lock);
+
+            // If the page became present while waiting, then done
+            if (*vpte & PTE_PRESENT) {
+                mutex_unlock(&mapping->lock);
                 return ctx;
             }
+
+            // Become the reader for this mapping
+            mapping->active_read = mapping_offset;
+            mutex_unlock(&mapping->lock);
+
+            mapping->callback(mapping->context, mapping->base_addr,
+                              mapping_offset, 0x10000);
+
+            // Mark the range present from end to start
+            addr_present((linaddr_t)mapping->base_addr +
+                         mapping_offset, path, ptes);
+            for (size_t i = (0x10000 >> PAGE_SIZE_BIT); i > 0; --i)
+                atomic_or(ptes[3] + (i - 1), PTE_PRESENT);
+
+            mutex_lock(&mapping->lock);
+            mapping->active_read = -1;
+            mutex_unlock(&mapping->lock);
+            condvar_wake_all(&mapping->done_cond);
+
+            // Restart the instruction
+            return ctx;
         } else {
+            printdbg("Invalid page fault at 0x%zx\n", fault_addr);
             assert(!"Invalid page fault");
         }
     } else if (present_mask != 0x0F) {
@@ -1484,8 +1491,6 @@ void mmu_init(int ap)
 
             ++free_page_count;
         } else {
-            //for (unsigned i = 0; i < phys_alloc_count; ++i)
-            //    printdbg("[%x]: %x\n", i, phys_alloc[i]);
             break;
         }
     }
@@ -2162,12 +2167,31 @@ uintptr_t mphysaddr(void volatile *addr)
     uintptr_t misalignment = linaddr & PAGE_MASK;
 
     unsigned path[4];
-    path_from_addr(path, linaddr);
+    pte_t *ptes[4];
+    int present_mask = addr_present(linaddr, path, ptes);
 
-    pte_t *pte[4];
-    pte_from_path(pte, path);
+    if ((present_mask & 0x07) != 0x07)
+        return 0;
 
-    return ((*pte[3]) & PTE_ADDR) + misalignment;
+    pte_t pte = *ptes[3];
+    physaddr_t page = pte & PTE_ADDR;
+
+    // If page is being demand paged
+    if (page == PTE_ADDR) {
+        // Commit a page
+        page = mmu_alloc_phys(0);
+
+        pte_t new_pte = (pte & ~PTE_ADDR) | page;
+
+        if (atomic_cmpxchg_upd(ptes[3], &pte, new_pte))
+            pte = new_pte;
+        else
+            mmu_free_phys(page);
+    } else if (!(pte & PTE_PRESENT)) {
+        return 0;
+    }
+
+    return (pte & PTE_ADDR) + misalignment;
 }
 
 static inline int mphysranges_enum(
@@ -2288,6 +2312,11 @@ void *mmap_register_device(void *context,
         mapping->context = context;
         mapping->len = block_size * block_count;
         mapping->callback = callback;
+
+        mutex_init(&mapping->lock);
+        condvar_init(&mapping->done_cond);
+
+        mapping->active_read = -1;
     }
 
     spinlock_unlock_noirq(&mm_dev_mapping_lock);
