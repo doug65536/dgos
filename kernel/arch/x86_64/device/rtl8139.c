@@ -55,7 +55,7 @@ struct rtl8139_dev_t {
 
     // PCI
     int use_msi;
-    int irq;
+    pci_irq_range_t irq_range;
 };
 
 static rtl8139_dev_t **rtl8139_devices;
@@ -796,7 +796,8 @@ static void *rtl8139_irq_handler(int irq, void *ctx)
     for (size_t i = 0; i < rtl8139_device_count; ++i) {
         rtl8139_dev_t *self = rtl8139_devices[i];
 
-        if (irq != self->irq)
+        int irq_offset = irq - self->irq_range.base;
+        if (unlikely(irq_offset < 0 || irq_offset >= self->irq_range.count))
             continue;
 
         spinlock_lock(&self->lock);
@@ -974,17 +975,13 @@ static int rtl8139_detect(eth_dev_base_t ***devices)
         memcpy(self->mac_addr, &mac_hi, sizeof(uint32_t));
 
         // Restore BIOS assigned IRQ
-        pci_irq_range_t irq_range = {
-            pci_iter.config.irq_line,
-            1
-        };
+        self->irq_range.base = pci_iter.config.irq_line;
+        self->irq_range.count = 1;
 
         // Use MSI IRQ if possible
         self->use_msi = pci_set_msi_irq(
                     pci_iter.bus, pci_iter.slot, pci_iter.func,
-                    &irq_range, 1, 0, 0, rtl8139_irq_handler);
-
-        self->irq = irq_range.base;
+                    &self->irq_range, 1, 0, 0, rtl8139_irq_handler);
 
         if (!self->use_msi) {
             // Plain IRQ pin
