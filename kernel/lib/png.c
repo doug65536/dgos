@@ -8,7 +8,7 @@
 #include "assert.h"
 #include "printk.h"
 
-#define PNG_DEBUG 1
+#define PNG_DEBUG 0
 #if PNG_DEBUG
 #define PNG_TRACE(...) printdbg("png: " __VA_ARGS__)
 #else
