@@ -119,14 +119,13 @@ struct cpu_info_t {
 static cpu_info_t cpus[MAX_CPUS];
 
 static volatile uint32_t cpu_count;
-
 static uint32_t default_mxcsr_mask;
 
 // Get executing APIC ID
 static uint32_t get_apic_id(void)
 {
     cpuid_t cpuid_info;
-    cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
+    cpuid_nocache(&cpuid_info, CPUID_INFO_FEATURES, 0);
     uint32_t apic_id = cpuid_info.ebx >> 24;
     return apic_id;
 }
@@ -136,9 +135,6 @@ static cpu_info_t *this_cpu(void)
     cpu_info_t *cpu = cpu_gs_read_ptr();
     assert(cpu >= cpus && cpu < cpus + countof(cpus));
     return cpu;
-
-    //uint64_t apic_id = get_apic_id();
-    //return cpu_from_apic_id(apic_id);
 }
 
 static thread_info_t *this_thread(void)
@@ -544,13 +540,6 @@ void *thread_schedule(void *ctx)
 
     ctx = thread->ctx;
     cpu->cur_thread = thread;
-
-    if (1) {
-        size_t cpu_number = cpu - cpus;
-        uint16_t *addr = (uint16_t*)0xb8000 + 80 + 70;
-        if ((addr[cpu_number] = ((addr[cpu_number] + 1) & 0xFF) | 0x0700) == 0x0700)
-            addr[cpu_number+80] = ((addr[cpu_number+80] + 1) & 0xFF) | 0x0700;
-    }
 
     isr_context_t *isrctx = (isr_context_t*)ctx;
 

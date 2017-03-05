@@ -4,6 +4,8 @@ arch/x86_64/cpu/except.c
 arch/x86_64/cpu/except.h
 arch/x86_64/cpu/except_asm.h
 arch/x86_64/cpu/except_asm.s
+arch/x86_64/cpu/memcpy.c
+arch/x86_64/cpu/memcpy.h
 arch/x86_64/device/usb_xhci.c
 arch/x86_64/device/usb_xhci.h
 arch/x86_64/device/vbe.c

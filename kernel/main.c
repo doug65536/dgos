@@ -639,7 +639,7 @@ static int init_thread(void *p)
 
     void *vbe_data = (void*)(uintptr_t)*(uint32_t*)(uintptr_t)(0x7C00 + 72);
     void *screen = (void*)(uintptr_t)*(uint32_t*)vbe_data;
-    memcpy(screen, png_pixels(img), 1920*1080*4);
+    memcpy_nt(screen, png_pixels(img), 1920*1080*4);
 
     free(img);
 
@@ -715,37 +715,11 @@ static int init_thread(void *p)
     return 0;
 }
 
-__attribute__((used))
-static void zlib_test(void)
-{
-    z_stream strm;
-    memset(&strm, 0, sizeof(strm));
-    strm.zalloc = zlib_malloc;
-    strm.zfree = zlib_free;
-    deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 9, Z_DEFAULT_STRATEGY);
-
-    char input[16] = "hello!";
-    char output[32];
-
-    strm.avail_in = strlen(input);
-    strm.next_in = (void*)input;
-    strm.avail_out = sizeof(output);
-    strm.next_out = (void*)output;
-
-    int status = deflate(&strm, Z_FINISH);
-
-    assert(status == Z_STREAM_END);
-
-    deflateEnd(&strm);
-}
-
 int main(void)
 {
     pci_init();
     keybd_init();
     keyb8042_init();
-
-    zlib_test();
 
     mprotect_test(0);
 
@@ -756,7 +730,6 @@ int main(void)
     munmap(a, 1 << 12);
     munmap(c, 1 << 12);
 
-    (void)init_thread;
     rbtree_test();
 
     thread_create(init_thread, 0, 0, 0);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "cpu/memcpy.h"
 
 #if 0 && !defined(__NO_BUILTIN) && !defined(__NO_STRING_BUILTIN)
 

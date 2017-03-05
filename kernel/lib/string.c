@@ -4,6 +4,7 @@
 #include "export.h"
 #include "bswap.h"
 #include "assert.h"
+#include "cpu/memcpy.h"
 
 #define USE_REP_STRING 1
 
@@ -519,4 +520,3 @@ size_t utf16_count(uint16_t const *in)
         ++count;
     return count;
 }
-
