@@ -3,46 +3,6 @@
 #include "types.h"
 #include "cpu/memcpy.h"
 
-#if 0 && !defined(__NO_BUILTIN) && !defined(__NO_STRING_BUILTIN)
-
-#define __extern_always_inline static inline
-
-#define DECLARE_BUILTIN_1(ret, name, t1) \
-    __extern_always_inline ret name(t1 a) { \
-        return __builtin_##name(a); \
-    }
-
-#define DECLARE_BUILTIN_2(ret, name, t1, t2) \
-    __extern_always_inline ret name(t1 a, t2 b) { \
-        return __builtin_##name(a, b); \
-    }
-
-#define DECLARE_BUILTIN_3(ret, name, t1, t2, t3) \
-    __extern_always_inline ret name(t1 a, t2 b, t3 c) { \
-        return __builtin_##name (a, b, c); \
-    }
-
-DECLARE_BUILTIN_1(size_t, strlen, char const *)
-DECLARE_BUILTIN_3(void *, memchr, void const *, int, size_t)
-DECLARE_BUILTIN_2(void *, strchr, char const *, int)
-
-DECLARE_BUILTIN_2(int , strcmp, char const *, char const *)
-DECLARE_BUILTIN_3(int , strncmp, char const *, char const *, size_t)
-DECLARE_BUILTIN_3(int , memcmp, void const *restrict, void const *restrict, size_t)
-DECLARE_BUILTIN_2(char *, strstr, char const *, char const *)
-
-DECLARE_BUILTIN_3(void *, memset, void *, int, size_t)
-DECLARE_BUILTIN_3(void *, memcpy, void *restrict, void const *restrict, size_t)
-DECLARE_BUILTIN_3(void *, memmove, void *, const void *, size_t)
-
-DECLARE_BUILTIN_2(char *, strcpy, char *restrict, char const *restrict)
-DECLARE_BUILTIN_2(char *, strcat, char *restrict, char const *restrict)
-
-DECLARE_BUILTIN_3(char *, strncpy, char *, char const *, size_t)
-DECLARE_BUILTIN_3(char *, strncat, char *, char const *, size_t)
-
-#else
-
 size_t strlen(char const *src);
 void *memchr(void const *mem, int ch, size_t count);
 void *memrchr(void const *mem, int ch, size_t count);
@@ -73,8 +33,6 @@ int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
 
 size_t utf8_count(char const *in);
 size_t utf16_count(uint16_t const *in);
-
-#endif
 
 void *aligned16_memset(void *dest, int c, size_t n);
 
