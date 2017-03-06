@@ -14,8 +14,8 @@ static memcpy_fn_t memcpy32_nt_fn = resolve_memcpy32_nt;
 
 static void *memcpy512_nt_sse4_1(void *dest, void const *src, size_t n)
 {
-    assert(!((uintptr_t)dest & 511));
-    assert(!((uintptr_t)src & 511));
+    assert(!((uintptr_t)dest & 63));
+    assert(!((uintptr_t)src & 63));
 
     void *d = dest;
     while (n >= 64) {
