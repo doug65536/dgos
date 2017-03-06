@@ -164,9 +164,9 @@
     MSR_IA32_PAT_n(PAT_IDX_WP, MSR_IA32_PAT_WP))
 
 #define PTE_PDEPAT_n(idx) \
-    ((PTE_PDEPAT & !!(idx & 4)) | \
-    (PTE_PCD & !!(idx & 2)) | \
-    (PTE_PWT & !!(idx & 1)))
+    ((PTE_PDEPAT & -!!(idx & 4)) | \
+    (PTE_PCD & -!!(idx & 2)) | \
+    (PTE_PWT & -!!(idx & 1)))
 
 #define PTE_PTEPAT_n(idx) \
     ((PTE_PTEPAT & -!!(idx & 4)) | \
@@ -2123,8 +2123,24 @@ int madvise(void *addr, size_t len, int advice)
     if (unlikely(len == 0))
         return 0;
 
-    if (advice != MADV_DONTNEED)
+    pte_t order_bits = 0;
+
+    switch (advice) {
+    case MADV_WEAKORDER:
+        order_bits = PTE_PTEPAT_n(PAT_IDX_WC);
+        break;
+
+    case MADV_STRONGORDER:
+        order_bits = PTE_PTEPAT_n(PAT_IDX_WB);
+        break;
+
+    case MADV_DONTNEED:
+        order_bits = -1;
+        break;
+
+    default:
         return 0;
+    }
 
     path_from_addr(path, (linaddr_t)addr);
     path_from_addr(path_en, (linaddr_t)addr + len - 1);
@@ -2141,21 +2157,34 @@ int madvise(void *addr, size_t len, int advice)
            (*pt[2] & PTE_PRESENT)) {
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
-            physaddr_t page = 0;
-            if (expect && (expect & demand_mask) != demand_mask) {
-                page = expect & PTE_ADDR;
-                replace = expect | PTE_ADDR;
+            if (order_bits == (pte_t)-1) {
+                physaddr_t page = 0;
+                if (expect && (expect & demand_mask) != demand_mask) {
+                    page = expect & PTE_ADDR;
+                    replace = expect | PTE_ADDR;
 
-                if (atomic_cmpxchg_upd(pt[3], &expect, replace)) {
-                    mmu_free_phys(page);
-                    break;
+                    if (atomic_cmpxchg_upd(pt[3], &expect, replace)) {
+                        mmu_free_phys(page);
+                        break;
+                    }
                 }
+            } else {
+                replace = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
+                        order_bits;
+
+                if (atomic_cmpxchg_upd(pt[3], &expect, replace))
+                    break;
             }
         }
+
+        cpu_invalidate_page((uintptr_t)addr);
+        addr = (char*)addr + PAGE_SIZE;
 
         path_inc(path);
         pte_from_path(pt, path);
     }
+
+    mmu_send_tlb_shootdown();
 
     return 0;
 }

@@ -30,6 +30,7 @@ CSRCS := mm.c \
 	fileio.c \
 	process.c \
 	png.c \
-	zlib_helper.c
+	zlib_helper.c \
+	framebuffer.c
 
 include $(BUILDROOT)/library.mk

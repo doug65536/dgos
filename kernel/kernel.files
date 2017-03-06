@@ -18,6 +18,8 @@ lib/dev_eth.c
 lib/dev_eth.h
 lib/fileio.c
 lib/fileio.h
+lib/framebuffer.c
+lib/framebuffer.h
 lib/hash.c
 lib/hash.h
 lib/hash_table.c

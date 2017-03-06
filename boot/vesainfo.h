@@ -1,4 +1,7 @@
+// If being included from the kernel, avoid our types.h
+#ifndef __x86_64__
 #include "types.h"
+#endif
 
 typedef struct vbe_selected_mode_t {
     uint32_t framebuffer_addr;

@@ -9,13 +9,8 @@ static inline void atomic_barrier(void)
     __asm__ __volatile__ ( "" : : : "memory" );
 }
 
-//
 // Technically not atomic but needed in cmpxchg loops
-
-static inline void pause(void)
-{
-    __asm__ __volatile__ ( "pause" : : : "memory" );
-}
+#define pause() __builtin_ia32_pause()
 
 #define atomic_fence() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 #define atomic_lfence() __atomic_thread_fence(__ATOMIC_ACQUIRE)

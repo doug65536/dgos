@@ -183,6 +183,12 @@ int mprotect(void *__addr, size_t __len, int __prot);
 /// Advise that this region is probably not useful in core dumps
 #define MADV_DONTDUMP       (-6)
 
+// Extension: Advise that this region can use weak ordering
+#define MADV_WEAKORDER      (9)
+
+// Extension: Advise that this region cannot use weak ordering
+#define MADV_STRONGORDER    (-9)
+
 /// Set hints about a range of address space
 /// __addr, address, start of range
 /// __len, size, of range

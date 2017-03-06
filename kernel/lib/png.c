@@ -79,12 +79,6 @@ typedef struct png_hdr_ihdr_t {
 // Color and alpha, no palette
 #define PNG_IHDR_COLOR_RGBA (PNG_IHDR_COLORTYPE_C|PNG_IHDR_COLORTYPE_A)
 
-typedef struct png_image_t {
-    int32_t width;
-    int32_t height;
-    void *reserved;
-} png_image_t;
-
 C_ASSERT((sizeof(png_image_t) & 0xF) == 0);
 
 typedef enum png_filter_type_t {
@@ -431,7 +425,7 @@ png_image_t *png_load(char const *path)
     return result;
 }
 
-uint32_t *png_pixels(png_image_t *img)
+uint32_t const *png_pixels(png_image_t const *img)
 {
-    return (uint32_t*)(img + 1);
+    return (uint32_t const*)(img + 1);
 }

@@ -26,6 +26,7 @@
 #include "zlib_helper.h"
 #include "stdlib.h"
 #include "png.h"
+#include "framebuffer.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -637,9 +638,27 @@ static int init_thread(void *p)
 
     png_image_t *img = png_load("background.png");
 
-    void *vbe_data = (void*)(uintptr_t)*(uint32_t*)(uintptr_t)(0x7C00 + 72);
-    void *screen = (void*)(uintptr_t)*(uint32_t*)vbe_data;
-    memcpy_nt(screen, png_pixels(img), 1920*1080*4);
+    fb_init();
+
+    uint64_t st_tm = time_ms();
+
+    int frames = 0;
+
+    for (int sx = -2000; sx < 2000; sx += 15) {
+        int step, sy1, sy2;
+        step = ((sx & 1) << 1) - 1;
+        sy1 = -1100 * step;
+        sy2 = 1100 * step;
+        for (int sy = sy1; sy != sy2; sy += step) {
+            fb_copy_to(sx, sy, img->width, img->width, img->height, png_pixels(img));
+            fb_update_dirty();
+            ++frames;
+        }
+    }
+
+    uint64_t en_tm = time_ms();
+
+    printdbg("Benchmark time: %d frames, %ldms\n", frames, en_tm - st_tm);
 
     free(img);
 
@@ -722,13 +741,6 @@ int main(void)
     keyb8042_init();
 
     mprotect_test(0);
-
-    void *a = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
-    void *b = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
-    void *c = mmap(0, 1 << 12, PROT_READ | PROT_WRITE, 0, -1, 0);
-    munmap(b, 1 << 12);
-    munmap(a, 1 << 12);
-    munmap(c, 1 << 12);
 
     rbtree_test();
 
