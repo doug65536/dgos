@@ -298,17 +298,12 @@ static uint64_t volatile phys_next_free[2];
 // Used to detect lazy TLB shootdown
 static uint64_t volatile mmu_seq;
 
-// Free address space management
-//static mutex_t free_addr_lock;
-//static rbtree_t *free_addr_by_size;
-//static rbtree_t *free_addr_by_addr;
-
-static int take_linear_cmp_key(
+static int contiguous_allocator_cmp_key(
         rbtree_kvp_t const *lhs,
         rbtree_kvp_t const *rhs,
         void *p);
 
-static int take_linear_cmp_both(
+static int contiguous_allocator_cmp_both(
         rbtree_kvp_t const *lhs,
         rbtree_kvp_t const *rhs,
         void *p);
@@ -329,7 +324,7 @@ typedef struct contiguous_allocator_t {
 static void contiguous_allocator_create(contiguous_allocator_t *allocator,
         linaddr_t *addr, size_t size, size_t capacity);
 
-static uintptr_t take_linear(
+static uintptr_t alloc_linear(
         contiguous_allocator_t *allocator,
         size_t size);
 static void release_linear(contiguous_allocator_t *allocator,
@@ -345,7 +340,7 @@ static contiguous_allocator_t contig_phys_allocator;
 void *mm_alloc_contiguous(size_t size)
 {
     return (void*)(uint64_t)
-            take_linear(&contig_phys_allocator, size);
+            alloc_linear(&contig_phys_allocator, size);
 }
 
 void mm_free_contiguous(void *addr, size_t size)
@@ -1525,7 +1520,7 @@ void mmu_init(int ap)
                                 128);
 
     // Allocate guard page
-    take_linear(&linear_allocator, PAGE_SIZE);
+    alloc_linear(&linear_allocator, PAGE_SIZE);
 }
 
 static size_t round_up(size_t n)
@@ -1541,7 +1536,7 @@ static size_t round_down(size_t n)
 //
 // Linear address allocator
 
-static int take_linear_cmp_key(
+static int contiguous_allocator_cmp_key(
         rbtree_kvp_t const *lhs,
         rbtree_kvp_t const *rhs,
         void *p)
@@ -1552,7 +1547,7 @@ static int take_linear_cmp_key(
             0;
 }
 
-static int take_linear_cmp_both(
+static int contiguous_allocator_cmp_both(
         rbtree_kvp_t const *lhs,
         rbtree_kvp_t const *rhs,
         void *p)
@@ -1606,9 +1601,9 @@ static void contiguous_allocator_create(
 
     mutex_init(&allocator->free_addr_lock);
     allocator->free_addr_by_addr = rbtree_create(
-                take_linear_cmp_key, 0, capacity);
+                contiguous_allocator_cmp_key, 0, capacity);
     allocator->free_addr_by_size = rbtree_create(
-                take_linear_cmp_both, 0, capacity);
+                contiguous_allocator_cmp_both, 0, capacity);
 
     // Account for space taken creating trees
 
@@ -1621,7 +1616,7 @@ static void contiguous_allocator_create(
                   *addr, size);
 }
 
-static uintptr_t take_linear(
+static uintptr_t alloc_linear(
         contiguous_allocator_t *allocator,
         size_t size)
 {
@@ -1705,6 +1700,83 @@ static uintptr_t take_linear(
     }
 
     return addr;
+}
+
+static void take_linear(
+        contiguous_allocator_t *allocator,
+        linaddr_t addr,
+        size_t size)
+{
+    assert(allocator->free_addr_by_addr);
+    assert(allocator->free_addr_by_size);
+
+    mutex_lock(&allocator->free_addr_lock);
+
+    // Round to pages
+    addr &= -PAGE_SIZE;
+    size = round_up(size);
+
+    linaddr_t end = addr + size;
+
+    // Find the last free range before or at the address
+    rbtree_iter_t place = rbtree_lower_bound(
+                allocator->free_addr_by_addr, addr, 0);
+
+    rbtree_iter_t next_place;
+
+    for (; place; place = next_place) {
+        rbtree_kvp_t by_addr = rbtree_item(
+                    allocator->free_addr_by_addr, place);
+
+        // If block is past end of allocated range, then done
+        if (by_addr.key >= end)
+            break;
+
+        if (by_addr.key < addr && by_addr.key + by_addr.val > addr) {
+            //
+            // The found free block is before the range and overlaps it
+
+            // Save next block
+            next_place = rbtree_next(allocator->free_addr_by_addr, place);
+
+            // Delete the size entry
+            rbtree_delete(allocator->free_addr_by_size,
+                          by_addr.val, by_addr.key);
+
+            // Delete the address entry
+            rbtree_delete_at(allocator->free_addr_by_addr, place);
+
+            // Create a smaller block that does not overlap taken range
+            by_addr.val = addr - by_addr.key;
+
+            // Insert smaller range by address
+            rbtree_insert_pair(allocator->free_addr_by_addr, &by_addr);
+
+            // Insert smaller range by size
+            rbtree_insert(allocator->free_addr_by_size,
+                          by_addr.val, by_addr.key);
+        } else if (by_addr.key >= addr && by_addr.key + by_addr.val <= end) {
+            //
+            // Range completely covers block, delete block
+
+            next_place = rbtree_next(allocator->free_addr_by_addr, place);
+
+            rbtree_delete(allocator->free_addr_by_size,
+                          by_addr.val, by_addr.key);
+
+            rbtree_delete_at(allocator->free_addr_by_addr, place);
+        } else if (by_addr.key > addr) {
+            //
+            // Range cut off some of beginning of block
+
+            rbtree_delete(allocator->free_addr_by_size,
+                          by_addr.val, by_addr.key);
+
+            rbtree_delete_at(allocator->free_addr_by_addr, place);
+
+            break;
+        }
+    }
 }
 
 static void release_linear(
@@ -1858,10 +1930,15 @@ void *mmap(void *addr, size_t len,
 
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
     linaddr_t linear_addr;
-    if (!(flags & MAP_NEAR))
-        linear_addr = take_linear(&linear_allocator, len);
-    else
-        linear_addr = take_linear(&near_allocator, len);
+    if (!addr) {
+        if (!(flags & MAP_NEAR))
+            linear_addr = alloc_linear(&linear_allocator, len);
+        else
+            linear_addr = alloc_linear(&near_allocator, len);
+    } else {
+        linear_addr = (linaddr_t)addr;
+        take_linear(&linear_allocator, linear_addr, len);
+    }
     PROFILE_LINEAR_ALLOC_ONLY( printdbg("Allocation of %lu bytes of"
                                         " address space took %lu cycles\n",
                                         len, cpu_rdtsc() - profile_linear_st) );
@@ -1941,7 +2018,7 @@ void *mremap(
 
         linaddr_t new_linear;
 
-        new_linear = take_linear(&linear_allocator, new_size);
+        new_linear = alloc_linear(&linear_allocator, new_size);
 
         unsigned path[4];
         path_from_addr(path, new_linear);
