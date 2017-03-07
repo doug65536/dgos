@@ -650,8 +650,11 @@ static int init_thread(void *p)
         sy1 = -1100 * step;
         sy2 = 1100 * step;
         for (int sy = sy1; sy != sy2; sy += step) {
-            fb_copy_to(sx, sy, img->width, img->width, img->height, png_pixels(img));
-            fb_update_dirty();
+            fb_fill_rect(sx, 0, sx + img->width, sy, 0);
+            fb_fill_rect(sx, sy + img->height, sx + img->width, 1080, 0);
+            fb_copy_to(sx, sy, img->width,
+                       img->width, img->height, png_pixels(img));
+            fb_update();
             ++frames;
         }
     }
@@ -663,16 +666,6 @@ static int init_thread(void *p)
     free(img);
 
     //modload_init();
-
-    int fd = file_open("root/hello.txt");
-    off_t size = file_seek(fd, 0, SEEK_END);
-    printdbg("File size = %lx\n", size);
-    file_seek(fd, 0, SEEK_SET);
-    char buf[16];
-    ssize_t readsize = file_read(fd, buf, sizeof(buf)-1);
-    buf[sizeof(buf)-1] = 0;
-    printdbg("File read, size = %ld, data = %s\n", readsize, buf);
-    file_close(fd);
 
     thread_create(find_vbe, (void*)0xC0000, 0, 0);
     thread_create(find_vbe, (void*)0xF0000, 0, 0);
