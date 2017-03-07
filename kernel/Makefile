@@ -38,8 +38,6 @@ INCS := . arch arch/$(ARCH) lib fs net extern/include
 INCLUDEPATHS := $(patsubst %,$(BUILDROOT)/%,$(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
 
-$(info Include paths: $(INCLUDEARGS))
-
 # Max warnings
 WEVERYTHING := -Wall
 WEVERYTHING += -Wextra
@@ -74,17 +72,15 @@ endif
 CFLAGS := -g3 -fno-stack-protector \
 	-mcmodel=kernel -mno-red-zone \
 	-msse -msse2 \
-	-ftls-model=$(TLS_MODEL) \
 	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
 	-std=c11 \
 	$(WEVERYTHING)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 #LTO := 1
 
 ifdef OPTIMIZE
-$(info Optimizing...)
 CFLAGS += \
 	-O2 -ftree-vectorize \
 	-fno-omit-frame-pointer -fbuiltin
@@ -146,7 +142,7 @@ LD := ld
 
 LDFLAGS ?=  --oformat elf64-x86-64 \
 	-Map $(DUMPDIR)/kernel.map \
-	 -g -export-dynamic
+	-g -export-dynamic
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG

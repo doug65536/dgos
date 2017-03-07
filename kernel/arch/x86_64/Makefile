@@ -24,7 +24,7 @@ CSRCS := \
 	cpu/interrupts.c \
 	cpu/ioport.c \
 	cpu/mmu.c \
-	cpu/memcpy.c \
+	cpu/nontemporal.c \
 	cpu/legacy_pic.c \
 	cpu/legacy_pit.c \
 	cpu/except.c \

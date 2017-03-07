@@ -98,6 +98,10 @@ typedef uint64_t __attribute__((vector_size(16))) __uvec2;
 typedef float __attribute__((vector_size(16))) __fvec4;
 typedef double __attribute__((vector_size(16))) __dvec2;
 
+// Some builtins unnecessarily insist on long long types
+typedef long long __attribute__((vector_size(16))) __ivec2LL;
+typedef unsigned long long __attribute__((vector_size(16))) __ivec2ULL;
+
 #define countof(arr) (sizeof(arr)/sizeof(*arr))
 #define offsetof(t, m) __builtin_offsetof(t, m)
 

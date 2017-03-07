@@ -52,6 +52,14 @@ void fb_init(void)
     fb_reset_dirty();
 }
 
+static inline void fb_update_dirty(int left, int top, int right, int bottom)
+{
+    fb.dirty.en.x = (fb.dirty.en.x < right ? right : fb.dirty.en.x);
+    fb.dirty.en.y = (fb.dirty.en.y < bottom ? bottom : fb.dirty.en.y);
+    fb.dirty.st.x = (fb.dirty.st.x > left ? left : fb.dirty.st.x);
+    fb.dirty.st.y = (fb.dirty.st.y > top ? top : fb.dirty.st.y);
+}
+
 void fb_copy_to(int scr_x, int scr_y,
                 int img_pitch, int img_w, int img_h,
                 uint32_t const *pixels)
@@ -103,11 +111,7 @@ void fb_copy_to(int scr_x, int scr_y,
     int scr_ex = scr_x + img_w;
     int scr_ey = scr_y + img_h;
 
-    // Update dirty rectangle
-    fb.dirty.en.x = (fb.dirty.en.x < scr_ex ? scr_ex : fb.dirty.en.x);
-    fb.dirty.en.y = (fb.dirty.en.y < scr_ey ? scr_ey : fb.dirty.en.y);
-    fb.dirty.st.x = (fb.dirty.st.x > scr_x ? scr_x : fb.dirty.st.x);
-    fb.dirty.st.y = (fb.dirty.st.y > scr_y ? scr_y : fb.dirty.st.y);
+    fb_update_dirty(scr_x, scr_y, scr_ex, scr_ey);
 
     uint8_t *out = fb.back_buf +
             (scr_y * fb.mode.pitch + scr_x * sizeof(uint32_t));
@@ -118,7 +122,41 @@ void fb_copy_to(int scr_x, int scr_y,
     }
 }
 
-void fb_update_vidmem(int left, int top, int right, int bottom)
+void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
+{
+    if (unlikely(ex > fb.mode.width))
+        ex = fb.mode.width;
+
+    if (unlikely(ey > fb.mode.height))
+        ey = fb.mode.height;
+
+    if (unlikely(sx < 0))
+        sx = 0;
+
+    if (unlikely(sy < 0))
+        sy = 0;
+
+    if (unlikely(ex <= sx))
+        return;
+
+    if (unlikely(ey <= sy))
+        return;
+
+    fb_update_dirty(sx, sy, ex, ey);
+
+    uint8_t *out = fb.back_buf +
+            sy * fb.mode.pitch +
+            sx * sizeof(uint32_t);
+
+    size_t width = (ex - sx) * sizeof(uint32_t);
+
+    for (int y = sy; y < ey; ++y) {
+        memset32_nt(out, color, width);
+        out += fb.mode.pitch;
+    }
+}
+
+static void fb_update_vidmem(int left, int top, int right, int bottom)
 {
     assert(left >= 0);
     assert(top >= 0);
@@ -128,8 +166,7 @@ void fb_update_vidmem(int left, int top, int right, int bottom)
     size_t width = (right - left) * sizeof(uint32_t);
     size_t row_ofs = top * fb.mode.pitch + left * sizeof(uint32_t);
 
-    for (size_t y = (unsigned)top; y < (unsigned)bottom;
-         ++y, row_ofs += fb.mode.pitch) {
+    for (int y = top; y < bottom; ++y, row_ofs += fb.mode.pitch) {
         // Calculate the address of the first pixel
         size_t ofs = row_ofs;
 
@@ -149,7 +186,7 @@ void fb_update_vidmem(int left, int top, int right, int bottom)
     memcpy_nt_fence();
 }
 
-void fb_update_dirty(void)
+void fb_update(void)
 {
     fb_update_vidmem(fb.dirty.st.x, fb.dirty.st.y,
                      fb.dirty.en.x, fb.dirty.en.y);

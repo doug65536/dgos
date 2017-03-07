@@ -4,7 +4,7 @@
 #include "export.h"
 #include "bswap.h"
 #include "assert.h"
-#include "cpu/memcpy.h"
+#include "cpu/nontemporal.h"
 
 #define USE_REP_STRING 1
 

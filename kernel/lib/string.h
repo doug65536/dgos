@@ -1,7 +1,7 @@
 #pragma once
 
 #include "types.h"
-#include "cpu/memcpy.h"
+#include "cpu/nontemporal.h"
 
 size_t strlen(char const *src);
 void *memchr(void const *mem, int ch, size_t count);
