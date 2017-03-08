@@ -267,6 +267,10 @@ png_image_t *png_load(char const *path)
     if (sizeof(png_sig) != file_read(fd, buf, sizeof(png_sig)))
         return 0;
 
+    // Check signature
+    if (memcmp(buf, png_sig, sizeof(png_sig)))
+        return 0;
+
     uint32_t input_level = 0;
     uint32_t decomp_level = 0;
     uint32_t consumed;
