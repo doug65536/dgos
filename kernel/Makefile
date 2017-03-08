@@ -142,6 +142,7 @@ LD := ld
 
 LDFLAGS ?=  --oformat elf64-x86-64 \
 	-Map $(DUMPDIR)/kernel.map \
+	-T $(LINKERSCRIPT) \
 	-g -export-dynamic
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
@@ -177,7 +178,6 @@ WLPREFIX := -Wl,
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOLE)
 	$(CC) $(CFLAGS) $(OUTPUT_OPTION) \
-		-T $(LINKERSCRIPT) \
 		-fuse-linker-plugin \
 		-nostdlib -Wl,-melf_x86_64 \
 		$(patsubst %,$(WLPREFIX)%,$(LDFLAGS)) \
