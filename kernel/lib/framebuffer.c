@@ -6,6 +6,7 @@
 
 #include "../boot/vesainfo.h"
 
+#define USE_NONTEMPORAL 1
 
 typedef struct fb_coord_t {
     int x;
@@ -117,7 +118,12 @@ void fb_copy_to(int scr_x, int scr_y,
             (scr_y * fb.mode.pitch + scr_x * sizeof(uint32_t));
 
     for (int y = scr_y; y < scr_ey; ++y, out += fb.mode.pitch) {
+#if USE_NONTEMPORAL
         memcpy32_nt(out, pixels, img_w * sizeof(uint32_t));
+#else
+        memcpy(out, pixels, img_w * sizeof(uint32_t));
+#endif
+
         pixels += img_pitch;
     }
 }
@@ -144,12 +150,11 @@ void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 
     fb_update_dirty(sx, sy, ex, ey);
 
-    uint8_t *out = fb.back_buf +
-            sy * fb.mode.pitch +
-            sx * sizeof(uint32_t);
+    size_t row_ofs = sx * sizeof(uint32_t);
+    size_t row_end = ex * sizeof(uint32_t);
 
-    size_t width = (ex - sx) * sizeof(uint32_t);
-
+    uint8_t *out = fb.back_buf + sy * fb.mode.pitch + row_ofs;
+    size_t width = row_end - row_ofs;
     for (int y = sy; y < ey; ++y) {
         memset32_nt(out, color, width);
         out += fb.mode.pitch;
@@ -181,9 +186,15 @@ static void fb_update_vidmem(int left, int top, int right, int bottom)
         copy_width = (copy_width + 63) & -64;
 
         // Copy whole cache lines without polluting cache
+#if USE_NONTEMPORAL
         memcpy512_nt(fb.video_mem + ofs, fb.back_buf + ofs, copy_width);
+#else
+        memcpy(fb.video_mem + ofs, fb.back_buf + ofs, copy_width);
+#endif
     }
+#if USE_NONTEMPORAL
     memcpy_nt_fence();
+#endif
 }
 
 void fb_update(void)
