@@ -1728,10 +1728,6 @@ static void take_linear(
         rbtree_kvp_t by_addr = rbtree_item(
                     allocator->free_addr_by_addr, place);
 
-        // If block is past end of allocated range, then done
-        if (by_addr.key >= end)
-            break;
-
         if (by_addr.key < addr && by_addr.key + by_addr.val > addr) {
             //
             // The found free block is before the range and overlaps it
@@ -1774,6 +1770,11 @@ static void take_linear(
 
             rbtree_delete_at(allocator->free_addr_by_addr, place);
 
+            break;
+        } else {
+            assert(by_addr.key >= end);
+
+            // Block is past end of allocated range, done
             break;
         }
     }
@@ -1930,7 +1931,7 @@ void *mmap(void *addr, size_t len,
 
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
     linaddr_t linear_addr;
-    if (!addr) {
+    if (!addr || (flags & MAP_PHYSICAL)) {
         if (!(flags & MAP_NEAR))
             linear_addr = alloc_linear(&linear_allocator, len);
         else
