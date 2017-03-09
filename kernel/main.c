@@ -644,16 +644,22 @@ static int init_thread(void *p)
 
     int frames = 0;
 
-    for (int sx = -2000; sx < 2000; sx += 15) {
+    // 1280x800
+    for (int sx = 1280-1920; sx < 0; sx += 15) {
         int step, sy1, sy2;
         step = ((sx & 1) << 1) - 1;
-        sy1 = -1100 * step;
-        sy2 = 1100 * step;
+        if (step > 0) {
+            sy1 = 800-1080;
+            sy2 = 0;
+        } else {
+            sy1 = 0;
+            sy2 = 800-1080;
+        }
         for (int sy = sy1; sy != sy2; sy += step) {
-            fb_fill_rect(sx, 0, sx + img->width, sy, 0);
-            fb_fill_rect(sx, sy + img->height, sx + img->width, 1080, 0);
             fb_copy_to(sx, sy, img->width,
                        img->width, img->height, png_pixels(img));
+            fb_fill_rect(sx, 0, sx + img->width, sy, 255);
+            fb_fill_rect(sx, sy + img->height, sx + img->width, 1080, 255*256);
             fb_update();
             ++frames;
         }
