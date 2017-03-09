@@ -18,7 +18,10 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
+#OPTIMIZE := 1
+#LTO := 1
 #CC := clang
+
 export CC
 
 CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | \
@@ -76,9 +79,6 @@ CFLAGS := -g3 -fno-stack-protector \
 	-fvisibility=hidden \
 	-std=c11 \
 	$(WEVERYTHING)
-
-#OPTIMIZE := 1
-#LTO := 1
 
 ifdef OPTIMIZE
 CFLAGS += \
@@ -143,7 +143,8 @@ LD := ld
 LDFLAGS ?=  --oformat elf64-x86-64 \
 	-Map $(DUMPDIR)/kernel.map \
 	-T $(LINKERSCRIPT) \
-	-g -export-dynamic
+	-g -export-dynamic \
+	-z max-page-size=4096
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
