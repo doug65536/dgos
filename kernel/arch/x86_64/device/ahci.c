@@ -1290,7 +1290,11 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
                 (port->taskfile_data & AHCI_HP_TFD_SERR))
             error = 2;
 
-        assert(error == 0);
+        if (error != 0) {
+            AHCI_TRACE("Error %d on interface=%zu port=%zu\n",
+                       error, dev - ahci_devices,
+                       pi - dev->port_info);
+        }
 
         pi->callbacks[slot].error = error;
 
@@ -1556,9 +1560,12 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
             cfis.h2d.command = is_read
                     ? ATA_CMD_READ_DMA_EXT
                     : ATA_CMD_WRITE_DMA_EXT;
-            cfis.h2d.lba0 = lba & 0xFFFF;
+            assert(lba < 0x1000000000000L);
+            cfis.h2d.lba0 = lba & 0xFF;
+            cfis.h2d.lba1 = (lba >> 8) & 0xFF;
             cfis.h2d.lba2 = (lba >> 16) & 0xFF;
-            cfis.h2d.lba3 = (lba >> 24) & 0xFFFF;
+            cfis.h2d.lba3 = (lba >> 24) & 0xFF;
+            cfis.h2d.lba4 = (lba >> 32) & 0xFF;
             cfis.h2d.lba5 = (lba >> 40);
             cfis.h2d.count = transferred_blocks;
             cfis.h2d.feature_lo = 1;

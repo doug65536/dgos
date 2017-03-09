@@ -67,7 +67,7 @@ EXPORT int strcmp(char const *lhs, char const *rhs)
 
 EXPORT int strncmp(char const *lhs, char const *rhs, size_t count)
 {
-    unsigned char cmp = 0;
+    int cmp = 0;
     if (count) {
         do {
             cmp = (unsigned char)(*lhs) -
@@ -81,7 +81,7 @@ EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
 {
     unsigned char const *lp = lhs;
     unsigned char const *rp = rhs;
-    unsigned char cmp = 0;
+    int cmp = 0;
     if (count) {
         do {
             cmp = *lp++ - *rp++;

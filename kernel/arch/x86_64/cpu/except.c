@@ -30,7 +30,7 @@ int __exception_handler_invoke(int exception_code)
 {
     __exception_context_t *top = thread_get_exception_top();
     if (!top)
-        return 0;
+        return 1;
 
     top->__exception_code = exception_code;
 

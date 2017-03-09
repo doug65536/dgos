@@ -9,167 +9,11 @@
 #include "elf64.h"
 #include "fs.h"
 
-// Bytes Per Sector	BPB_BytsPerSec	0x0B	16 Bits	Always 512 Bytes
-// Sectors Per Cluster	BPB_SecPerClus	0x0D	8 Bits	1,2,4,8,16,32,64,128
-// Number of Reserved Sectors	BPB_RsvdSecCnt	0x0E	16 Bits	Usually 0x20
-// Number of FATs	BPB_NumFATs	0x10	8 Bits	Always 2
-// Sectors Per FAT	BPB_FATSz32	0x24	32 Bits	Depends on disk size
-// Root Directory First Cluster	BPB_RootClus	0x2C	32 Bits	Usually 0x00000002
-// Signature	(none)	0x1FE	16 Bits	Always 0xAA55
-typedef struct bpb_data_t {
-    uint32_t root_dir_start;	// 0x2C LBA
-    uint32_t sec_per_fat;		// 0x24 1 per 128 clusters
-    uint16_t reserved_sectors;	// 0x0E Usually 32
-    uint16_t bytes_per_sec;		// 0x0B Always 512
-    uint16_t signature;			// 0x1FE Always 0xAA55
-    uint8_t sec_per_cluster;	// 0x0D 8=4KB cluster
-    uint8_t number_of_fats;		// 0x10 Always 2
-
-    // Inferred from data in on-disk BPB
-    uint32_t first_fat_lba;
-    uint32_t cluster_begin_lba;
-} bpb_data_t;
-
-// 32 bit boundaries are marked with *
-// *-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*
-// | Name          |Ext  |A|R|T|CT |CD |AD |STH|MD |MT |STL|Size   |
-// +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-// | 0             |     |B|C|D|E  |10 |12 |14 |16 |18 |1A |1C     |
-// *-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*
-// .|               |     | | | |   |   |   |   |   |   |   |      .
-// .|               |     | | | |   |   |   |   |   |   |   Size   .
-// .|               |     | | | |   |   |   |   |   |   Start      .
-// .|               |     | | | |   |   |   |   |   |   Cluster    .
-// .|               |     | | | |   |   |   |   |   |   Low        .
-// .|               |     | | | |   |   |   |   |   Modified time  .
-// .|               |     | | | |   |   |   |   Modified date      .
-// .|               |     | | | |   |   |   Start cluster high     .
-// .|               |     | | | |   |   Last access date           .
-// .|               |     | | | |   Creation date                  .
-// .|               |     | | | Creation time                      .
-// .|               |     | | Creation 10th of a second            .
-// .|               |     | Reserved                               .
-// .|               |     Attributes                               .
-// .|               Extension                                      .
-// .Filename (padded with spaces)                                  .
-// .................................................................
-//
-typedef struct dir_entry_t {
-    // offset = 0x00
-    char name[11];
-
-    // offset = 0x0B
-    uint8_t attr;
-
-    // offset = 0x0C (bit 4 = lowercase extension, bit 3 = lowercase filename)
-    uint8_t lowercase_flags;
-
-    // offset = 0x0D
-    uint8_t creation_tenth;
-
-    // offset = 0x0E
-    uint16_t creation_time;
-
-    // offset = 0x10
-    uint16_t creation_date;
-
-    // offset = 0x12
-    uint16_t access_date;
-
-    // offset = 0x14
-    uint16_t start_hi;
-
-    // offset = 0x16
-    uint16_t modified_date;
-
-    // offset = 0x18
-    uint16_t modified_time;
-
-    // offset = 0x1A
-    uint16_t start_lo;
-
-    // offset = 0x1C
-    uint32_t size;
-} dir_entry_t;
-
-// DOS date bitfields
-//  4:0  Day (1-31)
-//  8:5  Month (1-12)
-// 15:9  Year relative to 1980
-
-// DOS time bitfields
-//  4:0  Seconds divided by 2 (0-29)
-// 10:5  Minutes (0-59)
-// 15:11 Hours (0-23)
-
-#define FAT_LAST_LFN_ORDINAL 0x40
-#define FAT_DELETED_FLAG 0xE5
-
-#define FAT_ATTR_NONE 0
-#define FAT_ATTR_RO 1
-#define FAT_ATTR_HIDDEN 2
-#define FAT_ATTR_SYS 4
-#define FAT_ATTR_VOLUME 8
-#define FAT_ATTR_DIR 16
-#define FAT_ATTR_ARCH 32
-
-#define FAT_ATTR_MASK 0x3F
-#define FAT_LONGNAME (FAT_ATTR_RO | FAT_ATTR_HIDDEN | FAT_ATTR_SYS | FAT_ATTR_VOLUME)
-
-// Long filenames are stored in reverse order
-// The last fragment of the long filename is stored first,
-// with bit 6 set in its ordinal.
-// The beginning of the filename has an ordinal of 1
-// The 8.3 entry is immediately after the long filename entries
-// Each long filename entry stores 13 UTF-16 characters
-
-// https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#VFAT_long_file_names
-// encodes 13 UTF-16 codepoints per entry
-typedef struct long_dir_entry_t {
-    // offset = 0x00
-    uint8_t ordinal;
-
-    // offset = 0x01 (5 UTF-16 characters) (misaligned!)
-    uint8_t name[10];
-
-    // offset = 0x0B (FAT_LONGNAME (0x0F))
-    uint8_t attr;
-
-    // offset = 0x0C
-    uint8_t zero1;
-
-    // offset = 0x0D
-    uint8_t checksum;
-
-    // offset = 0x0E (6 UTF-16 characters)
-    uint8_t name2[12];
-
-    // offset = 0x1A
-    uint16_t zero2;
-
-    // offset = 0x1C (2 UTF-16 characters)
-    uint8_t name3[4];
-} long_dir_entry_t;
-
-typedef union dir_union_t {
-    dir_entry_t short_entry;
-    long_dir_entry_t long_entry;
-} dir_union_t;
-
-typedef struct long_name_fragment_t {
-    uint8_t ordinal;
-    uint16_t fragment[13];
-} long_name_fragment_t;
-
-typedef struct filename_info_t {
-    uint8_t lowercase_flags;
-    uint8_t filename_length;
-    uint8_t extension_length;
-} filename_info_t;
+#include "../kernel/fs/fat32_decl.h"
 
 // ===========================================================================
 
-static bpb_data_t bpb;
+static fat32_bpb_data_t bpb;
 static fat32_sector_iterator_t *file_handles;
 #define MAX_HANDLES 5
 
@@ -190,18 +34,7 @@ static uint16_t read_bpb(uint32_t partition_lba)
     if (err)
         return err;
 
-    bpb.root_dir_start = *(uint32_t*)(sector_buffer + 0x2C);
-    bpb.sec_per_fat = *(uint32_t*)(sector_buffer + 0x24);
-    bpb.reserved_sectors = *(uint16_t*)(sector_buffer + 0x0E);
-    bpb.bytes_per_sec = *(uint16_t*)(sector_buffer + 0x0B);
-    bpb.signature = *(uint16_t*)(sector_buffer + 0x1FE);
-    bpb.sec_per_cluster = *(uint8_t*)(sector_buffer + 0x0D);
-    bpb.number_of_fats = *(uint8_t*)(sector_buffer + 0x10);
-
-    bpb.first_fat_lba = partition_lba + bpb.reserved_sectors;
-    bpb.cluster_begin_lba = bpb.first_fat_lba +
-            bpb.number_of_fats * bpb.sec_per_fat -
-            2 * bpb.sec_per_cluster;
+    fat32_parse_bpb(&bpb, partition_lba, sector_buffer);
 
     return 0;
 }
@@ -378,12 +211,12 @@ static uint8_t lfn_checksum(char const *fcb_name)
 }
 
 // Returns
-static dir_union_t const *read_directory_current(
+static fat32_dir_union_t const *read_directory_current(
         dir_iterator_t const *iter,
         char const* sector)
 {
     if (iter->dir_file.err == 0)
-        return (dir_union_t const*)sector + iter->sector_index;
+        return (fat32_dir_union_t const*)sector + iter->sector_index;
     return 0;
 }
 
@@ -393,7 +226,7 @@ static int16_t read_directory_move_next(
 {
     // Advance to next sector_index
     if (++iter->sector_index >=
-            bpb.bytes_per_sec / sizeof(dir_entry_t))
+            bpb.bytes_per_sec / sizeof(fat32_dir_entry_t))
         return sector_iterator_next(&iter->dir_file, sector, 1);
 
     return 1;
@@ -526,7 +359,7 @@ static char shortname_char(char ch)
     return '_';
 }
 
-static void fill_short_filename(dir_union_t *match, char const *filename)
+static void fill_short_filename(fat32_dir_union_t *match, char const *filename)
 {
     char *fill_name = match->short_entry.name;
     char const *src = filename;
@@ -596,8 +429,8 @@ static uint16_t const *encode_lfn_name_fragment(
     return encoded_src;
 }
 
-static uint16_t dir_entry_match(dir_union_t const *entry,
-                          dir_union_t const *match)
+static uint16_t dir_entry_match(fat32_dir_union_t const *entry,
+                          fat32_dir_union_t const *match)
 {
     uint16_t long_entry = (entry->long_entry.attr == FAT_LONGNAME);
     uint16_t long_match = (match->long_entry.attr == FAT_LONGNAME);
@@ -629,7 +462,9 @@ static uint16_t dir_entry_match(dir_union_t const *entry,
         return 1;
     } else {
         // Compare short entry
-        if (memcmp(entry->short_entry.name, match->short_entry.name, sizeof(entry->short_entry.name)))
+        if (memcmp(entry->short_entry.name,
+                   match->short_entry.name,
+                   sizeof(entry->short_entry.name)))
             return 0;
 
         return 1;
@@ -640,7 +475,7 @@ static uint16_t dir_entry_match(dir_union_t const *entry,
 static uint32_t find_file_by_name(char const *filename,
                                   uint32_t dir_cluster)
 {
-    dir_union_t *match;
+    fat32_dir_union_t *match;
 
     filename_info_t info = get_filename_info(filename);
 
@@ -665,7 +500,7 @@ static uint32_t find_file_by_name(char const *filename,
         match = calloc(lfn_entries, sizeof(*match));
 
         // Fill in reverse order
-        dir_union_t *match_fill = match + (lfn_entries - 1);
+        fat32_dir_union_t *match_fill = match + (lfn_entries - 1);
 
         uint16_t done_name = 0;
         encoded_src = encoded_name;
@@ -712,7 +547,7 @@ static uint32_t find_file_by_name(char const *filename,
          status > 0;
          status = read_directory_move_next(
              &dir, sector_buffer)) {
-        dir_union_t const *entry =
+        fat32_dir_union_t const *entry =
                 read_directory_current(&dir, sector_buffer);
 
         if (entry->short_entry.attr == FAT_LONGNAME)
@@ -855,16 +690,26 @@ void fat32_boot_partition(uint32_t partition_lba)
         return;
     }
 
-    print_line("root_dir_start:	  %d", bpb.root_dir_start);     // 0x2C LBA
-    print_line("sec_per_fat:      %d", bpb.sec_per_fat);        // 0x24 1 per 128 clusters
-    print_line("reserved_sectors: %d", bpb.reserved_sectors);	// 0x0E Usually 32
-    print_line("bytes_per_sec:	  %d", bpb.bytes_per_sec);		// 0x0B Always 512
-    print_line("signature:		  %x", bpb.signature);			// 0x1FE Always 0xAA55
-    print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);    // 0x0D 8=4KB cluster
-    print_line("number_of_fats:	  %d", bpb.number_of_fats);		// 0x10 Always 2
+    // 0x2C LBA
+    print_line("root_dir_start:	  %d", bpb.root_dir_start);
 
-    //uint32_t root = find_file_by_name("long-kernel-name", bpb.root_dir_start);
-    //print_line("kernel start=%d", root);
+    // 0x24 1 per 128 clusters
+    print_line("sec_per_fat:      %d", bpb.sec_per_fat);
+
+    // 0x0E Usually 32
+    print_line("reserved_sectors: %d", bpb.reserved_sectors);
+
+    // 0x0B Always 512
+    print_line("bytes_per_sec:	  %d", bpb.bytes_per_sec);
+
+    // 0x1FE Always 0xAA55
+    print_line("signature:		  %x", bpb.signature);
+
+    // 0x0D 8=4KB cluster
+    print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);
+
+    // 0x10 Always 2
+    print_line("number_of_fats:	  %d", bpb.number_of_fats);
 
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_close = fat32_boot_close;

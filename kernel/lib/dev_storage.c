@@ -71,7 +71,7 @@ void register_storage_if_device(char const *name,
             // Calculate pointer to storage device instance
             storage_dev_base_t *dev = (void*)
                     ((char*)dev_list.base +
-                    k * dev_list.count);
+                    k * dev_list.stride);
             assert(storage_dev_count < countof(storage_devs));
 
             // Store device instance
@@ -145,8 +145,8 @@ void register_part_device(const char *name, part_vtbl_t *vtbl)
                     info.part_len = part->lba_len;
                     fs_mount(part->name, &info);
                 }
+                close_storage_dev(drive);
             }
-            close_storage_dev(drive);
         }
     }
     printk("%s partition type registered\n", name);

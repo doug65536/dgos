@@ -1125,6 +1125,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
 
             return ctx;
         } else if (pte & PTE_EX_DEVICE) {
+            //
             // Device mapping
 
             linaddr_t rounded_addr = (linaddr_t)fault_addr &
@@ -1147,6 +1148,8 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
             // Round down to nearest 64KB boundary
             mapping_offset &= -0x10000;
 
+            rounded_addr = (linaddr_t)mapping->base_addr + mapping_offset;
+
             pte_t volatile *vpte = ptes[3];
 
             // Attempt to be the first CPU to start reading a block
@@ -1165,12 +1168,11 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
             mapping->active_read = mapping_offset;
             mutex_unlock(&mapping->lock);
 
-            mapping->callback(mapping->context, mapping->base_addr,
+            mapping->callback(mapping->context, (void*)rounded_addr,
                               mapping_offset, 0x10000);
 
             // Mark the range present from end to start
-            addr_present((linaddr_t)mapping->base_addr +
-                         mapping_offset, path, ptes);
+            addr_present(rounded_addr, path, ptes);
             for (size_t i = (0x10000 >> PAGE_SIZE_BIT); i > 0; --i)
                 atomic_or(ptes[3] + (i - 1), PTE_PRESENT);
 

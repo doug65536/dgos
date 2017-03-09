@@ -48,6 +48,7 @@ UMOUNT := umount
 KPARTX := kpartx
 MKFS := mkfs.vfat
 CP := cp
+TOUCH := touch
 RM := rm
 SUDO := sudo
 CAT := cat
@@ -383,6 +384,13 @@ debug-iso-wait-singlecpu: $(ISO_FILE)
 		 $(QEMU_DEBUGCON) \
 		 $(QEMU_NET)
 
+debug-iso-wait-singlecpu-ide: $(ISO_FILE)
+	 $(QEMU) $(QEMU_FLAGS) \
+		 -cpu $(QEMU_CPU) \
+		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
+		 $(QEMU_DEBUGCON) \
+		 $(QEMU_NET)
+
 debug-iso-wait-singlecpu-kvm: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \
 		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
@@ -512,6 +520,17 @@ run-debug-wait: all debuggable-kernel-disk
 		$(QEMU_DEBUGCON) \
 		$(QEMU_NET)
 
+run-debug-wait-kvm: all debuggable-kernel-disk
+	$(QEMU) -s -S  \
+		-drive file=$(DISKIMAGE),format=raw \
+		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-m $(QEMU_RAM) \
+		$(QEMU_SMP) \
+		$(QEMU_DEBUGCON) \
+		$(QEMU_NET) \
+		-enable-kvm
+
 run-debug-wait-singlecpu: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
 		-drive file=$(DISKIMAGE),format=raw \
@@ -520,6 +539,16 @@ run-debug-wait-singlecpu: all debuggable-kernel-disk
 		-m $(QEMU_RAM) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_NET)
+
+run-debug-wait-singlecpu-kvm: all debuggable-kernel-disk
+	$(QEMU) -s -S  \
+		-drive file=$(DISKIMAGE),format=raw \
+		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
+		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-m $(QEMU_RAM) \
+		$(QEMU_DEBUGCON) \
+		$(QEMU_NET) \
+		-enable-kvm
 
 monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
@@ -595,6 +624,13 @@ inject-kernel: all
 	$(MAKE) mountdisk
 	(cd ../kernel && $(MAKE))
 	$(CP) ../kernel/bin/kernel disk/dgos-kernel
+	$(CP) ../user/background.png disk
+	$(TOUCH) disk/UCNAME
+	$(TOUCH) disk/lcname
+	$(TOUCH) disk/UCNAME.UEX
+	$(TOUCH) disk/UCNAME.lex
+	$(TOUCH) disk/lcname.UEX
+	$(TOUCH) disk/lcname.lex
 	$(MAKE) umountdisk
 
 .PHONY: all clean run debug-bochs debug bochs-symbols
