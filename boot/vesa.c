@@ -211,19 +211,22 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
     }
 
     far_ptr_t kernel_data;
+    kernel_data.segment = 0;
+    kernel_data.offset = 0;
+
     if (done) {
         kernel_data.segment = far_malloc(sizeof(sel));
         kernel_data.offset = 0;
         far_copy_from(kernel_data, &sel, sizeof(sel));
+
+        paging_map_range(kernel_data.segment << 4, sizeof(sel),
+                         kernel_data.segment << 4,
+                         PTE_PRESENT | PTE_WRITABLE, 2);
+
+        paging_map_range(sel.framebuffer_addr, sel.framebuffer_bytes,
+                         sel.framebuffer_addr,
+                         PTE_PRESENT | PTE_WRITABLE, 2);
     }
-
-    paging_map_range(kernel_data.segment << 4, sizeof(sel),
-                     kernel_data.segment << 4,
-                     PTE_PRESENT | PTE_WRITABLE, 2);
-
-    paging_map_range(sel.framebuffer_addr, sel.framebuffer_bytes,
-                     sel.framebuffer_addr,
-                     PTE_PRESENT | PTE_WRITABLE, 2);
 
     free(mode_info);
     free(info);
