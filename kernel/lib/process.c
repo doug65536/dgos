@@ -112,7 +112,7 @@ int process_spawn(pid_t * restrict pid_result,
     process->args[arg_count] = 0;
 
     for (size_t i = 0; i < env_count; ++i)
-        process->env[i] = strdup(argv[i]);
+        process->env[i] = strdup(envp[i]);
     process->env[env_count] = 0;
 
     *pid_result = process->pid;
