@@ -1832,12 +1832,13 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
         assert(pcp);
         usbxhci_pending_cmd_t pc = *pcp;
         htbl_delete(&usbxhci_pending_ht, &cmdaddr);
+        uint64_t cmd_physaddr = pcp->cmd_physaddr;
         free(pcp);
         spinlock_unlock_noirq(&self->lock_cmd);
 
         // Invoke completion handler
         pc.handler(self, (void*)((char*)self->dev_cmd_ring +
-                   (pcp->cmd_physaddr - self->cmd_ring_physaddr)),
+                   (cmd_physaddr - self->cmd_ring_physaddr)),
                    evt, pc.data);
 
         break;
