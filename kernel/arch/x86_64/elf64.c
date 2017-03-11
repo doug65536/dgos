@@ -7,6 +7,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "export.h"
+#include "assert.h"
 
 extern Elf64_Sym const ___dynsym_st[];
 extern Elf64_Sym const ___dynsym_en[];
@@ -252,6 +253,8 @@ module_entry_fn_t modload_load(char const *path)
             for (Elf64_Rel const *r = rel; (void*)r < end; ++r) {
                 symtab_idx = ELF64_R_SYM(r->r_info);
                 rel_type = ELF64_R_TYPE(r->r_info);
+                assert(!"Unhandled relocation type!");
+                return 0;
             }
             break;
 
