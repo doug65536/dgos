@@ -859,7 +859,7 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
 {
     int count = 1 << log2n;
 
-    uint64_t mask = ~(-1UL << count);
+    uint64_t mask = ~((uint64_t)-1 << count);
     uint64_t checked = mask;
     uint8_t result = 0;
 

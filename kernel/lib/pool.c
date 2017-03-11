@@ -5,7 +5,7 @@
 
 static uint32_t pool_round_up(uint32_t n, int8_t log2m)
 {
-    return (n + ((1<<log2m)-1)) & (-1<<log2m);
+    return (n + ((1<<log2m)-1)) & ((uint32_t)-1 << log2m);
 }
 
 int pool_create(pool_t *pool, uint32_t item_size, uint32_t capacity)

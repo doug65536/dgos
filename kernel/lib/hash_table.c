@@ -36,7 +36,7 @@ void htbl_destroy(hashtbl_t *self)
 
 static int htbl_rehash(hashtbl_t *self)
 {
-    int new_log2 = self->log2_capacity
+    unsigned new_log2 = self->log2_capacity
             ? self->log2_capacity + 1
             : 4;
 
@@ -45,7 +45,7 @@ static int htbl_rehash(hashtbl_t *self)
     if (!new_tbl)
         return 0;
 
-    uint32_t new_mask = ~(-1 << new_log2);
+    uint32_t new_mask = ~((uint32_t)-1 << new_log2);
     uint32_t new_count = 0;
 
     if (self->count) {
@@ -87,7 +87,7 @@ void *htbl_lookup(hashtbl_t *self, void *key)
     rwspinlock_sh_lock(&self->lock);
     if (self->count) {
         uint32_t hash = hash_32(key, self->key_size);
-        uint32_t mask = ~(-1 << self->log2_capacity);
+        uint32_t mask = ~((uint32_t)-1 << self->log2_capacity);
 
         hash &= mask;
 
@@ -122,7 +122,7 @@ int htbl_insert(hashtbl_t *self, void *item)
 
     uint32_t hash = hash_32((char*)item + self->key_ofs,
                             self->key_size);
-    uint32_t mask = ~(-1 << self->log2_capacity);
+    uint32_t mask = ~((uint32_t)-1 << self->log2_capacity);
 
     hash &= mask;
 
@@ -145,7 +145,7 @@ void htbl_delete(hashtbl_t *self, void *key)
     rwspinlock_sh_lock(&self->lock);
     if (self->count) {
         uint32_t hash = hash_32(key, self->key_size);
-        uint32_t mask = ~(-1 << self->log2_capacity);
+        uint32_t mask = ~((uint32_t)-1 << self->log2_capacity);
 
         hash &= mask;
 

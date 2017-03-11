@@ -28,14 +28,14 @@ static inline uint8_t bit_msb_set_64(int64_t n)
 // return ceil(log(n) / log(2))
 static inline uint8_t bit_log2_n_32(int32_t n)
 {
-    int top = bit_msb_set_32(n);
-    return top + !!(~(-1 << top) & n);
+    uint8_t top = bit_msb_set_32(n);
+    return top + !!(~((uint32_t)-1 << top) & n);
 }
 
 // return ceil(log(n) / log(2))
 static inline uint8_t bit_log2_n_64(int64_t n)
 {
-    int top = bit_msb_set_64(n);
-    return top + !!(~((int64_t)-1 << top) & n);
+    uint8_t top = bit_msb_set_64(n);
+    return top + !!(~((uint64_t)-1 << top) & n);
 }
 

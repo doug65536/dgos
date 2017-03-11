@@ -71,7 +71,7 @@ uint32_t pci_config_read(
         data >>= (offset & 3) << 3;
 
         if (size != sizeof(uint32_t))
-            data &= ~(-1 << (size << 3));
+            data &= ~((uint32_t)-1 << (size << 3));
     }
 
     return data;
@@ -131,7 +131,7 @@ int pci_config_write(
         uint32_t preserve_mask = 0;
         if (io_size != sizeof(uint32_t)) {
             // Mask with (io_size * 8) LSB set to 1
-            preserve_mask = ~(-1 << (io_size * 8));
+            preserve_mask = ~((uint32_t)-1 << (io_size * 8));
             // Mask with preserved bits one
             preserve_mask = ~0U ^ (preserve_mask << (byte_ofs * 8));
         }
