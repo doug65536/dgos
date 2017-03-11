@@ -644,6 +644,14 @@ static int init_thread(void *p)
 
     int frames = 0;
 
+    int od = file_opendir("");
+    dirent_t de;
+    dirent_t *dep;
+    while (file_readdir_r(od, &de, &dep)) {
+        printdbg("File: %s\n", de.d_name);
+    }
+    file_closedir(od);
+
     // 1280x800
     for (int sx = 1280-1920; sx < 0; sx += 15) {
         int step, sy1, sy2;

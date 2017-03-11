@@ -679,11 +679,30 @@ static ssize_t iso9660_readdir(fs_base_t *dev,
 
     iso9660_dir_handle_t *dir = fi;
 
+    ssize_t dir_size = (ssize_t)iso9660_dirent_size(dir->dirent);
+
+    if (offset >= dir_size)
+        return 0;
+
+    size_t orig_offset = offset;
+
+    iso9660_dir_ent_t *fe = (void*)dir->content;
     iso9660_dir_ent_t *de = (void*)(dir->content + offset);
+
+    if (de->len == 0) {
+        // Next entry would cross a sector boundary
+        offset = iso9660_next_dirent(self, fe, offset);
+        de = (void*)(dir->content + offset);
+
+        if (offset >= dir_size)
+            return 0;
+    }
 
     self->name_copy(buf->d_name, de->name, de->filename_len);
 
-    return 0;
+    offset = iso9660_next_dirent(self, fe, offset);
+
+    return offset - orig_offset;
 }
 
 static int iso9660_releasedir(fs_base_t *dev,
