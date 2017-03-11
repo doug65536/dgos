@@ -215,7 +215,7 @@ int file_datasync(int fd)
     return fh->fs->vtbl->fsync(fh->fs, fh->fi, 1);
 }
 
-int file_opendir(char *path)
+int file_opendir(char const *path)
 {
     fs_base_t *fs = file_fs_from_path(path);
 
@@ -223,6 +223,7 @@ int file_opendir(char *path)
         return -1;
 
     file_handle_t *fh = file_new_fd();
+    fh->fs = fs;
 
     int status = fh->fs->vtbl->opendir(fh->fs, &fh->fi, path);
     if (status < 0)
@@ -236,7 +237,7 @@ int file_opendir(char *path)
     return fh - files;
 }
 
-ssize_t file_readdir_r(int fd, dirent *buf, dirent **result)
+ssize_t file_readdir_r(int fd, dirent_t *buf, dirent_t **result)
 {
     file_handle_t *fh = file_fh_from_fd(fd);
     if (!fh)

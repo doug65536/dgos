@@ -672,7 +672,7 @@ static int iso9660_opendir(fs_base_t *dev,
 
 static ssize_t iso9660_readdir(fs_base_t *dev,
                                fs_file_info_t *fi,
-                               void* buf,
+                               dirent_t *buf,
                                off_t offset)
 {
     FS_DEV_PTR(dev);
@@ -681,7 +681,7 @@ static ssize_t iso9660_readdir(fs_base_t *dev,
 
     iso9660_dir_ent_t *de = (void*)(dir->content + offset);
 
-    self->name_copy(buf, de->name, de->filename_len);
+    self->name_copy(buf->d_name, de->name, de->filename_len);
 
     return 0;
 }

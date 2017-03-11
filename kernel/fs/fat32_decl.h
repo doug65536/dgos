@@ -96,7 +96,7 @@ typedef struct fat32_dir_entry_t {
 // 15:11 Hours (0-23)
 
 #define FAT_LAST_LFN_ORDINAL 0x40
-#define FAT_DELETED_FLAG 0xE5
+#define FAT_DELETED_FLAG ((char)0xE5)
 
 #define FAT_ATTR_NONE 0
 #define FAT_ATTR_RO 1

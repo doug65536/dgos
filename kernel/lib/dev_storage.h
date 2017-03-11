@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "dirent.h"
 
 // Storage device interface (IDE, AHCI, etc)
 
@@ -224,7 +225,7 @@ struct fs_vtbl_t {
                    fs_cpath_t path);
     ssize_t (*readdir)(fs_base_t *dev,
                        fs_file_info_t *fi,
-                       void* buf,
+                       dirent_t* buf,
                        off_t offset);
     int (*releasedir)(fs_base_t *dev,
                       fs_file_info_t *fi);

@@ -66,7 +66,7 @@ static int tmpfs_opendir(fs_base_t *dev,
 
 static ssize_t tmpfs_readdir(fs_base_t *dev,
                              fs_file_info_t *fi,
-                             void* buf,
+                             dirent_t *buf,
                              off_t offset)
 {
     FS_DEV_PTR_UNUSED(dev);

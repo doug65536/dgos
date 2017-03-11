@@ -17,6 +17,7 @@ dep-zlib.mk
 fs/fat32_decl.h
 lib/dev_eth.c
 lib/dev_eth.h
+lib/dirent.h
 lib/fileio.c
 lib/fileio.h
 lib/framebuffer.c
