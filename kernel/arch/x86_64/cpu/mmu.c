@@ -1918,6 +1918,9 @@ void *mmap(void *addr, size_t len,
     if (flags & MAP_USER)
         page_flags |= PTE_USER;
 
+    if (flags & MAP_GLOBAL)
+        page_flags |= PTE_GLOBAL;
+
     if (prot & PROT_WRITE)
         page_flags |= PTE_WRITABLE;
 
@@ -2430,7 +2433,7 @@ void *mmap_register_device(void *context,
 
     spinlock_unlock_noirq(&mm_dev_mapping_lock);
 
-    return mapping->base_addr;
+    return likely(mapping) ? mapping->base_addr : 0;
 }
 
 static int mm_dev_map_search(void const *v, void const *k, void *s)

@@ -52,7 +52,10 @@
 #define MAP_ANONYMOUS       0x00000200
 
 // Undefined flag mask
-#define MAP_INVALID_MASK    0x01FFFC00
+#define MAP_INVALID_MASK    0x00FFFC00
+
+// Kernel only: Global
+#define MAP_GLOBAL          0x01000000
 
 /// Kernel only: Map near the kernel (modules)
 #define MAP_NEAR            0x02000000
