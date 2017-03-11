@@ -360,7 +360,7 @@ static fat32_dir_union_t *fat32_lookup_dirent(
         fat32_fs_t *self, char const *pathname)
 {
     uint32_t cluster = self->root_cluster;
-    fat32_dir_union_t *de;
+    fat32_dir_union_t *de = 0;
 
     char const *name_st = pathname;
     char const *path_end = pathname + strlen(pathname);
