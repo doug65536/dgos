@@ -929,7 +929,7 @@ static int rtl8139_detect(eth_dev_base_t ***devices)
         self->vtbl = &rtl8139_eth_dev_device_vtbl;
 
         rtl8139_devices = realloc(rtl8139_devices,
-                                  sizeof(rtl8139_devices) *
+                                  sizeof(*rtl8139_devices) *
                                   (rtl8139_device_count + 1));
         rtl8139_devices[rtl8139_device_count++] = self;
 
