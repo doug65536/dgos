@@ -641,12 +641,29 @@ static int init_thread(void *p)
 
     fb_init();
 
-    printdbg("Floating point formatter:  42.8    =%7.5f\n", 42.8);
-    printdbg("Floating point formatter:  42.8e+60=%7.5f\n", 42.8e+60);
-    printdbg("Floating point formatter:  42.8e-60=%7.5f\n", 42.8e-60);
-    printdbg("Floating point formatter: -42.8    =%7.5f\n", 42.8);
-    printdbg("Floating point formatter: -42.8e+60=%7.5f\n", 42.8e+60);
-    printdbg("Floating point formatter: -42.8e-60=%7.5f\n", 42.8e-60);
+    printdbg("Floating point formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
+    printdbg("Floating point formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
+    printdbg("Floating point formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
+    printdbg("Floating point formatter: %%+17.5f    42.8e-60  -> %+17.5f\n", 42.8e-60);
+    printdbg("Floating point formatter: %%17.5f    -42.8      -> %17.5f\n", -42.8);
+    printdbg("Floating point formatter: %%17.5f    -42.8e+60  -> %17.5f\n", -42.8e+60);
+    printdbg("Floating point formatter: %%17.5f    -42.8e-60  -> %17.5f\n", -42.8e-60);
+    printdbg("Floating point formatter: %%017.5f    42.8      -> %017.5f\n", 42.8);
+    printdbg("Floating point formatter: %%017.5f   -42.8e+60  -> %017.5f\n", -42.8e+60);
+    printdbg("Floating point formatter: %%+017.5f   42.8      -> %+017.5f\n", 42.8);
+    printdbg("Floating point formatter: %%+017.5f  -42.8e+60  -> %+017.5f\n", -42.8e+60);
+
+    printdbg("Floating point formatter: %%17.5e     42.8      -> %17.5e\n", 42.8);
+    printdbg("Floating point formatter: %%17.5e     42.8e+60  -> %17.5e\n", 42.8e+60);
+    printdbg("Floating point formatter: %%17.5e     42.8e-60  -> %17.5e\n", 42.8e-60);
+    printdbg("Floating point formatter: %%+17.5e    42.8e-60  -> %+17.5e\n", 42.8e-60);
+    printdbg("Floating point formatter: %%17.5e    -42.8      -> %17.5e\n", -42.8);
+    printdbg("Floating point formatter: %%17.5e    -42.8e+60  -> %17.5e\n", -42.8e+60);
+    printdbg("Floating point formatter: %%17.5e    -42.8e-60  -> %17.5e\n", -42.8e-60);
+    printdbg("Floating point formatter: %%017.5e    42.8      -> %017.5e\n", 42.8);
+    printdbg("Floating point formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
+    printdbg("Floating point formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
+    printdbg("Floating point formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
 
     uint64_t st_tm = time_ms();
 

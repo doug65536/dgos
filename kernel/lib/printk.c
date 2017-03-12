@@ -130,7 +130,6 @@ static char *dtoa(char *txt, size_t txt_sz,
     if (sign < 0)
         n = -n;
 
-
     char *out = txt;
 
     int exp2 = ilogbl(n);
@@ -153,10 +152,8 @@ static char *dtoa(char *txt, size_t txt_sz,
     // log2(10) = 3.32192809488736
     int exp10 = exp2 / 3.32192809488736234787L;
 
-    if (flags->leading_plus && sign > 0)
-        *out++ = '+';
-    else if (sign < 0)
-        *out++ = '-';
+    if (sign < 0)
+        flags->negative = 1;
 
     int scientific;
     if (exp10 < -9 || exp10 > 9)
@@ -203,6 +200,7 @@ static char *dtoa(char *txt, size_t txt_sz,
 
     if (scientific) {
         char esign;
+        int epad0;
 
         char *eout = etxt + countof(etxt);
         *--eout = 0;
@@ -213,22 +211,52 @@ static char *dtoa(char *txt, size_t txt_sz,
             esign = '-';
             sciexp = -sciexp;
         }
+
+        // The exponent must be at least two digits
+        epad0 = (sciexp < 10);
+
         exp10 = 0;
         while (sciexp > 0) {
             *--eout = '0' + (sciexp % 10);
             sciexp /= 10;
             ++exp10;
         }
+
+        if (epad0)
+            *--eout = '0';
+
         *--eout = esign;
         *--eout = 'e';
 
-        size_t elen = (etxt + countof(etxt)) - eout;
+        size_t elen = ((etxt + countof(etxt)) - eout) - 1;
 
-        if (out + elen > txt + txt_sz)
+        if (out + elen >= txt + txt_sz)
             out = txt + txt_sz - elen - 1;
 
-        strcpy(out, eout);
+        memcpy(out, eout, elen + 1);
+        out += elen;
     }
+
+    size_t len = out - txt;
+
+    if (flags->has_min_width && (int)len < flags->min_width) {
+        flags->pending_padding = flags->min_width - len;
+
+        if (flags->pending_padding > 0) {
+            if (flags->leading_zero && (flags->leading_plus || flags->negative))
+                --flags->pending_padding;
+
+            //if (flags->leading_plus &&
+            //        (flags->leading_zero && flags->negative))
+            //    --flags->pending_padding;
+
+            if (flags->leading_zero) {
+                flags->pending_leading_zeros = flags->pending_padding;
+                flags->pending_padding = 0;
+            }
+        }
+    }
+
 
     return txt;
 }
@@ -301,7 +329,9 @@ static intptr_t formatter(
                 flags.hash = 1;
                 ch = *++fp;
                 break;
+            }
 
+            switch(ch) {
             case '0':
                 // Use leading zeros
                 flags.leading_zero = 1;
@@ -573,6 +603,9 @@ static intptr_t formatter(
                 }
                 break;
 
+            case 'e':
+                flags.scientific = 1;
+                // fall through
             case 'f':
                 switch (flags.length) {
                 case length_none:
