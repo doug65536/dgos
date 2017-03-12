@@ -6,6 +6,8 @@
 #include "debug.h"
 #include "cpu/spinlock.h"
 #include "export.h"
+#include "assert.h"
+#include "math.h"
 
 typedef enum length_mod_t {
     length_none,
@@ -27,6 +29,8 @@ typedef enum arg_type_t {
     arg_type_character,
     arg_type_intptr_value,
     arg_type_uintptr_value,
+    arg_type_double_value,
+    arg_type_long_double_value
 } arg_type_t;
 
 typedef union arg_t {
@@ -35,6 +39,8 @@ typedef union arg_t {
     int character;
     intptr_t intptr_value;
     uintptr_t uintptr_value;
+    double double_value;
+    long double long_double_value;
 } arg_t;
 
 typedef struct formatter_flags_t {
@@ -47,6 +53,7 @@ typedef struct formatter_flags_t {
     unsigned int has_min_width : 1;
     unsigned int has_precision : 1;
     unsigned int limit_string : 1;
+    unsigned int scientific : 1;
 
     int min_width;
     int precision;
@@ -82,6 +89,150 @@ static char const *parse_int(char const *p, int *result)
 
     return p;
 }
+
+#if 1
+static long double ipowl(int base, int exponent)
+{
+    long double result = 1;
+    long double b = base;
+    int neg_exp = (exponent < 0);
+
+    // Make exponent absolute
+    if (neg_exp)
+        exponent = -exponent;
+
+    while (exponent)
+    {
+        if (exponent & 1)
+            result *= b;
+
+        exponent >>= 1;
+        b *= b;
+    }
+
+    if (neg_exp)
+        result = 1.0 / result;
+
+    return result;
+}
+
+C_ASSERT(sizeof(int64_t) == sizeof(double));
+
+static char *dtoa(char *txt, size_t txt_sz,
+                  long double n, formatter_flags_t *flags)
+{
+    txt[txt_sz-1] = 0;
+
+    // Make -1 or 1 to save sign
+    int sign = ((n > 0) << 1) - 1;
+
+    // Make n absolute
+    if (sign < 0)
+        n = -n;
+
+
+    char *out = txt;
+
+    int exp2 = ilogbl(n);
+
+    if (exp2 == INT_MAX) {
+        char const *special;
+
+        if (isinf(n))
+            special = "inf";
+        else if (isnan(n))
+            special = "nan";
+        else
+            special = "???";
+
+        strcpy(out, special);
+
+        return txt;
+    }
+
+    // log2(10) = 3.32192809488736
+    int exp10 = exp2 / 3.32192809488736234787L;
+
+    if (flags->leading_plus && sign > 0)
+        *out++ = '+';
+    else if (sign < 0)
+        *out++ = '-';
+
+    int scientific;
+    if (exp10 < -9 || exp10 > 9)
+        scientific = 1;
+    else
+        scientific = flags->scientific;
+
+    int sciexp = 0;
+    if (scientific) {
+        // Normalize to -2 < n < -2
+        if (exp10 < 0)
+            --exp10;
+
+        n /= ipowl(10, exp10);
+
+        sciexp = exp10;
+        exp10 = 0;
+    }
+
+    // Round to precision
+    long double precision = ipowl(10, -flags->precision - 1);
+    n += 5.0 * precision;
+
+    int exp_limit = -flags->precision - 1;
+
+    for ( ; (n > precision || exp10 >= 0)
+         && exp10 > exp_limit; --exp10) {
+        long double w = ipowl(10, exp10);
+        if (w > 0) {
+            int digit = n / w;
+            n -= digit * w;
+            *out++ = '0' + digit;
+        }
+        if (exp10 == 0 && n > 0)
+            *out++ = '.';
+
+        if (out + 1 >= txt + txt_sz)
+            return 0;
+    }
+
+    *out = 0;
+
+    char etxt[7];
+
+    if (scientific) {
+        char esign;
+
+        char *eout = etxt + countof(etxt);
+        *--eout = 0;
+
+        if (sciexp > 0) {
+            esign = '+';
+        } else {
+            esign = '-';
+            sciexp = -sciexp;
+        }
+        exp10 = 0;
+        while (sciexp > 0) {
+            *--eout = '0' + (sciexp % 10);
+            sciexp /= 10;
+            ++exp10;
+        }
+        *--eout = esign;
+        *--eout = 'e';
+
+        size_t elen = (etxt + countof(etxt)) - eout;
+
+        if (out + elen > txt + txt_sz)
+            out = txt + txt_sz - elen - 1;
+
+        strcpy(out, eout);
+    }
+
+    return txt;
+}
+#endif
 
 #ifndef __COMPAT_ENHANCED
 #define RETURN_FORMATTER_ERROR(chars_written) return (~chars_written)
@@ -421,6 +572,25 @@ static intptr_t formatter(
                     RETURN_FORMATTER_ERROR(chars_written);
                 }
                 break;
+
+            case 'f':
+                switch (flags.length) {
+                case length_none:
+                case length_l:
+                    flags.arg_type = arg_type_double_value;
+                    flags.arg.double_value = va_arg(ap, double);
+                    break;
+
+                case length_L:
+                    flags.arg_type = arg_type_long_double_value;
+                    flags.arg.long_double_value = va_arg(ap, long double);
+                    break;
+
+                default:
+                    RETURN_FORMATTER_ERROR(chars_written);
+                }
+
+                break;
             }
 
             //
@@ -481,6 +651,12 @@ static intptr_t formatter(
                 flags.arg_type = arg_type_char_ptr;
                 flags.arg.char_ptr_value = digit_out;
 
+                break;
+
+            case arg_type_double_value:
+                dtoa(digits, sizeof(digits), flags.arg.double_value, &flags);
+                flags.arg_type = arg_type_char_ptr;
+                flags.arg.char_ptr_value = digits;
                 break;
 
             }

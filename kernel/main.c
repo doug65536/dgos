@@ -27,6 +27,7 @@
 #include "stdlib.h"
 #include "png.h"
 #include "framebuffer.h"
+#include "math.h"
 
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
@@ -639,6 +640,13 @@ static int init_thread(void *p)
     png_image_t *img = png_load("background.png");
 
     fb_init();
+
+    printdbg("Floating point formatter:  42.8    =%7.5f\n", 42.8);
+    printdbg("Floating point formatter:  42.8e+60=%7.5f\n", 42.8e+60);
+    printdbg("Floating point formatter:  42.8e-60=%7.5f\n", 42.8e-60);
+    printdbg("Floating point formatter: -42.8    =%7.5f\n", 42.8);
+    printdbg("Floating point formatter: -42.8e+60=%7.5f\n", 42.8e+60);
+    printdbg("Floating point formatter: -42.8e-60=%7.5f\n", 42.8e-60);
 
     uint64_t st_tm = time_ms();
 

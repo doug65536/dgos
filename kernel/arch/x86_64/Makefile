@@ -28,6 +28,7 @@ CSRCS := \
 	cpu/legacy_pic.c \
 	cpu/legacy_pit.c \
 	cpu/except.c \
+	cpu/math.c \
 	device/pci.c \
 	device/keyb8042.c \
 	device/e9debug.c \

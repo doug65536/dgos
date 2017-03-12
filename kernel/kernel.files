@@ -4,6 +4,7 @@ arch/x86_64/cpu/except.c
 arch/x86_64/cpu/except.h
 arch/x86_64/cpu/except_asm.h
 arch/x86_64/cpu/except_asm.s
+arch/x86_64/cpu/math.c
 arch/x86_64/cpu/nontemporal.c
 arch/x86_64/cpu/nontemporal.h
 arch/x86_64/device/usb_xhci.c
@@ -26,6 +27,8 @@ lib/hash.c
 lib/hash.h
 lib/hash_table.c
 lib/hash_table.h
+lib/math.c
+lib/math.h
 lib/png.c
 lib/png.h
 lib/process.c

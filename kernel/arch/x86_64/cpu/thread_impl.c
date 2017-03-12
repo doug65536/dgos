@@ -281,6 +281,13 @@ static thread_t thread_create_with_state(
         ctx->fpr.mxcsr = MXCSR_MASK_ALL;
         ctx->fpr.mxcsr_mask = default_mxcsr_mask;
 
+        // All FPU registers empty
+        ctx->fpr.fsw = FPUSW_TOP_n(7);
+
+        // 64 bit FPU precision
+        ctx->fpr.fcw = FPUCW_PC_n(FPUCW_PC_64) | FPUCW_IM |
+                FPUCW_DM | FPUCW_ZM | FPUCW_OM | FPUCW_UM | FPUCW_PM;
+
         ctx->ctx.gpr = &ctx->gpr;
         ctx->ctx.fpr = &ctx->fpr;
         ctx->align = 0;

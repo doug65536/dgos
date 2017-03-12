@@ -11,6 +11,8 @@ entry:
 	or $0x600,%rax
 	mov %rax,%cr4
 
+	fninit
+
 	push %rdx
 	push %rcx
 

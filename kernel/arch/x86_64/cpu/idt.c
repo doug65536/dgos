@@ -29,11 +29,18 @@
 // debug hack
 #include "apic.h"
 
-idt_entry_64_t idt[256];
+static idt_entry_64_t idt[256];
 
 static void *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
 
-cpu_flag_info_t const cpu_eflags_info[] = {
+typedef struct cpu_flag_info_t {
+    char const * const name;
+    int bit;
+    int mask;
+    char const * const *value_names;
+} cpu_flag_info_t;
+
+static cpu_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
     { "VIP",  EFLAGS_VIP_BIT,  1, 0 },
     { "VIF",  EFLAGS_VIF_BIT,  1, 0 },
@@ -54,14 +61,14 @@ cpu_flag_info_t const cpu_eflags_info[] = {
     { 0,      -1,             -1, 0 }
 };
 
-char const *cpu_mxcsr_rc[] = {
+static char const *cpu_mxcsr_rc[] = {
     "Nearest",
     "Down",
     "Up",
     "Truncate"
 };
 
-cpu_flag_info_t const cpu_mxcsr_info[] = {
+static cpu_flag_info_t const cpu_mxcsr_info[] = {
     { "IE",     MXCSR_IE_BIT, 1, 0 },
     { "DE",     MXCSR_DE_BIT, 1, 0 },
     { "ZE",     MXCSR_ZE_BIT, 1, 0 },
@@ -76,7 +83,45 @@ cpu_flag_info_t const cpu_mxcsr_info[] = {
     { "UM",     MXCSR_UM_BIT, 1, 0 },
     { "PM",     MXCSR_PM_BIT, 1, 0 },
     { "RC",     MXCSR_RC_BIT, MXCSR_RC_BITS, cpu_mxcsr_rc },
-    { "FZ",     MXCSR_FZ_BIT, 1, 0 }
+    { "FZ",     MXCSR_FZ_BIT, 1, 0 },
+    { 0,        -1,          -1, 0 }
+};
+
+static char const *cpu_fpucw_pc[] = {
+    "24-bit",
+    "??",
+    "53-bit",
+    "64-bit"
+};
+
+static cpu_flag_info_t const cpu_fpucw_info[] = {
+    { "IM",     FPUCW_IM_BIT, 1, 0 },
+    { "DM",     FPUCW_DM_BIT, 1, 0 },
+    { "ZM",     FPUCW_ZM_BIT, 1, 0 },
+    { "OM",     FPUCW_OM_BIT, 1, 0 },
+    { "UM",     FPUCW_UM_BIT, 1, 0 },
+    { "PM",     FPUCW_PM_BIT, 1, 0 },
+    { "PC",     FPUCW_PC_BIT, FPUCW_PC_BITS, cpu_fpucw_pc },
+    { "RC",     FPUCW_RC_BIT, FPUCW_RC_BITS, cpu_mxcsr_rc },
+    { 0,        -1,          -1, 0 }
+};
+
+static cpu_flag_info_t const cpu_fpusw_info[] = {
+    { "IE",     FPUSW_IE_BIT, 1, 0 },
+    { "DE",     FPUSW_DE_BIT, 1, 0 },
+    { "ZE",     FPUSW_ZE_BIT, 1, 0 },
+    { "OE",     FPUSW_OE_BIT, 1, 0 },
+    { "UE",     FPUSW_UE_BIT, 1, 0 },
+    { "PE",     FPUSW_PE_BIT, 1, 0 },
+    { "SF",     FPUSW_SF_BIT, 1, 0 },
+    { "ES",     FPUSW_ES_BIT, 1, 0 },
+    { "C0(c)",  FPUSW_C0_BIT, 1, 0 },
+    { "C1",     FPUSW_C1_BIT, 1, 0 },
+    { "C2(p)",  FPUSW_C2_BIT, 1, 0 },
+    { "TOP",    FPUSW_TOP_BIT, FPUSW_TOP_BITS, 0 },
+    { "C3(z)",  FPUSW_C3_BIT, 1, 0 },
+    { "B",      FPUSW_B_BIT,  1, 0 },
+    { 0,        -1,          -1, 0 }
 };
 
 typedef void (*isr_entry_t)(void);
@@ -208,7 +253,7 @@ int idt_init(int ap)
     return 0;
 }
 
-size_t cpu_format_flags_register(
+static size_t cpu_format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, cpu_flag_info_t const *info)
 {
@@ -274,6 +319,20 @@ size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr)
 {
     return cpu_format_flags_register(buf, buf_size, mxcsr,
                                      cpu_mxcsr_info);
+
+}
+
+size_t cpu_describe_fpucw(char *buf, size_t buf_size, uint16_t fpucw)
+{
+    return cpu_format_flags_register(buf, buf_size, fpucw,
+                                     cpu_fpucw_info);
+
+}
+
+size_t cpu_describe_fpusw(char *buf, size_t buf_size, uint16_t fpusw)
+{
+    return cpu_format_flags_register(buf, buf_size, fpusw,
+                                     cpu_fpusw_info);
 
 }
 
@@ -392,6 +451,18 @@ static void dump_context(isr_context_t *ctx, int to_screen)
                        ctx->fpr->mxcsr);
     printdbg("mxcsr=%04x %s\n",
              ctx->fpr->mxcsr, fmt_buf);
+
+    // fpucw and description
+    cpu_describe_fpucw(fmt_buf, sizeof(fmt_buf),
+                       ctx->fpr->fcw);
+    printdbg("fpucw=%04x %s\n",
+             ctx->fpr->fcw, fmt_buf);
+
+    // fpusw and description
+    cpu_describe_fpusw(fmt_buf, sizeof(fmt_buf),
+                       ctx->fpr->fsw);
+    printdbg("fpusw=%04x %s\n",
+             ctx->fpr->fsw, fmt_buf);
 
     // fault address
     printdbg("cr2=%012lx\n",

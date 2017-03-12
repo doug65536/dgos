@@ -6,6 +6,7 @@ CSRCS := mm.c \
 	threadsync.c \
 	callout.c \
 	printk.c \
+	math.c \
 	dev_text.c \
 	dev_storage.c \
 	dev_eth.c \
