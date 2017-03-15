@@ -2,6 +2,7 @@
 #include "isr.h"
 #include "irq.h"
 #include "gdt.h"
+#include "cpuid.h"
 #include "conio.h"
 #include "printk.h"
 #include "cpu/halt.h"
@@ -206,7 +207,7 @@ void *irq_dispatcher(int intr, isr_context_t *ctx)
     return irq_dispatcher_vec(intr, ctx);
 }
 
-static void load_idtr(table_register_64_t *table_reg)
+static void idtr_load(table_register_64_t *table_reg)
 {
     __asm__ __volatile__ (
         "lidtq (%[table_reg])\n\t"
@@ -214,6 +215,88 @@ static void load_idtr(table_register_64_t *table_reg)
         : [table_reg] "r" (&table_reg->limit)
         : "memory"
     );
+}
+
+static void idt_xsave_detect(int ap)
+{
+    (void)ap;
+
+    int intr_was_enabled = cpu_irq_disable();
+
+    while (cpuid_has_xsave()) {
+        cpuid_t info;
+
+        // Enable XSAVE
+        cpu_cr4_change_bits(0, CR4_OSXSAVE);
+
+        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
+            break;
+
+        uint64_t supported_states = ((uint64_t)info.edx << 32) | info.eax;
+
+        uint64_t wanted_states = XCR0_X87 |
+                XCR0_SSE | XCR0_AVX |
+                XCR0_AVX512_OPMASK |
+                XCR0_AVX512_UPPER |
+                XCR0_AVX512_XREGS;
+
+        uint64_t enabled_states = wanted_states & supported_states;
+
+        // Change enabled XSAVE features
+        cpu_xcr_change_bits(0, supported_states, enabled_states);
+
+        // Get size of save area
+        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
+            break;
+
+        // Store size of save area
+        assert(info.ebx < UINT16_MAX);
+        sse_context_size = (info.ebx + 15) & -16;
+
+        // Save offsets to extended contexts
+
+        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX_BIT)) {
+            assert(info.ebx < UINT16_MAX);
+            sse_avx_offset = (uint16_t)info.ebx;
+        }
+
+        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_OPMASK_BIT)) {
+            assert(info.ebx < UINT16_MAX);
+            sse_avx512_opmask_offset = (uint16_t)info.ebx;
+        }
+
+        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_UPPER_BIT)) {
+            assert(info.ebx < UINT16_MAX);
+            sse_avx512_upper_offset = (uint16_t)info.ebx;
+        }
+
+        if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_XREGS_BIT)) {
+            assert(info.ebx < UINT16_MAX);
+            sse_avx512_xregs_offset = (uint16_t)info.ebx;
+        }
+
+        // Sanity check offsets
+        assert(sse_avx_offset < sse_context_size);
+        assert(sse_avx512_opmask_offset < sse_context_size);
+        assert(sse_avx512_upper_offset < sse_context_size);
+        assert(sse_avx512_xregs_offset < sse_context_size);
+
+        sse_context_save = isr_save_xsave;
+        sse_context_restore = isr_restore_xrstor;
+
+        cpu_irq_toggle(intr_was_enabled);
+        return;
+    }
+
+    assert(sse_context_size == 0);
+    assert(sse_context_save == 0);
+    assert(sse_context_restore == 0);
+
+    sse_context_size = 512;
+    sse_context_save = isr_save_fxsave;
+    sse_context_restore = isr_restore_fxrstor;
+
+    cpu_irq_toggle(intr_was_enabled);
 }
 
 int idt_init(int ap)
@@ -248,7 +331,9 @@ int idt_init(int ap)
     idtr.base = addr;
     idtr.limit = sizeof(idt) - 1;
 
-    load_idtr(&idtr);
+    idt_xsave_detect(ap);
+
+    idtr_load(&idtr);
 
     return 0;
 }

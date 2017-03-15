@@ -1,6 +1,16 @@
 #pragma once
 #include "types.h"
 
+// Located nearby data touched in interrupt handling
+extern size_t sse_context_size;
+extern uint64_t sse_xsave_mask;
+extern uint16_t sse_avx_offset;
+extern uint16_t sse_avx512_opmask_offset;
+extern uint16_t sse_avx512_upper_offset;
+extern uint16_t sse_avx512_xregs_offset;
+extern void (*sse_context_save)(void);
+extern void (*sse_context_restore)(void);
+
 // MSI IRQ
 typedef struct msi_irq_mem_t {
     uintptr_t addr;

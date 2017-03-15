@@ -21,6 +21,7 @@ $(shell mkdir -p $(DUMPDIR) >/dev/null)
 #OPTIMIZE := 1
 #LTO := 1
 #CC := clang
+CC := gcc-6
 
 export CC
 
@@ -57,10 +58,6 @@ WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
 WEVERYTHING += -Wshadow
-
-ifneq ($(CC_IS_CLANG),1)
-	WEVERYTHING += -Wunsuffixed-float-constants
-endif
 
 # Strict overflow is noise
 WEVERYTHING += -Wno-strict-overflow

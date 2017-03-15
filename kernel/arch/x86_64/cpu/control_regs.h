@@ -97,6 +97,31 @@
 #define CR4_SMAP            (1 << CR4_SMAP_BIT    )
 #define CR4_PKE             (1 << CR4_PKE_BIT     )
 
+//
+// XSAVE/XRSTOR
+
+#define XCR0_X87_BIT            0   // x87 FPU state
+#define XCR0_SSE_BIT            1   // SSE state
+#define XCR0_AVX_BIT            2   // AVX state
+#define XCR0_MPX_BNDREG_BIT     3   // Memory Protection BNDREGS
+#define XCR0_MPX_BNDCSR_BIT     4   // Memory Protection BNDCSR
+#define XCR0_AVX512_OPMASK_BIT  5   // AVX-512 opmask registers k0-k7
+#define XCR0_AVX512_UPPER_BIT   6   // AVX-512 upper 256 bits
+#define XCR0_AVX512_XREGS_BIT   7   // AVX-512 extra 16 registers
+#define XCR0_PT_BIT             8   // Processor Trace MSRs
+#define XCR0_PKRU_BIT           9   // Protection Key
+
+#define XCR0_X87                (1<<XCR0_X87_BIT)
+#define XCR0_SSE                (1<<XCR0_SSE_BIT)
+#define XCR0_AVX                (1<<XCR0_AVX_BIT)
+#define XCR0_MPX_BNDREG         (1<<XCR0_MPX_BNDREG_BIT)
+#define XCR0_MPX_BNDCSR         (1<<XCR0_MPX_BNDCSR_BIT)
+#define XCR0_AVX512_OPMASK      (1<<XCR0_AVX512_OPMASK_BIT)
+#define XCR0_AVX512_UPPER       (1<<XCR0_AVX512_UPPER_BIT)
+#define XCR0_AVX512_XREGS       (1<<XCR0_AVX512_XREGS_BIT)
+#define XCR0_PT                 (1<<XCR0_PT_BIT)
+#define XCR0_PKRU               (1<<XCR0_PKRU_BIT)
+
 typedef struct table_register_t {
     uint16_t align;
     uint16_t limit;
@@ -135,6 +160,9 @@ uint64_t msr_adj_bit(uint32_t msr, int bit, int set);
 
 // Returns new value of cr0
 uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set);
+
+// Returns new value of xcr0
+uint64_t cpu_xcr_change_bits(uint32_t xcr, uint64_t clear, uint64_t set);
 
 // Returns new value of cr0
 uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set);
@@ -232,3 +260,6 @@ static inline uint64_t cpu_rdtsc(void)
 }
 
 uint32_t cpu_get_default_mxcsr_mask(void);
+
+void cpu_fxsave(void *fpuctx);
+void cpu_xsave(void *fpuctx);

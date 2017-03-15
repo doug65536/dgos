@@ -59,7 +59,7 @@ ISO_STAGE := cdstage
 ISO_FILE := dgos.iso
 
 QEMU_MACHINE := q35
-QEMU_CPU := kvm64
+QEMU_CPU := Skylake-Client
 #Haswell
 #kvm64
 QEMU_RAM := 5G

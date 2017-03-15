@@ -77,6 +77,27 @@ void msr_set_hi(uint32_t msr, uint32_t value)
     );
 }
 
+uint64_t cpu_xcr_change_bits(uint32_t xcr, uint64_t clear, uint64_t set)
+{
+    uint32_t eax;
+    uint32_t edx;
+    __asm__ __volatile__ (
+        "xgetbv\n\t"
+        "shl $32,%%rdx\n\t"
+        "or %%rdx,%%rax\n\t"
+        "and %[clear_mask],%%rax\n\t"
+        "or %[set],%%rax\n\t"
+        "mov %%rax,%%rdx\n\t"
+        "shr $32,%%rdx\n\t"
+        "xsetbv\n\t"
+        : "=a" (eax), "=d" (edx)
+        : "c" (xcr),
+          [set] "S" (set),
+          [clear_mask] "D" (~clear)
+    );
+    return ((uint64_t)edx << 32) | eax;
+}
+
 uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
@@ -227,4 +248,24 @@ uint32_t cpu_get_default_mxcsr_mask(void)
           [save_area_ptr] "+r" (save_area_ptr)
     );
     return mxcsr_mask;
+}
+
+void cpu_fxsave(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        "fxsave (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+void cpu_xsave(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        "xsave (%[fpuctx])\n\t"
+        :
+        : "a" (-1), "d" (-1), [fpuctx] "D" (fpuctx)
+        : "memory"
+    );
 }

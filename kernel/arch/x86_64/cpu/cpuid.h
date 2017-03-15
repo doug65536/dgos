@@ -23,6 +23,7 @@ int cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
 int cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
 
 #define CPUID_INFO_FEATURES     1
+#define CPUID_INFO_XSAVE        0xD
 
 static inline int cpuid_has_sse3(void)   { return cpuid_ecx_bit(0, 1, 0); }
 static inline int cpuid_has_mwait(void)  { return cpuid_ecx_bit(3, 1, 0); }

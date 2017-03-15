@@ -11,6 +11,7 @@
 #include "main.h"
 #include "halt.h"
 #include "idt.h"
+#include "irq.h"
 #include "gdt.h"
 #include "cpuid.h"
 #include "mm.h"
@@ -198,7 +199,8 @@ static thread_t thread_create_with_state(
         void *stack, size_t stack_size,
         thread_state_t state,
         uint64_t affinity,
-        thread_priority_t priority)
+        thread_priority_t priority,
+        void *fpu_context)
 {
     if (stack_size == 0)
         stack_size = 16384;
@@ -252,47 +254,65 @@ static thread_t thread_create_with_state(
         uintptr_t stack_end = stack_addr +
                 stack_size;
 
-        uintptr_t ctx_addr = stack_end -
-                sizeof(isr_start_context_t);
+        size_t ctx_size = sizeof(isr_gpr_context_t) +
+                sse_context_size +
+                sizeof(isr_context_t) + 8;
 
-        size_t misalignment = (ctx_addr +
-                offsetof(isr_start_context_t, fpr))
-                & 0x0F;
+        // Adjust start of context to make room for context
+        uintptr_t ctx_addr = stack_end - ctx_size;
+
+        // Predict address of FPU context address
+        uintptr_t fpr_address = ctx_addr + sizeof(isr_context_t);
+
+        uint8_t misalignment_mask = (sse_context_size == 512)
+                ? 0x0F
+                : 0x3F;
+
+        size_t misalignment = fpr_address & misalignment_mask;
 
         ctx_addr -= misalignment;
+        fpr_address -= misalignment;
 
-        isr_start_context_t *ctx =
-                (isr_start_context_t*)ctx_addr;
-        memset(ctx, 0, sizeof(*ctx));
-        ctx->gpr.iret.rsp = (uintptr_t)(ctx + 1);
-        ctx->gpr.iret.ss = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.iret.rflags = EFLAGS_IF;
-        ctx->gpr.iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
-        ctx->gpr.iret.cs = GDT_SEL_KERNEL_CODE64;
-        ctx->gpr.s[0] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.s[1] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.s[2] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.s[3] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr.r[0] = (uintptr_t)fn;
-        ctx->gpr.r[1] = (uintptr_t)userdata;
-        ctx->gpr.r[2] = (uintptr_t)i;
-        ctx->gpr.fsbase = 0;
+        assert((fpr_address & misalignment_mask) == 0);
+        assert((ctx_addr & 0x0F) == 0);
 
-        ctx->fpr.mxcsr = MXCSR_MASK_ALL;
-        ctx->fpr.mxcsr_mask = default_mxcsr_mask;
+        isr_context_t *ctx = (isr_context_t*)ctx_addr;
+        memset(ctx, 0, ctx_size);
+        ctx->fpr = (void*)(ctx + 1);
+        ctx->gpr = (void*)((char*)ctx->fpr + sse_context_size);
 
-        // All FPU registers empty
-        ctx->fpr.fsw = FPUSW_TOP_n(7);
+        ctx->gpr->iret.rsp = (uintptr_t)(((ctx_addr + ctx_size + 15) & -16) + 8);
+        ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->iret.rflags = EFLAGS_IF;
+        ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
+        ctx->gpr->iret.cs = GDT_SEL_KERNEL_CODE64;
+        ctx->gpr->s[0] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->s[1] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->s[2] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->s[3] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->r[0] = (uintptr_t)fn;
+        ctx->gpr->r[1] = (uintptr_t)userdata;
+        ctx->gpr->r[2] = (uintptr_t)i;
+        ctx->gpr->fsbase = 0;
 
-        // 64 bit FPU precision
-        ctx->fpr.fcw = FPUCW_PC_n(FPUCW_PC_64) | FPUCW_IM |
-                FPUCW_DM | FPUCW_ZM | FPUCW_OM | FPUCW_UM | FPUCW_PM;
+        ctx->fpr->mxcsr = MXCSR_MASK_ALL;
+        ctx->fpr->mxcsr_mask = default_mxcsr_mask;
 
-        ctx->ctx.gpr = &ctx->gpr;
-        ctx->ctx.fpr = &ctx->fpr;
-        ctx->align = 0;
+        if ((uintptr_t)fpu_context == 1) {
+            // All FPU registers empty
+            ctx->fpr->fsw = FPUSW_TOP_n(7);
 
-        thread->ctx = &ctx->ctx;
+            // 64 bit FPU precision
+            ctx->fpr->fcw = FPUCW_PC_n(FPUCW_PC_64) | FPUCW_IM |
+                    FPUCW_DM | FPUCW_ZM | FPUCW_OM | FPUCW_UM | FPUCW_PM;
+        } else if (sse_context_size == 512) {
+            cpu_fxsave(ctx->fpr);
+        } else {
+            assert(sse_context_size > 512);
+            cpu_xsave(ctx->fpr);
+        }
+
+        thread->ctx = ctx;
 
         ptrdiff_t free_stack_space = (char*)thread->ctx -
                 (char*)thread->stack;
@@ -318,7 +338,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
     return thread_create_with_state(
                 fn, userdata,
                 stack, stack_size,
-                THREAD_IS_READY, 0, 0);
+                THREAD_IS_READY, 0, 0, 0);
 }
 
 #if 0
@@ -387,7 +407,7 @@ void thread_init(int ap)
                     smp_thread, 0, 0, 0,
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
-                    -256);
+                    -256, (void*)1);
 
         cpu->goto_thread = thread;
         atomic_barrier();
@@ -536,7 +556,7 @@ void *thread_schedule(void *ctx)
         }
         pause();
     }
-    if (retries > 0)
+    if (unlikely(retries > 0))
         printdbg("Scheduler retries: %d\n", retries);
     atomic_barrier();
 

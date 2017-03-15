@@ -311,13 +311,14 @@ typedef struct isr_context_t {
     isr_fxsave_context_t * fpr;
 } isr_context_t;
 
-// Note that fpr must lie on a 16-byte boundary
-typedef struct isr_start_context_t {
-    isr_context_t ctx;
-    isr_fxsave_context_t fpr;
-    isr_gpr_context_t gpr;
-    void *align;
-} isr_start_context_t;
+// Note that fpr must lie on a 16-byte boundary for fxsave
+// and it must lie on a 64-byte boundary for xsave
+//typedef struct isr_start_context_t {
+//    isr_context_t ctx;
+//    isr_fxsave_context_t fpr;
+//    isr_gpr_context_t gpr;
+//    void *align;
+//} isr_start_context_t;
 
 typedef void *(*irq_dispatcher_handler_t)(
         int intr, isr_context_t *ctx);

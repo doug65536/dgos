@@ -2,17 +2,22 @@
 
 .macro push_cfi val
 	pushq \val
-	.cfi_adjust_cfa_offset 8
+#	.cfi_adjust_cfa_offset 8
 .endm
 
 .macro pop_cfi val
 	popq \val
-	.cfi_adjust_cfa_offset -8
+#	.cfi_adjust_cfa_offset -8
 .endm
 
-.macro adj_rsp	ofs
-	add $\ofs,%rsp
-	.cfi_adjust_cfa_offset -(\ofs)
+.macro add_rsp	ofs
+	add \ofs,%rsp
+#	.cfi_adjust_cfa_offset -(\ofs)
+.endm
+
+.macro sub_rsp	ofs
+	sub \ofs,%rsp
+#	.cfi_adjust_cfa_offset -(\ofs)
 .endm
 
 .macro isr_entry has_code int_num
@@ -20,16 +25,16 @@
 .hidden isr_entry_\int_num\()
 .align 16
 isr_entry_\int_num\():
-	.cfi_startproc
+#	.cfi_startproc
 	.if \has_code == 0
-		.cfi_def_cfa_offset 8
+#		.cfi_def_cfa_offset 8
 		push_cfi $0
 	.else
-		.cfi_def_cfa_offset 16
+#		.cfi_def_cfa_offset 16
 	.endif
 	push_cfi $\int_num
 	jmp isr_common
-	.cfi_endproc
+#	.cfi_endproc
 .endm
 
 # Exception handlers (32 exception handlers)
@@ -156,8 +161,8 @@ isr_entry 0 31
 
 .align 16
 isr_common:
-	.cfi_startproc
-	.cfi_def_cfa_offset 24
+#	.cfi_startproc
+#	.cfi_def_cfa_offset 24
 
 	# Save call-clobbered registers
 	# (in System-V parameter order in memory)
@@ -205,14 +210,11 @@ isr_common:
 8:
 	# Save pointer to general registers and return information
 	mov %rsp,%rdi
-	.cfi_register %rsp,%rdi
-
-	# 16 byte align stack and make room for fxsave
-	and $-16,%rsp
-	adj_rsp -512
+#	.cfi_register %rsp,%rdi
 
 	# Save entire sse/mmx/fpu state
-	fxsave (%rsp)
+	jmp *sse_context_save
+isr_save_done:
 
 	# Make structure on the stack
 	push_cfi %rsp
@@ -223,7 +225,7 @@ isr_common:
 
 	# Pass pointer to the context structure to isr_handler
 	mov %rsp,%rdi
-	.cfi_register %rsp,%rdi
+#	.cfi_register %rsp,%rdi
 	call isr_handler
 
 	# isr can return a new stack pointer, or just return
@@ -241,10 +243,11 @@ isr_common:
 
 	# Pop the pointer to the general registers
 	pop_cfi %rdi
-	fxrstor 8(%rsp)
+	jmp *sse_context_restore
+isr_restore_done:
 
 	mov %rdi,%rsp
-	.cfi_register %rdi,%rsp
+#	.cfi_register %rdi,%rsp
 
 	# See if we're returning to 64 bit code
 	cmp $8,20*8(%rsp)
@@ -253,7 +256,7 @@ isr_common:
 	# ...yes, returning to 64 bit mode
 
 	# Discard segments
-	adj_rsp 8
+	add_rsp $8
 
 	# Restore FSBASE
 	pop_cfi %rax
@@ -280,7 +283,7 @@ isr_common:
 	pop_cfi %r15
 
 	addq $16,%rsp
-	.cfi_def_cfa_offset 8
+#	.cfi_def_cfa_offset 8
 
 	iretq
 
@@ -321,7 +324,49 @@ isr_restore_32:
 	movw 6(%rsp),%gs
 
 	# Discard segments and FSBASE
-	adj_rsp 16
+	add_rsp $16
 	jmp 6b
 
-	.cfi_endproc
+#	.cfi_endproc
+
+.global isr_save_fxsave
+.hidden isr_save_fxsave
+isr_save_fxsave:
+	# 16 byte align stack and make room for fxsave
+	and $-16,%rsp
+	sub_rsp 512
+	fxsave (%rsp)
+	jmp isr_save_done
+
+.global isr_restore_fxrstor
+.hidden isr_restore_fxrstor
+isr_restore_fxrstor:
+	fxrstor 8(%rsp)
+	jmp isr_restore_done
+
+.global isr_save_xsave
+.hidden isr_save_xsave
+isr_save_xsave:
+	# 64 byte align stack and make room for fxsave
+	sub_rsp sse_context_size
+	and $-64,%rsp
+	xor %eax,%eax
+	mov %rax,0*8+512(%rsp)
+	mov %rax,1*8+512(%rsp)
+	mov %rax,2*8+512(%rsp)
+	mov %rax,3*8+512(%rsp)
+	mov %rax,4*8+512(%rsp)
+	mov $-1,%eax
+	mov $-1,%edx
+
+	xsave (%rsp)
+	jmp isr_save_done
+
+.global isr_restore_xrstor
+.hidden isr_restore_xrstor
+isr_restore_xrstor:
+	mov $-1,%eax
+	mov $-1,%edx
+	xrstor 8(%rsp)
+	jmp isr_restore_done
+
