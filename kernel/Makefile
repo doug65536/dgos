@@ -18,10 +18,10 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
 #LTO := 1
-#CC := clang
-CC := gcc-6
+CC := clang
+#CC := gcc-6
 
 export CC
 
@@ -80,22 +80,22 @@ CFLAGS := -g3 -fno-stack-protector \
 ifdef OPTIMIZE
 CFLAGS += \
 	-O2 -ftree-vectorize \
-	-fno-omit-frame-pointer -fbuiltin
+	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl
 else
 CFLAGS += \
 	-O0 \
 	-fno-omit-frame-pointer
 endif
-
-RANLIB := gcc-ranlib
-AR := gcc-ar
-NM := gcc-nm
+#-march=native
+RANLIB := gcc-ranlib-6
+AR := gcc-ar-6
+NM := gcc-nm-6
 export RANLIB
 export AR
 export NM
 
 ifdef LTO
-CFLAGS += -flto
+CFLAGS += -flto=8
 endif
 
 CFLAGS += $(OPTIMIZATIONFLAGS)
@@ -105,8 +105,6 @@ CFLAGS += $(OPTIMIZATIONFLAGS)
 CFLAGS += $(INCLUDEARGS)
 
 export CFLAGS
-
-ASFLAGS :=
 
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
