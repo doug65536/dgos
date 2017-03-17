@@ -15,6 +15,47 @@ static memcpy_fn_t memcpy512_nt_fn = resolve_memcpy512_nt;
 static memcpy_fn_t memcpy32_nt_fn = resolve_memcpy32_nt;
 static memset32_fn_t memset32_nt_fn = resolve_memset32_nt;
 
+static void *memcpy512_nt_avx(void *dest, void const *src, size_t n)
+{
+    void *d = dest;
+    while (n >= 64) {
+        __asm__ __volatile__ (
+            "vmovntdqa      (%[src]),%%ymm0 \n\t"
+            "vmovntdqa  2*16(%[src]),%%ymm1 \n\t"
+            "vmovntdq %%ymm0 ,     (%[dst])\n\t"
+            "vmovntdq %%ymm1 , 2*16(%[dst])\n\t"
+            :
+            : [src] "r" (src), [dst] "r" (d)
+            : "memory", "%ymm0", "%ymm1"
+        );
+        src = (__ivec4*)src + 4;
+        d = (__ivec4*)d + 4;
+        n -= 64;
+    }
+    __asm__ __volatile__ (
+        "vzeroupper\n\t"
+        :
+        :
+        : "%ymm0",  "%ymm1",  "%ymm2",  "%ymm3",
+          "%ymm4",  "%ymm5",  "%ymm6",  "%ymm7",
+          "%ymm8",  "%ymm9",  "%ymm10", "%ymm11",
+          "%ymm12", "%ymm13", "%ymm14", "%ymm15"
+    );
+    while (unlikely(n >= 16)) {
+        __asm__ __volatile__ (
+            "vmovntdqa      (%[src]),%%xmm0 \n\t"
+            "vmovntdq %%xmm0 ,     (%[dst])\n\t"
+            :
+            : [src] "r" (src), [dst] "r" (d)
+            : "memory", "%xmm0", "%xmm1"
+        );
+        src = (__ivec4*)src + 1;
+        d = (__ivec4*)d + 1;
+        n -= 16;
+    }
+    return dest;
+}
+
 static void *memcpy512_nt_sse4_1(void *dest, void const *src, size_t n)
 {
     void *d = dest;
@@ -53,7 +94,10 @@ static void *memcpy512_nt_sse4_1(void *dest, void const *src, size_t n)
 
 static void *resolve_memcpy512_nt(void *dest, void const *src, size_t n)
 {
-    if (cpuid_has_sse4_1()) {
+    if (cpuid_has_avx()) {
+        memcpy512_nt_fn = memcpy512_nt_avx;
+        return memcpy512_nt_avx(dest, src, n);
+    } else if (cpuid_has_sse4_1()) {
         memcpy512_nt_fn = memcpy512_nt_sse4_1;
         return memcpy512_nt_sse4_1(dest, src, n);
     }
