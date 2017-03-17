@@ -37,10 +37,6 @@ void cpu_init(int ap)
     if (cpuid_ecx_bit(17, 1, 0))
         cr4 |= CR4_PCIDE;
 
-    // Enable XSAVE if feature available
-    //if (cpuid_ecx_bit(26, 1, 0))
-    //    cr4 |= CR4_OSXSAVE;
-
     cpu_cr4_change_bits(CR4_TSD, cr4 | CR4_OFXSR | CR4_OSXMMEX);
 
     // Enable no-execute if feature available
