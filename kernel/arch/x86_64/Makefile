@@ -42,6 +42,8 @@ CSRCS := \
 OPTIMIZEDSRCS := cpu/thread_impl.c
 $(OPTIMIZEDSRCS:.c=.o): CFLAGS += -O2
 
+cpu/math.o: CFLAGS += -fno-builtin-ilogbl
+
 ASRCS := entry.s \
 	cpu/syscall.s \
 	cpu/isr.s \

@@ -111,7 +111,7 @@ static long double ipowl(int base, int exponent)
     }
 
     if (neg_exp)
-        result = 1.0 / result;
+        result = 1.0L / result;
 
     return result;
 }
@@ -124,17 +124,19 @@ static char *dtoa(char *txt, size_t txt_sz,
     txt[txt_sz-1] = 0;
 
     // Make -1 or 1 to save sign
-    int sign = ((n > 0) << 1) - 1;
+    int sign = ((n >= 0) << 1) - 1;
 
     // Make n absolute
-    if (sign < 0)
+    if (sign < 0) {
         n = -n;
+        flags->negative = 1;
+    }
 
     char *out = txt;
 
     int exp2 = ilogbl(n);
 
-    if (exp2 == INT_MAX) {
+    if (unlikely(exp2 == INT_MAX)) {
         char const *special;
 
         if (isinf(n))
@@ -147,13 +149,12 @@ static char *dtoa(char *txt, size_t txt_sz,
         strcpy(out, special);
 
         return txt;
+    } else if (exp2 == INT_MIN) {
+        exp2 = 0;
     }
 
     // log2(10) = 3.32192809488736
     int exp10 = exp2 / 3.32192809488736234787L;
-
-    if (sign < 0)
-        flags->negative = 1;
 
     int scientific;
     if (exp10 < -9 || exp10 > 9)
@@ -171,16 +172,19 @@ static char *dtoa(char *txt, size_t txt_sz,
 
         sciexp = exp10;
         exp10 = 0;
+    } else if (exp10 < 0) {
+        exp10 = 0;
     }
 
     // Round to precision
     long double precision = ipowl(10, -flags->precision - 1);
-    n += 5.0 * precision;
+    //precision = nextafterl(precision, HUGE_VALL);
+    precision += precision / 2.0L;
+    n += 5.0L * precision;
 
     int exp_limit = -flags->precision - 1;
 
-    for ( ; (n > precision || exp10 >= 0)
-         && exp10 > exp_limit; --exp10) {
+    for ( ; (exp10 >= 0 || exp10 > exp_limit); --exp10) {
         long double w = ipowl(10, exp10);
         if (w > 0) {
             int digit = n / w;
@@ -607,6 +611,11 @@ static intptr_t formatter(
                 flags.scientific = 1;
                 // fall through
             case 'f':
+                if (!flags.has_precision) {
+                    flags.has_precision = 1;
+                    flags.precision = 6;
+                }
+
                 switch (flags.length) {
                 case length_none:
                 case length_l:
@@ -687,7 +696,7 @@ static intptr_t formatter(
                 break;
 
             case arg_type_double_value:
-                dtoa(digits, sizeof(digits), flags.arg.double_value, &flags);
+                dtoa(digits, sizeof(digits), (long double)flags.arg.double_value, &flags);
                 flags.arg_type = arg_type_char_ptr;
                 flags.arg.char_ptr_value = digits;
                 break;

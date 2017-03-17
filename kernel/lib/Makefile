@@ -34,4 +34,6 @@ CSRCS := mm.c \
 	zlib_helper.c \
 	framebuffer.c
 
+framebuffer.o: CFLAGS += -ffast-math
+
 include $(BUILDROOT)/library.mk

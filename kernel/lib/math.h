@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 
 // Prototypes mostly for compiler builtins
 
@@ -71,17 +72,20 @@ int ilogbl(long double n);
 /// http://en.cppreference.com/w/c/numeric/math/frexp
 /// http://en.cppreference.com/w/c/numeric/math/modf
 /// http://en.cppreference.com/w/c/numeric/math/nextafter
+
+long double nextafterl(long double n, long double t);
+
 /// http://en.cppreference.com/w/c/numeric/math/nexttoward
 /// http://en.cppreference.com/w/c/numeric/math/copysign
 /// http://en.cppreference.com/w/c/numeric/math/fpclassify
 /// http://en.cppreference.com/w/c/numeric/math/isfinite
 /// http://en.cppreference.com/w/c/numeric/math/isinf
 
-#define isinf(n) __builtin_isinf(n)
+#define isinf(n) __builtin_isinf((n))
 
 /// http://en.cppreference.com/w/c/numeric/math/isnan
 
-#define isnan(n) __builtin_isnan(n)
+#define isnan(n) __builtin_isnan((n))
 
 /// http://en.cppreference.com/w/c/numeric/math/isnormal
 /// http://en.cppreference.com/w/c/numeric/math/signbit
@@ -99,6 +103,11 @@ int ilogbl(long double n);
 /// http://en.cppreference.com/w/c/numeric/math/HUGE_VALF
 /// http://en.cppreference.com/w/c/numeric/math/HUGE_VAL
 /// http://en.cppreference.com/w/c/numeric/math/HUGE_VALL
+
+#define HUGE_VALF __builtin_huge_valf()
+#define HUGE_VAL __builtin_huge_val()
+#define HUGE_VALL __builtin_huge_vall()
+
 /// http://en.cppreference.com/w/c/numeric/math/FP_FAST_FMAF
 /// FP_FAST_FMA
 /// FP_FAST_FMAL
@@ -111,6 +120,11 @@ int ilogbl(long double n);
 /// http://en.cppreference.com/w/c/numeric/math/abs
 /// http://en.cppreference.com/w/c/numeric/math/labs
 /// http://en.cppreference.com/w/c/numeric/math/llabs
+
+#define abs(n) __builtin_abs((n))
+#define labs(n) __builtin_labs((n))
+#define llabs(n) __builtin_llabs((n))
+
 /// http://en.cppreference.com/w/c/numeric/math/div
 /// http://en.cppreference.com/w/c/numeric/math/ldiv
 /// http://en.cppreference.com/w/c/numeric/math/lldiv
@@ -170,6 +184,19 @@ int ilogbl(long double n);
 /// http://en.cppreference.com/w/c/numeric/math/sqrt
 /// http://en.cppreference.com/w/c/numeric/math/sqrtf
 /// http://en.cppreference.com/w/c/numeric/math/sqrtl
+
+#if defined(__x86_64__) || defined(__x86__)
+#define sqrtf(n) (__builtin_ia32_sqrtss((__fvec4){ (n), 0, 0, 0 })[0])
+#else
+#define sqrtf(n) __builtin_sqrtf((n))
+#endif
+
+#if defined(__x86_64__) || defined(__x86__)
+#define sqrt(n) (__builtin_ia32_sqrtsd((__fvec2){ (n), 0 })[0])
+#else
+#define sqrt(n) __builtin_sqrt((n))
+#endif
+
 /// http://en.cppreference.com/w/c/numeric/math/cbrt
 /// http://en.cppreference.com/w/c/numeric/math/cbrtf
 /// http://en.cppreference.com/w/c/numeric/math/cbrtl

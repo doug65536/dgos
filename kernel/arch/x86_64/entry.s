@@ -11,7 +11,12 @@ entry:
 	or $0x600,%rax
 	mov %rax,%cr4
 
+	# Initialize FPU to 64 bit precision,
+	# all exceptions masked, round to nearest
 	fninit
+	push $((3 << 10) | 0x3F)
+	fldcw (%rsp)
+	add $8,%rax
 
 	push %rdx
 	push %rcx
