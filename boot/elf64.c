@@ -13,7 +13,7 @@
 #include "vesa.h"
 #include "progressbar.h"
 
-#define ELF64_DEBUG     1
+#define ELF64_DEBUG     0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) print_line("elf64: " __VA_ARGS__)
 #else
@@ -27,8 +27,8 @@ uint64_t mp_enter_kernel;
 
 static void enter_kernel_initial(uint64_t entry_point)
 {
-    //vbe_info_vector = vbe_select_mode(1280, 800, 1) << 4;
-    vbe_info_vector = vbe_select_mode(1920, 1080, 1) << 4;
+    vbe_info_vector = vbe_select_mode(1280, 800, 1) << 4;
+    //vbe_info_vector = vbe_select_mode(1920, 1080, 1) << 4;
 
     //
     // Relocate MP entry trampoline to 4KB boundary
