@@ -3,6 +3,8 @@
 #include "string.h"
 #include "likely.h"
 #include "assert.h"
+#include "math.h"
+#include "printk.h"
 
 #include "../boot/vesainfo.h"
 
@@ -159,6 +161,145 @@ void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
         memset32_nt(out, color, width);
         out += fb.mode.pitch;
     }
+}
+
+#ifdef __x86_64__
+static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
+{
+    //printdbg("alpha=%6.3f\n", (double)alpha);
+    float ooa = 1.0f - alpha;
+    __fvec4 tmp1, tmp2;
+    __asm__ __volatile__ (
+        "shufps $0,%[alpha],%[alpha]\n\t"
+        "shufps $0,%[ooa],%[ooa]\n\t"
+        "mulps %[ooa],%[fcolor]\n\t"
+        // Load 32 bit pixel
+        "movd (%[pixel]),%[tmp1]\n\t"
+        // Unpack to 16 bit vector
+        "punpcklbw %[zero],%[tmp1]\n\t"
+        // Foreground color
+        // Unpack to 32 bit vector
+        "punpcklwd %[zero],%[tmp1]\n\t"
+        // Convert pixel RGBA to floating point
+        "cvtdq2ps %[tmp1],%[tmp1]\n\t"
+        // Multiply pixel color by 1.0f - alpha
+        "mulps %[alpha],%[tmp1]\n\t"
+        // Add prescaled foreground color to result
+        "addps %[fcolor],%[tmp1]\n\t"
+        // Clamp
+        "maxps %[zero],%[tmp1]\n\t"
+        // Convert back to integer
+        "cvttps2dq %[tmp1],%[tmp1]\n\t"
+        // Pack to 16 bit vector
+        "packssdw %[zero],%[tmp1]\n\t"
+        // Pack to 8 bit vector
+        "packuswb %[zero],%[tmp1]\n\t"
+        // Store result pixel
+        "movd %[tmp1],(%[pixel])\n\t"
+        : [tmp1] "=&x" (tmp1), "=&x" (tmp2),
+          [alpha] "+x" (alpha),
+          [ooa] "+x" (ooa),
+          [fcolor] "+x" (fcolor)
+        : [pixel] "r" (pixel),
+          [zero] "x" (0)
+        : "memory"
+    );
+}
+#else
+static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
+{
+    float ooa = 1.0f - alpha;
+    pixel[0] = fcolor[0] * alpha + apixel[0] * ooa;
+    pixel[1] = fcolor[1] * alpha + apixel[1] * ooa;
+    pixel[2] = fcolor[2] * alpha + apixel[2] * ooa;
+    pixel[3] = fcolor[3] * alpha + apixel[3] * ooa;
+}
+#endif
+
+void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
+{
+    __fvec4 fcolor = {
+        color & 0xFF,
+        (color >> 8) & 0xFF,
+        (color >> 16) & 0xFF,
+        (color >> 24) & 0xFF
+    };
+    uint8_t *addr = fb.back_buf + (y0 * fb.mode.pitch + x0 * sizeof(uint32_t));
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+
+    int du, dv, u, v, uincr, vincr;
+
+    int abs_dx = abs(dx);
+    int abs_dy = abs(dy);
+
+    if (abs_dx > abs_dy)
+    {
+        du = abs_dx;
+        dv = abs_dy;
+        u = x1;
+        v = y1;
+        uincr = sizeof(uint32_t);
+        vincr = fb.mode.pitch;
+        if (dx < 0)
+            uincr = -uincr;
+        if (dy < 0)
+            vincr = -vincr;
+    }
+    else
+    {
+        du = abs_dy;
+        dv = abs_dx;
+        u = y1;
+        v = x1;
+        uincr = fb.mode.pitch;
+        vincr = sizeof(uint32_t);
+        if (dy < 0)
+            uincr = -uincr;
+        if (dx < 0)
+            vincr = -vincr;
+    }
+
+    int uend = u + 2 * du;
+    int d = (2 * dv) - du;
+    int incrS = 2 * dv;
+    int incrD = 2 * (dv - du);
+    int twovdu = 0;
+    float invD = 1.0f / (2.0f * sqrtf(du*du + dv*dv));
+    float invD2du = 2.0f * (du * invD);
+
+    do
+    {
+        fb_blend_pixel(addr - vincr, fcolor, (invD2du + twovdu*invD) * (1.0f/1.5f) + 0.001f);
+        fb_blend_pixel(addr,         fcolor, (          twovdu*invD) * (1.0f/1.5f) + 0.001f);
+        fb_blend_pixel(addr + vincr, fcolor, (invD2du - twovdu*invD) * (1.0f/1.5f) + 0.001f);
+
+        if (d < 0)
+        {
+            // u
+            twovdu = d + du;
+            d += incrS;
+        }
+        else
+        {
+            // u+v
+            twovdu = d - du;
+            d += incrD;
+            ++v;
+            addr += vincr;
+        }
+
+        ++u;
+        addr += uincr;
+    } while (u < uend);
+}
+
+void fb_clip_aa_line(int x0, int y0, int x1, int y1)
+{
+    (void)x0;
+    (void)y0;
+    (void)x1;
+    (void)y1;
 }
 
 static void fb_update_vidmem(int left, int top, int right, int bottom)

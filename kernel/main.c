@@ -641,6 +641,10 @@ static int init_thread(void *p)
 
     fb_init();
 
+//    for (int i = 0; i < 10000; ++i) {
+//        printdbg("%d=%f\n", i, i / 1000.0);
+//    }
+
     printdbg("Floating point formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
     printdbg("Floating point formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
     printdbg("Floating point formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
@@ -693,6 +697,10 @@ static int init_thread(void *p)
                        img->width, img->height, png_pixels(img));
             fb_fill_rect(sx, 0, sx + img->width, sy, 255);
             fb_fill_rect(sx, sy + img->height, sx + img->width, 1080, 255*256);
+            //uint64_t line_st = cpu_rdtsc();
+            fb_draw_aa_line(10, 10, 60, sy+300, 0xBFBFBF);
+            //uint64_t line_en = cpu_rdtsc();
+            //printdbg("Line draw %ld cycles\n", line_en - line_st);
             fb_update();
             ++frames;
         }
