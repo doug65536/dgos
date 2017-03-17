@@ -11,6 +11,7 @@ static inline uint8_t inb(ioport_t port)
         "inb %w[port],%b[result]\n\t"
         : [result] "=a" (result)
         : [port] "Nd" (port)
+        : "memory"
     );
     return result;
 }
@@ -22,6 +23,7 @@ static inline uint16_t inw(ioport_t port)
         "inw %w[port],%w[result]"
         : [result] "=a" (result)
         : [port] "Nd" (port)
+        : "memory"
     );
     return result;
 }
@@ -33,6 +35,7 @@ static inline uint32_t ind(ioport_t port)
         "inl %w[port],%[result]"
         : [result] "=a" (result)
         : [port] "Nd" (port)
+        : "memory"
     );
     return result;
 }
@@ -44,6 +47,7 @@ static inline void outb(ioport_t port, uint8_t value)
         :
         : [value] "a" (value),
           [port] "Nd" (port)
+        : "memory"
     );
 }
 
@@ -54,6 +58,7 @@ static inline void outw(ioport_t port, uint16_t value)
         :
         : [value] "a" (value),
           [port] "Nd" (port)
+        : "memory"
     );
 }
 
@@ -64,6 +69,7 @@ static inline void outd(ioport_t port, uint32_t value)
         :
         : [value] "a" (value),
           [port] "Nd" (port)
+        : "memory"
     );
 }
 
@@ -79,6 +85,7 @@ static inline void insb(ioport_t port,
         : [value] "D" (values),
           [count] "c" (count),
           [port] "d" (port)
+        : "memory"
     );
 }
 
@@ -91,6 +98,7 @@ static inline void insw(ioport_t port,
         : [value] "D" (values),
           [count] "c" (count),
           [port] "d" (port)
+        : "memory"
     );
 }
 
@@ -103,6 +111,7 @@ static inline void insd(ioport_t port,
         : [value] "D" (values),
           [count] "c" (count),
           [port] "d" (port)
+        : "memory"
     );
 }
 
@@ -115,6 +124,7 @@ static inline void outsb(ioport_t port,
         : [value] "S" (values),
           [count] "c" (count),
           [port] "d" (port)
+        : "memory"
     );
 }
 
@@ -127,6 +137,7 @@ static inline void outsw(ioport_t port,
         : [value] "S" (values),
           [count] "c" (count),
           [port] "d" (port)
+        : "memory"
     );
 }
 
@@ -139,5 +150,6 @@ static inline void outsd(ioport_t port,
         : [value] "S" (values),
           [count] "c" (count),
           [port] "d" (port)
+        : "memory"
     );
 }
