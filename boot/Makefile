@@ -99,6 +99,10 @@ CFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
 	-mrtd -mregparm=3 \
 	-std=c11
 
+ifeq ($(CC),clang)
+	CC := gcc
+endif
+
 ifneq ($(CC_IS_CLANG),1)
 	CFLAGS += \
 		-falign-functions=1 -falign-labels=1 \
@@ -129,8 +133,6 @@ CFLAGS += $(WEVERYTHING)
 
 # Optimize
 #CFLAGS += -Os -DNDEBUG
-
-ASFLAGS := --warn
 
 ifdef TUNEFOR
 	CFLAGS += -mtune=$(TUNEFOR)
@@ -330,25 +332,25 @@ run-iso-singlecpu-kvm: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_NET) \
-		-enable-kvm
+		-cpu host -enable-kvm
 
 run-iso-kvm: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-machine $(QEMU_MACHINE) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
 		$(QEMU_NET) \
-		-enable-kvm
+		-cpu host -enable-kvm
 
 run-iso-numa-kvm: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-machine $(QEMU_MACHINE) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_SMP) \
 		-numa node,mem=256M,cpus=0-1 \
 		-numa node,mem=256M,cpus=2-3 \
 		$(QEMU_NET) \
-		-enable-kvm
+		-cpu host -enable-kvm
 
 run-iso-numa: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
@@ -393,11 +395,11 @@ debug-iso-wait-singlecpu-ide: $(ISO_FILE)
 
 debug-iso-wait-singlecpu-kvm: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -machine $(QEMU_MACHINE) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
 		 $(QEMU_DEBUGCON) \
 		 $(QEMU_NET) \
-		 -enable-kvm
+		 -cpu host -enable-kvm
 
 bin/mem-garbage:
 	dd if=/dev/urandom of=bin/mem-garbage bs=1048576 count=512
@@ -445,11 +447,11 @@ debug-iso-bridge-test-wait: $(ISO_FILE)
 
 debug-iso-wait-kvm: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -machine $(QEMU_MACHINE) \
 		 $(QEMU_SMP) \
 		 $(QEMU_DEBUGCON) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 -enable-kvm
+		 -cpu host -enable-kvm
 
 #
 # Debug in KVM
@@ -524,12 +526,12 @@ run-debug-wait-kvm: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-machine $(QEMU_MACHINE) \
 		-m $(QEMU_RAM) \
 		$(QEMU_SMP) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_NET) \
-		-enable-kvm
+		-cpu host -enable-kvm
 
 run-debug-wait-singlecpu: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
@@ -544,11 +546,11 @@ run-debug-wait-singlecpu-kvm: all debuggable-kernel-disk
 	$(QEMU) -s -S  \
 		-drive file=$(DISKIMAGE),format=raw \
 		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-machine $(QEMU_MACHINE) \
 		-m $(QEMU_RAM) \
 		$(QEMU_DEBUGCON) \
 		$(QEMU_NET) \
-		-enable-kvm
+		-cpu host -enable-kvm
 
 monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
