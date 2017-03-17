@@ -3,6 +3,7 @@
 void isr_save_fxsave(void);
 void isr_restore_fxrstor(void);
 void isr_save_xsave(void);
+void isr_save_xsavec(void);
 void isr_restore_xrstor(void);
 
 // Exception handlers

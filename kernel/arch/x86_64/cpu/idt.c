@@ -249,40 +249,67 @@ static void idt_xsave_detect(int ap)
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
             break;
 
+        sse_context_save = isr_save_xsave;
+        sse_context_restore = isr_restore_xrstor;
+
         // Store size of save area
         assert(info.ebx < UINT16_MAX);
         sse_context_size = (info.ebx + 15) & -16;
 
-        // Save offsets to extended contexts
+        // Use compact format if available
+        if (cpuid(&info, CPUID_INFO_XSAVE, 1) && (info.eax & 2))
+            sse_context_save = isr_save_xsavec;
+
+        // Save offsets/sizes of extended contexts
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX_BIT)) {
             assert(info.ebx < UINT16_MAX);
+            assert(info.eax < UINT16_MAX);
+            assert(info.ebx + info.eax <= UINT16_MAX);
+
             sse_avx_offset = (uint16_t)info.ebx;
+            sse_avx_size = (uint16_t)info.eax;
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_OPMASK_BIT)) {
             assert(info.ebx < UINT16_MAX);
+            assert(info.eax < UINT16_MAX);
+            assert(info.ebx + info.eax <= UINT16_MAX);
+
             sse_avx512_opmask_offset = (uint16_t)info.ebx;
+            sse_avx512_opmask_size = (uint16_t)info.eax;
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_UPPER_BIT)) {
             assert(info.ebx < UINT16_MAX);
+            assert(info.eax < UINT16_MAX);
+            assert(info.ebx + info.eax <= UINT16_MAX);
+
             sse_avx512_upper_offset = (uint16_t)info.ebx;
+            sse_avx512_upper_size = (uint16_t)info.eax;
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_XREGS_BIT)) {
             assert(info.ebx < UINT16_MAX);
+            assert(info.eax < UINT16_MAX);
+            assert(info.ebx + info.eax <= UINT16_MAX);
+
             sse_avx512_xregs_offset = (uint16_t)info.ebx;
+            sse_avx512_xregs_size = (uint16_t)info.eax;
         }
 
         // Sanity check offsets
-        assert(sse_avx_offset < sse_context_size);
-        assert(sse_avx512_opmask_offset < sse_context_size);
-        assert(sse_avx512_upper_offset < sse_context_size);
-        assert(sse_avx512_xregs_offset < sse_context_size);
+        assert(sse_avx_offset +
+               sse_avx_size <= sse_context_size);
 
-        sse_context_save = isr_save_xsave;
-        sse_context_restore = isr_restore_xrstor;
+        assert(sse_avx512_opmask_offset +
+               sse_avx512_opmask_size <= sse_context_size);
+
+        assert(sse_avx512_upper_offset +
+               sse_avx512_upper_size <= sse_context_size);
+
+        assert(sse_avx512_xregs_offset +
+               sse_avx512_xregs_size <= sse_context_size);
 
         cpu_irq_toggle(intr_was_enabled);
         return;

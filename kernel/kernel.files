@@ -4,6 +4,7 @@ arch/x86_64/cpu/except.c
 arch/x86_64/cpu/except.h
 arch/x86_64/cpu/except_asm.h
 arch/x86_64/cpu/except_asm.s
+arch/x86_64/cpu/isr.S
 arch/x86_64/cpu/math.c
 arch/x86_64/cpu/nontemporal.c
 arch/x86_64/cpu/nontemporal.h
@@ -108,7 +109,6 @@ arch/x86_64/cpu/halt.h
 arch/x86_64/cpu/cpuid.c
 arch/x86_64/cpu/cpuid.h
 arch/x86_64/cpu/mmu.c
-arch/x86_64/cpu/isr.s
 arch/x86_64/cpu/legacy_pic.c
 arch/x86_64/cpu/legacy_pic.h
 arch/x86_64/cpu/legacy_pit.c

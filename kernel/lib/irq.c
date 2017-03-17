@@ -19,10 +19,16 @@ typedef struct intr_handler_reg_t {
 // Context save vector here for locality
 size_t sse_context_size;
 uint64_t sse_xsave_mask;
+
 uint16_t sse_avx_offset;
+uint16_t sse_avx_size;
 uint16_t sse_avx512_opmask_offset;
+uint16_t sse_avx512_opmask_size;
 uint16_t sse_avx512_upper_offset;
+uint16_t sse_avx512_upper_size;
 uint16_t sse_avx512_xregs_offset;
+uint16_t sse_avx512_xregs_size;
+
 void (*sse_context_save)(void);
 void (*sse_context_restore)(void);
 

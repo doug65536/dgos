@@ -15,10 +15,20 @@ $(shell mkdir -p $(DEPDIR) >/dev/null)
 # Flags to use when generating autodependencies
 DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$(notdir $<).d
 
+CC_WA_COMMA := -Wa,
+
+ifndef ASFLAGS
+ASFLAGS := -g -warn
+endif
+ifeq ($(CC),clang)
+CC_AS_FLAGS := -no-integrated-as
+endif
+
 # Compile commands for C and C++
 COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
 COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
-COMPILE.s = $(AS) $(ASFLAGS) $(TARGET_ARCH_AS) --warn -g
+COMPILE.s = $(CC) $(CC_AS_FLAGS) $(TARGET_ARCH) \
+	$(patsubst %,$(CC_WA_COMMA)%,$(ASFLAGS))
 
 OUTPUT_OPTION = -o $@
 
@@ -27,6 +37,11 @@ $(OBJS): Makefile
 
 # Compile assembly
 .s.o:
+	$(COMPILE.s) $(OUTPUT_OPTION) \
+		-c $<
+
+# Compile preprocessed assembly
+.S.o:
 	$(COMPILE.s) $(OUTPUT_OPTION) \
 		-c $<
 

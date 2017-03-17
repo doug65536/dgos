@@ -4,10 +4,16 @@
 // Located nearby data touched in interrupt handling
 extern size_t sse_context_size;
 extern uint64_t sse_xsave_mask;
+
 extern uint16_t sse_avx_offset;
+extern uint16_t sse_avx_size;
 extern uint16_t sse_avx512_opmask_offset;
+extern uint16_t sse_avx512_opmask_size;
 extern uint16_t sse_avx512_upper_offset;
+extern uint16_t sse_avx512_upper_size;
 extern uint16_t sse_avx512_xregs_offset;
+extern uint16_t sse_avx512_xregs_size;
+
 extern void (*sse_context_save)(void);
 extern void (*sse_context_restore)(void);
 

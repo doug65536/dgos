@@ -37,59 +37,9 @@ isr_entry_\int_num\():
 #	.cfi_endproc
 .endm
 
-# Exception handlers (32 exception handlers)
-
-isr_entry 0 0
-isr_entry 0 1
-isr_entry 0 2
-isr_entry 0 3
-isr_entry 0 4
-isr_entry 0 5
-isr_entry 0 6
-isr_entry 0 7
-isr_entry 1 8
-isr_entry 0 9
-isr_entry 1 10
-isr_entry 1 11
-isr_entry 1 12
-isr_entry 1 13
-isr_entry 1 14
-isr_entry 0 15
-isr_entry 0 16
-isr_entry 1 17
-isr_entry 0 18
-isr_entry 0 19
-isr_entry 0 20
-isr_entry 0 21
-isr_entry 0 22
-isr_entry 0 23
-isr_entry 0 24
-isr_entry 0 25
-isr_entry 0 26
-isr_entry 0 27
-isr_entry 0 28
-isr_entry 0 29
-isr_entry 1 30
-isr_entry 0 31
-
-# PIC IRQ handlers (16 IRQs)
-.irp int_num,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47
-	isr_entry 0 \int_num
-.endr
-
-# APIC handlers (24 IRQs)
-.irp int_num,48,49,50,51,52,53,54,55
-	isr_entry 0 \int_num
-.endr
-.irp int_num,56,57,58,59,60,61,62,63
-	isr_entry 0 \int_num
-.endr
-.irp int_num,64,65,66,67,68,69,70,71
-	isr_entry 0 \int_num
-.endr
-
 # Software interrupts
-.irp int_num,72,73,74,75,76,77,78,79
+# 72 thru 74 moved close
+.irp int_num,75,76,77,78,79
 	isr_entry 0 \int_num
 .endr
 .irp int_num,80,81,82,83,84,85,86,87
@@ -159,6 +109,62 @@ isr_entry 0 31
 	isr_entry 0 \int_num
 .endr
 
+# Exception handlers (32 exception handlers)
+isr_entry 0 0
+isr_entry 0 1
+isr_entry 0 2
+isr_entry 0 3
+isr_entry 0 4
+isr_entry 0 5
+isr_entry 0 6
+isr_entry 0 7
+isr_entry 1 8
+isr_entry 0 9
+isr_entry 1 10
+isr_entry 1 11
+isr_entry 1 12
+isr_entry 1 13
+# 14 moved close to handler
+isr_entry 0 15
+isr_entry 0 16
+isr_entry 1 17
+isr_entry 0 18
+isr_entry 0 19
+isr_entry 0 20
+isr_entry 0 21
+isr_entry 0 22
+isr_entry 0 23
+isr_entry 0 24
+isr_entry 0 25
+isr_entry 0 26
+isr_entry 0 27
+isr_entry 0 28
+isr_entry 0 29
+isr_entry 1 30
+isr_entry 0 31
+
+# PIC IRQ handlers (16 IRQs)
+.irp int_num,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47
+	isr_entry 0 \int_num
+.endr
+
+# APIC handlers (24 IRQs)
+.irp int_num,64,65,66,67,68,69,70,71
+	isr_entry 0 \int_num
+.endr
+.irp int_num,56,57,58,59,60,61,62,63
+	isr_entry 0 \int_num
+.endr
+.irp int_num,48,49,50,51,52,53,54,55
+	isr_entry 0 \int_num
+.endr
+
+.irp int_num,72,73,74
+	isr_entry 0 \int_num
+.endr
+
+isr_entry 1 14
+
 .align 16
 isr_common:
 #	.cfi_startproc
@@ -199,7 +205,7 @@ isr_common:
 	push_cfi %rax
 
 	# Really store segment registers if it is a #GP fault
-	cmp $0x0D,16*8(%rsp)
+	cmpl $0x0D,16*8(%rsp)
 	jz isr_save_real_segs
 
 	# Push segment registers
@@ -250,7 +256,7 @@ isr_restore_done:
 #	.cfi_register %rdi,%rsp
 
 	# See if we're returning to 64 bit code
-	cmp $8,20*8(%rsp)
+	cmpl $8,20*8(%rsp)
 	jnz isr_restore_32
 
 	# ...yes, returning to 64 bit mode
@@ -287,6 +293,7 @@ isr_restore_done:
 
 	iretq
 
+.align 16
 isr_save_real_segs:
 	sub $8,%rsp
 	mov %gs,6(%rsp)
@@ -296,6 +303,7 @@ isr_save_real_segs:
 	jmp 8b
 
 # Saving context from 32 bit mode, out of line
+.align 16
 isr_save_32:
 	# Push dummy FSBASE
 	push_cfi $0
@@ -313,6 +321,7 @@ isr_save_32:
 	jmp 8b
 
 # Resuming into 32 bit mode, out of line
+.align 16
 isr_restore_32:
 	# Protect kernel mode gsbase from changes
 	swapgs
@@ -329,44 +338,81 @@ isr_restore_32:
 
 #	.cfi_endproc
 
+.align 16
 .global isr_save_fxsave
 .hidden isr_save_fxsave
 isr_save_fxsave:
 	# 16 byte align stack and make room for fxsave
 	and $-16,%rsp
 	sub_rsp 512
-	fxsave (%rsp)
+	fxsave64 (%rsp)
 	jmp isr_save_done
 
+.align 16
 .global isr_restore_fxrstor
 .hidden isr_restore_fxrstor
 isr_restore_fxrstor:
-	fxrstor 8(%rsp)
+	fxrstor64 8(%rsp)
 	jmp isr_restore_done
 
+.align 16
 .global isr_save_xsave
 .hidden isr_save_xsave
 isr_save_xsave:
 	# 64 byte align stack and make room for fxsave
 	sub_rsp sse_context_size
 	and $-64,%rsp
+
+	# Clear XSAVE header
 	xor %eax,%eax
-	mov %rax,0*8+512(%rsp)
-	mov %rax,1*8+512(%rsp)
-	mov %rax,2*8+512(%rsp)
-	mov %rax,3*8+512(%rsp)
-	mov %rax,4*8+512(%rsp)
+	mov $512,%ecx
+	mov %rax,0*8(%rsp,%rcx)
+	mov %rax,1*8(%rsp,%rcx)
+	mov %rax,2*8(%rsp,%rcx)
+	mov %rax,3*8(%rsp,%rcx)
+	mov %rax,4*8(%rsp,%rcx)
+	mov %rax,5*8(%rsp,%rcx)
+	mov %rax,6*8(%rsp,%rcx)
+	mov %rax,7*8(%rsp,%rcx)
+
+	# Save all enabled states
 	mov $-1,%eax
 	mov $-1,%edx
-
-	xsave (%rsp)
+	xsave64 (%rsp)
 	jmp isr_save_done
 
+.align 16
+.global isr_save_xsavec
+.hidden isr_save_xsavec
+isr_save_xsavec:
+	# 64 byte align stack and make room for fxsave
+	sub_rsp sse_context_size
+	and $-64,%rsp
+
+	# Clear XSAVE header
+	xor %eax,%eax
+	mov $512,%ecx
+	mov %rax,0*8(%rsp,%rcx)
+	mov %rax,1*8(%rsp,%rcx)
+	mov %rax,2*8(%rsp,%rcx)
+	mov %rax,3*8(%rsp,%rcx)
+	mov %rax,4*8(%rsp,%rcx)
+	mov %rax,5*8(%rsp,%rcx)
+	mov %rax,6*8(%rsp,%rcx)
+	mov %rax,7*8(%rsp,%rcx)
+
+	# Save all enabled states in compact format
+	mov $-1,%eax
+	mov $-1,%edx
+	xsavec64 (%rsp)
+	jmp isr_save_done
+
+.align 16
 .global isr_restore_xrstor
 .hidden isr_restore_xrstor
 isr_restore_xrstor:
 	mov $-1,%eax
 	mov $-1,%edx
-	xrstor 8(%rsp)
+	xrstor64 8(%rsp)
 	jmp isr_restore_done
 
