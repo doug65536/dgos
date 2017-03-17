@@ -816,6 +816,7 @@ typedef struct usbxhci_ep_ctx_t {
     // Transfer Ring dequeue pointer
     //  if MaxPStreams = 0, this points to a transfer ring
     //  if MaxPStreams > 0, this points to a stream context array
+    //  Also contains dequeue cycle state
     uint64_t tr_dq_ptr;
 
     // Average TRB length (used to approximate bandwidth requirements)
@@ -896,14 +897,14 @@ C_ASSERT(sizeof(usbxhci_ep_ctx_t) == 0x20);
 typedef struct usbxhci_devctx_small_t {
     usbxhci_slotctx_t slotctx;
     usbxhci_ep_ctx_t epctx[16];
-} usbxhci_devctx_small_t;
+} __attribute__((packed)) usbxhci_devctx_small_t;
 
 typedef struct usbxhci_devctx_large_t {
     usbxhci_slotctx_t slotctx;
     uint8_t rsvd[32];
 
     usbxhci_ep_ctx_t epctx[16];
-} usbxhci_devctx_large_t;
+} __attribute__((packed)) usbxhci_devctx_large_t;
 
 typedef union usbxhci_devctx_t {
     void *any;
@@ -921,17 +922,17 @@ typedef struct usbxhci_inpctlctx_t {
     uint8_t iface_num;
     uint8_t alternate;
     uint8_t rsvd2;
-} usbxhci_inpctlctx_t;
+} __attribute__((packed)) usbxhci_inpctlctx_t;
 
 // 6.2.5 Input Context
 
-typedef struct usbxhci_inpctx_t {
+typedef struct usbxhci_inpctx_small_t {
     usbxhci_inpctlctx_t inpctl;
 
     usbxhci_slotctx_t slotctx;
 
     usbxhci_ep_ctx_t epctx[32];
-} usbxhci_inpctx_t;
+} __attribute__((packed)) usbxhci_inpctx_small_t;
 
 typedef struct usbxhci_inpctx_large_t {
     usbxhci_inpctlctx_t inpctl;
@@ -940,21 +941,26 @@ typedef struct usbxhci_inpctx_large_t {
     uint8_t rsvd[32];
 
     usbxhci_ep_ctx_t epctx[32];
-} usbxhci_inpctx_large_t;
+} __attribute__((packed)) usbxhci_inpctx_large_t;
 
+typedef union usbxhci_inpctx_t {
+    void *any;
+    usbxhci_inpctx_small_t *small;
+    usbxhci_inpctx_large_t *large;
+} usbxhci_inpctx_t;
 
 // 6.4.3 Command TRB
 
 typedef struct usbxhci_cmd_trb_t {
     uint32_t data[4];
-} usbxhci_cmd_trb_t;
+} __attribute__((packed)) usbxhci_cmd_trb_t;
 
 typedef struct usbxhci_cmd_trb_noop_t {
     uint32_t rsvd1[3];
     uint8_t cycle;
     uint8_t trb_type;
     uint16_t rsvd2;
-} usbxhci_cmd_trb_noop_t;
+} __attribute__((packed)) usbxhci_cmd_trb_noop_t;
 
 #define USBXHCI_CMD_TRB_TYPE_BIT    2
 #define USBXHCI_CMD_TRB_TYPE_BITS   6
@@ -970,7 +976,7 @@ typedef struct usbxhci_cmd_trb_setaddr_t {
     uint8_t trb_type;
     uint8_t rsvd2;
     uint8_t slotid;
-} usbxhci_cmd_trb_setaddr_t;
+} __attribute__((packed)) usbxhci_cmd_trb_setaddr_t;
 
 // 6.5 Event Ring Segment Table
 
@@ -1019,7 +1025,7 @@ typedef struct usbxhci_evt_cmdcomp_t {
     uint16_t flags;
     uint8_t id;
     uint8_t slotid;
-} usbxhci_evt_cmdcomp_t;
+} __attribute__((packed)) usbxhci_evt_cmdcomp_t;
 
 // Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT    0
@@ -1095,7 +1101,7 @@ typedef struct usbxhci_evt_xfer_t {
     uint8_t trb_type;
     uint8_t ep_id;
     uint8_t slotid;
-} usbxhci_evt_xfer_t;
+} __attribute__((packed)) usbxhci_evt_xfer_t;
 
 //
 // 6.4.2.2 Command Completion Event TRB
@@ -1109,7 +1115,7 @@ typedef struct usbxhci_evt_completion_t {
     uint8_t trb_type;
     uint8_t ep_id;
     uint8_t slotid;
-} usbxhci_evt_completion_t;
+} __attribute__((packed)) usbxhci_evt_completion_t;
 
 //
 // 6.4.2.3 Port Status Change Event TRB
@@ -1123,7 +1129,7 @@ typedef struct usbxhci_evt_portstchg_t {
     uint8_t cc;
     uint16_t flags;
     uint16_t rsvd5;
-} usbxhci_evt_portstchg_t;
+} __attribute__((packed)) usbxhci_evt_portstchg_t;
 
 //
 // 6.4.2.4 Bandwidth Request Event TRB
@@ -1137,7 +1143,7 @@ typedef struct usbxhci_evt_bwreq_t {
     uint16_t flags;
     uint8_t rsvd5;
     uint8_t slotid;
-} usbxhci_evt_bwreq_t;
+} __attribute__((packed)) usbxhci_evt_bwreq_t;
 
 //
 // 6.4.2.5 Doorbell Event TRB
@@ -1149,10 +1155,19 @@ typedef struct usbxhci_evt_db_t {
     uint16_t flags;
     uint8_t vf_id;
     uint8_t slotid;
-} usbxhci_evt_db_t;
+} __attribute__((packed)) usbxhci_evt_db_t;
 
 //
 // 6.4.1.2 Control TRBs
+
+typedef struct usbxhci_ctl_trb_generic_t {
+    uint32_t data[3];
+    uint8_t flags;
+    uint8_t trb_type;
+    uint16_t trt;
+} __attribute__((packed)) usbxhci_ctl_trb_generic_t;
+
+C_ASSERT(sizeof(usbxhci_ctl_trb_generic_t) == 0x10);
 
 // 6.4.1.2.1 Setup stage TRB
 
@@ -1166,7 +1181,7 @@ typedef struct usbxhci_ctl_trb_setup_t {
     uint8_t flags;
     uint8_t trb_type;
     uint16_t trt;
-} usbxhci_ctl_trb_setup_t;
+} __attribute__((packed)) usbxhci_ctl_trb_setup_t;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
 
@@ -1176,7 +1191,7 @@ typedef struct usbxhci_ctl_trb_data_t {
     uint8_t flags;
     uint8_t trb_type;
     uint16_t dir;
-} usbxhci_ctl_trb_data_t;
+} __attribute__((packed)) usbxhci_ctl_trb_data_t;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_data_t) == 0x10);
 
@@ -1187,17 +1202,18 @@ typedef struct usbxhci_ctl_trb_status_t {
     uint8_t flags;
     uint8_t trb_type;
     uint16_t dir;
-} usbxhci_ctl_trb_status_t;
+} __attribute__((packed)) usbxhci_ctl_trb_status_t;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_status_t) == 0x10);
 
 typedef union usbxhci_ctl_trb_t {
-     usbxhci_ctl_trb_setup_t setup;
-     usbxhci_ctl_trb_data_t data;
-     usbxhci_ctl_trb_status_t status;
+    usbxhci_ctl_trb_generic_t generic;
+    usbxhci_ctl_trb_setup_t setup;
+    usbxhci_ctl_trb_data_t data;
+    usbxhci_ctl_trb_status_t status;
 } __attribute__((packed)) usbxhci_ctl_trb_t;
 
-C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
+C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_BIT    0
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_BITS   5
@@ -1231,8 +1247,14 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
 #define USBXHCI_CTL_TRB_FLAGS_IOC_BIT   5
 #define USBXHCI_CTL_TRB_FLAGS_IDT_BIT   6
 
+// Cycle flag
 #define USBXHCI_CTL_TRB_FLAGS_C         (1<<USBXHCI_CTL_TRB_FLAGS_C_BIT)
+
+// Interrupt on completion
 #define USBXHCI_CTL_TRB_FLAGS_IOC       (1<<USBXHCI_CTL_TRB_FLAGS_IOC_BIT)
+
+// Immediate data (the pointer field actually contains
+// up to 8 bytes of data, not a pointer)
 #define USBXHCI_CTL_TRB_FLAGS_IDT       (1<<USBXHCI_CTL_TRB_FLAGS_IDT_BIT)
 
 #define USBXHCI_CTL_TRB_TRB_TYPE_BIT    2
@@ -1259,6 +1281,89 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
 #define USBXHCI_CTL_TRB_TRT_NODATA  0
 #define USBXHCI_CTL_TRB_TRT_OUT     2
 #define USBXHCI_CTL_TRB_TRT_IN      3
+
+//
+// USB Descriptor types (USB 3.1 spec, Table 9.5)
+
+#define USB_RQCODE_
+#define USB_RQCODE_GET_STATUS           0
+#define USB_RQCODE_CLEAR_FEATURE        1
+#define USB_RQCODE_SET_FEATURE          3
+#define USB_RQCODE_SET_ADDRESS          5
+#define USB_RQCODE_GET_DESCRIPTOR       6
+#define USB_RQCODE_SET_DESCRIPTOR       7
+#define USB_RQCODE_GET_CONFIGURATION    8
+#define USB_RQCODE_SET_CONFIGURATION    9
+#define USB_RQCODE_GET_INTERFACE        10
+#define USB_RQCODE_SET_INTERFACE        11
+#define USB_RQCODE_SYNCH_FRAME          12
+#define USB_RQCODE_SET_ENCRYPTION       13
+#define USB_RQCODE_GET_ENCRYPTION       14
+#define USB_RQCODE_SET_HANDSHAKE        15
+#define USB_RQCODE_GET_HANDSHAKE        16
+#define USB_RQCODE_SET_CONNECTION       17
+#define USB_RQCODE_SET_SECURITY_DATA    18
+#define USB_RQCODE_GET_SECURITY_DATA    19
+#define USB_RQCODE_SET_WUSB_DATA        20
+#define USB_RQCODE_LOOPBACK_DATA_WRITE  21
+#define USB_RQCODE_LOOPBACK_DATA_READ   22
+#define USB_RQCODE_SET_INTERFACE_DS     23
+#define USB_RQCODE_SET_SEL              48
+#define USB_RQCODE_SET_ISOCH_DELAY      49
+
+//
+// Descriptor Types (USB 3.1 spec, Table 9-6)
+
+#define USB_DESCTYPE_DEVICE                     1
+#define USB_DESCTYPE_CONFIGURATION              2
+#define USB_DESCTYPE_STRING                     3
+#define USB_DESCTYPE_INTERFACE                  4
+#define USB_DESCTYPE_ENDPOINT                   5
+#define USB_DESCTYPE_INTERFACE_POWER            8
+#define USB_DESCTYPE_OTG                        9
+#define USB_DESCTYPE_DEBUG                      10
+#define USB_DESCTYPE_INTERFACE_ASSOCIATION      11
+#define USB_DESCTYPE_BOS                        15
+#define USB_DESCTYPE_DEVICE_CAPABILITY          16
+#define USB_DESCTYPE_SS_EP_COMPANION            48
+#define USB_DESCTYPE_SSPLUS_ISOCH_EP_COMPANION  49
+
+//
+// USB Device Descriptor
+
+typedef struct usb_desc_device {
+    // Length of descriptor
+    uint8_t len;
+
+    // USB_DESCTYPE_*
+    uint8_t desc_type;
+
+    // USB spec, USB2.1=0x210, etc
+    uint16_t usb_spec;
+
+    // Device class, subclass, and protocol, else 0 if interface specific
+    uint8_t dev_class;
+    uint8_t dev_subclass;
+    uint8_t dev_protocol;
+
+    // 4=max 16 bytes, 12=max 4kb, 64=unlimited, etc
+    uint8_t log2_maxpktsz;
+
+    // Vendor, product, revision
+    uint16_t vendor_id;
+    uint16_t product_id;
+    uint16_t product_ver;
+
+    // Indices into string descriptor
+    uint8_t manufact_stridx;
+    uint8_t vendor_stridx;
+    uint8_t serial_stridx;
+
+    // Number of possible configurations
+    uint8_t num_config;
+} __attribute__((packed)) usb_desc_device;
+
+C_ASSERT(sizeof(usb_desc_device) == 18);
 
 //
 // Doorbells
@@ -1299,6 +1404,7 @@ typedef struct usbxhci_endpoint_data_t {
     uint64_t xfer_ring_physaddr;
     uint32_t xfer_next;
     uint32_t xfer_count;
+    uint8_t ccs;
 } usbxhci_endpoint_data_t;
 
 typedef struct usbxhci_dev_t {
@@ -1368,11 +1474,13 @@ struct usbxhci_pending_cmd_t {
 };
 
 typedef struct usbxhci_port_init_data_t {
-    void *inpctx;
+    usbxhci_inpctx_t inpctx;
     usbxhci_ctl_trb_t *trbs;
-    void *descriptor_buf;
+    usb_desc_device descriptor;
     uint8_t port;
     uint8_t slotid;
+    uint8_t current_descriptor;
+    uint8_t descriptor_count;
 } usbxhci_port_init_data_t;
 
 static usbxhci_dev_t *usbxhci_devices;
@@ -1405,6 +1513,18 @@ static void usbxhci_ring_doorbell(usbxhci_dev_t *self,
     self->mmio_db[doorbell] = value | (stream_id << 16);
 }
 
+static void usbxhci_insert_pending_command(
+        uint64_t cmd_physaddr,
+        usbxhci_complete_handler_t handler,
+        uintptr_t data)
+{
+    usbxhci_pending_cmd_t *pc = malloc(sizeof(usbxhci_pending_cmd_t));
+    pc->cmd_physaddr = cmd_physaddr;
+    pc->handler = handler;
+    pc->data = data;
+    htbl_insert(&usbxhci_pending_ht, pc);
+}
+
 static void usbxhci_issue_cmd(usbxhci_dev_t *self, void *cmd,
                        usbxhci_complete_handler_t handler,
                        uintptr_t data)
@@ -1418,11 +1538,8 @@ static void usbxhci_issue_cmd(usbxhci_dev_t *self, void *cmd,
 
     size_t offset = (uint64_t)s - (uint64_t)self->dev_cmd_ring;
 
-    usbxhci_pending_cmd_t *pc = malloc(sizeof(usbxhci_pending_cmd_t));
-    pc->cmd_physaddr = self->cmd_ring_physaddr + offset;
-    pc->handler = handler;
-    pc->data = data;
-    htbl_insert(&usbxhci_pending_ht, pc);
+    usbxhci_insert_pending_command(self->cmd_ring_physaddr + offset,
+                                   handler, data);
 
     spinlock_unlock_noirq(&self->lock_cmd);
 }
@@ -1430,7 +1547,9 @@ static void usbxhci_issue_cmd(usbxhci_dev_t *self, void *cmd,
 static void usbxhci_add_xfer_trbs(usbxhci_dev_t *self,
                                   uint8_t slotid,
                                   size_t count,
-                                  usbxhci_ctl_trb_t const *trbs)
+                                  usbxhci_ctl_trb_t *trbs,
+                                  usbxhci_complete_handler_t handler,
+                                  uintptr_t handler_data)
 {
     //usbxhci_slotctx_t *slot = usbxhci_dev_ctx_ent_slot(self, slotid);
     //usbxhci_ep_ctx_t *ep = usbxhci_dev_ctx_ent_ep(self, slotid, 0);
@@ -1441,14 +1560,135 @@ static void usbxhci_add_xfer_trbs(usbxhci_dev_t *self,
 
     usbxhci_endpoint_data_t *epd = htbl_lookup(&self->endpoint_lookup, &ept);
 
-    for (size_t i = 0; i < count; ++i)
-        memcpy(&epd->xfer_ring[epd->xfer_next++], trbs + i, sizeof(*trbs));
+    for (size_t i = 0; i < count; ++i) {
+        USBXHCI_TRACE("Writing TRB to %zx\n",
+                      mphysaddr(&epd->xfer_ring[epd->xfer_next]));
+        trbs[i].generic.flags |= (!!epd->ccs) << USBXHCI_CTL_TRB_FLAGS_C_BIT;
+        memcpy(&epd->xfer_ring[epd->xfer_next], trbs + i, sizeof(*trbs));
+
+        if (handler && ((i + 1) == count)) {
+            usbxhci_insert_pending_command(
+                        epd->xfer_ring_physaddr + epd->xfer_next *
+                        sizeof(*epd->xfer_ring), handler, handler_data);
+        }
+
+        ++epd->xfer_next;
+    }
 }
 
-static void usbxhci_cmd_comp_setaddr(usbxhci_dev_t *self,
-                                     usbxhci_cmd_trb_t *cmd,
-                                     usbxhci_evt_t *evt,
-                                     uintptr_t data)
+static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
+        void *response, uint16_t length,
+        uint8_t bmreq_type, uint8_t bmreq_recip,
+        uint8_t request, uint16_t value, uint16_t index)
+{
+    usbxhci_ctl_trb_t *trbs = calloc(3, sizeof(*trbs));
+
+    trbs[0].setup.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_SETUP);
+    trbs[0].setup.trt = USBXHCI_CTL_TRB_TRT_IN;
+    trbs[0].setup.bm_req_type =
+            USBXHCI_CTL_TRB_BMREQT_RECIP_n(
+                bmreq_recip) |
+            USBXHCI_CTL_TRB_BMREQT_TYPE_n(
+                bmreq_type) |
+            USBXHCI_CTL_TRB_BMREQT_TOHOST;
+    trbs[0].setup.request = request;
+    trbs[0].setup.value = value;
+    trbs[0].setup.index = index;
+    trbs[0].setup.length = length;
+    trbs[0].setup.xferlen_intr = 8;
+    trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_IDT;
+
+    trbs[1].data.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_DATA);
+    trbs[1].data.dir = 1;
+    trbs[1].data.xfer_td_intr = length;
+    trbs[1].data.data_physaddr = mphysaddr(response);
+
+    trbs[2].status.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_STATUS);
+    trbs[2].status.dir = 0;
+    trbs[2].status.flags = USBXHCI_CTL_TRB_FLAGS_IOC;
+
+    return trbs;
+}
+
+static usbxhci_ctl_trb_t *usbxhci_get_descriptor(
+        usbxhci_dev_t *self, usb_desc_device *desc,
+        uint8_t desc_index, uint8_t slotid,
+        usbxhci_complete_handler_t handler, uintptr_t handler_data)
+{
+    usbxhci_ctl_trb_t *trbs = usbxhci_make_setup_trbs(
+                desc, sizeof(*desc),
+                USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
+                USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
+                USB_RQCODE_GET_DESCRIPTOR,
+                (USB_DESCTYPE_DEVICE << 8) | desc_index, 0);
+
+    usbxhci_add_xfer_trbs(self, slotid, 3, trbs,
+                          handler, handler_data);
+
+    usbxhci_ring_doorbell(self, 1, USBXHCI_DB_VAL_CTL_EP_UPD, 0);
+
+    return trbs;
+}
+
+static usbxhci_ctl_trb_t *usbxhci_get_config(
+        usbxhci_dev_t *self, usb_desc_device *desc,
+        uint8_t desc_index, uint8_t slotid,
+        usbxhci_complete_handler_t handler, uintptr_t handler_data)
+{
+    usbxhci_ctl_trb_t *trbs = usbxhci_make_setup_trbs(
+                desc, sizeof(*desc),
+                USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
+                USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
+                USB_RQCODE_GET_DESCRIPTOR,
+                (USB_DESCTYPE_DEVICE << 8) | desc_index, 0);
+
+    usbxhci_add_xfer_trbs(self, slotid, 3, trbs,
+                          handler, handler_data);
+
+    usbxhci_ring_doorbell(self, USBXHCI_DB_VAL_OUT_EP_UPD_n(slotid),
+                          USBXHCI_DB_VAL_CTL_EP_UPD, 0);
+
+    return trbs;
+}
+
+static void usbxhci_get_descriptor_handler(
+        usbxhci_dev_t *self, usbxhci_cmd_trb_t *cmd,
+        usbxhci_evt_t *evt, uintptr_t data)
+{
+    usbxhci_port_init_data_t *init_data = (void*)data;
+    usbxhci_evt_xfer_t *xferevt = (void*)evt;
+    xferevt->len_hi = xferevt->len_hi;
+
+    USBXHCI_TRACE("Device descriptor: \n");
+
+    if (init_data->descriptor_count == 0) {
+        init_data->descriptor_count = init_data->descriptor.num_config;
+        init_data->current_descriptor = 1;
+    } else {
+        ++init_data->current_descriptor;
+    }
+
+    if (init_data->descriptor.dev_class == 0) {
+        free(init_data->trbs);
+        init_data->trbs = usbxhci_get_config(
+                    self, &init_data->descriptor,
+                    init_data->current_descriptor - 1,
+                    init_data->slotid,
+                    usbxhci_get_descriptor_handler, (uintptr_t)init_data);
+    }
+
+    (void)xferevt;
+    (void)self;
+    (void)cmd;
+    (void)data;
+}
+
+static void usbxhci_cmd_comp_setaddr(
+        usbxhci_dev_t *self, usbxhci_cmd_trb_t *cmd,
+        usbxhci_evt_t *evt, uintptr_t data)
 {
     usbxhci_port_init_data_t *init_data = (void*)data;
 
@@ -1462,40 +1702,17 @@ static void usbxhci_cmd_comp_setaddr(usbxhci_dev_t *self,
                   "parameter=%x, slotid=%d\n", cc, ccp, cmdcomp->slotid);
 
     if (self->dev_ctx_large) {
-        munmap(init_data->inpctx, sizeof(usbxhci_inpctx_large_t));
+        munmap(init_data->inpctx.large, sizeof(*init_data->inpctx.large));
     } else {
-        munmap(init_data->inpctx, sizeof(usbxhci_inpctx_t));
+        munmap(init_data->inpctx.small, sizeof(*init_data->inpctx.small));
     }
+    init_data->inpctx.any = 0;
 
-    init_data->descriptor_buf = calloc(1, 8);
+    memset(&init_data->descriptor, 0, sizeof(init_data->descriptor));
 
-    usbxhci_ctl_trb_t *trbs = calloc(3, sizeof(*trbs));
-    init_data->trbs = trbs;
-
-    trbs[0].setup.trb_type = USBXHCI_TRB_TYPE_SETUP;
-    trbs[0].setup.trt = USBXHCI_CTL_TRB_TRT_IN;
-    trbs[0].setup.bm_req_type =
-            USBXHCI_CTL_TRB_BMREQT_RECIP_n(USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE) |
-            USBXHCI_CTL_TRB_BMREQT_TYPE_n(USBXHCI_CTL_TRB_BMREQT_TYPE_STD) |
-            USBXHCI_CTL_TRB_BMREQT_TOHOST;
-    trbs[0].setup.request = 6;  // GET_DESCRIPTOR
-    trbs[0].setup.value = 0x100;    // descriptor index=0, descriptor type=1
-    trbs[0].setup.index = 0;
-    trbs[0].setup.length = 8;
-    trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_IDT;
-
-    trbs[1].data.trb_type = USBXHCI_TRB_TYPE_DATA;
-    trbs[1].data.dir = 1;
-    trbs[1].data.xfer_td_intr = 8;
-    trbs[1].data.data_physaddr = mphysaddr(init_data->descriptor_buf);
-
-    trbs[2].status.trb_type = USBXHCI_TRB_TYPE_STATUS;
-    trbs[2].status.dir = 0;
-    trbs[2].status.flags = USBXHCI_CTL_TRB_FLAGS_IOC;
-
-    usbxhci_add_xfer_trbs(self, init_data->slotid, 3, trbs);
-
-    //abort :( usbxhci_ring_doorbell(self, 1, USBXHCI_DB_VAL_CTL_EP_UPD, 0);
+    init_data->trbs = usbxhci_get_descriptor(
+                self, &init_data->descriptor, 0, init_data->slotid,
+                usbxhci_get_descriptor_handler, (uintptr_t)init_data);
 
     (void)cmd;
 }
@@ -1533,8 +1750,14 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
         spinlock_lock_noirq(&self->endpoints_lock);
         return 0;
     }
+    newepd->ccs = 1;
 
-    newepd->xfer_ring_physaddr = mphysaddr(newepd->xfer_ring);
+    uint64_t xfer_ring_physaddr = mphysaddr(newepd->xfer_ring);
+
+    USBXHCI_TRACE("Transfer ring physical address for slot=%d, ep=%d: %lx\n",
+                  slotid, epid, xfer_ring_physaddr);
+
+    newepd->xfer_ring_physaddr = xfer_ring_physaddr;
 
     htbl_insert(&self->endpoint_lookup, newepd);
 
@@ -1574,23 +1797,23 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * restrict self,
     // Issue a SET_ADDRESS command
 
     // Allocate an input context
-    void *inp;
+    usbxhci_inpctx_t inp;
     usbxhci_inpctlctx_t *ctlctx;
     usbxhci_slotctx_t *inpslotctx;
     usbxhci_ep_ctx_t *inpepctx;
 
     if (self->dev_ctx_large) {
-        inp = mmap(0, sizeof(usbxhci_inpctx_large_t),
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-        ctlctx = &((usbxhci_inpctx_large_t*)inp)->inpctl;
-        inpslotctx = &((usbxhci_inpctx_large_t*)inp)->slotctx;
-        inpepctx = ((usbxhci_inpctx_large_t*)inp)->epctx;
+        ctlctx = &inp.large->inpctl;
+        inpslotctx = &inp.large->slotctx;
+        inpepctx = inp.large->epctx;
     } else {
-        inp = mmap(0, sizeof(usbxhci_inpctx_t),
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-        ctlctx = &((usbxhci_inpctx_t*)inp)->inpctl;
-        inpslotctx = &((usbxhci_inpctx_t*)inp)->slotctx;
-        inpepctx = ((usbxhci_inpctx_t*)inp)->epctx;
+        ctlctx = &inp.small->inpctl;
+        inpslotctx = &inp.small->slotctx;
+        inpepctx = inp.small->epctx;
     }
 
     init_data->inpctx = inp;
@@ -1625,11 +1848,11 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * restrict self,
     usbxhci_endpoint_data_t *epdata =
             usbxhci_add_endpoint(self, cmdcomp->slotid, 0);
 
-    inpepctx->tr_dq_ptr = epdata->xfer_ring_physaddr;
+    inpepctx->tr_dq_ptr = epdata->xfer_ring_physaddr | epdata->ccs;
 
     usbxhci_cmd_trb_setaddr_t setaddr;
     memset(&setaddr, 0, sizeof(setaddr));
-    setaddr.input_ctx_physaddr = mphysaddr(inp);
+    setaddr.input_ctx_physaddr = mphysaddr(inp.any);
     setaddr.cycle = self->pcs;
     setaddr.trb_type = USBXHCI_CMD_TRB_TYPE_n(
                 USBXHCI_TRB_TYPE_ADDRDEVCMD);
@@ -1692,8 +1915,9 @@ static void usbxhci_init(usbxhci_dev_t *self)
                         MAP_POPULATE, -1, 0);
 
     // Device Context Base Address Array
-    for (size_t i = 0; i < self->maxslots; ++i)
+    for (size_t i = 0; i < self->maxslots; ++i) {
         self->dev_ctx_ptrs[i] = mphysaddr(usbxhci_dev_ctx_ent_slot(self, i));
+    }
 
     // Device Context Base Address Array Pointer
     self->mmio_op->dcbaap = mphysaddr(self->dev_ctx_ptrs);
@@ -1721,11 +1945,11 @@ static void usbxhci_init(usbxhci_dev_t *self)
         self->interrupters[i].ccs = 1;
 
         // Event ring
-        self->interrupters[i].evt_ring = mmap(0, 4096,
+        self->interrupters[i].evt_ring = mmap(0, PAGESIZE,
                                  PROT_READ | PROT_WRITE,
                                  MAP_POPULATE, -1, 0);
         self->interrupters[i].count =
-                4096 / sizeof(*self->interrupters[i].evt_ring);
+                PAGESIZE / sizeof(*self->interrupters[i].evt_ring);
         self->interrupters[i].next = 0;
 
         self->interrupters[i].evt_ring_physaddr =
@@ -1735,7 +1959,7 @@ static void usbxhci_init(usbxhci_dev_t *self)
                 self->interrupters[i].evt_ring_physaddr;
 
         self->dev_evt_segs[i*4].trb_count =
-                4096 / sizeof(*self->interrupters[i].evt_ring);
+                PAGESIZE / sizeof(*self->interrupters[i].evt_ring);
 
         // Event ring segment table size
         self->mmio_rt->ir[i].erstsz = 1;
@@ -1786,12 +2010,14 @@ static void usbxhci_init(usbxhci_dev_t *self)
             cmd.trb_type = USBXHCI_CMD_TRB_TYPE_n(
                         USBXHCI_TRB_TYPE_ENABLESLOTCMD);
 
-            usbxhci_port_init_data_t *init_data = calloc(1, sizeof(*init_data));
+            usbxhci_port_init_data_t *init_data =
+                    calloc(1, sizeof(*init_data));
 
             init_data->port = i + 1;
 
             usbxhci_issue_cmd(self, &cmd,
-                              usbxhci_cmd_comp_enableslot, (uintptr_t)init_data);
+                              usbxhci_cmd_comp_enableslot,
+                              (uintptr_t)init_data);
         }
     }
 
@@ -1816,30 +2042,19 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
                      USBXHCI_EVT_FLAGS_TYPE_BIT);
 
     usbxhci_evt_cmdcomp_t *cmdcomp;
+    usbxhci_evt_xfer_t *xfer;
+    uint64_t cmdaddr = 0;
 
     switch (type) {
     case USBXHCI_TRB_TYPE_XFEREVT:
         USBXHCI_TRACE("XFEREVT\n");
+        xfer = (void*)evt;
+        cmdaddr = xfer->trb_ptr;
         break;
 
     case USBXHCI_TRB_TYPE_CMDCOMPEVT:
         cmdcomp = (void*)evt;
-        uint64_t cmdaddr = cmdcomp->command_trb_ptr;
-
-        // Lookup pending command
-        spinlock_lock_noirq(&self->lock_cmd);
-        usbxhci_pending_cmd_t *pcp = htbl_lookup(&usbxhci_pending_ht, &cmdaddr);
-        assert(pcp);
-        usbxhci_pending_cmd_t pc = *pcp;
-        htbl_delete(&usbxhci_pending_ht, &cmdaddr);
-        uint64_t cmd_physaddr = pcp->cmd_physaddr;
-        free(pcp);
-        spinlock_unlock_noirq(&self->lock_cmd);
-
-        // Invoke completion handler
-        pc.handler(self, (void*)((char*)self->dev_cmd_ring +
-                   (cmd_physaddr - self->cmd_ring_physaddr)),
-                   evt, pc.data);
+        cmdaddr = cmdcomp->command_trb_ptr;
 
         break;
 
@@ -1872,12 +2087,30 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
         break;
 
     }
+
+    if (!cmdaddr)
+        return;
+
+    // Lookup pending command
+    spinlock_lock_noirq(&self->lock_cmd);
+    usbxhci_pending_cmd_t *pcp = htbl_lookup(&usbxhci_pending_ht, &cmdaddr);
+    assert(pcp);
+    usbxhci_pending_cmd_t pc = *pcp;
+    htbl_delete(&usbxhci_pending_ht, &cmdaddr);
+    uint64_t cmd_physaddr = pcp->cmd_physaddr;
+    free(pcp);
+    spinlock_unlock_noirq(&self->lock_cmd);
+
+    // Invoke completion handler
+    pc.handler(self, (void*)((char*)self->dev_cmd_ring +
+               (cmd_physaddr - self->cmd_ring_physaddr)),
+               evt, pc.data);
 }
 
 static void *usbxhci_irq_handler(int irq, void *ctx)
 {
     (void)irq;
-    USBXHCI_TRACE("IRQ!\n");
+    USBXHCI_TRACE("IRQ %d!\n", irq);
 
     for (size_t i = 0; i < usbxhci_device_count; ++i) {
         usbxhci_dev_t *self = usbxhci_devices + i;
