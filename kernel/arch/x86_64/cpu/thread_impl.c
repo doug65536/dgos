@@ -18,8 +18,8 @@
 #include "time.h"
 #include "threadsync.h"
 #include "export.h"
-
 #include "printk.h"
+#include "isr_constants.h"
 
 // Implements platform independent thread.h
 
@@ -68,14 +68,18 @@ typedef struct cpu_info_t cpu_info_t;
 struct thread_info_t {
     isr_context_t * volatile ctx;
 
+    void *xsave_ptr;
+    void *xsave_stack;
+
     void *syscall_stack;
 
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
     thread_priority_t volatile priority_boost;
-
     thread_state_t volatile state;
+
     uint32_t flags;
+    uint32_t stack_size;
 
     uint64_t volatile wake_time;
 
@@ -84,26 +88,30 @@ struct thread_info_t {
     void *exception_chain;
 
     void *stack;
-    uint32_t stack_size;
+
     int exit_code;
 
     mutex_t lock;
     condition_var_t done_cond;
 
-    //int align[1];
+    void *align[6];
 };
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
 
-C_ASSERT(sizeof(thread_info_t) == 128);
+C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
+C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
+
+C_ASSERT(sizeof(thread_info_t) == 64*3);
 
 // Store in a big array, for now
 #define MAX_THREADS 512
-static thread_info_t threads[MAX_THREADS];
+static thread_info_t threads[MAX_THREADS] __attribute__((aligned(64)));
 static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
 int thread_idle_ready;
+int spincount_mask;
 
 struct cpu_info_t {
     cpu_info_t *self;
@@ -114,13 +122,20 @@ struct cpu_info_t {
 
     // Used for lazy TLB shootdown
     uint64_t mmu_seq;
+
+    void *align[3];
 };
 
+C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
+C_ASSERT_ISPO2(sizeof(cpu_info_t));
+
 #define MAX_CPUS    64
-static cpu_info_t cpus[MAX_CPUS];
+static cpu_info_t cpus[MAX_CPUS] __attribute__((aligned(64)));
 
 static volatile uint32_t cpu_count;
-static uint32_t default_mxcsr_mask;
+
+// Set in startup code (entry.s)
+uint32_t default_mxcsr_mask;
 
 // Get executing APIC ID
 static uint32_t get_apic_id(void)
@@ -131,14 +146,15 @@ static uint32_t get_apic_id(void)
     return apic_id;
 }
 
-static cpu_info_t *this_cpu(void)
+static inline cpu_info_t *this_cpu(void)
 {
     cpu_info_t *cpu = cpu_gs_read_ptr();
     assert(cpu >= cpus && cpu < cpus + countof(cpus));
+    assert(cpu->self == cpu);
     return cpu;
 }
 
-static thread_info_t *this_thread(void)
+static inline thread_info_t *this_thread(void)
 {
     cpu_info_t *cpu = this_cpu();
     return cpu->cur_thread;
@@ -180,8 +196,6 @@ static void thread_cleanup(void)
     atomic_barrier();
     thread->priority = 0;
     thread->priority_boost = 0;
-    thread->stack = 0;
-    thread->stack_size = 0;
     thread->state = THREAD_IS_DESTRUCTING_BUSY;
     thread_yield();
 }
@@ -208,7 +222,8 @@ static thread_t thread_create_with_state(
         return -1;
 
     for (size_t i = 0; ; ++i) {
-        if (i >= MAX_THREADS) {
+        if (unlikely(i >= MAX_THREADS)) {
+            printdbg("Out of threads, yielding\n");
             thread_yield();
             i = 0;
         }
@@ -219,11 +234,11 @@ static thread_t thread_create_with_state(
             continue;
 
         // Atomically grab the thread
-        if (atomic_cmpxchg(
-                    &thread->state,
-                    THREAD_IS_UNINITIALIZED,
-                    THREAD_IS_INITIALIZING) !=
-                THREAD_IS_UNINITIALIZED) {
+        if (unlikely(atomic_cmpxchg(
+                         &thread->state,
+                         THREAD_IS_UNINITIALIZED,
+                         THREAD_IS_INITIALIZING) !=
+                     THREAD_IS_UNINITIALIZED)) {
             pause();
             continue;
         }
@@ -244,6 +259,12 @@ static thread_t thread_create_with_state(
                     0, 1 << 14, PROT_READ | PROT_WRITE,
                     MAP_STACK, -1, 0) + (1 << 14);
 
+        // XSave stack
+        thread->xsave_stack = mmap(
+                    0, 1 << 14, PROT_READ | PROT_WRITE,
+                    MAP_STACK, -1, 0);
+        thread->xsave_ptr = thread->xsave_stack;
+
         thread->stack = stack;
         thread->stack_size = stack_size;
         thread->priority = priority;
@@ -255,33 +276,20 @@ static thread_t thread_create_with_state(
                 stack_size;
 
         size_t ctx_size = sizeof(isr_gpr_context_t) +
-                sse_context_size +
-                sizeof(isr_context_t) + 8;
+                sizeof(isr_context_t);
 
         // Adjust start of context to make room for context
-        uintptr_t ctx_addr = stack_end - ctx_size;
+        uintptr_t ctx_addr = stack_end - ctx_size - 16;
 
-        // Predict address of FPU context address
-        uintptr_t fpr_address = ctx_addr + sizeof(isr_context_t);
-
-        uint8_t misalignment_mask = (sse_context_size == 512)
-                ? 0x0F
-                : 0x3F;
-
-        size_t misalignment = fpr_address & misalignment_mask;
-
-        ctx_addr -= misalignment;
-        fpr_address -= misalignment;
-
-        assert((fpr_address & misalignment_mask) == 0);
         assert((ctx_addr & 0x0F) == 0);
 
         isr_context_t *ctx = (isr_context_t*)ctx_addr;
         memset(ctx, 0, ctx_size);
-        ctx->fpr = (void*)(ctx + 1);
-        ctx->gpr = (void*)((char*)ctx->fpr + sse_context_size);
+        ctx->fpr = thread->xsave_ptr;
+        ctx->gpr = (void*)(ctx + 1);
 
-        ctx->gpr->iret.rsp = (uintptr_t)(((ctx_addr + ctx_size + 15) & -16) + 8);
+        ctx->gpr->iret.rsp = (uintptr_t)
+                (((ctx_addr + ctx_size + 15) & -16) + 8);
         ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA64;
         ctx->gpr->iret.rflags = EFLAGS_IF;
         ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
@@ -358,6 +366,9 @@ static void thread_monitor_mwait(void)
 
 static int smp_thread(void *arg)
 {
+    // Enable spinning
+    spincount_mask = -1;
+
     printdbg("SMP thread running\n");
     atomic_inc(&thread_smp_running);
     (void)arg;
@@ -389,15 +400,14 @@ void thread_init(int ap)
     cpu_set_gsbase(cpu);
 
     if (!ap) {
-        default_mxcsr_mask = cpu_get_default_mxcsr_mask();
-
-        printdbg("default mxcsr_mask=%x\n", default_mxcsr_mask);
-
         cpu->cur_thread = thread;
         thread->ctx = 0;
         thread->priority = -256;
         thread->stack = kernel_stack;
         thread->stack_size = kernel_stack_size;
+        thread->xsave_stack = mmap(0, 1 << 14, PROT_READ | PROT_WRITE,
+                                   MAP_STACK, -1, 0);
+        thread->xsave_ptr = thread->xsave_stack;
         thread->cpu_affinity = 1;
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
@@ -410,15 +420,21 @@ void thread_init(int ap)
                     -256, (void*)1);
 
         cpu->goto_thread = thread;
+
+        if (sse_context_size == 512)
+            cpu_fxsave(thread->xsave_ptr);
+        else
+            cpu_xsave(thread->xsave_ptr);
+
         atomic_barrier();
         thread_yield();
     }
 }
 
 static thread_info_t *thread_choose_next(
+        cpu_info_t *cpu,
         thread_info_t * const outgoing)
 {
-    cpu_info_t *cpu = this_cpu();
     size_t cpu_number = cpu - cpus;
     size_t i = outgoing - threads;
     thread_info_t *best = 0;
@@ -431,14 +447,14 @@ static thread_info_t *thread_choose_next(
 
     for (size_t checked = 0; ++i, checked <= count; ++checked) {
         // Wrap
-        if (i >= count)
+        if (unlikely(i >= count))
             i = 0;
 
         candidate = threads + i;
 
         // If this thread is not allowed to run on this CPU
         // then skip it
-        if (!(candidate->cpu_affinity & (1 << cpu_number)))
+        if (unlikely(!(candidate->cpu_affinity & (1 << cpu_number))))
             continue;
 
         //
@@ -452,7 +468,7 @@ static thread_info_t *thread_choose_next(
                 ? THREAD_IS_READY
                 : THREAD_IS_READY_BUSY;
 
-        if (candidate->state == expected_sleep) {
+        if (unlikely(candidate->state == expected_sleep)) {
             // The thread is sleeping, see if it should wake up yet
 
             // If we didn't get current time yet, get it
@@ -463,23 +479,29 @@ static thread_info_t *thread_choose_next(
                 continue;
 
             // Race to transition it to ready
-            if (atomic_cmpxchg(
-                        &candidate->state,
-                        expected_sleep,
-                        expected_ready) !=
-                    expected_sleep) {
+            if (unlikely(atomic_cmpxchg(
+                             &candidate->state,
+                             expected_sleep,
+                             expected_ready) !=
+                         expected_sleep)) {
                 // Another CPU beat us to it
                 continue;
             }
-        } else if (candidate->state != expected_ready)
+        } else if (unlikely(candidate->state != expected_ready))
             continue;
 
-        if (best) {
+        if (likely(best)) {
             // Must be better than best
             if (candidate->priority + candidate->priority_boost >
                     best->priority + best->priority_boost)
                 best = candidate;
+        } else if (outgoing->state == THREAD_IS_READY_BUSY) {
+            // Must be at least the same priority as outgoing
+            if (candidate->priority + candidate->priority_boost >=
+                    outgoing->priority + outgoing->priority_boost)
+                best = candidate;
         } else {
+            // Outgoing thread is not ready, any thread is better
             best = candidate;
         }
     }
@@ -502,7 +524,7 @@ void *thread_schedule(void *ctx)
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
 
-    thread_info_t *outgoing = thread;
+    thread_info_t * const outgoing = thread;
 
     if (unlikely(cpu->goto_thread)) {
         thread = cpu->goto_thread;
@@ -517,14 +539,15 @@ void *thread_schedule(void *ctx)
     thread->ctx = ctx;
 
     // Change to ready if running
-    if (thread->state == THREAD_IS_RUNNING) {
-        //thread->cpu = 0;
+    if (likely(thread->state == THREAD_IS_RUNNING)) {
         atomic_barrier();
         thread->state = THREAD_IS_READY_BUSY;
         atomic_barrier();
-    } else if (thread->state == THREAD_IS_DESTRUCTING) {
+    } else if (unlikely(thread->state == THREAD_IS_DESTRUCTING)) {
         if (thread->flags & THREAD_FLAG_OWNEDSTACK)
             munmap(thread->stack, thread->stack_size);
+
+        munmap(thread->xsave_stack, 1 << 14);
 
         mutex_lock_noyield(&thread->lock);
         thread->state = THREAD_IS_FINISHED;
@@ -537,13 +560,15 @@ void *thread_schedule(void *ctx)
     // ready
     int retries = 0;
     for ( ; ; ++retries) {
-        thread = thread_choose_next(outgoing);
+        thread = thread_choose_next(cpu, outgoing);
 
         assert(thread >= threads &&
                thread < threads + countof(threads));
 
         if (thread == outgoing &&
                 thread->state == THREAD_IS_READY_BUSY) {
+            // This doesn't need to be atomic because the
+            // outgoing thread is still marked busy
             atomic_barrier();
             thread->state = THREAD_IS_RUNNING;
             break;
@@ -658,7 +683,7 @@ EXPORT int thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
     mutex_lock(&thread->lock);
-    if (thread->state != THREAD_IS_FINISHED)
+    while (thread->state != THREAD_IS_FINISHED)
         condvar_wait(&thread->done_cond, &thread->lock);
     mutex_unlock(&thread->lock);
     return thread->exit_code;

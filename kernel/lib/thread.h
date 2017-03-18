@@ -10,6 +10,10 @@ typedef int16_t thread_priority_t;
 
 typedef int (*thread_fn_t)(void*);
 
+// Holds 0 if single cpu, otherwise holds -1
+// This allows branchless setting of spincounts to zero
+extern int spincount_mask;
+
 // Implemented in arch
 thread_t thread_create(thread_fn_t fn, void *userdata,
                        void *stack, size_t stack_size);

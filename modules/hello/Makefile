@@ -8,7 +8,9 @@ CSRCS := hello.c
 ASRCS :=
 
 CFLAGS := -g -mcmodel=kernel \
-	-std=c11 -fno-common -fno-exceptions -fno-asynchronous-unwind-tables
+	-std=c11 -fno-common -fno-exceptions
+
+#-fno-asynchronous-unwind-tables
 
 LDFLAGS := -g -r
 

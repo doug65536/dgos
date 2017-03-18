@@ -235,25 +235,10 @@ void cpu_crash(void)
     );
 }
 
-uint32_t cpu_get_default_mxcsr_mask(void)
-{
-    char save_area[512+16] = "";
-    char *save_area_ptr = save_area + 15;
-    uint32_t mxcsr_mask;
-    __asm__ __volatile__ (
-        "and $-16,%[save_area_ptr]\n\t"
-        "fxsave (%[save_area_ptr])\n\t"
-        "mov 0x1C(%[save_area_ptr]),%[mxcsr_mask]\n\t"
-        : [mxcsr_mask] "=r" (mxcsr_mask),
-          [save_area_ptr] "+r" (save_area_ptr)
-    );
-    return mxcsr_mask;
-}
-
 void cpu_fxsave(void *fpuctx)
 {
     __asm__ __volatile__ (
-        "fxsave (%0)\n\t"
+        "fxsave64 (%0)\n\t"
         :
         : "r" (fpuctx)
         : "memory"
@@ -263,7 +248,7 @@ void cpu_fxsave(void *fpuctx)
 void cpu_xsave(void *fpuctx)
 {
     __asm__ __volatile__ (
-        "xsave (%[fpuctx])\n\t"
+        "xsave64 (%[fpuctx])\n\t"
         :
         : "a" (-1), "d" (-1), [fpuctx] "D" (fpuctx)
         : "memory"

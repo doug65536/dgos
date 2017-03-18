@@ -5,6 +5,7 @@ arch/x86_64/cpu/except.h
 arch/x86_64/cpu/except_asm.h
 arch/x86_64/cpu/except_asm.s
 arch/x86_64/cpu/isr.S
+arch/x86_64/cpu/isr_constants.h
 arch/x86_64/cpu/math.c
 arch/x86_64/cpu/nontemporal.c
 arch/x86_64/cpu/nontemporal.h

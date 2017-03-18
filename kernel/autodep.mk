@@ -58,6 +58,7 @@ $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
 
 # Generate preprocessed source for C
 $(DUMPDIR)/%.i : %.c
+$(DUMPDIR)/%.i : %.S
 $(DUMPDIR)/%.i : %.c $(DEPDIR)/%.d
 	mkdir -p $(dir $@)
 	$(COMPILE.c) $(OUTPUT_OPTION) -E $<

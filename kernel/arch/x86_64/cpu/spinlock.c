@@ -8,11 +8,38 @@
 //
 // Exclusive lock. 0 is unlocked, 1 is locked
 
+void spinlock_lock_noyield(spinlock_t *lock)
+{
+    // Disable IRQs
+    int intr_enabled = cpu_irq_disable() << 1;
+
+    atomic_barrier();
+    while (*lock != 0 ||
+           atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
+        // Allow IRQs if they were enabled
+        cpu_irq_toggle(intr_enabled);
+
+        if (likely(spincount_mask))
+            pause();
+        else
+            panic("Deadlock acquiring spinlock in IRQ handler!");
+
+        // Disable IRQs
+        cpu_irq_disable();
+    }
+
+    // Return with interrupts disabled
+}
+
 void spinlock_lock(spinlock_t *lock)
 {
     atomic_barrier();
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
-        pause();
+    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
+        if (spincount_mask)
+            pause();
+        else
+            thread_yield();
+    }
 }
 
 int spinlock_try_lock(spinlock_t *lock)

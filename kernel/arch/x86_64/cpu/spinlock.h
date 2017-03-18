@@ -6,6 +6,14 @@ typedef int volatile spinlock_t;
 //
 // Mutex spinlock
 
+// This is equivalent to spinlock_lock_noirq,
+// but for IRQ handlers. Panic if lock is not
+// available and there is one CPU.
+// (This is would be a bug, any lock acquired
+// in an IRQ handler should disable IRQ when
+// acquired by the non-IRQ code)
+void spinlock_lock_noyield(spinlock_t *lock);
+
 void spinlock_lock(spinlock_t *lock);
 int spinlock_try_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);

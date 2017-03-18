@@ -1250,7 +1250,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     async_callback_t pending_callbacks[32];
     unsigned callback_count = 0;
 
-    spinlock_lock_noirq(&pi->lock);
+    spinlock_lock_noyield(&pi->lock);
 
     // Read command slot interrupt status
     int slot;

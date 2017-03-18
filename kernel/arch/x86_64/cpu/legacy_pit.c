@@ -158,6 +158,7 @@ static uint32_t pit8254_usleep(uint16_t microsec)
             PIT_ACCESS_LATCH);
         readback = inb(PIT_DATA(2));
         readback |= (uint16_t)inb(PIT_DATA(2));
+        pause();
     } while (readback);
 
     return microsec;

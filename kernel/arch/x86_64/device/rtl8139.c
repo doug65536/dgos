@@ -800,7 +800,7 @@ static void *rtl8139_irq_handler(int irq, void *ctx)
         if (unlikely(irq_offset < 0 || irq_offset >= self->irq_range.count))
             continue;
 
-        spinlock_lock(&self->lock);
+        spinlock_lock_noyield(&self->lock);
 
         uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
 

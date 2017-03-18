@@ -5,34 +5,46 @@
 entry:
 	xor %ebp,%ebp
 
+	# Store the physical memory map address
+	# passed in from bootloader
+	mov %ecx,%edx
+	shr $20,%edx
+	mov %rdx,phys_mem_map_count
+	and $0x000FFFFF,%rcx
+	mov %rcx,phys_mem_map
+
 	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions CR4_OSXMMEX)
 	# This must be done before jumping into C code
 	mov %cr4,%rax
 	or $0x600,%rax
 	mov %rax,%cr4
 
+	# Get the MXCSR_MASK
+	mov %rsp,%rdx
+	sub $512,%rsp
+	and $-64,%rsp
+
+	fxsave64 (%rsp)
+
+	mov 28(%rsp),%eax
+	mov %eax,default_mxcsr_mask
+
+	# Set MXCSR to 64-bit precision,
+	# all exceptions masked, round to nearest
+	movl $((3 << 13) | (0x3F << 7)),24(%rsp)
+	ldmxcsr 24(%rsp)
+
+	mov %rdx,%rsp
+
 	# Initialize FPU to 64 bit precision,
 	# all exceptions masked, round to nearest
 	fninit
 	push $((3 << 10) | 0x3F)
 	fldcw (%rsp)
-	add $8,%rax
+	add $8,%rsp
 
 	push %rdx
 	push %rcx
-
-	# See if branch trace is available
-#	mov $0x1A0,%ecx
-#	rdmsr
-#	test $0x800,%eax
-#	jz 0f
-#
-#	# Enable last branch records
-#	mov $0x1D9,%ecx
-#	rdmsr
-#	or $1,%eax
-#	wrmsr
-#0:
 
 	# See if this is the bootstrap processor
 	mov $0x1B,%ecx
@@ -54,14 +66,6 @@ entry:
 	lea kernel_stack(%rip),%rax
 	add kernel_stack_size(%rip),%rax
 	mov %rax,%rsp
-
-	# Store the physical memory map address
-	# passed in from bootloader
-	mov %ecx,%edx
-	shr $20,%edx
-	mov %rdx,phys_mem_map_count(%rip)
-	and $0x000FFFFF,%rcx
-	mov %rcx,phys_mem_map(%rip)
 
 	call e9debug_init
 

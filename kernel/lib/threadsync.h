@@ -33,7 +33,6 @@ struct mutex_t {
     thread_wait_link_t volatile link;
 
     thread_t volatile owner;
-
     int spin_count;
 
     // This lock must be held while updating the list

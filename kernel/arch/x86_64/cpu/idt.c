@@ -245,6 +245,9 @@ static void idt_xsave_detect(int ap)
         // Change enabled XSAVE features
         cpu_xcr_change_bits(0, supported_states, enabled_states);
 
+        if (ap)
+            return;
+
         // Get size of save area
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
             break;
@@ -257,8 +260,14 @@ static void idt_xsave_detect(int ap)
         sse_context_size = (info.ebx + 15) & -16;
 
         // Use compact format if available
-        if (cpuid(&info, CPUID_INFO_XSAVE, 1) && (info.eax & 2))
-            sse_context_save = isr_save_xsavec;
+        if (cpuid(&info, CPUID_INFO_XSAVE, 1)) {
+            sse_context_size = (sse_context_size + 63) & -64;
+
+            if (info.eax & 1)
+                sse_context_save = isr_save_xsaveopt;
+            else if (info.eax & 2)
+                sse_context_save = isr_save_xsavec;
+        }
 
         // Save offsets/sizes of extended contexts
 
@@ -314,6 +323,9 @@ static void idt_xsave_detect(int ap)
         cpu_irq_toggle(intr_was_enabled);
         return;
     }
+
+    if (ap)
+        return;
 
     assert(sse_context_size == 0);
     assert(sse_context_save == 0);

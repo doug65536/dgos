@@ -20,8 +20,8 @@
 #define CONDVAR_DTRACE(...) ((void)0)
 #endif
 
-#define SPINCOUNT_MAX   1048576
-#define SPINCOUNT_MIN   131072
+#define SPINCOUNT_MAX   16384
+#define SPINCOUNT_MIN   4096
 
 static void thread_wait_add(thread_wait_link_t volatile *root,
                             thread_wait_link_t volatile *node)
@@ -53,8 +53,8 @@ EXPORT void mutex_init(mutex_t *mutex)
 {
     mutex->owner = -1;
     mutex->lock = 0;
-    mutex->spin_count = SPINCOUNT_MIN +
-            ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1);
+    mutex->spin_count = spincount_mask &
+            (SPINCOUNT_MIN + ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1));
     mutex->link.next = &mutex->link;
     mutex->link.prev = &mutex->link;
 }
@@ -76,7 +76,7 @@ EXPORT void mutex_lock(mutex_t *mutex)
 
         // Increase spin count
         if (mutex->spin_count < SPINCOUNT_MAX)
-            ++mutex->spin_count;
+            mutex->spin_count -= spincount_mask;
 
         atomic_barrier();
     } else {
@@ -85,7 +85,7 @@ EXPORT void mutex_lock(mutex_t *mutex)
 
         // Decrease spin count
         if (mutex->spin_count > SPINCOUNT_MIN)
-            --mutex->spin_count;
+            mutex->spin_count += spincount_mask;
 
         MUTEX_DTRACE("Adding to waitchain of %p\n", (void*)mutex);
 

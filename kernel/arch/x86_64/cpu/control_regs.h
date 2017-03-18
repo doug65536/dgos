@@ -259,7 +259,5 @@ static inline uint64_t cpu_rdtsc(void)
     return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
 
-uint32_t cpu_get_default_mxcsr_mask(void);
-
 void cpu_fxsave(void *fpuctx);
 void cpu_xsave(void *fpuctx);
