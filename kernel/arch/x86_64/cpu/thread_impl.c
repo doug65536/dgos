@@ -411,9 +411,6 @@ void thread_init(int ap)
     // First CPU is the BSP
     cpu_info_t *cpu = cpus + cpu_number;
 
-    cpu->queue = priqueue_create(
-                0, thread_priority_cmp, thread_priority_swapped, cpu);
-
     assert(thread_count == cpu_number);
 
     // First thread is this boot thread
@@ -424,6 +421,9 @@ void thread_init(int ap)
     cpu->online = 1;
 
     cpu_set_gsbase(cpu);
+
+    cpu->queue = priqueue_create(
+                0, thread_priority_cmp, thread_priority_swapped, cpu);
 
     if (!ap) {
         cpu->cur_thread = thread;
