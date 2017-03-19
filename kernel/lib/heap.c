@@ -205,17 +205,15 @@ void *heap_alloc(heap_t *heap, size_t size)
     size_t bucket = log2size - 5;
 
     heap_hdr_t *first_free;
-    int intr_enabled;
 
-    if (bucket < HEAP_BUCKET_COUNT) {
-        intr_enabled = cpu_irq_disable();
-        mutex_lock(&heap->lock);
-
-        // Try to take a free item
-        first_free = heap->free_chains[bucket];
-    } else {
+    if (unlikely(bucket >= HEAP_BUCKET_COUNT))
         return heap_large_alloc(orig_size);
-    }
+
+    int intr_enabled = cpu_irq_disable();
+    mutex_lock(&heap->lock);
+
+    // Try to take a free item
+    first_free = heap->free_chains[bucket];
 
     if (!first_free) {
         // Create a new bucket
