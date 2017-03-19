@@ -3,6 +3,7 @@
 LIBNAME := kernel
 CSRCS := mm.c \
 	thread.c \
+	priorityqueue.c \
 	threadsync.c \
 	callout.c \
 	printk.c \

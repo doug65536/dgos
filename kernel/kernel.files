@@ -1,5 +1,6 @@
 arch/x86_64/bootdev.c
 arch/x86_64/bootdev.h
+arch/x86_64/cpu/cpu_metrics.h
 arch/x86_64/cpu/except.c
 arch/x86_64/cpu/except.h
 arch/x86_64/cpu/except_asm.h
@@ -33,6 +34,8 @@ lib/math.c
 lib/math.h
 lib/png.c
 lib/png.h
+lib/priorityqueue.c
+lib/priorityqueue.h
 lib/process.c
 lib/process.h
 lib/stddef.h

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "cpu/cpu_metrics.h"
 
 /// Failure return value for memory mapping functions
 #define MAP_FAILED ((void*)-1)
