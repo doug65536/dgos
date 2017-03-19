@@ -46,7 +46,6 @@ void msr_set(uint32_t msr, uint64_t value)
         : "a" (value)
         , "d" (value >> 32)
         , "c" (msr)
-        : "rdx"
     );
 }
 
