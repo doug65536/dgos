@@ -38,8 +38,8 @@ static unsigned fs_mount_count;
 
 storage_dev_base_t *open_storage_dev(dev_t dev)
 {
-    assert(dev >= 0 && (unsigned)dev < storage_dev_count);
-    return storage_devs[dev];
+    assert(dev >= 0 && (unsigned)dev <= storage_dev_count);
+    return (unsigned)dev < storage_dev_count ? storage_devs[dev] : 0;
 }
 
 void close_storage_dev(storage_dev_base_t *dev)
