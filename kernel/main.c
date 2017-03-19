@@ -53,13 +53,13 @@ void (** volatile device_list)(void) = device_constructor_list;
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_AHCI_STRESS_THREAD   0
-#define ENABLE_SLEEP_THREAD         0
-#define ENABLE_MUTEX_THREAD         0
-#define ENABLE_REGISTER_THREAD      0
-#define ENABLE_STRESS_MMAP_THREAD   0
-#define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_AHCI_STRESS_THREAD   4
+#define ENABLE_SLEEP_THREAD         4
+#define ENABLE_MUTEX_THREAD         4
+#define ENABLE_REGISTER_THREAD      4
+#define ENABLE_STRESS_MMAP_THREAD   4
+#define ENABLE_CTXSW_STRESS_THREAD  4
+#define ENABLE_STRESS_HEAP_THREAD   4
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    0
@@ -114,6 +114,9 @@ static int read_stress(void *p)
     (void)p;
 
     storage_dev_base_t *drive = open_storage_dev(0);
+
+    if (!drive)
+        return 0;
 
     // FIXME: lock the pages in the driver instead of
     // requiring MAP_POPULATE
