@@ -55,7 +55,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
-    paging_map_range(0xFFFFFFFF7FFFF000ULL - PAGE_SIZE, PAGE_SIZE, 0,
+    paging_map_range(0xFFFFFFFF80000000ULL - PAGE_SIZE, PAGE_SIZE, 0,
                      PTE_PRESENT | PTE_WRITABLE, 0);
 
     // Map first 640KB
