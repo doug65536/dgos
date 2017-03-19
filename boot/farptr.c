@@ -15,9 +15,9 @@ void far_zero(far_ptr_t dest, uint16_t paragraphs)
         "jnz 0b\n\t"
         "pop %%ds\n\t"
         : [paragraphs] "+m" (paragraphs)
-        : [zero] "a" (eax),
-          [ofs] "D" (dest.offset),
-          [seg] "c" (dest.segment)
+        : [zero] "a" (eax)
+        , [ofs] "D" (dest.offset)
+        , [seg] "c" (dest.segment)
         : "memory"
     );
 }

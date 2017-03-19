@@ -81,8 +81,8 @@ static uint16_t vbe_get_info(void *info, uint16_t ax, uint16_t cx)
     __asm__ __volatile__ (
         "int $0x10\n\t"
         : "+a" (ax)
-        : "D" (info),
-          "c" (cx)
+        : "D" (info)
+        , "c" (cx)
         : "memory"
     );
     return ax;

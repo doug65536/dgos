@@ -18,11 +18,11 @@ static uint16_t get_ram_region(physmem_range_t *range,
         "int $0x15\n\t"
         "setnc %%al\n"
         "movsbl %%al,%[eax]\n\t"
-        : [continuation] "+b" (*continuation_ptr),
-          [eax] "+a" (eax)
-        : "d" (0x534D4150),
-          "c" (sizeof(physmem_range_t)),
-          "D" ((uint16_t)(uint32_t)range)
+        : [continuation] "+b" (*continuation_ptr)
+        , [eax] "+a" (eax)
+        : "d" (0x534D4150)
+        , "c" (sizeof(physmem_range_t))
+        , "D" ((uint16_t)(uint32_t)range)
         : "memory"
     );
     return (uint16_t)eax;

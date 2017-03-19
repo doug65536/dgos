@@ -184,7 +184,8 @@ static uint16_t toggle_a20(uint8_t enable)
         "orb %0,%1\n\t"
         "wbinvd\n\t"
         "outb %1,$0x92\n\t"
-        : "+c" (enable), "=a" (value)
+        : "+c" (enable)
+        , "=a" (value)
     );
     return 0;
 }
@@ -201,9 +202,9 @@ int64_t cmpxchg8b(
     __asm__ __volatile__ (
         "lock cmpxchg8b (%[value])\n\t"
         : "+A" (expect)
-        : [value] "SD" (value),
-          "b" ((uint32_t)replacement & 0xFFFFFFFF),
-          "c" ((uint32_t)(replacement >> 32))
+        : [value] "SD" (value)
+        , "b" ((uint32_t)replacement & 0xFFFFFFFF)
+        , "c" ((uint32_t)(replacement >> 32))
         : "memory"
     );
     return expect;
@@ -235,8 +236,8 @@ uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 
     __asm__ __volatile__ (
         "cpuid"
-        : "=a" (output->eax), "=c" (output->ecx),
-          "=d" (output->edx), "=b" (output->ebx)
+        : "=a" (output->eax), "=c" (output->ecx)
+        , "=d" (output->edx), "=b" (output->ebx)
         : "a" (eax), "c" (ecx)
     );
 
@@ -499,21 +500,20 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "leaw %[idtr_16],%%si\n\t"
         "lidt (%%si)\n\t"
         :
-        :
-                [address] "m" (address),
-                [src] "m" (src),
-                [size] "m" (size),
-                [pdbr] "m" (pdbr),
-                [gdtr] "m" (gdtr),
-                [idtr_64] "m" (idtr_64),
-                [idtr_16] "m" (idtr_16),
-                [gdt_code64] "i" (GDT_SEL_KERNEL_CODE64),
-                [gdt_data64] "i" (GDT_SEL_KERNEL_DATA64),
-                [gdt_code32] "i" (GDT_SEL_KERNEL_CODE32),
-                [gdt_data32] "i" (GDT_SEL_KERNEL_DATA32),
-                [gdt_code16] "i" (GDT_SEL_KERNEL_CODE16),
-                [gdt_data16] "i" (GDT_SEL_KERNEL_DATA16),
-                [nx_available] "m" (nx_available)
+        : [address] "m" (address)
+        , [src] "m" (src)
+        , [size] "m" (size)
+        , [pdbr] "m" (pdbr)
+        , [gdtr] "m" (gdtr)
+        , [idtr_64] "m" (idtr_64)
+        , [idtr_16] "m" (idtr_16)
+        , [gdt_code64] "i" (GDT_SEL_KERNEL_CODE64)
+        , [gdt_data64] "i" (GDT_SEL_KERNEL_DATA64)
+        , [gdt_code32] "i" (GDT_SEL_KERNEL_CODE32)
+        , [gdt_data32] "i" (GDT_SEL_KERNEL_DATA32)
+        , [gdt_code16] "i" (GDT_SEL_KERNEL_CODE16)
+        , [gdt_data16] "i" (GDT_SEL_KERNEL_DATA16)
+        , [nx_available] "m" (nx_available)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
 

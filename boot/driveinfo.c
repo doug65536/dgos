@@ -30,8 +30,8 @@ void driveinfo(void)
         "shr $16,%%ax\n\t"
         "pop %%ds\n\t"
         : "+a" (ax)
-        : "d" (boot_drive),
-          "S" (ptr.segment)
+        : "d" (boot_drive)
+        , "S" (ptr.segment)
         : "memory"
     );
 

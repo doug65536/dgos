@@ -45,8 +45,8 @@ static inline void outb(ioport_t port, uint8_t value)
     __asm__ __volatile__ (
         "outb %b[value],%w[port]\n\t"
         :
-        : [value] "a" (value),
-          [port] "Nd" (port)
+        : [value] "a" (value)
+        , [port] "Nd" (port)
         : "memory"
     );
 }
@@ -56,8 +56,8 @@ static inline void outw(ioport_t port, uint16_t value)
     __asm__ __volatile__ (
         "outw %w[value],%w[port]\n\t"
         :
-        : [value] "a" (value),
-          [port] "Nd" (port)
+        : [value] "a" (value)
+        , [port] "Nd" (port)
         : "memory"
     );
 }
@@ -67,8 +67,8 @@ static inline void outd(ioport_t port, uint32_t value)
     __asm__ __volatile__ (
         "outl %[value],%w[port]\n\t"
         :
-        : [value] "a" (value),
-          [port] "Nd" (port)
+        : [value] "a" (value)
+        , [port] "Nd" (port)
         : "memory"
     );
 }
@@ -82,9 +82,9 @@ static inline void insb(ioport_t port,
     __asm__ __volatile__ (
         "rep insb\n\t"
         :
-        : [value] "D" (values),
-          [count] "c" (count),
-          [port] "d" (port)
+        : [value] "D" (values)
+        , [count] "c" (count)
+        , [port] "d" (port)
         : "memory"
     );
 }
@@ -95,9 +95,9 @@ static inline void insw(ioport_t port,
     __asm__ __volatile__ (
         "rep insw\n\t"
         :
-        : [value] "D" (values),
-          [count] "c" (count),
-          [port] "d" (port)
+        : [value] "D" (values)
+        , [count] "c" (count)
+        , [port] "d" (port)
         : "memory"
     );
 }
@@ -108,9 +108,9 @@ static inline void insd(ioport_t port,
     __asm__ __volatile__ (
         "rep insl\n\t"
         :
-        : [value] "D" (values),
-          [count] "c" (count),
-          [port] "d" (port)
+        : [value] "D" (values)
+        , [count] "c" (count)
+        , [port] "d" (port)
         : "memory"
     );
 }
@@ -121,9 +121,9 @@ static inline void outsb(ioport_t port,
     __asm__ __volatile__ (
         "rep outsb\n\t"
         :
-        : [value] "S" (values),
-          [count] "c" (count),
-          [port] "d" (port)
+        : [value] "S" (values)
+        , [count] "c" (count)
+        , [port] "d" (port)
         : "memory"
     );
 }
@@ -134,9 +134,9 @@ static inline void outsw(ioport_t port,
     __asm__ __volatile__ (
         "rep outsw\n\t"
         :
-        : [value] "S" (values),
-          [count] "c" (count),
-          [port] "d" (port)
+        : [value] "S" (values)
+        , [count] "c" (count)
+        , [port] "d" (port)
         : "memory"
     );
 }
@@ -147,9 +147,9 @@ static inline void outsd(ioport_t port,
     __asm__ __volatile__ (
         "rep outsl\n\t"
         :
-        : [value] "S" (values),
-          [count] "c" (count),
-          [port] "d" (port)
+        : [value] "S" (values)
+        , [count] "c" (count)
+        , [port] "d" (port)
         : "memory"
     );
 }

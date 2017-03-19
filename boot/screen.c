@@ -77,7 +77,10 @@ static void bios_scroll_region(uint16_t top_left, uint16_t bottom_right,
         "int $0x10\n\t"
         "popl %%ebp\n\t"
         : "=a" (lines)
-        : "c" (top_left), "d" (bottom_right), "a" (lines | (0x06 << 8)), "b" (attr << 8)
+        : "c" (top_left)
+        , "d" (bottom_right)
+        , "a" (lines | (0x06 << 8))
+        , "b" (attr << 8)
     );
 }
 

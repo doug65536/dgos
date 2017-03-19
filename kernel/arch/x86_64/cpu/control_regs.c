@@ -41,12 +41,11 @@ uint32_t msr_get_hi(uint32_t msr)
 void msr_set(uint32_t msr, uint64_t value)
 {
     __asm__ __volatile__ (
-        "mov %%rax,%%rdx\n\t"
-        "shr $32,%%rdx\n\t"
         "wrmsr\n\t"
         :
-        : "a" (value),
-        "c" (msr)
+        : "a" (value)
+        , "d" (value >> 32)
+        , "c" (msr)
         : "rdx"
     );
 }
@@ -58,8 +57,8 @@ void msr_set_lo(uint32_t msr, uint32_t value)
         "mov %[value],%%eax\n\t"
         "wrmsr"
         :
-        : [value] "S" (value),
-        "c" (msr)
+        : [value] "S" (value)
+        , "c" (msr)
         : "rdx"
     );
 }
@@ -71,8 +70,8 @@ void msr_set_hi(uint32_t msr, uint32_t value)
         "mov %[value],%%edx\n\t"
         "wrmsr"
         :
-        : [value] "S" (value),
-        "c" (msr)
+        : [value] "S" (value)
+        , "c" (msr)
         : "rdx"
     );
 }
@@ -91,9 +90,9 @@ uint64_t cpu_xcr_change_bits(uint32_t xcr, uint64_t clear, uint64_t set)
         "shr $32,%%rdx\n\t"
         "xsetbv\n\t"
         : "=a" (eax), "=d" (edx)
-        : "c" (xcr),
-          [set] "S" (set),
-          [clear_mask] "D" (~clear)
+        : "c" (xcr)
+        , [set] "S" (set)
+        , [clear_mask] "D" (~clear)
     );
     return ((uint64_t)edx << 32) | eax;
 }
@@ -107,8 +106,8 @@ uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
         "or %[set],%[result]\n\t"
         "mov %[result],%%cr0\n\t"
         : [result] "=&r" (rax)
-        : [clear] "r" (~clear),
-          [set] "r" (set)
+        : [clear] "r" (~clear)
+        , [set] "r" (set)
     );
     return rax;
 }
@@ -122,8 +121,8 @@ uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
         "orq %[set],%[result]\n\t"
         "movq %[result],%%cr4\n\t"
         : [result] "=&r" (rax)
-        : [clear] "r" (~clear),
-          [set] "r" (set)
+        : [clear] "r" (~clear)
+        , [set] "r" (set)
     );
     return rax;
 }

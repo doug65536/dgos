@@ -196,12 +196,12 @@ static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
         "packuswb %[zero],%[tmp1]\n\t"
         // Store result pixel
         "movd %[tmp1],(%[pixel])\n\t"
-        : [tmp1] "=&x" (tmp1), "=&x" (tmp2),
-          [alpha] "+x" (alpha),
-          [ooa] "+x" (ooa),
-          [fcolor] "+x" (fcolor)
-        : [pixel] "r" (pixel),
-          [zero] "x" (0)
+        : [tmp1] "=&x" (tmp1), "=&x" (tmp2)
+        , [alpha] "+x" (alpha)
+        , [ooa] "+x" (ooa)
+        , [fcolor] "+x" (fcolor)
+        : [pixel] "r" (pixel)
+        , [zero] "x" (0)
         : "memory"
     );
 }

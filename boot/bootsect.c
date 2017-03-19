@@ -143,8 +143,8 @@ uint16_t read_lba_sectors(
         "and %%al,%%ah\n"
         "shr $8,%%ax\n"
         : "+a" (ax)
-        : "d" (drive),
-          "S" (&pkt)
+        : "d" (drive)
+        , "S" (&pkt)
         : "memory"
     );
     return ax;

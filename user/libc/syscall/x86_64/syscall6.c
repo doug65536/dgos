@@ -14,7 +14,12 @@ long syscall6(long p0, long p1, long p2,
     __asm__ __volatile__ (
         "syscall\n\t"
         : "+a" (code),
-          "+D" (p0), "+S" (p1), "+d" (p2), "+r" (r10), "+r" (r8), "+r" (r9)
+          "+D" (p0)
+        , "+S" (p1)
+        , "+d" (p2)
+        , "+r" (r10)
+        , "+r" (r8)
+        , "+r" (r9)
         :
         : "memory", "rcx", "r11"
     );

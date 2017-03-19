@@ -36,10 +36,10 @@ static void *memcpy512_nt_avx(void *dest, void const *src, size_t n)
         "vzeroupper\n\t"
         :
         :
-        : "%ymm0",  "%ymm1",  "%ymm2",  "%ymm3",
-          "%ymm4",  "%ymm5",  "%ymm6",  "%ymm7",
-          "%ymm8",  "%ymm9",  "%ymm10", "%ymm11",
-          "%ymm12", "%ymm13", "%ymm14", "%ymm15"
+        : "%ymm0",  "%ymm1",  "%ymm2",  "%ymm3"
+        , "%ymm4",  "%ymm5",  "%ymm6",  "%ymm7"
+        , "%ymm8",  "%ymm9",  "%ymm10", "%ymm11"
+        , "%ymm12", "%ymm13", "%ymm14", "%ymm15"
     );
     while (unlikely(n >= 16)) {
         __asm__ __volatile__ (

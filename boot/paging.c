@@ -37,8 +37,8 @@ static uint64_t read_pte(uint16_t segment, uint16_t slot)
         "movw %[seg],%%fs\n\t"
         "movl %%fs:(%w[slot]),%%eax\n\t"
         "movl %%fs:4(%w[slot]),%%edx\n\t"
-        : "=A" (pte),
-          [slot] "+bSD" (slot)
+        : "=A" (pte)
+        , [slot] "+bSD" (slot)
         : [seg] "r" (segment)
         : "memory"
     );
