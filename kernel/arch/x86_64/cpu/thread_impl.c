@@ -20,6 +20,7 @@
 #include "export.h"
 #include "printk.h"
 #include "isr_constants.h"
+#include "priorityqueue.h"
 
 // Implements platform independent thread.h
 
@@ -94,7 +95,10 @@ struct thread_info_t {
     mutex_t lock;
     condition_var_t done_cond;
 
-    void *align[6];
+    size_t queue_slot;
+    uint64_t next_run;
+
+    void *align[4];
 };
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
@@ -123,7 +127,10 @@ struct cpu_info_t {
     // Used for lazy TLB shootdown
     uint64_t mmu_seq;
 
-    void *align[3];
+    priqueue_t *queue;
+    spinlock_t queue_lock;
+
+    void *align[1];
 };
 
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
@@ -378,6 +385,22 @@ static int smp_thread(void *arg)
     return 0;
 }
 
+static int thread_priority_cmp(uintptr_t a, uintptr_t b, void *ctx)
+{
+    (void)ctx;
+    thread_info_t *ap = threads + a;
+    thread_info_t *bp = threads + b;
+    return ((ap->next_run > bp->next_run) << 1) - 1;
+}
+
+static void thread_priority_swapped(uintptr_t a, uintptr_t b, void *ctx)
+{
+    (void)ctx;
+    uintptr_t tmp = threads[a].queue_slot;
+    threads[a].queue_slot = threads[b].queue_slot;
+    threads[b].queue_slot = tmp;
+}
+
 void thread_init(int ap)
 {
     uint32_t cpu_number = atomic_xadd(&cpu_count, 1);
@@ -387,6 +410,9 @@ void thread_init(int ap)
 
     // First CPU is the BSP
     cpu_info_t *cpu = cpus + cpu_number;
+
+    cpu->queue = priqueue_create(
+                0, thread_priority_cmp, thread_priority_swapped, cpu);
 
     assert(thread_count == cpu_number);
 
@@ -634,7 +660,7 @@ EXPORT void thread_sleep_until(uint64_t expiry)
         thread->wake_time = expiry;
         atomic_barrier();
         thread->state = THREAD_IS_SLEEPING_BUSY;
-        thread->priority_boost = 100;
+        //thread->priority_boost = 100;
         thread_yield();
     } else {
         thread_early_sleep(expiry);
@@ -675,7 +701,7 @@ EXPORT void thread_resume(thread_t thread)
                  thread, threads[thread].state, wait_count);
     }
 
-    threads[thread].priority_boost = 128;
+    //threads[thread].priority_boost = 128;
     threads[thread].state = THREAD_IS_READY;
 }
 
