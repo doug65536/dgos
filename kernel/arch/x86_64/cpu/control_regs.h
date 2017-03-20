@@ -137,35 +137,273 @@ typedef struct table_register_64_t {
     uintptr_t base;
 } table_register_64_t;
 
-// Get whole MSR register as a 64-bit value
-uint64_t msr_get(uint32_t msr);
+static inline uint64_t msr_get(uint32_t msr)
+{
+    uint32_t lo, hi;
+    __asm__ __volatile__ (
+        "rdmsr\n\t"
+        : "=a" (lo)
+        , "=d" (hi)
+        : "c" (msr)
+    );
+    return ((uint64_t)hi << 32) | lo;
+}
 
-// Get low 32 bits pf MSR register
-uint32_t msr_get_lo(uint32_t msr);
+static inline uint32_t msr_get_lo(uint32_t msr)
+{
+    uint64_t result;
+    __asm__ __volatile__ (
+        "rdmsr\n\t"
+        : "=a" (result)
+        : "c" (msr)
+        : "rdx"
+    );
+    return result;
+}
 
-// High high 32 bits of MSR register
-uint32_t msr_get_hi(uint32_t msr);
+static inline uint32_t msr_get_hi(uint32_t msr)
+{
+    uint64_t result;
+    __asm__ __volatile__ (
+        "rdmsr\n\t"
+        : "=d" (result)
+        : "c" (msr)
+        : "rax"
+    );
+    return result;
+}
 
-// Set whole MSR as a 64 bit value
-void msr_set(uint32_t msr, uint64_t value);
+static inline void msr_set(uint32_t msr, uint64_t value)
+{
+    __asm__ __volatile__ (
+        "wrmsr\n\t"
+        :
+        : "a" (value)
+        , "d" (value >> 32)
+        , "c" (msr)
+    );
+}
 
-// Update the low 32 bits of MSR, preserving the high 32 bits
-void msr_set_lo(uint32_t msr, uint32_t value);
+static inline void msr_set_lo(uint32_t msr, uint32_t value)
+{
+    __asm__ __volatile__ (
+        "rdmsr\n\t"
+        "mov %[value],%%eax\n\t"
+        "wrmsr"
+        :
+        : [value] "S" (value)
+        , "c" (msr)
+        : "rdx"
+    );
+}
 
-// Update the low 32 bits of MSR, preserving the high 32 bits
-void msr_set_hi(uint32_t msr, uint32_t value);
+static inline void msr_set_hi(uint32_t msr, uint32_t value)
+{
+    __asm__ __volatile__ (
+        "rdmsr\n\t"
+        "mov %[value],%%edx\n\t"
+        "wrmsr"
+        :
+        : [value] "S" (value)
+        , "c" (msr)
+        : "rdx"
+    );
+}
 
-// Set the specified bit of the specified MSR
-uint64_t msr_adj_bit(uint32_t msr, int bit, int set);
+static inline uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
+{
+    uint64_t n = msr_get(msr);
+    n &= ~((uint64_t)1 << bit);
+    n |= (uint64_t)(set != 0) << bit;
+    msr_set(msr, n);
+    return n;
+}
 
-// Returns new value of cr0
-uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set);
+static inline uint64_t cpu_xcr_change_bits(
+        uint32_t xcr, uint64_t clear, uint64_t set)
+{
+    uint32_t eax;
+    uint32_t edx;
+    __asm__ __volatile__ (
+        "xgetbv\n\t"
+        "shl $32,%%rdx\n\t"
+        "or %%rdx,%%rax\n\t"
+        "and %[clear_mask],%%rax\n\t"
+        "or %[set],%%rax\n\t"
+        "mov %%rax,%%rdx\n\t"
+        "shr $32,%%rdx\n\t"
+        "xsetbv\n\t"
+        : "=a" (eax), "=d" (edx)
+        : "c" (xcr)
+        , [set] "S" (set)
+        , [clear_mask] "D" (~clear)
+    );
+    return ((uint64_t)edx << 32) | eax;
+}
 
-// Returns new value of xcr0
-uint64_t cpu_xcr_change_bits(uint32_t xcr, uint64_t clear, uint64_t set);
+static inline uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
+{
+    uintptr_t rax;
+    __asm__ __volatile__ (
+        "mov %%cr0,%[result]\n\t"
+        "and %[clear],%[result]\n\t"
+        "or %[set],%[result]\n\t"
+        "mov %[result],%%cr0\n\t"
+        : [result] "=&r" (rax)
+        : [clear] "ri" (~clear)
+        , [set] "ri" (set)
+    );
+    return rax;
+}
 
-// Returns new value of cr0
-uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set);
+static inline uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
+{
+    uintptr_t rax;
+    __asm__ __volatile__ (
+        "movq %%cr4,%[result]\n\t"
+        "andq %[clear],%[result]\n\t"
+        "orq %[set],%[result]\n\t"
+        "movq %[result],%%cr4\n\t"
+        : [result] "=&r" (rax)
+        : [clear] "ri" (~clear)
+        , [set] "ri" (set)
+    );
+    return rax;
+}
+
+static inline void cpu_set_page_directory(uintptr_t addr)
+{
+    __asm__ __volatile__ (
+        "mov %[addr],%%cr3\n\t"
+        :
+        : [addr] "r" (addr)
+        : "memory"
+    );
+}
+
+static inline uintptr_t cpu_get_page_directory(void)
+{
+    uintptr_t addr;
+    __asm__ __volatile__ (
+        "mov %%cr3,%[addr]\n\t"
+        : [addr] "=r" (addr)
+    );
+    return addr;
+}
+
+static inline void cpu_flush_tlb(void)
+{
+    cpu_set_page_directory(cpu_get_page_directory() & -4096L);
+}
+
+static inline void cpu_set_fs(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "mov %w[selector],%%fs\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
+static inline void cpu_set_gs(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "mov %w[selector],%%gs\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
+static inline void cpu_set_fsbase(void *fs_base)
+{
+    msr_set(MSR_FSBASE, (uintptr_t)fs_base);
+}
+
+static inline void cpu_set_gsbase(void *gs_base)
+{
+    msr_set(MSR_GSBASE, (uintptr_t)gs_base);
+}
+
+static inline table_register_64_t cpu_get_gdtr(void)
+{
+    table_register_64_t gdtr;
+    __asm__ __volatile__ (
+        "sgdt (%[gdtr])\n\t"
+        :
+        : [gdtr] "r" (&gdtr.limit)
+        : "memory"
+    );
+    return gdtr;
+}
+
+static inline void cpu_set_gdtr(table_register_64_t gdtr)
+{
+    __asm__ __volatile__ (
+        "lgdt (%[gdtr])\n\t"
+        :
+        : [gdtr] "r" (&gdtr.limit)
+        : "memory"
+    );
+}
+
+static inline uint16_t cpu_get_tr(void)
+{
+    uint16_t tr;
+    __asm__ __volatile__ (
+        "str %w[tr]\n\t"
+        : [tr] "=r" (tr)
+        :
+        : "memory"
+    );
+    return tr;
+}
+
+static inline void cpu_set_tr(uint16_t tr)
+{
+    __asm__ __volatile__ (
+        "ltr %w[tr]\n\t"
+        :
+        : [tr] "r" (tr)
+        : "memory"
+    );
+}
+
+static inline void *cpu_get_stack_ptr(void)
+{
+    void *rsp;
+    __asm__ __volatile__ (
+        "mov %%rsp,%[rsp]\n\t"
+        : [rsp] "=r" (rsp)
+    );
+    return rsp;
+}
+
+static inline void cpu_crash(void)
+{
+    __asm__ __volatile__ (
+        "ud2"
+    );
+}
+
+static inline void cpu_fxsave(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        "fxsave64 (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static inline void cpu_xsave(void *fpuctx)
+{
+    __asm__ __volatile__ (
+        "xsave64 (%[fpuctx])\n\t"
+        :
+        : "a" (-1), "d" (-1), [fpuctx] "D" (fpuctx)
+        : "memory"
+    );
+}
 
 static inline uintptr_t cpu_get_fault_address(void)
 {
@@ -177,31 +415,15 @@ static inline uintptr_t cpu_get_fault_address(void)
     return addr;
 }
 
-uintptr_t cpu_get_page_directory(void);
-void cpu_set_page_directory(uintptr_t addr);
-void cpu_flush_tlb(void);
-
-void cpu_set_fs(uint16_t selector);
-void cpu_set_gs(uint16_t selector);
-
-void cpu_set_fsbase(void *fs_base);
-void cpu_set_gsbase(void *gs_base);
-
 static inline void cpu_invalidate_page(uintptr_t addr)
 {
     __asm__ __volatile__ (
-        "invlpg (%[addr])\n\t"
+        "invlpg %[addr]\n\t"
         :
-        : [addr] "r" (addr)
+        : [addr] "m" (*(char*)addr)
         : "memory"
     );
 }
-
-table_register_64_t cpu_get_gdtr(void);
-void cpu_set_gdtr(table_register_64_t gdtr);
-
-uint16_t cpu_get_tr(void);
-void cpu_set_tr(uint16_t tr);
 
 static inline void *cpu_gs_read_ptr(void)
 {
@@ -211,6 +433,46 @@ static inline void *cpu_gs_read_ptr(void)
         : [ptr] "=r" (ptr)
     );
     return ptr;
+}
+
+static inline uintptr_t cpu_get_flags(void)
+{
+    uintptr_t flags;
+    __asm__ __volatile__ (
+        "pushf\n\t"
+        "pop %[flags]\n\t"
+        : [flags] "=r" (flags)
+    );
+    return flags;
+}
+
+static inline void cpu_set_flags(uintptr_t flags)
+{
+    __asm__ __volatile__ (
+        "push %[flags]\n\t"
+        "popf\n\t"
+        :
+        : [flags] "ir" (flags)
+        : "cc"
+    );
+}
+
+static inline uintptr_t cpu_change_flags(uintptr_t clear, uintptr_t set)
+{
+    uintptr_t flags;
+    __asm__ __volatile__ (
+        "pushf\n\t"
+        "pop %[flags]\n\t"
+        "and %[clear],%[flags]\n\t"
+        "or %[set],%[flags]\n\t"
+        "push %[flags]\n\t"
+        "popf"
+        : [flags] "=&r" (flags)
+        : [clear] "ir" (clear)
+        , [set] "ir" (set)
+        : "cc"
+    );
+    return flags;
 }
 
 static inline int cpu_irq_disable(void)
@@ -243,13 +505,15 @@ static inline void cpu_irq_toggle(int enable)
         "push %q[temp]\n\t"
         "popfq\n\t"
         : [temp] "=&r" (temp)
-        : [enable] "r" ((!!enable) << 9)
-        : "memory"
+        : [enable] "ir" ((enable != 0) << 9)
+        : "cc"
     );
 }
 
-void *cpu_get_stack_ptr(void);
-void cpu_crash(void);
+static inline int cpu_irq_is_enabled(void)
+{
+    return (cpu_get_flags() & (1<<9)) != 0;
+}
 
 static inline uint64_t cpu_rdtsc(void)
 {
@@ -261,6 +525,3 @@ static inline uint64_t cpu_rdtsc(void)
     );
     return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
-
-void cpu_fxsave(void *fpuctx);
-void cpu_xsave(void *fpuctx);
