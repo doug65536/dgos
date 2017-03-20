@@ -420,6 +420,7 @@ void thread_init(int ap)
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
+    cpu_set_gs(GDT_SEL_KERNEL_DATA64);
     cpu_set_gsbase(cpu);
 
     cpu->queue = priqueue_create(
