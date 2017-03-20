@@ -53,17 +53,18 @@ void (** volatile device_list)(void) = device_constructor_list;
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_AHCI_STRESS_THREAD   4
-#define ENABLE_SLEEP_THREAD         4
-#define ENABLE_MUTEX_THREAD         4
-#define ENABLE_REGISTER_THREAD      4
-#define ENABLE_STRESS_MMAP_THREAD   4
-#define ENABLE_CTXSW_STRESS_THREAD  4
-#define ENABLE_STRESS_HEAP_THREAD   4
+#define ENABLE_AHCI_STRESS_THREAD   0
+#define ENABLE_SLEEP_THREAD         0
+#define ENABLE_MUTEX_THREAD         0
+#define ENABLE_REGISTER_THREAD      0
+#define ENABLE_STRESS_MMAP_THREAD   0
+#define ENABLE_CTXSW_STRESS_THREAD  0
+#define ENABLE_STRESS_HEAP_THREAD   1
+#define ENABLE_FRAMEBUFFER_THREAD   0
 
 #define ENABLE_STRESS_HEAP_SMALL    0
-#define ENABLE_STRESS_HEAP_LARGE    0
-#define ENABLE_STRESS_HEAP_BOTH     1
+#define ENABLE_STRESS_HEAP_LARGE    1
+#define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE     64
@@ -619,6 +620,7 @@ static int find_vbe(void *p)
     return 0;
 }
 
+#if ENABLE_FRAMEBUFFER_THREAD > 0
 static int draw_test(void *p)
 {
     (void)p;
@@ -660,10 +662,15 @@ static int draw_test(void *p)
 
     return 0;
 }
+#endif
 
 static int init_thread(void *p)
 {
     (void)p;
+
+    pci_init();
+    keybd_init();
+    keyb8042_init();
 
     // Run late initializations
     callout_call('L');
@@ -687,6 +694,14 @@ static int init_thread(void *p)
 //    for (int i = 0; i < 10000; ++i) {
 //        printdbg("%d=%f\n", i, i / 1000.0);
 //    }
+
+    //void *user_test = mmap((void*)0x400000, 1<<20,
+    //                       PROT_READ | PROT_WRITE, MAP_USER, -1, 0);
+    //munmap(user_test, 1<<20);
+
+    mprotect_test(0);
+
+    rbtree_test();
 
     printdbg("Floating point formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
     printdbg("Floating point formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
@@ -720,7 +735,9 @@ static int init_thread(void *p)
     }
     file_closedir(od);
 
+#if ENABLE_FRAMEBUFFER_THREAD > 0
     thread_create(draw_test, 0, 0, 0);
+#endif
 
     //modload_init();
 
@@ -786,14 +803,6 @@ static int init_thread(void *p)
 
 int main(void)
 {
-    pci_init();
-    keybd_init();
-    keyb8042_init();
-
-    mprotect_test(0);
-
-    rbtree_test();
-
     thread_create(init_thread, 0, 0, 0);
 
     thread_idle_set_ready();
