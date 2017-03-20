@@ -40,7 +40,9 @@ CSRCS := \
 	$(DEVSRCS)
 
 #OPTIMIZEDSRCS := cpu/thread_impl.c
+ifdef OPTIMIZEDSRCS
 $(OPTIMIZEDSRCS:.c=.o): CFLAGS += -O2
+endif
 
 cpu/math.o: CFLAGS += -fno-builtin-ilogbl
 
