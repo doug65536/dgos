@@ -1,3 +1,4 @@
+emulators.mk
 vesainfo.h
 debug.c
 debug.h
