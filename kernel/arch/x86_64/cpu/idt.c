@@ -246,7 +246,7 @@ static void idt_xsave_detect(int ap)
         cpu_xcr_change_bits(0, supported_states, enabled_states);
 
         if (ap)
-            return;
+            break;
 
         // Get size of save area
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
@@ -324,16 +324,15 @@ static void idt_xsave_detect(int ap)
         return;
     }
 
-    if (ap)
-        return;
+    if (!ap) {
+        assert(sse_context_size == 0);
+        assert(sse_context_save == 0);
+        assert(sse_context_restore == 0);
 
-    assert(sse_context_size == 0);
-    assert(sse_context_save == 0);
-    assert(sse_context_restore == 0);
-
-    sse_context_size = 512;
-    sse_context_save = isr_save_fxsave;
-    sse_context_restore = isr_restore_fxrstor;
+        sse_context_size = 512;
+        sse_context_save = isr_save_fxsave;
+        sse_context_restore = isr_restore_fxrstor;
+    }
 
     cpu_irq_toggle(intr_was_enabled);
 }
