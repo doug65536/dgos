@@ -256,16 +256,13 @@ physmem_range_t *phys_mem_map;
 size_t phys_mem_map_count;
 
 // Memory map
-physmem_range_t mem_ranges[64];
-size_t usable_mem_ranges;
+static physmem_range_t mem_ranges[64];
+static size_t usable_mem_ranges;
 
-physaddr_t root_physaddr;
+static physaddr_t root_physaddr;
 
-// Bitmask of available aliasing ptes (top one taken already)
-static uint64_t volatile apte_map = 0x8000000000000000UL;
-
-uint32_t *phys_alloc;
-unsigned phys_alloc_count;
+static uint32_t *phys_alloc;
+static unsigned phys_alloc_count;
 
 extern char ___init_brk[];
 extern uintptr_t ___top_physaddr;
