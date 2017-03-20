@@ -258,6 +258,7 @@ static thread_t thread_create_with_state(
             stack = mmap(0, stack_size,
                          PROT_READ | PROT_WRITE,
                          MAP_STACK, -1, 0);
+            memset(stack, 0xcc, stack_size);
             thread->flags |= THREAD_FLAG_OWNEDSTACK;
         }
 

@@ -3,6 +3,7 @@
 .global entry
 .hidden entry
 entry:
+	cld
 	xor %ebp,%ebp
 
 	# Store the physical memory map address
@@ -63,9 +64,15 @@ entry:
 
 0:
 
-	lea kernel_stack(%rip),%rax
-	add kernel_stack_size(%rip),%rax
-	mov %rax,%rsp
+	lea kernel_stack,%rdx
+	mov kernel_stack_size,%rbx
+
+	mov %rdx,%rdi
+	mov %rbx,%rcx
+	mov $0xcc,%al
+	rep stosb
+
+	lea (%rdx,%rbx),%rsp
 
 	call e9debug_init
 
