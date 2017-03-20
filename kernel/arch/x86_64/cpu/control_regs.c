@@ -146,6 +146,24 @@ uintptr_t cpu_get_page_directory(void)
     return addr;
 }
 
+void cpu_set_fs(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "mov %w[selector],%%fs\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
+void cpu_set_gs(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "mov %w[selector],%%gs\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
 void cpu_set_fsbase(void *fs_base)
 {
     msr_set(MSR_FSBASE, (uintptr_t)fs_base);

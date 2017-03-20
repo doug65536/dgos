@@ -181,6 +181,9 @@ uintptr_t cpu_get_page_directory(void);
 void cpu_set_page_directory(uintptr_t addr);
 void cpu_flush_tlb(void);
 
+void cpu_set_fs(uint16_t selector);
+void cpu_set_gs(uint16_t selector);
+
 void cpu_set_fsbase(void *fs_base);
 void cpu_set_gsbase(void *gs_base);
 
