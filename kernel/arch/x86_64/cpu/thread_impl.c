@@ -683,10 +683,10 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 
     thread->state = THREAD_IS_SUSPENDED_BUSY;
     atomic_barrier();
-    spinlock_unlock(lock);
+    spinlock_t saved_lock = spinlock_unlock_save(lock);
     thread_yield();
     assert(thread->state == THREAD_IS_RUNNING);
-    spinlock_lock(lock);
+    spinlock_lock_restore(lock, saved_lock);
 }
 
 EXPORT void thread_resume(thread_t thread)

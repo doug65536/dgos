@@ -1,7 +1,8 @@
 #pragma once
 #include "types.h"
 
-typedef int volatile spinlock_t;
+typedef int spinlock_value_t;
+typedef spinlock_value_t volatile spinlock_t;
 
 //
 // Mutex spinlock
@@ -21,6 +22,9 @@ void spinlock_unlock(spinlock_t *lock);
 void spinlock_lock_noirq(spinlock_t *lock);
 int spinlock_try_lock_noirq(spinlock_t *lock);
 void spinlock_unlock_noirq(spinlock_t *lock);
+
+spinlock_value_t spinlock_unlock_save(spinlock_t *lock);
+void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock);
 
 //
 // Reader/writer spinlock

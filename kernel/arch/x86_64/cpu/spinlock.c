@@ -57,6 +57,29 @@ void spinlock_unlock(spinlock_t *lock)
     atomic_barrier();
 }
 
+spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
+{
+    assert(*lock != 0);
+    return atomic_xchg(lock, 0);
+}
+
+void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
+{
+    atomic_barrier();
+    while (*lock != 0 ||
+           atomic_cmpxchg(lock, 0, saved_lock) != 0) {
+        // Allow IRQs if they were enabled
+        cpu_irq_toggle((saved_lock & 2) != 0);
+
+        pause();
+
+        // Disable IRQs
+        cpu_irq_disable();
+    }
+
+    // Return with interrupts disabled
+}
+
 // Spin to acquire lock, return with IRQs disabled
 void spinlock_lock_noirq(spinlock_t *lock)
 {
