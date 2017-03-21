@@ -425,6 +425,25 @@ static inline void cpu_invalidate_page(uintptr_t addr)
     );
 }
 
+static inline void cpu_invalidate_pcid(
+        uintptr_t type, int32_t pcid, uintptr_t addr)
+{
+    struct {
+        int64_t pcid;
+        uintptr_t addr;
+    } arg = {
+        pcid,
+        addr
+    };
+    __asm__ __volatile__ (
+        "invpcid %[arg],%[reg]\n\t"
+        :
+        : [reg] "r" (type)
+        , [arg] "m" (arg)
+        : "memory"
+    );
+}
+
 static inline void *cpu_gs_read_ptr(void)
 {
     void *ptr;
