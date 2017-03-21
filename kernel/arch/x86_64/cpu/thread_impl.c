@@ -107,7 +107,7 @@ struct thread_info_t {
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 
-C_ASSERT(sizeof(thread_info_t) == 64*3);
+C_ASSERT(sizeof(thread_info_t) % 64 == 0);
 
 // Store in a big array, for now
 #define MAX_THREADS 512
@@ -116,6 +116,7 @@ static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
 int thread_idle_ready;
 int spincount_mask;
+size_t storage_next_slot;
 
 struct cpu_info_t {
     cpu_info_t *self;
@@ -130,7 +131,7 @@ struct cpu_info_t {
     priqueue_t *queue;
     spinlock_t queue_lock;
 
-    void *align[1];
+    void *storage[9];
 };
 
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
@@ -817,4 +818,21 @@ void *thread_set_exception_top(void *chain)
     void *old = thread->exception_chain;
     thread->exception_chain = chain;
     return old;
+}
+
+size_t thread_cls_alloc(void)
+{
+    return atomic_xadd(&storage_next_slot, 1);
+}
+
+void *thread_cls_get(size_t slot)
+{
+    cpu_info_t *cpu = this_cpu();
+    return cpu->storage[slot];
+}
+
+void thread_cls_set(size_t slot, void *value)
+{
+    cpu_info_t *cpu = this_cpu();
+    cpu->storage[slot] = value;
 }

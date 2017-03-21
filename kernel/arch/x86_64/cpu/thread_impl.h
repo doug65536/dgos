@@ -8,6 +8,10 @@ void thread_init(int ap);
 uint32_t thread_cpu_count(void);
 uint32_t thread_cpus_started(void);
 
+size_t thread_cls_alloc(void);
+void *thread_cls_get(size_t slot);
+void thread_cls_set(size_t slot, void *value);
+
 uint64_t thread_get_cpu_mmu_seq(void);
 void thread_set_cpu_mmu_seq(uint64_t seq);
 
