@@ -59,10 +59,10 @@ ISO_STAGE := cdstage
 ISO_FILE := dgos.iso
 
 QEMU_MACHINE := q35
-QEMU_CPU := Skylake-Client
-#Haswell
-#kvm64
-QEMU_RAM := 5G
+#QEMU_CPU := Skylake-Client
+#QEMU_CPU := Haswell
+QEMU_CPU := kvm64
+QEMU_RAM := 128M
 QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -device nec-usb-xhci \
 	-device usb-kbd -device usb-mouse -trace events=dump/qemu-trace
 
