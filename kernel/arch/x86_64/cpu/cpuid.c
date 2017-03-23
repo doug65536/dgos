@@ -6,13 +6,30 @@
 // max_leaf[1] holds max supported extended leaf
 static uint32_t max_leaf[2];
 
-// Cache the most commonly needed leaves
-static int cpuid_cache_ready;
-static cpuid_t cpuid_00000001;
-static cpuid_t cpuid_00000007;
-static cpuid_t cpuid_80000001;
+cpuid_cache_t cpuid_cache;
 
-int cpuid_nocache(cpuid_t *output, uint32_t eax, uint32_t ecx)
+void cpuid_init(void)
+{
+    cpuid_cache.has_nx      = cpuid_edx_bit(20, 0x80000001, 0);
+    cpuid_cache.has_sse3    = cpuid_ecx_bit(0, 1, 0);
+    cpuid_cache.has_mwait   = cpuid_ecx_bit(3, 1, 0);
+    cpuid_cache.has_ssse3   = cpuid_ecx_bit(9, 1, 0);
+    cpuid_cache.has_fma     = cpuid_ecx_bit(12, 1, 0);
+    cpuid_cache.has_pge     = cpuid_edx_bit(13, 1, 0);
+    cpuid_cache.has_pcid    = cpuid_ecx_bit(17, 1, 0);
+    cpuid_cache.has_invpcid = cpuid_ebx_bit(10, 7, 0);
+    cpuid_cache.has_sse4_1  = cpuid_ecx_bit(19, 1, 0);
+    cpuid_cache.has_sse4_2  = cpuid_ecx_bit(20, 1, 0);
+    cpuid_cache.has_x2apic  = cpuid_ecx_bit(21, 1, 0);
+    cpuid_cache.has_aes     = cpuid_ecx_bit(25, 1, 0);
+    cpuid_cache.has_xsave   = cpuid_ecx_bit(26, 1, 0);
+    cpuid_cache.has_avx     = cpuid_ecx_bit(28, 1, 0);
+    cpuid_cache.has_rdrand  = cpuid_ecx_bit(30, 1, 0);
+    cpuid_cache.has_smep    = cpuid_ebx_bit(7, 7, 0);
+    cpuid_cache.has_de      = cpuid_edx_bit(2, 1, 0);
+}
+
+int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
     // Automatically check for support for the leaf
     if ((eax & 0x7FFFFFFF) != 0) {
@@ -21,7 +38,7 @@ int cpuid_nocache(cpuid_t *output, uint32_t eax, uint32_t ecx)
         if (max_leaf[i] != 0) {
             output->eax = max_leaf[i];
         } else {
-            cpuid_nocache(output, eax & 0x80000000, 0);
+            cpuid(output, eax & 0x80000000, 0);
             max_leaf[i] = output->eax;
         }
 
@@ -39,32 +56,6 @@ int cpuid_nocache(cpuid_t *output, uint32_t eax, uint32_t ecx)
     );
 
     return 1;
-}
-
-int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
-{
-    if (unlikely(!cpuid_cache_ready)) {
-        cpuid_nocache(&cpuid_00000001, 0x00000001, 0);
-        cpuid_nocache(&cpuid_00000007, 0x00000007, 0);
-        cpuid_nocache(&cpuid_80000001, 0x80000001, 0);
-        cpuid_cache_ready = 1;
-    }
-
-    switch (eax | ((uint64_t)ecx << 32)) {
-    case 0x00000001:
-        *output = cpuid_00000001;
-        return max_leaf[0] >= 0x00000001;
-
-    case 0x00000007:
-        *output = cpuid_00000007;
-        return max_leaf[0] >= 0x00000007;
-
-    case 0x80000001:
-        *output = cpuid_80000001;
-        return max_leaf[1] >= 0x80000001;
-    }
-
-    return cpuid_nocache(output, eax, ecx);
 }
 
 int cpuid_eax_bit(int bit, uint32_t eax, uint32_t ecx)

@@ -5,7 +5,7 @@
 #include "malloc.h"
 #include "screen.h"
 #include "paging.h"
-
+#include "cpu.h"
 #define VESA_DEBUG 1
 #if VESA_DEBUG
 #define VESA_TRACE(...) print_line("vesa: " __VA_ARGS__)
@@ -225,7 +225,8 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
 
         paging_map_range(sel.framebuffer_addr, sel.framebuffer_bytes,
                          sel.framebuffer_addr,
-                         PTE_PRESENT | PTE_WRITABLE, 2);
+                         PTE_PRESENT | PTE_WRITABLE |
+                         (-cpu_has_global_pages() & PTE_GLOBAL), 2);
     }
 
     free(mode_info);

@@ -19,6 +19,7 @@
 #include "idt.h"
 #include "bsearch.h"
 #include "process.h"
+#include "cpu_broadcast.h"
 
 #define DEBUG_CREATE_PT         0
 #define DEBUG_ADDR_ALLOC        0
@@ -260,6 +261,8 @@ static physmem_range_t mem_ranges[64];
 static size_t usable_mem_ranges;
 
 static physaddr_t root_physaddr;
+static pte_t const * master_pagedir;
+static pte_t *current_pagedir;
 
 static uint32_t *phys_alloc;
 static unsigned phys_alloc_count;
@@ -292,6 +295,15 @@ static int contiguous_allocator_cmp_both(
 static uint64_t volatile page_fault_count;
 
 static int64_t volatile free_page_count;
+
+typedef struct shootdown_t {
+    uintptr_t addr;
+    size_t size;
+    size_t step;
+    int32_t pcid;
+} shootdown_t;
+
+static size_t shootdown_slot;
 
 //
 // Contiguous allocator
@@ -805,20 +817,104 @@ static void mmu_map_page(
     *pte_linaddr[3] = (physaddr & PTE_ADDR) | flags;
 }
 
+// Set shootdown->pcid to -1 to flush global mappings
+// Set shootdown->pcid to pcid to flush specific context
+// Set shootdown->size to 0 to flush whole pcid
+// Set shootdown->addr,size to flush range
+static void mmu_tlb_perform_shootdown(void *data)
+{
+    shootdown_t *shootdown = data;
+
+    // perf fix: always ignore range
+
+    if (shootdown->size == 0 || 1) {
+        //
+        // Flush all
+
+        if (cpuid_has_invpcid()) {
+            if (shootdown->pcid >= 0) {
+                //
+                // Flush a entire context
+
+                cpu_invalidate_pcid(1, shootdown->pcid,
+                                    shootdown->addr);
+            } else {
+                //
+                // Flush all with pcid
+
+                cpu_invalidate_pcid(2, shootdown->pcid,
+                                    shootdown->addr);
+            }
+        } else if (cpuid_has_pge()) {
+            //
+            // Flush all global by toggling global mappings
+
+            // Toggle PGE off and on
+            cpu_cr4_change_bits(CR4_PGE, 0);
+            cpu_cr4_change_bits(0, CR4_PGE);
+        } else {
+            //
+            // Flush entire TLB
+
+            cpu_flush_tlb();
+        }
+    } else {
+        //
+        // Flush specific range
+
+        if (cpuid_has_invpcid() && shootdown->pcid >= 0) {
+            //
+            // Flush range of specific context
+
+            for (uintptr_t addr = shootdown->addr,
+                 end = shootdown->addr + shootdown->size;
+                 addr < end; addr += shootdown->step) {
+                cpu_invalidate_pcid(1, shootdown->pcid, addr);
+            }
+        } else if (shootdown->pcid < 0) {
+            //
+            // Flush range of global pages
+
+            for (uintptr_t addr = shootdown->addr,
+                 end = shootdown->addr + shootdown->size;
+                 addr < end; addr += shootdown->step) {
+                cpu_invalidate_page(addr);
+            }
+        } else {
+            //
+            // Flush whole TLB
+            cpu_flush_tlb();
+        }
+    }
+}
+
 // TLB shootdown IPI
-static void *mmu_tlb_shootdown(int intr, void *ctx)
+static void *mmu_tlb_shootdown_handler(int intr, void *ctx)
 {
     assert(intr == INTR_TLB_SHOOTDOWN);
-    //printdbg("Received TLB shootdown\n");
-    thread_set_cpu_mmu_seq(mmu_seq);
-    cpu_flush_tlb();
-    apic_eoi(intr);
+
+    cpu_broadcast_service(intr, shootdown_slot);
+
     return ctx;
 }
 
-static void mmu_send_tlb_shootdown(void)
+static void mmu_send_tlb_shootdown(
+        uint32_t pcid, uintptr_t addr, size_t size, size_t step)
 {
-    apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+    shootdown_t shootdown;
+
+    shootdown.pcid = pcid;
+    shootdown.addr = addr;
+    shootdown.size = size;
+    shootdown.step = step;
+
+    if (spincount_mask) {
+        cpu_broadcast_message(INTR_TLB_SHOOTDOWN, shootdown_slot, 1,
+                              mmu_tlb_perform_shootdown, &shootdown,
+                              sizeof(shootdown));
+    }
+
+    mmu_tlb_perform_shootdown(&shootdown);
 }
 
 static void *mmu_lazy_tlb_shootdown(void *ctx)
@@ -852,6 +948,15 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
     int present_mask = addr_present(fault_addr, path, ptes);
 
     pte_t pte = present_mask == 0x07 ? *ptes[3] : 0;
+
+    // See if process page directory is stale
+    if (path[0] >= 258) {
+        if (current_pagedir[path[0]] != master_pagedir[path[0]]) {
+            // Update process page directory
+            current_pagedir[path[0]] = master_pagedir[path[0]];
+            return ctx;
+        }
+    }
 
     // Check for lazy TLB shootdown
     if (present_mask == 0x0F &&
@@ -1041,23 +1146,19 @@ static int mmu_have_pat(void)
     return supported > 0;
 }
 
-static int mmu_have_nx(void)
-{
-    // 0 == unknown, 1 == supported, -1 == not supported
-    static int supported;
-    if (likely(supported != 0))
-        return supported > 0;
-
-    supported = (cpuid_edx_bit(20, 0x80000001, 0) << 1) - 1;
-
-    return supported > 0;
-}
-
 static void mmu_configure_pat(void)
 {
     if (likely(mmu_have_pat()))
         msr_set(MSR_IA32_PAT, PAT_CFG);
 }
+
+static void mmu_init_shootdown(void *p)
+{
+    (void)p;
+    shootdown_slot = cpu_broadcast_create();
+}
+
+REGISTER_CALLOUT(mmu_init_shootdown, 0, 'T', "000");
 
 void mmu_init(int ap)
 {
@@ -1067,7 +1168,7 @@ void mmu_init(int ap)
     }
 
     // Hook IPI for TLB shootdown
-    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown);
+    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler);
 
     usable_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
 
@@ -1246,6 +1347,13 @@ void mmu_init(int ap)
 
     // Allocate guard page
     alloc_linear(&linear_allocator, PAGE_SIZE);
+
+    // Alias master page directory to be accessible
+    // from all process contexts
+    master_pagedir = mmap((void*)root_physaddr, PAGE_SIZE, PROT_READ,
+                          MAP_PHYSICAL, -1, 0);
+
+    current_pagedir = (pte_t*)(PT0_PTR(PT_BASEADDR));
 }
 
 static size_t round_up(size_t n)
@@ -1641,13 +1749,13 @@ void *mmap(void *addr, size_t len,
     if (flags & MAP_USER)
         page_flags |= PTE_USER;
 
-    if (flags & MAP_GLOBAL)
+    if ((flags & MAP_GLOBAL) || !(flags & MAP_USER))
         page_flags |= PTE_GLOBAL;
 
     if (prot & PROT_WRITE)
         page_flags |= PTE_WRITABLE;
 
-    if (!(prot & PROT_EXEC) && mmu_have_nx())
+    if (!(prot & PROT_EXEC) && cpuid_has_nx())
         page_flags |= PTE_NX;
 
     uintptr_t misalignment = 0;
@@ -1803,7 +1911,14 @@ int munmap(void *addr, size_t size)
         path_inc(path);
     }
 
-    mmu_send_tlb_shootdown();
+    if ((intptr_t)addr >= 0) {
+        // User address
+        uintptr_t pcid = cpu_get_page_directory() & PAGE_MASK;
+        mmu_send_tlb_shootdown(pcid, (uintptr_t)addr, size, PAGE_SIZE);
+    } else {
+        // Kernel address (flush global mappings)
+        mmu_send_tlb_shootdown(-1, (uintptr_t)addr, size, PAGE_SIZE);
+    }
 
     release_linear(&linear_allocator,
                    (linaddr_t)addr - misalignment,
@@ -1839,7 +1954,7 @@ int mprotect(void *addr, size_t len, int prot)
     // Only the MSB of the physical address set
     pte_t const demand_no_read = (PTE_ADDR >> 1) & PTE_ADDR;
 
-    pte_t no_exec = mmu_have_nx() ? PTE_NX : 0;
+    pte_t no_exec = cpuid_has_nx() ? PTE_NX : 0;
 
     // Bits to set in PTE
     pte_t set_bits =
@@ -1920,11 +2035,13 @@ int mprotect(void *addr, size_t len, int prot)
 
 // Support discarding pages and reverting to demand
 // paged state with MADV_DONTNEED.
-// All other advice is ignored.
+// Support enabling/disabling write combining
+// with MADV_WEAKORDER/MADV_STRONGORDER
 int madvise(void *addr, size_t len, int advice)
 {
     unsigned path[4];
     unsigned path_en[4];
+    void *orig_addr = addr;
 
     if (unlikely(len == 0))
         return 0;
@@ -1990,7 +2107,10 @@ int madvise(void *addr, size_t len, int advice)
         pte_from_path(pt, path);
     }
 
-    mmu_send_tlb_shootdown();
+    uint32_t pcid = (intptr_t)orig_addr < 0
+            ? -(uintptr_t)1
+            : (cpu_get_page_directory() & PAGE_MASK);
+    mmu_send_tlb_shootdown(pcid, (uintptr_t)orig_addr, len, PAGE_SIZE);
 
     return 0;
 }
@@ -2163,14 +2283,118 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
 {
     (void)s;
     mmap_device_mapping_t const *mapping = v;
+
     if (k < mapping->base_addr)
         return -1;
+
     void const *mapping_end = (char*)mapping->base_addr + mapping->len;
     if (k > mapping_end)
         return 1;
+
     return 0;
 }
 
-//void mm_create_process(void)
-//{
-//}
+// Create a new process context and switch to it,
+// returns the physical address of the page directory
+uintptr_t mm_create_process(int pcid)
+{
+    pte_t *tables = mmap(0, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE,
+                        MAP_POPULATE, -1, 0);
+    mmphysrange_t addresses[4];
+    mphysranges(addresses, countof(addresses),
+                tables, 4 * PAGE_SIZE, PAGE_SIZE);
+
+    //
+    // Setup recursive mapping
+
+    tables[256] = addresses[0].physaddr;
+    tables[257] = addresses[1].physaddr;
+    tables[512] = addresses[0].physaddr;
+    tables[513] = addresses[2].physaddr;
+    tables[768] = addresses[0].physaddr;
+
+    // Copy kernel space
+    for (int i = 258; i < 512; ++i)
+        tables[i] = master_pagedir[i];
+
+    int masked_pcid = cpuid_has_pcid()
+            ? pcid & PAGE_MASK
+            : 0;
+
+    cpu_set_page_directory(addresses[0].physaddr | masked_pcid);
+
+    return addresses[0].physaddr;
+}
+
+static void mm_free_all_user_memory(void)
+{
+    unsigned path[4];
+    pte_t *ptes[4];
+    pte_t *base[3];
+
+    addr_present(0, path, ptes);
+
+    for (uintptr_t m0 = 0; m0 < 256; ++m0) {
+        if (!(ptes[0][m0] & PTE_PRESENT))
+            continue;
+
+        base[0] = ptes[1] + (m0 << 9);
+
+        if (*base[0] & PTE_PRESENT)
+            continue;
+
+        for (uintptr_t m1 = 0; m1 < 512; ++m1) {
+            base[1] = ptes[2] +
+                    (m0 << (9*2)) +
+                    (m1 << 9);
+
+            if (*base[1] & PTE_PRESENT)
+                continue;
+
+            for (uintptr_t m2 = 0; m2 < 512; ++m2) {
+                base[2] = ptes[3] +
+                        (m0 << (9*3)) +
+                        (m1 << (9*2)) +
+                        (m2 << 9);
+
+                if (*base[2] & PTE_PRESENT)
+                    continue;
+
+                for (uintptr_t m3 = 0; m3 < 512; ++m3) {
+                    if (base[2][m3] & PTE_PRESENT)
+                        mmu_free_phys(base[2][m3] & PTE_ADDR);
+                }
+
+                mmu_free_phys(*base[2] & PTE_ADDR);
+            }
+
+            mmu_free_phys(*base[1] & PTE_ADDR);
+        }
+
+        mmu_free_phys(*base[0] & PTE_ADDR);
+    }
+
+    mmu_free_phys(cpu_get_page_directory() & PTE_ADDR);
+}
+
+// Destroy the current process mapping
+// Switches to the master mapping,
+// frees the recursive mapping,
+// and recursively frees all user memory and page tables
+void mm_destroy_process(void)
+{
+    unsigned path[4];
+    pte_t *ptes[4];
+    int mask = addr_present(PT0_BASE, path, ptes);
+
+    assert(mask == 0xF);
+
+    mm_free_all_user_memory();
+
+//    uintptr_t recurse_maps[4];
+//    recurse_maps[0] = ptes[3][0] & PTE_ADDR;
+//    recurse_maps[1] = ptes[0][0] & PTE_ADDR;
+//    recurse_maps[2] = ptes[1][0] & PTE_ADDR;
+//    recurse_maps[3] = ptes[2][0] & PTE_ADDR;
+
+}

@@ -187,3 +187,4 @@ void init_irq(void);
 
 uint16_t cpu_has_long_mode(void);
 uint16_t cpu_has_no_execute(void);
+uint16_t cpu_has_global_pages(void);

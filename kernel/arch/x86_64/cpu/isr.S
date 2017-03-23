@@ -193,47 +193,52 @@ isr_common:
 	// C code requires that the direction flag is clear
 	cld
 
-    // See if we are coming from 64 bit kernel code
-	cmpq $8,18*8(%rsp)
-	jne isr_save_32
-
-	// ...yes, came from 64 bit code
-
 	// Save FSBASE MSR
-	movl $0xC0000100,%ecx
+	mov $0xC0000100,%ecx
 	rdmsr
 	shl $32,%rdx
 	or %rdx,%rax
 	push_cfi %rax
 
-	// Really store segment registers if it is a #GP fault
-	cmpl $0x0D,16*8(%rsp)
-	jz isr_save_real_segs
-
-	// Push segment registers
-	movabs $0x0010001000100010,%rax
+	// Push CR3
+	mov %cr3,%rax
 	push_cfi %rax
 
-	.align 16
-8:
-	// Save pointer to general registers and return information
-	mov %rsp,%rdi
-	.cfi_register %rsp,%rdi
+	// Push segment registers
+	sub_rsp 8
+	mov %gs,6(%rsp)
+	mov %fs,4(%rsp)
+	mov %es,2(%rsp)
+	mov %ds,(%rsp)
+
+	// See if we are coming from kernel code
+	cmpq $8,21*8(%rsp)
+	je 0f
+
+	// ...came from user code
+	swapgs
+	mov $0x10,%ax
+	mov %eax,%ds
+	mov %eax,%es
+0:
 
 	// Save entire sse/mmx/fpu state
 	jmp *sse_context_save
 isr_save_done:
 
 	// Make structure on the stack
+	push_cfi %rsp
 	push_cfi %rax
-	push_cfi %rdi
 	xor %eax,%eax
 	push_cfi %rax
 	push_cfi %rax
 
-	// Pass pointer to the context structure to isr_handler
 	mov %rsp,%rdi
-	.cfi_register %rsp,%rdi
+
+	// Align stack
+	push_cfi %rax
+
+	// Pass pointer to the context structure to isr_handler
 	call isr_handler
 
 	// isr can return a new stack pointer, or just return
@@ -250,22 +255,31 @@ isr_save_done:
 0:
 
 	// Pop the pointer to the general registers
+	pop_cfi %rbp
 	pop_cfi %rdi
-    pop_cfi %rbp
 	jmp *sse_context_restore
 isr_restore_done:
 
 	mov %rdi,%rsp
-	.cfi_register %rdi,%rsp
 
-	// See if we're returning to 64 bit code
-	cmpl $8,20*8(%rsp)
-	jnz isr_restore_32
+	// See if we're returning to user code
+	cmpl $8,21*8(%rsp)
+	jz 0f
 
-	// ...yes, returning to 64 bit mode
+	// ...yes, returning to user code
+	swapgs
 
-	// Discard segments
+	// Restore segments
+	mov (%rsp),%ds
+	mov 2(%rsp),%es
+	mov 4(%rsp),%fs
+	mov 6(%rsp),%gs
+0:
 	add_rsp 8
+
+	// Restore CR3
+	pop_cfi %rax
+	mov %rax,%cr3
 
 	// Restore FSBASE
 	pop_cfi %rax
@@ -274,7 +288,6 @@ isr_restore_done:
 	mov $0xC0000100,%ecx
 	wrmsr
 
-6:
 	pop_cfi %rdi
 	pop_cfi %rsi
 	pop_cfi %rdx
@@ -295,49 +308,6 @@ isr_restore_done:
 	.cfi_def_cfa_offset 8
 
 	iretq
-
-.align 16
-isr_save_real_segs:
-	sub $8,%rsp
-	mov %gs,6(%rsp)
-	mov %fs,4(%rsp)
-	mov %es,2(%rsp)
-	mov %ds,(%rsp)
-	jmp 8b
-
-// Saving context from 32 bit mode, out of line
-.align 16
-isr_save_32:
-	// Push dummy FSBASE
-	push_cfi $0
-
-	// Save 32 bit segment registers
-	sub $8,%rsp
-	movw %gs,6(%rsp)
-	movw %fs,4(%rsp)
-	movw %es,2(%rsp)
-	movw %ds,(%rsp)
-
-	// Get kernel mode GSBASE back
-	swapgs
-
-	jmp 8b
-
-// Resuming into 32 bit mode, out of line
-.align 16
-isr_restore_32:
-	// Protect kernel mode gsbase from changes
-	swapgs
-
-	// Restore 32 bit segment registers
-	movw (%rsp),%ds
-	movw 2(%rsp),%es
-	movw 4(%rsp),%fs
-	movw 6(%rsp),%gs
-
-	// Discard segments and FSBASE
-	add_rsp 16
-	jmp 6b
 
 	.cfi_endproc
 
@@ -364,7 +334,7 @@ isr_restore_32:
 		.align 16
 0:
 		xor %eax,%eax
-		# Clear xsave header
+		// Clear xsave header
 		mov $512,%edx
 		mov %rax,   (%rbp,%rdx)
 		mov %rax,1*8(%rbp,%rdx)

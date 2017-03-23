@@ -12,6 +12,7 @@ CSRCS := \
 	nano_time.c \
 	cpu/cpu.c \
 	cpu/apic.c \
+	cpu/cpu_broadcast.c \
 	cpu/cmos.c \
 	cpu/atomic.c \
 	cpu/control_regs.c \

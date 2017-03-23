@@ -72,7 +72,9 @@ entry:
 	mov $0xcc,%al
 	rep stosb
 
-	lea (%rdx,%rbx),%rsp
+	lea -16(%rdx,%rbx),%rsp
+
+	call cpuid_init
 
 	call e9debug_init
 

@@ -350,7 +350,6 @@ int idt_init(int ap)
                     ((addr >> 32) & 0xFFFFFFFF);
 
             idt[i].type_attr = IDT_PRESENT | IDT_INTR;
-                    //(i < 32 ? IDT_TRAP : IDT_INTR);
 
             idt[i].selector = IDT_SEL;
         }

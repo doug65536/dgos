@@ -293,7 +293,7 @@ static inline uintptr_t cpu_get_page_directory(void)
 
 static inline void cpu_flush_tlb(void)
 {
-    cpu_set_page_directory(cpu_get_page_directory() & -4096L);
+    cpu_set_page_directory(cpu_get_page_directory());
 }
 
 static inline void cpu_set_fs(uint16_t selector)

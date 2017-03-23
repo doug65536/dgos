@@ -258,6 +258,13 @@ uint16_t cpu_has_no_execute(void)
             (cpuinfo.edx & (1<<20));
 }
 
+uint16_t cpu_has_global_pages(void)
+{
+    cpuid_t cpuinfo;
+    return cpuid(&cpuinfo, 1U, 0) &&
+            (cpuinfo.edx & (1<<13));
+}
+
 static uint16_t disable_interrupts(void)
 {
     uint32_t int_enabled;
@@ -324,6 +331,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
     uint32_t pdbr = paging_root_addr();
 
     uint16_t nx_available = cpu_has_no_execute();
+    uint32_t gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
 
     __asm__ __volatile__ (
         "lgdt %[gdtr]\n\t"
@@ -355,6 +363,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         // Enable CR4.PAE (bit 5)
         "movl %%cr4,%%eax\n\t"
         "btsl $5,%%eax\n\t"
+        "orl %[gp_available],%%eax\n\t"
         "movl %%eax,%%cr4\n\t"
 
         // Load PDBR
@@ -514,6 +523,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         , [gdt_code16] "i" (GDT_SEL_KERNEL_CODE16)
         , [gdt_data16] "i" (GDT_SEL_KERNEL_DATA16)
         , [nx_available] "m" (nx_available)
+        , [gp_available] "m" (gp_available)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
 

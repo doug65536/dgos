@@ -22,25 +22,25 @@ void cpu_init(int ap)
     uintptr_t cr4 = 0;
 
     // Supervisor Mode Execution Prevention (SMEP)
-    if (cpuid_ebx_bit(7, 7, 0))
+    if (cpuid_has_smep())
         cr4 |= CR4_SMEP;
 
     // Enable global pages feature if available
-    if (cpuid_edx_bit(13, 1, 0))
+    if (cpuid_has_pge())
         cr4 |= CR4_PGE;
 
     // Enable debugging extensions feature if available
-    if (cpuid_edx_bit(2, 1, 0))
+    if (cpuid_has_de())
         cr4 |= CR4_DE;
 
     // Enable paging context identifiers feature if available
-    if (cpuid_ecx_bit(17, 1, 0))
+    if (cpuid_has_pcid())
         cr4 |= CR4_PCIDE;
 
     cpu_cr4_change_bits(CR4_TSD, cr4 | CR4_OFXSR | CR4_OSXMMEX);
 
     // Enable no-execute if feature available
-    if (cpuid_edx_bit(20, 0x80000001, 0))
+    if (cpuid_has_nx())
         msr_adj_bit(MSR_EFER, 11, 1);
 
     gdt_init();

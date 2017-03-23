@@ -250,6 +250,7 @@ typedef struct isr_iret_frame_t {
 // Exception handler context
 typedef struct isr_gpr_context_t {
     uint16_t s[4];
+    uintptr_t cr3;
     void *fsbase;
     uintptr_t r[15];
     interrupt_info_t info;
@@ -307,8 +308,8 @@ typedef struct isr_resume_context_t {
 // Exception handler C call parameter
 typedef struct isr_context_t {
     isr_resume_context_t resume;
-    isr_gpr_context_t * gpr;
     isr_fxsave_context_t * fpr;
+    isr_gpr_context_t * gpr;
 } isr_context_t;
 
 // Note that fpr must lie on a 16-byte boundary for fxsave

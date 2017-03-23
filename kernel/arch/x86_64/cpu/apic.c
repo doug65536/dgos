@@ -18,6 +18,7 @@
 #include "spinlock.h"
 #include "assert.h"
 #include "bitsearch.h"
+#include "callout.h"
 
 //
 // MP Tables
@@ -1702,6 +1703,9 @@ void apic_start_smp(void)
             }
         }
     }
+
+    // SMP online
+    callout_call('T');
 
     ioapic_irq_cpu(0, 1);
 }

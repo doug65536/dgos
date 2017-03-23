@@ -59,8 +59,8 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   1
-#define ENABLE_FRAMEBUFFER_THREAD   0
+#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_FRAMEBUFFER_THREAD   1
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    1
@@ -528,7 +528,6 @@ static int stress_heap_thread(void *p)
 {
     (void)p;
 
-
     heap_t *heap = heap_create();
     uint64_t min_el;
     uint64_t max_el;
@@ -546,6 +545,7 @@ static int stress_heap_thread(void *p)
 
             int count = 0;
             int size;
+            uint64_t overall = cpu_rdtsc();
             for (count = 0; count < 0x1000; ++count) {
                 size = rand_r_range(&seed,
                                     STRESS_HEAP_MINSIZE,
@@ -568,6 +568,7 @@ static int stress_heap_thread(void *p)
                     min_el = el;
                 tot_el += el;
             }
+            overall = cpu_rdtsc() - overall;
 
             for (int i = 0; i < (int)countof(history); ++i) {
                 heap_free(heap, history[i]);
@@ -575,10 +576,12 @@ static int stress_heap_thread(void *p)
             }
 
             printdbg("heap_alloc+memset+heap_free:"
-                     " min=%12ld,"
-                     " max=%12ld,"
-                     " avg=%12ld cycles\n",
-                     min_el, max_el, tot_el / count);
+                     " min=%8ld (%luns @ 3.2GHz),"
+                     " max=%8ld,"
+                     " avg=%8ld,"
+                     " withfree=%8ld cycles\n",
+                     min_el, min_el * 10 / 34, max_el, tot_el / count,
+                     overall / count);
         }
     }
     heap_destroy(heap);

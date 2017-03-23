@@ -1,5 +1,7 @@
 arch/x86_64/bootdev.c
 arch/x86_64/bootdev.h
+arch/x86_64/cpu/cpu_broadcast.c
+arch/x86_64/cpu/cpu_broadcast.h
 arch/x86_64/cpu/cpu_metrics.h
 arch/x86_64/cpu/except.c
 arch/x86_64/cpu/except.h

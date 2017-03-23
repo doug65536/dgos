@@ -19,6 +19,7 @@ struct process_t {
     char *path;
     char **args;
     char **env;
+    uintptr_t mmu_context;
 };
 
 static process_ptr_t *processes;

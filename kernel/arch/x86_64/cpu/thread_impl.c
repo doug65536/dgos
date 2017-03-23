@@ -21,6 +21,7 @@
 #include "printk.h"
 #include "isr_constants.h"
 #include "priorityqueue.h"
+#include "apic.h"
 
 // Implements platform independent thread.h
 
@@ -149,7 +150,7 @@ uint32_t default_mxcsr_mask;
 static uint32_t get_apic_id(void)
 {
     cpuid_t cpuid_info;
-    cpuid_nocache(&cpuid_info, CPUID_INFO_FEATURES, 0);
+    cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
     uint32_t apic_id = cpuid_info.ebx >> 24;
     return apic_id;
 }
@@ -288,7 +289,9 @@ static thread_t thread_create_with_state(
                 sizeof(isr_context_t);
 
         // Adjust start of context to make room for context
-        uintptr_t ctx_addr = stack_end - ctx_size - 16;
+        uintptr_t ctx_addr = stack_end - ctx_size - 32;
+
+        ctx_addr &= -16;
 
         assert((ctx_addr & 0x0F) == 0);
 
@@ -298,7 +301,7 @@ static thread_t thread_create_with_state(
         ctx->gpr = (void*)(ctx + 1);
 
         ctx->gpr->iret.rsp = (uintptr_t)
-                (((ctx_addr + ctx_size + 15) & -16) + 8);
+                ((ctx_addr + ctx_size + 15) & -16) + 8;
         ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA64;
         ctx->gpr->iret.rflags = EFLAGS_IF;
         ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
@@ -310,6 +313,7 @@ static thread_t thread_create_with_state(
         ctx->gpr->r[0] = (uintptr_t)fn;
         ctx->gpr->r[1] = (uintptr_t)userdata;
         ctx->gpr->r[2] = (uintptr_t)i;
+        ctx->gpr->cr3 = cpu_get_page_directory();
         ctx->gpr->fsbase = 0;
 
         ctx->fpr->mxcsr = MXCSR_MASK_ALL;
@@ -835,4 +839,27 @@ void thread_cls_set(size_t slot, void *value)
 {
     cpu_info_t *cpu = this_cpu();
     cpu->storage[slot] = value;
+}
+
+void thread_cls_init_each_cpu(
+        size_t slot, thread_cls_init_handler_t handler, void *arg)
+{
+    for (size_t c = 0; c < cpu_count; ++c)
+        cpus[c].storage[slot] = handler(arg);
+}
+
+void thread_cls_for_each_cpu(
+        size_t slot, int other_only,
+        thread_cls_each_handler_t handler, void *arg, size_t size)
+{
+    cpu_info_t *cpu = other_only ? this_cpu() : 0;
+    for (size_t c = 0; c < cpu_count; ++c) {
+        if (cpus + c != cpu)
+            handler(c, cpus[c].storage[slot], arg, size);
+    }
+}
+
+void thread_send_ipi(int cpu, int intr)
+{
+    apic_send_ipi(cpus[cpu].apic_id, intr);
 }

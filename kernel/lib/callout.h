@@ -10,6 +10,7 @@
 //  'F': Filesystem implementation
 //  'N': Network interface
 //  'U': USB interface
+//  'T': SMP online
 
 typedef struct callout_t {
     void (*fn)(void*);

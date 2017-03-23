@@ -60,7 +60,8 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     // Map first 640KB
     paging_map_range(0, 0xA0000, 0,
-                     PTE_PRESENT | PTE_WRITABLE, 2);
+                     PTE_PRESENT | PTE_WRITABLE |
+                     (-cpu_has_global_pages() & PTE_GLOBAL), 2);
 
     // Pack the size into the high 12 bits
     phys_mem_table |= phys_mem_table_size << 20;
@@ -85,6 +86,10 @@ uint16_t elf64_run(char const *filename)
 {
     if (!cpu_has_long_mode())
         halt("Need 64-bit CPU");
+
+    uint64_t pge_page_flags = 0;
+    if (cpu_has_global_pages())
+        pge_page_flags |= PTE_GLOBAL;
 
     uint64_t nx_page_flags = 0;
     if (cpu_has_no_execute())
@@ -129,6 +134,7 @@ uint16_t elf64_run(char const *filename)
     // Map the screen for debugging convenience
     paging_map_range(0xA0000, 0x20000, 0xA0000,
                      PTE_PRESENT | PTE_WRITABLE |
+                     (-cpu_has_global_pages() & PTE_GLOBAL) |
                      PTE_PCD | PTE_PWT, 0);
 
     // Allocate a page of memory to be used to alias high memory
@@ -144,7 +150,7 @@ uint16_t elf64_run(char const *filename)
     for (size_t i = 0; !failed && i < file_hdr.e_phnum; ++i) {
         Elf64_Phdr *blk = program_hdrs + i;
 
-        uint64_t page_flags = 0;
+        uint64_t page_flags = (-cpu_has_global_pages() & PTE_GLOBAL);
 
         // If it is not readable, writable or executable, ignore
         if ((blk->p_flags & (PF_R | PF_W | PF_X)) == 0)
@@ -161,6 +167,9 @@ uint16_t elf64_run(char const *filename)
 
         // Pages present
         page_flags |= PTE_PRESENT;
+
+        // Global if possible
+        page_flags |= pge_page_flags;
 
         // If not executable, mark as no execute
         if ((blk->p_flags & PF_X) == 0)
