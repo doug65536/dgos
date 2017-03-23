@@ -1,51 +1,51 @@
 
 DEVSRCS := \
-	device/vga.c \
-	device/ahci.c \
-	device/ide.c
+	device/vga.cc \
+	device/ahci.cc \
+	device/ide.cc
 
-DEVOBJS := $(DEVSRCS:.c=.o)
+DEVOBJS := $(DEVSRCS:.cc=.o)
 
 CSRCS := \
-	cpu/syscall_dispatch.c \
-	bios_data.c \
-	nano_time.c \
-	cpu/cpu.c \
-	cpu/apic.c \
-	cpu/cpu_broadcast.c \
-	cpu/cmos.c \
-	cpu/atomic.c \
-	cpu/control_regs.c \
-	cpu/cpuid.c \
-	cpu/thread_impl.c \
-	cpu/spinlock.c \
-	cpu/halt.c \
-	cpu/gdt.c \
-	cpu/idt.c \
-	cpu/interrupts.c \
-	cpu/ioport.c \
-	cpu/mmu.c \
-	cpu/nontemporal.c \
-	cpu/legacy_pic.c \
-	cpu/legacy_pit.c \
-	cpu/except.c \
-	cpu/math.c \
-	device/pci.c \
-	device/keyb8042.c \
-	device/e9debug.c \
-	device/rtl8139.c \
-	device/keyb8042_layout/keyb8042_layout_us.c \
-	device/usb_xhci.c \
-	bootdev.c \
-	elf64.c \
+	cpu/syscall_dispatch.cc \
+	bios_data.cc \
+	nano_time.cc \
+	cpu/cpu.cc \
+	cpu/apic.cc \
+	cpu/cpu_broadcast.cc \
+	cpu/cmos.cc \
+	cpu/atomic.cc \
+	cpu/control_regs.cc \
+	cpu/cpuid.cc \
+	cpu/thread_impl.cc \
+	cpu/spinlock.cc \
+	cpu/halt.cc \
+	cpu/gdt.cc \
+	cpu/idt.cc \
+	cpu/interrupts.cc \
+	cpu/ioport.cc \
+	cpu/mmu.cc \
+	cpu/nontemporal.cc \
+	cpu/legacy_pic.cc \
+	cpu/legacy_pit.cc \
+	cpu/except.cc \
+	cpu/math.cc \
+	device/pci.cc \
+	device/keyb8042.cc \
+	device/e9debug.cc \
+	device/rtl8139.cc \
+	device/keyb8042_layout/keyb8042_layout_us.cc \
+	device/usb_xhci.cc \
+	bootdev.cc \
+	elf64.cc \
 	$(DEVSRCS)
 
-#OPTIMIZEDSRCS := cpu/thread_impl.c
+#OPTIMIZEDSRCS := cpu/thread_impl.cc
 ifdef OPTIMIZEDSRCS
-$(OPTIMIZEDSRCS:.c=.o): CFLAGS += -O2
+$(OPTIMIZEDSRCS:.cc=.o): CXXFLAGS += -O2
 endif
 
-cpu/math.o: CFLAGS += -fno-builtin-ilogbl
+cpu/math.o: CXXFLAGS += -fno-builtin-ilogbl
 
 ASRCS := entry.s \
 	cpu/syscall.s \
@@ -74,6 +74,6 @@ generated_device_vtbl.s: $(DEVOBJS)
 
 buildtool/keyb_tool: device/keyb8042_layout/keyb8042_gentables.c
 	mkdir -p buildtool
-	$(CC) -Wall -Wextra -o $@ $^
+	$(CXX) -Wall -Wextra -o $@ $^
 
 all: buildtool/keyb_tool

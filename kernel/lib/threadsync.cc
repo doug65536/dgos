@@ -118,7 +118,7 @@ EXPORT void mutex_unlock(mutex_t *mutex)
     if (mutex->link.next != &mutex->link) {
         // Wake up the first waiter
         MUTEX_DTRACE("Mutex unlock waking waiter\n");
-        thread_wait_t *waiter = (void*)mutex->link.next;
+		thread_wait_t *waiter = (thread_wait_t*)mutex->link.next;
         thread_wait_del(&waiter->link);
         mutex->owner = waiter->thread;
         spinlock_unlock_noirq(&mutex->lock);
@@ -187,29 +187,29 @@ typedef struct condvar_spinlock_t {
 
 static void condvar_lock_spinlock(void *mutex)
 {
-    condvar_spinlock_t *state = mutex;
+	condvar_spinlock_t *state = (condvar_spinlock_t *)mutex;
     spinlock_lock_noirq(state->lock);
 }
 
 static void condvar_unlock_spinlock(void *mutex)
 {
-    condvar_spinlock_t *state = mutex;
+	condvar_spinlock_t *state = (condvar_spinlock_t *)mutex;
     spinlock_unlock_noirq(state->lock);
 }
 
 static void condvar_lock_mutex_noyield(void *mutex)
 {
-    mutex_lock_noyield(mutex);
+	mutex_lock_noyield((mutex_t *)mutex);
 }
 
 static void condvar_lock_mutex(void *mutex)
 {
-    mutex_lock(mutex);
+	mutex_lock((mutex_t *)mutex);
 }
 
 static void condvar_unlock_mutex(void *mutex)
 {
-    mutex_unlock(mutex);
+	mutex_unlock((mutex_t *)mutex);
 }
 
 static void condvar_wait_ex(condition_var_t *var,
@@ -263,7 +263,7 @@ EXPORT void condvar_wake_one(condition_var_t *var)
     spinlock_lock_noirq(&var->lock);
     atomic_barrier();
 
-    thread_wait_t volatile *wait = (void*)var->link.next;
+	thread_wait_t volatile *wait = (thread_wait_t*)var->link.next;
     if ((void*)wait != (void*)&var->link) {
         CONDVAR_DTRACE("%p: Removing wait\n", (void*)wait);
         thread_wait_del(&wait->link);
@@ -279,9 +279,9 @@ EXPORT void condvar_wake_all(condition_var_t *var)
 {
     spinlock_lock_noirq(&var->lock);
 
-    for (thread_wait_t *wait = (void*)var->link.next;
+	for (thread_wait_t *wait = (thread_wait_t*)var->link.next;
          wait != (void*)&var->link;
-         wait = (void*)thread_wait_del(&wait->link)) {
+		 wait = (thread_wait_t*)thread_wait_del(&wait->link)) {
         CONDVAR_DTRACE("%p: Waking id %d\n", (void*)wait, wait->thread);
         thread_resume(wait->thread);
     }

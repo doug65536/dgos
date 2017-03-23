@@ -15,11 +15,11 @@ int memcmp(void const *lhs, void const *rhs, size_t count);
 char *strstr(char const *str, char const *substr);
 
 void *memset(void *dest, int c, size_t n);
-void *memcpy(void *restrict dest, void const *restrict src, size_t n);
+void *memcpy(void *dest, void const *src, size_t n);
 void *memmove(void *dest, const void *src, size_t n);
 
-char *strcpy(char *restrict dest, char const *restrict src);
-char *strcat(char *restrict dest, char const *restrict src);
+char *strcpy(char *dest, char const *src);
+char *strcat(char *dest, char const *src);
 
 char *strncpy(char *dest, char const *src, size_t n);
 char *strncat(char *dest, char const *src, size_t n);

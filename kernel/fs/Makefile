@@ -2,10 +2,10 @@
 
 LIBNAME := fs
 CSRCS := \
-	mbr.c \
-	fat32.c \
-	iso9660.c \
-	iso9660_part.c \
-	tmpfs.c
+	mbr.cc \
+	fat32.cc \
+	iso9660.cc \
+	iso9660_part.cc \
+	tmpfs.cc
 
 include $(BUILDROOT)/library.mk

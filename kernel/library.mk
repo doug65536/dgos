@@ -8,7 +8,7 @@ LIBFILENAME := lib$(LIBNAME).a
 
 # Determine object file filenames
 AOBJS := $(ASRCS:.s=.o)
-COBJS := $(CSRCS:.c=.o)
+COBJS := $(CSRCS:.cc=.o)
 
 SRCS := $(ASRCS) $(CSRCS)
 

@@ -20,7 +20,7 @@ static int part_dev_count;
 
 typedef struct fs_reg_t {
     char const *name;
-    fs_vtbl_t *vtbl;
+    fs_factory_t *factory;
 } fs_reg_t;
 
 #define MAX_FS_REGS     16
@@ -48,14 +48,14 @@ void close_storage_dev(storage_dev_base_t *dev)
 }
 
 void register_storage_if_device(char const *name,
-                                storage_if_vtbl_t *vtbl)
+                                storage_if_base_t *vtbl)
 {
     // Get a list of storage devices of this type
     if_list_t if_list = vtbl->detect();
 
     for (unsigned i = 0; i < if_list.count; ++i) {
         // Calculate pointer to storage interface instance
-        storage_if_base_t *if_ = (void*)
+        storage_if_base_t *if_ = (storage_if_base_t *)
                 ((char*)if_list.base + i * if_list.stride);
 
         assert(storage_if_count < countof(storage_ifs));
@@ -65,11 +65,11 @@ void register_storage_if_device(char const *name,
 
         // Get a list of storage devices on this interface
         if_list_t dev_list;
-        dev_list = if_->vtbl->detect_devices(if_);
+        dev_list = if_->detect_devices(if_);
 
         for (unsigned k = 0; k < dev_list.count; ++k) {
             // Calculate pointer to storage device instance
-            storage_dev_base_t *dev = (void*)
+            storage_dev_base_t *dev = (storage_dev_base_t*)
                     ((char*)dev_list.base +
                     k * dev_list.stride);
             assert(storage_dev_count < countof(storage_devs));
@@ -81,11 +81,11 @@ void register_storage_if_device(char const *name,
     printk("%s device registered\n", name);
 }
 
-void register_fs_device(const char *name, fs_vtbl_t *vtbl)
+void register_fs_device(const char *name, fs_factory_t *fs)
 {
     if (fs_reg_count < MAX_FS_REGS) {
         fs_regs[fs_reg_count].name = name;
-        fs_regs[fs_reg_count].vtbl = vtbl;
+        fs_regs[fs_reg_count].factory = fs;
         ++fs_reg_count;
         printk("%s filesystem registered\n", name);
     }
@@ -112,7 +112,7 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     assert(fs_reg != 0);
 
-    fs_base_t *mfs = fs_reg->vtbl->mount(info);
+    fs_base_t *mfs = fs_reg->factory->mount(info);
     if (mfs && fs_mount_count < countof(fs_mounts)) {
         fs_mounts[fs_mount_count].fs = mfs;
         fs_mounts[fs_mount_count].reg = fs_reg;
@@ -137,7 +137,7 @@ void register_part_device(const char *name, part_vtbl_t *vtbl)
 
                 // Mount partitions
                 for (unsigned i = 0; i < part_list.count; ++i) {
-                    part_dev_t *part = (void*)((char*)part_list.base +
+                    part_dev_t *part = (part_dev_t*)((char*)part_list.base +
                                                part_list.stride * i);
                     fs_init_info_t info;
                     info.drive = drive;

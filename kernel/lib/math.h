@@ -186,7 +186,7 @@ long double nextafterl(long double n, long double t);
 /// http://en.cppreference.com/w/c/numeric/math/sqrtl
 
 #if defined(__x86_64__) || defined(__x86__)
-#define sqrtf(n) (__builtin_ia32_sqrtss((__fvec4){ (n), 0, 0, 0 })[0])
+#define sqrtf(n) (__builtin_ia32_sqrtss(__fvec4{ (n), 0, 0, 0 })[0])
 #else
 #define sqrtf(n) __builtin_sqrtf((n))
 #endif

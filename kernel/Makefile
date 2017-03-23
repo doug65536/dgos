@@ -25,13 +25,13 @@ $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
 export CC
 
-CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | \
+CC_IS_CLANG := $(shell ($(CXX) -v 2>&1 | \
 	head -n 1 | \
 	grep clang > /dev/null) && \
 	echo 1)
 
 AOBJS := $(ASRCS:.s=.o)
-COBJS := $(CSRCS:.c=.o)
+COBJS := $(CSRCS:.cc=.o)
 
 OBJS := $(AOBJS) $(COBJS)
 
@@ -52,7 +52,7 @@ WEVERYTHING += -Wdouble-promotion
 WEVERYTHING += -Wformat=2
 WEVERYTHING += -Wfloat-equal
 WEVERYTHING += -Wundef
-WEVERYTHING += -Wbad-function-cast
+#WEVERYTHING += -Wbad-function-cast
 #overkill WEVERYTHING += -Wcast-qual
 WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wmissing-prototypes
@@ -69,22 +69,22 @@ ifndef TLS_MODEL
 TLS_MODEL := local-exec
 endif
 
-CFLAGS := -g3 -fno-stack-protector \
+CXXFLAGS := -g3 -fno-stack-protector \
 	-mcmodel=kernel -mno-red-zone \
 	-msse -msse2 \
 	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
-	-std=c11 \
+	-std=c++14 -fpermissive \
 	$(WEVERYTHING)
 
 #-std=c++11 -x c++ \
 
 ifdef OPTIMIZE
-CFLAGS += \
+CXXFLAGS += \
 	-O2 -ftree-vectorize \
 	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl
 else
-CFLAGS += \
+CXXFLAGS += \
 	-O0 \
 	-fno-omit-frame-pointer
 endif
@@ -97,22 +97,22 @@ export AR
 export NM
 
 ifdef LTO
-CFLAGS += -flto=8
+CXXFLAGS += -flto=8
 endif
 
-CFLAGS += $(OPTIMIZATIONFLAGS)
+CXXFLAGS += $(OPTIMIZATIONFLAGS)
 
 #-fipa-icf
 
-CFLAGS += $(INCLUDEARGS)
+CXXFLAGS += $(INCLUDEARGS)
 
-export CFLAGS
+export CXXFLAGS
 
 ifdef TUNEFOR
-	CFLAGS += -mtune=$(TUNEFOR)
+	CXXFLAGS += -mtune=$(TUNEFOR)
 endif
 
-LIBGCC := $(shell $(CC) -print-libgcc-file-name)
+LIBGCC := $(shell $(CXX) -print-libgcc-file-name)
 LIBGCCDIR := $(dir $(LIBGCC))
 LIBGCCFILENAME = $(notdir $(LIBGCC))
 LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
@@ -144,7 +144,7 @@ LDFLAGS ?=  --oformat elf64-x86-64 \
 	-z max-page-size=4096
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
-$(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
+$(NEEDSMALLEST:.cc=.o): CFLAGS += -Os -DNDEBUG
 
 all: subdirs $(EXTERNLIBFILES) $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
 
@@ -175,7 +175,7 @@ $(LIBFILES): subdirs
 WLPREFIX := -Wl,
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOLE)
-	$(CC) $(CFLAGS) $(OUTPUT_OPTION) \
+	$(CXX) $(CXXFLAGS) $(OUTPUT_OPTION) \
 		-fuse-linker-plugin \
 		-nostdlib -Wl,-melf_x86_64 \
 		$(patsubst %,$(WLPREFIX)%,$(LDFLAGS)) \

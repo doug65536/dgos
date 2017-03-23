@@ -20,14 +20,14 @@ CC_WA_COMMA := -Wa,
 ifndef ASFLAGS
 ASFLAGS := -g -warn
 endif
-ifeq ($(CC),clang)
+ifeq ($(CXX),clang)
 CC_AS_FLAGS := -no-integrated-as
 endif
 
 # Compile commands for C and C++
 COMPILE.c = $(CC) $(DEPFLAGS) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
 COMPILE.cc = $(CXX) $(DEPFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(TARGET_ARCH)
-COMPILE.s = $(CC) $(CC_AS_FLAGS) $(TARGET_ARCH) \
+COMPILE.s = $(CXX) $(CC_AS_FLAGS) $(TARGET_ARCH) \
 	$(patsubst %,$(CC_WA_COMMA)%,$(ASFLAGS))
 
 OUTPUT_OPTION = -o $@
@@ -56,12 +56,25 @@ $(DUMPDIR)/%.s : %.c $(DEPDIR)/%.d
 	mkdir -p $(@D)
 	$(COMPILE.c) $(OUTPUT_OPTION) -fverbose-asm -S $<
 
+# Generate assembly dump for C++
+$(DUMPDIR)/%.s : %.cc
+$(DUMPDIR)/%.s : %.cc $(DEPDIR)/%.d
+	mkdir -p $(@D)
+	$(COMPILE.cc) $(OUTPUT_OPTION) -fverbose-asm -S $<
+
 # Generate preprocessed source for C
 $(DUMPDIR)/%.i : %.c
 $(DUMPDIR)/%.i : %.S
 $(DUMPDIR)/%.i : %.c $(DEPDIR)/%.d
 	mkdir -p $(dir $@)
 	$(COMPILE.c) $(OUTPUT_OPTION) -E $<
+
+# Generate preprocessed source for C++
+$(DUMPDIR)/%.i : %.cc
+$(DUMPDIR)/%.i : %.S
+$(DUMPDIR)/%.i : %.cc $(DEPDIR)/%.d
+	mkdir -p $(dir $@)
+	$(COMPILE.cc) $(OUTPUT_OPTION) -E $<
 
 # Compile C++ with cc extension
 

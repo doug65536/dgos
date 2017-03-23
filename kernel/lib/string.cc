@@ -17,7 +17,7 @@ EXPORT size_t strlen(char const *src)
 
 EXPORT void *memchr(void const *mem, int ch, size_t count)
 {
-    for (char const *p = mem; count--; ++p)
+    for (char const *p = (char const *)mem; count--; ++p)
         if (*p == (char)ch)
             return (void *)p;
    return 0;
@@ -38,7 +38,7 @@ EXPORT char *strchr(char const *s, int ch)
     for (;; ++s) {
         char c = *s;
         if (c == (char)ch)
-            return (void*)s;
+            return (char*)s;
         if (c == 0)
             return 0;
     }
@@ -232,7 +232,7 @@ static inline void memcpy_reverse(void *dest, void const *src, size_t n)
 
 EXPORT void *memmove(void *dest, void const *src, size_t n)
 {
-    char *d = dest;
+    char *d = (char *)dest;
     char const *s = src;
 
     // Can do forward copy if destination is before source,

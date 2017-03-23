@@ -48,7 +48,7 @@ void fb_init(void)
     screen_size = (screen_size + 63) & -64;
 
     fb.back_buf = mmap(0, screen_size, PROT_READ | PROT_WRITE, 0, -1, 0);
-    fb.video_mem = (void*)(uintptr_t)fb.mode.framebuffer_addr;
+    fb.video_mem = (uint8_t*)(uintptr_t)fb.mode.framebuffer_addr;
 
     madvise(fb.video_mem, screen_size, MADV_WEAKORDER);
 
@@ -221,10 +221,10 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
     fb_update_dirty(x0, y0, x1, y1);
 
     __fvec4 fcolor = {
-        color & 0xFF,
-        (color >> 8) & 0xFF,
-        (color >> 16) & 0xFF,
-        (color >> 24) & 0xFF
+        float(color & 0xFF),
+        float((color >> 8) & 0xFF),
+        float((color >> 16) & 0xFF),
+        float((color >> 24) & 0xFF)
     };
     uint8_t *addr = fb.back_buf + (y0 * fb.mode.pitch + x0 * sizeof(uint32_t));
     int dx = x1 - x0;

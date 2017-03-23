@@ -1,40 +1,40 @@
 # Compile libkernel (processor independent code)
 
 LIBNAME := kernel
-CSRCS := mm.c \
-	thread.c \
-	priorityqueue.c \
-	threadsync.c \
-	callout.c \
-	printk.c \
-	math.c \
-	dev_text.c \
-	dev_storage.c \
-	dev_eth.c \
-	conio.c \
-	mouse.c \
-	keyboard.c \
-	string.c \
-	irq.c \
-	time.c \
-	stdlib.c \
-	assert.c \
-	bitsearch.c \
-	bsearch.c \
-	rbtree.c \
-	debug.c \
-	rand.c \
-	bswap.c \
-	pool.c \
-	heap.c \
-	hash.c \
-	hash_table.c \
-	fileio.c \
-	process.c \
-	png.c \
-	zlib_helper.c \
-	framebuffer.c
+CSRCS := mm.cc \
+	thread.cc \
+	priorityqueue.cc \
+	threadsync.cc \
+	callout.cc \
+	printk.cc \
+	math.cc \
+	dev_text.cc \
+	dev_storage.cc \
+	dev_eth.cc \
+	conio.cc \
+	mouse.cc \
+	keyboard.cc \
+	string.cc \
+	irq.cc \
+	time.cc \
+	stdlib.cc \
+	assert.cc \
+	bitsearch.cc \
+	bsearch.cc \
+	rbtree.cc \
+	debug.cc \
+	rand.cc \
+	bswap.cc \
+	pool.cc \
+	heap.cc \
+	hash.cc \
+	hash_table.cc \
+	fileio.cc \
+	process.cc \
+	png.cc \
+	zlib_helper.cc \
+	framebuffer.cc
 
-framebuffer.o: CFLAGS += -ffast-math
+framebuffer.o: CXXFLAGS += -ffast-math
 
 include $(BUILDROOT)/library.mk

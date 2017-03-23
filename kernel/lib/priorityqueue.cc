@@ -30,7 +30,7 @@ priqueue_t *priqueue_create(uint32_t capacity,
     if (capacity == 0)
         capacity = (PAGESIZE - sizeof(priqueue_t)) / sizeof(uintptr_t);
 
-    priqueue_t *queue = mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
+	priqueue_t *queue = (priqueue_t*)mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
                              MAP_POPULATE, -1, 0);
 
     queue->capacity = capacity;
@@ -45,8 +45,8 @@ priqueue_t *priqueue_create(uint32_t capacity,
 
 void priqueue_destroy(priqueue_t *queue)
 {
-    char *end = (void*)priqueue_item(queue, queue->capacity);
-    char *begin = (void*)queue;
+	char *end = (char*)priqueue_item(queue, queue->capacity);
+	char *begin = (char*)queue;
     size_t size = end - begin;
     munmap(queue, size);
 }

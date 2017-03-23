@@ -11,7 +11,7 @@ struct __exception_context_t {
 
 __exception_jmp_buf_t *__exception_handler_add(void)
 {
-    __exception_context_t *ctx = malloc(sizeof(*ctx));
+    __exception_context_t *ctx = new __exception_context_t;
     ctx->__next = thread_set_exception_top(ctx);
     ctx->__exception_code = -1;
     return &ctx->__exception_state;

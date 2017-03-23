@@ -43,7 +43,7 @@ typedef union arg_t {
     long double long_double_value;
 } arg_t;
 
-typedef struct formatter_flags_t {
+struct formatter_flags_t {
     unsigned int left_justify : 1;
     unsigned int leading_plus : 1;
     unsigned int leading_zero : 1;
@@ -65,9 +65,9 @@ typedef struct formatter_flags_t {
     length_mod_t length;
     arg_type_t arg_type;
     arg_t arg;
-} formatter_flags_t;
+};
 
-static formatter_flags_t const empty_formatter_flags;
+static formatter_flags_t const empty_formatter_flags = {};
 
 /// Parse an integer from a string,
 /// returns the first non-digit
@@ -438,7 +438,7 @@ static intptr_t formatter(
                 switch (flags.length) {
                 case length_l:
                     flags.arg_type = arg_type_character;
-                    flags.arg.character = va_arg(ap, wchar_t);
+					flags.arg.character = va_arg(ap, int);
                     break;
                 case length_none:
                     flags.arg_type = arg_type_character;
@@ -863,7 +863,7 @@ typedef struct vsnprintf_context_t {
 
 static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 {
-    vsnprintf_context_t *ctx = context;
+	vsnprintf_context_t *ctx = (vsnprintf_context_t *)context;
     char buf[5];
 
     intptr_t len = 0;

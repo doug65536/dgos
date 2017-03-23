@@ -3,7 +3,7 @@
 
 // jenkins hash
 static inline uint32_t hash_32(void const* k, size_t length) {
-    uint8_t const* key = k;
+    uint8_t const* key = (uint8_t const *)k;
 
     size_t i = 0;
     uint32_t hash = 0;

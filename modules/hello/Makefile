@@ -3,11 +3,11 @@ export BUILDROOT
 
 MODNAME := hello
 
-CSRCS := hello.c
+CSRCS := hello.cc
 
 ASRCS :=
 
-CFLAGS := -g -mcmodel=kernel \
+CXXFLAGS := -g -mcmodel=kernel \
 	-std=c11 -fno-common -fno-exceptions
 
 #-fno-asynchronous-unwind-tables

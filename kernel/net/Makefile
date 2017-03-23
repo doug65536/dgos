@@ -2,17 +2,17 @@
 
 LIBNAME := net
 CSRCS := \
-	eth_q.c \
-	eth_frame.c \
-	arp_frame.c \
-	ipv4_frame.c \
-	tcp_frame.c \
-	udp_frame.c \
-	icmp_frame.c \
-	icmp.c \
-	ipv4.c \
-	udp.c \
-	tcp.c \
-	dhcp.c
+	eth_q.cc \
+	eth_frame.cc \
+	arp_frame.cc \
+	ipv4_frame.cc \
+	tcp_frame.cc \
+	udp_frame.cc \
+	icmp_frame.cc \
+	icmp.cc \
+	ipv4.cc \
+	udp.cc \
+	tcp.cc \
+	dhcp.cc
 
 include $(BUILDROOT)/library.mk

@@ -90,10 +90,10 @@ static process_t *process_add(void)
     return result;
 }
 
-int process_spawn(pid_t * restrict pid_result,
-                  char const * restrict path,
-                  char const * const * restrict argv,
-                  char const * const * restrict envp)
+int process_spawn(pid_t * pid_result,
+				  char const * path,
+				  char const * const * argv,
+				  char const * const * envp)
 {
     process_t *process = process_add();
 

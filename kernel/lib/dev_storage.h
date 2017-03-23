@@ -19,14 +19,14 @@
 //
 // Forward declarations
 
-typedef struct STORAGE_DEV_T STORAGE_DEV_T;
-typedef struct storage_dev_vtbl_t storage_dev_vtbl_t;
+struct STORAGE_DEV_T;
+struct storage_dev_vtbl_t;
 
-typedef struct STORAGE_IF_T STORAGE_IF_T;
-typedef struct storage_if_vtbl_t storage_if_vtbl_t;
+struct STORAGE_IF_T;
+struct storage_if_vtbl_t;
 
-typedef struct storage_dev_base_t storage_dev_base_t;
-typedef struct storage_if_base_t storage_if_base_t;
+struct storage_dev_base_t;
+struct storage_if_base_t;
 
 typedef struct if_list_t {
     void *base;
@@ -37,94 +37,43 @@ typedef struct if_list_t {
 //
 // Storage Device (hard drive, CDROM, etc)
 
-struct storage_dev_base_t {
-    storage_dev_vtbl_t *vtbl;
-    storage_if_base_t *if_;
-};
-
 typedef enum storage_dev_info_t {
     STORAGE_INFO_NONE = 0,
     STORAGE_INFO_BLOCKSIZE = 1,
     STORAGE_INFO_MAX = 0x7FFFFFFF
 } storage_dev_info_t;
 
-struct storage_dev_vtbl_t {
+struct storage_dev_base_t {
     // Startup/shutdown
-    void (*cleanup)(storage_dev_base_t *);
+    virtual void cleanup(storage_dev_base_t *) = 0;
 
-    int (*read_blocks)(storage_dev_base_t *dev,
+    virtual int read_blocks(storage_dev_base_t *dev,
                 void *data, uint64_t count,
-                uint64_t lba);
+                uint64_t lba) = 0;
 
-    int (*write_blocks)(
+    virtual int write_blocks(
             storage_dev_base_t *dev,
             void const *data, uint64_t count,
-            uint64_t lba);
+            uint64_t lba) = 0;
 
-    int (*flush)(storage_dev_base_t *dev);
+    virtual int flush(storage_dev_base_t *dev) = 0;
 
-    long (*info)(storage_dev_base_t *dev,
-                 storage_dev_info_t key);
+    virtual long info(storage_dev_base_t *dev,
+                 storage_dev_info_t key) = 0;
 };
 
 //
 // Storage Interface (IDE, AHCI, etc)
 
 struct storage_if_base_t {
-    storage_if_vtbl_t *vtbl;
+    virtual if_list_t detect(void) = 0;
+
+    virtual void cleanup(storage_if_base_t *if_) = 0;
+
+    virtual if_list_t detect_devices(storage_if_base_t *if_) = 0;
 };
 
-struct storage_if_vtbl_t {
-    if_list_t (*detect)(void);
-
-    void (*cleanup)(storage_if_base_t *if_);
-
-    if_list_t (*detect_devices)(storage_if_base_t *if_);
-};
-
-void register_storage_if_device(char const *name, storage_if_vtbl_t *vtbl);
-
-#define MAKE_storage_if_VTBL(type, name) { \
-    name##_if_detect, \
-    name##_if_cleanup, \
-    name##_if_detect_devices \
-}
-
-#define MAKE_storage_dev_VTBL(type, name) { \
-    name##_dev_cleanup, \
-    name##_dev_read_blocks, \
-    name##_dev_write_blocks, \
-    name##_dev_flush, \
-    name##_dev_info \
-}
-
-#ifdef STORAGE_DEV_NAME
-#define DECLARE_storage_if_DEVICE(name) \
-    DECLARE_DEVICE(storage_if, name)
-
-#define REGISTER_storage_if_DEVICE(name) \
-    REGISTER_DEVICE(storage_if, name, 'L')
-
-#define STORAGE_IF_DEV_PTR(dev) STORAGE_IF_T *self = (void*)dev
-
-#define STORAGE_IF_DEV_PTR_UNUSED(dev) (void)dev
-
-//
-
-#define DECLARE_storage_dev_DEVICE(name) \
-    DECLARE_DEVICE(storage_dev, name)
-
-#define REGISTER_storage_dev_DEVICE(name) \
-    REGISTER_DEVICE(storage_dev, name, 'L')
-
-#define DEFINE_storage_dev_DEVICE(name) \
-    DEFINE_DEVICE(storage_dev, name)
-
-#define STORAGE_DEV_DEV_PTR(dev) STORAGE_DEV_T *self = (void*)dev
-
-#define STORAGE_DEV_DEV_PTR_UNUSED(dev) (void)dev
-
-#endif
+void register_storage_if_device(char const *name, storage_if_base_t *vtbl);
 
 typedef int dev_t;
 
@@ -134,9 +83,9 @@ void close_storage_dev(storage_dev_base_t *dev);
 //
 // Filesystem (FAT32, etc)
 
-typedef struct fs_vtbl_t fs_vtbl_t;
+struct fs_vtbl_t;
 
-typedef struct fs_base_t fs_base_t;
+struct fs_base_t;
 
 typedef char const *fs_cpath_t;
 
@@ -144,20 +93,20 @@ typedef uint16_t fs_mode_t;
 typedef uint32_t fs_uid_t;
 typedef uint32_t fs_gid_t;
 
-typedef struct fs_init_info_t fs_init_info_t;
+struct fs_init_info_t;
 
-typedef struct fs_stat_t fs_stat_t;
+struct fs_stat_t;
 typedef void fs_file_info_t;
 
-typedef struct fs_statvfs_t fs_statvfs_t;
+struct fs_statvfs_t;
 
-typedef struct fs_flock_t fs_flock_t;
+struct fs_flock_t;
 
 typedef uint64_t fs_timespec_t;
 
 typedef uint64_t fs_dev_t;
 
-typedef struct fs_pollhandle_t fs_pollhandle_t;
+struct fs_pollhandle_t;
 
 struct fs_init_info_t {
     storage_dev_base_t *drive;
@@ -209,259 +158,186 @@ struct fs_statvfs_t {
     uint64_t   f_namemax;   /* maximum filename length */
 };
 
-struct fs_vtbl_t {
+struct fs_base_t;
+
+struct fs_factory_t {
+    virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
+};
+
+struct fs_base_t {
     //
     // Startup and shutdown
 
-    // Returns extended fs_base_t
-    void *(*mount)(fs_init_info_t *conn);
-    void (*unmount)(fs_base_t *dev);
+    virtual void unmount() = 0;
 
     //
     // Scan directories
 
-    int (*opendir)(fs_base_t *dev,
+    virtual int opendir(fs_base_t *dev,
                    fs_file_info_t **fi,
-                   fs_cpath_t path);
-    ssize_t (*readdir)(fs_base_t *dev,
+                   fs_cpath_t path) = 0;
+    virtual ssize_t readdir(fs_base_t *dev,
                        fs_file_info_t *fi,
                        dirent_t* buf,
-                       off_t offset);
-    int (*releasedir)(fs_base_t *dev,
-                      fs_file_info_t *fi);
+                       off_t offset) = 0;
+    virtual int releasedir(fs_base_t *dev,
+                      fs_file_info_t *fi) = 0;
 
     //
     // Read directory entry information
 
-    int (*getattr)(fs_base_t *dev,
-                   fs_cpath_t path, fs_stat_t* stbuf);
-    int (*access)(fs_base_t *dev,
-                  fs_cpath_t path, int mask);
-    int (*readlink)(fs_base_t *dev,
-                    fs_cpath_t path, char* buf, size_t size);
+    virtual int getattr(fs_base_t *dev,
+                   fs_cpath_t path, fs_stat_t* stbuf) = 0;
+    virtual int access(fs_base_t *dev,
+                  fs_cpath_t path, int mask) = 0;
+    virtual int readlink(fs_base_t *dev,
+                    fs_cpath_t path, char* buf, size_t size) = 0;
 
     //
     // Modify directories
 
-    int (*mknod)(fs_base_t *dev,
-                 fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev);
-    int (*mkdir)(fs_base_t *dev,
-                 fs_cpath_t path, fs_mode_t mode);
-    int (*rmdir)(fs_base_t *dev,
-                 fs_cpath_t path);
-    int (*symlink)(fs_base_t *dev,
-                   fs_cpath_t to, fs_cpath_t from);
-    int (*rename)(fs_base_t *dev,
-                  fs_cpath_t from, fs_cpath_t to);
-    int (*link)(fs_base_t *dev,
-                fs_cpath_t from, fs_cpath_t to);
-    int (*unlink)(fs_base_t *dev,
-                  fs_cpath_t path);
+    virtual int mknod(fs_base_t *dev,
+                 fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev) = 0;
+    virtual int mkdir(fs_base_t *dev,
+                 fs_cpath_t path, fs_mode_t mode) = 0;
+    virtual int rmdir(fs_base_t *dev,
+                 fs_cpath_t path) = 0;
+    virtual int symlink(fs_base_t *dev,
+                   fs_cpath_t to, fs_cpath_t from) = 0;
+    virtual int rename(fs_base_t *dev,
+                  fs_cpath_t from, fs_cpath_t to) = 0;
+    virtual int link(fs_base_t *dev,
+                fs_cpath_t from, fs_cpath_t to) = 0;
+    virtual int unlink(fs_base_t *dev,
+                  fs_cpath_t path) = 0;
 
     //
     // Modify directory entries
 
-    int (*chmod)(fs_base_t *dev,
+    virtual int chmod(fs_base_t *dev,
                  fs_cpath_t path,
-                 fs_mode_t mode);
-    int (*chown)(fs_base_t *dev,
+                 fs_mode_t mode) = 0;
+    virtual int chown(fs_base_t *dev,
                  fs_cpath_t path,
                  fs_uid_t uid,
-                 fs_gid_t gid);
-    int (*truncate)(fs_base_t *dev,
+                 fs_gid_t gid) = 0;
+    virtual int truncate(fs_base_t *dev,
                     fs_cpath_t path,
-                    off_t size);
-    int (*utimens)(fs_base_t *dev,
+                    off_t size) = 0;
+    virtual int utimens(fs_base_t *dev,
                    fs_cpath_t path,
-                   fs_timespec_t const *ts);
+                   fs_timespec_t const *ts) = 0;
 
     //
     // Open/close files
 
-    int (*open)(fs_base_t *dev,
+    virtual int open(fs_base_t *dev,
                 fs_file_info_t **fi,
-                fs_cpath_t path);
-    int (*release)(fs_base_t *dev,
-                   fs_file_info_t *fi);
+                fs_cpath_t path) = 0;
+    virtual int release(fs_base_t *dev,
+                   fs_file_info_t *fi) = 0;
 
     //
     // Read/write files
 
-    ssize_t (*read)(fs_base_t *dev,
+    virtual ssize_t read(fs_base_t *dev,
                     fs_file_info_t *fi,
                     char *buf,
                     size_t size,
-                    off_t offset);
-    ssize_t (*write)(fs_base_t *dev,
+                    off_t offset) = 0;
+    virtual ssize_t write(fs_base_t *dev,
                      fs_file_info_t *fi,
                      char const *buf,
                      size_t size,
-                     off_t offset);
-    int (*ftruncate)(fs_base_t *dev,
+                     off_t offset) = 0;
+    virtual int ftruncate(fs_base_t *dev,
                      fs_file_info_t *fi,
-                     off_t offset);
+                     off_t offset) = 0;
 
     //
     // Query open file
 
-    int (*fstat)(fs_base_t *dev,
+    virtual int fstat(fs_base_t *dev,
                  fs_file_info_t *fi,
-                 fs_stat_t *st);
+                 fs_stat_t *st) = 0;
 
     //
     // Sync files and directories and flush buffers
 
-    int (*fsync)(fs_base_t *dev,
+    virtual int fsync(fs_base_t *dev,
                  fs_file_info_t *fi,
-                 int isdatasync);
-    int (*fsyncdir)(fs_base_t *dev,
+                 int isdatasync) = 0;
+    virtual int fsyncdir(fs_base_t *dev,
                     fs_file_info_t *fi,
-                    int isdatasync);
-    int (*flush)(fs_base_t *dev,
-                 fs_file_info_t *fi);
+                    int isdatasync) = 0;
+    virtual int flush(fs_base_t *dev,
+                 fs_file_info_t *fi) = 0;
 
     //
     // lock/unlock file
 
-    int (*lock)(fs_base_t *dev,
+    virtual int lock(fs_base_t *dev,
                 fs_file_info_t *fi,
-                int cmd, fs_flock_t* locks);
+                int cmd, fs_flock_t* locks) = 0;
 
     //
     // Get block map
 
-    int (*bmap)(fs_base_t *dev,
+    virtual int bmap(fs_base_t *dev,
                 fs_cpath_t path, size_t blocksize,
-                uint64_t* blockno);
+                uint64_t* blockno) = 0;
 
     //
     // Get filesystem information
 
-    int (*statfs)(fs_base_t *dev,
-                  fs_statvfs_t* stbuf);
+    virtual int statfs(fs_base_t *dev,
+                  fs_statvfs_t* stbuf) = 0;
 
     //
     // Read/Write/Enumerate extended attributes
 
-    int (*setxattr)(fs_base_t *dev,
+    virtual int setxattr(fs_base_t *dev,
                     fs_cpath_t path,
                     char const* name, char const* value,
-                    size_t size, int flags);
-    int (*getxattr)(fs_base_t *dev,
+                    size_t size, int flags) = 0;
+    virtual int getxattr(fs_base_t *dev,
                     fs_cpath_t path,
                     char const* name, char* value,
-                    size_t size);
-    int (*listxattr)(fs_base_t *dev,
+                    size_t size) = 0;
+    virtual int listxattr(fs_base_t *dev,
                      fs_cpath_t path,
-                     char const* list, size_t size);
+                     char const* list, size_t size) = 0;
 
     //
     // ioctl API
 
-    int (*ioctl)(fs_base_t *dev,
+    virtual int ioctl(fs_base_t *dev,
                  fs_file_info_t *fi,
                  int cmd, void* arg,
-                 unsigned int flags, void* data);
+                 unsigned int flags, void* data) = 0;
 
     //
     //
 
-    int (*poll)(fs_base_t *dev,
+    virtual int poll(fs_base_t *dev,
                 fs_file_info_t *fi,
-                fs_pollhandle_t* ph, unsigned* reventsp);
+                fs_pollhandle_t* ph, unsigned* reventsp) = 0;
 };
 
-struct fs_base_t {
-    fs_vtbl_t *vtbl;
-};
-
-#define MAKE_fs_VTBL(type, name) { \
-    name##_mount,       \
-    name##_unmount,     \
-                        \
-    name##_opendir,     \
-    name##_readdir,     \
-    name##_releasedir,  \
-                        \
-    name##_getattr,     \
-    name##_access,      \
-    name##_readlink,    \
-                        \
-    name##_mknod,       \
-    name##_mkdir,       \
-    name##_rmdir,       \
-    name##_symlink,     \
-    name##_rename,      \
-    name##_link,        \
-    name##_unlink,      \
-                        \
-    name##_chmod,       \
-    name##_chown,       \
-    name##_truncate,    \
-    name##_utimens,     \
-                        \
-    name##_open,        \
-    name##_release,     \
-                        \
-    name##_read,        \
-    name##_write,       \
-    name##_ftruncate,   \
-                        \
-    name##_fstat,       \
-                        \
-    name##_fsync,       \
-    name##_fsyncdir,    \
-    name##_flush,       \
-                        \
-    name##_lock,        \
-    name##_bmap,        \
-                        \
-    name##_statfs,      \
-                        \
-    name##_setxattr,    \
-    name##_getxattr,    \
-    name##_listxattr,   \
-                        \
-    name##_ioctl,       \
-    name##_poll         \
-}
-
-#ifdef FS_NAME
-#define FS_T_EXPAND2(v) v ## _fs_t
-#define FS_T_EXPAND(v) FS_T_EXPAND2(v)
-#define FS_T FS_T_EXPAND(FS_NAME)
-
-typedef struct FS_T FS_T;
-
-#define DECLARE_fs_DEVICE(name) \
-    DECLARE_DEVICE(fs, name)
-
-#define REGISTER_fs_DEVICE(name) \
-    REGISTER_DEVICE(fs, name, 'F')
-
-#define DEFINE_fs_DEVICE(name) \
-    DEFINE_DEVICE(fs, name)
-
-#define FS_DEV_PTR(dev) FS_T *self = (void*)dev
-
-#define FS_DEV_PTR_UNUSED(dev) (void)dev
-#endif
-
-void register_fs_device(char const *name, fs_vtbl_t *vtbl);
+void register_fs_device(char const *name, fs_factory_t *fs);
 
 //
 // Partitioning scheme (MBR, UEFI, etc)
 
-typedef struct part_vtbl_t part_vtbl_t;
+struct part_vtbl_t;
 
-struct part_vtbl_t {
-    if_list_t (*detect)(storage_dev_base_t *drive);
+struct part_base_t {
+    virtual if_list_t detect(storage_dev_base_t *drive) = 0;
 };
 
-typedef struct part_dev_t part_dev_t;
+struct part_dev_t;
 
-struct part_dev_t {
-    part_vtbl_t *vtbl;
+struct part_dev_t : public part_base_t {
     storage_dev_base_t *drive;
     uint64_t lba_st;
     uint64_t lba_len;

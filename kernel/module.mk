@@ -12,7 +12,7 @@ MODFILENAME := $(MODNAME).km
 
 # Determine object file filenames
 AOBJS := $(ASRCS:.s=.o)
-COBJS := $(CSRCS:.c=.o)
+COBJS := $(CSRCS:.cc=.o)
 
 SRCS := $(ASRCS) $(CSRCS)
 
@@ -24,7 +24,7 @@ KERNELINCLUDES := arch/$(ARCH) lib net $(BUILDROOT)
 INCS := $(INCS) $(patsubst %,$(BUILDROOT)/%,$(KERNELINCLUDES))
 INCLUDEPATHS := $(realpath $(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
-CFLAGS := $(CFLAGS) $(INCLUDEARGS)
+CXXFLAGS := $(CXXFLAGS) $(INCLUDEARGS)
 
 $(info $(INCLUDEPATHS))
 
