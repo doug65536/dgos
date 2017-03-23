@@ -344,4 +344,4 @@ void *mmap_register_device(void *context,
 void *mm_alloc_contiguous(size_t size);
 void mm_free_contiguous(void *addr, size_t size);
 
-void mm_new_process(void);
+uintptr_t mm_new_process(void);

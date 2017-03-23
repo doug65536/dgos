@@ -99,12 +99,15 @@ int process_spawn(pid_t * restrict pid_result,
 
     process->path = strdup(path);
 
+    // Count the arguments
     size_t arg_count = 0;
     while (argv && argv[arg_count++]);
 
+    // Count the environment variables
     size_t env_count = 0;
     while (envp && envp[env_count++]);
 
+    // Make a copy of the arguments and environment variables
     process->args = calloc(arg_count + 1, sizeof(*argv));
     process->env = calloc(env_count + 1, sizeof(*envp));
 
@@ -116,7 +119,10 @@ int process_spawn(pid_t * restrict pid_result,
         process->env[i] = strdup(envp[i]);
     process->env[env_count] = 0;
 
+    // Return the assigned PID
     *pid_result = process->pid;
+
+    process->mmu_context = mm_new_process();
 
     return 0;
 }
