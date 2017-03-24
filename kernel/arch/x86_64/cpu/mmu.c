@@ -137,18 +137,6 @@
 #define PTE_EX_LOCKED       (1UL << PTE_EX_LOCKED_BIT)
 #define PTE_EX_DEVICE       (1UL << PTE_EX_DEVICE_BIT)
 
-// Get field
-#define GF(pte, field) \
-    (((pte) >> PTE_##field##_BIT) & PTE_##field##_MASK)
-
-// Set field
-#define SF(pte, field, value) \
-    ((((pte) >> PTE_##field##_BIT) & ~PTE_##field##_MASK) | \
-    (((value) & PTE_##field##_MASK) << PTE_##field##_BIT);
-
-// Write field
-#define WF(pte, field, value) ((pte) = SF((pte), (field), (value)))
-
 // PAT configuration
 #define PAT_IDX_WB  0
 #define PAT_IDX_WT  1
@@ -175,20 +163,10 @@
     (PTE_PCD & -!!(idx & 2)) | \
     (PTE_PWT & -!!(idx & 1)))
 
-// The page tables are recursively mapped,
-// pointing the 256 entry back at the page directory maps
-//  512GB of level 4 page tables from 0xFFFF800000000000-0xFFFF808000000000
-// pointing the 257:0 entry back at the page directory maps
-//    1GB of level 3 page tables from 0xFFFF808000000000-0xFFFF808040000000
-// pointing the 257:1:0 entry back at the page directory maps
-//    2MB of level 2 page tables from 0xFFFF808040000000-0xFFFF808040200000
-// pointing the 257:1:1:0 entry back at the page directory maps
-//    4KB of level 1 page table  from 0xFFFF808040200000-0xFFFF808040201000
-//
-// The page mapping consumes a total of 0x808040201000 bytes
-// 550,831,656,960 bytes of address space
-//
-// The recursive mapping requires 0+1+2+3 (6) pages of memory
+// Address [256] is at 0xFFFF800000000000
+// Address [256][256] is at 0xFFFF804000000000
+// Address [256][256][256] is at 0xFFFF804020000000
+// Address [256][256][256][256] is at 0xFFFF804020100000
 
 // Page table entries don't have a structure, they
 // are a bunch of bitfields. Use uint64_t and the
@@ -203,7 +181,11 @@ typedef uintptr_t linaddr_t;
 
 // Linear addresses
 #define PT_BASEADDR     (0xFFFF800000000000UL)
-#define PT_MAX_ADDR     (0xFFFF808040201000UL)
+#define PT_MAX_ADDR     (0xFFFF808000000000UL)
+
+// Recursive mapping index calculation
+#define PT_ENTRY(i0,i1,i2,i3) \
+    ((((((((i0)<<9)+(i1))<<9)+(i2))<<9)+(i3))<<9)
 
 // The number of pte_t entries at each level
 #define PT3_ENTRIES     (0x1000000000UL)
@@ -211,17 +193,20 @@ typedef uintptr_t linaddr_t;
 #define PT1_ENTRIES     (0x40000UL)
 #define PT0_ENTRIES     (0x200UL)
 
-// The array index of the start of each level
-#define PT3_BASE        (0)
-#define PT2_BASE        (PT3_BASE + PT3_ENTRIES)
-#define PT1_BASE        (PT2_BASE + PT2_ENTRIES)
-#define PT0_BASE        (PT1_BASE + PT1_ENTRIES)
+#define PT_RECURSE      (256UL)
 
 // Addresses of start of page tables for each level
-#define PT3_PTR(base)   ((pte_t*)(base))
-#define PT2_PTR(base)   (PT3_PTR(base) + PT2_BASE)
-#define PT1_PTR(base)   (PT3_PTR(base) + PT1_BASE)
-#define PT0_PTR(base)   (PT3_PTR(base) + PT0_BASE)
+#define PT3_INDEX       (PT_ENTRY(PT_RECURSE,0,0,0))
+#define PT2_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,0,0))
+#define PT1_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,0))
+#define PT0_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,PT_RECURSE))
+
+#define CANONICALIZE(n) (((-(((intptr_t)(n))>>47))<<47)|(n))
+
+#define PT3_PTR         ((pte_t*)CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
+#define PT2_PTR         ((pte_t*)CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
+#define PT1_PTR         ((pte_t*)CANONICALIZE(PT1_INDEX*sizeof(pte_t)))
+#define PT0_PTR         ((pte_t*)CANONICALIZE(PT0_INDEX*sizeof(pte_t)))
 
 // Device registration for memory mapped device
 typedef struct mmap_device_mapping_t {
@@ -479,8 +464,6 @@ static inline int path_inc(unsigned *path)
 // the given path
 static inline void pte_from_path(pte_t **pte, unsigned *path)
 {
-    linaddr_t base = PT_BASEADDR;
-
     uintptr_t page_index =
             (((uintptr_t)path[0]) << (9 * 3)) +
             (((uintptr_t)path[1]) << (9 * 2)) +
@@ -494,10 +477,10 @@ static inline void pte_from_path(pte_t **pte, unsigned *path)
     indices[2] = (page_index >> (9 * 1)) & (PT2_ENTRIES-1);
     indices[3] = (page_index >> (9 * 0)) & (PT3_ENTRIES-1);
 
-    pte[0] = PT0_PTR(base) + indices[0];
-    pte[1] = PT1_PTR(base) + indices[1];
-    pte[2] = PT2_PTR(base) + indices[2];
-    pte[3] = PT3_PTR(base) + indices[3];
+    pte[0] = PT0_PTR + indices[0];
+    pte[1] = PT1_PTR + indices[1];
+    pte[2] = PT2_PTR + indices[2];
+    pte[3] = PT3_PTR + indices[3];
 }
 
 static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
@@ -742,7 +725,7 @@ static pte_t *mm_map_aliasing_pte(
     linaddr_t linaddr;
 
     if ((linaddr_t)aliasing_pte >= PT_MAX_ADDR) {
-        uintptr_t pt3_index = aliasing_pte - PT3_PTR(PT_BASEADDR);
+        uintptr_t pt3_index = aliasing_pte - PT3_PTR;
         linaddr = (pt3_index << PAGE_SIZE_BIT);
         linaddr |= -(linaddr >> 47) << 47;
     } else {
@@ -1222,7 +1205,7 @@ void mmu_init(int ap)
     pte_t *aliasing_pte = init_find_aliasing_pte();
 
     physaddr_t phys_addr[4];
-    physaddr_t recursive_maps[3];
+    //physaddr_t recursive_maps[3];
     pte_t *pt;
 
     // Create the new root
@@ -1230,14 +1213,6 @@ void mmu_init(int ap)
     // Get a page
     phys_addr[0] = init_take_page(0);
     assert(phys_addr[0] != 0);
-
-    // recursive 257, 257:1, and 257:1:1 page
-    recursive_maps[0] = init_take_page(0);
-    recursive_maps[1] = init_take_page(0);
-    recursive_maps[2] = init_take_page(0);
-    assert(recursive_maps[0] != 0);
-    assert(recursive_maps[1] != 0);
-    assert(recursive_maps[2] != 0);
 
     pte_t *old_root = (void*)(cpu_get_page_directory() & PTE_ADDR);
 
@@ -1249,24 +1224,8 @@ void mmu_init(int ap)
     phys_addr[0] = cpu_get_page_directory() & PTE_ADDR;
 
     pt = init_map_aliasing_pte(aliasing_pte, phys_addr[0]);
-    assert(pt[256] == 0);
-    assert(pt[257] == 0);
-    pt[256] = phys_addr[0] | ptflags;
-    pt[257] = recursive_maps[0] | ptflags;
-
-    pt = init_map_aliasing_pte(aliasing_pte, recursive_maps[0]);
-    memset(pt, 0, PAGESIZE);
-    pt[0] = phys_addr[0] | ptflags;
-    pt[1] = recursive_maps[1] | ptflags;
-
-    pt = init_map_aliasing_pte(aliasing_pte, recursive_maps[1]);
-    memset(pt, 0, PAGESIZE);
-    pt[0] = phys_addr[0] | ptflags;
-    pt[1] = recursive_maps[2] | ptflags;
-
-    pt = init_map_aliasing_pte(aliasing_pte, recursive_maps[2]);
-    memset(pt, 0, PAGESIZE);
-    pt[0] = phys_addr[0] | ptflags;
+    assert(pt[PT_RECURSE] == 0);
+    pt[PT_RECURSE] = phys_addr[0] | ptflags;
 
     root_physaddr = phys_addr[0];
 
@@ -1276,7 +1235,7 @@ void mmu_init(int ap)
     cpu_set_page_directory(phys_addr[0]);
 
     // Make zero page not present to catch null pointers
-    *PT3_PTR(PT_BASEADDR) = 0;
+    *PT3_PTR = 0;
     cpu_invalidate_page(0);
 
     phys_alloc_count = highest_usable;
@@ -1353,7 +1312,7 @@ void mmu_init(int ap)
     master_pagedir = mmap((void*)root_physaddr, PAGE_SIZE, PROT_READ,
                           MAP_PHYSICAL, -1, 0);
 
-    current_pagedir = (pte_t*)(PT0_PTR(PT_BASEADDR));
+    current_pagedir = (pte_t*)(PT0_PTR);
 }
 
 static size_t round_up(size_t n)
@@ -2307,15 +2266,12 @@ uintptr_t mm_create_process(int pcid)
     //
     // Setup recursive mapping
 
-    tables[256] = addresses[0].physaddr;
-    tables[257] = addresses[1].physaddr;
-    tables[512] = addresses[0].physaddr;
-    tables[513] = addresses[2].physaddr;
-    tables[768] = addresses[0].physaddr;
 
     // Copy kernel space
-    for (int i = 258; i < 512; ++i)
+    for (int i = 256; i < 512; ++i)
         tables[i] = master_pagedir[i];
+
+    tables[PT_RECURSE] = addresses[0].physaddr;
 
     int masked_pcid = cpuid_has_pcid()
             ? pcid & PAGE_MASK
@@ -2385,16 +2341,9 @@ void mm_destroy_process(void)
 {
     unsigned path[4];
     pte_t *ptes[4];
-    int mask = addr_present(PT0_BASE, path, ptes);
+    int mask = addr_present((uintptr_t)PT0_PTR, path, ptes);
 
     assert(mask == 0xF);
 
     mm_free_all_user_memory();
-
-//    uintptr_t recurse_maps[4];
-//    recurse_maps[0] = ptes[3][0] & PTE_ADDR;
-//    recurse_maps[1] = ptes[0][0] & PTE_ADDR;
-//    recurse_maps[2] = ptes[1][0] & PTE_ADDR;
-//    recurse_maps[3] = ptes[2][0] & PTE_ADDR;
-
 }
