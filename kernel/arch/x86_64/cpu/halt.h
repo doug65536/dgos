@@ -1,5 +1,8 @@
 #pragma once
 
-void halt(void);
+static inline void halt(void)
+{
+    __asm__ __volatile__ ( "hlt" );
+}
 
 __attribute__((noreturn)) void halt_forever(void);

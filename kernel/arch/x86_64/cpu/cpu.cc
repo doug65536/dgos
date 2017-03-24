@@ -19,25 +19,29 @@ void cpu_init(int ap)
     // Enable write protection
     cpu_cr0_change_bits(0, CR0_WP);
 
-    uintptr_t cr4 = 0;
+    uintptr_t cr4_set = 0;
+    uintptr_t cr4_clr = 0;
 
     // Supervisor Mode Execution Prevention (SMEP)
     if (cpuid_has_smep())
-        cr4 |= CR4_SMEP;
+        cr4_set |= CR4_SMEP;
 
     // Enable global pages feature if available
     if (cpuid_has_pge())
-        cr4 |= CR4_PGE;
+        cr4_set |= CR4_PGE;
 
     // Enable debugging extensions feature if available
     if (cpuid_has_de())
-        cr4 |= CR4_DE;
+        cr4_set |= CR4_DE;
 
-    // Enable paging context identifiers feature if available
+    // Disable paging context identifiers feature if available
     if (cpuid_has_pcid())
-        cr4 |= CR4_PCIDE;
+        cr4_clr |= CR4_PCIDE;
 
-    cpu_cr4_change_bits(CR4_TSD, cr4 | CR4_OFXSR | CR4_OSXMMEX);
+    cr4_set |= CR4_OFXSR | CR4_OSXMMEX;
+    cr4_clr |= CR4_TSD;
+
+    cpu_cr4_change_bits(cr4_clr, cr4_set);
 
     // Enable no-execute if feature available
     if (cpuid_has_nx())
