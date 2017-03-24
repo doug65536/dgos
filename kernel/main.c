@@ -59,7 +59,7 @@ void (** volatile device_list)(void) = device_constructor_list;
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_STRESS_HEAP_THREAD   1
 #define ENABLE_FRAMEBUFFER_THREAD   1
 
 #define ENABLE_STRESS_HEAP_SMALL    0

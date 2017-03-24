@@ -431,7 +431,7 @@ static inline void cpu_invalidate_pcid(
     struct {
         int64_t pcid;
         uintptr_t addr;
-    } arg = {
+    } arg __attribute__((aligned(16))) = {
         pcid,
         addr
     };

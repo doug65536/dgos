@@ -193,7 +193,7 @@ typedef uintptr_t linaddr_t;
 #define PT0_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,PT_RECURSE))
 
 // Canonicalize the given address
-#define CANONICALIZE(n) (((-(((intptr_t)(n))>>47))<<47)|(n))
+#define CANONICALIZE(n) (((uintptr_t)(-(((intptr_t)(n))>>47))<<47)|(n))
 
 #define PT3_ADDR        (CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
 #define PT2_ADDR        (CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
@@ -206,7 +206,7 @@ typedef uintptr_t linaddr_t;
 #define PT0_PTR         ((pte_t*)PT0_ADDR)
 
 #define PT_BASEADDR     (PT0_ADDR)
-#define PT_MAX_ADDR     (PT0_ADDR + (1UL << 39))
+#define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
 //
 // Device mapping
@@ -270,6 +270,8 @@ static uint64_t volatile phys_next_free[2];
 // Used to detect lazy TLB shootdown
 static uint64_t volatile mmu_seq;
 
+static uint64_t volatile shootdown_pending;
+
 static int contiguous_allocator_cmp_key(
         rbtree_kvp_t const *lhs,
         rbtree_kvp_t const *rhs,
@@ -283,15 +285,6 @@ static int contiguous_allocator_cmp_both(
 static uint64_t volatile page_fault_count;
 
 static int64_t volatile free_page_count;
-
-typedef struct shootdown_t {
-    uintptr_t addr;
-    size_t size;
-    size_t step;
-    int32_t pcid;
-} shootdown_t;
-
-static size_t shootdown_slot;
 
 //
 // Contiguous allocator
@@ -803,74 +796,25 @@ static void mmu_map_page(
     *pte_linaddr[3] = (physaddr & PTE_ADDR) | flags;
 }
 
-// Set shootdown->pcid to -1 to flush global mappings
-// Set shootdown->pcid to pcid to flush specific context
-// Set shootdown->size to 0 to flush whole pcid
-// Set shootdown->addr,size to flush range
-static void mmu_tlb_perform_shootdown(void *data)
+static void mmu_tlb_perform_shootdown(void)
 {
-    shootdown_t *shootdown = data;
-
-    // perf fix: always ignore range
-
-    if (shootdown->size == 0 || 1) {
+    if (cpuid_has_invpcid()) {
         //
-        // Flush all
+        // Flush all with pcid
 
-        if (cpuid_has_invpcid()) {
-            if (shootdown->pcid >= 0) {
-                //
-                // Flush a entire context
+        cpu_invalidate_pcid(2, 0, 0);
+    } else if (cpuid_has_pge()) {
+        //
+        // Flush all global by toggling global mappings
 
-                cpu_invalidate_pcid(1, shootdown->pcid,
-                                    shootdown->addr);
-            } else {
-                //
-                // Flush all with pcid
-
-                cpu_invalidate_pcid(2, shootdown->pcid,
-                                    shootdown->addr);
-            }
-        } else if (cpuid_has_pge()) {
-            //
-            // Flush all global by toggling global mappings
-
-            // Toggle PGE off and on
-            cpu_cr4_change_bits(CR4_PGE, 0);
-            cpu_cr4_change_bits(0, CR4_PGE);
-        } else {
-            //
-            // Flush entire TLB
-
-            cpu_flush_tlb();
-        }
+        // Toggle PGE off and on
+        cpu_cr4_change_bits(CR4_PGE, 0);
+        cpu_cr4_change_bits(0, CR4_PGE);
     } else {
         //
-        // Flush specific range
+        // Flush entire TLB
 
-        if (cpuid_has_invpcid() && shootdown->pcid >= 0) {
-            //
-            // Flush range of specific context
-
-            for (uintptr_t addr = shootdown->addr,
-                 end = shootdown->addr + shootdown->size;
-                 addr < end; addr += shootdown->step) {
-                cpu_invalidate_pcid(1, shootdown->pcid, addr);
-            }
-        } else if (shootdown->pcid < 0) {
-            //
-            // Flush range of global pages
-
-            for (uintptr_t addr = shootdown->addr,
-                 end = shootdown->addr + shootdown->size;
-                 addr < end; addr += shootdown->step) {
-                cpu_invalidate_page(addr);
-            }
-        } else {
-            //
-            // Flush whole TLB
-            cpu_flush_tlb();
-        }
+        cpu_flush_tlb();
     }
 }
 
@@ -879,28 +823,43 @@ static void *mmu_tlb_shootdown_handler(int intr, void *ctx)
 {
     assert(intr == INTR_TLB_SHOOTDOWN);
 
-    cpu_broadcast_service(intr, shootdown_slot);
+    int cpu_number = thread_cpu_number();
+
+    // Clear pending
+    atomic_and(&shootdown_pending, ~(1 << cpu_number));
+
+    mmu_tlb_perform_shootdown();
 
     return ctx;
 }
 
-static void mmu_send_tlb_shootdown(
-        uint32_t pcid, uintptr_t addr, size_t size, size_t step)
+static void mmu_send_tlb_shootdown(void)
 {
-    shootdown_t shootdown;
+    int cpu_count = thread_cpu_count();
+    if (unlikely(cpu_count == 0))
+        return;
 
-    shootdown.pcid = pcid;
-    shootdown.addr = addr;
-    shootdown.size = size;
-    shootdown.step = step;
+    int irq_was_enabled = cpu_irq_disable();
+    int cur_cpu = thread_cpu_number();
+    int all_cpu_mask = (1 << cpu_count) - 1;
+    int cur_cpu_mask = 1 << cur_cpu;
+    int other_cpu_mask = all_cpu_mask & ~cur_cpu_mask;
+    int old_pending = atomic_or(&shootdown_pending, other_cpu_mask);
+    int need_ipi_mask = old_pending & other_cpu_mask;
 
-    if (spincount_mask) {
-        cpu_broadcast_message(INTR_TLB_SHOOTDOWN, shootdown_slot, 1,
-                              mmu_tlb_perform_shootdown, &shootdown,
-                              sizeof(shootdown));
+    if (other_cpu_mask) {
+        if (need_ipi_mask == other_cpu_mask) {
+            // Send to all other CPUs
+            thread_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+        } else {
+            int cpu_mask = 1;
+            for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
+                if (!(old_pending & cpu_mask) && (need_ipi_mask & cpu_mask))
+                    apic_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
+            }
+        }
     }
-
-    mmu_tlb_perform_shootdown(&shootdown);
+    cpu_irq_toggle(irq_was_enabled);
 }
 
 static void *mmu_lazy_tlb_shootdown(void *ctx)
@@ -1137,14 +1096,6 @@ static void mmu_configure_pat(void)
     if (likely(mmu_have_pat()))
         msr_set(MSR_IA32_PAT, PAT_CFG);
 }
-
-static void mmu_init_shootdown(void *p)
-{
-    (void)p;
-    shootdown_slot = cpu_broadcast_create();
-}
-
-REGISTER_CALLOUT(mmu_init_shootdown, 0, 'T', "000");
 
 void mmu_init(int ap)
 {
@@ -1873,14 +1824,7 @@ int munmap(void *addr, size_t size)
         path_inc(path);
     }
 
-    if ((intptr_t)addr >= 0) {
-        // User address
-        uintptr_t pcid = cpu_get_page_directory() & PAGE_MASK;
-        mmu_send_tlb_shootdown(pcid, (uintptr_t)addr, size, PAGE_SIZE);
-    } else {
-        // Kernel address (flush global mappings)
-        mmu_send_tlb_shootdown(-1, (uintptr_t)addr, size, PAGE_SIZE);
-    }
+    mmu_send_tlb_shootdown();
 
     release_linear(&linear_allocator,
                    (linaddr_t)addr - misalignment,
@@ -2003,7 +1947,6 @@ int madvise(void *addr, size_t len, int advice)
 {
     unsigned path[4];
     unsigned path_en[4];
-    void *orig_addr = addr;
 
     if (unlikely(len == 0))
         return 0;
@@ -2069,10 +2012,7 @@ int madvise(void *addr, size_t len, int advice)
         pte_from_path(pt, path);
     }
 
-    uint32_t pcid = (intptr_t)orig_addr < 0
-            ? -(uintptr_t)1
-            : (cpu_get_page_directory() & PAGE_MASK);
-    mmu_send_tlb_shootdown(pcid, (uintptr_t)orig_addr, len, PAGE_SIZE);
+    mmu_send_tlb_shootdown();
 
     return 0;
 }
@@ -2258,7 +2198,7 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
 
 // Create a new process context and switch to it,
 // returns the physical address of the page directory
-uintptr_t mm_create_process(int pcid)
+uintptr_t mm_create_process(void)
 {
     pte_t *tables = mmap(0, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE,
                         MAP_POPULATE, -1, 0);
@@ -2276,11 +2216,7 @@ uintptr_t mm_create_process(int pcid)
 
     tables[PT_RECURSE] = addresses[0].physaddr;
 
-    int masked_pcid = cpuid_has_pcid()
-            ? pcid & PAGE_MASK
-            : 0;
-
-    cpu_set_page_directory(addresses[0].physaddr | masked_pcid);
+    cpu_set_page_directory(addresses[0].physaddr);
 
     return addresses[0].physaddr;
 }

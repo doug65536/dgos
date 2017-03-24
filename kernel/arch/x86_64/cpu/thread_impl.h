@@ -7,6 +7,7 @@ void *thread_schedule(void *ctx);
 void thread_init(int ap);
 uint32_t thread_cpu_count(void);
 uint32_t thread_cpus_started(void);
+int thread_cpu_number(void);
 
 size_t thread_cls_alloc(void);
 void *thread_cls_get(size_t slot);

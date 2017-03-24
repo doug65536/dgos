@@ -13,6 +13,7 @@ typedef struct cpu_broadcast_work_t {
     cpu_broadcast_handler_t handler;
     void *data;
     int intr;
+    int unique;
 } cpu_broadcast_work_t;
 
 // Per-CPU message queue
@@ -20,7 +21,6 @@ typedef struct cpu_broadcast_queue_t {
     cpu_broadcast_work_t *head;
     cpu_broadcast_work_t *tail;
     cpu_broadcast_work_t *free;
-    hashtbl_t lookup;
 
     spinlock_t lock;
 } cpu_broadcast_queue_t;
@@ -64,11 +64,6 @@ static void *cpu_broadcast_init_cpu(void *arg)
 
     cpu_broadcast_queue_t *queue = calloc(1, sizeof(*queue));
 
-    htbl_create(&queue->lookup,
-                offsetof(cpu_broadcast_work_t, handler),
-            sizeof(cpu_broadcast_work_t) -
-            offsetof(cpu_broadcast_work_t, handler));
-
     return queue;
 }
 
@@ -88,7 +83,10 @@ static void cpu_broadcast_add_work(
     cpu_broadcast_queue_t *queue = slot_data;
 
     spinlock_lock_noirq(&queue->lock);
-    if (htbl_lookup(&queue->lookup, &((cpu_broadcast_work_t*)arg)->handler)) {
+
+    cpu_broadcast_work_t *incoming_work = arg;
+
+    if (incoming_work->unique && queue->head) {
         spinlock_unlock_noirq(&queue->lock);
         return;
     }
@@ -116,12 +114,13 @@ static void cpu_broadcast_add_work(
 
 void cpu_broadcast_message(int intr, size_t slot, int other_only,
                            cpu_broadcast_handler_t handler,
-                           void *data, size_t size)
+                           void *data, size_t size, int unique)
 {
     cpu_broadcast_work_t work;
     work.handler = handler;
     work.data = data;
     work.intr = intr;
+    work.unique = unique;
     thread_cls_for_each_cpu(slot, other_only,
                             cpu_broadcast_add_work, &work, size);
 }

@@ -18,9 +18,9 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
 #LTO := 1
-#CC := clang
+CC := clang
 #CC := gcc-6
 
 export CC
