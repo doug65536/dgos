@@ -163,11 +163,6 @@
     (PTE_PCD & -!!(idx & 2)) | \
     (PTE_PWT & -!!(idx & 1)))
 
-// Address [256] is at 0xFFFF800000000000
-// Address [256][256] is at 0xFFFF804000000000
-// Address [256][256][256] is at 0xFFFF804020000000
-// Address [256][256][256][256] is at 0xFFFF804020100000
-
 // Page table entries don't have a structure, they
 // are a bunch of bitfields. Use uint64_t and the
 // constants above
@@ -178,10 +173,6 @@ typedef uintptr_t linaddr_t;
 
 // The page tables are mapped at
 //  0x7f0000000000
-
-// Linear addresses
-#define PT_BASEADDR     (0xFFFF800000000000UL)
-#define PT_MAX_ADDR     (0xFFFF808000000000UL)
 
 // Recursive mapping index calculation
 #define PT_ENTRY(i0,i1,i2,i3) \
@@ -195,18 +186,27 @@ typedef uintptr_t linaddr_t;
 
 #define PT_RECURSE      (256UL)
 
-// Addresses of start of page tables for each level
+// Indices of start of page tables for each level
 #define PT3_INDEX       (PT_ENTRY(PT_RECURSE,0,0,0))
 #define PT2_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,0,0))
 #define PT1_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,0))
 #define PT0_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,PT_RECURSE))
 
+// Canonicalize the given address
 #define CANONICALIZE(n) (((-(((intptr_t)(n))>>47))<<47)|(n))
 
-#define PT3_PTR         ((pte_t*)CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
-#define PT2_PTR         ((pte_t*)CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
-#define PT1_PTR         ((pte_t*)CANONICALIZE(PT1_INDEX*sizeof(pte_t)))
-#define PT0_PTR         ((pte_t*)CANONICALIZE(PT0_INDEX*sizeof(pte_t)))
+#define PT3_ADDR        (CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
+#define PT2_ADDR        (CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
+#define PT1_ADDR        (CANONICALIZE(PT1_INDEX*sizeof(pte_t)))
+#define PT0_ADDR        (CANONICALIZE(PT0_INDEX*sizeof(pte_t)))
+
+#define PT3_PTR         ((pte_t*)PT3_ADDR)
+#define PT2_PTR         ((pte_t*)PT2_ADDR)
+#define PT1_PTR         ((pte_t*)PT1_ADDR)
+#define PT0_PTR         ((pte_t*)PT0_ADDR)
+
+#define PT_BASEADDR     (PT0_ADDR)
+#define PT_MAX_ADDR     (PT0_ADDR + (1UL << 39))
 
 // Device registration for memory mapped device
 typedef struct mmap_device_mapping_t {
