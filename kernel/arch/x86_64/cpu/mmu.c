@@ -171,8 +171,8 @@ typedef uintptr_t pte_t;
 typedef uintptr_t physaddr_t;
 typedef uintptr_t linaddr_t;
 
-// The page tables are mapped at
-//  0x7f0000000000
+//
+// Recursive page table mapping
 
 // Recursive mapping index calculation
 #define PT_ENTRY(i0,i1,i2,i3) \
@@ -207,6 +207,9 @@ typedef uintptr_t linaddr_t;
 
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (1UL << 39))
+
+//
+// Device mapping
 
 // Device registration for memory mapped device
 typedef struct mmap_device_mapping_t {
