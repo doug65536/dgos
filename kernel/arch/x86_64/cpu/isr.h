@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Modern xsave
 void isr_save_xsaveopt(void);
 void isr_save_xsavec(void);
@@ -273,3 +277,7 @@ extern void isr_entry_252(void);
 extern void isr_entry_253(void);
 extern void isr_entry_254(void);
 extern void isr_entry_255(void);
+
+#ifdef __cplusplus
+}
+#endif

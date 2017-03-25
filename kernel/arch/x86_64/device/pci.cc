@@ -90,7 +90,7 @@ int pci_config_write(
         return 0;
 
     // Pointer to input data
-    char *p = values;
+    char *p = (char*)values;
 
     uint32_t pci_address = (1 << 31) |
             (bus << 16) |
@@ -242,7 +242,7 @@ static void pci_config_copy(int bus, int slot, int func,
                             void *dest, int ofs, size_t size)
 {
     uint32_t value;
-    char *out = dest;
+    char *out = (char*)dest;
 
     for (size_t i = 0; i < size; i += sizeof(uint32_t)) {
         value = pci_config_read(bus, slot, func,

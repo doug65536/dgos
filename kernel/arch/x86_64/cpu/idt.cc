@@ -32,7 +32,7 @@
 
 static idt_entry_64_t idt[256];
 
-static void *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
+static isr_context_t *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
 
 typedef struct cpu_flag_info_t {
     char const * const name;
@@ -202,7 +202,7 @@ void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler)
     irq_dispatcher_vec = handler;
 }
 
-void *irq_dispatcher(int intr, isr_context_t *ctx)
+isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx)
 {
     return irq_dispatcher_vec(intr, ctx);
 }
@@ -730,7 +730,7 @@ static void dump_context(isr_context_t *ctx, int to_screen)
         apic_dump_regs(0);
 }
 
-static void *unhandled_exception_handler(isr_context_t *ctx)
+static isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
     dump_context(ctx, 1);
     halt_forever();

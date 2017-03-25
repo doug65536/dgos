@@ -1,7 +1,6 @@
 #define FS_NAME fat32
 #define STORAGE_IMPL
 #include "dev_storage.h"
-DECLARE_fs_DEVICE(fat32);
 
 #include "stdlib.h"
 #include "printk.h"
@@ -11,8 +10,64 @@ DECLARE_fs_DEVICE(fat32);
 #include "pool.h"
 #include "fat32_decl.h"
 
-struct fat32_fs_t {
-    fs_vtbl_t *vtbl;
+struct fat32_fs_t : public fs_base_t {
+
+    FS_BASE_IMPL
+
+    friend class fat32_factory_t;
+
+    struct full_lfn_t {
+        fat32_dir_union_t fragments[(256 + 12) / 13 + 1];
+        uint8_t lfn_entry_count;
+    };
+
+    struct file_handle_t : public fs_file_info_t {
+        fat32_fs_t *fs;
+        fat32_dir_entry_t *dirent;
+
+        off_t cached_offset;
+        uint64_t cached_cluster;
+    };
+
+    fs_base_t *mount(fs_init_info_t *conn);
+
+    static int mm_fault_handler(
+            void *dev, void *addr,
+            uint64_t offset, uint64_t length);
+
+    void *lookup_sector(uint64_t lba);
+
+    uint64_t offsetof_cluster(uint64_t cluster);
+
+    void *lookup_cluster(uint64_t cluster);
+
+    static uint32_t dirent_start_cluster(fat32_dir_entry_t const *de);
+
+    static uint8_t lfn_checksum(char const *fcb_name);
+
+    static void fcbname_from_lfn(
+            char *fcbname, uint16_t const *lfn, size_t lfn_len);
+
+    static void dirents_from_name(full_lfn_t *full,
+                                  char const *pathname, size_t name_len);
+
+    static size_t name_from_dirents(char *pathname,
+                                    full_lfn_t const *full);
+
+    static int is_eof(uint32_t cluster);
+
+    fat32_dir_union_t *search_dir(uint32_t cluster,
+            char const *filename, size_t name_len);
+
+    uint32_t walk_cluster_chain(off_t *distance,
+            uint32_t cluster, uint64_t offset);
+
+    fat32_dir_union_t *lookup_dirent(char const *pathname);
+
+    file_handle_t *create_handle(char const *path);
+
+    ssize_t internal_read(file_handle_t *file,
+            void *buf, size_t size, off_t offset);
 
     storage_dev_base_t *drive;
 
@@ -41,64 +96,54 @@ struct fat32_fs_t {
     fat32_dir_union_t root_dirent;
 };
 
-typedef struct fat32_full_lfn_t {
-    fat32_dir_union_t fragments[(256 + 12) / 13 + 1];
-    uint8_t lfn_entry_count;
-} fat32_full_lfn_t;
-
-typedef struct fat32_file_handle_t {
-    fat32_fs_t *fs;
-    fat32_dir_entry_t *dirent;
-
-    off_t cached_offset;
-    uint64_t cached_cluster;
-} fat32_file_handle_t;
+class fat32_factory_t : public fs_factory_t {
+    fs_base_t *mount(fs_init_info_t *conn);
+};
 
 static fat32_fs_t fat32_mounts[16];
 static unsigned fat32_mount_count;
 
 static pool_t fat32_handles;
 
-static int fat32_mm_fault_handler(
+int fat32_fs_t::mm_fault_handler(
         void *dev, void *addr,
         uint64_t offset, uint64_t length)
 {
-    FS_DEV_PTR(dev);
+    FS_DEV_PTR(fat32_fs_t, dev);
 
     uint64_t sector_offset = (offset >> self->sector_shift);
     uint64_t lba = self->lba_st + sector_offset;
 
     printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
 
-    return self->drive->vtbl->read_blocks(
-                self->drive, addr,
-                length >> self->sector_shift, lba);
+    return self->drive->read_blocks(addr, length >> self->sector_shift, lba);
 }
 
-static void *fat32_lookup_sector(fat32_fs_t *self, uint64_t lba)
+void *fat32_fs_t::lookup_sector(uint64_t lba)
 {
-    return self->mm_dev + (lba << self->sector_shift);
+    return mm_dev + (lba << sector_shift);
 }
 
-static uint64_t fat32_offsetof_cluster(fat32_fs_t *self, uint64_t cluster)
+uint64_t fat32_fs_t::offsetof_cluster(
+        uint64_t cluster)
 {
-    return (self->cluster_ofs << self->sector_shift) +
-            (cluster << (self->sector_shift + self->block_shift));
+    return (cluster_ofs << sector_shift) +
+            (cluster << (sector_shift + block_shift));
 }
 
-static void *fat32_lookup_cluster(fat32_fs_t *self, uint64_t cluster)
+void *fat32_fs_t::lookup_cluster(uint64_t cluster)
 {
-    return self->mm_dev + fat32_offsetof_cluster(self, cluster);
+    return mm_dev + fat32_fs_t::offsetof_cluster(cluster);
 }
 
-static uint32_t fat32_dirent_start_cluster(fat32_dir_entry_t const *de)
+uint32_t fat32_fs_t::dirent_start_cluster(fat32_dir_entry_t const *de)
 {
     return ((uint32_t)de->start_hi << 16) | de->start_lo;
 }
 
 // fcb_name is the space padded 11 character name with no dot,
 // the representation used in dir_entry_t's name field
-static uint8_t fat32_lfn_checksum(char const *fcb_name)
+uint8_t fat32_fs_t::lfn_checksum(char const *fcb_name)
 {
    uint16_t i;
    uint8_t sum = 0;
@@ -111,7 +156,7 @@ static uint8_t fat32_lfn_checksum(char const *fcb_name)
    return sum;
 }
 
-static void fat32_fcbname_from_lfn(
+void fat32_fs_t::fcbname_from_lfn(
         char *fcbname, uint16_t const *lfn, size_t lfn_len)
 {
     memset(fcbname, ' ', 11);
@@ -152,8 +197,8 @@ static void fat32_fcbname_from_lfn(
     }
 }
 
-static void fat32_dirents_from_name(
-        fat32_full_lfn_t *full, char const *pathname, size_t name_len)
+void fat32_fs_t::dirents_from_name(
+        full_lfn_t *full, char const *pathname, size_t name_len)
 {
     memset(full, 0, sizeof(*full));
 
@@ -174,9 +219,9 @@ static void fat32_dirents_from_name(
 
     char fcbname[11];
 
-    fat32_fcbname_from_lfn(fcbname, lfn, len);
+    fcbname_from_lfn(fcbname, lfn, len);
 
-    uint8_t checksum = fat32_lfn_checksum(fcbname);
+    uint8_t checksum = lfn_checksum(fcbname);
 
     uint32_t lfn_entries = (len + 12) / 13;
 
@@ -228,8 +273,8 @@ static void fat32_dirents_from_name(
     }
 }
 
-static size_t fat32_name_from_dirents(char *pathname,
-                                      fat32_full_lfn_t const *full)
+size_t fat32_fs_t::name_from_dirents(char *pathname,
+                                      full_lfn_t const *full)
 {
     if (full->lfn_entry_count == 0) {
         // Copy short name
@@ -269,31 +314,32 @@ static size_t fat32_name_from_dirents(char *pathname,
     return out - pathname;
 }
 
-static int fat32_is_eof(uint32_t cluster)
+int fat32_fs_t::is_eof(uint32_t cluster)
 {
     return cluster < 2 || cluster >= 0x0FFFFFF8;
 }
 
-static fat32_dir_union_t *fat32_search_dir(
-        fat32_fs_t *self, uint32_t cluster,
+fat32_dir_union_t *fat32_fs_t::search_dir(
+        uint32_t cluster,
         char const *filename, size_t name_len)
 {
-    fat32_full_lfn_t lfn;
-    fat32_dirents_from_name(&lfn, filename, name_len);
+    full_lfn_t lfn;
+    dirents_from_name(&lfn, filename, name_len);
 
-    uint32_t de_per_cluster = self->block_size / sizeof(fat32_dir_union_t);
+    uint32_t de_per_cluster = block_size / sizeof(fat32_dir_union_t);
     size_t match_index = 0;
 
     uint8_t last_checksum = 0;
 
-    while (!fat32_is_eof(cluster)) {
-        fat32_dir_union_t *de = fat32_lookup_cluster(self, self->root_cluster);
+    while (!is_eof(cluster)) {
+        fat32_dir_union_t *de = (fat32_dir_union_t *)
+                lookup_cluster(root_cluster);
 
         // Iterate through all of the directory entries in this cluster
         for (size_t i = 0; i < de_per_cluster; ++i, ++de) {
             // If this is a short filename entry
             if (de->long_entry.attr != FAT_LONGNAME) {
-                uint8_t checksum = fat32_lfn_checksum(de->short_entry.name);
+                uint8_t checksum = lfn_checksum(de->short_entry.name);
                 if (!memcmp(de->short_entry.name,
                             lfn.fragments[lfn.lfn_entry_count]
                             .short_entry.name,
@@ -333,21 +379,21 @@ static fat32_dir_union_t *fat32_search_dir(
             }
         }
 
-        cluster = self->fat[cluster];
+        cluster = fat[cluster];
     }
 
     return 0;
 }
 
-static uint32_t fat32_walk_cluster_chain(
-        fat32_fs_t *self, off_t *distance,
+uint32_t fat32_fs_t::walk_cluster_chain(
+        off_t *distance,
         uint32_t cluster, uint64_t offset)
 {
     uint64_t walked = 0;
 
-    while (walked + self->block_size <= offset) {
-        cluster = self->fat[cluster];
-        walked += self->block_size;
+    while (walked + block_size <= offset) {
+        cluster = fat[cluster];
+        walked += block_size;
     }
 
     if (distance)
@@ -356,21 +402,20 @@ static uint32_t fat32_walk_cluster_chain(
     return cluster;
 }
 
-static fat32_dir_union_t *fat32_lookup_dirent(
-        fat32_fs_t *self, char const *pathname)
+fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname)
 {
-    uint32_t cluster = self->root_cluster;
+    uint32_t cluster = root_cluster;
     fat32_dir_union_t *de = 0;
 
     char const *name_st = pathname;
     char const *path_end = pathname + strlen(pathname);
 
     if (name_st == path_end)
-        return &self->root_dirent;
+        return &root_dirent;
 
     char const *name_en;
     for ( ; name_st < path_end; name_st = name_en + 1) {
-        name_en = memchr(name_st, '/', path_end - name_st);
+        name_en = (char*)memchr(name_st, '/', path_end - name_st);
 
         if (!name_en)
             name_en = path_end;
@@ -380,60 +425,59 @@ static fat32_dir_union_t *fat32_lookup_dirent(
         if (name_len == 0)
             break;
 
-        de = fat32_search_dir(self, cluster, name_st, name_len);
+        de = search_dir(cluster, name_st, name_len);
 
         if (!de)
             return 0;
 
-        cluster = fat32_dirent_start_cluster(&de->short_entry);
+        cluster = dirent_start_cluster(&de->short_entry);
     }
 
     return de;
 }
 
-static fat32_file_handle_t *fat32_create_handle(
-        fat32_fs_t *self, char const *path)
+fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
+        char const *path)
 {
-    fat32_dir_union_t *de = fat32_lookup_dirent(self, path);
+    fat32_dir_union_t *de = lookup_dirent(path);
     (void)de;
 
     if (unlikely(!de))
         return 0;
 
-    fat32_file_handle_t *file = pool_alloc(&fat32_handles);
+    file_handle_t *file = (file_handle_t*)pool_alloc(&fat32_handles);
 
-    file->fs = self;
+    file->fs = this;
     file->dirent = &de->short_entry;
 
     file->cached_offset = 0;
-    file->cached_cluster = fat32_dirent_start_cluster(&de->short_entry);
+    file->cached_cluster = dirent_start_cluster(&de->short_entry);
 
     return file;
 }
 
-static ssize_t fat32_internal_read(
-        fat32_fs_t *self, fat32_file_handle_t *file,
+ssize_t fat32_fs_t::internal_read(file_handle_t *file,
         void *buf, size_t size, off_t offset)
 {
-    char *out = buf;
+    char *out = (char*)buf;
     ssize_t result = 0;
 
-    off_t cached_end = file->cached_offset + self->block_size;
+    off_t cached_end = file->cached_offset + block_size;
     while (size > 0) {
         if ((offset >= cached_end) &&
-                (offset < cached_end + self->block_size)) {
+                (offset < cached_end + block_size)) {
             // Move to next cluster
-            file->cached_offset += self->block_size;
-            file->cached_cluster = self->fat[file->cached_cluster];
-            cached_end += self->block_size;
+            file->cached_offset += block_size;
+            file->cached_cluster = fat[file->cached_cluster];
+            cached_end += block_size;
         } else if ((offset < file->cached_offset) ||
                    (offset >= cached_end)) {
             // Offset cache miss
-            file->cached_cluster = fat32_walk_cluster_chain(
-                        self, &file->cached_offset,
-                        fat32_dirent_start_cluster(file->dirent),
+            file->cached_cluster = walk_cluster_chain(
+                        &file->cached_offset,
+                        dirent_start_cluster(file->dirent),
                         offset);
-            cached_end = file->cached_offset + self->block_size;
+            cached_end = file->cached_offset + block_size;
         }
 
         size_t avail;
@@ -443,15 +487,15 @@ static ssize_t fat32_internal_read(
         else
             avail = 0;
 
-        assert(avail <= self->block_size);
+        assert(avail <= block_size);
 
         if (avail > size)
             avail = size;
 
-        size_t cluster_data_ofs = fat32_offsetof_cluster(
-                    self, file->cached_cluster);
+        size_t cluster_data_ofs = offsetof_cluster(
+                    file->cached_cluster);
 
-        memcpy(out, self->mm_dev + cluster_data_ofs +
+        memcpy(out, mm_dev + cluster_data_ofs +
                (offset - file->cached_offset), avail);
 
         offset += avail;
@@ -466,10 +510,52 @@ static ssize_t fat32_internal_read(
 //
 // Startup and shutdown
 
-static void *fat32_mount(fs_init_info_t *conn)
+fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
+{
+    drive = conn->drive;
+
+    sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
+
+    autofree void *sector_buffer = malloc(sector_size);
+    fat32_bpb_data_t bpb;
+
+    lba_st = conn->part_st;
+    lba_en = conn->part_st + conn->part_len;
+
+    drive->read_blocks((char*)sector_buffer, 1, lba_st);
+
+    // Pass 0 partition cluster to get partition relative values
+    fat32_parse_bpb(&bpb, 0, (char const *)sector_buffer);
+
+    root_cluster = bpb.root_dir_start;
+
+    memset(&root_dirent, 0, sizeof(root_dirent));
+    root_dirent.short_entry.start_lo =
+            (root_cluster) & 0xFFFF;
+    root_dirent.short_entry.start_hi =
+            (root_cluster >> 16) & 0xFFFF;
+
+    // Sector offset of cluster 0
+    cluster_ofs = bpb.cluster_begin_lba;
+
+    sector_shift = bit_log2_n_32(sector_size);
+    block_shift = bit_log2_n_32(bpb.sec_per_cluster);
+    block_size = sector_size << block_shift;
+
+    mm_dev = (char*)mmap_register_device(
+                this, block_size, conn->part_len,
+                PROT_READ, &fat32_fs_t::mm_fault_handler);
+
+    fat_size = bpb.sec_per_fat << sector_shift;
+    fat = (uint32_t*)lookup_sector(bpb.first_fat_lba);
+
+    return this;
+}
+
+fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 {
     if (fat32_mount_count == 0)
-        pool_create(&fat32_handles, sizeof(fat32_file_handle_t), 512);
+        pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 512);
 
     if (unlikely(fat32_mount_count == countof(fat32_mounts))) {
         printk("Too many FAT32 mounts\n");
@@ -478,68 +564,20 @@ static void *fat32_mount(fs_init_info_t *conn)
 
     fat32_fs_t *self = fat32_mounts + fat32_mount_count++;
 
-    self->vtbl = &fat32_fs_device_vtbl;
-
-    self->drive = conn->drive;
-
-    self->sector_size = self->drive->vtbl->info(
-                self->drive, STORAGE_INFO_BLOCKSIZE);
-
-    autofree void *sector_buffer = malloc(self->sector_size);
-    fat32_bpb_data_t bpb;
-
-    self->lba_st = conn->part_st;
-    self->lba_en = conn->part_st + conn->part_len;
-
-    self->drive->vtbl->read_blocks(
-                self->drive, sector_buffer, 1, self->lba_st);
-
-    // Pass 0 partition cluster to get partition relative values
-    fat32_parse_bpb(&bpb, 0, sector_buffer);
-
-    self->root_cluster = bpb.root_dir_start;
-
-    memset(&self->root_dirent, 0, sizeof(self->root_dirent));
-    self->root_dirent.short_entry.start_lo =
-            (self->root_cluster) & 0xFFFF;
-    self->root_dirent.short_entry.start_hi =
-            (self->root_cluster >> 16) & 0xFFFF;
-
-    // Sector offset of cluster 0
-    self->cluster_ofs = bpb.cluster_begin_lba;
-
-    self->sector_shift = bit_log2_n_32(self->sector_size);
-    self->block_shift = bit_log2_n_32(bpb.sec_per_cluster);
-    self->block_size = self->sector_size << self->block_shift;
-
-    self->mm_dev = mmap_register_device(
-                self, self->block_size, conn->part_len,
-                PROT_READ, fat32_mm_fault_handler);
-
-    self->fat_size = bpb.sec_per_fat << self->sector_shift;
-    self->fat = fat32_lookup_sector(self, bpb.first_fat_lba);
-
-    return self;
+    return self->mount(conn);
 }
 
-static void fat32_unmount(fs_base_t *dev)
+void fat32_fs_t::unmount()
 {
-    FS_DEV_PTR(dev);
-    munmap(self->mm_dev,
-           (uint64_t)(self->lba_en - self->lba_st)
-           << self->sector_shift);
+    munmap(mm_dev, (uint64_t)(lba_en - lba_st) << sector_shift);
 }
 
 //
 // Scan directories
 
-static int fat32_opendir(fs_base_t *dev,
-                         fs_file_info_t **fi,
-                         fs_cpath_t path)
+int fat32_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
-    FS_DEV_PTR(dev);
-
-    fat32_file_handle_t *file = fat32_create_handle(self, path);
+    file_handle_t *file = create_handle(path);
 
     if (!file)
         return -1;
@@ -549,22 +587,20 @@ static int fat32_opendir(fs_base_t *dev,
     return 0;
 }
 
-static ssize_t fat32_readdir(fs_base_t *dev,
-                             fs_file_info_t *fi,
+ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
                              dirent_t *buf,
                              off_t offset)
 {
-    FS_DEV_PTR(dev);
-
-    fat32_full_lfn_t lfn;
+    full_lfn_t lfn;
     size_t index;
     size_t distance;
 
     memset(&lfn, 0, sizeof(lfn));
 
     for (index = 0, distance = 0;
-         sizeof(lfn.fragments[index]) == fat32_internal_read(
-             self, fi, lfn.fragments + index, sizeof(lfn.fragments[index]),
+         sizeof(lfn.fragments[index]) == internal_read(
+             (file_handle_t*)fi, lfn.fragments + index,
+             sizeof(lfn.fragments[index]),
              offset + sizeof(lfn.fragments[index]) * index);
          ++distance, ++index) {
         if (lfn.fragments[index].short_entry.name[0] == 0)
@@ -589,15 +625,13 @@ static ssize_t fat32_readdir(fs_base_t *dev,
         break;
     }
 
-    fat32_name_from_dirents(buf->d_name, &lfn);
+    name_from_dirents(buf->d_name, &lfn);
 
     return distance * sizeof(fat32_dir_entry_t);
 }
 
-static int fat32_releasedir(fs_base_t *dev,
-                            fs_file_info_t *fi)
+int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)fi;
     return -1;
 }
@@ -605,28 +639,22 @@ static int fat32_releasedir(fs_base_t *dev,
 //
 // Read directory entry information
 
-static int fat32_getattr(fs_base_t *dev,
-                         fs_cpath_t path, fs_stat_t* stbuf)
+int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)stbuf;
     return -1;
 }
 
-static int fat32_access(fs_base_t *dev,
-                        fs_cpath_t path, int mask)
+int fat32_fs_t::access(fs_cpath_t path, int mask)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)mask;
     return -1;
 }
 
-static int fat32_readlink(fs_base_t *dev,
-                          fs_cpath_t path, char* buf, size_t size)
+int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)buf;
     (void)size;
@@ -636,65 +664,51 @@ static int fat32_readlink(fs_base_t *dev,
 //
 // Modify directories
 
-static int fat32_mknod(fs_base_t *dev,
-                       fs_cpath_t path,
+int fat32_fs_t::mknod(fs_cpath_t path,
                        fs_mode_t mode, fs_dev_t rdev)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)mode;
     (void)rdev;
     return -1;
 }
 
-static int fat32_mkdir(fs_base_t *dev,
-                       fs_cpath_t path, fs_mode_t mode)
+int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)mode;
     return -1;
 }
 
-static int fat32_rmdir(fs_base_t *dev,
-                       fs_cpath_t path)
+int fat32_fs_t::rmdir(fs_cpath_t path)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     return -1;
 }
 
-static int fat32_symlink(fs_base_t *dev,
-                         fs_cpath_t to, fs_cpath_t from)
+int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)to;
     (void)from;
     return -1;
 }
 
-static int fat32_rename(fs_base_t *dev,
-                        fs_cpath_t from, fs_cpath_t to)
+int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)from;
     (void)to;
     return -1;
 }
 
-static int fat32_link(fs_base_t *dev,
-                      fs_cpath_t from, fs_cpath_t to)
+int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)from;
     (void)to;
     return -1;
 }
 
-static int fat32_unlink(fs_base_t *dev,
-                        fs_cpath_t path)
+int fat32_fs_t::unlink(fs_cpath_t path)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     return -1;
 }
@@ -702,39 +716,31 @@ static int fat32_unlink(fs_base_t *dev,
 //
 // Modify directory entries
 
-static int fat32_chmod(fs_base_t *dev,
-                       fs_cpath_t path, fs_mode_t mode)
+int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)mode;
     return -1;
 }
 
-static int fat32_chown(fs_base_t *dev,
-                       fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)uid;
     (void)gid;
     return -1;
 }
 
-static int fat32_truncate(fs_base_t *dev,
-                          fs_cpath_t path, off_t size)
+int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)size;
     return -1;
 }
 
-static int fat32_utimens(fs_base_t *dev,
-                         fs_cpath_t path,
+int fat32_fs_t::utimens(fs_cpath_t path,
                          const fs_timespec_t *ts)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)ts;
     return -1;
@@ -743,13 +749,10 @@ static int fat32_utimens(fs_base_t *dev,
 //
 // Open/close files
 
-static int fat32_open(fs_base_t *dev,
-                      fs_file_info_t **fi,
+int fat32_fs_t::open(fs_file_info_t **fi,
                       fs_cpath_t path)
 {
-    FS_DEV_PTR(dev);
-
-    fat32_file_handle_t *file = fat32_create_handle(self, path);
+    file_handle_t *file = create_handle(path);
 
     if (!file)
         return -1;
@@ -759,11 +762,8 @@ static int fat32_open(fs_base_t *dev,
     return 0;
 }
 
-static int fat32_release(fs_base_t *dev,
-                         fs_file_info_t *fi)
+int fat32_fs_t::release(fs_file_info_t *fi)
 {
-    FS_DEV_PTR_UNUSED(dev);
-
     pool_free(&fat32_handles, fi);
     return 0;
 }
@@ -771,23 +771,19 @@ static int fat32_release(fs_base_t *dev,
 //
 // Read/write files
 
-static ssize_t fat32_read(fs_base_t *dev,
-                          fs_file_info_t *fi,
+ssize_t fat32_fs_t::read(fs_file_info_t *fi,
                           char *buf,
                           size_t size,
                           off_t offset)
 {
-    FS_DEV_PTR(dev);
-    return fat32_internal_read(self, fi, buf, size, offset);
+    return internal_read((file_handle_t*)fi, (char*)buf, size, offset);
 }
 
-static ssize_t fat32_write(fs_base_t *dev,
-                           fs_file_info_t *fi,
+ssize_t fat32_fs_t::write(fs_file_info_t *fi,
                            char const *buf,
                            size_t size,
                            off_t offset)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)buf;
     (void)size;
     (void)offset;
@@ -795,11 +791,9 @@ static ssize_t fat32_write(fs_base_t *dev,
     return -1;
 }
 
-static int fat32_ftruncate(fs_base_t *dev,
-                           fs_file_info_t *fi,
+int fat32_fs_t::ftruncate(fs_file_info_t *fi,
                            off_t offset)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)offset;
     (void)fi;
     return -1;
@@ -808,11 +802,9 @@ static int fat32_ftruncate(fs_base_t *dev,
 //
 // Query open file
 
-static int fat32_fstat(fs_base_t *dev,
-                       fs_file_info_t *fi,
+int fat32_fs_t::fstat(fs_file_info_t *fi,
                        fs_stat_t *st)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)fi;
     (void)st;
     return -1;
@@ -821,30 +813,24 @@ static int fat32_fstat(fs_base_t *dev,
 //
 // Sync files and directories and flush buffers
 
-static int fat32_fsync(fs_base_t *dev,
-                       fs_file_info_t *fi,
+int fat32_fs_t::fsync(fs_file_info_t *fi,
                        int isdatasync)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)isdatasync;
     (void)fi;
     return 0;
 }
 
-static int fat32_fsyncdir(fs_base_t *dev,
-                          fs_file_info_t *fi,
+int fat32_fs_t::fsyncdir(fs_file_info_t *fi,
                           int isdatasync)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)isdatasync;
     (void)fi;
     return 0;
 }
 
-static int fat32_flush(fs_base_t *dev,
-                       fs_file_info_t *fi)
+int fat32_fs_t::flush(fs_file_info_t *fi)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)fi;
     return 0;
 }
@@ -852,12 +838,10 @@ static int fat32_flush(fs_base_t *dev,
 //
 // lock/unlock file
 
-static int fat32_lock(fs_base_t *dev,
-                      fs_file_info_t *fi,
+int fat32_fs_t::lock(fs_file_info_t *fi,
                       int cmd,
                       fs_flock_t* locks)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)fi;
     (void)cmd;
     (void)locks;
@@ -867,12 +851,10 @@ static int fat32_lock(fs_base_t *dev,
 //
 // Get block map
 
-static int fat32_bmap(fs_base_t *dev,
-                      fs_cpath_t path,
+int fat32_fs_t::bmap(fs_cpath_t path,
                       size_t blocksize,
                       uint64_t* blockno)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)blocksize;
     (void)blockno;
@@ -882,10 +864,8 @@ static int fat32_bmap(fs_base_t *dev,
 //
 // Get filesystem information
 
-static int fat32_statfs(fs_base_t *dev,
-                        fs_statvfs_t* stbuf)
+int fat32_fs_t::statfs(fs_statvfs_t* stbuf)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)stbuf;
     return -1;
 }
@@ -893,13 +873,11 @@ static int fat32_statfs(fs_base_t *dev,
 //
 // Read/Write/Enumerate extended attributes
 
-static int fat32_setxattr(fs_base_t *dev,
-                          fs_cpath_t path,
+int fat32_fs_t::setxattr(fs_cpath_t path,
                           char const* name,
                           char const* value,
                           size_t size, int flags)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)name;
     (void)value;
@@ -908,13 +886,11 @@ static int fat32_setxattr(fs_base_t *dev,
     return -1;
 }
 
-static int fat32_getxattr(fs_base_t *dev,
-                          fs_cpath_t path,
+int fat32_fs_t::getxattr(fs_cpath_t path,
                           char const* name,
                           char* value,
                           size_t size)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)name;
     (void)value;
@@ -922,12 +898,10 @@ static int fat32_getxattr(fs_base_t *dev,
     return -1;
 }
 
-static int fat32_listxattr(fs_base_t *dev,
-                           fs_cpath_t path,
+int fat32_fs_t::listxattr(fs_cpath_t path,
                            char const* list,
                            size_t size)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)path;
     (void)list;
     (void)size;
@@ -937,14 +911,12 @@ static int fat32_listxattr(fs_base_t *dev,
 //
 // ioctl API
 
-static int fat32_ioctl(fs_base_t *dev,
-                       fs_file_info_t *fi,
+int fat32_fs_t::ioctl(fs_file_info_t *fi,
                        int cmd,
                        void* arg,
                        unsigned int flags,
                        void* data)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)cmd;
     (void)arg;
     (void)fi;
@@ -956,16 +928,12 @@ static int fat32_ioctl(fs_base_t *dev,
 //
 //
 
-static int fat32_poll(fs_base_t *dev,
-                      fs_file_info_t *fi,
+int fat32_fs_t::poll(fs_file_info_t *fi,
                       fs_pollhandle_t* ph,
                       unsigned* reventsp)
 {
-    FS_DEV_PTR_UNUSED(dev);
     (void)fi;
     (void)ph;
     (void)reventsp;
     return -1;
 }
-
-REGISTER_fs_DEVICE(fat32);

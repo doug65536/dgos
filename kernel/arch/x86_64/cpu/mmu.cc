@@ -66,7 +66,9 @@
 
 // 4KB pages
 #define PAGE_SIZE_BIT       12
+#ifndef PAGE_SIZE
 #define PAGE_SIZE           (1UL << PAGE_SIZE_BIT)
+#endif
 #define PAGE_MASK           (PAGE_SIZE - 1UL)
 
 // Page table entries
@@ -273,13 +275,13 @@ static uint64_t volatile mmu_seq;
 static uint64_t volatile shootdown_pending;
 
 static int contiguous_allocator_cmp_key(
-        rbtree_kvp_t const *lhs,
-        rbtree_kvp_t const *rhs,
+        typename rbtree_t<>::kvp_t const *lhs,
+        typename rbtree_t<>::kvp_t const *rhs,
         void *p);
 
 static int contiguous_allocator_cmp_both(
-        rbtree_kvp_t const *lhs,
-        rbtree_kvp_t const *rhs,
+        typename rbtree_t<>::kvp_t const *lhs,
+        typename rbtree_t<>::kvp_t const *rhs,
         void *p);
 
 static uint64_t volatile page_fault_count;
@@ -291,8 +293,8 @@ static int64_t volatile free_page_count;
 
 typedef struct contiguous_allocator_t {
     mutex_t free_addr_lock;
-    rbtree_t *free_addr_by_size;
-    rbtree_t *free_addr_by_addr;
+    rbtree_t<> *free_addr_by_size;
+    rbtree_t<> *free_addr_by_addr;
 } contiguous_allocator_t;
 
 static void contiguous_allocator_create(contiguous_allocator_t *allocator,
@@ -819,7 +821,7 @@ static void mmu_tlb_perform_shootdown(void)
 }
 
 // TLB shootdown IPI
-static void *mmu_tlb_shootdown_handler(int intr, void *ctx)
+static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 {
     assert(intr == INTR_TLB_SHOOTDOWN);
 
@@ -862,7 +864,7 @@ static void mmu_send_tlb_shootdown(void)
     cpu_irq_toggle(irq_was_enabled);
 }
 
-static void *mmu_lazy_tlb_shootdown(void *ctx)
+static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
 {
     thread_set_cpu_mmu_seq(mmu_seq);
     cpu_flush_tlb();
@@ -872,14 +874,12 @@ static void *mmu_lazy_tlb_shootdown(void *ctx)
 }
 
 // Page fault
-static void *mmu_page_fault_handler(int intr, void *ctx)
+static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 {
     (void)intr;
     assert(intr == INTR_EX_PAGE);
 
     atomic_inc(&page_fault_count);
-
-    isr_context_t *ic = ctx;
 
     uintptr_t fault_addr = cpu_get_fault_address();
 
@@ -925,7 +925,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
 
             pte_t page_flags;
 
-            if (ic->gpr->info.error_code & CTX_ERRCODE_PF_W)
+            if (ctx->gpr->info.error_code & CTX_ERRCODE_PF_W)
                 page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
             else
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
@@ -1030,13 +1030,13 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
                  "     physaddr=%lx\n"
                  "     no execute=%d\n"
                  "------------------\n",
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_P),
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_W),
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_U),
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_R),
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_I),
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_PK),
-                 !!(ic->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_P),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_W),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_U),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_R),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_I),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_PK),
+                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
                  !!(pte & PTE_PRESENT),
                  !!(pte & PTE_WRITABLE),
                  !!(pte & PTE_USER),
@@ -1057,7 +1057,7 @@ static void *mmu_page_fault_handler(int intr, void *ctx)
 
 #if DEBUG_ADDR_ALLOC
 static int dump_addr_node(rbtree_t *tree,
-                           rbtree_kvp_t *kvp,
+                           rbtree_t::kvp_t *kvp,
                            void *p)
 {
     (void)tree;
@@ -1070,7 +1070,7 @@ static int dump_addr_node(rbtree_t *tree,
 static void dump_addr_tree(rbtree_t *tree, char const *name)
 {
     printdbg("%s dump\n", name);
-    rbtree_walk(tree, dump_addr_node, 0);
+    tree->walk(dump_addr_node, 0);
     printdbg("---------------------------------\n");
 }
 #endif
@@ -1168,7 +1168,7 @@ void mmu_init(int ap)
     phys_addr[0] = init_take_page(0);
     assert(phys_addr[0] != 0);
 
-    pte_t *old_root = (void*)(cpu_get_page_directory() & PTE_ADDR);
+    pte_t *old_root = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
 
     pt = init_map_aliasing_pte(aliasing_pte, phys_addr[0]);
     memcpy(pt, old_root, PAGESIZE);
@@ -1193,7 +1193,7 @@ void mmu_init(int ap)
     cpu_invalidate_page(0);
 
     phys_alloc_count = highest_usable;
-    phys_alloc = mmap(0, phys_alloc_count * sizeof(*phys_alloc),
+    phys_alloc = (uint32_t*)mmap(0, phys_alloc_count * sizeof(*phys_alloc),
          PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
 
     printdbg("Building physical memory free list\n");
@@ -1249,12 +1249,12 @@ void mmu_init(int ap)
                 &contiguous_start, 4 << 20, 128);
 
     contiguous_allocator_create(&linear_allocator,
-                                (void*)&linear_base,
+                                (linaddr_t*)&linear_base,
                                 PT_BASEADDR - linear_base,
                                 1 << 20);
 
     contiguous_allocator_create(&near_allocator,
-                                (void*)&near_base,
+                                (linaddr_t*)&near_base,
                                 0ULL - near_base,
                                 128);
 
@@ -1263,7 +1263,7 @@ void mmu_init(int ap)
 
     // Alias master page directory to be accessible
     // from all process contexts
-    master_pagedir = mmap((void*)root_physaddr, PAGE_SIZE, PROT_READ,
+    master_pagedir = (pte_t*)mmap((void*)root_physaddr, PAGE_SIZE, PROT_READ,
                           MAP_PHYSICAL, -1, 0);
 
     current_pagedir = (pte_t*)(PT0_PTR);
@@ -1283,8 +1283,8 @@ static size_t round_down(size_t n)
 // Linear address allocator
 
 static int contiguous_allocator_cmp_key(
-        rbtree_kvp_t const *lhs,
-        rbtree_kvp_t const *rhs,
+        typename rbtree_t<>::kvp_t const *lhs,
+        typename rbtree_t<>::kvp_t const *rhs,
         void *p)
 {
     (void)p;
@@ -1294,8 +1294,8 @@ static int contiguous_allocator_cmp_key(
 }
 
 static int contiguous_allocator_cmp_both(
-        rbtree_kvp_t const *lhs,
-        rbtree_kvp_t const *rhs,
+        typename rbtree_t<>::kvp_t const *lhs,
+        typename rbtree_t<>::kvp_t const *rhs,
         void *p)
 {
     (void)p;
@@ -1312,13 +1312,13 @@ static void sanity_check_by_size(rbtree_t *tree)
     static int call = 0;
     ++call;
 
-    rbtree_kvp_t prev = { 0, 0 };
-    rbtree_kvp_t curr;
+    rbtree_t::kvp_t prev = { 0, 0 };
+    rbtree_t::kvp_t curr;
 
-    for (rbtree_iter_t it = rbtree_first(tree, 0);
+    for (tree->iter_t it = rbtree_first(0);
          it;
-         it = rbtree_next(tree, it)) {
-        curr = rbtree_item(tree, it);
+         it = tree->next(it)) {
+        curr = tree->item(it);
         assert(prev.val + prev.key != curr.val);
         prev = curr;
     }
@@ -1326,13 +1326,13 @@ static void sanity_check_by_size(rbtree_t *tree)
 
 static void sanity_check_by_addr(rbtree_t *tree)
 {
-    rbtree_kvp_t prev = { 0, 0 };
-    rbtree_kvp_t curr;
+    rbtree_t::kvp_t prev = { 0, 0 };
+    rbtree_t::kvp_t curr;
 
-    for (rbtree_iter_t it = rbtree_first(tree, 0);
+    for (rbtree_t::iter_t it = tree->first(0);
          it;
-         it = rbtree_next(tree, it)) {
-        curr = rbtree_item(tree, it);
+         it = tree->next(it)) {
+        curr = tree->item(it);
         assert(prev.key + prev.val != curr.key);
         prev = curr;
     }
@@ -1346,9 +1346,9 @@ static void contiguous_allocator_create(
     linaddr_t initial_addr = *addr;
 
     mutex_init(&allocator->free_addr_lock);
-    allocator->free_addr_by_addr = rbtree_create(
+    allocator->free_addr_by_addr = rbtree_t<>::create(
                 contiguous_allocator_cmp_key, 0, capacity);
-    allocator->free_addr_by_size = rbtree_create(
+    allocator->free_addr_by_size = rbtree_t<>::create(
                 contiguous_allocator_cmp_both, 0, capacity);
 
     // Account for space taken creating trees
@@ -1356,10 +1356,8 @@ static void contiguous_allocator_create(
     size_t size_adj = *addr - initial_addr;
     size -= size_adj;
 
-    rbtree_insert(allocator->free_addr_by_size,
-                  size, *addr);
-    rbtree_insert(allocator->free_addr_by_addr,
-                  *addr, size);
+    allocator->free_addr_by_size->insert(size, *addr);
+    allocator->free_addr_by_addr->insert(*addr, size);
 }
 
 static uintptr_t alloc_linear(
@@ -1384,36 +1382,30 @@ static uintptr_t alloc_linear(
 #endif
 
         // Find the lowest address item that is big enough
-        rbtree_iter_t place = rbtree_lower_bound(
-                    allocator->free_addr_by_size, size, 0);
+        typename rbtree_t<>::iter_t place =
+                allocator->free_addr_by_size->lower_bound(size, 0);
 
-        rbtree_kvp_t by_size = rbtree_item(
-                    allocator->free_addr_by_size, place);
+        typename rbtree_t<>::kvp_t by_size =
+                allocator->free_addr_by_size->item(place);
 
         if (by_size.key < size) {
-            place = rbtree_next(
-                        allocator->free_addr_by_size, place);
-            by_size = rbtree_item(
-                        allocator->free_addr_by_size, place);
+            place = allocator->free_addr_by_size->next(place);
+            by_size = allocator->free_addr_by_size->item(place);
         }
 
-        rbtree_delete_at(allocator->free_addr_by_size,
-                         place);
+        allocator->free_addr_by_size->delete_at(place);
 
         // Delete corresponding entry by address
-        rbtree_delete(allocator->free_addr_by_addr,
-                      by_size.val, by_size.key);
+        allocator->free_addr_by_addr->delete_item(by_size.val, by_size.key);
 
         if (by_size.key > size) {
             // Insert remainder by size
-            rbtree_insert(allocator->free_addr_by_size,
-                          by_size.key - size,
-                          by_size.val + size);
+            allocator->free_addr_by_size->insert(
+                        by_size.key - size, by_size.val + size);
 
             // Insert remainder by address
-            rbtree_insert(allocator->free_addr_by_addr,
-                          by_size.val + size,
-                          by_size.key - size);
+            allocator->free_addr_by_addr->insert(
+                        by_size.val + size, by_size.key - size);
         }
 
         addr = by_size.val;
@@ -1465,56 +1457,55 @@ static void take_linear(
     linaddr_t end = addr + size;
 
     // Find the last free range before or at the address
-    rbtree_iter_t place = rbtree_lower_bound(
-                allocator->free_addr_by_addr, addr, 0);
+    typename rbtree_t<>::iter_t place =
+            allocator->free_addr_by_addr->lower_bound(addr, 0);
 
-    rbtree_iter_t next_place;
+    typename rbtree_t<>::iter_t next_place;
 
     for (; place; place = next_place) {
-        rbtree_kvp_t by_addr = rbtree_item(
-                    allocator->free_addr_by_addr, place);
+        typename rbtree_t<>::kvp_t by_addr =
+                allocator->free_addr_by_addr->item(place);
 
         if (by_addr.key < addr && by_addr.key + by_addr.val > addr) {
             //
             // The found free block is before the range and overlaps it
 
             // Save next block
-            next_place = rbtree_next(allocator->free_addr_by_addr, place);
+            next_place = allocator->free_addr_by_addr->next(place);
 
             // Delete the size entry
-            rbtree_delete(allocator->free_addr_by_size,
-                          by_addr.val, by_addr.key);
+            allocator->free_addr_by_size->delete_item(
+                        by_addr.val, by_addr.key);
 
             // Delete the address entry
-            rbtree_delete_at(allocator->free_addr_by_addr, place);
+            allocator->free_addr_by_addr->delete_at(place);
 
             // Create a smaller block that does not overlap taken range
             by_addr.val = addr - by_addr.key;
 
             // Insert smaller range by address
-            rbtree_insert_pair(allocator->free_addr_by_addr, &by_addr);
+            allocator->free_addr_by_addr->insert_pair(&by_addr);
 
             // Insert smaller range by size
-            rbtree_insert(allocator->free_addr_by_size,
-                          by_addr.val, by_addr.key);
+            allocator->free_addr_by_size->insert(by_addr.val, by_addr.key);
         } else if (by_addr.key >= addr && by_addr.key + by_addr.val <= end) {
             //
             // Range completely covers block, delete block
 
-            next_place = rbtree_next(allocator->free_addr_by_addr, place);
+            next_place = allocator->free_addr_by_addr->next(place);
 
-            rbtree_delete(allocator->free_addr_by_size,
-                          by_addr.val, by_addr.key);
+            allocator->free_addr_by_size->delete_item(
+                        by_addr.val, by_addr.key);
 
-            rbtree_delete_at(allocator->free_addr_by_addr, place);
+            allocator->free_addr_by_addr->delete_at(place);
         } else if (by_addr.key > addr) {
             //
             // Range cut off some of beginning of block
 
-            rbtree_delete(allocator->free_addr_by_size,
+            allocator->free_addr_by_size->delete_item(
                           by_addr.val, by_addr.key);
 
-            rbtree_delete_at(allocator->free_addr_by_addr, place);
+            allocator->free_addr_by_addr->delete_at(place);
 
             break;
         } else {
@@ -1551,17 +1542,17 @@ static void release_linear(
 #endif
 
     // Find the nearest free block before the freed range
-    rbtree_iter_t pred_it = rbtree_lower_bound(
-                allocator->free_addr_by_addr, addr, 0);
+    typename rbtree_t<>::iter_t pred_it =
+            allocator->free_addr_by_addr->lower_bound(addr, 0);
 
     // Find the nearest free block after the freed range
-    rbtree_iter_t succ_it = rbtree_lower_bound(
-                allocator->free_addr_by_addr, end, ~0UL);
+    typename rbtree_t<>::iter_t succ_it =
+            allocator->free_addr_by_addr->lower_bound(end, ~0UL);
 
-    rbtree_kvp_t pred = rbtree_item(
-                allocator->free_addr_by_addr, pred_it);
-    rbtree_kvp_t succ = rbtree_item(
-                allocator->free_addr_by_addr, succ_it);
+    typename rbtree_t<>::kvp_t pred =
+            allocator->free_addr_by_addr->item(pred_it);
+    typename rbtree_t<>::kvp_t succ =
+            allocator->free_addr_by_addr->item(succ_it);
 
     int coalesce_pred = ((pred.key + pred.val) == addr);
     int coalesce_succ = (succ.key == end);
@@ -1569,26 +1560,20 @@ static void release_linear(
     if (coalesce_pred) {
         addr -= pred.val;
         size += pred.val;
-        rbtree_delete_at(allocator->free_addr_by_addr,
-                         pred_it);
+        allocator->free_addr_by_addr->delete_at(pred_it);
 
-        rbtree_delete(allocator->free_addr_by_size,
-                      pred.val, pred.key);
+        allocator->free_addr_by_size->delete_item(pred.val, pred.key);
     }
 
     if (coalesce_succ) {
         size += succ.val;
-        rbtree_delete_at(allocator->free_addr_by_addr,
-                         succ_it);
+        allocator->free_addr_by_addr->delete_at(succ_it);
 
-        rbtree_delete(allocator->free_addr_by_size,
-                      succ.val, succ.key);
+        allocator->free_addr_by_size->delete_item(succ.val, succ.key);
     }
 
-    rbtree_insert(allocator->free_addr_by_size,
-                  size, addr);
-    rbtree_insert(allocator->free_addr_by_addr,
-                  addr, size);
+    allocator->free_addr_by_size->insert(size, addr);
+    allocator->free_addr_by_addr->insert(addr, size);
 
 #if DEBUG_ADDR_ALLOC
     dump_addr_tree(allocator->free_addr_by_addr,
@@ -2099,7 +2084,7 @@ typedef struct mphysranges_state_t {
 
 static inline int mphysranges_callback(mmphysrange_t range, void *context)
 {
-    mphysranges_state_t *state = context;
+    mphysranges_state_t *state = (mphysranges_state_t *)context;
 
     int contiguous = state->count > 0 &&
             (state->range->physaddr + state->range->size == range.physaddr);
@@ -2184,7 +2169,7 @@ void *mmap_register_device(void *context,
 static int mm_dev_map_search(void const *v, void const *k, void *s)
 {
     (void)s;
-    mmap_device_mapping_t const *mapping = v;
+    mmap_device_mapping_t const *mapping = (mmap_device_mapping_t const *)v;
 
     if (k < mapping->base_addr)
         return -1;
@@ -2200,7 +2185,7 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
 // returns the physical address of the page directory
 uintptr_t mm_create_process(void)
 {
-    pte_t *tables = mmap(0, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE,
+    pte_t *tables = (pte_t*)mmap(0, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE,
                         MAP_POPULATE, -1, 0);
     mmphysrange_t addresses[4];
     mphysranges(addresses, countof(addresses),

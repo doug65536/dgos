@@ -12,7 +12,7 @@
 static eth_dev_base_t *eth_devices[MAX_ETH_DEVICES];
 static unsigned eth_device_count;
 
-void register_eth_dev_device(const char *name, eth_dev_vtbl_t *dev)
+void register_eth_dev_device(const char *name, eth_factory_t *dev)
 {
     (void)name;
     ETH_DEV_TRACE("Registered %s device\n", name);

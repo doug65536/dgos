@@ -3,48 +3,48 @@
 #include "types.h"
 #include "assert.h"
 
-typedef struct uint8_both_t {
+struct uint8_both_t {
     uint8_t le;
     uint8_t be;
-} uint8_both_t;
+};
 
-typedef struct uint16_both_t {
+struct uint16_both_t {
     uint16_t le;
     uint16_t be;
-} uint16_both_t;
+};
 
-typedef struct uint32_both_t {
+struct uint32_both_t {
     uint32_t le;
     uint32_t be;
-} uint32_both_t;
+};
 
-typedef struct uint64_both_t {
+struct uint64_both_t {
     uint64_t le;
     uint64_t be;
-} uint64_both_t;
+};
 
-typedef struct int8_both_t {
+struct int8_both_t {
     int8_t le;
     int8_t be;
-} int8_both_t;
+};
 
-typedef struct int16_both_t {
+struct int16_both_t {
     int16_t le;
     int16_t be;
-} int16_both_t;
+};
 
-typedef struct int32_both_t {
+struct int32_both_t {
     int32_t le;
     int32_t be;
-} int32_both_t;
+};
 
-typedef struct int64_both_t {
+struct int64_both_t {
     int64_t le;
     int64_t be;
-} int64_both_t;
+};
 
 // 17 bytes
-typedef struct iso9660_pvd_datetime_t {
+struct iso9660_pvd_datetime_t {
     char year[4];
     char month[2];
     char day[2];
@@ -53,10 +53,10 @@ typedef struct iso9660_pvd_datetime_t {
     char sec[2];
     char hundreths[2];
     int8_t tzofs;
-} iso9660_pvd_datetime_t;
+};
 
 // 7 bytes
-typedef struct iso9660_datetime_t {
+struct iso9660_datetime_t {
     // Since 1900
     uint8_t year;
 
@@ -77,10 +77,10 @@ typedef struct iso9660_datetime_t {
 
     // -48 to +52 (15 minute intervals)
     int8_t tz_ofs;
-} iso9660_datetime_t;
+};
 
 // 34 bytes
-typedef struct iso9660_dir_ent_t {
+struct iso9660_dir_ent_t {
     // directory entries cannot span a sector boundary
     // treat 0 len as 1 byte ignored entry
     uint8_t len;
@@ -118,12 +118,12 @@ typedef struct iso9660_dir_ent_t {
 
     // ...followed by filename
     // use len field to find next dir entry
-} iso9660_dir_ent_t;
+};
 
 C_ASSERT(sizeof(iso9660_dir_ent_t) == 34);
 
 // Primary Volume Descriptor
-typedef struct iso9660_pvd_t {
+struct iso9660_pvd_t {
     uint8_t type_code;
 
     // Always "CD001"
@@ -192,22 +192,22 @@ typedef struct iso9660_pvd_t {
     char application_specific[512];
 
     char reserved[653];
-} iso9660_pvd_t;
+};
 
 C_ASSERT(sizeof(iso9660_pvd_t) == 2048);
 
 // Path table record. Always begins at a 16-bit boundary
-typedef struct iso9660_pt_rec_t {
+struct iso9660_pt_rec_t {
     uint8_t di_len;
     uint8_t ea_len;
     uint16_t lba_lo;
     uint16_t lba_hi;
     uint16_t parent_dn;
     char name[2];
-} iso9660_pt_rec_t;
+};
 
 // Extended attribute record
-typedef struct iso9660_ea_rec_t {
+struct iso9660_ea_rec_t {
     uint32_t owner_id;
     uint32_t group_id;
     uint16_t permissions;
@@ -235,7 +235,7 @@ typedef struct iso9660_ea_rec_t {
 
     // App use data and escape sequence data
     char data[1798];
-} iso9660_ea_rec_t;
+};
 
 #define ISO9660_EA_PERM_SYS_NO_OR_BIT   0
 #define ISO9660_EA_PERM_SYS_NO_OX_BIT   2
@@ -262,11 +262,11 @@ C_ASSERT(offsetof(iso9660_ea_rec_t, system_id) == 84);
 C_ASSERT(offsetof(iso9660_ea_rec_t, ea_rec_ver) == 180);
 C_ASSERT(offsetof(iso9660_ea_rec_t, app_use_len_lo) == 246);
 
-typedef struct iso9660_sector_iterator_t {
+struct iso9660_sector_iterator_t {
     uint32_t lba;
     uint32_t size;
     uint16_t err;
-} iso9660_sector_iterator_t;
+};
 
 // Maximum length of a name, not including null, if any
 #define ISO9660_MAX_NAME    110

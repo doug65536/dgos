@@ -41,14 +41,14 @@ int ethq_init(void)
              sizeof(ethq_pkt2K_t*) +
              sizeof(uint16_t));
 
-    ethq_pkts = mmap(0, ethq_pool_size,
+    ethq_pkts = (ethq_pkt2K_t*)mmap(0, ethq_pool_size,
                           PROT_READ | PROT_WRITE,
                           MAP_POPULATE | MAP_32BIT, -1, 0);
     if (!ethq_pkts || ethq_pkts == MAP_FAILED)
         return 0;
 
-    ethq_pkt_list = (void*)(ethq_pkts + ethq_pkt_count);
-    ethq_free_chain = (void*)(ethq_pkt_list + ethq_pkt_count);
+    ethq_pkt_list = (ethq_pkt_t**)(ethq_pkts + ethq_pkt_count);
+    ethq_free_chain = (uint16_t*)(ethq_pkt_list + ethq_pkt_count);
 
     uintptr_t physaddr = 0;
     for (size_t i = 0; i < ethq_pkt_count; ++i) {
@@ -75,18 +75,18 @@ int ethq_init(void)
     ethq_first_free_aba = 0;
 
     // Self test
-    void *test1 = ethq_pkt_acquire();
-    void *test2 = ethq_pkt_acquire();
-    void *test3 = ethq_pkt_acquire();
-    void *test4 = ethq_pkt_acquire();
+    ethq_pkt_t *test1 = ethq_pkt_acquire();
+    ethq_pkt_t *test2 = ethq_pkt_acquire();
+    ethq_pkt_t *test3 = ethq_pkt_acquire();
+    ethq_pkt_t *test4 = ethq_pkt_acquire();
     ethq_pkt_release(test1);
     ethq_pkt_release(test2);
     ethq_pkt_release(test3);
     ethq_pkt_release(test4);
-    void *chk1 = ethq_pkt_acquire();
-    void *chk2 = ethq_pkt_acquire();
-    void *chk3 = ethq_pkt_acquire();
-    void *chk4 = ethq_pkt_acquire();
+    ethq_pkt_t *chk1 = ethq_pkt_acquire();
+    ethq_pkt_t *chk2 = ethq_pkt_acquire();
+    ethq_pkt_t *chk3 = ethq_pkt_acquire();
+    ethq_pkt_t *chk4 = ethq_pkt_acquire();
     assert(chk4 == test1);
     assert(chk3 == test2);
     assert(chk2 == test3);

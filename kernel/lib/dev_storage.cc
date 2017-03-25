@@ -14,9 +14,9 @@ static unsigned storage_if_count;
 static storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
 static unsigned storage_dev_count;
 
-#define MAX_PART_DEVS   4
-static part_vtbl_t *part_devs[MAX_PART_DEVS];
-static int part_dev_count;
+#define MAX_PART_FACTORIES   4
+static part_factory_t *part_factories[MAX_PART_FACTORIES];
+static int part_factory_count;
 
 typedef struct fs_reg_t {
     char const *name;
@@ -65,7 +65,7 @@ void register_storage_if_device(char const *name,
 
         // Get a list of storage devices on this interface
         if_list_t dev_list;
-        dev_list = if_->detect_devices(if_);
+        dev_list = if_->detect_devices();
 
         for (unsigned k = 0; k < dev_list.count; ++k) {
             // Calculate pointer to storage device instance
@@ -125,15 +125,15 @@ fs_base_t *fs_from_id(size_t id)
     return fs_mounts[id].fs;
 }
 
-void register_part_device(const char *name, part_vtbl_t *vtbl)
+void register_part_factory(const char *name, part_factory_t *factory)
 {
-    if (part_dev_count < MAX_PART_DEVS) {
-        part_devs[part_dev_count++] = vtbl;
+    if (part_factory_count < MAX_PART_FACTORIES) {
+        part_factories[part_factory_count++] = factory;
 
         for (unsigned dev = 0; dev < storage_dev_count; ++dev) {
             storage_dev_base_t *drive = open_storage_dev(dev);
             if (drive) {
-                if_list_t part_list = vtbl->detect(drive);
+                if_list_t part_list = factory->detect(drive);
 
                 // Mount partitions
                 for (unsigned i = 0; i < part_list.count; ++i) {

@@ -92,14 +92,15 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static void *pit8254_context_switch_handler(int intr, void *ctx)
+static isr_context_t *pit8254_context_switch_handler(
+        int intr, isr_context_t *ctx)
 {
     (void)intr;
     assert(intr == INTR_THREAD_YIELD);
     return thread_schedule(ctx);
 }
 
-static void *pit8254_handler(int irq, void *ctx)
+static isr_context_t *pit8254_handler(int irq, isr_context_t *ctx)
 {
     (void)irq;
     assert(irq == 0);

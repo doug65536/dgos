@@ -367,7 +367,7 @@ static void keyb8042_mouse_handler(void)
     }
 }
 
-static void *keyb8042_handler(int irq, void *ctx)
+static isr_context_t *keyb8042_handler(int irq, isr_context_t *ctx)
 {
     if (irq == KEYB_KEY_IRQ)
         keyb8042_keyboard_handler();

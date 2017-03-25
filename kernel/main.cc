@@ -198,7 +198,7 @@ static int mprotect_test(void *p)
     (void)p;
     return 0;
 
-    char *mem = mmap(0, 256 << 20, PROT_NONE, 0, -1, 0);
+    char *mem = (char*)mmap(0, 256 << 20, PROT_NONE, 0, -1, 0);
 
     __try {
         *mem = 'H';
@@ -602,7 +602,7 @@ static uint8_t sum_bytes(char *st, size_t len)
 
 static int find_vbe(void *p)
 {
-    char *bios = mmap(p, 0x10000, PROT_READ, MAP_PHYSICAL, -1, 0);
+    char *bios = (char*)mmap(p, 0x10000, PROT_READ, MAP_PHYSICAL, -1, 0);
 
     int i;
     for (i = 0; i < 0x8000 - 20; ++i) {
@@ -704,7 +704,7 @@ static int init_thread(void *p)
 
     mprotect_test(0);
 
-    rbtree_test();
+    rbtree_t<>::test();
 
     printdbg("Floating point formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
     printdbg("Floating point formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);

@@ -29,4 +29,4 @@ typedef struct callout_t {
         (fn), (arg), (type), 0, 0 \
     }
 
-size_t callout_call(int32_t type);
+extern "C" size_t callout_call(int32_t type);

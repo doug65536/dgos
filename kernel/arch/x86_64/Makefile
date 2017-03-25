@@ -72,7 +72,7 @@ generated_device_vtbl.s: $(DEVOBJS)
 			sed 's/.*/.quad &/' >> $@ && \
 		echo '.quad 0' >> $@
 
-buildtool/keyb_tool: device/keyb8042_layout/keyb8042_gentables.c
+buildtool/keyb_tool: device/keyb8042_layout/keyb8042_gentables.cc
 	mkdir -p buildtool
 	$(CXX) -Wall -Wextra -o $@ $^
 

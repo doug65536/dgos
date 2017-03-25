@@ -240,8 +240,8 @@ static int iso9660_lvl2_cmp(void const *candidate,
                               void const *goal,
                               size_t len)
 {
-    uint8_t const *g = goal;
-    uint8_t const *c = candidate;
+    uint8_t const *g = (uint8_t const *)goal;
+    uint8_t const *c = (uint8_t const *)candidate;
     if (c[len-1] == '.')
         --len;
     for (size_t i = 0; i < len; ++i) {
@@ -259,8 +259,8 @@ static int iso9660_joliet_compare(void const *candidate,
                            void const *goal,
                            size_t len)
 {
-    char const *g = goal;
-    uint16_t const *c = candidate;
+    char const *g = (char const *)goal;
+    uint16_t const *c = (uint16_t const *)candidate;
     for (size_t i = 0; i < len; ++i) {
         int diff = g[i] - bswap_16(c[i]);
         if (diff)
@@ -273,7 +273,7 @@ static void *iso9660_joliet_search(void const *candidate,
                             int c,
                             size_t len)
 {
-    uint16_t const *can = candidate;
+    uint16_t const *can = (uint16_t const *)candidate;
     for (size_t i = 0; i < len; ++i)
         if (bswap_16(can[i]) == c)
             return (void*)can;
@@ -290,13 +290,14 @@ static uint32_t find_file_by_name(char const *filename,
     for (uint32_t ofs = 0; ofs < (dir_size >> 11); ++ofs) {
         read_lba_sectors(iso9660_sector_buffer, boot_drive, dir_lba + ofs, 1);
 
-        iso9660_dir_ent_t *de = (void*)iso9660_sector_buffer;
-        iso9660_dir_ent_t *de_end = (void*)((char*)de + 2048);
+        iso9660_dir_ent_t *de = (iso9660_dir_ent_t*)iso9660_sector_buffer;
+        iso9660_dir_ent_t *de_end = (iso9660_dir_ent_t*)((char*)de + 2048);
 
         do {
             if (de->len >= sizeof(*de)) {
                 char *name = de->name;
-                char *name_end = iso9660_name_search(name, ';', de->filename_len);
+                char *name_end = (char*)iso9660_name_search(
+                            name, ';', de->filename_len);
                 size_t name_len = name_end - name;
                 if (name_len > de->filename_len)
                     name_len = de->filename_len;

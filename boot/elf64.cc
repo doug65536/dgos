@@ -115,7 +115,7 @@ uint16_t elf64_run(char const *filename)
     // Load program headers
     Elf64_Phdr *program_hdrs;
     read_size = sizeof(*program_hdrs) * file_hdr.e_phnum;
-    program_hdrs = malloc(read_size);
+    program_hdrs = (Elf64_Phdr*)malloc(read_size);
     if (!program_hdrs)
         return 0;
     if (read_size != boot_pread(

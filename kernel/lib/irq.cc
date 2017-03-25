@@ -178,7 +178,7 @@ int intr_has_handler(int intr)
     return intr_handlers_count > 0 && intr_first[intr] >= 0;
 }
 
-void *intr_invoke(int intr, void *ctx)
+isr_context_t *intr_invoke(int intr, isr_context_t *ctx)
 {
     if (intr_has_handler(intr)) {
         intr_handler_reg_t *entry;
@@ -193,7 +193,7 @@ void *intr_invoke(int intr, void *ctx)
     return ctx;
 }
 
-void *irq_invoke(int intr, int irq, void *ctx)
+isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx)
 {
     if (intr_has_handler(intr)) {
         intr_handler_reg_t *entry;

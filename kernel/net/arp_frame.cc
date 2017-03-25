@@ -13,7 +13,7 @@
 
 void arp_frame_received(ethq_pkt_t *pkt)
 {
-    arp_packet_t *ap = (void*)&pkt->pkt;
+    arp_packet_t *ap = (arp_packet_t*)&pkt->pkt;
 
     if (ap->hlen == 6 && ap->plen == 4) {
         ARP_TRACE("Sender=%02x:%02x:%02x:%02x:%02x:%02x"
@@ -50,7 +50,7 @@ void arp_frame_received(ethq_pkt_t *pkt)
                 ap->target_ip[2] == 122 &&
                 ap->target_ip[3] == 42) {
             ethq_pkt_t *reply_pkt = ethq_pkt_acquire();
-            arp_packet_t *reply = (void*)&reply_pkt->pkt;
+            arp_packet_t *reply = (arp_packet_t*)&reply_pkt->pkt;
             // Ethernet
             reply->htype = htons(1);
             // IPv4
@@ -73,7 +73,7 @@ void arp_frame_received(ethq_pkt_t *pkt)
             reply->eth_hdr.len_ethertype = htons(ETHERTYPE_ARP);
 
             // Get MAC from NIC (from me)
-            pkt->nic->vtbl->get_mac(pkt->nic, reply->eth_hdr.s_mac);
+            pkt->nic->get_mac(reply->eth_hdr.s_mac);
             memcpy(reply->source_mac, reply->eth_hdr.s_mac, 6);
 
             // Broadcast destination
@@ -111,7 +111,7 @@ void arp_frame_received(ethq_pkt_t *pkt)
 
             // Transmit
             ARP_TRACE("Sending ARP reply\n");
-            pkt->nic->vtbl->send(pkt->nic, reply_pkt);
+            pkt->nic->send(reply_pkt);
         }
     } else {
         ARP_TRACE("Unrecognized packet, hlen=%d, plen=%d\n",

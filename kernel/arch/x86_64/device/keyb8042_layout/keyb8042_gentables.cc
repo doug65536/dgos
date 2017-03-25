@@ -10,7 +10,7 @@ static char platform_url[] =
 static char *fmt_str_va(char const *format, va_list ap)
 {
     int len = vsnprintf(0, 0, format, ap);
-    char *str = malloc(len+1);
+    char *str = (char*)malloc(len+1);
     vsnprintf(str, len+1, format, ap);
     return str;
 }
@@ -66,7 +66,7 @@ int main(void)
                 platform_url);
 
     size_t line_buf_size = 64 << 10;
-    char *line = malloc(line_buf_size);
+    char *line = (char*)malloc(line_buf_size);
     size_t lines = 0;
     while (fgets(line, line_buf_size, s)) {
         if (sscanf(line, "<map keycode=\"%d\" iso=\"%3s\"/>",

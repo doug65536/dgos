@@ -42,7 +42,7 @@ static void modload_find_syms(Elf64_Shdr const **symtab,
 
 static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
 {
-    Elf64_Word hash = elf64_hash((void*)name);
+    Elf64_Word hash = elf64_hash((unsigned char*)name);
     Elf64_Word bucket = hash % ht->hash_nbucket;
 
     Elf64_Word i = ht->hash_buckets[bucket];
@@ -90,7 +90,7 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    autofree Elf64_Shdr *scn_hdrs = malloc(scn_hdr_size);
+    autofree Elf64_Shdr *scn_hdrs = (Elf64_Shdr *)malloc(scn_hdr_size);
 
     if (scn_hdr_size != file_pread(
                 fd, scn_hdrs, scn_hdr_size,
@@ -101,7 +101,7 @@ module_entry_fn_t modload_load(char const *path)
 
     size_t mod_str_scn = 0;
     autofree Elf64_Sym *mod_sym = 0;
-    void *mod_sym_end = 0;
+    Elf64_Sym *mod_sym_end = 0;
     autofree char *mod_str = 0;
 
     Elf64_Xword max_addr = 0;
@@ -126,8 +126,8 @@ module_entry_fn_t modload_load(char const *path)
         case SHT_SYMTAB:
             mod_str_scn = hdr->sh_link;
 
-            mod_sym = malloc(hdr->sh_size);
-            mod_sym_end = (char*)mod_sym + hdr->sh_size;
+            mod_sym = (Elf64_Sym *)malloc(hdr->sh_size);
+            mod_sym_end = (Elf64_Sym *)mod_sym + hdr->sh_size;
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_sym, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module symbols\n");
@@ -137,7 +137,7 @@ module_entry_fn_t modload_load(char const *path)
         case SHT_STRTAB:
             if (i != mod_str_scn)
                 break;
-            mod_str = malloc(hdr->sh_size);
+            mod_str = (char*)malloc(hdr->sh_size);
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_str, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module strings\n");
@@ -147,7 +147,7 @@ module_entry_fn_t modload_load(char const *path)
         }
     }
 
-    char *module = mmap(0, max_addr - min_addr,
+    char *module = (char *)mmap(0, max_addr - min_addr,
                         PROT_READ | PROT_WRITE,
                         MAP_NEAR, -1, 0);
 
@@ -186,8 +186,8 @@ module_entry_fn_t modload_load(char const *path)
 
     autofree void *rel_buf = malloc(max_rel);
 
-    Elf64_Rel const * const rel = rel_buf;
-    Elf64_Rela const * const rela = rel_buf;
+    Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf;
+    Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf;
 
     // Process relocations
     for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
@@ -224,8 +224,8 @@ module_entry_fn_t modload_load(char const *path)
 
         modload_find_syms(&symtab, &strtab, scn_hdrs, i);
 
-        autofree Elf64_Sym *symdata = malloc(symtab->sh_size);
-        autofree char *strdata = malloc(strtab->sh_size);
+        autofree Elf64_Sym *symdata = (Elf64_Sym *)malloc(symtab->sh_size);
+        autofree char *strdata = (char*)malloc(strtab->sh_size);
 
         if ((ssize_t)symtab->sh_size != file_pread(
                     fd, symdata, symtab->sh_size, symtab->sh_offset)) {

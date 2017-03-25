@@ -3,18 +3,21 @@
 #include "string.h"
 #include "iso9660_part.h"
 #include "dev_storage.h"
-
-DECLARE_part_DEVICE(iso9660);
+#include "unique_ptr.h"
 
 #include "iso9660_decl.h"
 
 //typedef struct part_dev_t part_dev_t;
 
+class iso9660_part_factory_t : public part_factory_t {
+    if_list_t detect(storage_dev_base_t *drive);
+};
+
 #define MAX_PARTITIONS  128
 static part_dev_t partitions[MAX_PARTITIONS];
 static size_t partition_count;
 
-static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
+if_list_t iso9660_part_factory_t::detect(storage_dev_base_t *drive)
 {
     unsigned start_at = partition_count;
 
@@ -24,7 +27,7 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
         0
     };
 
-    long sector_size = drive->vtbl->info(drive, STORAGE_INFO_BLOCKSIZE);
+    long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
     char sig[5];
 
     long sector_mul = 2048 / sector_size;
@@ -32,10 +35,10 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
     if (sector_mul < 1)
         sector_mul = 1;
 
-    char sector[sector_size * sector_mul];
-    iso9660_pvd_t *pvd = (void*)sector;
+    unique_ptr<char> sector(new char[sector_size * sector_mul]);
+    iso9660_pvd_t *pvd = (iso9660_pvd_t*)sector.get();
 
-    int err = drive->vtbl->read_blocks(drive, sector,
+    int err = drive->read_blocks(sector,
                              1 * sector_mul,
                              16 * sector_mul);
 
@@ -46,7 +49,6 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
         part_dev_t *part = partitions + partition_count++;
 
         part->drive = drive;
-        part->vtbl = &iso9660_part_device_vtbl;
         part->lba_st = 0;
         part->lba_len = pvd->block_count.le;
         part->name = "iso9660";
@@ -56,6 +58,3 @@ static if_list_t iso9660_part_detect(storage_dev_base_t *drive)
 
     return list;
 }
-
-REGISTER_part_DEVICE(iso9660);
-

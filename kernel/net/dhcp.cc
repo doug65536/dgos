@@ -4,7 +4,7 @@
 
 void dhcp_builder_begin(void *buf)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t*)buf;
 
     memset(pkt, 0, sizeof(*pkt));
 
@@ -62,7 +62,7 @@ void dhcp_builder_begin(void *buf)
 
 void dhcp_builder_s_mac(void *buf, const uint8_t *mac_addr)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t*)buf;
 
     memcpy(pkt->udp_hdr.ipv4_hdr.eth_hdr.s_mac, mac_addr,
            sizeof(pkt->udp_hdr.ipv4_hdr.eth_hdr.s_mac));
@@ -70,7 +70,7 @@ void dhcp_builder_s_mac(void *buf, const uint8_t *mac_addr)
 
 void dhcp_builder_d_mac(void *buf, const uint8_t *mac_addr)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     memcpy(pkt->udp_hdr.ipv4_hdr.eth_hdr.d_mac, mac_addr,
            sizeof(pkt->udp_hdr.ipv4_hdr.eth_hdr.d_mac));
@@ -78,42 +78,42 @@ void dhcp_builder_d_mac(void *buf, const uint8_t *mac_addr)
 
 void dhcp_builder_set_op(void *buf, uint8_t op)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     pkt->op = op;
 }
 
 void dhcp_builder_set_client_ip(void *buf, uint32_t ip_addr)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     memcpy(pkt->ci_addr, &ip_addr, sizeof(pkt->gi_addr));
 }
 
 void dhcp_builder_set_your_ip(void *buf, uint32_t ip_addr)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     memcpy(pkt->yi_addr, &ip_addr, sizeof(pkt->gi_addr));
 }
 
 void dhcp_builder_set_server_ip(void *buf, uint32_t ip_addr)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     memcpy(pkt->si_addr, &ip_addr, sizeof(pkt->gi_addr));
 }
 
 void dhcp_builder_set_gateway_ip(void *buf, uint32_t ip_addr)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     memcpy(pkt->gi_addr, &ip_addr, sizeof(pkt->gi_addr));
 }
 
 int dhcp_builder_add_option(void *buf, uint8_t option)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     for (size_t i = 0; i < countof(pkt->options); ) {
         if (pkt->options[i] == 0) {
@@ -129,7 +129,7 @@ int dhcp_builder_add_option(void *buf, uint8_t option)
 
 int dhcp_builder_add_option_param(void *buf, uint8_t option, uint8_t param)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     for (size_t i = 0; i < countof(pkt->options); ) {
         if (pkt->options[i] == option) {
@@ -146,7 +146,7 @@ int dhcp_builder_add_option_param(void *buf, uint8_t option, uint8_t param)
 int dhcp_builder_add_option_params(void *buf, uint8_t option,
                                     void const *data, size_t bytes)
 {
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
     for (size_t i = 0; i < countof(pkt->options); ) {
         if (pkt->options[i] == option) {
@@ -165,9 +165,9 @@ uint16_t dhcp_builder_finalize(void *buf)
 {
     int option_len = (dhcp_builder_add_option(buf, 255) + 1) & -2;
 
-    dhcp_pkt_t *pkt = buf;
+    dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 
-    char const *end = (void*)&pkt->options[option_len];
+    char const *end = (char const *)&pkt->options[option_len];
 
     udp_finalize(&pkt->udp_hdr, end);
 
@@ -176,7 +176,7 @@ uint16_t dhcp_builder_finalize(void *buf)
 
 uint16_t dhcp_build_discover(void *buf, uint8_t const *mac_addr)
 {
-    dhcp_pkt_t *discover = buf;
+    dhcp_pkt_t *discover = (dhcp_pkt_t *)buf;
 
     dhcp_builder_begin(discover);
     dhcp_builder_s_mac(discover, mac_addr);

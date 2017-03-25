@@ -14,7 +14,7 @@
 
 void ipv4_frame_received(ethq_pkt_t *pkt)
 {
-    ipv4_hdr_t *ipv4_pkt = (void*)&pkt->pkt;
+    ipv4_hdr_t *ipv4_pkt = (ipv4_hdr_t*)&pkt->pkt;
 
     switch (ipv4_pkt->protocol) {
     case IPV4_PROTO_TCP:

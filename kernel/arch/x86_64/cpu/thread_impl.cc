@@ -157,7 +157,7 @@ static uint32_t get_apic_id(void)
 
 static inline cpu_info_t *this_cpu(void)
 {
-    cpu_info_t *cpu = cpu_gs_read_ptr();
+    cpu_info_t *cpu = (cpu_info_t *)cpu_gs_read_ptr();
     assert(cpu >= cpus && cpu < cpus + countof(cpus));
     assert(cpu->self == cpu);
     return cpu;
@@ -297,8 +297,8 @@ static thread_t thread_create_with_state(
 
         isr_context_t *ctx = (isr_context_t*)ctx_addr;
         memset(ctx, 0, ctx_size);
-        ctx->fpr = thread->xsave_ptr;
-        ctx->gpr = (void*)(ctx + 1);
+        ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
+        ctx->gpr = (isr_gpr_context_t*)(ctx + 1);
 
         ctx->gpr->iret.rsp = (uintptr_t)
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
@@ -548,11 +548,11 @@ static thread_info_t *thread_choose_next(
 
 static void thread_clear_busy(void *outgoing)
 {
-    thread_info_t *thread = outgoing;
+    thread_info_t *thread = (thread_info_t*)outgoing;
     atomic_and(&thread->state, ~THREAD_BUSY);
 }
 
-void *thread_schedule(void *ctx)
+isr_context_t *thread_schedule(isr_context_t *ctx)
 {
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
@@ -569,7 +569,7 @@ void *thread_schedule(void *ctx)
     }
 
     // Store context pointer for resume later
-    thread->ctx = ctx;
+    thread->ctx = (isr_context_t*)ctx;
 
     // Change to ready if running
     if (likely(thread->state == THREAD_IS_RUNNING)) {

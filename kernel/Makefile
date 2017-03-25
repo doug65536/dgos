@@ -8,7 +8,7 @@ CONFIG ?= x86_64
 include config/$(CONFIG).mk
 
 CSRCS := \
-	main.c
+	main.cc
 
 ASRCS :=
 
@@ -55,7 +55,7 @@ WEVERYTHING += -Wundef
 #WEVERYTHING += -Wbad-function-cast
 #overkill WEVERYTHING += -Wcast-qual
 WEVERYTHING += -Wwrite-strings
-WEVERYTHING += -Wmissing-prototypes
+#WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
 WEVERYTHING += -Wshadow
 
@@ -74,7 +74,7 @@ CXXFLAGS := -g3 -fno-stack-protector \
 	-msse -msse2 \
 	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
-	-std=c++14 -fpermissive \
+	-std=c++14 -fpermissive -ffreestanding \
 	$(WEVERYTHING)
 
 #-std=c++11 -x c++ \

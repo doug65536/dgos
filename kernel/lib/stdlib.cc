@@ -39,8 +39,8 @@ void free(void *p)
 char *strdup(const char *s)
 {
     size_t len = strlen(s);
-    char *b = malloc(len+1);
-    return memcpy(b, s, len+1);
+    char *b = new char[len+1];
+    return (char*)memcpy(b, s, len+1);
 }
 
 void auto_free(void *mem)
@@ -50,4 +50,25 @@ void auto_free(void *mem)
         free(blk);
         *(void**)mem = 0;
     }
+}
+
+void *operator new(size_t size)
+{
+    return malloc(size);
+}
+
+void *operator new[](size_t size)
+{
+    return malloc(size);
+}
+
+void operator delete(void *block, unsigned long size)
+{
+    (void)size;
+    free(block);
+}
+
+void operator delete(void *block)
+{
+    free(block);
 }

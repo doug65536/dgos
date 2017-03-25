@@ -117,8 +117,8 @@ void *memcpy512_nt(void *dest, void const *src, size_t n)
 
 static void *memcpy32_nt_sse4_1(void *dest, void const *src, size_t n)
 {
-    int *d = dest;
-    int const *s = src;
+    int *d = (int*)dest;
+    int const *s = (int const *)src;
     while (n >= 4) {
         __builtin_ia32_movnti(d++, *s++);
         n -= 4;
@@ -153,11 +153,10 @@ void memcpy_nt_fence(void)
 
 static void *memset32_nt_sse(void *dest, uint32_t val, size_t n)
 {
-    void *d = dest;
+    int32_t *d = (int32_t*)dest;
 
     while (n >= 4) {
-        __builtin_ia32_movnti(d, val);
-        d = (uint32_t*)d + 1;
+        __builtin_ia32_movnti(d++, val);
         n -= 4;
     }
 
@@ -170,22 +169,22 @@ static void *memset32_nt_sse4_1(void *dest, uint32_t val, size_t n)
 
     // Write 32-bit values until it is 128-bit aligned
     while (((uintptr_t)d & 0xC) && n >= 4) {
-        __builtin_ia32_movnti(d, val);
+        __builtin_ia32_movnti((int*)d, val);
         d = (uint32_t*)d + 1;
         n -= 4;
     }
 
     // Write as many 128-bit values as possible
-    __ivec4 val128 = { val, val, val, val };
+    __uvec4 val128 = { val, val, val, val };
     while (n >= 16) {
-        __builtin_ia32_movntdq(d, (__ivec2LL)val128);
+        __builtin_ia32_movntdq((__ivec2LL*)d, (__ivec2LL)val128);
         d = (__ivec4*)d + 1;
         n -= 16;
     }
 
     // Write remainder
     while (n >= 4) {
-        __builtin_ia32_movnti(d, val);
+        __builtin_ia32_movnti((int*)d, val);
         d = (uint32_t*)d + 1;
         n -= 4;
     }

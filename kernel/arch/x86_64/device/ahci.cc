@@ -21,11 +21,7 @@
 #define AHCI_TRACE(...) ((void)0)
 #endif
 
-typedef struct ahci_if_t ahci_if_t;
-DECLARE_storage_if_DEVICE(ahci);
-DECLARE_storage_dev_DEVICE(ahci);
-
-typedef enum ata_cmd_t {
+enum ata_cmd_t {
     ATA_CMD_READ_PIO        = 0x20,
     ATA_CMD_READ_PIO_EXT    = 0x24,
 
@@ -48,9 +44,9 @@ typedef enum ata_cmd_t {
     ATA_CMD_IDENTIFY_PACKET = 0xA1,
 
     ATA_CMD_IDENTIFY        = 0xEC
-} ata_cmd_t;
+};
 
-typedef enum ahci_fis_type_t {
+enum ahci_fis_type_t {
     // Register FIS - host to device
     FIS_TYPE_REG_H2D    = 0x27,
 
@@ -74,10 +70,10 @@ typedef enum ahci_fis_type_t {
 
     // Set device bits FIS - device to host
     FIS_TYPE_DEV_BITS   = 0xA1,
-} ahci_fis_type_t;
+};
 
 // Host-to-Device
-typedef struct ahci_fis_h2d_t {
+struct ahci_fis_h2d_t {
     // FIS_TYPE_REG_H2D
     uint8_t fis_type;
 
@@ -127,7 +123,7 @@ typedef struct ahci_fis_h2d_t {
 
     // Reserved
     uint8_t rsv1[4];
-} ahci_fis_h2d_t;
+};
 
 #define AHCI_FIS_CTL_PORTMUX_BIT    0
 #define AHCI_FIS_CTL_PORTMUX_BITS   4
@@ -140,7 +136,7 @@ typedef struct ahci_fis_h2d_t {
 #define AHCI_FIS_CTL_CTL            (0U<<AHCI_FIS_CTL_CMD_BIT)
 
 // Native Command Queuing
-typedef struct ahci_fis_ncq_t {
+struct ahci_fis_ncq_t {
     // FIS_TYPE_REG_H2D
     uint8_t fis_type;
 
@@ -191,7 +187,7 @@ typedef struct ahci_fis_ncq_t {
 
     // Auxiliary
     uint32_t aux;
-} ahci_fis_ncq_t;
+};
 
 //
 // ahci_fis_ncq_t::tag
@@ -227,8 +223,7 @@ typedef struct ahci_fis_ncq_t {
 #define AHCI_FIS_FUA_FUA        (1U<<AHCI_FIS_FUA_FUA_BIT)
 #define AHCI_FIS_FUA_LBA        (1U<<AHCI_FIS_FUA_LBA_BIT)
 
-typedef struct ahci_fis_d2h_t
-{
+struct ahci_fis_d2h_t {
     // FIS_TYPE_REG_D2H
     uint8_t fis_type;
 
@@ -265,12 +260,12 @@ typedef struct ahci_fis_d2h_t
     uint8_t rsv3[2];    // Reserved
 
     uint32_t rsv4;      // Reserved
-} ahci_fis_d2h_t;
+};
 
 #define AHCI_FIS_CTL_INTR_BIT   6
 #define AHCI_FIS_CTL_INTR       (1U<<AHCI_FIS_CTL_INTR_BIT)
 
-typedef struct ahci_pio_setup_t {
+struct ahci_pio_setup_t {
     // FIS_TYPE_PIO_SETUP
     uint8_t	fis_type;
 
@@ -308,9 +303,9 @@ typedef struct ahci_pio_setup_t {
     uint16_t tc;
     // Reserved
     uint16_t rsv4;
-} ahci_pio_setup_t;
+};
 
-typedef struct ahci_dma_setup_t {
+struct ahci_dma_setup_t {
     // FIS_TYPE_DMA_SETUP
     uint8_t	fis_type;
 
@@ -336,7 +331,7 @@ typedef struct ahci_dma_setup_t {
 
     //Reserved
     uint32_t rsv3;
-} ahci_dma_setup_t;
+};
 
 C_ASSERT(sizeof(ahci_dma_setup_t) == 0x1C);
 
@@ -348,7 +343,7 @@ C_ASSERT(sizeof(ahci_dma_setup_t) == 0x1C);
 
 // MMIO
 
-typedef enum ahci_sig_t {
+enum ahci_sig_t {
     // SATA drive
     SATA_SIG_ATA    = (int32_t)0x00000101,
 
@@ -360,11 +355,11 @@ typedef enum ahci_sig_t {
 
     // Port multiplier
     SATA_SIG_PM     = (int32_t)0x96690101
-} ahci_sig_t;
+};
 
 C_ASSERT(sizeof(ahci_sig_t) == 4);
 
-typedef struct hba_port_t {
+struct hba_port_t {
     // command list base address, 1K-byte aligned
     uint64_t cmd_list_base;
 
@@ -419,14 +414,13 @@ typedef struct hba_port_t {
 
     // vendor specific
     uint32_t vendor[4];
-} hba_port_t;
+};
 
 C_ASSERT(offsetof(hba_port_t, sata_act) == 0x34);
 C_ASSERT(sizeof(hba_port_t) == 0x80);
 
 // 0x00 - 0x2B, Generic Host Control
-typedef struct hba_host_ctl_t
-{
+struct hba_host_ctl_t {
     // Host capability
     uint32_t cap;
 
@@ -468,7 +462,7 @@ typedef struct hba_host_ctl_t
 
     // 0x100 - 0x10FF, Port control registers
     hba_port_t ports[32];	// 1 ~ 32
-} hba_host_ctl_t;
+};
 
 C_ASSERT(offsetof(hba_host_ctl_t, rsv) == 0x2C);
 C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
@@ -969,7 +963,7 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 #define ATA_IDENT_NCQ_DEP_n(n)  (((n) & ATA_IDENT_NCQ_DEP_MASK) + 1)
 
 // 4.2.1
-typedef struct hba_fis_t {
+struct hba_fis_t {
     // offset = 0x00
     ahci_dma_setup_t dsfis;
     uint8_t pad0[4];
@@ -992,7 +986,7 @@ typedef struct hba_fis_t {
     uint8_t ufis[64];
 
     uint8_t rsv[0x100-0xA0];
-} hba_fis_t;
+};
 
 C_ASSERT(offsetof(hba_fis_t, dsfis) == 0x00);
 C_ASSERT(offsetof(hba_fis_t, psfis) == 0x20);
@@ -1005,7 +999,7 @@ C_ASSERT(offsetof(hba_fis_t, rsv) == 0xA0);
 C_ASSERT(sizeof(hba_fis_t) == 0x100);
 
 // 4.2.2
-typedef struct hba_cmd_hdr_t {
+struct hba_cmd_hdr_t {
     // Header
     uint16_t hdr;
 
@@ -1019,7 +1013,7 @@ typedef struct hba_cmd_hdr_t {
     uint64_t ctba;
 
     uint32_t rsv[4];
-} hba_cmd_hdr_t;
+};
 
 C_ASSERT(sizeof(hba_cmd_hdr_t) == 32);
 
@@ -1074,46 +1068,46 @@ C_ASSERT(sizeof(hba_cmd_hdr_t) == 32);
 #define AHCI_CH_DBC_n(n)    (((n)<<1) | 1)
 
 // 4.2.3.3 Physical Region Descriptor Table Entry
-typedef struct hba_prdt_ent_t {
+struct hba_prdt_ent_t {
     // Data Base Address
     uint64_t dba;
     uint32_t rsv;
     // Data Byte Count
     uint32_t dbc_intr;
-} hba_prdt_ent_t;
+};
 
 // Makes command table entry 1KB
 #define AHCI_CMD_TBL_ENT_MAX_PRD 56
 
-typedef union hba_cmd_cfis_t {
+union hba_cmd_cfis_t {
     ahci_fis_d2h_t d2h;
     ahci_fis_h2d_t h2d;
     ahci_fis_ncq_t ncq;
     char filler[64];
-} hba_cmd_cfis_t;
+};
 
 // 4.2.3 1KB command
-typedef struct hba_cmd_tbl_ent_t {
+struct hba_cmd_tbl_ent_t {
     hba_cmd_cfis_t cfis;
     char atapi_fis[16];
     char filler[0x80-0x50];
 
     // At offset 0x80
     hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
-} hba_cmd_tbl_ent_t;
+};
 
 C_ASSERT(sizeof(hba_cmd_tbl_ent_t) == 1024);
 
 typedef void (*async_callback_fn_t)(int error, int done, uintptr_t arg);
 
-typedef struct async_callback_t {
+struct async_callback_t {
     async_callback_fn_t callback;
     uintptr_t callback_arg;
     int done;
     int error;
-} async_callback_t;
+};
 
-typedef struct hba_port_info_t {
+struct hba_port_info_t {
     hba_fis_t *fis;
     hba_cmd_hdr_t *cmd_hdr;
     hba_cmd_tbl_ent_t *cmd_tbl;
@@ -1130,15 +1124,29 @@ typedef struct hba_port_info_t {
 
     mutex_t slotalloc_lock;
     condition_var_t slotalloc_avail;
-} hba_port_info_t;
+};
 
 #define AHCI_PE_INTR_BIT    31
 #define AHCI_PE_DBC_BIT     1
 #define AHCI_PE_DBC_n(n)    ((n)-1)
 
 // AHCI interface instance
-struct ahci_if_t {
-    storage_if_vtbl_t *vtbl;
+struct ahci_if_t : public storage_if_base_t {
+    STORAGE_IF_IMPL
+
+    void rw(int port_num, uint64_t lba,
+            void *data, uint32_t count, int is_read,
+            async_callback_fn_t callback,
+            uintptr_t callback_arg);
+
+    int acquire_slot(int port_num);
+
+    void cmd_issue(
+            int port_num, unsigned slot,
+            hba_cmd_cfis_t *cfis, void *atapi_fis,
+            size_t fis_size, hba_prdt_ent_t *prdts, size_t ranges_count,
+            int is_read, async_callback_fn_t callback,
+            int done, uintptr_t callback_arg);
 
     pci_config_hdr_t config;
 
@@ -1159,7 +1167,11 @@ struct ahci_if_t {
 
 // Drive
 struct ahci_dev_t {
-    storage_dev_vtbl_t *vtbl;
+    STORAGE_DEV_IMPL
+
+    int io(void *data, uint64_t count,
+           uint64_t lba, int is_read);
+
     ahci_if_t *if_;
     int port;
     int is_atapi;
@@ -1207,9 +1219,9 @@ static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
 // Acquire slot that is not in use
 // Returns -1 if all slots are in use
 // Must be holding port spinlock
-static int ahci_acquire_slot(ahci_if_t *dev, int port_num)
+int ahci_if_t::acquire_slot(int port_num)
 {
-    hba_port_info_t *pi = dev->port_info + port_num;
+    hba_port_info_t *pi = port_info + port_num;
 
     for (;;) {
         // Build bitmask of slots in use
@@ -1217,8 +1229,8 @@ static int ahci_acquire_slot(ahci_if_t *dev, int port_num)
 
         // If every slot is busy
         if (busy_mask == 0xFFFFFFFF ||
-                (dev->num_cmd_slots < 32 &&
-                busy_mask == ((1U<<dev->num_cmd_slots)-1)))
+                (num_cmd_slots < 32 &&
+                busy_mask == ((1U<<num_cmd_slots)-1)))
             return -1;
 
         // Find first zero
@@ -1229,7 +1241,7 @@ static int ahci_acquire_slot(ahci_if_t *dev, int port_num)
             if (old_busy == atomic_cmpxchg(
                         &pi->cmd_issued, old_busy,
                         old_busy | (1U<<slot))) {
-                if (!dev->use_ncq) {
+                if (!use_ncq) {
                     // Write slot number to issue queue
                     pi->issue_queue[pi->issue_head] = slot;
                     pi->issue_head = (pi->issue_head + 1) & 31;
@@ -1245,7 +1257,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
 {
     hba_host_ctl_t volatile *hba = dev->mmio_base;
     hba_port_t volatile *port = hba->ports + port_num;
-    hba_port_info_t volatile *pi = dev->port_info + port_num;
+    hba_port_info_t *pi = dev->port_info + port_num;
 
     async_callback_t pending_callbacks[32];
     unsigned callback_count = 0;
@@ -1326,7 +1338,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     }
 }
 
-static void *ahci_irq_handler(int irq, void *ctx)
+static isr_context_t *ahci_irq_handler(int irq, isr_context_t *ctx)
 {
     for (unsigned i = 0; i < ahci_count; ++i) {
         ahci_if_t *dev = ahci_devices + i;
@@ -1404,17 +1416,15 @@ static void ahci_port_start_all(ahci_if_t *dev)
     }
 }
 
-static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
-                           hba_cmd_cfis_t *cfis, void *atapi_fis,
-                           size_t fis_size,
-                           hba_prdt_ent_t *prdts, size_t ranges_count,
-                           int is_read,
-                           async_callback_fn_t callback,
-                           int done,
-                           uintptr_t callback_arg)
+void ahci_if_t::cmd_issue(
+        int port_num, unsigned slot,
+        hba_cmd_cfis_t *cfis, void *atapi_fis,
+        size_t fis_size, hba_prdt_ent_t *prdts, size_t ranges_count,
+        int is_read, async_callback_fn_t callback,
+        int done, uintptr_t callback_arg)
 {
-    hba_port_info_t *pi = dev->port_info + port_num;
-    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+    hba_port_info_t *pi = port_info + port_num;
+    hba_port_t volatile *port = mmio_base->ports + port_num;
 
     hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
     hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
@@ -1443,7 +1453,7 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
 
     atomic_barrier();
 
-    if (dev->use_ncq)
+    if (use_ncq)
         port->sata_act = (1U<<slot);
 
     atomic_barrier();
@@ -1452,17 +1462,17 @@ static void ahci_cmd_issue(ahci_if_t *dev, int port_num, unsigned slot,
     spinlock_unlock_noirq(&pi->lock);
 }
 
-static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
-                      void *data, uint32_t count, int is_read,
-                      async_callback_fn_t callback,
-                      uintptr_t callback_arg)
+void ahci_if_t::rw(int port_num, uint64_t lba,
+                   void *data, uint32_t count, int is_read,
+                   async_callback_fn_t callback,
+                   uintptr_t callback_arg)
 {
     mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
     size_t ranges_count;
 
     hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
 
-    hba_port_info_t *pi = dev->port_info + port_num;
+    hba_port_info_t *pi = port_info + port_num;
 
     do {
         ranges_count = mphysranges(ranges, countof(ranges),
@@ -1485,7 +1495,7 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
         mutex_lock(&pi->slotalloc_lock);
         int slot;
         for (;;) {
-            slot = ahci_acquire_slot(dev, port_num);
+            slot = acquire_slot(port_num);
             if (slot >= 0)
                 break;
 
@@ -1533,7 +1543,7 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
             // LBA
             cfis.d2h.device = 0;
-        } else if (dev->use_ncq) {
+        } else if (use_ncq) {
             fis_size = sizeof(cfis.ncq);
 
             cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
@@ -1576,14 +1586,11 @@ static void ahci_rw(ahci_if_t *dev, int port_num, uint64_t lba,
 
         atomic_barrier();
 
-        ahci_cmd_issue(dev, port_num, (unsigned)slot,
-                       &cfis,
-                       pi->is_atapi ? atapifis : 0,
-                       fis_size,
-                       prdts, ranges_count, is_read,
-                       callback,
-                       count == transferred_blocks,
-                       callback_arg);
+        cmd_issue(port_num, (unsigned)slot,
+                  &cfis, pi->is_atapi ? atapifis : 0,
+                  fis_size, prdts, ranges_count, is_read,
+                  callback, count == transferred_blocks,
+                  callback_arg);
 
         data = (char*)data + transferred;
         lba += transferred_blocks;
@@ -1683,9 +1690,9 @@ static void ahci_rebase(ahci_if_t *dev)
                              addr_type, -1, 0);
         memset(buffers, 0, port_buffer_size);
 
-        hba_cmd_hdr_t *cmd_hdr = buffers;
-        hba_cmd_tbl_ent_t *cmd_tbl = (void*)(cmd_hdr + 32);
-        hba_fis_t *fis = (void*)(cmd_tbl + 32);
+        hba_cmd_hdr_t *cmd_hdr = (hba_cmd_hdr_t *)buffers;
+        hba_cmd_tbl_ent_t *cmd_tbl = (hba_cmd_tbl_ent_t*)(cmd_hdr + 32);
+        hba_fis_t *fis = (hba_fis_t*)(cmd_tbl + 32);
 
         // Store linear addresses for writing to buffers
         pi->fis = fis;
@@ -1763,7 +1770,7 @@ static void ahci_bios_handoff(ahci_if_t *dev)
         thread_yield();
 }
 
-static if_list_t ahci_if_detect(void)
+if_list_t ahci_if_t::detect(void)
 {
     unsigned start_at = ahci_count;
 
@@ -1819,11 +1826,9 @@ static if_list_t ahci_if_detect(void)
         if (ahci_count < countof(ahci_devices)) {
             ahci_if_t *self = ahci_devices + ahci_count++;
 
-            self->vtbl = &ahci_storage_if_device_vtbl;
-
             self->config = pci_iter.config;
 
-            self->mmio_base =
+            self->mmio_base = (hba_host_ctl_t*)
                     mmap((void*)(uintptr_t)pci_iter.config.base_addr[5],
                     0x1100, PROT_READ | PROT_WRITE,
                     MAP_PHYSICAL, -1, 0);
@@ -1875,10 +1880,8 @@ static if_list_t ahci_if_detect(void)
 //
 // device registration
 
-static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
+if_list_t ahci_if_t::detect_devices()
 {
-    STORAGE_IF_DEV_PTR(if_);
-
     unsigned start_at = ahci_drive_count;
 
     if_list_t list = {
@@ -1888,15 +1891,14 @@ static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
     };
 
     for (int port_num = 0; port_num < 32; ++port_num) {
-        if (!(self->ports_impl & (1U<<port_num)))
+        if (!(ports_impl & (1U<<port_num)))
             continue;
 
-        hba_port_t volatile *port = self->mmio_base->ports + port_num;
+        hba_port_t volatile *port = mmio_base->ports + port_num;
 
         if (port->sig == SATA_SIG_ATA || port->sig == SATA_SIG_ATAPI) {
             ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
-            drive->vtbl = &ahci_storage_dev_device_vtbl;
-            drive->if_ = self;
+            drive->if_ = this;
             drive->port = port_num;
             drive->is_atapi = (port->sig == SATA_SIG_ATAPI);
         }
@@ -1907,30 +1909,28 @@ static if_list_t ahci_if_detect_devices(storage_if_base_t *if_)
     return list;
 }
 
-static void ahci_if_cleanup(storage_if_base_t *dev)
+void ahci_if_t::cleanup()
 {
-    (void)dev;
 }
 
-static void ahci_dev_cleanup(storage_dev_base_t *dev)
+void ahci_dev_t::cleanup()
 {
-    STORAGE_DEV_DEV_PTR_UNUSED(dev);
 }
 
-typedef struct ahci_blocking_io_t {
+struct ahci_blocking_io_t {
     mutex_t lock;
     condition_var_t done_cond;
 
     int done;
     int err;
     uint64_t lba;
-} ahci_blocking_io_t;
+};
 
 static void ahci_async_complete(int error,
                                 int done,
                                 uintptr_t arg)
 {
-    ahci_blocking_io_t *state = (void*)arg;
+    ahci_blocking_io_t *state = (ahci_blocking_io_t*)arg;
 
     mutex_lock_noyield(&state->lock);
     if (error)
@@ -1941,12 +1941,9 @@ static void ahci_async_complete(int error,
         condvar_wake_one(&state->done_cond);
 }
 
-static int ahci_dev_io(storage_dev_base_t *dev,
-                       void *data, uint64_t count,
-                       uint64_t lba, int is_read)
+int ahci_dev_t::io(void *data, uint64_t count,
+                  uint64_t lba, int is_read)
 {
-    STORAGE_DEV_DEV_PTR(dev);
-
     ahci_blocking_io_t block_state;
     memset(&block_state, 0, sizeof(block_state));
 
@@ -1960,8 +1957,8 @@ static int ahci_dev_io(storage_dev_base_t *dev,
     block_state.err = 0;
     block_state.lba = lba;
 
-    ahci_rw(self->if_, self->port, lba, data, count, is_read,
-            ahci_async_complete, (uintptr_t)&block_state);
+    if_->rw(port, lba, data, count, is_read,
+       ahci_async_complete, (uintptr_t)&block_state);
 
     while (!block_state.done)
         condvar_wait(&block_state.done_cond, &block_state.lock);
@@ -1976,40 +1973,32 @@ static int ahci_dev_io(storage_dev_base_t *dev,
     return block_state.err;
 }
 
-static int ahci_dev_read_blocks(
-        storage_dev_base_t *dev,
+int ahci_dev_t::read_blocks(
         void *data, uint64_t count,
         uint64_t lba)
 {
-    return ahci_dev_io(dev, data, count, lba, 1);
+    return io(data, count, lba, 1);
 }
 
-static int ahci_dev_write_blocks(
-        storage_dev_base_t *dev,
+int ahci_dev_t::write_blocks(
         void const *data, uint64_t count,
         uint64_t lba)
 {
-    return ahci_dev_io(dev, (void*)data, count, lba, 0);
+    return io((void*)data, count, lba, 0);
 }
 
-static int ahci_dev_flush(storage_dev_base_t *dev)
+int ahci_dev_t::flush()
 {
-    STORAGE_DEV_DEV_PTR_UNUSED(dev);
     return 0;
 }
 
-static long ahci_dev_info(storage_dev_base_t *dev,
-                          storage_dev_info_t key)
+long ahci_dev_t::info(storage_dev_info_t key)
 {
-    STORAGE_DEV_DEV_PTR(dev);
     switch (key) {
     case STORAGE_INFO_BLOCKSIZE:
-        return self->if_->port_info[self->port].sector_size;
+        return if_->port_info[port].sector_size;
 
     default:
         return 0;
     }
 }
-
-REGISTER_storage_if_DEVICE(ahci);
-DEFINE_storage_dev_DEVICE(ahci);

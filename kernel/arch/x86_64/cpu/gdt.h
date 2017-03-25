@@ -1,23 +1,43 @@
 #pragma once
 #include "types.h"
 
-typedef struct gdt_entry_t {
+struct gdt_entry_t {
+    constexpr gdt_entry_t(uint64_t base, uint64_t limit,
+                          uint8_t access_, uint8_t flags_)
+        : limit_low(limit & 0xFFFF)
+        , base_low(base & 0xFFFF)
+        , base_middle((limit >> 16) & 0xFF)
+        , access(access_)
+        , flags_limit_high(flags_ | (limit >> 24))
+        , base_high(base >> 24)
+    {
+    }
+
     uint16_t limit_low;
     uint16_t base_low;
     uint8_t base_middle;
     uint8_t access;
     uint8_t flags_limit_high;
     uint8_t base_high;
-} gdt_entry_t;
+};
 
-typedef struct gdt_entry_tss_ldt_t {
+struct gdt_entry_tss_ldt_t {
+    constexpr gdt_entry_tss_ldt_t(uint64_t base)
+        : base_high2((base >> 32) & 0xFFFFFFFF)
+        , reserved(0)
+    {
+    }
+
     uint32_t base_high2;
     uint32_t reserved;
-} gdt_entry_tss_ldt_t;
+};
 
 typedef union gdt_entry_combined_t {
     gdt_entry_t mem;
     gdt_entry_tss_ldt_t tss_ldt;
+
+    gdt_entry_combined_t(gdt_entry_t e) : mem(e) {}
+    gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}
 } gdt_entry_combined_t;
 
 #define GDT_ACCESS_PRESENT_BIT   7
@@ -60,6 +80,20 @@ typedef union gdt_entry_combined_t {
     base, limit, present, privilege, \
     type, \
     granularity, is32, is64) \
+    gdt_entry_combined_t(gdt_entry_t(base, limit, \
+        ((present) ? GDT_ACCESS_PRESENT : 0) | \
+        GDT_ACCESS_DPL_n(privilege) | \
+        (type), \
+        ((granularity) ? GDT_FLAGS_GRAN : 0) | \
+        ((is32) ? GDT_FLAGS_IS32 : 0) | \
+        ((is64) ? GDT_FLAGS_IS64 : 0) | \
+        (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH)))
+
+#if 0
+#define GDT_MAKE_SEGMENT_DESCRIPTOR( \
+    base, limit, present, privilege, \
+    type, \
+    granularity, is32, is64) \
 { .mem = { \
     ((limit) & GDT_LIMIT_LOW_MASK), \
     ((base) & GDT_BASE_LOW_MASK), \
@@ -77,6 +111,7 @@ typedef union gdt_entry_combined_t {
     ), \
     (((base) >> GDT_BASE_HIGH_BIT) & GDT_BASE_HIGH) \
 } }
+#endif
 
 #define GDT_MAKE_CODEDATA_TYPE(executable, downward, rw) \
     ((1 << 4) | \
@@ -103,9 +138,14 @@ typedef union gdt_entry_combined_t {
     granularity, 0, 0)
 
 #define GDT_MAKE_TSS_HIGH_DESCRIPTOR(base) \
+    gdt_entry_combined_t(gdt_entry_tss_ldt_t(base))
+
+#if 0
+#define GDT_MAKE_TSS_HIGH_DESCRIPTOR(base) \
 { .tss_ldt = {  \
     (base) >> 32, 0 \
 } }
+#endif
 
 //
 // Generic descriptors

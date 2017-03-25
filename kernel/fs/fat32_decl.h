@@ -9,7 +9,7 @@
 // Sectors Per FAT	BPB_FATSz32	0x24	32 Bits	Depends on disk size
 // Root Directory First Cluster	BPB_RootClus	0x2C	32 Bits	Usually 0x00000002
 // Signature	(none)	0x1FE	16 Bits	Always 0xAA55
-typedef struct fat32_bpb_data_t {
+struct fat32_bpb_data_t {
     uint32_t root_dir_start;	// 0x2C LBA
     uint32_t sec_per_fat;		// 0x24 1 per 128 clusters
     uint16_t reserved_sectors;	// 0x0E Usually 32
@@ -21,7 +21,7 @@ typedef struct fat32_bpb_data_t {
     // Inferred from data in on-disk BPB
     uint32_t first_fat_lba;
     uint32_t cluster_begin_lba;
-} __attribute__((packed)) fat32_bpb_data_t;
+} __attribute__((packed));
 
 // 32 bit boundaries are marked with *
 // *-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*
@@ -47,7 +47,7 @@ typedef struct fat32_bpb_data_t {
 // .Filename (padded with spaces)                                  .
 // .................................................................
 //
-typedef struct fat32_dir_entry_t {
+struct fat32_dir_entry_t {
     // offset = 0x00
     char name[11];
 
@@ -83,7 +83,7 @@ typedef struct fat32_dir_entry_t {
 
     // offset = 0x1C
     uint32_t size;
-} fat32_dir_entry_t;
+};
 
 // DOS date bitfields
 //  4:0  Day (1-31)
@@ -118,7 +118,7 @@ typedef struct fat32_dir_entry_t {
 
 // https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#VFAT_long_file_names
 // encodes 13 UTF-16 codepoints per entry
-typedef struct fat32_long_dir_entry_t {
+struct fat32_long_dir_entry_t {
     // offset = 0x00
     uint8_t ordinal;
 
@@ -142,23 +142,23 @@ typedef struct fat32_long_dir_entry_t {
 
     // offset = 0x1C (2 UTF-16 characters)
     uint8_t name3[4];
-} fat32_long_dir_entry_t;
+};
 
-typedef union fat32_dir_union_t {
+union fat32_dir_union_t {
     fat32_dir_entry_t short_entry;
     fat32_long_dir_entry_t long_entry;
-} fat32_dir_union_t;
+};
 
-typedef struct fat32_lfn_fragment_t {
+struct fat32_lfn_fragment_t {
     uint8_t ordinal;
     uint16_t fragment[13];
-} fat32_lfn_fragment_t;
+};
 
-typedef struct filename_info_t {
+struct filename_info_t {
     uint8_t lowercase_flags;
     uint8_t filename_length;
     uint8_t extension_length;
-} filename_info_t;
+};
 
 static inline void fat32_parse_bpb(fat32_bpb_data_t *bpb,
                                    uint64_t partition_lba,

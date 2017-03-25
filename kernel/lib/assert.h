@@ -17,7 +17,7 @@ int assert_failed(char const *expr,
 
 // Compile-time assert
 #ifdef __cplusplus
-#define C_ASSERT(e) static_assert(e)
+#define C_ASSERT(e) static_assert(e, #e)
 #else
 #define C_ASSERT(e) typedef char __C_ASSERT__[(e)?1:-1]
 #endif

@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "cpu/idt.h"
 
 // Located nearby data touched in interrupt handling
 extern size_t sse_context_size;
@@ -23,7 +24,7 @@ typedef struct msi_irq_mem_t {
     uintptr_t data;
 } msi_irq_mem_t;
 
-typedef void *(*intr_handler_t)(int intr, void*);
+typedef isr_context_t *(*intr_handler_t)(int intr, isr_context_t*);
 
 typedef void (*irq_setmask_handler_t)(int irq, int unmask);
 typedef void (*irq_hook_handler_t)(int irq, intr_handler_t handler);
@@ -66,10 +67,10 @@ void intr_hook(int intr, intr_handler_t handler);
 void intr_unhook(int intr, intr_handler_t handler);
 
 // Call the interrupt handler
-void *intr_invoke(int intr, void *ctx);
+isr_context_t *intr_invoke(int intr, isr_context_t *ctx);
 
 // Call the appropriate interrupt vector for the specified irq
-void *irq_invoke(int intr, int irq, void *ctx);
+isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx);
 
 // Returns true if there is an interrupt handler for the interrupt
 int intr_has_handler(int intr);

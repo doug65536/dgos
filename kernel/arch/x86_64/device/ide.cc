@@ -10,15 +10,15 @@
 #include "time.h"
 #include "printk.h"
 
-DECLARE_storage_if_DEVICE(ide);
-
-typedef struct ide_chan_ports_t {
+struct ide_chan_ports_t {
     ioport_t cmd;
     ioport_t ctl;
     uint8_t irq;
-} ide_chan_ports_t;
+};
 
-struct ide_if_t {
+struct ide_if_t : public storage_if_base_t {
+    STORAGE_IF_IMPL
+
     storage_if_vtbl_t *vtbl;
 
     ide_chan_ports_t ports[2];
@@ -97,7 +97,7 @@ static size_t ide_if_count;
 #define ATA_REG_ALTSTATUS  0x0C
 #define ATA_REG_DEVADDRESS 0x0D
 
-static if_list_t ide_if_detect(void)
+if_list_t ide_if_t::detect(void)
 {
     unsigned start_at = ide_if_count;
 
@@ -126,8 +126,6 @@ static if_list_t ide_if_detect(void)
 
     do {
         ide_if_t *dev = ide_ifs + ide_if_count++;
-
-        dev->vtbl = &ide_storage_if_device_vtbl;
 
         dev->ports[0].cmd = (iter.config.base_addr[0] > 1)
                 ? iter.config.base_addr[0]
@@ -185,16 +183,12 @@ static if_list_t ide_if_detect(void)
     return list;
 }
 
-static void ide_if_cleanup(storage_if_base_t *i)
+void ide_if_t::cleanup()
 {
-    (void)i;
 }
 
-static if_list_t ide_if_detect_devices(storage_if_base_t *if_)
+if_list_t ide_if_t::detect_devices()
 {
     if_list_t list = {0, 0, 0};
-    (void)if_;
     return list;
 }
-
-REGISTER_storage_if_DEVICE(ide);

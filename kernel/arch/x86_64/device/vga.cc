@@ -338,7 +338,7 @@ static int vga_detect(text_display_base_t **result)
     self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
 
     // Map frame buffer
-    self->video_mem = mmap((void*)0xB8000, 0x8000,
+    self->video_mem = (uint16_t*)mmap((void*)0xB8000, 0x8000,
                            PROT_READ | PROT_WRITE,
                            MAP_PHYSICAL, -1, 0);
     self->cursor_on = 1;
@@ -352,7 +352,7 @@ static int vga_detect(text_display_base_t **result)
     self->mouse_y = self->height >> 1;
 
     // Off-screen shadow buffer
-    self->shadow = mmap(0,
+    self->shadow = (uint16_t*)mmap(0,
                         self->width * self->height *
                         sizeof(*self->shadow),
                         PROT_READ | PROT_WRITE,

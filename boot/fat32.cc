@@ -26,7 +26,7 @@ static uint16_t read_bpb(uint32_t partition_lba)
 {
     // Use extra large sector buffer to accomodate
     // arbitrary sector size, until sector size is known
-    sector_buffer = malloc(512);
+    sector_buffer = (char*)malloc(512);
 
     uint16_t err = read_lba_sectors(
                 sector_buffer,
@@ -497,7 +497,7 @@ static uint32_t find_file_by_name(char const *filename,
 
         lfn_entries = (encoded_len + 12) / 13;
 
-        match = calloc(lfn_entries, sizeof(*match));
+        match = (fat32_dir_union_t*)calloc(lfn_entries, sizeof(*match));
 
         // Fill in reverse order
         fat32_dir_union_t *match_fill = match + (lfn_entries - 1);
@@ -532,7 +532,7 @@ static uint32_t find_file_by_name(char const *filename,
         }
     } else {
         // Short filename optimization
-        match = malloc(sizeof(*match));
+        match = (fat32_dir_union_t*)malloc(sizeof(*match));
 
         fill_short_filename(match, filename);
 
@@ -639,7 +639,7 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
                 sector_offset,
                 sector_buffer);
 
-    char *output = buf;
+    char *output = (char*)buf;
 
     int total = 0;
     for (;;) {
@@ -678,7 +678,8 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 
 void fat32_boot_partition(uint32_t partition_lba)
 {
-    file_handles = calloc(MAX_HANDLES, sizeof(*file_handles));
+    file_handles = (fat32_sector_iterator_t *)calloc(
+                MAX_HANDLES, sizeof(*file_handles));
 
     paging_init();
 

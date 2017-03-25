@@ -1,4 +1,3 @@
-#define ETH_DEV_NAME rtl8139
 #include "rtl8139.h"
 #include "pci.h"
 #include "callout.h"
@@ -26,11 +25,88 @@
 #define RTL8139_TRACE(...) (void)0
 #endif
 
-DECLARE_eth_dev_DEVICE(rtl8139);
+//
+// MMIO
 
-typedef struct rtl8139_dev_t rtl8139_dev_t;
-struct rtl8139_dev_t {
-    eth_dev_vtbl_t *vtbl;
+#define RTL8139_MMIO_PTR(type, reg) \
+    (*(type volatile *)(((char*)mmio) + (reg)))
+
+#define RTL8139_MMIO(type, reg)     RTL8139_MMIO_PTR(type, reg)
+
+#define RTL8139_MM_WR_8(reg, val) \
+    rtl8139_mm_out_8(reg, val)
+
+#define RTL8139_MM_WR_16(reg, val) \
+    rtl8139_mm_out_16(reg, val)
+
+#define RTL8139_MM_WR_32(reg, val) \
+    rtl8139_mm_out_32(reg, val)
+
+#define RTL8139_MM_RD_8(reg) \
+    rtl8139_mm_in_8(reg)
+
+#define RTL8139_MM_RD_16(reg) \
+    rtl8139_mm_in_16(reg)
+
+#define RTL8139_MM_RD_32(reg) \
+    rtl8139_mm_in_32(reg)
+
+struct rtl8139_factory_t : public eth_factory_t {
+    virtual int detect(eth_dev_base_t ***result) = 0;
+};
+
+struct rtl8139_dev_t : public eth_dev_base_t {
+    ETH_DEV_IMPL
+
+    __attribute__((used))
+    inline void rtl8139_mm_out_8(uint32_t reg, uint8_t val)
+    {
+        RTL8139_MMIO(uint8_t, reg) = val;
+        atomic_barrier();
+    }
+
+    __attribute__((used))
+    inline void rtl8139_mm_out_16(uint32_t reg, uint16_t val)
+    {
+        RTL8139_MMIO(uint16_t, reg) = val;
+        atomic_barrier();
+    }
+
+    __attribute__((used))
+    inline void rtl8139_mm_out_32(uint32_t reg, uint32_t val)
+    {
+        RTL8139_MMIO(uint32_t, reg) = val;
+        atomic_barrier();
+    }
+
+    __attribute__((used))
+    inline uint8_t rtl8139_mm_in_8(uint32_t reg)
+    {
+        atomic_barrier();
+        return RTL8139_MMIO(uint8_t, reg);
+    }
+
+    __attribute__((used))
+    inline uint16_t rtl8139_mm_in_16(uint32_t reg)
+    {
+        atomic_barrier();
+        return RTL8139_MMIO(uint16_t, reg);
+    }
+
+    __attribute__((used))
+    inline uint32_t rtl8139_mm_in_32(uint32_t reg)
+    {
+        atomic_barrier();
+        return RTL8139_MMIO(uint32_t, reg);
+    }
+
+    void detect(pci_dev_iterator_t &pci_iter);
+
+    void tx_packet(int slot, ethq_pkt_t *pkt);
+    void rx_irq_handler(uint16_t isr);
+    void tx_irq_handler();
+    void irq_handler();
+    static isr_context_t *irq_dispatcher(int irq, isr_context_t *ctx);
 
     uintptr_t mmio_physaddr;
     void volatile *mmio;
@@ -527,82 +603,7 @@ typedef struct rtl8139_rx_hdr_t {
 // Receive OK
 #define RTL8139_RX_HDR_ROK          (1U<<RTL8139_RX_HDR_ROK_BIT)
 
-//
-// MMIO
-
-#define RTL8139_MMIO_PTR(ptr, type, reg) \
-    (*(type volatile *)(((char*)(ptr)->mmio) + (reg)))
-
-#define RTL8139_MMIO(type, reg)     RTL8139_MMIO_PTR(self, type, reg)
-
-#define RTL8139_MM_WR_8(reg, val) \
-    rtl8139_mm_out_8(self, reg, val)
-
-#define RTL8139_MM_WR_16(reg, val) \
-    rtl8139_mm_out_16(self, reg, val)
-
-#define RTL8139_MM_WR_32(reg, val) \
-    rtl8139_mm_out_32(self, reg, val)
-
-#define RTL8139_MM_RD_8(reg) \
-    rtl8139_mm_in_8(self, reg)
-
-#define RTL8139_MM_RD_16(reg) \
-    rtl8139_mm_in_16(self, reg)
-
-#define RTL8139_MM_RD_32(reg) \
-    rtl8139_mm_in_32(self, reg)
-
-__attribute__((used))
-static inline void rtl8139_mm_out_8(rtl8139_dev_t *self,
-                             uint32_t reg, uint8_t val)
-{
-    RTL8139_MMIO(uint8_t, reg) = val;
-    atomic_barrier();
-}
-
-__attribute__((used))
-static inline void rtl8139_mm_out_16(rtl8139_dev_t *self,
-                              uint32_t reg, uint16_t val)
-{
-    RTL8139_MMIO(uint16_t, reg) = val;
-    atomic_barrier();
-}
-
-__attribute__((used))
-static inline void rtl8139_mm_out_32(rtl8139_dev_t *self,
-                              uint32_t reg, uint32_t val)
-{
-    RTL8139_MMIO(uint32_t, reg) = val;
-    atomic_barrier();
-}
-
-__attribute__((used))
-static inline uint8_t rtl8139_mm_in_8(rtl8139_dev_t *self,
-                                      uint32_t reg)
-{
-    atomic_barrier();
-    return RTL8139_MMIO(uint8_t, reg);
-}
-
-__attribute__((used))
-static inline uint16_t rtl8139_mm_in_16(rtl8139_dev_t *self,
-                                        uint32_t reg)
-{
-    atomic_barrier();
-    return RTL8139_MMIO(uint16_t, reg);
-}
-
-__attribute__((used))
-static inline uint32_t rtl8139_mm_in_32(rtl8139_dev_t *self,
-                                        uint32_t reg)
-{
-    atomic_barrier();
-    return RTL8139_MMIO(uint32_t, reg);
-}
-
-static void rtl8139_tx_packet(rtl8139_dev_t *self,
-                              int slot, ethq_pkt_t *pkt)
+void rtl8139_dev_t::tx_packet(int slot, ethq_pkt_t *pkt)
 {
     assert(slot >= 0 && slot < 4);
     assert(pkt->size <= RTL8139_TSD_SIZE_MAX);
@@ -612,8 +613,8 @@ static void rtl8139_tx_packet(rtl8139_dev_t *self,
         pkt->size = 64;
     }
 
-    assert(!self->tx_pkts[slot]);
-    self->tx_pkts[slot] = pkt;
+    assert(!tx_pkts[slot]);
+    tx_pkts[slot] = pkt;
 
     RTL8139_TRACE("Transmitting packet addr=%p, len=%d slot=%d\n",
              (void*)pkt->physaddr, pkt->size, slot);
@@ -627,20 +628,20 @@ static void rtl8139_tx_packet(rtl8139_dev_t *self,
 //
 // IRQ handler
 
-static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
+void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
 {
     RTL8139_TRACE("IRQ: Rx OK\n");
 
     if (isr & RTL8139_IxR_RXOVW) {
         RTL8139_TRACE("IRQ Rx: RXOVW\n");
-        //self->rx_offset = 0;
+        //rx_offset = 0;
         //RTL8139_MM_WR_16(RTL8139_IO_CAPR,
-        //                 (uint16_t)self->rx_offset);
+        //                 (uint16_t)rx_offset);
     }
 
     rtl8139_rx_hdr_t hdr;
-    rtl8139_rx_hdr_t *hdr_ptr = (void*)
-            ((char*)self->rx_buffer + self->rx_offset);
+    rtl8139_rx_hdr_t *hdr_ptr = (rtl8139_rx_hdr_t*)
+            ((char*)rx_buffer + rx_offset);
 
     while (!(RTL8139_MM_RD_8(RTL8139_IO_CR) & RTL8139_CR_RXEMPTY)) {
         memcpy(&hdr, hdr_ptr, sizeof(hdr));
@@ -657,12 +658,12 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
 
             pkt->size = hdr.len - 4;
 
-            if (self->rx_offset + hdr.len + 4 < 65536) {
+            if (rx_offset + hdr.len + 4 < 65536) {
                 memcpy(&pkt->pkt, pkt_st, hdr.len);
             } else {
-                size_t partial = 65536 - self->rx_offset - 4;
+                size_t partial = 65536 - rx_offset - 4;
                 memcpy(&pkt->pkt, pkt_st, partial);
-                memcpy((char*)&pkt->pkt + partial, self->rx_buffer,
+                memcpy((char*)&pkt->pkt + partial, rx_buffer,
                        hdr.len - partial);
             }
 
@@ -684,27 +685,28 @@ static void rtl8139_rx_irq_handler(rtl8139_dev_t *self, uint16_t isr)
                         : "?""?""?=",
                     ether_type);
 
-            pkt->nic = (void*)self;
+            pkt->nic = (eth_dev_base_t *)this;
 
-            ethq_enqueue(&self->rx_queue, pkt);
+            ethq_enqueue(&rx_queue, pkt);
         }
 
         // Advance to next packet, skipping header, CRC,
         // and aligning to 32-bit boundary
-        self->rx_offset = (self->rx_offset + hdr.len +
+        rx_offset = (rx_offset + hdr.len +
                            sizeof(rtl8139_rx_hdr_t) + 3) & -4;
 
         // Update read pointer
-        if (self->rx_offset >= 65536)
-            self->rx_offset -= 65536;
+        if (rx_offset >= 65536)
+            rx_offset -= 65536;
 
-        hdr_ptr = (void*)((char*)self->rx_buffer + self->rx_offset);
+        hdr_ptr = (rtl8139_rx_hdr_t *)
+                ((char*)rx_buffer + rx_offset);
 
-        RTL8139_MM_WR_16(RTL8139_IO_CAPR, self->rx_offset - 16);
+        RTL8139_MM_WR_16(RTL8139_IO_CAPR, rx_offset - 16);
     }
 }
 
-static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
+void rtl8139_dev_t::tx_irq_handler()
 {
     RTL8139_TRACE("IRQ: Tx OK\n");
 
@@ -714,21 +716,21 @@ static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
     RTL8139_TRACE("RX IRQ TSAD=%x\n", tsad);
 
     for (int i = 0; i < 4; ++i,
-         (self->tx_tail = ((self->tx_tail + 1) & 3))) {
-        ethq_pkt_t *pkt = self->tx_pkts[self->tx_tail];
+         (tx_tail = ((tx_tail + 1) & 3))) {
+        ethq_pkt_t *pkt = tx_pkts[tx_tail];
 
         if (!pkt)
             break;
 
-        if (tsad & RTL8139_TSAD_TOK_n(self->tx_tail)) {
-            self->tx_pkts[self->tx_tail] = 0;
+        if (tsad & RTL8139_TSAD_TOK_n(tx_tail)) {
+            tx_pkts[tx_tail] = 0;
 
-            RTL8139_TRACE("IRQ: TOK slot=%d\n", self->tx_tail);
+            RTL8139_TRACE("IRQ: TOK slot=%d\n", tx_tail);
 
             // Ignore slots that are not transmitting a packet
             if (!pkt) {
                 RTL8139_TRACE("*** Spurious Tx OK IRQ"
-                         " for slot=%d\n", self->tx_tail);
+                         " for slot=%d\n", tx_tail);
                 continue;
             }
 
@@ -740,25 +742,25 @@ static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
             ethq_pkt_release(pkt);
 
             // Get another outgoing packet
-            pkt = ethq_dequeue(&self->tx_queue);
+            pkt = ethq_dequeue(&tx_queue);
 
-            //RTL8139_MM_WR_32(RTL8139_IO_TSD_n(self->tx_tail),
+            //RTL8139_MM_WR_32(RTL8139_IO_TSD_n(tx_tail),
             //                 0);
 
             // Transmit new packet
             if (pkt) {
-                assert(!self->tx_next[i]);
-                self->tx_next[i] = pkt;
+                assert(!tx_next[i]);
+                tx_next[i] = pkt;
             }
         }
 
-        if (tsad & RTL8139_TSAD_TABT_n(self->tx_tail)) {
+        if (tsad & RTL8139_TSAD_TABT_n(tx_tail)) {
             // Transmit aborted?
 
             // Ignore slots that are not transmitting a packet
             if (!pkt) {
                 RTL8139_TRACE("*** Spurious transmit aborted IRQ"
-                         " for slot=%d\n", self->tx_tail);
+                         " for slot=%d\n", tx_tail);
                 continue;
             }
 
@@ -773,13 +775,13 @@ static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
                 pkt->callback(pkt, 1, pkt->callback_arg);
         }
 
-        if (tsad & RTL8139_TSAD_TUN_n(self->tx_tail)) {
+        if (tsad & RTL8139_TSAD_TUN_n(tx_tail)) {
             // Transmit underrun?
 
             // Ignore slots that are not transmitting a packet
             if (!pkt) {
                 RTL8139_TRACE("*** Spurious transmit aborted IRQ"
-                         " for slot=%d\n", self->tx_tail);
+                         " for slot=%d\n", tx_tail);
                 continue;
             }
 
@@ -791,7 +793,7 @@ static void rtl8139_tx_irq_handler(rtl8139_dev_t *self)
     }
 }
 
-static void *rtl8139_irq_handler(int irq, void *ctx)
+isr_context_t *rtl8139_dev_t::irq_dispatcher(int irq, isr_context_t *ctx)
 {
     for (size_t i = 0; i < rtl8139_device_count; ++i) {
         rtl8139_dev_t *self = rtl8139_devices[i];
@@ -800,93 +802,96 @@ static void *rtl8139_irq_handler(int irq, void *ctx)
         if (unlikely(irq_offset < 0 || irq_offset >= self->irq_range.count))
             continue;
 
-        spinlock_lock_noyield(&self->lock);
-
-        uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
-
-        // Acknowledge everything
-        RTL8139_MM_WR_16(RTL8139_IO_ISR, isr);
-
-        ethq_pkt_t *rx_first = 0;
-
-        if (isr != 0) {
-            RTL8139_TRACE("IRQ status = %x\n", isr);
-
-            if (isr & RTL8139_IxR_SERR) {
-                RTL8139_TRACE("*** IRQ: System Error\n");
-            }
-
-            if (isr & RTL8139_IxR_TOK) {
-                rtl8139_tx_irq_handler(self);
-            }
-
-            if (isr & RTL8139_IxR_ROK) {
-                rtl8139_rx_irq_handler(self, isr);
-            }
-
-            if (isr & RTL8139_IxR_FOVW) {
-                RTL8139_TRACE("*** IRQ: Rx FIFO overflow\n");
-            }
-
-            if (isr & RTL8139_IxR_TER) {
-                RTL8139_TRACE("*** IRQ: Tx Error\n");
-            }
-
-            if (isr & RTL8139_IxR_RER) {
-                RTL8139_TRACE("*** IRQ: Rx Error\n");
-            }
-
-            if (isr & RTL8139_IxR_RXOVW) {
-                RTL8139_TRACE("*** IRQ: Rx Overflow Error\n");
-            }
-
-            // Dequeue all received packets inside spinlock
-            rx_first = ethq_dequeue_all(&self->rx_queue);
-
-            for (int n = 0; n < 4; ++n) {
-                if (!self->tx_next[n])
-                    continue;
-
-                self->tx_pkts[self->tx_head] = self->tx_next[n];
-                rtl8139_tx_packet(self, self->tx_head, self->tx_next[n]);
-                self->tx_next[n] = 0;
-                self->tx_head = ((self->tx_head + 1) & 3);
-            }
-        }
-
-        spinlock_unlock(&self->lock);
-
-        // Service the receive queue outside spinlock
-        if (rx_first) {
-            ethq_pkt_t *rx_next;
-            for (ethq_pkt_t *rx_packet = rx_first; rx_packet;
-                 rx_packet = rx_next) {
-                rx_next = rx_packet->next;
-                eth_frame_received(rx_packet);
-                ethq_pkt_release(rx_packet);
-            }
-        }
+        self->irq_handler();
     }
 
     return ctx;
 }
 
-static int rtl8139_send(eth_dev_base_t *dev, ethq_pkt_t *pkt)
+void rtl8139_dev_t::irq_handler()
 {
-    ETH_DEV_PTR(dev);
+    spinlock_lock_noyield(&lock);
 
-    spinlock_lock_noirq(&self->lock);
+    uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
 
-    memcpy(pkt->pkt.hdr.s_mac, self->mac_addr, 6);
+    // Acknowledge everything
+    RTL8139_MM_WR_16(RTL8139_IO_ISR, isr);
 
-    if (!self->tx_pkts[self->tx_head]) {
-        rtl8139_tx_packet(self, self->tx_head, pkt);
-        self->tx_head = (self->tx_head + 1) & 3;
-    } else {
-        ethq_enqueue(&self->tx_queue, pkt);
+    ethq_pkt_t *rx_first = 0;
+
+    if (isr != 0) {
+        RTL8139_TRACE("IRQ status = %x\n", isr);
+
+        if (isr & RTL8139_IxR_SERR) {
+            RTL8139_TRACE("*** IRQ: System Error\n");
+        }
+
+        if (isr & RTL8139_IxR_TOK) {
+            tx_irq_handler();
+        }
+
+        if (isr & RTL8139_IxR_ROK) {
+            rx_irq_handler(isr);
+        }
+
+        if (isr & RTL8139_IxR_FOVW) {
+            RTL8139_TRACE("*** IRQ: Rx FIFO overflow\n");
+        }
+
+        if (isr & RTL8139_IxR_TER) {
+            RTL8139_TRACE("*** IRQ: Tx Error\n");
+        }
+
+        if (isr & RTL8139_IxR_RER) {
+            RTL8139_TRACE("*** IRQ: Rx Error\n");
+        }
+
+        if (isr & RTL8139_IxR_RXOVW) {
+            RTL8139_TRACE("*** IRQ: Rx Overflow Error\n");
+        }
+
+        // Dequeue all received packets inside spinlock
+        rx_first = ethq_dequeue_all(&rx_queue);
+
+        for (int n = 0; n < 4; ++n) {
+            if (!tx_next[n])
+                continue;
+
+            tx_pkts[tx_head] = tx_next[n];
+            tx_packet(tx_head, tx_next[n]);
+            tx_next[n] = 0;
+            tx_head = ((tx_head + 1) & 3);
+        }
     }
 
-    spinlock_unlock_noirq(&self->lock);
+    spinlock_unlock(&lock);
+
+    // Service the receive queue outside spinlock
+    if (rx_first) {
+        ethq_pkt_t *rx_next;
+        for (ethq_pkt_t *rx_packet = rx_first; rx_packet;
+             rx_packet = rx_next) {
+            rx_next = rx_packet->next;
+            eth_frame_received(rx_packet);
+            ethq_pkt_release(rx_packet);
+        }
+    }
+}
+
+int rtl8139_dev_t::send(ethq_pkt_t *pkt)
+{
+    spinlock_lock_noirq(&lock);
+
+    memcpy(pkt->pkt.hdr.s_mac, mac_addr, 6);
+
+    if (!tx_pkts[tx_head]) {
+        tx_packet(tx_head, pkt);
+        tx_head = (tx_head + 1) & 3;
+    } else {
+        ethq_enqueue(&tx_queue, pkt);
+    }
+
+    spinlock_unlock_noirq(&lock);
 
     return 1;
 }
@@ -894,7 +899,7 @@ static int rtl8139_send(eth_dev_base_t *dev, ethq_pkt_t *pkt)
 //
 // Initialization
 
-static int rtl8139_detect(eth_dev_base_t ***devices)
+int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
 {
     pci_dev_iterator_t pci_iter;
 
@@ -924,177 +929,171 @@ static int rtl8139_detect(eth_dev_base_t ***devices)
                  pci_iter.config.base_addr[5],
                  pci_iter.config.irq_line);
 
-        rtl8139_dev_t *self = calloc(1, sizeof(rtl8139_dev_t));
+        rtl8139_dev_t *self = (rtl8139_dev_t*)calloc(1, sizeof(rtl8139_dev_t));
 
-        self->vtbl = &rtl8139_eth_dev_device_vtbl;
-
-        rtl8139_devices = realloc(rtl8139_devices,
+        rtl8139_devices = (rtl8139_dev_t**)realloc(rtl8139_devices,
                                   sizeof(*rtl8139_devices) *
                                   (rtl8139_device_count + 1));
         rtl8139_devices[rtl8139_device_count++] = self;
 
-        self->mmio_physaddr = pci_iter.config.base_addr[1] & -16;
-
-        self->mmio = mmap((void*)self->mmio_physaddr, 256,
-                          PROT_READ | PROT_WRITE,
-                          MAP_PHYSICAL, -1, 0);
-
-        // Enable MMIO and bus master, disable port I/O
-        pci_adj_control_bits(pci_iter.bus, pci_iter.slot,
-                             pci_iter.func,
-                             PCI_CMD_BUSMASTER |
-                             PCI_CMD_MEMEN,
-                             PCI_CMD_IOEN);
-
-        // Power on
-        RTL8139_MM_WR_8(RTL8139_IO_CONFIG1, 0);
-
-        // Reset
-        RTL8139_MM_WR_8(RTL8139_IO_CR, RTL8139_CR_RST);
-
-        // Allocate contiguous rx buffer
-        self->rx_buffer_physaddr = mm_alloc_contiguous(65536 + 16);
-
-        // Map rx buffer physical memory
-        self->rx_buffer = mmap(self->rx_buffer_physaddr, 65536 + 16,
-                               PROT_READ, MAP_PHYSICAL,
-                               -1, 0);
-
-        // Wait for reset to finish
-        while ((RTL8139_MM_RD_8(RTL8139_IO_CR) &
-                RTL8139_CR_RST) != 0)
-            pause();
-
-        // Read MAC address
-        uint32_t mac_hi;
-        uint32_t mac_lo;
-        mac_hi = RTL8139_MM_RD_32(RTL8139_IO_IDR_HI);
-        mac_lo = RTL8139_MM_RD_32(RTL8139_IO_IDR_LO);
-
-        memcpy(self->mac_addr + 4, &mac_lo, sizeof(uint16_t));
-        memcpy(self->mac_addr, &mac_hi, sizeof(uint32_t));
-
-        // Restore BIOS assigned IRQ
-        self->irq_range.base = pci_iter.config.irq_line;
-        self->irq_range.count = 1;
-
-        // Use MSI IRQ if possible
-        self->use_msi = pci_set_msi_irq(
-                    pci_iter.bus, pci_iter.slot, pci_iter.func,
-                    &self->irq_range, 1, 0, 0, rtl8139_irq_handler);
-
-        if (!self->use_msi) {
-            // Plain IRQ pin
-            pci_set_irq_pin(pci_iter.bus, pci_iter.slot,
-                            pci_iter.func,
-                            pci_iter.config.irq_pin);
-            pci_set_irq_line(pci_iter.bus, pci_iter.slot,
-                             pci_iter.func,
-                             pci_iter.config.irq_line);
-
-            irq_hook(pci_iter.config.irq_line, rtl8139_irq_handler);
-            irq_setmask(pci_iter.config.irq_line, 1);
-        }
-
-        // Reset receive ring buffer offset
-        self->rx_offset = 0;
-        RTL8139_MM_WR_16(RTL8139_IO_CAPR, 0);
-
-        // Set rx buffer physical address
-        RTL8139_MM_WR_32(RTL8139_IO_RBSTART,
-                         (uint32_t)(uintptr_t)self->rx_buffer_physaddr);
-
-        // Set tx buffer physical addresses
-        for (unsigned i = 0; i < 4; ++i)
-            RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(i), 0);
-
-        // Enable rx and tx
-        RTL8139_MM_WR_8(RTL8139_IO_CR,
-                        RTL8139_CR_RXEN |
-                        RTL8139_CR_TXEN);
-
-        RTL8139_MM_WR_32(RTL8139_IO_RCR,
-                         // Early rx threshold 8=50%
-                         RTL8139_RCR_ERTH_n(8) |
-                         // Rx FIFO threshold 5=512 bytes
-                         RTL8139_RCR_RXFTH_n(5) |
-                         // Receive buffer length 3=64KB+16
-                         RTL8139_RCR_RBLEN_n(3) |
-                         // Max rx DMA 7=unlimited
-                         RTL8139_RCR_MXDMA_n(7) |
-                         // Accept broadcast
-                         RTL8139_RCR_AB |
-                         // Accept multicast
-                         RTL8139_RCR_AM |
-                         // Accept physical match
-                         RTL8139_RCR_APM);
-
-        // Tx configuration
-        RTL8139_MM_WR_32(RTL8139_IO_TCR,
-                         RTL8139_TCR_CRC |
-                         RTL8139_TCR_IFG_n(3) |
-                         RTL8139_TCR_TXRR_n(0) |
-                         RTL8139_TCR_MXDMA_n(7) |
-                         RTL8139_TCR_LBK_n(0));
-
-        uint16_t unmask =
-                RTL8139_IxR_SERR |
-                RTL8139_IxR_TIMEOUT |
-                RTL8139_IxR_FOVW |
-                RTL8139_IxR_PUNLC |
-                RTL8139_IxR_RXOVW |
-                RTL8139_IxR_TER |
-                RTL8139_IxR_TOK |
-                RTL8139_IxR_RER |
-                RTL8139_IxR_ROK;
-
-        // Acknowledge IRQs
-        //RTL8139_MM_WR_16(RTL8139_IO_ISR, unmask);
-
-        // Unmask IRQs
-        RTL8139_MM_WR_16(RTL8139_IO_IMR, unmask);
+        self->detect(pci_iter);
     } while (pci_enumerate_next(&pci_iter));
 
-    *devices = (void*)rtl8139_devices;
+    *devices = (eth_dev_base_t**)rtl8139_devices;
     return rtl8139_device_count;
 }
 
-static void rtl8139_get_mac(eth_dev_base_t *dev, void *mac_addr)
+void rtl8139_dev_t::detect(pci_dev_iterator_t &pci_iter)
 {
-    ETH_DEV_PTR(dev);
+    mmio_physaddr = pci_iter.config.base_addr[1] & -16;
 
-    memcpy(mac_addr, self->mac_addr, 6);
+    mmio = mmap((void*)mmio_physaddr, 256,
+                      PROT_READ | PROT_WRITE,
+                      MAP_PHYSICAL, -1, 0);
+
+    // Enable MMIO and bus master, disable port I/O
+    pci_adj_control_bits(pci_iter.bus, pci_iter.slot,
+                         pci_iter.func,
+                         PCI_CMD_BUSMASTER |
+                         PCI_CMD_MEMEN,
+                         PCI_CMD_IOEN);
+
+    // Power on
+    RTL8139_MM_WR_8(RTL8139_IO_CONFIG1, 0);
+
+    // Reset
+    RTL8139_MM_WR_8(RTL8139_IO_CR, RTL8139_CR_RST);
+
+    // Allocate contiguous rx buffer
+    rx_buffer_physaddr = mm_alloc_contiguous(65536 + 16);
+
+    // Map rx buffer physical memory
+    rx_buffer = mmap(rx_buffer_physaddr, 65536 + 16,
+                           PROT_READ, MAP_PHYSICAL,
+                           -1, 0);
+
+    // Wait for reset to finish
+    while ((RTL8139_MM_RD_8(RTL8139_IO_CR) &
+            RTL8139_CR_RST) != 0)
+        pause();
+
+    // Read MAC address
+    uint32_t mac_hi;
+    uint32_t mac_lo;
+    mac_hi = RTL8139_MM_RD_32(RTL8139_IO_IDR_HI);
+    mac_lo = RTL8139_MM_RD_32(RTL8139_IO_IDR_LO);
+
+    memcpy(mac_addr + 4, &mac_lo, sizeof(uint16_t));
+    memcpy(mac_addr, &mac_hi, sizeof(uint32_t));
+
+    // Restore BIOS assigned IRQ
+    irq_range.base = pci_iter.config.irq_line;
+    irq_range.count = 1;
+
+    // Use MSI IRQ if possible
+    use_msi = pci_set_msi_irq(
+                pci_iter.bus, pci_iter.slot, pci_iter.func,
+                &irq_range, 1, 0, 0, &rtl8139_dev_t::irq_dispatcher);
+
+    if (!use_msi) {
+        // Plain IRQ pin
+        pci_set_irq_pin(pci_iter.bus, pci_iter.slot,
+                        pci_iter.func,
+                        pci_iter.config.irq_pin);
+        pci_set_irq_line(pci_iter.bus, pci_iter.slot,
+                         pci_iter.func,
+                         pci_iter.config.irq_line);
+
+        irq_hook(pci_iter.config.irq_line, rtl8139_dev_t::irq_dispatcher);
+        irq_setmask(pci_iter.config.irq_line, 1);
+    }
+
+    // Reset receive ring buffer offset
+    rx_offset = 0;
+    RTL8139_MM_WR_16(RTL8139_IO_CAPR, 0);
+
+    // Set rx buffer physical address
+    RTL8139_MM_WR_32(RTL8139_IO_RBSTART,
+                     (uint32_t)(uintptr_t)rx_buffer_physaddr);
+
+    // Set tx buffer physical addresses
+    for (unsigned i = 0; i < 4; ++i)
+        RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(i), 0);
+
+    // Enable rx and tx
+    RTL8139_MM_WR_8(RTL8139_IO_CR,
+                    RTL8139_CR_RXEN |
+                    RTL8139_CR_TXEN);
+
+    RTL8139_MM_WR_32(RTL8139_IO_RCR,
+                     // Early rx threshold 8=50%
+                     RTL8139_RCR_ERTH_n(8) |
+                     // Rx FIFO threshold 5=512 bytes
+                     RTL8139_RCR_RXFTH_n(5) |
+                     // Receive buffer length 3=64KB+16
+                     RTL8139_RCR_RBLEN_n(3) |
+                     // Max rx DMA 7=unlimited
+                     RTL8139_RCR_MXDMA_n(7) |
+                     // Accept broadcast
+                     RTL8139_RCR_AB |
+                     // Accept multicast
+                     RTL8139_RCR_AM |
+                     // Accept physical match
+                     RTL8139_RCR_APM);
+
+    // Tx configuration
+    RTL8139_MM_WR_32(RTL8139_IO_TCR,
+                     RTL8139_TCR_CRC |
+                     RTL8139_TCR_IFG_n(3) |
+                     RTL8139_TCR_TXRR_n(0) |
+                     RTL8139_TCR_MXDMA_n(7) |
+                     RTL8139_TCR_LBK_n(0));
+
+    uint16_t unmask =
+            RTL8139_IxR_SERR |
+            RTL8139_IxR_TIMEOUT |
+            RTL8139_IxR_FOVW |
+            RTL8139_IxR_PUNLC |
+            RTL8139_IxR_RXOVW |
+            RTL8139_IxR_TER |
+            RTL8139_IxR_TOK |
+            RTL8139_IxR_RER |
+            RTL8139_IxR_ROK;
+
+    // Acknowledge IRQs
+    //RTL8139_MM_WR_16(RTL8139_IO_ISR, unmask);
+
+    // Unmask IRQs
+    RTL8139_MM_WR_16(RTL8139_IO_IMR, unmask);
 }
 
-static void rtl8139_set_mac(eth_dev_base_t *dev, void const *mac_addr)
+void rtl8139_dev_t::get_mac(void *mac_addr_ret)
 {
-    ETH_DEV_PTR(dev);
+    memcpy(mac_addr_ret, mac_addr, 6);
+}
 
-    memcpy(self->mac_addr, mac_addr, 6);
+void rtl8139_dev_t::set_mac(void const *mac_addr_set)
+{
+    memcpy(mac_addr, mac_addr_set, 6);
 
     uint32_t mac_hi;
     uint32_t mac_lo;
 
-    memcpy(&mac_lo, self->mac_addr + 4, sizeof(uint16_t));
-    memcpy(&mac_hi, self->mac_addr, sizeof(uint32_t));
+    memcpy(&mac_lo, mac_addr + 4, sizeof(uint16_t));
+    memcpy(&mac_hi, mac_addr, sizeof(uint32_t));
 
     RTL8139_MM_WR_32(RTL8139_IO_IDR_HI, mac_hi);
     RTL8139_MM_WR_32(RTL8139_IO_IDR_LO, mac_lo);
 }
 
-static int rtl8139_get_promiscuous(eth_dev_base_t *dev)
+int rtl8139_dev_t::get_promiscuous()
 {
-    ETH_DEV_PTR(dev);
-
     return !!(RTL8139_MM_RD_32(RTL8139_IO_RCR) &
             RTL8139_RCR_AAP);
 }
 
-static void rtl8139_set_promiscuous(eth_dev_base_t *dev,
-                                    int promiscuous)
+void rtl8139_dev_t::set_promiscuous(int promiscuous)
 {
-    ETH_DEV_PTR(dev);
-
     RTL8139_MM_WR_32(RTL8139_IO_RCR,
                      (RTL8139_MM_RD_32(RTL8139_IO_RCR) &
                      ~RTL8139_RCR_AAP) |
@@ -1136,5 +1135,3 @@ static void rtl8139_startup_hack(void *p)
 }
 REGISTER_CALLOUT(rtl8139_startup_hack, 0, 'L', "000");
 #endif
-
-REGISTER_eth_dev_DEVICE(rtl8139);

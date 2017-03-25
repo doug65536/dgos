@@ -67,7 +67,7 @@ C_ASSERT(sizeof(heap_t) == PAGESIZE);
 
 heap_t *heap_create(void)
 {
-    heap_t *heap = mmap(0, sizeof(heap_t),
+    heap_t *heap = (heap_t*)mmap(0, sizeof(heap_t),
                         PROT_READ | PROT_WRITE, 0, -1, 0);
     memset(heap->free_chains, 0, sizeof(heap->free_chains));
     memset(heap->arenas, 0, sizeof(heap->arenas));
@@ -120,8 +120,8 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
         // Create a new arena overflow page
         heap_ext_arena_t *new_list;
 
-        new_list = mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
-                        0, -1, 0);
+        new_list = (heap_ext_arena_t*)mmap(
+                    0, PAGESIZE, PROT_READ | PROT_WRITE, 0, -1, 0);
         if (!new_list || new_list == MAP_FAILED)
             return 0;
 
@@ -135,7 +135,7 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
 
     size_t bucket = log2size - 5;
 
-    char *arena = mmap(0, HEAP_BUCKET_SIZE,
+    char *arena = (char*)mmap(0, HEAP_BUCKET_SIZE,
                        PROT_READ | PROT_WRITE,
                        MAP_POPULATE, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
@@ -147,7 +147,7 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
     heap_hdr_t *hdr = 0;
     heap_hdr_t *first_free = heap->free_chains[bucket];
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
-        hdr = (void*)fill;
+        hdr = (heap_hdr_t*)fill;
         hdr->size_next = (uintptr_t)first_free;
         first_free = hdr;
     }
@@ -170,7 +170,7 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
 
 static void *heap_large_alloc(size_t size)
 {
-    heap_hdr_t *hdr = mmap(0, size,
+    heap_hdr_t *hdr = (heap_hdr_t*)mmap(0, size,
                            PROT_READ | PROT_WRITE,
                            0, -1, 0);
     hdr->size_next = size;
@@ -221,7 +221,7 @@ void *heap_alloc(heap_t *heap, size_t size)
     }
 
     // Remove block from chain
-    heap->free_chains[bucket] = (void*)first_free->size_next;
+    heap->free_chains[bucket] = (heap_hdr_t*)first_free->size_next;
 
     mutex_unlock(&heap->lock);
     cpu_irq_toggle(intr_enabled);

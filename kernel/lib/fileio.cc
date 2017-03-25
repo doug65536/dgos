@@ -22,7 +22,7 @@ static void file_init(void *p)
 {
     (void)p;
     file_capacity = 16;
-    files = mmap(0, sizeof(file_handle_t) * file_capacity,
+    files = (file_handle_t*)mmap(0, sizeof(file_handle_t) * file_capacity,
                  PROT_READ | PROT_WRITE,
                  0, -1, 0);
 }
@@ -37,7 +37,7 @@ static file_handle_t *file_new_fd(void)
 {
     for (size_t i = 1; i < file_capacity; ++i)
         if (!files[i].fs)
-            return memset(files + i, 0, sizeof(*files));
+            return (file_handle_t*)memset(files + i, 0, sizeof(*files));
     return 0;
 }
 
@@ -61,7 +61,7 @@ int file_open(const char *path)
 
     file_handle_t *fh = file_new_fd();
 
-    int status = fs->vtbl->open(fs, &fh->fi, path);
+    int status = fs->open(&fh->fi, path);
     if (status < 0)
         return -1;
 
@@ -79,7 +79,7 @@ int file_close(int fd)
     if (!fh)
         return -1;
 
-    fh->fs->vtbl->release(fh->fs, fh->fi);
+    fh->fs->release(fh->fi);
 
     free(fh->path);
 
@@ -94,7 +94,7 @@ ssize_t file_pread(int fd, void *buf, size_t bytes, off_t ofs)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->read(fh->fs, fh->fi, buf, bytes, ofs);
+    return fh->fs->read(fh->fi, (char*)buf, bytes, ofs);
 }
 
 ssize_t file_pwrite(int fd, void *buf, size_t bytes, off_t ofs)
@@ -103,7 +103,7 @@ ssize_t file_pwrite(int fd, void *buf, size_t bytes, off_t ofs)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->write(fh->fs, fh->fi, buf, bytes, ofs);
+    return fh->fs->write(fh->fi, (char*)buf, bytes, ofs);
 }
 
 int file_syncfs(int fd)
@@ -112,7 +112,7 @@ int file_syncfs(int fd)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->flush(fh->fs, fh->fi);
+    return fh->fs->flush(fh->fi);
 }
 
 off_t file_seek(int fd, off_t ofs, int whence)
@@ -140,7 +140,7 @@ off_t file_seek(int fd, off_t ofs, int whence)
 
     case SEEK_HOLE: // fall through
     case SEEK_END:
-        if (fh->fs->vtbl->fstat(fh->fs, fh->fi, &st) < 0)
+        if (fh->fs->fstat(fh->fi, &st) < 0)
             return -1;
 
         if (st.st_size + ofs < 0)
@@ -166,7 +166,7 @@ int file_ftruncate(int fd, off_t size)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->ftruncate(fh->fs, fh->fi, size);
+    return fh->fs->ftruncate(fh->fi, size);
 }
 
 ssize_t file_read(int fd, void *buf, size_t bytes)
@@ -175,8 +175,7 @@ ssize_t file_read(int fd, void *buf, size_t bytes)
     if (!fh)
         return -1;
 
-    ssize_t size = fh->fs->vtbl->read(fh->fs, fh->fi,
-                                      buf, bytes, fh->pos);
+    ssize_t size = fh->fs->read(fh->fi, (char*)buf, bytes, fh->pos);
     if (size >= 0)
         fh->pos += size;
 
@@ -189,8 +188,7 @@ ssize_t file_write(int fd, void const *buf, size_t bytes)
     if (!fh)
         return -1;
 
-    ssize_t size = fh->fs->vtbl->write(fh->fs, fh->fi,
-                                       buf, bytes, fh->pos);
+    ssize_t size = fh->fs->write(fh->fi, (char*)buf, bytes, fh->pos);
     if (size >= 0)
         fh->pos += size;
 
@@ -203,7 +201,7 @@ int file_sync(int fd)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->fsync(fh->fs, fh->fi, 0);
+    return fh->fs->fsync(fh->fi, 0);
 }
 
 int file_datasync(int fd)
@@ -212,7 +210,7 @@ int file_datasync(int fd)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->fsync(fh->fs, fh->fi, 1);
+    return fh->fs->fsync(fh->fi, 1);
 }
 
 int file_opendir(char const *path)
@@ -225,7 +223,7 @@ int file_opendir(char const *path)
     file_handle_t *fh = file_new_fd();
     fh->fs = fs;
 
-    int status = fh->fs->vtbl->opendir(fh->fs, &fh->fi, path);
+    int status = fh->fs->opendir(&fh->fi, path);
     if (status < 0)
         return -1;
 
@@ -243,7 +241,7 @@ ssize_t file_readdir_r(int fd, dirent_t *buf, dirent_t **result)
     if (!fh)
         return -1;
 
-    ssize_t size = fh->fs->vtbl->readdir(fh->fs, fh->fi, buf, fh->pos);
+    ssize_t size = fh->fs->readdir(fh->fi, buf, fh->pos);
 
     *result = 0;
     if (size < 0)
@@ -279,7 +277,7 @@ int file_closedir(int fd)
     if (!fh)
         return -1;
 
-    return fh->fs->vtbl->releasedir(fh->fs, fh->fi);
+    return fh->fs->releasedir(fh->fi);
 }
 
 int file_mkdir(const char *path, mode_t mode)
@@ -289,7 +287,7 @@ int file_mkdir(const char *path, mode_t mode)
     if (!fs)
         return -1;
 
-    return fs->vtbl->mkdir(fs, path, mode);
+    return fs->mkdir(path, mode);
 }
 
 int file_rmdir(const char *path)
@@ -299,7 +297,7 @@ int file_rmdir(const char *path)
     if (!fs)
         return -1;
 
-    return fs->vtbl->rmdir(fs, path);
+    return fs->rmdir(path);
 }
 
 int file_rename(const char *old_path, const char *new_path)
@@ -309,7 +307,7 @@ int file_rename(const char *old_path, const char *new_path)
     if (!fs)
         return -1;
 
-    return fs->vtbl->rename(fs, old_path, new_path);
+    return fs->rename(old_path, new_path);
 }
 
 int file_unlink(const char *path)
@@ -319,7 +317,7 @@ int file_unlink(const char *path)
     if (!fs)
         return -1;
 
-    return fs->vtbl->unlink(fs, path);
+    return fs->unlink(path);
 }
 
 void file_autoclose(int *fd)

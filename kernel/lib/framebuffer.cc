@@ -47,7 +47,8 @@ void fb_init(void)
     // Round the back buffer size up to a multiple of the cache size
     screen_size = (screen_size + 63) & -64;
 
-    fb.back_buf = mmap(0, screen_size, PROT_READ | PROT_WRITE, 0, -1, 0);
+    fb.back_buf = (uint8_t*)mmap(0, screen_size, PROT_READ | PROT_WRITE,
+                                 0, -1, 0);
     fb.video_mem = (uint8_t*)(uintptr_t)fb.mode.framebuffer_addr;
 
     madvise(fb.video_mem, screen_size, MADV_WEAKORDER);
@@ -267,7 +268,9 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
     int incrS = 2 * dv;
     int incrD = 2 * (dv - du);
     int twovdu = 0;
-    float invD = 1.0f / (2.0f * sqrtf(du*du + dv*dv));
+    float fdu = (float)du;
+    float fdv = (float)dv;
+    float invD = 1.0f / (2.0f * sqrtf(fdu*fdu + fdv*fdv));
     float invD2du = 2.0f * (du * invD);
 
     do

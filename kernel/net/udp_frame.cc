@@ -29,14 +29,14 @@ static void udp_handle_tbl_init(void)
 
 void udp_frame_received(ethq_pkt_t *pkt)
 {
-    udp_hdr_t const *p = (void*)pkt;
+    udp_hdr_t const *p = (udp_hdr_t*)pkt;
 
     ipv4_addr_pair_t pair;
 
     udp_port_get(&pair, p);
     ipv4_ip_get(&pair, &p->ipv4_hdr);
 
-    udp_bind_t *bind = htbl_lookup(&udp_addr_lookup, &pair);
+    udp_bind_t *bind = (udp_bind_t*)htbl_lookup(&udp_addr_lookup, &pair);
 
     (void)bind;
     (void)p;
@@ -45,7 +45,7 @@ void udp_frame_received(ethq_pkt_t *pkt)
 int udp_bind(ipv4_addr_pair_t const *pair)
 {
     int handle = atomic_xadd(&next_handle, 1);
-    udp_bind_t *bind = malloc(sizeof(*bind));
+    udp_bind_t *bind = (udp_bind_t*)malloc(sizeof(*bind));
     bind->handle = handle;
     bind->pair = *pair;
     return htbl_insert(&udp_handle_lookup, bind) &&

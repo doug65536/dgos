@@ -1,3 +1,3 @@
 #pragma once
 
-void e9debug_init(void);
+extern "C" void e9debug_init(void);

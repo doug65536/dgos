@@ -1,24 +1,24 @@
 # Make bootloader
 
 CSRCS := \
-	bootsect.c \
-	screen.c \
-	fs.c \
-	fat32.c \
-	iso9660.c \
-	cpu.c \
-	malloc.c \
-	string.c \
-	utf.c \
-	paging.c \
-	elf64.c \
-	rand.c \
-	physmem.c \
-	farptr.c \
-	vesa.c \
-	progressbar.c \
-	driveinfo.c \
-	debug.c
+	bootsect.cc \
+	screen.cc \
+	fs.cc \
+	fat32.cc \
+	iso9660.cc \
+	cpu.cc \
+	malloc.cc \
+	string.cc \
+	utf.cc \
+	paging.cc \
+	elf64.cc \
+	rand.cc \
+	physmem.cc \
+	farptr.cc \
+	vesa.cc \
+	progressbar.cc \
+	driveinfo.cc \
+	debug.cc
 
 ASRCS := \
 	part.s \
@@ -84,7 +84,7 @@ QEMU_NET := \
 #$(info $(LIBGCCNAME))
 
 AOBJS := $(ASRCS:.s=.o)
-COBJS := $(CSRCS:.c=.o)
+COBJS := $(CSRCS:.cc=.o)
 
 OBJS := $(AOBJS) $(COBJS)
 
@@ -97,7 +97,7 @@ CFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions \
 	-mrtd -mregparm=3 \
-	-std=c11
+	-std=c++14
 
 ifeq ($(CC),clang)
 	CC := gcc
@@ -158,16 +158,16 @@ OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect-debug.disasm \
 	$(DUMPDIR)/bootsect.hex
 
-NEEDSMALLEST := bootsect.c
-NOOPTIMIZE := iso9660.c elf64.c cpu.c
+NEEDSMALLEST := bootsect.cc
+NOOPTIMIZE := iso9660.cc elf64.cc cpu.cc
 
 DISKIMAGE := $(DISKIMGDIR)/dgos.fat32.raw
 
 LDFLAGS := -m i386linux -no-stdlib -M -T bootsect.ld
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
-$(NEEDSMALLEST:.c=.o): CFLAGS += -Os -DNDEBUG
-$(NOOPTIMIZE:.c=.o): CFLAGS += -O0
+$(NEEDSMALLEST:.cc=.o): CFLAGS += -Os -DNDEBUG
+$(NOOPTIMIZE:.cc=.o): CFLAGS += -O0
 
 ISO_DEPENDS := bootsect.bin dgos-kernel hello.km background.png
 ISO_TARGETS := $(patsubst %,$(ISO_STAGE)/%,$(ISO_DEPENDS))

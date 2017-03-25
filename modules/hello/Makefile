@@ -8,7 +8,7 @@ CSRCS := hello.cc
 ASRCS :=
 
 CXXFLAGS := -g -mcmodel=kernel \
-	-std=c11 -fno-common -fno-exceptions
+	-std=c++14 -fno-common -fno-exceptions
 
 #-fno-asynchronous-unwind-tables
 

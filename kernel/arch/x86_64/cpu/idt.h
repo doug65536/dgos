@@ -321,15 +321,15 @@ typedef struct isr_context_t {
 //    void *align;
 //} isr_start_context_t;
 
-typedef void *(*irq_dispatcher_handler_t)(
+typedef isr_context_t *(*irq_dispatcher_handler_t)(
         int intr, isr_context_t *ctx);
 
 void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler);
 
 // Handle EOI and invoke irq handler
-void *irq_dispatcher(int intr, isr_context_t *ctx);
+isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx);
 
-void *isr_handler(isr_context_t *ctx);
+extern "C" void *isr_handler(isr_context_t *ctx);
 
 isr_context_t *exception_isr_handler(isr_context_t *ctx);
 

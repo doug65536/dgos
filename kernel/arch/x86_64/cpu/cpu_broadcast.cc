@@ -27,7 +27,8 @@ typedef struct cpu_broadcast_queue_t {
 
 void cpu_broadcast_service(int intr, size_t slot)
 {
-    cpu_broadcast_queue_t *queue = thread_cls_get(slot);
+    cpu_broadcast_queue_t *queue =
+            (cpu_broadcast_queue_t *)thread_cls_get(slot);
     cpu_broadcast_work_t *work;
     int eoi_done = 0;
 
@@ -62,7 +63,8 @@ static void *cpu_broadcast_init_cpu(void *arg)
 {
     (void)arg;
 
-    cpu_broadcast_queue_t *queue = calloc(1, sizeof(*queue));
+    cpu_broadcast_queue_t *queue = (cpu_broadcast_queue_t *)
+            calloc(1, sizeof(*queue));
 
     return queue;
 }
@@ -80,18 +82,19 @@ size_t cpu_broadcast_create(void)
 static void cpu_broadcast_add_work(
         int cpu, void *slot_data, void *arg, size_t size)
 {
-    cpu_broadcast_queue_t *queue = slot_data;
+    cpu_broadcast_queue_t *queue = (cpu_broadcast_queue_t *)slot_data;
 
     spinlock_lock_noirq(&queue->lock);
 
-    cpu_broadcast_work_t *incoming_work = arg;
+    cpu_broadcast_work_t *incoming_work = (cpu_broadcast_work_t *)arg;
 
     if (incoming_work->unique && queue->head) {
         spinlock_unlock_noirq(&queue->lock);
         return;
     }
 
-    cpu_broadcast_work_t *queued_work = malloc(sizeof(*queued_work) + size);
+    cpu_broadcast_work_t *queued_work =
+            (cpu_broadcast_work_t *)malloc(sizeof(*queued_work) + size);
     memcpy(queued_work, arg, sizeof(*queued_work));
     memcpy(queued_work + 1, queued_work->data, size);
     queued_work->data = queued_work + 1;

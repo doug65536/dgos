@@ -900,14 +900,15 @@ static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
 
 static void acpi_process_madt(acpi_madt_t *madt_hdr)
 {
-    acpi_madt_ent_t *ent = (void*)(madt_hdr + 1);
-    acpi_madt_ent_t *end = (void*)((char*)madt_hdr + madt_hdr->hdr.len);
+    acpi_madt_ent_t *ent = (acpi_madt_ent_t*)(madt_hdr + 1);
+    acpi_madt_ent_t *end = (acpi_madt_ent_t*)
+            ((char*)madt_hdr + madt_hdr->hdr.len);
 
     apic_base = madt_hdr->lapic_address;
     acpi_madt_flags = madt_hdr->flags & 1;
 
     for ( ; ent < end;
-          ent = (void*)((char*)ent + ent->ioapic.hdr.record_len)) {
+          ent = (acpi_madt_ent_t*)((char*)ent + ent->ioapic.hdr.record_len)) {
         switch (ent->hdr.entry_type) {
         case ACPI_MADT_REC_TYPE_LAPIC:
             if (apic_id_count < countof(apic_id_list)) {
@@ -927,12 +928,11 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                 ioapic->addr = ent->ioapic.addr;
                 ioapic->irq_base = ent->ioapic.irq_base;
                 ioapic->id = ent->ioapic.apic_id;
-                ioapic->ptr = mmap((void*)(uintptr_t)ent->ioapic.addr,
-                                   12,
-                                   PROT_READ | PROT_WRITE,
-                                   MAP_PHYSICAL |
-                                   MAP_NOCACHE |
-                                   MAP_WRITETHRU, -1, 0);
+                ioapic->ptr = (uint32_t*)mmap(
+                            (void*)(uintptr_t)ent->ioapic.addr, 12,
+                            PROT_READ | PROT_WRITE,
+                            MAP_PHYSICAL | MAP_NOCACHE |
+                            MAP_WRITETHRU, -1, 0);
 
                 ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
                 uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
@@ -980,7 +980,7 @@ static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
 
 static uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
 {
-    return checksum_bytes((void*)hdr, hdr->len);
+    return checksum_bytes((char const *)hdr, hdr->len);
 }
 
 static int parse_mp_tables(void)
@@ -1000,10 +1000,11 @@ static int parse_mp_tables(void)
                              MAP_PHYSICAL, -1, 0);
             ranges[3] = (char*)ranges[2] + 0x20000;
         }
-        for (mp_table_hdr_t const* sig_srch = ranges[pass];
+        for (mp_table_hdr_t const* sig_srch =
+             (mp_table_hdr_t const*)ranges[pass];
              (void*)sig_srch < ranges[pass+1]; ++sig_srch) {
             // Check for ACPI 2.0+ RSDP
-            acpi_rsdp2_t *rsdp2 = (void*)sig_srch;
+            acpi_rsdp2_t *rsdp2 = (acpi_rsdp2_t*)sig_srch;
             if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
                 // Check checksum
                 if (rsdp2->rsdp1.rev != 0 &&
@@ -1021,7 +1022,7 @@ static int parse_mp_tables(void)
             }
 
             // Check for ACPI 1.0 RSDP
-            acpi_rsdp_t *rsdp = (void*)sig_srch;
+            acpi_rsdp_t *rsdp = (acpi_rsdp_t*)sig_srch;
             if (rsdp->rev == 0 &&
                     !memcmp(rsdp->sig, "RSD PTR ", 8)) {
                 // Check checksum
@@ -1044,7 +1045,7 @@ static int parse_mp_tables(void)
     }
 
     if (acpi_rsdp_addr) {
-        acpi_sdt_hdr_t *rsdt_hdr = mmap(
+        acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
                     (void*)acpi_rsdp_addr, 64 << 10,
                     PROT_READ,
                     MAP_PHYSICAL, -1, 0);
@@ -1054,19 +1055,18 @@ static int parse_mp_tables(void)
             return 0;
         }
 
-        uint32_t *rsdp_ptrs = (void*)(rsdt_hdr + 1);
-        uint32_t *rsdp_end = (void*)((char*)rsdt_hdr + rsdt_hdr->len);
+        uint32_t *rsdp_ptrs = (uint32_t *)(rsdt_hdr + 1);
+        uint32_t *rsdp_end = (uint32_t *)((char*)rsdt_hdr + rsdt_hdr->len);
 
         for (uint32_t *rsdp_ptr = rsdp_ptrs;
              rsdp_ptr < rsdp_end; ++rsdp_ptr) {
             uint32_t hdr_addr = *rsdp_ptr;
-            acpi_sdt_hdr_t *hdr = mmap((void*)(uintptr_t)hdr_addr,
-                                       64 << 10,
-                                       PROT_READ,
-                                       MAP_PHYSICAL, -1, 0);
+            acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
+                    mmap((void*)(uintptr_t)hdr_addr,
+                         64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
 
             if (!memcmp(hdr->sig, "FACP", 4)) {
-                acpi_fadt_t *fadt_hdr = (void*)hdr;
+                acpi_fadt_t *fadt_hdr = (acpi_fadt_t *)hdr;
 
                 if (acpi_chk_hdr(&fadt_hdr->hdr) == 0) {
                     printdbg("ACPI FADT found\n");
@@ -1075,7 +1075,7 @@ static int parse_mp_tables(void)
                     printdbg("ACPI FADT checksum mismatch!\n");
                 }
             } else if (!memcmp(hdr->sig, "APIC", 4)) {
-                acpi_madt_t *madt_hdr = (void*)hdr;
+                acpi_madt_t *madt_hdr = (acpi_madt_t *)hdr;
 
                 if (acpi_chk_hdr(&madt_hdr->hdr) == 0) {
                     printdbg("ACPI MADT found\n");
@@ -1084,7 +1084,7 @@ static int parse_mp_tables(void)
                     printdbg("ACPI MADT checksum mismatch!\n");
                 }
             } else if (!memcmp(hdr->sig, "HPET", 4)) {
-                acpi_hpet_t *hpet_hdr = (void*)hdr;
+                acpi_hpet_t *hpet_hdr = (acpi_hpet_t *)hdr;
 
                 if (acpi_chk_hdr(&hpet_hdr->hdr) == 0) {
                     printdbg("ACPI HPET found\n");
@@ -1106,9 +1106,9 @@ static int parse_mp_tables(void)
     }
 
     if (mp_tables) {
-        mp_cfg_tbl_hdr_t *cth = mmap(mp_tables, 0x10000,
-                                     PROT_READ, MAP_PHYSICAL,
-                                     -1, 0);
+        mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
+                mmap(mp_tables, 0x10000,
+                     PROT_READ, MAP_PHYSICAL, -1, 0);
 
         uint8_t *entry = (uint8_t*)(cth + 1);
 
@@ -1129,6 +1129,7 @@ static int parse_mp_tables(void)
             mp_cfg_buscompat_t *entry_buscompat;
             switch (*entry) {
             case MP_TABLE_TYPE_CPU:
+            {
                 entry_cpu = (mp_cfg_cpu_t *)entry;
 
                 printdbg("CPU package found,"
@@ -1145,8 +1146,10 @@ static int parse_mp_tables(void)
 
                 entry = (uint8_t*)(entry_cpu + 1);
                 break;
+            }
 
             case MP_TABLE_TYPE_BUS:
+            {
                 entry_bus = (mp_cfg_bus_t *)entry;
 
                 printdbg("%.*s bus found, id=%u\n",
@@ -1172,8 +1175,10 @@ static int parse_mp_tables(void)
                 }
                 entry = (uint8_t*)(entry_bus + 1);
                 break;
+            }
 
             case MP_TABLE_TYPE_IOAPIC:
+            {
                 entry_ioapic = (mp_cfg_ioapic_t *)entry;
 
                 if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED) {
@@ -1194,7 +1199,7 @@ static int parse_mp_tables(void)
                     ioapic->id = entry_ioapic->id;
                     ioapic->addr = entry_ioapic->addr;
 
-                    uint32_t volatile *ioapic_ptr = mmap(
+                    uint32_t volatile *ioapic_ptr = (uint32_t *)mmap(
                                 (void*)(uintptr_t)entry_ioapic->addr,
                                 12, PROT_READ | PROT_WRITE,
                                 MAP_PHYSICAL |
@@ -1225,8 +1230,10 @@ static int parse_mp_tables(void)
                 }
                 entry = (uint8_t*)(entry_ioapic + 1);
                 break;
+            }
 
             case MP_TABLE_TYPE_IOINTR:
+            {
                 entry_iointr = (mp_cfg_iointr_t *)entry;
 
                 if (memchr(mp_pci_bus_ids, entry_iointr->source_bus,
@@ -1301,8 +1308,10 @@ static int parse_mp_tables(void)
 
                 entry = (uint8_t*)(entry_iointr + 1);
                 break;
+            }
 
             case MP_TABLE_TYPE_LINTR:
+            {
                 entry_lintr = (mp_cfg_lintr_t*)entry;
                 if (memchr(mp_pci_bus_ids, entry_lintr->source_bus,
                             mp_pci_bus_count)) {
@@ -1331,8 +1340,10 @@ static int parse_mp_tables(void)
                 }
                 entry = (uint8_t*)(entry_lintr + 1);
                 break;
+            }
 
             case MP_TABLE_TYPE_ADDRMAP:
+            {
                 entry_addrmap = (mp_cfg_addrmap_t*)entry;
                 uint8_t bus = entry_addrmap->bus_id;
                 uint64_t addr =  entry_addrmap->addr_lo |
@@ -1345,10 +1356,12 @@ static int parse_mp_tables(void)
 
                 entry += entry_addrmap->len;
                 break;
+            }
 
             case MP_TABLE_TYPE_BUSHIER:
+            {
                 entry_busheir = (mp_cfg_bushier_t*)entry;
-                bus = entry_busheir->bus_id;
+                uint8_t bus = entry_busheir->bus_id;
                 uint8_t parent_bus = entry_busheir->parent_bus;
                 uint8_t info = entry_busheir->info;
 
@@ -1357,10 +1370,12 @@ static int parse_mp_tables(void)
 
                 entry += entry_busheir->len;
                 break;
+            }
 
             case MP_TABLE_TYPE_BUSCOMPAT:
+            {
                 entry_buscompat = (mp_cfg_buscompat_t*)entry;
-                bus = entry_buscompat->bus_id;
+                uint8_t bus = entry_buscompat->bus_id;
                 uint8_t bus_mod = entry_buscompat->bus_mod;
                 uint32_t bus_predef = entry_buscompat->predef_range_list;
 
@@ -1370,6 +1385,7 @@ static int parse_mp_tables(void)
 
                 entry += entry_buscompat->len;
                 break;
+            }
 
             default:
                 printdbg("Unknown MP table entry_type!"
@@ -1389,13 +1405,13 @@ static int parse_mp_tables(void)
     return !!mp_tables;
 }
 
-static void *apic_timer_handler(int intr, void *ctx)
+static isr_context_t *apic_timer_handler(int intr, isr_context_t *ctx)
 {
     apic_eoi(intr);
     return thread_schedule(ctx);
 }
 
-static void *apic_spurious_handler(int intr, void *ctx)
+static isr_context_t *apic_spurious_handler(int intr, isr_context_t *ctx)
 {
     (void)intr;
     assert(intr == INTR_APIC_SPURIOUS);
@@ -1548,7 +1564,7 @@ int apic_init(int ap)
         apic_base &= APIC_BASE_ADDR;
 
         assert(apic_ptr == 0);
-        apic_ptr = mmap((void*)apic_base, 4096,
+        apic_ptr = (uint32_t *)mmap((void*)apic_base, 4096,
                         PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL |
                         MAP_NOCACHE |
@@ -1863,7 +1879,7 @@ static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)
     return bus_irq_list + bus_irq_to_mapping[irq];
 }
 
-static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
+static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
 {
     uint8_t irq;
     if (intr >= ioapic_msi_base_intr &&
@@ -1887,8 +1903,8 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
         }
 
         // Reverse map ISA IRQ
-        uint8_t *isa_match = memchr(isa_irq_lookup, irq,
-                                    sizeof(isa_irq_lookup));
+        uint8_t *isa_match = (uint8_t *)memchr(isa_irq_lookup, irq,
+                                               sizeof(isa_irq_lookup));
 
         if (isa_match)
             irq = isa_match - isa_irq_lookup;
@@ -1897,7 +1913,7 @@ static void *ioapic_dispatcher(int intr, isr_context_t *ctx)
     }
 
     apic_eoi(intr);
-    ctx = irq_invoke(intr, irq, ctx);
+    ctx = (isr_context_t*)irq_invoke(intr, irq, ctx);
 
     return ctx;
 }

@@ -62,11 +62,11 @@ void *pool_alloc(pool_t *pool)
 
     if (pool->first_free && pool->first_free != ~0U) {
         // Reuse freed item
-        slot = pool_item(pool, pool->first_free);
+        slot = (uint32_t*)pool_item(pool, pool->first_free);
         pool->first_free = *slot;
     } else if (pool->item_count < pool->item_capacity) {
         // Use a new slot
-        slot = pool_item(pool, pool->item_count++);
+        slot = (uint32_t*)pool_item(pool, pool->item_count++);
     } else {
         // Full
         slot = 0;

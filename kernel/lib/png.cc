@@ -119,7 +119,7 @@ static inline uint8_t png_paeth_predict(uint8_t a, uint8_t b, uint8_t c)
 
 static void png_fixup_bgra(void *p, size_t count)
 {
-    uint32_t *p32 = p;
+    uint32_t *p32 = (uint32_t*)p;
     while (count--) {
         *p32 = (bswap_32(*p32) >> 8);
         ++p32;
@@ -247,7 +247,7 @@ static uint32_t png_process_idata(
 png_image_t *png_load(char const *path)
 {
     // Allocate read buffer
-    autofree uint8_t *buf = malloc(PNG_BUFSIZE);
+    autofree uint8_t *buf = (uint8_t*)malloc(PNG_BUFSIZE);
     if (!buf)
         return 0;
 
@@ -333,7 +333,7 @@ png_image_t *png_load(char const *path)
                     (ihdr.bit_depth >> 3);
             state.scanline_bytes = state.pixel_bytes * ihdr.width;
 
-            img = malloc(sizeof(*img) +
+            img = (png_image_t*)malloc(sizeof(*img) +
                          ihdr.width * ihdr.height * sizeof(uint32_t));
 
             img->width = ihdr.width;

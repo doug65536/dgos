@@ -41,7 +41,7 @@ static int htbl_rehash(hashtbl_t *self)
             : 4;
 
     size_t new_capacity = 1 << new_log2;
-    void **new_tbl = calloc(new_capacity, sizeof(*self->items));
+    void **new_tbl = (void**)calloc(new_capacity, sizeof(*self->items));
     if (!new_tbl)
         return 0;
 

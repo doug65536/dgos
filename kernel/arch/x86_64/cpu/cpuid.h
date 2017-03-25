@@ -9,7 +9,7 @@ typedef struct cpuid_t {
     uint32_t ebx;
 } cpuid_t;
 
-void cpuid_init(void);
+extern "C" void cpuid_init(void);
 
 // Force use of CPUID instruction (for getting APIC ID)
 // Returns true if the CPU supports that leaf

@@ -79,8 +79,8 @@ EXPORT int strncmp(char const *lhs, char const *rhs, size_t count)
 
 EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
 {
-    unsigned char const *lp = lhs;
-    unsigned char const *rp = rhs;
+    unsigned char const *lp = (unsigned char const *)lhs;
+    unsigned char const *rp = (unsigned char const *)rhs;
     int cmp = 0;
     if (count) {
         do {
@@ -142,7 +142,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
 {
     assert(n < 0x0000700000000000L);
 #ifdef USE_REP_STRING
-    char *d = dest;
+    char *d = (char*)dest;
     __asm__ __volatile__ (
         "rep stosb\n\t"
         : "+D" (d), "+c" (n)
@@ -173,7 +173,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
 EXPORT void *memcpy(void *dest, void const *src, size_t n)
 {
 #ifdef USE_REP_STRING
-    char *d = dest;
+    char *d = (char*)dest;
     __asm__ __volatile__ (
         "rep movsb\n\t"
         : "+D" (d), "+S" (src), "+c" (n)
@@ -233,7 +233,7 @@ static inline void memcpy_reverse(void *dest, void const *src, size_t n)
 EXPORT void *memmove(void *dest, void const *src, size_t n)
 {
     char *d = (char *)dest;
-    char const *s = src;
+    char const *s = (char const *)src;
 
     // Can do forward copy if destination is before source,
     // or the end of the source is before the destination
@@ -483,7 +483,7 @@ EXPORT int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
 
 void *memfill_16(void *dest, uint16_t v, size_t count)
 {
-    uint16_t *d = dest;
+    uint16_t *d = (uint16_t*)dest;
     for (size_t i = 0; i < count; ++i)
         d[i] = v;
     return dest;
@@ -491,7 +491,7 @@ void *memfill_16(void *dest, uint16_t v, size_t count)
 
 void *memfill_32(void *dest, uint32_t v, size_t count)
 {
-    uint32_t *d = dest;
+    uint32_t *d = (uint32_t*)dest;
     for (size_t i = 0; i < count; ++i)
         d[i] = v;
     return dest;
@@ -499,7 +499,7 @@ void *memfill_32(void *dest, uint32_t v, size_t count)
 
 void *memfill_64(void *dest, uint64_t v, size_t count)
 {
-    uint64_t *d = dest;
+    uint64_t *d = (uint64_t*)dest;
     for (size_t i = 0; i < count; ++i)
         d[i] = v;
     return dest;

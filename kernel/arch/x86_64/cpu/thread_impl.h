@@ -1,9 +1,10 @@
 #pragma once
 #include "types.h"
+#include "cpu/idt.h"
 
 extern uint32_t volatile thread_smp_running;
 
-void *thread_schedule(void *ctx);
+isr_context_t *thread_schedule(isr_context_t *ctx);
 void thread_init(int ap);
 uint32_t thread_cpu_count(void);
 uint32_t thread_cpus_started(void);

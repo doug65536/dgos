@@ -5,62 +5,26 @@
 #include "dev_registration.h"
 #include "eth_q.h"
 
-#ifdef ETH_DEV_NAME
-#define ETH_EXPAND_2(p,s) p ## s
-#define ETH_EXPAND(p,s) ETH_EXPAND_2(p,s)
-
-#define ETH_EXPAND1_3(t) t
-#define ETH_EXPAND1_2(t) ETH_EXPAND1_3(t)
-#define ETH_EXPAND1(t) ETH_EXPAND1_2(t)
-
-#define ETH_DEV_T ETH_EXPAND(ETH_DEV_NAME, _dev_t)
-
-typedef struct ETH_DEV_T ETH_DEV_T;
-#endif
-
-typedef struct storage_dev_vtbl_t storage_dev_vtbl_t;
-
-typedef struct eth_dev_t eth_dev_t;
-
-typedef struct eth_dev_vtbl_t eth_dev_vtbl_t;
-
-typedef struct eth_dev_base_t {
-    eth_dev_vtbl_t *vtbl;
-} eth_dev_base_t;
-
-struct eth_dev_vtbl_t {
-    int (*detect)(eth_dev_base_t ***result);
-
-    // Set/get dimensions
-    int (*send)(eth_dev_base_t *, ethq_pkt_t *pkt);
-
-    void (*get_mac)(eth_dev_base_t *, void *mac_addr);
-    void (*set_mac)(eth_dev_base_t *, void const *mac_addr);
-
-    int (*get_promiscuous)(eth_dev_base_t *);
-    void (*set_promiscuous)(eth_dev_base_t *, int promiscuous);
+struct eth_factory_t {
+    virtual int detect(eth_dev_base_t ***result) = 0;
 };
 
-#define MAKE_eth_dev_VTBL(type, name) { \
-    name##_detect,              \
-    name##_send,                \
-    name##_get_mac,             \
-    name##_set_mac,             \
-    name##_get_promiscuous,     \
-    name##_set_promiscuous      \
-}
+struct eth_dev_base_t {
+    // Set/get dimensions
+    virtual int send(ethq_pkt_t *pkt) = 0;
 
-void register_eth_dev_device(char const *name,
-                             eth_dev_vtbl_t *dev);
+    virtual void get_mac(void *mac_addr) = 0;
+    virtual void set_mac(void const *mac_addr) = 0;
 
-#define DECLARE_eth_dev_DEVICE(name) \
-    DECLARE_DEVICE(eth_dev, name)
+    virtual int get_promiscuous() = 0;
+    virtual void set_promiscuous(int promiscuous) = 0;
+};
 
-#define REGISTER_eth_dev_DEVICE(name) \
-    REGISTER_DEVICE(eth_dev, name, 'N')
+#define ETH_DEV_IMPL                                \
+    virtual int send(ethq_pkt_t *pkt);              \
+    virtual void get_mac(void *mac_addr);           \
+    virtual void set_mac(void const *mac_addr);     \
+    virtual int get_promiscuous();                  \
+    virtual void set_promiscuous(int promiscuous);
 
-#ifdef ETH_DEV_NAME
-#define ETH_DEV_PTR(dev) ETH_DEV_T *self = (void*)dev
-
-#define ETH_DEV_PTR_UNUSED(dev) (void)dev
-#endif
+void register_eth_dev_device(char const *name, eth_factory_t *dev);

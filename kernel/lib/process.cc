@@ -33,7 +33,7 @@ static process_t *process_add_locked(void)
     pid_t pid;
     size_t realloc_count = 0;
 
-    process_t *process = calloc(1, sizeof(process_t));
+    process_t *process = (process_t*)calloc(1, sizeof(process_t));
     if (unlikely(!process))
         return 0;
 
@@ -55,7 +55,7 @@ static process_t *process_add_locked(void)
 
     if (realloc_count) {
         // Expand process list
-        process_ptr_t *new_processes = realloc(
+        process_ptr_t *new_processes = (process_ptr_t*)realloc(
                     processes, sizeof(*processes) *
                     (process_count + 1));
         if (!new_processes) {
@@ -108,8 +108,8 @@ int process_spawn(pid_t * pid_result,
     while (envp && envp[env_count++]);
 
     // Make a copy of the arguments and environment variables
-    process->args = calloc(arg_count + 1, sizeof(*argv));
-    process->env = calloc(env_count + 1, sizeof(*envp));
+    process->args = (char**)calloc(arg_count + 1, sizeof(*argv));
+    process->env = (char**)calloc(env_count + 1, sizeof(*envp));
 
     for (size_t i = 0; i < arg_count; ++i)
         process->args[i] = strdup(argv[i]);

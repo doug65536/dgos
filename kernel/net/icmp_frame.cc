@@ -15,7 +15,7 @@
 
 static void icmp_echo(ethq_pkt_t *pkt)
 {
-    icmp_echo_hdr_t *hdr = (void*)&pkt->pkt;
+    icmp_echo_hdr_t *hdr = (icmp_echo_hdr_t*)&pkt->pkt;
 
     uint16_t check_checksum = ipv4_checksum(&hdr->icmp_hdr.ipv4_hdr);
 
@@ -33,7 +33,7 @@ static void icmp_echo(ethq_pkt_t *pkt)
     }
 
     ethq_pkt_t *reply_pkt = ethq_pkt_acquire();
-    icmp_echo_hdr_t *reply = (void*)&reply_pkt->pkt;
+    icmp_echo_hdr_t *reply = (icmp_echo_hdr_t*)&reply_pkt->pkt;
 
     memset(reply, 0, sizeof(*reply));
 
@@ -63,7 +63,7 @@ static void icmp_echo(ethq_pkt_t *pkt)
 
     reply->icmp_hdr.ipv4_hdr.ver_ihl = 0x45;
 
-    char const *end = ipv4_end_get(&hdr->icmp_hdr.ipv4_hdr);
+    char const *end = (char const *)ipv4_end_get(&hdr->icmp_hdr.ipv4_hdr);
 
     char const *payload = (char*)(hdr + 1);
 
@@ -81,12 +81,12 @@ static void icmp_echo(ethq_pkt_t *pkt)
     ICMP_TRACE("Transmitting ICMP reply seq=%d pkt=%p\n",
                ntohs(reply->seq), (void*)reply_pkt);
 
-    pkt->nic->vtbl->send(pkt->nic, reply_pkt);
+    pkt->nic->send(reply_pkt);
 }
 
 void icmp_frame_received(ethq_pkt_t *pkt)
 {
-    icmp_hdr_t *hdr = (void*)&pkt->pkt;
+    icmp_hdr_t *hdr = (icmp_hdr_t*)&pkt->pkt;
 
     switch (hdr->type) {
     case ICMP_TYPE_ECHO:

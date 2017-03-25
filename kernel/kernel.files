@@ -21,6 +21,8 @@ arch/x86_64/elf64.h
 arch/x86_64/elf64_decl.h
 dep-zlib.mk
 fs/fat32_decl.h
+lib/array.cc
+lib/array.h
 lib/dev_eth.cc
 lib/dev_eth.h
 lib/dirent.h
@@ -42,6 +44,8 @@ lib/process.cc
 lib/process.h
 lib/stddef.h
 lib/sys/types.h
+lib/unique_ptr.cc
+lib/unique_ptr.h
 lib/unistd.h
 lib/zlib_helper.cc
 lib/zlib_helper.h

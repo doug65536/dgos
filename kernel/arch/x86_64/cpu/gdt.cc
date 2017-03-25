@@ -60,7 +60,7 @@ static void gdt_set_tss_base(tss_t *base)
 
 void gdt_init_tss(int cpu_count)
 {
-    tss_list = mmap(0, sizeof(*tss_list) * cpu_count,
+    tss_list = (tss_t*)mmap(0, sizeof(*tss_list) * cpu_count,
                            PROT_READ | PROT_WRITE,
                            MAP_POPULATE, -1, 0);
     memset(tss_list, 0, sizeof(*tss_list) * cpu_count);

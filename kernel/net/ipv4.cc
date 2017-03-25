@@ -4,7 +4,7 @@
 
 uint16_t ipv4_checksum(ipv4_hdr_t const *hdr)
 {
-    uint16_t *in = (void*)&hdr->ver_ihl;
+    uint16_t *in = (uint16_t*)&hdr->ver_ihl;
 
     uint32_t total = 0;
     for (size_t i = 0, e = (hdr->ver_ihl & 0xF) << 1;

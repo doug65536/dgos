@@ -5,7 +5,7 @@
 uint16_t icmp_checksum(icmp_hdr_t const *hdr, void const *end)
 {
     uint32_t checksum = 0;
-    for (uint16_t const *in = (void*)&hdr->type; (void*)in < end; ++in)
+    for (uint16_t const *in = (uint16_t*)&hdr->type; (void*)in < end; ++in)
         checksum += ntohs(*in);
     checksum += (checksum >> 16);
     checksum &= 0xFFFF;

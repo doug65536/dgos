@@ -96,7 +96,7 @@ static void pic8259_eoi(int slave)
 
 // Detect and discard spurious IRQ
 // or call IRQ handler and acknowledge IRQ
-static void *pic8259_dispatcher(
+static isr_context_t *pic8259_dispatcher(
         int intr, isr_context_t *ctx)
 {
     isr_context_t *returned_stack_ctx;
