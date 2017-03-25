@@ -207,6 +207,7 @@ typedef uintptr_t linaddr_t;
 #define PT1_PTR         ((pte_t*)PT1_ADDR)
 #define PT0_PTR         ((pte_t*)PT0_ADDR)
 
+#define PT_KERNBASE     0xFFFFFFFF80000000
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
@@ -1250,7 +1251,7 @@ void mmu_init(int ap)
 
     contiguous_allocator_create(&linear_allocator,
                                 (linaddr_t*)&linear_base,
-                                PT_BASEADDR - linear_base,
+                                PT_KERNBASE - linear_base,
                                 1 << 20);
 
     contiguous_allocator_create(&near_allocator,

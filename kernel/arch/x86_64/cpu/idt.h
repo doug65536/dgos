@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "assert.h"
 
 typedef struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
@@ -8,6 +9,8 @@ typedef struct idt_entry_t {
     uint8_t type_attr;  // type and attributes
     uint16_t offset_hi; // offset bits 16..31
 } idt_entry_t;
+
+C_ASSERT(sizeof(idt_entry_t) == 8);
 
 typedef struct idt_entry_64_t {
     uint16_t offset_lo; // offset bits 0..15
@@ -19,6 +22,8 @@ typedef struct idt_entry_64_t {
     uint32_t offset_64_31;  // offset bits 63..32
     uint32_t reserved;
 } idt_entry_64_t;
+
+C_ASSERT(sizeof(idt_entry_64_t) == 16);
 
 // idt_entry_t selector field
 #define IDT_SEL         0x08

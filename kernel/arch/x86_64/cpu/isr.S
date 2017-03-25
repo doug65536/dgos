@@ -29,10 +29,10 @@
 isr_entry_\int_num\():
 	.cfi_startproc
 	.if \has_code == 0
-		.cfi_def_cfa_offset 8
+		.cfi_def_cfa_offset 16
 		push_cfi $0
 	.else
-		.cfi_def_cfa_offset 16
+		.cfi_def_cfa_offset 24
 	.endif
 	push_cfi $\int_num
 	jmp isr_common
@@ -161,9 +161,11 @@ isr_entry 0 31
 	isr_entry 0 \int_num
 .endr
 
-.irp int_num,72,73,74
+.irp int_num,72,73
 	isr_entry 0 \int_num
 .endr
+
+isr_entry 0 74
 
 isr_entry 1 14
 

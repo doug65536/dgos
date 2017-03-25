@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include "types.h"
 
+extern "C" {
+
 #ifdef __GNUC__
 #define ATTRIBUTE_FORMAT(m,n) __attribute__((format(printf, m, n)))
 #else
@@ -35,3 +37,5 @@ int cprintf(char const *format, ...)
     ATTRIBUTE_FORMAT(1, 2);
 
 int vcprintf(char const *format, va_list ap);
+
+}

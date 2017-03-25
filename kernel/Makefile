@@ -18,14 +18,17 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-OPTIMIZE := 1
+#OPTIMIZE := 1
 #LTO := 1
 CC := clang
+CXX := clang++
 #CC := gcc-6
+#CXX := gcc-6
 
 export CC
+export CXX
 
-CC_IS_CLANG := $(shell ($(CXX) -v 2>&1 | \
+CXX_IS_CLANG := $(shell ($(CXX) -v 2>&1 | \
 	head -n 1 | \
 	grep clang > /dev/null) && \
 	echo 1)
@@ -175,6 +178,7 @@ $(LIBFILES): subdirs
 WLPREFIX := -Wl,
 
 $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOLE)
+	mkdir -p $(DUMPDIR)
 	$(CXX) $(CXXFLAGS) $(OUTPUT_OPTION) \
 		-fuse-linker-plugin \
 		-nostdlib -Wl,-melf_x86_64 \
@@ -190,9 +194,11 @@ $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOL
 #$(LIBGCC) \
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)
+	mkdir -p $(@D)
 	objdump --all-headers $< > $@
 
 $(DUMPDIR)/kernel.dis: $(KERNEL)
+	mkdir -p $(@D)
 	objdump --disassemble --source $^ > $@
 
 include dep-zlib.mk

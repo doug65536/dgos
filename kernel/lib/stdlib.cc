@@ -68,7 +68,7 @@ void operator delete(void *block, unsigned long size)
     free(block);
 }
 
-void operator delete(void *block)
+void operator delete(void *block) throw()
 {
     free(block);
 }

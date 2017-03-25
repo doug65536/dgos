@@ -7,7 +7,6 @@
 template<typename Tkey = uintptr_t, typename Tval = uintptr_t>
 class rbtree_t {
 private:
-    enum color_t : uint8_t;
     struct node_t;
 
     typedef Tkey key_t;
@@ -57,7 +56,7 @@ public:
     static int test(void);
 
 private:
-    enum color_t : uint8_t {
+    enum color_t : int {
         NOCOLOR,
         BLACK,
         RED

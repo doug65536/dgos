@@ -16,6 +16,10 @@ struct ide_chan_ports_t {
     uint8_t irq;
 };
 
+struct ide_if_factory_t : public storage_if_factory_t {
+    virtual if_list_t detect(void);
+};
+
 struct ide_if_t : public storage_if_base_t {
     STORAGE_IF_IMPL
 
@@ -95,7 +99,7 @@ static size_t ide_if_count;
 #define ATA_REG_ALTSTATUS  0x0C
 #define ATA_REG_DEVADDRESS 0x0D
 
-if_list_t ide_if_t::detect(void)
+if_list_t ide_if_factory_t::detect(void)
 {
     unsigned start_at = ide_if_count;
 

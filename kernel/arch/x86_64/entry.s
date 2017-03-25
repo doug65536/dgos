@@ -4,15 +4,10 @@
 .hidden entry
 entry:
 	cld
-	xor %ebp,%ebp
 
-	# Store the physical memory map address
-	# passed in from bootloader
-	mov %ecx,%edx
-	shr $20,%edx
-	mov %rdx,phys_mem_map_count
-	and $0x000FFFFF,%rcx
-	mov %rcx,phys_mem_map
+	# Save parameter in call-preserved register
+	mov %ecx,%r15d
+	xor %ebp,%ebp
 
 	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions CR4_OSXMMEX)
 	# This must be done before jumping into C code
@@ -20,21 +15,67 @@ entry:
 	or $0x600,%rax
 	mov %rax,%cr4
 
-	# Get the MXCSR_MASK
+	# See if this is the bootstrap processor
+	mov $0x1B,%ecx
+	rdmsr
+	test $0x100,%eax
+	jnz 0f
+
+	# This is not the bootstrap CPU
+
+	# Initialize MXCSR
+	mov $((3 << 13) | (0x3F << 7)),%eax
+	and default_mxcsr_mask,%eax
+	push %rax
+	ldmxcsr (%rsp)
+
+	# Initialize FPU control word
+	movq $((3 << 10) | 0x3F),(%rsp)
+	fldcw (%rsp)
+
+	pop %rax
+
+	# Align stack
+	xor %ebp,%ebp
+	push %rbp
+
+	# MP processor entry
+	jmp mp_main
+
+0:
+	# This is the bootstrap processor
+
+	# Store the physical memory map address
+	# passed in from bootloader
+	mov %r15d,%eax
+	shr $20,%eax
+	mov %rax,phys_mem_map_count
+
+	mov %r15d,%eax
+	and $0x000FFFFF,%eax
+	mov %rax,phys_mem_map
+
+	# Save the MXCSR_MASK
+
+	# Allocate 512 bytes and cache line align stack
 	mov %rsp,%rdx
 	sub $512,%rsp
 	and $-64,%rsp
 
 	fxsave64 (%rsp)
 
+	# Read MXCSR_MASK from fxsave output and store it
 	mov 28(%rsp),%eax
 	mov %eax,default_mxcsr_mask
 
 	# Set MXCSR to 64-bit precision,
 	# all exceptions masked, round to nearest
-	movl $((3 << 13) | (0x3F << 7)),24(%rsp)
+	mov $((3 << 13) | (0x3F << 7)),%ecx
+	and %eax,%ecx
+	mov %ecx,24(%rsp)
 	ldmxcsr 24(%rsp)
 
+	# Free 512 bytes
 	mov %rdx,%rsp
 
 	# Initialize FPU to 64 bit precision,
@@ -43,26 +84,6 @@ entry:
 	push $((3 << 10) | 0x3F)
 	fldcw (%rsp)
 	add $8,%rsp
-
-	push %rdx
-	push %rcx
-
-	# See if this is the bootstrap processor
-	mov $0x1B,%ecx
-	rdmsr
-	pop %rcx
-	pop %rdx
-	test $0x100,%eax
-	jnz 0f
-
-	# Align stack
-	xor %ebp,%ebp
-	push $0
-
-	# MP processor entry
-	jmp mp_main
-
-0:
 
 	lea kernel_stack,%rdx
 	mov kernel_stack_size,%rbx
@@ -85,6 +106,9 @@ entry:
 	lea ___init_st(%rip),%rdi
 	lea ___init_en(%rip),%rsi
 	call invoke_function_array
+
+	xor %edi,%edi
+	call cpu_init_stage2
 
 	xor %edi,%edi
 	call cpu_hw_init
@@ -114,6 +138,7 @@ exit:
 invoke_function_array:
 	push %rbx
 	push %rbp
+	push %rbp
 	mov %rdi,%rbx
 	mov %rsi,%rbp
 0:
@@ -123,6 +148,7 @@ invoke_function_array:
 	add $8,%rbx
 	jmp 0b
 0:
+	pop %rbp
 	pop %rbp
 	pop %rbx
 	ret
@@ -134,3 +160,13 @@ mp_main:
 	mov $'S',%edi
 	call callout_call
 	ret
+
+.global __cxa_pure_virtual
+.hidden __cxa_pure_virtual
+__cxa_pure_virtual:
+	mov $pure_call_message,%rdi
+	jmp panic
+
+.section .rodata
+pure_call_message:
+	.string "Pure virtual function called"

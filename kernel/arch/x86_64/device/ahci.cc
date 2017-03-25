@@ -1130,23 +1130,44 @@ struct hba_port_info_t {
 #define AHCI_PE_DBC_BIT     1
 #define AHCI_PE_DBC_n(n)    ((n)-1)
 
+struct ahci_if_factory_t : public storage_if_factory_t {
+    ahci_if_factory_t() : storage_if_factory_t("ahci") {}
+    virtual if_list_t detect(void);
+};
+
+static ahci_if_factory_t factory;
+
 // AHCI interface instance
 struct ahci_if_t : public storage_if_base_t {
     STORAGE_IF_IMPL
+
+    void init(pci_dev_iterator_t const &pci_iter);
+    int supports_64bit();
+    void release_slot(int port_num, int slot);
+    void handle_port_irqs(int port_num);
+    static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
+    void port_stop(int port_num);
+    void port_start(int port_num);
+    void port_stop_all();
+    void port_start_all();
+    void rebase();
+    void perform_detect(int port_num);
 
     void rw(int port_num, uint64_t lba,
             void *data, uint32_t count, int is_read,
             async_callback_fn_t callback,
             uintptr_t callback_arg);
 
+    void bios_handoff();
+
     int acquire_slot(int port_num);
 
-    void cmd_issue(
-            int port_num, unsigned slot,
-            hba_cmd_cfis_t *cfis, void *atapi_fis,
-            size_t fis_size, hba_prdt_ent_t *prdts, size_t ranges_count,
-            int is_read, async_callback_fn_t callback,
-            int done, uintptr_t callback_arg);
+    void cmd_issue(int port_num, unsigned slot,
+                   hba_cmd_cfis_t *cfis, void *atapi_fis,
+                   size_t fis_size, hba_prdt_ent_t *prdts,
+                   size_t ranges_count, int is_read,
+                   async_callback_fn_t callback, int done,
+                   uintptr_t callback_arg);
 
     pci_config_hdr_t config;
 
@@ -1185,24 +1206,24 @@ static unsigned ahci_count;
 static ahci_dev_t ahci_drives[AHCI_MAX_DRIVES];
 static unsigned ahci_drive_count;
 
-static int ahci_supports_64bit(ahci_if_t *dev)
+int ahci_if_t::supports_64bit()
 {
-    return (dev->mmio_base->cap & AHCI_HC_CAP_S64A) != 0;
+    return (mmio_base->cap & AHCI_HC_CAP_S64A) != 0;
 }
 
 // Must be holding port spinlock
-static void ahci_release_slot(ahci_if_t *dev, int port_num, int slot)
+void ahci_if_t::release_slot(int port_num, int slot)
 {
     assert(slot >= 0);
 
-    hba_port_info_t *pi = dev->port_info + port_num;
+    hba_port_info_t *pi = port_info + port_num;
 
     mutex_lock_noyield(&pi->slotalloc_lock);
 
     // Make sure it was really acquired
     assert(pi->cmd_issued & (1U<<slot));
 
-    if (!dev->use_ncq) {
+    if (!use_ncq) {
         // Make sure this was really the oldest command
         assert(pi->issue_queue[pi->issue_tail] == slot);
         // Advance queue tail
@@ -1253,11 +1274,11 @@ int ahci_if_t::acquire_slot(int port_num)
     }
 }
 
-static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
+void ahci_if_t::handle_port_irqs(int port_num)
 {
-    hba_host_ctl_t volatile *hba = dev->mmio_base;
+    hba_host_ctl_t volatile *hba = mmio_base;
     hba_port_t volatile *port = hba->ports + port_num;
-    hba_port_info_t *pi = dev->port_info + port_num;
+    hba_port_info_t *pi = port_info + port_num;
 
     async_callback_t pending_callbacks[32];
     unsigned callback_count = 0;
@@ -1267,7 +1288,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     // Read command slot interrupt status
     int slot;
 
-    if (dev->use_ncq) {
+    if (use_ncq) {
         for (uint32_t done_slots = pi->cmd_issued &
              (pi->cmd_issued ^ port->sata_act);
              done_slots; done_slots &= ~(1U << slot)) {
@@ -1288,7 +1309,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
             pi->callbacks[slot].done = 0;
             pi->callbacks[slot].error = 0;
 
-            ahci_release_slot(dev, port_num, slot);
+            release_slot(port_num, slot);
         }
     } else {
         slot = pi->issue_queue[pi->issue_tail];
@@ -1304,8 +1325,8 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
 
         if (error != 0) {
             AHCI_TRACE("Error %d on interface=%zu port=%zu\n",
-                       error, dev - ahci_devices,
-                       pi - dev->port_info);
+                       error, this - ahci_devices,
+                       pi - port_info);
         }
 
         pi->callbacks[slot].error = error;
@@ -1319,7 +1340,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
         pi->callbacks[slot].done = 0;
         pi->callbacks[slot].error = 0;
 
-        ahci_release_slot(dev, port_num, slot);
+        release_slot(port_num, slot);
     }
 
     // Acknowledge slot interrupt
@@ -1338,7 +1359,7 @@ static void ahci_handle_port_irqs(ahci_if_t *dev, int port_num)
     }
 }
 
-static isr_context_t *ahci_irq_handler(int irq, isr_context_t *ctx)
+isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
 {
     for (unsigned i = 0; i < ahci_count; ++i) {
         ahci_if_t *dev = ahci_devices + i;
@@ -1355,7 +1376,7 @@ static isr_context_t *ahci_irq_handler(int irq, isr_context_t *ctx)
             // Look through each port
             port = bit_lsb_set_32(intr_status);
 
-            ahci_handle_port_irqs(dev, port);
+            dev->handle_port_irqs(port);
 
             // Acknowledge the interrupt on the port
             dev->mmio_base->intr_status = (1U<<port);
@@ -1365,9 +1386,9 @@ static isr_context_t *ahci_irq_handler(int irq, isr_context_t *ctx)
     return ctx;
 }
 
-static void ahci_port_stop(ahci_if_t *dev, int port_num)
+void ahci_if_t::port_stop(int port_num)
 {
-    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+    hba_port_t volatile *port = mmio_base->ports + port_num;
 
     // Clear start bit
     // Clear FIS receive enable bit
@@ -1381,9 +1402,9 @@ static void ahci_port_stop(ahci_if_t *dev, int port_num)
         thread_yield();
 }
 
-static void ahci_port_start(ahci_if_t *dev, int port_num)
+void ahci_if_t::port_start(int port_num)
 {
-    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+    hba_port_t volatile *port = mmio_base->ports + port_num;
 
     // Wait until there is not a command running, and
     // there is not a FIS receive running
@@ -1395,24 +1416,24 @@ static void ahci_port_start(ahci_if_t *dev, int port_num)
 }
 
 // Stop each implemented port
-static void ahci_port_stop_all(ahci_if_t *dev)
+void ahci_if_t::port_stop_all()
 {
     int port;
-    for (uint32_t impl = dev->ports_impl;
+    for (uint32_t impl = ports_impl;
          impl != 0; impl &= ~(1U<<port)) {
         port = bit_lsb_set_32(impl);
-        ahci_port_stop(dev, port);
+        port_stop(port);
     }
 }
 
 // Start each implemented port
-static void ahci_port_start_all(ahci_if_t *dev)
+void ahci_if_t::port_start_all()
 {
     int port;
-    for (uint32_t impl = dev->ports_impl;
+    for (uint32_t impl = ports_impl;
          impl != 0; impl &= ~(1U<<port)) {
         port = bit_lsb_set_32(impl);
-        ahci_port_start(dev, port);
+        port_start(port);
     }
 }
 
@@ -1460,6 +1481,49 @@ void ahci_if_t::cmd_issue(
     port->cmd_issue = (1U<<slot);
 
     spinlock_unlock_noirq(&pi->lock);
+}
+
+void ahci_if_t::init(const pci_dev_iterator_t &pci_iter)
+{
+    config = pci_iter.config;
+
+    mmio_base = (hba_host_ctl_t*)
+            mmap((void*)(uintptr_t)pci_iter.config.base_addr[5],
+            0x1100, PROT_READ | PROT_WRITE,
+            MAP_PHYSICAL, -1, 0);
+
+    AHCI_TRACE("Performing BIOS handoff\n");
+    bios_handoff();
+
+    // Cache implemented port bitmask
+    ports_impl = mmio_base->ports_impl;
+
+    // Cache number of command slots per port
+    num_cmd_slots = 1 + ((mmio_base->cap >>
+                          AHCI_HC_CAP_NCS_BIT) &
+                          AHCI_HC_CAP_NCS_MASK);
+
+    use_64 = !!(mmio_base->cap & AHCI_HC_CAP_S64A);
+    //use_ncq = !!(mmio_base->cap & AHCI_HC_CAP_SNCQ);
+    use_ncq = 0;
+
+    rebase();
+
+    // Assume legacy IRQ pin usage until MSI succeeds
+    irq_range.base = pci_iter.config.irq_line;
+    irq_range.count = 1;
+
+    // Try to use MSI IRQ
+    use_msi = pci_set_msi_irq(
+                pci_iter.bus, pci_iter.slot, pci_iter.func,
+                &irq_range, 1, 1, 1,
+                &ahci_if_t::irq_handler);
+
+    if (!use_msi) {
+        // Fall back to pin based IRQ
+        irq_hook(irq_range.base, &ahci_if_t::irq_handler);
+        irq_setmask(irq_range.base, 1);
+    }
 }
 
 void ahci_if_t::rw(int port_num, uint64_t lba,
@@ -1599,9 +1663,9 @@ void ahci_if_t::rw(int port_num, uint64_t lba,
 }
 
 // The command engine must be stopped before calling ahci_perform_detect
-static void ahci_perform_detect(ahci_if_t *dev, int port_num)
+void ahci_if_t::perform_detect(int port_num)
 {
-    hba_port_t volatile *port = dev->mmio_base->ports + port_num;
+    hba_port_t volatile *port = mmio_base->ports + port_num;
 
     // Enable FIS receive
     port->cmd |= AHCI_HP_CMD_FRE;
@@ -1624,13 +1688,13 @@ static void ahci_perform_detect(ahci_if_t *dev, int port_num)
     port->intr_status |= AHCI_HP_IS_DHRS;
 }
 
-static void ahci_rebase(ahci_if_t *dev)
+void ahci_if_t::rebase()
 {
     AHCI_TRACE("Stopping all ports\n");
     // Stop all ports
-    ahci_port_stop_all(dev);
+    port_stop_all();
 
-    int support_64bit = ahci_supports_64bit(dev);
+    int support_64bit = supports_64bit();
 
     int addr_type = support_64bit
             ? MAP_POPULATE
@@ -1640,14 +1704,12 @@ static void ahci_rebase(ahci_if_t *dev)
     AHCI_TRACE("64 bit support: %d\n", support_64bit);
 
     // Loop through the implemented ports
-    uint32_t ports_impl = dev->ports_impl;
-    uint32_t slots_impl = dev->num_cmd_slots;
 
     // Initial "slot busy" mask marks unimplemented slots
     // as permanently busy
-    uint32_t init_busy_mask = (slots_impl == 32)
+    uint32_t init_busy_mask = (num_cmd_slots == 32)
             ? 0
-            : ((uint32_t)~0<<slots_impl);
+            : ((uint32_t)~0<<num_cmd_slots);
 
     for (uint32_t port_num = 0; port_num < 32; ++port_num) {
         if (!(ports_impl & (1U<<port_num)))
@@ -1655,14 +1717,14 @@ static void ahci_rebase(ahci_if_t *dev)
 
         AHCI_TRACE("Initializing AHCI device port %d\n", port_num);
 
-        hba_port_t volatile *port = dev->mmio_base->ports + port_num;
-        hba_port_info_t *pi = dev->port_info + port_num;
+        hba_port_t volatile *port = mmio_base->ports + port_num;
+        hba_port_info_t *pi = port_info + port_num;
 
         mutex_init(&pi->slotalloc_lock);
         condvar_init(&pi->slotalloc_avail);
 
         AHCI_TRACE("Performing detection, port %d\n", port_num);
-        ahci_perform_detect(dev, port_num);
+        perform_detect(port_num);
 
         // FIXME: do IDENTIFY instead of assuming 2KB/512B
         if (port->sig == SATA_SIG_ATAPI) {
@@ -1685,7 +1747,7 @@ static void ahci_rebase(ahci_if_t *dev)
         // One cmd tbl per slot
         port_buffer_size += sizeof(hba_cmd_tbl_ent_t) * 32;
 
-        void *buffers = mmap(0, port_buffer_size,
+        buffers = mmap(0, port_buffer_size,
                              PROT_READ | PROT_WRITE,
                              addr_type, -1, 0);
         memset(buffers, 0, port_buffer_size);
@@ -1713,7 +1775,7 @@ static void ahci_rebase(ahci_if_t *dev)
         atomic_barrier();
 
         // Set command table base addresses (physical)
-        for (uint32_t slot = 0; slot < slots_impl; ++slot)
+        for (int slot = 0; slot < num_cmd_slots; ++slot)
             cmd_hdr[slot].ctba = mphysaddr(cmd_tbl + slot);
 
         // Acknowledging interrupts
@@ -1738,39 +1800,39 @@ static void ahci_rebase(ahci_if_t *dev)
     }
 
     AHCI_TRACE("Starting ports\n");
-    ahci_port_start_all(dev);
+    port_start_all();
 
     // Acknowledge all IRQs
     AHCI_TRACE("Acknowledging top level IRQ\n");
-    dev->mmio_base->intr_status = dev->mmio_base->intr_status;
+    mmio_base->intr_status = mmio_base->intr_status;
 
     AHCI_TRACE("Enabling IRQ\n");
 
     // Enable interrupts overall
-    dev->mmio_base->host_ctl |= AHCI_HC_HC_IE;
+    mmio_base->host_ctl |= AHCI_HC_HC_IE;
 
     AHCI_TRACE("Rebase done\n");
 }
 
-static void ahci_bios_handoff(ahci_if_t *dev)
+void ahci_if_t::bios_handoff()
 {
     // If BIOS handoff is not supported then return
-    if ((dev->mmio_base->cap2 & AHCI_HC_CAP2_BOH) == 0)
+    if ((mmio_base->cap2 & AHCI_HC_CAP2_BOH) == 0)
         return;
 
     // Request BIOS handoff
-    dev->mmio_base->bios_handoff =
-            (dev->mmio_base->bios_handoff & ~AHCI_HC_BOH_OOC) |
+    mmio_base->bios_handoff =
+            (mmio_base->bios_handoff & ~AHCI_HC_BOH_OOC) |
             AHCI_HC_BOH_OOS;
 
     atomic_barrier();
-    while ((dev->mmio_base->bios_handoff &
+    while ((mmio_base->bios_handoff &
             (AHCI_HC_BOH_BOS | AHCI_HC_BOH_OOS)) !=
            AHCI_HC_BOH_OOS)
         thread_yield();
 }
 
-if_list_t ahci_if_t::detect(void)
+if_list_t ahci_if_factory_t::detect(void)
 {
     unsigned start_at = ahci_count;
 
@@ -1826,45 +1888,7 @@ if_list_t ahci_if_t::detect(void)
         if (ahci_count < countof(ahci_devices)) {
             ahci_if_t *self = ahci_devices + ahci_count++;
 
-            self->config = pci_iter.config;
-
-            self->mmio_base = (hba_host_ctl_t*)
-                    mmap((void*)(uintptr_t)pci_iter.config.base_addr[5],
-                    0x1100, PROT_READ | PROT_WRITE,
-                    MAP_PHYSICAL, -1, 0);
-
-            AHCI_TRACE("Performing BIOS handoff\n");
-            ahci_bios_handoff(self);
-
-            // Cache implemented port bitmask
-            self->ports_impl = self->mmio_base->ports_impl;
-
-            // Cache number of command slots per port
-            self->num_cmd_slots = 1 + ((self->mmio_base->cap >>
-                                  AHCI_HC_CAP_NCS_BIT) &
-                                  AHCI_HC_CAP_NCS_MASK);
-
-            self->use_64 = !!(self->mmio_base->cap & AHCI_HC_CAP_S64A);
-            //dev->use_ncq = !!(dev->mmio_base->cap & AHCI_HC_CAP_SNCQ);
-            self->use_ncq = 0;
-
-            ahci_rebase(self);
-
-            // Assume legacy IRQ pin usage until MSI succeeds
-            self->irq_range.base = pci_iter.config.irq_line;
-            self->irq_range.count = 1;
-
-            // Try to use MSI IRQ
-            self->use_msi = pci_set_msi_irq(
-                        pci_iter.bus, pci_iter.slot, pci_iter.func,
-                        &self->irq_range, 1, 1, 1,
-                        ahci_irq_handler);
-
-            if (!self->use_msi) {
-                // Fall back to pin based IRQ
-                irq_hook(self->irq_range.base, ahci_irq_handler);
-                irq_setmask(self->irq_range.base, 1);
-            }
+            self->init(pci_iter);
         }
 
         AHCI_TRACE("Finding next AHCI device...\n");

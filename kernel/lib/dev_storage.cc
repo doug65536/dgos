@@ -48,10 +48,10 @@ void close_storage_dev(storage_dev_base_t *dev)
 }
 
 void register_storage_if_device(char const *name,
-                                storage_if_base_t *vtbl)
+                                storage_if_factory_t *factory)
 {
     // Get a list of storage devices of this type
-    if_list_t if_list = vtbl->detect();
+    if_list_t if_list = factory->detect();
 
     for (unsigned i = 0; i < if_list.count; ++i) {
         // Calculate pointer to storage interface instance
@@ -78,7 +78,7 @@ void register_storage_if_device(char const *name,
             storage_devs[storage_dev_count++] = dev;
         }
     }
-    printk("%s device registered\n", name);
+    printdbg("%s device registered\n", name);
 }
 
 void register_fs_device(const char *name, fs_factory_t *fs)
@@ -87,7 +87,7 @@ void register_fs_device(const char *name, fs_factory_t *fs)
         fs_regs[fs_reg_count].name = name;
         fs_regs[fs_reg_count].factory = fs;
         ++fs_reg_count;
-        printk("%s filesystem registered\n", name);
+        printdbg("%s filesystem registered\n", name);
     }
 }
 
@@ -150,4 +150,14 @@ void register_part_factory(const char *name, part_factory_t *factory)
         }
     }
     printk("%s partition type registered\n", name);
+}
+
+fs_factory_t::fs_factory_t(char const *name)
+{
+    register_fs_device(name, this);
+}
+
+storage_if_factory_t::storage_if_factory_t(const char *name)
+{
+    register_storage_if_device(name, this);
 }

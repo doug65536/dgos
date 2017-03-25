@@ -107,18 +107,23 @@
 
 gdt_entry_t gdt[] = {
     GDT_MAKE_EMPTY(),
+
     // 64 bit kernel code and data
     GDT_MAKE_CODESEG64(0),
     GDT_MAKE_DATASEG64(0),
+
     // 32 bit kernel code and data
     GDT_MAKE_CODESEG32(0),
     GDT_MAKE_DATASEG32(0),
+
     // 16 bit kernel code and data
     GDT_MAKE_CODESEG16(0),
     GDT_MAKE_DATASEG16(0),
+
     // 64 bit user code and data
     GDT_MAKE_CODESEG64(3),
     GDT_MAKE_DATASEG64(3),
+
     // 32 bit user code and data
     GDT_MAKE_CODESEG32(3),
     GDT_MAKE_DATASEG32(3)

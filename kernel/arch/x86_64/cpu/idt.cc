@@ -34,12 +34,12 @@ static idt_entry_64_t idt[256];
 
 static isr_context_t *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
 
-typedef struct cpu_flag_info_t {
+struct cpu_flag_info_t {
     char const * const name;
     int bit;
-    int mask;
+    uintptr_t mask;
     char const * const *value_names;
-} cpu_flag_info_t;
+};
 
 static cpu_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
@@ -59,7 +59,7 @@ static cpu_flag_info_t const cpu_eflags_info[] = {
     { "AF",   EFLAGS_AF_BIT,   1, 0 },
     { "PF",   EFLAGS_PF_BIT,   1, 0 },
     { "CF",   EFLAGS_CF_BIT,   1, 0 },
-    { 0,      -1,             -1, 0 }
+    { 0,      -1,              0, 0 }
 };
 
 static char const *cpu_mxcsr_rc[] = {
@@ -85,7 +85,7 @@ static cpu_flag_info_t const cpu_mxcsr_info[] = {
     { "PM",     MXCSR_PM_BIT, 1, 0 },
     { "RC",     MXCSR_RC_BIT, MXCSR_RC_BITS, cpu_mxcsr_rc },
     { "FZ",     MXCSR_FZ_BIT, 1, 0 },
-    { 0,        -1,          -1, 0 }
+    { 0,        -1,           0, 0 }
 };
 
 static char const *cpu_fpucw_pc[] = {
@@ -104,7 +104,7 @@ static cpu_flag_info_t const cpu_fpucw_info[] = {
     { "PM",     FPUCW_PM_BIT, 1, 0 },
     { "PC",     FPUCW_PC_BIT, FPUCW_PC_BITS, cpu_fpucw_pc },
     { "RC",     FPUCW_RC_BIT, FPUCW_RC_BITS, cpu_mxcsr_rc },
-    { 0,        -1,          -1, 0 }
+    { 0,        -1,           0, 0 }
 };
 
 static cpu_flag_info_t const cpu_fpusw_info[] = {
@@ -122,7 +122,7 @@ static cpu_flag_info_t const cpu_fpusw_info[] = {
     { "TOP",    FPUSW_TOP_BIT, FPUSW_TOP_BITS, 0 },
     { "C3(z)",  FPUSW_C3_BIT, 1, 0 },
     { "B",      FPUSW_B_BIT,  1, 0 },
-    { 0,        -1,          -1, 0 }
+    { 0,        -1,           0, 0 }
 };
 
 typedef void (*isr_entry_t)(void);
@@ -368,9 +368,9 @@ int idt_init(int ap)
     idtr.base = addr;
     idtr.limit = sizeof(idt) - 1;
 
-    idt_xsave_detect(ap);
-
     idtr_load(&idtr);
+
+    idt_xsave_detect(ap);
 
     return 0;
 }

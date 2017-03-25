@@ -61,18 +61,22 @@ struct storage_dev_base_t {
 //
 // Storage Interface (IDE, AHCI, etc)
 
-struct storage_if_base_t {
+struct storage_if_factory_t {
+    storage_if_factory_t(char const *name);
     virtual if_list_t detect(void) = 0;
+};
+
+struct storage_if_base_t {
     virtual void cleanup() = 0;
     virtual if_list_t detect_devices() = 0;
 };
 
 #define STORAGE_IF_IMPL                 \
-    virtual if_list_t detect(void);     \
     virtual void cleanup();             \
     virtual if_list_t detect_devices();
 
-void register_storage_if_device(char const *name, storage_if_base_t *vtbl);
+void register_storage_if_device(char const *name,
+                                storage_if_factory_t *factory);
 
 typedef int dev_t;
 
@@ -163,6 +167,7 @@ struct fs_base_t;
 
 struct fs_factory_t {
     virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
+    explicit fs_factory_t(char const *name);
 };
 
 struct fs_base_t {

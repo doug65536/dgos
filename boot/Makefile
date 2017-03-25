@@ -34,7 +34,7 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-CC_IS_CLANG := $(shell ($(CC) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
+CXX_IS_CLANG := $(shell ($(CXX) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
 
 GDB := gdb
 QEMU := qemu-system-x86_64
@@ -77,7 +77,7 @@ QEMU_NET := \
 
 
 # Linking libgcc.a crashes my linker
-#LIBGCC := $(shell $(CC) -m32 -print-libgcc-file-name)
+#LIBGCC := $(shell $(CXX) -m32 -print-libgcc-file-name)
 #LIBGCCDIR := $(dir $(LIBGCC))
 #LIBGCCFILENAME = $(notdir $(LIBGCC))
 #LIBGCCNAME := $(patsubst lib%.a,%,$(LIBGCCFILENAME))
@@ -103,7 +103,7 @@ ifeq ($(CXX),clang++)
 	CXX := g++
 endif
 
-ifneq ($(CC_IS_CLANG),1)
+ifneq ($(CXX_IS_CLANG),1)
 	CXXFLAGS += \
 		-falign-functions=1 -falign-labels=1 \
 		-falign-loops=1 -falign-jumps=1 \
@@ -125,7 +125,7 @@ WEVERYTHING += -Wwrite-strings
 WEVERYTHING += -Wredundant-decls
 WEVERYTHING += -fstrict-aliasing
 
-ifneq ($(CC_IS_CLANG),1)
+ifneq ($(CXX_IS_CLANG),1)
 	#WEVERYTHING += -Wunsuffixed-float-constants
 endif
 
@@ -191,11 +191,13 @@ cleaner: clean deletedisk
 # Link binaries
 
 $(SYMBOLFILE): $(OBJS) $(LINKERSCRIPT)
+	mkdir -p $(DUMPDIR)
 	$(LD) $(LDFLAGS) --oformat elf32-little \
 		$(OUTPUT_OPTION) -g $(OBJS) > $(DUMPDIR)/bootsect-debug.map
 		#-L$(LIBGCCDIR) -l$(LIBGCCNAME)
 
 $(BOOTSECTORS): $(OBJS) $(LINKERSCRIPT)
+	mkdir -p $(DUMPDIR)
 	$(LD) $(LDFLAGS) --oformat binary \
 		$(OUTPUT_OPTION) $(OBJS) > $(DUMPDIR)/bootsect.map
 		#-L$(LIBGCCDIR) -l$(LIBGCCNAME)

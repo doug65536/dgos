@@ -16,6 +16,8 @@
 
 void cpu_init(int ap)
 {
+    (void)ap;
+
     // Enable write protection
     cpu_cr0_change_bits(0, CR0_WP);
 
@@ -46,7 +48,10 @@ void cpu_init(int ap)
     // Enable no-execute if feature available
     if (cpuid_has_nx())
         msr_adj_bit(MSR_EFER, 11, 1);
+}
 
+void cpu_init_stage2(int ap)
+{
     gdt_init();
     idt_init(ap);
     mmu_init(ap);

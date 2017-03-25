@@ -40,6 +40,7 @@ static void smp_main(void *arg)
 {
     (void)arg;
     cpu_init(1);
+    cpu_init_stage2(1);
 }
 
 REGISTER_CALLOUT(smp_main, 0, 'S', "100");
@@ -53,12 +54,12 @@ void (** volatile device_list)(void) = device_constructor_list;
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_AHCI_STRESS_THREAD   0
-#define ENABLE_SLEEP_THREAD         0
-#define ENABLE_MUTEX_THREAD         0
-#define ENABLE_REGISTER_THREAD      0
-#define ENABLE_STRESS_MMAP_THREAD   0
-#define ENABLE_CTXSW_STRESS_THREAD  0
+#define ENABLE_AHCI_STRESS_THREAD   1
+#define ENABLE_SLEEP_THREAD         1
+#define ENABLE_MUTEX_THREAD         1
+#define ENABLE_REGISTER_THREAD      1
+#define ENABLE_STRESS_MMAP_THREAD   1
+#define ENABLE_CTXSW_STRESS_THREAD  1
 #define ENABLE_STRESS_HEAP_THREAD   1
 #define ENABLE_FRAMEBUFFER_THREAD   1
 
@@ -119,10 +120,8 @@ static int read_stress(void *p)
     if (!drive)
         return 0;
 
-    // FIXME: lock the pages in the driver instead of
-    // requiring MAP_POPULATE
-    char *data = mmap(0, 65536, PROT_READ | PROT_WRITE,
-                      MAP_POPULATE, -1, 0);
+    char *data = (char*)mmap(0, 65536, PROT_READ | PROT_WRITE,
+                             0, -1, 0);
 
     printk("read buffer at %lx\n", (uint64_t)data);
 
@@ -130,7 +129,7 @@ static int read_stress(void *p)
     while (1) {
         ++*(char*)p;
 
-        drive->vtbl->read_blocks(drive, data, 1, lba);
+        drive->read_blocks(data, 1, lba);
 
         if (++lba > 32)
             lba = 16;
@@ -148,7 +147,7 @@ typedef struct test_thread_param_t {
 
 static int other_thread(void *p)
 {
-    test_thread_param_t *tp = p;
+    test_thread_param_t *tp = (test_thread_param_t *)p;
     while (1) {
         int odd = ++(*tp->p) & 1;
         if (tp->sleep)
@@ -804,7 +803,7 @@ static int init_thread(void *p)
     return 0;
 }
 
-int main(void)
+extern "C" int main(void)
 {
     thread_create(init_thread, 0, 0, 0);
 

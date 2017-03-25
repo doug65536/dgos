@@ -33,4 +33,4 @@ void auto_free(void *mem);
 void *operator new(size_t size);
 void *operator new[](size_t size);
 void operator delete(void *block, unsigned long size);
-void operator delete(void *block);
+void operator delete(void *block) throw();

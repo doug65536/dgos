@@ -6,7 +6,7 @@ struct gdt_entry_t {
                           uint8_t access_, uint8_t flags_)
         : limit_low(limit & 0xFFFF)
         , base_low(base & 0xFFFF)
-        , base_middle((limit >> 16) & 0xFF)
+        , base_middle((base >> 16) & 0xFF)
         , access(access_)
         , flags_limit_high(flags_ | (limit >> 24))
         , base_high(base >> 24)
@@ -36,8 +36,8 @@ typedef union gdt_entry_combined_t {
     gdt_entry_t mem;
     gdt_entry_tss_ldt_t tss_ldt;
 
-    gdt_entry_combined_t(gdt_entry_t e) : mem(e) {}
-    gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}
+    constexpr gdt_entry_combined_t(gdt_entry_t e) : mem(e) {}
+    constexpr gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}
 } gdt_entry_combined_t;
 
 #define GDT_ACCESS_PRESENT_BIT   7

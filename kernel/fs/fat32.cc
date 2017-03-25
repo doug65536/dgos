@@ -97,8 +97,12 @@ struct fat32_fs_t : public fs_base_t {
 };
 
 class fat32_factory_t : public fs_factory_t {
+public:
+    fat32_factory_t() : fs_factory_t("fat32") {}
     fs_base_t *mount(fs_init_info_t *conn);
 };
+
+static fat32_factory_t factory;
 
 static fat32_fs_t fat32_mounts[16];
 static unsigned fat32_mount_count;

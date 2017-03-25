@@ -1,4 +1,5 @@
 #pragma once
 
 extern "C" void cpu_init(int ap);
+extern "C" void cpu_init_stage2(int ap);
 extern "C" void cpu_hw_init(int ap);

@@ -5,6 +5,11 @@
 #include "spinlock.h"
 #include "printk.h"
 
+#include "assert.h"
+C_ASSERT(sizeof(gdt_entry_t) == 8);
+C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
+C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
+
 #define TSS_STACK_SIZE (PAGESIZE*2)
 
 static gdt_entry_combined_t gdt[] = {
@@ -26,7 +31,7 @@ static gdt_entry_combined_t gdt[] = {
     GDT_MAKE_DATASEG32(3),
     GDT_MAKE_EMPTY(),
     // CPU task selector
-    GDT_MAKE_TSSSEG(0L, sizeof(tss_t)), GDT_MAKE_TSSSEG(0L, sizeof(tss_t))
+    GDT_MAKE_TSSSEG(0L, sizeof(tss_t))
 };
 
 // Holds exclusive access to TSS segment descriptor
@@ -78,12 +83,12 @@ void gdt_init_tss(int cpu_count)
 
             if (st) {
                 tss_list[i].ist[st].lo = (uint32_t)
-                        (uintptr_t)stack + TSS_STACK_SIZE;
+                        ((uintptr_t)stack + TSS_STACK_SIZE);
                 tss_list[i].ist[st].hi = (uint32_t)
                         (((uintptr_t)stack + TSS_STACK_SIZE) >> 32);
             } else {
                 tss_list[i].rsp[0].lo = (uint32_t)
-                        (uintptr_t)stack + TSS_STACK_SIZE;
+                        ((uintptr_t)stack + TSS_STACK_SIZE);
                 tss_list[i].rsp[0].hi = (uint32_t)
                         (((uintptr_t)stack + TSS_STACK_SIZE) >> 32);
             }

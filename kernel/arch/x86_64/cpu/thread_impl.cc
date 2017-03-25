@@ -25,7 +25,7 @@
 
 // Implements platform independent thread.h
 
-typedef enum thread_state_t {
+enum thread_state_t : uint32_t {
     THREAD_IS_UNINITIALIZED = 0,
     THREAD_IS_INITIALIZING,
     THREAD_IS_SUSPENDED,
@@ -37,13 +37,13 @@ typedef enum thread_state_t {
 
     // Flag keeps other cpus from taking thread
     // until after stack switch
-    THREAD_BUSY = (int)0x80000000,
+    THREAD_BUSY = 0x80000000U,
     THREAD_IS_SUSPENDED_BUSY = THREAD_IS_SUSPENDED | THREAD_BUSY,
     THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
     THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY,
     THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
     THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY
-} thread_state_t;
+};
 
 typedef struct thread_info_t thread_info_t;
 typedef struct cpu_info_t cpu_info_t;
@@ -549,7 +549,7 @@ static thread_info_t *thread_choose_next(
 static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
-    atomic_and(&thread->state, ~THREAD_BUSY);
+    atomic_and(&thread->state, (thread_state_t)~THREAD_BUSY);
 }
 
 isr_context_t *thread_schedule(isr_context_t *ctx)
