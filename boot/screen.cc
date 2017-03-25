@@ -360,7 +360,7 @@ void print_line(char const* format, ...)
 
 void print_xy(uint16_t x, uint16_t y, uint16_t ch, uint16_t attr, uint16_t count)
 {
-    char buf[count+1];
+    char *buf = (char*)__builtin_alloca(count+1);
     for (uint16_t ofs = 0; ofs < count; ++ofs)
         buf[ofs] = (char)ch;
     buf[count] = 0;

@@ -139,8 +139,8 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
     vbe_info_t *info;
     vbe_mode_info_t *mode_info;
 
-    info = malloc(sizeof(*info));
-    mode_info = malloc(sizeof(*mode_info));
+    info = (vbe_info_t *)malloc(sizeof(*info));
+    mode_info = (vbe_mode_info_t *)malloc(sizeof(*mode_info));
 
     vbe_selected_mode_t sel;
 

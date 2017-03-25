@@ -15,7 +15,7 @@
 // registers the device driver
 #define REGISTER_DEVICE(type, name, id) \
     DEFINE_DEVICE(type, name); \
-    void name##_##type##_register_device(void *arg); \
+    extern "C" void name##_##type##_register_device(void *arg); \
     void name##_##type##_register_device(void *arg) \
     { \
         (void)arg; \

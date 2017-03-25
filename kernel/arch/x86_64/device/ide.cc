@@ -19,8 +19,6 @@ struct ide_chan_ports_t {
 struct ide_if_t : public storage_if_base_t {
     STORAGE_IF_IMPL
 
-    storage_if_vtbl_t *vtbl;
-
     ide_chan_ports_t ports[2];
     ioport_t bmdma_base;
 };

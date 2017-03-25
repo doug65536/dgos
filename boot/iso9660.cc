@@ -309,7 +309,7 @@ static uint32_t find_file_by_name(char const *filename,
                     return de->lba_lo_le | (de->lba_hi_le << 16);
                 }
 
-                de = (void*)((char*)de + ((de->len + 1) & -2));
+                de = (iso9660_dir_ent_t*)((char*)de + ((de->len + 1) & -2));
             } else {
                 // Give up, rest of space is zeros
                 // Directory entries never cross sector boundaries
@@ -386,7 +386,7 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     uint32_t sector_offset = ofs >> 11;
     uint16_t byte_offset = ofs & ((1 << 11)-1);
 
-    char *output = buf;
+    char *output = (char*)buf;
 
     int16_t status;
 
@@ -432,13 +432,14 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 
 void iso9660_boot_partition(uint32_t pvd_lba)
 {
-    file_handles = calloc(MAX_HANDLES, sizeof(*file_handles));
+    file_handles = (iso9660_sector_iterator_t *)
+            calloc(MAX_HANDLES, sizeof(*file_handles));
 
     paging_init();
 
-    iso9660_sector_buffer = malloc(2048);
+    iso9660_sector_buffer = (char *)malloc(2048);
 
-    iso9660_pvd_t *pvd = (void*)iso9660_sector_buffer;
+    iso9660_pvd_t *pvd = (iso9660_pvd_t*)iso9660_sector_buffer;
     uint32_t best_ofs = 0;
 
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {

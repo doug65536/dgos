@@ -3,7 +3,7 @@
 
 // ╔╗║╚╝═█
 // 01234567
-static char boxchars[8] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
+static char boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
 
 typedef enum boxchar_index_t {
     TL,

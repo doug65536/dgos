@@ -55,7 +55,9 @@ ASRCS := entry.s \
 
 LIBNAME := arch
 
-CLEANOTHER += buildtool/keyb_tool
+CLEANOTHER += buildtool/keyb_tool \
+	generated_device_vtbl.o \
+	generated_device_vtbl.s
 
 include $(BUILDROOT)/library.mk
 

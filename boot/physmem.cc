@@ -42,7 +42,8 @@ uint16_t get_ram_regions(uint32_t *ret_size)
         ++count;
     } while (continuation != 0);
 
-    physmem_range_t *result = calloc(count + 1, sizeof(*result));
+    physmem_range_t *result = (physmem_range_t*)
+            calloc(count + 1, sizeof(*result));
 
     continuation = 0;
     uint64_t total_memory = 0;

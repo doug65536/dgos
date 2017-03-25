@@ -74,7 +74,7 @@ CXXFLAGS := -g3 -fno-stack-protector \
 	-msse -msse2 \
 	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
-	-std=c++14 -fpermissive -ffreestanding \
+	-std=c++14 -fpermissive -ffreestanding -fno-rtti \
 	$(WEVERYTHING)
 
 #-std=c++11 -x c++ \

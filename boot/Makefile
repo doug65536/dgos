@@ -92,19 +92,19 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m16
 TARGET_ARCH_AS := --32
 
-CFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
-	-Wall -Wextra -Wpedantic -Werror -Wmissing-prototypes \
+CXXFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
+	-Wall -Wextra -Wpedantic -Werror \
 	-mno-sse -mno-sse2 -mfpmath=387 \
-	-fno-asynchronous-unwind-tables -fno-exceptions \
+	-fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti \
 	-mrtd -mregparm=3 \
 	-std=c++14
 
-ifeq ($(CC),clang)
-	CC := gcc
+ifeq ($(CXX),clang++)
+	CXX := g++
 endif
 
 ifneq ($(CC_IS_CLANG),1)
-	CFLAGS += \
+	CXXFLAGS += \
 		-falign-functions=1 -falign-labels=1 \
 		-falign-loops=1 -falign-jumps=1 \
 		-mno-align-stringops
@@ -119,23 +119,23 @@ WEVERYTHING += -Wdouble-promotion
 WEVERYTHING += -Wformat=2
 WEVERYTHING += -Wfloat-equal
 WEVERYTHING += -Wundef
-WEVERYTHING += -Wbad-function-cast
+#WEVERYTHING += -Wbad-function-cast
 WEVERYTHING += -Wwrite-strings
-WEVERYTHING += -Wmissing-prototypes
+#WEVERYTHING += -Wmissing-prototypes
 WEVERYTHING += -Wredundant-decls
 WEVERYTHING += -fstrict-aliasing
 
 ifneq ($(CC_IS_CLANG),1)
-	WEVERYTHING += -Wunsuffixed-float-constants
+	#WEVERYTHING += -Wunsuffixed-float-constants
 endif
 
-CFLAGS += $(WEVERYTHING)
+CXXFLAGS += $(WEVERYTHING)
 
 # Optimize
-#CFLAGS += -Os -DNDEBUG
+#CXXFLAGS += -Os -DNDEBUG
 
 ifdef TUNEFOR
-	CFLAGS += -mtune=$(TUNEFOR)
+	CXXFLAGS += -mtune=$(TUNEFOR)
 endif
 
 LINKERSCRIPT = bootsect.ld
@@ -166,8 +166,8 @@ DISKIMAGE := $(DISKIMGDIR)/dgos.fat32.raw
 LDFLAGS := -m i386linux -no-stdlib -M -T bootsect.ld
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
-$(NEEDSMALLEST:.cc=.o): CFLAGS += -Os -DNDEBUG
-$(NOOPTIMIZE:.cc=.o): CFLAGS += -O0
+$(NEEDSMALLEST:.cc=.o): CXXFLAGS += -Os -DNDEBUG
+$(NOOPTIMIZE:.cc=.o): CXXFLAGS += -O0
 
 ISO_DEPENDS := bootsect.bin dgos-kernel hello.km background.png
 ISO_TARGETS := $(patsubst %,$(ISO_STAGE)/%,$(ISO_DEPENDS))

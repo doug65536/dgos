@@ -11,6 +11,6 @@
 void scroll_screen(void);
 void copy_to_screen(uint16_t offset, char const *message, uint8_t attr);
 
-void print_line(char const* format, ...) ATTRIBUTE_FORMAT(1, 2);
+extern "C" void print_line(char const* format, ...) ATTRIBUTE_FORMAT(1, 2);
 void print_xy(uint16_t x, uint16_t y, uint16_t ch, uint16_t attr, uint16_t count);
 extern char const hexlookup[];

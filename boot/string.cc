@@ -9,7 +9,7 @@ size_t strlen(char const *src)
 
 void *memchr(void const *mem, int ch, size_t count)
 {
-    for (char const *p = mem; count--; ++p)
+    for (char const *p = (char const *)mem; count--; ++p)
         if (*p == (char)ch)
             return (void *)p;
    return 0;
@@ -52,8 +52,8 @@ int strncmp(char const *lhs, char const *rhs, size_t count)
 
 int memcmp(void const *lhs, void const *rhs, size_t count)
 {
-    unsigned char const *lp = lhs;
-    unsigned char const *rp = rhs;
+    unsigned char const *lp = (unsigned char const *)lhs;
+    unsigned char const *rp = (unsigned char const *)rhs;
     int cmp = 0;
     if (count) {
         do {
@@ -89,7 +89,7 @@ char *strstr(char const *str, char const *substr)
 
 void *memset(void *dest, int c, size_t n)
 {
-    char *p = dest;
+    char *p = (char*)dest;
     while (n--)
         *p++ = (char)c;
     return dest;
@@ -97,8 +97,8 @@ void *memset(void *dest, int c, size_t n)
 
 void *memcpy(void *dest, void const *src, size_t n)
 {
-    char *d = dest;
-    char const *s = src;
+    char *d = (char*)dest;
+    char const *s = (char const *)src;
     while (n--)
         *d++ = *s++;
     return dest;
@@ -106,8 +106,8 @@ void *memcpy(void *dest, void const *src, size_t n)
 
 void *memmove(void *dest, void const *src, size_t n)
 {
-    char *d = dest;
-    char const *s = src;
+    char *d = (char*)dest;
+    char const *s = (char const *)src;
 
     if (d < s || s + n <= d)
         return memcpy(d, s, n);

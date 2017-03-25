@@ -167,7 +167,7 @@ typedef struct idt_entry_64_t {
 
 uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
 
-void copy_or_enter(uint64_t address, uint32_t src, uint32_t size);
+extern "C" void copy_or_enter(uint64_t address, uint32_t src, uint32_t size);
 
 #define USE_PORT_FUNCTIONS 0
 #if USE_PORT_FUNCTIONS

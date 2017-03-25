@@ -112,7 +112,7 @@ extern uint32_t bootinfo_primary_volume_desc;
 uint8_t boot_drive __attribute__((used));
 uint8_t fully_loaded __attribute__((used));
 
-int init(void);
+extern "C" int init(void);
 
 typedef struct disk_address_packet_t {
     uint8_t sizeof_packet;

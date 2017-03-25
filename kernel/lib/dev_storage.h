@@ -19,15 +19,6 @@
 //
 // Forward declarations
 
-struct STORAGE_DEV_T;
-struct storage_dev_vtbl_t;
-
-struct STORAGE_IF_T;
-struct storage_if_vtbl_t;
-
-struct storage_dev_base_t;
-struct storage_if_base_t;
-
 typedef struct if_list_t {
     void *base;
     unsigned stride;

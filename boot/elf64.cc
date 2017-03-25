@@ -20,7 +20,7 @@
 #define ELF64_TRACE(...) ((void)0)
 #endif
 
-void enter_kernel(uint64_t entry_point);
+extern "C" void enter_kernel(uint64_t entry_point);
 
 // Save the entry point address for later MP processor startup
 uint64_t mp_enter_kernel;
@@ -96,7 +96,7 @@ uint16_t elf64_run(char const *filename)
         nx_page_flags = PTE_NX;
 
     int file = boot_open(filename);
-    size_t read_size;
+    ssize_t read_size;
     Elf64_Ehdr file_hdr;
 
     read_size = boot_pread(file,
@@ -183,10 +183,10 @@ uint16_t elf64_run(char const *filename)
 
         uint64_t page_alloc = blk->p_paddr;
 
-        size_t chunk_size;
+        ssize_t chunk_size;
         uint64_t addr = blk->p_vaddr;
         uint64_t remain = blk->p_memsz;
-        uint64_t file_remain = blk->p_filesz;
+        Elf64_Off file_remain = blk->p_filesz;
         Elf64_Off bss_ofs = blk->p_offset + blk->p_filesz;
         Elf64_Off bss_remain = blk->p_memsz - blk->p_filesz;
         for (Elf64_Off ofs = blk->p_offset,
@@ -200,7 +200,7 @@ uint16_t elf64_run(char const *filename)
 
             // Handle partial read/zero
             if (ofs < bss_ofs) {
-                if (chunk_size > file_remain)
+                if ((Elf64_Off)chunk_size > file_remain)
                     chunk_size = file_remain;
                 file_remain -= chunk_size;
             } else if (ofs >= bss_ofs) {

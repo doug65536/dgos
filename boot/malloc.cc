@@ -99,7 +99,7 @@ static always_inline uint16_t payload_of(uint16_t addr)
 static always_inline char *payload_ptr_of(uint16_t addr)
 {
     DEBUG_ONLY(check_valid_header(addr))
-    return (void*)(uint32_t)payload_of(addr);
+    return (char*)(uint32_t)payload_of(addr);
 }
 
 static always_inline uint16_t id_of(uint16_t addr)
@@ -317,7 +317,7 @@ void *calloc(uint16_t num, uint16_t size)
 static uint16_t *alloc_random_block()
 {
     uint16_t size = rand_range(8, 512) >> 1;
-    uint16_t *block = malloc(size * sizeof(uint16_t));
+    uint16_t *block = (uint16_t*)malloc(size * sizeof(uint16_t));
 
     if (!block) {
         print_line("Warning, malloc failed, size=%d", size);
@@ -401,7 +401,7 @@ void test_malloc(void)
 
     // Try huge allocation and make sure it fails
     // Also coalesces all free blocks
-    ptrs[0] = malloc(0xFFFF);
+    ptrs[0] = (uint16_t *)malloc(0xFFFF);
     // Should fail
     if (ptrs[0])
         debug_break();
@@ -418,6 +418,12 @@ void *operator new(size_t size)
 }
 
 void operator delete(void *block, unsigned long size)
+{
+    (void)size;
+    free(block);
+}
+
+void operator delete(void *block, unsigned size)
 {
     (void)size;
     free(block);
