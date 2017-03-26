@@ -167,6 +167,13 @@ __cxa_pure_virtual:
 	mov $pure_call_message,%rdi
 	jmp panic
 
+.global __cxa_atexit
+__cxa_atexit:
+	ret
+
 .section .rodata
 pure_call_message:
 	.string "Pure virtual function called"
+
+.global __dso_handle
+__dso_handle: .quad __dso_handle

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "cpuid.h"
 
 #define MSR_FSBASE      0xC0000100
 #define MSR_GSBASE      0xC0000101
@@ -291,9 +292,65 @@ static inline uintptr_t cpu_get_page_directory(void)
     return addr;
 }
 
+static inline uintptr_t cpu_get_fault_address(void)
+{
+    uintptr_t addr;
+    __asm__ __volatile__ (
+        "mov %%cr2,%[addr]\n\t"
+        : [addr] "=r" (addr)
+    );
+    return addr;
+}
+
+static inline void cpu_invalidate_page(uintptr_t addr)
+{
+    __asm__ __volatile__ (
+        "invlpg %[addr]\n\t"
+        :
+        : [addr] "m" (*(char*)addr)
+        : "memory"
+    );
+}
+
+static inline void cpu_invalidate_pcid(
+        uintptr_t type, int32_t pcid, uintptr_t addr)
+{
+    struct {
+        int64_t pcid;
+        uintptr_t addr;
+    } arg __attribute__((aligned(16))) = {
+        pcid,
+        addr
+    };
+    __asm__ __volatile__ (
+        "invpcid %[arg],%[reg]\n\t"
+        :
+        : [reg] "r" (type)
+        , [arg] "m" (arg)
+        : "memory"
+    );
+}
+
 static inline void cpu_flush_tlb(void)
 {
-    cpu_set_page_directory(cpu_get_page_directory());
+    if (cpuid_has_invpcid()) {
+        //
+        // Flush all with invpcid
+
+        cpu_invalidate_pcid(2, 0, 0);
+    } else if (cpuid_has_pge()) {
+        //
+        // Flush all global by toggling global mappings
+
+        // Toggle PGE off and on
+        cpu_cr4_change_bits(CR4_PGE, 0);
+        cpu_cr4_change_bits(0, CR4_PGE);
+    } else {
+        //
+        // Reload CR3
+
+        cpu_set_page_directory(cpu_get_page_directory());
+    }
 }
 
 static inline void cpu_set_fs(uint16_t selector)
@@ -401,45 +458,6 @@ static inline void cpu_xsave(void *fpuctx)
         "xsave64 (%[fpuctx])\n\t"
         :
         : "a" (-1), "d" (-1), [fpuctx] "D" (fpuctx)
-        : "memory"
-    );
-}
-
-static inline uintptr_t cpu_get_fault_address(void)
-{
-    uintptr_t addr;
-    __asm__ __volatile__ (
-        "mov %%cr2,%[addr]\n\t"
-        : [addr] "=r" (addr)
-    );
-    return addr;
-}
-
-static inline void cpu_invalidate_page(uintptr_t addr)
-{
-    __asm__ __volatile__ (
-        "invlpg %[addr]\n\t"
-        :
-        : [addr] "m" (*(char*)addr)
-        : "memory"
-    );
-}
-
-static inline void cpu_invalidate_pcid(
-        uintptr_t type, int32_t pcid, uintptr_t addr)
-{
-    struct {
-        int64_t pcid;
-        uintptr_t addr;
-    } arg __attribute__((aligned(16))) = {
-        pcid,
-        addr
-    };
-    __asm__ __volatile__ (
-        "invpcid %[arg],%[reg]\n\t"
-        :
-        : [reg] "r" (type)
-        , [arg] "m" (arg)
         : "memory"
     );
 }

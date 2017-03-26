@@ -56,7 +56,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   1
+#define ENABLE_READ_STRESS_THREAD   16
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -135,7 +135,8 @@ static int read_stress(void *p)
         uint64_t lba = rand_r_range(&seed, 16, 32);
         int status = drive->read_blocks(data, 1, lba);
 
-        printdbg("Storage read status=%d count=%lu\n", status, ++count);
+        if (status != 0 || !(++count & ~-256))
+            printdbg("Storage read status=%d count=%lu\n", status, count);
 
         if (++lba > 32)
             lba = 16;

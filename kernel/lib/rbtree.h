@@ -12,8 +12,6 @@ private:
     typedef Tkey key_t;
     typedef Tval val_t;
 
-    rbtree_t() {}
-
 public:
     struct kvp_t {
         key_t key;
@@ -25,7 +23,12 @@ public:
     typedef int (*visitor_t)(kvp_t *kvp, void *p);
     typedef int (*cmp_t)(kvp_t const *lhs, kvp_t const *rhs, void *p);
 
-    static rbtree_t *create(cmp_t cmp, void *p, size_t capacity);
+    rbtree_t();
+
+    // Returns true if the tree is initialized
+    operator bool() const;
+
+    rbtree_t &init(cmp_t cmp, void *p);
     ~rbtree_t();
 
     iter_t lower_bound_pair(kvp_t *kvp);
@@ -180,7 +183,15 @@ rbtree_t<Tkey,Tval>::alloc_node()
                     sizeof(*nodes) * capacity);
         if (!new_nodes)
             return 0;
+
+
+        if (unlikely(!nodes)) {
+            memset(new_nodes, 0, sizeof(*nodes));
+            new_nodes[0].color = BLACK;
+        }
+
         nodes = new_nodes;
+
         n = size++;
     }
 
@@ -457,39 +468,41 @@ int rbtree_t<Tkey,Tval>::walk_impl(visitor_t callback, void *p, iter_t n)
 // Public API
 
 template<typename Tkey, typename Tval>
-rbtree_t<Tkey,Tval> *
-rbtree_t<Tkey,Tval>::create(cmp_t cmp, void *p, size_t capacity)
+rbtree_t<Tkey,Tval>::rbtree_t()
+    : nodes(nullptr)
+    , cmp(nullptr)
+    , cmp_param(nullptr)
+    , size(0)
+    , capacity(0)
+    , root(0)
+    , free(0)
+    , count(0)
 {
-    if (capacity == 0)
-        capacity = RBTREE_CAPACITY_FROM_BYTES(PAGE_SIZE - _MALLOC_OVERHEAD);
-    else
-        capacity -= ((sizeof(rbtree_t) + _MALLOC_OVERHEAD) +
-                ((sizeof(rbtree_t) + _MALLOC_OVERHEAD) - 1)) /
-                sizeof(node_t);
+}
 
-    rbtree_t *tree = (rbtree_t*)calloc(1, sizeof(*tree) +
-                                       sizeof(*nodes) *
-                                       capacity);
+template<typename Tkey, typename Tval>
+rbtree_t<Tkey,Tval>::operator bool() const
+{
+    return nodes != nullptr;
+}
 
-    if (tree) {
-        tree->cmp = cmp;
-        tree->cmp_param = p;
-        tree->root = 0;
-        tree->free = 0;
+template<typename Tkey, typename Tval>
+rbtree_t<Tkey,Tval> &
+rbtree_t<Tkey,Tval>::init(cmp_t init_cmp, void *p)
+{
+    cmp = init_cmp;
+    cmp_param = p;
+    root = 0;
+    free = 0;
 
-        // Size includes nil node
-        tree->size = 1;
-        tree->capacity = capacity;
-        tree->count = 0;
+    // Size includes nil node
+    size = 1;
+    capacity = 0;
+    count = 0;
 
-        tree->nodes = (node_t*)(tree + 1);
+    nodes = nullptr;
 
-        // Clear nil node
-        memset(tree->nodes, 0, sizeof(*tree->nodes));
-        tree->nodes[0].color = BLACK;
-    }
-
-    return tree;
+    return *this;
 }
 
 template<typename Tkey, typename Tval>
@@ -960,7 +973,8 @@ int rbtree_t<Tkey,Tval>::test(void)
 
     for (int pass = 0; pass < 4; ++pass) {
         for (int order = 0; order < 4; ++order) {
-            rbtree_t *tree = rbtree_t::create(&rbtree_t::test_cmp, 0, 0);
+            rbtree_t tree;
+            tree.init(&rbtree_t::test_cmp, 0);
 
             scenario[0] = orders[order][(0 + pass) & 3];
             scenario[1] = orders[order][(1 + pass) & 3];
@@ -973,31 +987,30 @@ int rbtree_t<Tkey,Tval>::test(void)
                    values[scenario[2]],
                    values[scenario[3]]);
 
-            tree->insert(values[scenario[0]], 0);
-            tree->insert(values[scenario[1]], 0);
-            tree->insert(values[scenario[2]], 0);
-            tree->insert(values[scenario[3]], 0);
+            tree.insert(values[scenario[0]], 0);
+            tree.insert(values[scenario[1]], 0);
+            tree.insert(values[scenario[2]], 0);
+            tree.insert(values[scenario[3]], 0);
 
-            tree->walk(test_visit, 0);
+            tree.walk(test_visit, 0);
 
             RBTREE_TRACE("---\n");
 
             for (int del = 0; del < 4; ++del) {
                 RBTREE_TRACE("Delete %d\n", values[scenario[del]]);
-                tree->delete_item(values[scenario[del]], 0);
-                tree->dump();
-                tree->walk(test_visit, 0);
+                tree.delete_item(values[scenario[del]], 0);
+                tree.dump();
+                tree.walk(test_visit, 0);
                 RBTREE_TRACE("---\n");
             }
-
-            delete tree;
         }
     }
 
     int seq[24];
     for (int dist = 4; dist <= 24; ++dist) {
         for (int pass = 0; pass < 2; ++pass) {
-            rbtree_t *tree = rbtree_t::create(&rbtree_t::test_cmp, 0, 0);
+            rbtree_t tree;
+            tree.init(&rbtree_t::test_cmp, 0);
 
             for (int i = 0; i < dist; ++i) {
                 if (!pass)
@@ -1005,13 +1018,11 @@ int rbtree_t<Tkey,Tval>::test(void)
                 else
                     seq[i] = 27 - i;
 
-                tree->insert(seq[i], 0);
-                tree->validate();
+                tree.insert(seq[i], 0);
+                tree.validate();
             }
 
-            tree->walk(test_visit, 0);
-
-            delete tree;
+            tree.walk(test_visit, 0);
 
             RBTREE_TRACE("---\n");
         }
