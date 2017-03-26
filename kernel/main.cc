@@ -29,6 +29,8 @@
 #include "framebuffer.h"
 #include "math.h"
 
+//#include "vector.h"
+
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
 

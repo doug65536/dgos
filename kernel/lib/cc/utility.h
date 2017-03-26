@@ -1,17 +1,17 @@
 #pragma once
-#include "type_traits"
+#include "type_traits.h"
 
 template<typename _T>
-typename std::remove_reference<_T>::type&&
+constexpr typename remove_reference<_T>::type&&
 move(_T&& __t) noexcept
 {
     return static_cast<typename remove_reference<_T>::type&&>(__t);
 }
 
 template<typename _T>
-constexpr typename std::remove_reference<_T>::type&&
-move(_T&& __t) noexcept
+void swap(_T& lhs, _T& rhs)
 {
-    return static_cast<typename remove_reference<_T>::type&&>(__t);
+    _T tmp(move(lhs));
+    lhs = move(rhs);
+    rhs = move(tmp);
 }
-

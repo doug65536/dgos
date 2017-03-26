@@ -3,17 +3,17 @@
 template<typename _T>
 struct remove_reference
 {
-    typedef T type;
+	typedef _T type;
 };
 
 template<typename _T >
 struct remove_reference<_T&>
 {
-    typedef T type;
+	typedef _T type;
 };
 
 template<typename _T>
 struct remove_reference<_T&&>
 {
-    typedef T type;
+	typedef _T type;
 };

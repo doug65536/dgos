@@ -21,9 +21,12 @@ arch/x86_64/elf64.h
 arch/x86_64/elf64_decl.h
 dep-zlib.mk
 fs/fat32_decl.h
+lib/cc/algorithm.h
 lib/cc/array
+lib/cc/initializer_list.h
 lib/cc/type_traits.h
 lib/cc/utility.h
+lib/cc/vector.h
 lib/dev_eth.cc
 lib/dev_eth.h
 lib/dirent.h

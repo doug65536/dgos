@@ -38,4 +38,3 @@ static inline uint8_t bit_log2_n_64(int64_t n)
     uint8_t top = bit_msb_set_64(n);
     return top + !!(~((uint64_t)-1 << top) & n);
 }
-

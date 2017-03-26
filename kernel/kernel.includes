@@ -10,3 +10,4 @@ fs
 net
 extern/include
 lib/sys
+lib/cc
