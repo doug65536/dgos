@@ -75,7 +75,7 @@ struct storage_if_base_t {
     virtual void cleanup();             \
     virtual if_list_t detect_devices();
 
-void register_storage_if_device(char const *name,
+void storage_if_register_factory(char const *name,
                                 storage_if_factory_t *factory);
 
 typedef int dev_t;
@@ -360,12 +360,13 @@ struct fs_base_t {
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 
-void register_fs_device(char const *name, fs_factory_t *fs);
+void fs_register_factory(char const *name, fs_factory_t *fs);
 
 //
 // Partitioning scheme (MBR, UEFI, etc)
 
 struct part_factory_t {
+    part_factory_t(char const *name);
     virtual if_list_t detect(storage_dev_base_t *drive) = 0;
 };
 
@@ -378,7 +379,7 @@ struct part_dev_t {
     char const *name;
 };
 
-void register_part_device(char const *name, part_factory_t *factory);
+void part_register_factory(char const *name, part_factory_t *factory);
 
 void fs_mount(char const *fs_name, fs_init_info_t *info);
 fs_base_t *fs_from_id(size_t id);

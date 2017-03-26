@@ -17,8 +17,11 @@ struct ide_chan_ports_t {
 };
 
 struct ide_if_factory_t : public storage_if_factory_t {
+    ide_if_factory_t() : storage_if_factory_t("ide") {}
     virtual if_list_t detect(void);
 };
+
+static ide_if_factory_t ide_factory;
 
 struct ide_if_t : public storage_if_base_t {
     STORAGE_IF_IMPL

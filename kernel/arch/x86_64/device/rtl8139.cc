@@ -51,9 +51,12 @@
 #define RTL8139_MM_RD_32(reg) \
     rtl8139_mm_in_32(reg)
 
-struct rtl8139_factory_t : public eth_factory_t {
-    virtual int detect(eth_dev_base_t ***result) = 0;
+struct rtl8139_factory_t : public eth_dev_factory_t {
+    rtl8139_factory_t() : eth_dev_factory_t("rtl8139") {}
+    virtual int detect(eth_dev_base_t ***result);
 };
+
+static rtl8139_factory_t rtl8139_factory;
 
 struct rtl8139_dev_t : public eth_dev_base_t {
     ETH_DEV_IMPL

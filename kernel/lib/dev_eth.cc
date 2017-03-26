@@ -8,18 +8,39 @@
 #define ETH_DEV_TRACE(...) ((void)0)
 #endif
 
+#define MAX_ETH_FACTORIES 16
+static eth_dev_factory_t *eth_factories[MAX_ETH_FACTORIES];
+static unsigned eth_factory_count;
+
 #define MAX_ETH_DEVICES 16
 static eth_dev_base_t *eth_devices[MAX_ETH_DEVICES];
 static unsigned eth_device_count;
 
-void register_eth_dev_device(const char *name, eth_factory_t *dev)
+void register_eth_dev_factory(const char *name, eth_dev_factory_t *factory)
 {
     (void)name;
-    ETH_DEV_TRACE("Registered %s device\n", name);
+    if (eth_factory_count < MAX_ETH_FACTORIES) {
+        eth_factories[eth_factory_count++] = factory;
+        ETH_DEV_TRACE("Registered %s device\n", name);
+    } else {
+        ETH_DEV_TRACE("Too many ethernet device factories,"
+                      " dropped %s!\n", name);
+    }
+}
 
-    eth_dev_base_t **devices = 0;
-    unsigned added_devices = dev->detect(&devices);
+static void invoke_eth_dev_factories(void*)
+{
+    for (unsigned df = 0; df < eth_factory_count; ++df) {
+        eth_dev_base_t **devices = 0;
+        unsigned added_devices = eth_factories[df]->detect(&devices);
+        for (unsigned i = 0; i < added_devices; ++i)
+            eth_devices[eth_device_count++] = devices[i];
+    }
+}
 
-    for (unsigned i = 0; i < added_devices; ++i)
-        eth_devices[eth_device_count++] = devices[i];
+REGISTER_CALLOUT(invoke_eth_dev_factories, nullptr, 'N', "000");
+
+eth_dev_factory_t::eth_dev_factory_t(const char *name)
+{
+    register_eth_dev_factory(name, this);
 }

@@ -18,7 +18,7 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-#OPTIMIZE := 1
+OPTIMIZE := 1
 #LTO := 1
 CC := clang
 CXX := clang++
@@ -41,7 +41,7 @@ OBJS := $(AOBJS) $(COBJS)
 TARGET_ARCH := -m64
 TARGET_ARCH_AS := --64
 
-INCS := . arch arch/$(ARCH) lib fs net extern/include
+INCS := . arch arch/$(ARCH) lib lib/cc cc fs net extern/include
 INCLUDEPATHS := $(patsubst %,$(BUILDROOT)/%,$(INCS))
 INCLUDEARGS := $(patsubst %,-I%,$(INCLUDEPATHS))
 
@@ -124,13 +124,13 @@ LINKERSCRIPT := arch/$(ARCH)/kernel.ld
 KERNEL := $(BINDIR)/kernel
 
 LIBFILES := \
-	lib/libkernel.a \
-	arch/$(ARCH)/libarch.a
+	lib/libkernel.a
 
 EXTERNLIBFILES := \
 	extern/zlib-src/build/libz.a
 
 LIBFILES_WHOLE := \
+	arch/$(ARCH)/libarch.a \
 	fs/libfs.a \
 	net/libnet.a
 
@@ -185,9 +185,11 @@ $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOL
 		$(patsubst %,$(WLPREFIX)%,$(LDFLAGS)) \
 		$(OBJS) \
 		-Wl,--start-group \
-		$(LIBFILES) \
-		$(EXTERNLIBFILES) \
-		-Wl,--whole-archive $(LIBFILES_WHOLE) -Wl,--no-whole-archive \
+			$(LIBFILES) \
+			$(EXTERNLIBFILES) \
+			-Wl,--whole-archive \
+				$(LIBFILES_WHOLE) \
+			-Wl,--no-whole-archive \
 		-Wl,--end-group \
 		-Wl,-build-id=none
 

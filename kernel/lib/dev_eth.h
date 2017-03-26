@@ -5,7 +5,8 @@
 #include "dev_registration.h"
 #include "eth_q.h"
 
-struct eth_factory_t {
+struct eth_dev_factory_t {
+    eth_dev_factory_t(char const *name);
     virtual int detect(eth_dev_base_t ***result) = 0;
 };
 
@@ -27,4 +28,4 @@ struct eth_dev_base_t {
     virtual int get_promiscuous();                  \
     virtual void set_promiscuous(int promiscuous);
 
-void register_eth_dev_device(char const *name, eth_factory_t *dev);
+void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory);

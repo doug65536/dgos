@@ -1,10 +1,19 @@
-#define STORAGE_DEV_NAME storage
 #include "dev_storage.h"
-#undef STORAGE_DEV_NAME
 
 #include "printk.h"
 #include "string.h"
 #include "assert.h"
+
+#define DEBUG_STORAGE   1
+#if DEBUG_STORAGE
+#define STORAGE_TRACE(...) printdbg("storage: " __VA_ARGS__)
+#else
+#define STORAGE_TRACE(...) ((void)0)
+#endif
+
+#define MAX_STORAGE_FACTORIES 16
+static storage_if_factory_t *storage_factories[MAX_STORAGE_FACTORIES];
+static unsigned storage_factory_count;
 
 #define MAX_STORAGE_IFS 64
 static storage_if_base_t *storage_ifs[MAX_STORAGE_IFS];
@@ -16,7 +25,7 @@ static unsigned storage_dev_count;
 
 #define MAX_PART_FACTORIES   4
 static part_factory_t *part_factories[MAX_PART_FACTORIES];
-static int part_factory_count;
+static unsigned part_factory_count;
 
 typedef struct fs_reg_t {
     char const *name;
@@ -47,41 +56,58 @@ void close_storage_dev(storage_dev_base_t *dev)
     (void)dev;
 }
 
-void register_storage_if_device(char const *name,
+void storage_if_register_factory(char const *name,
                                 storage_if_factory_t *factory)
 {
-    // Get a list of storage devices of this type
-    if_list_t if_list = factory->detect();
+    (void)name;
 
-    for (unsigned i = 0; i < if_list.count; ++i) {
-        // Calculate pointer to storage interface instance
-        storage_if_base_t *if_ = (storage_if_base_t *)
-                ((char*)if_list.base + i * if_list.stride);
-
-        assert(storage_if_count < countof(storage_ifs));
-
-        // Store interface instance
-        storage_ifs[storage_if_count++] = if_;
-
-        // Get a list of storage devices on this interface
-        if_list_t dev_list;
-        dev_list = if_->detect_devices();
-
-        for (unsigned k = 0; k < dev_list.count; ++k) {
-            // Calculate pointer to storage device instance
-            storage_dev_base_t *dev = (storage_dev_base_t*)
-                    ((char*)dev_list.base +
-                    k * dev_list.stride);
-            assert(storage_dev_count < countof(storage_devs));
-
-            // Store device instance
-            storage_devs[storage_dev_count++] = dev;
-        }
+    if (storage_factory_count < MAX_STORAGE_FACTORIES) {
+        storage_factories[storage_factory_count++] = factory;
+        STORAGE_TRACE("Registered storage driver %s\n", name);
+    } else {
+        STORAGE_TRACE("Too many storage drivers, dropped %s!\n", name);
     }
-    printdbg("%s device registered\n", name);
 }
 
-void register_fs_device(const char *name, fs_factory_t *fs)
+void invoke_storage_factories(void *)
+{
+    for (unsigned df = 0; df < storage_factory_count; ++df) {
+        storage_if_factory_t *factory = storage_factories[df];
+
+        // Get a list of storage devices of this type
+        if_list_t if_list = factory->detect();
+
+        for (unsigned i = 0; i < if_list.count; ++i) {
+            // Calculate pointer to storage interface instance
+            storage_if_base_t *if_ = (storage_if_base_t *)
+                    ((char*)if_list.base + i * if_list.stride);
+
+            assert(storage_if_count < countof(storage_ifs));
+
+            // Store interface instance
+            storage_ifs[storage_if_count++] = if_;
+
+            // Get a list of storage devices on this interface
+            if_list_t dev_list;
+            dev_list = if_->detect_devices();
+
+            for (unsigned k = 0; k < dev_list.count; ++k) {
+                // Calculate pointer to storage device instance
+                storage_dev_base_t *dev = (storage_dev_base_t*)
+                        ((char*)dev_list.base +
+                        k * dev_list.stride);
+                assert(storage_dev_count < countof(storage_devs));
+
+                // Store device instance
+                storage_devs[storage_dev_count++] = dev;
+            }
+        }
+    }
+}
+
+REGISTER_CALLOUT(invoke_storage_factories, 0, 'H', "000");
+
+void fs_register_factory(const char *name, fs_factory_t *fs)
 {
     if (fs_reg_count < MAX_FS_REGS) {
         fs_regs[fs_reg_count].name = name;
@@ -125,10 +151,19 @@ fs_base_t *fs_from_id(size_t id)
     return fs_mounts[id].fs;
 }
 
-void register_part_factory(const char *name, part_factory_t *factory)
+void part_register_factory(const char *name, part_factory_t *factory)
 {
     if (part_factory_count < MAX_PART_FACTORIES) {
         part_factories[part_factory_count++] = factory;
+    }
+    printk("%s partition type registered\n", name);
+}
+
+static void invoke_part_factories(void *arg)
+{
+    (void)arg;
+    for (unsigned fi = 0; fi < part_factory_count; ++fi) {
+        part_factory_t *factory = part_factories[fi];
 
         for (unsigned dev = 0; dev < storage_dev_count; ++dev) {
             storage_dev_base_t *drive = open_storage_dev(dev);
@@ -149,15 +184,21 @@ void register_part_factory(const char *name, part_factory_t *factory)
             }
         }
     }
-    printk("%s partition type registered\n", name);
 }
+
+REGISTER_CALLOUT(invoke_part_factories, nullptr, 'P', "000");
 
 fs_factory_t::fs_factory_t(char const *name)
 {
-    register_fs_device(name, this);
+    fs_register_factory(name, this);
 }
 
 storage_if_factory_t::storage_if_factory_t(const char *name)
 {
-    register_storage_if_device(name, this);
+    storage_if_register_factory(name, this);
+}
+
+part_factory_t::part_factory_t(const char *name)
+{
+    part_register_factory(name, this);
 }

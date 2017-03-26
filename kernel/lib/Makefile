@@ -34,8 +34,7 @@ CSRCS := mm.cc \
 	png.cc \
 	zlib_helper.cc \
 	framebuffer.cc \
-	unique_ptr.cc \
-	array.cc
+	unique_ptr.cc
 
 framebuffer.o: CXXFLAGS += -ffast-math
 

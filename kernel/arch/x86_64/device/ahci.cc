@@ -1135,7 +1135,7 @@ struct ahci_if_factory_t : public storage_if_factory_t {
     virtual if_list_t detect(void);
 };
 
-static ahci_if_factory_t factory;
+ahci_if_factory_t ahci_factory;
 
 // AHCI interface instance
 struct ahci_if_t : public storage_if_base_t {

@@ -5,12 +5,13 @@
 //  'M': VMM initialized
 //  'S': Initialize SMP CPU
 //  'E': Early initialized device
+//  'T': SMP online
 //  'L': Late initialized device
-//  'P': Partition scanner
 //  'F': Filesystem implementation
+//  'H': Storage interface
+//  'P': Partition scanner
 //  'N': Network interface
 //  'U': USB interface
-//  'T': SMP online
 
 typedef struct callout_t {
     void (*fn)(void*);

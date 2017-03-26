@@ -3,7 +3,6 @@
 #include "string.h"
 #include "mbr.h"
 #include "dev_storage.h"
-#include "array.h"
 #include "unique_ptr.h"
 
 typedef struct part_dev_t part_dev_t;
@@ -25,9 +24,12 @@ typedef struct partition_tbl_ent_t {
     uint32_t total_sectors;
 } __attribute__((packed)) partition_tbl_ent_t;
 
-class mbr_part_factory_t : public part_factory_t {
+struct mbr_part_factory_t : public part_factory_t {
+    mbr_part_factory_t() : part_factory_t("mbr") {}
     virtual if_list_t detect(storage_dev_base_t *drive);
 };
+
+static mbr_part_factory_t mbr_part_factory;
 
 #define MAX_PARTITIONS  128
 static part_dev_t partitions[MAX_PARTITIONS];

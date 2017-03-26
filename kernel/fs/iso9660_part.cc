@@ -9,9 +9,12 @@
 
 //typedef struct part_dev_t part_dev_t;
 
-class iso9660_part_factory_t : public part_factory_t {
+struct iso9660_part_factory_t : public part_factory_t {
+    iso9660_part_factory_t() : part_factory_t("iso9660") {}
     if_list_t detect(storage_dev_base_t *drive);
 };
+
+static iso9660_part_factory_t iso9660_factory;
 
 #define MAX_PARTITIONS  128
 static part_dev_t partitions[MAX_PARTITIONS];

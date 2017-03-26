@@ -32,7 +32,7 @@
 size_t const kernel_stack_size = 16384;
 char kernel_stack[16384];
 
-extern void (*device_constructor_list[])(void);
+//extern void (*device_constructor_list[])(void);
 
 void volatile *trick;
 
@@ -47,35 +47,35 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 
 // Pull in the device constructors
 // to cause them to be initialized
-void (** volatile device_list)(void) = device_constructor_list;
+//void (** volatile device_list)(void) = device_constructor_list;
 
 #define TEST_FORMAT(f, t, v) \
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_AHCI_STRESS_THREAD   1
-#define ENABLE_SLEEP_THREAD         1
-#define ENABLE_MUTEX_THREAD         1
-#define ENABLE_REGISTER_THREAD      1
-#define ENABLE_STRESS_MMAP_THREAD   1
-#define ENABLE_CTXSW_STRESS_THREAD  1
-#define ENABLE_STRESS_HEAP_THREAD   1
-#define ENABLE_FRAMEBUFFER_THREAD   1
+#define ENABLE_READ_STRESS_THREAD   1
+#define ENABLE_SLEEP_THREAD         0
+#define ENABLE_MUTEX_THREAD         0
+#define ENABLE_REGISTER_THREAD      0
+#define ENABLE_STRESS_MMAP_THREAD   0
+#define ENABLE_CTXSW_STRESS_THREAD  0
+#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_FRAMEBUFFER_THREAD   0
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    1
 #define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
-#define STRESS_HEAP_MINSIZE     64
-#define STRESS_HEAP_MAXSIZE     4080
+#define STRESS_HEAP_MINSIZE         64
+#define STRESS_HEAP_MAXSIZE         4080
 #elif ENABLE_STRESS_HEAP_LARGE
-#define STRESS_HEAP_MINSIZE     65536
-#define STRESS_HEAP_MAXSIZE     262144
+#define STRESS_HEAP_MINSIZE         65536
+#define STRESS_HEAP_MAXSIZE         262144
 #elif ENABLE_STRESS_HEAP_BOTH
-#define STRESS_HEAP_MINSIZE     64
-#define STRESS_HEAP_MAXSIZE     65536
+#define STRESS_HEAP_MINSIZE         64
+#define STRESS_HEAP_MAXSIZE         65536
 #elif ENABLE_STRESS_HEAP_THREAD
 #error Must enable a size range
 #endif
@@ -110,7 +110,7 @@ static int shell_thread(void *p)
 }
 #endif
 
-#if ENABLE_AHCI_STRESS_THREAD > 0
+#if ENABLE_READ_STRESS_THREAD > 0
 static int read_stress(void *p)
 {
     (void)p;
@@ -125,11 +125,15 @@ static int read_stress(void *p)
 
     printk("read buffer at %lx\n", (uint64_t)data);
 
-    uint64_t lba = 16;//rand_range(16, 32);
+    uint64_t seed = 42;
+    uint64_t count = 0;
     while (1) {
         ++*(char*)p;
 
-        drive->read_blocks(data, 1, lba);
+        uint64_t lba = rand_r_range(&seed, 16, 32);
+        int status = drive->read_blocks(data, 1, lba);
+
+        printdbg("Storage read status=%d count=%lu\n", status, ++count);
 
         if (++lba > 32)
             lba = 16;
@@ -680,6 +684,9 @@ static int init_thread(void *p)
     // Register filesystems
     callout_call('F');
 
+    // Storage interfaces
+    callout_call('H');
+
     // Register partition schemes
     callout_call('P');
 
@@ -766,8 +773,8 @@ static int init_thread(void *p)
     }
 #endif
 
-#if ENABLE_AHCI_STRESS_THREAD > 0
-    for (int i = 0; i < ENABLE_AHCI_STRESS_THREAD; ++i) {
+#if ENABLE_READ_STRESS_THREAD > 0
+    for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         thread_create(read_stress, (char*)(uintptr_t)
                       (0xb8000+ 80*2 + 2*i), 0, 0);
     }
