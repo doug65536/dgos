@@ -56,14 +56,14 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   16
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_STRESS_HEAP_THREAD   0
-#define ENABLE_FRAMEBUFFER_THREAD   0
+#define ENABLE_FRAMEBUFFER_THREAD   1
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    1
@@ -115,7 +115,14 @@ static int shell_thread(void *p)
 #if ENABLE_READ_STRESS_THREAD > 0
 static int read_stress(void *p)
 {
+    static uint8_t counts[ENABLE_READ_STRESS_THREAD << 6];
+    static int next_id;
+    static int completion_count;
+    int id = atomic_xadd(&next_id, 1);
+    assert(id < ENABLE_READ_STRESS_THREAD);
+
     (void)p;
+    thread_t tid = thread_get_id();
 
     storage_dev_base_t *drive = open_storage_dev(0);
 
@@ -129,14 +136,29 @@ static int read_stress(void *p)
 
     uint64_t seed = 42;
     uint64_t count = 0;
+    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2];
     while (1) {
         ++*(char*)p;
 
         uint64_t lba = rand_r_range(&seed, 16, 32);
         int status = drive->read_blocks(data, 1, lba);
 
-        if (status != 0 || !(++count & ~-256))
-            printdbg("Storage read status=%d count=%lu\n", status, count);
+        if (status != 0)
+            printdbg("(%3d) Storage read status=%d count=%lu\n",
+                     tid, status, count);
+
+        atomic_inc(counts + (id << 6));
+
+        if (!(atomic_xadd(&completion_count, 1) & ~-64)) {
+            int ofs = 0;
+            for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
+                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
+                                counts[s << 6]);
+            }
+            buf[ofs++] = 0;
+
+            printdbg("%s\n", buf);
+        }
 
         if (++lba > 32)
             lba = 16;
