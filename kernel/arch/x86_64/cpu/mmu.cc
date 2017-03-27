@@ -802,6 +802,7 @@ static void mmu_tlb_perform_shootdown(void)
 // TLB shootdown IPI
 static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 {
+    (void)intr;
     assert(intr == INTR_TLB_SHOOTDOWN);
 
     int cpu_number = thread_cpu_number();
@@ -1554,6 +1555,9 @@ void *mmap(void *addr, size_t len,
            int prot, int flags,
            int fd, off_t offset)
 {
+    (void)fd;
+    (void)offset;
+
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
 
     // Must pass MAP_DEVICE if passing a device registration index
@@ -2220,6 +2224,7 @@ void mm_destroy_process(void)
     pte_t *ptes[4];
     int mask = addr_present((uintptr_t)PT0_PTR, path, ptes);
 
+    (void)mask;
     assert(mask == 0xF);
 
     mm_free_all_user_memory();

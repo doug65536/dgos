@@ -107,7 +107,7 @@ void invoke_storage_factories(void *)
 
 REGISTER_CALLOUT(invoke_storage_factories, 0, 'H', "000");
 
-void fs_register_factory(const char *name, fs_factory_t *fs)
+void fs_register_factory(char const *name, fs_factory_t *fs)
 {
     if (fs_reg_count < MAX_FS_REGS) {
         fs_regs[fs_reg_count].name = name;
@@ -151,7 +151,7 @@ fs_base_t *fs_from_id(size_t id)
     return fs_mounts[id].fs;
 }
 
-void part_register_factory(const char *name, part_factory_t *factory)
+void part_register_factory(char const *name, part_factory_t *factory)
 {
     if (part_factory_count < MAX_PART_FACTORIES) {
         part_factories[part_factory_count++] = factory;
@@ -193,12 +193,12 @@ fs_factory_t::fs_factory_t(char const *name)
     fs_register_factory(name, this);
 }
 
-storage_if_factory_t::storage_if_factory_t(const char *name)
+storage_if_factory_t::storage_if_factory_t(char const *name)
 {
     storage_if_register_factory(name, this);
 }
 
-part_factory_t::part_factory_t(const char *name)
+part_factory_t::part_factory_t(char const *name)
 {
     part_register_factory(name, this);
 }

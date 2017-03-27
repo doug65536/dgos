@@ -86,6 +86,7 @@ ifdef OPTIMIZE
 CXXFLAGS += \
 	-O2 -ftree-vectorize \
 	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl
+#CXXFLAGS += -DNDEBUG
 else
 CXXFLAGS += \
 	-O0 \

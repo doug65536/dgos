@@ -74,6 +74,7 @@ int ethq_init(void)
     }
     ethq_first_free_aba = 0;
 
+#ifndef NDEBUG
     // Self test
     ethq_pkt_t *test1 = ethq_pkt_acquire();
     ethq_pkt_t *test2 = ethq_pkt_acquire();
@@ -95,6 +96,7 @@ int ethq_init(void)
     ethq_pkt_release(test3);
     ethq_pkt_release(test2);
     ethq_pkt_release(test1);
+#endif
 
     return 1;
 }

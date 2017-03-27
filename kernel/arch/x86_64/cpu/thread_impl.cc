@@ -335,12 +335,8 @@ static thread_t thread_create_with_state(
 
         thread->ctx = ctx;
 
-        ptrdiff_t free_stack_space = (char*)thread->ctx -
-                (char*)thread->stack;
-
-        //printk("New thread free stack space: %zd\n", free_stack_space);
-
-        assert(free_stack_space > 4096);
+        // Check available stack space
+        assert((char*)thread->ctx - (char*)thread->stack > 4096);
 
         atomic_barrier();
         thread->state = state;

@@ -52,7 +52,7 @@ static file_handle_t *file_fh_from_fd(int fd)
             : 0;
 }
 
-int file_open(const char *path)
+int file_open(char const *path)
 {
     fs_base_t *fs = file_fs_from_path(path);
 
@@ -280,7 +280,7 @@ int file_closedir(int fd)
     return fh->fs->releasedir(fh->fi);
 }
 
-int file_mkdir(const char *path, mode_t mode)
+int file_mkdir(char const *path, mode_t mode)
 {
     fs_base_t *fs = file_fs_from_path(path);
 
@@ -290,7 +290,7 @@ int file_mkdir(const char *path, mode_t mode)
     return fs->mkdir(path, mode);
 }
 
-int file_rmdir(const char *path)
+int file_rmdir(char const *path)
 {
     fs_base_t *fs = file_fs_from_path(path);
 
@@ -300,7 +300,7 @@ int file_rmdir(const char *path)
     return fs->rmdir(path);
 }
 
-int file_rename(const char *old_path, const char *new_path)
+int file_rename(char const *old_path, char const *new_path)
 {
     fs_base_t *fs = file_fs_from_path(old_path);
 
@@ -310,7 +310,7 @@ int file_rename(const char *old_path, const char *new_path)
     return fs->rename(old_path, new_path);
 }
 
-int file_unlink(const char *path)
+int file_unlink(char const *path)
 {
     fs_base_t *fs = file_fs_from_path(path);
 

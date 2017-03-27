@@ -56,7 +56,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   1
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -809,7 +809,7 @@ static int init_thread(void *p)
     for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
         thread_create(register_check, (void*)
                       (0xDEADFEEDF00DD00D +
-                       (1<<ENABLE_AHCI_STRESS_THREAD)), 0, 0);
+                       (1<<ENABLE_READ_STRESS_THREAD)), 0, 0);
     }
 #endif
 

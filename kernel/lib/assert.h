@@ -7,6 +7,7 @@ int assert_failed(char const *expr,
                    char const *file,
                    int line);
 
+#ifndef NDEBUG
 // Plain assert
 #define assert(e) \
     (likely(e) ? 1 : assert_failed(#e, 0, __FILE__, __LINE__))
@@ -14,6 +15,10 @@ int assert_failed(char const *expr,
 // Assert with message
 #define assert_msg(e, msg) \
     (likely(e) ? 1 : assert_failed(#e, (msg), __FILE__, __LINE__))
+#else
+#define assert(e) (1)
+#define assert_msg(e, msg) (1)
+#endif
 
 // Compile-time assert
 #ifdef __cplusplus

@@ -70,7 +70,7 @@ void dhcp_builder_set_gateway_ip(void *buf, uint32_t ip_addr);
 int dhcp_builder_add_option(void *buf, uint8_t option);
 int dhcp_builder_add_option_param(void *buf,uint8_t option, uint8_t param);
 int dhcp_builder_add_option_params(void *buf, uint8_t option,
-                                   const void *data, size_t bytes);
+                                   void const *data, size_t bytes);
 uint16_t dhcp_builder_finalize(void *buf);
 
 uint16_t dhcp_build_discover(void *buf, uint8_t const *mac_addr);

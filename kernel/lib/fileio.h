@@ -20,7 +20,7 @@ int file_sync(int fd);
 int file_datasync(int fd);
 int file_syncfs(int fd);
 
-int file_opendir(const char *path);
+int file_opendir(char const *path);
 ssize_t file_readdir_r(int fd, dirent_t *buf, dirent_t **result);
 off_t file_telldir(int fd);
 off_t file_seekdir(int fd, off_t ofs);

@@ -16,7 +16,7 @@ static unsigned eth_factory_count;
 static eth_dev_base_t *eth_devices[MAX_ETH_DEVICES];
 static unsigned eth_device_count;
 
-void register_eth_dev_factory(const char *name, eth_dev_factory_t *factory)
+void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory)
 {
     (void)name;
     if (eth_factory_count < MAX_ETH_FACTORIES) {
@@ -40,7 +40,7 @@ static void invoke_eth_dev_factories(void*)
 
 REGISTER_CALLOUT(invoke_eth_dev_factories, nullptr, 'N', "000");
 
-eth_dev_factory_t::eth_dev_factory_t(const char *name)
+eth_dev_factory_t::eth_dev_factory_t(char const *name)
 {
     register_eth_dev_factory(name, this);
 }

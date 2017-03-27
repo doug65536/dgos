@@ -23,7 +23,7 @@ EXPORT void *memchr(void const *mem, int ch, size_t count)
    return 0;
 }
 
-EXPORT void *memrchr(const void *mem, int ch, size_t count)
+EXPORT void *memrchr(void const *mem, int ch, size_t count)
 {
     for (char const *p = (char const *)mem + count; count--; --p)
         if (p[-1] == (char)ch)

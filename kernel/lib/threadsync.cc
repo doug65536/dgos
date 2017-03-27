@@ -182,6 +182,7 @@ EXPORT void mutex_lock_noyield(mutex_t *mutex)
 
 EXPORT void mutex_destroy(mutex_t *mutex)
 {
+    (void)mutex;
     assert(mutex->link.next == mutex->link.prev);
 }
 
