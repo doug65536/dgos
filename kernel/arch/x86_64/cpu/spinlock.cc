@@ -87,15 +87,21 @@ void spinlock_lock_noirq(spinlock_t *lock)
     int intr_enabled = cpu_irq_disable() << 1;
 
     atomic_barrier();
-    while (*lock != 0 ||
-           atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
-        // Allow IRQs if they were enabled
-        cpu_irq_toggle(intr_enabled);
+    if (intr_enabled) {
+        while (*lock != 0 ||
+               atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
+            // Allow IRQs if they were enabled
+            cpu_irq_toggle(intr_enabled);
 
-        pause();
+            pause();
 
-        // Disable IRQs
-        cpu_irq_disable();
+            // Disable IRQs
+            cpu_irq_disable();
+        }
+    } else {
+        while (*lock != 0 ||
+               atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0)
+            pause();
     }
 
     // Return with interrupts disabled

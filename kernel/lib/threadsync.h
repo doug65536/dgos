@@ -35,6 +35,9 @@ struct mutex_t {
     thread_t volatile owner;
     int spin_count;
 
+    // Allows noyield lock acquire to have high priority
+    int noyield_waiting;
+
     // This lock must be held while updating the list
     spinlock_t lock;
 };

@@ -20,8 +20,8 @@
 #define CONDVAR_DTRACE(...) ((void)0)
 #endif
 
-#define SPINCOUNT_MAX   16384
-#define SPINCOUNT_MIN   4096
+#define SPINCOUNT_MAX   16
+#define SPINCOUNT_MIN   4
 
 static void thread_wait_add(thread_wait_link_t volatile *root,
                             thread_wait_link_t volatile *node)
@@ -53,6 +53,7 @@ EXPORT void mutex_init(mutex_t *mutex)
 {
     mutex->owner = -1;
     mutex->lock = 0;
+    mutex->noyield_waiting = 0;
     mutex->spin_count = spincount_mask &
             (SPINCOUNT_MIN + ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1));
     mutex->link.next = &mutex->link;
@@ -61,25 +62,38 @@ EXPORT void mutex_init(mutex_t *mutex)
 
 EXPORT void mutex_lock(mutex_t *mutex)
 {
-    for (int spin = 0; spin < mutex->spin_count &&
-         mutex->owner >= 0; ++spin)
-        pause();
+    for (int spin = 0; ; pause(), ++spin) {
+        // Spin outside lock until spin limit
+        if (spin < mutex->spin_count &&
+                (mutex->owner >= 0 || mutex->noyield_waiting))
+            continue;
 
-    // Lock the mutex to acquire it or manipulate wait chain
-    spinlock_lock_noirq(&mutex->lock);
+        // Lock the mutex to acquire it or manipulate wait chain
+        spinlock_lock_noirq(&mutex->lock);
 
-    if (mutex->owner < 0) {
-        // Take ownership
-        mutex->owner = thread_get_id();
+        // Check again inside lock
+        if (spin < mutex->spin_count &&
+                (mutex->owner >= 0 || mutex->noyield_waiting)) {
+            // Racing thread beat us, go back to spinning outside lock
+            spinlock_unlock_noirq(&mutex->lock);
+            continue;
+        }
 
-        MUTEX_DTRACE("Took ownership of %p\n", (void*)mutex);
+        if (mutex->owner < 0 && !mutex->noyield_waiting) {
+            // Take ownership
+            mutex->owner = thread_get_id();
 
-        // Increase spin count
-        if (mutex->spin_count < SPINCOUNT_MAX)
-            mutex->spin_count -= spincount_mask;
+            MUTEX_DTRACE("Took ownership of %p\n", (void*)mutex);
 
-        atomic_barrier();
-    } else {
+            // Increase spin count
+            if (mutex->spin_count < SPINCOUNT_MAX)
+                mutex->spin_count -= spincount_mask;
+
+            atomic_barrier();
+
+            break;
+        }
+
         // Mutex is owned
         thread_wait_t wait;
 
@@ -101,6 +115,8 @@ EXPORT void mutex_lock(mutex_t *mutex)
         assert(wait.link.next == 0);
         assert(wait.link.prev == 0);
         assert(mutex->owner == wait.thread);
+
+        break;
     }
 
     // Release lock
@@ -133,14 +149,27 @@ EXPORT void mutex_unlock(mutex_t *mutex)
 
 EXPORT void mutex_lock_noyield(mutex_t *mutex)
 {
+    thread_t tid = thread_get_id();
+    int noyield_stored = 0;
+
     for (int done = 0; ; pause()) {
-        if (mutex->owner >= 0)
+        if (noyield_stored && mutex->owner >= 0)
             continue;
 
         spinlock_lock_noirq(&mutex->lock);
 
+        if (mutex->noyield_waiting != tid &&
+                mutex->noyield_waiting == 0) {
+            mutex->noyield_waiting = tid;
+            noyield_stored = 1;
+        }
+
         if (mutex->owner < 0) {
             mutex->owner = thread_get_id();
+
+            if (noyield_stored)
+                mutex->noyield_waiting = 0;
+
             done = 1;
         }
 
