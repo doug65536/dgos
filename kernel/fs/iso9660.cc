@@ -1,5 +1,3 @@
-#define FS_NAME iso9660
-#define STORAGE_IMPL
 #include "dev_storage.h"
 
 #include "iso9660_decl.h"
@@ -11,6 +9,14 @@
 #include "pool.h"
 #include "bsearch.h"
 #include "printk.h"
+
+struct iso9660_factory_t : public fs_factory_t {
+public:
+    iso9660_factory_t() : fs_factory_t("iso9660") {}
+    fs_base_t *mount(fs_init_info_t *conn);
+};
+
+static iso9660_factory_t iso9660_factory;
 
 struct iso9660_fs_t : public fs_base_t {
     FS_BASE_IMPL
@@ -508,14 +514,24 @@ int iso9660_fs_t::mm_fault_handler(
 //
 // Startup and shutdown
 
-void* iso9660_fs_t::mount(fs_init_info_t *conn)
+fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
 {
     if (iso9660_mount_count == 0) {
-        pool_create(&iso9660_handles, sizeof(handle_t), 512);
+        pool_create(&iso9660_handles, sizeof(iso9660_fs_t::handle_t), 512);
     }
 
-    iso9660_fs_t *self = iso9660_mounts + iso9660_mount_count++;
+    if (iso9660_mount_count < countof(iso9660_mounts)) {
+        iso9660_fs_t *self = iso9660_mounts + iso9660_mount_count++;
+        self->mount(conn);
+        return self;
+    }
 
+    printdbg("Too many iso9660 mounts!\n");
+    return nullptr;
+}
+
+void* iso9660_fs_t::mount(fs_init_info_t *conn)
+{
     drive = conn->drive;
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
@@ -534,7 +550,7 @@ void* iso9660_fs_t::mount(fs_init_info_t *conn)
 
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {
         // Read logical block 16
-        self->drive->read_blocks(&pvd,
+        drive->read_blocks(&pvd,
                     1 << block_size,
                     (16 + ofs) << block_shift);
 
@@ -551,8 +567,8 @@ void* iso9660_fs_t::mount(fs_init_info_t *conn)
 
     if (best_ofs == 0) {
         // We didn't find Joliet PVD, reread first one
-        drive->read_blocks(&pvd, 1 << self->block_size,
-                           16 << self->block_shift);
+        drive->read_blocks(&pvd, 1 << block_size,
+                           16 << block_shift);
     }
 
     root_lba = dirent_lba(&pvd.root_dirent);
@@ -568,23 +584,23 @@ void* iso9660_fs_t::mount(fs_init_info_t *conn)
                 0, pt_alloc_size, PROT_READ | PROT_WRITE,
                 MAP_POPULATE, -1, 0);
 
-    drive->read_blocks(pt, pt_alloc_size >> self->sector_shift, self->pt_lba);
+    drive->read_blocks(pt, pt_alloc_size >> sector_shift, pt_lba);
 
     // Count the path table entries
     pt_count = walk_pt(0, 0);
 
     // Allocate path table entry pointer array
     pt_ptrs = (iso9660_pt_rec_t **)mmap(
-                0, sizeof(*self->pt_ptrs) * self->pt_count,
+                0, sizeof(*pt_ptrs) * pt_count,
                 PROT_READ | PROT_WRITE, 0, -1, 0);
 
     // Populate path table entry pointer array
     walk_pt(&iso9660_fs_t::pt_fill, this);
 
-    self->lba_st = conn->part_st;
-    self->lba_len = conn->part_len;
+    lba_st = conn->part_st;
+    lba_len = conn->part_len;
 
-    self->mm_dev = (char*)mmap_register_device(
+    mm_dev = (char*)mmap_register_device(
                 this, block_size, conn->part_len,
                 PROT_READ, mm_fault_handler);
 
@@ -596,7 +612,7 @@ void* iso9660_fs_t::mount(fs_init_info_t *conn)
         printdbg("%*s\n", de->size_lo_le, content);
     }
 
-    return self;
+    return this;
 }
 
 void iso9660_fs_t::unmount()
