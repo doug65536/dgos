@@ -3,7 +3,9 @@
 BUILDROOT := $(realpath .)
 export BUILDROOT
 
-CONFIG ?= x86_64
+ifndef CONFIG
+	CONFIG := x86_64
+endif
 
 include config/$(CONFIG).mk
 
@@ -19,6 +21,7 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
 #OPTIMIZE := 1
+#OPTIMIZE_AVX := 1
 #LTO := 1
 CC := clang
 CXX := clang++
@@ -68,31 +71,29 @@ WEVERYTHING += -Wno-strict-overflow
 # Oh come on, interferes with inline assembly
 WEVERYTHING += -Wno-overlength-strings
 
-ifndef TLS_MODEL
-TLS_MODEL := local-exec
-endif
-
-CXXFLAGS := -g3 -fno-stack-protector \
+CXXFLAGS := -std=c++14 -g3 \
 	-mcmodel=kernel -mno-red-zone \
-	-msse -msse2 \
-	-fno-exceptions -fno-common \
 	-fvisibility=hidden \
-	-std=c++14 -fpermissive -ffreestanding -fno-rtti \
+	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
+	-msse -msse2 \
 	$(WEVERYTHING)
-
-#-std=c++11 -x c++ \
 
 ifdef OPTIMIZE
 CXXFLAGS += \
-	-O2 -ftree-vectorize \
+	-O2 -ftree-vectorize -mtune=native \
 	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl
 #CXXFLAGS += -DNDEBUG
+
+ifdef OPTIMIZE_AVX
+CXXFLAGS += -march=native -mtune=native -no-integrated-as -Wa,-msse2avx
+endif
+
 else
 CXXFLAGS += \
 	-O0 \
 	-fno-omit-frame-pointer
 endif
-#-march=native
+
 RANLIB := gcc-ranlib-6
 AR := gcc-ar-6
 NM := gcc-nm-6
@@ -166,7 +167,7 @@ clean:
 distclean: clean
 	@rm -rf extern
 
-subdirs: $(EXTERNLIBFILES)
+subdirs: $(EXTERNLIBFILES) Makefile
 	+(cd lib && $(MAKE))
 	+(cd net && $(MAKE))
 	+(cd fs && $(MAKE))

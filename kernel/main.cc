@@ -56,13 +56,13 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   1
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_STRESS_HEAP_THREAD   64
 #define ENABLE_FRAMEBUFFER_THREAD   1
 
 #define ENABLE_STRESS_HEAP_SMALL    0
@@ -671,17 +671,25 @@ static int draw_test(void *p)
             sy1 = 0;
             sy2 = 800-1080;
         }
+
         for (int sy = sy1; sy != sy2; sy += step) {
             if (img) {
                 fb_copy_to(sx, sy, img->width,
                            img->width, img->height, png_pixels(img));
+
                 fb_fill_rect(sx, 0, sx + img->width, sy, 255);
-                fb_fill_rect(sx, sy + img->height, sx + img->width, 1080, 255*256);
+
+                fb_fill_rect(sx, sy + img->height,
+                             sx + img->width, 1080, 255*256);
+
                 //uint64_t line_st = cpu_rdtsc();
             }
-            fb_draw_aa_line(10, 10, 60, sy+300, 0xBFBFBF & -!(sx & 1));
+
+            fb_draw_aa_line(10, 10, sx+640, sy+300, 0xBFBFBF & -!(sx & 1));
+
             //uint64_t line_en = cpu_rdtsc();
             //printdbg("Line draw %ld cycles\n", line_en - line_st);
+
             fb_update();
             ++frames;
         }
