@@ -161,9 +161,9 @@
     (PTE_PWT & -!!(idx & 1)))
 
 #define PTE_PTEPAT_n(idx) \
-    ((PTE_PTEPAT & -!!(idx & 4)) | \
-    (PTE_PCD & -!!(idx & 2)) | \
-    (PTE_PWT & -!!(idx & 1)))
+    ((PTE_PTEPAT & -!!(idx & 4U)) | \
+    (PTE_PCD & -!!(idx & 2U)) | \
+    (PTE_PWT & -!!(idx & 1U)))
 
 // Page table entries don't have a structure, they
 // are a bunch of bitfields. Use uint64_t and the
@@ -215,7 +215,7 @@ typedef uintptr_t linaddr_t;
 // Device mapping
 
 // Device registration for memory mapped device
-typedef struct mmap_device_mapping_t {
+struct mmap_device_mapping_t {
     void *base_addr;
     uint64_t len;
     mm_dev_mapping_callback_t callback;
@@ -223,7 +223,7 @@ typedef struct mmap_device_mapping_t {
     mutex_t lock;
     condition_var_t done_cond;
     int64_t active_read;
-} mmap_device_mapping_t;
+};
 
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
@@ -298,6 +298,7 @@ public:
     uintptr_t alloc_linear(size_t size);
     void take_linear(linaddr_t addr, size_t size);
     void release_linear(uintptr_t addr, size_t size);
+    int take_at(uintptr_t addr, size_t size);
 private:
     mutex_t free_addr_lock;
     rbtree_t<> free_addr_by_size;
@@ -778,8 +779,7 @@ static void mmu_map_page(
 {
     unsigned path[4];
     pte_t *pte_linaddr[4];
-    path_from_addr(path, addr);
-    int present_mask = path_present(path, pte_linaddr);
+    int present_mask = addr_present(addr, path, pte_linaddr);
 
     if (unlikely((present_mask & 0x07) != 0x07)) {
         for (int i = 0; i < 4; ++i) {
@@ -1475,7 +1475,14 @@ void contiguous_allocator_t::take_linear(linaddr_t addr, size_t size)
             break;
         }
     }
+
+    mutex_unlock(&free_addr_lock);
 }
+
+//int contiguous_allocator_t::take_at(uintptr_t addr, size_t size)
+//{
+//
+//}
 
 void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 {
@@ -1655,7 +1662,7 @@ void *mmap(void *addr, size_t len,
             }
 
             mmu_map_page(linear_addr + ofs, page, page_flags |
-                         (!ofs & PTE_PRESENT));
+                         ((!ofs) & PTE_PRESENT));
         } else {
             // addr is a physical address, caller uses
             // returned linear address to access it
@@ -1670,7 +1677,7 @@ void *mmap(void *addr, size_t len,
     assert(linear_addr > 0x100000);
 
     PROFILE_MMAP_ONLY( printdbg("mmap of %zd bytes took %ld cycles\n",
-                                len, cpu_rdtsc() - profile_st); );
+                                len, cpu_rdtsc() - profile_st); )
 
     return (void*)(linear_addr + misalignment);
 }
@@ -1680,23 +1687,29 @@ void *mremap(
         size_t old_size,
         size_t new_size,
         int flags,
-        ... /* void *__new_address */)
+        void *new_address)
 {
-    void *new_address = 0;
-
-    if (!(flags & MREMAP_FIXED)) {
-        va_list ap;
-        va_start(ap, flags);
-        new_address = va_arg(ap, void*);
-        va_end(ap);
-    }
-    (void)new_address;
-
     old_size = round_up(old_size);
     new_size = round_up(new_size);
 
     // Convert pointer to address
     uintptr_t old_st = (uintptr_t)old_address;
+    uintptr_t new_st = (uintptr_t)new_address;
+
+    // old_address must be page aligned
+    assert(!(old_st & PAGE_MASK));
+    if (unlikely(old_st & PAGE_MASK))
+        return 0;
+
+    // new_address must be page aligned
+    assert(!(new_st & PAGE_MASK));
+    if (unlikely(old_st & PAGE_MASK))
+        return 0;
+
+    // new_address must be nonzero if MREMAP_FIXED was set in flags
+    // new_address must be zero if MREMAP_FIXED was not set in flags
+    if (unlikely((!(flags & MREMAP_FIXED)) == (new_st == 0)))
+        return 0;
 
     if (new_size < old_size) {
         //
@@ -1710,9 +1723,7 @@ void *mremap(
         //
         // Got bigger
 
-        linaddr_t new_linear;
-
-        new_linear = linear_allocator.alloc_linear(new_size);
+        linaddr_t new_linear = linear_allocator.alloc_linear(new_size);
 
         unsigned path[4];
         path_from_addr(path, new_linear);
@@ -2030,14 +2041,14 @@ static inline int mphysranges_enum(
     return result;
 }
 
-typedef struct mphysranges_state_t {
+struct mphysranges_state_t {
     mmphysrange_t *range;
     size_t ranges_count;
     size_t count;
     size_t max_size;
     physaddr_t last_end;
     mmphysrange_t cur_range;
-} mphysranges_state_t;
+};
 
 static inline int mphysranges_callback(mmphysrange_t range, void *context)
 {

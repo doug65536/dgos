@@ -125,7 +125,7 @@ void *mremap(
         size_t __old_size,
         size_t __new_size,
         int __flags,
-        ... /* void *__new_address */);
+        void *__new_address = nullptr);
 
 /// Change protection on a range of memory
 /// __addr, address, start of range
