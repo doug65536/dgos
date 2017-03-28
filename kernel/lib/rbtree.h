@@ -23,13 +23,13 @@ public:
     typedef int (*visitor_t)(kvp_t *kvp, void *p);
     typedef int (*cmp_t)(kvp_t const *lhs, kvp_t const *rhs, void *p);
 
-    rbtree_t();
-
     // Returns true if the tree is initialized
     operator bool() const;
 
-    rbtree_t &init(cmp_t cmp, void *p);
+    rbtree_t();
     ~rbtree_t();
+
+    rbtree_t &init(cmp_t cmp, void *p);
 
     iter_t lower_bound_pair(kvp_t *kvp);
     iter_t lower_bound(key_t key, val_t val);
@@ -109,9 +109,9 @@ private:
 
     static int test_visit(kvp_t *kvp, void *p);
 
-    // Comparator
     node_t *nodes;
 
+    // Comparator
     cmp_t cmp;
     void *cmp_param;
 
@@ -649,9 +649,7 @@ rbtree_t<Tkey,Tval>::find(kvp_t *kvp, iter_t *iter)
     for (; n; n = next) {
         node_t const *node = NODE(n);
 
-        cmp_result = cmp(kvp,
-                        &node->kvp,
-                        cmp_param);
+        cmp_result = cmp(kvp, &node->kvp, cmp_param);
 
         if (cmp_result == 0)
             break;
