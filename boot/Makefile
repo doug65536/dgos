@@ -37,7 +37,6 @@ $(shell mkdir -p $(DUMPDIR) >/dev/null)
 CXX_IS_CLANG := $(shell ($(CXX) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
 
 GDB := gdb
-QEMU := qemu-system-x86_64
 SED := sed
 BOCHS := bochs
 GREP := grep
@@ -57,24 +56,6 @@ HEXDUMP := hexdump
 GENISOIMAGE := genisoimage
 ISO_STAGE := cdstage
 ISO_FILE := dgos.iso
-
-QEMU_MACHINE := q35
-#QEMU_CPU := Skylake-Client
-#QEMU_CPU := Haswell
-QEMU_CPU := kvm64
-QEMU_RAM := 128M
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -device nec-usb-xhci \
-	-device usb-kbd -device usb-mouse -trace events=dump/qemu-trace
-
-QEMU_BRIDGE :=
-
-QEMU_NET := \
-	-net nic,model=rtl8139 \
-	-net nic,model=ne2k_pci \
-	-net nic,model=e1000 \
-	$(QEMU_BRIDGE) \
-	-net dump,file=dump/netdump
-
 
 # Linking libgcc.a crashes my linker
 #LIBGCC := $(shell $(CXX) -m32 -print-libgcc-file-name)
@@ -146,12 +127,6 @@ BOOTSECTORS = $(BINDIR)/bootsect.bin
 BOCHSSYMBOLS = $(BINDIR)/bochs-symbols
 BOCHSKERNELSYMBOLS = $(BINDIR)/bochs-kernel-symbols
 BOCHSCOMBINEDSYMBOLS = $(BINDIR)/bochs-combined-symbols
-
-QEMU_DEBUGCON := \
-	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-	-device isa-debugcon,chardev=qemu-debug-out
-
-QEMU_SMP := -smp cpus=4,cores=2,threads=1
 
 OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect.dis \

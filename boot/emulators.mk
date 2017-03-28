@@ -1,3 +1,31 @@
+QEMU := qemu-system-x86_64
+
+QEMU_DEBUGCON := \
+	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+	-device isa-debugcon,chardev=qemu-debug-out
+
+QEMU_SMP := -smp cpus=8,cores=4,threads=2
+
+QEMU_MACHINE := q35
+#QEMU_CPU := Skylake-Client
+QEMU_CPU := Haswell
+#QEMU_CPU := kvm64
+QEMU_RAM := 5G
+QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -device nec-usb-xhci \
+	-device usb-kbd -device usb-mouse -trace events=dump/qemu-trace
+
+QEMU_BRIDGE :=
+
+QEMU_NET := \
+	-net nic,model=rtl8139 \
+	-net nic,model=ne2k_pci \
+	-net nic,model=e1000 \
+	$(QEMU_BRIDGE) \
+	-net dump,file=dump/netdump
+
+monitor-debug-output:
+	while true; do cat dump/qemu-debug-out; done
+
 run-iso-singlecpu: $(ISO_FILE)
 	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
 		$(QEMU_DEBUGCON) \
@@ -233,9 +261,6 @@ run-debug-wait-singlecpu-kvm: all debuggable-kernel-disk
 		$(QEMU_DEBUGCON) \
 		$(QEMU_NET) \
 		-cpu host -enable-kvm
-
-monitor-debug-output:
-	while true; do cat dump/qemu-debug-out; done
 
 run: all bootable-disk
 	$(QEMU) -m 5G -drive file=$(DISKIMAGE),format=raw \
