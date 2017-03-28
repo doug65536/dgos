@@ -227,17 +227,22 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
         float((color >> 16) & 0xFF),
         float((color >> 24) & 0xFF)
     };
+
     uint8_t *addr = fb.back_buf + (y0 * fb.mode.pitch + x0 * sizeof(uint32_t));
+
+    // x and y delta
     int dx = x1 - x0;
     int dy = y1 - y0;
 
     int du, dv, u, v, uincr, vincr;
 
+    // absolute delta
     int abs_dx = abs(dx);
     int abs_dy = abs(dy);
 
     if (abs_dx > abs_dy)
     {
+        // More horizontal than vertical
         du = abs_dx;
         dv = abs_dy;
         u = x1;
@@ -251,6 +256,7 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
     }
     else
     {
+        // More vertical than horizontal
         du = abs_dy;
         dv = abs_dx;
         u = y1;
@@ -264,7 +270,7 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
     }
 
     int uend = u + 2 * du;
-    int d = (2 * dv) - du;
+    int d = (dv + dv) - du;
     int incrS = 2 * dv;
     int incrD = 2 * (dv - du);
     int twovdu = 0;
