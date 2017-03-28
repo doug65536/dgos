@@ -30,7 +30,7 @@ priqueue_t *priqueue_create(uint32_t capacity,
     if (capacity == 0)
         capacity = (PAGESIZE - sizeof(priqueue_t)) / sizeof(uintptr_t);
 
-	priqueue_t *queue = (priqueue_t*)mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
+    priqueue_t *queue = (priqueue_t*)mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
                              MAP_POPULATE, -1, 0);
 
     queue->capacity = capacity;
