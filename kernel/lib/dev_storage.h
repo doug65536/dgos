@@ -6,16 +6,6 @@
 
 #include "dev_registration.h"
 
-#define STORAGE_EXPAND_2(p,s) p ## s
-#define STORAGE_EXPAND(p,s) STORAGE_EXPAND_2(p,s)
-
-#define STORAGE_EXPAND1_3(t) t
-#define STORAGE_EXPAND1_2(t) STORAGE_EXPAND1_3(t)
-#define STORAGE_EXPAND1(t) STORAGE_EXPAND1_2(t)
-
-#define STORAGE_IF_T STORAGE_EXPAND(STORAGE_DEV_NAME, _if_t)
-#define STORAGE_DEV_T STORAGE_EXPAND(STORAGE_DEV_NAME, _dev_t)
-
 //
 // Forward declarations
 
@@ -36,7 +26,7 @@ typedef enum storage_dev_info_t {
 
 struct storage_dev_base_t {
     // Startup/shutdown
-    virtual void cleanup(storage_dev_base_t *) = 0;
+    virtual void cleanup() = 0;
 
     virtual int read_blocks(
             void *data, uint64_t count, uint64_t lba) = 0;
@@ -49,14 +39,14 @@ struct storage_dev_base_t {
     virtual long info(storage_dev_info_t key) = 0;
 };
 
-#define STORAGE_DEV_IMPL                                        \
-    virtual void cleanup();                                     \
-    virtual int read_blocks(                                    \
-            void *data, uint64_t count, uint64_t lba);          \
-    virtual int write_blocks(                                   \
-            void const *data, uint64_t count, uint64_t lba);    \
-    virtual int flush();                                        \
-    virtual long info(storage_dev_info_t key);
+#define STORAGE_DEV_IMPL                                            \
+    void cleanup() final;                                           \
+    int read_blocks(                                                \
+            void *data, uint64_t count, uint64_t lba) final;        \
+    int write_blocks(                                               \
+            void const *data, uint64_t count, uint64_t lba) final;  \
+    int flush() final;                                              \
+    long info(storage_dev_info_t key) final;
 
 //
 // Storage Interface (IDE, AHCI, etc)
@@ -72,8 +62,8 @@ struct storage_if_base_t {
 };
 
 #define STORAGE_IF_IMPL                 \
-    virtual void cleanup();             \
-    virtual if_list_t detect_devices();
+    void cleanup() final;               \
+    if_list_t detect_devices() final;
 
 void storage_if_register_factory(char const *name,
                                 storage_if_factory_t *factory);
@@ -295,68 +285,68 @@ struct fs_base_t {
 };
 
 #define FS_BASE_IMPL \
-    virtual void unmount();                                               \
-    virtual int opendir(fs_file_info_t **fi, fs_cpath_t path);            \
-    virtual ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,            \
-                            off_t offset);                                \
-    virtual int releasedir(fs_file_info_t *fi);                           \
-    virtual int getattr(fs_cpath_t path, fs_stat_t* stbuf);               \
-    virtual int access(fs_cpath_t path, int mask);                        \
-    virtual int readlink(fs_cpath_t path, char* buf, size_t size);        \
-    virtual int mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev);    \
-    virtual int mkdir(fs_cpath_t path, fs_mode_t mode);                   \
-    virtual int rmdir(fs_cpath_t path);                                   \
-    virtual int symlink(fs_cpath_t to, fs_cpath_t from);                  \
-    virtual int rename(fs_cpath_t from, fs_cpath_t to);                   \
-    virtual int link(fs_cpath_t from, fs_cpath_t to);                     \
-    virtual int unlink(fs_cpath_t path);                                  \
-    virtual int chmod(fs_cpath_t path,                                    \
-                 fs_mode_t mode);                                         \
-    virtual int chown(fs_cpath_t path,                                    \
-                 fs_uid_t uid,                                            \
-                 fs_gid_t gid);                                           \
-    virtual int truncate(fs_cpath_t path,                                 \
-                    off_t size);                                          \
-    virtual int utimens(fs_cpath_t path,                                  \
-                   fs_timespec_t const *ts);                              \
-    virtual int open(fs_file_info_t **fi,                                 \
-                fs_cpath_t path);                                         \
-    virtual int release(fs_file_info_t *fi);                              \
-    virtual ssize_t read(fs_file_info_t *fi,                              \
-                    char *buf,                                            \
-                    size_t size,                                          \
-                    off_t offset);                                        \
-    virtual ssize_t write(fs_file_info_t *fi,                             \
-                     char const *buf,                                     \
-                     size_t size,                                         \
-                     off_t offset);                                       \
-    virtual int ftruncate(fs_file_info_t *fi,                             \
-                     off_t offset);                                       \
-    virtual int fstat(fs_file_info_t *fi,                                 \
-                 fs_stat_t *st);                                          \
-    virtual int fsync(fs_file_info_t *fi,                                 \
-                 int isdatasync);                                         \
-    virtual int fsyncdir(fs_file_info_t *fi,                              \
-                    int isdatasync);                                      \
-    virtual int flush(fs_file_info_t *fi);                                \
-    virtual int lock(fs_file_info_t *fi,                                  \
-                int cmd, fs_flock_t* locks);                              \
-    virtual int bmap(fs_cpath_t path, size_t blocksize,                   \
-                uint64_t* blockno);                                       \
-    virtual int statfs(fs_statvfs_t* stbuf);                              \
-    virtual int setxattr(fs_cpath_t path,                                 \
-                    char const* name, char const* value,                  \
-                    size_t size, int flags);                              \
-    virtual int getxattr(fs_cpath_t path,                                 \
-                    char const* name, char* value,                        \
-                    size_t size);                                         \
-    virtual int listxattr(fs_cpath_t path,                                \
-                     char const* list, size_t size);                      \
-    virtual int ioctl(fs_file_info_t *fi,                                 \
-                 int cmd, void* arg,                                      \
-                 unsigned int flags, void* data);                         \
-    virtual int poll(fs_file_info_t *fi,                                  \
-                fs_pollhandle_t* ph, unsigned* reventsp);
+    void unmount() final;                                               \
+    int opendir(fs_file_info_t **fi, fs_cpath_t path) final;            \
+    ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  \
+                    off_t offset) final;                                \
+    int releasedir(fs_file_info_t *fi) final;                           \
+    int getattr(fs_cpath_t path, fs_stat_t* stbuf) final;               \
+    int access(fs_cpath_t path, int mask) final;                        \
+    int readlink(fs_cpath_t path, char* buf, size_t size) final;        \
+    int mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev) final;    \
+    int mkdir(fs_cpath_t path, fs_mode_t mode) final;                   \
+    int rmdir(fs_cpath_t path) final;                                   \
+    int symlink(fs_cpath_t to, fs_cpath_t from) final;                  \
+    int rename(fs_cpath_t from, fs_cpath_t to) final;                   \
+    int link(fs_cpath_t from, fs_cpath_t to) final;                     \
+    int unlink(fs_cpath_t path) final;                                  \
+    int chmod(fs_cpath_t path,                                          \
+         fs_mode_t mode) final;                                         \
+    int chown(fs_cpath_t path,                                          \
+         fs_uid_t uid,                                                  \
+         fs_gid_t gid) final;                                           \
+    int truncate(fs_cpath_t path,                                       \
+            off_t size) final;                                          \
+    int utimens(fs_cpath_t path,                                        \
+           fs_timespec_t const *ts) final;                              \
+    int open(fs_file_info_t **fi,                                       \
+        fs_cpath_t path) final;                                         \
+    int release(fs_file_info_t *fi) final;                              \
+    ssize_t read(fs_file_info_t *fi,                                    \
+            char *buf,                                                  \
+            size_t size,                                                \
+            off_t offset) final;                                        \
+    ssize_t write(fs_file_info_t *fi,                                   \
+             char const *buf,                                           \
+             size_t size,                                               \
+             off_t offset) final;                                       \
+    int ftruncate(fs_file_info_t *fi,                                   \
+             off_t offset) final;                                       \
+    int fstat(fs_file_info_t *fi,                                       \
+         fs_stat_t *st) final;                                          \
+    int fsync(fs_file_info_t *fi,                                       \
+         int isdatasync) final;                                         \
+    int fsyncdir(fs_file_info_t *fi,                                    \
+            int isdatasync) final;                                      \
+    int flush(fs_file_info_t *fi) final;                                \
+    int lock(fs_file_info_t *fi,                                        \
+        int cmd, fs_flock_t* locks) final;                              \
+    int bmap(fs_cpath_t path, size_t blocksize,                         \
+        uint64_t* blockno) final;                                       \
+    int statfs(fs_statvfs_t* stbuf) final;                              \
+    int setxattr(fs_cpath_t path,                                       \
+            char const* name, char const* value,                        \
+            size_t size, int flags) final;                              \
+    int getxattr(fs_cpath_t path,                                       \
+            char const* name, char* value,                              \
+            size_t size) final;                                         \
+    int listxattr(fs_cpath_t path,                                      \
+             char const* list, size_t size) final;                      \
+    int ioctl(fs_file_info_t *fi,                                       \
+         int cmd, void* arg,                                            \
+         unsigned int flags, void* data) final;                         \
+    int poll(fs_file_info_t *fi,                                        \
+        fs_pollhandle_t* ph, unsigned* reventsp) final;
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 

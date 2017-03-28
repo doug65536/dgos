@@ -1187,7 +1187,7 @@ struct ahci_if_t : public storage_if_base_t {
 };
 
 // Drive
-struct ahci_dev_t {
+struct ahci_dev_t : public storage_dev_base_t {
     STORAGE_DEV_IMPL
 
     int io(void *data, uint64_t count,
