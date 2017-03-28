@@ -173,7 +173,7 @@ static void pic8259_setmask(int irq, int unmask)
         outb(PIC1_DATA, pic8259_mask & 0xFF);
     }
 
-    int is_slave = (irq >= 8);
+    uint8_t is_slave = (irq >= 8);
     uint8_t shift = is_slave << 3;
     ioport_t port = pic8259_port_data(is_slave);
 
