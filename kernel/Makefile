@@ -81,13 +81,13 @@ CXXFLAGS := -std=c++14 -g3 \
 ifdef OPTIMIZE
 CXXFLAGS += \
 	-O2 -ftree-vectorize -mtune=native \
-	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl
+	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl -mtune=native
 #CXXFLAGS += -DNDEBUG
 
 ifdef OPTIMIZE_AVX
-CXXFLAGS += -march=native -mtune=native -no-integrated-as -Wa,-msse2avx
+CXXFLAGS += -march=native -no-integrated-as
 endif
-
+# -Wa,-msse2avx
 else
 CXXFLAGS += \
 	-O0 \
@@ -149,7 +149,7 @@ LDFLAGS ?=  --oformat elf64-x86-64 \
 	-z max-page-size=4096
 
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
-$(NEEDSMALLEST:.cc=.o): CFLAGS += -Os -DNDEBUG
+$(NEEDSMALLEST:.cc=.o): CXXFLAGS += -Os -DNDEBUG
 
 all: subdirs $(EXTERNLIBFILES) $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
 

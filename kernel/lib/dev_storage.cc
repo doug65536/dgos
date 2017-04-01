@@ -138,6 +138,8 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     assert(fs_reg != 0);
 
+    printdbg("Mounting %s filesystem\n", fs_name);
+
     fs_base_t *mfs = fs_reg->factory->mount(info);
     if (mfs && fs_mount_count < countof(fs_mounts)) {
         fs_mounts[fs_mount_count].fs = mfs;

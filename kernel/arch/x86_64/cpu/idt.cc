@@ -127,7 +127,7 @@ static cpu_flag_info_t const cpu_fpusw_info[] = {
 
 typedef void (*isr_entry_t)(void);
 
-const isr_entry_t isr_entry_points[256] = {
+isr_entry_t const isr_entry_points[256] = {
     isr_entry_0,   isr_entry_1,   isr_entry_2,   isr_entry_3,
     isr_entry_4,   isr_entry_5,   isr_entry_6,   isr_entry_7,
     isr_entry_8,   isr_entry_9,   isr_entry_10,  isr_entry_11,

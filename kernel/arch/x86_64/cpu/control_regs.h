@@ -385,7 +385,7 @@ static inline table_register_64_t cpu_get_gdtr(void)
 {
     table_register_64_t gdtr;
     __asm__ __volatile__ (
-        "sgdt (%[gdtr])\n\t"
+        "sgdtq (%[gdtr])\n\t"
         :
         : [gdtr] "r" (&gdtr.limit)
         : "memory"
@@ -396,7 +396,7 @@ static inline table_register_64_t cpu_get_gdtr(void)
 static inline void cpu_set_gdtr(table_register_64_t gdtr)
 {
     __asm__ __volatile__ (
-        "lgdt (%[gdtr])\n\t"
+        "lgdtq (%[gdtr])\n\t"
         :
         : [gdtr] "r" (&gdtr.limit)
         : "memory"

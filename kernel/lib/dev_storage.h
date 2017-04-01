@@ -18,21 +18,21 @@ typedef struct if_list_t {
 //
 // Storage Device (hard drive, CDROM, etc)
 
-typedef enum storage_dev_info_t {
+enum storage_dev_info_t {
     STORAGE_INFO_NONE = 0,
     STORAGE_INFO_BLOCKSIZE = 1,
     STORAGE_INFO_MAX = 0x7FFFFFFF
-} storage_dev_info_t;
+};
 
 struct storage_dev_base_t {
     // Startup/shutdown
     virtual void cleanup() = 0;
 
-    virtual int read_blocks(
-            void *data, uint64_t count, uint64_t lba) = 0;
+    virtual int64_t read_blocks(
+            void *data, int64_t count, uint64_t lba) = 0;
 
-    virtual int write_blocks(
-            void const *data, uint64_t count, uint64_t lba) = 0;
+    virtual int64_t write_blocks(
+            void const *data, int64_t count, uint64_t lba) = 0;
 
     virtual int flush() = 0;
 
@@ -41,10 +41,10 @@ struct storage_dev_base_t {
 
 #define STORAGE_DEV_IMPL                                            \
     void cleanup() final;                                           \
-    int read_blocks(                                                \
-            void *data, uint64_t count, uint64_t lba) final;        \
-    int write_blocks(                                               \
-            void const *data, uint64_t count, uint64_t lba) final;  \
+    int64_t read_blocks(                                            \
+            void *data, int64_t count, uint64_t lba) final;         \
+    int64_t write_blocks(                                           \
+            void const *data, int64_t count, uint64_t lba) final;   \
     int flush() final;                                              \
     long info(storage_dev_info_t key) final;
 

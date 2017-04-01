@@ -196,7 +196,7 @@ void *heap_alloc(heap_t *heap, size_t size)
     size_t orig_size = size;
 
     // Calculate ceil(log(size) / log(2))
-    uint8_t log2size = bit_log2_n_64(size);
+    uint8_t log2size = bit_log2_n(size);
 
     // Round up to bucket item size
     size = 1 << log2size;
@@ -248,7 +248,7 @@ void heap_free(heap_t *heap, void *block)
 
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
 
-    uint8_t log2size = bit_log2_n_32((int32_t)hdr->size_next);
+    uint8_t log2size = bit_log2_n((int32_t)hdr->size_next);
     assert(log2size >= 5 && log2size < 32);
     size_t bucket = log2size - 5;
 
@@ -272,7 +272,7 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
 {
     if (block) {
         heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
-        uint8_t newlog2size = bit_log2_n_32((int32_t)size);
+        uint8_t newlog2size = bit_log2_n((int32_t)size);
         size_t new_size = 1 << newlog2size;
         if (hdr->size_next < new_size) {
             void *new_block = heap_alloc(heap, size);

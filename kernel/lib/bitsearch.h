@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "type_traits.h"
 
 // Return bit number of least significant set bit
 static inline uint8_t bit_lsb_set_32(int32_t n)
@@ -37,4 +38,23 @@ static inline uint8_t bit_log2_n_64(int64_t n)
 {
     uint8_t top = bit_msb_set_64(n);
     return top + !!(~((uint64_t)-1 << top) & n);
+}
+
+template<typename T>
+static inline uint8_t bit_log2_n(T n, false_type)
+{
+    return bit_log2_n_32((int32_t)n);
+}
+
+template<typename T>
+static inline uint8_t bit_log2_n(T n, true_type)
+{
+    return bit_log2_n_64((int64_t)n);
+}
+
+template<typename T>
+static inline uint8_t bit_log2_n(T n)
+{
+    return bit_log2_n(n, typename conditional<sizeof(T) == sizeof(uint64_t),
+                      true_type, false_type>::type());
 }

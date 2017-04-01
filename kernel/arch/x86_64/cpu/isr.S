@@ -256,13 +256,12 @@ isr_save_done:
 	call *%rax
 0:
 
-	// Pop the pointer to the general registers
-	pop_cfi %rbp
+	// Pop the pointer to the FPU context
 	pop_cfi %rdi
+	// Pop the pointer to the general registers
+	pop_cfi %rsp
 	jmp *sse_context_restore
 isr_restore_done:
-
-	mov %rdi,%rsp
 
 	// See if we're returning to user code
 	cmpl $8,21*8(%rsp)
@@ -313,55 +312,81 @@ isr_restore_done:
 
 	.cfi_endproc
 
-.macro xsave_ctx insn clear_hdr    
+// Expects ds loaded with kernel data segment
+// Clobbers rcx,rdx,rax,rdi
+// Returns rax=pointer to context
+.macro xsave_ctx insn clear_hdr
+	// Get pointer to current thread from CPU-local storage
 	mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+
+	// Tolerate CPU storage not being ready (yet)
     test %rcx,%rcx
     jz 1f
-	mov %ss:THREAD_XSAVE_PTR_OFS(%rcx),%rbp
+
+	// Read xsave stack pointer from thread
+	mov THREAD_XSAVE_PTR_OFS(%rcx),%rdi
+
+	// Only clear xsave header depending on macro parameter
 	.if \clear_hdr != 0
 		// If this is not the first context, clear xsave header
-		cmp %ss:THREAD_XSAVE_STACK_OFS(%rcx),%rbp
+		cmp THREAD_XSAVE_STACK_OFS(%rcx),%rdi
 		jnz 0f
 	.endif
+
+	// Set all bits of edx:eax
 	mov $-1,%eax
 	mov %eax,%edx
-	\insn (%rbp)
-	mov %rbp,%rax
-	add %ss:sse_context_size,%rbp
-	mov %rbp,%ss:THREAD_XSAVE_PTR_OFS(%rcx)
+
+	// Save context using instruction passed to macro
+	\insn (%rdi)
+	mov %rdi,%rax
+
+	// Update xsave stack pointer in thread
+	add sse_context_size,%rdi
+	mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 1:
 	jmp isr_save_done
 
+	// Out of line clear xsave header for recursive context save
 	.if \clear_hdr != 0
 		.align 16
 0:
 		xor %eax,%eax
 		// Clear xsave header
 		mov $512,%edx
-		mov %rax,   (%rbp,%rdx)
-		mov %rax,1*8(%rbp,%rdx)
-		mov %rax,2*8(%rbp,%rdx)
-		mov %rax,3*8(%rbp,%rdx)
-		mov %rax,4*8(%rbp,%rdx)
-		mov %rax,5*8(%rbp,%rdx)
-		mov %rax,6*8(%rbp,%rdx)
-		mov %rax,7*8(%rbp,%rdx)
+		mov %rax,   (%rdi,%rdx)
+		mov %rax,1*8(%rdi,%rdx)
+		mov %rax,2*8(%rdi,%rdx)
+		mov %rax,3*8(%rdi,%rdx)
+		mov %rax,4*8(%rdi,%rdx)
+		mov %rax,5*8(%rdi,%rdx)
+		mov %rax,6*8(%rdi,%rdx)
+		mov %rax,7*8(%rdi,%rdx)
 		dec %eax
 		mov %eax,%edx
-		\insn (%rbp)
-		mov %rbp,%rax
-		add %ss:sse_context_size,%rbp
-		mov %rbp,%ss:THREAD_XSAVE_PTR_OFS(%rcx)
+		\insn (%rdi)
+		mov %rdi,%rax
+		add sse_context_size,%rdi
+		mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 		jmp isr_save_done
 	.endif
 .endm
 
+// Expects ds to be kernel data segment
+// Expects rdi to point to saved context
+// Clobbers eax,edx,ecx
 .macro xrstor_ctx insn
-	mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+	// Set all bits of edx:eax
 	mov $-1,%eax
 	mov $-1,%edx
-	\insn (%rbp)
-	mov %rbp,%ss:THREAD_XSAVE_PTR_OFS(%rcx)
+
+	// Restore context using instruction passed to macro
+	\insn (%rdi)
+
+	// Get pointer to current thread from CPU-local storage
+	mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+	mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
+
 	jmp isr_restore_done
 .endm
 

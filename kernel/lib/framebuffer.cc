@@ -219,6 +219,10 @@ static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
 
 void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
 {
+    // fixme: clip properly
+    if (x0 < 0 || x1 < 0)
+        return;
+
     fb_update_dirty(x0, y0, x1, y1);
 
     __fvec4 fcolor = {

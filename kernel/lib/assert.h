@@ -2,7 +2,7 @@
 #include "likely.h"
 
 __attribute__((noinline))
-int assert_failed(char const *expr,
+extern "C" int assert_failed(char const *expr,
                    char const *msg,
                    char const *file,
                    int line);

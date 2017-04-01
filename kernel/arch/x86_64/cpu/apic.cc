@@ -2043,7 +2043,7 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     if (distribute < 0 || distribute > 1)
         return 0;
 
-    uint8_t vector_base = ioapic_aligned_vectors(bit_log2_n_32(count));
+    uint8_t vector_base = ioapic_aligned_vectors(bit_log2_n(count));
 
     // See if we ran out of vectors
     if (vector_base == 0)

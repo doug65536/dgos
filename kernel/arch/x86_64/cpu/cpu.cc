@@ -13,6 +13,7 @@
 #include "cpuid.h"
 #include "callout.h"
 #include "printk.h"
+#include "interrupts.h"
 
 void cpu_init(int ap)
 {
@@ -50,13 +51,21 @@ void cpu_init(int ap)
         msr_adj_bit(MSR_EFER, 11, 1);
 }
 
+static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
+{
+    assert(intr == INTR_EX_DEBUG);
+    printdbg("Unexpected debug exception, continuing\n");
+    return ctx;
+}
+
 void cpu_init_stage2(int ap)
 {
-    gdt_init();
     idt_init(ap);
+    gdt_init();
     mmu_init(ap);
     if (!ap)
         thread_init(ap);
+    intr_hook(INTR_EX_DEBUG, cpu_debug_exception_handler);
 }
 
 void cpu_hw_init(int ap)

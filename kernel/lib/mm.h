@@ -229,6 +229,12 @@ size_t mphysranges(mmphysrange_t *ranges,
                    void *addr, size_t size,
                    size_t max_size);
 
+// Ensure no range crosses the specified boundary
+// For example, pass 16 in log2_boundary to modify
+// the region list to never cross a 64KB boundary
+size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
+                         size_t count_limit, uint8_t log2_boundary);
+
 // Return true if the address is present
 int mpresent(uintptr_t addr);
 
@@ -345,3 +351,8 @@ void *mm_alloc_contiguous(size_t size);
 void mm_free_contiguous(void *addr, size_t size);
 
 uintptr_t mm_new_process(void);
+
+void *mmap_window(size_t size);
+void munmap_window(void *addr, size_t size);
+int alias_window(void *addr, size_t size,
+                 mmphysrange_t const *ranges, size_t range_count);

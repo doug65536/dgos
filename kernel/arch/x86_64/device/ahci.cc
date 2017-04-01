@@ -1190,7 +1190,7 @@ struct ahci_if_t : public storage_if_base_t {
 struct ahci_dev_t : public storage_dev_base_t {
     STORAGE_DEV_IMPL
 
-    int io(void *data, uint64_t count,
+    int io(void *data, int64_t count,
            uint64_t lba, int is_read);
 
     ahci_if_t *if_;
@@ -1965,7 +1965,7 @@ static void ahci_async_complete(int error,
         condvar_wake_one(&state->done_cond);
 }
 
-int ahci_dev_t::io(void *data, uint64_t count,
+int ahci_dev_t::io(void *data, int64_t count,
                   uint64_t lba, int is_read)
 {
     ahci_blocking_io_t block_state;
@@ -1997,15 +1997,15 @@ int ahci_dev_t::io(void *data, uint64_t count,
     return block_state.err;
 }
 
-int ahci_dev_t::read_blocks(
-        void *data, uint64_t count,
+int64_t ahci_dev_t::read_blocks(
+        void *data, int64_t count,
         uint64_t lba)
 {
     return io(data, count, lba, 1);
 }
 
-int ahci_dev_t::write_blocks(
-        void const *data, uint64_t count,
+int64_t ahci_dev_t::write_blocks(
+        void const *data, int64_t count,
         uint64_t lba)
 {
     return io((void*)data, count, lba, 0);

@@ -60,9 +60,9 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_STRESS_MMAP_THREAD   0
+#define ENABLE_STRESS_MMAP_THREAD   8
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   64
+#define ENABLE_STRESS_HEAP_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   1
 
 #define ENABLE_STRESS_HEAP_SMALL    0
@@ -540,7 +540,7 @@ static int stress_mmap_thread(void *p)
                          PROT_READ | PROT_WRITE,
                          0, -1, 0);
 
-            memset(block, 0, size);
+            memset(block, 0xcc, size);
 
             munmap(block, size);
 
@@ -575,8 +575,7 @@ static int stress_heap_thread(void *p)
             int size;
             uint64_t overall = cpu_rdtsc();
             for (count = 0; count < 0x1000; ++count) {
-                size = rand_r_range(&seed,
-                                    STRESS_HEAP_MINSIZE,
+                size = rand_r_range(&seed, STRESS_HEAP_MINSIZE,
                                     STRESS_HEAP_MAXSIZE);
 
                 heap_free(heap, history[history_index]);

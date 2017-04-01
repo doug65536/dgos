@@ -103,8 +103,8 @@ entry:
 	call cpu_init
 
 	# Call the constructors
-	lea ___init_st(%rip),%rdi
-	lea ___init_en(%rip),%rsi
+	mov $___init_st,%rdi
+	mov $___init_en,%rsi
 	call invoke_function_array
 
 	xor %edi,%edi

@@ -72,3 +72,8 @@ void operator delete(void *block) throw()
 {
     free(block);
 }
+
+void operator delete[](void *block) noexcept
+{
+    free(block);
+}

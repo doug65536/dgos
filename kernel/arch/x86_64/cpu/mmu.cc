@@ -255,19 +255,73 @@ static physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
 
-static uint32_t *phys_alloc;
-static unsigned phys_alloc_count;
+class mmu_phys_allocator_t {
+    typedef uint32_t entry_t;
+public:
+    static size_t size_from_highest_page(physaddr_t page_index);
+
+    void init(void *addr, physaddr_t begin_,
+                  uint8_t log2_pagesz_ = PAGE_SIZE_BIT);
+
+    void add_free_space(physaddr_t base, size_t size);
+
+    // Unreliably peek and see if there might be a free page, outside lock
+    operator bool() const
+    {
+        return next_free != 0;
+    }
+
+    physaddr_t alloc_one();
+
+    // Take multiple pages and receive each physical address in callback
+    // Returns false with no memory allocated on failure
+    template<typename F>
+    bool alloc_multiple(size_t size, F callback);
+
+    void release_one(physaddr_t addr);
+
+    void addref(physaddr_t addr);
+
+    void addref_virtual_range(linaddr_t start, size_t len);
+
+private:
+    inline size_t index_from_addr(physaddr_t addr) const
+    {
+        return (addr - begin) >> log2_pagesz;
+    }
+
+    inline physaddr_t addr_from_index(size_t index) const
+    {
+        return (index << log2_pagesz) + begin;
+    }
+
+    inline void release_one_locked(physaddr_t addr)
+    {
+        size_t index = index_from_addr(addr);
+        if (entries[index] == 1) {
+            // Free the page
+            entries[index] = next_free;
+            next_free = index;
+        } else {
+            // Reduce reference count
+            --entries[index];
+        }
+    }
+
+    entry_t *entries;
+    physaddr_t begin;
+    entry_t next_free;
+    entry_t free_page_count;
+    spinlock_t lock;
+    uint8_t log2_pagesz;
+};
 
 extern char ___init_brk[];
 extern uintptr_t ___top_physaddr;
 static linaddr_t near_base = (linaddr_t)___init_brk;
 static linaddr_t volatile linear_base = PT_MAX_ADDR;
 
-// Maintain two free page chains,
-// because some hardware requires 32-bit memory addresses
-// [0] is the chain >= 4GB
-// [1] is the chain < 4GB
-static uint64_t volatile phys_next_free[2];
+mmu_phys_allocator_t phys_allocators[2];
 
 // Incremented every time the page tables are changed
 // Used to detect lazy TLB shootdown
@@ -286,8 +340,6 @@ static int contiguous_allocator_cmp_both(
         void *p);
 
 static uint64_t volatile page_fault_count;
-
-static int64_t volatile free_page_count;
 
 //
 // Contiguous allocator
@@ -327,100 +379,26 @@ void mm_free_contiguous(void *addr, size_t size)
 
 static void mmu_free_phys(physaddr_t addr)
 {
-    PROFILE_PHYS_ALLOC_ONLY( uint64_t profile_st = cpu_rdtsc() );
-
-    uint64_t volatile *chain =
-            phys_next_free + (addr < 0x100000000UL);
-    uint64_t index = (addr - 0x100000UL) >> PAGE_SIZE_BIT;
-    uint64_t old_next = *chain;
-    for (;;) {
-        assert(index < phys_alloc_count);
-        phys_alloc[index] = (int32_t)old_next;
-        uint64_t next_version =
-                (old_next & 0xFFFFFFFF00000000UL) +
-                0x100000000UL;
-
-        uint64_t cur_next = atomic_cmpxchg(
-                    chain,
-                    old_next,
-                    index | next_version);
-
-        if (cur_next == old_next) {
-            atomic_inc(&free_page_count);
-
-#if DEBUG_PHYS_ALLOC
-            printdbg("Free phys page addr=%lx\n", addr);
-#endif
-            break;
-        }
-
-        old_next = cur_next;
-
-        pause();
-    }
-
-    PROFILE_PHYS_ALLOC_ONLY( printdbg("Free phys page %ld cycles\n",
-                                      cpu_rdtsc() - profile_st) );
+    phys_allocators[addr < 0x100000000].release_one(addr);
 }
 
 static physaddr_t mmu_alloc_phys(int low)
 {
-    PROFILE_PHYS_ALLOC_ONLY( uint64_t profile_st = cpu_rdtsc() );
+    physaddr_t page;
 
-    // Use low memory immediately if high
-    // memory is exhausted
-    low |= (phys_next_free[0] == 0);
-
-    uint64_t volatile *chain = phys_next_free + !!low;
-
-    uint64_t index_version = *chain;
-    for (;;) {
-        uint64_t next_version =
-                (index_version & 0xFFFFFFFF00000000UL) +
-                0x100000000UL;
-        uint32_t index = (uint32_t)index_version;
-        uint64_t new_next = index ? phys_alloc[index] : 0;
-
-        assert(index < phys_alloc_count);
-
-        new_next |= next_version;
-
-        if (!new_next) {
-            // Resort to low memory pages if high memory exhausted
-            if (!low)
-                return mmu_alloc_phys(1);
-
-            // Out of memory
-            return 0;
-        }
-
-        assert((new_next & 0xFFFFFFFFUL) < phys_alloc_count);
-
-        uint64_t cur_next = atomic_cmpxchg(
-                    chain, index_version, new_next);
-
-        if (cur_next == index_version) {
-            atomic_dec(&free_page_count);
-
-            phys_alloc[index] = 0;
-            physaddr_t addr = (((physaddr_t)index) <<
-                               PAGE_SIZE_BIT) + 0x100000;
-
-#if DEBUG_PHYS_ALLOC
-            printdbg("Allocated phys page addr=%lx\n", addr);
-#endif
-
-            PROFILE_PHYS_ALLOC_ONLY(
-                        printdbg("Alloc phys page %ld cycles\n",
-                                 cpu_rdtsc() - profile_st) );
-
-            return addr;
-        }
-
-        index_version = cur_next;
-
-        pause();
+    // Try to get high/low page as specified
+    if (phys_allocators[low]) {
+        page = phys_allocators[low].alloc_one();
+        if (likely(page))
+            return page;
     }
+
+    // If we already checked for low page, we failed
+    if (unlikely(low))
+        return 0;
+
+    // Resort to low page
+    return phys_allocators[1].alloc_one();
 }
 
 //
@@ -1173,13 +1151,14 @@ void mmu_init(int ap)
     *PT3_PTR = 0;
     cpu_invalidate_page(0);
 
-    phys_alloc_count = highest_usable;
-    phys_alloc = (uint32_t*)mmap(0, phys_alloc_count * sizeof(*phys_alloc),
-         PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    size_t physalloc_size = mmu_phys_allocator_t::size_from_highest_page(
+                highest_usable);
+    void *phys_alloc = mmap(
+                0, physalloc_size,
+                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    memset(phys_alloc, 0, physalloc_size);
 
     printdbg("Building physical memory free list\n");
-
-    memset(phys_alloc, 0, phys_alloc_count * sizeof(*phys_alloc));
 
     // Get the highest address taken by the kernel
     physaddr_t top_of_kernel = ___top_physaddr;
@@ -1189,27 +1168,21 @@ void mmu_init(int ap)
     physaddr_t contiguous_start = top_of_kernel;
     top_of_kernel += 4 << 20;
 
+    phys_allocators[0].init(phys_alloc, 0x100000);
+    phys_allocators[1].init(phys_alloc, 0x100000);
+
     // Put all of the remaining physical memory into the free lists
     uintptr_t free_count = 0;
     for (; ; ++free_count) {
         physaddr_t addr = init_take_page(0);
 
+        if (addr <= top_of_kernel)
+            break;
+
         assert(addr != 0);
 
-        if (addr > top_of_kernel &&
-                addr < 0xFFFFFFFFFFFFFFFFUL) {
-            uint64_t volatile *chain = phys_next_free +
-                    (addr < 0x100000000UL);
-            addr -= 0x100000U;
-            addr >>= PAGE_SIZE_BIT;
-            assert(addr < phys_alloc_count);
-            phys_alloc[addr] = *chain;
-            *chain = addr;
-
-            ++free_page_count;
-        } else {
-            break;
-        }
+        int low = addr < 0x100000000;
+        phys_allocators[low].add_free_space(addr, PAGE_SIZE);
     }
 
     // Start using physical memory allocator
@@ -1646,29 +1619,49 @@ void *mmap(void *addr, size_t len,
 
     assert(linear_addr > 0x100000);
 
-    for (size_t ofs = 0; ofs < len; ofs += PAGE_SIZE)
-    {
-        if (likely(!(flags & MAP_PHYSICAL))) {
-            // Allocate normal memory
-
-            // Not present pages with max physaddr are demand committed
-            physaddr_t page = PTE_ADDR;
-
-            // If populating, assign physical memory immediately
-            // Always commit first page immediately
-            if (!ofs || unlikely(flags & MAP_POPULATE)) {
-                page = init_take_page(!!(flags & MAP_32BIT));
-                assert(page != 0);
-            }
-
-            mmu_map_page(linear_addr + ofs, page, page_flags |
-                         ((!ofs) & PTE_PRESENT));
+    if (((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) &&
+            !usable_mem_ranges) {
+        len = round_up(len);
+        bool success;
+        if (!(flags & MAP_32BIT) && phys_allocators[0]) {
+            success = phys_allocators[0].alloc_multiple(
+                        len, [&](size_t ofs, physaddr_t paddr) {
+                mmu_map_page(linear_addr + ofs, paddr, page_flags);
+            });
         } else {
-            // addr is a physical address, caller uses
-            // returned linear address to access it
-            mmu_map_page(linear_addr + ofs,
-                         (((physaddr_t)addr) + ofs) & PTE_ADDR,
-                         page_flags);
+            success = phys_allocators[1].alloc_multiple(
+                        len, [&](size_t ofs, physaddr_t paddr) {
+                mmu_map_page(linear_addr + ofs, paddr, page_flags);
+            });
+        }
+        if (unlikely(!success))
+            return 0;
+        memset((void*)linear_addr, 0, len);
+    } else {
+        for (size_t ofs = 0; ofs < len; ofs += PAGE_SIZE)
+        {
+            if (likely(!(flags & MAP_PHYSICAL))) {
+                // Allocate normal memory
+
+                // Not present pages with max physaddr are demand committed
+                physaddr_t page = PTE_ADDR;
+
+                // If populating, assign physical memory immediately
+                // Always commit first page immediately
+                if (!ofs || unlikely(flags & MAP_POPULATE)) {
+                    page = init_take_page(!!(flags & MAP_32BIT));
+                    assert(page != 0);
+                }
+
+                mmu_map_page(linear_addr + ofs, page, page_flags |
+                             ((!ofs) & PTE_PRESENT));
+            } else {
+                // addr is a physical address, caller uses
+                // returned linear address to access it
+                mmu_map_page(linear_addr + ofs,
+                             (((physaddr_t)addr) + ofs) & PTE_ADDR,
+                             page_flags);
+            }
         }
     }
 
@@ -2104,6 +2097,31 @@ size_t mphysranges(mmphysrange_t *ranges,
     return state.count;
 }
 
+size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
+                         size_t count_limit, uint8_t log2_boundary)
+{
+    size_t boundary = size_t(1) << log2_boundary;
+
+    for (size_t i = ranges_count; i > 0 && ranges_count < count_limit; --i) {
+        mmphysrange_t *range = ranges + i - 1;
+
+        uintptr_t end = range->physaddr + range->size;
+
+        uintptr_t chk1 = range->physaddr >> log2_boundary;
+        uintptr_t chk2 = (end - 1) >> log2_boundary;
+
+        if (chk1 != chk2) {
+            // Needs split
+            uintptr_t new_end = end & -intptr_t(boundary);
+            memmove(range + 1, range, (ranges_count++ - i) * sizeof(*range));
+            range[0].size = new_end - range[0].size;
+            range[1].physaddr = range[0].physaddr + range[0].size;
+            range[1].size = end - range[1].physaddr;
+        }
+    }
+    return ranges_count;
+}
+
 void *mmap_register_device(void *context,
                            uint64_t block_size,
                            uint64_t block_count,
@@ -2240,3 +2258,202 @@ void mm_destroy_process(void)
 
     mm_free_all_user_memory();
 }
+
+size_t mmu_phys_allocator_t::size_from_highest_page(
+        physaddr_t page_index)
+{
+    return page_index * sizeof(entry_t);
+}
+
+void mmu_phys_allocator_t::init(
+        void *addr, physaddr_t begin_, uint8_t log2_pagesz_)
+{
+    entries = (entry_t*)addr;
+    begin = begin_;
+    lock = 0;
+    log2_pagesz = log2_pagesz_;
+}
+
+void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
+{
+    spinlock_lock_noyield(&lock);
+    physaddr_t free_end = base + size;
+    size_t pagesz = uint64_t(1) << log2_pagesz;
+    entry_t index = index_from_addr(free_end) - 1;
+    while (size != 0) {
+        entries[index] = next_free;
+        next_free = index;
+        --index;
+        size -= pagesz;
+        ++free_page_count;
+    }
+    spinlock_unlock_noirq(&lock);
+}
+
+physaddr_t mmu_phys_allocator_t::alloc_one()
+{
+    spinlock_lock_noyield(&lock);
+
+    size_t item = next_free;
+    entry_t new_next = entries[item];
+    next_free = new_next;
+    entries[item] = 1;
+
+    spinlock_unlock_noirq(&lock);
+
+    return addr_from_index(item);
+}
+
+template<typename F>
+bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
+{
+    size_t count = size >> log2_pagesz;
+
+    spinlock_lock_noyield(&lock);
+
+    entry_t first = next_free;
+    entry_t new_next = next_free;
+    size_t i;
+    for (i = 0; i < count && new_next; ++i)
+        new_next = entries[new_next];
+
+    // If we found enough pages, commit the change
+    if (i == count) {
+        next_free = new_next;
+        free_page_count -= count;
+    }
+
+    spinlock_unlock_noirq(&lock);
+
+    if (unlikely(i != count))
+        return false;
+
+    for (i = 0; i < count; ++i) {
+        // Call callable with physical address
+        callback(i << log2_pagesz, addr_from_index(first));
+
+        entry_t next = entries[first];
+
+        // Set reference count to 1
+        entries[first] = 1;
+
+        // Follow chain to next free
+        first = next;
+    }
+
+    return true;
+}
+
+void mmu_phys_allocator_t::release_one(physaddr_t addr)
+{
+    spinlock_lock_noyield(&lock);
+    release_one_locked(addr);
+    spinlock_unlock_noirq(&lock);
+}
+
+void mmu_phys_allocator_t::addref(physaddr_t addr)
+{
+    entry_t index = index_from_addr(addr);
+    spinlock_lock_noyield(&lock);
+    ++entries[index];
+    spinlock_unlock_noirq(&lock);
+}
+
+void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
+{
+    size_t count = len >> log2_pagesz;
+
+    spinlock_lock_noyield(&lock);
+
+    unsigned path[4];
+    pte_t *ptes[4];
+    int present_mask;
+
+    present_mask = addr_present(start, path, ptes);
+    for (size_t i = 0; i < count; ++i) {
+        // Check path at start and every time we wrap into next page table
+        if (unlikely(i && !((path[3] + i) & 511))) {
+            present_mask = addr_present(start, path, ptes);
+
+            // Make sure the last level page table is present
+            assert((present_mask & 7) == 7);
+        }
+
+        physaddr_t addr = ptes[3][i] & PTE_ADDR;
+
+        if (addr && addr != PTE_ADDR) {
+            entry_t index = index_from_addr(addr);
+            ++entries[index];
+        }
+    }
+
+    spinlock_unlock_noirq(&lock);
+}
+
+void *mmap_window(size_t size)
+{
+    size = round_up(size);
+
+    linaddr_t addr = linear_allocator.alloc_linear(size);
+
+    for (size_t i = 0; i < size; i += PAGE_SIZE) {
+        mmu_map_page(addr + i, PTE_ADDR, PTE_ACCESSED | PTE_DIRTY |
+                     PTE_WRITABLE);
+    }
+
+    return (void*)addr;
+}
+
+void munmap_window(void *addr, size_t size)
+{
+    size = round_up(size);
+    linear_allocator.release_linear((uintptr_t)addr, size);
+}
+
+int alias_window(void *addr, size_t size,
+                  mmphysrange_t const *ranges, size_t range_count)
+{
+    linaddr_t base = (linaddr_t)addr;
+    mmphysrange_t const *range = ranges;
+    mmphysrange_t const *ranges_end = ranges + range_count;
+
+    size_t range_offset = 0;
+
+    size = round_up(size);
+
+    unsigned path[4];
+    pte_t *ptes[4];
+    int present_mask = addr_present((uintptr_t)base, path, ptes);
+    size_t pte_index = 0;
+
+    assert((present_mask & 0x7) == 0x7);
+    if ((present_mask & 0x7) != 0x7)
+        return 0;
+
+    if (ranges) {
+        for (size_t offset = 0; offset < size;
+             offset += PAGE_SIZE, range_offset += PAGE_SIZE) {
+            // If we have reached the end of the range, advance to next range
+            if (range_offset >= range->size) {
+                if (++range == ranges_end)
+                    return (offset + PAGE_SIZE) == size;
+                range_offset = 0;
+            }
+
+            ptes[3][pte_index++] = ((range->physaddr + range_offset) &
+                                    PTE_ADDR) +
+                    PTE_ACCESSED | PTE_DIRTY | PTE_WRITABLE | PTE_PRESENT;
+        }
+    } else {
+        for (size_t offset = 0; offset < size; offset += PAGE_SIZE) {
+            ptes[3][pte_index++] = PTE_ADDR |
+                    PTE_ACCESSED | PTE_DIRTY | PTE_WRITABLE;
+        }
+    }
+
+    for (size_t offset = 0; offset < size; offset += PAGE_SIZE)
+        cpu_invalidate_page(base + offset);
+
+    return 1;
+}
+

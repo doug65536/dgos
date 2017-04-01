@@ -536,7 +536,7 @@ void* iso9660_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    sector_shift = bit_log2_n_32(sector_size);
+    sector_shift = bit_log2_n(sector_size);
     block_shift = 11 - sector_shift;
     block_size = sector_size << block_size;
 

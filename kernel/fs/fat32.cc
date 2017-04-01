@@ -542,8 +542,8 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
     // Sector offset of cluster 0
     cluster_ofs = bpb.cluster_begin_lba;
 
-    sector_shift = bit_log2_n_32(sector_size);
-    block_shift = bit_log2_n_32(bpb.sec_per_cluster);
+    sector_shift = bit_log2_n(sector_size);
+    block_shift = bit_log2_n(bpb.sec_per_cluster);
     block_size = sector_size << block_shift;
 
     mm_dev = (char*)mmap_register_device(

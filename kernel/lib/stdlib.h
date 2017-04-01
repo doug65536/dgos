@@ -34,3 +34,4 @@ void *operator new(size_t size);
 void *operator new[](size_t size);
 void operator delete(void *block, unsigned long size);
 void operator delete(void *block) throw();
+void operator delete[](void *block) throw();

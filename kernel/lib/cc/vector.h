@@ -648,7 +648,7 @@ template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::push_back(_T const& __value)
 {
     if (__sz + 1 >= __capacity)
-        reserve(size_type(1) << bit_log2_n_32 (__capacity + 16) * 2
+        reserve(size_type(1) << bit_log2_n(__capacity + 16) * 2
 }
 
 template<typename _T, typename _Allocator>
