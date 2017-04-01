@@ -8,12 +8,12 @@ QEMU_SMP := -smp cpus=8,cores=4,threads=2
 
 QEMU_MACHINE := q35
 #QEMU_CPU := Skylake-Client
-QEMU_CPU := Haswell
-#QEMU_CPU := kvm64
+#QEMU_CPU := Haswell
+QEMU_CPU := kvm64
 QEMU_RAM := 5G
-QEMU_FLAGS :=  -no-shutdown -no-reboot -d unimp -device nec-usb-xhci \
-	-device usb-kbd -device usb-mouse -trace events=dump/qemu-trace
-
+QEMU_FLAGS := -no-shutdown -no-reboot -d unimp -device nec-usb-xhci \
+	-device usb-kbd -device usb-mouse
+#-no-shutdown
 QEMU_BRIDGE :=
 
 QEMU_NET := \
@@ -85,6 +85,7 @@ debug-iso-kernel: $(ISO_FILE)
 		-ex 'b entry' \
 		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
 			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+			-accel tcg,thread=multi \
 			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
 			-gdb stdio \
 			$(QEMU_NET)'
@@ -100,6 +101,24 @@ debug-iso-wait-singlecpu-ide: $(ISO_FILE)
 	 $(QEMU) $(QEMU_FLAGS) \
 		 -cpu $(QEMU_CPU) \
 		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
+		 $(QEMU_DEBUGCON) \
+		 $(QEMU_NET) \
+		 -machine pc
+
+debug-fat-wait-singlecpu-ide: debuggable-kernel-disk $(DISKIMAGE)
+	 $(QEMU) $(QEMU_FLAGS) \
+		 -cpu $(QEMU_CPU) \
+		 -m $(QEMU_RAM) -s -S \
+		 -drive file=$(DISKIMAGE),format=raw \
+		 $(QEMU_DEBUGCON) \
+		 $(QEMU_NET) \
+		 -machine pc
+
+debug-fat-wait-singlecpu: debuggable-kernel-disk $(DISKIMAGE)
+	 $(QEMU) $(QEMU_FLAGS) \
+		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		 -m $(QEMU_RAM) -s -S \
+		 -drive file=$(DISKIMAGE),format=raw \
 		 $(QEMU_DEBUGCON) \
 		 $(QEMU_NET)
 
@@ -296,19 +315,52 @@ $(BOCHSSYMBOLS): $(SYMBOLFILE)
 		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		$(SORT) > $@
 
-$(BINDIR)/bochs-config.bxrc: utils/bochs-config.bxrc.template
+$(BINDIR)/bochs-iso-config.bxrc: utils/bochs-iso-config.bxrc.template
 	$(SED) "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | \
 		$(SED) "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
-debug-bochs: all bochs-symbols iso $(BINDIR)/bochs-config.bxrc
+$(BINDIR)/bochs-fat-config.bxrc: utils/bochs-fat-config.bxrc.template
+	$(SED) "s|\$$SYMBOLFILE|$(SYMBOLFILE)|g" $< | \
+		$(SED) "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
+
+debug-iso-bochs: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
 	$(BOCHS) \
-		-qf $(BINDIR)/bochs-config.bxrc \
+		-qf $(BINDIR)/bochs-iso-config.bxrc \
 		-rc utils/bochs-debugger-commands
 
-debug-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-config.bxrc
+debug-fat-bochs: all bochs-symbols iso $(BINDIR)/bochs-fat-config.bxrc
 	$(BOCHS) \
-		-qf $(BINDIR)/bochs-config.bxrc \
+		-qf $(BINDIR)/bochs-fat-config.bxrc \
+		-rc utils/bochs-debugger-commands
+
+debug-iso-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
+	$(BOCHS) \
+		-qf $(BINDIR)/bochs-iso-config.bxrc \
 		-rc utils/bochs-debugger-boot-commands
 
-run-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-config.bxrc
-	$(BOCHS) -qf $(BINDIR)/bochs-config.bxrc -q
+debug-fat-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-fat-config.bxrc
+	$(BOCHS) \
+		-qf $(BINDIR)/bochs-fat-config.bxrc \
+		-rc utils/bochs-debugger-boot-commands
+
+run-iso-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-iso-config.bxrc
+	$(BOCHS) -qf $(BINDIR)/bochs-iso-config.bxrc -q
+
+run-fat-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-fat-config.bxrc
+	$(BOCHS) -qf $(BINDIR)/bochs-fat-config.bxrc -q
+
+.PHONY: monitor-debug-output run-iso-singlecpu run-iso run-iso-singlecpu-kvm
+.PHONY: run-iso-kvm run-iso-numa-kvm run-iso-numa run-iso-numa-kvm
+.PHONY: run-iso-numa-kvm run-iso-numa debug-iso-boot debug-iso-kernel
+.PHONY: debug-iso-wait-singlecpu debug-fat-wait-singlecpu
+.PHONY: debug-iso-wait-singlecpu-kvm
+.PHONY: debug-iso-wait-singlecpu-ide debug-fat-wait-singlecpu-ide
+.PHONY: debug-iso-wait-many-ahci debug-iso-wait
+.PHONY: debug-iso-bridge-test-wait debug-iso-wait-kvm
+.PHONY: debug debug-kernel debug-attach debug-boot-attach run-debug
+.PHONY: run-debug-singlecpu run-debug-wait run-debug-wait-kvm
+.PHONY: run-debug-wait-singlecpu run-debug-wait-singlecpu-kvm
+.PHONY: run bochs-symbols
+.PHONY: debug-iso-bochs debug-fat-bochs
+.PHONY: debug-iso-bochs-boot debug-fat-bochs-boot
+.PHONY: run-iso-bochs run-fat-bochs

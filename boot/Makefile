@@ -322,11 +322,9 @@ inject-kernel: all
 	$(TOUCH) disk/lcname.lex
 	$(MAKE) umountdisk
 
-.PHONY: all clean run debug-bochs debug bochs-symbols
+.PHONY: all clean
 .PHONY: deletedisk bootable-disk debuggable-disk mountdisk umountdisk
-.PHONY: kernel debuggable-kernel-disk
-.PHONY: iso debug-iso-boot debug-iso-kernel
-.PHONY: stagedir modules
+.PHONY: kernel debuggable-kernel-disk iso stagedir modules
 
 .PRECIOUS: $(DISKIMAGE)
 

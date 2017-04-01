@@ -1,10 +1,11 @@
 emulators.mk
+utils/bochs-fat-config.bxrc.template
+utils/bochs-iso-config.bxrc.template
 vesainfo.h
 debug.cc
 debug.h
 driveinfo.cc
 driveinfo.h
-utils/bochs-config.bxrc.template
 utils/debug-kvm-commands.template
 utils/debug-kernel-kvm-commands.template
 utils/bochs-debugger-commands
