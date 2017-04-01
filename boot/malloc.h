@@ -13,6 +13,8 @@ uint16_t far_malloc_aligned(uint32_t bytes);
 void test_malloc(void);
 #endif
 
-void *operator new(size_t size);
-void operator delete(void *block, unsigned long size);
-void operator delete(void *block);
+void *operator new(size_t size) noexcept;
+void operator delete(void *block, unsigned long size) noexcept;
+void operator delete(void *block) noexcept;
+void operator delete[](void *block) noexcept;
+void operator delete[](void *block, unsigned int);

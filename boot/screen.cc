@@ -366,3 +366,8 @@ void print_xy(uint16_t x, uint16_t y, uint16_t ch, uint16_t attr, uint16_t count
     buf[count] = 0;
     print_at(y, x, attr, count, buf);
 }
+
+void print_lba(uint32_t lba)
+{
+    print_line("%u\n", lba);
+}

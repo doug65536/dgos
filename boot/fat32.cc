@@ -18,15 +18,16 @@ static fat32_sector_iterator_t *file_handles;
 #define MAX_HANDLES 5
 
 static char *sector_buffer;
+static char *fat_buffer;
+uint32_t fat_buffer_lba;
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
 // Returns
 static uint16_t read_bpb(uint32_t partition_lba)
 {
-    // Use extra large sector buffer to accomodate
-    // arbitrary sector size, until sector size is known
     sector_buffer = (char*)malloc(512);
+    fat_buffer = (char*)malloc(512);
 
     uint16_t err = read_lba_sectors(
                 sector_buffer,
@@ -92,11 +93,16 @@ static uint32_t next_cluster(
     uint32_t const *fat_array = (uint32_t *)sector;
     uint32_t lba = bpb.first_fat_lba + fat_sector_index;
 
-    uint16_t err = read_lba_sectors(sector, boot_drive, lba, 1);
-    if (err_ptr)
-        *err_ptr = err;
-    if (err)
-        return 0xFFFFFFFF;
+    uint16_t err = 0;
+    if (fat_buffer_lba != lba) {
+        err = read_lba_sectors(fat_buffer, boot_drive, lba, 1);
+        if (err_ptr)
+            *err_ptr = err;
+        if (err)
+            return 0xFFFFFFFF;
+        fat_buffer_lba = lba;
+    }
+    memcpy(sector, fat_buffer, 512);
 
     current_cluster = fat_array[fat_sector_offset] & 0x0FFFFFFF;
 

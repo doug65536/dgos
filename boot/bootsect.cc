@@ -105,6 +105,7 @@ extern uint32_t bootinfo_primary_volume_desc;
 #include "fat32.h"
 #include "iso9660.h"
 #include "driveinfo.h"
+#include "screen.h"
 
 #define __stdcall __attribute__((stdcall))
 #define __packed __attribute__((packed))
@@ -126,6 +127,9 @@ uint16_t read_lba_sectors(
         char *buf, uint8_t drive,
         uint32_t lba, uint16_t count)
 {
+    //if (fully_loaded)
+    //    print_lba(lba);
+
     // Extended Read LBA sectors
     // INT 13h AH=42h
     disk_address_packet_t pkt = {
@@ -157,14 +161,17 @@ __attribute__((used)) int init(void)
 {
     if (bootinfo_file_location == 0) {
         // Calculate how many more sectors to load
-        uint16_t load_size = (__initialized_data_end - __initialized_data_start) >> 9;
+        uint16_t load_size = (__initialized_data_end -
+                              __initialized_data_start) >> 9;
 
         uint16_t err = read_lba_sectors((char*)(0x7c00u + 512),
                                        boot_drive, 1,
                                        load_size - 1);
 
-        if (err != 0)
+        if (err != 0) {
             halt(0);
+            return 0;
+        }
     }
 
     fully_loaded = 1;

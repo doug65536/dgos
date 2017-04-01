@@ -433,3 +433,13 @@ void operator delete(void *block)
 {
     free(block);
 }
+
+void operator delete[](void *block)
+{
+    free(block);
+}
+
+void operator delete[](void *block, unsigned int)
+{
+    free(block);
+}
