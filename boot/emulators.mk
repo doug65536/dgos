@@ -4,17 +4,14 @@ QEMU_DEBUGCON := \
 	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
 	-device isa-debugcon,chardev=qemu-debug-out
 
-QEMU_SMP := -smp cpus=8,cores=4,threads=2
-
-QEMU_MACHINE := q35
-#QEMU_CPU := Skylake-Client
-#QEMU_CPU := Haswell
-QEMU_CPU := kvm64
+QEMU_CPU := host
 QEMU_RAM := 5G
-QEMU_FLAGS := -no-shutdown -no-reboot -d unimp -device nec-usb-xhci \
-	-device usb-kbd -device usb-mouse
-#-no-shutdown
+QEMU_FLAGS :=
 QEMU_BRIDGE :=
+
+QEMU_USB := -device nec-usb-xhci \
+	-device usb-kbd \
+	-device usb-mouse
 
 QEMU_NET := \
 	-net nic,model=rtl8139 \
@@ -23,164 +20,392 @@ QEMU_NET := \
 	$(QEMU_BRIDGE) \
 	-net dump,file=dump/netdump
 
+QEMU_COMMON := $(QEMU_DEBUGCON) $(QEMU_USB) $(QEMU_NET) \
+	-s \
+	-no-shutdown \
+	-no-reboot \
+	-d unimp \
+	$(QEMU_FLAGS) \
+	-m $(QEMU_RAM)
+
+QEMU_WAIT := -S
+QEMU_RUN :=
+
+QEMU_SMP := -smp cpus=8,cores=4,threads=2
+QEMU_UP := -smp cpus=1,cores=1,threads=1
+
+QEMU_FAT := -drive file=$(DISKIMAGE),format=raw
+QEMU_ISO := -cdrom $(ISO_FILE)
+
+QEMU_KVM := -enable-kvm \
+	-cpu $(QEMU_CPU)
+QEMU_TCG := -accel tcg,thread=multi \
+	-cpu kvm64
+
+QEMU_IDE := -machine pc
+QEMU_AHCI := -machine q35
+
+QEMU_ISO_DEPS := $(ISO_FILE)
+QEMU_FAT_DEPS := debuggable-kernel-disk $(DISKIMAGE)
+
 monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
 
-run-iso-singlecpu: $(ISO_FILE)
-	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET)
+.PHONY: monitor-debug-output
 
-run-iso: $(ISO_FILE)
-	$(QEMU) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		$(QEMU_DEBUGCON) \
+# Targets
+#  {debug|run}-{up|smp}-{iso|fat}-{ahci|ide}-{kvm|tcg}
+#   |   |       |  |     |   |     |    |     |   |
+#   |   |       |  |     |   |     |    |     |   QEMU_TCG
+#   |   |       |  |     |   |     |    |     QEMU_KVM
+#   |   |       |  |     |   |     |    QEMU_IDE
+#   |   |       |  |     |   |     QEMU_AHCI
+#   |   |       |  |     |   QEMU_FAT
+#   |   |       |  |     QEMU_ISO
+#   |   |       |  QEMU_SMP
+#   |   |       QEMU_UP
+#   |   QEMU_RUN
+#   QEMU_WAIT
+
+debug-up-iso-ahci-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+debug-up-iso-ahci-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+debug-up-iso-ide-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+debug-up-iso-ide-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+debug-up-fat-ahci-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+debug-up-fat-ahci-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+debug-up-fat-ide-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+debug-up-fat-ide-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+debug-smp-iso-ahci-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+debug-smp-iso-ahci-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+debug-smp-iso-ide-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+debug-smp-iso-ide-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+debug-smp-fat-ahci-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+debug-smp-fat-ahci-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+debug-smp-fat-ide-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+debug-smp-fat-ide-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_WAIT) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+run-up-iso-ahci-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+run-up-iso-ahci-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+run-up-iso-ide-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+run-up-iso-ide-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+run-up-fat-ahci-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+run-up-fat-ahci-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+run-up-fat-ide-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+run-up-fat-ide-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_UP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+run-smp-iso-ahci-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+run-smp-iso-ahci-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+run-smp-iso-ide-tcg: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+run-smp-iso-ide-kvm: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_ISO) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+run-smp-fat-ahci-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_TCG)
+
+run-smp-fat-ahci-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_AHCI) \
+	$(QEMU_KVM)
+
+run-smp-fat-ide-tcg: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_TCG)
+
+run-smp-fat-ide-kvm: $(QEMU_FAT_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+	$(QEMU_RUN) \
+	$(QEMU_SMP) \
+	$(QEMU_FAT) \
+	$(QEMU_IDE) \
+	$(QEMU_KVM)
+
+#  {debug|run}-{up|smp}-{iso|fat}-{ahci|ide}-{kvm|tcg}
+.PHONY: debug-up-iso-ahci-kvm
+.PHONY: debug-up-iso-ahci-tcg
+.PHONY: debug-up-iso-ide-kvm
+.PHONY: debug-up-iso-ide-tcg
+.PHONY: debug-up-fat-ahci-kvm
+.PHONY: debug-up-fat-ahci-tcg
+.PHONY: debug-up-fat-ide-kvm
+.PHONY: debug-up-fat-ide-tcg
+.PHONY: debug-smp-iso-ahci-kvm
+.PHONY: debug-smp-iso-ahci-tcg
+.PHONY: debug-smp-iso-ide-kvm
+.PHONY: debug-smp-iso-ide-tcg
+.PHONY: debug-smp-fat-ahci-kvm
+.PHONY: debug-smp-fat-ahci-tcg
+.PHONY: debug-smp-fat-ide-kvm
+.PHONY: debug-smp-fat-ide-tcg
+.PHONY: run-up-iso-ahci-kvm
+.PHONY: run-up-iso-ahci-tcg
+.PHONY: run-up-iso-ide-kvm
+.PHONY: run-up-iso-ide-tcg
+.PHONY: run-up-fat-ahci-kvm
+.PHONY: run-up-fat-ahci-tcg
+.PHONY: run-up-fat-ide-kvm
+.PHONY: run-up-fat-ide-tcg
+.PHONY: run-smp-iso-ahci-kvm
+.PHONY: run-smp-iso-ahci-tcg
+.PHONY: run-smp-iso-ide-kvm
+.PHONY: run-smp-iso-ide-tcg
+.PHONY: run-smp-fat-ahci-kvm
+.PHONY: run-smp-fat-ahci-tcg
+.PHONY: run-smp-fat-ide-kvm
+.PHONY: run-smp-fat-ide-tcg
+
+# ---
+
+debug-iso-wait-many-ahci: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+		$(QEMU_TCG) \
 		$(QEMU_SMP) \
-		$(QEMU_NET)
+		$(QEMU_ISO) \
+		-device ich9-ahci,id=ahci2 \
+		-device ich9-ahci,id=ahci3 \
+		-device ich9-ahci,id=ahci4
 
-run-iso-singlecpu-kvm: $(ISO_FILE)
-	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET) \
-		-cpu host -enable-kvm
-
-run-iso-kvm: $(ISO_FILE)
-	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		-machine $(QEMU_MACHINE) \
-		$(QEMU_DEBUGCON) \
+debug-iso-bridge-test-wait: $(QEMU_ISO_DEPS)
+	$(QEMU) $(QEMU_COMMON) \
+		$(QEMU_TCG) \
 		$(QEMU_SMP) \
-		$(QEMU_NET) \
-		-cpu host -enable-kvm
+		$(QEMU_ISO) \
+		-device i82801b11-bridge,bus=pcie.0,id=pcie.1 \
+		-device i82801b11-bridge,bus=pcie.1,id=pcie.2 \
+		-device i82801b11-bridge,bus=pcie.2,id=pcie.3 \
+		-device i82801b11-bridge,bus=pcie.3,id=pcie.4 \
+		-device i82801b11-bridge,bus=pcie.4,id=pcie.5 \
+		-device i82801b11-bridge,bus=pcie.5,id=pcie.6 \
+		-device ich9-ahci,bus=pcie.1,id=ahci2 \
+		-device ich9-ahci,bus=pcie.2,id=ahci3 \
+		-device ich9-ahci,bus=pcie.2,id=ahci4 \
+		-device ich9-ahci,bus=pcie.4,id=ahci5 \
+		-device ich9-ahci,bus=pcie.5,id=ahci6 \
+		-device ich9-ahci,bus=pcie.6,id=ahci7 \
+		-device ich9-ahci,bus=pcie.6,id=ahci8
 
-run-iso-numa-kvm: $(ISO_FILE)
-	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		-machine $(QEMU_MACHINE) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_SMP) \
-		-numa node,mem=256M,cpus=0-1 \
-		-numa node,mem=256M,cpus=2-3 \
-		$(QEMU_NET) \
-		-cpu host -enable-kvm
+#
+# Get GDB
 
-run-iso-numa: $(ISO_FILE)
-	$(QEMU) $(QEMU_FLAGS) -m $(QEMU_RAM) -s -cdrom $(ISO_FILE) \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_SMP) \
-		-numa node,mem=256M,cpus=0-1 \
-		-numa node,mem=256M,cpus=2-3 \
-		$(QEMU_NET)
-
-debug-iso-boot: $(ISO_FILE)
-	 $(GDB) $(SYMBOLFILE) --tui \
+debug-iso-boot: $(QEMU_ISO_DEPS)
+	$(GDB) $(SYMBOLFILE) --tui \
 		-ex 'b elf64_run' \
-		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
-			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio \
-			$(QEMU_NET)'
+		-ex 'target remote | exec $(QEMU) $(QEMU_COMMON) \
+			$(QEMU_TCG) \
+			$(QEMU_ISO) \
+			-gdb stdio'
 
-debug-iso-kernel: $(ISO_FILE)
+debug-iso-kernel: $(QEMU_ISO_DEPS)
 	$(GDB) --symbols $(KERNELSYMBOLFILE) --tui \
 		-ex 'b entry' \
-		-ex 'target remote | exec $(QEMU) $(QEMU_FLAGS) \
-			-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
+		-ex 'target remote | exec $(QEMU) $(QEMU_COMMON) \
+			$(QEMU_TCG) \
 			-accel tcg,thread=multi \
-			-m $(QEMU_RAM) -S -cdrom $(ISO_FILE) \
-			-gdb stdio \
-			$(QEMU_NET)'
-
-debug-iso-wait-singlecpu: $(ISO_FILE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON) \
-		 $(QEMU_NET)
-
-debug-iso-wait-singlecpu-ide: $(ISO_FILE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON) \
-		 $(QEMU_NET) \
-		 -machine pc
-
-debug-fat-wait-singlecpu-ide: debuggable-kernel-disk $(DISKIMAGE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -s -S \
-		 -drive file=$(DISKIMAGE),format=raw \
-		 $(QEMU_DEBUGCON) \
-		 $(QEMU_NET) \
-		 -machine pc
-
-debug-fat-wait-singlecpu: debuggable-kernel-disk $(DISKIMAGE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 -m $(QEMU_RAM) -s -S \
-		 -drive file=$(DISKIMAGE),format=raw \
-		 $(QEMU_DEBUGCON) \
-		 $(QEMU_NET)
-
-debug-iso-wait-singlecpu-kvm: $(ISO_FILE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON) \
-		 $(QEMU_NET) \
-		 -cpu host -enable-kvm
-
-bin/mem-garbage:
-	dd if=/dev/urandom of=bin/mem-garbage bs=1048576 count=512
-
-debug-iso-wait: $(ISO_FILE) #bin/mem-garbage
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 $(QEMU_SMP) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON) \
-		 $(QEMU_NET)
-
-#		 -object memory-backend-file,id=mem,size=512M,mem-path=bin/mem-garbage,share=on \
-#		 -numa node,memdev=mem
-
-debug-iso-wait-many-ahci: $(ISO_FILE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 $(QEMU_SMP) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON) \
-		 -device ich9-ahci,id=ahci2 \
-		 -device ich9-ahci,id=ahci3 \
-		 -device ich9-ahci,id=ahci4
-
-debug-iso-bridge-test-wait: $(ISO_FILE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		 $(QEMU_SMP) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 $(QEMU_DEBUGCON) \
-		 -device i82801b11-bridge,bus=pcie.0,id=pcie.1 \
-		 -device i82801b11-bridge,bus=pcie.1,id=pcie.2 \
-		 -device i82801b11-bridge,bus=pcie.2,id=pcie.3 \
-		 -device i82801b11-bridge,bus=pcie.3,id=pcie.4 \
-		 -device i82801b11-bridge,bus=pcie.4,id=pcie.5 \
-		 -device i82801b11-bridge,bus=pcie.5,id=pcie.6 \
-		 -device ich9-ahci,bus=pcie.1,id=ahci2 \
-		 -device ich9-ahci,bus=pcie.2,id=ahci3 \
-		 -device ich9-ahci,bus=pcie.2,id=ahci4 \
-		 -device ich9-ahci,bus=pcie.4,id=ahci5 \
-		 -device ich9-ahci,bus=pcie.5,id=ahci6 \
-		 -device ich9-ahci,bus=pcie.6,id=ahci7 \
-		 -device ich9-ahci,bus=pcie.6,id=ahci8
-
-debug-iso-wait-kvm: $(ISO_FILE)
-	 $(QEMU) $(QEMU_FLAGS) \
-		 -machine $(QEMU_MACHINE) \
-		 $(QEMU_SMP) \
-		 $(QEMU_DEBUGCON) \
-		 -m $(QEMU_RAM) -S -cdrom $(ISO_FILE) -s -S \
-		 -cpu host -enable-kvm
+			$(QEMU_ISO) \
+			-gdb stdio'
 
 #
 # Debug in KVM
@@ -192,98 +417,6 @@ $(BINDIR)/debug-kvm-gdbcommands: utils/debug-kvm-commands.template
 $(BINDIR)/debug-kernel-kvm-gdbcommands: utils/debug-kernel-kvm-commands.template
 	$(SED) "s|\$$SYMBOLFILE|$(KERNELSYMBOLFILE)|g" $< | \
 		$(SED) "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
-
-debug: all debuggable-disk $(BINDIR)/debug-kvm-gdbcommands
-	$(GDB) -x $(BINDIR)/debug-kvm-gdbcommands
-
-debug-kernel: all $(BINDIR)/debug-kernel-kvm-gdbcommands
-	$(GDB) -x $(BINDIR)/debug-kernel-kvm-gdbcommands
-
-debug-attach:
-	$(GDB) --symbols=$(KERNELSYMBOLFILE) --tui \
-		-iex 'set architecture i386:x86-64' \
-		-ex 'target remote localhost:1234' \
-		-ex 'layout regs' \
-		-ex 'set radix 16' \
-		-ex 'b assert_failed' \
-		-ex 'b unhandled_exception_handler'
-
-debug-boot-attach:
-	$(GDB) $(SYMBOLFILE) --tui \
-		-iex 'set architecture i8086' \
-		-ex 'target remote localhost:1234' \
-		-ex 'layout regs' \
-		-ex 'set radix 16' \
-		-ex 'b *0x7C00'
-
-run-debug: all bootable-disk debuggable-kernel-disk inject-kernel
-	$(QEMU) \
-		-drive file=$(DISKIMAGE),format=raw \
-		-no-shutdown -no-reboot -d cpu_reset \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-s -m $(QEMU_RAM) \
-		$(QEMU_SMP) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET)
-
-# -drive file=$(DISKIMAGE),format=raw,if=ide
-
-run-debug-singlecpu: all debuggable-kernel-disk
-	$(QEMU) -s \
-		-drive file=$(DISKIMAGE),format=raw \
-		-no-shutdown -no-reboot -d cpu_reset \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET)
-
-#		-drive id=disk,file=$(DISKIMAGE),if=none \
-#		-device ahci,id=ahci \
-#		-device ide-drive,drive=disk,bus=ahci.0 \
-
-run-debug-wait: all debuggable-kernel-disk
-	$(QEMU) -s -S  \
-		-drive file=$(DISKIMAGE),format=raw \
-		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) \
-		$(QEMU_SMP) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET)
-
-run-debug-wait-kvm: all debuggable-kernel-disk
-	$(QEMU) -s -S  \
-		-drive file=$(DISKIMAGE),format=raw \
-		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine $(QEMU_MACHINE) \
-		-m $(QEMU_RAM) \
-		$(QEMU_SMP) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET) \
-		-cpu host -enable-kvm
-
-run-debug-wait-singlecpu: all debuggable-kernel-disk
-	$(QEMU) -s -S  \
-		-drive file=$(DISKIMAGE),format=raw \
-		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine $(QEMU_MACHINE) -cpu $(QEMU_CPU) \
-		-m $(QEMU_RAM) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET)
-
-run-debug-wait-singlecpu-kvm: all debuggable-kernel-disk
-	$(QEMU) -s -S  \
-		-drive file=$(DISKIMAGE),format=raw \
-		-no-shutdown -no-reboot -d cpu_reset,guest_errors \
-		-machine $(QEMU_MACHINE) \
-		-m $(QEMU_RAM) \
-		$(QEMU_DEBUGCON) \
-		$(QEMU_NET) \
-		-cpu host -enable-kvm
-
-run: all bootable-disk
-	$(QEMU) -m 5G -drive file=$(DISKIMAGE),format=raw \
-		$(QEMU_NET)
 
 #		-netdev user,id=mynet0,net=192.168.66.0/24,dhcpstart=192.168.66.9 \
 #		-net nic,model=i82551 \
@@ -348,19 +481,3 @@ run-iso-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-iso-config.bxrc
 
 run-fat-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-fat-config.bxrc
 	$(BOCHS) -qf $(BINDIR)/bochs-fat-config.bxrc -q
-
-.PHONY: monitor-debug-output run-iso-singlecpu run-iso run-iso-singlecpu-kvm
-.PHONY: run-iso-kvm run-iso-numa-kvm run-iso-numa run-iso-numa-kvm
-.PHONY: run-iso-numa-kvm run-iso-numa debug-iso-boot debug-iso-kernel
-.PHONY: debug-iso-wait-singlecpu debug-fat-wait-singlecpu
-.PHONY: debug-iso-wait-singlecpu-kvm
-.PHONY: debug-iso-wait-singlecpu-ide debug-fat-wait-singlecpu-ide
-.PHONY: debug-iso-wait-many-ahci debug-iso-wait
-.PHONY: debug-iso-bridge-test-wait debug-iso-wait-kvm
-.PHONY: debug debug-kernel debug-attach debug-boot-attach run-debug
-.PHONY: run-debug-singlecpu run-debug-wait run-debug-wait-kvm
-.PHONY: run-debug-wait-singlecpu run-debug-wait-singlecpu-kvm
-.PHONY: run bochs-symbols
-.PHONY: debug-iso-bochs debug-fat-bochs
-.PHONY: debug-iso-bochs-boot debug-fat-bochs-boot
-.PHONY: run-iso-bochs run-fat-bochs
