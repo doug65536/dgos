@@ -41,14 +41,66 @@ struct ide_if_t : public storage_if_base_t {
 
     C_ASSERT(sizeof(bmdma_prd_t) == 8);
 
+    //
+    // Commands
+
+    enum struct ata_cmd : uint8_t {
+        READ_PIO            = 0x20,
+        READ_PIO_EXT        = 0x24,
+        READ_MULT_PIO       = 0xC5,
+        READ_MULT_PIO_EXT   = 0x29,
+        READ_DMA            = 0xC8,
+        READ_DMA_EXT        = 0x25,
+
+        WRITE_PIO           = 0x30,
+        WRITE_PIO_EXT       = 0x34,
+        WRITE_MULT_PIO      = 0xC4,
+        WRITE_MULT_PIO_EXT  = 0x39,
+        WRITE_DMA           = 0xCA,
+        WRITE_DMA_EXT       = 0x35,
+
+        SET_MULTIPLE        = 0xC6,
+
+        CACHE_FLUSH         = 0xE7,
+        CACHE_FLUSH_EXT     = 0xEA,
+
+        PACKET              = 0xA0,
+
+        IDENTIFY_PACKET     = 0xA1,
+        IDENTIFY            = 0xEC,
+
+        SET_FEATURE         = 0xEF
+    };
+
+    //
+    // Task file
+
+    enum struct ata_reg_cmd : uint16_t {
+        DATA            = 0x00,
+        FEATURES        = 0x01,   // write only
+        ERROR           = 0x01,   // read only
+        SECCOUNT0       = 0x02,
+        LBA0            = 0x03,
+        LBA1            = 0x04,
+        LBA2            = 0x05,
+        HDDEVSEL        = 0x06,
+        COMMAND         = 0x07,   // write only
+        STATUS          = 0x07    // read only
+    };
+
+    enum struct ata_reg_ctl : uint16_t {
+        ALTSTATUS       = 0x00,   // read only
+        CONTROL         = 0x00
+    };
+
     struct ide_chan_t {
         ide_if_t *iface;
         int secondary;
 
         uint32_t max_multiple;
         uint16_t has_48bit;
-        uint8_t read_command;
-        uint8_t write_command;
+        ata_cmd read_command;
+        ata_cmd write_command;
         int8_t max_dma;
         int8_t old_dma;
 
@@ -70,7 +122,19 @@ struct ide_if_t : public storage_if_base_t {
 
         int acquire_access();
         void release_access(int intr_was_enabled);
+
         void detect_devices();
+
+        // Automatically use the correct port based on the enumeration type
+        inline uint8_t inb(ata_reg_cmd reg);
+        inline uint16_t inw(ata_reg_cmd reg);
+        inline void outb(ata_reg_cmd reg, uint8_t value);
+        inline void outw(ata_reg_cmd reg, uint16_t value);
+        inline void outsw(ata_reg_cmd reg, void const *values, size_t count);
+        inline void insw(ata_reg_cmd reg, void *values, size_t count);
+        inline uint8_t inb(ata_reg_ctl reg);
+        inline void outb(ata_reg_ctl reg, uint8_t value);
+
         void set_drv(int slave);
         void set_lba(uint64_t lba);
         void set_count(int count);
@@ -78,7 +142,7 @@ struct ide_if_t : public storage_if_base_t {
                          uint8_t p3 = 0, uint8_t p4 = 0);
         uint8_t wait_not_bsy();
         uint8_t wait_drq();
-        void issue_command(uint8_t command);
+        void issue_command(ata_cmd command);
         void issue_packet_read(uint64_t lba, uint32_t count,
                                uint16_t burst_len, int use_dma);
         void set_irq_enable(int enable);
@@ -135,80 +199,10 @@ static ide_dev_t ide_devs[IDE_MAX_DEVS];
 static size_t ide_dev_count;
 
 //
-// Commands
-
-#define ATA_CMD_READ_PIO            0x20
-#define ATA_CMD_READ_PIO_EXT        0x24
-#define ATA_CMD_READ_MULT_PIO       0xC5
-#define ATA_CMD_READ_MULT_PIO_EXT   0x29
-#define ATA_CMD_READ_DMA            0xC8
-#define ATA_CMD_READ_DMA_EXT        0x25
-
-#define ATA_CMD_WRITE_PIO           0x30
-#define ATA_CMD_WRITE_PIO_EXT       0x34
-#define ATA_CMD_WRITE_MULT_PIO      0xC4
-#define ATA_CMD_WRITE_MULT_PIO_EXT  0x39
-#define ATA_CMD_WRITE_DMA           0xCA
-#define ATA_CMD_WRITE_DMA_EXT       0x35
-
-#define ATA_CMD_SET_MULTIPLE        0xC6
-
-#define ATA_CMD_CACHE_FLUSH         0xE7
-#define ATA_CMD_CACHE_FLUSH_EXT     0xEA
-
-#define ATA_CMD_PACKET              0xA0
-
-#define ATA_CMD_IDENTIFY_PACKET     0xA1
-#define ATA_CMD_IDENTIFY            0xEC
-
-#define ATA_CMD_SET_FEATURE         0xEF
-
-//
 // ATAPI commands
 
 #define      ATAPI_CMD_READ         0xA8
 #define      ATAPI_CMD_EJECT        0x1B
-
-//
-// Task file
-
-#if 1
-#define ATA_REG_CMD_DATA            0x00
-#define ATA_REG_CMD_FEATURES        0x01    // write only
-#define ATA_REG_CMD_ERROR           0x01    // read only
-#define ATA_REG_CMD_SECCOUNT0       0x02
-#define ATA_REG_CMD_LBA0            0x03
-#define ATA_REG_CMD_LBA1            0x04
-#define ATA_REG_CMD_LBA2            0x05
-#define ATA_REG_CMD_HDDEVSEL        0x06
-#define ATA_REG_CMD_COMMAND         0x07    // write only
-#define ATA_REG_CMD_STATUS          0x07    // read only
-
-// ctl ports
-#define ATA_REG_CTL_ALTSTATUS       0x00    // read only
-#define ATA_REG_CTL_CONTROL         0x00
-#else
-// cmd ports (wtf?)
-#define ATA_REG_CMD_DATA            0x00
-#define ATA_REG_CMD_FEATURES        0x01    // write only
-#define ATA_REG_CMD_ERROR           0x01    // read only
-#define ATA_REG_CMD_SECCOUNT0       0x02
-#define ATA_REG_CMD_LBA0            0x03
-#define ATA_REG_CMD_LBA1            0x04
-#define ATA_REG_CMD_LBA2            0x05
-#define ATA_REG_CMD_HDDEVSEL        0x06
-#define ATA_REG_CMD_COMMAND         0x07    // write only
-#define ATA_REG_CMD_STATUS          0x07    // read only
-#define ATA_REG_CMD_SECCOUNT1       0x08
-#define ATA_REG_CMD_LBA3            0x09
-#define ATA_REG_CMD_LBA4            0x0A
-#define ATA_REG_CMD_LBA5            0x0B
-#define ATA_REG_CMD_CONTROL         0x0C    // write only
-
-// ctl ports
-#define ATA_REG_CTL_ALTSTATUS       0x02    // read only
-#define ATA_REG_CTL_DRVADDRESS      0x03
-#endif
 
 #define ATA_REG_STATUS_ERR_BIT      0
 #define ATA_REG_STATUS_IDX_BIT      1
@@ -483,7 +477,7 @@ uint8_t ide_if_t::ide_chan_t::wait_not_bsy()
     uint8_t status;
 
     for (;; pause()) {
-        status = inb(ports.cmd + ATA_REG_CMD_STATUS);
+        status = inb(ata_reg_cmd::STATUS);
 
         if ((!(status & ATA_REG_STATUS_BSY)) || (status == 0xFF))
             break;
@@ -497,7 +491,7 @@ uint8_t ide_if_t::ide_chan_t::wait_drq()
     uint8_t status;
 
     for (;; pause()) {
-        status = inb(ports.cmd + ATA_REG_CMD_STATUS);
+        status = inb(ata_reg_cmd::STATUS);
 
         if ((status & ATA_REG_STATUS_DRQ) || (status == 0xFF))
             break;
@@ -506,21 +500,21 @@ uint8_t ide_if_t::ide_chan_t::wait_drq()
     return status;
 }
 
-void ide_if_t::ide_chan_t::issue_command(uint8_t command)
+void ide_if_t::ide_chan_t::issue_command(ata_cmd command)
 {
-    outb(ports.cmd + ATA_REG_CMD_COMMAND, command);
+    outb(ata_reg_cmd::COMMAND, uint8_t(command));
 }
 
 void ide_if_t::ide_chan_t::issue_packet_read(
         uint64_t lba, uint32_t count, uint16_t burst_len, int use_dma)
 {
-    outb(ports.cmd + ATA_REG_CMD_FEATURES, use_dma ? 1 : 0);
-    outb(ports.cmd + ATA_REG_CMD_SECCOUNT0, 0);
-    outb(ports.cmd + ATA_REG_CMD_LBA0, 0);
-    outb(ports.cmd + ATA_REG_CMD_LBA1, (burst_len >> (8*0)) & 0xFF);
-    outb(ports.cmd + ATA_REG_CMD_LBA2, (burst_len >> (8*1)) & 0xFF);
+    outb(ata_reg_cmd::FEATURES, use_dma ? 1 : 0);
+    outb(ata_reg_cmd::SECCOUNT0, 0);
+    outb(ata_reg_cmd::LBA0, 0);
+    outb(ata_reg_cmd::LBA1, (burst_len >> (8*0)) & 0xFF);
+    outb(ata_reg_cmd::LBA2, (burst_len >> (8*1)) & 0xFF);
     set_irq_enable(0);
-    issue_command(ATA_CMD_PACKET);
+    issue_command(ata_cmd::PACKET);
 
     uint8_t packet[12] = {
         0xA8,
@@ -541,13 +535,12 @@ void ide_if_t::ide_chan_t::issue_packet_read(
     wait_drq();
 
     set_irq_enable(1);
-    outsw(ports.cmd + ATA_REG_CMD_DATA,
-          packet, sizeof(packet) / sizeof(uint16_t));
+    outsw(ata_reg_cmd::DATA, packet, sizeof(packet) / sizeof(uint16_t));
 }
 
 void ide_if_t::ide_chan_t::set_irq_enable(int enable)
 {
-    outb(ports.ctl + ATA_REG_CTL_CONTROL, ATA_REG_CONTROL_n(
+    outb(ata_reg_ctl::CONTROL, ATA_REG_CONTROL_n(
              enable ? 0 : ATA_REG_CONTROL_nIEN));
 }
 
@@ -582,7 +575,7 @@ void ide_if_t::ide_chan_t::hex_dump(void const *mem, size_t size)
 
 void ide_if_t::ide_chan_t::set_drv(int slave)
 {
-    outb(ports.cmd + ATA_REG_CMD_HDDEVSEL,
+    outb(ata_reg_cmd::HDDEVSEL,
          ATA_REG_HDDEVSEL_n((slave ? ATA_REG_HDDEVSEL_DRV : 0) |
          ATA_REG_HDDEVSEL_LBA));
 }
@@ -592,32 +585,32 @@ void ide_if_t::ide_chan_t::set_lba(uint64_t lba)
     assert(lba < (uint64_t(1) << (6*8)));
 
     if (has_48bit) {
-        outb(ports.cmd + ATA_REG_CMD_LBA0, (lba >> (3*8)) & 0xFF);
-        outb(ports.cmd + ATA_REG_CMD_LBA1, (lba >> (4*8)) & 0xFF);
-        outb(ports.cmd + ATA_REG_CMD_LBA2, (lba >> (5*8)) & 0xFF);
+        outb(ata_reg_cmd::LBA0, (lba >> (3*8)) & 0xFF);
+        outb(ata_reg_cmd::LBA1, (lba >> (4*8)) & 0xFF);
+        outb(ata_reg_cmd::LBA2, (lba >> (5*8)) & 0xFF);
     }
-    outb(ports.cmd + ATA_REG_CMD_LBA0, (lba >> (0*8)) & 0xFF);
-    outb(ports.cmd + ATA_REG_CMD_LBA1, (lba >> (1*8)) & 0xFF);
-    outb(ports.cmd + ATA_REG_CMD_LBA2, (lba >> (2*8)) & 0xFF);
+    outb(ata_reg_cmd::LBA0, (lba >> (0*8)) & 0xFF);
+    outb(ata_reg_cmd::LBA1, (lba >> (1*8)) & 0xFF);
+    outb(ata_reg_cmd::LBA2, (lba >> (2*8)) & 0xFF);
 }
 
 void ide_if_t::ide_chan_t::set_count(int count)
 {
     assert(count <= ((has_48bit && max_multiple > 1) ? 65536 : 256));
     if (has_48bit)
-        outb(ports.cmd + ATA_REG_CMD_SECCOUNT0, (count >> (1*8)) & 0xFF);
-    outb(ports.cmd + ATA_REG_CMD_SECCOUNT0, (count >> (0*8)) & 0xFF);
+        outb(ata_reg_cmd::SECCOUNT0, (count >> (1*8)) & 0xFF);
+    outb(ata_reg_cmd::SECCOUNT0, (count >> (0*8)) & 0xFF);
 }
 
 void ide_if_t::ide_chan_t::set_feature(
         uint8_t feature, uint8_t p1, uint8_t p2, uint8_t p3, uint8_t p4)
 {
-    outb(ports.cmd + ATA_REG_CMD_FEATURES, feature);
-    outb(ports.cmd + ATA_REG_CMD_SECCOUNT0, p1);
-    outb(ports.cmd + ATA_REG_CMD_LBA0, p2);
-    outb(ports.cmd + ATA_REG_CMD_LBA1, p3);
-    outb(ports.cmd + ATA_REG_CMD_LBA2, p4);
-    outb(ports.cmd + ATA_REG_CMD_COMMAND, ATA_CMD_SET_FEATURE);
+    outb(ata_reg_cmd::FEATURES, feature);
+    outb(ata_reg_cmd::SECCOUNT0, p1);
+    outb(ata_reg_cmd::LBA0, p2);
+    outb(ata_reg_cmd::LBA1, p3);
+    outb(ata_reg_cmd::LBA2, p4);
+    issue_command(ata_cmd::SET_FEATURE);
 }
 
 ide_if_t::ide_chan_t::ide_chan_t()
@@ -669,13 +662,13 @@ void ide_if_t::ide_chan_t::detect_devices()
         set_irq_enable(0);
 
         IDE_TRACE("if=%d, dev=%d, issuing IDENTIFY\n", secondary, slave);
-        issue_command(ATA_CMD_IDENTIFY);
+        issue_command(ata_cmd::IDENTIFY);
 
         int is_atapi = 0;
         int is_err = 0;
 
         for (;; pause()) {
-            status = inb(ports.cmd + ATA_REG_CMD_STATUS);
+            status = inb(ata_reg_cmd::STATUS);
 
             // If no drive, give up
             if (status == 0)
@@ -687,8 +680,8 @@ void ide_if_t::ide_chan_t::detect_devices()
 
             // If error bit set, it failed
             if (!is_atapi && (status & ATA_REG_STATUS_ERR)) {
-                uint8_t lba1 = inb(ports.cmd + ATA_REG_CMD_LBA1);
-                uint8_t lba2 = inb(ports.cmd + ATA_REG_CMD_LBA2);
+                uint8_t lba1 = inb(ata_reg_cmd::LBA1);
+                uint8_t lba2 = inb(ata_reg_cmd::LBA2);
 
                 // Check for ATAPI signature
                 if (lba1 == 0x14 && lba2 == 0xEB)
@@ -698,7 +691,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
                 if (is_atapi) {
                     // Issue identify command
-                    issue_command(ATA_CMD_IDENTIFY_PACKET);
+                    issue_command(ata_cmd::IDENTIFY_PACKET);
                     continue;
                 }
 
@@ -722,7 +715,7 @@ void ide_if_t::ide_chan_t::detect_devices()
         // If error bit set, read error register
         uint8_t err = 0;
         if (is_err)
-            err = inb(ports.cmd + ATA_REG_CMD_ERROR);
+            err = inb(ata_reg_cmd::ERROR);
 
         // If error and command aborted, there is no drive
         if (is_err && (err & ATA_REG_ERROR_ABRT)) {
@@ -748,7 +741,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         // Read IDENTIFY data
         memset(buf, 0, 512);
-        insw(ports.cmd + ATA_REG_CMD_DATA, buf, 512 / sizeof(uint16_t));
+        insw(ata_reg_cmd::DATA, buf, 512 / sizeof(uint16_t));
         hex_dump(buf, 512);
 
         max_multiple = buf[ATA_IDENTIFY_MAX_MULTIPLE] & 0xFF;
@@ -798,27 +791,27 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         if (has_48bit) {
             if (max_dma >= 0) {
-                read_command = ATA_CMD_READ_DMA_EXT;
-                write_command = ATA_CMD_WRITE_DMA_EXT;
+                read_command = ata_cmd::READ_DMA_EXT;
+                write_command = ata_cmd::WRITE_DMA_EXT;
                 max_multiple = 65536;
             } else if (max_multiple > 1) {
-                read_command = ATA_CMD_READ_MULT_PIO_EXT;
-                write_command = ATA_CMD_WRITE_MULT_PIO_EXT;
+                read_command = ata_cmd::READ_MULT_PIO_EXT;
+                write_command = ata_cmd::WRITE_MULT_PIO_EXT;
             } else {
-                read_command = ATA_CMD_READ_PIO_EXT;
-                write_command = ATA_CMD_WRITE_PIO_EXT;
+                read_command = ata_cmd::READ_PIO_EXT;
+                write_command = ata_cmd::WRITE_PIO_EXT;
             }
         } else {
             if (max_dma >= 0) {
-                read_command = ATA_CMD_READ_DMA;
-                write_command = ATA_CMD_WRITE_DMA;
+                read_command = ata_cmd::READ_DMA;
+                write_command = ata_cmd::WRITE_DMA;
                 max_multiple = 256;
             } else if (max_multiple > 1) {
-                read_command = ATA_CMD_READ_MULT_PIO;
-                write_command = ATA_CMD_WRITE_MULT_PIO;
+                read_command = ata_cmd::READ_MULT_PIO;
+                write_command = ata_cmd::WRITE_MULT_PIO;
             } else {
-                read_command = ATA_CMD_READ_PIO;
-                write_command = ATA_CMD_WRITE_PIO;
+                read_command = ata_cmd::READ_PIO;
+                write_command = ata_cmd::WRITE_PIO;
             }
         }
 
@@ -853,7 +846,7 @@ void ide_if_t::ide_chan_t::detect_devices()
             // Get list of physical address ranges for io_window
             size_t range_count = mphysranges(
                         io_window_ranges, countof(io_window_ranges),
-                        dma_bounce, max_multiple * sector_size, 32768);
+                        dma_bounce, max_multiple * sector_size, 65536);
 
             range_count = mphysranges_split(
                         io_window_ranges, range_count,
@@ -876,7 +869,7 @@ void ide_if_t::ide_chan_t::detect_devices()
             wait_not_bsy();
             set_count(max_multiple);
             set_lba(0);
-            issue_command(ATA_CMD_SET_MULTIPLE);
+            issue_command(ata_cmd::SET_MULTIPLE);
             status = wait_not_bsy();
 
             if (status & ATA_REG_STATUS_ERR) {
@@ -897,6 +890,48 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         IDE_TRACE("if=%d, dev=%d, done\n", secondary, slave);
     }
+}
+
+uint8_t ide_if_t::ide_chan_t::inb(ata_reg_cmd reg)
+{
+    return ::inb(ports.cmd + uint16_t(reg));
+}
+
+uint16_t ide_if_t::ide_chan_t::inw(ata_reg_cmd reg)
+{
+    return ::inw(ports.cmd + uint16_t(reg));
+}
+
+void ide_if_t::ide_chan_t::outb(ata_reg_cmd reg, uint8_t value)
+{
+    ::outb(ports.cmd + uint16_t(reg), value);
+}
+
+void ide_if_t::ide_chan_t::outw(ata_reg_cmd reg, uint16_t value)
+{
+    ::outw(ports.cmd + uint16_t(reg), value);
+}
+
+void ide_if_t::ide_chan_t::outsw(ata_reg_cmd reg,
+                                 void const *values, size_t count)
+{
+    ::outsw(ports.cmd + uint16_t(reg), values, count);
+}
+
+void ide_if_t::ide_chan_t::insw(ide_if_t::ata_reg_cmd reg,
+                                void *values, size_t count)
+{
+    ::insw(ports.cmd + uint16_t(reg), values, count);
+}
+
+uint8_t ide_if_t::ide_chan_t::inb(ide_if_t::ata_reg_ctl reg)
+{
+    return ::inb(ports.ctl + uint16_t(reg));
+}
+
+void ide_if_t::ide_chan_t::outb(ide_if_t::ata_reg_ctl reg, uint8_t value)
+{
+    ::outb(ports.ctl + uint16_t(reg), value);
 }
 
 ide_if_t::ide_if_t()
@@ -1031,7 +1066,7 @@ int64_t ide_if_t::ide_chan_t::io(
 
         if (io_status & ATA_REG_STATUS_ERR) {
             IDE_TRACE("error! status=0x%x, err=0x%x", io_status,
-                      inb(ports.cmd + ATA_REG_CMD_ERROR));
+                      inb(ata_reg_cmd::ERROR));
             err = 1;
         }
 
@@ -1069,8 +1104,7 @@ int64_t ide_if_t::ide_chan_t::io(
                          io_window_ranges, ranges_count);
 
             IDE_TRACE("Reading PIO data\n");
-            insw(ports.cmd + ATA_REG_CMD_DATA,
-                 (char*)io_window + io_window_misalignment,
+            insw(ata_reg_cmd::DATA, (char*)io_window + io_window_misalignment,
                  (sector_size >> 1) * sub_count);
         }
 
@@ -1103,7 +1137,7 @@ void ide_if_t::ide_chan_t::irq_handler()
 {
     mutex_lock_noyield(&lock);
     io_done = 1;
-    io_status = inb(ports.cmd + ATA_REG_CMD_STATUS);
+    io_status = inb(ata_reg_cmd::STATUS);
     IDE_TRACE("IRQ, status=0x%x!\n", io_status);
     mutex_unlock(&lock);
     condvar_wake_one(&done_cond);
