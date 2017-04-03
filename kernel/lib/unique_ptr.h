@@ -6,7 +6,7 @@ struct default_delete
 {
     constexpr default_delete() = default;
 
-    void operator()(T *ptr) const
+    inline void operator()(T* ptr) const
     {
         delete ptr;
     }
@@ -17,7 +17,7 @@ struct default_delete<T[]>
 {
     constexpr default_delete() = default;
 
-    void operator()(T* ptr) const
+    inline void operator()(T* ptr) const
     {
         delete[] ptr;
     }
@@ -31,11 +31,14 @@ public:
     using value_type = T;
     using pointer = T*;
     using const_pointer = T const*;
-    using reference = T&;
-    using const_reference = T const&;
 
     unique_ptr()
         : ptr(nullptr)
+    {
+    }
+
+    unique_ptr(unique_ptr&& rhs)
+        : ptr(rhs.release())
     {
     }
 
@@ -48,16 +51,8 @@ public:
 
     ~unique_ptr()
     {
-    }
-
-    reference operator[](size_t index)
-    {
-        return ptr[index];
-    }
-
-    const_reference operator[](size_t index) const
-    {
-        return ptr[index];
+        if (ptr)
+            ((Tdeleter()))(ptr);
     }
 
     operator pointer()
@@ -66,6 +61,16 @@ public:
     }
 
     operator const_pointer() const
+    {
+        return ptr;
+    }
+
+    pointer operator->()
+    {
+        return ptr;
+    }
+
+    const_pointer operator->() const
     {
         return ptr;
     }
@@ -83,17 +88,60 @@ public:
     unique_ptr &operator=(pointer rhs)
     {
         if (ptr)
-            deleter(ptr);
+            ((Tdeleter()))(ptr);
         ptr = rhs;
         return *this;
     }
 
     Tdeleter get_deleter()
     {
-        return deleter;
+        return Tdeleter();
+    }
+
+    pointer release()
+    {
+        pointer p = ptr;
+        ptr = nullptr;
+        return p;
+    }
+
+    void reset(pointer p = pointer())
+    {
+        pointer old = ptr;
+        ptr = p;
+        if (old)
+            ((Tdeleter()))(old);
     }
 
 private:
-    Tdeleter deleter;
     pointer ptr;
 };
+
+template<typename T>
+class free_deleter
+{
+public:
+    constexpr free_deleter() = default;
+
+    inline void operator()(T* ptr) const
+    {
+        if (ptr) {
+            destruct(ptr);
+            free(ptr);
+        }
+    }
+
+private:
+    void destruct(void *) const
+    {
+    }
+
+    template<typename U>
+    void destruct(U *ptr) const
+    {
+        ptr->~U();
+    }
+};
+
+template<typename T>
+using unique_ptr_free = unique_ptr<T, free_deleter<T>>;

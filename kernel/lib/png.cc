@@ -7,6 +7,7 @@
 #include "likely.h"
 #include "assert.h"
 #include "printk.h"
+#include "unique_ptr.h"
 
 #define PNG_DEBUG 0
 #if PNG_DEBUG
@@ -247,7 +248,7 @@ static uint32_t png_process_idata(
 png_image_t *png_load(char const *path)
 {
     // Allocate read buffer
-    autofree uint8_t *buf = (uint8_t*)malloc(PNG_BUFSIZE);
+    unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE];
     if (!buf)
         return 0;
 
@@ -276,7 +277,7 @@ png_image_t *png_load(char const *path)
     uint32_t consumed;
     uint32_t read_size;
 
-    autofree png_image_t *img = 0;
+    unique_ptr_free<png_image_t> img;
     png_read_state_t state;
     state.cur_row = 0;
     state.cur_filter = PNG_FILTER_UNSET;
@@ -333,8 +334,8 @@ png_image_t *png_load(char const *path)
                     (ihdr.bit_depth >> 3);
             state.scanline_bytes = state.pixel_bytes * ihdr.width;
 
-            img = (png_image_t*)malloc(sizeof(*img) +
-                         ihdr.width * ihdr.height * sizeof(uint32_t));
+            img.reset((png_image_t*)malloc(sizeof(*img) +
+                         ihdr.width * ihdr.height * sizeof(uint32_t)));
 
             img->width = ihdr.width;
             img->height = ihdr.height;
@@ -422,11 +423,7 @@ png_image_t *png_load(char const *path)
 
     png_fixup_bgra(img + 1, img->width * img->height);
 
-    // Release autofree
-    png_image_t *result = img;
-    img = 0;
-
-    return result;
+    return img.release();
 }
 
 uint32_t const *png_pixels(png_image_t const *img)

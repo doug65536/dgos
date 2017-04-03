@@ -55,7 +55,7 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
     char sig[2];
 
     if (sector_size >= 512) {
-        unique_ptr<uint8_t> sector(new uint8_t[sector_size]);
+        unique_ptr<uint8_t> sector = new uint8_t[sector_size];
 
         drive->read_blocks(sector, 1, 0);
 

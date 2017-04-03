@@ -8,6 +8,7 @@
 #include "string.h"
 #include "export.h"
 #include "assert.h"
+#include "unique_ptr.h"
 
 extern Elf64_Sym const ___dynsym_st[];
 extern Elf64_Sym const ___dynsym_en[];
@@ -90,7 +91,7 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    autofree Elf64_Shdr *scn_hdrs = (Elf64_Shdr *)malloc(scn_hdr_size);
+    Elf64_Shdr *scn_hdrs = (Elf64_Shdr *)malloc(scn_hdr_size);
 
     if (scn_hdr_size != file_pread(
                 fd, scn_hdrs, scn_hdr_size,
@@ -100,9 +101,9 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     size_t mod_str_scn = 0;
-    autofree Elf64_Sym *mod_sym = 0;
+    unique_ptr_free<Elf64_Sym> mod_sym;
     Elf64_Sym *mod_sym_end = 0;
-    autofree char *mod_str = 0;
+    unique_ptr_free<char> mod_str;
 
     Elf64_Xword max_addr = 0;
     Elf64_Xword min_addr = ~0U;
@@ -126,8 +127,8 @@ module_entry_fn_t modload_load(char const *path)
         case SHT_SYMTAB:
             mod_str_scn = hdr->sh_link;
 
-            mod_sym = (Elf64_Sym *)malloc(hdr->sh_size);
-            mod_sym_end = (Elf64_Sym *)mod_sym + hdr->sh_size;
+            mod_sym.reset((Elf64_Sym *)malloc(hdr->sh_size));
+            mod_sym_end = mod_sym + hdr->sh_size;
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_sym, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module symbols\n");
@@ -137,7 +138,7 @@ module_entry_fn_t modload_load(char const *path)
         case SHT_STRTAB:
             if (i != mod_str_scn)
                 break;
-            mod_str = (char*)malloc(hdr->sh_size);
+            mod_str.reset((char*)malloc(hdr->sh_size));
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_str, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module strings\n");
@@ -184,10 +185,10 @@ module_entry_fn_t modload_load(char const *path)
         }
     }
 
-    autofree void *rel_buf = malloc(max_rel);
+    unique_ptr_free<void> rel_buf(malloc(max_rel));
 
-    Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf;
-    Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf;
+    Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf.get();
+    Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf.get();
 
     // Process relocations
     for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
@@ -224,8 +225,9 @@ module_entry_fn_t modload_load(char const *path)
 
         modload_find_syms(&symtab, &strtab, scn_hdrs, i);
 
-        autofree Elf64_Sym *symdata = (Elf64_Sym *)malloc(symtab->sh_size);
-        autofree char *strdata = (char*)malloc(strtab->sh_size);
+        unique_ptr_free<Elf64_Sym> symdata(
+                    (Elf64_Sym *)malloc(symtab->sh_size));
+        unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
 
         if ((ssize_t)symtab->sh_size != file_pread(
                     fd, symdata, symtab->sh_size, symtab->sh_offset)) {

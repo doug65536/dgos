@@ -35,7 +35,7 @@ if_list_t iso9660_part_factory_t::detect(storage_dev_base_t *drive)
     if (sector_mul < 1)
         sector_mul = 1;
 
-    unique_ptr<char> sector(new char[sector_size * sector_mul]);
+    unique_ptr<char> sector = new char[sector_size * sector_mul];
     iso9660_pvd_t *pvd = (iso9660_pvd_t*)sector.get();
 
     int err = drive->read_blocks(sector,

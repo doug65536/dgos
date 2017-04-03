@@ -6,6 +6,7 @@
 #include "bitsearch.h"
 #include "pool.h"
 #include "fat32_decl.h"
+#include "unique_ptr.h"
 
 struct fat32_fs_t : public fs_base_t {
 
@@ -517,16 +518,16 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    autofree void *sector_buffer = malloc(sector_size);
+    unique_ptr<char> sector_buffer = new char[sector_size];
     fat32_bpb_data_t bpb;
 
     lba_st = conn->part_st;
     lba_en = conn->part_st + conn->part_len;
 
-    drive->read_blocks((char*)sector_buffer, 1, lba_st);
+    drive->read_blocks(sector_buffer, 1, lba_st);
 
     // Pass 0 partition cluster to get partition relative values
-    fat32_parse_bpb(&bpb, 0, (char const *)sector_buffer);
+    fat32_parse_bpb(&bpb, 0, sector_buffer);
 
     root_cluster = bpb.root_dir_start;
 
