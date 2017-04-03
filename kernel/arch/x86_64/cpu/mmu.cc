@@ -2369,6 +2369,8 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
     int present_mask;
 
     present_mask = addr_present(start, path, ptes);
+    assert((present_mask & 7) == 7);
+
     for (size_t i = 0; i < count; ++i) {
         // Check path at start and every time we wrap into next page table
         if (unlikely(i && !((path[3] + i) & 511))) {
