@@ -42,7 +42,7 @@ struct ide_if_t : public storage_if_base_t {
     C_ASSERT(sizeof(bmdma_prd_t) == 8);
 
     struct ide_chan_t {
-        ide_if_t *if_;
+        ide_if_t *iface;
         int secondary;
 
         uint32_t max_multiple;
@@ -765,7 +765,7 @@ void ide_if_t::ide_chan_t::detect_devices()
         // otherwise, force dma_support to 0 if validity bit does not report
         // support for UDMA,
         // otherwise, use max supported UDMA value
-        uint16_t dma_support = (if_->bmdma_base
+        uint16_t dma_support = (iface->bmdma_base
                 ? (buf[ATA_IDENTIFY_VALIDITY] & (1 << 2))
                 : 0)
                 ? buf[ATA_IDENTIFY_UDMA_SUPPORT]
@@ -779,7 +779,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         if (max_dma < 0) {
             // Look for old DMA
-            dma_support = if_->bmdma_base
+            dma_support = iface->bmdma_base
                     ? buf[ATA_IDENTIFY_OLD_DMA]
                     : 0;
 
@@ -868,7 +868,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
             // Set PRD address register
             assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
-            if_->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
+            iface->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
                             (uint32_t)dma_prd_physaddr);
         } else if (max_multiple > 1) {
             IDE_TRACE("if=%d, dev=%d, enabling MULTIPLE\n", secondary, slave);
@@ -901,8 +901,8 @@ void ide_if_t::ide_chan_t::detect_devices()
 
 ide_if_t::ide_if_t()
 {
-    chan[0].if_ = this;
-    chan[1].if_ = this;
+    chan[0].iface = this;
+    chan[1].iface = this;
     chan[1].secondary = 1;
 }
 
@@ -989,11 +989,11 @@ int64_t ide_if_t::ide_chan_t::io(
         mutex_unlock(&lock);
 
         if (max_dma >= 0) {
-            if_->bmdma_acquire();
+            iface->bmdma_acquire();
 
             // Set PRD address register
             assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
-            if_->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
+            iface->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
                             (uint32_t)dma_prd_physaddr);
         }
 
@@ -1011,7 +1011,7 @@ int64_t ide_if_t::ide_chan_t::io(
             IDE_TRACE("Starting DMA\n");
 
             // Program DMA reads or writes and start DMA
-            if_->bmdma_outb(ATA_BMDMA_REG_CMD_n(secondary), is_read ? 9 : 1);
+            iface->bmdma_outb(ATA_BMDMA_REG_CMD_n(secondary), is_read ? 9 : 1);
 
             // Get physical addresses of destination
             size_t range_count = mphysranges(
@@ -1020,6 +1020,11 @@ int64_t ide_if_t::ide_chan_t::io(
 
             // Map window to modify the memory
             alias_window(io_window, sub_size, io_window_ranges, range_count);
+
+            if (!is_read) {
+                memcpy(dma_bounce, (char*)io_window + io_window_misalignment,
+                       sub_size);
+            }
         }
 
         yield_until_irq();
@@ -1033,23 +1038,25 @@ int64_t ide_if_t::ide_chan_t::io(
         if (max_dma >= 0) {
             // Must read status register to synchronize with bus master
             IDE_TRACE("Reading DMA status\n");
-            uint8_t bmdma_status = if_->bmdma_inb(
+            uint8_t bmdma_status = iface->bmdma_inb(
                         ATA_BMDMA_REG_STATUS_n(secondary));
 
             // Write 1 to interrupt bit to acknowledge
-            if_->bmdma_outb(ATA_BMDMA_REG_STATUS_n(secondary),
+            iface->bmdma_outb(ATA_BMDMA_REG_STATUS_n(secondary),
                             bmdma_status | (1 << 2));
             IDE_TRACE("bmdma status=0x%x\n", bmdma_status);
 
             // Stop DMA
             IDE_TRACE("Stopping DMA\n");
-            if_->bmdma_outb(ATA_BMDMA_REG_CMD_n(secondary), 0);
+            iface->bmdma_outb(ATA_BMDMA_REG_CMD_n(secondary), 0);
 
-            if_->bmdma_release();
+            iface->bmdma_release();
 
-            // Copy into caller's data buffer
-            memcpy((char*)io_window + io_window_misalignment,
-                   dma_bounce, sub_size);
+            if (is_read) {
+                // Copy into caller's data buffer
+                memcpy((char*)io_window + io_window_misalignment,
+                       dma_bounce, sub_size);
+            }
         } else {
             size_t adj_size = (sub_size) + io_window_misalignment;
             char *aligned_addr = (char*)data - io_window_misalignment;

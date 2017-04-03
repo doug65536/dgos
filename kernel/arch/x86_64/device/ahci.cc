@@ -1192,7 +1192,7 @@ struct ahci_dev_t : public storage_dev_base_t {
     int io(void *data, int64_t count,
            uint64_t lba, int is_read);
 
-    ahci_if_t *if_;
+    ahci_if_t *iface;
     int port;
     int is_atapi;
 };
@@ -1921,7 +1921,7 @@ if_list_t ahci_if_t::detect_devices()
 
         if (port->sig == SATA_SIG_ATA || port->sig == SATA_SIG_ATAPI) {
             ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
-            drive->if_ = this;
+            drive->iface = this;
             drive->port = port_num;
             drive->is_atapi = (port->sig == SATA_SIG_ATAPI);
         }
@@ -1980,7 +1980,7 @@ int ahci_dev_t::io(void *data, int64_t count,
     block_state.err = 0;
     block_state.lba = lba;
 
-    if_->rw(port, lba, data, count, is_read,
+    iface->rw(port, lba, data, count, is_read,
        ahci_async_complete, (uintptr_t)&block_state);
 
     while (!block_state.done)
@@ -2019,7 +2019,7 @@ long ahci_dev_t::info(storage_dev_info_t key)
 {
     switch (key) {
     case STORAGE_INFO_BLOCKSIZE:
-        return if_->port_info[port].sector_size;
+        return iface->port_info[port].sector_size;
 
     default:
         return 0;
