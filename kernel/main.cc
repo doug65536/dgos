@@ -26,11 +26,12 @@
 #include "png.h"
 #include "framebuffer.h"
 #include "math.h"
+#include "unique_ptr.h"
 
 //#include "vector.h"
 
-size_t const kernel_stack_size = 16384;
-char kernel_stack[16384];
+constexpr size_t const kernel_stack_size = 16384;
+char kernel_stack[kernel_stack_size];
 
 //extern void (*device_constructor_list[])(void);
 
@@ -58,7 +59,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_STRESS_MMAP_THREAD   8
+#define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_STRESS_HEAP_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   1
@@ -656,7 +657,7 @@ static int draw_test(void *p)
     int frames = 0;
 
     // 1280x800
-    png_image_t *img = png_load("background.png");
+    unique_ptr<png_image_t> img(png_load("background.png"));
     uint64_t st_tm = time_ms();
     for (int sx = 1280-1920; sx < 0; sx += 15) {
         int step, sy1, sy2;
@@ -693,8 +694,6 @@ static int draw_test(void *p)
     }
     uint64_t en_tm = time_ms();
     printdbg("Benchmark time: %d frames, %ldms\n", frames, en_tm - st_tm);
-
-    free(img);
 
     return 0;
 }
