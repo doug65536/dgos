@@ -1,8 +1,5 @@
-#define PART_T iso9660
-#define STORAGE_IMPL
-#include "string.h"
-#include "iso9660_part.h"
 #include "dev_storage.h"
+#include "string.h"
 #include "unique_ptr.h"
 
 #include "iso9660_decl.h"

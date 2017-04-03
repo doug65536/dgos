@@ -13,9 +13,6 @@ arch/x86_64/cpu/math.cc
 arch/x86_64/cpu/nontemporal.cc
 arch/x86_64/cpu/nontemporal.h
 arch/x86_64/device/usb_xhci.cc
-arch/x86_64/device/usb_xhci.h
-arch/x86_64/device/vbe.cc
-arch/x86_64/device/vbe.h
 arch/x86_64/elf64.cc
 arch/x86_64/elf64.h
 arch/x86_64/elf64_decl.h
@@ -82,7 +79,6 @@ net/arp.h
 net/dhcp.h
 net/ethernet.h
 arch/x86_64/device/rtl8139.cc
-arch/x86_64/device/rtl8139.h
 arch/x86_64/module.ld
 lib/heap.cc
 lib/heap.h
@@ -141,9 +137,7 @@ arch/x86_64/cpu/cmos.h
 arch/x86_64/cpu/spinlock.h
 arch/x86_64/cpu/spinlock.cc
 arch/x86_64/device/ahci.cc
-arch/x86_64/device/ahci.h
 arch/x86_64/device/vga.cc
-arch/x86_64/device/vga.h
 arch/x86_64/device/keyb8042.cc
 arch/x86_64/device/keyb8042.h
 arch/x86_64/device/pci.cc
@@ -188,7 +182,6 @@ lib/debug.h
 lib/debug.cc
 lib/rbtree.h
 lib/rbtree.cc
-arch/x86_64/device/ide.h
 arch/x86_64/device/ide.cc
 lib/bitsearch.h
 lib/bitsearch.cc
@@ -198,10 +191,8 @@ lib/threadsync.h
 lib/threadsync.cc
 .gitignore
 fs/mbr.cc
-fs/mbr.h
 fs/Makefile
 fs/fat32.cc
-fs/fat32.h
 lib/export.h
 lib/rand.h
 lib/rand.cc
@@ -210,9 +201,6 @@ arch/x86_64/cpu/syscall.s
 arch/x86_64/cpu/syscall_dispatch.cc
 arch/x86_64/cpu/syscall_dispatch.h
 fs/iso9660.cc
-fs/iso9660.h
 fs/iso9660_decl.h
 fs/tmpfs.cc
-fs/tmpfs.h
 fs/iso9660_part.cc
-fs/iso9660_part.h

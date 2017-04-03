@@ -7,9 +7,7 @@
 #include "device/pci.h"
 #include "device/keyb8042.h"
 #include "callout.h"
-#include "device/ahci.h"
 #include "time.h"
-#include "dev_storage.h"
 #include "rbtree.h"
 #include "keyboard.h"
 #include "threadsync.h"
@@ -728,7 +726,7 @@ static int init_thread(void *p)
     // Register USB interfaces
     callout_call('U');
 
-    bootdev_info(0, 0, 0);
+    //bootdev_info(0, 0, 0);
 
     fb_init();
 

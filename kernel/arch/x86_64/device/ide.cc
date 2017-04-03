@@ -1,5 +1,4 @@
 #include "dev_storage.h"
-
 #include "cpu/ioport.h"
 #include "pci.h"
 #include "mm.h"
@@ -38,7 +37,9 @@ struct ide_if_t : public storage_if_base_t {
         uint32_t physaddr;
         uint16_t size;
         uint16_t eot;
-    };
+    } __attribute__((packed));
+
+    C_ASSERT(sizeof(bmdma_prd_t) == 8);
 
     struct ide_chan_t {
         ide_if_t *if_;
@@ -171,7 +172,23 @@ static size_t ide_dev_count;
 //
 // Task file
 
-// cmd ports
+#if 1
+#define ATA_REG_CMD_DATA            0x00
+#define ATA_REG_CMD_FEATURES        0x01    // write only
+#define ATA_REG_CMD_ERROR           0x01    // read only
+#define ATA_REG_CMD_SECCOUNT0       0x02
+#define ATA_REG_CMD_LBA0            0x03
+#define ATA_REG_CMD_LBA1            0x04
+#define ATA_REG_CMD_LBA2            0x05
+#define ATA_REG_CMD_HDDEVSEL        0x06
+#define ATA_REG_CMD_COMMAND         0x07    // write only
+#define ATA_REG_CMD_STATUS          0x07    // read only
+
+// ctl ports
+#define ATA_REG_CTL_ALTSTATUS       0x00    // read only
+#define ATA_REG_CTL_CONTROL         0x00
+#else
+// cmd ports (wtf?)
 #define ATA_REG_CMD_DATA            0x00
 #define ATA_REG_CMD_FEATURES        0x01    // write only
 #define ATA_REG_CMD_ERROR           0x01    // read only
@@ -191,6 +208,7 @@ static size_t ide_dev_count;
 // ctl ports
 #define ATA_REG_CTL_ALTSTATUS       0x02    // read only
 #define ATA_REG_CTL_DRVADDRESS      0x03
+#endif
 
 #define ATA_REG_STATUS_ERR_BIT      0
 #define ATA_REG_STATUS_IDX_BIT      1
@@ -348,9 +366,9 @@ static size_t ide_dev_count;
 // |     |     0Bh | Device Specific                            |    |
 // +-----+---------+--------------------------------------------+----+
 
-#define ATA_BMDMA_REG_CMD_n(secondary)      (((secondary) << 3) + 0)
-#define ATA_BMDMA_REG_STATUS_n(secondary)   (((secondary) << 3) + 2)
-#define ATA_BMDMA_REG_PRD_n(secondary)      (((secondary) << 3) + 4)
+#define ATA_BMDMA_REG_CMD_n(secondary)      ((((secondary) != 0) << 3) + 0)
+#define ATA_BMDMA_REG_STATUS_n(secondary)   ((((secondary) != 0) << 3) + 2)
+#define ATA_BMDMA_REG_PRD_n(secondary)      ((((secondary) != 0) << 3) + 4)
 
 if_list_t ide_if_factory_t::detect(void)
 {
@@ -362,12 +380,12 @@ if_list_t ide_if_factory_t::detect(void)
         0
     };
 
-    pci_dev_iterator_t iter;
+    pci_dev_iterator_t pci_iter;
 
     IDE_TRACE("Enumerating PCI busses for IDE\n");
 
     if (!pci_enumerate_begin(
-                &iter,
+                &pci_iter,
                 PCI_DEV_CLASS_STORAGE,
                 PCI_SUBCLASS_STORAGE_IDE))
         return list;
@@ -384,52 +402,53 @@ if_list_t ide_if_factory_t::detect(void)
     do {
         ide_if_t *dev = ide_ifs + ide_if_count++;
 
-        dev->chan[0].ports.cmd = (iter.config.base_addr[0] > 1)
-                ? iter.config.base_addr[0]
+        dev->chan[0].ports.cmd = (pci_iter.config.base_addr[0] > 1)
+                ? pci_iter.config.base_addr[0]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->chan[0].ports.ctl = (iter.config.base_addr[1] > 1)
-                ? iter.config.base_addr[1]
+        dev->chan[0].ports.ctl = (pci_iter.config.base_addr[1] > 1)
+                ? pci_iter.config.base_addr[1]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->chan[1].ports.cmd = (iter.config.base_addr[2] > 1)
-                ? iter.config.base_addr[2]
+        dev->chan[1].ports.cmd = (pci_iter.config.base_addr[2] > 1)
+                ? pci_iter.config.base_addr[2]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->chan[1].ports.ctl = (iter.config.base_addr[3] > 1)
-                ? iter.config.base_addr[3]
+        dev->chan[1].ports.ctl = (pci_iter.config.base_addr[3] > 1)
+                ? pci_iter.config.base_addr[3]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->bmdma_base = iter.config.base_addr[4];
+        dev->bmdma_base = pci_iter.config.base_addr[4];
 
-        if (iter.config.prog_if == 0x8A ||
-                iter.config.prog_if == 0x80) {
+        if (pci_iter.config.prog_if == 0x8A ||
+                pci_iter.config.prog_if == 0x80) {
             IDE_TRACE("On IRQ 14 and 15\n");
             dev->chan[0].ports.irq = 14;
             dev->chan[1].ports.irq = 15;
-        } else if (iter.config.irq_line != 0xFE) {
-            IDE_TRACE("Both on IRQ %d\n", iter.config.irq_line);
-            dev->chan[0].ports.irq = iter.config.irq_line;
-            dev->chan[1].ports.irq = iter.config.irq_line;
+        } else if (pci_iter.config.irq_line != 0xFE) {
+            IDE_TRACE("Both on IRQ %d\n", pci_iter.config.irq_line);
+            dev->chan[0].ports.irq = pci_iter.config.irq_line;
+            dev->chan[1].ports.irq = pci_iter.config.irq_line;
         } else {
             IDE_TRACE("Both on IRQ 14\n");
             dev->chan[0].ports.irq = 14;
             dev->chan[1].ports.irq = 14;
             IDE_TRACE("Updating PCI config IRQ line\n");
-            pci_config_write(iter.bus, iter.slot, iter.func,
+            pci_config_write(pci_iter.bus, pci_iter.slot, pci_iter.func,
                            offsetof(pci_config_hdr_t, irq_line),
                            &dev->chan[0].ports.irq, sizeof(uint8_t));
         }
 
-        IDE_TRACE("Found PCI IDE interface at %x/%x/irq%d - %x/%x/irq%d\n",
+        IDE_TRACE("Found PCI IDE interface at 0x%x/0x%x/irq%d"
+                  " - 0x%x/0x%x/irq%d\n",
                   dev->chan[0].ports.cmd,
                 dev->chan[0].ports.ctl, dev->chan[0].ports.irq,
                 dev->chan[1].ports.cmd, dev->chan[1].ports.ctl,
@@ -443,7 +462,12 @@ if_list_t ide_if_factory_t::detect(void)
             --ide_if_count;
             continue;
         }
-    } while (pci_enumerate_next(&iter));
+
+        // Enable bus master DMA
+        pci_adj_control_bits(pci_iter.bus, pci_iter.slot,
+                             pci_iter.func, PCI_CMD_BUSMASTER, 0);
+
+    } while (pci_enumerate_next(&pci_iter));
 
     list.count = ide_if_count - start_at;
 
@@ -513,6 +537,7 @@ void ide_if_t::ide_chan_t::issue_packet_read(
         0
     };
 
+    wait_not_bsy();
     wait_drq();
 
     set_irq_enable(1);
@@ -522,7 +547,7 @@ void ide_if_t::ide_chan_t::issue_packet_read(
 
 void ide_if_t::ide_chan_t::set_irq_enable(int enable)
 {
-    outb(ports.cmd + ATA_REG_CMD_CONTROL, ATA_REG_CONTROL_n(
+    outb(ports.ctl + ATA_REG_CTL_CONTROL, ATA_REG_CONTROL_n(
              enable ? 0 : ATA_REG_CONTROL_nIEN));
 }
 
@@ -636,7 +661,7 @@ void ide_if_t::ide_chan_t::detect_devices()
         if (status == 0)
             continue;
 
-        IDE_TRACE("if=%d, dev=%d, status=%x\n", secondary, slave, status);
+        IDE_TRACE("if=%d, dev=%d, status=0x%x\n", secondary, slave, status);
 
         // Set LBA to zero for ATAPI detection later
         set_drv(slave);
@@ -701,14 +726,14 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         // If error and command aborted, there is no drive
         if (is_err && (err & ATA_REG_ERROR_ABRT)) {
-            IDE_TRACE("if=%d, dev=%d, error=%x, no drive\n",
+            IDE_TRACE("if=%d, dev=%d, error=0x%x, no drive\n",
                       secondary, slave, err);
             continue;
         }
 
         // If error, then we do not know what happened
         if (is_err) {
-            IDE_TRACE("if=%d, dev=%d, error=%x\n", secondary, slave, err);
+            IDE_TRACE("if=%d, dev=%d, error=0x%x\n", secondary, slave, err);
             continue;
         }
 
@@ -828,7 +853,7 @@ void ide_if_t::ide_chan_t::detect_devices()
             // Get list of physical address ranges for io_window
             size_t range_count = mphysranges(
                         io_window_ranges, countof(io_window_ranges),
-                        dma_bounce, max_multiple * sector_size, 65536);
+                        dma_bounce, max_multiple * sector_size, 32768);
 
             range_count = mphysranges_split(
                         io_window_ranges, range_count,
@@ -838,10 +863,11 @@ void ide_if_t::ide_chan_t::detect_devices()
             for (size_t i = 0; i < range_count; ++i) {
                 dma_prd[i].physaddr = io_window_ranges[i].physaddr;
                 dma_prd[i].size = io_window_ranges[i].size;
-                dma_prd[i].eot = 0;
+                dma_prd[i].eot = (i == (range_count-1)) ? 0x8000 : 0;
             }
 
             // Set PRD address register
+            assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
             if_->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
                             (uint32_t)dma_prd_physaddr);
         } else if (max_multiple > 1) {
@@ -928,12 +954,14 @@ int64_t ide_if_t::ide_chan_t::io(
         void *data, int64_t count, uint64_t lba,
         int slave, int is_atapi, int is_read)
 {
+    int err = 0;
+
     if (unlikely(count == 0))
-        return 0;
+        return err;
 
     int sector_size = !is_atapi ? 512 : 2048;
 
-    IDE_TRACE("Read lba=%lx, max_multiple=%u, count=%ld\n",
+    IDE_TRACE("Read lba=%lu, max_multiple=%u, count=%ld\n",
               lba, max_multiple, count);
 
     int64_t read_count = 0;
@@ -945,7 +973,8 @@ int64_t ide_if_t::ide_chan_t::io(
     set_irq_enable(1);
 
     for (int64_t count_base = 0;
-         count_base < count; count_base += max_multiple) {
+         err == 0 && count_base < count;
+         count_base += max_multiple) {
         unsigned sub_count = count - count_base;
 
         if (sub_count > max_multiple)
@@ -963,6 +992,7 @@ int64_t ide_if_t::ide_chan_t::io(
             if_->bmdma_acquire();
 
             // Set PRD address register
+            assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
             if_->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
                             (uint32_t)dma_prd_physaddr);
         }
@@ -975,6 +1005,8 @@ int64_t ide_if_t::ide_chan_t::io(
             issue_packet_read(lba + count_base, sub_count, 2048, max_dma >= 0);
         }
 
+        size_t io_window_misalignment = (uintptr_t)data & ~(int)-PAGESIZE;
+
         if (max_dma >= 0) {
             IDE_TRACE("Starting DMA\n");
 
@@ -984,7 +1016,7 @@ int64_t ide_if_t::ide_chan_t::io(
             // Get physical addresses of destination
             size_t range_count = mphysranges(
                         io_window_ranges, countof(io_window_ranges),
-                        data, sub_size, 65536);
+                        data, sub_size + io_window_misalignment, ~0UL);
 
             // Map window to modify the memory
             alias_window(io_window, sub_size, io_window_ranges, range_count);
@@ -992,13 +1024,22 @@ int64_t ide_if_t::ide_chan_t::io(
 
         yield_until_irq();
 
+        if (io_status & ATA_REG_STATUS_ERR) {
+            IDE_TRACE("error! status=0x%x, err=0x%x", io_status,
+                      inb(ports.cmd + ATA_REG_CMD_ERROR));
+            err = 1;
+        }
+
         if (max_dma >= 0) {
             // Must read status register to synchronize with bus master
             IDE_TRACE("Reading DMA status\n");
             uint8_t bmdma_status = if_->bmdma_inb(
                         ATA_BMDMA_REG_STATUS_n(secondary));
-            IDE_TRACE("bmdma status=%x\n", bmdma_status);
 
+            // Write 1 to interrupt bit to acknowledge
+            if_->bmdma_outb(ATA_BMDMA_REG_STATUS_n(secondary),
+                            bmdma_status | (1 << 2));
+            IDE_TRACE("bmdma status=0x%x\n", bmdma_status);
 
             // Stop DMA
             IDE_TRACE("Stopping DMA\n");
@@ -1007,11 +1048,11 @@ int64_t ide_if_t::ide_chan_t::io(
             if_->bmdma_release();
 
             // Copy into caller's data buffer
-            memcpy(io_window, dma_bounce, sub_size);
+            memcpy((char*)io_window + io_window_misalignment,
+                   dma_bounce, sub_size);
         } else {
-            size_t misalignment = uintptr_t(data) & (PAGESIZE-1);
-            size_t adj_size = (sub_size) + misalignment;
-            char *aligned_addr = (char*)data - misalignment;
+            size_t adj_size = (sub_size) + io_window_misalignment;
+            char *aligned_addr = (char*)data - io_window_misalignment;
 
             size_t ranges_count = mphysranges(
                         io_window_ranges, countof(io_window_ranges),
@@ -1022,9 +1063,11 @@ int64_t ide_if_t::ide_chan_t::io(
 
             IDE_TRACE("Reading PIO data\n");
             insw(ports.cmd + ATA_REG_CMD_DATA,
-                 (char*)io_window + misalignment,
+                 (char*)io_window + io_window_misalignment,
                  (sector_size >> 1) * sub_count);
         }
+
+        //hex_dump(data, sub_size);
 
         IDE_TRACE("lba = %ld\n", lba + count_base);
 
@@ -1036,7 +1079,7 @@ int64_t ide_if_t::ide_chan_t::io(
 
     release_access(intr_was_enabled);
 
-    return read_count;
+    return err;
 }
 
 isr_context_t *ide_if_t::ide_chan_t::irq_handler(int irq, isr_context_t *ctx)
@@ -1054,7 +1097,7 @@ void ide_if_t::ide_chan_t::irq_handler()
     mutex_lock_noyield(&lock);
     io_done = 1;
     io_status = inb(ports.cmd + ATA_REG_CMD_STATUS);
-    printdbg("IDE IRQ, status=%x!\n", io_status);
+    IDE_TRACE("IRQ, status=0x%x!\n", io_status);
     mutex_unlock(&lock);
     condvar_wake_one(&done_cond);
 }

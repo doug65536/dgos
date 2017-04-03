@@ -1,6 +1,5 @@
 #include "dev_text.h"
 
-#include "vga.h"
 #include "bios_data.h"
 #include "mm.h"
 #include "string.h"

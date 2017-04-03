@@ -74,8 +74,12 @@ void invoke_storage_factories(void *)
     for (unsigned df = 0; df < storage_factory_count; ++df) {
         storage_if_factory_t *factory = storage_factories[df];
 
+        STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
+
         // Get a list of storage devices of this type
         if_list_t if_list = factory->detect();
+
+        STORAGE_TRACE("Found %u %s interfaces\n", if_list.count, factory->name);
 
         for (unsigned i = 0; i < if_list.count; ++i) {
             // Calculate pointer to storage interface instance
@@ -87,9 +91,14 @@ void invoke_storage_factories(void *)
             // Store interface instance
             storage_ifs[storage_if_count++] = if_;
 
+            STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
+
             // Get a list of storage devices on this interface
             if_list_t dev_list;
             dev_list = if_->detect_devices();
+
+            STORAGE_TRACE("Found %u %s[%u] drives\n", dev_list.count,
+                          factory->name, i);
 
             for (unsigned k = 0; k < dev_list.count; ++k) {
                 // Calculate pointer to storage device instance
@@ -170,6 +179,8 @@ static void invoke_part_factories(void *arg)
         for (unsigned dev = 0; dev < storage_dev_count; ++dev) {
             storage_dev_base_t *drive = open_storage_dev(dev);
             if (drive) {
+                STORAGE_TRACE("Probing for %s partitions...\n", factory->name);
+
                 if_list_t part_list = factory->detect(drive);
 
                 // Mount partitions
@@ -183,6 +194,9 @@ static void invoke_part_factories(void *arg)
                     fs_mount(part->name, &info);
                 }
                 close_storage_dev(drive);
+
+                STORAGE_TRACE("Found %u %s partitions\n", part_list.count,
+                              factory->name);
             }
         }
     }
@@ -190,17 +204,20 @@ static void invoke_part_factories(void *arg)
 
 REGISTER_CALLOUT(invoke_part_factories, nullptr, 'P', "000");
 
-fs_factory_t::fs_factory_t(char const *name)
+fs_factory_t::fs_factory_t(char const *factory_name)
+    : name(factory_name)
 {
-    fs_register_factory(name, this);
+    fs_register_factory(factory_name, this);
 }
 
-storage_if_factory_t::storage_if_factory_t(char const *name)
+storage_if_factory_t::storage_if_factory_t(char const *factory_name)
+    : name(factory_name)
 {
-    storage_if_register_factory(name, this);
+    storage_if_register_factory(factory_name, this);
 }
 
-part_factory_t::part_factory_t(char const *name)
+part_factory_t::part_factory_t(const char *factory_name)
+    : name(factory_name)
 {
     part_register_factory(name, this);
 }

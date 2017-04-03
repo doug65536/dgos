@@ -1,4 +1,3 @@
-#include "rtl8139.h"
 #include "pci.h"
 #include "callout.h"
 #include "printk.h"

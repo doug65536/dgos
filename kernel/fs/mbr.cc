@@ -1,14 +1,20 @@
-#define PART_T mbr
-#define STORAGE_IMPL
-#include "string.h"
-#include "mbr.h"
 #include "dev_storage.h"
+#include "string.h"
 #include "unique_ptr.h"
+#include "printk.h"
+
+#define DEBUG_MBR   1
+#if DEBUG_MBR
+#define MBR_TRACE(...) printdbg("mbr: " __VA_ARGS__)
+#else
+#define MBR_TRACE(...) ((void)0)
+#endif
 
 typedef struct part_dev_t part_dev_t;
 
 typedef struct partition_tbl_ent_t {
-    uint8_t  boot;					//0: Boot indicator bit flag: 0 = no, 0x80 = bootable (or "active")
+    uint8_t  boot;					//0: Boot indicator bit flag: 0 = no,
+                                    // 0x80 = bootable (or "active")
     uint8_t  start_head;			// H
 
     uint16_t start_sector : 6;		// S
@@ -26,7 +32,7 @@ typedef struct partition_tbl_ent_t {
 
 struct mbr_part_factory_t : public part_factory_t {
     mbr_part_factory_t() : part_factory_t("mbr") {}
-    virtual if_list_t detect(storage_dev_base_t *drive);
+    if_list_t detect(storage_dev_base_t *drive);
 };
 
 static mbr_part_factory_t mbr_part_factory;

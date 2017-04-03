@@ -1636,7 +1636,6 @@ void *mmap(void *addr, size_t len,
         }
         if (unlikely(!success))
             return 0;
-        memset((void*)linear_addr, 0, len);
     } else {
         for (size_t ofs = 0; ofs < len; ofs += PAGE_SIZE)
         {
@@ -2113,8 +2112,8 @@ size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
         if (chk1 != chk2) {
             // Needs split
             uintptr_t new_end = end & -intptr_t(boundary);
-            memmove(range + 1, range, (ranges_count++ - i) * sizeof(*range));
-            range[0].size = new_end - range[0].size;
+            memmove(range + 1, range, (++ranges_count - i) * sizeof(*range));
+            range[0].size = new_end - range[0].physaddr;
             range[1].physaddr = range[0].physaddr + range[0].size;
             range[1].size = end - range[1].physaddr;
         }

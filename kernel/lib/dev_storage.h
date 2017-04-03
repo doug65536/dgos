@@ -52,8 +52,9 @@ struct storage_dev_base_t {
 // Storage Interface (IDE, AHCI, etc)
 
 struct storage_if_factory_t {
-    storage_if_factory_t(char const *name);
+    storage_if_factory_t(char const *factory_name);
     virtual if_list_t detect(void) = 0;
+    char const * const name;
 };
 
 struct storage_if_base_t {
@@ -156,8 +157,9 @@ struct fs_statvfs_t {
 struct fs_base_t;
 
 struct fs_factory_t {
+    explicit fs_factory_t(char const *factory_name);
     virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
-    explicit fs_factory_t(char const *name);
+    char const * const name;
 };
 
 struct fs_base_t {
@@ -356,8 +358,9 @@ void fs_register_factory(char const *name, fs_factory_t *fs);
 // Partitioning scheme (MBR, UEFI, etc)
 
 struct part_factory_t {
-    part_factory_t(char const *name);
+    explicit part_factory_t(char const * factory_name);
     virtual if_list_t detect(storage_dev_base_t *drive) = 0;
+    char const * const name;
 };
 
 struct part_dev_t;

@@ -1,5 +1,3 @@
-#define FS_NAME fat_fs_t
-#define STORAGE_IMPL
 #include "dev_storage.h"
 
 #include "mm.h"

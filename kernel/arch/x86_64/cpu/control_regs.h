@@ -189,7 +189,7 @@ static inline void msr_set_lo(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
-        "mov %[value],%%eax\n\t"
+        "mov %k[value],%%eax\n\t"
         "wrmsr"
         :
         : [value] "S" (value)
@@ -202,7 +202,7 @@ static inline void msr_set_hi(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
-        "mov %[value],%%edx\n\t"
+        "mov %k[value],%%edx\n\t"
         "wrmsr"
         :
         : [value] "S" (value)
@@ -246,10 +246,10 @@ static inline uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
     __asm__ __volatile__ (
-        "mov %%cr0,%[result]\n\t"
-        "and %[clear],%[result]\n\t"
-        "or %[set],%[result]\n\t"
-        "mov %[result],%%cr0\n\t"
+        "mov %%cr0,%q[result]\n\t"
+        "and %q[clear],%q[result]\n\t"
+        "or %q[set],%q[result]\n\t"
+        "mov %q[result],%%cr0\n\t"
         : [result] "=&r" (rax)
         : [clear] "ri" (~clear)
         , [set] "ri" (set)
@@ -261,10 +261,10 @@ static inline uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
     __asm__ __volatile__ (
-        "movq %%cr4,%[result]\n\t"
-        "andq %[clear],%[result]\n\t"
-        "orq %[set],%[result]\n\t"
-        "movq %[result],%%cr4\n\t"
+        "movq %%cr4,%q[result]\n\t"
+        "andq %q[clear],%q[result]\n\t"
+        "orq %q[set],%q[result]\n\t"
+        "movq %q[result],%%cr4\n\t"
         : [result] "=&r" (rax)
         : [clear] "ri" (~clear)
         , [set] "ri" (set)

@@ -1,5 +1,4 @@
-#define STORAGE_IMPL
-#include "device/ahci.h"
+#include "dev_storage.h"
 #include "device/pci.h"
 #include "irq.h"
 #include "printk.h"

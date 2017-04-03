@@ -1,5 +1,3 @@
-#include "usb_xhci.h"
-
 #include "callout.h"
 #include "pci.h"
 #include "printk.h"

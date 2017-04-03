@@ -1,7 +1,4 @@
-#define FS_NAME fat32
-#define STORAGE_IMPL
 #include "dev_storage.h"
-
 #include "stdlib.h"
 #include "printk.h"
 #include "string.h"
