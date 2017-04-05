@@ -33,7 +33,7 @@ static char png_blk_types[][5] = {
     "IEND"
 };
 
-#define PNG_BUFSIZE (64<<10)
+#define PNG_BUFSIZE ((64<<10)-_MALLOC_OVERHEAD)
 
 typedef struct png_chunk_hdr_t {
     uint32_t len;
