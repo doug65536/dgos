@@ -66,8 +66,7 @@ spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 {
     atomic_barrier();
-    while (*lock != 0 ||
-           atomic_cmpxchg(lock, 0, saved_lock) != 0) {
+    while (*lock != 0 || atomic_cmpxchg(lock, 0, saved_lock) != 0) {
         // Allow IRQs if they were enabled
         cpu_irq_toggle((saved_lock & 2) != 0);
 
@@ -88,8 +87,7 @@ void spinlock_lock_noirq(spinlock_t *lock)
 
     atomic_barrier();
     if (intr_enabled) {
-        while (*lock != 0 ||
-               atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
+        while (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
             // Allow IRQs if they were enabled
             cpu_irq_toggle(intr_enabled);
 
@@ -114,8 +112,7 @@ int spinlock_try_lock_noirq(spinlock_t *lock)
     int intr_enabled = cpu_irq_disable() << 1;
 
     atomic_barrier();
-    if (*lock != 0 ||
-            atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
+    if (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         cpu_irq_toggle(intr_enabled);
 
         return 0;
