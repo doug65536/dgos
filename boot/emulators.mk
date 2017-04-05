@@ -58,7 +58,7 @@ monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
 
 monitor-connect:
-	netcat localhost 7777
+	telnet localhost 7777
 
 .PHONY: monitor-debug-output
 
