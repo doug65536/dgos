@@ -74,6 +74,8 @@ private:
         color_t color;
     };
 
+    C_ASSERT(sizeof(node_t) == 32);
+
     void insert_case1(iter_t n);
     void insert_case2(iter_t n);
     void insert_case3(iter_t n);
@@ -149,15 +151,15 @@ private:
 #endif
 
 #define RBTREE_CAPACITY_FROM_BYTES(n) \
-    (((n)-sizeof(rbtree_t)) / sizeof(node_t))
+    ((n > _MALLOC_OVERHEAD ? n - _MALLOC_OVERHEAD : 0) / sizeof(node_t))
 
 #define RBTREE_PAGE_COUNT(c) \
-    (((sizeof(rbtree_t) + sizeof(node_t)*(c)) + \
-    PAGE_SIZE - 1) / PAGE_SIZE)
+    (((sizeof(node_t)*(c)) + PAGE_SIZE - 1) >> PAGE_SCALE)
 
 #define RBTREE_NEXT_CAPACITY(c) \
-    RBTREE_CAPACITY_FROM_BYTES(RBTREE_PAGE_COUNT(c) * \
-    2U * PAGE_SIZE)
+    (c \
+    ? RBTREE_CAPACITY_FROM_BYTES(RBTREE_PAGE_COUNT(c) * 2U * PAGE_SIZE) \
+    : RBTREE_CAPACITY_FROM_BYTES(PAGE_SIZE - _MALLOC_OVERHEAD))
 
 //
 // Internals
@@ -179,8 +181,7 @@ rbtree_t<Tkey,Tval>::alloc_node()
         // Expand tree
         capacity = RBTREE_NEXT_CAPACITY(capacity);
         node_t *new_nodes = (node_t*)realloc(
-                    nodes, sizeof(*this) +
-                    sizeof(*nodes) * capacity);
+                    nodes, sizeof(*nodes) * capacity);
         if (!new_nodes)
             return 0;
 
@@ -508,6 +509,8 @@ rbtree_t<Tkey,Tval>::init(cmp_t init_cmp, void *p)
 template<typename Tkey, typename Tval>
 rbtree_t<Tkey,Tval>::~rbtree_t()
 {
+    // FIXME: call destructors
+    ::free(nodes);
 }
 
 template<typename Tkey, typename Tval>
@@ -539,7 +542,7 @@ rbtree_t<Tkey,Tval>::insert_pair(kvp_t *kvp)
 {
     iter_t i = new_node(kvp);
     insert_case1(i);
-    dump();
+    //dump();
     return i;
 }
 
@@ -997,7 +1000,7 @@ int rbtree_t<Tkey,Tval>::test(void)
             for (int del = 0; del < 4; ++del) {
                 RBTREE_TRACE("Delete %d\n", values[scenario[del]]);
                 tree.delete_item(values[scenario[del]], 0);
-                tree.dump();
+                //tree.dump();
                 tree.walk(test_visit, 0);
                 RBTREE_TRACE("---\n");
             }
