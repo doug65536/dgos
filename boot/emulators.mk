@@ -2,6 +2,8 @@ QEMU := qemu-system-x86_64
 
 QEMU_DEBUGCON := \
 	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet \
+	-mon qemu-monitor,mode=readline,default \
 	-device isa-debugcon,chardev=qemu-debug-out
 
 QEMU_CPU := host
@@ -24,7 +26,7 @@ QEMU_COMMON := $(QEMU_DEBUGCON) $(QEMU_USB) $(QEMU_NET) \
 	-s \
 	-no-shutdown \
 	-no-reboot \
-	-d unimp \
+	-d unimp,guest_errors \
 	$(QEMU_FLAGS) \
 	-m $(QEMU_RAM)
 
@@ -34,22 +36,29 @@ QEMU_RUN :=
 QEMU_SMP := -smp cpus=8,cores=4,threads=2
 QEMU_UP := -smp cpus=1,cores=1,threads=1
 
-QEMU_FAT := -drive file=$(DISKIMAGE),format=raw
-QEMU_ISO := -cdrom $(ISO_FILE)
+QEMU_HDCTL_DEV_ahci := -machine q35
+QEMU_HDCTL_DEV_ide := -machine pc
 
-QEMU_KVM := -enable-kvm \
-	-cpu $(QEMU_CPU)
-QEMU_TCG := -accel tcg,thread=multi \
-	-cpu kvm64
+# $(call QEMU_STORAGE,image,interface,media)
+QEMU_STORAGE = $(QEMU_HDCTL_DEV_$(2)) -drive file=$(1),format=raw,media=$(3)
 
-QEMU_IDE := -machine pc
-QEMU_AHCI := -machine q35
+QEMU_STORAGE_FAT = $(call QEMU_STORAGE,$(DISKIMAGE),$(1),disk)
+QEMU_STORAGE_ISO = $(call QEMU_STORAGE,$(ISO_FILE),$(1),cdrom)
+
+QEMU_AHCI := ahci
+QEMU_IDE := ide
+
+QEMU_KVM := -enable-kvm -cpu $(QEMU_CPU)
+QEMU_TCG := -cpu kvm64
 
 QEMU_ISO_DEPS := $(ISO_FILE)
 QEMU_FAT_DEPS := debuggable-kernel-disk $(DISKIMAGE)
 
 monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
+
+monitor-connect:
+	netcat localhost 7777
 
 .PHONY: monitor-debug-output
 
@@ -71,256 +80,224 @@ debug-up-iso-ahci-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 debug-up-iso-ahci-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 debug-up-iso-ide-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 debug-up-iso-ide-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 debug-up-fat-ahci-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 debug-up-fat-ahci-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 debug-up-fat-ide-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 debug-up-fat-ide-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 debug-smp-iso-ahci-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 debug-smp-iso-ahci-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 debug-smp-iso-ide-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 debug-smp-iso-ide-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 debug-smp-fat-ahci-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 debug-smp-fat-ahci-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 debug-smp-fat-ide-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 debug-smp-fat-ide-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_WAIT) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 run-up-iso-ahci-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 run-up-iso-ahci-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 run-up-iso-ide-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 run-up-iso-ide-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 run-up-fat-ahci-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 run-up-fat-ahci-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 run-up-fat-ide-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 run-up-fat-ide-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_UP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 run-smp-iso-ahci-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 run-smp-iso-ahci-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 run-smp-iso-ide-tcg: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 run-smp-iso-ide-kvm: $(QEMU_ISO_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_ISO) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_ISO,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 run-smp-fat-ahci-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_TCG)
 
 run-smp-fat-ahci-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_AHCI) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_AHCI)) \
 	$(QEMU_KVM)
 
 run-smp-fat-ide-tcg: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_TCG)
 
 run-smp-fat-ide-kvm: $(QEMU_FAT_DEPS)
 	$(QEMU) $(QEMU_COMMON) \
 	$(QEMU_RUN) \
 	$(QEMU_SMP) \
-	$(QEMU_FAT) \
-	$(QEMU_IDE) \
+	$(call QEMU_STORAGE_FAT,$(QEMU_IDE)) \
 	$(QEMU_KVM)
 
 #  {debug|run}-{up|smp}-{iso|fat}-{ahci|ide}-{kvm|tcg}
