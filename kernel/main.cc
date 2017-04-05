@@ -582,7 +582,6 @@ static int stress_heap_thread(void *p)
 
                 uint64_t st = cpu_rdtsc();
                 void *block = heap_alloc(heap, size);
-                //printdbg("Allocated size=%d\n", size);
                 uint64_t el = cpu_rdtsc() - st;
 
                 history[history_index++] = block;
@@ -602,9 +601,7 @@ static int stress_heap_thread(void *p)
             }
 
             printdbg("heap_alloc+memset+heap_free:"
-                     " min=%8ld (%luns @ 3.2GHz),"
-                     " max=%8ld,"
-                     " avg=%8ld,"
+                     " min=%8ld (%luns @ 3.2GHz), max=%8ld, avg=%8ld,"
                      " withfree=%8ld cycles\n",
                      min_el, min_el * 10 / 34, max_el, tot_el / count,
                      overall / count);
@@ -774,7 +771,8 @@ static int init_thread(void *p)
     file_closedir(od);
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
-    thread_create(draw_test, 0, 0, 0);
+    thread_t draw_thread_id = thread_create(draw_test, 0, 0, 0);
+    printdbg("draw thread id=%d\n", draw_thread_id);
 #endif
 
     //modload_init();
