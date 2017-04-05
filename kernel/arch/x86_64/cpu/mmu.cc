@@ -783,6 +783,8 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
     (void)intr;
     assert(intr == INTR_TLB_SHOOTDOWN);
 
+    apic_eoi(intr);
+
     int cpu_number = thread_cpu_number();
 
     // Clear pending
@@ -799,7 +801,7 @@ static void mmu_send_tlb_shootdown(void)
     if (unlikely(cpu_count == 0))
         return;
 
-    int irq_was_enabled = cpu_irq_disable();
+    cpu_scoped_irq_disable irq_was_enabled;
     int cur_cpu = thread_cpu_number();
     int all_cpu_mask = (1 << cpu_count) - 1;
     int cur_cpu_mask = 1 << cur_cpu;
@@ -810,16 +812,15 @@ static void mmu_send_tlb_shootdown(void)
     if (other_cpu_mask) {
         if (need_ipi_mask == other_cpu_mask) {
             // Send to all other CPUs
-            thread_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+            apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
         } else {
             int cpu_mask = 1;
             for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
                 if (!(old_pending & cpu_mask) && (need_ipi_mask & cpu_mask))
-                    apic_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
+                    thread_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
             }
         }
     }
-    cpu_irq_toggle(irq_was_enabled);
 }
 
 static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
@@ -1312,6 +1313,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
     linaddr_t addr;
 
     if (free_addr_by_addr && free_addr_by_size) {
+        cpu_scoped_irq_disable intr_was_enabled;
         mutex_lock(&free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
@@ -1383,6 +1385,7 @@ void contiguous_allocator_t::take_linear(linaddr_t addr, size_t size)
     assert(free_addr_by_addr);
     assert(free_addr_by_size);
 
+    cpu_scoped_irq_disable intr_was_enabled;
     mutex_lock(&free_addr_lock);
 
     // Round to pages
@@ -1469,6 +1472,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 
     linaddr_t end = addr + size;
 
+    cpu_scoped_irq_disable intr_was_enabled;
     mutex_lock(&free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC

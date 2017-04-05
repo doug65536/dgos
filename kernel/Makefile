@@ -81,11 +81,11 @@ CXXFLAGS := -std=c++14 -g3 \
 ifdef OPTIMIZE
 CXXFLAGS += \
 	-O2 -ftree-vectorize -mtune=native \
-	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl -mtune=native
+	-fno-omit-frame-pointer -fbuiltin -fno-builtin-ilogbl
 #CXXFLAGS += -DNDEBUG
 
 ifdef OPTIMIZE_AVX
-CXXFLAGS += -march=native -no-integrated-as
+CXXFLAGS += -mavx -mavx2 -no-integrated-as
 endif
 # -Wa,-msse2avx
 else

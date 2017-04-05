@@ -1407,7 +1407,7 @@ static int parse_mp_tables(void)
 
 static isr_context_t *apic_timer_handler(int intr, isr_context_t *ctx)
 {
-    apic_eoi(intr);
+    apic_eoi(intr & 0);
     return thread_schedule(ctx);
 }
 
@@ -1432,14 +1432,14 @@ unsigned apic_get_id(void)
 
 static void apic_send_command(uint32_t dest, uint32_t cmd)
 {
-    int intr_enabled = cpu_irq_disable();
+    cpu_scoped_irq_disable intr_enabled;
+
     APIC_DEST = dest;
     atomic_barrier();
     APIC_CMD = cmd;
     atomic_barrier();
     while (APIC_CMD & APIC_CMD_PENDING)
         pause();
-    cpu_irq_toggle(intr_enabled);
 }
 
 // if target_apic_id is <= -2, sends to all CPUs
@@ -1539,8 +1539,7 @@ static void apic_configure_timer(
 {
     APIC_LVT_DCR = dcr;
     atomic_barrier();
-    APIC_LVT_TR = APIC_LVT_VECTOR_n(intr) |
-            APIC_LVT_TR_MODE_n(timer_mode);
+    APIC_LVT_TR = APIC_LVT_VECTOR_n(intr) | APIC_LVT_TR_MODE_n(timer_mode);
     atomic_barrier();
     APIC_LVT_ICR = icr;
 }
@@ -1566,9 +1565,7 @@ int apic_init(int ap)
         assert(apic_ptr == 0);
         apic_ptr = (uint32_t *)mmap((void*)apic_base, 4096,
                         PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL |
-                        MAP_NOCACHE |
-                        MAP_WRITETHRU, -1, 0);
+                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
         intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);

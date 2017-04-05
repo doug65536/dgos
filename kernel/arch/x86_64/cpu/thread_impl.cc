@@ -745,12 +745,10 @@ EXPORT thread_t thread_get_id(void)
     if (thread_count) {
         thread_t thread_id;
 
-        int was_enabled = cpu_irq_disable();
+        cpu_scoped_irq_disable intr_was_enabled;
 
         cpu_info_t *cpu = this_cpu();
         thread_id = cpu->cur_thread - threads;
-
-        cpu_irq_toggle(was_enabled);
 
         return thread_id;
     }
@@ -857,6 +855,7 @@ void thread_cls_for_each_cpu(
 
 void thread_send_ipi(int cpu, int intr)
 {
+    assert(cpu >= 0 && (unsigned)cpu < cpu_count);
     apic_send_ipi(cpus[cpu].apic_id, intr);
 }
 

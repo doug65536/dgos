@@ -1973,7 +1973,7 @@ int ahci_dev_t::io(void *data, int64_t count,
     mutex_init(&block_state.lock);
     condvar_init(&block_state.done_cond);
 
-    int intr_were_enabled = cpu_irq_disable();
+    cpu_scoped_irq_disable intr_were_enabled;
 
     mutex_lock(&block_state.lock);
 
@@ -1990,8 +1990,6 @@ int ahci_dev_t::io(void *data, int64_t count,
 
     condvar_destroy(&block_state.done_cond);
     mutex_destroy(&block_state.lock);
-
-    cpu_irq_toggle(intr_were_enabled);
 
     return block_state.err;
 }

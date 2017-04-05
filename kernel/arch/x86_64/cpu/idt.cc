@@ -217,11 +217,11 @@ static void idtr_load(table_register_64_t *table_reg)
     );
 }
 
-static void idt_xsave_detect(int ap)
+void idt_xsave_detect(int ap)
 {
     (void)ap;
 
-    int intr_was_enabled = cpu_irq_disable();
+    cpu_scoped_irq_disable intr_was_enabled;
 
     while (cpuid_has_xsave()) {
         cpuid_t info;
@@ -320,7 +320,6 @@ static void idt_xsave_detect(int ap)
         assert(sse_avx512_xregs_offset +
                sse_avx512_xregs_size <= sse_context_size);
 
-        cpu_irq_toggle(intr_was_enabled);
         return;
     }
 
@@ -333,8 +332,6 @@ static void idt_xsave_detect(int ap)
         sse_context_save = isr_save_fxsave;
         sse_context_restore = isr_restore_fxrstor;
     }
-
-    cpu_irq_toggle(intr_was_enabled);
 }
 
 int idt_init(int ap)
@@ -369,8 +366,6 @@ int idt_init(int ap)
     idtr.limit = sizeof(idt) - 1;
 
     idtr_load(&idtr);
-
-    idt_xsave_detect(ap);
 
     return 0;
 }

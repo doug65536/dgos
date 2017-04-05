@@ -13,6 +13,8 @@ typedef struct heap_hdr_t {
     uint32_t sig2;
 } heap_hdr_t;
 
+C_ASSERT(sizeof(heap_hdr_t) == 16);
+
 #define HEAP_BLK_TYPE_USED  0xa10ca1ed
 #define HEAP_BLK_TYPE_FREE  0xfeeeb10c
 
@@ -31,9 +33,9 @@ typedef struct heap_hdr_t {
 /// .... -> use mmap
 
 #define HEAP_BUCKET_COUNT   12
-#define HEAP_MMAP_THRESHOLD (1<<(5+HEAP_BUCKET_COUNT-1))
+#define HEAP_MMAP_THRESHOLD (1U<<(5+HEAP_BUCKET_COUNT-1))
 
-#define HEAP_BUCKET_SIZE    (1<<(HEAP_BUCKET_COUNT+5-1))
+#define HEAP_BUCKET_SIZE    (1U<<(HEAP_BUCKET_COUNT+5-1))
 #define HEAP_MAX_ARENAS \
     (((PAGESIZE - \
     sizeof(void*) * HEAP_BUCKET_COUNT - \
@@ -135,20 +137,20 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
 
     size_t bucket = log2size - 5;
 
-    char *arena = (char*)mmap(0, HEAP_BUCKET_SIZE,
-                       PROT_READ | PROT_WRITE,
+    char *arena = (char*)mmap(0, HEAP_BUCKET_SIZE, PROT_READ | PROT_WRITE,
                        MAP_POPULATE, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 
     arena_list_ptr[(*arena_count_ptr)++] = arena;
 
-    size_t size = 1 << log2size;
+    size_t size = 1U << log2size;
 
     heap_hdr_t *hdr = 0;
     heap_hdr_t *first_free = heap->free_chains[bucket];
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
         hdr = (heap_hdr_t*)fill;
-        hdr->size_next = (uintptr_t)first_free;
+        hdr->size_next = uintptr_t(first_free);
+        hdr->sig1 = HEAP_BLK_TYPE_FREE;
         first_free = hdr;
     }
     heap->free_chains[bucket] = first_free;
@@ -175,7 +177,7 @@ static void *heap_large_alloc(size_t size)
                            0, -1, 0);
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
-    hdr->sig2 = HEAP_BLK_TYPE_USED ^ (uint32_t)size;
+    hdr->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
 
     return hdr + 1;
 }
@@ -187,7 +189,7 @@ static void heap_large_free(heap_hdr_t *hdr, size_t size)
 
 void *heap_alloc(heap_t *heap, size_t size)
 {
-    if (size == 0)
+    if (unlikely(size == 0))
         return 0;
 
     // Add room for bucket header
@@ -199,9 +201,10 @@ void *heap_alloc(heap_t *heap, size_t size)
     uint8_t log2size = bit_log2_n(size);
 
     // Round up to bucket item size
-    size = 1 << log2size;
+    size = 1U << log2size;
 
     // Bucket 0 is 32 bytes
+    assert(log2size >= 5);
     size_t bucket = log2size - 5;
 
     heap_hdr_t *first_free;
@@ -209,26 +212,29 @@ void *heap_alloc(heap_t *heap, size_t size)
     if (unlikely(bucket >= HEAP_BUCKET_COUNT))
         return heap_large_alloc(orig_size);
 
-    int intr_enabled = cpu_irq_disable();
-    mutex_lock(&heap->lock);
+    {
+        cpu_scoped_irq_disable intr_was_enabled;
+        mutex_lock(&heap->lock);
 
-    // Try to take a free item
-    first_free = heap->free_chains[bucket];
+        // Try to take a free item
+        first_free = heap->free_chains[bucket];
 
-    if (!first_free) {
-        // Create a new bucket
-        first_free = heap_create_arena(heap, log2size);
+        if (!first_free) {
+            // Create a new bucket
+            first_free = heap_create_arena(heap, log2size);
+        }
+
+        // Remove block from chain
+        heap->free_chains[bucket] = (heap_hdr_t*)first_free->size_next;
+
+        mutex_unlock(&heap->lock);
     }
 
-    // Remove block from chain
-    heap->free_chains[bucket] = (heap_hdr_t*)first_free->size_next;
-
-    mutex_unlock(&heap->lock);
-    cpu_irq_toggle(intr_enabled);
-
-    if (first_free) {
+    if (likely(first_free)) {
         // Store size in header
         first_free->size_next = size;
+
+        assert(first_free->sig1 == HEAP_BLK_TYPE_FREE);
 
         first_free->sig1 = HEAP_BLK_TYPE_USED;
         first_free->sig2 = HEAP_BLK_TYPE_USED ^ (uint32_t)size;
@@ -241,7 +247,7 @@ void *heap_alloc(heap_t *heap, size_t size)
 
 void heap_free(heap_t *heap, void *block)
 {
-    if (!block)
+    if (unlikely(!block))
         return;
 
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
@@ -253,16 +259,15 @@ void heap_free(heap_t *heap, void *block)
     size_t bucket = log2size - 5;
 
     if (bucket < HEAP_BUCKET_COUNT) {
-        assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ (1 << log2size)));
+        assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ (1U << log2size)));
 
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
-        int intr_enabled = cpu_irq_disable();
+        cpu_scoped_irq_disable intr_was_enabled;
         mutex_lock(&heap->lock);
-        hdr->size_next = (uintptr_t)heap->free_chains[bucket];
+        hdr->size_next = uintptr_t(heap->free_chains[bucket]);
         heap->free_chains[bucket] = hdr;
         mutex_unlock(&heap->lock);
-        cpu_irq_toggle(intr_enabled);
     } else {
         heap_large_free(hdr, hdr->size_next);
     }    
@@ -273,7 +278,7 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
     if (block) {
         heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
         uint8_t newlog2size = bit_log2_n((int32_t)size);
-        size_t new_size = 1 << newlog2size;
+        size_t new_size = 1U << newlog2size;
         if (hdr->size_next < new_size) {
             void *new_block = heap_alloc(heap, size);
             memcpy(new_block, block, hdr->size_next);

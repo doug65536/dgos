@@ -35,6 +35,10 @@ entry:
 
 	pop %rax
 
+	# xsave-enable AVX on AP
+	mov $1,%edi
+	call idt_xsave_detect
+
 	# Align stack
 	xor %ebp,%ebp
 	push %rbp
@@ -98,6 +102,10 @@ entry:
 	call cpuid_init
 
 	call e9debug_init
+
+	# Must xsave-enable AVX ASAP if available
+	xor %edi,%edi
+	call idt_xsave_detect
 
 	xor %edi,%edi
 	call cpu_init

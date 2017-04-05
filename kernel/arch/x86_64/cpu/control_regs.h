@@ -468,6 +468,8 @@ static inline void *cpu_gs_read_ptr(void)
     __asm__ __volatile__ (
         "mov %%gs:0,%[ptr]\n\t"
         : [ptr] "=r" (ptr)
+        :
+        : "memory"
     );
     return ptr;
 }
@@ -521,14 +523,14 @@ static inline int cpu_irq_disable(void)
         "cli\n\t"
         : [rflags] "=r" (rflags)
         :
-        : "memory"
+        : "cc"
     );
     return ((rflags >> 9) & 1);
 }
 
 static inline void cpu_irq_enable(void)
 {
-    __asm__ __volatile__ ( "sti" : : : "memory" );
+    __asm__ __volatile__ ( "sti" : : : "cc" );
 }
 
 static inline void cpu_irq_toggle(int enable)
@@ -562,3 +564,28 @@ static inline uint64_t cpu_rdtsc(void)
     );
     return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
+
+//
+// C++ utilities
+
+class cpu_scoped_irq_disable
+{
+public:
+    cpu_scoped_irq_disable()
+        : intr_was_enabled(cpu_irq_disable())
+    {
+    }
+
+    ~cpu_scoped_irq_disable()
+    {
+        cpu_irq_toggle(intr_was_enabled);
+    }
+
+    operator bool() const
+    {
+        return intr_was_enabled;
+    }
+
+private:
+    bool intr_was_enabled;
+};

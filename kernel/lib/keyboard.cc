@@ -129,7 +129,7 @@ int keybd_event(keyboard_event_t event)
 keyboard_event_t keybd_waitevent(void)
 {
     keyboard_event_t event;
-    int intr_was_enabled = cpu_irq_disable();
+    cpu_scoped_irq_disable intr_was_enabled;
 
     mutex_lock(&keybd_buffer.lock);
 
@@ -142,7 +142,6 @@ keyboard_event_t keybd_waitevent(void)
     keybd_buffer.tail = keybd_queue_next(keybd_buffer.tail);
 
     mutex_unlock(&keybd_buffer.lock);
-    cpu_irq_toggle(intr_was_enabled);
 
     return event;
 }
