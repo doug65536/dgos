@@ -35,7 +35,7 @@ isr_entry_\int_num\():
 		.cfi_def_cfa_offset 24
 	.endif
 	push_cfi $\int_num
-	jmp isr_common
+    jmp 0f
 	.cfi_endproc
 .endm
 
@@ -170,7 +170,7 @@ isr_entry 0 74
 isr_entry 1 14
 
 .align 16
-isr_common:
+0:
 	.cfi_startproc
 	.cfi_def_cfa_offset 24
 
@@ -226,7 +226,7 @@ isr_common:
 
 	// Save entire sse/mmx/fpu state
 	jmp *sse_context_save
-isr_save_done:
+8:
 
 	// Make structure on the stack
 	push_cfi %rsp
@@ -261,7 +261,7 @@ isr_save_done:
 	// Pop the pointer to the general registers
 	pop_cfi %rsp
 	jmp *sse_context_restore
-isr_restore_done:
+9:
 
 	// See if we're returning to user code
 	cmpl $8,21*8(%rsp)
@@ -345,7 +345,7 @@ isr_restore_done:
 	add sse_context_size,%rdi
 	mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 1:
-	jmp isr_save_done
+    jmp 8b
 
 	// Out of line clear xsave header for recursive context save
 	.if \clear_hdr != 0
@@ -368,7 +368,7 @@ isr_restore_done:
 		mov %rdi,%rax
 		add sse_context_size,%rdi
 		mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
-		jmp isr_save_done
+        jmp 8b
 	.endif
 .endm
 
@@ -387,7 +387,7 @@ isr_restore_done:
 	mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
 	mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 
-	jmp isr_restore_done
+    jmp 9b
 .endm
 
 .align 16
