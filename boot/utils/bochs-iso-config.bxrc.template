@@ -19,11 +19,15 @@ ata2: enabled=0
 ata3: enabled=0
 pci: enabled=1, chipset=i440fx
 vga: extension=vbe, update_freq=5, realtime=1
-cpu: count=4:1:1, ips=40000000, quantum=1, model=bx_generic, reset_on_triple_fault=0, cpuid_limit_winnt=0, ignore_bad_msrs=0, mwait_is_nop=0
-cpuid: level=6, stepping=3, model=3, family=6, vendor_string="GenuineIntel", brand_string="              Intel(R) Pentium(R) 4 CPU        "
-cpuid: mmx=1, apic=xapic, simd=sse2, sse4a=1, misaligned_sse=0, sep=1, movbe=0, adx=0
-cpuid: aes=0, sha=0, xsave=1, xsaveopt=1, avx_f16c=0, avx_fma=0, bmi=0, xop=0, fma4=0
-cpuid: tbm=0, x86_64=1, 1g_pages=1, pcid=1, fsgsbase=1, smep=1, smap=1, mwait=1
+cpu: count=4:1:1, ips=40000000, quantum=1, model=bx_generic
+cpu: reset_on_triple_fault=0, cpuid_limit_winnt=0, ignore_bad_msrs=0
+cpu: mwait_is_nop=0
+cpuid: level=6, stepping=3, model=3, family=6, vendor_string="GenuineIntel",
+cpuid: brand_string="              Intel(R) Pentium(R) 4 CPU        "
+cpuid: mmx=1, apic=xapic, simd=avx2, sse4a=1, misaligned_sse=0, sep=1
+cpuid: movbe=0, adx=0, aes=0, sha=0, xsave=1, xsaveopt=1, avx_f16c=0
+cpuid: avx_fma=0, bmi=0, xop=0, fma4=0, tbm=0, x86_64=1, 1g_pages=1, pcid=1
+cpuid: fsgsbase=1, smep=1, smap=1, mwait=1
 print_timestamps: enabled=0
 debugger_log: -
 magic_break: enabled=0
@@ -34,7 +38,8 @@ clock: sync=none, time0=utc, rtc_sync=0
 # no loader
 log: -
 logprefix: %t%e%d
-debug: action=ignore, pci_ide=report, harddrv=report, atapi=report, pci_ide=report, cd1=report
+debug: action=ignore
+#, pci_ide=report, harddrv=report, atapi=report, pci_ide=report, cd1=report
 #, ioapic=report
 #, apic0=report, apic1=report
 info: action=report
