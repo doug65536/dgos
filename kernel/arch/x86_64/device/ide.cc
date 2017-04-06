@@ -304,9 +304,6 @@ static size_t ide_dev_count;
 // IORDY flow control supported
 #define ATA_IDENTIFY_CAPS1_IORDY    (1U<<ATA_IDENTIFY_CAPS1_IORDY_BIT)
 
-// DMA supported
-#define ATA_IDENTIFY_CAPS1_DMA      (1U<<ATA_IDENTIFY_CAPS1_DMA_BIT)
-
 //
 // Features
 
@@ -824,8 +821,7 @@ void ide_if_t::ide_chan_t::detect_devices()
                 break;
         }
 
-        if (unit.max_dma < 0 &&
-                (buf[ATA_IDENTIFY_CAPS1] & ATA_IDENTIFY_CAPS1_DMA)) {
+        if (unit.max_dma < 0) {
             // Look for old DMA
             dma_support = iface->bmdma_base
                     ? buf[ATA_IDENTIFY_OLD_DMA]
