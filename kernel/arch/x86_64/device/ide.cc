@@ -97,12 +97,18 @@ struct ide_if_t : public storage_if_base_t {
         ide_if_t *iface;
         int secondary;
 
-        uint32_t max_multiple;
-        uint16_t has_48bit;
-        ata_cmd read_command;
-        ata_cmd write_command;
-        int8_t max_dma;
-        int8_t old_dma;
+        struct unit_data_t {
+            uint32_t max_multiple;
+            uint16_t has_48bit;
+            ata_cmd read_command;
+            ata_cmd write_command;
+            int8_t max_dma;
+            int8_t old_dma;
+            int8_t iordy;
+        };
+
+        // Capabilities of master slave
+        unit_data_t unit_data[2];
 
         ide_chan_ports_t ports;
         int busy;
@@ -136,8 +142,8 @@ struct ide_if_t : public storage_if_base_t {
         inline void outb(ata_reg_ctl reg, uint8_t value);
 
         void set_drv(int slave);
-        void set_lba(uint64_t lba);
-        void set_count(int count);
+        void set_lba(unit_data_t &unit, uint64_t lba);
+        void set_count(unit_data_t &unit, int count);
         void set_feature(uint8_t feature, uint8_t p1 = 0, uint8_t p2 = 0,
                          uint8_t p3 = 0, uint8_t p4 = 0);
         uint8_t wait_not_bsy();
@@ -146,6 +152,10 @@ struct ide_if_t : public storage_if_base_t {
         void issue_packet_read(uint64_t lba, uint32_t count,
                                uint16_t burst_len, int use_dma);
         void set_irq_enable(int enable);
+
+        void pio_read_data(unit_data_t &unit, void *buf, size_t bytes);
+        void pio_write_data(unit_data_t &unit, void const *buf, size_t bytes);
+
         void hex_dump(void const *mem, size_t size);
 
         int64_t io(void *data, int64_t count, uint64_t lba,
@@ -282,10 +292,20 @@ static size_t ide_dev_count;
 // Identify response
 
 #define ATA_IDENTIFY_MAX_MULTIPLE   47
+#define ATA_IDENTIFY_CAPS1          48
 #define ATA_IDENTIFY_OLD_DMA        63
 #define ATA_IDENTIFY_CMD_SETS_2     83
 #define ATA_IDENTIFY_VALIDITY       53
 #define ATA_IDENTIFY_UDMA_SUPPORT   88
+
+#define ATA_IDENTIFY_CAPS1_IORDY_BIT    11
+#define ATA_IDENTIFY_CAPS1_DMA_BIT      8
+
+// IORDY flow control supported
+#define ATA_IDENTIFY_CAPS1_IORDY    (1U<<ATA_IDENTIFY_CAPS1_IORDY_BIT)
+
+// DMA supported
+#define ATA_IDENTIFY_CAPS1_DMA      (1U<<ATA_IDENTIFY_CAPS1_DMA_BIT)
 
 //
 // Features
@@ -544,6 +564,35 @@ void ide_if_t::ide_chan_t::set_irq_enable(int enable)
              enable ? 0 : ATA_REG_CONTROL_nIEN));
 }
 
+void ide_if_t::ide_chan_t::pio_read_data(unit_data_t &unit,
+                                         void *buf, size_t bytes)
+{
+    if (likely(unit.iordy)) {
+        insw(ata_reg_cmd::DATA, buf, bytes / sizeof(uint16_t));
+    } else {
+        uint16_t *out = (uint16_t*)buf;
+        while (bytes >= 2) {
+            wait_drq();
+            *out++ = inw(ata_reg_cmd::DATA);
+            bytes -= 2;
+        }
+    }
+}
+
+void ide_if_t::ide_chan_t::pio_write_data(unit_data_t &unit, void const *buf, size_t bytes)
+{
+    if (likely(unit.iordy)) {
+        outsw(ata_reg_cmd::DATA, buf, bytes / sizeof(uint16_t));
+    } else {
+        uint16_t *in = (uint16_t*)buf;
+        while (bytes >= 2) {
+            wait_drq();
+            outw(ata_reg_cmd::DATA, *in++);
+            bytes -= 2;
+        }
+    }
+}
+
 void ide_if_t::ide_chan_t::hex_dump(void const *mem, size_t size)
 {
     uint8_t *buf = (uint8_t*)mem;
@@ -580,11 +629,11 @@ void ide_if_t::ide_chan_t::set_drv(int slave)
          ATA_REG_HDDEVSEL_LBA));
 }
 
-void ide_if_t::ide_chan_t::set_lba(uint64_t lba)
+void ide_if_t::ide_chan_t::set_lba(unit_data_t &unit, uint64_t lba)
 {
     assert(lba < (uint64_t(1) << (6*8)));
 
-    if (has_48bit) {
+    if (unit.has_48bit) {
         outb(ata_reg_cmd::LBA0, (lba >> (3*8)) & 0xFF);
         outb(ata_reg_cmd::LBA1, (lba >> (4*8)) & 0xFF);
         outb(ata_reg_cmd::LBA2, (lba >> (5*8)) & 0xFF);
@@ -594,10 +643,10 @@ void ide_if_t::ide_chan_t::set_lba(uint64_t lba)
     outb(ata_reg_cmd::LBA2, (lba >> (2*8)) & 0xFF);
 }
 
-void ide_if_t::ide_chan_t::set_count(int count)
+void ide_if_t::ide_chan_t::set_count(unit_data_t &unit, int count)
 {
-    assert(count <= ((has_48bit && max_multiple > 1) ? 65536 : 256));
-    if (has_48bit)
+    assert(count <= ((unit.has_48bit && unit.max_multiple > 1) ? 65536 : 256));
+    if (unit.has_48bit)
         outb(ata_reg_cmd::SECCOUNT0, (count >> (1*8)) & 0xFF);
     outb(ata_reg_cmd::SECCOUNT0, (count >> (0*8)) & 0xFF);
 }
@@ -647,6 +696,8 @@ void ide_if_t::ide_chan_t::detect_devices()
     IDE_TRACE("Detecting IDE devices\n");
 
     for (int slave = 0; slave < 2; ++slave) {
+        unit_data_t &unit = unit_data[slave];
+
         // Wait for not busy
         uint8_t status = wait_not_bsy();
 
@@ -658,7 +709,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         // Set LBA to zero for ATAPI detection later
         set_drv(slave);
-        set_lba(0);
+        set_lba(unit, 0);
         set_irq_enable(0);
 
         IDE_TRACE("if=%d, dev=%d, issuing IDENTIFY\n", secondary, slave);
@@ -741,18 +792,21 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         // Read IDENTIFY data
         memset(buf, 0, 512);
-        insw(ata_reg_cmd::DATA, buf, 512 / sizeof(uint16_t));
+        pio_read_data(unit, buf, 512);
         hex_dump(buf, 512);
 
-        max_multiple = buf[ATA_IDENTIFY_MAX_MULTIPLE] & 0xFF;
+        unit.iordy = ((buf[ATA_IDENTIFY_CAPS1] &
+                       ATA_IDENTIFY_CAPS1_IORDY) != 0);
 
-        if (max_multiple == 0)
-            max_multiple = 1;
+        unit.max_multiple = buf[ATA_IDENTIFY_MAX_MULTIPLE] & 0xFF;
 
-        has_48bit = (buf[ATA_IDENTIFY_CMD_SETS_2] >> 10) & 1;
+        if (unit.max_multiple == 0)
+            unit.max_multiple = 1;
+
+        unit.has_48bit = (buf[ATA_IDENTIFY_CMD_SETS_2] >> 10) & 1;
 
         IDE_TRACE("if=%d, dev=%d, has_48bit=%d\n",
-                  secondary, slave, has_48bit);
+                  secondary, slave, unit.has_48bit);
 
         // Force dma_support to 0 if interface does not support UDMA,
         // otherwise, force dma_support to 0 if validity bit does not report
@@ -765,69 +819,70 @@ void ide_if_t::ide_chan_t::detect_devices()
                 : 0;
 
         // Look for highest supported UDMA
-        for (max_dma = 5; max_dma >= 0; --max_dma) {
-            if (dma_support & (1 << max_dma))
+        for (unit.max_dma = 5; unit.max_dma >= 0; --unit.max_dma) {
+            if (dma_support & (1 << unit.max_dma))
                 break;
         }
 
-        if (max_dma < 0) {
+        if (unit.max_dma < 0 &&
+                (buf[ATA_IDENTIFY_CAPS1] & ATA_IDENTIFY_CAPS1_DMA)) {
             // Look for old DMA
             dma_support = iface->bmdma_base
                     ? buf[ATA_IDENTIFY_OLD_DMA]
                     : 0;
 
-            for (max_dma = 2; max_dma >= 0; --max_dma) {
-                if (dma_support & (1 << max_dma))
+            for (unit.max_dma = 2; unit.max_dma >= 0; --unit.max_dma) {
+                if (dma_support & (1 << unit.max_dma))
                     break;
             }
 
-            if (max_dma >= 0)
-                old_dma = 1;
+            if (unit.max_dma >= 0)
+                unit.old_dma = 1;
         }
 
         delete[] buf;
 
-        IDE_TRACE("if=%d, dev=%d, max_dma=%d\n", secondary, slave, max_dma);
+        IDE_TRACE("if=%d, dev=%d, max_dma=%d\n", secondary, slave, unit.max_dma);
 
-        if (has_48bit) {
-            if (max_dma >= 0) {
-                read_command = ata_cmd::READ_DMA_EXT;
-                write_command = ata_cmd::WRITE_DMA_EXT;
-                max_multiple = 65536;
-            } else if (max_multiple > 1) {
-                read_command = ata_cmd::READ_MULT_PIO_EXT;
-                write_command = ata_cmd::WRITE_MULT_PIO_EXT;
+        if (unit.has_48bit) {
+            if (unit.max_dma >= 0) {
+                unit.read_command = ata_cmd::READ_DMA_EXT;
+                unit.write_command = ata_cmd::WRITE_DMA_EXT;
+                unit.max_multiple = 65536;
+            } else if (unit.max_multiple > 1) {
+                unit.read_command = ata_cmd::READ_MULT_PIO_EXT;
+                unit.write_command = ata_cmd::WRITE_MULT_PIO_EXT;
             } else {
-                read_command = ata_cmd::READ_PIO_EXT;
-                write_command = ata_cmd::WRITE_PIO_EXT;
+                unit.read_command = ata_cmd::READ_PIO_EXT;
+                unit.write_command = ata_cmd::WRITE_PIO_EXT;
             }
         } else {
-            if (max_dma >= 0) {
-                read_command = ata_cmd::READ_DMA;
-                write_command = ata_cmd::WRITE_DMA;
-                max_multiple = 256;
-            } else if (max_multiple > 1) {
-                read_command = ata_cmd::READ_MULT_PIO;
-                write_command = ata_cmd::WRITE_MULT_PIO;
+            if (unit.max_dma >= 0) {
+                unit.read_command = ata_cmd::READ_DMA;
+                unit.write_command = ata_cmd::WRITE_DMA;
+                unit.max_multiple = 256;
+            } else if (unit.max_multiple > 1) {
+                unit.read_command = ata_cmd::READ_MULT_PIO;
+                unit.write_command = ata_cmd::WRITE_MULT_PIO;
             } else {
-                read_command = ata_cmd::READ_PIO;
-                write_command = ata_cmd::WRITE_PIO;
+                unit.read_command = ata_cmd::READ_PIO;
+                unit.write_command = ata_cmd::WRITE_PIO;
             }
         }
 
-        if (max_dma >= 0) {
+        if (unit.max_dma >= 0) {
             wait_not_bsy();
 
-            if (!old_dma) {
+            if (!unit.old_dma) {
                 // Enable UDMA
                 IDE_TRACE("if=%d, dev=%d, enabling UDMA\n", secondary, slave);
                 set_feature(ATA_FEATURE_XFER_MODE,
-                            ATA_FEATURE_XFER_MODE_UDMA_n(max_dma));
+                            ATA_FEATURE_XFER_MODE_UDMA_n(unit.max_dma));
             } else {
                 // Enable MWDMA
                 IDE_TRACE("if=%d, dev=%d, enabling MWDMA\n", secondary, slave);
                 set_feature(ATA_FEATURE_XFER_MODE,
-                            ATA_FEATURE_XFER_MODE_MWDMA_n(max_dma));
+                            ATA_FEATURE_XFER_MODE_MWDMA_n(unit.max_dma));
             }
 
             // Allocate page for PRD list
@@ -838,15 +893,15 @@ void ide_if_t::ide_chan_t::detect_devices()
             dma_prd_physaddr = mphysaddr(dma_prd);
 
             // Allocate bounce buffer for DMA
-            dma_bounce = mmap(0, max_multiple * sector_size,
+            dma_bounce = mmap(0, unit.max_multiple * sector_size,
                               PROT_READ | PROT_WRITE,
                               MAP_32BIT | MAP_POPULATE, -1, 0);
-            io_window = mmap_window(max_multiple * sector_size);
+            io_window = mmap_window(unit.max_multiple * sector_size);
 
             // Get list of physical address ranges for io_window
             size_t range_count = mphysranges(
                         io_window_ranges, countof(io_window_ranges),
-                        dma_bounce, max_multiple * sector_size, 65536);
+                        dma_bounce, unit.max_multiple * sector_size, 65536);
 
             range_count = mphysranges_split(
                         io_window_ranges, range_count,
@@ -863,12 +918,12 @@ void ide_if_t::ide_chan_t::detect_devices()
             assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
             iface->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
                             (uint32_t)dma_prd_physaddr);
-        } else if (max_multiple > 1) {
+        } else if (unit.max_multiple > 1) {
             IDE_TRACE("if=%d, dev=%d, enabling MULTIPLE\n", secondary, slave);
 
             wait_not_bsy();
-            set_count(max_multiple);
-            set_lba(0);
+            set_count(unit, unit.max_multiple);
+            set_lba(unit, 0);
             issue_command(ata_cmd::SET_MULTIPLE);
             status = wait_not_bsy();
 
@@ -876,7 +931,7 @@ void ide_if_t::ide_chan_t::detect_devices()
                 IDE_TRACE("Set multiple command failed\n");
             }
 
-            io_window = mmap_window(max_multiple * sector_size);
+            io_window = mmap_window(unit.max_multiple * sector_size);
         } else {
             IDE_TRACE("if=%d, dev=%d, single sector (old)\n", secondary, slave);
 
@@ -989,15 +1044,17 @@ int64_t ide_if_t::ide_chan_t::io(
         void *data, int64_t count, uint64_t lba,
         int slave, int is_atapi, int is_read)
 {
+    unit_data_t &unit = unit_data[slave];
+
     int err = 0;
 
     if (unlikely(count == 0))
         return err;
 
-    int sector_size = !is_atapi ? 512 : 2048;
+    uint8_t log2_sector_size = !is_atapi ? 9 : 11;
 
     IDE_TRACE("Read lba=%lu, max_multiple=%u, count=%ld\n",
-              lba, max_multiple, count);
+              lba, unit.max_multiple, count);
 
     int64_t read_count = 0;
 
@@ -1009,21 +1066,21 @@ int64_t ide_if_t::ide_chan_t::io(
 
     for (int64_t count_base = 0;
          err == 0 && count_base < count;
-         count_base += max_multiple) {
-        unsigned sub_count = count - count_base;
+         count_base += unit.max_multiple) {
+        uint32_t sub_count = count - count_base;
 
-        if (sub_count > max_multiple)
-            sub_count = max_multiple;
+        if (sub_count > unit.max_multiple)
+            sub_count = unit.max_multiple;
 
         IDE_TRACE("sub_count=%u\n", sub_count);
 
-        size_t sub_size = sector_size * sub_count;
+        uint32_t sub_size = sub_count << log2_sector_size;
 
         mutex_lock(&lock);
         io_done = 0;
         mutex_unlock(&lock);
 
-        if (max_dma >= 0) {
+        if (unit.max_dma >= 0) {
             iface->bmdma_acquire();
 
             // Set PRD address register
@@ -1033,16 +1090,17 @@ int64_t ide_if_t::ide_chan_t::io(
         }
 
         if (!is_atapi) {
-            set_lba(lba + count_base);
-            set_count(sub_count);
-            issue_command(is_read ? read_command : write_command);
+            set_lba(unit, lba + count_base);
+            set_count(unit, sub_count);
+            issue_command(is_read ? unit.read_command : unit.write_command);
         } else {
-            issue_packet_read(lba + count_base, sub_count, 2048, max_dma >= 0);
+            issue_packet_read(lba + count_base, sub_count, 2048,
+                              unit.max_dma >= 0);
         }
 
         size_t io_window_misalignment = (uintptr_t)data & ~(int)-PAGESIZE;
 
-        if (max_dma >= 0) {
+        if (unit.max_dma >= 0) {
             IDE_TRACE("Starting DMA\n");
 
             // Program DMA reads or writes and start DMA
@@ -1070,7 +1128,7 @@ int64_t ide_if_t::ide_chan_t::io(
             err = 1;
         }
 
-        if (max_dma >= 0) {
+        if (unit.max_dma >= 0) {
             // Must read status register to synchronize with bus master
             IDE_TRACE("Reading DMA status\n");
             uint8_t bmdma_status = iface->bmdma_inb(
@@ -1093,7 +1151,7 @@ int64_t ide_if_t::ide_chan_t::io(
                        dma_bounce, sub_size);
             }
         } else {
-            size_t adj_size = (sub_size) + io_window_misalignment;
+            size_t adj_size = sub_size + io_window_misalignment;
             char *aligned_addr = (char*)data - io_window_misalignment;
 
             size_t ranges_count = mphysranges(
@@ -1103,9 +1161,14 @@ int64_t ide_if_t::ide_chan_t::io(
             alias_window(io_window, sub_size,
                          io_window_ranges, ranges_count);
 
-            IDE_TRACE("Reading PIO data\n");
-            insw(ata_reg_cmd::DATA, (char*)io_window + io_window_misalignment,
-                 (sector_size >> 1) * sub_count);
+            IDE_TRACE("Transferring PIO data\n");
+            if (is_read) {
+                pio_read_data(unit, (char*)io_window + io_window_misalignment,
+                              sub_count << log2_sector_size);
+            } else {
+                pio_write_data(unit, (char*)io_window + io_window_misalignment,
+                               sub_count << log2_sector_size);
+            }
         }
 
         //hex_dump(data, sub_size);
@@ -1116,7 +1179,7 @@ int64_t ide_if_t::ide_chan_t::io(
         read_count += sub_count;
     }
 
-    alias_window(io_window, max_multiple * sector_size, nullptr, 0);
+    alias_window(io_window, unit.max_multiple << log2_sector_size, nullptr, 0);
 
     release_access(intr_was_enabled);
 
