@@ -91,7 +91,7 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    Elf64_Shdr *scn_hdrs = (Elf64_Shdr *)malloc(scn_hdr_size);
+    unique_ptr<Elf64_Shdr> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
 
     if (scn_hdr_size != file_pread(
                 fd, scn_hdrs, scn_hdr_size,
