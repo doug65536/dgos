@@ -54,6 +54,8 @@ QEMU_TCG := -cpu kvm64
 QEMU_ISO_DEPS := $(ISO_FILE)
 QEMU_FAT_DEPS := debuggable-kernel-disk $(DISKIMAGE)
 
+BOCHS_FLAGS :=
+
 monitor-debug-output:
 	while true; do cat dump/qemu-debug-out; done
 
@@ -434,27 +436,27 @@ $(BINDIR)/bochs-fat-config.bxrc: utils/bochs-fat-config.bxrc.template
 		$(SED) "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
 debug-iso-bochs: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
-	$(BOCHS) \
+	$(BOCHS) $(BOCHS_FLAGS) \
 		-qf $(BINDIR)/bochs-iso-config.bxrc \
 		-rc utils/bochs-debugger-commands
 
 debug-fat-bochs: all bochs-symbols iso $(BINDIR)/bochs-fat-config.bxrc
-	$(BOCHS) \
+	$(BOCHS) $(BOCHS_FLAGS) \
 		-qf $(BINDIR)/bochs-fat-config.bxrc \
 		-rc utils/bochs-debugger-commands
 
 debug-iso-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
-	$(BOCHS) \
+	$(BOCHS) $(BOCHS_FLAGS) \
 		-qf $(BINDIR)/bochs-iso-config.bxrc \
 		-rc utils/bochs-debugger-boot-commands
 
 debug-fat-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-fat-config.bxrc
-	$(BOCHS) \
+	$(BOCHS) $(BOCHS_FLAGS) \
 		-qf $(BINDIR)/bochs-fat-config.bxrc \
 		-rc utils/bochs-debugger-boot-commands
 
 run-iso-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-iso-config.bxrc
-	$(BOCHS) -qf $(BINDIR)/bochs-iso-config.bxrc -q
+	$(BOCHS) $(BOCHS_FLAGS) -qf $(BINDIR)/bochs-iso-config.bxrc -q
 
 run-fat-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-fat-config.bxrc
-	$(BOCHS) -qf $(BINDIR)/bochs-fat-config.bxrc -q
+	$(BOCHS) $(BOCHS_FLAGS) -qf $(BINDIR)/bochs-fat-config.bxrc -q
