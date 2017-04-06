@@ -20,29 +20,43 @@
 #define AHCI_TRACE(...) ((void)0)
 #endif
 
-enum ata_cmd_t {
-    ATA_CMD_READ_PIO        = 0x20,
-    ATA_CMD_READ_PIO_EXT    = 0x24,
+enum ata_cmd_t : uint8_t {
+    // 24-bit PIO
+    ATA_CMD_READ_PIO            = 0x20,
+    ATA_CMD_WRITE_PIO           = 0x30,
 
-    ATA_CMD_READ_DMA        = 0xC8,
-    ATA_CMD_READ_DMA_EXT    = 0x25,
+    // 48-bit PIO
+    ATA_CMD_READ_PIO_EXT        = 0x24,
+    ATA_CMD_WRITE_PIO_EXT       = 0x34,
 
-    ATA_CMD_WRITE_PIO       = 0x30,
-    ATA_CMD_WRITE_PIO_EXT   = 0x34,
+    // 24-bit DMA
+    ATA_CMD_READ_DMA            = 0xC8,
+    ATA_CMD_WRITE_DMA           = 0xCA,
 
-    ATA_CMD_WRITE_DMA       = 0xCA,
-    ATA_CMD_WRITE_DMA_EXT   = 0x35,
+    // 48-bit DMA
+    ATA_CMD_READ_DMA_EXT        = 0x25,
+    ATA_CMD_WRITE_DMA_EXT       = 0x35,
 
-    ATA_CMD_READ_DMA_NCQ    = 0x60,
-    ATA_CMD_WRITE_DMA_NCQ   = 0x61,
+    // 24-bit NCQ DMA
+    ATA_CMD_READ_DMA_NCQ        = 0x60,
+    ATA_CMD_WRITE_DMA_NCQ       = 0x61,
 
-    ATA_CMD_CACHE_FLUSH     = 0xE7,
-    ATA_CMD_CACHE_FLUSH_EXT = 0xEA,
+    // 48-bit NCQ DMA
+    ATA_CMD_READ_DMA_NCQ_EXT    = 0x26,
+    ATA_CMD_WRITE_DMA_NCQ_EXT   = 0x36,
 
-    ATA_CMD_PACKET          = 0xA0,
-    ATA_CMD_IDENTIFY_PACKET = 0xA1,
+    // 24-bit cache flush
+    ATA_CMD_CACHE_FLUSH         = 0xE7,
 
-    ATA_CMD_IDENTIFY        = 0xEC
+    // 48-bit cache flush
+    ATA_CMD_CACHE_FLUSH_EXT     = 0xEA,
+
+    // Read drive capabilities
+    ATA_CMD_IDENTIFY            = 0xEC,
+    ATA_CMD_IDENTIFY_PACKET     = 0xA1,
+
+    // ATAPI command packet
+    ATA_CMD_PACKET              = 0xA0,
 };
 
 enum ahci_fis_type_t {
