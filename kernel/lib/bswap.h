@@ -74,6 +74,15 @@ static inline uint64_t be64toh(uint64_t n)
     return bswap_64(n);
 }
 
+
+static inline void htons_buf(void *buf, size_t bytes)
+{
+    uint16_t *w = (uint16_t*)buf;
+    size_t count = bytes / sizeof(uint16_t);
+    for (size_t i = 0; i < count; ++i)
+        w[i] = bswap_16(w[i]);
+}
+
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 
 static inline uint16_t htons(uint16_t n)
@@ -104,6 +113,10 @@ static inline uint32_t ntohl(uint32_t n)
 static inline uint64_t be64toh(uint64_t n)
 {
     return n;
+}
+
+static inline void htons_buf(void *, size_t)
+{
 }
 
 #else

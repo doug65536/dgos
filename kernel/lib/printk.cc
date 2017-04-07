@@ -953,17 +953,58 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
     return write_debug_str(s, ch);
 }
 
-EXPORT void vprintdbg(char const *format, va_list ap)
+EXPORT int vprintdbg(char const *format, va_list ap)
 {
     //spinlock_hold_t hold = printdbg_lock_noirq();
-    formatter(format, ap, printdbg_emit_chars, 0);
+    return formatter(format, ap, printdbg_emit_chars, 0);
     //printdbg_unlock_noirq(&hold);
 }
 
-EXPORT void printdbg(char const *format, ...)
+EXPORT int printdbg(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
-    vprintdbg(format, ap);
+    int result = vprintdbg(format, ap);
     va_end(ap);
+    return result;
+}
+
+static int hex_dump_formatter(void const *mem, size_t size,
+                              int (*output)(char const *format, ...))
+{
+    uint8_t *buf = (uint8_t*)mem;
+    char line_buf[8 + 1 + 1 + 3*16 + 1 + 16 + 2];
+    int written = 0;
+
+    int line_ofs;
+    for (size_t i = 0; i < size; ++i) {
+        if (!(i & 15)) {
+            line_ofs = snprintf(line_buf, sizeof(line_buf), "%08zx: ", i);
+        }
+
+        line_ofs += snprintf(line_buf + line_ofs,
+                             sizeof(line_buf) - line_ofs,
+                             "%02x ", buf[i]);
+
+        if ((i & 15) == 15) {
+            line_buf[line_ofs++] = ' ';
+
+            for (int k = -15; k <= 0; ++k)
+                line_buf[line_ofs++] =
+                        buf[i + k] < ' ' ? '.' : buf[i + k];
+
+            line_buf[line_ofs++] = '\n';
+            line_buf[line_ofs++] = 0;
+            int write_size = output("%s", line_buf);
+            if (write_size < 0)
+                return -1;
+            written += write_size;
+        }
+    }
+    return written;
+}
+
+int hex_dump(void const *mem, size_t size)
+{
+    return hex_dump_formatter(mem, size, printdbg);
 }

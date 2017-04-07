@@ -12,6 +12,7 @@ arch/x86_64/cpu/isr_constants.h
 arch/x86_64/cpu/math.cc
 arch/x86_64/cpu/nontemporal.cc
 arch/x86_64/cpu/nontemporal.h
+arch/x86_64/device/ata_decl.h
 arch/x86_64/device/usb_xhci.cc
 arch/x86_64/elf64.cc
 arch/x86_64/elf64.h

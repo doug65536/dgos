@@ -1,4 +1,5 @@
 #include "dev_storage.h"
+#include "ata_decl.h"
 #include "device/pci.h"
 #include "irq.h"
 #include "printk.h"
@@ -19,45 +20,6 @@
 #else
 #define AHCI_TRACE(...) ((void)0)
 #endif
-
-enum ata_cmd_t : uint8_t {
-    // 24-bit PIO
-    ATA_CMD_READ_PIO            = 0x20,
-    ATA_CMD_WRITE_PIO           = 0x30,
-
-    // 48-bit PIO
-    ATA_CMD_READ_PIO_EXT        = 0x24,
-    ATA_CMD_WRITE_PIO_EXT       = 0x34,
-
-    // 24-bit DMA
-    ATA_CMD_READ_DMA            = 0xC8,
-    ATA_CMD_WRITE_DMA           = 0xCA,
-
-    // 48-bit DMA
-    ATA_CMD_READ_DMA_EXT        = 0x25,
-    ATA_CMD_WRITE_DMA_EXT       = 0x35,
-
-    // 24-bit NCQ DMA
-    ATA_CMD_READ_DMA_NCQ        = 0x60,
-    ATA_CMD_WRITE_DMA_NCQ       = 0x61,
-
-    // 48-bit NCQ DMA
-    ATA_CMD_READ_DMA_NCQ_EXT    = 0x26,
-    ATA_CMD_WRITE_DMA_NCQ_EXT   = 0x36,
-
-    // 24-bit cache flush
-    ATA_CMD_CACHE_FLUSH         = 0xE7,
-
-    // 48-bit cache flush
-    ATA_CMD_CACHE_FLUSH_EXT     = 0xEA,
-
-    // Read drive capabilities
-    ATA_CMD_IDENTIFY            = 0xEC,
-    ATA_CMD_IDENTIFY_PACKET     = 0xA1,
-
-    // ATAPI command packet
-    ATA_CMD_PACKET              = 0xA0,
-};
 
 enum ahci_fis_type_t {
     // Register FIS - host to device
@@ -94,14 +56,14 @@ struct ahci_fis_h2d_t {
     uint8_t ctl;
 
     // Command register
-    uint8_t command;
+    ata_cmd_t command;
 
     // Feature register, 7:0
     uint8_t feature_lo;
 
 
     // LBA low register, 7:0
-    uint8_t lba0;
+    uint8_t _lba0;
 
     // LBA mid register, 15:8
     uint8_t lba1;
@@ -136,7 +98,24 @@ struct ahci_fis_h2d_t {
 
     // Reserved
     uint8_t rsv1[4];
+
+    inline void set_lba(uint64_t lba)
+    {
+        _lba0 = (lba >> (0*8)) & 0xFF;
+        lba1 = (lba >> (0*8)) & 0xFF;
+        lba2 = (lba >> (0*8)) & 0xFF;
+        lba3 = (lba >> (0*8)) & 0xFF;
+        lba4 = (lba >> (0*8)) & 0xFF;
+        lba5 = (lba >> (0*8)) & 0xFF;
+    }
+
+    inline void set_count(uint32_t new_count)
+    {
+        count = new_count;
+    }
 };
+
+C_ASSERT(sizeof(ahci_fis_h2d_t) == 20);
 
 #define AHCI_FIS_CTL_PORTMUX_BIT    0
 #define AHCI_FIS_CTL_PORTMUX_BITS   4
@@ -157,7 +136,7 @@ struct ahci_fis_ncq_t {
     uint8_t ctl;
 
     // Command register
-    uint8_t command;
+    ata_cmd_t command;
 
     // Count register, 7:0
     uint8_t count_lo;
@@ -200,6 +179,22 @@ struct ahci_fis_ncq_t {
 
     // Auxiliary
     uint32_t aux;
+
+    inline void set_lba(uint64_t lba)
+    {
+        lba0 = (lba >> (0*8)) & 0xFF;
+        lba1 = (lba >> (0*8)) & 0xFF;
+        lba2 = (lba >> (0*8)) & 0xFF;
+        lba3 = (lba >> (0*8)) & 0xFF;
+        lba4 = (lba >> (0*8)) & 0xFF;
+        lba5 = (lba >> (0*8)) & 0xFF;
+    }
+
+    inline void set_count(uint32_t count)
+    {
+        count_lo = (count >> (0*8)) & 0xFFFF;
+        count_hi = (count >> (1*8)) & 0xFFFF;
+    }
 };
 
 //
@@ -1102,7 +1097,7 @@ union hba_cmd_cfis_t {
 // 4.2.3 1KB command
 struct hba_cmd_tbl_ent_t {
     hba_cmd_cfis_t cfis;
-    char atapi_fis[16];
+    atapi_fis_t atapi_fis;
     char filler[0x80-0x50];
 
     // At offset 0x80
@@ -1176,8 +1171,8 @@ struct ahci_if_t : public storage_if_base_t {
     int acquire_slot(int port_num);
 
     void cmd_issue(int port_num, unsigned slot,
-                   hba_cmd_cfis_t *cfis, void *atapi_fis,
-                   size_t fis_size, hba_prdt_ent_t *prdts,
+                   hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
+                   size_t fis_size, hba_prdt_ent_t const *prdts,
                    size_t ranges_count, int is_read,
                    async_callback_fn_t callback, int done,
                    uintptr_t callback_arg);
@@ -1305,9 +1300,8 @@ void ahci_if_t::handle_port_irqs(int port_num)
         for (uint32_t done_slots = pi->cmd_issued &
              (pi->cmd_issued ^ port->sata_act);
              done_slots; done_slots &= ~(1U << slot)) {
-            slot = bit_lsb_set_32(done_slots);
+            slot = bit_lsb_set(done_slots);
 
-            // FIXME: check error
             int error = (port->sata_err != 0);
             assert(error == 0);
 
@@ -1452,8 +1446,8 @@ void ahci_if_t::port_start_all()
 
 void ahci_if_t::cmd_issue(
         int port_num, unsigned slot,
-        hba_cmd_cfis_t *cfis, void *atapi_fis,
-        size_t fis_size, hba_prdt_ent_t *prdts, size_t ranges_count,
+        hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
+        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count,
         int is_read, async_callback_fn_t callback,
         int done, uintptr_t callback_arg)
 {
@@ -1469,10 +1463,8 @@ void ahci_if_t::cmd_issue(
 
     memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
 
-    if (atapi_fis) {
-        memcpy(cmd_tbl_ent->atapi_fis, atapi_fis,
-               sizeof(cmd_tbl_ent->atapi_fis));
-    }
+    if (atapi_fis)
+        cmd_tbl_ent->atapi_fis = *atapi_fis;
 
     cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
             (!is_read ? AHCI_CH_WR : 0) |
@@ -1517,8 +1509,8 @@ void ahci_if_t::init(const pci_dev_iterator_t &pci_iter)
                           AHCI_HC_CAP_NCS_MASK);
 
     use_64 = !!(mmio_base->cap & AHCI_HC_CAP_S64A);
-    //use_ncq = !!(mmio_base->cap & AHCI_HC_CAP_SNCQ);
-    use_ncq = 0;
+    use_ncq = !!(mmio_base->cap & AHCI_HC_CAP_SNCQ);
+    //use_ncq = 0;
 
     rebase();
 
@@ -1585,38 +1577,19 @@ void ahci_if_t::rw(int port_num, uint64_t lba,
 
         memset(&cfis, 0, sizeof(cfis));
 
-        uint8_t atapifis[16];
+        atapi_fis_t atapifis;
 
         if (pi->is_atapi) {
-            atapifis[0] = 0xA8;
-            atapifis[1] = 0;
-            atapifis[2] = (lba >> 24) & 0xFF;
-            atapifis[3] = (lba >> 16) & 0xFF;
-            atapifis[4] = (lba >>  8) & 0xFF;
-            atapifis[5] = (lba >>  0) & 0xFF;
-            atapifis[6] = (transferred_blocks >> 24) & 0xFF;
-            atapifis[7] = (transferred_blocks >> 16) & 0xFF;
-            atapifis[8] = (transferred_blocks >>  8) & 0xFF;
-            atapifis[9] = (transferred_blocks >>  0) & 0xFF;
-            atapifis[10] = 0;
-            atapifis[11] = 0;
-
-            atapifis[12] = 0;
-            atapifis[13] = 0;
-            atapifis[14] = 0;
-            atapifis[15] = 0;
+            atapifis.set(0xA8, lba, transferred_blocks, 1);
 
             fis_size = sizeof(cfis.h2d);
 
             cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
-            cfis.h2d.command = ATA_CMD_PACKET;
+            cfis.h2d.command = ata_cmd_t::PACKET;
             cfis.h2d.feature_lo = 1;    // DMA
-            cfis.h2d.lba0 = 0;
-            cfis.h2d.lba2 = 0;
-            cfis.h2d.lba3 = 2048 >> 8;
-            cfis.h2d.lba5 = 0;
-            cfis.h2d.count = 0;
+            cfis.h2d.set_count(0);
+            cfis.h2d.set_lba(2048 << 16);
 
             // LBA
             cfis.d2h.device = 0;
@@ -1626,14 +1599,10 @@ void ahci_if_t::rw(int port_num, uint64_t lba,
             cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
             cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
             cfis.ncq.command = is_read
-                    ? ATA_CMD_READ_DMA_NCQ
-                    : ATA_CMD_WRITE_DMA_NCQ;
-            cfis.ncq.lba0 = lba & 0xFFFF;
-            cfis.ncq.lba2 = (lba >> 16) & 0xFF;
-            cfis.ncq.lba3 = (lba >> 24) & 0xFFFF;
-            cfis.ncq.lba5 = (lba >> 40);
-            cfis.ncq.count_lo = transferred_blocks & 0xFF;
-            cfis.ncq.count_hi = (transferred_blocks >> 8) & 0xFF;
+                    ? ata_cmd_t::READ_DMA_NCQ_EXT
+                    : ata_cmd_t::WRITE_DMA_NCQ_EXT;
+            cfis.ncq.set_lba(lba);
+            cfis.ncq.set_count(transferred_blocks);
             cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
             cfis.ncq.fua = AHCI_FIS_FUA_LBA |
                     (!is_read ? AHCI_FIS_FUA_FUA : 0);
@@ -1645,16 +1614,11 @@ void ahci_if_t::rw(int port_num, uint64_t lba,
             cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
             cfis.h2d.command = is_read
-                    ? ATA_CMD_READ_DMA_EXT
-                    : ATA_CMD_WRITE_DMA_EXT;
-            assert(lba < 0x1000000000000L);
-            cfis.h2d.lba0 = lba & 0xFF;
-            cfis.h2d.lba1 = (lba >> 8) & 0xFF;
-            cfis.h2d.lba2 = (lba >> 16) & 0xFF;
-            cfis.h2d.lba3 = (lba >> 24) & 0xFF;
-            cfis.h2d.lba4 = (lba >> 32) & 0xFF;
-            cfis.h2d.lba5 = (lba >> 40);
-            cfis.h2d.count = transferred_blocks;
+                    ? ata_cmd_t::READ_DMA_EXT
+                    : ata_cmd_t::WRITE_DMA_EXT;
+            assert(lba < (1UL << 48));
+            cfis.h2d.set_lba(lba);
+            cfis.h2d.set_count(transferred_blocks);
             cfis.h2d.feature_lo = 1;
 
             // LBA
@@ -1664,7 +1628,7 @@ void ahci_if_t::rw(int port_num, uint64_t lba,
         atomic_barrier();
 
         cmd_issue(port_num, (unsigned)slot,
-                  &cfis, pi->is_atapi ? atapifis : 0,
+                  &cfis, pi->is_atapi ? &atapifis : 0,
                   fis_size, prdts, ranges_count, is_read,
                   callback, count == transferred_blocks,
                   callback_arg);
