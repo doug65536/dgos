@@ -1174,16 +1174,27 @@ void mmu_init(int ap)
 
     // Put all of the remaining physical memory into the free lists
     uintptr_t free_count = 0;
-    for (; ; ++free_count) {
-        physaddr_t addr = init_take_page(0);
 
-        if (addr <= top_of_kernel)
+    while (usable_mem_ranges) {
+        physmem_range_t range = mem_ranges[usable_mem_ranges-1];
+        if (range.base < top_of_kernel) {
+            size_t removed = top_of_kernel - range.base;
+            range.base += removed;
+            range.size -= removed;
+        }
+
+        // There's no way a range spans the 1MB line
+        assert((range.base <= 0x100000) ==
+               ((range.base + range.size) <= 0x100000));
+
+        int low = range.base < 0x100000000;
+        phys_allocators[low].add_free_space(range.base, range.size);
+        --usable_mem_ranges;
+
+        if (range.base == top_of_kernel) {
+            usable_mem_ranges = 0;
             break;
-
-        assert(addr != 0);
-
-        int low = addr < 0x100000000;
-        phys_allocators[low].add_free_space(addr, PAGE_SIZE);
+        }
     }
 
     // Start using physical memory allocator
