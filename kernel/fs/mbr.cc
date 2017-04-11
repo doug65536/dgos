@@ -57,23 +57,23 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
     if (sector_size >= 512) {
         unique_ptr<uint8_t> sector = new uint8_t[sector_size];
 
-        drive->read_blocks(sector, 1, 0);
+        if (drive->read_blocks(sector, 1, 0) < 0) {
+            memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
 
-        memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
+            if (sector[510] == 0x55 &&
+                    sector[511] == 0xAAU) {
+                partition_tbl_ent_t ptbl[4];
+                memcpy(ptbl, sector + 446, sizeof(ptbl));
 
-        if (sector[510] == 0x55 &&
-                sector[511] == 0xAAU) {
-            partition_tbl_ent_t ptbl[4];
-            memcpy(ptbl, sector + 446, sizeof(ptbl));
-
-            for (int i = 0;
-                 i < 4 && partition_count < MAX_PARTITIONS; ++i) {
-                if (ptbl[i].system_id == 0x0C) {
-                    part_dev_t *part = partitions + partition_count++;
-                    part->drive = drive;
-                    part->lba_st = ptbl[i].start_lba;
-                    part->lba_len = ptbl[i].total_sectors;
-                    part->name = "fat32";
+                for (int i = 0;
+                     i < 4 && partition_count < MAX_PARTITIONS; ++i) {
+                    if (ptbl[i].system_id == 0x0C) {
+                        part_dev_t *part = partitions + partition_count++;
+                        part->drive = drive;
+                        part->lba_st = ptbl[i].start_lba;
+                        part->lba_len = ptbl[i].total_sectors;
+                        part->name = "fat32";
+                    }
                 }
             }
         }

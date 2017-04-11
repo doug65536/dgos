@@ -35,10 +35,6 @@ enum struct ata_cmd_t : uint8_t {
     READ_DMA_EXT        = 0x25,
     WRITE_DMA_EXT       = 0x35,
 
-    // 48-bit NCQ DMA
-    READ_DMA_NCQ_EXT    = 0x26,
-    WRITE_DMA_NCQ_EXT   = 0x36,
-
     // 48-bit cache flush
     CACHE_FLUSH_EXT     = 0xEA,
 
@@ -89,10 +85,12 @@ struct ata_identify_t {
     uint16_t :8;    // always 0x80
 
     // Word 48
-    uint16_t unused_48;
+    uint16_t support_trusted:1;
+    uint16_t :15;
 
     // Word 49
-    uint16_t :8;
+    uint16_t current_long_phys_alignment:2;
+    uint16_t :6;
     uint16_t dma_supported:1;
     uint16_t lba_supported:1;
     uint16_t iordy_may_be_disabled:1;
@@ -114,7 +112,8 @@ struct ata_identify_t {
     uint16_t :1;
     uint16_t word_70_64_valid:1;
     uint16_t word_88_valid:1;
-    uint16_t :13;
+    uint16_t :5;
+    uint16_t freefall_sensitivity:8;
 
     // Word 54-58
     uint16_t unused_54_58[59-54];
@@ -122,7 +121,11 @@ struct ata_identify_t {
     // Word 59
     uint16_t current_mult:8;
     uint16_t current_mult_valid:1;
-    uint16_t :7;
+    uint16_t :3;
+    uint16_t support_sanitize:1;
+    uint16_t support_crypto_scramble:1;
+    uint16_t support_overwrite_ext:1;
+    uint16_t support_block_erase_ext:1;
 
     // Word 60-61
     uint32_t max_lba;
@@ -159,8 +162,40 @@ struct ata_identify_t {
     uint16_t max_queue_minus1:5;
     uint16_t :11;
 
-    // Word 76-79
-    uint16_t unused_76_79[80-76];
+    // Word 76 (SATA)
+    uint16_t :1;
+    uint16_t support_sata_gen1:1;
+    uint16_t support_sata_gen2:1;
+    uint16_t :5;
+    uint16_t support_ncq:1;
+    uint16_t support_host_pm:1;
+    uint16_t support_phy_event_counters:1;
+    uint16_t support_unload_during_ncq:1;
+    uint16_t support_ncq_priority:1;
+    uint16_t :3;
+
+    // Word 77
+    uint16_t unused_77;
+
+    // Word 78 (SATA features supported)
+    uint16_t :1;
+    uint16_t support_nonzero_buffer_offset:1;
+    uint16_t support_dma_setup_auto_activate:1;
+    uint16_t support_initiating_pm:1;
+    uint16_t support_inorder_data_delivery:1;
+    uint16_t :1;
+    uint16_t support_setting_preservation:1;
+    uint16_t :9;
+
+    // Word 79
+    uint16_t :1;
+    uint16_t nonzero_buffer_offset_enabled:1;
+    uint16_t dma_setup_auto_activate_enabled:1;
+    uint16_t initiating_pm_enabled:1;
+    uint16_t inorder_data_delivery_enabled:1;
+    uint16_t :1;
+    uint16_t setting_preservation_enabled:1;
+    uint16_t :9;
 
     // Word 80
     uint16_t :3;
@@ -197,7 +232,7 @@ struct ata_identify_t {
     uint16_t support_cfa:1;
     uint16_t support_apm:1;
     uint16_t support_removable_notify:1;
-    uint16_t support_pup_in_sby:1;
+    uint16_t support_puis:1;
     uint16_t support_set_features_spinup:1;
     uint16_t support_addr_offset_rsvd:1;
     uint16_t support_set_max:1;
@@ -242,7 +277,7 @@ struct ata_identify_t {
     uint16_t cfa_enabled:1;
     uint16_t apm_enabled:1;
     uint16_t removable_notify_enabled:1;
-    uint16_t pup_in_sby_enabled:1;
+    uint16_t puis_enabled:1;
     uint16_t set_features_spinup_enabled:1;
     uint16_t addr_offset_rsvd_enabled:1;
     uint16_t set_max_enabled:1;
@@ -305,8 +340,33 @@ struct ata_identify_t {
     // Word 100-103
     uint64_t max_lba_ext48bit;
 
-    // Word 104-126
-    uint16_t unused_104_126[127-104];
+    // Word 104
+    uint16_t streaming_xfer_time_pio;
+
+    // Word 105
+    uint16_t max_lba_range_entries;
+
+    // Word 106
+    uint16_t log2_sectors_per_phys_sector:4;
+    uint16_t :8;
+    uint16_t sector_longer_than_512:1;
+    uint16_t multiple_log_sectors_per_phys:1;
+    uint16_t :2;
+
+    // Word 107
+    uint16_t interseek_delay_for_am;
+
+    // Word 108-111
+    uint16_t worldwide_name[112-108];
+
+    // Word 112-116
+    uint16_t unused_104_126[117-112];
+
+    // Word 117-118
+    uint32_t logical_sector_size;
+
+    // Word 119-126
+    uint16_t unused_119_126[127-119];
 
     // Word 127
     uint16_t removable_notify_support:2;
@@ -357,16 +417,12 @@ struct ata_identify_t {
 C_ASSERT(offsetof(ata_identify_t, unused_1) == 1*2);
 C_ASSERT(offsetof(ata_identify_t, unused_3_9) == 3*2);
 C_ASSERT(offsetof(ata_identify_t, unused_20_22) == 20*2);
-C_ASSERT(offsetof(ata_identify_t, unused_48) == 48*2);
 C_ASSERT(offsetof(ata_identify_t, unused_51_52) == 51*2);
 C_ASSERT(offsetof(ata_identify_t, unused_54_58) == 54*2);
 C_ASSERT(offsetof(ata_identify_t, unused_62) == 62*2);
 C_ASSERT(offsetof(ata_identify_t, unused_69_74) == 69*2);
-C_ASSERT(offsetof(ata_identify_t, unused_76_79) == 76*2);
-C_ASSERT(offsetof(ata_identify_t, unused_95_99) == 95*2);
-C_ASSERT(offsetof(ata_identify_t, unused_104_126) == 104*2);
-
 C_ASSERT(offsetof(ata_identify_t, minor_ver) == 81*2);
+C_ASSERT(offsetof(ata_identify_t, unused_95_99) == 95*2);
 C_ASSERT(offsetof(ata_identify_t, secure_erase_time) == 89*2);
 C_ASSERT(offsetof(ata_identify_t, max_lba_ext48bit) == 100*2);
 C_ASSERT(offsetof(ata_identify_t, vendor_specific) == 129*2);
@@ -422,3 +478,10 @@ struct atapi_fis_t {
 };
 
 C_ASSERT(sizeof(atapi_fis_t) == 16);
+
+//
+// ATAPI commands
+
+#define ATAPI_CMD_READ              0xA8
+#define ATAPI_IDENTIFY_PACKET       0xA1
+#define ATAPI_CMD_EJECT             0x1B

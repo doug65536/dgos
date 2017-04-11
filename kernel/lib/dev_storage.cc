@@ -166,18 +166,22 @@ void part_register_factory(char const *name, part_factory_t *factory)
 {
     if (part_factory_count < MAX_PART_FACTORIES) {
         part_factories[part_factory_count++] = factory;
+        printk("%s partition type registered\n", name);
     }
-    printk("%s partition type registered\n", name);
 }
 
 static void invoke_part_factories(void *arg)
 {
     (void)arg;
+
+    // For each partition factory
     for (unsigned fi = 0; fi < part_factory_count; ++fi) {
         part_factory_t *factory = part_factories[fi];
 
+        // For each storage device
         for (unsigned dev = 0; dev < storage_dev_count; ++dev) {
             storage_dev_base_t *drive = open_storage_dev(dev);
+
             if (drive) {
                 STORAGE_TRACE("Probing for %s partitions...\n", factory->name);
 

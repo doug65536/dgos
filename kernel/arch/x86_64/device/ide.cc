@@ -146,6 +146,11 @@ struct ide_if_t : public storage_if_base_t {
         void yield_until_irq();
 
         int sector_size() const;
+
+        void trace_status(int slave, char const *msg,
+                          uint8_t status);
+        void trace_error(int slave, char const *msg,
+                         uint8_t status, uint8_t err);
     };
 
     ide_if_t();
@@ -185,12 +190,6 @@ static size_t ide_if_count;
 static ide_dev_t ide_devs[IDE_MAX_DEVS];
 static size_t ide_dev_count;
 
-//
-// ATAPI commands
-
-#define ATAPI_CMD_READ              0xA8
-#define ATAPI_CMD_EJECT             0x1B
-
 #define ATA_REG_STATUS_ERR_BIT      0
 #define ATA_REG_STATUS_IDX_BIT      1
 #define ATA_REG_STATUS_CORR_BIT     2
@@ -208,6 +207,19 @@ static size_t ide_dev_count;
 #define ATA_REG_STATUS_DWF          (1U<<ATA_REG_STATUS_DWF_BIT)
 #define ATA_REG_STATUS_DRDY         (1U<<ATA_REG_STATUS_DRDY_BIT)
 #define ATA_REG_STATUS_BSY          (1U<<ATA_REG_STATUS_BSY_BIT)
+
+__attribute__((used))
+static format_flag_info_t const ide_flags_status[] = {
+    { "ERR",  ATA_REG_STATUS_ERR_BIT,  1, 0 },
+    { "IDX",  ATA_REG_STATUS_IDX_BIT,  1, 0 },
+    { "CORR", ATA_REG_STATUS_CORR_BIT, 1, 0 },
+    { "DRQ",  ATA_REG_STATUS_DRQ_BIT,  1, 0 },
+    { "DSC",  ATA_REG_STATUS_DSC_BIT,  1, 0 },
+    { "DWF",  ATA_REG_STATUS_DWF_BIT,  1, 0 },
+    { "DRDY", ATA_REG_STATUS_DRDY_BIT, 1, 0 },
+    { "BSY",  ATA_REG_STATUS_BSY_BIT,  1, 0 },
+    { 0,      -1,                      0, 0 }
+};
 
 #define ATA_REG_CONTROL_nIEN_BIT    1
 #define ATA_REG_CONTROL_SRST_BIT    2
@@ -240,6 +252,19 @@ static size_t ide_dev_count;
 #define ATA_REG_ERROR_MC_BIT        5
 #define ATA_REG_ERROR_UNC_BIT       6
 #define ATA_REG_ERROR_BBK_BIT       7
+
+__attribute__((used))
+static format_flag_info_t const ide_flags_error[] = {
+    { "AMNF",  ATA_REG_ERROR_AMNF_BIT,  1, 0 },
+    { "TKONF", ATA_REG_ERROR_TKONF_BIT, 1, 0 },
+    { "ABRT",  ATA_REG_ERROR_ABRT_BIT,  1, 0 },
+    { "MCR",   ATA_REG_ERROR_MCR_BIT,   1, 0 },
+    { "IDNF",  ATA_REG_ERROR_IDNF_BIT,  1, 0 },
+    { "MC",    ATA_REG_ERROR_MC_BIT,    1, 0 },
+    { "UNC",   ATA_REG_ERROR_UNC_BIT,   1, 0 },
+    { "BBK",   ATA_REG_ERROR_BBK_BIT,   1, 0 },
+    { 0,      -1,                      0, 0 }
+};
 
 // Address mark not found
 #define ATA_REG_ERROR_AMNF          (1U<<ATA_REG_ERROR_AMNF_BIT)
@@ -646,17 +671,19 @@ void ide_if_t::ide_chan_t::detect_devices()
         uint8_t status = wait_not_bsy();
 
         // If status == 0, no device
-        if (status == 0)
+        if (status == 0) {
+            IDE_TRACE("if=%d, slave=%d, no device\n", secondary, slave);
             continue;
+        }
 
-        IDE_TRACE("if=%d, dev=%d, status=0x%x\n", secondary, slave, status);
+        trace_status(slave, "detect", status);
 
         // Set LBA to zero for ATAPI detection later
         set_drv(slave);
         set_lba(unit, 0);
         set_irq_enable(0);
 
-        IDE_TRACE("if=%d, dev=%d, issuing IDENTIFY\n", secondary, slave);
+        IDE_TRACE("if=%d, slave=%d, issuing IDENTIFY\n", secondary, slave);
         issue_command(ata_cmd_t::IDENTIFY);
 
         int is_atapi = 0;
@@ -714,14 +741,13 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         // If error and command aborted, there is no drive
         if (is_err && (err & ATA_REG_ERROR_ABRT)) {
-            IDE_TRACE("if=%d, dev=%d, error=0x%x, no drive\n",
-                      secondary, slave, err);
+            trace_error(slave, "no drive", status, err);
             continue;
         }
 
         // If error, then we do not know what happened
         if (is_err) {
-            IDE_TRACE("if=%d, dev=%d, error=0x%x\n", secondary, slave, err);
+            trace_error(slave, "unexpected error", status, err);
             continue;
         }
 
@@ -732,7 +758,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         unique_ptr<ata_identify_t> ident = new ata_identify_t;
 
-        IDE_TRACE("if=%d, dev=%d, receiving IDENTIFY\n", secondary, slave);
+        IDE_TRACE("if=%d, slave=%d, receiving IDENTIFY\n", secondary, slave);
 
         // Read IDENTIFY data
         memset(ident, 0, sizeof(*ident));
@@ -771,12 +797,16 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         unit.has_48bit = ident->support_ext48bit;
 
-        if (unit.has_48bit)
-            unit.max_lba = ident->max_lba_ext48bit;
-        else
-            unit.max_lba = ident->max_lba;
+        if (!is_atapi) {
+            if (unit.has_48bit)
+                unit.max_lba = ident->max_lba_ext48bit;
+            else
+                unit.max_lba = ident->max_lba;
+        } else {
+            unit.max_lba = 0;
+        }
 
-        IDE_TRACE("if=%d, dev=%d, has_48bit=%d\n",
+        IDE_TRACE("if=%d, slave=%d, has_48bit=%d\n",
                   secondary, slave, unit.has_48bit);
 
         // Force dma_support to 0 if interface does not support UDMA,
@@ -810,7 +840,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         ident.reset();
 
-        IDE_TRACE("if=%d, dev=%d, max_dma=%d\n", secondary, slave, unit.max_dma);
+        IDE_TRACE("if=%d, slave=%d, max_dma=%d\n", secondary, slave, unit.max_dma);
 
         if (unit.has_48bit) {
             if (unit.max_dma >= 0) {
@@ -839,16 +869,16 @@ void ide_if_t::ide_chan_t::detect_devices()
         }
 
         if (unit.max_dma >= 0) {
-            wait_not_bsy();
+            status = wait_not_bsy();
 
             if (!unit.old_dma) {
                 // Enable UDMA
-                IDE_TRACE("if=%d, dev=%d, enabling UDMA\n", secondary, slave);
+                trace_status(slave, "enabling UDMA", status);
                 set_feature(ATA_FEATURE_XFER_MODE,
                             ATA_FEATURE_XFER_MODE_UDMA_n(unit.max_dma));
             } else {
                 // Enable MWDMA
-                IDE_TRACE("if=%d, dev=%d, enabling MWDMA\n", secondary, slave);
+                trace_status(slave, "enabling MWDMA", status);
                 set_feature(ATA_FEATURE_XFER_MODE,
                             ATA_FEATURE_XFER_MODE_MWDMA_n(unit.max_dma));
             }
@@ -888,7 +918,7 @@ void ide_if_t::ide_chan_t::detect_devices()
             iface->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
                             (uint32_t)dma_prd_physaddr);
         } else if (unit.max_multiple > 1) {
-            IDE_TRACE("if=%d, dev=%d, enabling MULTIPLE\n", secondary, slave);
+            IDE_TRACE("if=%d, slave=%d, enabling MULTIPLE\n", secondary, slave);
 
             wait_not_bsy();
             set_count(unit, unit.max_multiple);
@@ -902,7 +932,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
             io_window = mmap_window(unit.max_multiple << log2_sector_size);
         } else {
-            IDE_TRACE("if=%d, dev=%d, single sector (old)\n", secondary, slave);
+            IDE_TRACE("if=%d, slave=%d, single sector (!)\n", secondary, slave);
 
             io_window = mmap_window(1 << log2_sector_size);
         }
@@ -912,7 +942,7 @@ void ide_if_t::ide_chan_t::detect_devices()
         irq_hook(ports.irq, &ide_chan_t::irq_handler);
         irq_setmask(ports.irq, 1);
 
-        IDE_TRACE("if=%d, dev=%d, done\n", secondary, slave);
+        IDE_TRACE("if=%d, slave=%d, done\n", secondary, slave);
     }
 }
 
@@ -1009,11 +1039,40 @@ void ide_if_t::ide_chan_t::yield_until_irq()
     mutex_unlock(&lock);
 }
 
+void ide_if_t::ide_chan_t::trace_status(int slave, char const *msg,
+                                        uint8_t status)
+{
+    char status_text[64];
+    format_flags_register(status_text, sizeof(status_text),
+                          status, ide_flags_status);
+    IDE_TRACE("%s: chan=%d, slave=%d, status=0x%x (%s)\n",
+              msg, secondary, slave, status, status_text);
+}
+
+void ide_if_t::ide_chan_t::trace_error(int slave,
+                                       char const *msg,
+                                       uint8_t status, uint8_t err)
+{
+    char status_text[64];
+    char error_text[64];
+
+    format_flags_register(status_text, sizeof(status_text),
+                          status, ide_flags_status);
+
+    format_flags_register(status_text, sizeof(error_text),
+                          err, ide_flags_error);
+
+    IDE_TRACE("%s: chan=%d, slave=%d, status=0x%x (%s), err=0x%x (%s)\n",
+              msg, secondary, slave, status, status_text, err, error_text);
+}
+
 int64_t ide_if_t::ide_chan_t::io(
         void *data, int64_t count, uint64_t lba,
         int slave, int is_atapi, int is_read)
 {
     unit_data_t &unit = unit_data[slave];
+
+    assert(!unit.max_lba || lba + count <= unit.max_lba);
 
     int err = 0;
 
@@ -1092,8 +1151,8 @@ int64_t ide_if_t::ide_chan_t::io(
         yield_until_irq();
 
         if (io_status & ATA_REG_STATUS_ERR) {
-            IDE_TRACE("error! status=0x%x, err=0x%x", io_status,
-                      inb(ata_reg_cmd::ERROR));
+            err = inb(ata_reg_cmd::ERROR);
+            trace_error(slave, "I/O error", io_status, err);
             err = 1;
         }
 
@@ -1170,7 +1229,6 @@ void ide_if_t::ide_chan_t::irq_handler()
     mutex_lock_noyield(&lock);
     io_done = 1;
     io_status = inb(ata_reg_cmd::STATUS);
-    IDE_TRACE("IRQ, status=0x%x!\n", io_status);
     mutex_unlock(&lock);
     condvar_wake_one(&done_cond);
 }

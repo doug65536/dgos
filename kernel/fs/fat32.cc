@@ -524,7 +524,8 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
     lba_st = conn->part_st;
     lba_en = conn->part_st + conn->part_len;
 
-    drive->read_blocks(sector_buffer, 1, lba_st);
+    if (drive->read_blocks(sector_buffer, 1, lba_st) < 0)
+        return nullptr;
 
     // Pass 0 partition cluster to get partition relative values
     fat32_parse_bpb(&bpb, 0, sector_buffer);

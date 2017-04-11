@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "dirent.h"
+#include "errno.h"
 
 // Storage device interface (IDE, AHCI, etc)
 
