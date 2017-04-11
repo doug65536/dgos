@@ -62,6 +62,8 @@ EXPORT void mutex_init(mutex_t *mutex)
 
 EXPORT void mutex_lock(mutex_t *mutex)
 {
+    assert(mutex->owner != thread_get_id());
+
     for (int spin = 0; ; pause(), ++spin) {
         // Spin outside lock until spin limit
         if (spin < mutex->spin_count &&
@@ -152,14 +154,13 @@ EXPORT void mutex_lock_noyield(mutex_t *mutex)
     thread_t tid = thread_get_id();
     int noyield_stored = 0;
 
-    for (int done = 0; ; pause()) {
+    for (bool done = false; ; pause()) {
         if (noyield_stored && mutex->owner >= 0)
             continue;
 
         spinlock_lock_noirq(&mutex->lock);
 
-        if (mutex->noyield_waiting != tid &&
-                mutex->noyield_waiting == 0) {
+        if (mutex->noyield_waiting != tid && mutex->noyield_waiting == 0) {
             mutex->noyield_waiting = tid;
             noyield_stored = 1;
         }
@@ -170,7 +171,7 @@ EXPORT void mutex_lock_noyield(mutex_t *mutex)
             if (noyield_stored)
                 mutex->noyield_waiting = 0;
 
-            done = 1;
+            done = true;
         }
 
         spinlock_unlock_noirq(&mutex->lock);
@@ -256,12 +257,12 @@ static void condvar_wait_ex(condition_var_t *var,
     CONDVAR_DTRACE("%p: Suspending\n", (void*)&wait);
     thread_suspend_release(&var->lock, &wait.thread);
     CONDVAR_DTRACE("%p: Awoke\n", (void*)&wait);
+
+    spinlock_unlock_noirq(&var->lock);
     lock(mutex);
 
     assert(wait.link.next == 0);
     assert(wait.link.prev == 0);
-
-    spinlock_unlock_noirq(&var->lock);
 }
 
 EXPORT void condvar_wait_spinlock(condition_var_t *var,
@@ -275,7 +276,7 @@ EXPORT void condvar_wait_spinlock(condition_var_t *var,
 
 EXPORT void condvar_wait(condition_var_t *var, mutex_t *mutex)
 {
-    assert(mutex->owner >= 0);
+    assert(mutex->owner == thread_get_id());
     condvar_wait_ex(var, condvar_lock_mutex,
                     condvar_unlock_mutex, mutex);
 }

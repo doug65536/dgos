@@ -165,6 +165,7 @@ static inline cpu_info_t *this_cpu(void)
 
 static inline thread_info_t *this_thread(void)
 {
+    cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
     return cpu->cur_thread;
 }
@@ -657,6 +658,7 @@ static void thread_early_sleep(uint64_t expiry)
 EXPORT void thread_sleep_until(uint64_t expiry)
 {
     if (thread_idle_ready) {
+        cpu_scoped_irq_disable intr_was_enabled;
         cpu_info_t *cpu = this_cpu();
         thread_info_t *thread = cpu->cur_thread;
 
@@ -677,6 +679,7 @@ EXPORT void thread_sleep_for(uint64_t ms)
 
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 {
+    cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
 
@@ -699,7 +702,7 @@ EXPORT void thread_resume(thread_t thread)
           ++wait_count)
         pause();
 
-    if (wait_count > 0) {
+    if (wait_count > 2) {
         printdbg("Resuming thread %d with old state %x, waited %d\n",
                  thread, threads[thread].state, wait_count);
     }
@@ -730,12 +733,14 @@ uint32_t thread_cpus_started(void)
 
 uint64_t thread_get_cpu_mmu_seq(void)
 {
+    cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
     return cpu->mmu_seq;
 }
 
 void thread_set_cpu_mmu_seq(uint64_t seq)
 {
+    cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
     cpu->mmu_seq = seq;
 }
@@ -764,6 +769,7 @@ EXPORT uint64_t thread_get_affinity(int id)
 
 EXPORT void thread_set_affinity(int id, uint64_t affinity)
 {
+    cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
     size_t cpu_number = cpu - cpus;
 
