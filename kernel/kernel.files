@@ -28,6 +28,7 @@ lib/cc/vector.h
 lib/dev_eth.cc
 lib/dev_eth.h
 lib/dirent.h
+lib/errno.h
 lib/fileio.cc
 lib/fileio.h
 lib/framebuffer.cc

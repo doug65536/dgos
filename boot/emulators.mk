@@ -417,13 +417,13 @@ $(BOCHSCOMBINEDSYMBOLS): $(BOCHSKERNELSYMBOLS) $(BOCHSSYMBOLS)
 
 $(BOCHSKERNELSYMBOLS): kernel
 	$(OBJDUMP) --wide --syms ../kernel/bin/kernel | \
-		$(GREP) -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
+		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		$(SORT) > $@
 
 $(BOCHSSYMBOLS): $(SYMBOLFILE)
 	$(OBJDUMP) --wide --syms $^ | \
-		$(GREP) -P '^[0-9A-Fa-f]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
+		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		$(SORT) > $@
 
@@ -436,27 +436,33 @@ $(BINDIR)/bochs-fat-config.bxrc: utils/bochs-fat-config.bxrc.template
 		$(SED) "s|\$$DISKIMAGE|$(DISKIMAGE)|g" > $@
 
 debug-iso-bochs: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
-	$(BOCHS) $(BOCHS_FLAGS) \
+	$(BOCHS) \
 		-qf $(BINDIR)/bochs-iso-config.bxrc \
-		-rc utils/bochs-debugger-commands
+		-rc utils/bochs-debugger-commands \
+		$(BOCHS_FLAGS)
 
-debug-fat-bochs: all bochs-symbols iso $(BINDIR)/bochs-fat-config.bxrc
-	$(BOCHS) $(BOCHS_FLAGS) \
+debug-fat-bochs: all bochs-symbols debuggable-kernel-disk $(BINDIR)/bochs-fat-config.bxrc
+	$(BOCHS) \
 		-qf $(BINDIR)/bochs-fat-config.bxrc \
-		-rc utils/bochs-debugger-commands
+		-rc utils/bochs-debugger-commands \
+		$(BOCHS_FLAGS)
 
 debug-iso-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
-	$(BOCHS) $(BOCHS_FLAGS) \
+	$(BOCHS) \
 		-qf $(BINDIR)/bochs-iso-config.bxrc \
-		-rc utils/bochs-debugger-boot-commands
+		-rc utils/bochs-debugger-boot-commands \
+		$(BOCHS_FLAGS)
 
-debug-fat-bochs-boot: all bochs-symbols iso $(BINDIR)/bochs-fat-config.bxrc
-	$(BOCHS) $(BOCHS_FLAGS) \
+debug-fat-bochs-boot: all bochs-symbols debuggable-kernel-disk $(BINDIR)/bochs-fat-config.bxrc
+	$(BOCHS) \
 		-qf $(BINDIR)/bochs-fat-config.bxrc \
-		-rc utils/bochs-debugger-boot-commands
+		-rc utils/bochs-debugger-boot-commands \
+		$(BOCHS_FLAGS)
 
-run-iso-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-iso-config.bxrc
-	$(BOCHS) $(BOCHS_FLAGS) -qf $(BINDIR)/bochs-iso-config.bxrc -q
+run-iso-bochs: all bochs-symbols iso $(BINDIR)/bochs-iso-config.bxrc
+	$(BOCHS) -qf $(BINDIR)/bochs-iso-config.bxrc -q \
+		$(BOCHS_FLAGS)
 
-run-fat-bochs: all bochs-symbols debuggable-disk $(BINDIR)/bochs-fat-config.bxrc
-	$(BOCHS) $(BOCHS_FLAGS) -qf $(BINDIR)/bochs-fat-config.bxrc -q
+run-fat-bochs: all bochs-symbols debuggable-kernel-disk $(BINDIR)/bochs-fat-config.bxrc
+	$(BOCHS) -qf $(BINDIR)/bochs-fat-config.bxrc -q \
+		$(BOCHS_FLAGS)
