@@ -232,7 +232,7 @@ typedef struct pci_irq_range_t {
     uint8_t count;
 } pci_irq_range_t;
 
-int pci_set_msi_irq(int bus, int slot, int func,
+bool pci_set_msi_irq(int bus, int slot, int func,
                     pci_irq_range_t *irq_range,
                     int cpu, int distribute, int multiple,
                     intr_handler_t handler);

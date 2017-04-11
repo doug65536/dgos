@@ -132,7 +132,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     uint8_t mac_addr[8];
 
     // PCI
-    int use_msi;
+    bool use_msi;
     pci_irq_range_t irq_range;
 };
 

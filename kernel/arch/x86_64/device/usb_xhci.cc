@@ -1444,7 +1444,7 @@ typedef struct usbxhci_dev_t {
     usbxhci_portinfo_t *ports;
     unsigned port_count;
 
-    uint8_t use_msi;
+    bool use_msi;
 
     // Producer Cycle State
     uint8_t pcs;

@@ -405,7 +405,7 @@ int pci_find_capability(int bus, int slot, int func,
                 pci_enum_capabilities_match, capability_id);
 }
 
-int pci_set_msi_irq(int bus, int slot, int func,
+bool pci_set_msi_irq(int bus, int slot, int func,
                     pci_irq_range_t *irq_range,
                     int cpu, int distribute, int multiple,
                     intr_handler_t handler)
@@ -429,7 +429,7 @@ int pci_set_msi_irq(int bus, int slot, int func,
     // Extract the multi message capability value
     uint8_t multi_exp = (caps.msg_ctrl >> PCI_MSI_HDR_MMC_BIT) &
             PCI_MSI_HDR_MMC_MASK;
-    uint8_t multi_cap = 1 << multi_exp;
+    uint8_t multi_cap = 1U << multi_exp;
 
     // Sanity check multi message capability
     assert(multi_cap <= 32);
@@ -479,7 +479,7 @@ int pci_set_msi_irq(int bus, int slot, int func,
                      offsetof(pci_msi_caps_hdr_t, msg_ctrl),
                      &caps.msg_ctrl, sizeof(caps.msg_ctrl));
 
-    return 1;
+    return true;
 }
 
 void pci_set_irq_line(int bus, int slot, int func,
