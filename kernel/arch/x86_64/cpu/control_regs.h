@@ -272,6 +272,7 @@ static inline uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
     return rax;
 }
 
+__attribute__((always_inline))
 static inline void cpu_set_page_directory(uintptr_t addr)
 {
     __asm__ __volatile__ (
@@ -282,6 +283,7 @@ static inline void cpu_set_page_directory(uintptr_t addr)
     );
 }
 
+__attribute__((always_inline))
 static inline uintptr_t cpu_get_page_directory(void)
 {
     uintptr_t addr;
@@ -292,6 +294,7 @@ static inline uintptr_t cpu_get_page_directory(void)
     return addr;
 }
 
+__attribute__((always_inline))
 static inline uintptr_t cpu_get_fault_address(void)
 {
     uintptr_t addr;
@@ -381,6 +384,7 @@ static inline void cpu_set_gsbase(void *gs_base)
     msr_set(MSR_GSBASE, (uintptr_t)gs_base);
 }
 
+__attribute__((always_inline))
 static inline table_register_64_t cpu_get_gdtr(void)
 {
     table_register_64_t gdtr;
@@ -393,6 +397,7 @@ static inline table_register_64_t cpu_get_gdtr(void)
     return gdtr;
 }
 
+__attribute__((always_inline))
 static inline void cpu_set_gdtr(table_register_64_t gdtr)
 {
     __asm__ __volatile__ (
@@ -403,6 +408,7 @@ static inline void cpu_set_gdtr(table_register_64_t gdtr)
     );
 }
 
+__attribute__((always_inline))
 static inline uint16_t cpu_get_tr(void)
 {
     uint16_t tr;
@@ -425,6 +431,7 @@ static inline void cpu_set_tr(uint16_t tr)
     );
 }
 
+__attribute__((always_inline))
 static inline void *cpu_get_stack_ptr(void)
 {
     void *rsp;
@@ -442,6 +449,7 @@ static inline void cpu_crash(void)
     );
 }
 
+__attribute__((always_inline))
 static inline void cpu_fxsave(void *fpuctx)
 {
     __asm__ __volatile__ (
@@ -452,6 +460,7 @@ static inline void cpu_fxsave(void *fpuctx)
     );
 }
 
+__attribute__((always_inline))
 static inline void cpu_xsave(void *fpuctx)
 {
     __asm__ __volatile__ (
@@ -462,6 +471,7 @@ static inline void cpu_xsave(void *fpuctx)
     );
 }
 
+__attribute__((always_inline))
 static inline void *cpu_gs_read_ptr(void)
 {
     void *ptr;
@@ -474,6 +484,7 @@ static inline void *cpu_gs_read_ptr(void)
     return ptr;
 }
 
+__attribute__((always_inline))
 static inline uintptr_t cpu_get_flags(void)
 {
     uintptr_t flags;
@@ -485,6 +496,7 @@ static inline uintptr_t cpu_get_flags(void)
     return flags;
 }
 
+__attribute__((always_inline))
 static inline void cpu_set_flags(uintptr_t flags)
 {
     __asm__ __volatile__ (
@@ -514,6 +526,7 @@ static inline uintptr_t cpu_change_flags(uintptr_t clear, uintptr_t set)
     return flags;
 }
 
+__attribute__((always_inline))
 static inline int cpu_irq_disable(void)
 {
     uintptr_t rflags;
@@ -528,11 +541,13 @@ static inline int cpu_irq_disable(void)
     return ((rflags >> 9) & 1);
 }
 
+__attribute__((always_inline))
 static inline void cpu_irq_enable(void)
 {
     __asm__ __volatile__ ( "sti" : : : "cc" );
 }
 
+__attribute__((always_inline))
 static inline void cpu_irq_toggle(int enable)
 {
     uintptr_t temp;
@@ -554,6 +569,7 @@ static inline int cpu_irq_is_enabled(void)
     return (cpu_get_flags() & (1<<9)) != 0;
 }
 
+__attribute__((always_inline))
 static inline uint64_t cpu_rdtsc(void)
 {
     uint32_t tsc_lo;
@@ -571,21 +587,34 @@ static inline uint64_t cpu_rdtsc(void)
 class cpu_scoped_irq_disable
 {
 public:
+    __attribute__((always_inline))
     cpu_scoped_irq_disable()
-        : intr_was_enabled(cpu_irq_disable())
+        : intr_was_enabled((cpu_irq_disable() << 1) - 1)
     {
     }
 
+    __attribute__((always_inline))
     ~cpu_scoped_irq_disable()
     {
-        cpu_irq_toggle(intr_was_enabled);
+        if (intr_was_enabled)
+            cpu_irq_toggle(intr_was_enabled > 0);
     }
 
+    __attribute__((always_inline))
     operator bool() const
     {
-        return intr_was_enabled;
+        return intr_was_enabled > 0;
+    }
+
+    __attribute__((always_inline))
+    void restore()
+    {
+        if (intr_was_enabled) {
+            cpu_irq_toggle(intr_was_enabled > 0);
+            intr_was_enabled = 0;
+        }
     }
 
 private:
-    bool intr_was_enabled;
+    int8_t intr_was_enabled;
 };

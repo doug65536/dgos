@@ -4,6 +4,7 @@
 //
 // Some other concurrent code helpers
 
+__attribute__((always_inline))
 static inline void atomic_barrier(void)
 {
     __asm__ __volatile__ ( "" : : : "memory" );
