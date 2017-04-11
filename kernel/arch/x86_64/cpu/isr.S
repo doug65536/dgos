@@ -35,7 +35,7 @@ isr_entry_\int_num\():
 		.cfi_def_cfa_offset 24
 	.endif
 	push_cfi $\int_num
-    jmp 0f
+    jmp isr_common
 	.cfi_endproc
 .endm
 
@@ -170,7 +170,7 @@ isr_entry 0 74
 isr_entry 1 14
 
 .align 16
-0:
+isr_common:
 	.cfi_startproc
 	.cfi_def_cfa_offset 24
 
