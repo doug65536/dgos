@@ -227,8 +227,6 @@ C_ASSERT(sizeof(idt_entry_64_t) == 16);
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58
 
-typedef struct cpu_flag_info_t cpu_flag_info_t;
-
 size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags);
 size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr);
 size_t cpu_describe_fpucw(char *buf, size_t buf_size, uint16_t fpucw);

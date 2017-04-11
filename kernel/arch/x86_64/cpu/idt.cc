@@ -34,14 +34,7 @@ static idt_entry_64_t idt[256];
 
 static isr_context_t *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
 
-struct cpu_flag_info_t {
-    char const * const name;
-    int bit;
-    uintptr_t mask;
-    char const * const *value_names;
-};
-
-static cpu_flag_info_t const cpu_eflags_info[] = {
+static format_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
     { "VIP",  EFLAGS_VIP_BIT,  1, 0 },
     { "VIF",  EFLAGS_VIF_BIT,  1, 0 },
@@ -69,7 +62,7 @@ static char const *cpu_mxcsr_rc[] = {
     "Truncate"
 };
 
-static cpu_flag_info_t const cpu_mxcsr_info[] = {
+static format_flag_info_t const cpu_mxcsr_info[] = {
     { "IE",     MXCSR_IE_BIT, 1, 0 },
     { "DE",     MXCSR_DE_BIT, 1, 0 },
     { "ZE",     MXCSR_ZE_BIT, 1, 0 },
@@ -95,7 +88,7 @@ static char const *cpu_fpucw_pc[] = {
     "64-bit"
 };
 
-static cpu_flag_info_t const cpu_fpucw_info[] = {
+static format_flag_info_t const cpu_fpucw_info[] = {
     { "IM",     FPUCW_IM_BIT, 1, 0 },
     { "DM",     FPUCW_DM_BIT, 1, 0 },
     { "ZM",     FPUCW_ZM_BIT, 1, 0 },
@@ -107,7 +100,7 @@ static cpu_flag_info_t const cpu_fpucw_info[] = {
     { 0,        -1,           0, 0 }
 };
 
-static cpu_flag_info_t const cpu_fpusw_info[] = {
+static format_flag_info_t const cpu_fpusw_info[] = {
     { "IE",     FPUSW_IE_BIT, 1, 0 },
     { "DE",     FPUSW_DE_BIT, 1, 0 },
     { "ZE",     FPUSW_ZE_BIT, 1, 0 },
@@ -370,85 +363,29 @@ int idt_init(int ap)
     return 0;
 }
 
-static size_t cpu_format_flags_register(
-        char *buf, size_t buf_size,
-        uintptr_t flags, cpu_flag_info_t const *info)
-{
-    size_t total_written = 0;
-    int chars_needed;
-
-    for (cpu_flag_info_t const *fi = info;
-         fi->name; ++fi) {
-        uintptr_t value = (flags >> fi->bit) & fi->mask;
-
-        if (value != 0 ||
-                (fi->value_names && fi->value_names[0])) {
-            char const *prefix = total_written > 0 ? " " : "";
-            if (fi->value_names && fi->value_names[value]) {
-                // Text value
-                chars_needed = snprintf(
-                            buf + total_written,
-                            buf_size - total_written,
-                            "%s%s=%s", prefix, fi->name,
-                            fi->value_names[value]);
-            } else if (fi->mask == 1) {
-                // Single bit flag
-                chars_needed = snprintf(
-                            buf + total_written,
-                            buf_size - total_written,
-                            "%s%s", prefix, fi->name);
-            } else {
-                // Multi-bit flag
-                chars_needed = snprintf(
-                            buf + total_written,
-                            buf_size - total_written,
-                            "%s%s=%lX", prefix, fi->name, value);
-            }
-            if (chars_needed + total_written >= buf_size) {
-                if (buf_size > 3) {
-                    // Truncate with ellipsis
-                    strcpy(buf + buf_size - 4, "...");
-                    return buf_size - 1;
-                } else if (buf_size > 0) {
-                    // Truncate with * fill
-                    memset(buf, '*', buf_size-1);
-                    buf[buf_size-1] = 0;
-                    return buf_size - 1;
-                }
-                // Wow, no room for anything
-                return 0;
-            }
-
-            total_written += chars_needed;
-        }
-    }
-
-    return total_written;
-}
-
 size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags)
 {
-    return cpu_format_flags_register(buf, buf_size, rflags,
+    return format_flags_register(buf, buf_size, rflags,
                                      cpu_eflags_info);
 }
 
 size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr)
 {
-    return cpu_format_flags_register(buf, buf_size, mxcsr,
+    return format_flags_register(buf, buf_size, mxcsr,
                                      cpu_mxcsr_info);
 
 }
 
 size_t cpu_describe_fpucw(char *buf, size_t buf_size, uint16_t fpucw)
 {
-    return cpu_format_flags_register(buf, buf_size, fpucw,
+    return format_flags_register(buf, buf_size, fpucw,
                                      cpu_fpucw_info);
 
 }
 
 size_t cpu_describe_fpusw(char *buf, size_t buf_size, uint16_t fpusw)
 {
-    return cpu_format_flags_register(buf, buf_size, fpusw,
+    return format_flags_register(buf, buf_size, fpusw,
                                      cpu_fpusw_info);
 
 }

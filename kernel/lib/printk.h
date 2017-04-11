@@ -40,4 +40,15 @@ int vcprintf(char const *format, va_list ap);
 
 int hex_dump(void const *mem, size_t size);
 
+struct format_flag_info_t {
+    char const * const name;
+    int bit;
+    uintptr_t mask;
+    char const * const *value_names;
+};
+
+size_t format_flags_register(
+        char *buf, size_t buf_size,
+        uintptr_t flags, format_flag_info_t const *info);
+
 }

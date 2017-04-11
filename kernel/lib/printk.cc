@@ -1008,3 +1008,59 @@ int hex_dump(void const *mem, size_t size)
 {
     return hex_dump_formatter(mem, size, printdbg);
 }
+
+size_t format_flags_register(
+        char *buf, size_t buf_size,
+        uintptr_t flags, format_flag_info_t const *info)
+{
+    size_t total_written = 0;
+    int chars_needed;
+
+    for (format_flag_info_t const *fi = info;
+         fi->name; ++fi) {
+        uintptr_t value = (flags >> fi->bit) & fi->mask;
+
+        if (value != 0 ||
+                (fi->value_names && fi->value_names[0])) {
+            char const *prefix = total_written > 0 ? " " : "";
+            if (fi->value_names && fi->value_names[value]) {
+                // Text value
+                chars_needed = snprintf(
+                            buf + total_written,
+                            buf_size - total_written,
+                            "%s%s=%s", prefix, fi->name,
+                            fi->value_names[value]);
+            } else if (fi->mask == 1) {
+                // Single bit flag
+                chars_needed = snprintf(
+                            buf + total_written,
+                            buf_size - total_written,
+                            "%s%s", prefix, fi->name);
+            } else {
+                // Multi-bit flag
+                chars_needed = snprintf(
+                            buf + total_written,
+                            buf_size - total_written,
+                            "%s%s=%lX", prefix, fi->name, value);
+            }
+            if (chars_needed + total_written >= buf_size) {
+                if (buf_size > 3) {
+                    // Truncate with ellipsis
+                    strcpy(buf + buf_size - 4, "...");
+                    return buf_size - 1;
+                } else if (buf_size > 0) {
+                    // Truncate with * fill
+                    memset(buf, '*', buf_size-1);
+                    buf[buf_size-1] = 0;
+                    return buf_size - 1;
+                }
+                // Wow, no room for anything
+                return 0;
+            }
+
+            total_written += chars_needed;
+        }
+    }
+
+    return total_written;
+}
