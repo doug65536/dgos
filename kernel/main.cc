@@ -26,6 +26,7 @@
 #include "png.h"
 #include "framebuffer.h"
 #include "math.h"
+#include "dev_storage.h"
 #include "unique_ptr.h"
 
 //#include "vector.h"
@@ -55,7 +56,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   40
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
