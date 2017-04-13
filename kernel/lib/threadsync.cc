@@ -23,6 +23,9 @@
 #define SPINCOUNT_MAX   4096
 #define SPINCOUNT_MIN   4
 
+//
+// Wait chain
+
 static void thread_wait_add(thread_wait_link_t volatile *root,
                             thread_wait_link_t volatile *node)
 {
@@ -48,6 +51,9 @@ static thread_wait_link_t volatile *thread_wait_del(
     atomic_barrier();
     return next;
 }
+
+//
+// Mutex
 
 EXPORT void mutex_init(mutex_t *mutex)
 {
@@ -138,9 +144,10 @@ EXPORT void mutex_unlock(mutex_t *mutex)
         MUTEX_DTRACE("Mutex unlock waking waiter\n");
         thread_wait_t *waiter = (thread_wait_t*)mutex->link.next;
         thread_wait_del(&waiter->link);
-        mutex->owner = waiter->thread;
+        thread_t waked_thread = waiter->thread;
+        mutex->owner = waked_thread;
         spinlock_unlock_noirq(&mutex->lock);
-        thread_resume(waiter->thread);
+        thread_resume(waked_thread);
     } else {
         // No waiters
         mutex->owner = -1;
@@ -185,12 +192,223 @@ EXPORT void mutex_destroy(mutex_t *mutex)
 {
     (void)mutex;
     assert(mutex->link.next == mutex->link.prev);
+    assert(mutex->owner == -1);
 }
 
 EXPORT int mutex_held(mutex_t *mutex)
 {
     return mutex->owner == thread_get_id();
 }
+
+//
+// Reader/Writer lock
+
+EXPORT void rwlock_init(rwlock_t *rwlock)
+{
+    rwlock->lock = 0;
+    rwlock->ex_link.next = &rwlock->ex_link;
+    rwlock->ex_link.prev = &rwlock->ex_link;
+    rwlock->sh_link.next = &rwlock->sh_link;
+    rwlock->sh_link.prev = &rwlock->sh_link;
+    rwlock->reader_count = 0;
+    rwlock->spin_count = spincount_mask &
+            (SPINCOUNT_MIN + ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1));
+    atomic_barrier();
+}
+
+EXPORT void rwlock_destroy(rwlock_t *rwlock)
+{
+    (void)rwlock;
+    assert(rwlock->ex_link.next == rwlock->ex_link.prev);
+    assert(rwlock->sh_link.next == rwlock->sh_link.prev);
+}
+
+EXPORT void rwlock_ex_lock(rwlock_t *rwlock)
+{
+    thread_t tid = thread_get_id();
+
+    int spin = 0;
+    for (bool done = false; !done; pause(), ++spin) {
+        // Spin only if someone has exclusive lock
+        // and there are no waiting writers
+        if (spin < rwlock->spin_count &&
+                rwlock->reader_count < 0 &&
+                rwlock->ex_link.next == &rwlock->ex_link)
+            continue;
+
+        spinlock_lock_noirq(&rwlock->lock);
+
+        // If there is no owner and there is no next writer
+        if (rwlock->reader_count == 0 &&
+                rwlock->ex_link.next == &rwlock->ex_link) {
+            // Acquire exclusive lock
+            rwlock->reader_count = -tid;
+
+            done = true;
+        } else if (spin >= rwlock->spin_count) {
+            thread_wait_t wait;
+
+            if (rwlock->spin_count > SPINCOUNT_MIN)
+                rwlock->spin_count += spincount_mask;
+
+            thread_wait_add(&rwlock->ex_link, &wait.link);
+
+            thread_suspend_release(&rwlock->lock, &wait.thread);
+
+            assert(wait.thread == tid);
+            assert(rwlock->lock != 0);
+            assert(wait.link.next == 0);
+            assert(wait.link.prev == 0);
+            assert(rwlock->reader_count == -wait.thread);
+
+            done = true;
+        }
+
+        spinlock_unlock_noirq(&rwlock->lock);
+    }
+}
+
+EXPORT void rwlock_upgrade(rwlock_t *rwlock)
+{
+    thread_t tid = thread_get_id();
+
+    spinlock_lock_noirq(&rwlock->lock);
+
+    assert(rwlock->reader_count > 0);
+
+    if (rwlock->reader_count == 1) {
+        // I am the only reader, direct upgrade
+        rwlock->reader_count = -tid;
+    } else {
+        thread_wait_t wait;
+
+        // Add self to exclusive wait chain and suspend
+        thread_wait_add(&rwlock->ex_link, &wait.link);
+
+        thread_suspend_release(&rwlock->lock, &wait.thread);
+
+        assert(wait.thread == tid);
+        assert(rwlock->lock != 0);
+        assert(wait.link.next == 0);
+        assert(wait.link.prev == 0);
+        assert(rwlock->reader_count == -wait.thread);
+    }
+
+    spinlock_unlock_noirq(&rwlock->lock);
+}
+
+EXPORT void rwlock_ex_unlock(rwlock_t *rwlock)
+{
+    spinlock_lock_noirq(&rwlock->lock);
+
+    atomic_barrier();
+    assert(rwlock->reader_count == -thread_get_id());
+
+    if (rwlock->ex_link.next != &rwlock->ex_link) {
+        // Wake and transfer ownership to next writer
+        thread_wait_t *waiter = (thread_wait_t*)rwlock->ex_link.next;
+        thread_wait_del(&waiter->link);
+        thread_t waked_thread = waiter->thread;
+        rwlock->reader_count = -waked_thread;
+        spinlock_unlock_noirq(&rwlock->lock);
+        thread_resume(waked_thread);
+    } else if (rwlock->sh_link.next != &rwlock->sh_link) {
+        // Wake all readers
+        rwlock->reader_count = 0;
+        do {
+            thread_wait_t *waiter = (thread_wait_t*)rwlock->sh_link.next;
+            thread_wait_del(&waiter->link);
+            thread_t waked_thread = waiter->thread;
+            ++rwlock->reader_count;
+            thread_resume(waked_thread);
+        } while (rwlock->sh_link.next != &rwlock->sh_link);
+        spinlock_unlock_noirq(&rwlock->lock);
+    } else {
+        // No waiters
+        rwlock->reader_count = 0;
+        atomic_barrier();
+        spinlock_unlock_noirq(&rwlock->lock);
+    }
+}
+
+EXPORT void rwlock_sh_lock(rwlock_t *rwlock)
+{
+    int spin = 0;
+    for (bool done = false; !done; pause(), ++spin) {
+        // Spin outside lock until spin limit
+        //  while the exclusive lock is held, and,
+        //  there is a next writer
+        if (spin < rwlock->spin_count &&
+                rwlock->reader_count < 0 &&
+                rwlock->ex_link.next == &rwlock->ex_link)
+            continue;
+
+        spinlock_lock_noirq(&rwlock->lock);
+
+        // If there is no exclusive owner and there is no next writer
+        if (rwlock->reader_count >= 0 &&
+                rwlock->ex_link.next == &rwlock->ex_link) {
+            // Acquire exclusive lock
+            ++rwlock->reader_count;
+
+            done = true;
+        } else if (spin >= rwlock->spin_count) {
+            thread_wait_t wait;
+
+            // Decrease spin count
+            if (rwlock->spin_count > SPINCOUNT_MIN)
+                rwlock->spin_count += spincount_mask;
+
+            // Register to be awakened
+            thread_wait_add(&rwlock->sh_link, &wait.link);
+
+            // Wait
+            thread_suspend_release(&rwlock->lock, &wait.thread);
+
+            // We were awakened
+            assert(rwlock->lock != 0);
+            assert(wait.link.next == 0);
+            assert(wait.link.prev == 0);
+            assert(rwlock->reader_count > 0);
+
+            done = true;
+        }
+
+        spinlock_unlock_noirq(&rwlock->lock);
+    }
+}
+
+EXPORT void rwlock_sh_unlock(rwlock_t *rwlock)
+{
+    spinlock_lock_noirq(&rwlock->lock);
+
+    atomic_barrier();
+
+    assert(rwlock->reader_count > 0);
+    --rwlock->reader_count;
+
+    if (!rwlock->reader_count && rwlock->ex_link.next != &rwlock->ex_link) {
+        // Wake first exclusive waiter
+        thread_wait_t *waiter = (thread_wait_t*)rwlock->ex_link.next;
+        thread_wait_del(&waiter->link);
+        thread_t waked_thread = waiter->thread;
+        rwlock->reader_count = -waked_thread;
+        spinlock_unlock_noirq(&rwlock->lock);
+        thread_resume(waked_thread);
+    } else {
+        // No waiters
+        atomic_barrier();
+        spinlock_unlock_noirq(&rwlock->lock);
+    }
+}
+
+EXPORT bool rwlock_have_ex(rwlock_t *rwlock)
+{
+    return rwlock->reader_count == -thread_get_id();
+}
+
+//
+// Condition variable
 
 EXPORT void condvar_init(condition_var_t *var)
 {
