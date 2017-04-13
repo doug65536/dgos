@@ -710,7 +710,7 @@ int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 
     (void)path;
     (void)stbuf;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::access(fs_cpath_t path, int mask)
@@ -719,7 +719,7 @@ int fat32_fs_t::access(fs_cpath_t path, int mask)
 
     (void)path;
     (void)mask;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
@@ -729,7 +729,7 @@ int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
     (void)path;
     (void)buf;
     (void)size;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -743,7 +743,7 @@ int fat32_fs_t::mknod(fs_cpath_t path,
     (void)path;
     (void)mode;
     (void)rdev;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
@@ -752,7 +752,7 @@ int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 
     (void)path;
     (void)mode;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::rmdir(fs_cpath_t path)
@@ -760,7 +760,7 @@ int fat32_fs_t::rmdir(fs_cpath_t path)
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
 
     (void)path;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
@@ -769,7 +769,7 @@ int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 
     (void)to;
     (void)from;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
@@ -778,7 +778,7 @@ int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 
     (void)from;
     (void)to;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
@@ -787,7 +787,7 @@ int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 
     (void)from;
     (void)to;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::unlink(fs_cpath_t path)
@@ -795,7 +795,7 @@ int fat32_fs_t::unlink(fs_cpath_t path)
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
 
     (void)path;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -807,7 +807,7 @@ int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 
     (void)path;
     (void)mode;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
@@ -817,7 +817,7 @@ int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
     (void)path;
     (void)uid;
     (void)gid;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
@@ -826,7 +826,7 @@ int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 
     (void)path;
     (void)size;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::utimens(fs_cpath_t path,
@@ -836,7 +836,7 @@ int fat32_fs_t::utimens(fs_cpath_t path,
 
     (void)path;
     (void)ts;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -891,7 +891,7 @@ ssize_t fat32_fs_t::write(fs_file_info_t *fi,
     (void)size;
     (void)offset;
     (void)fi;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::ftruncate(fs_file_info_t *fi,
@@ -901,7 +901,7 @@ int fat32_fs_t::ftruncate(fs_file_info_t *fi,
 
     (void)offset;
     (void)fi;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -914,7 +914,7 @@ int fat32_fs_t::fstat(fs_file_info_t *fi,
 
     (void)fi;
     (void)st;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -960,7 +960,7 @@ int fat32_fs_t::lock(fs_file_info_t *fi,
     (void)fi;
     (void)cmd;
     (void)locks;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -975,7 +975,7 @@ int fat32_fs_t::bmap(fs_cpath_t path,
     (void)path;
     (void)blocksize;
     (void)blockno;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -986,7 +986,7 @@ int fat32_fs_t::statfs(fs_statvfs_t* stbuf)
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
 
     (void)stbuf;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -1004,7 +1004,7 @@ int fat32_fs_t::setxattr(fs_cpath_t path,
     (void)value;
     (void)size;
     (void)flags;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::getxattr(fs_cpath_t path,
@@ -1018,7 +1018,7 @@ int fat32_fs_t::getxattr(fs_cpath_t path,
     (void)name;
     (void)value;
     (void)size;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int fat32_fs_t::listxattr(fs_cpath_t path,
@@ -1030,7 +1030,7 @@ int fat32_fs_t::listxattr(fs_cpath_t path,
     (void)path;
     (void)list;
     (void)size;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -1049,7 +1049,7 @@ int fat32_fs_t::ioctl(fs_file_info_t *fi,
     (void)fi;
     (void)flags;
     (void)data;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -1064,5 +1064,5 @@ int fat32_fs_t::poll(fs_file_info_t *fi,
     (void)fi;
     (void)ph;
     (void)reventsp;
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
