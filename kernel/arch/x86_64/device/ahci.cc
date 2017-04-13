@@ -1,5 +1,5 @@
 #include "dev_storage.h"
-#include "ata_decl.h"
+#include "ata.h"
 #include "device/pci.h"
 #include "irq.h"
 #include "printk.h"
@@ -102,6 +102,7 @@ struct ahci_fis_h2d_t {
 
     inline void set_lba(uint64_t lba)
     {
+        assert(lba < 0x1000000000000);
         lba0 = (lba >> (0*8)) & 0xFF;
         lba1 = (lba >> (1*8)) & 0xFF;
         lba2 = (lba >> (2*8)) & 0xFF;
@@ -112,6 +113,7 @@ struct ahci_fis_h2d_t {
 
     inline void set_count(uint32_t new_count)
     {
+        assert(new_count <= 0x10000);
         count = new_count;
     }
 };
@@ -183,18 +185,20 @@ struct ahci_fis_ncq_t {
 
     inline void set_lba(uint64_t lba)
     {
-        lba0 = (lba >> (0*8)) & 0xFF;
-        lba1 = (lba >> (1*8)) & 0xFF;
-        lba2 = (lba >> (2*8)) & 0xFF;
-        lba3 = (lba >> (3*8)) & 0xFF;
-        lba4 = (lba >> (4*8)) & 0xFF;
-        lba5 = (lba >> (5*8)) & 0xFF;
+        assert(lba < 0x1000000000000);
+        lba0 = (lba >> (0*8)) & 0xFFU;
+        lba1 = (lba >> (1*8)) & 0xFFU;
+        lba2 = (lba >> (2*8)) & 0xFFU;
+        lba3 = (lba >> (3*8)) & 0xFFU;
+        lba4 = (lba >> (4*8)) & 0xFFU;
+        lba5 = (lba >> (5*8)) & 0xFFU;
     }
 
     inline void set_count(uint32_t count)
     {
-        count_lo = (count >> (0*8)) & 0xFFFF;
-        count_hi = (count >> (1*8)) & 0xFFFF;
+        assert(count <= 0x10000);
+        count_lo = (count >> (0*8)) & 0xFFU;
+        count_hi = (count >> (1*8)) & 0xFFU;
     }
 };
 
@@ -913,6 +917,7 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 #define AHCI_HP_TFD_ERR_BITS    8
 #define AHCI_HP_TFD_ERR_MASK    ((1U << AHCI_HP_TFD_ERR_BITS)-1)
 #define AHCI_HP_TFD_ERR         (AHCI_HP_TFD_ERR_MASK << AHCI_HP_TFD_ERR_BIT)
+#define AHCI_HP_TFD_ERR_n(n)    ((n) << AHCI_HP_TFD_ERR_BIT)
 
 #define AHCI_HP_TFD_SBSY_BIT    7
 #define AHCI_HP_TFD_SCS64_BIT   4
@@ -920,6 +925,8 @@ C_ASSERT(offsetof(hba_host_ctl_t, ports) == 0x100);
 #define AHCI_HP_TFD_SCS21_BIT   1
 #define AHCI_HP_TFD_SERR_BIT    0
 
+#define AHCI_HP_TFD_SBSY        (1U << AHCI_HP_TFD_SBSY_BIT)
+#define AHCI_HP_TFD_SDRQ        (1U << AHCI_HP_TFD_SDRQ_BIT)
 #define AHCI_HP_TFD_SERR        (1U << AHCI_HP_TFD_SERR_BIT)
 
 //
@@ -1422,7 +1429,8 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
         int error = 0;
 
-        if (unlikely(port_intr_status & AHCI_HP_IS_TFES)) {
+        if (unlikely(port_intr_status & AHCI_HP_IS_TFES) &&
+                (port->taskfile_data & AHCI_HP_TFD_SERR)) {
             // Taskfile error
             error = (port->taskfile_data >> AHCI_HP_TFD_ERR_BIT) &
                     AHCI_HP_TFD_ERR_MASK;
@@ -1835,8 +1843,8 @@ void ahci_if_t::port_reset(unsigned port_num)
     // Clear FIS receive bit
     port->cmd &= ~AHCI_HP_CMD_FRE;
 
-    // Acknowledge FIS receive interrupt
-    port->intr_status |= AHCI_HP_IS_DHRS;
+    // Acknowledge all interrupts
+    port->intr_status = port->intr_status;
 }
 
 void ahci_if_t::rebase()

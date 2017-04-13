@@ -2,7 +2,8 @@
 DEVSRCS := \
 	device/vga.cc \
 	device/ahci.cc \
-	device/ide.cc
+	device/ide.cc \
+	device/ata.cc
 
 DEVOBJS := $(DEVSRCS:.cc=.o)
 
