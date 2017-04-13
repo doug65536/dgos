@@ -140,7 +140,7 @@ static int read_stress(void *p)
     while (1) {
         ++*(char*)p;
 
-        uint64_t lba = rand_r_range(&seed, 16, 32);
+        uint64_t lba = rand_r_range(&seed, 16, 32000);
         int status = drive->read_blocks(data, 1, lba);
 
         if (status != 0)
