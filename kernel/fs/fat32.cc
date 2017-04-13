@@ -697,8 +697,8 @@ int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
 
-    (void)fi;
-    return -1;
+    pool_free(&fat32_handles, fi);
+    return 0;
 }
 
 //
