@@ -212,7 +212,7 @@ struct fs_base_t {
     // Open/close files
 
     virtual int open(fs_file_info_t **fi,
-                fs_cpath_t path) = 0;
+                fs_cpath_t path, int flags, mode_t mode) = 0;
     virtual int release(fs_file_info_t *fi) = 0;
 
     //
@@ -313,7 +313,7 @@ struct fs_base_t {
     int utimens(fs_cpath_t path,                                        \
            fs_timespec_t const *ts) final;                              \
     int open(fs_file_info_t **fi,                                       \
-        fs_cpath_t path) final;                                         \
+        fs_cpath_t path, int flags, mode_t mode) final;                 \
     int release(fs_file_info_t *fi) final;                              \
     ssize_t read(fs_file_info_t *fi,                                    \
             char *buf,                                                  \

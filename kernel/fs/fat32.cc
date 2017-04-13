@@ -7,10 +7,12 @@
 #include "pool.h"
 #include "fat32_decl.h"
 #include "unique_ptr.h"
+#include "threadsync.h"
 
 struct fat32_fs_t : public fs_base_t {
-
     FS_BASE_IMPL
+
+    fat32_fs_t();
 
     friend class fat32_factory_t;
 
@@ -60,12 +62,18 @@ struct fat32_fs_t : public fs_base_t {
     uint32_t walk_cluster_chain(off_t *distance,
             uint32_t cluster, uint64_t offset);
 
-    fat32_dir_union_t *lookup_dirent(char const *pathname);
+    fat32_dir_union_t *lookup_dirent(char const *pathname,
+                                     fat32_dir_union_t **dde);
 
-    file_handle_t *create_handle(char const *path);
+    fat32_dir_union_t *create_dirent(char const *pathname,
+                                     fat32_dir_union_t *dde, mode_t mode);
+
+    file_handle_t *create_handle(char const *path, int flags, mode_t mode);
 
     ssize_t internal_read(file_handle_t *file,
             void *buf, size_t size, off_t offset);
+
+    rwlock_t rwlock;
 
     storage_dev_base_t *drive;
 
@@ -106,6 +114,9 @@ static fat32_fs_t fat32_mounts[16];
 static unsigned fat32_mount_count;
 
 static pool_t fat32_handles;
+
+static constexpr uint8_t dirent_size_shift =
+        bit_log2_n(sizeof(fat32_dir_union_t));
 
 int fat32_fs_t::mm_fault_handler(
         void *dev, void *addr,
@@ -328,14 +339,13 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
     full_lfn_t lfn;
     dirents_from_name(&lfn, filename, name_len);
 
-    uint32_t de_per_cluster = block_size / sizeof(fat32_dir_union_t);
+    uint32_t de_per_cluster = block_size >> dirent_size_shift;
     size_t match_index = 0;
 
     uint8_t last_checksum = 0;
 
     while (!is_eof(cluster)) {
-        fat32_dir_union_t *de = (fat32_dir_union_t *)
-                lookup_cluster(root_cluster);
+        fat32_dir_union_t *de = (fat32_dir_union_t *)lookup_cluster(cluster);
 
         // Iterate through all of the directory entries in this cluster
         for (size_t i = 0; i < de_per_cluster; ++i, ++de) {
@@ -404,10 +414,14 @@ uint32_t fat32_fs_t::walk_cluster_chain(
     return cluster;
 }
 
-fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname)
+fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
+                                             fat32_dir_union_t **dde)
 {
     uint32_t cluster = root_cluster;
-    fat32_dir_union_t *de = 0;
+    fat32_dir_union_t *de = nullptr;
+
+    if (dde)
+        *dde = nullptr;
 
     char const *name_st = pathname;
     char const *path_end = pathname + strlen(pathname);
@@ -427,6 +441,10 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname)
         if (name_len == 0)
             break;
 
+        // Save directory entry of directory containing final filename
+        if (dde && name_en == path_end)
+            *dde = de;
+
         de = search_dir(cluster, name_st, name_len);
 
         if (!de)
@@ -438,22 +456,53 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname)
     return de;
 }
 
-fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
-        char const *path)
+fat32_dir_union_t *fat32_fs_t::create_dirent(
+        char const *pathname, fat32_dir_union_t *dde, mode_t mode)
 {
-    fat32_dir_union_t *de = lookup_dirent(path);
-    (void)de;
+    (void)pathname;
+    (void)dde;
+    (void)mode;
+    return nullptr;
+}
 
-    if (unlikely(!de))
-        return 0;
+fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
+        char const *path, int flags, mode_t mode)
+{
+    fat32_dir_union_t *dde;
+    fat32_dir_union_t *fde = lookup_dirent(path, &dde);
+
+    if (!(flags & O_CREAT)) {
+        // Opening existing file
+        if (unlikely(!fde)) {
+            // File not found
+            return 0;
+        }
+    } else {
+        // Creating file
+        if (unlikely(!dde)) {
+            // Path not found
+            return 0;
+        }
+
+        if ((flags & O_EXCL) && fde) {
+            // File already exists
+            return 0;
+        }
+
+        if (!fde) {
+            fde = create_dirent(path, dde, mode);
+            if (!fde)
+                return 0;
+        }
+    }
 
     file_handle_t *file = (file_handle_t*)pool_alloc(&fat32_handles);
 
     file->fs = this;
-    file->dirent = &de->short_entry;
+    file->dirent = &fde->short_entry;
 
     file->cached_offset = 0;
-    file->cached_cluster = dirent_start_cluster(&de->short_entry);
+    file->cached_cluster = dirent_start_cluster(&fde->short_entry);
 
     return file;
 }
@@ -511,6 +560,11 @@ ssize_t fat32_fs_t::internal_read(file_handle_t *file,
 
 //
 // Startup and shutdown
+
+fat32_fs_t::fat32_fs_t()
+{
+    rwlock_init(&rwlock);
+}
 
 fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
 {
@@ -572,6 +626,8 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 
 void fat32_fs_t::unmount()
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::exclusive);
+
     munmap(mm_dev, (uint64_t)(lba_en - lba_st) << sector_shift);
 }
 
@@ -580,7 +636,9 @@ void fat32_fs_t::unmount()
 
 int fat32_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
-    file_handle_t *file = create_handle(path);
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
+    file_handle_t *file = create_handle(path, O_RDONLY | O_DIRECTORY, 0);
 
     if (!file)
         return -1;
@@ -594,6 +652,8 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
                              dirent_t *buf,
                              off_t offset)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     full_lfn_t lfn;
     size_t index;
     size_t distance;
@@ -635,6 +695,8 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
 
 int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)fi;
     return -1;
 }
@@ -644,6 +706,8 @@ int fat32_fs_t::releasedir(fs_file_info_t *fi)
 
 int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)path;
     (void)stbuf;
     return -1;
@@ -651,6 +715,8 @@ int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 
 int fat32_fs_t::access(fs_cpath_t path, int mask)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)path;
     (void)mask;
     return -1;
@@ -658,6 +724,8 @@ int fat32_fs_t::access(fs_cpath_t path, int mask)
 
 int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)path;
     (void)buf;
     (void)size;
@@ -670,6 +738,8 @@ int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 int fat32_fs_t::mknod(fs_cpath_t path,
                        fs_mode_t mode, fs_dev_t rdev)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)mode;
     (void)rdev;
@@ -678,6 +748,8 @@ int fat32_fs_t::mknod(fs_cpath_t path,
 
 int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)mode;
     return -1;
@@ -685,12 +757,16 @@ int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 
 int fat32_fs_t::rmdir(fs_cpath_t path)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     return -1;
 }
 
 int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)to;
     (void)from;
     return -1;
@@ -698,6 +774,8 @@ int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 
 int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)from;
     (void)to;
     return -1;
@@ -705,6 +783,8 @@ int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 
 int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)from;
     (void)to;
     return -1;
@@ -712,6 +792,8 @@ int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 
 int fat32_fs_t::unlink(fs_cpath_t path)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     return -1;
 }
@@ -721,6 +803,8 @@ int fat32_fs_t::unlink(fs_cpath_t path)
 
 int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)mode;
     return -1;
@@ -728,6 +812,8 @@ int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 
 int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)uid;
     (void)gid;
@@ -736,6 +822,8 @@ int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
 
 int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)size;
     return -1;
@@ -744,6 +832,8 @@ int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 int fat32_fs_t::utimens(fs_cpath_t path,
                          const fs_timespec_t *ts)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)ts;
     return -1;
@@ -753,9 +843,13 @@ int fat32_fs_t::utimens(fs_cpath_t path,
 // Open/close files
 
 int fat32_fs_t::open(fs_file_info_t **fi,
-                      fs_cpath_t path)
+                      fs_cpath_t path, int flags, mode_t mode)
 {
-    file_handle_t *file = create_handle(path);
+    scoped_rwlock_t lock(rwlock, (flags & O_CREAT)
+                         ? scoped_rwlock_t::writer
+                         : scoped_rwlock_t::reader);
+
+    file_handle_t *file = create_handle(path, flags, mode);
 
     if (!file)
         return -1;
@@ -767,6 +861,8 @@ int fat32_fs_t::open(fs_file_info_t **fi,
 
 int fat32_fs_t::release(fs_file_info_t *fi)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     pool_free(&fat32_handles, fi);
     return 0;
 }
@@ -779,6 +875,8 @@ ssize_t fat32_fs_t::read(fs_file_info_t *fi,
                           size_t size,
                           off_t offset)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     return internal_read((file_handle_t*)fi, (char*)buf, size, offset);
 }
 
@@ -787,6 +885,8 @@ ssize_t fat32_fs_t::write(fs_file_info_t *fi,
                            size_t size,
                            off_t offset)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)buf;
     (void)size;
     (void)offset;
@@ -797,6 +897,8 @@ ssize_t fat32_fs_t::write(fs_file_info_t *fi,
 int fat32_fs_t::ftruncate(fs_file_info_t *fi,
                            off_t offset)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)offset;
     (void)fi;
     return -1;
@@ -808,6 +910,8 @@ int fat32_fs_t::ftruncate(fs_file_info_t *fi,
 int fat32_fs_t::fstat(fs_file_info_t *fi,
                        fs_stat_t *st)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)fi;
     (void)st;
     return -1;
@@ -819,6 +923,8 @@ int fat32_fs_t::fstat(fs_file_info_t *fi,
 int fat32_fs_t::fsync(fs_file_info_t *fi,
                        int isdatasync)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)isdatasync;
     (void)fi;
     return 0;
@@ -827,6 +933,8 @@ int fat32_fs_t::fsync(fs_file_info_t *fi,
 int fat32_fs_t::fsyncdir(fs_file_info_t *fi,
                           int isdatasync)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)isdatasync;
     (void)fi;
     return 0;
@@ -834,6 +942,8 @@ int fat32_fs_t::fsyncdir(fs_file_info_t *fi,
 
 int fat32_fs_t::flush(fs_file_info_t *fi)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)fi;
     return 0;
 }
@@ -845,6 +955,8 @@ int fat32_fs_t::lock(fs_file_info_t *fi,
                       int cmd,
                       fs_flock_t* locks)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)fi;
     (void)cmd;
     (void)locks;
@@ -858,6 +970,8 @@ int fat32_fs_t::bmap(fs_cpath_t path,
                       size_t blocksize,
                       uint64_t* blockno)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)path;
     (void)blocksize;
     (void)blockno;
@@ -869,6 +983,8 @@ int fat32_fs_t::bmap(fs_cpath_t path,
 
 int fat32_fs_t::statfs(fs_statvfs_t* stbuf)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)stbuf;
     return -1;
 }
@@ -881,6 +997,8 @@ int fat32_fs_t::setxattr(fs_cpath_t path,
                           char const* value,
                           size_t size, int flags)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)path;
     (void)name;
     (void)value;
@@ -894,6 +1012,8 @@ int fat32_fs_t::getxattr(fs_cpath_t path,
                           char* value,
                           size_t size)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)path;
     (void)name;
     (void)value;
@@ -905,6 +1025,8 @@ int fat32_fs_t::listxattr(fs_cpath_t path,
                            char const* list,
                            size_t size)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)path;
     (void)list;
     (void)size;
@@ -920,6 +1042,8 @@ int fat32_fs_t::ioctl(fs_file_info_t *fi,
                        unsigned int flags,
                        void* data)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
+
     (void)cmd;
     (void)arg;
     (void)fi;
@@ -935,6 +1059,8 @@ int fat32_fs_t::poll(fs_file_info_t *fi,
                       fs_pollhandle_t* ph,
                       unsigned* reventsp)
 {
+    scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
+
     (void)fi;
     (void)ph;
     (void)reventsp;

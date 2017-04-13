@@ -8,7 +8,8 @@
 #define SEEK_DATA   3
 #define SEEK_HOLE   4
 
-int file_open(char const *path);
+int file_creat(char const *path, mode_t mode);
+int file_open(char const *path, int flags, mode_t mode = 0);
 int file_close(int fd);
 ssize_t file_read(int fd, void *buf, size_t bytes);
 ssize_t file_write(int fd, void const *buf, size_t bytes);

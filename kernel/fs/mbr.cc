@@ -57,7 +57,7 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
     if (sector_size >= 512) {
         unique_ptr<uint8_t> sector = new uint8_t[sector_size];
 
-        if (drive->read_blocks(sector, 1, 0) < 0) {
+        if (drive->read_blocks(sector, 1, 0) >= 0) {
             memcpy(sig, sector + 512 - sizeof(sig), sizeof(sig));
 
             if (sector[510] == 0x55 &&

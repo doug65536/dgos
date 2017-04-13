@@ -764,7 +764,7 @@ int iso9660_fs_t::mknod(fs_cpath_t path,
     (void)mode;
     (void)rdev;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::mkdir(fs_cpath_t path,
@@ -773,14 +773,14 @@ int iso9660_fs_t::mkdir(fs_cpath_t path,
     (void)path;
     (void)mode;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::rmdir(fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::symlink(
@@ -790,7 +790,7 @@ int iso9660_fs_t::symlink(
     (void)to;
     (void)from;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::rename(
@@ -800,7 +800,7 @@ int iso9660_fs_t::rename(
     (void)from;
     (void)to;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::link(
@@ -810,7 +810,7 @@ int iso9660_fs_t::link(
     (void)from;
     (void)to;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::unlink(
@@ -818,7 +818,7 @@ int iso9660_fs_t::unlink(
 {
     (void)path;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 //
@@ -831,7 +831,7 @@ int iso9660_fs_t::chmod(
     (void)path;
     (void)mode;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::chown(
@@ -843,7 +843,7 @@ int iso9660_fs_t::chown(
     (void)uid;
     (void)gid;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::truncate(
@@ -853,7 +853,7 @@ int iso9660_fs_t::truncate(
     (void)path;
     (void)size;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::utimens(
@@ -863,7 +863,7 @@ int iso9660_fs_t::utimens(
     (void)path;
     (void)ts;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 
@@ -871,10 +871,13 @@ int iso9660_fs_t::utimens(
 // Open/close files
 
 int iso9660_fs_t::open(fs_file_info_t **fi,
-                        fs_cpath_t path)
+                        fs_cpath_t path, int flags, mode_t)
 {
+    if (unlikely((flags & O_CREAT) | ((flags & O_RDWR) == O_WRONLY)))
+        return -int(errno_t::EROFS);
+
     file_handle_t *file = (file_handle_t *)pool_alloc(&iso9660_handles);
-    *fi = file;
+    *fi = file;    
 
     file->dirent = lookup_dirent(path);
     file->content = (char*)lookup_sector(dirent_lba(file->dirent));
@@ -925,7 +928,7 @@ ssize_t iso9660_fs_t::write(fs_file_info_t *fi,
     (void)offset;
     (void)fi;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::ftruncate(fs_file_info_t *fi,
@@ -934,7 +937,7 @@ int iso9660_fs_t::ftruncate(fs_file_info_t *fi,
     (void)offset;
     (void)fi;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 //
@@ -1067,7 +1070,7 @@ int iso9660_fs_t::setxattr(
     (void)size;
     (void)flags;
     // Fail, read only
-    return -1;
+    return -int(errno_t::EROFS);
 }
 
 int iso9660_fs_t::getxattr(

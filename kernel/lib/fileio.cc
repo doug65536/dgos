@@ -52,7 +52,12 @@ static file_handle_t *file_fh_from_fd(int fd)
             : 0;
 }
 
-int file_open(char const *path)
+int file_creat(char const *path, mode_t mode)
+{
+    return file_open(path, O_CREAT | O_WRONLY | O_TRUNC, mode);
+}
+
+int file_open(char const *path, int flags, mode_t mode)
 {
     fs_base_t *fs = file_fs_from_path(path);
 
@@ -61,7 +66,7 @@ int file_open(char const *path)
 
     file_handle_t *fh = file_new_fd();
 
-    int status = fs->open(&fh->fi, path);
+    int status = fs->open(&fh->fi, path, flags, mode);
     if (status < 0)
         return -1;
 

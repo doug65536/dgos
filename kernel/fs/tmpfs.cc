@@ -19,13 +19,13 @@ class tmpfs_factory_t : public fs_factory_t {
 fs_base_t *tmpfs_factory_t::mount(fs_init_info_t *conn)
 {
     (void)conn;
-    return 0;
+    return nullptr;
 }
 
 void* tmpfs_fs_t::mount(fs_init_info_t *conn)
 {
     (void)conn;
-    return 0;
+    return nullptr;
 }
 
 void tmpfs_fs_t::unmount()
@@ -39,14 +39,14 @@ int tmpfs_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 {
     (void)path;
     (void)stbuf;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::access(fs_cpath_t path, int mask)
 {
     (void)path;
     (void)mask;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
@@ -54,7 +54,7 @@ int tmpfs_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
     (void)path;
     (void)buf;
     (void)size;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -64,7 +64,7 @@ int tmpfs_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
     (void)path;
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 ssize_t tmpfs_fs_t::readdir(fs_file_info_t *fi,
@@ -73,13 +73,13 @@ ssize_t tmpfs_fs_t::readdir(fs_file_info_t *fi,
     (void)buf;
     (void)offset;
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::releasedir(fs_file_info_t *fi)
 {
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 
@@ -91,47 +91,47 @@ int tmpfs_fs_t::mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev)
     (void)path;
     (void)mode;
     (void)rdev;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 {
     (void)path;
     (void)mode;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::rmdir(fs_cpath_t path)
 {
     (void)path;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 {
     (void)to;
     (void)from;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 {
     (void)from;
     (void)to;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 {
     (void)from;
     (void)to;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::unlink(fs_cpath_t path)
 {
     (void)path;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -141,7 +141,7 @@ int tmpfs_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 {
     (void)path;
     (void)mode;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
@@ -149,38 +149,41 @@ int tmpfs_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
     (void)path;
     (void)uid;
     (void)gid;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::truncate(fs_cpath_t path, off_t size)
 {
     (void)path;
     (void)size;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::utimens(fs_cpath_t path, const fs_timespec_t *ts)
 {
     (void)path;
     (void)ts;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 
 //
 // Open/close files
 
-int tmpfs_fs_t::open(fs_file_info_t **fi, fs_cpath_t path)
+int tmpfs_fs_t::open(fs_file_info_t **fi,
+                     fs_cpath_t path, int flags, mode_t mode)
 {
-    (void)path;
     (void)fi;
-    return 0;
+    (void)path;
+    (void)flags;
+    (void)mode;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::release(fs_file_info_t *fi)
 {
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 
@@ -194,7 +197,7 @@ ssize_t tmpfs_fs_t::read(fs_file_info_t *fi, char *buf,
     (void)size;
     (void)offset;
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 ssize_t tmpfs_fs_t::write(fs_file_info_t *fi, char const *buf,
@@ -204,7 +207,7 @@ ssize_t tmpfs_fs_t::write(fs_file_info_t *fi, char const *buf,
     (void)size;
     (void)offset;
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::ftruncate(fs_file_info_t *fi, off_t offset)
@@ -222,7 +225,7 @@ int tmpfs_fs_t::fstat(fs_file_info_t *fi, fs_stat_t *st)
 {
     (void)fi;
     (void)st;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -232,20 +235,20 @@ int tmpfs_fs_t::fsync(fs_file_info_t *fi, int isdatasync)
 {
     (void)isdatasync;
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::fsyncdir(fs_file_info_t *fi, int isdatasync)
 {
     (void)isdatasync;
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::flush(fs_file_info_t *fi)
 {
     (void)fi;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -254,7 +257,7 @@ int tmpfs_fs_t::flush(fs_file_info_t *fi)
 int tmpfs_fs_t::statfs(fs_statvfs_t* stbuf)
 {
     (void)stbuf;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -266,7 +269,7 @@ int tmpfs_fs_t::lock(
     (void)fi;
     (void)cmd;
     (void)locks;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -278,7 +281,7 @@ int tmpfs_fs_t::bmap(
     (void)path;
     (void)blocksize;
     (void)blockno;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -294,7 +297,7 @@ int tmpfs_fs_t::setxattr(
     (void)value;
     (void)size;
     (void)flags;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::getxattr(
@@ -306,7 +309,7 @@ int tmpfs_fs_t::getxattr(
     (void)name;
     (void)value;
     (void)size;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 int tmpfs_fs_t::listxattr(
@@ -316,7 +319,7 @@ int tmpfs_fs_t::listxattr(
     (void)path;
     (void)list;
     (void)size;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -334,7 +337,7 @@ int tmpfs_fs_t::ioctl(
     (void)fi;
     (void)flags;
     (void)data;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
 
 //
@@ -347,5 +350,5 @@ int tmpfs_fs_t::poll(fs_file_info_t *fi,
     (void)fi;
     (void)ph;
     (void)reventsp;
-    return 0;
+    return -int(errno_t::ENOSYS);
 }
