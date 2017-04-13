@@ -161,29 +161,24 @@ static pool_t iso9660_handles;
 uint64_t iso9660_fs_t::dirent_size(iso9660_dir_ent_t const *de)
 {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return (de->size_hi_le << 16) |
-            de->size_lo_le;
+    return (de->size_hi_le << 16) | de->size_lo_le;
 #else
-    return (de->size_hi_be << 16) |
-            de->size_lo_be;
+    return (de->size_hi_be << 16) | de->size_lo_be;
 #endif
 }
 
 uint64_t iso9660_fs_t::dirent_lba(iso9660_dir_ent_t const *de)
 {
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-    return (de->lba_hi_le << 16) |
-            de->lba_lo_le;
+    return (de->lba_hi_le << 16) | de->lba_lo_le;
 #else
-    return (de->lba_hi_be << 16) |
-            de->lba_lo_be;
+    return (de->lba_hi_be << 16) | de->lba_lo_be;
 #endif
 }
 
 uint64_t iso9660_fs_t::pt_rec_lba(iso9660_pt_rec_t const *pt_rec)
 {
-    return (pt_rec->lba_hi << 16) |
-            pt_rec->lba_lo;
+    return (pt_rec->lba_hi << 16) | pt_rec->lba_lo;
 }
 
 int iso9660_fs_t::name_to_ascii(
@@ -638,7 +633,7 @@ int iso9660_fs_t::getattr(
     // File serial number.
     stbuf->st_ino = 0;
 
-    // Mode of file (see below)
+    // Mode of file
     stbuf->st_mode = 0;
 
     // Number of hard links to the file
@@ -747,7 +742,6 @@ ssize_t iso9660_fs_t::readdir(fs_file_info_t *fi,
 
 int iso9660_fs_t::releasedir(fs_file_info_t *fi)
 {
-    (void)fi;
     pool_free(&iso9660_handles, fi);
     return 0;
 }

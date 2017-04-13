@@ -262,6 +262,96 @@ C_ASSERT(offsetof(iso9660_ea_rec_t, system_id) == 84);
 C_ASSERT(offsetof(iso9660_ea_rec_t, ea_rec_ver) == 180);
 C_ASSERT(offsetof(iso9660_ea_rec_t, app_use_len_lo) == 246);
 
+//
+// RockRidge Extension
+
+struct iso9660_rr_hdr_t {
+    char sig[2];
+    uint8_t len;
+    uint8_t ver;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_hdr_t) == 4);
+
+// POSIX file attributes
+struct iso9660_rr_px_t {
+    iso9660_rr_hdr_t hdr;
+    uint32_both_t st_mode;
+    uint32_both_t st_nlink;
+    uint32_both_t st_uid;
+    uint32_both_t st_gid;
+    uint32_both_t st_ino;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_px_t) == 44);
+
+// POSIX device number
+struct iso9660_rr_pn_t {
+    iso9660_rr_hdr_t hdr;
+    uint32_both_t dev_hi;
+    uint32_both_t dev_lo;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_pn_t) == 20);
+
+// Symbolic link
+struct iso9660_rr_sl_t {
+    iso9660_rr_hdr_t hdr;
+    uint8_t flags;
+    // followed by variable length component
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_sl_t) == 5);
+
+// Alternate name
+struct iso9660_rr_nm_t {
+    iso9660_rr_hdr_t hdr;
+    uint8_t flags;
+    // followed by variable length name
+} __attribute__((packed));
+
+// Child link
+struct iso9660_rr_cl_t {
+    iso9660_rr_hdr_t hdr;
+    uint32_both_t lba;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_cl_t) == 12);
+
+// Parent link
+struct iso9660_rr_pl_t {
+    iso9660_rr_hdr_t hdr;
+    uint32_both_t lba;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_pl_t) == 12);
+
+// Relocated directory
+struct iso9660_rr_re_t {
+    iso9660_rr_hdr_t hdr;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_re_t) == 4);
+
+// Timestamps
+struct iso9660_rr_tf_t {
+    iso9660_rr_hdr_t hdr;
+    uint8_t flags;
+    // followed by timestamps
+} __attribute__((packed));
+
+//C_ASSERT(sizeof(iso9660_tf_re_t) == 12);
+
+// Sparse file
+struct iso9660_rr_sf_t {
+    iso9660_rr_hdr_t hdr;
+    uint32_both_t virtual_size_hi;
+    uint32_both_t virtual_size_lo;
+    uint8_t table_depth;
+} __attribute__((packed));
+
+C_ASSERT(sizeof(iso9660_rr_sf_t) == 21);
+
 struct iso9660_sector_iterator_t {
     uint32_t lba;
     uint32_t size;
