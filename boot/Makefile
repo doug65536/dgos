@@ -259,6 +259,7 @@ $(ISO_STAGE)/bootsect.bin: $(BOOTSECTORS)
 	mkdir -p $(ISO_STAGE)/var/spool
 	mkdir -p $(ISO_STAGE)/var/tmp
 	mkdir -p $(ISO_STAGE)/dev
+	touch $(ISO_STAGE)/home/unicode-🂡
 	echo Hello! >> $(ISO_STAGE)/root/hello.txt
 
 stagedir: $(ISO_STAGE)/bootsect.bin modules
