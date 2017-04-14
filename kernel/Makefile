@@ -151,7 +151,8 @@ LDFLAGS ?=  --oformat elf64-x86-64 \
 # Add smallest code optimization to all objects for sources in NEEDSMALLEST
 $(NEEDSMALLEST:.cc=.o): CXXFLAGS += -Os -DNDEBUG
 
-all: subdirs $(EXTERNLIBFILES) $(OUTPUTS) $(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
+all: subdirs $(EXTERNLIBFILES) $(OUTPUTS) \
+	$(DUMPDIR)/kernel-headers $(DUMPDIR)/kernel.dis
 
 clean:
 	@rm -f $(BINDIR)/kernel
@@ -179,7 +180,8 @@ $(LIBFILES): subdirs
 
 WLPREFIX := -Wl,
 
-$(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) $(EXTERNLIBFILES) $(LIBFILES_WHOLE)
+$(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) \
+		$(EXTERNLIBFILES) $(LIBFILES_WHOLE)
 	mkdir -p $(DUMPDIR)
 	$(CXX) $(CXXFLAGS) $(OUTPUT_OPTION) \
 		-fuse-linker-plugin \
