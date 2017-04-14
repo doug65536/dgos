@@ -20,6 +20,7 @@
 #include "bsearch.h"
 #include "process.h"
 #include "cpu_broadcast.h"
+#include "errno.h"
 
 #define DEBUG_CREATE_PT         0
 #define DEBUG_ADDR_ALLOC        0
@@ -832,6 +833,17 @@ static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
     return ctx;
 }
 
+static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
+{
+    intptr_t device = binary_search(
+                mm_dev_mappings, mm_dev_mapping_count,
+                sizeof(*mm_dev_mappings),
+                (void*)rounded_addr,
+                mm_dev_map_search, 0, 1);
+
+    return device;
+}
+
 // Page fault
 static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 {
@@ -913,11 +925,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
                     -(intptr_t)PAGE_SIZE;
 
             // Lookup the device mapping
-            intptr_t device = binary_search(
-                        mm_dev_mappings, mm_dev_mapping_count,
-                        sizeof(*mm_dev_mappings),
-                        (void*)rounded_addr,
-                        mm_dev_map_search, 0, 1);
+            intptr_t device = mmu_device_from_addr(rounded_addr);
             if (unlikely(device < 0))
                 return 0;
 
@@ -950,7 +958,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             mutex_unlock(&mapping->lock);
 
             mapping->callback(mapping->context, (void*)rounded_addr,
-                              mapping_offset, 0x10000);
+                              mapping_offset, 0x10000, true, false);
 
             // Mark the range present from end to start
             addr_present(rounded_addr, path, ptes);
@@ -1975,6 +1983,35 @@ int madvise(void *addr, size_t len, int advice)
     mmu_send_tlb_shootdown();
 
     return 0;
+}
+
+int msync(void const *addr, size_t len, int flags)
+{
+    linaddr_t rounded_addr = (linaddr_t)addr & -(intptr_t)PAGE_SIZE;
+    len = round_up(len);
+
+    intptr_t device = mmu_device_from_addr(rounded_addr);
+
+    if (unlikely(device < 0))
+        return -int(errno_t::EFAULT);
+
+    mmap_device_mapping_t *mapping = mm_dev_mappings + device;
+
+    mutex_lock(&mapping->lock);
+
+    while (mapping->active_read >= 0)
+        condvar_wait(&mapping->done_cond, &mapping->lock);
+
+    uintptr_t offset = rounded_addr - uintptr_t(mapping->base_addr);
+
+    bool need_flush = (flags & MS_SYNC) != 0;
+
+    int result = mapping->callback(mapping->context, (void*)rounded_addr,
+                                   offset, len, false, need_flush);
+
+    mutex_unlock(&mapping->lock);
+
+    return result;
 }
 
 uintptr_t mphysaddr(void volatile *addr)

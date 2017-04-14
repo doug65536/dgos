@@ -31,9 +31,8 @@ struct fat32_fs_t : public fs_base_t {
 
     fs_base_t *mount(fs_init_info_t *conn);
 
-    static int mm_fault_handler(
-            void *dev, void *addr,
-            uint64_t offset, uint64_t length);
+    static int mm_fault_handler(void *dev, void *addr,
+            uint64_t offset, uint64_t length, bool read, bool flush);
 
     void *lookup_sector(uint64_t lba);
 
@@ -70,8 +69,8 @@ struct fat32_fs_t : public fs_base_t {
 
     file_handle_t *create_handle(char const *path, int flags, mode_t mode);
 
-    ssize_t internal_read(file_handle_t *file,
-            void *buf, size_t size, off_t offset);
+    ssize_t internal_rw(file_handle_t *file,
+            void *buf, size_t size, off_t offset, bool read);
 
     rwlock_t rwlock;
 
@@ -118,18 +117,30 @@ static pool_t fat32_handles;
 static constexpr uint8_t dirent_size_shift =
         bit_log2_n(sizeof(fat32_dir_union_t));
 
-int fat32_fs_t::mm_fault_handler(
-        void *dev, void *addr,
-        uint64_t offset, uint64_t length)
+int fat32_fs_t::mm_fault_handler(void *dev, void *addr,
+                                 uint64_t offset, uint64_t length,
+                                 bool read, bool flush)
 {
     FS_DEV_PTR(fat32_fs_t, dev);
 
     uint64_t sector_offset = (offset >> self->sector_shift);
     uint64_t lba = self->lba_st + sector_offset;
 
-    printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
+    if (likely(read)) {
+        printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
 
-    return self->drive->read_blocks(addr, length >> self->sector_shift, lba);
+        return self->drive->read_blocks(
+                    addr, length >> self->sector_shift, lba);
+    }
+
+    printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
+    int result = self->drive->write_blocks(
+                addr, length >> self->sector_shift, lba);
+
+    if (unlikely(result >= 0 && flush))
+        result = self->drive->flush();
+
+    return result;
 }
 
 void *fat32_fs_t::lookup_sector(uint64_t lba)
@@ -137,8 +148,7 @@ void *fat32_fs_t::lookup_sector(uint64_t lba)
     return mm_dev + (lba << sector_shift);
 }
 
-uint64_t fat32_fs_t::offsetof_cluster(
-        uint64_t cluster)
+uint64_t fat32_fs_t::offsetof_cluster(uint64_t cluster)
 {
     return (cluster_ofs << sector_shift) +
             (cluster << (sector_shift + block_shift));
@@ -404,6 +414,9 @@ uint32_t fat32_fs_t::walk_cluster_chain(
     uint64_t walked = 0;
 
     while (walked + block_size <= offset) {
+        if (is_eof(fat[cluster]))
+            break;
+
         cluster = fat[cluster];
         walked += block_size;
     }
@@ -507,10 +520,10 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
     return file;
 }
 
-ssize_t fat32_fs_t::internal_read(file_handle_t *file,
-        void *buf, size_t size, off_t offset)
+ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
+        void *buf, size_t size, off_t offset, bool read)
 {
-    char *out = (char*)buf;
+    char *io = (char*)buf;
     ssize_t result = 0;
 
     off_t cached_end = file->cached_offset + block_size;
@@ -543,15 +556,19 @@ ssize_t fat32_fs_t::internal_read(file_handle_t *file,
         if (avail > size)
             avail = size;
 
-        size_t cluster_data_ofs = offsetof_cluster(
-                    file->cached_cluster);
+        size_t cluster_data_ofs = offsetof_cluster(file->cached_cluster);
 
-        memcpy(out, mm_dev + cluster_data_ofs +
-               (offset - file->cached_offset), avail);
+        if (read) {
+            memcpy(io, mm_dev + cluster_data_ofs +
+                   (offset - file->cached_offset), avail);
+        } else {
+            memcpy(mm_dev + cluster_data_ofs +
+                   (offset - file->cached_offset), io, avail);
+        }
 
         offset += avail;
         size -= avail;
-        out += avail;
+        io += avail;
         result += avail;
     }
 
@@ -661,10 +678,10 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
     memset(&lfn, 0, sizeof(lfn));
 
     for (index = 0, distance = 0;
-         sizeof(lfn.fragments[index]) == internal_read(
+         sizeof(lfn.fragments[index]) == internal_rw(
              (file_handle_t*)fi, lfn.fragments + index,
              sizeof(lfn.fragments[index]),
-             offset + sizeof(lfn.fragments[index]) * index);
+             offset + sizeof(lfn.fragments[index]) * index, true);
          ++distance, ++index) {
         if (lfn.fragments[index].short_entry.name[0] == 0)
             break;
@@ -877,7 +894,7 @@ ssize_t fat32_fs_t::read(fs_file_info_t *fi,
 {
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::reader);
 
-    return internal_read((file_handle_t*)fi, (char*)buf, size, offset);
+    return internal_rw((file_handle_t*)fi, (char*)buf, size, offset, true);
 }
 
 ssize_t fat32_fs_t::write(fs_file_info_t *fi,
@@ -887,11 +904,7 @@ ssize_t fat32_fs_t::write(fs_file_info_t *fi,
 {
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
 
-    (void)buf;
-    (void)size;
-    (void)offset;
-    (void)fi;
-    return -int(errno_t::ENOSYS);
+    return internal_rw((file_handle_t*)fi, (char*)buf, size, offset, false);
 }
 
 int fat32_fs_t::ftruncate(fs_file_info_t *fi,
