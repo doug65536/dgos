@@ -1,7 +1,7 @@
 
 - x86-64 platform
 
--- Bootloader
+## Bootloader
 
 - Implemented mostly in C++
 - Custom bootloader, supports FAT32 with LFN and ISO9660 with Joliet
@@ -14,7 +14,7 @@
 - Implements basic exception handlers
 - Shows loading progress bar
 
--- Kernel
+## Kernel
 
 - SMP (supporting Multiprocessor Specification and ACPI)
 - Priority-based scheduler
