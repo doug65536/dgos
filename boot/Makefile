@@ -113,7 +113,7 @@ endif
 CXXFLAGS += $(WEVERYTHING)
 
 # Optimize
-#CXXFLAGS += -Os -DNDEBUG
+CXXFLAGS += -Os -DNDEBUG
 
 ifdef TUNEFOR
 	CXXFLAGS += -mtune=$(TUNEFOR)
@@ -134,7 +134,7 @@ OUTPUTS = $(BOOTSECTORS) $(SYMBOLFILE) $(ISO_FILE) \
 	$(DUMPDIR)/bootsect.hex
 
 NEEDSMALLEST := bootsect.cc
-NOOPTIMIZE := iso9660.cc elf64.cc cpu.cc
+#NOOPTIMIZE := iso9660.cc elf64.cc cpu.cc
 
 DISKIMAGE := $(DISKIMGDIR)/dgos.fat32.raw
 
