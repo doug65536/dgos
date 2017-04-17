@@ -56,7 +56,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   40
+#define ENABLE_READ_STRESS_THREAD   8
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -149,7 +149,7 @@ static int read_stress(void *p)
 
         atomic_inc(counts + (id << 6));
 
-        if (!(atomic_xadd(&completion_count, 1) & ~-64)) {
+        if (!(atomic_xadd(&completion_count, 1) & ~-1024)) {
             int ofs = 0;
             for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
                 ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
@@ -159,9 +159,6 @@ static int read_stress(void *p)
 
             printdbg("%s\n", buf);
         }
-
-        if (++lba > 32)
-            lba = 16;
     }
 
     return 0;
@@ -169,10 +166,10 @@ static int read_stress(void *p)
 #endif
 
 #if ENABLE_SLEEP_THREAD
-typedef struct test_thread_param_t {
+struct test_thread_param_t {
     uint16_t *p;
     int sleep;
-} test_thread_param_t;
+};
 
 static int other_thread(void *p)
 {
@@ -726,6 +723,9 @@ static int init_thread(void *p)
     //bootdev_info(0, 0, 0);
 
     fb_init();
+
+    int create_test = file_open("created", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+    file_close(create_test);
 
 //    for (int i = 0; i < 10000; ++i) {
 //        printdbg("%d=%f\n", i, i / 1000.0);

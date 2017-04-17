@@ -337,7 +337,7 @@ void fat32_fs_t::dirents_from_name(
 size_t fat32_fs_t::name_from_dirents(char *pathname,
                                       full_lfn_t const *full)
 {
-    if (full->lfn_entry_count == 0) {
+    if (unlikely(full->lfn_entry_count == 0)) {
         // Copy short name
     }
 
@@ -635,10 +635,16 @@ fat32_dir_union_t *fat32_fs_t::create_dirent(
     sfn.modified_time = sfn.creation_time;
     sfn.access_date = sfn.creation_date;
 
+    // Archive bit is set in new files
+    sfn.attr = FAT_ATTR_ARCH;
+
+    // If owner doesn't have write permission, then set read only attribute
+    if (!(mode & S_IWUSR))
+        sfn.attr |= FAT_ATTR_RO;
+
     fat32_dir_union_t *entry_ptr;
     entry_ptr = dirent_create(dde, lfn);
 
-    (void)mode;
     return nullptr;
 }
 

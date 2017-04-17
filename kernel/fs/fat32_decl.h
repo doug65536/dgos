@@ -107,7 +107,8 @@ struct fat32_dir_entry_t {
 #define FAT_ATTR_ARCH 32
 
 #define FAT_ATTR_MASK 0x3F
-#define FAT_LONGNAME (FAT_ATTR_RO | FAT_ATTR_HIDDEN | FAT_ATTR_SYS | FAT_ATTR_VOLUME)
+#define FAT_LONGNAME (FAT_ATTR_RO | FAT_ATTR_HIDDEN | \
+    FAT_ATTR_SYS | FAT_ATTR_VOLUME)
 
 // Long filenames are stored in reverse order
 // The last fragment of the long filename is stored first,
