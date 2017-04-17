@@ -407,31 +407,25 @@ static physaddr_t mmu_alloc_phys(int low)
 
 static inline void path_from_addr(unsigned *path, linaddr_t addr)
 {
-    path[0] = (addr >> 39) & 0x1FF;
-    path[1] = (addr >> 30) & 0x1FF;
-    path[2] = (addr >> 21) & 0x1FF;
     path[3] = (addr >> 12) & 0x1FF;
+    path[2] = (addr >> 21) & 0x1FF;
+    path[1] = (addr >> 30) & 0x1FF;
+    path[0] = (addr >> 39) & 0x1FF;
 }
 
-// Returns true on innermost level carry
-static inline int path_inc(unsigned *path)
+static int ptes_present(pte_t **ptes)
 {
-    // Branchless algorithm
+    int present_mask;
 
-    uintptr_t n =
-            ((linaddr_t)path[0] << (9 * 3)) |
-            ((linaddr_t)path[1] << (9 * 2)) |
-            ((linaddr_t)path[2] << (9 * 1)) |
-            (linaddr_t)(path[3]);
+    present_mask = (*ptes[0] & PTE_PRESENT);
+    present_mask |= (present_mask == 1 &&
+                     (*ptes[1] & PTE_PRESENT)) << 1;
+    present_mask |= (present_mask == 3 &&
+                     (*ptes[2] & PTE_PRESENT)) << 2;
+    present_mask |= (present_mask == 7 &&
+                     (*ptes[3] & PTE_PRESENT)) << 3;
 
-    ++n;
-
-    path[0] = (unsigned)(n >> (9 * 3)) & 0x1FF;
-    path[1] = (unsigned)(n >> (9 * 2)) & 0x1FF;
-    path[2] = (unsigned)(n >> (9 * 1)) & 0x1FF;
-    path[3] = (unsigned)n & 0x1FF;
-
-    return path[3] == 0;
+    return present_mask;
 }
 
 // Returns the linear addresses of the page tables for
@@ -455,6 +449,53 @@ static inline void pte_from_path(pte_t **pte, unsigned *path)
     pte[1] = PT1_PTR + indices[1];
     pte[2] = PT2_PTR + indices[2];
     pte[3] = PT3_PTR + indices[3];
+}
+
+static int path_present(unsigned *path, pte_t **ptes)
+{
+    pte_from_path(ptes, path);
+    return ptes_present(ptes);
+}
+
+static int addr_present(uintptr_t addr,
+                        unsigned *path, pte_t **ptes)
+{
+    path_from_addr(path, addr);
+    return path_present(path, ptes);
+}
+
+// Returns linear page index (addr>>12) represented by the specified path
+static inline uintptr_t path_inc(unsigned *path)
+{
+    // Branchless algorithm
+
+    uintptr_t n =
+            (linaddr_t)(path[3] << (9 * 0)) |
+            ((linaddr_t)path[2] << (9 * 1)) |
+            ((linaddr_t)path[1] << (9 * 2)) |
+            ((linaddr_t)path[0] << (9 * 3));
+
+    ++n;
+
+    path[3] = (n >> (9 * 0)) & 0x1FF;
+    path[2] = (n >> (9 * 1)) & 0x1FF;
+    path[1] = (n >> (9 * 2)) & 0x1FF;
+    path[0] = (n >> (9 * 3)) & 0x1FF;
+
+    return n;
+}
+
+// Returns true on innermost level carry
+static inline int path_inc(unsigned *path, pte_t **ptes)
+{
+    uintptr_t n = path_inc(path);
+
+    ptes[3] = PT3_PTR + (n >> (9 * 0));
+    ptes[2] = PT2_PTR + (n >> (9 * 1));
+    ptes[1] = PT1_PTR + (n >> (9 * 2));
+    ptes[0] = PT0_PTR + (n >> (9 * 3));
+
+    return ptes_present(ptes);
 }
 
 static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
@@ -724,34 +765,6 @@ static pte_t *init_map_aliasing_pte(
 //
 // Page table creation
 
-static int ptes_present(pte_t **ptes)
-{
-    int present_mask;
-
-    present_mask = (*ptes[0] & PTE_PRESENT);
-    present_mask |= (present_mask == 1 &&
-                     (*ptes[1] & PTE_PRESENT)) << 1;
-    present_mask |= (present_mask == 3 &&
-                     (*ptes[2] & PTE_PRESENT)) << 2;
-    present_mask |= (present_mask == 7 &&
-                     (*ptes[3] & PTE_PRESENT)) << 3;
-
-    return present_mask;
-}
-
-static int path_present(unsigned *path, pte_t **ptes)
-{
-    pte_from_path(ptes, path);
-    return ptes_present(ptes);
-}
-
-static int addr_present(uintptr_t addr,
-                        unsigned *path, pte_t **ptes)
-{
-    path_from_addr(path, addr);
-    return path_present(path, ptes);
-}
-
 static void mmu_map_page(
         linaddr_t addr,
         physaddr_t physaddr, pte_t flags)
@@ -957,21 +970,24 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             mapping->active_read = mapping_offset;
             mutex_unlock(&mapping->lock);
 
-            mapping->callback(mapping->context, (void*)rounded_addr,
-                              mapping_offset, 0x10000, true, false);
+            int io_result = mapping->callback(
+                        mapping->context, (void*)rounded_addr,
+                        mapping_offset, 0x10000, true, false);
 
-            // Mark the range present from end to start
-            addr_present(rounded_addr, path, ptes);
-            for (size_t i = (0x10000 >> PAGE_SIZE_BIT); i > 0; --i)
-                atomic_or(ptes[3] + (i - 1), PTE_PRESENT);
+            if (likely(io_result >= 0)) {
+                // Mark the range present from end to start
+                addr_present(rounded_addr, path, ptes);
+                for (size_t i = (0x10000 >> PAGE_SIZE_BIT); i > 0; --i)
+                    atomic_or(ptes[3] + (i - 1), PTE_PRESENT | PTE_ACCESSED);
+            }
 
             mutex_lock(&mapping->lock);
             mapping->active_read = -1;
             mutex_unlock(&mapping->lock);
             condvar_wake_all(&mapping->done_cond);
 
-            // Restart the instruction
-            return ctx;
+            // Restart the instruction, or unhandled exception on I/O error
+            return likely(io_result >= 0) ? ctx : 0;
         } else {
             printdbg("Invalid page fault at 0x%zx\n", fault_addr);
             assert(!"Invalid page fault");
@@ -1985,10 +2001,58 @@ int madvise(void *addr, size_t len, int advice)
     return 0;
 }
 
+// Returns the return value of the callback
+// Ends the loop when the callback returns a negative number
+// Calls the callback with each present sub-range
+// Callback signature: int(linaddr_t base, size_t len)
+template<typename F>
+static int present_ranges(F callback, linaddr_t rounded_addr, size_t len)
+{
+    assert(rounded_addr != 0);
+    assert(((rounded_addr) & PAGE_MASK) == 0);
+    assert(((len) & PAGE_MASK) == 0);
+
+    unsigned path[4];
+    pte_t *ptes[4];
+
+    linaddr_t end = rounded_addr + len;
+
+    int present_mask = addr_present(rounded_addr, path, ptes);
+
+    int result = 0;
+    linaddr_t range_start = 0;
+
+    for (linaddr_t addr = rounded_addr;
+         result >= 0 && addr < end; addr += PAGE_SIZE) {
+        if (present_mask == 0xF) {
+            if (!range_start)
+                range_start = addr;
+        } else {
+            if (range_start)
+                result = callback(range_start, addr - range_start);
+
+            range_start = 0;
+        }
+
+        present_mask = path_inc(path, ptes);
+    }
+
+    if (range_start && result >= 0)
+        result = callback(range_start, end - range_start);
+
+    return result;
+}
+
 int msync(void const *addr, size_t len, int flags)
 {
+    // Check for validity, particularly accidentally using O_SYNC
+    assert((flags & (MS_SYNC | MS_INVALIDATE)) == flags);
+
     linaddr_t rounded_addr = (linaddr_t)addr & -(intptr_t)PAGE_SIZE;
     len = round_up(len);
+
+    if (unlikely(len == 0))
+        return 0;
 
     intptr_t device = mmu_device_from_addr(rounded_addr);
 
@@ -2002,12 +2066,14 @@ int msync(void const *addr, size_t len, int flags)
     while (mapping->active_read >= 0)
         condvar_wait(&mapping->done_cond, &mapping->lock);
 
-    uintptr_t offset = rounded_addr - uintptr_t(mapping->base_addr);
-
     bool need_flush = (flags & MS_SYNC) != 0;
 
-    int result = mapping->callback(mapping->context, (void*)rounded_addr,
-                                   offset, len, false, need_flush);
+    int result = present_ranges([&](linaddr_t base, size_t range_len) -> int {
+        uintptr_t offset = base - uintptr_t(mapping->base_addr);
+
+        return mapping->callback(mapping->context, (void*)base,
+                                 offset, range_len, false, need_flush);
+    }, rounded_addr, len);
 
     mutex_unlock(&mapping->lock);
 
