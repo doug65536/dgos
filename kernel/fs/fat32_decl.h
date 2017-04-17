@@ -58,7 +58,7 @@ struct fat32_dir_entry_t {
     uint8_t lowercase_flags;
 
     // offset = 0x0D
-    uint8_t creation_tenth;
+    uint8_t creation_centisec;
 
     // offset = 0x0E
     uint16_t creation_time;
