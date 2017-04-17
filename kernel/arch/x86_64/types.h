@@ -2,6 +2,19 @@
 
 #if defined(__GNUC__)
 
+#define __packed                __attribute__((packed))
+#define __const                 __attribute__((const))
+#define __pure                  __attribute__((pure))
+#define __aligned(n)            __attribute__((aligned(n)))
+#define __always_inline         __attribute__((always_inline))
+#define __noreturn              __attribute__((noreturn))
+#define __used                  __attribute__((used))
+#define __returns_twice         __attribute__((returns_twice))
+#define __vector_size(n)        __attribute__((vector_size(n)))
+#define __noinline              __attribute__((noinline))
+#define __assume_aligned(n)     __attribute__((assume_aligned(n)))
+#define __printf_format(m,n)    __attribute__((format(printf, m, n)))
+#define __malloc                __attribute__((malloc))
 
 #ifndef __SIG_ATOMIC_TYPE__
 #define __SIG_ATOMIC_TYPE__ long int
@@ -87,25 +100,24 @@ typedef int wchar_t;
 #endif
 
 /// SSE vectors
-typedef int8_t __attribute__((vector_size(16))) __ivec16;
-typedef int16_t __attribute__((vector_size(16))) __ivec8;
-typedef int32_t __attribute__((vector_size(16))) __ivec4;
-typedef int64_t __attribute__((vector_size(16))) __ivec2;
-typedef uint8_t __attribute__((vector_size(16))) __uvec16;
-typedef uint16_t __attribute__((vector_size(16))) __uvec8;
-typedef uint32_t __attribute__((vector_size(16))) __uvec4;
-typedef uint64_t __attribute__((vector_size(16))) __uvec2;
-typedef float __attribute__((vector_size(16))) __fvec4;
-typedef double __attribute__((vector_size(16))) __dvec2;
+typedef int8_t __vector_size(16) __ivec16;
+typedef int16_t __vector_size(16) __ivec8;
+typedef int32_t __vector_size(16) __ivec4;
+typedef int64_t __vector_size(16) __ivec2;
+typedef uint8_t __vector_size(16) __uvec16;
+typedef uint16_t __vector_size(16) __uvec8;
+typedef uint32_t __vector_size(16) __uvec4;
+typedef uint64_t __vector_size(16) __uvec2;
+typedef float __vector_size(16) __fvec4;
+typedef double __vector_size(16) __dvec2;
 
 // Some builtins unnecessarily insist on long long types
-typedef long long __attribute__((vector_size(16))) __ivec2LL;
-typedef unsigned long long __attribute__((vector_size(16))) __ivec2ULL;
+typedef long long __vector_size(16) __ivec2LL;
+typedef unsigned long long __vector_size(16) __ivec2ULL;
 
 #define countof(arr) (sizeof(arr)/sizeof(*arr))
 #define offsetof(t, m) __builtin_offsetof(t, m)
 
-// LOL
 #define CHAR_BIT        8
 
 #define MB_LEN_MAX      4

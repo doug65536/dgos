@@ -27,19 +27,19 @@ static unsigned storage_dev_count;
 static part_factory_t *part_factories[MAX_PART_FACTORIES];
 static unsigned part_factory_count;
 
-typedef struct fs_reg_t {
+struct fs_reg_t {
     char const *name;
     fs_factory_t *factory;
-} fs_reg_t;
+};
 
 #define MAX_FS_REGS     16
 static fs_reg_t fs_regs[MAX_FS_REGS];
 static int fs_reg_count;
 
-typedef struct fs_mount_t {
+struct fs_mount_t {
     fs_reg_t *reg;
     fs_base_t *fs;
-} fs_mount_t;
+};
 
 #define MAX_MOUNTS      16
 static fs_mount_t fs_mounts[MAX_MOUNTS];

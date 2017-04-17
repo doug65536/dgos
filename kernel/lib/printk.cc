@@ -33,7 +33,7 @@ typedef enum arg_type_t {
     arg_type_long_double_value
 } arg_type_t;
 
-typedef union arg_t {
+union arg_t {
     char *char_ptr_value;
     wchar_t *wchar_ptr_value;
     int character;
@@ -41,7 +41,7 @@ typedef union arg_t {
     uintptr_t uintptr_value;
     double double_value;
     long double long_double_value;
-} arg_t;
+};
 
 struct formatter_flags_t {
     unsigned int left_justify : 1;
@@ -855,11 +855,11 @@ EXPORT void vpanic(char const *format, va_list ap)
     halt_forever();
 }
 
-typedef struct vsnprintf_context_t {
+struct vsnprintf_context_t {
     char *buf;
     size_t limit;
     size_t level;
-} vsnprintf_context_t;
+};
 
 static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 {
@@ -925,13 +925,13 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
 
 static spinlock_t printdbg_user_lock;
 
-__attribute__((used))
+__used
 static void printdbg_lock_noirq(void)
 {
     spinlock_lock_noirq(&printdbg_user_lock);
 }
 
-__attribute__((used))
+__used
 static void printdbg_unlock_noirq()
 {
     spinlock_unlock_noirq(&printdbg_user_lock);

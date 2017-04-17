@@ -21,7 +21,7 @@ struct fat32_bpb_data_t {
     // Inferred from data in on-disk BPB
     uint32_t first_fat_lba;
     uint32_t cluster_begin_lba;
-} __attribute__((packed));
+} __packed;
 
 // 32 bit boundaries are marked with *
 // *-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*

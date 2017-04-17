@@ -53,7 +53,23 @@ struct fat32_fs_t : public fs_base_t {
     static size_t name_from_dirents(char *pathname,
                                     full_lfn_t const *full);
 
-    static int is_eof(uint32_t cluster);
+    static bool is_eof(uint32_t cluster);
+    static bool is_free(uint32_t cluster);
+    static bool is_dirent_free(fat32_dir_union_t const *de);
+
+    size_t extend_fat_chain(uint32_t *clusters,
+                            uint32_t count, uint32_t cluster);
+    uint32_t allocate_near(uint32_t cluster);
+    void commit_fat_extend(uint32_t *clusters, uint32_t count);
+
+    // Iterate the directory, and if extend_cluster is not null, then
+    // store the appended cluster number there if we fall off the end
+    // of the fat chain of the directory
+    // Callback signature: bool(fat32_dir_union_t* de,
+    //                          uint32_t dir_cluster, bool new_cluster)
+    template<typename F>
+    void iterate_dir(uint32_t cluster, F callback,
+                     uint32_t *extend_cluster = nullptr);
 
     fat32_dir_union_t *search_dir(uint32_t cluster,
             char const *filename, size_t name_len);
@@ -66,6 +82,12 @@ struct fat32_fs_t : public fs_base_t {
 
     fat32_dir_union_t *create_dirent(char const *pathname,
                                      fat32_dir_union_t *dde, mode_t mode);
+
+    fat32_dir_union_t *dirent_create(fat32_dir_union_t *dde,
+                                     full_lfn_t const& lfn);
+
+    uint32_t transact_cluster(uint32_t prev_cluster,
+                              fat32_dir_union_t *dde, uint32_t cluster);
 
     file_handle_t *create_handle(char const *path, int flags, mode_t mode);
 
@@ -84,10 +106,12 @@ struct fat32_fs_t : public fs_base_t {
     uint64_t lba_en;
 
     uint32_t *fat;
+    uint32_t *fat2;
     uint32_t fat_size;
 
     uint32_t root_cluster;
     uint32_t cluster_ofs;
+    uint32_t end_cluster;
 
     uint32_t block_size;
 
@@ -135,10 +159,7 @@ int fat32_fs_t::mm_fault_handler(void *dev, void *addr,
 
     printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
     int result = self->drive->write_blocks(
-                addr, length >> self->sector_shift, lba);
-
-    if (unlikely(result >= 0 && flush))
-        result = self->drive->flush();
+                addr, length >> self->sector_shift, lba, flush);
 
     return result;
 }
@@ -337,9 +358,104 @@ size_t fat32_fs_t::name_from_dirents(char *pathname,
     return out - pathname;
 }
 
-int fat32_fs_t::is_eof(uint32_t cluster)
+bool fat32_fs_t::is_eof(uint32_t cluster)
 {
     return cluster < 2 || cluster >= 0x0FFFFFF8;
+}
+
+bool fat32_fs_t::is_free(uint32_t cluster)
+{
+    return (cluster & 0x0FFFFFFF) == 0;
+}
+
+bool fat32_fs_t::is_dirent_free(fat32_dir_union_t const *de)
+{
+    return (de->short_entry.name[0] == 0) ||
+            (de->short_entry.name[0] == FAT_DELETED_FLAG);
+}
+
+size_t fat32_fs_t::extend_fat_chain(uint32_t *clusters,
+                                    uint32_t count, uint32_t cluster)
+{
+    uint32_t allocated;
+
+    for (allocated = 0; allocated < count; ++allocated) {
+        cluster = allocate_near(cluster);
+        clusters[allocated] = cluster;
+    }
+
+    if (unlikely(allocated < count))
+        clusters[allocated] = 0;
+
+    return allocated;
+}
+
+uint32_t fat32_fs_t::allocate_near(uint32_t cluster)
+{
+    uint32_t candidate = cluster + 1;
+
+    for (uint32_t checked = 0; checked < end_cluster; ++checked, ++candidate) {
+        if (candidate >= end_cluster)
+            candidate = 2;
+
+        if (is_free(fat[candidate])) {
+            fat[candidate] = 1;
+            fat2[candidate] = 1;
+            msync(fat + candidate, sizeof(uint32_t), MS_SYNC);
+            msync(fat2 + candidate, sizeof(uint32_t), MS_SYNC);
+            return candidate;
+        }
+    }
+
+    // Disk full
+    return 0;
+}
+
+void fat32_fs_t::commit_fat_extend(uint32_t *clusters, uint32_t count)
+{
+    if (likely(count)) {
+        uint32_t i;
+        uint32_t cluster;
+        for (i = 0; i < count - 1; ++i) {
+            cluster = clusters[i];
+
+            assert(fat[cluster] == 1);
+            fat[cluster] = clusters[i+1];
+            fat2[cluster] = clusters[i+1];
+
+            msync(fat + cluster, sizeof(uint32_t), MS_SYNC);
+            msync(fat2 + cluster, sizeof(uint32_t), MS_SYNC);
+        }
+        cluster = clusters[i];
+        fat[cluster] = 0x0FFFFFFF;
+        fat2[cluster] = 0x0FFFFFFF;
+        msync(fat + cluster, sizeof(uint32_t), MS_SYNC);
+        msync(fat2 + cluster, sizeof(uint32_t), MS_SYNC);
+    }
+}
+
+template<typename F>
+void fat32_fs_t::iterate_dir(uint32_t cluster, F callback,
+                             uint32_t *extend_cluster)
+{
+    uint32_t de_per_cluster = block_size >> dirent_size_shift;
+
+    while (!is_eof(cluster)) {
+        fat32_dir_union_t *de = (fat32_dir_union_t *)lookup_cluster(cluster);
+
+        // Iterate through all of the directory entries in this cluster
+        for (size_t i = 0; i < de_per_cluster; ++i, ++de) {
+            if (!callback(de, cluster, i == 0))
+                return;
+        }
+
+        if (extend_cluster && is_eof(fat[cluster])) {
+            extend_fat_chain(extend_cluster, 1, cluster);
+            cluster = *extend_cluster;
+        } else {
+            cluster = fat[cluster];
+        }
+    }
 }
 
 fat32_dir_union_t *fat32_fs_t::search_dir(
@@ -349,60 +465,58 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
     full_lfn_t lfn;
     dirents_from_name(&lfn, filename, name_len);
 
-    uint32_t de_per_cluster = block_size >> dirent_size_shift;
     size_t match_index = 0;
 
     uint8_t last_checksum = 0;
 
-    while (!is_eof(cluster)) {
-        fat32_dir_union_t *de = (fat32_dir_union_t *)lookup_cluster(cluster);
+    fat32_dir_union_t *result = nullptr;
 
-        // Iterate through all of the directory entries in this cluster
-        for (size_t i = 0; i < de_per_cluster; ++i, ++de) {
-            // If this is a short filename entry
-            if (de->long_entry.attr != FAT_LONGNAME) {
-                uint8_t checksum = lfn_checksum(de->short_entry.name);
-                if (!memcmp(de->short_entry.name,
-                            lfn.fragments[lfn.lfn_entry_count]
-                            .short_entry.name,
-                            sizeof(de->short_entry.name)) &&
-                        match_index == lfn.lfn_entry_count &&
-                        last_checksum == checksum) {
-                    // Found
-                    return de;
-                }
-
-                // Start matching from the start of the searched entry
-                match_index = 0;
-                continue;
+    iterate_dir(cluster,
+                [&](fat32_dir_union_t *de, uint32_t, bool) -> bool {
+        // If this is a short filename entry
+        if (de->long_entry.attr != FAT_LONGNAME) {
+            uint8_t checksum = lfn_checksum(de->short_entry.name);
+            if (!memcmp(de->short_entry.name,
+                        lfn.fragments[lfn.lfn_entry_count]
+                        .short_entry.name,
+                        sizeof(de->short_entry.name)) &&
+                    match_index == lfn.lfn_entry_count &&
+                    last_checksum == checksum) {
+                // Found
+                result = de;
+                return false;
             }
 
-            if (match_index < lfn.lfn_entry_count) {
-                fat32_long_dir_entry_t const *le;
-                le = &lfn.fragments[match_index].long_entry;
+            // Start matching from the start of the searched entry
+            match_index = 0;
+            return true;
+        }
 
-                if (le->ordinal == de->long_entry.ordinal &&
-                        !memcmp((void*)le->name,
-                                (void*)de->long_entry.name,
-                                   sizeof(le->name)) &&
-                        !memcmp((void*)le->name2,
-                                (void*)de->long_entry.name2,
-                                sizeof(le->name2)) &&
-                        !memcmp((void*)le->name3,
-                                (void*)de->long_entry.name3,
-                                sizeof(le->name3))) {
-                    last_checksum = de->long_entry.checksum;
-                    ++match_index;
-                } else {
-                    match_index = 0;
-                }
+        if (match_index < lfn.lfn_entry_count) {
+            fat32_long_dir_entry_t const *le;
+            le = &lfn.fragments[match_index].long_entry;
+
+            if (le->ordinal == de->long_entry.ordinal &&
+                    !memcmp((void*)le->name,
+                            (void*)de->long_entry.name,
+                               sizeof(le->name)) &&
+                    !memcmp((void*)le->name2,
+                            (void*)de->long_entry.name2,
+                            sizeof(le->name2)) &&
+                    !memcmp((void*)le->name3,
+                            (void*)de->long_entry.name3,
+                            sizeof(le->name3))) {
+                last_checksum = de->long_entry.checksum;
+                ++match_index;
             } else {
                 match_index = 0;
             }
+        } else {
+            match_index = 0;
         }
 
-        cluster = fat[cluster];
-    }
+        return true;
+    });
 
     return 0;
 }
@@ -434,7 +548,7 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
     fat32_dir_union_t *de = nullptr;
 
     if (dde)
-        *dde = nullptr;
+        *dde = &root_dirent;
 
     char const *name_st = pathname;
     char const *path_end = pathname + strlen(pathname);
@@ -454,14 +568,13 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
         if (name_len == 0)
             break;
 
-        // Save directory entry of directory containing final filename
-        if (dde && name_en == path_end)
-            *dde = de;
-
         de = search_dir(cluster, name_st, name_len);
 
         if (!de)
             return 0;
+
+        if (dde)
+            *dde = de;
 
         cluster = dirent_start_cluster(&de->short_entry);
     }
@@ -472,10 +585,131 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
 fat32_dir_union_t *fat32_fs_t::create_dirent(
         char const *pathname, fat32_dir_union_t *dde, mode_t mode)
 {
-    (void)pathname;
-    (void)dde;
+    // Find the end of the pathname
+    char const *name_en = pathname + strlen(pathname);
+
+    // Find the end of the path
+    char const *path_en = (char*)memrchr(pathname, '/', name_en - pathname);
+
+    // If there is no separator, the path is empty
+    if (unlikely(!path_en))
+        path_en = pathname;
+
+    // The name starts after the separator, or the whole pathname is the name
+    char const *name_st = path_en ? path_en + (*path_en == '/') : pathname;
+
+    size_t name_len = name_en - name_st;
+
+    full_lfn_t lfn;
+
+    dirents_from_name(&lfn, name_st, name_len);
+
+    fat32_dir_union_t *entry_ptr;
+    entry_ptr = dirent_create(dde, lfn);
+
     (void)mode;
     return nullptr;
+}
+
+fat32_dir_union_t *fat32_fs_t::dirent_create(
+        fat32_dir_union_t *dde, full_lfn_t const& lfn)
+{
+    fat32_dir_union_t *result;
+
+    int count = lfn.lfn_entry_count + 1;
+
+    // If the directory was expanded, this is the newly allocated cluster
+    uint32_t extend_cluster = 0;
+
+    uint32_t result_cluster;
+
+    uint32_t prev_cluster = 0;
+    uint32_t last_cluster = 0;
+    int consecutive_free = 0;
+
+    uint32_t dir_start = dirent_start_cluster(&dde->short_entry);
+    iterate_dir(dir_start, [&](fat32_dir_union_t *de,
+                uint32_t cluster, bool new_cluster) -> bool {
+        // If we transitioned to a different cluster, reset
+        if (new_cluster) {
+            prev_cluster = last_cluster;
+            consecutive_free = 0;
+            result = nullptr;
+        }
+
+        last_cluster = cluster;
+
+        if (!is_dirent_free(de)) {
+            // We ran into an allocated entry, restart search
+            consecutive_free = 0;
+            result = nullptr;
+            return true;
+        }
+
+        // If this is the first empty entry, remember start cluster
+        if (++consecutive_free == 1) {
+            result_cluster = cluster;
+            result = de;
+        }
+
+        // Done when we have found enough consecutive free entries
+        return consecutive_free < count;
+    }, &extend_cluster);
+
+    if (extend_cluster) {
+        // No need for transaction, it is in a new cluster
+
+    } else {
+        // Perform transacted update
+        uint32_t backup = transact_cluster(prev_cluster, dde, result_cluster);
+
+        fat[prev_cluster] = result_cluster;
+        fat2[prev_cluster] = result_cluster;
+
+        fat[backup] = 0;
+        fat2[backup] = 0;
+
+        msync(fat + prev_cluster, sizeof(uint32_t), MS_SYNC);
+        msync(fat2 + prev_cluster, sizeof(uint32_t), MS_SYNC);
+    }
+
+    return result;
+}
+
+// Move a cluster to another location and link FAT chain to moved cluster
+// flushing the data, then the fat sector
+uint32_t fat32_fs_t::transact_cluster(uint32_t prev_cluster,
+                                      fat32_dir_union_t *dde, uint32_t cluster)
+{
+    uint32_t backup = allocate_near(cluster);
+
+    if (unlikely(!backup))
+        return 0;
+
+    void *destination = lookup_cluster(backup);
+    void *source = lookup_cluster(cluster);
+    memcpy(destination, source, block_size);
+    msync(destination, block_size, O_SYNC);
+
+    fat[backup] = fat[cluster];
+    fat2[backup] = fat[cluster];
+    msync(fat + backup, sizeof(uint32_t), MS_SYNC);
+    msync(fat2 + backup, sizeof(uint32_t), MS_SYNC);
+
+    if (prev_cluster == 0) {
+        // First cluster, adjust start cluster in directory entry
+        dde->short_entry.start_lo = backup & 0xFFFF;
+        dde->short_entry.start_hi = (backup >> 16) & 0xFFFF;
+        msync(dde, sizeof(*dde), O_SYNC);
+    } else {
+        // Not the first cluster, adjust FAT entry
+        fat[prev_cluster] = backup;
+        fat2[prev_cluster] = backup;
+        msync(fat + prev_cluster, sizeof(uint32_t), O_SYNC);
+        msync(fat2 + prev_cluster, sizeof(uint32_t), O_SYNC);
+    }
+
+    return backup;
 }
 
 fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
@@ -618,10 +852,16 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
 
     mm_dev = (char*)mmap_register_device(
                 this, block_size, conn->part_len,
-                PROT_READ, &fat32_fs_t::mm_fault_handler);
+                PROT_READ | PROT_WRITE, &fat32_fs_t::mm_fault_handler);
 
     fat_size = bpb.sec_per_fat << sector_shift;
     fat = (uint32_t*)lookup_sector(bpb.first_fat_lba);
+    fat2 = (uint32_t*)lookup_sector(bpb.first_fat_lba + bpb.sec_per_fat);
+    end_cluster = (lba_en - cluster_ofs) >> bit_log2_n(bpb.sec_per_cluster);
+
+    int fat_mismatches = 0;
+    for (int i = 0, e = fat_size >> bit_log2_n(sizeof(uint32_t)); i < e; ++i)
+        fat_mismatches += fat[i] != fat2[i];
 
     return this;
 }

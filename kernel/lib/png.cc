@@ -35,14 +35,14 @@ static char png_blk_types[][5] = {
 
 #define PNG_BUFSIZE ((64<<10)-_MALLOC_OVERHEAD)
 
-typedef struct png_chunk_hdr_t {
+struct png_chunk_hdr_t {
     uint32_t len;
     char type[4];
-} __attribute__((packed)) png_chunk_hdr_t;
+} __packed;
 
 typedef uint32_t png_crc_t;
 
-typedef struct png_hdr_ihdr_t {
+struct png_hdr_ihdr_t {
     uint32_t width;
     uint32_t height;
     uint8_t bit_depth;
@@ -50,7 +50,7 @@ typedef struct png_hdr_ihdr_t {
     uint8_t compr_method;
     uint8_t filter_method;
     uint8_t interlace_method;
-} __attribute__((packed)) png_hdr_ihdr_t;
+} __packed;
 
 #define PNG_IHDR_COLORTYPE_P_BIT    0
 #define PNG_IHDR_COLORTYPE_C_BIT    1
@@ -91,13 +91,13 @@ typedef enum png_filter_type_t {
     PNG_FILTER_UNSET,
 } png_filter_type_t;
 
-typedef struct png_read_state_t {
+struct png_read_state_t {
     png_image_t const *img;
     int32_t cur_row;
     png_filter_type_t cur_filter;
     intptr_t pixel_bytes;
     intptr_t scanline_bytes;
-} png_read_state_t;
+};
 
 static png_type_t png_hdr_type(png_chunk_hdr_t *hdr)
 {

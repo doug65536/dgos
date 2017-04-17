@@ -2,17 +2,17 @@
 #include "types.h"
 #include "assert.h"
 
-typedef struct idt_entry_t {
+struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
     uint8_t zero;       // unused, set to 0
     uint8_t type_attr;  // type and attributes
     uint16_t offset_hi; // offset bits 16..31
-} idt_entry_t;
+};
 
 C_ASSERT(sizeof(idt_entry_t) == 8);
 
-typedef struct idt_entry_64_t {
+struct idt_entry_64_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
     uint8_t ist;        // interrupt stack table index
@@ -21,7 +21,7 @@ typedef struct idt_entry_64_t {
 
     uint32_t offset_64_31;  // offset bits 63..32
     uint32_t reserved;
-} idt_entry_64_t;
+};
 
 C_ASSERT(sizeof(idt_entry_64_t) == 16);
 
@@ -233,35 +233,35 @@ size_t cpu_describe_fpucw(char *buf, size_t buf_size, uint16_t fpucw);
 size_t cpu_describe_fpusw(char *buf, size_t buf_size, uint16_t fpusw);
 
 // Passed by ISR handler
-typedef struct interrupt_info_t {
+struct interrupt_info_t {
     uintptr_t interrupt;
     uintptr_t error_code;
-} interrupt_info_t;
+};
 
-typedef struct isr_ret_frame_t {
+struct isr_ret_frame_t {
     void (*ret_rip)(void);
-} isr_ret_frame_t;
+};
 
-typedef struct isr_iret_frame_t {
+struct isr_iret_frame_t {
     int (*rip)(void*);
     uintptr_t cs;
     uintptr_t rflags;
     uintptr_t rsp;
     uintptr_t ss;
-} isr_iret_frame_t;
+};
 
 // Exception handler context
-typedef struct isr_gpr_context_t {
+struct isr_gpr_context_t {
     uint16_t s[4];
     uintptr_t cr3;
     void *fsbase;
     uintptr_t r[15];
     interrupt_info_t info;
     isr_iret_frame_t iret;
-} isr_gpr_context_t;
+};
 
 // FPU/SSE context
-typedef struct isr_fxsave_context_t {
+struct isr_fxsave_context_t {
     // FPU control word
     uint16_t fcw;
     // FPU status word
@@ -300,20 +300,20 @@ typedef struct isr_fxsave_context_t {
         uint32_t dword[4];
         uint64_t qword[2];
     } xmm[16];
-} isr_fxsave_context_t;
+};
 
 // Added to top of context on stack when switching to a context
-typedef struct isr_resume_context_t {
+struct isr_resume_context_t {
     void (*cleanup)(void*);
     void *cleanup_arg;
-} isr_resume_context_t;
+};
 
 // Exception handler C call parameter
-typedef struct isr_context_t {
+struct isr_context_t {
     isr_resume_context_t resume;
     isr_fxsave_context_t * fpr;
     isr_gpr_context_t * gpr;
-} isr_context_t;
+};
 
 typedef isr_context_t *(*irq_dispatcher_handler_t)(
         int intr, isr_context_t *ctx);

@@ -8,22 +8,22 @@
 #include "hash_table.h"
 
 // Queued work item
-typedef struct cpu_broadcast_work_t {
+struct cpu_broadcast_work_t {
     struct cpu_broadcast_work_t *next;
     cpu_broadcast_handler_t handler;
     void *data;
     int intr;
     int unique;
-} cpu_broadcast_work_t;
+};
 
 // Per-CPU message queue
-typedef struct cpu_broadcast_queue_t {
+struct cpu_broadcast_queue_t {
     cpu_broadcast_work_t *head;
     cpu_broadcast_work_t *tail;
     cpu_broadcast_work_t *free;
 
     spinlock_t lock;
-} cpu_broadcast_queue_t;
+};
 
 void cpu_broadcast_service(int intr, size_t slot)
 {

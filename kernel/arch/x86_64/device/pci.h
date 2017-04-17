@@ -3,7 +3,7 @@
 #include "assert.h"
 #include "irq.h"
 
-typedef struct pci_config_hdr_t {
+struct pci_config_hdr_t {
     uint16_t vendor;
     uint16_t device;
 
@@ -36,7 +36,7 @@ typedef struct pci_config_hdr_t {
     uint8_t irq_pin;
     uint8_t min_grant;
     uint8_t max_latency;
-} pci_config_hdr_t;
+};
 
 // PCI config command register
 #define PCI_CMD_IOEN_BIT            0
@@ -124,7 +124,7 @@ C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 #define PCI_CFG_STATUS_CAPLIST_BIT  4
 #define PCI_CFG_STATUS_CAPLIST      (1<<PCI_CFG_STATUS_CAPLIST_BIT)
 
-typedef struct pci_dev_iterator_t {
+struct pci_dev_iterator_t {
     pci_config_hdr_t config;
 
     int dev_class;
@@ -138,7 +138,7 @@ typedef struct pci_dev_iterator_t {
 
     uint8_t bus_todo_len;
     uint8_t bus_todo[64];
-} pci_dev_iterator_t;
+};
 
 int pci_init(void);
 
@@ -184,11 +184,11 @@ int pci_enum_capabilities(int bus, int slot, int func,
 //
 // MSI
 
-typedef struct pci_msi_hdr_t {
+struct pci_msi_caps_hdr_t {
     uint8_t capability_id;
     uint8_t next_ptr;
     uint16_t msg_ctrl;
-} pci_msi_caps_hdr_t;
+};
 
 // 64-bit capable
 #define PCI_MSI_HDR_64_BIT      7
@@ -216,21 +216,21 @@ typedef struct pci_msi_hdr_t {
 #define PCI_MSI_HDR_MMC_n(n)    ((n)<<PCI_MSI_HDR_MMC_BIT)
 #define PCI_MSI_HDR_MME_n(n)    ((n)<<PCI_MSI_HDR_MME_BIT)
 
-typedef struct pci_msi32_t {
+struct pci_msi32_t {
     uint32_t addr;
     uint16_t data;
-} __attribute__((packed)) pci_msi32_t;
+} __packed;
 
-typedef struct pci_msi64_t {
+struct pci_msi64_t {
     uint32_t addr_lo;
     uint32_t addr_hi;
     uint16_t data;
-} __attribute__((packed)) pci_msi64_t;
+} __packed;
 
-typedef struct pci_irq_range_t {
+struct pci_irq_range_t {
     uint8_t base;
     uint8_t count;
-} pci_irq_range_t;
+};
 
 bool pci_set_msi_irq(int bus, int slot, int func,
                     pci_irq_range_t *irq_range,

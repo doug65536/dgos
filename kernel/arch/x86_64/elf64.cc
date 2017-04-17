@@ -17,12 +17,12 @@ extern char const ___dynstr_en[];
 extern Elf64_Word const ___hash_st[];
 extern Elf64_Word const ___hash_en[];
 
-typedef struct kernel_ht_t {
+struct kernel_ht_t {
     Elf64_Word hash_nbucket;
     Elf64_Word hash_nchain;
     Elf64_Word const * hash_buckets;
     Elf64_Word const * hash_chains;
-} kernel_ht_t;
+};
 
 static kernel_ht_t export_ht;
 

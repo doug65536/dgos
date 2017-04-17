@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-typedef struct __exception_jmp_buf_t __exception_jmp_buf_t;
+struct __exception_jmp_buf_t;
 
 struct __exception_jmp_buf_t {
     void *rip;
@@ -15,8 +15,8 @@ struct __exception_jmp_buf_t {
     uintptr_t rflags;
 };
 
-extern "C" __attribute__((returns_twice))
+extern "C" __returns_twice
 int __exception_setjmp(__exception_jmp_buf_t *__ctx);
 
-extern "C" __attribute__((noreturn))
+extern "C" __noreturn
 int __exception_longjmp(__exception_jmp_buf_t *__ctx, int value);

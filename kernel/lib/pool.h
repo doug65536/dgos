@@ -3,14 +3,14 @@
 #include "threadsync.h"
 #include "assert.h"
 
-typedef struct pool_t {
+struct pool_t {
     char *items;
     uint32_t item_size;
     uint32_t item_capacity;
     uint32_t item_count;
     uint32_t first_free;
     mutex_t lock;
-} pool_t;
+};
 
 // Isolate pool items onto separate cache lines
 #define POOL_LOG2_ALIGN     6

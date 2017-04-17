@@ -1,7 +1,7 @@
 #pragma once
 #include "types.h"
 
-typedef struct priqueue_t priqueue_t;
+struct priqueue_t;
 typedef int (*priqueue_comparator_t)(uintptr_t lhs, uintptr_t rhs, void *ctx);
 typedef void (*priqueue_swapped_t)(uintptr_t a, uintptr_t b, void *ctx);
 

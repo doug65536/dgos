@@ -45,8 +45,8 @@ enum thread_state_t : uint32_t {
     THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY
 };
 
-typedef struct thread_info_t thread_info_t;
-typedef struct cpu_info_t cpu_info_t;
+struct thread_info_t;
+struct cpu_info_t;
 
 // When state is equal to one of these:
 //  THREAD_IS_READY
@@ -112,7 +112,7 @@ C_ASSERT(sizeof(thread_info_t) % 64 == 0);
 
 // Store in a big array, for now
 #define MAX_THREADS 512
-static thread_info_t threads[MAX_THREADS] __attribute__((aligned(64)));
+static thread_info_t threads[MAX_THREADS] __aligned(64);
 static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
 int thread_idle_ready;
@@ -139,7 +139,7 @@ C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
 #define MAX_CPUS    64
-static cpu_info_t cpus[MAX_CPUS] __attribute__((aligned(64)));
+static cpu_info_t cpus[MAX_CPUS] __aligned(64);
 
 static volatile uint32_t cpu_count;
 

@@ -3,8 +3,8 @@
 #include "ethernet.h"
 
 // Circular dependency
-typedef struct ethq_pkt_t ethq_pkt_t;
-typedef struct eth_dev_base_t eth_dev_base_t;
+struct ethq_pkt_t;
+struct eth_dev_base_t;
 
 #include "dev_eth.h"
 
@@ -33,11 +33,11 @@ int ethq_init(void);
 ethq_pkt_t *ethq_pkt_acquire(void);
 void ethq_pkt_release(ethq_pkt_t *pkt);
 
-typedef struct ethq_queue_t {
+struct ethq_queue_t {
     ethq_pkt_t * volatile head;
     ethq_pkt_t * volatile tail;
     size_t volatile count;
-} ethq_queue_t;
+};
 
 void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt);
 ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue);

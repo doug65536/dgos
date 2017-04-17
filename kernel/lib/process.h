@@ -4,7 +4,7 @@
 
 typedef int pid_t;
 
-typedef struct process_t process_t;
+struct process_t;
 
 // Load and execute the specified program
 int process_spawn(pid_t * pid,

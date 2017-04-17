@@ -4,13 +4,13 @@
 
 #include "dev_registration.h"
 
-typedef struct text_display_t text_display_t;
+struct text_display_t;
 
-typedef struct text_display_vtbl_t text_display_vtbl_t;
+struct text_display_vtbl_t;
 
-typedef struct text_display_base_t {
+struct text_display_base_t {
     text_display_vtbl_t *vtbl;
-} text_display_base_t;
+};
 
 struct text_display_vtbl_t {
     int (*detect)(text_display_base_t **result);

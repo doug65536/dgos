@@ -2,10 +2,10 @@
 
 #include "types.h"
 
-typedef struct far_ptr_t {
+struct far_ptr_t {
     uint16_t offset;
     uint16_t segment;
-} far_ptr_t;
+};
 
 void far_zero(far_ptr_t dest, uint16_t paragraphs);
 

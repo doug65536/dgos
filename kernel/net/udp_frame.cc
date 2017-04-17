@@ -6,10 +6,10 @@
 #include "hash_table.h"
 #include "cpu/atomic.h"
 
-typedef struct udp_bind_t {
+struct udp_bind_t {
     ipv4_addr_pair_t pair;
     int handle;
-} udp_bind_t;
+};
 
 static hashtbl_t udp_handle_lookup;
 static hashtbl_t udp_addr_lookup;

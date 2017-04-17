@@ -13,13 +13,13 @@
 //  'N': Network interface
 //  'U': USB interface
 
-typedef struct callout_t {
+struct callout_t {
     void (*fn)(void*);
     void *userarg;
     int32_t type;
     int32_t reserved;
     int64_t reserved2;
-} callout_t;
+};
 
 #define REGISTER_CALLOUT3(a,n)   a##n
 #define REGISTER_CALLOUT2(a,n)   REGISTER_CALLOUT3(a,n)

@@ -12,10 +12,10 @@
 #endif
 
 // A half-page (exactly) packet
-typedef struct ethq_pkt2K_t {
+struct ethq_pkt2K_t {
     ethq_pkt_t pkt;
     uint8_t align1[(PAGESIZE >> 1) - sizeof(ethq_pkt_t)];
-} ethq_pkt2K_t;
+};
 
 C_ASSERT(sizeof(ethq_pkt2K_t) == (PAGESIZE >> 1));
 

@@ -5,7 +5,7 @@
 // 01234567
 static char boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
 
-typedef enum boxchar_index_t {
+enum boxchar_index_t {
     TL,
     TR,
     V,
@@ -14,7 +14,7 @@ typedef enum boxchar_index_t {
     H,
     S,
     X
-} boxchar_index_t;
+};
 
 void progress_bar_draw(uint16_t top, uint16_t left,
                        uint16_t right, uint16_t percent)

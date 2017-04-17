@@ -23,16 +23,16 @@
 //
 // MP Tables
 
-typedef struct mp_table_hdr_t {
+struct mp_table_hdr_t {
     char sig[4];
     uint32_t phys_addr;
     uint8_t length;
     uint8_t spec;
     uint8_t checksum;
     uint8_t features[5];
-} mp_table_hdr_t;
+};
 
-typedef struct mp_cfg_tbl_hdr_t {
+struct mp_cfg_tbl_hdr_t {
     char sig[4];
     uint16_t base_tbl_len;
     uint8_t spec_rev;
@@ -46,10 +46,10 @@ typedef struct mp_cfg_tbl_hdr_t {
     uint16_t ext_tbl_len;
     uint8_t ext_tbl_checksum;
     uint8_t reserved;
-} mp_cfg_tbl_hdr_t;
+};
 
 // entry_type 0
-typedef struct mp_cfg_cpu_t {
+struct mp_cfg_cpu_t {
     uint8_t entry_type;
     uint8_t apic_id;
     uint8_t apic_ver;
@@ -58,7 +58,7 @@ typedef struct mp_cfg_cpu_t {
     uint32_t features;
     uint32_t reserved1;
     uint32_t reserved2;
-} mp_cfg_cpu_t;
+};
 
 #define MP_CPU_FLAGS_ENABLED_BIT    0
 #define MP_CPU_FLAGS_BSP_BIT        1
@@ -67,20 +67,20 @@ typedef struct mp_cfg_cpu_t {
 #define MP_CPU_FLAGS_BSP            (1<<MP_CPU_FLAGS_BSP_BIT)
 
 // entry_type 1
-typedef struct mp_cfg_bus_t {
+struct mp_cfg_bus_t {
     uint8_t entry_type;
     uint8_t bus_id;
     char type[6];
-} mp_cfg_bus_t;
+};
 
 // entry_type 2
-typedef struct mp_cfg_ioapic_t {
+struct mp_cfg_ioapic_t {
     uint8_t entry_type;
     uint8_t id;
     uint8_t ver;
     uint8_t flags;
     uint32_t addr;
-} mp_cfg_ioapic_t;
+};
 
 #define MP_IOAPIC_FLAGS_ENABLED_BIT   0
 
@@ -208,7 +208,7 @@ static char const * const intr_type_text[] = {
 };
 
 // entry_type 3
-typedef struct mp_cfg_iointr_t {
+struct mp_cfg_iointr_t {
     uint8_t entry_type;
     uint8_t type;
     uint16_t flags;
@@ -216,10 +216,10 @@ typedef struct mp_cfg_iointr_t {
     uint8_t source_bus_irq;
     uint8_t dest_ioapic_id;
     uint8_t dest_ioapic_intin;
-} mp_cfg_iointr_t;
+};
 
 // entry_type 4
-typedef struct mp_cfg_lintr_t {
+struct mp_cfg_lintr_t {
     uint8_t entry_type;
     uint8_t type;
     uint16_t flags;
@@ -227,10 +227,10 @@ typedef struct mp_cfg_lintr_t {
     uint8_t source_bus_irq;
     uint8_t dest_lapic_id;
     uint8_t dest_lapic_lintin;
-} mp_cfg_lintr_t;
+};
 
 // entry_type 128
-typedef struct mp_cfg_addrmap_t {
+struct mp_cfg_addrmap_t {
     uint8_t entry_type;
     uint8_t len;
     uint8_t bus_id;
@@ -239,28 +239,28 @@ typedef struct mp_cfg_addrmap_t {
     uint32_t addr_hi;
     uint32_t len_lo;
     uint32_t len_hi;
-} mp_cfg_addrmap_t;
+};
 
 // entry_type 129
-typedef struct mp_cfg_bushier_t {
+struct mp_cfg_bushier_t {
     uint8_t entry_type;
     uint8_t len;
     uint8_t bus_id;
     uint8_t info;
     uint8_t parent_bus;
     uint8_t reserved[3];
-} mp_cfg_bushier_t;
+};
 
 // entry_type 130
-typedef struct mp_cfg_buscompat_t {
+struct mp_cfg_buscompat_t {
     uint8_t entry_type;
     uint8_t len;
     uint8_t bus_id;
     uint8_t bus_mod;
     uint32_t predef_range_list;
-} mp_cfg_buscompat_t;
+};
 
-typedef struct mp_bus_irq_mapping_t {
+struct mp_bus_irq_mapping_t {
     uint8_t bus;
     uint8_t intr_type;
     uint8_t flags;
@@ -268,9 +268,9 @@ typedef struct mp_bus_irq_mapping_t {
     uint8_t irq;
     uint8_t ioapic_id;
     uint8_t intin;
-} mp_bus_irq_mapping_t;
+};
 
-typedef struct mp_ioapic_t {
+struct mp_ioapic_t {
     uint8_t id;
     uint8_t base_intr;
     uint8_t vector_count;
@@ -278,7 +278,7 @@ typedef struct mp_ioapic_t {
     uint32_t addr;
     uint32_t volatile *ptr;
     spinlock_t lock;
-} mp_ioapic_t;
+};
 
 static char *mp_tables;
 
@@ -543,18 +543,18 @@ static uint32_t volatile *apic_ptr;
 // ACPI
 
 // Root System Description Pointer (ACPI 1.0)
-typedef struct acpi_rsdp_t {
+struct acpi_rsdp_t {
     char sig[8];
     uint8_t checksum;
     char oem_id[6];
     uint8_t rev;
     uint32_t rsdt_addr;
-} acpi_rsdp_t;
+};
 
 C_ASSERT(sizeof(acpi_rsdp_t) == 20);
 
 // Root System Description Pointer (ACPI 2.0+)
-typedef struct acpi_rsdp2_t {
+struct acpi_rsdp2_t {
     acpi_rsdp_t rsdp1;
 
     uint32_t length;
@@ -562,12 +562,12 @@ typedef struct acpi_rsdp2_t {
     uint32_t xsdt_addr_hi;
     uint8_t checksum;
     uint8_t reserved[3];
-} acpi_rsdp2_t;
+};
 
 C_ASSERT(sizeof(acpi_rsdp2_t) == 36);
 
 // Root System Description Table
-typedef struct acpi_sdt_hdr_t {
+struct acpi_sdt_hdr_t {
     char sig[4];
     uint32_t len;
     uint8_t rev;
@@ -577,19 +577,19 @@ typedef struct acpi_sdt_hdr_t {
     uint32_t oem_rev;
     uint32_t creator_id;
     uint32_t creator_rev;
-} __attribute__((packed)) acpi_sdt_hdr_t;
+} __packed;
 
 C_ASSERT(sizeof(acpi_sdt_hdr_t) == 36);
 
 // Generic Address Structure
-typedef struct acpi_gas_t {
+struct acpi_gas_t {
     uint8_t addr_space;
     uint8_t bit_width;
     uint8_t bit_offset;
     uint8_t access_size;
     uint32_t addr_lo;
     uint32_t addr_hi;
-} acpi_gas_t;
+};
 
 C_ASSERT(sizeof(acpi_gas_t) == 12);
 
@@ -606,7 +606,7 @@ C_ASSERT(sizeof(acpi_gas_t) == 12);
 #define ACPI_GAS_ASZ_32     0
 #define ACPI_GAS_ASZ_64     0
 
-typedef struct acpi_fadt_t {
+struct acpi_fadt_t {
     acpi_sdt_hdr_t hdr;
     uint32_t fw_ctl;
     uint32_t dsdt;
@@ -671,44 +671,44 @@ typedef struct acpi_fadt_t {
     acpi_gas_t x_pm_timer_block;
     acpi_gas_t x_gpe0_block;
     acpi_gas_t x_gpe1_block;
-} __attribute__((packed)) acpi_fadt_t;
+} __packed;
 
-typedef struct acpi_ssdt_t {
+struct acpi_ssdt_t {
     // sig == ?
     acpi_sdt_hdr_t hdr;
-} __attribute__((packed)) acpi_ssdt_t;
+} __packed;
 
-typedef struct acpi_madt_rec_hdr_t {
+struct acpi_madt_rec_hdr_t {
     uint8_t entry_type;
     uint8_t record_len;
-} acpi_madt_rec_hdr_t;
+};
 
 #define ACPI_MADT_REC_TYPE_LAPIC    0
 #define ACPI_MADT_REC_TYPE_IOAPIC   1
 #define ACPI_MADT_REC_TYPE_IRQ      2
 
-typedef struct acpi_madt_lapic_t {
+struct acpi_madt_lapic_t {
     acpi_madt_rec_hdr_t hdr;
     uint8_t cpu_id;
     uint8_t apic_id;
     uint32_t flags;
-} __attribute__((packed)) acpi_madt_lapic_t;
+} __packed;
 
-typedef struct acpi_madt_ioapic_t {
+struct acpi_madt_ioapic_t {
     acpi_madt_rec_hdr_t hdr;
     uint8_t apic_id;
     uint8_t reserved;
     uint32_t addr;
     uint32_t irq_base;
-} __attribute__((packed)) acpi_madt_ioapic_t;
+} __packed;
 
-typedef struct acpi_madt_irqsrc_t {
+struct acpi_madt_irqsrc_t {
     acpi_madt_rec_hdr_t hdr;
     uint8_t bus;
     uint8_t irq_src;
     uint32_t gsi;
     uint16_t flags;
-} __attribute__((packed)) acpi_madt_irqsrc_t;
+} __packed;
 
 //
 // The IRQ routing flags are identical to MPS flags
@@ -753,14 +753,14 @@ typedef struct acpi_madt_irqsrc_t {
 #define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(n) \
     MP_INTR_FLAGS_TRIGGER_n(n)
 
-typedef union acpi_madt_ent_t {
+union acpi_madt_ent_t {
     acpi_madt_rec_hdr_t hdr;
     acpi_madt_lapic_t lapic;
     acpi_madt_ioapic_t ioapic;
     acpi_madt_irqsrc_t irq_src;
-} __attribute__((packed)) acpi_madt_ent_t;
+} __packed;
 
-typedef struct acpi_madt_t {
+struct acpi_madt_t {
     // sig == "APIC"
     acpi_sdt_hdr_t hdr;
 
@@ -768,7 +768,7 @@ typedef struct acpi_madt_t {
 
     // 1 = Dual 8259 PICs installed
     uint32_t flags;
-} __attribute__((packed)) acpi_madt_t;
+} __packed;
 
 #define ACPI_MADT_FLAGS_HAVE_PIC_BIT    0
 #define ACPI_MADT_FLAGS_HAVE_PIC        (1<<ACPI_MADT_FLAGS_HAVE_PIC_BIT)
@@ -776,7 +776,7 @@ typedef struct acpi_madt_t {
 //
 // HPET ACPI info
 
-typedef struct acpi_hpet_t {
+struct acpi_hpet_t {
     acpi_sdt_hdr_t hdr;
 
     uint32_t blk_id;
@@ -784,7 +784,7 @@ typedef struct acpi_hpet_t {
     uint8_t number;
     uint16_t min_tick_count;
     uint8_t page_prot;
-} acpi_hpet_t;
+};
 
 #define ACPI_HPET_BLKID_PCI_VEN_BIT     16
 #define ACPI_HPET_BLKID_LEGACY_CAP_BIT  15

@@ -10,22 +10,22 @@
 
 #define USE_NONTEMPORAL 1
 
-typedef struct fb_coord_t {
+struct fb_coord_t {
     int x;
     int y;
-} fb_coord_t;
+};
 
-typedef struct fb_rect_t {
+struct fb_rect_t {
     fb_coord_t st;
     fb_coord_t en;
-} fb_rect_t;
+};
 
-typedef struct framebuffer_t {
+struct framebuffer_t {
     uint8_t *video_mem;
     uint8_t *back_buf;
     vbe_selected_mode_t mode;
     fb_rect_t dirty;
-} framebuffer_t;
+};
 
 static framebuffer_t fb;
 

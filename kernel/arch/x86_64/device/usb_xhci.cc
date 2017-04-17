@@ -17,7 +17,7 @@
 //
 // 5.3 Host Controller Capability Registers
 
-typedef struct usbxhci_capreg_t {
+struct usbxhci_capreg_t {
     // 5.3.1 00h Capability register length
     uint8_t caplength;
 
@@ -46,7 +46,7 @@ typedef struct usbxhci_capreg_t {
 
     // 5.3.9 1Ch Capability Parameters 2
     uint32_t hccparams2;
-} __attribute__((packed)) usbxhci_capreg_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_capreg_t) == 0x20);
 
@@ -175,7 +175,7 @@ C_ASSERT(sizeof(usbxhci_capreg_t) == 0x20);
 
 // 5.5.2 Interrupt Register Set
 
-typedef struct usbxhci_intr_t {
+struct usbxhci_intr_t {
     // 5.5.2.1 Interrupt Management Register
     uint32_t iman;
 
@@ -193,7 +193,7 @@ typedef struct usbxhci_intr_t {
 
     // 5.5.2.3.3 Event Ring Dequeue Pointer Register
     uint64_t erdp;
-} __attribute__((packed)) usbxhci_intr_t;
+} __packed;
 
 #define USBXHCI_INTR_IMAN_IP_BIT    0
 #define USBXHCI_INTR_IMAN_IE_BIT    1
@@ -208,7 +208,7 @@ C_ASSERT(sizeof(usbxhci_intr_t) == 0x20);
 
 // 5.5 Host Controller Runtime Registers
 
-typedef struct usbxhci_rtreg_t  {
+struct usbxhci_rtreg_t  {
     // 5.5.1 Microframe Index Register
     uint32_t mfindex;
 
@@ -216,13 +216,13 @@ typedef struct usbxhci_rtreg_t  {
 
     // 5.5.2 Interrupter Register Set
     usbxhci_intr_t ir[1023];
-} __attribute__((packed)) usbxhci_rtreg_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_rtreg_t) == 0x8000);
 
 typedef uint32_t usbxhci_dbreg_t;
 
-typedef struct usbxhci_portreg_t {
+struct usbxhci_portreg_t {
     // 5.4.8 0h Port Status and Control
     uint32_t portsc;
 
@@ -234,11 +234,11 @@ typedef struct usbxhci_portreg_t {
 
     // 5.4.11 Ch Port Hardware LPM Control
     uint32_t porthlpmc;
-} __attribute__((packed)) usbxhci_portreg_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_portreg_t) == 0x10);
 
-typedef struct usbxhci_opreg_t {
+struct usbxhci_opreg_t {
     // 5.4.1 0x00 USB Command
     uint32_t usbcmd;
 
@@ -272,7 +272,7 @@ typedef struct usbxhci_opreg_t {
     // 5.4.8 0x400 0x13FF Port Register Set 1-MaxPorts
     // The actual number of ports is in HCSPARAMS1
     usbxhci_portreg_t ports[256];
-} __attribute__((packed)) usbxhci_opreg_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
 
@@ -676,7 +676,7 @@ C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
 
 // 6.2.2 Slot Context
 
-typedef struct usbxhci_slotctx_t {
+struct usbxhci_slotctx_t {
     // Route string, speed, Multi-TT, hub, last endpoint index
     uint32_t rsmhc;
 
@@ -715,7 +715,7 @@ typedef struct usbxhci_slotctx_t {
     uint32_t rsvd2[4];
 
     // If the HCCPARAMS1 CSZ field is 1, then this structure is 32 bytes larger
-} __attribute__((packed)) usbxhci_slotctx_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_slotctx_t) == 0x20);
 
@@ -778,7 +778,7 @@ C_ASSERT(sizeof(usbxhci_slotctx_t) == 0x20);
 
 // 6.2.3 Endpoint Context
 
-typedef struct usbxhci_ep_ctx_t {
+struct usbxhci_ep_ctx_t {
     // Endpoint state (3 bits)
     uint8_t ep_state;
 
@@ -824,7 +824,7 @@ typedef struct usbxhci_ep_ctx_t {
     uint16_t max_eist_pl_lo;
 
     uint32_t rsvd[3];
-} __attribute__((packed)) usbxhci_ep_ctx_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_ep_ctx_t) == 0x20);
 
@@ -892,27 +892,27 @@ C_ASSERT(sizeof(usbxhci_ep_ctx_t) == 0x20);
 
 // 6.2.1 Device Context
 
-typedef struct usbxhci_devctx_small_t {
+struct usbxhci_devctx_small_t {
     usbxhci_slotctx_t slotctx;
     usbxhci_ep_ctx_t epctx[16];
-} __attribute__((packed)) usbxhci_devctx_small_t;
+} __packed;
 
-typedef struct usbxhci_devctx_large_t {
+struct usbxhci_devctx_large_t {
     usbxhci_slotctx_t slotctx;
     uint8_t rsvd[32];
 
     usbxhci_ep_ctx_t epctx[16];
-} __attribute__((packed)) usbxhci_devctx_large_t;
+} __packed;
 
-typedef union usbxhci_devctx_t {
+union usbxhci_devctx_t {
     void *any;
     usbxhci_devctx_small_t *small;
     usbxhci_devctx_large_t *large;
-} usbxhci_devctx_t;
+};
 
 // 6.2.5.1 Input Control Context
 
-typedef struct usbxhci_inpctlctx_t {
+struct usbxhci_inpctlctx_t {
     uint32_t drop_bits;
     uint32_t add_bits;
     uint32_t rsvd[5];
@@ -920,45 +920,45 @@ typedef struct usbxhci_inpctlctx_t {
     uint8_t iface_num;
     uint8_t alternate;
     uint8_t rsvd2;
-} __attribute__((packed)) usbxhci_inpctlctx_t;
+} __packed;
 
 // 6.2.5 Input Context
 
-typedef struct usbxhci_inpctx_small_t {
+struct usbxhci_inpctx_small_t {
     usbxhci_inpctlctx_t inpctl;
 
     usbxhci_slotctx_t slotctx;
 
     usbxhci_ep_ctx_t epctx[32];
-} __attribute__((packed)) usbxhci_inpctx_small_t;
+} __packed;
 
-typedef struct usbxhci_inpctx_large_t {
+struct usbxhci_inpctx_large_t {
     usbxhci_inpctlctx_t inpctl;
 
     usbxhci_slotctx_t slotctx;
     uint8_t rsvd[32];
 
     usbxhci_ep_ctx_t epctx[32];
-} __attribute__((packed)) usbxhci_inpctx_large_t;
+} __packed;
 
-typedef union usbxhci_inpctx_t {
+union usbxhci_inpctx_t {
     void *any;
     usbxhci_inpctx_small_t *small;
     usbxhci_inpctx_large_t *large;
-} usbxhci_inpctx_t;
+};
 
 // 6.4.3 Command TRB
 
-typedef struct usbxhci_cmd_trb_t {
+struct usbxhci_cmd_trb_t {
     uint32_t data[4];
-} __attribute__((packed)) usbxhci_cmd_trb_t;
+} __packed;
 
-typedef struct usbxhci_cmd_trb_noop_t {
+struct usbxhci_cmd_trb_noop_t {
     uint32_t rsvd1[3];
     uint8_t cycle;
     uint8_t trb_type;
     uint16_t rsvd2;
-} __attribute__((packed)) usbxhci_cmd_trb_noop_t;
+} __packed;
 
 #define USBXHCI_CMD_TRB_TYPE_BIT    2
 #define USBXHCI_CMD_TRB_TYPE_BITS   6
@@ -967,18 +967,18 @@ typedef struct usbxhci_cmd_trb_noop_t {
 #define USBXHCI_CMD_TRB \
     (USBXHCI_CMD_TRB_TYPE_MASK<<USBXHCI_CMD_TRB_TYPE_BIT)
 
-typedef struct usbxhci_cmd_trb_setaddr_t {
+struct usbxhci_cmd_trb_setaddr_t {
     uint64_t input_ctx_physaddr;
     uint32_t rsvd;
     uint8_t cycle;
     uint8_t trb_type;
     uint8_t rsvd2;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_cmd_trb_setaddr_t;
+} __packed;
 
 // 6.5 Event Ring Segment Table
 
-typedef struct usbxhci_evtring_seg_t {
+struct usbxhci_evtring_seg_t {
     // Base address, must be 64-byte aligned
     uint64_t base;
 
@@ -987,7 +987,7 @@ typedef struct usbxhci_evtring_seg_t {
 
     uint16_t resvd;
     uint32_t resvd2;
-} __attribute__((packed)) usbxhci_evtring_seg_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_evtring_seg_t) == 0x10);
 
@@ -996,12 +996,12 @@ C_ASSERT(sizeof(usbxhci_evtring_seg_t) == 0x10);
 
 // 6.4.2 Event TRBs
 
-typedef struct usbxhci_evt_t {
+struct usbxhci_evt_t {
     uint32_t data[3];
     uint16_t flags;
     uint8_t id;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_evt_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_evt_t) == 0x10);
 
@@ -1017,13 +1017,13 @@ C_ASSERT(sizeof(usbxhci_evt_t) == 0x10);
 
 // 6.4.2.2 Command Completion Event TRB
 
-typedef struct usbxhci_evt_cmdcomp_t {
+struct usbxhci_evt_cmdcomp_t {
     uint64_t command_trb_ptr;
     uint32_t info;
     uint16_t flags;
     uint8_t id;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_evt_cmdcomp_t;
+} __packed;
 
 // Command completion parameter
 #define USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT    0
@@ -1090,7 +1090,7 @@ C_ASSERT(sizeof(usbxhci_evt_cmdcomp_t) == 0x10);
 //
 // 6.4.2.1 Transfer Event TRB
 
-typedef struct usbxhci_evt_xfer_t {
+struct usbxhci_evt_xfer_t {
     uint64_t trb_ptr;
     uint16_t len_lo;
     uint8_t len_hi;
@@ -1099,12 +1099,12 @@ typedef struct usbxhci_evt_xfer_t {
     uint8_t trb_type;
     uint8_t ep_id;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_evt_xfer_t;
+} __packed;
 
 //
 // 6.4.2.2 Command Completion Event TRB
 
-typedef struct usbxhci_evt_completion_t {
+struct usbxhci_evt_completion_t {
     uint64_t trb_ptr;
     uint16_t len_lo;
     uint8_t len_hi;
@@ -1113,12 +1113,12 @@ typedef struct usbxhci_evt_completion_t {
     uint8_t trb_type;
     uint8_t ep_id;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_evt_completion_t;
+} __packed;
 
 //
 // 6.4.2.3 Port Status Change Event TRB
 
-typedef struct usbxhci_evt_portstchg_t {
+struct usbxhci_evt_portstchg_t {
     uint16_t rsvd1;
     uint8_t rsvd2;
     uint8_t portid;
@@ -1127,12 +1127,12 @@ typedef struct usbxhci_evt_portstchg_t {
     uint8_t cc;
     uint16_t flags;
     uint16_t rsvd5;
-} __attribute__((packed)) usbxhci_evt_portstchg_t;
+} __packed;
 
 //
 // 6.4.2.4 Bandwidth Request Event TRB
 
-typedef struct usbxhci_evt_bwreq_t {
+struct usbxhci_evt_bwreq_t {
     uint32_t rsvd1;
     uint32_t rsvd2;
     uint16_t rsvd3;
@@ -1141,35 +1141,35 @@ typedef struct usbxhci_evt_bwreq_t {
     uint16_t flags;
     uint8_t rsvd5;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_evt_bwreq_t;
+} __packed;
 
 //
 // 6.4.2.5 Doorbell Event TRB
 
-typedef struct usbxhci_evt_db_t {
+struct usbxhci_evt_db_t {
     uint8_t reason;
     uint8_t rsvd[10];
     uint8_t cc;
     uint16_t flags;
     uint8_t vf_id;
     uint8_t slotid;
-} __attribute__((packed)) usbxhci_evt_db_t;
+} __packed;
 
 //
 // 6.4.1.2 Control TRBs
 
-typedef struct usbxhci_ctl_trb_generic_t {
+struct usbxhci_ctl_trb_generic_t {
     uint32_t data[3];
     uint8_t flags;
     uint8_t trb_type;
     uint16_t trt;
-} __attribute__((packed)) usbxhci_ctl_trb_generic_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_generic_t) == 0x10);
 
 // 6.4.1.2.1 Setup stage TRB
 
-typedef struct usbxhci_ctl_trb_setup_t {
+struct usbxhci_ctl_trb_setup_t {
     uint8_t bm_req_type;
     uint8_t request;
     uint16_t value;
@@ -1179,37 +1179,37 @@ typedef struct usbxhci_ctl_trb_setup_t {
     uint8_t flags;
     uint8_t trb_type;
     uint16_t trt;
-} __attribute__((packed)) usbxhci_ctl_trb_setup_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
 
-typedef struct usbxhci_ctl_trb_data_t {
+struct usbxhci_ctl_trb_data_t {
     uint64_t data_physaddr;
     uint32_t xfer_td_intr;
     uint8_t flags;
     uint8_t trb_type;
     uint16_t dir;
-} __attribute__((packed)) usbxhci_ctl_trb_data_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_data_t) == 0x10);
 
-typedef struct usbxhci_ctl_trb_status_t {
+struct usbxhci_ctl_trb_status_t {
     uint64_t rsvd;
     uint16_t rsvd2;
     uint16_t intr;
     uint8_t flags;
     uint8_t trb_type;
     uint16_t dir;
-} __attribute__((packed)) usbxhci_ctl_trb_status_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_status_t) == 0x10);
 
-typedef union usbxhci_ctl_trb_t {
+union usbxhci_ctl_trb_t {
     usbxhci_ctl_trb_generic_t generic;
     usbxhci_ctl_trb_setup_t setup;
     usbxhci_ctl_trb_data_t data;
     usbxhci_ctl_trb_status_t status;
-} __attribute__((packed)) usbxhci_ctl_trb_t;
+} __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 
@@ -1329,7 +1329,7 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 //
 // USB Device Descriptor
 
-typedef struct usb_desc_device {
+struct usb_desc_device {
     // Length of descriptor
     uint8_t len;
 
@@ -1359,7 +1359,7 @@ typedef struct usb_desc_device {
 
     // Number of possible configurations
     uint8_t num_config;
-} __attribute__((packed)) usb_desc_device;
+} __packed;
 
 C_ASSERT(sizeof(usb_desc_device) == 18);
 
@@ -1373,29 +1373,29 @@ C_ASSERT(sizeof(usb_desc_device) == 18);
 //
 // Interface Interface
 
-typedef struct usbxhci_device_vtbl_t {
+struct usbxhci_device_vtbl_t {
     void (*init)(void);
-} usbxhci_device_vtbl_t;
+};
 
-typedef struct usbxhci_interrupter_info_t {
+struct usbxhci_interrupter_info_t {
     usbxhci_evt_t volatile *evt_ring;
     uint64_t evt_ring_physaddr;
     uint32_t next;
     uint32_t count;
     uint8_t ccs;
-} usbxhci_interrupter_info_t;
+};
 
-typedef struct usbxhci_portinfo_t {
+struct usbxhci_portinfo_t {
     usbxhci_evtring_seg_t volatile *dev_evt_segs;
     usbxhci_evt_t volatile *dev_evt_ring;
-} usbxhci_portinfo_t;
+};
 
-typedef struct usbxhci_endpoint_target_t {
+struct usbxhci_endpoint_target_t {
     uint8_t slotid;
     uint8_t epid;
-} usbxhci_endpoint_target_t;
+};
 
-typedef struct usbxhci_endpoint_data_t {
+struct usbxhci_endpoint_data_t {
     usbxhci_endpoint_target_t target;
 
     usbxhci_evt_xfer_t *xfer_ring;
@@ -1403,9 +1403,9 @@ typedef struct usbxhci_endpoint_data_t {
     uint32_t xfer_next;
     uint32_t xfer_count;
     uint8_t ccs;
-} usbxhci_endpoint_data_t;
+};
 
-typedef struct usbxhci_dev_t {
+struct usbxhci_dev_t {
     usbxhci_device_vtbl_t *vtbl;
 
     uint64_t mmio_addr;
@@ -1456,9 +1456,9 @@ typedef struct usbxhci_dev_t {
 
     // Command issue lock
     spinlock_t lock_cmd;
-} usbxhci_dev_t;
+};
 
-typedef struct usbxhci_pending_cmd_t usbxhci_pending_cmd_t;
+struct usbxhci_pending_cmd_t;
 
 typedef void (*usbxhci_complete_handler_t)(usbxhci_dev_t *self,
                                            usbxhci_cmd_trb_t *cmd,
@@ -1471,7 +1471,7 @@ struct usbxhci_pending_cmd_t {
     uintptr_t data;
 };
 
-typedef struct usbxhci_port_init_data_t {
+struct usbxhci_port_init_data_t {
     usbxhci_inpctx_t inpctx;
     usbxhci_ctl_trb_t *trbs;
     usb_desc_device descriptor;
@@ -1479,7 +1479,7 @@ typedef struct usbxhci_port_init_data_t {
     uint8_t slotid;
     uint8_t current_descriptor;
     uint8_t descriptor_count;
-} usbxhci_port_init_data_t;
+};
 
 static usbxhci_dev_t *usbxhci_devices;
 static unsigned usbxhci_device_count;
@@ -1495,7 +1495,7 @@ static usbxhci_slotctx_t *usbxhci_dev_ctx_ent_slot(usbxhci_dev_t *self, size_t i
 }
 
 // Handle 32 or 64 byte device context size
-__attribute__((used))
+__used
 static usbxhci_ep_ctx_t *usbxhci_dev_ctx_ent_ep(usbxhci_dev_t *self,
                                                 size_t slot, size_t i)
 {

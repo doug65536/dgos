@@ -90,12 +90,12 @@ static char const keyb8042_passthru_lookup[] =
 static char const keyb8042_numpad_ascii[] =
         "0123456789.\n+-*/";
 
-typedef enum keyb8042_key_state_t {
+enum keyb8042_key_state_t {
     NORMAL,
     IN_E0,
     IN_E1_1,
     IN_E1_2
-} keyb8042_key_state_t;
+};
 
 // Bit positions for each shift key
 #define KEYB_LSHIFT_DOWN_BIT 0

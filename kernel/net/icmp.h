@@ -1,13 +1,13 @@
 #pragma once
 #include "ipv4.h"
 
-typedef struct icmp_hdr_t {
+struct icmp_hdr_t {
     ipv4_hdr_t ipv4_hdr;
 
     uint8_t type;
     uint8_t code;
     uint16_t checksum;
-} __attribute__((packed)) icmp_hdr_t;
+} __packed;
 
 // Echo reply
 #define ICMP_TYPE_ECHO_REPLY    0
@@ -39,38 +39,38 @@ typedef struct icmp_hdr_t {
 // Address mask reply
 #define ICMP_TYPE_MASK_REPLY    18
 
-typedef struct icmp_echo_hdr_t {
+struct icmp_echo_hdr_t {
     icmp_hdr_t icmp_hdr;
 
     uint16_t identifier;
     uint16_t seq;
-} icmp_echo_hdr_t;
+};
 
-typedef struct icmp_redirect_pkt_t {
+struct icmp_redirect_pkt_t {
     icmp_hdr_t icmp_hdr;
 
     uint8_t ip_addr[4];
     ipv4_hdr_t orig_ipv4_hdr;
     uint8_t orig_ipv4_payload[8];
-} icmp_redirect_pkt_t;
+};
 
 #define ICMP_REDIRECT_CODE_NET          0
 #define ICMP_REDIRECT_CODE_HOST         1
 #define ICMP_REDIRECT_CODE_TOS_NET      2
 #define ICMP_REDIRECT_CODE_TOS_HOST     3
 
-typedef struct icmp_time_exceeded_pkt_t {
+struct icmp_time_exceeded_pkt_t {
     icmp_hdr_t icmp_hdr;
 
     uint32_t unused;
     ipv4_hdr_t orig_ipv4_hdr;
     uint8_t orig_ipv4_payload[8];
-} icmp_time_exceeded_pkt_t;
+};
 
 #define ICMP_TIME_EXCEEDED_CODE_TTL     0
 #define ICMP_TIME_EXCEEDED_CODE_FRAG    1
 
-typedef struct icmp_timestamp_pkt_t {
+struct icmp_timestamp_pkt_t {
     icmp_hdr_t icmp_hdr;
 
     uint16_t identifier;
@@ -78,22 +78,22 @@ typedef struct icmp_timestamp_pkt_t {
     uint32_t orig_timestamp;
     uint32_t rx_timestamp;
     uint32_t tx_timestamp;
-} icmp_timestamp_pkt_t;
+};
 
-typedef struct icmp_addr_mask_pkt_t {
+struct icmp_addr_mask_pkt_t {
     icmp_hdr_t icmp_hdr;
 
     uint8_t addr_mask[4];
-} icmp_addr_mask_pkt_t;
+};
 
-typedef struct icmp_unreachable_pkt_t {
+struct icmp_unreachable_pkt_t {
     icmp_hdr_t icmp_hdr;
 
     uint16_t unused;
     uint16_t next_hop_mtu;
     ipv4_hdr_t orig_ipv4_hdr;
     char orig_ipv4_payload[8];
-} icmp_unreachable_pkt_t;
+};
 
 uint16_t icmp_checksum(icmp_hdr_t const *hdr, void const *end);
 uint16_t icmp_finalize(icmp_hdr_t *hdr, void const *end);

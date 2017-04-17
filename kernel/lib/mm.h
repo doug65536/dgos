@@ -217,10 +217,10 @@ int msync(void const *__addr, size_t __len, int __flags);
 /// Page faults if the memory region is not mapped
 uintptr_t mphysaddr(volatile void *addr);
 
-typedef struct mmphysrange_t {
+struct mmphysrange_t {
     uintptr_t physaddr;
     size_t size;
-} mmphysrange_t;
+};
 
 /// Fill in an array of physical memory ranges corresponding to
 /// the specified range of linear address space.

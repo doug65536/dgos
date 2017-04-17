@@ -1,11 +1,11 @@
 #pragma once
 #include "types.h"
 
-typedef struct png_image_t {
+struct png_image_t {
     int32_t width;
     int32_t height;
     void *reserved;
-} png_image_t;
+};
 
 png_image_t *png_load(char const *path);
 void png_free(png_image_t *pp);

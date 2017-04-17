@@ -3,7 +3,7 @@
 #include "types.h"
 #endif
 
-typedef struct vbe_selected_mode_t {
+struct vbe_selected_mode_t {
     uint32_t framebuffer_addr;
     uint32_t framebuffer_bytes;
 
@@ -23,4 +23,4 @@ typedef struct vbe_selected_mode_t {
     uint8_t mask_pos_a;
 
     char reserved[6];
-} vbe_selected_mode_t;
+};

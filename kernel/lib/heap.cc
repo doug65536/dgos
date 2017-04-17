@@ -7,11 +7,11 @@
 #include "printk.h"
 #include "cpu/control_regs.h"
 
-typedef struct heap_hdr_t {
+struct heap_hdr_t {
     uintptr_t size_next;
     uint32_t sig1;
     uint32_t sig2;
-} heap_hdr_t;
+};
 
 C_ASSERT(sizeof(heap_hdr_t) == 16);
 
@@ -45,7 +45,6 @@ C_ASSERT(sizeof(heap_hdr_t) == 16);
 
 // When the main heap_t::arenas array overflows, an additional
 // page is allocated to hold additional arena pointers.
-typedef struct heap_ext_arena_t heap_ext_arena_t;
 struct heap_ext_arena_t {
     heap_ext_arena_t *prev;
     size_t arena_count;

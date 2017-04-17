@@ -4,10 +4,10 @@
 typedef uint64_t ino_t;
 typedef uint16_t mode_t;
 
-typedef struct dirent_t {
+struct dirent_t {
     ino_t d_ino;
     char     d_name[256];
-} dirent_t;
+};
 
 #define O_RDONLY    (1<<0)
 #define O_WRONLY    (1<<1)

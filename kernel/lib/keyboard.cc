@@ -3,14 +3,14 @@
 #include "threadsync.h"
 #include "cpu/control_regs.h"
 
-typedef struct keyboard_buffer_t {
+struct keyboard_buffer_t {
     keyboard_event_t buffer[16];
     size_t head;
     size_t tail;
 
     mutex_t lock;
     condition_var_t not_empty;
-} keyboard_buffer_t;
+};
 
 static keyboard_buffer_t keybd_buffer;
 

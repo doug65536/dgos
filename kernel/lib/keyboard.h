@@ -84,14 +84,14 @@ typedef enum keyboard_virtual_key_t {
     KEYB_VK_NUMPAD_EN = KEYB_VK_NUMPAD_SLASH
 } keyboard_virtual_key_t;
 
-typedef struct keyboard_event_t {
+struct keyboard_event_t {
     // Positive values indicate keydown/repeat
     // Negative values indicate keyup
     int vk;
     int codepoint;
 
     int flags;
-} keyboard_event_t;
+};
 
 // Mouse events use these too:
 

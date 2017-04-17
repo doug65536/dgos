@@ -2,7 +2,7 @@
 
 #include "eth_q.h"
 
-typedef struct arp_packet_t {
+struct arp_packet_t {
     ethernet_hdr_t eth_hdr;
 
     // Ethernet = 1
@@ -31,4 +31,4 @@ typedef struct arp_packet_t {
 
     // Target IPv4 address
     uint8_t target_ip[4];
-} __attribute__((packed)) arp_packet_t;
+} __packed;

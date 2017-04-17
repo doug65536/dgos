@@ -18,7 +18,7 @@
 // Errors have nonzero error code in AL
 
 // 512 bytes
-typedef struct vbe_info_t {
+struct vbe_info_t {
     char sig[4];            // "VESA"
     uint16_t version;       // 0x200
     far_ptr_t oem_str_ptr;
@@ -31,10 +31,10 @@ typedef struct vbe_info_t {
     far_ptr_t product_rev_str;
     char reserved[222];
     char oemdata[256];
-} __attribute__((packed)) vbe_info_t;
+} __packed;
 
 // 256 bytes
-typedef struct vbe_mode_info_t {
+struct vbe_mode_info_t {
     // VBE 1.0
     uint16_t mode_attrib;
     uint8_t win_a_attrib;
@@ -74,7 +74,7 @@ typedef struct vbe_mode_info_t {
     uint32_t offscreen_mem_offset;
     uint16_t offscreen_mem_size_kb;
     char reserved2[206];
-} __attribute__((packed)) vbe_mode_info_t;
+} __packed;
 
 static uint16_t vbe_get_info(void *info, uint16_t ax, uint16_t cx)
 {

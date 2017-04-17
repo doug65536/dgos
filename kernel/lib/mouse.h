@@ -1,12 +1,12 @@
 #pragma once
 #include "types.h"
 
-typedef struct mouse_raw_event_t {
+struct mouse_raw_event_t {
     int16_t hdist;
     int16_t vdist;
     int16_t wdist;
     int16_t buttons;
-} mouse_raw_event_t;
+};
 
 // negative hdist is left movement
 // negative vdist is down movement

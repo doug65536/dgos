@@ -2,7 +2,7 @@
 #include "eth_q.h"
 #include "ipv4.h"
 
-typedef struct tcp_hdr_t {
+struct tcp_hdr_t {
     ipv4_hdr_t ipv4_hdr;
     uint16_t s_port;
     uint16_t d_port;
@@ -12,7 +12,7 @@ typedef struct tcp_hdr_t {
     uint16_t window;
     uint16_t checksum;
     uint16_t urgent;
-} __attribute__((packed)) tcp_hdr_t;
+} __packed;
 
 #define TCP_FLAGS_FIN_BIT       0
 #define TCP_FLAGS_SYN_BIT       1

@@ -107,21 +107,18 @@ extern uint32_t bootinfo_primary_volume_desc;
 #include "driveinfo.h"
 #include "screen.h"
 
-#define __stdcall __attribute__((stdcall))
-#define __packed __attribute__((packed))
-
-uint8_t boot_drive __attribute__((used));
-uint8_t fully_loaded __attribute__((used));
+uint8_t boot_drive __used;
+uint8_t fully_loaded __used;
 
 extern "C" int init(void);
 
-typedef struct disk_address_packet_t {
+struct disk_address_packet_t {
     uint8_t sizeof_packet;
     uint8_t reserved;
     uint16_t block_count;
     uint32_t address;
     uint64_t lba;
-} disk_address_packet_t;
+};
 
 uint16_t read_lba_sectors(
         char *buf, uint8_t drive,
@@ -157,7 +154,7 @@ uint16_t read_lba_sectors(
 extern char __initialized_data_start[];
 extern char __initialized_data_end[];
 
-__attribute__((used)) int init(void)
+__used int init(void)
 {
     if (bootinfo_file_location == 0) {
         // Calculate how many more sectors to load

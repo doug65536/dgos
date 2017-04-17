@@ -1,7 +1,8 @@
 #pragma once
+#include "types.h"
 #include "likely.h"
 
-__attribute__((noinline))
+__noinline
 extern "C" int assert_failed(char const *expr,
                    char const *msg,
                    char const *file,

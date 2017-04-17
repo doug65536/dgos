@@ -32,13 +32,13 @@ struct gdt_entry_tss_ldt_t {
     uint32_t reserved;
 };
 
-typedef union gdt_entry_combined_t {
+union gdt_entry_combined_t {
     gdt_entry_t mem;
     gdt_entry_tss_ldt_t tss_ldt;
 
     constexpr gdt_entry_combined_t(gdt_entry_t e) : mem(e) {}
     constexpr gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}
-} gdt_entry_combined_t;
+};
 
 #define GDT_ACCESS_PRESENT_BIT   7
 #define GDT_ACCESS_DPL_BIT       5
@@ -201,13 +201,13 @@ typedef union gdt_entry_combined_t {
 #define GDT_SEL_USER_DATA32     0x50
 #define GDT_SEL_TSS             0x60
 
-typedef struct tss_stack_t {
+struct tss_stack_t {
     uint32_t lo;
     uint32_t hi;
-} tss_stack_t;
+};
 
 // Task State Segment (64-bit)
-typedef struct tss_t {
+struct tss_t {
     uint32_t reserved0;
     tss_stack_t rsp[3];
     tss_stack_t ist[8];
@@ -217,7 +217,7 @@ typedef struct tss_t {
     uint16_t iomap_base;
     // entry 0 is rsp[0], rest are ist stacks
     void *stack[8];
-} tss_t;
+};
 
 void gdt_init(void);
 void gdt_init_tss(int cpu_count);

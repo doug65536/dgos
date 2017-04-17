@@ -35,10 +35,10 @@ static FILE *fmt_popen(
     return stream;
 }
 
-typedef struct iso_key_t {
+struct iso_key_t {
     char iso_code[4];
     int key_code;
-} iso_key_t;
+};
 
 iso_key_t iso_keys[256];
 

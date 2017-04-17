@@ -19,10 +19,10 @@ extern void (*sse_context_save)(void);
 extern void (*sse_context_restore)(void);
 
 // MSI IRQ
-typedef struct msi_irq_mem_t {
+struct msi_irq_mem_t {
     uintptr_t addr;
     uintptr_t data;
-} msi_irq_mem_t;
+};
 
 typedef isr_context_t *(*intr_handler_t)(int intr, isr_context_t*);
 

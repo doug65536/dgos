@@ -60,42 +60,42 @@ static rtl8139_factory_t rtl8139_factory;
 struct rtl8139_dev_t : public eth_dev_base_t {
     ETH_DEV_IMPL
 
-    __attribute__((used))
+    __used
     inline void rtl8139_mm_out_8(uint32_t reg, uint8_t val)
     {
         RTL8139_MMIO(uint8_t, reg) = val;
         atomic_barrier();
     }
 
-    __attribute__((used))
+    __used
     inline void rtl8139_mm_out_16(uint32_t reg, uint16_t val)
     {
         RTL8139_MMIO(uint16_t, reg) = val;
         atomic_barrier();
     }
 
-    __attribute__((used))
+    __used
     inline void rtl8139_mm_out_32(uint32_t reg, uint32_t val)
     {
         RTL8139_MMIO(uint32_t, reg) = val;
         atomic_barrier();
     }
 
-    __attribute__((used))
+    __used
     inline uint8_t rtl8139_mm_in_8(uint32_t reg)
     {
         atomic_barrier();
         return RTL8139_MMIO(uint8_t, reg);
     }
 
-    __attribute__((used))
+    __used
     inline uint16_t rtl8139_mm_in_16(uint32_t reg)
     {
         atomic_barrier();
         return RTL8139_MMIO(uint16_t, reg);
     }
 
-    __attribute__((used))
+    __used
     inline uint32_t rtl8139_mm_in_32(uint32_t reg)
     {
         atomic_barrier();
@@ -563,10 +563,10 @@ static size_t rtl8139_device_count;
 #define RTL8139_TSAD_TOK_n(n)       (1U<<((n)+RTL8139_TSAD_TOK_BIT))
 
 // Rx packet header
-typedef struct rtl8139_rx_hdr_t {
+struct rtl8139_rx_hdr_t {
     uint16_t status;
     uint16_t len;
-} rtl8139_rx_hdr_t;
+};
 
 #define RTL8139_RX_HDR_MAR_BIT      15
 #define RTL8139_RX_HDR_PAM_BIT      14

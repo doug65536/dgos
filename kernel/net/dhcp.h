@@ -3,7 +3,7 @@
 
 // TODO: Move this to user mode
 
-typedef struct dhcp_pkt_t {
+struct dhcp_pkt_t {
     udp_hdr_t udp_hdr;
 
     // discover=1, offer=2
@@ -57,7 +57,7 @@ typedef struct dhcp_pkt_t {
     //  3: (Router), offer=router ip address
     //  15: (Domain name)
     //  6: (DNS server), offer=dns server list
-} __attribute__((packed)) dhcp_pkt_t;
+} __packed;
 
 void dhcp_builder_begin(void *buf);
 void dhcp_builder_s_mac(void *buf, uint8_t const *mac_addr);

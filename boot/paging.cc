@@ -21,10 +21,10 @@
 // The fs segment is used and is not preserved
 
 // Structure to hold the segment and slot for the PTE for a given address
-typedef struct pte_ref_t {
+struct pte_ref_t {
     uint16_t segment;
     uint16_t slot;
-} pte_ref_t;
+};
 
 static uint16_t root_page_dir;
 

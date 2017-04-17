@@ -2,7 +2,7 @@
 #include "types.h"
 #include "except_asm.h"
 
-typedef struct __exception_context_t __exception_context_t;
+struct __exception_context_t;
 
 int __exception_handler_remove(void);
 int __exception_handler_invoke(int exception_code);

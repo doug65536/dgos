@@ -10,9 +10,9 @@
 #define MBR_TRACE(...) ((void)0)
 #endif
 
-typedef struct part_dev_t part_dev_t;
+struct part_dev_t;
 
-typedef struct partition_tbl_ent_t {
+struct partition_tbl_ent_t {
     uint8_t  boot;					//0: Boot indicator bit flag: 0 = no,
                                     // 0x80 = bootable (or "active")
     uint8_t  start_head;			// H
@@ -28,7 +28,7 @@ typedef struct partition_tbl_ent_t {
 
     uint32_t start_lba;
     uint32_t total_sectors;
-} __attribute__((packed)) partition_tbl_ent_t;
+} __packed;
 
 struct mbr_part_factory_t : public part_factory_t {
     mbr_part_factory_t() : part_factory_t("mbr") {}

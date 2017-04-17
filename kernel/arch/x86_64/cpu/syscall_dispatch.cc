@@ -1,10 +1,10 @@
 #include "syscall_dispatch.h"
 #include "types.h"
 
-typedef struct fd_t {
+struct fd_t {
 
     off_t seek_pos;
-} fd_t;
+};
 
 static long sys_read(
         long fd, long bufaddr, long count,

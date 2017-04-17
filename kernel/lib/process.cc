@@ -8,11 +8,12 @@
 #include "cpu/spinlock.h"
 #include "likely.h"
 #include "fileio.h"
+#include "errno.h"
 
-typedef union process_ptr_t {
+union process_ptr_t {
     process_t *p;
     pid_t next;
-} process_ptr_t;
+};
 
 struct process_t {
     pid_t pid;

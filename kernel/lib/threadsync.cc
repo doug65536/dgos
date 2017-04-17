@@ -430,9 +430,9 @@ EXPORT void condvar_destroy(condition_var_t *var)
     assert(var->link.prev == &var->link);
 }
 
-typedef struct condvar_spinlock_t {
+struct condvar_spinlock_t {
     spinlock_t *lock;
-} condvar_spinlock_t;
+};
 
 static void condvar_lock_spinlock(void *mutex)
 {

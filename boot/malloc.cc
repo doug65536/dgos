@@ -46,7 +46,7 @@ uint16_t far_malloc_aligned(uint32_t bytes)
 
 // This must be small enough to fit before first header
 // Maximum 13 bytes
-typedef struct alloc_state_t {
+struct alloc_state_t {
     uint8_t alloc_id;
     uint8_t heap_ready;
 
@@ -55,14 +55,10 @@ typedef struct alloc_state_t {
 
     // Optimize starting point for free block search
     uint16_t first_free;
-} alloc_state_t;
+};
 
 extern alloc_state_t __heap;
 extern char __heap_end[];
-
-#ifdef __GNUC__
-#define always_inline inline __attribute__((always_inline))
-#endif
 
 #ifndef NDEBUG
 #define DEBUG_ONLY(e) e;
@@ -85,48 +81,48 @@ static void check_valid_header(uint16_t v)
 }
 #endif
 
-static always_inline uint16_t addr_of(void *p)
+static __always_inline uint16_t addr_of(void *p)
 {
     return (uint16_t)(uint32_t)p;
 }
 
-static always_inline uint16_t payload_of(uint16_t addr)
+static __always_inline uint16_t payload_of(uint16_t addr)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return addr + 3;
 }
 
-static always_inline char *payload_ptr_of(uint16_t addr)
+static __always_inline char *payload_ptr_of(uint16_t addr)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return (char*)(uint32_t)payload_of(addr);
 }
 
-static always_inline uint16_t id_of(uint16_t addr)
+static __always_inline uint16_t id_of(uint16_t addr)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return *(uint8_t*)(uint32_t)addr;
 }
 
-static always_inline uint16_t size_of(uint16_t addr)
+static __always_inline uint16_t size_of(uint16_t addr)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return *(uint16_t*)(uint32_t)(addr + 1);
 }
 
-static always_inline uint8_t set_id_of(uint16_t addr, uint8_t id)
+static __always_inline uint8_t set_id_of(uint16_t addr, uint8_t id)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return *(uint8_t*)(uint32_t)addr = id;
 }
 
-static always_inline uint16_t set_size_of(uint16_t addr, uint16_t size)
+static __always_inline uint16_t set_size_of(uint16_t addr, uint16_t size)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return *(uint16_t*)(uint32_t)(addr + 1) = size;
 }
 
-static always_inline uint16_t inc_size_of(uint16_t addr, uint16_t inc)
+static __always_inline uint16_t inc_size_of(uint16_t addr, uint16_t inc)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return *(uint16_t*)(uint32_t)(addr + 1) += inc;

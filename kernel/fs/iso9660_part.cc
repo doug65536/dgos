@@ -4,7 +4,7 @@
 
 #include "iso9660_decl.h"
 
-//typedef struct part_dev_t part_dev_t;
+//struct part_dev_t;
 
 struct iso9660_part_factory_t : public part_factory_t {
     iso9660_part_factory_t() : part_factory_t("iso9660") {}

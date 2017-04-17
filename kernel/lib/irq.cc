@@ -8,13 +8,13 @@
 
 typedef int16_t intr_link_t;
 
-typedef struct intr_handler_reg_t {
+struct intr_handler_reg_t {
     intr_link_t next;
     int16_t refcount;
     int16_t intr;
     int16_t eoi_handler;
     intr_handler_t handler;
-} intr_handler_reg_t;
+};
 
 // Context save vector here for locality
 size_t sse_context_size;

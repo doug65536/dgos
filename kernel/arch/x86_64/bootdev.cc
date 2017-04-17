@@ -1,7 +1,7 @@
 #include "bootdev.h"
 #include "printk.h"
 
-typedef struct bootdev_drive_params_t {
+struct bootdev_drive_params_t {
     uint16_t size;
     uint16_t info_flags;
     uint32_t cylinders;
@@ -63,7 +63,7 @@ typedef struct bootdev_drive_params_t {
 
     uint8_t reserved2;
     uint8_t checksum;
-} __attribute__((packed)) bootdev_drive_params_t;
+} __packed;
 
 void bootdev_info(uint8_t *bus, uint8_t *slot, uint8_t *func)
 {

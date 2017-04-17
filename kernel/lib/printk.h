@@ -5,36 +5,24 @@
 
 extern "C" {
 
-#ifdef __GNUC__
-#define ATTRIBUTE_FORMAT(m,n) __attribute__((format(printf, m, n)))
-#else
-#define ATTRIBUTE_FORMAT(m,n)
-#endif
+__noreturn void vpanic(char const *format, va_list ap);
 
-__attribute__((noreturn))
-void vpanic(char const *format, va_list ap);
-
-__attribute__((noreturn))
-void panic(char const *format, ...)
-    ATTRIBUTE_FORMAT(1, 2);
+__noreturn void panic(char const *format, ...) __printf_format(1, 2);
 
 int vsnprintf(char *buf, size_t limit, char const *format, va_list ap);
 
 int snprintf(char *buf, size_t limit, char const *format, ...)
-    ATTRIBUTE_FORMAT(3, 4);
+    __printf_format(3, 4);
 
-void printk(char const *format, ...)
-    ATTRIBUTE_FORMAT(1, 2);
+void printk(char const *format, ...) __printf_format(1, 2);
 
 void vprintk(char const *format, va_list ap);
 
-int printdbg(char const *format, ...)
-    ATTRIBUTE_FORMAT(1, 2);
+int printdbg(char const *format, ...) __printf_format(1, 2);
 
 int vprintdbg(char const *format, va_list ap);
 
-int cprintf(char const *format, ...)
-    ATTRIBUTE_FORMAT(1, 2);
+int cprintf(char const *format, ...) __printf_format(1, 2);
 
 int vcprintf(char const *format, va_list ap);
 

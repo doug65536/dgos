@@ -2,12 +2,12 @@
 
 #include "types.h"
 
-typedef struct physmem_range_t {
+struct physmem_range_t {
     uint64_t base;
     uint64_t size;
     uint32_t type;
     uint32_t valid;
-} physmem_range_t;
+};
 
 #define PHYSMEM_TYPE_NORMAL         1
 #define PHYSMEM_TYPE_UNUSABLE       2

@@ -12,7 +12,7 @@ typedef uint64_t Elf64_Xword;
 typedef int64_t Elf64_Sxword;
 
 // File header
-typedef struct Elf64_Ehdr {
+struct Elf64_Ehdr {
     unsigned char e_ident[16]; /* ELF identification */
     Elf64_Half e_type; /* Object file type */
     Elf64_Half e_machine; /* Machine type */
@@ -27,7 +27,7 @@ typedef struct Elf64_Ehdr {
     Elf64_Half e_shentsize; /* Size of section header entry */
     Elf64_Half e_shnum; /* Number of section header entries */
     Elf64_Half e_shstrndx; /* Section name string table index */
-} Elf64_Ehdr;
+};
 
 #define EI_MAG0 0 // File identification
 #define EI_MAG1 1
@@ -71,7 +71,7 @@ char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
 #define SHN_ABS 0xFFF1 // Indicates that the corresponding reference is an absolute value
 #define SHN_COMMON 0xFFF2 // Indicates a symbol that has been declared as a common block
 
-typedef struct Elf64_Shdr {
+struct Elf64_Shdr {
     Elf64_Word sh_name; /* Section name */
     Elf64_Word sh_type; /* Section type */
     Elf64_Xword sh_flags; /* Section attributes */
@@ -82,7 +82,7 @@ typedef struct Elf64_Shdr {
     Elf64_Word sh_info; /* Miscellaneous information */
     Elf64_Xword sh_addralign; /* Address alignment boundary */
     Elf64_Xword sh_entsize; /* Size of entries, if section has table */
-} Elf64_Shdr;
+};
 
 // sh_type
 #define SHT_NULL 0 // Marks an unused section header
@@ -127,14 +127,14 @@ typedef struct Elf64_Shdr {
 //SHT_SYMTAB // Index of first non-local symbol (i.e., number of local symbols
 //SHT_DYNSYM // Index of first non-local symbol (i.e., number of local symbols
 
-typedef struct Elf64_Sym {
+struct Elf64_Sym {
     Elf64_Word st_name; /* Symbol name */
     unsigned char st_info; /* Type and Binding attributes */
     unsigned char st_other; /* Reserved */
     Elf64_Half st_shndx; /* Section table index */
     Elf64_Addr st_value; /* Symbol value */
     Elf64_Xword st_size; /* Size of object (e.g., common) */
-} Elf64_Sym;
+};
 
 // Symbol bindings
 #define STB_LOCAL 0 Not visible outside the object file
@@ -157,19 +157,19 @@ typedef struct Elf64_Sym {
 #define STT_HIPROC 15
 
 // Relocation
-typedef struct Elf64_Rel {
+struct Elf64_Rel {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
-} Elf64_Rel;
+};
 
-typedef struct Elf64_Rela {
+struct Elf64_Rela {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
     Elf64_Sxword r_addend; /* Constant part of expression */
-} Elf64_Rela;
+};
 
 // Program header
-typedef struct Elf64_Phdr {
+struct Elf64_Phdr {
     Elf64_Word p_type; /* Type of segment */
     Elf64_Word p_flags; /* Segment attributes */
     Elf64_Off p_offset; /* Offset in file */
@@ -178,7 +178,7 @@ typedef struct Elf64_Phdr {
     Elf64_Xword p_filesz; /* Size of segment in file */
     Elf64_Xword p_memsz; /* Size of segment in memory */
     Elf64_Xword p_align; /* Alignment of segment */
-} Elf64_Phdr;
+};
 
 #define PT_NULL 0 // Unused entry
 #define PT_LOAD 1 // Loadable segment
@@ -200,13 +200,13 @@ typedef struct Elf64_Phdr {
 #define PF_MASKPROC 0xFF000000 // These flag bits are reserved for processor-specific use
 
 // Dynamic table
-typedef struct Elf64_Dyn {
+struct Elf64_Dyn {
     Elf64_Sxword d_tag;
     union {
         Elf64_Xword d_val;
         Elf64_Addr d_ptr;
     } d_un;
-} Elf64_Dyn;
+};
 
 #define DT_NULL 0  // ignored Marks the end of the dynamic array
 #define DT_NEEDED 1  // d_val The string table offset of the name of a needed library

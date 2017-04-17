@@ -6,7 +6,6 @@
 #include "stdlib.h"
 #include "string.h"
 
-typedef struct file_handle_t file_handle_t;
 struct file_handle_t {
     file_handle_t *next;
     fs_file_info_t *fi;

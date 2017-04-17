@@ -13,11 +13,9 @@
 
 extern "C" {
 
-__attribute__((malloc))
-void *calloc(size_t num, size_t size);
+__malloc void *calloc(size_t num, size_t size);
 
-__attribute__((malloc))
-void *malloc(size_t size);
+__malloc void *malloc(size_t size);
 
 void *realloc(void *p, size_t new_size);
 
