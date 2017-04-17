@@ -15,6 +15,8 @@ static uint32_t usleep_dummy(uint16_t microsec);
 static uint64_t (*time_ms_vec)(void) = time_ms_dummy;
 static uint32_t (*usleep_vec)(uint16_t microsec) = usleep_dummy;
 
+static time_ofday_handler_t time_gettimeofday_vec;
+
 // Provides a handler for time_ms until the timer is initialized
 static uint64_t time_ms_dummy(void)
 {
@@ -50,4 +52,14 @@ EXPORT uint32_t usleep(uint16_t microsec)
 EXPORT void sleep(int ms)
 {
     thread_sleep_for(ms);
+}
+
+void time_ofday_set_handler(time_ofday_handler_t handler)
+{
+    time_gettimeofday_vec = handler;
+}
+
+time_of_day_t time_ofday()
+{
+    return time_gettimeofday_vec();
 }
