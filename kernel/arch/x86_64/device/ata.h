@@ -5,38 +5,34 @@
 #include "printk.h"
 
 enum struct ata_cmd_t : uint8_t {
-    // 24-bit PIO
-    READ_PIO            = 0x20,
-    WRITE_PIO           = 0x30,
+    NOP                 = 0x00,
 
-    // 24-bit Multiple
-    READ_MULT_PIO       = 0xC5,
-    WRITE_MULT_PIO      = 0xC4,
-
-    // 24-bit DMA
-    READ_DMA            = 0xC8,
-    WRITE_DMA           = 0xCA,
-
-    // 24-bit NCQ DMA
+    // NCQ DMA
     READ_DMA_NCQ        = 0x60,
     WRITE_DMA_NCQ       = 0x61,
 
-    // 24-bit cache flush
-    CACHE_FLUSH         = 0xE7,
-
-    // 48-bit PIO
+    // PIO
+    READ_PIO            = 0x20,
+    WRITE_PIO           = 0x30,
     READ_PIO_EXT        = 0x24,
     WRITE_PIO_EXT       = 0x34,
 
-    // 48-bit Multiple
+    // Multiple
+    READ_MULT_PIO       = 0xC5,
+    WRITE_MULT_PIO      = 0xC4,
     READ_MULT_PIO_EXT   = 0x29,
     WRITE_MULT_PIO_EXT  = 0x39,
+    WRITE_MULT_FUA_EXT  = 0xCE,
 
-    // 48-bit DMA
+    // DMA
+    READ_DMA            = 0xC8,
+    WRITE_DMA           = 0xCA,
     READ_DMA_EXT        = 0x25,
     WRITE_DMA_EXT       = 0x35,
+    WRITE_DMA_FUA_EXT   = 0x3D,
 
-    // 48-bit cache flush
+    // Cache flush
+    CACHE_FLUSH         = 0xE7,
     CACHE_FLUSH_EXT     = 0xEA,
 
     // Read drive capabilities
@@ -46,9 +42,86 @@ enum struct ata_cmd_t : uint8_t {
     // ATAPI command packet
     PACKET              = 0xA0,
 
+    // Configure
     SET_MULTIPLE        = 0xC6,
-
     SET_FEATURE         = 0xEF,
+    SET_MULT_MODE       = 0xC6,
+
+    // Log
+    READ_LOG_EXT        = 0x2F,
+    WRITE_LOG_EXT       = 0x3F,
+    READ_LOG_DMA_EXT    = 0x47,
+    WRITE_LOG_DMA_EXT   = 0x57,
+
+    // Compact flash
+    CFA_XLAT_SECT       = 0x87,
+    CFA_ERASE_SECT      = 0xC0,
+    CFA_WRITE_NE        = 0x38,
+    CFA_WRITE_MULT_NE   = 0xCD,
+    CFA_REQ_EXT_ERR     = 0x03,
+    CFA_MEDIA_CARD_TYPE = 0xD1,
+
+    // Stream
+    READ_STR_EXT        = 0x2B,
+    WRITE_STR_DMA       = 0x3B,
+    READ_STR_DMA_EXT    = 0x2A,
+    WRITE_STR_DMA_EXT   = 0x3A,
+
+    // Verify
+    VERIFY_SECTORS      = 0x40,
+    VERIFY_SECTORS_EXT  = 0x42,
+
+    // Trusted
+    TRUSTED_NONDATA     = 0x5B,
+    TRUSTED_RECV        = 0x5C,
+    TRUSTED_RECV_DMA    = 0x5D,
+    TRUSTED_SEND        = 0x5E,
+    TRUSTED_SEND_DMA    = 0x5F,
+
+    // Power management
+    STANDBY_IMM         = 0xE0,
+    IDLE_IMM            = 0xE1,
+    STANDBY             = 0xE2,
+    IDLE                = 0xE3,
+    SLEEP               = 0xE6,
+    CHK_PWR_MODE        = 0xE5,
+
+    // Buffer
+    WRITE_BUFFER_DMA    = 0xE8,
+    READ_BUFFER_DMA     = 0xE9,
+    READ_BUFFER         = 0xE4,
+
+    // Trim
+    DATA_SET_MGMT       = 0x06,
+
+    // Security
+    SEC_SET_PASSWORD    = 0xF1,
+    SEC_UNLOCK          = 0xF2,
+    SEC_ERASE_PREP      = 0xF3,
+    SEC_ERASE_UNIT      = 0xF4,
+    SEC_FREEZE_LOCK     = 0xF5,
+    SEC_DIS_PASSWORD    = 0xF6,
+    SANITIZE            = 0xB4,
+
+    // Max address
+    SET_MAX_ADDR_EXT    = 0x37,
+    SET_MAX_ADDR        = 0xF9,
+
+    // Firmware
+    MICROCODE           = 0x92,
+    MICROCODE_DMA       = 0x93,
+
+    // Diagnostic
+    DIAGNOSTIC          = 0x90,
+    WRITE_UNCORR_EXT    = 0x45,
+    SMART               = 0xB0,
+
+    DEVICE_RESET        = 0x08,
+    REQ_SENSE_EXT       = 0x0B,
+    READ_N_MAX_ADDR_EXT = 0x27,
+    CONFIG_STR          = 0x51,
+    NV_CACHE            = 0xB6,
+    READ_N_MAX_ADDR     = 0xF8,
 };
 
 struct ata_identify_t {
@@ -249,9 +322,13 @@ struct ata_identify_t {
     uint16_t support_smart_test:1;
     uint16_t support_media_serial:1;
     uint16_t support_media_card:1;
-    uint16_t :1;
+    uint16_t support_streaming:1;
     uint16_t support_logging:1;
-    uint16_t :8;
+    uint16_t support_fua_ext:1;
+    uint16_t :1;
+    uint16_t support_wwn:1;
+    uint16_t :4;
+    uint16_t support_idle_imm_unload:1;
     uint16_t :2;
 
     // Word 85
@@ -394,8 +471,22 @@ struct ata_identify_t {
     uint16_t :1;
     uint16_t word_160_supported:1;
 
-    // Word 161-175
-    uint16_t cf_reserved[176-161];
+    // Word 161-167
+    uint16_t cf_reserved[168-161];
+
+    // Word 168
+    uint16_t nominal_form_factor:4;
+    uint16_t :12;
+
+    // Word 169
+    uint16_t support_trim:1;
+    uint16_t :15;
+
+    // Word 170-173
+    char extra_product_id[(174-170)*2];
+
+    // Word 174-175
+    uint16_t unused_174_175[176-174];
 
     // Word 176-205
     char media_serial[(206-176)*2];
@@ -413,7 +504,7 @@ struct ata_identify_t {
         htons_buf(model, sizeof(model));
         htons_buf(media_serial, sizeof(media_serial));
     }
-} __attribute__((packed));
+} __packed;
 
 C_ASSERT(offsetof(ata_identify_t, unused_1) == 1*2);
 C_ASSERT(offsetof(ata_identify_t, unused_3_9) == 3*2);
@@ -505,7 +596,7 @@ C_ASSERT(sizeof(atapi_fis_t) == 16);
 #define ATA_REG_STATUS_DRDY         (1U<<ATA_REG_STATUS_DRDY_BIT)
 #define ATA_REG_STATUS_BSY          (1U<<ATA_REG_STATUS_BSY_BIT)
 
-__attribute__((used))
+__used
 static format_flag_info_t const ide_flags_status[] = {
     { "ERR",  ATA_REG_STATUS_ERR_BIT,  1, 0 },
     { "IDX",  ATA_REG_STATUS_IDX_BIT,  1, 0 },
@@ -581,50 +672,73 @@ extern format_flag_info_t const ide_flags_error[];
 
 // 01h Enable 8-bit PIO transfer mode (CFA feature set only)
 #define ATA_FEATURE_ENA_8BIT_PIO    0x01
+
 // 02h Enable write cache
 #define ATA_FEATURE_ENA_WR_CACHE    0x02
+
 // 03h Set transfer mode based on value in Sector Count register.
 #define ATA_FEATURE_XFER_MODE       0x03
+
 // 05h Enable advanced power management
 #define ATA_FEATURE_ENABLE_APM      0x05
+
 // 06h Enable Power-Up In Standby feature set.
 #define ATA_FEATURE_ENA_PUIS        0x06
+
 // 07h Power-Up In Standby feature set device spin-up.
 #define ATA_FEATURE_PUIS_FS         0x07
+
 // 0Ah Enable CFA power mode 1
 #define ATA_FEATURE_CFA_PWR_M1      0x0A
+
 // 31h Disable Media Status Notification
 #define ATA_FEATURE_DIS_MSN         0x31
+
 // 42h Enable Automatic Acoustic Management feature set
 #define ATA_FEATURE_ENA_AAM         0x42
+
 // 55h Disable read look-ahead feature
 #define ATA_FEATURE_DIS_RLA         0x55
+
 // 5Dh Enable release interrupt
 #define ATA_FEATURE_ENA_REL_INTR    0x5D
+
 // 5Eh Enable SERVICE interrupt
 #define ATA_FEATURE_ENA_SVC_INTR    0x5E
+
 // 66h Disable reverting to power-on defaults
 #define ATA_FEATURE_DIS_POD         0x66
+
 // 81h Disable 8-bit PIO transfer mode (CFA feature set only)
 #define ATA_FEATURE_DIS_8BIT_PIO    0x81
+
 // 82h Disable write cache
 #define ATA_FEATURE_DIS_WR_CACHE    0x82
+
 // 85h Disable advanced power management
 #define ATA_FEATURE_DIS_APM         0x85
+
 // 86h Disable Power-Up In Standby feature set.
 #define ATA_FEATURE_DIS_PUIS        0x86
+
 // 8Ah Disable CFA power mode 1
 #define ATA_FEATURE_DIS_CFA_M1      0x8A
+
 // 95h Enable Media Status Notification
 #define ATA_FEATURE_ENA_MSN         0x95
+
 // AAh Enable read look-ahead feature
 #define ATA_FEATURE_ENA_RLA         0xAA
+
 // C2h Disable Automatic Acoustic Management feature set
 #define ATA_FEATURE_DIS_AAM         0xC2
+
 // CCh Enable reverting to power-on defaults
 #define ATA_FEATURE_ENA_POD         0xCC
+
 // DDh Disable release interrupt
 #define ATA_FEATURE_DIS_REL_INTR    0xDD
+
 // DEh Disable SERVICE interrupt
 #define ATA_FEATURE_DIS_SVC_INTR    0xDE
 

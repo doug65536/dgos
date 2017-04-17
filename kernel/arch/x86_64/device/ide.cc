@@ -19,6 +19,14 @@
 #define IDE_TRACE(...) ((void)0)
 #endif
 
+enum struct io_op_t {
+    read,
+    write,
+
+    identify,
+    flush
+};
+
 struct ide_chan_ports_t {
     ioport_t cmd;
     ioport_t ctl;
@@ -39,7 +47,7 @@ struct ide_if_t : public storage_if_base_t {
         uint32_t physaddr;
         uint16_t size;
         uint16_t eot;
-    } __attribute__((packed));
+    } __packed;
 
     C_ASSERT(sizeof(bmdma_prd_t) == 8);
 
@@ -74,15 +82,17 @@ struct ide_if_t : public storage_if_base_t {
         struct unit_data_t {
             uint64_t max_lba;
             uint32_t max_multiple;
-            uint16_t has_48bit;
             ata_cmd_t read_command;
             ata_cmd_t write_command;
+            ata_cmd_t write_fua_command;
+            ata_cmd_t flush_command;
             int8_t max_dma;
-            int8_t old_dma;
-            int8_t iordy;
             int8_t max_ncq;
             uint8_t atapi_packet_size;
-            uint32_t ncq_available;
+            bool old_dma;
+            bool iordy;
+            bool has_48bit;
+            bool has_fua;
         };
 
         // Capabilities of master slave
@@ -136,7 +146,7 @@ struct ide_if_t : public storage_if_base_t {
         void pio_write_data(unit_data_t &unit, void const *buf, size_t bytes);
 
         int64_t io(void *data, int64_t count, uint64_t lba,
-                   int slave, int is_atapi, int is_read);
+                   int slave, int is_atapi, io_op_t op, bool fua);
 
         static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
         void irq_handler();
@@ -683,6 +693,8 @@ void ide_if_t::ide_chan_t::detect_devices()
                 unit.old_dma = 1;
         }
 
+        unit.has_fua = ident->support_fua_ext;
+
         ident.reset();
 
         IDE_TRACE("if=%d, slave=%d, max_dma=%d\n", secondary, slave, unit.max_dma);
@@ -691,25 +703,33 @@ void ide_if_t::ide_chan_t::detect_devices()
             if (unit.max_dma >= 0) {
                 unit.read_command = ata_cmd_t::READ_DMA_EXT;
                 unit.write_command = ata_cmd_t::WRITE_DMA_EXT;
+                unit.write_fua_command = ata_cmd_t::WRITE_DMA_FUA_EXT;
+                unit.flush_command = ata_cmd_t::CACHE_FLUSH_EXT;
                 unit.max_multiple = 65536;
             } else if (unit.max_multiple > 1) {
                 unit.read_command = ata_cmd_t::READ_MULT_PIO_EXT;
                 unit.write_command = ata_cmd_t::WRITE_MULT_PIO_EXT;
+                unit.write_fua_command = ata_cmd_t::WRITE_MULT_FUA_EXT;
+                unit.flush_command = ata_cmd_t::CACHE_FLUSH_EXT;
             } else {
                 unit.read_command = ata_cmd_t::READ_PIO_EXT;
                 unit.write_command = ata_cmd_t::WRITE_PIO_EXT;
+                unit.flush_command = ata_cmd_t::CACHE_FLUSH_EXT;
             }
         } else {
             if (unit.max_dma >= 0) {
                 unit.read_command = ata_cmd_t::READ_DMA;
                 unit.write_command = ata_cmd_t::WRITE_DMA;
+                unit.flush_command = ata_cmd_t::CACHE_FLUSH;
                 unit.max_multiple = 256;
             } else if (unit.max_multiple > 1) {
                 unit.read_command = ata_cmd_t::READ_MULT_PIO;
                 unit.write_command = ata_cmd_t::WRITE_MULT_PIO;
+                unit.flush_command = ata_cmd_t::CACHE_FLUSH;
             } else {
                 unit.read_command = ata_cmd_t::READ_PIO;
                 unit.write_command = ata_cmd_t::WRITE_PIO;
+                unit.flush_command = ata_cmd_t::CACHE_FLUSH;
             }
         }
 
@@ -911,9 +931,8 @@ void ide_if_t::ide_chan_t::trace_error(int slave,
               msg, secondary, slave, status, status_text, err, error_text);
 }
 
-int64_t ide_if_t::ide_chan_t::io(
-        void *data, int64_t count, uint64_t lba,
-        int slave, int is_atapi, int is_read)
+int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
+        int slave, int is_atapi, io_op_t op, bool fua)
 {
     unit_data_t &unit = unit_data[slave];
 
@@ -965,7 +984,35 @@ int64_t ide_if_t::ide_chan_t::io(
         if (!is_atapi) {
             set_lba(unit, lba + count_base);
             set_count(unit, sub_count);
-            issue_command(is_read ? unit.read_command : unit.write_command);
+
+            ata_cmd_t cmd;
+
+            switch (op) {
+            case io_op_t::read:
+                cmd = unit.read_command;
+                break;
+
+            case io_op_t::write:
+                cmd = (fua && unit.has_fua)
+                        ? unit.write_fua_command
+                        : unit.write_command;
+                break;
+
+            case io_op_t::flush:
+                cmd = unit.flush_command;
+                break;
+
+            case io_op_t::identify:
+                cmd = ata_cmd_t::IDENTIFY;
+                break;
+
+            default:
+                cmd = ata_cmd_t::NOP;
+                assert(!"Invalid op");
+                break;
+            }
+
+            issue_command(cmd);
         } else {
             issue_packet_read(unit, lba + count_base, sub_count, 2048,
                               unit.max_dma >= 0);
@@ -973,11 +1020,12 @@ int64_t ide_if_t::ide_chan_t::io(
 
         size_t io_window_misalignment = (uintptr_t)data & ~(int)-PAGESIZE;
 
-        if (unit.max_dma >= 0) {
+        if (unit.max_dma >= 0 && op != io_op_t::flush) {
             IDE_TRACE("Starting DMA\n");
 
             // Program DMA reads or writes and start DMA
-            iface->bmdma_outb(ATA_BMDMA_REG_CMD_n(secondary), is_read ? 9 : 1);
+            iface->bmdma_outb(ATA_BMDMA_REG_CMD_n(secondary),
+                              op == io_op_t::read ? 9 : 1);
 
             // Get physical addresses of destination
             size_t range_count = mphysranges(
@@ -987,7 +1035,7 @@ int64_t ide_if_t::ide_chan_t::io(
             // Map window to modify the memory
             alias_window(io_window, sub_size, io_window_ranges, range_count);
 
-            if (!is_read) {
+            if (op == io_op_t::write) {
                 memcpy(dma_bounce, (char*)io_window + io_window_misalignment,
                        sub_size);
             }
@@ -1001,7 +1049,7 @@ int64_t ide_if_t::ide_chan_t::io(
             err = 1;
         }
 
-        if (unit.max_dma >= 0) {
+        if (unit.max_dma >= 0 && op != io_op_t::flush) {
             // Must read status register to synchronize with bus master
             IDE_TRACE("Reading DMA status\n");
             uint8_t bmdma_status = iface->bmdma_inb(
@@ -1018,7 +1066,7 @@ int64_t ide_if_t::ide_chan_t::io(
 
             iface->bmdma_release();
 
-            if (is_read) {
+            if (op != io_op_t::write) {
                 // Copy into caller's data buffer
                 memcpy((char*)io_window + io_window_misalignment,
                        dma_bounce, sub_size);
@@ -1035,12 +1083,33 @@ int64_t ide_if_t::ide_chan_t::io(
                          io_window_ranges, ranges_count);
 
             IDE_TRACE("Transferring PIO data\n");
-            if (is_read) {
-                pio_read_data(unit, (char*)io_window + io_window_misalignment,
-                              sub_count << log2_sector_size);
-            } else {
-                pio_write_data(unit, (char*)io_window + io_window_misalignment,
-                               sub_count << log2_sector_size);
+            if (op != io_op_t::flush) {
+                if (op != io_op_t::write) {
+                    pio_read_data(unit, (char*)io_window +
+                                  io_window_misalignment,
+                                  sub_count << log2_sector_size);
+                } else {
+                    pio_write_data(unit, (char*)io_window +
+                                   io_window_misalignment,
+                                   sub_count << log2_sector_size);
+                }
+            }
+        }
+
+        // Emulate FUA when unsupported by issuing subsequent FLUSH CACHE
+        if (err == 0 && fua && !unit.has_fua) {
+            // Issue FLUSH CACHE
+            set_lba(unit, 0);
+            set_count(unit, 0);
+            outb(ata_reg_cmd::FEATURES, 0);
+            issue_command(unit.flush_command);
+
+            yield_until_irq();
+
+            if (io_status & ATA_REG_STATUS_ERR) {
+                err = inb(ata_reg_cmd::ERROR);
+                trace_error(slave, "Flush I/O error", io_status, err);
+                err = 1;
             }
         }
 
@@ -1080,8 +1149,11 @@ void ide_if_t::ide_chan_t::irq_handler()
 
 int ide_if_t::ide_chan_t::flush(int slave, int is_atapi)
 {
+    if (is_atapi)
+        return 0;
+
+
     (void)slave;
-    (void)is_atapi;
     return 0;
 }
 
@@ -1119,13 +1191,22 @@ void ide_dev_t::cleanup()
 int64_t ide_dev_t::read_blocks(
         void *data, int64_t count, uint64_t lba)
 {
-    return chan->io(data, count, lba, slave, is_atapi, 1);
+    return chan->io(data, count, lba, slave, is_atapi,
+                    io_op_t::read, false);
 }
 
 int64_t ide_dev_t::write_blocks(
-        void const *data, int64_t count, uint64_t lba)
+        void const *data, int64_t count, uint64_t lba, bool fua)
 {
-    return chan->io((void*)data, count, lba, slave, is_atapi, 0);
+    return chan->io((void*)data, count, lba, slave, is_atapi,
+                    io_op_t::write, fua);
+}
+
+int64_t ide_dev_t::trim_blocks(int64_t count, uint64_t lba)
+{
+    (void)count;
+    (void)lba;
+    return -int(errno_t::ENOSYS);
 }
 
 int ide_dev_t::flush()
@@ -1138,6 +1219,9 @@ long ide_dev_t::info(storage_dev_info_t key)
     switch (key) {
     case STORAGE_INFO_BLOCKSIZE:
         return !is_atapi ? 512 : 2048;
+
+    case STORAGE_INFO_HAVE_TRIM:
+        return 0;
 
     default:
         return -1;

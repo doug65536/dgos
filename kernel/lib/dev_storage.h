@@ -10,19 +10,19 @@
 //
 // Forward declarations
 
-typedef struct if_list_t {
+struct if_list_t {
     void *base;
     unsigned stride;
     unsigned count;
-} if_list_t;
+};
 
 //
 // Storage Device (hard drive, CDROM, etc)
 
-enum storage_dev_info_t {
+enum storage_dev_info_t : uint32_t {
     STORAGE_INFO_NONE = 0,
-    STORAGE_INFO_BLOCKSIZE = 1,
-    STORAGE_INFO_MAX = 0x7FFFFFFF
+    STORAGE_INFO_BLOCKSIZE,
+    STORAGE_INFO_HAVE_TRIM
 };
 
 struct storage_dev_base_t {
@@ -33,20 +33,26 @@ struct storage_dev_base_t {
             void *data, int64_t count, uint64_t lba) = 0;
 
     virtual int64_t write_blocks(
-            void const *data, int64_t count, uint64_t lba) = 0;
+            void const *data, int64_t count, uint64_t lba, bool fua) = 0;
+
+    virtual int64_t trim_blocks(int64_t count, uint64_t lba) = 0;
 
     virtual int flush() = 0;
 
     virtual long info(storage_dev_info_t key) = 0;
 };
 
-#define STORAGE_DEV_IMPL                                            \
-    void cleanup() final;                                           \
-    int64_t read_blocks(                                            \
-            void *data, int64_t count, uint64_t lba) final;         \
-    int64_t write_blocks(                                           \
-            void const *data, int64_t count, uint64_t lba) final;   \
-    int flush() final;                                              \
+#define STORAGE_DEV_IMPL                        \
+    void cleanup() final;                       \
+    int64_t read_blocks(                        \
+            void *data, int64_t count,          \
+            uint64_t lba) final;                \
+    int64_t write_blocks(                       \
+            void const *data, int64_t count,    \
+            uint64_t lba, bool fua) final;      \
+    int flush() final;                          \
+    int64_t trim_blocks(int64_t count,          \
+            uint64_t lba) final;                \
     long info(storage_dev_info_t key) final;
 
 //

@@ -1159,11 +1159,23 @@ struct async_callback_t {
     int error;
 };
 
+enum struct slot_op_t {
+    read,
+    write,
+
+    // All non-NCQ operations must go after this value
+    non_ncq,
+
+    identify,
+    flush
+};
+
 struct slot_request_t {
     void *data;
     int64_t count;
     uint64_t lba;
-    int is_read;
+    slot_op_t op;
+    bool fua;
     async_callback_t callback;
 };
 
@@ -1177,7 +1189,14 @@ struct hba_port_info_t {
 
     slot_request_t slot_requests[32];
 
+    // Wake every time a slot is released
     condition_var_t slotalloc_avail;
+
+    // Wake when all slots are released
+    condition_var_t idle_cond;
+
+    // Wake after a non-NCQ command finishes (when NCQ capable)
+    condition_var_t non_ncq_done_cond;
 
     // Keep track of slot order
     mutex_t lock;
@@ -1185,7 +1204,14 @@ struct hba_port_info_t {
     uint8_t issue_head;
     uint8_t issue_tail;
 
+    // Set to true to block slot acquires to idle the controller for a
+    // non-NCQ command (when NCQ is enabled). non_ncq_done_cond is signalled
+    // when the command is finished
+    bool non_ncq_pending;
+
     bool use_ncq;
+    bool use_fua;
+    bool use_48bit;
     uint8_t queue_depth;
     uint8_t log2_sector_size;
 };
@@ -1208,24 +1234,24 @@ class ahci_if_t : public storage_if_base_t {
 public:
     void init(pci_dev_iterator_t const &pci_iter);
 
-    unsigned rw(unsigned port_num, uint64_t lba,
-            void *data, uint32_t count, int is_read,
-            async_callback_fn_t callback,
-            uintptr_t callback_arg);
+    unsigned io(unsigned port_num, slot_request_t &request);
+
+    int port_flush(unsigned port_num, async_callback_fn_t callback, uintptr_t callback_arg);
 
     unsigned get_sector_size(unsigned port);
     void configure_ncq(unsigned port_num, bool enable, uint8_t queue_depth);
+    void configure_48bit(unsigned port_num, bool enable);
+    void configure_fua(unsigned port_num, bool enable);
+
+    int8_t slot_wait(hba_port_info_t &pi);
 
 private:
     STORAGE_IF_IMPL
 
-    unsigned rw_locked(unsigned port_num, uint64_t lba,
-            void *data, uint32_t count, int is_read,
-            async_callback_fn_t callback,
-            uintptr_t callback_arg);
+    unsigned io_locked(unsigned port_num, slot_request_t &request);
 
     bool supports_64bit();
-    void release_slot(unsigned port_num, int slot);
+    void slot_release(unsigned port_num, int slot);
     void handle_port_irqs(unsigned port_num);
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     void port_stop(unsigned port_num);
@@ -1237,14 +1263,12 @@ private:
 
     void bios_handoff();
 
-    uint8_t acquire_slot(unsigned port_num);
+    int8_t slot_acquire(hba_port_info_t& pi);
 
     void cmd_issue(unsigned port_num, unsigned slot,
                    hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
                    size_t fis_size, hba_prdt_ent_t const *prdts,
-                   size_t ranges_count, int is_read,
-                   async_callback_fn_t callback,
-                   uintptr_t callback_arg);
+                   size_t ranges_count);
 
     pci_config_hdr_t config;
 
@@ -1272,7 +1296,7 @@ private:
     STORAGE_DEV_IMPL
 
     int io(void *data, int64_t count,
-           uint64_t lba, int is_read);
+           uint64_t lba, bool fua, slot_op_t op);
 
     ahci_if_t *iface;
     unsigned port;
@@ -1292,8 +1316,8 @@ bool ahci_if_t::supports_64bit()
     return (mmio_base->cap & AHCI_HC_CAP_S64A) != 0;
 }
 
-// Must be holding port spinlock
-void ahci_if_t::release_slot(unsigned port_num, int slot)
+// Must be holding port lock
+void ahci_if_t::slot_release(unsigned port_num, int slot)
 {
     assert(slot >= 0);
 
@@ -1312,32 +1336,39 @@ void ahci_if_t::release_slot(unsigned port_num, int slot)
     // Mark slot as not in use
     pi->cmd_issued &= ~(1U<<slot);
 
+    // Wake a thread that may be waiting for a slot
     condvar_wake_one(&pi->slotalloc_avail);
+
+    // Wake non-ncq thread if non-ncq is pending when every slot is free
+    if (pi->non_ncq_pending && ((pi->cmd_issued & pi->slot_mask) == 0))
+        condvar_wake_one(&pi->idle_cond);
 }
 
 // Acquire slot that is not in use
 // Returns -1 if all slots are in use
-// Must be holding port spinlock
-uint8_t ahci_if_t::acquire_slot(unsigned port_num)
+// Must be holding port lock
+int8_t ahci_if_t::slot_acquire(hba_port_info_t& pi)
 {
-    hba_port_info_t *pi = port_info + port_num;
+    // Wait for non-NCQ command to finish
+    while (unlikely(pi.use_ncq && pi.non_ncq_pending))
+        condvar_wait(&pi.non_ncq_done_cond, &pi.lock);
 
     // Build bitmask of slots in use
-    uint32_t busy_mask = pi->cmd_issued;
+    uint32_t busy_mask = pi.cmd_issued;
 
     // If every slot is busy
-    if (busy_mask == 0xFFFFFFFF)
+    if (unlikely(busy_mask == 0xFFFFFFFF))
         return -1;
 
     // Find first zero
     uint8_t slot = bit_lsb_set(~busy_mask);
 
-    pi->cmd_issued |= (1U << slot);
+    pi.cmd_issued |= (1U << slot);
 
-    if (!pi->use_ncq) {
+    if (!pi.use_ncq) {
         // Write slot number to issue queue
-        pi->issue_queue[pi->issue_head] = slot;
-        pi->issue_head = (pi->issue_head + 1) & 31;
+        pi.issue_queue[pi.issue_head] = slot;
+        pi.issue_head = (pi.issue_head + 1) & 31;
     }
 
     return slot;
@@ -1381,19 +1412,19 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
             request.callback.callback_arg = 0;
             request.callback.error = 0;
 
-            release_slot(port_num, slot);
+            slot_release(port_num, slot);
         }
 
-        /// Handle failure by
-        ///  - stopping DMA engine,
-        ///  - disabling ncq
-        ///  - resetting port
-        ///  - starting DMA engine
-        ///  - rebuilding issue queue (for non-NCQ completion)
-        ///  - reissuing all outstanding commands
-        /// This is to make command execution sequential, to get precise
-        /// error information
         if (unlikely(port_intr_status & AHCI_HP_IS_TFES)) {
+            /// Handle failure by
+            ///  - stopping DMA engine,
+            ///  - disabling ncq
+            ///  - resetting port
+            ///  - starting DMA engine
+            ///  - rebuilding issue queue (for non-NCQ completion)
+            ///  - reissuing all outstanding commands
+            /// This is to make command execution sequential, to get precise
+            /// error information
             port_stop(port_num);
             port_reset(port_num);
             pi->use_ncq = false;
@@ -1417,9 +1448,7 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
                 slot_request_t &request = pending[reissue];
 
-                rw_locked(port_num, request.lba, request.data, request.count,
-                          request.is_read, request.callback.callback,
-                          request.callback.callback_arg);
+                io_locked(port_num, request);
             }
         }
     } else {
@@ -1454,7 +1483,12 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
         request.callback.callback_arg = 0;
         request.callback.error = 0;
 
-        release_slot(port_num, slot);
+        slot_release(port_num, slot);
+
+        if (pi->use_ncq && int(request.op) > int(slot_op_t::non_ncq)) {
+            pi->non_ncq_pending = false;
+            condvar_wake_all(&pi->non_ncq_done_cond);
+        }
     }
 
     // Acknowledge slot interrupt
@@ -1550,12 +1584,10 @@ void ahci_if_t::port_start_all()
     }
 }
 
-// Must be holding port spinlock
-void ahci_if_t::cmd_issue(
-        unsigned port_num, unsigned slot,
+// Must be holding port lock
+void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
         hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
-        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count,
-        int is_read, async_callback_fn_t callback, uintptr_t callback_arg)
+        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count)
 {
     hba_port_info_t *pi = port_info + port_num;
     hba_port_t volatile *port = mmio_base->ports + port_num;
@@ -1563,7 +1595,12 @@ void ahci_if_t::cmd_issue(
     hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
     hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
 
-    memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
+    slot_request_t &request = pi->slot_requests[slot];
+
+    if (likely(prdts != nullptr))
+        memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
+    else
+        memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
 
     memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
 
@@ -1571,15 +1608,11 @@ void ahci_if_t::cmd_issue(
         cmd_tbl_ent->atapi_fis = *atapi_fis;
 
     cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
-            (!is_read ? AHCI_CH_WR : 0) |
+            (request.op == slot_op_t::write ? AHCI_CH_WR : 0) |
             (atapi_fis ? AHCI_CH_ATAPI : 0);
     cmd_hdr->prdbc = 0;
     cmd_hdr->prdtl = ranges_count;
 
-    slot_request_t &request = pi->slot_requests[slot];
-
-    request.callback.callback = callback;
-    request.callback.callback_arg = callback_arg;
     request.callback.error = 0;
 
     atomic_barrier();
@@ -1594,6 +1627,16 @@ void ahci_if_t::cmd_issue(
 unsigned ahci_if_t::get_sector_size(unsigned port)
 {
     return 1U << port_info[port].log2_sector_size;
+}
+
+void ahci_if_t::configure_48bit(unsigned port_num, bool enable)
+{
+    port_info[port_num].use_48bit = enable;
+}
+
+void ahci_if_t::configure_fua(unsigned port_num, bool enable)
+{
+    port_info[port_num].use_fua = enable;
 }
 
 void ahci_if_t::configure_ncq(unsigned port_num, bool enable,
@@ -1659,55 +1702,111 @@ void ahci_if_t::init(pci_dev_iterator_t const &pci_iter)
     }
 }
 
-static void condvar_wait_wtf(condition_var_t *var, mutex_t *mutex)
-{
-    return condvar_wait(var, mutex);
-}
-
-unsigned ahci_if_t::rw(unsigned port_num, uint64_t lba,
-                   void *data, uint32_t count, int is_read,
-                   async_callback_fn_t callback,
-                   uintptr_t callback_arg)
+unsigned ahci_if_t::io(unsigned port_num, slot_request_t &request)
 {
     unsigned expect_count;
 
     mutex_lock(&port_info[port_num].lock);
 
-    expect_count = rw_locked(port_num, lba, data, count,
-                             is_read, callback, callback_arg);
+    expect_count = io_locked(port_num, request);
 
     mutex_unlock(&port_info[port_num].lock);
 
     return expect_count;
 }
 
+int ahci_if_t::port_flush(unsigned port_num, async_callback_fn_t callback,
+                          uintptr_t callback_arg)
+{
+    hba_port_info_t &pi = port_info[port_num];
+
+    mutex_lock(&pi.lock);
+
+    bool save_ncq = false;
+
+    if (pi.use_ncq) {
+        if (!pi.non_ncq_pending)
+            pi.non_ncq_pending = true;
+
+        // Wait for all slots to become available
+        while (pi.cmd_issued & pi.slot_mask)
+            condvar_wait(&pi.idle_cond, &pi.lock);
+
+        // Disable NCQ for duration of flush
+        save_ncq = pi.use_ncq;
+        pi.use_ncq = false;
+
+        // Add item to in-order completion queue
+        pi.issue_queue[pi.issue_head] = 0;
+        pi.issue_head = (pi.issue_head + 1) & 31;
+    }
+
+    slot_request_t request = pi.slot_requests[0];
+
+    memset(&request, 0, sizeof(request));
+    request.op = slot_op_t::flush;
+    request.callback.callback = callback;
+    request.callback.callback_arg = callback_arg;
+
+    io(port_num, request);
+
+    if (save_ncq)
+        pi.use_ncq = save_ncq;
+
+    mutex_unlock(&pi.lock);
+
+    return 0;
+}
+
+// Acquire a slot, waiting if necessary
+int8_t ahci_if_t::slot_wait(hba_port_info_t &pi)
+{
+    int8_t slot;
+    for (;;) {
+        slot = slot_acquire(pi);
+        if (slot >= 0)
+            break;
+
+        condvar_wait(&pi.slotalloc_avail, &pi.lock);
+    }
+
+    return slot;
+}
+
 // Expects interrupts disabled
 // Returns the number of async completions to expect
-unsigned ahci_if_t::rw_locked(unsigned port_num, uint64_t lba,
-                   void *data, uint32_t count, int is_read,
-                   async_callback_fn_t callback,
-                   uintptr_t callback_arg)
+unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request)
 {
     mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
     size_t ranges_count;
 
     hba_prdt_ent_t prdts[AHCI_CMD_TBL_ENT_MAX_PRD];
 
-    hba_port_info_t *pi = port_info + port_num;
+    hba_port_info_t &pi = port_info[port_num];
 
     // Make sure phy state is established
     if (unlikely((mmio_base->ports[port_num].sata_status & AHCI_SS_DET) !=
                  AHCI_SS_DET_n(AHCI_SS_DET_ONLINE))) {
         // Not established
-        callback(-int(errno_t::EIO), callback_arg);
+        request.callback.callback(-int(errno_t::EIO),
+                                  request.callback.callback_arg);
         return 0;
     }
 
+    void *data = request.data;
+    uint32_t lba = request.lba;
+    uint32_t count = request.count;
+
     unsigned chunks;
     for (chunks = 0; count > 0; ++chunks) {
-        ranges_count = mphysranges(ranges, countof(ranges),
-                                   data, count << pi->log2_sector_size,
-                                   4<<20);
+        if (likely(request.data != nullptr)) {
+            ranges_count = mphysranges(ranges, countof(ranges),
+                                       request.data,
+                                       request.count << pi.log2_sector_size,
+                                       4<<20);
+        } else {
+            ranges_count = 0;
+        }
 
         size_t transferred = 0;
 
@@ -1719,17 +1818,10 @@ unsigned ahci_if_t::rw_locked(unsigned port_num, uint64_t lba,
             transferred += ranges[i].size;
         }
 
-        size_t transferred_blocks = transferred >> pi->log2_sector_size;
+        size_t transferred_blocks = transferred >> pi.log2_sector_size;
 
         // Wait for a slot
-        int8_t slot;
-        for (;;) {
-            slot = acquire_slot(port_num);
-            if (slot >= 0)
-                break;
-
-            condvar_wait_wtf(&pi->slotalloc_avail, &pi->lock);
-        }
+        uint8_t slot = slot_wait(pi);
 
         hba_cmd_cfis_t cfis;
         size_t fis_size;
@@ -1738,79 +1830,84 @@ unsigned ahci_if_t::rw_locked(unsigned port_num, uint64_t lba,
 
         atapi_fis_t atapifis;
 
-        if (unlikely(is_read < 0)) {
+        if (unlikely(request.op == slot_op_t::identify)) {
             fis_size = sizeof(cfis.h2d);
 
             cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
 
-            cfis.h2d.command = !pi->is_atapi
+            cfis.h2d.command = !pi.is_atapi
                     ? ata_cmd_t::IDENTIFY
                     : ata_cmd_t::IDENTIFY_PACKET;
-            cfis.h2d.set_lba(pi->is_atapi ? 512 << 8 : 0);
+            cfis.h2d.set_lba(pi.is_atapi ? 512 << 8 : 0);
             cfis.h2d.set_count(0);
             cfis.h2d.feature_lo = 0;
 
             cfis.d2h.device = 0;
-        } else if (pi->is_atapi) {
+        } else if (unlikely(request.op == slot_op_t::flush)) {
+            fis_size = sizeof(cfis.h2d);
+
+            cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
+            cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
+
+            cfis.h2d.command = pi.use_48bit
+                    ? ata_cmd_t::CACHE_FLUSH_EXT
+                    : ata_cmd_t::CACHE_FLUSH;
+        } else if (pi.use_ncq) {
+            fis_size = sizeof(cfis.ncq);
+
+            cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
+            cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
+
+            cfis.ncq.command = request.op == slot_op_t::read
+                    ? ata_cmd_t::READ_DMA_NCQ
+                    : ata_cmd_t::WRITE_DMA_NCQ;
+            cfis.ncq.set_lba(request.lba);
+            cfis.ncq.set_count(transferred_blocks);
+            cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
+            cfis.ncq.fua = AHCI_FIS_FUA_LBA | (request.fua
+                                               ? AHCI_FIS_FUA_FUA : 0);
+            cfis.ncq.prio = 0;
+            cfis.ncq.aux = 0;
+        } else if (pi.is_atapi) {
             fis_size = sizeof(cfis.h2d);
 
             cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
             cfis.h2d.command = ata_cmd_t::PACKET;
 
-            atapifis.set(ATAPI_CMD_READ, lba, transferred_blocks, 1);
-            cfis.h2d.feature_lo = 1 | ((is_read > 0) << 2); // DMA and DMADIR
+            atapifis.set(ATAPI_CMD_READ, request.lba, transferred_blocks, 1);
+            // DMA and DMADIR
+            cfis.h2d.feature_lo = 1 | ((request.op == slot_op_t::read) << 2);
             cfis.h2d.set_count(0);
             cfis.h2d.set_lba(2048 << 16);
             cfis.d2h.device = 0;
-        } else if (pi->use_ncq) {
-            fis_size = sizeof(cfis.ncq);
-
-            cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
-            cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
-
-            cfis.ncq.command = is_read
-                    ? ata_cmd_t::READ_DMA_NCQ
-                    : ata_cmd_t::WRITE_DMA_NCQ;
-            cfis.ncq.set_lba(lba);
-            cfis.ncq.set_count(transferred_blocks);
-            cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
-            cfis.ncq.fua = AHCI_FIS_FUA_LBA |
-                    (!is_read ? AHCI_FIS_FUA_FUA : 0);
-            cfis.ncq.prio = 0;
-            cfis.ncq.aux = 0;
         } else {
             fis_size = sizeof(cfis.h2d);
 
             cfis.h2d.fis_type = FIS_TYPE_REG_H2D;
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
 
-            cfis.h2d.command = is_read
+            cfis.h2d.command = request.op == slot_op_t::read
                     ? ata_cmd_t::READ_DMA_EXT
                     : ata_cmd_t::WRITE_DMA_EXT;
-            assert(lba < (1UL << 48));
-            cfis.h2d.set_lba(lba);
+            assert(request.lba < (1UL << 48));
+            cfis.h2d.set_lba(request.lba);
             cfis.h2d.set_count(transferred_blocks);
             cfis.h2d.feature_lo = 1;
 
             // LBA
-            cfis.d2h.device = AHCI_FIS_FUA_LBA;
+            cfis.d2h.device = request.fua ? AHCI_FIS_FUA_LBA : 0;
         }
 
         atomic_barrier();
 
-        slot_request_t &request = pi->slot_requests[slot];
-
-        request.data = data;
-        request.count = transferred_blocks;
-        request.lba = lba;
-        request.is_read = is_read;
+        pi.slot_requests[slot] = request;
 
         cmd_issue(port_num, slot, &cfis,
-                  (is_read >= 0 && pi->is_atapi) ? &atapifis : 0,
-                  fis_size, prdts, ranges_count, is_read,
-                  callback, callback_arg);
+                  (request.op == slot_op_t::read &&
+                   pi.is_atapi) ? &atapifis : 0,
+                  fis_size, prdts, ranges_count);
 
         data = (char*)data + transferred;
         lba += transferred_blocks;
@@ -1887,6 +1984,8 @@ void ahci_if_t::rebase()
 
         mutex_init(&pi->lock);
         condvar_init(&pi->slotalloc_avail);
+        condvar_init(&pi->idle_cond);
+        condvar_init(&pi->non_ncq_done_cond);
 
         AHCI_TRACE("Performing detection, port %d\n", port_num);
         port_reset(port_num);
@@ -2114,14 +2213,18 @@ void ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     unique_ptr<ata_identify_t> identify = new ata_identify_t;
 
-    if (io(identify, 1, 0, -1) < 0)
+    if (io(identify, 1, 0, false, slot_op_t::identify) < 0)
         return;
 
     identify->fixup_strings();
 
     if (!dev_is_atapi) {
+        iface->configure_48bit(dev_port, identify->support_ext48bit);
+
         iface->configure_ncq(port, identify->support_ncq,
                              identify->max_queue_minus1 + 1);
+
+        iface->configure_fua(port, identify->support_fua_ext);
     }
 }
 
@@ -2171,16 +2274,23 @@ static void ahci_async_complete(int error, uintptr_t arg)
 }
 
 int ahci_dev_t::io(void *data, int64_t count,
-                  uint64_t lba, int is_read)
+                  uint64_t lba, bool fua, slot_op_t op)
 {
     cpu_scoped_irq_disable intr_were_enabled;
     ahci_blocking_io_t block_state;
 
     mutex_lock(&block_state.lock);
 
-    block_state.expect_count = iface->rw(
-                port, lba, data, count, is_read,
-                ahci_async_complete, (uintptr_t)&block_state);
+    slot_request_t request;
+    request.data = data;
+    request.count = count;
+    request.lba = lba;
+    request.op = op;
+    request.fua = fua;
+    request.callback.callback = ahci_async_complete;
+    request.callback.callback_arg = uintptr_t(&block_state);
+
+    block_state.expect_count = iface->io(port, request);
 
     while (block_state.done_count != block_state.expect_count)
         condvar_wait(&block_state.done_cond, &block_state.lock);
@@ -2194,19 +2304,38 @@ int64_t ahci_dev_t::read_blocks(
         void *data, int64_t count,
         uint64_t lba)
 {
-    return io(data, count, lba, 1);
+    return io(data, count, lba, false, slot_op_t::read);
 }
 
 int64_t ahci_dev_t::write_blocks(
         void const *data, int64_t count,
-        uint64_t lba)
+        uint64_t lba, bool fua)
 {
-    return io((void*)data, count, lba, 0);
+    return io((void*)data, count, lba, fua, slot_op_t::write);
+}
+
+int64_t ahci_dev_t::trim_blocks(int64_t count, uint64_t lba)
+{
+    (void)count;
+    (void)lba;
+    return -int(errno_t::ENOSYS);
 }
 
 int ahci_dev_t::flush()
 {
-    return 0;
+    cpu_scoped_irq_disable intr_were_enabled;
+    ahci_blocking_io_t block_state;
+
+    mutex_lock(&block_state.lock);
+
+    iface->port_flush(port, ahci_async_complete, uintptr_t(&block_state));
+
+    while (block_state.done_count != block_state.expect_count)
+        condvar_wait(&block_state.done_cond, &block_state.lock);
+
+    mutex_unlock(&block_state.lock);
+
+    return block_state.err;
 }
 
 long ahci_dev_t::info(storage_dev_info_t key)
@@ -2214,6 +2343,9 @@ long ahci_dev_t::info(storage_dev_info_t key)
     switch (key) {
     case STORAGE_INFO_BLOCKSIZE:
         return iface->get_sector_size(port);
+
+    case STORAGE_INFO_HAVE_TRIM:
+        return 0;
 
     default:
         return 0;
