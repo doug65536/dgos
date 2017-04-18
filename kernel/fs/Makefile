@@ -3,6 +3,7 @@
 LIBNAME := fs
 CSRCS := \
 	mbr.cc \
+	ext4.cc \
 	fat32.cc \
 	iso9660.cc \
 	iso9660_part.cc \

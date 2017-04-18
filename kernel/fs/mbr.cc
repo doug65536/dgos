@@ -67,12 +67,36 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
 
                 for (int i = 0;
                      i < 4 && partition_count < MAX_PARTITIONS; ++i) {
-                    if (ptbl[i].system_id == 0x0C) {
-                        part_dev_t *part = partitions + partition_count++;
+
+                    part_dev_t *part;
+
+                    switch (ptbl[i].system_id) {
+                    case 0x0C:
+                        // FAT32 LBA filesystem
+                        part = partitions + partition_count++;
                         part->drive = drive;
                         part->lba_st = ptbl[i].start_lba;
                         part->lba_len = ptbl[i].total_sectors;
                         part->name = "fat32";
+                        break;
+
+                    case 0x83:
+                        // Linux filesystem
+                        unique_ptr<uint8_t> ext_superblock =
+                                new uint8_t[sector_size];
+
+                        if (!drive->read_blocks(ext_superblock, 1,
+                                                ptbl[i].start_lba)) {
+                            MBR_TRACE("Unable to read linux partition"
+                                      " (at LBA %u)!\n", ptbl[i].start_lba);
+                            break;
+                        }
+
+                        part = partitions + partition_count++;
+                        part->drive = drive;
+                        part->lba_st = ptbl[i].start_lba;
+                        part->lba_len = ptbl[i].total_sectors;
+                        part->name = "ext4";
                     }
                 }
             }
