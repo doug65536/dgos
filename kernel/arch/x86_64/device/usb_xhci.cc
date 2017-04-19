@@ -6,6 +6,7 @@
 #include "cpu/atomic.h"
 #include "string.h"
 #include "hash_table.h"
+#include "usb.h"
 
 #define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
@@ -1169,9 +1170,13 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_generic_t) == 0x10);
 
 // 6.4.1.2.1 Setup stage TRB
 
+// USB 3.1 spec 9.3
 struct usbxhci_ctl_trb_setup_t {
+    // bit 7 0=host-to-device, 1=device-to-host, 6:5=type, 4:0=recipient
     uint8_t bm_req_type;
-    uint8_t request;
+
+    usb_rqcode_t request;
+
     uint16_t value;
     uint16_t index;
     uint16_t length;
@@ -1279,89 +1284,6 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 #define USBXHCI_CTL_TRB_TRT_NODATA  0
 #define USBXHCI_CTL_TRB_TRT_OUT     2
 #define USBXHCI_CTL_TRB_TRT_IN      3
-
-//
-// USB Descriptor types (USB 3.1 spec, Table 9.5)
-
-#define USB_RQCODE_
-#define USB_RQCODE_GET_STATUS           0
-#define USB_RQCODE_CLEAR_FEATURE        1
-#define USB_RQCODE_SET_FEATURE          3
-#define USB_RQCODE_SET_ADDRESS          5
-#define USB_RQCODE_GET_DESCRIPTOR       6
-#define USB_RQCODE_SET_DESCRIPTOR       7
-#define USB_RQCODE_GET_CONFIGURATION    8
-#define USB_RQCODE_SET_CONFIGURATION    9
-#define USB_RQCODE_GET_INTERFACE        10
-#define USB_RQCODE_SET_INTERFACE        11
-#define USB_RQCODE_SYNCH_FRAME          12
-#define USB_RQCODE_SET_ENCRYPTION       13
-#define USB_RQCODE_GET_ENCRYPTION       14
-#define USB_RQCODE_SET_HANDSHAKE        15
-#define USB_RQCODE_GET_HANDSHAKE        16
-#define USB_RQCODE_SET_CONNECTION       17
-#define USB_RQCODE_SET_SECURITY_DATA    18
-#define USB_RQCODE_GET_SECURITY_DATA    19
-#define USB_RQCODE_SET_WUSB_DATA        20
-#define USB_RQCODE_LOOPBACK_DATA_WRITE  21
-#define USB_RQCODE_LOOPBACK_DATA_READ   22
-#define USB_RQCODE_SET_INTERFACE_DS     23
-#define USB_RQCODE_SET_SEL              48
-#define USB_RQCODE_SET_ISOCH_DELAY      49
-
-//
-// Descriptor Types (USB 3.1 spec, Table 9-6)
-
-#define USB_DESCTYPE_DEVICE                     1
-#define USB_DESCTYPE_CONFIGURATION              2
-#define USB_DESCTYPE_STRING                     3
-#define USB_DESCTYPE_INTERFACE                  4
-#define USB_DESCTYPE_ENDPOINT                   5
-#define USB_DESCTYPE_INTERFACE_POWER            8
-#define USB_DESCTYPE_OTG                        9
-#define USB_DESCTYPE_DEBUG                      10
-#define USB_DESCTYPE_INTERFACE_ASSOCIATION      11
-#define USB_DESCTYPE_BOS                        15
-#define USB_DESCTYPE_DEVICE_CAPABILITY          16
-#define USB_DESCTYPE_SS_EP_COMPANION            48
-#define USB_DESCTYPE_SSPLUS_ISOCH_EP_COMPANION  49
-
-//
-// USB Device Descriptor
-
-struct usb_desc_device {
-    // Length of descriptor
-    uint8_t len;
-
-    // USB_DESCTYPE_*
-    uint8_t desc_type;
-
-    // USB spec, USB2.1=0x210, etc
-    uint16_t usb_spec;
-
-    // Device class, subclass, and protocol, else 0 if interface specific
-    uint8_t dev_class;
-    uint8_t dev_subclass;
-    uint8_t dev_protocol;
-
-    // 4=max 16 bytes, 12=max 4kb, 64=unlimited, etc
-    uint8_t log2_maxpktsz;
-
-    // Vendor, product, revision
-    uint16_t vendor_id;
-    uint16_t product_id;
-    uint16_t product_ver;
-
-    // Indices into string descriptor
-    uint8_t manufact_stridx;
-    uint8_t vendor_stridx;
-    uint8_t serial_stridx;
-
-    // Number of possible configurations
-    uint8_t num_config;
-} __packed;
-
-C_ASSERT(sizeof(usb_desc_device) == 18);
 
 //
 // Doorbells
@@ -1474,7 +1396,8 @@ struct usbxhci_pending_cmd_t {
 struct usbxhci_port_init_data_t {
     usbxhci_inpctx_t inpctx;
     usbxhci_ctl_trb_t *trbs;
-    usb_desc_device descriptor;
+    usb_desc_device dev_desc[1];
+    usb_desc_config cfg_desc[1];
     uint8_t port;
     uint8_t slotid;
     uint8_t current_descriptor;
@@ -1578,8 +1501,8 @@ static void usbxhci_add_xfer_trbs(usbxhci_dev_t *self,
 
 static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
         void *response, uint16_t length,
-        uint8_t bmreq_type, uint8_t bmreq_recip,
-        uint8_t request, uint16_t value, uint16_t index)
+        uint8_t bmreq_type, uint8_t bmreq_recip, bool to_host,
+        usb_rqcode_t request, uint16_t value, uint16_t index)
 {
     usbxhci_ctl_trb_t *trbs = (usbxhci_ctl_trb_t *)
             calloc(3, sizeof(*trbs));
@@ -1587,12 +1510,9 @@ static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
     trbs[0].setup.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
                 USBXHCI_TRB_TYPE_SETUP);
     trbs[0].setup.trt = USBXHCI_CTL_TRB_TRT_IN;
-    trbs[0].setup.bm_req_type =
-            USBXHCI_CTL_TRB_BMREQT_RECIP_n(
-                bmreq_recip) |
-            USBXHCI_CTL_TRB_BMREQT_TYPE_n(
-                bmreq_type) |
-            USBXHCI_CTL_TRB_BMREQT_TOHOST;
+    trbs[0].setup.bm_req_type = USBXHCI_CTL_TRB_BMREQT_RECIP_n(bmreq_recip) |
+            USBXHCI_CTL_TRB_BMREQT_TYPE_n(bmreq_type) |
+            (to_host ? USBXHCI_CTL_TRB_BMREQT_TOHOST : 0);
     trbs[0].setup.request = request;
     trbs[0].setup.value = value;
     trbs[0].setup.index = index;
@@ -1600,8 +1520,7 @@ static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
     trbs[0].setup.xferlen_intr = 8;
     trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_IDT;
 
-    trbs[1].data.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
-                USBXHCI_TRB_TYPE_DATA);
+    trbs[1].data.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA);
     trbs[1].data.dir = 1;
     trbs[1].data.xfer_td_intr = length;
     trbs[1].data.data_physaddr = mphysaddr(response);
@@ -1615,16 +1534,16 @@ static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
 }
 
 static usbxhci_ctl_trb_t *usbxhci_get_descriptor(
-        usbxhci_dev_t *self, usb_desc_device *desc,
+        usbxhci_dev_t *self, usb_desc_device *desc, uint8_t desc_size,
         uint8_t desc_index, uint8_t slotid,
         usbxhci_complete_handler_t handler, uintptr_t handler_data)
 {
     usbxhci_ctl_trb_t *trbs = usbxhci_make_setup_trbs(
-                desc, sizeof(*desc),
+                desc, desc_size,
                 USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
                 USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
-                USB_RQCODE_GET_DESCRIPTOR,
-                (USB_DESCTYPE_DEVICE << 8) | desc_index, 0);
+                true, usb_rqcode_t::GET_DESCRIPTOR,
+                (uint8_t(usb_desctype_t::DEVICE) << 8) | desc_index, 0);
 
     usbxhci_add_xfer_trbs(self, slotid, 3, trbs,
                           handler, handler_data);
@@ -1635,16 +1554,16 @@ static usbxhci_ctl_trb_t *usbxhci_get_descriptor(
 }
 
 static usbxhci_ctl_trb_t *usbxhci_get_config(
-        usbxhci_dev_t *self, usb_desc_device *desc,
-        uint8_t desc_index, uint8_t slotid,
+        usbxhci_dev_t *self, usb_desc_config *desc,
+        uint8_t desc_size, uint8_t slotid,
         usbxhci_complete_handler_t handler, uintptr_t handler_data)
 {
     usbxhci_ctl_trb_t *trbs = usbxhci_make_setup_trbs(
-                desc, sizeof(*desc),
+                desc, desc_size,
                 USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
                 USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
-                USB_RQCODE_GET_DESCRIPTOR,
-                (USB_DESCTYPE_DEVICE << 8) | desc_index, 0);
+                true, usb_rqcode_t::GET_CONFIGURATION,
+                0, 0);
 
     usbxhci_add_xfer_trbs(self, slotid, 3, trbs,
                           handler, handler_data);
@@ -1665,26 +1584,13 @@ static void usbxhci_get_descriptor_handler(
 
     USBXHCI_TRACE("Device descriptor: \n");
 
-    if (init_data->descriptor_count == 0) {
-        init_data->descriptor_count = init_data->descriptor.num_config;
-        init_data->current_descriptor = 1;
-    } else {
-        ++init_data->current_descriptor;
-    }
+    free(init_data->trbs);
+    init_data->trbs = usbxhci_get_config(
+                self, init_data->cfg_desc, sizeof(init_data->cfg_desc),
+                init_data->slotid,
+                usbxhci_get_descriptor_handler, (uintptr_t)init_data);
 
-    if (init_data->descriptor.dev_class == 0) {
-        free(init_data->trbs);
-        init_data->trbs = usbxhci_get_config(
-                    self, &init_data->descriptor,
-                    init_data->current_descriptor - 1,
-                    init_data->slotid,
-                    usbxhci_get_descriptor_handler, (uintptr_t)init_data);
-    }
-
-    (void)xferevt;
-    (void)self;
     (void)cmd;
-    (void)data;
 }
 
 static void usbxhci_cmd_comp_setaddr(
@@ -1709,10 +1615,11 @@ static void usbxhci_cmd_comp_setaddr(
     }
     init_data->inpctx.any = 0;
 
-    memset(&init_data->descriptor, 0, sizeof(init_data->descriptor));
+    memzero(init_data->dev_desc);
 
     init_data->trbs = usbxhci_get_descriptor(
-                self, &init_data->descriptor, 0, init_data->slotid,
+                self, init_data->dev_desc, sizeof(init_data->dev_desc),
+                0, init_data->slotid,
                 usbxhci_get_descriptor_handler, (uintptr_t)init_data);
 
     (void)cmd;
@@ -1786,8 +1693,10 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
 
     uint32_t cc = ((cmdcomp->info & USBXHCI_EVT_CMDCOMP_INFO_CC) >>
                    USBXHCI_EVT_CMDCOMP_INFO_CC_BIT);
+
     uint32_t ccp = ((cmdcomp->info & USBXHCI_EVT_CMDCOMP_INFO_CCP) >>
                     USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT);
+
     USBXHCI_TRACE("enableslot completed: completion code=%x, "
                   "parameter=%x, slotid=%d\n", cc, ccp, cmdcomp->slotid);
 
@@ -2023,6 +1932,8 @@ static void usbxhci_init(usbxhci_dev_t *self)
                     calloc(1, sizeof(*init_data));
 
             init_data->port = i + 1;
+
+            USBXHCI_TRACE("Enabling slot for port %zx\n", i);
 
             usbxhci_issue_cmd(self, &cmd,
                               usbxhci_cmd_comp_enableslot,
