@@ -44,3 +44,9 @@ void *memfill_32(void *dest, uint32_t v, size_t count);
 void *memfill_64(void *dest, uint64_t v, size_t count);
 
 }
+
+template<typename T>
+void memzero(T &obj)
+{
+    memset(&obj, 0, sizeof(obj));
+}
