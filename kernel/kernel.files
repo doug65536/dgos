@@ -15,6 +15,7 @@ arch/x86_64/cpu/nontemporal.cc
 arch/x86_64/cpu/nontemporal.h
 arch/x86_64/device/ata.cc
 arch/x86_64/device/ata.h
+arch/x86_64/device/usb.h
 arch/x86_64/device/usb_xhci.cc
 arch/x86_64/elf64.cc
 arch/x86_64/elf64.h
