@@ -108,7 +108,8 @@ struct ide_if_t : public storage_if_base_t {
 
         void *io_window;
         void *dma_bounce;
-        bmdma_prd_t *dma_prd;
+        bmdma_prd_t *dma_cur_prd;
+        unique_ptr<bmdma_prd_t> dma_full_prd;
         uintptr_t dma_prd_physaddr;
         mmphysrange_t io_window_ranges[PAGESIZE / sizeof(uint64_t)];
 
@@ -749,11 +750,12 @@ void ide_if_t::ide_chan_t::detect_devices()
             }
 
             // Allocate page for PRD list
-            dma_prd = (bmdma_prd_t*)mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
-                           MAP_32BIT | MAP_POPULATE, -1, 0);
+            dma_cur_prd = (bmdma_prd_t*)mmap(
+                        0, PAGESIZE, PROT_READ | PROT_WRITE,
+                        MAP_32BIT | MAP_POPULATE, -1, 0);
 
             // Get physical address of PRD list
-            dma_prd_physaddr = mphysaddr(dma_prd);
+            dma_prd_physaddr = mphysaddr(dma_cur_prd);
 
             // Allocate bounce buffer for DMA
             dma_bounce = mmap(0, unit.max_multiple << log2_sector_size,
@@ -771,11 +773,13 @@ void ide_if_t::ide_chan_t::detect_devices()
                         io_window_ranges, range_count,
                         countof(io_window_ranges), 16);
 
+            dma_full_prd = new bmdma_prd_t[range_count];
+
             // Populate PRD list with bounce buffer addresses
             for (size_t i = 0; i < range_count; ++i) {
-                dma_prd[i].physaddr = io_window_ranges[i].physaddr;
-                dma_prd[i].size = io_window_ranges[i].size;
-                dma_prd[i].eot = (i == (range_count-1)) ? 0x8000 : 0;
+                dma_full_prd[i].physaddr = io_window_ranges[i].physaddr;
+                dma_full_prd[i].size = io_window_ranges[i].size;
+                dma_full_prd[i].eot = (i == (range_count-1)) ? 0x8000 : 0;
             }
 
             // Set PRD address register
@@ -974,6 +978,31 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
         if (unit.max_dma >= 0) {
             iface->bmdma_acquire();
+
+            // Work around incorrectly implemented hardware
+            // Build PRD list that is exactly the transfer size
+
+            uint32_t prd_index = 0;
+            for (uint32_t prd_remain = sub_size; prd_remain > 0; ++prd_index) {
+                bmdma_prd_t& full = dma_full_prd[prd_index];
+                bmdma_prd_t& curr = dma_cur_prd[prd_index];
+                size_t chunk;
+
+                curr.physaddr = full.physaddr;
+
+                chunk = full.size ? full.size : 0x10000;
+
+                if (prd_remain <= chunk) {
+                    chunk = prd_remain;
+                    curr.eot = 0x8000;
+                } else {
+                    curr.eot = 0;
+                }
+
+                curr.size = uint16_t(chunk);
+
+                prd_remain -= chunk;
+            }
 
             // Set PRD address register
             assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
