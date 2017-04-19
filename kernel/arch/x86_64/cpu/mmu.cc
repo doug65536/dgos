@@ -485,7 +485,7 @@ static inline uintptr_t path_inc(unsigned *path)
     return n;
 }
 
-// Returns true on innermost level carry
+// Returns present mask for new page
 static inline int path_inc(unsigned *path, pte_t **ptes)
 {
     uintptr_t n = path_inc(path);
@@ -1789,13 +1789,13 @@ int munmap(void *addr, size_t size)
 
     pte_t *pteptr[4];
 
+    int present_mask = path_present(path, pteptr);
     for (size_t ofs = 0; ofs < size; ofs += PAGE_SIZE)
     {
-        int present_mask = path_present(path, pteptr);
         if ((present_mask & 0x07) == 0x07) {
             pte_t pte = atomic_xchg(pteptr[3], 0);
 
-            if (!(pte & PTE_EX_PHYSICAL)) {
+            if (likely(!(pte & PTE_EX_PHYSICAL))) {
                 physaddr_t physaddr = pte & PTE_ADDR;
 
                 if (physaddr && (physaddr != PTE_ADDR))
@@ -1807,7 +1807,7 @@ int munmap(void *addr, size_t size)
         }
 
         a += PAGE_SIZE;
-        path_inc(path);
+        present_mask = path_inc(path, pteptr);
     }
 
     mmu_send_tlb_shootdown();
@@ -2376,8 +2376,7 @@ void mm_destroy_process(void)
     mm_free_all_user_memory();
 }
 
-size_t mmu_phys_allocator_t::size_from_highest_page(
-        physaddr_t page_index)
+size_t mmu_phys_allocator_t::size_from_highest_page(physaddr_t page_index)
 {
     return page_index * sizeof(entry_t);
 }
