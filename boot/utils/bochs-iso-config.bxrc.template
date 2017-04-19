@@ -8,6 +8,7 @@ ata1-master: type=none
 ata1-slave: type=none
 ata2: enabled=0
 ata3: enabled=0
+usb_xhci: enabled=0
 debugger_log: dump/bochs-debuglog
 plugin_ctrl: unmapped=1, biosdev=1, extfpuirq=1, parallel=1, serial=1
 config_interface: textconfig
