@@ -1931,7 +1931,9 @@ static int64_t acpi_pm_timer_raw()
 {
     static acpi_gas_accessor_t *accessor;
 
-    if (unlikely(!accessor)) {
+    if (unlikely(!accessor &&
+                 (acpi_fadt.pm_timer_block ||
+                  acpi_fadt.x_pm_timer_block.access_size))) {
         if (likely(acpi_fadt.pm_timer_block)) {
             accessor = new acpi_gas_accessor_sysio_t<4>(
                         acpi_fadt.pm_timer_block);
@@ -2025,7 +2027,7 @@ static void apic_calibrate()
         uint32_t ccr_st = APIC_LVT_CCR;
         uint64_t tsc_st = cpu_rdtsc();
 
-        // Wait for about 280 microseconds
+        // Wait for about 1ms
         uint64_t tmr_nsec = nsleep(1000000);
 
         uint32_t ccr_en = APIC_LVT_CCR;

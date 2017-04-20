@@ -159,7 +159,7 @@ static int read_stress(void *p)
 
         uint64_t completions = atomic_xadd(&completion_count, 1);
 
-        if (!(completions & ~-1024)) {
+        if (!(completions & ~-32768)) {
             int ofs = 0;
             for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
                 ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
@@ -168,7 +168,7 @@ static int read_stress(void *p)
 
             uint64_t now = time_ms();
             uint64_t delta_time = now - last_time;
-            if (delta_time > 32) {
+            if (delta_time > 1000) {
                 uint64_t completion_delta = completions - last_completions;
                 ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu/sec",
                                 (1000 * completion_delta) / (now - last_time));
