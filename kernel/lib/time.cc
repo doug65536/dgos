@@ -10,10 +10,10 @@ static uint64_t time_ms_dummy(void);
 
 // Returns the number of microseconds actually elapsed, if possible
 // otherwise returns passed value
-static uint32_t usleep_dummy(uint16_t microsec);
+static uint64_t nsleep_dummy(uint64_t microsec);
 
 static uint64_t (*time_ms_vec)(void) = time_ms_dummy;
-static uint32_t (*usleep_vec)(uint16_t microsec) = usleep_dummy;
+static uint64_t (*nsleep_vec)(uint64_t microsec) = nsleep_dummy;
 
 static time_ofday_handler_t time_gettimeofday_vec;
 
@@ -23,10 +23,10 @@ static uint64_t time_ms_dummy(void)
     return 0;
 }
 
-// Provides a handler for usleep until the timer is initialized
-static uint32_t usleep_dummy(uint16_t microsec)
+// Provides a handler for nsleep until the timer is initialized
+static uint64_t nsleep_dummy(uint64_t)
 {
-    return microsec;
+    return 0;
 }
 
 void time_ms_set_handler(uint64_t (*vec)(void))
@@ -39,14 +39,14 @@ EXPORT uint64_t time_ms(void)
     return time_ms_vec();
 }
 
-void usleep_set_handler(uint32_t (*vec)(uint16_t microsec))
+void nsleep_set_handler(uint64_t (*vec)(uint64_t nanosec))
 {
-    usleep_vec = vec;
+    nsleep_vec = vec;
 }
 
-EXPORT uint32_t usleep(uint16_t microsec)
+EXPORT uint64_t nsleep(uint64_t nanosec)
 {
-    return usleep_vec(microsec);
+    return nsleep_vec(nanosec);
 }
 
 EXPORT void sleep(int ms)

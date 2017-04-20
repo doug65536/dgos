@@ -56,17 +56,17 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   8
+#define ENABLE_READ_STRESS_THREAD   4
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_STRESS_HEAP_THREAD   0
-#define ENABLE_FRAMEBUFFER_THREAD   1
+#define ENABLE_FRAMEBUFFER_THREAD   0
 
-#define ENABLE_STRESS_HEAP_SMALL    0
-#define ENABLE_STRESS_HEAP_LARGE    1
+#define ENABLE_STRESS_HEAP_SMALL    1
+#define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
@@ -129,19 +129,27 @@ static int read_stress(void *p)
     if (!drive)
         return 0;
 
-    char *data = (char*)mmap(0, 65536, PROT_READ | PROT_WRITE,
+    size_t data_size = 8;
+
+    char *data = (char*)mmap(0, data_size, PROT_READ | PROT_WRITE,
                              0, -1, 0);
+
+    size_t data_blocks = data_size / drive->info(STORAGE_INFO_BLOCKSIZE);
 
     printk("read buffer at %lx\n", (uint64_t)data);
 
+    uint64_t last_time = time_ms();
+    uint64_t last_completions = completion_count;
+
     uint64_t seed = 42;
-    uint64_t count = 0;
-    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2];
+    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 24];
     while (1) {
         ++*(char*)p;
 
-        uint64_t lba = rand_r_range(&seed, 16, 32000);
-        int status = drive->read_blocks(data, 1, lba);
+        uint64_t lba = rand_r_range(&seed, 16, 1000 - data_blocks);
+        //int64_t count = rand_r_range(&seed, 1, data_blocks);
+        int64_t count = data_blocks;
+        int status = drive->read_blocks(data, count, lba);
 
         if (status != 0)
             printdbg("(%3d) Storage read status=%d count=%lu\n",
@@ -149,12 +157,25 @@ static int read_stress(void *p)
 
         atomic_inc(counts + (id << 6));
 
-        if (!(atomic_xadd(&completion_count, 1) & ~-1024)) {
+        uint64_t completions = atomic_xadd(&completion_count, 1);
+
+        if (!(completions & ~-1024)) {
             int ofs = 0;
             for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
                 ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
                                 counts[s << 6]);
             }
+
+            uint64_t now = time_ms();
+            uint64_t delta_time = now - last_time;
+            if (delta_time > 32) {
+                uint64_t completion_delta = completions - last_completions;
+                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu/sec",
+                                (1000 * completion_delta) / (now - last_time));
+                last_completions = completions;
+                last_time = now;
+            }
+
             buf[ofs++] = 0;
 
             printdbg("%s\n", buf);
@@ -632,7 +653,8 @@ static int find_vbe(void *p)
                 bios[i+2] == 'M' &&
                 bios[i+3] == 'P' &&
                 sum_bytes(bios + i, 20) == 0) {
-            printdbg("Found VBE PM Interface at %x!\n", (uint32_t)(uintptr_t)p + i);
+            printdbg("Found VBE PM Interface at %x!\n",
+                     (uint32_t)(uintptr_t)p + i);
             break;
         }
     }

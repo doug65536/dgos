@@ -870,3 +870,11 @@ int thread_cpu_number(void)
     cpu_info_t *cpu = this_cpu();
     return cpu - cpus;
 }
+
+isr_context_t *thread_schedule_if_idle(isr_context_t *ctx)
+{
+    cpu_info_t *cpu = this_cpu();
+    if (cpu->cur_thread - threads < cpu_count)
+        return thread_schedule(ctx);
+    return ctx;
+}

@@ -153,6 +153,9 @@ uint32_t pci_config_read(
 int pci_config_write(int bus, int slot, int func,
         size_t offset, void *values, size_t size);
 
+void pci_config_copy(int bus, int slot, int func,
+                     void *dest, int ofs, size_t size);
+
 int pci_find_capability(
         int bus, int slot, int func,
         int capability_id);

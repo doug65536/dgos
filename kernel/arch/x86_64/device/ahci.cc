@@ -1931,7 +1931,7 @@ void ahci_if_t::port_reset(unsigned port_num)
 
     // Wait 3x the documented minimum
     // FIXME: this isn't completely safe from IRQ handler
-    usleep(3000);
+    nsleep(3000000);
 
     // Put port into normal operation
     port->sata_ctl = (port->sata_ctl & ~AHCI_HP_SC_DET) |

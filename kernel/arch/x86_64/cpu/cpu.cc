@@ -70,6 +70,9 @@ void cpu_init_stage2(int ap)
 
 void cpu_hw_init(int ap)
 {
+    // May need PIT nsleep early for APIC calibration
+    pit8253_init();
+
     apic_init(ap);
     cmos_init();
 

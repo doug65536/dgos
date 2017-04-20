@@ -238,8 +238,8 @@ static void pci_enumerate(void)
 }
 #endif
 
-static void pci_config_copy(int bus, int slot, int func,
-                            void *dest, int ofs, size_t size)
+void pci_config_copy(int bus, int slot, int func,
+                     void *dest, int ofs, size_t size)
 {
     uint32_t value;
     char *out = (char*)dest;

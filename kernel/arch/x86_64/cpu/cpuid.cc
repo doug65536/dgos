@@ -27,6 +27,7 @@ void cpuid_init(void)
     cpuid_cache.has_rdrand  = cpuid_ecx_bit(30, 1, 0);
     cpuid_cache.has_smep    = cpuid_ebx_bit(7, 7, 0);
     cpuid_cache.has_de      = cpuid_edx_bit(2, 1, 0);
+    cpuid_cache.has_inrdtsc = cpuid_edx_bit(8, 0x80000007, 0);
 }
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)

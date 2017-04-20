@@ -19,6 +19,16 @@
 #include "assert.h"
 #include "bitsearch.h"
 #include "callout.h"
+#include "device/pci.h"
+#include "ioport.h"
+#include "mm.h"
+
+#define DEBUG_ACPI  1
+#if DEBUG_ACPI
+#define ACPI_TRACE(...) printdbg("acpi: " __VA_ARGS__)
+#else
+#define ACPI_TRACE(...) ((void)0)
+#endif
 
 //
 // MP Tables
@@ -291,6 +301,9 @@ static mp_bus_irq_mapping_t bus_irq_list[64];
 static uint8_t bus_irq_count;
 
 static uint8_t bus_irq_to_mapping[64];
+
+static uint64_t apic_timer_freq;
+static uint64_t rdtsc_freq;
 
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
@@ -651,6 +664,8 @@ struct acpi_fadt_t {
     uint16_t boot_arch_flags;
 
     uint8_t  reserved2;
+
+    // ACPI_FADT_FFF_*
     uint32_t flags;
 
     // 12 byte structure; see below for details
@@ -672,6 +687,78 @@ struct acpi_fadt_t {
     acpi_gas_t x_gpe0_block;
     acpi_gas_t x_gpe1_block;
 } __packed;
+
+//
+// FADT Fixed Feature Flags
+
+#define ACPI_FADT_FFF_WBINVD_BIT                0
+#define ACPI_FADT_FFF_WBINVD_FLUSH_BIT          1
+#define ACPI_FADT_FFF_PROC_C1_BIT               2
+#define ACPI_FADT_FFF_P_LVL2_MP_BIT             3
+#define ACPI_FADT_FFF_PWR_BUTTON_BIT            4
+#define ACPI_FADT_FFF_SLP_BUTTON_BIT            5
+#define ACPI_FADT_FFF_FIX_RTC_BIT               6
+#define ACPI_FADT_FFF_RTC_S4_BIT                7
+#define ACPI_FADT_FFF_TMR_VAL_EXT_BIT           8
+#define ACPI_FADT_FFF_DCK_CAP_BIT               9
+#define ACPI_FADT_FFF_RESET_REG_SUP_BIT         10
+#define ACPI_FADT_FFF_SEALED_CASE_BIT           11
+#define ACPI_FADT_FFF_HEADLESS_BIT              12
+#define ACPI_FADT_FFF_CPU_SW_SLP_BIT            13
+#define ACPI_FADT_FFF_PCI_EXP_WAK_BIT           14
+#define ACPI_FADT_FFF_PLAT_CLOCK_BIT            15
+#define ACPI_FADT_FFF_S4_RTC_STS_BIT            16
+#define ACPI_FADT_FFF_REMOTE_ON_CAP_BIT         17
+#define ACPI_FADT_FFF_FORCE_CLUSTER_BIT         18
+#define ACPI_FADT_FFF_FORCE_PHYS_DEST_BIT       19
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT       20
+#define ACPI_FADT_FFF_LOCAL_POWER_S0_CAP_BIT    21
+
+#define ACPI_FADT_FFF_WBINVD \
+    (1U<<ACPI_FADT_FFF_WBINVD_BIT)
+#define ACPI_FADT_FFF_WBINVD_FLUSH \
+    (1U<<ACPI_FADT_FFF_WBINVD_FLUSH_BIT)
+#define ACPI_FADT_FFF_PROC_C1 \
+    (1U<<ACPI_FADT_FFF_PROC_C1_BIT)
+#define ACPI_FADT_FFF_P_LVL2_MP \
+    (1U<<ACPI_FADT_FFF_P_LVL2_MP_BIT)
+#define ACPI_FADT_FFF_PWR_BUTTON \
+    (1U<<ACPI_FADT_FFF_PWR_BUTTON_BIT)
+#define ACPI_FADT_FFF_SLP_BUTTON \
+    (1U<<ACPI_FADT_FFF_SLP_BUTTON_BIT)
+#define ACPI_FADT_FFF_FIX_RTC \
+    (1U<<ACPI_FADT_FFF_FIX_RTC_BIT)
+#define ACPI_FADT_FFF_RTC_S4 \
+    (1U<<ACPI_FADT_FFF_RTC_S4_BIT)
+#define ACPI_FADT_FFF_TMR_VAL_EXT \
+    (1U<<ACPI_FADT_FFF_TMR_VAL_EXT_BIT)
+#define ACPI_FADT_FFF_DCK_CAP \
+    (1U<<ACPI_FADT_FFF_DCK_CAP_BIT)
+#define ACPI_FADT_FFF_RESET_REG_SUP \
+    (1U<<ACPI_FADT_FFF_RESET_REG_SUP_BIT)
+#define ACPI_FADT_FFF_SEALED_CASE \
+    (1U<<ACPI_FADT_FFF_SEALED_CASE_BIT)
+#define ACPI_FADT_FFF_HEADLESS \
+    (1U<<ACPI_FADT_FFF_HEADLESS_BIT)
+#define ACPI_FADT_FFF_CPU_SW_SLP \
+    (1U<<ACPI_FADT_FFF_CPU_SW_SLP_BIT)
+#define ACPI_FADT_FFF_PCI_EXP_WAK \
+    (1U<<ACPI_FADT_FFF_PCI_EXP_WAK_BIT)
+#define ACPI_FADT_FFF_PLAT_CLOCK \
+    (1U<<ACPI_FADT_FFF_PLAT_CLOCK_BIT)
+#define ACPI_FADT_FFF_S4_RTC_STS \
+    (1U<<ACPI_FADT_FFF_S4_RTC_STS_BIT)
+#define ACPI_FADT_FFF_REMOTE_ON_CAP \
+    (1U<<ACPI_FADT_FFF_REMOTE_ON_CAP_BIT)
+#define ACPI_FADT_FFF_FORCE_CLUSTER \
+    (1U<<ACPI_FADT_FFF_FORCE_CLUSTER_BIT)
+#define ACPI_FADT_FFF_FORCE_PHYS_DEST \
+    (1U<<ACPI_FADT_FFF_FORCE_PHYS_DEST_BIT)
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI \
+    (1U<<ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT)
+#define ACPI_FADT_FFF_LOCAL_POWER_S0_CAP \
+    (1U<<ACPI_FADT_FFF_LOCAL_POWER_S0_CAP_BIT)
+
 
 struct acpi_ssdt_t {
     // sig == ?
@@ -828,6 +915,11 @@ static acpi_gas_t acpi_hpet_list[ACPI_MAX_HPET];
 static unsigned acpi_hpet_count;
 static int acpi_madt_flags;
 
+static acpi_fadt_t acpi_fadt;
+
+// The ACPI PM timer runs at 3.579545MHz
+#define ACPI_PM_TIMER_HZ    3579545
+
 static uint64_t acpi_rsdp_addr;
 
 int acpi_have8259pic(void)
@@ -895,7 +987,7 @@ static uint8_t checksum_bytes(char const *bytes, size_t len)
 
 static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
 {
-    (void)fadt_hdr;
+    acpi_fadt = *fadt_hdr;
 }
 
 static void acpi_process_madt(acpi_madt_t *madt_hdr)
@@ -1519,27 +1611,16 @@ void apic_dump_regs(int ap)
     }
 }
 
-static uint64_t apic_get_timer_freq(void)
-{
-    // Intel combined manual, page 770
-    cpuid_t info;
-    uint64_t freq = 1000000000;
-
-    if (cpuid(&info, 0x16, 0)) {
-        freq = info.ecx;
-    } else if (cpuid(&info, 0x15, 0)) {
-        freq = (uint64_t)info.ecx * info.ebx / info.eax;
-    }
-    return freq;
-}
+static void apic_calibrate();
 
 static void apic_configure_timer(
         uint32_t dcr, uint32_t icr, uint8_t timer_mode,
-        uint8_t intr)
+        uint8_t intr, bool mask = false)
 {
     APIC_LVT_DCR = dcr;
     atomic_barrier();
-    APIC_LVT_TR = APIC_LVT_VECTOR_n(intr) | APIC_LVT_TR_MODE_n(timer_mode);
+    APIC_LVT_TR = APIC_LVT_VECTOR_n(intr) | APIC_LVT_TR_MODE_n(timer_mode) |
+            (mask ? APIC_LVT_MASK : 0);
     atomic_barrier();
     APIC_LVT_ICR = icr;
 }
@@ -1556,8 +1637,7 @@ int apic_init(int ap)
         if (!(apic_base & APIC_BASE_GENABLE)) {
             printdbg("APIC was globally disabled!"
                      " Enabling...\n");
-            msr_set(APIC_BASE_MSR, apic_base |
-                    APIC_BASE_GENABLE);
+            msr_set(APIC_BASE_MSR, apic_base | APIC_BASE_GENABLE);
         }
 
         apic_base &= APIC_BASE_ADDR;
@@ -1571,16 +1651,16 @@ int apic_init(int ap)
         intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
 
         parse_mp_tables();
+
+        apic_calibrate();
     }
 
     apic_online(1, INTR_APIC_SPURIOUS);
 
     APIC_TPR = 0x0;
 
-    uint64_t timer_freq = apic_get_timer_freq();
-
     apic_configure_timer(APIC_LVT_DCR_BY_1,
-                         timer_freq/ 60,
+                         apic_timer_freq / 60,
                          APIC_LVT_TR_MODE_PERIODIC,
                          INTR_APIC_TIMER);
 
@@ -1689,9 +1769,9 @@ void apic_start_smp(void)
                 apic_id_count;
         uint16_t stagger = 16666 - cpus;
 
-        for (unsigned core = 0; core < topo_core_count; ++core) {
-            for (unsigned thread = 0;
-                 thread < topo_thread_count; ++thread) {
+        for (unsigned thread = 0;
+             thread < topo_thread_count; ++thread) {
+            for (unsigned core = 0; core < topo_core_count; ++core) {
                 uint8_t target = apic_id_list[pkg] +
                         (thread | (core << topo_thread_bits));
 
@@ -1708,7 +1788,7 @@ void apic_start_smp(void)
                                   APIC_CMD_DEST_MODE_SIPI |
                                   APIC_CMD_DEST_TYPE_BYID);
 
-                usleep(stagger);
+                nsleep(stagger * 1000);
 
                 ++smp_expect;
                 while (thread_smp_running != smp_expect)
@@ -1726,6 +1806,243 @@ void apic_start_smp(void)
 uint32_t apic_timer_count(void)
 {
     return APIC_LVT_CCR;
+}
+
+//
+// ACPI timer
+
+class acpi_gas_accessor_t {
+public:
+    static acpi_gas_accessor_t *from_gas(acpi_gas_t const& gas);
+    static acpi_gas_accessor_t *from_ioport(uint16_t ioport, int size);
+
+    virtual ~acpi_gas_accessor_t() {}
+    virtual size_t get_size() const = 0;
+    virtual int64_t read() const = 0;
+    virtual void write(int64_t value) const = 0;
+};
+
+template<int size>
+class acpi_gas_accessor_sysmem_t : public acpi_gas_accessor_t {
+public:
+    typedef typename type_from_size<size, true>::type value_type;
+
+    acpi_gas_accessor_sysmem_t(uint64_t mem_addr)
+    {
+        mem = (value_type*)mmap((void*)mem_addr, size,
+                                PROT_READ | PROT_WRITE,
+                                MAP_PHYSICAL, -1, 0);
+    }
+
+    size_t get_size() const final { return size; }
+
+    int64_t read() const final { return *mem; }
+
+    void write(int64_t value) const final
+    {
+        *mem = value_type(value);
+    }
+
+private:
+    value_type *mem;
+};
+
+template<int size>
+class acpi_gas_accessor_sysio_t : public acpi_gas_accessor_t {
+public:
+    typedef typename type_from_size<size, true>::type value_type;
+
+    acpi_gas_accessor_sysio_t(uint64_t io_port)
+        : port(ioport_t(io_port)) {}
+
+    size_t get_size() const final { return size; }
+
+    int64_t read() const final { return inp<size>(port); }
+
+    void write(int64_t value) const final
+    {
+        outp<size>(port, value_type(value));
+    }
+
+private:
+    ioport_t port;
+};
+
+template<int size>
+class acpi_gas_accessor_pcicfg_t : public acpi_gas_accessor_t {
+public:
+    typedef typename type_from_size<size, true>::type value_type;
+
+    acpi_gas_accessor_pcicfg_t(uint64_t pci_dfo)
+        : dfo(pci_dfo) {}
+
+    size_t get_size() const final { return size; }
+
+    int64_t read() const final
+    {
+        value_type result;
+        pci_config_copy(0, (dfo >> 32) & 0xFF,
+                        (dfo >> 16) & 0xFF, &result,
+                        dfo & 0xFF, size);
+        return result;
+    }
+
+    void write(int64_t value) const final
+    {
+        pci_config_write(0, (dfo >> 32) & 0xFF,
+                         (dfo >> 16) & 0xFF, dfo & 0xFF, &value, size);
+    }
+
+private:
+    uint64_t dfo;
+};
+
+//template<int size>
+//class acpi_gas_accessor_embed_t : public acpi_gas_accessor_t {
+//public:
+//    typedef typename type_from_size<size, true>::type value_type;
+//
+//    acpi_gas_accessor_embed_t(uint64_t addr, uint8_t size)
+//        : acpi_gas_accessor_t(size) {}
+//};
+//
+//template<int size>
+//class acpi_gas_accessor_smbus_t : public acpi_gas_accessor_t {
+//public:
+//    typedef type_from_size<size, true>::type value_type;
+//
+//    acpi_gas_accessor_smbus_t(uint64_t addr, uint8_t size)
+//        : acpi_gas_accessor_t(size) {}
+//};
+//
+//template<int size>
+//class acpi_gas_accessor_fixed_t : public acpi_gas_accessor_t {
+//public:
+//    typedef type_from_size<size, true>::type value_type;
+//
+//    acpi_gas_accessor_fixed_t(uint64_t addr, uint8_t size)
+//        : acpi_gas_accessor_t(size) {}
+//};
+
+static uint64_t acpi_pm_timer_nsleep_handler(uint64_t nanosec);
+
+// Returns -1 if PM timer is not available, otherwise a 24 or 32 bit raw value
+static int64_t acpi_pm_timer_raw()
+{
+    static acpi_gas_accessor_t *accessor;
+
+    if (unlikely(!accessor)) {
+        if (likely(acpi_fadt.pm_timer_block)) {
+            accessor = new acpi_gas_accessor_sysio_t<4>(
+                        acpi_fadt.pm_timer_block);
+        } else if (acpi_fadt.x_pm_timer_block.access_size) {
+            accessor = acpi_gas_accessor_t::from_gas(
+                        acpi_fadt.x_pm_timer_block);
+        }
+
+        if (likely(accessor))
+            nsleep_set_handler(acpi_pm_timer_nsleep_handler);
+    }
+
+    return likely(accessor) ? uint32_t(accessor->read()) : -1;
+}
+
+static uint32_t acpi_pm_timer_diff(uint32_t before, uint32_t after)
+{
+    // If counter is 32 bits
+    if (likely(acpi_fadt.flags & ACPI_FADT_FFF_TMR_VAL_EXT))
+        return after - before;
+
+    // Counter is 24 bits
+    return ((after << 8) - (before << 8)) >> 8;
+}
+
+// Timer precision is approximately 279ns
+static uint64_t acpi_pm_timer_ns(uint32_t diff)
+{
+    return (uint64_t(diff) * 1000000000) / ACPI_PM_TIMER_HZ;
+}
+
+__used
+static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
+{
+    uint32_t st = acpi_pm_timer_raw();
+    uint32_t en;
+    uint32_t elap;
+    uint32_t elap_ns;
+    do {
+        en = acpi_pm_timer_raw();
+        elap = acpi_pm_timer_diff(st, en);
+        elap_ns = acpi_pm_timer_ns(elap);
+    } while (elap_ns < ns);
+
+    return elap_ns;
+}
+
+static void apic_calibrate()
+{
+    int volatile hack = 0;
+    if (acpi_pm_timer_raw() >= 0 && hack) {
+        //
+        // Have PM timer
+
+        // Program timer (should be high enough to measure 858ms @ 5GHz)
+        apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
+                             APIC_LVT_TR_MODE_n(APIC_LVT_TR_MODE_ONESHOT),
+                             INTR_APIC_TIMER, true);
+
+        uint32_t tmr_st = acpi_pm_timer_raw();
+        uint32_t ccr_st = APIC_LVT_CCR;
+        uint32_t tmr_en;
+        uint64_t tsc_st = cpu_rdtsc();
+        uint32_t tmr_diff;
+
+        // Wait for about 1ms
+        do {
+            pause();
+            tmr_en = acpi_pm_timer_raw();
+            tmr_diff = acpi_pm_timer_diff(tmr_st, tmr_en);
+        } while (tmr_diff < 3579);
+
+        uint32_t ccr_en = APIC_LVT_CCR;
+        uint64_t tsc_en = cpu_rdtsc();
+
+        uint64_t tsc_elap = tsc_en - tsc_st;
+        uint32_t ccr_elap = ccr_st - ccr_en;
+        uint64_t tmr_nsec = acpi_pm_timer_ns(tmr_diff);
+
+        uint64_t cpu_freq = (uint64_t(tsc_elap) * 1000000000) / tmr_nsec;
+        uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
+
+        apic_timer_freq = ccr_freq;
+        rdtsc_freq = cpu_freq;
+    } else {
+        // Program timer (should be high enough to measure 858ms @ 5GHz)
+        apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
+                             APIC_LVT_TR_MODE_n(APIC_LVT_TR_MODE_ONESHOT),
+                             INTR_APIC_TIMER, true);
+
+        uint32_t ccr_st = APIC_LVT_CCR;
+        uint64_t tsc_st = cpu_rdtsc();
+
+        // Wait for about 280 microseconds
+        uint64_t tmr_nsec = nsleep(1000000);
+
+        uint32_t ccr_en = APIC_LVT_CCR;
+        uint64_t tsc_en = cpu_rdtsc();
+
+        uint64_t tsc_elap = tsc_en - tsc_st;
+        uint32_t ccr_elap = ccr_st - ccr_en;
+
+        uint64_t cpu_freq = (uint64_t(tsc_elap) * 1000000000) / tmr_nsec;
+        uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
+
+        apic_timer_freq = ccr_freq;
+        rdtsc_freq = cpu_freq;
+    }
+
+    printdbg("CPU clock: %luHz\n", rdtsc_freq);
+    printdbg("APIC clock: %luHz\n", apic_timer_freq);
 }
 
 //
@@ -1878,6 +2195,8 @@ static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)
 
 static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
 {
+    isr_context_t *orig_ctx = ctx;
+
     uint8_t irq;
     if (intr >= ioapic_msi_base_intr &&
             intr < INTR_APIC_SPURIOUS) {
@@ -1911,6 +2230,9 @@ static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
 
     apic_eoi(intr);
     ctx = (isr_context_t*)irq_invoke(intr, irq, ctx);
+
+    if (ctx == orig_ctx)
+        return thread_schedule_if_idle(ctx);
 
     return ctx;
 }
@@ -2061,4 +2383,50 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     }
 
     return vector_base - INTR_APIC_IRQ_BASE;
+}
+
+acpi_gas_accessor_t *acpi_gas_accessor_t::from_gas(acpi_gas_t const& gas)
+{
+    uint64_t addr = gas.addr_lo | (uint64_t(gas.addr_hi) << 32);
+
+    ACPI_TRACE("Using extended PM Timer Generic Address Structure: "
+               " addr_space: 0x%x, addr=0x%lx, size=0x%x,"
+               " width=0x%x, bit=0x%x\n",
+               gas.addr_space, addr, gas.access_size,
+               gas.bit_width, gas.bit_offset);
+
+    switch (gas.addr_space) {
+    case ACPI_GAS_ADDR_SYSMEM:
+        ACPI_TRACE("ACPI PM Timer using MMIO address space: 0x%lx\n", addr);
+        switch (gas.access_size) {
+        case 1: return new acpi_gas_accessor_sysmem_t<1>(addr);
+        case 2: return new acpi_gas_accessor_sysmem_t<2>(addr);
+        case 4: return new acpi_gas_accessor_sysmem_t<4>(addr);
+        case 8: return new acpi_gas_accessor_sysmem_t<8>(addr);
+        default: return nullptr;
+        }
+    case ACPI_GAS_ADDR_SYSIO:
+        ACPI_TRACE("ACPI PM Timer using I/O address space: 0x%lx\n", addr);
+        switch (gas.access_size) {
+        case 1: return new acpi_gas_accessor_sysio_t<1>(addr);
+        case 2: return new acpi_gas_accessor_sysio_t<2>(addr);
+        case 4: return new acpi_gas_accessor_sysio_t<4>(addr);
+        case 8: return nullptr;
+        default: return nullptr;
+        }
+    case ACPI_GAS_ADDR_PCICFG:
+        ACPI_TRACE("ACPI PM Timer using PCI config address space: 0x%lx\n",
+                   addr);
+        switch (gas.access_size) {
+        case 1: return new acpi_gas_accessor_pcicfg_t<1>(addr);
+        case 2: return new acpi_gas_accessor_pcicfg_t<2>(addr);
+        case 4: return new acpi_gas_accessor_pcicfg_t<4>(addr);
+        case 8: return new acpi_gas_accessor_pcicfg_t<8>(addr);
+        default: return nullptr;
+        }
+    default:
+        ACPI_TRACE("Unhandled ACPI PM Timer address space: 0x%x\n",
+                   gas.addr_space);
+        return nullptr;
+    }
 }

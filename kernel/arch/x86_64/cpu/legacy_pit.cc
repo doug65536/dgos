@@ -138,9 +138,14 @@ static uint64_t pit8254_time_ms(void)
     return timer_ms;
 }
 
-static uint32_t pit8254_usleep(uint16_t microsec)
+// Returns number of elapsed nanoseconds
+// Maximum delay is 54870us
+static uint64_t pit8254_nsleep(uint64_t microsec)
 {
-    uint64_t count = (uint64_t)microsec * 1000000 / 1193182;
+    uint64_t count = uint64_t(microsec) * 1193182 / 1000000000;
+
+    count += 64;
+
     if (count > 0xFFFF)
         count = 0xFFFF;
 
@@ -152,23 +157,27 @@ static uint32_t pit8254_usleep(uint16_t microsec)
     outb(PIT_DATA(2), count & 0xFF);
     outb(PIT_DATA(2), (count >> 8) & 0xFF);
 
-    uint16_t readback;
+    uint32_t readback;
     do {
         outb(PIT_CMD,
             PIT_CHANNEL(2) |
             PIT_ACCESS_LATCH);
         readback = inb(PIT_DATA(2));
-        readback |= (uint16_t)inb(PIT_DATA(2));
+        readback |= inb(PIT_DATA(2)) << 8;
         pause();
-    } while (readback);
+    } while (readback > 64);
 
-    return microsec;
+    return uint64_t(count - readback) * 1000000000 / 1193182;
 }
 
-void pit8254_enable(void)
+void pit8253_init()
+{
+    nsleep_set_handler(pit8254_nsleep);
+}
+
+void pit8254_enable()
 {
     time_ms_set_handler(pit8254_time_ms);
-    usleep_set_handler(pit8254_usleep);
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_handler);

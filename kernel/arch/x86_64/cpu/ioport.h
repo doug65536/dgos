@@ -1,9 +1,11 @@
 #pragma once
 
 #include "types.h"
+#include "type_traits.h"
 
 typedef uint16_t ioport_t;
 
+__always_inline
 static inline uint8_t inb(ioport_t port)
 {
     uint8_t result;
@@ -15,6 +17,7 @@ static inline uint8_t inb(ioport_t port)
     return result;
 }
 
+__always_inline
 static inline uint16_t inw(ioport_t port)
 {
     uint16_t result;
@@ -26,6 +29,7 @@ static inline uint16_t inw(ioport_t port)
     return result;
 }
 
+__always_inline
 static inline uint32_t ind(ioport_t port)
 {
     uint32_t result;
@@ -37,6 +41,7 @@ static inline uint32_t ind(ioport_t port)
     return result;
 }
 
+__always_inline
 static inline void outb(ioport_t port, uint8_t value)
 {
     __asm__ __volatile__ (
@@ -47,6 +52,7 @@ static inline void outb(ioport_t port, uint8_t value)
     );
 }
 
+__always_inline
 static inline void outw(ioport_t port, uint16_t value)
 {
     __asm__ __volatile__ (
@@ -57,6 +63,7 @@ static inline void outw(ioport_t port, uint16_t value)
     );
 }
 
+__always_inline
 static inline void outd(ioport_t port, uint32_t value)
 {
     __asm__ __volatile__ (
@@ -70,6 +77,7 @@ static inline void outd(ioport_t port, uint32_t value)
 //
 // Block I/O
 
+__always_inline
 static inline void insb(ioport_t port, void const *values, intptr_t count)
 {
     __asm__ __volatile__ (
@@ -81,6 +89,7 @@ static inline void insb(ioport_t port, void const *values, intptr_t count)
     );
 }
 
+__always_inline
 static inline void insw(ioport_t port, void const *values, intptr_t count)
 {
     __asm__ __volatile__ (
@@ -92,6 +101,7 @@ static inline void insw(ioport_t port, void const *values, intptr_t count)
     );
 }
 
+__always_inline
 static inline void insd(ioport_t port, void const *values, intptr_t count)
 {
     __asm__ __volatile__ (
@@ -103,7 +113,8 @@ static inline void insd(ioport_t port, void const *values, intptr_t count)
     );
 }
 
-static inline void outsb(ioport_t port, void const *values, intptr_t count)
+__always_inline
+static inline void outsb(ioport_t port, void const *values, size_t count)
 {
     __asm__ __volatile__ (
         "rep outsb\n\t"
@@ -114,7 +125,8 @@ static inline void outsb(ioport_t port, void const *values, intptr_t count)
     );
 }
 
-static inline void outsw(ioport_t port, void const *values, intptr_t count)
+__always_inline
+static inline void outsw(ioport_t port, void const *values, size_t count)
 {
     __asm__ __volatile__ (
         "rep outsw\n\t"
@@ -125,7 +137,8 @@ static inline void outsw(ioport_t port, void const *values, intptr_t count)
     );
 }
 
-static inline void outsd(ioport_t port, void const *values, intptr_t count)
+__always_inline
+static inline void outsd(ioport_t port, void const *values, size_t count)
 {
     __asm__ __volatile__ (
         "rep outsl\n\t"
@@ -134,4 +147,126 @@ static inline void outsd(ioport_t port, void const *values, intptr_t count)
         : "d" (port)
         : "memory"
     );
+}
+
+template<int size>
+struct io_helper
+{
+};
+
+template<>
+struct io_helper<1> {
+    typedef uint8_t value_type;
+
+    __always_inline
+    static inline value_type inp(ioport_t port)
+    {
+        return inb(port);
+    }
+
+    __always_inline
+    static inline void outp(ioport_t port, value_type val)
+    {
+        return outb(port, val);
+    }
+
+    __always_inline
+    static inline void ins(ioport_t port, void const *values, size_t count)
+    {
+        insb(port, values, count);
+    }
+
+    __always_inline
+    static inline void outs(ioport_t port, void const *values, size_t count)
+    {
+        outsb(port, values, count);
+    }
+};
+
+template<>
+struct io_helper<2>
+{
+    typedef uint16_t value_type;
+
+    __always_inline
+    static value_type inp(ioport_t port)
+    {
+        return inw(port);
+    }
+
+    __always_inline
+    static void outp(ioport_t port, value_type val)
+    {
+        return outw(port, val);
+    }
+
+    __always_inline
+    static inline void ins(ioport_t port, void const *values, size_t count)
+    {
+        insw(port, values, count);
+    }
+
+    __always_inline
+    static inline void outs(ioport_t port, void const *values, size_t count)
+    {
+        outsw(port, values, count);
+    }
+};
+
+template<>
+struct io_helper<4>
+{
+    typedef uint32_t value_type;
+
+    __always_inline
+    static value_type inp(ioport_t port)
+    {
+        return ind(port);
+    }
+
+    __always_inline
+    static void outp(ioport_t port, value_type val)
+    {
+        return outd(port, val);
+    }
+
+    __always_inline
+    static inline void ins(ioport_t port, void const *values, size_t count)
+    {
+        insd(port, values, count);
+    }
+
+    __always_inline
+    static inline void outs(ioport_t port, void const *values, size_t count)
+    {
+        outsd(port, values, count);
+    }
+};
+
+template<int size>
+__always_inline
+static inline typename type_from_size<size>::type inp(ioport_t port)
+{
+    return io_helper<size>::inp(port);
+}
+
+template<int size>
+__always_inline
+static inline void outp(ioport_t port, typename io_helper<size>::value_type val)
+{
+    return io_helper<size>::outp(port, val);
+}
+
+template<int size>
+__always_inline
+static inline void insp(ioport_t port, void const *values, size_t count)
+{
+    return io_helper<size>::insp(port, values, count);
+}
+
+template<int size>
+__always_inline
+static inline void outsp(ioport_t port, void const *values, size_t count)
+{
+    return io_helper<size>::outsp(port, values, count);
 }

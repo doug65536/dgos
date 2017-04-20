@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 
 template<bool _Condition, typename _T, typename _F>
 struct conditional
@@ -138,3 +139,13 @@ struct remove_reference<_T&&>
 {
 	typedef _T type;
 };
+
+template<int size, bool uns = true> struct type_from_size { };
+template<> struct type_from_size<1, true> { typedef uint8_t type; };
+template<> struct type_from_size<2, true> { typedef uint16_t type; };
+template<> struct type_from_size<4, true> { typedef uint32_t type; };
+template<> struct type_from_size<8, true> { typedef uint64_t type; };
+template<> struct type_from_size<1, false> { typedef int8_t type; };
+template<> struct type_from_size<2, false> { typedef int16_t type; };
+template<> struct type_from_size<4, false> { typedef int32_t type; };
+template<> struct type_from_size<8, false> { typedef int64_t type; };
