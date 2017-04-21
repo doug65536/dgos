@@ -22,6 +22,7 @@
 #include "isr_constants.h"
 #include "priorityqueue.h"
 #include "apic.h"
+#include "unique_ptr.h"
 
 // Implements platform independent thread.h
 
@@ -129,7 +130,7 @@ struct cpu_info_t {
     // Used for lazy TLB shootdown
     uint64_t mmu_seq;
 
-    priqueue_t *queue;
+    unique_ptr<priqueue_t<thread_info_t*>> queue;
     spinlock_t queue_lock;
 
     void *storage[9];
@@ -388,20 +389,18 @@ static int smp_thread(void *arg)
     return 0;
 }
 
-static int thread_priority_cmp(uintptr_t a, uintptr_t b, void *ctx)
+static int thread_priority_cmp(thread_info_t * const& a,
+                               thread_info_t * const& b, void *ctx)
 {
     (void)ctx;
-    thread_info_t *ap = threads + a;
-    thread_info_t *bp = threads + b;
-    return ((ap->next_run > bp->next_run) << 1) - 1;
+    return ((a->next_run > b->next_run) << 1) - 1;
 }
 
-static void thread_priority_swapped(uintptr_t a, uintptr_t b, void *ctx)
+static void thread_priority_swapped(thread_info_t * const& a,
+                                    thread_info_t * const& b, void *ctx)
 {
     (void)ctx;
-    uintptr_t tmp = threads[a].queue_slot;
-    threads[a].queue_slot = threads[b].queue_slot;
-    threads[b].queue_slot = tmp;
+    swap(a->queue_slot, b->queue_slot);
 }
 
 void thread_init(int ap)
@@ -426,8 +425,8 @@ void thread_init(int ap)
     cpu_set_gs(GDT_SEL_KERNEL_DATA64);
     cpu_set_gsbase(cpu);
 
-    cpu->queue = priqueue_create(
-                0, thread_priority_cmp, thread_priority_swapped, cpu);
+    cpu->queue.reset(new priqueue_t<thread_info_t*>(
+                thread_priority_cmp, thread_priority_swapped, cpu));
 
     if (!ap) {
         cpu->cur_thread = thread;
