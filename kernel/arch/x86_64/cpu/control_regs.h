@@ -138,6 +138,7 @@ struct table_register_64_t {
     uintptr_t base;
 };
 
+__always_inline
 static inline uint64_t msr_get(uint32_t msr)
 {
     uint32_t lo, hi;
@@ -150,6 +151,7 @@ static inline uint64_t msr_get(uint32_t msr)
     return ((uint64_t)hi << 32) | lo;
 }
 
+__always_inline
 static inline uint32_t msr_get_lo(uint32_t msr)
 {
     uint64_t result;
@@ -162,6 +164,7 @@ static inline uint32_t msr_get_lo(uint32_t msr)
     return result;
 }
 
+__always_inline
 static inline uint32_t msr_get_hi(uint32_t msr)
 {
     uint64_t result;
@@ -174,6 +177,7 @@ static inline uint32_t msr_get_hi(uint32_t msr)
     return result;
 }
 
+__always_inline
 static inline void msr_set(uint32_t msr, uint64_t value)
 {
     __asm__ __volatile__ (
@@ -185,6 +189,7 @@ static inline void msr_set(uint32_t msr, uint64_t value)
     );
 }
 
+__always_inline
 static inline void msr_set_lo(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
@@ -198,6 +203,7 @@ static inline void msr_set_lo(uint32_t msr, uint32_t value)
     );
 }
 
+__always_inline
 static inline void msr_set_hi(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
@@ -211,6 +217,7 @@ static inline void msr_set_hi(uint32_t msr, uint32_t value)
     );
 }
 
+__always_inline
 static inline uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
 {
     uint64_t n = msr_get(msr);
@@ -220,6 +227,7 @@ static inline uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
     return n;
 }
 
+__always_inline
 static inline uint64_t cpu_xcr_change_bits(
         uint32_t xcr, uint64_t clear, uint64_t set)
 {
@@ -242,6 +250,7 @@ static inline uint64_t cpu_xcr_change_bits(
     return ((uint64_t)edx << 32) | eax;
 }
 
+__always_inline
 static inline uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
@@ -257,6 +266,7 @@ static inline uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
     return rax;
 }
 
+__always_inline
 static inline uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
@@ -305,6 +315,7 @@ static inline uintptr_t cpu_get_fault_address(void)
     return addr;
 }
 
+__always_inline
 static inline void cpu_invalidate_page(uintptr_t addr)
 {
     __asm__ __volatile__ (
@@ -315,6 +326,7 @@ static inline void cpu_invalidate_page(uintptr_t addr)
     );
 }
 
+__always_inline
 static inline void cpu_invalidate_pcid(
         uintptr_t type, int32_t pcid, uintptr_t addr)
 {
@@ -356,6 +368,7 @@ static inline void cpu_flush_tlb(void)
     }
 }
 
+__always_inline
 static inline void cpu_set_fs(uint16_t selector)
 {
     __asm__ __volatile__ (
@@ -365,6 +378,7 @@ static inline void cpu_set_fs(uint16_t selector)
     );
 }
 
+__always_inline
 static inline void cpu_set_gs(uint16_t selector)
 {
     __asm__ __volatile__ (
@@ -374,11 +388,13 @@ static inline void cpu_set_gs(uint16_t selector)
     );
 }
 
+__always_inline
 static inline void cpu_set_fsbase(void *fs_base)
 {
     msr_set(MSR_FSBASE, (uintptr_t)fs_base);
 }
 
+__always_inline
 static inline void cpu_set_gsbase(void *gs_base)
 {
     msr_set(MSR_GSBASE, (uintptr_t)gs_base);
@@ -421,6 +437,7 @@ static inline uint16_t cpu_get_tr(void)
     return tr;
 }
 
+__always_inline
 static inline void cpu_set_tr(uint16_t tr)
 {
     __asm__ __volatile__ (
@@ -442,6 +459,7 @@ static inline void *cpu_get_stack_ptr(void)
     return rsp;
 }
 
+__always_inline
 static inline void cpu_crash(void)
 {
     __asm__ __volatile__ (
@@ -508,6 +526,7 @@ static inline void cpu_set_flags(uintptr_t flags)
     );
 }
 
+__always_inline
 static inline uintptr_t cpu_change_flags(uintptr_t clear, uintptr_t set)
 {
     uintptr_t flags;
@@ -564,6 +583,7 @@ static inline void cpu_irq_toggle(int enable)
     );
 }
 
+__always_inline
 static inline int cpu_irq_is_enabled(void)
 {
     return (cpu_get_flags() & (1<<9)) != 0;
