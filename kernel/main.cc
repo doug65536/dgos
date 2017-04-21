@@ -28,6 +28,7 @@
 #include "math.h"
 #include "dev_storage.h"
 #include "unique_ptr.h"
+#include "priorityqueue.h"
 
 //#include "vector.h"
 
@@ -746,8 +747,14 @@ static int init_thread(void *p)
 
     fb_init();
 
-    int create_test = file_open("created", O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-    file_close(create_test);
+    //priqueue_test.test();
+
+    for (int n = 0; n < 1000; ++n) {
+        char name[16];
+        snprintf(name, sizeof(name), "created_%d", n);
+        int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        file_close(create_test);
+    }
 
 //    for (int i = 0; i < 10000; ++i) {
 //        printdbg("%d=%f\n", i, i / 1000.0);
