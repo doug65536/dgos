@@ -310,7 +310,7 @@ static uint8_t bus_irq_count;
 static uint8_t bus_irq_to_mapping[64];
 
 static uint64_t apic_timer_freq;
-static uint64_t rdtsc_freq;
+static uint64_t rdtsc_mhz;
 
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
@@ -1752,9 +1752,10 @@ int apic_init(int ap)
             APIC_TRACE("Using xAPIC\n");
 
             assert(!apic_ptr);
-            apic_ptr = (uint32_t *)mmap((void*)apic_base, 4096,
-                            PROT_READ | PROT_WRITE,
-                            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+            apic_ptr = (uint32_t *)mmap((void*)(apic_base & APIC_BASE_ADDR),
+                                        4096, PROT_READ | PROT_WRITE,
+                                        MAP_PHYSICAL | MAP_NOCACHE |
+                                        MAP_WRITETHRU, -1, 0);
 
             apic = &apic_x;
             msr_set(APIC_BASE_MSR, apic_base | APIC_BASE_GENABLE);
@@ -2138,7 +2139,7 @@ static void apic_calibrate()
         uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
 
         apic_timer_freq = ccr_freq;
-        rdtsc_freq = cpu_freq;
+        rdtsc_mhz = (cpu_freq + 500000) / 1000000;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
         apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
@@ -2161,10 +2162,10 @@ static void apic_calibrate()
         uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
 
         apic_timer_freq = ccr_freq;
-        rdtsc_freq = cpu_freq;
+        rdtsc_mhz = (cpu_freq + 500000) / 1000000;
     }
 
-    printdbg("CPU clock: %luHz\n", rdtsc_freq);
+    printdbg("CPU clock: %luMHz\n", rdtsc_mhz);
     printdbg("APIC clock: %luHz\n", apic_timer_freq);
 }
 
@@ -2360,7 +2361,7 @@ static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-static void ioapic_setmask(int irq, int unmask)
+static void ioapic_setmask(int irq, bool unmask)
 {
     mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
     mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);

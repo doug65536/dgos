@@ -153,7 +153,7 @@ void pic8259_disable(void)
 }
 
 // Gets plugged into irq_setmask
-static void pic8259_setmask(int irq, int unmask)
+static void pic8259_setmask(int irq, bool unmask)
 {
     if (unmask)
         pic8259_mask &= ~(1 << irq);

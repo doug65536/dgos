@@ -69,7 +69,7 @@ void msi_irq_alloc_set_handler(msi_irq_alloc_handler_t handler)
     msi_irq_alloc_vec = handler;
 }
 
-void irq_setmask(int irq, int unmask)
+void irq_setmask(int irq, bool unmask)
 {
     irq_setmask_vec(irq, unmask);
 }
