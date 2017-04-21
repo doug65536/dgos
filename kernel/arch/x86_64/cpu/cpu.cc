@@ -74,7 +74,6 @@ void cpu_hw_init(int ap)
     pit8253_init();
 
     apic_init(ap);
-    cmos_init();
 
     // Initialize APIC, but fallback to 8259 if no MP tables
     if (!apic_enable())
@@ -83,6 +82,8 @@ void cpu_hw_init(int ap)
         pic8259_disable();
     else
         panic("No IOAPICs, no MPS, and no 8259! Can't use IRQs! Halting.");
+
+    cmos_init();
 
     pit8254_enable();
 
