@@ -417,6 +417,8 @@ cluster_t fat32_fs_t::allocate_near(cluster_t cluster)
             candidate = 2;
 
         if (unlikely(is_free(fat[candidate]))) {
+            void *block = lookup_cluster(candidate);
+            memset(block, 0, block_size);
             fat[candidate] = 1;
             return candidate;
         }
@@ -461,6 +463,9 @@ void fat32_fs_t::iterate_dir(cluster_t cluster, F callback,
 {
     size_t de_per_cluster = block_size >> dirent_size_shift;
 
+    if (extend_cluster)
+        *extend_cluster = 0;
+
     while (!is_eof(cluster)) {
         fat32_dir_union_t *de = (fat32_dir_union_t *)lookup_cluster(cluster);
 
@@ -471,7 +476,7 @@ void fat32_fs_t::iterate_dir(cluster_t cluster, F callback,
         }
 
         if (extend_cluster && is_eof(fat[cluster])) {
-            extend_fat_chain(extend_cluster, 1, cluster);
+            extend_fat_chain(extend_cluster, 1, cluster);// fixme disk full?
             cluster = *extend_cluster;
         } else {
             cluster = fat[cluster];
@@ -645,7 +650,7 @@ fat32_dir_union_t *fat32_fs_t::create_dirent(
     fat32_dir_union_t *entry_ptr;
     entry_ptr = dirent_create(dde, lfn);
 
-    return nullptr;
+    return entry_ptr;
 }
 
 fat32_dir_union_t *fat32_fs_t::dirent_create(
@@ -693,12 +698,23 @@ fat32_dir_union_t *fat32_fs_t::dirent_create(
         return consecutive_free < count;
     }, &extend_cluster);
 
+    cluster_t backup = 0;
+
     if (extend_cluster) {
         // No need for transaction, it is in a new cluster
+        for (int i = 0; i < count; ++i)
+            ins_point[i] = lfn.fragments[i];
 
+        // Write EOF
+        assert(fat[extend_cluster] == 1);
+        //assert(fat2[extend_cluster] == 1);
+        fat[extend_cluster] = 0x0FFFFFF8;
+        fat2[extend_cluster] = 0x0FFFFFF8;
+        if (sync_fat_entry(extend_cluster) < 0)
+            return nullptr;
     } else {
         // Perform transacted update
-        cluster_t backup = transact_cluster(prev_cluster, dde, result_cluster);
+        backup = transact_cluster(prev_cluster, dde, result_cluster);
 
         // Copy directory entries into page cache
         for (int i = 0; i < count; ++i)
@@ -707,20 +723,22 @@ fat32_dir_union_t *fat32_fs_t::dirent_create(
         // Write new directory entries to disk
         if (msync(ins_point, sizeof(*ins_point) * count, MS_SYNC) < 0)
             return nullptr;
+    }
 
-        // Commit transaction
-        if (prev_cluster) {
-            fat[prev_cluster] = result_cluster;
-            fat2[prev_cluster] = result_cluster;
+    // Commit transaction
+    if (prev_cluster) {
+        fat[prev_cluster] = result_cluster;
+        fat2[prev_cluster] = result_cluster;
 
-            if (sync_fat_entry(prev_cluster) < 0)
-                return nullptr;
-        } else {
-            if (change_dirent_start(dde, result_cluster) < 0)
-                return nullptr;
-        }
+        if (sync_fat_entry(prev_cluster) < 0)
+            return nullptr;
+    } else {
+        if (change_dirent_start(dde, result_cluster) < 0)
+            return nullptr;
+    }
 
-
+    if (!extend_cluster) {
+        assert(backup != 0);
         fat[backup] = 0;
         fat2[backup] = 0;
     }
@@ -772,9 +790,11 @@ void fat32_fs_t::date_encode(uint16_t *date_field, uint16_t *time_field,
 
     int yr = tod.century * 100 + tod.year;
 
+    // 7 bit year : 4 bit month : 5 bit day
     *date_field = ((yr - 1980) << 9) |
             (tod.month << 5) | tod.day;
 
+    // 5 bit hour : 6 bit minute : 4 bit second
     *time_field = (tod.hour << 11) |
             (tod.minute << 5) | (tod.second >> 1);
 
