@@ -2,6 +2,7 @@
 #include "type_traits.h"
 
 template<typename _T>
+__always_inline
 constexpr typename remove_reference<_T>::type&&
 move(_T&& __t) noexcept
 {
