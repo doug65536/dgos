@@ -30,6 +30,13 @@
 #define ACPI_TRACE(...) ((void)0)
 #endif
 
+#define DEBUG_APIC  1
+#if DEBUG_APIC
+#define APIC_TRACE(...) printdbg("apic: " __VA_ARGS__)
+#else
+#define APIC_TRACE(...) ((void)0)
+#endif
+
 //
 // MP Tables
 
@@ -350,87 +357,83 @@ static uint32_t volatile *apic_ptr;
 //
 // APIC
 
-#define APIC_REG(n)     apic_ptr[(n)>>2]
-#define APIC_BIT(r,n)   (APIC_REG((r) + (((n)>>5)<<2)) & \
-                            (1<<((n)&31)))
+// APIC ID (read only)
+#define APIC_REG_ID             0x02
 
-// APIC ID
-#define APIC_ID         APIC_REG(0x20)
-
-// APIC version
-#define APIC_VER        APIC_REG(0x30)
+// APIC version (read only)
+#define APIC_REG_VER            0x03
 
 // Task Priority Register
-#define APIC_TPR        APIC_REG(0x80)
+#define APIC_REG_TPR            0x08
 
-// Arbitration Priority Register
-#define APIC_APR        APIC_REG(0x90)
+// Arbitration Priority Register (not present in x2APIC mode)
+#define APIC_REG_APR            0x09
 
-// Processor Priority Register
-#define APIC_PPR        APIC_REG(0xA0)
+// Processor Priority Register (read only)
+#define APIC_REG_PPR            0x0A
 
-// End Of Interrupt register
-#define APIC_EOI        APIC_REG(0xB0)
+// End Of Interrupt register (must write 0 in x2APIC mode)
+#define APIC_REG_EOI            0x0B
 
-// Logical Destination Register
-#define APIC_LDR        APIC_REG(0xD0)
+// Logical Destination Register (not writeable in x2APIC mode)
+#define APIC_REG_LDR            0x0D
 
-// Destination Format Register
-#define APIC_DFR        APIC_REG(0xE0)
+// Destination Format Register (not present in x2APIC mode)
+#define APIC_REG_DFR            0x0E
 
-// Spuriout Interrupt Register
-#define APIC_SIR        APIC_REG(0xF0)
+// Spurious Interrupt Register
+#define APIC_REG_SIR            0x0F
 
-// In Service Registers (256 individual bits)
-#define APIC_ISR_n(n)   APIC_BIT(0x100, n)
+// In Service Registers (bit n) (read only)
+#define APIC_REG_ISR_n(n)       (0x10 + ((n) >> 5))
 
-// Trigger Mode Registers (256 bits)
-#define APIC_TMR_n(n)   APIC_BIT(0x180, n)
+// Trigger Mode Registers (bit n) (read only)
+#define APIC_REG_TMR_n(n)       (0x18 + ((n) >> 5))
 
-// Interrupt Request Registers (256 bits)
-#define APIC_IRR_n(n)   APIC_BIT(0x200, n)
+// Interrupt Request Registers (bit n) (read only)
+#define APIC_REG_IRR_n(n)       (0x20 + ((n) >> 5))
 
-// Error Status Register
-#define APIC_ESR        APIC_REG(0x280)
+// Error Status Register (not present in x2APIC mode)
+#define APIC_REG_ESR            0x28
 
 // Local Vector Table Corrected Machine Check Interrupt
-#define APIC_LVT_CMCI   APIC_REG(0x2F0)
+#define APIC_REG_LVT_CMCI       0x2F
 
-// Local Vector Table Interrupt Command Register Low
-#define APIC_ICR_LO     APIC_REG(0x300)
+// Local Vector Table Interrupt Command Register Lo (64-bit in x2APIC mode)
+#define APIC_REG_ICR_LO         0x30
 
-// Local Vector Table Interrupt Command Register High
-#define APIC_ICR_HI     APIC_REG(0x310)
+// Local Vector Table Interrupt Command Register Hi (not present in x2APIC mode)
+#define APIC_REG_ICR_HI         0x31
 
 // Local Vector Table Timer Register
-#define APIC_LVT_TR     APIC_REG(0x320)
+#define APIC_REG_LVT_TR         0x32
 
 // Local Vector Table Thermal Sensor Register
-#define APIC_LVT_TSR    APIC_REG(0x330)
+#define APIC_REG_LVT_TSR        0x33
 
 // Local Vector Table Performance Monitoring Counter Register
-#define APIC_LVT_PMCR   APIC_REG(0x340)
+#define APIC_REG_LVT_PMCR       0x34
 
 // Local Vector Table Local Interrupt 0 Register
-#define APIC_LVT_LNT0   APIC_REG(0x350)
+#define APIC_REG_LVT_LNT0       0x35
 
 // Local Vector Table Local Interrupt 1 Register
-#define APIC_LVT_LNT1   APIC_REG(0x360)
+#define APIC_REG_LVT_LNT1       0x36
 
 // Local Vector Table Error Register
-#define APIC_LVT_ERR    APIC_REG(0x370)
+#define APIC_REG_LVT_ERR        0x37
 
 // Local Vector Table Timer Initial Count Register
-#define APIC_LVT_ICR    APIC_REG(0x380)
+#define APIC_REG_LVT_ICR        0x38
 
-// Local Vector Table Timer Current Count Register
-#define APIC_LVT_CCR    APIC_REG(0x390)
+// Local Vector Table Timer Current Count Register (read only)
+#define APIC_REG_LVT_CCR        0x39
 
 // Local Vector Table Timer Divide Configuration Register
-#define APIC_LVT_DCR    APIC_REG(0x3E0)
+#define APIC_REG_LVT_DCR        0x3E
 
-#define APIC_CMD        APIC_ICR_LO
-#define APIC_DEST       APIC_ICR_HI
+// Self Interprocessor Interrupt (x2APIC only, write only)
+#define APIC_REG_SELF_IPI       0x3F
 
 #define APIC_DEST_BIT               24
 #define APIC_DEST_BITS              8
@@ -545,12 +548,135 @@ static uint32_t volatile *apic_ptr;
 #define APIC_BASE_ADDR_BIT      12
 #define APIC_BASE_ADDR_BITS     40
 #define APIC_BASE_GENABLE_BIT   11
+#define APIC_BASE_X2ENABLE_BIT  10
 #define APIC_BASE_BSP_BIT       8
 
 #define APIC_BASE_GENABLE       (1UL<<APIC_BASE_GENABLE_BIT)
+#define APIC_BASE_X2ENABLE      (1UL<<APIC_BASE_X2ENABLE_BIT)
 #define APIC_BASE_BSP           (1UL<<APIC_BASE_BSP_BIT)
 #define APIC_BASE_ADDR_MASK     ((1UL<<APIC_BASE_ADDR_BITS)-1)
 #define APIC_BASE_ADDR          (APIC_BASE_ADDR_MASK<<APIC_BASE_ADDR_BIT)
+
+class lapic_t {
+public:
+    virtual void command(uint32_t dest, uint32_t cmd) const = 0;
+
+    virtual uint32_t read32(uint32_t offset) const = 0;
+    virtual void write32(uint32_t offset, uint32_t val) const = 0;
+
+    virtual uint64_t read64(uint32_t offset) const = 0;
+    virtual void write64(uint32_t offset, uint64_t val) const = 0;
+
+    virtual bool reg_readable(uint32_t reg) const = 0;
+    virtual bool reg_exists(uint32_t reg) const = 0;
+
+protected:
+    static bool reg_maybe_exists(uint32_t reg)
+    {
+        // Reserved registers:
+        return  !(reg >= 0x40) &&
+                !(reg <= 0x01) &&
+                !(reg >= 0x04 && reg <= 0x07) &&
+                !(reg == 0x0C) &&
+                !(reg >= 0x29 && reg <= 0x2E) &&
+                !(reg >= 0x3A && reg <= 0x3D) &&
+                !(reg == 0x3F);
+    }
+
+    static bool reg_maybe_readable(uint32_t reg)
+    {
+        return reg != APIC_REG_EOI &&
+                reg != APIC_REG_SELF_IPI &&
+                reg_maybe_exists(reg);
+    }
+};
+
+class lapic_x_t : public lapic_t {
+    void command(uint32_t dest, uint32_t cmd) const final
+    {
+        write32(APIC_REG_ICR_HI, dest);
+        write32(APIC_REG_ICR_LO, cmd);
+        while (read32(APIC_REG_ICR_LO) & APIC_CMD_PENDING)
+            pause();
+    }
+
+    uint32_t read32(uint32_t offset) const final
+    {
+        return apic_ptr[offset << (4 - 2)];
+    }
+
+    void write32(uint32_t offset, uint32_t val) const final
+    {
+        apic_ptr[offset << (4 - 2)] = val;
+    }
+
+    uint64_t read64(uint32_t offset) const final
+    {
+        return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
+    }
+
+    void write64(uint32_t offset, uint64_t val) const final
+    {
+        ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
+    }
+
+    bool reg_readable(uint32_t reg) const final
+    {
+        return reg_maybe_readable(reg);
+    }
+
+    bool reg_exists(uint32_t reg) const final
+    {
+        return reg_maybe_readable(reg);
+    }
+};
+
+class lapic_x2_t : public lapic_t {
+    void command(uint32_t dest, uint32_t cmd) const final
+    {
+        write64(APIC_REG_ICR_LO, (uint64_t(dest) << 32) | cmd);
+    }
+
+    uint32_t read32(uint32_t offset) const final
+    {
+        return msr_get_lo(0x800 + offset);
+    }
+
+    void write32(uint32_t offset, uint32_t val) const final
+    {
+        msr_set(0x800 + offset, val);
+    }
+
+    uint64_t read64(uint32_t offset) const final
+    {
+        return msr_get(0x800 + offset);
+    }
+
+    void write64(uint32_t offset, uint64_t val) const final
+    {
+        msr_set(0x800 + offset, val);
+    }
+
+    bool reg_readable(uint32_t reg) const final
+    {
+        // APIC_REG_LVT_CMCI raises #GP if CMCI not enabled
+        return reg != APIC_REG_LVT_CMCI &&
+                reg != APIC_REG_ICR_HI &&
+                reg_exists(reg) &&
+                reg_maybe_readable(reg);
+    }
+
+    bool reg_exists(uint32_t reg) const final
+    {
+        return reg != APIC_REG_DFR &&
+                reg != APIC_REG_APR &&
+                reg_maybe_exists(reg);
+    }
+};
+
+static lapic_x_t apic_x;
+static lapic_x2_t apic_x2;
+static lapic_t *apic;
 
 //
 // ACPI
@@ -1513,8 +1639,8 @@ static isr_context_t *apic_spurious_handler(int intr, isr_context_t *ctx)
 
 unsigned apic_get_id(void)
 {
-    if (likely(apic_ptr))
-        return APIC_ID;
+    if (likely(apic))
+        return apic->read32(APIC_REG_ID);
 
     cpuid_t cpuid_info;
     cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
@@ -1526,12 +1652,7 @@ static void apic_send_command(uint32_t dest, uint32_t cmd)
 {
     cpu_scoped_irq_disable intr_enabled;
 
-    APIC_DEST = dest;
-    atomic_barrier();
-    APIC_CMD = cmd;
-    atomic_barrier();
-    while (APIC_CMD & APIC_CMD_PENDING)
-        pause();
+    apic->command(dest, cmd);
 }
 
 // if target_apic_id is <= -2, sends to all CPUs
@@ -1539,7 +1660,7 @@ static void apic_send_command(uint32_t dest, uint32_t cmd)
 // if target_apid_id is >= 0, sends to specific APIC ID
 void apic_send_ipi(int target_apic_id, uint8_t intr)
 {
-    if (unlikely(!apic_ptr))
+    if (unlikely(!apic))
         return;
 
     uint32_t dest_type = target_apic_id < -1
@@ -1558,12 +1679,12 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
 
 void apic_eoi(int intr)
 {
-    APIC_EOI = intr;
+    apic->write32(APIC_REG_EOI, intr);
 }
 
 static void apic_online(int enabled, int spurious_intr)
 {
-    uint32_t sir = APIC_SIR;
+    uint32_t sir = apic->read32(APIC_REG_SIR);
 
     if (enabled)
         sir |= APIC_SIR_APIC_ENABLE;
@@ -1573,39 +1694,25 @@ static void apic_online(int enabled, int spurious_intr)
     if (spurious_intr >= 32)
         sir = (sir & -256) | spurious_intr;
 
-    APIC_LDR = 0xFFFFFFFF;
-    APIC_SIR = sir;
-}
+    // LDR is read only in x2APIC mode
+    if (apic != &apic_x2)
+        apic->write32(APIC_REG_LDR, 0xFFFFFFFF);
 
-static int apic_dump_impl(int reg)
-{
-    // Reserved registers:
-    //  0x00, 0x10,
-    return (reg & 0xF) == 0 &&
-            !(reg >= 0x000 && reg <= 0x010) &&
-            !(reg >= 0x040 && reg <= 0x070) &&
-            !(reg >= 0x290 && reg <= 0x2E0) &&
-            !(reg >= 0x3A0 && reg <= 0x3D0) &&
-            !(reg == 0x3F0) &&
-            (reg < 0x400) &&
-            (reg >= 0) &&
-            // Bochs does not like these
-            (reg != 0x0C0) &&
-            (reg != 0x2F0);
+    apic->write32(APIC_REG_SIR, sir);
 }
 
 void apic_dump_regs(int ap)
 {
-    for (int i = 0; i < 256; i += 16) {
+    for (int i = 0; i < 64; i += 4) {
         printdbg("ap=%d APIC: ", ap);
-        for (int x = 0; x < 16; x += 4) {
-            if (apic_dump_impl((i + x) * 4)) {
-                printdbg("[%3x]=%08x%s", (i + x) * 4,
-                         apic_ptr[i + x],
-                        x == 12 ? "\n" : " ");
+        for (int x = 0; x < 4; ++x) {
+            if (apic->reg_readable(i + x)) {
+                printdbg("[%3x]=%08x%s", (i + x),
+                         apic->read32(i + x),
+                         x == 3 ? "\n" : " ");
             } else {
-                printdbg("[%3x]=--------%s", (i + x) * 4,
-                        x == 12 ? "\n" : " ");
+                printdbg("[%3x]=--------%s", i + x,
+                        x == 3 ? "\n" : " ");
             }
         }
     }
@@ -1617,12 +1724,11 @@ static void apic_configure_timer(
         uint32_t dcr, uint32_t icr, uint8_t timer_mode,
         uint8_t intr, bool mask = false)
 {
-    APIC_LVT_DCR = dcr;
-    atomic_barrier();
-    APIC_LVT_TR = APIC_LVT_VECTOR_n(intr) | APIC_LVT_TR_MODE_n(timer_mode) |
-            (mask ? APIC_LVT_MASK : 0);
-    atomic_barrier();
-    APIC_LVT_ICR = icr;
+    apic->write32(APIC_REG_LVT_DCR, dcr);
+    apic->write32(APIC_REG_LVT_TR, APIC_LVT_VECTOR_n(intr) |
+                  APIC_LVT_TR_MODE_n(timer_mode) |
+                  (mask ? APIC_LVT_MASK : 0));
+    apic->write32(APIC_REG_LVT_ICR, icr);
 }
 
 int apic_init(int ap)
@@ -1630,22 +1736,37 @@ int apic_init(int ap)
     if (!ap) {
         // Bootstrap CPU only
 
-        if (apic_base == 0)
-            apic_base = msr_get(APIC_BASE_MSR);
+        apic_base = msr_get(APIC_BASE_MSR);
+
+        if (!(apic_base & APIC_BASE_GENABLE)) {
+            printdbg("APIC was globally disabled!"
+                     " Enabling...\n");
+        }
+
+        if (cpuid_has_x2apic()) {
+            APIC_TRACE("Using x2APIC\n");
+            apic = &apic_x2;
+            msr_set(APIC_BASE_MSR, apic_base |
+                    APIC_BASE_GENABLE | APIC_BASE_X2ENABLE);
+        } else {
+            APIC_TRACE("Using xAPIC\n");
+
+            assert(!apic_ptr);
+            apic_ptr = (uint32_t *)mmap((void*)apic_base, 4096,
+                            PROT_READ | PROT_WRITE,
+                            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+
+            apic = &apic_x;
+            msr_set(APIC_BASE_MSR, apic_base | APIC_BASE_GENABLE);
+        }
 
         // Set global enable if it is clear
         if (!(apic_base & APIC_BASE_GENABLE)) {
             printdbg("APIC was globally disabled!"
                      " Enabling...\n");
-            msr_set(APIC_BASE_MSR, apic_base | APIC_BASE_GENABLE);
         }
 
         apic_base &= APIC_BASE_ADDR;
-
-        assert(apic_ptr == 0);
-        apic_ptr = (uint32_t *)mmap((void*)apic_base, 4096,
-                        PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
         intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
@@ -1657,7 +1778,7 @@ int apic_init(int ap)
 
     apic_online(1, INTR_APIC_SPURIOUS);
 
-    APIC_TPR = 0x0;
+    apic->write32(APIC_REG_TPR, 0x0);
 
     apic_configure_timer(APIC_LVT_DCR_BY_1,
                          apic_timer_freq / 60,
@@ -1805,7 +1926,7 @@ void apic_start_smp(void)
 
 uint32_t apic_timer_count(void)
 {
-    return APIC_LVT_CCR;
+    return apic->read32(APIC_REG_LVT_CCR);
 }
 
 //
@@ -1994,7 +2115,7 @@ static void apic_calibrate()
                              INTR_APIC_TIMER, true);
 
         uint32_t tmr_st = acpi_pm_timer_raw();
-        uint32_t ccr_st = APIC_LVT_CCR;
+        uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);
         uint32_t tmr_en;
         uint64_t tsc_st = cpu_rdtsc();
         uint32_t tmr_diff;
@@ -2006,7 +2127,7 @@ static void apic_calibrate()
             tmr_diff = acpi_pm_timer_diff(tmr_st, tmr_en);
         } while (tmr_diff < 3579);
 
-        uint32_t ccr_en = APIC_LVT_CCR;
+        uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
 
         uint64_t tsc_elap = tsc_en - tsc_st;
@@ -2024,13 +2145,13 @@ static void apic_calibrate()
                              APIC_LVT_TR_MODE_n(APIC_LVT_TR_MODE_ONESHOT),
                              INTR_APIC_TIMER, true);
 
-        uint32_t ccr_st = APIC_LVT_CCR;
+        uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_st = cpu_rdtsc();
 
         // Wait for about 1ms
         uint64_t tmr_nsec = nsleep(1000000);
 
-        uint32_t ccr_en = APIC_LVT_CCR;
+        uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
 
         uint64_t tsc_elap = tsc_en - tsc_st;
