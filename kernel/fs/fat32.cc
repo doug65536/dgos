@@ -339,6 +339,45 @@ size_t fat32_fs_t::name_from_dirents(char *pathname,
 {
     if (unlikely(full->lfn_entry_count == 0)) {
         // Copy short name
+        fat32_dir_entry_t const &short_ent = full->fragments[0].short_entry;
+
+        char const *short_end = (char*)memchr(short_ent.name, ' ', 8);
+        if (!short_end)
+            short_end = short_ent.name + 8;
+
+        char const *ext_end = (char*)memchr(short_ent.name + 8, ' ', 3);
+        if (!ext_end)
+            ext_end = short_ent.name + 8 + 3;
+
+        size_t name_len = short_end - short_ent.name;
+        size_t ext_len = ext_end - (short_ent.name + 8);
+
+        memcpy(pathname, short_ent.name, name_len);
+        pathname[name_len] = 0;
+
+        if (short_ent.lowercase_flags & FAT_LOWERCASE_NAME) {
+            for (size_t i = 0; i < name_len; ++i) {
+                if (pathname[i] >= 'A' && pathname[i] <= 'Z')
+                    pathname[i] += 'a' - 'A';
+            }
+        }
+
+        if (ext_len) {
+            pathname[name_len] = '.';
+            memcpy(pathname + name_len + 1, short_ent.name + 8, ext_len);
+            pathname[name_len + 1 + ext_len] = 0;
+
+            if (short_ent.lowercase_flags & FAT_LOWERCASE_EXT) {
+                for (size_t i = 0; i < ext_len; ++i) {
+                    if (pathname[name_len + 1 + i] >= 'A' && pathname[i] <= 'Z')
+                        pathname[name_len + 1 + i] += 'a' - 'A';
+                }
+            }
+
+            return name_len + 1 + ext_len;
+        }
+
+        return name_len;
     }
 
     uint16_t chunk[(sizeof(full->fragments[0].long_entry.name) +
@@ -1049,35 +1088,74 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
 
     memset(&lfn, 0, sizeof(lfn));
 
+    char expected_fragments = 0;
+
     for (index = 0, distance = 0;
          sizeof(lfn.fragments[index]) == internal_rw(
              (file_handle_t*)fi, lfn.fragments + index,
              sizeof(lfn.fragments[index]),
              offset + sizeof(lfn.fragments[index]) * index, true);
          ++distance, ++index) {
-        if (lfn.fragments[index].short_entry.name[0] == 0)
+        fat32_dir_union_t& fragment = lfn.fragments[index];
+
+        if (unlikely(fragment.short_entry.name[0] == 0))
             break;
 
+        // If there are too many fragments, restart
         if (unlikely(index + 1 >= countof(lfn.fragments))) {
             // Invalid
             index = 0;
             continue;
         }
 
-        if (lfn.fragments[index].short_entry.attr == FAT_LONGNAME)
-            continue;
+        // Accept long name entry
+        if (likely(fragment.short_entry.attr == FAT_LONGNAME)) {
+            char ordinal = fragment.short_entry.name[0];
+            char lfn_index = ordinal & FAT_ORDINAL_MASK;
 
-        if (lfn.fragments[index].short_entry.name[0] == FAT_DELETED_FLAG) {
+            // Detect the beginning of a run of LFN entries
+            if (unlikely(ordinal & FAT_LAST_LFN_ORDINAL)) {
+                index = 0;
+                expected_fragments = lfn_index;
+                continue;
+            }
+
+            // Validate LFN sequence number
+            if (unlikely(index != size_t(expected_fragments - lfn_index))) {
+                // Encountered LFN entry with wrong ordinal index
+                index = 0;
+                expected_fragments = 0;
+            }
+
+            continue;
+        }
+
+        // If first LFN entry had wrong fragment count, drop
+        if (index != size_t(expected_fragments)) {
+            index = 0;
+            expected_fragments = 0;
+            continue;
+        }
+
+        // Drop deleted files
+        if (unlikely(fragment.short_entry.name[0] == FAT_DELETED_FLAG)) {
             index = 0;
             continue;
         }
+
+        // 0xE5 is represented as 0x05 in short names
+        if (unlikely(fragment.short_entry.name[0] == FAT_ESCAPED_0xE5))
+            fragment.short_entry.name[0] = FAT_DELETED_FLAG;
 
         lfn.lfn_entry_count = index;
         ++distance;
         break;
     }
 
-    name_from_dirents(buf->d_name, &lfn);
+    if (distance > 0)
+        name_from_dirents(buf->d_name, &lfn);
+    else
+        memset(buf, 0, sizeof(*buf));
 
     return distance * sizeof(fat32_dir_entry_t);
 }
