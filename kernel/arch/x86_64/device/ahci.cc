@@ -1200,9 +1200,6 @@ struct hba_port_info_t {
 
     // Keep track of slot order
     mutex_t lock;
-    uint8_t issue_queue[32];
-    uint8_t issue_head;
-    uint8_t issue_tail;
 
     // Set to true to block slot acquires to idle the controller for a
     // non-NCQ command (when NCQ is enabled). non_ncq_done_cond is signalled
@@ -1326,13 +1323,6 @@ void ahci_if_t::slot_release(unsigned port_num, int slot)
     // Make sure it was really acquired
     assert(pi->cmd_issued & (1U<<slot));
 
-    if (!pi->use_ncq) {
-        // Make sure this was really the oldest command
-        assert(pi->issue_queue[pi->issue_tail] == slot);
-        // Advance queue tail
-        pi->issue_tail = (pi->issue_tail + 1) & 31;
-    }
-
     // Mark slot as not in use
     pi->cmd_issued &= ~(1U<<slot);
 
@@ -1364,12 +1354,6 @@ int8_t ahci_if_t::slot_acquire(hba_port_info_t& pi)
     uint8_t slot = bit_lsb_set(~busy_mask);
 
     pi.cmd_issued |= (1U << slot);
-
-    if (!pi.use_ncq) {
-        // Write slot number to issue queue
-        pi.issue_queue[pi.issue_head] = slot;
-        pi.issue_head = (pi.issue_head + 1) & 31;
-    }
 
     return slot;
 }
@@ -1433,8 +1417,6 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
             // Free up all ports and reinitialize issue_queue
             uint32_t pending_mask = pi->cmd_issued;
             pi->cmd_issued = 0;
-            pi->issue_head = 0;
-            pi->issue_tail = 0;
 
             // Take a snapshot of all pending commands
             slot_request_t pending[32];
@@ -1452,7 +1434,12 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
             }
         }
     } else {
-        slot = pi->issue_queue[pi->issue_tail];
+        uint32_t issue_changed = (pi->cmd_issued ^ port->cmd_issue) &
+                pi->slot_mask;
+
+        slot = bit_lsb_set(issue_changed);
+
+        assert((issue_changed & ~(1 << slot)) == 0);
 
         slot_request_t &request = pi->slot_requests[slot];
 
@@ -1735,10 +1722,6 @@ int ahci_if_t::port_flush(unsigned port_num, async_callback_fn_t callback,
         // Disable NCQ for duration of flush
         save_ncq = pi.use_ncq;
         pi.use_ncq = false;
-
-        // Add item to in-order completion queue
-        pi.issue_queue[pi.issue_head] = 0;
-        pi.issue_head = (pi.issue_head + 1) & 31;
     }
 
     slot_request_t request = pi.slot_requests[0];
