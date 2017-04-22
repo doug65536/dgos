@@ -222,22 +222,6 @@ static time_of_day_t cmos_read_gettimeofday(void)
     return cmos_fixup_timeofday(result);
 }
 
-static time_of_day_t cmos_readtimeofday()
-{
-    time_of_day_t last;
-    time_of_day_t curr;
-
-    // Keep reading time until we get
-    // the same values twice
-    memset(&last, 0xFF, sizeof(last));
-    do {
-        last = cmos_read_gettimeofday();
-        curr = cmos_read_gettimeofday();
-    } while (memcmp(&last, &curr, sizeof(last)));
-
-    return curr;
-}
-
 static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 {
     spinlock_lock_noyield(&time_of_day_lock);
@@ -246,7 +230,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 
     if (intr_cause & CMOS_STATUS_C_UEI) {
         // Update ended interrupt
-        time_of_day = cmos_readtimeofday();
+        time_of_day = cmos_read_gettimeofday();
         time_of_day_timestamp = time_ms();
     }
 
