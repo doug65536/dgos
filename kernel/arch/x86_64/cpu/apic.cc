@@ -435,6 +435,7 @@ static uint32_t volatile *apic_ptr;
 // Self Interprocessor Interrupt (x2APIC only, write only)
 #define APIC_REG_SELF_IPI       0x3F
 
+// Only used in xAPIC mode
 #define APIC_DEST_BIT               24
 #define APIC_DEST_BITS              8
 #define APIC_DEST_MASK              ((1U << APIC_DEST_BITS)-1U)
@@ -594,8 +595,10 @@ protected:
 class lapic_x_t : public lapic_t {
     void command(uint32_t dest, uint32_t cmd) const final
     {
-        write32(APIC_REG_ICR_HI, dest);
+        cpu_scoped_irq_disable intr_enabled;
+        write32(APIC_REG_ICR_HI, APIC_DEST_n(dest));
         write32(APIC_REG_ICR_LO, cmd);
+        intr_enabled.restore();
         while (read32(APIC_REG_ICR_LO) & APIC_CMD_PENDING)
             pause();
     }
@@ -1650,8 +1653,6 @@ unsigned apic_get_id(void)
 
 static void apic_send_command(uint32_t dest, uint32_t cmd)
 {
-    cpu_scoped_irq_disable intr_enabled;
-
     apic->command(dest, cmd);
 }
 
@@ -1670,7 +1671,7 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
             : APIC_CMD_DEST_TYPE_BYID;
 
     apic_send_command(target_apic_id >= 0
-                      ? target_apic_id << 24
+                      ? target_apic_id
                       : 0,
                       APIC_CMD_VECTOR_n(intr) |
                       dest_type |
@@ -1733,42 +1734,49 @@ static void apic_configure_timer(
 
 int apic_init(int ap)
 {
-    if (!ap) {
-        // Bootstrap CPU only
+    uint64_t apic_base_msr = msr_get(APIC_BASE_MSR);
 
-        apic_base = msr_get(APIC_BASE_MSR);
+    if (!apic_base)
+        apic_base = apic_base_msr;
 
-        if (!(apic_base & APIC_BASE_GENABLE)) {
-            printdbg("APIC was globally disabled!"
-                     " Enabling...\n");
-        }
+    if (!(apic_base_msr & APIC_BASE_GENABLE)) {
+        printdbg("APIC was globally disabled!"
+                 " Enabling...\n");
+    }
 
-        if (cpuid_has_x2apic()) {
-            APIC_TRACE("Using x2APIC\n");
+    if (cpuid_has_x2apic()) {
+        APIC_TRACE("Using x2APIC\n");
+        if (!ap)
             apic = &apic_x2;
-            msr_set(APIC_BASE_MSR, apic_base |
-                    APIC_BASE_GENABLE | APIC_BASE_X2ENABLE);
-        } else {
-            APIC_TRACE("Using xAPIC\n");
 
+        msr_set(APIC_BASE_MSR, apic_base_msr |
+                APIC_BASE_GENABLE | APIC_BASE_X2ENABLE);
+    } else {
+        APIC_TRACE("Using xAPIC\n");
+
+        if (!ap) {
+            // Bootstrap CPU only
             assert(!apic_ptr);
-            apic_ptr = (uint32_t *)mmap((void*)(apic_base & APIC_BASE_ADDR),
+            apic_ptr = (uint32_t *)mmap((void*)(apic_base_msr & APIC_BASE_ADDR),
                                         4096, PROT_READ | PROT_WRITE,
                                         MAP_PHYSICAL | MAP_NOCACHE |
                                         MAP_WRITETHRU, -1, 0);
 
             apic = &apic_x;
-            msr_set(APIC_BASE_MSR, apic_base | APIC_BASE_GENABLE);
         }
 
-        // Set global enable if it is clear
-        if (!(apic_base & APIC_BASE_GENABLE)) {
-            printdbg("APIC was globally disabled!"
-                     " Enabling...\n");
-        }
+        msr_set(APIC_BASE_MSR, apic_base_msr | APIC_BASE_GENABLE);
+    }
 
-        apic_base &= APIC_BASE_ADDR;
+    // Set global enable if it is clear
+    if (!(apic_base_msr & APIC_BASE_GENABLE)) {
+        printdbg("APIC was globally disabled!"
+                 " Enabling...\n");
+    }
 
+    apic_base_msr &= APIC_BASE_ADDR;
+
+    if (!ap) {
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
         intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
 
@@ -1869,7 +1877,7 @@ void apic_start_smp(void)
     uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
     // Send INIT to all other CPUs
-    apic_send_command(0,
+    apic_send_command(0xFFFFFFFF,
                       APIC_CMD_DEST_MODE_INIT |
                       APIC_CMD_DEST_LOGICAL |
                       APIC_CMD_DEST_TYPE_OTHER);
@@ -1904,7 +1912,7 @@ void apic_start_smp(void)
                 printdbg("Sending IPI to APIC ID %u\n", target);
 
                 // Send SIPI to CPU
-                apic_send_command(APIC_DEST_n(target),
+                apic_send_command(target,
                                   APIC_CMD_SIPI_PAGE_n(
                                       mp_trampoline_page) |
                                   APIC_CMD_DEST_MODE_SIPI |
@@ -2057,6 +2065,7 @@ static int64_t acpi_pm_timer_raw()
                  (acpi_fadt.pm_timer_block ||
                   acpi_fadt.x_pm_timer_block.access_size))) {
         if (likely(acpi_fadt.pm_timer_block)) {
+            ACPI_TRACE("PM Timer at I/O port 0x%x\n", acpi_fadt.pm_timer_block);
             accessor = new acpi_gas_accessor_sysio_t<4>(
                         acpi_fadt.pm_timer_block);
         } else if (acpi_fadt.x_pm_timer_block.access_size) {
@@ -2068,7 +2077,10 @@ static int64_t acpi_pm_timer_raw()
             nsleep_set_handler(acpi_pm_timer_nsleep_handler);
     }
 
-    return likely(accessor) ? uint32_t(accessor->read()) : -1;
+    if (likely(accessor))
+        return accessor->read();
+
+    return -1;
 }
 
 static uint32_t acpi_pm_timer_diff(uint32_t before, uint32_t after)
@@ -2103,10 +2115,17 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
     return elap_ns;
 }
 
+static uint64_t apic_rdtsc_time_ms_handler()
+{
+    uint64_t now = cpu_rdtsc();
+    return now / (rdtsc_mhz * 1000);
+}
+
 static void apic_calibrate()
 {
-    int volatile hack = 0;
-    if (acpi_pm_timer_raw() >= 0 && hack) {
+    int64_t wtf = acpi_pm_timer_raw();
+    (void)wtf;
+    if (acpi_pm_timer_raw() >= 0) {
         //
         // Have PM timer
 
@@ -2121,12 +2140,12 @@ static void apic_calibrate()
         uint64_t tsc_st = cpu_rdtsc();
         uint32_t tmr_diff;
 
-        // Wait for about 1ms
+        // Wait for about 16ms
         do {
             pause();
             tmr_en = acpi_pm_timer_raw();
             tmr_diff = acpi_pm_timer_diff(tmr_st, tmr_en);
-        } while (tmr_diff < 3579);
+        } while (tmr_diff < 3579*16);
 
         uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
@@ -2139,6 +2158,15 @@ static void apic_calibrate()
         uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
 
         apic_timer_freq = ccr_freq;
+
+        // Round CPU frequency to nearest multiple of 33MHz
+        cpu_freq += 8333333;
+        cpu_freq -= cpu_freq % 16666666;
+
+        // Round APIC frequency to nearest multiple of 100MHz
+        apic_timer_freq += 50000000;
+        apic_timer_freq -= apic_timer_freq % 100000000;
+
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
@@ -2163,6 +2191,11 @@ static void apic_calibrate()
 
         apic_timer_freq = ccr_freq;
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
+    }
+
+    if (cpuid_has_inrdtsc()) {
+        APIC_TRACE("Using RDTSC for precision timing\n");
+        time_ms_set_handler(apic_rdtsc_time_ms_handler);
     }
 
     printdbg("CPU clock: %luMHz\n", rdtsc_mhz);

@@ -63,9 +63,10 @@ void cpu_init_stage2(int ap)
     idt_init(ap);
     gdt_init();
     mmu_init(ap);
-    if (!ap)
+    if (!ap) {
         thread_init(ap);
-    intr_hook(INTR_EX_DEBUG, cpu_debug_exception_handler);
+        intr_hook(INTR_EX_DEBUG, cpu_debug_exception_handler);
+    }
 }
 
 void cpu_hw_init(int ap)
@@ -94,6 +95,7 @@ void cpu_hw_init(int ap)
 
 static void cpu_init_smp_apic(void *arg)
 {
+    printdbg("AP in cpu_init_smp_apic\n");
     (void)arg;
     apic_init(1);
     thread_init(1);

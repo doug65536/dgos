@@ -41,6 +41,7 @@ void volatile *trick;
 
 static void smp_main(void *arg)
 {
+    printdbg("AP in smp_main...\n");
     (void)arg;
     cpu_init(1);
     cpu_init_stage2(1);
