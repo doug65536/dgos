@@ -280,7 +280,11 @@ isr_common:
 
 	// Restore CR3
 	pop_cfi %rax
+	// mov %cr3,%rdx
+	// cmp %rax,%rdx
+	// jz 1f
 	mov %rax,%cr3
+//1:
 
 	// Restore FSBASE
 	pop_cfi %rax
