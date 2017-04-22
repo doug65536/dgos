@@ -21,6 +21,9 @@ static char *sector_buffer;
 static char *fat_buffer;
 uint32_t fat_buffer_lba;
 
+static uint32_t next_cluster(
+        uint32_t current_cluster, char *sector, uint16_t *err_ptr);
+
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
 // Returns
@@ -67,11 +70,27 @@ static int16_t fat32_sector_iterator_begin(
     iter->position = 0;
     iter->sector_offset = 0;
 
+    // Cache cluster chain
+    int cluster_count = 0;
+    for (int walk = cluster; walk; ++cluster_count)
+        walk = next_cluster(walk, nullptr, &iter->err);
+
+    iter->cluster_count = cluster_count;
+    iter->clusters.segment = far_malloc(sizeof(uint32_t) * (cluster_count - 1));
+    iter->clusters.offset = 0;
+
+    cluster_count = 0;
+    for (int walk = cluster; walk; ++cluster_count) {
+        far_copy_from(far_adj(iter->clusters, cluster_count * sizeof(uint32_t)),
+                      &walk, sizeof(uint32_t));
+        //iter->clusters[cluster_count++] = walk;
+        walk = next_cluster(walk, nullptr, &iter->err);
+    }
+
     if (!is_eof_cluster(cluster)) {
         int32_t lba = lba_from_cluster(cluster);
 
-        iter->err = read_lba_sectors(
-                    sector, boot_drive, lba, 1);
+        iter->err = read_lba_sectors(sector, boot_drive, lba, 1);
 
         if (!iter->err)
             return 1;
@@ -102,7 +121,9 @@ static uint32_t next_cluster(
             return 0xFFFFFFFF;
         fat_buffer_lba = lba;
     }
-    memcpy(sector, fat_buffer, 512);
+    fat_array = (uint32_t*)fat_buffer;
+    if (sector)
+        memcpy(sector, fat_buffer, 512);
 
     current_cluster = fat_array[fat_sector_offset] & 0x0FFFFFFF;
 
@@ -110,13 +131,15 @@ static uint32_t next_cluster(
     if (is_eof_cluster(current_cluster))
         return 0;
 
-    lba = lba_from_cluster(current_cluster);
+    if (sector) {
+        lba = lba_from_cluster(current_cluster);
 
-    err = read_lba_sectors(sector, boot_drive, lba, 1);
-    if (err_ptr)
-        *err_ptr = err;
-    if (err)
-        return 0xFFFFFFFF;
+        err = read_lba_sectors(sector, boot_drive, lba, 1);
+        if (err_ptr)
+            *err_ptr = err;
+        if (err)
+            return 0xFFFFFFFF;
+    }
 
     return current_cluster;
 }
@@ -167,21 +190,42 @@ static int16_t sector_iterator_seek(
         uint32_t sector_offset,
         char *sector)
 {
-
     // See if we are already there
     if (iter->position == sector_offset) {
         uint16_t is_eof_now = is_eof_cluster(iter->cluster);
         return is_eof_now ? 0 : 1;
     }
 
-    int16_t status = fat32_sector_iterator_begin(
-                iter, sector, iter->start_cluster);
+    //print_line("Seeking to %u\n", sector_offset);
 
-    while (status > 0 && sector_offset--)
-        status = sector_iterator_next(iter, sector,
-                                      sector_offset == 0);
+    uint32_t cluster_index = sector_offset / bpb.sec_per_cluster;
+    uint32_t cluster_offset = sector_offset % bpb.sec_per_cluster;
+    iter->sector_offset = sector_offset;
 
-    return status;
+    // Check for EOF
+    if (cluster_index > iter->cluster_count)
+        return 0;
+
+    uint32_t cluster;
+    far_copy_to(&cluster, far_adj(iter->clusters,
+                                  cluster_index * sizeof(uint32_t)),
+                sizeof(uint32_t));
+    uint32_t lba = lba_from_cluster(cluster);
+    iter->err = read_lba_sectors(sector, boot_drive,
+                     lba + cluster_offset, 1);
+    if (iter->err)
+        return -1;
+
+    return 1;
+
+    //int16_t status = fat32_sector_iterator_begin(
+    //            iter, sector, iter->start_cluster);
+    //
+    //while (status > 0 && sector_offset--)
+    //    status = sector_iterator_next(iter, sector,
+    //                                  sector_offset == 0);
+    //
+    //return status;
 }
 
 // Read the first sector of a directory
@@ -625,6 +669,8 @@ static int fat32_boot_close(int file)
     // Fail the close if the file is in error state
     if (file_handles[file].err)
         result = -1;
+
+    //free(file_handles[file].clusters);
 
     // Mark as available
     memset(file_handles + file, 0, sizeof(*file_handles));

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "farptr.h"
 
 // Handles advancing through the sectors of
 // a cluster and following the cluster chain
@@ -19,6 +20,9 @@ struct fat32_sector_iterator_t {
     uint16_t sector_offset;
 
     uint16_t err;
+
+    far_ptr_t clusters;
+    uint32_t cluster_count;
 };
 
 // Handles iterating a directory and advancing

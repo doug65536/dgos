@@ -42,8 +42,8 @@ void far_copy(far_ptr_t dest,
         "pushw %%es\n\t"
         "pushw %%di\n\t"
 
-        "les %[dest],%%di\n\t"
-        "lds %[src],%%si\n\t"
+        "les (%[dest]),%%di\n\t"
+        "lds (%[src]),%%si\n\t"
         "cld\n\t"
         "rep movsb\n\t"
 
@@ -52,7 +52,7 @@ void far_copy(far_ptr_t dest,
         "popw %%si\n\t"
         "popw %%ds\n\t"
         : "+c" (size)
-        : [dest] "m" (dest), [src] "m" (src)
+        : [dest] "b" (&dest.offset), [src] "d" (&src.offset)
         : "memory"
     );
 }
