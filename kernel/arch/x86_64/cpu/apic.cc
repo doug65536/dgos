@@ -1737,7 +1737,7 @@ int apic_init(int ap)
     uint64_t apic_base_msr = msr_get(APIC_BASE_MSR);
 
     if (!apic_base)
-        apic_base = apic_base_msr;
+        apic_base = apic_base_msr & APIC_BASE_ADDR;
 
     if (!(apic_base_msr & APIC_BASE_GENABLE)) {
         printdbg("APIC was globally disabled!"
