@@ -7,6 +7,7 @@
 #include "irq.h"
 #include "control_regs.h"
 #include "spinlock.h"
+#include "printk.h"
 
 #define CMOS_ADDR_PORT  0x70
 #define CMOS_DATA_PORT  0x71
@@ -185,7 +186,6 @@ static time_of_day_t cmos_fixup_timeofday(time_of_day_t t)
 
     if ((cmos_status_b & CMOS_STATUS_B_BIN) == 0) {
         // BCD
-        t.centisec = cmos_bcd_to_binary(t.centisec);
         t.second = cmos_bcd_to_binary(t.second);
         t.minute = cmos_bcd_to_binary(t.minute);
         t.hour = cmos_bcd_to_binary(t.hour & 0x7F);
@@ -248,6 +248,10 @@ time_of_day_t cmos_gettimeofday()
     result.centisec = adj / 10;
 
     spinlock_unlock_noirq(&time_of_day_lock);
+
+    if (result.centisec >= 100)
+        result.centisec = 99;
+
     return result;
 }
 
@@ -256,7 +260,18 @@ void cmos_init(void)
     cmos_status_b = cmos_read(CMOS_REG_STATUS_B);
     time_ofday_set_handler(cmos_gettimeofday);
 
-    time_of_day = cmos_gettimeofday();
+    time_of_day_t tod1;
+    time_of_day_t tod2;
+    tod1 = cmos_read_gettimeofday();
+    for (;;) {
+        tod2 = cmos_read_gettimeofday();
+
+        if (!memcmp(&tod1, &tod2, sizeof(tod1)))
+            break;
+
+        tod1 = tod2;
+    }
+    time_of_day = tod1;
     time_of_day_timestamp = time_ms();
 
     //
