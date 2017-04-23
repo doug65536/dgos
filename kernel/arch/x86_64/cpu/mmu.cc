@@ -2559,7 +2559,7 @@ int alias_window(void *addr, size_t size,
             }
 
             ptes[3][pte_index++] = ((range->physaddr + range_offset) &
-                                    PTE_ADDR) +
+                                    PTE_ADDR) |
                     PTE_ACCESSED | PTE_DIRTY | PTE_WRITABLE | PTE_PRESENT;
         }
     } else {

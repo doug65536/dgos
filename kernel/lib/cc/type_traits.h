@@ -23,7 +23,7 @@ struct integral_constant
 {
     typedef _T value_type;
     typedef integral_constant<_T, _Val> type;
-    static constexpr _T val = _Val;
+    static constexpr _T value = _Val;
 
     operator value_type() const { return _Val; }
     value_type operator()() const { return _Val; }
@@ -97,13 +97,30 @@ template<typename _T>
 using is_standard_layout = bool_constant<__is_standard_layout(_T)>;
 
 template<typename _T1, typename _T2>
-using is_same = bool_constant<__is_same(_T1, _T2)>;
+struct is_same : public false_type
+{
+};
+
+template<typename _T1>
+struct is_same<_T1, _T1> : public true_type
+{
+};
 
 template<typename _T>
 using is_trivial = bool_constant<__is_trivial(_T)>;
 
 template<typename _T>
 using is_union = bool_constant<__is_union(_T)>;
+
+template<typename _T>
+struct is_lvalue_reference : public false_type
+{
+};
+
+template<typename _T>
+struct is_lvalue_reference<_T&&> : public true_type
+{
+};
 
 template<typename _T>
 struct underlying_type

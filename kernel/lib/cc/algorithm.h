@@ -122,11 +122,23 @@ _OutputIt uninitialized_copy(_InputIt __first, _InputIt __last,
     return __out;
 }
 
+template<typename _OutputIt, typename _T>
+_OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
+                             _T const& __value)
+{
+    using T = decltype(*__first);
+    while (__first != __last) {
+        new (&*__first) T(__value);
+        ++__first;
+    }
+    return __first;
+}
+
 template<typename _InputIt, typename _OutputIt>
 _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
                              _OutputIt __out)
 {
-    using T = decltype(*__out);
+    using T = typename remove_reference<decltype(*__out)>::type;
     while (__first != __last) {
         new (&*__out) T(move(*__first));
         ++__out;

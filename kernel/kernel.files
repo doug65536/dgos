@@ -26,6 +26,7 @@ fs/fat32_decl.h
 lib/cc/algorithm.h
 lib/cc/array
 lib/cc/initializer_list.h
+lib/cc/memory.h
 lib/cc/type_traits.h
 lib/cc/utility.h
 lib/cc/vector.h

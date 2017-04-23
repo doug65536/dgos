@@ -2,11 +2,8 @@
 #include "types.h"
 #include "likely.h"
 
-__noinline
-extern "C" int assert_failed(char const *expr,
-                   char const *msg,
-                   char const *file,
-                   int line);
+extern "C" __noinline int assert_failed(
+        char const *expr, char const *msg, char const *file, int line);
 
 #ifndef NDEBUG
 // Plain assert

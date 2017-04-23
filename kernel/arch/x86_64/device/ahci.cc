@@ -1635,10 +1635,10 @@ void ahci_if_t::configure_ncq(unsigned port_num, bool enable,
     // Use queue depth to mark all unsupported tags permanently busy
     if (queue_depth < 32 && enable) {
         // Mark all unsupported slots permanently busy
-        port_info[port_num].cmd_issued |= ~0 << queue_depth;
+        port_info[port_num].cmd_issued |= ~0U << queue_depth;
 
         // Setup mask of usable slots
-        port_info[port_num].slot_mask = ~(~0 << queue_depth);
+        port_info[port_num].slot_mask = ~(~0U << queue_depth);
     } else {
         port_info[port_num].slot_mask = ~0U;
     }

@@ -23,10 +23,10 @@ $(shell mkdir -p $(DUMPDIR) >/dev/null)
 #OPTIMIZE := 1
 #OPTIMIZE_AVX := 1
 #LTO := 1
-CC := clang
-CXX := clang++
-#CC := gcc-6
-#CXX := gcc-6
+#CC := clang
+#CXX := clang++
+CC := gcc-6
+CXX := gcc-6
 
 export CC
 export CXX
