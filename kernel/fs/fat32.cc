@@ -9,6 +9,7 @@
 #include "unique_ptr.h"
 #include "threadsync.h"
 #include "time.h"
+#include "vector.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -37,6 +38,7 @@ struct fat32_fs_t : public fs_base_t {
 
         off_t cached_offset;
         uint64_t cached_cluster;
+        bool dirty;
     };
 
     fs_base_t *mount(fs_init_info_t *conn);
@@ -51,6 +53,7 @@ struct fat32_fs_t : public fs_base_t {
     void *lookup_cluster(uint64_t cluster);
 
     static cluster_t dirent_start_cluster(fat32_dir_entry_t const *de);
+    static void dirent_start_cluster(fat32_dir_entry_t *de, cluster_t cluster);
 
     static uint8_t lfn_checksum(char const *fcb_name);
 
@@ -84,8 +87,7 @@ struct fat32_fs_t : public fs_base_t {
     fat32_dir_union_t *search_dir(cluster_t cluster,
             char const *filename, size_t name_len);
 
-    cluster_t walk_cluster_chain(off_t *distance,
-            cluster_t cluster, uint64_t offset);
+    off_t walk_cluster_chain(file_handle_t *file, off_t offset, bool append);
 
     fat32_dir_union_t *lookup_dirent(char const *pathname,
                                      fat32_dir_union_t **dde);
@@ -135,6 +137,7 @@ struct fat32_fs_t : public fs_base_t {
     uint32_t sector_size;
     uint8_t sector_shift;
     uint8_t block_shift;
+    uint8_t fat_block_shift;
 
     // Synthetic root directory entry
     // to allow code to refer to root as a
@@ -188,6 +191,8 @@ void *fat32_fs_t::lookup_sector(uint64_t lba)
 
 uint64_t fat32_fs_t::offsetof_cluster(uint64_t cluster)
 {
+    assert(cluster >= 2);
+
     return (cluster_ofs << sector_shift) +
             (cluster << (sector_shift + block_shift));
 }
@@ -200,6 +205,12 @@ void *fat32_fs_t::lookup_cluster(uint64_t cluster)
 cluster_t fat32_fs_t::dirent_start_cluster(fat32_dir_entry_t const *de)
 {
     return (de->start_hi << 16) | de->start_lo;
+}
+
+void fat32_fs_t::dirent_start_cluster(fat32_dir_entry_t *de, cluster_t cluster)
+{
+    de->start_lo = (cluster >> 0*16) & 0xFFFF;
+    de->start_hi = (cluster >> 1*16) & 0xFFFF;
 }
 
 // fcb_name is the space padded 11 character name with no dot,
@@ -586,24 +597,68 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
     return result;
 }
 
-cluster_t fat32_fs_t::walk_cluster_chain(
-        off_t *distance,
-        cluster_t cluster, uint64_t offset)
+off_t fat32_fs_t::walk_cluster_chain(
+        file_handle_t *file, off_t offset, bool append)
 {
-    uint64_t walked = 0;
+    off_t walked = 0;
+
+    cluster_t cluster = file->cached_cluster;
+
+    vector<cluster_t> sync_pending;
 
     while (walked + block_size <= offset) {
-        if (is_eof(fat[cluster]))
-            break;
+        if (is_eof(fat[cluster])) {
+            if (!append)
+                break;
+
+            cluster_t alloc = allocate_near(cluster);
+            if (unlikely(alloc == 0))
+                break;
+
+            if (dirent_start_cluster(file->dirent) == 0)
+                dirent_start_cluster(file->dirent, alloc);
+
+            cluster_t fat_block = cluster >> fat_block_shift;
+            if (sync_pending.empty() || sync_pending.back() != fat_block)
+                sync_pending.push_back(fat_block);
+
+            fat[cluster] = alloc;
+            fat2[cluster] = alloc;
+
+            file->cached_cluster = alloc;
+            file->cached_offset += block_size;
+        }
 
         cluster = fat[cluster];
         walked += block_size;
     }
 
-    if (distance)
-        *distance = walked;
+    if (append && file->cached_cluster == 0) {
+        // Initial block in empty file (try to reserve first MB to metadata)
+        file->cached_cluster = allocate_near(2047);
+        file->cached_offset = 0;
 
-    return cluster;
+        cluster_t fat_block = cluster >> fat_block_shift;
+        if (sync_pending.empty() || sync_pending.back() != fat_block)
+            sync_pending.push_back(fat_block);
+    }
+
+    for (cluster_t block_index : sync_pending) {
+        int status = msync(fat + (block_index << fat_block_shift),
+                           block_size, MS_SYNC);
+
+        if (status < 0)
+            return status;
+
+        if (file->cached_offset == 0) {
+            dirent_start_cluster(file->dirent, file->cached_cluster);
+            status = msync(file->dirent, sizeof(*file->dirent), MS_SYNC);
+            if (status < 0)
+                return status;
+        }
+    }
+
+    return walked;
 }
 
 fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
@@ -912,11 +967,13 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
 
     file_handle_t *file = (file_handle_t*)pool_alloc(&fat32_handles);
 
+    memzero(*file);
+
     file->fs = this;
     file->dirent = &fde->short_entry;
 
-    file->cached_offset = 0;
     file->cached_cluster = dirent_start_cluster(&fde->short_entry);
+    file->cached_offset = 0;
 
     return file;
 }
@@ -929,20 +986,23 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
 
     off_t cached_end = file->cached_offset + block_size;
     while (size > 0) {
-        if ((offset >= cached_end) &&
+        if (file->cached_cluster &&
+                offset < file->dirent->size &&
+                (offset >= cached_end) &&
                 (offset < cached_end + block_size)) {
             // Move to next cluster
             file->cached_offset += block_size;
             file->cached_cluster = fat[file->cached_cluster];
             cached_end += block_size;
-        } else if ((offset < file->cached_offset) ||
+        } else if (!file->cached_cluster ||
+                   (offset < file->cached_offset) ||
                    (offset >= cached_end)) {
             // Offset cache miss
-            file->cached_cluster = walk_cluster_chain(
-                        &file->cached_offset,
-                        dirent_start_cluster(file->dirent),
-                        offset);
-            cached_end = file->cached_offset + block_size;
+            file->cached_cluster = dirent_start_cluster(file->dirent);
+            file->cached_offset = 0;
+            walk_cluster_chain(file, offset, !read);
+            if (file->dirent->size > 0 || !read)
+                cached_end = file->cached_offset + block_size;
         }
 
         size_t avail;
@@ -963,8 +1023,27 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
             memcpy(io, mm_dev + cluster_data_ofs +
                    (offset - file->cached_offset), avail);
         } else {
-            memcpy(mm_dev + cluster_data_ofs +
-                   (offset - file->cached_offset), io, avail);
+            void *output = mm_dev + cluster_data_ofs +
+                    (offset - file->cached_offset);
+            memcpy(output, io, avail);
+            int status = msync(output, avail, MS_ASYNC);
+            if (status < 0)
+                return status;
+
+            // Update size
+            if (file->dirent->size < offset + avail)
+                file->dirent->size = offset + avail;
+
+            // Update last-modified
+            time_of_day_t now = time_ofday();
+            date_encode(&file->dirent->modified_date,
+                        &file->dirent->modified_time, nullptr, now);
+
+            // Set archive bit
+            file->dirent->attr |= FAT_ATTR_ARCH;
+
+            // Mark for writeback
+            file->dirty = true;
         }
 
         offset += avail;
@@ -1016,6 +1095,9 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
     sector_shift = bit_log2_n(sector_size);
     block_shift = bit_log2_n(bpb.sec_per_cluster);
     block_size = sector_size << block_shift;
+
+    // Right shift a cluster number this much to find cluster index within FAT
+    fat_block_shift = bit_log2_n(block_size >> bit_log2_n(sizeof(cluster_t)));
 
     mm_dev = (char*)mmap_register_device(
                 this, block_size, conn->part_len,
@@ -1330,8 +1412,14 @@ int fat32_fs_t::release(fs_file_info_t *fi)
 {
     scoped_rwlock_t lock(rwlock, scoped_rwlock_t::writer);
 
+    file_handle_t *file = (file_handle_t*)fi;
+    int status = 0;
+
+    if (file->dirty)
+        status = msync(file->dirent, sizeof(*file->dirent), MS_SYNC);
+
     pool_free(&fat32_handles, fi);
-    return 0;
+    return status;
 }
 
 //
