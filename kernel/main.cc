@@ -30,7 +30,7 @@
 #include "unique_ptr.h"
 #include "priorityqueue.h"
 
-//#include "vector.h"
+#include "vector.h"
 
 constexpr size_t const kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size];
@@ -58,7 +58,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   4
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -131,7 +131,7 @@ static int read_stress(void *p)
     if (!drive)
         return 0;
 
-    size_t data_size = 8;
+    size_t data_size = 4096;
 
     char *data = (char*)mmap(0, data_size, PROT_READ | PROT_WRITE,
                              0, -1, 0);
@@ -754,6 +754,7 @@ static int init_thread(void *p)
         char name[16];
         snprintf(name, sizeof(name), "created_%d", n);
         int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        file_write(create_test, "Hello!", 6);
         file_close(create_test);
     }
 
@@ -769,29 +770,29 @@ static int init_thread(void *p)
 
     rbtree_t<>::test();
 
-    printdbg("Floating point formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
-    printdbg("Floating point formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
-    printdbg("Floating point formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
-    printdbg("Floating point formatter: %%+17.5f    42.8e-60  -> %+17.5f\n", 42.8e-60);
-    printdbg("Floating point formatter: %%17.5f    -42.8      -> %17.5f\n", -42.8);
-    printdbg("Floating point formatter: %%17.5f    -42.8e+60  -> %17.5f\n", -42.8e+60);
-    printdbg("Floating point formatter: %%17.5f    -42.8e-60  -> %17.5f\n", -42.8e-60);
-    printdbg("Floating point formatter: %%017.5f    42.8      -> %017.5f\n", 42.8);
-    printdbg("Floating point formatter: %%017.5f   -42.8e+60  -> %017.5f\n", -42.8e+60);
-    printdbg("Floating point formatter: %%+017.5f   42.8      -> %+017.5f\n", 42.8);
-    printdbg("Floating point formatter: %%+017.5f  -42.8e+60  -> %+017.5f\n", -42.8e+60);
+    printdbg("Float formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
+    printdbg("Float formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
+    printdbg("Float formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
+    printdbg("Float formatter: %%+17.5f    42.8e-60  -> %+17.5f\n", 42.8e-60);
+    printdbg("Float formatter: %%17.5f    -42.8      -> %17.5f\n", -42.8);
+    printdbg("Float formatter: %%17.5f    -42.8e+60  -> %17.5f\n", -42.8e+60);
+    printdbg("Float formatter: %%17.5f    -42.8e-60  -> %17.5f\n", -42.8e-60);
+    printdbg("Float formatter: %%017.5f    42.8      -> %017.5f\n", 42.8);
+    printdbg("Float formatter: %%017.5f   -42.8e+60  -> %017.5f\n", -42.8e+60);
+    printdbg("Float formatter: %%+017.5f   42.8      -> %+017.5f\n", 42.8);
+    printdbg("Float formatter: %%+017.5f  -42.8e+60  -> %+017.5f\n", -42.8e+60);
 
-    printdbg("Floating point formatter: %%17.5e     42.8      -> %17.5e\n", 42.8);
-    printdbg("Floating point formatter: %%17.5e     42.8e+60  -> %17.5e\n", 42.8e+60);
-    printdbg("Floating point formatter: %%17.5e     42.8e-60  -> %17.5e\n", 42.8e-60);
-    printdbg("Floating point formatter: %%+17.5e    42.8e-60  -> %+17.5e\n", 42.8e-60);
-    printdbg("Floating point formatter: %%17.5e    -42.8      -> %17.5e\n", -42.8);
-    printdbg("Floating point formatter: %%17.5e    -42.8e+60  -> %17.5e\n", -42.8e+60);
-    printdbg("Floating point formatter: %%17.5e    -42.8e-60  -> %17.5e\n", -42.8e-60);
-    printdbg("Floating point formatter: %%017.5e    42.8      -> %017.5e\n", 42.8);
-    printdbg("Floating point formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
-    printdbg("Floating point formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
-    printdbg("Floating point formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
+    printdbg("Float formatter: %%17.5e     42.8      -> %17.5e\n", 42.8);
+    printdbg("Float formatter: %%17.5e     42.8e+60  -> %17.5e\n", 42.8e+60);
+    printdbg("Float formatter: %%17.5e     42.8e-60  -> %17.5e\n", 42.8e-60);
+    printdbg("Float formatter: %%+17.5e    42.8e-60  -> %+17.5e\n", 42.8e-60);
+    printdbg("Float formatter: %%17.5e    -42.8      -> %17.5e\n", -42.8);
+    printdbg("Float formatter: %%17.5e    -42.8e+60  -> %17.5e\n", -42.8e+60);
+    printdbg("Float formatter: %%17.5e    -42.8e-60  -> %17.5e\n", -42.8e-60);
+    printdbg("Float formatter: %%017.5e    42.8      -> %017.5e\n", 42.8);
+    printdbg("Float formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
+    printdbg("Float formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
+    printdbg("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
 
     int od = file_opendir("");
     dirent_t de;
