@@ -976,7 +976,7 @@ static int hex_dump_formatter(void const *mem, size_t size,
     char line_buf[8 + 1 + 1 + 3*16 + 1 + 16 + 2];
     int written = 0;
 
-    int line_ofs;
+    int line_ofs = 0;
     for (size_t i = 0; i < size; ++i) {
         if (!(i & 15)) {
             line_ofs = snprintf(line_buf, sizeof(line_buf), "%08zx: ", i);

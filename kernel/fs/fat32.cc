@@ -750,14 +750,14 @@ fat32_dir_union_t *fat32_fs_t::create_dirent(
 fat32_dir_union_t *fat32_fs_t::dirent_create(
         fat32_dir_union_t *dde, full_lfn_t const& lfn)
 {
-    fat32_dir_union_t *ins_point;
+    fat32_dir_union_t *ins_point = nullptr;
 
     int count = lfn.lfn_entry_count + 1;
 
     // If the directory was expanded, this is the newly allocated cluster
     cluster_t extend_cluster = 0;
 
-    cluster_t result_cluster;
+    cluster_t result_cluster = 0;
 
     cluster_t prev_cluster = 0;
     cluster_t last_cluster = 0;
@@ -880,7 +880,6 @@ void fat32_fs_t::date_encode(uint16_t *date_field, uint16_t *time_field,
     assert(tod.hour >= 0 && tod.hour <= 23);
     assert(tod.minute >= 0 && tod.minute <= 59);
     assert(tod.second >= 0 && tod.second <= 59);
-    assert(tod.centisec >= 0 && tod.centisec <= 99);
 
     int yr = tod.century * 100 + tod.year;
 
