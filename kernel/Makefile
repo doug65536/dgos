@@ -20,8 +20,8 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-#OPTIMIZE := 1
-#OPTIMIZE_AVX := 1
+OPTIMIZE := 1
+OPTIMIZE_AVX := 1
 #LTO := 1
 #CC := clang
 #CXX := clang++
@@ -85,7 +85,12 @@ CXXFLAGS += \
 #CXXFLAGS += -DNDEBUG
 
 ifdef OPTIMIZE_AVX
-CXXFLAGS += -mavx -mavx2 -no-integrated-as
+CXXFLAGS += -mavx -mavx2
+
+ifdef CXX_IS_CLANG
+CXXFLAGS += -no-integrated-as
+endif
+
 endif
 # -Wa,-msse2avx
 else
