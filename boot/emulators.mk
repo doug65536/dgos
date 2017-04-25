@@ -6,7 +6,7 @@ QEMU_DEBUGCON := \
 	-mon qemu-monitor,mode=readline,default \
 	-device isa-debugcon,chardev=qemu-debug-out
 
-QEMU_CPU := host
+QEMU_CPU := host,migratable=false,host-cache-info=true
 QEMU_RAM := 5G
 QEMU_FLAGS :=
 QEMU_BRIDGE :=
