@@ -311,6 +311,8 @@ static uint8_t bus_irq_to_mapping[64];
 
 static uint64_t apic_timer_freq;
 static uint64_t rdtsc_mhz;
+static uint64_t clk_to_ns_numer;
+static uint64_t clk_to_ns_denom;
 
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
@@ -2115,10 +2117,18 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
     return elap_ns;
 }
 
-static uint64_t apic_rdtsc_time_ms_handler()
+template<typename T>
+constexpr T gcd(T a, T b)
+{
+    if (b)
+        return gcd(b, a % b);
+    return a;
+}
+
+static uint64_t apic_rdtsc_time_ns_handler()
 {
     uint64_t now = cpu_rdtsc();
-    return now / (rdtsc_mhz * 1000);
+    return now * clk_to_ns_denom / clk_to_ns_denom;
 }
 
 static void apic_calibrate()
@@ -2168,6 +2178,17 @@ static void apic_calibrate()
         apic_timer_freq -= apic_timer_freq % 100000000;
 
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
+
+        // Example: let rdtsc_mhz = 2500. gcd(1000,2500) = 500
+        // then,
+        //  clk_to_ns_numer = 1000/500 = 2
+        //  chk_to_ns_denom = 2500/500 = 5
+        // clk_to_ns: let clks = 2500000000
+        //  2500000000 * 2 / 5 = 1000000000ns
+
+        uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
+        clk_to_ns_numer = 1000 / clk_to_ns_gcd;
+        clk_to_ns_denom = rdtsc_mhz / clk_to_ns_gcd;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
         apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
@@ -2195,7 +2216,7 @@ static void apic_calibrate()
 
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
-        time_ms_set_handler(apic_rdtsc_time_ms_handler);
+        time_ns_set_handler(apic_rdtsc_time_ns_handler);
     }
 
     printdbg("CPU clock: %luMHz\n", rdtsc_mhz);

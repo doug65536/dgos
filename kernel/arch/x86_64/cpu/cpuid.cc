@@ -59,30 +59,46 @@ int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
     return 1;
 }
 
-int cpuid_eax_bit(int bit, uint32_t eax, uint32_t ecx)
+uint32_t cpuid_eax(uint32_t eax, uint32_t ecx)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, eax, ecx) &
-            (cpuinfo.eax >> bit) & 1;
+    return -cpuid(&cpuinfo, eax, ecx) & cpuinfo.eax;
 }
 
-int cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx)
+uint32_t cpuid_ebx(uint32_t eax, uint32_t ecx)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, eax, ecx) &
-            (cpuinfo.ebx >> bit) & 1;
+    return -cpuid(&cpuinfo, eax, ecx) & cpuinfo.ebx;
 }
 
-int cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx)
+uint32_t cpuid_ecx(uint32_t eax, uint32_t ecx)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, eax, ecx) &
-            (cpuinfo.ecx >> bit) & 1;
+    return -cpuid(&cpuinfo, eax, ecx) & cpuinfo.ecx;
 }
 
-int cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx)
+uint32_t cpuid_edx(uint32_t eax, uint32_t ecx)
 {
     cpuid_t cpuinfo;
-    return cpuid(&cpuinfo, eax, ecx) &
-            (cpuinfo.edx >> bit) & 1;
+    return -cpuid(&cpuinfo, eax, ecx) & cpuinfo.edx;
+}
+
+bool cpuid_eax_bit(int bit, uint32_t eax, uint32_t ecx)
+{
+    return (cpuid_eax(eax, ecx) >> bit) & 1;
+}
+
+bool cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx)
+{
+    return (cpuid_ebx(eax, ecx) >> bit) & 1;
+}
+
+bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx)
+{
+    return (cpuid_ecx(eax, ecx) >> bit) & 1;
+}
+
+bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx)
+{
+    return (cpuid_edx(eax, ecx) >> bit) & 1;
 }

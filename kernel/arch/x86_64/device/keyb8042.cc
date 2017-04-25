@@ -351,8 +351,8 @@ static void keyb8042_mouse_handler(void)
     // the unlikely case of getting out of sync
     // with the mouse
 
-    uint64_t now = time_ms();
-    if (keyb8042_last_mouse_packet_time + 500 < now)
+    uint64_t now = time_ns();
+    if (keyb8042_last_mouse_packet_time + 500000000 < now)
         keyb8042_mouse_packet_level = 0;
     keyb8042_last_mouse_packet_time = now;
 

@@ -14,10 +14,10 @@ struct time_of_day_t {
 
 typedef time_of_day_t (*time_ofday_handler_t)();
 
-void time_ms_set_handler(uint64_t (*vec)(void));
+void time_ns_set_handler(uint64_t (*vec)(void));
 void nsleep_set_handler(uint64_t (*vec)(uint64_t microsec));
 
-uint64_t time_ms(void);
+uint64_t time_ns(void);
 uint64_t nsleep(uint64_t nanosec);
 void sleep(int ms);
 

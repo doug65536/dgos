@@ -231,7 +231,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
     if (intr_cause & CMOS_STATUS_C_UEI) {
         // Update ended interrupt
         time_of_day = cmos_read_gettimeofday();
-        time_of_day_timestamp = time_ms();
+        time_of_day_timestamp = time_ns();
     }
 
     spinlock_unlock_noirq(&time_of_day_lock);
@@ -243,9 +243,9 @@ time_of_day_t cmos_gettimeofday()
     spinlock_lock_noirq(&time_of_day_lock);
 
     time_of_day_t result = time_of_day;
-    uint64_t now = time_ms();
-    uint32_t adj = now - time_of_day_timestamp;
-    result.centisec = adj / 10;
+    uint64_t now = time_ns();
+    uint64_t adj = now - time_of_day_timestamp;
+    result.centisec = adj / 10000000;
 
     spinlock_unlock_noirq(&time_of_day_lock);
 
@@ -272,7 +272,7 @@ void cmos_init(void)
         tod1 = tod2;
     }
     time_of_day = tod1;
-    time_of_day_timestamp = time_ms();
+    time_of_day_timestamp = time_ns();
 
     //
     // Program CMOS interrupt

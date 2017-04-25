@@ -140,7 +140,7 @@ static int read_stress(void *p)
 
     printk("read buffer at %lx\n", (uint64_t)data);
 
-    uint64_t last_time = time_ms();
+    uint64_t last_time = time_ns();
     uint64_t last_completions = completion_count;
 
     uint64_t seed = 42;
@@ -168,9 +168,9 @@ static int read_stress(void *p)
                                 counts[s << 6]);
             }
 
-            uint64_t now = time_ms();
+            uint64_t now = time_ns();
             uint64_t delta_time = now - last_time;
-            if (delta_time > 1000) {
+            if (delta_time > 1000000000) {
                 uint64_t completion_delta = completions - last_completions;
                 ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu/sec",
                                 (1000 * completion_delta) / (now - last_time));
@@ -622,9 +622,9 @@ static int stress_heap_thread(void *p)
             }
 
             printdbg("heap_alloc+memset+heap_free:"
-                     " min=%8ld (%luns @ 3.2GHz), max=%8ld, avg=%8ld,"
+                     " min=%8ld (%luns @ 2.5GHz), max=%8ld, avg=%8ld,"
                      " withfree=%8ld cycles\n",
-                     min_el, min_el * 10 / 34, max_el, tot_el / count,
+                     min_el, min_el * 10 / 25, max_el, tot_el / count,
                      overall / count);
         }
     }
@@ -677,7 +677,7 @@ static int draw_test(void *p)
 
     // 1280x800
     unique_ptr<png_image_t> img(png_load("background.png"));
-    uint64_t st_tm = time_ms();
+    uint64_t st_tm = time_ns();
     for (int sx = 1280-1920; sx < 0; sx += 15) {
         int step, sy1, sy2;
         step = ((sx & 1) << 1) - 1;
@@ -711,7 +711,7 @@ static int draw_test(void *p)
             ++frames;
         }
     }
-    uint64_t en_tm = time_ms();
+    uint64_t en_tm = time_ns();
     printdbg("Benchmark time: %d frames, %ldms\n", frames, en_tm - st_tm);
 
     return 0;

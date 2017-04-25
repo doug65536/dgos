@@ -403,6 +403,14 @@ static void thread_priority_swapped(thread_info_t * const& a,
     swap(a->queue_slot, b->queue_slot);
 }
 
+static isr_context_t *thread_context_switch_handler(
+        int intr, isr_context_t *ctx)
+{
+    (void)intr;
+    assert(intr == INTR_THREAD_YIELD);
+    return thread_schedule(ctx);
+}
+
 void thread_init(int ap)
 {
     uint32_t cpu_number = atomic_xadd(&cpu_count, 1);
@@ -429,6 +437,8 @@ void thread_init(int ap)
                 thread_priority_cmp, thread_priority_swapped, cpu));
 
     if (!ap) {
+        intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler);
+
         cpu->cur_thread = thread;
         thread->ctx = 0;
         thread->priority = -256;
@@ -502,7 +512,7 @@ static thread_info_t *thread_choose_next(
 
             // If we didn't get current time yet, get it
             if (now == 0)
-                now = time_ms();
+                now = time_ns();
 
             if (now < candidate->wake_time)
                 continue;
@@ -650,7 +660,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
 static void thread_early_sleep(uint64_t expiry)
 {
-    while (time_ms() < expiry)
+    while (time_ns() < expiry)
         halt();
 }
 
@@ -673,7 +683,7 @@ EXPORT void thread_sleep_until(uint64_t expiry)
 
 EXPORT void thread_sleep_for(uint64_t ms)
 {
-    thread_sleep_until(time_ms() + ms);
+    thread_sleep_until(time_ns() + ms * 1000000);
 }
 
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
