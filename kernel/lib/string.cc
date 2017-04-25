@@ -79,6 +79,23 @@ EXPORT int strncmp(char const *lhs, char const *rhs, size_t count)
 
 EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
 {
+#ifdef USE_REP_STRING
+    int result = 0;
+    register int below asm("r8") = -1;
+    __asm__ __volatile__ (
+        "xor %[result],%[result]\n\t"
+        "repe cmpsb\n\t"
+        "cmovb %[below],%[result]\n\t"
+        "cmova %[above],%[result]\n\t"
+        : [result] "=a" (result)
+        : "S" (lhs)
+        , "D" (rhs)
+        , "c" (count)
+        , [below] "r" (below)
+        , [above] "d" (1)
+    );
+    return result;
+#else
     unsigned char const *lp = (unsigned char const *)lhs;
     unsigned char const *rp = (unsigned char const *)rhs;
     int cmp = 0;
@@ -88,6 +105,7 @@ EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
         } while (cmp == 0 && --count);
     }
     return cmp;
+#endif
 }
 
 EXPORT char *strstr(char const *str, char const *substr)
