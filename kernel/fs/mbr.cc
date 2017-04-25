@@ -36,6 +36,7 @@ struct mbr_part_factory_t : public part_factory_t {
 };
 
 static mbr_part_factory_t mbr_part_factory;
+STORAGE_REGISTER_FACTORY(mbr_part);
 
 #define MAX_PARTITIONS  128
 static part_dev_t partitions[MAX_PARTITIONS];

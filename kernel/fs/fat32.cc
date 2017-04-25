@@ -152,9 +152,9 @@ public:
 };
 
 static fat32_factory_t fat32_factory;
+STORAGE_REGISTER_FACTORY(fat32);
 
-static fat32_fs_t fat32_mounts[16];
-static unsigned fat32_mount_count;
+static vector<fat32_fs_t*> fat32_mounts;
 
 static pool_t fat32_handles;
 
@@ -1120,15 +1120,11 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
 
 fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 {
-    if (fat32_mount_count == 0)
+    if (fat32_mounts.empty())
         pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 512);
 
-    if (unlikely(fat32_mount_count == countof(fat32_mounts))) {
-        printk("Too many FAT32 mounts\n");
-        return 0;
-    }
-
-    fat32_fs_t *self = fat32_mounts + fat32_mount_count++;
+    fat32_fs_t *self = new fat32_fs_t;
+    fat32_mounts.push_back(self);
 
     return self->mount(conn);
 }

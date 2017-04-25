@@ -61,6 +61,7 @@ struct storage_dev_base_t {
 struct storage_if_factory_t {
     storage_if_factory_t(char const *factory_name);
     virtual if_list_t detect(void) = 0;
+    static void register_factory(void *p);
     char const * const name;
 };
 
@@ -72,6 +73,10 @@ struct storage_if_base_t {
 #define STORAGE_IF_IMPL                 \
     void cleanup() final;               \
     if_list_t detect_devices() final;
+
+#define STORAGE_REGISTER_FACTORY(name) \
+    REGISTER_CALLOUT(& name##_factory_t::register_factory, \
+        & name##_factory, 'L', "000")
 
 void storage_if_register_factory(char const *name,
                                 storage_if_factory_t *factory);
@@ -166,6 +171,8 @@ struct fs_base_t;
 struct fs_factory_t {
     explicit fs_factory_t(char const *factory_name);
     virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
+    static void register_factory(void *p);
+
     char const * const name;
 };
 
@@ -367,6 +374,7 @@ void fs_register_factory(char const *name, fs_factory_t *fs);
 struct part_factory_t {
     explicit part_factory_t(char const * factory_name);
     virtual if_list_t detect(storage_dev_base_t *drive) = 0;
+    static void register_factory(void *p);
     char const * const name;
 };
 

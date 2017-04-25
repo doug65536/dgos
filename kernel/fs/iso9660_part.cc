@@ -11,7 +11,8 @@ struct iso9660_part_factory_t : public part_factory_t {
     if_list_t detect(storage_dev_base_t *drive);
 };
 
-static iso9660_part_factory_t iso9660_factory;
+static iso9660_part_factory_t iso9660_part_factory;
+STORAGE_REGISTER_FACTORY(iso9660_part);
 
 #define MAX_PARTITIONS  128
 static part_dev_t partitions[MAX_PARTITIONS];

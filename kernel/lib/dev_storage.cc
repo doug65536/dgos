@@ -3,6 +3,7 @@
 #include "printk.h"
 #include "string.h"
 #include "assert.h"
+#include "vector.h"
 
 #define DEBUG_STORAGE   1
 #if DEBUG_STORAGE
@@ -11,44 +12,27 @@
 #define STORAGE_TRACE(...) ((void)0)
 #endif
 
-#define MAX_STORAGE_FACTORIES 16
-static storage_if_factory_t *storage_factories[MAX_STORAGE_FACTORIES];
-static unsigned storage_factory_count;
-
-#define MAX_STORAGE_IFS 64
-static storage_if_base_t *storage_ifs[MAX_STORAGE_IFS];
-static unsigned storage_if_count;
-
-#define MAX_STORAGE_DEVS 64
-static storage_dev_base_t *storage_devs[MAX_STORAGE_DEVS];
-static unsigned storage_dev_count;
-
-#define MAX_PART_FACTORIES   4
-static part_factory_t *part_factories[MAX_PART_FACTORIES];
-static unsigned part_factory_count;
-
 struct fs_reg_t {
     char const *name;
     fs_factory_t *factory;
 };
-
-#define MAX_FS_REGS     16
-static fs_reg_t fs_regs[MAX_FS_REGS];
-static int fs_reg_count;
 
 struct fs_mount_t {
     fs_reg_t *reg;
     fs_base_t *fs;
 };
 
-#define MAX_MOUNTS      16
-static fs_mount_t fs_mounts[MAX_MOUNTS];
-static unsigned fs_mount_count;
+static vector<storage_if_factory_t*> storage_factories;
+static vector<storage_if_base_t*> storage_ifs;
+static vector<storage_dev_base_t*> storage_devs;
+static vector<part_factory_t*> part_factories;
+static vector<fs_reg_t*> fs_regs;
+static vector<fs_mount_t> fs_mounts;
 
 storage_dev_base_t *open_storage_dev(dev_t dev)
 {
-    assert(dev >= 0 && (unsigned)dev <= storage_dev_count);
-    return (unsigned)dev < storage_dev_count ? storage_devs[dev] : 0;
+    assert(size_t(dev) <= storage_devs.size());
+    return size_t(dev) < storage_devs.size() ? storage_devs[dev] : 0;
 }
 
 void close_storage_dev(storage_dev_base_t *dev)
@@ -61,19 +45,13 @@ void storage_if_register_factory(char const *name,
 {
     (void)name;
 
-    if (storage_factory_count < MAX_STORAGE_FACTORIES) {
-        storage_factories[storage_factory_count++] = factory;
-        STORAGE_TRACE("Registered storage driver %s\n", name);
-    } else {
-        STORAGE_TRACE("Too many storage drivers, dropped %s!\n", name);
-    }
+    storage_factories.push_back(factory);
+    STORAGE_TRACE("Registered storage driver %s\n", name);
 }
 
 void invoke_storage_factories(void *)
 {
-    for (unsigned df = 0; df < storage_factory_count; ++df) {
-        storage_if_factory_t *factory = storage_factories[df];
-
+    for (storage_if_factory_t* factory : storage_factories) {
         STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
 
         // Get a list of storage devices of this type
@@ -86,10 +64,8 @@ void invoke_storage_factories(void *)
             storage_if_base_t *if_ = (storage_if_base_t *)
                     ((char*)if_list.base + i * if_list.stride);
 
-            assert(storage_if_count < countof(storage_ifs));
-
             // Store interface instance
-            storage_ifs[storage_if_count++] = if_;
+            storage_ifs.push_back(if_);
 
             STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
 
@@ -105,10 +81,8 @@ void invoke_storage_factories(void *)
                 storage_dev_base_t *dev = (storage_dev_base_t*)
                         ((char*)dev_list.base +
                         k * dev_list.stride);
-                assert(storage_dev_count < countof(storage_devs));
-
                 // Store device instance
-                storage_devs[storage_dev_count++] = dev;
+                storage_devs.push_back(dev);
             }
         }
     }
@@ -118,21 +92,17 @@ REGISTER_CALLOUT(invoke_storage_factories, 0, 'H', "000");
 
 void fs_register_factory(char const *name, fs_factory_t *fs)
 {
-    if (fs_reg_count < MAX_FS_REGS) {
-        fs_regs[fs_reg_count].name = name;
-        fs_regs[fs_reg_count].factory = fs;
-        ++fs_reg_count;
-        printdbg("%s filesystem registered\n", name);
-    }
+    fs_regs.push_back(new fs_reg_t{ name, fs });
+    printdbg("%s filesystem registered\n", name);
 }
 
 static fs_reg_t *find_fs(char const *name)
 {
-    for (int i = 0; i < fs_reg_count; ++i) {
-        if (strcmp(fs_regs[i].name, name))
+    for (fs_reg_t *reg : fs_regs) {
+        if (strcmp(reg->name, name))
             continue;
 
-        return fs_regs + i;
+        return reg;
     }
     return 0;
 }
@@ -151,11 +121,8 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
     printdbg("Mounting %s filesystem\n", fs_name);
 
     fs_base_t *mfs = fs_reg->factory->mount(info);
-    if (mfs && fs_mount_count < countof(fs_mounts)) {
-        fs_mounts[fs_mount_count].fs = mfs;
-        fs_mounts[fs_mount_count].reg = fs_reg;
-        ++fs_mount_count;
-    }
+    if (mfs)
+        fs_mounts.push_back(fs_mount_t{ fs_reg, mfs });
 }
 
 fs_base_t *fs_from_id(size_t id)
@@ -165,10 +132,8 @@ fs_base_t *fs_from_id(size_t id)
 
 void part_register_factory(char const *name, part_factory_t *factory)
 {
-    if (part_factory_count < MAX_PART_FACTORIES) {
-        part_factories[part_factory_count++] = factory;
-        printk("%s partition type registered\n", name);
-    }
+    part_factories.push_back(factory);
+    printk("%s partition type registered\n", name);
 }
 
 static void invoke_part_factories(void *arg)
@@ -176,13 +141,9 @@ static void invoke_part_factories(void *arg)
     (void)arg;
 
     // For each partition factory
-    for (unsigned fi = 0; fi < part_factory_count; ++fi) {
-        part_factory_t *factory = part_factories[fi];
-
+    for (part_factory_t *factory : part_factories) {
         // For each storage device
-        for (unsigned dev = 0; dev < storage_dev_count; ++dev) {
-            storage_dev_base_t *drive = open_storage_dev(dev);
-
+        for (storage_dev_base_t *drive : storage_devs) {
             if (drive) {
                 STORAGE_TRACE("Probing for %s partitions...\n", factory->name);
 
@@ -212,17 +173,32 @@ REGISTER_CALLOUT(invoke_part_factories, nullptr, 'P', "000");
 fs_factory_t::fs_factory_t(char const *factory_name)
     : name(factory_name)
 {
-    fs_register_factory(factory_name, this);
+}
+
+void fs_factory_t::register_factory(void *p)
+{
+    fs_factory_t *instance = (fs_factory_t*)p;
+    fs_register_factory(instance->name, instance);
 }
 
 storage_if_factory_t::storage_if_factory_t(char const *factory_name)
     : name(factory_name)
 {
-    storage_if_register_factory(factory_name, this);
+}
+
+void storage_if_factory_t::register_factory(void *p)
+{
+    storage_if_factory_t *instance = (storage_if_factory_t*)p;
+    storage_if_register_factory(instance->name, instance);
 }
 
 part_factory_t::part_factory_t(const char *factory_name)
     : name(factory_name)
 {
-    part_register_factory(name, this);
+}
+
+void part_factory_t::register_factory(void *p)
+{
+    part_factory_t *instance = (part_factory_t*)p;
+    part_register_factory(instance->name, instance);
 }

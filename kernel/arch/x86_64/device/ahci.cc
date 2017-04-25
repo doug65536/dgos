@@ -1224,7 +1224,8 @@ private:
     virtual if_list_t detect(void) final;
 };
 
-ahci_if_factory_t ahci_factory;
+static ahci_if_factory_t ahci_if_factory;
+STORAGE_REGISTER_FACTORY(ahci_if);
 
 // AHCI interface instance
 class ahci_if_t : public storage_if_base_t {

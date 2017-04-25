@@ -22,6 +22,7 @@
 #include "device/pci.h"
 #include "ioport.h"
 #include "mm.h"
+#include "vector.h"
 
 #define DEBUG_ACPI  1
 #if DEBUG_ACPI
@@ -299,13 +300,10 @@ struct mp_ioapic_t {
 
 static char *mp_tables;
 
-#define MAX_PCI_BUSSES 16
-static uint8_t mp_pci_bus_ids[MAX_PCI_BUSSES];
-static uint8_t mp_pci_bus_count;
+static vector<uint8_t> mp_pci_bus_ids;
 static uint16_t mp_isa_bus_id;
 
-static mp_bus_irq_mapping_t bus_irq_list[64];
-static uint8_t bus_irq_count;
+static vector<mp_bus_irq_mapping_t> bus_irq_list;
 
 static uint8_t bus_irq_to_mapping[64];
 
@@ -1041,9 +1039,7 @@ struct acpi_hpet_t {
 #define ACPI_HPET_BLKID_REV_ID \
     (ACPI_HPET_BLKID_REV_ID_BITS<<ACPI_HPET_BLKID_REV_ID_BIT)
 
-#define ACPI_MAX_HPET 4
-static acpi_gas_t acpi_hpet_list[ACPI_MAX_HPET];
-static unsigned acpi_hpet_count;
+static vector<acpi_gas_t> acpi_hpet_list;
 static int acpi_madt_flags;
 
 static acpi_fadt_t acpi_fadt;
@@ -1168,24 +1164,24 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
             break;
 
         case ACPI_MADT_REC_TYPE_IRQ:
-            if (bus_irq_count == 0) {
+            if (bus_irq_list.empty()) {
+                // Populate bus_irq_list with 16 legacy ISA IRQs
                 for (int i = 0; i < 16; ++i) {
-                    mp_bus_irq_mapping_t *mapping = bus_irq_list + i;
-                    mapping->bus = ent->irq_src.bus;
-                    mapping->intin = i;
-                    mapping->irq = i;
-                    mapping->flags = \
-                            ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI |
+                    mp_bus_irq_mapping_t mapping{};
+                    mapping.bus = ent->irq_src.bus;
+                    mapping.intin = i;
+                    mapping.irq = i;
+                    mapping.flags = ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI |
                             ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE;
                     isa_irq_lookup[i] = i;
+                    bus_irq_list.push_back(mapping);
                 }
             }
-            bus_irq_count = 16;
 
-            mp_bus_irq_mapping_t *mapping = bus_irq_list + ent->irq_src.gsi;
-            mapping->bus = ent->irq_src.bus;
-            mapping->irq = ent->irq_src.irq_src;
-            mapping->flags = ent->irq_src.flags;
+            mp_bus_irq_mapping_t &mapping = bus_irq_list[ent->irq_src.gsi];
+            mapping.bus = ent->irq_src.bus;
+            mapping.irq = ent->irq_src.irq_src;
+            mapping.flags = ent->irq_src.flags;
             isa_irq_lookup[ent->irq_src.irq_src] = ent->irq_src.gsi;
             break;
         }
@@ -1194,11 +1190,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
 static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
 {
-    if (acpi_hpet_count < ACPI_MAX_HPET) {
-        acpi_hpet_list[acpi_hpet_count++] = acpi_hdr->addr;
-    } else {
-        printdbg("Too many HPETs! Dropped one\n");
-    }
+    acpi_hpet_list.push_back(acpi_hdr->addr);
 }
 
 static uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
@@ -1380,12 +1372,7 @@ static int parse_mp_tables(void)
                          entry_bus->type, entry_bus->bus_id);
 
                 if (!memcmp(entry_bus->type, "PCI   ", 6)) {
-                    if (mp_pci_bus_count < MAX_PCI_BUSSES) {
-                        mp_pci_bus_ids[mp_pci_bus_count++] =
-                                entry_bus->bus_id;
-                    } else {
-                        printdbg("Too many PCI busses!\n");
-                    }
+                    mp_pci_bus_ids.push_back(entry_bus->bus_id);
                 } else if (!memcmp(entry_bus->type, "ISA   ", 6)) {
                     if (mp_isa_bus_id == 0xFFFF)
                         mp_isa_bus_id = entry_bus->bus_id;
@@ -1459,8 +1446,8 @@ static int parse_mp_tables(void)
             {
                 entry_iointr = (mp_cfg_iointr_t *)entry;
 
-                if (memchr(mp_pci_bus_ids, entry_iointr->source_bus,
-                            mp_pci_bus_count)) {
+                if (memchr(mp_pci_bus_ids.data(), entry_iointr->source_bus,
+                            mp_pci_bus_ids.size())) {
                     // PCI IRQ
                     uint8_t bus = entry_iointr->source_bus;
                     uint8_t intr_type = entry_iointr->type;
@@ -1478,18 +1465,16 @@ static int parse_mp_tables(void)
                                  intr_type_text[intr_type] :
                                  "(invalid type!)");
 
-                    if (bus_irq_count < countof(bus_irq_list)) {
-                        bus_irq_list[bus_irq_count].bus = bus;
-                        bus_irq_list[bus_irq_count].intr_type = intr_type;
-                        bus_irq_list[bus_irq_count].flags = intr_flags;
-                        bus_irq_list[bus_irq_count].device = device;
-                        bus_irq_list[bus_irq_count].irq = pci_irq & 3;
-                        bus_irq_list[bus_irq_count].ioapic_id = ioapic_id;
-                        bus_irq_list[bus_irq_count].intin = intin;
-                        ++bus_irq_count;
-                    } else {
-                        printdbg("Dropped! Too many PCI IRQ mappings\n");
-                    }
+
+                    mp_bus_irq_mapping_t mapping{};
+                    mapping.bus = bus;
+                    mapping.intr_type = intr_type;
+                    mapping.flags = intr_flags;
+                    mapping.device = device;
+                    mapping.irq = pci_irq & 3;
+                    mapping.ioapic_id = ioapic_id;
+                    mapping.intin = intin;
+                    bus_irq_list.push_back(mapping);
                 } else if (entry_iointr->source_bus == mp_isa_bus_id) {
                     // ISA IRQ
 
@@ -1506,19 +1491,16 @@ static int parse_mp_tables(void)
                                  intr_type_text[intr_type] :
                                  "(invalid type!)");
 
-                    if (bus_irq_count < countof(bus_irq_list)) {
-                        isa_irq_lookup[isa_irq] = bus_irq_count;
-                        bus_irq_list[bus_irq_count].bus = bus;
-                        bus_irq_list[bus_irq_count].intr_type = intr_type;
-                        bus_irq_list[bus_irq_count].flags = intr_flags;
-                        bus_irq_list[bus_irq_count].device = 0;
-                        bus_irq_list[bus_irq_count].irq = isa_irq;
-                        bus_irq_list[bus_irq_count].ioapic_id = ioapic_id;
-                        bus_irq_list[bus_irq_count].intin = intin;
-                        ++bus_irq_count;
-                    } else {
-                        printdbg("Dropped! Too many ISA IRQ mappings\n");
-                    }
+                    isa_irq_lookup[isa_irq] = bus_irq_list.size();
+                    mp_bus_irq_mapping_t mapping{};
+                    mapping.bus = bus;
+                    mapping.intr_type = intr_type;
+                    mapping.flags = intr_flags;
+                    mapping.device = 0;
+                    mapping.irq = isa_irq;
+                    mapping.ioapic_id = ioapic_id;
+                    mapping.intin = intin;
+                    bus_irq_list.push_back(mapping);
                 } else {
                     // Unknown bus!
                     printdbg("IRQ %d on unknown bus ->"
@@ -1536,8 +1518,8 @@ static int parse_mp_tables(void)
             case MP_TABLE_TYPE_LINTR:
             {
                 entry_lintr = (mp_cfg_lintr_t*)entry;
-                if (memchr(mp_pci_bus_ids, entry_lintr->source_bus,
-                            mp_pci_bus_count)) {
+                if (memchr(mp_pci_bus_ids.data(), entry_lintr->source_bus,
+                            mp_pci_bus_ids.size())) {
                     uint8_t device = entry_lintr->source_bus_irq >> 2;
                     uint8_t pci_irq = entry_lintr->source_bus_irq;
                     uint8_t lapic_id = entry_lintr->dest_lapic_id;
@@ -2368,7 +2350,7 @@ static mp_ioapic_t *ioapic_from_intr(int intr)
 
 static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)
 {
-    return bus_irq_list + bus_irq_to_mapping[irq];
+    return &bus_irq_list[bus_irq_to_mapping[irq]];
 }
 
 static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
@@ -2388,9 +2370,9 @@ static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
 
         // IOAPIC IRQ
 
-        mp_bus_irq_mapping_t *mapping = bus_irq_list;
+        mp_bus_irq_mapping_t *mapping = bus_irq_list.data();
         uint8_t intin = intr - ioapic->base_intr;
-        for (irq = 0; irq < bus_irq_count; ++irq, ++mapping) {
+        for (irq = 0; irq < bus_irq_list.size(); ++irq, ++mapping) {
             if (mapping->ioapic_id == ioapic->id &&
                     mapping->intin == intin)
                 break;
@@ -2467,8 +2449,8 @@ static void ioapic_map_all(void)
     for (unsigned i = 0; i < 16; ++i)
         bus_irq_to_mapping[i] = isa_irq_lookup[i];
 
-    for (unsigned i = 0; i < bus_irq_count; ++i) {
-        mapping = bus_irq_list + i;
+    for (size_t i = 0; i < bus_irq_list.size(); ++i) {
+        mapping = &bus_irq_list[i];
         ioapic = ioapic_by_id(mapping->ioapic_id);
         if (mapping->bus != mp_isa_bus_id) {
             uint8_t irq = ioapic->irq_base + mapping->intin;

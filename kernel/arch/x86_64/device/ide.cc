@@ -38,7 +38,8 @@ struct ide_if_factory_t : public storage_if_factory_t {
     virtual if_list_t detect(void);
 };
 
-static ide_if_factory_t ide_factory;
+static ide_if_factory_t ide_if_factory;
+STORAGE_REGISTER_FACTORY(ide_if);
 
 struct ide_if_t : public storage_if_base_t {
     STORAGE_IF_IMPL

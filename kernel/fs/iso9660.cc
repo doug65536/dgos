@@ -8,6 +8,7 @@
 #include "pool.h"
 #include "bsearch.h"
 #include "printk.h"
+#include "vector.h"
 
 struct iso9660_factory_t : public fs_factory_t {
 public:
@@ -16,6 +17,7 @@ public:
 };
 
 static iso9660_factory_t iso9660_factory;
+STORAGE_REGISTER_FACTORY(iso9660);
 
 struct iso9660_fs_t : public fs_base_t {
     FS_BASE_IMPL
@@ -104,7 +106,7 @@ struct iso9660_fs_t : public fs_base_t {
     static int mm_fault_handler(void *dev, void *addr,
             uint64_t offset, uint64_t length, bool read, bool flush);
 
-    void* mount(fs_init_info_t *conn);
+    iso9660_fs_t *mount(fs_init_info_t *conn);
 
     storage_dev_base_t *drive;
 
@@ -152,8 +154,7 @@ struct iso9660_fs_t : public fs_base_t {
     uint8_t block_shift;
 };
 
-static iso9660_fs_t iso9660_mounts[16];
-static unsigned iso9660_mount_count;
+static vector<iso9660_fs_t*> iso9660_mounts;
 
 static pool_t iso9660_handles;
 
@@ -512,21 +513,15 @@ int iso9660_fs_t::mm_fault_handler(
 
 fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
 {
-    if (iso9660_mount_count == 0) {
+    if (iso9660_mounts.empty())
         pool_create(&iso9660_handles, sizeof(iso9660_fs_t::handle_t), 512);
-    }
 
-    if (iso9660_mount_count < countof(iso9660_mounts)) {
-        iso9660_fs_t *self = iso9660_mounts + iso9660_mount_count++;
-        self->mount(conn);
-        return self;
-    }
-
-    printdbg("Too many iso9660 mounts!\n");
-    return nullptr;
+    iso9660_fs_t *self = new iso9660_fs_t;
+    iso9660_mounts.push_back(self);
+    return self->mount(conn);
 }
 
-void* iso9660_fs_t::mount(fs_init_info_t *conn)
+iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
 {
     drive = conn->drive;
 
