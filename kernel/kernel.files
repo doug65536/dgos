@@ -23,6 +23,7 @@ arch/x86_64/elf64_decl.h
 dep-zlib.mk
 fs/ext4.cc
 fs/fat32_decl.h
+lib/bitop.h
 lib/cc/algorithm.h
 lib/cc/array
 lib/cc/initializer_list.h
