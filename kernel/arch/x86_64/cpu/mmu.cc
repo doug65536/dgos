@@ -21,6 +21,7 @@
 #include "process.h"
 #include "cpu_broadcast.h"
 #include "errno.h"
+#include "vector.h"
 
 #define DEBUG_CREATE_PT         0
 #define DEBUG_ADDR_ALLOC        0
@@ -428,8 +429,7 @@ static int ptes_present(pte_t **ptes)
     return present_mask;
 }
 
-// Returns the linear addresses of the page tables for
-// the given path
+// Returns the linear addresses of the page tables for the given path
 static inline void pte_from_path(pte_t **pte, unsigned *path)
 {
     uintptr_t page_index =
@@ -1243,6 +1243,13 @@ void mmu_init(int ap)
 
     // Allocate guard page
     linear_allocator.alloc_linear(PAGE_SIZE);
+
+    // Preallocate the second level kernel PTPD pages so we don't
+    // need to worry about process-specific page directory synchronization
+    for (size_t i = 256; i < 512; ++i) {
+        if (PT0_PTR[i] == 0)
+            PT0_PTR[i] = mmu_alloc_phys(0) | PTE_WRITABLE | PTE_PRESENT;
+    }
 
     // Alias master page directory to be accessible
     // from all process contexts
@@ -2284,98 +2291,6 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
     return 0;
 }
 
-// Create a new process context and switch to it,
-// returns the physical address of the page directory
-uintptr_t mm_create_process(void)
-{
-    pte_t *tables = (pte_t*)mmap(0, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE,
-                        MAP_POPULATE, -1, 0);
-    mmphysrange_t addresses[4];
-    mphysranges(addresses, countof(addresses),
-                tables, 4 * PAGE_SIZE, PAGE_SIZE);
-
-    //
-    // Setup recursive mapping
-
-
-    // Copy kernel space
-    for (int i = 256; i < 512; ++i)
-        tables[i] = master_pagedir[i];
-
-    tables[PT_RECURSE] = addresses[0].physaddr;
-
-    cpu_set_page_directory(addresses[0].physaddr);
-
-    return addresses[0].physaddr;
-}
-
-static void mm_free_all_user_memory(void)
-{
-    unsigned path[4];
-    pte_t *ptes[4];
-    pte_t *base[3];
-
-    addr_present(0, path, ptes);
-
-    for (uintptr_t m0 = 0; m0 < 256; ++m0) {
-        if (!(ptes[0][m0] & PTE_PRESENT))
-            continue;
-
-        base[0] = ptes[1] + (m0 << 9);
-
-        if (*base[0] & PTE_PRESENT)
-            continue;
-
-        for (uintptr_t m1 = 0; m1 < 512; ++m1) {
-            base[1] = ptes[2] +
-                    (m0 << (9*2)) +
-                    (m1 << 9);
-
-            if (*base[1] & PTE_PRESENT)
-                continue;
-
-            for (uintptr_t m2 = 0; m2 < 512; ++m2) {
-                base[2] = ptes[3] +
-                        (m0 << (9*3)) +
-                        (m1 << (9*2)) +
-                        (m2 << 9);
-
-                if (*base[2] & PTE_PRESENT)
-                    continue;
-
-                for (uintptr_t m3 = 0; m3 < 512; ++m3) {
-                    if (base[2][m3] & PTE_PRESENT)
-                        mmu_free_phys(base[2][m3] & PTE_ADDR);
-                }
-
-                mmu_free_phys(*base[2] & PTE_ADDR);
-            }
-
-            mmu_free_phys(*base[1] & PTE_ADDR);
-        }
-
-        mmu_free_phys(*base[0] & PTE_ADDR);
-    }
-
-    mmu_free_phys(cpu_get_page_directory() & PTE_ADDR);
-}
-
-// Destroy the current process mapping
-// Switches to the master mapping,
-// frees the recursive mapping,
-// and recursively frees all user memory and page tables
-void mm_destroy_process(void)
-{
-    unsigned path[4];
-    pte_t *ptes[4];
-    int mask = addr_present((uintptr_t)PT0_PTR, path, ptes);
-
-    (void)mask;
-    assert(mask == 0xF);
-
-    mm_free_all_user_memory();
-}
-
 size_t mmu_phys_allocator_t::size_from_highest_page(physaddr_t page_index)
 {
     return page_index * sizeof(entry_t);
@@ -2575,3 +2490,90 @@ int alias_window(void *addr, size_t size,
     return 1;
 }
 
+uintptr_t mm_new_process(void)
+{
+    // Allocate a page directory
+    pte_t *dir = (pte_t*)mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, 0, -1, 0);
+
+    // Copy upper memory mappings into new page directory
+    memcpy(dir + 256, master_pagedir + 256, sizeof(*dir) * 256);
+
+    // Get the physical address for the new process page directory
+    physaddr_t dir_physaddr = mphysaddr(dir);
+
+    // Initialize recursive mapping
+    dir[PT_RECURSE] = dir_physaddr | PTE_PRESENT | PTE_WRITABLE |
+            PTE_ACCESSED | PTE_DIRTY;
+
+    // Switch to new page directory
+    cpu_set_page_directory(dir_physaddr);
+
+    return dir_physaddr;
+}
+
+void mm_destroy_process()
+{
+    physaddr_t dir = cpu_get_page_directory() & PTE_ADDR;
+
+    assert(dir != root_physaddr);
+
+    unsigned path[4];
+    pte_t *ptes[4];
+
+    vector<physaddr_t> pending_frees;
+    pending_frees.reserve(4);
+
+    for (linaddr_t addr = 0; addr <= 0x800000000000; ) {
+        for (physaddr_t physaddr : pending_frees)
+            mmu_free_phys(physaddr);
+        pending_frees.clear();
+
+        if (addr == 0x800000000000)
+            break;
+
+        int present_mask = addr_present(addr, path, ptes);
+
+        if ((present_mask & 0xF) == 0xF &&
+                !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
+            pending_frees.push_back(*ptes[3] & PTE_ADDR);
+        if (unlikely(path[3] == 511)) {
+            if ((present_mask & 0x7) == 0x7 &&
+                    !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
+                pending_frees.push_back(*ptes[2] & PTE_ADDR);
+            if (path[2] == 511) {
+                if ((present_mask & 0x3) == 0x3 &&
+                        !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
+                    pending_frees.push_back(*ptes[1] & PTE_ADDR);
+                if (path[1] == 511) {
+                    if ((present_mask & 0x1) == 0x1 &&
+                            !(*ptes[3] & (PTE_EX_PHYSICAL | PTE_EX_DEVICE)))
+                        pending_frees.push_back(*ptes[0] & PTE_ADDR);
+                }
+            }
+        }
+
+        // If level 0 is not present, advance 512GB
+        if (unlikely(!(present_mask & 1))) {
+            addr += 1L << (12 + (9*3));
+            continue;
+        }
+
+        // If level 1 is not present, advance 1GB
+        if (unlikely(!(present_mask & 2))) {
+            addr += 1L << (12 + (9*2));
+            continue;
+        }
+
+        // If level 2 is not present, advance 2MB
+        if (unlikely(!(present_mask & 4))) {
+            addr += 1L << (12 + (9*1));
+            continue;
+        }
+
+        addr += 1L << (12 + (9*0));
+    }
+
+    cpu_set_page_directory(root_physaddr);
+
+    mmu_free_phys(dir);
+}
