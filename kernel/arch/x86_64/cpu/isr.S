@@ -219,7 +219,7 @@ isr_common:
 
 	// ...came from user code
 	swapgs
-	mov $0x10,%ax
+    mov $0x10,%eax
 	mov %eax,%ds
 	mov %eax,%es
 0:
