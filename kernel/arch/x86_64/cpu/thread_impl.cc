@@ -20,9 +20,9 @@
 #include "export.h"
 #include "printk.h"
 #include "isr_constants.h"
-#include "priorityqueue.h"
 #include "apic.h"
 #include "unique_ptr.h"
+#include "rbtree.h"
 
 // Implements platform independent thread.h
 
@@ -97,19 +97,26 @@ struct thread_info_t {
     mutex_t lock;
     condition_var_t done_cond;
 
-    size_t queue_slot;
-    uint64_t next_run;
+    // Total cpu time used
+    uint64_t used_time;
 
-    void *align[4];
+    // Timestamp at moment thread was resumed
+    uint64_t sched_timestamp;
+
+    process_t *process;
+
+    void *align[3];
 };
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
 
+// Verify defines used from assembly (isr.S)
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 
-C_ASSERT(sizeof(thread_info_t) % 64 == 0);
+// Verify that thread_info_t is a multiple of the cache line size
+C_ASSERT((sizeof(thread_info_t) & 63) == 0);
 
 // Store in a big array, for now
 #define MAX_THREADS 512
@@ -130,10 +137,9 @@ struct cpu_info_t {
     // Used for lazy TLB shootdown
     uint64_t mmu_seq;
 
-    unique_ptr<priqueue_t<thread_info_t*>> queue;
     spinlock_t queue_lock;
 
-    void *storage[9];
+    void *storage[10];
 };
 
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
@@ -146,6 +152,22 @@ static volatile uint32_t cpu_count;
 
 // Set in startup code (entry.s)
 uint32_t default_mxcsr_mask;
+
+// Per-CPU scheduling queue
+class cpu_queue_t {
+public:
+    cpu_queue_t();
+    ~cpu_queue_t();
+
+    thread_info_t *choose_next();
+
+private:
+    rbtree_t<uint64_t, thread_info_t*> queue;
+
+    static uint32_t quantum_from_priority(thread_info_t const *thread);
+
+    spinlock_t lock;
+};
 
 // Get executing APIC ID
 static uint32_t get_apic_id(void)
@@ -283,6 +305,8 @@ static thread_t thread_create_with_state(
         thread->priority_boost = 0;
         thread->cpu_affinity = affinity ? affinity : ~0UL;
 
+        thread->process = thread_current_process();
+
         uintptr_t stack_addr = (uintptr_t)stack;
         uintptr_t stack_end = stack_addr +
                 stack_size;
@@ -389,20 +413,6 @@ static int smp_thread(void *arg)
     return 0;
 }
 
-static int thread_priority_cmp(thread_info_t * const& a,
-                               thread_info_t * const& b, void *ctx)
-{
-    (void)ctx;
-    return ((a->next_run > b->next_run) << 1) - 1;
-}
-
-static void thread_priority_swapped(thread_info_t * const& a,
-                                    thread_info_t * const& b, void *ctx)
-{
-    (void)ctx;
-    swap(a->queue_slot, b->queue_slot);
-}
-
 static isr_context_t *thread_context_switch_handler(
         int intr, isr_context_t *ctx)
 {
@@ -433,13 +443,17 @@ void thread_init(int ap)
     cpu_set_gs(GDT_SEL_KERNEL_DATA64);
     cpu_set_gsbase(cpu);
 
-    cpu->queue.reset(new priqueue_t<thread_info_t*>(
-                thread_priority_cmp, thread_priority_swapped, cpu));
-
     if (!ap) {
         intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler);
 
+        thread->process = process_init(cpu_get_page_directory());
+
         cpu->cur_thread = thread;
+
+        mm_init_process();
+
+        thread->sched_timestamp = cpu_rdtsc();
+        thread->used_time = 0;
         thread->ctx = 0;
         thread->priority = -256;
         thread->stack = kernel_stack;
@@ -457,6 +471,8 @@ void thread_init(int ap)
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
                     -256, (void*)1);
+
+        thread->used_time = 0;
 
         cpu->goto_thread = thread;
 
@@ -576,6 +592,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     // Store context pointer for resume later
     thread->ctx = (isr_context_t*)ctx;
+    uint64_t now = cpu_rdtsc();
+    thread->used_time += now - thread->sched_timestamp;
 
     // Change to ready if running
     if (likely(thread->state == THREAD_IS_RUNNING)) {
@@ -623,6 +641,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     if (unlikely(retries > 0))
         printdbg("Scheduler retries: %d\n", retries);
     atomic_barrier();
+
+    thread->sched_timestamp = now;
 
     // Thread loses its priority boost when it is scheduled
     thread->priority_boost = 0;
@@ -887,3 +907,17 @@ isr_context_t *thread_schedule_if_idle(isr_context_t *ctx)
         return thread_schedule(ctx);
     return ctx;
 }
+
+// linearly map [-20,0] -> [800,100], and map [0,20] -> [100,5]
+uint32_t cpu_queue_t::quantum_from_priority(thread_info_t const *thread)
+{
+    uint8_t n = thread->priority;
+    return n <= 0 ? n * -35 + 100 : n * -19 / 4 + 100;
+}
+
+process_t *thread_current_process()
+{
+    thread_info_t *thread = this_thread();
+    return thread->process;
+}
+

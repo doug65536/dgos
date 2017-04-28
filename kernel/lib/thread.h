@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "cpu/spinlock.h"
+#include "process.h"
 
 // Platform independent thread API
 
@@ -42,3 +43,5 @@ void thread_idle_set_ready(void);
 
 void *thread_get_exception_top(void);
 void *thread_set_exception_top(void *chain);
+
+process_t *thread_current_process();
