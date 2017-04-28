@@ -9,6 +9,7 @@
 #include "likely.h"
 #include "fileio.h"
 #include "errno.h"
+#include "thread.h"
 
 union process_ptr_t {
     process_t *p;
@@ -21,6 +22,7 @@ struct process_t {
     char **args;
     char **env;
     uintptr_t mmu_context;
+    void *linear_allocator;
 };
 
 static process_ptr_t *processes;
@@ -126,4 +128,24 @@ int process_spawn(pid_t * pid_result,
     process->mmu_context = mm_new_process();
 
     return 0;
+}
+
+void *process_get_allocator()
+{
+    process_t *process = thread_current_process();
+    return process->linear_allocator;
+}
+
+void process_set_allocator(void *allocator)
+{
+    process_t *process = thread_current_process();
+    assert(process->linear_allocator == nullptr);
+    process->linear_allocator = allocator;
+}
+
+process_t *process_init(uintptr_t mmu_context)
+{
+    process_t *process = process_add();
+    process->mmu_context = mmu_context;
+    return process;
 }
