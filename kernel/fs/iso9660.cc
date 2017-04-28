@@ -105,6 +105,8 @@ struct iso9660_fs_t : public fs_base_t {
 
     static int mm_fault_handler(void *dev, void *addr,
             uint64_t offset, uint64_t length, bool read, bool flush);
+    int mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
+                         bool read, bool flush);
 
     iso9660_fs_t *mount(fs_init_info_t *conn);
 
@@ -492,20 +494,25 @@ iso9660_dir_ent_t *iso9660_fs_t::lookup_dirent(char const *pathname)
 }
 
 int iso9660_fs_t::mm_fault_handler(
-        void *dev, void *addr,
-        uint64_t offset, uint64_t length, bool read, bool)
+        void *dev, void *addr, uint64_t offset, uint64_t length,
+        bool read, bool)
 {
     FS_DEV_PTR(iso9660_fs_t, dev);
+    return self->mm_fault_handler(addr, offset, length, read, false);
+}
 
+int iso9660_fs_t::mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
+                                   bool read, bool)
+{
     if (!read)
         return -int(errno_t::EROFS);
 
-    uint32_t sector_offset = (offset >> self->sector_shift);
-    uint64_t lba = self->lba_st + sector_offset;
+    uint32_t sector_offset = (offset >> sector_shift);
+    uint64_t lba = lba_st + sector_offset;
 
     printdbg("Demand paging LBA %ld at addr %p\n", lba, addr);
 
-    return self->drive->read_blocks(addr, length >> self->sector_shift, lba);
+    return drive->read_blocks(addr, length >> sector_shift, lba);
 }
 
 //

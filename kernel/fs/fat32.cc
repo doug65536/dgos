@@ -45,6 +45,8 @@ struct fat32_fs_t : public fs_base_t {
 
     static int mm_fault_handler(void *dev, void *addr,
             uint64_t offset, uint64_t length, bool read, bool flush);
+    int mm_fault_handler(void *addr,
+            uint64_t offset, uint64_t length, bool read, bool flush);
 
     void *lookup_sector(uint64_t lba);
 
@@ -161,25 +163,28 @@ static pool_t fat32_handles;
 static constexpr uint8_t dirent_size_shift =
         bit_log2_n(sizeof(fat32_dir_union_t));
 
-int fat32_fs_t::mm_fault_handler(void *dev, void *addr,
-                                 uint64_t offset, uint64_t length,
-                                 bool read, bool flush)
+int fat32_fs_t::mm_fault_handler(
+        void *dev, void *addr, uint64_t offset, uint64_t length,
+        bool read, bool flush)
 {
     FS_DEV_PTR(fat32_fs_t, dev);
+    return self->mm_fault_handler(addr, offset, length, read, flush);
+}
 
-    uint64_t sector_offset = (offset >> self->sector_shift);
-    uint64_t lba = self->lba_st + sector_offset;
+int fat32_fs_t::mm_fault_handler(
+        void *addr, uint64_t offset, uint64_t length, bool read, bool flush)
+{
+    uint64_t sector_offset = (offset >> sector_shift);
+    uint64_t lba = lba_st + sector_offset;
 
     if (likely(read)) {
         printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
 
-        return self->drive->read_blocks(
-                    addr, length >> self->sector_shift, lba);
+        return drive->read_blocks(addr, length >> sector_shift, lba);
     }
 
     printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
-    int result = self->drive->write_blocks(
-                addr, length >> self->sector_shift, lba, flush);
+    int result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
 
     return result;
 }
