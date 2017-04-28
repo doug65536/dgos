@@ -13,22 +13,22 @@ template<typename _T, typename _Allocator = allocator<_T>>
 class vector
 {
 public:
-    typedef _T value_type;
-    typedef _Allocator allocator_type;
-    typedef size_t size_type;
-    typedef ptrdiff_t difference_type;
-    typedef value_type& reference;
-    typedef value_type const& const_reference;
-    typedef value_type* pointer;
-    typedef value_type const* const_pointer;
+    using value_type = _T;
+    using allocator_type = _Allocator;
+    using size_type = size_t;
+    using difference_type = ptrdiff_t;
+    using reference = value_type&;
+    using const_reference = value_type const&;
+    using pointer = value_type*;
+    using const_pointer = value_type const*;
 
     template<int _Dir, bool _Is_const>
     class vector_iter;
 
-    typedef vector_iter<1, false> iterator;
-    typedef vector_iter<1, true> const_iterator;
-    typedef vector_iter<-1, false> reverse_iterator;
-    typedef vector_iter<-1, true> const_reverse_iterator;
+    using iterator = vector_iter<1, false>;
+    using const_iterator = vector_iter<1, true>;
+    using reverse_iterator = vector_iter<-1, false>;
+    using const_reverse_iterator = vector_iter<-1, true>;
 
     vector();
 
@@ -179,40 +179,43 @@ public:
     {
     private:
         friend class vector;
-        vector_iter(pointer __ip);
+        inline vector_iter(pointer __ip);
 
     public:
-        vector_iter();
-        vector_iter(vector_iter const& rhs) = default;
-        vector_iter(vector_iter&& rhs) = default;
+        inline vector_iter();
 
-        reference operator*();
-        const_reference operator*() const;
-        vector_iter operator+(size_type __n);
-        vector_iter operator-(size_type __n);
-        reference operator[](size_type __n);
-        const_reference operator[](size_type __n) const;
+        template<bool _RhsIsConst>
+        inline vector_iter(vector_iter<_Dir, _RhsIsConst> const& rhs);
 
-        bool operator==(vector_iter const& rhs) const;
-        bool operator!=(vector_iter const& rhs) const;
-        bool operator<(vector_iter const& rhs) const;
-        bool operator<=(vector_iter const& rhs) const;
-        bool operator>=(vector_iter const& rhs) const;
-        bool operator>(vector_iter const& rhs) const;
+        inline reference operator*();
+        inline const_reference operator*() const;
+        inline vector_iter operator+(size_type __n) const;
+        inline vector_iter operator-(size_type __n) const;
+        inline reference operator[](size_type __n);
+        inline const_reference operator[](size_type __n) const;
+        inline pointer operator->();
+        inline const_pointer operator->() const;
 
-        vector_iter& operator++();
-        vector_iter operator++(int);
+        inline bool operator==(vector_iter const& rhs) const;
+        inline bool operator!=(vector_iter const& rhs) const;
+        inline bool operator<(vector_iter const& rhs) const;
+        inline bool operator<=(vector_iter const& rhs) const;
+        inline bool operator>=(vector_iter const& rhs) const;
+        inline bool operator>(vector_iter const& rhs) const;
 
-        vector_iter& operator--();
-        vector_iter operator--(int);
+        inline vector_iter& operator++();
+        inline vector_iter operator++(int);
 
-        vector_iter& operator+=(difference_type diff);
-        vector_iter& operator-=(difference_type diff);
+        inline vector_iter& operator--();
+        inline vector_iter operator--(int);
 
-        vector_iter operator+(difference_type diff) const;
-        vector_iter operator-(difference_type diff) const;
+        inline vector_iter& operator+=(difference_type diff);
+        inline vector_iter& operator-=(difference_type diff);
 
-        vector_iter operator-(vector_iter const& rhs) const;
+        inline vector_iter operator+(difference_type diff) const;
+        inline vector_iter operator-(difference_type diff) const;
+
+        inline difference_type operator-(vector_iter const& rhs) const;
 
     private:
         pointer __p;
@@ -875,6 +878,17 @@ void swap(vector<_T,_Alloc>& lhs,
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
+template<bool _RhsIsConst>
+vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(
+        vector_iter<_Dir, _RhsIsConst> const& rhs)
+    : __p(rhs.__p)
+{
+    static_assert(_Is_const || (_RhsIsConst == _Is_const),
+                  "Cannot copy const_(reverse_)iterator to (reverse_)iterator");
+}
+
+template<typename _T, typename _Alloc>
+template<int _Dir, bool _Is_const>
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(pointer __ip)
     : __p(__ip)
 {
@@ -900,7 +914,7 @@ template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
 typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator+(
-        size_type __n)
+        size_type __n) const
 {
     return vector_iter(__p + __n * _Dir);
 }
@@ -908,7 +922,8 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator+(
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
 typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
-vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(size_type __n)
+vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
+        size_type __n) const
 {
     return vector_iter(__p - __n * _Dir);
 }
@@ -929,6 +944,21 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator[](size_type __n) const
     return __p[__n];
 }
 
+template<typename _T, typename _Alloc>
+template<int _Dir, bool _Is_const>
+typename vector<_T,_Alloc>::pointer
+vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->()
+{
+    return __p;
+}
+
+template<typename _T, typename _Alloc>
+template<int _Dir, bool _Is_const>
+typename vector<_T,_Alloc>::const_pointer
+vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator->() const
+{
+    return __p;
+}
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
@@ -1052,7 +1082,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::template vector_iter<_Dir, _Is_const>
+typename vector<_T,_Alloc>::difference_type
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
         vector_iter const& rhs) const
 {
