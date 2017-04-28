@@ -1,5 +1,6 @@
 #pragma once
 #include "ethernet.h"
+#include "utility.h"
 
 struct ipv4_hdr_t {
     ethernet_hdr_t eth_hdr;
@@ -30,6 +31,26 @@ struct ipv4_addr_t {
 struct ipv4_addr_pair_t {
     ipv4_addr_t s;
     ipv4_addr_t d;
+};
+
+template<>
+struct hash<ipv4_addr_t>
+{
+    size_t operator()(ipv4_addr_t const& __k) const
+    {
+        return (hash<uint32_t>()(__k.ip) << 16) ^
+                hash<uint16_t>()(__k.port);
+    }
+};
+
+template<>
+struct hash<ipv4_addr_pair_t>
+{
+    size_t operator()(ipv4_addr_pair_t const& __k) const
+    {
+        return (hash<ipv4_addr_t>()(__k.s) << 16) ^
+                hash<ipv4_addr_t>()(__k.d);
+    }
 };
 
 uint16_t ipv4_checksum(ipv4_hdr_t const *hdr);
