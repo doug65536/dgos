@@ -2,6 +2,7 @@
 #include "cpu/spinlock.h"
 #include "thread.h"
 #include "assert.h"
+#include "type_traits.h"
 
 struct thread_wait_link_t;
 struct condition_var_t;
@@ -63,6 +64,72 @@ int mutex_held(mutex_t *mutex);
 void mutex_lock(mutex_t *mutex);
 void mutex_lock_noyield(mutex_t *mutex);
 void mutex_unlock(mutex_t *mutex);
+
+class scoped_mutex_t {
+public:
+    scoped_mutex_t()
+        : p(nullptr)
+        , locked(false)
+    {
+    }
+
+    explicit scoped_mutex_t(mutex_t &m)
+        : p(&m)
+        , locked(false)
+    {
+        lock();
+    }
+
+    scoped_mutex_t(mutex_t &m, bool acquire)
+        : p(&m)
+        , locked(false)
+    {
+        if (acquire)
+            lock();
+    }
+
+    scoped_mutex_t(scoped_mutex_t const &) = delete;
+
+    ~scoped_mutex_t()
+    {
+        if (p && locked)
+            unlock();
+    }
+
+    void lock()
+    {
+        assert(!locked);
+        mutex_lock(p);
+        locked = true;
+    }
+
+    void unlock()
+    {
+        assert(locked);
+        mutex_unlock(p);
+        locked = false;
+    }
+
+    void detach()
+    {
+        p = nullptr;
+        locked = false;
+    }
+
+    bool is_locked() const
+    {
+        return locked;
+    }
+
+    operator bool() const
+    {
+        return is_locked();
+    }
+
+private:
+    mutex_t *p;
+    bool locked;
+};
 
 void rwlock_init(rwlock_t *rwlock);
 void rwlock_destroy(rwlock_t *rwlock);
