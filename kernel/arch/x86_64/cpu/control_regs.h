@@ -638,3 +638,5 @@ public:
 private:
     int8_t intr_was_enabled;
 };
+
+void cpu_debug_break();

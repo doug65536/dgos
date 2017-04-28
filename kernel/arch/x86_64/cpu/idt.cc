@@ -664,6 +664,7 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
 static isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
+    cpu_debug_break();
     dump_context(ctx, 1);
     halt_forever();
     return ctx;

@@ -53,6 +53,7 @@ void cpu_init(int ap)
 
 static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
 {
+    cpu_debug_break();
     assert(intr == INTR_EX_DEBUG);
     printdbg("Unexpected debug exception, continuing\n");
     return ctx;
