@@ -190,6 +190,8 @@ isr_handler:
 	jb 1b
 
 0:
+	# Undocumented instruction "icebp"
+	.byte 0xf1
 	hlt
 	jmp 0b
 
@@ -203,6 +205,12 @@ text_out:
 	jz 0f
 	movw %ax,(%rdi)
 	leaq 2(%rdi),%rdi
+	push %rax
+	in $0xe9,%al
+	cmp $0xe9,%al
+	pop %rax
+	jnz text_out
+	out %al,$0xe9
 	jmp text_out
 0:
 	ret
@@ -236,6 +244,13 @@ hex_common:
 	shl $4,%rsi
 	movb (%r9,%rdx,1),%al
 	movw %ax,(%rdi)
+	push %rax
+	in $0xe9,%al
+	cmp $0xe9,%al
+	pop %rax
+	jnz 0f
+	out %al,$0xe9
+0:
 	leaq 2(%rdi),%rdi
 	decb %r8b
 	jnz 0b
