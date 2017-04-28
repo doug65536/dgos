@@ -82,14 +82,14 @@ struct png_hdr_ihdr_t {
 
 C_ASSERT((sizeof(png_image_t) & 0xF) == 0);
 
-typedef enum png_filter_type_t {
-    PNG_FILTER_NONE,
-    PNG_FILTER_SUB,
-    PNG_FILTER_UP,
-    PNG_FILTER_AVG,
-    PNG_FILTER_PAETH,
-    PNG_FILTER_UNSET,
-} png_filter_type_t;
+enum struct png_filter_type_t {
+    NONE,
+    SUB,
+    UP,
+    AVG,
+    PAETH,
+    UNSET,
+};
 
 struct png_read_state_t {
     png_image_t const *img;
@@ -147,20 +147,20 @@ static uint32_t png_process_idata(
         if (ofs + 1 + state->scanline_bytes > avail)
             break;
 
-        state->cur_filter = (png_filter_type_t)data[ofs++];
+        state->cur_filter = png_filter_type_t(data[ofs++]);
 
         if (state->cur_row == 0) {
-            if (state->cur_filter == PNG_FILTER_PAETH ||
-                 state->cur_filter == PNG_FILTER_AVG)
-                state->cur_filter = PNG_FILTER_SUB;
-            else if (state->cur_filter == PNG_FILTER_UP)
-                state->cur_filter = PNG_FILTER_NONE;
+            if (state->cur_filter == png_filter_type_t::PAETH ||
+                 state->cur_filter == png_filter_type_t::AVG)
+                state->cur_filter = png_filter_type_t::SUB;
+            else if (state->cur_filter == png_filter_type_t::UP)
+                state->cur_filter = png_filter_type_t::NONE;
         }
 
         PNG_TRACE("Filter type is %d\n", (int)state->cur_filter);
 
         switch (state->cur_filter) {
-        case PNG_FILTER_NONE:
+        case png_filter_type_t::NONE:
             for (int32_t i = 0; i < state->img->width; ++i) {
                 for (int32_t c = 0; c < state->pixel_bytes; ++c)
                     out[c] = data[ofs + c];
@@ -169,7 +169,7 @@ static uint32_t png_process_idata(
             }
             break;
 
-        case PNG_FILTER_SUB:
+        case png_filter_type_t::SUB:
             for (int32_t i = 0; i < state->img->width; ++i) {
                 for (int32_t c = 0; c < state->pixel_bytes; ++c)
                     out[c] = prev[c] = prev[c] + data[ofs + c];
@@ -178,7 +178,7 @@ static uint32_t png_process_idata(
             }
             break;
 
-        case PNG_FILTER_UP:
+        case png_filter_type_t::UP:
             for (int32_t i = 0; i < state->img->width; ++i) {
                 for (int32_t c = 0; c < state->pixel_bytes; ++c) {
                     uint8_t p = out[-state->scanline_bytes + c];
@@ -189,7 +189,7 @@ static uint32_t png_process_idata(
             }
             break;
 
-        case PNG_FILTER_AVG:
+        case png_filter_type_t::AVG:
             for (int32_t c = 0; c < state->pixel_bytes; ++c) {
                 uint8_t p = out[-state->scanline_bytes + c] >> 1;
                 out[c] = p + data[ofs + c];
@@ -208,7 +208,7 @@ static uint32_t png_process_idata(
             }
             break;
 
-        case PNG_FILTER_PAETH:
+        case png_filter_type_t::PAETH:
             for (int32_t c = 0; c < state->pixel_bytes; ++c) {
                 uint8_t p = png_paeth_predict(
                         0, out[-state->scanline_bytes + c], 0);
@@ -232,7 +232,7 @@ static uint32_t png_process_idata(
             break;
 
         default:
-        case PNG_FILTER_UNSET:
+        case png_filter_type_t::UNSET:
             assert(0);
             return ~0;
         }
@@ -280,7 +280,7 @@ png_image_t *png_load(char const *path)
     unique_ptr_free<png_image_t> img;
     png_read_state_t state;
     state.cur_row = 0;
-    state.cur_filter = PNG_FILTER_UNSET;
+    state.cur_filter = png_filter_type_t::UNSET;
     state.scanline_bytes = 0;
     state.pixel_bytes = 0;
     state.img = 0;
@@ -378,6 +378,7 @@ png_image_t *png_load(char const *path)
 
                     int inf_status = inflate(&inf, Z_NO_FLUSH);
 
+                    assert(inf_status != Z_DATA_ERROR);
                     if (inf_status == Z_DATA_ERROR)
                         return 0;
 
