@@ -840,6 +840,7 @@ EXPORT void vprintk(char const *format, va_list ap)
     vcprintf(format, ap);
 }
 
+__noreturn
 EXPORT void panic(char const *format, ...)
 {
     va_list ap;
@@ -848,6 +849,7 @@ EXPORT void panic(char const *format, ...)
     va_end(ap);
 }
 
+__noreturn
 EXPORT void vpanic(char const *format, va_list ap)
 {
     printk("KERNEL PANIC! ");
