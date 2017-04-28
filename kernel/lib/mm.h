@@ -53,7 +53,10 @@
 #define MAP_ANONYMOUS       0x00000200
 
 // Undefined flag mask
-#define MAP_INVALID_MASK    0x00FFFC00
+#define MAP_INVALID_MASK    0x007FFC00
+
+// Kernel only: Exclusive (fail if address range is not free)
+#define MAP_EXCLUSIVE       0x00800000
 
 // Kernel only: Global
 #define MAP_GLOBAL          0x01000000
@@ -352,7 +355,8 @@ void *mmap_register_device(void *context,
                          uint64_t block_size,
                          uint64_t block_count,
                          int prot,
-                         mm_dev_mapping_callback_t callback);
+                         mm_dev_mapping_callback_t callback,
+                           void *addr = nullptr);
 
 // Allocate/free contiguous physical memory
 void *mm_alloc_contiguous(size_t size);
@@ -364,3 +368,5 @@ void *mmap_window(size_t size);
 void munmap_window(void *addr, size_t size);
 int alias_window(void *addr, size_t size,
                  mmphysrange_t const *ranges, size_t range_count);
+
+void mm_init_process();
