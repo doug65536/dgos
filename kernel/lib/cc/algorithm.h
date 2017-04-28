@@ -1,6 +1,30 @@
 #pragma once
 #include "likely.h"
 
+template<typename _InputIt, typename _T>
+_InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
+{
+    while (__first != __last && *__first != __v)
+        ++__first;
+    return __first;
+}
+
+template<typename _InputIt, typename _UnaryPredicate>
+bool find_if(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+{
+    while (__first != __last && !__p(*__first))
+        ++__first;
+    return __first;
+}
+
+template<typename _InputIt, typename _UnaryPredicate>
+bool find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+{
+    while (__first != __last && __p(*__first))
+        ++__first;
+    return __first;
+}
+
 template<typename _InputIt, typename _UnaryPredicate>
 bool all_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 {
@@ -145,4 +169,74 @@ _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
         ++__first;
     }
     return __out;
+}
+
+template<typename _ForwardIt>
+constexpr _ForwardIt min_element(_ForwardIt __first, _ForwardIt __last)
+{
+    if (__first != __last) {
+        _ForwardIt __smallest = __first;
+
+        for (++__first; __first != __last; ++__first) {
+            if (*__first < *__smallest)
+                __smallest = __first;
+        }
+
+        return __smallest;
+    }
+
+    return __last;
+}
+
+template<typename _ForwardIt>
+constexpr _ForwardIt max_element(_ForwardIt __first, _ForwardIt __last)
+{
+    if (__first != __last) {
+        _ForwardIt __largest = __first;
+
+        for (++__first; __first != __last; ++__first) {
+            if (*__largest < *__first)
+                __largest = __first;
+        }
+
+        return __largest;
+    }
+
+    return __last;
+}
+
+template<typename _ForwardIt, typename _Compare>
+constexpr _ForwardIt min_element(_ForwardIt __first, _ForwardIt __last,
+                                 _Compare __cmp)
+{
+    if (__first != __last) {
+        _ForwardIt __smallest = __first;
+
+        for (++__first; __first != __last; ++__first) {
+            if (__cmp(*__first, *__smallest) < 0)
+                __smallest = __first;
+        }
+
+        return __smallest;
+    }
+
+    return __last;
+}
+
+template<typename _ForwardIt, typename _Compare>
+constexpr _ForwardIt max_element(_ForwardIt __first, _ForwardIt __last,
+                                 _Compare __cmp)
+{
+    if (__first != __last) {
+        _ForwardIt __largest = __first;
+
+        for (++__first; __first != __last; ++__first) {
+            if (__cmp(*__largest, *__first) < 0)
+                __largest = __first;
+        }
+
+        return __largest;
+    }
+
+    return __last;
 }
