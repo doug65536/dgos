@@ -6,6 +6,7 @@
 #include "cpu/thread_impl.h"
 #include "interrupts.h"
 #include "assert.h"
+#include "spinlock.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -55,11 +56,13 @@
 // Timer crystal runs at 1.193181666... MHz
 // Freq * 6 = 7159090.0 even
 
+static spinlock_t pit8253_lock;
+
 // Total timer interrupts, no time relationship
-uint64_t volatile timer_ticks;
+static uint64_t volatile timer_ticks;
 
 // Exceeds 2^63 in about 292 years
-uint64_t volatile timer_ns;
+static uint64_t volatile timer_ns;
 
 static unsigned rate_hz;
 static uint64_t tick_ns;
@@ -83,6 +86,8 @@ static void pit8254_set_rate(unsigned hz)
     rate_hz = hz;
     accumulator = 0U;
 
+    spinlock_lock_noirq(&pit8253_lock);
+
     outb(PIT_CMD,
          PIT_CHANNEL(0) |
          PIT_ACCESS_BOTH |
@@ -90,9 +95,11 @@ static void pit8254_set_rate(unsigned hz)
          PIT_FORMAT_BINARY);
     outb(PIT_DATA(0), divisor & 0xFF);
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
+
+    spinlock_unlock_noirq(&pit8253_lock);
 }
 
-static isr_context_t *pit8254_handler(int irq, isr_context_t *ctx)
+static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
 {
     (void)irq;
     assert(irq == 0);
@@ -113,9 +120,26 @@ static isr_context_t *pit8254_handler(int irq, isr_context_t *ctx)
     return ctx;
 }
 
-static uint64_t pit8254_time_ns(void)
+static uint64_t pit8254_time_ns()
 {
     return timer_ns;
+}
+
+static void pit8254_time_ns_stop()
+{
+    irq_setmask(0, 0);
+
+    spinlock_lock_noirq(&pit8253_lock);
+    outb(PIT_CMD,
+         PIT_CHANNEL(0) |
+         PIT_ACCESS_BOTH |
+         PIT_MODE_ONESHOT |
+         PIT_FORMAT_BINARY);
+    outb(PIT_DATA(0), 0);
+    outb(PIT_DATA(0), 0);
+    spinlock_unlock_noirq(&pit8253_lock);
+
+    irq_unhook(0, pit8254_irq_handler);
 }
 
 #if __amd64__
@@ -148,6 +172,8 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
     if (count > 0xFFFF)
         count = 0xFFFF;
 
+    spinlock_lock_noirq(&pit8253_lock);
+
     outb(PIT_CMD, PIT_CHANNEL(2) | PIT_ACCESS_BOTH |
          PIT_MODE_ONESHOT | PIT_FORMAT_BINARY);
     outb(PIT_DATA(2), count & 0xFF);
@@ -163,19 +189,22 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
         pause();
     } while (readback > 64);
 
+    spinlock_unlock_noirq(&pit8253_lock);
+
     return mul_64_64_div_64(count - readback, 1000000000, 1193182);
 }
 
 void pit8253_init()
 {
-    nsleep_set_handler(pit8254_nsleep);
+    nsleep_set_handler(pit8254_nsleep, nullptr, false);
 }
 
 void pit8254_enable()
 {
-    time_ns_set_handler(pit8254_time_ns);
+    if (!time_ns_set_handler(pit8254_time_ns, pit8254_time_ns_stop, false))
+        return;
 
     pit8254_set_rate(60);
-    irq_hook(0, pit8254_handler);
-    irq_setmask(0, 1);
+    irq_hook(0, pit8254_irq_handler);
+    irq_setmask(0, true);
 }

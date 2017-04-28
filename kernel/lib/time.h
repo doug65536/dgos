@@ -14,8 +14,9 @@ struct time_of_day_t {
 
 typedef time_of_day_t (*time_ofday_handler_t)();
 
-void time_ns_set_handler(uint64_t (*vec)(void));
-void nsleep_set_handler(uint64_t (*vec)(uint64_t microsec));
+bool time_ns_set_handler(uint64_t (*vec)(void), void (*stop)(), bool override);
+bool nsleep_set_handler(uint64_t (*vec)(uint64_t microsec), void (*stop)(),
+                        bool override);
 
 uint64_t time_ns(void);
 uint64_t nsleep(uint64_t nanosec);

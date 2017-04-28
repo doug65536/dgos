@@ -1878,10 +1878,10 @@ void apic_start_smp(void)
     for (unsigned pkg = 0; pkg < apic_id_count; ++pkg) {
         printdbg("Package base APIC ID = %u\n", apic_id_list[pkg]);
 
-        uint8_t cpus = topo_core_count *
+        uint8_t total_cpus = topo_core_count *
                 topo_thread_count *
                 apic_id_count;
-        uint16_t stagger = 16666 - cpus;
+        uint32_t stagger = 16666666 / total_cpus;
 
         for (unsigned thread = 0;
              thread < topo_thread_count; ++thread) {
@@ -1902,7 +1902,7 @@ void apic_start_smp(void)
                                   APIC_CMD_DEST_MODE_SIPI |
                                   APIC_CMD_DEST_TYPE_BYID);
 
-                nsleep(stagger * 1000);
+                nsleep(stagger);
 
                 ++smp_expect;
                 while (thread_smp_running != smp_expect)
@@ -2058,7 +2058,7 @@ static int64_t acpi_pm_timer_raw()
         }
 
         if (likely(accessor))
-            nsleep_set_handler(acpi_pm_timer_nsleep_handler);
+            nsleep_set_handler(acpi_pm_timer_nsleep_handler, nullptr, true);
     }
 
     if (likely(accessor))
@@ -2110,7 +2110,7 @@ constexpr T gcd(T a, T b)
 static uint64_t apic_rdtsc_time_ns_handler()
 {
     uint64_t now = cpu_rdtsc();
-    return now * clk_to_ns_denom / clk_to_ns_denom;
+    return now * clk_to_ns_numer/ clk_to_ns_denom;
 }
 
 static void apic_calibrate()
@@ -2198,7 +2198,7 @@ static void apic_calibrate()
 
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
-        time_ns_set_handler(apic_rdtsc_time_ns_handler);
+        time_ns_set_handler(apic_rdtsc_time_ns_handler, nullptr, true);
     }
 
     printdbg("CPU clock: %luMHz\n", rdtsc_mhz);
