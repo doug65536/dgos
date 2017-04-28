@@ -3,7 +3,7 @@
 #include "malloc.h"
 #include "farptr.h"
 
-void driveinfo(void)
+void driveinfo()
 {
     // AH = 48h
     // DL = drive (80h-FFh)

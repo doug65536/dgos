@@ -182,9 +182,9 @@ uint32_t inl(uint16_t dx);
 #define USE_8259_PIC_FUNCTIONS 0
 #if USE_8259_PIC_FUNCTIONS
 void ack_irq(uint8_t irq);
-void init_irq(void);
+void init_irq();
 #endif
 
-uint16_t cpu_has_long_mode(void);
-uint16_t cpu_has_no_execute(void);
-uint16_t cpu_has_global_pages(void);
+uint16_t cpu_has_long_mode();
+uint16_t cpu_has_no_execute();
+uint16_t cpu_has_global_pages();

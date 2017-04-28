@@ -362,7 +362,7 @@ static void check_random_block(uint16_t *block)
 }
 
 #define TEST_SIZE 48
-void test_malloc(void)
+void test_malloc()
 {
     uint16_t *ptrs[TEST_SIZE];
     const uint32_t iters = 0xFFFFFF;

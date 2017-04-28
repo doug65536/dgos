@@ -197,14 +197,14 @@ uint64_t paging_map_range(
     return allocated;
 }
 
-uint32_t paging_root_addr(void)
+uint32_t paging_root_addr()
 {
     return root_page_dir << 4;
 }
 
 // Identity map the first 64KB of physical addresses and
 // prepare to populate tables
-void paging_init(void)
+void paging_init()
 {
     // Clear the root page directory
     root_page_dir = far_malloc_aligned(PAGE_SIZE);

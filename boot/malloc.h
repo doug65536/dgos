@@ -10,7 +10,7 @@ uint16_t far_malloc(uint32_t bytes);
 uint16_t far_malloc_aligned(uint32_t bytes);
 
 #ifndef NDEBUG
-void test_malloc(void);
+void test_malloc();
 #endif
 
 void *operator new(size_t size) noexcept;

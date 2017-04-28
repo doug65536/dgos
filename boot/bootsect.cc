@@ -110,7 +110,7 @@ extern uint32_t bootinfo_primary_volume_desc;
 uint8_t boot_drive __used;
 uint8_t fully_loaded __used;
 
-extern "C" int init(void);
+extern "C" int init();
 
 struct disk_address_packet_t {
     uint8_t sizeof_packet;
@@ -154,7 +154,7 @@ uint16_t read_lba_sectors(
 extern char __initialized_data_start[];
 extern char __initialized_data_end[];
 
-__used int init(void)
+__used int init()
 {
     if (bootinfo_file_location == 0) {
         // Calculate how many more sectors to load

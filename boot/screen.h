@@ -8,7 +8,7 @@
 #define ATTRIBUTE_FORMAT(m,n)
 #endif
 
-void scroll_screen(void);
+void scroll_screen();
 void copy_to_screen(uint16_t offset, char const *message, uint8_t attr);
 
 extern "C" void print_line(char const* format, ...) ATTRIBUTE_FORMAT(1, 2);

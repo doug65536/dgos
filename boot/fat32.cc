@@ -626,7 +626,7 @@ static uint32_t find_file_by_name(char const *filename,
     return 0;
 }
 
-static int fat32_find_available_file_handle(void)
+static int fat32_find_available_file_handle()
 {
     for (size_t i = 0; i < MAX_HANDLES; ++i) {
         if (file_handles[i].start_cluster == 0)

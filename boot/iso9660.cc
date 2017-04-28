@@ -222,7 +222,7 @@ static uint32_t iso9660_root_dir_size;
 
 static uint8_t iso9660_char_shift;
 
-static int iso9660_find_available_file_handle(void)
+static int iso9660_find_available_file_handle()
 {
     for (size_t i = 0; i < MAX_HANDLES; ++i) {
         if (file_handles[i].lba == 0)

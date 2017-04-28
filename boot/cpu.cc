@@ -215,28 +215,28 @@ uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
     return 1;
 }
 
-uint16_t cpu_has_long_mode(void)
+uint16_t cpu_has_long_mode()
 {
     cpuid_t cpuinfo;
     return cpuid(&cpuinfo, 0x80000001U, 0) &&
             (cpuinfo.edx & (1<<29));
 }
 
-uint16_t cpu_has_no_execute(void)
+uint16_t cpu_has_no_execute()
 {
     cpuid_t cpuinfo;
     return cpuid(&cpuinfo, 0x80000001U, 0) &&
             (cpuinfo.edx & (1<<20));
 }
 
-uint16_t cpu_has_global_pages(void)
+uint16_t cpu_has_global_pages()
 {
     cpuid_t cpuinfo;
     return cpuid(&cpuinfo, 1U, 0) &&
             (cpuinfo.edx & (1<<13));
 }
 
-static uint16_t disable_interrupts(void)
+static uint16_t disable_interrupts()
 {
     uint32_t int_enabled;
     __asm__ __volatile__ (
@@ -250,7 +250,7 @@ static uint16_t disable_interrupts(void)
     return !!int_enabled;
 }
 
-static void enable_interrupts(void)
+static void enable_interrupts()
 {
     __asm__ __volatile__ ("sti");
 }
@@ -263,7 +263,7 @@ static void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
-static void idt_init(void)
+static void idt_init()
 {
     for (size_t i = 0; i < 32; ++i) {
         idt[i].type_attr = IDT_PRESENT | IDT_INTR;

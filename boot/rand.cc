@@ -13,7 +13,7 @@ void lfsr113_seed(uint32_t seed)
     seed_z4 = seed;
 }
 
-uint32_t lfsr113_rand(void)
+uint32_t lfsr113_rand()
 {
 
    unsigned int b;
