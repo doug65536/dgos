@@ -35,6 +35,9 @@ void (*sse_context_restore)(void);
 // Singly linked list head for each interrupt
 static intr_link_t intr_first[256];
 
+// Unmask count for each interrupt
+static uint8_t intr_unmask_count[256];
+
 // Interrupt handler vectors
 #define MAX_INTR_HANDLERS   256
 static intr_link_t intr_first_free;
@@ -71,7 +74,13 @@ void msi_irq_alloc_set_handler(msi_irq_alloc_handler_t handler)
 
 void irq_setmask(int irq, bool unmask)
 {
-    irq_setmask_vec(irq, unmask);
+    spinlock_lock_noirq(&intr_handler_reg_lock);
+    // Unmask when unmask count transitions from 0 to 1
+    // Mask when unmask count transitions from 1 to 0
+    assert(intr_unmask_count[irq] != (unmask ? 255U : 0U));
+    if ((intr_unmask_count[irq] += (unmask ? 1 : -1)) == (unmask ? 1 : 0))
+        irq_setmask_vec(irq, unmask);
+    spinlock_unlock_noirq(&intr_handler_reg_lock);
 }
 
 void irq_hook(int irq, intr_handler_t handler)
