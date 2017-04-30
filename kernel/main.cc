@@ -29,15 +29,12 @@
 #include "dev_storage.h"
 #include "unique_ptr.h"
 #include "priorityqueue.h"
+#include "device/serial-uart.h"
 
 #include "vector.h"
 
 constexpr size_t const kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size];
-
-//extern void (*device_constructor_list[])(void);
-
-void volatile *trick;
 
 static void smp_main(void *arg)
 {
@@ -65,7 +62,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_STRESS_HEAP_THREAD   0
-#define ENABLE_FRAMEBUFFER_THREAD   0
+#define ENABLE_FRAMEBUFFER_THREAD   1
 
 #define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
@@ -551,6 +548,7 @@ static int stress_mmap_thread(void *p)
     void *block;
     uint64_t seed = 42;
     for (;;) {
+        //uint64_t time_st = time_ns();
         for (unsigned iter = 0; iter < 50; ++iter) {
             int size = rand_r_range(&seed, 1, 131072);
             assert(size >= 1);
@@ -564,8 +562,9 @@ static int stress_mmap_thread(void *p)
 
             munmap(block, size);
 
-            //printdbg("Ran mmap test iteration %u\n", iter);
         }
+        //uint64_t time_en = time_ns();
+        //printdbg("Ran mmap test iteration %luns\n", (time_en - time_st)/50);
     }
     return 0;
 }
@@ -633,8 +632,20 @@ static int stress_heap_thread(void *p)
 }
 #endif
 
-extern void usbxhci_detect(void*);
-void (*usbxhci_pull_in)(void*) = usbxhci_detect;
+int clks_unhalted(void *cpu)
+{
+    auto cpu_nr = size_t(cpu);
+    uint64_t last = msr_get(0x30A);
+    while (1) {
+        thread_sleep_for(1000);
+        uint64_t curr = msr_get(0x30A);
+        printdbg("CPU %zx: %lu clocks\n", cpu_nr, curr - last);
+        last = curr;
+    }
+}
+
+//extern void usbxhci_detect(void*);
+//void (*usbxhci_pull_in)(void*) = usbxhci_detect;
 
 static uint8_t sum_bytes(char *st, size_t len)
 {
@@ -712,7 +723,8 @@ static int draw_test(void *p)
         }
     }
     uint64_t en_tm = time_ns();
-    printdbg("Benchmark time: %d frames, %ldms\n", frames, en_tm - st_tm);
+    printdbg("Benchmark time: %d frames, %ldms\n", frames,
+             (en_tm - st_tm) / 1000000);
 
     return 0;
 }
@@ -747,6 +759,11 @@ static int init_thread(void *p)
     //bootdev_info(0, 0, 0);
 
     fb_init();
+
+    // Test specifying address to mmap
+    void *map_at_test = mmap((void*)0x420000, 4096, PROT_READ | PROT_WRITE,
+                             MAP_USER, -1, 0);
+    memset(map_at_test, 42, 4096);
 
     //priqueue_test.test();
 
@@ -865,6 +882,24 @@ static int init_thread(void *p)
         thread_create(stress_heap_thread, 0, 0, 0);
     }
 #endif
+
+    auto com1 = uart_dev_t::open(0);
+    com1->write("Hello!", 6, 6);
+
+    vector<char> input;
+    char input_char;
+    do {
+        com1->read(&input_char, 1, 1);
+        com1->write(&input_char, 1, 1);
+        input.push_back(input_char);
+    } while (input_char != '\n');
+
+    com1->write(input.data(), input.size(), input.size());
+
+    for (size_t i = 0, e = thread_get_cpu_count(); i != e; ++i) {
+        thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0);
+        thread_set_affinity(tid, size_t(1) << i);
+    }
 
     return 0;
 }
