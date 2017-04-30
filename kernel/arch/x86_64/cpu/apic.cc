@@ -2340,8 +2340,7 @@ static mp_ioapic_t *ioapic_from_intr(int intr)
     for (unsigned i = 0; i < ioapic_count; ++i) {
         mp_ioapic_t *ioapic = ioapic_list + i;
         if (intr >= ioapic->base_intr &&
-                intr < ioapic->base_intr +
-                ioapic->vector_count) {
+                intr < ioapic->base_intr + ioapic->vector_count) {
             return ioapic;
         }
     }
@@ -2404,16 +2403,14 @@ static void ioapic_setmask(int irq, bool unmask)
 
     ioapic_lock_noirq(ioapic);
 
-    uint32_t ent = ioapic_read(
-                ioapic, IOAPIC_RED_LO_n(mapping->intin));
+    uint32_t ent = ioapic_read(ioapic, IOAPIC_RED_LO_n(mapping->intin));
 
     if (unmask)
         ent &= ~IOAPIC_REDLO_MASKIRQ;
     else
         ent |= IOAPIC_REDLO_MASKIRQ;
 
-    ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin),
-                 ent);
+    ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin), ent);
 
     ioapic_unlock_noirq(ioapic);
 }
