@@ -88,10 +88,10 @@ EXPORT int memcmp(void const *lhs, void const *rhs, size_t count)
         "cmovb %[below],%[result]\n\t"
         "cmova %[above],%[result]\n\t"
         : [result] "=a" (result)
-        : "S" (lhs)
-        , "D" (rhs)
-        , "c" (count)
-        , [below] "r" (below)
+        , "+S" (lhs)
+        , "+D" (rhs)
+        , "+c" (count)
+        : [below] "r" (below)
         , [above] "d" (1)
     );
     return result;
