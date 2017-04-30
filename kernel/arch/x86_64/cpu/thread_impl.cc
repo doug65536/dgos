@@ -796,6 +796,11 @@ EXPORT uint64_t thread_get_affinity(int id)
     return threads[id].cpu_affinity;
 }
 
+EXPORT size_t thread_get_cpu_count()
+{
+    return cpu_count;
+}
+
 EXPORT void thread_set_affinity(int id, uint64_t affinity)
 {
     cpu_scoped_irq_disable intr_was_enabled;

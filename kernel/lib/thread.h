@@ -26,6 +26,8 @@ void thread_sleep_for(uint64_t ms);
 void thread_set_affinity(int id, uint64_t affinity);
 uint64_t thread_get_affinity(int id);
 
+size_t thread_get_cpu_count();
+
 thread_t thread_get_id(void);
 
 // Suspend the thread, then release the lock,
