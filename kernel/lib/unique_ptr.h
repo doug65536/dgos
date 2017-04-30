@@ -17,7 +17,8 @@ struct default_delete<T[]>
 {
     constexpr default_delete() = default;
 
-    inline void operator()(T* ptr) const
+    template<typename U>
+    inline void operator()(U ptr) const
     {
         delete[] ptr;
     }
