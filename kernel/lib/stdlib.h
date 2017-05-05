@@ -23,6 +23,14 @@ void free(void *p);
 
 char *strdup(char const *s);
 
+int strtoi(const char *str, char **end, int base);
+long strtol(char const *str, char **end, int base);
+long long strtoll(char const *str, char **end, int base);
+
+int atoi(char const *str);
+int atol(char const *str);
+int atoll(char const *str);
+
 void auto_free(void *mem);
 
 #define autofree __attribute__((cleanup(auto_free)))
