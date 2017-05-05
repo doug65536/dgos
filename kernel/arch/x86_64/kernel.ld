@@ -160,9 +160,12 @@ SECTIONS {
 		*(.bss)
 		*(SORT(.bss.*))
 		*(COMMON)
-		. = ALIGN(16);
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
+
+	.bspstk : ALIGN(4096) {
+		*(.bspstk)
+	}
 
 	.tdata : ALIGN(4096) {
 		PROVIDE_HIDDEN(___tdata_st = .);

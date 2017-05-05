@@ -33,8 +33,8 @@
 
 #include "vector.h"
 
-constexpr size_t const kernel_stack_size = 16384;
-char kernel_stack[kernel_stack_size];
+size_t constexpr kernel_stack_size = 16384;
+char kernel_stack[kernel_stack_size] __section(".bspstk");
 
 static void smp_main(void *arg)
 {
