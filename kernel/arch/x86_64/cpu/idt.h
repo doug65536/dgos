@@ -353,7 +353,7 @@ struct isr_fxsave_context_t {
     } xmm[16];
 };
 
-// Added to top of context on stack when switching to a context
+// Function to call after switching to another context stack
 struct isr_resume_context_t {
     void (*cleanup)(void*);
     void *cleanup_arg;
