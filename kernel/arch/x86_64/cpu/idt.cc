@@ -15,20 +15,6 @@
 
 #include "apic.h"
 
-#define PROFILE_IRQ         0
-#if PROFILE_IRQ
-#define PROFILE_IRQ_ONLY(p) p
-#else
-#define PROFILE_IRQ_ONLY(p) (void)0
-#endif
-
-#define PROFILE_EXCEPTION   0
-#if PROFILE_EXCEPTION
-#define PROFILE_EXCEPTION_ONLY(p) p
-#else
-#define PROFILE_EXCEPTION_ONLY(p) (void)0
-#endif
-
 static idt_entry_64_t idt[256];
 
 static irq_dispatcher_handler_t irq_dispatcher_vec;
