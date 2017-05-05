@@ -15,6 +15,7 @@
 #define __assume_aligned(n)     __attribute__((assume_aligned(n)))
 #define __printf_format(m,n)    __attribute__((format(printf, m, n)))
 #define __malloc                __attribute__((malloc))
+#define __section(name)         __attribute__((section(name)))
 
 #ifndef __SIG_ATOMIC_TYPE__
 #define __SIG_ATOMIC_TYPE__ long int
