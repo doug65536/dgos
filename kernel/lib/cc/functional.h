@@ -27,15 +27,17 @@ public:
     {
     }
 
-    R operator()(Args ...args)
+    template<typename ..._A>
+    R operator()(_A&& ...args) const
     {
-        return impl->invoke(args...);
+        return impl->invoke(forward<_A>(args)...);
     }
 
-    template<typename T>
-    function& operator=(T&& callable)
+    template<typename _C>
+    function& operator=(_C&& callable)
     {
-        impl.reset(new Callable<T>(forward(callable)));
+        impl.reset(new Callable<_C>(move(callable)));
+        return *this;
     }
 
     operator bool() const
@@ -52,8 +54,8 @@ private:
     struct CallableBase
     {
         virtual ~CallableBase() {}
-        virtual R invoke(Args ...args) = 0;
-        virtual CallableBase *copy() = 0;
+        virtual R invoke(Args&& ...args) const = 0;
+        virtual CallableBase *copy() const = 0;
     };
 
     template<typename T>
@@ -64,14 +66,14 @@ private:
         {
         }
 
-        CallableBase *copy()
+        CallableBase *copy() const final
         {
             return new Callable(storage);
         }
 
-        R invoke(Args&& ...args) final
+        R invoke(Args&& ...args) const final
         {
-            return (*impl)(forward<Args>(args)...);
+            return storage(forward<Args>(args)...);
         }
 
         T storage;
