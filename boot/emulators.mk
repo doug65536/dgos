@@ -1,10 +1,16 @@
 QEMU := qemu-system-x86_64
 
+QEMU_MONITOR := \
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
+
 QEMU_DEBUGCON := \
 	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
-	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet \
-	-mon qemu-monitor,mode=readline,default \
+	-mon qemu-monitor,mode=readline \
 	-device isa-debugcon,chardev=qemu-debug-out
+
+QEMU_SERIAL := \
+	-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server,nowait \
+	-serial chardev:qemu-serial-socket
 
 QEMU_CPU := host,migratable=false,host-cache-info=true
 QEMU_RAM := 5G
@@ -22,18 +28,24 @@ QEMU_NET := \
 	$(QEMU_BRIDGE) \
 	-net dump,file=dump/netdump
 
-QEMU_COMMON := $(QEMU_DEBUGCON) $(QEMU_USB) $(QEMU_NET) \
+QEMU_COMMON := \
+	$(QEMU_MONITOR) \
+	$(QEMU_SERIAL) \
+	$(QEMU_DEBUGCON) \
+	$(QEMU_USB) \
+	$(QEMU_NET) \
 	-s \
-	-no-shutdown \
-	-no-reboot \
-	-d unimp,guest_errors \
-	$(QEMU_FLAGS) \
-	-m $(QEMU_RAM)
+	-no-shutdown -no-reboot -d unimp,guest_errors \
+	-m $(QEMU_RAM) \
+	$(QEMU_FLAGS)
 
 QEMU_WAIT := -S
 QEMU_RUN :=
 
-QEMU_SMP := -smp cpus=8,cores=4,threads=2
+QEMU_CPUS := 8
+QEMU_CORES := 4
+QEMU_THREADS := 2
+QEMU_SMP := -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_UP := -smp cpus=1,cores=1,threads=1
 
 QEMU_HDCTL_DEV_ahci := -machine q35
@@ -49,6 +61,7 @@ QEMU_AHCI := ahci
 QEMU_IDE := ide
 
 QEMU_KVM := -enable-kvm -cpu $(QEMU_CPU)
+#QEMU_TCG := -cpu kvm64 -accel tcg,thread=multi
 QEMU_TCG := -cpu kvm64
 
 QEMU_ISO_DEPS := $(ISO_FILE)
