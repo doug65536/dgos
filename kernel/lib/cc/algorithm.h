@@ -1,5 +1,6 @@
 #pragma once
 #include "likely.h"
+#include "type_traits.h"
 
 template<typename _InputIt, typename _T>
 _InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
@@ -10,7 +11,7 @@ _InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-bool find_if(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+_InputIt find_if(_InputIt __first, _InputIt __last, _UnaryPredicate&& __p)
 {
     while (__first != __last && !__p(*__first))
         ++__first;
@@ -18,7 +19,7 @@ bool find_if(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-bool find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+_InputIt find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 {
     while (__first != __last && __p(*__first))
         ++__first;
