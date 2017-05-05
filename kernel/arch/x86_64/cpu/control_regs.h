@@ -282,6 +282,90 @@ static inline uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
     return rax;
 }
 
+#define CPU_DR7_EN_LOCAL    0x1
+#define CPU_DR7_EN_GLOBAL   0x2
+#define CPU_DR7_EN_MASK     0x3
+#define CPU_DR7_RW_INSN     0x0
+#define CPU_DR7_RW_WRITE    0x1
+#define CPU_DR7_RW_IO       0x2
+#define CPU_DR7_RW_RW       0x3
+#define CPU_DR7_RW_MASK     0x3
+#define CPU_DR7_LEN_1       0x0
+#define CPU_DR7_LEN_2       0x1
+#define CPU_DR7_LEN_8       0x2
+#define CPU_DR7_LEN_4       0x3
+#define CPU_DR7_LEN_MASK    0x3
+
+#define CPU_DR7_BPn_VAL(n, en, rw, len) \
+    (((en) << (n * 2)) | \
+    ((rw) << ((n) * 4 + 16)) | \
+    ((len) << ((n) * 4 + 16 + 2)))
+
+#define CPU_DR7_BPn_MASK(n) \
+    CPU_DR7_BPn_VAL((n), CPU_DR7_EN_MASK, CPU_DR7_RW_MASK, CPU_DR7_LEN_MASK)
+
+#define CPU_DR6_BPn_OCCURED(n)  (1<<(n))
+#define CPU_DR6_BD_BIT          13
+#define CPU_DR6_BS_BIT          14
+#define CPU_DR6_BT_BIT          15
+#define CPU_DR6_RTM_BIT         16
+#define CPU_DR6_BD              (1<<CPU_DR6_BD_BIT)
+#define CPU_DR6_BS              (1<<CPU_DR6_BS_BIT)
+#define CPU_DR6_BT              (1<<CPU_DR6_BT_BIT)
+#define CPU_DR6_RTM             (1<<CPU_DR6_RTM_BIT)
+
+template<int dr> __always_inline
+static inline uintptr_t cpu_get_debug_reg()
+{
+    uintptr_t value;
+    __asm__ __volatile__ (
+        "mov %%dr%c[dr],%[value]\n\t"
+        : [value] "=r" (value)
+        : [dr] "i" (dr)
+    );
+    return value;
+}
+
+template<int dr> __always_inline
+static inline void cpu_set_debug_reg(uintptr_t value)
+{
+    __asm__ __volatile__ (
+        "mov %[value],%%dr%c[dr]\n\t"
+        :
+        : [value] "r" (value)
+        , [dr] "i" (dr)
+    );
+}
+
+template<int dr> __always_inline
+static inline uintptr_t cpu_change_debug_reg(uintptr_t clear, uintptr_t set)
+{
+    uintptr_t value = cpu_get_debug_reg<dr>();
+    value &= ~clear;
+    value |= set;
+    cpu_set_debug_reg<dr>(value);
+    return value;
+}
+
+template<int dr> __always_inline
+static inline void cpu_set_debug_breakpoint(
+        uintptr_t addr, int rw, int len, int enable)
+{
+    constexpr uintptr_t enable_mask = ~CPU_DR7_BPn_MASK(dr);
+    uintptr_t enable_value = CPU_DR7_BPn_VAL(dr, enable, rw, len);
+
+    uintptr_t ctl = cpu_get_debug_reg<7>();
+
+    // Disable it before changing address
+    ctl &= enable_mask;
+    cpu_set_debug_reg<7>(ctl);
+    cpu_set_debug_reg<dr>(addr);
+
+    // Enable it
+    ctl |= enable_value;
+    cpu_set_debug_reg<7>(ctl);
+}
+
 __always_inline
 static inline void cpu_set_page_directory(uintptr_t addr)
 {
