@@ -1047,51 +1047,55 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             return likely(io_result >= 0) ? ctx : 0;
         } else {
             printdbg("Invalid page fault at 0x%zx\n", fault_addr);
+            if (thread_get_exception_top())
+                return 0;
+
             assert(!"Invalid page fault");
         }
     } else if (present_mask != 0x0F) {
-        assert(!"Invalid page fault path");
-    } else {
-        printdbg("#PF: present=%d\n"
-                 "     write=%d\n"
-                 "     user=%d\n"
-                 "     reserved bit violation=%d\n"
-                 "     instruction fetch=%d\n"
-                 "     protection key violation=%d\n"
-                 "     SGX violation=%d\n"
-                 "PTE: present=%d\n"
-                 "     writable=%d\n"
-                 "     user=%d\n"
-                 "     write through=%d\n"
-                 "     cache disable=%d\n"
-                 "     accessed=%d\n"
-                 "     dirty=%d\n"
-                 "     PAT=%d\n"
-                 "     global=%d\n"
-                 "     physaddr=%lx\n"
-                 "     no execute=%d\n"
-                 "------------------\n",
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_P),
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_W),
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_U),
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_R),
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_I),
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_PK),
-                 !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
-                 !!(pte & PTE_PRESENT),
-                 !!(pte & PTE_WRITABLE),
-                 !!(pte & PTE_USER),
-                 !!(pte & PTE_PWT),
-                 !!(pte & PTE_PCD),
-                 !!(pte & PTE_ACCESSED),
-                 !!(pte & PTE_DIRTY),
-                 !!(pte & PTE_PTEPAT),
-                 !!(pte & PTE_GLOBAL),
-                 (pte & PTE_ADDR),
-                 !!(pte & PTE_NX));
+        if (thread_get_exception_top())
+            return 0;
 
-        assert(!"Unexpected page fault");
+        assert(!"Invalid page fault path");
     }
+
+    printdbg("#PF: present=%d\n"
+             "     write=%d\n"
+             "     user=%d\n"
+             "     reserved bit violation=%d\n"
+             "     instruction fetch=%d\n"
+             "     protection key violation=%d\n"
+             "     SGX violation=%d\n"
+             "PTE: present=%d\n"
+             "     writable=%d\n"
+             "     user=%d\n"
+             "     write through=%d\n"
+             "     cache disable=%d\n"
+             "     accessed=%d\n"
+             "     dirty=%d\n"
+             "     PAT=%d\n"
+             "     global=%d\n"
+             "     physaddr=%lx\n"
+             "     no execute=%d\n"
+             "------------------\n",
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_P),
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_W),
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_U),
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_R),
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_I),
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_PK),
+             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
+             !!(pte & PTE_PRESENT),
+             !!(pte & PTE_WRITABLE),
+             !!(pte & PTE_USER),
+             !!(pte & PTE_PWT),
+             !!(pte & PTE_PCD),
+             !!(pte & PTE_ACCESSED),
+             !!(pte & PTE_DIRTY),
+             !!(pte & PTE_PTEPAT),
+             !!(pte & PTE_GLOBAL),
+             (pte & PTE_ADDR),
+             !!(pte & PTE_NX));
 
     return 0;
 }
@@ -2002,14 +2006,10 @@ int mprotect(void *addr, size_t len, int prot)
 
     unsigned path[4];
     unsigned path_en[4];
-
-    path_from_addr(path, (linaddr_t)addr);
-    path_from_addr(path_en, (linaddr_t)addr + len);
-
     pte_t *pt[4];
     pte_t *pt_en[4];
-    pte_from_path(pt, path);
-    pte_from_path(pt_en, path_en);
+    addr_present(linaddr_t(addr), path, pt);
+    addr_present(linaddr_t(addr) + len, path_en, pt_en);
 
     while (((pt[0] != pt_en[0]) | (pt[1] != pt_en[1]) |
             (pt[2] != pt_en[2]) | (pt[3] != pt_en[3])) &&
@@ -2103,9 +2103,9 @@ int madvise(void *addr, size_t len, int advice)
 
                     if (atomic_cmpxchg_upd(pt[3], &expect, replace)) {
                         mmu_free_phys(page);
-                        break;
                     }
                 }
+                break;
             } else {
                 replace = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
                         order_bits;
@@ -2708,4 +2708,63 @@ void mm_init_process()
     contiguous_allocator_t *allocator = new contiguous_allocator_t{};
     allocator->init(0x400000, 0x800000000000 - 0x400000);
     process_set_allocator(allocator);
+}
+
+extern char ___text_st[];
+extern char ___text_en[];
+
+// Returns the physical address of the original page directory
+uintptr_t mm_fork_kernel_text()
+{
+    uintptr_t st = uintptr_t(___text_st);
+    uintptr_t en = uintptr_t(___text_en) - 1;
+
+    // Make aliasing window big enough for two pages
+    pte_t *window = (pte_t*)mmap_window(PAGE_SIZE << 1);
+    uintptr_t src_linaddr = uintptr_t(window);
+    uintptr_t dst_linaddr = uintptr_t(window + 512);
+
+    pte_t constexpr flags = PTE_PRESENT | PTE_WRITABLE;
+
+    // Clone root page directory
+    physaddr_t page = mmu_alloc_phys(0);
+    mmu_map_page(uintptr_t(window), page, flags);
+    memcpy(window, master_pagedir, PAGE_SIZE);
+    window[PT_RECURSE] = page | flags;
+
+    uintptr_t orig_pagedir = cpu_get_page_directory();
+    cpu_set_page_directory(page);
+
+    unsigned st_path[4];
+    unsigned en_path[4];
+    pte_t *st_ptes[4];
+    pte_t *en_ptes[4];
+
+    addr_present(st, st_path, st_ptes);
+    addr_present(en, en_path, en_ptes);
+
+    for (size_t level = 0; level < 4; ++level) {
+        for (pte_t *pte = st_ptes[level]; pte <= en_ptes[level]; ++pte) {
+            cpu_flush_tlb();
+
+            // Allocate clone
+            page = mmu_alloc_phys(0);
+
+            // Map original
+            mmu_map_page(src_linaddr, (*pte & PTE_ADDR), flags);
+
+            // Map clone
+            mmu_map_page(dst_linaddr, page, flags);
+
+            // Copy original to clone
+            memcpy(window + 512, window, PAGE_SIZE);
+
+            // Point PTE to clone
+            *pte = page | flags;
+        }
+    }
+
+    cpu_flush_tlb();
+
+    return orig_pagedir;
 }

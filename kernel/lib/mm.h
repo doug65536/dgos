@@ -370,3 +370,5 @@ int alias_window(void *addr, size_t size,
                  mmphysrange_t const *ranges, size_t range_count);
 
 void mm_init_process();
+
+uintptr_t mm_fork_kernel_text();
