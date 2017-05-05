@@ -5,6 +5,7 @@
 #include "vector.h"
 #include "irq.h"
 #include "threadsync.h"
+#include "cpu/control_regs.h"
 
 #define DEBUG_UART  1
 #if DEBUG_UART
@@ -278,6 +279,8 @@ public:
     ssize_t write(void const *buf, size_t size, size_t min_write);
     ssize_t read(void *buf, size_t size, size_t min_read);
 
+    void route_irq(int cpu);
+
 private:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     isr_context_t *port_irq_handler(isr_context_t *ctx);
@@ -324,7 +327,6 @@ private:
     mcr_t reg_mcr;
     lsr_t reg_lsr;
     msr_t reg_msr;
-
 
     // Use 16 bit values to allow buffering of error information
     // as values >= 256
@@ -471,6 +473,7 @@ ssize_t uart_t::write(void const *buf, size_t size, size_t min_write)
 
 ssize_t uart_t::read(void *buf, size_t size, size_t min_read)
 {
+    cpu_scoped_irq_disable intr_was_enabled;
     spinlock_lock_noirq(&lock);
 
     auto data = (char *)buf;
@@ -478,6 +481,10 @@ ssize_t uart_t::read(void *buf, size_t size, size_t min_read)
     size_t i;
     for (i = 0; i < size; ++i) {
         if (!is_rx_not_empty()) {
+            // Reset buffer to maximize locality
+            rx_head = 0;
+            rx_tail = 0;
+
             if (i >= min_read)
                 break;
 
@@ -493,6 +500,11 @@ ssize_t uart_t::read(void *buf, size_t size, size_t min_read)
     spinlock_unlock_noirq(&lock);
 
     return i;
+}
+
+void uart_t::route_irq(int cpu)
+{
+    irq_setcpu(irq, cpu);
 }
 
 isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
@@ -544,7 +556,15 @@ void uart_t::send_some_locked()
 
             // Don't put more data into Tx FIFO after a break byte
             i = 16;
+
+            break;
         }
+    }
+
+    if (tx_head == tx_tail) {
+        // Reset buffer pointers to maximize locality
+        tx_head = 0;
+        tx_tail = 0;
     }
 }
 
@@ -653,7 +673,8 @@ void uart_t::out(port_t ofs, uint8_t value)
 
 void uart_t::detect(void *)
 {
-    uarts.push_back(new uart_t(0x3F8, 4, 115200));
+    if (uarts.empty())
+        uarts.push_back(new uart_t(0x3F8, 4, 115200));
 }
 
 REGISTER_CALLOUT(&uart_t::detect, nullptr, 'E', "000");
@@ -662,5 +683,7 @@ REGISTER_CALLOUT(&uart_t::detect, nullptr, 'E', "000");
 
 uart_dev_t *uart_dev_t::open(size_t id)
 {
+    uart_defs::uart_t::detect(nullptr);
     return id < uart_defs::uarts.size() ? uart_defs::uarts[id].get() : nullptr;
 }
+
