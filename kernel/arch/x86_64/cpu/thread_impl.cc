@@ -26,6 +26,13 @@
 
 // Implements platform independent thread.h
 
+#define DEBUG_THREAD    1
+#if DEBUG_THREAD
+#define THREAD_TRACE(...) printdbg("thread: " __VA_ARGS__)
+#else
+#define THREAD_TRACE(...) ((void)0)
+#endif
+
 enum thread_state_t : uint32_t {
     THREAD_IS_UNINITIALIZED = 0,
     THREAD_IS_INITIALIZING,
@@ -86,7 +93,7 @@ struct thread_info_t {
 
     uint64_t volatile wake_time;
 
-    uint64_t cpu_affinity;
+    uint64_t volatile cpu_affinity;
 
     void *exception_chain;
 
@@ -126,6 +133,9 @@ uint32_t volatile thread_smp_running;
 int thread_idle_ready;
 int spincount_mask;
 size_t storage_next_slot;
+
+static size_t constexpr syscall_stack_size = (1 << 16);
+static size_t constexpr xsave_stack_size = (1 << 16);
 
 struct cpu_info_t {
     cpu_info_t *self;
@@ -281,23 +291,54 @@ static thread_t thread_create_with_state(
         thread->flags = 0;
 
         if (!stack) {
-            stack = mmap(0, stack_size,
+            // Allocate one extra page for guard page
+            stack = mmap(0, stack_size + PAGE_SIZE,
                          PROT_READ | PROT_WRITE,
                          MAP_STACK, -1, 0);
-            memset(stack, 0xcc, stack_size);
+            // Guard page
+            madvise(stack, PAGE_SIZE, MADV_DONTNEED);
+            mprotect(stack, PAGE_SIZE, PROT_NONE);
+            memset((char*)stack + PAGE_SIZE, 0xcc, stack_size);
             thread->flags |= THREAD_FLAG_OWNEDSTACK;
+
+            THREAD_TRACE("Thread %zd stack guard=0x%zx,"
+                         " stack=0x%zx-0x%zx\n",
+                         i,
+                         uintptr_t(stack),
+                         uintptr_t(stack) + PAGE_SIZE,
+                         uintptr_t(stack) + PAGE_SIZE + stack_size);
         }
 
         // Syscall stack
+        // Allocate one extra page for guard page
         thread->syscall_stack = (char*)mmap(
-                    0, 1 << 14, PROT_READ | PROT_WRITE,
-                    MAP_STACK, -1, 0) + (1 << 14);
+                    0, syscall_stack_size + PAGE_SIZE, PROT_READ | PROT_WRITE,
+                    MAP_STACK, -1, 0) + syscall_stack_size;
+        madvise(thread->syscall_stack, PAGE_SIZE, MADV_DONTNEED);
+        mprotect(thread->syscall_stack, PAGE_SIZE, PROT_NONE);
+        THREAD_TRACE("Thread %zd syscall stack guard=0x%zx,"
+                     " stack=0x%zx-0x%zx\n",
+                     i,
+                     uintptr_t(thread->syscall_stack),
+                     uintptr_t(thread->syscall_stack) + PAGE_SIZE,
+                     uintptr_t(thread->syscall_stack) + PAGE_SIZE +
+                     syscall_stack_size);
 
         // XSave stack
+        // Allocate one extra page for guard page
         thread->xsave_stack = mmap(
-                    0, 1 << 14, PROT_READ | PROT_WRITE,
+                    0, xsave_stack_size + PAGE_SIZE, PROT_READ | PROT_WRITE,
                     MAP_STACK, -1, 0);
         thread->xsave_ptr = thread->xsave_stack;
+        madvise((char*)thread->xsave_stack + xsave_stack_size,
+                PAGE_SIZE, MADV_DONTNEED);
+        mprotect(thread->xsave_ptr, PAGE_SIZE, MADV_DONTNEED);
+        THREAD_TRACE("Thread %zd xsave stack guard=0x%zx,"
+                     " stack=0x%zx-0x%zx\n",
+                     i,
+                     uintptr_t(thread->xsave_stack) + stack_size,
+                     uintptr_t(thread->xsave_stack),
+                     uintptr_t(thread->xsave_stack) + stack_size);
 
         thread->stack = stack;
         thread->stack_size = stack_size;
@@ -305,11 +346,12 @@ static thread_t thread_create_with_state(
         thread->priority_boost = 0;
         thread->cpu_affinity = affinity ? affinity : ~0UL;
 
-        thread->process = thread_current_process();
+        // APs inherit BSP's process
+        thread->process = cpus[0].cur_thread->process;
 
         uintptr_t stack_addr = (uintptr_t)stack;
         uintptr_t stack_end = stack_addr +
-                stack_size;
+                stack_size + PAGE_SIZE;
 
         size_t ctx_size = sizeof(isr_gpr_context_t) +
                 sizeof(isr_context_t);
@@ -456,10 +498,35 @@ void thread_init(int ap)
         thread->used_time = 0;
         thread->ctx = 0;
         thread->priority = -256;
+
         thread->stack = kernel_stack;
         thread->stack_size = kernel_stack_size;
-        thread->xsave_stack = mmap(0, 1 << 14, PROT_READ | PROT_WRITE,
+        madvise((char*)thread->stack, PAGE_SIZE, MADV_DONTNEED);
+        mprotect((char*)thread->stack, PAGE_SIZE, PROT_NONE);
+        THREAD_TRACE("Thread %d stack guard=0x%zx,"
+                     " stack=0x%zx-0x%zx\n",
+                     0,
+                     uintptr_t(thread->stack),
+                     uintptr_t(thread->stack) + PAGE_SIZE,
+                     uintptr_t(thread->stack) + PAGE_SIZE + kernel_stack_size);
+
+        thread->xsave_stack = mmap(0, xsave_stack_size + PAGE_SIZE,
+                                   PROT_READ | PROT_WRITE,
                                    MAP_STACK, -1, 0);
+        madvise((char*)thread->xsave_stack + xsave_stack_size,
+                PAGE_SIZE, MADV_DONTNEED);
+        mprotect((char*)thread->xsave_stack + xsave_stack_size,
+                 PAGE_SIZE, PROT_NONE);
+        THREAD_TRACE("Thread %d stack guard=0x%zx,"
+                     " stack=0x%zx-0x%zx\n",
+                     0,
+                     uintptr_t(thread->stack),
+                     uintptr_t(thread->stack) + PAGE_SIZE,
+                     uintptr_t(thread->stack) + PAGE_SIZE + xsave_stack_size);
+
+        madvise(kernel_stack, PAGE_SIZE, MADV_DONTNEED);
+        mprotect(kernel_stack, PAGE_SIZE, PROT_NONE);
+
         thread->xsave_ptr = thread->xsave_stack;
         thread->cpu_affinity = 1;
         atomic_barrier();
@@ -500,6 +567,11 @@ static thread_info_t *thread_choose_next(
 
     size_t count = thread_count;
 
+    // If this thread is not allowed on this CPU, best is the idle thread
+    // until proven otherwise
+    if (unlikely(!(outgoing->cpu_affinity & (1 << cpu_number))))
+        best = threads + cpu_number;
+
     for (size_t checked = 0; ++i, checked <= count; ++checked) {
         // Wrap
         if (unlikely(i >= count))
@@ -507,9 +579,12 @@ static thread_info_t *thread_choose_next(
 
         candidate = threads + i;
 
+        //if (candidate->cpu_affinity == 0x80 && candidate->priority != -256)
+        //    cpu_debug_break();
+
         // If this thread is not allowed to run on this CPU
         // then skip it
-        if (unlikely(!(candidate->cpu_affinity & (1 << cpu_number))))
+        if (unlikely(!(candidate->cpu_affinity & (1U << cpu_number))))
             continue;
 
         //
@@ -604,7 +679,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         if (thread->flags & THREAD_FLAG_OWNEDSTACK)
             munmap(thread->stack, thread->stack_size);
 
-        munmap(thread->xsave_stack, 1 << 14);
+        munmap(thread->xsave_stack, 1 << 16);
 
         mutex_lock_noyield(&thread->lock);
         thread->state = THREAD_IS_FINISHED;
@@ -663,7 +738,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
     assert(isrctx->gpr->iret.rsp <
-           (uintptr_t)thread->stack + thread->stack_size);
+           (uintptr_t)thread->stack + thread->stack_size + PAGE_SIZE);
 
     if (thread != outgoing) {
         // Add outgoing cleanup data at top of context
@@ -810,10 +885,15 @@ EXPORT void thread_set_affinity(int id, uint64_t affinity)
     threads[id].cpu_affinity = affinity;
 
     // Are we changing current thread affinity?
-    if (cpu->cur_thread == threads + id &&
+    while (cpu->cur_thread == threads + id &&
             !(affinity & (1 << cpu_number))) {
         // Get off this CPU
         thread_yield();
+
+        // Check again, a racing thread may have picked
+        // up this thread without seeing change
+        cpu = this_cpu();
+        cpu_number = cpu - cpus;
     }
 }
 
@@ -835,8 +915,11 @@ void thread_check_stack(void)
     void *sp = cpu_get_stack_ptr();
 
     if (sp < thread->stack ||
-            (char*)sp > (char*)thread->stack + thread->stack_size)
+            (char*)sp > (char*)thread->stack +
+            thread->stack_size + PAGE_SIZE) {
+        cpu_debug_break();
         cpu_crash();
+    }
 }
 
 void thread_idle_set_ready(void)
@@ -926,3 +1009,8 @@ process_t *thread_current_process()
     return thread->process;
 }
 
+
+uint32_t thread_get_cpu_apic_id(int cpu)
+{
+    return cpus[cpu].apic_id;
+}
