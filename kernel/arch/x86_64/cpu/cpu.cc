@@ -51,13 +51,13 @@ void cpu_init(int ap)
         msr_adj_bit(MSR_EFER, 11, 1);
 }
 
-static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
-{
-    cpu_debug_break();
-    assert(intr == INTR_EX_DEBUG);
-    printdbg("Unexpected debug exception, continuing\n");
-    return ctx;
-}
+//static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
+//{
+//    cpu_debug_break();
+//    assert(intr == INTR_EX_DEBUG);
+//    printdbg("Unexpected debug exception, continuing\n");
+//    return ctx;
+//}
 
 void cpu_init_stage2(int ap)
 {
@@ -66,7 +66,7 @@ void cpu_init_stage2(int ap)
     mmu_init(ap);
     if (!ap) {
         thread_init(ap);
-        intr_hook(INTR_EX_DEBUG, cpu_debug_exception_handler);
+        //intr_hook(INTR_EX_DEBUG, cpu_debug_exception_handler);
     }
 }
 
