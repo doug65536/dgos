@@ -13,6 +13,8 @@
 #include "assert.h"
 #include "except.h"
 
+#include "apic.h"
+
 #define PROFILE_IRQ         0
 #if PROFILE_IRQ
 #define PROFILE_IRQ_ONLY(p) p
@@ -27,12 +29,10 @@
 #define PROFILE_EXCEPTION_ONLY(p) (void)0
 #endif
 
-// debug hack
-#include "apic.h"
-
 static idt_entry_64_t idt[256];
 
-static isr_context_t *(*irq_dispatcher_vec)(int irq, isr_context_t *ctx);
+static irq_dispatcher_handler_t irq_dispatcher_vec;
+static idt_unhandled_exception_handler_t unhandled_exception_handler_vec;
 
 static format_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
@@ -664,54 +664,33 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
 static isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
+    if (unhandled_exception_handler_vec) {
+        isr_context_t *handled_ctx = unhandled_exception_handler_vec(
+                    ctx->gpr->info.interrupt, ctx);
+
+        if (handled_ctx)
+            return handled_ctx;
+    }
+
     cpu_debug_break();
     dump_context(ctx, 1);
     halt_forever();
     return ctx;
 }
 
-isr_context_t *exception_isr_handler(isr_context_t *ctx)
+isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
 {
-    if (!intr_has_handler(ctx->gpr->info.interrupt) ||
-            !intr_invoke(ctx->gpr->info.interrupt, ctx)) {
-        if (__exception_handler_invoke(ctx->gpr->info.interrupt))
+    if (!intr_has_handler(intr) || !intr_invoke(intr, ctx)) {
+        if (__exception_handler_invoke(intr))
             return unhandled_exception_handler(ctx);
     }
 
     return ctx;
 }
 
-void *isr_handler(isr_context_t *ctx)
+void idt_set_unhandled_exception_handler(
+        idt_unhandled_exception_handler_t handler)
 {
-    if (ctx->gpr->info.interrupt < 32) {
-        // Exception
-        PROFILE_EXCEPTION_ONLY( uint64_t st = cpu_rdtsc() );
-        ctx = exception_isr_handler(ctx);
-        PROFILE_EXCEPTION_ONLY( uint64_t en = cpu_rdtsc() );
-        PROFILE_EXCEPTION_ONLY( printdbg("Exception %ld took %ld cycles\n",
-                 ctx->gpr->info.interrupt, en-st) );
-    } else if ((ctx->gpr->info.interrupt >= 32 &&
-               ctx->gpr->info.interrupt < 48) ||
-               (ctx->gpr->info.interrupt >= 0x80 &&
-               ctx->gpr->info.interrupt < 0xFF)) {
-        // IRQ
-        PROFILE_IRQ_ONLY( uint64_t st = cpu_rdtsc() );
-
-        ctx = irq_dispatcher(ctx->gpr->info.interrupt, ctx);
-
-        PROFILE_IRQ_ONLY( uint64_t en = cpu_rdtsc() );
-        PROFILE_IRQ_ONLY( printdbg("IRQ interrupt %ld took %ld cycles\n",
-                 ctx->gpr->info.interrupt - INTR_APIC_IRQ_BASE, en-st) );
-    } else {
-        //
-        // Other interrupts
-        ctx = intr_invoke(ctx->gpr->info.interrupt, ctx);
-    }
-
-    assert(ctx->gpr->iret.cs == 0x8);
-    assert(ctx->gpr->s[0] == 0x10);
-    assert(ctx->gpr->s[1] == 0x10);
-    assert(ctx->gpr->iret.ss == 0x10);
-
-    return ctx;
+    assert(!unhandled_exception_handler_vec);
+    unhandled_exception_handler_vec = handler;
 }

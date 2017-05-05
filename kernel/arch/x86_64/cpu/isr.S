@@ -2,6 +2,9 @@
 
 #include "isr_constants.h"
 
+// This must be position independent code because the GDB stub clones off
+// a redundant copy to protect against infinite recursion
+
 .macro push_cfi val
 	pushq \val
 	.cfi_adjust_cfa_offset 8
@@ -235,13 +238,45 @@ isr_common:
 	push_cfi %rax
 	push_cfi %rax
 
-	mov %rsp,%rdi
+	// Pass intr, ctx
+    mov %rsp,%rsi
+	mov 22*8(%rsp),%rdi
 
 	// Align stack
 	push_cfi %rax
 
-	// Pass pointer to the context structure to isr_handler
-	call isr_handler
+	// Interrupt dispatch
+	//      0xFF -> intr_invoke
+	// 0x80-0xFE -> irq_dispatcher
+	// 0x30-0x7F -> intr_invoke
+	// 0x20-0x2F -> irq_dispatcher
+	// 0x00-0x1F -> exception_isr_handler
+
+	// Assume 0xFF -> intr_invoke
+	mov $intr_invoke,%rax
+
+	// If <= 0xFE -> irq_dispatcher
+	mov $irq_dispatcher,%rcx
+	cmp $0xFE,%edi
+	cmovbe %rcx,%rax
+
+	// If <= 0x7F -> intr_invoke
+	mov $intr_invoke,%rcx
+	cmp $0x7F,%edi
+	cmovbe %rcx,%rax
+
+	// If <= 0x2F -> irq_dispatcher
+	mov $irq_dispatcher,%rcx
+	cmp $0x2F,%rdi
+	cmovbe %rcx,%rax
+
+	// If < 0x1F -> exception_isr_handler
+	lea exception_isr_handler(%rip),%rcx
+	cmp $0x1F,%edi
+	cmovbe %rcx,%rax
+
+	// Pass pointer to the context structure to handler
+	call *%rax
 
 	// isr can return a new stack pointer, or just return
 	// the passed one to continue with this thread

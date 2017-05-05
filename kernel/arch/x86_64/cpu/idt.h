@@ -227,6 +227,57 @@ C_ASSERT(sizeof(idt_entry_64_t) == 16);
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58
 
+// isr_context->gpr->r order
+#define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr->r[0])
+#define ISR_CTX_REG_RSI(ctx)            ((ctx)->gpr->r[1])
+#define ISR_CTX_REG_RDX(ctx)            ((ctx)->gpr->r[2])
+#define ISR_CTX_REG_RCX(ctx)            ((ctx)->gpr->r[3])
+#define ISR_CTX_REG_R8(ctx)             ((ctx)->gpr->r[4])
+#define ISR_CTX_REG_R9(ctx)             ((ctx)->gpr->r[5])
+#define ISR_CTX_REG_RAX(ctx)            ((ctx)->gpr->r[6])
+#define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr->r[7])
+#define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr->r[8])
+#define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr->r[9])
+#define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr->r[10])
+#define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr->r[11])
+#define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr->r[12])
+#define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr->r[13])
+#define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr->r[14])
+
+#define ISR_CTX_REG_RIP(ctx)            ((ctx)->gpr->iret.rip)
+#define ISR_CTX_REG_RSP(ctx)            ((ctx)->gpr->iret.rsp)
+#define ISR_CTX_REG_RFLAGS(ctx)         ((ctx)->gpr->iret.rflags)
+
+#define ISR_CTX_REG_CS(ctx)             ((ctx)->gpr->iret.cs)
+#define ISR_CTX_REG_SS(ctx)             ((ctx)->gpr->iret.ss)
+#define ISR_CTX_REG_DS(ctx)             ((ctx)->gpr->s[0])
+#define ISR_CTX_REG_ES(ctx)             ((ctx)->gpr->s[1])
+#define ISR_CTX_REG_FS(ctx)             ((ctx)->gpr->s[2])
+#define ISR_CTX_REG_GS(ctx)             ((ctx)->gpr->s[3])
+
+#define ISR_CTX_ERRCODE(ctx)            ((ctx)->info.error_code)
+#define ISR_CTX_INTR(ctx)               ((ctx)->info.interrupt)
+#define ISR_CTX_CR3(ctx)                ((ctx)->gpr->cr3)
+#define ISR_CTX_FSBASE(ctx)             ((ctx)->gpr->fsbase)
+
+#define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
+#define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
+#define ISR_CTX_FPU_FIP(ctx)            ((ctx)->fpr->fpu_ip)
+#define ISR_CTX_FPU_FIS(ctx)            ((ctx)->fpr->cs_or_hi_ip)
+#define ISR_CTX_FPU_FDP(ctx)            ((ctx)->fpr->fpu_dp_31_0)
+#define ISR_CTX_FPU_FDS(ctx)            ((ctx)->fpr->ds_or_dp_47_32)
+#define ISR_CTX_FPU_FSW(ctx)            ((ctx)->fpr->fsw)
+#define ISR_CTX_FPU_FTW(ctx)            ((ctx)->fpr->ftw)
+#define ISR_CTX_FPU_STn_31_0(ctx, n)    ((ctx)->fpr->st[(n)].st_mm_31_0)
+#define ISR_CTX_FPU_STn_63_32(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_63_32)
+#define ISR_CTX_FPU_STn_79_64(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_79_64)
+
+#define ISR_CTX_SSE_XMMn_b(ctx, n, i)   ((ctx)->fpr->xmm[(n)].byte[(i)])
+#define ISR_CTX_SSE_XMMn_w(ctx, n, i)   ((ctx)->fpr->xmm[(n)].word[(i)])
+#define ISR_CTX_SSE_XMMn_d(ctx, n, i)   ((ctx)->fpr->xmm[(n)].dword[(i)])
+#define ISR_CTX_SSE_XMMn_q(ctx, n, i)   ((ctx)->fpr->xmm[(n)].qword[(i)])
+#define ISR_CTX_SSE_MXCSR(ctx)          ((ctx)->fpr->mxcsr)
+
 size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags);
 size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr);
 size_t cpu_describe_fpucw(char *buf, size_t buf_size, uint16_t fpucw);
@@ -273,7 +324,7 @@ struct isr_fxsave_context_t {
     uint16_t fop;
     // FPU IP
     uint32_t fpu_ip;
-    uint16_t hi_ip_or_cs;
+    uint16_t cs_or_hi_ip;
     uint16_t reserved_2;
 
     // FPU data pointer
@@ -288,10 +339,10 @@ struct isr_fxsave_context_t {
     struct fpu_reg_t {
         uint32_t st_mm_31_0;
         uint32_t st_mm_63_32;
-        uint16_t st_mm_79_63;
+        uint16_t st_mm_79_64;
         uint16_t st_mm_reserved_95_80;
         uint32_t st_mm_reserved_127_96;
-    } fpu_regs[8];
+    } st[8];
 
     // XMM registers
     union xmm_reg_t {
@@ -318,15 +369,20 @@ struct isr_context_t {
 typedef isr_context_t *(*irq_dispatcher_handler_t)(
         int intr, isr_context_t *ctx);
 
+typedef irq_dispatcher_handler_t idt_unhandled_exception_handler_t;
+
 void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler);
 
 // Handle EOI and invoke irq handler
-isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx);
+extern "C" isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx);
 
-extern "C" void *isr_handler(isr_context_t *ctx);
+extern "C" isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx);
 
-isr_context_t *exception_isr_handler(isr_context_t *ctx);
+extern "C" isr_context_t *isr_handler(int intr, isr_context_t *ctx);
 
 extern "C" void idt_xsave_detect(int ap);
+
+void idt_set_unhandled_exception_handler(
+        idt_unhandled_exception_handler_t handler);
 
 int idt_init(int ap);
