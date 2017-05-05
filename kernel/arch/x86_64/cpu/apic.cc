@@ -1640,26 +1640,24 @@ static void apic_send_command(uint32_t dest, uint32_t cmd)
     apic->command(dest, cmd);
 }
 
-// if target_apic_id is <= -2, sends to all CPUs
-// if target_apic_id is == -1, sends to other CPUs
-// if target_apid_id is >= 0, sends to specific APIC ID
 void apic_send_ipi(int target_apic_id, uint8_t intr)
 {
     if (unlikely(!apic))
         return;
 
-    uint32_t dest_type = target_apic_id < -1
+    uint32_t dest_type = (target_apic_id < -1)
             ? APIC_CMD_DEST_TYPE_ALL
-            : target_apic_id < 0
+            : (target_apic_id < 0)
             ? APIC_CMD_DEST_TYPE_OTHER
             : APIC_CMD_DEST_TYPE_BYID;
 
-    apic_send_command(target_apic_id >= 0
-                      ? target_apic_id
-                      : 0,
-                      APIC_CMD_VECTOR_n(intr) |
-                      dest_type |
-                      APIC_CMD_DEST_MODE_NORMAL);
+    uint32_t dest_mode = (intr != INTR_EX_NMI)
+            ? APIC_CMD_DEST_MODE_NORMAL
+            : APIC_CMD_DEST_MODE_NMI;
+
+    uint32_t dest = (target_apic_id >= 0) ? target_apic_id : 0;
+
+    apic_send_command(dest, APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);
 }
 
 void apic_eoi(int intr)
@@ -2467,12 +2465,13 @@ static void ioapic_map_all(void)
 
 // Pass negative cpu value to get highest CPU number
 // Returns 0 on failure, 1 on success
-int ioapic_irq_cpu(int irq, int cpu)
+bool ioapic_irq_cpu(int irq, int cpu)
 {
     if (cpu < 0)
-        return ioapic_count;
-    if ((unsigned)cpu >= apic_id_count)
-        return 0;
+        return ioapic_count > 0;
+
+    if (unsigned(cpu) >= apic_id_count)
+        return false;
 
     mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
     mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
@@ -2480,7 +2479,7 @@ int ioapic_irq_cpu(int irq, int cpu)
     ioapic_write(ioapic, IOAPIC_RED_HI_n(mapping->intin),
                  IOAPIC_REDHI_DEST_n(apic_id_list[cpu]));
     ioapic_unlock_noirq(ioapic);
-    return 1;
+    return true;
 }
 
 int apic_enable(void)
@@ -2494,6 +2493,7 @@ int apic_enable(void)
     irq_setmask_set_handler(ioapic_setmask);
     irq_hook_set_handler(ioapic_hook);
     irq_unhook_set_handler(ioapic_unhook);
+    irq_setcpu_set_handler(ioapic_irq_cpu);
 
     return 1;
 }
