@@ -40,6 +40,7 @@ CSRCS := \
 	device/usb_xhci.cc \
 	bootdev.cc \
 	elf64.cc \
+	gdbstub.cc \
 	$(DEVSRCS)
 
 #OPTIMIZEDSRCS := cpu/thread_impl.cc

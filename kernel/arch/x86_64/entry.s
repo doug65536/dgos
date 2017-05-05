@@ -121,6 +121,9 @@ entry:
 	xor %edi,%edi
 	call cpu_hw_init
 
+	# Initialize GDB stub
+	call gdb_init
+
 	# Initialize early-initialized devices
 	mov $'E',%edi
 	call callout_call
