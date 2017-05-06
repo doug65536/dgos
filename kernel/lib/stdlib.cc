@@ -95,7 +95,7 @@ static T strto(const char *str, char **end, int base)
     T digit;
     T sign = 0;
 
-    for (;;) {
+    for (;; ++str) {
         char c = *str;
 
         if (c >= '0' && c <= '9')
@@ -104,10 +104,13 @@ static T strto(const char *str, char **end, int base)
             digit = c + 10 - 'A';
         else if (c >= 'a' && c <= 'z')
             digit = c + 10 - 'a';
-        else if (c == '-' && sign == 0)
+        else if (c == '-' && sign == 0) {
             sign = -1;
-        else if (c == '+' && sign == 0)
+            continue;
+        } else if (c == '+' && sign == 0) {
             sign = 1;
+            continue;
+        }
         else
             break;
 
