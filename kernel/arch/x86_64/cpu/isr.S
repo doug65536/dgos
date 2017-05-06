@@ -1,4 +1,4 @@
-.section .text, "ax"
+.section .text.isr, "ax"
 
 #include "isr_constants.h"
 
@@ -267,7 +267,7 @@ isr_common:
 
 	// If <= 0x2F -> irq_dispatcher
 	mov $irq_dispatcher,%rcx
-	cmp $0x2F,%rdi
+    cmp $0x2F,%edi
 	cmovbe %rcx,%rax
 
 	// If < 0x1F -> exception_isr_handler
