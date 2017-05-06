@@ -723,4 +723,6 @@ private:
     int8_t intr_was_enabled;
 };
 
+
+extern "C" __noinline
 void cpu_debug_break();
