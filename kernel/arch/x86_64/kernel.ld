@@ -14,12 +14,21 @@ SECTIONS {
 
 	/* Code and read-only data */
 	.text : AT (0x100000) ALIGN(4096) {
-		*(.entry)
-		*(.text)
-		*(.text.startup .text.startup.*)
+		/* ISR code is hot and should be page aligned because it is cloned */
+		___isr_st = .;
+		*(.text.isr)
+		___isr_en = .;
+
+		/* cache line align start of hot code */
+		. = ALIGN(64);
 		*(.text.hot .text.hot.*)
+		*(.text)
 		*(SORT(.text.*))
 		*(.text.unlikely)
+
+		/* startup code away from normal code to maximize locality */
+		*(.entry)
+		*(.text.startup .text.startup.*)
 	} :text
 
 	.rodata : ALIGN(4096) {
