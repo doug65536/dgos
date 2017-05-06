@@ -3,6 +3,14 @@
 #include "likely.h"
 #include "assert.h"
 #include "string.h"
+#include "printk.h"
+
+#define DEBUG_NONTEMPORAL   1
+#if DEBUG_NONTEMPORAL
+#define NONTEMPORAL_TRACE(...) printdbg("nontemporal: " __VA_ARGS__)
+#else
+#define NONTEMPORAL_TRACE(...) ((void)0)
+#endif
 
 static void *resolve_memcpy512_nt(void *dest, void const *src, size_t n);
 static void *resolve_memcpy32_nt(void *dest, void const *src, size_t n);
@@ -15,92 +23,33 @@ static memcpy_fn_t memcpy512_nt_fn = resolve_memcpy512_nt;
 static memcpy_fn_t memcpy32_nt_fn = resolve_memcpy32_nt;
 static memset32_fn_t memset32_nt_fn = resolve_memset32_nt;
 
-static void *memcpy512_nt_avx(void *dest, void const *src, size_t n)
-{
-    void *d = dest;
-    while (n >= 64) {
-        __asm__ __volatile__ (
-            "vmovntdqa      (%[src]),%%ymm0 \n\t"
-            "vmovntdqa  2*16(%[src]),%%ymm1 \n\t"
-            "vmovntdq %%ymm0 ,     (%[dst])\n\t"
-            "vmovntdq %%ymm1 , 2*16(%[dst])\n\t"
-            :
-            : [src] "r" (src), [dst] "r" (d)
-            : "memory", "%ymm0", "%ymm1"
-        );
-        src = (__ivec4*)src + 4;
-        d = (__ivec4*)d + 4;
-        n -= 64;
-    }
-    __asm__ __volatile__ (
-        "vzeroupper\n\t"
-        :
-        :
-        : "%ymm0",  "%ymm1",  "%ymm2",  "%ymm3"
-        , "%ymm4",  "%ymm5",  "%ymm6",  "%ymm7"
-        , "%ymm8",  "%ymm9",  "%ymm10", "%ymm11"
-        , "%ymm12", "%ymm13", "%ymm14", "%ymm15"
-    );
-    while (unlikely(n >= 16)) {
-        __asm__ __volatile__ (
-            "vmovntdqa      (%[src]),%%xmm0 \n\t"
-            "vmovntdq %%xmm0 ,     (%[dst])\n\t"
-            :
-            : [src] "r" (src), [dst] "r" (d)
-            : "memory", "%xmm0", "%xmm1"
-        );
-        src = (__ivec4*)src + 1;
-        d = (__ivec4*)d + 1;
-        n -= 16;
-    }
-    return dest;
-}
+// In separate file due to extra compiler option needed
+extern "C" void *memcpy512_nt_avx512(void *dest, void const *src, size_t n);
+extern "C" void *memcpy512_nt_avx(void *dest, void const *src, size_t n);
+extern "C" void *memcpy512_nt_sse4_1(void *dest, void const *src, size_t n);
 
-static void *memcpy512_nt_sse4_1(void *dest, void const *src, size_t n)
-{
-    void *d = dest;
-    while (n >= 64) {
-        __asm__ __volatile__ (
-            "movntdqa      (%[src]),%%xmm0 \n\t"
-            "movntdqa  1*16(%[src]),%%xmm1 \n\t"
-            "movntdqa  2*16(%[src]),%%xmm2 \n\t"
-            "movntdqa  3*16(%[src]),%%xmm3 \n\t"
-            "movntdq %%xmm0 ,     (%[dst])\n\t"
-            "movntdq %%xmm1 , 1*16(%[dst])\n\t"
-            "movntdq %%xmm2 , 2*16(%[dst])\n\t"
-            "movntdq %%xmm3 , 3*16(%[dst])\n\t"
-            :
-            : [src] "r" (src), [dst] "r" (d)
-            : "memory"
-        );
-        src = (__ivec4*)src + 4;
-        d = (__ivec4*)d + 4;
-        n -= 64;
-    }
-    while (unlikely(n >= 16)) {
-        __asm__ __volatile__ (
-            "movntdqa      (%[src]),%%xmm0 \n\t"
-            "movntdq %%xmm0 ,     (%[dst])\n\t"
-            :
-            : [src] "r" (src), [dst] "r" (d)
-            : "memory"
-        );
-        src = (__ivec4*)src + 1;
-        d = (__ivec4*)d + 1;
-        n -= 16;
-    }
-    return dest;
-}
+extern "C" void *memcpy32_nt_sse4_1(void *dest, void const *src, size_t n);
+extern "C" void *memset32_nt_sse4_1(void *dest, uint32_t val, size_t n);
+extern "C" void *memcpy32_nt_avx(void *dest, void const *src, size_t n);
+
+extern "C" void *memset32_nt_avx(void *dest, uint32_t val, size_t n);
 
 static void *resolve_memcpy512_nt(void *dest, void const *src, size_t n)
 {
-    if (cpuid_has_avx()) {
+    if (cpuid_has_avx512f()) {
+        NONTEMPORAL_TRACE("using avx512 memcpy512\n");
+        memcpy512_nt_fn = memcpy512_nt_avx512;
+        return memcpy512_nt_avx512(dest, src, n);
+    } else if (cpuid_has_avx()) {
+        NONTEMPORAL_TRACE("using avx memcpy512\n");
         memcpy512_nt_fn = memcpy512_nt_avx;
         return memcpy512_nt_avx(dest, src, n);
     } else if (cpuid_has_sse4_1()) {
+        NONTEMPORAL_TRACE("using sse4.1 memcpy512\n");
         memcpy512_nt_fn = memcpy512_nt_sse4_1;
         return memcpy512_nt_sse4_1(dest, src, n);
     }
+    NONTEMPORAL_TRACE("using legacy memcpy512\n");
     memcpy512_nt_fn = memcpy;
     return memcpy(dest, src, n);
 }
@@ -115,23 +64,18 @@ void *memcpy512_nt(void *dest, void const *src, size_t n)
     return memcpy512_nt_fn(dest, src, n);
 }
 
-static void *memcpy32_nt_sse4_1(void *dest, void const *src, size_t n)
-{
-    int *d = (int*)dest;
-    int const *s = (int const *)src;
-    while (n >= 4) {
-        __builtin_ia32_movnti(d++, *s++);
-        n -= 4;
-    }
-    return dest;
-}
-
 static void *resolve_memcpy32_nt(void *dest, void const *src, size_t n)
 {
-    if (cpuid_has_sse4_1()) {
+    if (cpuid_has_avx()) {
+        NONTEMPORAL_TRACE("using avx memcpy32\n");
+        memcpy32_nt_fn = memcpy32_nt_avx;
+        return memcpy32_nt_avx(dest, src, n);
+    } else if (cpuid_has_sse4_1()) {
+        NONTEMPORAL_TRACE("using sse4.1 memcpy32\n");
         memcpy32_nt_fn = memcpy32_nt_sse4_1;
         return memcpy32_nt_sse4_1(dest, src, n);
     }
+    NONTEMPORAL_TRACE("using legacy memcpy32\n");
     memcpy32_nt_fn = memcpy;
     return memcpy(dest, src, n);
 }
@@ -163,41 +107,18 @@ static void *memset32_nt_sse(void *dest, uint32_t val, size_t n)
     return dest;
 }
 
-static void *memset32_nt_sse4_1(void *dest, uint32_t val, size_t n)
-{
-    void *d = dest;
-
-    // Write 32-bit values until it is 128-bit aligned
-    while (((uintptr_t)d & 0xC) && n >= 4) {
-        __builtin_ia32_movnti((int*)d, val);
-        d = (uint32_t*)d + 1;
-        n -= 4;
-    }
-
-    // Write as many 128-bit values as possible
-    __uvec4 val128 = { val, val, val, val };
-    while (n >= 16) {
-        __builtin_ia32_movntdq((__ivec2LL*)d, (__ivec2LL)val128);
-        d = (__ivec4*)d + 1;
-        n -= 16;
-    }
-
-    // Write remainder
-    while (n >= 4) {
-        __builtin_ia32_movnti((int*)d, val);
-        d = (uint32_t*)d + 1;
-        n -= 4;
-    }
-
-    return dest;
-}
-
 static void *resolve_memset32_nt(void *dest, uint32_t val, size_t n)
 {
-    if (cpuid_has_sse4_1()) {
+    if (cpuid_has_avx()) {
+        NONTEMPORAL_TRACE("using avx memset\n");
+        memset32_nt_fn = memset32_nt_avx;
+        return memset32_nt_avx(dest, val, n);
+    } else if (cpuid_has_sse4_1()) {
+        NONTEMPORAL_TRACE("using sse4.1 memset\n");
         memset32_nt_fn = memset32_nt_sse4_1;
         return memset32_nt_sse4_1(dest, val, n);
     }
+    NONTEMPORAL_TRACE("using sse2 memset\n");
     memset32_nt_fn = memset32_nt_sse;
     return memset32_nt_sse(dest, val, n);
 }

@@ -28,6 +28,9 @@ CSRCS := \
 	cpu/ioport.cc \
 	cpu/mmu.cc \
 	cpu/nontemporal.cc \
+	cpu/nontemporal_sse4_1.cc \
+	cpu/nontemporal_avx.cc \
+	cpu/nontemporal_avx512.cc \
 	cpu/legacy_pic.cc \
 	cpu/legacy_pit.cc \
 	cpu/except.cc \
@@ -42,6 +45,17 @@ CSRCS := \
 	elf64.cc \
 	gdbstub.cc \
 	$(DEVSRCS)
+
+OPTIMIZEDSRCS :=
+
+AVX512SRCS := $(filter %_avx512.cc,$(CSRCS))
+AVXSRCS := $(filter %_avx.cc,$(CSRCS))
+SSE4_1SRCS := $(filter %_sse4_1.cc,$(CSRCS))
+$(AVX512SRCS:.cc=.o): CXXFLAGS += -mavx512f
+$(AVXSRCS:.cc=.o): CXXFLAGS += -mavx
+$(SSE4_1SRCS:.cc=.o): CXXFLAGS += -msse4.1
+
+OPTIMIZEDSRCS += $(AVX512SRCS) $(AVXSRCS) $(SSE4_1SRCS)
 
 #OPTIMIZEDSRCS := cpu/thread_impl.cc
 ifdef OPTIMIZEDSRCS

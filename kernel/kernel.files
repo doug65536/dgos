@@ -13,6 +13,9 @@ arch/x86_64/cpu/isr_constants.h
 arch/x86_64/cpu/math.cc
 arch/x86_64/cpu/nontemporal.cc
 arch/x86_64/cpu/nontemporal.h
+arch/x86_64/cpu/nontemporal_avx.cc
+arch/x86_64/cpu/nontemporal_avx512.cc
+arch/x86_64/cpu/nontemporal_sse4_1.cc
 arch/x86_64/device/ata.cc
 arch/x86_64/device/ata.h
 arch/x86_64/device/serial-uart.cc
