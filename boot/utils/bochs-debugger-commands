@@ -1,5 +1,4 @@
 u switch-mode
-ldsym "bin/bochs-kernel-symbols"
-lb "exception_common"
-lb "assert_failed"
+ldsym global "bin/bochs-kernel-symbols"
+lb "cpu_debug_break"
 c
