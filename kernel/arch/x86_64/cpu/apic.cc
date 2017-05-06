@@ -33,9 +33,16 @@
 
 #define DEBUG_APIC  1
 #if DEBUG_APIC
-#define APIC_TRACE(...) printdbg("apic: " __VA_ARGS__)
+#define APIC_TRACE(...) printdbg("lapic: " __VA_ARGS__)
 #else
 #define APIC_TRACE(...) ((void)0)
+#endif
+
+#define DEBUG_IOAPIC  1
+#if DEBUG_IOAPIC
+#define IOAPIC_TRACE(...) printdbg("ioapic: " __VA_ARGS__)
+#else
+#define IOAPIC_TRACE(...) ((void)0)
 #endif
 
 //
@@ -1612,7 +1619,7 @@ static int parse_mp_tables(void)
 
 static isr_context_t *apic_timer_handler(int intr, isr_context_t *ctx)
 {
-    apic_eoi(intr & 0);
+    apic_eoi(intr);
     return thread_schedule(ctx);
 }
 
@@ -1662,7 +1669,7 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
 
 void apic_eoi(int intr)
 {
-    apic->write32(APIC_REG_EOI, intr);
+    apic->write32(APIC_REG_EOI, intr & 0);
 }
 
 static void apic_online(int enabled, int spurious_intr)
@@ -1707,6 +1714,9 @@ static void apic_configure_timer(
         uint32_t dcr, uint32_t icr, uint8_t timer_mode,
         uint8_t intr, bool mask = false)
 {
+    APIC_TRACE("configuring timer,"
+               " dcr=0x%x, icr=0x%x, mode=0x%x, intr=0x%x, mask=%d\n",
+               dcr, icr, timer_mode, intr, mask);
     apic->write32(APIC_REG_LVT_DCR, dcr);
     apic->write32(APIC_REG_LVT_TR, APIC_LVT_VECTOR_n(intr) |
                   APIC_LVT_TR_MODE_n(timer_mode) |
@@ -1771,11 +1781,6 @@ int apic_init(int ap)
 
     apic->write32(APIC_REG_TPR, 0x0);
 
-    apic_configure_timer(APIC_LVT_DCR_BY_1,
-                         apic_timer_freq / 60,
-                         APIC_LVT_TR_MODE_PERIODIC,
-                         INTR_APIC_TIMER);
-
     assert(apic_base == (msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
 
     apic_dump_regs(ap);
@@ -1832,6 +1837,12 @@ static void apic_detect_topology(void)
 
 void apic_start_smp(void)
 {
+    // Start the timer here because interrupts are enable by now
+    apic_configure_timer(APIC_LVT_DCR_BY_1,
+                         apic_timer_freq / 60,
+                         APIC_LVT_TR_MODE_PERIODIC,
+                         INTR_APIC_TIMER);
+
     printdbg("%d CPU packages\n", apic_id_count);
 
     if (!acpi_rsdp_addr)
@@ -2311,6 +2322,9 @@ static void ioapic_map(mp_ioapic_t *ioapic,
             IOAPIC_REDLO_DELIVERY_n(delivery) |
             IOAPIC_REDLO_POLARITY_n(polarity) |
             IOAPIC_REDLO_TRIGGER_n(trigger);
+
+    IOAPIC_TRACE("Mapped IOAPIC irq %d (intin=%d) to interrupt 0x%x\n",
+                 mapping->irq, mapping->intin, intr);
 
     uint32_t iored_hi = IOAPIC_REDHI_DEST_n(0);
 
