@@ -376,6 +376,64 @@ size_t cpu_describe_fpusw(char *buf, size_t buf_size, uint16_t fpusw)
 
 }
 
+
+struct xsave_hdr_t {
+    uint64_t xstate_bv;
+    uint64_t xcomp_bv;
+};
+
+// NOTE: need separate get/set to handle modifying compact format in place
+static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
+{
+    xsave_hdr_t const *hdr = (xsave_hdr_t*)((char*)ctx->fpr + 512);
+    uint64_t const *area;
+    bool compact = (hdr->xcomp_bv & (uint64_t(1) << 63)) != 0;
+    int index = 0;
+    bool bit;
+
+    static uint64_t constexpr zero = 0;
+
+    if (reg < 16) {
+        // reg  0-15 xmm0-xmm15 (128 bits each)
+        return ctx->fpr->xmm[reg].qword;
+    } else if (sse_avx_offset && reg < 32) {
+        // reg 16-31 ymm0h-ymm15h (128 bits each)
+        reg -= 16;
+
+        area = (uint64_t*)((char*)ctx->fpr + sse_avx_offset);
+
+        if (compact) {
+            // Compact format
+
+            for (uint8_t i = 0; i < 16; ++i) {
+                bit = hdr->xcomp_bv & (1 << (i + 2));
+                index += bit;
+            }
+
+            if (!bit)
+                return &zero;
+
+            return area + (index * 2);
+        } else {
+            // Standard format
+
+            return area + (reg * 2);
+        }
+    } else if (sse_avx512_upper_offset && reg < 48) {
+        // reg 32-47 zmm0h-zmm15h (256 bits each)
+        reg -= 32;
+
+    } else if (sse_avx512_xregs_offset && reg < 64) {
+        // reg 48-63 zmm16-zmm31  (512 bits each)
+        reg -= 48;
+
+    } else if (sse_avx512_opmask_offset && reg < 72) {
+        // reg 64-72 are opmask (64 bits each)
+    }
+
+    return nullptr;
+}
+
 static void dump_context(isr_context_t *ctx, int to_screen)
 {
     char fmt_buf[64];
@@ -452,12 +510,29 @@ static void dump_context(isr_context_t *ctx, int to_screen)
                  ctx->gpr->r[i]);
     }
 
-    // xmm registers
-    for (int i = 0; i < 16; ++i) {
-        printdbg("%sxmm%d=%016lx%016lx\n",
-                 i > 9 ? "" : " ", i,
-                 ctx->fpr->xmm[i].qword[0],
-                ctx->fpr->xmm[i].qword[1]);
+    if (sse_avx512_xregs_offset && sse_avx512_xregs_size) {
+        // 32 register AVX-512
+
+    } else if (sse_avx512_upper_offset && sse_avx512_upper_size) {
+        // AVX-512
+
+    } else if (sse_avx_offset && sse_avx_size) {
+        // AVX
+        for (int i = 0; i < 16; ++i) {
+            uint64_t const *lo = cpu_get_fpr_reg(ctx, i);
+            uint64_t const *hi = cpu_get_fpr_reg(ctx, i + 16);
+            printdbg("%symm%d=%016lx:%016lx:%016lx:%016lx\n",
+                     i > 9 ? "" : " ", i,
+                     hi[1], hi[0], lo[1], lo[0]);
+        }
+    } else {
+        // xmm registers
+        for (int i = 0; i < 16; ++i) {
+            printdbg("%sxmm%d=%016lx%016lx\n",
+                     i > 9 ? "" : " ", i,
+                     ctx->fpr->xmm[i].qword[1],
+                    ctx->fpr->xmm[i].qword[0]);
+        }
     }
 
     // Segment registers
@@ -550,6 +625,7 @@ static void dump_context(isr_context_t *ctx, int to_screen)
                  i < 10 ? " " : "",
                  i);
         con_draw_xy(29, i, fmt_buf, color);
+
         // XMM register value
         snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx%016lx ",
                 ctx->fpr->xmm[i].qword[0],
@@ -658,8 +734,8 @@ static isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
             return handled_ctx;
     }
 
-    cpu_debug_break();
     dump_context(ctx, 1);
+    cpu_debug_break();
     halt_forever();
     return ctx;
 }
@@ -669,6 +745,7 @@ isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
     if (!intr_has_handler(intr) || !intr_invoke(intr, ctx)) {
         if (__exception_handler_invoke(intr))
             return unhandled_exception_handler(ctx);
+        cpu_debug_break();
     }
 
     return ctx;
