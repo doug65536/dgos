@@ -852,6 +852,7 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
 static void mmu_tlb_perform_shootdown(void)
 {
     cpu_flush_tlb();
+    thread_shootdown_notify();
 }
 
 // TLB shootdown IPI
@@ -872,10 +873,10 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-static void mmu_send_tlb_shootdown(void)
+static void mmu_send_tlb_shootdown(bool synchronous = false)
 {
     int cpu_count = thread_cpu_count();
-    if (unlikely(cpu_count == 0))
+    if (unlikely(cpu_count <= 1))
         return;
 
     cpu_scoped_irq_disable irq_was_enabled;
@@ -885,6 +886,14 @@ static void mmu_send_tlb_shootdown(void)
     int other_cpu_mask = all_cpu_mask & ~cur_cpu_mask;
     int old_pending = atomic_or(&shootdown_pending, other_cpu_mask);
     int need_ipi_mask = old_pending & other_cpu_mask;
+
+    vector<uint64_t> shootdown_counts;
+    shootdown_counts.reserve(thread_cpu_count());
+    for (int i = 0; i < cpu_count; ++i) {
+        shootdown_counts.push_back((i != cur_cpu)
+                                   ? thread_shootdown_count(i)
+                                   : -1);
+    }
 
     if (other_cpu_mask) {
         if (need_ipi_mask == other_cpu_mask) {
@@ -897,6 +906,28 @@ static void mmu_send_tlb_shootdown(void)
                     thread_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
             }
         }
+    }
+
+
+
+    if (synchronous) {
+        uint64_t wait_st = nano_time();
+        uint64_t loops = 0;
+        for (int wait_count = cpu_count - 1; wait_count > 0; pause()) {
+            for (int i = 0; i < cpu_count; ++i) {
+                uint64_t &count = shootdown_counts[i];
+                if (count != uint64_t(-1) &&
+                        thread_shootdown_count(i) > count) {
+                    count = -1;
+                    --wait_count;
+                }
+            }
+            ++loops;
+        }
+        uint64_t wait_en = nano_time();
+
+        printdbg("TLB shootdown waited for %lu loops, %lu cycles\n", loops,
+                 wait_en - wait_st);
     }
 }
 
@@ -2745,8 +2776,6 @@ uintptr_t mm_fork_kernel_text()
 
     for (size_t level = 0; level < 4; ++level) {
         for (pte_t *pte = st_ptes[level]; pte <= en_ptes[level]; ++pte) {
-            cpu_flush_tlb();
-
             // Allocate clone
             page = mmu_alloc_phys(0);
 
@@ -2762,9 +2791,9 @@ uintptr_t mm_fork_kernel_text()
             // Point PTE to clone
             *pte = page | flags;
         }
-    }
 
-    cpu_flush_tlb();
+        cpu_flush_tlb();
+    }
 
     return orig_pagedir;
 }

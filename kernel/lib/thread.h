@@ -47,3 +47,9 @@ void *thread_get_exception_top(void);
 void *thread_set_exception_top(void *chain);
 
 process_t *thread_current_process();
+
+// Get the TLB shootdown counter for the specified CPU
+uint64_t thread_shootdown_count(int cpu_nr);
+
+// Increment the TLB shootdown counter for the current CPU
+void thread_shootdown_notify();

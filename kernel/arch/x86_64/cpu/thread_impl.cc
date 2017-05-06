@@ -146,10 +146,11 @@ struct cpu_info_t {
 
     // Used for lazy TLB shootdown
     uint64_t mmu_seq;
+    uint64_t volatile tlb_shootdown_count;
 
     spinlock_t queue_lock;
 
-    void *storage[10];
+    void *storage[9];
 };
 
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
@@ -578,9 +579,6 @@ static thread_info_t *thread_choose_next(
             i = 0;
 
         candidate = threads + i;
-
-        //if (candidate->cpu_affinity == 0x80 && candidate->priority != -256)
-        //    cpu_debug_break();
 
         // If this thread is not allowed to run on this CPU
         // then skip it
@@ -1014,3 +1012,16 @@ uint32_t thread_get_cpu_apic_id(int cpu)
 {
     return cpus[cpu].apic_id;
 }
+
+uint64_t thread_shootdown_count(int cpu_nr)
+{
+    cpu_info_t const *cpu = cpus + cpu_nr;
+    return cpu->tlb_shootdown_count;
+}
+
+void thread_shootdown_notify()
+{
+    cpu_info_t *cpu = this_cpu();
+    atomic_inc(&cpu->tlb_shootdown_count);
+}
+
