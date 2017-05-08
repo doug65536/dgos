@@ -833,13 +833,15 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
     int present_mask = addr_present(addr, path, pte_linaddr);
 
     if (unlikely((present_mask & 0x07) != 0x07)) {
+        pte_t path_flags = PTE_PRESENT | PTE_WRITABLE;
+
         for (int i = 0; i < 3; ++i) {
             pte = *pte_linaddr[i];
 
             if (!pte) {
                 physaddr_t ptaddr = init_take_page(0);
                 clear_phys(ptaddr);
-                *pte_linaddr[i] = ptaddr | PTE_PRESENT | PTE_WRITABLE;
+                *pte_linaddr[i] = ptaddr | path_flags;
             }
         }
     }
@@ -974,7 +976,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
     int present_mask = addr_present(fault_addr, path, ptes);
 
-    pte_t pte = present_mask == 0x07 ? *ptes[3] : 0;
+    pte_t pte = (present_mask == 0x07) ? *ptes[3] : 0;
 
     // Check for lazy TLB shootdown
     if (present_mask == 0x0F &&
@@ -1097,7 +1099,8 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              "     instruction fetch=%d\n"
              "     protection key violation=%d\n"
              "     SGX violation=%d\n"
-             "PTE: present=%d\n"
+             "PTE: present_mask=0x%x\n"
+             "     present=%d\n"
              "     writable=%d\n"
              "     user=%d\n"
              "     write through=%d\n"
@@ -1106,7 +1109,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              "     dirty=%d\n"
              "     PAT=%d\n"
              "     global=%d\n"
-             "     physaddr=%lx\n"
+             "     physaddr=0x%lx\n"
              "     no execute=%d\n"
              "------------------\n",
              !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_P),
@@ -1116,6 +1119,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_I),
              !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_PK),
              !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
+             present_mask,
              !!(pte & PTE_PRESENT),
              !!(pte & PTE_WRITABLE),
              !!(pte & PTE_USER),
@@ -2785,15 +2789,20 @@ uintptr_t mm_fork_kernel_text()
             // Map clone
             mmu_map_page(dst_linaddr, page, flags);
 
+            // Flush tlb each iteration to ensure that stale entries
+            // from prefetch won't cause a problem
+            cpu_flush_tlb();
+
             // Copy original to clone
             memcpy(window + 512, window, PAGE_SIZE);
+
+            atomic_barrier();
 
             // Point PTE to clone
             *pte = page | flags;
         }
-
-        cpu_flush_tlb();
     }
+    cpu_flush_tlb();
 
     return orig_pagedir;
 }
