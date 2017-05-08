@@ -1783,6 +1783,13 @@ int apic_init(int ap)
 
     assert(apic_base == (msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
 
+    if (ap) {
+        apic_configure_timer(APIC_LVT_DCR_BY_1,
+                             apic_timer_freq / 60,
+                             APIC_LVT_TR_MODE_PERIODIC,
+                             INTR_APIC_TIMER);
+    }
+
     apic_dump_regs(ap);
 
     return 1;
