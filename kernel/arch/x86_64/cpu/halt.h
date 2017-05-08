@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 
+__always_inline
 static inline void halt(void)
 {
     __asm__ __volatile__ ( "hlt" );
