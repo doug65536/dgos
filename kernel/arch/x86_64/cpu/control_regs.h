@@ -246,6 +246,7 @@ static inline uint64_t cpu_xcr_change_bits(
         : "c" (xcr)
         , [set] "S" (set)
         , [clear_mask] "D" (~clear)
+        : "memory"
     );
     return ((uint64_t)edx << 32) | eax;
 }
@@ -262,6 +263,7 @@ static inline uintptr_t cpu_cr0_change_bits(uintptr_t clear, uintptr_t set)
         : [result] "=&r" (rax)
         : [clear] "ri" (~clear)
         , [set] "ri" (set)
+        : "memory"
     );
     return rax;
 }
@@ -278,6 +280,7 @@ static inline uintptr_t cpu_cr4_change_bits(uintptr_t clear, uintptr_t set)
         : [result] "=&r" (rax)
         : [clear] "ri" (~clear)
         , [set] "ri" (set)
+        : "memory"
     );
     return rax;
 }
