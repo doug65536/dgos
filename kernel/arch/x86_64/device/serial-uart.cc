@@ -285,21 +285,21 @@ private:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     isr_context_t *port_irq_handler(isr_context_t *ctx);
 
-    uint16_t queue_next(uint16_t value);
+    uint16_t queue_next(uint16_t value) const;
 
     void rx_enqueue(uint16_t value);
 
-    bool is_rx_full();
-    bool is_tx_full();
-    bool is_tx_not_empty();
-    bool is_rx_not_empty();
+    bool is_rx_full() const;
+    bool is_tx_full() const;
+    bool is_tx_not_empty() const;
+    bool is_rx_not_empty() const;
 
-    uint16_t tx_peek_value();
+    uint16_t tx_peek_value() const;
     void tx_take_value();
 
     void send_some_locked();
 
-    inline void out(port_t ofs, uint8_t value);
+    inline void out(port_t ofs, uint8_t value) const;
 
     template<typename T>
     inline void outp(T const& reg)
@@ -621,7 +621,7 @@ isr_context_t *uart_t::port_irq_handler(isr_context_t *ctx)
     return ctx;
 }
 
-uint16_t uart_t::queue_next(uint16_t value)
+uint16_t uart_t::queue_next(uint16_t value) const
 {
     return (value + 1) & ~-(1 << log2_buffer_size);
 }
@@ -632,31 +632,31 @@ void uart_t::rx_enqueue(uint16_t value)
     rx_head = queue_next(rx_head);
 }
 
-bool uart_t::is_rx_full()
+bool uart_t::is_rx_full() const
 {
     // Newly received bytes are placed at rx_head
     // Stream reads take bytes from rx_tail
     return queue_next(rx_head) == rx_tail;
 }
 
-bool uart_t::is_tx_full()
+bool uart_t::is_tx_full() const
 {
     // Stream writes place bytes at tx_head
     // Transmit takes bytes from tx_tail
     return queue_next(tx_head) == tx_tail;
 }
 
-bool uart_t::is_tx_not_empty()
+bool uart_t::is_tx_not_empty() const
 {
     return tx_head != tx_tail;
 }
 
-bool uart_t::is_rx_not_empty()
+bool uart_t::is_rx_not_empty() const
 {
     return rx_head != rx_tail;
 }
 
-uint16_t uart_t::tx_peek_value()
+uint16_t uart_t::tx_peek_value() const
 {
     return tx_buffer[tx_tail];
 }
@@ -666,7 +666,7 @@ void uart_t::tx_take_value()
     tx_tail = queue_next(tx_tail);
 }
 
-void uart_t::out(port_t ofs, uint8_t value)
+void uart_t::out(port_t ofs, uint8_t value) const
 {
     outb(io_base + ioport_t(ofs), value);
 }
