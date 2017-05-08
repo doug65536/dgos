@@ -99,6 +99,7 @@ static void cpu_init_smp_apic(void *arg)
     printdbg("AP in cpu_init_smp_apic\n");
     (void)arg;
     apic_init(1);
+
     thread_init(1);
 }
 
