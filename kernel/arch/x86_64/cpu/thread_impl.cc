@@ -578,6 +578,8 @@ static thread_info_t *thread_choose_next(
         if (unlikely(i >= count))
             i = 0;
 
+        atomic_barrier();
+
         candidate = threads + i;
 
         // If this thread is not allowed to run on this CPU
