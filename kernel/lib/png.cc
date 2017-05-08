@@ -26,7 +26,7 @@ typedef enum png_type_t {
     PNG_OTHER
 } png_type_t;
 
-static char png_blk_types[][5] = {
+static char constexpr png_blk_types[][5] = {
     "IHDR",
     "PLTE",
     "IDAT",
