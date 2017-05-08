@@ -386,3 +386,6 @@ void idt_set_unhandled_exception_handler(
         idt_unhandled_exception_handler_t handler);
 
 int idt_init(int ap);
+
+void idt_override_vector(int intr, irq_dispatcher_handler_t handler);
+void idt_clone_debug_exception_dispatcher(void);

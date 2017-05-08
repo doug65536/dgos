@@ -12,6 +12,7 @@
 #include "string.h"
 #include "assert.h"
 #include "except.h"
+#include "mm.h"
 
 #include "apic.h"
 
@@ -756,4 +757,35 @@ void idt_set_unhandled_exception_handler(
 {
     assert(!unhandled_exception_handler_vec);
     unhandled_exception_handler_vec = handler;
+}
+
+void idt_override_vector(int intr, irq_dispatcher_handler_t handler)
+{
+    idt[intr].offset_lo = uint16_t(uintptr_t(handler) >> 0);
+    idt[intr].offset_hi = uint16_t(uintptr_t(handler) >> 16);
+    idt[intr].offset_64_31 = uintptr_t(handler) >> 32;
+}
+
+void idt_clone_debug_exception_dispatcher(void)
+{
+    // From linker script
+    extern char ___isr_st[];
+    extern char ___isr_en[];
+    char const * bp_entry = (char const * const)isr_entry_3;
+    char const * debug_entry = (char const * const)isr_entry_1;
+
+    size_t isr_size = ___isr_en - ___isr_st;
+    size_t bp_entry_ofs = bp_entry - ___isr_st;
+    size_t debug_entry_ofs = debug_entry - ___isr_st;
+
+    char *clone = (char*)mmap(0, isr_size, PROT_READ | PROT_WRITE | PROT_EXEC,
+                       MAP_POPULATE, -1, 0);
+
+    memcpy(clone, ___isr_st, isr_size);
+
+    auto clone_breakpoint = irq_dispatcher_handler_t(clone + bp_entry_ofs);
+    auto clone_debug = irq_dispatcher_handler_t(clone + debug_entry_ofs);
+
+    idt_override_vector(INTR_EX_BREAKPOINT, clone_breakpoint);
+    idt_override_vector(INTR_EX_DEBUG, clone_debug);
 }
