@@ -73,7 +73,8 @@ static uint16_t allocate_page_table()
 }
 
 // Returns with segment == 0 if it does mapping does not exist
-static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create)
+static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create,
+                                 uint8_t log2_pagesize = 12)
 {
     pte_ref_t ref;
     ref.segment = root_page_dir;
@@ -88,7 +89,7 @@ static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create)
         ref.slot = (uint16_t)(linear_addr >> shift) & 0x1FF;
 
         // If we are in the last level page table, then done
-        if (shift == 12)
+        if (shift == log2_pagesize)
             break;
 
         // Read page table entry
@@ -125,9 +126,10 @@ static uint16_t paging_map_page(
         uint64_t linear_addr,
         uint64_t phys_addr,
         uint64_t pte_flags,
-        uint16_t keep)
+        uint16_t keep,
+        uint8_t log2_pagesize = 12)
 {
-    pte_ref_t ref = paging_find_pte(linear_addr, 1);
+    pte_ref_t ref = paging_find_pte(linear_addr, 1, log2_pagesize);
 
     // Read page table entry
     uint64_t pte = read_pte(ref.segment, ref.slot);
@@ -176,22 +178,25 @@ uint64_t paging_map_range(
         uint64_t length,
         uint64_t phys_addr,
         uint64_t pte_flags,
-        uint16_t keep)
+        uint16_t keep,
+        uint8_t log2_pagesize)
 {
-    uint16_t misalignment = linear_base & PAGE_MASK;
+    uint32_t page_size = 1 << log2_pagesize;
+    uint16_t misalignment = linear_base & (page_size - 1);
     linear_base -= misalignment;
     length += misalignment;
-    length = (length + PAGE_MASK) & -(int)PAGE_SIZE;
+    length = (length + (page_size - 1)) & -(int)page_size;
+
 
     uint64_t allocated = 0;
-    for (uint64_t offset = 0; offset < length; offset += PAGE_SIZE) {
+    for (uint64_t offset = 0; offset < length; offset += page_size) {
         if (paging_map_page(linear_base + offset,
                             phys_addr,
                             pte_flags,
-                            keep) || keep > 1)
+                            keep, log2_pagesize) || keep > 1)
         {
             ++allocated;
-            phys_addr += PAGE_SIZE;
+            phys_addr += page_size;
         }
     }
     return allocated;

@@ -72,7 +72,7 @@ uint32_t paging_root_addr();
 uint64_t paging_map_range(uint64_t linear_base,
         uint64_t length,
         uint64_t phys_addr,
-        uint64_t pte_flags, uint16_t keep);
+        uint64_t pte_flags, uint16_t keep, uint8_t log2_pagesize = 12);
 
 void paging_alias_range(uint64_t alias_addr,
                         uint64_t linear_addr,
