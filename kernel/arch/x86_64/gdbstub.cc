@@ -178,6 +178,8 @@ private:
     // or specified cpu (cpu_nr > 0)
     gdb_cpu_t *cpu_from_nr(int cpu_nr);
 
+    static void wait(gdb_cpu_t const *cpu);
+
     static isr_context_t *exception_handler(int, isr_context_t *ctx);
 
     inline isr_context_t *exception_handler(isr_context_t *ctx);
@@ -381,12 +383,15 @@ private:
     void data_received(char const *data, size_t size);
     bool match(const char *&input, char const *pattern,
                char const *separators, char *sep = nullptr);
-    bool parse_memop(uintptr_t& addr, size_t& size, char const *&input);
+    bool parse_memop(uintptr_t& addr, size_t& size, const char *input);
 
 
     uint8_t calc_checksum(char const *data, size_t size);
 
     rx_state_t handle_packet();
+    rx_state_t handle_memop_read(const char *input);
+    rx_state_t handle_memop_write(const char *&input);
+
     rx_state_t replyf_hex(char const *format, ...);
     rx_state_t replyf(char const *format, ...);
     rx_state_t reply(char const *data);
@@ -402,6 +407,7 @@ private:
     size_t reply_index;
 
     rx_state_t cmd_state;
+    uint8_t cmd_sum;
     uint8_t cmd_checksum;
 
     // Current CPU for step/continue operations
@@ -603,6 +609,8 @@ gdbstub_t::rx_state_t gdbstub_t::reply(const char *data, size_t size)
 
 void gdbstub_t::data_received(char const *data, size_t size)
 {
+    bool nonsense = false;
+
     for (size_t i = 0; i < size; ++i) {
         char ch = data[i];
 
@@ -610,25 +618,32 @@ void gdbstub_t::data_received(char const *data, size_t size)
         case rx_state_t::IDLE:
             if (ch == '$') {
                 cmd_index = 0;
+                cmd_sum = 0;
                 cmd_state = rx_state_t::GETLINE;
+                nonsense = false;
             } else if (ch == 3) {
                 cmd_buf[0] = 3;
                 cmd_index = 1;
                 cmd_state = handle_packet();
+                nonsense = false;
             } else {
                 GDBSTUB_TRACE("Dropped nonsense character"
                               " in IDLE state: 0x%x '%c'\n", uint8_t(ch),
                               ch >= 32 && ch < 127 ? ch : '.');
+                nonsense = true;
             }
             break;
 
         case rx_state_t::GETLINE:
-            if (ch == '}') {
-                cmd_state = rx_state_t::GETLINE_ESCAPED;
-            } else if (ch != '#') {
-                cmd_buf[cmd_index++] = ch;
-            } else if (unlikely(cmd_index >= MAX_BUFFER_SIZE - 1)) {
+            if (unlikely(cmd_index >= MAX_BUFFER_SIZE - 1)) {
+                GDBSTUB_TRACE("Command buffer overrun, dropping command\n");
                 cmd_state = rx_state_t::IDLE;
+            } else if (unlikely(ch == '}')) {
+                cmd_sum += ch;
+                cmd_state = rx_state_t::GETLINE_ESCAPED;
+            } else if (likely(ch != '#')) {
+                cmd_sum += ch;
+                cmd_buf[cmd_index++] = ch;
             } else {
                 cmd_buf[cmd_index] = 0;
                 cmd_state = rx_state_t::CHKSUM1;
@@ -636,6 +651,7 @@ void gdbstub_t::data_received(char const *data, size_t size)
             break;
 
         case rx_state_t::GETLINE_ESCAPED:
+            cmd_sum += ch;
             cmd_buf[cmd_index++] = ch ^ 0x20;
             cmd_state = rx_state_t::GETLINE;
             break;
@@ -648,13 +664,12 @@ void gdbstub_t::data_received(char const *data, size_t size)
         case rx_state_t::CHKSUM2:
             cmd_checksum |= from_hex(ch);
 
-            uint8_t checksum = calc_checksum(cmd_buf, cmd_index);
-
-            if (checksum == cmd_checksum) {
+            if (cmd_sum == cmd_checksum) {
                 // Send ACK
                 GDBSTUB_TRACE("command: %s\n", cmd_buf);
                 port->write("+", 1, 1);
                 cmd_state = handle_packet();
+                nonsense = false;
             } else {
                 // Send NACK
                 GDBSTUB_TRACE("Sending NAK, wrong checksum!\n");
@@ -665,6 +680,11 @@ void gdbstub_t::data_received(char const *data, size_t size)
             break;
 
         }
+    }
+
+    if (nonsense) {
+        port->write("-", 1, 1);
+        cmd_state = rx_state_t::IDLE;
     }
 }
 
@@ -703,7 +723,7 @@ void gdbstub_t::run()
 
             if (run_state == run_state_t::STOPPED || cpu_nr == 0 ||
                     !gdb_cpu_ctrl_t::is_cpu_frozen(cpu_nr)) {
-                halt();
+                thread_sleep_for(100);
                 continue;
             }
 
@@ -749,7 +769,7 @@ bool gdbstub_t::match(char const *&input, char const *pattern,
     return false;
 }
 
-bool gdbstub_t::parse_memop(uintptr_t& addr, size_t& size, char const *&input)
+bool gdbstub_t::parse_memop(uintptr_t& addr, size_t& size, char const *input)
 {
     from_hex<uintptr_t>(&addr, input);
     if (*input++ != ',')
@@ -761,6 +781,85 @@ bool gdbstub_t::parse_memop(uintptr_t& addr, size_t& size, char const *&input)
         return false;
 
     return true;
+}
+
+gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
+{
+    uintptr_t memop_addr;
+    uint64_t saved_cr3;
+    size_t memop_size;
+    size_t memop_index;
+    uint8_t const *memop_ptr;
+    isr_context_t const *ctx;
+
+    if (!parse_memop(memop_addr, memop_size, input))
+        return reply("E02");
+
+    memop_ptr = (uint8_t *)memop_addr;
+
+    ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
+    saved_cr3 = cpu_get_page_directory();
+
+    __try {
+        cpu_set_page_directory(ctx->gpr->cr3);
+        cpu_flush_tlb();
+        __try {
+            for (memop_index = 0; memop_index < memop_size; ++memop_index)
+                to_hex_bytes(tx_buf + memop_index*2, memop_ptr[memop_index]);
+        }
+        __catch {
+        }
+    }
+    __catch {
+    }
+
+    cpu_set_page_directory(saved_cr3);
+    cpu_flush_tlb();
+
+    if (memop_index)
+        return reply(tx_buf, memop_index * 2);
+
+    return reply("E14");
+}
+
+gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
+{
+    uintptr_t memop_addr;
+    uint64_t saved_cr3;
+    size_t memop_size;
+    size_t memop_index;
+    uint8_t *memop_ptr;
+    isr_context_t const *ctx;
+    bool ok;
+
+    if (!parse_memop(memop_addr, memop_size, input) || *input++ != ':')
+        return reply("E02");
+
+    memop_ptr = (uint8_t *)memop_addr;
+
+    ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
+    saved_cr3 = cpu_get_page_directory();
+
+    ok = false;
+
+    __try {
+        cpu_set_page_directory(ctx->gpr->cr3);
+        cpu_flush_tlb();
+        __try {
+            for (memop_index = 0; memop_index < memop_size; ++memop_index)
+                from_hex<uint8_t>(&memop_ptr[memop_index], input);
+            ok = true;
+        }
+        __catch {
+        }
+    }
+    __catch {
+    }
+
+    cpu_set_page_directory(saved_cr3);
+    cpu_flush_tlb();
+
+    return reply(ok ? "OK" : "E14");
 }
 
 gdbstub_t::rx_state_t gdbstub_t::handle_packet()
@@ -776,19 +875,15 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
     //  vCont to step and continue with multiple threads
 
     isr_context_t *ctx;
-    uintptr_t memop_addr;
-    uint64_t saved_cr3;
     uintptr_t addr;
-    size_t memop_size;
-    size_t memop_index;
     int thread;
     int cpu;
     gdb_breakpoint_type_t type;
     int kind;
     bool add;
-    uint8_t *memop_ptr;
-    bool ok;
     size_t reg;
+
+    vector<char> step_actions;
 
     switch (ch) {
     case 3:
@@ -847,65 +942,11 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
     case 'm':
         // Read memory
-        if (!parse_memop(memop_addr, memop_size, input))
-            return reply("E02");
-
-        memop_ptr = (uint8_t *)memop_addr;
-
-        ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
-        saved_cr3 = cpu_get_page_directory();
-
-        __try {
-            cpu_set_page_directory(ctx->gpr->cr3);
-            cpu_flush_tlb();
-            __try {
-                for (memop_index = 0; memop_index < memop_size; ++memop_index)
-                    to_hex_bytes(tx_buf + memop_index*2, memop_ptr[memop_index]);
-            }
-            __catch {
-            }
-        }
-        __catch {
-        }
-
-        cpu_set_page_directory(saved_cr3);
-        cpu_flush_tlb();
-
-        if (memop_index)
-            return reply(tx_buf, memop_index * 2);
-
-        return reply("E14");
+        return handle_memop_read(input);
 
     case 'M':
         // Set memory
-        if (!parse_memop(memop_addr, memop_size, input) || *input++ != ':')
-            return reply("E02");
-
-        memop_ptr = (uint8_t *)memop_addr;
-
-        ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
-        saved_cr3 = cpu_get_page_directory();
-
-        __try {
-            cpu_set_page_directory(ctx->gpr->cr3);
-            cpu_flush_tlb();
-            __try {
-                for (memop_index = 0; memop_index < memop_size; ++memop_index)
-                    from_hex<uint8_t>(&memop_ptr[memop_index], input);
-                ok = true;
-            }
-            __catch {
-                ok = false;
-            }
-        }
-        __catch {
-            ok = false;
-        }
-
-        cpu_set_page_directory(saved_cr3);
-        cpu_flush_tlb();
-
-        return reply(ok ? "OK" : "E14");
+        return handle_memop_write(input);
 
     case 'H':
         thread = 0;
@@ -972,6 +1013,12 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
             // "vCont?" command
             return reply("vCont;s;c;S;C");
         } else if (match(input, "Cont", ":;")) {
+            // Initialize an array with one entry per CPU
+            // Values are set once, only entries with 0 value are modified
+            step_actions.resize(gdb_cpu_ctrl_t::get_gdb_cpu(), 0);
+
+            step_cpu_nr = 0;
+
             while (*input) {
                 char action = 0;
                 char sep = 0;
@@ -987,18 +1034,31 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
                 if (*input)
                     thread = from_hex<int>(&input);
 
-                if (action == 's') {
-                    // Single step one CPU
-                    run_state = run_state_t::STEPPING;
-                    step_cpu_nr = thread;
-                    gdb_cpu_ctrl_t::continue_frozen(thread, true);
+                if (thread > 0) {
+                    // Step a specific CPU
+                    if (step_actions.at(thread - 1) == 0) {
+                        step_actions[thread - 1] = action;
+
+                        if (action == 's' && step_cpu_nr == 0)
+                            step_cpu_nr = thread;
+                    }
                 } else {
-                    // Continue all CPUs
-                    run_state = run_state_t::RUNNING;
-                    step_cpu_nr = 0;
-                    gdb_cpu_ctrl_t::continue_frozen(0, false);
+                    // Step all CPUs that don't have an action assigned
+                    for (char& cpu_action : step_actions) {
+                        if (cpu_action == 0)
+                            cpu_action = action;
+                    }
                 }
 
+                run_state = step_cpu_nr
+                        ? run_state_t::STEPPING
+                        : run_state_t::RUNNING;
+
+                for (char& cpu_action : step_actions) {
+                    if (cpu_action != 0)
+                        gdb_cpu_ctrl_t::continue_frozen(
+                                    thread, cpu_action == 's');
+                }
 
                 return rx_state_t::IDLE;
             }
@@ -1399,6 +1459,8 @@ void gdb_cpu_ctrl_t::hook_exceptions()
     intr_hook(INTR_EX_NMI, &gdb_cpu_ctrl_t::exception_handler);
     intr_hook(INTR_EX_BREAKPOINT, &gdb_cpu_ctrl_t::exception_handler);
     idt_set_unhandled_exception_handler(&gdb_cpu_ctrl_t::exception_handler);
+
+    idt_clone_debug_exception_dispatcher();
 }
 
 void gdb_cpu_ctrl_t::start_stub()
@@ -1458,7 +1520,7 @@ void gdb_cpu_ctrl_t::start()
         pause();
 }
 
-void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t &cpu)
+void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t& cpu)
 {
     if (cpu.state == gdb_cpu_state_t::RUNNING) {
         cpu.state = gdb_cpu_state_t::FREEZING;
@@ -1477,6 +1539,9 @@ int gdb_cpu_ctrl_t::gdb_thread(void *)
 
 void gdb_cpu_ctrl_t::gdb_thread()
 {
+    while (stub_tid == 0)
+        thread_sleep_for(10);
+
     gdb_cpu = cpus.size();
 
     thread_set_affinity(stub_tid, 1U << (gdb_cpu));
@@ -1508,6 +1573,12 @@ gdb_cpu_t *gdb_cpu_ctrl_t::cpu_from_nr(int cpu_nr)
 isr_context_t *gdb_cpu_ctrl_t::exception_handler(int, isr_context_t *ctx)
 {
     return instance.exception_handler(ctx);
+}
+
+void gdb_cpu_ctrl_t::wait(gdb_cpu_t const *cpu)
+{
+    while (cpu->state == gdb_cpu_state_t::FROZEN)
+        halt();
 }
 
 isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
@@ -1576,8 +1647,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     cpu->state = gdb_cpu_state_t::FROZEN;
 
     // Idle the CPU until NMI wakes it
-    while (cpu->state == gdb_cpu_state_t::FROZEN)
-        halt();
+    wait(cpu);
 
     // The only way to reach here
     assert(cpu->state == gdb_cpu_state_t::RESUMING);
