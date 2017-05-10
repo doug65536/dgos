@@ -442,7 +442,7 @@ static void thread_monitor_mwait(void)
 }
 #endif
 
-static int smp_thread(void *arg)
+static int smp_idle_thread(void *arg)
 {
     // Enable spinning
     spincount_mask = -1;
@@ -535,7 +535,7 @@ void thread_init(int ap)
         thread_count = 1;
     } else {
         thread = threads + thread_create_with_state(
-                    smp_thread, 0, 0, 0,
+                    smp_idle_thread, 0, 0, 0,
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
                     -256, (void*)1);
