@@ -1549,11 +1549,11 @@ void gdb_cpu_ctrl_t::gdb_thread()
     // Set GDB stub to time critical priority
     thread_set_priority(stub_tid, 32767);
 
+    unique_ptr<gdbstub_t> stub(new gdbstub_t);
+
     freeze_all();
 
     stub_running = true;
-
-    unique_ptr<gdbstub_t> stub(new gdbstub_t);
     stub->run();
 }
 
