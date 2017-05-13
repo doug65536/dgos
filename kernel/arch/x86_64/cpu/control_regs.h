@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "cpuid.h"
+#include "atomic.h"
 
 #define MSR_FSBASE      0xC0000100
 #define MSR_GSBASE      0xC0000101
@@ -726,6 +727,54 @@ private:
     int8_t intr_was_enabled;
 };
 
+// Monitor/mwait
+
+template<typename T>
+__always_inline
+static inline void cpu_monitor(T const volatile *addr,
+                               uint32_t ext, uint32_t hint)
+{
+    static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
+
+    __asm__ __volatile__ (
+        "monitor"
+        :
+        : "a" (addr)
+        , "c" (ext)
+        , "d" (hint)
+    );
+}
+
+__always_inline
+static inline void cpu_mwait(uint32_t ext, uint32_t hint)
+{
+    __asm__ __volatile__ (
+        "mwait"
+        :
+        : "c" (ext)
+        , "d" (hint)
+    );
+}
+
+template<typename T>
+__always_inline
+void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
+{
+    static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
+
+    T mask = T(1) << bit;
+    if (cpuid_has_mwait()) {
+        while (*value & mask) {
+            cpu_monitor(value, 0, 0);
+
+            if (*value & mask)
+                cpu_mwait(0, 0);
+        }
+    } else {
+        while (*value & mask)
+            pause();
+    }
+}
 
 extern "C" __noinline
 void cpu_debug_break();
