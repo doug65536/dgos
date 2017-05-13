@@ -77,7 +77,7 @@ extern "C" isr_context_t *intr_invoke(int intr, isr_context_t *ctx);
 isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx);
 
 // Returns true if there is an interrupt handler for the interrupt
-int intr_has_handler(int intr);
+extern "C" int intr_has_handler(int intr);
 
 int msi_irq_alloc(msi_irq_mem_t *results, int count,
                   int cpu, int distribute);

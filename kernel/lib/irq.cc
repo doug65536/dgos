@@ -195,15 +195,13 @@ int intr_has_handler(int intr)
 
 isr_context_t *intr_invoke(int intr, isr_context_t *ctx)
 {
-    if (intr_has_handler(intr)) {
-        intr_handler_reg_t *entry;
-        intr_link_t i = intr_first[intr];
-        // assert not empty handler list
-        assert(i >= 0);
-        for ( ; i >= 0; i = entry->next) {
-            entry = intr_handlers + i;
-            ctx = entry->handler(intr, ctx);
-        }
+    intr_handler_reg_t *entry;
+    intr_link_t i = intr_first[intr];
+    // assert not empty handler list
+    assert(i >= 0);
+    for ( ; i >= 0; i = entry->next) {
+        entry = intr_handlers + i;
+        ctx = entry->handler(intr, ctx);
     }
     return ctx;
 }
