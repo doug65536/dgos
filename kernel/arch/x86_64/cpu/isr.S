@@ -464,3 +464,75 @@ isr_save_fxsave:
 .hidden isr_restore_fxrstor
 isr_restore_fxrstor:
 	xrstor_ctx fxrstor64
+
+//  isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
+//  {
+//      if (!intr_has_handler(intr) || !intr_invoke(intr, ctx)) {
+//          if (__exception_handler_invoke(intr))
+//              return unhandled_exception_handler(ctx);
+//          cpu_debug_break();
+//      }
+//
+//      return ctx;
+//  }
+//
+// isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
+exception_isr_handler:
+	.cfi_startproc
+
+	push_cfi %rbp
+    mov %rsp,%rbp
+	push_cfi %rbx
+	push_cfi %r12
+
+	mov $intr_has_handler,%rax
+
+	// ebx=intr, r12=ctx
+	mov %edi,%ebx
+	mov %rsi,%r12
+
+	// If there is no handler...
+	call *%rax
+    test %eax,%eax
+    jz 0f
+
+	// ...or the handler rejected it
+	mov $intr_invoke,%rax
+	mov %ebx,%edi
+	mov %r12,%rsi
+	call *%rax
+    test %eax,%eax
+	jz 0f
+
+1:
+	// Handler handled it
+	mov %r12,%rax
+	pop_cfi %r12
+	pop_cfi %rbx
+	pop_cfi %rbp
+	retq
+
+.align 16
+0:
+	// ...no handler or handler rejected it
+	mov $__exception_handler_invoke,%rax
+	mov %ebx,%edi
+	call *%rax
+	test %eax,%eax
+	jnz 2f
+
+	mov $cpu_debug_break,%rax
+	call *%rax
+	jmp 1b
+.align 16
+
+	// Tail call to unhandled_exception_handler
+2:
+	mov $unhandled_exception_handler,%rax
+	mov %r12,%rdi
+	pop_cfi %r12
+	pop_cfi %rbx
+	pop_cfi %rbp
+	jmp *%rax
+
+	.cfi_endproc

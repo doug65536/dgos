@@ -725,7 +725,7 @@ static void dump_context(isr_context_t *ctx, int to_screen)
         apic_dump_regs(0);
 }
 
-static isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
+isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
     if (unhandled_exception_handler_vec) {
         isr_context_t *handled_ctx = unhandled_exception_handler_vec(
@@ -741,16 +741,16 @@ static isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
     return ctx;
 }
 
-isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
-{
-    if (!intr_has_handler(intr) || !intr_invoke(intr, ctx)) {
-        if (__exception_handler_invoke(intr))
-            return unhandled_exception_handler(ctx);
-        cpu_debug_break();
-    }
-
-    return ctx;
-}
+//isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
+//{
+//    if (!intr_has_handler(intr) || !intr_invoke(intr, ctx)) {
+//        if (__exception_handler_invoke(intr))
+//            return unhandled_exception_handler(ctx);
+//        cpu_debug_break();
+//    }
+//
+//    return ctx;
+//}
 
 void idt_set_unhandled_exception_handler(
         idt_unhandled_exception_handler_t handler)
