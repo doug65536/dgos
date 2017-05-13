@@ -27,6 +27,8 @@ arch/x86_64/elf64.h
 arch/x86_64/elf64_decl.h
 arch/x86_64/gdbstub.cc
 arch/x86_64/gdbstub.h
+arch/x86_64/stacktrace.cc
+arch/x86_64/stacktrace.h
 dep-zlib.mk
 fs/ext4.cc
 fs/fat32_decl.h

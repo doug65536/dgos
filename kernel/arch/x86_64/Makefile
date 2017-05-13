@@ -43,6 +43,7 @@ CSRCS := \
 	device/usb_xhci.cc \
 	bootdev.cc \
 	elf64.cc \
+	stacktrace.cc \
 	gdbstub.cc \
 	$(DEVSRCS)
 
