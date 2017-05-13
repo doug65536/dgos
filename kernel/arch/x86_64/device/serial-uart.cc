@@ -383,6 +383,14 @@ uart_t::uart_t(ioport_t port, uint8_t port_irq, uint32_t baud)
 
     // Enable access to baud rate registers
     reg_lcr.bits.baud_latch = 1;
+
+    // Might as well program the rest of LCR here
+    reg_lcr.bits.wordlen = uint8_t(lcr_wordlen_t::DATA8);
+    reg_lcr.bits.stopbits = uint8_t(lcr_stopbits_t::STOP1);
+    reg_lcr.bits.parity = uint8_t(lcr_parity_t::ZERO);
+    reg_lcr.bits.parity_en = 0;
+    reg_lcr.bits.tx_break = 0;
+
     outp(reg_lcr);
 
     // Set baud rate
@@ -575,7 +583,7 @@ isr_context_t *uart_t::port_irq_handler(isr_context_t *ctx)
     bool wake_tx = false;
     bool wake_rx = false;
 
-    for (inp(reg_iir); reg_iir.bits.nintr != 1; inp(reg_iir)) {
+    for (inp(reg_iir); !reg_iir.bits.nintr && !is_rx_full(); inp(reg_iir)) {
         switch (reg_iir.bits.source) {
         case uint8_t(iir_source_t::ERROR):
             // Overrun error, parity error, framing error, break
