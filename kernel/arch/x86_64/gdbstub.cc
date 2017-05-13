@@ -100,7 +100,7 @@ public:
 
     static bool is_cpu_running(int cpu_nr);
     static int is_cpu_frozen(int cpu_nr);
-    static void freeze_all();
+    static void freeze_all(int first = 1);
     static void continue_frozen(int cpu_nr, bool single_step);
 
     static void hook_exceptions();
@@ -109,6 +109,7 @@ public:
     static int get_gdb_cpu();
 
     static gdb_signal_idx_t signal_from_intr(int intr);
+    static char const *signal_name(gdb_signal_idx_t sig);
 
     template<typename T>
     bool breakpoint_write_target(uintptr_t addr, T value,
@@ -119,6 +120,10 @@ public:
     static bool breakpoint_del(gdb_breakpoint_type_t type,
                                uintptr_t addr, uintptr_t page_dir);
     static void breakpoint_toggle_all(bool activate);
+
+    static int breakpoint_get_byte(const uint8_t *addr, uintptr_t page_dir);
+    static bool breakpoint_set_byte(uint8_t *addr, uintptr_t page_dir,
+                                    uint8_t value);
 
 private:
     struct breakpoint_t {
@@ -398,7 +403,8 @@ private:
     rx_state_t reply_hex(char const *format, size_t size);
     rx_state_t reply(char const *data, size_t size);
     static size_t get_context(char *reply, isr_context_t const *ctx);
-    static size_t set_context(isr_context_t const *ctx, char const *data);
+    static size_t set_context(isr_context_t const *ctx,
+                              char const *data, size_t data_len);
 
     uart_dev_t *port;
 
@@ -601,7 +607,8 @@ gdbstub_t::rx_state_t gdbstub_t::reply(const char *data, size_t size)
 
         port->read(&ack, 1, 1);
 
-        GDBSTUB_TRACE("Got reply response: %c\n", ack);
+        if (ack != '+')
+            GDBSTUB_TRACE("Got reply response: %c\n", ack);
     } while (ack == '-');
 
     return rx_state_t::IDLE;
@@ -723,12 +730,12 @@ void gdbstub_t::run()
 
             if (run_state == run_state_t::STOPPED || cpu_nr == 0 ||
                     !gdb_cpu_ctrl_t::is_cpu_frozen(cpu_nr)) {
-                thread_sleep_for(100);
+                halt();
                 continue;
             }
 
             if (run_state == run_state_t::RUNNING)
-                gdb_cpu_ctrl_t::freeze_all();
+                gdb_cpu_ctrl_t::freeze_all(c_cpu);
 
             run_state = run_state_t::STOPPED;
             step_cpu_nr = 0;
@@ -736,7 +743,20 @@ void gdbstub_t::run()
             ctx = gdb_cpu_ctrl_t::context_of(cpu_nr);
             sig = gdb_cpu_ctrl_t::signal_from_intr(ctx->gpr->info.interrupt);
 
-            replyf("T%02xthread:%x;", sig, cpu_nr);
+            if (ctx->gpr->info.interrupt == INTR_EX_BREAKPOINT) {
+                // If we planted the breakpoint, adjust RIP
+                if (gdb_cpu_ctrl_t::breakpoint_get_byte(
+                            (uint8_t*)ctx->gpr->iret.rip - 1,
+                            ctx->gpr->cr3) >= 0) {
+                    ctx->gpr->iret.rip = (int(*)(void*))
+                            ((uint8_t*)ctx->gpr->iret.rip - 1);
+                }
+
+                //replyf("T%02xswbreak:;", sig);
+            }
+            //else {
+                replyf("T%02xthread:%x;", sig, cpu_nr);
+            //}
         }
     }
 }
@@ -804,8 +824,19 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
         cpu_set_page_directory(ctx->gpr->cr3);
         cpu_flush_tlb();
         __try {
-            for (memop_index = 0; memop_index < memop_size; ++memop_index)
-                to_hex_bytes(tx_buf + memop_index*2, memop_ptr[memop_index]);
+            for (memop_index = 0; memop_index < memop_size; ++memop_index) {
+                uint8_t const& mem_value = memop_ptr[memop_index];
+
+                // Read the old byte if a software breakpoint is placed there
+                int bp_byte = gdb_cpu_ctrl_t::breakpoint_get_byte(
+                            &mem_value, ctx->gpr->cr3);
+
+                // Read memory or use saved value from software breakpoint
+                if (bp_byte < 0)
+                    to_hex_bytes(tx_buf + memop_index*2, mem_value);
+                else
+                    to_hex_bytes(tx_buf + memop_index*2, uint8_t(bp_byte));
+            }
         }
         __catch {
         }
@@ -846,8 +877,14 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
         cpu_set_page_directory(ctx->gpr->cr3);
         cpu_flush_tlb();
         __try {
-            for (memop_index = 0; memop_index < memop_size; ++memop_index)
-                from_hex<uint8_t>(&memop_ptr[memop_index], input);
+            for (memop_index = 0; memop_index < memop_size; ++memop_index) {
+                uint8_t& mem_value = memop_ptr[memop_index];
+                uint8_t new_value;
+                from_hex<uint8_t>(&new_value, input);
+                if (!gdb_cpu_ctrl_t::breakpoint_set_byte(
+                            &mem_value, ctx->gpr->cr3, new_value))
+                    mem_value = new_value;
+            }
             ok = true;
         }
         __catch {
@@ -888,9 +925,10 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
     switch (ch) {
     case 3:
         // Ctrl-c pressed on client
+        GDBSTUB_TRACE("Got interrupt request\n");
         step_cpu_nr = c_cpu;
         run_state = run_state_t::STEPPING;
-        gdb_cpu_ctrl_t::freeze_all();
+        gdb_cpu_ctrl_t::freeze_all(c_cpu);
         return rx_state_t::IDLE;
 
     case '?':
@@ -905,7 +943,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
         // Set all CPU registers
         ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
         if (ctx) {
-            set_context(ctx, input);
+            set_context(ctx, input, cmd_index);
             return reply("OK");
         }
 
@@ -937,7 +975,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
         memset(tx_buf + regs[reg].offset, '0', regs[reg].size);
         assert(strlen(input) >= regs[reg].size);
         memcpy(tx_buf + regs[reg].offset, input, regs[reg].size);
-        set_context(ctx, tx_buf);
+        set_context(ctx, tx_buf, cmd_index);
         return reply("OK");
 
     case 'm':
@@ -1054,10 +1092,20 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
                         ? run_state_t::STEPPING
                         : run_state_t::RUNNING;
 
+                // Do all of the continues (if any)
+                int wake = 1;
                 for (char& cpu_action : step_actions) {
-                    if (cpu_action != 0)
-                        gdb_cpu_ctrl_t::continue_frozen(
-                                    thread, cpu_action == 's');
+                    if (cpu_action == 'c')
+                        gdb_cpu_ctrl_t::continue_frozen(wake, false);
+                    ++wake;
+                }
+
+                // Do all of the steps (if any)
+                wake = 1;
+                for (char& cpu_action : step_actions) {
+                    if (cpu_action == 's')
+                        gdb_cpu_ctrl_t::continue_frozen(wake, true);
+                    ++wake;
                 }
 
                 return rx_state_t::IDLE;
@@ -1088,6 +1136,10 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
             gdb_cpu_ctrl_t::breakpoint_del(type, addr, ctx->gpr->cr3);
 
         return reply("OK");
+
+    case 'k':
+        // FIXME: reboot the machine / kill the vm
+        break;
     }
 
     return reply("");
@@ -1215,9 +1267,11 @@ void gdbstub_t::from_hex_bytes(T *out, char const *&input, size_t advance)
         input += (advance - sizeof(T)) * 2;
 }
 
-size_t gdbstub_t::set_context(isr_context_t const *ctx, char const *data)
+size_t gdbstub_t::set_context(isr_context_t const *ctx,
+                              char const *data, size_t data_len)
 {
     char const *input = data;
+    char const *end = data + data_len;
 
     from_hex_bytes(&ISR_CTX_REG_RAX(ctx), input);
     from_hex_bytes(&ISR_CTX_REG_RBX(ctx), input);
@@ -1269,11 +1323,16 @@ size_t gdbstub_t::set_context(isr_context_t const *ctx, char const *data)
 
     from_hex_bytes(&ISR_CTX_SSE_MXCSR(ctx), input);
 
-    input += 16;
+    // Skip prev_rax
+    if (input + 16 <= end)
+        input += 16;
 
-    from_hex_bytes((uintptr_t*)&ISR_CTX_FSBASE(ctx), input);
+    if (input + 16 <= end)
+        from_hex_bytes((uintptr_t*)&ISR_CTX_FSBASE(ctx), input);
 
-    input += 16;
+    // Skip gs_base
+    if (input + 16 <= end)
+        input += 16;
 
     assert(input - data == X86_64_CONTEXT_SIZE);
 
@@ -1316,6 +1375,8 @@ bool gdb_cpu_ctrl_t::breakpoint_write_target(
     cpu_flush_tlb();
     cpu_cr0_change_bits(CR0_WP, 0);
     *old_value = atomic_xchg((uint8_t*)addr, value);
+    GDBSTUB_TRACE("Wrote 0x%lx to %zx, replaced 0x%lx\n",
+                  uintptr_t(value), addr, uintptr_t(*old_value));
     cpu_cr0_change_bits(0, CR0_WP);
     cpu_set_page_directory(orig_pagedir);
     cpu_flush_tlb();
@@ -1367,10 +1428,14 @@ bool gdb_cpu_ctrl_t::breakpoint_toggle(breakpoint_t &bp, bool activate)
         if (!breakpoint_write_target(bp.addr, X86_BREAKPOINT_OPCODE,
                                      &bp.orig_data, bp.page_dir))
             return false;
+
+        bp.active = true;
     } else if (!activate && bp.active) {
         if (!breakpoint_write_target(bp.addr, bp.orig_data,
                                      &old_value, bp.page_dir))
             return false;
+
+        bp.active = false;
         assert(old_value == X86_BREAKPOINT_OPCODE);
     }
     return true;
@@ -1380,6 +1445,31 @@ void gdb_cpu_ctrl_t::breakpoint_toggle_all(bool activate)
 {
     instance.breakpoint_toggle_list(instance.bp_sw, activate);
     instance.breakpoint_toggle_list(instance.bp_hw, activate);
+}
+
+int gdb_cpu_ctrl_t::breakpoint_get_byte(uint8_t const *addr, uintptr_t page_dir)
+{
+    auto it = instance.breakpoint_find(instance.bp_sw, uintptr_t(addr),
+                                       page_dir);
+
+    if (it == instance.bp_sw.end() || !it->active)
+        return -1;
+
+    return it->orig_data;
+}
+
+bool gdb_cpu_ctrl_t::breakpoint_set_byte(uint8_t *addr, uintptr_t page_dir,
+                                         uint8_t value)
+{
+    auto it = instance.breakpoint_find(instance.bp_sw, uintptr_t(addr),
+                                       page_dir);
+
+    if (it == instance.bp_sw.end() || !it->active)
+        return false;
+
+    it->orig_data = value;
+
+    return true;
 }
 
 void gdb_cpu_ctrl_t::breakpoint_toggle_list(bp_list &list, bool activate)
@@ -1407,12 +1497,14 @@ bool gdb_cpu_ctrl_t::is_cpu_running(int cpu_nr)
 int gdb_cpu_ctrl_t::is_cpu_frozen(int cpu_nr)
 {
     if (cpu_nr >= 0) {
+        // Specific CPU
         gdb_cpu_t const *cpu = instance.cpu_from_nr(cpu_nr);
         return (cpu && cpu->state == gdb_cpu_state_t::FROZEN)
                 ? cpu->cpu_nr
                 : 0;
     }
 
+    // Any CPU
     for (gdb_cpu_t& cpu : instance.cpus) {
         if (cpu.state == gdb_cpu_state_t::FROZEN)
             return cpu.cpu_nr;
@@ -1421,10 +1513,20 @@ int gdb_cpu_ctrl_t::is_cpu_frozen(int cpu_nr)
     return 0;
 }
 
-void gdb_cpu_ctrl_t::freeze_all()
+void gdb_cpu_ctrl_t::freeze_all(int first)
 {
-    for (auto& cpu : instance.cpus)
-        instance.freeze_one(cpu);
+    gdb_cpu_t* first_cpu = nullptr;
+
+    if (first > 0)
+        first_cpu = instance.cpu_from_nr(first);
+
+    if (first_cpu)
+        instance.freeze_one(*first_cpu);
+
+    for (auto& cpu : instance.cpus) {
+        if (&cpu != first_cpu)
+            instance.freeze_one(cpu);
+    }
 }
 
 void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
@@ -1444,6 +1546,8 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
             cpu.state = gdb_cpu_state_t::RESUMING;
 
             // Send an NMI to the CPU to wake it up from halt
+            GDBSTUB_TRACE("Sending NMI to cpu %d (APICID=0x%x)\n",
+                          cpu.cpu_nr, cpu.apic_id);
             apic_send_ipi(cpu.apic_id, INTR_EX_NMI);
 
             // Wait for CPU to pick it up
@@ -1478,7 +1582,7 @@ gdb_signal_idx_t gdb_cpu_ctrl_t::signal_from_intr(int intr)
     switch (intr) {
     case INTR_EX_DIV        : return gdb_signal_idx_t::SIGFPE;
     case INTR_EX_DEBUG      : return gdb_signal_idx_t::SIGTRAP;
-    case INTR_EX_NMI        : return gdb_signal_idx_t::SIGTRAP;
+    case INTR_EX_NMI        : return gdb_signal_idx_t::SIGINT;
     case INTR_EX_BREAKPOINT : return gdb_signal_idx_t::SIGTRAP;
     case INTR_EX_OVF        : return gdb_signal_idx_t::SIGFPE;
     case INTR_EX_BOUND      : return gdb_signal_idx_t::SIGSEGV;
@@ -1497,6 +1601,29 @@ gdb_signal_idx_t gdb_cpu_ctrl_t::signal_from_intr(int intr)
     case INTR_EX_SIMD       : return gdb_signal_idx_t::SIGFPE;
     case INTR_EX_VIRTUALIZE : return gdb_signal_idx_t::SIGBUS;
     default                 : return gdb_signal_idx_t::SIGTRAP;
+    }
+}
+
+char const *gdb_cpu_ctrl_t::signal_name(gdb_signal_idx_t sig)
+{
+    switch (sig) {
+    case gdb_signal_idx_t::NONE:    return "NONE";
+    case gdb_signal_idx_t::SIGHUP:  return "SIGHUP";
+    case gdb_signal_idx_t::SIGINT:  return "SIGINT";
+    case gdb_signal_idx_t::SIGQUIT: return "SIGQUIT";
+    case gdb_signal_idx_t::SIGILL:  return "SIGILL";
+    case gdb_signal_idx_t::SIGTRAP: return "SIGTRAP";
+    case gdb_signal_idx_t::SIGABRT: return "SIGABRT";
+    case gdb_signal_idx_t::SIGEMT:  return "SIGEMT";
+    case gdb_signal_idx_t::SIGFPE:  return "SIGFPE";
+    case gdb_signal_idx_t::SIGKILL: return "SIGKILL";
+    case gdb_signal_idx_t::SIGBUS:  return "SIGBUS";
+    case gdb_signal_idx_t::SIGSEGV: return "SIGSEGV";
+    case gdb_signal_idx_t::SIGSYS:  return "SIGSYS";
+    case gdb_signal_idx_t::SIGPIPE: return "SIGPIPE";
+    case gdb_signal_idx_t::SIGALRM: return "SIGALRM";
+    case gdb_signal_idx_t::SIGTERM: return "SIGTERM";
+    default: return "???";
     }
 }
 
@@ -1551,7 +1678,7 @@ void gdb_cpu_ctrl_t::gdb_thread()
 
     unique_ptr<gdbstub_t> stub(new gdbstub_t);
 
-    freeze_all();
+    freeze_all(1);
 
     stub_running = true;
     stub->run();
@@ -1585,13 +1712,12 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 {
     gdb_cpu_t *cpu = cpu_from_nr(0);
 
-    static uintptr_t bp_workaround_addr;
-
     if (!cpu) {
+        static uintptr_t bp_workaround_addr;
+
         // This is the GDB stub
-        if (ctx->gpr->iret.rflags & EFLAGS_TF) {
+        if ((ctx->gpr->iret.rflags & EFLAGS_TF) && bp_workaround_addr) {
             // We are in a single step breakpoint workaround
-            assert(bp_workaround_addr != 0);
 
             // Find the breakpoint we stepped over
             bp_list::iterator it = breakpoint_find(bp_sw,
@@ -1638,16 +1764,23 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 
     // Ignore NMI when not freezing
     if (ctx->gpr->info.interrupt == INTR_EX_NMI &&
-            cpu->state != gdb_cpu_state_t::FREEZING)
+            cpu->state != gdb_cpu_state_t::FREEZING) {
+        GDBSTUB_TRACE("Received NMI on cpu %d, continuing\n", cpu->cpu_nr);
         return ctx;
+    }
 
     cpu->ctx = ctx;
 
     // GDB thread waits for the state to transition to FROZEN
     cpu->state = gdb_cpu_state_t::FROZEN;
 
+    GDBSTUB_TRACE("CPU entering wait: %d (%s)\n", cpu->cpu_nr,
+                  signal_name(signal_from_intr(ctx->gpr->info.interrupt)));
+
     // Idle the CPU until NMI wakes it
     wait(cpu);
+
+    GDBSTUB_TRACE("CPU woke up: %d\n", cpu->cpu_nr);
 
     // The only way to reach here
     assert(cpu->state == gdb_cpu_state_t::RESUMING);
