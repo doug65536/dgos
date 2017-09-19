@@ -370,6 +370,9 @@ static inline void cpu_set_debug_breakpoint(
     cpu_set_debug_reg<7>(ctl);
 }
 
+void cpu_set_debug_breakpoint_indirect(uintptr_t addr, int rw,
+                                       int len, int enable, size_t index);
+
 __always_inline
 static inline void cpu_set_page_directory(uintptr_t addr)
 {
@@ -772,6 +775,25 @@ void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
         }
     } else {
         while (*value & mask)
+            pause();
+    }
+}
+
+template<typename T>
+__always_inline
+void cpu_wait_value(T const volatile *value, T wait_value)
+{
+    static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
+
+    if (cpuid_has_mwait()) {
+        while (*value != wait_value) {
+            cpu_monitor(value, 0, 0);
+
+            if (*value != wait_value)
+                cpu_mwait(0, 0);
+        }
+    } else {
+        while (*value != wait_value)
             pause();
     }
 }

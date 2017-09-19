@@ -24,8 +24,9 @@
 #define TRACE_GDBSTUB(...) ((void)0)
 #endif
 
-uint8_t constexpr X86_BREAKPOINT_OPCODE = 0xCC;
+static uint8_t constexpr X86_BREAKPOINT_OPCODE = 0xCC;
 static size_t constexpr X86_64_CONTEXT_SIZE = 1120;
+static uint8_t constexpr X86_MAX_HW_BP = 4;
 
 enum struct gdb_signal_idx_t {
     NONE,       // 0
@@ -79,17 +80,20 @@ enum struct gdb_cpu_state_t {
     FREEZING,
     FROZEN,
     RESUMING,
+    SYNC_HW_BP
 };
 
 struct gdb_cpu_t {
-    uint32_t apic_id;
     int cpu_nr;
+    uint32_t apic_id;
     isr_context_t *ctx;
     gdb_cpu_state_t volatile state;
+    function<void()> sync_bp;
 
     gdb_cpu_t(uint32_t init_apic_id, int nr)
-        : apic_id(init_apic_id)
-        , cpu_nr(nr)
+        : cpu_nr(nr)
+        , apic_id(init_apic_id)
+
     {
     }
 };
@@ -102,6 +106,7 @@ public:
     static int is_cpu_frozen(int cpu_nr);
     static void freeze_all(int first = 1);
     static void continue_frozen(int cpu_nr, bool single_step);
+    static void sync_hw_bp();
 
     static void hook_exceptions();
     static void start_stub();
@@ -116,9 +121,11 @@ public:
                                  T *old_value, uintptr_t page_dir);
 
     static bool breakpoint_add(gdb_breakpoint_type_t type,
-                               uintptr_t addr, uintptr_t page_dir, int kind);
+                               uintptr_t addr, uintptr_t page_dir,
+                               uint8_t size);
     static bool breakpoint_del(gdb_breakpoint_type_t type,
-                               uintptr_t addr, uintptr_t page_dir);
+                               uintptr_t addr, uintptr_t page_dir,
+                               uint8_t kind);
     static void breakpoint_toggle_all(bool activate);
 
     static int breakpoint_get_byte(const uint8_t *addr, uintptr_t page_dir);
@@ -164,7 +171,8 @@ private:
 
     using bp_list = vector<breakpoint_t>;
 
-    bp_list::iterator breakpoint_find(bp_list &list, uintptr_t addr, uintptr_t page_dir);
+    bp_list::iterator breakpoint_find(bp_list &list, uintptr_t addr,
+                                      uintptr_t page_dir, uint8_t kind);
     bp_list &breakpoint_list(gdb_breakpoint_type_t type);
 
     bool breakpoint_toggle(breakpoint_t& bp, bool activate);
@@ -245,7 +253,7 @@ private:
         RUNNING
     };
 
-    static size_t constexpr MAX_BUFFER_SIZE = 4096;
+    static size_t constexpr MAX_BUFFER_SIZE = 4096 - _MALLOC_OVERHEAD;
 
     using sender_fn_t = function<ssize_t(char const *, size_t)>;
 
@@ -313,7 +321,60 @@ private:
         XMM13,
         XMM14,
         XMM15,
-        MXCSR
+        MXCSR,
+        FSBASE,
+        GSBASE,
+        // The following exist if AVX is supported
+        YMM0H,
+        YMM1H,
+        YMM2H,
+        YMM3H,
+        YMM4H,
+        YMM5H,
+        YMM6H,
+        YMM7H,
+        YMM8H,
+        YMM9H,
+        YMM10H,
+        YMM11H,
+        YMM12H,
+        YMM13H,
+        YMM14H,
+        YMM15H,
+        // The following exist if AVX512 is supported and are 256 bits each
+        ZMM0H,
+        ZMM1H,
+        ZMM2H,
+        ZMM3H,
+        ZMM4H,
+        ZMM5H,
+        ZMM6H,
+        ZMM7H,
+        ZMM8H,
+        ZMM9H,
+        ZMM10H,
+        ZMM11H,
+        ZMM12H,
+        ZMM13H,
+        ZMM14H,
+        ZMM15H,
+        // The following exist if AVX512 is supported and are 512 bits each
+        ZMM16,
+        ZMM17,
+        ZMM18,
+        ZMM19,
+        ZMM20,
+        ZMM21,
+        ZMM22,
+        ZMM23,
+        ZMM24,
+        ZMM25,
+        ZMM26,
+        ZMM27,
+        ZMM28,
+        ZMM29,
+        ZMM30,
+        ZMM31
     };
 
     struct reg_info_t {
@@ -394,8 +455,11 @@ private:
     uint8_t calc_checksum(char const *data, size_t size);
 
     rx_state_t handle_packet();
-    rx_state_t handle_memop_read(const char *input);
-    rx_state_t handle_memop_write(const char *&input);
+    rx_state_t handle_memop_read(char const *input);
+    rx_state_t handle_memop_write(char const *&input);
+    static bool get_target_desc(unique_ptr<char[]> &result, size_t &result_sz,
+                                const char *annex, size_t annex_sz);
+    rx_state_t handle_query_features(char const *input);
 
     rx_state_t replyf_hex(char const *format, ...);
     rx_state_t replyf(char const *format, ...);
@@ -485,7 +549,7 @@ gdbstub_t::reg_info_t gdbstub_t::regs[] = {
     { "foseg",    4, 0 },
     { "foofs",    4, 0 },
     { "fop",      4, 0 },
-    // SSE registers
+    // SSE registers 127:0
     { "xmm0",    16, 0 },
     { "xmm1",    16, 0 },
     { "xmm2",    16, 0 },
@@ -503,9 +567,102 @@ gdbstub_t::reg_info_t gdbstub_t::regs[] = {
     { "xmm14",   16, 0 },
     { "xmm15",   16, 0 },
     { "mxcsr",    4, 0 },
-    { "orig_rax", 8, 0 },
+    // segment bases
     { "fs_base",  8, 0 },
-    { "gs_base",  8, 0 }
+    { "gs_base",  8, 0 },
+    // AVX registers 255:128
+    { "ymm0h",   16, 0 },
+    { "ymm1h",   16, 0 },
+    { "ymm2h",   16, 0 },
+    { "ymm3h",   16, 0 },
+    { "ymm4h",   16, 0 },
+    { "ymm5h",   16, 0 },
+    { "ymm6h",   16, 0 },
+    { "ymm7h",   16, 0 },
+    { "ymm8h",   16, 0 },
+    { "ymm9h",   16, 0 },
+    { "ymm10h",  16, 0 },
+    { "ymm11h",  16, 0 },
+    { "ymm12h",  16, 0 },
+    { "ymm13h",  16, 0 },
+    { "ymm14h",  16, 0 },
+    { "ymm15h",  16, 0 },
+    // AVX-512 extra registers 127:0
+    { "xmm16",   16, 0 },
+    { "xmm17",   16, 0 },
+    { "xmm18",   16, 0 },
+    { "xmm19",   16, 0 },
+    { "xmm20",   16, 0 },
+    { "xmm21",   16, 0 },
+    { "xmm22",   16, 0 },
+    { "xmm23",   16, 0 },
+    { "xmm24",   16, 0 },
+    { "xmm25",   16, 0 },
+    { "xmm26",   16, 0 },
+    { "xmm27",   16, 0 },
+    { "xmm28",   16, 0 },
+    { "xmm29",   16, 0 },
+    { "xmm30",   16, 0 },
+    { "xmm31",   16, 0 },
+    // AVX-512 extra registers 255:128
+    { "ymm16h",  16, 0 },
+    { "ymm17h",  16, 0 },
+    { "ymm18h",  16, 0 },
+    { "ymm19h",  16, 0 },
+    { "ymm20h",  16, 0 },
+    { "ymm21h",  16, 0 },
+    { "ymm22h",  16, 0 },
+    { "ymm23h",  16, 0 },
+    { "ymm24h",  16, 0 },
+    { "ymm25h",  16, 0 },
+    { "ymm26h",  16, 0 },
+    { "ymm27h",  16, 0 },
+    { "ymm28h",  16, 0 },
+    { "ymm29h",  16, 0 },
+    { "ymm30h",  16, 0 },
+    { "ymm31h",  16, 0 },
+    // AVX-512 mask registers 63:0
+    { "k0",       8, 0 },
+    { "k1",       8, 0 },
+    { "k2",       8, 0 },
+    { "k3",       8, 0 },
+    { "k4",       8, 0 },
+    { "k5",       8, 0 },
+    { "k6",       8, 0 },
+    { "k7",       8, 0 },
+    // AVX-512 registers 511:256
+    { "zmm0h",   32, 0 },
+    { "zmm1h",   32, 0 },
+    { "zmm2h",   32, 0 },
+    { "zmm3h",   32, 0 },
+    { "zmm4h",   32, 0 },
+    { "zmm5h",   32, 0 },
+    { "zmm6h",   32, 0 },
+    { "zmm7h",   32, 0 },
+    { "zmm8h",   32, 0 },
+    { "zmm9h",   32, 0 },
+    { "zmm10h",  32, 0 },
+    { "zmm11h",  32, 0 },
+    { "zmm12h",  32, 0 },
+    { "zmm13h",  32, 0 },
+    { "zmm14h",  32, 0 },
+    { "zmm15h",  32, 0 },
+    { "zmm16h",  32, 0 },
+    { "zmm17h",  32, 0 },
+    { "zmm18h",  32, 0 },
+    { "zmm19h",  32, 0 },
+    { "zmm20h",  32, 0 },
+    { "zmm21h",  32, 0 },
+    { "zmm22h",  32, 0 },
+    { "zmm23h",  32, 0 },
+    { "zmm24h",  32, 0 },
+    { "zmm25h",  32, 0 },
+    { "zmm26h",  32, 0 },
+    { "zmm27h",  32, 0 },
+    { "zmm28h",  32, 0 },
+    { "zmm29h",  32, 0 },
+    { "zmm30h",  32, 0 },
+    { "zmm31h",  32, 0 },
 };
 
 extern "C" void gdb_init()
@@ -769,7 +926,7 @@ void gdbstub_t::init_reg_offsets()
         regs[i].size *= 2;
         ofs += regs[i].size;
     }
-    assert(ofs == X86_64_CONTEXT_SIZE);
+    //assert(ofs == X86_64_CONTEXT_SIZE);
 }
 
 bool gdbstub_t::match(char const *&input, char const *pattern,
@@ -899,6 +1056,352 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
     return reply(ok ? "OK" : "E14");
 }
 
+bool gdbstub_t::get_target_desc(
+        unique_ptr<char[]>& result, size_t& result_sz,
+        char const *annex, size_t annex_sz)
+{
+    // The following XML target descriptions were copied from the GDB
+    // source, with the following copyright notice:
+    //
+    // Copyright (C) 2010-2017 Free Software Foundation, Inc.
+    // Copying and distribution of this file, with or without
+    // modification, are permitted in any medium without royalty
+    // provided the copyright notice and this notice are
+    // preserved.
+
+    static constexpr char const x86_64_target_header[] =
+        R"*(<?xml version="1.0"?>)*"
+        R"*(<!DOCTYPE feature SYSTEM "gdb-target.dtd">)*"
+        R"*(<target>)*"
+        R"*(<architecture>i386:x86-64</architecture>)*";
+
+    static constexpr char const x86_64_core[] =
+        R"*(<feature name="org.gnu.gdb.i386.core">)*"
+        R"*(<flags id="i386_eflags" size="4">)*"
+        R"*(<field name="CF" start="0" end="0"/>)*"
+        R"*(<field name="" start="1" end="1"/>)*"
+        R"*(<field name="PF" start="2" end="2"/>)*"
+        R"*(<field name="AF" start="4" end="4"/>)*"
+        R"*(<field name="ZF" start="6" end="6"/>)*"
+        R"*(<field name="SF" start="7" end="7"/>)*"
+        R"*(<field name="TF" start="8" end="8"/>)*"
+        R"*(<field name="IF" start="9" end="9"/>)*"
+        R"*(<field name="DF" start="10" end="10"/>)*"
+        R"*(<field name="OF" start="11" end="11"/>)*"
+        R"*(<field name="NT" start="14" end="14"/>)*"
+        R"*(<field name="RF" start="16" end="16"/>)*"
+        R"*(<field name="VM" start="17" end="17"/>)*"
+        R"*(<field name="AC" start="18" end="18"/>)*"
+        R"*(<field name="VIF" start="19" end="19"/>)*"
+        R"*(<field name="VIP" start="20" end="20"/>)*"
+        R"*(<field name="ID" start="21" end="21"/>)*"
+        R"*(</flags>)*"
+
+        R"*(<reg name="rax" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="rbx" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="rcx" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="rdx" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="rsi" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="rdi" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="rbp" bitsize="64" type="data_ptr"/>)*"
+        R"*(<reg name="rsp" bitsize="64" type="data_ptr"/>)*"
+        R"*(<reg name="r8" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r9" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r10" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r11" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r12" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r13" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r14" bitsize="64" type="int64"/>)*"
+        R"*(<reg name="r15" bitsize="64" type="int64"/>)*"
+
+        R"*(<reg name="rip" bitsize="64" type="code_ptr"/>)*"
+        R"*(<reg name="eflags" bitsize="32" type="i386_eflags"/>)*"
+        R"*(<reg name="cs" bitsize="32" type="int32"/>)*"
+        R"*(<reg name="ss" bitsize="32" type="int32"/>)*"
+        R"*(<reg name="ds" bitsize="32" type="int32"/>)*"
+        R"*(<reg name="es" bitsize="32" type="int32"/>)*"
+        R"*(<reg name="fs" bitsize="32" type="int32"/>)*"
+        R"*(<reg name="gs" bitsize="32" type="int32"/>)*"
+
+        R"*(<reg name="st0" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st1" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st2" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st3" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st4" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st5" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st6" bitsize="80" type="i387_ext"/>)*"
+        R"*(<reg name="st7" bitsize="80" type="i387_ext"/>)*"
+
+        R"*(<reg name="fctrl" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="fstat" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="ftag" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="fiseg" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="fioff" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="foseg" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="fooff" bitsize="32" type="int" group="float"/>)*"
+        R"*(<reg name="fop" bitsize="32" type="int" group="float"/>)*"
+        R"*(</feature>)*";
+
+    static constexpr char const x86_64_sse[] =
+        R"*(<feature name="org.gnu.gdb.i386.sse">)*"
+        R"*(<vector id="v4f" type="ieee_single" count="4"/>)*"
+        R"*(<vector id="v2d" type="ieee_double" count="2"/>)*"
+        R"*(<vector id="v16i8" type="int8" count="16"/>)*"
+        R"*(<vector id="v8i16" type="int16" count="8"/>)*"
+        R"*(<vector id="v4i32" type="int32" count="4"/>)*"
+        R"*(<vector id="v2i64" type="int64" count="2"/>)*"
+        R"*(<union id="vec128">)*"
+        R"*(<field name="v4_float" type="v4f"/>)*"
+        R"*(<field name="v2_double" type="v2d"/>)*"
+        R"*(<field name="v16_int8" type="v16i8"/>)*"
+        R"*(<field name="v8_int16" type="v8i16"/>)*"
+        R"*(<field name="v4_int32" type="v4i32"/>)*"
+        R"*(<field name="v2_int64" type="v2i64"/>)*"
+        R"*(<field name="uint128" type="uint128"/>)*"
+        R"*(</union>)*"
+        R"*(<flags id="i386_mxcsr" size="4">)*"
+        R"*(<field name="IE" start="0" end="0"/>)*"
+        R"*(<field name="DE" start="1" end="1"/>)*"
+        R"*(<field name="ZE" start="2" end="2"/>)*"
+        R"*(<field name="OE" start="3" end="3"/>)*"
+        R"*(<field name="UE" start="4" end="4"/>)*"
+        R"*(<field name="PE" start="5" end="5"/>)*"
+        R"*(<field name="DAZ" start="6" end="6"/>)*"
+        R"*(<field name="IM" start="7" end="7"/>)*"
+        R"*(<field name="DM" start="8" end="8"/>)*"
+        R"*(<field name="ZM" start="9" end="9"/>)*"
+        R"*(<field name="OM" start="10" end="10"/>)*"
+        R"*(<field name="UM" start="11" end="11"/>)*"
+        R"*(<field name="PM" start="12" end="12"/>)*"
+        R"*(<field name="FZ" start="15" end="15"/>)*"
+        R"*(</flags>)*"
+
+        R"*(<reg name="xmm0" bitsize="128" type="vec128" regnum="40"/>)*"
+        R"*(<reg name="xmm1" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm2" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm3" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm4" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm5" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm6" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm7" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm8" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm9" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm10" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm11" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm12" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm13" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm14" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm15" bitsize="128" type="vec128"/>)*"
+
+        R"*(<reg name="mxcsr" bitsize="32" type="i386_mxcsr")*"
+        R"*( group="vector"/>)*"
+        R"*(</feature>)*";
+
+    static constexpr char const x86_64_segments[] =
+        R"*(<feature name="org.gnu.gdb.i386.segments">)*"
+        R"*(<reg name="fs_base" bitsize="64" type="int"/>)*"
+        R"*(<reg name="gs_base" bitsize="64" type="int"/>)*"
+        R"*(</feature>)*";
+
+    static constexpr char const x86_64_avx[] =
+        R"*(<feature name="org.gnu.gdb.i386.avx">)*"
+        R"*(<reg name="ymm0h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm1h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm2h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm3h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm4h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm5h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm6h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm7h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm8h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm9h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm10h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm11h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm12h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm13h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm14h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm15h" bitsize="128" type="uint128"/>)*"
+        R"*(</feature>)*";
+
+    static constexpr char const x86_64_avx512[] =
+        R"*(<feature name="org.gnu.gdb.i386.avx512">)*"
+        R"*(<vector id="v4f" type="ieee_single" count="4"/>)*"
+        R"*(<vector id="v2d" type="ieee_double" count="2"/>)*"
+        R"*(<vector id="v16i8" type="int8" count="16"/>)*"
+        R"*(<vector id="v8i16" type="int16" count="8"/>)*"
+        R"*(<vector id="v4i32" type="int32" count="4"/>)*"
+        R"*(<vector id="v2i64" type="int64" count="2"/>)*"
+
+        R"*(<union id="vec128">)*"
+        R"*(<field name="v4_float" type="v4f"/>)*"
+        R"*(<field name="v2_double" type="v2d"/>)*"
+        R"*(<field name="v16_int8" type="v16i8"/>)*"
+        R"*(<field name="v8_int16" type="v8i16"/>)*"
+        R"*(<field name="v4_int32" type="v4i32"/>)*"
+        R"*(<field name="v2_int64" type="v2i64"/>)*"
+        R"*(<field name="uint128" type="uint128"/>)*"
+        R"*(</union>)*"
+
+        R"*(<reg name="xmm16" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm17" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm18" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm19" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm20" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm21" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm22" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm23" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm24" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm25" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm26" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm27" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm28" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm29" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm30" bitsize="128" type="vec128"/>)*"
+        R"*(<reg name="xmm31" bitsize="128" type="vec128"/>)*"
+
+        R"*(<reg name="ymm16h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm17h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm18h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm19h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm20h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm21h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm22h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm23h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm24h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm25h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm26h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm27h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm28h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm29h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm30h" bitsize="128" type="uint128"/>)*"
+        R"*(<reg name="ymm31h" bitsize="128" type="uint128"/>)*"
+
+        R"*(<vector id="v2ui128" type="uint128" count="2"/>)*"
+
+        R"*(<reg name="k0" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k1" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k2" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k3" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k4" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k5" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k6" bitsize="64" type="uint64"/>)*"
+        R"*(<reg name="k7" bitsize="64" type="uint64"/>)*"
+
+        R"*(<reg name="zmm0h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm1h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm2h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm3h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm4h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm5h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm6h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm7h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm8h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm9h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm10h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm11h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm12h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm13h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm14h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm15h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm16h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm17h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm18h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm19h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm20h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm21h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm22h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm23h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm24h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm25h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm26h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm27h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm28h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm29h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm30h" bitsize="256" type="v2ui128"/>)*"
+        R"*(<reg name="zmm31h" bitsize="256" type="v2ui128"/>)*"
+        R"*(</feature>)*";
+
+    static constexpr char const x86_64_target_footer[] =
+        R"*(</target>)*";
+
+    if (annex_sz == 10 && strncmp(annex, "target.xml", annex_sz) != 0)
+        return false;
+
+    result_sz = (countof(x86_64_target_header) - 1);
+
+    result_sz += (countof(x86_64_core) - 1);
+    result_sz += (countof(x86_64_sse) - 1);
+    result_sz += (countof(x86_64_segments) - 1);
+
+    if (sse_avx_offset)
+        result_sz += (countof(x86_64_avx) - 1);
+
+    if (sse_avx512_upper_offset)
+        result_sz += (countof(x86_64_avx512) - 1);
+
+    result_sz += (countof(x86_64_target_footer) - 1);
+
+    result.reset(new char[result_sz + 1]);
+
+    strcpy(result, x86_64_target_header);
+    strcat(result, x86_64_core);
+    strcat(result, x86_64_sse);
+    strcat(result, x86_64_segments);
+
+    if (sse_avx_offset)
+        strcat(result, x86_64_avx);
+
+    if (sse_avx512_upper_offset)
+        strcat(result, x86_64_avx512);
+
+    strcat(result, x86_64_target_footer);
+
+    return true;
+}
+
+gdbstub_t::rx_state_t gdbstub_t::handle_query_features(char const *input)
+{
+    char const *annex_st = input;
+    char const *annex_en = strchr(annex_st, ':');
+
+    if (!annex_en)
+        return reply("E03");
+
+    unique_ptr<char[]> desc;
+    size_t desc_sz = 0;
+    bool exists = get_target_desc(desc, desc_sz, annex_st, annex_en - annex_st);
+
+    if (!exists)
+        return reply("E00");
+
+    input = annex_en + 1;
+
+    size_t offset = from_hex<size_t>(&input);
+
+    if (*input++ != ',')
+        return reply("E01");
+
+    size_t length = from_hex<size_t>(&input);
+
+    char prefix;
+    size_t reply_len = 0;
+    if (offset >= desc_sz) {
+        // Past end, return empty "last" packet reply
+        return reply("l");
+    } else if (desc_sz - offset <= length) {
+        reply_len = desc_sz - offset;
+        prefix = 'l';
+    } else {
+        reply_len = length;
+        prefix = 'm';
+    }
+
+    tx_buf[0] = prefix;
+    memcpy(tx_buf + 1, &desc[offset], reply_len);
+
+    return reply(tx_buf, reply_len + 1);
+}
+
 gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 {
     char const *input = cmd_buf;
@@ -1005,15 +1508,22 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
             GDBSTUB_TRACE("Changed %c CPU to %d\n", cpu, thread);
         }
+
         return reply("OK");
 
     case 'q':
         if (!strcmp(input, "C")) {
             return reply("QC1");
         } else if (match(input, "Supported", ":")) {
-            return replyf("PacketSize=%x", MAX_BUFFER_SIZE);
+            // Query for feature support
+            return replyf("PacketSize=%x;qXfer:features:read+",
+                          MAX_BUFFER_SIZE);
+        } else if (match(input, "Xfer:features:read", ":")) {
+            // Get machine description
+            return handle_query_features(input);
         } else if (!strcmp(input, "fThreadInfo") ||
                 !strcmp(input, "sThreadInfo")) {
+            // Enumerate threads
             if (input[0] == 's')
                 return reply("l");
 
@@ -1030,6 +1540,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
             return reply(tx_buf, tx_index);
         } else if (!strncmp(input, "ThreadExtraInfo,", 16)) {
+            // Get human readable description for thread
             input += 16;
             thread = from_hex<int>(&input);
             bool cpu_running = gdb_cpu_ctrl_t::is_cpu_running(thread);
@@ -1130,10 +1641,18 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
         ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
 
-        if (add)
-            gdb_cpu_ctrl_t::breakpoint_add(type, addr, ctx->gpr->cr3, kind);
-        else
-            gdb_cpu_ctrl_t::breakpoint_del(type, addr, ctx->gpr->cr3);
+        if (add) {
+            if (!gdb_cpu_ctrl_t::breakpoint_add(
+                        type, addr, ctx->gpr->cr3, kind)) {
+                // Breakpoint could not be added
+                return reply("E01");
+            }
+        } else {
+            gdb_cpu_ctrl_t::breakpoint_del(type, addr, ctx->gpr->cr3, kind);
+        }
+
+        if (type == gdb_breakpoint_type_t::HARDWARE)
+            gdb_cpu_ctrl_t::sync_hw_bp();
 
         return reply("OK");
 
@@ -1340,10 +1859,12 @@ size_t gdbstub_t::set_context(isr_context_t const *ctx,
 }
 
 gdb_cpu_ctrl_t::bp_list::iterator gdb_cpu_ctrl_t::breakpoint_find(
-        bp_list &list, uintptr_t addr, uintptr_t page_dir)
+        bp_list &list, uintptr_t addr, uintptr_t page_dir, uint8_t kind)
 {
     return find_if(list.begin(), list.end(), [&](breakpoint_t const& item) {
-        return item.addr == addr && (!page_dir || item.page_dir == page_dir);
+        return item.addr == addr &&
+                (!kind || item.kind == kind) &&
+                (!page_dir || item.page_dir == page_dir);
     });
 }
 
@@ -1387,18 +1908,26 @@ bool gdb_cpu_ctrl_t::breakpoint_write_target(
 
 bool gdb_cpu_ctrl_t::breakpoint_add(
         gdb_breakpoint_type_t type, uintptr_t addr,
-        uintptr_t page_dir, int kind)
+        uintptr_t page_dir, uint8_t size)
 {
+    // See if there are too many breakpoints
+    if (type != gdb_breakpoint_type_t::SOFTWARE && instance.bp_hw.size() >=
+            X86_MAX_HW_BP)
+        return false;
+
     auto& list = instance.breakpoint_list(type);
-    auto it = instance.breakpoint_find(list, addr, page_dir);
+    auto it = instance.breakpoint_find(list, addr, page_dir, size);
 
     // Adding a duplicate breakpoint should be idempotent
     if (it != list.end())
         return true;
 
-    list.emplace_back(type, addr, page_dir, kind, 0, false);
+    list.emplace_back(type, addr, page_dir, size, 0, false);
 
-    if (!instance.breakpoint_toggle(list.back(), true)) {
+    // If it is a software breakpoint, and it didn't apply,
+    // then remove it and report failure to caller
+    if (type == gdb_breakpoint_type_t::SOFTWARE &&
+            !instance.breakpoint_toggle(list.back(), true)) {
         list.pop_back();
         return false;
     }
@@ -1407,10 +1936,11 @@ bool gdb_cpu_ctrl_t::breakpoint_add(
 }
 
 bool gdb_cpu_ctrl_t::breakpoint_del(gdb_breakpoint_type_t type,
-                                    uintptr_t addr, uintptr_t page_dir)
+                                    uintptr_t addr, uintptr_t page_dir,
+                                    uint8_t kind)
 {
     auto& list = instance.breakpoint_list(type);
-    auto it = instance.breakpoint_find(list, addr, page_dir);
+    auto it = instance.breakpoint_find(list, addr, page_dir, kind);
     if (it != list.end()) {
         if (!instance.breakpoint_toggle(*it, false))
             return false;
@@ -1450,7 +1980,7 @@ void gdb_cpu_ctrl_t::breakpoint_toggle_all(bool activate)
 int gdb_cpu_ctrl_t::breakpoint_get_byte(uint8_t const *addr, uintptr_t page_dir)
 {
     auto it = instance.breakpoint_find(instance.bp_sw, uintptr_t(addr),
-                                       page_dir);
+                                       page_dir, 0);
 
     if (it == instance.bp_sw.end() || !it->active)
         return -1;
@@ -1462,7 +1992,7 @@ bool gdb_cpu_ctrl_t::breakpoint_set_byte(uint8_t *addr, uintptr_t page_dir,
                                          uint8_t value)
 {
     auto it = instance.breakpoint_find(instance.bp_sw, uintptr_t(addr),
-                                       page_dir);
+                                       page_dir, 0);
 
     if (it == instance.bp_sw.end() || !it->active)
         return false;
@@ -1553,6 +2083,79 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
             // Wait for CPU to pick it up
             while (cpu.state == gdb_cpu_state_t::RESUMING)
                 pause();
+        }
+    }
+}
+
+void gdb_cpu_ctrl_t::sync_hw_bp()
+{
+    GDBSTUB_TRACE("Synchronizing hardware breakpoints\n");
+
+    auto callback = [] {
+        size_t i, e;
+        for (i = 0, e = instance.bp_hw.size(); i < X86_MAX_HW_BP; ++i) {
+            breakpoint_t& bp = instance.bp_hw[i];
+
+            uintptr_t addr;
+            int len;
+            int enable;
+            int rw;
+
+            if (i < e && i) {
+                addr = bp.addr;
+
+                switch (bp.kind) {
+                case 1: len = CPU_DR7_LEN_1; break;
+                case 2: len = CPU_DR7_LEN_2; break;
+                case 4: len = CPU_DR7_LEN_4; break;
+                case 8: len = CPU_DR7_LEN_8; break;
+                }
+
+                switch (bp.type) {
+                case gdb_breakpoint_type_t::HARDWARE:
+                    rw = CPU_DR7_RW_INSN;
+                    break;
+
+                case gdb_breakpoint_type_t::WRITEWATCH:
+                    rw = CPU_DR7_RW_WRITE;
+                    break;
+
+                default:
+                    assert(!"Invalid hardware breakpoint type,"
+                            " treating as ACCESSWATCH");
+                case gdb_breakpoint_type_t::READWATCH:
+                    // Read watch isn't possible, treat as ACCESSWATCH
+                    // fall thru...
+                case gdb_breakpoint_type_t::ACCESSWATCH:
+                    rw = CPU_DR7_RW_RW;
+                    break;
+                }
+
+                enable = CPU_DR7_EN_GLOBAL;
+            } else {
+                addr = 0;
+                len = 0;
+                enable = 0;
+                rw = 0;
+            }
+
+            cpu_set_debug_breakpoint_indirect(bp.addr, rw, len, enable, i);
+        }
+    };
+
+    for (gdb_cpu_t& cpu : instance.cpus) {
+        if (cpu.state == gdb_cpu_state_t::FROZEN) {
+            cpu.sync_bp = callback;
+
+            GDBSTUB_TRACE("Synchronizing hardware breakpoints"
+                          " on CPU %d\n", cpu.cpu_nr);
+
+            // Tell waiting thread to synchronize hardware breakpoints
+            cpu.state = gdb_cpu_state_t::SYNC_HW_BP;
+
+            apic_send_ipi(cpu.apic_id, INTR_EX_NMI);
+
+            cpu_wait_value(&cpu.state, gdb_cpu_state_t::FROZEN);
         }
     }
 }
@@ -1697,15 +2300,15 @@ gdb_cpu_t *gdb_cpu_ctrl_t::cpu_from_nr(int cpu_nr)
     return likely(it != cpus.end()) ? &*it : nullptr;
 }
 
-isr_context_t *gdb_cpu_ctrl_t::exception_handler(int, isr_context_t *ctx)
-{
-    return instance.exception_handler(ctx);
-}
-
 void gdb_cpu_ctrl_t::wait(gdb_cpu_t const *cpu)
 {
     while (cpu->state == gdb_cpu_state_t::FROZEN)
         halt();
+}
+
+isr_context_t *gdb_cpu_ctrl_t::exception_handler(int, isr_context_t *ctx)
+{
+    return instance.exception_handler(ctx);
 }
 
 isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
@@ -1720,8 +2323,8 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             // We are in a single step breakpoint workaround
 
             // Find the breakpoint we stepped over
-            bp_list::iterator it = breakpoint_find(bp_sw,
-                                                   bp_workaround_addr, 0);
+            bp_list::iterator it = breakpoint_find(bp_sw, bp_workaround_addr,
+                                                   0, 0);
             if (it == bp_sw.end())
                 return 0;
 
@@ -1746,7 +2349,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 
             // Find the breakpoint
             bp_list::iterator it = breakpoint_find(
-                        bp_sw, uintptr_t(ctx->gpr->iret.rip), 0);
+                        bp_sw, uintptr_t(ctx->gpr->iret.rip), 0, 0);
             if (it == bp_sw.end())
                 return 0;
 
@@ -1777,13 +2380,18 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     GDBSTUB_TRACE("CPU entering wait: %d (%s)\n", cpu->cpu_nr,
                   signal_name(signal_from_intr(ctx->gpr->info.interrupt)));
 
-    // Idle the CPU until NMI wakes it
-    wait(cpu);
+    while (cpu->state != gdb_cpu_state_t::RESUMING) {
+        // Idle the CPU until NMI wakes it
+        wait(cpu);
+
+        if (cpu->state == gdb_cpu_state_t::SYNC_HW_BP) {
+            cpu->sync_bp();
+
+            cpu->state = gdb_cpu_state_t::FROZEN;
+        }
+    }
 
     GDBSTUB_TRACE("CPU woke up: %d\n", cpu->cpu_nr);
-
-    // The only way to reach here
-    assert(cpu->state == gdb_cpu_state_t::RESUMING);
 
     cpu->ctx = nullptr;
 
