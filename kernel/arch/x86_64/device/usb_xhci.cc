@@ -1168,10 +1168,24 @@ struct usbxhci_ctl_trb_generic_t {
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_generic_t) == 0x10);
 
+//
+// 6.4.3.6 Evaluate Context command
+
+struct usbxhci_ctl_trb_evalctx_t {
+    uint64_t input_ctx_ptr;
+    uint32_t rsvd[1];
+    uint8_t flags;
+    uint8_t trb_type;
+    uint16_t trt;
+} __packed;
+
 // 6.4.1.2.1 Setup stage TRB
 
 // USB 3.1 spec 9.3
 struct usbxhci_ctl_trb_setup_t {
+    //
+    // USB fields
+
     // bit 7 0=host-to-device, 1=device-to-host, 6:5=type, 4:0=recipient
     uint8_t bm_req_type;
 
@@ -1180,6 +1194,10 @@ struct usbxhci_ctl_trb_setup_t {
     uint16_t value;
     uint16_t index;
     uint16_t length;
+
+    //
+    // xHCI fields
+
     uint32_t xferlen_intr;
     uint8_t flags;
     uint8_t trb_type;
@@ -1224,15 +1242,20 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 #define USBXHCI_CTL_TRB_BMREQT_TYPE_BITS    2
 #define USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT   7
 
-#define USBXHCI_CTL_TRB_BMREQT_TOHOST       (1U<<USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT)
+#define USBXHCI_CTL_TRB_BMREQT_TOHOST \
+    (1U<<USBXHCI_CTL_TRB_BMREQT_TOHOST_BIT)
 
-#define USBXHCI_CTL_TRB_BMREQT_RECIP_MASK   ((1U<<USBXHCI_CTL_TRB_BMREQT_RECIP_BITS)-1)
-#define USBXHCI_CTL_TRB_BMREQT_RECIP_n(n)   ((n)<<USBXHCI_CTL_TRB_BMREQT_RECIP_BIT)
+#define USBXHCI_CTL_TRB_BMREQT_RECIP_MASK \
+    ((1U<<USBXHCI_CTL_TRB_BMREQT_RECIP_BITS)-1)
+#define USBXHCI_CTL_TRB_BMREQT_RECIP_n(n) \
+    ((n)<<USBXHCI_CTL_TRB_BMREQT_RECIP_BIT)
 #define USBXHCI_CTL_TRB_BMREQT_RECIP \
     (USBXHCI_CTL_TRB_BMREQT_RECIP_MASK<<USBXHCI_CTL_TRB_BMREQT_RECIP_BIT)
 
-#define USBXHCI_CTL_TRB_BMREQT_TYPE_MASK   ((1U<<USBXHCI_CTL_TRB_BMREQT_TYPE_BITS)-1)
-#define USBXHCI_CTL_TRB_BMREQT_TYPE_n(n)   ((n)<<USBXHCI_CTL_TRB_BMREQT_TYPE_BIT)
+#define USBXHCI_CTL_TRB_BMREQT_TYPE_MASK \
+    ((1U<<USBXHCI_CTL_TRB_BMREQT_TYPE_BITS)-1)
+#define USBXHCI_CTL_TRB_BMREQT_TYPE_n(n) \
+    ((n)<<USBXHCI_CTL_TRB_BMREQT_TYPE_BIT)
 #define USBXHCI_CTL_TRB_BMREQT_TYPE \
     (USBXHCI_CTL_TRB_BMREQT_TYPE_MASK<<USBXHCI_CTL_TRB_BMREQT_TYPE_BIT)
 
@@ -1410,7 +1433,8 @@ static unsigned usbxhci_device_count;
 static hashtbl_t usbxhci_pending_ht;
 
 // Handle 32 or 64 byte device context size
-static usbxhci_slotctx_t *usbxhci_dev_ctx_ent_slot(usbxhci_dev_t *self, size_t i)
+static usbxhci_slotctx_t *usbxhci_dev_ctx_ent_slot(
+        usbxhci_dev_t *self, size_t i)
 {
     if (self->dev_ctx_large)
         return &self->dev_ctx.large[i].slotctx;
@@ -1517,6 +1541,7 @@ static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
     trbs[0].setup.value = value;
     trbs[0].setup.index = index;
     trbs[0].setup.length = length;
+    // Always 8
     trbs[0].setup.xferlen_intr = 8;
     trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_IDT;
 
@@ -1553,6 +1578,7 @@ static usbxhci_ctl_trb_t *usbxhci_get_descriptor(
     return trbs;
 }
 
+__used
 static usbxhci_ctl_trb_t *usbxhci_get_config(
         usbxhci_dev_t *self, usb_desc_config *desc,
         uint8_t desc_size, uint8_t slotid,
@@ -1584,11 +1610,55 @@ static void usbxhci_get_descriptor_handler(
 
     USBXHCI_TRACE("Device descriptor: \n");
 
-    free(init_data->trbs);
-    init_data->trbs = usbxhci_get_config(
-                self, init_data->cfg_desc, sizeof(init_data->cfg_desc),
-                init_data->slotid,
-                usbxhci_get_descriptor_handler, (uintptr_t)init_data);
+    // Update max packet size
+    usbxhci_slotctx_t *ctx = usbxhci_dev_ctx_ent_slot(self, init_data->slotid);
+    usbxhci_ep_ctx_t *ep = usbxhci_dev_ctx_ent_ep(self, init_data->slotid, 0);
+    if (init_data->dev_desc[0].usb_spec >= 0x300)
+        ep->max_packet = 1U << init_data->dev_desc[0].log2_maxpktsz;
+    else
+        ep->max_packet = init_data->dev_desc[0].log2_maxpktsz;
+
+    usbxhci_inpctx_t inp;
+    usbxhci_inpctlctx_t *ctlctx;
+    usbxhci_slotctx_t *inpslotctx;
+    usbxhci_ep_ctx_t *inpepctx;
+
+    if (self->dev_ctx_large) {
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
+                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        ctlctx = &inp.large->inpctl;
+        inpslotctx = &inp.large->slotctx;
+        inpepctx = inp.large->epctx;
+    } else {
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
+                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        ctlctx = &inp.small->inpctl;
+        inpslotctx = &inp.small->slotctx;
+        inpepctx = inp.small->epctx;
+    }
+
+    init_data->inpctx = inp;
+
+    ctlctx->add_bits = (1 << 0);
+
+    inpslotctx[0] = *ctx;
+    inpepctx[0] = *ep;
+
+    // Issue evaluate context command
+    usbxhci_ctl_trb_evalctx_t *eval = (usbxhci_ctl_trb_evalctx_t *)
+            calloc(1, sizeof(*eval));
+    eval->trb_type = USBXHCI_TRB_TYPE_EVALCTXCMD;
+    eval->input_ctx_ptr = mphysaddr(eval);
+    eval->flags = self->endpoints[init_data->slotid]->ccs;
+    //usbxhci_issue_cmd(self, eval,
+    //                  usbxhci_get_descriptor_handler, uintptr_t(init_data));
+    //usbxhci_ring_doorbell(self, 0, 0, 0);
+
+    //free(init_data->trbs);
+    //init_data->trbs = usbxhci_get_config(
+    //            self, init_data->cfg_desc, sizeof(init_data->cfg_desc),
+    //            init_data->slotid,
+    //            usbxhci_get_descriptor_handler, (uintptr_t)init_data);
 
     (void)cmd;
 }
@@ -2028,7 +2098,7 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
                (usbxhci_evt_t*)evt, pc.data);
 }
 
-static isr_context_t*usbxhci_irq_handler(int irq, isr_context_t *ctx)
+static isr_context_t *usbxhci_irq_handler(int irq, isr_context_t *ctx)
 {
     (void)irq;
     USBXHCI_TRACE("IRQ %d!\n", irq);
@@ -2090,6 +2160,8 @@ void usbxhci_detect(void *arg);
 void usbxhci_detect(void *arg)
 {
     (void)arg;
+
+    return;
 
     pci_dev_iterator_t pci_iter;
 
