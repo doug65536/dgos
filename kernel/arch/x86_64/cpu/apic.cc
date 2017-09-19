@@ -24,6 +24,8 @@
 #include "mm.h"
 #include "vector.h"
 
+#define ENABLE_ACPI 1
+
 #define DEBUG_ACPI  1
 #if DEBUG_ACPI
 #define ACPI_TRACE(...) printdbg("acpi: " __VA_ARGS__)
@@ -181,7 +183,7 @@ struct mp_cfg_ioapic_t {
 #define IOAPIC_REDLO_POLARITY_BIT   13
 #define IOAPIC_REDLO_REMOTEIRR_BIT  14
 #define IOAPIC_REDLO_TRIGGER_BIT    15
-#define IOAPIC_REDLO_MASKIRQ_BIT       16
+#define IOAPIC_REDLO_MASKIRQ_BIT    16
 #define IOAPIC_REDHI_DEST_BIT       (56-32)
 
 #define IOAPIC_REDLO_DESTMODE       (1<<IOAPIC_REDLO_DESTMODE_BIT)
@@ -1225,6 +1227,7 @@ static int parse_mp_tables(void)
         for (mp_table_hdr_t const* sig_srch =
              (mp_table_hdr_t const*)ranges[pass];
              (void*)sig_srch < ranges[pass+1]; ++sig_srch) {
+#if ENABLE_ACPI
             // Check for ACPI 2.0+ RSDP
             acpi_rsdp2_t *rsdp2 = (acpi_rsdp2_t*)sig_srch;
             if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
@@ -1253,6 +1256,7 @@ static int parse_mp_tables(void)
                     break;
                 }
             }
+#endif
 
             // Check for MP tables signature
             if (!memcmp(sig_srch->sig, "_MP_", 4)) {
@@ -1706,6 +1710,8 @@ void apic_dump_regs(int ap)
             }
         }
     }
+    printdbg("Logical destination register value: 0x%x\n",
+             apic->read32(APIC_REG_LDR));
 }
 
 static void apic_calibrate();
