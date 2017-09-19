@@ -222,3 +222,4 @@ fs/iso9660.cc
 fs/iso9660_decl.h
 fs/tmpfs.cc
 fs/iso9660_part.cc
+lib/intrin_compat.h

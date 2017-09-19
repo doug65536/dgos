@@ -20,13 +20,13 @@ DUMPDIR := dump
 $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-OPTIMIZE := 1
-OPTIMIZE_AVX := 1
+#OPTIMIZE := 1
+#OPTIMIZE_AVX := 1
 #LTO := 1
-#CC := clang
-#CXX := clang++
-CC := gcc-6
-CXX := gcc-6
+CC := clang
+CXX := clang++
+#CC := gcc-6
+#CXX := gcc-6
 
 export CC
 export CXX
@@ -55,7 +55,7 @@ WEVERYTHING += -Wpedantic
 WEVERYTHING += -Werror
 #too many false positives WEVERYTHING  = -Wconversion
 WEVERYTHING += -Wdouble-promotion
-WEVERYTHING += -Wformat=2
+WEVERYTHING += -Wformat
 WEVERYTHING += -Wfloat-equal
 WEVERYTHING += -Wundef
 #WEVERYTHING += -Wbad-function-cast
@@ -72,10 +72,10 @@ WEVERYTHING += -Wno-strict-overflow
 WEVERYTHING += -Wno-overlength-strings
 
 CXXFLAGS := -std=c++14 -g3 \
-	-mcmodel=kernel -mno-red-zone \
+        -mcmodel=kernel -fno-pie -mno-red-zone \
 	-fvisibility=hidden \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
-	-msse -msse2 \
+	-msse -msse2 -fverbose-asm \
 	$(WEVERYTHING)
 
 ifdef OPTIMIZE
@@ -192,7 +192,7 @@ $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) \
 		-fuse-linker-plugin \
 		-nostdlib -Wl,-melf_x86_64 \
 		$(patsubst %,$(WLPREFIX)%,$(LDFLAGS)) \
-		$(OBJS) \
+		$(OBJS) $(DUMPDIR)/symbols-all.o \
 		-Wl,--start-group \
 			$(LIBFILES) \
 			$(EXTERNLIBFILES) \
@@ -201,8 +201,6 @@ $(KERNEL): $(OBJS) $(LINKERSCRIPT) $(LIBFILES) \
 			-Wl,--no-whole-archive \
 		-Wl,--end-group \
 		-Wl,-build-id=none
-
-#$(LIBGCC) \
 
 $(DUMPDIR)/kernel-headers: $(KERNEL)
 	mkdir -p $(@D)

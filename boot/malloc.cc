@@ -408,12 +408,12 @@ void test_malloc()
 
 #endif
 
-void *operator new(size_t size)
+void *operator new(size_t size) noexcept
 {
     return malloc(size);
 }
 
-void operator delete(void *block, unsigned long size)
+void operator delete(void *block, unsigned long size) noexcept
 {
     (void)size;
     free(block);
@@ -425,12 +425,12 @@ void operator delete(void *block, unsigned size)
     free(block);
 }
 
-void operator delete(void *block)
+void operator delete(void *block) noexcept
 {
     free(block);
 }
 
-void operator delete[](void *block)
+void operator delete[](void *block) noexcept
 {
     free(block);
 }

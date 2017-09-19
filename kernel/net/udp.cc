@@ -19,10 +19,12 @@ uint16_t udp_checksum(udp_hdr_t const *hdr)
         total += native;
     }
 
-    uint16_t const *in = &hdr->s_port;
+    char const *in = (char const *)&hdr->s_port;
     uint16_t native_udplen = ntohs(hdr->len);
     for (size_t i = 0, e = native_udplen >> 1; i < e; ++i) {
-        uint32_t native = ntohs(in[i]);
+        uint16_t tmp;
+        memcpy(&tmp, in + (i*2), sizeof(tmp));
+        uint32_t native = ntohs(tmp);
         total += native;
     }
 

@@ -1,6 +1,6 @@
 #include "types.h"
 #include "likely.h"
-
+#include "intrin_compat.h"
 
 extern "C" void *memcpy512_nt_sse4_1(void *dest, void const *src, size_t n)
 {

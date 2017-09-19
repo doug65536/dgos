@@ -10,7 +10,8 @@ ZLIBBUILDROOT := $(EXTERNDIR)/zlib-src
 ZLIBSOURCEDIR := $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)
 ZLIBGZFILE := zlib-$(ZLIBVER).tar.gz
 ZLIBURL := http://zlib.net/$(ZLIBGZFILE)
-ZLIBCFLAGS := -O3 -mcmodel=kernel -mno-red-zone -msse -msse2 -fno-exceptions \
+ZLIBCFLAGS := -O3 -mcmodel=kernel -fno-pie \
+        -mno-red-zone -msse -msse2 -fno-exceptions \
 	-fno-common -fno-stack-protector -fbuiltin
 #-fno-asynchronous-unwind-tables
 ZLIBCONFIGURE := $(ZLIBSOURCEDIR)/configure
