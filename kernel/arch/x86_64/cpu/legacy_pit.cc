@@ -11,6 +11,13 @@
 #include "conio.h"
 #include "printk.h"
 
+#define DEBUG_PIT   1
+#if DEBUG_PIT
+#define PIT_TRACE(...) printdbg("pit: " __VA_ARGS__)
+#else
+#define PIT_TRACE(...) ((void)0)
+#endif
+
 //
 // Command byte
 
@@ -127,6 +134,8 @@ static uint64_t pit8254_time_ns()
 
 static void pit8254_time_ns_stop()
 {
+    PIT_TRACE("Disabling PIT timer tick\n");
+
     irq_setmask(0, 0);
 
     spinlock_lock_noirq(&pit8253_lock);
@@ -203,6 +212,8 @@ void pit8254_enable()
 {
     if (!time_ns_set_handler(pit8254_time_ns, pit8254_time_ns_stop, false))
         return;
+
+    PIT_TRACE("Starting PIT timer\n");
 
     pit8254_set_rate(60);
     irq_hook(0, pit8254_irq_handler);
