@@ -13,7 +13,7 @@ QEMU_SERIAL := \
 	-serial chardev:qemu-serial-socket
 
 QEMU_CPU := host,migratable=false,host-cache-info=true
-QEMU_RAM := 5G
+QEMU_RAM := 3G
 QEMU_FLAGS :=
 QEMU_BRIDGE :=
 

@@ -49,7 +49,7 @@ info: action=report
 error: action=ask
 panic: action=ask
 keyboard: type=mf, serial_delay=250, paste_delay=100000, user_shortcut=none
-mouse: type=imeps2, enabled=0, toggle=ctrl+mbutton
+#mouse: type=imeps2, enabled=0, toggle=ctrl+mbutton
 #sound: waveoutdrv=alsa, waveout=none, waveindrv=alsa, wavein=none, midioutdrv=alsa, midiout=none
 sound: waveoutdrv=none, waveout=none, waveindrv=none, wavein=none, midioutdrv=none, midiout=none
 #speaker: enabled=1, mode=sound
