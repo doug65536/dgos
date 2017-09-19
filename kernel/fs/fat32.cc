@@ -177,14 +177,18 @@ int fat32_fs_t::mm_fault_handler(
     uint64_t sector_offset = (offset >> sector_shift);
     uint64_t lba = lba_st + sector_offset;
 
+    int result;
     if (likely(read)) {
         printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
 
-        return drive->read_blocks(addr, length >> sector_shift, lba);
+        result = drive->read_blocks(addr, length >> sector_shift, lba);
+    } else {
+        printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
+        result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
     }
 
-    printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
-    int result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
+    if (result < 0)
+        printdbg("Demand paging I/O error: %d\n", result);
 
     return result;
 }
