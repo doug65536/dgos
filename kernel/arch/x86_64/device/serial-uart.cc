@@ -517,6 +517,8 @@ void uart_t::route_irq(int cpu)
 
 isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
 {
+    //printdbg("UART IRQ\n");
+
     for (uart_t *uart : uarts) {
         if (uart->irq == irq)
             ctx = uart->port_irq_handler(ctx);
