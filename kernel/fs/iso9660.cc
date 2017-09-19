@@ -257,6 +257,7 @@ void iso9660_fs_t::name_copy_utf16be(
         int codepoint = utf16be_to_ucs4(name, &name);
         out += ucs4_to_utf8(out, codepoint);
     }
+    *out++ = 0;
 }
 
 uint32_t iso9660_fs_t::round_up(
