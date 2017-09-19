@@ -63,6 +63,7 @@ REGISTER_CALLOUT(smp_main, 0, 'S', "100");
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_STRESS_HEAP_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   1
+#define ENABLE_FILESYSTEM_TEST      0
 
 #define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
@@ -713,7 +714,7 @@ static int draw_test(void *p)
                 //uint64_t line_st = cpu_rdtsc();
             }
 
-            fb_draw_aa_line(10, 10, sx+640, sy+300, 0xBFBFBF & -!(sx & 1));
+            fb_draw_aa_line(40, 60, sx+640, sy+300, 0xBFBFBF & -!(sx & 1));
 
             //uint64_t line_en = cpu_rdtsc();
             //printdbg("Line draw %ld cycles\n", line_en - line_st);
@@ -767,6 +768,7 @@ static int init_thread(void *p)
 
     //priqueue_test.test();
 
+#if ENABLE_FILESYSTEM_TEST
     for (int n = 0; n < 1000; ++n) {
         char name[16];
         snprintf(name, sizeof(name), "created_%d", n);
@@ -774,6 +776,7 @@ static int init_thread(void *p)
         file_write(create_test, "Hello!", 6);
         file_close(create_test);
     }
+#endif
 
 //    for (int i = 0; i < 10000; ++i) {
 //        printdbg("%d=%f\n", i, i / 1000.0);
@@ -810,6 +813,8 @@ static int init_thread(void *p)
     printdbg("Float formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
     printdbg("Float formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
     printdbg("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
+
+    printdbg("Opening root directory\n");
 
     int od = file_opendir("");
     dirent_t de;
