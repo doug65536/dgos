@@ -34,7 +34,7 @@ public:
     }
 
     template<typename _C>
-    function& operator=(_C&& callable)
+    function& operator=(_C callable)
     {
         impl.reset(new Callable<_C>(move(callable)));
         return *this;
