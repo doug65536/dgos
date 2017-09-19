@@ -5,7 +5,7 @@
 #include "assert.h"
 #include "math.h"
 #include "printk.h"
-
+#include "utility.h"
 #include "../boot/vesainfo.h"
 
 #define USE_NONTEMPORAL 1
@@ -164,59 +164,111 @@ void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
     }
 }
 
-#ifdef __x86_64__
-static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
-{
-    //printdbg("alpha=%6.3f\n", (double)alpha);
-    float ooa = 1.0f - alpha;
-    __fvec4 tmp1, tmp2;
-    __asm__ __volatile__ (
-        "shufps $0,%[alpha],%[alpha]\n\t"
-        "shufps $0,%[ooa],%[ooa]\n\t"
-        "mulps %[ooa],%[fcolor]\n\t"
-        // Load 32 bit pixel
-        "movd (%[pixel]),%[tmp1]\n\t"
-        // Unpack to 16 bit vector
-        "punpcklbw %[zero],%[tmp1]\n\t"
-        // Foreground color
-        // Unpack to 32 bit vector
-        "punpcklwd %[zero],%[tmp1]\n\t"
-        // Convert pixel RGBA to floating point
-        "cvtdq2ps %[tmp1],%[tmp1]\n\t"
-        // Multiply pixel color by 1.0f - alpha
-        "mulps %[alpha],%[tmp1]\n\t"
-        // Add prescaled foreground color to result
-        "addps %[fcolor],%[tmp1]\n\t"
-        // Clamp
-        "maxps %[zero],%[tmp1]\n\t"
-        // Convert back to integer
-        "cvttps2dq %[tmp1],%[tmp1]\n\t"
-        // Pack to 16 bit vector
-        "packssdw %[zero],%[tmp1]\n\t"
-        // Pack to 8 bit vector
-        "packuswb %[zero],%[tmp1]\n\t"
-        // Store result pixel
-        "movd %[tmp1],(%[pixel])\n\t"
-        : [tmp1] "=&x" (tmp1), "=&x" (tmp2)
-        , [alpha] "+x" (alpha)
-        , [ooa] "+x" (ooa)
-        , [fcolor] "+x" (fcolor)
-        : [pixel] "r" (pixel)
-        , [zero] "x" (0)
-        : "memory"
-    );
-}
-#else
-static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
-{
-    float ooa = 1.0f - alpha;
-    pixel[0] = fcolor[0] * alpha + apixel[0] * ooa;
-    pixel[1] = fcolor[1] * alpha + apixel[1] * ooa;
-    pixel[2] = fcolor[2] * alpha + apixel[2] * ooa;
-    pixel[3] = fcolor[3] * alpha + apixel[3] * ooa;
-}
-#endif
+//#ifdef __x86_64__
+//static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
+//{
+//    //printdbg("alpha=%6.3f\n", (double)alpha);
+//    float ooa = 1.0f - alpha;
+//    __fvec4 tmp1, tmp2;
+//    __asm__ __volatile__ (
+//        "shufps $0,%[alpha],%[alpha]\n\t"
+//        "shufps $0,%[ooa],%[ooa]\n\t"
+//        "mulps %[ooa],%[fcolor]\n\t"
+//        // Load 32 bit pixel
+//        "movd (%[pixel]),%[tmp1]\n\t"
+//        // Unpack to 16 bit vector
+//        "punpcklbw %[zero],%[tmp1]\n\t"
+//        // Foreground color
+//        // Unpack to 32 bit vector
+//        "punpcklwd %[zero],%[tmp1]\n\t"
+//        // Convert pixel RGBA to floating point
+//        "cvtdq2ps %[tmp1],%[tmp1]\n\t"
+//        // Multiply pixel color by 1.0f - alpha
+//        "mulps %[alpha],%[tmp1]\n\t"
+//        // Add prescaled foreground color to result
+//        "addps %[fcolor],%[tmp1]\n\t"
+//        // Clamp
+//        "maxps %[zero],%[tmp1]\n\t"
+//        // Convert back to integer
+//        "cvttps2dq %[tmp1],%[tmp1]\n\t"
+//        // Pack to 16 bit vector
+//        "packssdw %[zero],%[tmp1]\n\t"
+//        // Pack to 8 bit vector
+//        "packuswb %[zero],%[tmp1]\n\t"
+//        // Store result pixel
+//        "movd %[tmp1],(%[pixel])\n\t"
+//        : [tmp1] "=&x" (tmp1), "=&x" (tmp2)
+//        , [alpha] "+x" (alpha)
+//        , [ooa] "+x" (ooa)
+//        , [fcolor] "+x" (fcolor)
+//        : [pixel] "r" (pixel)
+//        , [zero] "x" (0)
+//        : "memory"
+//    );
+//}
+//#else
+//static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
+//{
+//    float ooa = 1.0f - alpha;
+//    pixel[0] = fcolor[0] * alpha + apixel[0] * ooa;
+//    pixel[1] = fcolor[1] * alpha + apixel[1] * ooa;
+//    pixel[2] = fcolor[2] * alpha + apixel[2] * ooa;
+//    pixel[3] = fcolor[3] * alpha + apixel[3] * ooa;
+//}
+//#endif
 
+#if 1
+template<typename F>
+void fb_draw_line(int x0, int y0, int x1, int y1, uint32_t color, F setpixel)
+{
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int adx = max(dx, -dx);
+    int ady = max(dy, -dy);
+
+    if (adx >= ady) {
+        // Shallow, x changes more than y
+
+        int d = 2 * ady - adx;
+        int s = y0;
+        int fa = x0 <= x1 ? 1 : -1;
+        int sa = y0 <= y1 ? 1 : -1;
+
+        for (int f = x0; f != x1; f += fa) {
+            setpixel(f, s, color);
+            if (d > 0) {
+               s = s + sa;
+               d = d - 2 * adx;
+            }
+            d = d + 2 * ady;
+        }
+    } else {
+        // Steep, y changes more than x
+        int d = 2 * adx - ady;
+        int s = x0;
+        int fa = y0 <= y1 ? 1 : -1;
+        int sa = x0 <= x1 ? 1 : -1;
+
+        for (int f = y0; f != y1; f += fa) {
+            setpixel(s, f, color);
+            if (d > 0) {
+               s = s + sa;
+               d = d - 2 * ady;
+            }
+            d = d + 2 * adx;
+        }
+    }
+}
+
+void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
+{
+    fb_draw_line(x0, y0, x1, y1, color, [](int x, int y, uint32_t pixel_color) {
+        if (x >= 0 && x < fb.mode.width && y >= 0 && y < fb.mode.height)
+            ((uint32_t*)(fb.back_buf + fb.mode.pitch * y))[x] = pixel_color;
+    });
+}
+
+#else
 void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
 {
     // fixme: clip properly
@@ -316,6 +368,7 @@ void fb_clip_aa_line(int x0, int y0, int x1, int y1)
     (void)x1;
     (void)y1;
 }
+#endif
 
 static void fb_update_vidmem(int left, int top, int right, int bottom)
 {
