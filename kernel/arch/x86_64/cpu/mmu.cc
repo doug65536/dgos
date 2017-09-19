@@ -97,6 +97,7 @@
 #define PTE_EX_PHYSICAL_BIT (PTE_AVAIL1_BIT+0)
 #define PTE_EX_LOCKED_BIT   (PTE_AVAIL1_BIT+1)
 #define PTE_EX_DEVICE_BIT   (PTE_AVAIL1_BIT+2)
+#define PTE_EX_WAIT_BIT     (PTE_AVAIL2_BIT+0)
 
 // Size of multi-bit fields
 #define PTE_PK_BITS         4
@@ -140,6 +141,7 @@
 #define PTE_EX_PHYSICAL     (1UL << PTE_EX_PHYSICAL_BIT)
 #define PTE_EX_LOCKED       (1UL << PTE_EX_LOCKED_BIT)
 #define PTE_EX_DEVICE       (1UL << PTE_EX_DEVICE_BIT)
+#define PTE_EX_WAIT         (1UL << PTE_EX_WAIT_BIT)
 
 // PAT configuration
 #define PAT_IDX_WB  0
@@ -509,6 +511,27 @@ static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
     *b = temp;
 }
 
+__used
+static int ptes_leaf_level(pte_t const **ptes)
+{
+    pte_t constexpr present_large = PTE_PRESENT | PTE_PAGESIZE;
+
+    if (unlikely((*ptes[0] & PTE_PRESENT) == 0))
+        return -1;
+
+    for (int level = 1; level < 3; ++level) {
+        pte_t const pte = *ptes[level];
+
+        if (unlikely((pte & PTE_PRESENT) == 0))
+            return -1;
+
+        if (unlikely((pte & present_large) == present_large))
+            return level;
+    }
+
+    return 3;
+}
+
 //
 // Physical memory allocation map processing
 
@@ -738,8 +761,7 @@ static pte_t *init_find_aliasing_pte(void)
 //
 // Aliasing page table mapping
 
-static pte_t *mm_map_aliasing_pte(
-        pte_t *aliasing_pte, physaddr_t addr)
+static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 {
     linaddr_t linaddr;
 
@@ -760,8 +782,7 @@ static pte_t *mm_map_aliasing_pte(
     return (pte_t*)linaddr;
 }
 
-static pte_t *init_map_aliasing_pte(
-        pte_t *aliasing_pte, physaddr_t addr)
+static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 {
     return mm_map_aliasing_pte(aliasing_pte, addr);
 }
@@ -890,11 +911,13 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     int need_ipi_mask = old_pending & other_cpu_mask;
 
     vector<uint64_t> shootdown_counts;
-    shootdown_counts.reserve(thread_cpu_count());
-    for (int i = 0; i < cpu_count; ++i) {
-        shootdown_counts.push_back((i != cur_cpu)
-                                   ? thread_shootdown_count(i)
-                                   : -1);
+    if (synchronous) {
+        shootdown_counts.reserve(thread_cpu_count());
+        for (int i = 0; i < cpu_count; ++i) {
+            shootdown_counts.push_back((i != cur_cpu)
+                                       ? thread_shootdown_count(i)
+                                       : -1);
+        }
     }
 
     if (other_cpu_mask) {
@@ -909,8 +932,6 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
             }
         }
     }
-
-
 
     if (synchronous) {
         uint64_t wait_st = nano_time();
@@ -1078,6 +1099,10 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
             // Restart the instruction, or unhandled exception on I/O error
             return likely(io_result >= 0) ? ctx : 0;
+        } else if (pte & PTE_EX_WAIT) {
+            // Must wait for another CPU to finish doing something with PTE
+            cpu_wait_bit_clear(ptes[3], PTE_EX_WAIT_BIT);
+            return ctx;
         } else {
             printdbg("Invalid page fault at 0x%zx\n", fault_addr);
             if (thread_get_exception_top())
@@ -2590,8 +2615,8 @@ void *mmap_window(size_t size)
     linaddr_t addr = linear_allocator.alloc_linear(size);
 
     for (size_t i = 0; i < size; i += PAGE_SIZE) {
-        mmu_map_page(addr + i, PTE_ADDR, PTE_ACCESSED | PTE_DIRTY |
-                     PTE_WRITABLE);
+        mmu_map_page(addr + i, PTE_ADDR,
+                     PTE_ACCESSED | PTE_DIRTY | PTE_WRITABLE);
     }
 
     return (void*)addr;
