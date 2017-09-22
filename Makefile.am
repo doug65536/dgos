@@ -1,5 +1,66 @@
 ## Process this file with automake to produce Makefile.in
 
+# ----------------------------------------------------------------------------
+# ZLib
+
+EXTERNDIR = $(top_builddir)/extern
+ZLIBVER = 1.2.11
+ZLIBBUILDROOT = $(EXTERNDIR)/zlib-src
+ZLIBSOURCEDIR = $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)
+ZLIBGZFILE = zlib-$(ZLIBVER).tar.gz
+ZLIBURL = http://zlib.net/$(ZLIBGZFILE)
+ZLIBCFLAGS = -O3 -mcmodel=kernel -fno-pie \
+	-mno-red-zone -msse -msse2 -fno-exceptions \
+	-fno-common -fno-stack-protector -fbuiltin
+
+EXTERNINCLUDEDIR = $(EXTERNDIR)/include
+ZLIBINCLUDEDIR = $(EXTERNINCLUDEDIR)/zlib
+ZLIBHEADERS = zlib.h zconf.h
+
+#ZLIBHEADERSOURCES = $(patsubst %,$(ZLIBSOURCEDIR)/%,$(ZLIBHEADERS))
+ZLIBHEADERSOURCES = $(ZLIBSOURCEDIR)/zlib.h $(ZLIBSOURCEDIR)/zconf.h
+
+#ZLIBPUBLICINCLUDES = $(patsubst %,$(ZLIBINCLUDEDIR)/%,$(ZLIBHEADERS))
+ZLIBPUBLICINCLUDES = $(ZLIBINCLUDEDIR)/zlib.h $(ZLIBINCLUDEDIR)/zconf.h
+
+# -fno-asynchronous-unwind-tables
+
+ZLIBCONFIGURE = $(ZLIBSOURCEDIR)/configure
+ZLIBLIBDIR = $(EXTERNDIR)/zlib-src/build
+ZLIBLIBNAME = libz.a
+ZLIBSTATICLIB = $(ZLIBLIBDIR)/$(ZLIBLIBNAME)
+ZLIBCONFIGUREFLAGS = --64 --static
+ZLIBMAKEFILE = $(ZLIBLIBDIR)/Makefile
+ZLIBMAKE = $(MAKE)
+
+$(ZLIBINCLUDEDIR):
+	mkdir -p $(ZLIBINCLUDEDIR)
+
+# Make zlib
+$(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES) $(ZLIBHEADERSOURCES): $(ZLIBMAKEFILE) $(ZLIBINCLUDEDIR)
+	+( \
+		( cd $(@D) && $(ZLIBMAKE) $(ZLIBLIBNAME) ); \
+		for i in $(ZLIBHEADERS); do \
+			cp $(ZLIBSOURCEDIR)/$$i $(ZLIBINCLUDEDIR)/$$i;\
+		done \
+	)
+
+# Run zlib configure
+$(ZLIBMAKEFILE): $(ZLIBCONFIGURE)
+	( \
+		mkdir -p $(@D) && \
+		cd $(@D) && \
+		CFLAGS="$(ZLIBCFLAGS)" ../zlib-$(ZLIBVER)/configure $(ZLIBCONFIGUREFLAGS) \
+	)
+
+# Download zlib
+$(ZLIBCONFIGURE):
+	mkdir -p $(ZLIBBUILDROOT)
+	curl -o $(ZLIBBUILDROOT)/zlib.tar.gz $(ZLIBURL)
+	(cd $(ZLIBBUILDROOT) && tar -xzvf zlib.tar.gz)
+
+BUILT_SOURCES = $(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES) $(top_builddir)/dump
+
 bin_PROGRAMS = \
 	bootsect-elf \
 	kernel-elf
@@ -152,6 +213,7 @@ kernel_elf_CXXFLAGS = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
+	-I$(EXTERNINCLUDEDIR) \
 	-std=c++14 -ggdb \
 	-mcmodel=kernel -fno-pie -mno-red-zone \
 	-fvisibility=hidden \
@@ -182,70 +244,11 @@ libkernel_avx512_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -mavx512f
 kernel_elf_LDADD = \
 	libkernel-sse41.a \
 	libkernel-avx.a \
-	libkernel-avx512.a
+	libkernel-avx512.a \
+	$(ZLIBSTATICLIB)
 
 # ----------------------------------------------------------------------------
 # Misc make rules
 
 $(top_builddir)/dump:
 	mkdir -p $(top_builddir)/dump
-
-# ----------------------------------------------------------------------------
-# ZLib
-
-EXTERNDIR = $(top_builddir)/extern
-ZLIBVER = 1.2.11
-ZLIBBUILDROOT = $(EXTERNDIR)/zlib-src
-ZLIBSOURCEDIR = $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)
-ZLIBGZFILE = zlib-$(ZLIBVER).tar.gz
-ZLIBURL = http://zlib.net/$(ZLIBGZFILE)
-ZLIBCFLAGS = -O3 -mcmodel=kernel -fno-pie \
-	-mno-red-zone -msse -msse2 -fno-exceptions \
-	-fno-common -fno-stack-protector -fbuiltin
-
-EXTERNINCLUDEDIR = $(EXTERNDIR)/include
-ZLIBINCLUDEDIR = $(EXTERNINCLUDEDIR)/zlib
-ZLIBHEADERS = zlib.h zconf.h
-
-#ZLIBHEADERSOURCES = $(patsubst %,$(ZLIBSOURCEDIR)/%,$(ZLIBHEADERS))
-ZLIBHEADERSOURCES = $(ZLIBSOURCEDIR)/zlib.h $(ZLIBSOURCEDIR)/zconf.h
-
-#ZLIBPUBLICINCLUDES = $(patsubst %,$(ZLIBINCLUDEDIR)/%,$(ZLIBHEADERS))
-ZLIBPUBLICINCLUDES = $(ZLIBINCLUDEDIR)/zlib.h $(ZLIBINCLUDEDIR)/zconf.h
-
-# -fno-asynchronous-unwind-tables
-
-ZLIBCONFIGURE = $(ZLIBSOURCEDIR)/configure
-ZLIBLIBDIR = $(EXTERNDIR)/zlib-src/build
-ZLIBLIBNAME = libz.a
-ZLIBSTATICLIB = $(ZLIBLIBDIR)/$(ZLIBLIBNAME)
-ZLIBCONFIGUREFLAGS = --64 --static
-ZLIBMAKEFILE = $(ZLIBLIBDIR)/Makefile
-ZLIBMAKE = $(MAKE)
-
-# Make zlib
-$(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES): $(ZLIBMAKEFILE)
-	( cd $(@D) && $(ZLIBMAKE) $(ZLIBLIBNAME) )
-	mkdir -p $(ZLIBINCLUDEDIR)
-	for i in $(ZLIBHEADERS); do \
-		cp $(ZLIBSOURCEDIR)/$$i $(ZLIBINCLUDEDIR)/$$i;\
-	done
-
-# Run zlib configure
-$(ZLIBMAKEFILE): $(ZLIBCONFIGURE)
-	( \
-		mkdir -p $(@D) && \
-		cd $(@D) && \
-		CFLAGS="$(ZLIBCFLAGS)" ../zlib-$(ZLIBVER)/configure $(ZLIBCONFIGUREFLAGS) \
-	)
-
-# Download zlib
-$(ZLIBCONFIGURE):
-	mkdir -p $(ZLIBBUILDROOT)
-	curl -o $(ZLIBBUILDROOT)/zlib.tar.gz $(ZLIBURL)
-	(cd $(ZLIBBUILDROOT) && tar -xzvf zlib.tar.gz)
-
-BUILT_SOURCES = $(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES) $(top_builddir)/dump
-
-kernel_elf_LDADD += $(ZLIBSTATICLIB)
-kernel_elf_CXXFLAGS += -I$(EXTERNINCLUDEDIR)
