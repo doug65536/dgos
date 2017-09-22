@@ -1,3 +1,4 @@
+.code16
 .section ".parttab", "ax"
 
 .macro partition_table_entry active,lba_start,lba_sectors,type

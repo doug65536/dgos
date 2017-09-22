@@ -314,9 +314,9 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Clear prefetch queue
         "jmp 0f\n\t"
+        "0:\n\t"
 
         // Far jump to load cs selector
-        "0:\n\t"
         "ljmpl %[gdt_code32],$0f\n\t"
 
         // In protected mode
@@ -421,7 +421,11 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "3:\n\t"
 
         // Far return to 32 bit compatibility mode code segment
+#ifndef __clang__
         "retf\n\t"
+#else
+        "lret\n\t"
+#endif
 
         "1:\n\t"
         ".code32\n\t"
