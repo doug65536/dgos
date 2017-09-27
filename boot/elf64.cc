@@ -13,7 +13,7 @@
 #include "vesa.h"
 #include "progressbar.h"
 
-#define ELF64_DEBUG     0
+#define ELF64_DEBUG     1
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) print_line("elf64: " __VA_ARGS__)
 #else
@@ -84,6 +84,8 @@ void enter_kernel(uint64_t entry_point)
 
 uint16_t elf64_run(char const *filename)
 {
+	cpu_init();
+
     if (!cpu_has_long_mode())
         halt("Need 64-bit CPU");
 

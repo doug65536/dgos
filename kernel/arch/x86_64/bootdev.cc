@@ -1,5 +1,6 @@
 #include "bootdev.h"
 #include "printk.h"
+#include "bootinfo.h"
 
 struct bootdev_drive_params_t {
     uint16_t size;
@@ -72,7 +73,8 @@ void bootdev_info(uint8_t *bus, uint8_t *slot, uint8_t *func)
     (void)func;
 
     bootdev_drive_params_t *p = (bootdev_drive_params_t*)
-            (uintptr_t)*(uint32_t*)0x7C44;
+//            (uintptr_t)*(uint32_t*)0x7C44;
+			bootinfo_parameter(bootparam_t::boot_device);
 
     printdbg("Host bus %4.4s %8.8s\n", p->host_bus, p->interface_type);
 }

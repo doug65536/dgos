@@ -6,6 +6,7 @@
 #include "math.h"
 #include "printk.h"
 #include "utility.h"
+#include "bootinfo.h"
 #include "../boot/vesainfo.h"
 
 #define USE_NONTEMPORAL 1
@@ -40,7 +41,8 @@ static inline void fb_reset_dirty(void)
 void fb_init(void)
 {
     fb.mode = *(vbe_selected_mode_t*)(uintptr_t)
-            *(uint32_t*)(uintptr_t)(0x7C00 + 72);
+			//*(uint32_t*)(uintptr_t)(0x7C00 + 72);
+			bootinfo_parameter(bootparam_t::vbe_mode_info);
 
     size_t screen_size = fb.mode.width * fb.mode.height * sizeof(uint32_t);
 

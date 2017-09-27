@@ -1,6 +1,7 @@
 #include "paging.h"
 #include "screen.h"
 #include "malloc.h"
+#include "screen.h"
 
 // Builds 64-bit page tables using far pointers in real mode
 //
@@ -19,6 +20,13 @@
 // Page tables are accessed through far pointers and manipulated
 // with helper functions that load segment registers
 // The fs segment is used and is not preserved
+
+#define DEBUG_PAGING	1
+#if DEBUG_PAGING
+#define PAGING_TRACE(...) print_line("paging: " __VA_ARGS__)
+#else
+#define PAGING_TRACE(...) ((void)0)
+#endif
 
 // Structure to hold the segment and slot for the PTE for a given address
 struct pte_ref_t {
@@ -152,6 +160,9 @@ void paging_alias_range(uint64_t alias_addr,
                         uint64_t size,
                         uint64_t alias_flags)
 {
+	PAGING_TRACE("aliasing %llu bytes at lin %llx to physaddr %llx\n",
+				 size, linear_addr, alias_addr);
+
     for (uint64_t offset = 0; offset < size; offset += PAGE_SIZE) {
         pte_ref_t original = paging_find_pte(linear_addr, 0);
         pte_ref_t alias_ref = paging_find_pte(alias_addr, 1);

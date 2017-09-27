@@ -23,6 +23,7 @@
 #include "ioport.h"
 #include "mm.h"
 #include "vector.h"
+#include "bootinfo.h"
 
 #define ENABLE_ACPI 1
 
@@ -1878,8 +1879,11 @@ void apic_start_smp(void)
         return;
 
     // Read address of MP entry trampoline from boot sector
-    uint32_t *mp_trampoline_ptr = (uint32_t*)0x7c40;
-    uint32_t mp_trampoline_addr = *mp_trampoline_ptr;
+	//uint32_t *mp_trampoline_ptr = (uint32_t*)0x7c40;
+	//		bootinfo_parameter(bootparam_t::ap_entry_point);
+	uint32_t mp_trampoline_addr = //*mp_trampoline_ptr;
+			(uint32_t)
+			bootinfo_parameter(bootparam_t::ap_entry_point);
     uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
     // Send INIT to all other CPUs

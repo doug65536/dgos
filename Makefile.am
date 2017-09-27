@@ -1,20 +1,117 @@
 ## Process this file with automake to produce Makefile.in
 
-include zlib.mk
+BUILT_SOURCES = \
+	$(ZLIBSTATICLIB) \
+	$(ZLIBPUBLICINCLUDES) \
+	qemu-emu.mk \
+	$(abs_top_builddir)/dump
 
-BUILT_SOURCES = $(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES) $(top_builddir)/dump
+# Build libmbr
+#  -> Link mbr-elf
+#  -> Link mbr-bin
+# Build libbootsect
+#  -> Link bootfat-elf
+#  -> Link bootfat-bin
+#  -> Link bootiso-elf
+#  -> Link bootiso-bin
+# Build libkernel-sse41.a libkernel-avx libkernel-avx512
+#  -> Build kernel-elf
 
-bin_PROGRAMS = \
-	bootsect-elf \
-	kernel-elf
+CLANG_FLAGS = -no-integrated-as
+CLANG_FLAGS += -Wno-unused-command-line-argument
+#CLANG_FLAGS =
+LINKER_SEL = -fuse-ld=gold
+
+#LINKER_DEBUG = -Wl,--orphan-handling,warn
+LINKER_DEBUG =
 
 noinst_LIBRARIES = \
+	libmbr.a \
+	libbootsect.a \
 	libkernel-sse41.a \
 	libkernel-avx.a \
 	libkernel-avx512.a
 
-bootsect_elf_SOURCES = \
+bin_PROGRAMS = \
+	mbr-elf \
+	mbr-bin \
+	bootfat-elf \
+	bootfat-bin \
+	bootiso-elf \
+	bootiso-bin \
+	kernel-elf
+
+libmbr_a_SOURCES = \
+	mbr/mbr.s
+
+libmbr_a_CCASFLAGS = \
+	-m16 \
+	$(CLANG_FLAGS) \
+	-fno-pie -fno-pic \
+	-Wno-unused-command-line-argument
+
+EXTRA_libmbr_a_DEPENDENCIES = \
+	$(abs_top_builddir)/dump
+
+mbr_elf_LDFLAGS = \
+	-m16 \
+	-Wl,--oformat,elf32-little \
+	-Wl,-Map,$(top_builddir)/mbr.map \
+	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
+	$(LINKER_DEBUG) \
+	$(LINKER_SEL) \
+	-Wl,-nostdlib \
+	-nostartfiles -nodefaultlibs -nostdlib
+
+EXTRA_mbr_elf_DEPENDENCIES = \
+	$(top_srcdir)/mbr/mbr.ld
+
+mbr_elf_SOURCES = \
+	mbr/mbr.ld \
+	mbr/empty.cc
+
+mbr_elf_CXXFLAGS = \
+	-m16 \
+	$(CLANG_FLAGS)
+
+mbr_elf_CCASFLAGS = \
+	-m16 \
+	$(CLANG_FLAGS)
+
+mbr_elf_LDADD = \
+	libmbr.a
+
+mbr_bin_SOURCES = \
+	mbr/empty.cc
+
+mbr_bin_CXXFLAGS = \
+	-m16 \
+	$(CLANG_FLAGS)
+
+mbr_bin_CFLAGS = \
+	-m16 \
+	-fno-pic -fno-pie \
+	$(CLANG_FLAGS)
+
+mbr_bin_LDFLAGS = \
+	-m16 \
+	-Wl,--oformat,binary \
+	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
+	$(LINKER_DEBUG) \
+	-fuse-ld=bfd \
+	-Wl,-nostdlib \
+	-fno-pic -fno-pie \
+	-nostartfiles -nodefaultlibs -nostdlib
+
+EXTRA_mbr_bin_DEPENDENCIES = \
+	$(top_srcdir)/mbr/mbr.ld
+
+mbr_bin_LDADD = libmbr.a
+
+libbootsect_a_SOURCES = \
+	boot/bootsect.ld \
 	boot/bootsect.cc \
+	boot/bootinfo.s \
 	boot/screen.cc \
 	boot/fs.cc \
 	boot/fat32.cc \
@@ -34,29 +131,144 @@ bootsect_elf_SOURCES = \
 	boot/debug.cc \
 	boot/part.s \
 	boot/mpentry.s \
-	boot/exception.s
+	boot/exception.s \
+	boot/part.h \
+	boot/vesainfo.h \
+	boot/progressbar.h \
+	boot/paging.h \
+	boot/rand.h \
+	boot/types.h \
+	boot/iso9660.h \
+	boot/debug.h \
+	boot/cpu.h \
+	boot/utf.h \
+	boot/elf64.h \
+	boot/exception.h \
+	boot/farptr.h \
+	boot/elf64decl.h \
+	boot/mpentry.h \
+	boot/screen.h \
+	boot/fat32.h \
+	boot/driveinfo.h \
+	boot/string.h \
+	boot/physmem.h \
+	boot/bootsect.h \
+	boot/malloc.h \
+	boot/fs.h \
+	boot/vesa.h
 
-bootsect_elf_CXXFLAGS = \
-	-I$(top_srcdir)/boot \
-	-m16 -ggdb -Os -ffreestanding \
-	-Wall -Wextra -Wpedantic -Werror \
+libbootsect_a_INCLUDES = \
+	-I$(top_srcdir)/boot
+
+libbootsect_a_CXXFLAGS = \
+	$(libbootsect_a_INCLUDES) \
+	-m16 -ggdb -Oz -ffreestanding \
+	-Wall -Wextra -Wpedantic \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti \
 	-mrtd -mregparm=3 \
-	-std=c++14 -fno-pic -fno-pie
+	-std=c++14 -fno-pic -fno-pie \
+	$(CLANG_FLAGS)
 
-bootsect_elf_LDFLAGS = \
-	-Wl,-m -Wl,i386linux \
-	-Wl,-nostdlib \
-	-Wl,-M \
-	-Wl,-T -Wl,$(top_srcdir)/boot/bootsect.ld \
-	-no-integrated-as \
+libbootsect_a_CFLAGS = \
+	-m16 -ggdb -Oz -ffreestanding \
+	-Wall -Wextra -Wpedantic \
+	-mno-sse -mno-sse2 -mfpmath=387 \
+	-fno-asynchronous-unwind-tables \
+	-mrtd -mregparm=3 \
+	-std=c++14 -fno-pic -fno-pie \
+	$(CLANG_FLAGS)
+
+libbootsect_a_CCASFLAGS = \
+	-m16 -ggdb -Oz -ffreestanding \
+	-Wall -Wextra -Wpedantic \
+	-mno-sse -mno-sse2 -mfpmath=387 \
+	-fno-asynchronous-unwind-tables \
+	-mrtd -mregparm=3 \
+	-std=c++14 -fno-pic -fno-pie \
+	$(CLANG_FLAGS)
+
+bootfat_elf_SOURCES = \
+	boot/bootfat.s
+
+bootfat_elf_CXXFLAGS = \
+	$(libbootsect_a_CXXFLAGS)
+
+bootfat_elf_CCASFLAGS = \
+	-m16 -fno-pic -fno-pie \
+	$(CLANG_FLAGS)
+
+bootfat_elf_LDFLAGS = \
+	-m16 \
+	-Wl,-m,i386linux \
+	-Wl,-Map,$(top_builddir)/bootsect.map \
+	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
+	$(LINKER_DEBUG) \
 	-Wl,-v \
-	-fuse-ld=gold \
+	$(LINKER_SEL) -fuse-ld=gold \
+	-nostartfiles -nodefaultlibs -nostdlib \
+	$(CLANG_FLAGS)
+
+EXTRA_bootfat_elf_DEPENCENCIES = \
+	$(top_srcdir)/boot/bootsect.ld
+
+bootfat_elf_LDADD = \
+	libbootsect.a
+
+bootfat_bin_SOURCES = \
+	boot/bootfat.s
+
+bootfat_bin_CXXFLAGS = \
+	$(libbootsect_a_CXXFLAGS)
+
+bootfat_bin_CCASFLAGS = \
+	$(bootfat_elf_CCASFLAGS)
+
+bootfat_bin_LDFLAGS = \
+	-m16 \
+	-Wl,--oformat,binary \
+	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
+	$(LINKER_DEBUG) \
+	-fuse-ld=bfd \
+	-Wl,-nostdlib \
+	-fno-pic -fno-pie \
 	-nostartfiles -nodefaultlibs -nostdlib
 
-bootsect_elf_CCASFLAGS = \
-	-m16
+EXTRA_bootfat_bin_DEPENDENCIES = \
+	$(top_srcdir)/boot/bootsect.ld
+
+bootfat_bin_LDADD = \
+	libbootsect.a
+
+bootiso_elf_SOURCES = \
+	boot/bootiso.s
+
+bootiso_elf_CXXFLAGS = \
+	$(bootfat_elf_CXXFLAGS)
+
+bootiso_bin_CCASFLAGS = \
+	$(bootfat_bin_CCASFLAGS)
+
+bootiso_elf_LDFLAGS = \
+	$(bootfat_elf_LDFLAGS)
+
+bootiso_elf_LDADD = \
+	libbootsect.a
+
+bootiso_bin_SOURCES = \
+	boot/bootiso.s
+
+bootiso_bin_CXXFLAGS = \
+	$(bootfat_bin_CXXFLAGS)
+
+bootiso_bin_LDFLAGS = \
+	$(bootfat_bin_LDFLAGS)
+
+EXTRA_bootiso_bin_DEPENDENCIES = \
+	$(top_srcdir)/boot/bootsect.ld
+
+bootiso_bin_LDADD = \
+	libbootsect.a
 
 kernel_elf_SOURCES = \
 	kernel/arch/x86_64/entry.s \
@@ -64,6 +276,7 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/cpu/except_asm.s \
 	kernel/arch/x86_64/cpu/syscall.s \
 	kernel/main.cc \
+	kernel/lib/bootinfo.cc \
 	kernel/lib/mm.cc \
 	kernel/lib/thread.cc \
 	kernel/lib/priorityqueue.cc \
@@ -98,6 +311,12 @@ kernel_elf_SOURCES = \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/framebuffer.cc \
 	kernel/lib/unique_ptr.cc \
+	kernel/fs/mbr.cc \
+	kernel/fs/ext4.cc \
+	kernel/fs/fat32.cc \
+	kernel/fs/iso9660.cc \
+	kernel/fs/iso9660_part.cc \
+	kernel/fs/tmpfs.cc \
 	kernel/net/eth_q.cc \
 	kernel/net/eth_frame.cc \
 	kernel/net/arp_frame.cc \
@@ -147,19 +366,127 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/device/ahci.cc \
 	kernel/arch/x86_64/device/ide.cc \
 	kernel/arch/x86_64/device/ata.cc \
-	kernel/arch/x86_64/device/serial-uart.cc
+	kernel/arch/x86_64/device/serial-uart.cc \
+	kernel/net/eth_q.h \
+	kernel/net/ipv4_frame.h \
+	kernel/net/udp_frame.h \
+	kernel/net/ethernet.h \
+	kernel/net/ipv4.h \
+	kernel/net/icmp.h \
+	kernel/net/arp.h \
+	kernel/net/tcp_frame.h \
+	kernel/net/icmp_frame.h \
+	kernel/net/tcp.h \
+	kernel/net/udp.h \
+	kernel/net/arp_frame.h \
+	kernel/net/dhcp.h \
+	kernel/net/eth_frame.h \
+	kernel/arch/cpu.h \
+	kernel/arch/x86_64/bios_data.h \
+	kernel/arch/x86_64/gdbstub.h \
+	kernel/arch/x86_64/elf64_decl.h \
+	kernel/arch/x86_64/types.h \
+	kernel/arch/x86_64/device/keyb8042.h \
+	kernel/arch/x86_64/device/e9debug.h \
+	kernel/arch/x86_64/device/usb.h \
+	kernel/arch/x86_64/device/serial-uart.h \
+	kernel/arch/x86_64/device/ata.h \
+	kernel/arch/x86_64/device/pci.h \
+	kernel/arch/x86_64/elf64.h \
+	kernel/arch/x86_64/cpu/cpu_broadcast.h \
+	kernel/arch/x86_64/cpu/gdt.h \
+	kernel/arch/x86_64/cpu/spinlock.h \
+	kernel/arch/x86_64/cpu/apic.h \
+	kernel/arch/x86_64/cpu/syscall_dispatch.h \
+	kernel/arch/x86_64/cpu/cpu_metrics.h \
+	kernel/arch/x86_64/cpu/isr.h \
+	kernel/arch/x86_64/cpu/idt.h \
+	kernel/arch/x86_64/cpu/thread_impl.h \
+	kernel/arch/x86_64/cpu/interrupts.h \
+	kernel/arch/x86_64/cpu/legacy_pic.h \
+	kernel/arch/x86_64/cpu/except.h \
+	kernel/arch/x86_64/cpu/ioport.h \
+	kernel/arch/x86_64/cpu/nontemporal.h \
+	kernel/arch/x86_64/cpu/isr_constants.h \
+	kernel/arch/x86_64/cpu/legacy_pit.h \
+	kernel/arch/x86_64/cpu/except_asm.h \
+	kernel/arch/x86_64/cpu/cmos.h \
+	kernel/arch/x86_64/cpu/atomic.h \
+	kernel/arch/x86_64/cpu/cpuid.h \
+	kernel/arch/x86_64/cpu/control_regs.h \
+	kernel/arch/x86_64/cpu/halt.h \
+	kernel/arch/x86_64/stacktrace.h \
+	kernel/arch/x86_64/bootdev.h \
+	kernel/arch/mmu.h \
+	kernel/fs/iso9660_decl.h \
+	kernel/fs/fat32_decl.h \
+	kernel/lib/bootinfo.h \
+	kernel/lib/main.h \
+	kernel/lib/png.h \
+	kernel/lib/framebuffer.h \
+	kernel/lib/likely.h \
+	kernel/lib/zlib_helper.h \
+	kernel/lib/priorityqueue.h \
+	kernel/lib/pool.h \
+	kernel/lib/assert.h \
+	kernel/lib/dev_eth.h \
+	kernel/lib/export.h \
+	kernel/lib/unistd.h \
+	kernel/lib/dev_storage.h \
+	kernel/lib/process.h \
+	kernel/lib/rand.h \
+	kernel/lib/mm.h \
+	kernel/lib/dev_text.h \
+	kernel/lib/debug.h \
+	kernel/lib/sys/types.h \
+	kernel/lib/hash.h \
+	kernel/lib/conio.h \
+	kernel/lib/hash_table.h \
+	kernel/lib/thread.h \
+	kernel/lib/rbtree.h \
+	kernel/lib/heap.h \
+	kernel/lib/mouse.h \
+	kernel/lib/callout.h \
+	kernel/lib/math.h \
+	kernel/lib/cc/functional.h \
+	kernel/lib/cc/algorithm.h \
+	kernel/lib/cc/utility.h \
+	kernel/lib/cc/initializer_list.h \
+	kernel/lib/cc/type_traits.h \
+	kernel/lib/cc/vector.h \
+	kernel/lib/cc/memory.h \
+	kernel/lib/bsearch.h \
+	kernel/lib/bswap.h \
+	kernel/lib/threadsync.h \
+	kernel/lib/stddef.h \
+	kernel/lib/bitop.h \
+	kernel/lib/time.h \
+	kernel/lib/irq.h \
+	kernel/lib/string.h \
+	kernel/lib/stdlib.h \
+	kernel/lib/intrin_compat.h \
+	kernel/lib/printk.h \
+	kernel/lib/errno.h \
+	kernel/lib/unique_ptr.h \
+	kernel/lib/dirent.h \
+	kernel/lib/keyboard.h \
+	kernel/lib/dev_registration.h \
+	kernel/lib/bitsearch.h \
+	kernel/lib/fileio.h
 
-kernel_elf_CXXFLAGS = \
+kernel_elf_INCLUDES = \
 	-I$(top_srcdir)/kernel \
 	-I$(top_srcdir)/kernel/lib \
 	-I$(top_srcdir)/kernel/net \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
-	-I$(EXTERNINCLUDEDIR) \
+	-I$(EXTERNINCLUDEDIR)
+
+kernel_elf_CXXFLAGS = \
+	$(kernel_elf_INCLUDES) \
 	-std=c++14 -ggdb \
-	-mcmodel=kernel -fno-pie -mno-red-zone \
-	-fvisibility=hidden \
+	-mcmodel=kernel -fno-pic -mno-red-zone \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
 	-msse -msse2 -fverbose-asm
 
@@ -173,12 +500,19 @@ libkernel_avx512_a_SOURCES = \
 	kernel/arch/x86_64/cpu/nontemporal_avx512.cc
 
 kernel_elf_LDFLAGS = \
-	-Wl,--oformat -Wl,elf64-x86-64 \
-	-Wl,-Map -Wl,$(top_builddir)/dump/kernel.map \
-	-Wl,-T -Wl,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
-	-Wl,-g -Wl,-export-dynamic \
-	-Wl,-z -Wl,max-page-size=4096 \
+	-Wl,--oformat,elf64-x86-64 \
+	-Wl,-Map,$(top_builddir)/kernel.map \
+	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
+	$(LINKER_DEBUG) \
+	-Wl,-g \
+	-Wl,-export-dynamic \
+	-Wl,-z,max-page-size=4096 \
 	-nostartfiles -nodefaultlibs -nostdlib
+
+EXTRA_kernel_elf_DEPENDENCIES = \
+	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
+	$(abs_top_builddir)/dump \
+	$(ZLIBSTATICLIB)
 
 libkernel_sse41_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -msse4.1
 libkernel_avx_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -mavx
@@ -193,5 +527,121 @@ kernel_elf_LDADD = \
 # ----------------------------------------------------------------------------
 # Misc make rules
 
-$(top_builddir)/dump:
-	mkdir -p $(top_builddir)/dump
+$(abs_top_builddir)/dump:
+	echo WTF ******************************** $(ZLIBSTATICLIB)
+	mkdir -p $(abs_top_builddir)/dump
+
+include zlib.mk
+include diskfat.mk
+#include emulators.mk
+
+# ----------------------------------------------------------------------------
+# QEMU launcher
+
+dump/qemu-debug-out:
+	mkfifo $@
+
+QEMU = qemu-system-x86_64
+
+QEMU_CPUS = 8
+QEMU_CORES = 4
+QEMU_THREADS = 1
+QEMU_CPU = host,migratable=false,host-cache-info=true
+
+QEMU_RAM = 5G
+
+QEMU_USB = -device nec-usb-xhci \
+	-device usb-kbd \
+	-device usb-mouse
+
+QEMU_NET = \
+	-net nic,model=rtl8139 \
+	-net nic,model=ne2k_pci \
+	-net nic,model=e1000 \
+	$(QEMU_BRIDGE) \
+	-net dump,file=dump/netdump
+
+QEMU_MONITOR = \
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
+
+QEMU_DEBUGCON = \
+	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+	-mon qemu-monitor,mode=readline \
+	-device isa-debugcon,chardev=qemu-debug-out
+
+QEMU_SERIAL = \
+	-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server,nowait \
+	-serial chardev:qemu-serial-socket
+
+QEMU_COMMON = \
+	$(QEMU_MONITOR) \
+	$(QEMU_SERIAL) \
+	$(QEMU_DEBUGCON) \
+	$(QEMU_USB) \
+	$(QEMU_NET) \
+	-no-shutdown -no-reboot -d unimp,guest_errors \
+	-m $(QEMU_RAM) \
+	$(QEMU_FLAGS)
+
+QEMU_RT_debug = -s -S
+QEMU_RT_run = -s
+QEMU_HDCTL_DEV_ahci =  -machine q35
+QEMU_HDCTL_DEV_ide =  -machine pc
+QEMU_MEDIA_fat = disk
+QEMU_MEDIA_iso = cdrom
+QEMU_IMAGE_fat = fatdisk.img
+QEMU_IMAGE_iso = isodisk.img
+QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
+QEMU_NP_up = -smp cpus=1,cores=1,threads=1
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
+QEMU_EMU_tcg = -cpu kvm64
+
+# Connect to debug log
+monitor-debug-output:
+	while true; do cat dump/qemu-debug-out; done
+
+# Connect to console
+monitor-connect:
+	telnet localhost 7777
+
+# Generate emulators makefile
+qemu-emu.mk: $(top_srcdir)/Makefile.am
+	@echo Generating qemu-emu.mk
+	@rm -f qemu-emu.mk
+	@for rt in debug run; do \
+		for np in up smp; do \
+			for fs in iso fat; do \
+				for sc in ahci ide; do \
+					for em in kvm tcg; do \
+						IMG="\$$(QEMU_IMAGE_$$fs)"; \
+						QUP="\$$(QEMU_NP_$$np)"; \
+						CTL="\$$(QEMU_HDCTL_DEV_$$sc)"; \
+						QM="\$$(QEMU_MEDIA_$$fs)"; \
+						QEM="\$$(QEMU_EMU_$$em)"; \
+						QRT="\$$(QEMU_RT_$$rt)"; \
+						printf %s \
+							"$$rt-$$np-$$fs-$$sc-$$em: " \
+							$$IMG \
+							' dump/qemu-debug-out' \
+							$$'\n' $$'\t' \
+							'$$(QEMU) $$(QEMU_COMMON)' \
+							' \' $$'\n' $$'\t' \
+							$$QUP \
+							' \' $$'\n' $$'\t' \
+							$$CTL \
+							' \' $$'\n' $$'\t' \
+							$$QEM \
+							' \' $$'\n' $$'\t' \
+							'-drive' \
+							" file=$$IMG,format=raw,media=$$QM" \
+							' \' $$'\n' $$'\t' \
+							$$QRT \
+							$$'\n' $$'\n' \
+							>> qemu-emu.mk; \
+					done; \
+				done; \
+			done; \
+		done; \
+	done
+
+-include qemu-emu.mk

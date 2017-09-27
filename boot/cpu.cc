@@ -105,7 +105,7 @@
 #define GDT_MAKE_DATASEG64(ring) \
     GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 0, 0)
 
-gdt_entry_t gdt[] = {
+static gdt_entry_t gdt[] = {
     GDT_MAKE_EMPTY(),
 
     // 64 bit kernel code and data
@@ -129,14 +129,14 @@ gdt_entry_t gdt[] = {
     GDT_MAKE_DATASEG32(3)
 };
 
-table_register_64_t idtr_64;
-table_register_t idtr_16 = {
+static table_register_64_t idtr_64;
+static table_register_t idtr_16 = {
     8 * 256,
     0,
     0
 };
 
-idt_entry_64_t idt[32];
+static idt_entry_64_t idt[32];
 
 #define GDT_SEL_KERNEL_CODE64   0x08
 #define GDT_SEL_KERNEL_DATA64   0x10
@@ -275,34 +275,54 @@ static void idt_init()
     idtr_64.limit = 32 * sizeof(*idt) - 1;
 }
 
+static bool need_a20_toggle;
+
+static table_register_64_t gdtr = {
+	sizeof(gdt) - 1,
+	(uint16_t)(uint32_t)gdt,
+	0,
+	0,
+	0
+};
+
+static bool nx_available;
+static uint32_t gp_available;
+
+void cpu_init()
+{
+	idt_init();
+	need_a20_toggle = !check_a20();
+	if (need_a20_toggle) {
+		toggle_a20(1);
+		if (!check_a20()) {
+			halt("A20 not enabled and enabling it failed!");
+		}
+	}
+	nx_available = cpu_has_no_execute();
+	gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
+}
+
 // If src is > 0, copy size bytes from src to address
 // If src is == 0, jumps to entry point in address, passing size as an argument
 void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 {
-    if (idtr_64.base_lo == 0)
-        idt_init();
-
     uint16_t intf = disable_interrupts();
-    uint16_t was_a20 = check_a20();
-    if (!was_a20) {
-        toggle_a20(1);
-        if (!check_a20()) {
-            halt("A20 not enabled!");
-        }
-    }
 
-    table_register_64_t gdtr = {
-        sizeof(gdt) - 1,
-        (uint16_t)(uint32_t)gdt,
-        0,
-        0,
-        0
-    };
+	if (need_a20_toggle) {
+        toggle_a20(1);
+    }
 
     uint32_t pdbr = paging_root_addr();
 
-    uint16_t nx_available = cpu_has_no_execute();
-    uint32_t gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
+	struct {
+		uint64_t address;
+		uint32_t src;
+		uint32_t size;
+	} params = {
+		address,
+		src,
+		size
+	};
 
     __asm__ __volatile__ (
         "lgdt %[gdtr]\n\t"
@@ -314,7 +334,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Clear prefetch queue
         "jmp 0f\n\t"
-        "0:\n\t"
+		"0:\n\t"
 
         // Far jump to load cs selector
         "ljmpl %[gdt_code32],$0f\n\t"
@@ -396,12 +416,13 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "movl %%eax,%%fs\n\t"
         "movl %%eax,%%ss\n\t"
 
-        // Load copy/entry parameters
-        "movq %[address],%%rdi\n\t"
-        "movl %[size],%%ecx\n\t"
-        "movl %[src],%%esi\n\t"
+		// Load copy/entry parameters
+		// (before screwing up stack pointer with call)
+		"mov (%[params]),%%rdi\n\t"
+		"movl 8(%[params]),%%esi\n\t"
+		"movl 12(%[params]),%%ecx\n\t"
 
-        // Check whether it is copy or entry
+		// Check whether it is copy or entry
         "testl %%esi,%%esi\n\t"
         "jz 2f\n\t"
 
@@ -421,11 +442,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "3:\n\t"
 
         // Far return to 32 bit compatibility mode code segment
-#ifndef __clang__
-        "retf\n\t"
-#else
-        "lret\n\t"
-#endif
+		"lret\n\t"
 
         "1:\n\t"
         ".code32\n\t"
@@ -484,9 +501,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "leaw %[idtr_16],%%si\n\t"
         "lidt (%%si)\n\t"
         :
-        : [address] "m" (address)
-        , [src] "m" (src)
-        , [size] "m" (size)
+		: [params] "b" (&params)
         , [pdbr] "m" (pdbr)
         , [gdtr] "m" (gdtr)
         , [idtr_64] "m" (idtr_64)
@@ -502,7 +517,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
 
-    if (!was_a20)
+	if (need_a20_toggle)
         toggle_a20(0);
 
     toggle_interrupts(intf);

@@ -24,12 +24,12 @@ void far_zero(far_ptr_t dest, uint16_t paragraphs)
 
 void far_copy_to(void *near, far_ptr_t src, uint16_t size)
 {
-    far_copy(far_ptr((uint32_t)near), src, size);
+	far_copy(far_ptr(uint32_t(near)), src, size);
 }
 
 void far_copy_from(far_ptr_t dest, void *near, uint16_t size)
 {
-    far_copy(dest, far_ptr((uint32_t)near), size);
+	far_copy(dest, far_ptr(uint32_t(near)), size);
 }
 
 void far_copy(far_ptr_t dest,

@@ -7,6 +7,7 @@
 #include "irq.h"
 #include "control_regs.h"
 #include "spinlock.h"
+#include "bootinfo.h"
 #include "printk.h"
 
 #define CMOS_ADDR_PORT  0x70
@@ -168,7 +169,9 @@ static void cmos_write(uint8_t reg, uint8_t val)
 void cmos_prepare_ap(void)
 {
     // Read vector immediately after boot sector structure
-    uint32_t ap_entry_point = *(uint32_t*)0x7C40;
+	uint32_t ap_entry_point = //*(uint32_t*)0x7C40;
+			(uint32_t)
+			bootinfo_parameter(bootparam_t::ap_entry_point);
     *BIOS_DATA_AREA(uint32_t, 0x467) = ap_entry_point;
 
     outb(CMOS_ADDR_PORT, CMOS_REG_SHUTDOWN_STATUS);

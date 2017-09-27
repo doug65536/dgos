@@ -5,6 +5,13 @@
 #include "rand.h"
 #include "farptr.h"
 
+#define MALLOC_DEBUG 0
+#if MALLOC_DEBUG
+#define MALLOC_TRACE(...) print_line("malloc: " __VA_ARGS__)
+#else
+#define MALLOC_TRACE(...) ((void)0)
+#endif
+
 // Allocate-only (no free) far pointer allocator
 
 // Next free location for aligned far allocations
@@ -29,6 +36,9 @@ uint16_t far_malloc(uint32_t bytes)
     uint16_t segment = (free_seg_en -= paragraphs);
     far_zero(far_ptr2(segment, 0), paragraphs);
 
+	MALLOC_TRACE("far malloc %u bytes returns segment %u\n",
+				 bytes, segment);
+
     return segment;
 }
 
@@ -39,7 +49,11 @@ uint16_t far_malloc_aligned(uint32_t bytes)
     uint16_t paragraphs = ((bytes - 1 + (1 << 12)) & -4096) >> 4;
     free_seg_st += paragraphs;
     far_zero(far_ptr2(segment, 0), paragraphs);
-    return segment;
+
+	MALLOC_TRACE("far malloc aligned %u bytes returns segment %u\n",
+				 bytes, segment);
+
+	return segment;
 }
 
 // Simple heap allocator
@@ -60,7 +74,7 @@ struct alloc_state_t {
 extern alloc_state_t __heap;
 extern char __heap_end[];
 
-#ifndef NDEBUG
+#if !defined(NDEBUG) || 0
 #define DEBUG_ONLY(e) e;
 #else
 #define DEBUG_ONLY(e)
@@ -274,6 +288,9 @@ void *malloc(uint16_t bytes)
     // Maybe __heap.first_free still points to this block?
     // That's okay. Only freeing and coalescing blocks moves it back.
     // Only splitting the first free block moves it forward
+
+	MALLOC_TRACE("near malloc %u bytes returns segment %x\n",
+				 bytes, (size_t)payload_ptr_of(best_addr));
 
     return payload_ptr_of(best_addr);
 }

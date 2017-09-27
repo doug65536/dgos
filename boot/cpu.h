@@ -185,6 +185,7 @@ void ack_irq(uint8_t irq);
 void init_irq();
 #endif
 
+extern "C" void cpu_init();
 uint16_t cpu_has_long_mode();
 uint16_t cpu_has_no_execute();
 uint16_t cpu_has_global_pages();
