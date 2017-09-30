@@ -4,7 +4,8 @@ BUILT_SOURCES = \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES) \
 	qemu-emu.mk \
-	$(abs_top_builddir)/dump
+	$(abs_top_builddir)/dump \
+	generated_headers
 
 # Build libmbr
 #  -> Link mbr-elf
@@ -276,203 +277,211 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/cpu/except_asm.s \
 	kernel/arch/x86_64/cpu/syscall.s \
 	kernel/main.cc \
-	kernel/lib/bootinfo.cc \
-	kernel/lib/mm.cc \
-	kernel/lib/thread.cc \
-	kernel/lib/priorityqueue.cc \
-	kernel/lib/threadsync.cc \
-	kernel/lib/callout.cc \
-	kernel/lib/printk.cc \
-	kernel/lib/math.cc \
-	kernel/lib/dev_text.cc \
-	kernel/lib/dev_storage.cc \
-	kernel/lib/dev_eth.cc \
-	kernel/lib/conio.cc \
-	kernel/lib/mouse.cc \
-	kernel/lib/keyboard.cc \
-	kernel/lib/string.cc \
-	kernel/lib/irq.cc \
-	kernel/lib/time.cc \
-	kernel/lib/stdlib.cc \
 	kernel/lib/assert.cc \
+	kernel/lib/assert.h \
+	kernel/lib/bitop.h \
 	kernel/lib/bitsearch.cc \
+	kernel/lib/bitsearch.h \
+	kernel/lib/bootinfo.cc \
+	kernel/lib/bootinfo.h \
 	kernel/lib/bsearch.cc \
-	kernel/lib/rbtree.cc \
-	kernel/lib/debug.cc \
-	kernel/lib/rand.cc \
+	kernel/lib/bsearch.h \
 	kernel/lib/bswap.cc \
-	kernel/lib/pool.cc \
-	kernel/lib/heap.cc \
-	kernel/lib/hash.cc \
-	kernel/lib/hash_table.cc \
+	kernel/lib/bswap.h \
+	kernel/lib/callout.cc \
+	kernel/lib/callout.h \
+	kernel/lib/cc/algorithm.h \
+	kernel/lib/cc/functional.h \
+	kernel/lib/cc/initializer_list.h \
+	kernel/lib/cc/memory.h \
+	kernel/lib/cc/type_traits.h \
+	kernel/lib/cc/utility.h \
+	kernel/lib/cc/vector.h \
+	kernel/lib/conio.cc \
+	kernel/lib/conio.h \
+	kernel/lib/debug.cc \
+	kernel/lib/debug.h \
+	kernel/lib/dev_eth.cc \
+	kernel/lib/dev_eth.h \
+	kernel/lib/dev_registration.h \
+	kernel/lib/dev_storage.cc \
+	kernel/lib/dev_storage.h \
+	kernel/lib/dev_text.cc \
+	kernel/lib/dev_text.h \
+	kernel/lib/dirent.h \
+	kernel/lib/errno.h \
+	kernel/lib/export.h \
 	kernel/lib/fileio.cc \
-	kernel/lib/process.cc \
-	kernel/lib/png.cc \
-	kernel/lib/zlib_helper.cc \
+	kernel/lib/fileio.h \
 	kernel/lib/framebuffer.cc \
+	kernel/lib/framebuffer.h \
+	kernel/lib/hash.cc \
+	kernel/lib/hash.h \
+	kernel/lib/hash_table.cc \
+	kernel/lib/hash_table.h \
+	kernel/lib/heap.cc \
+	kernel/lib/heap.h \
+	kernel/lib/intrin_compat.h \
+	kernel/lib/irq.cc \
+	kernel/lib/irq.h \
+	kernel/lib/keyboard.cc \
+	kernel/lib/keyboard.h \
+	kernel/lib/likely.h \
+	kernel/lib/main.h \
+	kernel/lib/math.cc \
+	kernel/lib/math.h \
+	kernel/lib/mm.cc \
+	kernel/lib/mm.h \
+	kernel/lib/mouse.cc \
+	kernel/lib/mouse.h \
+	kernel/lib/png.cc \
+	kernel/lib/png.h \
+	kernel/lib/pool.cc \
+	kernel/lib/pool.h \
+	kernel/lib/printk.cc \
+	kernel/lib/printk.h \
+	kernel/lib/priorityqueue.cc \
+	kernel/lib/priorityqueue.h \
+	kernel/lib/process.cc \
+	kernel/lib/process.h \
+	kernel/lib/rand.cc \
+	kernel/lib/rand.h \
+	kernel/lib/rbtree.cc \
+	kernel/lib/rbtree.h \
+	kernel/lib/stddef.h \
+	kernel/lib/stdlib.cc \
+	kernel/lib/stdlib.h \
+	kernel/lib/string.cc \
+	kernel/lib/string.h \
+	kernel/lib/sys/types.h \
+	kernel/lib/thread.cc \
+	kernel/lib/thread.h \
+	kernel/lib/threadsync.cc \
+	kernel/lib/threadsync.h \
+	kernel/lib/time.cc \
+	kernel/lib/time.h \
 	kernel/lib/unique_ptr.cc \
-	kernel/fs/mbr.cc \
+	kernel/lib/unique_ptr.h \
+	kernel/lib/unistd.h \
+	kernel/lib/zlib_helper.cc \
+	kernel/lib/zlib_helper.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/fat32.cc \
+	kernel/fs/fat32_decl.h \
 	kernel/fs/iso9660.cc \
+	kernel/fs/iso9660_decl.h \
 	kernel/fs/iso9660_part.cc \
+	kernel/fs/mbr.cc \
 	kernel/fs/tmpfs.cc \
-	kernel/net/eth_q.cc \
-	kernel/net/eth_frame.cc \
 	kernel/net/arp_frame.cc \
-	kernel/net/ipv4_frame.cc \
-	kernel/net/tcp_frame.cc \
-	kernel/net/udp_frame.cc \
-	kernel/net/icmp_frame.cc \
-	kernel/net/icmp.cc \
-	kernel/net/ipv4.cc \
-	kernel/net/udp.cc \
-	kernel/net/tcp.cc \
+	kernel/net/arp_frame.h \
+	kernel/net/arp.h \
 	kernel/net/dhcp.cc \
-	kernel/arch/x86_64/cpu/syscall_dispatch.cc \
+	kernel/net/dhcp.h \
+	kernel/net/ethernet.h \
+	kernel/net/eth_frame.cc \
+	kernel/net/eth_frame.h \
+	kernel/net/eth_q.cc \
+	kernel/net/eth_q.h \
+	kernel/net/icmp.cc \
+	kernel/net/icmp_frame.cc \
+	kernel/net/icmp_frame.h \
+	kernel/net/icmp.h \
+	kernel/net/ipv4.cc \
+	kernel/net/ipv4_frame.cc \
+	kernel/net/ipv4_frame.h \
+	kernel/net/ipv4.h \
+	kernel/net/tcp.cc \
+	kernel/net/tcp_frame.cc \
+	kernel/net/tcp_frame.h \
+	kernel/net/tcp.h \
+	kernel/net/udp.cc \
+	kernel/net/udp_frame.cc \
+	kernel/net/udp_frame.h \
+	kernel/net/udp.h \
+	kernel/arch/cpu.h \
+	kernel/arch/mmu.h \
 	kernel/arch/x86_64/bios_data.cc \
-	kernel/arch/x86_64/nano_time.cc \
-	kernel/arch/x86_64/cpu/cpu.cc \
+	kernel/arch/x86_64/bios_data.h \
+	kernel/arch/x86_64/bootdev.cc \
+	kernel/arch/x86_64/bootdev.h \
 	kernel/arch/x86_64/cpu/apic.cc \
-	kernel/arch/x86_64/cpu/cpu_broadcast.cc \
-	kernel/arch/x86_64/cpu/cmos.cc \
+	kernel/arch/x86_64/cpu/apic.h \
 	kernel/arch/x86_64/cpu/atomic.cc \
+	kernel/arch/x86_64/cpu/atomic.h \
+	kernel/arch/x86_64/cpu/cmos.cc \
+	kernel/arch/x86_64/cpu/cmos.h \
 	kernel/arch/x86_64/cpu/control_regs.cc \
+	kernel/arch/x86_64/cpu/control_regs.h \
+	kernel/arch/x86_64/cpu/cpu_broadcast.cc \
+	kernel/arch/x86_64/cpu/cpu_broadcast.h \
+	kernel/arch/x86_64/cpu/cpu.cc \
 	kernel/arch/x86_64/cpu/cpuid.cc \
-	kernel/arch/x86_64/cpu/thread_impl.cc \
-	kernel/arch/x86_64/cpu/spinlock.cc \
-	kernel/arch/x86_64/cpu/halt.cc \
+	kernel/arch/x86_64/cpu/cpuid.h \
+	kernel/arch/x86_64/cpu/cpu_metrics.h \
+	kernel/arch/x86_64/cpu/except_asm.h \
+	kernel/arch/x86_64/cpu/except.cc \
+	kernel/arch/x86_64/cpu/except.h \
 	kernel/arch/x86_64/cpu/gdt.cc \
+	kernel/arch/x86_64/cpu/gdt.h \
+	kernel/arch/x86_64/cpu/halt.cc \
+	kernel/arch/x86_64/cpu/halt.h \
 	kernel/arch/x86_64/cpu/idt.cc \
+	kernel/arch/x86_64/cpu/idt.h \
 	kernel/arch/x86_64/cpu/interrupts.cc \
+	kernel/arch/x86_64/cpu/interrupts.h \
 	kernel/arch/x86_64/cpu/ioport.cc \
+	kernel/arch/x86_64/cpu/ioport.h \
+	kernel/arch/x86_64/cpu/isr_constants.h \
+	kernel/arch/x86_64/cpu/isr.h \
+	kernel/arch/x86_64/cpu/legacy_pic.cc \
+	kernel/arch/x86_64/cpu/legacy_pic.h \
+	kernel/arch/x86_64/cpu/legacy_pit.cc \
+	kernel/arch/x86_64/cpu/legacy_pit.h \
+	kernel/arch/x86_64/cpu/math.cc \
 	kernel/arch/x86_64/cpu/mmu.cc \
 	kernel/arch/x86_64/cpu/nontemporal.cc \
-	kernel/arch/x86_64/cpu/legacy_pic.cc \
-	kernel/arch/x86_64/cpu/legacy_pit.cc \
-	kernel/arch/x86_64/cpu/except.cc \
-	kernel/arch/x86_64/cpu/math.cc \
-	kernel/arch/x86_64/device/pci.cc \
-	kernel/arch/x86_64/device/keyb8042.cc \
-	kernel/arch/x86_64/device/e9debug.cc \
-	kernel/arch/x86_64/device/rtl8139.cc \
-	kernel/arch/x86_64/device/keyb8042_layout/keyb8042_layout_us.cc \
-	kernel/arch/x86_64/device/usb_xhci.cc \
-	kernel/arch/x86_64/bootdev.cc \
-	kernel/arch/x86_64/elf64.cc \
-	kernel/arch/x86_64/stacktrace.cc \
-	kernel/arch/x86_64/gdbstub.cc \
-	kernel/arch/x86_64/device/vga.cc \
-	kernel/arch/x86_64/device/ahci.cc \
-	kernel/arch/x86_64/device/ide.cc \
-	kernel/arch/x86_64/device/ata.cc \
-	kernel/arch/x86_64/device/serial-uart.cc \
-	kernel/net/eth_q.h \
-	kernel/net/ipv4_frame.h \
-	kernel/net/udp_frame.h \
-	kernel/net/ethernet.h \
-	kernel/net/ipv4.h \
-	kernel/net/icmp.h \
-	kernel/net/arp.h \
-	kernel/net/tcp_frame.h \
-	kernel/net/icmp_frame.h \
-	kernel/net/tcp.h \
-	kernel/net/udp.h \
-	kernel/net/arp_frame.h \
-	kernel/net/dhcp.h \
-	kernel/net/eth_frame.h \
-	kernel/arch/cpu.h \
-	kernel/arch/x86_64/bios_data.h \
-	kernel/arch/x86_64/gdbstub.h \
-	kernel/arch/x86_64/elf64_decl.h \
-	kernel/arch/x86_64/types.h \
-	kernel/arch/x86_64/device/keyb8042.h \
-	kernel/arch/x86_64/device/e9debug.h \
-	kernel/arch/x86_64/device/usb.h \
-	kernel/arch/x86_64/device/serial-uart.h \
-	kernel/arch/x86_64/device/ata.h \
-	kernel/arch/x86_64/device/pci.h \
-	kernel/arch/x86_64/elf64.h \
-	kernel/arch/x86_64/cpu/cpu_broadcast.h \
-	kernel/arch/x86_64/cpu/gdt.h \
-	kernel/arch/x86_64/cpu/spinlock.h \
-	kernel/arch/x86_64/cpu/apic.h \
-	kernel/arch/x86_64/cpu/syscall_dispatch.h \
-	kernel/arch/x86_64/cpu/cpu_metrics.h \
-	kernel/arch/x86_64/cpu/isr.h \
-	kernel/arch/x86_64/cpu/idt.h \
-	kernel/arch/x86_64/cpu/thread_impl.h \
-	kernel/arch/x86_64/cpu/interrupts.h \
-	kernel/arch/x86_64/cpu/legacy_pic.h \
-	kernel/arch/x86_64/cpu/except.h \
-	kernel/arch/x86_64/cpu/ioport.h \
 	kernel/arch/x86_64/cpu/nontemporal.h \
-	kernel/arch/x86_64/cpu/isr_constants.h \
-	kernel/arch/x86_64/cpu/legacy_pit.h \
-	kernel/arch/x86_64/cpu/except_asm.h \
-	kernel/arch/x86_64/cpu/cmos.h \
-	kernel/arch/x86_64/cpu/atomic.h \
-	kernel/arch/x86_64/cpu/cpuid.h \
-	kernel/arch/x86_64/cpu/control_regs.h \
-	kernel/arch/x86_64/cpu/halt.h \
+	kernel/arch/x86_64/cpu/spinlock.cc \
+	kernel/arch/x86_64/cpu/spinlock.h \
+	kernel/arch/x86_64/cpu/syscall_dispatch.cc \
+	kernel/arch/x86_64/cpu/syscall_dispatch.h \
+	kernel/arch/x86_64/cpu/thread_impl.cc \
+	kernel/arch/x86_64/cpu/thread_impl.h \
+	kernel/arch/x86_64/device/ahci.cc \
+	kernel/arch/x86_64/device/ata.cc \
+	kernel/arch/x86_64/device/ata.h \
+	kernel/arch/x86_64/device/ata.h \
+	kernel/arch/x86_64/device/e9debug.cc \
+	kernel/arch/x86_64/device/e9debug.h \
+	kernel/arch/x86_64/device/e9debug.h \
+	kernel/arch/x86_64/device/ide.cc \
+	kernel/arch/x86_64/device/keyb8042.cc \
+	kernel/arch/x86_64/device/keyb8042.h \
+	kernel/arch/x86_64/device/keyb8042.h \
+	kernel/arch/x86_64/device/keyb8042_layout/keyb8042_layout_us.cc \
+	kernel/arch/x86_64/device/nvme.cc \
+	kernel/arch/x86_64/device/nvme.h \
+	kernel/arch/x86_64/device/pci.cc \
+	kernel/arch/x86_64/device/pci.h \
+	kernel/arch/x86_64/device/pci.h \
+	kernel/arch/x86_64/device/rtl8139.cc \
+	kernel/arch/x86_64/device/serial-uart.cc \
+	kernel/arch/x86_64/device/serial-uart.h \
+	kernel/arch/x86_64/device/serial-uart.h \
+	kernel/arch/x86_64/device/usb.h \
+	kernel/arch/x86_64/device/usb.h	\
+	kernel/arch/x86_64/device/usb_xhci.cc \
+	kernel/arch/x86_64/device/vga.cc \
+	kernel/arch/x86_64/elf64.cc \
+	kernel/arch/x86_64/elf64_decl.h \
+	kernel/arch/x86_64/elf64.h \
+	kernel/arch/x86_64/gdbstub.cc \
+	kernel/arch/x86_64/gdbstub.h \
+	kernel/arch/x86_64/nano_time.cc \
+	kernel/arch/x86_64/stacktrace.cc \
 	kernel/arch/x86_64/stacktrace.h \
-	kernel/arch/x86_64/bootdev.h \
-	kernel/arch/mmu.h \
-	kernel/fs/iso9660_decl.h \
-	kernel/fs/fat32_decl.h \
-	kernel/lib/bootinfo.h \
-	kernel/lib/main.h \
-	kernel/lib/png.h \
-	kernel/lib/framebuffer.h \
-	kernel/lib/likely.h \
-	kernel/lib/zlib_helper.h \
-	kernel/lib/priorityqueue.h \
-	kernel/lib/pool.h \
-	kernel/lib/assert.h \
-	kernel/lib/dev_eth.h \
-	kernel/lib/export.h \
-	kernel/lib/unistd.h \
-	kernel/lib/dev_storage.h \
-	kernel/lib/process.h \
-	kernel/lib/rand.h \
-	kernel/lib/mm.h \
-	kernel/lib/dev_text.h \
-	kernel/lib/debug.h \
-	kernel/lib/sys/types.h \
-	kernel/lib/hash.h \
-	kernel/lib/conio.h \
-	kernel/lib/hash_table.h \
-	kernel/lib/thread.h \
-	kernel/lib/rbtree.h \
-	kernel/lib/heap.h \
-	kernel/lib/mouse.h \
-	kernel/lib/callout.h \
-	kernel/lib/math.h \
-	kernel/lib/cc/functional.h \
-	kernel/lib/cc/algorithm.h \
-	kernel/lib/cc/utility.h \
-	kernel/lib/cc/initializer_list.h \
-	kernel/lib/cc/type_traits.h \
-	kernel/lib/cc/vector.h \
-	kernel/lib/cc/memory.h \
-	kernel/lib/bsearch.h \
-	kernel/lib/bswap.h \
-	kernel/lib/threadsync.h \
-	kernel/lib/stddef.h \
-	kernel/lib/bitop.h \
-	kernel/lib/time.h \
-	kernel/lib/irq.h \
-	kernel/lib/string.h \
-	kernel/lib/stdlib.h \
-	kernel/lib/intrin_compat.h \
-	kernel/lib/printk.h \
-	kernel/lib/errno.h \
-	kernel/lib/unique_ptr.h \
-	kernel/lib/dirent.h \
-	kernel/lib/keyboard.h \
-	kernel/lib/dev_registration.h \
-	kernel/lib/bitsearch.h \
-	kernel/lib/fileio.h
+	kernel/arch/x86_64/types.h
 
 kernel_elf_INCLUDES = \
 	-I$(top_srcdir)/kernel \
@@ -481,6 +490,7 @@ kernel_elf_INCLUDES = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
+	-I$(top_builddir)/generated-headers \
 	-I$(EXTERNINCLUDEDIR)
 
 kernel_elf_CXXFLAGS = \
@@ -536,6 +546,29 @@ include diskfat.mk
 #include emulators.mk
 
 # ----------------------------------------------------------------------------
+# Generate register definitions
+
+generated_headers: \
+	$(top_builddir)/generated-headers/nvmebits.h \
+	$(top_builddir)/generated-headers/pcibits.h
+
+.PHONY: generated_headers
+
+$(top_builddir)/generated-headers/nvmebits.h: \
+		$(top_srcdir)/kernel/arch/x86_64/device/nvme.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_builddir)/generated-headers/pcibits.h: \
+		$(top_srcdir)/kernel/arch/x86_64/device/pci.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+# ----------------------------------------------------------------------------
 # QEMU launcher
 
 dump/qemu-debug-out:
@@ -562,7 +595,9 @@ QEMU_NET = \
 	-net dump,file=dump/netdump
 
 QEMU_MONITOR = \
-	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait
+
+#,telnet
 
 QEMU_DEBUGCON = \
 	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
@@ -585,8 +620,15 @@ QEMU_COMMON = \
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
-QEMU_HDCTL_DEV_ahci =  -machine q35
-QEMU_HDCTL_DEV_ide =  -machine pc
+QEMU_HDCTL_DEV_nvme = \
+	-machine q35 \
+	-device nvme,drive=nvmedrv,serial=42424242 \
+	-boot menu=on
+QEMU_HDCTL_DEV_ahci = -machine q35
+QEMU_HDCTL_DEV_ide = -machine pc
+QEMU_DIF_nvme = ,if=none,id=nvmedrv
+QEMU_DIF_ahci =
+QEMU_DIF_ide =
 QEMU_MEDIA_fat = disk
 QEMU_MEDIA_iso = cdrom
 QEMU_IMAGE_fat = fatdisk.img
@@ -595,6 +637,9 @@ QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
 QEMU_EMU_tcg = -cpu kvm64
+
+#QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom
+QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
 
 # Connect to debug log
 monitor-debug-output:
@@ -611,11 +656,12 @@ qemu-emu.mk: $(top_srcdir)/Makefile.am
 	@for rt in debug run; do \
 		for np in up smp; do \
 			for fs in iso fat; do \
-				for sc in ahci ide; do \
+				for sc in ahci ide nvme; do \
 					for em in kvm tcg; do \
 						IMG="\$$(QEMU_IMAGE_$$fs)"; \
 						QUP="\$$(QEMU_NP_$$np)"; \
 						CTL="\$$(QEMU_HDCTL_DEV_$$sc)"; \
+						DIF="\$$(QEMU_DIF_$$sc)"; \
 						QM="\$$(QEMU_MEDIA_$$fs)"; \
 						QEM="\$$(QEMU_EMU_$$em)"; \
 						QRT="\$$(QEMU_RT_$$rt)"; \
@@ -633,9 +679,11 @@ qemu-emu.mk: $(top_srcdir)/Makefile.am
 							$$QEM \
 							' \' $$'\n' $$'\t' \
 							'-drive' \
-							" file=$$IMG,format=raw,media=$$QM" \
+							" file=$$IMG$$DIF,format=raw,media=$$QM" \
 							' \' $$'\n' $$'\t' \
 							$$QRT \
+							' \' $$'\n' $$'\t' \
+							'\$$(QEMU_BIOS)' \
 							$$'\n' $$'\n' \
 							>> qemu-emu.mk; \
 					done; \

@@ -1,0 +1,75 @@
+-- PCI_ID=0x00 Identifiers
+31:16 DID Device ID
+15:0 VID Vendor ID
+
+-- PCI_CMD=0x04 Command
+10 ID Interrupt pin disable (does not affect MSI)
+9 FBE Fast back-to-back enable
+8 SEE SERR# Enable
+6 PEE Parity error response enable
+5 VGA VGA palette snooping enable
+4 MWIE Memory write and invalidate enable
+3 SCE Special cycle enable
+2 BME Bus master enable
+1 MSE Memory space enable
+0 IOSE I/O space enable
+
+-- PCI_STS=0x06 Device status
+15 DPE Detected parity error
+14 SSE Signalled system error
+13 RMA Received master abort
+12 RTA Received target abort
+11 STO Signaled target abort
+10:9 DEVT DEVSEL# timing
+8 DPD Master data parity error detected
+7 FBC Fast back to back capable
+5 C66 66MHz capable
+4 CL Capabilities list present
+3 IS Interrupt status (1=asserted)
+
+-- PCI_RID=0x08 Revision ID
+7:0 RID Revision ID
+
+-- PCI_CC=0x09 Class code
+23:16 BCC Base class code
+15:8 SCC Sub class code
+7:0 PI Programming interface
+
+-- PCI_CLS=0x0C Cache line size
+7:0 CLS Cache line size
+
+-- PCI_MLT=0x0D Master latency timer
+7:0 MLT Master latency timer
+
+-- PCI_HTYPE=0x0E Header type
+7 MFD Multifunction device
+6:0 HL Header layout
+
+-- PCI_BIST= Built in self test (optional)
+7 BC Built in self test capable
+6 SB Start built in self test
+3:0 CC Completion code
+
+-- PCI_BAR
+31:14 BA Base address
+3 PF Prefetchable
+2:1 Type
+0 RTE Resource type indicator
+
+-- PCI_SS Subsystem identifiers
+31:16 SSID Subsystem identifier
+15:0 SSVID Subsystem vendor identifier
+
+-- PCI_CAP Capabilities pointer
+7:0 CP Capability pointer
+
+-- PCI_INTR
+15:8 IPIN Interrupt pin
+7:0 ILINE Interrupt line
+
+-- PCI_MGNT Minimum grant
+7:0 GNT Minimum grant
+
+-- PCI_MLAT Maximum latency
+7:0 LAT Maximum latency
+
