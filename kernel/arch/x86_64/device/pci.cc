@@ -438,7 +438,7 @@ bool pci_set_msi_irq(int bus, int slot, int func,
     if (unlikely(multi_cap > 32))
         multi_cap = 32;
 
-    uint8_t multi_en = multiple ? multi_exp : 1;
+	uint8_t multi_en = multiple ? multi_exp : 0;
 
     caps.msg_ctrl = (caps.msg_ctrl & ~PCI_MSI_HDR_MME) |
             PCI_MSI_HDR_MME_n(multi_en) |
