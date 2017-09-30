@@ -1,0 +1,107 @@
+
+
+-- NVME_CAP Capabilities
+55:52 MPSMAX Memory page size maximum (2 ^ (12 + MPSMAX))
+51:48 MPSMIN Memory page size minimum (2 ^ (12 + MPSMIN))
+44:37 CSS Command sets supported
+36 NSSRS NVM subsystem reset supported
+35:32 DSTRD Doorbell stride (2 ^ (2 + DSTRD))
+31:24 TO Timeout (500ms increments)
+18:17 AMS Arbitration mechanism supported
+16 CQR Contiguous queues required
+15:0 MQES Maximum queue entries supported
+
+-- NVME_VS Version
+31:16 MJR Major version number
+15:8 MNR Minor version number
+7:0 TER Tertiary version number
+
+-- NVME_CC Configuration
+23:20 IOCQES I/O completion queue entry size
+19:16 IOSQES I/O submission queue entry size
+15:14 SHN Shutdown notification
+13:11 AMS Arbitration mechanism selected
+10:7 MPS Memory page size
+6:4 CCS I/O command set selected
+0 EN Enable
+
+-- NVME_CSTS
+5 PP Processing paused
+4 NSSRO NVM subsystem reset occurred
+3:2 SHST Shutdown status
+1 CFS Controller fatal status
+0 RDY Ready
+
+-- NVME_AQA
+27:16 ACQS Admin completion queue size
+11:0 ASQS Admin submission queue size
+
+-- NVME_ASQ
+63:12 ASQB Admin submission queue base
+
+-- NVME_ACQ
+63:12 ACQB Admin completion queue base
+
+-- NVME_CMBLOC
+31:12 OFST Offset
+2:0 BIR Base indicator register
+
+-- NVME_CMBSZ
+31:12 SZ Size
+11:8 SZU Size units
+4 WDS Write data support
+3 RDS Read data support
+2 LISTS PRP SGL list support
+1 CQS Completion queue support
+0 SQS Submission queue support
+
+-- NVME_SQyTDBL Completion queue doorbell
+15:0 SQT Submission queue y tail doorbell
+
+-- NVME_CQyHDBL Completion queue doorbell
+15:0 SQT Completion queue y tail doorbell
+
+# 4.2 Submission queue entry
+
+-- NVME_SQEDW0 Submission queue entry command dword 0
+31:16 CID Command identifier
+15:14 PSDT PRP or SGL data transfer
+9:8 FUSE Fused operation
+7:0 OPC Opcode
+
+# 5.3 Create I/O completion queue command
+
+-- NVME_CMD_CCQ_CDW10
+31:16 QSIZE Queue size
+15:0 QID Queue identifier
+
+-- NVME_CMD_CCQ_CDW11
+31:16 IV Interrupt vector
+1 IEN Interrupts enabled
+0 PC Physically contiguous
+
+# 5.4 Create I/O submission queue command
+
+-- NVME_CMD_CSQ_CDW10
+31:16 QSIZE Queue size
+15:0 QID Queue identifier
+
+-- NVME_CMD_CSQ_CDW11
+31:16 CQID Completion queue identifier
+2:1 QPRIO Queue priority
+0 PC Physically contiguous
+
+# 4.6 Completion queue entry
+
+-- NVME_CQEDW2 Completion queue entry dword 2
+31:16 SQID Submission queue ID
+15:0 SQHD Submission queue head pointer
+
+-- NVME_CQEDW3
+31 DNR Do not retry (0 if retry might succeed)
+30 M More information is part of the Error Information log
+27:25 SCT Status code type
+24:17 SC Status code
+16 P Phase tag
+15:0 CID Command ID
+
