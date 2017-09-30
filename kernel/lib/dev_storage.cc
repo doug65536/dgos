@@ -127,7 +127,9 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
 fs_base_t *fs_from_id(size_t id)
 {
-    return fs_mounts[id].fs;
+	return !fs_mounts.empty()
+			? fs_mounts[id].fs
+			: nullptr;
 }
 
 void part_register_factory(char const *name, part_factory_t *factory)
