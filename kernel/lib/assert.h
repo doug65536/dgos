@@ -18,6 +18,10 @@ extern "C" __noinline int assert_failed(
 #define assert_msg(e, msg) (1)
 #endif
 
+// Assert that a value is an integer power of two
+#define assert_ispo2(n) \
+	assert_msg(((n) & ((n)-1)) == 0, "Must be a power of two")
+
 // Compile-time assert
 #ifdef __cplusplus
 #define C_ASSERT(e) static_assert(e, #e)
