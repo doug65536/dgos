@@ -1,3 +1,5 @@
+../configure.ac
+../Makefile.am
 config/x86_64.mk
 net/eth_q.h
 net/ipv4_frame.h
@@ -247,3 +249,4 @@ kernel.creator.user.c2fe216
 %{Env:BUILDDIR}/dump/lib/tls.s
 %{Env:BUILDDIR}/dump/lib/printk.s
 %{Env:BUILDDIR}/dump/kernel-headers
+../qemu-emu-generator

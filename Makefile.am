@@ -18,9 +18,6 @@ BUILT_SOURCES = \
 # Build libkernel-sse41.a libkernel-avx libkernel-avx512
 #  -> Build kernel-elf
 
-CLANG_FLAGS = -no-integrated-as
-CLANG_FLAGS += -Wno-unused-command-line-argument
-#CLANG_FLAGS =
 LINKER_SEL = -fuse-ld=gold
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
@@ -47,9 +44,8 @@ libmbr_a_SOURCES = \
 
 libmbr_a_CCASFLAGS = \
 	-m16 \
-	$(CLANG_FLAGS) \
 	-fno-pie -fno-pic \
-	-Wno-unused-command-line-argument
+	$(COMPILER_FLAGS)
 
 EXTRA_libmbr_a_DEPENDENCIES = \
 	$(abs_top_builddir)/dump
@@ -73,11 +69,11 @@ mbr_elf_SOURCES = \
 
 mbr_elf_CXXFLAGS = \
 	-m16 \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 mbr_elf_CCASFLAGS = \
-	-m16 \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS) \
+	-m16
 
 mbr_elf_LDADD = \
 	libmbr.a
@@ -87,12 +83,12 @@ mbr_bin_SOURCES = \
 
 mbr_bin_CXXFLAGS = \
 	-m16 \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 mbr_bin_CFLAGS = \
 	-m16 \
 	-fno-pic -fno-pie \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 mbr_bin_LDFLAGS = \
 	-m16 \
@@ -163,13 +159,13 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	$(libbootsect_a_INCLUDES) \
-	-m16 -ggdb -Oz -ffreestanding \
+	-m16 -ggdb $(SMALLEST_CODE_FLAGS) -ffreestanding \
 	-Wall -Wextra -Wpedantic \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti \
 	-mrtd -mregparm=3 \
 	-std=c++14 -fno-pic -fno-pie \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 libbootsect_a_CFLAGS = \
 	-m16 -ggdb -Oz -ffreestanding \
@@ -178,7 +174,7 @@ libbootsect_a_CFLAGS = \
 	-fno-asynchronous-unwind-tables \
 	-mrtd -mregparm=3 \
 	-std=c++14 -fno-pic -fno-pie \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 libbootsect_a_CCASFLAGS = \
 	-m16 -ggdb -Oz -ffreestanding \
@@ -187,7 +183,7 @@ libbootsect_a_CCASFLAGS = \
 	-fno-asynchronous-unwind-tables \
 	-mrtd -mregparm=3 \
 	-std=c++14 -fno-pic -fno-pie \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 bootfat_elf_SOURCES = \
 	boot/bootfat.s
@@ -197,7 +193,7 @@ bootfat_elf_CXXFLAGS = \
 
 bootfat_elf_CCASFLAGS = \
 	-m16 -fno-pic -fno-pie \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 bootfat_elf_LDFLAGS = \
 	-m16 \
@@ -208,7 +204,7 @@ bootfat_elf_LDFLAGS = \
 	-Wl,-v \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
-	$(CLANG_FLAGS)
+	$(COMPILER_FLAGS)
 
 EXTRA_bootfat_elf_DEPENCENCIES = \
 	$(top_srcdir)/boot/bootsect.ld
@@ -496,7 +492,7 @@ kernel_elf_INCLUDES = \
 kernel_elf_CXXFLAGS = \
 	$(kernel_elf_INCLUDES) \
 	-std=c++14 -ggdb \
-	-mcmodel=kernel -fno-pic -mno-red-zone \
+	-mcmodel=kernel -fno-pic -fno-pie -mno-red-zone \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
 	-msse -msse2 -fverbose-asm
 
@@ -650,46 +646,7 @@ monitor-connect:
 	telnet localhost 7777
 
 # Generate emulators makefile
-qemu-emu.mk: $(top_srcdir)/Makefile.am
-	@echo Generating qemu-emu.mk
-	@rm -f qemu-emu.mk
-	@for rt in debug run; do \
-		for np in up smp; do \
-			for fs in iso fat; do \
-				for sc in ahci ide nvme; do \
-					for em in kvm tcg; do \
-						IMG="\$$(QEMU_IMAGE_$$fs)"; \
-						QUP="\$$(QEMU_NP_$$np)"; \
-						CTL="\$$(QEMU_HDCTL_DEV_$$sc)"; \
-						DIF="\$$(QEMU_DIF_$$sc)"; \
-						QM="\$$(QEMU_MEDIA_$$fs)"; \
-						QEM="\$$(QEMU_EMU_$$em)"; \
-						QRT="\$$(QEMU_RT_$$rt)"; \
-						printf %s \
-							"$$rt-$$np-$$fs-$$sc-$$em: " \
-							$$IMG \
-							' dump/qemu-debug-out' \
-							$$'\n' $$'\t' \
-							'$$(QEMU) $$(QEMU_COMMON)' \
-							' \' $$'\n' $$'\t' \
-							$$QUP \
-							' \' $$'\n' $$'\t' \
-							$$CTL \
-							' \' $$'\n' $$'\t' \
-							$$QEM \
-							' \' $$'\n' $$'\t' \
-							'-drive' \
-							" file=$$IMG$$DIF,format=raw,media=$$QM" \
-							' \' $$'\n' $$'\t' \
-							$$QRT \
-							' \' $$'\n' $$'\t' \
-							'\$$(QEMU_BIOS)' \
-							$$'\n' $$'\n' \
-							>> qemu-emu.mk; \
-					done; \
-				done; \
-			done; \
-		done; \
-	done
+qemu-emu.mk: $(top_srcdir)/Makefile.am $(top_srcdir)/qemu-emu-generator
+	$(top_srcdir)/qemu-emu-generator
 
 -include qemu-emu.mk

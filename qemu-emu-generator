@@ -1,0 +1,46 @@
+#!/bin/bash
+echo Generating qemu-emu.mk
+rm -f qemu-emu.mk
+for rt in debug run
+do
+	for np in up smp
+	do
+		for fs in iso fat
+		do
+			for sc in ahci ide nvme
+			do
+				for em in kvm tcg
+				do
+					IMG="\$(QEMU_IMAGE_$fs)"
+					QUP="\$(QEMU_NP_$np)"
+					CTL="\$(QEMU_HDCTL_DEV_$sc)"
+					DIF="\$(QEMU_DIF_$sc)"
+					QM="\$(QEMU_MEDIA_$fs)"
+					QEM="\$(QEMU_EMU_$em)"
+					QRT="\$(QEMU_RT_$rt)"
+					printf %s \
+						"$rt-$np-$fs-$sc-$em: " \
+						$IMG \
+						' dump/qemu-debug-out' \
+						$'\n' $'\t' \
+						'$(QEMU) $(QEMU_COMMON)' \
+						' \' $'\n' $'\t' \
+						$QUP \
+						' \' $'\n' $'\t' \
+						$CTL \
+						' \' $'\n' $'\t' \
+						$QEM \
+						' \' $'\n' $'\t' \
+						'-drive' \
+						" file=$IMG$DIF,format=raw,media=$QM" \
+						' \' $'\n' $'\t' \
+						$QRT \
+						' \' $'\n' $'\t' \
+						"\$(QEMU_BIOS)" \
+						$'\n' $'\n' \
+						>> qemu-emu.mk
+				done
+			done
+		done
+	done
+done
