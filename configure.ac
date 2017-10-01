@@ -10,6 +10,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_FILES([Makefile])
 AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall])
+: ${CFLAGS="-g"}
 AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
@@ -40,6 +41,17 @@ AC_SUBST([COMPILER_FLAGS])
 AX_CHECK_COMPILE_FLAG([-Oz],
 			 [SMALLEST_CODE_FLAGS=-Oz],
 			  [SMALLEST_CODE_FLAGS=-Os])
+AX_CHECK_COMPILE_FLAG([-falign-loops=0],
+			  [SMALLEST_CODE_FLAGS+=" -falign-loops=0"])
+AX_CHECK_COMPILE_FLAG([-falign-functions=0],
+			  [SMALLEST_CODE_FLAGS+=" -falign-functions=0"])
+AX_CHECK_COMPILE_FLAG([-falign-labels=0],
+			  [SMALLEST_CODE_FLAGS+=" -falign-labels=0"])
+AX_CHECK_COMPILE_FLAG([-falign-jumps=0],
+			  [SMALLEST_CODE_FLAGS+=" -falign-jumps=0"])
+AX_CHECK_COMPILE_FLAG([-mno-align-stringops],
+			  [SMALLEST_CODE_FLAGS+=" -mno-align-stringops"])
+
 AC_SUBST([SMALLEST_CODE_FLAGS])
 
 AC_OUTPUT

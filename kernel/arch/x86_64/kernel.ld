@@ -123,8 +123,14 @@ SECTIONS {
 	} :readonly
 
 	.rela.plt : {
-		PROVIDE_HIDDEN(___rela_plt = .);
+		PROVIDE_HIDDEN(___rela_entry_start = .);
+		*(.rela.entry)
+		PROVIDE_HIDDEN(___rela_entry_end = .);
+
+		PROVIDE_HIDDEN(___rela_plt_start = .);
 		*(.rela.plt)
+		PROVIDE_HIDDEN(___rela_plt_end = .);
+
 		PROVIDE_HIDDEN (__rela_iplt_start = .);
 		*(.rela.iplt)
 		PROVIDE_HIDDEN (__rela_iplt_end = .);
@@ -191,17 +197,26 @@ SECTIONS {
 		PROVIDE_HIDDEN(___tbss_en = .);
 	} :tls
 
+	.note : {
+		*(.note*)
+	}
+
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
+	.debug          0 : { *(.debug)             }
 	.debug_info		0 : { *(.debug_info)		}
 	.debug_abbrev	0 : { *(.debug_abbrev)		}
 	.debug_aranges	0 : { *(.debug_aranges)		}
+	.debug_ranges	0 : { *(.debug_ranges)		}
+	.debug_frame	0 : { *(.debug_frame)		}
 	.debug_macro	0 : { *(.debug_macro)		}
 	.debug_line		0 : { *(.debug_line)		}
 	.debug_str		0 : { *(.debug_str)			}
+	.debug_loc		0 : { *(.debug_loc)			}
+	.comment        0 : { *(.comment)           }
 
-	/DISCARD/		: { *(.interp)				}
-	/DISCARD/		: { *(.comment)				}
-	/DISCARD/		: { *(.note.gnu.build-id)	}
+	/DISCARD/		0 : { *(.interp)			}
+	/DISCARD/		0 : { *(.comment)			}
+	/DISCARD/		0 : { *(.note.gnu.build-id)	}
 }

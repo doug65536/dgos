@@ -760,8 +760,7 @@ static inline void cpu_mwait(uint32_t ext, uint32_t hint)
 }
 
 template<typename T>
-__always_inline
-void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
+static inline void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
 {
     static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
 
@@ -780,8 +779,7 @@ void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
 }
 
 template<typename T>
-__always_inline
-void cpu_wait_value(T const volatile *value, T wait_value)
+static inline void cpu_wait_value(T const volatile *value, T wait_value)
 {
     static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
 

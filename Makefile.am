@@ -20,7 +20,7 @@ BUILT_SOURCES = \
 
 LINKER_SEL = -fuse-ld=gold
 
-LINKER_DEBUG = -Wl,--orphan-handling,warn
+#LINKER_DEBUG = -Wl,--orphan-handling,warn
 
 noinst_LIBRARIES = \
 	libmbr.a \
@@ -202,7 +202,7 @@ bootfat_elf_CCASFLAGS = \
 bootfat_elf_LDFLAGS = \
 	-m16 \
 	-Wl,-m,i386linux \
-	-Wl,-Map,$(top_builddir)/bootsect.map \
+	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-v \
@@ -251,7 +251,15 @@ bootiso_bin_CCASFLAGS = \
 	$(bootfat_bin_CCASFLAGS)
 
 bootiso_elf_LDFLAGS = \
-	$(bootfat_elf_LDFLAGS)
+	-m16 \
+	-Wl,-m,i386linux \
+	-Wl,-Map,$(top_builddir)/bootiso.map \
+	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
+	$(LINKER_DEBUG) \
+	-Wl,-v \
+	$(LINKER_SEL) -fuse-ld=gold \
+	-nostartfiles -nodefaultlibs -nostdlib \
+	$(COMPILER_FLAGS)
 
 bootiso_elf_LDADD = \
 	libbootsect.a
@@ -548,6 +556,23 @@ $(abs_top_builddir)/dump:
 include zlib.mk
 include diskfat.mk
 #include emulators.mk
+
+clean-local:
+	rm -f $(top_builddir)/mbr.sym
+	rm -f $(top_builddir)/mbr.map
+	rm -f $(top_builddir)/kernel.sym
+	rm -f $(top_builddir)/kernel.map
+	rm -f $(top_builddir)/bootfat.sym
+	rm -f $(top_builddir)/bootfat.map
+	rm -f $(top_builddir)/bootiso.sym
+	rm -f $(top_builddir)/bootiso.map
+	rm -rf $(top_builddir)/dump
+
+distclean-local:
+	rm -rf $(top_builddir)/extern
+	rm -f $(top_builddir)/fatdisk.img
+	rm -f $(top_builddir)/fatpart.img
+	rm -f $(top_builddir)/qemu-emu.mk
 
 # ----------------------------------------------------------------------------
 # Generate register definitions

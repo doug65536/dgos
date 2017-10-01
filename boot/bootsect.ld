@@ -31,7 +31,6 @@ SECTIONS {
 		*(.data.*)
 		*(.rodata)
 		*(.rodata.*)
-		*(.rela.*)
 
 		bootinfo_start = .;
 		*(.bootinfo)
@@ -46,6 +45,8 @@ SECTIONS {
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
+		*(COMMON.*)
+		*(COMMON*)
 		__bss_end = .;
 
 		. = ALIGN(16);

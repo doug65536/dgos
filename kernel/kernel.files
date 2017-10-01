@@ -54,7 +54,6 @@ arch/x86_64/device/serial-uart.h
 arch/x86_64/device/e9debug.cc
 arch/x86_64/device/usb_xhci.cc
 arch/x86_64/device/rtl8139.cc
-arch/x86_64/device/legacy_keyboard.c.autosave
 arch/x86_64/device/vga.cc
 arch/x86_64/device/nvme.h
 arch/x86_64/device/serial-uart.cc
@@ -70,7 +69,6 @@ arch/x86_64/elf64.h
 arch/x86_64/Makefile
 arch/x86_64/cpu/except_asm.s
 arch/x86_64/cpu/cpu_broadcast.h
-arch/x86_64/cpu/except.s.autosave
 arch/x86_64/cpu/gdt.h
 arch/x86_64/cpu/spinlock.h
 arch/x86_64/cpu/gdt.cc

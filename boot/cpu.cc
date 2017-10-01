@@ -263,11 +263,11 @@ static void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
-static bool need_a20_toggle;
-static table_register_64_t volatile gdtr;
+bool need_a20_toggle;
+table_register_64_t gdtr;
 
-static bool nx_available;
-static uint32_t gp_available;
+bool nx_available;
+uint32_t gp_available;
 
 static void idt_init()
 {
