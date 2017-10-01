@@ -263,6 +263,12 @@ static void toggle_interrupts(uint16_t enable)
         disable_interrupts();
 }
 
+static bool need_a20_toggle;
+static table_register_64_t volatile gdtr;
+
+static bool nx_available;
+static uint32_t gp_available;
+
 static void idt_init()
 {
     for (size_t i = 0; i < 32; ++i) {
@@ -275,22 +281,16 @@ static void idt_init()
     idtr_64.limit = 32 * sizeof(*idt) - 1;
 }
 
-static bool need_a20_toggle;
-
-static table_register_64_t gdtr = {
-	sizeof(gdt) - 1,
-	(uint16_t)(uint32_t)gdt,
-	0,
-	0,
-	0
-};
-
-static bool nx_available;
-static uint32_t gp_available;
+static void gdt_init()
+{
+	gdtr.limit = sizeof(gdt)-1;
+	gdtr.base_lo = (uint16_t)(uint32_t)gdt;
+}
 
 void cpu_init()
 {
 	idt_init();
+	gdt_init();
 	need_a20_toggle = !check_a20();
 	if (need_a20_toggle) {
 		toggle_a20(1);

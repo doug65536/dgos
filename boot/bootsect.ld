@@ -31,6 +31,7 @@ SECTIONS {
 		*(.data.*)
 		*(.rodata)
 		*(.rodata.*)
+		*(.rela.*)
 
 		bootinfo_start = .;
 		*(.bootinfo)

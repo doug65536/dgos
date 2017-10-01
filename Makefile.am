@@ -3,7 +3,7 @@
 BUILT_SOURCES = \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES) \
-	qemu-emu.mk \
+	$(top_builddir)/qemu-emu.mk \
 	$(abs_top_builddir)/dump \
 	generated_headers
 
@@ -20,8 +20,7 @@ BUILT_SOURCES = \
 
 LINKER_SEL = -fuse-ld=gold
 
-#LINKER_DEBUG = -Wl,--orphan-handling,warn
-LINKER_DEBUG =
+LINKER_DEBUG = -Wl,--orphan-handling,warn
 
 noinst_LIBRARIES = \
 	libmbr.a \
@@ -162,16 +161,21 @@ libbootsect_a_CXXFLAGS = \
 	-m16 -ggdb $(SMALLEST_CODE_FLAGS) -ffreestanding \
 	-Wall -Wextra -Wpedantic \
 	-mno-sse -mno-sse2 -mfpmath=387 \
-	-fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti \
+	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
+	-fno-asynchronous-unwind-tables \
+	-fno-common \
 	-mrtd -mregparm=3 \
 	-std=c++14 -fno-pic -fno-pie \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CFLAGS = \
-	-m16 -ggdb -Oz -ffreestanding \
+$(libbootsect_a_INCLUDES) \
+	-m16 -ggdb $(SMALLEST_CODE_FLAGS) -ffreestanding \
 	-Wall -Wextra -Wpedantic \
 	-mno-sse -mno-sse2 -mfpmath=387 \
+	-fno-stack-protector -fno-common -fno-rtti \
 	-fno-asynchronous-unwind-tables \
+	-fno-common \
 	-mrtd -mregparm=3 \
 	-std=c++14 -fno-pic -fno-pie \
 	$(COMPILER_FLAGS)
@@ -493,8 +497,10 @@ kernel_elf_CXXFLAGS = \
 	$(kernel_elf_INCLUDES) \
 	-std=c++14 -ggdb \
 	-mcmodel=kernel -fno-pic -fno-pie -mno-red-zone \
+	-fno-asynchronous-unwind-tables \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
-	-msse -msse2 -fverbose-asm
+	-msse -msse2 -fverbose-asm \
+	-rdynamic
 
 libkernel_sse41_a_SOURCES = \
 	kernel/arch/x86_64/cpu/nontemporal_sse4_1.cc
@@ -511,9 +517,11 @@ kernel_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
-	-Wl,-export-dynamic \
+	-rdynamic -static \
 	-Wl,-z,max-page-size=4096 \
 	-nostartfiles -nodefaultlibs -nostdlib
+
+#-Wl,-export-dynamic
 
 EXTRA_kernel_elf_DEPENDENCIES = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
@@ -646,7 +654,7 @@ monitor-connect:
 	telnet localhost 7777
 
 # Generate emulators makefile
-qemu-emu.mk: $(top_srcdir)/Makefile.am $(top_srcdir)/qemu-emu-generator
+$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am $(top_srcdir)/qemu-emu-generator
 	$(top_srcdir)/qemu-emu-generator
 
 -include qemu-emu.mk

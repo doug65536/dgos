@@ -1,3 +1,10 @@
+AM_CXX=clang++
+AM_CC=clang
+AM_AR=gcc-ar
+AM_RANLIB=gcc-ranlib
+AC_SUBST([AM_RANLIB])
+
+
 AC_INIT([dgos], [0.8])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
