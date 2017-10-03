@@ -17,10 +17,10 @@ public:
     using allocator_type = _Allocator;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-    using reference = value_type&;
-    using const_reference = value_type const&;
-    using pointer = value_type*;
-    using const_pointer = value_type const*;
+	using reference = _T&;
+	using const_reference = _T const&;
+	using pointer = _T*;
+	using const_pointer = _T const*;
 
     template<int _Dir, bool _Is_const>
     class vector_iter;
@@ -68,17 +68,17 @@ public:
 
     allocator_type get_allocator() const;
 
-    reference at(size_type __pos);
-    const_reference at(size_type __pos) const;
+	_T& at(size_type __pos);
+	_T const& at(size_type __pos) const;
 
-    reference operator[](size_type __pos);
-    const_reference operator[](size_type __pos) const;
+	_T& operator[](size_type __pos);
+	_T const& operator[](size_type __pos) const;
 
-    reference front();
-    const_reference front() const;
+	_T& front();
+	_T const& front() const;
 
-    reference back();
-    const_reference back() const;
+	_T& back();
+	_T const& back() const;
 
     pointer data();
     const_pointer data() const;
@@ -164,12 +164,12 @@ public:
         template<bool _RhsIsConst>
         inline vector_iter(vector_iter<_Dir, _RhsIsConst> const& rhs);
 
-        inline reference operator*();
-        inline const_reference operator*() const;
+		inline _T& operator*();
+		inline _T const& operator*() const;
         inline vector_iter operator+(size_type __n) const;
         inline vector_iter operator-(size_type __n) const;
-        inline reference operator[](size_type __n);
-        inline const_reference operator[](size_type __n) const;
+		inline _T& operator[](size_type __n);
+		inline _T const& operator[](size_type __n) const;
         inline pointer operator->();
         inline const_pointer operator->() const;
 
@@ -428,7 +428,7 @@ vector<_T,_Allocator>::get_allocator() const
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::reference
+_T&
 vector<_T,_Allocator>::at(size_type __pos)
 {
     if (likely(__pos < __sz))
@@ -437,7 +437,7 @@ vector<_T,_Allocator>::at(size_type __pos)
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::const_reference
+_T const&
 vector<_T,_Allocator>::at(size_type __pos) const
 {
     if (likely(__pos < __sz))
@@ -446,42 +446,42 @@ vector<_T,_Allocator>::at(size_type __pos) const
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::reference
+_T&
 vector<_T,_Allocator>::operator[](size_type __pos)
 {
     return __m[__pos];
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::const_reference
+_T const&
 vector<_T,_Allocator>::operator[](size_type __pos) const
 {
     return __m[__pos];
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::reference
+_T&
 vector<_T,_Allocator>::front()
 {
     return __m[0];
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::const_reference
+_T const&
 vector<_T,_Allocator>::front() const
 {
     return __m[0];
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::reference
+_T&
 vector<_T,_Allocator>::back()
 {
     return __m[__sz - 1];
 }
 
 template<typename _T, typename _Allocator>
-typename vector<_T,_Allocator>::const_reference
+_T const&
 vector<_T,_Allocator>::back() const
 {
     return __m[__sz - 1];
@@ -882,7 +882,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::vector_iter(pointer __ip)
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::reference
+_T&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator *()
 {
     return *__p;
@@ -890,7 +890,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator *()
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::const_reference
+_T const&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator *() const
 {
     return *__p;
@@ -916,7 +916,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::reference
+_T&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator[](size_type __n)
 {
     return __p[__n];
@@ -924,7 +924,7 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator[](size_type __n)
 
 template<typename _T, typename _Alloc>
 template<int _Dir, bool _Is_const>
-typename vector<_T,_Alloc>::const_reference
+_T const&
 vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator[](size_type __n) const
 {
     return __p[__n];

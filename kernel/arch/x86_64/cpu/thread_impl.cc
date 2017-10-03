@@ -982,7 +982,7 @@ void thread_send_ipi(int cpu, int intr)
     apic_send_ipi(cpus[cpu].apic_id, intr);
 }
 
-int thread_cpu_number(void)
+int thread_cpu_number()
 {
     cpu_info_t *cpu = this_cpu();
     return cpu - cpus;

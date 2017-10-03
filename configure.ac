@@ -9,8 +9,9 @@ AC_INIT([dgos], [0.8])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_FILES([Makefile])
+: ${CFLAGS="-g -O0"}
+: ${CXXFLAGS="-g -O0"}
 AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall])
-: ${CFLAGS="-g"}
 AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
@@ -36,6 +37,32 @@ AX_CHECK_COMPILE_FLAG([-fno-integrated-as],
 			  [COMPILER_FLAGS+=" -fno-integrated-as"], [])
 AX_CHECK_COMPILE_FLAG([-Wno-unused-command-line-argument],
 			  [COMPILER_FLAGS+=" -Wno-unused-command-line-argument"], [])
+
+AX_CHECK_COMPILE_FLAG([-Wall],
+			  [COMPILER_FLAGS+=" -Wall"], [])
+AX_CHECK_COMPILE_FLAG([-Wextra],
+			  [COMPILER_FLAGS+=" -Wextra"], [])
+AX_CHECK_COMPILE_FLAG([-Wpedantic],
+			  [COMPILER_FLAGS+=" -Wpedantic"], [])
+AX_CHECK_COMPILE_FLAG([-Wdouble-promotion],
+			  [COMPILER_FLAGS+=" -Wdouble-promotion"], [])
+AX_CHECK_COMPILE_FLAG([-Wformat],
+			  [COMPILER_FLAGS+=" -Wformat"], [])
+AX_CHECK_COMPILE_FLAG([-Wfloat-equal],
+			  [COMPILER_FLAGS+=" -Wfloat-equal"], [])
+AX_CHECK_COMPILE_FLAG([-Wundef],
+			  [COMPILER_FLAGS+=" -Wundef"], [])
+AX_CHECK_COMPILE_FLAG([-Wwrite-strings],
+			  [COMPILER_FLAGS+=" -Wwrite-strings"], [])
+AX_CHECK_COMPILE_FLAG([-Wredundant-decls],
+			  [COMPILER_FLAGS+=" -Wredundant-decls"], [])
+AX_CHECK_COMPILE_FLAG([-Wshadow],
+			  [COMPILER_FLAGS+=" -Wshadow"], [])
+AX_CHECK_COMPILE_FLAG([-Wno-strict-overflow],
+			  [COMPILER_FLAGS+=" -Wno-strict-overflow"], [])
+AX_CHECK_COMPILE_FLAG([-Wno-overlength-strings],
+			  [COMPILER_FLAGS+=" -Wno-overlength-strings"], [])
+
 AC_SUBST([COMPILER_FLAGS])
 
 AX_CHECK_COMPILE_FLAG([-Oz],
@@ -51,7 +78,38 @@ AX_CHECK_COMPILE_FLAG([-falign-jumps=0],
 			  [SMALLEST_CODE_FLAGS+=" -falign-jumps=0"])
 AX_CHECK_COMPILE_FLAG([-mno-align-stringops],
 			  [SMALLEST_CODE_FLAGS+=" -mno-align-stringops"])
+AX_CHECK_COMPILE_FLAG([-Wno-ignored-optimization-argument],
+			  [SMALLEST_CODE_FLAGS+=" -Wno-ignored-optimization-argument"])
 
 AC_SUBST([SMALLEST_CODE_FLAGS])
+
+AX_CHECK_COMPILE_FLAG([-m16],
+			  [REAL_MODE_FLAGS+=" -m16"])
+AX_CHECK_COMPILE_FLAG([-mno-sse],
+			  [REAL_MODE_FLAGS+=" -mno-sse"])
+AX_CHECK_COMPILE_FLAG([-mno-sse2],
+			  [REAL_MODE_FLAGS+=" -mno-sse2"])
+AX_CHECK_COMPILE_FLAG([-mno-avx],
+			  [REAL_MODE_FLAGS+=" -mno-avx"])
+AX_CHECK_COMPILE_FLAG([-mno-avx2],
+			  [REAL_MODE_FLAGS+=" -mno-avx2"])
+AX_CHECK_COMPILE_FLAG([-mfpmath=387],
+			  [REAL_MODE_FLAGS+=" -mfpmath=387"])
+
+AC_SUBST([REAL_MODE_FLAGS])
+
+AX_CHECK_COMPILE_FLAG([-mrtd],
+			  [REGPARM_FLAGS+=" -mrtd"])
+AX_CHECK_COMPILE_FLAG([-mregparm=3],
+			  [REGPARM_FLAGS+=" -mregparm=3"])
+
+AC_SUBST([REGPARM_FLAGS])
+
+AX_CHECK_COMPILE_FLAG([-fno-pie],
+			  [NO_PIC_FLAGS+=" -fno-pie"])
+AX_CHECK_COMPILE_FLAG([-fno-pic],
+			  [NO_PIC_FLAGS+=" -fno-pic"])
+
+AC_SUBST([NO_PIC_FLAGS])
 
 AC_OUTPUT

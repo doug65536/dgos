@@ -248,3 +248,5 @@ kernel.creator.user.c2fe216
 %{Env:BUILDDIR}/dump/lib/printk.s
 %{Env:BUILDDIR}/dump/kernel-headers
 ../qemu-emu-generator
+arch/x86_64/device/nvmebits.h
+arch/x86_64/device/pcibits.h

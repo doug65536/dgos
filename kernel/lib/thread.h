@@ -27,6 +27,7 @@ void thread_set_affinity(int id, uint64_t affinity);
 uint64_t thread_get_affinity(int id);
 
 size_t thread_get_cpu_count();
+int thread_cpu_number();
 
 thread_t thread_get_id(void);
 

@@ -24,14 +24,14 @@ struct default_delete<T[]>
     }
 };
 
-template<typename T,
-         typename Tdeleter = default_delete<T>>
+template<typename _T,
+		 typename Tdeleter = default_delete<_T>>
 class unique_ptr
 {
 public:
-    using value_type = T;
-    using pointer = T*;
-    using const_pointer = T const*;
+	using value_type = _T;
+	using pointer = _T*;
+	using const_pointer = _T const*;
 
     unique_ptr()
         : ptr(nullptr)
@@ -45,7 +45,7 @@ public:
 
     unique_ptr(unique_ptr const &) = delete;
 
-    unique_ptr(pointer value)
+	unique_ptr(_T* value)
         : ptr(value)
     {
     }
@@ -56,37 +56,37 @@ public:
             ((Tdeleter()))(ptr);
     }
 
-    operator pointer()
+	operator _T*()
     {
         return ptr;
     }
 
-    operator const_pointer() const
+	operator _T const*() const
     {
         return ptr;
     }
 
-    pointer operator->()
+	_T* operator->()
     {
         return ptr;
     }
 
-    const_pointer operator->() const
+	_T const* operator->() const
     {
         return ptr;
     }
 
-    pointer get()
+	_T* get()
     {
         return ptr;
     }
 
-    const_pointer get() const
+	_T const* get() const
     {
         return ptr;
     }
 
-    unique_ptr &operator=(pointer rhs)
+	unique_ptr &operator=(_T* rhs)
     {
         if (ptr)
             ((Tdeleter()))(ptr);
@@ -99,32 +99,32 @@ public:
         return Tdeleter();
     }
 
-    pointer release()
+	_T* release()
     {
-        pointer p = ptr;
+		_T* p = ptr;
         ptr = nullptr;
         return p;
     }
 
-    void reset(pointer p = pointer())
+	void reset(_T* p = pointer())
     {
-        pointer old = ptr;
+		_T* old = ptr;
         ptr = p;
         if (old)
             ((Tdeleter()))(old);
     }
 
 private:
-    pointer ptr;
+	_T* ptr;
 };
 
-template<typename T, typename Tdeleter>
-class unique_ptr<T[], Tdeleter>
+template<typename _T, typename Tdeleter>
+class unique_ptr<_T[], Tdeleter>
 {
 public:
-    using value_type = T;
-    using pointer = T*;
-    using const_pointer = T const*;
+	using value_type = _T;
+	using pointer = _T*;
+	using const_pointer = _T const*;
 
     unique_ptr()
         : ptr(nullptr)
@@ -138,7 +138,7 @@ public:
 
     unique_ptr(unique_ptr const &) = delete;
 
-    unique_ptr(pointer value)
+	unique_ptr(_T* value)
         : ptr(value)
     {
     }
@@ -149,37 +149,47 @@ public:
             ((Tdeleter()))(ptr);
     }
 
-    operator pointer()
+	operator _T*()
     {
         return ptr;
     }
 
-    operator const_pointer() const
+	operator _T const*() const
     {
         return ptr;
     }
 
-    pointer operator->()
+	_T& operator[](size_t i)
+	{
+		return ptr[i];
+	}
+
+	_T const& operator[](size_t i) const
+	{
+		return ptr[i];
+	}
+
+	_T* operator->()
     {
         return ptr;
     }
 
-    const_pointer operator->() const
+	_T const* operator->() const
     {
         return ptr;
     }
 
-    pointer get()
+	_T* get()
     {
         return ptr;
     }
 
-    const_pointer get() const
+	_T const* get() const
     {
         return ptr;
     }
 
-    unique_ptr &operator=(pointer rhs)
+	unique_ptr &operator=(_T* rhs)
     {
         if (ptr)
             ((Tdeleter()))(ptr);
@@ -192,23 +202,23 @@ public:
         return Tdeleter();
     }
 
-    pointer release()
+	_T* release()
     {
-        pointer p = ptr;
+		_T* p = ptr;
         ptr = nullptr;
         return p;
     }
 
-    void reset(pointer p = pointer())
+	void reset(_T* p = pointer())
     {
-        pointer old = ptr;
+		_T* old = ptr;
         ptr = p;
         if (old)
             ((Tdeleter()))(old);
     }
 
 private:
-    pointer ptr;
+	_T* ptr;
 };
 
 template<typename T>

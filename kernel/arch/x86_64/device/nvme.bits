@@ -63,7 +63,7 @@
 
 # 4.2 Submission queue entry
 
--- NVME_SQEDW0 Submission queue entry command dword 0
+-- NVME_CMD_SDW0 Submission queue entry command dword 0
 31:16 CID Command identifier
 15:14 PSDT PRP or SGL data transfer
 9:8 FUSE Fused operation
@@ -82,22 +82,49 @@
 
 # 5.4 Create I/O submission queue command
 
--- NVME_CMD_CSQ_CDW10
+-- NVME_CMD_CSQ_CDW10 Create I/O submission queue
 31:16 QSIZE Queue size
 15:0 QID Queue identifier
 
--- NVME_CMD_CSQ_CDW11
+-- NVME_CMD_CSQ_CDW11 Create I/O submission queue
 31:16 CQID Completion queue identifier
 2:1 QPRIO Queue priority
 0 PC Physically contiguous
 
+# 6.9 Read command
+
+-- NVME_CMD_READ_CDW10
+31:0 SLBA Starting LBA low
+
+-- NVME_CMD_READ_CDW11
+31:0 SLBA Starting LBA high
+
+-- NVME_CMD_READ_CDW12
+31 LR Limited retry
+30 FUA Force unit access
+29:26 PRINFO Protected information field
+15:0 NLB Number of logical blocks
+
+-- NVME_CMD_READ_CDW13
+7 INCOMP Incompressible
+6 SEQ Sequential request
+5:4 LAT Latency
+3:0 AF Access frequency
+
+-- NVME_CMD_READ_CDW14 End-to-end protection
+31:0 EILBRT Expected initial logical block reference tag
+
+-- NVME_CMD_READ_CDW15 End-to-end protection
+31:16 ELBATM Expected logical block application tag mask
+15:0 ELBAT Expected logical block application tag
+
 # 4.6 Completion queue entry
 
--- NVME_CQEDW2 Completion queue entry dword 2
+-- NVME_CMP_DW2 Completion queue entry dword 2
 31:16 SQID Submission queue ID
 15:0 SQHD Submission queue head pointer
 
--- NVME_CQEDW3
+-- NVME_CMP_DW3 Completion queue entry dword 3
 31 DNR Do not retry (0 if retry might succeed)
 30 M More information is part of the Error Information log
 27:25 SCT Status code type
@@ -105,3 +132,17 @@
 16 P Phase tag
 15:0 CID Command ID
 
+# 5.11 Identify command
+
+-- NVME_CMD_IDENT_CDW10 Identify command dword 10
+31:16 CNTID Controller identifier
+7:0 CNS Controller or namespace structure
+
+-- NVME_NS_IDENT_FLBAS
+4 EXTLBA Metadata at end of data
+3:0 LBAIDX Index of formatted LBA in lbaf
+
+-- NVME_NS_IDENT_LBAF
+25:24 RP Relative performance
+23:16 LBADS LBA data size (as power of two)
+15:0 MS Metadata size

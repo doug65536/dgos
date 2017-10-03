@@ -372,12 +372,12 @@ static contiguous_allocator_t contig_phys_allocator;
 //
 // Contiguous physical memory allocator
 
-void *mm_alloc_contiguous(size_t size)
+uintptr_t mm_alloc_contiguous(size_t size)
 {
-    return (void*)contig_phys_allocator.alloc_linear(size);
+	return contig_phys_allocator.alloc_linear(size);
 }
 
-void mm_free_contiguous(void *addr, size_t size)
+void mm_free_contiguous(uintptr_t addr, size_t size)
 {
     contig_phys_allocator.release_linear((linaddr_t)addr, size);
 }

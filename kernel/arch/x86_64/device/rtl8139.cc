@@ -113,7 +113,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     uintptr_t mmio_physaddr;
     void volatile *mmio;
 
-    void *rx_buffer_physaddr;
+	uintptr_t rx_buffer_physaddr;
     void *rx_buffer;
     size_t rx_offset;
 
@@ -970,7 +970,7 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t &pci_iter)
     rx_buffer_physaddr = mm_alloc_contiguous(65536 + 16);
 
     // Map rx buffer physical memory
-    rx_buffer = mmap(rx_buffer_physaddr, 65536 + 16,
+	rx_buffer = mmap((void*)rx_buffer_physaddr, 65536 + 16,
                            PROT_READ, MAP_PHYSICAL,
                            -1, 0);
 

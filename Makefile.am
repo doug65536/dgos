@@ -5,6 +5,7 @@ BUILT_SOURCES = \
 	$(ZLIBPUBLICINCLUDES) \
 	$(top_builddir)/qemu-emu.mk \
 	$(abs_top_builddir)/dump \
+	$(top_builddir)/dump/qemu-debug-out \
 	generated_headers
 
 # Build libmbr
@@ -42,20 +43,20 @@ libmbr_a_SOURCES = \
 	mbr/mbr.s
 
 libmbr_a_CCASFLAGS = \
-	-m16 \
-	-fno-pie -fno-pic \
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS)
 
 EXTRA_libmbr_a_DEPENDENCIES = \
 	$(abs_top_builddir)/dump
 
 mbr_elf_LDFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
 	-Wl,--oformat,elf32-little \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) \
+	$(LINKER_SEL) -fuse-ld=gold \
 	-Wl,-nostdlib \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -67,12 +68,12 @@ mbr_elf_SOURCES = \
 	mbr/empty.cc
 
 mbr_elf_CXXFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_elf_CCASFLAGS = \
-	$(COMPILER_FLAGS) \
-	-m16
+	$(REAL_MODE_FLAGS) \
+	$(COMPILER_FLAGS)
 
 mbr_elf_LDADD = \
 	libmbr.a
@@ -81,22 +82,22 @@ mbr_bin_SOURCES = \
 	mbr/empty.cc
 
 mbr_bin_CXXFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_bin_CFLAGS = \
-	-m16 \
-	-fno-pic -fno-pie \
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_bin_LDFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	-fuse-ld=bfd \
 	-Wl,-nostdlib \
-	-fno-pic -fno-pie \
+	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
 
 EXTRA_mbr_bin_DEPENDENCIES = \
@@ -158,35 +159,39 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	$(libbootsect_a_INCLUDES) \
-	-m16 -ggdb $(SMALLEST_CODE_FLAGS) -ffreestanding \
-	-Wall -Wextra -Wpedantic \
-	-mno-sse -mno-sse2 -mfpmath=387 \
+	$(REAL_MODE_FLAGS) \
+	$(SMALLEST_CODE_FLAGS) \
+	-ggdb -ffreestanding \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
 	-fno-asynchronous-unwind-tables \
 	-fno-common \
 	-mrtd -mregparm=3 \
-	-std=c++14 -fno-pic -fno-pie \
+	-std=c++14 $(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CFLAGS = \
-$(libbootsect_a_INCLUDES) \
-	-m16 -ggdb $(SMALLEST_CODE_FLAGS) -ffreestanding \
-	-Wall -Wextra -Wpedantic \
-	-mno-sse -mno-sse2 -mfpmath=387 \
+	$(libbootsect_a_INCLUDES) \
+	$(REAL_MODE_FLAGS) \
+	$(SMALLEST_CODE_FLAGS) \
+	$(REGPARM_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	-ggdb \
+	-ffreestanding \
 	-fno-stack-protector -fno-common -fno-rtti \
 	-fno-asynchronous-unwind-tables \
 	-fno-common \
-	-mrtd -mregparm=3 \
-	-std=c++14 -fno-pic -fno-pie \
+	-std=c++14 \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CCASFLAGS = \
-	-m16 -ggdb -Oz -ffreestanding \
-	-Wall -Wextra -Wpedantic \
-	-mno-sse -mno-sse2 -mfpmath=387 \
+	$(REAL_MODE_FLAGS) \
+	$(SMALLEST_CODE_FLAGS) \
+	$(REGPARM_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	-ggdb \
+	-ffreestanding \
 	-fno-asynchronous-unwind-tables \
-	-mrtd -mregparm=3 \
-	-std=c++14 -fno-pic -fno-pie \
+	-std=c++14 \
 	$(COMPILER_FLAGS)
 
 bootfat_elf_SOURCES = \
@@ -196,16 +201,17 @@ bootfat_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_elf_CCASFLAGS = \
-	-m16 -fno-pic -fno-pie \
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS)
 
 bootfat_elf_LDFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(LINKER_DEBUG) \
 	-Wl,-m,i386linux \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
-	$(LINKER_DEBUG) \
-	-Wl,-v \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS)
@@ -226,13 +232,13 @@ bootfat_bin_CCASFLAGS = \
 	$(bootfat_elf_CCASFLAGS)
 
 bootfat_bin_LDFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
+	$(LINKER_DEBUG) \
+	$(NO_PIC_FLAGS) \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
-	$(LINKER_DEBUG) \
 	-fuse-ld=bfd \
 	-Wl,-nostdlib \
-	-fno-pic -fno-pie \
 	-nostartfiles -nodefaultlibs -nostdlib
 
 EXTRA_bootfat_bin_DEPENDENCIES = \
@@ -251,12 +257,11 @@ bootiso_bin_CCASFLAGS = \
 	$(bootfat_bin_CCASFLAGS)
 
 bootiso_elf_LDFLAGS = \
-	-m16 \
+	$(REAL_MODE_FLAGS) \
 	-Wl,-m,i386linux \
 	-Wl,-Map,$(top_builddir)/bootiso.map \
 	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
 	$(LINKER_DEBUG) \
-	-Wl,-v \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS)
@@ -498,13 +503,12 @@ kernel_elf_INCLUDES = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
-	-I$(top_builddir)/generated-headers \
 	-I$(EXTERNINCLUDEDIR)
 
 kernel_elf_CXXFLAGS = \
 	$(kernel_elf_INCLUDES) \
 	-std=c++14 -ggdb \
-	-mcmodel=kernel -fno-pic -fno-pie -mno-red-zone \
+	-mcmodel=kernel $(NO_PIC_FLAGS) -mno-red-zone \
 	-fno-asynchronous-unwind-tables \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
 	-msse -msse2 -fverbose-asm \
@@ -566,31 +570,31 @@ clean-local:
 	rm -f $(top_builddir)/bootfat.map
 	rm -f $(top_builddir)/bootiso.sym
 	rm -f $(top_builddir)/bootiso.map
-	rm -rf $(top_builddir)/dump
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
 	rm -f $(top_builddir)/fatdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/qemu-emu.mk
+	rm -rf $(top_builddir)/dump
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
 
 generated_headers: \
-	$(top_builddir)/generated-headers/nvmebits.h \
-	$(top_builddir)/generated-headers/pcibits.h
+	$(top_srcdir)/kernel/arch/x86_64/device/nvmebits.h \
+	$(top_srcdir)/kernel/arch/x86_64/device/pcibits.h
 
 .PHONY: generated_headers
 
-$(top_builddir)/generated-headers/nvmebits.h: \
+$(top_srcdir)/kernel/arch/x86_64/device/nvmebits.h: \
 		$(top_srcdir)/kernel/arch/x86_64/device/nvme.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
 	$(top_srcdir)/genregs.py "$<" > "$@"
 
-$(top_builddir)/generated-headers/pcibits.h: \
+$(top_srcdir)/kernel/arch/x86_64/device/pcibits.h: \
 		$(top_srcdir)/kernel/arch/x86_64/device/pci.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
@@ -600,8 +604,9 @@ $(top_builddir)/generated-headers/pcibits.h: \
 # ----------------------------------------------------------------------------
 # QEMU launcher
 
-dump/qemu-debug-out:
-	mkfifo $@
+$(top_builddir)/dump/qemu-debug-out:
+	mkdir -p "$(@D)"
+	mkfifo "$@"
 
 QEMU = qemu-system-x86_64
 
@@ -629,7 +634,7 @@ QEMU_MONITOR = \
 #,telnet
 
 QEMU_DEBUGCON = \
-	-chardev pipe,path=dump/qemu-debug-out,id=qemu-debug-out \
+	-chardev pipe,path=$(top_builddir)/dump/qemu-debug-out,id=qemu-debug-out \
 	-mon qemu-monitor,mode=readline \
 	-device isa-debugcon,chardev=qemu-debug-out
 
@@ -672,7 +677,7 @@ QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
 
 # Connect to debug log
 monitor-debug-output:
-	while true; do cat dump/qemu-debug-out; done
+	while true; do cat "$(top_builddir)/dump/qemu-debug-out"; done
 
 # Connect to console
 monitor-connect:

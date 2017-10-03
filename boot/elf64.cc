@@ -13,7 +13,7 @@
 #include "vesa.h"
 #include "progressbar.h"
 
-#define ELF64_DEBUG     1
+#define ELF64_DEBUG    0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) print_line("elf64: " __VA_ARGS__)
 #else

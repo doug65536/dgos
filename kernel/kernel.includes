@@ -11,4 +11,3 @@ net
 extern/include
 lib/sys
 lib/cc
-../../build-out/generated-headers

@@ -359,8 +359,8 @@ void *mmap_register_device(void *context,
                            void *addr = nullptr);
 
 // Allocate/free contiguous physical memory
-void *mm_alloc_contiguous(size_t size);
-void mm_free_contiguous(void *addr, size_t size);
+uintptr_t mm_alloc_contiguous(size_t size);
+void mm_free_contiguous(uintptr_t addr, size_t size);
 
 uintptr_t mm_new_process(void);
 

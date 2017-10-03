@@ -21,7 +21,7 @@
 // with helper functions that load segment registers
 // The fs segment is used and is not preserved
 
-#define DEBUG_PAGING	1
+#define DEBUG_PAGING	0
 #if DEBUG_PAGING
 #define PAGING_TRACE(...) print_line("paging: " __VA_ARGS__)
 #else
