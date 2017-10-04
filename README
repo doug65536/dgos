@@ -47,6 +47,7 @@
   bounce buffering
 - IRQ driven AHCI with native command queueing (NCQ), asynchronous I/O,
   handles up to 32 concurrent commands per port
+- IRQ driven NVME with per-cpu queues and multiple namespace support
 - FAT32 and ISO9660 filesystems with LFN and Joliet support
   (with full unicode support, including outside the basic multilingual plane)
 - Virtual block storage device abstraction layer
