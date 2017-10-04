@@ -1,5 +1,7 @@
 ../configure.ac
 ../Makefile.am
+../README
+../INSTALL
 config/x86_64.mk
 net/eth_q.h
 net/ipv4_frame.h
