@@ -252,3 +252,4 @@ kernel.creator.user.c2fe216
 ../qemu-emu-generator
 arch/x86_64/device/nvmebits.h
 arch/x86_64/device/pcibits.h
+arch/x86_64/device/nvmedecl.h

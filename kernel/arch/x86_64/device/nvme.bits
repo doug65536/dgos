@@ -146,3 +146,21 @@
 25:24 RP Relative performance
 23:16 LBADS LBA data size (as power of two)
 15:0 MS Metadata size
+
+# 6.7 Dataset management
+
+-- NVME_CMD_DSMGMT_CDW10 Dataset management command
+7:0 NR Number of ranges
+
+-- NVME_CMD_DSMGMT_CDW11 Dataset management command
+2 AD Deallocate
+1 IDW Integral dataset for write
+0 IDR Integram dataset for read
+
+-- NVME_CMD_DSMGMT_CA Context attributes
+31:24 CAS Command access size
+10 WP Write prepare
+9 SW Sequential write range
+8 SR Sequential read range
+5:4 AL Access latency
+3:0 AF Access frequency
