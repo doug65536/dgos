@@ -66,6 +66,28 @@ EXPORT void mutex_init(mutex_t *mutex)
     mutex->link.prev = &mutex->link;
 }
 
+EXPORT bool mutex_try_lock(mutex_t *mutex)
+{
+	bool result;
+
+	thread_t this_thread_id = thread_get_id();
+
+	assert(mutex->owner != this_thread_id);
+
+	spinlock_lock_noirq(&mutex->lock);
+
+	if (mutex->owner < 0) {
+		mutex->owner = this_thread_id;
+		result = true;
+	} else {
+		result = false;
+	}
+
+	spinlock_unlock_noirq(&mutex->lock);
+
+	return result;
+}
+
 EXPORT void mutex_lock(mutex_t *mutex)
 {
     assert(mutex->owner != thread_get_id());

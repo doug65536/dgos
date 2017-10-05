@@ -253,3 +253,5 @@ kernel.creator.user.c2fe216
 arch/x86_64/device/nvmebits.h
 arch/x86_64/device/pcibits.h
 arch/x86_64/device/nvmedecl.h
+lib/mutex.h
+lib/mutex.cc

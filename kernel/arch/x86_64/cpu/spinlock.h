@@ -16,11 +16,11 @@ typedef spinlock_value_t volatile spinlock_t;
 void spinlock_lock_noyield(spinlock_t *lock);
 
 void spinlock_lock(spinlock_t *lock);
-int spinlock_try_lock(spinlock_t *lock);
+bool spinlock_try_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
 
 void spinlock_lock_noirq(spinlock_t *lock);
-int spinlock_try_lock_noirq(spinlock_t *lock);
+bool spinlock_try_lock_noirq(spinlock_t *lock);
 void spinlock_unlock_noirq(spinlock_t *lock);
 
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock);

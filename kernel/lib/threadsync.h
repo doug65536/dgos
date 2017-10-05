@@ -61,6 +61,7 @@ struct rwlock_t {
 void mutex_init(mutex_t *mutex);
 void mutex_destroy(mutex_t *mutex);
 int mutex_held(mutex_t *mutex);
+bool mutex_try_lock(mutex_t *mutex);
 void mutex_lock(mutex_t *mutex);
 void mutex_lock_noyield(mutex_t *mutex);
 void mutex_unlock(mutex_t *mutex);

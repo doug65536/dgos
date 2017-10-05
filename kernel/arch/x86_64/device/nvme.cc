@@ -9,8 +9,8 @@
 #include "utility.h"
 #include "thread.h"
 #include "vector.h"
-#include "threadsync.h"
 #include "cpu/control_regs.h"
+#include "mutex.h"
 
 #define NVME_DEBUG	1
 #if NVME_DEBUG
@@ -299,7 +299,6 @@ public:
 		: list(list)
 		, identify_data_physaddr(0)
 		, identify_data(nullptr)
-		, lock(0)
 		, cur_ns(0)
 		, done(false)
 	{
@@ -319,31 +318,27 @@ public:
 
 		if (!identify_data_physaddr)
 			panic("Failed to map identify data!\n");
-
-		condvar_init(&done_cond);
 	}
 
 	~nvme_detect_dev_ctx_t()
 	{
-		condvar_destroy(&done_cond);
 		munmap(identify_data, 4096);
 		mm_free_contiguous(identify_data_physaddr, 4096);
 	}
 
 	void wait()
 	{
-		spinlock_lock_noirq(&lock);
+		unique_lock<spinlock> hold(lock);
 		while (!done)
-			condvar_wait_spinlock(&done_cond, &lock);
-		spinlock_unlock_noirq(&lock);
+			done_cond.wait(hold);
 	}
 
 	void set_done()
 	{
-		spinlock_lock_noirq(&lock);
+		unique_lock<spinlock> hold(lock);
 		done = true;
-		spinlock_unlock_noirq(&lock);
-		condvar_wake_all(&done_cond);
+		hold.unlock();
+		done_cond.notify_all();
 	}
 
 	void *identify_data;
@@ -352,8 +347,8 @@ public:
 
 private:
 	uint64_t identify_data_physaddr;
-	spinlock_t lock;
-	condition_var_t done_cond;
+	spinlock lock;
+	condition_variable done_cond;
 	bool done;
 };
 
@@ -394,53 +389,44 @@ struct nvme_blocking_io_t {
 		, done_count(0)
 		, err(0)
 	{
-		mutex_init(&lock);
-		condvar_init(&done_cond);
 	}
 
 	~nvme_blocking_io_t()
 	{
-		condvar_destroy(&done_cond);
-		mutex_destroy(&lock);
 	}
 
 	bool set_done(int error)
 	{
-		acquire_lock();
+		auto hold = acquire_lock();
 		if (error)
 			err = error;
 
 		++done_count;
 		bool done = (done_count == expect_count);
 
-		release_lock();
+		hold.unlock();
 
 		if (done) {
-			condvar_wake_one(&done_cond);
+			done_cond.notify_one();
 			return true;
 		}
 
 		return false;
 	}
 
-	void acquire_lock()
+	unique_lock<mutex> acquire_lock()
 	{
-		mutex_lock_noyield(&lock);
+		return unique_lock<mutex>(lock);
 	}
 
-	void release_lock()
-	{
-		mutex_unlock(&lock);
-	}
-
-	void wait()
+	void wait(unique_lock<mutex> &hold)
 	{
 		while (done_count != expect_count)
-			condvar_wait(&done_cond, &lock);
+			done_cond.wait(hold);
 	}
 
-	mutex_t lock;
-	condition_var_t done_cond;
+	mutex lock;
+	condition_variable done_cond;
 
 	int expect_count;
 	int done_count;
@@ -477,16 +463,11 @@ typedef nvme_queue_t<nvme_cmp_t> cmp_queue_t;
 class nvme_queue_state_t {
 public:
 	nvme_queue_state_t()
-		: lock(0)
 	{
-		condvar_init(&not_full);
-		condvar_init(&not_empty);
 	}
 
 	~nvme_queue_state_t()
 	{
-		condvar_destroy(&not_full);
-		condvar_destroy(&not_empty);
 	}
 
 	void init(size_t count)
@@ -505,10 +486,10 @@ public:
 					mmphysrange_t *ranges = nullptr,
 					size_t range_count = 0)
 	{
-		scoped_lock_t hold(&lock);
+		unique_lock<spinlock> hold(lock);
 
 		while (sub_queue.is_full())
-			condvar_wait_spinlock(&not_full, &lock);
+			not_full.wait(hold);
 
 		int index = sub_queue.get_tail();
 
@@ -537,10 +518,10 @@ public:
 
 	void advance_head(uint16_t new_head)
 	{
-		scoped_lock_t hold(&lock);
+		unique_lock<spinlock> hold(lock);
 		sub_queue.take_until(new_head);
 		hold.unlock();
-		condvar_wake_all(&not_full);
+		not_full.notify_all();
 	}
 
 	void invoke_completion(nvme_if_t* owner, nvme_cmp_t& packet,
@@ -552,38 +533,13 @@ public:
 	sub_queue_t sub_queue;
 	cmp_queue_t cmp_queue;
 
-	class scoped_lock_t {
-	public:
-		scoped_lock_t(spinlock_t *lock)
-			: lock(lock)
-		{
-			spinlock_lock_noirq(lock);
-		}
-
-		~scoped_lock_t()
-		{
-			unlock();
-		}
-
-		void unlock()
-		{
-			if (lock) {
-				spinlock_unlock_noirq(lock);
-				lock = nullptr;
-			}
-		}
-
-	private:
-		spinlock_t *lock;
-	};
-
 private:
 	vector<nvme_callback_t> cmp_handlers;
 	uint64_t* prp_lists;
 
-	spinlock_t lock;
-	condition_var_t not_full;
-	condition_var_t not_empty;
+	spinlock lock;
+	condition_variable not_full;
+	condition_variable not_empty;
 };
 
 // ---------------------------------------------------------------------------
@@ -862,9 +818,9 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
 						 &nvme_if_t::setfeat_queues_handler,
 						 &blocking_setfeatures);
 
-	blocking_setfeatures.acquire_lock();
-	blocking_setfeatures.wait();
-	blocking_setfeatures.release_lock();
+	auto hold = blocking_setfeatures.acquire_lock();
+	blocking_setfeatures.wait(hold);
+	hold.unlock();
 
 	queue_count = min(requested_queue_count, max_queues);
 
@@ -1201,7 +1157,7 @@ int64_t nvme_dev_t::io(
    cpu_scoped_irq_disable intr_were_enabled;
    nvme_blocking_io_t block_state;
 
-   block_state.acquire_lock();
+   auto hold = block_state.acquire_lock();
 
    nvme_request_t request;
    request.data = data;
@@ -1214,9 +1170,9 @@ int64_t nvme_dev_t::io(
 
    block_state.expect_count = parent->io(ns, request, log2_sectorsize);
 
-   block_state.wait();
+   block_state.wait(hold);
 
-   block_state.release_lock();
+   hold.unlock();
 
    return block_state.err;
 }

@@ -347,6 +347,7 @@ kernel_elf_SOURCES = \
 	kernel/lib/mm.h \
 	kernel/lib/mouse.cc \
 	kernel/lib/mouse.h \
+	kernel/lib/mutex.cc \
 	kernel/lib/png.cc \
 	kernel/lib/png.h \
 	kernel/lib/pool.cc \

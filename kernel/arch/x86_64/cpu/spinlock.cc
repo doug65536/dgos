@@ -42,12 +42,12 @@ void spinlock_lock(spinlock_t *lock)
     }
 }
 
-int spinlock_try_lock(spinlock_t *lock)
+bool spinlock_try_lock(spinlock_t *lock)
 {
     atomic_barrier();
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
-        return 0;
-    return 1;
+		return false;
+	return true;
 }
 
 void spinlock_unlock(spinlock_t *lock)
@@ -98,7 +98,7 @@ void spinlock_lock_noirq(spinlock_t *lock)
 
 // Returns 1 with interrupts disabled if lock was acquired
 // Returns 0 with interrupts preserved if lock was not acquired
-int spinlock_try_lock_noirq(spinlock_t *lock)
+bool spinlock_try_lock_noirq(spinlock_t *lock)
 {
     int intr_enabled = cpu_irq_disable() << 1;
 
@@ -106,10 +106,10 @@ int spinlock_try_lock_noirq(spinlock_t *lock)
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         cpu_irq_toggle(intr_enabled);
 
-        return 0;
+		return false;
     }
 
-    return 1;
+	return true;
 }
 
 void spinlock_unlock_noirq(spinlock_t *lock)
