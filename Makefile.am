@@ -462,31 +462,31 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
 	kernel/arch/x86_64/cpu/thread_impl.h \
-	kernel/arch/x86_64/device/ahci.cc \
-	kernel/arch/x86_64/device/ata.cc \
-	kernel/arch/x86_64/device/ata.h \
-	kernel/arch/x86_64/device/ata.h \
-	kernel/arch/x86_64/device/e9debug.cc \
-	kernel/arch/x86_64/device/e9debug.h \
-	kernel/arch/x86_64/device/e9debug.h \
-	kernel/arch/x86_64/device/ide.cc \
-	kernel/arch/x86_64/device/keyb8042.cc \
-	kernel/arch/x86_64/device/keyb8042.h \
-	kernel/arch/x86_64/device/keyb8042.h \
-	kernel/arch/x86_64/device/keyb8042_layout/keyb8042_layout_us.cc \
-	kernel/arch/x86_64/device/nvme.cc \
-	kernel/arch/x86_64/device/nvme.h \
-	kernel/arch/x86_64/device/pci.cc \
-	kernel/arch/x86_64/device/pci.h \
-	kernel/arch/x86_64/device/pci.h \
-	kernel/arch/x86_64/device/rtl8139.cc \
-	kernel/arch/x86_64/device/serial-uart.cc \
-	kernel/arch/x86_64/device/serial-uart.h \
-	kernel/arch/x86_64/device/serial-uart.h \
-	kernel/arch/x86_64/device/usb.h \
-	kernel/arch/x86_64/device/usb.h	\
-	kernel/arch/x86_64/device/usb_xhci.cc \
-	kernel/arch/x86_64/device/vga.cc \
+	kernel/device/ahci.cc \
+	kernel/device/ata.cc \
+	kernel/device/ata.h \
+	kernel/device/ata.h \
+	kernel/device/e9debug.cc \
+	kernel/device/e9debug.h \
+	kernel/device/e9debug.h \
+	kernel/device/ide.cc \
+	kernel/device/keyb8042.cc \
+	kernel/device/keyb8042.h \
+	kernel/device/keyb8042.h \
+	kernel/device/keyb8042_layout/keyb8042_layout_us.cc \
+	kernel/device/nvme.cc \
+	kernel/device/nvme.h \
+	kernel/device/pci.cc \
+	kernel/device/pci.h \
+	kernel/device/pci.h \
+	kernel/device/rtl8139.cc \
+	kernel/device/serial-uart.cc \
+	kernel/device/serial-uart.h \
+	kernel/device/serial-uart.h \
+	kernel/device/usb.h \
+	kernel/device/usb.h	\
+	kernel/device/usb_xhci.cc \
+	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
 	kernel/arch/x86_64/elf64.h \
@@ -583,20 +583,20 @@ distclean-local:
 # Generate register definitions
 
 generated_headers: \
-	$(top_srcdir)/kernel/arch/x86_64/device/nvmebits.h \
-	$(top_srcdir)/kernel/arch/x86_64/device/pcibits.h
+	$(top_srcdir)/kernel/device/nvmebits.h \
+	$(top_srcdir)/kernel/device/pcibits.h
 
 .PHONY: generated_headers
 
-$(top_srcdir)/kernel/arch/x86_64/device/nvmebits.h: \
-		$(top_srcdir)/kernel/arch/x86_64/device/nvme.bits \
+$(top_srcdir)/kernel/device/nvmebits.h: \
+		$(top_srcdir)/kernel/device/nvme.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
 	$(top_srcdir)/genregs.py "$<" > "$@"
 
-$(top_srcdir)/kernel/arch/x86_64/device/pcibits.h: \
-		$(top_srcdir)/kernel/arch/x86_64/device/pci.bits \
+$(top_srcdir)/kernel/device/pcibits.h: \
+		$(top_srcdir)/kernel/device/pci.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
