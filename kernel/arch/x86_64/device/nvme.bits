@@ -164,3 +164,20 @@
 8 SR Sequential read range
 5:4 AL Access latency
 3:0 AF Access frequency
+
+# 5.15 Set features admin command
+
+-- NVME_CMD_SETFEAT_CDW10 Set features command dword 10
+
+31 SV Save
+7:0 FID Feature ID
+
+-- NVME_CMD_SETFEAT_NQ_CDW11 Set features number of queues command dword 11
+
+31:16 NCQR Number of completion queues requested
+15:0 NSQR Number of submission queues requested
+
+-- NVME_CMP_SETFEAT_NQ_DW0 Set features number of queues completion dword 0
+
+31:16 NCQA Number of completion queues allocated
+15:0 NSQA Number of submission queues allocated

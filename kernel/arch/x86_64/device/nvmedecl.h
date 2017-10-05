@@ -125,6 +125,10 @@ enum struct nvme_cmd_opcode_t : uint8_t {
 	reservation_rel = 0x15
 };
 
+enum struct nvme_feat_id_t : uint8_t {
+	num_queues = 0x07
+};
+
 // NVM command structure with command factories
 struct nvme_cmd_t {
 	nvme_cmd_hdr_t hdr;
@@ -154,6 +158,8 @@ struct nvme_cmd_t {
 			uint64_t lba, uint32_t count, uint8_t ns, bool fua);
 
 	static nvme_cmd_t create_flush(uint8_t ns);
+
+	static nvme_cmd_t create_setfeatures(uint16_t ncqr, uint16_t nsqr);
 };
 
 C_ASSERT(sizeof(nvme_cmd_t) == 64);
