@@ -1,7 +1,6 @@
 #include "serial-uart.h"
 #include "cpu/ioport.h"
 #include "callout.h"
-#include "cpu/idt.h"
 #include "vector.h"
 #include "irq.h"
 #include "threadsync.h"
