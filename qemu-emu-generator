@@ -37,6 +37,8 @@ do
 						$QRT \
 						' \' $'\n' $'\t' \
 						"\$(QEMU_BIOS)" \
+						' \' $'\n' $'\t' \
+						"\$(QEMU_EXTRA)" \
 						$'\n' $'\n' \
 						>> qemu-emu.mk
 				done

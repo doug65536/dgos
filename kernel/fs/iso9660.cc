@@ -505,7 +505,7 @@ int iso9660_fs_t::mm_fault_handler(
 int iso9660_fs_t::mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
                                    bool read, bool)
 {
-    if (!read)
+    if (unlikely(!read))
         return -int(errno_t::EROFS);
 
     uint32_t sector_offset = (offset >> sector_shift);
@@ -602,14 +602,6 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
     mm_dev = (char*)mmap_register_device(
                 this, block_size, conn->part_len,
                 PROT_READ, mm_fault_handler);
-
-    lookup_path("usr/include", -1);
-
-    iso9660_dir_ent_t *de = lookup_dirent("root/hello.txt");
-    if (de) {
-        char *content = (char*)lookup_sector(dirent_lba(de));
-        printdbg("%*s\n", de->size_lo_le, content);
-    }
 
     return this;
 }

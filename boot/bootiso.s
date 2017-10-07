@@ -25,27 +25,57 @@ bootinfo_checksum:
 bootinfo_reserved:
 .space 10*4
 
-# The kernel finds the boot code by reading this vector
-# MP entry point vector at offset 64
-.globl mp_entry_vector
-mp_entry_vector:
-.int 0
-
-# The kernel finds the boot device information by reading this vector
-# Int 13h, AH=48h Get drive parameters
-# Vector at offset 68
-.globl boot_device_info_vector
-boot_device_info_vector:
-.int 0
-
-# The kernel finds the VBE information by reading this vector
-# Vector at offset 72
-.globl vbe_info_vector
-vbe_info_vector:
-.int 0
-
 .section .early
 entry_start:
-	ljmp $0,$zero_cs
+	fninit
 
-zero_cs:
+	# Initialize stack
+	xorw %ax,%ax
+	pushw %ax
+	pushw $__initial_stack
+	movw %sp,%bp
+	lss (%bp),%sp
+	movw %sp,%bp
+
+	# Save segment of partition table entry in fs
+	movw %ds,%cx
+	movw %cx,%fs
+
+	# Initialize segment registers
+	movw %ax,%ds
+	movw %ax,%es
+
+	# Relocate to 0x800
+	mov $__initialized_data_end,%cx
+	sub $entry,%cx
+	mov $0x7c00,%si
+	mov $0x800,%di
+	cld
+	rep movsb
+
+	ljmp $0,$reloc_entry
+reloc_entry:
+	call clear_bss
+	mov %dl,boot_drive
+
+call_constructors:
+	movl $__ctors_start,%ebx
+0:
+	cmpl $__ctors_end,%ebx
+	jae 0f
+	movl (%ebx),%eax
+	test %eax,%eax
+	jz 1f
+	cmpl $entry,%eax
+	jb 1f
+	call *%eax
+1:
+	addl $4,%ebx
+	jmp 0b
+0:
+
+	mov bootinfo_primary_volume_desc,%eax
+	call iso9660_boot_partition
+unreachable:
+	hlt
+	jmp unreachable

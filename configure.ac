@@ -17,6 +17,12 @@ AM_PROG_AS
 AM_PROG_AR
 AC_PROG_RANLIB
 
+AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
+if test x"$MKISOFS" == x"NOT_FOUND"
+then
+	AC_MSG_ERROR([Please install mkisofs (or genisoimage)])
+fi
+
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
 [AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_IF
 AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_[]_AC_LANG_ABBREV[]flags_$4_$1])dnl

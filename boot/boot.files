@@ -13,7 +13,10 @@ utils/bochs-debugger-boot-commands
 utils/watch.sh
 bootsect.cc
 bootsect.h
-bootsect.ld
+bootfat.ld
+bootiso.ld
+bootfat.s
+bootiso.s
 cpu.cc
 cpu.h
 elf64.cc

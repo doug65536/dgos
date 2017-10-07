@@ -110,11 +110,13 @@ struct ide_if_t : public storage_if_base_t {
         void *io_window;
         void *dma_bounce;
         bmdma_prd_t *dma_cur_prd;
-        unique_ptr<bmdma_prd_t> dma_full_prd;
+        bmdma_prd_t *dma_full_prd;
+        size_t dma_range_count;
         uintptr_t dma_prd_physaddr;
         mmphysrange_t io_window_ranges[PAGESIZE / sizeof(uint64_t)];
 
         ide_chan_t();
+        ~ide_chan_t();
 
         int acquire_access();
         void release_access(int intr_was_enabled);
@@ -495,6 +497,15 @@ ide_if_t::ide_chan_t::ide_chan_t()
     condvar_init(&done_cond);
 }
 
+ide_if_t::ide_chan_t::~ide_chan_t()
+{
+    if (dma_full_prd != nullptr) {
+        munmap(dma_full_prd,
+               sizeof(*dma_full_prd) * dma_range_count);
+        dma_full_prd = nullptr;
+    }
+}
+
 int ide_if_t::ide_chan_t::acquire_access()
 {
     int intr_was_enabled = cpu_irq_disable();
@@ -767,25 +778,28 @@ void ide_if_t::ide_chan_t::detect_devices()
             io_window = mmap_window(unit.max_multiple << log2_sector_size);
 
             // Get list of physical address ranges for io_window
-            size_t range_count = mphysranges(
+            dma_range_count = mphysranges(
                         io_window_ranges, countof(io_window_ranges),
                         dma_bounce, unit.max_multiple << log2_sector_size,
                         65536);
 
-            range_count = mphysranges_split(
-                        io_window_ranges, range_count,
+            dma_range_count = mphysranges_split(
+                        io_window_ranges, dma_range_count,
                         countof(io_window_ranges), 16);
 
-            IDE_TRACE("PRD list has %zu entries\n", range_count);
+            IDE_TRACE("PRD list has %zu entries\n", dma_range_count);
 
-            dma_full_prd = new bmdma_prd_t[range_count];
+            dma_full_prd = (bmdma_prd_t*)mmap(
+                        nullptr, sizeof(*dma_full_prd) * dma_range_count,
+                        PROT_READ | PROT_WRITE,
+                        MAP_32BIT | MAP_POPULATE, -1, 0);
             dma_prd_physaddr = mphysaddr(dma_full_prd);
 
             // Populate PRD list with bounce buffer addresses
-            for (size_t i = 0; i < range_count; ++i) {
+            for (size_t i = 0; i < dma_range_count; ++i) {
                 dma_full_prd[i].physaddr = io_window_ranges[i].physaddr;
                 dma_full_prd[i].size = io_window_ranges[i].size;
-                dma_full_prd[i].eot = (i == (range_count-1)) ? 0x8000 : 0;
+                dma_full_prd[i].eot = (i == (dma_range_count-1)) ? 0x8000 : 0;
             }
 
             // Set PRD address register

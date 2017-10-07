@@ -98,6 +98,10 @@ uint16_t elf64_run(char const *filename)
         nx_page_flags = PTE_NX;
 
     int file = boot_open(filename);
+
+    if (file < 0)
+        halt("Could not open kernel file");
+
     ssize_t read_size;
     Elf64_Ehdr file_hdr;
 
@@ -107,25 +111,25 @@ uint16_t elf64_run(char const *filename)
                            0);
 
     if (read_size != sizeof(file_hdr))
-        return 0;
+        halt("Could not read ELF header");
 
     // Check magic number
     if (memcmp(&file_hdr.e_ident[EI_MAG0],
                elf_magic, sizeof(elf_magic)))
-        return 0;
+        halt("Could not read magic number");
 
     // Load program headers
     Elf64_Phdr *program_hdrs;
     read_size = sizeof(*program_hdrs) * file_hdr.e_phnum;
     program_hdrs = (Elf64_Phdr*)malloc(read_size);
     if (!program_hdrs)
-        return 0;
+        halt("Insufficient memory for program headers");
     if (read_size != boot_pread(
                 file,
                 program_hdrs,
                 read_size,
                 file_hdr.e_phoff))
-        return 0;
+        halt("Could not read program headers");
 
     uint64_t total_bytes = 0;
     for (uint16_t i = 0; i < file_hdr.e_phnum; ++i)
@@ -268,6 +272,8 @@ uint16_t elf64_run(char const *filename)
 
     if (!failed)
         enter_kernel(file_hdr.e_entry);
+
+    halt("Failed to load kernel");
 
     return 1;
 }

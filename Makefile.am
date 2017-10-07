@@ -39,6 +39,8 @@ bin_PROGRAMS = \
 	bootiso-bin \
 	kernel-elf
 
+# libmbr.a
+
 libmbr_a_SOURCES = \
 	mbr/mbr.s
 
@@ -50,10 +52,11 @@ libmbr_a_CCASFLAGS = \
 EXTRA_libmbr_a_DEPENDENCIES = \
 	$(abs_top_builddir)/dump
 
+# mbr-elf
+
 mbr_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	-Wl,--oformat,elf32-little \
-	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -fuse-ld=gold \
@@ -78,6 +81,8 @@ mbr_elf_CCASFLAGS = \
 mbr_elf_LDADD = \
 	libmbr.a
 
+# mbr-bin
+
 mbr_bin_SOURCES = \
 	mbr/empty.cc
 
@@ -93,6 +98,7 @@ mbr_bin_CFLAGS = \
 mbr_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	-Wl,--oformat,binary \
+	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	-fuse-ld=bfd \
@@ -105,8 +111,9 @@ EXTRA_mbr_bin_DEPENDENCIES = \
 
 mbr_bin_LDADD = libmbr.a
 
+# libbootsect.a
+
 libbootsect_a_SOURCES = \
-	boot/bootsect.ld \
 	boot/bootsect.cc \
 	boot/bootinfo.s \
 	boot/screen.cc \
@@ -194,6 +201,8 @@ libbootsect_a_CCASFLAGS = \
 	-std=c++14 \
 	$(COMPILER_FLAGS)
 
+# bootfat-elf
+
 bootfat_elf_SOURCES = \
 	boot/bootfat.s
 
@@ -211,19 +220,21 @@ bootfat_elf_LDFLAGS = \
 	$(LINKER_DEBUG) \
 	-Wl,-m,i386linux \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
-	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
+	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS)
 
 EXTRA_bootfat_elf_DEPENCENCIES = \
-	$(top_srcdir)/boot/bootsect.ld
+	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
 	libbootsect.a
 
+# bootfat-bin
+
 bootfat_bin_SOURCES = \
-	boot/bootfat.s
+	$(bootfat_elf_SOURCES)
 
 bootfat_bin_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
@@ -233,56 +244,79 @@ bootfat_bin_CCASFLAGS = \
 
 bootfat_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(LINKER_DEBUG) \
 	$(NO_PIC_FLAGS) \
+	$(LINKER_DEBUG) \
 	-Wl,--oformat,binary \
-	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
+	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-fuse-ld=bfd \
 	-Wl,-nostdlib \
-	-nostartfiles -nodefaultlibs -nostdlib
+	-nostartfiles -nodefaultlibs -nostdlib \
+	$(COMPILER_FLAGS)
 
 EXTRA_bootfat_bin_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootsect.ld
+	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_bin_LDADD = \
 	libbootsect.a
+
+# bootiso-elf
 
 bootiso_elf_SOURCES = \
 	boot/bootiso.s
 
 bootiso_elf_CXXFLAGS = \
-	$(bootfat_elf_CXXFLAGS)
+	$(libbootsect_a_CXXFLAGS)
 
-bootiso_bin_CCASFLAGS = \
-	$(bootfat_bin_CCASFLAGS)
+bootiso_elf_CCASFLAGS = \
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(COMPILER_FLAGS)
 
 bootiso_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	-Wl,-m,i386linux \
-	-Wl,-Map,$(top_builddir)/bootiso.map \
-	-Wl,-T,$(top_srcdir)/boot/bootsect.ld \
+	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
+	-Wl,-m,i386linux \
+	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS)
 
+EXTRA_bootiso_elf_DEPENDENCIES = \
+	$(top_srcdir)/boot/bootiso.ld
+
 bootiso_elf_LDADD = \
 	libbootsect.a
 
+# bootiso-bin
+
 bootiso_bin_SOURCES = \
-	boot/bootiso.s
+	$(bootiso_elf_SOURCES)
 
 bootiso_bin_CXXFLAGS = \
-	$(bootfat_bin_CXXFLAGS)
+	$(libbootsect_a_CXXFLAGS)
+
+bootiso_bin_CCASFLAGS = \
+	$(bootiso_elf_CCASFLAGS)
 
 bootiso_bin_LDFLAGS = \
-	$(bootfat_bin_LDFLAGS)
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(LINKER_DEBUG) \
+	-Wl,--oformat,binary \
+	-Wl,-Map,$(top_builddir)/bootiso.map \
+	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
+	-fuse-ld=bfd \
+	-nostartfiles -nodefaultlibs -nostdlib \
+	$(COMPILER_FLAGS)
 
 EXTRA_bootiso_bin_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootsect.ld
+	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_bin_LDADD = \
 	libbootsect.a
+
+# kernel-elf
 
 kernel_elf_SOURCES = \
 	kernel/arch/x86_64/entry.s \
@@ -539,7 +573,8 @@ kernel_elf_LDFLAGS = \
 EXTRA_kernel_elf_DEPENDENCIES = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
 	$(abs_top_builddir)/dump \
-	$(ZLIBSTATICLIB)
+	$(ZLIBSTATICLIB) \
+	$(ZLIBPUBLICINCLUDES)
 
 libkernel_sse41_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -msse4.1
 libkernel_avx_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -mavx
@@ -559,8 +594,9 @@ $(abs_top_builddir)/dump:
 	mkdir -p $(abs_top_builddir)/dump
 
 include zlib.mk
+include symbols.mk
 include diskfat.mk
-#include emulators.mk
+include diskiso.mk
 
 clean-local:
 	rm -f $(top_builddir)/mbr.sym

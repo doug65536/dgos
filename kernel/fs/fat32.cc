@@ -37,7 +37,7 @@ struct fat32_fs_t : public fs_base_t {
         fat32_dir_entry_t *dirent;
 
         off_t cached_offset;
-        uint64_t cached_cluster;
+        cluster_t cached_cluster;
         bool dirty;
     };
 
@@ -611,7 +611,7 @@ off_t fat32_fs_t::walk_cluster_chain(
 {
     off_t walked = 0;
 
-    cluster_t cluster = file->cached_cluster;
+    cluster_t& cluster = file->cached_cluster;
 
     vector<cluster_t> sync_pending;
 
@@ -992,10 +992,15 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
     char *io = (char*)buf;
     ssize_t result = 0;
 
+    // The fat chain is a singly linked list, so we
+    // keep track of our current offset as we step through
+    // the chain. If a read outside the "cached" range occurs
+    // we reiterate through the fat chain and reset the cache
+
     off_t cached_end = file->cached_offset + block_size;
     while (size > 0) {
         if (file->cached_cluster &&
-                offset < file->dirent->size &&
+                file->dirent->is_within_size(offset) &&
                 (offset >= cached_end) &&
                 (offset < cached_end + block_size)) {
             // Move to next cluster
@@ -1009,7 +1014,8 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
             file->cached_cluster = dirent_start_cluster(file->dirent);
             file->cached_offset = 0;
             walk_cluster_chain(file, offset, !read);
-            if (file->dirent->size > 0 || !read)
+            if (file->dirent->is_directory() ||
+                    file->dirent->size > 0 || !read)
                 cached_end = file->cached_offset + block_size;
         }
 
@@ -1096,6 +1102,7 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
             (root_cluster) & 0xFFFF;
     root_dirent.short_entry.start_hi =
             (root_cluster >> 16) & 0xFFFF;
+    root_dirent.short_entry.attr = FAT_ATTR_DIR;
 
     // Sector offset of cluster 0
     cluster_ofs = bpb.cluster_begin_lba;

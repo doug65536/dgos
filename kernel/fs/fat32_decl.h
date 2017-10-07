@@ -23,6 +23,38 @@ struct fat32_bpb_data_t {
     uint32_t cluster_begin_lba;
 } __packed;
 
+// DOS date bitfields
+//  4:0  Day (1-31)
+//  8:5  Month (1-12)
+// 15:9  Year relative to 1980
+
+// DOS time bitfields
+//  4:0  Seconds divided by 2 (0-29)
+// 10:5  Minutes (0-59)
+// 15:11 Hours (0-23)
+
+#define FAT_LAST_LFN_ORDINAL    char(0x40)
+#define FAT_ORDINAL_MASK        char(0x3F)
+#define FAT_DELETED_FLAG        char(0xE5)
+#define FAT_ESCAPED_0xE5        char(0x05)
+
+#define FAT_LOWERCASE_NAME_BIT  3
+#define FAT_LOWERCASE_EXT_BIT   4
+#define FAT_LOWERCASE_NAME      (1U<<FAT_LOWERCASE_NAME_BIT)
+#define FAT_LOWERCASE_EXT       (1U<<FAT_LOWERCASE_EXT_BIT)
+
+#define FAT_ATTR_NONE   0
+#define FAT_ATTR_RO     1
+#define FAT_ATTR_HIDDEN 2
+#define FAT_ATTR_SYS    4
+#define FAT_ATTR_VOLUME 8
+#define FAT_ATTR_DIR    16
+#define FAT_ATTR_ARCH   32
+
+#define FAT_ATTR_MASK   0x3F
+#define FAT_LONGNAME (FAT_ATTR_RO | FAT_ATTR_HIDDEN | \
+    FAT_ATTR_SYS | FAT_ATTR_VOLUME)
+
 // 32 bit boundaries are marked with *
 // *-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*-+-+-+-*
 // | Name          |Ext  |A|R|T|CT |CD |AD |STH|MD |MT |STL|Size   |
@@ -83,40 +115,22 @@ struct fat32_dir_entry_t {
 
     // offset = 0x1C
     uint32_t size;
+
+    bool is_directory() const
+    {
+        return (attr & FAT_ATTR_DIR) != 0;
+    }
+
+    bool is_readonly() const
+    {
+        return (attr & FAT_ATTR_RO);
+    }
+
+    bool is_within_size(off_t ofs) const
+    {
+        return ofs < size || is_directory();
+    }
 };
-
-// DOS date bitfields
-//  4:0  Day (1-31)
-//  8:5  Month (1-12)
-// 15:9  Year relative to 1980
-
-// DOS time bitfields
-//  4:0  Seconds divided by 2 (0-29)
-// 10:5  Minutes (0-59)
-// 15:11 Hours (0-23)
-
-#define FAT_LAST_LFN_ORDINAL    char(0x40)
-#define FAT_ORDINAL_MASK        char(0x3F)
-#define FAT_DELETED_FLAG        char(0xE5)
-#define FAT_ESCAPED_0xE5        char(0x05)
-
-#define FAT_LOWERCASE_NAME_BIT  3
-#define FAT_LOWERCASE_EXT_BIT   4
-#define FAT_LOWERCASE_NAME      (1U<<FAT_LOWERCASE_NAME_BIT)
-#define FAT_LOWERCASE_EXT       (1U<<FAT_LOWERCASE_EXT_BIT)
-
-#define FAT_ATTR_NONE   0
-#define FAT_ATTR_RO     1
-#define FAT_ATTR_HIDDEN 2
-#define FAT_ATTR_SYS    4
-#define FAT_ATTR_VOLUME 8
-#define FAT_ATTR_DIR    16
-#define FAT_ATTR_ARCH   32
-
-#define FAT_ATTR_MASK   0x3F
-#define FAT_LONGNAME (FAT_ATTR_RO | FAT_ATTR_HIDDEN | \
-    FAT_ATTR_SYS | FAT_ATTR_VOLUME)
-
 // Long filenames are stored in reverse order
 // The last fragment of the long filename is stored first,
 // with bit 6 set in its ordinal.

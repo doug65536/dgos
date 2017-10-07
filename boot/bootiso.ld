@@ -4,18 +4,10 @@ SECTIONS {
 	.text 0x800 : AT(0x800) {
 		__initialized_data_start = .;
 		*(.head)
-
-		. = 0x5A;
 		*(.early)
 
 		. = 0x1A0;
 		SHORT(bootinfo_start);
-
-		. = 0x1BE;
-		*(.parttab)
-
-		/* Reserve 512 bytes for FS Information sector */
-		. = 0x400;
 
 		__ctors_start = .;
 		*(.ctors)
