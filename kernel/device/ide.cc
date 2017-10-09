@@ -149,13 +149,13 @@ struct ide_if_t : public storage_if_base_t {
         void pio_read_data(unit_data_t &unit, void *buf, size_t bytes);
         void pio_write_data(unit_data_t &unit, void const *buf, size_t bytes);
 
-        int64_t io(void *data, int64_t count, uint64_t lba,
-                   int slave, int is_atapi, io_op_t op, bool fua);
+        errno_t io(void *data, int64_t count, uint64_t lba,
+                   int slave, int is_atapi, io_op_t op, bool fua, iocp_t *iocp);
 
         static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
         void irq_handler();
 
-        int flush(int slave, int is_atapi);
+        errno_t flush(int slave, int is_atapi, iocp_t *iocp);
 
         void yield_until_irq();
 
@@ -955,14 +955,14 @@ void ide_if_t::ide_chan_t::trace_error(int slave,
               msg, secondary, slave, status, status_text, err, error_text);
 }
 
-int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
-        int slave, int is_atapi, io_op_t op, bool fua)
+errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
+        int slave, int is_atapi, io_op_t op, bool fua, iocp_t *iocp)
 {
     unit_data_t &unit = unit_data[slave];
 
     assert(!unit.max_lba || lba + count <= unit.max_lba);
 
-    int err = 0;
+    errno_t err = errno_t::OK;
 
     if (unlikely(count == 0))
         return err;
@@ -981,7 +981,7 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
     set_irq_enable(1);
 
     for (int64_t count_base = 0;
-         err == 0 && count_base < count;
+         err == errno_t::OK && count_base < count;
          count_base += unit.max_multiple) {
         uint32_t sub_count = count - count_base;
 
@@ -999,30 +999,30 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
         if (unit.max_dma >= 0) {
             iface->bmdma_acquire();
 
-            // Work around incorrectly implemented hardware
-            // Build PRD list that is exactly the transfer size
-
-            uint32_t prd_index = 0;
-            for (uint32_t prd_remain = sub_size; prd_remain > 0; ++prd_index) {
-                bmdma_prd_t& full = dma_full_prd[prd_index];
-                bmdma_prd_t& curr = dma_cur_prd[prd_index];
-                size_t chunk;
-
-                curr.physaddr = full.physaddr;
-
-                chunk = full.size ? full.size : 0x10000;
-
-                if (prd_remain <= chunk) {
-                    chunk = prd_remain;
-                    curr.eot = 0x8000;
-                } else {
-                    curr.eot = 0;
-                }
-
-                curr.size = uint16_t(chunk);
-
-                prd_remain -= chunk;
-            }
+//            // Work around incorrectly implemented hardware
+//            // Build PRD list that is exactly the transfer size
+//
+//            uint32_t prd_index = 0;
+//            for (uint32_t prd_remain = sub_size; prd_remain > 0; ++prd_index) {
+//                bmdma_prd_t& full = dma_full_prd[prd_index];
+//                bmdma_prd_t& curr = dma_cur_prd[prd_index];
+//                size_t chunk;
+//
+//                curr.physaddr = full.physaddr;
+//
+//                chunk = full.size ? full.size : 0x10000;
+//
+//                if (prd_remain <= chunk) {
+//                    chunk = prd_remain;
+//                    curr.eot = 0x8000;
+//                } else {
+//                    curr.eot = 0;
+//                }
+//
+//                curr.size = uint16_t(chunk);
+//
+//                prd_remain -= chunk;
+//            }
 
             // Set PRD address register
             assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
@@ -1093,9 +1093,9 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
         yield_until_irq();
 
         if (io_status & ATA_REG_STATUS_ERR) {
-            err = inb(ata_reg_cmd::ERROR);
-            trace_error(slave, "I/O error", io_status, err);
-            err = 1;
+            int ata_err = inb(ata_reg_cmd::ERROR);
+            trace_error(slave, "I/O error", io_status, ata_err);
+            err = errno_t::EIO;
         }
 
         if (unit.max_dma >= 0 && op != io_op_t::flush) {
@@ -1146,7 +1146,7 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
         }
 
         // Emulate FUA when unsupported by issuing subsequent FLUSH CACHE
-        if (err == 0 && fua && !unit.has_fua) {
+        if (err == errno_t::OK && fua && !unit.has_fua) {
             // Issue FLUSH CACHE
             set_lba(unit, 0);
             set_count(unit, 0);
@@ -1156,9 +1156,9 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
             yield_until_irq();
 
             if (io_status & ATA_REG_STATUS_ERR) {
-                err = inb(ata_reg_cmd::ERROR);
-                trace_error(slave, "Flush I/O error", io_status, err);
-                err = 1;
+                int ata_err = inb(ata_reg_cmd::ERROR);
+                trace_error(slave, "Flush I/O error", io_status, ata_err);
+                err = errno_t::EIO;
             }
         }
 
@@ -1173,6 +1173,9 @@ int64_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
     alias_window(io_window, unit.max_multiple << log2_sector_size, nullptr, 0);
 
     release_access(intr_was_enabled);
+
+    iocp->set_result(err);
+    iocp->invoke();
 
     return err;
 }
@@ -1196,14 +1199,18 @@ void ide_if_t::ide_chan_t::irq_handler()
     condvar_wake_one(&done_cond);
 }
 
-int ide_if_t::ide_chan_t::flush(int slave, int is_atapi)
+errno_t ide_if_t::ide_chan_t::flush(int slave, int is_atapi, iocp_t *iocp)
 {
-    if (is_atapi)
-        return 0;
-
+    if (is_atapi) {
+        // FIXME
+        iocp->invoke();
+        return errno_t::OK;
+    }
 
     (void)slave;
-    return 0;
+    // FIXME
+    iocp->invoke();
+    return errno_t::OK;
 }
 
 if_list_t ide_if_t::detect_devices()
@@ -1237,30 +1244,33 @@ void ide_dev_t::cleanup()
 {
 }
 
-int64_t ide_dev_t::read_blocks(
-        void *data, int64_t count, uint64_t lba)
+errno_t ide_dev_t::read_async(
+        void *data, int64_t count, uint64_t lba,
+        iocp_t *iocp)
 {
     return chan->io(data, count, lba, slave, is_atapi,
-                    io_op_t::read, false);
+                    io_op_t::read, false, iocp);
 }
 
-int64_t ide_dev_t::write_blocks(
-        void const *data, int64_t count, uint64_t lba, bool fua)
+errno_t ide_dev_t::write_async(
+        void const *data, int64_t count, uint64_t lba, bool fua,
+        iocp_t *iocp)
 {
     return chan->io((void*)data, count, lba, slave, is_atapi,
-                    io_op_t::write, fua);
+                    io_op_t::write, fua, iocp);
 }
 
-int64_t ide_dev_t::trim_blocks(int64_t count, uint64_t lba)
+errno_t ide_dev_t::trim_async(int64_t count, uint64_t lba,
+                              iocp_t *iocp)
 {
     (void)count;
     (void)lba;
-    return -int(errno_t::ENOSYS);
+    return errno_t::ENOSYS;
 }
 
-int ide_dev_t::flush()
+errno_t ide_dev_t::flush_async(iocp_t *iocp)
 {
-    return chan->flush(slave, is_atapi);
+    return chan->flush(slave, is_atapi, iocp);
 }
 
 long ide_dev_t::info(storage_dev_info_t key)

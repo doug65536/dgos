@@ -2,6 +2,8 @@
 #include "assert.h"
 
 enum struct errno_t : int8_t {
+    OK = 0,
+
     /// Argument list too long (POSIX.1).
     E2BIG = 1,
 

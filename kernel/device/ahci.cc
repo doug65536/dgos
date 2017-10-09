@@ -1176,7 +1176,7 @@ struct slot_request_t {
     uint64_t lba;
     slot_op_t op;
     bool fua;
-    async_callback_t callback;
+    iocp_t *callback;
 };
 
 struct hba_port_info_t {
@@ -1234,7 +1234,7 @@ public:
 
     unsigned io(unsigned port_num, slot_request_t &request);
 
-    int port_flush(unsigned port_num, async_callback_fn_t callback, uintptr_t callback_arg);
+    int port_flush(unsigned port_num, iocp_t *iocp);
 
     unsigned get_sector_size(unsigned port);
     void configure_ncq(unsigned port_num, bool enable, uint8_t queue_depth);
@@ -1293,8 +1293,8 @@ public:
 private:
     STORAGE_DEV_IMPL
 
-    int io(void *data, int64_t count,
-           uint64_t lba, bool fua, slot_op_t op);
+    errno_t io(void *data, int64_t count,
+           uint64_t lba, bool fua, slot_op_t op, iocp_t *iocp);
 
     ahci_if_t *iface;
     unsigned port;
@@ -1365,7 +1365,7 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
     hba_port_t volatile *port = hba->ports + port_num;
     hba_port_info_t *pi = port_info + port_num;
 
-    async_callback_t pending_callbacks[32];
+    iocp_t *pending_callbacks[32];
     unsigned callback_count = 0;
 
     mutex_lock_noyield(&pi->lock);
@@ -1387,15 +1387,13 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
             slot_request_t &request = pi->slot_requests[slot];
 
-            request.callback.error = error;
+            request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
 
             // Invoke completion callback
-            assert(request.callback.callback);
+            assert(request.callback);
             assert(callback_count < countof(pending_callbacks));
             pending_callbacks[callback_count++] = request.callback;
-            request.callback.callback = 0;
-            request.callback.callback_arg = 0;
-            request.callback.error = 0;
+            request.callback = nullptr;
 
             slot_release(port_num, slot);
         }
@@ -1461,15 +1459,13 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
                        pi - port_info);
         }
 
-        request.callback.error = error;
+        request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
 
         // Invoke completion callback
-        assert(request.callback.callback);
+        assert(request.callback);
         assert(callback_count < countof(pending_callbacks));
         pending_callbacks[callback_count++] = request.callback;
-        request.callback.callback = 0;
-        request.callback.callback_arg = 0;
-        request.callback.error = 0;
+        request.callback = nullptr;
 
         slot_release(port_num, slot);
 
@@ -1486,11 +1482,8 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
     // Make all callbacks outside lock
     for (unsigned i = 0; i < callback_count; ++i) {
-        async_callback_t *callback = pending_callbacks + i;
-        if (callback->callback) {
-            callback->callback(callback->error,
-                               callback->callback_arg);
-        }
+        iocp_t *callback = pending_callbacks[i];
+        callback->invoke();
     }
 }
 
@@ -1601,8 +1594,6 @@ void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
     cmd_hdr->prdbc = 0;
     cmd_hdr->prdtl = ranges_count;
 
-    request.callback.error = 0;
-
     atomic_barrier();
 
     if (pi->use_ncq)
@@ -1703,8 +1694,7 @@ unsigned ahci_if_t::io(unsigned port_num, slot_request_t &request)
     return expect_count;
 }
 
-int ahci_if_t::port_flush(unsigned port_num, async_callback_fn_t callback,
-                          uintptr_t callback_arg)
+int ahci_if_t::port_flush(unsigned port_num, iocp_t *iocp)
 {
     hba_port_info_t &pi = port_info[port_num];
 
@@ -1729,8 +1719,7 @@ int ahci_if_t::port_flush(unsigned port_num, async_callback_fn_t callback,
 
     memset(&request, 0, sizeof(request));
     request.op = slot_op_t::flush;
-    request.callback.callback = callback;
-    request.callback.callback_arg = callback_arg;
+    request.callback = iocp;
 
     io(port_num, request);
 
@@ -1772,8 +1761,8 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request)
     if (unlikely((mmio_base->ports[port_num].sata_status & AHCI_SS_DET) !=
                  AHCI_SS_DET_n(AHCI_SS_DET_ONLINE))) {
         // Not established
-        request.callback.callback(-int(errno_t::EIO),
-                                  request.callback.callback_arg);
+        request.callback->set_result(errno_t::ENODEV);
+        request.callback->invoke();
         return 0;
     }
 
@@ -2197,8 +2186,12 @@ void ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     unique_ptr<ata_identify_t> identify = new ata_identify_t;
 
-    if (io(identify, 1, 0, false, slot_op_t::identify) < 0)
+    blocking_iocp_t block;
+
+    if (io(identify, 1, 0, false, slot_op_t::identify, block) != errno_t::OK)
         return;
+
+    block.wait();
 
     identify->fixup_strings();
 
@@ -2257,13 +2250,12 @@ static void ahci_async_complete(int error, uintptr_t arg)
         condvar_wake_one(&state->done_cond);
 }
 
-int ahci_dev_t::io(void *data, int64_t count,
-                  uint64_t lba, bool fua, slot_op_t op)
+errno_t ahci_dev_t::io(
+        void *data, int64_t count,
+        uint64_t lba, bool fua, slot_op_t op,
+        iocp_t *iocp)
 {
     cpu_scoped_irq_disable intr_were_enabled;
-    ahci_blocking_io_t block_state;
-
-    mutex_lock(&block_state.lock);
 
     slot_request_t request;
     request.data = data;
@@ -2271,55 +2263,49 @@ int ahci_dev_t::io(void *data, int64_t count,
     request.lba = lba;
     request.op = op;
     request.fua = fua;
-    request.callback.callback = ahci_async_complete;
-    request.callback.callback_arg = uintptr_t(&block_state);
+    request.callback = iocp;
 
-    block_state.expect_count = iface->io(port, request);
+    int expect = iface->io(port, request);
 
-    while (block_state.done_count != block_state.expect_count)
-        condvar_wait(&block_state.done_cond, &block_state.lock);
+    iocp->set_expect(expect);
 
-    mutex_unlock(&block_state.lock);
-
-    return block_state.err;
+    return errno_t::OK;
 }
 
-int64_t ahci_dev_t::read_blocks(
+errno_t ahci_dev_t::read_async(
         void *data, int64_t count,
-        uint64_t lba)
+        uint64_t lba, iocp_t *iocp)
 {
-    return io(data, count, lba, false, slot_op_t::read);
+    cpu_scoped_irq_disable intr_were_enabled;
+    return io(data, count, lba, false, slot_op_t::read, iocp);
 }
 
-int64_t ahci_dev_t::write_blocks(
+errno_t ahci_dev_t::write_async(
         void const *data, int64_t count,
-        uint64_t lba, bool fua)
+        uint64_t lba, bool fua,
+        iocp_t *iocp)
 {
-    return io((void*)data, count, lba, fua, slot_op_t::write);
+    cpu_scoped_irq_disable intr_were_enabled;
+    return io((void*)data, count, lba, fua, slot_op_t::write, iocp);
 }
 
-int64_t ahci_dev_t::trim_blocks(int64_t count, uint64_t lba)
+errno_t ahci_dev_t::trim_async(
+        int64_t count, uint64_t lba,
+        iocp_t *iocp)
 {
     (void)count;
     (void)lba;
-    return -int(errno_t::ENOSYS);
+    return errno_t::ENOSYS;
 }
 
-int ahci_dev_t::flush()
+errno_t ahci_dev_t::flush_async(iocp_t *iocp)
 {
     cpu_scoped_irq_disable intr_were_enabled;
-    ahci_blocking_io_t block_state;
 
-    mutex_lock(&block_state.lock);
+    int expect = iface->port_flush(port, iocp);
+    iocp->set_expect(expect);
 
-    iface->port_flush(port, ahci_async_complete, uintptr_t(&block_state));
-
-    while (block_state.done_count != block_state.expect_count)
-        condvar_wait(&block_state.done_cond, &block_state.lock);
-
-    mutex_unlock(&block_state.lock);
-
-    return block_state.err;
+    return errno_t::OK;
 }
 
 long ahci_dev_t::info(storage_dev_info_t key)

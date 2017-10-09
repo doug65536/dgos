@@ -4,6 +4,7 @@
 #include "string.h"
 #include "assert.h"
 #include "vector.h"
+#include "cpu/control_regs.h"
 
 #define DEBUG_STORAGE   1
 #if DEBUG_STORAGE
@@ -203,4 +204,48 @@ void part_factory_t::register_factory(void *p)
 {
     part_factory_t *instance = (part_factory_t*)p;
     part_register_factory(instance->name, instance);
+}
+
+int64_t storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
+{
+    cpu_scoped_irq_disable intr_were_enabled;
+
+    blocking_iocp_t block;
+    errno_t err = read_async(data, count, lba, block);
+    if (err != errno_t::OK)
+        return -int64_t(err);
+    err = block.wait();
+    if (err != errno_t::OK)
+        return -int64_t(err);
+    return count;
+}
+
+int64_t storage_dev_base_t::write_blocks(const void *data, int64_t count, uint64_t lba, bool fua)
+{
+    blocking_iocp_t block;
+    errno_t err = write_async(data, count, lba, fua, block);
+    err = block.wait();
+    if (err != errno_t::OK)
+        return -int64_t(err);
+    return count;
+}
+
+int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
+{
+    blocking_iocp_t block;
+    errno_t err = trim_async(count, lba, block);
+    err = block.wait();
+    if (err != errno_t::OK)
+        return -int64_t(err);
+    return count;
+}
+
+int storage_dev_base_t::flush()
+{
+    blocking_iocp_t block;
+    errno_t err = flush_async(block);
+    err = block.wait();
+    if (err != errno_t::OK)
+        return -int64_t(err);
+    return 0;
 }

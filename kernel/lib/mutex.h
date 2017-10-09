@@ -91,6 +91,7 @@ class unique_lock
 public:
 	unique_lock(T& m)
 		: m(m)
+        , locked(false)
 	{
 		lock();
 	}

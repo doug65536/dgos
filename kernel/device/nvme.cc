@@ -383,56 +383,6 @@ private:
 	void *data;
 };
 
-struct nvme_blocking_io_t {
-	nvme_blocking_io_t(int expect_count = 0)
-		: expect_count(expect_count)
-		, done_count(0)
-		, err(0)
-	{
-	}
-
-	~nvme_blocking_io_t()
-	{
-	}
-
-	bool set_done(int error)
-	{
-		auto hold = acquire_lock();
-		if (error)
-			err = error;
-
-		++done_count;
-		bool done = (done_count == expect_count);
-
-		hold.unlock();
-
-		if (done) {
-			done_cond.notify_one();
-			return true;
-		}
-
-		return false;
-	}
-
-	unique_lock<mutex> acquire_lock()
-	{
-		return unique_lock<mutex>(lock);
-	}
-
-	void wait(unique_lock<mutex> &hold)
-	{
-		while (done_count != expect_count)
-			done_cond.wait(hold);
-	}
-
-	mutex lock;
-	condition_variable done_cond;
-
-	int expect_count;
-	int done_count;
-	int err;
-};
-
 enum struct nvme_op_t : uint8_t {
 	read,
 	write,
@@ -452,7 +402,7 @@ struct nvme_request_t {
 	void *data;
 	int64_t count;
 	uint64_t lba;
-	nvme_request_callback_t callback;
+    iocp_t *callback;
 	nvme_op_t op;
 	bool fua;
 };
@@ -619,11 +569,8 @@ public:
 private:
 	STORAGE_DEV_IMPL
 
-	int64_t io(void *data, int64_t count,
-			   uint64_t lba, bool fua, nvme_op_t op);
-
-	static void async_complete(int error, uintptr_t arg);
-
+    errno_t io(void *data, int64_t count,
+               uint64_t lba, bool fua, nvme_op_t op, iocp_t *iocp);
 
 	nvme_if_t *parent;
 	uint8_t ns;
@@ -809,18 +756,18 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
 
 	NVME_TRACE("Requesting queue count %zd\n", requested_queue_count - 1);
 
-	nvme_blocking_io_t blocking_setfeatures(1);
+    blocking_iocp_t blocking_setfeatures;
+    cpu_scoped_irq_disable intr_were_enabled;
 
 	// Do a Set Features command to request the desired number of queues
 	queues[0].submit_cmd(nvme_cmd_t::create_setfeatures(
 							 requested_queue_count - 1,
 							 requested_queue_count - 1),
 						 &nvme_if_t::setfeat_queues_handler,
-						 &blocking_setfeatures);
+                         (iocp_t*)blocking_setfeatures);
 
-	auto hold = blocking_setfeatures.acquire_lock();
-	blocking_setfeatures.wait(hold);
-	hold.unlock();
+    blocking_setfeatures.wait();
+    intr_were_enabled.restore();
 
 	queue_count = min(requested_queue_count, max_queues);
 
@@ -1122,7 +1069,7 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
 		}
 
 		queues[queue_index].submit_cmd(
-					move(cmd), &nvme_if_t::io_handler, &request,
+                    move(cmd), &nvme_if_t::io_handler, request.callback,
 					ranges, range_count);
 	}
 
@@ -1132,32 +1079,32 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
 void nvme_if_t::io_handler(void *data, nvme_cmp_t& packet,
 						   uint16_t cmd_id, int status_type, int status)
 {
-	nvme_request_t* request = (nvme_request_t*)data;
+    iocp_t* iocp = (iocp_t*)data;
 
-	int err = status_type != 0 || status != 0;
+    errno_t err = status_type == 0 && status == 0
+            ? errno_t::OK
+            : errno_t::EIO;
 
-	request->callback.callback(err, request->callback.callback_arg);
+    iocp->set_result(err);
+    iocp->invoke();
 }
 
 void nvme_if_t::setfeat_queues_handler(
 		void *data, nvme_cmp_t& packet,
 		uint16_t cmd_id, int status_type, int status)
 {
-	nvme_blocking_io_t* state = (nvme_blocking_io_t*)data;
+    iocp_t* state = (iocp_t*)data;
 	uint16_t max_sq = NVME_CMP_SETFEAT_NQ_DW0_NCQA_GET(packet.cmp_dword[0]);
 	uint16_t max_cq = NVME_CMP_SETFEAT_NQ_DW0_NSQA_GET(packet.cmp_dword[0]);
 	max_queues = min(max_sq, max_cq) + 1;
-	state->set_done(0);
+    state->invoke();
 }
 
-int64_t nvme_dev_t::io(
+errno_t nvme_dev_t::io(
 		void *data, int64_t count, uint64_t lba,
-		bool fua, nvme_op_t op)
+        bool fua, nvme_op_t op, iocp_t *iocp)
 {
    cpu_scoped_irq_disable intr_were_enabled;
-   nvme_blocking_io_t block_state;
-
-   auto hold = block_state.acquire_lock();
 
    nvme_request_t request;
    request.data = data;
@@ -1165,47 +1112,37 @@ int64_t nvme_dev_t::io(
    request.lba = lba;
    request.op = op;
    request.fua = fua;
-   request.callback.callback = async_complete;
-   request.callback.callback_arg = uintptr_t(&block_state);
+   request.callback = iocp;
 
-   block_state.expect_count = parent->io(ns, request, log2_sectorsize);
+   int expect = parent->io(ns, request, log2_sectorsize);
+   iocp->set_expect(expect);
 
-   block_state.wait(hold);
-
-   hold.unlock();
-
-   return block_state.err;
+   return errno_t::OK;
 }
 
-void nvme_dev_t::async_complete(int error, uintptr_t arg)
-{
-	nvme_blocking_io_t *state = (nvme_blocking_io_t*)arg;
-	state->set_done(error);
-}
-
-int64_t nvme_dev_t::read_blocks(
+errno_t nvme_dev_t::read_async(
 		void *data, int64_t count,
-		uint64_t lba)
+        uint64_t lba, iocp_t *iocp)
 {
-	return io(data, count, lba, false, nvme_op_t::read);
+    return io(data, count, lba, false, nvme_op_t::read, iocp);
 }
 
-int64_t nvme_dev_t::write_blocks(
+errno_t nvme_dev_t::write_async(
 		void const *data, int64_t count,
-		uint64_t lba, bool fua)
+        uint64_t lba, bool fua, iocp_t *iocp)
 {
-	return io((void*)data, count, lba, fua, nvme_op_t::write);
+    return io((void*)data, count, lba, fua, nvme_op_t::write, iocp);
 }
 
-int nvme_dev_t::flush()
+errno_t nvme_dev_t::flush_async(iocp_t *iocp)
 {
-	return io(nullptr, 0, 0, false, nvme_op_t::flush);
+    return io(nullptr, 0, 0, false, nvme_op_t::flush, iocp);
 }
 
-int64_t nvme_dev_t::trim_blocks(int64_t count,
-		uint64_t lba)
+errno_t nvme_dev_t::trim_async(int64_t count,
+        uint64_t lba, iocp_t *iocp)
 {
-	return io(nullptr, count, lba, false, nvme_op_t::trim);
+    return io(nullptr, count, lba, false, nvme_op_t::trim, iocp);
 }
 
 long nvme_dev_t::info(storage_dev_info_t key)

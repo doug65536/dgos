@@ -2,6 +2,8 @@
 #include "types.h"
 #include "dirent.h"
 #include "errno.h"
+#include "cpu/atomic.h"
+#include "mutex.h"
 
 // Storage device interface (IDE, AHCI, etc)
 
@@ -25,34 +27,175 @@ enum storage_dev_info_t : uint32_t {
     STORAGE_INFO_HAVE_TRIM
 };
 
+// I/O completion
+struct iocp_t {
+    typedef void (*callback_t)(errno_t err, uintptr_t arg);
+
+    iocp_t(callback_t callback, uintptr_t arg)
+        : done_count(0)
+        , expect_count(0)
+        , err(errno_t::OK)
+        , callback(callback)
+        , arg(arg)
+    {
+    }
+
+    // A single request can be split into multiple requests at
+    // the device driver layer. This allows a single completion
+    // to be shared by all of the split operations. The actual
+    // callback will be invoked when invoke is called `expect`
+    // times. If this is not called before invoke, invoke will
+    // immediately invoke the actual callback.
+    void set_expect(uint16_t expect)
+    {
+        unique_lock<spinlock> hold(lock);
+        expect_count = expect;
+
+        if (done_count == expect)
+            invoke_once();
+    }
+
+    void set_result(errno_t err_code)
+    {
+        err = err_code;
+    }
+
+    void invoke()
+    {
+        unique_lock<spinlock> hold(lock);
+        if (++done_count >= expect_count)
+            invoke_once();
+    }
+
+    void operator()()
+    {
+        invoke();
+    }
+
+    errno_t get_error() const
+    {
+        return err;
+    }
+
+private:
+    void invoke_once()
+    {
+        if (callback != nullptr) {
+            callback(err, arg);
+            callback = nullptr;
+        }
+    }
+
+    uint16_t volatile done_count;
+    uint16_t expect_count;
+    spinlock lock;
+    callback_t callback;
+    uintptr_t arg;
+    errno_t err;
+};
+
+class blocking_iocp_t {
+public:
+    blocking_iocp_t()
+        : iocp(&blocking_iocp_t::handler, uintptr_t(this))
+        , done(false)
+    {
+    }
+
+    static void handler(errno_t err, uintptr_t arg)
+    {
+        return ((blocking_iocp_t*)arg)->handler(err);
+    }
+
+    void handler(errno_t err)
+    {
+        unique_lock<spinlock> hold(lock);
+        assert(!done);
+        done = true;
+        hold.unlock();
+        done_cond.notify_all();
+    }
+
+    operator iocp_t*()
+    {
+        return &iocp;
+    }
+
+    errno_t wait()
+    {
+        unique_lock<spinlock> hold(lock);
+        while (!done)
+            done_cond.wait(hold);
+        return iocp.get_error();
+    }
+
+private:
+    iocp_t iocp;
+    spinlock lock;
+    condition_variable done_cond;
+    bool done;
+};
+
 struct storage_dev_base_t {
     // Startup/shutdown
     virtual void cleanup() = 0;
 
+    //
+    // Asynchronous I/O
+
+    typedef void (*completion_callback_t)(errno_t err, uintptr_t arg);
+
+    virtual errno_t read_async(
+            void *data, int64_t count, uint64_t lba,
+            iocp_t *iocp) = 0;
+
+    virtual errno_t write_async(
+            void const *data, int64_t count, uint64_t lba, bool fua,
+            iocp_t *iocp) = 0;
+
+    virtual errno_t trim_async(
+            int64_t count, uint64_t lba,
+            iocp_t *iocp) = 0;
+
+    virtual errno_t flush_async(
+            iocp_t *iocp) = 0;
+
+    // Synchronous wrappers
+
     virtual int64_t read_blocks(
-            void *data, int64_t count, uint64_t lba) = 0;
+            void *data, int64_t count, uint64_t lba);
 
     virtual int64_t write_blocks(
-            void const *data, int64_t count, uint64_t lba, bool fua) = 0;
+            void const *data, int64_t count, uint64_t lba, bool fua);
 
-    virtual int64_t trim_blocks(int64_t count, uint64_t lba) = 0;
+    virtual int64_t trim_blocks(int64_t count, uint64_t lba);
 
-    virtual int flush() = 0;
+    virtual int flush();
 
     virtual long info(storage_dev_info_t key) = 0;
 };
 
 #define STORAGE_DEV_IMPL                        \
     void cleanup() final;                       \
-    int64_t read_blocks(                        \
+                                                \
+    errno_t read_async(                         \
             void *data, int64_t count,          \
-            uint64_t lba) final;                \
-    int64_t write_blocks(                       \
+            uint64_t lba,                       \
+            iocp_t *iocp) final;                \
+                                                \
+    errno_t write_async(                        \
             void const *data, int64_t count,    \
-            uint64_t lba, bool fua) final;      \
-    int flush() final;                          \
-    int64_t trim_blocks(int64_t count,          \
-            uint64_t lba) final;                \
+            uint64_t lba, bool fua,             \
+            iocp_t *iocp) final;                \
+                                                \
+    errno_t flush_async(                        \
+            iocp_t *iocp) final;                \
+                                                \
+    errno_t trim_async(                         \
+            int64_t count,                      \
+            uint64_t lba,                       \
+            iocp_t *iocp) final;                \
+                                                \
     long info(storage_dev_info_t key) final;
 
 //
