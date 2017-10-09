@@ -76,6 +76,7 @@ mbr_elf_CXXFLAGS = \
 
 mbr_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_elf_LDADD = \
@@ -88,11 +89,13 @@ mbr_bin_SOURCES = \
 
 mbr_bin_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_bin_CFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_bin_LDFLAGS = \
@@ -174,6 +177,7 @@ libbootsect_a_CXXFLAGS = \
 	-fno-common \
 	-mrtd -mregparm=3 \
 	-std=c++14 $(NO_PIC_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CFLAGS = \
@@ -188,6 +192,7 @@ libbootsect_a_CFLAGS = \
 	-fno-asynchronous-unwind-tables \
 	-fno-common \
 	-std=c++14 \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CCASFLAGS = \
@@ -199,6 +204,7 @@ libbootsect_a_CCASFLAGS = \
 	-ffreestanding \
 	-fno-asynchronous-unwind-tables \
 	-std=c++14 \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 # bootfat-elf
@@ -212,6 +218,7 @@ bootfat_elf_CXXFLAGS = \
 bootfat_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 bootfat_elf_LDFLAGS = \
@@ -223,6 +230,7 @@ bootfat_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 EXTRA_bootfat_elf_DEPENCENCIES = \
@@ -251,6 +259,7 @@ bootfat_bin_LDFLAGS = \
 	-fuse-ld=bfd \
 	-Wl,-nostdlib \
 	-nostartfiles -nodefaultlibs -nostdlib \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 EXTRA_bootfat_bin_DEPENDENCIES = \
@@ -270,6 +279,7 @@ bootiso_elf_CXXFLAGS = \
 bootiso_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 bootiso_elf_LDFLAGS = \
@@ -280,6 +290,7 @@ bootiso_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -fuse-ld=gold \
 	-nostartfiles -nodefaultlibs -nostdlib \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 EXTRA_bootiso_elf_DEPENDENCIES = \
@@ -308,6 +319,7 @@ bootiso_bin_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	-fuse-ld=bfd \
 	-nostartfiles -nodefaultlibs -nostdlib \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 EXTRA_bootiso_bin_DEPENDENCIES = \
@@ -547,7 +559,9 @@ kernel_elf_CXXFLAGS = \
 	-fno-asynchronous-unwind-tables \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
 	-msse -msse2 -fverbose-asm \
-	-rdynamic
+	-rdynamic \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
 
 libkernel_sse41_a_SOURCES = \
 	kernel/arch/x86_64/cpu/nontemporal_sse4_1.cc

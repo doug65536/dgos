@@ -4,13 +4,12 @@ AM_AR=gcc-ar
 AM_RANLIB=gcc-ranlib
 AC_SUBST([AM_RANLIB])
 
-
 AC_INIT([dgos], [0.8])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_FILES([Makefile])
-: ${CFLAGS="-g -O0"}
-: ${CXXFLAGS="-g -O0"}
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
 AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall])
 AC_PROG_CXX
 AM_PROG_AS
@@ -117,5 +116,25 @@ AX_CHECK_COMPILE_FLAG([-fno-pic],
 			  [NO_PIC_FLAGS+=" -fno-pic"])
 
 AC_SUBST([NO_PIC_FLAGS])
+
+AC_ARG_ENABLE([optimize],
+	)
+
+AC_ARG_ENABLE(optimize,
+	AS_HELP_STRING([--enable-optimize], [Enable size/speed optimizations]),
+	[
+		echo Enabling optimizations
+		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS -g"
+		OPTIMIZE_SPEED_FLAGS="-O2 -g"
+	],[
+		echo Disabling optimizations
+		OPTIMIZE_SIZE_FLAGS="-O0 -g"
+		OPTIMIZE_SPEED_FLAGS="-O0 -g"
+	])
+
+AC_SUBST([DISABLE_OPTIMIZATION_FLAGS], [-O0 -g])
+
+AC_SUBST([OPTIMIZE_SIZE_FLAGS])
+AC_SUBST([OPTIMIZE_SPEED_FLAGS])
 
 AC_OUTPUT
