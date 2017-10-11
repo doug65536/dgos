@@ -423,6 +423,7 @@ kernel_elf_SOURCES = \
 	kernel/lib/unique_ptr.cc \
 	kernel/lib/unique_ptr.h \
 	kernel/lib/unistd.h \
+	kernel/lib/work_queue.cc \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/zlib_helper.h \
 	kernel/fs/ext4.cc \
