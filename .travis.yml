@@ -3,15 +3,22 @@ language: c++
 sudo: false
 
 script:
-  - "autoreconf -f && mkdir -p build-$CXX && cd build-$CXX && ../configure --enable-optimize && make"
+  - export CXX=$USE_CXX
+  - export CC=$USE_CC
+  - autoreconf -f
+  - mkdir -p build-$CXX
+  - cd build-$CXX
+  - ../configure --enable-optimize
+  - make
 
 branches:
   only:
     - master
 
-compiler:
-  - clang
-  - gcc-5
+env:
+  matrix:
+    - USE_CC=gcc-5 USE_CXX=g++-5
+    - USE_CC=clang USE_CXX=clang++
 
 addons:
   apt:
