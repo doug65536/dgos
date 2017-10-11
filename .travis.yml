@@ -18,7 +18,7 @@ addons:
   apt:
     sources:
         - ubuntu-toolchain-r-test
-	packages:
+    packages:
         - gcc-5
         - g++-5
         - gcc-5-multilib
