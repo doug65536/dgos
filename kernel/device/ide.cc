@@ -1261,7 +1261,7 @@ errno_t ide_dev_t::write_async(
 }
 
 errno_t ide_dev_t::trim_async(int64_t count, uint64_t lba,
-                              iocp_t *iocp)
+                              iocp_t *)
 {
     (void)count;
     (void)lba;
