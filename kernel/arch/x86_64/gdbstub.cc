@@ -965,7 +965,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
     uintptr_t memop_addr;
     uint64_t saved_cr3;
     size_t memop_size;
-    size_t memop_index;
+    size_t volatile memop_index = 0;
     uint8_t const *memop_ptr;
     isr_context_t const *ctx;
 
@@ -982,7 +982,9 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
         cpu_flush_tlb();
         __try {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
-                uint8_t const& mem_value = memop_ptr[memop_index];
+                size_t index = memop_index;
+
+                uint8_t const& mem_value = memop_ptr[index];
 
                 // Read the old byte if a software breakpoint is placed there
                 int bp_byte = gdb_cpu_ctrl_t::breakpoint_get_byte(
@@ -990,9 +992,9 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
 
                 // Read memory or use saved value from software breakpoint
                 if (bp_byte < 0)
-                    to_hex_bytes(tx_buf + memop_index*2, mem_value);
+                    to_hex_bytes(tx_buf + index*2, mem_value);
                 else
-                    to_hex_bytes(tx_buf + memop_index*2, uint8_t(bp_byte));
+                    to_hex_bytes(tx_buf + index*2, uint8_t(bp_byte));
             }
         }
         __catch {
@@ -2139,7 +2141,7 @@ void gdb_cpu_ctrl_t::sync_hw_bp()
                 rw = 0;
             }
 
-            cpu_set_debug_breakpoint_indirect(bp.addr, rw, len, enable, i);
+            cpu_set_debug_breakpoint_indirect(addr, rw, len, enable, i);
         }
     };
 
