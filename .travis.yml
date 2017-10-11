@@ -24,6 +24,8 @@ addons:
         - gcc-5-multilib
         - g++-5-multilib
         - clang
+        - automake
+        - autoconf
 
 notifications:
     email:
