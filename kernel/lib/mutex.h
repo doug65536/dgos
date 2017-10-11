@@ -89,8 +89,8 @@ template<typename T>
 class unique_lock
 {
 public:
-	unique_lock(T& m)
-		: m(m)
+    unique_lock(T& m)
+        : m(m)
         , locked(false)
 	{
 		lock();
