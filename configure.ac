@@ -61,8 +61,8 @@ AX_CHECK_COMPILE_FLAG([-Wwrite-strings],
 			  [COMPILER_FLAGS+=" -Wwrite-strings"], [])
 AX_CHECK_COMPILE_FLAG([-Wredundant-decls],
 			  [COMPILER_FLAGS+=" -Wredundant-decls"], [])
-AX_CHECK_COMPILE_FLAG([-Wshadow],
-			  [COMPILER_FLAGS+=" -Wshadow"], [])
+AX_CHECK_COMPILE_FLAG([-Wno-shadow],
+			  [COMPILER_FLAGS+=" -Wno-shadow"], [])
 AX_CHECK_COMPILE_FLAG([-Wno-strict-overflow],
 			  [COMPILER_FLAGS+=" -Wno-strict-overflow"], [])
 AX_CHECK_COMPILE_FLAG([-Wno-overlength-strings],
