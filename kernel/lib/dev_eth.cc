@@ -38,7 +38,8 @@ static void invoke_eth_dev_factories(void*)
     }
 }
 
-REGISTER_CALLOUT(invoke_eth_dev_factories, nullptr, 'N', "000");
+REGISTER_CALLOUT(invoke_eth_dev_factories, nullptr,
+                 callout_type_t::nic, "000");
 
 eth_dev_factory_t::eth_dev_factory_t(char const *name)
 {

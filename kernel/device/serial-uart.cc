@@ -686,7 +686,8 @@ void uart_t::detect(void *)
         uarts.push_back(new uart_t(0x3F8, 4, 115200));
 }
 
-REGISTER_CALLOUT(&uart_t::detect, nullptr, 'E', "000");
+REGISTER_CALLOUT(&uart_t::detect, nullptr,
+                 callout_type_t::early_dev, "000");
 
 }
 

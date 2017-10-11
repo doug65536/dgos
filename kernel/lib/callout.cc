@@ -3,7 +3,7 @@
 extern callout_t ___callout_array_st[];
 extern callout_t ___callout_array_en[];
 
-size_t callout_call(int32_t type)
+size_t callout_call(callout_type_t type)
 {
     for (callout_t *callout = ___callout_array_st;
          callout < ___callout_array_en; ++callout) {

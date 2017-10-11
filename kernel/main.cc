@@ -44,7 +44,7 @@ static void smp_main(void *arg)
     cpu_init_stage2(1);
 }
 
-REGISTER_CALLOUT(smp_main, 0, 'S', "100");
+REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 
 // Pull in the device constructors
 // to cause them to be initialized
@@ -739,23 +739,26 @@ static int init_thread(void *p)
     keybd_init();
     keyb8042_init();
 
+    // Facilities needed by drivers
+    callout_call(callout_type_t::driver_base);
+
     // Run late initializations
-    callout_call('L');
+    callout_call(callout_type_t::late_dev);
 
     // Register filesystems
-    callout_call('F');
+    callout_call(callout_type_t::reg_filesys);
 
     // Storage interfaces
-    callout_call('H');
+    callout_call(callout_type_t::storage_dev);
 
     // Register partition schemes
-    callout_call('P');
+    callout_call(callout_type_t::partition_probe);
 
     // Register network interfaces
-    callout_call('N');
+    callout_call(callout_type_t::nic);
 
     // Register USB interfaces
-    callout_call('U');
+    callout_call(callout_type_t::usb);
 
     //bootdev_info(0, 0, 0);
 

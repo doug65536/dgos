@@ -388,7 +388,8 @@ static void vga_remap_callback(void *arg)
     (void)arg;
 }
 
-REGISTER_CALLOUT(vga_remap_callback, 0, 'M', "000");
+REGISTER_CALLOUT(vga_remap_callback, 0,
+                 callout_type_t::vmm_ready, "000");
 
 // Set/get dimensions
 

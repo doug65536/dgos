@@ -40,7 +40,7 @@ static file_handle_t *file_new_fd(void)
     return 0;
 }
 
-REGISTER_CALLOUT(file_init, 0, 'P', "999");
+REGISTER_CALLOUT(file_init, 0, callout_type_t::partition_probe, "999");
 
 static file_handle_t *file_fh_from_fd(int fd)
 {

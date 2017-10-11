@@ -89,7 +89,8 @@ void invoke_storage_factories(void *)
     }
 }
 
-REGISTER_CALLOUT(invoke_storage_factories, 0, 'H', "000");
+REGISTER_CALLOUT(invoke_storage_factories, 0,
+                 callout_type_t::storage_dev, "000");
 
 void fs_register_factory(char const *name, fs_factory_t *fs)
 {
@@ -171,7 +172,8 @@ static void invoke_part_factories(void *arg)
     }
 }
 
-REGISTER_CALLOUT(invoke_part_factories, nullptr, 'P', "000");
+REGISTER_CALLOUT(invoke_part_factories, nullptr,
+                 callout_type_t::partition_probe, "000");
 
 fs_factory_t::fs_factory_t(char const *factory_name)
     : name(factory_name)

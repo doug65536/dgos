@@ -2232,4 +2232,4 @@ void usbxhci_detect(void *arg)
     } while (pci_enumerate_next(&pci_iter));
 }
 
-REGISTER_CALLOUT(usbxhci_detect, 0, 'U', "000");
+REGISTER_CALLOUT(usbxhci_detect, 0, callout_type_t::usb, "000");

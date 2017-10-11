@@ -1350,7 +1350,7 @@ void mmu_init(int ap)
 
     intr_hook(INTR_EX_PAGE, mmu_page_fault_handler);
 
-    callout_call('M');
+    callout_call(callout_type_t::vmm_ready);
 
     // Prepare 4MB contiguous physical memory
     // allocator with a capacity of 128

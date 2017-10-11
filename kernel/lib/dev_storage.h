@@ -34,9 +34,9 @@ struct iocp_t {
     iocp_t(callback_t callback, uintptr_t arg)
         : done_count(0)
         , expect_count(0)
-        , err(errno_t::OK)
         , callback(callback)
         , arg(arg)
+        , err(errno_t::OK)
     {
     }
 
@@ -107,7 +107,7 @@ public:
         return ((blocking_iocp_t*)arg)->handler(err);
     }
 
-    void handler(errno_t err)
+    void handler(errno_t)
     {
         unique_lock<spinlock> hold(lock);
         assert(!done);
@@ -219,7 +219,7 @@ struct storage_if_base_t {
 
 #define STORAGE_REGISTER_FACTORY(name) \
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
-        & name##_factory, 'L', "000")
+        & name##_factory, callout_type_t::late_dev, "000")
 
 void storage_if_register_factory(char const *name,
                                 storage_if_factory_t *factory);
