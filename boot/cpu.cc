@@ -176,9 +176,6 @@ static uint16_t check_a20()
     return enabled;
 }
 
-// Returns BIOS error code, or zero on success
-//  01h keyboard controller is in secure mode
-//  86h function not supported
 static uint16_t toggle_a20(uint8_t enable)
 {
     uint8_t value;
