@@ -19,7 +19,7 @@ AC_PROG_RANLIB
 AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
 if test x"$MKISOFS" == x"NOT_FOUND"
 then
-	AC_MSG_ERROR([Please install mkisofs (or genisoimage)])
+	AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])
 fi
 
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
