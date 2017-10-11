@@ -58,8 +58,8 @@ static void enter_kernel_initial(uint64_t entry_point)
     paging_map_range(0xFFFFFFFF80000000ULL - PAGE_SIZE, PAGE_SIZE, 0,
                      PTE_PRESENT | PTE_WRITABLE, 0);
 
-    // Map first 640KB
-    paging_map_range(0, 0xA0000, 0,
+    // Map first 768KB (0x0000-0xBFFF)
+    paging_map_range(0, 0xC0000, 0,
                      PTE_PRESENT | PTE_WRITABLE |
                      (-cpu_has_global_pages() & PTE_GLOBAL), 2);
 
