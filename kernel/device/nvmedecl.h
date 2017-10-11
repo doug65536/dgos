@@ -154,8 +154,7 @@ struct nvme_cmd_t {
 	static nvme_cmd_t create_write(
 			uint64_t lba, uint32_t count, uint8_t ns, bool fua);
 
-	static nvme_cmd_t create_trim(
-			uint64_t lba, uint32_t count, uint8_t ns, bool fua);
+	static nvme_cmd_t create_trim(uint64_t lba, uint32_t count, uint8_t ns);
 
 	static nvme_cmd_t create_flush(uint8_t ns);
 

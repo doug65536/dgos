@@ -93,16 +93,17 @@ nvme_cmd_t nvme_cmd_t::create_write(uint64_t lba, uint32_t count,
 				uint8_t(nvme_cmd_opcode_t::read));
 	cmd.hdr.nsid = ns;
 	cmd.cmd_dword_10[0] =
-			NVME_CMD_READ_CDW10_SLBA_n(uint32_t(lba & 0xFFFFFFFF));
+            NVME_CMD_WRITE_CDW10_SLBA_n(uint32_t(lba & 0xFFFFFFFF));
 	cmd.cmd_dword_10[1] =
-			NVME_CMD_READ_CDW11_SLBA_n(uint32_t(lba >> 32));
+            NVME_CMD_WRITE_CDW11_SLBA_n(uint32_t(lba >> 32));
 	cmd.cmd_dword_10[2] =
-			NVME_CMD_READ_CDW12_FUA_n((uint8_t)fua);
-	return cmd;
+            NVME_CMD_WRITE_CDW12_FUA_n((uint8_t)fua) |
+            NVME_CMD_WRITE_CDW12_NLB_n(count - 1);
+    return cmd;
 }
 
 nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
-								   uint8_t ns, bool fua)
+                                   uint8_t ns)
 {
 	nvme_cmd_t cmd{};
 	cmd.hdr.cdw0 = NVME_CMD_SDW0_OPC_n(
@@ -127,7 +128,8 @@ nvme_cmd_t nvme_cmd_t::create_flush(uint8_t ns)
 	nvme_cmd_t cmd{};
 	cmd.hdr.cdw0 = NVME_CMD_SDW0_OPC_n(
 				uint8_t(nvme_cmd_opcode_t::flush));
-	return cmd;
+    cmd.hdr.nsid = ns;
+    return cmd;
 }
 
 nvme_cmd_t nvme_cmd_t::create_setfeatures(uint16_t ncqr, uint16_t nsqr)
@@ -135,7 +137,7 @@ nvme_cmd_t nvme_cmd_t::create_setfeatures(uint16_t ncqr, uint16_t nsqr)
 	nvme_cmd_t cmd{};
 	cmd.hdr.cdw0 = NVME_CMD_SDW0_OPC_n(
 				uint8_t(nvme_admin_cmd_opcode_t::set_features));
-	cmd.cmd_dword_10[0] =
+    cmd.cmd_dword_10[0] =
 			NVME_CMD_SETFEAT_CDW10_FID_n(
 				uint8_t(nvme_feat_id_t::num_queues));
 	cmd.cmd_dword_10[1] =
@@ -157,9 +159,9 @@ class nvme_queue_t {
 public:
 	nvme_queue_t()
 		: entries(nullptr)
+        , mask(0)
 		, head(0)
 		, tail(0)
-		, mask(0)
 		, phase(1)
 	{
 	}
@@ -213,7 +215,7 @@ public:
 	uint32_t enqueue(Args&& ...args)
 	{
 		int index = tail;
-		T* item = new (entries + tail) T(forward<Args>(args)...);
+        new (entries + tail) T(forward<Args>(args)...);
 		phase ^= set_tail(next(tail));
 		return index;
 	}
@@ -296,11 +298,11 @@ private:
 class nvme_detect_dev_ctx_t {
 public:
 	nvme_detect_dev_ctx_t(if_list_t& list)
-		: list(list)
-		, identify_data_physaddr(0)
-		, identify_data(nullptr)
-		, cur_ns(0)
-		, done(false)
+        : identify_data(nullptr)
+        , list(list)
+        , cur_ns(0)
+        , identify_data_physaddr(0)
+        , done(false)
 	{
 		identify_data_physaddr = mm_alloc_contiguous(4096);
 
@@ -541,6 +543,8 @@ private:
 	void io_handler(void *data, nvme_cmp_t &packet,
 					uint16_t cmd_id, int status_type, int status);
 
+    static errno_t status_to_errno(int status_type, int status);
+
 	nvme_mmio_t volatile *mmio_base;
 	pci_config_hdr_t config;
 	pci_irq_range_t irq_range;
@@ -560,6 +564,7 @@ private:
 	vector<uint32_t> namespaces;
 
 	unique_ptr<nvme_queue_state_t[]> queues;
+    bool use_msi;
 };
 
 class nvme_dev_t : public storage_dev_base_t {
@@ -654,7 +659,7 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
 	irq_range.base = pci_iter.config.irq_line;
 	irq_range.count = 1;
 
-	bool use_msi = pci_set_msi_irq(
+    use_msi = pci_set_msi_irq(
 				pci_iter.bus, pci_iter.slot, pci_iter.func,
 				&irq_range, 0, 0, 0, irq_handler);
 
@@ -802,22 +807,21 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
 	for (size_t i = 1; i < queue_count; ++i) {
 		queues[0].submit_cmd(nvme_cmd_t::create_cmp_queue(
 								 queues[i].cmp_queue.data(),
-								 queue_slots, i, i));
+                                 queue_slots, i, i % irq_range.count));
 	}
 
 	// Create submission queues
 	for (size_t i = 1; i < queue_count; ++i) {
 		queues[0].submit_cmd(nvme_cmd_t::create_sub_queue(
 								 queues[i].sub_queue.data(),
-								 queue_slots, i, i, 2));
+                                 queue_slots, i, i, 2));
 	}
 
 	NVME_TRACE("interface initialization success\n");
 }
 
 void nvme_if_t::identify_ns_id_handler(
-		void *data, nvme_cmp_t& packet,
-		uint16_t cmd_id, int status_type, int status)
+        void *data, nvme_cmp_t&, uint16_t, int, int)
 {
 	NVME_TRACE("enumerating namespaces\n");
 
@@ -846,8 +850,7 @@ void nvme_if_t::identify_ns_id_handler(
 }
 
 void nvme_if_t::identify_ns_handler(
-		void *data, nvme_cmp_t& packet,
-		uint16_t cmd_id, int status_type, int status)
+        void *data, nvme_cmp_t&, uint16_t, int, int)
 {
 	auto ctx = (nvme_detect_dev_ctx_t*)data;
 	auto ns_ident = (nvme_ns_identify_t*)ctx->identify_data;
@@ -875,8 +878,7 @@ void nvme_if_t::identify_ns_handler(
 }
 
 void nvme_if_t::identify_handler(
-		void *data, nvme_cmp_t& packet,
-		uint16_t cmd_id, int status_type, int status)
+        void *data, nvme_cmp_t&, uint16_t, int, int)
 {
 	nvme_identify_t* identify = (nvme_identify_t*)data;
 
@@ -957,11 +959,13 @@ void nvme_if_t::irq_handler(int irq_offset)
 {
 	NVME_TRACE("received IRQ\n");
 
-	for (int i = 0; i < queue_count; ++i)
+    int queue_stride = use_msi ? irq_range.count : 1;
+
+    for (size_t i = irq_offset; i < queue_count; i += queue_stride)
 	{
 		nvme_queue_state_t& queue = queues[i];
 		cmp_queue_t& cmp_queue = queue.cmp_queue;
-		int phase = cmp_queue.get_phase();
+        unsigned phase = cmp_queue.get_phase();
 		for (;;) {
 			nvme_cmp_t packet = cmp_queue.peek();
 
@@ -979,7 +983,7 @@ void nvme_if_t::irq_handler(int irq_offset)
 			size_t sub_queue_head = NVME_CMP_DW2_SQHD_GET(packet.cmp_dword[2]);
 			sub_queue_state.advance_head(sub_queue_head);
 
-			bool dnr = NVME_CMP_DW3_DNR_GET(packet.cmp_dword[3]);
+            //bool dnr = NVME_CMP_DW3_DNR_GET(packet.cmp_dword[3]);
 			int status_type = NVME_CMP_DW3_SCT_GET(packet.cmp_dword[3]);
 			int status = NVME_CMP_DW3_SC_GET(packet.cmp_dword[3]);
 			uint16_t cmd_id = NVME_CMP_DW3_CID_GET(packet.cmp_dword[3]);
@@ -1017,36 +1021,34 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
 		++expect;
 
 		size_t chunk;
-		size_t pages;
 		size_t lba_count;
 		size_t range_count;
 		mmphysrange_t ranges[16];
-		uintptr_t prps[2];
 		nvme_cmd_t cmd;
 
 		switch (request.op) {
 		case nvme_op_t::read:
 		case nvme_op_t::write:
-			chunk = min(bytes, size_t(0x10000));
-
-			pages = (chunk + PAGE_SIZE - 1) >> PAGE_SCALE;
-
-			lba_count = chunk >> log2_sectorsize;
-			request.count -= lba_count;
-
+            chunk = min(bytes, size_t(0x10000));
 			range_count = mphysranges(ranges, countof(ranges),
 											 request.data, chunk,
 											 PAGE_SIZE);
+
+            lba_count = chunk >> log2_sectorsize;
+            request.count -= lba_count;
 			break;
 
 		case nvme_op_t::flush:
+            range_count = 0;
+            request.count = 0;
 			break;
 
 		default:
 			panic("Unhandled operation! op=%d", (int)request.op);
 		}
 
-		switch (request.op) {
+
+        switch (request.op) {
 		case nvme_op_t::read:
 			cmd = nvme_cmd_t::create_read(
 					request.lba, lba_count, ns);
@@ -1059,7 +1061,7 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
 
 		case nvme_op_t::trim:
 			cmd = nvme_cmd_t::create_trim(
-					request.lba, lba_count, ns, request.fua);
+                    request.lba, lba_count, ns);
 			break;
 
 		case nvme_op_t::flush:
@@ -1076,28 +1078,37 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
 	return expect;
 }
 
-void nvme_if_t::io_handler(void *data, nvme_cmp_t& packet,
-						   uint16_t cmd_id, int status_type, int status)
+void nvme_if_t::io_handler(void *data, nvme_cmp_t&,
+                           uint16_t, int status_type, int status)
 {
     iocp_t* iocp = (iocp_t*)data;
 
-    errno_t err = status_type == 0 && status == 0
-            ? errno_t::OK
-            : errno_t::EIO;
+    errno_t err = status_to_errno(status_type, status);
 
     iocp->set_result(err);
     iocp->invoke();
 }
 
+errno_t nvme_if_t::status_to_errno(int status_type, int status)
+{
+    return status_type == 0 && status == 0
+            ? errno_t::OK
+            : errno_t::EIO;
+}
+
 void nvme_if_t::setfeat_queues_handler(
 		void *data, nvme_cmp_t& packet,
-		uint16_t cmd_id, int status_type, int status)
+        uint16_t, int status_type, int status)
 {
-    iocp_t* state = (iocp_t*)data;
+    iocp_t* iocp = (iocp_t*)data;
 	uint16_t max_sq = NVME_CMP_SETFEAT_NQ_DW0_NCQA_GET(packet.cmp_dword[0]);
 	uint16_t max_cq = NVME_CMP_SETFEAT_NQ_DW0_NSQA_GET(packet.cmp_dword[0]);
 	max_queues = min(max_sq, max_cq) + 1;
-    state->invoke();
+
+    errno_t err = status_to_errno(status_type, status);
+
+    iocp->set_result(err);
+    iocp->invoke();
 }
 
 errno_t nvme_dev_t::io(

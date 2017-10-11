@@ -118,6 +118,26 @@
 31:16 ELBATM Expected logical block application tag mask
 15:0 ELBAT Expected logical block application tag
 
+# 6.14 Write command
+
+-- NVME_CMD_WRITE_CDW10
+31:0 SLBA Starting LBA low
+
+-- NVME_CMD_WRITE_CDW11
+31:0 SLBA Starting LBA high
+
+-- NVME_CMD_WRITE_CDW12
+31 LR Limited retry
+30 FUA Force unit access
+29:26 PRINFO Protected information field
+15:0 NLB Number of logical blocks
+
+-- NVME_CMD_WRITE_CDW13
+7 INCOMP Incompressible
+6 SEQ Sequential request
+5:4 LAT Latency
+3:0 AF Access frequency
+
 # 4.6 Completion queue entry
 
 -- NVME_CMP_DW2 Completion queue entry dword 2
