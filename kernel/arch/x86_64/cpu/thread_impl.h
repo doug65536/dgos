@@ -9,7 +9,6 @@ isr_context_t *thread_schedule_if_idle(isr_context_t *ctx);
 void thread_init(int ap);
 uint32_t thread_cpu_count(void);
 uint32_t thread_cpus_started(void);
-int thread_cpu_number(void);
 uint32_t thread_get_cpu_apic_id(int cpu);
 
 size_t thread_cls_alloc(void);
