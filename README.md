@@ -1,3 +1,4 @@
+![](https://api.travis-ci.org/doug65536/dgos.svg?branch=master)
 
 - x86-64 platform
 
