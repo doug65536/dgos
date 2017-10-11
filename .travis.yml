@@ -7,27 +7,27 @@ script:
 
 branches:
   only:
-	- master
+    - master
 
 env:
   matrix:
-	- CC=gcc-5 CXX=g++-5
-	- CC=clang CXX=clang++
+    - CC=gcc-5 CXX=g++-5
+    - CC=clang CXX=clang++
 
 addons:
   apt:
-	sources:
-		- ubuntu-toolchain-r-test
+    sources:
+        - ubuntu-toolchain-r-test
 	packages:
-		- gcc-5
-		- g++-5
-		- gcc-5-multilib
-		- g++-5-multilib
-		- clang-4.0
+        - gcc-5
+        - g++-5
+        - gcc-5-multilib
+        - g++-5-multilib
+        - clang-4.0
 
 notifications:
-	email:
-		- doug16k@gmail.com
+    email:
+        - doug16k@gmail.com
 
 after_success:
-	- cd build-out && ls
+    - cd build-out && ls
