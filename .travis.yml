@@ -23,7 +23,7 @@ addons:
         - g++-5
         - gcc-5-multilib
         - g++-5-multilib
-        - clang-4.0
+        - clang
 
 notifications:
     email:
