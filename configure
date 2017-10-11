@@ -4346,7 +4346,8 @@ test -n "$MKISOFS" || MKISOFS="NOT_FOUND"
 
 if test x"$MKISOFS" == x"NOT_FOUND"
 then
-	as_fn_error $? "Please install mkisofs (or genisoimage)" "$LINENO" 5
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Install mkisofs (or genisoimage) to build CD images" >&5
+$as_echo "$as_me: WARNING: Install mkisofs (or genisoimage) to build CD images" >&2;}
 fi
 
 
@@ -5473,7 +5474,7 @@ else
 fi
 
 
-DISABLE_OPTIMIZATION_FLAGS=-O0 -g
+DISABLE_OPTIMIZATION_FLAGS="-O0 -g"
 
 
 
