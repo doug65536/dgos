@@ -208,12 +208,22 @@ EXPORT void thread_yield(void)
 {
 #if 1
     __asm__ __volatile__ (
+        // Emulate behavior of software interrupt instruction
+        // int is a serializing instruction
         "mfence\n\t"
+
+        // Push ss:rsp
         "movq %%rsp,%%rax\n\t"
         "pushq $0x10\n\t"
         "push %%rax\n\t"
+
+        // Push rflags
         "pushfq\n\t"
+
+        // Disable interrupts
         "cli\n\t"
+
+        // Push cs:rip and jump to isr_entry
         "push $0x8\n\t"
         "call isr_entry_%c[yield]\n\t"
         :
