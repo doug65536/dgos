@@ -9,10 +9,9 @@ branches:
   only:
     - master
 
-env:
-  matrix:
-    - CC=gcc-5 CXX=g++-5
-    - CC=clang CXX=clang++
+compiler:
+  - clang
+  - gcc-5
 
 addons:
   apt:
