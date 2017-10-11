@@ -2233,23 +2233,6 @@ struct ahci_blocking_io_t {
     int err;
 };
 
-static void ahci_async_complete(int error, uintptr_t arg)
-{
-    ahci_blocking_io_t *state = (ahci_blocking_io_t*)arg;
-
-    mutex_lock_noyield(&state->lock);
-    if (error)
-        state->err = error;
-
-    ++state->done_count;
-    bool done = (state->done_count == state->expect_count);
-
-    mutex_unlock(&state->lock);
-
-    if (done)
-        condvar_wake_one(&state->done_cond);
-}
-
 errno_t ahci_dev_t::io(
         void *data, int64_t count,
         uint64_t lba, bool fua, slot_op_t op,
@@ -2291,7 +2274,7 @@ errno_t ahci_dev_t::write_async(
 
 errno_t ahci_dev_t::trim_async(
         int64_t count, uint64_t lba,
-        iocp_t *iocp)
+        iocp_t *)
 {
     (void)count;
     (void)lba;
