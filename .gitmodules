@@ -1,3 +1,0 @@
-[submodule "musl"]
-	path = musl
-	url = https://github.com/doug65536/dgos-musl.git
