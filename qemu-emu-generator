@@ -23,21 +23,23 @@ do
 						$IMG \
 						' dump/qemu-debug-out' \
 						$'\n' $'\t' \
+						'echo -e -n ' $'\'' '\ec' $'\'' ' >> dump/qemu-debug-out' \
+						$'\n' $'\t' \
 						'$(QEMU) $(QEMU_COMMON)' \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						$QUP \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						$CTL \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						$QEM \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						'-drive' \
 						" file=$IMG$DIF,format=raw,media=$QM" \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						$QRT \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						"\$(QEMU_BIOS)" \
-						' \' $'\n' $'\t' \
+						' \' $'\n' $'\t\t' \
 						"\$(QEMU_EXTRA)" \
 						$'\n' $'\n' \
 						>> qemu-emu.mk
