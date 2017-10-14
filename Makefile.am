@@ -38,6 +38,8 @@ bin_PROGRAMS = \
 	bootiso-elf \
 	bootiso-bin \
 	kernel-elf
+	
+#user-hello
 
 # libmbr.a
 
@@ -602,6 +604,11 @@ kernel_elf_LDADD = \
 	$(ZLIBSTATICLIB)
 
 # ----------------------------------------------------------------------------
+# User programs
+
+#user_hello_SOURCES = 
+
+# ----------------------------------------------------------------------------
 # Misc make rules
 
 $(abs_top_builddir)/dump:
@@ -629,6 +636,8 @@ distclean-local:
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/qemu-emu.mk
 	rm -rf $(top_builddir)/dump
+	rm -rf $(MUSL_BUILDDIR)
+	rm -rf $(MUSL_INSTDIR)
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -652,6 +661,62 @@ $(top_srcdir)/kernel/device/pcibits.h: \
 	mkdir -p "$(@D)"
 	rm -f "$@"
 	$(top_srcdir)/genregs.py "$<" > "$@"
+
+# ----------------------------------------------------------------------------
+# Build musl
+
+MUSL_BUILDDIR = $(top_builddir)/musl-build
+MUSL_INSTDIR = $(top_builddir)/musl-install
+MUSL_CFLAGS = -mno-red-zone -fno-asynchronous-unwind-tables -mtune=znver1
+MUSL_ARCH = x86_64
+
+MUSL_SRCDIR = $(top_srcdir)/musl
+
+MUSL_BUILDOUT = \
+	$(MUSL_BUILDDIR)/lib/libxnet.a \
+	$(MUSL_BUILDDIR)/lib/libutil.a \
+	$(MUSL_BUILDDIR)/lib/libc.a \
+	$(MUSL_BUILDDIR)/lib/libm.a \
+	$(MUSL_BUILDDIR)/lib/librt.a \
+	$(MUSL_BUILDDIR)/lib/libdl.a \
+	$(MUSL_BUILDDIR)/lib/libresolv.a \
+	$(MUSL_BUILDDIR)/lib/libpthread.a \
+	$(MUSL_BUILDDIR)/lib/libcrypt.a
+
+MUSL_INSTOUT = \
+	$(MUSL_INSTDIR)/lib/libxnet.a \
+	$(MUSL_INSTDIR)/lib/libutil.a \
+	$(MUSL_INSTDIR)/lib/libc.a \
+	$(MUSL_INSTDIR)/lib/libm.a \
+	$(MUSL_INSTDIR)/lib/librt.a \
+	$(MUSL_INSTDIR)/lib/libdl.a \
+	$(MUSL_INSTDIR)/lib/libresolv.a \
+	$(MUSL_INSTDIR)/lib/libpthread.a \
+	$(MUSL_INSTDIR)/lib/libcrypt.a
+
+$(MUSL_BUILDDIR)/Makefile: $(MUSL_SRCDIR)/configure
+	( \
+		mkdir -p $(MUSL_BUILDDIR) && \
+		cd $(MUSL_BUILDDIR) && \
+		CFLAGS="$(MUSL_CFLAGS)" ../$(top_srcdir)/musl/configure \
+				--prefix=$(MUSL_INSTDIR) \
+	)
+
+$(MUSL_BUILDOUT): $(MUSL_BUILDDIR)/Makefile
+	( \
+		cd $(MUSL_BUILDDIR) && \
+			make ARCH=$(MUSL_ARCH) \
+	)
+
+$(MUSL_INSTOUT): $(MUSL_BUILDOUT)
+	( \
+		cd $(MUSL_BUILDDIR) && \
+			make install \
+	)
+
+musl: $(MUSL_INSTOUT)
+
+.PHONY: musl
 
 # ----------------------------------------------------------------------------
 # QEMU launcher
