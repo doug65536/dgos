@@ -10,6 +10,13 @@
 #include "assert.h"
 #include "unique_ptr.h"
 
+#define ELF64_DEBUG     1
+#if ELF64_DEBUG
+#define ELF64_TRACE(...) printdbg(__VA_ARGS__)
+#else
+#define ELF64_TRACE(...) ((void)0)
+#endif
+
 extern Elf64_Sym const ___dynsym_st[];
 extern Elf64_Sym const ___dynsym_en[];
 extern char const ___dynstr_st[];
@@ -77,8 +84,9 @@ static Elf64_Sym const *modload_lookup_in_module(
 
 module_entry_fn_t modload_load(char const *path)
 {
-    autoclose int fd = file_open("hello.km", O_RDONLY);
-    if (fd < 0) {
+    file_t fd = file_open("hello.km", O_RDONLY);
+    
+    if (!fd.is_open()) {
         printdbg("Failed to open module \"%s\"\n", path);
         return 0;
     }
