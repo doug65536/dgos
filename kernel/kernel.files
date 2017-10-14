@@ -257,3 +257,10 @@ lib/mutex.cc
 lib/work_queue.cc
 lib/work_queue.h
 ../.travis.yml
+../diskfat.mk
+../diskiso.mk
+../symbols.mk
+../zlib.mk
+../mkposixdirs.sh
+../populate_fat.sh
+../populate_iso.sh
