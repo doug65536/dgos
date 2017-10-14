@@ -32,6 +32,58 @@ int file_rmdir(char const *path);
 int file_rename(char const *old_path, char const *new_path);
 int file_unlink(char const *path);
 
-void file_autoclose(int *fd);
-
-#define autoclose __attribute__((cleanup(file_autoclose)))
+class file_t {
+public:
+    file_t()
+        : fd(-1)
+    {
+    }
+    
+    file_t(int fd)
+        : fd(fd)
+    {
+    }
+    
+    ~file_t()
+    {
+        if (fd >= 0)
+            file_close(fd);
+    }
+    
+    int release()
+    {
+        int result = fd;
+        fd = -1;
+        return result;
+    }
+    
+    int close()
+    {
+        if (fd >= 0) {
+            int result = file_close(fd);
+            fd = -1;
+            return result;
+        }
+        return 0;
+    }
+    
+    file_t& operator=(int fd)
+    {
+        close();
+        this->fd = fd;
+        return *this;
+    }
+    
+    operator int() const
+    {
+        return fd;
+    }
+    
+    bool is_open() const
+    {
+        return fd >= 0;
+    }
+    
+private:
+    int fd;
+};

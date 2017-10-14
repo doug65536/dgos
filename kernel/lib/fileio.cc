@@ -323,11 +323,3 @@ int file_unlink(char const *path)
 
     return fs->unlink(path);
 }
-
-void file_autoclose(int *fd)
-{
-    if (*fd > 0) {
-        file_close(*fd);
-        *fd = 0;
-    }
-}
