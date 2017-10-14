@@ -122,7 +122,7 @@ entry:
 	call cpu_hw_init
 
 	# Initialize GDB stub
-	#call gdb_init
+	call gdb_init
 
 	# Initialize early-initialized devices
 	mov $'E',%edi
