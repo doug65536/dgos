@@ -29,8 +29,22 @@ bool cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx);
 bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
 bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
 
-#define CPUID_INFO_FEATURES     1
+#define CPUID_HIGHESTFUNC       0x0
+#define CPUID_INFO_FEATURES     0x1
+#define CPUID_CACHE_TLB         0x2
+#define CPUID_SERIALNUM         0x3
+#define CPUID_TOPOLOGY1         0x4
+#define CPUID_TOPOLOGY2         0xB
 #define CPUID_INFO_XSAVE        0xD
+#define CPUID_EXTHIGHESTFUNC    0x80000000
+#define CPUID_EXTINFO_FEATURES  0x80000001
+#define CPUID_BRANDSTR1         0x80000002
+#define CPUID_BRANDSTR2         0x80000003
+#define CPUID_BRANDSTR3         0x80000004
+#define CPUID_L1TLBIDENT        0x80000005
+#define CPUID_EXTL2CACHE        0x80000006
+#define CPUID_APM               0x80000007
+#define CPUID_ADDRSIZES         0x80000008
 
 struct cpuid_cache_t {
     bool has_nx      :1;
