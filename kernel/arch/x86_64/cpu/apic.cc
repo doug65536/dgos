@@ -1815,11 +1815,16 @@ int apic_init(int ap)
     return 1;
 }
 
-static void apic_detect_topology(void)
+static void apic_detect_topology_amd(void)
+{
+    
+}
+
+static void apic_detect_topology_intel(void)
 {
     cpuid_t info;
 
-    if (!cpuid(&info, 4, 0)) {
+    if (!cpuid(&info, CPUID_TOPOLOGY1, 0)) {
         // Enable full CPUID
         uint64_t misc_enables = msr_get(MSR_IA32_MISC_ENABLES);
         if (misc_enables & (1L<<22)) {
@@ -1834,7 +1839,7 @@ static void apic_detect_topology(void)
     topo_thread_count = 1;
     topo_core_count = 1;
 
-    if (cpuid(&info, 1, 0)) {
+    if (cpuid(&info, CPUID_INFO_FEATURES, 0)) {
         if ((info.edx >> 28) & 1) {
             // CPU supports hyperthreading
 
@@ -1844,7 +1849,7 @@ static void apic_detect_topology(void)
                  ++topo_thread_bits;
         }
 
-        if (cpuid(&info, 4, 0)) {
+        if (cpuid(&info, CPUID_TOPOLOGY1, 0)) {
             topo_core_count = ((info.eax >> 26) & 0x3F) + 1;
             while ((1U << topo_core_bits) < topo_core_count)
                  ++topo_core_bits;
@@ -1860,6 +1865,11 @@ static void apic_detect_topology(void)
 
     topo_cpu_count = apic_id_count *
             topo_core_count * topo_thread_count;
+}
+
+static void apic_detect_topology(void)
+{
+    
 }
 
 void apic_start_smp(void)
@@ -2190,7 +2200,7 @@ static void apic_calibrate()
 
         apic_timer_freq = ccr_freq;
 
-        // Round CPU frequency to nearest multiple of 33MHz
+        // Round CPU frequency to nearest multiple of 16MHz
         cpu_freq += 8333333;
         cpu_freq -= cpu_freq % 16666666;
 
