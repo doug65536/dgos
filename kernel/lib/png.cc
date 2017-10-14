@@ -256,8 +256,9 @@ png_image_t *png_load(char const *path)
     uint8_t * const decomp_buf = buf + (PNG_BUFSIZE >> 1);
 
     // Open PNG file
-    autoclose int fd = file_open(path, O_RDONLY);
-    if (fd < 0)
+    file_t fd = file_open(path, O_RDONLY);
+
+    if (!fd.is_open())
         return 0;
 
     z_stream inf;
