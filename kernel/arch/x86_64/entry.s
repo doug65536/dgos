@@ -9,10 +9,11 @@ entry:
 	mov %ecx,%r15d
 	xor %ebp,%ebp
 
-	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions CR4_OSXMMEX)
+	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions (CR4_OSXMMEX)
+	# and RDFSBASE/RDGSBASE/WRFSBASE/WRGSBASE (CR4_FSGSBASE_BIT)
 	# This must be done before jumping into C code
 	mov %cr4,%rax
-	or $0x600,%rax
+	or $0x10600,%rax
 	mov %rax,%cr4
 
 	# See if this is the bootstrap processor
@@ -122,7 +123,7 @@ entry:
 	call cpu_hw_init
 
 	# Initialize GDB stub
-	call gdb_init
+	#call gdb_init
 
 	# Initialize early-initialized devices
 	mov $'E',%edi
