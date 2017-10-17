@@ -198,11 +198,7 @@ isr_common:
 	// C code requires that the direction flag is clear
 	cld
 
-	// Save FSBASE MSR
-	mov $0xC0000100,%ecx
-	rdmsr
-	shl $32,%rdx
-	or %rdx,%rax
+    rdfsbase %rax
 	push_cfi %rax
 
 	// Push CR3
@@ -323,10 +319,7 @@ isr_common:
 
 	// Restore FSBASE
 	pop_cfi %rax
-	mov %rax,%rdx
-	shr $32,%rdx
-	mov $0xC0000100,%ecx
-	wrmsr
+    wrfsbase %rax
 
 	pop_cfi %rdi
 	pop_cfi %rsi
