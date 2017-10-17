@@ -2,6 +2,7 @@
 #include "malloc.h"
 #include "farptr.h"
 #include "screen.h"
+#include "bioscall.h"
 
 static uint16_t get_ram_region(physmem_range_t *range,
                                uint32_t *continuation_ptr)
@@ -12,20 +13,21 @@ static uint16_t get_ram_region(physmem_range_t *range,
     // EBX = continuation value or 00000000h to start at beginning of map
     // ECX = size of buffer for result, in bytes (should be >= 20 bytes)
     // ES:DI -> buffer for result (see #00581)
-    uint32_t eax = 0x0000E820;
-    __asm__ __volatile__ (
-        "movl $1,20(%%di)\n\t"
-        "int $0x15\n\t"
-        "setnc %%al\n"
-        "movsbl %%al,%[eax]\n\t"
-        : [continuation] "+b" (*continuation_ptr)
-        , [eax] "+a" (eax)
-        : "d" (0x534D4150)
-        , "c" (sizeof(physmem_range_t))
-        , "D" ((uint16_t)(uint32_t)range)
-        : "memory"
-    );
-    return (uint16_t)eax;
+    
+    range->valid = 1;
+    
+    bios_regs_t regs;
+    regs.eax = 0xE820;
+    regs.edx = 0x534D4150;
+    regs.ebx = *continuation_ptr;
+    regs.ecx = sizeof(physmem_range_t);
+    regs.edi = (uint32_t)range;
+    
+    bioscall(&regs, 0x15);
+    
+    *continuation_ptr = regs.ebx;
+    
+    return !regs.ah_if_carry();
 }
 
 uint16_t get_ram_regions(uint32_t *ret_size)

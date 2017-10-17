@@ -2,6 +2,7 @@
 #include "screen.h"
 #include "malloc.h"
 #include "screen.h"
+#include "farptr.h"
 
 // Builds 64-bit page tables using far pointers in real mode
 //
@@ -40,31 +41,16 @@ static uint16_t root_page_dir;
 static uint64_t read_pte(uint16_t segment, uint16_t slot)
 {
     uint64_t pte;
-    __asm__ __volatile__ (
-        "shl $3,%w[slot]\n\t"
-        "movw %[seg],%%fs\n\t"
-        "movl %%fs:(%w[slot]),%%eax\n\t"
-        "movl %%fs:4(%w[slot]),%%edx\n\t"
-        : "=A" (pte)
-        , [slot] "+bSD" (slot)
-        : [seg] "r" (segment)
-        : "memory"
-    );
+    far_ptr_t ptr = far_ptr2(segment, slot * sizeof(pte));
+    far_copy_to(&pte, ptr, sizeof(pte));
     return pte;
 }
 
 // Write a 64-bit entry to the specified slot of the specified segment
 static void write_pte(uint16_t segment, uint16_t slot, uint64_t pte)
 {
-    __asm__ __volatile__ (
-        "shl $3,%w[slot]\n\t"
-        "mov %[seg],%%fs\n\t"
-        "mov %%eax,%%fs:(%w[slot])\n\t"
-        "mov %%edx,%%fs:4(%w[slot])\n\t"
-        : [slot] "+bSD" (slot)
-        : "A" (pte), [seg] "r" (segment)
-        : "memory"
-    );
+    far_ptr_t ptr = far_ptr2(segment, slot * sizeof(pte));
+    far_copy_from(ptr, &pte, sizeof(pte));
 }
 
 static void clear_page_table(uint16_t segment)

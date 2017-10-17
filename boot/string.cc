@@ -89,18 +89,97 @@ char *strstr(char const *str, char const *substr)
 
 void *memset(void *dest, int c, size_t n)
 {
+#if 1
+    char *d = (char*)dest;
+    if ((n & 3) == 0) {
+        n >>= 2;
+        __asm__ __volatile__ (
+            "rep stosl\n\t"
+            : "+D" (d)
+            , "+c" (n)
+            : "a" ((c & 0xFF) * 0x01010101)
+        );
+    } else {
+        __asm__ __volatile__ (
+            "rep stosb\n\t"
+            : "+D" (d)
+            , "+c" (n)
+            : "a" (c)
+        );
+    }
+#else
     char *p = (char*)dest;
     while (n--)
         *p++ = (char)c;
+#endif
     return dest;
 }
 
 void *memcpy(void *dest, void const *src, size_t n)
 {
+#if 1
+    char *d = (char*)dest;
+    if ((n & 3) == 0) {
+        n >>= 2;
+        __asm__ __volatile__ (
+            "cld\n\t"
+            "rep movsl\n\t"
+            : "+S" (src)
+            , "+D" (d)
+            , "+c" (n)
+        );
+    } else {
+        __asm__ __volatile__ (
+            "cld\n\t"
+            "rep movsb\n\t"
+            : "+S" (src)
+            , "+D" (d)
+            , "+c" (n)
+        );
+    }
+#else
     char *d = (char*)dest;
     char const *s = (char const *)src;
     while (n--)
         *d++ = *s++;
+#endif
+    return dest;
+}
+
+void *memcpy_rev(void *dest, void const *src, size_t n)
+{
+#if 1
+    if ((n & 3) == 0) {
+        src = (char*)src + n - 1;
+        char *d = (char*)dest + n - 1;
+        n >>= 2;
+        __asm__ __volatile__ (
+            "std\n\t"
+            "rep movsl\n\t"
+            "cld\n\t"
+            : "+S" (src)
+            , "+D" (d)
+            , "+c" (n)
+        );
+    } else {
+        src = (char*)src + n - 4;
+        char *d = (char*)dest + n - 4;
+        __asm__ __volatile__ (
+            "std\n\t"
+            "rep movsb\n\t"
+            "cld\n\t"
+            : "+S" (src)
+            , "+D" (d)
+            , "+c" (n)
+        );
+    }
+    return dest;
+#else
+    char *d = (char*)dest;
+    char const *s = (char const *)src;
+    while (n--)
+        *d++ = *s++;
+#endif
     return dest;
 }
 

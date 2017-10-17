@@ -111,7 +111,9 @@ am__v_AR_1 =
 libbootsect_a_AR = $(AR) $(ARFLAGS)
 libbootsect_a_LIBADD =
 am__dirstamp = $(am__leading_dot)dirstamp
-am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootsect.$(OBJEXT) \
+am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
+	boot/libbootsect_a-bioscall.$(OBJEXT) \
+	boot/libbootsect_a-bootsect.$(OBJEXT) \
 	boot/libbootsect_a-bootinfo.$(OBJEXT) \
 	boot/libbootsect_a-screen.$(OBJEXT) \
 	boot/libbootsect_a-fs.$(OBJEXT) \
@@ -532,9 +534,10 @@ BUILT_SOURCES = \
 #  -> Link bootiso-bin
 # Build libkernel-sse41.a libkernel-avx libkernel-avx512
 #  -> Build kernel-elf
-LINKER_SEL = -fuse-ld=gold
+LINKER_SEL = -fuse-ld=gold -z max-page-size=256
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
+LINKER_DEBUG = 
 noinst_LIBRARIES = \
 	libmbr.a \
 	libbootsect.a \
@@ -564,7 +567,7 @@ mbr_elf_LDFLAGS = \
 	-Wl,--oformat,elf32-little \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) -fuse-ld=gold \
+	$(LINKER_SEL) -fuse-ld=bfd -static \
 	-Wl,-nostdlib \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -609,7 +612,7 @@ mbr_bin_LDFLAGS = \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
-	-fuse-ld=bfd \
+	$(LINKER_SEL) -fuse-ld=bfd -static \
 	-Wl,-nostdlib \
 	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
@@ -621,6 +624,8 @@ mbr_bin_LDADD = libmbr.a
 
 # libbootsect.a
 libbootsect_a_SOURCES = \
+	boot/bootcommon.s \
+	boot/bioscall.s \
 	boot/bootsect.cc \
 	boot/bootinfo.s \
 	boot/screen.cc \
@@ -671,9 +676,11 @@ libbootsect_a_SOURCES = \
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot
 
+
+#	$(REAL_MODE_FLAGS)
 libbootsect_a_CXXFLAGS = \
+	-m32 \
 	$(libbootsect_a_INCLUDES) \
-	$(REAL_MODE_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	-ggdb -ffreestanding \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
@@ -684,9 +691,11 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+
+#	$(REAL_MODE_FLAGS)
 libbootsect_a_CFLAGS = \
+	-m32 \
 	$(libbootsect_a_INCLUDES) \
-	$(REAL_MODE_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -699,8 +708,10 @@ libbootsect_a_CFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+
+#	$(REAL_MODE_FLAGS)
 libbootsect_a_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -717,22 +728,27 @@ bootfat_elf_SOURCES = \
 	boot/bootfat.s
 
 bootfat_elf_CXXFLAGS = \
+	-m32 \
 	$(libbootsect_a_CXXFLAGS)
 
+
+#	$(REAL_MODE_FLAGS)
 bootfat_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+
+#	$(REAL_MODE_FLAGS)
 bootfat_elf_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,i386linux \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	$(LINKER_SEL) -fuse-ld=gold \
+	$(LINKER_SEL) -fuse-ld=gold -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -749,20 +765,24 @@ bootfat_bin_SOURCES = \
 	$(bootfat_elf_SOURCES)
 
 bootfat_bin_CXXFLAGS = \
+	-m32 \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_bin_CCASFLAGS = \
+	-m32 \
 	$(bootfat_elf_CCASFLAGS)
 
+
+#	$(REAL_MODE_FLAGS)
 bootfat_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	-fuse-ld=bfd \
+	$(LINKER_SEL) -fuse-ld=bfd -static \
 	-Wl,-nostdlib \
-	-nostartfiles -nodefaultlibs -nostdlib \
+	-nostartfiles -nodefaultlibs -nostdlib -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -780,19 +800,24 @@ bootiso_elf_SOURCES = \
 bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
+
+#	$(REAL_MODE_FLAGS)
 bootiso_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
+	-Wa,-g \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+
+# $(REAL_MODE_FLAGS)
 bootiso_elf_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,i386linux \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	$(LINKER_SEL) -fuse-ld=gold \
+	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -812,16 +837,20 @@ bootiso_bin_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_bin_CCASFLAGS = \
+	-m32 \
+	-Wa,-g \
 	$(bootiso_elf_CCASFLAGS)
 
+
+# $(REAL_MODE_FLAGS)
 bootiso_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/bootiso.map \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	-fuse-ld=bfd \
+	-fuse-ld=bfd -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -1266,6 +1295,10 @@ boot/$(am__dirstamp):
 boot/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) boot/$(DEPDIR)
 	@: > boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-bootcommon.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-bioscall.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-bootsect.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-bootinfo.$(OBJEXT): boot/$(am__dirstamp) \
@@ -3555,6 +3588,18 @@ mbr/mbr_elf-empty.obj: mbr/empty.cc
 
 .s.obj:
 	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+boot/libbootsect_a-bootcommon.o: boot/bootcommon.s
+	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bootcommon.o `test -f 'boot/bootcommon.s' || echo '$(srcdir)/'`boot/bootcommon.s
+
+boot/libbootsect_a-bootcommon.obj: boot/bootcommon.s
+	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bootcommon.obj `if test -f 'boot/bootcommon.s'; then $(CYGPATH_W) 'boot/bootcommon.s'; else $(CYGPATH_W) '$(srcdir)/boot/bootcommon.s'; fi`
+
+boot/libbootsect_a-bioscall.o: boot/bioscall.s
+	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bioscall.o `test -f 'boot/bioscall.s' || echo '$(srcdir)/'`boot/bioscall.s
+
+boot/libbootsect_a-bioscall.obj: boot/bioscall.s
+	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bioscall.obj `if test -f 'boot/bioscall.s'; then $(CYGPATH_W) 'boot/bioscall.s'; else $(CYGPATH_W) '$(srcdir)/boot/bioscall.s'; fi`
 
 boot/libbootsect_a-bootinfo.o: boot/bootinfo.s
 	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bootinfo.o `test -f 'boot/bootinfo.s' || echo '$(srcdir)/'`boot/bootinfo.s

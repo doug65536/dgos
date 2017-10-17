@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "bioscall.h"
 
 #ifdef __GNUC__
 #define ATTRIBUTE_FORMAT(m,n) __attribute__((format(printf, m, n)))
@@ -16,3 +17,5 @@ void print_xy(uint16_t x, uint16_t y, uint16_t ch, uint16_t attr, uint16_t count
 extern char const hexlookup[];
 
 void print_lba(uint32_t lba);
+
+void dump_regs(bios_regs_t& regs, bool show_flags = false);

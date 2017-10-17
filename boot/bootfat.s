@@ -1,3 +1,5 @@
+.code32
+
 .code16
 
 # ptbl_ent
@@ -104,24 +106,9 @@ disk_error:
 	movl %ecx,%eax
 	pushl %eax
 
-call_constructors:
-	movl $__ctors_start,%ebx
-0:
-	cmpl $__ctors_end,%ebx
-	jae 0f
-	movl (%ebx),%eax
-	test %eax,%eax
-	jz 1f
-	cmpl $entry,%eax
-	jb 1f
-	call *%eax
-1:
-	addl $4,%ebx
-	jmp 0b
-0:
-
 	popl %eax
-	call fat32_boot_partition
+	movl $fat32_boot_partition,%edx
+	call boot
 unreachable:
 	hlt
 	jmp unreachable

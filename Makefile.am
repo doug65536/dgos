@@ -19,10 +19,11 @@ BUILT_SOURCES = \
 # Build libkernel-sse41.a libkernel-avx libkernel-avx512
 #  -> Build kernel-elf
 
-LINKER_SEL = -fuse-ld=gold
+LINKER_SEL = -fuse-ld=gold -z max-page-size=256
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
-
+LINKER_DEBUG = 
+ 
 noinst_LIBRARIES = \
 	libmbr.a \
 	libbootsect.a \
@@ -61,7 +62,7 @@ mbr_elf_LDFLAGS = \
 	-Wl,--oformat,elf32-little \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) -fuse-ld=gold \
+	$(LINKER_SEL) -fuse-ld=bfd -static \
 	-Wl,-nostdlib \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -106,7 +107,7 @@ mbr_bin_LDFLAGS = \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
-	-fuse-ld=bfd \
+	$(LINKER_SEL) -fuse-ld=bfd -static \
 	-Wl,-nostdlib \
 	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
@@ -119,6 +120,8 @@ mbr_bin_LDADD = libmbr.a
 # libbootsect.a
 
 libbootsect_a_SOURCES = \
+	boot/bootcommon.s \
+	boot/bioscall.s \
 	boot/bootsect.cc \
 	boot/bootinfo.s \
 	boot/screen.cc \
@@ -169,9 +172,11 @@ libbootsect_a_SOURCES = \
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot
 
+#	$(REAL_MODE_FLAGS)
+
 libbootsect_a_CXXFLAGS = \
+	-m32 \
 	$(libbootsect_a_INCLUDES) \
-	$(REAL_MODE_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	-ggdb -ffreestanding \
 	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
@@ -182,9 +187,11 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+#	$(REAL_MODE_FLAGS)
+
 libbootsect_a_CFLAGS = \
+	-m32 \
 	$(libbootsect_a_INCLUDES) \
-	$(REAL_MODE_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -197,8 +204,10 @@ libbootsect_a_CFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+#	$(REAL_MODE_FLAGS)
+
 libbootsect_a_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -215,22 +224,27 @@ bootfat_elf_SOURCES = \
 	boot/bootfat.s
 
 bootfat_elf_CXXFLAGS = \
+	-m32 \
 	$(libbootsect_a_CXXFLAGS)
 
+#	$(REAL_MODE_FLAGS)
+
 bootfat_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+#	$(REAL_MODE_FLAGS)
+
 bootfat_elf_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,i386linux \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	$(LINKER_SEL) -fuse-ld=gold \
+	$(LINKER_SEL) -fuse-ld=gold -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -247,20 +261,24 @@ bootfat_bin_SOURCES = \
 	$(bootfat_elf_SOURCES)
 
 bootfat_bin_CXXFLAGS = \
+	-m32 \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_bin_CCASFLAGS = \
+	-m32 \
 	$(bootfat_elf_CCASFLAGS)
 
+#	$(REAL_MODE_FLAGS)
+
 bootfat_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	-fuse-ld=bfd \
+	$(LINKER_SEL) -fuse-ld=bfd -static \
 	-Wl,-nostdlib \
-	-nostartfiles -nodefaultlibs -nostdlib \
+	-nostartfiles -nodefaultlibs -nostdlib -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -278,19 +296,24 @@ bootiso_elf_SOURCES = \
 bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
+#	$(REAL_MODE_FLAGS)
+
 bootiso_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
+	-Wa,-g \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+# $(REAL_MODE_FLAGS)
+
 bootiso_elf_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,i386linux \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	$(LINKER_SEL) -fuse-ld=gold \
+	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -310,16 +333,20 @@ bootiso_bin_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_bin_CCASFLAGS = \
+	-m32 \
+	-Wa,-g \
 	$(bootiso_elf_CCASFLAGS)
 
+# $(REAL_MODE_FLAGS)
+
 bootiso_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/bootiso.map \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	-fuse-ld=bfd \
+	-fuse-ld=bfd -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)

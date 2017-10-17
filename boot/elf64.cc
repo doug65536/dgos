@@ -35,6 +35,9 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     uint16_t mp_entry_seg = far_malloc_aligned(mp_entry_size);
     far_ptr_t mp_entry_ptr = far_ptr2(mp_entry_seg, 0);
+    
+    print_line("SMP trampoline at %x:%x", 
+               mp_entry_ptr.segment, mp_entry_ptr.offset);
 
     far_copy(mp_entry_ptr,
              far_ptr2(0, (uint16_t)(uint32_t)mp_entry),

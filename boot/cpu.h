@@ -167,6 +167,10 @@ struct idt_entry_64_t {
 
 uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
 
+extern "C" void cpu_a20_enterpm();
+extern "C" void cpu_a20_exitpm();
+extern "C" uint16_t toggle_a20(uint8_t enable);
+
 extern "C" void copy_or_enter(uint64_t address, uint32_t src, uint32_t size);
 
 #define USE_PORT_FUNCTIONS 0

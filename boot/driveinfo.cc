@@ -2,8 +2,9 @@
 #include "bootsect.h"
 #include "malloc.h"
 #include "farptr.h"
+#include "bioscall.h"
 
-void driveinfo()
+uint16_t driveinfo()
 {
     // AH = 48h
     // DL = drive (80h-FFh)
@@ -17,25 +18,18 @@ void driveinfo()
 
     // Write the size into the memory
     far_copy_from(ptr, &size, sizeof(size));
-
-    uint16_t ax = 0x4800;
-    __asm__ __volatile__ (
-        "push %%ds\n\t"
-        "mov %%si,%%ds\n\t"
-        "xor %%si,%%si\n\t"
-        "int $0x13\n\t"
-        "setc %%al\n\t"
-        "neg %%al\n\t"
-        "and %%al,%%ah\n\t"
-        "shr $16,%%ax\n\t"
-        "pop %%ds\n\t"
-        : "+a" (ax)
-        : "d" (boot_drive)
-        , "S" (ptr.segment)
-        : "memory"
-    );
-
+    
+    bios_regs_t regs;
+    regs.eax = 0x4800;
+    regs.ds = ptr.segment;
+    regs.edx = boot_drive;
+    regs.esi = ptr.offset;
+    
+    bioscall(&regs, 0x13);
+    
     // Store the pointer so kernel can find it
-    if (ax == 0)
+    if (!regs.flags_CF())
         boot_device_info_vector = ptr.segment << 4;
+    
+    return regs.ah_if_carry();
 }

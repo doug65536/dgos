@@ -61,3 +61,6 @@ iso9660.cc
 iso9660.h
 fs.h
 fs.cc
+bootcommon.s
+bioscall.s
+bioscall.h

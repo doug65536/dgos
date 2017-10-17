@@ -6,6 +6,8 @@
 #include "screen.h"
 #include "paging.h"
 #include "cpu.h"
+#include "bioscall.h"
+
 #define VESA_DEBUG 1
 #if VESA_DEBUG
 #define VESA_TRACE(...) print_line("vesa: " __VA_ARGS__)
@@ -78,14 +80,15 @@ struct vbe_mode_info_t {
 
 static uint16_t vbe_get_info(void *info, uint16_t ax, uint16_t cx)
 {
-    __asm__ __volatile__ (
-        "int $0x10\n\t"
-        : "+a" (ax)
-        : "D" (info)
-        , "c" (cx)
-        : "memory"
-    );
-    return ax;
+    bios_regs_t regs{};
+    
+    regs.eax = ax;
+    regs.ecx = cx;
+    regs.edi = (uint32_t)info;
+    
+    bioscall(&regs, 0x10);
+    
+    return regs.eax & 0xFFFF;
 }
 
 static int vbe_detect(vbe_info_t *info)
@@ -104,15 +107,15 @@ static int vbe_mode_info(vbe_mode_info_t *info, uint16_t mode)
 
 static uint16_t vbe_set_mode(uint16_t mode)
 {
-    uint16_t ax = 0x4F02;
+    bios_regs_t regs;
+    
+    regs.eax = 0x4F02;
     // 0x4000 means use linear framebuffer
-    uint16_t bx = 0x4000 | mode;
-    __asm__ __volatile__ (
-        "int $0x10\n\t"
-        : "+a" (ax)
-        : "b" (bx)
-    );
-    return ax == 0x4F;
+    regs.ebx = 0x4000 | mode;
+    
+    bioscall(&regs, 0x10);
+    
+    return (regs.eax & 0xFFFF) == 0x4F;
 }
 
 static uint16_t gcd(uint16_t a, uint16_t b)
