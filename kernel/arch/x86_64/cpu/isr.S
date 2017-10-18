@@ -198,12 +198,11 @@ isr_common:
 	// C code requires that the direction flag is clear
 	cld
 
+    // Save FSBASE and CR3
     rdfsbase %rax
+    mov %cr3,%rcx
 	push_cfi %rax
-
-	// Push CR3
-	mov %cr3,%rax
-	push_cfi %rax
+    push_cfi %rcx
 
 	// Push segment registers
 	sub_rsp 8
@@ -236,7 +235,7 @@ isr_common:
 
 	// Pass intr, ctx
     mov %rsp,%rsi
-	mov 22*8(%rsp),%rdi
+	mov 22*8(%rsp),%edi
 
 	// Align stack
 	push_cfi %rax
@@ -271,7 +270,7 @@ isr_common:
 	cmp $0x1F,%edi
 	cmovbe %rcx,%rax
 
-	// Pass pointer to the context structure to handler
+	// Call handler
 	call *%rax
 
 	// isr can return a new stack pointer, or just return
@@ -294,7 +293,8 @@ isr_common:
 	jmp *sse_context_restore
 9:
 
-	// See if we're returning to user code
+	// See if we're not returning to user code
+    // Branch past swapgs and restoration of segments if not
 	cmpl $8,21*8(%rsp)
 	jz 0f
 
@@ -458,17 +458,6 @@ isr_save_fxsave:
 isr_restore_fxrstor:
 	xrstor_ctx fxrstor64
 
-//  isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
-//  {
-//      if (!intr_has_handler(intr) || !intr_invoke(intr, ctx)) {
-//          if (__exception_handler_invoke(intr))
-//              return unhandled_exception_handler(ctx);
-//          cpu_debug_break();
-//      }
-//
-//      return ctx;
-//  }
-//
 // isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
 exception_isr_handler:
 	.cfi_startproc
