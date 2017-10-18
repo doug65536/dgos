@@ -1711,21 +1711,27 @@ static void apic_online(int enabled, int spurious_intr)
 
 void apic_dump_regs(int ap)
 {
+#if DEBUG_APIC
     for (int i = 0; i < 64; i += 4) {
-        APIC_TRACE("ap=%d APIC: ", ap);
+        printdbg("ap=%d APIC: ", ap);
         for (int x = 0; x < 4; ++x) {
             if (apic->reg_readable(i + x)) {
-                APIC_TRACE("[%3x]=%08x%s", (i + x),
+                printdbg("%s[%3x]=%08x%s",
+                         x == 0 ? "apic: " : "",
+                         (i + x),
                          apic->read32(i + x),
                          x == 3 ? "\n" : " ");
             } else {
-                APIC_TRACE("[%3x]=--------%s", i + x,
-                        x == 3 ? "\n" : " ");
+                printdbg("%s[%3x]=--------%s", 
+                         x == 0 ? "apic: " : "",
+                         i + x,
+                         x == 3 ? "\n" : " ");
             }
         }
     }
     APIC_TRACE("Logical destination register value: 0x%x\n",
              apic->read32(APIC_REG_LDR));
+#endif
 }
 
 static void apic_calibrate();
@@ -1862,6 +1868,10 @@ static void apic_detect_topology_intel(void)
         topo_thread_bits = 0;
 
     topo_thread_count /= topo_core_count;
+    
+    // Workaround strange occurrence of it calculating 0 threads
+    if (topo_thread_count <= 0)
+        topo_thread_count = 1;
 
     topo_cpu_count = apic_id_count *
             topo_core_count * topo_thread_count;
@@ -1869,7 +1879,7 @@ static void apic_detect_topology_intel(void)
 
 static void apic_detect_topology(void)
 {
-    
+    apic_detect_topology_intel();
 }
 
 void apic_start_smp(void)
@@ -2209,17 +2219,6 @@ static void apic_calibrate()
         apic_timer_freq -= apic_timer_freq % 100000000;
 
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
-
-        // Example: let rdtsc_mhz = 2500. gcd(1000,2500) = 500
-        // then,
-        //  clk_to_ns_numer = 1000/500 = 2
-        //  chk_to_ns_denom = 2500/500 = 5
-        // clk_to_ns: let clks = 2500000000
-        //  2500000000 * 2 / 5 = 1000000000ns
-
-        uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
-        clk_to_ns_numer = 1000 / clk_to_ns_gcd;
-        clk_to_ns_denom = rdtsc_mhz / clk_to_ns_gcd;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
         apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
@@ -2244,7 +2243,27 @@ static void apic_calibrate()
         apic_timer_freq = ccr_freq;
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
     }
+    
+    // Example: let rdtsc_mhz = 2500. gcd(1000,2500) = 500
+    // then,
+    //  clk_to_ns_numer = 1000/500 = 2
+    //  chk_to_ns_denom = 2500/500 = 5
+    // clk_to_ns: let clks = 2500000000
+    //  2500000000 * 2 / 5 = 1000000000ns
+    
+    APIC_TRACE("CPU MHz: %ld\n", rdtsc_mhz);
 
+    uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
+    
+    APIC_TRACE("CPU MHz GCD: %ld\n", clk_to_ns_gcd);
+    
+    clk_to_ns_numer = 1000 / clk_to_ns_gcd;
+    clk_to_ns_denom = rdtsc_mhz / clk_to_ns_gcd;
+
+    APIC_TRACE("clk_to_ns_numer: %ld\n", clk_to_ns_numer);
+    APIC_TRACE("clk_to_ns_denom: %ld\n", clk_to_ns_denom);
+    
+    
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
         time_ns_set_handler(apic_rdtsc_time_ns_handler, nullptr, true);
