@@ -99,6 +99,17 @@ uint16_t elf64_run(char const *filename)
     uint64_t nx_page_flags = 0;
     if (cpu_has_no_execute())
         nx_page_flags = PTE_NX;
+    
+    // Map the screen for debugging convenience
+    paging_map_range(0xA0000, 0x20000, 0xA0000,
+                     PTE_PRESENT | PTE_WRITABLE |
+                     (-cpu_has_global_pages() & PTE_GLOBAL) |
+                     PTE_PCD | PTE_PWT, 0);
+
+    // Allocate a page of memory to be used to alias high memory
+    // Map two pages to simplify copies that are not page aligned
+    uint32_t address_window =
+            (uint32_t)far_malloc_aligned(PAGE_SIZE << 1) << 4;
 
     int file = boot_open(filename);
 
@@ -139,17 +150,6 @@ uint16_t elf64_run(char const *filename)
         total_bytes += program_hdrs[i].p_memsz;
 
     uint16_t failed = 0;
-
-    // Map the screen for debugging convenience
-    paging_map_range(0xA0000, 0x20000, 0xA0000,
-                     PTE_PRESENT | PTE_WRITABLE |
-                     (-cpu_has_global_pages() & PTE_GLOBAL) |
-                     PTE_PCD | PTE_PWT, 0);
-
-    // Allocate a page of memory to be used to alias high memory
-    // Map two pages to simplify copies that are not page aligned
-    uint32_t address_window =
-            (uint32_t)far_malloc_aligned(PAGE_SIZE << 1) << 4;
 
     uint64_t done_bytes = 0;
 
