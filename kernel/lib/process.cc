@@ -10,6 +10,7 @@
 #include "fileio.h"
 #include "errno.h"
 #include "thread.h"
+#include "vector.h"
 
 union process_ptr_t {
     process_t *p;
@@ -126,8 +127,68 @@ int process_spawn(pid_t * pid_result,
     *pid_result = process->pid;
 
     process->mmu_context = mm_new_process();
-
-    return 0;
+    
+    // Simply load it for now
+    Elf64_Ehdr hdr;
+    
+    file_t fd = file_open(path, O_RDONLY);
+    
+    ssize_t read_size;
+    
+    read_size = file_read(fd, &hdr, sizeof(hdr));
+    if (read_size != sizeof(hdr))
+        return -1;
+    
+    // Allocate memory for program headers
+    vector<Elf64_Phdr> program_hdrs;
+    program_hdrs.resize(hdr.e_phnum);
+    
+    // Read program headers
+    read_size = sizeof(Elf64_Phdr) * hdr.e_phnum;
+    if (read_size != file_pread(
+                fd,
+                program_hdrs.data(), 
+                read_size,
+                hdr.e_phoff))
+        return -1;
+    
+    for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not readable, writable or executable, ignore
+        if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
+            continue;
+        
+        if (ph.p_memsz == 0)
+            continue;
+        
+        int page_prot = 0;
+        
+        if (ph.p_flags & PF_R)
+            page_prot |= PROT_READ;
+        if (ph.p_flags & PF_W)
+            page_prot |= PROT_WRITE;
+        if (ph.p_flags & PF_X)
+            page_prot |= PROT_EXEC;
+        
+        void *mem = mmap((void*)ph.p_vaddr, 
+                         ph.p_memsz, page_prot, 
+                         MAP_USER | MAP_POPULATE, -1, 0);
+        
+        read_size = ph.p_filesz;
+        if (ph.p_filesz > 0) {
+            if (read_size != file_pread(
+                        fd, 
+                        mem, 
+                        read_size, 
+                        ph.p_offset)) {
+                return -1;
+            }
+        }
+    }
+    
+    thread_create(thread_fn_t(uintptr_t(hdr.e_entry)),
+                  nullptr, nullptr, 0);
+    
+    return process->pid;
 }
 
 void *process_get_allocator()
