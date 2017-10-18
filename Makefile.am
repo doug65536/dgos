@@ -23,7 +23,7 @@ LINKER_SEL = -fuse-ld=gold -z max-page-size=256
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG = 
- 
+
 noinst_LIBRARIES = \
 	libmbr.a \
 	libbootsect.a \

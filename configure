@@ -588,6 +588,8 @@ LIBOBJS
 OPTIMIZE_SPEED_FLAGS
 OPTIMIZE_SIZE_FLAGS
 DISABLE_OPTIMIZATION_FLAGS
+ENABLE_FRAMEPOINTER_FLAGS
+DISABLE_FRAMEPOINTER_FLAGS
 NO_PIC_FLAGS
 REGPARM_FLAGS
 REAL_MODE_FLAGS
@@ -1343,7 +1345,6 @@ Optional Features:
                           do not reject slow dependency extractors
   --disable-dependency-tracking
                           speeds up one-time build
-
   --enable-optimize       Enable size/speed optimizations
 
 Some influential environment variables:
@@ -5452,29 +5453,101 @@ fi
 
 
 
-# Check whether --enable-optimize was given.
-if test "${enable_optimize+set}" = set; then :
-  enableval=$enable_optimize;
+DISABLE_FRAMEPOINTER_FLAGS=
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-omit-frame-pointer" >&5
+$as_echo_n "checking whether C compiler accepts -fno-omit-frame-pointer... " >&6; }
+if ${ax_cv_check_cflags___fno_omit_frame_pointer+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fno-omit-frame-pointer"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fno_omit_frame_pointer=yes
+else
+  ax_cv_check_cflags___fno_omit_frame_pointer=no
 fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_omit_frame_pointer" >&5
+$as_echo "$ax_cv_check_cflags___fno_omit_frame_pointer" >&6; }
+if test "x$ax_cv_check_cflags___fno_omit_frame_pointer" = xyes; then :
+  DISABLE_FRAMEPOINTER_FLAGS=" -fomit-frame-pointer"
+else
+  :
+fi
+
+
+
+
+ENABLE_FRAMEPOINTER_FLAGS=
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fomit-frame-pointer" >&5
+$as_echo_n "checking whether C compiler accepts -fomit-frame-pointer... " >&6; }
+if ${ax_cv_check_cflags___fomit_frame_pointer+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fomit-frame-pointer"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fomit_frame_pointer=yes
+else
+  ax_cv_check_cflags___fomit_frame_pointer=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fomit_frame_pointer" >&5
+$as_echo "$ax_cv_check_cflags___fomit_frame_pointer" >&6; }
+if test "x$ax_cv_check_cflags___fomit_frame_pointer" = xyes; then :
+  ENABLE_FRAMEPOINTER_FLAGS=" -fno-omit-frame-pointer"
+else
+  :
+fi
+
+
 
 
 # Check whether --enable-optimize was given.
 if test "${enable_optimize+set}" = set; then :
   enableval=$enable_optimize;
 		echo Enabling optimizations
-		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS -g"
-		OPTIMIZE_SPEED_FLAGS="-O2 -g"
+		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS -g $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="-O2 -g $DISABLE_FRAMEPOINTER_FLAGS"
 
 else
 
 		echo Disabling optimizations
-		OPTIMIZE_SIZE_FLAGS="-O0 -g"
-		OPTIMIZE_SPEED_FLAGS="-O0 -g"
+		OPTIMIZE_SIZE_FLAGS="-O0 -g $ENABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="-O0 -g $ENABLE_FRAMEPOINTER_FLAGS"
 
 fi
 
 
-DISABLE_OPTIMIZATION_FLAGS="-O0 -g"
+DISABLE_OPTIMIZATION_FLAGS="-O0 -g $ENABLE_FRAMEPOINTER_FLAGS"
 
 
 
