@@ -17,19 +17,19 @@
 
 enum struct callout_type_t : uint32_t {
     // bootstrap
-    vmm_ready,  // 'M'
-    smp_start,  // 'S'
-    early_dev,  // 'E'
-    smp_online, // 'T'
+    vmm_ready = 'M',
+    smp_start = 'S',
+    early_dev = 'E',
+    smp_online = 'T',
 
     // from init_thread
-    driver_base,    // 'D'
-    late_dev,       // 'L'
-    reg_filesys,    // 'F'
-    storage_dev,    // 'H'
-    partition_probe,// 'P'
-    nic,            // 'N'
-    usb             // 'U'
+    driver_base= 'D',
+    late_dev = 'L',
+    reg_filesys = 'F',
+    storage_dev = 'H',
+    partition_probe = 'P',
+    nic = 'N',
+    usb = 'U'
 };
 
 struct callout_t {
