@@ -264,3 +264,4 @@ lib/work_queue.h
 ../mkposixdirs.sh
 ../populate_fat.sh
 ../populate_iso.sh
+lib/cc/numeric.h
