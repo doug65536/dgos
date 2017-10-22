@@ -11,19 +11,11 @@
 #include "errno.h"
 #include "thread.h"
 #include "vector.h"
+#include "desc_alloc.h"
 
 union process_ptr_t {
     process_t *p;
     pid_t next;
-};
-
-struct process_t {
-    pid_t pid;
-    char *path;
-    char **args;
-    char **env;
-    uintptr_t mmu_context;
-    void *linear_allocator;
 };
 
 static process_ptr_t *processes;

@@ -1,7 +1,7 @@
 #pragma once
+#include "assert.h"
 #include "cpu/spinlock.h"
 #include "thread.h"
-#include "assert.h"
 #include "type_traits.h"
 
 struct thread_wait_link_t;

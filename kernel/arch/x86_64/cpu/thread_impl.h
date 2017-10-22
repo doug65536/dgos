@@ -1,6 +1,10 @@
 #pragma once
 #include "types.h"
 #include "cpu/idt.h"
+#include "segrw.h"
+#include "isr_constants.h"
+
+struct process_t;
 
 extern uint32_t volatile thread_smp_running;
 
@@ -11,6 +15,7 @@ uint32_t thread_cpu_count(void);
 uint32_t thread_cpus_started(void);
 uint32_t thread_get_cpu_apic_id(int cpu);
 
+// CPU-local storage
 size_t thread_cls_alloc(void);
 void *thread_cls_get(size_t slot);
 void thread_cls_set(size_t slot, void *value);
@@ -27,6 +32,15 @@ void thread_cls_init_each_cpu(
         size_t slot, thread_cls_init_handler_t handler, void *arg);
 
 void thread_cls_for_each_cpu(size_t slot, int other_only,
-                             thread_cls_each_handler_t handler, void *arg, size_t size);
+                             thread_cls_each_handler_t handler, 
+                             void *arg, size_t size);
 
 void thread_send_ipi(int cpu, int intr);
+
+#define PROCESS_PTR_GS_OFS  (4*8)
+
+static inline process_t *fast_cur_process()
+{
+    void *cpu_info = cpu_gs_read_ptr(CPU_INFO_CURTHREAD_OFS);
+    return *(process_t**)((char*)cpu_info + PROCESS_PTR_GS_OFS);
+}

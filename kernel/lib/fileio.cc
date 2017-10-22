@@ -5,25 +5,25 @@
 #include "mm.h"
 #include "stdlib.h"
 #include "string.h"
+#include "vector.h"
 
-struct file_handle_t {
-    file_handle_t *next;
+struct filetab_t {
     fs_file_info_t *fi;
-    char *path;
+    ino_t inode;
     fs_base_t *fs;
     off_t pos;
+    filetab_t *next_free;
+    int refcount;
 };
 
-static file_handle_t *files;
-static size_t file_capacity;
+static spinlock file_table_lock;
+static vector<filetab_t> file_table;
+static filetab_t *file_table_ff;
 
-static void file_init(void *p)
+static void file_init(void *)
 {
-    (void)p;
-    file_capacity = 16;
-    files = (file_handle_t*)mmap(0, sizeof(file_handle_t) * file_capacity,
-                 PROT_READ | PROT_WRITE,
-                 0, -1, 0);
+    unique_lock<spinlock> lock(file_table_lock);
+    file_table.reserve(1000);
 }
 
 static fs_base_t *file_fs_from_path(char const *path)
@@ -32,23 +32,58 @@ static fs_base_t *file_fs_from_path(char const *path)
     return fs_from_id(0);
 }
 
-static file_handle_t *file_new_fd(void)
+static filetab_t *file_new_filetab(void)
 {
-    for (size_t i = 1; i < file_capacity; ++i)
-        if (!files[i].fs)
-            return (file_handle_t*)memset(files + i, 0, sizeof(*files));
-    return 0;
+    filetab_t *item = nullptr;
+    if (file_table_ff) {
+        // Reuse freed item
+        item = file_table_ff;
+        file_table_ff = item->next_free;
+        item->next_free = nullptr;
+    } else if (file_table.size() < file_table.capacity()) {
+        // Add another item
+        file_table.emplace_back();
+        item = &file_table.back();
+    }
+    assert(item->refcount == 0);
+    item->refcount = 1;
+    return item;
+}
+
+static bool file_del_filetab(filetab_t *item)
+{
+    if (--item->refcount == 0) {
+        item->next_free = file_table_ff;
+        file_table_ff = item;
+        return true;
+    }
+    
+    return false;
+}
+
+bool file_ref_filetab(int id)
+{
+    unique_lock<spinlock> lock(file_table_lock);
+    if (id >= 0 && id < (int)file_table.size() &&
+            file_table[id].refcount > 0) {
+        ++file_table[id].refcount;
+        return true;
+    }
+    
+    return false;
 }
 
 REGISTER_CALLOUT(file_init, 0, callout_type_t::partition_probe, "999");
 
-static file_handle_t *file_fh_from_fd(int fd)
+static filetab_t *file_fh_from_id(int id)
 {
-    return fd > 0 &&
-            (size_t)fd < file_capacity &&
-            files[fd].fs
-            ? files + fd
-            : 0;
+    filetab_t *item = nullptr;
+    if (likely(id > 0 && id < (int)file_table.size()))
+        item = &file_table[id];
+    if (likely(item->refcount > 0))
+        return item;
+    assert(!"Zero ref count!");
+    return nullptr;
 }
 
 int file_creat(char const *path, mode_t mode)
@@ -63,65 +98,64 @@ int file_open(char const *path, int flags, mode_t mode)
     if (!fs)
         return -1;
 
-    file_handle_t *fh = file_new_fd();
+    filetab_t *fh = file_new_filetab();
 
     int status = fs->open(&fh->fi, path, flags, mode);
     if (status < 0)
-        return -1;
+        return status;
 
     fh->fs = fs;
-    fh->next = 0;
-    fh->path = strdup(path);
+    //fh->path = strdup(path);
     fh->pos = 0;
 
-    return fh - files;
+    return fh - file_table.data();
 }
 
-int file_close(int fd)
+int file_close(int id)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
-    if (!fh)
+    filetab_t *fh = file_fh_from_id(id);
+    
+    if (unlikely(!fh))
         return -1;
-
-    fh->fs->release(fh->fi);
-
-    free(fh->path);
-
-    memset(fh, 0, sizeof(*fh));
+    
+    if (file_del_filetab(fh)) {
+        fh->fs->release(fh->fi);
+        memset(fh, 0, sizeof(*fh));
+    }
 
     return 0;
 }
 
-ssize_t file_pread(int fd, void *buf, size_t bytes, off_t ofs)
+ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
     return fh->fs->read(fh->fi, (char*)buf, bytes, ofs);
 }
 
-ssize_t file_pwrite(int fd, void *buf, size_t bytes, off_t ofs)
+ssize_t file_pwrite(int id, void const *buf, size_t bytes, off_t ofs)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
     return fh->fs->write(fh->fi, (char*)buf, bytes, ofs);
 }
 
-int file_syncfs(int fd)
+int file_syncfs(int id)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
     return fh->fs->flush(fh->fi);
 }
 
-off_t file_seek(int fd, off_t ofs, int whence)
+off_t file_seek(int id, off_t ofs, int whence)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
@@ -164,18 +198,18 @@ off_t file_seek(int fd, off_t ofs, int whence)
     return fh->pos;
 }
 
-int file_ftruncate(int fd, off_t size)
+int file_ftruncate(int id, off_t size)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
     return fh->fs->ftruncate(fh->fi, size);
 }
 
-ssize_t file_read(int fd, void *buf, size_t bytes)
+ssize_t file_read(int id, void *buf, size_t bytes)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
@@ -186,9 +220,9 @@ ssize_t file_read(int fd, void *buf, size_t bytes)
     return size;
 }
 
-ssize_t file_write(int fd, void const *buf, size_t bytes)
+ssize_t file_write(int id, void const *buf, size_t bytes)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
@@ -199,18 +233,18 @@ ssize_t file_write(int fd, void const *buf, size_t bytes)
     return size;
 }
 
-int file_sync(int fd)
+int file_fsync(int id)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
     return fh->fs->fsync(fh->fi, 0);
 }
 
-int file_datasync(int fd)
+int file_fdatasync(int id)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
@@ -224,7 +258,7 @@ int file_opendir(char const *path)
     if (!fs)
         return -1;
 
-    file_handle_t *fh = file_new_fd();
+    filetab_t *fh = file_new_filetab();
     fh->fs = fs;
 
     int status = fh->fs->opendir(&fh->fi, path);
@@ -232,16 +266,16 @@ int file_opendir(char const *path)
         return -1;
 
     fh->fs = fs;
-    fh->path = strdup(path);
+    //fh->path = strdup(path);
     fh->pos = 0;
-    fh->next = 0;
+    //fh->next = 0;
 
-    return fh - files;
+    return fh - file_table.data();
 }
 
-ssize_t file_readdir_r(int fd, dirent_t *buf, dirent_t **result)
+ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
@@ -256,18 +290,18 @@ ssize_t file_readdir_r(int fd, dirent_t *buf, dirent_t **result)
     return size;
 }
 
-off_t file_telldir(int fd)
+off_t file_telldir(int id)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
     return fh->pos;
 }
 
-off_t file_seekdir(int fd, off_t ofs)
+off_t file_seekdir(int id, off_t ofs)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
     if (!fh)
         return -1;
 
@@ -275,9 +309,10 @@ off_t file_seekdir(int fd, off_t ofs)
     return 0;
 }
 
-int file_closedir(int fd)
+int file_closedir(int id)
 {
-    file_handle_t *fh = file_fh_from_fd(fd);
+    filetab_t *fh = file_fh_from_id(id);
+    
     if (!fh)
         return -1;
 

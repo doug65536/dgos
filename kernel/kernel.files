@@ -265,3 +265,11 @@ lib/work_queue.h
 ../populate_fat.sh
 ../populate_iso.sh
 lib/cc/numeric.h
+lib/desc_alloc.cc
+lib/desc_alloc.h
+syscall/fd.cc
+syscall/fd.h
+arch/x86_64/cpu/segrw.h
+arch/x86_64/cpu/segrw.cc
+syscall/mem.cc
+syscall/mem.h

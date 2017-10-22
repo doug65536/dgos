@@ -389,6 +389,8 @@ kernel_elf_SOURCES = \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
 	kernel/lib/debug.h \
+	kernel/lib/desc_alloc.cc \
+	kernel/lib/desc_alloc.h \
 	kernel/lib/dev_eth.cc \
 	kernel/lib/dev_eth.h \
 	kernel/lib/dev_registration.h \
@@ -532,6 +534,8 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/cpu/mmu.cc \
 	kernel/arch/x86_64/cpu/nontemporal.cc \
 	kernel/arch/x86_64/cpu/nontemporal.h \
+	kernel/arch/x86_64/cpu/segrw.cc \
+	kernel/arch/x86_64/cpu/segrw.h \
 	kernel/arch/x86_64/cpu/spinlock.cc \
 	kernel/arch/x86_64/cpu/spinlock.h \
 	kernel/arch/x86_64/cpu/syscall_dispatch.cc \
@@ -571,7 +575,9 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/nano_time.cc \
 	kernel/arch/x86_64/stacktrace.cc \
 	kernel/arch/x86_64/stacktrace.h \
-	kernel/arch/x86_64/types.h
+	kernel/arch/x86_64/types.h \
+	kernel/syscall/fd.cc \
+	kernel/syscall/mem.cc
 
 kernel_elf_INCLUDES = \
 	-I$(top_srcdir)/kernel \

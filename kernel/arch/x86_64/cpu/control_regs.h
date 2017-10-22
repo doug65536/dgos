@@ -581,19 +581,6 @@ static inline void cpu_xsave(void *fpuctx)
 }
 
 __always_inline
-static inline void *cpu_gs_read_ptr(void)
-{
-    void *ptr;
-    __asm__ __volatile__ (
-        "mov %%gs:0,%[ptr]\n\t"
-        : [ptr] "=r" (ptr)
-        :
-        : "memory"
-    );
-    return ptr;
-}
-
-__always_inline
 static inline uintptr_t cpu_get_flags(void)
 {
     uintptr_t flags;

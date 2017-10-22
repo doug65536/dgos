@@ -23,6 +23,7 @@
 #include "apic.h"
 #include "unique_ptr.h"
 #include "rbtree.h"
+#include "process.h"
 
 // Implements platform independent thread.h
 
@@ -82,6 +83,8 @@ struct thread_info_t {
     void *xsave_stack;
 
     void *syscall_stack;
+    
+    process_t *process;
 
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
@@ -92,6 +95,8 @@ struct thread_info_t {
     uint32_t stack_size;
 
     uint64_t volatile wake_time;
+    
+    // --- cache line ---
 
     uint64_t volatile cpu_affinity;
 
@@ -110,10 +115,12 @@ struct thread_info_t {
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
 
-    process_t *process;
-
-    void *align[3];
+    errno_t errno;
+    void *align[2];
 };
+
+C_ASSERT(offsetof(thread_info_t, cpu_affinity) == 64);
+C_ASSERT(offsetof(thread_info_t, process) == PROCESS_PTR_GS_OFS);
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
@@ -1037,3 +1044,14 @@ void thread_shootdown_notify()
     atomic_inc(&cpu->tlb_shootdown_count);
 }
 
+void thread_set_error(errno_t errno)
+{
+    thread_info_t *info = this_thread();
+    info->errno = errno;
+}
+
+errno_t thread_get_error()
+{
+    thread_info_t *info = this_thread();
+    return info->errno;
+}

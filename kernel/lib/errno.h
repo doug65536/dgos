@@ -1,3 +1,4 @@
+#pragma once
 #include "types.h"
 #include "assert.h"
 
@@ -374,4 +375,6 @@ enum struct errno_t : int8_t {
 
     /// Exchange full.
     EXFULL,
+    
+    MAX_ERRNO
 };

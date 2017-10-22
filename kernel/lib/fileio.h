@@ -8,24 +8,26 @@
 #define SEEK_DATA   3
 #define SEEK_HOLE   4
 
+bool file_ref_filetab(int id);
+
 int file_creat(char const *path, mode_t mode);
 int file_open(char const *path, int flags, mode_t mode = 0);
-int file_close(int fd);
-ssize_t file_read(int fd, void *buf, size_t bytes);
-ssize_t file_write(int fd, void const *buf, size_t bytes);
-ssize_t file_pread(int fd, void *buf, size_t bytes, off_t ofs);
-ssize_t file_pwrite(int fd, void *buf, size_t bytes, off_t ofs);
-off_t file_seek(int fd, off_t ofs, int whence);
-int file_ftruncate(int fd, off_t size);
-int file_sync(int fd);
-int file_datasync(int fd);
-int file_syncfs(int fd);
+int file_close(int id);
+ssize_t file_read(int id, void *buf, size_t bytes);
+ssize_t file_write(int id, void const *buf, size_t bytes);
+ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs);
+ssize_t file_pwrite(int id, const void *buf, size_t bytes, off_t ofs);
+off_t file_seek(int id, off_t ofs, int whence);
+int file_ftruncate(int id, off_t size);
+int file_fsync(int id);
+int file_fdatasync(int id);
+int file_syncfs(int id);
 
 int file_opendir(char const *path);
-ssize_t file_readdir_r(int fd, dirent_t *buf, dirent_t **result);
-off_t file_telldir(int fd);
-off_t file_seekdir(int fd, off_t ofs);
-int file_closedir(int fd);
+ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result);
+off_t file_telldir(int id);
+off_t file_seekdir(int id, off_t ofs);
+int file_closedir(int id);
 
 int file_mkdir(char const *path, mode_t mode);
 int file_rmdir(char const *path);

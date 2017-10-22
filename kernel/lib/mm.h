@@ -55,6 +55,9 @@
 // Undefined flag mask
 #define MAP_INVALID_MASK    0x007FFC00
 
+// Allowed in user mode
+#define MAP_USER_MASK       0x000003FF
+
 // Kernel only: Exclusive (fail if address range is not free)
 #define MAP_EXCLUSIVE       0x00800000
 
