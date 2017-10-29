@@ -50,16 +50,16 @@ gdtr:
 	# 0x30: 16 bit kernel data
 	gdt_seg_data 0,0,0,0x0
 
-	# 0x38: 64 bit user code
+	# 0x3B: 64 bit user code
 	gdt_seg_code 3,1,0,1,0xF
 	
-	# 0x40: 64 bit user data
+	# 0x43: 64 bit user data
 	gdt_seg_data 3,1,1,0xF
 
-	# 0x48: 32 bit user code
+	# 0x4B: 32 bit user code
 	gdt_seg_code 3,1,1,0,0xF
 	
-	# 0x50: 32 bit user data
+	# 0x53: 32 bit user data
 	gdt_seg_data 3,1,1,0xF
 
 .section .text
