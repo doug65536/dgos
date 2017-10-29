@@ -34,8 +34,8 @@ typedef enum arg_type_t {
 } arg_type_t;
 
 union arg_t {
-    char *char_ptr_value;
-    wchar_t *wchar_ptr_value;
+    char const *char_ptr_value;
+    wchar_t const *wchar_ptr_value;
     int character;
     intptr_t intptr_value;
     uintptr_t uintptr_value;
@@ -459,10 +459,24 @@ static intptr_t formatter(
                 case length_l:
                     flags.arg_type = arg_type_wchar_ptr;
                     flags.arg.wchar_ptr_value = va_arg(ap, wchar_t *);
+                    if (!flags.arg.wchar_ptr_value) {
+                        if (!flags.has_precision || flags.precision >= 6) {
+                            flags.arg.wchar_ptr_value = L"(null)";
+                        } else {
+                            flags.arg.wchar_ptr_value = L"";
+                        }
+                    }
                     break;
                 case length_none:
                     flags.arg_type = arg_type_char_ptr;
                     flags.arg.char_ptr_value = va_arg(ap, char *);
+                    if (!flags.arg.char_ptr_value) {
+                        if (!flags.has_precision || flags.precision >= 6) {
+                            flags.arg.char_ptr_value = "(null)";
+                        } else {
+                            flags.arg.char_ptr_value = "";
+                        }
+                    }
                     break;
                 default:
                     RETURN_FORMATTER_ERROR(chars_written);
