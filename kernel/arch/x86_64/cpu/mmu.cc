@@ -1,4 +1,5 @@
 #include "mmu.h"
+#include "assert.h"
 #include "mm.h"
 #include "control_regs.h"
 #include "interrupts.h"
@@ -11,7 +12,6 @@
 #include "bios_data.h"
 #include "callout.h"
 #include "likely.h"
-#include "assert.h"
 #include "cpuid.h"
 #include "thread_impl.h"
 #include "threadsync.h"

@@ -1,11 +1,11 @@
 #include "legacy_pit.h"
+#include "assert.h"
 #include "ioport.h"
 #include "irq.h"
 #include "atomic.h"
 #include "time.h"
 #include "cpu/thread_impl.h"
 #include "interrupts.h"
-#include "assert.h"
 #include "spinlock.h"
 
 #include "conio.h"

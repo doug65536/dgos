@@ -4,8 +4,8 @@
 #include "string.h"
 #include "spinlock.h"
 #include "printk.h"
-
 #include "assert.h"
+
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
 C_ASSERT(sizeof(gdt_entry_combined_t) == 8);

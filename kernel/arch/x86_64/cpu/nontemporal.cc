@@ -1,7 +1,7 @@
 #include "nontemporal.h"
+#include "assert.h"
 #include "cpuid.h"
 #include "likely.h"
-#include "assert.h"
 #include "string.h"
 #include "printk.h"
 
