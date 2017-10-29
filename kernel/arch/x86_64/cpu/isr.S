@@ -197,12 +197,27 @@ isr_common:
 
 	// C code requires that the direction flag is clear
 	cld
+	
+	// Save FSBASE and CR3
+    
+	// Branch to horrible MSR read if CPU does not support rdfsbase
+    cmpb $0,cpu_has_fsgsbase
+    je 1f
 
-    // Save FSBASE and CR3
     rdfsbase %rax
-    mov %cr3,%rcx
+	jmp 0f
+
+1:
+    // Slow path, use MSR to read FSBASE
+    mov $0xC0000100,%ecx
+	rdmsr
+	shlq $32,%rdx
+	orq %rdx,%rax
+	
+0:
+	mov %cr3,%rcx
 	push_cfi %rax
-    push_cfi %rcx
+	push_cfi %rcx
 
 	// Push segment registers
 	sub_rsp 8
@@ -319,7 +334,19 @@ isr_common:
 
 	// Restore FSBASE
 	pop_cfi %rax
+	cmpb $0,cpu_has_fsgsbase
+	je 1f
+	
     wrfsbase %rax
+	jmp 0f
+	
+1:
+	mov $0xC0000100,%ecx
+	mov %rax,%rdx
+	shr $32,%rdx
+	wrmsr
+	
+0:
 
 	pop_cfi %rdi
 	pop_cfi %rsi

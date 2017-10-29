@@ -1,3 +1,4 @@
+../build-crossgcc-gcc.patch
 ../configure.ac
 ../Makefile.am
 ../README
@@ -239,15 +240,6 @@ lib/dev_text.cc
 lib/bitsearch.h
 lib/fileio.h
 kernel.creator.user.c2fe216
-%{Env:BUILDDIR}/dump/kernel.dis
-%{Env:BUILDDIR}/dump/arch/x86_64/cpu/nontemporal.s
-%{Env:BUILDDIR}/dump/arch/x86_64/cpu/gdt.s
-%{Env:BUILDDIR}/dump/kernel.map
-%{Env:BUILDDIR}/dump/symbols-all.txt
-%{Env:BUILDDIR}/dump/symbols-all.s
-%{Env:BUILDDIR}/dump/lib/tls.s
-%{Env:BUILDDIR}/dump/lib/printk.s
-%{Env:BUILDDIR}/dump/kernel-headers
 ../qemu-emu-generator
 device/nvmebits.h
 device/pcibits.h
@@ -273,3 +265,5 @@ arch/x86_64/cpu/segrw.h
 arch/x86_64/cpu/segrw.cc
 syscall/mem.cc
 syscall/mem.h
+../build-crossgcc.sh
+../build-crossgcc-versions

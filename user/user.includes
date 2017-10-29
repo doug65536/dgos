@@ -1,6 +1,1 @@
-libc
-libc/include
-libc/src
-libc/syscall
-.
-shell
+../optimized/musl-install/include

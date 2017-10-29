@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "assert.h"
 #include "isr.h"
 #include "irq.h"
 #include "gdt.h"
@@ -10,7 +11,6 @@
 #include "interrupts.h"
 #include "control_regs.h"
 #include "string.h"
-#include "assert.h"
 #include "except.h"
 #include "mm.h"
 
@@ -234,6 +234,7 @@ void idt_xsave_detect(int ap)
 
         sse_context_save = isr_save_xsave;
         sse_context_restore = isr_restore_xrstor;
+        cpu_has_fsgsbase = cpuid_has_fsgsbase();
 
         // Store size of save area
         assert(info.ebx < UINT16_MAX);

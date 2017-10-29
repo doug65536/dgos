@@ -21,39 +21,7 @@ static int badf_err()
     return err(errno_t::EBADF);
 }
 
-int sys_open(char const* pathname, int flags, mode_t mode)
-{
-    process_t *p = fast_cur_process();
-    
-    int fd = p->ids.desc_alloc.alloc();
-    
-    int id = file_open(pathname, flags, mode);
-    
-    if (likely(id >= 0)) {
-        p->ids.ids[fd] = id;
-        return fd;
-    }
-    
-    p->ids.desc_alloc.free(fd);
-    return err(-id);
-}
-
-int sys_creat(const char *path, mode_t mode)
-{
-    process_t *p = fast_cur_process();
-    
-    int fd = p->ids.desc_alloc.alloc();
-    
-    int id = file_creat(path, mode);
-    
-    if (likely(id >= 0)) {
-        p->ids.ids[fd] = id;
-        return fd;
-    }
-    
-    p->ids.desc_alloc.free(fd);
-    return err(-id);
-}
+// == APIs that take file descriptors ==
 
 ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
@@ -249,6 +217,50 @@ int sys_dup2(int oldfd, int newfd)
     return sys_dup3(oldfd, newfd, 0);
 }
 
+// == APIs that take paths ==
+
+int sys_open(char const* pathname, int flags, mode_t mode)
+{
+    process_t *p = fast_cur_process();
+    
+    int fd = p->ids.desc_alloc.alloc();
+    
+    int id = file_open(pathname, flags, mode);
+    
+    if (likely(id >= 0)) {
+        p->ids.ids[fd] = id;
+        return fd;
+    }
+    
+    p->ids.desc_alloc.free(fd);
+    return err(-id);
+}
+
+int sys_creat(const char *path, mode_t mode)
+{
+    process_t *p = fast_cur_process();
+    
+    int fd = p->ids.desc_alloc.alloc();
+    
+    int id = file_creat(path, mode);
+    
+    if (likely(id >= 0)) {
+        p->ids.ids[fd] = id;
+        return fd;
+    }
+    
+    p->ids.desc_alloc.free(fd);
+    return err(-id);
+}
+
+int sys_truncate(char const *path, off_t size)
+{
+    int fd = sys_open(path, O_RDWR, 0);
+    int err = sys_ftruncate(fd, size);
+    sys_close(fd);
+    return err;
+}
+
 int sys_rename(const char *old_path, const char *new_path)
 {
     int status = file_rename(old_path, new_path);
@@ -283,4 +295,68 @@ int sys_unlink(const char *path)
         return status;
 
     return err(status);
+}
+
+int sys_mknod(const char *path, mode_t mode, int rdev)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_link(const char *from, const char *to)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_chmod(const char *path, mode_t mode)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_fchmod(int fd, mode_t mode)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_chown(const char *path, int uid, int gid)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_fchown(int fd, int uid, int gid)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_setxattr(const char *path, 
+                 const char *name, const char *value, 
+                 size_t size, int flags)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_getxattr(const char *path, 
+                 const char *name, char *value, 
+                 size_t size)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_listxattr(const char *path, const char *list, size_t size)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_access(const char *path, int mask)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);    
 }

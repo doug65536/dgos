@@ -98,7 +98,7 @@ entry_start:
 	# Relocate to 0x600
 	movw $0x7c00,%si
 	movw $0x0600,%di
-	movw $512/2,%cx
+	movw $256,%cx
 	cld
 	rep movsw
 	ljmp $0,$relocated_entry

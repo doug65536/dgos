@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-
 quiet=0
 scriptroot="$(cd "$(dirname "$0")" && pwd)"
 patches="$scriptroot/patches/"
@@ -10,6 +8,10 @@ outdir=
 archives=
 prefixdir=
 logfile=
+
+export CFLAGS='-static'
+export CXXFLAGS='-static'
+export LDFLAGS='-static'
 
 # Set pipe errors to fail the command
 set -o pipefail
@@ -71,12 +73,13 @@ function require_values() {
 function extract_tool() {
 	local base="$1"
 	local ext="$2"
+	local config="$3"
 
 	local input=$(fullpath "$base$ext")
 	
 	local name=${base#$archives/}
 	
-	echo "Extracting and configuring $name"
+	echo "Extracting $name"
 	
 	local src="$outdir/src"
 	local build="$outdir/build"	
@@ -84,9 +87,19 @@ function extract_tool() {
 	mkdir -p "$src" || exit
 	mkdir -p "$build" || exit
 	
+	local patchname="$scriptroot/build-crossgcc-$config.patch"
+	
 	pushd "$src" || exit
 	if ! [[ -d "$name" ]]; then
 		tar xf "$input" || exit
+		
+		if [[ -f "$patchname" ]]; then
+			log echo Applying patch $patchname
+			cd "$name" || exit
+			patch -p1 < "$patchname" || exit
+		else
+			log echo "No patch for $patchname"
+		fi
 	fi
 	popd || exit
 }
@@ -160,6 +173,7 @@ do
     esac
 done
 
+mkdir -p "$outdir"
 logfile=$(fullpath "$outdir/build.log")
 prefixdir=$(fullpath "$prefixdir")
 
@@ -199,30 +213,37 @@ download_file "$gmpurl" "$archives"
 download_file "$mpcurl" "$archives"
 download_file "$mpfurl" "$archives"
 
+toolre='/([^/-]+)-'
 for tarball in $archives/*.tar.*; do
 	log echo Extracting tarball $tarball
-	process_tarball "$tarball" "extract_tool"
+	if [[ $tarball =~ $toolre ]]; then
+		toolname="${BASH_REMATCH[1]}"
+	else
+		toolname=
+	fi
+	process_tarball "$tarball" "extract_tool" "$toolname" || exit
 done
 
 ln -sf $(fullpath "$outdir/src/gmp-$gmpver") \
-	$(fullpath "$outdir/src/gcc-$gccver/gmp")
+	$(fullpath "$outdir/src/gcc-$gccver/gmp") || exit
 ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
-	$(fullpath "$outdir/src/gcc-$gccver/mpc")
+	$(fullpath "$outdir/src/gcc-$gccver/mpc") || exit
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
-	$(fullpath "$outdir/src/gcc-$gccver/mpfr")
+	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
 gcc_config="--target=$arches --with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
---enable-shared --enable-system-zlib --enable-threads"
+--enable-shared --enable-system-zlib"
+
+# disable for now: --enable-threads=posix
 
 bin_config="--target=$arches --enable-gold --enable-ld"
 gdb_config="--target=$arches"
 
-process_tarball "$archives/$bintar" "make_tool" all "$bin_config"
-process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config"
+process_tarball "$archives/$bintar" "make_tool" all "$bin_config" || exit
+process_tarball "$archives/$bintar" "make_tool" install "$bin_config" || exit
+process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" || exit
 for target in all-gcc all-target-libgcc install-gcc install-target-libgcc; do
-	process_tarball "$archives/$gcctar" "make_tool" "$target" "$gcc_config"
+	process_tarball "$archives/$gcctar" "make_tool" "$target" "$gcc_config" || exit
 done
-
-process_tarball "$archives/$bintar" "make_tool" install "$bin_config" 
-process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" 
+process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" || exit

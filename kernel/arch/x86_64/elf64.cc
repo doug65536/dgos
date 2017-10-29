@@ -84,7 +84,7 @@ static Elf64_Sym const *modload_lookup_in_module(
 
 module_entry_fn_t modload_load(char const *path)
 {
-    file_t fd = file_open("hello.km", O_RDONLY);
+    file_t fd = file_open(path, O_RDONLY);
     
     if (!fd.is_open()) {
         printdbg("Failed to open module \"%s\"\n", path);

@@ -9,7 +9,6 @@
 
 struct filetab_t {
     fs_file_info_t *fi;
-    ino_t inode;
     fs_base_t *fs;
     off_t pos;
     filetab_t *next_free;
@@ -78,11 +77,13 @@ REGISTER_CALLOUT(file_init, 0, callout_type_t::partition_probe, "999");
 static filetab_t *file_fh_from_id(int id)
 {
     filetab_t *item = nullptr;
-    if (likely(id > 0 && id < (int)file_table.size()))
+    if (likely(id > 0 && id < (int)file_table.size())) {
         item = &file_table[id];
-    if (likely(item->refcount > 0))
-        return item;
-    assert(!"Zero ref count!");
+
+        if (likely(item->refcount > 0))
+            return item;
+        assert(!"Zero ref count!");
+    }
     return nullptr;
 }
 

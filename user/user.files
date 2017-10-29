@@ -14,3 +14,4 @@ libc/syscall/x86_64/syscall5.c
 libc/syscall/x86_64/syscall6.c
 libc/syscall/x86_64/syscall0.c
 .gitignore
+bin/hello/hello.cc

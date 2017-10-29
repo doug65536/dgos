@@ -19,7 +19,8 @@ BUILT_SOURCES = \
 # Build libkernel-sse41.a libkernel-avx libkernel-avx512
 #  -> Build kernel-elf
 
-LINKER_SEL = -fuse-ld=gold -z max-page-size=256
+#LINKER_SEL = -fuse-ld=gold -z max-page-size=256
+LINKER_SEL =
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG = 
@@ -59,7 +60,7 @@ EXTRA_libmbr_a_DEPENDENCIES = \
 
 mbr_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	-Wl,--oformat,elf32-little \
+	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -fuse-ld=bfd -static \
@@ -103,6 +104,7 @@ mbr_bin_CFLAGS = \
 
 mbr_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
@@ -172,48 +174,43 @@ libbootsect_a_SOURCES = \
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot
 
-#	$(REAL_MODE_FLAGS)
-
 libbootsect_a_CXXFLAGS = \
+	$(REAL_MODE_FLAGS) \
 	-m32 \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	-ggdb -ffreestanding \
-	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
-	-fno-asynchronous-unwind-tables \
-	-fno-common \
+	-ffreestanding \
+	$(NO_STACKPROTECTOR_FLAGS) $(NO_EXCEPTIONS_FLAGS) -fno-rtti \
+	$(NO_UNWIND_TABLES_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	-mrtd -mregparm=3 \
 	-std=c++14 $(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-#	$(REAL_MODE_FLAGS)
-
 libbootsect_a_CFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	-ggdb \
 	-ffreestanding \
-	-fno-stack-protector -fno-common -fno-rtti \
-	-fno-asynchronous-unwind-tables \
-	-fno-common \
+	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) -fno-rtti \
+	$(NO_UNWIND_TABLES_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	-std=c++14 \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-#	$(REAL_MODE_FLAGS)
 
 libbootsect_a_CCASFLAGS = \
 	-m32 \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	-ggdb \
 	-ffreestanding \
-	-fno-asynchronous-unwind-tables \
+	$(NO_UNWIND_TABLES_FLAGS) \
 	-std=c++14 \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -225,26 +222,26 @@ bootfat_elf_SOURCES = \
 
 bootfat_elf_CXXFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
-#	$(REAL_MODE_FLAGS)
 
 bootfat_elf_CCASFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-#	$(REAL_MODE_FLAGS)
 
 bootfat_elf_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,i386linux \
+	-Wl,-melf_i386 \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	$(LINKER_SEL) -fuse-ld=gold -static \
+	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -266,14 +263,15 @@ bootfat_bin_CXXFLAGS = \
 
 bootfat_bin_CCASFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(bootfat_elf_CCASFLAGS)
 
-#	$(REAL_MODE_FLAGS)
 
 bootfat_bin_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
+	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	$(LINKER_SEL) -fuse-ld=bfd -static \
@@ -296,7 +294,6 @@ bootiso_elf_SOURCES = \
 bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
-#	$(REAL_MODE_FLAGS)
 
 bootiso_elf_CCASFLAGS = \
 	-m32 \
@@ -311,7 +308,7 @@ bootiso_elf_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,i386linux \
+	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
@@ -343,6 +340,7 @@ bootiso_bin_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
+	-Wl,-m,elf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/bootiso.map \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
@@ -590,13 +588,18 @@ kernel_elf_INCLUDES = \
 
 kernel_elf_CXXFLAGS = \
 	$(kernel_elf_INCLUDES) \
-	-std=c++14 -ggdb \
-	-mcmodel=kernel $(NO_PIC_FLAGS) -mno-red-zone \
-	-fno-asynchronous-unwind-tables \
-	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
+	-std=c++14 \
+	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_COMMON_FLAGS) \
+	-fno-rtti \
 	-msse -msse2 -fverbose-asm \
-	-rdynamic \
+	-Wl,--export-dynamic \
 	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
+
+kernel_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS)
 
 libkernel_sse41_a_SOURCES = \
@@ -609,12 +612,12 @@ libkernel_avx512_a_SOURCES = \
 	kernel/arch/x86_64/cpu/nontemporal_avx512.cc
 
 kernel_elf_LDFLAGS = \
-	-Wl,--oformat,elf64-x86-64 \
+	-Wl,-melf_x86_64 \
 	-Wl,-Map,$(top_builddir)/kernel.map \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
-	-rdynamic -static \
+	-Wl,--export-dynamic -static \
 	-Wl,-z,max-page-size=4096 \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -698,12 +701,12 @@ $(top_srcdir)/kernel/device/pcibits.h: \
 # ----------------------------------------------------------------------------
 # Build musl
 
-MUSL_BUILDDIR = $(top_builddir)/musl-build
-MUSL_INSTDIR = $(top_builddir)/musl-install
-MUSL_CFLAGS = -mno-red-zone -fno-asynchronous-unwind-tables -mtune=znver1
+MUSL_BUILDDIR = $(abs_top_builddir)/musl-build
+MUSL_INSTDIR = $(abs_top_builddir)/musl-install
+MUSL_CFLAGS = $(NO_REDZONE_FLAGS) $(NO_UNWIND_TABLES_FLAGS) -mtune=znver1
 MUSL_ARCH = x86_64
 
-MUSL_SRCDIR = $(top_srcdir)/musl
+MUSL_SRCDIR = $(abs_top_srcdir)/musl
 
 MUSL_BUILDOUT = \
 	$(MUSL_BUILDDIR)/lib/libxnet.a \
@@ -731,8 +734,9 @@ $(MUSL_BUILDDIR)/Makefile: $(MUSL_SRCDIR)/configure
 	( \
 		mkdir -p $(MUSL_BUILDDIR) && \
 		cd $(MUSL_BUILDDIR) && \
+		CC=$(CC) CXX=$(CXX) AR=$(AR) RANLIB=$(RANLIB) LD=$(LD) \
 		CFLAGS="$(MUSL_CFLAGS)" ../$(top_srcdir)/musl/configure \
-				--prefix=$(MUSL_INSTDIR) \
+			--prefix=$(MUSL_INSTDIR) \
 	)
 
 $(MUSL_BUILDOUT): $(MUSL_BUILDDIR)/Makefile

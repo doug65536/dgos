@@ -66,6 +66,7 @@ struct cpuid_cache_t {
     bool has_de      :1;
     bool has_inrdtsc :1;
     bool has_avx512f :1;
+    bool has_fsgsbase:1;
 };
 
 extern cpuid_cache_t cpuid_cache;
@@ -145,3 +146,7 @@ static inline bool cpuid_has_inrdtsc(void) { return cpuid_cache.has_inrdtsc; }
 // Avx-512 Foundation
 __const
 static inline bool cpuid_has_avx512f(void) { return cpuid_cache.has_avx512f; }
+
+// {RD|WR}{FS|GS}BASE instructions
+__const
+static inline bool cpuid_has_fsgsbase(void){ return cpuid_cache.has_fsgsbase; }

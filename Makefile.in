@@ -176,10 +176,10 @@ bootiso_elf_OBJECTS = $(am_bootiso_elf_OBJECTS)
 bootiso_elf_DEPENDENCIES = libbootsect.a
 bootiso_elf_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootiso_elf_LDFLAGS) $(LDFLAGS) -o $@
-am_kernel_elf_OBJECTS = kernel/arch/x86_64/entry.$(OBJEXT) \
-	kernel/arch/x86_64/cpu/isr.$(OBJEXT) \
-	kernel/arch/x86_64/cpu/except_asm.$(OBJEXT) \
-	kernel/arch/x86_64/cpu/syscall.$(OBJEXT) \
+am_kernel_elf_OBJECTS = kernel/arch/x86_64/kernel_elf-entry.$(OBJEXT) \
+	kernel/arch/x86_64/cpu/kernel_elf-isr.$(OBJEXT) \
+	kernel/arch/x86_64/cpu/kernel_elf-except_asm.$(OBJEXT) \
+	kernel/arch/x86_64/cpu/kernel_elf-syscall.$(OBJEXT) \
 	kernel/kernel_elf-main.$(OBJEXT) \
 	kernel/lib/kernel_elf-assert.$(OBJEXT) \
 	kernel/lib/kernel_elf-bitsearch.$(OBJEXT) \
@@ -310,16 +310,16 @@ DEFAULT_INCLUDES = -I.@am__isrc@
 depcomp = $(SHELL) $(top_srcdir)/build-aux/depcomp
 am__depfiles_maybe = depfiles
 am__mv = mv -f
+AM_V_lt = $(am__v_lt_@AM_V@)
+am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
+am__v_lt_0 = --silent
+am__v_lt_1 = 
 CPPASCOMPILE = $(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CCASFLAGS) $(CCASFLAGS)
 AM_V_CPPAS = $(am__v_CPPAS_@AM_V@)
 am__v_CPPAS_ = $(am__v_CPPAS_@AM_DEFAULT_V@)
 am__v_CPPAS_0 = @echo "  CPPAS   " $@;
 am__v_CPPAS_1 = 
-AM_V_lt = $(am__v_lt_@AM_V@)
-am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
-am__v_lt_0 = --silent
-am__v_lt_1 = 
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 AM_V_CXX = $(am__v_CXX_@AM_V@)
@@ -442,7 +442,6 @@ DISABLE_OPTIMIZATION_FLAGS = @DISABLE_OPTIMIZATION_FLAGS@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
-ENABLE_FRAMEPOINTER_FLAGS = @ENABLE_FRAMEPOINTER_FLAGS@
 EXEEXT = @EXEEXT@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
@@ -456,7 +455,12 @@ LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MKISOFS = @MKISOFS@
+NO_COMMON_FLAGS = @NO_COMMON_FLAGS@
+NO_EXCEPTIONS_FLAGS = @NO_EXCEPTIONS_FLAGS@
 NO_PIC_FLAGS = @NO_PIC_FLAGS@
+NO_REDZONE_FLAGS = @NO_REDZONE_FLAGS@
+NO_STACKPROTECTOR_FLAGS = @NO_STACKPROTECTOR_FLAGS@
+NO_UNWIND_TABLES_FLAGS = @NO_UNWIND_TABLES_FLAGS@
 OBJEXT = @OBJEXT@
 OPTIMIZE_SIZE_FLAGS = @OPTIMIZE_SIZE_FLAGS@
 OPTIMIZE_SPEED_FLAGS = @OPTIMIZE_SPEED_FLAGS@
@@ -540,7 +544,9 @@ BUILT_SOURCES = \
 #  -> Link bootiso-bin
 # Build libkernel-sse41.a libkernel-avx libkernel-avx512
 #  -> Build kernel-elf
-LINKER_SEL = -fuse-ld=gold -z max-page-size=256
+
+#LINKER_SEL = -fuse-ld=gold -z max-page-size=256
+LINKER_SEL = 
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG = 
@@ -570,7 +576,7 @@ EXTRA_libmbr_a_DEPENDENCIES = \
 # mbr-elf
 mbr_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	-Wl,--oformat,elf32-little \
+	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -fuse-ld=bfd -static \
@@ -614,6 +620,7 @@ mbr_bin_CFLAGS = \
 
 mbr_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
@@ -682,48 +689,42 @@ libbootsect_a_SOURCES = \
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot
 
-
-#	$(REAL_MODE_FLAGS)
 libbootsect_a_CXXFLAGS = \
+	$(REAL_MODE_FLAGS) \
 	-m32 \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	-ggdb -ffreestanding \
-	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
-	-fno-asynchronous-unwind-tables \
-	-fno-common \
+	-ffreestanding \
+	$(NO_STACKPROTECTOR_FLAGS) $(NO_EXCEPTIONS_FLAGS) -fno-rtti \
+	$(NO_UNWIND_TABLES_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	-mrtd -mregparm=3 \
 	-std=c++14 $(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-
-#	$(REAL_MODE_FLAGS)
 libbootsect_a_CFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	-ggdb \
 	-ffreestanding \
-	-fno-stack-protector -fno-common -fno-rtti \
-	-fno-asynchronous-unwind-tables \
-	-fno-common \
+	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) -fno-rtti \
+	$(NO_UNWIND_TABLES_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	-std=c++14 \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-
-#	$(REAL_MODE_FLAGS)
 libbootsect_a_CCASFLAGS = \
 	-m32 \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	-ggdb \
 	-ffreestanding \
-	-fno-asynchronous-unwind-tables \
+	$(NO_UNWIND_TABLES_FLAGS) \
 	-std=c++14 \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -735,26 +736,24 @@ bootfat_elf_SOURCES = \
 
 bootfat_elf_CXXFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
-
-#	$(REAL_MODE_FLAGS)
 bootfat_elf_CCASFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-
-#	$(REAL_MODE_FLAGS)
 bootfat_elf_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,i386linux \
+	-Wl,-melf_i386 \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	$(LINKER_SEL) -fuse-ld=gold -static \
+	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -776,14 +775,14 @@ bootfat_bin_CXXFLAGS = \
 
 bootfat_bin_CCASFLAGS = \
 	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(bootfat_elf_CCASFLAGS)
 
-
-#	$(REAL_MODE_FLAGS)
 bootfat_bin_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
+	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	$(LINKER_SEL) -fuse-ld=bfd -static \
@@ -806,8 +805,6 @@ bootiso_elf_SOURCES = \
 bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
-
-#	$(REAL_MODE_FLAGS)
 bootiso_elf_CCASFLAGS = \
 	-m32 \
 	-Wa,-g \
@@ -821,7 +818,7 @@ bootiso_elf_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,i386linux \
+	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
@@ -853,6 +850,7 @@ bootiso_bin_LDFLAGS = \
 	-m32 \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
+	-Wl,-m,elf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/bootiso.map \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
@@ -1100,13 +1098,18 @@ kernel_elf_INCLUDES = \
 
 kernel_elf_CXXFLAGS = \
 	$(kernel_elf_INCLUDES) \
-	-std=c++14 -ggdb \
-	-mcmodel=kernel $(NO_PIC_FLAGS) -mno-red-zone \
-	-fno-asynchronous-unwind-tables \
-	-fno-stack-protector -fno-exceptions -fno-common -fno-rtti \
+	-std=c++14 \
+	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_COMMON_FLAGS) \
+	-fno-rtti \
 	-msse -msse2 -fverbose-asm \
-	-rdynamic \
+	-Wl,--export-dynamic \
 	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
+
+kernel_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS)
 
 libkernel_sse41_a_SOURCES = \
@@ -1119,12 +1122,12 @@ libkernel_avx512_a_SOURCES = \
 	kernel/arch/x86_64/cpu/nontemporal_avx512.cc
 
 kernel_elf_LDFLAGS = \
-	-Wl,--oformat,elf64-x86-64 \
+	-Wl,-melf_x86_64 \
 	-Wl,-Map,$(top_builddir)/kernel.map \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
-	-rdynamic -static \
+	-Wl,--export-dynamic -static \
 	-Wl,-z,max-page-size=4096 \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -1168,11 +1171,11 @@ ZLIBMAKE = $(MAKE)
 
 # ----------------------------------------------------------------------------
 # Build musl
-MUSL_BUILDDIR = $(top_builddir)/musl-build
-MUSL_INSTDIR = $(top_builddir)/musl-install
-MUSL_CFLAGS = -mno-red-zone -fno-asynchronous-unwind-tables -mtune=znver1
+MUSL_BUILDDIR = $(abs_top_builddir)/musl-build
+MUSL_INSTDIR = $(abs_top_builddir)/musl-install
+MUSL_CFLAGS = $(NO_REDZONE_FLAGS) $(NO_UNWIND_TABLES_FLAGS) -mtune=znver1
 MUSL_ARCH = x86_64
-MUSL_SRCDIR = $(top_srcdir)/musl
+MUSL_SRCDIR = $(abs_top_srcdir)/musl
 MUSL_BUILDOUT = \
 	$(MUSL_BUILDDIR)/lib/libxnet.a \
 	$(MUSL_BUILDDIR)/lib/libutil.a \
@@ -1475,16 +1478,16 @@ kernel/arch/x86_64/$(am__dirstamp):
 kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) kernel/arch/x86_64/$(DEPDIR)
 	@: > kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
-kernel/arch/x86_64/entry.$(OBJEXT):  \
+kernel/arch/x86_64/kernel_elf-entry.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
-kernel/arch/x86_64/cpu/isr.$(OBJEXT):  \
+kernel/arch/x86_64/cpu/kernel_elf-isr.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
-kernel/arch/x86_64/cpu/except_asm.$(OBJEXT):  \
+kernel/arch/x86_64/cpu/kernel_elf-except_asm.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
-kernel/arch/x86_64/cpu/syscall.$(OBJEXT):  \
+kernel/arch/x86_64/cpu/kernel_elf-syscall.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
 kernel/$(am__dirstamp):
@@ -1835,7 +1838,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/$(DEPDIR)/kernel_elf-gdbstub.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/$(DEPDIR)/kernel_elf-nano_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/$(DEPDIR)/kernel_elf-stacktrace.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/isr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-apic.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-atomic.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-cmos.Po@am__quote@
@@ -1849,6 +1851,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-idt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-interrupts.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-ioport.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-legacy_pic.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-legacy_pit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-math.Po@am__quote@
@@ -1949,6 +1952,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CPPASCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+kernel/arch/x86_64/cpu/kernel_elf-isr.o: kernel/arch/x86_64/cpu/isr.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_elf-isr.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Tpo -c -o kernel/arch/x86_64/cpu/kernel_elf-isr.o `test -f 'kernel/arch/x86_64/cpu/isr.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/isr.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/isr.S' object='kernel/arch/x86_64/cpu/kernel_elf-isr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_elf-isr.o `test -f 'kernel/arch/x86_64/cpu/isr.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/isr.S
+
+kernel/arch/x86_64/cpu/kernel_elf-isr.obj: kernel/arch/x86_64/cpu/isr.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_elf-isr.obj -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Tpo -c -o kernel/arch/x86_64/cpu/kernel_elf-isr.obj `if test -f 'kernel/arch/x86_64/cpu/isr.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/isr.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/isr.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_elf-isr.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/isr.S' object='kernel/arch/x86_64/cpu/kernel_elf-isr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_elf-isr.obj `if test -f 'kernel/arch/x86_64/cpu/isr.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/isr.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/isr.S'; fi`
 
 .cc.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -3746,6 +3763,24 @@ boot/bootiso_elf-bootiso.o: boot/bootiso.s
 boot/bootiso_elf-bootiso.obj: boot/bootiso.s
 	$(AM_V_CCAS)$(CCAS) $(bootiso_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_elf-bootiso.obj `if test -f 'boot/bootiso.s'; then $(CYGPATH_W) 'boot/bootiso.s'; else $(CYGPATH_W) '$(srcdir)/boot/bootiso.s'; fi`
 
+kernel/arch/x86_64/kernel_elf-entry.o: kernel/arch/x86_64/entry.s
+	$(AM_V_CCAS)$(CCAS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/kernel_elf-entry.o `test -f 'kernel/arch/x86_64/entry.s' || echo '$(srcdir)/'`kernel/arch/x86_64/entry.s
+
+kernel/arch/x86_64/kernel_elf-entry.obj: kernel/arch/x86_64/entry.s
+	$(AM_V_CCAS)$(CCAS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/kernel_elf-entry.obj `if test -f 'kernel/arch/x86_64/entry.s'; then $(CYGPATH_W) 'kernel/arch/x86_64/entry.s'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/entry.s'; fi`
+
+kernel/arch/x86_64/cpu/kernel_elf-except_asm.o: kernel/arch/x86_64/cpu/except_asm.s
+	$(AM_V_CCAS)$(CCAS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_elf-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.s' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.s
+
+kernel/arch/x86_64/cpu/kernel_elf-except_asm.obj: kernel/arch/x86_64/cpu/except_asm.s
+	$(AM_V_CCAS)$(CCAS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_elf-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.s'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.s'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.s'; fi`
+
+kernel/arch/x86_64/cpu/kernel_elf-syscall.o: kernel/arch/x86_64/cpu/syscall.s
+	$(AM_V_CCAS)$(CCAS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_elf-syscall.o `test -f 'kernel/arch/x86_64/cpu/syscall.s' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/syscall.s
+
+kernel/arch/x86_64/cpu/kernel_elf-syscall.obj: kernel/arch/x86_64/cpu/syscall.s
+	$(AM_V_CCAS)$(CCAS) $(kernel_elf_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_elf-syscall.obj `if test -f 'kernel/arch/x86_64/cpu/syscall.s'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/syscall.s'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/syscall.s'; fi`
+
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
 tags: tags-am
@@ -4285,8 +4320,9 @@ $(MUSL_BUILDDIR)/Makefile: $(MUSL_SRCDIR)/configure
 	( \
 		mkdir -p $(MUSL_BUILDDIR) && \
 		cd $(MUSL_BUILDDIR) && \
+		CC=$(CC) CXX=$(CXX) AR=$(AR) RANLIB=$(RANLIB) LD=$(LD) \
 		CFLAGS="$(MUSL_CFLAGS)" ../$(top_srcdir)/musl/configure \
-				--prefix=$(MUSL_INSTDIR) \
+			--prefix=$(MUSL_INSTDIR) \
 	)
 
 $(MUSL_BUILDOUT): $(MUSL_BUILDDIR)/Makefile

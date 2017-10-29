@@ -12,3 +12,4 @@ extern/include
 lib/sys
 lib/cc
 syscall
+../

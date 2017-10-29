@@ -40,6 +40,10 @@ void cpu_init(int ap)
     // Disable paging context identifiers feature if available
     if (cpuid_has_pcid())
         cr4_clr |= CR4_PCIDE;
+    
+    // Enable {RD|WR}{FS|GS}BASE instructions
+    if (cpuid_has_fsgsbase())
+        cr4_set |= CR4_FSGSBASE;
 
     cr4_set |= CR4_OFXSR | CR4_OSXMMEX;
     cr4_clr |= CR4_TSD;

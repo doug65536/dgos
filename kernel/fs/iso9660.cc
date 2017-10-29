@@ -22,16 +22,18 @@ STORAGE_REGISTER_FACTORY(iso9660);
 struct iso9660_fs_t : public fs_base_t {
     FS_BASE_IMPL
 
-    struct dir_handle_t : public fs_file_info_t {
-        iso9660_fs_t *fs;
-        iso9660_dir_ent_t *dirent;
-        char *content;
-    };
-
     struct file_handle_t : public fs_file_info_t {
         iso9660_fs_t *fs;
         iso9660_dir_ent_t *dirent;
         char *content;
+        
+        ino_t get_inode() const
+        {
+            return fs->dirent_lba(dirent);
+        }
+    };
+    
+    struct dir_handle_t : public file_handle_t {
     };
 
     union handle_t {

@@ -2125,6 +2125,7 @@ void gdb_cpu_ctrl_t::sync_hw_bp()
                 default:
                     assert(!"Invalid hardware breakpoint type,"
                             " treating as ACCESSWATCH");
+                    // fall thru...
                 case gdb_breakpoint_type_t::READWATCH:
                     // Read watch isn't possible, treat as ACCESSWATCH
                     // fall thru...
@@ -2187,18 +2188,18 @@ gdb_signal_idx_t gdb_cpu_ctrl_t::signal_from_intr(int intr)
     switch (intr) {
     case INTR_EX_DIV        : return gdb_signal_idx_t::SIGFPE;
     case INTR_EX_DEBUG      : return gdb_signal_idx_t::SIGTRAP;
-    case INTR_EX_NMI        : return gdb_signal_idx_t::SIGINT;
+    case INTR_EX_NMI        : return gdb_signal_idx_t::NONE;
     case INTR_EX_BREAKPOINT : return gdb_signal_idx_t::SIGTRAP;
-    case INTR_EX_OVF        : return gdb_signal_idx_t::SIGFPE;
-    case INTR_EX_BOUND      : return gdb_signal_idx_t::SIGSEGV;
+    case INTR_EX_OVF        : return gdb_signal_idx_t::SIGSEGV;
+    case INTR_EX_BOUND      : return gdb_signal_idx_t::NONE;
     case INTR_EX_OPCODE     : return gdb_signal_idx_t::SIGILL;
-    case INTR_EX_DEV_NOT_AV : return gdb_signal_idx_t::SIGEMT;
-    case INTR_EX_DBLFAULT   : return gdb_signal_idx_t::SIGTERM;
+    case INTR_EX_DEV_NOT_AV : return gdb_signal_idx_t::SIGFPE;
+    case INTR_EX_DBLFAULT   : return gdb_signal_idx_t::NONE;
     case INTR_EX_COPR_SEG   : return gdb_signal_idx_t::SIGSEGV;
-    case INTR_EX_TSS        : return gdb_signal_idx_t::SIGSEGV;
-    case INTR_EX_SEGMENT    : return gdb_signal_idx_t::SIGSEGV;
+    case INTR_EX_TSS        : return gdb_signal_idx_t::NONE;
+    case INTR_EX_SEGMENT    : return gdb_signal_idx_t::NONE;
     case INTR_EX_STACK      : return gdb_signal_idx_t::SIGSEGV;
-    case INTR_EX_GPF        : return gdb_signal_idx_t::SIGILL;
+    case INTR_EX_GPF        : return gdb_signal_idx_t::SIGSEGV;
     case INTR_EX_PAGE       : return gdb_signal_idx_t::SIGSEGV;
     case INTR_EX_MATH       : return gdb_signal_idx_t::SIGFPE;
     case INTR_EX_ALIGNMENT  : return gdb_signal_idx_t::SIGTRAP;

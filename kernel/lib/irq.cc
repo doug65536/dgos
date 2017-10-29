@@ -31,6 +31,7 @@ uint16_t sse_avx512_xregs_size;
 
 void (*sse_context_save)(void);
 void (*sse_context_restore)(void);
+bool cpu_has_fsgsbase;
 
 // Singly linked list head for each interrupt
 static intr_link_t intr_first[256];

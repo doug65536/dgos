@@ -35,12 +35,16 @@ SECTIONS {
 		PROVIDE_HIDDEN(___init_st = .);
 		*(.init_array)
 		*(SORT(.init_array.*))
+		*(.ctors)
+		*(.ctors.*)
 		PROVIDE_HIDDEN(___init_en = .);
 
 		. = ALIGN(16);
 		PROVIDE_HIDDEN(___fini_st = .);
 		*(.fini_array)
 		*(SORT(.fini_array.*))
+		*(.dtors)
+		*(.dtors.*)
 		PROVIDE_HIDDEN(___fini_en = .);
 
 		. = ALIGN(32);

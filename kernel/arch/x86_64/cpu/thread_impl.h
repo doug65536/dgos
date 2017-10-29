@@ -39,6 +39,7 @@ void thread_send_ipi(int cpu, int intr);
 
 #define PROCESS_PTR_GS_OFS  (4*8)
 
+__const
 static inline process_t *fast_cur_process()
 {
     void *cpu_info = cpu_gs_read_ptr(CPU_INFO_CURTHREAD_OFS);

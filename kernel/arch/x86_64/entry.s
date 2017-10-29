@@ -10,10 +10,9 @@ entry:
 	xor %ebp,%ebp
 
 	# Enable SSE (CR4_OFXSR_BIT) and SSE exceptions (CR4_OSXMMEX)
-	# and RDFSBASE/RDGSBASE/WRFSBASE/WRGSBASE (CR4_FSGSBASE_BIT)
 	# This must be done before jumping into C code
 	mov %cr4,%rax
-	or $0x10600,%rax
+	or $0x0600,%rax
 	mov %rax,%cr4
 
 	# See if this is the bootstrap processor
@@ -24,14 +23,17 @@ entry:
 
 	# This is not the bootstrap CPU
 
-	# Initialize MXCSR
+	# Initialize AP MXCSR
 	mov $((3 << 13) | (0x3F << 7)),%eax
 	and default_mxcsr_mask,%eax
 	push %rax
 	ldmxcsr (%rsp)
 
-	# Initialize FPU control word
-	movq $((3 << 10) | 0x3F),(%rsp)
+	# Initialize AP FPU control word
+	# 0 = round to nearest even
+	# 2 = 53 bit significand, 
+	# 0x3F = all exceptions masked
+	movw $((0 << 10) | (2 << 8) | 0x3F),(%rsp)
 	fldcw (%rsp)
 
 	pop %rax
@@ -66,6 +68,12 @@ entry:
 	mov %rsp,%rdx
 	sub $512,%rsp
 	and $-64,%rsp
+	
+	# Initialize FPU to 64 bit precision,
+	# all exceptions masked, round to nearest
+	fninit
+	movw $((0 << 10) | (2 << 8) | 0x3F),(%rsp)
+	fldcw (%rsp)
 
 	fxsave64 (%rsp)
 
@@ -73,22 +81,16 @@ entry:
 	mov 28(%rsp),%eax
 	mov %eax,default_mxcsr_mask
 
-	# Set MXCSR to 64-bit precision,
-	# all exceptions masked, round to nearest
-	mov $((3 << 13) | (0x3F << 7)),%ecx
+	# Set MXCSR
+	# 0x3F = all exceptions masked
+	# 0 = round to nearest
+	mov $((0 << 13) | (0x3F << 7)),%ecx
 	and %eax,%ecx
 	mov %ecx,24(%rsp)
 	ldmxcsr 24(%rsp)
-
-	# Free 512 bytes
+	
+	# Restore stack pointer
 	mov %rdx,%rsp
-
-	# Initialize FPU to 64 bit precision,
-	# all exceptions masked, round to nearest
-	fninit
-	push $((3 << 10) | 0x3F)
-	fldcw (%rsp)
-	add $8,%rsp
 
 	lea kernel_stack,%rdx
 	mov kernel_stack_size,%rbx

@@ -247,6 +247,8 @@ struct fs_init_info_t;
 struct fs_stat_t;
 class fs_file_info_t
 {
+public:
+    virtual ino_t get_inode() const = 0;
 };
 
 struct fs_statvfs_t;
