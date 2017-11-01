@@ -9,12 +9,9 @@ archives=
 prefixdir=
 logfile=
 
-export CFLAGS='-static'
-export CXXFLAGS='-static'
-export LDFLAGS='-static'
-
-# Set pipe errors to fail the command
-set -o pipefail
+#export CFLAGS='-static'
+#export CXXFLAGS='-static'
+#export LDFLAGS='-static'
 
 function log() {
 	if [[ $quiet = 0 ]]; then
@@ -180,7 +177,7 @@ prefixdir=$(fullpath "$prefixdir")
 require_value "$arches" "Architecture list required, need -a <dir>"
 require_value "$outdir" "Output directory required, need -o <dir>"
 require_value "$prefixdir" "Prefix directory required, need -p <dir>"
-require_value "$gnu_mirror" "Specified mirror URL is invalid: -m $gnu_mirror"
+require_value "$gnu_mirror" "Specified mirror URL is invalid: -m \"$gnu_mirror\""
 
 require_cmd "wget" "tar" "g++" "gcc" "as" "ar" "ranlib" "nm" "tee" "tail"
 
@@ -237,7 +234,7 @@ gcc_config="--target=$arches --with-system-zlib \
 
 # disable for now: --enable-threads=posix
 
-bin_config="--target=$arches --enable-gold --enable-ld"
+bin_config="--target=$arches --enable-gold --enable-ld --enable-plugins"
 gdb_config="--target=$arches"
 
 process_tarball "$archives/$bintar" "make_tool" all "$bin_config" || exit
