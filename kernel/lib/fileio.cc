@@ -33,6 +33,7 @@ static fs_base_t *file_fs_from_path(char const *path)
 
 static filetab_t *file_new_filetab(void)
 {
+    unique_lock<spinlock> lock(file_table_lock);
     filetab_t *item = nullptr;
     if (file_table_ff) {
         // Reuse freed item
@@ -43,6 +44,8 @@ static filetab_t *file_new_filetab(void)
         // Add another item
         file_table.emplace_back();
         item = &file_table.back();
+    } else {
+        return nullptr;
     }
     assert(item->refcount == 0);
     item->refcount = 1;
@@ -77,7 +80,7 @@ REGISTER_CALLOUT(file_init, 0, callout_type_t::partition_probe, "999");
 static filetab_t *file_fh_from_id(int id)
 {
     filetab_t *item = nullptr;
-    if (likely(id > 0 && id < (int)file_table.size())) {
+    if (likely(id >= 0 && id < (int)file_table.size())) {
         item = &file_table[id];
 
         if (likely(item->refcount > 0))
