@@ -18,6 +18,9 @@
 void cpu_init(int ap)
 {
     (void)ap;
+    
+    char const *feature_names[6];
+    size_t feature_count = 0;
 
     // Enable write protection
     cpu_cr0_change_bits(0, CR0_WP);
@@ -26,24 +29,33 @@ void cpu_init(int ap)
     uintptr_t cr4_clr = 0;
 
     // Supervisor Mode Execution Prevention (SMEP)
-    if (cpuid_has_smep())
+    if (cpuid_has_smep()) {
+        feature_names[feature_count++] = "Supervisor Mode Execution Prevention";
         cr4_set |= CR4_SMEP;
+    }
 
     // Enable global pages feature if available
-    if (cpuid_has_pge())
+    if (cpuid_has_pge()) {
+        feature_names[feature_count++] = "Global pages";
         cr4_set |= CR4_PGE;
+    }
 
     // Enable debugging extensions feature if available
-    if (cpuid_has_de())
+    if (cpuid_has_de()) {
+        feature_names[feature_count++] = "Debugging extensions";
         cr4_set |= CR4_DE;
+    }
 
     // Disable paging context identifiers feature if available
-    if (cpuid_has_pcid())
+    if (cpuid_has_pcid()) {
         cr4_clr |= CR4_PCIDE;
+    }
     
     // Enable {RD|WR}{FS|GS}BASE instructions
-    if (cpuid_has_fsgsbase())
+    if (cpuid_has_fsgsbase()) {
+        feature_names[feature_count++] = "FSGSBASE instructions";
         cr4_set |= CR4_FSGSBASE;
+    }
 
     cr4_set |= CR4_OFXSR | CR4_OSXMMEX;
     cr4_clr |= CR4_TSD;
@@ -51,8 +63,13 @@ void cpu_init(int ap)
     cpu_cr4_change_bits(cr4_clr, cr4_set);
 
     // Enable no-execute if feature available
-    if (cpuid_has_nx())
+    if (cpuid_has_nx()) {
+        feature_names[feature_count++] = "No-execute paging";
         msr_adj_bit(MSR_EFER, 11, 1);
+    }
+    
+    for (size_t i = 0; i < feature_count; ++i)
+        printdbg("CPU feature: %s\n", feature_names[i]);
 }
 
 //static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
