@@ -1105,7 +1105,8 @@ kernel_elf_CXXFLAGS = \
 	$(NO_COMMON_FLAGS) \
 	-fno-rtti \
 	-msse -msse2 -fverbose-asm \
-	-Wl,--export-dynamic \
+	-fvisibility=default \
+	-export-dynamic \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -1126,8 +1127,9 @@ kernel_elf_LDFLAGS = \
 	-Wl,-Map,$(top_builddir)/kernel.map \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
+	-v \
 	-Wl,-g \
-	-Wl,--export-dynamic -static \
+	-export-dynamic \
 	-Wl,-z,max-page-size=4096 \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -4318,10 +4320,11 @@ $(top_srcdir)/kernel/device/pcibits.h: \
 
 $(MUSL_BUILDDIR)/Makefile: $(MUSL_SRCDIR)/configure
 	( \
+		muslpath=$$(readlink -f "$(top_srcdir)/musl") && \
 		mkdir -p $(MUSL_BUILDDIR) && \
 		cd $(MUSL_BUILDDIR) && \
 		CC=$(CC) CXX=$(CXX) AR=$(AR) RANLIB=$(RANLIB) LD=$(LD) \
-		CFLAGS="$(MUSL_CFLAGS)" ../$(top_srcdir)/musl/configure \
+		CFLAGS="$(MUSL_CFLAGS)" $$muslpath/configure \
 			--prefix=$(MUSL_INSTDIR) \
 	)
 
