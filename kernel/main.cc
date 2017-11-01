@@ -622,9 +622,9 @@ static int stress_heap_thread(void *p)
             }
 
             printdbg("heap_alloc+memset+heap_free:"
-                     " min=%8ld (%luns @ 2.5GHz), max=%8ld, avg=%8ld,"
+                     " min=%8ld (%luns @ 3.2GHz), max=%8ld, avg=%8ld,"
                      " withfree=%8ld cycles\n",
-                     min_el, min_el * 10 / 25, max_el, tot_el / count,
+                     min_el, min_el * 10 / 32, max_el, tot_el / count,
                      overall / count);
         }
     }
