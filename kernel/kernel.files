@@ -1,8 +1,10 @@
+../AUTHORS
 ../build-crossgcc-gcc.patch
 ../configure.ac
 ../Makefile.am
 ../README
 ../INSTALL
+../dobuild
 net/eth_q.h
 net/ipv4_frame.h
 net/udp_frame.h
