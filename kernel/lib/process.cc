@@ -144,6 +144,8 @@ int process_spawn(pid_t * pid_result,
                 hdr.e_phoff))
         return -1;
     
+    uintptr_t top_addr;
+    
     for (Elf64_Phdr& ph : program_hdrs) {
         // If it is not readable, writable or executable, ignore
         if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
@@ -151,6 +153,10 @@ int process_spawn(pid_t * pid_result,
         
         if (ph.p_memsz == 0)
             continue;
+        
+        // See if it grossly overflows into kernel space
+        if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0)
+            return -1;
         
         int page_prot = 0;
         
@@ -176,6 +182,8 @@ int process_spawn(pid_t * pid_result,
             }
         }
     }
+    
+    // Initialize the stack
     
     thread_create(thread_fn_t(uintptr_t(hdr.e_entry)),
                   nullptr, nullptr, 0);
