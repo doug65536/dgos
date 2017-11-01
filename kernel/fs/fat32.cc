@@ -1083,7 +1083,7 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    unique_ptr<char> sector_buffer = new char[sector_size];
+    unique_ptr<char[]> sector_buffer = new char[sector_size];
     fat32_bpb_data_t bpb;
 
     lba_st = conn->part_st;
