@@ -97,3 +97,10 @@ int sys_munlockall()
     thread_set_error(errno_t::ENOSYS);
     return -1;
 }
+
+int clone(int flags, void *child_stack,
+          int *ptid, unsigned long newtls,
+          int *ctid)
+{
+    
+}
