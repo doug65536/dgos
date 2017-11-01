@@ -113,12 +113,13 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 {
     fs_reg_t *fs_reg = find_fs(fs_name);
 
-    if (fs_reg == 0) {
+    if (!fs_reg) {
         STORAGE_TRACE("Could not find %s filesystem implementation\n", fs_name);
         return;
     }
 
-    assert(fs_reg != 0);
+    assert(fs_reg != nullptr);
+    assert(fs_reg->factory != nullptr);
 
     printdbg("Mounting %s filesystem\n", fs_name);
 
