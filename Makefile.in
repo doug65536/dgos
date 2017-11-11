@@ -1343,6 +1343,7 @@ libc_a_CXXFLAGS = \
     -isystem $(top_srcdir)/libc/include \
     -isystem $(top_builddir)/cross-tool/x86_64-elf/include \
     -ffreestanding \
+	-std=c++14 \
     $(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)    
 
