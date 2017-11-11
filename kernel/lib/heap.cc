@@ -1,11 +1,19 @@
 #include "heap.h"
 #include "threadsync.h"
-#include "mm.h"
 #include "assert.h"
 #include "string.h"
 #include "bitsearch.h"
-#include "printk.h"
+
+#ifdef __DGOS_KERNEL__
+#include "mm.h"
 #include "cpu/control_regs.h"
+#else
+#include <pthread.h>
+#define mutex_init pthread_mutex_init
+#define mutex_destroy pthread_mutex_destroy
+#define mutex_lock pthread_mutex_lock
+#define mutex_unlock pthread_mutex_unlock
+#endif
 
 struct heap_hdr_t {
     uintptr_t size_next;
@@ -15,33 +23,31 @@ struct heap_hdr_t {
 
 C_ASSERT(sizeof(heap_hdr_t) == 16);
 
-#define HEAP_BLK_TYPE_USED  0xa10ca1ed
-#define HEAP_BLK_TYPE_FREE  0xfeeeb10c
+static constexpr uint32_t HEAP_BLK_TYPE_USED = 0xa10ca1ed;
+static constexpr uint32_t HEAP_BLK_TYPE_FREE = 0xfeeeb10c;
 
-/// [ 0] ->      32
-/// [ 1] ->      64
-/// [ 2] ->     128
-/// [ 3] ->     256
-/// [ 4] ->     512
-/// [ 5] ->    1024
-/// [ 6] ->    2048
-/// [ 7] ->    4096
-/// [ 8] ->    8096
-/// [ 9] ->   16384
-/// [10] ->   32768
-/// [11] ->   65536
+/// bucket  slot sz item sz items efficiency
+/// [ 0] ->      32      16  2048     50.00%
+/// [ 1] ->      64      48  1024     75.00%
+/// [ 2] ->     128     112   512     87.50%
+/// [ 3] ->     256     240   256     93.75%
+/// [ 4] ->     512     496   128     96.88%
+/// [ 5] ->    1024    1008    64     98.44%
+/// [ 6] ->    2048    2032    32     99.22%
+/// [ 7] ->    4096    4080    16     99.61%
+/// [ 8] ->    8192    8176     8     99.80%
+/// [ 9] ->   16384   16368     4     99.90%
+/// [10] ->   32768   32752     2     99.95%
+/// [11] ->   65536   65520     1     99.98%
 /// .... -> use mmap
 
-#define HEAP_BUCKET_COUNT   12
-#define HEAP_MMAP_THRESHOLD (1U<<(5+HEAP_BUCKET_COUNT-1))
+static constexpr size_t HEAP_BUCKET_COUNT = 12;
 
-#define HEAP_BUCKET_SIZE    (1U<<(HEAP_BUCKET_COUNT+5-1))
-#define HEAP_MAX_ARENAS \
-    (((PAGESIZE - \
-    sizeof(void*) * HEAP_BUCKET_COUNT - \
-    sizeof(heap_ext_arena_t*) - \
-    sizeof(mutex_t)) / \
-    sizeof(void*)) - 1)
+static constexpr size_t HEAP_MMAP_THRESHOLD =
+        (size_t(1)<<(5+HEAP_BUCKET_COUNT-1));
+
+static constexpr size_t HEAP_BUCKET_SIZE = 
+        (size_t(1)<<(HEAP_BUCKET_COUNT+5-1));
 
 // When the main heap_t::arenas array overflows, an additional
 // page is allocated to hold additional arena pointers.
@@ -51,6 +57,16 @@ struct heap_ext_arena_t {
     void *arenas[(PAGESIZE - sizeof(heap_ext_arena_t*) -
                   sizeof(size_t)) / sizeof(void*)];
 };
+
+// The maximum number of arenas without adding extended arenas
+static constexpr size_t HEAP_MAX_ARENAS = 
+    (((PAGESIZE -
+    sizeof(void*) * HEAP_BUCKET_COUNT -
+    sizeof(heap_ext_arena_t*) -
+    sizeof(mutex_t)) /
+    sizeof(void*)) - 1);
+
+C_ASSERT(sizeof(heap_ext_arena_t) == PAGESIZE);
 
 struct heap_t {
     heap_hdr_t *free_chains[HEAP_BUCKET_COUNT];    
@@ -189,7 +205,7 @@ static void heap_large_free(heap_hdr_t *hdr, size_t size)
 void *heap_alloc(heap_t *heap, size_t size)
 {
     if (unlikely(size == 0))
-        return 0;
+        return nullptr;
 
     // Add room for bucket header
     size += sizeof(heap_hdr_t);
@@ -200,7 +216,7 @@ void *heap_alloc(heap_t *heap, size_t size)
     uint8_t log2size = bit_log2_n(size);
 
     // Round up to bucket item size
-    size = 1U << log2size;
+    size = size_t(1) << log2size;
 
     // Bucket 0 is 32 bytes
     assert(log2size >= 5);
@@ -212,7 +228,11 @@ void *heap_alloc(heap_t *heap, size_t size)
         return heap_large_alloc(orig_size);
 
     {
+        // Disable irqs to allow malloc in interrupt handlers
+#ifdef __DGOS_KERNEL__
         cpu_scoped_irq_disable intr_was_enabled;
+#endif
+        
         mutex_lock(&heap->lock);
 
         // Try to take a free item
@@ -230,13 +250,13 @@ void *heap_alloc(heap_t *heap, size_t size)
     }
 
     if (likely(first_free)) {
-        // Store size in header
+        // Store size (including size of header) in header
         first_free->size_next = size;
 
         assert(first_free->sig1 == HEAP_BLK_TYPE_FREE);
 
         first_free->sig1 = HEAP_BLK_TYPE_USED;
-        first_free->sig2 = HEAP_BLK_TYPE_USED ^ (uint32_t)size;
+        first_free->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
 
         return first_free + 1;
     }
@@ -253,12 +273,12 @@ void heap_free(heap_t *heap, void *block)
 
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
 
-    uint8_t log2size = bit_log2_n((int32_t)hdr->size_next);
+    uint8_t log2size = bit_log2_n(hdr->size_next);
     assert(log2size >= 5 && log2size < 32);
     size_t bucket = log2size - 5;
 
     if (bucket < HEAP_BUCKET_COUNT) {
-        assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ (1U << log2size)));
+        assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ (size_t(1) << log2size)));
 
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
@@ -274,18 +294,42 @@ void heap_free(heap_t *heap, void *block)
 
 void *heap_realloc(heap_t *heap, void *block, size_t size)
 {
-    if (block) {
+    if (block && size) {
         heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
-        uint8_t newlog2size = bit_log2_n((int32_t)size);
-        size_t new_size = 1U << newlog2size;
-        if (hdr->size_next < new_size) {
+        
+        assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
+        
+        uint8_t log2size = bit_log2_n(hdr->size_next);
+        uint8_t newlog2size = bit_log2_n(size + sizeof(heap_hdr_t));
+        
+        // Reallocating to a size that is in the same bucket is a no-op
+        // If it ends up in a different bucket...
+        if (newlog2size != log2size) {
+            // Allocate a new block
             void *new_block = heap_alloc(heap, size);
+            
+            // If allocation fails, leave original block unaffected
+            if (!new_block)
+                return nullptr;
+            
+            // Copy the original to the new block
             memcpy(new_block, block, hdr->size_next);
+            
+            // Free the original
             heap_free(heap, block);
+            
+            // Return new block
             block = new_block;
         }
-        return block;
+    } else if (block && !size) {
+        // Reallocating to zero size is equivalent to heap_free
+        heap_free(heap, block);
+        block = nullptr;
+    } else {
+        // Reallocating null block is equivalent to heap_alloc
+        return heap_alloc(heap, size);
     }
-    return heap_alloc(heap, size);
+    
+    return block;
 }
 

@@ -2,7 +2,7 @@
 #include "types.h"
 #include "cpu/idt.h"
 #include "segrw.h"
-#include "isr_constants.h"
+#include "asm_constants.h"
 
 struct process_t;
 
@@ -37,11 +37,9 @@ void thread_cls_for_each_cpu(size_t slot, int other_only,
 
 void thread_send_ipi(int cpu, int intr);
 
-#define PROCESS_PTR_GS_OFS  (4*8)
-
 __const
 static inline process_t *fast_cur_process()
 {
-    void *cpu_info = cpu_gs_read_ptr(CPU_INFO_CURTHREAD_OFS);
-    return *(process_t**)((char*)cpu_info + PROCESS_PTR_GS_OFS);
+    void *thread_info = cpu_gs_read_ptr(CPU_INFO_CURTHREAD_OFS);
+    return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);
 }

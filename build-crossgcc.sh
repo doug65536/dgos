@@ -230,7 +230,15 @@ ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 
 gcc_config="--target=$arches --with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
---enable-shared --enable-system-zlib"
+--with-gnu-as --with-gnu-ld \
+--enable-initfini-array \
+--enable-link-mutex \
+--disable-nls \
+--enable-shared --enable-system-zlib \
+--enable-multiarch \
+--enable-targets=all \
+--with-arch-32=i686 --with-abi=m64 \
+--with-multilib-list=m32,m64,mx32"
 
 # disable for now: --enable-threads=posix
 

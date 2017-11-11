@@ -1,0 +1,7 @@
+include
+src/string
+/home/doug/cross-elf/lib/gcc/x86_64-elf/7.2.0/include
+include/sys
+src/stdlib
+src/sys
+tests

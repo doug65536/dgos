@@ -1,3 +1,6 @@
+arch/x86_64/cpu/asm_constants.h
+syscall/syscall_helper.h
+syscall/syscall_helper.cc
 ../AUTHORS
 ../build-crossgcc-gcc.patch
 ../configure.ac
@@ -5,6 +8,11 @@
 ../README
 ../INSTALL
 ../dobuild
+../m4/ax_prog_cc_for_build.m4
+../m4/ax_prog_cxx_for_build.m4
+arch/x86_64/cpu/syscall.S
+arch/x86_64/cpu/syscall.h
+lib/errno.cc
 net/eth_q.h
 net/ipv4_frame.h
 net/udp_frame.h
@@ -81,7 +89,6 @@ arch/x86_64/cpu/spinlock.cc
 arch/x86_64/cpu/legacy_pic.cc
 arch/x86_64/cpu/thread_impl.cc
 arch/x86_64/cpu/apic.h
-arch/x86_64/cpu/syscall.s
 arch/x86_64/cpu/atomic.cc
 arch/x86_64/cpu/syscall_dispatch.h
 arch/x86_64/cpu/cpu_metrics.h
@@ -101,7 +108,6 @@ arch/x86_64/cpu/nontemporal.cc
 arch/x86_64/cpu/except.cc
 arch/x86_64/cpu/ioport.h
 arch/x86_64/cpu/nontemporal.h
-arch/x86_64/cpu/isr_constants.h
 arch/x86_64/cpu/control_regs.cc
 arch/x86_64/cpu/mmu.cc
 arch/x86_64/cpu/cpu_broadcast.cc

@@ -14,25 +14,37 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
 static gdt_entry_combined_t gdt[] = {
     GDT_MAKE_EMPTY(),
+    
+    // Must be in this order for syscall instruction
     // 64 bit kernel code and data
     GDT_MAKE_CODESEG64(0),
     GDT_MAKE_DATASEG64(0),
+    
+    // Arbitrary
     // 32 bit kernel code and data
     GDT_MAKE_CODESEG32(0),
     GDT_MAKE_DATASEG32(0),
     // 16 bit kernel code and data
     GDT_MAKE_CODESEG16(0),
     GDT_MAKE_DATASEG16(0),
-    // 64 bit user code and data
-    GDT_MAKE_CODESEG64(3),
-    GDT_MAKE_DATASEG64(3),
-    // 32 bit user code and data
+    
+    // Must be in this order for sysret instruction
+    // 32 bit user code
     GDT_MAKE_CODESEG32(3),
-    GDT_MAKE_DATASEG32(3),
+    // User data
+    GDT_MAKE_DATASEG64(3),
+    // 64 bit user code
+    GDT_MAKE_CODESEG32(3),
+    
     GDT_MAKE_EMPTY(),
+    
     // CPU task selector
     GDT_MAKE_TSSSEG(0L, sizeof(tss_t))
 };
+
+C_ASSERT(GDT_SEL_KERNEL_CODE64 == 1*8);
+C_ASSERT(GDT_SEL_USER_CODE32 == 7*8);
+C_ASSERT(GDT_SEL_TSS == 11*8);
 
 // Holds exclusive access to TSS segment descriptor
 // while loading task register

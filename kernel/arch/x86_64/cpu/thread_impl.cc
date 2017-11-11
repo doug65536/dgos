@@ -19,7 +19,7 @@
 #include "threadsync.h"
 #include "export.h"
 #include "printk.h"
-#include "isr_constants.h"
+#include "asm_constants.h"
 #include "apic.h"
 #include "unique_ptr.h"
 #include "rbtree.h"
@@ -82,6 +82,7 @@ struct thread_info_t {
     void *xsave_ptr;
     void *xsave_stack;
 
+    uint64_t syscall_rip;
     void *syscall_stack;
     
     process_t *process;
@@ -94,10 +95,10 @@ struct thread_info_t {
     uint32_t flags;
     uint32_t stack_size;
 
-    uint64_t volatile wake_time;
-    
     // --- cache line ---
 
+    uint64_t volatile wake_time;
+    
     uint64_t volatile cpu_affinity;
 
     void *exception_chain;
@@ -105,6 +106,9 @@ struct thread_info_t {
     void *stack;
 
     int exit_code;
+    errno_t errno;
+    
+    // 3 bytes...
 
     mutex_t lock;
     condition_var_t done_cond;
@@ -115,19 +119,19 @@ struct thread_info_t {
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
 
-    errno_t errno;
     void *align[2];
 };
 
-C_ASSERT(offsetof(thread_info_t, cpu_affinity) == 64);
-C_ASSERT(offsetof(thread_info_t, process) == PROCESS_PTR_GS_OFS);
+C_ASSERT(offsetof(thread_info_t, wake_time) == 64);
+
+// Verify asm_constants.h values
+C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
+C_ASSERT(offsetof(thread_info_t, syscall_stack) == THREAD_SYSCALL_STACK_OFS);
+C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
+C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
-
-// Verify defines used from assembly (isr.S)
-C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 
 // Verify that thread_info_t is a multiple of the cache line size
 C_ASSERT((sizeof(thread_info_t) & 63) == 0);
@@ -141,8 +145,8 @@ int thread_idle_ready;
 int spincount_mask;
 size_t storage_next_slot;
 
-static size_t constexpr syscall_stack_size = (1 << 16);
-static size_t constexpr xsave_stack_size = (1 << 16);
+static size_t constexpr syscall_stack_size = (size_t(1) << 16);
+static size_t constexpr xsave_stack_size = (size_t(1) << 16);
 
 struct cpu_info_t {
     cpu_info_t *self;
@@ -159,9 +163,10 @@ struct cpu_info_t {
 
     void *storage[9];
 };
-
-C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
+
+// Verify asm_constants.h values
+C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 
 #define MAX_CPUS    64
 static cpu_info_t cpus[MAX_CPUS] __aligned(64);
@@ -388,14 +393,14 @@ static thread_t thread_create_with_state(
 
         ctx->gpr->iret.rsp = (uintptr_t)
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
-        ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA;
         ctx->gpr->iret.rflags = EFLAGS_IF;
         ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
         ctx->gpr->iret.cs = GDT_SEL_KERNEL_CODE64;
-        ctx->gpr->s[0] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr->s[1] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr->s[2] = GDT_SEL_KERNEL_DATA64;
-        ctx->gpr->s[3] = GDT_SEL_KERNEL_DATA64;
+        ctx->gpr->s[0] = GDT_SEL_KERNEL_DATA;
+        ctx->gpr->s[1] = GDT_SEL_KERNEL_DATA;
+        ctx->gpr->s[2] = GDT_SEL_KERNEL_DATA;
+        ctx->gpr->s[3] = GDT_SEL_KERNEL_DATA;
         ctx->gpr->r[0] = (uintptr_t)fn;
         ctx->gpr->r[1] = (uintptr_t)userdata;
         ctx->gpr->r[2] = (uintptr_t)i;
@@ -409,8 +414,8 @@ static thread_t thread_create_with_state(
             // All FPU registers empty
             ctx->fpr->fsw = FPUSW_TOP_n(7);
 
-            // 64 bit FPU precision
-            ctx->fpr->fcw = FPUCW_PC_n(FPUCW_PC_64) | FPUCW_IM |
+            // 53 bit FPU precision
+            ctx->fpr->fcw = FPUCW_PC_n(FPUCW_PC_53) | FPUCW_IM |
                     FPUCW_DM | FPUCW_ZM | FPUCW_OM | FPUCW_UM | FPUCW_PM;
         } else if (sse_context_size == 512) {
             cpu_fxsave(ctx->fpr);
@@ -500,7 +505,7 @@ void thread_init(int ap)
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
-    cpu_set_gs(GDT_SEL_KERNEL_DATA64);
+    cpu_set_gs(GDT_SEL_KERNEL_DATA);
     cpu_set_gsbase(cpu);
 
     if (!ap) {

@@ -190,16 +190,15 @@ union gdt_entry_combined_t {
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 #define GDT_SEL_KERNEL_CODE64   0x08
-#define GDT_SEL_KERNEL_DATA64   0x10
+#define GDT_SEL_KERNEL_DATA     0x10
 #define GDT_SEL_KERNEL_CODE32   0x18
 #define GDT_SEL_KERNEL_DATA32   0x20
 #define GDT_SEL_KERNEL_CODE16   0x28
 #define GDT_SEL_KERNEL_DATA16   0x30
-#define GDT_SEL_USER_CODE64     0x38
-#define GDT_SEL_USER_DATA64     0x40
-#define GDT_SEL_USER_CODE32     0x48
-#define GDT_SEL_USER_DATA32     0x50
-#define GDT_SEL_TSS             0x60
+#define GDT_SEL_USER_CODE32     0x38
+#define GDT_SEL_USER_DATA       0x40
+#define GDT_SEL_USER_CODE64     0x48
+#define GDT_SEL_TSS             0x58
 
 struct tss_stack_t {
     uint32_t lo;

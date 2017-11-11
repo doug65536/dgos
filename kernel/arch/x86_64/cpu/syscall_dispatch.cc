@@ -1,5 +1,7 @@
 #include "syscall_dispatch.h"
 #include "types.h"
+#include "asm_constants.h"
+#include "assert.h"
 
 #include "syscall/fd.h"
 #include "syscall/mem.h"
@@ -320,3 +322,5 @@ syscall_handler_t *syscall_handlers[314] = {
     (syscall_handler_t*)0,//sys_kcmp,
     (syscall_handler_t*)0//sys_finit_module
 };
+
+C_ASSERT(countof(syscall_handlers) == SYSCALL_COUNT);

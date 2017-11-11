@@ -1,6 +1,6 @@
 .section .text.isr, "ax"
 
-#include "isr_constants.h"
+#include "asm_constants.h"
 
 // This must be position independent code because the GDB stub clones off
 // a redundant copy to protect against infinite recursion

@@ -1832,11 +1832,11 @@ static void apic_detect_topology_intel(void)
 
     if (!cpuid(&info, CPUID_TOPOLOGY1, 0)) {
         // Enable full CPUID
-        uint64_t misc_enables = msr_get(MSR_IA32_MISC_ENABLES);
+        uint64_t misc_enables = msr_get(MSR_MISC_ENABLES);
         if (misc_enables & (1L<<22)) {
             // Enable more CPUID support and retry
             misc_enables &= ~(1L<<22);
-            msr_set(MSR_IA32_MISC_ENABLES, misc_enables);
+            msr_set(MSR_MISC_ENABLES, misc_enables);
         }
     }
 

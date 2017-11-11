@@ -13,3 +13,4 @@ lib/sys
 lib/cc
 syscall
 ../
+../m4

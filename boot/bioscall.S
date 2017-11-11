@@ -1,3 +1,5 @@
+#include "gdt.h"
+
 .code32
 
 .global bioscall
@@ -19,13 +21,13 @@ bioscall:
 	call cpu_a20_exitpm
 	
 	# Jump to 16 bit protected mode to load 64KB segment limits
-	ljmp $0x28,$0f
+	ljmp $GDT_SEL_KERNEL_CODE16,$0f
 0:
 .code16
 	# 16-bit protected mode
 	
 	# Load 16-bit data segments
-	mov $0x30,%dx
+	mov $GDT_SEL_KERNEL_DATA16,%dx
 	mov %dx,%ds
 	mov %dx,%es
 	mov %dx,%fs
@@ -108,10 +110,10 @@ bioscall:
 	bts $0,%edx
 	mov %edx,%cr0
 	
-	ljmpw $0x18,$0f
+	ljmpw $GDT_SEL_KERNEL_CODE32,$0f
 0:
 .code32
-	mov $0x20,%eax
+	mov $GDT_SEL_KERNEL_DATA,%eax
 	mov %eax,%ds
 	mov %eax,%es
 	mov %eax,%fs

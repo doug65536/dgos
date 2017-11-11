@@ -14,6 +14,7 @@
 #include "callout.h"
 #include "printk.h"
 #include "interrupts.h"
+#include "syscall.h"
 
 void cpu_init(int ap)
 {
@@ -67,6 +68,12 @@ void cpu_init(int ap)
         feature_names[feature_count++] = "No-execute paging";
         msr_adj_bit(MSR_EFER, 11, 1);
     }
+    
+    // Configure syscall
+    msr_set(MSR_FMASK, EFLAGS_AC | EFLAGS_DF | EFLAGS_TF | EFLAGS_IF);
+    msr_set(MSR_LSTAR, (uint64_t)syscall_entry);
+    msr_set_hi(MSR_STAR, GDT_SEL_KERNEL_CODE64 |
+               (GDT_SEL_USER_CODE32 << 16));
     
     for (size_t i = 0; i < feature_count; ++i)
         printdbg("CPU feature: %s\n", feature_names[i]);

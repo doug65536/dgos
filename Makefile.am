@@ -30,7 +30,8 @@ noinst_LIBRARIES = \
 	libbootsect.a \
 	libkernel-sse41.a \
 	libkernel-avx.a \
-	libkernel-avx512.a
+	libkernel-avx512.a \
+    libc.a
 
 bin_PROGRAMS = \
 	mbr-elf \
@@ -123,7 +124,7 @@ mbr_bin_LDADD = libmbr.a
 
 libbootsect_a_SOURCES = \
 	boot/bootcommon.s \
-	boot/bioscall.s \
+	boot/bioscall.S \
 	boot/bootsect.cc \
 	boot/bootinfo.s \
 	boot/screen.cc \
@@ -361,7 +362,7 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/entry.s \
 	kernel/arch/x86_64/cpu/isr.S \
 	kernel/arch/x86_64/cpu/except_asm.s \
-	kernel/arch/x86_64/cpu/syscall.s \
+	kernel/arch/x86_64/cpu/syscall.S \
 	kernel/main.cc \
 	kernel/lib/assert.cc \
 	kernel/lib/assert.h \
@@ -398,6 +399,7 @@ kernel_elf_SOURCES = \
 	kernel/lib/dev_text.h \
 	kernel/lib/dirent.h \
 	kernel/lib/errno.h \
+	kernel/lib/errno.cc \
 	kernel/lib/export.h \
 	kernel/lib/fileio.cc \
 	kernel/lib/fileio.h \
@@ -497,6 +499,7 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/bootdev.h \
 	kernel/arch/x86_64/cpu/apic.cc \
 	kernel/arch/x86_64/cpu/apic.h \
+	kernel/arch/x86_64/cpu/asm_constants.h \
 	kernel/arch/x86_64/cpu/atomic.cc \
 	kernel/arch/x86_64/cpu/atomic.h \
 	kernel/arch/x86_64/cpu/cmos.cc \
@@ -522,7 +525,6 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/cpu/interrupts.h \
 	kernel/arch/x86_64/cpu/ioport.cc \
 	kernel/arch/x86_64/cpu/ioport.h \
-	kernel/arch/x86_64/cpu/isr_constants.h \
 	kernel/arch/x86_64/cpu/isr.h \
 	kernel/arch/x86_64/cpu/legacy_pic.cc \
 	kernel/arch/x86_64/cpu/legacy_pic.h \
@@ -574,6 +576,8 @@ kernel_elf_SOURCES = \
 	kernel/arch/x86_64/stacktrace.cc \
 	kernel/arch/x86_64/stacktrace.h \
 	kernel/arch/x86_64/types.h \
+	kernel/syscall/syscall_helper.h \
+	kernel/syscall/syscall_helper.cc \
 	kernel/syscall/fd.cc \
 	kernel/syscall/mem.cc
 
@@ -587,6 +591,7 @@ kernel_elf_INCLUDES = \
 	-I$(EXTERNINCLUDEDIR)
 
 kernel_elf_CXXFLAGS = \
+    -D__DGOS_KERNEL__=0x00000001 \
 	$(kernel_elf_INCLUDES) \
 	-std=c++14 \
 	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
@@ -617,7 +622,6 @@ kernel_elf_LDFLAGS = \
 	-Wl,-Map,$(top_builddir)/kernel.map \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
-	-v \
 	-Wl,-g \
 	-export-dynamic \
 	-Wl,-z,max-page-size=4096 \
@@ -640,6 +644,177 @@ kernel_elf_LDADD = \
 	libkernel-avx.a \
 	libkernel-avx512.a \
 	$(ZLIBSTATICLIB)
+
+# ----------------------------------------------------------------------------
+# libc
+
+libc_a_SOURCES = \
+    libc/src/string/strsignal.cc \
+    libc/src/string/strcoll_l.cc \
+    libc/src/string/strerror.cc \
+    libc/src/string/strlen.cc \
+    libc/src/string/strdup.cc \
+    libc/src/string/strtok.cc \
+    libc/src/string/strnlen.cc \
+    libc/src/string/strcpy.cc \
+    libc/src/string/strcmp.cc \
+    libc/src/string/memset.cc \
+    libc/src/string/strndup.cc \
+    libc/src/string/strcspn.cc \
+    libc/src/string/memcmp.cc \
+    libc/src/string/strrchr.cc \
+    libc/src/string/strpbrk.cc \
+    libc/src/string/memcpy.cc \
+    libc/src/string/stpncpy.cc \
+    libc/src/string/strtok_r.cc \
+    libc/src/string/stpcpy.cc \
+    libc/src/string/memccpy.cc \
+    libc/src/string/strcat.cc \
+    libc/src/string/strchr.cc \
+    libc/src/string/strncpy.cc \
+    libc/src/string/strncat.cc \
+    libc/src/string/strstr.cc \
+    libc/src/string/memmove.cc \
+    libc/src/string/strspn.cc \
+    libc/src/string/strcoll.cc \
+    libc/src/string/strerror_r.cc \
+    libc/src/string/strerror_l.cc \
+    libc/src/string/strxfrm.cc \
+    libc/src/string/memchr.cc \
+    libc/src/string/strxfrm_l.cc \
+    libc/src/string/strncmp.cc \
+    libc/src/stdlib/_Exit.cc \
+    libc/src/sys/syscall.s \
+    libc/include/termios.h \
+    libc/include/complex.h \
+    libc/include/regex.h \
+    libc/include/cpio.h \
+    libc/include/pwd.h \
+    libc/include/net/if.h \
+    libc/include/wctype.h \
+    libc/include/monetary.h \
+    libc/include/nl_types.h \
+    libc/include/wordexp.h \
+    libc/include/mqueue.h \
+    libc/include/assert.h \
+    libc/include/syslog.h \
+    libc/include/signal.h \
+    libc/include/unistd.h \
+    libc/include/stropts.h \
+    libc/include/search.h \
+    libc/include/limits.h \
+    libc/include/libgen.h \
+    libc/include/glob.h \
+    libc/include/ulimit.h \
+    libc/include/utime.h \
+    libc/include/fnmatch.h \
+    libc/include/spawn.h \
+    libc/include/iconv.h \
+    libc/include/fcntl.h \
+    libc/include/stdio.h \
+    libc/include/setjmp.h \
+    libc/include/sys/syscall.h \
+    libc/include/sys/resource.h \
+    libc/include/sys/select.h \
+    libc/include/sys/sem.h \
+    libc/include/sys/socket.h \
+    libc/include/sys/types.h \
+    libc/include/sys/un.h \
+    libc/include/sys/wait.h \
+    libc/include/sys/utsname.h \
+    libc/include/sys/stat.h \
+    libc/include/sys/ipc.h \
+    libc/include/sys/times.h \
+    libc/include/sys/statvfs.h \
+    libc/include/sys/msg.h \
+    libc/include/sys/shm.h \
+    libc/include/sys/time.h \
+    libc/include/sys/cdefs.h \
+    libc/include/sys/mman.h \
+    libc/include/sys/uio.h \
+    libc/include/semaphore.h \
+    libc/include/arpa/inet.h \
+    libc/include/fmtmsg.h \
+    libc/include/pthread.h \
+    libc/include/fenv.h \
+    libc/include/aio.h \
+    libc/include/dlfcn.h \
+    libc/include/math.h \
+    libc/include/poll.h \
+    libc/include/wchar.h \
+    libc/include/utmpx.h \
+    libc/include/ctype.h \
+    libc/include/sched.h \
+    libc/include/tar.h \
+    libc/include/ndbm.h \
+    libc/include/time.h \
+    libc/include/grp.h \
+    libc/include/netdb.h \
+    libc/include/string.h \
+    libc/include/strings.h \
+    libc/include/stdlib.h \
+    libc/include/errno.h \
+    libc/include/ftw.h \
+    libc/include/inttypes.h \
+    libc/include/dirent.h \
+    libc/include/trace.h \
+    libc/include/netinet/in.h \
+    libc/include/netinet/tcp.h \
+    libc/include/langinfo.h \
+    libc/include/locale.h
+
+libc_a_CXXFLAGS = \
+    -isystem $(top_srcdir)/libc/include \
+    -isystem $(top_builddir)/cross-tool/x86_64-elf/include \
+    -ffreestanding \
+    $(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)    
+
+# ----------------------------------------------------------------------------
+# libc unit tests
+
+LIBC_TESTS = \
+	$(top_srcdir)/libc/tests/testassert.cc \
+	$(top_srcdir)/libc/tests/test_string.cc
+
+LIBC_CXXFLAGS = \
+	-ggdb \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
+	-fno-exceptions \
+	-ffreestanding \
+	-isystem $(top_srcdir)/libc/include \
+	-I$(top_builddir) \
+	-L$(top_builddir)
+
+$(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
+	echo "#define TERMESC_RED" \
+		"\"$$(tput setaf 1 | sed 's/\x1b/\\x1b/g')\"" \
+		> $(top_builddir)/termesc.h
+	echo "#define TERMESC_GREEN" \
+		"\"$$(tput setaf 2 | sed 's/\x1b/\\x1b/g')\"" \
+		>> $(top_builddir)/termesc.h
+	echo "#define TERMESC_BLUE" \
+		"\"$$(tput setaf 4 | sed 's/\x1b/\\x1b/g')\"" \
+		>> $(top_builddir)/termesc.h
+	echo "#define TERMESC_WHITE" \
+		"\"$$(tput setaf 7 | sed 's/\x1b/\\x1b/g')\"" \
+		>> $(top_builddir)/termesc.h
+	
+	$(CXX_FOR_BUILD) \
+		$(LIBC_CXXFLAGS) \
+		-o libc_tests \
+		$(LIBC_TESTS) \
+		-static -nostdlib \
+		-v \
+		$(top_builddir)/libc.a -lgcc
+
+test_compile: $(top_builddir)/libc_tests
+
+test: test_compile
+	$(top_builddir)/libc_tests
+
+.PHONY: test_compile test
 
 # ----------------------------------------------------------------------------
 # User programs

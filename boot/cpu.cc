@@ -4,6 +4,7 @@
 #include "exception.h"
 #include "farptr.h"
 #include "string.h"
+#include "gdt.h"
 
 extern gdt_entry_t gdt[];
 
@@ -15,17 +16,6 @@ static table_register_t idtr_16 = {
 };
 
 idt_entry_64_t idt[32];
-
-#define GDT_SEL_KERNEL_CODE64   0x08
-#define GDT_SEL_KERNEL_DATA64   0x10
-#define GDT_SEL_KERNEL_CODE32   0x18
-#define GDT_SEL_KERNEL_DATA32   0x20
-#define GDT_SEL_KERNEL_CODE16   0x28
-#define GDT_SEL_KERNEL_DATA16   0x30
-#define GDT_SEL_USER_CODE64     0x38
-#define GDT_SEL_USER_DATA64     0x40
-#define GDT_SEL_USER_CODE32     0x48
-#define GDT_SEL_USER_DATA32     0x50
 
 uint16_t toggle_a20(uint8_t enable)
 {
@@ -293,7 +283,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         , [idtr_64] "m" (idtr_64)
         , [idtr_16] "m" (idtr_16)
         , [gdt_code64] "i" (GDT_SEL_KERNEL_CODE64)
-        , [gdt_data64] "i" (GDT_SEL_KERNEL_DATA64)
+        , [gdt_data64] "i" (GDT_SEL_KERNEL_DATA)
         , [gdt_code32] "i" (GDT_SEL_KERNEL_CODE32)
         , [gdt_data32] "i" (GDT_SEL_KERNEL_DATA32)
         , [gdt_code16] "i" (GDT_SEL_KERNEL_CODE16)

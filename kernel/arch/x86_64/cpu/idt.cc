@@ -13,8 +13,16 @@
 #include "string.h"
 #include "except.h"
 #include "mm.h"
+#include "asm_constants.h"
 
 #include "apic.h"
+
+// Enforce that we use the correct value in syscall.S
+C_ASSERT(SYSCALL_RFLAGS == (EFLAGS_IF | 2));
+
+// Enforce that we don't try to set any flags bits that
+// will be cleared anyway on sysret
+C_ASSERT((SYSCALL_RFLAGS & ~uintptr_t(0x3C7FD7)) == 0);
 
 static idt_entry_64_t idt[256];
 

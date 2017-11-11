@@ -2,6 +2,7 @@
 #include "process.h"
 #include "thread.h"
 #include "fileio.h"
+#include "syscall_helper.h"
 
 static int err(errno_t errno)
 {
@@ -48,6 +49,12 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
     
     if (unlikely(id < 0))
         return badf_err();
+    
+    if (uintptr_t(bufaddr) >= 0x800000000000)
+        return err(errno_t::EFAULT);
+    
+    if (!verify_accessible(bufaddr, count, false))
+        return err(errno_t::EFAULT);
     
     ssize_t sz = file_write(id, bufaddr, count);
     

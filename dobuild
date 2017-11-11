@@ -11,5 +11,6 @@ if [[ ! -f "cross-tool/.build-done" ]]; then
 	make musl || exit
 	cp -R musl-install/* cross-tool/x86_64-elf || exit
 	touch "cross-tool/.build-done" || exit
+    "$scriptroot/configure" --host x86_64-elf
 	make || exit
 fi

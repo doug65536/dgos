@@ -1,7 +1,7 @@
 #include "zlib_helper.h"
 #include "zlib/zlib.h"
 #include "string.h"
-#include "malloc.h"
+#include "stdlib.h"
 
 void zlib_init(z_stream *strm)
 {

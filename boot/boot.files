@@ -1,4 +1,7 @@
+bioscall.S
+bootcommon.S
 emulators.mk
+gdt.h
 utils/bochs-fat-config.bxrc.template
 utils/bochs-iso-config.bxrc.template
 vesainfo.h
@@ -61,6 +64,4 @@ iso9660.cc
 iso9660.h
 fs.h
 fs.cc
-bootcommon.s
-bioscall.s
 bioscall.h
