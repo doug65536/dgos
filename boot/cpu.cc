@@ -109,13 +109,13 @@ uint32_t gp_available;
 
 void cpu_init()
 {
-	nx_available = cpu_has_no_execute();
-	gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
+    nx_available = cpu_has_no_execute();
+    gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
 }
 
 void cpu_a20_enterpm()
 {
-    if (need_a20_toggle)    
+    if (need_a20_toggle)
         toggle_a20(1);
 }
 
@@ -134,20 +134,20 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
     //    memcpy((void*)address, (void*)src, size);
     //    return;
     //}
-    
+
     uint16_t intf = disable_interrupts();
 
     uint32_t pdbr = paging_root_addr();
 
-	struct {
-		uint64_t address;
-		uint32_t src;
-		uint32_t size;
-	} params = {
-		address,
-		src,
-		size
-	};
+    struct {
+        uint64_t address;
+        uint32_t src;
+        uint32_t size;
+    } params = {
+        address,
+        src,
+        size
+    };
 
     __asm__ __volatile__ (
         // Enable CR4.PAE (bit 5)
@@ -215,13 +215,13 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "movl %%eax,%%fs\n\t"
         "movl %%eax,%%ss\n\t"
 
-		// Load copy/entry parameters
-		// (before screwing up stack pointer with call)
-		"mov (%[params]),%%rdi\n\t"
-		"movl 8(%[params]),%%esi\n\t"
-		"movl 12(%[params]),%%ecx\n\t"
+        // Load copy/entry parameters
+        // (before screwing up stack pointer with call)
+        "mov (%[params]),%%rdi\n\t"
+        "movl 8(%[params]),%%esi\n\t"
+        "movl 12(%[params]),%%ecx\n\t"
 
-		// Check whether it is copy or entry
+        // Check whether it is copy or entry
         "testl %%esi,%%esi\n\t"
         "jz 2f\n\t"
 
@@ -232,6 +232,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Enter kernel
         "2:\n\t"
+        "movb $'Y',0xb8000\n\t"  // <-- debug hack
         "mov %%rsp,%%r15\n\t"
         "andq $-16,%%rsp\n\t"
         "call *%%rdi\n\t"
@@ -241,7 +242,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "3:\n\t"
 
         // Far return to 32 bit compatibility mode code segment
-		"lret\n\t"
+        "lret\n\t"
 
         "1:\n\t"
         ".code32\n\t"
@@ -277,7 +278,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "lea %[idtr_16],%%esi\n\t"
         "lidt (%%esi)\n\t"
         :
-		: [params] "b" (&params)
+        : [params] "b" (&params)
         , [pdbr] "m" (pdbr)
         , [gdtr] "m" (gdtr)
         , [idtr_64] "m" (idtr_64)
