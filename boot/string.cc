@@ -32,19 +32,19 @@ int strcmp(char const *lhs, char const *rhs)
 {
     int cmp = 0;
     do {
-        cmp = (unsigned char)(*lhs) -
-                (unsigned char)(*rhs++);
+        cmp = int((unsigned char)*lhs) -
+                int((unsigned char)*rhs++);
     } while (cmp == 0 && *lhs++);
     return cmp;
 }
 
 int strncmp(char const *lhs, char const *rhs, size_t count)
 {
-    unsigned char cmp = 0;
+    int cmp = 0;
     if (count) {
         do {
-            cmp = (unsigned char)(*lhs) -
-                    (unsigned char)(*rhs++);
+            cmp = int((unsigned char)*lhs) -
+                    int((unsigned char)*rhs++);
         } while (--count && cmp == 0 && *lhs++);
     }
     return cmp;
@@ -218,7 +218,7 @@ char *strncpy(char *dest, char const *src, size_t n)
 
     size_t i = 0;
 
-    // Copy from src up to and including null terminator
+    // Copy from src up to but not including null terminator
     for ( ; i < n && src[i]; ++i)
         d[i] = src[i];
 
