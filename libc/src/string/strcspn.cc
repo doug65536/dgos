@@ -1,18 +1,15 @@
 #include <string.h>
 #include <stdint.h>
+#include "__bytebitmap.h"
 
 size_t strcspn(const char *lhs, const char *rhs)
 {
-    uint32_t bitmap[256 >> 5];
-    
-    uint32_t n;
-    size_t i;
-    
     // Build a bitmap of characters
-    for (i = 0; (n = (unsigned char)rhs[i]) != 0; ++i)
-        bitmap[n >> 5] |= (uint32_t(1) << (n & 31));
+    uint32_t bitmap[256 >> 5];
+    __byte_bitmap(bitmap, rhs);
     
     // Count leading characters that are not in the bitmap
+    size_t i, n;
     for (i = 0; (n = (unsigned char)lhs[i]) != 0 &&
          !(bitmap[n >> 5] & (uint32_t(1) << (n & 31))); ++i);
     
