@@ -14,24 +14,24 @@ mp_entry:
 	movw %ax,%es
 	movw %ax,%ss
 	movl $0xFFF0,%esp
-	
+
 	lgdt gdtr
-	
+
 	# Enter protected mode
 	mov %cr0,%eax
 	bts $0,%eax
 	mov %eax,%cr0
-	
+
 	xor %ecx,%ecx
 	mov %cs,%ecx
 	shl $4,%ecx
-	
+
 	# eax now holds address of mp_entry
 	add $0f - mp_entry,%ecx
 	pushl $0x18
 	pushl %ecx
 	data32 ljmp *(%esp)
-	
+
 0:
 .code32
 	movl $0x20,%ecx

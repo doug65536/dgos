@@ -20,7 +20,7 @@ extern "C" __noinline int assert_failed(
 
 // Assert that a value is an integer power of two
 #define assert_ispo2(n) \
-	assert_msg(((n) & ((n)-1)) == 0, "Must be a power of two")
+    assert_msg(((n) & ((n)-1)) == 0, "Must be a power of two")
 
 // Compile-time assert
 #ifdef __cplusplus

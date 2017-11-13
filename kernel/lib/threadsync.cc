@@ -68,24 +68,24 @@ EXPORT void mutex_init(mutex_t *mutex)
 
 EXPORT bool mutex_try_lock(mutex_t *mutex)
 {
-	bool result;
+    bool result;
 
-	thread_t this_thread_id = thread_get_id();
+    thread_t this_thread_id = thread_get_id();
 
-	assert(mutex->owner != this_thread_id);
+    assert(mutex->owner != this_thread_id);
 
-	spinlock_lock_noirq(&mutex->lock);
+    spinlock_lock_noirq(&mutex->lock);
 
-	if (mutex->owner < 0) {
-		mutex->owner = this_thread_id;
-		result = true;
-	} else {
-		result = false;
-	}
+    if (mutex->owner < 0) {
+        mutex->owner = this_thread_id;
+        result = true;
+    } else {
+        result = false;
+    }
 
-	spinlock_unlock_noirq(&mutex->lock);
+    spinlock_unlock_noirq(&mutex->lock);
 
-	return result;
+    return result;
 }
 
 EXPORT void mutex_lock(mutex_t *mutex)

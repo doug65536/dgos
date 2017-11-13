@@ -18,18 +18,18 @@ uint16_t driveinfo()
 
     // Write the size into the memory
     far_copy_from(ptr, &size, sizeof(size));
-    
+
     bios_regs_t regs;
     regs.eax = 0x4800;
     regs.ds = ptr.segment;
     regs.edx = boot_drive;
     regs.esi = ptr.offset;
-    
+
     bioscall(&regs, 0x13);
-    
+
     // Store the pointer so kernel can find it
     if (!regs.flags_CF())
         boot_device_info_vector = ptr.segment << 4;
-    
+
     return regs.ah_if_carry();
 }

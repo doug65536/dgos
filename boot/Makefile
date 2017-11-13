@@ -78,7 +78,7 @@ CXXFLAGS := $(TARGET_ARCH) -ggdb -Os -ffreestanding \
 	-mno-sse -mno-sse2 -mfpmath=387 \
 	-fno-asynchronous-unwind-tables -fno-exceptions -fno-rtti \
 	-mrtd -mregparm=3 \
-        -std=c++14 -fno-pic -fno-pie
+	-std=c++14 -fno-pic -fno-pie
 
 ifeq ($(CXX),clang++)
 	CXX := g++

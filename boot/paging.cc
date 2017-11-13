@@ -146,8 +146,8 @@ void paging_alias_range(uint64_t alias_addr,
                         uint64_t size,
                         uint64_t alias_flags)
 {
-	PAGING_TRACE("aliasing %llu bytes at lin %llx to physaddr %llx\n",
-				 size, linear_addr, alias_addr);
+    PAGING_TRACE("aliasing %llu bytes at lin %llx to physaddr %llx\n",
+                 size, linear_addr, alias_addr);
 
     for (uint64_t offset = 0; offset < size; offset += PAGE_SIZE) {
         pte_ref_t original = paging_find_pte(linear_addr, 0);

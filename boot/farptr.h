@@ -44,12 +44,12 @@ static inline far_ptr_t far_ptr(uint32_t addr)
 
 static inline void far_copy_to(void *near, far_ptr_t src, uint16_t size)
 {
-	far_copy(far_ptr(uint32_t(near)), src, size);
+    far_copy(far_ptr(uint32_t(near)), src, size);
 }
 
 static inline void far_copy_from(far_ptr_t dest, void *near, uint16_t size)
 {
-	far_copy(dest, far_ptr(uint32_t(near)), size);
+    far_copy(dest, far_ptr(uint32_t(near)), size);
 }
 
 // Adjust a far pointer and renormalize the segment to

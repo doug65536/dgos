@@ -34,12 +34,12 @@ uint16_t read_lba_sectors(
         (uint32_t)buf,
         lba
     };
-    
+
     bios_regs_t regs;
     regs.eax = 0x4200;
     regs.edx = drive;
     regs.esi = (uint32_t)&pkt;
-    
+
     bioscall(&regs, 0x13);
 
     return regs.ah_if_carry();

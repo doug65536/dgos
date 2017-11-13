@@ -14,7 +14,7 @@ struct bios_regs_t {
     uint16_t fs;
     uint16_t gs;
     uint32_t eflags_out;
-    
+
     bios_regs_t()
         : ds(0)
         , es(0)
@@ -22,13 +22,13 @@ struct bios_regs_t {
         , gs(0)
     {
     }
-    
+
     // Helper to get carry flag
     bool flags_CF() const
     {
         return eflags_out & (1 << 0);
     }
-    
+
     uint16_t ah_if_carry() const
     {
         if (flags_CF())

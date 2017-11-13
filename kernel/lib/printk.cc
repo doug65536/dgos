@@ -438,7 +438,7 @@ static intptr_t formatter(
                 switch (flags.length) {
                 case length_l:
                     flags.arg_type = arg_type_character;
-					flags.arg.character = va_arg(ap, int);
+                    flags.arg.character = va_arg(ap, int);
                     break;
                 case length_none:
                     flags.arg_type = arg_type_character;
@@ -879,7 +879,7 @@ struct vsnprintf_context_t {
 
 static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
 {
-	vsnprintf_context_t *ctx = (vsnprintf_context_t *)context;
+    vsnprintf_context_t *ctx = (vsnprintf_context_t *)context;
     char buf[5];
 
     intptr_t len = 0;

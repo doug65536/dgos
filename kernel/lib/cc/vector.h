@@ -17,10 +17,10 @@ public:
     using allocator_type = _Allocator;
     using size_type = size_t;
     using difference_type = ptrdiff_t;
-	using reference = _T&;
-	using const_reference = _T const&;
-	using pointer = _T*;
-	using const_pointer = _T const*;
+    using reference = _T&;
+    using const_reference = _T const&;
+    using pointer = _T*;
+    using const_pointer = _T const*;
 
     template<int _Dir, bool _Is_const>
     class vector_iter;
@@ -68,17 +68,17 @@ public:
 
     allocator_type get_allocator() const;
 
-	_T& at(size_type __pos);
-	_T const& at(size_type __pos) const;
+    _T& at(size_type __pos);
+    _T const& at(size_type __pos) const;
 
-	_T& operator[](size_type __pos);
-	_T const& operator[](size_type __pos) const;
+    _T& operator[](size_type __pos);
+    _T const& operator[](size_type __pos) const;
 
-	_T& front();
-	_T const& front() const;
+    _T& front();
+    _T const& front() const;
 
-	_T& back();
-	_T const& back() const;
+    _T& back();
+    _T const& back() const;
 
     pointer data();
     const_pointer data() const;
@@ -164,12 +164,12 @@ public:
         template<bool _RhsIsConst>
         inline vector_iter(vector_iter<_Dir, _RhsIsConst> const& rhs);
 
-		inline _T& operator*();
-		inline _T const& operator*() const;
+        inline _T& operator*();
+        inline _T const& operator*() const;
         inline vector_iter operator+(size_type __n) const;
         inline vector_iter operator-(size_type __n) const;
-		inline _T& operator[](size_type __n);
-		inline _T const& operator[](size_type __n) const;
+        inline _T& operator[](size_type __n);
+        inline _T const& operator[](size_type __n) const;
         inline pointer operator->();
         inline const_pointer operator->() const;
 

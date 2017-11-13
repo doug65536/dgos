@@ -32,7 +32,7 @@ void thread_cls_init_each_cpu(
         size_t slot, thread_cls_init_handler_t handler, void *arg);
 
 void thread_cls_for_each_cpu(size_t slot, int other_only,
-                             thread_cls_each_handler_t handler, 
+                             thread_cls_each_handler_t handler,
                              void *arg, size_t size);
 
 void thread_send_ipi(int cpu, int intr);

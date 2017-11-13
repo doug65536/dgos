@@ -46,8 +46,8 @@ bool spinlock_try_lock(spinlock_t *lock)
 {
     atomic_barrier();
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
-		return false;
-	return true;
+        return false;
+    return true;
 }
 
 void spinlock_unlock(spinlock_t *lock)
@@ -106,10 +106,10 @@ bool spinlock_try_lock_noirq(spinlock_t *lock)
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         cpu_irq_toggle(intr_enabled);
 
-		return false;
+        return false;
     }
 
-	return true;
+    return true;
 }
 
 void spinlock_unlock_noirq(spinlock_t *lock)
