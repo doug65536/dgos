@@ -533,7 +533,7 @@ void keyb8042_init(void)
         return;
 
     if (ctl_test_result != KEYB_REPLY_PASSED)
-        printk("Keyboard controller self test failed! result=%02x",
+        printk("Keyboard controller self test failed! result=%02x\n",
                ctl_test_result);
 
     if (keyb8042_send_command(KEYB_CMD_TEST_PORT1) < 0)
@@ -543,7 +543,7 @@ void keyb8042_init(void)
         return;
 
     if (port1_test_result != 0)
-        printk("Keyboard port 1 self test failed! result=%02x",
+        printk("Keyboard port 1 self test failed! result=%02x\n",
                ctl_test_result);
 
     if (port2_exists) {
@@ -555,7 +555,7 @@ void keyb8042_init(void)
             return;
 
         if (port2_test_result != 0) {
-            printk("Keyboard port 2 self test failed! result=%02x",
+            printk("Keyboard port 2 self test failed! result=%02x\n",
                    port2_test_result);
             port2_exists = 0;
         }
