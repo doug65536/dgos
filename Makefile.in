@@ -142,7 +142,8 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 libbootsect_a_OBJECTS = $(am_libbootsect_a_OBJECTS)
 libc_a_AR = $(AR) $(ARFLAGS)
 libc_a_LIBADD =
-am_libc_a_OBJECTS = libc/src/string/libc_a-strsignal.$(OBJEXT) \
+am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
+	libc/src/string/libc_a-strsignal.$(OBJEXT) \
 	libc/src/string/libc_a-strcoll_l.$(OBJEXT) \
 	libc/src/string/libc_a-strerror.$(OBJEXT) \
 	libc/src/string/libc_a-strlen.$(OBJEXT) \
@@ -595,12 +596,12 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+DUMPDIR = $(abs_top_builddir)/dump
 BUILT_SOURCES = \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES) \
 	$(top_builddir)/qemu-emu.mk \
-	$(abs_top_builddir)/dump \
-	$(top_builddir)/dump/qemu-debug-out \
+	$(DUMPDIR)/qemu-debug-out \
 	generated_headers
 
 
@@ -626,7 +627,7 @@ noinst_LIBRARIES = \
 	libkernel-sse41.a \
 	libkernel-avx.a \
 	libkernel-avx512.a \
-    libc.a
+	libc.a
 
 
 #user-hello
@@ -641,7 +642,7 @@ libmbr_a_CCASFLAGS = \
 	$(COMPILER_FLAGS)
 
 EXTRA_libmbr_a_DEPENDENCIES = \
-	$(abs_top_builddir)/dump
+	$(DUMPDIR)
 
 
 # mbr-elf
@@ -1171,7 +1172,7 @@ kernel_elf_INCLUDES = \
 	-I$(EXTERNINCLUDEDIR)
 
 kernel_elf_CXXFLAGS = \
-    -D__DGOS_KERNEL__=0x00000001 \
+	-D__DGOS_KERNEL__=0x00000001 \
 	$(kernel_elf_INCLUDES) \
 	-std=c++14 \
 	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
@@ -1225,127 +1226,128 @@ kernel_elf_LDADD = \
 # ----------------------------------------------------------------------------
 # libc
 libc_a_SOURCES = \
-    libc/src/string/strsignal.cc \
-    libc/src/string/strcoll_l.cc \
-    libc/src/string/strerror.cc \
-    libc/src/string/strlen.cc \
-    libc/src/string/strdup.cc \
-    libc/src/string/strtok.cc \
-    libc/src/string/strnlen.cc \
-    libc/src/string/strcpy.cc \
-    libc/src/string/strcmp.cc \
-    libc/src/string/memset.cc \
-    libc/src/string/strndup.cc \
-    libc/src/string/strcspn.cc \
-    libc/src/string/memcmp.cc \
-    libc/src/string/strrchr.cc \
-    libc/src/string/strpbrk.cc \
-    libc/src/string/memcpy.cc \
-    libc/src/string/stpncpy.cc \
-    libc/src/string/strtok_r.cc \
-    libc/src/string/stpcpy.cc \
-    libc/src/string/memccpy.cc \
-    libc/src/string/strcat.cc \
-    libc/src/string/strchr.cc \
-    libc/src/string/strncpy.cc \
-    libc/src/string/strncat.cc \
-    libc/src/string/strstr.cc \
-    libc/src/string/memmove.cc \
-    libc/src/string/strspn.cc \
-    libc/src/string/strcoll.cc \
-    libc/src/string/strerror_r.cc \
-    libc/src/string/strerror_l.cc \
-    libc/src/string/strxfrm.cc \
-    libc/src/string/memchr.cc \
-    libc/src/string/strxfrm_l.cc \
-    libc/src/string/strncmp.cc \
-    libc/src/stdlib/_Exit.cc \
-    libc/src/sys/syscall.s \
-    libc/include/termios.h \
-    libc/include/complex.h \
-    libc/include/regex.h \
-    libc/include/cpio.h \
-    libc/include/pwd.h \
-    libc/include/net/if.h \
-    libc/include/wctype.h \
-    libc/include/monetary.h \
-    libc/include/nl_types.h \
-    libc/include/wordexp.h \
-    libc/include/mqueue.h \
-    libc/include/assert.h \
-    libc/include/syslog.h \
-    libc/include/signal.h \
-    libc/include/unistd.h \
-    libc/include/stropts.h \
-    libc/include/search.h \
-    libc/include/limits.h \
-    libc/include/libgen.h \
-    libc/include/glob.h \
-    libc/include/ulimit.h \
-    libc/include/utime.h \
-    libc/include/fnmatch.h \
-    libc/include/spawn.h \
-    libc/include/iconv.h \
-    libc/include/fcntl.h \
-    libc/include/stdio.h \
-    libc/include/setjmp.h \
-    libc/include/sys/syscall.h \
-    libc/include/sys/resource.h \
-    libc/include/sys/select.h \
-    libc/include/sys/sem.h \
-    libc/include/sys/socket.h \
-    libc/include/sys/types.h \
-    libc/include/sys/un.h \
-    libc/include/sys/wait.h \
-    libc/include/sys/utsname.h \
-    libc/include/sys/stat.h \
-    libc/include/sys/ipc.h \
-    libc/include/sys/times.h \
-    libc/include/sys/statvfs.h \
-    libc/include/sys/msg.h \
-    libc/include/sys/shm.h \
-    libc/include/sys/time.h \
-    libc/include/sys/cdefs.h \
-    libc/include/sys/mman.h \
-    libc/include/sys/uio.h \
-    libc/include/semaphore.h \
-    libc/include/arpa/inet.h \
-    libc/include/fmtmsg.h \
-    libc/include/pthread.h \
-    libc/include/fenv.h \
-    libc/include/aio.h \
-    libc/include/dlfcn.h \
-    libc/include/math.h \
-    libc/include/poll.h \
-    libc/include/wchar.h \
-    libc/include/utmpx.h \
-    libc/include/ctype.h \
-    libc/include/sched.h \
-    libc/include/tar.h \
-    libc/include/ndbm.h \
-    libc/include/time.h \
-    libc/include/grp.h \
-    libc/include/netdb.h \
-    libc/include/string.h \
-    libc/include/strings.h \
-    libc/include/stdlib.h \
-    libc/include/errno.h \
-    libc/include/ftw.h \
-    libc/include/inttypes.h \
-    libc/include/dirent.h \
-    libc/include/trace.h \
-    libc/include/netinet/in.h \
-    libc/include/netinet/tcp.h \
-    libc/include/langinfo.h \
-    libc/include/locale.h
+	libc/src/string/__bytebitmap.cc \
+	libc/src/string/strsignal.cc \
+	libc/src/string/strcoll_l.cc \
+	libc/src/string/strerror.cc \
+	libc/src/string/strlen.cc \
+	libc/src/string/strdup.cc \
+	libc/src/string/strtok.cc \
+	libc/src/string/strnlen.cc \
+	libc/src/string/strcpy.cc \
+	libc/src/string/strcmp.cc \
+	libc/src/string/memset.cc \
+	libc/src/string/strndup.cc \
+	libc/src/string/strcspn.cc \
+	libc/src/string/memcmp.cc \
+	libc/src/string/strrchr.cc \
+	libc/src/string/strpbrk.cc \
+	libc/src/string/memcpy.cc \
+	libc/src/string/stpncpy.cc \
+	libc/src/string/strtok_r.cc \
+	libc/src/string/stpcpy.cc \
+	libc/src/string/memccpy.cc \
+	libc/src/string/strcat.cc \
+	libc/src/string/strchr.cc \
+	libc/src/string/strncpy.cc \
+	libc/src/string/strncat.cc \
+	libc/src/string/strstr.cc \
+	libc/src/string/memmove.cc \
+	libc/src/string/strspn.cc \
+	libc/src/string/strcoll.cc \
+	libc/src/string/strerror_r.cc \
+	libc/src/string/strerror_l.cc \
+	libc/src/string/strxfrm.cc \
+	libc/src/string/memchr.cc \
+	libc/src/string/strxfrm_l.cc \
+	libc/src/string/strncmp.cc \
+	libc/src/stdlib/_Exit.cc \
+	libc/src/sys/syscall.s \
+	libc/include/termios.h \
+	libc/include/complex.h \
+	libc/include/regex.h \
+	libc/include/cpio.h \
+	libc/include/pwd.h \
+	libc/include/net/if.h \
+	libc/include/wctype.h \
+	libc/include/monetary.h \
+	libc/include/nl_types.h \
+	libc/include/wordexp.h \
+	libc/include/mqueue.h \
+	libc/include/assert.h \
+	libc/include/syslog.h \
+	libc/include/signal.h \
+	libc/include/unistd.h \
+	libc/include/stropts.h \
+	libc/include/search.h \
+	libc/include/limits.h \
+	libc/include/libgen.h \
+	libc/include/glob.h \
+	libc/include/ulimit.h \
+	libc/include/utime.h \
+	libc/include/fnmatch.h \
+	libc/include/spawn.h \
+	libc/include/iconv.h \
+	libc/include/fcntl.h \
+	libc/include/stdio.h \
+	libc/include/setjmp.h \
+	libc/include/sys/syscall.h \
+	libc/include/sys/resource.h \
+	libc/include/sys/select.h \
+	libc/include/sys/sem.h \
+	libc/include/sys/socket.h \
+	libc/include/sys/types.h \
+	libc/include/sys/un.h \
+	libc/include/sys/wait.h \
+	libc/include/sys/utsname.h \
+	libc/include/sys/stat.h \
+	libc/include/sys/ipc.h \
+	libc/include/sys/times.h \
+	libc/include/sys/statvfs.h \
+	libc/include/sys/msg.h \
+	libc/include/sys/shm.h \
+	libc/include/sys/time.h \
+	libc/include/sys/cdefs.h \
+	libc/include/sys/mman.h \
+	libc/include/sys/uio.h \
+	libc/include/semaphore.h \
+	libc/include/arpa/inet.h \
+	libc/include/fmtmsg.h \
+	libc/include/pthread.h \
+	libc/include/fenv.h \
+	libc/include/aio.h \
+	libc/include/dlfcn.h \
+	libc/include/math.h \
+	libc/include/poll.h \
+	libc/include/wchar.h \
+	libc/include/utmpx.h \
+	libc/include/ctype.h \
+	libc/include/sched.h \
+	libc/include/tar.h \
+	libc/include/ndbm.h \
+	libc/include/time.h \
+	libc/include/grp.h \
+	libc/include/netdb.h \
+	libc/include/string.h \
+	libc/include/strings.h \
+	libc/include/stdlib.h \
+	libc/include/errno.h \
+	libc/include/ftw.h \
+	libc/include/inttypes.h \
+	libc/include/dirent.h \
+	libc/include/trace.h \
+	libc/include/netinet/in.h \
+	libc/include/netinet/tcp.h \
+	libc/include/langinfo.h \
+	libc/include/locale.h
 
 libc_a_CXXFLAGS = \
-    -isystem $(top_srcdir)/libc/include \
-    -isystem $(top_builddir)/cross-tool/x86_64-elf/include \
-    -ffreestanding \
+	-isystem $(top_srcdir)/libc/include \
+	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
+	-ffreestanding \
 	-std=c++14 \
-    $(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)    
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
 
 
 # ----------------------------------------------------------------------------
@@ -1432,7 +1434,7 @@ QEMU_NET = \
 	-net nic,model=ne2k_pci \
 	-net nic,model=e1000 \
 	$(QEMU_BRIDGE) \
-	-net dump,file=dump/netdump
+	-net dump,file="$(DUMPDIR)/netdump"
 
 QEMU_MONITOR = \
 	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait
@@ -1440,7 +1442,7 @@ QEMU_MONITOR = \
 
 #,telnet
 QEMU_DEBUGCON = \
-	-chardev pipe,path=$(top_builddir)/dump/qemu-debug-out,id=qemu-debug-out \
+	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
 	-mon qemu-monitor,mode=readline \
 	-device isa-debugcon,chardev=qemu-debug-out
 
@@ -1452,12 +1454,13 @@ QEMU_COMMON = \
 	$(QEMU_MONITOR) \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
-	$(QEMU_USB) \
 	$(QEMU_NET) \
 	-no-shutdown -no-reboot -d unimp,guest_errors \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS)
 
+
+#$(QEMU_USB)
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme = \
@@ -1588,6 +1591,9 @@ libc/src/string/$(am__dirstamp):
 libc/src/string/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/string/$(DEPDIR)
 	@: > libc/src/string/$(DEPDIR)/$(am__dirstamp)
+libc/src/string/libc_a-__bytebitmap.$(OBJEXT):  \
+	libc/src/string/$(am__dirstamp) \
+	libc/src/string/$(DEPDIR)/$(am__dirstamp)
 libc/src/string/libc_a-strsignal.$(OBJEXT):  \
 	libc/src/string/$(am__dirstamp) \
 	libc/src/string/$(DEPDIR)/$(am__dirstamp)
@@ -2296,6 +2302,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_elf-mem.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_elf-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-_Exit.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memccpy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memchr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memcmp.Po@am__quote@
@@ -2658,6 +2665,20 @@ boot/libbootsect_a-debug.obj: boot/debug.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/debug.cc' object='boot/libbootsect_a-debug.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-debug.obj `if test -f 'boot/debug.cc'; then $(CYGPATH_W) 'boot/debug.cc'; else $(CYGPATH_W) '$(srcdir)/boot/debug.cc'; fi`
+
+libc/src/string/libc_a-__bytebitmap.o: libc/src/string/__bytebitmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/string/libc_a-__bytebitmap.o -MD -MP -MF libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo -c -o libc/src/string/libc_a-__bytebitmap.o `test -f 'libc/src/string/__bytebitmap.cc' || echo '$(srcdir)/'`libc/src/string/__bytebitmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/string/__bytebitmap.cc' object='libc/src/string/libc_a-__bytebitmap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/string/libc_a-__bytebitmap.o `test -f 'libc/src/string/__bytebitmap.cc' || echo '$(srcdir)/'`libc/src/string/__bytebitmap.cc
+
+libc/src/string/libc_a-__bytebitmap.obj: libc/src/string/__bytebitmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/string/libc_a-__bytebitmap.obj -MD -MP -MF libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo -c -o libc/src/string/libc_a-__bytebitmap.obj `if test -f 'libc/src/string/__bytebitmap.cc'; then $(CYGPATH_W) 'libc/src/string/__bytebitmap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/string/__bytebitmap.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/string/__bytebitmap.cc' object='libc/src/string/libc_a-__bytebitmap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/string/libc_a-__bytebitmap.obj `if test -f 'libc/src/string/__bytebitmap.cc'; then $(CYGPATH_W) 'libc/src/string/__bytebitmap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/string/__bytebitmap.cc'; fi`
 
 libc/src/string/libc_a-strsignal.o: libc/src/string/strsignal.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/string/libc_a-strsignal.o -MD -MP -MF libc/src/string/$(DEPDIR)/libc_a-strsignal.Tpo -c -o libc/src/string/libc_a-strsignal.o `test -f 'libc/src/string/strsignal.cc' || echo '$(srcdir)/'`libc/src/string/strsignal.cc
@@ -5095,9 +5116,13 @@ uninstall-am: uninstall-binPROGRAMS
 
 .PRECIOUS: Makefile
 
-	$(abs_top_builddir)/dump \
+	$(DUMPDIR) \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES)
+
+$(DUMPDIR)/kernel.dis: $(KERNEL)
+	mkdir -p $(@D)
+	objdump --disassemble --source $^ > $@
 
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 	echo "#define TERMESC_RED" \
@@ -5131,13 +5156,12 @@ test: test_compile
 # ----------------------------------------------------------------------------
 # User programs
 
-#user_hello_SOURCES = 
+#user_hello_SOURCES =
 
 # ----------------------------------------------------------------------------
 # Misc make rules
 
-$(abs_top_builddir)/dump:
-	echo WTF ******************************** $(ZLIBSTATICLIB)
+$(DUMPDIR):
 	mkdir -p $(abs_top_builddir)/dump
 
 # Make zlib
@@ -5192,10 +5216,14 @@ kernel.sym: kernel-elf symbols.mk
 		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		$(SORT) > $@
+
+kernel-elf.dis: kernel-elf
+	objdump --disassemble --source $^ > $@
 $(top_builddir)/fatdisk.img: mbr-bin bootfat-bin \
 		bootfat.sym mbr.sym kernel.sym diskfat.mk \
 		$(top_srcdir)/populate_fat.sh \
-		$(top_srcdir)/mkposixdirs.sh
+		$(top_srcdir)/mkposixdirs.sh \
+		kernel-elf.dis
 	set -x && \
 		rm -f fatpart.img fatdisk.img && \
 		truncate --size=261120K fatpart.img && \
@@ -5225,7 +5253,8 @@ $(top_builddir)/fatdisk.img: mbr-bin bootfat-bin \
 isodisk.img: bootiso-bin \
 		bootiso.sym mbr.sym kernel.sym diskiso.mk \
 		$(top_srcdir)/populate_iso.sh \
-		$(top_srcdir)/mkposixdirs.sh
+		$(top_srcdir)/mkposixdirs.sh \
+		kernel-elf.dis
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)
 	export size=$$(wc -c < bootiso-bin) && \
 	export blocks=$$(( (size + 511) / 512 )) && \
@@ -5242,6 +5271,7 @@ isodisk.img: bootiso-bin \
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
+	rm -f $(top_builddir)/kernel.dis
 	rm -f $(top_builddir)/kernel.sym
 	rm -f $(top_builddir)/kernel.map
 	rm -f $(top_builddir)/bootfat.sym
@@ -5254,7 +5284,7 @@ distclean-local:
 	rm -f $(top_builddir)/fatdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/qemu-emu.mk
-	rm -rf $(top_builddir)/dump
+	rm -rf $(DUMPDIR)
 	rm -rf $(MUSL_BUILDDIR)
 	rm -rf $(MUSL_INSTDIR)
 
@@ -5310,13 +5340,13 @@ musl: $(MUSL_INSTOUT)
 # ----------------------------------------------------------------------------
 # QEMU launcher
 
-$(top_builddir)/dump/qemu-debug-out:
+$(DUMPDIR)/qemu-debug-out:
 	mkdir -p "$(@D)"
 	mkfifo "$@"
 
 # Connect to debug log
 monitor-debug-output:
-	while true; do cat "$(top_builddir)/dump/qemu-debug-out"; done
+	while true; do cat "$(DUMPDIR)/qemu-debug-out"; done
 
 # Connect to console
 monitor-connect:

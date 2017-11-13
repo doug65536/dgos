@@ -1,11 +1,12 @@
 ## Process this file with automake to produce Makefile.in
 
+DUMPDIR = $(abs_top_builddir)/dump
+
 BUILT_SOURCES = \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES) \
 	$(top_builddir)/qemu-emu.mk \
-	$(abs_top_builddir)/dump \
-	$(top_builddir)/dump/qemu-debug-out \
+	$(DUMPDIR)/qemu-debug-out \
 	generated_headers
 
 # Build libmbr
@@ -23,7 +24,7 @@ BUILT_SOURCES = \
 LINKER_SEL =
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
-LINKER_DEBUG = 
+LINKER_DEBUG =
 
 noinst_LIBRARIES = \
 	libmbr.a \
@@ -31,7 +32,7 @@ noinst_LIBRARIES = \
 	libkernel-sse41.a \
 	libkernel-avx.a \
 	libkernel-avx512.a \
-    libc.a
+	libc.a
 
 bin_PROGRAMS = \
 	mbr-elf \
@@ -41,7 +42,7 @@ bin_PROGRAMS = \
 	bootiso-elf \
 	bootiso-bin \
 	kernel-elf
-	
+
 #user-hello
 
 # libmbr.a
@@ -55,7 +56,7 @@ libmbr_a_CCASFLAGS = \
 	$(COMPILER_FLAGS)
 
 EXTRA_libmbr_a_DEPENDENCIES = \
-	$(abs_top_builddir)/dump
+	$(DUMPDIR)
 
 # mbr-elf
 
@@ -591,7 +592,7 @@ kernel_elf_INCLUDES = \
 	-I$(EXTERNINCLUDEDIR)
 
 kernel_elf_CXXFLAGS = \
-    -D__DGOS_KERNEL__=0x00000001 \
+	-D__DGOS_KERNEL__=0x00000001 \
 	$(kernel_elf_INCLUDES) \
 	-std=c++14 \
 	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
@@ -631,7 +632,7 @@ kernel_elf_LDFLAGS = \
 
 EXTRA_kernel_elf_DEPENDENCIES = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
-	$(abs_top_builddir)/dump \
+	$(DUMPDIR) \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES)
 
@@ -645,131 +646,136 @@ kernel_elf_LDADD = \
 	libkernel-avx512.a \
 	$(ZLIBSTATICLIB)
 
+$(DUMPDIR)/kernel.dis: $(KERNEL)
+	mkdir -p $(@D)
+	objdump --disassemble --source $^ > $@
+
 # ----------------------------------------------------------------------------
 # libc
 
 libc_a_SOURCES = \
-    libc/src/string/strsignal.cc \
-    libc/src/string/strcoll_l.cc \
-    libc/src/string/strerror.cc \
-    libc/src/string/strlen.cc \
-    libc/src/string/strdup.cc \
-    libc/src/string/strtok.cc \
-    libc/src/string/strnlen.cc \
-    libc/src/string/strcpy.cc \
-    libc/src/string/strcmp.cc \
-    libc/src/string/memset.cc \
-    libc/src/string/strndup.cc \
-    libc/src/string/strcspn.cc \
-    libc/src/string/memcmp.cc \
-    libc/src/string/strrchr.cc \
-    libc/src/string/strpbrk.cc \
-    libc/src/string/memcpy.cc \
-    libc/src/string/stpncpy.cc \
-    libc/src/string/strtok_r.cc \
-    libc/src/string/stpcpy.cc \
-    libc/src/string/memccpy.cc \
-    libc/src/string/strcat.cc \
-    libc/src/string/strchr.cc \
-    libc/src/string/strncpy.cc \
-    libc/src/string/strncat.cc \
-    libc/src/string/strstr.cc \
-    libc/src/string/memmove.cc \
-    libc/src/string/strspn.cc \
-    libc/src/string/strcoll.cc \
-    libc/src/string/strerror_r.cc \
-    libc/src/string/strerror_l.cc \
-    libc/src/string/strxfrm.cc \
-    libc/src/string/memchr.cc \
-    libc/src/string/strxfrm_l.cc \
-    libc/src/string/strncmp.cc \
-    libc/src/stdlib/_Exit.cc \
-    libc/src/sys/syscall.s \
-    libc/include/termios.h \
-    libc/include/complex.h \
-    libc/include/regex.h \
-    libc/include/cpio.h \
-    libc/include/pwd.h \
-    libc/include/net/if.h \
-    libc/include/wctype.h \
-    libc/include/monetary.h \
-    libc/include/nl_types.h \
-    libc/include/wordexp.h \
-    libc/include/mqueue.h \
-    libc/include/assert.h \
-    libc/include/syslog.h \
-    libc/include/signal.h \
-    libc/include/unistd.h \
-    libc/include/stropts.h \
-    libc/include/search.h \
-    libc/include/limits.h \
-    libc/include/libgen.h \
-    libc/include/glob.h \
-    libc/include/ulimit.h \
-    libc/include/utime.h \
-    libc/include/fnmatch.h \
-    libc/include/spawn.h \
-    libc/include/iconv.h \
-    libc/include/fcntl.h \
-    libc/include/stdio.h \
-    libc/include/setjmp.h \
-    libc/include/sys/syscall.h \
-    libc/include/sys/resource.h \
-    libc/include/sys/select.h \
-    libc/include/sys/sem.h \
-    libc/include/sys/socket.h \
-    libc/include/sys/types.h \
-    libc/include/sys/un.h \
-    libc/include/sys/wait.h \
-    libc/include/sys/utsname.h \
-    libc/include/sys/stat.h \
-    libc/include/sys/ipc.h \
-    libc/include/sys/times.h \
-    libc/include/sys/statvfs.h \
-    libc/include/sys/msg.h \
-    libc/include/sys/shm.h \
-    libc/include/sys/time.h \
-    libc/include/sys/cdefs.h \
-    libc/include/sys/mman.h \
-    libc/include/sys/uio.h \
-    libc/include/semaphore.h \
-    libc/include/arpa/inet.h \
-    libc/include/fmtmsg.h \
-    libc/include/pthread.h \
-    libc/include/fenv.h \
-    libc/include/aio.h \
-    libc/include/dlfcn.h \
-    libc/include/math.h \
-    libc/include/poll.h \
-    libc/include/wchar.h \
-    libc/include/utmpx.h \
-    libc/include/ctype.h \
-    libc/include/sched.h \
-    libc/include/tar.h \
-    libc/include/ndbm.h \
-    libc/include/time.h \
-    libc/include/grp.h \
-    libc/include/netdb.h \
-    libc/include/string.h \
-    libc/include/strings.h \
-    libc/include/stdlib.h \
-    libc/include/errno.h \
-    libc/include/ftw.h \
-    libc/include/inttypes.h \
-    libc/include/dirent.h \
-    libc/include/trace.h \
-    libc/include/netinet/in.h \
-    libc/include/netinet/tcp.h \
-    libc/include/langinfo.h \
-    libc/include/locale.h
+	libc/src/string/__bytebitmap.cc \
+	libc/src/string/strsignal.cc \
+	libc/src/string/strcoll_l.cc \
+	libc/src/string/strerror.cc \
+	libc/src/string/strlen.cc \
+	libc/src/string/strdup.cc \
+	libc/src/string/strtok.cc \
+	libc/src/string/strnlen.cc \
+	libc/src/string/strcpy.cc \
+	libc/src/string/strcmp.cc \
+	libc/src/string/memset.cc \
+	libc/src/string/strndup.cc \
+	libc/src/string/strcspn.cc \
+	libc/src/string/memcmp.cc \
+	libc/src/string/strrchr.cc \
+	libc/src/string/strpbrk.cc \
+	libc/src/string/memcpy.cc \
+	libc/src/string/stpncpy.cc \
+	libc/src/string/strtok_r.cc \
+	libc/src/string/stpcpy.cc \
+	libc/src/string/memccpy.cc \
+	libc/src/string/strcat.cc \
+	libc/src/string/strchr.cc \
+	libc/src/string/strncpy.cc \
+	libc/src/string/strncat.cc \
+	libc/src/string/strstr.cc \
+	libc/src/string/memmove.cc \
+	libc/src/string/strspn.cc \
+	libc/src/string/strcoll.cc \
+	libc/src/string/strerror_r.cc \
+	libc/src/string/strerror_l.cc \
+	libc/src/string/strxfrm.cc \
+	libc/src/string/memchr.cc \
+	libc/src/string/strxfrm_l.cc \
+	libc/src/string/strncmp.cc \
+	libc/src/stdlib/_Exit.cc \
+	libc/src/sys/syscall.s \
+	libc/include/termios.h \
+	libc/include/complex.h \
+	libc/include/regex.h \
+	libc/include/cpio.h \
+	libc/include/pwd.h \
+	libc/include/net/if.h \
+	libc/include/wctype.h \
+	libc/include/monetary.h \
+	libc/include/nl_types.h \
+	libc/include/wordexp.h \
+	libc/include/mqueue.h \
+	libc/include/assert.h \
+	libc/include/syslog.h \
+	libc/include/signal.h \
+	libc/include/unistd.h \
+	libc/include/stropts.h \
+	libc/include/search.h \
+	libc/include/limits.h \
+	libc/include/libgen.h \
+	libc/include/glob.h \
+	libc/include/ulimit.h \
+	libc/include/utime.h \
+	libc/include/fnmatch.h \
+	libc/include/spawn.h \
+	libc/include/iconv.h \
+	libc/include/fcntl.h \
+	libc/include/stdio.h \
+	libc/include/setjmp.h \
+	libc/include/sys/syscall.h \
+	libc/include/sys/resource.h \
+	libc/include/sys/select.h \
+	libc/include/sys/sem.h \
+	libc/include/sys/socket.h \
+	libc/include/sys/types.h \
+	libc/include/sys/un.h \
+	libc/include/sys/wait.h \
+	libc/include/sys/utsname.h \
+	libc/include/sys/stat.h \
+	libc/include/sys/ipc.h \
+	libc/include/sys/times.h \
+	libc/include/sys/statvfs.h \
+	libc/include/sys/msg.h \
+	libc/include/sys/shm.h \
+	libc/include/sys/time.h \
+	libc/include/sys/cdefs.h \
+	libc/include/sys/mman.h \
+	libc/include/sys/uio.h \
+	libc/include/semaphore.h \
+	libc/include/arpa/inet.h \
+	libc/include/fmtmsg.h \
+	libc/include/pthread.h \
+	libc/include/fenv.h \
+	libc/include/aio.h \
+	libc/include/dlfcn.h \
+	libc/include/math.h \
+	libc/include/poll.h \
+	libc/include/wchar.h \
+	libc/include/utmpx.h \
+	libc/include/ctype.h \
+	libc/include/sched.h \
+	libc/include/tar.h \
+	libc/include/ndbm.h \
+	libc/include/time.h \
+	libc/include/grp.h \
+	libc/include/netdb.h \
+	libc/include/string.h \
+	libc/include/strings.h \
+	libc/include/stdlib.h \
+	libc/include/errno.h \
+	libc/include/ftw.h \
+	libc/include/inttypes.h \
+	libc/include/dirent.h \
+	libc/include/trace.h \
+	libc/include/netinet/in.h \
+	libc/include/netinet/tcp.h \
+	libc/include/langinfo.h \
+	libc/include/locale.h
 
 libc_a_CXXFLAGS = \
-    -isystem $(top_srcdir)/libc/include \
-    -isystem $(top_builddir)/cross-tool/x86_64-elf/include \
-    -ffreestanding \
+	-isystem $(top_srcdir)/libc/include \
+	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
+	-ffreestanding \
 	-std=c++14 \
-    $(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)    
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
 
 # ----------------------------------------------------------------------------
 # libc unit tests
@@ -801,7 +807,7 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 	echo "#define TERMESC_WHITE" \
 		"\"$$(tput setaf 7 | sed 's/\x1b/\\x1b/g')\"" \
 		>> $(top_builddir)/termesc.h
-	
+
 	$(CXX_FOR_BUILD) \
 		$(LIBC_CXXFLAGS) \
 		-o libc_tests \
@@ -820,13 +826,12 @@ test: test_compile
 # ----------------------------------------------------------------------------
 # User programs
 
-#user_hello_SOURCES = 
+#user_hello_SOURCES =
 
 # ----------------------------------------------------------------------------
 # Misc make rules
 
-$(abs_top_builddir)/dump:
-	echo WTF ******************************** $(ZLIBSTATICLIB)
+$(DUMPDIR):
 	mkdir -p $(abs_top_builddir)/dump
 
 include zlib.mk
@@ -837,6 +842,7 @@ include diskiso.mk
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
+	rm -f $(top_builddir)/kernel.dis
 	rm -f $(top_builddir)/kernel.sym
 	rm -f $(top_builddir)/kernel.map
 	rm -f $(top_builddir)/bootfat.sym
@@ -849,7 +855,7 @@ distclean-local:
 	rm -f $(top_builddir)/fatdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/qemu-emu.mk
-	rm -rf $(top_builddir)/dump
+	rm -rf $(DUMPDIR)
 	rm -rf $(MUSL_BUILDDIR)
 	rm -rf $(MUSL_INSTDIR)
 
@@ -937,7 +943,7 @@ musl: $(MUSL_INSTOUT)
 # ----------------------------------------------------------------------------
 # QEMU launcher
 
-$(top_builddir)/dump/qemu-debug-out:
+$(DUMPDIR)/qemu-debug-out:
 	mkdir -p "$(@D)"
 	mkfifo "$@"
 
@@ -959,7 +965,7 @@ QEMU_NET = \
 	-net nic,model=ne2k_pci \
 	-net nic,model=e1000 \
 	$(QEMU_BRIDGE) \
-	-net dump,file=dump/netdump
+	-net dump,file="$(DUMPDIR)/netdump"
 
 QEMU_MONITOR = \
 	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait
@@ -967,7 +973,7 @@ QEMU_MONITOR = \
 #,telnet
 
 QEMU_DEBUGCON = \
-	-chardev pipe,path=$(top_builddir)/dump/qemu-debug-out,id=qemu-debug-out \
+	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
 	-mon qemu-monitor,mode=readline \
 	-device isa-debugcon,chardev=qemu-debug-out
 
@@ -979,11 +985,12 @@ QEMU_COMMON = \
 	$(QEMU_MONITOR) \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
-	$(QEMU_USB) \
 	$(QEMU_NET) \
 	-no-shutdown -no-reboot -d unimp,guest_errors \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS)
+
+#$(QEMU_USB)
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
@@ -1010,7 +1017,7 @@ QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
 
 # Connect to debug log
 monitor-debug-output:
-	while true; do cat "$(top_builddir)/dump/qemu-debug-out"; done
+	while true; do cat "$(DUMPDIR)/qemu-debug-out"; done
 
 # Connect to console
 monitor-connect:
