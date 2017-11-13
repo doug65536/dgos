@@ -242,7 +242,9 @@ gcc_config="--target=$arches --with-system-zlib \
 
 # disable for now: --enable-threads=posix
 
-bin_config="--target=$arches --enable-gold --enable-ld --enable-plugins"
+bin_config="--target=$arches \
+--enable-gold --enable-ld \
+--enable-plugins --enable-lto"
 gdb_config="--target=$arches"
 
 process_tarball "$archives/$bintar" "make_tool" all "$bin_config" || exit
