@@ -26,3 +26,6 @@ kernel.sym: kernel-elf symbols.mk
 		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
 		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
 		$(SORT) > $@
+
+kernel-elf.dis: kernel-elf
+	objdump --disassemble --source $^ > $@
