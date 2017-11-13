@@ -6,7 +6,7 @@
 #define __const                 __attribute__((const))
 #define __pure                  __attribute__((pure))
 #define __aligned(n)            __attribute__((aligned(n)))
-#define __always_inline         __attribute__((always_inline))
+#define __always_inline         __attribute__((always_inline)) inline
 #define __noreturn              __attribute__((noreturn))
 #define __used                  __attribute__((used))
 #define __returns_twice         __attribute__((returns_twice))

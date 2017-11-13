@@ -1,8 +1,7 @@
 #pragma once
 #include "types.h"
 
-__always_inline
-static inline void *cpu_gs_read_ptr(void)
+static __always_inline void *cpu_gs_read_ptr(void)
 {
     void *ptr;
     __asm__ __volatile__ (
@@ -14,8 +13,7 @@ static inline void *cpu_gs_read_ptr(void)
     return ptr;
 }
 
-__always_inline
-static inline void *cpu_gs_read_ptr(size_t offset)
+static __always_inline void *cpu_gs_read_ptr(size_t offset)
 {
     void *ptr;
     __asm__ __volatile__ (
