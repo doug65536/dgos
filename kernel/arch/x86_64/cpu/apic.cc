@@ -29,34 +29,34 @@
 
 #define DEBUG_ACPI  1
 #if DEBUG_ACPI
-#define ACPI_TRACE(...) printdbg("acpi: " __VA_ARGS__)
+#define ACPI_TRACE(...) printk("acpi: " __VA_ARGS__)
 #else
 #define ACPI_TRACE(...) ((void)0)
 #endif
 
-#define ACPI_ERROR(...) printdbg("mp: error: " __VA_ARGS__)
+#define ACPI_ERROR(...) printk("mp: error: " __VA_ARGS__)
 
 #define DEBUG_MPS  1
 #if DEBUG_MPS
-#define MPS_TRACE(...) printdbg("mp: " __VA_ARGS__)
+#define MPS_TRACE(...) printk("mp: " __VA_ARGS__)
 #else
 #define MPS_TRACE(...) ((void)0)
 #endif
 
-#define MPS_ERROR(...) printdbg("mp: " __VA_ARGS__)
+#define MPS_ERROR(...) printk("mp: " __VA_ARGS__)
 
 #define DEBUG_APIC  1
 #if DEBUG_APIC
-#define APIC_TRACE(...) printdbg("lapic: " __VA_ARGS__)
+#define APIC_TRACE(...) printk("lapic: " __VA_ARGS__)
 #else
 #define APIC_TRACE(...) ((void)0)
 #endif
 
-#define APIC_ERROR(...) printdbg("lapic: error: " __VA_ARGS__)
+#define APIC_ERROR(...) printk("lapic: error: " __VA_ARGS__)
 
 #define DEBUG_IOAPIC  1
 #if DEBUG_IOAPIC
-#define IOAPIC_TRACE(...) printdbg("ioapic: " __VA_ARGS__)
+#define IOAPIC_TRACE(...) printk("ioapic: " __VA_ARGS__)
 #else
 #define IOAPIC_TRACE(...) ((void)0)
 #endif
@@ -1070,11 +1070,12 @@ static acpi_fadt_t acpi_fadt;
 // The ACPI PM timer runs at 3.579545MHz
 #define ACPI_PM_TIMER_HZ    3579545
 
-static uint64_t acpi_rsdp_addr;
+static uint64_t acpi_rsdt_addr;
+static uint64_t acpi_rsdt_len;
 
 int acpi_have8259pic(void)
 {
-    return !acpi_rsdp_addr ||
+    return !acpi_rsdt_addr ||
             !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
 }
 
@@ -1127,7 +1128,7 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
     return result;
 }
 
-static uint8_t checksum_bytes(char const *bytes, size_t len)
+static __always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
 {
     uint8_t sum = 0;
     for (size_t i = 0; i < len; ++i)
@@ -1216,421 +1217,524 @@ static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
     acpi_hpet_list.push_back(acpi_hdr->addr);
 }
 
-static uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
+static __always_inline uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
 {
     return checksum_bytes((char const *)hdr, hdr->len);
 }
 
+static bool acpi_find_rsdp(void *start, size_t len)
+{
+    for (size_t offset = 0; offset < len; offset += 16) {
+        acpi_rsdp2_t *rsdp2 = (acpi_rsdp2_t*)
+                ((char*)start + offset);
+
+        // Check for ACPI 2.0+ RSDP
+        if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
+            // Check checksum
+            if (rsdp2->rsdp1.rev != 0 &&
+                    checksum_bytes((char*)rsdp2,
+                               sizeof(*rsdp2)) == 0 &&
+                    checksum_bytes((char*)&rsdp2->rsdp1,
+                                   sizeof(rsdp2->rsdp1)) == 0) {
+                if (rsdp2->xsdt_addr_lo | rsdp2->xsdt_addr_hi) {
+                    acpi_rsdt_addr = rsdp2->xsdt_addr_lo |
+                            ((uint64_t)rsdp2->xsdt_addr_hi << 32);
+                } else {
+                    acpi_rsdt_addr = rsdp2->rsdp1.rsdt_addr;
+                }
+
+                acpi_rsdt_len = rsdp2->length;
+
+                printk("Found ACPI 2.0+ RSDP at 0x%zx\n", acpi_rsdt_addr);
+
+                return true;
+            }
+        }
+
+        // Check for ACPI 1.0 RSDP
+        acpi_rsdp_t *rsdp = (acpi_rsdp_t*)rsdp2;
+        if (rsdp->rev == 0 &&
+                !memcmp(rsdp->sig, "RSD PTR ", 8)) {
+            // Check checksum
+            if (checksum_bytes((char*)rsdp, sizeof(*rsdp)) == 0) {
+                acpi_rsdt_addr = rsdp->rsdt_addr;
+
+                // Leave acpi_rsdt_len 0 in this case, it is
+                // handled later
+
+                printk("Found ACPI 1.0 RSDP at 0x%zx\n", acpi_rsdt_addr);
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+static bool mp_find_fps(void *start, size_t len)
+{
+    for (size_t offset = 0; offset < len; offset += 16) {
+        mp_table_hdr_t *sig_srch = (mp_table_hdr_t*)
+                ((char*)start + offset);
+
+        // Check for MP tables signature
+        if (!memcmp(sig_srch->sig, "_MP_", 4)) {
+            // Check checksum
+            if (checksum_bytes((char*)sig_srch,
+                               sizeof(*sig_srch)) == 0) {
+                mp_tables = (char*)(uintptr_t)sig_srch->phys_addr;
+
+                printk("Found MPS tables at %zx\n", size_t(mp_tables));
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+// Sometimes we have to guess the size
+// then read the header to get the actual size.
+// This handles that.
+template<typename T>
+static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
+                         size_t guess, size_t actual_len)
+{
+    if (actual_len > guess) {
+        munmap(ptr, guess);
+        ptr = (T*)mmap((void*)physaddr, actual_len,
+                       PROT_READ, MAP_PHYSICAL, -1, 0);
+    }
+
+    return ptr;
+}
+
+static void acpi_parse_rsdt()
+{
+    acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
+                (void*)acpi_rsdt_addr,
+                acpi_rsdt_len ? acpi_rsdt_len : sizeof(*rsdt_hdr),
+                PROT_READ, MAP_PHYSICAL, -1, 0);
+
+    // For ACPI 1.0, get length from header and remap
+    if (!acpi_rsdt_len) {
+        acpi_rsdt_len = rsdt_hdr->len;
+        rsdt_hdr = acpi_remap_len(rsdt_hdr, acpi_rsdt_addr,
+                                  sizeof(*rsdt_hdr), acpi_rsdt_len);
+    }
+
+    printk("RSDT version %x\n", rsdt_hdr->rev);
+
+    if (acpi_chk_hdr(rsdt_hdr) != 0) {
+        ACPI_ERROR("ACPI RSDT checksum mismatch!\n");
+        return;
+    }
+
+    uint32_t *rsdp_ptrs = (uint32_t *)(rsdt_hdr + 1);
+    uint32_t *rsdp_end = (uint32_t *)((char*)rsdt_hdr + rsdt_hdr->len);
+
+    printk("Processing RSDP pointers from %p to %p\n",
+           (void*)rsdp_ptrs, (void*)rsdp_end);
+
+    for (uint32_t *rsdp_ptr = rsdp_ptrs;
+         rsdp_ptr < rsdp_end; ++rsdp_ptr) {
+        uint32_t hdr_addr = *rsdp_ptr;
+
+        acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
+                mmap((void*)(uintptr_t)hdr_addr,
+                      64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
+
+        hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, hdr->len);
+
+        if (!memcmp(hdr->sig, "FACP", 4)) {
+            acpi_fadt_t *fadt_hdr = (acpi_fadt_t *)hdr;
+
+            if (acpi_chk_hdr(&fadt_hdr->hdr) == 0) {
+                ACPI_TRACE("ACPI FADT found\n");
+                acpi_process_fadt(fadt_hdr);
+            } else {
+                ACPI_ERROR("ACPI FADT checksum mismatch!\n");
+            }
+        } else if (!memcmp(hdr->sig, "APIC", 4)) {
+            acpi_madt_t *madt_hdr = (acpi_madt_t *)hdr;
+
+            if (acpi_chk_hdr(&madt_hdr->hdr) == 0) {
+                ACPI_TRACE("ACPI MADT found\n");
+                acpi_process_madt(madt_hdr);
+            } else {
+                ACPI_ERROR("ACPI MADT checksum mismatch!\n");
+            }
+        } else if (!memcmp(hdr->sig, "HPET", 4)) {
+            acpi_hpet_t *hpet_hdr = (acpi_hpet_t *)hdr;
+
+            if (acpi_chk_hdr(&hpet_hdr->hdr) == 0) {
+                ACPI_TRACE("ACPI HPET found\n");
+                acpi_process_hpet(hpet_hdr);
+            } else {
+                ACPI_ERROR("ACPI MADT checksum mismatch!\n");
+            }
+        } else {
+            if (acpi_chk_hdr(hdr) == 0) {
+                ACPI_TRACE("ACPI %4.4s ignored\n", hdr->sig);
+            } else {
+                ACPI_ERROR("ACPI %4.4s checksum mismatch!"
+                       " (ignored anyway)\n", hdr->sig);
+            }
+        }
+
+        munmap(hdr, max(size_t(64 << 10), size_t(hdr->len)));
+    }
+}
+
+static void mp_parse_fps()
+{
+    mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
+            mmap(mp_tables, 0x10000,
+                 PROT_READ, MAP_PHYSICAL, -1, 0);
+
+    cth = acpi_remap_len(cth, uintptr_t(mp_tables),
+                         0x10000, cth->base_tbl_len + cth->ext_tbl_len);
+
+    uint8_t *entry = (uint8_t*)(cth + 1);
+
+    // Reset to impossible values
+    mp_isa_bus_id = -1;
+
+    // First slot reserved for BSP
+    apic_id_count = 1;
+
+    for (uint16_t i = 0; i < cth->entry_count; ++i) {
+        mp_cfg_cpu_t *entry_cpu;
+        mp_cfg_bus_t *entry_bus;
+        mp_cfg_ioapic_t *entry_ioapic;
+        mp_cfg_iointr_t *entry_iointr;
+        mp_cfg_lintr_t *entry_lintr;
+        mp_cfg_addrmap_t *entry_addrmap;
+        mp_cfg_bushier_t *entry_busheir;
+        mp_cfg_buscompat_t *entry_buscompat;
+        switch (*entry) {
+        case MP_TABLE_TYPE_CPU:
+        {
+            entry_cpu = (mp_cfg_cpu_t *)entry;
+
+            MPS_TRACE("CPU package found,"
+                      " base apic id=%u ver=0x%x\n",
+                      entry_cpu->apic_id, entry_cpu->apic_ver);
+
+            if ((entry_cpu->flags & MP_CPU_FLAGS_ENABLED) &&
+                    apic_id_count < countof(apic_id_list)) {
+                if (entry_cpu->flags & MP_CPU_FLAGS_BSP)
+                    apic_id_list[0] = entry_cpu->apic_id;
+                else
+                    apic_id_list[apic_id_count++] = entry_cpu->apic_id;
+            }
+
+            entry = (uint8_t*)(entry_cpu + 1);
+            break;
+        }
+
+        case MP_TABLE_TYPE_BUS:
+        {
+            entry_bus = (mp_cfg_bus_t *)entry;
+
+            MPS_TRACE("%.*s bus found, id=%u\n",
+                     (int)sizeof(entry_bus->type),
+                     entry_bus->type, entry_bus->bus_id);
+
+            if (!memcmp(entry_bus->type, "PCI   ", 6)) {
+                mp_pci_bus_ids.push_back(entry_bus->bus_id);
+            } else if (!memcmp(entry_bus->type, "ISA   ", 6)) {
+                if (mp_isa_bus_id == 0xFFFF)
+                    mp_isa_bus_id = entry_bus->bus_id;
+                else
+                    MPS_ERROR("Too many ISA busses,"
+                              " only one supported\n");
+            } else {
+                MPS_ERROR("Dropped! Unrecognized bus named \"%.*s\"\n",
+                          (int)sizeof(entry_bus->type), entry_bus->type);
+            }
+            entry = (uint8_t*)(entry_bus + 1);
+            break;
+        }
+
+        case MP_TABLE_TYPE_IOAPIC:
+        {
+            entry_ioapic = (mp_cfg_ioapic_t *)entry;
+
+            if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED) {
+                if (ioapic_count >= countof(ioapic_list)) {
+                    MPS_ERROR("Dropped! Too many IOAPIC devices\n");
+                    break;
+                }
+
+                MPS_TRACE("IOAPIC id=%d, addr=0x%x,"
+                          " flags=0x%x, ver=0x%x\n",
+                          entry_ioapic->id,
+                          entry_ioapic->addr,
+                          entry_ioapic->flags,
+                          entry_ioapic->ver);
+
+                mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
+
+                ioapic->id = entry_ioapic->id;
+                ioapic->addr = entry_ioapic->addr;
+
+                uint32_t volatile *ioapic_ptr = (uint32_t *)mmap(
+                            (void*)(uintptr_t)entry_ioapic->addr,
+                            12, PROT_READ | PROT_WRITE,
+                            MAP_PHYSICAL |
+                            MAP_NOCACHE |
+                            MAP_WRITETHRU, -1, 0);
+
+                ioapic->ptr = ioapic_ptr;
+
+                // Read redirection table size
+
+                ioapic_ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
+                uint32_t ioapic_ver = ioapic_ptr[IOAPIC_IOREGWIN];
+
+                uint8_t ioapic_intr_count =
+                        (ioapic_ver >> IOAPIC_VER_ENTRIES_BIT) &
+                        IOAPIC_VER_ENTRIES_MASK;
+
+                // Allocate virtual IRQ numbers
+                ioapic->irq_base = ioapic_next_irq_base;
+                ioapic_next_irq_base += ioapic_intr_count;
+
+                // Allocate vectors, assign range to IOAPIC
+                ioapic->vector_count = ioapic_intr_count;
+                ioapic->base_intr = ioapic_alloc_vectors(
+                            ioapic_intr_count);;
+
+                ioapic->lock = 0;
+            }
+            entry = (uint8_t*)(entry_ioapic + 1);
+            break;
+        }
+
+        case MP_TABLE_TYPE_IOINTR:
+        {
+            entry_iointr = (mp_cfg_iointr_t *)entry;
+
+            if (memchr(mp_pci_bus_ids.data(), entry_iointr->source_bus,
+                        mp_pci_bus_ids.size())) {
+                // PCI IRQ
+                uint8_t bus = entry_iointr->source_bus;
+                uint8_t intr_type = entry_iointr->type;
+                uint8_t intr_flags = entry_iointr->flags;
+                uint8_t device = entry_iointr->source_bus_irq >> 2;
+                uint8_t pci_irq = entry_iointr->source_bus_irq & 3;
+                uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
+                uint8_t intin = entry_iointr->dest_ioapic_intin;
+
+                MPS_TRACE("PCI device %u INT_%c# ->"
+                          " IOAPIC ID 0x%02x INTIN %d %s\n",
+                          device, (int)(pci_irq) + 'A',
+                          ioapic_id, intin,
+                          intr_type < countof(intr_type_text) ?
+                              intr_type_text[intr_type] :
+                              "(invalid type!)");
+
+
+                mp_bus_irq_mapping_t mapping{};
+                mapping.bus = bus;
+                mapping.intr_type = intr_type;
+                mapping.flags = intr_flags;
+                mapping.device = device;
+                mapping.irq = pci_irq & 3;
+                mapping.ioapic_id = ioapic_id;
+                mapping.intin = intin;
+                bus_irq_list.push_back(mapping);
+            } else if (entry_iointr->source_bus == mp_isa_bus_id) {
+                // ISA IRQ
+
+                uint8_t bus =  entry_iointr->source_bus;
+                uint8_t intr_type = entry_iointr->type;
+                uint8_t intr_flags = entry_iointr->flags;
+                uint8_t isa_irq = entry_iointr->source_bus_irq;
+                uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
+                uint8_t intin = entry_iointr->dest_ioapic_intin;
+
+                MPS_TRACE("ISA IRQ %d -> IOAPIC ID 0x%02x INTIN %u %s\n",
+                          isa_irq, ioapic_id, intin,
+                          intr_type < countof(intr_type_text) ?
+                              intr_type_text[intr_type] :
+                              "(invalid type!)");
+
+                isa_irq_lookup[isa_irq] = bus_irq_list.size();
+                mp_bus_irq_mapping_t mapping{};
+                mapping.bus = bus;
+                mapping.intr_type = intr_type;
+                mapping.flags = intr_flags;
+                mapping.device = 0;
+                mapping.irq = isa_irq;
+                mapping.ioapic_id = ioapic_id;
+                mapping.intin = intin;
+                bus_irq_list.push_back(mapping);
+            } else {
+                // Unknown bus!
+                MPS_ERROR("IRQ %d on unknown bus ->"
+                          " IOAPIC ID 0x%02x INTIN %u type=%d\n",
+                          entry_iointr->source_bus_irq,
+                          entry_iointr->dest_ioapic_id,
+                          entry_iointr->dest_ioapic_intin,
+                          entry_iointr->type);
+            }
+
+            entry = (uint8_t*)(entry_iointr + 1);
+            break;
+        }
+
+        case MP_TABLE_TYPE_LINTR:
+        {
+            entry_lintr = (mp_cfg_lintr_t*)entry;
+            if (memchr(mp_pci_bus_ids.data(), entry_lintr->source_bus,
+                        mp_pci_bus_ids.size())) {
+                uint8_t device = entry_lintr->source_bus_irq >> 2;
+                uint8_t pci_irq = entry_lintr->source_bus_irq;
+                uint8_t lapic_id = entry_lintr->dest_lapic_id;
+                uint8_t intin = entry_lintr->dest_lapic_lintin;
+                MPS_TRACE("PCI device %u INT_%c# ->"
+                          " LAPIC ID 0x%02x INTIN %d\n",
+                          device, (int)(pci_irq & 3) + 'A',
+                          lapic_id, intin);
+            } else if (entry_lintr->source_bus == mp_isa_bus_id) {
+                uint8_t isa_irq = entry_lintr->source_bus_irq;
+                uint8_t lapic_id = entry_lintr->dest_lapic_id;
+                uint8_t intin = entry_lintr->dest_lapic_lintin;
+
+                MPS_TRACE("ISA IRQ %d -> LAPIC ID 0x%02x INTIN %u\n",
+                          isa_irq, lapic_id, intin);
+            } else {
+                // Unknown bus!
+                MPS_ERROR("IRQ %d on unknown bus ->"
+                          " IOAPIC ID 0x%02x INTIN %u\n",
+                          entry_lintr->source_bus_irq,
+                          entry_lintr->dest_lapic_id,
+                          entry_lintr->dest_lapic_lintin);
+            }
+            entry = (uint8_t*)(entry_lintr + 1);
+            break;
+        }
+
+        case MP_TABLE_TYPE_ADDRMAP:
+        {
+            entry_addrmap = (mp_cfg_addrmap_t*)entry;
+            uint8_t bus = entry_addrmap->bus_id;
+            uint64_t addr =  entry_addrmap->addr_lo |
+                    ((uint64_t)entry_addrmap->addr_hi << 32);
+            uint64_t len =  entry_addrmap->addr_lo |
+                    ((uint64_t)entry_addrmap->addr_hi << 32);
+
+            MPS_TRACE("Address map, bus=%d, addr=%lx, len=%lx\n",
+                      bus, addr, len);
+
+            entry += entry_addrmap->len;
+            break;
+        }
+
+        case MP_TABLE_TYPE_BUSHIER:
+        {
+            entry_busheir = (mp_cfg_bushier_t*)entry;
+            uint8_t bus = entry_busheir->bus_id;
+            uint8_t parent_bus = entry_busheir->parent_bus;
+            uint8_t info = entry_busheir->info;
+
+            MPS_TRACE("Bus hierarchy, bus=%d, parent=%d, info=%x\n",
+                      bus, parent_bus, info);
+
+            entry += entry_busheir->len;
+            break;
+        }
+
+        case MP_TABLE_TYPE_BUSCOMPAT:
+        {
+            entry_buscompat = (mp_cfg_buscompat_t*)entry;
+            uint8_t bus = entry_buscompat->bus_id;
+            uint8_t bus_mod = entry_buscompat->bus_mod;
+            uint32_t bus_predef = entry_buscompat->predef_range_list;
+
+            MPS_TRACE("Bus compat, bus=%d, mod=%d,"
+                      " predefined_range_list=%x\n",
+                      bus, bus_mod, bus_predef);
+
+            entry += entry_buscompat->len;
+            break;
+        }
+
+        default:
+            MPS_ERROR("Unknown MP table entry_type!"
+                      " Guessing size is 8\n");
+            // Hope for the best here
+            entry += 8;
+            break;
+        }
+    }
+
+    munmap(cth, max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
+}
+
 static int parse_mp_tables(void)
 {
-    void *mem_top =
-            (uint16_t*)((uintptr_t)*BIOS_DATA_AREA(
-                uint16_t, 0x40E) << 4);
-    void *ranges[4] = {
-        mem_top, (uint32_t*)0xA0000,
-        0, 0
-    };
-    for (size_t pass = 0;
-         !mp_tables && !acpi_rsdp_addr && pass < 4;
-         pass += 2) {
-        if (pass == 2) {
-            ranges[2] = mmap((void*)0xE0000, 0x20000, PROT_READ,
-                             MAP_PHYSICAL, -1, 0);
-            ranges[3] = (char*)ranges[2] + 0x20000;
-        }
-        for (mp_table_hdr_t const* sig_srch =
-             (mp_table_hdr_t const*)ranges[pass];
-             (void*)sig_srch < ranges[pass+1]; ++sig_srch) {
+    uint16_t ebda_seg = *BIOS_DATA_AREA(uint16_t, 0x40E);
+    uintptr_t ebda = uintptr_t(ebda_seg << 4);
+
+    // ACPI RSDP can be found:
+    //  - in the first 1KB of the EBDA
+    //  - in the 128KB range starting at 0xE0000
+
+    // MP table floating pointer structure can be found:
+    //  - in the first 1KB of the EBDA
+    //  - in the 1KB range starting at 0x9FC00
+    //  - in the 64KB range starting at 0xF0000
+
+    void *p_9fc00 = mmap((void*)0x9FC00, 0x400, PROT_READ,
+                         MAP_PHYSICAL, -1, 0);
+    void *p_e0000 = mmap((void*)0xE0000, 0x20000, PROT_READ,
+                       MAP_PHYSICAL, -1, 0);
+    void *p_f0000 = (char*)p_e0000 + 0x10000;
+
+    void *p_ebda;
+    if (ebda == 0x9FC00) {
+        p_ebda = p_9fc00;
+    } else {
+        p_ebda = mmap((void*)ebda, 0x400, PROT_READ,
+                      MAP_PHYSICAL, -1, 0);
+    }
+
+    struct range {
+        void *start;
+        size_t len;
+        bool (*search_fn)(void *start, size_t len);
+    } const search_data[] = {
 #if ENABLE_ACPI
-            // Check for ACPI 2.0+ RSDP
-            acpi_rsdp2_t *rsdp2 = (acpi_rsdp2_t*)sig_srch;
-            if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
-                // Check checksum
-                if (rsdp2->rsdp1.rev != 0 &&
-                        checksum_bytes((char*)rsdp2,
-                                   sizeof(*rsdp2)) == 0 &&
-                        checksum_bytes((char*)&rsdp2->rsdp1,
-                                       sizeof(rsdp2->rsdp1)) == 0) {
-                    if (rsdp2->xsdt_addr_lo | rsdp2->xsdt_addr_hi)
-                        acpi_rsdp_addr = rsdp2->xsdt_addr_lo |
-                                ((uint64_t)rsdp2->xsdt_addr_hi << 32);
-                    else
-                        acpi_rsdp_addr = rsdp2->rsdp1.rsdt_addr;
-                    break;
-                }
-            }
-
-            // Check for ACPI 1.0 RSDP
-            acpi_rsdp_t *rsdp = (acpi_rsdp_t*)sig_srch;
-            if (rsdp->rev == 0 &&
-                    !memcmp(rsdp->sig, "RSD PTR ", 8)) {
-                // Check checksum
-                if (checksum_bytes((char*)rsdp, sizeof(*rsdp)) == 0) {
-                    acpi_rsdp_addr = rsdp->rsdt_addr;
-                    break;
-                }
-            }
+        range{ p_ebda, 0x400, acpi_find_rsdp },
+        range{ p_e0000, 0x20000, acpi_find_rsdp },
 #endif
+        range{ p_ebda, 0x400, mp_find_fps },
+        range{ p_9fc00 != p_ebda ? p_9fc00 : nullptr, 0x400, mp_find_fps },
+        range{ p_f0000, 0x10000, mp_find_fps }
+    };
 
-            // Check for MP tables signature
-            if (!memcmp(sig_srch->sig, "_MP_", 4)) {
-                // Check checksum
-                if (checksum_bytes((char*)sig_srch,
-                                   sizeof(*sig_srch)) == 0) {
-                    mp_tables = (char*)(uintptr_t)sig_srch->phys_addr;
-                    break;
-                }
-            }
-        }
+    for (size_t i = 0; i < countof(search_data); ++i) {
+        if (unlikely(!search_data[i].start))
+            continue;
+        if (search_data[i].search_fn(
+                    search_data[i].start, search_data[i].len))
+            break;
     }
 
-    if (acpi_rsdp_addr) {
-        acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
-                    (void*)acpi_rsdp_addr, 64 << 10,
-                    PROT_READ,
-                    MAP_PHYSICAL, -1, 0);
+    if (acpi_rsdt_addr)
+        acpi_parse_rsdt();
+    else if (mp_tables)
+        mp_parse_fps();
 
-        if (acpi_chk_hdr(rsdt_hdr) != 0) {
-            ACPI_ERROR("ACPI RSDT checksum mismatch!\n");
-            return 0;
-        }
-
-        uint32_t *rsdp_ptrs = (uint32_t *)(rsdt_hdr + 1);
-        uint32_t *rsdp_end = (uint32_t *)((char*)rsdt_hdr + rsdt_hdr->len);
-
-        for (uint32_t *rsdp_ptr = rsdp_ptrs;
-             rsdp_ptr < rsdp_end; ++rsdp_ptr) {
-            uint32_t hdr_addr = *rsdp_ptr;
-            acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
-                    mmap((void*)(uintptr_t)hdr_addr,
-                         64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
-
-            if (!memcmp(hdr->sig, "FACP", 4)) {
-                acpi_fadt_t *fadt_hdr = (acpi_fadt_t *)hdr;
-
-                if (acpi_chk_hdr(&fadt_hdr->hdr) == 0) {
-                    ACPI_TRACE("ACPI FADT found\n");
-                    acpi_process_fadt(fadt_hdr);
-                } else {
-                    ACPI_ERROR("ACPI FADT checksum mismatch!\n");
-                }
-            } else if (!memcmp(hdr->sig, "APIC", 4)) {
-                acpi_madt_t *madt_hdr = (acpi_madt_t *)hdr;
-
-                if (acpi_chk_hdr(&madt_hdr->hdr) == 0) {
-                    ACPI_TRACE("ACPI MADT found\n");
-                    acpi_process_madt(madt_hdr);
-                } else {
-                    ACPI_ERROR("ACPI MADT checksum mismatch!\n");
-                }
-            } else if (!memcmp(hdr->sig, "HPET", 4)) {
-                acpi_hpet_t *hpet_hdr = (acpi_hpet_t *)hdr;
-
-                if (acpi_chk_hdr(&hpet_hdr->hdr) == 0) {
-                    ACPI_TRACE("ACPI HPET found\n");
-                    acpi_process_hpet(hpet_hdr);
-                } else {
-                    ACPI_ERROR("ACPI MADT checksum mismatch!\n");
-                }
-            } else {
-                if (acpi_chk_hdr(hdr) == 0) {
-                    ACPI_TRACE("ACPI %4.4s ignored\n", hdr->sig);
-                } else {
-                    ACPI_ERROR("ACPI %4.4s checksum mismatch!"
-                           " (ignored anyway)\n", hdr->sig);
-                }
-            }
-
-            munmap(hdr, 64 << 10);
-        }
-    }
-
-    if (mp_tables) {
-        mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
-                mmap(mp_tables, 0x10000,
-                     PROT_READ, MAP_PHYSICAL, -1, 0);
-
-        uint8_t *entry = (uint8_t*)(cth + 1);
-
-        // Reset to impossible values
-        mp_isa_bus_id = -1;
-
-        // First slot reserved for BSP
-        apic_id_count = 1;
-
-        for (uint16_t i = 0; i < cth->entry_count; ++i) {
-            mp_cfg_cpu_t *entry_cpu;
-            mp_cfg_bus_t *entry_bus;
-            mp_cfg_ioapic_t *entry_ioapic;
-            mp_cfg_iointr_t *entry_iointr;
-            mp_cfg_lintr_t *entry_lintr;
-            mp_cfg_addrmap_t *entry_addrmap;
-            mp_cfg_bushier_t *entry_busheir;
-            mp_cfg_buscompat_t *entry_buscompat;
-            switch (*entry) {
-            case MP_TABLE_TYPE_CPU:
-            {
-                entry_cpu = (mp_cfg_cpu_t *)entry;
-
-                MPS_TRACE("CPU package found,"
-                          " base apic id=%u ver=0x%x\n",
-                          entry_cpu->apic_id, entry_cpu->apic_ver);
-
-                if ((entry_cpu->flags & MP_CPU_FLAGS_ENABLED) &&
-                        apic_id_count < countof(apic_id_list)) {
-                    if (entry_cpu->flags & MP_CPU_FLAGS_BSP)
-                        apic_id_list[0] = entry_cpu->apic_id;
-                    else
-                        apic_id_list[apic_id_count++] = entry_cpu->apic_id;
-                }
-
-                entry = (uint8_t*)(entry_cpu + 1);
-                break;
-            }
-
-            case MP_TABLE_TYPE_BUS:
-            {
-                entry_bus = (mp_cfg_bus_t *)entry;
-
-                MPS_TRACE("%.*s bus found, id=%u\n",
-                         (int)sizeof(entry_bus->type),
-                         entry_bus->type, entry_bus->bus_id);
-
-                if (!memcmp(entry_bus->type, "PCI   ", 6)) {
-                    mp_pci_bus_ids.push_back(entry_bus->bus_id);
-                } else if (!memcmp(entry_bus->type, "ISA   ", 6)) {
-                    if (mp_isa_bus_id == 0xFFFF)
-                        mp_isa_bus_id = entry_bus->bus_id;
-                    else
-                        MPS_ERROR("Too many ISA busses,"
-                                  " only one supported\n");
-                } else {
-                    MPS_ERROR("Dropped! Unrecognized bus named \"%.*s\"\n",
-                              (int)sizeof(entry_bus->type), entry_bus->type);
-                }
-                entry = (uint8_t*)(entry_bus + 1);
-                break;
-            }
-
-            case MP_TABLE_TYPE_IOAPIC:
-            {
-                entry_ioapic = (mp_cfg_ioapic_t *)entry;
-
-                if (entry_ioapic->flags & MP_IOAPIC_FLAGS_ENABLED) {
-                    if (ioapic_count >= countof(ioapic_list)) {
-                        MPS_ERROR("Dropped! Too many IOAPIC devices\n");
-                        break;
-                    }
-
-                    MPS_TRACE("IOAPIC id=%d, addr=0x%x,"
-                              " flags=0x%x, ver=0x%x\n",
-                              entry_ioapic->id,
-                              entry_ioapic->addr,
-                              entry_ioapic->flags,
-                              entry_ioapic->ver);
-
-                    mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
-
-                    ioapic->id = entry_ioapic->id;
-                    ioapic->addr = entry_ioapic->addr;
-
-                    uint32_t volatile *ioapic_ptr = (uint32_t *)mmap(
-                                (void*)(uintptr_t)entry_ioapic->addr,
-                                12, PROT_READ | PROT_WRITE,
-                                MAP_PHYSICAL |
-                                MAP_NOCACHE |
-                                MAP_WRITETHRU, -1, 0);
-
-                    ioapic->ptr = ioapic_ptr;
-
-                    // Read redirection table size
-
-                    ioapic_ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
-                    uint32_t ioapic_ver = ioapic_ptr[IOAPIC_IOREGWIN];
-
-                    uint8_t ioapic_intr_count =
-                            (ioapic_ver >> IOAPIC_VER_ENTRIES_BIT) &
-                            IOAPIC_VER_ENTRIES_MASK;
-
-                    // Allocate virtual IRQ numbers
-                    ioapic->irq_base = ioapic_next_irq_base;
-                    ioapic_next_irq_base += ioapic_intr_count;
-
-                    // Allocate vectors, assign range to IOAPIC
-                    ioapic->vector_count = ioapic_intr_count;
-                    ioapic->base_intr = ioapic_alloc_vectors(
-                                ioapic_intr_count);;
-
-                    ioapic->lock = 0;
-                }
-                entry = (uint8_t*)(entry_ioapic + 1);
-                break;
-            }
-
-            case MP_TABLE_TYPE_IOINTR:
-            {
-                entry_iointr = (mp_cfg_iointr_t *)entry;
-
-                if (memchr(mp_pci_bus_ids.data(), entry_iointr->source_bus,
-                            mp_pci_bus_ids.size())) {
-                    // PCI IRQ
-                    uint8_t bus = entry_iointr->source_bus;
-                    uint8_t intr_type = entry_iointr->type;
-                    uint8_t intr_flags = entry_iointr->flags;
-                    uint8_t device = entry_iointr->source_bus_irq >> 2;
-                    uint8_t pci_irq = entry_iointr->source_bus_irq & 3;
-                    uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
-                    uint8_t intin = entry_iointr->dest_ioapic_intin;
-
-                    MPS_TRACE("PCI device %u INT_%c# ->"
-                              " IOAPIC ID 0x%02x INTIN %d %s\n",
-                              device, (int)(pci_irq) + 'A',
-                              ioapic_id, intin,
-                              intr_type < countof(intr_type_text) ?
-                                  intr_type_text[intr_type] :
-                                  "(invalid type!)");
-
-
-                    mp_bus_irq_mapping_t mapping{};
-                    mapping.bus = bus;
-                    mapping.intr_type = intr_type;
-                    mapping.flags = intr_flags;
-                    mapping.device = device;
-                    mapping.irq = pci_irq & 3;
-                    mapping.ioapic_id = ioapic_id;
-                    mapping.intin = intin;
-                    bus_irq_list.push_back(mapping);
-                } else if (entry_iointr->source_bus == mp_isa_bus_id) {
-                    // ISA IRQ
-
-                    uint8_t bus =  entry_iointr->source_bus;
-                    uint8_t intr_type = entry_iointr->type;
-                    uint8_t intr_flags = entry_iointr->flags;
-                    uint8_t isa_irq = entry_iointr->source_bus_irq;
-                    uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
-                    uint8_t intin = entry_iointr->dest_ioapic_intin;
-
-                    MPS_TRACE("ISA IRQ %d -> IOAPIC ID 0x%02x INTIN %u %s\n",
-                              isa_irq, ioapic_id, intin,
-                              intr_type < countof(intr_type_text) ?
-                                  intr_type_text[intr_type] :
-                                  "(invalid type!)");
-
-                    isa_irq_lookup[isa_irq] = bus_irq_list.size();
-                    mp_bus_irq_mapping_t mapping{};
-                    mapping.bus = bus;
-                    mapping.intr_type = intr_type;
-                    mapping.flags = intr_flags;
-                    mapping.device = 0;
-                    mapping.irq = isa_irq;
-                    mapping.ioapic_id = ioapic_id;
-                    mapping.intin = intin;
-                    bus_irq_list.push_back(mapping);
-                } else {
-                    // Unknown bus!
-                    MPS_ERROR("IRQ %d on unknown bus ->"
-                              " IOAPIC ID 0x%02x INTIN %u type=%d\n",
-                              entry_iointr->source_bus_irq,
-                              entry_iointr->dest_ioapic_id,
-                              entry_iointr->dest_ioapic_intin,
-                              entry_iointr->type);
-                }
-
-                entry = (uint8_t*)(entry_iointr + 1);
-                break;
-            }
-
-            case MP_TABLE_TYPE_LINTR:
-            {
-                entry_lintr = (mp_cfg_lintr_t*)entry;
-                if (memchr(mp_pci_bus_ids.data(), entry_lintr->source_bus,
-                            mp_pci_bus_ids.size())) {
-                    uint8_t device = entry_lintr->source_bus_irq >> 2;
-                    uint8_t pci_irq = entry_lintr->source_bus_irq;
-                    uint8_t lapic_id = entry_lintr->dest_lapic_id;
-                    uint8_t intin = entry_lintr->dest_lapic_lintin;
-                    MPS_TRACE("PCI device %u INT_%c# ->"
-                              " LAPIC ID 0x%02x INTIN %d\n",
-                              device, (int)(pci_irq & 3) + 'A',
-                              lapic_id, intin);
-                } else if (entry_lintr->source_bus == mp_isa_bus_id) {
-                    uint8_t isa_irq = entry_lintr->source_bus_irq;
-                    uint8_t lapic_id = entry_lintr->dest_lapic_id;
-                    uint8_t intin = entry_lintr->dest_lapic_lintin;
-
-                    MPS_TRACE("ISA IRQ %d -> LAPIC ID 0x%02x INTIN %u\n",
-                              isa_irq, lapic_id, intin);
-                } else {
-                    // Unknown bus!
-                    MPS_ERROR("IRQ %d on unknown bus ->"
-                              " IOAPIC ID 0x%02x INTIN %u\n",
-                              entry_lintr->source_bus_irq,
-                              entry_lintr->dest_lapic_id,
-                              entry_lintr->dest_lapic_lintin);
-                }
-                entry = (uint8_t*)(entry_lintr + 1);
-                break;
-            }
-
-            case MP_TABLE_TYPE_ADDRMAP:
-            {
-                entry_addrmap = (mp_cfg_addrmap_t*)entry;
-                uint8_t bus = entry_addrmap->bus_id;
-                uint64_t addr =  entry_addrmap->addr_lo |
-                        ((uint64_t)entry_addrmap->addr_hi << 32);
-                uint64_t len =  entry_addrmap->addr_lo |
-                        ((uint64_t)entry_addrmap->addr_hi << 32);
-
-                MPS_TRACE("Address map, bus=%d, addr=%lx, len=%lx\n",
-                          bus, addr, len);
-
-                entry += entry_addrmap->len;
-                break;
-            }
-
-            case MP_TABLE_TYPE_BUSHIER:
-            {
-                entry_busheir = (mp_cfg_bushier_t*)entry;
-                uint8_t bus = entry_busheir->bus_id;
-                uint8_t parent_bus = entry_busheir->parent_bus;
-                uint8_t info = entry_busheir->info;
-
-                MPS_TRACE("Bus hierarchy, bus=%d, parent=%d, info=%x\n",
-                          bus, parent_bus, info);
-
-                entry += entry_busheir->len;
-                break;
-            }
-
-            case MP_TABLE_TYPE_BUSCOMPAT:
-            {
-                entry_buscompat = (mp_cfg_buscompat_t*)entry;
-                uint8_t bus = entry_buscompat->bus_id;
-                uint8_t bus_mod = entry_buscompat->bus_mod;
-                uint32_t bus_predef = entry_buscompat->predef_range_list;
-
-                MPS_TRACE("Bus compat, bus=%d, mod=%d,"
-                          " predefined_range_list=%x\n",
-                          bus, bus_mod, bus_predef);
-
-                entry += entry_buscompat->len;
-                break;
-            }
-
-            default:
-                MPS_ERROR("Unknown MP table entry_type!"
-                          " Guessing size is 8\n");
-                // Hope for the best here
-                entry += 8;
-                break;
-            }
-        }
-
-        munmap(cth, 0x10000);
-    }
-
-    if (ranges[2] != 0)
-        munmap(ranges[2], 0x20000);
+    munmap(p_9fc00, 0x400);
+    munmap(p_e0000, 0x20000);
+    if (p_ebda != p_9fc00)
+        munmap(p_ebda, 0x400);
 
     return !!mp_tables;
 }
@@ -1722,7 +1826,7 @@ void apic_dump_regs(int ap)
                          apic->read32(i + x),
                          x == 3 ? "\n" : " ");
             } else {
-                printdbg("%s[%3x]=--------%s", 
+                printdbg("%s[%3x]=--------%s",
                          x == 0 ? "apic: " : "",
                          i + x,
                          x == 3 ? "\n" : " ");
@@ -1758,11 +1862,14 @@ int apic_init(int ap)
         apic_base = apic_base_msr & APIC_BASE_ADDR;
 
     if (!(apic_base_msr & APIC_BASE_GENABLE)) {
+        printk("APIC was disabled! Enabling\n");
+
         APIC_TRACE("APIC was globally disabled!"
                    " Enabling...\n");
     }
 
     if (cpuid_has_x2apic()) {
+        printk("Using x2APIC\n");
         APIC_TRACE("Using x2APIC\n");
         if (!ap)
             apic = &apic_x2;
@@ -1775,10 +1882,11 @@ int apic_init(int ap)
         if (!ap) {
             // Bootstrap CPU only
             assert(!apic_ptr);
-            apic_ptr = (uint32_t *)mmap((void*)(apic_base_msr & APIC_BASE_ADDR),
-                                        4096, PROT_READ | PROT_WRITE,
-                                        MAP_PHYSICAL | MAP_NOCACHE |
-                                        MAP_WRITETHRU, -1, 0);
+            apic_ptr = (uint32_t *)mmap(
+                        (void*)(apic_base),
+                        4096, PROT_READ | PROT_WRITE,
+                        MAP_PHYSICAL | MAP_NOCACHE |
+                        MAP_WRITETHRU, -1, 0);
 
             apic = &apic_x;
         }
@@ -1798,10 +1906,16 @@ int apic_init(int ap)
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
         intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
 
+        printk("Parsing boot tables\n");
+
         parse_mp_tables();
+
+        printk("Calibrating APIC timer\n");
 
         apic_calibrate();
     }
+
+    printk("Enabling APIC\n");
 
     apic_online(1, INTR_APIC_SPURIOUS);
 
@@ -1810,6 +1924,7 @@ int apic_init(int ap)
     assert(apic_base == (msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
 
     if (ap) {
+        printk("Configuring APIC timer\n");
         apic_configure_timer(APIC_LVT_DCR_BY_1,
                              apic_timer_freq / 60,
                              APIC_LVT_TR_MODE_PERIODIC,
@@ -1823,7 +1938,7 @@ int apic_init(int ap)
 
 static void apic_detect_topology_amd(void)
 {
-    
+
 }
 
 static void apic_detect_topology_intel(void)
@@ -1868,7 +1983,7 @@ static void apic_detect_topology_intel(void)
         topo_thread_bits = 0;
 
     topo_thread_count /= topo_core_count;
-    
+
     // Workaround strange occurrence of it calculating 0 threads
     if (topo_thread_count <= 0)
         topo_thread_count = 1;
@@ -1892,7 +2007,7 @@ void apic_start_smp(void)
 
     APIC_TRACE("%d CPU packages\n", apic_id_count);
 
-    if (!acpi_rsdp_addr)
+    if (!acpi_rsdt_addr)
         apic_detect_topology();
     else {
         // Treat as N cpu packages
@@ -1912,11 +2027,11 @@ void apic_start_smp(void)
         return;
 
     // Read address of MP entry trampoline from boot sector
-	//uint32_t *mp_trampoline_ptr = (uint32_t*)0x7c40;
-	//		bootinfo_parameter(bootparam_t::ap_entry_point);
-	uint32_t mp_trampoline_addr = //*mp_trampoline_ptr;
-			(uint32_t)
-			bootinfo_parameter(bootparam_t::ap_entry_point);
+    //uint32_t *mp_trampoline_ptr = (uint32_t*)0x7c40;
+    //		bootinfo_parameter(bootparam_t::ap_entry_point);
+    uint32_t mp_trampoline_addr = //*mp_trampoline_ptr;
+            (uint32_t)
+            bootinfo_parameter(bootparam_t::ap_entry_point);
     uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
     // Send INIT to all other CPUs
@@ -2191,12 +2306,12 @@ static void apic_calibrate()
         uint64_t tsc_st = cpu_rdtsc();
         uint32_t tmr_diff;
 
-        // Wait for about 16ms
+        // Wait for about 1ms
         do {
             pause();
             tmr_en = acpi_pm_timer_raw();
             tmr_diff = acpi_pm_timer_diff(tmr_st, tmr_en);
-        } while (tmr_diff < 3579*16);
+        } while (tmr_diff < 3579);
 
         uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
@@ -2243,27 +2358,27 @@ static void apic_calibrate()
         apic_timer_freq = ccr_freq;
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
     }
-    
+
     // Example: let rdtsc_mhz = 2500. gcd(1000,2500) = 500
     // then,
     //  clk_to_ns_numer = 1000/500 = 2
     //  chk_to_ns_denom = 2500/500 = 5
     // clk_to_ns: let clks = 2500000000
     //  2500000000 * 2 / 5 = 1000000000ns
-    
+
     APIC_TRACE("CPU MHz: %ld\n", rdtsc_mhz);
 
     uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
-    
+
     APIC_TRACE("CPU MHz GCD: %ld\n", clk_to_ns_gcd);
-    
+
     clk_to_ns_numer = 1000 / clk_to_ns_gcd;
     clk_to_ns_denom = rdtsc_mhz / clk_to_ns_gcd;
 
     APIC_TRACE("clk_to_ns_numer: %ld\n", clk_to_ns_numer);
     APIC_TRACE("clk_to_ns_denom: %ld\n", clk_to_ns_denom);
-    
-    
+
+
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
         time_ns_set_handler(apic_rdtsc_time_ns_handler, nullptr, true);
