@@ -53,6 +53,8 @@ SECTIONS {
 		__heap = .;
 	}
 
+	/DISCARD/ : { *(.eh_frame) }
+
 	__initial_stack = 0xfff0;
 	__heap_end = 0xd000;
 }
