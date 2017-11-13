@@ -50,13 +50,13 @@ static void bios_print_at(
         uint16_t length, char const *text)
 {
     bios_regs_t regs;
-    
+
     regs.eax = 0x1300;
     regs.ebx = attr;
     regs.ecx = length;
     regs.edx = col | (row << 8);
     regs.ebp = (uint32_t)text;
-    
+
     bioscall(&regs, 0x10);
 }
 
@@ -69,14 +69,14 @@ static void bios_scroll_region(uint16_t top_left, uint16_t bottom_right,
     // CH,CL = row,column of window's upper left corner
     // DH,DL = row,column of window's lower right corner
     // Int 10h
-    
+
     bios_regs_t regs;
-    
+
     regs.ecx = top_left;
     regs.edx = bottom_right;
     regs.eax = (lines | (0x06 << 8));
     regs.ebx = (attr << 8);
-    
+
     bioscall(&regs, 0x10);
 }
 
@@ -365,22 +365,22 @@ void print_xy(uint16_t x, uint16_t y, uint16_t ch, uint16_t attr, uint16_t count
 
 void print_lba(uint32_t lba)
 {
-    print_line("%u\n", lba);
+    print_line("%lu\n", lba);
 }
 
 void dump_regs(bios_regs_t& regs, bool show_flags)
 {
-    print_line("eax=%x\n", regs.eax);
-    print_line("ebx=%x\n", regs.ebx);
-    print_line("ecx=%x\n", regs.ecx);
-    print_line("edx=%x\n", regs.edx);
-    print_line("esi=%x\n", regs.esi);
-    print_line("edi=%x\n", regs.edi);
-    print_line("ebp=%x\n", regs.ebp);
+    print_line("eax=%lx\n", regs.eax);
+    print_line("ebx=%lx\n", regs.ebx);
+    print_line("ecx=%lx\n", regs.ecx);
+    print_line("edx=%lx\n", regs.edx);
+    print_line("esi=%lx\n", regs.esi);
+    print_line("edi=%lx\n", regs.edi);
+    print_line("ebp=%lx\n", regs.ebp);
     print_line(" ds=%x\n", regs.ds);
     print_line(" es=%x\n", regs.es);
     print_line(" fs=%x\n", regs.fs);
     print_line(" gs=%x\n", regs.gs);
     if (show_flags)
-        print_line("flg=%x\n", regs.eflags_out);
+        print_line("flg=%lx\n", regs.eflags_out);
 }

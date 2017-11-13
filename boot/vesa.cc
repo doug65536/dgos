@@ -81,13 +81,13 @@ struct vbe_mode_info_t {
 static uint16_t vbe_get_info(void *info, uint16_t ax, uint16_t cx)
 {
     bios_regs_t regs{};
-    
+
     regs.eax = ax;
     regs.ecx = cx;
     regs.edi = (uint32_t)info;
-    
+
     bioscall(&regs, 0x10);
-    
+
     return regs.eax & 0xFFFF;
 }
 
@@ -108,13 +108,13 @@ static int vbe_mode_info(vbe_mode_info_t *info, uint16_t mode)
 static uint16_t vbe_set_mode(uint16_t mode)
 {
     bios_regs_t regs;
-    
+
     regs.eax = 0x4F02;
     // 0x4000 means use linear framebuffer
     regs.ebx = 0x4000 | mode;
-    
+
     bioscall(&regs, 0x10);
-    
+
     return (regs.eax & 0xFFFF) == 0x4F;
 }
 
@@ -176,7 +176,7 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
 
                 if (verbose) {
                     VESA_TRACE("vbe mode %u w=%u h=%u"
-                               " %d:%d:%d:%d phys_addr=%x %d:%d",
+                               " %d:%d:%d:%d phys_addr=%lx %d:%d",
                                mode,
                                mode_info->res_x,
                                mode_info->res_y,

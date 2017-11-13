@@ -735,7 +735,7 @@ void fat32_boot_partition(uint32_t partition_lba)
 
     paging_init();
 
-    print_line("Booting partition at LBA %u", partition_lba);
+    print_line("Booting partition at LBA %lu", partition_lba);
 
     uint16_t err = read_bpb(partition_lba);
     if (err) {
@@ -744,10 +744,10 @@ void fat32_boot_partition(uint32_t partition_lba)
     }
 
     // 0x2C LBA
-    print_line("root_dir_start:	  %d", bpb.root_dir_start);
+    print_line("root_dir_start:	  %ld", bpb.root_dir_start);
 
     // 0x24 1 per 128 clusters
-    print_line("sec_per_fat:      %d", bpb.sec_per_fat);
+    print_line("sec_per_fat:      %ld", bpb.sec_per_fat);
 
     // 0x0E Usually 32
     print_line("reserved_sectors: %d", bpb.reserved_sectors);

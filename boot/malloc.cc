@@ -36,8 +36,8 @@ uint16_t far_malloc(uint32_t bytes)
     uint16_t segment = (free_seg_en -= paragraphs);
     far_zero(far_ptr2(segment, 0), paragraphs);
 
-	MALLOC_TRACE("far malloc %u bytes returns segment %u\n",
-				 bytes, segment);
+    MALLOC_TRACE("far malloc %u bytes returns segment %u\n",
+                 bytes, segment);
 
     return segment;
 }
@@ -50,10 +50,10 @@ uint16_t far_malloc_aligned(uint32_t bytes)
     free_seg_st += paragraphs;
     far_zero(far_ptr2(segment, 0), paragraphs);
 
-	MALLOC_TRACE("far malloc aligned %u bytes returns segment %u\n",
-				 bytes, segment);
+    MALLOC_TRACE("far malloc aligned %u bytes returns segment %u\n",
+                 bytes, segment);
 
-	return segment;
+    return segment;
 }
 
 // Simple heap allocator
@@ -289,8 +289,8 @@ void *malloc(uint16_t bytes)
     // That's okay. Only freeing and coalescing blocks moves it back.
     // Only splitting the first free block moves it forward
 
-	MALLOC_TRACE("near malloc %u bytes returns segment %x\n",
-				 bytes, (size_t)payload_ptr_of(best_addr));
+    MALLOC_TRACE("near malloc %u bytes returns segment %x\n",
+                 bytes, (size_t)payload_ptr_of(best_addr));
 
     return payload_ptr_of(best_addr);
 }
@@ -405,7 +405,7 @@ void test_malloc()
             debug_break();
 
         if (!(i & 0xFFFF))
-            print_line("Iter %d", i);
+            print_line("Iter %ld", i);
     }
 
     // Free everything

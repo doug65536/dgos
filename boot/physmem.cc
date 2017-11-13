@@ -13,20 +13,20 @@ static uint16_t get_ram_region(physmem_range_t *range,
     // EBX = continuation value or 00000000h to start at beginning of map
     // ECX = size of buffer for result, in bytes (should be >= 20 bytes)
     // ES:DI -> buffer for result (see #00581)
-    
+
     range->valid = 1;
-    
+
     bios_regs_t regs;
     regs.eax = 0xE820;
     regs.edx = 0x534D4150;
     regs.ebx = *continuation_ptr;
     regs.ecx = sizeof(physmem_range_t);
     regs.edi = (uint32_t)range;
-    
+
     bioscall(&regs, 0x15);
-    
+
     *continuation_ptr = regs.ebx;
-    
+
     return !regs.ah_if_carry();
 }
 
@@ -56,7 +56,7 @@ uint16_t get_ram_regions(uint32_t *ret_size)
         if (result[i].type == PHYSMEM_TYPE_NORMAL)
             total_memory += result[i].size;
 
-        print_line("base=%llx length=%llx type=%x valid=%x",
+        print_line("base=%llx length=%llx type=%lx valid=%lx",
                    result[i].base,
                    result[i].size,
                    result[i].type,
