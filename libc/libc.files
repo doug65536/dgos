@@ -1,3 +1,5 @@
+src/string/__bytebitmap.cc
+src/string/__bytebitmap.h
 tests/testassert.cc
 tests/testassert.h
 tests/test_string.cc
