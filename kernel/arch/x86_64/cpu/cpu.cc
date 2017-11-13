@@ -100,25 +100,41 @@ void cpu_init_stage2(int ap)
 
 void cpu_hw_init(int ap)
 {
+    printk("Initializing PIT\n");
+    
     // May need PIT nsleep early for APIC calibration
     pit8253_init();
 
+    printk("Initializing APIC\n");
+    
     apic_init(ap);
 
+    
     // Initialize APIC, but fallback to 8259 if no MP tables
-    if (!apic_enable())
+    if (!apic_enable()) {
+        printk("Enabling 8259 PIC\n");
         pic8259_enable();
-    else if (acpi_have8259pic())
+    } else if (acpi_have8259pic()) {
+        printk("Enabling 8259 PIC\n");
         pic8259_disable();
-    else
+    } else {
         panic("No IOAPICs, no MPS, and no 8259! Can't use IRQs! Halting.");
-
+    }
+    
+    printk("Initializing RTC\n");
+    
     cmos_init();
 
+    printk("Enabling 8254 PIT\n");
+    
     pit8254_enable();
 
+    printk("Enabling IRQs\n");
+    
     cpu_irq_enable();
 
+    printk("Starting SMP\n");
+    
     apic_start_smp();
 }
 
