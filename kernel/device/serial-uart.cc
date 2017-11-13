@@ -116,9 +116,12 @@ union fcr_t {
         bool fifo_rx_reset:1;
         bool fifo_tx_reset:1;
 
-        // ?
         bool dma_mode:1;
-        bool unused:2;
+        
+        bool unused:1;
+        
+        // 16750 only
+        bool fifo64:1;
 
         // Rx FIFO trigger threshold
         uint8_t rx_trigger:2;
@@ -232,6 +235,18 @@ union msr_t {
     uint8_t value;
 };
 
+union scr_t {
+    uint8_t value;
+};
+
+enum struct chiptype_t : uint8_t {
+    U8250,
+    U16450,
+    U16550,
+    U16550A,
+    U16750
+};
+
 template<typename> struct reg_t;
 
 template<> struct reg_t<dat_t> {
@@ -264,6 +279,10 @@ template<> struct reg_t<lsr_t> {
 
 template<> struct reg_t<msr_t> {
     static constexpr port_t ofs = port_t::MSR;
+};
+
+template<> struct reg_t<scr_t> {
+    static constexpr port_t ofs = port_t::SCR;
 };
 
 class uart_t : public uart_dev_t
@@ -326,6 +345,7 @@ private:
     mcr_t reg_mcr;
     lsr_t reg_lsr;
     msr_t reg_msr;
+    scr_t reg_scr;
 
     // Use 16 bit values to allow buffering of error information
     // as values >= 256
@@ -347,6 +367,8 @@ private:
 
     ioport_t io_base;
     uint8_t irq;
+    
+    chiptype_t chip;
 
     bool sending_break;
     bool sending_data;
@@ -379,6 +401,39 @@ uart_t::uart_t(ioport_t port, uint8_t port_irq, uint32_t baud)
     inp(reg_mcr);
     inp(reg_lsr);
     inp(reg_msr);
+    inp(reg_scr);
+    
+    // Detect type of UART
+    reg_fcr.value = 0;
+    reg_fcr.bits.fifo_en = 1;
+    reg_fcr.bits.fifo_rx_reset = 1;
+    reg_fcr.bits.fifo_tx_reset = 1;
+    reg_fcr.bits.fifo64 = 1;
+    reg_fcr.bits.rx_trigger = 3;
+    outp(reg_fcr);
+    
+    inp(reg_fcr);
+    if (reg_fcr.bits.rx_trigger == 3 && reg_fcr.bits.fifo64) {
+        // 64 byte fifo bit was writable, it is a 16750
+        chip = chiptype_t::U16750;
+    } else if (reg_fcr.bits.rx_trigger == 3 && !reg_fcr.bits.fifo64) {
+        // Both rx_trigger bits were writable, it is a good 16550A
+        // Good 16550A
+        chip = chiptype_t::U16550A;
+    } else if (reg_fcr.bits.rx_trigger == 1) {
+        // Bit 6 was not preserved, is a crap 16550
+        // Buggy 16550
+        chip = chiptype_t::U16550;
+    } else {
+        // If the scratch register preserves value, it is a 16450
+        reg_scr.value = 0x55;
+        outp(reg_scr);
+        inp(reg_scr);
+        if (reg_scr.value == 0x55)
+            chip = chiptype_t::U16450;
+        else
+            chip = chiptype_t::U8250;
+    }
 
     // Enable access to baud rate registers
     reg_lcr.bits.baud_latch = 1;
