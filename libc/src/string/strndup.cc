@@ -1,3 +1,3 @@
 #include <string.h>
 
-char *strndup(const char *, size_t);
+//char *strndup(const char *, size_t);

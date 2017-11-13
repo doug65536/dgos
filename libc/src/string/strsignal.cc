@@ -1,3 +1,3 @@
 #include <string.h>
 
-char *strsignal(int);
+//char *strsignal(int);

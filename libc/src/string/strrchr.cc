@@ -1,3 +1,3 @@
 #include <string.h>
 
-char *strrchr(const char *, int);
+//char *strrchr(const char *, int);

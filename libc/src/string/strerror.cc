@@ -1,3 +1,3 @@
 #include <string.h>
 
-char *strerror(int);
+//char *strerror(int);
