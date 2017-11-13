@@ -27,7 +27,7 @@ uint64_t mp_enter_kernel;
 
 static void enter_kernel_initial(uint64_t entry_point)
 {
-    vbe_info_vector = vbe_select_mode(1280, 800, 1) << 4;
+    vbe_info_vector = vbe_select_mode(65535, 800, 1) << 4;
     //vbe_info_vector = vbe_select_mode(1920, 1080, 1) << 4;
 
     //
@@ -35,8 +35,8 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     uint16_t mp_entry_seg = far_malloc_aligned(mp_entry_size);
     far_ptr_t mp_entry_ptr = far_ptr2(mp_entry_seg, 0);
-    
-    print_line("SMP trampoline at %x:%x", 
+
+    print_line("SMP trampoline at %x:%x",
                mp_entry_ptr.segment, mp_entry_ptr.offset);
 
     far_copy(mp_entry_ptr,
@@ -56,10 +56,14 @@ static void enter_kernel_initial(uint64_t entry_point)
     paging_map_range(phys_mem_table, phys_mem_table_size,
                      phys_mem_table, PTE_PRESENT | PTE_WRITABLE, 1);
 
+    print_line("Mapping aliasing window\n");
+
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
     paging_map_range(0xFFFFFFFF80000000ULL - PAGE_SIZE, PAGE_SIZE, 0,
                      PTE_PRESENT | PTE_WRITABLE, 0);
+
+    print_line("Mapping first 768KB\n");
 
     // Map first 768KB (0x0000-0xBFFF)
     paging_map_range(0, 0xC0000, 0,
@@ -70,6 +74,8 @@ static void enter_kernel_initial(uint64_t entry_point)
     phys_mem_table |= phys_mem_table_size << 20;
 
     ELF64_TRACE("Entry point: %llx\n", entry_point);
+
+    print_line("Entering kernel at %llx\n", entry_point);
 
     copy_or_enter(entry_point, 0, phys_mem_table);
 }
@@ -87,7 +93,7 @@ void enter_kernel(uint64_t entry_point)
 
 uint16_t elf64_run(char const *filename)
 {
-	cpu_init();
+    cpu_init();
 
     if (!cpu_has_long_mode())
         halt("Need 64-bit CPU");
@@ -99,7 +105,7 @@ uint16_t elf64_run(char const *filename)
     uint64_t nx_page_flags = 0;
     if (cpu_has_no_execute())
         nx_page_flags = PTE_NX;
-    
+
     // Map the screen for debugging convenience
     paging_map_range(0xA0000, 0x20000, 0xA0000,
                      PTE_PRESENT | PTE_WRITABLE |
