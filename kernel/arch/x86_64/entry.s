@@ -1,8 +1,14 @@
 .section .entry, "ax"
 
+.macro debugind ch
+	movb $\ch,0xb8000
+.endm
+
 .global entry
 .hidden entry
 entry:
+	debugind '1'
+
 	cld
 
 	# Save parameter in call-preserved register
@@ -15,11 +21,15 @@ entry:
 	or $0x0600,%rax
 	mov %rax,%cr4
 
+	debugind '2'
+
 	# See if this is the bootstrap processor
 	mov $0x1B,%ecx
 	rdmsr
 	test $0x100,%eax
 	jnz 0f
+
+	debugind 'Z'
 
 	# This is not the bootstrap CPU
 
@@ -31,7 +41,7 @@ entry:
 
 	# Initialize AP FPU control word
 	# 0 = round to nearest even
-	# 2 = 53 bit significand, 
+	# 2 = 53 bit significand,
 	# 0x3F = all exceptions masked
 	movw $((0 << 10) | (2 << 8) | 0x3F),(%rsp)
 	fldcw (%rsp)
@@ -52,6 +62,8 @@ entry:
 0:
 	# This is the bootstrap processor
 
+	debugind '3'
+
 	# Store the physical memory map address
 	# passed in from bootloader
 	mov %r15d,%eax
@@ -68,7 +80,7 @@ entry:
 	mov %rsp,%rdx
 	sub $512,%rsp
 	and $-64,%rsp
-	
+
 	# Initialize FPU to 64 bit precision,
 	# all exceptions masked, round to nearest
 	fninit
@@ -88,7 +100,7 @@ entry:
 	and %eax,%ecx
 	mov %ecx,24(%rsp)
 	ldmxcsr 24(%rsp)
-	
+
 	# Restore stack pointer
 	mov %rdx,%rsp
 
@@ -102,7 +114,11 @@ entry:
 
 	lea -16(%rdx,%rbx),%rsp
 
+	debugind '4'
+
 	call cpuid_init
+
+	debugind '5'
 
 	call e9debug_init
 
@@ -110,19 +126,33 @@ entry:
 	xor %edi,%edi
 	call idt_xsave_detect
 
+	debugind '6'
+
 	xor %edi,%edi
 	call cpu_init
+
+	debugind '7'
 
 	# Call the constructors
 	mov $___init_st,%rdi
 	mov $___init_en,%rsi
 	call invoke_function_array
 
+	debugind '8'
+
+	# Initialize text devices
+	mov $'V',%edi
+	call callout_call
+
 	xor %edi,%edi
 	call cpu_init_stage2
 
+	debugind '9'
+
 	xor %edi,%edi
 	call cpu_hw_init
+
+	debugind 'A'
 
 	# Initialize GDB stub
 	#call gdb_init
@@ -131,7 +161,11 @@ entry:
 	mov $'E',%edi
 	call callout_call
 
+	debugind 'B'
+
 	call main
+
+	debugind '?'
 
 	mov %rax,%rdi
 	call exit

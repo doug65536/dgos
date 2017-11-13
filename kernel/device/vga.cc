@@ -45,7 +45,8 @@ struct text_display_t {
 #define VGA_SET_CURSOR_HI(pos) (VGA_CRTC_CURSOR_HI | \
     ((pos) & 0xFF00))
 
-static text_display_t displays[MAX_VGA_DISPLAYS];
+static text_display_t vga_displays[MAX_VGA_DISPLAYS];
+static size_t vga_display_count;
 
 // === Internal API ===
 
@@ -330,16 +331,20 @@ static void print_character(text_display_t *self, int ch)
 
 static int vga_detect(text_display_base_t **result)
 {
-    text_display_t *self = displays;
+    if (vga_display_count >= MAX_VGA_DISPLAYS) {
+        *result = nullptr;
+        return 0;
+    }
+    
+    text_display_t *self = vga_displays + vga_display_count++;
+    
     self->vtbl = &vga_text_display_device_vtbl;
 
     // Get I/O port base from BIOS data area
     self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
 
     // Map frame buffer
-    self->video_mem = (uint16_t*)mmap((void*)0xB8000, 0x8000,
-                           PROT_READ | PROT_WRITE,
-                           MAP_PHYSICAL, -1, 0);
+    self->video_mem = (uint16_t*)0xb8000;
     self->cursor_on = 1;
     self->cursor_x = 0;
     self->cursor_y = 0;
@@ -351,11 +356,8 @@ static int vga_detect(text_display_base_t **result)
     self->mouse_y = self->height >> 1;
 
     // Off-screen shadow buffer
-    self->shadow = (uint16_t*)mmap(0,
-                        self->width * self->height *
-                        sizeof(*self->shadow),
-                        PROT_READ | PROT_WRITE,
-                        0, -1, 0);
+    // Uses video memory until memory manager is online
+    self->shadow = (uint16_t*)self->video_mem + (80 * 25);
 
     mouse_toggle(self, 1);
 
@@ -368,14 +370,7 @@ static int vga_detect(text_display_base_t **result)
 
 static void vga_init(text_display_base_t *dev)
 {
-    TEXT_DEV_PTR(dev);
-
-    self->video_mem = (uint16_t*)0xB8000;
-    //video_mem = mmap((void*)0xB8000, 0x10000,
-    //                 PROT_READ | PROT_WRITE,
-    //                 MAP_FIXED | MAP_LOCKED |
-    //                 MAP_NOCACHE | MAP_PHYSICAL,
-    //                 -1, 0);
+    TEXT_DEV_PTR_UNUSED(dev);
 }
 
 static void vga_cleanup(text_display_base_t *dev)
@@ -383,9 +378,29 @@ static void vga_cleanup(text_display_base_t *dev)
     TEXT_DEV_PTR_UNUSED(dev);
 }
 
-static void vga_remap_callback(void *arg)
+static void vga_remap_callback(void *)
 {
-    (void)arg;
+    for (size_t i = 0; i < vga_display_count; ++i) {
+        text_display_t *self = vga_displays + i;
+        
+        self->video_mem = (uint16_t*)
+                mmap((void*)0xB8000, 0x8000,
+                     PROT_READ | PROT_WRITE,
+                     MAP_PHYSICAL, -1, 0);
+        
+        // Start using system RAM shadow buffer
+        
+        uint16_t *old_shadow = self->shadow;
+        
+        self->shadow = (uint16_t*)mmap(0,
+                            self->width * self->height *
+                            sizeof(*self->shadow),
+                            PROT_READ | PROT_WRITE,
+                            0, -1, 0);
+        
+        memcpy(self->shadow, old_shadow, sizeof(uint16_t) * (80 * 25));
+        memset(old_shadow, 0, sizeof(uint16_t) * (80 * 25));
+    }
 }
 
 REGISTER_CALLOUT(vga_remap_callback, 0,

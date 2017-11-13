@@ -19,6 +19,7 @@ enum struct callout_type_t : uint32_t {
     // bootstrap
     vmm_ready = 'M',
     smp_start = 'S',
+    txt_dev = 'V',
     early_dev = 'E',
     smp_online = 'T',
 
