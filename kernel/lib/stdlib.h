@@ -36,7 +36,7 @@ void auto_free(void *mem);
 #define autofree __attribute__((cleanup(auto_free)))
 }
 
-void *operator new(size_t, void *p);
+void *operator new(size_t, void *p) noexcept;
 
 void *operator new(size_t size);
 void *operator new[](size_t size);

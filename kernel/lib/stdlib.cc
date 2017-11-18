@@ -82,7 +82,7 @@ void operator delete[](void *block, size_t) noexcept
     free(block);
 }
 
-void *operator new(size_t, void *p)
+void *operator new(size_t, void *p) noexcept
 {
     return p;
 }
