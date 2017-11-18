@@ -430,6 +430,11 @@ void *operator new(size_t size) noexcept
     return malloc(size);
 }
 
+void *operator new(size_t, void *p) noexcept
+{
+    return p;
+}
+
 void operator delete(void *block, unsigned long size) noexcept
 {
     (void)size;
@@ -452,7 +457,7 @@ void operator delete[](void *block) noexcept
     free(block);
 }
 
-void operator delete[](void *block, unsigned int)
+void operator delete[](void *block, unsigned int) noexcept
 {
     free(block);
 }

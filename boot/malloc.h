@@ -14,7 +14,8 @@ void test_malloc();
 #endif
 
 void *operator new(size_t size) noexcept;
+void *operator new(size_t size, void *p) noexcept;
 void operator delete(void *block, unsigned long size) noexcept;
 void operator delete(void *block) noexcept;
 void operator delete[](void *block) noexcept;
-void operator delete[](void *block, unsigned int);
+void operator delete[](void *block, unsigned int) noexcept;
