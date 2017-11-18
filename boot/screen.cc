@@ -225,6 +225,8 @@ void print_line(char const* format, ...)
             if (p[1] == 'l' && p[2] == 'l') {
                 flags |= FLAG_LONGLONG;
                 p += 2;
+            } else if (p[1] == 'l') {
+                ++p;
             }
 
             switch (p[1]) {
