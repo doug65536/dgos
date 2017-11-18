@@ -1549,7 +1549,7 @@ void ahci_if_t::port_stop_all()
     unsigned port;
     for (uint32_t impl = ports_impl_mask;
          impl != 0; impl &= ~(1U<<port)) {
-        port = bit_lsb_set_32(impl);
+        port = bit_lsb_set(impl);
         port_stop(port);
     }
 }
@@ -1560,7 +1560,7 @@ void ahci_if_t::port_start_all()
     unsigned port;
     for (uint32_t impl = ports_impl_mask;
          impl != 0; impl &= ~(1U<<port)) {
-        port = bit_lsb_set_32(impl);
+        port = bit_lsb_set(impl);
         port_start(port);
     }
 }

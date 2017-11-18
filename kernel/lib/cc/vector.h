@@ -214,7 +214,7 @@ void vector<_T,_Allocator>::__grow(size_t __amount)
     size_t __new_cap;
 
     if (__capacity) {
-        __new_cap = size_t(1) << (bit_log2_n(__capacity + __amount));
+        __new_cap = size_t(1) << (bit_log2(__capacity + __amount));
     } else if (__capacity == 0 && __amount < 12) {
         __new_cap = 12;
     } else {

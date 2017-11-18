@@ -161,7 +161,7 @@ static vector<fat32_fs_t*> fat32_mounts;
 static pool_t fat32_handles;
 
 static constexpr uint8_t dirent_size_shift =
-        bit_log2_n(sizeof(fat32_dir_union_t));
+        bit_log2(sizeof(fat32_dir_union_t));
 
 int fat32_fs_t::mm_fault_handler(
         void *dev, void *addr, uint64_t offset, uint64_t length,
@@ -1107,12 +1107,12 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
     // Sector offset of cluster 0
     cluster_ofs = bpb.cluster_begin_lba;
 
-    sector_shift = bit_log2_n(sector_size);
-    block_shift = bit_log2_n(bpb.sec_per_cluster);
+    sector_shift = bit_log2(sector_size);
+    block_shift = bit_log2(bpb.sec_per_cluster);
     block_size = sector_size << block_shift;
 
     // Right shift a cluster number this much to find cluster index within FAT
-    fat_block_shift = bit_log2_n(block_size >> bit_log2_n(sizeof(cluster_t)));
+    fat_block_shift = bit_log2(block_size >> bit_log2(sizeof(cluster_t)));
 
     mm_dev = (char*)mmap_register_device(
                 this, block_size, conn->part_len,
@@ -1121,10 +1121,10 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
     fat_size = bpb.sec_per_fat << sector_shift;
     fat = (cluster_t*)lookup_sector(bpb.first_fat_lba);
     fat2 = (cluster_t*)lookup_sector(bpb.first_fat_lba + bpb.sec_per_fat);
-    end_cluster = (lba_en - cluster_ofs) >> bit_log2_n(bpb.sec_per_cluster);
+    end_cluster = (lba_en - cluster_ofs) >> bit_log2(bpb.sec_per_cluster);
 
     int fat_mismatches = 0;
-    for (int i = 0, e = fat_size >> bit_log2_n(sizeof(cluster_t)); i < e; ++i)
+    for (int i = 0, e = fat_size >> bit_log2(sizeof(cluster_t)); i < e; ++i)
         fat_mismatches += fat[i] != fat2[i];
 
     if (fat_mismatches != 0) {

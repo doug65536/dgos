@@ -26,13 +26,13 @@ struct iso9660_fs_t : public fs_base_t {
         iso9660_fs_t *fs;
         iso9660_dir_ent_t *dirent;
         char *content;
-        
+
         ino_t get_inode() const
         {
             return fs->dirent_lba(dirent);
         }
     };
-    
+
     struct dir_handle_t : public file_handle_t {
     };
 
@@ -537,7 +537,7 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    sector_shift = bit_log2_n(sector_size);
+    sector_shift = bit_log2(sector_size);
     block_shift = 11 - sector_shift;
     block_size = sector_size << block_size;
 
@@ -870,7 +870,7 @@ int iso9660_fs_t::open(fs_file_info_t **fi,
         return -int(errno_t::EROFS);
 
     file_handle_t *file = (file_handle_t *)pool_alloc(&iso9660_handles);
-    *fi = file;    
+    *fi = file;
 
     file->dirent = lookup_dirent(path);
     file->content = (char*)lookup_sector(dirent_lba(file->dirent));
