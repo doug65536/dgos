@@ -46,54 +46,54 @@ AX_CHECK_COMPILE_FLAG([-Wall -Wextra -Wpedantic -Werror],
 	[COMPILER_WERROR=""])
 
 AX_CHECK_COMPILE_FLAG([-ggdb],
-	[COMPILER_FLAGS+=" -ggdb"], 
+	[COMPILER_FLAGS+=" -ggdb"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-fno-integrated-as],
-	[COMPILER_FLAGS+=" -fno-integrated-as"], 
+	[COMPILER_FLAGS+=" -fno-integrated-as"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wno-unused-command-line-argument],
-	[COMPILER_FLAGS+=" -Wno-unused-command-line-argument"], 
+	[COMPILER_FLAGS+=" -Wno-unused-command-line-argument"],
 	[], [$COMPILER_WERROR])
 
 AX_CHECK_COMPILE_FLAG([-Wa,-g],
-	[COMPILER_FLAGS+=" -Wa,-g"], 
+	[COMPILER_FLAGS+=" -Wa,-g"],
 	[], [$COMPILER_WERROR])
 
 AX_CHECK_COMPILE_FLAG([-Wall],
-	[COMPILER_FLAGS+=" -Wall"], 
+	[COMPILER_FLAGS+=" -Wall"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wextra],
-	[COMPILER_FLAGS+=" -Wextra"], 
+	[COMPILER_FLAGS+=" -Wextra"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wpedantic],
-	[COMPILER_FLAGS+=" -Wpedantic"], 
+	[COMPILER_FLAGS+=" -Wpedantic"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wdouble-promotion],
-	[COMPILER_FLAGS+=" -Wdouble-promotion"], 
+	[COMPILER_FLAGS+=" -Wdouble-promotion"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wformat],
-	[COMPILER_FLAGS+=" -Wformat"], 
+	[COMPILER_FLAGS+=" -Wformat"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wfloat-equal],
-	[COMPILER_FLAGS+=" -Wfloat-equal"], 
+	[COMPILER_FLAGS+=" -Wfloat-equal"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wundef],
-	[COMPILER_FLAGS+=" -Wundef"], 
+	[COMPILER_FLAGS+=" -Wundef"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wwrite-strings],
-	[COMPILER_FLAGS+=" -Wwrite-strings"], 
+	[COMPILER_FLAGS+=" -Wwrite-strings"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wredundant-decls],
-	[COMPILER_FLAGS+=" -Wredundant-decls"], 
+	[COMPILER_FLAGS+=" -Wredundant-decls"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wno-shadow],
-	[COMPILER_FLAGS+=" -Wno-shadow"], 
+	[COMPILER_FLAGS+=" -Wno-shadow"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wno-strict-overflow],
-	[COMPILER_FLAGS+=" -Wno-strict-overflow"], 
+	[COMPILER_FLAGS+=" -Wno-strict-overflow"],
 	[], [$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-Wno-overlength-strings],
-	[COMPILER_FLAGS+=" -Wno-overlength-strings"], 
+	[COMPILER_FLAGS+=" -Wno-overlength-strings"],
 	[], [$COMPILER_WERROR])
 
 AC_SUBST([COMPILER_FLAGS])
@@ -173,7 +173,7 @@ ENABLE_FRAMEPOINTER_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],
 	[ENABLE_FRAMEPOINTER_FLAGS=" -fno-omit-frame-pointer"]
 	[], [$COMPILER_WERROR])
-	
+
 AX_CHECK_COMPILE_FLAG([-mno-red-zone],
 	[NO_REDZONE_FLAGS=" -mno-red-zone"]
 	[], [$COMPILER_WERROR])
@@ -204,12 +204,19 @@ AX_CHECK_COMPILE_FLAG([-fno-common],
 
 AC_SUBST([NO_COMMON_FLAGS])
 
+
+AX_CHECK_COMPILE_FLAG([-ftree-vectorize],
+	[VECTORIZE_FLAGS=" -ftree-vectorize"]
+	[], [$COMPILER_WERROR])
+
+AC_SUBST([VECTORIZE_FLAGS])
+
 AC_ARG_ENABLE(optimize,
 	AS_HELP_STRING([--enable-optimize], [Enable size/speed optimizations]),
 	[
 		echo Enabling optimizations
 		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="-O2 $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
 	],[
 		echo Disabling optimizations
 		OPTIMIZE_SIZE_FLAGS="-O0 $ENABLE_FRAMEPOINTER_FLAGS"

@@ -588,6 +588,7 @@ LIBOBJS
 OPTIMIZE_SPEED_FLAGS
 OPTIMIZE_SIZE_FLAGS
 DISABLE_OPTIMIZATION_FLAGS
+VECTORIZE_FLAGS
 NO_COMMON_FLAGS
 NO_EXCEPTIONS_FLAGS
 NO_UNWIND_TABLES_FLAGS
@@ -8130,12 +8131,52 @@ fi
 
 
 
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -ftree-vectorize" >&5
+$as_echo_n "checking whether C compiler accepts -ftree-vectorize... " >&6; }
+if ${ax_cv_check_cflags___ftree_vectorize+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -ftree-vectorize"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___ftree_vectorize=yes
+else
+  ax_cv_check_cflags___ftree_vectorize=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___ftree_vectorize" >&5
+$as_echo "$ax_cv_check_cflags___ftree_vectorize" >&6; }
+if test "x$ax_cv_check_cflags___ftree_vectorize" = xyes; then :
+  VECTORIZE_FLAGS=" -ftree-vectorize"
+
+else
+  $COMPILER_WERROR
+fi
+
+
+
+
 # Check whether --enable-optimize was given.
 if test "${enable_optimize+set}" = set; then :
   enableval=$enable_optimize;
 		echo Enabling optimizations
 		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="-O2 $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
 
 else
 
