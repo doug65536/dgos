@@ -27,7 +27,7 @@ bioscall:
     // 16-bit protected mode
 
     // Load 16-bit data segments
-    mov $GDT_SEL_KERNEL_DATA16,%dx
+    mov $GDT_SEL_KERNEL_DATA16,%edx
     mov %dx,%ds
     mov %dx,%es
     mov %dx,%fs
@@ -114,11 +114,11 @@ bioscall:
 0:
 .code32
     mov $GDT_SEL_KERNEL_DATA,%eax
-    mov %eax,%ds
-    mov %eax,%es
-    mov %eax,%fs
-    mov %eax,%gs
-    mov %eax,%ss
+    mov %ax,%ds
+    mov %ax,%es
+    mov %ax,%fs
+    mov %ax,%gs
+    mov %ax,%ss
 
     add $8,%esp
 

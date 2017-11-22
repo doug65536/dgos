@@ -112,11 +112,11 @@ boot:
 0:
 .code32
     mov $GDT_SEL_KERNEL_DATA,%edx
-    mov %edx,%ds
-    mov %edx,%es
-    mov %edx,%fs
-    mov %edx,%gs
-    mov %edx,%ss
+    mov %dx,%ds
+    mov %dx,%es
+    mov %dx,%fs
+    mov %dx,%gs
+    mov %dx,%ss
     and $-16 & 0xFFFF,%esp
 
     call cpu_a20_enterpm
@@ -151,11 +151,11 @@ boot:
 0:
 
     xor %edx,%edx
-    mov %edx,%ds
-    mov %edx,%es
-    mov %edx,%fs
-    mov %edx,%gs
-    mov %edx,%ss
+    mov %dx,%ds
+    mov %dx,%es
+    mov %dx,%fs
+    mov %dx,%gs
+    mov %dx,%ss
 
     ret
 

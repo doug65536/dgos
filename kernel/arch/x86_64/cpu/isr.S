@@ -233,8 +233,8 @@ isr_common:
     // ...came from user code
     swapgs
     mov $0x10,%eax
-    mov %eax,%ds
-    mov %eax,%es
+    mov %ax,%ds
+    mov %ax,%es
 0:
 
     // Save entire sse/mmx/fpu state

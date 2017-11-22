@@ -35,11 +35,11 @@ mp_entry:
 0:
 .code32
 	movl $0x20,%ecx
-	mov %ecx,%ds
-	mov %ecx,%es
-	mov %ecx,%fs
-	mov %ecx,%gs
-	mov %ecx,%ss
+	mov %cx,%ds
+	mov %cx,%es
+	mov %cx,%fs
+	mov %cx,%gs
+	mov %cx,%ss
 	movl mp_enter_kernel,%eax
 	movl mp_enter_kernel+4,%edx
 	mov $enter_kernel,%ecx
