@@ -107,7 +107,8 @@ static png_type_t png_hdr_type(png_chunk_hdr_t *hdr)
     return PNG_OTHER;
 }
 
-static inline uint8_t png_paeth_predict(uint8_t a, uint8_t b, uint8_t c)
+static __always_inline uint8_t png_paeth_predict(
+        uint8_t a, uint8_t b, uint8_t c)
 {
     // a = left, b = above, c = upper left
     int p = a + b - c;

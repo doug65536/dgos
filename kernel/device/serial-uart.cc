@@ -13,6 +13,16 @@
 #define UART_TRACE(...) ((void)0)
 #endif
 
+// Null model connections:
+//
+//  Peer      Peer
+//   TxD  ->   RxD
+//   DTR  ->   DSR
+//   RTS  ->   CTS
+//   RxD  <-   TxD
+//   DSR  <-   DTR
+//
+
 namespace uart_defs {
 
 enum struct special_val_t : uint16_t {
@@ -117,9 +127,9 @@ union fcr_t {
         bool fifo_tx_reset:1;
 
         bool dma_mode:1;
-        
+
         bool unused:1;
-        
+
         // 16750 only
         bool fifo64:1;
 
@@ -179,6 +189,7 @@ union mcr_t {
         // Tell the peer we are ready to rx
         bool rts:1;
 
+        // Enable IRQs (externally ANDed with int_en to IRQ line)
         bool out1:1;
 
         // Enable IRQs
@@ -198,10 +209,18 @@ union lsr_t {
         bool overrun:1;
         bool parity_err:1;
         bool framing_err:1;
+
+        // Break in progress
         bool break_intr:1;
+
+        // Tx data register empty
         bool tx_hold_empty:1;
+
+        // Tx shift register empty
         bool tx_sr_empty:1;
-        uint8_t unused:1;
+
+        // Parity error, framing error, or break, in FIFO somewhere
+        bool err_in_fifo:1;
     } bits;
     uint8_t value;
 };
@@ -240,6 +259,7 @@ union scr_t {
 };
 
 enum struct chiptype_t : uint8_t {
+    UNKNOWN,
     U8250,
     U16450,
     U16550,
@@ -288,20 +308,16 @@ template<> struct reg_t<scr_t> {
 class uart_t : public uart_dev_t
 {
 public:
-    static void detect(void*);
-
     // Configure the UART specified by port and IRQ using 8N1
-    uart_t(ioport_t port, uint8_t port_irq, uint32_t baud);
+    uart_t();
     ~uart_t();
 
-    ssize_t write(void const *buf, size_t size, size_t min_write);
-    ssize_t read(void *buf, size_t size, size_t min_read);
+protected:
+    void init(ioport_t port, uint8_t port_irq, uint32_t baud);
 
-    void route_irq(int cpu);
-
-private:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
-    isr_context_t *port_irq_handler(isr_context_t *ctx);
+
+    virtual isr_context_t *port_irq_handler(isr_context_t *ctx);
 
     uint16_t queue_next(uint16_t value) const;
 
@@ -317,21 +333,22 @@ private:
 
     void send_some_locked();
 
-    inline void out(port_t ofs, uint8_t value) const;
+    __always_inline void out(port_t ofs, uint8_t value) const;
+    __always_inline void outs(port_t ofs, const void *value, size_t len) const;
 
     template<typename T>
-    inline void outp(T const& reg)
+    __always_inline void outp(T const& reg)
     {
         out(reg_t<T>::ofs, reg.value);
     }
 
-    inline uint8_t in(port_t ofs)
+    __always_inline uint8_t in(port_t ofs)
     {
         return inb(io_base + ioport_t(ofs));
     }
 
     template<typename T>
-    inline T inp(T& reg)
+    __always_inline T inp(T& reg)
     {
         reg.value = in(reg_t<T>::ofs);
         return reg;
@@ -347,51 +364,40 @@ private:
     msr_t reg_msr;
     scr_t reg_scr;
 
-    // Use 16 bit values to allow buffering of error information
-    // as values >= 256
-    unique_ptr<uint16_t> rx_buffer;
-    unique_ptr<uint16_t> tx_buffer;
-
-    spinlock_t lock;
-
-    uint16_t tx_head;
-    uint16_t tx_tail;
-    //uint16_t tx_level;
-
     uint16_t rx_head;
     uint16_t rx_tail;
-    //uint16_t rx_level;
-
-    condition_var_t tx_not_full;
-    condition_var_t rx_not_empty;
 
     ioport_t io_base;
     uint8_t irq;
-    
+
     chiptype_t chip;
-
-    bool sending_break;
-    bool sending_data;
-
-    uint8_t log2_buffer_size;
+    uint8_t fifo_size;
 };
 
 static vector<unique_ptr<uart_t>> uarts;
 
-uart_t::uart_t(ioport_t port, uint8_t port_irq, uint32_t baud)
-    : lock(0)
-    , tx_head(0)
-    , tx_tail(0)
-    //, tx_level(0)
-    , rx_head(0)
+uart_t::uart_t()
+    : rx_head(0)
     , rx_tail(0)
-    //, rx_level(0)
-    , io_base(port)
-    , irq(port_irq)
-    , sending_break(false)
-    , sending_data(false)
+    , io_base(0)
+    , irq(0)
+    , chip(chiptype_t::UNKNOWN)
+    , fifo_size(0)
 {
-    irq_hook(irq, &uart_t::irq_handler);
+    reg_ier.value = 0;
+    reg_iir.value = 0;
+    reg_fcr.value = 0;
+    reg_lcr.value = 0;
+    reg_mcr.value = 0;
+    reg_lsr.value = 0;
+    reg_msr.value = 0;
+    reg_scr.value = 0;
+}
+
+void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
+{
+    io_base = port;
+    irq = port_irq;
 
     // Initialize shadow registers
     // (and acknowledge any pending interrupts too)
@@ -402,7 +408,7 @@ uart_t::uart_t(ioport_t port, uint8_t port_irq, uint32_t baud)
     inp(reg_lsr);
     inp(reg_msr);
     inp(reg_scr);
-    
+
     // Detect type of UART
     reg_fcr.value = 0;
     reg_fcr.bits.fifo_en = 1;
@@ -411,28 +417,34 @@ uart_t::uart_t(ioport_t port, uint8_t port_irq, uint32_t baud)
     reg_fcr.bits.fifo64 = 1;
     reg_fcr.bits.rx_trigger = 3;
     outp(reg_fcr);
-    
+
     inp(reg_fcr);
     if (reg_fcr.bits.rx_trigger == 3 && reg_fcr.bits.fifo64) {
         // 64 byte fifo bit was writable, it is a 16750
         chip = chiptype_t::U16750;
+        fifo_size = 64;
     } else if (reg_fcr.bits.rx_trigger == 3 && !reg_fcr.bits.fifo64) {
         // Both rx_trigger bits were writable, it is a good 16550A
         // Good 16550A
         chip = chiptype_t::U16550A;
+        fifo_size = 16;
     } else if (reg_fcr.bits.rx_trigger == 1) {
         // Bit 6 was not preserved, is a crap 16550
         // Buggy 16550
         chip = chiptype_t::U16550;
+        fifo_size = 1;
     } else {
         // If the scratch register preserves value, it is a 16450
         reg_scr.value = 0x55;
         outp(reg_scr);
         inp(reg_scr);
+
         if (reg_scr.value == 0x55)
             chip = chiptype_t::U16450;
         else
             chip = chiptype_t::U8250;
+
+        fifo_size = 1;
     }
 
     // Enable access to baud rate registers
@@ -479,13 +491,6 @@ uart_t::uart_t(ioport_t port, uint8_t port_irq, uint32_t baud)
     reg_mcr.bits.rts = 1;
     outp(reg_mcr);
 
-    log2_buffer_size = 16;
-    rx_buffer = new uint16_t[1 << log2_buffer_size];
-    tx_buffer = new uint16_t[1 << log2_buffer_size];
-
-    condvar_init(&tx_not_full);
-    condvar_init(&rx_not_empty);
-
     irq_setmask(irq, true);
 }
 
@@ -493,15 +498,111 @@ uart_t::~uart_t()
 {
     reg_mcr.bits.int_en = 0;
     outp(reg_mcr);
+}
+
+isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
+{
+    //printdbg("UART IRQ\n");
+
+    for (uart_t *uart : uarts) {
+        if (uart->irq == irq)
+            ctx = uart->port_irq_handler(ctx);
+    }
+    return ctx;
+}
+
+isr_context_t *uart_t::port_irq_handler(isr_context_t *ctx)
+{
+    return ctx;
+}
+
+void uart_t::out(port_t ofs, uint8_t value) const
+{
+    outb(io_base + ioport_t(ofs), value);
+}
+
+void uart_t::outs(port_t ofs, void const *value, size_t len) const
+{
+    outsb(io_base + ioport_t(ofs), value, len);
+}
+
+// ===========================================================================
+// IRQ driven, asynchronous UART implementation
+
+class uart_async_t : public uart_t {
+public:
+    uart_async_t();
+
+    ssize_t write(void const *buf, size_t size, size_t min_write);
+    ssize_t read(void *buf, size_t size, size_t min_read);
+
+    void route_irq(int cpu);
+
+    ~uart_async_t();
+
+private:
+    static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
+    isr_context_t *port_irq_handler(isr_context_t *ctx);
+
+    void send_some_locked();
+
+    uint16_t queue_next(uint16_t value) const;
+    void rx_enqueue(uint16_t value);
+
+    bool is_rx_full() const;
+    bool is_tx_full() const;
+    bool is_tx_not_empty() const;
+    bool is_rx_not_empty() const;
+    uint16_t tx_peek_value() const;
+    void tx_take_value();
+
+    condition_var_t tx_not_full;
+    condition_var_t rx_not_empty;
+
+    // Use 16 bit values to allow buffering of error information
+    // as values >= 256
+    unique_ptr<uint16_t> rx_buffer;
+    unique_ptr<uint16_t> tx_buffer;
+
+    spinlock_t lock;
+
+    uint16_t tx_head;
+    uint16_t tx_tail;
+
+    uint8_t log2_buffer_size;
+
+    bool sending_break;
+    bool sending_data;
+};
+
+uart_async_t::uart_async_t()
+    : uart_t()
+    , lock(0)
+    , tx_head(0)
+    , tx_tail(0)
+    , log2_buffer_size(16)
+    , sending_break(false)
+    , sending_data(false)
+{
+    condvar_init(&tx_not_full);
+    condvar_init(&rx_not_empty);
+
+    rx_buffer = new uint16_t[1 << log2_buffer_size];
+    tx_buffer = new uint16_t[1 << log2_buffer_size];
+
+    irq_hook(irq, &uart_t::irq_handler);
+}
+
+uart_async_t::~uart_async_t()
+{
+    irq_setmask(irq, false);
+    irq_unhook(irq, &uart_t::irq_handler);
 
     condvar_destroy(&tx_not_full);
     condvar_destroy(&rx_not_empty);
-
-    irq_setmask(irq, false);
-    irq_unhook(irq, &uart_t::irq_handler);
 }
 
-ssize_t uart_t::write(void const *buf, size_t size, size_t min_write)
+ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
 {
     spinlock_lock_noirq(&lock);
 
@@ -533,7 +634,7 @@ ssize_t uart_t::write(void const *buf, size_t size, size_t min_write)
     return i;
 }
 
-ssize_t uart_t::read(void *buf, size_t size, size_t min_read)
+ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
 {
     cpu_scoped_irq_disable intr_was_enabled;
     spinlock_lock_noirq(&lock);
@@ -564,23 +665,12 @@ ssize_t uart_t::read(void *buf, size_t size, size_t min_read)
     return i;
 }
 
-void uart_t::route_irq(int cpu)
+void uart_async_t::route_irq(int cpu)
 {
     irq_setcpu(irq, cpu);
 }
 
-isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
-{
-    //printdbg("UART IRQ\n");
-
-    for (uart_t *uart : uarts) {
-        if (uart->irq == irq)
-            ctx = uart->port_irq_handler(ctx);
-    }
-    return ctx;
-}
-
-void uart_t::send_some_locked()
+void uart_async_t::send_some_locked()
 {
     sending_data = is_tx_not_empty();
 
@@ -632,7 +722,52 @@ void uart_t::send_some_locked()
     }
 }
 
-isr_context_t *uart_t::port_irq_handler(isr_context_t *ctx)
+uint16_t uart_async_t::queue_next(uint16_t value) const
+{
+    return (value + 1) & ~-(1 << log2_buffer_size);
+}
+
+void uart_async_t::rx_enqueue(uint16_t value)
+{
+    rx_buffer[rx_head] = value;
+    rx_head = queue_next(rx_head);
+}
+
+bool uart_async_t::is_rx_full() const
+{
+    // Newly received bytes are placed at rx_head
+    // Stream reads take bytes from rx_tail
+    return queue_next(rx_head) == rx_tail;
+}
+
+bool uart_async_t::is_tx_full() const
+{
+    // Stream writes place bytes at tx_head
+    // Transmit takes bytes from tx_tail
+    return queue_next(tx_head) == tx_tail;
+}
+
+bool uart_async_t::is_tx_not_empty() const
+{
+    return tx_head != tx_tail;
+}
+
+bool uart_async_t::is_rx_not_empty() const
+{
+    return rx_head != rx_tail;
+}
+
+uint16_t uart_async_t::tx_peek_value() const
+{
+    return tx_buffer[tx_tail];
+}
+
+void uart_async_t::tx_take_value()
+{
+    tx_tail = queue_next(tx_tail);
+}
+
+isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
 {
     spinlock_lock_noyield(&lock);
 
@@ -685,70 +820,76 @@ isr_context_t *uart_t::port_irq_handler(isr_context_t *ctx)
     return ctx;
 }
 
-uint16_t uart_t::queue_next(uint16_t value) const
+
+// ===========================================================================
+// Polling driven synchronous UART
+
+class uart_poll_t : public uart_t {
+    void init(ioport_t port, uint8_t port_irq, uint32_t baud);
+    virtual ssize_t write(const void *buf, size_t size, size_t min_write);
+    virtual ssize_t read(void *buf, size_t size, size_t min_read);
+};
+
+void uart_poll_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
 {
-    return (value + 1) & ~-(1 << log2_buffer_size);
+    uart_t::init(port, port_irq, baud);
 }
 
-void uart_t::rx_enqueue(uint16_t value)
+ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
 {
-    rx_buffer[rx_head] = value;
-    rx_head = queue_next(rx_head);
+    for (size_t i = 0; i < size; ) {
+        // Wait for tx holding register to be empty
+        for (;;) {
+            inp(reg_lsr);
+
+            if (reg_lsr.bits.tx_hold_empty)
+                break;
+
+            if (i >= min_write)
+                return ssize_t(i);
+
+            pause();
+        }
+
+        // Wait for CTS
+        for (;;) {
+            inp(reg_msr);
+
+            if (reg_msr.bits.cts)
+                break;
+
+            if (i >= min_write)
+                return ssize_t(i);
+
+            pause();
+        }
+
+        // Fill the FIFO or send the remainder
+        size_t block_size = min(size_t(fifo_size), size - i);
+
+        outs(port_t::DAT, buf + i, block_size);
+        i += block_size;
+    }
 }
 
-bool uart_t::is_rx_full() const
+ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read)
 {
-    // Newly received bytes are placed at rx_head
-    // Stream reads take bytes from rx_tail
-    return queue_next(rx_head) == rx_tail;
+
 }
 
-bool uart_t::is_tx_full() const
+static uart_poll_t debug_uart;
+
+}   // namespace
+
+
+// ===========================================================================
+//
+
+uart_dev_t *uart_dev_t::open(size_t id, bool simple)
 {
-    // Stream writes place bytes at tx_head
-    // Transmit takes bytes from tx_tail
-    return queue_next(tx_head) == tx_tail;
+    if (!simple)
+        return id < uart_defs::uarts.size()
+                ? uart_defs::uarts[id].get()
+                : nullptr;
+    return &uart_defs::debug_uart;
 }
-
-bool uart_t::is_tx_not_empty() const
-{
-    return tx_head != tx_tail;
-}
-
-bool uart_t::is_rx_not_empty() const
-{
-    return rx_head != rx_tail;
-}
-
-uint16_t uart_t::tx_peek_value() const
-{
-    return tx_buffer[tx_tail];
-}
-
-void uart_t::tx_take_value()
-{
-    tx_tail = queue_next(tx_tail);
-}
-
-void uart_t::out(port_t ofs, uint8_t value) const
-{
-    outb(io_base + ioport_t(ofs), value);
-}
-
-void uart_t::detect(void *)
-{
-    if (uarts.empty())
-        uarts.push_back(new uart_t(0x3F8, 4, 115200));
-}
-
-REGISTER_CALLOUT(&uart_t::detect, nullptr,
-                 callout_type_t::early_dev, "000");
-
-}
-
-uart_dev_t *uart_dev_t::open(size_t id)
-{
-    uart_defs::uart_t::detect(nullptr);
-    return id < uart_defs::uarts.size() ? uart_defs::uarts[id].get() : nullptr;
-}
-

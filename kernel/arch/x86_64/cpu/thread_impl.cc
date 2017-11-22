@@ -201,7 +201,7 @@ static uint32_t get_apic_id(void)
     return apic_id;
 }
 
-static inline cpu_info_t *this_cpu(void)
+static __always_inline cpu_info_t *this_cpu(void)
 {
     cpu_info_t *cpu = (cpu_info_t *)cpu_gs_read_ptr();
     assert(cpu >= cpus && cpu < cpus + countof(cpus));
@@ -209,7 +209,7 @@ static inline cpu_info_t *this_cpu(void)
     return cpu;
 }
 
-static inline thread_info_t *this_thread(void)
+static __always_inline thread_info_t *this_thread(void)
 {
     cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();

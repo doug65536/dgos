@@ -73,80 +73,140 @@ extern cpuid_cache_t cpuid_cache;
 
 // No eXecute bit in page tables
 __const
-static inline bool cpuid_has_nx(void)      { return cpuid_cache.has_nx;      }
+static __always_inline bool cpuid_has_nx(void)
+{
+    return cpuid_cache.has_nx;
+}
 
 // SSE instructions
 __const
-static inline bool cpuid_has_sse3(void)    { return cpuid_cache.has_sse3;    }
+static __always_inline bool cpuid_has_sse3(void)
+{
+    return cpuid_cache.has_sse3;
+}
 
 // MONITOR/MWAIT instructions
 __const
-static inline bool cpuid_has_mwait(void)   { return cpuid_cache.has_mwait;   }
+static __always_inline bool cpuid_has_mwait(void)
+{
+    return cpuid_cache.has_mwait;
+}
 
 // SSE3 instructions
 __const
-static inline bool cpuid_has_ssse3(void)   { return cpuid_cache.has_ssse3;   }
+static __always_inline bool cpuid_has_ssse3(void)
+{
+    return cpuid_cache.has_ssse3;
+}
 
 // Fused Multiply Add instructions
 __const
-static inline bool cpuid_has_fma(void)     { return cpuid_cache.has_fma;     }
+static __always_inline bool cpuid_has_fma(void)
+{
+    return cpuid_cache.has_fma;
+}
 
 // Page Global Enable capability
 __const
-static inline bool cpuid_has_pge(void)     { return cpuid_cache.has_pge;     }
+static __always_inline bool cpuid_has_pge(void)
+{
+    return cpuid_cache.has_pge;
+}
 
 // Process Context Identifiers
 __const
-static inline bool cpuid_has_pcid(void)    { return cpuid_cache.has_pcid;    }
+static __always_inline bool cpuid_has_pcid(void)
+{
+    return cpuid_cache.has_pcid;
+}
 
 // Invalidate Process Context Identifier instruction
 __const
-static inline bool cpuid_has_invpcid(void) { return cpuid_cache.has_invpcid; }
+static __always_inline bool cpuid_has_invpcid(void)
+{
+    return cpuid_cache.has_invpcid;
+}
 
 // SSE4.1 instructions
 __const
-static inline bool cpuid_has_sse4_1(void)  { return cpuid_cache.has_sse4_1;  }
+static __always_inline bool cpuid_has_sse4_1(void)
+{
+    return cpuid_cache.has_sse4_1;
+}
 
 // SSE4.2 instructions
 __const
-static inline bool cpuid_has_sse4_2(void)  { return cpuid_cache.has_sse4_2;  }
+static __always_inline bool cpuid_has_sse4_2(void)
+{
+    return cpuid_cache.has_sse4_2;
+}
 
 // x2APIC present
 __const
-static inline bool cpuid_has_x2apic(void)  { return cpuid_cache.has_x2apic;  }
+static __always_inline bool cpuid_has_x2apic(void)
+{
+    return cpuid_cache.has_x2apic;
+}
 
 // Advanced Encryption Standard instructions
 __const
-static inline bool cpuid_has_aes(void)     { return cpuid_cache.has_aes;     }
+static __always_inline bool cpuid_has_aes(void)
+{
+    return cpuid_cache.has_aes;
+}
 
 // eXtented Save instructions
 __const
-static inline bool cpuid_has_xsave(void)   { return cpuid_cache.has_xsave;   }
+static __always_inline bool cpuid_has_xsave(void)
+{
+    return cpuid_cache.has_xsave;
+}
 
 // Advanced Vector Extensions instructions
 __const
-static inline bool cpuid_has_avx(void)     { return cpuid_cache.has_avx;     }
+static __always_inline bool cpuid_has_avx(void)
+{
+    return cpuid_cache.has_avx;
+}
 
 // ReaD RAND instruction
 __const
-static inline bool cpuid_has_rdrand(void)  { return cpuid_cache.has_rdrand;  }
+static __always_inline bool cpuid_has_rdrand(void)
+{
+    return cpuid_cache.has_rdrand;
+}
 
 // Supervisor Mode Execution Prevention
 __const
-static inline bool cpuid_has_smep(void)    { return cpuid_cache.has_smep;    }
+static __always_inline bool cpuid_has_smep(void)
+{
+    return cpuid_cache.has_smep;
+}
 
 // Debugging Extensions
 __const
-static inline bool cpuid_has_de(void)      { return cpuid_cache.has_de;      }
+static __always_inline bool cpuid_has_de(void)
+{
+    return cpuid_cache.has_de;
+}
 
 // INvariant ReaD TimeStamp Counter
 __const
-static inline bool cpuid_has_inrdtsc(void) { return cpuid_cache.has_inrdtsc; }
+static __always_inline bool cpuid_has_inrdtsc(void)
+{
+    return cpuid_cache.has_inrdtsc;
+}
 
 // Avx-512 Foundation
 __const
-static inline bool cpuid_has_avx512f(void) { return cpuid_cache.has_avx512f; }
+static __always_inline bool cpuid_has_avx512f(void)
+{
+    return cpuid_cache.has_avx512f;
+}
 
 // {RD|WR}{FS|GS}BASE instructions
 __const
-static inline bool cpuid_has_fsgsbase(void){ return cpuid_cache.has_fsgsbase; }
+static __always_inline bool cpuid_has_fsgsbase(void)
+{
+    return cpuid_cache.has_fsgsbase;
+}

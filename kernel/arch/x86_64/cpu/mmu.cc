@@ -287,17 +287,17 @@ public:
     void addref_virtual_range(linaddr_t start, size_t len);
 
 private:
-    inline size_t index_from_addr(physaddr_t addr) const
+    __always_inline size_t index_from_addr(physaddr_t addr) const
     {
         return (addr - begin) >> log2_pagesz;
     }
 
-    inline physaddr_t addr_from_index(size_t index) const
+    __always_inline physaddr_t addr_from_index(size_t index) const
     {
         return (index << log2_pagesz) + begin;
     }
 
-    inline void release_one_locked(physaddr_t addr)
+    __always_inline void release_one_locked(physaddr_t addr)
     {
         size_t index = index_from_addr(addr);
         if (entries[index] == 1) {
@@ -374,7 +374,7 @@ static contiguous_allocator_t contig_phys_allocator;
 
 uintptr_t mm_alloc_contiguous(size_t size)
 {
-	return contig_phys_allocator.alloc_linear(size);
+    return contig_phys_allocator.alloc_linear(size);
 }
 
 void mm_free_contiguous(uintptr_t addr, size_t size)
@@ -412,7 +412,7 @@ static physaddr_t mmu_alloc_phys(int low)
 //
 // Path to PTE
 
-static inline void path_from_addr(unsigned *path, linaddr_t addr)
+static __always_inline void path_from_addr(unsigned *path, linaddr_t addr)
 {
     path[3] = (addr >> 12) & 0x1FF;
     path[2] = (addr >> 21) & 0x1FF;
@@ -436,7 +436,7 @@ static int ptes_present(pte_t **ptes)
 }
 
 // Returns the linear addresses of the page tables for the given path
-static inline void pte_from_path(pte_t **pte, unsigned *path)
+static __always_inline void pte_from_path(pte_t **pte, unsigned *path)
 {
     uintptr_t page_index =
             (((uintptr_t)path[0]) << (9 * 3)) +
@@ -471,7 +471,7 @@ static int addr_present(uintptr_t addr,
 }
 
 // Returns linear page index (addr>>12) represented by the specified path
-static inline uintptr_t path_inc(unsigned *path)
+static __always_inline uintptr_t path_inc(unsigned *path)
 {
     // Branchless algorithm
 
@@ -492,7 +492,7 @@ static inline uintptr_t path_inc(unsigned *path)
 }
 
 // Returns present mask for new page
-static inline int path_inc(unsigned *path, pte_t **ptes)
+static __always_inline int path_inc(unsigned *path, pte_t **ptes)
 {
     uintptr_t n = path_inc(path);
 
@@ -1104,7 +1104,8 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             cpu_wait_bit_clear(ptes[3], PTE_EX_WAIT_BIT);
             return ctx;
         } else {
-            printdbg("Invalid page fault at 0x%zx\n", fault_addr);
+            printdbg("Invalid page fault at 0x%zx, RIP=%p\n",
+                     fault_addr, (void*)ctx->gpr->iret.rip);
             if (thread_get_exception_top())
                 return 0;
 
@@ -2300,7 +2301,7 @@ uintptr_t mphysaddr(void volatile *addr)
     return (pte & PTE_ADDR) + misalignment;
 }
 
-static inline int mphysranges_enum(
+static __always_inline int mphysranges_enum(
         void *addr, size_t size,
         int (*callback)(mmphysrange_t, void*),
         void *context)
@@ -2346,7 +2347,8 @@ struct mphysranges_state_t {
     mmphysrange_t cur_range;
 };
 
-static inline int mphysranges_callback(mmphysrange_t range, void *context)
+static __always_inline int mphysranges_callback(
+        mmphysrange_t range, void *context)
 {
     mphysranges_state_t *state = (mphysranges_state_t *)context;
 
@@ -2673,6 +2675,21 @@ int alias_window(void *addr, size_t size,
         cpu_invalidate_page(base + offset);
 
     return 1;
+}
+
+int mlock(const void *addr, size_t len)
+{
+    linaddr_t staddr = linaddr_t(addr);
+    linaddr_t enaddr = staddr + len;
+
+    bool kernel = staddr >= 0x800000000000;
+
+    if (unlikely(!kernel && enaddr >= 0x800000000000))
+        return int(errno_t::EINVAL);
+
+
+
+    return 0;
 }
 
 uintptr_t mm_new_process(void)

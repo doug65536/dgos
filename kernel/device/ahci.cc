@@ -100,7 +100,7 @@ struct ahci_fis_h2d_t {
     // Reserved
     uint8_t rsv1[4];
 
-    inline void set_lba(uint64_t lba)
+    __always_inline void set_lba(uint64_t lba)
     {
         assert(lba < 0x1000000000000);
         lba0 = (lba >> (0*8)) & 0xFF;
@@ -111,7 +111,7 @@ struct ahci_fis_h2d_t {
         lba5 = (lba >> (5*8)) & 0xFF;
     }
 
-    inline void set_count(uint32_t new_count)
+    __always_inline void set_count(uint32_t new_count)
     {
         assert(new_count <= 0x10000);
         count = new_count;
@@ -183,7 +183,7 @@ struct ahci_fis_ncq_t {
     // Auxiliary
     uint32_t aux;
 
-    inline void set_lba(uint64_t lba)
+    __always_inline void set_lba(uint64_t lba)
     {
         assert(lba < 0x1000000000000);
         lba0 = (lba >> (0*8)) & 0xFFU;
@@ -194,7 +194,7 @@ struct ahci_fis_ncq_t {
         lba5 = (lba >> (5*8)) & 0xFFU;
     }
 
-    inline void set_count(uint32_t count)
+    __always_inline void set_count(uint32_t count)
     {
         assert(count <= 0x10000);
         count_lo = (count >> (0*8)) & 0xFFU;
@@ -1969,9 +1969,11 @@ void ahci_if_t::rebase()
             pi->is_atapi = 1;
             pi->log2_sector_size = 11;
             port->cmd |= AHCI_HP_CMD_ATAPI;
+            AHCI_TRACE("Found ATAPI device, port %d\n", port_num);
         } else if (port->sig == ahci_sig_t::SATA_SIG_ATA) {
             pi->is_atapi = 0;
             pi->log2_sector_size = 9;
+            AHCI_TRACE("Found ATA device, port %d\n", port_num);
         } else {
             continue;
         }

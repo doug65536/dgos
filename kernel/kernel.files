@@ -221,7 +221,6 @@ lib/mm.cc
 lib/bswap.h
 lib/threadsync.h
 lib/priorityqueue.cc
-lib/stddef.h
 lib/bootinfo.cc
 lib/mouse.cc
 lib/bitop.h

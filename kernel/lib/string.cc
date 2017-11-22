@@ -140,14 +140,14 @@ EXPORT void *aligned16_memset(void *dest, int c, size_t n)
 #else
 #ifdef __OPTIMIZE__
     char cc = (char)c;
-    __ivec16 v = {
+    __i8_vec16 v = {
         cc, cc, cc, cc, cc, cc, cc, cc,
         cc, cc, cc, cc, cc, cc, cc, cc
     };
-    __ivec16 *vp = (__ivec16*)dest;
-    while (n >= sizeof(__ivec16)) {
+    __i8_vec16 *vp = (__i8_vec16*)dest;
+    while (n >= sizeof(__i8_vec16)) {
         *vp++ = v;
-        n -= sizeof(__ivec16);
+        n -= sizeof(__i8_vec16);
     }
     return vp;
 #else
@@ -176,7 +176,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
         --n;
     }
     // Write as many 128-bit chunks as possible
-    if (n > sizeof(__ivec16)) {
+    if (n > sizeof(__i8_vec16)) {
         p = aligned16_memset(p, c, n);
         n &= 15;
     }
@@ -205,8 +205,8 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
 #ifdef __GNUC__
     // If source and destination are aligned, copy 128 bits at a time
     if (n >= 16 && !((intptr_t)dest & 0x0F) && !((intptr_t)src & 0x0F)) {
-        __ivec2 *vd = dest;
-        __ivec2 const *vs = src;
+        __i64_vec2 *vd = dest;
+        __i64_vec2 const *vs = src;
         while (n >= sizeof(*vd)) {
             *vd++ = *vs++;
             n -= sizeof(*vd);
@@ -231,7 +231,8 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
     return dest;
 }
 
-static inline void memcpy_reverse(void *dest, void const *src, size_t n)
+static __always_inline void memcpy_reverse(
+        void *dest, void const *src, size_t n)
 {
 #if USE_REP_STRING
     __asm__ __volatile__ (

@@ -434,7 +434,7 @@ static __always_inline void cpu_invalidate_pcid(
     );
 }
 
-static inline void cpu_flush_tlb(void)
+static __always_inline void cpu_flush_tlb(void)
 {
     if (cpuid_has_invpcid()) {
         //
@@ -723,7 +723,8 @@ static __always_inline void cpu_mwait(uint32_t ext, uint32_t hint)
 }
 
 template<typename T>
-static inline void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
+static __always_inline void cpu_wait_bit_clear(
+        T const volatile *value, uint8_t bit)
 {
     static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
 
@@ -742,7 +743,8 @@ static inline void cpu_wait_bit_clear(T const volatile *value, uint8_t bit)
 }
 
 template<typename T>
-static inline void cpu_wait_value(T const volatile *value, T wait_value)
+static __always_inline void cpu_wait_value(
+        T const volatile *value, T wait_value)
 {
     static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
 

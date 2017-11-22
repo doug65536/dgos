@@ -18,8 +18,8 @@ extern "C" void *memcpy512_nt_avx512(void *dest, void const *src, size_t n)
             : [src] "r" (src), [dst] "r" (d)
             : "memory", "%ymm0", "%ymm1"
         );
-        src = (__ivec4*)src + 16;
-        d = (__ivec4*)d + 16;
+        src = (__i32_vec4*)src + 16;
+        d = (__i32_vec4*)d + 16;
         n -= 256;
     }
     __asm__ __volatile__ (
@@ -39,8 +39,8 @@ extern "C" void *memcpy512_nt_avx512(void *dest, void const *src, size_t n)
             : [src] "r" (src), [dst] "r" (d)
             : "memory", "%xmm0", "%xmm1"
         );
-        src = (__ivec4*)src + 1;
-        d = (__ivec4*)d + 1;
+        src = (__i32_vec4*)src + 1;
+        d = (__i32_vec4*)d + 1;
         n -= 16;
     }
     return dest;

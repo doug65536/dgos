@@ -19,8 +19,8 @@ extern "C" void *memcpy512_nt_avx(void *dest, void const *src, size_t n)
             : [src] "r" (src), [dst] "r" (d)
             : "memory", "%ymm0", "%ymm1", "%ymm2", "%ymm3"
         );
-        src = (__ivec4*)src + 8;
-        d = (__ivec4*)d + 8;
+        src = (__i32_vec4*)src + 8;
+        d = (__i32_vec4*)d + 8;
         n -= 128;
     }
     __asm__ __volatile__ (
@@ -40,8 +40,8 @@ extern "C" void *memcpy512_nt_avx(void *dest, void const *src, size_t n)
             : [src] "r" (src), [dst] "r" (d)
             : "memory", "%xmm0", "%xmm1"
         );
-        src = (__ivec4*)src + 1;
-        d = (__ivec4*)d + 1;
+        src = (__i32_vec4*)src + 1;
+        d = (__i32_vec4*)d + 1;
         n -= 16;
     }
     return dest;
@@ -91,10 +91,10 @@ extern "C" void *memset32_nt_avx(void *dest, uint32_t val, size_t n)
     }
 
     // Write as many 128-bit values as possible
-    __uvec4 val128 = { val, val, val, val };
+    __u32_vec4 val128 = { val, val, val, val };
     while (n >= 16) {
-        __builtin_ia32_movntdq((__ivec2LL*)d, (__ivec2LL)val128);
-        d = (__ivec4*)d + 1;
+        __builtin_ia32_movntdq((__i64_vec2LL*)d, (__i64_vec2LL)val128);
+        d = (__i32_vec4*)d + 1;
         n -= 16;
     }
 

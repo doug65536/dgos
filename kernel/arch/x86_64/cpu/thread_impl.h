@@ -38,7 +38,7 @@ void thread_cls_for_each_cpu(size_t slot, int other_only,
 void thread_send_ipi(int cpu, int intr);
 
 __const
-static inline process_t *fast_cur_process()
+static __always_inline process_t *fast_cur_process()
 {
     void *thread_info = cpu_gs_read_ptr(CPU_INFO_CURTHREAD_OFS);
     return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);

@@ -12,15 +12,11 @@
 //  Address
 //  Bits
 //  -----------
-//   47:39 Page directory (512GB regions)
-//   38:30 Page directory (1GB regions)
-//   29:21 Page directory (2MB regions)
-//   20:12 Page table (4KB regions)
+//   47:39 Page directory (512GB regions) (PML4e)
+//   38:30 Page directory (1GB regions)   (PDPTE)
+//   29:21 Page directory (2MB regions)   (PDE)
+//   20:12 Page table     (4KB regions)   (PTE)
 //   11:0  Offset (bytes)
-
-// Page tables are accessed through far pointers and manipulated
-// with helper functions that load segment registers
-// The fs segment is used and is not preserved
 
 #define DEBUG_PAGING	0
 #if DEBUG_PAGING

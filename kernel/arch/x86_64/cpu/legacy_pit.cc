@@ -155,7 +155,8 @@ static void pit8254_time_ns_stop()
 // Multiply two unsigned 64 bit values, giving an intermediate 128 bit result,
 // then divide that by an unsigned 64 bit value, and return the quotient
 __const
-static inline uint64_t mul_64_64_div_64(uint64_t m1, uint64_t m2, uint64_t d)
+static __always_inline uint64_t mul_64_64_div_64(
+        uint64_t m1, uint64_t m2, uint64_t d)
 {
     __asm__ (
         "mul %[m2]\n\t"

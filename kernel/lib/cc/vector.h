@@ -156,43 +156,43 @@ public:
     {
     private:
         friend class vector;
-        inline vector_iter(pointer __ip);
+        __always_inline vector_iter(pointer __ip);
 
     public:
-        inline vector_iter();
+        __always_inline vector_iter();
 
         template<bool _RhsIsConst>
-        inline vector_iter(vector_iter<_Dir, _RhsIsConst> const& rhs);
+        __always_inline vector_iter(vector_iter<_Dir, _RhsIsConst> const& rhs);
 
-        inline _T& operator*();
-        inline _T const& operator*() const;
-        inline vector_iter operator+(size_type __n) const;
-        inline vector_iter operator-(size_type __n) const;
-        inline _T& operator[](size_type __n);
-        inline _T const& operator[](size_type __n) const;
-        inline pointer operator->();
-        inline const_pointer operator->() const;
+        __always_inline _T& operator*();
+        __always_inline _T const& operator*() const;
+        __always_inline vector_iter operator+(size_type __n) const;
+        __always_inline vector_iter operator-(size_type __n) const;
+        __always_inline _T& operator[](size_type __n);
+        __always_inline _T const& operator[](size_type __n) const;
+        __always_inline pointer operator->();
+        __always_inline const_pointer operator->() const;
 
-        inline bool operator==(vector_iter const& rhs) const;
-        inline bool operator!=(vector_iter const& rhs) const;
-        inline bool operator<(vector_iter const& rhs) const;
-        inline bool operator<=(vector_iter const& rhs) const;
-        inline bool operator>=(vector_iter const& rhs) const;
-        inline bool operator>(vector_iter const& rhs) const;
+        __always_inline bool operator==(vector_iter const& rhs) const;
+        __always_inline bool operator!=(vector_iter const& rhs) const;
+        __always_inline bool operator<(vector_iter const& rhs) const;
+        __always_inline bool operator<=(vector_iter const& rhs) const;
+        __always_inline bool operator>=(vector_iter const& rhs) const;
+        __always_inline bool operator>(vector_iter const& rhs) const;
 
-        inline vector_iter& operator++();
-        inline vector_iter operator++(int);
+        __always_inline vector_iter& operator++();
+        __always_inline vector_iter operator++(int);
 
-        inline vector_iter& operator--();
-        inline vector_iter operator--(int);
+        __always_inline vector_iter& operator--();
+        __always_inline vector_iter operator--(int);
 
-        inline vector_iter& operator+=(difference_type diff);
-        inline vector_iter& operator-=(difference_type diff);
+        __always_inline vector_iter& operator+=(difference_type diff);
+        __always_inline vector_iter& operator-=(difference_type diff);
 
-        inline vector_iter operator+(difference_type diff) const;
-        inline vector_iter operator-(difference_type diff) const;
+        __always_inline vector_iter operator+(difference_type diff) const;
+        __always_inline vector_iter operator-(difference_type diff) const;
 
-        inline difference_type operator-(vector_iter const& rhs) const;
+        __always_inline difference_type operator-(vector_iter const& rhs) const;
 
     private:
         pointer __p;

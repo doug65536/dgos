@@ -30,7 +30,7 @@ struct framebuffer_t {
 
 static framebuffer_t fb;
 
-static inline void fb_reset_dirty(void)
+static __always_inline void fb_reset_dirty(void)
 {
     fb.dirty.st.x = fb.mode.width;
     fb.dirty.st.y = fb.mode.height;
@@ -62,7 +62,8 @@ void fb_init(void)
     fb_reset_dirty();
 }
 
-static inline void fb_update_dirty(int left, int top, int right, int bottom)
+static __always_inline void fb_update_dirty(
+        int left, int top, int right, int bottom)
 {
     fb.dirty.en.x = (fb.dirty.en.x < right ? right : fb.dirty.en.x);
     fb.dirty.en.y = (fb.dirty.en.y < bottom ? bottom : fb.dirty.en.y);
@@ -171,11 +172,11 @@ void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 }
 
 //#ifdef __x86_64__
-//static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
+//static void fb_blend_pixel(uint8_t *pixel, __f32_vec4 fcolor, float alpha)
 //{
 //    //printdbg("alpha=%6.3f\n", (double)alpha);
 //    float ooa = 1.0f - alpha;
-//    __fvec4 tmp1, tmp2;
+//    __f32_vec4 tmp1, tmp2;
 //    __asm__ __volatile__ (
 //        "shufps $0,%[alpha],%[alpha]\n\t"
 //        "shufps $0,%[ooa],%[ooa]\n\t"
@@ -213,7 +214,7 @@ void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 //    );
 //}
 //#else
-//static void fb_blend_pixel(uint8_t *pixel, __fvec4 fcolor, float alpha)
+//static void fb_blend_pixel(uint8_t *pixel, __f32_vec4 fcolor, float alpha)
 //{
 //    float ooa = 1.0f - alpha;
 //    pixel[0] = fcolor[0] * alpha + apixel[0] * ooa;
@@ -283,7 +284,7 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
 
     fb_update_dirty(x0, y0, x1, y1);
 
-    __fvec4 fcolor = {
+    __f32_vec4 fcolor = {
         float(color & 0xFF),
         float((color >> 8) & 0xFF),
         float((color >> 16) & 0xFF),

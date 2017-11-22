@@ -282,7 +282,7 @@ struct Elf64_Dyn {
 
 #define R_AMD64_GOT32       3   // word32  G + A
 #define R_AMD64_PLT32       4   // word32  L + A - P
-#define R_AMD64_COPY        5   // None    Refer to the explanation following this table.
+#define R_AMD64_COPY        5   // None    Refer to the explanation
 
 #define R_AMD64_GLOB_DAT    6   // word64  S
 #define R_AMD64_JUMP_SLOT   7   // word64  S
@@ -298,7 +298,7 @@ struct Elf64_Dyn {
 
 #define R_AMD64_REX_GOTPCRELX   42  // ?
 
-static inline unsigned long elf64_hash(unsigned char const *name)
+static __always_inline unsigned long elf64_hash(unsigned char const *name)
 {
     unsigned long h = 0, g;
     while (*name) {

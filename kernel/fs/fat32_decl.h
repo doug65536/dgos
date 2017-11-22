@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 
 // This is included by the bootloader
 
@@ -182,7 +183,7 @@ struct filename_info_t {
     uint8_t extension_length;
 };
 
-static inline void fat32_parse_bpb(fat32_bpb_data_t *bpb,
+static __always_inline void fat32_parse_bpb(fat32_bpb_data_t *bpb,
                                    uint64_t partition_lba,
                                    char const *sector_buffer)
 {
