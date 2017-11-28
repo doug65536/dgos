@@ -94,11 +94,11 @@ reloc_entry:
 	incl %ecx
 	movl %ecx,dap+dap_lba
 	decl %ecx
-disk_error:
+disk_read:
 	movw $0x4200,%ax
 	mov $dap,%si
 	int $0x13
-	jc disk_error
+	jc disk_read
 
 	call clear_bss
 	movb %dl,boot_drive

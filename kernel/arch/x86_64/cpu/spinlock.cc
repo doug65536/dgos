@@ -116,6 +116,7 @@ void spinlock_unlock_noirq(spinlock_t *lock)
 {
     int intr_enabled = *lock >> 1;
     assert(*lock & 1);
+    atomic_barrier();
     *lock = 0;
     cpu_irq_toggle(intr_enabled);
     atomic_barrier();

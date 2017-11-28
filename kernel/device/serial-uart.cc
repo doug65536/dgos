@@ -5,6 +5,7 @@
 #include "irq.h"
 #include "threadsync.h"
 #include "cpu/control_regs.h"
+#include "nano_time.h"
 
 #define DEBUG_UART  1
 #if DEBUG_UART
@@ -313,25 +314,11 @@ public:
     ~uart_t();
 
 protected:
-    void init(ioport_t port, uint8_t port_irq, uint32_t baud);
+    void init(ioport_t port, uint8_t port_irq, uint32_t baud, bool use_irq);
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
 
     virtual isr_context_t *port_irq_handler(isr_context_t *ctx);
-
-    uint16_t queue_next(uint16_t value) const;
-
-    void rx_enqueue(uint16_t value);
-
-    bool is_rx_full() const;
-    bool is_tx_full() const;
-    bool is_tx_not_empty() const;
-    bool is_rx_not_empty() const;
-
-    uint16_t tx_peek_value() const;
-    void tx_take_value();
-
-    void send_some_locked();
 
     __always_inline void out(port_t ofs, uint8_t value) const;
     __always_inline void outs(port_t ofs, const void *value, size_t len) const;
@@ -352,6 +339,13 @@ protected:
     {
         reg.value = in(reg_t<T>::ofs);
         return reg;
+    }
+
+    __const
+    __always_inline uint16_t queue_next(
+            uint16_t value, uint8_t log2_buffer_size) const
+    {
+        return (value + 1) & ~-(1 << log2_buffer_size);
     }
 
     // Shadow registers
@@ -394,7 +388,7 @@ uart_t::uart_t()
     reg_scr.value = 0;
 }
 
-void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
+void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud, bool use_irq)
 {
     io_base = port;
     irq = port_irq;
@@ -468,7 +462,9 @@ void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
     reg_lcr.bits.baud_latch = 0;
     outp(reg_lcr);
 
+    //
     // Configure and reset FIFO
+
     reg_fcr.value = 0;
     reg_fcr.bits.fifo_en = 1;
     reg_fcr.bits.fifo_rx_reset = 1;
@@ -476,22 +472,35 @@ void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
     reg_fcr.bits.rx_trigger = uint8_t(fcr_rx_trigger_t::FIFO8);
     outp(reg_fcr);
 
-    // Configure interrupts
+    //
+    // Unmask interrupts
+
     reg_ier.value = 0;
-    reg_ier.bits.error = 1;
-    reg_ier.bits.status = 1;
-    reg_ier.bits.rx_avail = 1;
-    reg_ier.bits.tx_empty = 1;
+    reg_ier.bits.error = use_irq;
+    reg_ier.bits.status = use_irq;
+    reg_ier.bits.rx_avail = use_irq;
+    reg_ier.bits.tx_empty = use_irq;
     outp(reg_ier);
 
+    //
     // Configure modem control outputs
+
     reg_mcr.value = 0;
+
+    // Assert DTR, port is now open
     reg_mcr.bits.dtr = 1;
-    reg_mcr.bits.int_en = 1;
-    reg_mcr.bits.rts = 1;
+
+    // Enable IRQ if requested
+    reg_mcr.bits.out1 = use_irq;
+    reg_mcr.bits.int_en = use_irq;
+
+    // Don't assert RTS immediately when polling
+    reg_mcr.bits.rts = use_irq;
+
     outp(reg_mcr);
 
-    irq_setmask(irq, true);
+    if (use_irq)
+        irq_setmask(irq, true);
 }
 
 uart_t::~uart_t()
@@ -532,27 +541,34 @@ void uart_t::outs(port_t ofs, void const *value, size_t len) const
 class uart_async_t : public uart_t {
 public:
     uart_async_t();
+    ~uart_async_t();
 
     ssize_t write(void const *buf, size_t size, size_t min_write);
     ssize_t read(void *buf, size_t size, size_t min_read);
 
     void route_irq(int cpu);
 
-    ~uart_async_t();
-
 private:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     isr_context_t *port_irq_handler(isr_context_t *ctx);
 
-    void send_some_locked();
-
-    uint16_t queue_next(uint16_t value) const;
     void rx_enqueue(uint16_t value);
+
+    void send_some_locked();
 
     bool is_rx_full() const;
     bool is_tx_full() const;
-    bool is_tx_not_empty() const;
-    bool is_rx_not_empty() const;
+
+    __always_inline bool is_tx_empty() const
+    {
+        return tx_head == tx_tail;
+    }
+
+    __always_inline bool is_rx_empty() const
+    {
+        return rx_head == rx_tail;
+    }
+
     uint16_t tx_peek_value() const;
     void tx_take_value();
 
@@ -623,7 +639,7 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
         }
 
         tx_buffer[tx_head] = *data++;
-        tx_head = queue_next(tx_head);
+        tx_head = queue_next(tx_head, log2_buffer_size);
     }
 
     if (!sending_data)
@@ -639,11 +655,11 @@ ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
     cpu_scoped_irq_disable intr_was_enabled;
     spinlock_lock_noirq(&lock);
 
-    auto data = (char *)buf;
+    auto data = (uint8_t *)buf;
 
     size_t i;
     for (i = 0; i < size; ++i) {
-        if (!is_rx_not_empty()) {
+        if (is_rx_empty()) {
             // Reset buffer to maximize locality
             rx_head = 0;
             rx_tail = 0;
@@ -653,11 +669,11 @@ ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
 
             do {
                 condvar_wait_spinlock(&rx_not_empty, &lock);
-            } while (!is_rx_not_empty());
+            } while (is_rx_empty());
         }
 
         *data++ = rx_buffer[rx_tail];
-        rx_tail = queue_next(rx_tail);
+        rx_tail = queue_next(rx_tail, log2_buffer_size);
     }
 
     spinlock_unlock_noirq(&lock);
@@ -672,9 +688,9 @@ void uart_async_t::route_irq(int cpu)
 
 void uart_async_t::send_some_locked()
 {
-    sending_data = is_tx_not_empty();
+    sending_data = !is_tx_empty();
 
-    for (size_t i = 0; i < 16 && is_tx_not_empty(); ++i) {
+    for (size_t i = 0; i < 16 && !is_tx_empty(); ++i) {
         // Peek at next value without removing it from the queue
         uint16_t tx_value = tx_peek_value();
 
@@ -722,39 +738,24 @@ void uart_async_t::send_some_locked()
     }
 }
 
-uint16_t uart_async_t::queue_next(uint16_t value) const
-{
-    return (value + 1) & ~-(1 << log2_buffer_size);
-}
-
 void uart_async_t::rx_enqueue(uint16_t value)
 {
     rx_buffer[rx_head] = value;
-    rx_head = queue_next(rx_head);
+    rx_head = queue_next(rx_head, log2_buffer_size);
 }
 
 bool uart_async_t::is_rx_full() const
 {
     // Newly received bytes are placed at rx_head
     // Stream reads take bytes from rx_tail
-    return queue_next(rx_head) == rx_tail;
+    return queue_next(rx_head, log2_buffer_size) == rx_tail;
 }
 
 bool uart_async_t::is_tx_full() const
 {
     // Stream writes place bytes at tx_head
     // Transmit takes bytes from tx_tail
-    return queue_next(tx_head) == tx_tail;
-}
-
-bool uart_async_t::is_tx_not_empty() const
-{
-    return tx_head != tx_tail;
-}
-
-bool uart_async_t::is_rx_not_empty() const
-{
-    return rx_head != rx_tail;
+    return queue_next(tx_head, log2_buffer_size) == tx_tail;
 }
 
 uint16_t uart_async_t::tx_peek_value() const
@@ -764,7 +765,7 @@ uint16_t uart_async_t::tx_peek_value() const
 
 void uart_async_t::tx_take_value()
 {
-    tx_tail = queue_next(tx_tail);
+    tx_tail = queue_next(tx_tail, log2_buffer_size);
 }
 
 isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
@@ -825,14 +826,39 @@ isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
 // Polling driven synchronous UART
 
 class uart_poll_t : public uart_t {
+public:
+    uart_poll_t();
+
     void init(ioport_t port, uint8_t port_irq, uint32_t baud);
     virtual ssize_t write(const void *buf, size_t size, size_t min_write);
     virtual ssize_t read(void *buf, size_t size, size_t min_read);
+
+private:
+    bool is_rx_full() const;
+
+    __always_inline bool is_rx_empty() const
+    {
+        return rx_tail == rx_head;
+    }
+
+    uint8_t rx_dequeue();
+    void rx_enqueue(uint8_t value);
+
+    static constexpr uint8_t log2_buffer_size = 7;
+    uint8_t rx_buffer[1 << log2_buffer_size];
+    uint8_t rx_head;
+    uint8_t rx_tail;
 };
+
+uart_poll_t::uart_poll_t()
+    : rx_head(0)
+    , rx_tail(0)
+{
+}
 
 void uart_poll_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
 {
-    uart_t::init(port, port_irq, baud);
+    uart_t::init(port, port_irq, baud, false);
 }
 
 ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
@@ -867,14 +893,69 @@ ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
         // Fill the FIFO or send the remainder
         size_t block_size = min(size_t(fifo_size), size - i);
 
-        outs(port_t::DAT, buf + i, block_size);
+        outs(port_t::DAT, (char*)buf + i, block_size);
         i += block_size;
     }
+
+    return size;
 }
 
 ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read)
 {
+    // First drain the buffer
+    size_t i = 0;
 
+    uint8_t *rxbuf = (uint8_t*)buf;
+
+    while (i < size && !is_rx_empty())
+        rxbuf[i++] = rx_dequeue();
+
+    // +------------+-----------+
+    // | Rate (cps) | time/byte |
+    // +------------+-----------+
+    // |        240 |    4.1 ms |
+    // |        960 |    1.0 ms |
+    // |       1920 |    520 us |
+    // |       3840 |    260 us |
+    // |      11520 |     65 us |
+    // |          n |  1e6/n us |
+    // +------------+-----------+
+
+    while (i < size) {
+        inp(reg_lsr);
+
+        if (reg_lsr.bits.rx_data) {
+            // Receive incoming byte
+            ((uint8_t*)buf)[i++] = in(port_t::DAT);
+        } else if (!reg_mcr.bits.rts) {
+            // Raise RTS
+            reg_mcr.bits.rts = 1;
+            outp(reg_mcr);
+        } else if (i >= min_read) {
+            // We've read enough, don't poll
+            break;
+        } else {
+            pause();
+        }
+    }
+
+    // Drop RTS when not in read function
+    reg_mcr.bits.rts = 0;
+    outp(reg_mcr);
+
+    return 0;
+}
+
+bool uart_poll_t::is_rx_full() const
+{
+    return queue_next(rx_head, log2_buffer_size) == rx_tail;
+}
+
+uint8_t uart_poll_t::rx_dequeue()
+{
+    uint8_t value = rx_buffer[rx_tail];
+    rx_tail = queue_next(rx_tail, log2_buffer_size);
+    return value;
 }
 
 static uart_poll_t debug_uart;
@@ -891,5 +972,6 @@ uart_dev_t *uart_dev_t::open(size_t id, bool simple)
         return id < uart_defs::uarts.size()
                 ? uart_defs::uarts[id].get()
                 : nullptr;
+    uart_defs::debug_uart.init(0x3F8, 4, 115200);
     return &uart_defs::debug_uart;
 }

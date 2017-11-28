@@ -9,6 +9,8 @@ void write_debug_str_set_handler(write_debug_str_handler_t handler)
 
 int write_debug_str(char const *str, intptr_t len)
 {
-    return write_debug_str_vec(str, len);
+    if (write_debug_str_vec)
+        return write_debug_str_vec(str, len);
+    return -1;
 }
 

@@ -29,7 +29,7 @@ struct bios_regs_t {
         return eflags_out & (1 << 0);
     }
 
-    uint16_t ah_if_carry() const
+    uint8_t ah_if_carry() const
     {
         if (flags_CF())
             return (eax >> 8) & 0xFF;

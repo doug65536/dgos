@@ -1,2 +1,0 @@
-ldsym "bin/bochs-symbols"
-lb "elf64_run"

@@ -1732,11 +1732,25 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 //
 // Public API
 
-int mpresent(uintptr_t addr)
+int mpresent(uintptr_t addr, size_t size)
 {
     unsigned path[4];
     pte_t *ptes[4];
-    return addr_present(addr, path, ptes) == 0x0F;
+
+    do {
+        if (addr_present(addr, path, ptes) != 0x0F)
+            return false;
+
+        uintptr_t remainder = ((addr + PAGE_SIZE) & -PAGE_SIZE) - addr;
+
+        if (remainder >= size)
+            break;
+
+        addr += remainder;
+        size -= remainder;
+    } while (size);
+
+    return true;
 }
 
 void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)

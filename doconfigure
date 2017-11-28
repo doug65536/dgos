@@ -1,0 +1,5 @@
+#!/bin/bash
+
+scriptroot="$(cd "$(dirname "$0")" && pwd)"
+CFLAGS="-nostdlib -nostartfiles" CXXFLAGS=$CFLAGS LDFLAGS=$CFLAGS "$scriptroot/configure" --host=x86_64-elf  "$@"
+

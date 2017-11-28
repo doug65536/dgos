@@ -29,6 +29,9 @@ static idt_entry_64_t idt[256];
 static irq_dispatcher_handler_t irq_dispatcher_vec;
 static idt_unhandled_exception_handler_t unhandled_exception_handler_vec;
 
+uint32_t xsave_supported_states;
+uint32_t xsave_enabled_states;
+
 static format_flag_info_t const cpu_eflags_info[] = {
     { "ID",   EFLAGS_ID_BIT,   1, 0 },
     { "VIP",  EFLAGS_VIP_BIT,  1, 0 },
@@ -111,6 +114,43 @@ static format_flag_info_t const cpu_fpusw_info[] = {
     { "C3(z)",  FPUSW_C3_BIT, 1, 0 },
     { "B",      FPUSW_B_BIT,  1, 0 },
     { 0,        -1,           0, 0 }
+};
+
+static char const reserved_exception[] = "Reserved";
+
+static char const * const exception_names[] = {
+    "#DE Divide Error",
+    "#DB Debug",
+    "#NM NMI",
+    "#BP Breakpoint,",
+    "#OF Overflow",
+    "#BR BOUND Range Exceeded",
+    "#UD Invalid Opcode",
+    "#NM Device Not Available",
+    "#DF Double Fault",
+    reserved_exception,
+    "#TS Invalid TSS",
+    "#NP Segment Not Present",
+    "#SS Stack Fault",
+    "#GP General Protection",
+    "#PF Page Fault",
+    reserved_exception,
+    "#MF Floating-Point Error",
+    "#AC Alignment Check",
+    "#MC Machine Check",
+    "#XM SIMD",
+    "#VE Virtualization",
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception,
+    reserved_exception
 };
 
 typedef void (*isr_entry_t)(void);
@@ -211,30 +251,34 @@ void idt_xsave_detect(int ap)
 
     cpu_scoped_irq_disable intr_was_enabled;
 
+    cpu_has_fsgsbase = cpuid_has_fsgsbase();
+
     while (cpuid_has_xsave()) {
         cpuid_t info;
 
         // Enable XSAVE
-        cpu_cr4_change_bits(0, CR4_OSXSAVE);
+//        cpu_cr4_change_bits(0, CR4_OSXSAVE);
 
-        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
-            break;
+//        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
+//            break;
 
-        uint64_t supported_states = ((uint64_t)info.edx << 32) | info.eax;
+//        xsave_supported_states = ((uint64_t)info.edx << 32) | info.eax;
 
-        uint64_t wanted_states = XCR0_X87 |
-                XCR0_SSE | XCR0_AVX |
-                XCR0_AVX512_OPMASK |
-                XCR0_AVX512_UPPER |
-                XCR0_AVX512_XREGS;
+//        uint32_t wanted_states = XCR0_X87 |
+//                XCR0_SSE | XCR0_AVX |
+//                XCR0_AVX512_OPMASK |
+//                XCR0_AVX512_UPPER |
+//                XCR0_AVX512_XREGS;
 
-        uint64_t enabled_states = wanted_states & supported_states;
+//        xsave_enabled_states = wanted_states & xsave_supported_states;
 
-        // Change enabled XSAVE features
-        cpu_xcr_change_bits(0, supported_states, enabled_states);
+//        // Change enabled XSAVE features
+//        cpu_xcr_change_bits(0, xsave_supported_states, xsave_enabled_states);
 
-        if (ap)
-            break;
+//        if (ap)
+//            break;
+
+        printk("Detecting xsave support\n");
 
         // Get size of save area
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
@@ -242,7 +286,6 @@ void idt_xsave_detect(int ap)
 
         sse_context_save = isr_save_xsave;
         sse_context_restore = isr_restore_xrstor;
-        cpu_has_fsgsbase = cpuid_has_fsgsbase();
 
         // Store size of save area
         assert(info.ebx < UINT16_MAX);
@@ -444,6 +487,32 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
     return nullptr;
 }
 
+static void stack_trace(isr_context_t *ctx,
+                        void (*cb)(uintptr_t rbp, uintptr_t rip))
+{
+    uintptr_t *frame_ptr = (uintptr_t*)ISR_CTX_REG_RBP(ctx);
+
+    uintptr_t frame_rbp;
+    uintptr_t frame_rip;
+
+    do {
+        if (!mpresent(uintptr_t(frame_ptr), sizeof(uintptr_t) * 2))
+            return;
+
+        frame_rbp = frame_ptr[0];
+        frame_rip = frame_ptr[1];
+
+        cb(frame_rbp, frame_rip);
+
+        frame_ptr = (uintptr_t*)frame_rbp;
+    } while (frame_rbp);
+}
+
+static void dump_frame(uintptr_t rbp, uintptr_t rip)
+{
+    printk("at rbp=%016zx rip=%016zx\n", rbp, rip);
+}
+
 static void dump_context(isr_context_t *ctx, int to_screen)
 {
     char fmt_buf[64];
@@ -469,43 +538,6 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
     static char const *seg_names[] = {
         "ds", "es", "fs", "gs"
-    };
-
-    static char const reserved_exception[] = "Reserved";
-
-    static char const * const exception_names[] = {
-        "#DE Divide Error",
-        "#DB Debug",
-        "#NM NMI",
-        "#BP Breakpoint,",
-        "#OF Overflow",
-        "#BR BOUND Range Exceeded",
-        "#UD Invalid Opcode",
-        "#NM Device Not Available",
-        "#DF Double Fault",
-        reserved_exception,
-        "#TS Invalid TSS",
-        "#NP Segment Not Present",
-        "#SS Stack Fault",
-        "#GP General Protection",
-        "#PF Page Fault",
-        reserved_exception,
-        "#MF Floating-Point Error",
-        "#AC Alignment Check",
-        "#MC Machine Check",
-        "#XM SIMD",
-        "#VE Virtualization",
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception,
-        reserved_exception
     };
 
     //
@@ -605,11 +637,11 @@ static void dump_context(isr_context_t *ctx, int to_screen)
              fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%12zx\n",
+    printdbg("fsbase=%16zx\n",
              (uintptr_t)ctx->gpr->fsbase);
 
     // gsbase
-    printdbg("gsbase=%12lx\n",
+    printdbg("gsbase=%16lx\n",
              msr_get(MSR_GSBASE));
 
     printdbg("-------------------------------------------\n");
@@ -732,6 +764,8 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
     if (ctx->gpr->info.interrupt == INTR_EX_GPF)
         apic_dump_regs(0);
+
+    stack_trace(ctx, dump_frame);
 }
 
 isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
@@ -743,6 +777,15 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
         if (handled_ctx)
             return handled_ctx;
     }
+
+    char const *name = ctx->gpr->info.interrupt < countof(exception_names)
+            ? exception_names[ctx->gpr->info.interrupt]
+            : nullptr;
+
+    printk("\nUnhandled exception 0x%zx (%s) at RIP=%p\n",
+           ctx->gpr->info.interrupt,
+           name ? name : "??",
+           (void*)ctx->gpr->iret.rip);
 
     dump_context(ctx, 1);
     cpu_debug_break();

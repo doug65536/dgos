@@ -1887,7 +1887,7 @@ template<typename T>
 bool gdb_cpu_ctrl_t::breakpoint_write_target(
         uintptr_t addr, T value, T* old_value, uintptr_t page_dir)
 {
-    if (!mpresent(addr))
+    if (!mpresent(addr, sizeof(T)))
         return false;
 
     uintptr_t orig_pagedir = cpu_get_page_directory();

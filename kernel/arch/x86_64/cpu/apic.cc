@@ -24,6 +24,7 @@
 #include "mm.h"
 #include "vector.h"
 #include "bootinfo.h"
+#include "nano_time.h"
 
 #define ENABLE_ACPI 1
 
@@ -331,9 +332,6 @@ static vector<mp_bus_irq_mapping_t> bus_irq_list;
 static uint8_t bus_irq_to_mapping[64];
 
 static uint64_t apic_timer_freq;
-static uint64_t rdtsc_mhz;
-static uint64_t clk_to_ns_numer;
-static uint64_t clk_to_ns_denom;
 
 static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
@@ -346,6 +344,13 @@ static uint64_t ioapic_msi_alloc_map[] = {
     0x0000000000000000L,
     0x8000000000000000L
 };
+
+
+static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg);
+static void ioapic_write(mp_ioapic_t *ioapic,
+                             uint32_t reg, uint32_t value);
+
+static mp_ioapic_t *ioapic_from_gsi(int gsi);
 
 static uint8_t ioapic_next_irq_base = 16;
 
@@ -1072,6 +1077,7 @@ static acpi_fadt_t acpi_fadt;
 
 static uint64_t acpi_rsdt_addr;
 static uint64_t acpi_rsdt_len;
+static uint8_t acpi_rsdt_ptrsz;
 
 int acpi_have8259pic(void)
 {
@@ -1152,20 +1158,27 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
     for ( ; ent < end;
           ent = (acpi_madt_ent_t*)((char*)ent + ent->ioapic.hdr.record_len)) {
+        ACPI_TRACE("FADT record, type=%x ptr=%p, len=%u\n",
+                   ent->hdr.entry_type, (void*)ent,
+                   ent->ioapic.hdr.record_len);
         switch (ent->hdr.entry_type) {
         case ACPI_MADT_REC_TYPE_LAPIC:
             if (apic_id_count < countof(apic_id_list)) {
+                ACPI_TRACE("Found LAPIC, ID=%d\n", ent->lapic.apic_id);
+
                 // If processor is enabled
-                if (ent->lapic.flags == 1)
+                if (ent->lapic.flags == 1) {
                     apic_id_list[apic_id_count++] = ent->lapic.apic_id;
-                else
+                } else {
                     ACPI_TRACE("Disabled processor detected\n");
+                }
             } else {
                 ACPI_ERROR("Too many CPU packages! Dropped one\n");
             }
             break;
 
         case ACPI_MADT_REC_TYPE_IOAPIC:
+            ACPI_TRACE("IOAPIC found\n");
             if (ioapic_count < countof(ioapic_list)) {
                 mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
                 ioapic->addr = ent->ioapic.addr;
@@ -1184,11 +1197,22 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
                 ioapic->vector_count = entries;
                 ioapic->base_intr = ioapic_alloc_vectors(entries);
+
+                ACPI_TRACE("IOAPIC registered, id=%u, addr=%u, irqbase=%d,"
+                           " entries=%u\n",
+                           ioapic->id, ioapic->addr, ioapic->irq_base,
+                           ioapic->vector_count);
+            } else {
+                ACPI_TRACE("Too many IOAPICs!\n");
             }
             break;
 
         case ACPI_MADT_REC_TYPE_IRQ:
+        {
+            ACPI_TRACE("Got Interrupt redirection table\n");
             if (bus_irq_list.empty()) {
+                ACPI_TRACE("Initially assuming 1-to-1 mapping\n");
+
                 // Populate bus_irq_list with 16 legacy ISA IRQs
                 for (int i = 0; i < 16; ++i) {
                     mp_bus_irq_mapping_t mapping{};
@@ -1197,6 +1221,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                     mapping.irq = i;
                     mapping.flags = ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI |
                             ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE;
+                    mapping.ioapic_id = ioapic_from_gsi(i)->id;
                     isa_irq_lookup[i] = i;
                     bus_irq_list.push_back(mapping);
                 }
@@ -1206,8 +1231,18 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
             mapping.bus = ent->irq_src.bus;
             mapping.irq = ent->irq_src.irq_src;
             mapping.flags = ent->irq_src.flags;
+            mapping.ioapic_id = ioapic_from_gsi(ent->irq_src.gsi)->id;
             isa_irq_lookup[ent->irq_src.irq_src] = ent->irq_src.gsi;
+
+            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u\n",
+                       mapping.irq, ent->irq_src.gsi);
+
             break;
+        }
+        default:
+            ACPI_TRACE("Unrecognized FADT record\n");
+            break;
+
         }
     }
 }
@@ -1237,10 +1272,14 @@ static bool acpi_find_rsdp(void *start, size_t len)
                     checksum_bytes((char*)&rsdp2->rsdp1,
                                    sizeof(rsdp2->rsdp1)) == 0) {
                 if (rsdp2->xsdt_addr_lo | rsdp2->xsdt_addr_hi) {
+                    ACPI_TRACE("Found 64-bit XSDT\n");
                     acpi_rsdt_addr = rsdp2->xsdt_addr_lo |
                             ((uint64_t)rsdp2->xsdt_addr_hi << 32);
+                    acpi_rsdt_ptrsz = sizeof(uint64_t);
                 } else {
+                    ACPI_TRACE("Found 32-bit RSDT\n");
                     acpi_rsdt_addr = rsdp2->rsdp1.rsdt_addr;
+                    acpi_rsdt_ptrsz = sizeof(uint32_t);
                 }
 
                 acpi_rsdt_len = rsdp2->length;
@@ -1258,6 +1297,7 @@ static bool acpi_find_rsdp(void *start, size_t len)
             // Check checksum
             if (checksum_bytes((char*)rsdp, sizeof(*rsdp)) == 0) {
                 acpi_rsdt_addr = rsdp->rsdt_addr;
+                acpi_rsdt_ptrsz = sizeof(uint32_t);
 
                 // Leave acpi_rsdt_len 0 in this case, it is
                 // handled later
@@ -1339,8 +1379,13 @@ static void acpi_parse_rsdt()
            (void*)rsdp_ptrs, (void*)rsdp_end);
 
     for (uint32_t *rsdp_ptr = rsdp_ptrs;
-         rsdp_ptr < rsdp_end; ++rsdp_ptr) {
-        uint32_t hdr_addr = *rsdp_ptr;
+         rsdp_ptr < rsdp_end; rsdp_ptr += (acpi_rsdt_ptrsz >> 2)) {
+        uint64_t hdr_addr;
+
+        if (acpi_rsdt_ptrsz == sizeof(uint32_t))
+            hdr_addr = *rsdp_ptr;
+        else
+            hdr_addr = *(uint64_t*)rsdp_ptr;
 
         acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
                 mmap((void*)(uintptr_t)hdr_addr,
@@ -1506,9 +1551,17 @@ static void mp_parse_fps()
                 // Allocate vectors, assign range to IOAPIC
                 ioapic->vector_count = ioapic_intr_count;
                 ioapic->base_intr = ioapic_alloc_vectors(
-                            ioapic_intr_count);;
+                            ioapic_intr_count);
 
                 ioapic->lock = 0;
+
+                // Mask all IRQs
+                for (size_t i = 0; i < ioapic_intr_count; ++i) {
+                    uint32_t ent = ioapic_read(
+                                ioapic, IOAPIC_RED_LO_n(i));
+                    ent |= IOAPIC_REDLO_MASKIRQ;
+                    ioapic_write(ioapic, IOAPIC_RED_LO_n(i), ent);
+                }
             }
             entry = (uint8_t*)(entry_ioapic + 1);
             break;
@@ -1926,19 +1979,49 @@ int apic_init(int ap)
     if (ap) {
         printk("Configuring APIC timer\n");
         apic_configure_timer(APIC_LVT_DCR_BY_1,
-                             apic_timer_freq / 60,
+                             apic_timer_freq / 20,
                              APIC_LVT_TR_MODE_PERIODIC,
                              INTR_APIC_TIMER);
     }
 
-    apic_dump_regs(ap);
+    //apic_dump_regs(ap);
 
     return 1;
 }
 
 static void apic_detect_topology_amd(void)
 {
+    cpuid_t info;
 
+    if (unlikely(!cpuid(&info, 1, 0)))
+        return;
+
+    topo_thread_count = (info.ebx >> 16) & 0xFF;
+
+    if (cpuid(&info, 0x80000008, 0)) {
+        // First check ECX bits 12 to 15,
+        // if it is not zero, then it contains "core_bits".
+        // Otherwise, use ECX bits 0 to 7 to determine the number of cores,
+        // round it up to the next power of 2
+        // and use it to determine "core_bits".
+
+        topo_core_bits = (info.ecx >> 12) & 0xF;
+
+        if (topo_core_bits == 0) {
+            topo_core_count = info.ecx & 0xFF;
+            topo_core_bits = bit_log2(topo_core_count);
+        }
+
+        topo_thread_bits = bit_log2(topo_thread_count >> topo_core_bits);
+        topo_thread_count = 1 << topo_thread_bits;
+    } else {
+        topo_core_count = topo_thread_count;
+        topo_core_bits = bit_log2(topo_core_count);
+        topo_thread_bits = 0;
+        topo_thread_count = 1;
+    }
+
+    topo_cpu_count = apic_id_count;
 }
 
 static void apic_detect_topology_intel(void)
@@ -1992,9 +2075,41 @@ static void apic_detect_topology_intel(void)
             topo_core_count * topo_thread_count;
 }
 
+__aligned(16) char const vendor_intel[16] = "GenuineIntel";
+__aligned(16) char const vendor_amd[16] = "AuthenticAMD";
+
 static void apic_detect_topology(void)
 {
-    apic_detect_topology_intel();
+    cpuid_t info;
+
+    // Assume 1 thread per core, 1 core per package, 1 package per cpu
+    // until proven otherwise
+    topo_core_bits = 0;
+    topo_core_count = 1;
+    topo_thread_bits = 0;
+    topo_thread_count = 1;
+    topo_cpu_count = apic_id_count;
+
+    if (unlikely(!cpuid(&info, 0, 0)))
+        return;
+
+    union vendor_str_t {
+        char txt[16];
+        uint32_t regs[4];
+    } vendor_str;
+
+    vendor_str.regs[0] = info.ebx;
+    vendor_str.regs[1] = info.edx;
+    vendor_str.regs[2] = info.ecx;
+    vendor_str.regs[3] = 0;
+
+    printk("Detected CPU: %s\n", vendor_str.txt);
+
+    if (!memcmp(vendor_intel, vendor_str.txt, 16)) {
+        apic_detect_topology_intel();
+    } else if (!memcmp(vendor_amd, vendor_str.txt, 16)) {
+        apic_detect_topology_amd();
+    }
 }
 
 void apic_start_smp(void)
@@ -2521,6 +2636,18 @@ static void ioapic_map(mp_ioapic_t *ioapic,
 //
 //
 
+static mp_ioapic_t *ioapic_from_gsi(int gsi)
+{
+    for (unsigned i = 0; i < ioapic_count; ++i) {
+        mp_ioapic_t *ioapic = ioapic_list + i;
+        if (gsi >= ioapic->irq_base &&
+                gsi < ioapic->irq_base + ioapic->vector_count) {
+            return ioapic;
+        }
+    }
+    return nullptr;
+}
+
 static mp_ioapic_t *ioapic_from_intr(int intr)
 {
     for (unsigned i = 0; i < ioapic_count; ++i) {
@@ -2530,7 +2657,7 @@ static mp_ioapic_t *ioapic_from_intr(int intr)
             return ioapic;
         }
     }
-    return 0;
+    return nullptr;
 }
 
 static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)

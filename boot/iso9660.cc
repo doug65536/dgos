@@ -1,8 +1,9 @@
 #include "iso9660.h"
+#include "malloc.h"
 #include "bootsect.h"
 #include "paging.h"
-#include "malloc.h"
 #include "string.h"
+#include "cpu.h"
 #include "fs.h"
 #include "elf64.h"
 
@@ -469,5 +470,5 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     fs_api.boot_close = iso9660_boot_close;
     fs_api.boot_pread = iso9660_boot_pread;
 
-    elf64_run("dgos-kernel");
+    elf64_run(cpu_choose_kernel());
 }

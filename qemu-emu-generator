@@ -42,6 +42,8 @@ do
 						' \' $'\n' $'\t\t' \
 						"\$(QEMU_EXTRA)" \
 						$'\n' $'\n' \
+						'.PHONY: ' "$rt-$np-$fs-$sc-$em" \
+						$'\n' $'\n' \
 						>> qemu-emu.mk
 				done
 			done

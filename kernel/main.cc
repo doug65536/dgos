@@ -58,15 +58,15 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 #define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
-#define ENABLE_REGISTER_THREAD      1
+#define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
-#define ENABLE_CTXSW_STRESS_THREAD  1
-#define ENABLE_STRESS_HEAP_THREAD   1
+#define ENABLE_CTXSW_STRESS_THREAD  0
+#define ENABLE_STRESS_HEAP_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   1
 #define ENABLE_FILESYSTEM_TEST      0
 
 #define ENABLE_STRESS_HEAP_SMALL    1
-#define ENABLE_STRESS_HEAP_LARGE    0
+#define ENABLE_STRESS_HEAP_LARGE    1
 #define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
@@ -97,6 +97,8 @@ static int ctx_sw_thread(void *p)
 static int shell_thread(void *p)
 {
     (void)p;
+
+    printk("Shell running\n");
 
     for (;;) {
         keyboard_event_t event = keybd_waitevent();
@@ -891,7 +893,7 @@ static int init_thread(void *p)
     }
 #endif
 
-    auto com1 = uart_dev_t::open(0);
+    auto com1 = uart_dev_t::open(0, false);
     com1->write("Hello!", 6, 6);
 
     vector<char> input;

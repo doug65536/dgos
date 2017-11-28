@@ -1,4 +1,0 @@
-u switch-mode
-ldsym global "bin/bochs-kernel-symbols"
-lb "cpu_debug_break"
-c

@@ -250,7 +250,7 @@ size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
                          size_t count_limit, uint8_t log2_boundary);
 
 // Return true if the address is present
-int mpresent(uintptr_t addr);
+int mpresent(uintptr_t addr, size_t size);
 
 /// Lock all process address space in memory
 #define MCL_CURRENT

@@ -1,4 +1,13 @@
+../bochs-debugger-boot-commands
+../bochs-debugger-commands
+../bochs-fat-config.bxrc
+../bochs-iso-config.bxrc
 arch/x86_64/cpu/asm_constants.h
+arch/x86_64/cpu/control_regs_constants.h
+arch/x86_64/entry.S
+arch/x86_64/nano_time.h
+device/i350.bits
+device/i350.cc
 syscall/syscall_helper.h
 syscall/syscall_helper.cc
 ../AUTHORS
@@ -46,7 +55,6 @@ kernel.creator
 .gitignore
 arch/cpu.h
 arch/x86_64/buildtool/keyb_tool
-arch/x86_64/entry.s
 arch/x86_64/module.ld
 arch/x86_64/bios_data.h
 arch/x86_64/.gitignore

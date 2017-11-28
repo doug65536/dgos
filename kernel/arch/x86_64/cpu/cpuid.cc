@@ -1,6 +1,8 @@
+#define CPUID_CC
 #include "cpuid.h"
 #include "string.h"
 #include "likely.h"
+#include "control_regs_constants.h"
 
 // max_leaf[0] holds max supported leaf
 // max_leaf[1] holds max supported extended leaf

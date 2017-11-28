@@ -24,5 +24,11 @@ void sleep(int ms);
 
 uint64_t nano_time(void);
 
+__const
+uint64_t nano_time_ns(uint64_t a, uint64_t b);
+
+__const
+uint64_t nano_time_add(uint64_t after, uint64_t ns);
+
 void time_ofday_set_handler(time_ofday_handler_t handler);
 time_of_day_t time_ofday(void);

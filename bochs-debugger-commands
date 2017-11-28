@@ -1,0 +1,3 @@
+u switch-mode
+ldsym global "kernel-avx2.sym"
+lb "cpu_debug_break"

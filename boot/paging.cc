@@ -4,7 +4,7 @@
 #include "screen.h"
 #include "farptr.h"
 
-// Builds 64-bit page tables using far pointers in real mode
+// Builds 64-bit page tables
 //
 // Each page is 4KB and contains 512 64-bit entries
 // There are 4 levels of page tables
@@ -33,26 +33,26 @@ struct pte_ref_t {
 
 static uint16_t root_page_dir;
 
+static uint64_t *pte_ptr(uint16_t segment, uint16_t slot)
+{
+    return (uint64_t*)seg_to_ptr(segment) + slot;
+}
+
 // Read a 64-bit entry from the specified slot of the specified segment
 static uint64_t read_pte(uint16_t segment, uint16_t slot)
 {
-    uint64_t pte;
-    far_ptr_t ptr = far_ptr2(segment, slot * sizeof(pte));
-    far_copy_to(&pte, ptr, sizeof(pte));
-    return pte;
+    return *pte_ptr(segment, slot);
 }
 
 // Write a 64-bit entry to the specified slot of the specified segment
-static void write_pte(uint16_t segment, uint16_t slot, uint64_t pte)
+static void write_pte(uint16_t segment, uint16_t slot, pte_t pte)
 {
-    far_ptr_t ptr = far_ptr2(segment, slot * sizeof(pte));
-    far_copy_from(ptr, &pte, sizeof(pte));
+    *pte_ptr(segment, slot) = pte;
 }
 
 static void clear_page_table(uint16_t segment)
 {
-    for (uint16_t i = 0; i < 512; ++i)
-        write_pte(segment, i, 0);
+    memset(pte_ptr(segment, 0), 0, 512 * sizeof(pte_t));
 }
 
 static uint16_t allocate_page_table()
@@ -63,13 +63,13 @@ static uint16_t allocate_page_table()
 }
 
 // Returns with segment == 0 if it does mapping does not exist
-static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create,
+static pte_ref_t paging_find_pte(addr64_t linear_addr, bool create,
                                  uint8_t log2_pagesize = 12)
 {
     pte_ref_t ref;
     ref.segment = root_page_dir;
 
-    uint64_t pte;
+    pte_t pte;
 
     // Process the address bits from high to low
     // in groups of 9 bits
@@ -94,7 +94,7 @@ static pte_ref_t paging_find_pte(uint64_t linear_addr, uint16_t create,
             }
 
             //print_line("Creating page directory for %llx",
-            //           (uint64_t)(linear_addr >> shift) << shift);
+            //           (pte_t)(linear_addr >> shift) << shift);
 
             // Allocate a page table on first use
             next_segment = allocate_page_table();
@@ -137,10 +137,10 @@ static uint16_t paging_map_page(
     return 1;
 }
 
-void paging_alias_range(uint64_t alias_addr,
-                        uint64_t linear_addr,
-                        uint64_t size,
-                        uint64_t alias_flags)
+void paging_alias_range(addr64_t alias_addr,
+                        addr64_t linear_addr,
+                        size64_t size,
+                        pte_t alias_flags)
 {
     PAGING_TRACE("aliasing %llu bytes at lin %llx to physaddr %llx\n",
                  size, linear_addr, alias_addr);
@@ -214,13 +214,13 @@ void paging_init()
                      PTE_PRESENT | PTE_WRITABLE, 0);
 }
 
-void paging_modify_flags(uint64_t addr, uint64_t size,
-                         uint64_t clear, uint64_t set)
+void paging_modify_flags(addr64_t addr, size64_t size,
+                         pte_t clear, pte_t set)
 {
-    for (uint64_t offset = 0; offset < size; offset += PAGE_SIZE) {
+    for (addr64_t offset = 0; offset < size; offset += PAGE_SIZE) {
         pte_ref_t original = paging_find_pte(addr + offset, 0);
         if (original.segment) {
-            uint64_t pte = read_pte(original.segment, original.slot);
+            pte_t pte = read_pte(original.segment, original.slot);
             pte &= ~clear;
             pte |= set;
             write_pte(original.segment, original.slot, pte);

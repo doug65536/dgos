@@ -69,15 +69,19 @@
 void paging_init();
 uint32_t paging_root_addr();
 
+typedef uint64_t pte_t;
+typedef uint64_t addr64_t;
+typedef uint64_t size64_t;
+
 uint64_t paging_map_range(uint64_t linear_base,
         uint64_t length,
         uint64_t phys_addr,
         uint64_t pte_flags, uint16_t keep, uint8_t log2_pagesize = 12);
 
-void paging_alias_range(uint64_t alias_addr,
-                        uint64_t linear_addr,
-                        uint64_t size,
-                        uint64_t alias_flags);
+void paging_alias_range(addr64_t alias_addr,
+                        addr64_t linear_addr,
+                        size64_t size,
+                        pte_t alias_flags);
 
-void paging_modify_flags(uint64_t addr, uint64_t size,
-                         uint64_t clear, uint64_t set);
+void paging_modify_flags(addr64_t addr, size64_t size,
+                         pte_t clear, pte_t set);

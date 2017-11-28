@@ -176,8 +176,8 @@ idt_init:
     cmpl $32,%ecx
     jb 0b
 
-    movw $32 * 8 - 1,idtr_64
-    movw $idt,idtr_64 + 2
+    movw $32 * 8 - 1,idtr_64 + 6
+    movw $idt,idtr_64 + 8
 
     ret
 

@@ -14,12 +14,12 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
 static gdt_entry_combined_t gdt[] = {
     GDT_MAKE_EMPTY(),
-    
+
     // Must be in this order for syscall instruction
     // 64 bit kernel code and data
     GDT_MAKE_CODESEG64(0),
     GDT_MAKE_DATASEG64(0),
-    
+
     // Arbitrary
     // 32 bit kernel code and data
     GDT_MAKE_CODESEG32(0),
@@ -27,7 +27,7 @@ static gdt_entry_combined_t gdt[] = {
     // 16 bit kernel code and data
     GDT_MAKE_CODESEG16(0),
     GDT_MAKE_DATASEG16(0),
-    
+
     // Must be in this order for sysret instruction
     // 32 bit user code
     GDT_MAKE_CODESEG32(3),
@@ -35,9 +35,9 @@ static gdt_entry_combined_t gdt[] = {
     GDT_MAKE_DATASEG64(3),
     // 64 bit user code
     GDT_MAKE_CODESEG32(3),
-    
+
     GDT_MAKE_EMPTY(),
-    
+
     // CPU task selector
     GDT_MAKE_TSSSEG(0L, sizeof(tss_t))
 };
@@ -54,9 +54,9 @@ static tss_t *tss_list;
 void gdt_init(void)
 {
     table_register_64_t gdtr;
+    gdtr.limit = sizeof(gdt) - 1;
     uintptr_t gdt_addr = (uintptr_t)gdt;
     gdtr.base = gdt_addr;
-    gdtr.limit = sizeof(gdt) - 1;
     cpu_set_gdtr(gdtr);
 }
 

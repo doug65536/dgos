@@ -1,0 +1,41 @@
+
+-- I350_CTRL Device control register
+0 FD Full duplex (1=full)
+2 GIOMD GIO master enable
+6 SLU Set link up
+7 ILOS Invert loss-of-signal signal
+9:8 SPEED (0=10, 1=100, 2=1000, 3=undefined) Mbps
+11 FRCSPC Force speed
+12 FRCDPLX Force duplex
+16 SDP0_GPIEN General purpose interrupt detection enable for SDP0
+17 SDP1_GPIEN General purpose interrupt detection enable for SDP0
+18 SDP0_DATA SDP0 I/O pin data value
+19 SDP1_DATA SDP1 I/O pin data value
+20 ADVD3WUC D3Cold wakeup capability enable
+21 SDP0_WDE Use SDP0 as watchdog
+22 SDP0_IODIR Data direction for SDP0
+23 SDP1_IODIR Data direction for SDP1
+26 RST Software reset
+27 RFCE Receive flow control enable
+28 TFCE Transmit flow control enable
+29 DEV_RST Device reset
+30 VME VLAN mode enable
+31 PHY_RST PHY reset
+
+-- I350_STATUS Device status register
+0 FD Full duplex (1=full)
+1 LU Link up (1=up)
+3:2 LAN_ID LAN identifier for the MAC
+4 TXOFF Transmission paused due to flow control
+7:6 SPEED (0=10, 1=100, 2=1000, 3=undefined) Mbps
+9:8 ASDV Auto-speed detection value
+10 PHYRA PHY reset asserted
+17:14 NUM_VFS
+18 IOV_MODE VF enable bit
+19 GIO_MES GIO master enable status
+20 DEV_RST_SET Device reset set
+21 PF_RST_DONE Device reset completed
+31 MAC_CLK_GE MAC clock gating enabled
+
+
+

@@ -6,20 +6,26 @@
 
 #if defined(__GNUC__)
 
-#define __packed                __attribute__((packed))
-#define __const                 __attribute__((const))
-#define __pure                  __attribute__((pure))
-#define __aligned(n)            __attribute__((aligned(n)))
-#define __always_inline         __attribute__((always_inline)) inline
-#define __noreturn              __attribute__((noreturn))
-#define __used                  __attribute__((used))
-#define __returns_twice         __attribute__((returns_twice))
-#define __vector_size(n)        __attribute__((vector_size(n)))
-#define __noinline              __attribute__((noinline))
-#define __assume_aligned(n)     __attribute__((assume_aligned(n)))
-#define __printf_format(m,n)    __attribute__((format(printf, m, n)))
-#define __malloc                __attribute__((malloc))
-#define __section(name)         __attribute__((section(name)))
+#define __packed                __attribute__((__packed__))
+#define __const                 __attribute__((__const__))
+#define __pure                  __attribute__((__pure__))
+#define __aligned(n)            __attribute__((__aligned__(n)))
+#define __always_inline         __attribute__((__always_inline__)) inline
+#define __noreturn              __attribute__((__noreturn__))
+#define __used                  __attribute__((__used__))
+#define __returns_twice         __attribute__((__returns_twice__))
+#define __vector_size(n)        __attribute__((__vector_size__(n)))
+#define __noinline              __attribute__((__noinline__))
+#define __assume_aligned(n)     __attribute__((__assume_aligned__(n)))
+#define __printf_format(m,n)    __attribute__((__format__(printf, m, n)))
+#define __malloc                __attribute__((__malloc__))
+#define __section(name)         __attribute__((__section__(name)))
+
+#define __generic_target \
+    __attribute__((__target__( \
+            "no-sse3", "no-ssse3", "no-sse4.1", "no-sse4.2", \
+            "no-avx", "no-avx2" \
+    )))
 
 typedef int_fast64_t off_t;
 typedef __SIZE_TYPE__ size_t;

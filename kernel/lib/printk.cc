@@ -588,7 +588,7 @@ static intptr_t formatter(
                 case length_t:
                     // uptrdiff_t
                     flags.arg.uintptr_value =
-                            va_arg(ap, uptrdiff_t);
+                            va_arg(ap, uintptr_t);
                     break;
                 default:
                     RETURN_FORMATTER_ERROR(chars_written);
@@ -847,9 +847,9 @@ EXPORT void printk(char const *format, ...)
     va_start(ap, format);
     vprintdbg(format, ap);
     va_end(ap);
-    va_start(ap, format);
-    vprintk(format, ap);
-    va_end(ap);
+//    va_start(ap, format);
+//    vprintk(format, ap);
+//    va_end(ap);
 }
 
 EXPORT void vprintk(char const *format, va_list ap)

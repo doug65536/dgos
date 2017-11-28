@@ -6,6 +6,7 @@
 //  'S': Initialize SMP CPU
 //  'E': Early initialized device
 //  'T': SMP online
+//  'C': Constructors ran
 // from init thread, in this order:
 //  'D': Facilities needed by drivers
 //  'L': Late initialized device
@@ -22,6 +23,7 @@ enum struct callout_type_t : uint32_t {
     txt_dev = 'V',
     early_dev = 'E',
     smp_online = 'T',
+    constructors_ran = 'C',
 
     // from init_thread
     driver_base= 'D',

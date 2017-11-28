@@ -19,7 +19,7 @@
 void cpu_init(int ap)
 {
     (void)ap;
-    
+
     char const *feature_names[6];
     size_t feature_count = 0;
 
@@ -51,7 +51,7 @@ void cpu_init(int ap)
     if (cpuid_has_pcid()) {
         cr4_clr |= CR4_PCIDE;
     }
-    
+
     // Enable {RD|WR}{FS|GS}BASE instructions
     if (cpuid_has_fsgsbase()) {
         feature_names[feature_count++] = "FSGSBASE instructions";
@@ -68,15 +68,15 @@ void cpu_init(int ap)
         feature_names[feature_count++] = "No-execute paging";
         msr_adj_bit(MSR_EFER, 11, 1);
     }
-    
+
     // Configure syscall
     msr_set(MSR_FMASK, EFLAGS_AC | EFLAGS_DF | EFLAGS_TF | EFLAGS_IF);
     msr_set(MSR_LSTAR, (uint64_t)syscall_entry);
     msr_set_hi(MSR_STAR, GDT_SEL_KERNEL_CODE64 |
                (GDT_SEL_USER_CODE32 << 16));
-    
-    for (size_t i = 0; i < feature_count; ++i)
-        printdbg("CPU feature: %s\n", feature_names[i]);
+
+    //for (size_t i = 0; i < feature_count; ++i)
+    //    printdbg("CPU feature: %s\n", feature_names[i]);
 }
 
 //static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
@@ -101,15 +101,15 @@ void cpu_init_stage2(int ap)
 void cpu_hw_init(int ap)
 {
     printk("Initializing PIT\n");
-    
+
     // May need PIT nsleep early for APIC calibration
     pit8253_init();
 
     printk("Initializing APIC\n");
-    
+
     apic_init(ap);
 
-    
+
     // Initialize APIC, but fallback to 8259 if no MP tables
     if (!apic_enable()) {
         printk("Enabling 8259 PIC\n");
@@ -120,21 +120,21 @@ void cpu_hw_init(int ap)
     } else {
         panic("No IOAPICs, no MPS, and no 8259! Can't use IRQs! Halting.");
     }
-    
+
     printk("Initializing RTC\n");
-    
+
     cmos_init();
 
     printk("Enabling 8254 PIT\n");
-    
+
     pit8254_enable();
 
     printk("Enabling IRQs\n");
-    
+
     cpu_irq_enable();
 
     printk("Starting SMP\n");
-    
+
     apic_start_smp();
 }
 

@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-DUMPDIR = $(abs_top_builddir)/dump
+DUMPDIR = $(top_builddir)/dump
 
 BUILT_SOURCES = \
 	$(ZLIBSTATICLIB) \
@@ -18,7 +18,7 @@ BUILT_SOURCES = \
 #  -> Link bootiso-elf
 #  -> Link bootiso-bin
 # Build libkernel-sse41.a libkernel-avx libkernel-avx512
-#  -> Build kernel-elf
+#  -> Build kernel-*
 
 #LINKER_SEL = -fuse-ld=gold -z max-page-size=256
 LINKER_SEL =
@@ -41,7 +41,15 @@ bin_PROGRAMS = \
 	bootfat-bin \
 	bootiso-elf \
 	bootiso-bin \
-	kernel-elf
+	kernel-generic \
+	kernel-sse4 \
+	kernel-avx2
+
+KERNEL_SSE4_FLAGS = \
+	-msse -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2
+
+KERNEL_AVX2_FLAGS = \
+	$(KERNEL_SSE4_FLAGS) -mavx -mavx2 -msse2avx
 
 #user-hello
 
@@ -357,10 +365,10 @@ EXTRA_bootiso_bin_DEPENDENCIES = \
 bootiso_bin_LDADD = \
 	libbootsect.a
 
-# kernel-elf
+# kernel
 
-kernel_elf_SOURCES = \
-	kernel/arch/x86_64/entry.s \
+KERNEL_SOURCES_SHARED = \
+	kernel/arch/x86_64/entry.S \
 	kernel/arch/x86_64/cpu/isr.S \
 	kernel/arch/x86_64/cpu/except_asm.s \
 	kernel/arch/x86_64/cpu/syscall.S \
@@ -550,6 +558,7 @@ kernel_elf_SOURCES = \
 	kernel/device/e9debug.cc \
 	kernel/device/e9debug.h \
 	kernel/device/e9debug.h \
+	kernel/device/i350.cc \
 	kernel/device/ide.cc \
 	kernel/device/keyb8042.cc \
 	kernel/device/keyb8042.h \
@@ -582,7 +591,7 @@ kernel_elf_SOURCES = \
 	kernel/syscall/fd.cc \
 	kernel/syscall/mem.cc
 
-kernel_elf_INCLUDES = \
+KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/kernel \
 	-I$(top_srcdir)/kernel/lib \
 	-I$(top_srcdir)/kernel/net \
@@ -591,9 +600,8 @@ kernel_elf_INCLUDES = \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	-I$(EXTERNINCLUDEDIR)
 
-kernel_elf_CXXFLAGS = \
+KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__=0x00000001 \
-	$(kernel_elf_INCLUDES) \
 	-std=c++14 \
 	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -606,19 +614,10 @@ kernel_elf_CXXFLAGS = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
-kernel_elf_CCASFLAGS = \
+KERNEL_CCASFLAGS_SHARED = \
 	$(COMPILER_FLAGS)
 
-libkernel_sse41_a_SOURCES = \
-	kernel/arch/x86_64/cpu/nontemporal_sse4_1.cc
-
-libkernel_avx_a_SOURCES = \
-	kernel/arch/x86_64/cpu/nontemporal_avx.cc
-
-libkernel_avx512_a_SOURCES = \
-	kernel/arch/x86_64/cpu/nontemporal_avx512.cc
-
-kernel_elf_LDFLAGS = \
+KERNEL_LDFLAGS_SHARED = \
 	-Wl,-melf_x86_64 \
 	-Wl,-Map,$(top_builddir)/kernel.map \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
@@ -630,25 +629,84 @@ kernel_elf_LDFLAGS = \
 
 #-Wl,-export-dynamic
 
-EXTRA_kernel_elf_DEPENDENCIES = \
+EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
 	$(DUMPDIR) \
 	$(ZLIBSTATICLIB) \
 	$(ZLIBPUBLICINCLUDES)
 
-libkernel_sse41_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -msse4.1
-libkernel_avx_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -mavx
-libkernel_avx512_a_CXXFLAGS = $(kernel_elf_CXXFLAGS) -mavx512f
+libkernel_sse41_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) -msse4.1
+libkernel_avx_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) -mavx
+libkernel_avx512_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) -mavx512f
 
-kernel_elf_LDADD = \
+KERNEL_LDADD_SHARED = \
 	libkernel-sse41.a \
 	libkernel-avx.a \
 	libkernel-avx512.a \
 	$(ZLIBSTATICLIB)
 
-$(DUMPDIR)/kernel.dis: $(KERNEL)
-	mkdir -p $(@D)
-	objdump --disassemble --source $^ > $@
+# ----------------------------------------------------------------------------
+# architecture dependent libraries (need different flags)
+
+libkernel_sse41_a_SOURCES = \
+	kernel/arch/x86_64/cpu/nontemporal_sse4_1.cc
+
+libkernel_avx_a_SOURCES = \
+	kernel/arch/x86_64/cpu/nontemporal_avx.cc
+
+libkernel_avx512_a_SOURCES = \
+	kernel/arch/x86_64/cpu/nontemporal_avx512.cc
+
+# ----------------------------------------------------------------------------
+# kernel variations
+
+kernel_generic_SOURCES = $(KERNEL_SOURCES_SHARED)
+
+kernel_generic_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED)
+
+kernel_generic_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED)
+	$(KERNEL_INCLUDES_SHARED)
+
+kernel_generic_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED)
+
+kernel_generic_LDADD = $(KERNEL_LDADD_SHARED)
+
+EXTRA_kernel_generic_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+
+kernel_sse4_SOURCES = $(KERNEL_SOURCES_SHARED)
+
+kernel_sse4_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_SSE4_FLAGS)
+
+kernel_sse4_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED)$(KERNEL_SSE4_FLAGS)
+
+kernel_sse4_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_SSE4_FLAGS)
+
+kernel_sse4_LDADD = $(KERNEL_LDADD_SHARED)
+
+EXTRA_kernel_sse4_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+
+kernel_avx2_SOURCES = $(KERNEL_SOURCES_SHARED)
+
+kernel_avx2_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_AVX2_FLAGS)
+
+kernel_avx2_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_AVX2_FLAGS)
+
+kernel_avx2_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_AVX2_FLAGS)
+
+kernel_avx2_LDADD = $(KERNEL_LDADD_SHARED)
+
+EXTRA_kernel_avx2_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
 # ----------------------------------------------------------------------------
 # libc
@@ -832,7 +890,7 @@ test: test_compile
 # Misc make rules
 
 $(DUMPDIR):
-	mkdir -p $(abs_top_builddir)/dump
+	mkdir -p $(top_builddir)/dump
 
 include zlib.mk
 include symbols.mk
@@ -843,8 +901,12 @@ clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
 	rm -f $(top_builddir)/kernel.dis
-	rm -f $(top_builddir)/kernel.sym
-	rm -f $(top_builddir)/kernel.map
+	rm -f $(top_builddir)/kernel-generic.sym
+	rm -f $(top_builddir)/kernel-sse4.sym
+	rm -f $(top_builddir)/kernel-avx2.sym
+	rm -f $(top_builddir)/kernel-generic.map
+	rm -f $(top_builddir)/kernel-sse4.map
+	rm -f $(top_builddir)/kernel-avx2.map
 	rm -f $(top_builddir)/bootfat.sym
 	rm -f $(top_builddir)/bootfat.map
 	rm -f $(top_builddir)/bootiso.sym
@@ -864,7 +926,8 @@ distclean-local:
 
 generated_headers: \
 	$(top_srcdir)/kernel/device/nvmebits.h \
-	$(top_srcdir)/kernel/device/pcibits.h
+	$(top_srcdir)/kernel/device/pcibits.h \
+	$(top_srcdir)/kernel/device/i350bits.h
 
 .PHONY: generated_headers
 
@@ -877,6 +940,13 @@ $(top_srcdir)/kernel/device/nvmebits.h: \
 
 $(top_srcdir)/kernel/device/pcibits.h: \
 		$(top_srcdir)/kernel/device/pci.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/device/i350bits.h: \
+		$(top_srcdir)/kernel/device/i350.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
@@ -977,8 +1047,10 @@ QEMU_DEBUGCON = \
 	-mon qemu-monitor,mode=readline \
 	-device isa-debugcon,chardev=qemu-debug-out
 
+#-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server,nowait
+
 QEMU_SERIAL = \
-	-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server,nowait \
+	-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0 \
 	-serial chardev:qemu-serial-socket
 
 QEMU_COMMON = \
@@ -986,7 +1058,7 @@ QEMU_COMMON = \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
 	$(QEMU_NET) \
-	-no-shutdown -no-reboot -d unimp,guest_errors \
+	-no-shutdown -no-reboot -d unimp,guest_errors,pcall,cpu_reset \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS)
 
@@ -1010,7 +1082,8 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu kvm64
+QEMU_EMU_tcg = -cpu EPYC
+#kvm64
 
 #QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom
 QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
@@ -1024,7 +1097,87 @@ monitor-connect:
 	telnet localhost 7777
 
 # Generate emulators makefile
-$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am $(top_srcdir)/qemu-emu-generator
+$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
+		$(top_srcdir)/qemu-emu-generator
 	$(top_srcdir)/qemu-emu-generator
 
 -include qemu-emu.mk
+
+# ----------------------------------------------------------------------------
+# Bochs launcher
+
+BOCHS=bochs
+
+$(abs_top_builddir)/bochs-debugger-commands: \
+		$(top_srcdir)/bochs-debugger-commands
+	cp "$<" "$@"
+
+$(abs_top_builddir)/bochs-debugger-boot-commands: \
+		$(top_srcdir)/bochs-debugger-boot-commands
+	cp "$<" "$@"
+
+debug-iso-bochs: $(QEMU_IMAGE_iso) \
+		mbr.sym bootfat.sym \
+		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		$(top_srcdir)/bochs-iso-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/bochs-iso-config.bxrc \
+		-rc bochs-debugger-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-iso-bochs
+
+debug-fat-bochs: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym \
+		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		$(top_srcdir)/bochs-fat-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/bochs-fat-config.bxrc \
+		-rc bochs-debugger-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-fat-bochs
+
+debug-iso-bochs-boot: $(QEMU_IMAGE_iso) \
+		mbr.sym bootfat.sym \
+		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		$(top_srcdir)/bochs-iso-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-boot-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/bochs-iso-config.bxrc \
+		-rc bochs-debugger-boot-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-iso-bochs-boot
+
+debug-fat-bochs-boot: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym \
+		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		$(top_srcdir)/bochs-fat-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-boot-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/bochs-fat-config.bxrc \
+		-rc bochs-debugger-boot-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-fat-bochs-boot
+
+run-iso-bochs: $(QEMU_IMAGE_iso) \
+		mbr.sym bootfat.sym \
+		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		$(top_srcdir)/bochs-iso-config.bxrc
+	$(BOCHS) -f $(top_srcdir)/bochs-iso-config.bxrc -q \
+		$(BOCHS_FLAGS)
+
+.PHONY: run-iso-bochs
+
+run-fat-bochs: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym \
+		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		$(top_srcdir)/bochs-fat-config.bxrc
+	$(BOCHS) -f $(top_srcdir)/bochs-fat-config.bxrc -q \
+		$(BOCHS_FLAGS)
+
+.PHONY: run-fat-bochs

@@ -114,17 +114,16 @@ struct gdt_entry_t {
     GDT_MAKE_SEGMENT_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 0, 0)
 
 struct table_register_t {
+    uint16_t align;
     uint16_t limit;
-    uint16_t base_lo;
-    uint16_t base_hi;
+    uint32_t base;
 };
 
 struct table_register_64_t {
+    uint16_t align[3];
     uint16_t limit;
-    uint16_t base_lo;
-    uint16_t base_hi;
-    uint16_t base_hi1;
-    uint16_t base_hi2;
+    uint32_t base_lo;
+    uint32_t base_hi;
 };
 
 struct cpuid_t {
@@ -165,23 +164,75 @@ struct idt_entry_64_t {
 #define IDT_INTR        0x0E
 #define IDT_TRAP        0x0F
 
-uint16_t cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
+bool cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
 
 extern "C" void cpu_a20_enterpm();
 extern "C" void cpu_a20_exitpm();
-extern "C" uint16_t toggle_a20(uint8_t enable);
+extern "C" bool toggle_a20(uint8_t enable);
 
 extern "C" void copy_or_enter(uint64_t address, uint32_t src, uint32_t size);
 
-#define USE_PORT_FUNCTIONS 0
-#if USE_PORT_FUNCTIONS
-void outb(uint16_t dx, uint8_t al);
-void outw(uint16_t dx, uint16_t ax);
-void outl(uint16_t dx, uint32_t eax);
-uint8_t inb(uint16_t dx);
-uint16_t inw(uint16_t dx);
-uint32_t inl(uint16_t dx);
-#endif
+static __always_inline void outb(uint16_t dx, uint8_t al)
+{
+    __asm__ __volatile__ (
+        "outb %b[val],%w[port]"
+        :
+        : [val] "a" (al)
+        , [port] "Nd" (dx));
+}
+
+static __always_inline void outw(uint16_t dx, uint16_t ax)
+{
+    __asm__ __volatile__ (
+        "outw %w[val],%w[port]"
+        :
+        : [val] "a" (ax)
+        , [port] "Nd" (dx));
+}
+
+static __always_inline void outl(uint16_t dx, uint32_t eax)
+{
+    __asm__ __volatile__ (
+        "outl %[val],%w[port]"
+        :
+        : [val] "a" (eax)
+        , [port] "Nd" (dx));
+}
+
+static __always_inline uint8_t inb(uint16_t dx)
+{
+    uint8_t al;
+    __asm__ __volatile__ (
+        "inb %w[port],%b[val]"
+        : [val] "=a" (al)
+        : [port] "Nd" (dx));
+    return al;
+}
+
+static __always_inline uint16_t inw(uint16_t dx)
+{
+    uint16_t ax;
+    __asm__ __volatile__ (
+        "inw %w[port],%w[val]"
+        : [val] "=a" (ax)
+        : [port] "Nd" (dx));
+    return ax;
+}
+
+static __always_inline uint32_t inl(uint16_t dx)
+{
+    uint32_t eax;
+    __asm__ __volatile__ (
+        "inl %w[port],%[val]"
+        : [val] "=a" (eax)
+        : [port] "Nd" (dx));
+    return eax;
+}
+
+static __always_inline void pause()
+{
+    __asm__ __volatile__ ("pause");
+}
 
 #define USE_8259_PIC_FUNCTIONS 0
 #if USE_8259_PIC_FUNCTIONS
@@ -190,6 +241,11 @@ void init_irq();
 #endif
 
 extern "C" void cpu_init();
-uint16_t cpu_has_long_mode();
-uint16_t cpu_has_no_execute();
-uint16_t cpu_has_global_pages();
+bool cpu_has_long_mode();
+bool cpu_has_no_execute();
+bool cpu_has_global_pages();
+
+const char *cpu_choose_kernel();
+
+extern "C" uint8_t xcr0_value;
+

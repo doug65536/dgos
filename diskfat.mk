@@ -1,8 +1,17 @@
 $(top_builddir)/fatdisk.img: mbr-bin bootfat-bin \
-		bootfat.sym mbr.sym kernel.sym diskfat.mk \
+		diskfat.mk \
 		$(top_srcdir)/populate_fat.sh \
 		$(top_srcdir)/mkposixdirs.sh \
-		kernel-elf.dis
+		mbr.sym \
+		bootfat.sym \
+		kernel-generic.sym \
+		kernel-sse4.sym \
+		kernel-avx2.sym \
+		kernel-generic.dis \
+		kernel-sse4.dis \
+		kernel-avx2.dis \
+		bootfat.dis \
+		mbr.dis
 	set -x && \
 		rm -f fatpart.img fatdisk.img && \
 		truncate --size=261120K fatpart.img && \

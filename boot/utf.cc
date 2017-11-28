@@ -1,14 +1,13 @@
 #include "utf.h"
 
-// Returns 0 on failure due to invalid UTF-8 or truncation due to insufficient buffer
+// Returns 0 on failure due to invalid UTF-8 or truncation
+// due to insufficient buffer
 // Returns output count (not including null terminator) on success
-uint16_t utf8_to_utf16(uint16_t *output,
-                       uint16_t out_size_words,
-                       char const *in)
+size_t utf8_to_utf16(uint16_t *output, size_t out_size_words, char const *in)
 {
     uint16_t *out = output;
     uint16_t *out_end = out + out_size_words;
-    uint16_t len;
+    size_t len;
     uint32_t ch;
 
     while (*in) {
@@ -25,7 +24,7 @@ uint16_t utf8_to_utf16(uint16_t *output,
             // Invalid, too long or character begins with 10xxxxxx
             return 0;
         } else if (out < out_end) {
-            *out++ = (uint16_t)(uint8_t)*in++;
+            *out++ = uint16_t(uint8_t(*in++));
             continue;
         } else {
             // Output buffer overrun
@@ -57,7 +56,7 @@ uint16_t utf8_to_utf16(uint16_t *output,
         }
         if (ch < 0x10000) {
             // Single UTF-16 character
-            *out++ = (uint16_t)ch;
+            *out++ = uint16_t(ch);
         } else if (out + 1 >= out_end) {
             // Surrogate pair would overrun output buffer
             return 0;
@@ -73,7 +72,7 @@ uint16_t utf8_to_utf16(uint16_t *output,
         return 0;
     }
 
-    *out++ = 0;
+    *out = 0;
 
-    return out - output - 1;
+    return out - output;
 }

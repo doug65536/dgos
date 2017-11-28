@@ -1,13 +1,13 @@
 #include "fat32.h"
 #include "malloc.h"
 #include "bootsect.h"
+#include "paging.h"
 #include "screen.h"
 #include "string.h"
 #include "cpu.h"
-#include "paging.h"
-#include "utf.h"
 #include "elf64.h"
 #include "fs.h"
+#include "utf.h"
 
 #include "../kernel/fs/fat32_decl.h"
 
@@ -768,5 +768,5 @@ void fat32_boot_partition(uint32_t partition_lba)
     fs_api.boot_close = fat32_boot_close;
     fs_api.boot_pread = fat32_boot_pread;
 
-    elf64_run("dgos-kernel");
+    elf64_run(cpu_choose_kernel());
 }
