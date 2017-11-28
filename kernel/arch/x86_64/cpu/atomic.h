@@ -6,7 +6,7 @@
 
 static __always_inline void atomic_barrier(void)
 {
-    __asm__ __volatile__ ( "" : : : "memory" );
+    __asm__ __volatile__ ("" ::: "memory");
 }
 
 // Technically not atomic but needed in cmpxchg loops
