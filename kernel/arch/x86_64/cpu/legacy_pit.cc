@@ -151,13 +151,13 @@ static void pit8254_time_ns_stop()
     irq_unhook(0, pit8254_irq_handler);
 }
 
-#if __amd64__
 // Multiply two unsigned 64 bit values, giving an intermediate 128 bit result,
 // then divide that by an unsigned 64 bit value, and return the quotient
 __const
 static __always_inline uint64_t mul_64_64_div_64(
         uint64_t m1, uint64_t m2, uint64_t d)
 {
+#if __amd64__
     __asm__ (
         "mul %[m2]\n\t"
         "div %[d]\n\t"
@@ -167,10 +167,10 @@ static __always_inline uint64_t mul_64_64_div_64(
         : "cc"
     );
     return m1;
-}
 #else
 #error Need 32x32->64/32 implementation
 #endif
+}
 
 // Returns number of elapsed nanoseconds
 static uint64_t pit8254_nsleep(uint64_t nanosec)
