@@ -84,7 +84,7 @@ struct thread_info_t {
 
     uint64_t syscall_rip;
     void *syscall_stack;
-    
+
     process_t *process;
 
     // Higher numbers are higher priority
@@ -98,7 +98,7 @@ struct thread_info_t {
     // --- cache line ---
 
     uint64_t volatile wake_time;
-    
+
     uint64_t volatile cpu_affinity;
 
     void *exception_chain;
@@ -107,7 +107,7 @@ struct thread_info_t {
 
     int exit_code;
     errno_t errno;
-    
+
     // 3 bytes...
 
     mutex_t lock;
@@ -393,6 +393,7 @@ static thread_t thread_create_with_state(
 
         ctx->gpr->iret.rsp = (uintptr_t)
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
+        assert((ctx->gpr->iret.rsp & 0xF) == 0x8);
         ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA;
         ctx->gpr->iret.rflags = EFLAGS_IF;
         ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
@@ -556,6 +557,8 @@ void thread_init(int ap)
         thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
     } else {
+        cpu_irq_disable();
+
         thread = threads + thread_create_with_state(
                     smp_idle_thread, 0, 0, 0,
                     THREAD_IS_INITIALIZING,
@@ -564,15 +567,16 @@ void thread_init(int ap)
 
         thread->used_time = 0;
 
-        cpu->goto_thread = thread;
-
         if (sse_context_size == 512)
             cpu_fxsave(thread->xsave_ptr);
         else
             cpu_xsave(thread->xsave_ptr);
 
+        cpu->goto_thread = thread;
+
         atomic_barrier();
         thread_yield();
+        __builtin_unreachable();
     }
 }
 
@@ -801,6 +805,15 @@ EXPORT void thread_sleep_until(uint64_t expiry)
 EXPORT void thread_sleep_for(uint64_t ms)
 {
     thread_sleep_until(time_ns() + ms * 1000000);
+}
+
+EXPORT uint64_t thread_get_usage(int id)
+{
+    if (id >= int(countof(threads)))
+        return -1;
+
+    thread_info_t *thread = id < 0 ? this_thread() : (threads + id);
+    return thread->used_time;
 }
 
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)

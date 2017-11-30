@@ -256,9 +256,6 @@ void idt_xsave_detect(int ap)
     while (cpuid_has_xsave()) {
         cpuid_t info;
 
-        // Enable XSAVE
-//        cpu_cr4_change_bits(0, CR4_OSXSAVE);
-
 //        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
 //            break;
 
@@ -277,6 +274,10 @@ void idt_xsave_detect(int ap)
 
 //        if (ap)
 //            break;
+
+        uintptr_t bv = cpu_xcr_change_bits(0, 0, 0);
+
+        printk("orig xcr0=%016zx\n", bv);
 
         printk("Detecting xsave support\n");
 
@@ -513,7 +514,7 @@ static void dump_frame(uintptr_t rbp, uintptr_t rip)
     printk("at rbp=%016zx rip=%016zx\n", rbp, rip);
 }
 
-static void dump_context(isr_context_t *ctx, int to_screen)
+void dump_context(isr_context_t *ctx, int to_screen)
 {
     char fmt_buf[64];
     int color = 0x0F;
@@ -642,7 +643,7 @@ static void dump_context(isr_context_t *ctx, int to_screen)
 
     // gsbase
     printdbg("gsbase=%16lx\n",
-             msr_get(MSR_GSBASE));
+             cpu_msr_get(MSR_GSBASE));
 
     printdbg("-------------------------------------------\n");
 
@@ -753,7 +754,7 @@ static void dump_context(isr_context_t *ctx, int to_screen)
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
-                     msr_get(MSR_GSBASE));
+                     cpu_msr_get(MSR_GSBASE));
     con_draw_xy(6, 21, fmt_buf, color);
 
     // last branch

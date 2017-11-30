@@ -11,10 +11,16 @@ static spinlock_t e9debug_lock;
 static uart_dev_t *uart;
 static bool uart_ready;
 
+static char vt102_reset[] = "\x1B" "c";
+
 static void e9debug_serial_ready(void*)
 {
     uart = uart_dev_t::open(0, true);
     uart_ready = true;
+
+    // Send some VT102 initialization sequences
+
+    uart->write(vt102_reset, sizeof(vt102_reset)-1, sizeof(vt102_reset)-1);
 }
 
 static int e9debug_write_debug_str(char const *str, intptr_t len)

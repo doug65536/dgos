@@ -1081,5 +1081,7 @@ size_t format_flags_register(
         }
     }
 
+    buf[total_written] = 0;
+
     return total_written;
 }

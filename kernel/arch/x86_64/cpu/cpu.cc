@@ -20,63 +20,61 @@ void cpu_init(int ap)
 {
     (void)ap;
 
-    char const *feature_names[6];
-    size_t feature_count = 0;
-
     // Enable write protection
     cpu_cr0_change_bits(0, CR0_WP);
 
-    uintptr_t cr4_set = 0;
-    uintptr_t cr4_clr = 0;
+    uintptr_t set = 0;
+    uintptr_t clr = 0;
 
     // Supervisor Mode Execution Prevention (SMEP)
-    if (cpuid_has_smep()) {
-        feature_names[feature_count++] = "Supervisor Mode Execution Prevention";
-        cr4_set |= CR4_SMEP;
-    }
+    if (cpuid_has_smep())
+        set |= CR4_SMEP;
 
     // Enable global pages feature if available
-    if (cpuid_has_pge()) {
-        feature_names[feature_count++] = "Global pages";
-        cr4_set |= CR4_PGE;
-    }
+    if (cpuid_has_pge())
+        set |= CR4_PGE;
 
     // Enable debugging extensions feature if available
-    if (cpuid_has_de()) {
-        feature_names[feature_count++] = "Debugging extensions";
-        cr4_set |= CR4_DE;
-    }
+    if (cpuid_has_de())
+        set |= CR4_DE;
 
     // Disable paging context identifiers feature if available
-    if (cpuid_has_pcid()) {
-        cr4_clr |= CR4_PCIDE;
-    }
+    if (cpuid_has_pcid())
+        clr |= CR4_PCIDE;
 
     // Enable {RD|WR}{FS|GS}BASE instructions
-    if (cpuid_has_fsgsbase()) {
-        feature_names[feature_count++] = "FSGSBASE instructions";
-        cr4_set |= CR4_FSGSBASE;
-    }
+    if (cpuid_has_fsgsbase())
+        set |= CR4_FSGSBASE;
 
-    cr4_set |= CR4_OFXSR | CR4_OSXMMEX;
-    cr4_clr |= CR4_TSD;
+    set |= CR4_OFXSR | CR4_OSXMMEX;
+    clr |= CR4_TSD;
 
-    cpu_cr4_change_bits(cr4_clr, cr4_set);
+    cpu_cr4_change_bits(clr, set);
+
+    //
+    // Adjust IA32_MISC_ENABLES
+
+    // crashes on non-intel
+//    set = MSR_MISC_ENABLE_FAST_STR;
+//    clr = MSR_MISC_ENABLE_LIMIT_CPUID;
+//
+//    if (cpuid_has_mwait())
+//        set = MSR_MISC_ENABLE_MONITOR_FSM;
+//
+//    if (cpuid_has_nx())
+//        clr = MSR_MISC_ENABLE_XD_DISABLE;
+//
+//    cpu_msr_change_bits(MSR_MISC_ENABLE, clr, set);
 
     // Enable no-execute if feature available
-    if (cpuid_has_nx()) {
-        feature_names[feature_count++] = "No-execute paging";
-        msr_adj_bit(MSR_EFER, 11, 1);
-    }
+    if (cpuid_has_nx())
+        cpu_msr_change_bits(MSR_EFER, 0, MSR_EFER_NX);
 
     // Configure syscall
-    msr_set(MSR_FMASK, EFLAGS_AC | EFLAGS_DF | EFLAGS_TF | EFLAGS_IF);
-    msr_set(MSR_LSTAR, (uint64_t)syscall_entry);
-    msr_set_hi(MSR_STAR, GDT_SEL_KERNEL_CODE64 |
+    cpu_msr_set(MSR_FMASK, EFLAGS_AC | EFLAGS_DF | EFLAGS_TF | EFLAGS_IF);
+    cpu_msr_set(MSR_LSTAR, (uint64_t)syscall_entry);
+    cpu_msr_set_hi(MSR_STAR, GDT_SEL_KERNEL_CODE64 |
                (GDT_SEL_USER_CODE32 << 16));
-
-    //for (size_t i = 0; i < feature_count; ++i)
-    //    printdbg("CPU feature: %s\n", feature_names[i]);
 }
 
 //static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)

@@ -62,11 +62,11 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_STRESS_HEAP_THREAD   0
-#define ENABLE_FRAMEBUFFER_THREAD   1
+#define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
 
-#define ENABLE_STRESS_HEAP_SMALL    1
-#define ENABLE_STRESS_HEAP_LARGE    1
+#define ENABLE_STRESS_HEAP_SMALL    0
+#define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
@@ -637,14 +637,15 @@ static int stress_heap_thread(void *p)
 
 int clks_unhalted(void *cpu)
 {
-    auto cpu_nr = size_t(cpu);
-    uint64_t last = msr_get(0x30A);
-    while (1) {
-        thread_sleep_for(1000);
-        uint64_t curr = msr_get(0x30A);
-        printdbg("CPU %zx: %lu clocks\n", cpu_nr, curr - last);
-        last = curr;
-    }
+    //auto cpu_nr = size_t(cpu);
+    //uint64_t last = thread_get_usage(-1);
+    //while (1) {
+    //    thread_sleep_for(1000);
+    //    uint64_t curr = thread_get_usage(-1);
+    //    printdbg("CPU %zx: %lu clocks\n", cpu_nr, curr - last);
+    //    last = curr;
+    //}
+    return 0;
 }
 
 //extern void usbxhci_detect(void*);
@@ -893,18 +894,18 @@ static int init_thread(void *p)
     }
 #endif
 
-    auto com1 = uart_dev_t::open(0, false);
-    com1->write("Hello!", 6, 6);
+//    auto com1 = uart_dev_t::open(0, false);
+//    com1->write("Hello!", 6, 6);
 
-    vector<char> input;
-    char input_char;
-    do {
-        com1->read(&input_char, 1, 1);
-        com1->write(&input_char, 1, 1);
-        input.push_back(input_char);
-    } while (input_char != '\n');
+//    vector<char> input;
+//    char input_char;
+//    do {
+//        com1->read(&input_char, 1, 1);
+//        com1->write(&input_char, 1, 1);
+//        input.push_back(input_char);
+//    } while (input_char != '\n');
 
-    com1->write(input.data(), input.size(), input.size());
+//    com1->write(input.data(), input.size(), input.size());
 
     for (size_t i = 0, e = thread_get_cpu_count(); i != e; ++i) {
         thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0);

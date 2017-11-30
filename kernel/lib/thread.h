@@ -24,6 +24,7 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
 void thread_yield(void);
 void thread_sleep_until(uint64_t expiry);
 void thread_sleep_for(uint64_t ms);
+uint64_t thread_get_usage(int id);
 
 void thread_set_affinity(int id, uint64_t affinity);
 uint64_t thread_get_affinity(int id);

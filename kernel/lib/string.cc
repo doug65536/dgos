@@ -132,72 +132,145 @@ EXPORT char *strstr(char const *str, char const *substr)
     return 0;
 }
 
-// Returns a pointer to after the last byte written!
-EXPORT void *aligned16_memset(void *dest, int c, size_t n)
+static void memset64(char *&d, uint64_t s, size_t n)
 {
-#if USE_REP_STRING
-    return memset(dest, c, n);
-#else
-#ifdef __OPTIMIZE__
-    char cc = (char)c;
-    __i8_vec16 v = {
-        cc, cc, cc, cc, cc, cc, cc, cc,
-        cc, cc, cc, cc, cc, cc, cc, cc
-    };
-    __i8_vec16 *vp = (__i8_vec16*)dest;
-    while (n >= sizeof(__i8_vec16)) {
-        *vp++ = v;
-        n -= sizeof(__i8_vec16);
-    }
-    return vp;
-#else
-    return (char*)memset(dest, c, n) + n;
-#endif
-#endif
+    __asm__ __volatile__ (
+        "rep stosq"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
+}
+
+static void memset_byte(char *&d, uint64_t s, uint32_t &ofs)
+{
+    __asm__ __volatile__ (
+        "mov %%al,(%%rdi,%%rdx)\n\t"
+        "add $1,%%rdx\n\t"
+        : "+D" (d)
+        , "+d" (ofs)
+        : "a" (s)
+        : "memory"
+    );
 }
 
 EXPORT void *memset(void *dest, int c, size_t n)
 {
-    assert(n < 0x0000700000000000L);
-#ifdef USE_REP_STRING
     char *d = (char*)dest;
-    __asm__ __volatile__ (
-        "rep stosb\n\t"
-        : "+D" (d), "+c" (n)
-        : "a" ((uint8_t)c)
-        : "memory"
-    );
-#else
-    char *p = dest;
-#if defined(__GNUC__) && defined(__OPTIMIZE__)
-    // Write bytes until aligned
-    while ((intptr_t)p & 0x0F && n) {
-        *p++ = (char)c;
-        --n;
+    uint64_t s = size_t(0x0101010101010101) * (c & 0xFF);
+
+    if (n >= 7) {
+        if (unlikely(uintptr_t(d) & 7)) {
+            uint32_t ofs = 0;
+            switch (uintptr_t(d) & 7) {
+            case 1: memset_byte(d, s, ofs); // fall thru
+            case 2: memset_byte(d, s, ofs); // fall thru
+            case 3: memset_byte(d, s, ofs); // fall thru
+            case 4: memset_byte(d, s, ofs); // fall thru
+            case 5: memset_byte(d, s, ofs); // fall thru
+            case 6: memset_byte(d, s, ofs); // fall thru
+            case 7: memset_byte(d, s, ofs); // fall thru
+            }
+
+            n -= ofs;
+            if (unlikely(!n))
+                return dest;
+
+            d += ofs;
+            s += ofs;
+        }
     }
-    // Write as many 128-bit chunks as possible
-    if (n > sizeof(__i8_vec16)) {
-        p = aligned16_memset(p, c, n);
-        n &= 15;
+
+    size_t quads = n >> 3;
+    memset64(d, s, quads);
+
+    if (unlikely(n &= 7)) {
+        uint32_t ofs = 0;
+        switch (n) {
+        case 7: memset_byte(d, s, ofs); // fall thru
+        case 6: memset_byte(d, s, ofs); // fall thru
+        case 5: memset_byte(d, s, ofs); // fall thru
+        case 4: memset_byte(d, s, ofs); // fall thru
+        case 3: memset_byte(d, s, ofs); // fall thru
+        case 2: memset_byte(d, s, ofs); // fall thru
+        case 1: memset_byte(d, s, ofs); // fall thru
+        }
     }
-#endif
-    while (n--)
-        *p++ = (char)c;
-#endif
 
     return dest;
+}
+
+static __always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
+{
+    uint32_t eax;
+    __asm__ __volatile__(
+        "movzbl (%%rsi,%%rdx),%%eax\n\t"
+        "movb %%al,(%%rdi,%%rdx)\n\t"
+        "addl $1,%%edx\n\t"
+        : "+d" (ofs)
+        , "=a" (eax)
+        : "D" (d)
+        , "S" (s)
+        : "memory"
+    );
+}
+
+static __always_inline void memcpy64(char *&d, char const *&s, size_t count)
+{
+    __asm__ __volatile__ (
+        "rep movsq\n\t"
+        : "+D" (d)
+        , "+S" (s)
+        , "+c" (count)
+        :
+        : "memory"
+    );
 }
 
 EXPORT void *memcpy(void *dest, void const *src, size_t n)
 {
 #ifdef USE_REP_STRING
     char *d = (char*)dest;
-    __asm__ __volatile__ (
-        "rep movsb\n\t"
-        : "+D" (d), "+S" (src), "+c" (n)
-        :
-        : "memory"
-    );
+    char const *s = (char const *)src;
+
+    if (n >= 7) {
+        if (unlikely(uintptr_t(d) & 7)) {
+            uint32_t ofs = 0;
+            switch (uintptr_t(d) & 7) {
+            case 1: memcpy_byte(d, s, ofs); // fall thru
+            case 2: memcpy_byte(d, s, ofs); // fall thru
+            case 3: memcpy_byte(d, s, ofs); // fall thru
+            case 4: memcpy_byte(d, s, ofs); // fall thru
+            case 5: memcpy_byte(d, s, ofs); // fall thru
+            case 6: memcpy_byte(d, s, ofs); // fall thru
+            case 7: memcpy_byte(d, s, ofs); // fall thru
+            }
+
+            n -= ofs;
+            if (unlikely(!n))
+                return dest;
+
+            d += ofs;
+            s += ofs;
+        }
+    }
+
+    size_t quads = n >> 3;
+    memcpy64(d, s, quads);
+
+    if (unlikely(n &= 7)) {
+        uint32_t ofs = 0;
+        switch (n) {
+        case 7: memcpy_byte(d, s, ofs); // fall thru
+        case 6: memcpy_byte(d, s, ofs); // fall thru
+        case 5: memcpy_byte(d, s, ofs); // fall thru
+        case 4: memcpy_byte(d, s, ofs); // fall thru
+        case 3: memcpy_byte(d, s, ofs); // fall thru
+        case 2: memcpy_byte(d, s, ofs); // fall thru
+        case 1: memcpy_byte(d, s, ofs); // fall thru
+        }
+    }
 #else
     char *d;
     char const *s;
@@ -231,18 +304,81 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
     return dest;
 }
 
+static __always_inline void memcpy_byte_reverse(
+        char *d, char const *s, size_t &count)
+{
+    uint32_t eax;
+    __asm__ __volatile__ (
+        "movzbl (%%rsi,%%rdx),%%eax\n"
+        "movb %%al,(%%rdi,%%rdx)\n\t"
+        "addq $-1,%%rdx\n\t"
+        : "+d" (count)
+        , "=a" (eax)
+        : "D" (d)
+        , "S" (s)
+        : "memory"
+    );
+}
+
+static __always_inline void memcpy64_reverse(
+        char *&d, char const *&s, size_t count)
+{
+    __asm__ __volatile__ (
+        "std\n\t"
+        "rep movsq\n\t"
+        "cld\n\t"
+        : "+D" (d)
+        , "+S" (s)
+        , "+c" (count)
+        :
+        : "memory"
+    );
+}
+
 static __always_inline void memcpy_reverse(
         void *dest, void const *src, size_t n)
 {
 #if USE_REP_STRING
-    __asm__ __volatile__ (
-        "std\n\t"
-        "rep movsb\n\t"
-        "cld\n\t"
-        : "+D" (dest), "+S" (src), "+c" (n)
-        :
-        : "memory"
-    );
+    char *d = (char *)dest;
+    char const *s = (char const *)src;
+
+
+    if (uintptr_t(d) & 7) {
+        size_t ofs = 0;
+        switch (uintptr_t(d) & 7) {
+        case 7: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 6: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 5: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 4: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 3: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 2: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 1: memcpy_byte_reverse(d, s, ofs); // fall thru
+        }
+
+        // plus because ofs is negative
+        n += ofs;
+        if (unlikely(!n))
+            return;
+
+        d += ofs;
+        s += ofs;
+    }
+
+    size_t quads = n >> 3;
+    memcpy64_reverse(d, s, quads);
+
+    if (n &= 7) {
+        size_t ofs = 0;
+        switch (n) {
+        case 7: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 6: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 5: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 4: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 3: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 2: memcpy_byte_reverse(d, s, ofs); // fall thru
+        case 1: memcpy_byte_reverse(d, s, ofs); // fall thru
+        }
+    }
 #else
     for (size_t i = n; i; --i)
         dest[i-1] = src[i-1];

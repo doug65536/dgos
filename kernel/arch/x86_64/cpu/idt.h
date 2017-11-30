@@ -250,3 +250,4 @@ void idt_clone_debug_exception_dispatcher(void);
 
 extern "C" uint32_t xsave_supported_states;
 extern "C" uint32_t xsave_enabled_states;
+extern "C" void dump_context(isr_context_t *ctx, int to_screen);

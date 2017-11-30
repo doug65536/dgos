@@ -670,22 +670,22 @@ class lapic_x2_t : public lapic_t {
 
     uint32_t read32(uint32_t offset) const final
     {
-        return msr_get_lo(0x800 + offset);
+        return cpu_msr_get_lo(0x800 + offset);
     }
 
     void write32(uint32_t offset, uint32_t val) const final
     {
-        msr_set(0x800 + offset, val);
+        cpu_msr_set(0x800 + offset, val);
     }
 
     uint64_t read64(uint32_t offset) const final
     {
-        return msr_get(0x800 + offset);
+        return cpu_msr_get(0x800 + offset);
     }
 
     void write64(uint32_t offset, uint64_t val) const final
     {
-        msr_set(0x800 + offset, val);
+        cpu_msr_set(0x800 + offset, val);
     }
 
     bool reg_readable(uint32_t reg) const final
@@ -1909,7 +1909,7 @@ static void apic_configure_timer(
 
 int apic_init(int ap)
 {
-    uint64_t apic_base_msr = msr_get(APIC_BASE_MSR);
+    uint64_t apic_base_msr = cpu_msr_get(APIC_BASE_MSR);
 
     if (!apic_base)
         apic_base = apic_base_msr & APIC_BASE_ADDR;
@@ -1927,7 +1927,7 @@ int apic_init(int ap)
         if (!ap)
             apic = &apic_x2;
 
-        msr_set(APIC_BASE_MSR, apic_base_msr |
+        cpu_msr_set(APIC_BASE_MSR, apic_base_msr |
                 APIC_BASE_GENABLE | APIC_BASE_X2ENABLE);
     } else {
         APIC_TRACE("Using xAPIC\n");
@@ -1944,7 +1944,7 @@ int apic_init(int ap)
             apic = &apic_x;
         }
 
-        msr_set(APIC_BASE_MSR, apic_base_msr | APIC_BASE_GENABLE);
+        cpu_msr_set(APIC_BASE_MSR, apic_base_msr | APIC_BASE_GENABLE);
     }
 
     // Set global enable if it is clear
@@ -1974,7 +1974,7 @@ int apic_init(int ap)
 
     apic->write32(APIC_REG_TPR, 0x0);
 
-    assert(apic_base == (msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
+    assert(apic_base == (cpu_msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
 
     if (ap) {
         printk("Configuring APIC timer\n");
@@ -2030,11 +2030,11 @@ static void apic_detect_topology_intel(void)
 
     if (!cpuid(&info, CPUID_TOPOLOGY1, 0)) {
         // Enable full CPUID
-        uint64_t misc_enables = msr_get(MSR_MISC_ENABLES);
+        uint64_t misc_enables = cpu_msr_get(MSR_MISC_ENABLE);
         if (misc_enables & (1L<<22)) {
             // Enable more CPUID support and retry
             misc_enables &= ~(1L<<22);
-            msr_set(MSR_MISC_ENABLES, misc_enables);
+            cpu_msr_set(MSR_MISC_ENABLE, misc_enables);
         }
     }
 
@@ -2194,8 +2194,8 @@ void apic_start_smp(void)
                 nsleep(stagger);
 
                 ++smp_expect;
-                while (thread_smp_running != smp_expect)
-                    pause();
+
+                cpu_wait_value(&thread_smp_running, smp_expect);
             }
         }
     }

@@ -2,25 +2,28 @@
 
 // This is included in assembly
 
-#define MSR_FSBASE          0xC0000100
-#define MSR_GSBASE          0xC0000101
-#define MSR_KGSBASE         0xC0000102
-#define MSR_EFER            0xC0000080
+#define MSR_FSBASE          0xC0000100U
+#define MSR_GSBASE          0xC0000101U
+#define MSR_KGSBASE         0xC0000102U
+#define MSR_EFER            0xC0000080U
+
+#define MSR_EFER_NX_BIT     11
+#define MSR_EFER_NX         (1U << MSR_EFER_NX_BIT)
 
 // RFLAGS mask on syscall entry
-#define MSR_FMASK           0xC0000084
+#define MSR_FMASK           0xC0000084U
 
 // Long mode syscall entry
-#define MSR_LSTAR           0xC0000082
+#define MSR_LSTAR           0xC0000082U
 
 // CS/SS values for syscall entry
-#define MSR_STAR            0xC0000081
+#define MSR_STAR            0xC0000081U
 
-// IA32_MISC_ENABLES
-#define MSR_MISC_ENABLES    0x1A0
+// IA32_MISC_ENABLE
+#define MSR_MISC_ENABLE    0x1A0U
 
 // PAT MSR
-#define MSR_IA32_PAT        0x277
+#define MSR_IA32_PAT        0x277U
 
 // Uncacheable
 #define MSR_IA32_PAT_UC     0
@@ -42,6 +45,9 @@
 
 #define MSR_IA32_PAT_n(n,v) ((uint64_t)(v) << ((n) << 3))
 
+//
+// CR0
+
 #define CR0_PE_BIT 0	// Protected Mode
 #define CR0_MP_BIT 1	// Monitor co-processor
 #define CR0_EM_BIT 2	// Emulation
@@ -54,17 +60,55 @@
 #define CR0_CD_BIT 30	// Cache disable
 #define CR0_PG_BIT 31	// Paging
 
-#define CR0_PE  (1 << CR0_PE_BIT)
-#define CR0_MP  (1 << CR0_MP_BIT)
-#define CR0_EM  (1 << CR0_EM_BIT)
-#define CR0_TS  (1 << CR0_TS_BIT)
-#define CR0_ET  (1 << CR0_ET_BIT)
-#define CR0_NE  (1 << CR0_NE_BIT)
-#define CR0_WP  (1 << CR0_WP_BIT)
-#define CR0_AM  (1 << CR0_AM_BIT)
-#define CR0_NW  (1 << CR0_NW_BIT)
-#define CR0_CD  (1 << CR0_CD_BIT)
-#define CR0_PG  (1 << CR0_PG_BIT)
+#define CR0_PE  (1U << CR0_PE_BIT)
+#define CR0_MP  (1U << CR0_MP_BIT)
+#define CR0_EM  (1U << CR0_EM_BIT)
+#define CR0_TS  (1U << CR0_TS_BIT)
+#define CR0_ET  (1U << CR0_ET_BIT)
+#define CR0_NE  (1U << CR0_NE_BIT)
+#define CR0_WP  (1U << CR0_WP_BIT)
+#define CR0_AM  (1U << CR0_AM_BIT)
+#define CR0_NW  (1U << CR0_NW_BIT)
+#define CR0_CD  (1U << CR0_CD_BIT)
+#define CR0_PG  (1U << CR0_PG_BIT)
+
+//
+// IA32_MISC_ENABLE
+
+#define MSR_MISC_ENABLE_FAST_STR_BIT        0
+#define MSR_MISC_ENABLE_AUTO_THERM_BIT      3
+#define MSR_MISC_ENABLE_PERF_MON_BIT        7
+#define MSR_MISC_ENABLE_NO_BTS_BIT          11
+#define MSR_MISC_ENABLE_NO_PEBS_BIT         12
+#define MSR_MISC_ENABLE_ENH_SPEEDSTEP_BIT   16
+#define MSR_MISC_ENABLE_MONITOR_FSM_BIT     18
+#define MSR_MISC_ENABLE_LIMIT_CPUID_BIT     22
+#define MSR_MISC_ENABLE_XTPR_DISABLED_BIT   23
+#define MSR_MISC_ENABLE_XD_DISABLE_BIT      34
+
+#define MSR_MISC_ENABLE_FAST_STR \
+    (1UL << MSR_MISC_ENABLE_FAST_STR_BIT)
+#define MSR_MISC_ENABLE_AUTO_THERM \
+    (1UL << MSR_MISC_ENABLE_AUTO_THERM_BIT)
+#define MSR_MISC_ENABLE_PERF_MON \
+    (1UL << MSR_MISC_ENABLE_PERF_MON_BIT)
+#define MSR_MISC_ENABLE_NO_BTS \
+    (1UL << MSR_MISC_ENABLE_NO_BTS_BIT)
+#define MSR_MISC_ENABLE_NO_PEBS \
+    (1UL << MSR_MISC_ENABLE_NO_PEBS_BIT)
+#define MSR_MISC_ENABLE_ENH_SPEEDSTEP \
+    (1UL << MSR_MISC_ENABLE_ENH_SPEEDSTEP_BIT)
+#define MSR_MISC_ENABLE_MONITOR_FSM \
+    (1UL << MSR_MISC_ENABLE_MONITOR_FSM_BIT)
+#define MSR_MISC_ENABLE_LIMIT_CPUID \
+    (1UL << MSR_MISC_ENABLE_LIMIT_CPUID_BIT)
+#define MSR_MISC_ENABLE_XTPR_DISABLED \
+    (1UL << MSR_MISC_ENABLE_XTPR_DISABLED_BIT)
+#define MSR_MISC_ENABLE_XD_DISABLE \
+    (1UL << MSR_MISC_ENABLE_XD_DISABLE_BIT)
+
+//
+// CR4
 
 #define CR4_VME_BIT         0	// Virtual 8086 Mode Extensions
 #define CR4_PVI_BIT         1	// Protected-mode Virtual Interrupts
@@ -86,28 +130,28 @@
 #define CR4_SMAP_BIT        21	// Supervisor Mode Access Protection Enable
 #define CR4_PKE_BIT         22	// Protection Key Enable
 
-#define CR4_VME             (1 << CR4_VME_BIT     )
-#define CR4_PVI             (1 << CR4_PVI_BIT     )
-#define CR4_TSD             (1 << CR4_TSD_BIT     )
-#define CR4_DE              (1 << CR4_DE_BIT      )
-#define CR4_PSE             (1 << CR4_PSE_BIT     )
-#define CR4_PAE             (1 << CR4_PAE_BIT     )
-#define CR4_MCE             (1 << CR4_MCE_BIT     )
-#define CR4_PGE             (1 << CR4_PGE_BIT     )
-#define CR4_PCE             (1 << CR4_PCE_BIT     )
-#define CR4_OFXSR           (1 << CR4_OFXSR_BIT   )
-#define CR4_OSXMMEX         (1 << CR4_OSXMMEX_BIT )
-#define CR4_VMXE            (1 << CR4_VMXE_BIT    )
-#define CR4_SMXE            (1 << CR4_SMXE_BIT    )
-#define CR4_FSGSBASE        (1 << CR4_FSGSBASE_BIT)
-#define CR4_PCIDE           (1 << CR4_PCIDE_BIT   )
-#define CR4_OSXSAVE         (1 << CR4_OSXSAVE_BIT )
-#define CR4_SMEP            (1 << CR4_SMEP_BIT    )
-#define CR4_SMAP            (1 << CR4_SMAP_BIT    )
-#define CR4_PKE             (1 << CR4_PKE_BIT     )
+#define CR4_VME             (1U << CR4_VME_BIT     )
+#define CR4_PVI             (1U << CR4_PVI_BIT     )
+#define CR4_TSD             (1U << CR4_TSD_BIT     )
+#define CR4_DE              (1U << CR4_DE_BIT      )
+#define CR4_PSE             (1U << CR4_PSE_BIT     )
+#define CR4_PAE             (1U << CR4_PAE_BIT     )
+#define CR4_MCE             (1U << CR4_MCE_BIT     )
+#define CR4_PGE             (1U << CR4_PGE_BIT     )
+#define CR4_PCE             (1U << CR4_PCE_BIT     )
+#define CR4_OFXSR           (1U << CR4_OFXSR_BIT   )
+#define CR4_OSXMMEX         (1U << CR4_OSXMMEX_BIT )
+#define CR4_VMXE            (1U << CR4_VMXE_BIT    )
+#define CR4_SMXE            (1U << CR4_SMXE_BIT    )
+#define CR4_FSGSBASE        (1U << CR4_FSGSBASE_BIT)
+#define CR4_PCIDE           (1U << CR4_PCIDE_BIT   )
+#define CR4_OSXSAVE         (1U << CR4_OSXSAVE_BIT )
+#define CR4_SMEP            (1U << CR4_SMEP_BIT    )
+#define CR4_SMAP            (1U << CR4_SMAP_BIT    )
+#define CR4_PKE             (1U << CR4_PKE_BIT     )
 
 //
-// XSAVE/XRSTOR
+// XCR0
 
 #define XCR0_X87_BIT            0   // x87 FPU state
 #define XCR0_SSE_BIT            1   // SSE state
@@ -120,16 +164,16 @@
 #define XCR0_PT_BIT             8   // Processor Trace MSRs
 #define XCR0_PKRU_BIT           9   // Protection Key
 
-#define XCR0_X87                (1<<XCR0_X87_BIT)
-#define XCR0_SSE                (1<<XCR0_SSE_BIT)
-#define XCR0_AVX                (1<<XCR0_AVX_BIT)
-#define XCR0_MPX_BNDREG         (1<<XCR0_MPX_BNDREG_BIT)
-#define XCR0_MPX_BNDCSR         (1<<XCR0_MPX_BNDCSR_BIT)
-#define XCR0_AVX512_OPMASK      (1<<XCR0_AVX512_OPMASK_BIT)
-#define XCR0_AVX512_UPPER       (1<<XCR0_AVX512_UPPER_BIT)
-#define XCR0_AVX512_XREGS       (1<<XCR0_AVX512_XREGS_BIT)
-#define XCR0_PT                 (1<<XCR0_PT_BIT)
-#define XCR0_PKRU               (1<<XCR0_PKRU_BIT)
+#define XCR0_X87                (1U<<XCR0_X87_BIT)
+#define XCR0_SSE                (1U<<XCR0_SSE_BIT)
+#define XCR0_AVX                (1U<<XCR0_AVX_BIT)
+#define XCR0_MPX_BNDREG         (1U<<XCR0_MPX_BNDREG_BIT)
+#define XCR0_MPX_BNDCSR         (1U<<XCR0_MPX_BNDCSR_BIT)
+#define XCR0_AVX512_OPMASK      (1U<<XCR0_AVX512_OPMASK_BIT)
+#define XCR0_AVX512_UPPER       (1U<<XCR0_AVX512_UPPER_BIT)
+#define XCR0_AVX512_XREGS       (1U<<XCR0_AVX512_XREGS_BIT)
+#define XCR0_PT                 (1U<<XCR0_PT_BIT)
+#define XCR0_PKRU               (1U<<XCR0_PKRU_BIT)
 
 
 //
@@ -153,22 +197,22 @@
 #define EFLAGS_VIP_BIT  20
 #define EFLAGS_ID_BIT   21
 
-#define EFLAGS_CF       (1 << EFLAGS_CF_BIT)
-#define EFLAGS_PF       (1 << EFLAGS_PF_BIT)
-#define EFLAGS_AF       (1 << EFLAGS_AF_BIT)
-#define EFLAGS_ZF       (1 << EFLAGS_ZF_BIT)
-#define EFLAGS_SF       (1 << EFLAGS_SF_BIT)
-#define EFLAGS_TF       (1 << EFLAGS_TF_BIT)
-#define EFLAGS_IF       (1 << EFLAGS_IF_BIT)
-#define EFLAGS_DF       (1 << EFLAGS_DF_BIT)
-#define EFLAGS_OF       (1 << EFLAGS_OF_BIT)
-#define EFLAGS_NT       (1 << EFLAGS_NT_BIT)
-#define EFLAGS_RF       (1 << EFLAGS_RF_BIT)
-#define EFLAGS_VM       (1 << EFLAGS_VM_BIT)
-#define EFLAGS_AC       (1 << EFLAGS_AC_BIT)
-#define EFLAGS_VIF      (1 << EFLAGS_VIF_BIT)
-#define EFLAGS_VIP      (1 << EFLAGS_VIP_BIT)
-#define EFLAGS_ID       (1 << EFLAGS_ID_BIT)
+#define EFLAGS_CF       (1U << EFLAGS_CF_BIT)
+#define EFLAGS_PF       (1U << EFLAGS_PF_BIT)
+#define EFLAGS_AF       (1U << EFLAGS_AF_BIT)
+#define EFLAGS_ZF       (1U << EFLAGS_ZF_BIT)
+#define EFLAGS_SF       (1U << EFLAGS_SF_BIT)
+#define EFLAGS_TF       (1U << EFLAGS_TF_BIT)
+#define EFLAGS_IF       (1U << EFLAGS_IF_BIT)
+#define EFLAGS_DF       (1U << EFLAGS_DF_BIT)
+#define EFLAGS_OF       (1U << EFLAGS_OF_BIT)
+#define EFLAGS_NT       (1U << EFLAGS_NT_BIT)
+#define EFLAGS_RF       (1U << EFLAGS_RF_BIT)
+#define EFLAGS_VM       (1U << EFLAGS_VM_BIT)
+#define EFLAGS_AC       (1U << EFLAGS_AC_BIT)
+#define EFLAGS_VIF      (1U << EFLAGS_VIF_BIT)
+#define EFLAGS_VIP      (1U << EFLAGS_VIP_BIT)
+#define EFLAGS_ID       (1U << EFLAGS_ID_BIT)
 
 #define EFLAGS_IOPL_BITS    2
 #define EFLAGS_IOPL_MASK    ((1 << EFLAGS_IOPL_BITS)-1)
@@ -190,20 +234,20 @@
 #define MXCSR_RC_BIT        13
 #define MXCSR_FZ_BIT        15
 
-#define MXCSR_IE            (1 << MXCSR_IE_BIT)
-#define MXCSR_DE            (1 << MXCSR_DE_BIT)
-#define MXCSR_ZE            (1 << MXCSR_ZE_BIT)
-#define MXCSR_OE            (1 << MXCSR_OE_BIT)
-#define MXCSR_UE            (1 << MXCSR_UE_BIT)
-#define MXCSR_PE            (1 << MXCSR_PE_BIT)
-#define MXCSR_DAZ           (1 << MXCSR_DAZ_BIT)
-#define MXCSR_IM            (1 << MXCSR_IM_BIT)
-#define MXCSR_DM            (1 << MXCSR_DM_BIT)
-#define MXCSR_ZM            (1 << MXCSR_ZM_BIT)
-#define MXCSR_OM            (1 << MXCSR_OM_BIT)
-#define MXCSR_UM            (1 << MXCSR_UM_BIT)
-#define MXCSR_PM            (1 << MXCSR_PM_BIT)
-#define MXCSR_FZ            (1 << MXCSR_FZ_BIT)
+#define MXCSR_IE            (1U << MXCSR_IE_BIT)
+#define MXCSR_DE            (1U << MXCSR_DE_BIT)
+#define MXCSR_ZE            (1U << MXCSR_ZE_BIT)
+#define MXCSR_OE            (1U << MXCSR_OE_BIT)
+#define MXCSR_UE            (1U << MXCSR_UE_BIT)
+#define MXCSR_PE            (1U << MXCSR_PE_BIT)
+#define MXCSR_DAZ           (1U << MXCSR_DAZ_BIT)
+#define MXCSR_IM            (1U << MXCSR_IM_BIT)
+#define MXCSR_DM            (1U << MXCSR_DM_BIT)
+#define MXCSR_ZM            (1U << MXCSR_ZM_BIT)
+#define MXCSR_OM            (1U << MXCSR_OM_BIT)
+#define MXCSR_UM            (1U << MXCSR_UM_BIT)
+#define MXCSR_PM            (1U << MXCSR_PM_BIT)
+#define MXCSR_FZ            (1U << MXCSR_FZ_BIT)
 
 #define MXCSR_MASK_ALL      (MXCSR_IM | MXCSR_DM | MXCSR_ZM | \
                                 MXCSR_OM | MXCSR_UM | MXCSR_PM)
@@ -214,7 +258,7 @@
 #define MXCSR_RC_TRUNCATE   3
 
 #define MXCSR_RC_BITS       2
-#define MXCSR_RC_MASK       ((1 << MXCSR_RC_BITS)-1)
+#define MXCSR_RC_MASK       ((1U << MXCSR_RC_BITS)-1)
 #define MXCSR_RC            (MXCSR_RC_MASK << MXCSR_RC_BIT)
 #define MXCSR_RC_n(rc)      (((rc) & MXCSR_RC_MASK) << MXCSR_RC_BIT)
 

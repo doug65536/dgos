@@ -2,8 +2,9 @@
 
 #include "types.h"
 #include "cpu/nontemporal.h"
+#include "type_traits.h"
 
-extern "C" {
+__BEGIN_DECLS
 
 size_t strlen(char const *src);
 void *memchr(void const *mem, int ch, size_t count);
@@ -43,10 +44,193 @@ void *memfill_16(void *dest, uint16_t v, size_t count);
 void *memfill_32(void *dest, uint32_t v, size_t count);
 void *memfill_64(void *dest, uint64_t v, size_t count);
 
-}
+__END_DECLS
 
 template<typename T>
 void memzero(T &obj)
 {
     memset(&obj, 0, sizeof(obj));
+}
+
+//
+// Helpers to access device memory safely (KVM explodes if you use vector insn)
+
+// Zero extending loads
+
+template<typename T>
+static __always_inline unsigned devload_impl(
+        T const *p, integral_constant<size_t, 1>::type, false_type)
+{
+    unsigned result;
+    __asm__ __volatile__ (
+        "movzbl %[src],%k[result]\n\t"
+        : [result] "=r" (result)
+        : [src] "m" ((uint8_t *)p)
+    );
+    return result;
+}
+
+template<typename T>
+static __always_inline unsigned devload_impl(
+        T const *p, integral_constant<size_t, 2>::type, false_type)
+{
+    unsigned result;
+    __asm__ __volatile__ (
+        "movzwl %[src],%k[result]\n\t"
+        : [result] "=r" (result)
+        : [src] "m" (*(uint16_t *)p)
+    );
+    return result;
+}
+
+template<typename T>
+static __always_inline unsigned devload_impl(
+        T const *p, integral_constant<size_t, 4>::type, false_type)
+{
+    unsigned result;
+    __asm__ __volatile__ (
+        "movl %[src],%k[result]\n\t"
+        : [result] "=r" (result)
+        : [src] "m" (*(uint32_t *)p)
+    );
+    return result;
+}
+
+template<typename T>
+static __always_inline uint64_t devload_impl(
+        T const *p, integral_constant<size_t, 8>::type, false_type)
+{
+    uint64_t result;
+    __asm__ __volatile__ (
+        "movq %[src],%q[result]\n\t"
+        : [result] "=r" (result)
+        : [src] "m" (*(uint64_t *)p)
+    );
+    return result;
+}
+
+// Sign extending loads
+
+template<typename T>
+static __always_inline int devload_impl(
+        T const *p, integral_constant<size_t, 1>::type, true_type)
+{
+    int result;
+    __asm__ __volatile__ (
+        "movsbl %[src],%k[result]\n\t"
+        : [result] "=r" (result)
+        : [src] "m" ((uint8_t *)p)
+    );
+    return result;
+}
+
+template<typename T>
+static __always_inline int devload_impl(
+        T const *p, integral_constant<size_t, 2>::type, true_type)
+{
+    int result;
+    __asm__ __volatile__ (
+        "movswl %[src],%k[result]\n\t"
+        : [result] "=r" (result)
+        : [src] "m" (*(uint16_t *)p)
+    );
+    return result;
+}
+
+template<typename T>
+static __always_inline int devload_impl(
+        T const *p, integral_constant<size_t, 4>::type, true_type)
+{
+    int result;
+    __asm__ __volatile__ (
+        "movl %[src],%k[dest]\n\t"
+        : [dest] "=r" (result)
+        : [src] "m" (*(uint32_t *)p)
+    );
+    return result;
+}
+
+template<typename T>
+static __always_inline int64_t devload_impl(
+        T const *p, integral_constant<size_t, 8>::type, true_type)
+{
+    int64_t result;
+    __asm__ __volatile__ (
+        "movq %[src],%q[dest]\n\t"
+        : [dest] "=r" (result)
+        : [src] "m" (*(uint64_t *)p)
+    );
+    return result;
+}
+
+// Stores
+
+template<typename T>
+static __always_inline void devstore_impl(
+        T *p, T const& val, integral_constant<size_t, 1>::type)
+{
+    uint8_t result;
+    __asm__ __volatile__ (
+        "movb %b[src],%[dest]\n\t"
+        :
+        : [dest] "=m" (*(uint8_t *)p)
+        , [src] "r" (val)
+    );
+}
+
+template<typename T>
+static __always_inline void devstore_impl(
+        T *p, T const& val, integral_constant<size_t, 2>::type)
+{
+    __asm__ __volatile__ (
+        "movw %w[src],%[dest]\n\t"
+        : [dest] "=m" (*(uint8_t *)p)
+        : [src] "r" (val)
+    );
+}
+
+template<typename T>
+static __always_inline void devstore_impl(
+        T *p, T const& val, integral_constant<size_t, 4>::type)
+{
+    __asm__ __volatile__ (
+        "movl %k[src],%[dest]\n\t"
+        : [dest] "=m" (*(uint8_t *)p)
+        : [src] "r" (val)
+    );
+}
+
+template<typename T>
+static __always_inline void devstore_impl(
+        T *p, T const& val, integral_constant<size_t, 8>::type)
+{
+    __asm__ __volatile__ (
+        "movq %q[src],%[dest]\n\t"
+        : [dest] "=m" (*(uint64_t *)p)
+        : [src] "r" (val)
+    );
+}
+
+// Dispatcher
+
+template<typename T>
+static __always_inline auto devload(T const *p) ->
+    decltype(devload_impl(
+                 p, typename integral_constant<size_t, sizeof(T)>::type(),
+                 typename is_signed<T>::type()))
+{
+    return devload_impl(
+                p, typename integral_constant<size_t, sizeof(T)>::type(),
+                typename is_signed<T>::type());
+}
+
+template<typename T>
+static __always_inline auto devstore(T*p, T const& val) ->
+    decltype(devstore_impl(
+                 p, val,
+                 typename integral_constant<size_t, sizeof(T)>::type()))
+{
+    return devstore_impl(
+                p, val,
+                typename integral_constant<size_t, sizeof(T)>::type());
 }

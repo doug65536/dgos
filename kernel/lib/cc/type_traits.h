@@ -127,6 +127,44 @@ struct is_lvalue_reference<_T&&> : public false_type
 };
 
 template<typename _T>
+struct is_signed : public true_type
+{
+};
+
+template<>
+struct is_signed<unsigned char> : public false_type
+{
+};
+
+template<>
+struct is_signed<unsigned short> : public false_type
+{
+};
+
+template<>
+struct is_signed<unsigned int> : public false_type
+{
+};
+
+template<>
+struct is_signed<unsigned long> : public false_type
+{
+};
+
+template<>
+struct is_signed<__uint128_t> : public false_type
+{
+};
+
+template<typename _T>
+struct is_unsigned
+        : public conditional<
+            is_signed<_T>::value, false_type, true_type
+        >::type
+{
+};
+
+template<typename _T>
 struct underlying_type
 {
     using type = __underlying_type(_T);

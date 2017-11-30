@@ -21,7 +21,7 @@ struct table_register_64_t {
     uintptr_t base;
 };
 
-static __always_inline uint64_t msr_get(uint32_t msr)
+static __always_inline uint64_t cpu_msr_get(uint32_t msr)
 {
     uint32_t lo, hi;
     __asm__ __volatile__ (
@@ -33,7 +33,7 @@ static __always_inline uint64_t msr_get(uint32_t msr)
     return ((uint64_t)hi << 32) | lo;
 }
 
-static __always_inline uint32_t msr_get_lo(uint32_t msr)
+static __always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
 {
     uint64_t result;
     __asm__ __volatile__ (
@@ -45,7 +45,7 @@ static __always_inline uint32_t msr_get_lo(uint32_t msr)
     return result;
 }
 
-static __always_inline uint32_t msr_get_hi(uint32_t msr)
+static __always_inline uint32_t cpu_msr_get_hi(uint32_t msr)
 {
     uint64_t result;
     __asm__ __volatile__ (
@@ -57,7 +57,7 @@ static __always_inline uint32_t msr_get_hi(uint32_t msr)
     return result;
 }
 
-static __always_inline void msr_set(uint32_t msr, uint64_t value)
+static __always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
 {
     __asm__ __volatile__ (
         "wrmsr\n\t"
@@ -68,7 +68,7 @@ static __always_inline void msr_set(uint32_t msr, uint64_t value)
     );
 }
 
-static __always_inline void msr_set_lo(uint32_t msr, uint32_t value)
+static __always_inline void cpu_msr_set_lo(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
@@ -81,7 +81,7 @@ static __always_inline void msr_set_lo(uint32_t msr, uint32_t value)
     );
 }
 
-static __always_inline void msr_set_hi(uint32_t msr, uint32_t value)
+static __always_inline void cpu_msr_set_hi(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
@@ -94,12 +94,13 @@ static __always_inline void msr_set_hi(uint32_t msr, uint32_t value)
     );
 }
 
-static __always_inline uint64_t msr_adj_bit(uint32_t msr, int bit, int set)
+static __always_inline uint64_t cpu_msr_change_bits(
+        uint32_t msr, uint64_t clr, uint64_t set)
 {
-    uint64_t n = msr_get(msr);
-    n &= ~((uint64_t)1 << bit);
-    n |= (uint64_t)(set != 0) << bit;
-    msr_set(msr, n);
+    uint64_t n = cpu_msr_get(msr);
+    n &= ~clr;
+    n |= set;
+    cpu_msr_set(msr, n);
     return n;
 }
 
@@ -349,12 +350,12 @@ static __always_inline void cpu_set_gs(uint16_t selector)
 
 static __always_inline void cpu_set_fsbase(void *fs_base)
 {
-    msr_set(MSR_FSBASE, (uintptr_t)fs_base);
+    cpu_msr_set(MSR_FSBASE, (uintptr_t)fs_base);
 }
 
 static __always_inline void cpu_set_gsbase(void *gs_base)
 {
-    msr_set(MSR_GSBASE, (uintptr_t)gs_base);
+    cpu_msr_set(MSR_GSBASE, (uintptr_t)gs_base);
 }
 
 static __always_inline table_register_64_t cpu_get_gdtr(void)
@@ -574,8 +575,6 @@ template<typename T>
 static __always_inline void cpu_monitor(
         T const volatile *addr, uint32_t ext, uint32_t hint)
 {
-    static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
-
     __asm__ __volatile__ (
         "monitor"
         :
@@ -619,14 +618,14 @@ template<typename T>
 static __always_inline void cpu_wait_value(
         T const volatile *value, T wait_value)
 {
-    static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
-
     if (cpuid_has_mwait()) {
         while (*value != wait_value) {
             cpu_monitor(value, 0, 0);
 
             if (*value != wait_value)
                 cpu_mwait(0, 0);
+
+            pause();
         }
     } else {
         while (*value != wait_value)
