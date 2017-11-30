@@ -21,7 +21,7 @@ floppy_bootsig_check: disabled=0
 # no floppyb
 pci: enabled=1, chipset=i440fx
 vga: extension=vbe, update_freq=5, realtime=1
-cpu: count=4:1:1, ips=12000000, quantum=1, model=bx_generic
+cpu: count=4:1:1, ips=15270000, quantum=1, model=bx_generic
 cpu: reset_on_triple_fault=0, cpuid_limit_winnt=0, ignore_bad_msrs=0
 cpu: mwait_is_nop=0
 cpuid: level=6, stepping=3, model=3, family=6, vendor_string="GenuineIntel",
@@ -50,9 +50,9 @@ error: action=ask
 panic: action=ask
 keyboard: type=mf, serial_delay=250, paste_delay=100000, user_shortcut=none
 #mouse: type=imeps2, enabled=0, toggle=ctrl+mbutton
-#sound: waveoutdrv=alsa, waveout=none, waveindrv=alsa, wavein=none, midioutdrv=alsa, midiout=none
-sound: waveoutdrv=none, waveout=none, waveindrv=none, wavein=none, midioutdrv=none, midiout=none
-#speaker: enabled=1, mode=sound
+sound: waveoutdrv=alsa, waveout=none, waveindrv=alsa, wavein=none, midioutdrv=alsa, midiout=none
+#sound: waveoutdrv=none, waveout=none, waveindrv=none, wavein=none, midioutdrv=none, midiout=none
+speaker: enabled=1, mode=sound
 parport1: enabled=1, file=none
 parport2: enabled=0
 com1: enabled=1, mode=file, dev=/dev/ttyS0
