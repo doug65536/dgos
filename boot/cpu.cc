@@ -11,7 +11,7 @@
 extern gdt_entry_t gdt[];
 
 table_register_64_t idtr_64;
-table_register_t idtr_16 = {
+table_register_t idtr_16 __used = {
     0,
     4 * 256,
     0
@@ -280,32 +280,32 @@ const char *cpu_choose_kernel()
         return "dgos-kernel-generic";
 }
 
-static bool disable_interrupts()
-{
-    uint32_t int_enabled;
-    __asm__ __volatile__ (
-        "pushfl\n"
-        "popl %0\n"
-        "shrl $9,%0\n\t"
-        "andl $1,%0\n\t"
-        "cli\n\t"
-        : "=r" (int_enabled)
-    );
-    return !!int_enabled;
-}
+//static bool disable_interrupts()
+//{
+//    uint32_t int_enabled;
+//    __asm__ __volatile__ (
+//        "pushfl\n"
+//        "popl %0\n"
+//        "shrl $9,%0\n\t"
+//        "andl $1,%0\n\t"
+//        "cli\n\t"
+//        : "=r" (int_enabled)
+//    );
+//    return !!int_enabled;
+//}
 
-static void enable_interrupts()
-{
-    __asm__ __volatile__ ("sti");
-}
+//static void enable_interrupts()
+//{
+//    __asm__ __volatile__ ("sti");
+//}
 
-static void toggle_interrupts(bool enable)
-{
-    if (enable)
-        enable_interrupts();
-    else
-        disable_interrupts();
-}
+//static void toggle_interrupts(bool enable)
+//{
+//    if (enable)
+//        enable_interrupts();
+//    else
+//        disable_interrupts();
+//}
 
 bool need_a20_toggle;
 
@@ -370,7 +370,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Enable long mode IA32_EFER.LME (bit 8) MSR 0xC0000080
         // and if available, enable no-execute bit in paging
-        "movl $0xC0000080,%%ecx\n"
+        "movl $%c[msr_efer],%%ecx\n"
         "rdmsr\n\t"
         "btsl $8,%%eax\n\t"
         "cmpw $0,%[nx_available]\n\t"
@@ -502,6 +502,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         , [gdt_data32] "n" (GDT_SEL_KERNEL_DATA32)
         , [gdt_code16] "n" (GDT_SEL_KERNEL_CODE16)
         , [gdt_data16] "n" (GDT_SEL_KERNEL_DATA16)
+        , [msr_efer] "n" (MSR_EFER)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
 

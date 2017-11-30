@@ -11,11 +11,13 @@ struct gdt_entry_t {
     uint8_t base_high;
 };
 
-#define GDT_ACCESS_PRESENT_BIT   7
-#define GDT_ACCESS_DPL_BIT       5
-#define GDT_ACCESS_EXEC_BIT      3
-#define GDT_ACCESS_DOWN_BIT      2
-#define GDT_ACCESS_RW_BIT        1
+#define MSR_EFER                0xC0000080U
+
+#define GDT_ACCESS_PRESENT_BIT  7
+#define GDT_ACCESS_DPL_BIT      5
+#define GDT_ACCESS_EXEC_BIT     3
+#define GDT_ACCESS_DOWN_BIT     2
+#define GDT_ACCESS_RW_BIT       1
 
 #define GDT_ACCESS_PRESENT      (1 << GDT_ACCESS_PRESENT_BIT)
 #define GDT_ACCESS_EXEC         (1 << GDT_ACCESS_EXEC_BIT)
