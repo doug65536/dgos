@@ -2,6 +2,8 @@ bioscall.S
 bootcommon.S
 emulators.mk
 gdt.h
+tui.cc
+tui.h
 utils/bochs-fat-config.bxrc.template
 utils/bochs-iso-config.bxrc.template
 vesainfo.h

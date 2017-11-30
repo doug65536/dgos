@@ -2,6 +2,8 @@
 ../bochs-debugger-commands
 ../bochs-fat-config.bxrc
 ../bochs-iso-config.bxrc
+../gensymtab.sh
+arch/x86_64/cfi_helpers.h
 arch/x86_64/cpu/asm_constants.h
 arch/x86_64/cpu/control_regs_constants.h
 arch/x86_64/entry.S
