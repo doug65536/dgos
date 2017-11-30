@@ -139,7 +139,8 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-debug.$(OBJEXT) \
 	boot/libbootsect_a-part.$(OBJEXT) \
 	boot/libbootsect_a-mpentry.$(OBJEXT) \
-	boot/libbootsect_a-exception.$(OBJEXT)
+	boot/libbootsect_a-exception.$(OBJEXT) \
+	boot/libbootsect_a-tui.$(OBJEXT)
 libbootsect_a_OBJECTS = $(am_libbootsect_a_OBJECTS)
 libc_a_AR = $(AR) $(ARFLAGS)
 libc_a_LIBADD =
@@ -989,7 +990,9 @@ libbootsect_a_SOURCES = \
 	boot/bootsect.h \
 	boot/malloc.h \
 	boot/fs.h \
-	boot/vesa.h
+	boot/vesa.h \
+	boot/tui.h \
+	boot/tui.cc
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot
@@ -1416,6 +1419,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	-msse -msse2 -fverbose-asm \
 	-fvisibility=default \
 	-export-dynamic \
+	-ffreestanding \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -1736,7 +1740,7 @@ QEMU_COMMON = \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
 	$(QEMU_NET) \
-	-no-shutdown -no-reboot -d unimp,guest_errors,pcall,cpu_reset \
+	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS)
 
@@ -1761,8 +1765,8 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu EPYC
-#kvm64
+QEMU_EMU_tcg = -cpu kvm64
+#-cpu EPYC
 
 #QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom
 QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
@@ -1865,6 +1869,8 @@ boot/libbootsect_a-part.$(OBJEXT): boot/$(am__dirstamp) \
 boot/libbootsect_a-mpentry.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-exception.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-tui.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 
 libbootsect.a: $(libbootsect_a_OBJECTS) $(libbootsect_a_DEPENDENCIES) $(EXTRA_libbootsect_a_DEPENDENCIES) 
@@ -3065,6 +3071,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-screen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-string.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-tui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-utf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-vesa.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/$(DEPDIR)/kernel_avx2-main.Po@am__quote@
@@ -3847,6 +3854,20 @@ boot/libbootsect_a-debug.obj: boot/debug.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/debug.cc' object='boot/libbootsect_a-debug.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-debug.obj `if test -f 'boot/debug.cc'; then $(CYGPATH_W) 'boot/debug.cc'; else $(CYGPATH_W) '$(srcdir)/boot/debug.cc'; fi`
+
+boot/libbootsect_a-tui.o: boot/tui.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-tui.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-tui.Tpo -c -o boot/libbootsect_a-tui.o `test -f 'boot/tui.cc' || echo '$(srcdir)/'`boot/tui.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-tui.Tpo boot/$(DEPDIR)/libbootsect_a-tui.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/tui.cc' object='boot/libbootsect_a-tui.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-tui.o `test -f 'boot/tui.cc' || echo '$(srcdir)/'`boot/tui.cc
+
+boot/libbootsect_a-tui.obj: boot/tui.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-tui.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-tui.Tpo -c -o boot/libbootsect_a-tui.obj `if test -f 'boot/tui.cc'; then $(CYGPATH_W) 'boot/tui.cc'; else $(CYGPATH_W) '$(srcdir)/boot/tui.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-tui.Tpo boot/$(DEPDIR)/libbootsect_a-tui.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/tui.cc' object='boot/libbootsect_a-tui.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-tui.obj `if test -f 'boot/tui.cc'; then $(CYGPATH_W) 'boot/tui.cc'; else $(CYGPATH_W) '$(srcdir)/boot/tui.cc'; fi`
 
 libc/src/string/libc_a-__bytebitmap.o: libc/src/string/__bytebitmap.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/string/libc_a-__bytebitmap.o -MD -MP -MF libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo -c -o libc/src/string/libc_a-__bytebitmap.o `test -f 'libc/src/string/__bytebitmap.cc' || echo '$(srcdir)/'`libc/src/string/__bytebitmap.cc
@@ -9248,59 +9269,53 @@ GREP ?= grep
 SED ?= sed
 SORT ?= sort
 
-bootfat.sym: bootfat-elf symbols.mk
-	$(OBJDUMP) --wide --syms $< | \
-		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
-		$(SORT) > $@
+bootfat.sym: bootfat-elf \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-bootiso.sym: bootiso-elf symbols.mk
-	$(OBJDUMP) --wide --syms $< | \
-		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
-		$(SORT) > $@
+bootiso.sym: bootiso-elf \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-mbr.sym: mbr-elf symbols.mk
-	$(OBJDUMP) --wide --syms $< | \
-		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
-		$(SORT) > $@
+mbr.sym: mbr-elf \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-kernel-generic.sym: kernel-generic symbols.mk
-	$(OBJDUMP) --wide --syms $< | \
-		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
-		$(SORT) > $@
+kernel-generic.sym: kernel-generic \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-kernel-sse4.sym: kernel-sse4 symbols.mk
-	$(OBJDUMP) --wide --syms $< | \
-		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
-		$(SORT) > $@
+kernel-sse4.sym: kernel-sse4 \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-kernel-avx2.sym: kernel-avx2 symbols.mk
-	$(OBJDUMP) --wide --syms $< | \
-		$(GREP) -P '^[0-9A-Fa-f_]+\s.*\s[a-zA-Z_][a-zA-Z0-9_]+$$' | \
-		$(SED) -r 's/^(\S+)\s+.*\s+(\S+)$$/\1 \2/' | \
-		$(SORT) > $@
+kernel-avx2.sym: kernel-avx2 \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-mbr.dis: mbr-elf
-	objdump --disassemble --source -m i8086 $^ > $@
+mbr.dis: mbr-elf $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< > $@
 
-bootfat.dis: bootfat-elf
-	objdump --disassemble --source $^ > $@
+bootfat.dis: bootfat-elf $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< > $@
 
-bootiso.dis: bootiso-elf
-	objdump --disassemble --source $^ > $@
+bootiso.dis: bootiso-elf $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< > $@
 
-kernel-generic.dis: kernel-generic
-	objdump --disassemble --source $^ > $@
+kernel-generic.dis: kernel-generic $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< > $@
 
-kernel-sse4.dis: kernel-sse4
-	objdump --disassemble --source $^ > $@
+kernel-sse4.dis: kernel-sse4 $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< > $@
 
-kernel-avx2.dis: kernel-avx2
-	objdump --disassemble --source $^ > $@
+kernel-avx2.dis: kernel-avx2 $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< > $@
 $(top_builddir)/fatdisk.img: mbr-bin bootfat-bin \
 		diskfat.mk \
 		$(top_srcdir)/populate_fat.sh \
@@ -9367,17 +9382,21 @@ isodisk.img: bootiso-bin \
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
-	rm -f $(top_builddir)/kernel.dis
+	rm -f $(top_builddir)/mbr.dis
+	rm -f $(top_builddir)/bootfat.sym
+	rm -f $(top_builddir)/bootfat.map
+	rm -f $(top_builddir)/bootfat.dis
+	rm -f $(top_builddir)/bootiso.sym
+	rm -f $(top_builddir)/bootiso.map
 	rm -f $(top_builddir)/kernel-generic.sym
 	rm -f $(top_builddir)/kernel-sse4.sym
 	rm -f $(top_builddir)/kernel-avx2.sym
+	rm -f $(top_builddir)/kernel-generic.dis
+	rm -f $(top_builddir)/kernel-sse4.dis
+	rm -f $(top_builddir)/kernel-avx2.dis
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-sse4.map
 	rm -f $(top_builddir)/kernel-avx2.map
-	rm -f $(top_builddir)/bootfat.sym
-	rm -f $(top_builddir)/bootfat.map
-	rm -f $(top_builddir)/bootiso.sym
-	rm -f $(top_builddir)/bootiso.map
 
 distclean-local:
 	rm -rf $(top_builddir)/extern

@@ -179,7 +179,9 @@ libbootsect_a_SOURCES = \
 	boot/bootsect.h \
 	boot/malloc.h \
 	boot/fs.h \
-	boot/vesa.h
+	boot/vesa.h \
+	boot/tui.h \
+	boot/tui.cc
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot
@@ -611,6 +613,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	-msse -msse2 -fverbose-asm \
 	-fvisibility=default \
 	-export-dynamic \
+	-ffreestanding \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -900,17 +903,21 @@ include diskiso.mk
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
-	rm -f $(top_builddir)/kernel.dis
+	rm -f $(top_builddir)/mbr.dis
+	rm -f $(top_builddir)/bootfat.sym
+	rm -f $(top_builddir)/bootfat.map
+	rm -f $(top_builddir)/bootfat.dis
+	rm -f $(top_builddir)/bootiso.sym
+	rm -f $(top_builddir)/bootiso.map
 	rm -f $(top_builddir)/kernel-generic.sym
 	rm -f $(top_builddir)/kernel-sse4.sym
 	rm -f $(top_builddir)/kernel-avx2.sym
+	rm -f $(top_builddir)/kernel-generic.dis
+	rm -f $(top_builddir)/kernel-sse4.dis
+	rm -f $(top_builddir)/kernel-avx2.dis
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-sse4.map
 	rm -f $(top_builddir)/kernel-avx2.map
-	rm -f $(top_builddir)/bootfat.sym
-	rm -f $(top_builddir)/bootfat.map
-	rm -f $(top_builddir)/bootiso.sym
-	rm -f $(top_builddir)/bootiso.map
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
@@ -1058,7 +1065,7 @@ QEMU_COMMON = \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
 	$(QEMU_NET) \
-	-no-shutdown -no-reboot -d unimp,guest_errors,pcall,cpu_reset \
+	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS)
 
@@ -1082,8 +1089,8 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu EPYC
-#kvm64
+QEMU_EMU_tcg = -cpu kvm64
+#-cpu EPYC
 
 #QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom
 QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
