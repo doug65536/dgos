@@ -11,6 +11,7 @@ arch/x86_64/cpu/apic.bits
 arch/x86_64/cpu/apicbits.h
 arch/x86_64/cpu/asm_constants.h
 arch/x86_64/cpu/control_regs_constants.h
+arch/x86_64/cpu/perftest.S
 arch/x86_64/entry.S
 arch/x86_64/nano_time.h
 device/i350.bits

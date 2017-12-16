@@ -131,6 +131,8 @@ C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_stack) == THREAD_SYSCALL_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
+C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
+C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
@@ -399,34 +401,34 @@ static thread_t thread_create_with_state(
         ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
         ctx->gpr = (isr_gpr_context_t*)(ctx + 1);
 
-        ctx->gpr->iret.rsp = (uintptr_t)
+        ISR_CTX_REG_RSP(ctx) = (uintptr_t)
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
-        assert((ctx->gpr->iret.rsp & 0xF) == 0x8);
-        ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA;
-        ctx->gpr->iret.rflags = CPU_EFLAGS_IF;
-        ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
-        ctx->gpr->iret.cs = GDT_SEL_KERNEL_CODE64;
-        ctx->gpr->s[0] = GDT_SEL_KERNEL_DATA;
-        ctx->gpr->s[1] = GDT_SEL_KERNEL_DATA;
-        ctx->gpr->s[2] = GDT_SEL_KERNEL_DATA;
-        ctx->gpr->s[3] = GDT_SEL_KERNEL_DATA;
-        ctx->gpr->r[0] = (uintptr_t)fn;
-        ctx->gpr->r[1] = (uintptr_t)userdata;
-        ctx->gpr->r[2] = (uintptr_t)i;
-        ctx->gpr->cr3 = cpu_get_page_directory();
+        assert((ISR_CTX_REG_RSP(ctx) & 0xF) == 0x8);
+        ISR_CTX_REG_SS(ctx) = GDT_SEL_KERNEL_DATA;
+        ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
+        ISR_CTX_REG_RIP(ctx) = (thread_fn_t)(uintptr_t)thread_startup;
+        ISR_CTX_REG_CS(ctx) = GDT_SEL_KERNEL_CODE64;
+        ISR_CTX_REG_DS(ctx) = GDT_SEL_USER_DATA | 3;
+        ISR_CTX_REG_ES(ctx) = GDT_SEL_USER_DATA | 3;
+        ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
+        ISR_CTX_REG_GS(ctx) = GDT_SEL_USER_DATA | 3;
+        ISR_CTX_REG_RDI(ctx) = (uintptr_t)fn;
+        ISR_CTX_REG_RSI(ctx) = (uintptr_t)userdata;
+        ISR_CTX_REG_RDX(ctx) = (uintptr_t)i;
+        ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
 
         memset(ctx->fpr, 0, sse_context_size);
 
-        ctx->fpr->mxcsr = (CPU_MXCSR_MASK_ALL |
+        ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
                 CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
                 default_mxcsr_mask;
-        ctx->fpr->mxcsr_mask = default_mxcsr_mask;
+        ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
 
         // All FPU registers empty
-        ctx->fpr->fsw = CPU_FPUSW_TOP_n(7);
+        ISR_CTX_FPU_FSW(ctx) = CPU_FPUSW_TOP_n(7);
 
         // 53 bit FPU precision
-        ctx->fpr->fcw = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
+        ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
                 CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
                 CPU_FPUCW_UM | CPU_FPUCW_PM;
 
@@ -512,7 +514,7 @@ void thread_init(int ap)
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
-    cpu_set_gs(GDT_SEL_KERNEL_DATA);
+    cpu_set_gs(GDT_SEL_USER_DATA | 3);
     cpu_set_gsbase(cpu);
 
     if (!ap) {
@@ -758,10 +760,10 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     assert(isrctx->gpr->iret.cs == 0x8);
     assert(isrctx->gpr->iret.ss == 0x10);
-    assert(isrctx->gpr->s[0] == 0x10);
-    assert(isrctx->gpr->s[1] == 0x10);
-    assert(isrctx->gpr->s[2] == 0x10);
-    assert(isrctx->gpr->s[3] == 0x10);
+    assert(isrctx->gpr->s[0] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr->s[1] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr->s[2] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr->s[3] == (GDT_SEL_USER_DATA | 3));
 
     assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
     assert(isrctx->gpr->iret.rsp <

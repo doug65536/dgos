@@ -525,13 +525,13 @@ void dump_context(isr_context_t *ctx, int to_screen)
         " r9",
         "rax",
         "rbx",
-        "rbp",
         "r10",
         "r11",
         "r12",
         "r13",
         "r14",
-        "r15"
+        "r15",
+        "rbp"
     };
 
     static char const *seg_names[] = {

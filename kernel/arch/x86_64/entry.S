@@ -26,16 +26,19 @@ entry:
 //    push %rax
 //    push %rdx
 //    push %rcx
+//    mov %cr4,%rax
+//    or $CPU_CR4_FSGSBASE,%rax
+//    mov %rax,%cr4
 //    rdtscp
 //    shl $32,%rdx
 //    or %rdx,%rax
 //    mov %rax,%r12
-//    call mov_seg_perf
+//    call rdfsbase_perf
 //    rdtscp
 //    shl $32,%rdx
 //    or %rdx,%rax
 //    sub %r12,%rax
-//    mov $256000000,%rcx
+//    mov $60000000,%rcx
 //    xor %edx,%edx
 //    div %rcx
 //    pop %rcx

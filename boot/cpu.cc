@@ -380,6 +380,8 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "movl %%eax,%%ds\n\t"
         "movl %%eax,%%es\n\t"
         "movl %%eax,%%fs\n\t"
+        "movl %%eax,%%gs\n\t"
+        "movl %[gdt_stkseg],%%eax\n\t"
         "movl %%eax,%%ss\n\t"
 
         // Load copy/entry parameters
@@ -457,7 +459,8 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         , [size_ofs] "e" (offsetof(params_t, size))
         , [pdbr_ofs] "e" (offsetof(params_t, pdbr))
         , [gdt_code64] "n" (GDT_SEL_KERNEL_CODE64)
-        , [gdt_data64] "n" (GDT_SEL_KERNEL_DATA)
+        , [gdt_data64] "n" (GDT_SEL_USER_DATA | 3)
+        , [gdt_stkseg] "n" (GDT_SEL_KERNEL_DATA)
         , [gdt_code32] "n" (GDT_SEL_KERNEL_CODE32)
         , [gdt_data32] "n" (GDT_SEL_KERNEL_DATA32)
         , [gdt_code16] "n" (GDT_SEL_KERNEL_CODE16)

@@ -8,10 +8,6 @@
 // This must be position independent code because the GDB stub clones off
 // a redundant copy to protect against infinite recursion
 
-// Self modify code to use xsave when appropriate
-.global sse_context_save
-.global sse_context_restore
-
 
 .macro isr_entry has_code int_num
 .global isr_entry_\int_num\()
@@ -166,28 +162,30 @@ isr_common:
 	.cfi_startproc
 	.cfi_def_cfa_offset 24
 
-	// At this point:
-	//  0*8(%rsp) -> interrupt
-	//  1*8(%rsp) -> error code
-	//  2*8(%rsp) -> rip
-	//  3*8(%rsp) -> cs
-	//  4*8(%rsp) -> flags
-	//  5*8(%rsp) -> rsp
-	//  6*8(%rsp) -> ss
-
 	// Save call-clobbered registers
 	// (in System-V parameter order in memory)
+	push_cfi %rbp
+	mov %rsp,%rbp
+
+	//  1*8(%rbp) -> interrupt
+	//  2*8(%rbp) -> error code
+	//  3*8(%rbp) -> rip
+	//  4*8(%rbp) -> cs
+	//  5*8(%rbp) -> flags
+	//  6*8(%rbp) -> rsp
+	//  7*8(%rbp) -> ss
+
 	push_cfi %r15
 	push_cfi %r14
 	push_cfi %r13
 	push_cfi %r12
 	push_cfi %r11
 	push_cfi %r10
-	push_cfi %rbp
 	push_cfi %rbx
 	push_cfi %rax
-	mov %cr3,%rax
+	cld
 	push_cfi %r9
+	mov %cr3,%rax
 	push_cfi %r8
 	push_cfi %rcx
 	push_cfi %rdx
@@ -197,7 +195,6 @@ isr_common:
 	// Register usage:
 	//  r13: segment register values at interrupt entry
 
-	cld
 	push_cfi %rax
 
 	// Get segment registers packed into %r13
@@ -213,20 +210,21 @@ isr_common:
 	push_cfi %r13
 
 	// See if we are coming from kernel code
-	cmpw $GDT_SEL_KERNEL_CODE64,20*8(%rsp)
-	je 0f
+	cmpl $GDT_SEL_KERNEL_CODE64,4*8(%rbp)
+	je .Lfrom_kernel
 
 	// ...came from user code
 	swapgs
-0:
+
+.Lfrom_kernel:
 
 	// Save entire sse/mmx/fpu state
 	// NOTE: this instruction may be patched to call one of the xsave versions!
 	jmp isr_save_fxsave
-sse_context_save:
+.Lsse_context_save_jmp:
 
 .align 16
-8:
+.Lafter_fpu_save:
 
 	// Make structure on the stack
 	push_cfi %rsp
@@ -237,10 +235,7 @@ sse_context_save:
 
 	// Pass intr, ctx
 	mov %rsp,%rsi
-	mov 22*8(%rsp),%edi
-
-	// Setup frame pointer so rbp stack traces will work
-	//lea 24*8(%rsp),%rbp  -- worse
+	mov 1*8(%rbp),%edi
 
 	// Interrupt dispatch
 	// 0x00-0x1F -> exception_isr_handler
@@ -273,14 +268,16 @@ sse_context_save:
 	// the passed one to continue with this thread
 	mov %rax,%rsp
 
+	lea 20*8(%rsp),%rbp
+
 	// Pop outgoing cleanup data
 	// Used to adjust outgoing thread state after switching stack
 	pop_cfi %rax
 	pop_cfi %rdi
 	test %rax,%rax
-	jz 0f
+	jz .Lno_cleanup_call
 	call *%rax
-0:
+.Lno_cleanup_call:
 
 	// Pop the pointer to the FPU context
 	pop_cfi %rdi
@@ -289,74 +286,66 @@ sse_context_save:
 
 	// NOTE: this instruction may be patched to call one of the xsave versions!
 	jmp isr_restore_fxrstor
-sse_context_restore:
+.Lsse_context_restore_jmp:
 
 .align 16
-9:
+.Lafter_cpu_restore:
+
+	// pop packed segments qword into rdx
+	// fetch cpu local storage pointer into r14
+	// if not returning to kernel
+	//   update tss rsp0
+	//   swapgs
+	//   if any data segment is not GDT_SEL_USER_DATA | 3
+	//     load all segment registers with GDT_SEL_USER_DATA | 3
+	//   endif
+	//   restore fsbase
+	// endif
 
 	// Load return cs
-	movzwl 20*8(%rsp),%ecx
+	movzwl 4*8(%rbp),%ecx
+
+	// Pop segments
+	pop_cfi %rdx
+
+	// Fetch pointer to cpu_info
+	mov %gs:0,%r14
 
 	// See if we're not returning to user code
 	// Branch past swapgs and restoration of segments if not
 	cmpl $GDT_SEL_KERNEL_CODE64,%ecx
-	jz 0f
+	jz .Lreturning_to_kernel
 
-	// ...yes, returning to user code
+	// ...returning to user code
 
 	// Fetch pointer to this CPU's TSS for TSS.RSP0 update
-	mov %gs:CPU_INFO_TSS_PTR_OFS,%rbx
-	lea 24*16(%rsp),%rax
+	mov CPU_INFO_TSS_PTR_OFS(%r14),%rbx
+	lea 8*8(%rbp),%rax
 	mov %rax,TSS_RSP0_OFS(%rbx)
 
 	// Restore user gs
 	swapgs
 
-	// Only restore segments if returning to compatibility mode
-	pop_cfi %rax
-	cmp $(GDT_SEL_USER_CODE32 | 3),%ecx
-	je 1f
-	jmp 0f
-
-1:
 	// If segments are not changing, avoid 136*4 cycles
-	cmp %r13,%rax
-	jnz 1f
-	jmp 0f
-
-1:
-	// Restore segments
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%eax
-	mov %ax,%gs
+	cmp %r13,%rdx
+	jnz .Lsegments_changed
+	jmp .Lsegments_not_changed
 
 .align 16
-0:
+.Lsegments_changed:
+	// Restore segments
+	movl $(GDT_SEL_USER_DATA | 3),%eax
+	movw %ax,%ds
+	movw %ax,%es
+	movw %ax,%fs
+	movw %ax,%gs
+
+.align 16
+.Lsegments_not_changed:
+.Lreturning_to_kernel:
 	// Restore CR3
 	pop_cfi %rax
 	mov %rax,%cr3
-
-	// Restore FSBASE
-	pop_cfi %rax
-	cmpb $0,cpu_has_fsgsbase
-	je 1f
-
-	wrfsbase %rax
-	jmp 0f
-
-.align 16
-1:
-	mov $CPU_MSR_FSBASE,%ecx
-	mov %rax,%rdx
-	shr $32,%rdx
-	wrmsr
-
-.align 16
-0:
 
 	pop_cfi %rdi
 	pop_cfi %rsi
@@ -366,13 +355,13 @@ sse_context_restore:
 	pop_cfi %r9
 	pop_cfi %rax
 	pop_cfi %rbx
-	pop_cfi %rbp
 	pop_cfi %r10
 	pop_cfi %r11
 	pop_cfi %r12
 	pop_cfi %r13
 	pop_cfi %r14
 	pop_cfi %r15
+	pop_cfi %rbp
 
 	addq $16,%rsp
 	.cfi_def_cfa_offset 8
@@ -384,7 +373,7 @@ sse_context_restore:
 // Expects ds loaded with kernel data segment
 // Clobbers rcx,rdx,rax,rdi
 // Returns rax=pointer to context
-.macro xsave_ctx insn clear_hdr
+.macro xsave_ctx insn
 	// Get pointer to current thread from CPU-local storage
 	mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
 
@@ -392,19 +381,12 @@ sse_context_restore:
 	mov $-1,%eax
 	mov $-1,%edx
 
-	// Panic on CPU storage not being ready (yet)
+	// Skip if threading not initialized yet (still needed?)
 	test %rcx,%rcx
 	jz 1f
 
 	// Read xsave stack pointer from thread
 	mov THREAD_XSAVE_PTR_OFS(%rcx),%rdi
-
-	// Only clear xsave header depending on macro parameter
-	.if \clear_hdr != 0
-		// If this is not the first context, clear xsave header
-		cmp THREAD_XSAVE_STACK_OFS(%rcx),%rdi
-		jnz 0f
-	.endif
 
 	// Save context using instruction passed to macro
 	\insn (%rdi)
@@ -414,34 +396,7 @@ sse_context_restore:
 	add sse_context_size,%rdi
 	mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 1:
-	jmp 8b
-
-0:  call cpu_debug_break
-	jmp 0b
-
-	// Out of line clear xsave header for recursive context save
-	.if \clear_hdr != 0
-		.align 16
-0:
-		xor %eax,%eax
-		// Clear xsave header
-		mov $512,%edx
-		mov %rax,   (%rdi,%rdx)
-		mov %rax,1*8(%rdi,%rdx)
-		mov %rax,2*8(%rdi,%rdx)
-		mov %rax,3*8(%rdi,%rdx)
-		mov %rax,4*8(%rdi,%rdx)
-		mov %rax,5*8(%rdi,%rdx)
-		mov %rax,6*8(%rdi,%rdx)
-		mov %rax,7*8(%rdi,%rdx)
-		dec %eax
-		mov %eax,%edx
-		\insn (%rdi)
-		mov %rdi,%rax
-		add sse_context_size,%rdi
-		mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
-		jmp 8b
-	.endif
+	jmp .Lafter_fpu_save
 .endm
 
 // Expects ds to be kernel data segment
@@ -459,26 +414,26 @@ sse_context_restore:
 	mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
 	mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 
-	jmp 9b
+	jmp .Lafter_cpu_restore
 .endm
 
 .align 16
 .global isr_save_xsaveopt
 .hidden isr_save_xsaveopt
 isr_save_xsaveopt:
-	xsave_ctx xsaveopt64 0
+	xsave_ctx xsaveopt64
 
 .align 16
 .global isr_save_xsave
 .hidden isr_save_xsave
 isr_save_xsave:
-	xsave_ctx xsave64 0
+	xsave_ctx xsave64
 
 .align 16
 .global isr_save_xsavec
 .hidden isr_save_xsavec
 isr_save_xsavec:
-	xsave_ctx xsavec64 0
+	xsave_ctx xsavec64
 
 .align 16
 .global isr_restore_xrstor
@@ -490,7 +445,7 @@ isr_restore_xrstor:
 .global isr_save_fxsave
 .hidden isr_save_fxsave
 isr_save_fxsave:
-	xsave_ctx fxsave64 0
+	xsave_ctx fxsave64
 
 .align 16
 .global isr_restore_fxrstor
@@ -559,798 +514,15 @@ exception_isr_handler:
 
 	.cfi_endproc
 
-// Load segments 256,000,000 times from top of stack
-// old way 136 cycles
-.global mov_seg_perf
-mov_seg_perf:
-	push $0
-	mov $1000000,%ecx
+.align 64
 
-	xor %eax,%eax
-.align 16
-0:
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	mov (%rsp),%rax
-	mov %ax,%ds
-	shr $16,%rax
-	mov %ax,%es
-	shr $16,%rax
-	mov %ax,%fs
-	shr $16,%rax
-	mov %ax,%gs
-	dec %ecx
-	jnz 0b
-	pop %rax
-	ret
+// Pointers to patch points
+.global sse_context_save
+sse_context_save:
+	.quad .Lsse_context_save_jmp
 
-// Load segments 256,000,000 times from top of stack
-.global str_seg_perf
-str_seg_perf:
-	push $0
-	mov $1000000,%ecx
+.global sse_context_restore
+sse_context_restore:
+	.quad .Lsse_context_restore_jmp
 
-.align 16
-0:
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	mov %ds,(%rsp)
-	mov %es,2(%rsp)
-	mov %fs,4(%rsp)
-	mov %gs,6(%rsp)
-	dec %ecx
-	jnz 0b
-	pop %rax
-	ret
+.align 64, 0

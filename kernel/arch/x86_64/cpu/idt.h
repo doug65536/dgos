@@ -39,13 +39,13 @@ extern "C" idt_entry_64_t idt[];
 #define ISR_CTX_REG_R9(ctx)             ((ctx)->gpr->r[5])
 #define ISR_CTX_REG_RAX(ctx)            ((ctx)->gpr->r[6])
 #define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr->r[7])
-#define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr->r[8])
-#define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr->r[9])
-#define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr->r[10])
-#define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr->r[11])
-#define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr->r[12])
-#define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr->r[13])
-#define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr->r[14])
+#define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr->r[8])
+#define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr->r[9])
+#define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr->r[10])
+#define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr->r[11])
+#define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr->r[12])
+#define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr->r[13])
+#define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr->r[14])
 
 #define ISR_CTX_REG_RIP(ctx)            ((ctx)->gpr->iret.rip)
 #define ISR_CTX_REG_RSP(ctx)            ((ctx)->gpr->iret.rsp)
@@ -58,9 +58,10 @@ extern "C" idt_entry_64_t idt[];
 #define ISR_CTX_REG_FS(ctx)             ((ctx)->gpr->s[2])
 #define ISR_CTX_REG_GS(ctx)             ((ctx)->gpr->s[3])
 
+#define ISR_CTX_REG_CR3(ctx)            ((ctx)->gpr->cr3)
+
 #define ISR_CTX_ERRCODE(ctx)            ((ctx)->info.error_code)
 #define ISR_CTX_INTR(ctx)               ((ctx)->info.interrupt)
-#define ISR_CTX_CR3(ctx)                ((ctx)->gpr->cr3)
 
 #define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
 #define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
@@ -79,6 +80,7 @@ extern "C" idt_entry_64_t idt[];
 #define ISR_CTX_SSE_XMMn_d(ctx, n, i)   ((ctx)->fpr->xmm[(n)].dword[(i)])
 #define ISR_CTX_SSE_XMMn_q(ctx, n, i)   ((ctx)->fpr->xmm[(n)].qword[(i)])
 #define ISR_CTX_SSE_MXCSR(ctx)          ((ctx)->fpr->mxcsr)
+#define ISR_CTX_SSE_MXCSR_MASK(ctx)     ((ctx)->fpr->mxcsr_mask)
 
 size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags);
 size_t cpu_describe_mxcsr(char *buf, size_t buf_size, uintptr_t mxcsr);
