@@ -102,7 +102,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
         return RTL8139_MMIO(uint32_t, reg);
     }
 
-    void detect(pci_dev_iterator_t &pci_iter);
+    void detect(pci_dev_t const& pci_dev);
 
     void tx_packet(int slot, ethq_pkt_t *pkt);
     void rx_irq_handler(uint16_t isr);
@@ -905,9 +905,10 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
 {
     pci_dev_iterator_t pci_iter;
 
-    pci_enumerate_begin(&pci_iter,
-                        PCI_DEV_CLASS_NETWORK,
-                        PCI_SUBCLASS_NETWORK_ETHERNET);
+    if (!pci_enumerate_begin(&pci_iter,
+                             PCI_DEV_CLASS_NETWORK,
+                             PCI_SUBCLASS_NETWORK_ETHERNET))
+        return 0;
 
     do {
         if (pci_iter.config.vendor != 0x10EC ||
@@ -945,19 +946,16 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
     return rtl8139_device_count;
 }
 
-void rtl8139_dev_t::detect(pci_dev_iterator_t &pci_iter)
+void rtl8139_dev_t::detect(pci_dev_t const &pci_dev)
 {
-    mmio_physaddr = pci_iter.config.base_addr[1] & -16;
+    mmio_physaddr = pci_dev.config.base_addr[1] & -16;
 
     mmio = mmap((void*)mmio_physaddr, 256,
                       PROT_READ | PROT_WRITE,
                       MAP_PHYSICAL, -1, 0);
 
     // Enable MMIO and bus master, disable port I/O
-    pci_adj_control_bits(pci_iter.bus, pci_iter.slot,
-                         pci_iter.func,
-                         PCI_CMD_BUSMASTER |
-                         PCI_CMD_MEMEN,
+    pci_adj_control_bits(pci_dev, PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
                          PCI_CMD_IOEN);
 
     // Power on
@@ -988,27 +986,12 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t &pci_iter)
     memcpy(mac_addr + 4, &mac_lo, sizeof(uint16_t));
     memcpy(mac_addr, &mac_hi, sizeof(uint32_t));
 
-    // Restore BIOS assigned IRQ
-    irq_range.base = pci_iter.config.irq_line;
-    irq_range.count = 1;
-
     // Use MSI IRQ if possible
-    use_msi = pci_set_msi_irq(
-                pci_iter.bus, pci_iter.slot, pci_iter.func,
-                &irq_range, 1, 0, 0, &rtl8139_dev_t::irq_dispatcher);
+    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 1, false, 0,
+                              &rtl8139_dev_t::irq_dispatcher);
 
-    if (!use_msi) {
-        // Plain IRQ pin
-        pci_set_irq_pin(pci_iter.bus, pci_iter.slot,
-                        pci_iter.func,
-                        pci_iter.config.irq_pin);
-        pci_set_irq_line(pci_iter.bus, pci_iter.slot,
-                         pci_iter.func,
-                         pci_iter.config.irq_line);
-
-        irq_hook(pci_iter.config.irq_line, rtl8139_dev_t::irq_dispatcher);
-        irq_setmask(pci_iter.config.irq_line, 1);
-    }
+    RTL8139_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
+               use_msi, irq_range.base, irq_range.count);
 
     // Reset receive ring buffer offset
     rx_offset = 0;

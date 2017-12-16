@@ -128,7 +128,8 @@ struct ide_if_t : public storage_if_base_t {
         __always_inline uint16_t inw(ata_reg_cmd reg);
         __always_inline void outb(ata_reg_cmd reg, uint8_t value);
         __always_inline void outw(ata_reg_cmd reg, uint16_t value);
-        __always_inline void outsw(ata_reg_cmd reg, void const *values, size_t count);
+        __always_inline void outsw(ata_reg_cmd reg,
+                                   void const *values, size_t count);
         __always_inline void insw(ata_reg_cmd reg, void *values, size_t count);
         __always_inline uint8_t inb(ata_reg_ctl reg);
         __always_inline void outb(ata_reg_ctl reg, uint8_t value);
@@ -319,10 +320,8 @@ if_list_t ide_if_factory_t::detect(void)
             continue;
         }
 
-        // Enable bus master DMA
-        pci_adj_control_bits(pci_iter.bus, pci_iter.slot,
-                             pci_iter.func, PCI_CMD_BUSMASTER, 0);
-
+        // Enable bus master DMA and I/O ports
+        pci_adj_control_bits(pci_iter, PCI_CMD_BUSMASTER | PCI_CMD_IOEN, 0);
     } while (pci_enumerate_next(&pci_iter));
 
     list.count = ide_if_count - start_at;
@@ -710,7 +709,8 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         ident.reset();
 
-        IDE_TRACE("if=%d, slave=%d, max_dma=%d\n", secondary, slave, unit.max_dma);
+        IDE_TRACE("if=%d, slave=%d, max_dma=%d\n",
+                  secondary, slave, unit.max_dma);
 
         if (unit.has_48bit) {
             if (unit.max_dma >= 0) {

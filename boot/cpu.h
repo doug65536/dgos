@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "cpu_constants.h"
 
 struct gdt_entry_t {
     uint16_t limit_low;
@@ -10,44 +11,6 @@ struct gdt_entry_t {
     uint8_t flags_limit_high;
     uint8_t base_high;
 };
-
-#define MSR_EFER                0xC0000080U
-
-#define GDT_ACCESS_PRESENT_BIT  7
-#define GDT_ACCESS_DPL_BIT      5
-#define GDT_ACCESS_EXEC_BIT     3
-#define GDT_ACCESS_DOWN_BIT     2
-#define GDT_ACCESS_RW_BIT       1
-
-#define GDT_ACCESS_PRESENT      (1 << GDT_ACCESS_PRESENT_BIT)
-#define GDT_ACCESS_EXEC         (1 << GDT_ACCESS_EXEC_BIT)
-#define GDT_ACCESS_DOWN         (1 << GDT_ACCESS_DOWN_BIT)
-#define GDT_ACCESS_RW           (1 << GDT_ACCESS_RW_BIT)
-
-#define GDT_ACCESS_DPL_BITS     2
-#define GDT_ACCESS_DPL_MASK     ((1 << GDT_ACCESS_DPL_BITS)-1)
-#define GDT_ACCESS_DPL          (GDT_ACCESS_DPL_MASK << GDT_ACCESS_DPL_BIT)
-#define GDT_ACCESS_DPL_n(dpl)   ((dpl) << GDT_ACCESS_DPL_BIT)
-
-#define GDT_FLAGS_GRAN_BIT      7
-#define GDT_FLAGS_IS32_BIT      6
-#define GDT_FLAGS_IS64_BIT      5
-
-#define GDT_FLAGS_GRAN          (1 << GDT_FLAGS_GRAN_BIT)
-#define GDT_FLAGS_IS32          (1 << GDT_FLAGS_IS32_BIT)
-#define GDT_FLAGS_IS64          (1 << GDT_FLAGS_IS64_BIT)
-
-#define GDT_LIMIT_LOW_MASK      0xFFFF
-#define GDT_BASE_LOW_MASK       0xFFFF
-
-#define GDT_BASE_MIDDLE_BIT     16
-#define GDT_BASE_MIDDLE         0xFF
-
-#define GDT_LIMIT_HIGH_BIT      16
-#define GDT_LIMIT_HIGH          0x0F
-
-#define GDT_BASE_HIGH_BIT       24
-#define GDT_BASE_HIGH           0xFF
 
 #define GDT_MAKE_SEGMENT_DESCRIPTOR(base, \
             limit, \
@@ -154,18 +117,6 @@ struct idt_entry_64_t {
     uint32_t reserved;
 };
 
-// idt_entry_t selector field
-#define IDT_SEL         0x08
-// idt_entry_t type_attr field
-#define IDT_PRESENT     0x80
-#define IDT_DPL_BIT     5
-#define IDT_DPL_BITS    2
-#define IDT_DPL_MASK    ((1 << IDT_DPL_BITS)-1)
-#define IDT_DPL3        (3 << IDT_DPL_BIT)
-#define IDT_TASK        0x05
-#define IDT_INTR        0x0E
-#define IDT_TRAP        0x0F
-
 bool cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
 
 extern "C" void cpu_a20_enterpm();
@@ -234,6 +185,11 @@ static __always_inline uint32_t inl(uint16_t dx)
 static __always_inline void pause()
 {
     __asm__ __volatile__ ("pause");
+}
+
+static __always_inline void cpu_flush_cache()
+{
+    __asm__ __volatile__ ("wbinvd\n\t");
 }
 
 #define USE_8259_PIC_FUNCTIONS 0

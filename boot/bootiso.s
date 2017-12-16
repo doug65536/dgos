@@ -79,3 +79,7 @@ call_constructors:
 unreachable:
 	hlt
 	jmp unreachable
+
+.global boot_drive
+boot_drive:
+	.byte 0

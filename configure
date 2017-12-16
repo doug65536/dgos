@@ -592,6 +592,9 @@ VECTORIZE_FLAGS
 NO_COMMON_FLAGS
 NO_EXCEPTIONS_FLAGS
 NO_UNWIND_TABLES_FLAGS
+NO_RTTI_FLAGS
+NO_STACK_CHECK_FLAGS
+STACK_CHECK_FLAGS
 NO_STACKPROTECTOR_FLAGS
 NO_REDZONE_FLAGS
 DISABLE_FRAMEPOINTER_FLAGS
@@ -721,7 +724,10 @@ PACKAGE_TARNAME
 PACKAGE_NAME
 PATH_SEPARATOR
 SHELL
-AM_RANLIB'
+AM_RANLIB
+AM_AR
+AM_CXX
+AM_CC'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
@@ -7267,7 +7273,41 @@ $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
   SMALLEST_CODE_FLAGS=-Oz
 else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Os" >&5
+$as_echo_n "checking whether C compiler accepts -Os... " >&6; }
+if ${ax_cv_check_cflags___Os+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -Os"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___Os=yes
+else
+  ax_cv_check_cflags___Os=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Os" >&5
+$as_echo "$ax_cv_check_cflags___Os" >&6; }
+if test "x$ax_cv_check_cflags___Os" = xyes; then :
   SMALLEST_CODE_FLAGS=-Os
+else
+  $COMPILER_WERROR
+fi
+
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -falign-loops=0" >&5
@@ -8006,6 +8046,123 @@ fi
 $as_echo "$ax_cv_check_cflags___fno_stack_protector" >&6; }
 if test "x$ax_cv_check_cflags___fno_stack_protector" = xyes; then :
   NO_STACKPROTECTOR_FLAGS=" -fno-stack-protector"
+
+else
+  $COMPILER_WERROR
+fi
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstack-check" >&5
+$as_echo_n "checking whether C compiler accepts -fstack-check... " >&6; }
+if ${ax_cv_check_cflags___fstack_check+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fstack-check"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fstack_check=yes
+else
+  ax_cv_check_cflags___fstack_check=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fstack_check" >&5
+$as_echo "$ax_cv_check_cflags___fstack_check" >&6; }
+if test "x$ax_cv_check_cflags___fstack_check" = xyes; then :
+  STACK_CHECK_FLAGS=" -fstack-check"
+
+else
+  $COMPILER_WERROR
+fi
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-stack-check" >&5
+$as_echo_n "checking whether C compiler accepts -fno-stack-check... " >&6; }
+if ${ax_cv_check_cflags___fno_stack_check+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fno-stack-check"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fno_stack_check=yes
+else
+  ax_cv_check_cflags___fno_stack_check=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_stack_check" >&5
+$as_echo "$ax_cv_check_cflags___fno_stack_check" >&6; }
+if test "x$ax_cv_check_cflags___fno_stack_check" = xyes; then :
+  NO_STACK_CHECK_FLAGS=" -fno-stack-check"
+
+else
+  $COMPILER_WERROR
+fi
+
+
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-rtti" >&5
+$as_echo_n "checking whether C compiler accepts -fno-rtti... " >&6; }
+if ${ax_cv_check_cflags___fno_rtti+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS  -fno-rtti"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ax_cv_check_cflags___fno_rtti=yes
+else
+  ax_cv_check_cflags___fno_rtti=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_rtti" >&5
+$as_echo "$ax_cv_check_cflags___fno_rtti" >&6; }
+if test "x$ax_cv_check_cflags___fno_rtti" = xyes; then :
+  NO_RTTI_FLAGS=" -fno-rtti"
 
 else
   $COMPILER_WERROR

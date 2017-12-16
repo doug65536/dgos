@@ -1,7 +1,11 @@
 bioscall.S
 bootcommon.S
+bootinfo.s
+cpu_constants.h
+cpu_constants.h
 emulators.mk
 gdt.h
+mpentry.S
 tui.cc
 tui.h
 utils/bochs-fat-config.bxrc.template
@@ -55,7 +59,6 @@ physmem.cc
 physmem.h
 farptr.h
 farptr.cc
-mpentry.s
 mpentry.h
 vesa.cc
 vesa.h

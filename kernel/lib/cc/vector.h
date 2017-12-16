@@ -690,7 +690,8 @@ vector<_T,_Allocator>::insert(
 template<typename _T, typename _Allocator>
 template<typename InputIt>
 typename vector<_T,_Allocator>::iterator
-vector<_T,_Allocator>::insert(const_iterator __pos, InputIt __first, InputIt __last)
+vector<_T,_Allocator>::insert(const_iterator __pos,
+                              InputIt __first, InputIt __last)
 {
     constexpr size_t __count = __last - __first;
     pointer place = __make_space(__pos, __count);
@@ -701,7 +702,8 @@ vector<_T,_Allocator>::insert(const_iterator __pos, InputIt __first, InputIt __l
 
 template<typename _T, typename _Allocator>
 typename vector<_T,_Allocator>::iterator
-vector<_T,_Allocator>::insert(const_iterator __pos, initializer_list<_T> __ilist)
+vector<_T,_Allocator>::insert(const_iterator __pos,
+                              initializer_list<_T> __ilist)
 {
     return insert(__pos, __ilist.begin(), __ilist.end());
 }

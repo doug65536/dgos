@@ -152,12 +152,12 @@
 #define PAT_IDX_WP  5
 
 #define PAT_CFG \
-    (MSR_IA32_PAT_n(PAT_IDX_WB, MSR_IA32_PAT_WB) | \
-    MSR_IA32_PAT_n(PAT_IDX_WT, MSR_IA32_PAT_WT) | \
-    MSR_IA32_PAT_n(PAT_IDX_UCW, MSR_IA32_PAT_UCW) | \
-    MSR_IA32_PAT_n(PAT_IDX_UC, MSR_IA32_PAT_UC) | \
-    MSR_IA32_PAT_n(PAT_IDX_WC, MSR_IA32_PAT_WC) | \
-    MSR_IA32_PAT_n(PAT_IDX_WP, MSR_IA32_PAT_WP))
+    (CPU_MSR_IA32_PAT_n(PAT_IDX_WB, CPU_MSR_IA32_PAT_WB) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_WT, CPU_MSR_IA32_PAT_WT) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_UCW, CPU_MSR_IA32_PAT_UCW) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_UC, CPU_MSR_IA32_PAT_UC) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_WC, CPU_MSR_IA32_PAT_WC) | \
+    CPU_MSR_IA32_PAT_n(PAT_IDX_WP, CPU_MSR_IA32_PAT_WP))
 
 #define PTE_PDEPAT_n(idx) \
     ((PTE_PDEPAT & -!!(idx & 4)) | \
@@ -1170,7 +1170,7 @@ static int dump_addr_node(rbtree_t *tree,
 {
     (void)tree;
     (void)p;
-    printdbg("key=%12lx val=%12lx\n",
+    printdbg("key=%16lx val=%16lx\n",
              kvp->key, kvp->val);
     return 0;
 }
@@ -1201,7 +1201,7 @@ static int mmu_have_pat(void)
 static void mmu_configure_pat(void)
 {
     if (likely(mmu_have_pat()))
-        cpu_msr_set(MSR_IA32_PAT, PAT_CFG);
+        cpu_msr_set(CPU_MSR_IA32_PAT, PAT_CFG);
 }
 
 void mmu_init(int ap)
@@ -1278,9 +1278,7 @@ void mmu_init(int ap)
     pt = init_map_aliasing_pte(aliasing_pte, root_phys_addr);
     memcpy(pt, old_root, PAGESIZE);
 
-    pte_t ptflags = PTE_PRESENT | PTE_WRITABLE;// | PTE_GLOBAL;
-
-    //root_phys_addr = cpu_get_page_directory() & PTE_ADDR;
+    pte_t ptflags = PTE_PRESENT | PTE_WRITABLE;
 
     pt = init_map_aliasing_pte(aliasing_pte, root_phys_addr);
     assert(pt[PT_RECURSE] == 0);
@@ -1301,9 +1299,9 @@ void mmu_init(int ap)
 
     size_t physalloc_size = mmu_phys_allocator_t::size_from_highest_page(
                 highest_usable);
-    void *phys_alloc = mmap(
-                0, physalloc_size,
-                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    void *phys_alloc = mmap(0, physalloc_size,
+                            PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+
     memset(phys_alloc, 0, physalloc_size);
 
     printdbg("Building physical memory free list\n");
@@ -2027,8 +2025,10 @@ int munmap(void *addr, size_t size)
 int mprotect(void *addr, size_t len, int prot)
 {
     // Fail on invalid protection mask
-    if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
+    if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC)))) {
+        assert(!"Invalid parameter!");
         return -1;
+    }
 
     // Fail on invalid address
     if (!addr)
@@ -2048,7 +2048,7 @@ int mprotect(void *addr, size_t len, int prot)
     /// Demand paged PTE, not readable
     ///  present=0, addr=(PTE_ADDR>>1)&PTE_ADDR
 
-    // Only the MSB of the physical address set
+    // Unreadable demand paged has MSB of physical address cleared
     pte_t const demand_no_read = (PTE_ADDR >> 1) & PTE_ADDR;
 
     pte_t no_exec = cpuid_has_nx() ? PTE_NX : 0;
@@ -2122,6 +2122,8 @@ int mprotect(void *addr, size_t len, int prot)
         path_inc(path);
         pte_from_path(pt, path);
     }
+
+    mmu_send_tlb_shootdown();
 
     return 1;
 }

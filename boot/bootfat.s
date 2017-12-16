@@ -2,6 +2,9 @@
 
 .code16
 
+# Note that this code goes out of its way to avoid using any
+# instructions that will not work on an 8088
+
 # ptbl_ent
 .struct 0
 ptbl_ent_start:
@@ -49,34 +52,37 @@ dap_length = dap_end - dap_start
 entry:
 	jmp .+0x5A
 
+// MBR calls this entry point with
+//  dl = drive number
+//  ds:si -> partition table entry
 .section .early
 entry_start:
-	# Initialize stack
+	// Save pointer to partition table entry in registers
+	movw %si,%bx
+	movw %ds,%bp
+
+	// Initialize segment registers
 	xorw %ax,%ax
-	pushw %ax
-	pushw $__initial_stack
-	movw %sp,%bp
-	lss (%bp),%sp
-	movw %sp,%bp
-
-	# Save segment of partition table entry in fs
-	movw %ds,%cx
-	movw %cx,%fs
-
-	# Initialize segment registers
 	movw %ax,%ds
 	movw %ax,%es
 
-	# Relocate to 0x800
-	pushw %si
-	mov $512,%cx
-	mov $0x7c00,%si
-	mov $0x800,%di
+	# Relocate to linked address
+	movw $256,%cx
+	movw $0x7c00,%si
+	movw $entry,%di
 	cld
-	rep movsb
-	popw %si
+	rep movsw
 
-	ljmp $0,$reloc_entry
+	// Save boot drive and pointer to partition entry
+	movb %dl,boot_drive
+	movw %bx,partition_entry_ptr
+	movw %bp,2+partition_entry_ptr
+
+	// Initialize stack pointer
+	lssw initial_stack_ptr,%sp
+
+	// Load cs register
+	ljmpw $0,$reloc_entry
 reloc_entry:
 
 	#
@@ -84,16 +90,34 @@ reloc_entry:
 
 	# Calculate number of sectors to load
 	# (rounded up to a multiple of 512)
-	movw $__initialized_data_end+511,%cx
+	movw $__initialized_data_end + 511,%cx
 	subw $first_sector_end,%cx
 	shrw $9,%cx
-	mov %cx,dap+dap_block_count
+	movw %cx,dap+dap_block_count
 
+	#
 	# Get LBA of first sector after this one
-	movl %fs:ptbl_ent_stsec(%si),%ecx
-	incl %ecx
-	movl %ecx,dap+dap_lba
-	decl %ecx
+
+	# Read 32-bit LBA from ds:si saved above
+	ldsw partition_entry_ptr,%bx
+
+	// Get partition start LBA into bp:di
+	movw ptbl_ent_stsec(%bx),%di
+	movw 2+ptbl_ent_stsec(%bx),%bp
+	movw zerow,%ds
+
+	# Add 1 to 32 bit LBA in bp:di
+	addw $1,%di
+	adcw $0,%bp
+
+	# Store incremented LBA in DAP
+	movw %di,dap+dap_lba
+	movw %bp,2+dap+dap_lba
+
+	# Restore original LBA in bp:di
+	subw $1,%di
+	sbbw $0,%bp
+
 disk_read:
 	movw $0x4200,%ax
 	mov $dap,%si
@@ -101,14 +125,21 @@ disk_read:
 	jc disk_read
 
 	call clear_bss
-	movb %dl,boot_drive
 
-	movl %ecx,%eax
-	pushl %eax
+	call detect_ancient_cpu
 
-	popl %eax
+	// 32 bit instructions are okay if detect_ancient_cpu returned...
+
+	movzwl %sp,%esp
+
+	// Copy bp:dp into eax
+	movzwl %bp,%eax
+	shll $16,%eax
+	movw %di,%ax
+
 	movl $fat32_boot_partition,%edx
 	call boot
+	cli
 unreachable:
 	hlt
 	jmp unreachable
@@ -119,3 +150,18 @@ dap:
 	.word 1
 	.long first_sector_end
 	.quad 0
+
+.global boot_drive
+boot_drive:
+	.byte 0
+
+.align 4
+partition_entry_ptr:
+	.int 0
+
+initial_stack_ptr:
+	.short __initial_stack
+	.short 0
+
+zerow:
+	.short 0

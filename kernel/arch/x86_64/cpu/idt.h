@@ -13,72 +13,19 @@ struct idt_entry_t {
 C_ASSERT(sizeof(idt_entry_t) == 8);
 
 struct idt_entry_64_t {
-    uint16_t offset_lo; // offset bits 0..15
-    uint16_t selector;  // a code segment selector in GDT or LDT
-    uint8_t ist;        // interrupt stack table index
-    uint8_t type_attr;  // type and attributes
-    uint16_t offset_hi; // offset bits 16..31
+    uint16_t offset_lo;     // offset bits 15:0
+    uint16_t selector;      // a code segment selector in GDT
+    uint8_t ist;            // interrupt stack table index
+    uint8_t type_attr;      // type and attributes
+    uint16_t offset_hi;     // offset bits 31:16
 
-    uint32_t offset_64_31;  // offset bits 63..32
+    uint32_t offset_64_31;  // offset bits 63:32
     uint32_t reserved;
 };
 
 C_ASSERT(sizeof(idt_entry_64_t) == 16);
 
-// idt_entry_t selector field
-#define IDT_SEL         0x08
-// idt_entry_t type_attr field
-#define IDT_PRESENT_BIT 7
-#define IDT_DPL_BIT     5
-#define IDT_TYPE_BIT    0
-
-#define IDT_TYPE_TASK   0x5
-#define IDT_TYPE_INTR   0xE
-#define IDT_TYPE_TRAP   0xF
-
-#define IDT_PRESENT     (1 << IDT_PRESENT_BIT)
-
-#define IDT_DPL_BITS    2
-#define IDT_DPL_MASK    ((1 << IDT_DPL_BITS)-1)
-#define IDT_DPL         (IDT_DPL_MASK << IDT_DPL_BIT)
-
-#define IDT_DPL_n(dpl)  (((dpl) & IDT_DPL_MASK) << IDT_DPL_BIT)
-
-#define IDT_TASK        (IDT_TYPE_TASK << IDT_TYPE_BIT)
-#define IDT_INTR        (IDT_TYPE_INTR << IDT_TYPE_BIT)
-#define IDT_TRAP        (IDT_TYPE_TRAP << IDT_TYPE_BIT)
-
-//
-// Exception error code
-
-#define CTX_ERRCODE_PF_P_BIT    0
-#define CTX_ERRCODE_PF_W_BIT    1
-#define CTX_ERRCODE_PF_U_BIT    2
-#define CTX_ERRCODE_PF_R_BIT    3
-#define CTX_ERRCODE_PF_I_BIT    4
-#define CTX_ERRCODE_PF_PK_BIT   5
-#define CTX_ERRCODE_PF_SGX_BIT  15
-
-// Page fault because page not present
-#define CTX_ERRCODE_PF_P        (1<<CTX_ERRCODE_PF_P_BIT)
-
-// Page fault was a write
-#define CTX_ERRCODE_PF_W        (1<<CTX_ERRCODE_PF_W_BIT)
-
-// Page fault occurred in user mode
-#define CTX_ERRCODE_PF_U        (1<<CTX_ERRCODE_PF_U_BIT)
-
-// Page fault because reserved PTE field was 1
-#define CTX_ERRCODE_PF_R        (1<<CTX_ERRCODE_PF_R_BIT)
-
-// Page fault was instruction fetch
-#define CTX_ERRCODE_PF_I        (1<<CTX_ERRCODE_PF_I_BIT)
-
-// Page fault was protection keys violation
-#define CTX_ERRCODE_PF_PK       (1<<CTX_ERRCODE_PF_PK_BIT)
-
-// Page fault was instruction fetch
-#define CTX_ERRCODE_PF_SGX      (1<<CTX_ERRCODE_PF_SGX_BIT)
+extern "C" idt_entry_64_t idt[];
 
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58
@@ -114,7 +61,6 @@ C_ASSERT(sizeof(idt_entry_64_t) == 16);
 #define ISR_CTX_ERRCODE(ctx)            ((ctx)->info.error_code)
 #define ISR_CTX_INTR(ctx)               ((ctx)->info.interrupt)
 #define ISR_CTX_CR3(ctx)                ((ctx)->gpr->cr3)
-#define ISR_CTX_FSBASE(ctx)             ((ctx)->gpr->fsbase)
 
 #define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
 #define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
@@ -161,7 +107,6 @@ struct isr_iret_frame_t {
 struct isr_gpr_context_t {
     uint16_t s[4];
     uintptr_t cr3;
-    void *fsbase;
     uintptr_t r[15];
     interrupt_info_t info;
     isr_iret_frame_t iret;

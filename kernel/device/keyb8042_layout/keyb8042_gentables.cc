@@ -5,7 +5,8 @@
 #include <locale.h>
 
 static char platform_url[] =
-        "http://www.unicode.org/repos/cldr/tags/latest/keyboards/windows/_platform.xml";
+        "http://www.unicode.org/repos/cldr"
+        "/tags/latest/keyboards/windows/_platform.xml";
 
 static char *fmt_str_va(char const *format, va_list ap)
 {
@@ -62,7 +63,8 @@ int main(void)
     FILE *s = fmt_popen(
                 "r",
                 "curl '%s' | "
-                "grep -oP '<\\s*map\\s+keycode=\"\\d+\"\\s+iso=\"[^\"]+\"\\s*/>'",
+                "grep -oP '<\\s*map\\s+keycode="
+                "\"\\d+\"\\s+iso=\"[^\"]+\"\\s*/>'",
                 platform_url);
 
     size_t line_buf_size = 64 << 10;

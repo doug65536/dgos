@@ -90,7 +90,7 @@ nvme_cmd_t nvme_cmd_t::create_write(uint64_t lba, uint32_t count,
 {
     nvme_cmd_t cmd{};
     cmd.hdr.cdw0 = NVME_CMD_SDW0_OPC_n(
-                uint8_t(nvme_cmd_opcode_t::read));
+                uint8_t(nvme_cmd_opcode_t::write));
     cmd.hdr.nsid = ns;
     cmd.cmd_dword_10[0] =
             NVME_CMD_WRITE_CDW10_SLBA_n(uint32_t(lba & 0xFFFFFFFF));
@@ -163,6 +163,8 @@ public:
         , head(0)
         , tail(0)
         , phase(1)
+        , head_doorbell(nullptr)
+        , tail_doorbell(nullptr)
     {
     }
 
@@ -171,7 +173,9 @@ public:
               uint32_t volatile *tail_doorbell,
               int phase)
     {
+        assert(count > 0);
         assert_ispo2(count);
+        assert(phase >= 0 && phase <= 1);
 
         // Only makes sense to have one doorbell
         // Submission queues have tail doorbells
@@ -422,9 +426,15 @@ public:
     {
     }
 
-    void init(size_t count)
+    void init(size_t count,
+              nvme_cmd_t *sub_queue_ptr, uint32_t volatile *sub_doorbell,
+              nvme_cmp_t *cmp_queue_ptr, uint32_t volatile *cmp_doorbell)
     {
+        sub_queue.init(sub_queue_ptr, count, nullptr, sub_doorbell, 1);
+        cmp_queue.init(cmp_queue_ptr, count, cmp_doorbell, nullptr, 1);
+
         cmp_handlers.resize(count);
+        cmp_buf.reserve(count);
 
         // Allocate enough memory for 4 PRP list entries per slot
         prp_lists = (uint64_t*)mmap(
@@ -468,9 +478,13 @@ public:
         sub_queue.enqueue(cmd);
     }
 
-    void advance_head(uint16_t new_head)
+    void advance_head(uint16_t new_head, bool need_lock)
     {
-        unique_lock<spinlock> hold(lock);
+        unique_lock<spinlock> hold(lock, defer_lock_t());
+
+        if (need_lock)
+            hold.lock();
+
         sub_queue.take_until(new_head);
         hold.unlock();
         not_full.notify_all();
@@ -482,10 +496,63 @@ public:
         cmp_handlers[cmd_id](owner, packet, cmd_id, status_type, status);
     }
 
+    void process_completions(nvme_if_t *nvme_if, nvme_queue_state_t *queues)
+    {
+        unique_lock<spinlock> hold(lock);
+
+        unsigned phase = cmp_queue.get_phase();
+        for (;;) {
+            nvme_cmp_t packet = cmp_queue.peek();
+
+            // Done when phase does not match expected phase
+            if (NVME_CMP_DW3_P_GET(packet.cmp_dword[3]) != phase)
+                break;
+
+            cmp_queue.take();
+
+            // Decode submission queue for which command has completed
+            size_t sub_queue_id = NVME_CMP_DW2_SQID_GET(packet.cmp_dword[2]);
+            nvme_queue_state_t& sub_queue_state = queues[sub_queue_id];
+
+            // Get submission queue head
+            size_t sub_queue_head = NVME_CMP_DW2_SQHD_GET(packet.cmp_dword[2]);
+            sub_queue_state.advance_head(sub_queue_head,
+                                         &sub_queue_state != this);
+
+            cmp_buf.push_back(packet);
+        }
+
+        hold.unlock();
+
+        for (nvme_cmp_t& packet : cmp_buf) {
+
+            //bool dnr = NVME_CMP_DW3_DNR_GET(packet.cmp_dword[3]);
+            int status_type = NVME_CMP_DW3_SCT_GET(packet.cmp_dword[3]);
+            int status = NVME_CMP_DW3_SC_GET(packet.cmp_dword[3]);
+            uint16_t cmd_id = NVME_CMP_DW3_CID_GET(packet.cmp_dword[3]);
+
+            invoke_completion(nvme_if, packet, cmd_id, status_type, status);
+        }
+
+        cmp_buf.clear();
+    }
+
+    nvme_cmd_t *sub_queue_ptr()
+    {
+        return sub_queue.data();
+    }
+
+    nvme_cmp_t *cmp_queue_ptr()
+    {
+        return cmp_queue.data();
+    }
+
+private:
     sub_queue_t sub_queue;
     cmp_queue_t cmp_queue;
 
-private:
+    vector<nvme_cmp_t> cmp_buf;
+
     vector<nvme_callback_t> cmp_handlers;
     uint64_t* prp_lists;
 
@@ -510,7 +577,7 @@ STORAGE_REGISTER_FACTORY(nvme_if);
 // NVMe interface instance
 class nvme_if_t : public storage_if_base_t {
 public:
-    void init(pci_dev_iterator_t const& pci_iter);
+    bool init(pci_dev_t const& pci_dev);
 
 private:
     STORAGE_IF_IMPL
@@ -525,7 +592,8 @@ private:
     unsigned io(uint8_t ns, nvme_request_t &request, uint8_t log2_sectorsize);
 
     // Handle setting the queue count
-    void setfeat_queues_handler(void *data, nvme_cmp_t &packet, uint16_t cmd_id, int status_type, int status);
+    void setfeat_queues_handler(void *data, nvme_cmp_t &packet,
+                                uint16_t cmd_id, int status_type, int status);
 
     // Handle controller identify
     void identify_handler(void *data, nvme_cmp_t &packet,
@@ -620,11 +688,15 @@ if_list_t nvme_if_factory_t::detect(void)
 
         NVME_TRACE("found device!\n");
 
-
         if (nvme_count < countof(nvme_devices)) {
             nvme_if_t *self = nvme_devices + nvme_count++;
 
-            self->init(pci_iter);
+            if (!self->init(pci_iter)) {
+                self->~nvme_if_t();
+                memset(self, 0, sizeof(*self));
+                new (self) nvme_if_t;
+                --nvme_count;
+            }
         }
     } while (pci_enumerate_next(&pci_iter));
 
@@ -635,12 +707,12 @@ if_list_t nvme_if_factory_t::detect(void)
     return list;
 }
 
-void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
+bool nvme_if_t::init(pci_dev_t const &pci_dev)
 {
-    config = pci_iter.config;
+    config = pci_dev.config;
 
-    uint64_t addr = (uint64_t(pci_iter.config.base_addr[1]) << 32) |
-            pci_iter.config.base_addr[0];
+    uint64_t addr = (uint64_t(pci_dev.config.base_addr[1]) << 32) |
+            pci_dev.config.base_addr[0];
 
     mmio_base = (nvme_mmio_t*)mmap(
                 (void*)(addr & -8),
@@ -650,24 +722,15 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
     // 7.6.1 Initialization
 
     // Enable bus master DMA, enable MMIO, disable port I/O
-    pci_adj_control_bits(pci_iter.bus, pci_iter.slot,
-                         pci_iter.func,
-                         PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
+    pci_adj_control_bits(pci_dev, PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
                          PCI_CMD_IOEN);
 
-    // Assume legacy IRQ pin usage until MSI succeeds
-    irq_range.base = pci_iter.config.irq_line;
-    irq_range.count = 1;
+    // Try to use MSI IRQ
+    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, false, 0,
+                              irq_handler);
 
-    use_msi = pci_set_msi_irq(
-                pci_iter.bus, pci_iter.slot, pci_iter.func,
-                &irq_range, 0, 0, 0, irq_handler);
-
-    if (!use_msi) {
-        // Fall back to pin based IRQ
-        irq_hook(irq_range.base, &nvme_if_t::irq_handler);
-        irq_setmask(irq_range.base, 1);
-    }
+    NVME_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
+               use_msi, irq_range.base, irq_range.count);
 
     // Disable the controller
     if (mmio_base->cc & NVME_CC_EN)
@@ -734,8 +797,16 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
     mmio_base->cc = cc;
 
     // 7.6.1 4) Wait for ready
-    while (!(mmio_base->csts & NVME_CSTS_RDY))
+    uint32_t ctrl_status;
+    while (!((ctrl_status = mmio_base->csts) &
+             (NVME_CSTS_RDY | NVME_CSTS_CFS)))
         pause();
+
+    if (ctrl_status & NVME_CSTS_CFS) {
+        // Controller fatal status
+        NVME_TRACE("Controller fatal status!\n");
+        return false;
+    }
 
     // Read the doorbell stride
     doorbell_shift = NVME_CAP_DSTRD_GET(mmio_base->cap) + 1;
@@ -751,11 +822,12 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
 
     queues.reset(new nvme_queue_state_t[requested_queue_count]);
 
-    queues[0].sub_queue.init(sub_queue_ptr, queue_slots,
-                             nullptr, doorbell_ptr(false, 0), 1);
-    queues[0].cmp_queue.init(cmp_queue_ptr, queue_slots,
-                             doorbell_ptr(true, 0), nullptr, 1);
-    queues[0].init(queue_slots);
+    //queues[0].sub_queue.init(sub_queue_ptr, queue_slots,
+    //                         nullptr, doorbell_ptr(false, 0), 1);
+    //queues[0].cmp_queue.init(cmp_queue_ptr, queue_slots,
+    //                         doorbell_ptr(true, 0), nullptr, 1);
+    queues[0].init(queue_slots, sub_queue_ptr, doorbell_ptr(false, 0),
+                   cmp_queue_ptr, doorbell_ptr(true, 0));
     sub_queue_ptr += queue_slots;
     cmp_queue_ptr += queue_slots;
 
@@ -779,19 +851,11 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
     NVME_TRACE("Allocated queue count %zu\n", queue_count - 1);
 
     for (size_t i = 1; i < queue_count; ++i) {
-        queues[i].sub_queue.init(sub_queue_ptr, queue_slots,
-                                 nullptr, doorbell_ptr(false, i), 1);
+        queues[i].init(queue_slots, sub_queue_ptr, doorbell_ptr(false, i),
+                       cmp_queue_ptr, doorbell_ptr(true, i));
         sub_queue_ptr += queue_slots;
-    }
-
-    for (size_t i = 1; i < queue_count; ++i) {
-        queues[i].cmp_queue.init(cmp_queue_ptr, queue_slots,
-                                 doorbell_ptr(true, i), nullptr, 1);
         cmp_queue_ptr += queue_slots;
     }
-
-    for (size_t i = 1; i < queue_count; ++i)
-        queues[i].init(queue_slots);
 
     uintptr_t identify_physaddr = mm_alloc_contiguous(4096);
 
@@ -806,18 +870,20 @@ void nvme_if_t::init(pci_dev_iterator_t const &pci_iter)
     // Create completion queues
     for (size_t i = 1; i < queue_count; ++i) {
         queues[0].submit_cmd(nvme_cmd_t::create_cmp_queue(
-                                 queues[i].cmp_queue.data(),
+                                 queues[i].cmp_queue_ptr(),
                                  queue_slots, i, i % irq_range.count));
     }
 
     // Create submission queues
     for (size_t i = 1; i < queue_count; ++i) {
         queues[0].submit_cmd(nvme_cmd_t::create_sub_queue(
-                                 queues[i].sub_queue.data(),
+                                 queues[i].sub_queue_ptr(),
                                  queue_slots, i, i, 2));
     }
 
     NVME_TRACE("interface initialization success\n");
+
+    return true;
 }
 
 void nvme_if_t::identify_ns_id_handler(
@@ -959,37 +1025,12 @@ void nvme_if_t::irq_handler(int irq_offset)
 {
     NVME_TRACE("received IRQ\n");
 
-    int queue_stride = use_msi ? irq_range.count : 1;
+    int queue_stride = irq_range.count;
 
     for (size_t i = irq_offset; i < queue_count; i += queue_stride)
     {
         nvme_queue_state_t& queue = queues[i];
-        cmp_queue_t& cmp_queue = queue.cmp_queue;
-        unsigned phase = cmp_queue.get_phase();
-        for (;;) {
-            nvme_cmp_t packet = cmp_queue.peek();
-
-            // Done when phase does not match expected phase
-            if (NVME_CMP_DW3_P_GET(packet.cmp_dword[3]) != phase)
-                break;
-
-            cmp_queue.take();
-
-            // Decode submission queue for which command has completed
-            size_t sub_queue_id = NVME_CMP_DW2_SQID_GET(packet.cmp_dword[2]);
-            nvme_queue_state_t& sub_queue_state = queues[sub_queue_id];
-
-            // Get submission queue head
-            size_t sub_queue_head = NVME_CMP_DW2_SQHD_GET(packet.cmp_dword[2]);
-            sub_queue_state.advance_head(sub_queue_head);
-
-            //bool dnr = NVME_CMP_DW3_DNR_GET(packet.cmp_dword[3]);
-            int status_type = NVME_CMP_DW3_SCT_GET(packet.cmp_dword[3]);
-            int status = NVME_CMP_DW3_SC_GET(packet.cmp_dword[3]);
-            uint16_t cmd_id = NVME_CMP_DW3_CID_GET(packet.cmp_dword[3]);
-
-            queue.invoke_completion(this, packet, cmd_id, status_type, status);
-        }
+        queue.process_completions(this, queues);
     }
 }
 
@@ -1046,7 +1087,6 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
         default:
             panic("Unhandled operation! op=%d", (int)request.op);
         }
-
 
         switch (request.op) {
         case nvme_op_t::read:

@@ -4,7 +4,6 @@ PHDRS {
 	text PT_LOAD FLAGS(5);
 	readonly PT_LOAD FLAGS(4);
 	data PT_LOAD FLAGS(6);
-	tls PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
@@ -31,7 +30,7 @@ SECTIONS {
 		*(.text.startup .text.startup.*)
 	} :text
 
-	.rodata : ALIGN(4096) {
+	.rodata : ALIGN(64) {
 		PROVIDE_HIDDEN(___init_st = .);
 		*(.init_array)
 		*(SORT(.init_array.*))
@@ -73,41 +72,41 @@ SECTIONS {
 		PROVIDE_HIDDEN(___text_en = .);
 	} :readonly
 
-	.eh_frame_hdr :  ALIGN(4096) {
+	.eh_frame_hdr :  ALIGN(64) {
 		*(.eh_frame_hdr)
 		*(.eh_frame_entry .eh_frame_entry.*)
 	} :readonly
 
-	.eh_frame : ALIGN(4096) {
+	.eh_frame : ALIGN(64) {
 		KEEP(*(.eh_frame))
 		*(.eh_frame.*)
 	} :readonly
 
-	.hash : ALIGN(4096) {
+	.hash : ALIGN(64) {
 		PROVIDE_HIDDEN(___hash_st = .);
 		*(.hash);
 		PROVIDE_HIDDEN(___hash_en = .);
 	} :readonly
 
-	.dynsym : ALIGN(4096) {
+	.dynsym : ALIGN(64) {
 		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
 		PROVIDE_HIDDEN(___dynsym_en = .);
 	} :readonly
 
-	.dynstr : ALIGN(4096) {
+	.dynstr : ALIGN(64) {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	} :readonly
 
-	.got : ALIGN(4096) {
+	.got : ALIGN(64) {
 		PROVIDE_HIDDEN(___got = .);
 		*(.got*)
 		*(.got.plt)
 	} :readonly
 
-	.rela.dyn : {
+	.rela.dyn : ALIGN(64) {
 		PROVIDE_HIDDEN(___rela_dyn = .);
 		*(.rela.init)
 		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
@@ -126,7 +125,7 @@ SECTIONS {
 		*(.rela.ifunc)
 	} :readonly
 
-	.rela.plt : {
+	.rela.plt : ALIGN(64) {
 		PROVIDE_HIDDEN(___rela_entry_start = .);
 		*(.rela.entry)
 		PROVIDE_HIDDEN(___rela_entry_end = .);
@@ -140,17 +139,17 @@ SECTIONS {
 		PROVIDE_HIDDEN (__rela_iplt_end = .);
 	} :readonly
 
-	.plt.got : {
+	.plt.got : ALIGN(64) {
 		PROVIDE_HIDDEN(___plt_got = .);
 		*(.plt.got)
 	} :readonly
 
-	.plt.bnd : {
+	.plt.bnd : ALIGN(64) {
 		PROVIDE_HIDDEN(___plt_bnd = .);
 		*(.plt.bnd)
 	} :readonly
 
-	.plt : ALIGN(4096) {
+	.plt : ALIGN(64) {
 		PROVIDE_HIDDEN(___plt = .);
 		*(.plt)
 		*(.iplt)
@@ -162,7 +161,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	} :data
 
-	.got : ALIGN(4096) {
+	.got : ALIGN(64) {
 		PROVIDE_HIDDEN(___got = .);
 		*(.got*)
 		*(.got.plt)
@@ -183,23 +182,11 @@ SECTIONS {
 	} :data
 
 	.bspstk : ALIGN(4096) {
+		/* emergency stack for early bootstrap */
+		. = . + 65536;
+		/* bootstrap CPU stack */
 		*(.bspstk)
-	}
-
-	.tdata : ALIGN(4096) {
-		PROVIDE_HIDDEN(___tdata_st = .);
-		*(.tdata)
-		. = ALIGN(16);
-		PROVIDE_HIDDEN(___tdata_en = .);
-	} :tls
-
-	.tbss : {
-		PROVIDE_HIDDEN(___tbss_st = .);
-		*(.tbss)
-		*(.tcommon)
-		. = ALIGN(16);
-		PROVIDE_HIDDEN(___tbss_en = .);
-	} :tls
+	} :data
 
 	.note : {
 		*(.note*)

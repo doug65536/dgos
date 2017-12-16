@@ -2,8 +2,8 @@
 #include "ioport.h"
 #include "irq.h"
 #include "cpu/halt.h"
-#include "idt.h"
 #include "control_regs.h"
+#include "interrupts.h"
 
 // Implements legacy Programmable Interrupt Controller,
 // used if the APIC is not available
@@ -20,9 +20,6 @@
 #define PIC2_DATA   (PIC2_BASE+1)
 
 #define PIC_EOI     0x20
-
-// PIC IRQ0 -> INT 32
-#define PIC_IRQ_BASE    32
 
 static uint16_t pic8259_mask;
 
@@ -96,12 +93,12 @@ static void pic8259_eoi(int slave)
 
 // Detect and discard spurious IRQ
 // or call IRQ handler and acknowledge IRQ
-static isr_context_t *pic8259_dispatcher(
+isr_context_t *pic8259_dispatcher(
         int intr, isr_context_t *ctx)
 {
     isr_context_t *returned_stack_ctx;
 
-    int irq = intr - PIC_IRQ_BASE;
+    int irq = intr - INTR_PIC1_IRQ_BASE;
 
     int is_slave = (irq >= 8);
 
@@ -130,8 +127,7 @@ static isr_context_t *pic8259_dispatcher(
     // If we made it here, it was not a spurious IRQ
 
     // Run IRQ handler
-    returned_stack_ctx = irq_invoke(irq + PIC_IRQ_BASE,
-                                    irq, ctx);
+    returned_stack_ctx = irq_invoke(irq + INTR_PIC1_IRQ_BASE, irq, ctx);
 
     if (irq < 16) {
         // Acknowledge IRQ
@@ -145,7 +141,7 @@ void pic8259_disable(void)
 {
     // Need to move it to reasonable ISRs even if disabled
     // in case of spurious IRQs
-    pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
+    pic8259_init(INTR_PIC1_IRQ_BASE, INTR_PIC2_IRQ_BASE);
 
     // Mask all IRQs
     outb(PIC1_DATA, 0xFF);
@@ -183,19 +179,18 @@ static void pic8259_setmask(int irq, bool unmask)
 // Gets plugged into irq_hook
 static void pic8259_hook(int irq, intr_handler_t handler)
 {
-    intr_hook(irq + PIC_IRQ_BASE, handler);
+    intr_hook(irq + INTR_PIC1_IRQ_BASE, handler);
 }
 
 // Gets plugged into irq_unhook
 static void pic8259_unhook(int irq, intr_handler_t handler)
 {
-    intr_unhook(irq + PIC_IRQ_BASE, handler);
+    intr_unhook(irq + INTR_PIC1_IRQ_BASE, handler);
 }
 
 void pic8259_enable(void)
 {
-    pic8259_init(PIC_IRQ_BASE, PIC_IRQ_BASE + 8);
-    irq_dispatcher_set_handler(pic8259_dispatcher);
+    pic8259_init(INTR_PIC1_IRQ_BASE, INTR_PIC2_IRQ_BASE);
     irq_setmask_set_handler(pic8259_setmask);
     irq_hook_set_handler(pic8259_hook);
     irq_unhook_set_handler(pic8259_unhook);

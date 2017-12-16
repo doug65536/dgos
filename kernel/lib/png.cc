@@ -1,3 +1,4 @@
+#if 0
 #include "png.h"
 #include "zlib_helper.h"
 #include "fileio.h"
@@ -433,3 +434,4 @@ uint32_t const *png_pixels(png_image_t const *img)
 {
     return (uint32_t const*)(img + 1);
 }
+#endif

@@ -16,8 +16,7 @@ enum boxchar_index_t {
     X
 };
 
-void progress_bar_draw(uint16_t top, uint16_t left,
-                       uint16_t right, uint16_t percent)
+void progress_bar_draw(int top, int left, int right, int percent)
 {
     print_xy(left, top, boxchars[TL], 0x0F, 1);
     print_xy(left + 1, top, boxchars[H], 0x0F, right - left - 1);
@@ -28,8 +27,8 @@ void progress_bar_draw(uint16_t top, uint16_t left,
     print_xy(left + 1, top + 2, boxchars[H], 0x0F, right - left - 1);
     print_xy(right, top + 2, boxchars[BR], 0x0F, 1);
 
-    uint16_t filled = percent * (right - left - 1) / 100;
-    uint16_t cleared = right - left - 1 - filled;
+    int filled = percent * (right - left - 1) / 100;
+    int cleared = right - left - 1 - filled;
     print_xy(left + 1, top + 1, boxchars[S], 0x0F,
             filled);
     print_xy(left + filled, top + 1, boxchars[X], 0x0F,

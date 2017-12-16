@@ -82,7 +82,9 @@ struct thread_info_t {
     void *xsave_ptr;
     void *xsave_stack;
 
-    uint64_t syscall_rip;
+    uintptr_t fsbase;
+    uintptr_t gsbase;
+
     void *syscall_stack;
 
     process_t *process;
@@ -92,10 +94,10 @@ struct thread_info_t {
     thread_priority_t volatile priority_boost;
     thread_state_t volatile state;
 
+    // --- cache line ---
+
     uint32_t flags;
     uint32_t stack_size;
-
-    // --- cache line ---
 
     uint64_t volatile wake_time;
 
@@ -119,10 +121,10 @@ struct thread_info_t {
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
 
-    void *align[2];
+    void *align[1];
 };
 
-C_ASSERT(offsetof(thread_info_t, wake_time) == 64);
+C_ASSERT(offsetof(thread_info_t, flags) == 64);
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
@@ -151,6 +153,7 @@ static size_t constexpr xsave_stack_size = (size_t(1) << 16);
 struct cpu_info_t {
     cpu_info_t *self;
     thread_info_t * volatile cur_thread;
+    tss_t *tss_ptr;
     uint32_t apic_id;
     int online;
     thread_info_t *goto_thread;
@@ -161,12 +164,13 @@ struct cpu_info_t {
 
     spinlock_t queue_lock;
 
-    void *storage[9];
+    void *storage[8];
 };
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
+C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
 #define MAX_CPUS    64
 static cpu_info_t cpus[MAX_CPUS] __aligned(64);
@@ -279,12 +283,11 @@ static thread_t thread_create_with_state(
         void *stack, size_t stack_size,
         thread_state_t state,
         uint64_t affinity,
-        thread_priority_t priority,
-        void *fpu_context)
+        thread_priority_t priority)
 {
     if (stack_size == 0)
-        stack_size = 16384;
-    else if (stack_size < 16384)
+        stack_size = 65536;
+    else if (stack_size < 65536)
         return -1;
 
     for (size_t i = 0; ; ++i) {
@@ -335,7 +338,8 @@ static thread_t thread_create_with_state(
         // Syscall stack
         // Allocate one extra page for guard page
         thread->syscall_stack = (char*)mmap(
-                    0, syscall_stack_size + PAGE_SIZE, PROT_READ | PROT_WRITE,
+                    0, syscall_stack_size + PAGE_SIZE,
+                    PROT_READ | PROT_WRITE,
                     MAP_STACK, -1, 0) + syscall_stack_size;
         madvise(thread->syscall_stack, PAGE_SIZE, MADV_DONTNEED);
         mprotect(thread->syscall_stack, PAGE_SIZE, PROT_NONE);
@@ -350,12 +354,14 @@ static thread_t thread_create_with_state(
         // XSave stack
         // Allocate one extra page for guard page
         thread->xsave_stack = mmap(
-                    0, xsave_stack_size + PAGE_SIZE, PROT_READ | PROT_WRITE,
+                    0, xsave_stack_size + PAGE_SIZE,
+                    PROT_READ | PROT_WRITE,
                     MAP_STACK, -1, 0);
         thread->xsave_ptr = thread->xsave_stack;
         madvise((char*)thread->xsave_stack + xsave_stack_size,
                 PAGE_SIZE, MADV_DONTNEED);
-        mprotect(thread->xsave_ptr, PAGE_SIZE, MADV_DONTNEED);
+        mprotect((char*)thread->xsave_stack + xsave_stack_size,
+                 PAGE_SIZE, PROT_NONE);
         THREAD_TRACE("Thread %zd xsave stack guard=0x%zx,"
                      " stack=0x%zx-0x%zx\n",
                      i,
@@ -368,6 +374,8 @@ static thread_t thread_create_with_state(
         thread->priority = priority;
         thread->priority_boost = 0;
         thread->cpu_affinity = affinity ? affinity : ~0UL;
+        thread->fsbase = 0;
+        thread->gsbase = 0;
 
         // APs inherit BSP's process
         thread->process = cpus[0].cur_thread->process;
@@ -395,7 +403,7 @@ static thread_t thread_create_with_state(
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
         assert((ctx->gpr->iret.rsp & 0xF) == 0x8);
         ctx->gpr->iret.ss = GDT_SEL_KERNEL_DATA;
-        ctx->gpr->iret.rflags = EFLAGS_IF;
+        ctx->gpr->iret.rflags = CPU_EFLAGS_IF;
         ctx->gpr->iret.rip = (thread_fn_t)(uintptr_t)thread_startup;
         ctx->gpr->iret.cs = GDT_SEL_KERNEL_CODE64;
         ctx->gpr->s[0] = GDT_SEL_KERNEL_DATA;
@@ -406,24 +414,21 @@ static thread_t thread_create_with_state(
         ctx->gpr->r[1] = (uintptr_t)userdata;
         ctx->gpr->r[2] = (uintptr_t)i;
         ctx->gpr->cr3 = cpu_get_page_directory();
-        ctx->gpr->fsbase = 0;
 
-        ctx->fpr->mxcsr = MXCSR_MASK_ALL;
+        memset(ctx->fpr, 0, sse_context_size);
+
+        ctx->fpr->mxcsr = (CPU_MXCSR_MASK_ALL |
+                CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
+                default_mxcsr_mask;
         ctx->fpr->mxcsr_mask = default_mxcsr_mask;
 
-        if ((uintptr_t)fpu_context == 1) {
-            // All FPU registers empty
-            ctx->fpr->fsw = FPUSW_TOP_n(7);
+        // All FPU registers empty
+        ctx->fpr->fsw = CPU_FPUSW_TOP_n(7);
 
-            // 53 bit FPU precision
-            ctx->fpr->fcw = FPUCW_PC_n(FPUCW_PC_53) | FPUCW_IM |
-                    FPUCW_DM | FPUCW_ZM | FPUCW_OM | FPUCW_UM | FPUCW_PM;
-        } else if (sse_context_size == 512) {
-            cpu_fxsave(ctx->fpr);
-        } else {
-            assert(sse_context_size > 512);
-            cpu_xsave(ctx->fpr);
-        }
+        // 53 bit FPU precision
+        ctx->fpr->fcw = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
+                CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
+                CPU_FPUCW_UM | CPU_FPUCW_PM;
 
         thread->ctx = ctx;
 
@@ -447,7 +452,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
     return thread_create_with_state(
                 fn, userdata,
                 stack, stack_size,
-                THREAD_IS_READY, 0, 0, 0);
+                THREAD_IS_READY, 0, 0);
 }
 
 #if 0
@@ -496,6 +501,7 @@ void thread_init(int ap)
 
     // First CPU is the BSP
     cpu_info_t *cpu = cpus + cpu_number;
+    cpu->tss_ptr = tss_list + cpu_number;
 
     assert(thread_count == cpu_number);
 
@@ -563,14 +569,9 @@ void thread_init(int ap)
                     smp_idle_thread, 0, 0, 0,
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
-                    -256, (void*)1);
+                    -256);
 
         thread->used_time = 0;
-
-        if (sse_context_size == 512)
-            cpu_fxsave(thread->xsave_ptr);
-        else
-            cpu_xsave(thread->xsave_ptr);
 
         cpu->goto_thread = thread;
 
@@ -1072,4 +1073,16 @@ errno_t thread_get_error()
 {
     thread_info_t *info = this_thread();
     return info->errno;
+}
+
+uintptr_t thread_get_fsbase(int thread)
+{
+    thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
+    return info->fsbase;
+}
+
+uintptr_t thread_get_gsbase(int thread)
+{
+    thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
+    return info->gsbase;
 }

@@ -3,6 +3,7 @@
 #include "isr.h"
 #include "irq.h"
 #include "gdt.h"
+#include "cpu.h"
 #include "cpuid.h"
 #include "conio.h"
 #include "printk.h"
@@ -14,17 +15,18 @@
 #include "except.h"
 #include "mm.h"
 #include "asm_constants.h"
+#include "thread_impl.h"
 
 #include "apic.h"
 
 // Enforce that we use the correct value in syscall.S
-C_ASSERT(SYSCALL_RFLAGS == (EFLAGS_IF | 2));
+C_ASSERT(SYSCALL_RFLAGS == (CPU_EFLAGS_IF | 2));
 
 // Enforce that we don't try to set any flags bits that
 // will be cleared anyway on sysret
 C_ASSERT((SYSCALL_RFLAGS & ~uintptr_t(0x3C7FD7)) == 0);
 
-static idt_entry_64_t idt[256];
+idt_entry_64_t idt[256];
 
 static irq_dispatcher_handler_t irq_dispatcher_vec;
 static idt_unhandled_exception_handler_t unhandled_exception_handler_vec;
@@ -33,24 +35,24 @@ uint32_t xsave_supported_states;
 uint32_t xsave_enabled_states;
 
 static format_flag_info_t const cpu_eflags_info[] = {
-    { "ID",   EFLAGS_ID_BIT,   1, 0 },
-    { "VIP",  EFLAGS_VIP_BIT,  1, 0 },
-    { "VIF",  EFLAGS_VIF_BIT,  1, 0 },
-    { "AC",   EFLAGS_AC_BIT,   1, 0 },
-    { "VM",   EFLAGS_VM_BIT,   1, 0 },
-    { "RF",   EFLAGS_RF_BIT,   1, 0 },
-    { "NT",   EFLAGS_NT_BIT,   1, 0 },
-    { "IOPL", EFLAGS_IOPL_BIT, EFLAGS_IOPL_MASK, 0 },
-    { "OF",   EFLAGS_OF_BIT,   1, 0 },
-    { "DF",   EFLAGS_DF_BIT,   1, 0 },
-    { "IF",   EFLAGS_IF_BIT,   1, 0 },
-    { "TF",   EFLAGS_TF_BIT,   1, 0 },
-    { "SF",   EFLAGS_SF_BIT,   1, 0 },
-    { "ZF",   EFLAGS_ZF_BIT,   1, 0 },
-    { "AF",   EFLAGS_AF_BIT,   1, 0 },
-    { "PF",   EFLAGS_PF_BIT,   1, 0 },
-    { "CF",   EFLAGS_CF_BIT,   1, 0 },
-    { 0,      -1,              0, 0 }
+    { "ID",   1,                    0, CPU_EFLAGS_ID_BIT   },
+    { "VIP",  1,                    0, CPU_EFLAGS_VIP_BIT  },
+    { "VIF",  1,                    0, CPU_EFLAGS_VIF_BIT  },
+    { "AC",   1,                    0, CPU_EFLAGS_AC_BIT   },
+    { "VM",   1,                    0, CPU_EFLAGS_VM_BIT   },
+    { "RF",   1,                    0, CPU_EFLAGS_RF_BIT   },
+    { "NT",   1,                    0, CPU_EFLAGS_NT_BIT   },
+    { "IOPL", CPU_EFLAGS_IOPL_MASK, 0, CPU_EFLAGS_IOPL_BIT },
+    { "OF",   1,                    0, CPU_EFLAGS_OF_BIT   },
+    { "DF",   1,                    0, CPU_EFLAGS_DF_BIT   },
+    { "IF",   1,                    0, CPU_EFLAGS_IF_BIT   },
+    { "TF",   1,                    0, CPU_EFLAGS_TF_BIT   },
+    { "SF",   1,                    0, CPU_EFLAGS_SF_BIT   },
+    { "ZF",   1,                    0, CPU_EFLAGS_ZF_BIT   },
+    { "AF",   1,                    0, CPU_EFLAGS_AF_BIT   },
+    { "PF",   1,                    0, CPU_EFLAGS_PF_BIT   },
+    { "CF",   1,                    0, CPU_EFLAGS_CF_BIT   },
+    { 0,      0,                    0, -1                  }
 };
 
 static char const *cpu_mxcsr_rc[] = {
@@ -61,22 +63,22 @@ static char const *cpu_mxcsr_rc[] = {
 };
 
 static format_flag_info_t const cpu_mxcsr_info[] = {
-    { "IE",     MXCSR_IE_BIT, 1, 0 },
-    { "DE",     MXCSR_DE_BIT, 1, 0 },
-    { "ZE",     MXCSR_ZE_BIT, 1, 0 },
-    { "OE",     MXCSR_OE_BIT, 1, 0 },
-    { "UE",     MXCSR_UE_BIT, 1, 0 },
-    { "PE",     MXCSR_PE_BIT, 1, 0 },
-    { "DAZ",    MXCSR_DAZ_BIT, 1, 0 },
-    { "IM",     MXCSR_IM_BIT, 1, 0 },
-    { "DM",     MXCSR_DM_BIT, 1, 0 },
-    { "ZM",     MXCSR_ZM_BIT, 1, 0 },
-    { "OM",     MXCSR_OM_BIT, 1, 0 },
-    { "UM",     MXCSR_UM_BIT, 1, 0 },
-    { "PM",     MXCSR_PM_BIT, 1, 0 },
-    { "RC",     MXCSR_RC_BIT, MXCSR_RC_BITS, cpu_mxcsr_rc },
-    { "FZ",     MXCSR_FZ_BIT, 1, 0 },
-    { 0,        -1,           0, 0 }
+    { "IE",  1,                 0,            CPU_MXCSR_IE_BIT  },
+    { "DE",  1,                 0,            CPU_MXCSR_DE_BIT  },
+    { "ZE",  1,                 0,            CPU_MXCSR_ZE_BIT  },
+    { "OE",  1,                 0,            CPU_MXCSR_OE_BIT  },
+    { "UE",  1,                 0,            CPU_MXCSR_UE_BIT  },
+    { "PE",  1,                 0,            CPU_MXCSR_PE_BIT  },
+    { "DAZ", 1,                 0,            CPU_MXCSR_DAZ_BIT },
+    { "IM",  1,                 0,            CPU_MXCSR_IM_BIT  },
+    { "DM",  1,                 0,            CPU_MXCSR_DM_BIT  },
+    { "ZM",  1,                 0,            CPU_MXCSR_ZM_BIT  },
+    { "OM",  1,                 0,            CPU_MXCSR_OM_BIT  },
+    { "UM",  1,                 0,            CPU_MXCSR_UM_BIT  },
+    { "PM",  1,                 0,            CPU_MXCSR_PM_BIT  },
+    { "RC",  CPU_MXCSR_RC_BITS, cpu_mxcsr_rc, CPU_MXCSR_RC_BIT  },
+    { "FZ",  1,                 0,            CPU_MXCSR_FZ_BIT  },
+    { 0,     0,                 0,            -1                }
 };
 
 static char const *cpu_fpucw_pc[] = {
@@ -87,33 +89,33 @@ static char const *cpu_fpucw_pc[] = {
 };
 
 static format_flag_info_t const cpu_fpucw_info[] = {
-    { "IM",     FPUCW_IM_BIT, 1, 0 },
-    { "DM",     FPUCW_DM_BIT, 1, 0 },
-    { "ZM",     FPUCW_ZM_BIT, 1, 0 },
-    { "OM",     FPUCW_OM_BIT, 1, 0 },
-    { "UM",     FPUCW_UM_BIT, 1, 0 },
-    { "PM",     FPUCW_PM_BIT, 1, 0 },
-    { "PC",     FPUCW_PC_BIT, FPUCW_PC_BITS, cpu_fpucw_pc },
-    { "RC",     FPUCW_RC_BIT, FPUCW_RC_BITS, cpu_mxcsr_rc },
-    { 0,        -1,           0, 0 }
+    { "IM", 1,                 0,            CPU_FPUCW_IM_BIT },
+    { "DM", 1,                 0,            CPU_FPUCW_DM_BIT },
+    { "ZM", 1,                 0,            CPU_FPUCW_ZM_BIT },
+    { "OM", 1,                 0,            CPU_FPUCW_OM_BIT },
+    { "UM", 1,                 0,            CPU_FPUCW_UM_BIT },
+    { "PM", 1,                 0,            CPU_FPUCW_PM_BIT },
+    { "PC", CPU_FPUCW_PC_BITS, cpu_fpucw_pc, CPU_FPUCW_PC_BIT },
+    { "RC", CPU_FPUCW_RC_BITS, cpu_mxcsr_rc, CPU_FPUCW_RC_BIT },
+    { 0,    0,                 0,            -1               }
 };
 
 static format_flag_info_t const cpu_fpusw_info[] = {
-    { "IE",     FPUSW_IE_BIT, 1, 0 },
-    { "DE",     FPUSW_DE_BIT, 1, 0 },
-    { "ZE",     FPUSW_ZE_BIT, 1, 0 },
-    { "OE",     FPUSW_OE_BIT, 1, 0 },
-    { "UE",     FPUSW_UE_BIT, 1, 0 },
-    { "PE",     FPUSW_PE_BIT, 1, 0 },
-    { "SF",     FPUSW_SF_BIT, 1, 0 },
-    { "ES",     FPUSW_ES_BIT, 1, 0 },
-    { "C0(c)",  FPUSW_C0_BIT, 1, 0 },
-    { "C1",     FPUSW_C1_BIT, 1, 0 },
-    { "C2(p)",  FPUSW_C2_BIT, 1, 0 },
-    { "TOP",    FPUSW_TOP_BIT, FPUSW_TOP_BITS, 0 },
-    { "C3(z)",  FPUSW_C3_BIT, 1, 0 },
-    { "B",      FPUSW_B_BIT,  1, 0 },
-    { 0,        -1,           0, 0 }
+    { "IE",    1,                  0, CPU_FPUSW_IE_BIT  },
+    { "DE",    1,                  0, CPU_FPUSW_DE_BIT  },
+    { "ZE",    1,                  0, CPU_FPUSW_ZE_BIT  },
+    { "OE",    1,                  0, CPU_FPUSW_OE_BIT  },
+    { "UE",    1,                  0, CPU_FPUSW_UE_BIT  },
+    { "PE",    1,                  0, CPU_FPUSW_PE_BIT  },
+    { "SF",    1,                  0, CPU_FPUSW_SF_BIT  },
+    { "ES",    1,                  0, CPU_FPUSW_ES_BIT  },
+    { "C0(c)", 1,                  0, CPU_FPUSW_C0_BIT  },
+    { "C1",    1,                  0, CPU_FPUSW_C1_BIT  },
+    { "C2(p)", 1,                  0, CPU_FPUSW_C2_BIT  },
+    { "TOP",   CPU_FPUSW_TOP_BITS, 0, CPU_FPUSW_TOP_BIT },
+    { "C3(z)", 1,                  0, CPU_FPUSW_C3_BIT  },
+    { "B",     1,                  0, CPU_FPUSW_B_BIT   },
+    { 0,       0,                  0, -1,               }
 };
 
 static char const reserved_exception[] = "Reserved";
@@ -155,7 +157,7 @@ static char const * const exception_names[] = {
 
 typedef void (*isr_entry_t)(void);
 
-isr_entry_t const isr_entry_points[256] = {
+extern "C" isr_entry_t const isr_entry_points[256] = {
     isr_entry_0,   isr_entry_1,   isr_entry_2,   isr_entry_3,
     isr_entry_4,   isr_entry_5,   isr_entry_6,   isr_entry_7,
     isr_entry_8,   isr_entry_9,   isr_entry_10,  isr_entry_11,
@@ -256,37 +258,15 @@ void idt_xsave_detect(int ap)
     while (cpuid_has_xsave()) {
         cpuid_t info;
 
-//        if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
-//            break;
+        //uintptr_t bv = cpu_xcr_change_bits(0, 0, 0);
 
-//        xsave_supported_states = ((uint64_t)info.edx << 32) | info.eax;
+        //printk("orig xcr0=%16zx\n", bv);
 
-//        uint32_t wanted_states = XCR0_X87 |
-//                XCR0_SSE | XCR0_AVX |
-//                XCR0_AVX512_OPMASK |
-//                XCR0_AVX512_UPPER |
-//                XCR0_AVX512_XREGS;
-
-//        xsave_enabled_states = wanted_states & xsave_supported_states;
-
-//        // Change enabled XSAVE features
-//        cpu_xcr_change_bits(0, xsave_supported_states, xsave_enabled_states);
-
-//        if (ap)
-//            break;
-
-        uintptr_t bv = cpu_xcr_change_bits(0, 0, 0);
-
-        printk("orig xcr0=%016zx\n", bv);
-
-        printk("Detecting xsave support\n");
+        //printk("Detecting xsave support\n");
 
         // Get size of save area
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
             break;
-
-        sse_context_save = isr_save_xsave;
-        sse_context_restore = isr_restore_xrstor;
 
         // Store size of save area
         assert(info.ebx < UINT16_MAX);
@@ -296,10 +276,29 @@ void idt_xsave_detect(int ap)
         if (cpuid(&info, CPUID_INFO_XSAVE, 1)) {
             sse_context_size = (sse_context_size + 63) & -64;
 
-            if (info.eax & 1)
-                sse_context_save = isr_save_xsaveopt;
-            else if (info.eax & 2)
-                sse_context_save = isr_save_xsavec;
+            if (info.eax & 1) {
+                // Patch jmp instruction
+                cpu_patch_insn(sse_context_save - 1,
+                               uintptr_t(isr_save_xsaveopt) -
+                               uintptr_t(sse_context_save),
+                               sizeof(*sse_context_save));
+                cpu_patch_insn(sse_context_restore - 1,
+                               uintptr_t(isr_restore_xrstor) -
+                               uintptr_t(sse_context_restore),
+                               sizeof(*sse_context_restore));
+                //printk("Using xsaveopt\n");
+            } else if (info.eax & 2) {
+                // Patch jmp instruction
+                cpu_patch_insn(sse_context_save - 1,
+                               uintptr_t(isr_save_xsavec) -
+                               uintptr_t(sse_context_save),
+                               sizeof(*sse_context_save));
+                cpu_patch_insn(sse_context_restore - 1,
+                               uintptr_t(isr_restore_xrstor) -
+                               uintptr_t(sse_context_restore),
+                               sizeof(*sse_context_restore));
+                //printk("Using xsavec\n");
+            }
         }
 
         // Save offsets/sizes of extended contexts
@@ -311,6 +310,7 @@ void idt_xsave_detect(int ap)
 
             sse_avx_offset = (uint16_t)info.ebx;
             sse_avx_size = (uint16_t)info.eax;
+            //printk("Have AVX\n");
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_OPMASK_BIT)) {
@@ -320,6 +320,7 @@ void idt_xsave_detect(int ap)
 
             sse_avx512_opmask_offset = (uint16_t)info.ebx;
             sse_avx512_opmask_size = (uint16_t)info.eax;
+            //printk("Have AVX-512 opmask\n");
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_UPPER_BIT)) {
@@ -329,6 +330,7 @@ void idt_xsave_detect(int ap)
 
             sse_avx512_upper_offset = (uint16_t)info.ebx;
             sse_avx512_upper_size = (uint16_t)info.eax;
+            //printk("Have 512-bit AVX-512 registers\n");
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_XREGS_BIT)) {
@@ -338,6 +340,7 @@ void idt_xsave_detect(int ap)
 
             sse_avx512_xregs_offset = (uint16_t)info.ebx;
             sse_avx512_xregs_size = (uint16_t)info.eax;
+            //printk("Have 32 AVX-512 registers\n");
         }
 
         // Sanity check offsets
@@ -356,15 +359,10 @@ void idt_xsave_detect(int ap)
         return;
     }
 
-    if (!ap) {
-        assert(sse_context_size == 0);
-        assert(sse_context_save == 0);
-        assert(sse_context_restore == 0);
+    // Execution reaches here if we must use the old fxsave instruction
 
+    if (!ap)
         sse_context_size = 512;
-        sse_context_save = isr_save_fxsave;
-        sse_context_restore = isr_restore_fxrstor;
-    }
 }
 
 int idt_init(int ap)
@@ -374,10 +372,9 @@ int idt_init(int ap)
     if (!ap) {
         for (size_t i = 0; i < countof(isr_entry_points); ++i) {
             addr = (uintptr_t)isr_entry_points[i];
-            idt[i].offset_lo = (uint16_t)(addr & 0xFFFF);
-            idt[i].offset_hi = (uint16_t)((addr >> 16) & 0xFFFF);
-            idt[i].offset_64_31 = (uint32_t)
-                    ((addr >> 32) & 0xFFFFFFFF);
+            idt[i].offset_lo = uint16_t(addr & 0xFFFF);
+            idt[i].offset_hi = uint16_t((addr >> 16) & 0xFFFF);
+            idt[i].offset_64_31 = uint32_t((addr >> 32) & 0xFFFFFFFF);
 
             idt[i].type_attr = IDT_PRESENT | IDT_INTR;
 
@@ -511,7 +508,7 @@ static void stack_trace(isr_context_t *ctx,
 
 static void dump_frame(uintptr_t rbp, uintptr_t rip)
 {
-    printk("at rbp=%016zx rip=%016zx\n", rbp, rip);
+    printk("at rbp=%16zx rip=%16zx\n", rbp, rip);
 }
 
 void dump_context(isr_context_t *ctx, int to_screen)
@@ -541,6 +538,9 @@ void dump_context(isr_context_t *ctx, int to_screen)
         "ds", "es", "fs", "gs"
     };
 
+    uintptr_t fsbase = thread_get_fsbase(-1);
+    uintptr_t gsbase = thread_get_gsbase(-1);
+
     //
     // Dump context to debug console
 
@@ -548,7 +548,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // General registers (except rsp)
     for (int i = 0; i < 15; ++i) {
-        printdbg("%s=%016lx\n",
+        printdbg("%s=%16lx\n",
                  reg_names[i],
                  ctx->gpr->r[i]);
     }
@@ -564,14 +564,14 @@ void dump_context(isr_context_t *ctx, int to_screen)
         for (int i = 0; i < 16; ++i) {
             uint64_t const *lo = cpu_get_fpr_reg(ctx, i);
             uint64_t const *hi = cpu_get_fpr_reg(ctx, i + 16);
-            printdbg("%symm%d=%016lx:%016lx:%016lx:%016lx\n",
+            printdbg("%symm%d=%16lx:%16lx:%16lx:%16lx\n",
                      i > 9 ? "" : " ", i,
                      hi[1], hi[0], lo[1], lo[0]);
         }
     } else {
         // xmm registers
         for (int i = 0; i < 16; ++i) {
-            printdbg("%sxmm%d=%016lx%016lx\n",
+            printdbg("%sxmm%d=%16lx%16lx\n",
                      i > 9 ? "" : " ", i,
                      ctx->fpr->xmm[i].qword[1],
                     ctx->fpr->xmm[i].qword[0]);
@@ -586,11 +586,11 @@ void dump_context(isr_context_t *ctx, int to_screen)
     }
 
     // ss:rsp
-    printdbg("ss:rsp=%04lx:%012lx\n",
+    printdbg("ss:rsp=%4lx:%16lx\n",
              ctx->gpr->iret.ss,
              ctx->gpr->iret.rsp);
     // cs:rip
-    printdbg("cs:rip=%04lx:%012lx\n",
+    printdbg("cs:rip=%4lx:%16lx\n",
              ctx->gpr->iret.cs,
              (uintptr_t)ctx->gpr->iret.rip);
 
@@ -623,11 +623,11 @@ void dump_context(isr_context_t *ctx, int to_screen)
              ctx->fpr->fsw, fmt_buf);
 
     // fault address
-    printdbg("cr2=%012lx\n",
+    printdbg("cr2=%16lx\n",
              cpu_get_fault_address());
 
     // error code
-    printdbg("Error code 0x%012lx\n",
+    printdbg("Error code 0x%16lx\n",
              ctx->gpr->info.error_code);
 
     // rflags (it's actually only 22 bits) and description
@@ -638,12 +638,10 @@ void dump_context(isr_context_t *ctx, int to_screen)
              fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%16zx\n",
-             (uintptr_t)ctx->gpr->fsbase);
+    printdbg("fsbase=%16zx\n", fsbase);
 
     // gsbase
-    printdbg("gsbase=%16lx\n",
-             cpu_msr_get(MSR_GSBASE));
+    printdbg("gsbase=%16lx\n", gsbase);
 
     printdbg("-------------------------------------------\n");
 
@@ -658,7 +656,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
             // General register name
             con_draw_xy(0, i, reg_names[i], color);
             // General register value
-            snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx ",
+            snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ",
                      ctx->gpr->r[i]);
             con_draw_xy(3, i, fmt_buf, color);
         }
@@ -670,7 +668,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
         con_draw_xy(29, i, fmt_buf, color);
 
         // XMM register value
-        snprintf(fmt_buf, sizeof(fmt_buf), "=%016lx%016lx ",
+        snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx%16lx ",
                 ctx->fpr->xmm[i].qword[0],
                 ctx->fpr->xmm[i].qword[1]);
         con_draw_xy(35, i, fmt_buf, color);
@@ -687,13 +685,13 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // ss:rsp
     con_draw_xy(0, 15, "ss:rsp", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012lx ",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16lx ",
              ctx->gpr->iret.ss, ctx->gpr->iret.rsp);
     con_draw_xy(6, 15, fmt_buf, color);
 
     // cs:rip
     con_draw_xy(0, 16, "cs:rip", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%012zx",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16zx",
              ctx->gpr->iret.cs, (uintptr_t)ctx->gpr->iret.rip);
     con_draw_xy(6, 16, fmt_buf, color);
 
@@ -724,13 +722,13 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // fault address
     con_draw_xy(48, 19, "cr2", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%012lx",
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx",
              cpu_get_fault_address());
     con_draw_xy(51, 19, fmt_buf, color);
 
     // error code
     con_draw_xy(0, 18, "Error code", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%012lx",
+    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%16lx",
              ctx->gpr->info.error_code);
     con_draw_xy(10, 18, fmt_buf, color);
 
@@ -747,19 +745,17 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%12zx ",
-             (uintptr_t)ctx->gpr->fsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%16zx ", fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
-                     cpu_msr_get(MSR_GSBASE));
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ", gsbase);
     con_draw_xy(6, 21, fmt_buf, color);
 
     // last branch
     //con_draw_xy(0, 22, "lastbr", color);
-    //snprintf(fmt_buf, sizeof(fmt_buf), "=%12lx ",
+    //snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ",
     //                 msr_get(0x1DD));
     //con_draw_xy(6, 22, fmt_buf, color);
 
@@ -782,6 +778,11 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
     char const *name = ctx->gpr->info.interrupt < countof(exception_names)
             ? exception_names[ctx->gpr->info.interrupt]
             : nullptr;
+
+    if (ctx->gpr->info.interrupt == INTR_EX_OPCODE) {
+        uint8_t const *chk = (uint8_t const *)ctx->gpr->iret.rip;
+        printk("Opcode = %02x\n", *chk);
+    }
 
     printk("\nUnhandled exception 0x%zx (%s) at RIP=%p\n",
            ctx->gpr->info.interrupt,

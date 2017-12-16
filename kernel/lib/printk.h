@@ -3,7 +3,7 @@
 #include <stdarg.h>
 #include "types.h"
 
-extern "C" {
+__BEGIN_DECLS
 
 __noreturn
 void vpanic(char const *format, va_list ap);
@@ -36,13 +36,14 @@ int hex_dump(void const *mem, size_t size);
 
 struct format_flag_info_t {
     char const * const name;
-    int bit;
     uintptr_t mask;
     char const * const *value_names;
+    int8_t bit;
+    uint64_t :56;
 };
 
 size_t format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, format_flag_info_t const *info);
 
-}
+__END_DECLS

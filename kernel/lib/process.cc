@@ -20,11 +20,11 @@ union process_ptr_t {
 
 static process_ptr_t *processes;
 static size_t process_count;
-static spinlock_t processes_lock;
+static spinlock processes_lock;
 static pid_t process_first_free;
 static pid_t process_last_free;
 
-static process_t *process_add_locked(void)
+static process_t *process_add_locked(unique_lock<spinlock> const&)
 {
     pid_t pid;
     size_t realloc_count = 0;
@@ -80,9 +80,8 @@ void process_remove(process_t *process)
 
 static process_t *process_add(void)
 {
-    spinlock_lock(&processes_lock);
-    process_t *result = process_add_locked();
-    spinlock_unlock(&processes_lock);
+    unique_lock<spinlock> lock(processes_lock);
+    process_t *result = process_add_locked(lock);
     return result;
 }
 

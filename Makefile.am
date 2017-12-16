@@ -2,9 +2,10 @@
 
 DUMPDIR = $(top_builddir)/dump
 
+#$(ZLIBSTATICLIB) \
+#$(ZLIBPUBLICINCLUDES)
+
 BUILT_SOURCES = \
-	$(ZLIBSTATICLIB) \
-	$(ZLIBPUBLICINCLUDES) \
 	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
 	generated_headers
@@ -154,7 +155,7 @@ libbootsect_a_SOURCES = \
 	boot/driveinfo.cc \
 	boot/debug.cc \
 	boot/part.s \
-	boot/mpentry.s \
+	boot/mpentry.S \
 	boot/exception.s \
 	boot/part.h \
 	boot/vesainfo.h \
@@ -192,13 +193,17 @@ libbootsect_a_CXXFLAGS = \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
 	-ffreestanding \
-	$(NO_STACKPROTECTOR_FLAGS) $(NO_EXCEPTIONS_FLAGS) -fno-rtti \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	-mrtd -mregparm=3 \
 	-std=c++14 $(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
+
+#	$(NO_STACK_CHECK_FLAGS)
 
 libbootsect_a_CFLAGS = \
 	-m32 \
@@ -208,7 +213,8 @@ libbootsect_a_CFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	-ffreestanding \
-	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) -fno-rtti \
+	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) \
+	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	-std=c++14 \
@@ -392,6 +398,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/functional.h \
 	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/memory.h \
+	kernel/lib/cc/numeric.h \
 	kernel/lib/cc/type_traits.h \
 	kernel/lib/cc/utility.h \
 	kernel/lib/cc/vector.h \
@@ -606,11 +613,11 @@ KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__=0x00000001 \
 	-std=c++14 \
 	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
+	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	-fno-rtti \
-	-msse -msse2 -fverbose-asm \
+	$(NO_RTTI_FLAGS) \
 	-fvisibility=default \
 	-export-dynamic \
 	-ffreestanding \
@@ -634,9 +641,10 @@ KERNEL_LDFLAGS_SHARED = \
 
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
-	$(DUMPDIR) \
-	$(ZLIBSTATICLIB) \
-	$(ZLIBPUBLICINCLUDES)
+	$(DUMPDIR)
+
+#$(ZLIBSTATICLIB) \
+#$(ZLIBPUBLICINCLUDES)
 
 libkernel_sse41_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) -msse4.1
@@ -714,44 +722,8 @@ EXTRA_kernel_avx2_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 # ----------------------------------------------------------------------------
 # libc
 
-libc_a_SOURCES = \
-	libc/src/string/__bytebitmap.cc \
-	libc/src/string/strsignal.cc \
-	libc/src/string/strcoll_l.cc \
-	libc/src/string/strerror.cc \
-	libc/src/string/strlen.cc \
-	libc/src/string/strdup.cc \
-	libc/src/string/strtok.cc \
-	libc/src/string/strnlen.cc \
-	libc/src/string/strcpy.cc \
-	libc/src/string/strcmp.cc \
-	libc/src/string/memset.cc \
-	libc/src/string/strndup.cc \
-	libc/src/string/strcspn.cc \
-	libc/src/string/memcmp.cc \
-	libc/src/string/strrchr.cc \
-	libc/src/string/strpbrk.cc \
-	libc/src/string/memcpy.cc \
-	libc/src/string/stpncpy.cc \
-	libc/src/string/strtok_r.cc \
-	libc/src/string/stpcpy.cc \
-	libc/src/string/memccpy.cc \
-	libc/src/string/strcat.cc \
-	libc/src/string/strchr.cc \
-	libc/src/string/strncpy.cc \
-	libc/src/string/strncat.cc \
-	libc/src/string/strstr.cc \
-	libc/src/string/memmove.cc \
-	libc/src/string/strspn.cc \
-	libc/src/string/strcoll.cc \
-	libc/src/string/strerror_r.cc \
-	libc/src/string/strerror_l.cc \
-	libc/src/string/strxfrm.cc \
-	libc/src/string/memchr.cc \
-	libc/src/string/strxfrm_l.cc \
-	libc/src/string/strncmp.cc \
-	libc/src/stdlib/_Exit.cc \
-	libc/src/sys/syscall.s \
+libc_adir = $(includedir)/wtfadir
+libc_a_HEADERS = \
 	libc/include/termios.h \
 	libc/include/complex.h \
 	libc/include/regex.h \
@@ -830,6 +802,46 @@ libc_a_SOURCES = \
 	libc/include/langinfo.h \
 	libc/include/locale.h
 
+libc_a_SOURCES = \
+	libc/src/string/__bytebitmap.cc \
+	libc/src/string/strsignal.cc \
+	libc/src/string/strcoll_l.cc \
+	libc/src/string/strerror.cc \
+	libc/src/string/strlen.cc \
+	libc/src/string/strdup.cc \
+	libc/src/string/strtok.cc \
+	libc/src/string/strnlen.cc \
+	libc/src/string/strcpy.cc \
+	libc/src/string/strcmp.cc \
+	libc/src/string/memset.cc \
+	libc/src/string/strndup.cc \
+	libc/src/string/strcspn.cc \
+	libc/src/string/memcmp.cc \
+	libc/src/string/strrchr.cc \
+	libc/src/string/strpbrk.cc \
+	libc/src/string/memcpy.cc \
+	libc/src/string/stpncpy.cc \
+	libc/src/string/strtok_r.cc \
+	libc/src/string/stpcpy.cc \
+	libc/src/string/memccpy.cc \
+	libc/src/string/strcat.cc \
+	libc/src/string/strchr.cc \
+	libc/src/string/strncpy.cc \
+	libc/src/string/strncat.cc \
+	libc/src/string/strstr.cc \
+	libc/src/string/memmove.cc \
+	libc/src/string/strspn.cc \
+	libc/src/string/strcoll.cc \
+	libc/src/string/strerror_r.cc \
+	libc/src/string/strerror_l.cc \
+	libc/src/string/strxfrm.cc \
+	libc/src/string/memchr.cc \
+	libc/src/string/strxfrm_l.cc \
+	libc/src/string/strncmp.cc \
+	libc/src/stdlib/_Exit.cc \
+	libc/src/sys/syscall.s \
+	$(libc_a_HEADERS)
+
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
@@ -895,7 +907,7 @@ test: test_compile
 $(DUMPDIR):
 	mkdir -p $(top_builddir)/dump
 
-include zlib.mk
+#include zlib.mk
 include symbols.mk
 include diskfat.mk
 include diskiso.mk
@@ -934,7 +946,8 @@ distclean-local:
 generated_headers: \
 	$(top_srcdir)/kernel/device/nvmebits.h \
 	$(top_srcdir)/kernel/device/pcibits.h \
-	$(top_srcdir)/kernel/device/i350bits.h
+	$(top_srcdir)/kernel/device/i350bits.h \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h
 
 .PHONY: generated_headers
 
@@ -954,6 +967,13 @@ $(top_srcdir)/kernel/device/pcibits.h: \
 
 $(top_srcdir)/kernel/device/i350bits.h: \
 		$(top_srcdir)/kernel/device/i350.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
+		$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
@@ -1029,7 +1049,7 @@ QEMU = qemu-system-x86_64
 QEMU_CPUS = 8
 QEMU_CORES = 4
 QEMU_THREADS = 1
-QEMU_CPU = host,migratable=false,host-cache-info=true
+QEMU_CPU = max,migratable=false,host-cache-info=true
 
 QEMU_RAM = 5G
 
@@ -1045,9 +1065,7 @@ QEMU_NET = \
 	-net dump,file="$(DUMPDIR)/netdump"
 
 QEMU_MONITOR = \
-	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait
-
-#,telnet
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
 
 QEMU_DEBUGCON = \
 	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
@@ -1076,7 +1094,7 @@ QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme = \
 	-machine q35 \
 	-device nvme,drive=nvmedrv,serial=42424242 \
-	-boot menu=on
+	-boot order=c,menu=on
 QEMU_HDCTL_DEV_ahci = -machine q35
 QEMU_HDCTL_DEV_ide = -machine pc
 QEMU_DIF_nvme = ,if=none,id=nvmedrv
@@ -1089,7 +1107,7 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu kvm64
+QEMU_EMU_tcg = -cpu max
 #-cpu EPYC
 
 #QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom

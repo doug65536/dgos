@@ -15,8 +15,10 @@ extern uint16_t sse_avx512_upper_size;
 extern uint16_t sse_avx512_xregs_offset;
 extern uint16_t sse_avx512_xregs_size;
 
-extern void (*sse_context_save)(void);
-extern void (*sse_context_restore)(void);
+// These point to immediately after the operand of a jmp instruction
+extern uint32_t sse_context_save[];
+extern uint32_t sse_context_restore[];
+
 // Keep this flag right next to other data touched in interrupt handler
 extern bool cpu_has_fsgsbase;
 

@@ -2,6 +2,9 @@ AM_CXX=clang++
 AM_CC=clang
 AM_AR=gcc-ar
 AM_RANLIB=gcc-ranlib
+AC_SUBST([AM_CC])
+AC_SUBST([AM_CXX])
+AC_SUBST([AM_AR])
 AC_SUBST([AM_RANLIB])
 
 AC_INIT([dgos], [0.8])
@@ -100,7 +103,9 @@ AC_SUBST([COMPILER_FLAGS])
 
 AX_CHECK_COMPILE_FLAG([-Oz],
 	[SMALLEST_CODE_FLAGS=-Oz],
-	[SMALLEST_CODE_FLAGS=-Os],
+	[AX_CHECK_COMPILE_FLAG([-Os],
+		[SMALLEST_CODE_FLAGS=-Os],
+		[$COMPILER_WERROR])],
 	[$COMPILER_WERROR])
 AX_CHECK_COMPILE_FLAG([-falign-loops=0],
 	[SMALLEST_CODE_FLAGS+=" -falign-loops=0"]
@@ -185,6 +190,24 @@ AX_CHECK_COMPILE_FLAG([-fno-stack-protector],
 	[], [$COMPILER_WERROR])
 
 AC_SUBST([NO_STACKPROTECTOR_FLAGS])
+
+AX_CHECK_COMPILE_FLAG([-fstack-check],
+	[STACK_CHECK_FLAGS=" -fstack-check"]
+	[], [$COMPILER_WERROR])
+
+AC_SUBST([STACK_CHECK_FLAGS])
+
+AX_CHECK_COMPILE_FLAG([-fno-stack-check],
+	[NO_STACK_CHECK_FLAGS=" -fno-stack-check"]
+	[], [$COMPILER_WERROR])
+
+AC_SUBST([NO_STACK_CHECK_FLAGS])
+
+AX_CHECK_COMPILE_FLAG([-fno-rtti],
+	[NO_RTTI_FLAGS=" -fno-rtti"]
+	[], [$COMPILER_WERROR])
+
+AC_SUBST([NO_RTTI_FLAGS])
 
 AX_CHECK_COMPILE_FLAG([-fno-asynchronous-unwind-tables],
 	[NO_UNWIND_TABLES_FLAGS=" -fno-asynchronous-unwind-tables"]

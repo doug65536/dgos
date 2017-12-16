@@ -598,15 +598,15 @@ C_ASSERT(sizeof(atapi_fis_t) == 16);
 
 __used
 static format_flag_info_t const ide_flags_status[] = {
-    { "ERR",  ATA_REG_STATUS_ERR_BIT,  1, 0 },
-    { "IDX",  ATA_REG_STATUS_IDX_BIT,  1, 0 },
-    { "CORR", ATA_REG_STATUS_CORR_BIT, 1, 0 },
-    { "DRQ",  ATA_REG_STATUS_DRQ_BIT,  1, 0 },
-    { "DSC",  ATA_REG_STATUS_DSC_BIT,  1, 0 },
-    { "DWF",  ATA_REG_STATUS_DWF_BIT,  1, 0 },
-    { "DRDY", ATA_REG_STATUS_DRDY_BIT, 1, 0 },
-    { "BSY",  ATA_REG_STATUS_BSY_BIT,  1, 0 },
-    { 0,      -1,                      0, 0 }
+    { "ERR",  1, 0, ATA_REG_STATUS_ERR_BIT  },
+    { "IDX",  1, 0, ATA_REG_STATUS_IDX_BIT  },
+    { "CORR", 1, 0, ATA_REG_STATUS_CORR_BIT },
+    { "DRQ",  1, 0, ATA_REG_STATUS_DRQ_BIT  },
+    { "DSC",  1, 0, ATA_REG_STATUS_DSC_BIT  },
+    { "DWF",  1, 0, ATA_REG_STATUS_DWF_BIT  },
+    { "DRDY", 1, 0, ATA_REG_STATUS_DRDY_BIT },
+    { "BSY",  1, 0, ATA_REG_STATUS_BSY_BIT  },
+    { 0,      0, 0, -1,                     }
 };
 
 #define ATA_REG_CONTROL_nIEN_BIT    1

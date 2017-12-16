@@ -8,7 +8,6 @@
 #include "screen.h"
 #include "bioscall.h"
 
-uint8_t boot_drive __used;
 uint8_t fully_loaded __used;
 
 extern "C" int init();

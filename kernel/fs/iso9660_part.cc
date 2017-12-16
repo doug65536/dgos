@@ -43,10 +43,10 @@ if_list_t iso9660_part_factory_t::detect(storage_dev_base_t *drive)
                              1 * sector_mul,
                              16 * sector_mul);
 
-    if (err == 0)
+    if (err >= 0)
         memcpy(sig, sector + 1, sizeof(sig));
 
-    if (err == 0 && !memcmp(sig, "CD001", 5)) {
+    if (err >= sector_mul && !memcmp(sig, "CD001", 5)) {
         part_dev_t *part = partitions + partition_count++;
 
         part->drive = drive;

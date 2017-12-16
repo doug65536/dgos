@@ -67,13 +67,13 @@ bool toggle_a20(uint8_t enable)
         uint8_t value;
         enable = (enable != 0) << 1;
         __asm__ __volatile__ (
-            "inb $0x92,%1\n\t"
-            "andb $~2,%1\n\t"
-            "orb %0,%1\n\t"
+            "inb $0x92,%[value]\n\t"
+            "andb $~2,%[value]\n\t"
+            "orb %[enable],%[value]\n\t"
             "wbinvd\n\t"
             "outb %1,$0x92\n\t"
-            : "+c" (enable)
-            , "=a" (value)
+            : [enable] "+c" (enable)
+            , [value] "=a" (value)
         );
         return true;
 
@@ -280,33 +280,6 @@ const char *cpu_choose_kernel()
         return "dgos-kernel-generic";
 }
 
-//static bool disable_interrupts()
-//{
-//    uint32_t int_enabled;
-//    __asm__ __volatile__ (
-//        "pushfl\n"
-//        "popl %0\n"
-//        "shrl $9,%0\n\t"
-//        "andl $1,%0\n\t"
-//        "cli\n\t"
-//        : "=r" (int_enabled)
-//    );
-//    return !!int_enabled;
-//}
-
-//static void enable_interrupts()
-//{
-//    __asm__ __volatile__ ("sti");
-//}
-
-//static void toggle_interrupts(bool enable)
-//{
-//    if (enable)
-//        enable_interrupts();
-//    else
-//        disable_interrupts();
-//}
-
 bool need_a20_toggle;
 
 bool nx_available;
@@ -334,15 +307,6 @@ void cpu_a20_exitpm()
 // If src is == 0, jumps to entry point in address, passing size as an argument
 void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 {
-    //// Fast-path copies to below 4GB line
-    /// can't, relies on aliasing window and paging
-    //if (src > 0 && address < 0x100000000 && address + size <= 0x100000000) {
-    //    memcpy((void*)address, (void*)src, size);
-    //    return;
-    //}
-
-    //uint16_t intf = disable_interrupts();
-
     uint32_t pdbr = paging_root_addr();
 
     struct params_t {
@@ -360,7 +324,7 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
     __asm__ __volatile__ (
         // Enable CR4.PAE (bit 5)
         "movl %%cr4,%%eax\n\t"
-        "btsl $5,%%eax\n\t"
+        "btsl $%c[cr4_pae_bit],%%eax\n\t"
         "orl %[gp_available],%%eax\n\t"
         "movl %%eax,%%cr4\n\t"
 
@@ -372,25 +336,22 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         // and if available, enable no-execute bit in paging
         "movl $%c[msr_efer],%%ecx\n"
         "rdmsr\n\t"
-        "btsl $8,%%eax\n\t"
+        "btsl $%c[msr_efer_lme_bit],%%eax\n\t"
         "cmpw $0,%[nx_available]\n\t"
         "jz 0f\n\t"
-        "btsl $11,%%eax\n\t"
+        "btsl $%c[msr_efer_nx_bit],%%eax\n\t"
         "0:"
         "wrmsr\n\t"
 
         // Enable paging (CR0.PG (bit 31)
         "movl %%cr0,%%eax\n\t"
-        "btsl $31,%%eax\n\t"
+        "btsl $%c[cr0_pg_bit],%%eax\n\t"
         "movl %%eax,%%cr0\n\t"
 
         "jmp 0f\n\t"
         "0:"
 
         // Now in 64 bit compatibility mode (still really 32 bit)
-
-//        "mov %c[gdtr_ptr_ofs](%[params]),%%eax\n\t"
-//        "lgdt 6(%%eax)\n\t"
 
         // Far jump to selector that has L bit set (64 bit)
         "lea 6+idtr_64,%%eax\n\t"
@@ -414,10 +375,6 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         "lidtq (%%eax)\n\t"
 
-        // Deliberate crash to test exception handlers
-        //"movl $0x56363,%%eax\n\t"
-        //"decl (%%eax)\n\t"
-
         // Load 64 bit data segments
         "movl %[gdt_data64],%%eax\n\t"
         "movl %%eax,%%ds\n\t"
@@ -426,7 +383,6 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "movl %%eax,%%ss\n\t"
 
         // Load copy/entry parameters
-        // (before screwing up stack pointer with call)
         "mov %c[addr_ofs](%[params]),%%rdi\n\t"
         "movl %c[src_ofs](%[params]),%%esi\n\t"
         "movl %c[size_ofs](%[params]),%%ecx\n\t"
@@ -440,9 +396,16 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "rep movsb\n\t"
         "jmp 3f\n\t"
 
+        //
         // Enter kernel
         "2:\n\t"
         "movb $'Y',0xb8000\n\t"  // <-- debug hack
+
+        // Enable CR0.WP write protection
+        "mov %%cr0,%%rax\n\t"
+        "bts $%c[cr0_wp_bit],%%rax\n\t"
+        "mov %%rax,%%cr0\n\t"
+
         "mov %%rsp,%%r15\n\t"
         "andq $-16,%%rsp\n\t"
         "call *%%rdi\n\t"
@@ -459,17 +422,14 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         // Disable paging
         "mov %%cr0,%%eax\n\t"
-        "btr $31,%%eax\n\t"
+        "btr $%c[cr0_pg_bit],%%eax\n\t"
         "mov %%eax,%%cr0\n\t"
 
         // Disable long mode
-        "movl $0xC0000080,%%ecx\n"
+        "movl $%c[msr_efer],%%ecx\n"
         "rdmsr\n\t"
-        "andl $~0x100,%%eax\n\t"
+        "btr $%c[msr_efer_lme_bit],%%eax\n\t"
         "wrmsr\n\t"
-
-//        "movl %c[gdtr_ptr_ofs](%[params]),%%eax\n\t"
-//        "lgdt 6(%%eax)\n\t"
 
         // Load 32 bit selectors
         "movl %[gdt_data32],%%eax\n\t"
@@ -502,9 +462,12 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         , [gdt_data32] "n" (GDT_SEL_KERNEL_DATA32)
         , [gdt_code16] "n" (GDT_SEL_KERNEL_CODE16)
         , [gdt_data16] "n" (GDT_SEL_KERNEL_DATA16)
-        , [msr_efer] "n" (MSR_EFER)
+        , [msr_efer] "n" (CPU_MSR_EFER)
+        , [cr0_pg_bit] "n" (CPU_CR0_PG_BIT)
+        , [cr0_wp_bit] "n" (CPU_CR0_WP_BIT)
+        , [cr4_pae_bit] "n" (CPU_CR4_PAE_BIT)
+        , [msr_efer_lme_bit] "n" (CPU_MSR_EFER_LME_BIT)
+        , [msr_efer_nx_bit] "n" (CPU_MSR_EFER_NX_BIT)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
-
-    //toggle_interrupts(intf);
 }

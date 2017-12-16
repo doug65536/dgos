@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "assert.h"
 
 struct gdt_entry_t {
     constexpr gdt_entry_t(uint64_t base, uint64_t limit,
@@ -40,41 +41,9 @@ union gdt_entry_combined_t {
     constexpr gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}
 };
 
-#define GDT_ACCESS_PRESENT_BIT   7
-#define GDT_ACCESS_DPL_BIT       5
-#define GDT_ACCESS_EXEC_BIT      3
-#define GDT_ACCESS_DOWN_BIT      2
-#define GDT_ACCESS_RW_BIT        1
-
-#define GDT_ACCESS_PRESENT      (1 << GDT_ACCESS_PRESENT_BIT)
-#define GDT_ACCESS_EXEC         (1 << GDT_ACCESS_EXEC_BIT)
-#define GDT_ACCESS_DOWN         (1 << GDT_ACCESS_DOWN_BIT)
-#define GDT_ACCESS_RW           (1 << GDT_ACCESS_RW_BIT)
-
-#define GDT_ACCESS_DPL_BITS     2
-#define GDT_ACCESS_DPL_MASK     ((1 << GDT_ACCESS_DPL_BITS)-1)
-#define GDT_ACCESS_DPL          (GDT_ACCESS_DPL_MASK << GDT_ACCESS_DPL_BIT)
-#define GDT_ACCESS_DPL_n(dpl)   ((dpl) << GDT_ACCESS_DPL_BIT)
-
-#define GDT_FLAGS_GRAN_BIT      7
-#define GDT_FLAGS_IS32_BIT      6
-#define GDT_FLAGS_IS64_BIT      5
-
-#define GDT_FLAGS_GRAN          (1 << GDT_FLAGS_GRAN_BIT)
-#define GDT_FLAGS_IS32          (1 << GDT_FLAGS_IS32_BIT)
-#define GDT_FLAGS_IS64          (1 << GDT_FLAGS_IS64_BIT)
-
-#define GDT_LIMIT_LOW_MASK      0xFFFF
-#define GDT_BASE_LOW_MASK       0xFFFF
-
-#define GDT_BASE_MIDDLE_BIT     16
-#define GDT_BASE_MIDDLE         0xFF
-
-#define GDT_LIMIT_HIGH_BIT      16
-#define GDT_LIMIT_HIGH          0x0F
-
-#define GDT_BASE_HIGH_BIT       24
-#define GDT_BASE_HIGH           0xFF
+C_ASSERT(sizeof(gdt_entry_t) == 8);
+C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
+C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
 #define GDT_MAKE_SEGMENT_DESCRIPTOR( \
     base, limit, present, privilege, \
@@ -127,8 +96,6 @@ union gdt_entry_combined_t {
     base, limit, present, privilege, \
     GDT_MAKE_CODEDATA_TYPE(executable, downward, rw), \
     granularity, is32, is64)
-
-#define GDT_TYPE_TSS    0x09
 
 #define GDT_MAKE_TSS_DESCRIPTOR( \
     base, limit, present, privilege, granularity) \
@@ -189,35 +156,33 @@ union gdt_entry_combined_t {
 #define GDT_MAKE_DATASEG16(ring) \
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
-#define GDT_SEL_KERNEL_CODE64   0x08
-#define GDT_SEL_KERNEL_DATA     0x10
-#define GDT_SEL_KERNEL_CODE32   0x18
-#define GDT_SEL_KERNEL_DATA32   0x20
-#define GDT_SEL_KERNEL_CODE16   0x28
-#define GDT_SEL_KERNEL_DATA16   0x30
-#define GDT_SEL_USER_CODE32     0x38
-#define GDT_SEL_USER_DATA       0x40
-#define GDT_SEL_USER_CODE64     0x48
-#define GDT_SEL_TSS             0x58
-
-struct tss_stack_t {
-    uint32_t lo;
-    uint32_t hi;
-};
-
 // Task State Segment (64-bit)
 struct tss_t {
+    // EVERYTHING is misaligned without dummy_align
+    uint32_t dummy_align;
+
+    // Beginning of TSS is actually here
     uint32_t reserved0;
-    tss_stack_t rsp[3];
-    tss_stack_t ist[8];
+
+    uint64_t rsp[3];
+
+    uint64_t ist[8];
+
     uint32_t reserved3;
     uint32_t reserved4;
+
     uint16_t reserved5;
     uint16_t iomap_base;
+    uint32_t dummy_align2;
+
     // entry 0 is rsp[0], rest are ist stacks
     void *stack[8];
 };
 
-void gdt_init(void);
+extern tss_t *tss_list;
+
+void gdt_init(int ap);
 void gdt_init_tss(int cpu_count);
 void gdt_load_tr(int cpu_number);
+
+extern "C" gdt_entry_combined_t gdt[];

@@ -9,7 +9,7 @@ class tmpfs_fs_t : public fs_base_t {
 };
 
 class tmpfs_factory_t : public fs_factory_t {
-    fs_base_t *mount(fs_init_info_t *conn);
+    fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
 //

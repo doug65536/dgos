@@ -54,6 +54,7 @@ public:
 
     ~spinlock()
     {
+        assert(m == 0);
     }
 
     spinlock(spinlock const& r) = delete;

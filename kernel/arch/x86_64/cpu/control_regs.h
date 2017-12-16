@@ -161,38 +161,6 @@ static __always_inline uintptr_t cpu_cr4_change_bits(
     return rax;
 }
 
-#define CPU_DR7_EN_LOCAL    0x1
-#define CPU_DR7_EN_GLOBAL   0x2
-#define CPU_DR7_EN_MASK     0x3
-#define CPU_DR7_RW_INSN     0x0
-#define CPU_DR7_RW_WRITE    0x1
-#define CPU_DR7_RW_IO       0x2
-#define CPU_DR7_RW_RW       0x3
-#define CPU_DR7_RW_MASK     0x3
-#define CPU_DR7_LEN_1       0x0
-#define CPU_DR7_LEN_2       0x1
-#define CPU_DR7_LEN_8       0x2
-#define CPU_DR7_LEN_4       0x3
-#define CPU_DR7_LEN_MASK    0x3
-
-#define CPU_DR7_BPn_VAL(n, en, rw, len) \
-    (((en) << (n * 2)) | \
-    ((rw) << ((n) * 4 + 16)) | \
-    ((len) << ((n) * 4 + 16 + 2)))
-
-#define CPU_DR7_BPn_MASK(n) \
-    CPU_DR7_BPn_VAL((n), CPU_DR7_EN_MASK, CPU_DR7_RW_MASK, CPU_DR7_LEN_MASK)
-
-#define CPU_DR6_BPn_OCCURED(n)  (1<<(n))
-#define CPU_DR6_BD_BIT          13
-#define CPU_DR6_BS_BIT          14
-#define CPU_DR6_BT_BIT          15
-#define CPU_DR6_RTM_BIT         16
-#define CPU_DR6_BD              (1<<CPU_DR6_BD_BIT)
-#define CPU_DR6_BS              (1<<CPU_DR6_BS_BIT)
-#define CPU_DR6_BT              (1<<CPU_DR6_BT_BIT)
-#define CPU_DR6_RTM             (1<<CPU_DR6_RTM_BIT)
-
 template<int dr>
 static __always_inline uintptr_t cpu_get_debug_reg()
 {
@@ -320,14 +288,19 @@ static __always_inline void cpu_flush_tlb(void)
         // Flush all global by toggling global mappings
 
         // Toggle PGE off and on
-        cpu_cr4_change_bits(CR4_PGE, 0);
-        cpu_cr4_change_bits(0, CR4_PGE);
+        cpu_cr4_change_bits(CPU_CR4_PGE, 0);
+        cpu_cr4_change_bits(0, CPU_CR4_PGE);
     } else {
         //
         // Reload CR3
 
         cpu_set_page_directory(cpu_get_page_directory());
     }
+}
+
+static __always_inline void cpu_flush_cache()
+{
+    __asm__ __volatile__ ("wbinvd\n\t");
 }
 
 static __always_inline void cpu_set_fs(uint16_t selector)
@@ -350,12 +323,12 @@ static __always_inline void cpu_set_gs(uint16_t selector)
 
 static __always_inline void cpu_set_fsbase(void *fs_base)
 {
-    cpu_msr_set(MSR_FSBASE, (uintptr_t)fs_base);
+    cpu_msr_set(CPU_MSR_FSBASE, (uintptr_t)fs_base);
 }
 
 static __always_inline void cpu_set_gsbase(void *gs_base)
 {
-    cpu_msr_set(MSR_GSBASE, (uintptr_t)gs_base);
+    cpu_msr_set(CPU_MSR_GSBASE, (uintptr_t)gs_base);
 }
 
 static __always_inline table_register_64_t cpu_get_gdtr(void)
@@ -480,7 +453,7 @@ static __always_inline uintptr_t cpu_change_flags(
     return flags;
 }
 
-static __always_inline int cpu_irq_disable(void)
+static __always_inline bool cpu_irq_disable(void)
 {
     uintptr_t rflags;
     __asm__ __volatile__ (
@@ -491,7 +464,7 @@ static __always_inline int cpu_irq_disable(void)
         :
         : "cc"
     );
-    return ((rflags >> 9) & 1);
+    return rflags & CPU_EFLAGS_IF;
 }
 
 static __always_inline void cpu_irq_enable(void)
@@ -515,9 +488,9 @@ static __always_inline void cpu_irq_toggle(int enable)
     );
 }
 
-static __always_inline int cpu_irq_is_enabled(void)
+static __always_inline bool cpu_irq_is_enabled(void)
 {
-    return (cpu_get_flags() & (1<<9)) != 0;
+    return cpu_get_flags() & CPU_EFLAGS_IF;
 }
 
 static __always_inline uint64_t cpu_rdtsc(void)
@@ -581,6 +554,7 @@ static __always_inline void cpu_monitor(
         : "a" (addr)
         , "c" (ext)
         , "d" (hint)
+        : "memory"
     );
 }
 
@@ -591,27 +565,8 @@ static __always_inline void cpu_mwait(uint32_t ext, uint32_t hint)
         :
         : "c" (ext)
         , "d" (hint)
+        : "memory"
     );
-}
-
-template<typename T>
-static __always_inline void cpu_wait_bit_clear(
-        T const volatile *value, uint8_t bit)
-{
-    static_assert(sizeof(T) <= sizeof(uint64_t), "Questionable size");
-
-    T mask = T(1) << bit;
-    if (cpuid_has_mwait()) {
-        while (*value & mask) {
-            cpu_monitor(value, 0, 0);
-
-            if (*value & mask)
-                cpu_mwait(0, 0);
-        }
-    } else {
-        while (*value & mask)
-            pause();
-    }
 }
 
 template<typename T>
@@ -624,13 +579,49 @@ static __always_inline void cpu_wait_value(
 
             if (*value != wait_value)
                 cpu_mwait(0, 0);
-
-            pause();
         }
     } else {
         while (*value != wait_value)
             pause();
     }
+}
+
+template<typename T>
+static __always_inline void cpu_wait_value(
+        T const volatile *value, T wait_value, T mask)
+{
+    if (cpuid_has_mwait()) {
+        while ((*value & mask) != wait_value) {
+            cpu_monitor(value, 0, 0);
+
+            if ((*value & mask) != wait_value)
+                cpu_mwait(0, 0);
+        }
+    } else {
+        while ((*value & mask) != wait_value)
+            pause();
+    }
+}
+
+template<typename T>
+static __always_inline void cpu_wait_bit_value(
+        T const volatile *value, uint8_t bit, bool bit_value)
+{
+    return cpu_wait_value(value, T(bit_value) << bit, T(1) << bit);
+}
+
+template<typename T>
+static __always_inline void cpu_wait_bit_clear(
+        T const volatile *value, uint8_t bit)
+{
+    return cpu_wait_bit_value(value, bit, false);
+}
+
+template<typename T>
+static __always_inline void cpu_wait_bit_set(
+        T const volatile *value, uint8_t bit)
+{
+    return cpu_wait_bit_value(value, bit, true);
 }
 
 extern "C" __noinline

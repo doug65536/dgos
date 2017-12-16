@@ -25,6 +25,9 @@
 #include "vector.h"
 #include "bootinfo.h"
 #include "nano_time.h"
+#include "cmos.h"
+#include "apicbits.h"
+#include "mutex.h"
 
 #define ENABLE_ACPI 1
 
@@ -102,12 +105,6 @@ struct mp_cfg_cpu_t {
     uint32_t reserved2;
 };
 
-#define MP_CPU_FLAGS_ENABLED_BIT    0
-#define MP_CPU_FLAGS_BSP_BIT        1
-
-#define MP_CPU_FLAGS_ENABLED        (1<<MP_CPU_FLAGS_ENABLED_BIT)
-#define MP_CPU_FLAGS_BSP            (1<<MP_CPU_FLAGS_BSP_BIT)
-
 // entry_type 1
 struct mp_cfg_bus_t {
     uint8_t entry_type;
@@ -124,29 +121,7 @@ struct mp_cfg_ioapic_t {
     uint32_t addr;
 };
 
-#define MP_IOAPIC_FLAGS_ENABLED_BIT   0
-
-#define MP_IOAPIC_FLAGS_ENABLED       (1<<MP_IOAPIC_FLAGS_ENABLED_BIT)
-
 // entry_type 3 and 4 flags
-
-#define MP_INTR_FLAGS_POLARITY_BIT    0
-#define MP_INTR_FLAGS_POLARITY_BITS   2
-#define MP_INTR_FLAGS_TRIGGER_BIT     2
-#define MP_INTR_FLAGS_TRIGGER_BITS    2
-
-#define MP_INTR_FLAGS_TRIGGER_MASK \
-        ((1<<MP_INTR_FLAGS_TRIGGER_BITS)-1)
-
-#define MP_INTR_FLAGS_POLARITY_MASK   \
-        ((1<<MP_INTR_FLAGS_POLARITY_BITS)-1)
-
-#define MP_INTR_FLAGS_TRIGGER \
-        (MP_INTR_FLAGS_TRIGGER_MASK<<MP_INTR_FLAGS_TRIGGER_BITS)
-
-#define MP_INTR_FLAGS_POLARITY \
-        (MP_INTR_FLAGS_POLARITY_MASK << \
-        MP_INTR_FLAGS_POLARITY_BITS)
 
 #define MP_INTR_FLAGS_POLARITY_DEFAULT    0
 #define MP_INTR_FLAGS_POLARITY_ACTIVEHI   1
@@ -155,9 +130,6 @@ struct mp_cfg_ioapic_t {
 #define MP_INTR_FLAGS_TRIGGER_DEFAULT     0
 #define MP_INTR_FLAGS_TRIGGER_EDGE        1
 #define MP_INTR_FLAGS_TRIGGER_LEVEL       3
-
-#define MP_INTR_FLAGS_POLARITY_n(n)   ((n)<<MP_INTR_FLAGS_POLARITY_BIT)
-#define MP_INTR_FLAGS_TRIGGER_n(n)    ((n)<<MP_INTR_FLAGS_TRIGGER_BIT)
 
 #define MP_INTR_TYPE_APIC   0
 #define MP_INTR_TYPE_NMI    1
@@ -174,60 +146,8 @@ struct mp_cfg_ioapic_t {
 #define IOAPIC_REG_VER          1
 #define IOAPIC_REG_ARB          2
 
-#define IOAPIC_VER_VERSION_BIT  0
-#define IOAPIC_VER_VERSION_BITS 8
-#define IOAPIC_VER_VERSION_MASK ((1<<IOAPIC_VER_VERSION_BITS)-1)
-#define IOAPIC_VER_VERSION      \
-    (IOAPIC_VER_VERSION_MASK<<IOAPIC_VER_VERSION_BIT)
-#define IOAPIC_VER_VERSION_n(n) ((n)<<IOAPIC_VER_VERSION_BIT)
-
-#define IOAPIC_VER_ENTRIES_BIT  16
-#define IOAPIC_VER_ENTRIES_BITS 8
-#define IOAPIC_VER_ENTRIES_MASK ((1<<IOAPIC_VER_ENTRIES_BITS)-1)
-#define IOAPIC_VER_ENTRIES      \
-    (IOAPIC_VER_ENTRIES_MASK<<IOAPIC_VER_ENTRIES_BIT)
-#define IOAPIC_VER_ENTRIES_n(n) ((n)<<IOAPIC_VER_ENTRIES_BIT)
-
 #define IOAPIC_RED_LO_n(n)      (0x10 + (n) * 2)
 #define IOAPIC_RED_HI_n(n)      (0x10 + (n) * 2 + 1)
-
-#define IOAPIC_REDLO_VECTOR_BIT     0
-#define IOAPIC_REDLO_DELIVERY_BIT   8
-#define IOAPIC_REDLO_DESTMODE_BIT   11
-#define IOAPIC_REDLO_STATUS_BIT     12
-#define IOAPIC_REDLO_POLARITY_BIT   13
-#define IOAPIC_REDLO_REMOTEIRR_BIT  14
-#define IOAPIC_REDLO_TRIGGER_BIT    15
-#define IOAPIC_REDLO_MASKIRQ_BIT    16
-#define IOAPIC_REDHI_DEST_BIT       (56-32)
-
-#define IOAPIC_REDLO_DESTMODE       (1<<IOAPIC_REDLO_DESTMODE_BIT)
-#define IOAPIC_REDLO_STATUS         (1<<IOAPIC_REDLO_STATUS_BIT)
-#define IOAPIC_REDLO_POLARITY       (1<<IOAPIC_REDLO_POLARITY_BIT)
-#define IOAPIC_REDLO_REMOTEIRR      (1<<IOAPIC_REDLO_REMOTEIRR_BIT)
-#define IOAPIC_REDLO_TRIGGER        (1<<IOAPIC_REDLO_TRIGGER_BIT)
-#define IOAPIC_REDLO_MASKIRQ        (1<<IOAPIC_REDLO_MASKIRQ_BIT)
-
-#define IOAPIC_REDLO_VECTOR_BITS    8
-#define IOAPIC_REDLO_DELVERY_BITS   3
-#define IOAPIC_REDHI_DEST_BITS      8
-
-#define IOAPIC_REDLO_VECTOR_MASK    ((1<<IOAPIC_REDLO_VECTOR_BITS)-1)
-#define IOAPIC_REDLO_DELVERY_MASK   ((1<<IOAPIC_REDLO_DELVERY_BITS)-1)
-#define IOAPIC_REDHI_DEST_MASK      ((1<<IOAPIC_REDHI_DEST_BITS)-1)
-
-#define IOAPIC_REDLO_VECTOR \
-    (IOAPIC_REDLO_VECTOR_MASK<<IOAPIC_REDLO_VECTOR_BITS)
-#define IOAPIC_REDLO_DELVERY \
-    (IOAPIC_REDLO_DELVERY_MASK<<IOAPIC_REDLO_DELVERY_BITS)
-#define IOAPIC_REDHI_DEST \
-    (IOAPIC_REDHI_DEST_MASK<<IOAPIC_REDHI_DEST_BITS)
-
-#define IOAPIC_REDLO_VECTOR_n(n)    ((n)<<IOAPIC_REDLO_VECTOR_BIT)
-#define IOAPIC_REDLO_DELIVERY_n(n)  ((n)<<IOAPIC_REDLO_DELIVERY_BIT)
-#define IOAPIC_REDLO_TRIGGER_n(n)   ((n)<<IOAPIC_REDLO_TRIGGER_BIT)
-#define IOAPIC_REDHI_DEST_n(n)      ((n)<<IOAPIC_REDHI_DEST_BIT)
-#define IOAPIC_REDLO_POLARITY_n(n)  ((n)<<IOAPIC_REDLO_POLARITY_BIT)
 
 #define IOAPIC_REDLO_DELIVERY_APIC      0
 #define IOAPIC_REDLO_DELIVERY_LOWPRI    1
@@ -302,16 +222,6 @@ struct mp_cfg_buscompat_t {
     uint32_t predef_range_list;
 };
 
-struct mp_bus_irq_mapping_t {
-    uint8_t bus;
-    uint8_t intr_type;
-    uint8_t flags;
-    uint8_t device;
-    uint8_t irq;
-    uint8_t ioapic_id;
-    uint8_t intin;
-};
-
 struct mp_ioapic_t {
     uint8_t id;
     uint8_t base_intr;
@@ -319,7 +229,7 @@ struct mp_ioapic_t {
     uint8_t irq_base;
     uint32_t addr;
     uint32_t volatile *ptr;
-    spinlock_t lock;
+    spinlock lock;
 };
 
 static char *mp_tables;
@@ -327,30 +237,29 @@ static char *mp_tables;
 static vector<uint8_t> mp_pci_bus_ids;
 static uint16_t mp_isa_bus_id;
 
-static vector<mp_bus_irq_mapping_t> bus_irq_list;
-
-static uint8_t bus_irq_to_mapping[64];
-
 static uint64_t apic_timer_freq;
 
-static mp_ioapic_t ioapic_list[16];
 static unsigned ioapic_count;
+static mp_ioapic_t ioapic_list[16];
 
-static spinlock_t ioapic_msi_alloc_lock;
+static spinlock ioapic_msi_alloc_lock;
 static uint8_t ioapic_msi_next_irq = INTR_APIC_IRQ_BASE;
 static uint64_t ioapic_msi_alloc_map[] = {
     0x0000000000000000L,
     0x0000000000000000L,
     0x0000000000000000L,
-    0x8000000000000000L
+    0x0000000000000000L
 };
 
-
-static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg);
-static void ioapic_write(mp_ioapic_t *ioapic,
-                             uint32_t reg, uint32_t value);
-
-static mp_ioapic_t *ioapic_from_gsi(int gsi);
+static mp_ioapic_t *ioapic_by_id(uint8_t id);
+static void ioapic_reset(mp_ioapic_t *ioapic);
+static void ioapic_set_flags(mp_ioapic_t *ioapic,
+                             uint8_t intin, uint16_t intr_flags);
+static uint32_t ioapic_read(
+        mp_ioapic_t *ioapic, uint32_t reg, unique_lock<spinlock> const&);
+static void ioapic_write(
+        mp_ioapic_t *ioapic, uint32_t reg, uint32_t value,
+        unique_lock<spinlock> const&);
 
 static uint8_t ioapic_next_irq_base = 16;
 
@@ -358,10 +267,14 @@ static uint8_t ioapic_next_irq_base = 16;
 static uint8_t ioapic_msi_base_intr;
 static uint8_t ioapic_msi_base_irq;
 
-static uint8_t isa_irq_lookup[16];
+static vector<uint8_t> isa_irq_lookup;
 
-static uint8_t apic_id_list[64];
 static unsigned apic_id_count;
+static uint8_t apic_id_list[64];
+
+static int16_t intr_to_irq[256];
+static int16_t irq_to_intr[256];
+static int16_t intr_to_ioapic[256];
 
 static uint8_t topo_thread_bits;
 static uint8_t topo_thread_count;
@@ -373,150 +286,105 @@ static uint8_t topo_cpu_count;
 static uintptr_t apic_base;
 static uint32_t volatile *apic_ptr;
 
-#define MP_TABLE_TYPE_CPU       0
-#define MP_TABLE_TYPE_BUS       1
-#define MP_TABLE_TYPE_IOAPIC    2
-#define MP_TABLE_TYPE_IOINTR    3
-#define MP_TABLE_TYPE_LINTR     4
-#define MP_TABLE_TYPE_ADDRMAP   128
-#define MP_TABLE_TYPE_BUSHIER   129
-#define MP_TABLE_TYPE_BUSCOMPAT 130
+#define MP_TABLE_TYPE_CPU           0
+#define MP_TABLE_TYPE_BUS           1
+#define MP_TABLE_TYPE_IOAPIC        2
+#define MP_TABLE_TYPE_IOINTR        3
+#define MP_TABLE_TYPE_LINTR         4
+#define MP_TABLE_TYPE_ADDRMAP       128
+#define MP_TABLE_TYPE_BUSHIER       129
+#define MP_TABLE_TYPE_BUSCOMPAT     130
 
 //
 // APIC
 
 // APIC ID (read only)
-#define APIC_REG_ID             0x02
+#define APIC_REG_ID                 0x02
 
 // APIC version (read only)
-#define APIC_REG_VER            0x03
+#define APIC_REG_VER                0x03
 
 // Task Priority Register
-#define APIC_REG_TPR            0x08
+#define APIC_REG_TPR                0x08
 
 // Arbitration Priority Register (not present in x2APIC mode)
-#define APIC_REG_APR            0x09
+#define APIC_REG_APR                0x09
 
 // Processor Priority Register (read only)
-#define APIC_REG_PPR            0x0A
+#define APIC_REG_PPR                0x0A
 
 // End Of Interrupt register (must write 0 in x2APIC mode)
-#define APIC_REG_EOI            0x0B
+#define APIC_REG_EOI                0x0B
 
 // Logical Destination Register (not writeable in x2APIC mode)
-#define APIC_REG_LDR            0x0D
+#define APIC_REG_LDR                0x0D
 
 // Destination Format Register (not present in x2APIC mode)
-#define APIC_REG_DFR            0x0E
+#define APIC_REG_DFR                0x0E
 
 // Spurious Interrupt Register
-#define APIC_REG_SIR            0x0F
+#define APIC_REG_SIR                0x0F
 
 // In Service Registers (bit n) (read only)
-#define APIC_REG_ISR_n(n)       (0x10 + ((n) >> 5))
+#define APIC_REG_ISR_n(n)           (0x10 + ((n) >> 5))
 
 // Trigger Mode Registers (bit n) (read only)
-#define APIC_REG_TMR_n(n)       (0x18 + ((n) >> 5))
+#define APIC_REG_TMR_n(n)           (0x18 + ((n) >> 5))
 
 // Interrupt Request Registers (bit n) (read only)
-#define APIC_REG_IRR_n(n)       (0x20 + ((n) >> 5))
+#define APIC_REG_IRR_n(n)           (0x20 + ((n) >> 5))
 
 // Error Status Register (not present in x2APIC mode)
-#define APIC_REG_ESR            0x28
+#define APIC_REG_ESR                0x28
 
 // Local Vector Table Corrected Machine Check Interrupt
-#define APIC_REG_LVT_CMCI       0x2F
+#define APIC_REG_LVT_CMCI           0x2F
 
 // Local Vector Table Interrupt Command Register Lo (64-bit in x2APIC mode)
-#define APIC_REG_ICR_LO         0x30
+#define APIC_REG_ICR_LO             0x30
 
 // Local Vector Table Interrupt Command Register Hi (not present in x2APIC mode)
-#define APIC_REG_ICR_HI         0x31
+#define APIC_REG_ICR_HI             0x31
 
 // Local Vector Table Timer Register
-#define APIC_REG_LVT_TR         0x32
+#define APIC_REG_LVT_TR             0x32
 
 // Local Vector Table Thermal Sensor Register
-#define APIC_REG_LVT_TSR        0x33
+#define APIC_REG_LVT_TSR            0x33
 
 // Local Vector Table Performance Monitoring Counter Register
-#define APIC_REG_LVT_PMCR       0x34
+#define APIC_REG_LVT_PMCR           0x34
 
 // Local Vector Table Local Interrupt 0 Register
-#define APIC_REG_LVT_LNT0       0x35
+#define APIC_REG_LVT_LNT0           0x35
 
 // Local Vector Table Local Interrupt 1 Register
-#define APIC_REG_LVT_LNT1       0x36
+#define APIC_REG_LVT_LNT1           0x36
 
 // Local Vector Table Error Register
-#define APIC_REG_LVT_ERR        0x37
+#define APIC_REG_LVT_ERR            0x37
 
 // Local Vector Table Timer Initial Count Register
-#define APIC_REG_LVT_ICR        0x38
+#define APIC_REG_LVT_ICR            0x38
 
 // Local Vector Table Timer Current Count Register (read only)
-#define APIC_REG_LVT_CCR        0x39
+#define APIC_REG_LVT_CCR            0x39
 
 // Local Vector Table Timer Divide Configuration Register
-#define APIC_REG_LVT_DCR        0x3E
+#define APIC_REG_LVT_DCR            0x3E
 
 // Self Interprocessor Interrupt (x2APIC only, write only)
-#define APIC_REG_SELF_IPI       0x3F
+#define APIC_REG_SELF_IPI           0x3F
 
-// Only used in xAPIC mode
-#define APIC_DEST_BIT               24
-#define APIC_DEST_BITS              8
-#define APIC_DEST_MASK              ((1U << APIC_DEST_BITS)-1U)
-#define APIC_DEST_n(n)              \
-    (((n) & APIC_DEST_MASK) << APIC_DEST_BIT)
+#define APIC_CMD_DEST_MODE_PHYSICAL APIC_CMD_DEST_MODE_n(0)
+#define APIC_CMD_DEST_MODE_LOGICAL  APIC_CMD_DEST_MODE_n(1)
 
-#define APIC_CMD_SIPI_PAGE_BIT      0
-#define APIC_CMD_VECTOR_BIT         0
-#define APIC_CMD_DEST_MODE_BIT      8
-#define APIC_CMD_DEST_LOGICAL_BIT   11
-#define APIC_CMD_PENDING_BIT        12
-#define APIC_CMD_ILD_CLR_BIT        14
-#define APIC_CMD_ILD_SET_BIT        15
-#define APIC_CMD_DEST_TYPE_BIT      18
-
-#define APIC_CMD_VECTOR_BITS        8
-#define APIC_CMD_SIPI_PAGE_BITS     8
-#define APIC_CMD_DEST_MODE_BITS     3
-#define APIC_CMD_DEST_TYPE_BITS     2
-
-#define APIC_CMD_VECTOR_MASK        ((1 << APIC_CMD_VECTOR_BITS)-1)
-#define APIC_CMD_SIPI_PAGE_MASK     ((1 << APIC_CMD_SIPI_PAGE_BITS)-1)
-#define APIC_CMD_DEST_MODE_MASK     ((1 << APIC_CMD_DEST_MODE_BITS)-1)
-#define APIC_CMD_DEST_TYPE_MASK     ((1 << APIC_CMD_DEST_TYPE_BITS)-1)
-
-#define APIC_CMD_SIPI_PAGE      \
-    (APIC_CMD_SIPI_PAGE_MASK << APIC_CMD_SIPI_PAGE_BIT)
-#define APIC_CMD_DEST_MODE      \
-    (APIC_CMD_DEST_MODE_MASK << APIC_CMD_DEST_MODE_BIT)
-#define APIC_CMD_SIPI_PAGE      \
-    (APIC_CMD_SIPI_PAGE_MASK << APIC_CMD_SIPI_PAGE_BIT)
-
-#define APIC_CMD_SIPI_PAGE_n(n) ((n) << APIC_CMD_SIPI_PAGE_BIT)
-#define APIC_CMD_DEST_MODE_n(n) ((n) << APIC_CMD_DEST_MODE_BIT)
-#define APIC_CMD_DEST_TYPE_n(n) ((n) << APIC_CMD_DEST_TYPE_BIT)
-#define APIC_CMD_SIPI_PAGE_n(n) ((n) << APIC_CMD_SIPI_PAGE_BIT)
-
-#define APIC_CMD_VECTOR_n(n)    \
-    (((n) & APIC_CMD_VECTOR_MASK) << APIC_CMD_VECTOR_BIT)
-
-#define APIC_CMD_VECTOR         (1U << APIC_CMD_VECTOR_BIT)
-#define APIC_CMD_DEST_LOGICAL   (1U << APIC_CMD_DEST_LOGICAL_BIT)
-#define APIC_CMD_PENDING        (1U << APIC_CMD_PENDING_BIT)
-#define APIC_CMD_ILD_CLR        (1U << APIC_CMD_ILD_CLR_BIT)
-#define APIC_CMD_ILD_SET        (1U << APIC_CMD_ILD_SET_BIT)
-#define APIC_CMD_DEST_TYPE      (1U << APIC_CMD_DEST_TYPE_BIT)
-
-#define APIC_CMD_DEST_MODE_NORMAL   APIC_CMD_DEST_MODE_n(0)
-#define APIC_CMD_DEST_MODE_LOWPRI   APIC_CMD_DEST_MODE_n(1)
-#define APIC_CMD_DEST_MODE_SMI      APIC_CMD_DEST_MODE_n(2)
-#define APIC_CMD_DEST_MODE_NMI      APIC_CMD_DEST_MODE_n(4)
-#define APIC_CMD_DEST_MODE_INIT     APIC_CMD_DEST_MODE_n(5)
-#define APIC_CMD_DEST_MODE_SIPI     APIC_CMD_DEST_MODE_n(6)
+#define APIC_CMD_DELIVERY_NORMAL    APIC_CMD_DELIVERY_n(0)
+#define APIC_CMD_DELIVERY_LOWPRI    APIC_CMD_DELIVERY_n(1)
+#define APIC_CMD_DELIVERY_SMI       APIC_CMD_DELIVERY_n(2)
+#define APIC_CMD_DELIVERY_NMI       APIC_CMD_DELIVERY_n(4)
+#define APIC_CMD_DELIVERY_INIT      APIC_CMD_DELIVERY_n(5)
+#define APIC_CMD_DELIVERY_SIPI      APIC_CMD_DELIVERY_n(6)
 
 #define APIC_CMD_DEST_TYPE_BYID     APIC_CMD_DEST_TYPE_n(0)
 #define APIC_CMD_DEST_TYPE_SELF     APIC_CMD_DEST_TYPE_n(1)
@@ -536,55 +404,29 @@ static uint32_t volatile *apic_ptr;
 #define APIC_SIR_APIC_ENABLE_BIT    8
 #define APIC_SIR_APIC_ENABLE        (1<<APIC_SIR_APIC_ENABLE_BIT)
 
-#define APIC_LVT_TR_MODE_BIT        17
-#define APIC_LVT_TR_MODE_BITS       2
-#define APIC_LVT_TR_MODE_MASK       ((1U<<APIC_LVT_TR_MODE_BITS)-1U)
-#define APIC_LVT_TR_MODE_n(n)       ((n)<<APIC_LVT_TR_MODE_BIT)
-
 #define APIC_LVT_TR_MODE_ONESHOT    0
 #define APIC_LVT_TR_MODE_PERIODIC   1
 #define APIC_LVT_TR_MODE_DEADLINE   2
 
-#define APIC_LVT_MASK_BIT       16
-#define APIC_LVT_PENDING_BIT    12
-#define APIC_LVT_LEVEL_BIT      15
-#define APIC_LVT_REMOTEIRR_BIT  14
-#define APIC_LVT_ACTIVELOW_BIT  13
-#define APIC_LVT_DELIVERY_BIT   8
-#define APIC_LVT_DELIVERY_BITS  3
+#define APIC_LVT_DELIVERY_FIXED     0
+#define APIC_LVT_DELIVERY_SMI       2
+#define APIC_LVT_DELIVERY_NMI       4
+#define APIC_LVT_DELIVERY_EXINT     7
+#define APIC_LVT_DELIVERY_INIT      5
 
-#define APIC_LVT_MASK           (1U<<APIC_LVT_MASK_BIT)
-#define APIC_LVT_PENDING        (1U<<APIC_LVT_PENDING_BIT)
-#define APIC_LVT_LEVEL          (1U<<APIC_LVT_LEVEL_BIT)
-#define APIC_LVT_REMOTEIRR      (1U<<APIC_LVT_REMOTEIRR_BIT)
-#define APIC_LVT_ACTIVELOW      (1U<<APIC_LVT_ACTIVELOW_BIT)
-#define APIC_LVT_DELIVERY_MASK  ((1U<<APIC_LVT_DELIVERY_BITS)-1)
-#define APIC_LVT_DELIVERY_n(n)  ((n)<<APIC_LVT_DELIVERY_BIT)
+#define APIC_BASE_MSR               0x1B
 
-#define APIC_LVT_DELIVERY_FIXED 0
-#define APIC_LVT_DELIVERY_SMI   2
-#define APIC_LVT_DELIVERY_NMI   4
-#define APIC_LVT_DELIVERY_EXINT 7
-#define APIC_LVT_DELIVERY_INIT  5
+#define APIC_BASE_ADDR_BIT          12
+#define APIC_BASE_ADDR_BITS         40
+#define APIC_BASE_GENABLE_BIT       11
+#define APIC_BASE_X2ENABLE_BIT      10
+#define APIC_BASE_BSP_BIT           8
 
-#define APIC_LVT_VECTOR_BIT     0
-#define APIC_LVT_VECTOR_BITS    8
-#define APIC_LVT_VECTOR_MASK    ((1U<<APIC_LVT_VECTOR_BITS)-1U)
-#define APIC_LVT_VECTOR_n(n)    ((n)<<APIC_LVT_VECTOR_BIT)
-
-#define APIC_BASE_MSR  0x1B
-
-#define APIC_BASE_ADDR_BIT      12
-#define APIC_BASE_ADDR_BITS     40
-#define APIC_BASE_GENABLE_BIT   11
-#define APIC_BASE_X2ENABLE_BIT  10
-#define APIC_BASE_BSP_BIT       8
-
-#define APIC_BASE_GENABLE       (1UL<<APIC_BASE_GENABLE_BIT)
-#define APIC_BASE_X2ENABLE      (1UL<<APIC_BASE_X2ENABLE_BIT)
-#define APIC_BASE_BSP           (1UL<<APIC_BASE_BSP_BIT)
-#define APIC_BASE_ADDR_MASK     ((1UL<<APIC_BASE_ADDR_BITS)-1)
-#define APIC_BASE_ADDR          (APIC_BASE_ADDR_MASK<<APIC_BASE_ADDR_BIT)
+#define APIC_BASE_GENABLE           (1UL<<APIC_BASE_GENABLE_BIT)
+#define APIC_BASE_X2ENABLE          (1UL<<APIC_BASE_X2ENABLE_BIT)
+#define APIC_BASE_BSP               (1UL<<APIC_BASE_BSP_BIT)
+#define APIC_BASE_ADDR_MASK         ((1UL<<APIC_BASE_ADDR_BITS)-1)
+#define APIC_BASE_ADDR              (APIC_BASE_ADDR_MASK<<APIC_BASE_ADDR_BIT)
 
 class lapic_t {
 public:
@@ -621,7 +463,7 @@ protected:
 };
 
 class lapic_x_t : public lapic_t {
-    void command(uint32_t dest, uint32_t cmd) const final
+    void command(uint32_t dest, uint32_t cmd) const override final
     {
         cpu_scoped_irq_disable intr_enabled;
         write32(APIC_REG_ICR_HI, APIC_DEST_n(dest));
@@ -631,64 +473,64 @@ class lapic_x_t : public lapic_t {
             pause();
     }
 
-    uint32_t read32(uint32_t offset) const final
+    uint32_t read32(uint32_t offset) const override final
     {
         return apic_ptr[offset << (4 - 2)];
     }
 
-    void write32(uint32_t offset, uint32_t val) const final
+    void write32(uint32_t offset, uint32_t val) const override final
     {
         apic_ptr[offset << (4 - 2)] = val;
     }
 
-    uint64_t read64(uint32_t offset) const final
+    uint64_t read64(uint32_t offset) const override final
     {
         return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
     }
 
-    void write64(uint32_t offset, uint64_t val) const final
+    void write64(uint32_t offset, uint64_t val) const override final
     {
         ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
     }
 
-    bool reg_readable(uint32_t reg) const final
+    bool reg_readable(uint32_t reg) const override final
     {
         return reg_maybe_readable(reg);
     }
 
-    bool reg_exists(uint32_t reg) const final
+    bool reg_exists(uint32_t reg) const override final
     {
         return reg_maybe_readable(reg);
     }
 };
 
 class lapic_x2_t : public lapic_t {
-    void command(uint32_t dest, uint32_t cmd) const final
+    void command(uint32_t dest, uint32_t cmd) const override final
     {
         write64(APIC_REG_ICR_LO, (uint64_t(dest) << 32) | cmd);
     }
 
-    uint32_t read32(uint32_t offset) const final
+    uint32_t read32(uint32_t offset) const override final
     {
         return cpu_msr_get_lo(0x800 + offset);
     }
 
-    void write32(uint32_t offset, uint32_t val) const final
+    void write32(uint32_t offset, uint32_t val) const override final
     {
         cpu_msr_set(0x800 + offset, val);
     }
 
-    uint64_t read64(uint32_t offset) const final
+    uint64_t read64(uint32_t offset) const override final
     {
         return cpu_msr_get(0x800 + offset);
     }
 
-    void write64(uint32_t offset, uint64_t val) const final
+    void write64(uint32_t offset, uint64_t val) const override final
     {
         cpu_msr_set(0x800 + offset, val);
     }
 
-    bool reg_readable(uint32_t reg) const final
+    bool reg_readable(uint32_t reg) const override final
     {
         // APIC_REG_LVT_CMCI raises #GP if CMCI not enabled
         return reg != APIC_REG_LVT_CMCI &&
@@ -697,7 +539,7 @@ class lapic_x2_t : public lapic_t {
                 reg_maybe_readable(reg);
     }
 
-    bool reg_exists(uint32_t reg) const final
+    bool reg_exists(uint32_t reg) const override final
     {
         return reg != APIC_REG_DFR &&
                 reg != APIC_REG_APR &&
@@ -845,78 +687,6 @@ struct acpi_fadt_t {
     acpi_gas_t x_gpe1_block;
 } __packed;
 
-//
-// FADT Fixed Feature Flags
-
-#define ACPI_FADT_FFF_WBINVD_BIT                0
-#define ACPI_FADT_FFF_WBINVD_FLUSH_BIT          1
-#define ACPI_FADT_FFF_PROC_C1_BIT               2
-#define ACPI_FADT_FFF_P_LVL2_MP_BIT             3
-#define ACPI_FADT_FFF_PWR_BUTTON_BIT            4
-#define ACPI_FADT_FFF_SLP_BUTTON_BIT            5
-#define ACPI_FADT_FFF_FIX_RTC_BIT               6
-#define ACPI_FADT_FFF_RTC_S4_BIT                7
-#define ACPI_FADT_FFF_TMR_VAL_EXT_BIT           8
-#define ACPI_FADT_FFF_DCK_CAP_BIT               9
-#define ACPI_FADT_FFF_RESET_REG_SUP_BIT         10
-#define ACPI_FADT_FFF_SEALED_CASE_BIT           11
-#define ACPI_FADT_FFF_HEADLESS_BIT              12
-#define ACPI_FADT_FFF_CPU_SW_SLP_BIT            13
-#define ACPI_FADT_FFF_PCI_EXP_WAK_BIT           14
-#define ACPI_FADT_FFF_PLAT_CLOCK_BIT            15
-#define ACPI_FADT_FFF_S4_RTC_STS_BIT            16
-#define ACPI_FADT_FFF_REMOTE_ON_CAP_BIT         17
-#define ACPI_FADT_FFF_FORCE_CLUSTER_BIT         18
-#define ACPI_FADT_FFF_FORCE_PHYS_DEST_BIT       19
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT       20
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_CAP_BIT    21
-
-#define ACPI_FADT_FFF_WBINVD \
-    (1U<<ACPI_FADT_FFF_WBINVD_BIT)
-#define ACPI_FADT_FFF_WBINVD_FLUSH \
-    (1U<<ACPI_FADT_FFF_WBINVD_FLUSH_BIT)
-#define ACPI_FADT_FFF_PROC_C1 \
-    (1U<<ACPI_FADT_FFF_PROC_C1_BIT)
-#define ACPI_FADT_FFF_P_LVL2_MP \
-    (1U<<ACPI_FADT_FFF_P_LVL2_MP_BIT)
-#define ACPI_FADT_FFF_PWR_BUTTON \
-    (1U<<ACPI_FADT_FFF_PWR_BUTTON_BIT)
-#define ACPI_FADT_FFF_SLP_BUTTON \
-    (1U<<ACPI_FADT_FFF_SLP_BUTTON_BIT)
-#define ACPI_FADT_FFF_FIX_RTC \
-    (1U<<ACPI_FADT_FFF_FIX_RTC_BIT)
-#define ACPI_FADT_FFF_RTC_S4 \
-    (1U<<ACPI_FADT_FFF_RTC_S4_BIT)
-#define ACPI_FADT_FFF_TMR_VAL_EXT \
-    (1U<<ACPI_FADT_FFF_TMR_VAL_EXT_BIT)
-#define ACPI_FADT_FFF_DCK_CAP \
-    (1U<<ACPI_FADT_FFF_DCK_CAP_BIT)
-#define ACPI_FADT_FFF_RESET_REG_SUP \
-    (1U<<ACPI_FADT_FFF_RESET_REG_SUP_BIT)
-#define ACPI_FADT_FFF_SEALED_CASE \
-    (1U<<ACPI_FADT_FFF_SEALED_CASE_BIT)
-#define ACPI_FADT_FFF_HEADLESS \
-    (1U<<ACPI_FADT_FFF_HEADLESS_BIT)
-#define ACPI_FADT_FFF_CPU_SW_SLP \
-    (1U<<ACPI_FADT_FFF_CPU_SW_SLP_BIT)
-#define ACPI_FADT_FFF_PCI_EXP_WAK \
-    (1U<<ACPI_FADT_FFF_PCI_EXP_WAK_BIT)
-#define ACPI_FADT_FFF_PLAT_CLOCK \
-    (1U<<ACPI_FADT_FFF_PLAT_CLOCK_BIT)
-#define ACPI_FADT_FFF_S4_RTC_STS \
-    (1U<<ACPI_FADT_FFF_S4_RTC_STS_BIT)
-#define ACPI_FADT_FFF_REMOTE_ON_CAP \
-    (1U<<ACPI_FADT_FFF_REMOTE_ON_CAP_BIT)
-#define ACPI_FADT_FFF_FORCE_CLUSTER \
-    (1U<<ACPI_FADT_FFF_FORCE_CLUSTER_BIT)
-#define ACPI_FADT_FFF_FORCE_PHYS_DEST \
-    (1U<<ACPI_FADT_FFF_FORCE_PHYS_DEST_BIT)
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI \
-    (1U<<ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT)
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_CAP \
-    (1U<<ACPI_FADT_FFF_LOCAL_POWER_S0_CAP_BIT)
-
-
 struct acpi_ssdt_t {
     // sig == ?
     acpi_sdt_hdr_t hdr;
@@ -1014,9 +784,6 @@ struct acpi_madt_t {
     uint32_t flags;
 } __packed;
 
-#define ACPI_MADT_FLAGS_HAVE_PIC_BIT    0
-#define ACPI_MADT_FLAGS_HAVE_PIC        (1<<ACPI_MADT_FLAGS_HAVE_PIC_BIT)
-
 //
 // HPET ACPI info
 
@@ -1040,33 +807,6 @@ struct acpi_hpet_t {
 #define ACPI_HPET_BLKID_NUM_CMP_BITS    8
 #define ACPI_HPET_BLKID_REV_ID_BITS     8
 
-#define ACPI_HPET_BLKID_PCI_VEN_MASK \
-    ((1<<ACPI_HPET_BLKID_PCI_VEN_BITS)-1)
-#define ACPI_HPET_BLKID_NUM_CMP_MASK \
-    ((1<<ACPI_HPET_BLKID_NUM_CMP_BITS)-1)
-#define ACPI_HPET_BLKID_REV_ID_MASK \
-    ((1<<ACPI_HPET_BLKID_REV_ID_BITS)-1)
-
-// LegacyReplacement IRQ Routing Capable
-#define ACPI_HPET_BLKID_LEGACY_CAP \
-    (1<<ACPI_HPET_BLKID_LEGACY_CAP_BIT)
-
-// 64-bit counters
-#define ACPI_HPET_BLKID_COUNTER_SZ \
-    (1<<ACPI_HPET_BLKID_COUNTER_SZ_BIT)
-
-// PCI Vendor ID
-#define ACPI_HPET_BLKID_PCI_VEN \
-    (ACPI_HPET_BLKID_PCI_VEN_MASK<<ACPI_HPET_BLKID_PCI_VEN_BIT)
-
-// Number of comparators in 1st block
-#define ACPI_HPET_BLKID_NUM_CMP \
-    (ACPI_HPET_BLKID_NUM_CMP_MASK<<ACPI_HPET_BLKID_NUM_CMP_BIT)
-
-// Hardware revision ID
-#define ACPI_HPET_BLKID_REV_ID \
-    (ACPI_HPET_BLKID_REV_ID_BITS<<ACPI_HPET_BLKID_REV_ID_BIT)
-
 static vector<acpi_gas_t> acpi_hpet_list;
 static int acpi_madt_flags;
 
@@ -1087,16 +827,15 @@ int acpi_have8259pic(void)
 
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {
-    spinlock_lock_noirq(&ioapic_msi_alloc_lock);
+    unique_lock<spinlock> lock(ioapic_msi_alloc_lock);
 
     uint8_t base = ioapic_msi_next_irq;
+    ioapic_msi_next_irq += count;
 
     for (size_t intr = base - INTR_APIC_IRQ_BASE, end = intr + count;
          intr < end; ++intr) {
         ioapic_msi_alloc_map[intr >> 6] |= (1UL << (intr & 0x3F));
     }
-
-    spinlock_unlock_noirq(&ioapic_msi_alloc_lock);
 
     return base;
 }
@@ -1113,7 +852,7 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
     uint64_t checked = mask;
     uint8_t result = 0;
 
-    spinlock_lock_noirq(&ioapic_msi_alloc_lock);
+    unique_lock<spinlock> lock(ioapic_msi_alloc_lock);
 
     for (size_t bit = 0; bit < 128; bit += count)
     {
@@ -1128,8 +867,6 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
         if (!checked)
             checked = mask;
     }
-
-    spinlock_unlock_noirq(&ioapic_msi_alloc_lock);
 
     return result;
 }
@@ -1198,7 +935,9 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                 ioapic->vector_count = entries;
                 ioapic->base_intr = ioapic_alloc_vectors(entries);
 
-                ACPI_TRACE("IOAPIC registered, id=%u, addr=%u, irqbase=%d,"
+                ioapic_reset(ioapic);
+
+                ACPI_TRACE("IOAPIC registered, id=%u, addr=0x%x, irqbase=%d,"
                            " entries=%u\n",
                            ioapic->id, ioapic->addr, ioapic->irq_base,
                            ioapic->vector_count);
@@ -1210,32 +949,16 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
         case ACPI_MADT_REC_TYPE_IRQ:
         {
             ACPI_TRACE("Got Interrupt redirection table\n");
-            if (bus_irq_list.empty()) {
-                ACPI_TRACE("Initially assuming 1-to-1 mapping\n");
 
-                // Populate bus_irq_list with 16 legacy ISA IRQs
-                for (int i = 0; i < 16; ++i) {
-                    mp_bus_irq_mapping_t mapping{};
-                    mapping.bus = ent->irq_src.bus;
-                    mapping.intin = i;
-                    mapping.irq = i;
-                    mapping.flags = ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI |
-                            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE;
-                    mapping.ioapic_id = ioapic_from_gsi(i)->id;
-                    isa_irq_lookup[i] = i;
-                    bus_irq_list.push_back(mapping);
-                }
-            }
+            uint8_t gsi = ent->irq_src.gsi;
+            uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
+            uint8_t irq = ent->irq_src.irq_src;
 
-            mp_bus_irq_mapping_t &mapping = bus_irq_list[ent->irq_src.gsi];
-            mapping.bus = ent->irq_src.bus;
-            mapping.irq = ent->irq_src.irq_src;
-            mapping.flags = ent->irq_src.flags;
-            mapping.ioapic_id = ioapic_from_gsi(ent->irq_src.gsi)->id;
-            isa_irq_lookup[ent->irq_src.irq_src] = ent->irq_src.gsi;
+            intr_to_irq[intr] = irq;
+            irq_to_intr[irq] = intr;
 
-            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u\n",
-                       mapping.irq, ent->irq_src.gsi);
+            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u, vector=%u\n",
+                       irq, gsi, intr);
 
             break;
         }
@@ -1284,7 +1007,7 @@ static bool acpi_find_rsdp(void *start, size_t len)
 
                 acpi_rsdt_len = rsdp2->length;
 
-                printk("Found ACPI 2.0+ RSDP at 0x%zx\n", acpi_rsdt_addr);
+                ACPI_TRACE("Found ACPI 2.0+ RSDP at 0x%zx\n", acpi_rsdt_addr);
 
                 return true;
             }
@@ -1302,7 +1025,7 @@ static bool acpi_find_rsdp(void *start, size_t len)
                 // Leave acpi_rsdt_len 0 in this case, it is
                 // handled later
 
-                printk("Found ACPI 1.0 RSDP at 0x%zx\n", acpi_rsdt_addr);
+                ACPI_TRACE("Found ACPI 1.0 RSDP at 0x%zx\n", acpi_rsdt_addr);
 
                 return true;
             }
@@ -1325,7 +1048,7 @@ static bool mp_find_fps(void *start, size_t len)
                                sizeof(*sig_srch)) == 0) {
                 mp_tables = (char*)(uintptr_t)sig_srch->phys_addr;
 
-                printk("Found MPS tables at %zx\n", size_t(mp_tables));
+                ACPI_TRACE("Found MPS tables at %zx\n", size_t(mp_tables));
 
                 return true;
             }
@@ -1365,7 +1088,7 @@ static void acpi_parse_rsdt()
                                   sizeof(*rsdt_hdr), acpi_rsdt_len);
     }
 
-    printk("RSDT version %x\n", rsdt_hdr->rev);
+    ACPI_TRACE("RSDT version %x\n", rsdt_hdr->rev);
 
     if (acpi_chk_hdr(rsdt_hdr) != 0) {
         ACPI_ERROR("ACPI RSDT checksum mismatch!\n");
@@ -1375,7 +1098,7 @@ static void acpi_parse_rsdt()
     uint32_t *rsdp_ptrs = (uint32_t *)(rsdt_hdr + 1);
     uint32_t *rsdp_end = (uint32_t *)((char*)rsdt_hdr + rsdt_hdr->len);
 
-    printk("Processing RSDP pointers from %p to %p\n",
+    ACPI_TRACE("Processing RSDP pointers from %p to %p\n",
            (void*)rsdp_ptrs, (void*)rsdp_end);
 
     for (uint32_t *rsdp_ptr = rsdp_ptrs;
@@ -1449,6 +1172,10 @@ static void mp_parse_fps()
 
     // First slot reserved for BSP
     apic_id_count = 1;
+
+    fill_n(intr_to_irq, countof(intr_to_irq), -1);
+    fill_n(irq_to_intr, countof(irq_to_intr), -1);
+    fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
 
     for (uint16_t i = 0; i < cth->entry_count; ++i) {
         mp_cfg_cpu_t *entry_cpu;
@@ -1553,15 +1280,7 @@ static void mp_parse_fps()
                 ioapic->base_intr = ioapic_alloc_vectors(
                             ioapic_intr_count);
 
-                ioapic->lock = 0;
-
-                // Mask all IRQs
-                for (size_t i = 0; i < ioapic_intr_count; ++i) {
-                    uint32_t ent = ioapic_read(
-                                ioapic, IOAPIC_RED_LO_n(i));
-                    ent |= IOAPIC_REDLO_MASKIRQ;
-                    ioapic_write(ioapic, IOAPIC_RED_LO_n(i), ent);
-                }
+                ioapic_reset(ioapic);
             }
             entry = (uint8_t*)(entry_ioapic + 1);
             break;
@@ -1571,70 +1290,11 @@ static void mp_parse_fps()
         {
             entry_iointr = (mp_cfg_iointr_t *)entry;
 
-            if (memchr(mp_pci_bus_ids.data(), entry_iointr->source_bus,
-                        mp_pci_bus_ids.size())) {
-                // PCI IRQ
-                uint8_t bus = entry_iointr->source_bus;
-                uint8_t intr_type = entry_iointr->type;
-                uint8_t intr_flags = entry_iointr->flags;
-                uint8_t device = entry_iointr->source_bus_irq >> 2;
-                uint8_t pci_irq = entry_iointr->source_bus_irq & 3;
-                uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
-                uint8_t intin = entry_iointr->dest_ioapic_intin;
+            uint16_t intr_flags = entry_iointr->flags;
+            uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
+            uint8_t intin = entry_iointr->dest_ioapic_intin;
 
-                MPS_TRACE("PCI device %u INT_%c# ->"
-                          " IOAPIC ID 0x%02x INTIN %d %s\n",
-                          device, (int)(pci_irq) + 'A',
-                          ioapic_id, intin,
-                          intr_type < countof(intr_type_text) ?
-                              intr_type_text[intr_type] :
-                              "(invalid type!)");
-
-
-                mp_bus_irq_mapping_t mapping{};
-                mapping.bus = bus;
-                mapping.intr_type = intr_type;
-                mapping.flags = intr_flags;
-                mapping.device = device;
-                mapping.irq = pci_irq & 3;
-                mapping.ioapic_id = ioapic_id;
-                mapping.intin = intin;
-                bus_irq_list.push_back(mapping);
-            } else if (entry_iointr->source_bus == mp_isa_bus_id) {
-                // ISA IRQ
-
-                uint8_t bus =  entry_iointr->source_bus;
-                uint8_t intr_type = entry_iointr->type;
-                uint8_t intr_flags = entry_iointr->flags;
-                uint8_t isa_irq = entry_iointr->source_bus_irq;
-                uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
-                uint8_t intin = entry_iointr->dest_ioapic_intin;
-
-                MPS_TRACE("ISA IRQ %d -> IOAPIC ID 0x%02x INTIN %u %s\n",
-                          isa_irq, ioapic_id, intin,
-                          intr_type < countof(intr_type_text) ?
-                              intr_type_text[intr_type] :
-                              "(invalid type!)");
-
-                isa_irq_lookup[isa_irq] = bus_irq_list.size();
-                mp_bus_irq_mapping_t mapping{};
-                mapping.bus = bus;
-                mapping.intr_type = intr_type;
-                mapping.flags = intr_flags;
-                mapping.device = 0;
-                mapping.irq = isa_irq;
-                mapping.ioapic_id = ioapic_id;
-                mapping.intin = intin;
-                bus_irq_list.push_back(mapping);
-            } else {
-                // Unknown bus!
-                MPS_ERROR("IRQ %d on unknown bus ->"
-                          " IOAPIC ID 0x%02x INTIN %u type=%d\n",
-                          entry_iointr->source_bus_irq,
-                          entry_iointr->dest_ioapic_id,
-                          entry_iointr->dest_ioapic_intin,
-                          entry_iointr->type);
-            }
+            ioapic_set_flags(ioapic_by_id(ioapic_id), intin, intr_flags);
 
             entry = (uint8_t*)(entry_iointr + 1);
             break;
@@ -1806,6 +1466,14 @@ static isr_context_t *apic_spurious_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
+static isr_context_t *apic_err_handler(int intr, isr_context_t *ctx)
+{
+    (void)intr;
+    assert(intr == INTR_APIC_ERROR);
+    APIC_ERROR("APIC error interrupt!\n");
+    return ctx;
+}
+
 unsigned apic_get_id(void)
 {
     if (likely(apic))
@@ -1834,8 +1502,8 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
             : APIC_CMD_DEST_TYPE_BYID;
 
     uint32_t dest_mode = (intr != INTR_EX_NMI)
-            ? APIC_CMD_DEST_MODE_NORMAL
-            : APIC_CMD_DEST_MODE_NMI;
+            ? APIC_CMD_DELIVERY_NORMAL
+            : APIC_CMD_DELIVERY_NMI;
 
     uint32_t dest = (target_apic_id >= 0) ? target_apic_id : 0;
 
@@ -1847,7 +1515,7 @@ void apic_eoi(int intr)
     apic->write32(APIC_REG_EOI, intr & 0);
 }
 
-static void apic_online(int enabled, int spurious_intr)
+static void apic_online(int enabled, int spurious_intr, int err_intr)
 {
     uint32_t sir = apic->read32(APIC_REG_SIR);
 
@@ -1864,6 +1532,13 @@ static void apic_online(int enabled, int spurious_intr)
         apic->write32(APIC_REG_LDR, 0xFFFFFFFF);
 
     apic->write32(APIC_REG_SIR, sir);
+
+    apic->write32(APIC_REG_LVT_ERR,
+                  APIC_LVT_VECTOR_n(err_intr) |
+                  APIC_LVT_DELIVERY_n(0) |
+                  APIC_LVT_MASK_n(0));
+
+    apic->write32(APIC_REG_ESR, 0);
 }
 
 void apic_dump_regs(int ap)
@@ -1915,14 +1590,11 @@ int apic_init(int ap)
         apic_base = apic_base_msr & APIC_BASE_ADDR;
 
     if (!(apic_base_msr & APIC_BASE_GENABLE)) {
-        printk("APIC was disabled! Enabling\n");
-
         APIC_TRACE("APIC was globally disabled!"
                    " Enabling...\n");
     }
 
     if (cpuid_has_x2apic()) {
-        printk("Using x2APIC\n");
         APIC_TRACE("Using x2APIC\n");
         if (!ap)
             apic = &apic_x2;
@@ -1958,26 +1630,27 @@ int apic_init(int ap)
     if (!ap) {
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
         intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
+        intr_hook(INTR_APIC_ERROR, apic_err_handler);
 
-        printk("Parsing boot tables\n");
+        APIC_TRACE("Parsing boot tables\n");
 
         parse_mp_tables();
 
-        printk("Calibrating APIC timer\n");
+        APIC_TRACE("Calibrating APIC timer\n");
 
         apic_calibrate();
     }
 
-    printk("Enabling APIC\n");
+    APIC_TRACE("Enabling APIC\n");
 
-    apic_online(1, INTR_APIC_SPURIOUS);
+    apic_online(1, INTR_APIC_SPURIOUS, INTR_APIC_ERROR);
 
     apic->write32(APIC_REG_TPR, 0x0);
 
     assert(apic_base == (cpu_msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
 
     if (ap) {
-        printk("Configuring APIC timer\n");
+        APIC_TRACE("Configuring timer\n");
         apic_configure_timer(APIC_LVT_DCR_BY_1,
                              apic_timer_freq / 20,
                              APIC_LVT_TR_MODE_PERIODIC,
@@ -2030,11 +1703,11 @@ static void apic_detect_topology_intel(void)
 
     if (!cpuid(&info, CPUID_TOPOLOGY1, 0)) {
         // Enable full CPUID
-        uint64_t misc_enables = cpu_msr_get(MSR_MISC_ENABLE);
+        uint64_t misc_enables = cpu_msr_get(CPU_MSR_MISC_ENABLE);
         if (misc_enables & (1L<<22)) {
             // Enable more CPUID support and retry
             misc_enables &= ~(1L<<22);
-            cpu_msr_set(MSR_MISC_ENABLE, misc_enables);
+            cpu_msr_set(CPU_MSR_MISC_ENABLE, misc_enables);
         }
     }
 
@@ -2103,7 +1776,7 @@ static void apic_detect_topology(void)
     vendor_str.regs[2] = info.ecx;
     vendor_str.regs[3] = 0;
 
-    printk("Detected CPU: %s\n", vendor_str.txt);
+    APIC_TRACE("Detected CPU: %s\n", vendor_str.txt);
 
     if (!memcmp(vendor_intel, vendor_str.txt, 16)) {
         apic_detect_topology_intel();
@@ -2149,13 +1822,25 @@ void apic_start_smp(void)
             bootinfo_parameter(bootparam_t::ap_entry_point);
     uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
-    // Send INIT to all other CPUs
-    apic_send_command(0xFFFFFFFF,
-                      APIC_CMD_DEST_MODE_INIT |
-                      APIC_CMD_DEST_LOGICAL |
-                      APIC_CMD_DEST_TYPE_OTHER);
+    cmos_prepare_ap();
 
-    sleep(10);
+    // Send INIT to all other CPUs
+    for (size_t i = 1; i < apic_id_count; ++i) {
+//        apic_send_command(0xFFFFFFFF,
+//                          APIC_CMD_DELIVERY_INIT |
+//                          APIC_CMD_DEST_MODE_LOGICAL |
+//                          APIC_CMD_DEST_TYPE_OTHER);
+        APIC_TRACE("Sending INIT IPI to APIC ID 0x%x\n", apic_id_list[i]);
+        __sync_synchronize();
+        apic_send_command(apic_id_list[i],
+                          APIC_CMD_DELIVERY_INIT |
+                          APIC_CMD_DEST_MODE_PHYSICAL |
+                          APIC_CMD_DEST_TYPE_BYID);
+    }
+    APIC_TRACE("Done sending INIT IPIs\n");
+
+    // 10ms delay
+    nsleep(10000000);
 
     APIC_TRACE("%d hyperthread bits\n", topo_thread_bits);
     APIC_TRACE("%d core bits\n", topo_core_bits);
@@ -2172,6 +1857,11 @@ void apic_start_smp(void)
                 apic_id_count;
         uint32_t stagger = 16666666 / total_cpus;
 
+        // The AP might have CD/NW bits set, and therefore might not be
+        // cache coherent when it fetches the instructions in the trampoline,
+        // so write all caches back to RAM before issuing any SIPIs
+        cpu_flush_cache();
+
         for (unsigned thread = 0;
              thread < topo_thread_count; ++thread) {
             for (unsigned core = 0; core < topo_core_count; ++core) {
@@ -2182,14 +1872,16 @@ void apic_start_smp(void)
                 if (target == apic_id_list[0])
                     continue;
 
-                APIC_TRACE("Sending IPI to APIC ID %u\n", target);
+                APIC_TRACE("Sending SIPI to APIC ID %u, "
+                           "trampoline page=0x%x\n",
+                           target, mp_trampoline_page);
 
                 // Send SIPI to CPU
                 apic_send_command(target,
-                                  APIC_CMD_SIPI_PAGE_n(
-                                      mp_trampoline_page) |
-                                  APIC_CMD_DEST_MODE_SIPI |
-                                  APIC_CMD_DEST_TYPE_BYID);
+                                  APIC_CMD_SIPI_PAGE_n(mp_trampoline_page) |
+                                  APIC_CMD_DELIVERY_SIPI |
+                                  APIC_CMD_DEST_TYPE_BYID |
+                                  APIC_CMD_DEST_MODE_PHYSICAL);
 
                 nsleep(stagger);
 
@@ -2237,11 +1929,11 @@ public:
                                 MAP_PHYSICAL, -1, 0);
     }
 
-    size_t get_size() const final { return size; }
+    size_t get_size() const override final { return size; }
 
-    int64_t read() const final { return *mem; }
+    int64_t read() const override final { return *mem; }
 
-    void write(int64_t value) const final
+    void write(int64_t value) const override final
     {
         *mem = value_type(value);
     }
@@ -2258,11 +1950,11 @@ public:
     acpi_gas_accessor_sysio_t(uint64_t io_port)
         : port(ioport_t(io_port)) {}
 
-    size_t get_size() const final { return size; }
+    size_t get_size() const override final { return size; }
 
-    int64_t read() const final { return inp<size>(port); }
+    int64_t read() const override final { return inp<size>(port); }
 
-    void write(int64_t value) const final
+    void write(int64_t value) const override final
     {
         outp<size>(port, value_type(value));
     }
@@ -2279,9 +1971,9 @@ public:
     acpi_gas_accessor_pcicfg_t(uint64_t pci_dfo)
         : dfo(pci_dfo) {}
 
-    size_t get_size() const final { return size; }
+    size_t get_size() const override final { return size; }
 
-    int64_t read() const final
+    int64_t read() const override final
     {
         value_type result;
         pci_config_copy(0, (dfo >> 32) & 0xFF,
@@ -2290,7 +1982,7 @@ public:
         return result;
     }
 
-    void write(int64_t value) const final
+    void write(int64_t value) const override final
     {
         pci_config_write(0, (dfo >> 32) & 0xFF,
                          (dfo >> 16) & 0xFF, dfo & 0xFF, &value, size);
@@ -2402,10 +2094,23 @@ static uint64_t apic_rdtsc_time_ns_handler()
     return now * clk_to_ns_numer/ clk_to_ns_denom;
 }
 
+static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)
+{
+    assert(clk_to_ns_denom != 0);
+    assert(clk_to_ns_numer != 0);
+
+    uint64_t begin = cpu_rdtsc();
+    uint64_t then = nanosec * clk_to_ns_denom / clk_to_ns_numer + begin;
+    uint64_t now;
+
+    for (now = begin; now < then; now = cpu_rdtsc())
+        pause();
+
+    return (now - begin) * clk_to_ns_numer / clk_to_ns_denom;
+}
+
 static void apic_calibrate()
 {
-    int64_t wtf = acpi_pm_timer_raw();
-    (void)wtf;
     if (acpi_pm_timer_raw() >= 0) {
         //
         // Have PM timer
@@ -2440,15 +2145,13 @@ static void apic_calibrate()
 
         apic_timer_freq = ccr_freq;
 
-        // Round CPU frequency to nearest multiple of 16MHz
-        cpu_freq += 8333333;
-        cpu_freq -= cpu_freq % 16666666;
+        // Round APIC frequency to nearest multiple of 1MHz
+        apic_timer_freq += 500000;
+        apic_timer_freq -= apic_timer_freq % 1000000;
 
-        // Round APIC frequency to nearest multiple of 100MHz
-        apic_timer_freq += 50000000;
-        apic_timer_freq -= apic_timer_freq % 100000000;
-
-        rdtsc_mhz = (cpu_freq + 500000) / 1000000;
+        // Round CPU frequency to nearest multiple of 1MHz
+        cpu_freq += 500000;
+        rdtsc_mhz = cpu_freq / 1000000;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
         apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
@@ -2481,8 +2184,6 @@ static void apic_calibrate()
     // clk_to_ns: let clks = 2500000000
     //  2500000000 * 2 / 5 = 1000000000ns
 
-    APIC_TRACE("CPU MHz: %ld\n", rdtsc_mhz);
-
     uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
 
     APIC_TRACE("CPU MHz GCD: %ld\n", clk_to_ns_gcd);
@@ -2493,10 +2194,10 @@ static void apic_calibrate()
     APIC_TRACE("clk_to_ns_numer: %ld\n", clk_to_ns_numer);
     APIC_TRACE("clk_to_ns_denom: %ld\n", clk_to_ns_denom);
 
-
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
         time_ns_set_handler(apic_rdtsc_time_ns_handler, nullptr, true);
+        nsleep_set_handler(apic_rdtsc_nsleep_handler, nullptr, true);
     }
 
     APIC_TRACE("CPU clock: %luMHz\n", rdtsc_mhz);
@@ -2506,24 +2207,16 @@ static void apic_calibrate()
 //
 // IOAPIC
 
-static void ioapic_lock_noirq(mp_ioapic_t *ioapic)
-{
-    spinlock_lock_noirq(&ioapic->lock);
-}
-
-static void ioapic_unlock_noirq(mp_ioapic_t *ioapic)
-{
-    spinlock_unlock_noirq(&ioapic->lock);
-}
-
-static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg)
+static uint32_t ioapic_read(
+        mp_ioapic_t *ioapic, uint32_t reg, unique_lock<spinlock> const&)
 {
     ioapic->ptr[IOAPIC_IOREGSEL] = reg;
     return ioapic->ptr[IOAPIC_IOREGWIN];
 }
 
-static void ioapic_write(mp_ioapic_t *ioapic,
-                             uint32_t reg, uint32_t value)
+static void ioapic_write(
+        mp_ioapic_t *ioapic, uint32_t reg, uint32_t value,
+        unique_lock<spinlock> const&)
 {
     ioapic->ptr[IOAPIC_IOREGSEL] = reg;
     ioapic->ptr[IOAPIC_IOREGWIN] = value;
@@ -2538,54 +2231,58 @@ static mp_ioapic_t *ioapic_by_id(uint8_t id)
     return 0;
 }
 
-// Returns 1 on success
-// device should be 0 for ISA IRQs
-static void ioapic_map(mp_ioapic_t *ioapic,
-                       mp_bus_irq_mapping_t *mapping)
+static void ioapic_reset(mp_ioapic_t *ioapic)
 {
-    uint8_t delivery;
+    unique_lock<spinlock> lock(ioapic->lock);
 
-    switch (mapping->intr_type) {
-    case MP_INTR_TYPE_APIC:
-        delivery = IOAPIC_REDLO_DELIVERY_APIC;
-        break;
+    // Fill entries in interrupt-to-ioapic lookup table
+    fill_n(intr_to_ioapic + ioapic->base_intr,
+           ioapic->vector_count, ioapic - ioapic_list);
 
-    case MP_INTR_TYPE_NMI:
-        delivery = IOAPIC_REDLO_DELIVERY_NMI;
-        break;
+    // Assume GSIs are sequentially assigned to IOAPIC inputs
+    for (size_t i = 0; i < ioapic->vector_count; ++i) {
+        intr_to_irq[ioapic->base_intr + i] =
+                ioapic->base_intr + i - INTR_APIC_IRQ_BASE;
 
-    case MP_INTR_TYPE_SMI:
-        delivery = IOAPIC_REDLO_DELIVERY_SMI;
-        break;
+        irq_to_intr[ioapic->base_intr +
+                i - INTR_APIC_IRQ_BASE] = ioapic->base_intr + i;
 
-    case MP_INTR_TYPE_EXTINT:
-        delivery = IOAPIC_REDLO_DELIVERY_EXTINT;
-        break;
+        // Mask all IRQs
+        uint32_t ent = ioapic_read(ioapic, IOAPIC_RED_LO_n(i), lock);
 
-    default:
-        APIC_ERROR("MP: Unrecognized interrupt delivery type!"
-                   " Guessing APIC\n");
-        delivery = IOAPIC_REDLO_DELIVERY_APIC;
-        break;
+        // Mask interrupts
+        IOAPIC_REDLO_MASKIRQ_SET(ent, 1);
+        ioapic_write(ioapic, IOAPIC_RED_LO_n(i), ent, lock);
+
+        // Set vector
+        IOAPIC_REDLO_VECTOR_SET(ent, ioapic->base_intr + i);
+        ioapic_write(ioapic, IOAPIC_RED_LO_n(i), ent, lock);
+
+        // Route to CPU 0 by default
+        ioapic_write(ioapic, IOAPIC_RED_HI_n(i), IOAPIC_REDHI_DEST_n(0), lock);
     }
+}
 
-    uint8_t polarity;
+static void ioapic_set_flags(mp_ioapic_t *ioapic,
+                             uint8_t intin, uint16_t intr_flags)
+{
+    unique_lock<spinlock> lock(ioapic->lock);
 
-    switch (mapping->flags & ACPI_MADT_ENT_IRQ_FLAGS_POLARITY) {
+    uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
+
+    switch (intr_flags & ACPI_MADT_ENT_IRQ_FLAGS_POLARITY) {
     default:
     case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(
             ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI):
-        polarity = IOAPIC_REDLO_POLARITY_ACTIVEHI;
+        IOAPIC_REDLO_POLARITY_SET(reg, IOAPIC_REDLO_POLARITY_ACTIVEHI);
         break;
     case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(
             ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO):
-        polarity = IOAPIC_REDLO_POLARITY_ACTIVELO;
+        IOAPIC_REDLO_POLARITY_SET(reg, IOAPIC_REDLO_POLARITY_ACTIVELO);
         break;
     }
 
-    uint8_t trigger;
-
-    switch (mapping->flags & ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER) {
+    switch (intr_flags & ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER) {
     default:
         APIC_TRACE("MP: Unrecognized IRQ trigger type!"
                    " Guessing edge\n");
@@ -2594,111 +2291,27 @@ static void ioapic_map(mp_ioapic_t *ioapic,
             ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_DEFAULT):
     case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
             ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE):
-        trigger = IOAPIC_REDLO_TRIGGER_EDGE;
+        IOAPIC_REDLO_TRIGGER_SET(reg, IOAPIC_REDLO_TRIGGER_EDGE);
         break;
 
     case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
             ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL):
-        trigger = IOAPIC_REDLO_TRIGGER_LEVEL;
+        IOAPIC_REDLO_TRIGGER_SET(reg, IOAPIC_REDLO_TRIGGER_LEVEL);
         break;
 
     }
 
-    uint8_t intr = ioapic->base_intr + mapping->intin;
-
-    uint32_t iored_lo =
-            IOAPIC_REDLO_VECTOR_n(intr) |
-            IOAPIC_REDLO_DELIVERY_n(delivery) |
-            IOAPIC_REDLO_POLARITY_n(polarity) |
-            IOAPIC_REDLO_TRIGGER_n(trigger);
-
-    IOAPIC_TRACE("Mapped IOAPIC irq %d (intin=%d) to interrupt 0x%x\n",
-                 mapping->irq, mapping->intin, intr);
-
-    uint32_t iored_hi = IOAPIC_REDHI_DEST_n(0);
-
-    ioapic_lock_noirq(ioapic);
-
-    // Write low part with mask set
-    ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin),
-                 iored_lo | IOAPIC_REDLO_MASKIRQ);
-
-    atomic_barrier();
-
-    // Write high part
-    ioapic_write(ioapic, IOAPIC_RED_HI_n(mapping->intin), iored_hi);
-
-    atomic_barrier();
-
-    ioapic_unlock_noirq(ioapic);
+    ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), reg, lock);
 }
 
 //
 //
 
-static mp_ioapic_t *ioapic_from_gsi(int gsi)
-{
-    for (unsigned i = 0; i < ioapic_count; ++i) {
-        mp_ioapic_t *ioapic = ioapic_list + i;
-        if (gsi >= ioapic->irq_base &&
-                gsi < ioapic->irq_base + ioapic->vector_count) {
-            return ioapic;
-        }
-    }
-    return nullptr;
-}
-
-static mp_ioapic_t *ioapic_from_intr(int intr)
-{
-    for (unsigned i = 0; i < ioapic_count; ++i) {
-        mp_ioapic_t *ioapic = ioapic_list + i;
-        if (intr >= ioapic->base_intr &&
-                intr < ioapic->base_intr + ioapic->vector_count) {
-            return ioapic;
-        }
-    }
-    return nullptr;
-}
-
-static mp_bus_irq_mapping_t *ioapic_mapping_from_irq(int irq)
-{
-    return &bus_irq_list[bus_irq_to_mapping[irq]];
-}
-
-static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
+isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
     isr_context_t *orig_ctx = ctx;
 
-    uint8_t irq;
-    if (intr >= ioapic_msi_base_intr &&
-            intr < INTR_APIC_SPURIOUS) {
-        // MSI IRQ
-        irq = intr - ioapic_msi_base_intr + ioapic_msi_base_irq;
-    } else {
-        mp_ioapic_t *ioapic = ioapic_from_intr(intr);
-        assert(ioapic);
-        if (!ioapic)
-            return ctx;
-
-        // IOAPIC IRQ
-
-        mp_bus_irq_mapping_t *mapping = bus_irq_list.data();
-        uint8_t intin = intr - ioapic->base_intr;
-        for (irq = 0; irq < bus_irq_list.size(); ++irq, ++mapping) {
-            if (mapping->ioapic_id == ioapic->id &&
-                    mapping->intin == intin)
-                break;
-        }
-
-        // Reverse map ISA IRQ
-        uint8_t *isa_match = (uint8_t *)memchr(isa_irq_lookup, irq,
-                                               sizeof(isa_irq_lookup));
-
-        if (isa_match)
-            irq = isa_match - isa_irq_lookup;
-        else
-            irq = ioapic->irq_base + intin;
-    }
+    uint8_t irq = intr_to_irq[intr];
 
     apic_eoi(intr);
     ctx = (isr_context_t*)irq_invoke(intr, irq, ctx);
@@ -2711,71 +2324,47 @@ static isr_context_t *ioapic_dispatcher(int intr, isr_context_t *ctx)
 
 static void ioapic_setmask(int irq, bool unmask)
 {
-    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
-    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
+    int irq_intr = irq_to_intr[irq];
+    assert(irq_intr >= 0);
+    int ioapic_index = intr_to_ioapic[irq_intr];
+    assert(ioapic_index >= 0);
+    assert(ioapic_index < int(ioapic_count));
+    mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
+    int intin = irq_intr - ioapic->base_intr;
+    assert(intin >= 0 && intin < ioapic->vector_count);
 
-    ioapic_lock_noirq(ioapic);
+    unique_lock<spinlock> lock(ioapic->lock);
 
-    uint32_t ent = ioapic_read(ioapic, IOAPIC_RED_LO_n(mapping->intin));
+    uint32_t ent = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
 
     if (unmask)
         ent &= ~IOAPIC_REDLO_MASKIRQ;
     else
         ent |= IOAPIC_REDLO_MASKIRQ;
 
-    ioapic_write(ioapic, IOAPIC_RED_LO_n(mapping->intin), ent);
-
-    ioapic_unlock_noirq(ioapic);
+    ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), ent, lock);
 }
 
 static void ioapic_hook(int irq, intr_handler_t handler)
 {
-    uint8_t intr;
-    if (irq >= ioapic_msi_base_irq) {
-        // MSI IRQ
-        intr = irq - ioapic_msi_base_irq + ioapic_msi_base_intr;
-    } else {
-        // IOAPIC IRQ
-        mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
-        mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-        intr = ioapic->base_intr + mapping->intin;
-    }
+    int intr = irq_to_intr[irq];
+    assert(intr >= 0);
     intr_hook(intr, handler);
 }
 
 static void ioapic_unhook(int irq, intr_handler_t handler)
 {
-    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
-    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-    uint8_t intr = ioapic->base_intr + mapping->intin;
+    int intr = irq_to_intr[irq];
+    assert(intr >= 0);
     intr_unhook(intr, handler);
 }
 
 static void ioapic_map_all(void)
 {
-    mp_bus_irq_mapping_t *mapping;
-    mp_ioapic_t *ioapic;
-
-    for (unsigned i = 0; i < 16; ++i)
-        bus_irq_to_mapping[i] = isa_irq_lookup[i];
-
-    for (size_t i = 0; i < bus_irq_list.size(); ++i) {
-        mapping = &bus_irq_list[i];
-        ioapic = ioapic_by_id(mapping->ioapic_id);
-        if (mapping->bus != mp_isa_bus_id) {
-            uint8_t irq = ioapic->irq_base + mapping->intin;
-            bus_irq_to_mapping[irq] = i;
-        }
-
-        ioapic_map(ioapic, mapping);
-    }
-
     // MSI IRQs start after last IOAPIC
-    ioapic = &ioapic_list[ioapic_count-1];
-    ioapic_msi_base_intr = ioapic->base_intr +
-            ioapic->vector_count;
-    ioapic_msi_base_irq = ioapic->irq_base +
-            ioapic->vector_count;
+    mp_ioapic_t *ioapic = &ioapic_list[ioapic_count-1];
+    ioapic_msi_base_intr = ioapic->base_intr + ioapic->vector_count;
+    ioapic_msi_base_irq = ioapic->irq_base + ioapic->vector_count;
 }
 
 // Pass negative cpu value to get highest CPU number
@@ -2788,12 +2377,12 @@ bool ioapic_irq_cpu(int irq, int cpu)
     if (unsigned(cpu) >= apic_id_count)
         return false;
 
-    mp_bus_irq_mapping_t *mapping = ioapic_mapping_from_irq(irq);
-    mp_ioapic_t *ioapic = ioapic_by_id(mapping->ioapic_id);
-    ioapic_lock_noirq(ioapic);
-    ioapic_write(ioapic, IOAPIC_RED_HI_n(mapping->intin),
-                 IOAPIC_REDHI_DEST_n(apic_id_list[cpu]));
-    ioapic_unlock_noirq(ioapic);
+    int irq_intr = irq_to_intr[irq];
+    int ioapic_index = intr_to_ioapic[irq_intr];
+    mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
+    unique_lock<spinlock> lock(ioapic->lock);
+    ioapic_write(ioapic, IOAPIC_RED_HI_n(irq_intr - ioapic->base_intr),
+                 IOAPIC_REDHI_DEST_n(apic_id_list[cpu]), lock);
     return true;
 }
 
@@ -2804,7 +2393,6 @@ int apic_enable(void)
 
     ioapic_map_all();
 
-    irq_dispatcher_set_handler(ioapic_dispatcher);
     irq_setmask_set_handler(ioapic_setmask);
     irq_hook_set_handler(ioapic_hook);
     irq_unhook_set_handler(ioapic_unhook);
@@ -2819,7 +2407,7 @@ int apic_enable(void)
 // Returns the starting IRQ number of allocated range
 // Returns 0 for failure
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
-                       int cpu, int distribute,
+                       int cpu, bool distribute,
                        intr_handler_t handler)
 {
     // Don't try to use MSI if there are no IOAPIC devices
@@ -2829,10 +2417,6 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     // If out of range starting CPU number, force to zero
     if (cpu < 0 || (unsigned)cpu >= apic_id_count)
         cpu = 0;
-
-    // Only allow distribute to be 0 or 1, fail otherwise
-    if (distribute < 0 || distribute > 1)
-        return 0;
 
     uint8_t vector_base = ioapic_aligned_vectors(bit_log2(count));
 
@@ -2845,9 +2429,17 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                 (apic_id_list[cpu] << 12);
         results[i].data = (vector_base + i);
 
-        irq_hook(vector_base + i - ioapic_msi_base_intr +
+        irq_to_intr[vector_base + i - INTR_APIC_IRQ_BASE] = vector_base + i;
+        intr_to_irq[vector_base + i] = vector_base + i - INTR_APIC_IRQ_BASE;
+
+        ioapic_hook(vector_base + i - ioapic_msi_base_intr +
                  ioapic_msi_base_irq,
                  handler);
+
+        if (distribute) {
+            if (++cpu >= int(apic_id_count))
+                cpu = 0;
+        }
 
         // It will always be edge triggered
         // (!!activehi << 14) |

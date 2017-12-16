@@ -7,6 +7,7 @@
 #include "irq.h"
 #include "control_regs.h"
 #include "spinlock.h"
+#include "mutex.h"
 #include "bootinfo.h"
 #include "printk.h"
 
@@ -146,21 +147,23 @@
 #define CMOS_SHUTDOWN_STATUS_NORMAL 0x4
 
 // JMP DWORD with INT init
-#define CMOS_SHUTDOWN_STATUS_AP     0x5
+#define CMOS_SHUTDOWN_STATUS_AP     0xB
 
-static spinlock_t time_of_day_lock;
+static spinlock cmos_lock;
 static time_of_day_t time_of_day;
 static uint64_t time_of_day_timestamp;
 
 static uint8_t cmos_status_b;
 
-static uint8_t cmos_read(uint8_t reg)
+static uint8_t cmos_read(uint8_t reg,
+                         unique_lock<spinlock> const&)
 {
     outb(CMOS_ADDR_PORT, reg);
     return inb(CMOS_DATA_PORT);
 }
 
-static void cmos_write(uint8_t reg, uint8_t val)
+static void cmos_write(uint8_t reg, uint8_t val,
+                       unique_lock<spinlock> const&)
 {
     outb(CMOS_ADDR_PORT, reg);
     outb(CMOS_DATA_PORT, val);
@@ -168,14 +171,16 @@ static void cmos_write(uint8_t reg, uint8_t val)
 
 void cmos_prepare_ap(void)
 {
+    unique_lock<spinlock> lock(cmos_lock);
+
     // Read vector immediately after boot sector structure
     uint32_t ap_entry_point = //*(uint32_t*)0x7C40;
             (uint32_t)
             bootinfo_parameter(bootparam_t::ap_entry_point);
     *BIOS_DATA_AREA(uint32_t, 0x467) = ap_entry_point;
 
-    outb(CMOS_ADDR_PORT, CMOS_REG_SHUTDOWN_STATUS);
-    outb(CMOS_DATA_PORT, CMOS_SHUTDOWN_STATUS_AP);
+    cmos_write(CMOS_REG_SHUTDOWN_STATUS, CMOS_SHUTDOWN_STATUS_AP, lock);
+    //cmos_write(CMOS_REG_SHUTDOWN_STATUS, CMOS_SHUTDOWN_STATUS_US, lock);
 }
 
 static uint8_t cmos_bcd_to_binary(uint8_t n)
@@ -210,47 +215,44 @@ static time_of_day_t cmos_fixup_timeofday(time_of_day_t t)
     return t;
 }
 
-static time_of_day_t cmos_read_gettimeofday(void)
+static time_of_day_t cmos_read_gettimeofday(unique_lock<spinlock> const& lock)
 {
     time_of_day_t result;
 
     result.centisec = 0;
-    result.second = cmos_read(CMOS_REG_RTC_SECOND);
-    result.minute = cmos_read(CMOS_REG_RTC_MINUTE);
-    result.hour = cmos_read(CMOS_REG_RTC_HOUR);
-    result.day = cmos_read(CMOS_REG_RTC_DAY);
-    result.month = cmos_read(CMOS_REG_RTC_MONTH);
-    result.year = cmos_read(CMOS_REG_RTC_YEAR);
+    result.second = cmos_read(CMOS_REG_RTC_SECOND, lock);
+    result.minute = cmos_read(CMOS_REG_RTC_MINUTE, lock);
+    result.hour = cmos_read(CMOS_REG_RTC_HOUR, lock);
+    result.day = cmos_read(CMOS_REG_RTC_DAY, lock);
+    result.month = cmos_read(CMOS_REG_RTC_MONTH, lock);
+    result.year = cmos_read(CMOS_REG_RTC_YEAR, lock);
 
     return cmos_fixup_timeofday(result);
 }
 
 static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 {
-    spinlock_lock_noyield(&time_of_day_lock);
+    unique_lock<spinlock> lock(cmos_lock);
 
-    uint8_t intr_cause = cmos_read(CMOS_REG_STATUS_C);
+    uint8_t intr_cause = cmos_read(CMOS_REG_STATUS_C, lock);
 
     if (intr_cause & CMOS_STATUS_C_UEI) {
         // Update ended interrupt
-        time_of_day = cmos_read_gettimeofday();
+        time_of_day = cmos_read_gettimeofday(lock);
         time_of_day_timestamp = time_ns();
     }
 
-    spinlock_unlock_noirq(&time_of_day_lock);
     return ctx;
 }
 
 time_of_day_t cmos_gettimeofday()
 {
-    spinlock_lock_noirq(&time_of_day_lock);
+    unique_lock<spinlock> lock(cmos_lock);
 
     time_of_day_t result = time_of_day;
     uint64_t now = time_ns();
     uint64_t adj = now - time_of_day_timestamp;
     result.centisec = adj / 10000000;
-
-    spinlock_unlock_noirq(&time_of_day_lock);
 
     if (result.centisec >= 100)
         result.centisec = 99;
@@ -260,14 +262,16 @@ time_of_day_t cmos_gettimeofday()
 
 void cmos_init(void)
 {
-    cmos_status_b = cmos_read(CMOS_REG_STATUS_B);
+    unique_lock<spinlock> lock(cmos_lock);
+
+    cmos_status_b = cmos_read(CMOS_REG_STATUS_B, lock);
     time_ofday_set_handler(cmos_gettimeofday);
 
     time_of_day_t tod1;
     time_of_day_t tod2;
-    tod1 = cmos_read_gettimeofday();
+    tod1 = cmos_read_gettimeofday(lock);
     for (;;) {
-        tod2 = cmos_read_gettimeofday();
+        tod2 = cmos_read_gettimeofday(lock);
 
         if (!memcmp(&tod1, &tod2, sizeof(tod1)))
             break;
@@ -289,11 +293,11 @@ void cmos_init(void)
     // Enable update ended IRQ, don't disable clock update
     cmos_status_b |= CMOS_STATUS_B_UEI;
 
-    cmos_write(CMOS_REG_STATUS_B, cmos_status_b);
+    cmos_write(CMOS_REG_STATUS_B, cmos_status_b, lock);
 
     irq_hook(8, cmos_irq_handler);
     irq_setmask(8, true);
 
     // EOI just in case
-    cmos_read(CMOS_REG_STATUS_C);
+    cmos_read(CMOS_REG_STATUS_C, lock);
 }

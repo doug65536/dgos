@@ -15,7 +15,7 @@ syscall_entry:
     // return rax
     // CPU puts rip in rcx
     // CPU puts rflags in r11 (which is clobbered)
-    // on return, rflags is initialized to EFLAGS_IF | 2
+    // on return, rflags is initialized to CPU_EFLAGS_IF | 2
     // CPU is configured to clear EFLAGS IF, DF, TF, AC on entry
 
     // Range check syscall number

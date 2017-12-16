@@ -940,8 +940,10 @@ ssize_t uart_poll_t::read(void *buf, size_t size, size_t min_read)
     }
 
     // Drop RTS when not in read function
-    reg_mcr.bits.rts = 0;
-    outp(reg_mcr);
+    if (reg_mcr.bits.rts) {
+        reg_mcr.bits.rts = 0;
+        outp(reg_mcr);
+    }
 
     return 0;
 }

@@ -1732,7 +1732,9 @@ size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
     memset(reply + ofs, 'x', 16);
     ofs += 16;
 
-    ofs += to_hex_bytes(reply + ofs, uintptr_t(ISR_CTX_FSBASE(ctx)));
+    // fsbase
+    memset(reply + ofs, 'x', 16);
+    ofs += 16;
 
     memset(reply + ofs, 'x', 16);
     ofs += 16;
@@ -1848,8 +1850,9 @@ size_t gdbstub_t::set_context(isr_context_t const *ctx,
     if (input + 16 <= end)
         input += 16;
 
+    // Skip fs_base
     if (input + 16 <= end)
-        from_hex_bytes((uintptr_t*)&ISR_CTX_FSBASE(ctx), input);
+        input += 16;
 
     // Skip gs_base
     if (input + 16 <= end)
@@ -1896,11 +1899,11 @@ bool gdb_cpu_ctrl_t::breakpoint_write_target(
 
     cpu_set_page_directory(page_dir);
     cpu_flush_tlb();
-    cpu_cr0_change_bits(CR0_WP, 0);
+    cpu_cr0_change_bits(CPU_CR0_WP, 0);
     *old_value = atomic_xchg((uint8_t*)addr, value);
     GDBSTUB_TRACE("Wrote 0x%lx to %zx, replaced 0x%lx\n",
                   uintptr_t(value), addr, uintptr_t(*old_value));
-    cpu_cr0_change_bits(0, CR0_WP);
+    cpu_cr0_change_bits(0, CPU_CR0_WP);
     cpu_set_page_directory(orig_pagedir);
     cpu_flush_tlb();
     GDBSTUB_TRACE("Switched back to stub pagedir (%zx)\n", orig_pagedir);
@@ -2070,9 +2073,9 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
         if (cpu.state == gdb_cpu_state_t::FROZEN) {
             // Set trap and resume flag if single stepping
             if (single_step)
-                cpu.ctx->gpr->iret.rflags |= EFLAGS_TF | EFLAGS_RF;
+                cpu.ctx->gpr->iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
             else
-                cpu.ctx->gpr->iret.rflags &= ~EFLAGS_TF;
+                cpu.ctx->gpr->iret.rflags &= ~CPU_EFLAGS_TF;
 
             // Change state to break it out of the halt loop
             cpu.state = gdb_cpu_state_t::RESUMING;
@@ -2322,7 +2325,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
         static uintptr_t bp_workaround_addr;
 
         // This is the GDB stub
-        if ((ctx->gpr->iret.rflags & EFLAGS_TF) && bp_workaround_addr) {
+        if ((ctx->gpr->iret.rflags & CPU_EFLAGS_TF) && bp_workaround_addr) {
             // We are in a single step breakpoint workaround
 
             // Find the breakpoint we stepped over
@@ -2334,7 +2337,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             bp_workaround_addr = 0;
 
             // Disable single-step
-            ctx->gpr->iret.rflags &= ~EFLAGS_TF;
+            ctx->gpr->iret.rflags &= ~CPU_EFLAGS_TF;
 
             // Reenable it
             breakpoint_toggle(*it, true);
@@ -2360,7 +2363,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             breakpoint_toggle(*it, false);
 
             // Single step the instruction
-            ctx->gpr->iret.rflags |= EFLAGS_TF | EFLAGS_RF;
+            ctx->gpr->iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
 
             return ctx;
         }

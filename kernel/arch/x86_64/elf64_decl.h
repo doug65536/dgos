@@ -64,13 +64,22 @@ char const elf_magic[] = { '\x7f', 'E', 'L', 'F' };
 #define ET_LOPROC 0xFF00 // Processor-specific use
 #define ET_HIPROC 0xFFFF
 
-#define SHN_UNDEF 0 // Used to mark an undefined or meaningless section reference
-#define SHN_LOPROC 0xFF00 // Processor-specific use
+// Used to mark an undefined or meaningless section reference
+#define SHN_UNDEF 0
+
+// Processor-specific use
+#define SHN_LOPROC 0xFF00
 #define SHN_HIPROC 0xFF1F
-#define SHN_LOOS 0xFF20 // Environment-specific use
+
+// Environment-specific use
+#define SHN_LOOS 0xFF20
 #define SHN_HIOS 0xFF3F
-#define SHN_ABS 0xFFF1 // Indicates that the corresponding reference is an absolute value
-#define SHN_COMMON 0xFFF2 // Indicates a symbol that has been declared as a common block
+
+// Indicates that the corresponding reference is an absolute value
+#define SHN_ABS 0xFFF1
+
+// Indicates a symbol that has been declared as a common block
+#define SHN_COMMON 0xFFF2
 
 struct Elf64_Shdr {
     Elf64_Word sh_name; /* Section name */

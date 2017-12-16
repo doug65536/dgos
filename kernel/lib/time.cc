@@ -68,6 +68,7 @@ bool nsleep_set_handler(uint64_t (*vec)(uint64_t nanosec), void (*stop)(),
 
 EXPORT uint64_t nsleep(uint64_t nanosec)
 {
+    assert(nsleep_vec);
     return nsleep_vec(nanosec);
 }
 

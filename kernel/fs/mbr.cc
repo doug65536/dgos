@@ -86,8 +86,8 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
                         unique_ptr<uint8_t> ext_superblock =
                                 new uint8_t[sector_size];
 
-                        if (!drive->read_blocks(ext_superblock, 1,
-                                                ptbl[i].start_lba)) {
+                        if (drive->read_blocks(ext_superblock, 1,
+                                                ptbl[i].start_lba) < 0) {
                             MBR_TRACE("Unable to read linux partition"
                                       " (at LBA %u)!\n", ptbl[i].start_lba);
                             break;

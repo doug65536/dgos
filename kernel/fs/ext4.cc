@@ -231,7 +231,7 @@ class ext4_fs_t : public fs_base_t {
     friend constexpr bool enable_bitwise(superblock_t::mount_opts_t);
     friend constexpr bool enable_bitwise(superblock_t::misc_flags_t);
 
-    ext4_fs_t *mount(fs_init_info_t *conn);
+    bool mount(fs_init_info_t *conn);
 
     //
     // Internals
@@ -299,12 +299,16 @@ int ext4_fs_t::mm_fault_handler(
 
 fs_base_t *ext4_factory_t::mount(fs_init_info_t *conn)
 {
-    ext4_fs_t *self = new ext4_fs_t;
-    ext4_mounts.push_back(self);
-    return self->mount(conn);
+    unique_ptr<ext4_fs_t> self(new ext4_fs_t);
+    if (self->mount(conn)) {
+        ext4_mounts.push_back(self);
+        return self.release();
+    }
+
+    return nullptr;
 }
 
-ext4_fs_t* ext4_fs_t::mount(fs_init_info_t *conn)
+bool ext4_fs_t::mount(fs_init_info_t *conn)
 {
     drive = conn->drive;
     part_st = conn->part_st;
@@ -314,7 +318,10 @@ ext4_fs_t* ext4_fs_t::mount(fs_init_info_t *conn)
                 this, block_size, conn->part_len,
                 PROT_READ | PROT_WRITE, &ext4_fs_t::mm_fault_handler);
 
-    return nullptr;
+    if (!mm_dev)
+        return false;
+
+    return false;
 }
 
 void ext4_fs_t::unmount()

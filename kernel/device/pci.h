@@ -126,15 +126,17 @@ C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 #define PCI_CFG_STATUS_CAPLIST_BIT  4
 #define PCI_CFG_STATUS_CAPLIST      (1<<PCI_CFG_STATUS_CAPLIST_BIT)
 
-struct pci_dev_iterator_t {
+struct pci_dev_t {
     pci_config_hdr_t config;
-
-    int dev_class;
-    int subclass;
 
     int bus;
     int slot;
     int func;
+};
+
+struct pci_dev_iterator_t : public pci_dev_t {
+    int dev_class;
+    int subclass;
 
     uint8_t header_type;
 
@@ -237,9 +239,14 @@ struct pci_irq_range_t {
     uint8_t count;
 };
 
+bool pci_try_msi_irq(pci_dev_t const& pci_dev,
+                     pci_irq_range_t *irq_range,
+                     int cpu, bool distribute, int multiple,
+                     intr_handler_t handler);
+
 bool pci_set_msi_irq(int bus, int slot, int func,
                     pci_irq_range_t *irq_range,
-                    int cpu, int distribute, int multiple,
+                    int cpu, bool distribute, int multiple,
                     intr_handler_t handler);
 
 void pci_set_irq_line(int bus, int slot, int func,
@@ -247,6 +254,9 @@ void pci_set_irq_line(int bus, int slot, int func,
 
 void pci_set_irq_pin(int bus, int slot, int func,
                      uint8_t irq_pin);
+
+void pci_adj_control_bits(pci_dev_t const& pci_dev,
+                          uint16_t set, uint16_t clr);
 
 void pci_adj_control_bits(int bus, int slot, int func,
                           uint16_t set, uint16_t clr);

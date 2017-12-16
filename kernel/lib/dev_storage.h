@@ -38,6 +38,7 @@ struct iocp_t {
         , arg(arg)
         , err(errno_t::OK)
     {
+        assert(callback);
     }
 
     // A single request can be split into multiple requests at
@@ -52,7 +53,7 @@ struct iocp_t {
         expect_count = expect;
 
         if (done_count == expect)
-            invoke_once();
+            invoke_once(hold);
     }
 
     void set_result(errno_t err_code)
@@ -64,7 +65,7 @@ struct iocp_t {
     {
         unique_lock<spinlock> hold(lock);
         if (++done_count >= expect_count)
-            invoke_once();
+            invoke_once(hold);
     }
 
     void operator()()
@@ -78,7 +79,7 @@ struct iocp_t {
     }
 
 private:
-    void invoke_once()
+    void invoke_once(unique_lock<spinlock> const&)
     {
         if (callback != nullptr) {
             callback(err, arg);
@@ -162,10 +163,10 @@ struct storage_dev_base_t {
 
     // Synchronous wrappers
 
-    virtual int64_t read_blocks(
+    virtual int read_blocks(
             void *data, int64_t count, uint64_t lba);
 
-    virtual int64_t write_blocks(
+    virtual int write_blocks(
             void const *data, int64_t count, uint64_t lba, bool fua);
 
     virtual int64_t trim_blocks(int64_t count, uint64_t lba);
@@ -176,25 +177,25 @@ struct storage_dev_base_t {
 };
 
 #define STORAGE_DEV_IMPL                        \
-    void cleanup() final;                       \
+    void cleanup() override final;              \
                                                 \
     errno_t read_async(                         \
             void *data, int64_t count,          \
             uint64_t lba,                       \
-            iocp_t *iocp) final;                \
+            iocp_t *iocp) override final;       \
                                                 \
     errno_t write_async(                        \
             void const *data, int64_t count,    \
             uint64_t lba, bool fua,             \
-            iocp_t *iocp) final;                \
+            iocp_t *iocp) override final;       \
                                                 \
     errno_t flush_async(                        \
-            iocp_t *iocp) final;                \
+            iocp_t *iocp) override final;       \
                                                 \
     errno_t trim_async(                         \
             int64_t count,                      \
             uint64_t lba,                       \
-            iocp_t *iocp) final;                \
+            iocp_t *iocp) override final;       \
                                                 \
     long info(storage_dev_info_t key) final;
 
@@ -214,7 +215,7 @@ struct storage_if_base_t {
 };
 
 #define STORAGE_IF_IMPL                 \
-    void cleanup() final;               \
+    void cleanup() override final;      \
     if_list_t detect_devices() final;
 
 #define STORAGE_REGISTER_FACTORY(name) \
@@ -322,6 +323,8 @@ struct fs_factory_t {
 };
 
 struct fs_base_t {
+    virtual ~fs_base_t() {}
+
     //
     // Startup and shutdown
 
@@ -446,66 +449,66 @@ struct fs_base_t {
 };
 
 #define FS_BASE_IMPL \
-    void unmount() final;                                               \
-    int opendir(fs_file_info_t **fi, fs_cpath_t path) final;            \
+    void unmount() override final;                                      \
+    int opendir(fs_file_info_t **fi, fs_cpath_t path) override final;   \
     ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  \
-                    off_t offset) final;                                \
-    int releasedir(fs_file_info_t *fi) final;                           \
-    int getattr(fs_cpath_t path, fs_stat_t* stbuf) final;               \
-    int access(fs_cpath_t path, int mask) final;                        \
+                    off_t offset) override final;                       \
+    int releasedir(fs_file_info_t *fi) override final;                  \
+    int getattr(fs_cpath_t path, fs_stat_t* stbuf) override final;      \
+    int access(fs_cpath_t path, int mask) override final;               \
     int readlink(fs_cpath_t path, char* buf, size_t size) final;        \
     int mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev) final;    \
-    int mkdir(fs_cpath_t path, fs_mode_t mode) final;                   \
-    int rmdir(fs_cpath_t path) final;                                   \
-    int symlink(fs_cpath_t to, fs_cpath_t from) final;                  \
-    int rename(fs_cpath_t from, fs_cpath_t to) final;                   \
-    int link(fs_cpath_t from, fs_cpath_t to) final;                     \
-    int unlink(fs_cpath_t path) final;                                  \
+    int mkdir(fs_cpath_t path, fs_mode_t mode) override final;          \
+    int rmdir(fs_cpath_t path) override final;                          \
+    int symlink(fs_cpath_t to, fs_cpath_t from) override final;         \
+    int rename(fs_cpath_t from, fs_cpath_t to) override final;          \
+    int link(fs_cpath_t from, fs_cpath_t to) override final;            \
+    int unlink(fs_cpath_t path) override final;                         \
     int chmod(fs_cpath_t path,                                          \
-         fs_mode_t mode) final;                                         \
+         fs_mode_t mode) override final;                                \
     int chown(fs_cpath_t path,                                          \
          fs_uid_t uid,                                                  \
-         fs_gid_t gid) final;                                           \
+         fs_gid_t gid) override final;                                  \
     int truncate(fs_cpath_t path,                                       \
-            off_t size) final;                                          \
+            off_t size) override final;                                 \
     int utimens(fs_cpath_t path,                                        \
-           fs_timespec_t const *ts) final;                              \
+           fs_timespec_t const *ts) override final;                     \
     int open(fs_file_info_t **fi,                                       \
-        fs_cpath_t path, int flags, mode_t mode) final;                 \
-    int release(fs_file_info_t *fi) final;                              \
+        fs_cpath_t path, int flags, mode_t mode) override final;        \
+    int release(fs_file_info_t *fi) override final;                     \
     ssize_t read(fs_file_info_t *fi,                                    \
             char *buf,                                                  \
             size_t size,                                                \
-            off_t offset) final;                                        \
+            off_t offset) override final;                               \
     ssize_t write(fs_file_info_t *fi,                                   \
              char const *buf,                                           \
              size_t size,                                               \
-             off_t offset) final;                                       \
+             off_t offset) override final;                              \
     int ftruncate(fs_file_info_t *fi,                                   \
-             off_t offset) final;                                       \
+             off_t offset) override final;                              \
     int fstat(fs_file_info_t *fi,                                       \
-         fs_stat_t *st) final;                                          \
+         fs_stat_t *st) override final;                                 \
     int fsync(fs_file_info_t *fi,                                       \
-         int isdatasync) final;                                         \
+         int isdatasync) override final;                                \
     int fsyncdir(fs_file_info_t *fi,                                    \
-            int isdatasync) final;                                      \
-    int flush(fs_file_info_t *fi) final;                                \
+            int isdatasync) override final;                             \
+    int flush(fs_file_info_t *fi) override final;                       \
     int lock(fs_file_info_t *fi,                                        \
-        int cmd, fs_flock_t* locks) final;                              \
+        int cmd, fs_flock_t* locks) override final;                     \
     int bmap(fs_cpath_t path, size_t blocksize,                         \
-        uint64_t* blockno) final;                                       \
-    int statfs(fs_statvfs_t* stbuf) final;                              \
+        uint64_t* blockno) override final;                              \
+    int statfs(fs_statvfs_t* stbuf) override final;                     \
     int setxattr(fs_cpath_t path,                                       \
             char const* name, char const* value,                        \
-            size_t size, int flags) final;                              \
+            size_t size, int flags) override final;                     \
     int getxattr(fs_cpath_t path,                                       \
             char const* name, char* value,                              \
-            size_t size) final;                                         \
+            size_t size) override final;                                \
     int listxattr(fs_cpath_t path,                                      \
-             char const* list, size_t size) final;                      \
+             char const* list, size_t size) override final;             \
     int ioctl(fs_file_info_t *fi,                                       \
          int cmd, void* arg,                                            \
-         unsigned int flags, void* data) final;                         \
+         unsigned int flags, void* data) override final;                \
     int poll(fs_file_info_t *fi,                                        \
         fs_pollhandle_t* ph, unsigned* reventsp) final;
 

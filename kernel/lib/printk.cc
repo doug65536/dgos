@@ -44,16 +44,17 @@ union arg_t {
 };
 
 struct formatter_flags_t {
-    unsigned int left_justify : 1;
-    unsigned int leading_plus : 1;
-    unsigned int leading_zero : 1;
-    unsigned int hash : 1;
-    unsigned int upper : 1;
-    unsigned int negative : 1;
-    unsigned int has_min_width : 1;
-    unsigned int has_precision : 1;
-    unsigned int limit_string : 1;
-    unsigned int scientific : 1;
+    unsigned left_justify : 1;
+    unsigned leading_plus : 1;
+    unsigned leading_zero : 1;
+    unsigned hash : 1;
+    unsigned upper : 1;
+    unsigned negative : 1;
+    unsigned has_min_width : 1;
+    unsigned has_precision : 1;
+    unsigned limit_string : 1;
+    unsigned scientific : 1;
+    unsigned :22;
 
     int min_width;
     int precision;
@@ -63,8 +64,8 @@ struct formatter_flags_t {
     int max_chars;
 
     length_mod_t length;
-    arg_type_t arg_type;
     arg_t arg;
+    arg_type_t arg_type;
 };
 
 static formatter_flags_t const empty_formatter_flags = {};

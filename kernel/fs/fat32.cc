@@ -41,7 +41,7 @@ struct fat32_fs_t : public fs_base_t {
         bool dirty;
     };
 
-    fs_base_t *mount(fs_init_info_t *conn);
+    bool mount(fs_init_info_t *conn);
 
     static int mm_fault_handler(void *dev, void *addr,
             uint64_t offset, uint64_t length, bool read, bool flush);
@@ -150,7 +150,7 @@ struct fat32_fs_t : public fs_base_t {
 class fat32_factory_t : public fs_factory_t {
 public:
     fat32_factory_t() : fs_factory_t("fat32") {}
-    fs_base_t *mount(fs_init_info_t *conn);
+    fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
 static fat32_factory_t fat32_factory;
@@ -1077,20 +1077,24 @@ fat32_fs_t::fat32_fs_t()
     rwlock_init(&rwlock);
 }
 
-fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
+bool fat32_fs_t::mount(fs_init_info_t *conn)
 {
     drive = conn->drive;
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     unique_ptr<char[]> sector_buffer = new char[sector_size];
+
+    if (!sector_buffer)
+        return false;
+
     fat32_bpb_data_t bpb;
 
     lba_st = conn->part_st;
     lba_en = conn->part_st + conn->part_len;
 
     if (drive->read_blocks(sector_buffer, 1, lba_st) < 0)
-        return nullptr;
+        return false;
 
     // Pass 0 partition cluster to get partition relative values
     fat32_parse_bpb(&bpb, 0, sector_buffer);
@@ -1118,6 +1122,9 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
                 this, block_size, conn->part_len,
                 PROT_READ | PROT_WRITE, &fat32_fs_t::mm_fault_handler);
 
+    if (!mm_dev)
+        return false;
+
     fat_size = bpb.sec_per_fat << sector_shift;
     fat = (cluster_t*)lookup_sector(bpb.first_fat_lba);
     fat2 = (cluster_t*)lookup_sector(bpb.first_fat_lba + bpb.sec_per_fat);
@@ -1131,7 +1138,7 @@ fs_base_t *fat32_fs_t::mount(fs_init_info_t *conn)
         FAT32_TRACE("%d FAT mismatches", fat_mismatches);
     }
 
-    return this;
+    return true;
 }
 
 fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
@@ -1139,10 +1146,13 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     if (fat32_mounts.empty())
         pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 512);
 
-    fat32_fs_t *self = new fat32_fs_t;
-    fat32_mounts.push_back(self);
+    unique_ptr<fat32_fs_t> self(new fat32_fs_t);
+    if (self->mount(conn)) {
+        fat32_mounts.push_back(self);
+        return self.release();
+    }
 
-    return self->mount(conn);
+    return nullptr;
 }
 
 void fat32_fs_t::unmount()

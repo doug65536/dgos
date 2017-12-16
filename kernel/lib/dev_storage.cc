@@ -156,8 +156,8 @@ static void invoke_part_factories(void *arg)
 
                 // Mount partitions
                 for (unsigned i = 0; i < part_list.count; ++i) {
-                    part_dev_t *part = (part_dev_t*)((char*)part_list.base +
-                                               part_list.stride * i);
+                    part_dev_t *part = (part_dev_t*)
+                            ((char*)part_list.base + part_list.stride * i);
                     fs_init_info_t info;
                     info.drive = drive;
                     info.part_st = part->lba_st;
@@ -209,7 +209,7 @@ void part_factory_t::register_factory(void *p)
     part_register_factory(instance->name, instance);
 }
 
-int64_t storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
+int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
 {
     cpu_scoped_irq_disable intr_were_enabled;
 
@@ -223,7 +223,8 @@ int64_t storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
     return count;
 }
 
-int64_t storage_dev_base_t::write_blocks(const void *data, int64_t count, uint64_t lba, bool fua)
+int storage_dev_base_t::write_blocks(
+        const void *data, int64_t count, uint64_t lba, bool fua)
 {
     blocking_iocp_t block;
     errno_t err = write_async(data, count, lba, fua, block);
@@ -232,7 +233,6 @@ int64_t storage_dev_base_t::write_blocks(const void *data, int64_t count, uint64
         return -int64_t(err);
     return count;
 }
-
 int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
 {
     blocking_iocp_t block;

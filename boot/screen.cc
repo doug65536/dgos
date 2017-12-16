@@ -175,7 +175,7 @@ static void buffer_char(char *buf, char **pptr, char c)
 #define FLAG_NEG        0x02
 #define FLAG_LONGLONG   0x04
 
-#define USE_LONGLONG_MOD 1
+#define USE_LONGLONG_MOD 0
 
 #if USE_LONGLONG_MOD
 // Only works correctly for values <= 2⁵³
@@ -307,7 +307,9 @@ void print_line(char const* format, ...)
                 // __udivi3 and __umodi3. 64 bit values are
                 // almost always file offsets or addresses
                 // and hex is ideal for those anyway
-                if (base == 16 || (!USE_LONGLONG_MOD && (flags & FLAG_LONGLONG))) {
+                if (base == 16 ||
+                        (!USE_LONGLONG_MOD && (flags & FLAG_LONGLONG)))
+                {
                     do
                     {
                         *--dp = hexlookup[n & 0x0F];
@@ -356,7 +358,7 @@ void print_line(char const* format, ...)
     va_end(ap);
 }
 
-void print_xy(uint16_t x, uint16_t y, uint16_t ch, uint16_t attr, uint16_t count)
+void print_xy(int x, int y, uint8_t ch, uint16_t attr, uint16_t count)
 {
     char *buf = (char*)__builtin_alloca(count+1);
     for (uint16_t ofs = 0; ofs < count; ++ofs)

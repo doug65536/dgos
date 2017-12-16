@@ -20,7 +20,8 @@ enum struct errno_t : int8_t {
     /// Address family not supported (POSIX.1).
     EAFNOSUPPORT,
 
-    /// Resource temporarily unavailable (may be the same value as EWOULDBLOCK) (POSIX.1).
+    /// Resource temporarily unavailable
+    /// (may be the same value as EWOULDBLOCK) (POSIX.1).
     EAGAIN,
 
     /// Connection already in progress (POSIX.1).
@@ -170,7 +171,9 @@ enum struct errno_t : int8_t {
     /// Wrong medium type.
     EMEDIUMTYPE,
 
-    /// Too many open files (POSIX.1).  Commonly caused by exceeding the RLIMIT_NOFILE resource limit described in getrlimit(2).
+    /// Too many open files (POSIX.1).
+    /// Commonly caused by exceeding the RLIMIT_NOFILE resource limit
+    /// described in getrlimit(2).
     EMFILE,
 
     /// Too many links (POSIX.1).
@@ -194,7 +197,9 @@ enum struct errno_t : int8_t {
     /// Network unreachable (POSIX.1).
     ENETUNREACH,
 
-    /// Too many open files in system (POSIX.1).  On Linux, this is probably a result of encountering the /proc/sys/fs/file-max limit (see proc(5)).
+    /// Too many open files in system (POSIX.1).
+    /// On Linux, this is probably a result of encountering the
+    ///  /proc/sys/fs/file-max limit (see proc(5)).
     ENFILE,
 
     /// No buffer space available (POSIX.1 (XSI STREAMS option)).
@@ -375,6 +380,6 @@ enum struct errno_t : int8_t {
 
     /// Exchange full.
     EXFULL,
-    
+
     MAX_ERRNO
 };

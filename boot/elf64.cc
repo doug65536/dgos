@@ -33,17 +33,17 @@ static void enter_kernel_initial(uint64_t entry_point)
     //
     // Relocate MP entry trampoline to 4KB boundary
 
-    uint16_t mp_entry_seg = far_malloc_aligned(mp_entry_size);
-    far_ptr_t mp_entry_ptr = far_ptr2(mp_entry_seg, 0);
+    uint16_t ap_entry_seg = far_malloc_aligned(ap_entry_size);
+    far_ptr_t ap_entry_ptr = far_ptr2(ap_entry_seg, 0);
 
-    print_line("SMP trampoline at %x:%x",
-               mp_entry_ptr.segment, mp_entry_ptr.offset);
+    print_line("SMP trampoline at 0x%x:%x",
+               ap_entry_ptr.segment, ap_entry_ptr.offset);
 
-    far_copy(mp_entry_ptr, far_ptr2(0, (uint16_t)(uint32_t)mp_entry),
-             mp_entry_size);
+    far_copy(ap_entry_ptr, far_ptr2(0, (uint16_t)(uint32_t)ap_entry),
+             ap_entry_size);
 
-    // Write address of AP entrypoint to mp_entry_vector
-    mp_entry_vector = (uint32_t)mp_entry_seg << 4;
+    // Write address of AP entrypoint to ap_entry_vector
+    ap_entry_vector = (uintptr_t)ap_entry_seg << 4;
 
     //
     // Build physical memory table
@@ -72,9 +72,9 @@ static void enter_kernel_initial(uint64_t entry_point)
     // Pack the size into the high 12 bits
     phys_mem_table |= phys_mem_table_size << 20;
 
-    ELF64_TRACE("Entry point: %llx\n", entry_point);
+    ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
-    print_line("Entering kernel at %llx\n", entry_point);
+    print_line("Entering kernel at 0x%llx\n", entry_point);
 
     copy_or_enter(entry_point, 0, phys_mem_table);
 }
@@ -169,7 +169,7 @@ uint16_t elf64_run(char const *filename)
         if ((blk->p_flags & (PF_R | PF_W | PF_X)) == 0)
             continue;
 
-        ELF64_TRACE("vaddr=%llx, filesz=%llx, memsz=%llx, paddr=%llx",
+        ELF64_TRACE("vaddr=0x%llx, filesz=0x%llx, memsz=0x%llx, paddr=0x%llx",
                    blk->p_vaddr,
                    blk->p_filesz,
                    blk->p_memsz,
@@ -194,10 +194,10 @@ uint16_t elf64_run(char const *filename)
 
         char read_buffer[PAGE_SIZE];
 
-        uint64_t page_alloc = blk->p_paddr;
+        uint64_t paddr = blk->p_paddr;
 
         ssize_t chunk_size;
-        uint64_t addr = blk->p_vaddr;
+        uint64_t vaddr = blk->p_vaddr;
         uint64_t remain = blk->p_memsz;
         Elf64_Off file_remain = blk->p_filesz;
         Elf64_Off bss_ofs = blk->p_offset + blk->p_filesz;
@@ -209,7 +209,8 @@ uint16_t elf64_run(char const *filename)
 
             // Handle partial page,
             // limit chunk to realign to page on next iteration
-            chunk_size -= (addr & PAGE_MASK);
+            uint32_t page_ofs = vaddr & PAGE_MASK;
+            chunk_size -= page_ofs;
 
             // Handle partial read/zero
             if (ofs < bss_ofs) {
@@ -225,7 +226,7 @@ uint16_t elf64_run(char const *filename)
             done_bytes += chunk_size;
 
             if (ofs < bss_ofs) {
-                ELF64_TRACE("Reading %u byte chunk at offset %llx",
+                ELF64_TRACE("Reading 0x%lx byte chunk at offset 0x%llx",
                            chunk_size, ofs);
                 if (chunk_size != boot_pread(
                             file, read_buffer, chunk_size, ofs))
@@ -235,29 +236,30 @@ uint16_t elf64_run(char const *filename)
                 memset(read_buffer, 0, sizeof(read_buffer));
             }
 
-            if (addr + chunk_size < 0x100000000U) {
-                memcpy((void*)addr, read_buffer, chunk_size);
+            ELF64_TRACE("Copying 0x%lx bytes to 0x%llx (phys=0x%llx)",
+                        chunk_size, vaddr, paddr);
+
+            uint64_t page_vaddr = vaddr - page_ofs;
+            uint64_t page_paddr = paddr - page_ofs;
+
+            // Map pages
+            paging_map_range(page_vaddr, PAGE_SIZE, page_paddr,
+                        page_flags, 1);
+
+            if (paddr + chunk_size <= 0x100000000U) {
+                memcpy((char*)paddr, read_buffer, chunk_size);
             } else {
-                uint64_t round_addr = addr & (int)-PAGE_SIZE;
-
-                // Map pages
-                page_alloc += paging_map_range(
-                            round_addr, PAGE_SIZE,
-                            page_alloc,
-                            page_flags, 1) << PAGE_SIZE_BIT;
-
-                paging_alias_range(address_window, round_addr, PAGE_SIZE,
+                paging_alias_range(address_window, page_vaddr, PAGE_SIZE << 1,
                                    PTE_PRESENT | PTE_WRITABLE);
-
-                ELF64_TRACE("Copying %d bytes to %llx", chunk_size, round_addr);
 
                 // Copy to alias region
                 // Add misalignment offset
-                copy_or_enter(address_window + (addr & PAGE_MASK),
+                copy_or_enter(address_window + page_ofs,
                               (uint32_t)read_buffer, chunk_size);
             }
 
-            addr += chunk_size;
+            paddr += chunk_size;
+            vaddr += chunk_size;
 
             progress_bar_draw(20, 10, 70,
                               100 * (double)done_bytes / (double)total_bytes);

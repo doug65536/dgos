@@ -2,7 +2,7 @@
 #include "bios_data.h"
 
 struct bootinfo_data_t {
-    uint32_t mp_entry_addr;
+    uint32_t ap_entry_addr;
     uint32_t vbe_info_addr;
     uint32_t bootdev_info_addr;
 };
@@ -18,7 +18,7 @@ uintptr_t bootinfo_parameter(bootparam_t param)
 
     switch (param) {
     case bootparam_t::ap_entry_point:
-        return data->mp_entry_addr;
+        return data->ap_entry_addr;
 
     case bootparam_t::boot_device:
         return data->bootdev_info_addr;

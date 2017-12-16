@@ -669,7 +669,8 @@ C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
 #define USBXHCI_PORTHLPMC_L1TO \
     (USBXHCI_PORTHLPMC_L1TO_MASK<<USBXHCI_PORTHLPMC_L1TO_BIT)
 
-// RWS Best Effort Service Latency Deep, n=how long to drive resume on exit from U2
+// RWS Best Effort Service Latency Deep,
+// n=how long to drive resume on exit from U2
 #define USBXHCI_PORTHLPMC_BESLD_MASK    ((1U<<USBXHCI_PORTHLPMC_BESLD_BITS)-1)
 #define USBXHCI_PORTHLPMC_BESLD_n(n)    ((n)<<USBXHCI_PORTHLPMC_BESLD_BIT)
 #define USBXHCI_PORTHLPMC_BESLD \
@@ -2186,18 +2187,11 @@ void usbxhci_detect(void *arg)
 
         memset(self, 0, sizeof(*self));
 
-        self->irq_range.base = pci_iter.config.irq_line;
-        self->irq_range.count = 1;
+        self->use_msi = pci_try_msi_irq(pci_iter, &self->irq_range,
+                                        1, false, 1, usbxhci_irq_handler);
 
-        self->use_msi = pci_set_msi_irq(
-                    pci_iter.bus, pci_iter.slot, pci_iter.func,
-                    &self->irq_range, 1, 0, 1, usbxhci_irq_handler);
-
-        if (!self->use_msi) {
-            // Fall back to pin based IRQ
-            irq_hook(self->irq_range.base, usbxhci_irq_handler);
-            irq_setmask(self->irq_range.base, 1);
-        }
+        USBXHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
+                   self->use_msi, self->irq_range.base, self->irq_range.count);
 
         self->mmio_addr = (pci_iter.config.base_addr[0] & -16) |
                 ((uint64_t)pci_iter.config.base_addr[1] << 32);

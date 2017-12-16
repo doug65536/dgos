@@ -4,10 +4,10 @@ ZLIBBUILDROOT = $(EXTERNDIR)/zlib-src
 ZLIBSOURCEDIR = $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)
 ZLIBGZFILE = zlib-$(ZLIBVER).tar.gz
 ZLIBURL = http://zlib.net/$(ZLIBGZFILE)
-ZLIBCFLAGS = -O3 -mcmodel=kernel -fno-pie \
+ZLIBCFLAGS = -O3 -mcmodel=kernel -fno-pic -fno-pie \
 	-mno-red-zone -msse -msse2 -fno-exceptions \
 	-fno-common -fno-stack-protector -fbuiltin \
-	-fno-asynchronous-unwind-tables
+	-fno-asynchronous-unwind-tables -ffreestanding
 
 EXTERNINCLUDEDIR = $(EXTERNDIR)/include
 ZLIBINCLUDEDIR = $(EXTERNINCLUDEDIR)/zlib
@@ -39,7 +39,9 @@ $(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES) $(ZLIBHEADERSOURCES):
 		( \
 			cd $(@D) && \
 			echo Configuring zlib && \
-			CFLAGS="$(ZLIBCFLAGS)" CXX=$(CXX) CC=$(CC) $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)/configure $(ZLIBCONFIGUREFLAGS) && \
+			CFLAGS="$(ZLIBCFLAGS)" CXX=$(CXX) CC=$(CC) \
+			$(ZLIBBUILDROOT)/zlib-$(ZLIBVER)/configure \
+			$(ZLIBCONFIGUREFLAGS) && \
 			echo Invoking $(ZLIBMAKE) $(ZLIBLIBNAME) && \
 			$(ZLIBMAKE) $(ZLIBLIBNAME) \
 		) && \

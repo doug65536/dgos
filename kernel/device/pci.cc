@@ -405,9 +405,38 @@ int pci_find_capability(int bus, int slot, int func,
                 pci_enum_capabilities_match, capability_id);
 }
 
+bool pci_try_msi_irq(pci_dev_t const& pci_dev,
+                     pci_irq_range_t *irq_range,
+                     int cpu, bool distribute, int multiple,
+                     intr_handler_t handler)
+{
+    // Assume we can't use MSI at first, prepare to use pin interrupt
+    irq_range->base = pci_dev.config.irq_line;
+    irq_range->count = 1;
+
+    bool use_msi = pci_set_msi_irq(
+                pci_dev.bus, pci_dev.slot, pci_dev.func,
+                irq_range, cpu, distribute, multiple, handler);
+
+    if (!use_msi) {
+        // Plain IRQ pin
+        pci_set_irq_pin(pci_dev.bus, pci_dev.slot,
+                        pci_dev.func,
+                        pci_dev.config.irq_pin);
+        pci_set_irq_line(pci_dev.bus, pci_dev.slot,
+                         pci_dev.func,
+                         pci_dev.config.irq_line);
+
+        irq_hook(pci_dev.config.irq_line, handler);
+        irq_setmask(pci_dev.config.irq_line, true);
+    }
+
+    return use_msi;
+}
+
 bool pci_set_msi_irq(int bus, int slot, int func,
                     pci_irq_range_t *irq_range,
-                    int cpu, int distribute, int multiple,
+                    int cpu, bool distribute, int multiple,
                     intr_handler_t handler)
 {
     // Look for the MSI extended capability
@@ -516,6 +545,12 @@ static void pci_adj_bits_16(int bus, int slot, int func,
                              &new_reg, sizeof(new_reg));
         }
     }
+}
+
+void pci_adj_control_bits(pci_dev_t const& pci_dev,
+                          uint16_t set, uint16_t clr)
+{
+    pci_adj_control_bits(pci_dev.bus, pci_dev.slot, pci_dev.func, set, clr);
 }
 
 void pci_adj_control_bits(int bus, int slot, int func,

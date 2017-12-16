@@ -36,7 +36,7 @@ static __always_inline void far_zero(far_ptr_t dest, uint16_t paragraphs)
 }
 
 static __always_inline void far_copy(far_ptr_t dest,
-              far_ptr_t src, uint16_t size)
+              far_ptr_t src, size_t size)
 {
     void *dest_addr = far_to_ptr(dest);
     void *src_addr = far_to_ptr(src);

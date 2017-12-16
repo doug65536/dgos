@@ -2,6 +2,6 @@
 
 #include "types.h"
 
-extern char const mp_entry[];
-extern uint32_t const mp_entry_size;
-extern uint32_t mp_entry_vector;
+extern char const ap_entry[];
+extern size_t const ap_entry_size;
+extern uintptr_t ap_entry_vector;

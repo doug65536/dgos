@@ -85,7 +85,7 @@ static Elf64_Sym const *modload_lookup_in_module(
 module_entry_fn_t modload_load(char const *path)
 {
     file_t fd = file_open(path, O_RDONLY);
-    
+
     if (!fd.is_open()) {
         printdbg("Failed to open module \"%s\"\n", path);
         return 0;
@@ -330,8 +330,9 @@ module_entry_fn_t modload_load(char const *path)
                 case R_AMD64_64:
                     *(uint64_t*)fixup_addr =
                             (internal
-                             ? (uint64_t)module + scn_hdrs[sym->st_shndx].sh_addr
-                             : ((uint64_t)module +
+                             ? uint64_t(module) +
+                               scn_hdrs[sym->st_shndx].sh_addr
+                             : (uint64_t(module) +
                                 scn_hdrs[match->st_shndx].sh_addr)) +
                             r->r_addend + match->st_value;
                     break;

@@ -13,7 +13,7 @@
 struct iso9660_factory_t : public fs_factory_t {
 public:
     iso9660_factory_t() : fs_factory_t("iso9660") {}
-    fs_base_t *mount(fs_init_info_t *conn);
+    fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
 static iso9660_factory_t iso9660_factory;
@@ -110,7 +110,7 @@ struct iso9660_fs_t : public fs_base_t {
     int mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
                          bool read, bool flush);
 
-    iso9660_fs_t *mount(fs_init_info_t *conn);
+    bool mount(fs_init_info_t *conn);
 
     storage_dev_base_t *drive;
 
@@ -526,12 +526,16 @@ fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
     if (iso9660_mounts.empty())
         pool_create(&iso9660_handles, sizeof(iso9660_fs_t::handle_t), 512);
 
-    iso9660_fs_t *self = new iso9660_fs_t;
-    iso9660_mounts.push_back(self);
-    return self->mount(conn);
+    unique_ptr<iso9660_fs_t> self(new iso9660_fs_t);
+    if (self->mount(conn)) {
+        iso9660_mounts.push_back(self);
+        return self.release();
+    }
+
+    return nullptr;
 }
 
-iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
+bool iso9660_fs_t::mount(fs_init_info_t *conn)
 {
     drive = conn->drive;
 
@@ -551,9 +555,12 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
 
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {
         // Read logical block 16
-        drive->read_blocks(&pvd,
+        int err = drive->read_blocks(&pvd,
                     1 << block_size,
                     (16 + ofs) << block_shift);
+
+        if (err < 0)
+            continue;
 
         if (pvd.type_code == 2) {
             // Prefer joliet pvd
@@ -568,8 +575,11 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
 
     if (best_ofs == 0) {
         // We didn't find Joliet PVD, reread first one
-        drive->read_blocks(&pvd, 1 << block_size,
+        int err = drive->read_blocks(&pvd, 1 << block_size,
                            16 << block_shift);
+
+        if (err < 0)
+            return false;
     }
 
     root_lba = dirent_lba(&pvd.root_dirent);
@@ -584,8 +594,12 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
     pt = (iso9660_pt_rec_t *)mmap(
                 0, pt_alloc_size, PROT_READ | PROT_WRITE,
                 MAP_POPULATE, -1, 0);
+    if (pt == MAP_FAILED)
+        return false;
 
-    drive->read_blocks(pt, pt_alloc_size >> sector_shift, pt_lba);
+    int err = drive->read_blocks(pt, pt_alloc_size >> sector_shift, pt_lba);
+    if (err < 0)
+        return false;
 
     // Count the path table entries
     pt_count = walk_pt(0, 0);
@@ -594,6 +608,8 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
     pt_ptrs = (iso9660_pt_rec_t **)mmap(
                 0, sizeof(*pt_ptrs) * pt_count,
                 PROT_READ | PROT_WRITE, 0, -1, 0);
+    if (pt_ptrs == MAP_FAILED)
+        return false;
 
     // Populate path table entry pointer array
     walk_pt(&iso9660_fs_t::pt_fill, this);
@@ -604,8 +620,10 @@ iso9660_fs_t *iso9660_fs_t::mount(fs_init_info_t *conn)
     mm_dev = (char*)mmap_register_device(
                 this, block_size, conn->part_len,
                 PROT_READ, mm_fault_handler);
+    if (!mm_dev)
+        return false;
 
-    return this;
+    return true;
 }
 
 void iso9660_fs_t::unmount()

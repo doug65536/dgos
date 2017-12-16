@@ -1,3 +1,4 @@
+#if 0
 #include "zlib_helper.h"
 #include "zlib/zlib.h"
 #include "string.h"
@@ -21,3 +22,4 @@ void zlib_free(void *opaque, void *p)
     (void)opaque;
     free(p);
 }
+#endif

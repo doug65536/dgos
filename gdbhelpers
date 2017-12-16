@@ -1,0 +1,9 @@
+define startupbreakpoints
+	set scheduler-locking step
+	set range-stepping off
+	thbreak entry
+	commands
+		b cpu_debug_break
+		b unhandled_exception_handler
+	end
+end

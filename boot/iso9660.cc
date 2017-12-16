@@ -134,7 +134,8 @@ struct iso9660_pvd_t {
 
     char unused[1];
 
-    // The name of the system that can act upon sectors 0x00-0x0F for the volume.
+    // The name of the system that can act
+    // upon sectors 0x00-0x0F for the volume.
     char system_id[32];
 
     char volume_id[32];

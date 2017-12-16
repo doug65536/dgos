@@ -10,7 +10,10 @@ static __always_inline void atomic_barrier(void)
 }
 
 // Technically not atomic but needed in cmpxchg loops
-#define pause() __builtin_ia32_pause()
+static __always_inline void pause()
+{
+    __builtin_ia32_pause();
+}
 
 #define atomic_fence() __atomic_thread_fence(__ATOMIC_SEQ_CST)
 #define atomic_lfence() __atomic_thread_fence(__ATOMIC_ACQUIRE)

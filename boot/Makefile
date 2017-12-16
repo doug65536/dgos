@@ -34,7 +34,8 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 $(shell mkdir -p $(DUMPDIR) >/dev/null)
 
-CXX_IS_CLANG := $(shell ($(CXX) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
+CXX_IS_CLANG := \
+	$(shell ($(CXX) -v 2>&1 | head -n 1 | grep clang > /dev/null) && echo 1)
 
 GDB := gdb
 SED := sed

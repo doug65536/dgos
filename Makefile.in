@@ -15,6 +15,7 @@
 @SET_MAKE@
 
 
+
 VPATH = @srcdir@
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
@@ -101,7 +102,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
-	$(am__configure_deps) $(am__DIST_COMMON)
+	$(am__configure_deps) $(libc_a_HEADERS) $(am__DIST_COMMON)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
@@ -144,6 +145,7 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 libbootsect_a_OBJECTS = $(am_libbootsect_a_OBJECTS)
 libc_a_AR = $(AR) $(ARFLAGS)
 libc_a_LIBADD =
+am__objects_1 =
 am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/string/libc_a-strsignal.$(OBJEXT) \
 	libc/src/string/libc_a-strcoll_l.$(OBJEXT) \
@@ -180,7 +182,7 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/string/libc_a-strxfrm_l.$(OBJEXT) \
 	libc/src/string/libc_a-strncmp.$(OBJEXT) \
 	libc/src/stdlib/libc_a-_Exit.$(OBJEXT) \
-	libc/src/sys/syscall.$(OBJEXT)
+	libc/src/sys/syscall.$(OBJEXT) $(am__objects_1)
 libc_a_OBJECTS = $(am_libc_a_OBJECTS)
 libkernel_avx_a_AR = $(AR) $(ARFLAGS)
 libkernel_avx_a_LIBADD =
@@ -198,10 +200,10 @@ libmbr_a_AR = $(AR) $(ARFLAGS)
 libmbr_a_LIBADD =
 am_libmbr_a_OBJECTS = mbr/libmbr_a-mbr.$(OBJEXT)
 libmbr_a_OBJECTS = $(am_libmbr_a_OBJECTS)
-am__installdirs = "$(DESTDIR)$(bindir)"
+am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libc_adir)"
 PROGRAMS = $(bin_PROGRAMS)
-am__objects_1 = boot/bootfat_bin-bootfat.$(OBJEXT)
-am_bootfat_bin_OBJECTS = $(am__objects_1)
+am__objects_2 = boot/bootfat_bin-bootfat.$(OBJEXT)
+am_bootfat_bin_OBJECTS = $(am__objects_2)
 bootfat_bin_OBJECTS = $(am_bootfat_bin_OBJECTS)
 bootfat_bin_DEPENDENCIES = libbootsect.a
 bootfat_bin_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -211,8 +213,8 @@ bootfat_elf_OBJECTS = $(am_bootfat_elf_OBJECTS)
 bootfat_elf_DEPENDENCIES = libbootsect.a
 bootfat_elf_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootfat_elf_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_2 = boot/bootiso_bin-bootiso.$(OBJEXT)
-am_bootiso_bin_OBJECTS = $(am__objects_2)
+am__objects_3 = boot/bootiso_bin-bootiso.$(OBJEXT)
+am_bootiso_bin_OBJECTS = $(am__objects_3)
 bootiso_bin_OBJECTS = $(am_bootiso_bin_OBJECTS)
 bootiso_bin_DEPENDENCIES = libbootsect.a
 bootiso_bin_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -222,7 +224,7 @@ bootiso_elf_OBJECTS = $(am_bootiso_elf_OBJECTS)
 bootiso_elf_DEPENDENCIES = libbootsect.a
 bootiso_elf_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootiso_elf_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_3 = kernel/arch/x86_64/kernel_avx2-entry.$(OBJEXT) \
+am__objects_4 = kernel/arch/x86_64/kernel_avx2-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_avx2-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_avx2-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_avx2-syscall.$(OBJEXT) \
@@ -328,12 +330,14 @@ am__objects_3 = kernel/arch/x86_64/kernel_avx2-entry.$(OBJEXT) \
 	kernel/syscall/kernel_avx2-syscall_helper.$(OBJEXT) \
 	kernel/syscall/kernel_avx2-fd.$(OBJEXT) \
 	kernel/syscall/kernel_avx2-mem.$(OBJEXT)
-am_kernel_avx2_OBJECTS = $(am__objects_3)
+am_kernel_avx2_OBJECTS = $(am__objects_4)
 kernel_avx2_OBJECTS = $(am_kernel_avx2_OBJECTS)
-kernel_avx2_DEPENDENCIES = $(KERNEL_LDADD_SHARED)
+am__DEPENDENCIES_1 = libkernel-sse41.a libkernel-avx.a \
+	libkernel-avx512.a
+kernel_avx2_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_avx2_LINK = $(CXXLD) $(kernel_avx2_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_avx2_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
+am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-syscall.$(OBJEXT) \
@@ -439,12 +443,12 @@ am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/syscall/kernel_generic-syscall_helper.$(OBJEXT) \
 	kernel/syscall/kernel_generic-fd.$(OBJEXT) \
 	kernel/syscall/kernel_generic-mem.$(OBJEXT)
-am_kernel_generic_OBJECTS = $(am__objects_4)
+am_kernel_generic_OBJECTS = $(am__objects_5)
 kernel_generic_OBJECTS = $(am_kernel_generic_OBJECTS)
-kernel_generic_DEPENDENCIES = $(KERNEL_LDADD_SHARED)
+kernel_generic_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_generic_LINK = $(CXXLD) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_generic_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_5 = kernel/arch/x86_64/kernel_sse4-entry.$(OBJEXT) \
+am__objects_6 = kernel/arch/x86_64/kernel_sse4-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_sse4-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_sse4-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_sse4-syscall.$(OBJEXT) \
@@ -550,9 +554,9 @@ am__objects_5 = kernel/arch/x86_64/kernel_sse4-entry.$(OBJEXT) \
 	kernel/syscall/kernel_sse4-syscall_helper.$(OBJEXT) \
 	kernel/syscall/kernel_sse4-fd.$(OBJEXT) \
 	kernel/syscall/kernel_sse4-mem.$(OBJEXT)
-am_kernel_sse4_OBJECTS = $(am__objects_5)
+am_kernel_sse4_OBJECTS = $(am__objects_6)
 kernel_sse4_OBJECTS = $(am_kernel_sse4_OBJECTS)
-kernel_sse4_DEPENDENCIES = $(KERNEL_LDADD_SHARED)
+kernel_sse4_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_sse4_LINK = $(CXXLD) $(kernel_sse4_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_sse4_LDFLAGS) $(LDFLAGS) -o $@
 am_mbr_bin_OBJECTS = mbr/mbr_bin-empty.$(OBJEXT)
@@ -640,6 +644,34 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
+am__vpath_adj = case $$p in \
+    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+    *) f=$$p;; \
+  esac;
+am__strip_dir = f=`echo $$p | sed -e 's|^.*/||'`;
+am__install_max = 40
+am__nobase_strip_setup = \
+  srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*|]/\\\\&/g'`
+am__nobase_strip = \
+  for p in $$list; do echo "$$p"; done | sed -e "s|$$srcdirstrip/||"
+am__nobase_list = $(am__nobase_strip_setup); \
+  for p in $$list; do echo "$$p $$p"; done | \
+  sed "s| $$srcdirstrip/| |;"' / .*\//!s/ .*/ ./; s,\( .*\)/[^/]*$$,\1,' | \
+  $(AWK) 'BEGIN { files["."] = "" } { files[$$2] = files[$$2] " " $$1; \
+    if (++n[$$2] == $(am__install_max)) \
+      { print $$2, files[$$2]; n[$$2] = 0; files[$$2] = "" } } \
+    END { for (dir in files) print dir, files[dir] }'
+am__base_list = \
+  sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
+  sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
+am__uninstall_files_from_dir = { \
+  test -z "$$files" \
+    || { test ! -d "$$dir" && test ! -f "$$dir" && test ! -r "$$dir"; } \
+    || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
+         $(am__cd) "$$dir" && rm -f $$files; }; \
+  }
+HEADERS = $(libc_a_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
 # and print each of them once, without duplicates.  Input order is
@@ -662,7 +694,7 @@ CTAGS = ctags
 CSCOPE = cscope
 AM_RECURSIVE_TARGETS = cscope
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/diskfat.mk \
-	$(srcdir)/diskiso.mk $(srcdir)/symbols.mk $(srcdir)/zlib.mk \
+	$(srcdir)/diskiso.mk $(srcdir)/symbols.mk \
 	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
 	$(top_srcdir)/build-aux/config.sub \
@@ -691,6 +723,9 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
+AM_AR = @AM_AR@
+AM_CC = @AM_CC@
+AM_CXX = @AM_CXX@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AM_RANLIB = @AM_RANLIB@
 AR = @AR@
@@ -747,7 +782,9 @@ NO_COMMON_FLAGS = @NO_COMMON_FLAGS@
 NO_EXCEPTIONS_FLAGS = @NO_EXCEPTIONS_FLAGS@
 NO_PIC_FLAGS = @NO_PIC_FLAGS@
 NO_REDZONE_FLAGS = @NO_REDZONE_FLAGS@
+NO_RTTI_FLAGS = @NO_RTTI_FLAGS@
 NO_STACKPROTECTOR_FLAGS = @NO_STACKPROTECTOR_FLAGS@
+NO_STACK_CHECK_FLAGS = @NO_STACK_CHECK_FLAGS@
 NO_UNWIND_TABLES_FLAGS = @NO_UNWIND_TABLES_FLAGS@
 OBJEXT = @OBJEXT@
 OPTIMIZE_SIZE_FLAGS = @OPTIMIZE_SIZE_FLAGS@
@@ -766,6 +803,7 @@ REGPARM_FLAGS = @REGPARM_FLAGS@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SMALLEST_CODE_FLAGS = @SMALLEST_CODE_FLAGS@
+STACK_CHECK_FLAGS = @STACK_CHECK_FLAGS@
 STRIP = @STRIP@
 VECTORIZE_FLAGS = @VECTORIZE_FLAGS@
 VERSION = @VERSION@
@@ -825,9 +863,10 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 DUMPDIR = $(top_builddir)/dump
+
+#$(ZLIBSTATICLIB) \
+#$(ZLIBPUBLICINCLUDES)
 BUILT_SOURCES = \
-	$(ZLIBSTATICLIB) \
-	$(ZLIBPUBLICINCLUDES) \
 	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
 	generated_headers
@@ -965,7 +1004,7 @@ libbootsect_a_SOURCES = \
 	boot/driveinfo.cc \
 	boot/debug.cc \
 	boot/part.s \
-	boot/mpentry.s \
+	boot/mpentry.S \
 	boot/exception.s \
 	boot/part.h \
 	boot/vesainfo.h \
@@ -1003,7 +1042,9 @@ libbootsect_a_CXXFLAGS = \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
 	-ffreestanding \
-	$(NO_STACKPROTECTOR_FLAGS) $(NO_EXCEPTIONS_FLAGS) -fno-rtti \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	-mrtd -mregparm=3 \
@@ -1011,6 +1052,8 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+
+#	$(NO_STACK_CHECK_FLAGS)
 libbootsect_a_CFLAGS = \
 	-m32 \
 	$(REAL_MODE_FLAGS) \
@@ -1019,7 +1062,8 @@ libbootsect_a_CFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	-ffreestanding \
-	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) -fno-rtti \
+	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) \
+	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	-std=c++14 \
@@ -1198,6 +1242,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/functional.h \
 	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/memory.h \
+	kernel/lib/cc/numeric.h \
 	kernel/lib/cc/type_traits.h \
 	kernel/lib/cc/utility.h \
 	kernel/lib/cc/vector.h \
@@ -1412,11 +1457,11 @@ KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__=0x00000001 \
 	-std=c++14 \
 	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
+	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	-fno-rtti \
-	-msse -msse2 -fverbose-asm \
+	$(NO_RTTI_FLAGS) \
 	-fvisibility=default \
 	-export-dynamic \
 	-ffreestanding \
@@ -1441,6 +1486,9 @@ KERNEL_LDFLAGS_SHARED = \
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
 
+
+#$(ZLIBSTATICLIB) \
+#$(ZLIBPUBLICINCLUDES)
 libkernel_sse41_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) -msse4.1
 
@@ -1508,44 +1556,8 @@ EXTRA_kernel_avx2_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
 # ----------------------------------------------------------------------------
 # libc
-libc_a_SOURCES = \
-	libc/src/string/__bytebitmap.cc \
-	libc/src/string/strsignal.cc \
-	libc/src/string/strcoll_l.cc \
-	libc/src/string/strerror.cc \
-	libc/src/string/strlen.cc \
-	libc/src/string/strdup.cc \
-	libc/src/string/strtok.cc \
-	libc/src/string/strnlen.cc \
-	libc/src/string/strcpy.cc \
-	libc/src/string/strcmp.cc \
-	libc/src/string/memset.cc \
-	libc/src/string/strndup.cc \
-	libc/src/string/strcspn.cc \
-	libc/src/string/memcmp.cc \
-	libc/src/string/strrchr.cc \
-	libc/src/string/strpbrk.cc \
-	libc/src/string/memcpy.cc \
-	libc/src/string/stpncpy.cc \
-	libc/src/string/strtok_r.cc \
-	libc/src/string/stpcpy.cc \
-	libc/src/string/memccpy.cc \
-	libc/src/string/strcat.cc \
-	libc/src/string/strchr.cc \
-	libc/src/string/strncpy.cc \
-	libc/src/string/strncat.cc \
-	libc/src/string/strstr.cc \
-	libc/src/string/memmove.cc \
-	libc/src/string/strspn.cc \
-	libc/src/string/strcoll.cc \
-	libc/src/string/strerror_r.cc \
-	libc/src/string/strerror_l.cc \
-	libc/src/string/strxfrm.cc \
-	libc/src/string/memchr.cc \
-	libc/src/string/strxfrm_l.cc \
-	libc/src/string/strncmp.cc \
-	libc/src/stdlib/_Exit.cc \
-	libc/src/sys/syscall.s \
+libc_adir = $(includedir)/wtfadir
+libc_a_HEADERS = \
 	libc/include/termios.h \
 	libc/include/complex.h \
 	libc/include/regex.h \
@@ -1624,6 +1636,46 @@ libc_a_SOURCES = \
 	libc/include/langinfo.h \
 	libc/include/locale.h
 
+libc_a_SOURCES = \
+	libc/src/string/__bytebitmap.cc \
+	libc/src/string/strsignal.cc \
+	libc/src/string/strcoll_l.cc \
+	libc/src/string/strerror.cc \
+	libc/src/string/strlen.cc \
+	libc/src/string/strdup.cc \
+	libc/src/string/strtok.cc \
+	libc/src/string/strnlen.cc \
+	libc/src/string/strcpy.cc \
+	libc/src/string/strcmp.cc \
+	libc/src/string/memset.cc \
+	libc/src/string/strndup.cc \
+	libc/src/string/strcspn.cc \
+	libc/src/string/memcmp.cc \
+	libc/src/string/strrchr.cc \
+	libc/src/string/strpbrk.cc \
+	libc/src/string/memcpy.cc \
+	libc/src/string/stpncpy.cc \
+	libc/src/string/strtok_r.cc \
+	libc/src/string/stpcpy.cc \
+	libc/src/string/memccpy.cc \
+	libc/src/string/strcat.cc \
+	libc/src/string/strchr.cc \
+	libc/src/string/strncpy.cc \
+	libc/src/string/strncat.cc \
+	libc/src/string/strstr.cc \
+	libc/src/string/memmove.cc \
+	libc/src/string/strspn.cc \
+	libc/src/string/strcoll.cc \
+	libc/src/string/strerror_r.cc \
+	libc/src/string/strerror_l.cc \
+	libc/src/string/strxfrm.cc \
+	libc/src/string/memchr.cc \
+	libc/src/string/strxfrm_l.cc \
+	libc/src/string/strncmp.cc \
+	libc/src/stdlib/_Exit.cc \
+	libc/src/sys/syscall.s \
+	$(libc_a_HEADERS)
+
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
@@ -1649,29 +1701,6 @@ LIBC_CXXFLAGS = \
 	-I$(top_builddir) \
 	-L$(top_builddir)
 
-EXTERNDIR = $(abs_top_builddir)/extern
-ZLIBVER = 1.2.11
-ZLIBBUILDROOT = $(EXTERNDIR)/zlib-src
-ZLIBSOURCEDIR = $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)
-ZLIBGZFILE = zlib-$(ZLIBVER).tar.gz
-ZLIBURL = http://zlib.net/$(ZLIBGZFILE)
-ZLIBCFLAGS = -O3 -mcmodel=kernel -fno-pie \
-	-mno-red-zone -msse -msse2 -fno-exceptions \
-	-fno-common -fno-stack-protector -fbuiltin \
-	-fno-asynchronous-unwind-tables
-
-EXTERNINCLUDEDIR = $(EXTERNDIR)/include
-ZLIBINCLUDEDIR = $(EXTERNINCLUDEDIR)/zlib
-ZLIBHEADERS = zlib.h zconf.h
-ZLIBHEADERSOURCES = $(ZLIBSOURCEDIR)/zlib.h $(ZLIBSOURCEDIR)/zconf.h
-ZLIBPUBLICINCLUDES = $(ZLIBINCLUDEDIR)/zlib.h $(ZLIBINCLUDEDIR)/zconf.h
-ZLIBCONFIGURE = $(ZLIBSOURCEDIR)/configure
-ZLIBBUILDDIR = $(EXTERNDIR)/zlib-src/build
-ZLIBLIBNAME = libz.a
-ZLIBSTATICLIB = $(ZLIBBUILDDIR)/$(ZLIBLIBNAME)
-ZLIBCONFIGUREFLAGS = --64 --static
-ZLIBMAKEFILE = $(ZLIBBUILDDIR)/Makefile
-ZLIBMAKE = $(MAKE)
 
 # ----------------------------------------------------------------------------
 # Build musl
@@ -1706,7 +1735,7 @@ QEMU = qemu-system-x86_64
 QEMU_CPUS = 8
 QEMU_CORES = 4
 QEMU_THREADS = 1
-QEMU_CPU = host,migratable=false,host-cache-info=true
+QEMU_CPU = max,migratable=false,host-cache-info=true
 QEMU_RAM = 5G
 QEMU_USB = -device nec-usb-xhci \
 	-device usb-kbd \
@@ -1720,10 +1749,8 @@ QEMU_NET = \
 	-net dump,file="$(DUMPDIR)/netdump"
 
 QEMU_MONITOR = \
-	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait
+	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
 
-
-#,telnet
 QEMU_DEBUGCON = \
 	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
 	-mon qemu-monitor,mode=readline \
@@ -1751,7 +1778,7 @@ QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme = \
 	-machine q35 \
 	-device nvme,drive=nvmedrv,serial=42424242 \
-	-boot menu=on
+	-boot order=c,menu=on
 
 QEMU_HDCTL_DEV_ahci = -machine q35
 QEMU_HDCTL_DEV_ide = -machine pc
@@ -1765,7 +1792,7 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu kvm64
+QEMU_EMU_tcg = -cpu max
 #-cpu EPYC
 
 #QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom
@@ -1781,7 +1808,7 @@ all: $(BUILT_SOURCES)
 .SUFFIXES: .S .cc .o .obj .s
 am--refresh: Makefile
 	@:
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/zlib.mk $(srcdir)/symbols.mk $(srcdir)/diskfat.mk $(srcdir)/diskiso.mk $(am__configure_deps)
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/symbols.mk $(srcdir)/diskfat.mk $(srcdir)/diskiso.mk $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -1803,7 +1830,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $@ $(am__depfiles_maybe);; \
 	esac;
-$(srcdir)/zlib.mk $(srcdir)/symbols.mk $(srcdir)/diskfat.mk $(srcdir)/diskiso.mk $(am__empty):
+$(srcdir)/symbols.mk $(srcdir)/diskfat.mk $(srcdir)/diskiso.mk $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	$(SHELL) ./config.status --recheck
@@ -3065,6 +3092,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-fs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-iso9660.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-malloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-mpentry.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-paging.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-physmem.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-progressbar.Po@am__quote@
@@ -3460,6 +3488,20 @@ boot/libbootsect_a-bioscall.obj: boot/bioscall.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bioscall.S' object='boot/libbootsect_a-bioscall.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bioscall.obj `if test -f 'boot/bioscall.S'; then $(CYGPATH_W) 'boot/bioscall.S'; else $(CYGPATH_W) '$(srcdir)/boot/bioscall.S'; fi`
+
+boot/libbootsect_a-mpentry.o: boot/mpentry.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-mpentry.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-mpentry.Tpo -c -o boot/libbootsect_a-mpentry.o `test -f 'boot/mpentry.S' || echo '$(srcdir)/'`boot/mpentry.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-mpentry.Tpo boot/$(DEPDIR)/libbootsect_a-mpentry.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry.S' object='boot/libbootsect_a-mpentry.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-mpentry.o `test -f 'boot/mpentry.S' || echo '$(srcdir)/'`boot/mpentry.S
+
+boot/libbootsect_a-mpentry.obj: boot/mpentry.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-mpentry.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-mpentry.Tpo -c -o boot/libbootsect_a-mpentry.obj `if test -f 'boot/mpentry.S'; then $(CYGPATH_W) 'boot/mpentry.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-mpentry.Tpo boot/$(DEPDIR)/libbootsect_a-mpentry.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry.S' object='boot/libbootsect_a-mpentry.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-mpentry.obj `if test -f 'boot/mpentry.S'; then $(CYGPATH_W) 'boot/mpentry.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry.S'; fi`
 
 kernel/arch/x86_64/kernel_avx2-entry.o: kernel/arch/x86_64/entry.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_avx2_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/kernel_avx2-entry.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_avx2-entry.Tpo -c -o kernel/arch/x86_64/kernel_avx2-entry.o `test -f 'kernel/arch/x86_64/entry.S' || echo '$(srcdir)/'`kernel/arch/x86_64/entry.S
@@ -8751,12 +8793,6 @@ boot/libbootsect_a-part.o: boot/part.s
 boot/libbootsect_a-part.obj: boot/part.s
 	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-part.obj `if test -f 'boot/part.s'; then $(CYGPATH_W) 'boot/part.s'; else $(CYGPATH_W) '$(srcdir)/boot/part.s'; fi`
 
-boot/libbootsect_a-mpentry.o: boot/mpentry.s
-	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-mpentry.o `test -f 'boot/mpentry.s' || echo '$(srcdir)/'`boot/mpentry.s
-
-boot/libbootsect_a-mpentry.obj: boot/mpentry.s
-	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-mpentry.obj `if test -f 'boot/mpentry.s'; then $(CYGPATH_W) 'boot/mpentry.s'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry.s'; fi`
-
 boot/libbootsect_a-exception.o: boot/exception.s
 	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-exception.o `test -f 'boot/exception.s' || echo '$(srcdir)/'`boot/exception.s
 
@@ -8810,6 +8846,27 @@ kernel/arch/x86_64/cpu/kernel_sse4-except_asm.o: kernel/arch/x86_64/cpu/except_a
 
 kernel/arch/x86_64/cpu/kernel_sse4-except_asm.obj: kernel/arch/x86_64/cpu/except_asm.s
 	$(AM_V_CCAS)$(CCAS) $(kernel_sse4_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_sse4-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.s'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.s'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.s'; fi`
+install-libc_aHEADERS: $(libc_a_HEADERS)
+	@$(NORMAL_INSTALL)
+	@list='$(libc_a_HEADERS)'; test -n "$(libc_adir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(libc_adir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(libc_adir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(libc_adir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(libc_adir)" || exit $$?; \
+	done
+
+uninstall-libc_aHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(libc_a_HEADERS)'; test -n "$(libc_adir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(libc_adir)'; $(am__uninstall_files_from_dir)
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -9036,9 +9093,9 @@ distcleancheck: distclean
 check-am: all-am
 check: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) check-am
-all-am: Makefile $(LIBRARIES) $(PROGRAMS)
+all-am: Makefile $(LIBRARIES) $(PROGRAMS) $(HEADERS)
 installdirs:
-	for dir in "$(DESTDIR)$(bindir)"; do \
+	for dir in "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libc_adir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: $(BUILT_SOURCES)
@@ -9125,7 +9182,7 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-libc_aHEADERS
 
 install-dvi: install-dvi-am
 
@@ -9172,7 +9229,7 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-binPROGRAMS
+uninstall-am: uninstall-binPROGRAMS uninstall-libc_aHEADERS
 
 .MAKE: all check install install-am install-strip
 
@@ -9186,18 +9243,17 @@ uninstall-am: uninstall-binPROGRAMS
 	html-am info info-am install install-am install-binPROGRAMS \
 	install-data install-data-am install-dvi install-dvi-am \
 	install-exec install-exec-am install-html install-html-am \
-	install-info install-info-am install-man install-pdf \
-	install-pdf-am install-ps install-ps-am install-strip \
-	installcheck installcheck-am installdirs maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic pdf pdf-am ps ps-am tags tags-am uninstall \
-	uninstall-am uninstall-binPROGRAMS
+	install-info install-info-am install-libc_aHEADERS install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	maintainer-clean maintainer-clean-generic mostlyclean \
+	mostlyclean-compile mostlyclean-generic pdf pdf-am ps ps-am \
+	tags tags-am uninstall uninstall-am uninstall-binPROGRAMS \
+	uninstall-libc_aHEADERS
 
 .PRECIOUS: Makefile
 
-	$(DUMPDIR) \
-	$(ZLIBSTATICLIB) \
-	$(ZLIBPUBLICINCLUDES)
+	$(DUMPDIR)
 	$(KERNEL_INCLUDES_SHARED)
 
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
@@ -9239,31 +9295,6 @@ test: test_compile
 
 $(DUMPDIR):
 	mkdir -p $(top_builddir)/dump
-
-# Make zlib
-$(ZLIBSTATICLIB) $(ZLIBPUBLICINCLUDES) $(ZLIBHEADERSOURCES):
-	echo top build dir $(abs_top_builddir)
-	echo Downloading zlib
-	mkdir -p $(ZLIBBUILDROOT)
-	curl -o $(ZLIBBUILDROOT)/zlib.tar.gz $(ZLIBURL)
-	echo Extracting zlib
-	(cd $(ZLIBBUILDROOT) && tar -xzvf zlib.tar.gz)
-	echo Building zlib
-	mkdir -p $(@D)
-	mkdir -p $(ZLIBINCLUDEDIR)
-	+( \
-		( \
-			cd $(@D) && \
-			echo Configuring zlib && \
-			CFLAGS="$(ZLIBCFLAGS)" CXX=$(CXX) CC=$(CC) $(ZLIBBUILDROOT)/zlib-$(ZLIBVER)/configure $(ZLIBCONFIGUREFLAGS) && \
-			echo Invoking $(ZLIBMAKE) $(ZLIBLIBNAME) && \
-			$(ZLIBMAKE) $(ZLIBLIBNAME) \
-		) && \
-		mkdir -p $(ZLIBINCLUDEDIR) && \
-		for i in $(ZLIBHEADERS); do \
-			cp $(ZLIBSOURCEDIR)/$$i $(ZLIBINCLUDEDIR)/$$i;\
-		done \
-	)
 OBJDUMP ?= objdump
 GREP ?= grep
 SED ?= sed
@@ -9379,6 +9410,8 @@ isodisk.img: bootiso-bin \
 		-r -J \
 		$(top_builddir)/iso_stage
 
+#include zlib.mk
+
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
@@ -9413,7 +9446,8 @@ distclean-local:
 generated_headers: \
 	$(top_srcdir)/kernel/device/nvmebits.h \
 	$(top_srcdir)/kernel/device/pcibits.h \
-	$(top_srcdir)/kernel/device/i350bits.h
+	$(top_srcdir)/kernel/device/i350bits.h \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h
 
 .PHONY: generated_headers
 
@@ -9433,6 +9467,13 @@ $(top_srcdir)/kernel/device/pcibits.h: \
 
 $(top_srcdir)/kernel/device/i350bits.h: \
 		$(top_srcdir)/kernel/device/i350.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
+		$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"

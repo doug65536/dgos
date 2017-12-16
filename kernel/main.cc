@@ -20,8 +20,8 @@
 #include "elf64.h"
 #include "fileio.h"
 #include "bootdev.h"
-#include "zlib/zlib.h"
-#include "zlib_helper.h"
+//#include "zlib/zlib.h"
+//#include "zlib_helper.h"
 #include "stdlib.h"
 #include "png.h"
 #include "framebuffer.h"
@@ -30,7 +30,7 @@
 #include "unique_ptr.h"
 #include "priorityqueue.h"
 #include "device/serial-uart.h"
-
+#include "numeric_limits.h"
 #include "vector.h"
 
 size_t constexpr kernel_stack_size = 16384;
@@ -55,8 +55,8 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   0
-#define ENABLE_SLEEP_THREAD         0
+#define ENABLE_READ_STRESS_THREAD   1
+#define ENABLE_SLEEP_THREAD         16
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
@@ -65,7 +65,7 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
 
-#define ENABLE_STRESS_HEAP_SMALL    0
+#define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
 
@@ -107,7 +107,7 @@ static int shell_thread(void *p)
             printk("%c", event.codepoint);
     }
 
-    //printk("From shell thread!! %016lx", (uint64_t)p);
+    //printk("From shell thread!! %16lx", (uint64_t)p);
     //
 
     return 0;
@@ -126,7 +126,7 @@ static int read_stress(void *p)
     (void)p;
     thread_t tid = thread_get_id();
 
-    storage_dev_base_t *drive = open_storage_dev(0);
+    storage_dev_base_t *drive = open_storage_dev(1);
 
     if (!drive)
         return 0;
@@ -198,11 +198,13 @@ static int other_thread(void *p)
 {
     test_thread_param_t *tp = (test_thread_param_t *)p;
     while (1) {
-        int odd = ++(*tp->p) & 1;
+        int odd = ++(*tp->p);
         if (tp->sleep)
             thread_sleep_for(tp->sleep);
-        else
-            thread_set_affinity(thread_get_id(), 1 << odd);
+        //else
+
+        thread_set_affinity(thread_get_id(),
+                            (1UL << (odd % thread_get_cpu_count())));
     }
     return 0;
 }
@@ -537,6 +539,8 @@ static int register_check(void *p)
         "jmp 0b\n\t"
         "0:\n\t"
         "ud2\n\t"
+        "call cpu_debug_break\n\t"
+        "jmp 0b\n\t"
         :
         : "a" (p)
     );
@@ -596,7 +600,7 @@ static int stress_heap_thread(void *p)
             int count = 0;
             int size;
             uint64_t overall = cpu_rdtsc();
-            for (count = 0; count < 0x1000; ++count) {
+            for (count = 0; count < 0x100000; ++count) {
                 size = rand_r_range(&seed, STRESS_HEAP_MINSIZE,
                                     STRESS_HEAP_MAXSIZE);
 
@@ -778,9 +782,11 @@ static int init_thread(void *p)
     for (int n = 0; n < 1000; ++n) {
         char name[16];
         snprintf(name, sizeof(name), "created_%d", n);
+        printk("creating %s\n", name);
         int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
         file_write(create_test, "Hello!", 6);
         file_close(create_test);
+        printk(" created %s\n\n", name);
     }
 #endif
 

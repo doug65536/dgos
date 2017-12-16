@@ -36,8 +36,8 @@ clear_bss:
 
 .section .bootinfo
 
-.globl mp_entry_vector
-mp_entry_vector:
+.globl ap_entry_vector
+ap_entry_vector:
 	.int 0
 
 .globl vbe_info_vector

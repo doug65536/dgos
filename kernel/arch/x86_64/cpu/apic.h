@@ -20,6 +20,8 @@ int apic_enable(void);
 bool ioapic_irq_cpu(int irq, int cpu);
 
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
-                       int cpu, int distribute, intr_handler_t handler);
+                       int cpu, bool distribute, intr_handler_t handler);
 
 int acpi_have8259pic(void);
+
+extern "C" isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx);

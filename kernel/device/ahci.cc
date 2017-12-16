@@ -1230,7 +1230,7 @@ STORAGE_REGISTER_FACTORY(ahci_if);
 // AHCI interface instance
 class ahci_if_t : public storage_if_base_t {
 public:
-    void init(pci_dev_iterator_t const &pci_iter);
+    bool init(pci_dev_t const &pci_dev);
 
     unsigned io(unsigned port_num, slot_request_t &request);
 
@@ -1636,12 +1636,16 @@ void ahci_if_t::configure_ncq(unsigned port_num, bool enable,
     }
 }
 
-void ahci_if_t::init(pci_dev_iterator_t const &pci_iter)
+bool ahci_if_t::init(pci_dev_t const& pci_dev)
 {
-    config = pci_iter.config;
+    config = pci_dev.config;
+
+    // Enable MMIO and bus master, disable port I/O
+    pci_adj_control_bits(pci_dev, PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
+                         PCI_CMD_IOEN);
 
     mmio_base = (hba_host_ctl_t*)
-            mmap((void*)(uintptr_t)pci_iter.config.base_addr[5],
+            mmap((void*)(uintptr_t)pci_dev.config.base_addr[5],
             0x1100, PROT_READ | PROT_WRITE,
             MAP_PHYSICAL, -1, 0);
 
@@ -1654,6 +1658,25 @@ void ahci_if_t::init(pci_dev_iterator_t const &pci_iter)
     // Cache implemented port bitmask
     ports_impl_mask = mmio_base->ports_impl_mask;
 
+    // Reset the HBA
+    AHCI_TRACE("Resetting HBA\n");
+    mmio_base->host_ctl |= AHCI_HC_HC_HR;
+
+    uint64_t reset_st = time_ns();
+    uint64_t reset_en = reset_st + 500000000;
+    uint64_t now = reset_st;
+
+    while ((mmio_base->host_ctl & AHCI_HC_HC_HR) &&
+           (now = time_ns()) < reset_en)
+        pause();
+
+    if (now >= reset_en) {
+        AHCI_TRACE("HBA reset timeout!\n");
+        return false;
+    }
+
+    AHCI_TRACE("Reset complete in %lu ns\n", now - reset_st);
+
     // Cache number of command slots per port
     num_cmd_slots = 1 + ((mmio_base->cap >>
                           AHCI_HC_CAP_NCS_BIT) &
@@ -1664,21 +1687,14 @@ void ahci_if_t::init(pci_dev_iterator_t const &pci_iter)
 
     rebase();
 
-    // Assume legacy IRQ pin usage until MSI succeeds
-    irq_range.base = pci_iter.config.irq_line;
-    irq_range.count = 1;
-
     // Try to use MSI IRQ
-    use_msi = pci_set_msi_irq(
-                pci_iter.bus, pci_iter.slot, pci_iter.func,
-                &irq_range, 1, 0, 0,
-                &ahci_if_t::irq_handler);
+    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 1, false, 0,
+                              &ahci_if_t::irq_handler);
 
-    if (!use_msi) {
-        // Fall back to pin based IRQ
-        irq_hook(irq_range.base, &ahci_if_t::irq_handler);
-        irq_setmask(irq_range.base, 1);
-    }
+    AHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
+               use_msi, irq_range.base, irq_range.count);
+
+    return true;
 }
 
 unsigned ahci_if_t::io(unsigned port_num, slot_request_t &request)
@@ -2129,9 +2145,10 @@ if_list_t ahci_if_factory_t::detect(void)
         //sleep(3000);
 
         if (ahci_count < countof(ahci_devices)) {
-            ahci_if_t *self = ahci_devices + ahci_count++;
+            ahci_if_t *self = ahci_devices + ahci_count;
 
-            self->init(pci_iter);
+            if (self->init(pci_iter))
+                ++ahci_count;
         }
     } while (pci_enumerate_next(&pci_iter));
 
