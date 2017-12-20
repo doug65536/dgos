@@ -194,5 +194,5 @@ void pic8259_enable(void)
     irq_setmask_set_handler(pic8259_setmask);
     irq_hook_set_handler(pic8259_hook);
     irq_unhook_set_handler(pic8259_unhook);
-    cpu_irq_enable();
+    //cpu_irq_enable();
 }
