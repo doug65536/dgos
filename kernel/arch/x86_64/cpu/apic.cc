@@ -2309,6 +2309,9 @@ static void ioapic_set_flags(mp_ioapic_t *ioapic,
 
 isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
+    assert(intr >= 0);
+    assert(intr < 256);
+
     isr_context_t *orig_ctx = ctx;
 
     uint8_t irq = intr_to_irq[intr];
