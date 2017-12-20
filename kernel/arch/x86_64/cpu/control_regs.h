@@ -375,6 +375,15 @@ static __always_inline void cpu_set_tr(uint16_t tr)
     );
 }
 
+static __always_inline void cpu_set_ldt(uint16_t ldt)
+{
+    __asm__ __volatile__ (
+        "lldt %w[ldt]\n\t"
+        :
+        : [ldt] "r" (ldt)
+    );
+}
+
 static __always_inline void *cpu_get_stack_ptr(void)
 {
     void *rsp;

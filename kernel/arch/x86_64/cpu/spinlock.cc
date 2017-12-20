@@ -132,12 +132,12 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock, int expect)
 {
     atomic_barrier();
 
-    int own_bit30 = 0;
+    bool own_bit30 = false;
 
     for (rwspinlock_t old_value = *lock; ; pause()) {
         rwspinlock_t upd_value;
 
-        if (!own_bit30) {
+        if (unlikely(!own_bit30)) {
             //
             // We haven't locked out readers yet
 
@@ -152,7 +152,7 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock, int expect)
                         lock, old_value, old_value | (1<<30));
 
                 if (upd_value == old_value)
-                    own_bit30 = 1;
+                    own_bit30 = true;
 
                 old_value = upd_value;
                 continue;

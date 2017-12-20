@@ -215,10 +215,10 @@ int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
 
     blocking_iocp_t block;
     errno_t err = read_async(data, count, lba, block);
-    if (err != errno_t::OK)
+    if (unlikely(err != errno_t::OK))
         return -int64_t(err);
     err = block.wait();
-    if (err != errno_t::OK)
+    if (unlikely(err != errno_t::OK))
         return -int64_t(err);
     return count;
 }
@@ -229,7 +229,7 @@ int storage_dev_base_t::write_blocks(
     blocking_iocp_t block;
     errno_t err = write_async(data, count, lba, fua, block);
     err = block.wait();
-    if (err != errno_t::OK)
+    if (unlikely(err != errno_t::OK))
         return -int64_t(err);
     return count;
 }
@@ -238,7 +238,7 @@ int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
     blocking_iocp_t block;
     errno_t err = trim_async(count, lba, block);
     err = block.wait();
-    if (err != errno_t::OK)
+    if (unlikely(err != errno_t::OK))
         return -int64_t(err);
     return count;
 }
@@ -248,7 +248,7 @@ int storage_dev_base_t::flush()
     blocking_iocp_t block;
     errno_t err = flush_async(block);
     err = block.wait();
-    if (err != errno_t::OK)
+    if (unlikely(err != errno_t::OK))
         return -int64_t(err);
     return 0;
 }

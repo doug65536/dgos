@@ -1,3 +1,4 @@
+test/test.S
 shell/grammar.y
 shell/lemon_highlight.xml
 shell/Makefile

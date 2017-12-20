@@ -1309,6 +1309,8 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 #define USBXHCI_CTL_TRB_TRT_OUT     2
 #define USBXHCI_CTL_TRB_TRT_IN      3
 
+#define USBXHCI_CTL_TRB_TRT_SLOTID_n(n) ((n) << 8)
+
 //
 // Doorbells
 
@@ -1640,7 +1642,10 @@ static void usbxhci_get_descriptor_handler(
 
     init_data->inpctx = inp;
 
-    ctlctx->add_bits = (1 << 0);
+    // 4.3.3 Device slot initialization to initialize the
+    // slot context and endpoint 0 context
+    // Set A0 and A1
+    ctlctx->add_bits = (1 << 0);// | (1 << 1);
 
     inpslotctx[0] = *ctx;
     inpepctx[0] = *ep;
@@ -1648,18 +1653,19 @@ static void usbxhci_get_descriptor_handler(
     // Issue evaluate context command
     usbxhci_ctl_trb_evalctx_t *eval = (usbxhci_ctl_trb_evalctx_t *)
             calloc(1, sizeof(*eval));
-    eval->trb_type = USBXHCI_TRB_TYPE_EVALCTXCMD;
-    eval->input_ctx_ptr = mphysaddr(eval);
+    eval->trb_type = USBXHCI_TRB_TYPE_EVALCTXCMD << 2;
+    eval->trt = USBXHCI_CTL_TRB_TRT_SLOTID_n(init_data->slotid);
+    eval->input_ctx_ptr = mphysaddr(inp.any);
     eval->flags = self->endpoints[init_data->slotid]->ccs;
-    //usbxhci_issue_cmd(self, eval,
-    //                  usbxhci_get_descriptor_handler, uintptr_t(init_data));
-    //usbxhci_ring_doorbell(self, 0, 0, 0);
+    usbxhci_issue_cmd(self, eval,
+                      usbxhci_get_descriptor_handler, uintptr_t(init_data));
+    usbxhci_ring_doorbell(self, 0, 0, 0);
 
-    //free(init_data->trbs);
-    //init_data->trbs = usbxhci_get_config(
-    //            self, init_data->cfg_desc, sizeof(init_data->cfg_desc),
-    //            init_data->slotid,
-    //            usbxhci_get_descriptor_handler, (uintptr_t)init_data);
+    free(init_data->trbs);
+    init_data->trbs = usbxhci_get_config(
+                self, init_data->cfg_desc, sizeof(init_data->cfg_desc),
+                init_data->slotid,
+                usbxhci_get_descriptor_handler, (uintptr_t)init_data);
 
     (void)cmd;
 }
@@ -1839,8 +1845,8 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
     memset(&setaddr, 0, sizeof(setaddr));
     setaddr.input_ctx_physaddr = mphysaddr(inp.any);
     setaddr.cycle = self->pcs;
-    setaddr.trb_type = USBXHCI_CMD_TRB_TYPE_n(
-                USBXHCI_TRB_TYPE_ADDRDEVCMD);
+    setaddr.trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_ADDRDEVCMD);
+
     setaddr.slotid = evt->slotid;
     usbxhci_issue_cmd(self, &setaddr,
                       usbxhci_cmd_comp_setaddr, (uintptr_t)init_data);

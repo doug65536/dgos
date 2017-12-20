@@ -44,15 +44,14 @@ bin_PROGRAMS = \
 	bootiso-bin \
 	kernel-generic \
 	kernel-sse4 \
-	kernel-avx2
+	kernel-avx2 \
+	user-shell
 
 KERNEL_SSE4_FLAGS = \
 	-msse -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2
 
 KERNEL_AVX2_FLAGS = \
 	$(KERNEL_SSE4_FLAGS) -mavx -mavx2 -msse2avx
-
-#user-hello
 
 # libmbr.a
 
@@ -597,8 +596,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/types.h \
 	kernel/syscall/syscall_helper.h \
 	kernel/syscall/syscall_helper.cc \
-	kernel/syscall/fd.cc \
-	kernel/syscall/mem.cc
+	kernel/syscall/sys_fd.cc \
+	kernel/syscall/sys_mem.cc \
+	kernel/syscall/sys_time.cc
 
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/kernel \
@@ -606,8 +606,7 @@ KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/kernel/net \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
-	-I$(top_srcdir)/kernel/arch/x86_64 \
-	-I$(EXTERNINCLUDEDIR)
+	-I$(top_srcdir)/kernel/arch/x86_64
 
 KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__=0x00000001 \
@@ -899,6 +898,9 @@ test: test_compile
 # ----------------------------------------------------------------------------
 # User programs
 
+user_shell_SOURCES = \
+	user/test/test.S
+
 #user_hello_SOURCES =
 
 # ----------------------------------------------------------------------------
@@ -984,7 +986,9 @@ $(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
 
 MUSL_BUILDDIR = $(abs_top_builddir)/musl-build
 MUSL_INSTDIR = $(abs_top_builddir)/musl-install
-MUSL_CFLAGS = $(NO_REDZONE_FLAGS) $(NO_UNWIND_TABLES_FLAGS) -mtune=znver1
+MUSL_CFLAGS = \
+	$(NO_REDZONE_FLAGS) \
+	$(NO_UNWIND_TABLES_FLAGS)
 MUSL_ARCH = x86_64
 
 MUSL_SRCDIR = $(abs_top_srcdir)/musl
@@ -1085,9 +1089,8 @@ QEMU_COMMON = \
 	$(QEMU_NET) \
 	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
-	$(QEMU_FLAGS)
-
-#$(QEMU_USB)
+	$(QEMU_FLAGS) \
+	$(QEMU_USB)
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s

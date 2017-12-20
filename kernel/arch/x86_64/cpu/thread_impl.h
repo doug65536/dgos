@@ -46,3 +46,5 @@ static __always_inline process_t *fast_cur_process()
     void *thread_info = cpu_gs_read_ptr(CPU_INFO_CURTHREAD_OFS);
     return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);
 }
+
+void thread_set_process(int thread, process_t *process);

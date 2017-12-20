@@ -44,195 +44,139 @@ AS_VAR_IF(CACHEVAR,yes,
 AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
-AX_CHECK_COMPILE_FLAG([-Wall -Wextra -Wpedantic -Werror],
-	[COMPILER_WERROR="-Wall -Wextra -Wpedantic -Werror"],
-	[COMPILER_WERROR=""])
+COMPILER_WERROR=
+for flag in Wall Wextra Wpedantic Werror; do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[COMPILER_WERROR+=" -$flag"])
+done
 
-AX_CHECK_COMPILE_FLAG([-ggdb],
-	[COMPILER_FLAGS+=" -ggdb"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-fno-integrated-as],
-	[COMPILER_FLAGS+=" -fno-integrated-as"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wno-unused-command-line-argument],
-	[COMPILER_FLAGS+=" -Wno-unused-command-line-argument"],
-	[], [$COMPILER_WERROR])
-
-AX_CHECK_COMPILE_FLAG([-Wa,-g],
-	[COMPILER_FLAGS+=" -Wa,-g"],
-	[], [$COMPILER_WERROR])
-
-AX_CHECK_COMPILE_FLAG([-Wall],
-	[COMPILER_FLAGS+=" -Wall"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wextra],
-	[COMPILER_FLAGS+=" -Wextra"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wpedantic],
-	[COMPILER_FLAGS+=" -Wpedantic"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wdouble-promotion],
-	[COMPILER_FLAGS+=" -Wdouble-promotion"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wformat],
-	[COMPILER_FLAGS+=" -Wformat"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wfloat-equal],
-	[COMPILER_FLAGS+=" -Wfloat-equal"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wundef],
-	[COMPILER_FLAGS+=" -Wundef"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wwrite-strings],
-	[COMPILER_FLAGS+=" -Wwrite-strings"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wredundant-decls],
-	[COMPILER_FLAGS+=" -Wredundant-decls"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wno-shadow],
-	[COMPILER_FLAGS+=" -Wno-shadow"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wno-strict-overflow],
-	[COMPILER_FLAGS+=" -Wno-strict-overflow"],
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wno-overlength-strings],
-	[COMPILER_FLAGS+=" -Wno-overlength-strings"],
-	[], [$COMPILER_WERROR])
-
+COMPILER_FLAGS=
+for flag in \
+		ggdb fno-integrated-as Wno-unused-command-line-argument \
+		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
+		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
+		Wno-shadow Wno-strict-overflow Wno-overlength-strings
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[COMPILER_FLAGS+=" -$flag"],
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([COMPILER_FLAGS])
 
+SMALLEST_CODE_FLAGS=
 AX_CHECK_COMPILE_FLAG([-Oz],
 	[SMALLEST_CODE_FLAGS=-Oz],
 	[AX_CHECK_COMPILE_FLAG([-Os],
 		[SMALLEST_CODE_FLAGS=-Os],
 		[$COMPILER_WERROR])],
 	[$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-falign-loops=0],
-	[SMALLEST_CODE_FLAGS+=" -falign-loops=0"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-falign-functions=0],
-	[SMALLEST_CODE_FLAGS+=" -falign-functions=0"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-falign-labels=0],
-	[SMALLEST_CODE_FLAGS+=" -falign-labels=0"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-falign-jumps=0],
-	[SMALLEST_CODE_FLAGS+=" -falign-jumps=0"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mno-align-stringops],
-	[SMALLEST_CODE_FLAGS+=" -mno-align-stringops"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-Wno-ignored-optimization-argument],
-	[SMALLEST_CODE_FLAGS+=" -Wno-ignored-optimization-argument"]
-	[], [$COMPILER_WERROR])
-
+for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
+		mno-align-stringops Wno-ignored-optimization-argument
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[SMALLEST_CODE_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([SMALLEST_CODE_FLAGS])
 
-AX_CHECK_COMPILE_FLAG([-m32],
-	[REAL_MODE_FLAGS+=" -m32"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mno-sse],
-	[REAL_MODE_FLAGS+=" -mno-sse"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mno-sse2],
-	[REAL_MODE_FLAGS+=" -mno-sse2"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mno-avx],
-	[REAL_MODE_FLAGS+=" -mno-avx"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mno-avx2],
-	[REAL_MODE_FLAGS+=" -mno-avx2"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mfpmath=387],
-	[REAL_MODE_FLAGS+=" -mfpmath=387"]
-	[], [$COMPILER_WERROR])
-
+REAL_MODE_FLAGS=
+for flag in m32 mno-sse mno-sse2 mno-avx mno-avx2 mfpmath=387
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[REAL_MODE_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([REAL_MODE_FLAGS])
 
-AX_CHECK_COMPILE_FLAG([-mrtd],
-	[REGPARM_FLAGS+=" -mrtd"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-mregparm=3],
-	[REGPARM_FLAGS+=" -mregparm=3"]
-	[], [$COMPILER_WERROR])
-
+REGPARM_FLAGS=
+for flag in mrtd mregparm=3
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[REGPARM_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([REGPARM_FLAGS])
 
-AX_CHECK_COMPILE_FLAG([-fno-pie],
-	[NO_PIC_FLAGS+=" -fno-pie"]
-	[], [$COMPILER_WERROR])
-AX_CHECK_COMPILE_FLAG([-fno-pic],
-	[NO_PIC_FLAGS+=" -fno-pic"]
-	[], [$COMPILER_WERROR])
-
+NO_PIC_FLAGS=
+for flag in fno-pie fno-pic
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[NO_PIC_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([NO_PIC_FLAGS])
 
 DISABLE_FRAMEPOINTER_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
 	[DISABLE_FRAMEPOINTER_FLAGS=" -fomit-frame-pointer"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([DISABLE_FRAMEPOINTER_FLAGS])
 
 ENABLE_FRAMEPOINTER_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],
 	[ENABLE_FRAMEPOINTER_FLAGS=" -fno-omit-frame-pointer"]
 	[], [$COMPILER_WERROR])
+AC_SUBST([ENABLE_FRAMEPOINTER_FLAGS])
 
+NO_REDZONE_FLAGS=
 AX_CHECK_COMPILE_FLAG([-mno-red-zone],
 	[NO_REDZONE_FLAGS=" -mno-red-zone"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_REDZONE_FLAGS])
 
+NO_STACKPROTECTOR_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-stack-protector],
 	[NO_STACKPROTECTOR_FLAGS=" -fno-stack-protector"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_STACKPROTECTOR_FLAGS])
 
+STACK_CHECK_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fstack-check],
 	[STACK_CHECK_FLAGS=" -fstack-check"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([STACK_CHECK_FLAGS])
 
+NO_STACK_CHECK_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-stack-check],
 	[NO_STACK_CHECK_FLAGS=" -fno-stack-check"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_STACK_CHECK_FLAGS])
 
+NO_RTTI_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-rtti],
 	[NO_RTTI_FLAGS=" -fno-rtti"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_RTTI_FLAGS])
 
+NO_UNWIND_TABLES_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-asynchronous-unwind-tables],
 	[NO_UNWIND_TABLES_FLAGS=" -fno-asynchronous-unwind-tables"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_UNWIND_TABLES_FLAGS])
 
+NO_EXCEPTIONS_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-exceptions],
 	[NO_EXCEPTIONS_FLAGS=" -fno-exceptions"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_EXCEPTIONS_FLAGS])
 
+NO_COMMON_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-common],
 	[NO_COMMON_FLAGS=" -fno-common"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([NO_COMMON_FLAGS])
 
-
+VECTORIZE_FLAGS=
 AX_CHECK_COMPILE_FLAG([-ftree-vectorize],
 	[VECTORIZE_FLAGS=" -ftree-vectorize"]
 	[], [$COMPILER_WERROR])
-
 AC_SUBST([VECTORIZE_FLAGS])
+
+TUNE_FLAGS=
+AX_CHECK_COMPILE_FLAG([-mtune=znver1],
+	[TUNE_FLAGS=" -mtune=znver1"]
+	[], [$COMPILER_WERROR])
+AC_SUBST([TUNE_FLAGS])
 
 AC_ARG_ENABLE(optimize,
 	AS_HELP_STRING([--enable-optimize], [Enable size/speed optimizations]),
@@ -240,6 +184,7 @@ AC_ARG_ENABLE(optimize,
 		echo Enabling optimizations
 		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
 		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS+=" $TUNE_FLAGS"
 	],[
 		echo Disabling optimizations
 		OPTIMIZE_SIZE_FLAGS="-O0 $ENABLE_FRAMEPOINTER_FLAGS"

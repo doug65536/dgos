@@ -177,7 +177,15 @@ struct tss_t {
 
     // entry 0 is rsp[0], rest are ist stacks
     void *stack[8];
+
+    uint8_t pad_to_256[256 - 176];
 };
+
+// Ensure no false sharing
+C_ASSERT_ISPO2((sizeof(tss_t) & 63) == 0);
+
+// Ensure no spanning page boundaries
+C_ASSERT(4096 % sizeof(tss_t) == 0);
 
 extern tss_t *tss_list;
 

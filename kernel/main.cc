@@ -32,6 +32,7 @@
 #include "device/serial-uart.h"
 #include "numeric_limits.h"
 #include "vector.h"
+#include "process.h"
 
 size_t constexpr kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size] __section(".bspstk");
@@ -54,9 +55,9 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   1
-#define ENABLE_SLEEP_THREAD         16
+#define ENABLE_SHELL_THREAD         0
+#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
@@ -652,8 +653,8 @@ int clks_unhalted(void *cpu)
     return 0;
 }
 
-//extern void usbxhci_detect(void*);
-//void (*usbxhci_pull_in)(void*) = usbxhci_detect;
+extern void usbxhci_detect(void*);
+void (*usbxhci_pull_in)(void*) = usbxhci_detect;
 
 static uint8_t sum_bytes(char *st, size_t len)
 {
@@ -769,6 +770,9 @@ static int init_thread(void *p)
 
     //bootdev_info(0, 0, 0);
 
+    pid_t pid = 0;
+    int spawn_result = process_t::spawn(&pid, "user-shell", nullptr, nullptr);
+
     fb_init();
 
     // Test specifying address to mmap
@@ -843,8 +847,8 @@ static int init_thread(void *p)
 
     //modload_init();
 
-    thread_create(find_vbe, (void*)0xC0000, 0, 0);
-    thread_create(find_vbe, (void*)0xF0000, 0, 0);
+    thread_create(find_vbe, (void*)0xC0000, 0, 0, false);
+    thread_create(find_vbe, (void*)0xF0000, 0, 0, false);
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
@@ -853,7 +857,7 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_SHELL_THREAD > 0
-    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0);
+    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0, false);
 #endif
 
 #if ENABLE_SLEEP_THREAD
@@ -914,7 +918,7 @@ static int init_thread(void *p)
 //    com1->write(input.data(), input.size(), input.size());
 
     for (size_t i = 0, e = thread_get_cpu_count(); i != e; ++i) {
-        thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0);
+        thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0, false);
         thread_set_affinity(tid, size_t(1) << i);
     }
 
@@ -923,7 +927,7 @@ static int init_thread(void *p)
 
 extern "C" int main(void)
 {
-    thread_create(init_thread, 0, 0, 0);
+    thread_create(init_thread, 0, 0, 0, false);
 
     thread_idle_set_ready();
 

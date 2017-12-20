@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "cpu/cpu_metrics.h"
+#include "process.h"
 
 /// Failure return value for memory mapping functions
 #define MAP_FAILED ((void*)-1)
@@ -99,8 +100,7 @@
 /// __flags, bitmask, MAP_*
 /// __fd, file descriptor, file backed mapping
 /// __offset, file pointer, position in file to start mapping
-void *mmap(
-        void *__addr,
+void *mmap(void *__addr,
         size_t __len,
         int __prot,
         int __flags,
@@ -250,7 +250,7 @@ size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
                          size_t count_limit, uint8_t log2_boundary);
 
 // Return true if the address is present
-int mpresent(uintptr_t addr, size_t size);
+bool mpresent(uintptr_t addr, size_t size);
 
 /// Lock all process address space in memory
 #define MCL_CURRENT
@@ -365,13 +365,13 @@ void *mmap_register_device(void *context,
 uintptr_t mm_alloc_contiguous(size_t size);
 void mm_free_contiguous(uintptr_t addr, size_t size);
 
-uintptr_t mm_new_process(void);
+uintptr_t mm_new_process(process_t *process);
 
 void *mmap_window(size_t size);
 void munmap_window(void *addr, size_t size);
 int alias_window(void *addr, size_t size,
                  mmphysrange_t const *ranges, size_t range_count);
 
-void mm_init_process();
+void mm_init_process(process_t *process);
 
 uintptr_t mm_fork_kernel_text();

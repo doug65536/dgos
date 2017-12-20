@@ -263,3 +263,5 @@ void pci_adj_control_bits(int bus, int slot, int func,
 
 void pci_clear_status_bits(int bus, int slot, int func,
                            uint16_t bits);
+
+char const * pci_device_class_text(uint8_t cls);

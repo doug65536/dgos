@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "printk.h"
 #include "assert.h"
+#include "callout.h"
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
@@ -64,12 +65,12 @@ static void gdt_set_tss_base(tss_t *base)
 {
     gdt_entry_combined_t gdt_ent_lo =
             GDT_MAKE_TSS_DESCRIPTOR(
-                (uintptr_t)&base->reserved0,
+                uintptr_t(&base->reserved0),
                 sizeof(*base)-1, 1, 0, 0);
 
     gdt_entry_combined_t gdt_ent_hi =
             GDT_MAKE_TSS_HIGH_DESCRIPTOR(
-                (uintptr_t)&base->reserved0);
+                uintptr_t(&base->reserved0));
 
     gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
     gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;
@@ -80,10 +81,11 @@ void gdt_init_tss(int cpu_count)
     tss_list = (tss_t*)mmap(0, sizeof(*tss_list) * cpu_count,
                            PROT_READ | PROT_WRITE,
                            MAP_POPULATE, -1, 0);
-    memset(tss_list, 0, sizeof(*tss_list) * cpu_count);
 
     for (int i = 0; i < cpu_count; ++i) {
-        for (int st = 0; st < 8; ++st) {
+        tss_t *tss = tss_list + i;
+
+        for (int st = 0; st < 3; ++st) {
             void *stack = mmap(0, TSS_STACK_SIZE,
                                PROT_READ | PROT_WRITE,
                                MAP_POPULATE, -1, 0);
@@ -91,15 +93,24 @@ void gdt_init_tss(int cpu_count)
             printdbg("Allocated IST cpu=%d slot=%d at %lx\n",
                      i, st, (uintptr_t)stack);
 
-            tss_list[i].stack[st] = stack;
+            tss->stack[st] = stack;
 
             if (st) {
-                tss_list[i].ist[st] = (uint64_t)stack + TSS_STACK_SIZE;
+                tss->ist[st] = (uint64_t)stack + TSS_STACK_SIZE;
             } else {
-                tss_list[i].rsp[0] = (uint64_t)stack + TSS_STACK_SIZE;
+                tss->rsp[0] = (uint64_t)stack + TSS_STACK_SIZE;
             }
+
+            tss->iomap_base = uint16_t(uintptr_t(tss + 1) - uintptr_t(tss));
+
+            assert(tss->reserved0 == 0);
+            assert(tss->reserved3 == 0);
+            assert(tss->reserved4 == 0);
+            assert(tss->reserved5 == 0);
         }
     }
+
+   callout_call(callout_type_t::tss_list_ready);
 }
 
 void gdt_load_tr(int cpu_number)

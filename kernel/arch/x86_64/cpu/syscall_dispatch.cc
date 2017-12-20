@@ -3,8 +3,9 @@
 #include "asm_constants.h"
 #include "assert.h"
 
-#include "syscall/fd.h"
-#include "syscall/mem.h"
+#include "syscall/sys_fd.h"
+#include "syscall/sys_mem.h"
+#include "syscall/sys_time.h"
 
 syscall_handler_t *syscall_handlers[314] = {
     (syscall_handler_t*)sys_read,
@@ -42,7 +43,7 @@ syscall_handler_t *syscall_handlers[314] = {
     (syscall_handler_t*)sys_dup,
     (syscall_handler_t*)sys_dup2,
     (syscall_handler_t*)0,//sys_pause,
-    (syscall_handler_t*)0,//sys_nanosleep,
+    (syscall_handler_t*)sys_nanosleep,
     (syscall_handler_t*)0,//sys_getitimer,
     (syscall_handler_t*)0,//sys_alarm,
     (syscall_handler_t*)0,//sys_setitimer,

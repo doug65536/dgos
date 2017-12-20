@@ -1,4 +1,4 @@
-#include "fd.h"
+#include "sys_fd.h"
 #include "process.h"
 #include "thread.h"
 #include "fileio.h"
@@ -27,52 +27,52 @@ static int badf_err()
 ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     ssize_t sz = file_read(id, bufaddr, count);
-    
+
     if (sz < 0)
         thread_set_error(errno_t(-sz));
-    
+
     return sz;
 }
 
 ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     if (uintptr_t(bufaddr) >= 0x800000000000)
         return err(errno_t::EFAULT);
-    
+
     if (!verify_accessible(bufaddr, count, false))
         return err(errno_t::EFAULT);
-    
+
     ssize_t sz = file_write(id, bufaddr, count);
-    
+
     if (sz >= 0)
         return sz;
-        
+
     return err(sz);
 }
 
 int sys_close(int fd)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int status = file_close(id);
     if (status != 0)
         return 0;
@@ -83,12 +83,12 @@ int sys_close(int fd)
 ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int sz = file_pread(id, bufaddr, count, ofs);
     if (sz >= 0)
         return sz;
@@ -96,16 +96,16 @@ ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
     return err(sz);
 }
 
-ssize_t sys_pwrite64(int fd, void const *bufaddr, 
+ssize_t sys_pwrite64(int fd, void const *bufaddr,
                      size_t count, off_t ofs)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int sz = file_pwrite(id, bufaddr, count, ofs);
     if (sz >= 0)
         return sz;
@@ -116,12 +116,12 @@ ssize_t sys_pwrite64(int fd, void const *bufaddr,
 off_t sys_lseek(int fd, off_t ofs, int whence)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int pos = file_seek(id, ofs, whence);
     if (pos >= 0)
         return pos;
@@ -132,12 +132,12 @@ off_t sys_lseek(int fd, off_t ofs, int whence)
 int sys_fsync(int fd)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int status = file_fsync(id);
     if (status >= 0)
         return status;
@@ -148,12 +148,12 @@ int sys_fsync(int fd)
 int sys_fdatasync(int fd)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int status = file_fdatasync(id);
     if (status >= 0)
         return status;
@@ -164,12 +164,12 @@ int sys_fdatasync(int fd)
 int sys_ftruncate(int fd, off_t size)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(fd);
-    
+
     if (unlikely(id < 0))
         return badf_err();
-    
+
     int status = file_ftruncate(id, size);
     if (status >= 0)
         return status;
@@ -180,42 +180,42 @@ int sys_ftruncate(int fd, off_t size)
 int sys_dup(int oldfd)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(oldfd);
-    
+
     int newfd = p->ids.desc_alloc.alloc();
-    
+
     if (file_ref_filetab(id)) {
         p->ids.ids[newfd] = id;
         return newfd;
     }
-    
+
     p->ids.desc_alloc.free(newfd);
-    
+
     return badf_err();
 }
 
 int sys_dup3(int oldfd, int newfd, int flags)
 {
     process_t *p = fast_cur_process();
-    
+
     int id = p->fd_to_id(oldfd);
-    
+
     int newid = p->fd_to_id(newfd);
-    
+
     if (newid >= 0)
         file_close(newid);
     else if (!p->ids.desc_alloc.take(newfd))
         return err(errno_t::EMFILE);
-    
-    
+
+
     if (likely(file_ref_filetab(id))) {
         p->ids.ids[newfd].set(id, flags);
         return newfd;
     }
-    
+
     p->ids.desc_alloc.free(newfd);
-    
+
     return badf_err();
 }
 
@@ -229,16 +229,16 @@ int sys_dup2(int oldfd, int newfd)
 int sys_open(char const* pathname, int flags, mode_t mode)
 {
     process_t *p = fast_cur_process();
-    
+
     int fd = p->ids.desc_alloc.alloc();
-    
+
     int id = file_open(pathname, flags, mode);
-    
+
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
         return fd;
     }
-    
+
     p->ids.desc_alloc.free(fd);
     return err(-id);
 }
@@ -246,16 +246,16 @@ int sys_open(char const* pathname, int flags, mode_t mode)
 int sys_creat(const char *path, mode_t mode)
 {
     process_t *p = fast_cur_process();
-    
+
     int fd = p->ids.desc_alloc.alloc();
-    
+
     int id = file_creat(path, mode);
-    
+
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
         return fd;
     }
-    
+
     p->ids.desc_alloc.free(fd);
     return err(-id);
 }
@@ -274,7 +274,7 @@ int sys_rename(const char *old_path, const char *new_path)
     if (likely(status >= 0))
         return status;
 
-    return err(status);    
+    return err(status);
 }
 
 int sys_mkdir(const char *path, mode_t mode)
@@ -340,16 +340,16 @@ int sys_fchown(int fd, int uid, int gid)
     return -int(errno_t::ENOSYS);
 }
 
-int sys_setxattr(const char *path, 
-                 const char *name, const char *value, 
+int sys_setxattr(const char *path,
+                 const char *name, const char *value,
                  size_t size, int flags)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
 
-int sys_getxattr(const char *path, 
-                 const char *name, char *value, 
+int sys_getxattr(const char *path,
+                 const char *name, char *value,
                  size_t size)
 {
     // FIXME: implement me
@@ -365,5 +365,5 @@ int sys_listxattr(const char *path, const char *list, size_t size)
 int sys_access(const char *path, int mask)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);    
+    return -int(errno_t::ENOSYS);
 }

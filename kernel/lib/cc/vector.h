@@ -103,7 +103,7 @@ public:
     size_type size() const;
     size_type max_size() const;
 
-    void reserve(size_type __new_cap);
+    bool reserve(size_type __new_cap);
     size_type capacity() const;
     void shrink_to_fit();
     void clear();
@@ -143,9 +143,9 @@ public:
 
     void pop_back();
 
-    void resize(size_type __count);
+    bool resize(size_type __count);
 
-    void resize(size_type __count,
+    bool resize(size_type __count,
                 value_type const& __value);
 
     void swap(vector& __other);
@@ -199,7 +199,7 @@ public:
     };
 
 private:
-    void __grow(size_t __amount = 1);
+    bool __grow(size_t __amount = 1);
     pointer __make_space(iterator __pos, size_t __count);
 
     pointer __m;
@@ -209,7 +209,7 @@ private:
 };
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::__grow(size_t __amount)
+bool vector<_T,_Allocator>::__grow(size_t __amount)
 {
     size_t __new_cap;
 
@@ -221,7 +221,7 @@ void vector<_T,_Allocator>::__grow(size_t __amount)
         __new_cap = __amount;
     }
 
-    reserve(__new_cap);
+    return reserve(__new_cap);
 }
 
 
@@ -606,12 +606,12 @@ vector<_T,_Allocator>::max_size() const
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::reserve(size_type __new_cap)
+bool vector<_T,_Allocator>::reserve(size_type __new_cap)
 {
     if (__capacity < __new_cap) {
         unique_ptr<value_type> new_p = __alloc.allocate(__new_cap);
         if (!new_p)
-            panic("Out of memory!");
+            return false;
         uninitialized_move(__m, __m + __sz, new_p.get());
         for (size_t i = 0; i < __sz; ++i)
             __m[i].~value_type();
@@ -620,6 +620,7 @@ void vector<_T,_Allocator>::reserve(size_type __new_cap)
         __m = new_p.release();
         __capacity = __new_cap;
     }
+    return true;
 }
 
 template<typename _T, typename _Allocator>
@@ -790,23 +791,25 @@ void vector<_T,_Allocator>::pop_back()
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::resize(size_type __count)
+bool vector<_T,_Allocator>::resize(size_type __count)
 {
-    resize(__count, value_type());
+    return resize(__count, value_type());
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::resize(size_type __count, value_type const& __value)
+bool vector<_T,_Allocator>::resize(size_type __count, value_type const& __value)
 {
     if (__sz > __count) {
         do {
             pop_back();
         } while (--__sz);
     } else {
-        reserve(__count);
+        if (unlikely(!reserve(__count)))
+            return false;
         fill_n(__m + __sz, __count - __sz, __value);
         __sz = __count;
     }
+    return true;
 }
 
 template<typename _T, typename _Allocator>

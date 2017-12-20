@@ -116,7 +116,7 @@ bsp_init:
     and $0x000FFFFF,%eax
     mov %rax,phys_mem_map
 
-    // Get IDT up asap
+    // Get IDT and TSS up asap
     call idt_gdt_tss_init
 
     // Save the CPU_MXCSR_MASK
@@ -260,15 +260,25 @@ idt_gdt_tss_init:
     //	uint8_t base_high;
 
     movq $init_tss,%rax
-    mov %ax,2+GDT_SEL_TSS+gdt
-    sar $16,%rax
-    mov %al,3+GDT_SEL_TSS+gdt
-    sar $8,%rax
-    mov %al,7+GDT_SEL_TSS+gdt
-    sar $8,%rax
-    movl %eax,8+GDT_SEL_TSS+gdt
-    movl $0,12+GDT_SEL_TSS+gdt
+    // Limit 15:0
+    movw $(init_tss_end - init_tss - 1),GDT_SEL_TSS+gdt
+    // Base 15:0
+    movw %ax,2+GDT_SEL_TSS+gdt
+    sarq $16,%rax
+    // Base 23:16
+    movb %al,4+GDT_SEL_TSS+gdt
+    sarq $8,%rax
+    // access
     movb $(GDT_ACCESS_PRESENT | GDT_TYPE_TSS),5+GDT_SEL_TSS+gdt
+    // Limit 19:16, flags
+    movb $0,6+GDT_SEL_TSS+gdt
+    // Base 21:24
+    movb %al,7+GDT_SEL_TSS+gdt
+    sarq $8,%rax
+    // Base 63:32
+    movl %eax,8+GDT_SEL_TSS+gdt
+    // Reserved
+    movl $0,12+GDT_SEL_TSS+gdt
 
     mov $GDT_SEL_TSS,%eax
     ltr %ax
@@ -278,35 +288,48 @@ idt_gdt_tss_init:
     pop %rbx
     ret
 
-.align 64
+.section .data
+
+.align 8
     // TSS layout is completely misaligned without nudging it up 4 bytes
     //  uint32_t dummy_align;
     .space 4
 init_tss:
     // TSS structure
     //  uint32_t reserved0;
+    .int 0
     //
     //  uint64_t rsp[3];
+    .quad 0
+    .quad 0
+    .quad 0
     //
+    // uint64_t reserved;
+    .quad 0
+
     //  uint64_t ist[8];
+    .quad kernel_stack-32768
+    .quad kernel_stack-32768
+    .space 6*8
     //
     //  uint32_t reserved3;
+    .int 0
     //  uint32_t reserved4;
+    .int 0
     //
     //  uint16_t reserved5;
+    .short 0
     //  uint16_t iomap_base;
+    .short init_tss_end-init_tss
     //  uint32_t dummy_align2;
+    .int 0
     //
     //  // entry 0 is rsp[0], rest are ist stacks
     //  void *stack[8];
-
-    .space 4+4+8*3
-    // Two IST entries for early bootstrap
-    .quad kernel_stack
-    .quad kernel_stack-32768
-    .space 6*8+4+4+2+2+4+8*8
+    .space 8*8
 init_tss_end:
 
+.section .text
 .align 16
 .global exit
 .hidden exit

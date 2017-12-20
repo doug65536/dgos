@@ -12,24 +12,31 @@
 #include "thread.h"
 #include "vector.h"
 #include "desc_alloc.h"
+#include "cpu/control_regs.h"
+#include "cpu/isr.h"
 
 union process_ptr_t {
     process_t *p;
     pid_t next;
+
+    process_ptr_t()
+        : p(nullptr)
+    {
+    }
 };
 
-static process_ptr_t *processes;
+static vector<process_ptr_t> processes;
 static size_t process_count;
 static spinlock processes_lock;
 static pid_t process_first_free;
 static pid_t process_last_free;
 
-static process_t *process_add_locked(unique_lock<spinlock> const&)
+process_t *process_t::add_locked(unique_lock<spinlock> const&)
 {
     pid_t pid;
     size_t realloc_count = 0;
 
-    process_t *process = (process_t*)calloc(1, sizeof(process_t));
+    process_t *process = new process_t;
     if (unlikely(!process))
         return 0;
 
@@ -51,15 +58,10 @@ static process_t *process_add_locked(unique_lock<spinlock> const&)
 
     if (realloc_count) {
         // Expand process list
-        process_ptr_t *new_processes = (process_ptr_t*)realloc(
-                    processes, sizeof(*processes) *
-                    (process_count + 1));
-        if (!new_processes) {
+        if (!processes.resize(realloc_count)) {
             free(process);
-            return 0;
+            return nullptr;
         }
-
-        processes = new_processes;
 
         if (unlikely(process_count == 2))
             processes[0].p = 0;
@@ -67,30 +69,34 @@ static process_t *process_add_locked(unique_lock<spinlock> const&)
     processes[pid].p = process;
     process->pid = pid;
 
+    process->state = state_t::starting;
+
     return process;
 }
 
-void process_remove(process_t *process)
+void process_t::remove()
 {
     if (process_last_free) {
-        processes[process_last_free].next = process->pid;
-        process_last_free = process->pid;
+        processes[process_last_free].next = pid;
+        process_last_free = pid;
     }
 }
 
-static process_t *process_add(void)
+process_t *process_t::add()
 {
     unique_lock<spinlock> lock(processes_lock);
-    process_t *result = process_add_locked(lock);
+    process_t *result = process_t::add_locked(lock);
     return result;
 }
 
-int process_spawn(pid_t * pid_result,
+int process_t::spawn(pid_t * pid_result,
                   char const * path,
                   char const * const * argv,
                   char const * const * envp)
 {
-    process_t *process = process_add();
+    *pid_result = -1;
+
+    process_t *process = process_t::add();
 
     process->path = strdup(path);
 
@@ -117,7 +123,27 @@ int process_spawn(pid_t * pid_result,
     // Return the assigned PID
     *pid_result = process->pid;
 
-    process->mmu_context = mm_new_process();
+    thread_create(&process_t::start, process, nullptr, 0, false);
+
+    unique_lock<spinlock> lock(process->process_lock);
+    while (process->state == process_t::state_t::starting)
+        process->cond.wait(lock);
+
+    return process->state == process_t::state_t::running
+            ? 0
+            : int(errno_t::EFAULT);
+}
+
+int process_t::start(void *process_arg)
+{
+    return ((process_t*)process_arg)->start();
+}
+
+int process_t::start()
+{
+    thread_set_process(-1, this);
+
+    mmu_context = mm_new_process(this);
 
     // Simply load it for now
     Elf64_Ehdr hdr;
@@ -143,8 +169,6 @@ int process_spawn(pid_t * pid_result,
                 hdr.e_phoff))
         return -1;
 
-    uintptr_t top_addr;
-
     for (Elf64_Phdr& ph : program_hdrs) {
         // If it is not readable, writable or executable, ignore
         if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
@@ -161,8 +185,8 @@ int process_spawn(pid_t * pid_result,
 
         if (ph.p_flags & PF_R)
             page_prot |= PROT_READ;
-        if (ph.p_flags & PF_W)
-            page_prot |= PROT_WRITE;
+        // Unconditionally writable until loaded
+        page_prot |= PROT_WRITE;
         if (ph.p_flags & PF_X)
             page_prot |= PROT_EXEC;
 
@@ -182,30 +206,53 @@ int process_spawn(pid_t * pid_result,
         }
     }
 
+    // Make read only pages read only
+    for (Elf64_Phdr& ph : program_hdrs) {
+        int page_prot = 0;
+
+        // Ignore the region if it should be writable
+        if (ph.p_flags & PF_W)
+            continue;
+
+        if (ph.p_flags & PF_R)
+            page_prot |= PROT_READ;
+        if (ph.p_flags & PF_X)
+            page_prot |= PROT_EXEC;
+
+        mprotect((void*)ph.p_vaddr, ph.p_memsz, page_prot);
+    }
+
     // Initialize the stack
 
-    thread_create(thread_fn_t(uintptr_t(hdr.e_entry)),
-                  nullptr, nullptr, 0);
+    size_t stack_size = 65536;
+    void *stack = mmap(0, stack_size, PROT_READ | PROT_WRITE,
+                       MAP_STACK | MAP_USER, -1, 0);
 
-    return process->pid;
+    unique_lock<spinlock> lock(processes_lock);
+    state = state_t::running;
+    lock.unlock();
+    cond.notify_all();
+
+    isr_sysret64(hdr.e_entry, (uintptr_t)stack + stack_size);
+
+    return pid;
 }
 
-void *process_get_allocator()
+void *process_t::get_allocator()
 {
     process_t *process = thread_current_process();
     return process->linear_allocator;
 }
 
-void process_set_allocator(void *allocator)
+void process_t::set_allocator(void *allocator)
 {
-    process_t *process = thread_current_process();
-    assert(process->linear_allocator == nullptr);
-    process->linear_allocator = allocator;
+    assert(linear_allocator == nullptr);
+    linear_allocator = allocator;
 }
 
-process_t *process_init(uintptr_t mmu_context)
+process_t *process_t::init(uintptr_t mmu_context)
 {
-    process_t *process = process_add();
+    process_t *process = process_t::add();
     process->mmu_context = mmu_context;
     return process;
 }

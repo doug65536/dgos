@@ -2207,7 +2207,8 @@ void ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     blocking_iocp_t block;
 
-    if (io(identify, 1, 0, false, slot_op_t::identify, block) != errno_t::OK)
+    errno_t status = io(identify, 1, 0, false, slot_op_t::identify, block);
+    if (unlikely(status != errno_t::OK))
         return;
 
     block.wait();

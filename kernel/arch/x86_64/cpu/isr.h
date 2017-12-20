@@ -1,8 +1,7 @@
 #pragma once
+#include "types.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+__BEGIN_DECLS
 
 // Modern xsave
 void isr_save_xsaveopt(void);
@@ -278,6 +277,7 @@ extern void isr_entry_253(void);
 extern void isr_entry_254(void);
 extern void isr_entry_255(void);
 
-#ifdef __cplusplus
-}
-#endif
+__noreturn
+void isr_sysret64(uintptr_t rip, uintptr_t rsp);
+
+__END_DECLS

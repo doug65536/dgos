@@ -1,3 +1,9 @@
+lib/sys/sys_types.h
+syscall/sys_fd.cc
+syscall/sys_fd.h
+syscall/sys_mem.cc
+syscall/sys_mem.h
+syscall/sys_time.cc
 ../bochs-debugger-boot-commands
 ../bochs-debugger-commands
 ../bochs-fat-config.bxrc
@@ -17,6 +23,7 @@ arch/x86_64/nano_time.h
 device/i350.bits
 device/i350.cc
 lib/cc/numeric_limits.h
+syscall/sys_time.h
 syscall/syscall_helper.h
 syscall/syscall_helper.cc
 ../AUTHORS
@@ -200,7 +207,6 @@ lib/rand.h
 lib/mm.h
 lib/dev_text.h
 lib/debug.h
-lib/sys/types.h
 lib/rbtree.cc
 lib/framebuffer.cc
 lib/threadsync.cc
@@ -283,11 +289,7 @@ lib/work_queue.h
 lib/cc/numeric.h
 lib/desc_alloc.cc
 lib/desc_alloc.h
-syscall/fd.cc
-syscall/fd.h
 arch/x86_64/cpu/segrw.h
 arch/x86_64/cpu/segrw.cc
-syscall/mem.cc
-syscall/mem.h
 ../build-crossgcc.sh
 ../build-crossgcc-versions

@@ -52,6 +52,7 @@ struct cpuid_cache_t {
     bool has_inrdtsc :1;
     bool has_avx512f :1;
     bool has_fsgsbase:1;
+    bool has_sysenter:1;
 };
 
 #ifdef CPUID_CC
@@ -182,4 +183,10 @@ CPUID_CONST_INLINE bool cpuid_has_avx512f(void)
 CPUID_CONST_INLINE bool cpuid_has_fsgsbase(void)
 {
     return cpuid_cache.has_fsgsbase;
+}
+
+// SYSENTER/SYSEXIT instructions
+CPUID_CONST_INLINE bool cpuid_has_sysenter(void)
+{
+    return cpuid_cache.has_sysenter;
 }

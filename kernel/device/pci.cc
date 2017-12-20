@@ -23,8 +23,7 @@ static spinlock_t pci_spinlock;
 #define size_of(type, member) \
     sizeof(((type*)0x10U)->member)
 
-#if PCI_DEBUG
-static char const *pci_device_class_text[] = {
+static char const *pci_device_class_text_lookup[] = {
     "No device class, must be old",
     "Mass Storage Controller",
     "Network Controller",
@@ -44,7 +43,6 @@ static char const *pci_device_class_text[] = {
     "Encryption/Decryption Controllers",
     "Data Acquisition and Signal Processing Controllers"
 };
-#endif
 
 uint32_t pci_config_read(
         int bus, int slot, int func,
@@ -153,90 +151,6 @@ int pci_config_write(
 
     return 1;
 }
-
-#if PCI_DEBUG
-#define PCI_DEFINE_CONFIG_GETTER(type, field) \
-    static uint16_t pci_device_##field ( \
-            uint32_t bus, uint32_t slot, uint32_t func) \
-    { \
-        return pci_read_config( \
-                    bus, slot, func, \
-                    offset_of(type, field), \
-                    size_of(type, field)); \
-    }
-
-PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, vendor)
-PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, dev_class)
-PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, subclass)
-PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, header_type)
-PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, device)
-PCI_DEFINE_CONFIG_GETTER(pci_config_hdr_t, irq_line)
-
-static void pci_enumerate(void)
-{
-    PCI_DEBUGMSG("Enumerating PCI devices\n");
-    for (uint32_t bus = 0; bus < 256; ++bus) {
-        for (uint32_t slot = 0; slot < 32; ++slot) {
-            uint16_t vendor = pci_device_vendor(bus, slot, 0);
-
-            if (vendor == 0xFFFF)
-                continue;
-
-            uint16_t header_type = pci_device_header_type(
-                        bus, slot, 0);
-
-            uint32_t function_count = (header_type & 0x80) ? 8 : 1;
-
-            for (uint32_t func = 0; func < function_count; ++func) {
-                uint8_t dev_class = pci_device_dev_class(
-                            bus, slot, func);
-
-                uint16_t device = pci_device_device(bus, slot, func);
-
-                if (dev_class == 0xFF)
-                    break;
-
-                uint16_t subclass = pci_device_subclass(bus, slot, func);
-
-                char const *class_text = "<unknown>";
-                if (dev_class < countof(pci_device_class_text))
-                    class_text = pci_device_class_text[dev_class];
-
-                uint8_t irq = pci_device_irq_line(bus, slot, func);
-
-                PCI_DEBUGMSG("Found device, vendor=%04x device=%04x irq=%d\n"
-                             " bus=%d,"
-                             " slot=%d,"
-                             " func=%d,"
-                             " class=%s"
-                             " subclass=%x"
-                             " (%d)\n",
-                             vendor, device, irq,
-                             bus,
-                             slot,
-                             func,
-                             class_text,
-                             subclass,
-                             dev_class);
-
-                if (vendor == 0x10EC && device == 0x8139) {
-                    // RTL 8139
-                    PCI_DEBUGMSG("RTL8139 NIC\n");
-                    for (int i = 0; i < 6; ++i) {
-                        uint32_t base_addr = pci_read_config(
-                                    bus, slot, func,
-                                    offset_of(pci_config_hdr_t, base_addr) +
-                                    sizeof(uint32_t) * i,
-                                    sizeof(uint32_t));
-
-                        PCI_DEBUGMSG("base_addr[%d] = %x\n", i, base_addr);
-                    }
-                }
-            }
-        }
-    }
-}
-#endif
 
 void pci_config_copy(int bus, int slot, int func,
                      void *dest, int ofs, size_t size)
@@ -567,4 +481,11 @@ void pci_clear_status_bits(int bus, int slot, int func,
     pci_config_write(bus, slot, func,
                      offsetof(pci_config_hdr_t, status),
                      &bits, sizeof(bits));
+}
+
+char const *pci_device_class_text(uint8_t cls)
+{
+    if (cls < sizeof(pci_device_class_text_lookup))
+        return pci_device_class_text_lookup[cls];
+    return nullptr;
 }

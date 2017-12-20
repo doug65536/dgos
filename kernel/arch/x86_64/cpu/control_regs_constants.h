@@ -7,10 +7,23 @@
 #define CPU_MSR_KGSBASE         0xC0000102U
 #define CPU_MSR_EFER            0xC0000080U
 
+#define CPU_MSR_EFER_SCE_BIT    0
 #define CPU_MSR_EFER_LME_BIT    8
+#define CPU_MSR_EFER_LMA_BIT    10
 #define CPU_MSR_EFER_NX_BIT     11
+#define CPU_MSR_EFER_SVME_BIT   12
+#define CPU_MSR_EFER_LMSLE_BIT  13
+#define CPU_MSR_EFER_FFXSR_BIT  14
+#define CPU_MSR_EFER_TCE_BIT    15
+
+#define CPU_MSR_EFER_SCE        (1U << CPU_MSR_EFER_SCE_BIT)
 #define CPU_MSR_EFER_LME        (1U << CPU_MSR_EFER_LME_BIT)
+#define CPU_MSR_EFER_LMA        (1U << CPU_MSR_EFER_LMA_BIT)
 #define CPU_MSR_EFER_NX         (1U << CPU_MSR_EFER_NX_BIT)
+#define CPU_MSR_EFER_SVME       (1U << CPU_MSR_EFER_SVME_BIT)
+#define CPU_MSR_EFER_LMSLE      (1U << CPU_MSR_EFER_LMSLE_BIT)
+#define CPU_MSR_EFER_FFXSR      (1U << CPU_MSR_EFER_FFXSR_BIT)
+#define CPU_MSR_EFER_TCE        (1U << CPU_MSR_EFER_TCE_BIT)
 
 // RFLAGS mask on syscall entry
 #define CPU_MSR_FMASK           0xC0000084U

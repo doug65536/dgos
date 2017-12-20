@@ -1825,18 +1825,18 @@ void apic_start_smp(void)
     cmos_prepare_ap();
 
     // Send INIT to all other CPUs
-    for (size_t i = 1; i < apic_id_count; ++i) {
-//        apic_send_command(0xFFFFFFFF,
-//                          APIC_CMD_DELIVERY_INIT |
-//                          APIC_CMD_DEST_MODE_LOGICAL |
-//                          APIC_CMD_DEST_TYPE_OTHER);
-        APIC_TRACE("Sending INIT IPI to APIC ID 0x%x\n", apic_id_list[i]);
-        __sync_synchronize();
-        apic_send_command(apic_id_list[i],
+//    for (size_t i = 1; i < apic_id_count; ++i) {
+        apic_send_command(0xFFFFFFFF,
                           APIC_CMD_DELIVERY_INIT |
-                          APIC_CMD_DEST_MODE_PHYSICAL |
-                          APIC_CMD_DEST_TYPE_BYID);
-    }
+                          APIC_CMD_DEST_MODE_LOGICAL |
+                          APIC_CMD_DEST_TYPE_OTHER);
+//        APIC_TRACE("Sending INIT IPI to APIC ID 0x%x\n", apic_id_list[i]);
+//        __sync_synchronize();
+//        apic_send_command(apic_id_list[i],
+//                          APIC_CMD_DELIVERY_INIT |
+//                          APIC_CMD_DEST_MODE_PHYSICAL |
+//                          APIC_CMD_DEST_TYPE_BYID);
+//    }
     APIC_TRACE("Done sending INIT IPIs\n");
 
     // 10ms delay

@@ -254,11 +254,18 @@ void fat32_fs_t::fcbname_from_lfn(
     for (i = 0; i < last_dot && out < 8; ++i) {
         if ((lfn[i] >= 'A' && lfn[i] <= 'Z') ||
                 (lfn[i] >= '0' && lfn[i] <= '9')) {
+            // Accept uppercase alphanumeric as is
             fcbname[out++] = lfn[i];
         } else if (lfn[i] >= 'a' && lfn[i] <= 'z') {
+            // Convert lowercase alphabetic to uppercase
             fcbname[out++] = lfn[i] + ('A' - 'a');
-        } else {
+        } else if (lfn[i] < ' ' || lfn[i] >= 0x7F ||
+                   strchr("\"'*+,/:;<=>?[\\]|", lfn[i])) {
+            // Convert disallowed to underscore
             fcbname[out++] = '_';
+        } else {
+            // Accept everything else as is
+            fcbname[out++] = lfn[i];
         }
     }
 
@@ -556,8 +563,8 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
 
     fat32_dir_union_t *result = nullptr;
 
-    iterate_dir(cluster,
-                [&](fat32_dir_union_t *de, cluster_t, bool) -> bool {
+    iterate_dir(cluster, [&](fat32_dir_union_t *de, cluster_t, bool) -> bool {
+
         // If this is a short filename entry
         if (de->long_entry.attr != FAT_LONGNAME) {
             uint8_t checksum = lfn_checksum(de->short_entry.name);

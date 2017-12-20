@@ -229,9 +229,8 @@ isr_common:
 	// Make structure on the stack
 	push_cfi %rsp
 	push_cfi %rax
-	xor %eax,%eax
-	push_cfi %rax
-	push_cfi %rax
+	push_cfi $0
+	push_cfi $0
 
 	// Pass intr, ctx
 	mov %rsp,%rsi
@@ -473,11 +472,13 @@ exception_isr_handler:
 	test %eax,%eax
 	jz 0f
 
-	// ...or the handler rejected it
+	// There is a handler
 	mov $intr_invoke,%rax
 	mov %ebx,%edi
 	mov %r12,%rsi
 	call *%rax
+
+	// See if the handler rejected it
 	test %eax,%eax
 	jz 0f
 
@@ -501,9 +502,9 @@ exception_isr_handler:
 	mov $cpu_debug_break,%rax
 	call *%rax
 	jmp 1b
-.align 16
 
 	// Tail call to unhandled_exception_handler
+.align 16
 2:
 	mov $unhandled_exception_handler,%rax
 	mov %r12,%rdi
@@ -514,7 +515,104 @@ exception_isr_handler:
 
 	.cfi_endproc
 
-.align 64
+// __noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
+.global isr_sysret64
+isr_sysret64:
+	push %rbp
+	mov %rsp,%rbp
+
+	xor %eax,%eax
+
+	// Clear the opmask registers
+
+	cmpw $0,sse_avx512_opmask_offset(%rip)
+	jne .Lclear_opmask
+	jmp .Ldone_opmask
+
+.Lclear_opmask:
+	kmovw %eax,%k1
+	kmovw %eax,%k2
+	kmovw %eax,%k3
+	kmovw %eax,%k4
+	kmovw %eax,%k5
+	kmovw %eax,%k6
+	kmovw %eax,%k7
+
+.align 16
+.Ldone_opmask:
+	// Check for AVX
+	cmpw $0,sse_avx_offset(%rip)
+	je .Lno_avx
+
+	// Clear all vector registers
+	vzeroall
+	jmp .Ldone_sse
+
+.align 16
+.Lno_avx:
+	pxor %xmm0,%xmm0
+	movq %xmm0,%xmm1
+	movq %xmm0,%xmm2
+	movq %xmm0,%xmm3
+	movq %xmm0,%xmm4
+	movq %xmm0,%xmm5
+	movq %xmm0,%xmm6
+	movq %xmm0,%xmm7
+	movq %xmm0,%xmm8
+	movq %xmm0,%xmm9
+	movq %xmm0,%xmm10
+	movq %xmm0,%xmm11
+	movq %xmm0,%xmm12
+	movq %xmm0,%xmm13
+	movq %xmm0,%xmm14
+	movq %xmm0,%xmm15
+
+.align 16
+.Ldone_sse:
+	// Clear the x87 stack
+	fld1
+	fsub %st,%st
+	fld %st
+	fld %st
+	fld %st
+	fld %st
+	fld %st
+	fld %st
+	fld %st
+	fstp %st
+	fstp %st
+	fstp %st
+	fstp %st
+	fstp %st
+	fstp %st
+	fstp %st
+	fstp %st
+
+	mov %rdi,%rcx
+	mov $(CPU_EFLAGS_IF | 2),%r11d
+
+	// Avoid leaking any register values to user code
+	mov %eax,%ebx
+	// not ecx
+	mov %eax,%edx
+	// not esi
+	mov %eax,%edi
+	mov %eax,%ebp
+	mov %eax,%r8d
+	mov %eax,%r9d
+	mov %eax,%r10d
+	// not r11
+	mov %eax,%r12d
+	mov %eax,%r13d
+	mov %eax,%r14d
+	mov %eax,%r15d
+	cli
+	swapgs
+	mov %rsi,%rsp
+	sysretq
+
+.section .rodata
+.align 8
 
 // Pointers to patch points
 .global sse_context_save
@@ -524,5 +622,3 @@ sse_context_save:
 .global sse_context_restore
 sse_context_restore:
 	.quad .Lsse_context_restore_jmp
-
-.align 64, 0

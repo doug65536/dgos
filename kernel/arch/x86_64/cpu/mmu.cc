@@ -854,7 +854,8 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
     int present_mask = addr_present(addr, path, pte_linaddr);
 
     if (unlikely((present_mask & 0x07) != 0x07)) {
-        pte_t path_flags = PTE_PRESENT | PTE_WRITABLE;
+        pte_t path_flags = PTE_PRESENT | PTE_WRITABLE |
+                (addr <= 0x7FFFFFFFFFFF ? PTE_USER : 0);
 
         for (int i = 0; i < 3; ++i) {
             pte = *pte_linaddr[i];
@@ -997,7 +998,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
     int present_mask = addr_present(fault_addr, path, ptes);
 
-    pte_t pte = (present_mask == 0x07) ? *ptes[3] : 0;
+    pte_t pte = (present_mask >= 0x07) ? *ptes[3] : 0;
 
     // Check for lazy TLB shootdown
     if (present_mask == 0x0F &&
@@ -1116,6 +1117,8 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
     } else if (present_mask != 0x0F) {
         if (thread_get_exception_top())
             return 0;
+
+        dump_context(ctx, 1);
 
         assert(!"Invalid page fault path");
     }
@@ -1732,7 +1735,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 //
 // Public API
 
-int mpresent(uintptr_t addr, size_t size)
+bool mpresent(uintptr_t addr, size_t size)
 {
     unsigned path[4];
     pte_t *ptes[4];
@@ -1753,17 +1756,49 @@ int mpresent(uintptr_t addr, size_t size)
     return true;
 }
 
+bool mwritable(uintptr_t addr, size_t size)
+{
+    uintptr_t end_addr = addr + size - 1;
+    unsigned path[4], end_path[4];
+    pte_t *ptes[4];
+
+    // Check last page in range and get path to last PTE
+    if (addr_present(end_addr, end_path, ptes) != 0xF)
+        return false;
+
+    do {
+        if (addr_present(addr, path, ptes) != 0x0F)
+            return false;
+
+        while (path[3] < 512 &&
+               (path[2] < end_path[2] || path[3] <= end_path[3])) {
+            if (unlikely((*ptes[3]++ & (PTE_PRESENT | PTE_WRITABLE)) !=
+                    (PTE_PRESENT | PTE_WRITABLE)))
+                return false;
+            path[3]++;
+        }
+
+        uintptr_t remainder = ((addr + PAGE_SIZE) & -PAGE_SIZE) - addr;
+
+        if (remainder >= size)
+            break;
+
+        addr += remainder;
+        size -= remainder;
+    } while (size);
+
+    return true;
+}
+
 void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 {
     (void)offset;
+    assert(offset == 0);
 
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
 
     // Must pass MAP_DEVICE if passing a device registration index
     assert((flags & MAP_DEVICE) || (fd < 0));
-
-    // Not used (yet)
-    assert(offset == 0);
 
     assert(len > 0);
 
@@ -1774,16 +1809,28 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     pte_t page_flags = 0;
 
+    // Any invalid flag set returns failure
     if (unlikely(flags & MAP_INVALID_MASK))
-        return 0;
+        return MAP_FAILED;
 
+    static constexpr int user_prohibited =
+            MAP_NEAR | MAP_DEVICE | MAP_GLOBAL |
+            MAP_GLOBAL | MAP_UNINITIALIZED |
+            MAP_WEAKORDER | MAP_NOCACHE | MAP_WRITETHRU;
+
+    if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
+        return MAP_FAILED;
+
+    // Populate stacks
     if (unlikely(flags & (MAP_STACK | MAP_32BIT)))
         flags |= MAP_POPULATE;
 
+    // Set physical and present flag on physical memory mapping
     if (unlikely(flags & MAP_PHYSICAL))
         page_flags |= PTE_EX_PHYSICAL | PTE_PRESENT;
 
     if (unlikely(flags & MAP_WEAKORDER)) {
+        // Weakly ordered memory, set write combining in PTE if capable
         if (likely(mmu_have_pat()))
             page_flags |= PTE_PTEPAT_n(PAT_IDX_WC);
         else
@@ -1821,29 +1868,27 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         len += misalignment;
     }
 
+    contiguous_allocator_t *allocator =
+            (flags & MAP_USER) ?
+                (contiguous_allocator_t*)
+                thread_current_process()->get_allocator()
+            : (flags & MAP_NEAR) ? &near_allocator
+            : &linear_allocator;
+
     PROFILE_LINEAR_ALLOC_ONLY( uint64_t profile_linear_st = cpu_rdtsc() );
     linaddr_t linear_addr;
     if (!addr || (flags & MAP_PHYSICAL)) {
-        if (!(flags & MAP_NEAR))
-            linear_addr = linear_allocator.alloc_linear(len);
-        else
-            linear_addr = near_allocator.alloc_linear(len);
-    } else if (flags & MAP_USER) {
-        linear_addr = (linaddr_t)addr;
-
-        if (unlikely(linear_addr >= 0x7FFFFFFFF000))
-            return MAP_FAILED;
-
-        auto allocator = (contiguous_allocator_t *)process_get_allocator();
-
-        if (unlikely(!allocator->take_linear(linear_addr, len,
-                                             flags & MAP_EXCLUSIVE)))
-            return MAP_FAILED;
+        linear_addr = allocator->alloc_linear(len);
     } else {
         linear_addr = (linaddr_t)addr;
 
-        if (unlikely(!linear_allocator.take_linear(linear_addr, len,
-                                          flags & MAP_EXCLUSIVE)))
+        if (unlikely((flags & MAP_USER) &&
+                     (linear_addr >= 0x7FFFFFFFF000 ||
+                      linear_addr + len > 0x7FFFFFFFF000)))
+            return MAP_FAILED;
+
+        if (unlikely(!allocator->take_linear(
+                         linear_addr, len, flags & MAP_EXCLUSIVE)))
             return MAP_FAILED;
     }
 
@@ -2710,7 +2755,7 @@ int mlock(const void *addr, size_t len)
     return 0;
 }
 
-uintptr_t mm_new_process(void)
+uintptr_t mm_new_process(process_t *process)
 {
     // Allocate a page directory
     pte_t *dir = (pte_t*)mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, 0, -1, 0);
@@ -2727,6 +2772,10 @@ uintptr_t mm_new_process(void)
 
     // Switch to new page directory
     cpu_set_page_directory(dir_physaddr);
+
+    cpu_flush_tlb();
+
+    mm_init_process(process);
 
     return dir_physaddr;
 }
@@ -2798,11 +2847,11 @@ void mm_destroy_process()
     mmu_free_phys(dir);
 }
 
-void mm_init_process()
+void mm_init_process(process_t *process)
 {
     contiguous_allocator_t *allocator = new contiguous_allocator_t{};
     allocator->init(0x400000, 0x800000000000 - 0x400000);
-    process_set_allocator(allocator);
+    process->set_allocator(allocator);
 }
 
 extern char ___text_st[];

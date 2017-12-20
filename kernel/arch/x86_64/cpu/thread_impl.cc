@@ -24,6 +24,7 @@
 #include "unique_ptr.h"
 #include "rbtree.h"
 #include "process.h"
+#include "callout.h"
 
 // Implements platform independent thread.h
 
@@ -283,9 +284,8 @@ static void thread_startup(thread_fn_t fn, void *p, thread_t id)
 static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata,
         void *stack, size_t stack_size,
-        thread_state_t state,
-        uint64_t affinity,
-        thread_priority_t priority)
+        thread_state_t state, uint64_t affinity,
+        thread_priority_t priority, bool user)
 {
     if (stack_size == 0)
         stack_size = 65536;
@@ -404,10 +404,14 @@ static thread_t thread_create_with_state(
         ISR_CTX_REG_RSP(ctx) = (uintptr_t)
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
         assert((ISR_CTX_REG_RSP(ctx) & 0xF) == 0x8);
-        ISR_CTX_REG_SS(ctx) = GDT_SEL_KERNEL_DATA;
+        ISR_CTX_REG_SS(ctx) = user
+                ? GDT_SEL_USER_DATA | 3
+                : GDT_SEL_KERNEL_DATA;
         ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
         ISR_CTX_REG_RIP(ctx) = (thread_fn_t)(uintptr_t)thread_startup;
-        ISR_CTX_REG_CS(ctx) = GDT_SEL_KERNEL_CODE64;
+        ISR_CTX_REG_CS(ctx) = user
+                ? GDT_SEL_USER_CODE64 | 3
+                : GDT_SEL_KERNEL_CODE64;
         ISR_CTX_REG_DS(ctx) = GDT_SEL_USER_DATA | 3;
         ISR_CTX_REG_ES(ctx) = GDT_SEL_USER_DATA | 3;
         ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
@@ -448,13 +452,12 @@ static thread_t thread_create_with_state(
 }
 
 EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
-                       void *stack,
-                       size_t stack_size)
+                       void *stack, size_t stack_size, bool user)
 {
     return thread_create_with_state(
                 fn, userdata,
                 stack, stack_size,
-                THREAD_IS_READY, 0, 0);
+                THREAD_IS_READY, 0, 0, user);
 }
 
 #if 0
@@ -498,12 +501,12 @@ void thread_init(int ap)
 {
     uint32_t cpu_number = atomic_xadd(&cpu_count, 1);
 
-    if (cpu_number > 0)
-        gdt_load_tr(cpu_number);
-
-    // First CPU is the BSP
     cpu_info_t *cpu = cpus + cpu_number;
-    cpu->tss_ptr = tss_list + cpu_number;
+
+    if (cpu_number > 0) {
+        gdt_load_tr(cpu_number);
+        cpu->tss_ptr = tss_list + cpu_number;
+    }
 
     assert(thread_count == cpu_number);
 
@@ -520,11 +523,11 @@ void thread_init(int ap)
     if (!ap) {
         intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler);
 
-        thread->process = process_init(cpu_get_page_directory());
+        thread->process = process_t::init(cpu_get_page_directory());
 
         cpu->cur_thread = thread;
 
-        mm_init_process();
+        mm_init_process(thread->process);
 
         thread->sched_timestamp = cpu_rdtsc();
         thread->used_time = 0;
@@ -571,7 +574,7 @@ void thread_init(int ap)
                     smp_idle_thread, 0, 0, 0,
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
-                    -256);
+                    -256, false);
 
         thread->used_time = 0;
 
@@ -758,16 +761,15 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     isr_context_t *isrctx = (isr_context_t*)ctx;
 
-    assert(isrctx->gpr->iret.cs == 0x8);
-    assert(isrctx->gpr->iret.ss == 0x10);
     assert(isrctx->gpr->s[0] == (GDT_SEL_USER_DATA | 3));
     assert(isrctx->gpr->s[1] == (GDT_SEL_USER_DATA | 3));
     assert(isrctx->gpr->s[2] == (GDT_SEL_USER_DATA | 3));
     assert(isrctx->gpr->s[3] == (GDT_SEL_USER_DATA | 3));
 
-    assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
-    assert(isrctx->gpr->iret.rsp <
-           (uintptr_t)thread->stack + thread->stack_size + PAGE_SIZE);
+    // Removed until I can range check user mode stack
+    //assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
+    //assert(isrctx->gpr->iret.rsp <
+    //       (uintptr_t)thread->stack + thread->stack_size + PAGE_SIZE);
 
     if (thread != outgoing) {
         // Add outgoing cleanup data at top of context
@@ -1088,3 +1090,16 @@ uintptr_t thread_get_gsbase(int thread)
     thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
     return info->gsbase;
 }
+
+void thread_set_process(int thread, process_t *process)
+{
+    thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
+    info->process = process;
+}
+
+void thread_tss_ready(void*)
+{
+    cpus[0].tss_ptr = tss_list;
+}
+
+REGISTER_CALLOUT(thread_tss_ready, 0, callout_type_t::tss_list_ready, "000");

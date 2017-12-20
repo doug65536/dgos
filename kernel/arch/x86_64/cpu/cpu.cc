@@ -77,9 +77,15 @@ void cpu_init(int ap)
 //
 //    cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
 
+    // Enable syscall/sysret
+    set = CPU_MSR_EFER_SCE;
+    clr = 0;
+
     // Enable no-execute if feature available
     if (cpuid_has_nx())
-        cpu_msr_change_bits(CPU_MSR_EFER, 0, CPU_MSR_EFER_NX);
+        set |= CPU_MSR_EFER_NX;
+
+    cpu_msr_change_bits(CPU_MSR_EFER, clr, set);
 
     // Configure syscall
     cpu_msr_set(CPU_MSR_FMASK, CPU_EFLAGS_AC | CPU_EFLAGS_DF |
@@ -87,23 +93,16 @@ void cpu_init(int ap)
     cpu_msr_set(CPU_MSR_LSTAR, (uint64_t)syscall_entry);
     cpu_msr_set_hi(CPU_MSR_STAR, GDT_SEL_KERNEL_CODE64 |
                (GDT_SEL_USER_CODE32 << 16));
-}
 
-//static isr_context_t *cpu_debug_exception_handler(int intr, isr_context_t *ctx)
-//{
-//    cpu_debug_break();
-//    assert(intr == INTR_EX_DEBUG);
-//    printdbg("Unexpected debug exception, continuing\n");
-//    return ctx;
-//}
+    // Load null LDT
+    cpu_set_ldt(0);
+}
 
 void cpu_init_stage2(int ap)
 {
     mmu_init(ap);
-    if (!ap) {
+    if (!ap)
         thread_init(ap);
-        //intr_hook(INTR_EX_DEBUG, cpu_debug_exception_handler);
-    }
 }
 
 void cpu_hw_init(int ap)
