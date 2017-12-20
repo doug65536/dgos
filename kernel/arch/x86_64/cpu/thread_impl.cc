@@ -218,9 +218,7 @@ static __always_inline cpu_info_t *this_cpu(void)
 
 static __always_inline thread_info_t *this_thread(void)
 {
-    cpu_scoped_irq_disable intr_was_enabled;
-    cpu_info_t *cpu = this_cpu();
-    return cpu->cur_thread;
+    return (thread_info_t*)cpu_gs_read_ptr(offsetof(cpu_info_t, cur_thread));
 }
 
 EXPORT void thread_yield(void)
@@ -399,7 +397,6 @@ static thread_t thread_create_with_state(
         isr_context_t *ctx = (isr_context_t*)ctx_addr;
         memset(ctx, 0, ctx_size);
         ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
-        ctx->gpr = (isr_gpr_context_t*)(ctx + 1);
 
         ISR_CTX_REG_RSP(ctx) = (uintptr_t)
                 ((ctx_addr + ctx_size + 15) & -16) + 8;
@@ -761,14 +758,14 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     isr_context_t *isrctx = (isr_context_t*)ctx;
 
-    assert(isrctx->gpr->s[0] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr->s[1] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr->s[2] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr->s[3] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s[0] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s[1] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s[2] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s[3] == (GDT_SEL_USER_DATA | 3));
 
     // Removed until I can range check user mode stack
-    //assert(isrctx->gpr->iret.rsp >= (uintptr_t)thread->stack);
-    //assert(isrctx->gpr->iret.rsp <
+    //assert(isrctx->gpr.iret.rsp >= (uintptr_t)thread->stack);
+    //assert(isrctx->gpr.iret.rsp <
     //       (uintptr_t)thread->stack + thread->stack_size + PAGE_SIZE);
 
     if (thread != outgoing) {
@@ -793,9 +790,7 @@ static void thread_early_sleep(uint64_t expiry)
 EXPORT void thread_sleep_until(uint64_t expiry)
 {
     if (thread_idle_ready) {
-        cpu_scoped_irq_disable intr_was_enabled;
-        cpu_info_t *cpu = this_cpu();
-        thread_info_t *thread = cpu->cur_thread;
+        thread_info_t *thread = this_thread();
 
         thread->wake_time = expiry;
         atomic_barrier();
@@ -824,8 +819,7 @@ EXPORT uint64_t thread_get_usage(int id)
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 {
     cpu_scoped_irq_disable intr_was_enabled;
-    cpu_info_t *cpu = this_cpu();
-    thread_info_t *thread = cpu->cur_thread;
+    thread_info_t *thread = this_thread();
 
     *thread_id = thread - threads;
     atomic_barrier();
@@ -894,10 +888,8 @@ EXPORT thread_t thread_get_id(void)
     if (thread_count) {
         thread_t thread_id;
 
-        cpu_scoped_irq_disable intr_was_enabled;
-
-        cpu_info_t *cpu = this_cpu();
-        thread_id = cpu->cur_thread - threads;
+        thread_info_t *cur_thread = this_thread();
+        thread_id = cur_thread - threads;
 
         return thread_id;
     }
@@ -1030,8 +1022,8 @@ int thread_cpu_number()
 
 isr_context_t *thread_schedule_if_idle(isr_context_t *ctx)
 {
-    cpu_info_t *cpu = this_cpu();
-    if (cpu->cur_thread - threads < cpu_count)
+    thread_info_t *cur_thread = this_thread();
+    if (cur_thread - threads < cpu_count)
         return thread_schedule(ctx);
     return ctx;
 }

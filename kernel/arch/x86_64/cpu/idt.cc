@@ -550,7 +550,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     for (int i = 0; i < 15; ++i) {
         printdbg("%s=%16lx\n",
                  reg_names[i],
-                 ctx->gpr->r[i]);
+                 ctx->gpr.r[i]);
     }
 
     if (sse_avx512_xregs_offset && sse_avx512_xregs_size) {
@@ -582,26 +582,26 @@ void dump_context(isr_context_t *ctx, int to_screen)
     for (int i = 0; i < 4; ++i) {
         printdbg("%s=%04x\n",
                  seg_names[i],
-                 ctx->gpr->s[i]);
+                 ctx->gpr.s[i]);
     }
 
     // ss:rsp
     printdbg("ss:rsp=%4lx:%16lx\n",
-             ctx->gpr->iret.ss,
-             ctx->gpr->iret.rsp);
+             ctx->gpr.iret.ss,
+             ctx->gpr.iret.rsp);
     // cs:rip
     printdbg("cs:rip=%4lx:%16lx\n",
-             ctx->gpr->iret.cs,
-             (uintptr_t)ctx->gpr->iret.rip);
+             ctx->gpr.iret.cs,
+             (uintptr_t)ctx->gpr.iret.rip);
 
     // Exception
-    if (ctx->gpr->info.interrupt < 32) {
+    if (ctx->gpr.info.interrupt < 32) {
         printdbg("Exception 0x%02lx %s\n",
-                 ctx->gpr->info.interrupt,
-                 exception_names[ctx->gpr->info.interrupt]);
+                 ctx->gpr.info.interrupt,
+                 exception_names[ctx->gpr.info.interrupt]);
     } else {
         printdbg("Interrupt 0x%02lx\n",
-                 ctx->gpr->info.interrupt);
+                 ctx->gpr.info.interrupt);
     }
 
     // mxcsr and description
@@ -628,13 +628,13 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // error code
     printdbg("Error code 0x%16lx\n",
-             ctx->gpr->info.error_code);
+             ctx->gpr.info.error_code);
 
     // rflags (it's actually only 22 bits) and description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
-                       ctx->gpr->iret.rflags);
+                       ctx->gpr.iret.rflags);
     printdbg("rflags=%06lx %s\n",
-             ctx->gpr->iret.rflags,
+             ctx->gpr.iret.rflags,
              fmt_buf);
 
     // fsbase
@@ -657,7 +657,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
             con_draw_xy(0, i, reg_names[i], color);
             // General register value
             snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ",
-                     ctx->gpr->r[i]);
+                     ctx->gpr.r[i]);
             con_draw_xy(3, i, fmt_buf, color);
         }
 
@@ -679,33 +679,33 @@ void dump_context(isr_context_t *ctx, int to_screen)
         con_draw_xy(37+i*8, 18, seg_names[i], color);
         // Segment register value
         snprintf(fmt_buf, sizeof(fmt_buf), "=%04x ",
-                 ctx->gpr->s[i]);
+                 ctx->gpr.s[i]);
         con_draw_xy(39+i*8, 18, fmt_buf, color);
     }
 
     // ss:rsp
     con_draw_xy(0, 15, "ss:rsp", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16lx ",
-             ctx->gpr->iret.ss, ctx->gpr->iret.rsp);
+             ctx->gpr.iret.ss, ctx->gpr.iret.rsp);
     con_draw_xy(6, 15, fmt_buf, color);
 
     // cs:rip
     con_draw_xy(0, 16, "cs:rip", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16zx",
-             ctx->gpr->iret.cs, (uintptr_t)ctx->gpr->iret.rip);
+             ctx->gpr.iret.cs, (uintptr_t)ctx->gpr.iret.rip);
     con_draw_xy(6, 16, fmt_buf, color);
 
-    if (ctx->gpr->info.interrupt < 32) {
+    if (ctx->gpr.info.interrupt < 32) {
         // exception
         con_draw_xy(0, 17, "Exception", color);
         snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
-                 ctx->gpr->info.interrupt,
-                 exception_names[ctx->gpr->info.interrupt]);
+                 ctx->gpr.info.interrupt,
+                 exception_names[ctx->gpr.info.interrupt]);
         con_draw_xy(9, 17, fmt_buf, color);
     } else {
         con_draw_xy(0, 17, "Interrupt", color);
         snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx",
-                 ctx->gpr->info.interrupt);
+                 ctx->gpr.info.interrupt);
         con_draw_xy(9, 17, fmt_buf, color);
     }
 
@@ -729,18 +729,18 @@ void dump_context(isr_context_t *ctx, int to_screen)
     // error code
     con_draw_xy(0, 18, "Error code", color);
     snprintf(fmt_buf, sizeof(fmt_buf), " 0x%16lx",
-             ctx->gpr->info.error_code);
+             ctx->gpr.info.error_code);
     con_draw_xy(10, 18, fmt_buf, color);
 
     // rflags (it's actually only 22 bits)
     con_draw_xy(0, 19, "rflags", color);
     width = snprintf(fmt_buf, sizeof(fmt_buf), "=%06lx ",
-             ctx->gpr->iret.rflags);
+             ctx->gpr.iret.rflags);
     con_draw_xy(6, 19, fmt_buf, color);
 
     // rflags description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
-                       ctx->gpr->iret.rflags);
+                       ctx->gpr.iret.rflags);
     con_draw_xy(6+width, 19, fmt_buf, color);
 
     // fsbase
@@ -759,7 +759,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     //                 msr_get(0x1DD));
     //con_draw_xy(6, 22, fmt_buf, color);
 
-    if (ctx->gpr->info.interrupt == INTR_EX_GPF)
+    if (ctx->gpr.info.interrupt == INTR_EX_GPF)
         apic_dump_regs(0);
 
     stack_trace(ctx, dump_frame);
@@ -769,25 +769,25 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
     if (unhandled_exception_handler_vec) {
         isr_context_t *handled_ctx = unhandled_exception_handler_vec(
-                    ctx->gpr->info.interrupt, ctx);
+                    ctx->gpr.info.interrupt, ctx);
 
         if (handled_ctx)
             return handled_ctx;
     }
 
-    char const *name = ctx->gpr->info.interrupt < countof(exception_names)
-            ? exception_names[ctx->gpr->info.interrupt]
+    char const *name = ctx->gpr.info.interrupt < countof(exception_names)
+            ? exception_names[ctx->gpr.info.interrupt]
             : nullptr;
 
-    if (ctx->gpr->info.interrupt == INTR_EX_OPCODE) {
-        uint8_t const *chk = (uint8_t const *)ctx->gpr->iret.rip;
+    if (ctx->gpr.info.interrupt == INTR_EX_OPCODE) {
+        uint8_t const *chk = (uint8_t const *)ctx->gpr.iret.rip;
         printk("Opcode = %02x\n", *chk);
     }
 
     printk("\nUnhandled exception 0x%zx (%s) at RIP=%p\n",
-           ctx->gpr->info.interrupt,
+           ctx->gpr.info.interrupt,
            name ? name : "??",
-           (void*)ctx->gpr->iret.rip);
+           (void*)ctx->gpr.iret.rip);
 
     dump_context(ctx, 1);
     cpu_debug_break();

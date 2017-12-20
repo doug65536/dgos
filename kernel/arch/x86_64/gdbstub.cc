@@ -467,7 +467,7 @@ private:
     rx_state_t reply_hex(char const *format, size_t size);
     rx_state_t reply(char const *data, size_t size);
     static size_t get_context(char *reply, isr_context_t const *ctx);
-    static size_t set_context(isr_context_t const *ctx,
+    static size_t set_context(isr_context_t *ctx,
                               char const *data, size_t data_len);
 
     uart_dev_t *port;
@@ -898,15 +898,15 @@ void gdbstub_t::run()
             step_cpu_nr = 0;
 
             ctx = gdb_cpu_ctrl_t::context_of(cpu_nr);
-            sig = gdb_cpu_ctrl_t::signal_from_intr(ctx->gpr->info.interrupt);
+            sig = gdb_cpu_ctrl_t::signal_from_intr(ctx->gpr.info.interrupt);
 
-            if (ctx->gpr->info.interrupt == INTR_EX_BREAKPOINT) {
+            if (ctx->gpr.info.interrupt == INTR_EX_BREAKPOINT) {
                 // If we planted the breakpoint, adjust RIP
                 if (gdb_cpu_ctrl_t::breakpoint_get_byte(
-                            (uint8_t*)ctx->gpr->iret.rip - 1,
-                            ctx->gpr->cr3) >= 0) {
-                    ctx->gpr->iret.rip = (int(*)(void*))
-                            ((uint8_t*)ctx->gpr->iret.rip - 1);
+                            (uint8_t*)ctx->gpr.iret.rip - 1,
+                            ctx->gpr.cr3) >= 0) {
+                    ctx->gpr.iret.rip = (int(*)(void*))
+                            ((uint8_t*)ctx->gpr.iret.rip - 1);
                 }
 
                 //replyf("T%02xswbreak:;", sig);
@@ -978,7 +978,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
     saved_cr3 = cpu_get_page_directory();
 
     __try {
-        cpu_set_page_directory(ctx->gpr->cr3);
+        cpu_set_page_directory(ctx->gpr.cr3);
         cpu_flush_tlb();
         __try {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
@@ -988,7 +988,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
 
                 // Read the old byte if a software breakpoint is placed there
                 int bp_byte = gdb_cpu_ctrl_t::breakpoint_get_byte(
-                            &mem_value, ctx->gpr->cr3);
+                            &mem_value, ctx->gpr.cr3);
 
                 // Read memory or use saved value from software breakpoint
                 if (bp_byte < 0)
@@ -1033,7 +1033,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
     ok = false;
 
     __try {
-        cpu_set_page_directory(ctx->gpr->cr3);
+        cpu_set_page_directory(ctx->gpr.cr3);
         cpu_flush_tlb();
         __try {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
@@ -1041,7 +1041,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
                 uint8_t new_value;
                 from_hex<uint8_t>(&new_value, input);
                 if (!gdb_cpu_ctrl_t::breakpoint_set_byte(
-                            &mem_value, ctx->gpr->cr3, new_value))
+                            &mem_value, ctx->gpr.cr3, new_value))
                     mem_value = new_value;
             }
             ok = true;
@@ -1645,12 +1645,12 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
         if (add) {
             if (!gdb_cpu_ctrl_t::breakpoint_add(
-                        type, addr, ctx->gpr->cr3, kind)) {
+                        type, addr, ctx->gpr.cr3, kind)) {
                 // Breakpoint could not be added
                 return reply("E01");
             }
         } else {
-            gdb_cpu_ctrl_t::breakpoint_del(type, addr, ctx->gpr->cr3, kind);
+            gdb_cpu_ctrl_t::breakpoint_del(type, addr, ctx->gpr.cr3, kind);
         }
 
         if (type == gdb_breakpoint_type_t::HARDWARE)
@@ -1790,7 +1790,7 @@ void gdbstub_t::from_hex_bytes(T *out, char const *&input, size_t advance)
         input += (advance - sizeof(T)) * 2;
 }
 
-size_t gdbstub_t::set_context(isr_context_t const *ctx,
+size_t gdbstub_t::set_context(isr_context_t *ctx,
                               char const *data, size_t data_len)
 {
     char const *input = data;
@@ -2073,9 +2073,9 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
         if (cpu.state == gdb_cpu_state_t::FROZEN) {
             // Set trap and resume flag if single stepping
             if (single_step)
-                cpu.ctx->gpr->iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
+                cpu.ctx->gpr.iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
             else
-                cpu.ctx->gpr->iret.rflags &= ~CPU_EFLAGS_TF;
+                cpu.ctx->gpr.iret.rflags &= ~CPU_EFLAGS_TF;
 
             // Change state to break it out of the halt loop
             cpu.state = gdb_cpu_state_t::RESUMING;
@@ -2325,7 +2325,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
         static uintptr_t bp_workaround_addr;
 
         // This is the GDB stub
-        if ((ctx->gpr->iret.rflags & CPU_EFLAGS_TF) && bp_workaround_addr) {
+        if ((ctx->gpr.iret.rflags & CPU_EFLAGS_TF) && bp_workaround_addr) {
             // We are in a single step breakpoint workaround
 
             // Find the breakpoint we stepped over
@@ -2337,25 +2337,25 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             bp_workaround_addr = 0;
 
             // Disable single-step
-            ctx->gpr->iret.rflags &= ~CPU_EFLAGS_TF;
+            ctx->gpr.iret.rflags &= ~CPU_EFLAGS_TF;
 
             // Reenable it
             breakpoint_toggle(*it, true);
             return ctx;
         }
 
-        if (ctx->gpr->info.interrupt == INTR_EX_BREAKPOINT) {
+        if (ctx->gpr.info.interrupt == INTR_EX_BREAKPOINT) {
             // Handle hitting breakpoint in stub by deactivating it,
             // single-stepping stepping, and reenabling it (above)
 
             // Adjust RIP back to start of instruction
-            ctx->gpr->iret.rip = (int(*)(void*))((char*)ctx->gpr->iret.rip - 1);
+            ctx->gpr.iret.rip = (int(*)(void*))((char*)ctx->gpr.iret.rip - 1);
 
-            bp_workaround_addr = uintptr_t(ctx->gpr->iret.rip);
+            bp_workaround_addr = uintptr_t(ctx->gpr.iret.rip);
 
             // Find the breakpoint
             bp_list::iterator it = breakpoint_find(
-                        bp_sw, uintptr_t(ctx->gpr->iret.rip), 0, 0);
+                        bp_sw, uintptr_t(ctx->gpr.iret.rip), 0, 0);
             if (it == bp_sw.end())
                 return 0;
 
@@ -2363,7 +2363,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             breakpoint_toggle(*it, false);
 
             // Single step the instruction
-            ctx->gpr->iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
+            ctx->gpr.iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
 
             return ctx;
         }
@@ -2372,7 +2372,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     }
 
     // Ignore NMI when not freezing
-    if (ctx->gpr->info.interrupt == INTR_EX_NMI &&
+    if (ctx->gpr.info.interrupt == INTR_EX_NMI &&
             cpu->state != gdb_cpu_state_t::FREEZING) {
         GDBSTUB_TRACE("Received NMI on cpu %d, continuing\n", cpu->cpu_nr);
         return ctx;
@@ -2384,7 +2384,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     cpu->state = gdb_cpu_state_t::FROZEN;
 
     GDBSTUB_TRACE("CPU entering wait: %d (%s)\n", cpu->cpu_nr,
-                  signal_name(signal_from_intr(ctx->gpr->info.interrupt)));
+                  signal_name(signal_from_intr(ctx->gpr.info.interrupt)));
 
     while (cpu->state != gdb_cpu_state_t::RESUMING) {
         // Idle the CPU until NMI wakes it

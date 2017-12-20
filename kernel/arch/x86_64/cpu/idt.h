@@ -30,35 +30,35 @@ extern "C" idt_entry_64_t idt[];
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58
 
-// isr_context->gpr->r order
-#define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr->r[0])
-#define ISR_CTX_REG_RSI(ctx)            ((ctx)->gpr->r[1])
-#define ISR_CTX_REG_RDX(ctx)            ((ctx)->gpr->r[2])
-#define ISR_CTX_REG_RCX(ctx)            ((ctx)->gpr->r[3])
-#define ISR_CTX_REG_R8(ctx)             ((ctx)->gpr->r[4])
-#define ISR_CTX_REG_R9(ctx)             ((ctx)->gpr->r[5])
-#define ISR_CTX_REG_RAX(ctx)            ((ctx)->gpr->r[6])
-#define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr->r[7])
-#define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr->r[8])
-#define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr->r[9])
-#define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr->r[10])
-#define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr->r[11])
-#define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr->r[12])
-#define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr->r[13])
-#define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr->r[14])
+// isr_context->gpr.r order
+#define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr.r[0])
+#define ISR_CTX_REG_RSI(ctx)            ((ctx)->gpr.r[1])
+#define ISR_CTX_REG_RDX(ctx)            ((ctx)->gpr.r[2])
+#define ISR_CTX_REG_RCX(ctx)            ((ctx)->gpr.r[3])
+#define ISR_CTX_REG_R8(ctx)             ((ctx)->gpr.r[4])
+#define ISR_CTX_REG_R9(ctx)             ((ctx)->gpr.r[5])
+#define ISR_CTX_REG_RAX(ctx)            ((ctx)->gpr.r[6])
+#define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr.r[7])
+#define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr.r[8])
+#define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr.r[9])
+#define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr.r[10])
+#define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr.r[11])
+#define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr.r[12])
+#define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr.r[13])
+#define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr.r[14])
 
-#define ISR_CTX_REG_RIP(ctx)            ((ctx)->gpr->iret.rip)
-#define ISR_CTX_REG_RSP(ctx)            ((ctx)->gpr->iret.rsp)
-#define ISR_CTX_REG_RFLAGS(ctx)         ((ctx)->gpr->iret.rflags)
+#define ISR_CTX_REG_RIP(ctx)            ((ctx)->gpr.iret.rip)
+#define ISR_CTX_REG_RSP(ctx)            ((ctx)->gpr.iret.rsp)
+#define ISR_CTX_REG_RFLAGS(ctx)         ((ctx)->gpr.iret.rflags)
 
-#define ISR_CTX_REG_CS(ctx)             ((ctx)->gpr->iret.cs)
-#define ISR_CTX_REG_SS(ctx)             ((ctx)->gpr->iret.ss)
-#define ISR_CTX_REG_DS(ctx)             ((ctx)->gpr->s[0])
-#define ISR_CTX_REG_ES(ctx)             ((ctx)->gpr->s[1])
-#define ISR_CTX_REG_FS(ctx)             ((ctx)->gpr->s[2])
-#define ISR_CTX_REG_GS(ctx)             ((ctx)->gpr->s[3])
+#define ISR_CTX_REG_CS(ctx)             ((ctx)->gpr.iret.cs)
+#define ISR_CTX_REG_SS(ctx)             ((ctx)->gpr.iret.ss)
+#define ISR_CTX_REG_DS(ctx)             ((ctx)->gpr.s[0])
+#define ISR_CTX_REG_ES(ctx)             ((ctx)->gpr.s[1])
+#define ISR_CTX_REG_FS(ctx)             ((ctx)->gpr.s[2])
+#define ISR_CTX_REG_GS(ctx)             ((ctx)->gpr.s[3])
 
-#define ISR_CTX_REG_CR3(ctx)            ((ctx)->gpr->cr3)
+#define ISR_CTX_REG_CR3(ctx)            ((ctx)->gpr.cr3)
 
 #define ISR_CTX_ERRCODE(ctx)            ((ctx)->info.error_code)
 #define ISR_CTX_INTR(ctx)               ((ctx)->info.interrupt)
@@ -166,7 +166,7 @@ struct isr_resume_context_t {
 struct isr_context_t {
     isr_resume_context_t resume;
     isr_fxsave_context_t * fpr;
-    isr_gpr_context_t * gpr;
+    isr_gpr_context_t gpr;
 };
 
 typedef isr_context_t *(*irq_dispatcher_handler_t)(

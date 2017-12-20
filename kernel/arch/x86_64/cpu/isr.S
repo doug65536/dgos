@@ -198,12 +198,12 @@ isr_common:
 	push_cfi %rax
 
 	// Get segment registers packed into %r13
-	mov %es,%r13w
-	shl $16,%r13d
-	mov %ds,%r13w
-	mov %gs,%ax
+	mov %gs,%eax
+	mov %es,%r13d
 	shl $16,%eax
+	shl $16,%r13d
 	mov %fs,%ax
+	mov %ds,%r13w
 	shl $32,%rax
 	or %rax,%r13
 
@@ -227,7 +227,6 @@ isr_common:
 .Lafter_fpu_save:
 
 	// Make structure on the stack
-	push_cfi %rsp
 	push_cfi %rax
 	push_cfi $0
 	push_cfi $0
@@ -235,6 +234,9 @@ isr_common:
 	// Pass intr, ctx
 	mov %rsp,%rsi
 	mov 1*8(%rbp),%edi
+
+	// Align stack pointer
+	sub_rsp 8
 
 	// Interrupt dispatch
 	// 0x00-0x1F -> exception_isr_handler
@@ -267,7 +269,7 @@ isr_common:
 	// the passed one to continue with this thread
 	mov %rax,%rsp
 
-	lea 20*8(%rsp),%rbp
+	lea 19*8(%rax),%rbp
 
 	// Pop outgoing cleanup data
 	// Used to adjust outgoing thread state after switching stack
@@ -280,8 +282,6 @@ isr_common:
 
 	// Pop the pointer to the FPU context
 	pop_cfi %rdi
-	// Pop the pointer to the general registers
-	pop_cfi %rsp
 
 	// NOTE: this instruction may be patched to call one of the xsave versions!
 	jmp isr_restore_fxrstor
@@ -362,7 +362,7 @@ isr_common:
 	pop_cfi %r15
 	pop_cfi %rbp
 
-	addq $16,%rsp
+	add_rsp 16
 	.cfi_def_cfa_offset 8
 
 	iretq

@@ -1022,7 +1022,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
             pte_t page_flags;
 
-            if (ctx->gpr->info.error_code & CTX_ERRCODE_PF_W)
+            if (ctx->gpr.info.error_code & CTX_ERRCODE_PF_W)
                 page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
             else
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
@@ -1106,7 +1106,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             return ctx;
         } else {
             printdbg("Invalid page fault at 0x%zx, RIP=%p\n",
-                     fault_addr, (void*)ctx->gpr->iret.rip);
+                     fault_addr, (void*)ctx->gpr.iret.rip);
             if (thread_get_exception_top())
                 return 0;
 
@@ -1129,39 +1129,53 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              "     reserved bit violation=%d\n"
              "     instruction fetch=%d\n"
              "     protection key violation=%d\n"
-             "     SGX violation=%d\n"
-             "PTE: present_mask=0x%x\n"
-             "     present=%d\n"
-             "     writable=%d\n"
-             "     user=%d\n"
-             "     write through=%d\n"
-             "     cache disable=%d\n"
-             "     accessed=%d\n"
-             "     dirty=%d\n"
-             "     PAT=%d\n"
-             "     global=%d\n"
-             "     physaddr=0x%lx\n"
-             "     no execute=%d\n"
-             "------------------\n",
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_P),
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_W),
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_U),
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_R),
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_I),
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_PK),
-             !!(ctx->gpr->info.error_code & CTX_ERRCODE_PF_SGX),
-             present_mask,
-             !!(pte & PTE_PRESENT),
-             !!(pte & PTE_WRITABLE),
-             !!(pte & PTE_USER),
-             !!(pte & PTE_PWT),
-             !!(pte & PTE_PCD),
-             !!(pte & PTE_ACCESSED),
-             !!(pte & PTE_DIRTY),
-             !!(pte & PTE_PTEPAT),
-             !!(pte & PTE_GLOBAL),
-             (pte & PTE_ADDR),
-             !!(pte & PTE_NX));
+             "     SGX violation=%d\n",
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_P),
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_W),
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_U),
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_R),
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_I),
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_PK),
+             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_SGX));
+    static char const *pagetable_names[] = {
+        "PML4",
+        "PDPT",
+        "PD",
+        "PTE"
+    };
+
+    printdbg("     present_mask=0x%x\n",
+             present_mask);
+
+    for (int i = 3; i >= 0; --i) {
+        if (!((0x8 >> i) & present_mask))
+            continue;
+        printdbg("%s:\n"
+                 "     present=%d\n"
+                 "     writable=%d\n"
+                 "     user=%d\n"
+                 "     write through=%d\n"
+                 "     cache disable=%d\n"
+                 "     accessed=%d\n"
+                 "     dirty=%d\n"
+                 "     PAT=%d\n"
+                 "     global=%d\n"
+                 "     physaddr=0x%lx\n"
+                 "     no execute=%d\n"
+                 "------------------\n",
+                 pagetable_names[i],
+                 !!(*ptes[i] & PTE_PRESENT),
+                 !!(*ptes[i] & PTE_WRITABLE),
+                 !!(*ptes[i] & PTE_USER),
+                 !!(*ptes[i] & PTE_PWT),
+                 !!(*ptes[i] & PTE_PCD),
+                 !!(*ptes[i] & PTE_ACCESSED),
+                 !!(*ptes[i] & PTE_DIRTY),
+                 !!(*ptes[i] & PTE_PTEPAT),
+                 !!(*ptes[i] & PTE_GLOBAL),
+                 (*ptes[i] & PTE_ADDR),
+                 !!(*ptes[i] & PTE_NX));
+    }
 
     return 0;
 }
