@@ -446,7 +446,7 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
 
     if (reg < 16) {
         // reg  0-15 xmm0-xmm15 (128 bits each)
-        return ctx->fpr->xmm[reg].qword;
+        return ISR_CTX_SSE_XMMn_q_ptr(ctx, reg);
     } else if (sse_avx_offset && reg < 32) {
         // reg 16-31 ymm0h-ymm15h (128 bits each)
         reg -= 16;
@@ -573,8 +573,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
         for (int i = 0; i < 16; ++i) {
             printdbg("%sxmm%d=%16lx%16lx\n",
                      i > 9 ? "" : " ", i,
-                     ctx->fpr->xmm[i].qword[1],
-                    ctx->fpr->xmm[i].qword[0]);
+                     ISR_CTX_SSE_XMMn_q(ctx, i, 1),
+                     ISR_CTX_SSE_XMMn_q(ctx, i, 0));
         }
     }
 
@@ -585,57 +585,39 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  ctx->gpr.s[i]);
     }
 
-    // ss:rsp
-    printdbg("ss:rsp=%4lx:%16lx\n",
-             ctx->gpr.iret.ss,
-             ctx->gpr.iret.rsp);
-    // cs:rip
-    printdbg("cs:rip=%4lx:%16lx\n",
-             ctx->gpr.iret.cs,
-             (uintptr_t)ctx->gpr.iret.rip);
+    printdbg("ss:rsp=%4lx:%16lx\n", ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
+    printdbg("cs:rip=%4lx:%16lx\n", ISR_CTX_REG_CS(ctx), ISR_CTX_REG_RIP(ctx));
 
     // Exception
-    if (ctx->gpr.info.interrupt < 32) {
+    if (ISR_CTX_INTR(ctx) < 32) {
         printdbg("Exception 0x%02lx %s\n",
-                 ctx->gpr.info.interrupt,
-                 exception_names[ctx->gpr.info.interrupt]);
+                 ISR_CTX_INTR(ctx),
+                 exception_names[ISR_CTX_INTR(ctx)]);
     } else {
-        printdbg("Interrupt 0x%02lx\n",
-                 ctx->gpr.info.interrupt);
+        printdbg("Interrupt 0x%02lx\n", ISR_CTX_INTR(ctx));
     }
 
     // mxcsr and description
-    cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
-                       ctx->fpr->mxcsr);
-    printdbg("mxcsr=%04x %s\n",
-             ctx->fpr->mxcsr, fmt_buf);
+    cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf), ISR_CTX_SSE_MXCSR(ctx));
+    printdbg("mxcsr=%04x %s\n", ISR_CTX_SSE_MXCSR(ctx), fmt_buf);
 
     // fpucw and description
-    cpu_describe_fpucw(fmt_buf, sizeof(fmt_buf),
-                       ctx->fpr->fcw);
-    printdbg("fpucw=%04x %s\n",
-             ctx->fpr->fcw, fmt_buf);
+    cpu_describe_fpucw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FCW(ctx));
+    printdbg("fpucw=%04x %s\n", ISR_CTX_FPU_FCW(ctx), fmt_buf);
 
     // fpusw and description
-    cpu_describe_fpusw(fmt_buf, sizeof(fmt_buf),
-                       ctx->fpr->fsw);
-    printdbg("fpusw=%04x %s\n",
-             ctx->fpr->fsw, fmt_buf);
+    cpu_describe_fpusw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FSW(ctx));
+    printdbg("fpusw=%04x %s\n", ISR_CTX_FPU_FSW(ctx), fmt_buf);
 
     // fault address
-    printdbg("cr2=%16lx\n",
-             cpu_get_fault_address());
+    printdbg("cr2=%16lx\n", cpu_get_fault_address());
 
     // error code
-    printdbg("Error code 0x%16lx\n",
-             ctx->gpr.info.error_code);
+    printdbg("Error code 0x%16lx\n", ISR_CTX_ERRCODE(ctx));
 
     // rflags (it's actually only 22 bits) and description
-    cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
-                       ctx->gpr.iret.rflags);
-    printdbg("rflags=%06lx %s\n",
-             ctx->gpr.iret.rflags,
-             fmt_buf);
+    cpu_describe_eflags(fmt_buf, sizeof(fmt_buf), ISR_CTX_REG_RFLAGS(ctx));
+    printdbg("rflags=%06lx %s\n", ISR_CTX_REG_RFLAGS(ctx), fmt_buf);
 
     // fsbase
     printdbg("fsbase=%16zx\n", fsbase);
@@ -669,8 +651,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
         // XMM register value
         snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx%16lx ",
-                ctx->fpr->xmm[i].qword[0],
-                ctx->fpr->xmm[i].qword[1]);
+                ISR_CTX_SSE_XMMn_q(ctx, i, 1),
+                ISR_CTX_SSE_XMMn_q(ctx, i, 0));
         con_draw_xy(35, i, fmt_buf, color);
     }
 
@@ -686,38 +668,38 @@ void dump_context(isr_context_t *ctx, int to_screen)
     // ss:rsp
     con_draw_xy(0, 15, "ss:rsp", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16lx ",
-             ctx->gpr.iret.ss, ctx->gpr.iret.rsp);
+             ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
     con_draw_xy(6, 15, fmt_buf, color);
 
     // cs:rip
     con_draw_xy(0, 16, "cs:rip", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%04lx:%16zx",
-             ctx->gpr.iret.cs, (uintptr_t)ctx->gpr.iret.rip);
+             ISR_CTX_REG_CS(ctx), (uintptr_t)ISR_CTX_REG_RIP(ctx));
     con_draw_xy(6, 16, fmt_buf, color);
 
-    if (ctx->gpr.info.interrupt < 32) {
+    if (ISR_CTX_INTR(ctx) < 32) {
         // exception
         con_draw_xy(0, 17, "Exception", color);
         snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
-                 ctx->gpr.info.interrupt,
-                 exception_names[ctx->gpr.info.interrupt]);
+                 ISR_CTX_INTR(ctx),
+                 exception_names[ISR_CTX_INTR(ctx)]);
         con_draw_xy(9, 17, fmt_buf, color);
     } else {
         con_draw_xy(0, 17, "Interrupt", color);
         snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx",
-                 ctx->gpr.info.interrupt);
+                 ISR_CTX_INTR(ctx));
         con_draw_xy(9, 17, fmt_buf, color);
     }
 
     // MXCSR
     width = snprintf(fmt_buf, sizeof(fmt_buf), "=%04x",
-                     ctx->fpr->mxcsr);
+                     ISR_CTX_SSE_MXCSR(ctx));
     con_draw_xy(63-width, 16, "mxcsr", color);
     con_draw_xy(68-width, 16, fmt_buf, color);
 
     // MXCSR description
     width = cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
-                       ctx->fpr->mxcsr);
+                       ISR_CTX_SSE_MXCSR(ctx));
     con_draw_xy(68-width, 17, fmt_buf, color);
 
     // fault address
@@ -729,18 +711,18 @@ void dump_context(isr_context_t *ctx, int to_screen)
     // error code
     con_draw_xy(0, 18, "Error code", color);
     snprintf(fmt_buf, sizeof(fmt_buf), " 0x%16lx",
-             ctx->gpr.info.error_code);
+             ISR_CTX_ERRCODE(ctx));
     con_draw_xy(10, 18, fmt_buf, color);
 
     // rflags (it's actually only 22 bits)
     con_draw_xy(0, 19, "rflags", color);
     width = snprintf(fmt_buf, sizeof(fmt_buf), "=%06lx ",
-             ctx->gpr.iret.rflags);
+             ISR_CTX_REG_RFLAGS(ctx));
     con_draw_xy(6, 19, fmt_buf, color);
 
     // rflags description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf),
-                       ctx->gpr.iret.rflags);
+                       ISR_CTX_REG_RFLAGS(ctx));
     con_draw_xy(6+width, 19, fmt_buf, color);
 
     // fsbase
@@ -759,7 +741,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     //                 msr_get(0x1DD));
     //con_draw_xy(6, 22, fmt_buf, color);
 
-    if (ctx->gpr.info.interrupt == INTR_EX_GPF)
+    if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)
         apic_dump_regs(0);
 
     stack_trace(ctx, dump_frame);
@@ -769,25 +751,25 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 {
     if (unhandled_exception_handler_vec) {
         isr_context_t *handled_ctx = unhandled_exception_handler_vec(
-                    ctx->gpr.info.interrupt, ctx);
+                    ISR_CTX_INTR(ctx), ctx);
 
         if (handled_ctx)
             return handled_ctx;
     }
 
-    char const *name = ctx->gpr.info.interrupt < countof(exception_names)
-            ? exception_names[ctx->gpr.info.interrupt]
+    char const *name = ISR_CTX_INTR(ctx) < countof(exception_names)
+            ? exception_names[ISR_CTX_INTR(ctx)]
             : nullptr;
 
-    if (ctx->gpr.info.interrupt == INTR_EX_OPCODE) {
-        uint8_t const *chk = (uint8_t const *)ctx->gpr.iret.rip;
+    if (ISR_CTX_INTR(ctx) == INTR_EX_OPCODE) {
+        uint8_t const *chk = (uint8_t const *)ISR_CTX_REG_RIP(ctx);
         printk("Opcode = %02x\n", *chk);
     }
 
     printk("\nUnhandled exception 0x%zx (%s) at RIP=%p\n",
-           ctx->gpr.info.interrupt,
+           ISR_CTX_INTR(ctx),
            name ? name : "??",
-           (void*)ctx->gpr.iret.rip);
+           (void*)ISR_CTX_REG_RIP(ctx));
 
     dump_context(ctx, 1);
     cpu_debug_break();

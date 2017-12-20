@@ -60,8 +60,8 @@ extern "C" idt_entry_64_t idt[];
 
 #define ISR_CTX_REG_CR3(ctx)            ((ctx)->gpr.cr3)
 
-#define ISR_CTX_ERRCODE(ctx)            ((ctx)->info.error_code)
-#define ISR_CTX_INTR(ctx)               ((ctx)->info.interrupt)
+#define ISR_CTX_ERRCODE(ctx)            ((ctx)->gpr.info.error_code)
+#define ISR_CTX_INTR(ctx)               ((ctx)->gpr.info.interrupt)
 
 #define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
 #define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
@@ -74,6 +74,11 @@ extern "C" idt_entry_64_t idt[];
 #define ISR_CTX_FPU_STn_31_0(ctx, n)    ((ctx)->fpr->st[(n)].st_mm_31_0)
 #define ISR_CTX_FPU_STn_63_32(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_63_32)
 #define ISR_CTX_FPU_STn_79_64(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_79_64)
+
+#define ISR_CTX_SSE_XMMn_b_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].byte)
+#define ISR_CTX_SSE_XMMn_w_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].word)
+#define ISR_CTX_SSE_XMMn_d_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].dword)
+#define ISR_CTX_SSE_XMMn_q_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].qword)
 
 #define ISR_CTX_SSE_XMMn_b(ctx, n, i)   ((ctx)->fpr->xmm[(n)].byte[(i)])
 #define ISR_CTX_SSE_XMMn_w(ctx, n, i)   ((ctx)->fpr->xmm[(n)].word[(i)])

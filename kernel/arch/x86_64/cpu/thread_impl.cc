@@ -764,8 +764,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     assert(isrctx->gpr.s[3] == (GDT_SEL_USER_DATA | 3));
 
     // Removed until I can range check user mode stack
-    //assert(isrctx->gpr.iret.rsp >= (uintptr_t)thread->stack);
-    //assert(isrctx->gpr.iret.rsp <
+    //assert(ISR_CTX_REG_RSP(isrctx) >= (uintptr_t)thread->stack);
+    //assert(ISR_CTX_REG_RSP(isrctx) <
     //       (uintptr_t)thread->stack + thread->stack_size + PAGE_SIZE);
 
     if (thread != outgoing) {

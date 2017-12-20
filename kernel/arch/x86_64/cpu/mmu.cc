@@ -1022,7 +1022,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
             pte_t page_flags;
 
-            if (ctx->gpr.info.error_code & CTX_ERRCODE_PF_W)
+            if (ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_W)
                 page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
             else
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
@@ -1106,7 +1106,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             return ctx;
         } else {
             printdbg("Invalid page fault at 0x%zx, RIP=%p\n",
-                     fault_addr, (void*)ctx->gpr.iret.rip);
+                     fault_addr, (void*)ISR_CTX_REG_RIP(ctx));
             if (thread_get_exception_top())
                 return 0;
 
@@ -1130,13 +1130,13 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              "     instruction fetch=%d\n"
              "     protection key violation=%d\n"
              "     SGX violation=%d\n",
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_P),
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_W),
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_U),
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_R),
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_I),
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_PK),
-             !!(ctx->gpr.info.error_code & CTX_ERRCODE_PF_SGX));
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_P),
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_W),
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_U),
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_R),
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_I),
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_PK),
+             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_SGX));
     static char const *pagetable_names[] = {
         "PML4",
         "PDPT",

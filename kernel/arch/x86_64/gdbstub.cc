@@ -898,15 +898,15 @@ void gdbstub_t::run()
             step_cpu_nr = 0;
 
             ctx = gdb_cpu_ctrl_t::context_of(cpu_nr);
-            sig = gdb_cpu_ctrl_t::signal_from_intr(ctx->gpr.info.interrupt);
+            sig = gdb_cpu_ctrl_t::signal_from_intr(ISR_CTX_INTR(ctx));
 
-            if (ctx->gpr.info.interrupt == INTR_EX_BREAKPOINT) {
+            if (ISR_CTX_INTR(ctx) == INTR_EX_BREAKPOINT) {
                 // If we planted the breakpoint, adjust RIP
                 if (gdb_cpu_ctrl_t::breakpoint_get_byte(
-                            (uint8_t*)ctx->gpr.iret.rip - 1,
+                            (uint8_t*)ISR_CTX_REG_RIP(ctx) - 1,
                             ctx->gpr.cr3) >= 0) {
-                    ctx->gpr.iret.rip = (int(*)(void*))
-                            ((uint8_t*)ctx->gpr.iret.rip - 1);
+                    ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
+                            ((uint8_t*)ISR_CTX_REG_RIP(ctx) - 1);
                 }
 
                 //replyf("T%02xswbreak:;", sig);
@@ -2073,9 +2073,9 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
         if (cpu.state == gdb_cpu_state_t::FROZEN) {
             // Set trap and resume flag if single stepping
             if (single_step)
-                cpu.ctx->gpr.iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
+                ISR_CTX_REG_RFLAGS(cpu.ctx) |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
             else
-                cpu.ctx->gpr.iret.rflags &= ~CPU_EFLAGS_TF;
+                ISR_CTX_REG_RFLAGS(cpu.ctx) &= ~CPU_EFLAGS_TF;
 
             // Change state to break it out of the halt loop
             cpu.state = gdb_cpu_state_t::RESUMING;
@@ -2325,7 +2325,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
         static uintptr_t bp_workaround_addr;
 
         // This is the GDB stub
-        if ((ctx->gpr.iret.rflags & CPU_EFLAGS_TF) && bp_workaround_addr) {
+        if ((ISR_CTX_REG_RFLAGS(ctx) & CPU_EFLAGS_TF) && bp_workaround_addr) {
             // We are in a single step breakpoint workaround
 
             // Find the breakpoint we stepped over
@@ -2337,25 +2337,26 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             bp_workaround_addr = 0;
 
             // Disable single-step
-            ctx->gpr.iret.rflags &= ~CPU_EFLAGS_TF;
+            ISR_CTX_REG_RFLAGS(ctx) &= ~CPU_EFLAGS_TF;
 
             // Reenable it
             breakpoint_toggle(*it, true);
             return ctx;
         }
 
-        if (ctx->gpr.info.interrupt == INTR_EX_BREAKPOINT) {
+        if (ISR_CTX_INTR(ctx) == INTR_EX_BREAKPOINT) {
             // Handle hitting breakpoint in stub by deactivating it,
             // single-stepping stepping, and reenabling it (above)
 
             // Adjust RIP back to start of instruction
-            ctx->gpr.iret.rip = (int(*)(void*))((char*)ctx->gpr.iret.rip - 1);
+            ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
+                    ((char*)ctx->gpr.iret.rip - 1);
 
-            bp_workaround_addr = uintptr_t(ctx->gpr.iret.rip);
+            bp_workaround_addr = uintptr_t(ISR_CTX_REG_RIP(ctx));
 
             // Find the breakpoint
             bp_list::iterator it = breakpoint_find(
-                        bp_sw, uintptr_t(ctx->gpr.iret.rip), 0, 0);
+                        bp_sw, uintptr_t(ISR_CTX_REG_RIP(ctx)), 0, 0);
             if (it == bp_sw.end())
                 return 0;
 
@@ -2363,7 +2364,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             breakpoint_toggle(*it, false);
 
             // Single step the instruction
-            ctx->gpr.iret.rflags |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
+            ISR_CTX_REG_RFLAGS(ctx) |= CPU_EFLAGS_TF | CPU_EFLAGS_RF;
 
             return ctx;
         }
@@ -2372,7 +2373,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     }
 
     // Ignore NMI when not freezing
-    if (ctx->gpr.info.interrupt == INTR_EX_NMI &&
+    if (ISR_CTX_INTR(ctx) == INTR_EX_NMI &&
             cpu->state != gdb_cpu_state_t::FREEZING) {
         GDBSTUB_TRACE("Received NMI on cpu %d, continuing\n", cpu->cpu_nr);
         return ctx;
@@ -2384,7 +2385,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     cpu->state = gdb_cpu_state_t::FROZEN;
 
     GDBSTUB_TRACE("CPU entering wait: %d (%s)\n", cpu->cpu_nr,
-                  signal_name(signal_from_intr(ctx->gpr.info.interrupt)));
+                  signal_name(signal_from_intr(ISR_CTX_INTR(ctx))));
 
     while (cpu->state != gdb_cpu_state_t::RESUMING) {
         // Idle the CPU until NMI wakes it
