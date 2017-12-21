@@ -586,7 +586,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
     }
 
     printdbg("ss:rsp=%4lx:%16lx\n", ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
-    printdbg("cs:rip=%4lx:%16lx\n", ISR_CTX_REG_CS(ctx), ISR_CTX_REG_RIP(ctx));
+    printdbg("cs:rip=%4lx:%16lzx\n", ISR_CTX_REG_CS(ctx),
+             uintptr_t(ISR_CTX_REG_RIP(ctx)));
 
     // Exception
     if (ISR_CTX_INTR(ctx) < 32) {
@@ -639,7 +640,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
             con_draw_xy(0, i, reg_names[i], color);
             // General register value
             snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ",
-                     ctx->gpr.r[i]);
+                     ISR_CTX_REG_GPR_n(ctx, i));
             con_draw_xy(3, i, fmt_buf, color);
         }
 
@@ -661,7 +662,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
         con_draw_xy(37+i*8, 18, seg_names[i], color);
         // Segment register value
         snprintf(fmt_buf, sizeof(fmt_buf), "=%04x ",
-                 ctx->gpr.s[i]);
+                 ISR_CTX_REG_SEG_n(ctx, i));
         con_draw_xy(39+i*8, 18, fmt_buf, color);
     }
 

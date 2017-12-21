@@ -30,6 +30,9 @@ extern "C" idt_entry_64_t idt[];
 // Buffer large enough for worst case flags description
 #define CPU_MAX_FLAGS_DESCRIPTION    58
 
+#define ISR_CTX_REG_GPR_n(ctx, i) ((ctx)->gpr.r[(i)])
+#define ISR_CTX_REG_SEG_n(ctx, i) ((ctx)->gpr.s[(i)])
+
 // isr_context->gpr.r order
 #define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr.r[0])
 #define ISR_CTX_REG_RSI(ctx)            ((ctx)->gpr.r[1])
