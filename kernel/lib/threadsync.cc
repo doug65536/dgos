@@ -532,7 +532,6 @@ EXPORT void condvar_wait_noyield(condition_var_t *var,
 EXPORT void condvar_wake_one(condition_var_t *var)
 {
     spinlock_lock_noirq(&var->lock);
-    atomic_barrier();
 
     thread_wait_t volatile *wait = (thread_wait_t*)var->link.next;
     if ((void*)wait != (void*)&var->link) {
@@ -550,10 +549,12 @@ EXPORT void condvar_wake_all(condition_var_t *var)
 {
     spinlock_lock_noirq(&var->lock);
 
+    thread_wait_t *next_wait;
     for (thread_wait_t *wait = (thread_wait_t*)var->link.next;
          wait != (void*)&var->link;
-         wait = (thread_wait_t*)thread_wait_del(&wait->link)) {
+         wait = next_wait) {
         CONDVAR_DTRACE("%p: Waking id %d\n", (void*)wait, wait->thread);
+        next_wait = (thread_wait_t*)thread_wait_del(&wait->link);
         thread_resume(wait->thread);
     }
 
