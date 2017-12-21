@@ -77,7 +77,7 @@ struct cpu_info_t;
 //  THREAD_IS_UNINITIALIZED
 //
 
-struct thread_info_t {
+struct alignas(64) thread_info_t {
     isr_context_t * volatile ctx;
 
     void *xsave_ptr;
@@ -121,8 +121,6 @@ struct thread_info_t {
 
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
-
-    void *align[1];
 };
 
 C_ASSERT(offsetof(thread_info_t, flags) == 64);
@@ -143,7 +141,7 @@ C_ASSERT((sizeof(thread_info_t) & 63) == 0);
 
 // Store in a big array, for now
 #define MAX_THREADS 512
-static thread_info_t threads[MAX_THREADS] __aligned(64);
+static thread_info_t threads[MAX_THREADS];
 static size_t volatile thread_count;
 uint32_t volatile thread_smp_running;
 int thread_idle_ready;
@@ -153,7 +151,7 @@ size_t storage_next_slot;
 static size_t constexpr syscall_stack_size = (size_t(1) << 16);
 static size_t constexpr xsave_stack_size = (size_t(1) << 16);
 
-struct cpu_info_t {
+struct alignas(64) cpu_info_t {
     cpu_info_t *self;
     thread_info_t * volatile cur_thread;
     tss_t *tss_ptr;
@@ -176,7 +174,7 @@ C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
 #define MAX_CPUS    64
-static cpu_info_t cpus[MAX_CPUS] __aligned(64);
+static cpu_info_t cpus[MAX_CPUS];
 
 static volatile uint32_t cpu_count;
 
@@ -210,7 +208,7 @@ static uint32_t get_apic_id(void)
 
 static __always_inline cpu_info_t *this_cpu(void)
 {
-    cpu_info_t *cpu = (cpu_info_t *)cpu_gs_read_ptr();
+    cpu_info_t *cpu = (cpu_info_t *)cpu_gs_read_ptr<0>();
     assert(cpu >= cpus && cpu < cpus + countof(cpus));
     assert(cpu->self == cpu);
     return cpu;
@@ -218,7 +216,7 @@ static __always_inline cpu_info_t *this_cpu(void)
 
 static __always_inline thread_info_t *this_thread(void)
 {
-    return (thread_info_t*)cpu_gs_read_ptr(offsetof(cpu_info_t, cur_thread));
+    return (thread_info_t*)cpu_gs_read_ptr<offsetof(cpu_info_t, cur_thread)>();
 }
 
 EXPORT void thread_yield(void)
@@ -514,7 +512,7 @@ void thread_init(int ap)
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
-    cpu_set_gs(GDT_SEL_USER_DATA | 3);
+    //cpu_set_gs(GDT_SEL_USER_DATA | 3);
     cpu_set_gsbase(cpu);
 
     if (!ap) {
@@ -1023,7 +1021,7 @@ int thread_cpu_number()
 isr_context_t *thread_schedule_if_idle(isr_context_t *ctx)
 {
     thread_info_t *cur_thread = this_thread();
-    if (cur_thread - threads < cpu_count)
+    if (cur_thread - threads < cpu_count && thread_idle_ready)
         return thread_schedule(ctx);
     return ctx;
 }
