@@ -232,6 +232,8 @@ static time_of_day_t cmos_read_gettimeofday(unique_lock<spinlock> const& lock)
 
 static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 {
+    //printdbg("CMOS IRQ\n");
+
     unique_lock<spinlock> lock(cmos_lock);
 
     uint8_t intr_cause = cmos_read(CMOS_REG_STATUS_C, lock);
@@ -264,9 +266,18 @@ void cmos_init(void)
 {
     unique_lock<spinlock> lock(cmos_lock);
 
+    irq_hook(8, cmos_irq_handler);
+
+    // Set IRQ rate to 2Hz, just in case
+    uint8_t cmos_status_a = cmos_read(CMOS_REG_STATUS_A, lock);
+    cmos_status_a = (cmos_status_a & ~CMOS_STATUS_A_RATE) |
+            CMOS_STATUS_A_RATE_2;
+    cmos_write(CMOS_REG_STATUS_A, cmos_status_a, lock);
+
     cmos_status_b = cmos_read(CMOS_REG_STATUS_B, lock);
     time_ofday_set_handler(cmos_gettimeofday);
 
+    // Keep rereading the time until we get the same values twice
     time_of_day_t tod1;
     time_of_day_t tod2;
     tod1 = cmos_read_gettimeofday(lock);
@@ -293,11 +304,14 @@ void cmos_init(void)
     // Enable update ended IRQ, don't disable clock update
     cmos_status_b |= CMOS_STATUS_B_UEI;
 
-    cmos_write(CMOS_REG_STATUS_B, cmos_status_b, lock);
+    // Disable periodic IRQ
+    cmos_status_b &= ~CMOS_STATUS_C_PI;
 
-    irq_hook(8, cmos_irq_handler);
-    irq_setmask(8, true);
+    // Enable update ended IRQ
+    cmos_write(CMOS_REG_STATUS_B, cmos_status_b, lock);
 
     // EOI just in case
     cmos_read(CMOS_REG_STATUS_C, lock);
+
+    irq_setmask(8, true);
 }
