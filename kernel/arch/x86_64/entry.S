@@ -23,28 +23,6 @@
 entry:
     debugind '1'
 
-//    push %rax
-//    push %rdx
-//    push %rcx
-//    mov %cr4,%rax
-//    or $CPU_CR4_FSGSBASE,%rax
-//    mov %rax,%cr4
-//    rdtscp
-//    shl $32,%rdx
-//    or %rdx,%rax
-//    mov %rax,%r12
-//    call rdfsbase_perf
-//    rdtscp
-//    shl $32,%rdx
-//    or %rdx,%rax
-//    sub %r12,%rax
-//    mov $60000000,%rcx
-//    xor %edx,%edx
-//    div %rcx
-//    pop %rcx
-//    pop %rdx
-//    pop %rax
-
     // Align the stack
     and $-16,%rsp
 
@@ -442,3 +420,89 @@ pure_call_message:
 
 .global __dso_handle
 __dso_handle: .quad __dso_handle
+
+
+//    push %rax
+//    push %rdx
+//    push %rcx
+//    mov %cr4,%rax
+//    or $CPU_CR4_FSGSBASE,%rax
+//    mov %rax,%cr4
+//    rdtscp
+//    shl $32,%rdx
+//    or %rdx,%rax
+//    mov %rax,%r12
+//    call rdfsbase_perf
+//    rdtscp
+//    shl $32,%rdx
+//    or %rdx,%rax
+//    sub %r12,%rax
+//    mov $60000000,%rcx
+//    xor %edx,%edx
+//    div %rcx
+//    pop %rcx
+//    pop %rdx
+//    pop %rax
+
+
+//            push %rax
+//            push %rdx
+//            push %rcx
+//            mov %cr4,%rax
+//            or $CPU_CR4_FSGSBASE,%rax
+//            mov %rax,%cr4
+//            rdtscp
+//            shl $32,%rdx
+//            or %rdx,%rax
+//            mov %rax,%r12
+//            mov $60000000,%ecx
+//        .align 16
+//        0:
+//        .macro iter_step
+//            mov %cr2,%rax
+//            add $23,%r9
+//            add $23,%r9
+//            add $23,%r9
+//            add $23,%r9
+//            add $23,%r9
+//            add $23,%r9
+//            add $23,%r9
+//            add $23,%r9
+//        .endm
+
+//        .macro iter
+//            iter_step
+//            iter_step
+//            iter_step
+//            iter_step
+//            iter_step
+//            iter_step
+//            iter_step
+//            iter_step
+//        .endm
+
+//        .macro iter_block
+//            iter
+//            iter
+//            iter
+//            iter
+//            iter
+//            iter
+//            iter
+//            iter
+//        .endm
+
+//            iter_block
+
+//            add $-1,%ecx
+//            jnz 0b
+//            rdtscp
+//            shl $32,%rdx
+//            or %rdx,%rax
+//            sub %r12,%rax
+//            mov $60000000,%rcx
+//            xor %edx,%edx
+//            div %rcx
+//            pop %rcx
+//            pop %rdx
+//            pop %rax
