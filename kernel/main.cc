@@ -55,10 +55,10 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         0
+#define ENABLE_SHELL_THREAD         1
 #define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
-#define ENABLE_MUTEX_THREAD         0
+#define ENABLE_MUTEX_THREAD         64
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_STRESS_MMAP_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
@@ -841,6 +841,7 @@ static int init_thread(void *p)
     file_closedir(od);
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
+    printdbg("Running framebuffer stress\n");
     thread_t draw_thread_id = thread_create(draw_test, 0, 0, 0);
     printdbg("draw thread id=%d\n", draw_thread_id);
 #endif
@@ -851,16 +852,22 @@ static int init_thread(void *p)
     thread_create(find_vbe, (void*)0xF0000, 0, 0, false);
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
+    printdbg("Running context switch stress with %d threads\n",
+             ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
         thread_create(ctx_sw_thread, 0, 0, 0);
     }
 #endif
 
 #if ENABLE_SHELL_THREAD > 0
+    printdbg("Running shell thread\n");
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0, false);
 #endif
 
 #if ENABLE_SLEEP_THREAD
+    printdbg("Running sleep stress with %d threads\n",
+             ENABLE_SLEEP_THREAD);
+
     static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
 
     for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
@@ -871,6 +878,8 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_READ_STRESS_THREAD > 0
+    printdbg("Running block read stress with %d threads\n",
+             ENABLE_READ_STRESS_THREAD);
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         thread_create(read_stress, (char*)(uintptr_t)
                       (0xb8000+ 80*2 + 2*i), 0, 0);
@@ -878,6 +887,8 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_REGISTER_THREAD > 0
+    printdbg("Running register stress with %d threads\n",
+             ENABLE_READ_STRESS_THREAD);
     for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
         thread_create(register_check, (void*)
                       (0xDEADFEEDF00DD00D +
@@ -886,19 +897,24 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_MUTEX_THREAD > 0
+    printdbg("Running mutex stress with %d threads\n", ENABLE_MUTEX_THREAD);
     mutex_init(&stress_lock);
     for (int i = 0; i < ENABLE_MUTEX_THREAD; ++i) {
-        thread_create(stress_mutex, 0, 0, 0);
+        thread_create(stress_mutex, 0, 0, 0, false);
     }
 #endif
 
 #if ENABLE_STRESS_MMAP_THREAD > 0
+    printdbg("Running mmap stress with %d threads\n",
+             ENABLE_STRESS_MMAP_THREAD);
     for (int i = 0; i < ENABLE_STRESS_MMAP_THREAD; ++i) {
         thread_create(stress_mmap_thread, 0, 0, 0);
     }
 #endif
 
 #if ENABLE_STRESS_HEAP_THREAD > 0
+    printdbg("Running heap stress with %d threads\n",
+             ENABLE_STRESS_HEAP_THREAD);
     for (int i = 0; i < ENABLE_STRESS_HEAP_THREAD; ++i) {
         thread_create(stress_heap_thread, 0, 0, 0);
     }
@@ -917,10 +933,10 @@ static int init_thread(void *p)
 
 //    com1->write(input.data(), input.size(), input.size());
 
-    for (size_t i = 0, e = thread_get_cpu_count(); i != e; ++i) {
-        thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0, false);
-        thread_set_affinity(tid, size_t(1) << i);
-    }
+//    for (size_t i = 0, e = thread_get_cpu_count(); i != e; ++i) {
+//        thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0, false);
+//        thread_set_affinity(tid, size_t(1) << i);
+//    }
 
     return 0;
 }
