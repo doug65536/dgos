@@ -300,7 +300,7 @@ static __always_inline void cpu_flush_tlb(void)
 
 static __always_inline void cpu_flush_cache()
 {
-    __asm__ __volatile__ ("wbinvd\n\t");
+    __asm__ __volatile__ ("wbinvd\n\t" : : : "memory");
 }
 
 static __always_inline void cpu_set_fs(uint16_t selector)
