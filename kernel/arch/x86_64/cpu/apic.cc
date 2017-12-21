@@ -1616,7 +1616,8 @@ int apic_init(int ap)
             apic = &apic_x;
         }
 
-        cpu_msr_set(APIC_BASE_MSR, apic_base_msr | APIC_BASE_GENABLE);
+        cpu_msr_set(APIC_BASE_MSR,
+                    (apic_base_msr & ~APIC_BASE_X2ENABLE) | APIC_BASE_GENABLE);
     }
 
     // Set global enable if it is clear
@@ -1624,8 +1625,6 @@ int apic_init(int ap)
         APIC_TRACE("APIC was globally disabled!"
                    " Enabling...\n");
     }
-
-    apic_base_msr &= APIC_BASE_ADDR;
 
     if (!ap) {
         intr_hook(INTR_APIC_TIMER, apic_timer_handler);
@@ -1650,7 +1649,7 @@ int apic_init(int ap)
     assert(apic_base == (cpu_msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
 
     if (ap) {
-        APIC_TRACE("Configuring timer\n");
+        APIC_TRACE("Configuring AP timer\n");
         apic_configure_timer(APIC_LVT_DCR_BY_1,
                              apic_timer_freq / 20,
                              APIC_LVT_TR_MODE_PERIODIC,
@@ -2145,9 +2144,9 @@ static void apic_calibrate()
 
         apic_timer_freq = ccr_freq;
 
-        // Round APIC frequency to nearest multiple of 1MHz
-        apic_timer_freq += 500000;
-        apic_timer_freq -= apic_timer_freq % 1000000;
+//        // Round APIC frequency to nearest multiple of 1MHz
+//        apic_timer_freq += 1790;
+//        apic_timer_freq -= apic_timer_freq % 1790;
 
         // Round CPU frequency to nearest multiple of 1MHz
         cpu_freq += 500000;
