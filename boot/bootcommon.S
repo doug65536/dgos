@@ -124,6 +124,10 @@ pmode_entry:
     xor %eax,%eax
     lldt %ax
 
+    // Clean eflags
+    pushl $2
+    popfl
+
     call cpu_a20_enterpm
 
     call call_constructors
