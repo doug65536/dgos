@@ -100,9 +100,10 @@ void cpu_init(int ap)
 
 void cpu_init_stage2(int ap)
 {
-    mmu_init(ap);
-    if (!ap)
+    if (!ap) {
+        mmu_init();
         thread_init(ap);
+    }
 }
 
 void cpu_hw_init(int ap)

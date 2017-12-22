@@ -36,6 +36,9 @@ entry:
     or $(CPU_CR4_OFXSR | CPU_CR4_OSXMMEX),%rax
     mov %rax,%cr4
 
+    // Get IDT and TSS up asap
+    call idt_gdt_tss_init
+
     debugind '2'
 
     // See if this is the bootstrap processor
@@ -49,8 +52,9 @@ entry:
 ap_init:
     // This is not the bootstrap CPU
 
-    // Get IDT up asap
-    call idt_gdt_tss_init
+    // Load kernel memory mapping ASAP
+    mov root_physaddr,%rax
+    mov %rax,%cr3
 
     // Initialize AP MXCSR
     mov $(CPU_MXCSR_ELF_INIT),%eax
@@ -93,9 +97,6 @@ bsp_init:
     mov %r15d,%eax
     and $0x000FFFFF,%eax
     mov %rax,phys_mem_map
-
-    // Get IDT and TSS up asap
-    call idt_gdt_tss_init
 
     // Save the CPU_MXCSR_MASK
 

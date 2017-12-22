@@ -174,9 +174,6 @@
 // constants above
 typedef uintptr_t pte_t;
 
-typedef uintptr_t physaddr_t;
-typedef uintptr_t linaddr_t;
-
 //
 // Recursive page table mapping
 
@@ -253,7 +250,7 @@ size_t phys_mem_map_count;
 static physmem_range_t mem_ranges[64];
 static size_t usable_mem_ranges;
 
-static physaddr_t root_physaddr;
+physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
 
@@ -1221,13 +1218,8 @@ static void mmu_configure_pat(void)
         cpu_msr_set(CPU_MSR_IA32_PAT, PAT_CFG);
 }
 
-void mmu_init(int ap)
+void mmu_init()
 {
-    if (ap) {
-        cpu_set_page_directory(root_physaddr);
-        return;
-    }
-
     // Hook IPI for TLB shootdown
     intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler);
 
