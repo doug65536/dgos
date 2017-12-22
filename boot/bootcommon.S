@@ -121,6 +121,9 @@ pmode_entry:
     movw %dx,%ss
     and $-16 & 0xFFFF,%esp
 
+    xor %eax,%eax
+    lldt %ax
+
     call cpu_a20_enterpm
 
     call call_constructors
