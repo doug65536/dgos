@@ -265,7 +265,7 @@ bootfat_elf_LDFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-EXTRA_bootfat_elf_DEPENCENCIES = \
+EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
