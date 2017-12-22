@@ -20,6 +20,8 @@ SECTIONS {
 		__ctors_start = .;
 		*(.ctors)
 		*(.ctors.*)
+		*(.init_array)
+		*(SORT(.init_array.*))
 		__ctors_end = .;
 
 		/* --- additional sectors --- */
