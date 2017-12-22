@@ -941,8 +941,6 @@ distclean-local:
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/qemu-emu.mk
 	rm -rf $(DUMPDIR)
-	rm -rf $(MUSL_BUILDDIR)
-	rm -rf $(MUSL_INSTDIR)
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -982,66 +980,6 @@ $(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
 	mkdir -p "$(@D)"
 	rm -f "$@"
 	$(top_srcdir)/genregs.py "$<" > "$@"
-
-# ----------------------------------------------------------------------------
-# Build musl
-
-MUSL_BUILDDIR = $(abs_top_builddir)/musl-build
-MUSL_INSTDIR = $(abs_top_builddir)/musl-install
-MUSL_CFLAGS = \
-	$(NO_REDZONE_FLAGS) \
-	$(NO_UNWIND_TABLES_FLAGS)
-MUSL_ARCH = x86_64
-
-MUSL_SRCDIR = $(abs_top_srcdir)/musl
-
-MUSL_BUILDOUT = \
-	$(MUSL_BUILDDIR)/lib/libxnet.a \
-	$(MUSL_BUILDDIR)/lib/libutil.a \
-	$(MUSL_BUILDDIR)/lib/libc.a \
-	$(MUSL_BUILDDIR)/lib/libm.a \
-	$(MUSL_BUILDDIR)/lib/librt.a \
-	$(MUSL_BUILDDIR)/lib/libdl.a \
-	$(MUSL_BUILDDIR)/lib/libresolv.a \
-	$(MUSL_BUILDDIR)/lib/libpthread.a \
-	$(MUSL_BUILDDIR)/lib/libcrypt.a
-
-MUSL_INSTOUT = \
-	$(MUSL_INSTDIR)/lib/libxnet.a \
-	$(MUSL_INSTDIR)/lib/libutil.a \
-	$(MUSL_INSTDIR)/lib/libc.a \
-	$(MUSL_INSTDIR)/lib/libm.a \
-	$(MUSL_INSTDIR)/lib/librt.a \
-	$(MUSL_INSTDIR)/lib/libdl.a \
-	$(MUSL_INSTDIR)/lib/libresolv.a \
-	$(MUSL_INSTDIR)/lib/libpthread.a \
-	$(MUSL_INSTDIR)/lib/libcrypt.a
-
-$(MUSL_BUILDDIR)/Makefile: $(MUSL_SRCDIR)/configure
-	( \
-		muslpath=$$(readlink -f "$(top_srcdir)/musl") && \
-		mkdir -p $(MUSL_BUILDDIR) && \
-		cd $(MUSL_BUILDDIR) && \
-		CC=$(CC) CXX=$(CXX) AR=$(AR) RANLIB=$(RANLIB) LD=$(LD) \
-		CFLAGS="$(MUSL_CFLAGS)" $$muslpath/configure \
-			--prefix=$(MUSL_INSTDIR) \
-	)
-
-$(MUSL_BUILDOUT): $(MUSL_BUILDDIR)/Makefile
-	( \
-		cd $(MUSL_BUILDDIR) && \
-			make ARCH=$(MUSL_ARCH) \
-	)
-
-$(MUSL_INSTOUT): $(MUSL_BUILDOUT)
-	( \
-		cd $(MUSL_BUILDDIR) && \
-			make install \
-	)
-
-musl: $(MUSL_INSTOUT)
-
-.PHONY: musl
 
 # ----------------------------------------------------------------------------
 # QEMU launcher

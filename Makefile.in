@@ -1058,10 +1058,9 @@ libbootsect_a_CXXFLAGS = \
 	-mrtd -mregparm=3 \
 	-std=c++14 $(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
+	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS)
 
-
-#	$(NO_STACK_CHECK_FLAGS)
 libbootsect_a_CFLAGS = \
 	-m32 \
 	$(REAL_MODE_FLAGS) \
@@ -1070,7 +1069,9 @@ libbootsect_a_CFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	-ffreestanding \
-	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_STACK_CHECK_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
@@ -1118,7 +1119,7 @@ bootfat_elf_LDFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-EXTRA_bootfat_elf_DEPENCENCIES = \
+EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
@@ -1715,39 +1716,6 @@ LIBC_CXXFLAGS = \
 user_shell_SOURCES = \
 	user/test/test.S
 
-
-# ----------------------------------------------------------------------------
-# Build musl
-MUSL_BUILDDIR = $(abs_top_builddir)/musl-build
-MUSL_INSTDIR = $(abs_top_builddir)/musl-install
-MUSL_CFLAGS = \
-	$(NO_REDZONE_FLAGS) \
-	$(NO_UNWIND_TABLES_FLAGS)
-
-MUSL_ARCH = x86_64
-MUSL_SRCDIR = $(abs_top_srcdir)/musl
-MUSL_BUILDOUT = \
-	$(MUSL_BUILDDIR)/lib/libxnet.a \
-	$(MUSL_BUILDDIR)/lib/libutil.a \
-	$(MUSL_BUILDDIR)/lib/libc.a \
-	$(MUSL_BUILDDIR)/lib/libm.a \
-	$(MUSL_BUILDDIR)/lib/librt.a \
-	$(MUSL_BUILDDIR)/lib/libdl.a \
-	$(MUSL_BUILDDIR)/lib/libresolv.a \
-	$(MUSL_BUILDDIR)/lib/libpthread.a \
-	$(MUSL_BUILDDIR)/lib/libcrypt.a
-
-MUSL_INSTOUT = \
-	$(MUSL_INSTDIR)/lib/libxnet.a \
-	$(MUSL_INSTDIR)/lib/libutil.a \
-	$(MUSL_INSTDIR)/lib/libc.a \
-	$(MUSL_INSTDIR)/lib/libm.a \
-	$(MUSL_INSTDIR)/lib/librt.a \
-	$(MUSL_INSTDIR)/lib/libdl.a \
-	$(MUSL_INSTDIR)/lib/libresolv.a \
-	$(MUSL_INSTDIR)/lib/libpthread.a \
-	$(MUSL_INSTDIR)/lib/libcrypt.a
-
 QEMU = qemu-system-x86_64
 QEMU_CPUS = 8
 QEMU_CORES = 4
@@ -1786,9 +1754,10 @@ QEMU_COMMON = \
 	$(QEMU_NET) \
 	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
-	$(QEMU_FLAGS) \
-	$(QEMU_USB)
+	$(QEMU_FLAGS)
 
+
+#	$(QEMU_USB)
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme = \
@@ -9520,8 +9489,6 @@ distclean-local:
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/qemu-emu.mk
 	rm -rf $(DUMPDIR)
-	rm -rf $(MUSL_BUILDDIR)
-	rm -rf $(MUSL_INSTDIR)
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -9561,32 +9528,6 @@ $(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
 	mkdir -p "$(@D)"
 	rm -f "$@"
 	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(MUSL_BUILDDIR)/Makefile: $(MUSL_SRCDIR)/configure
-	( \
-		muslpath=$$(readlink -f "$(top_srcdir)/musl") && \
-		mkdir -p $(MUSL_BUILDDIR) && \
-		cd $(MUSL_BUILDDIR) && \
-		CC=$(CC) CXX=$(CXX) AR=$(AR) RANLIB=$(RANLIB) LD=$(LD) \
-		CFLAGS="$(MUSL_CFLAGS)" $$muslpath/configure \
-			--prefix=$(MUSL_INSTDIR) \
-	)
-
-$(MUSL_BUILDOUT): $(MUSL_BUILDDIR)/Makefile
-	( \
-		cd $(MUSL_BUILDDIR) && \
-			make ARCH=$(MUSL_ARCH) \
-	)
-
-$(MUSL_INSTOUT): $(MUSL_BUILDOUT)
-	( \
-		cd $(MUSL_BUILDDIR) && \
-			make install \
-	)
-
-musl: $(MUSL_INSTOUT)
-
-.PHONY: musl
 
 # ----------------------------------------------------------------------------
 # QEMU launcher
