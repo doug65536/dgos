@@ -200,9 +200,9 @@ libbootsect_a_CXXFLAGS = \
 	-mrtd -mregparm=3 \
 	-std=c++14 $(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
+	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS)
 
-#	$(NO_STACK_CHECK_FLAGS)
 
 libbootsect_a_CFLAGS = \
 	-m32 \
@@ -212,7 +212,9 @@ libbootsect_a_CFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	-ffreestanding \
-	$(NO_STACKPROTECTOR_FLAGS) $(NO_COMMON_FLAGS) \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_STACK_CHECK_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
