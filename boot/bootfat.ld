@@ -5,7 +5,7 @@ SECTIONS {
 		__initialized_data_start = .;
 		*(.head)
 
-		. = 0x5A;
+		. = 0x5C;
 		*(.early)
 
 		. = 0x1A0;

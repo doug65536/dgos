@@ -50,7 +50,7 @@ dap_length = dap_end - dap_start
 .section .head
 .globl entry
 entry:
-	jmp .+0x5A
+	jmp .+0x5C
 
 // MBR calls this entry point with
 //  dl = drive number
