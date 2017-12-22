@@ -9,7 +9,6 @@ if [[ ! -f "cross-tool/.build-done" ]]; then
 	CFLAGS="-nostartfiles -nostdlib" CXXFLAGS=$CFLAGS \
 		"$scriptroot/configure" --host x86_64-elf || exit
 	make libc.a || exit
-#	cp -R musl-install/* cross-tool/x86_64-elf || exit
 #	touch "cross-tool/.build-done" || exit
 #    "$scriptroot/configure" --host x86_64-elf
 #	make || exit
