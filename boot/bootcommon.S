@@ -110,8 +110,8 @@ boot:
     bts $0,%eax
     mov %eax,%cr0
 
-    ljmp $GDT_SEL_KERNEL_CODE32,$0f
-0:
+    ljmp $GDT_SEL_KERNEL_CODE32,$pmode_entry
+pmode_entry:
 .code32
     movl $GDT_SEL_KERNEL_DATA,%edx
     movw %dx,%ds
