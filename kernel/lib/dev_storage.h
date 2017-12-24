@@ -45,8 +45,8 @@ struct iocp_t {
     // the device driver layer. This allows a single completion
     // to be shared by all of the split operations. The actual
     // callback will be invoked when invoke is called `expect`
-    // times. If this is not called before invoke, invoke will
-    // immediately invoke the actual callback.
+    // times. Invoke will never be called if set_expect is never
+    // called.
     void set_expect(uint16_t expect)
     {
         unique_lock<spinlock> hold(lock);
@@ -64,7 +64,7 @@ struct iocp_t {
     void invoke()
     {
         unique_lock<spinlock> hold(lock);
-        if (++done_count >= expect_count)
+        if (expect_count && ++done_count >= expect_count)
             invoke_once(hold);
     }
 
@@ -120,6 +120,11 @@ public:
     operator iocp_t*()
     {
         return &iocp;
+    }
+
+    void set_expect(uint16_t expect)
+    {
+        iocp.set_expect(expect);
     }
 
     errno_t wait()
