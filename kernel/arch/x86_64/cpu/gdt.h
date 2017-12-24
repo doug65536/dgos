@@ -58,30 +58,6 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
         ((is64) ? GDT_FLAGS_IS64 : 0) | \
         (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH)))
 
-#if 0
-#define GDT_MAKE_SEGMENT_DESCRIPTOR( \
-    base, limit, present, privilege, \
-    type, \
-    granularity, is32, is64) \
-{ .mem = { \
-    ((limit) & GDT_LIMIT_LOW_MASK), \
-    ((base) & GDT_BASE_LOW_MASK), \
-    (((base) >> GDT_BASE_MIDDLE_BIT) & GDT_BASE_MIDDLE), \
-    ( \
-        ((present) ? GDT_ACCESS_PRESENT : 0) | \
-        GDT_ACCESS_DPL_n(privilege) | \
-        (type) \
-    ), \
-    ( \
-        ((granularity) ? GDT_FLAGS_GRAN : 0) | \
-        ((is32) ? GDT_FLAGS_IS32 : 0) | \
-        ((is64) ? GDT_FLAGS_IS64 : 0) | \
-        (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH) \
-    ), \
-    (((base) >> GDT_BASE_HIGH_BIT) & GDT_BASE_HIGH) \
-} }
-#endif
-
 #define GDT_MAKE_CODEDATA_TYPE(executable, downward, rw) \
     ((1 << 4) | \
     ((executable) ? GDT_ACCESS_EXEC : 0) | \

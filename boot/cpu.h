@@ -32,7 +32,8 @@ struct gdt_entry_t {
         (1 << 4) | \
         ((executable) ? GDT_ACCESS_EXEC : 0) | \
         ((downward) ? GDT_ACCESS_DOWN : 0) | \
-        ((rw) ? GDT_ACCESS_RW : 0) \
+        ((rw) ? GDT_ACCESS_RW : 0) | \
+        (GDT_ACCESS_ACCESSED) \
     ), \
     ( \
         ((granularity) ? GDT_FLAGS_GRAN : 0) | \
