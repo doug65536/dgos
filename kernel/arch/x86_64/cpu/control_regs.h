@@ -331,6 +331,11 @@ static __always_inline void cpu_set_gsbase(void *gs_base)
     cpu_msr_set(CPU_MSR_GSBASE, (uintptr_t)gs_base);
 }
 
+static __always_inline void cpu_set_altgsbase(void *gs_base)
+{
+    cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)gs_base);
+}
+
 static __always_inline table_register_64_t cpu_get_gdtr(void)
 {
     table_register_64_t gdtr;
