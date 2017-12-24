@@ -26,7 +26,7 @@ static void e9debug_serial_ready(void*)
 static int e9debug_write_debug_str(char const *str, intptr_t len)
 {
     int n = 0;
-    spinlock_lock_noirq(&e9debug_lock);
+    //spinlock_lock_noirq(&e9debug_lock);
     if (len && str) {
         outsb(0xE9, str, len);
     } else if (str) {
@@ -37,7 +37,7 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
     }
     if (uart_ready)
         uart->write(str, len, len);
-    spinlock_unlock_noirq(&e9debug_lock);
+    //spinlock_unlock_noirq(&e9debug_lock);
     return n;
 }
 
