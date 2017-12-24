@@ -159,12 +159,12 @@ class nvme_queue_t {
 public:
     nvme_queue_t()
         : entries(nullptr)
+        , head_doorbell(nullptr)
+        , tail_doorbell(nullptr)
         , mask(0)
         , head(0)
         , tail(0)
         , phase(true)
-        , head_doorbell(nullptr)
-        , tail_doorbell(nullptr)
     {
     }
 
@@ -194,7 +194,7 @@ public:
         return entries;
     }
 
-    uint16_t get_tail() const
+    uint32_t get_tail() const
     {
         return tail;
     }
@@ -215,11 +215,37 @@ public:
     }
 
     template<typename... Args>
-    uint32_t enqueue(Args&& ...args)
+    uint32_t enqueue(T&& item)
     {
         size_t index = tail;
-        new (entries + tail) T(forward<Args>(args)...);
+        entries[tail] = move(item);
         phase ^= set_tail(next(tail));
+        return index;
+    }
+
+    T& at_tail(size_t tail_offset, bool& ret_phase)
+    {
+        uint32_t index = (tail + tail_offset) & mask;
+        ret_phase = phase ^ (index < tail);
+        return entries[index];
+    }
+
+    // Returns the number of items ready to be dequeued
+    uint32_t count() const
+    {
+        return (tail - head) & mask;
+    }
+
+    // Returns the number of items that may be enqueued
+    uint32_t space() const
+    {
+        return (head - tail) & mask;
+    }
+
+    uint32_t enqueued(uint32_t count)
+    {
+        uint32_t index = (tail + count) & mask;
+        phase ^= set_tail(index);
         return index;
     }
 
@@ -230,21 +256,24 @@ public:
         return item;
     }
 
-    void take()
+    // Used when completions have been consumed
+    void take(uint32_t count)
     {
-        entries[head].~T();
-        phase ^= set_head(next(head));
+        uint32_t index = (head + count) & mask;
+        phase ^= set_head(index);
     }
 
-    void take_until(uint16_t new_head)
+    // Used when processing completions to free up submission queue entries
+    void take_until(uint32_t new_head)
     {
-        while (head != new_head)
-            take();
+        phase ^= set_head(new_head);
     }
 
-    T& peek()
+    T const& at_head(uint32_t head_offset, bool &expect_phase) const
     {
-        return entries[head];
+        uint32_t index = (head + head_offset) & mask;
+        expect_phase = phase ^ (index < head);
+        return entries[(head + head_offset) & mask];
     }
 
     void reset()
@@ -256,13 +285,13 @@ public:
     }
 
 private:
-    uint32_t next(uint16_t index) const
+    uint32_t next(uint32_t index) const
     {
         return (index + 1) & mask;
     }
 
     // Returns 1 if the queue wrapped
-    bool set_head(uint16_t new_head)
+    bool set_head(uint32_t new_head)
     {
         bool wrapped = new_head < head;
 
@@ -275,7 +304,7 @@ private:
     }
 
     // Returns 1 if the queue wrapped
-    bool set_tail(uint16_t new_tail)
+    bool set_tail(uint32_t new_tail)
     {
         bool wrapped = new_tail < tail;
 
@@ -288,12 +317,12 @@ private:
     }
 
     T* entries;
-    uint16_t mask;
-    uint16_t head;
-    uint16_t tail;
-    bool phase;
     uint32_t volatile *head_doorbell;
     uint32_t volatile *tail_doorbell;
+    uint32_t mask;
+    uint32_t head;
+    uint32_t tail;
+    bool phase;
 };
 
 // Carries context information through device detection
@@ -333,14 +362,14 @@ public:
 
     void wait()
     {
-        unique_lock<spinlock> hold(lock);
+        scoped_lock hold(lock);
         while (!done)
             done_cond.wait(hold);
     }
 
     void set_done()
     {
-        unique_lock<spinlock> hold(lock);
+        scoped_lock hold(lock);
         done = true;
         hold.unlock();
         done_cond.notify_all();
@@ -351,8 +380,10 @@ public:
     uint8_t cur_ns;
 
 private:
+    using lock_t = spinlock;
+    using scoped_lock = unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
-    spinlock lock;
+    lock_t lock;
     condition_variable done_cond;
     bool done;
 };
@@ -429,6 +460,9 @@ public:
               nvme_cmd_t *sub_queue_ptr, uint32_t volatile *sub_doorbell,
               nvme_cmp_t *cmp_queue_ptr, uint32_t volatile *cmp_doorbell);
 
+    template<typename T>
+    void submit_multiple();
+
     void submit_cmd(nvme_cmd_t&& cmd,
                     nvme_callback_t::member_t callback = nullptr,
                     void *data = nullptr,
@@ -455,7 +489,9 @@ private:
     vector<nvme_callback_t> cmp_handlers;
     uint64_t *prp_lists;
 
-    spinlock lock;
+    using lock_t = spinlock;
+    using scoped_lock = unique_lock<lock_t>;
+    lock_t lock;
     condition_variable not_full;
     condition_variable not_empty;
 };
@@ -739,10 +775,14 @@ bool nvme_if_t::init(pci_dev_t const &pci_dev)
                                requested_queue_count - 1,
                                requested_queue_count - 1),
                            &nvme_if_t::setfeat_queues_handler,
-                         (iocp_t*)blocking_setfeatures);
+                           (iocp_t*)blocking_setfeatures);
 
-    blocking_setfeatures.wait();
+    blocking_setfeatures.set_expect(1);
+    errno_t status = blocking_setfeatures.wait();
     intr_were_enabled.restore();
+
+    if (status != errno_t::OK)
+        return false;
 
     queue_count = min(requested_queue_count, max_queues);
 
@@ -770,7 +810,7 @@ bool nvme_if_t::init(pci_dev_t const &pci_dev)
     for (size_t i = 1; i < queue_count; ++i) {
         admin_queue.submit_cmd(nvme_cmd_t::create_cmp_queue(
                                    queues[i].cmp_queue_ptr(),
-                                   queue_slots, i, i % irq_range.count));
+                                   queue_slots, i, i & (irq_range.count - 1)));
     }
 
     // Create submission queues
@@ -876,6 +916,7 @@ if_list_t nvme_if_t::detect_devices()
 
     NVME_TRACE("enumerating namespaces\n");
 
+    cpu_scoped_irq_disable intr_was_enabled;
     nvme_detect_dev_ctx_t ctx(list);
 
     // Get namespace list
@@ -925,7 +966,7 @@ isr_context_t *nvme_if_t::irq_handler(int irq, isr_context_t *ctx)
 
 void nvme_if_t::irq_handler(int irq_offset)
 {
-    NVME_TRACE("received IRQ\n");
+    //NVME_TRACE("received IRQ\n");
 
     int queue_stride = irq_range.count;
 
@@ -1057,8 +1098,6 @@ errno_t nvme_dev_t::io(
         void *data, int64_t count, uint64_t lba,
         bool fua, nvme_op_t op, iocp_t *iocp)
 {
-   cpu_scoped_irq_disable intr_were_enabled;
-
    nvme_request_t request;
    request.data = data;
    request.count = count;
@@ -1066,6 +1105,8 @@ errno_t nvme_dev_t::io(
    request.op = op;
    request.fua = fua;
    request.callback = iocp;
+
+   cpu_scoped_irq_disable intr_were_enabled;
 
    int expect = parent->io(ns, request, log2_sectorsize);
    iocp->set_expect(expect);
@@ -1077,6 +1118,8 @@ errno_t nvme_dev_t::read_async(
         void *data, int64_t count,
         uint64_t lba, iocp_t *iocp)
 {
+    //NVME_TRACE("Reading %ld blocks at LBA %lx", count, lba);
+
     return io(data, count, lba, false, nvme_op_t::read, iocp);
 }
 
@@ -1133,12 +1176,12 @@ void nvme_queue_state_t::submit_cmd(
         nvme_cmd_t &&cmd, nvme_callback_t::member_t callback,
         void *data, mmphysrange_t *ranges, size_t range_count)
 {
-    unique_lock<spinlock> hold(lock);
+    scoped_lock hold(lock);
 
     while (sub_queue.is_full())
         not_full.wait(hold);
 
-    uint16_t index = sub_queue.get_tail();
+    uint32_t index = sub_queue.get_tail();
 
     NVME_CMD_SDW0_CID_SET(cmd.hdr.cdw0, index);
 
@@ -1160,12 +1203,12 @@ void nvme_queue_state_t::submit_cmd(
 
     cmp_handlers[index] = nvme_callback_t(callback, data);
 
-    sub_queue.enqueue(cmd);
+    sub_queue.enqueue(move(cmd));
 }
 
 void nvme_queue_state_t::advance_head(uint16_t new_head, bool need_lock)
 {
-    unique_lock<spinlock> hold(lock, defer_lock_t());
+    scoped_lock hold(lock, defer_lock_t());
 
     if (need_lock)
         hold.lock();
@@ -1185,17 +1228,18 @@ void nvme_queue_state_t::invoke_completion(
 void nvme_queue_state_t::process_completions(
         nvme_if_t *nvme_if, nvme_queue_state_t *queues)
 {
-    unique_lock<spinlock> hold(lock);
+    scoped_lock hold(lock);
 
-    bool phase = cmp_queue.get_phase();
+    uint32_t i = 0;
     for (;;) {
-        nvme_cmp_t packet = cmp_queue.peek();
+        bool phase;
+        nvme_cmp_t const& packet = cmp_queue.at_head(i, phase);
 
         // Done when phase does not match expected phase
         if (NVME_CMP_DW3_P_GET(packet.cmp_dword[3]) != phase)
             break;
 
-        cmp_queue.take();
+        ++i;
 
         // Decode submission queue for which command has completed
         unsigned sub_queue_id = NVME_CMP_DW2_SQID_GET(
@@ -1211,6 +1255,9 @@ void nvme_queue_state_t::process_completions(
 
         cmp_buf.push_back(packet);
     }
+
+    if (i > 0)
+        cmp_queue.take(i);
 
     hold.unlock();
 
