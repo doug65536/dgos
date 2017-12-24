@@ -216,15 +216,6 @@ static int sector_iterator_seek(
         return -1;
 
     return 1;
-
-    //int16_t status = fat32_sector_iterator_begin(
-    //            iter, sector, iter->start_cluster);
-    //
-    //while (status > 0 && sector_offset--)
-    //    status = sector_iterator_next(iter, sector,
-    //                                  sector_offset == 0);
-    //
-    //return status;
 }
 
 // Read the first sector of a directory
