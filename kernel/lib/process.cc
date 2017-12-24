@@ -48,12 +48,12 @@ process_t *process_t::add_locked(unique_lock<spinlock> const&)
         process_first_free = processes[process_first_free].next;
     } else if (process_count) {
         // New pid
-        pid = process_count;
-        realloc_count = process_count + 1;
+        pid = process_count++;
+        realloc_count = process_count;
     } else {
-        //
         pid = 1;
         realloc_count = 2;
+        process_count = 2;
     }
 
     if (realloc_count) {
