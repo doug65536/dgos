@@ -610,7 +610,7 @@ bool vector<_T,_Allocator>::reserve(size_type __new_cap)
 {
     if (__capacity < __new_cap) {
         unique_ptr<value_type> new_p = __alloc.allocate(__new_cap);
-        if (!new_p)
+        if (unlikely(!new_p))
             return false;
         uninitialized_move(__m, __m + __sz, new_p.get());
         for (size_t i = 0; i < __sz; ++i)
@@ -753,7 +753,7 @@ vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
 template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::push_back(_T const& __value)
 {
-    if (unlikely(__sz + 1 >= __capacity))
+    if (unlikely(__sz + 1 > __capacity))
         __grow();
 
     new (__m + __sz) value_type(__value);
@@ -764,7 +764,7 @@ void vector<_T,_Allocator>::push_back(_T const& __value)
 template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::push_back(_T&& __value)
 {
-    if (unlikely(__sz + 1 >= __capacity))
+    if (unlikely(__sz + 1 > __capacity))
         __grow();
 
     new (__m + __sz) value_type(move(__value));
@@ -776,7 +776,7 @@ template<typename _T, typename _Allocator>
 template<typename... _Args>
 void vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
 {
-    if (unlikely(__sz + 1 >= __capacity))
+    if (unlikely(__sz + 1 > __capacity))
         __grow();
 
     new (__m + __sz) value_type(forward<_Args>(__args)...);
