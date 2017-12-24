@@ -57,17 +57,18 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 
 #define ENABLE_SHELL_THREAD         1
 #define ENABLE_READ_STRESS_THREAD   0
-#define ENABLE_SLEEP_THREAD         0
-#define ENABLE_MUTEX_THREAD         64
+#define ENABLE_SLEEP_THREAD         64
+#define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_STRESS_MMAP_THREAD   0
+#define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_STRESS_HEAP_THREAD   0
+#define ENABLE_HEAP_STRESS_THREAD   1
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
+#define ENABLE_SPAWN_STRESS         0
 
-#define ENABLE_STRESS_HEAP_SMALL    1
-#define ENABLE_STRESS_HEAP_LARGE    0
+#define ENABLE_STRESS_HEAP_SMALL    0
+#define ENABLE_STRESS_HEAP_LARGE    1
 #define ENABLE_STRESS_HEAP_BOTH     0
 
 #if ENABLE_STRESS_HEAP_SMALL
@@ -75,11 +76,11 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 #define STRESS_HEAP_MAXSIZE         4080
 #elif ENABLE_STRESS_HEAP_LARGE
 #define STRESS_HEAP_MINSIZE         65536
-#define STRESS_HEAP_MAXSIZE         262144
+#define STRESS_HEAP_MAXSIZE         65536 //262144
 #elif ENABLE_STRESS_HEAP_BOTH
 #define STRESS_HEAP_MINSIZE         64
 #define STRESS_HEAP_MAXSIZE         65536
-#elif ENABLE_STRESS_HEAP_THREAD
+#elif ENABLE_HEAP_STRESS_THREAD
 #error Must enable a size range
 #endif
 
@@ -154,7 +155,7 @@ static int read_stress(void *p)
         int64_t count = data_blocks;
         int status = drive->read_blocks(data, count, lba);
 
-        if (status != 0)
+        if (status < 0)
             printdbg("(%3d) Storage read status=%d count=%lu\n",
                      tid, status, count);
 
@@ -220,6 +221,7 @@ static int stress_mutex(void *p)
 {
     (void)p;
     thread_t this_thread = thread_get_id();
+    uint64_t seed = this_thread * 6364136223846793005;
 
     for (;;) {
         mutex_lock(&stress_lock);
@@ -228,10 +230,9 @@ static int stress_mutex(void *p)
 
         mutex_check = this_thread;
 
-        for (int i = 0; i < 16000; ++i) {
-            assert(mutex_check == this_thread);
-            pause();
-        }
+        thread_sleep_for(1 + ((uint64_t(rand_r(&seed)) * 100) >> 31));
+
+        assert(mutex_check == this_thread);
 
         mutex_check = -1;
 
@@ -549,7 +550,7 @@ static int register_check(void *p)
 }
 #endif
 
-#if ENABLE_STRESS_MMAP_THREAD > 0
+#if ENABLE_MMAP_STRESS_THREAD > 0
 static int stress_mmap_thread(void *p)
 {
     (void)p;
@@ -578,7 +579,7 @@ static int stress_mmap_thread(void *p)
 }
 #endif
 
-#if ENABLE_STRESS_HEAP_THREAD > 0
+#if ENABLE_HEAP_STRESS_THREAD > 0
 static int stress_heap_thread(void *p)
 {
     (void)p;
@@ -770,15 +771,18 @@ static int init_thread(void *p)
 
     //bootdev_info(0, 0, 0);
 
-    pid_t pid = 0;
-    int spawn_result = process_t::spawn(&pid, "user-shell", nullptr, nullptr);
+#if ENABLE_SPAWN_STRESS > 0
+    for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
+        pid_t pid = 0;
+        int spawn_result = process_t::spawn(
+                    &pid, "user-shell", nullptr, nullptr);
+        printdbg("Started user mode process with PID=%d, status=%d\n",
+                 pid, spawn_result);
+        assert(spawn_result == 0 || pid < 0);
+    }
+#endif
 
     fb_init();
-
-    // Test specifying address to mmap
-    void *map_at_test = mmap((void*)0x420000, 4096, PROT_READ | PROT_WRITE,
-                             MAP_USER, -1, 0);
-    memset(map_at_test, 42, 4096);
 
     //priqueue_test.test();
 
@@ -855,7 +859,7 @@ static int init_thread(void *p)
     printdbg("Running context switch stress with %d threads\n",
              ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
-        thread_create(ctx_sw_thread, 0, 0, 0);
+        thread_create(ctx_sw_thread, 0, 0, 0, false);
     }
 #endif
 
@@ -873,7 +877,7 @@ static int init_thread(void *p)
     for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
         ttp[i].sleep = i * 100;
         ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
-        thread_create(other_thread, ttp + i, 0, 0);
+        thread_create(other_thread, ttp + i, 0, 0, false);
     }
 #endif
 
@@ -882,7 +886,7 @@ static int init_thread(void *p)
              ENABLE_READ_STRESS_THREAD);
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         thread_create(read_stress, (char*)(uintptr_t)
-                      (0xb8000+ 80*2 + 2*i), 0, 0);
+                      (0xb8000+ 80*2 + 2*i), 0, 0, false);
     }
 #endif
 
@@ -892,7 +896,7 @@ static int init_thread(void *p)
     for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
         thread_create(register_check, (void*)
                       (0xDEADFEEDF00DD00D +
-                       (1<<ENABLE_READ_STRESS_THREAD)), 0, 0);
+                       (1<<ENABLE_READ_STRESS_THREAD)), 0, 0, false);
     }
 #endif
 
@@ -904,39 +908,21 @@ static int init_thread(void *p)
     }
 #endif
 
-#if ENABLE_STRESS_MMAP_THREAD > 0
+#if ENABLE_MMAP_STRESS_THREAD > 0
     printdbg("Running mmap stress with %d threads\n",
-             ENABLE_STRESS_MMAP_THREAD);
-    for (int i = 0; i < ENABLE_STRESS_MMAP_THREAD; ++i) {
-        thread_create(stress_mmap_thread, 0, 0, 0);
+             ENABLE_MMAP_STRESS_THREAD);
+    for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
+        thread_create(stress_mmap_thread, 0, 0, 0, false);
     }
 #endif
 
-#if ENABLE_STRESS_HEAP_THREAD > 0
+#if ENABLE_HEAP_STRESS_THREAD > 0
     printdbg("Running heap stress with %d threads\n",
-             ENABLE_STRESS_HEAP_THREAD);
-    for (int i = 0; i < ENABLE_STRESS_HEAP_THREAD; ++i) {
-        thread_create(stress_heap_thread, 0, 0, 0);
+             ENABLE_HEAP_STRESS_THREAD);
+    for (int i = 0; i < ENABLE_HEAP_STRESS_THREAD; ++i) {
+        thread_create(stress_heap_thread, 0, 0, 0, false);
     }
 #endif
-
-//    auto com1 = uart_dev_t::open(0, false);
-//    com1->write("Hello!", 6, 6);
-
-//    vector<char> input;
-//    char input_char;
-//    do {
-//        com1->read(&input_char, 1, 1);
-//        com1->write(&input_char, 1, 1);
-//        input.push_back(input_char);
-//    } while (input_char != '\n');
-
-//    com1->write(input.data(), input.size(), input.size());
-
-//    for (size_t i = 0, e = thread_get_cpu_count(); i != e; ++i) {
-//        thread_t tid = thread_create(clks_unhalted, nullptr, nullptr, 0, false);
-//        thread_set_affinity(tid, size_t(1) << i);
-//    }
 
     return 0;
 }
