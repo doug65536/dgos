@@ -80,7 +80,7 @@ void spinlock_lock_noirq(spinlock_t *lock)
     if (intr_enabled) {
         while (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
             // Allow IRQs if they were enabled
-            cpu_irq_toggle(intr_enabled);
+            cpu_irq_enable();
 
             pause();
 
