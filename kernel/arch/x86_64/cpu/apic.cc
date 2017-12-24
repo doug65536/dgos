@@ -2311,11 +2311,17 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     assert(intr >= 0);
     assert(intr < 256);
 
+    assert(intr >= INTR_APIC_IRQ_BASE);
+    assert(intr < INTR_APIC_IRQ_END);
+
     isr_context_t *orig_ctx = ctx;
 
     uint8_t irq = intr_to_irq[intr];
 
+    assert(irq < INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE);
+
     apic_eoi(intr);
+
     ctx = (isr_context_t*)irq_invoke(intr, irq, ctx);
 
     if (ctx == orig_ctx)
