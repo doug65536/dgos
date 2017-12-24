@@ -49,10 +49,11 @@ SECTIONS {
 		*(COMMON)
 		*(COMMON.*)
 		*(COMMON*)
-		__bss_end = .;
 
 		. = ALIGN(16);
 		__heap = .;
+		. += 8;
+		__bss_end = .;
 	}
 
 	/DISCARD/ : { *(.eh_frame) }

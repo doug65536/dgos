@@ -182,6 +182,8 @@ void *malloc(uint16_t bytes)
 
     // Initialize heap if necessary
     if (!__heap.heap_ready) {
+        memset(&__heap, 0, __heap_end - (char*)&__heap);
+
         __heap.heap_ready = 1;
 
         // Mark end of heap with special id 0xFF
