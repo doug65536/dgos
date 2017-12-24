@@ -221,8 +221,8 @@ struct mmap_device_mapping_t {
     uint64_t len;
     mm_dev_mapping_callback_t callback;
     void *context;
-    mutex_t lock;
-    condition_var_t done_cond;
+    mutex lock;
+    condition_variable done_cond;
     int64_t active_read;
 };
 
@@ -254,6 +254,8 @@ physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
 
+static pte_t *mm_create_pagetables(uintptr_t start, size_t size);
+
 class mmu_phys_allocator_t {
     typedef uint32_t entry_t;
 public:
@@ -275,7 +277,7 @@ public:
     // Take multiple pages and receive each physical address in callback
     // Returns false with no memory allocated on failure
     template<typename F>
-    bool alloc_multiple(size_t size, F callback);
+    bool __always_inline alloc_multiple(size_t size, F callback);
 
     void release_one(physaddr_t addr);
 
@@ -356,7 +358,7 @@ public:
     void release_linear(uintptr_t addr, size_t size);
     int take_at(uintptr_t addr, size_t size);
 private:
-    mutex_t free_addr_lock;
+    mutex free_addr_lock;
     typedef rbtree_t<> tree_t;
     tree_t free_addr_by_size;
     tree_t free_addr_by_addr;
@@ -411,10 +413,10 @@ static physaddr_t mmu_alloc_phys(int low)
 
 static __always_inline void path_from_addr(unsigned *path, linaddr_t addr)
 {
-    path[3] = (addr >> 12) & 0x1FF;
-    path[2] = (addr >> 21) & 0x1FF;
-    path[1] = (addr >> 30) & 0x1FF;
-    path[0] = (addr >> 39) & 0x1FF;
+    path[3] = (addr >>= 12) & 0x1FF;
+    path[2] = (addr >>= 9) & 0x1FF;
+    path[1] = (addr >>= 9) & 0x1FF;
+    path[0] = (addr >>= 9) & 0x1FF;
 }
 
 static int ptes_present(pte_t **ptes)
@@ -787,20 +789,30 @@ static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 //
 // Zero initialization
 
-void clear_phys_init()
+void mm_phys_clear_init()
 {
-    clear_area = uintptr_t(mmap((void*)(PTE_ADDR - PAGE_SIZE * 64),
-                      PAGE_SIZE * 64, PROT_READ | PROT_WRITE,
-                      MAP_PHYSICAL, -1, 0));
-    clear_busy = 0;
+    clear_area = linear_allocator.alloc_linear(PAGE_SIZE * 64);
 
     unsigned path[4];
     pte_t *ptes[4];
 
     addr_present(clear_area, path, ptes);
-    clear_ptes = ptes[3];
 
-    memset(clear_ptes, 0, sizeof(pte_t) * 64);
+    for (int i = 0; i < 3; ) {
+        assert(*ptes[i] == 0);
+        physaddr_t page = init_take_page(0);
+        *ptes[i] = page | PTE_PRESENT | PTE_WRITABLE |
+                PTE_ACCESSED | PTE_DIRTY;
+
+        // Clear new page table page
+        cpu_invalidate_page(uintptr_t(ptes[++i]));
+        pte_t *page_base = (pte_t*)(uintptr_t(ptes[i]) & -PAGE_SIZE);
+        memset(page_base, 0, PAGE_SIZE);
+    }
+
+    clear_busy = 0;
+
+    clear_ptes = ptes[3];
 
     for (size_t i = 0; i < PAGE_SIZE * 64; i += PAGE_SIZE)
         cpu_invalidate_page(clear_area + i);
@@ -808,8 +820,7 @@ void clear_phys_init()
 
 void clear_phys(physaddr_t addr)
 {
-    if (unlikely(!clear_area))
-        return;
+    assert(clear_area != 0);
 
     uint64_t old_busy = clear_busy;
 
@@ -825,7 +836,8 @@ void clear_phys(physaddr_t addr)
         if (unlikely(!atomic_cmpxchg_upd(&clear_busy, &old_busy, new_busy)))
             continue;
 
-        clear_ptes[bit] = addr | PTE_PRESENT | PTE_WRITABLE;
+        clear_ptes[bit] = addr | PTE_PRESENT | PTE_WRITABLE |
+                PTE_ACCESSED | PTE_DIRTY;
 
         atomic_barrier();
 
@@ -1064,20 +1076,18 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             pte_t volatile *vpte = ptes[3];
 
             // Attempt to be the first CPU to start reading a block
-            mutex_lock(&mapping->lock);
+            unique_lock<mutex> lock(mapping->lock);
             while (mapping->active_read >= 0 &&
                    !(*vpte & PTE_PRESENT))
-                condvar_wait(&mapping->done_cond, &mapping->lock);
+                mapping->done_cond.wait(lock);
 
             // If the page became present while waiting, then done
-            if (*vpte & PTE_PRESENT) {
-                mutex_unlock(&mapping->lock);
+            if (*vpte & PTE_PRESENT)
                 return ctx;
-            }
 
             // Become the reader for this mapping
             mapping->active_read = mapping_offset;
-            mutex_unlock(&mapping->lock);
+            lock.unlock();
 
             int io_result = mapping->callback(
                         mapping->context, (void*)rounded_addr,
@@ -1090,10 +1100,10 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
                     atomic_or(ptes[3] + (i - 1), PTE_PRESENT | PTE_ACCESSED);
             }
 
-            mutex_lock(&mapping->lock);
+            lock.lock();
             mapping->active_read = -1;
-            mutex_unlock(&mapping->lock);
-            condvar_wake_all(&mapping->done_cond);
+            lock.unlock();
+            mapping->done_cond.notify_all();
 
             // Restart the instruction, or unhandled exception on I/O error
             return likely(io_result >= 0) ? ctx : 0;
@@ -1304,7 +1314,7 @@ void mmu_init()
     *PT3_PTR = 0;
     cpu_invalidate_page(0);
 
-    clear_phys_init();
+    mm_phys_clear_init();
 
     size_t physalloc_size = mmu_phys_allocator_t::size_from_highest_page(
                 highest_usable);
@@ -1377,8 +1387,12 @@ void mmu_init()
     // Preallocate the second level kernel PTPD pages so we don't
     // need to worry about process-specific page directory synchronization
     for (size_t i = 256; i < 512; ++i) {
-        if (PT0_PTR[i] == 0)
-            PT0_PTR[i] = mmu_alloc_phys(0) | PTE_WRITABLE | PTE_PRESENT;
+        if (PT0_PTR[i] == 0) {
+            physaddr_t page = mmu_alloc_phys(0);
+            clear_phys(page);
+            PT0_PTR[i] = page | PTE_GLOBAL |
+                    PTE_WRITABLE | PTE_PRESENT;
+        }
     }
 
     // Alias master page directory to be accessible
@@ -1461,8 +1475,6 @@ static void sanity_check_by_addr(rbtree_t *tree)
 
 void contiguous_allocator_t::early_init(linaddr_t *addr, size_t size)
 {
-    mutex_init(&free_addr_lock);
-
     linaddr_t initial_addr = *addr;
 
     free_addr_by_addr.init(contiguous_allocator_cmp_key, 0);
@@ -1479,7 +1491,6 @@ void contiguous_allocator_t::early_init(linaddr_t *addr, size_t size)
 
 void contiguous_allocator_t::init(linaddr_t addr, size_t size)
 {
-    mutex_init(&free_addr_lock);
     free_addr_by_addr.init(contiguous_allocator_cmp_key, 0);
     free_addr_by_size.init(contiguous_allocator_cmp_both, 0);
     free_addr_by_size.insert(size, addr);
@@ -1493,9 +1504,9 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
     linaddr_t addr;
 
-    if (free_addr_by_addr && free_addr_by_size) {
+    if (likely(free_addr_by_addr && free_addr_by_size)) {
         cpu_scoped_irq_disable intr_was_enabled;
-        mutex_lock(&free_addr_lock);
+        unique_lock<mutex> lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
         printdbg("---- Alloc %lx\n", size);
@@ -1546,8 +1557,6 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         printdbg("Took address space @ %lx,"
                  " size=%lx\n", addr, size);
 #endif
-
-        mutex_unlock(&free_addr_lock);
     } else {
         addr = atomic_xadd(&linear_base, size);
 
@@ -1566,7 +1575,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
     assert(free_addr_by_size);
 
     cpu_scoped_irq_disable intr_was_enabled;
-    scoped_mutex_t lock(free_addr_lock);
+    unique_lock<mutex> lock(free_addr_lock);
 
     // Round to pages
     addr &= -PAGE_SIZE;
@@ -1688,7 +1697,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     linaddr_t end = addr + size;
 
     cpu_scoped_irq_disable intr_was_enabled;
-    mutex_lock(&free_addr_lock);
+    unique_lock<mutex> lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
     printdbg("---- Free %lx @ %lx\n", size, addr);
@@ -1734,8 +1743,6 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     //dump_addr_tree(free_addr_by_size,
     /                "Addr map by size (after free)");
 #endif
-
-    mutex_unlock(&free_addr_lock);
 }
 
 //
@@ -1796,6 +1803,75 @@ bool mwritable(uintptr_t addr, size_t size)
     return true;
 }
 
+static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
+{
+    pte_t *pte_st[4];
+    pte_t *pte_en[4];
+    unsigned path_st[4];
+    unsigned path_en[4];
+
+    uintptr_t const end = start + size - 1;
+
+    path_from_addr(path_st, start);
+    path_from_addr(path_en, end);
+    pte_from_path(pte_st, path_st);
+    pte_from_path(pte_en, path_en);
+
+    // Fastpath small allocations fully within a 2MB region,
+    // where there is nothing to do
+    if (pte_st[2] == pte_en[2] &&
+            (*pte_st[0] & PTE_PRESENT) &&
+            (*pte_st[1] & PTE_PRESENT) &&
+            (*pte_st[2] & PTE_PRESENT))
+        return pte_st[3];
+
+    bool const low = (path_st[0] < 256);
+
+    // Mark high pages PTE_GLOBAL, low pages PTE_USER
+    // First 3 levels PTE_ACCESSED and PTE_DIRTY
+    pte_t const page_flags = (low ? PTE_USER : PTE_GLOBAL) |
+            PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT | PTE_WRITABLE;
+
+    for (unsigned level = 0; level < 3; ++level) {
+        pte_t * const base = pte_st[level];
+        size_t const range_count = (pte_en[level] - base) + 1;
+        for (size_t i = 0; i < range_count; ++i) {
+            pte_t old = base[i];
+            if (!(old & PTE_PRESENT)) {
+                physaddr_t const page = mmu_alloc_phys(0);
+
+                clear_phys(page);
+
+                if (atomic_cmpxchg(base + i, old, page | page_flags) != old)
+                    mmu_free_phys(page);
+            }
+        }
+    }
+
+    return pte_st[3];
+}
+
+static pte_t *mm_create_pagetables(uintptr_t start, size_t size)
+{
+    unsigned const misalignment = unsigned(start & PAGE_MASK);
+    start -= misalignment;
+    size += misalignment;
+    size = round_up(size);
+
+    return mm_create_pagetables_aligned(start, size);
+}
+
+static __always_inline int zero_if_false(bool cond, int bits)
+{
+    return bits & -cond;
+}
+
+static __always_inline int select_mask(bool cond, int true_val, int false_val)
+{
+    int mask = -cond;
+    return (true_val & mask) | (false_val & ~mask);
+}
+
 void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 {
     (void)offset;
@@ -1828,51 +1904,32 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         return MAP_FAILED;
 
     // Populate stacks
-    if (unlikely(flags & (MAP_STACK | MAP_32BIT)))
-        flags |= MAP_POPULATE;
+    flags |= zero_if_false(flags & (MAP_STACK | MAP_32BIT), MAP_POPULATE);
 
     // Set physical and present flag on physical memory mapping
-    if (unlikely(flags & MAP_PHYSICAL))
-        page_flags |= PTE_EX_PHYSICAL | PTE_PRESENT;
+    page_flags |= zero_if_false(flags & MAP_PHYSICAL,
+                                PTE_EX_PHYSICAL | PTE_PRESENT);
 
     if (unlikely(flags & MAP_WEAKORDER)) {
         // Weakly ordered memory, set write combining in PTE if capable
-        if (likely(mmu_have_pat()))
-            page_flags |= PTE_PTEPAT_n(PAT_IDX_WC);
-        else
-            page_flags |= PTE_PCD | PTE_PWT;
+        page_flags |= select_mask(mmu_have_pat(),
+                                  PTE_PTEPAT_n(PAT_IDX_WC),
+                                  PTE_PCD | PTE_PWT);
     } else {
-        if (unlikely(flags & MAP_NOCACHE))
-            page_flags |= PTE_PCD;
-
-        if (unlikely(flags & MAP_WRITETHRU))
-            page_flags |= PTE_PWT;
+        page_flags |= zero_if_false(flags & MAP_NOCACHE, PTE_PCD);
+        page_flags |= zero_if_false(flags & MAP_WRITETHRU, PTE_PWT);
     }
 
-    if (flags & MAP_POPULATE)
-        page_flags |= PTE_PRESENT;
+    page_flags |= zero_if_false(flags & MAP_POPULATE, PTE_PRESENT);
+    page_flags |= zero_if_false(flags & MAP_DEVICE, PTE_EX_DEVICE);
+    page_flags |= zero_if_false(flags & MAP_USER, PTE_USER);
+    page_flags |= zero_if_false(!(flags & MAP_USER), PTE_GLOBAL);
+    page_flags |= zero_if_false(prot & PROT_WRITE, PTE_WRITABLE);
+    page_flags |= zero_if_false(!(prot & PROT_EXEC), PTE_NX & cpuid_nx_mask);
 
-    if (unlikely(flags & MAP_DEVICE))
-        page_flags |= PTE_EX_DEVICE;
-
-    if (flags & MAP_USER)
-        page_flags |= PTE_USER;
-
-    if ((flags & MAP_GLOBAL) || !(flags & MAP_USER))
-        page_flags |= PTE_GLOBAL;
-
-    if (likely(prot & PROT_WRITE))
-        page_flags |= PTE_WRITABLE;
-
-    if (!(prot & PROT_EXEC) && cpuid_has_nx())
-        page_flags |= PTE_NX;
-
-    uintptr_t misalignment = 0;
-
-    if (unlikely(flags & MAP_PHYSICAL)) {
-        misalignment = (uintptr_t)addr & PAGE_MASK;
-        len += misalignment;
-    }
+    uintptr_t misalignment = zero_if_false(
+                flags & MAP_PHYSICAL, uintptr_t(addr) & PAGE_MASK);
+    len += misalignment;
 
     contiguous_allocator_t *allocator =
             (flags & MAP_USER) ?
@@ -1905,23 +1962,36 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
     assert(linear_addr > 0x100000);
 
     if (((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) &&
-            !usable_mem_ranges) {
+            !usable_mem_ranges)
+    {
+        // POPULATE, not PHYSICAL, physical memory allocator online
+
         len = round_up(len);
         bool success;
+
+        pte_t *base_pte = mm_create_pagetables(linear_addr, len);
+
         if (!(flags & MAP_32BIT) && phys_allocators[0]) {
             success = phys_allocators[0].alloc_multiple(
                         len, [&](size_t ofs, physaddr_t paddr) {
                 if (likely(!(flags & MAP_UNINITIALIZED)))
                     clear_phys(paddr);
 
-                mmu_map_page(linear_addr + ofs, paddr, page_flags);
+                pte_t& entry = base_pte[ofs >> 12];
+                pte_t old = entry;
+
+                return atomic_cmpxchg(&entry, old, paddr | page_flags) == old;
             });
         } else {
             success = phys_allocators[1].alloc_multiple(
                         len, [&](size_t ofs, physaddr_t paddr) {
                 if (likely(!(flags & MAP_UNINITIALIZED)))
                     clear_phys(paddr);
-                mmu_map_page(linear_addr + ofs, paddr, page_flags);
+
+                pte_t& entry = base_pte[ofs >> 12];
+                pte_t old = entry;
+
+                return atomic_cmpxchg(&entry, old, paddr | page_flags) == old;
             });
         }
         if (unlikely(!success))
@@ -1980,8 +2050,8 @@ void *mremap(
     new_size = round_up(new_size);
 
     // Convert pointer to address
-    uintptr_t old_st = (uintptr_t)old_address;
-    uintptr_t new_st = (uintptr_t)new_address;
+    uintptr_t old_st = uintptr_t(old_address);
+    uintptr_t new_st = uintptr_t(new_address);
 
     // old_address must be page aligned
     assert(!(old_st & PAGE_MASK));
@@ -2317,10 +2387,10 @@ int msync(void const *addr, size_t len, int flags)
 
     mmap_device_mapping_t *mapping = mm_dev_mappings[device];
 
-    mutex_lock(&mapping->lock);
+    unique_lock<mutex> lock(mapping->lock);
 
     while (mapping->active_read >= 0)
-        condvar_wait(&mapping->done_cond, &mapping->lock);
+        mapping->done_cond.wait(lock);
 
     bool need_flush = (flags & MS_SYNC) != 0;
 
@@ -2330,8 +2400,6 @@ int msync(void const *addr, size_t len, int flags)
         return mapping->callback(mapping->context, (void*)base,
                                  offset, range_len, false, need_flush);
     }, rounded_addr, len);
-
-    mutex_unlock(&mapping->lock);
 
     return result;
 }
@@ -2517,9 +2585,6 @@ void *mmap_register_device(void *context,
     mapping->len = block_size * block_count;
     mapping->callback = callback;
 
-    mutex_init(&mapping->lock);
-    condvar_init(&mapping->done_cond);
-
     mapping->active_read = -1;
 
     if (ins == mm_dev_mappings.end())
@@ -2616,13 +2681,17 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
         return false;
 
     for (i = 0; i < count; ++i) {
-        // Call callable with physical address
-        callback(i << log2_pagesz, addr_from_index(first));
-
         entry_t next = entries[first];
 
-        // Set reference count to 1
-        entries[first] = 1;
+        physaddr_t paddr = addr_from_index(first);
+
+        // Call callable with physical address
+        if (callback(i << log2_pagesz, paddr)) {
+            // Set reference count to 1
+            entries[first] = 1;
+        } else {
+            mmu_free_phys(paddr);
+        }
 
         // Follow chain to next free
         first = next;

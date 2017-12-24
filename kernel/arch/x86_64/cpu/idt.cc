@@ -550,7 +550,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     for (int i = 0; i < 15; ++i) {
         printdbg("%s=%16lx\n",
                  reg_names[i],
-                 ctx->gpr.r[i]);
+                 ctx->gpr.r.r[i]);
     }
 
     if (sse_avx512_xregs_offset && sse_avx512_xregs_size) {
@@ -582,11 +582,11 @@ void dump_context(isr_context_t *ctx, int to_screen)
     for (int i = 0; i < 4; ++i) {
         printdbg("%s=%04x\n",
                  seg_names[i],
-                 ctx->gpr.s[i]);
+                 ctx->gpr.s.r[i]);
     }
 
     printdbg("ss:rsp=%4lx:%16lx\n", ISR_CTX_REG_SS(ctx), ISR_CTX_REG_RSP(ctx));
-    printdbg("cs:rip=%4lx:%16lzx\n", ISR_CTX_REG_CS(ctx),
+    printdbg("cs:rip=%4lx:%16zx\n", ISR_CTX_REG_CS(ctx),
              uintptr_t(ISR_CTX_REG_RIP(ctx)));
 
     // Exception

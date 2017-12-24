@@ -3,6 +3,184 @@
 
 __BEGIN_DECLS
 
+
+#define ISR_CTX_REG_GPR_n(ctx, i) ((ctx)->gpr.r.r[(i)])
+#define ISR_CTX_REG_SEG_n(ctx, i) ((ctx)->gpr.s.r[(i)])
+
+// isr_context->gpr.r order
+#define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr.r.n.rdi)
+#define ISR_CTX_REG_RSI(ctx)            ((ctx)->gpr.r.n.rsi)
+#define ISR_CTX_REG_RDX(ctx)            ((ctx)->gpr.r.n.rdx)
+#define ISR_CTX_REG_RCX(ctx)            ((ctx)->gpr.r.n.rcx)
+#define ISR_CTX_REG_R8(ctx)             ((ctx)->gpr.r.n.r8)
+#define ISR_CTX_REG_R9(ctx)             ((ctx)->gpr.r.n.r9)
+#define ISR_CTX_REG_RAX(ctx)            ((ctx)->gpr.r.n.rax)
+#define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr.r.n.rbx)
+#define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr.r.n.r10)
+#define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr.r.n.r11)
+#define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr.r.n.r12)
+#define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr.r.n.r13)
+#define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr.r.n.r14)
+#define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr.r.n.r15)
+#define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr.r.n.rbp)
+
+#define ISR_CTX_REG_RIP(ctx)            ((ctx)->gpr.iret.rip)
+#define ISR_CTX_REG_RSP(ctx)            ((ctx)->gpr.iret.rsp)
+#define ISR_CTX_REG_RFLAGS(ctx)         ((ctx)->gpr.iret.rflags)
+
+#define ISR_CTX_REG_CS(ctx)             ((ctx)->gpr.iret.cs)
+#define ISR_CTX_REG_SS(ctx)             ((ctx)->gpr.iret.ss)
+#define ISR_CTX_REG_DS(ctx)             ((ctx)->gpr.s.n.ds)
+#define ISR_CTX_REG_ES(ctx)             ((ctx)->gpr.s.n.es)
+#define ISR_CTX_REG_FS(ctx)             ((ctx)->gpr.s.n.fs)
+#define ISR_CTX_REG_GS(ctx)             ((ctx)->gpr.s.n.gs)
+
+#define ISR_CTX_REG_CR3(ctx)            ((ctx)->gpr.cr3)
+
+#define ISR_CTX_ERRCODE(ctx)            ((ctx)->gpr.info.error_code)
+#define ISR_CTX_INTR(ctx)               ((ctx)->gpr.info.interrupt)
+
+#define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
+#define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
+#define ISR_CTX_FPU_FIP(ctx)            ((ctx)->fpr->fpu_ip)
+#define ISR_CTX_FPU_FIS(ctx)            ((ctx)->fpr->cs_or_hi_ip)
+#define ISR_CTX_FPU_FDP(ctx)            ((ctx)->fpr->fpu_dp_31_0)
+#define ISR_CTX_FPU_FDS(ctx)            ((ctx)->fpr->ds_or_dp_47_32)
+#define ISR_CTX_FPU_FSW(ctx)            ((ctx)->fpr->fsw)
+#define ISR_CTX_FPU_FTW(ctx)            ((ctx)->fpr->ftw)
+#define ISR_CTX_FPU_STn_31_0(ctx, n)    ((ctx)->fpr->st[(n)].st_mm_31_0)
+#define ISR_CTX_FPU_STn_63_32(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_63_32)
+#define ISR_CTX_FPU_STn_79_64(ctx, n)   ((ctx)->fpr->st[(n)].st_mm_79_64)
+
+#define ISR_CTX_SSE_XMMn_b_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].byte)
+#define ISR_CTX_SSE_XMMn_w_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].word)
+#define ISR_CTX_SSE_XMMn_d_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].dword)
+#define ISR_CTX_SSE_XMMn_q_ptr(ctx, n)  ((ctx)->fpr->xmm[(n)].qword)
+
+#define ISR_CTX_SSE_XMMn_b(ctx, n, i)   ((ctx)->fpr->xmm[(n)].byte[(i)])
+#define ISR_CTX_SSE_XMMn_w(ctx, n, i)   ((ctx)->fpr->xmm[(n)].word[(i)])
+#define ISR_CTX_SSE_XMMn_d(ctx, n, i)   ((ctx)->fpr->xmm[(n)].dword[(i)])
+#define ISR_CTX_SSE_XMMn_q(ctx, n, i)   ((ctx)->fpr->xmm[(n)].qword[(i)])
+#define ISR_CTX_SSE_MXCSR(ctx)          ((ctx)->fpr->mxcsr)
+#define ISR_CTX_SSE_MXCSR_MASK(ctx)     ((ctx)->fpr->mxcsr_mask)
+
+// Passed by ISR handler
+struct interrupt_info_t {
+    uintptr_t interrupt;
+    uintptr_t error_code;
+};
+
+struct isr_ret_frame_t {
+    void (*ret_rip)(void);
+};
+
+struct isr_iret_frame_t {
+    int (*rip)(void*);
+    uintptr_t cs;
+    uintptr_t rflags;
+    uintptr_t rsp;
+    uintptr_t ss;
+};
+
+struct isr_gpr_t {
+    uintptr_t rdi;
+    uintptr_t rsi;
+    uintptr_t rdx;
+    uintptr_t rcx;
+    uintptr_t r8;
+    uintptr_t r9;
+    uintptr_t rax;
+    uintptr_t rbx;
+    uintptr_t r10;
+    uintptr_t r11;
+    uintptr_t r12;
+    uintptr_t r13;
+    uintptr_t r14;
+    uintptr_t r15;
+    uintptr_t rbp;
+};
+
+union isr_gpr_union_t {
+    isr_gpr_t n;
+    uintptr_t r[15];
+};
+
+struct isr_seg_t {
+    uint16_t ds;
+    uint16_t es;
+    uint16_t fs;
+    uint16_t gs;
+};
+
+union isr_seg_union_t {
+    isr_seg_t n;
+    uint16_t r[4];
+};
+
+// Exception handler context
+struct isr_gpr_context_t {
+    isr_seg_union_t s;
+    uintptr_t cr3;
+    isr_gpr_union_t r;
+    interrupt_info_t info;
+    isr_iret_frame_t iret;
+};
+
+// FPU/SSE context
+struct isr_fxsave_context_t {
+    // FPU control word
+    uint16_t fcw;
+    // FPU status word
+    uint16_t fsw;
+    // FPU tag word (bitmap of non-empty mm/st regs)
+    uint8_t ftw;
+    uint8_t reserved_1;
+    // FPU opcode
+    uint16_t fop;
+    // FPU IP
+    uint32_t fpu_ip;
+    uint16_t cs_or_hi_ip;
+    uint16_t reserved_2;
+
+    // FPU data pointer
+    uint32_t fpu_dp_31_0;
+    uint16_t ds_or_dp_47_32;
+    uint16_t reserved_3;
+    // SSE status register
+    uint32_t mxcsr;
+    uint32_t mxcsr_mask;
+
+    // FPU/MMX registers
+    struct fpu_reg_t {
+        uint32_t st_mm_31_0;
+        uint32_t st_mm_63_32;
+        uint16_t st_mm_79_64;
+        uint16_t st_mm_reserved_95_80;
+        uint32_t st_mm_reserved_127_96;
+    } st[8];
+
+    // XMM registers
+    union xmm_reg_t {
+        uint8_t byte[16];
+        uint16_t word[8];
+        uint32_t dword[4];
+        uint64_t qword[2];
+    } xmm[16];
+};
+
+// Function to call after switching to another context stack
+struct isr_resume_context_t {
+    void (*cleanup)(void*);
+    void *cleanup_arg;
+};
+
+// Exception handler C call parameter
+struct isr_context_t {
+    isr_resume_context_t resume;
+    isr_fxsave_context_t * fpr;
+    isr_gpr_context_t gpr;
+};
+
 // Modern xsave
 void isr_save_xsaveopt(void);
 void isr_save_xsavec(void);
