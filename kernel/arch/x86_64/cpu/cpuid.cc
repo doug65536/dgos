@@ -9,6 +9,7 @@
 static uint32_t max_leaf[2];
 
 cpuid_cache_t cpuid_cache;
+int cpuid_nx_mask;
 
 void cpuid_init(void)
 {
@@ -33,6 +34,8 @@ void cpuid_init(void)
     cpuid_cache.has_avx512f = cpuid_ebx_bit(16, 7, 0);
     cpuid_cache.has_fsgsbase= cpuid_ebx_bit(0, 7, 0);
     cpuid_cache.has_sysenter= cpuid_edx_bit(11, 1, 0);
+
+    cpuid_nx_mask = -!!cpuid_cache.has_nx;
 }
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)

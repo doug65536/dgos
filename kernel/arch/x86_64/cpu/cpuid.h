@@ -64,6 +64,7 @@ struct cpuid_cache_t {
 #endif
 
 extern cpuid_cache_t cpuid_cache;
+extern int cpuid_nx_mask;
 
 // No eXecute bit in page tables
 CPUID_CONST_INLINE bool cpuid_has_nx(void)
