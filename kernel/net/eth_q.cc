@@ -12,9 +12,8 @@
 #endif
 
 // A half-page (exactly) packet
-struct ethq_pkt2K_t {
+struct alignas(2048) ethq_pkt2K_t {
     ethq_pkt_t pkt;
-    uint8_t align1[(PAGESIZE >> 1) - sizeof(ethq_pkt_t)];
 };
 
 C_ASSERT(sizeof(ethq_pkt2K_t) == (PAGESIZE >> 1));
@@ -53,13 +52,13 @@ int ethq_init(void)
     uintptr_t physaddr = 0;
     for (size_t i = 0; i < ethq_pkt_count; ++i) {
         if (!(i & 1))
-            physaddr = mphysaddr(&ethq_pkts->pkt);
+            physaddr = mphysaddr(&ethq_pkts[i].pkt);
         else
             physaddr += sizeof(ethq_pkt2K_t);
 
         ethq_pkts[i].pkt.next = (i+1) < ethq_pkt_count
                 ? &ethq_pkts[i+1].pkt
-                : 0;
+                : nullptr;
 
         ethq_pkts[i].pkt.physaddr = physaddr;
 
