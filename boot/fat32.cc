@@ -21,18 +21,17 @@ static char *sector_buffer;
 static char *fat_buffer;
 uint32_t fat_buffer_lba;
 
-static uint32_t next_cluster(
-        uint32_t current_cluster, char *sector, uint16_t *err_ptr);
+static uint32_t next_cluster(uint32_t current_cluster, char *sector, uint8_t *err_ptr);
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
 // Returns
-static uint16_t read_bpb(uint32_t partition_lba)
+static uint8_t read_bpb(uint32_t partition_lba)
 {
     sector_buffer = (char*)malloc(512);
     fat_buffer = (char*)malloc(512);
 
-    uint16_t err = read_lba_sectors(
+    uint8_t err = read_lba_sectors(
                 sector_buffer,
                 boot_drive, partition_lba, 1);
     if (err)
@@ -49,7 +48,7 @@ static uint32_t lba_from_cluster(uint32_t cluster)
             cluster * bpb.sec_per_cluster;
 }
 
-static uint16_t is_eof_cluster(uint32_t cluster)
+static bool is_eof_cluster(uint32_t cluster)
 {
     return cluster < 2 || cluster >= 0x0FFFFFF8;
 }
@@ -59,7 +58,7 @@ static uint16_t is_eof_cluster(uint32_t cluster)
 // Returns -1 on error
 // Returns 0 on EOF
 // Returns 1 on success
-static int16_t fat32_sector_iterator_begin(
+static int fat32_sector_iterator_begin(
         fat32_sector_iterator_t *iter,
         char *sector,
         uint32_t cluster)
@@ -105,14 +104,14 @@ static int16_t fat32_sector_iterator_begin(
 // Returns new cluster number, returns 0 at end of file
 // Returns 0xFFFFFFFF on error
 static uint32_t next_cluster(
-        uint32_t current_cluster, char *sector, uint16_t *err_ptr)
+        uint32_t current_cluster, char *sector, uint8_t *err_ptr)
 {
     uint32_t fat_sector_index = current_cluster >> (9-2);
     uint32_t fat_sector_offset = current_cluster & ((1 << (9-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
     uint32_t lba = bpb.first_fat_lba + fat_sector_index;
 
-    uint16_t err = 0;
+    uint8_t err = 0;
     if (fat_buffer_lba != lba) {
         err = read_lba_sectors(fat_buffer, boot_drive, lba, 1);
         if (err_ptr)
@@ -147,10 +146,10 @@ static uint32_t next_cluster(
 // Returns -1 on error
 // Returns 0 on EOF
 // Returns 1 if successfully advanced to next sector
-static int16_t sector_iterator_next(
+static int sector_iterator_next(
         fat32_sector_iterator_t *iter,
         char *sector,
-        uint16_t read_data)
+        bool read_data)
 {
     if (is_eof_cluster(iter->cluster))
         return 0;
@@ -185,14 +184,14 @@ static int16_t sector_iterator_next(
     return 1;
 }
 
-static int16_t sector_iterator_seek(
+static int sector_iterator_seek(
         fat32_sector_iterator_t *iter,
         uint32_t sector_offset,
         char *sector)
 {
     // See if we are already there
     if (iter->position == sector_offset) {
-        uint16_t is_eof_now = is_eof_cluster(iter->cluster);
+        bool is_eof_now = is_eof_cluster(iter->cluster);
         return is_eof_now ? 0 : 1;
     }
 
@@ -233,12 +232,12 @@ static int16_t sector_iterator_seek(
 // Returns -1 on error
 // Returns 0 on end of directory
 // Returns 1 on success
-static int16_t read_directory_begin(
+static int read_directory_begin(
         dir_iterator_t *iter,
         char *sector,
         uint32_t cluster)
 {
-    int16_t status = fat32_sector_iterator_begin(
+    int status = fat32_sector_iterator_begin(
                 &iter->dir_file, sector, cluster);
     iter->sector_index = 0;
 
@@ -249,13 +248,11 @@ static int16_t read_directory_begin(
 // the representation used in dir_entry_t's name field
 static uint8_t lfn_checksum(char const *fcb_name)
 {
-   uint16_t i;
+   int i;
    uint8_t sum = 0;
 
    for (i = 11; i; i--)
-      sum = ((sum & 1) << 7) +
-              (sum >> 1) +
-              (uint8_t)*fcb_name++;
+      sum = ((sum & 1) << 7) + (sum >> 1) + uint8_t(*fcb_name++);
 
    return sum;
 }
@@ -453,11 +450,11 @@ static void fill_short_filename(fat32_dir_union_t *match, char const *filename)
 // carry across fragment calls
 static uint16_t const *encode_lfn_name_fragment(
         uint8_t *lfn_fragment,
-        uint16_t fragment_size,
+        size_t fragment_size,
         uint16_t const *encoded_src,
         uint16_t *done_name)
 {
-    for (uint16_t i = 0; i < fragment_size; ++i) {
+    for (size_t i = 0; i < fragment_size; ++i) {
         if (*done_name) {
             // Everything after null terminator is 0xFFFF
             lfn_fragment[i*2] = 0xFF;
@@ -479,45 +476,45 @@ static uint16_t const *encode_lfn_name_fragment(
     return encoded_src;
 }
 
-static uint16_t dir_entry_match(fat32_dir_union_t const *entry,
+static bool dir_entry_match(fat32_dir_union_t const *entry,
                           fat32_dir_union_t const *match)
 {
     uint16_t long_entry = (entry->long_entry.attr == FAT_LONGNAME);
     uint16_t long_match = (match->long_entry.attr == FAT_LONGNAME);
 
     if (long_entry != long_match)
-        return 0;
+        return false;
 
     if (long_entry) {
         // Compare long entry
 
         if (entry->long_entry.ordinal != match->long_entry.ordinal)
-            return 0;
+            return false;
 
         if (memcmp(entry->long_entry.name,
                    match->long_entry.name,
                    sizeof(entry->long_entry.name)))
-            return 0;
+            return false;
 
         if (memcmp(entry->long_entry.name2,
                    match->long_entry.name2,
                    sizeof(entry->long_entry.name2)))
-            return 0;
+            return false;
 
         if (memcmp(entry->long_entry.name3,
                    match->long_entry.name3,
                    sizeof(entry->long_entry.name3)))
-            return 0;
+            return false;
 
-        return 1;
+        return true;
     } else {
         // Compare short entry
         if (memcmp(entry->short_entry.name,
                    match->short_entry.name,
                    sizeof(entry->short_entry.name)))
-            return 0;
+            return false;
 
-        return 1;
+        return true;
     }
 }
 
@@ -576,7 +573,7 @@ static uint32_t find_file_by_name(char const *filename,
             match_fill->long_entry.attr = FAT_LONGNAME;
         } while (match_fill-- != match);
 
-        for (uint16_t i = 0; i < lfn_entries; ++i) {
+        for (size_t i = 0; i < lfn_entries; ++i) {
             match[i].long_entry.ordinal =
                 ((i == 0) << 6) + (lfn_entries - i);
         }
@@ -592,7 +589,7 @@ static uint32_t find_file_by_name(char const *filename,
     dir_iterator_t dir;
     uint16_t match_index = 0;
     uint8_t checksum = 0;
-    for (int16_t status = read_directory_begin(
+    for (int status = read_directory_begin(
              &dir, sector_buffer, dir_cluster);
          status > 0;
          status = read_directory_move_next(
@@ -686,7 +683,7 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     uint32_t sector_offset = ofs >> 9;
     uint16_t byte_offset = ofs & ((1 << 9)-1);
 
-    int16_t status = sector_iterator_seek(
+    int status = sector_iterator_seek(
                 file_handles + file,
                 sector_offset,
                 sector_buffer);
@@ -737,7 +734,7 @@ void fat32_boot_partition(uint32_t partition_lba)
 
     print_line("Booting partition at LBA %lu", partition_lba);
 
-    uint16_t err = read_bpb(partition_lba);
+    uint8_t err = read_bpb(partition_lba);
     if (err) {
         print_line("Error reading BPB!");
         return;

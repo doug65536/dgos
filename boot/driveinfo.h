@@ -3,4 +3,4 @@
 
 extern uint32_t boot_device_info_vector;
 
-uint16_t driveinfo();
+uint8_t driveinfo();

@@ -90,7 +90,7 @@ void enter_kernel(uint64_t entry_point)
     copy_or_enter(entry_point, 0, 0);
 }
 
-uint16_t elf64_run(char const *filename)
+bool elf64_run(char const *filename)
 {
     cpu_init();
 
@@ -150,10 +150,10 @@ uint16_t elf64_run(char const *filename)
         halt("Could not read program headers");
 
     uint64_t total_bytes = 0;
-    for (uint16_t i = 0; i < file_hdr.e_phnum; ++i)
+    for (unsigned i = 0; i < file_hdr.e_phnum; ++i)
         total_bytes += program_hdrs[i].p_memsz;
 
-    uint16_t failed = 0;
+    bool failed = false;
 
     uint64_t done_bytes = 0;
 
@@ -286,5 +286,5 @@ uint16_t elf64_run(char const *filename)
 
     halt("Failed to load kernel");
 
-    return 1;
+    return false;
 }

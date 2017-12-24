@@ -176,9 +176,9 @@ static void debug_ff(uint16_t addr)
 
 void *malloc(uint16_t bytes)
 {
-    uint16_t addr;
-    uint16_t best_size = 0;
-    uint16_t best_addr;
+    uintptr_t addr;
+    uintptr_t best_size = 0;
+    uintptr_t best_addr;
 
     // Initialize heap if necessary
     if (!__heap.heap_ready) {
@@ -202,7 +202,7 @@ void *malloc(uint16_t bytes)
         debug_ff(addr);
     }
 
-    uint16_t seen_free = 0;
+    bool seen_free = false;
     addr = __heap.first_free;
 
     for (;;) {
@@ -219,8 +219,8 @@ void *malloc(uint16_t bytes)
         if (id == 0) {
             // Yes, it is free
 
-            if (seen_free == 0) {
-                seen_free = 1;
+            if (!seen_free) {
+                seen_free = true;
 
                 // Make first free precise
                 if (__heap.first_free != addr) {
@@ -384,7 +384,7 @@ static void check_random_block(uint16_t *block)
 void test_malloc()
 {
     uint16_t *ptrs[TEST_SIZE];
-    const uint32_t iters = 0xFFFFFF;
+    uint32_t const iters = 0xFFFFFF;
 
     // Populate with random blocks
     for (uint16_t i = 0; i < TEST_SIZE; ++i) {
@@ -417,12 +417,10 @@ void test_malloc()
     // Try huge allocation and make sure it fails
     // Also coalesces all free blocks
     ptrs[0] = (uint16_t *)malloc(0xFFFF);
+
     // Should fail
     if (ptrs[0])
         debug_break();
-
-    //uint16_t chk = malloc_next_header(addr_of(&__heap));
-    //print_line("Max block remaining is %x", chk);
 }
 
 #endif
@@ -443,7 +441,7 @@ void operator delete(void *block, unsigned long size) noexcept
     free(block);
 }
 
-void operator delete(void *block, unsigned size)
+void operator delete(void *block, unsigned size) noexcept
 {
     (void)size;
     free(block);

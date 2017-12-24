@@ -4,7 +4,8 @@
 #include "farptr.h"
 #include "bioscall.h"
 
-uint16_t driveinfo()
+// Returns 0 on success, otherwise BIOS error code
+uint8_t driveinfo()
 {
     // AH = 48h
     // DL = drive (80h-FFh)

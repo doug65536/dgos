@@ -174,8 +174,8 @@ uint64_t paging_map_range(
         uint16_t keep,
         uint8_t log2_pagesize)
 {
-    uint32_t page_size = 1 << log2_pagesize;
-    uint16_t misalignment = linear_base & (page_size - 1);
+    uint32_t page_size = 1U << log2_pagesize;
+    size_t misalignment = linear_base & (page_size - 1);
     linear_base -= misalignment;
     length += misalignment;
     length = (length + (page_size - 1)) & -(int)page_size;

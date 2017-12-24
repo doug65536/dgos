@@ -323,7 +323,8 @@ static uint32_t find_file_by_name(char const *filename,
     return 0;
 }
 
-static int16_t iso9660_sector_iterator_begin(
+// 0 on success, otherwise BIOS error code
+static int8_t iso9660_sector_iterator_begin(
         iso9660_sector_iterator_t *iter,
         char *sector,
         uint32_t cluster,
@@ -386,27 +387,27 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         return -1;
 
     uint32_t sector_offset = ofs >> 11;
-    uint16_t byte_offset = ofs & ((1 << 11)-1);
+    size_t byte_offset = ofs & ((1 << 11)-1);
 
     char *output = (char*)buf;
 
-    int16_t status;
+    uint8_t err;
 
-    status = read_lba_sectors(iso9660_sector_buffer, boot_drive,
+    err = read_lba_sectors(iso9660_sector_buffer, boot_drive,
                      file_handles[file].lba +
                      sector_offset, 1);
 
     int total = 0;
     for (;;) {
         // Error?
-        if (status < 0)
+        if (err)
             return -1;
 
         // EOF?
         if (ofs > file_handles[file].size)
             return 0;
 
-        uint16_t limit = 2048 - byte_offset;
+        size_t limit = 2048 - byte_offset;
         if (limit > bytes)
             limit = bytes;
 
@@ -423,7 +424,7 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         byte_offset = 0;
 
         if (bytes > 0) {
-            status = read_lba_sectors(
+            err = read_lba_sectors(
                         iso9660_sector_buffer, boot_drive,
                         file_handles[file].lba + (++sector_offset), 1);
         }
