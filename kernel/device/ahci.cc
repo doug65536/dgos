@@ -1288,7 +1288,7 @@ private:
 // Drive
 class ahci_dev_t : public storage_dev_base_t {
 public:
-    void init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi);
+    bool init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi);
 
 private:
     STORAGE_DEV_IMPL
@@ -2181,8 +2181,10 @@ if_list_t ahci_if_t::detect_devices()
                 port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
             ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
 
-            drive->init(this, port_num,
-                        port->sig == ahci_sig_t::SATA_SIG_ATAPI);
+            if (!drive->init(this, port_num,
+                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
+                // FIXME
+            }
         }
     }
 
@@ -2195,7 +2197,7 @@ void ahci_if_t::cleanup()
 {
 }
 
-void ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
+bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 {
     assert(iface == nullptr);
 
@@ -2209,9 +2211,11 @@ void ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     errno_t status = io(identify, 1, 0, false, slot_op_t::identify, block);
     if (unlikely(status != errno_t::OK))
-        return;
+        return false;
 
-    block.wait();
+    status = block.wait();
+    if (unlikely(status != errno_t::OK))
+        return false;
 
     identify->fixup_strings();
 
@@ -2223,6 +2227,8 @@ void ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
         iface->configure_fua(port, identify->support_fua_ext);
     }
+
+    return true;
 }
 
 void ahci_dev_t::cleanup()
@@ -2258,8 +2264,6 @@ errno_t ahci_dev_t::io(
         uint64_t lba, bool fua, slot_op_t op,
         iocp_t *iocp)
 {
-    cpu_scoped_irq_disable intr_were_enabled;
-
     slot_request_t request;
     request.data = data;
     request.count = count;
@@ -2267,6 +2271,8 @@ errno_t ahci_dev_t::io(
     request.op = op;
     request.fua = fua;
     request.callback = iocp;
+
+    cpu_scoped_irq_disable intr_were_enabled;
 
     int expect = iface->io(port, request);
 
