@@ -11,7 +11,7 @@ C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
 C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
-#define TSS_STACK_SIZE (PAGESIZE*2)
+#define TSS_STACK_SIZE (32 << 10)
 
 gdt_entry_combined_t gdt[13] = {
     GDT_MAKE_EMPTY(),
