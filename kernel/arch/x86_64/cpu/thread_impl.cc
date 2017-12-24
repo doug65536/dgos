@@ -1,7 +1,6 @@
 #include "cpu/thread_impl.h"
 #include "types.h"
 #include "interrupts.h"
-#include "atomic.h"
 #include "string.h"
 #include "assert.h"
 #include "likely.h"
@@ -10,20 +9,13 @@
 #include "control_regs.h"
 #include "main.h"
 #include "halt.h"
-#include "idt.h"
-#include "irq.h"
 #include "gdt.h"
-#include "cpuid.h"
 #include "mm.h"
 #include "time.h"
-#include "threadsync.h"
 #include "export.h"
 #include "printk.h"
-#include "asm_constants.h"
 #include "apic.h"
-#include "unique_ptr.h"
 #include "rbtree.h"
-#include "process.h"
 #include "callout.h"
 
 // Implements platform independent thread.h
@@ -136,9 +128,6 @@ C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
 
-// Verify that thread_info_t is a multiple of the cache line size
-C_ASSERT((sizeof(thread_info_t) & 63) == 0);
-
 // Store in a big array, for now
 #define MAX_THREADS 512
 static thread_info_t threads[MAX_THREADS];
@@ -148,8 +137,8 @@ int thread_idle_ready;
 int spincount_mask;
 size_t storage_next_slot;
 
-static size_t constexpr syscall_stack_size = (size_t(1) << 16);
-static size_t constexpr xsave_stack_size = (size_t(1) << 16);
+static size_t constexpr syscall_stack_size = (size_t(8) << 10);
+static size_t constexpr xsave_stack_size = (size_t(64) << 10);
 
 struct alignas(64) cpu_info_t {
     cpu_info_t *self;
@@ -197,7 +186,7 @@ private:
     spinlock_t lock;
 };
 
-// Get executing APIC ID
+// Get executing APIC ID (the slow expensive way, for early initialization)
 static uint32_t get_apic_id(void)
 {
     cpuid_t cpuid_info;
@@ -208,10 +197,7 @@ static uint32_t get_apic_id(void)
 
 static __always_inline cpu_info_t *this_cpu(void)
 {
-    cpu_info_t *cpu = (cpu_info_t *)cpu_gs_read_ptr<0>();
-    assert(cpu >= cpus && cpu < cpus + countof(cpus));
-    assert(cpu->self == cpu);
-    return cpu;
+    return (cpu_info_t *)cpu_gs_read_ptr<0>();
 }
 
 static __always_inline thread_info_t *this_thread(void)
@@ -284,8 +270,8 @@ static thread_t thread_create_with_state(
         thread_priority_t priority, bool user)
 {
     if (stack_size == 0)
-        stack_size = 65536;
-    else if (stack_size < 65536)
+        stack_size = 16384;
+    else if (stack_size < 16384)
         return -1;
 
     for (size_t i = 0; ; ++i) {
@@ -322,7 +308,7 @@ static thread_t thread_create_with_state(
             // Guard page
             madvise(stack, PAGE_SIZE, MADV_DONTNEED);
             mprotect(stack, PAGE_SIZE, PROT_NONE);
-            memset((char*)stack + PAGE_SIZE, 0xcc, stack_size);
+            //memset((char*)stack + PAGE_SIZE, 0xcc, stack_size);
             thread->flags |= THREAD_FLAG_OWNEDSTACK;
 
             THREAD_TRACE("Thread %zd stack guard=0x%zx,"
@@ -338,7 +324,7 @@ static thread_t thread_create_with_state(
         thread->syscall_stack = (char*)mmap(
                     0, syscall_stack_size + PAGE_SIZE,
                     PROT_READ | PROT_WRITE,
-                    MAP_STACK, -1, 0) + syscall_stack_size;
+                    MAP_STACK, -1, 0);
         madvise(thread->syscall_stack, PAGE_SIZE, MADV_DONTNEED);
         mprotect(thread->syscall_stack, PAGE_SIZE, PROT_NONE);
         THREAD_TRACE("Thread %zd syscall stack guard=0x%zx,"
@@ -348,6 +334,8 @@ static thread_t thread_create_with_state(
                      uintptr_t(thread->syscall_stack) + PAGE_SIZE,
                      uintptr_t(thread->syscall_stack) + PAGE_SIZE +
                      syscall_stack_size);
+        thread->syscall_stack = (char*)thread->syscall_stack + PAGE_SIZE +
+                syscall_stack_size;
 
         // XSave stack
         // Allocate one extra page for guard page
@@ -514,6 +502,7 @@ void thread_init(int ap)
 
     //cpu_set_gs(GDT_SEL_USER_DATA | 3);
     cpu_set_gsbase(cpu);
+    cpu_set_altgsbase((void*)0xFFFFFEEDBEEFF00D);
 
     if (!ap) {
         intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler);
@@ -756,10 +745,10 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     isr_context_t *isrctx = (isr_context_t*)ctx;
 
-    assert(isrctx->gpr.s[0] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr.s[1] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr.s[2] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr.s[3] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s.r[0] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s.r[1] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s.r[2] == (GDT_SEL_USER_DATA | 3));
+    assert(isrctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
 
     // Removed until I can range check user mode stack
     //assert(ISR_CTX_REG_RSP(isrctx) >= (uintptr_t)thread->stack);
