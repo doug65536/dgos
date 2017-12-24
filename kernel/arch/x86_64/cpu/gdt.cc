@@ -89,6 +89,8 @@ void gdt_init_tss(int cpu_count)
             void *stack = mmap(0, TSS_STACK_SIZE,
                                PROT_READ | PROT_WRITE,
                                MAP_POPULATE, -1, 0);
+            madvise(stack, PAGESIZE, MADV_DONTNEED);
+            mprotect(stack, PAGESIZE, PROT_NONE);
 
             printdbg("Allocated IST cpu=%d slot=%d at %lx\n",
                      i, st, (uintptr_t)stack);
