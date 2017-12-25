@@ -374,28 +374,26 @@ static thread_t thread_create_with_state(
         uintptr_t stack_end = stack_addr +
                 stack_size + PAGE_SIZE;
 
-        size_t ctx_size = sizeof(isr_gpr_context_t) +
-                sizeof(isr_context_t);
+        size_t ctx_size = sizeof(isr_context_t);
 
         // Adjust start of context to make room for context
-        uintptr_t ctx_addr = stack_end - ctx_size - 32;
-
-        ctx_addr &= -16;
-
-        assert((ctx_addr & 0x0F) == 0);
+        uintptr_t ctx_addr = stack_end - ctx_size;
 
         isr_context_t *ctx = (isr_context_t*)ctx_addr;
         memset(ctx, 0, ctx_size);
         ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
 
-        ISR_CTX_REG_RSP(ctx) = (uintptr_t)
-                ((ctx_addr + ctx_size + 15) & -16) + 8;
+        ISR_CTX_REG_RSP(ctx) = stack_end - 8;
         assert((ISR_CTX_REG_RSP(ctx) & 0xF) == 0x8);
+
         ISR_CTX_REG_SS(ctx) = user
                 ? GDT_SEL_USER_DATA | 3
                 : GDT_SEL_KERNEL_DATA;
+
         ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
+
         ISR_CTX_REG_RIP(ctx) = (thread_fn_t)(uintptr_t)thread_startup;
+
         ISR_CTX_REG_CS(ctx) = user
                 ? GDT_SEL_USER_CODE64 | 3
                 : GDT_SEL_KERNEL_CODE64;
@@ -403,6 +401,7 @@ static thread_t thread_create_with_state(
         ISR_CTX_REG_ES(ctx) = GDT_SEL_USER_DATA | 3;
         ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
         ISR_CTX_REG_GS(ctx) = GDT_SEL_USER_DATA | 3;
+
         ISR_CTX_REG_RDI(ctx) = (uintptr_t)fn;
         ISR_CTX_REG_RSI(ctx) = (uintptr_t)userdata;
         ISR_CTX_REG_RDX(ctx) = (uintptr_t)i;
