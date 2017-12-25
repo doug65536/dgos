@@ -10,8 +10,8 @@
 #define CPU_MSR_EFER_LME_BIT    8
 #define CPU_MSR_EFER_NX_BIT     11
 
-#define CPU_MSR_EFER_LME        (1 << CPU_MSR_EFER_LME_BIT)
-#define CPU_MSR_EFER_NX         (1 << CPU_MSR_EFER_NX_BIT)
+#define CPU_MSR_EFER_LME        (1U << CPU_MSR_EFER_LME_BIT)
+#define CPU_MSR_EFER_NX         (1U << CPU_MSR_EFER_NX_BIT)
 
 //
 // CR0
@@ -28,17 +28,17 @@
 #define CPU_CR0_CD_BIT 30	// Cache disable
 #define CPU_CR0_PG_BIT 31	// Paging
 
-#define CPU_CR0_PE  (1 << CPU_CR0_PE_BIT)
-#define CPU_CR0_MP  (1 << CPU_CR0_MP_BIT)
-#define CPU_CR0_EM  (1 << CPU_CR0_EM_BIT)
-#define CPU_CR0_TS  (1 << CPU_CR0_TS_BIT)
-#define CPU_CR0_ET  (1 << CPU_CR0_ET_BIT)
-#define CPU_CR0_NE  (1 << CPU_CR0_NE_BIT)
-#define CPU_CR0_WP  (1 << CPU_CR0_WP_BIT)
-#define CPU_CR0_AM  (1 << CPU_CR0_AM_BIT)
-#define CPU_CR0_NW  (1 << CPU_CR0_NW_BIT)
-#define CPU_CR0_CD  (1 << CPU_CR0_CD_BIT)
-#define CPU_CR0_PG  (1 << CPU_CR0_PG_BIT)
+#define CPU_CR0_PE  (1U << CPU_CR0_PE_BIT)
+#define CPU_CR0_MP  (1U << CPU_CR0_MP_BIT)
+#define CPU_CR0_EM  (1U << CPU_CR0_EM_BIT)
+#define CPU_CR0_TS  (1U << CPU_CR0_TS_BIT)
+#define CPU_CR0_ET  (1U << CPU_CR0_ET_BIT)
+#define CPU_CR0_NE  (1U << CPU_CR0_NE_BIT)
+#define CPU_CR0_WP  (1U << CPU_CR0_WP_BIT)
+#define CPU_CR0_AM  (1U << CPU_CR0_AM_BIT)
+#define CPU_CR0_NW  (1U << CPU_CR0_NW_BIT)
+#define CPU_CR0_CD  (1U << CPU_CR0_CD_BIT)
+#define CPU_CR0_PG  (1U << CPU_CR0_PG_BIT)
 
 //
 // CR4
@@ -63,25 +63,25 @@
 #define CPU_CR4_SMAP_BIT        21	// Supervisor Mode Access Protect Enable
 #define CPU_CR4_PKE_BIT         22	// Protection Key Enable
 
-#define CPU_CR4_VME             (1 << CPU_CR4_VME_BIT     )
-#define CPU_CR4_PVI             (1 << CPU_CR4_PVI_BIT     )
-#define CPU_CR4_TSD             (1 << CPU_CR4_TSD_BIT     )
-#define CPU_CR4_DE              (1 << CPU_CR4_DE_BIT      )
-#define CPU_CR4_PSE             (1 << CPU_CR4_PSE_BIT     )
-#define CPU_CR4_PAE             (1 << CPU_CR4_PAE_BIT     )
-#define CPU_CR4_MCE             (1 << CPU_CR4_MCE_BIT     )
-#define CPU_CR4_PGE             (1 << CPU_CR4_PGE_BIT     )
-#define CPU_CR4_PCE             (1 << CPU_CR4_PCE_BIT     )
-#define CPU_CR4_OFXSR           (1 << CPU_CR4_OFXSR_BIT   )
-#define CPU_CR4_OSXMMEX         (1 << CPU_CR4_OSXMMEX_BIT )
-#define CPU_CR4_VMXE            (1 << CPU_CR4_VMXE_BIT    )
-#define CPU_CR4_SMXE            (1 << CPU_CR4_SMXE_BIT    )
-#define CPU_CR4_FSGSBASE        (1 << CPU_CR4_FSGSBASE_BIT)
-#define CPU_CR4_PCIDE           (1 << CPU_CR4_PCIDE_BIT   )
-#define CPU_CR4_OSXSAVE         (1 << CPU_CR4_OSXSAVE_BIT )
-#define CPU_CR4_SMEP            (1 << CPU_CR4_SMEP_BIT    )
-#define CPU_CR4_SMAP            (1 << CPU_CR4_SMAP_BIT    )
-#define CPU_CR4_PKE             (1 << CPU_CR4_PKE_BIT     )
+#define CPU_CR4_VME             (1U << CPU_CR4_VME_BIT     )
+#define CPU_CR4_PVI             (1U << CPU_CR4_PVI_BIT     )
+#define CPU_CR4_TSD             (1U << CPU_CR4_TSD_BIT     )
+#define CPU_CR4_DE              (1U << CPU_CR4_DE_BIT      )
+#define CPU_CR4_PSE             (1U << CPU_CR4_PSE_BIT     )
+#define CPU_CR4_PAE             (1U << CPU_CR4_PAE_BIT     )
+#define CPU_CR4_MCE             (1U << CPU_CR4_MCE_BIT     )
+#define CPU_CR4_PGE             (1U << CPU_CR4_PGE_BIT     )
+#define CPU_CR4_PCE             (1U << CPU_CR4_PCE_BIT     )
+#define CPU_CR4_OFXSR           (1U << CPU_CR4_OFXSR_BIT   )
+#define CPU_CR4_OSXMMEX         (1U << CPU_CR4_OSXMMEX_BIT )
+#define CPU_CR4_VMXE            (1U << CPU_CR4_VMXE_BIT    )
+#define CPU_CR4_SMXE            (1U << CPU_CR4_SMXE_BIT    )
+#define CPU_CR4_FSGSBASE        (1U << CPU_CR4_FSGSBASE_BIT)
+#define CPU_CR4_PCIDE           (1U << CPU_CR4_PCIDE_BIT   )
+#define CPU_CR4_OSXSAVE         (1U << CPU_CR4_OSXSAVE_BIT )
+#define CPU_CR4_SMEP            (1U << CPU_CR4_SMEP_BIT    )
+#define CPU_CR4_SMAP            (1U << CPU_CR4_SMAP_BIT    )
+#define CPU_CR4_PKE             (1U << CPU_CR4_PKE_BIT     )
 
 #define GDT_ACCESS_PRESENT_BIT  7
 #define GDT_ACCESS_DPL_BIT      5
@@ -90,11 +90,11 @@
 #define GDT_ACCESS_RW_BIT       1
 #define GDT_ACCESS_ACCESSED_BIT 0
 
-#define GDT_ACCESS_PRESENT      (1 << GDT_ACCESS_PRESENT_BIT)
-#define GDT_ACCESS_EXEC         (1 << GDT_ACCESS_EXEC_BIT)
-#define GDT_ACCESS_DOWN         (1 << GDT_ACCESS_DOWN_BIT)
-#define GDT_ACCESS_RW           (1 << GDT_ACCESS_RW_BIT)
-#define GDT_ACCESS_ACCESSED     (1 << GDT_ACCESS_ACCESSED_BIT)
+#define GDT_ACCESS_PRESENT      (1U << GDT_ACCESS_PRESENT_BIT)
+#define GDT_ACCESS_EXEC         (1U << GDT_ACCESS_EXEC_BIT)
+#define GDT_ACCESS_DOWN         (1U << GDT_ACCESS_DOWN_BIT)
+#define GDT_ACCESS_RW           (1U << GDT_ACCESS_RW_BIT)
+#define GDT_ACCESS_ACCESSED     (1U << GDT_ACCESS_ACCESSED_BIT)
 
 #define GDT_ACCESS_DPL_BITS     2
 #define GDT_ACCESS_DPL_MASK     ((1 << GDT_ACCESS_DPL_BITS)-1)
@@ -105,9 +105,9 @@
 #define GDT_FLAGS_IS32_BIT      6
 #define GDT_FLAGS_IS64_BIT      5
 
-#define GDT_FLAGS_GRAN          (1 << GDT_FLAGS_GRAN_BIT)
-#define GDT_FLAGS_IS32          (1 << GDT_FLAGS_IS32_BIT)
-#define GDT_FLAGS_IS64          (1 << GDT_FLAGS_IS64_BIT)
+#define GDT_FLAGS_GRAN          (1U << GDT_FLAGS_GRAN_BIT)
+#define GDT_FLAGS_IS32          (1U << GDT_FLAGS_IS32_BIT)
+#define GDT_FLAGS_IS64          (1U << GDT_FLAGS_IS64_BIT)
 
 #define GDT_LIMIT_LOW_MASK      0xFFFF
 #define GDT_BASE_LOW_MASK       0xFFFF
