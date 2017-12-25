@@ -933,6 +933,8 @@ extern "C" int main(void)
 
     thread_idle_set_ready();
 
+    cpu_irq_enable();
+
     while (1)
         halt();
 

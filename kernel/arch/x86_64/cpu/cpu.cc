@@ -141,9 +141,7 @@ void cpu_hw_init(int ap)
 
     apic_start_smp();
 
-    printk("Enabling IRQs\n");
-
-    cpu_irq_enable();
+    //printk("Enabling IRQs\n");
 }
 
 static void cpu_init_smp_apic(void *arg)

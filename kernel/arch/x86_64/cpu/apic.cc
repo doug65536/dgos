@@ -1507,6 +1507,12 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
 
     uint32_t dest = (target_apic_id >= 0) ? target_apic_id : 0;
 
+    if (intr != 0xFD) {
+        APIC_TRACE("IPI: intr=%x dest_type=%x dest_mode=%x cmd=%x\n",
+                   intr, dest_type, dest_mode,
+                   APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);
+    }
+
     apic_send_command(dest, APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);
 }
 
@@ -1825,8 +1831,7 @@ void apic_start_smp(void)
 
     // Send INIT to all other CPUs
 //    for (size_t i = 1; i < apic_id_count; ++i) {
-        apic_send_command(0xFFFFFFFF,
-                          APIC_CMD_DELIVERY_INIT |
+        apic_send_command(0, APIC_CMD_DELIVERY_INIT |
                           APIC_CMD_DEST_MODE_LOGICAL |
                           APIC_CMD_DEST_TYPE_OTHER);
 //        APIC_TRACE("Sending INIT IPI to APIC ID 0x%x\n", apic_id_list[i]);

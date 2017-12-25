@@ -12,6 +12,8 @@ ap_entry:
     cli
     cld
 
+    wbinvd
+
     xor %ax,%ax
     movw %ax,%ds
     movw %ax,%es
