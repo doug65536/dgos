@@ -132,49 +132,49 @@ isr_common:
     //  7*8(%rbp) -> ss
 
     push %r15
-    .cfi_rel_offset r15,-8
+    .cfi_rel_offset r15,72+0*8
 
     push %r14
-    .cfi_rel_offset r14,-16
+    .cfi_rel_offset r14,72+1*8
 
     push %r13
-    .cfi_rel_offset r13,-24
+    .cfi_rel_offset r13,72+2*8
 
     push %r12
-    .cfi_rel_offset r12,-32
+    .cfi_rel_offset r12,72+3*8
 
     push %r11
-    .cfi_rel_offset r11,-40
+    .cfi_rel_offset r11,72+4*8
 
     push %r10
-    .cfi_rel_offset r10,-48
+    .cfi_rel_offset r10,72+5*8
 
     push %rbx
-    .cfi_rel_offset rbx,-56
+    .cfi_rel_offset rbx,72+6*8
 
     push %rax
-    .cfi_rel_offset rax,-64
+    .cfi_rel_offset rax,72+7*8
 
     cld
     push %r9
-    .cfi_rel_offset r9,-72
+    .cfi_rel_offset r9,72+8*8
 
     mov %cr3,%rax
 
     push %r8
-    .cfi_rel_offset r8,-80
+    .cfi_rel_offset r8,72+9*8
 
     push %rcx
-    .cfi_rel_offset rcx,-88
+    .cfi_rel_offset rcx,72+10*8
 
     push %rdx
-    .cfi_rel_offset rdx,-96
+    .cfi_rel_offset rdx,72+11*8
 
     push %rsi
-    .cfi_rel_offset rsi,-104
+    .cfi_rel_offset rsi,72+12*8
 
     push %rdi
-    .cfi_rel_offset rdi,-112
+    .cfi_rel_offset rdi,72+13*8
 
     // Register usage:
     //  r13: segment register values at interrupt entry
