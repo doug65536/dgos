@@ -369,9 +369,10 @@ isr_common:
 
     pop %rbp
     .cfi_restore rbp
+    .cfi_def_cfa_register rsp
+    .cfi_def_cfa_offset 24
 
     add_rsp 16
-    .cfi_def_cfa_offset 8
 
     iretq
 
