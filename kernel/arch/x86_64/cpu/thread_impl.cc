@@ -17,6 +17,7 @@
 #include "apic.h"
 #include "rbtree.h"
 #include "callout.h"
+#include "vector.h"
 
 // Implements platform independent thread.h
 
@@ -170,6 +171,8 @@ static volatile uint32_t cpu_count;
 // Set in startup code (entry.s)
 uint32_t default_mxcsr_mask;
 
+///
+
 // Per-CPU scheduling queue
 class cpu_queue_t {
 public:
@@ -179,11 +182,12 @@ public:
     thread_info_t *choose_next();
 
 private:
-    rbtree_t<uint64_t, thread_info_t*> queue;
+    thread_info_t *current;
 
-    static uint32_t quantum_from_priority(thread_info_t const *thread);
+    vector<thread_info_t*> priorities;
+    uint32_t empty_flags;
 
-    spinlock_t lock;
+    spinlock lock;
 };
 
 // Get executing APIC ID (the slow expensive way, for early initialization)
@@ -1013,13 +1017,6 @@ isr_context_t *thread_schedule_if_idle(isr_context_t *ctx)
     if (cur_thread - threads < cpu_count && thread_idle_ready)
         return thread_schedule(ctx);
     return ctx;
-}
-
-// linearly map [-20,0] -> [800,100], and map [0,20] -> [100,5]
-uint32_t cpu_queue_t::quantum_from_priority(thread_info_t const *thread)
-{
-    uint8_t n = thread->priority;
-    return n <= 0 ? n * -35 + 100 : n * -19 / 4 + 100;
 }
 
 process_t *thread_current_process()
