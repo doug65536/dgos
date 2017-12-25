@@ -25,10 +25,6 @@ syscall_entry:
     // Read function pointer from vector table
     movq syscall_handlers(,%rax,8),%rax
 
-    // Validate non-null
-    testq %rax,%rax
-    jz 0f
-
     // Switch to CPU-local data gs
     swapgs
 
