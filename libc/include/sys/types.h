@@ -54,6 +54,7 @@ typedef uint32_t pid_t;
 // Used to identify a thread attribute object.
 typedef struct pthread_addr_t pthread_attr_t;
 
+#if 0   // not implemented yet
 // Used for condition variables.
 typedef _t pthread_cond_t;
 
@@ -77,6 +78,7 @@ typedef _t pthread_rwlock_t;
 
 // Used for read-write lock attributes.
 typedef _t pthread_rwlockattr_t;
+#endif
 
 // Used to identify a thread.
 typedef uint32_t pthread_t;

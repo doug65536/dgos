@@ -5,3 +5,5 @@ include/sys
 src/stdlib
 src/sys
 tests
+src/fcntl
+src/unistd

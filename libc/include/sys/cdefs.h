@@ -9,4 +9,4 @@
 # define __END_DECLS
 #endif
 
-#define __always_inline __attribute__((always_inline)) inline
+#define __always_inline __attribute__((__always_inline__)) inline
