@@ -396,10 +396,12 @@ static void vga_remap_callback(void *)
                             self->width * self->height *
                             sizeof(*self->shadow),
                             PROT_READ | PROT_WRITE,
-                            0, -1, 0);
+                            MAP_POPULATE, -1, 0);
 
-        memcpy(self->shadow, old_shadow, sizeof(uint16_t) * (80 * 25));
-        memset(old_shadow, 0, sizeof(uint16_t) * (80 * 25));
+        memcpy(self->shadow, old_shadow,
+               self->width * self->height * sizeof(*self->shadow));
+        memset(old_shadow, 0,
+               self->width * self->height * sizeof(*self->shadow));
     }
 }
 

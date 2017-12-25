@@ -85,7 +85,9 @@ C_ASSERT(sizeof(heap_t) == PAGESIZE);
 heap_t *heap_create(void)
 {
     heap_t *heap = (heap_t*)mmap(0, sizeof(heap_t),
-                        PROT_READ | PROT_WRITE, 0, -1, 0);
+                        PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    if (unlikely(heap == MAP_FAILED))
+        return nullptr;
     memset(heap->free_chains, 0, sizeof(heap->free_chains));
     memset(heap->arenas, 0, sizeof(heap->arenas));
     heap->arena_count = 0;

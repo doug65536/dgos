@@ -8,13 +8,13 @@
 
 static heap_t *default_heap;
 
-static void malloc_startup(void *p)
+void malloc_startup(void *p)
 {
     (void)p;
     default_heap = heap_create();
 }
 
-REGISTER_CALLOUT(malloc_startup, 0, callout_type_t::vmm_ready, "000");
+//REGISTER_CALLOUT(malloc_startup, 0, callout_type_t::vmm_ready, "000");
 
 void *calloc(size_t num, size_t size)
 {

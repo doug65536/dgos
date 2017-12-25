@@ -1370,7 +1370,7 @@ void mmu_init()
 
     intr_hook(INTR_EX_PAGE, mmu_page_fault_handler);
 
-    callout_call(callout_type_t::vmm_ready);
+    malloc_startup(nullptr);
 
     // Prepare 4MB contiguous physical memory
     // allocator with a capacity of 128
@@ -1401,6 +1401,8 @@ void mmu_init()
                           MAP_PHYSICAL, -1, 0);
 
     current_pagedir = (pte_t*)(PT0_PTR);
+
+    callout_call(callout_type_t::vmm_ready);
 }
 
 static size_t round_up(size_t n)
@@ -1877,6 +1879,22 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
     (void)offset;
     assert(offset == 0);
 
+    // Fail on invalid protection mask
+    if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
+        return MAP_FAILED;
+
+    // Any invalid flag set returns failure
+    if (unlikely(flags & MAP_INVALID_MASK))
+        return MAP_FAILED;
+
+    static constexpr int user_prohibited =
+            MAP_NEAR | MAP_DEVICE | MAP_GLOBAL |
+            MAP_GLOBAL | MAP_UNINITIALIZED |
+            MAP_WEAKORDER | MAP_NOCACHE | MAP_WRITETHRU;
+
+    if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
+        return MAP_FAILED;
+
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
 
     // Must pass MAP_DEVICE if passing a device registration index
@@ -1890,18 +1908,6 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 #endif
 
     pte_t page_flags = 0;
-
-    // Any invalid flag set returns failure
-    if (unlikely(flags & MAP_INVALID_MASK))
-        return MAP_FAILED;
-
-    static constexpr int user_prohibited =
-            MAP_NEAR | MAP_DEVICE | MAP_GLOBAL |
-            MAP_GLOBAL | MAP_UNINITIALIZED |
-            MAP_WEAKORDER | MAP_NOCACHE | MAP_WRITETHRU;
-
-    if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
-        return MAP_FAILED;
 
     // Populate stacks
     flags |= zero_if_false(flags & (MAP_STACK | MAP_32BIT), MAP_POPULATE);
@@ -1927,9 +1933,10 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
     page_flags |= zero_if_false(prot & PROT_WRITE, PTE_WRITABLE);
     page_flags |= zero_if_false(!(prot & PROT_EXEC), PTE_NX & cpuid_nx_mask);
 
-    uintptr_t misalignment = zero_if_false(
-                flags & MAP_PHYSICAL, uintptr_t(addr) & PAGE_MASK);
+    uintptr_t misalignment = uintptr_t(addr) & PAGE_MASK;
+    addr = (void*)(uintptr_t(addr) - misalignment);
     len += misalignment;
+    len = round_up(len);
 
     contiguous_allocator_t *allocator =
             (flags & MAP_USER) ?
@@ -1961,42 +1968,68 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     assert(linear_addr > 0x100000);
 
-    if (((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) &&
-            !usable_mem_ranges)
-    {
-        // POPULATE, not PHYSICAL, physical memory allocator online
-
-        len = round_up(len);
-        bool success;
-
+    if (likely(!usable_mem_ranges)) {
         pte_t *base_pte = mm_create_pagetables(linear_addr, len);
 
-        if (!(flags & MAP_32BIT) && phys_allocators[0]) {
-            success = phys_allocators[0].alloc_multiple(
+        if ((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) {
+            // POPULATE, not PHYSICAL
+
+            mmu_phys_allocator_t *phys_allocator = phys_allocators +
+                    !!(flags & MAP_32BIT);
+
+            bool success = phys_allocator->alloc_multiple(
                         len, [&](size_t ofs, physaddr_t paddr) {
                 if (likely(!(flags & MAP_UNINITIALIZED)))
                     clear_phys(paddr);
 
-                pte_t& entry = base_pte[ofs >> 12];
-                pte_t old = entry;
+                pte_t old = atomic_xchg(base_pte + (ofs >> 12),
+                                        pte_t(paddr | page_flags));
 
-                return atomic_cmpxchg(&entry, old, paddr | page_flags) == old;
+                if (old && old != PTE_ADDR)
+                    mmu_free_phys(old & PTE_ADDR);
+
+                return true;
             });
+
+            if (unlikely(!success))
+                return 0;
+        } else if (!(flags & MAP_PHYSICAL)) {
+            // Demand paged
+
+            size_t ofs = 0;
+            pte_t old;
+
+            if (!(flags & MAP_DEVICE)) {
+                // Commit first page
+                old = atomic_xchg(base_pte,
+                                        pte_t(mmu_alloc_phys(0) | page_flags |
+                                              PTE_PRESENT));
+                if (unlikely(old && old != PTE_ADDR))
+                    mmu_free_phys(old & PTE_ADDR);
+
+                ++ofs;
+            }
+
+            for (size_t end = (len >> PAGE_SCALE); ofs < end; ++ofs) {
+                old = atomic_xchg(base_pte + ofs, pte_t(PTE_ADDR | page_flags));
+
+                if (unlikely(old && old != PTE_ADDR))
+                    mmu_free_phys(old & PTE_ADDR);
+            }
+        } else if (flags & MAP_PHYSICAL) {
+            for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end; ++ofs) {
+                physaddr_t paddr = uintptr_t(addr) + (ofs << PAGE_SCALE);
+                pte_t old = atomic_xchg(base_pte + ofs,
+                                        pte_t(paddr | page_flags));
+
+                if (old && old != PTE_ADDR)
+                    mmu_free_phys(old & PTE_ADDR);
+            }
         } else {
-            success = phys_allocators[1].alloc_multiple(
-                        len, [&](size_t ofs, physaddr_t paddr) {
-                if (likely(!(flags & MAP_UNINITIALIZED)))
-                    clear_phys(paddr);
-
-                pte_t& entry = base_pte[ofs >> 12];
-                pte_t old = entry;
-
-                return atomic_cmpxchg(&entry, old, paddr | page_flags) == old;
-            });
+            assert(!"Unhandled condition");
         }
-        if (unlikely(!success))
-            return 0;
     } else {
+        // Early
         for (size_t ofs = 0; ofs < len; ofs += PAGE_SIZE)
         {
             if (likely(!(flags & MAP_PHYSICAL))) {
