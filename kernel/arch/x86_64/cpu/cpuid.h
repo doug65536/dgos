@@ -53,6 +53,9 @@ struct cpuid_cache_t {
     bool has_avx512f :1;
     bool has_fsgsbase:1;
     bool has_sysenter:1;
+
+    uint16_t min_monitor_line;
+    uint16_t max_monitor_line;
 };
 
 #ifdef CPUID_CC

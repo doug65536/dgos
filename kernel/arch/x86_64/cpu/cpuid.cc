@@ -36,6 +36,12 @@ void cpuid_init(void)
     cpuid_cache.has_sysenter= cpuid_edx_bit(11, 1, 0);
 
     cpuid_nx_mask = -!!cpuid_cache.has_nx;
+
+    cpuid_t info;
+    if (cpuid(&info, CPUID_MONITOR, 0)) {
+        cpuid_cache.min_monitor_line = uint16_t(info.eax);
+        cpuid_cache.max_monitor_line = uint16_t(info.ebx);
+    }
 }
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
