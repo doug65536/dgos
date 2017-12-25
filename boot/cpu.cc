@@ -272,9 +272,9 @@ bool cpu_has_upto_avx2()
 const char *cpu_choose_kernel()
 {
     if (cpu_has_upto_sse42()) {
-        if (cpu_has_upto_avx2())
-            return "dgos-kernel-avx2";
-        else
+//        if (cpu_has_upto_avx2())
+//            return "dgos-kernel-avx2";
+//        else
             return "dgos-kernel-sse4";
     } else
         return "dgos-kernel-generic";
