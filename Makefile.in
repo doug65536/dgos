@@ -1682,7 +1682,7 @@ libc_a_SOURCES = \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
 	libc/src/stdlib/_Exit.cc \
-	libc/src/sys/syscall.s \
+	libc/src/sys/syscall.S \
 	$(libc_a_HEADERS)
 
 libc_a_CXXFLAGS = \
@@ -3466,6 +3466,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strtok_r.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strxfrm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strxfrm_l.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_bin-empty.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-empty.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/test.Po@am__quote@
@@ -9220,7 +9221,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -9268,7 +9269,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

@@ -1,9 +1,9 @@
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
+src/sys/syscall.S
 tests/testassert.cc
 tests/testassert.h
 tests/test_string.cc
-src/sys/syscall.s
 include/sys/cdefs.h
 include/sys/syscall.h
 src/stdlib/_Exit.cc

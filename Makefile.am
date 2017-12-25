@@ -840,7 +840,7 @@ libc_a_SOURCES = \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
 	libc/src/stdlib/_Exit.cc \
-	libc/src/sys/syscall.s \
+	libc/src/sys/syscall.S \
 	$(libc_a_HEADERS)
 
 libc_a_CXXFLAGS = \
