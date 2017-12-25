@@ -1033,8 +1033,9 @@ QEMU_COMMON = \
 	$(QEMU_NET) \
 	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
-	$(QEMU_FLAGS) \
-	$(QEMU_USB)
+	$(QEMU_FLAGS)
+
+#	$(QEMU_USB)
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
