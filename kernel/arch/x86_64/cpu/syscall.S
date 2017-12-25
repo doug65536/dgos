@@ -35,7 +35,7 @@ syscall_entry:
     movq THREAD_SYSCALL_STACK_OFS(%r11),%r11
 
     // Switch to this thread's syscall stack
-    xchg %rsp,%r11
+    xchgq %rsp,%r11
 
     // IRQs are okay at this point
     sti
@@ -71,7 +71,7 @@ syscall_entry:
 
     sysretq
 
-0:	// Vector table contained null pointer, or,
+0:
     // syscall number out of range
     movq $SYSCALL_ENOSYS,%rax
     sysretq
