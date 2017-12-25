@@ -903,6 +903,10 @@ test: test_compile
 user_shell_SOURCES = \
 	user/test/test.S
 
+user_shell_LDADD = libc.a
+
+EXTRA_user_shell_DEPENDENCIES = libc.a
+
 #user_hello_SOURCES =
 
 # ----------------------------------------------------------------------------

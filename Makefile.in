@@ -574,7 +574,7 @@ mbr_elf_LINK = $(CXXLD) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) \
 	$(mbr_elf_LDFLAGS) $(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
-user_shell_LDADD = $(LDADD)
+user_shell_DEPENDENCIES = libc.a
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -1716,6 +1716,8 @@ LIBC_CXXFLAGS = \
 user_shell_SOURCES = \
 	user/test/test.S
 
+user_shell_LDADD = libc.a
+EXTRA_user_shell_DEPENDENCIES = libc.a
 QEMU = qemu-system-x86_64
 QEMU_CPUS = 8
 QEMU_CORES = 4
