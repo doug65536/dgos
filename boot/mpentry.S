@@ -3,9 +3,9 @@
 .code16
 .section .text, "ax"
 
-# This must be position independent code
-# Note that this code is called with the cs set to
-# some segment and ip is zero
+// This must be position independent code
+// Note that this code is called with the cs set to
+// some segment and ip is zero
 .globl ap_entry
 .globl ap_entry_size
 ap_entry:
@@ -25,15 +25,15 @@ ap_entry:
     mov %cs,%cx
     shl $4,%ecx
 
-    # Calculate address of protected mode entry point below
+    // Calculate address of protected mode entry point below
     add $0f - ap_entry,%ecx
 
-    # ecx now holds address of ap_entry, push a far pointer to the stack
+    // ecx now holds address of ap_entry, push a far pointer to the stack
     pushl $0x18
     pushl %ecx
 
-    # Enter protected mode, enable cache and cache coherency,
-    # and jump into protected mode immediately after setting CR0.PE
+    // Enter protected mode, enable cache and cache coherency,
+    // and jump into protected mode immediately after setting CR0.PE
     mov %cr0,%eax
     or $1,%eax
     and $(~(CPU_CR0_CD | CPU_CR0_NW)),%eax
