@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "assert.h"
+#include "control_regs_constants.h"
 
 struct gdt_entry_t {
     constexpr gdt_entry_t(uint64_t base, uint64_t limit,
@@ -62,7 +63,8 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     ((1 << 4) | \
     ((executable) ? GDT_ACCESS_EXEC : 0) | \
     ((downward) ? GDT_ACCESS_DOWN : 0) | \
-    ((rw) ? GDT_ACCESS_RW : 0))
+    ((rw) ? GDT_ACCESS_RW : 0)) | \
+    GDT_ACCESS_ACCESSED
 
 #define GDT_MAKE_CODEDATA_DESCRIPTOR( \
     base, limit, present, privilege, \
