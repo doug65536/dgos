@@ -32,10 +32,10 @@ struct iocp_t {
     typedef void (*callback_t)(errno_t err, uintptr_t arg);
 
     iocp_t(callback_t callback, uintptr_t arg)
-        : done_count(0)
-        , expect_count(0)
-        , callback(callback)
+        : callback(callback)
         , arg(arg)
+        , done_count(0)
+        , expect_count(0)
         , err(errno_t::OK)
     {
         assert(callback);
@@ -47,7 +47,7 @@ struct iocp_t {
     // callback will be invoked when invoke is called `expect`
     // times. Invoke will never be called if set_expect is never
     // called.
-    void set_expect(uint16_t expect)
+    void set_expect(unsigned expect)
     {
         unique_lock<spinlock> hold(lock);
         expect_count = expect;
@@ -87,11 +87,11 @@ private:
         }
     }
 
-    uint16_t volatile done_count;
-    uint16_t expect_count;
-    spinlock lock;
     callback_t callback;
     uintptr_t arg;
+    unsigned done_count;
+    unsigned expect_count;
+    spinlock lock;
     errno_t err;
 };
 
@@ -113,8 +113,9 @@ public:
         unique_lock<spinlock> hold(lock);
         assert(!done);
         done = true;
-        hold.unlock();
         done_cond.notify_all();
+        // Hold lock until after notify to ensure that the object
+        // won't get destructed from under us
     }
 
     operator iocp_t*()
