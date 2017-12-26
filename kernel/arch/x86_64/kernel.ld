@@ -4,6 +4,8 @@ PHDRS {
 	text PT_LOAD FLAGS(5);
 	readonly PT_LOAD FLAGS(4);
 	data PT_LOAD FLAGS(6);
+	guard PT_LOAD FLAGS(0);
+	stacks PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
@@ -181,12 +183,16 @@ SECTIONS {
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
 
+	.bspguard : ALIGN(4096) {
+		. += 4096;
+	} :guard
+
 	.bspstk : ALIGN(4096) {
 		/* emergency stack for early bootstrap */
 		. = . + 65536;
 		/* bootstrap CPU stack */
 		*(.bspstk)
-	} :data
+	} :stacks
 
 	.note : {
 		*(.note*)
