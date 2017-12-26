@@ -992,6 +992,12 @@ test: test_compile
 user_shell_SOURCES = \
 	user/test/test.S
 
+user_shell_LDFLAGS = \
+	-Wl,-z,max-page-size=4096
+
+user_shell_CCASFLAGS = \
+	-Wa,-g
+
 user_shell_LDADD = libc.a
 
 EXTRA_user_shell_DEPENDENCIES = libc.a

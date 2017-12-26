@@ -663,9 +663,11 @@ mbr_elf_OBJECTS = $(am_mbr_elf_OBJECTS)
 mbr_elf_DEPENDENCIES = libmbr.a
 mbr_elf_LINK = $(CXXLD) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) \
 	$(mbr_elf_LDFLAGS) $(LDFLAGS) -o $@
-am_user_shell_OBJECTS = user/test/test.$(OBJEXT)
+am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
 user_shell_DEPENDENCIES = libc.a
+user_shell_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(user_shell_LDFLAGS) \
+	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -1895,6 +1897,12 @@ LIBC_CXXFLAGS = \
 # User programs
 user_shell_SOURCES = \
 	user/test/test.S
+
+user_shell_LDFLAGS = \
+	-Wl,-z,max-page-size=4096
+
+user_shell_CCASFLAGS = \
+	-Wa,-g
 
 user_shell_LDADD = libc.a
 EXTRA_user_shell_DEPENDENCIES = libc.a
@@ -3523,12 +3531,12 @@ user/test/$(am__dirstamp):
 user/test/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) user/test/$(DEPDIR)
 	@: > user/test/$(DEPDIR)/$(am__dirstamp)
-user/test/test.$(OBJEXT): user/test/$(am__dirstamp) \
+user/test/user_shell-test.$(OBJEXT): user/test/$(am__dirstamp) \
 	user/test/$(DEPDIR)/$(am__dirstamp)
 
 user-shell$(EXEEXT): $(user_shell_OBJECTS) $(user_shell_DEPENDENCIES) $(EXTRA_user_shell_DEPENDENCIES) 
 	@rm -f user-shell$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(user_shell_OBJECTS) $(user_shell_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(user_shell_LINK) $(user_shell_OBJECTS) $(user_shell_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -4025,7 +4033,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-write.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_bin-empty.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-empty.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/test.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
 
 .S.o:
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
