@@ -507,7 +507,7 @@ void thread_init(int ap)
 
     //cpu_set_gs(GDT_SEL_USER_DATA | 3);
     cpu_set_gsbase(cpu);
-    cpu_set_altgsbase((void*)0xFFFFFEEDBEEFF00D);
+    cpu_set_altgsbase((void*)0xFFFFD1D1D1D1D1D1);
 
     if (!ap) {
         intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler);
