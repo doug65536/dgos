@@ -134,12 +134,11 @@ public:
     iterator erase(const_iterator __first,
                    const_iterator __last);
 
-    void push_back(_T const& __value);
-
-    void push_back(_T&& __value);
+    bool push_back(_T const& __value);
+    bool push_back(_T&& __value);
 
     template<typename... _Args>
-    void emplace_back(_Args&&... __args);
+    bool emplace_back(_Args&&... __args);
 
     void pop_back();
 
@@ -751,37 +750,49 @@ vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::push_back(_T const& __value)
+bool vector<_T,_Allocator>::push_back(_T const& __value)
 {
-    if (unlikely(__sz + 1 > __capacity))
-        __grow();
+    if (unlikely(__sz + 1 > __capacity)) {
+        if (unlikely(!__grow()))
+            return false;
+    }
 
     new (__m + __sz) value_type(__value);
 
     ++__sz;
+
+    return true;
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::push_back(_T&& __value)
+bool vector<_T,_Allocator>::push_back(_T&& __value)
 {
-    if (unlikely(__sz + 1 > __capacity))
-        __grow();
+    if (unlikely(__sz + 1 > __capacity)) {
+        if (unlikely(!__grow()))
+            return false;
+    }
 
     new (__m + __sz) value_type(move(__value));
 
     ++__sz;
+
+    return true;
 }
 
 template<typename _T, typename _Allocator>
 template<typename... _Args>
-void vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
+bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
 {
-    if (unlikely(__sz + 1 > __capacity))
-        __grow();
+    if (unlikely(__sz + 1 > __capacity)) {
+        if (unlikely(__grow()))
+            return false;
+    }
 
     new (__m + __sz) value_type(forward<_Args>(__args)...);
 
     ++__sz;
+
+    return true;
 }
 
 template<typename _T, typename _Allocator>
@@ -797,7 +808,8 @@ bool vector<_T,_Allocator>::resize(size_type __count)
 }
 
 template<typename _T, typename _Allocator>
-bool vector<_T,_Allocator>::resize(size_type __count, value_type const& __value)
+bool vector<_T,_Allocator>::resize(size_type __count,
+                                   value_type const& __value)
 {
     if (__sz > __count) {
         do {
@@ -809,6 +821,7 @@ bool vector<_T,_Allocator>::resize(size_type __count, value_type const& __value)
         fill_n(__m + __sz, __count - __sz, __value);
         __sz = __count;
     }
+
     return true;
 }
 

@@ -1,11 +1,11 @@
 #pragma once
+#include "vector.h"
 #include "cpu/thread_impl.h"
 #include "thread.h"
 #include "desc_alloc.h"
 #include "cpu/thread_impl.h"
 #include "desc_alloc.h"
-
-typedef int pid_t;
+#include "thread.h"
 
 struct fd_table_t
 {
@@ -89,6 +89,7 @@ struct process_t
     pid_t pid;
     spinlock process_lock;
     condition_variable cond;
+    int exitcode;
 
     fd_table_t ids;
     state_t state;
@@ -102,7 +103,14 @@ struct process_t
     void *get_allocator();
     void set_allocator(void *allocator);
 
+    static void exit(pid_t pid, int exitcode);
+    static bool add_thread(pid_t pid, thread_t tid);
+
 private:
+    vector<thread_t> threads;
+
+    static process_t *lookup(pid_t pid);
+
     static process_t *add_locked(unique_lock<spinlock> const&);
     void remove();
     static process_t *add();

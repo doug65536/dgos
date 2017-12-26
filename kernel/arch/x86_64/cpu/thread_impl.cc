@@ -1,4 +1,5 @@
 #include "cpu/thread_impl.h"
+#include "process.h"
 #include "types.h"
 #include "interrupts.h"
 #include "string.h"
@@ -18,6 +19,7 @@
 #include "rbtree.h"
 #include "callout.h"
 #include "vector.h"
+#include "mutex.h"
 
 // Implements platform independent thread.h
 
