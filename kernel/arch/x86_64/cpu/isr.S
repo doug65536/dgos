@@ -269,7 +269,6 @@ isr_common:
 .Lsse_context_restore_jmp:
 
     // pop packed segments qword into rdx
-    // fetch cpu local storage pointer into r14
     // if not returning to kernel
     //   update tss rsp0
     //   swapgs
@@ -285,9 +284,6 @@ isr_common:
     // Pop segments
     pop %rdx
 
-    // Fetch pointer to cpu_info
-    mov %gs:0,%r14
-
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
     // Compare against user segment because the CPU pushes nonsense for #DF
@@ -297,7 +293,7 @@ isr_common:
     // ...returning to user code
 
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
-    mov CPU_INFO_TSS_PTR_OFS(%r14),%rbx
+    mov %gs:CPU_INFO_TSS_PTR_OFS,%rbx
     lea 8*8(%rbp),%rax
     mov %rax,TSS_RSP0_OFS(%rbx)
 
