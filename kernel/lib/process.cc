@@ -123,7 +123,10 @@ int process_t::spawn(pid_t * pid_result,
     // Return the assigned PID
     *pid_result = process->pid;
 
-    thread_create(&process_t::start, process, nullptr, 0, false);
+    thread_t tid = thread_create(&process_t::start, process,
+                                 nullptr, 0, false);
+
+    process->add_thread(process->pid, tid);
 
     unique_lock<spinlock> lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
@@ -248,6 +251,30 @@ void process_t::set_allocator(void *allocator)
 {
     assert(linear_allocator == nullptr);
     linear_allocator = allocator;
+}
+
+void process_t::exit(pid_t pid, int exitcode)
+{
+
+}
+
+bool process_t::add_thread(pid_t pid, thread_t tid)
+{
+    process_t *process_ptr = lookup(pid);
+
+    return process_ptr
+            ? process_ptr->threads.push_back(tid)
+            : false;
+}
+
+process_t *process_t::lookup(pid_t pid)
+{
+    if (unlikely(pid >= int(processes.size())))
+        return nullptr;
+
+    return (pid < 0)
+            ? thread_current_process()
+            : processes[pid].p;
 }
 
 process_t *process_t::init(uintptr_t mmu_context)
