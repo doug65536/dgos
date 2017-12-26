@@ -449,11 +449,18 @@ typedef nvme_queue_t<nvme_cmp_t> cmp_queue_t;
 class nvme_queue_state_t {
 public:
     nvme_queue_state_t()
+        : prp_lists(nullptr)
+        , ready(false)
     {
     }
 
     ~nvme_queue_state_t()
     {
+    }
+
+    operator bool() const
+    {
+        return ready;
     }
 
     void init(size_t count,
@@ -494,6 +501,7 @@ private:
     lock_t lock;
     condition_variable not_full;
     condition_variable not_empty;
+    bool ready;
 };
 
 // ---------------------------------------------------------------------------
