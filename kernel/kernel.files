@@ -1,8 +1,11 @@
+lib/cc/memory.cc
 lib/sys/sys_types.h
 syscall/sys_fd.cc
 syscall/sys_fd.h
 syscall/sys_mem.cc
 syscall/sys_mem.h
+syscall/sys_process.cc
+syscall/sys_process.h
 syscall/sys_time.cc
 ../bochs-debugger-boot-commands
 ../bochs-debugger-commands

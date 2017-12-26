@@ -600,7 +600,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/syscall_helper.cc \
 	kernel/syscall/sys_fd.cc \
 	kernel/syscall/sys_mem.cc \
-	kernel/syscall/sys_time.cc
+	kernel/syscall/sys_time.cc \
+	kernel/syscall/sys_process.cc
 
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/kernel \

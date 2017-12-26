@@ -60,3 +60,7 @@ typedef long long __vector_size(16) __i64_vec2LL;
 typedef unsigned long long __vector_size(16) __ivec2ULL;
 
 #define countof(arr) (sizeof(arr)/sizeof(*arr))
+
+typedef int pid_t;
+
+struct process_t;

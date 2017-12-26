@@ -3,10 +3,11 @@
 set timeout -1
 set host [lindex $argv 0]
 set port [lindex $argv 1]
-set cmd [lindex $argv 2]
 spawn telnet $host $port
-expect "(qemu) "
-send "$cmd\n"
+foreach cmd [lrange $argv 2 $argc] {
+	expect "(qemu) "
+	send "$cmd\n"
+}
 expect "(qemu) "
 send "\x1d"
 send "close\n"

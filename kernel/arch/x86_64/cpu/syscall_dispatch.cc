@@ -7,6 +7,7 @@
 #include "syscall/sys_fd.h"
 #include "syscall/sys_mem.h"
 #include "syscall/sys_time.h"
+#include "syscall/sys_process.h"
 
 long sys_unimplemented()
 {
@@ -74,7 +75,7 @@ syscall_handler_t *syscall_handlers[314] = {
     (syscall_handler_t*)sys_unimplemented,//sys_fork,
     (syscall_handler_t*)sys_unimplemented,//sys_vfork,
     (syscall_handler_t*)sys_unimplemented,//sys_execve,
-    (syscall_handler_t*)sys_unimplemented,//sys_exit,
+    (syscall_handler_t*)sys_exit,
     (syscall_handler_t*)sys_unimplemented,//sys_wait4,
     (syscall_handler_t*)sys_unimplemented,//sys_kill,
     (syscall_handler_t*)sys_unimplemented,//sys_uname,
