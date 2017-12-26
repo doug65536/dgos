@@ -1137,13 +1137,13 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
     fat2 = (cluster_t*)lookup_sector(bpb.first_fat_lba + bpb.sec_per_fat);
     end_cluster = (lba_en - cluster_ofs) >> bit_log2(bpb.sec_per_cluster);
 
-    int fat_mismatches = 0;
-    for (int i = 0, e = fat_size >> bit_log2(sizeof(cluster_t)); i < e; ++i)
-        fat_mismatches += fat[i] != fat2[i];
-
-    if (fat_mismatches != 0) {
-        FAT32_TRACE("%d FAT mismatches", fat_mismatches);
-    }
+    //int fat_mismatches = 0;
+    //for (int i = 0, e = fat_size >> bit_log2(sizeof(cluster_t)); i < e; ++i)
+    //    fat_mismatches += fat[i] != fat2[i];
+    //
+    //if (fat_mismatches != 0) {
+    //    FAT32_TRACE("%d FAT mismatches", fat_mismatches);
+    //}
 
     return true;
 }
