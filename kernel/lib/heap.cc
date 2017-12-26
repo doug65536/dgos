@@ -84,8 +84,8 @@ C_ASSERT(sizeof(heap_t) == PAGESIZE);
 
 heap_t *heap_create(void)
 {
-    heap_t *heap = (heap_t*)mmap(0, sizeof(heap_t),
-                        PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    heap_t *heap = (heap_t*)mmap(0, sizeof(heap_t), PROT_READ | PROT_WRITE,
+                                 MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
     if (unlikely(heap == MAP_FAILED))
         return nullptr;
     memset(heap->free_chains, 0, sizeof(heap->free_chains));
@@ -140,7 +140,8 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
         heap_ext_arena_t *new_list;
 
         new_list = (heap_ext_arena_t*)mmap(
-                    0, PAGESIZE, PROT_READ | PROT_WRITE, 0, -1, 0);
+                    0, PAGESIZE, PROT_READ | PROT_WRITE,
+                    MAP_UNINITIALIZED, -1, 0);
         if (!new_list || new_list == MAP_FAILED)
             return 0;
 
@@ -155,7 +156,7 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
     size_t bucket = log2size - 5;
 
     char *arena = (char*)mmap(0, HEAP_BUCKET_SIZE, PROT_READ | PROT_WRITE,
-                       MAP_POPULATE, -1, 0);
+                       MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 
     arena_list_ptr[(*arena_count_ptr)++] = arena;
@@ -180,18 +181,14 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
     size *= num;
     void *block = heap_alloc(heap, size);
 
-    if (size < HEAP_MMAP_THRESHOLD)
-        return memset(block, 0, size);
-
-    // mmap already guarantees cleared pages
-    return block;
+    return memset(block, 0, size);
 }
 
 static void *heap_large_alloc(size_t size)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)mmap(0, size,
                            PROT_READ | PROT_WRITE,
-                           0, -1, 0);
+                           MAP_UNINITIALIZED, -1, 0);
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
     hdr->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);

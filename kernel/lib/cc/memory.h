@@ -30,8 +30,15 @@ struct allocator
     }
 };
 
+struct page_allocator_base
+{
+protected:
+    static void *allocate_impl(size_t n);
+    static void deallocate_impl(void *p, size_t n);
+};
+
 template<typename _T>
-struct page_allocator
+struct page_allocator : public page_allocator_base
 {
     typedef _T value_type;
 
@@ -43,12 +50,11 @@ struct page_allocator
 
     value_type * allocate(size_t __n) const
     {
-        return mmap(nullptr, __n * sizeof(value_type),
-                    PROT_READ | PROT_WRITE, 0, -1, 0);
+        return allocate_impl(__n * sizeof(value_type));
     }
 
-    void deallocate(value_type * __p, size_t __n) const
+    void deallocate(value_type * p, size_t n) const
     {
-        munmap(__p, __n * sizeof(value_type));
+        deallocate_impl(p, n);
     }
 };

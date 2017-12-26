@@ -285,6 +285,8 @@ public:
 
     void addref_virtual_range(linaddr_t start, size_t len);
 
+    void set_fallback(mmu_phys_allocator_t *fallback);
+
 private:
     __always_inline size_t index_from_addr(physaddr_t addr) const
     {
@@ -310,10 +312,11 @@ private:
     }
 
     entry_t *entries;
+    mmu_phys_allocator_t *fallback;
     physaddr_t begin;
     entry_t next_free;
     entry_t free_page_count;
-    spinlock_t lock;
+    spinlock lock;
     uint8_t log2_pagesz;
 };
 
@@ -1390,8 +1393,7 @@ void mmu_init()
         if (PT0_PTR[i] == 0) {
             physaddr_t page = mmu_alloc_phys(0);
             clear_phys(page);
-            PT0_PTR[i] = page | PTE_GLOBAL |
-                    PTE_WRITABLE | PTE_PRESENT;
+            PT0_PTR[i] = page | PTE_GLOBAL | PTE_WRITABLE | PTE_PRESENT;
         }
     }
 
@@ -1895,12 +1897,13 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
     if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
         return MAP_FAILED;
 
+    if (len == 0)
+        return nullptr;
+
     PROFILE_MMAP_ONLY( uint64_t profile_st = cpu_rdtsc() );
 
     // Must pass MAP_DEVICE if passing a device registration index
     assert((flags & MAP_DEVICE) || (fd < 0));
-
-    assert(len > 0);
 
 #if DEBUG_PAGE_TABLES
     printdbg("Mapping len=%zx prot=%x flags=%x addr=%lx\n",
@@ -1909,8 +1912,12 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     pte_t page_flags = 0;
 
-    // Populate stacks
-    flags |= zero_if_false(flags & (MAP_STACK | MAP_32BIT), MAP_POPULATE);
+    // Populate 32 bit memory, always
+    flags |= zero_if_false(flags & MAP_32BIT, MAP_POPULATE);
+
+    // Populate kernel stacks
+    flags |= zero_if_false((flags & (MAP_STACK | MAP_USER)) == MAP_STACK,
+                           MAP_POPULATE);
 
     // Set physical and present flag on physical memory mapping
     page_flags |= zero_if_false(flags & MAP_PHYSICAL,
@@ -1977,19 +1984,31 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             mmu_phys_allocator_t *phys_allocator = phys_allocators +
                     !!(flags & MAP_32BIT);
 
-            bool success = phys_allocator->alloc_multiple(
-                        len, [&](size_t ofs, physaddr_t paddr) {
-                if (likely(!(flags & MAP_UNINITIALIZED)))
-                    clear_phys(paddr);
+            bool success;
+            for (;;) {
+                success = phys_allocator->alloc_multiple(
+                            len, [&](size_t ofs, physaddr_t paddr) {
+                    if (likely(!(flags & MAP_UNINITIALIZED)))
+                        clear_phys(paddr);
 
-                pte_t old = atomic_xchg(base_pte + (ofs >> 12),
-                                        pte_t(paddr | page_flags));
+                    pte_t old = atomic_xchg(base_pte + (ofs >> 12),
+                                            pte_t(paddr | page_flags));
 
-                if (old && old != PTE_ADDR)
-                    mmu_free_phys(old & PTE_ADDR);
+                    if (old && old != PTE_ADDR)
+                        mmu_free_phys(old & PTE_ADDR);
 
-                return true;
-            });
+                    return true;
+                });
+
+                // If it failed, retry with low memory allocator
+                if (success)
+                    break;
+
+                if (phys_allocator == phys_allocators)
+                    phys_allocator++;
+                else
+                    break;
+            }
 
             if (unlikely(!success))
                 return 0;
@@ -1997,33 +2016,54 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             // Demand paged
 
             size_t ofs = 0;
-            pte_t old;
+            pte_t pte;
 
-            if (!(flags & MAP_DEVICE)) {
+            physaddr_t paddr = 0;
+
+            size_t end = len >> PAGE_SCALE;
+
+            if (!(flags & MAP_DEVICE))
+                paddr = mmu_alloc_phys(0);
+
+            if (paddr && !(flags & MAP_UNINITIALIZED))
+                clear_phys(paddr);
+
+            pte = 0;
+
+            if (paddr)
+                pte = pte_t(paddr | page_flags | PTE_PRESENT);
+
+            if (paddr && !(flags & MAP_STACK)) {
                 // Commit first page
-                old = atomic_xchg(base_pte,
-                                        pte_t(mmu_alloc_phys(0) | page_flags |
-                                              PTE_PRESENT));
-                if (unlikely(old && old != PTE_ADDR))
-                    mmu_free_phys(old & PTE_ADDR);
+                pte = atomic_xchg(base_pte, pte);
 
                 ++ofs;
+            } else if (paddr) {
+                // Commit last page
+
+                pte = atomic_xchg(base_pte + --end, pte);
             }
 
-            for (size_t end = (len >> PAGE_SCALE); ofs < end; ++ofs) {
-                old = atomic_xchg(base_pte + ofs, pte_t(PTE_ADDR | page_flags));
+            if (unlikely(pte && pte != PTE_ADDR))
+                mmu_free_phys(pte & PTE_ADDR);
 
-                if (unlikely(old && old != PTE_ADDR))
-                    mmu_free_phys(old & PTE_ADDR);
+            for ( ; ofs < end; ++ofs) {
+                pte = pte_t(PTE_ADDR | page_flags);
+                pte = atomic_xchg(base_pte + ofs, pte);
+
+                if (unlikely(pte && pte != PTE_ADDR))
+                    mmu_free_phys(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
+            pte_t pte;
+
             for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end; ++ofs) {
                 physaddr_t paddr = uintptr_t(addr) + (ofs << PAGE_SCALE);
-                pte_t old = atomic_xchg(base_pte + ofs,
-                                        pte_t(paddr | page_flags));
+                pte = pte_t(paddr | page_flags);
+                pte = atomic_xchg(base_pte + ofs, pte);
 
-                if (old && old != PTE_ADDR)
-                    mmu_free_phys(old & PTE_ADDR);
+                if (pte && pte != PTE_ADDR)
+                    mmu_free_phys(pte & PTE_ADDR);
             }
         } else {
             assert(!"Unhandled condition");
@@ -2192,7 +2232,7 @@ int mprotect(void *addr, size_t len, int prot)
     addr = (char*)addr - misalignment;
     len += misalignment;
 
-    len = (len + PAGE_MASK) & -(int)PAGE_SIZE;
+    len = round_up(len);
 
     if (unlikely(len == 0))
         return 0;
@@ -2242,8 +2282,8 @@ int mprotect(void *addr, size_t len, int prot)
     addr_present(linaddr_t(addr), path, pt);
     addr_present(linaddr_t(addr) + len, path_en, pt_en);
 
-    while (((pt[0] != pt_en[0]) | (pt[1] != pt_en[1]) |
-            (pt[2] != pt_en[2]) | (pt[3] != pt_en[3])) &&
+    while (((pt[3] != pt_en[3]) | (pt[2] != pt_en[2]) |
+            (pt[1] != pt_en[1]) | (pt[0] != pt_en[0])) &&
            (*pt[0] & PTE_PRESENT) &&
            (*pt[1] & PTE_PRESENT) &&
            (*pt[2] & PTE_PRESENT)) {
@@ -2272,7 +2312,6 @@ int mprotect(void *addr, size_t len, int prot)
         cpu_invalidate_page((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
-        ++pt[3];
         path_inc(path);
         pte_from_path(pt, path);
     }
@@ -2645,6 +2684,11 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
     return 0;
 }
 
+void mmu_phys_allocator_t::set_fallback(mmu_phys_allocator_t *fallback)
+{
+    this->fallback = fallback;
+}
+
 size_t mmu_phys_allocator_t::size_from_highest_page(physaddr_t page_index)
 {
     return page_index * sizeof(entry_t);
@@ -2655,13 +2699,12 @@ void mmu_phys_allocator_t::init(
 {
     entries = (entry_t*)addr;
     begin = begin_;
-    lock = 0;
     log2_pagesz = log2_pagesz_;
 }
 
 void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 {
-    spinlock_lock_noyield(&lock);
+    unique_lock<spinlock> lock_(lock);
     physaddr_t free_end = base + size;
     size_t pagesz = uint64_t(1) << log2_pagesz;
     entry_t index = index_from_addr(free_end) - 1;
@@ -2672,19 +2715,22 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
         size -= pagesz;
         ++free_page_count;
     }
-    spinlock_unlock_noirq(&lock);
 }
 
 physaddr_t mmu_phys_allocator_t::alloc_one()
 {
-    spinlock_lock_noyield(&lock);
+    unique_lock<spinlock> lock_(lock);
 
     size_t item = next_free;
+
+    if (unlikely(!item) && fallback)
+        return fallback->alloc_one();
+
     entry_t new_next = entries[item];
     next_free = new_next;
     entries[item] = 1;
 
-    spinlock_unlock_noirq(&lock);
+    lock_.unlock();
 
     return addr_from_index(item);
 }
@@ -2694,7 +2740,7 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
 {
     size_t count = size >> log2_pagesz;
 
-    spinlock_lock_noyield(&lock);
+    unique_lock<spinlock> lock_(lock);
 
     entry_t first = next_free;
     entry_t new_next = next_free;
@@ -2706,12 +2752,11 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
     if (i == count) {
         next_free = new_next;
         free_page_count -= count;
+    } else {
+        return false;
     }
 
-    spinlock_unlock_noirq(&lock);
-
-    if (unlikely(i != count))
-        return false;
+    lock_.unlock();
 
     for (i = 0; i < count; ++i) {
         entry_t next = entries[first];
@@ -2735,24 +2780,22 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
 
 void mmu_phys_allocator_t::release_one(physaddr_t addr)
 {
-    spinlock_lock_noyield(&lock);
+    unique_lock<spinlock> lock_(lock);
     release_one_locked(addr);
-    spinlock_unlock_noirq(&lock);
 }
 
 void mmu_phys_allocator_t::addref(physaddr_t addr)
 {
     entry_t index = index_from_addr(addr);
-    spinlock_lock_noyield(&lock);
+    unique_lock<spinlock> lock_(lock);
     ++entries[index];
-    spinlock_unlock_noirq(&lock);
 }
 
 void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 {
     size_t count = len >> log2_pagesz;
 
-    spinlock_lock_noyield(&lock);
+    unique_lock<spinlock> lock_(lock);
 
     unsigned path[4];
     pte_t *ptes[4];
@@ -2777,8 +2820,6 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
             ++entries[index];
         }
     }
-
-    spinlock_unlock_noirq(&lock);
 }
 
 void *mmap_window(size_t size)
