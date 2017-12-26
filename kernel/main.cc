@@ -55,17 +55,17 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
 
-#define ENABLE_SHELL_THREAD         1
+#define ENABLE_SHELL_THREAD         0
 #define ENABLE_READ_STRESS_THREAD   0
-#define ENABLE_SLEEP_THREAD         64
+#define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_HEAP_STRESS_THREAD   1
+#define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
-#define ENABLE_SPAWN_STRESS         0
+#define ENABLE_SPAWN_STRESS         1
 
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    1
@@ -776,6 +776,7 @@ static int init_thread(void *p)
         pid_t pid = 0;
         int spawn_result = process_t::spawn(
                     &pid, "user-shell", nullptr, nullptr);
+        thread_sleep_for(10000);
         printdbg("Started user mode process with PID=%d, status=%d\n",
                  pid, spawn_result);
         assert(spawn_result == 0 || pid < 0);
