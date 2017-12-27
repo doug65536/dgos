@@ -103,6 +103,15 @@ void cpu_init(int ap)
     static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");
 
+    if (!ap && sse_avx_offset) {
+        // Patch vzeroall into syscall code path
+        extern uint8_t const syscall_patch_jmp[];
+        uintptr_t const base = uintptr_t(syscall_entry);
+        uintptr_t const syscall_jmp = base + syscall_patch_jmp[0];
+        uintptr_t const syscall_vzeroall = base + syscall_patch_jmp[1];
+        // 3 is the size of the vzeroall instruction
+        cpu_patch_code((void*)syscall_jmp, (void*)syscall_vzeroall, 3);
+    }
 
     // Load null LDT
     cpu_set_ldt(0);
@@ -167,10 +176,15 @@ REGISTER_CALLOUT(cpu_init_smp_apic, 0, callout_type_t::smp_start, "200");
 
 void cpu_patch_insn(void *addr, uint64_t value, size_t size)
 {
+    return cpu_patch_code(addr, &value, size);
+}
+
+void cpu_patch_code(void *addr, void const *src, size_t size)
+{
     // Disable write protect
     cpu_cr0_change_bits(CPU_CR0_WP, 0);
     // Patch
-    memcpy(addr, &value, size);
+    memcpy(addr, src, size);
     // Enable write protect
     cpu_cr0_change_bits(0, CPU_CR0_WP);
 }

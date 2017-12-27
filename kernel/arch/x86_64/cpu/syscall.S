@@ -69,9 +69,51 @@ syscall_entry:
     // Restore caller's stack
     popq %rsp
 
+    // Don't leak information to user mode
+    xor %edx,%edx
+    mov %edx,%esi
+    mov %edx,%edi
+    mov %edx,%r8d
+    mov %edx,%r9d
+    mov %edx,%r10d
+
+    // This might be patched over with vzeroall
+.Lpatch_jmp:
+    jmp .Lold_clear
+    nop
+
     sysretq
 
 0:
     // syscall number out of range
-    movq $SYSCALL_ENOSYS,%rax
+    movl $SYSCALL_ENOSYS,%eax
     sysretq
+
+.align 16
+.Lold_clear:
+    pxor %xmm0,%xmm0
+    movq %xmm0,%xmm1
+    movq %xmm0,%xmm2
+    movq %xmm0,%xmm3
+    movq %xmm0,%xmm4
+    movq %xmm0,%xmm5
+    movq %xmm0,%xmm6
+    movq %xmm0,%xmm7
+    movq %xmm0,%xmm8
+    movq %xmm0,%xmm9
+    movq %xmm0,%xmm10
+    movq %xmm0,%xmm11
+    movq %xmm0,%xmm12
+    movq %xmm0,%xmm13
+    movq %xmm0,%xmm14
+    movq %xmm0,%xmm15
+    sysretq
+
+.Lvzeroall_st:
+    vzeroall
+
+.section .rodata
+.global syscall_patch_jmp
+syscall_patch_jmp:
+    .byte .Lpatch_jmp - syscall_entry
+    .byte .Lvzeroall_st - syscall_entry
