@@ -743,34 +743,47 @@ static int init_thread(void *p)
 {
     (void)p;
 
+    printdbg("Initializing PCI\n");
     pci_init();
+
+    printdbg("Initializing keyboard event queue\n");
     keybd_init();
+
+    printdbg("Initializing 8042 keyboard\n");
     keyb8042_init();
 
     // Facilities needed by drivers
+    printdbg("Initializing driver base\n");
     callout_call(callout_type_t::driver_base);
 
     // Run late initializations
+    printdbg("Initializing late devices\n");
     callout_call(callout_type_t::late_dev);
 
     // Register filesystems
+    printdbg("Initializing filesystems\n");
     callout_call(callout_type_t::reg_filesys);
 
     // Storage interfaces
+    printdbg("Initializing storage devices\n");
     callout_call(callout_type_t::storage_dev);
 
     // Register partition schemes
+    printdbg("Initializing partition probes\n");
     callout_call(callout_type_t::partition_probe);
 
     // Register network interfaces
+    printdbg("Initializing network interfaces\n");
     callout_call(callout_type_t::nic);
 
     // Register USB interfaces
+    printdbg("Initializing USB interfaces\n");
     callout_call(callout_type_t::usb);
 
     //bootdev_info(0, 0, 0);
 
 #if ENABLE_SPAWN_STRESS > 0
+    printdbg("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
     for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
         pid_t pid = 0;
         int spawn_result = process_t::spawn(
@@ -782,11 +795,13 @@ static int init_thread(void *p)
     }
 #endif
 
+    printdbg("Initializing framebuffer\n");
     fb_init();
 
     //priqueue_test.test();
 
 #if ENABLE_FILESYSTEM_TEST
+    printdbg("Starting filesystem test\n");
     for (int n = 0; n < 1000; ++n) {
         char name[16];
         snprintf(name, sizeof(name), "created_%d", n);
@@ -806,10 +821,13 @@ static int init_thread(void *p)
     //                       PROT_READ | PROT_WRITE, MAP_USER, -1, 0);
     //munmap(user_test, 1<<20);
 
+    printdbg("Running mprotect self test\n");
     mprotect_test(0);
 
+    printdbg("Running red-black tree self test\n");
     rbtree_t<>::test();
 
+    printdbg("Testing floating point formatter\n");
     printdbg("Float formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
     printdbg("Float formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
     printdbg("Float formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
@@ -845,6 +863,7 @@ static int init_thread(void *p)
     file_closedir(od);
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
+    printdbg("Starting framebuffer stress\n");
     printdbg("Running framebuffer stress\n");
     thread_t draw_thread_id = thread_create(draw_test, 0, 0, 0);
     printdbg("draw thread id=%d\n", draw_thread_id);
