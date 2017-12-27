@@ -2213,6 +2213,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     if (unlikely(status != errno_t::OK))
         return false;
 
+    block.set_expect(1);
     status = block.wait();
     if (unlikely(status != errno_t::OK))
         return false;
