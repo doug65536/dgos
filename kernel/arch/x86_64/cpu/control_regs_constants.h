@@ -28,10 +28,32 @@
 // RFLAGS mask on syscall entry
 #define CPU_MSR_FMASK           0xC0000084U
 
+// Compatibility mode syscall entry
+#define CPU_MSR_CSTAR           0xC0000083U
+
 // Long mode syscall entry
 #define CPU_MSR_LSTAR           0xC0000082U
 
 // CS/SS values for syscall entry
+//             +-----------+--------------+--------------+
+//             | 63      48 | 47       32 | 31         0 |
+//             +------------+-------------+--------------+
+//             | SYSRET_SEG | SYSCALL_SEG | 32 bit entry |
+//             +------------+-------------+--------------+
+//             |    User    |    Kernel   |
+//   32 bit CS |     +0     |     +0      |
+//   64 bit CS |    +16     |     +0      |
+//   32 bit SS |     +8     |     +8      |
+//   64 bit SS |     +8     |     +8      |
+//             +------------+-------------+
+//
+// Required GDT layout:
+//               usercode32
+//                userdata
+//               usercode64
+//
+//                           kernelcode64
+//                            kerneldata
 #define CPU_MSR_STAR            0xC0000081U
 
 // IA32_MISC_ENABLE
@@ -452,18 +474,22 @@
 // Page fault was instruction fetch
 #define CTX_ERRCODE_PF_SGX      (1<<CTX_ERRCODE_PF_SGX_BIT)
 
-#define GDT_SEL_KERNEL_CODE64   0x08
-#define GDT_SEL_KERNEL_DATA     0x10
-#define GDT_SEL_KERNEL_CODE32   0x18
-#define GDT_SEL_KERNEL_DATA32   0x20
-#define GDT_SEL_KERNEL_CODE16   0x28
-#define GDT_SEL_KERNEL_DATA16   0x30
-#define GDT_SEL_USER_CODE32     0x38
-#define GDT_SEL_USER_DATA       0x40
-#define GDT_SEL_USER_CODE64     0x48
-#define GDT_SEL_TSS             0x58
-#define GDT_SEL_TSS_HI          0x60
-#define GDT_SEL_END             0x68
+#define GDT_SEL_PM_CODE16       0x08
+#define GDT_SEL_PM_DATA16       0x10
+#define GDT_SEL_PM_CODE32       0x18
+#define GDT_SEL_PM_DATA32       0x20
+
+#define GDT_SEL_USER_CODE32     0x40
+#define GDT_SEL_USER_DATA       0x48
+#define GDT_SEL_USER_CODE64     0x50
+
+#define GDT_SEL_KERNEL_CODE64   0x60
+#define GDT_SEL_KERNEL_DATA     0x68
+
+#define GDT_SEL_TSS             0x80
+#define GDT_SEL_TSS_HI          0x88
+
+#define GDT_SEL_END             0xC0
 
 #define GDT_TYPE_TSS            0x09
 

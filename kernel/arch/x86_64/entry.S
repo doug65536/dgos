@@ -36,9 +36,6 @@ entry:
     or $(CPU_CR4_OFXSR | CPU_CR4_OSXMMEX),%rax
     mov %rax,%cr4
 
-    // Get IDT and TSS up asap
-    call idt_gdt_tss_init
-
     debugind '2'
 
     // See if this is the bootstrap processor
@@ -55,6 +52,9 @@ ap_init:
     // Load kernel memory mapping ASAP
     mov root_physaddr,%rax
     mov %rax,%cr3
+
+    // Get IDT and TSS up asap
+    call idt_gdt_tss_init_ap
 
     // Initialize AP MXCSR
     mov $(CPU_MXCSR_ELF_INIT),%eax
@@ -97,6 +97,9 @@ bsp_init:
     mov %r15d,%eax
     and $0x000FFFFF,%eax
     mov %rax,phys_mem_map
+
+    // Get IDT and TSS up asap
+    call idt_gdt_tss_init
 
     // Save the CPU_MXCSR_MASK
 
@@ -204,7 +207,7 @@ idt_gdt_tss_init:
     //  uint32_t reserved;
     movw %ax,idt(,%rbx,2)
     sarq $16,%rax
-    movw $IDT_SEL,2+idt(,%rbx,2)
+    movw $GDT_SEL_KERNEL_CODE64,2+idt(,%rbx,2)
     movb $0,4+idt(,%rbx,2)
     movb $(IDT_PRESENT | IDT_INTR),5+idt(,%rbx,2)
     movw %ax,6+idt(,%rbx,2)
@@ -219,6 +222,18 @@ idt_gdt_tss_init:
     movb $1,idt+4+16*INTR_EX_STACK
     movb $2,idt+4+16*INTR_EX_DBLFAULT
 
+    // Poke initial TSS into TSS GDT entry
+    //  uint16_t limit_low;
+    //	uint16_t base_low;
+    //	uint8_t base_middle;
+    //	uint8_t access;
+    //	uint8_t flags_limit_high;
+    //	uint8_t base_high;
+
+    pop %rbx
+    // fall through...
+
+idt_gdt_tss_init_ap:
     // Load IDTR
     sub $(24*8),%rsp
     movw $(16 * 256 - 1),6(%rsp)
@@ -230,14 +245,6 @@ idt_gdt_tss_init:
     movq $gdt,8(%rsp)
     lgdtq 6(%rsp)
 
-    // Poke initial TSS into TSS GDT entry
-    //  uint16_t limit_low;
-    //	uint16_t base_low;
-    //	uint8_t base_middle;
-    //	uint8_t access;
-    //	uint8_t flags_limit_high;
-    //	uint8_t base_high;
-
     movq $init_tss,%rax
     // Limit 15:0
     movw $(init_tss_end - init_tss - 1),GDT_SEL_TSS+gdt
@@ -248,7 +255,8 @@ idt_gdt_tss_init:
     movb %al,4+GDT_SEL_TSS+gdt
     sarq $8,%rax
     // access
-    movb $(GDT_ACCESS_PRESENT | GDT_TYPE_TSS),5+GDT_SEL_TSS+gdt
+    movb $(GDT_ACCESS_PRESENT | \
+        GDT_ACCESS_ACCESSED | GDT_TYPE_TSS),5+GDT_SEL_TSS+gdt
     // Limit 19:16, flags
     movb $0,6+GDT_SEL_TSS+gdt
     // Base 21:24
@@ -259,12 +267,11 @@ idt_gdt_tss_init:
     // Reserved
     movl $0,12+GDT_SEL_TSS+gdt
 
+    // Load TR
     mov $GDT_SEL_TSS,%eax
     ltr %ax
 
     add $(24*8),%rsp
-
-    pop %rbx
     ret
 
 .section .data

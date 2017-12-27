@@ -108,8 +108,8 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 // Native data (64 bit)
 // 3.4.5 "When not in IA-32e mode or for non-code segments, bit 21 is
 // reserved and should always be set to 0"
-#define GDT_MAKE_DATASEG64(ring) \
-    GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 0, 0)
+#define GDT_MAKE_DATASEG(ring) \
+    GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1, 0)
 
 #define GDT_MAKE_TSSSEG(base, limit) \
     GDT_MAKE_TSS_DESCRIPTOR(base, limit, 1, 0, 0), \
@@ -122,11 +122,9 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 #define GDT_MAKE_CODESEG32(ring) \
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0xFFFFF, 1, ring, 1, 0, 1, 1, 1, 0)
 
-// Native data (32 bit)
-#define GDT_MAKE_DATASEG32(ring) \
-    GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0xFFFFF, 1, ring, 0, 0, 1, 1, 1, 0)
+// 32 bit data same as 64 bit data
 
-// Foregn code (16 bit)
+// Foreign code (16 bit)
 #define GDT_MAKE_CODESEG16(ring) \
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 1, 0, 1, 0, 0, 0)
 

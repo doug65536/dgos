@@ -121,8 +121,6 @@
 #define GDT_BASE_HIGH_BIT       24
 #define GDT_BASE_HIGH           0xFF
 
-// idt_entry_t selector field
-#define IDT_SEL         0x08
 // idt_entry_t type_attr field
 #define IDT_PRESENT     0x80
 #define IDT_DPL_BIT     5

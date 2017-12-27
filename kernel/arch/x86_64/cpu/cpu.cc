@@ -89,10 +89,20 @@ void cpu_init(int ap)
 
     // Configure syscall
     cpu_msr_set(CPU_MSR_FMASK, CPU_EFLAGS_AC | CPU_EFLAGS_DF |
-                CPU_EFLAGS_TF | CPU_EFLAGS_IF);
-    cpu_msr_set(CPU_MSR_LSTAR, (uint64_t)syscall_entry);
-    cpu_msr_set_hi(CPU_MSR_STAR, GDT_SEL_KERNEL_CODE64 |
-               (GDT_SEL_USER_CODE32 << 16));
+                CPU_EFLAGS_TF | CPU_EFLAGS_IF | CPU_EFLAGS_RF |
+                CPU_EFLAGS_VM);
+    cpu_msr_set(CPU_MSR_LSTAR, uint64_t(syscall_entry));
+    cpu_msr_set(CPU_MSR_STAR, (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
+               (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
+
+    // SYSCALL and SYSRET are hardwired to assume these things about the GDT:
+    static_assert(GDT_SEL_USER_DATA == GDT_SEL_USER_CODE32 + 8,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+    static_assert(GDT_SEL_USER_CODE64 == GDT_SEL_USER_DATA + 8,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+    static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
+                  "GDT inconsistent with SYSCALL/SYSRET behaviour");
+
 
     // Load null LDT
     cpu_set_ldt(0);

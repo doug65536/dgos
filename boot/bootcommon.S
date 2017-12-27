@@ -30,16 +30,16 @@
     .elseif \sel == GDT_SEL_KERNEL_DATA
         gdt_seg_data 0,1,1,0xF
 
-    .elseif \sel == GDT_SEL_KERNEL_CODE32
+    .elseif \sel == GDT_SEL_PM_CODE32
         gdt_seg_code 0,1,1,0,0xF
 
-    .elseif \sel == GDT_SEL_KERNEL_DATA32
+    .elseif \sel == GDT_SEL_PM_DATA32
         gdt_seg_data 0,1,1,0xF
 
-    .elseif \sel == GDT_SEL_KERNEL_CODE16
+    .elseif \sel == GDT_SEL_PM_CODE16
         gdt_seg_code 0,0,0,0,0x0
 
-    .elseif \sel == GDT_SEL_KERNEL_DATA16
+    .elseif \sel == GDT_SEL_PM_DATA16
         gdt_seg_data 0,0,0,0x0
 
     .elseif \sel == GDT_SEL_USER_CODE32
@@ -57,14 +57,6 @@
     .endif
 .endm
 
-.macro gdt_emit_desc_after sel, after
-    .if \sel != \after + 8
-        .error "GDT order not matching constants"
-    .endif
-
-    gdt_emit_desc \sel
-.endm
-
 .global gdt
 .global gdtr
 
@@ -74,18 +66,40 @@
 gdt:
     .word 0
 gdtr:
-    .word 8*11
+    .word 8*24
     .int gdt
 
-    gdt_emit_desc_after GDT_SEL_KERNEL_CODE64, 0
-    gdt_emit_desc_after GDT_SEL_KERNEL_DATA, GDT_SEL_KERNEL_CODE64
-    gdt_emit_desc_after GDT_SEL_KERNEL_CODE32, GDT_SEL_KERNEL_DATA
-    gdt_emit_desc_after GDT_SEL_KERNEL_DATA32, GDT_SEL_KERNEL_CODE32
-    gdt_emit_desc_after GDT_SEL_KERNEL_CODE16, GDT_SEL_KERNEL_DATA32
-    gdt_emit_desc_after GDT_SEL_KERNEL_DATA16, GDT_SEL_KERNEL_CODE16
-    gdt_emit_desc_after GDT_SEL_USER_CODE32, GDT_SEL_KERNEL_DATA16
-    gdt_emit_desc_after GDT_SEL_USER_DATA, GDT_SEL_USER_CODE32
-    gdt_emit_desc_after GDT_SEL_USER_CODE64, GDT_SEL_USER_DATA
+    gdt_emit_desc GDT_SEL_PM_CODE16
+    gdt_emit_desc GDT_SEL_PM_DATA16
+
+    gdt_emit_desc GDT_SEL_PM_CODE32
+    gdt_emit_desc GDT_SEL_PM_DATA32
+
+    .quad 0
+    .quad 0
+    .quad 0
+
+    gdt_emit_desc GDT_SEL_USER_CODE32
+    gdt_emit_desc GDT_SEL_USER_DATA
+    gdt_emit_desc GDT_SEL_USER_CODE64
+
+    .quad 0
+
+    gdt_emit_desc GDT_SEL_KERNEL_CODE64
+    gdt_emit_desc GDT_SEL_KERNEL_DATA
+
+    .quad 0
+    .quad 0
+
+    .quad 0
+    .quad 0
+
+    .quad 0
+    .quad 0
+    .quad 0
+    .quad 0
+    .quad 0
+    .quad 0
 
 .section .text
 
@@ -110,10 +124,10 @@ boot:
     bts $0,%eax
     mov %eax,%cr0
 
-    ljmp $GDT_SEL_KERNEL_CODE32,$pmode_entry
+    ljmp $GDT_SEL_PM_CODE32,$pmode_entry
 pmode_entry:
 .code32
-    movl $GDT_SEL_KERNEL_DATA,%edx
+    movl $GDT_SEL_PM_DATA32,%edx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
@@ -140,10 +154,10 @@ pmode_entry:
     call cpu_a20_exitpm
 
     // Jump to 16 bit protected mode and load segments
-    ljmp $GDT_SEL_KERNEL_CODE16,$0f
+    ljmp $GDT_SEL_PM_CODE16,$0f
 .code16
 0:
-    movw $GDT_SEL_KERNEL_DATA16,%dx
+    movw $GDT_SEL_PM_DATA16,%dx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
@@ -312,7 +326,7 @@ idt_init:
 0:
     movw isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
-    movw $8,2(%edx,%ecx,8)
+    movw $GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
     movw $0,4(%edx,%ecx,8)
     movw $0x8e,5(%edx,%ecx,8)
     movw $0,6(%edx,%ecx,8)

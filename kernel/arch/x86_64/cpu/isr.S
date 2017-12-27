@@ -193,9 +193,12 @@ isr_common:
 
     push %r13
 
+    // Get interrupted code segment
+    mov 4*8(%rbp),%ecx
+
     // See if we are coming from kernel code
-    cmpl $(GDT_SEL_USER_CODE64 | 3),4*8(%rbp)
-    jne .Lfrom_kernel
+    cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
+    je .Lfrom_kernel
 
     // ...came from user code
     swapgs

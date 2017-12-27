@@ -1,4 +1,5 @@
 #include "cpu_constants.h"
+#include "gdt.h"
 
 .code16
 .section .text, "ax"
@@ -31,7 +32,7 @@ ap_entry:
     add $0f - ap_entry,%ecx
 
     // ecx now holds address of ap_entry, push a far pointer to the stack
-    pushl $0x18
+    pushl $GDT_SEL_PM_CODE32
     pushl %ecx
 
     // Enter protected mode, enable cache and cache coherency,
@@ -44,7 +45,7 @@ ap_entry:
 
 0:
 .code32
-    movl $0x20,%ecx
+    movl $GDT_SEL_PM_DATA32,%ecx
     mov %cx,%ds
     mov %cx,%es
     mov %cx,%fs

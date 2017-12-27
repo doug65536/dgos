@@ -13,39 +13,66 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
 #define TSS_STACK_SIZE (32 << 10)
 
-gdt_entry_combined_t gdt[13] = {
+// Must match control_regs_constants.h GDT_SEL_* defines!
+__aligned(64) gdt_entry_combined_t gdt[24] = {
+    // --- cache line ---
+
+    // 0x00
     GDT_MAKE_EMPTY(),
 
-    // Must be in this order for syscall instruction
-    // 64 bit kernel code and data
-    GDT_MAKE_CODESEG64(0),
-    GDT_MAKE_DATASEG64(0),
-
-    // Arbitrary
-    // 32 bit kernel code and data
-    GDT_MAKE_CODESEG32(0),
-    GDT_MAKE_DATASEG32(0),
-    // 16 bit kernel code and data
+    // 0x8, 0x10
     GDT_MAKE_CODESEG16(0),
     GDT_MAKE_DATASEG16(0),
 
-    // Must be in this order for sysret instruction
-    // 32 bit user code
-    GDT_MAKE_CODESEG32(3),
-    // User data
-    GDT_MAKE_DATASEG64(3),
-    // 64 bit user code
-    GDT_MAKE_CODESEG32(3),
+    // 0x18, 0x20
+    GDT_MAKE_CODESEG32(0),
+    GDT_MAKE_DATASEG(0),
 
+    // 0x28, 0x30, 0x38
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY(),
 
+    // --- cache line ---
+
+    // 32 bit user code
+    // 0x40, 0x48, 0x50
+    GDT_MAKE_CODESEG32(3),
+    GDT_MAKE_DATASEG(3),
+    GDT_MAKE_CODESEG64(3),
+
+    // 0x58
+    GDT_MAKE_EMPTY(),
+
+    // 64 bit kernel code and data
+    // 0x60, 0x68
+    GDT_MAKE_CODESEG64(0),
+    GDT_MAKE_DATASEG(0),
+
+    // 0x68, 0x70, 0x78
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY(),
+
+    // --- cache line ---
+
     // CPU task selector
-    GDT_MAKE_TSSSEG(0L, sizeof(tss_t))
+    // 0x80-0x8F
+    GDT_MAKE_TSSSEG(0L, sizeof(tss_t)),
+
+    // 0x90-0xBF
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY(),
+    GDT_MAKE_EMPTY()
+
+    // --- cache line ---
 };
 
-C_ASSERT(GDT_SEL_KERNEL_CODE64 == 1*8);
-C_ASSERT(GDT_SEL_USER_CODE32 == 7*8);
-C_ASSERT(GDT_SEL_TSS == 11*8);
+C_ASSERT(GDT_SEL_KERNEL_CODE64 == 12*8);
+C_ASSERT(GDT_SEL_USER_CODE32 == 8*8);
+C_ASSERT(GDT_SEL_TSS == 16*8);
 C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 
 // Holds exclusive access to TSS segment descriptor
