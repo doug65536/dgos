@@ -11,3 +11,5 @@ foreach cmd [lrange $argv 2 $argc] {
 expect "(qemu) "
 send "\x1d"
 send "close\n"
+send_user "\n"
+
