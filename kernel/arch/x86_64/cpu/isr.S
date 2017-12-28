@@ -196,6 +196,10 @@ isr_common:
     // Get interrupted code segment
     movl 4*8(%rbp),%ecx
 
+    // Check for doublefault nonsense cs
+    test %ecx,%ecx
+    jz .Lfrom_kernel
+
     // See if we are coming from kernel code
     cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
     je .Lfrom_kernel
