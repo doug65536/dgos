@@ -93,6 +93,7 @@ struct alignas(64) thread_info_t {
     // --- cache line ---
 
     uint32_t flags;
+    // Doesn't include guard page
     uint32_t stack_size;
 
     uint64_t volatile wake_time;
@@ -101,6 +102,7 @@ struct alignas(64) thread_info_t {
 
     void *exception_chain;
 
+    // Points to the end of the stack!
     void *stack;
 
     int exit_code;
@@ -329,6 +331,8 @@ static thread_t thread_create_with_state(
                          uintptr_t(stack) + PAGE_SIZE + stack_size);
         }
 
+        stack = (char*)stack + PAGE_SIZE + stack_size;
+
         // Syscall stack
         // Allocate one extra page for guard page
         thread->syscall_stack = (char*)mmap(
@@ -376,9 +380,8 @@ static thread_t thread_create_with_state(
         // APs inherit BSP's process
         thread->process = cpus[0].cur_thread->process;
 
-        uintptr_t stack_addr = (uintptr_t)stack;
-        uintptr_t stack_end = stack_addr +
-                stack_size + PAGE_SIZE;
+        uintptr_t stack_addr = uintptr_t(stack);
+        uintptr_t stack_end = stack_addr + stack_size + PAGE_SIZE;
 
         size_t ctx_size = sizeof(isr_context_t);
 
@@ -527,17 +530,20 @@ void thread_init(int ap)
         thread->ctx = 0;
         thread->priority = -256;
 
-        thread->stack = kernel_stack;
+        // BSP stack (grows down)
+        thread->stack = kernel_stack + kernel_stack_size + PAGE_SIZE;
         thread->stack_size = kernel_stack_size;
-        madvise((char*)thread->stack, PAGE_SIZE, MADV_DONTNEED);
-        mprotect((char*)thread->stack, PAGE_SIZE, PROT_NONE);
-        THREAD_TRACE("Thread %d stack guard=0x%zx,"
+        madvise(kernel_stack, PAGE_SIZE, MADV_DONTNEED);
+        mprotect(kernel_stack, PAGE_SIZE, PROT_NONE);
+        THREAD_TRACE("Thread %d stack, guard=0x%zx,"
                      " stack=0x%zx-0x%zx\n",
                      0,
-                     uintptr_t(thread->stack),
-                     uintptr_t(thread->stack) + PAGE_SIZE,
-                     uintptr_t(thread->stack) + PAGE_SIZE + kernel_stack_size);
+                     uintptr_t(kernel_stack),
+                     uintptr_t(kernel_stack) + PAGE_SIZE,
+                     uintptr_t(kernel_stack) + PAGE_SIZE +
+                     kernel_stack_size);
 
+        // BSP XSAVE stack (grows up)
         thread->xsave_stack = mmap(0, xsave_stack_size + PAGE_SIZE,
                                    PROT_READ | PROT_WRITE,
                                    MAP_STACK, -1, 0);
@@ -545,15 +551,17 @@ void thread_init(int ap)
                 PAGE_SIZE, MADV_DONTNEED);
         mprotect((char*)thread->xsave_stack + xsave_stack_size,
                  PAGE_SIZE, PROT_NONE);
-        THREAD_TRACE("Thread %d stack guard=0x%zx,"
+        THREAD_TRACE("Thread %d xsave stack, guard=0x%zx,"
                      " stack=0x%zx-0x%zx\n",
                      0,
-                     uintptr_t(thread->stack),
-                     uintptr_t(thread->stack) + PAGE_SIZE,
-                     uintptr_t(thread->stack) + PAGE_SIZE + xsave_stack_size);
+                     uintptr_t(thread->xsave_stack) + xsave_stack_size,
+                     uintptr_t(thread->xsave_stack),
+                     uintptr_t(thread->xsave_stack) + xsave_stack_size);
 
-        madvise(kernel_stack, PAGE_SIZE, MADV_DONTNEED);
-        mprotect(kernel_stack, PAGE_SIZE, PROT_NONE);
+        madvise((char*)thread->xsave_stack + xsave_stack_size,
+                PAGE_SIZE, MADV_DONTNEED);
+        mprotect((char*)thread->xsave_stack + xsave_stack_size,
+                 PAGE_SIZE, PROT_NONE);
 
         thread->xsave_ptr = thread->xsave_stack;
         thread->cpu_affinity = 1;
