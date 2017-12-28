@@ -131,70 +131,70 @@ isr_common:
     //  6*8(%rbp) -> rsp
     //  7*8(%rbp) -> ss
 
-    push %r15
+    pushq %r15
     .cfi_rel_offset r15,72+0*8
 
-    push %r14
+    pushq %r14
     .cfi_rel_offset r14,72+1*8
 
-    push %r13
+    pushq %r13
     .cfi_rel_offset r13,72+2*8
 
-    push %r12
+    pushq %r12
     .cfi_rel_offset r12,72+3*8
 
-    push %r11
+    pushq %r11
     .cfi_rel_offset r11,72+4*8
 
-    push %r10
+    pushq %r10
     .cfi_rel_offset r10,72+5*8
 
-    push %rbx
+    pushq %rbx
     .cfi_rel_offset rbx,72+6*8
 
-    push %rax
+    pushq %rax
     .cfi_rel_offset rax,72+7*8
 
     cld
-    push %r9
+    pushq %r9
     .cfi_rel_offset r9,72+8*8
 
-    mov %cr3,%rax
+    movq %cr3,%rax
 
-    push %r8
+    pushq %r8
     .cfi_rel_offset r8,72+9*8
 
-    push %rcx
+    pushq %rcx
     .cfi_rel_offset rcx,72+10*8
 
-    push %rdx
+    pushq %rdx
     .cfi_rel_offset rdx,72+11*8
 
-    push %rsi
+    pushq %rsi
     .cfi_rel_offset rsi,72+12*8
 
-    push %rdi
+    pushq %rdi
     .cfi_rel_offset rdi,72+13*8
 
     // Register usage:
     //  r13: segment register values at interrupt entry
 
-    push %rax
+    pushq %rax
 
     // Get segment registers packed into %r13
-    mov %gs,%eax
-    mov %es,%r13d
-    shl $16,%eax
-    shl $16,%r13d
-    mov %fs,%ax
-    mov %ds,%r13w
-    shl $32,%rax
-    or %rax,%r13
+    movl %gs,%eax
+    movl %es,%r13d
+    shll $16,%eax
+    shll $16,%r13d
+    movw %fs,%ax
+    movw %ds,%r13w
+    shlq $32,%rax
+    orq %rax,%r13
 
-    push %r13
+    pushq %r13
 
     // Get interrupted code segment
-    mov 4*8(%rbp),%ecx
+    movl 4*8(%rbp),%ecx
 
     // See if we are coming from kernel code
     cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
@@ -211,16 +211,16 @@ isr_common:
 .Lsse_context_save_jmp:
 
     // Make structure on the stack
-    push %rax
-    push $0
-    push $0
+    pushq %rax
+    pushq $0
+    pushq $0
 
     // Pass intr, ctx
-    mov %rsp,%rsi
-    mov 1*8(%rbp),%edi
+    movq %rsp,%rsi
+    movl 1*8(%rbp),%edi
 
     // Align stack pointer
-    sub $8,%rsp
+    subq $8,%rsp
 
     // Interrupt dispatch
     // 0x00-0x1F -> exception_isr_handler
@@ -229,22 +229,22 @@ isr_common:
     // 0xF0-0xFF -> intr_invoke
 
     // 0x00-0x1F -> exception_isr_handler
-    lea exception_isr_handler(%rip),%rax
+    leaq exception_isr_handler(%rip),%rax
 
     // 0x20-0x2F -> pic_dispatcher
-    mov $pic8259_dispatcher,%rcx
-    cmp $INTR_PIC1_IRQ_BASE,%edi
-    cmovae %rcx,%rax
+    movq $pic8259_dispatcher,%rcx
+    cmpl $INTR_PIC1_IRQ_BASE,%edi
+    cmovaeq %rcx,%rax
 
     // 0x30-0xEF -> apic_dispatcher
-    mov $apic_dispatcher,%rcx
-    cmp $INTR_APIC_IRQ_BASE,%edi
-    cmovae %rcx,%rax
+    movq $apic_dispatcher,%rcx
+    cmpl $INTR_APIC_IRQ_BASE,%edi
+    cmovaeq %rcx,%rax
 
     // 0xF0-0xFF -> intr_invoke
-    mov $intr_invoke,%rcx
-    cmp $INTR_SOFT_BASE,%edi
-    cmovae %rcx,%rax
+    movq $intr_invoke,%rcx
+    cmpl $INTR_SOFT_BASE,%edi
+    cmovaeq %rcx,%rax
 
     // Call handler
     call *%rax
@@ -257,15 +257,15 @@ isr_common:
 
     // Pop outgoing cleanup data
     // Used to adjust outgoing thread state after switching stack
-    pop %rax
-    pop %rdi
-    test %rax,%rax
+    popq %rax
+    popq %rdi
+    testq %rax,%rax
     jz .Lno_cleanup_call
     call *%rax
 .Lno_cleanup_call:
 
     // Pop the pointer to the FPU context
-    pop %rdi
+    popq %rdi
 
     // NOTE: this instruction may be patched to call one of the xsave versions!
     call isr_restore_fxrstor
@@ -282,29 +282,29 @@ isr_common:
     // endif
 
     // Load return cs
-    movzwl 4*8(%rbp),%ecx
+    movl 4*8(%rbp),%ecx
 
     // Pop segments
-    pop %rdx
+    popq %rdx
 
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
     // Compare against user segment because the CPU pushes nonsense for #DF
-    cmpl $(GDT_SEL_USER_CODE64 | 3),%ecx
-    jne .Lreturning_to_kernel
+    cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
+    je .Lreturning_to_kernel
 
     // ...returning to user code
 
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
-    mov %gs:CPU_INFO_TSS_PTR_OFS,%rbx
-    lea 8*8(%rbp),%rax
-    mov %rax,TSS_RSP0_OFS(%rbx)
+    movq %gs:CPU_INFO_TSS_PTR_OFS,%rbx
+    leaq 8*8(%rbp),%rax
+    movq %rax,TSS_RSP0_OFS(%rbx)
 
     // Restore user gs
     swapgs
 
     // If segments are not changing, avoid 136*4 cycles
-    cmp %r13,%rdx
+    cmpq %r13,%rdx
     jnz .Lsegments_changed
     jmp .Lsegments_not_changed
 
@@ -321,52 +321,52 @@ isr_common:
 .Lsegments_not_changed:
 .Lreturning_to_kernel:
     // Restore CR3
-    pop %rax
-    mov %rax,%cr3
+    popq %rax
+    movq %rax,%cr3
 
-    pop %rdi
+    popq %rdi
     .cfi_restore rdi
 
-    pop %rsi
+    popq %rsi
     .cfi_restore rsi
 
-    pop %rdx
+    popq %rdx
     .cfi_restore rdx
 
-    pop %rcx
+    popq %rcx
     .cfi_restore rcx
 
-    pop %r8
+    popq %r8
     .cfi_restore r8
 
-    pop %r9
+    popq %r9
     .cfi_restore r9
 
-    pop %rax
+    popq %rax
     .cfi_restore rax
 
-    pop %rbx
+    popq %rbx
     .cfi_restore rbx
 
-    pop %r10
+    popq %r10
     .cfi_restore r10
 
-    pop %r11
+    popq %r11
     .cfi_restore r11
 
-    pop %r12
+    popq %r12
     .cfi_restore r12
 
-    pop %r13
+    popq %r13
     .cfi_restore r13
 
-    pop %r14
+    popq %r14
     .cfi_restore r14
 
-    pop %r15
+    popq %r15
     .cfi_restore r15
 
-    pop %rbp
+    popq %rbp
     .cfi_restore rbp
     .cfi_def_cfa_register rsp
     .cfi_def_cfa_offset 24
@@ -387,23 +387,23 @@ isr_common:
     mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
 
     // Set all bits of edx:eax
-    mov $-1,%eax
-    mov $-1,%edx
+    movl $-1,%eax
+    movl $-1,%edx
 
     // Skip if threading not initialized yet (still needed?)
-    test %rcx,%rcx
+    testq %rcx,%rcx
     jz 1f
 
     // Read xsave stack pointer from thread
-    mov THREAD_XSAVE_PTR_OFS(%rcx),%rdi
+    movq THREAD_XSAVE_PTR_OFS(%rcx),%rdi
 
     // Save context using instruction passed to macro
     \insn (%rdi)
-    mov %rdi,%rax
+    movq %rdi,%rax
 
     // Update xsave stack pointer in thread
-    add sse_context_size,%rdi
-    mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
+    addq sse_context_size,%rdi
+    movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 1:
     ret
 
@@ -417,15 +417,15 @@ isr_common:
     .cfi_startproc
 
     // Set all bits of edx:eax
-    mov $-1,%eax
-    mov $-1,%edx
+    movl $-1,%eax
+    movl $-1,%edx
 
     // Restore context using instruction passed to macro
     \insn (%rdi)
 
     // Get pointer to current thread from CPU-local storage
-    mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
-    mov %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
+    movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+    movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 
     ret
 
@@ -477,30 +477,30 @@ exception_isr_handler:
     push_cfi %rbx
     push_cfi %r12
 
-    mov $intr_has_handler,%rax
+    movq $intr_has_handler,%rax
 
     // ebx=intr, r12=ctx
-    mov %edi,%ebx
-    mov %rsi,%r12
+    movl %edi,%ebx
+    movq %rsi,%r12
 
     // If there is no handler...
-    call *%rax
-    test %eax,%eax
+    callq *%rax
+    testl %eax,%eax
     jz 0f
 
     // There is a handler
-    mov $intr_invoke,%rax
-    mov %ebx,%edi
-    mov %r12,%rsi
-    call *%rax
+    movq $intr_invoke,%rax
+    movl %ebx,%edi
+    movq %r12,%rsi
+    callq *%rax
 
     // See if the handler rejected it
-    test %eax,%eax
+    testl %eax,%eax
     jz 0f
 
 1:
     // Handler handled it
-    mov %r12,%rax
+    movq %r12,%rax
     pop_cfi %r12
     pop_cfi %rbx
     pop_cfi %rbp
@@ -509,25 +509,25 @@ exception_isr_handler:
 .align 16
 0:
     // ...no handler or handler rejected it
-    mov $__exception_handler_invoke,%rax
-    mov %ebx,%edi
-    call *%rax
-    test %eax,%eax
+    movq $__exception_handler_invoke,%rax
+    movl %ebx,%edi
+    callq *%rax
+    testl %eax,%eax
     jnz 2f
 
-    mov $cpu_debug_break,%rax
+    movq $cpu_debug_break,%rax
     call *%rax
     jmp 1b
 
     // Tail call to unhandled_exception_handler
 .align 16
 2:
-    mov $unhandled_exception_handler,%rax
-    mov %r12,%rdi
+    movq $unhandled_exception_handler,%rax
+    movq %r12,%rdi
     pop_cfi %r12
     pop_cfi %rbx
     pop_cfi %rbp
-    jmp *%rax
+    jmpq *%rax
 
     .cfi_endproc
 
