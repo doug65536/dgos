@@ -548,10 +548,13 @@ exception_isr_handler:
 // __noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 .global isr_sysret64
 isr_sysret64:
-    push %rbp
-    mov %rsp,%rbp
+    .cfi_startproc
+    .cfi_def_cfa_offset 8
 
-    xor %eax,%eax
+    push_cfi %rbp
+    movq %rsp,%rbp
+
+    xorl %eax,%eax
 
     // Clear the opmask registers
 
@@ -640,6 +643,8 @@ isr_sysret64:
     swapgs
     mov %rsi,%rsp
     sysretq
+
+    .cfi_endproc
 
 .section .rodata
 .align 8
