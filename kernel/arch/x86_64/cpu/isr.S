@@ -211,9 +211,11 @@ isr_common:
 
     // Save entire sse/mmx/fpu state
     // NOTE: this instruction may be patched to call one of the xsave versions!
-    call isr_save_fxsave
+    jmp isr_save_fxsave
 .Lsse_context_save_jmp:
 
+.align 16
+.Lsse_context_save_resume:
     // Make structure on the stack
     pushq %rax
     pushq $0
@@ -272,9 +274,11 @@ isr_common:
     popq %rdi
 
     // NOTE: this instruction may be patched to call one of the xsave versions!
-    call isr_restore_fxrstor
+    jmp isr_restore_fxrstor
 .Lsse_context_restore_jmp:
 
+.align 16
+.Lsse_context_restore_resume:
     // pop packed segments qword into rdx
     // if not returning to kernel
     //   update tss rsp0
@@ -386,6 +390,8 @@ isr_common:
 // Returns rax=pointer to context
 .macro xsave_ctx insn
     .cfi_startproc
+    .cfi_def_cfa_register rbp
+    .cfi_def_cfa_offset 32
 
     // Get pointer to current thread from CPU-local storage
     mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
@@ -409,7 +415,7 @@ isr_common:
     addq sse_context_size,%rdi
     movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 1:
-    ret
+    jmp .Lsse_context_save_resume
 
     .cfi_endproc
 .endm
@@ -419,6 +425,8 @@ isr_common:
 // Clobbers eax,edx,ecx
 .macro xrstor_ctx insn
     .cfi_startproc
+    .cfi_def_cfa_register rbp
+    .cfi_def_cfa_offset 32
 
     // Set all bits of edx:eax
     movl $-1,%eax
@@ -431,7 +439,7 @@ isr_common:
     movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
     movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 
-    ret
+    jmp .Lsse_context_restore_resume
 
     .cfi_endproc
 .endm
