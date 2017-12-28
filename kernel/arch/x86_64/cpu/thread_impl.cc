@@ -527,7 +527,7 @@ void thread_init(int ap)
 
         thread->sched_timestamp = cpu_rdtsc();
         thread->used_time = 0;
-        thread->ctx = 0;
+        thread->ctx = nullptr;
         thread->priority = -256;
 
         // BSP stack (grows down)
@@ -695,10 +695,13 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         cpu->goto_thread = 0;
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
-        return thread->ctx;
+        ctx = thread->ctx;
+        thread->ctx = nullptr;
+        return ctx;
     }
 
     // Store context pointer for resume later
+    assert(thread->ctx == nullptr);
     thread->ctx = (isr_context_t*)ctx;
     uint64_t now = cpu_rdtsc();
     thread->used_time += now - thread->sched_timestamp;
@@ -758,14 +761,14 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     assert(thread->state == THREAD_IS_RUNNING);
 
     ctx = thread->ctx;
+    thread->ctx = nullptr;
+    assert(ctx != nullptr);
     cpu->cur_thread = thread;
 
-    isr_context_t *isrctx = (isr_context_t*)ctx;
-
-    assert(isrctx->gpr.s.r[0] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr.s.r[1] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr.s.r[2] == (GDT_SEL_USER_DATA | 3));
-    assert(isrctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
+    assert(ctx->gpr.s.r[0] == (GDT_SEL_USER_DATA | 3));
+    assert(ctx->gpr.s.r[1] == (GDT_SEL_USER_DATA | 3));
+    assert(ctx->gpr.s.r[2] == (GDT_SEL_USER_DATA | 3));
+    assert(ctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
 
     // Removed until I can range check user mode stack
     //assert(ISR_CTX_REG_RSP(isrctx) >= (uintptr_t)thread->stack);
@@ -774,7 +777,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     if (thread != outgoing) {
         // Add outgoing cleanup data at top of context
-        isr_resume_context_t *cleanup = &isrctx->resume;
+        isr_resume_context_t *cleanup = &ctx->resume;
 
         cleanup->cleanup = thread_clear_busy;
         cleanup->cleanup_arg = outgoing;
