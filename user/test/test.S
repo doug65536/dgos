@@ -8,8 +8,9 @@ _start:
 	shl $32,%rdx
 	or %rdx,%rax
 	mov %rax,%r13
-	mov $140,%rbx
+	mov $140,%ebx
 	mov $1000000,%r12d
+.align 16
 0:
 	mov %ebx,%eax
 	syscall
