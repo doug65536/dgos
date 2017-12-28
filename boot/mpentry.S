@@ -13,7 +13,7 @@ ap_entry:
     cli
     cld
 
-    wbinvd
+    //wbinvd
 
     xor %ax,%ax
     movw %ax,%ds

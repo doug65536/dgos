@@ -1864,7 +1864,7 @@ void apic_start_smp(void)
         // The AP might have CD/NW bits set, and therefore might not be
         // cache coherent when it fetches the instructions in the trampoline,
         // so write all caches back to RAM before issuing any SIPIs
-        cpu_flush_cache();
+        //cpu_flush_cache();
 
         for (unsigned thread = 0;
              thread < topo_thread_count; ++thread) {
