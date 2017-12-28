@@ -485,6 +485,8 @@ isr_restore_fxrstor:
 exception_isr_handler:
     .cfi_startproc
 
+    .cfi_def_cfa_offset 8
+
     push_cfi %rbp
     push_cfi %rbx
     push_cfi %r12
