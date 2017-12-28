@@ -10,6 +10,7 @@
 #define THREAD_XSAVE_STACK_OFS      16
 #define THREAD_FSBASE_OFS           24
 #define THREAD_GSBASE_OFS           32
+#define THREAD_STACK_OFS            96
 #define THREAD_SYSCALL_STACK_OFS    40
 #define THREAD_PROCESS_PTR_OFS      48
 #define SYSCALL_COUNT   314

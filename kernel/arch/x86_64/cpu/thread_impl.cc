@@ -127,6 +127,7 @@ C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
+C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
 
 #define THREAD_FLAG_OWNEDSTACK_BIT  1
 #define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
