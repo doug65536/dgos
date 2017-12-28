@@ -14,7 +14,7 @@ long sys_unimplemented()
     return -int(errno_t::ENOSYS);
 }
 
-syscall_handler_t *syscall_handlers[314] = {
+syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)sys_read,
     (syscall_handler_t*)sys_write,
     (syscall_handler_t*)sys_open,
@@ -328,7 +328,8 @@ syscall_handler_t *syscall_handlers[314] = {
     (syscall_handler_t*)sys_unimplemented,//sys_process_vm_readv,
     (syscall_handler_t*)sys_unimplemented,//sys_process_vm_writev,
     (syscall_handler_t*)sys_unimplemented,//sys_kcmp,
-    (syscall_handler_t*)sys_unimplemented//sys_finit_module
+    (syscall_handler_t*)sys_unimplemented,//sys_finit_module
+    (syscall_handler_t*)sys_unimplemented//sys_fexecve
 };
 
 C_ASSERT(countof(syscall_handlers) == SYSCALL_COUNT);

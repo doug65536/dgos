@@ -13,6 +13,6 @@
 #define THREAD_STACK_OFS            96
 #define THREAD_SYSCALL_STACK_OFS    40
 #define THREAD_PROCESS_PTR_OFS      48
-#define SYSCALL_COUNT   314
+#define SYSCALL_COUNT   315
 #define SYSCALL_ENOSYS  -81
 #define SYSCALL_RFLAGS  0x202

@@ -314,3 +314,4 @@
 #define SYS_process_vm_writev       311
 #define SYS_kcmp                    312
 #define SYS_finit_module            313
+#define SYS_fexecve                 314
