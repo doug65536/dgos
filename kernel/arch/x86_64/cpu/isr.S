@@ -621,8 +621,16 @@ isr_sysret64:
     fstp %st
     fstp %st
 
+    cli
     mov %rdi,%rcx
     mov $(CPU_EFLAGS_IF | 2),%r11d
+
+    // Initialize kernel stack pointer for this thread
+    movq %gs:CPU_INFO_SELF_OFS,%rbx
+    movq CPU_INFO_TSS_PTR_OFS(%rbx),%rdx
+    movq CPU_INFO_CURTHREAD_OFS(%rbx),%rbx
+    movq THREAD_STACK_OFS(%rbx),%rbx
+    movq %rbx,TSS_RSP0_OFS(%rdx)
 
     // Avoid leaking any register values to user code
     mov %eax,%ebx
