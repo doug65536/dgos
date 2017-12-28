@@ -6,7 +6,7 @@
 
 __BEGIN_DECLS
 
-void *memccpy(void *restrict dest, const void *restrict src, 
+void *memccpy(void *restrict dest, const void *restrict src,
               int c, size_t sz);
 
 void *memchr(const void *, int, size_t);

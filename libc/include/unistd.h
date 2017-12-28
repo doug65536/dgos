@@ -909,7 +909,7 @@ char        *getcwd(char *, size_t);
 gid_t        getegid(void);
 uid_t        geteuid(void);
 gid_t        getgid(void);
-int          getgroups(int, gid_t []);
+int          getgroups(int, gid_t*);
 
 long         gethostid(void);
 
@@ -936,7 +936,7 @@ int          nice(int);
 
 long         pathconf(const char *, int);
 int          pause(void);
-int          pipe(int [2]);
+int          pipe(int *fds);
 ssize_t      pread(int, void *, size_t, off_t);
 ssize_t      pwrite(int, const void *, size_t, off_t);
 ssize_t      read(int, void *, size_t);
