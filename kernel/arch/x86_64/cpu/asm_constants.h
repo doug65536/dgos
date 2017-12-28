@@ -2,6 +2,7 @@
 
 // Careful, this is included in assembly code
 
+#define CPU_INFO_SELF_OFS           0
 #define CPU_INFO_CURTHREAD_OFS      8
 #define CPU_INFO_TSS_PTR_OFS        16
 #define TSS_RSP0_OFS                8

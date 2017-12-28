@@ -162,6 +162,7 @@ struct alignas(64) cpu_info_t {
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
 // Verify asm_constants.h values
+C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
