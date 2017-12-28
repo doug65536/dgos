@@ -245,6 +245,30 @@ EXPORT void rwlock_destroy(rwlock_t *rwlock)
     assert(rwlock->sh_link.next == rwlock->sh_link.prev);
 }
 
+EXPORT bool rwlock_ex_try_lock(rwlock_t *rwlock)
+{
+    if (rwlock->reader_count < 0)
+        return false;
+
+    spinlock_lock_noirq(&rwlock->lock);
+
+    thread_t tid = thread_get_id();
+
+    bool result = false;
+
+    if (rwlock->reader_count == 0 &&
+            rwlock->ex_link.next == &rwlock->ex_link) {
+        // Acquire exclusive lock
+        rwlock->reader_count = -tid;
+
+        result = true;
+    }
+
+    spinlock_unlock_noirq(&rwlock->lock);
+
+    return result;
+}
+
 EXPORT void rwlock_ex_lock(rwlock_t *rwlock)
 {
     thread_t tid = thread_get_id();
@@ -351,6 +375,26 @@ EXPORT void rwlock_ex_unlock(rwlock_t *rwlock)
         atomic_barrier();
         spinlock_unlock_noirq(&rwlock->lock);
     }
+}
+
+EXPORT bool rwlock_sh_try_lock(rwlock_t *rwlock)
+{
+    if (rwlock->reader_count < 0)
+        return false;
+
+    spinlock_lock_noirq(&rwlock->lock);
+
+    bool result = false;
+
+    if (rwlock->reader_count >= 0 &&
+            rwlock->ex_link.next == &rwlock->ex_link) {
+        ++rwlock->reader_count;
+        result = true;
+    }
+
+    spinlock_unlock_noirq(&rwlock->lock);
+
+    return result;
 }
 
 EXPORT void rwlock_sh_lock(rwlock_t *rwlock)

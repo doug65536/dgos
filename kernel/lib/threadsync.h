@@ -68,8 +68,10 @@ void mutex_unlock(mutex_t *mutex);
 
 void rwlock_init(rwlock_t *rwlock);
 void rwlock_destroy(rwlock_t *rwlock);
+bool rwlock_ex_try_lock(rwlock_t *rwlock);
 void rwlock_ex_lock(rwlock_t *rwlock);
 void rwlock_upgrade(rwlock_t *rwlock);
+bool rwlock_sh_try_lock(rwlock_t *rwlock);
 void rwlock_sh_lock(rwlock_t *rwlock);
 void rwlock_ex_unlock(rwlock_t *rwlock);
 void rwlock_sh_unlock(rwlock_t *rwlock);

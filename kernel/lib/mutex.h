@@ -33,13 +33,69 @@ public:
         mutex_unlock(&m);
     }
 
-    mutex_t& native_handle()
+    mutex_type& native_handle()
     {
         return m;
     }
 
 private:
     mutex_t m;
+};
+
+// Meets SharedMutex requirements
+class shared_mutex {
+public:
+    typedef rwlock_t mutex_type;
+
+    shared_mutex()
+    {
+        rwlock_init(&m);
+    }
+
+    ~shared_mutex()
+    {
+        rwlock_destroy(&m);
+    }
+
+    shared_mutex(mutex_type const& r) = delete;
+
+    void lock()
+    {
+        rwlock_ex_lock(&m);
+    }
+
+    bool try_lock()
+    {
+        return rwlock_ex_try_lock(&m);
+    }
+
+    void unlock()
+    {
+        rwlock_ex_unlock(&m);
+    }
+
+    void lock_shared()
+    {
+        rwlock_sh_lock(&m);
+    }
+
+    void try_lock_shared()
+    {
+        rwlock_sh_try_lock(&m);
+    }
+
+    void unlock_shared()
+    {
+        rwlock_sh_unlock(&m);
+    }
+
+    mutex_type& native_handle()
+    {
+        return m;
+    }
+
+private:
+    mutex_type m;
 };
 
 // Meets BasicLockable requirements
@@ -120,6 +176,53 @@ public:
         if (locked) {
             locked = false;
             m.unlock();
+        }
+    }
+
+    typename T::mutex_type& native_handle()
+    {
+        return m.native_handle();
+    }
+
+private:
+    T& m;
+    bool locked;
+};
+
+template<typename T>
+class shared_lock
+{
+public:
+    shared_lock(T& m)
+        : m(m)
+        , locked(false)
+    {
+        lock();
+    }
+
+    shared_lock(T& lock, defer_lock_t)
+        : m(lock)
+        , locked(false)
+    {
+    }
+
+    ~shared_lock()
+    {
+        unlock();
+    }
+
+    void lock()
+    {
+        assert(!locked);
+        m.lock_shared();
+        locked = true;
+    }
+
+    void unlock()
+    {
+        if (locked) {
+            locked = false;
+            m.unlock_shared();
         }
     }
 
