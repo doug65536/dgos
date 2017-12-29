@@ -564,16 +564,16 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
     fat32_dir_union_t *result = nullptr;
 
     iterate_dir(cluster, [&](fat32_dir_union_t *de, cluster_t, bool) -> bool {
-
         // If this is a short filename entry
         if (de->long_entry.attr != FAT_LONGNAME) {
             uint8_t checksum = lfn_checksum(de->short_entry.name);
-            if (!memcmp(de->short_entry.name,
-                        lfn.fragments[lfn.lfn_entry_count]
-                        .short_entry.name,
-                        sizeof(de->short_entry.name)) &&
-                    match_index == lfn.lfn_entry_count &&
-                    last_checksum == checksum) {
+            if (match_index == lfn.lfn_entry_count &&
+                    last_checksum == checksum &&
+                    !memcmp(de->short_entry.name,
+                            lfn.fragments[lfn.lfn_entry_count]
+                            .short_entry.name,
+                            sizeof(de->short_entry.name)))
+            {
                 // Found
                 result = de;
                 return false;
