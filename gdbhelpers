@@ -5,7 +5,6 @@ define startupbreakpoints
 	commands
 		b cpu_debug_break
 		b unhandled_exception_handler
-		b sys_exit
-		b *0x400078
+		b isr_entry_8
 	end
 end
