@@ -185,7 +185,7 @@
 // If this symbol is defined in <unistd.h>, it shall be defined to be
 // -1, 0, or 200809L. The value of this symbol reported by sysconf() shall
 // either be -1 or 200809L. [Option End]
-#define _POSIX_SPAWN
+#define _POSIX_SPAWN 200809L
 
 // The implementation supports spin locks.
 // This symbol shall always be set to the value 200809L.
