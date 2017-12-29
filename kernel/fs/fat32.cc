@@ -1151,7 +1151,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 {
     if (fat32_mounts.empty())
-        pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 512);
+        pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 510);
 
     unique_ptr<fat32_fs_t> self(new fat32_fs_t);
     if (self->mount(conn)) {
