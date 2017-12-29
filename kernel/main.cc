@@ -788,7 +788,7 @@ static int init_thread(void *p)
         pid_t pid = 0;
         int spawn_result = process_t::spawn(
                     &pid, "user-shell", nullptr, nullptr);
-        thread_sleep_for(10000);
+        //thread_sleep_for(10000);
         printdbg("Started user mode process with PID=%d, status=%d\n",
                  pid, spawn_result);
         assert(spawn_result == 0 || pid < 0);
