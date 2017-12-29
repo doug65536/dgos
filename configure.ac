@@ -79,6 +79,14 @@ do
 done
 AC_SUBST([SMALLEST_CODE_FLAGS])
 
+for flag in ffreestanding
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[FREESTANDING_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([FREESTANDING_FLAGS])
+
 REAL_MODE_FLAGS=
 for flag in m32 mno-sse mno-sse2 mno-avx mno-avx2 mfpmath=387
 do

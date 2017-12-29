@@ -74,7 +74,6 @@ mbr_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -fuse-ld=bfd -static \
-	-Wl,-nostdlib \
 	-nostartfiles -nodefaultlibs -nostdlib
 
 EXTRA_mbr_elf_DEPENDENCIES = \
@@ -120,7 +119,6 @@ mbr_bin_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -fuse-ld=bfd -static \
-	-Wl,-nostdlib \
 	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -191,7 +189,7 @@ libbootsect_a_CXXFLAGS = \
 	-m32 \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	-ffreestanding \
+	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_RTTI_FLAGS) \
@@ -211,7 +209,7 @@ libbootsect_a_CFLAGS = \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	-ffreestanding \
+	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_COMMON_FLAGS) \
@@ -228,7 +226,7 @@ libbootsect_a_CCASFLAGS = \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	-ffreestanding \
+	$(FREESTANDING_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	-std=c++14 \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -622,7 +620,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=default \
 	-export-dynamic \
-	-ffreestanding \
+	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -935,7 +933,7 @@ libc_a_SOURCES = \
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
-	-ffreestanding \
+	$(FREESTANDING_FLAGS) \
 	-std=c++14 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -951,8 +949,8 @@ LIBC_CXXFLAGS = \
 	-ggdb \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
-	-fno-exceptions \
-	-ffreestanding \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(FREESTANDING_FLAGS) \
 	-isystem $(top_srcdir)/libc/include \
 	-I$(top_builddir) \
 	-L$(top_builddir)
