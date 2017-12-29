@@ -273,7 +273,7 @@ static char *dtoa(char *txt, size_t txt_sz,
 #define RETURN_FORMATTER_ERROR(chars_written) return (-1)
 #endif
 
-static char const formatter_hexlookup[] = "0123456789ABCDEF";
+static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
@@ -694,6 +694,7 @@ static intptr_t formatter(
                 *--digit_out = 0;
                 do {
                     *--digit_out = formatter_hexlookup[
+                            (flags.upper << 4) +
                             flags.arg.uintptr_value % flags.base];
                     flags.arg.uintptr_value /= flags.base;
 
