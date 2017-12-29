@@ -2312,8 +2312,7 @@ int mprotect(void *addr, size_t len, int prot)
         cpu_invalidate_page((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
-        path_inc(path);
-        pte_from_path(pt, path);
+        path_inc(path, pt);
     }
 
     mmu_send_tlb_shootdown();
@@ -2390,8 +2389,7 @@ int madvise(void *addr, size_t len, int advice)
         cpu_invalidate_page((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
-        path_inc(path);
-        pte_from_path(pt, path);
+        path_inc(path, pt);
     }
 
     mmu_send_tlb_shootdown();
@@ -2819,6 +2817,8 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
             entry_t index = index_from_addr(addr);
             ++entries[index];
         }
+
+        path_inc(path);
     }
 }
 
