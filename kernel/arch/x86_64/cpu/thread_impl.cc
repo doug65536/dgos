@@ -169,8 +169,11 @@ C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
-#define MAX_CPUS    64
-static cpu_info_t cpus[MAX_CPUS];
+static cpu_info_t cpus[MAX_CPUS] = {
+    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0,
+      { 0, 0, 0, 0, 0, 0, 0, 0 }
+    }
+};
 
 static volatile uint32_t cpu_count;
 
@@ -505,14 +508,12 @@ void thread_init(int ap)
 
     assert(thread_count == cpu_number);
 
-    // First thread is this boot thread
     thread_info_t *thread = threads + cpu_number;
 
     cpu->self = cpu;
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
-    //cpu_set_gs(GDT_SEL_USER_DATA | 3);
     cpu_set_gsbase(cpu);
     cpu_set_altgsbase((void*)0xFFFFD1D1D1D1D1D1);
 

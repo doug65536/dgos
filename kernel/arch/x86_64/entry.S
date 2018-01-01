@@ -191,10 +191,13 @@ bsp_init:
     mov %rax,%rdi
     call exit
 
+.align 16
 idt_gdt_tss_init:
     push %rbx
     xor %ebx,%ebx
     mov $256,%ecx
+
+.align 16
 0:
     movq isr_entry_points(%rbx),%rax
     // IDT structure:
@@ -231,8 +234,14 @@ idt_gdt_tss_init:
     //	uint8_t base_high;
 
     pop %rbx
+
+    movl $INTR_EX_DEBUG,%edi
+    movq $debug_exception_handler,%rsi
+    call intr_hook
+
     // fall through...
 
+.align 16
 idt_gdt_tss_init_ap:
     // Load IDTR
     sub $(24*8),%rsp
@@ -276,7 +285,7 @@ idt_gdt_tss_init_ap:
 
 .section .data
 
-.align 8
+.align 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
     //  uint32_t dummy_align;
     .space 4
@@ -411,6 +420,7 @@ mp_main:
     pop %rbp
     ret
 
+.align 16
 .global __cxa_pure_virtual
 .hidden __cxa_pure_virtual
 __cxa_pure_virtual:
@@ -426,6 +436,7 @@ __cxa_atexit:
 pure_call_message:
     .string "Pure virtual function called"
 
+.align 8
 .global __dso_handle
 __dso_handle: .quad __dso_handle
 

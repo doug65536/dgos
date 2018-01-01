@@ -237,6 +237,7 @@ isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx)
     return irq_dispatcher_vec(intr, ctx);
 }
 
+#if 0
 static void idtr_load(table_register_64_t *table_reg)
 {
     __asm__ __volatile__ (
@@ -246,6 +247,7 @@ static void idtr_load(table_register_64_t *table_reg)
         : "memory"
     );
 }
+#endif
 
 void idt_xsave_detect(int ap)
 {
@@ -365,6 +367,14 @@ void idt_xsave_detect(int ap)
         sse_context_size = 512;
 }
 
+isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
+{
+    assert(intr == INTR_EX_DEBUG);
+    //printdbg("Ignored debug exception\n");
+    return ctx;
+}
+
+#if 0
 int idt_init(int ap)
 {
     uintptr_t addr;
@@ -397,8 +407,11 @@ int idt_init(int ap)
 
     idtr_load(&idtr);
 
+    intr_hook(INTR_EX_DEBUG, debug_exception_handler);
+
     return 0;
 }
+#endif
 
 size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags)
 {

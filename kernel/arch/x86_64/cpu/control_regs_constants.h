@@ -2,6 +2,8 @@
 
 // This is included in assembly
 
+#define MAX_CPUS    64
+
 #define CPU_MSR_FSBASE          0xC0000100U
 #define CPU_MSR_GSBASE          0xC0000101U
 #define CPU_MSR_KGSBASE         0xC0000102U

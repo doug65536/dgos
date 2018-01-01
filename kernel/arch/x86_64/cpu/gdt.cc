@@ -78,7 +78,7 @@ C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 // Holds exclusive access to TSS segment descriptor
 // while loading task register
 static spinlock_t gdt_tss_lock;
-tss_t *tss_list;
+tss_t tss_list[];
 
 void gdt_init(int)
 {
@@ -105,9 +105,9 @@ static void gdt_set_tss_base(tss_t *base)
 
 void gdt_init_tss(int cpu_count)
 {
-    tss_list = (tss_t*)mmap(0, sizeof(*tss_list) * cpu_count,
-                           PROT_READ | PROT_WRITE,
-                           MAP_POPULATE, -1, 0);
+    //tss_list = (tss_t*)mmap(0, sizeof(*tss_list) * cpu_count,
+    //                       PROT_READ | PROT_WRITE,
+    //                       MAP_POPULATE, -1, 0);
 
     for (int i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
@@ -124,11 +124,10 @@ void gdt_init_tss(int cpu_count)
 
             tss->stack[st] = stack;
 
-            if (st) {
-                tss->ist[st] = (uint64_t)stack + TSS_STACK_SIZE;
-            } else {
-                tss->rsp[0] = (uint64_t)stack + TSS_STACK_SIZE;
-            }
+            if (st)
+                tss->ist[st] = uintptr_t(stack) + TSS_STACK_SIZE;
+            else
+                tss->rsp[0] = uintptr_t(stack) + TSS_STACK_SIZE;
 
             tss->iomap_base = uint16_t(uintptr_t(tss + 1) - uintptr_t(tss));
 

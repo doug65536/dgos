@@ -163,7 +163,7 @@ C_ASSERT_ISPO2((sizeof(tss_t) & 63) == 0);
 // Ensure no spanning page boundaries
 C_ASSERT(4096 % sizeof(tss_t) == 0);
 
-extern tss_t *tss_list;
+extern tss_t tss_list[MAX_CPUS];
 
 void gdt_init(int ap);
 void gdt_init_tss(int cpu_count);

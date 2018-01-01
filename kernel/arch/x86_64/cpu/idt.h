@@ -50,6 +50,9 @@ extern "C" isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx);
 
 extern "C" isr_context_t *isr_handler(int intr, isr_context_t *ctx);
 
+extern "C" isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx);
+
+
 extern "C" void idt_xsave_detect(int ap);
 
 extern "C" isr_context_t *unhandled_exception_handler(isr_context_t *ctx);
