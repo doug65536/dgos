@@ -52,7 +52,7 @@ done
 
 COMPILER_FLAGS=
 for flag in \
-		ggdb fno-integrated-as Wno-unused-command-line-argument \
+		ggdb3 fno-integrated-as Wno-unused-command-line-argument \
 		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings
@@ -62,6 +62,15 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([COMPILER_FLAGS])
+
+for flag in Wa,-g g ggdb3
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[ASM_DEBUG_INFO_FLAGS+=" -$flag"],
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([ASM_DEBUG_INFO_FLAGS])
+
 
 SMALLEST_CODE_FLAGS=
 AX_CHECK_COMPILE_FLAG([-Oz],
@@ -113,6 +122,24 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([NO_PIC_FLAGS])
+
+SSE4_FLAGS=
+for flag in msse msse2 msse3 mssse3 msse4 msse4.1 msse4.2
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[SSE4_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([SSE4_FLAGS])
+
+AVX2_FLAGS=
+for flag in mavx mavx2 msse2avx
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AVX2_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([AVX2_FLAGS])
 
 DISABLE_FRAMEPOINTER_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
@@ -191,7 +218,7 @@ AC_ARG_ENABLE(optimize,
 	[
 		echo Enabling optimizations
 		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS" # $DISABLE_FRAMEPOINTER_FLAGS"
 		OPTIMIZE_SPEED_FLAGS+=" $TUNE_FLAGS"
 	],[
 		echo Disabling optimizations

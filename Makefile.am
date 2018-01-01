@@ -48,10 +48,11 @@ bin_PROGRAMS = \
 	user-shell
 
 KERNEL_SSE4_FLAGS = \
-	-msse -msse2 -msse3 -mssse3 -msse4 -msse4.1 -msse4.2
+	$(SSE4_FLAGS)
 
 KERNEL_AVX2_FLAGS = \
-	$(KERNEL_SSE4_FLAGS) -mavx -mavx2 -msse2avx
+	$(SSE4_FLAGS) \
+	$(AVX2_FLAGS)
 
 # libmbr.a
 
@@ -186,7 +187,7 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(FREESTANDING_FLAGS) \
@@ -203,7 +204,6 @@ libbootsect_a_CXXFLAGS = \
 
 
 libbootsect_a_CFLAGS = \
-	-m32 \
 	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
@@ -222,7 +222,7 @@ libbootsect_a_CFLAGS = \
 
 
 libbootsect_a_CCASFLAGS = \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -238,13 +238,11 @@ bootfat_elf_SOURCES = \
 	boot/bootfat.s
 
 bootfat_elf_CXXFLAGS = \
-	-m32 \
 	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
 
 bootfat_elf_CCASFLAGS = \
-	-m32 \
 	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -252,7 +250,7 @@ bootfat_elf_CCASFLAGS = \
 
 
 bootfat_elf_LDFLAGS = \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -275,17 +273,16 @@ bootfat_bin_SOURCES = \
 	$(bootfat_elf_SOURCES)
 
 bootfat_bin_CXXFLAGS = \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_bin_CCASFLAGS = \
-	-m32 \
 	$(REAL_MODE_FLAGS) \
 	$(bootfat_elf_CCASFLAGS)
 
 
 bootfat_bin_LDFLAGS = \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -313,8 +310,8 @@ bootiso_elf_CXXFLAGS = \
 
 
 bootiso_elf_CCASFLAGS = \
-	-m32 \
-	-Wa,-g \
+	$(REAL_MODE_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -322,7 +319,7 @@ bootiso_elf_CCASFLAGS = \
 # $(REAL_MODE_FLAGS)
 
 bootiso_elf_LDFLAGS = \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -347,14 +344,14 @@ bootiso_bin_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_bin_CCASFLAGS = \
-	-m32 \
-	-Wa,-g \
+	$(REAL_MODE_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
 	$(bootiso_elf_CCASFLAGS)
 
 # $(REAL_MODE_FLAGS)
 
 bootiso_bin_LDFLAGS = \
-	-m32 \
+	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,elf_i386 \
@@ -994,7 +991,7 @@ user_shell_LDFLAGS = \
 	-Wl,-z,max-page-size=4096
 
 user_shell_CCASFLAGS = \
-	-Wa,-g
+	$(ASM_DEBUG_INFO_FLAGS)
 
 user_shell_LDADD = libc.a
 
