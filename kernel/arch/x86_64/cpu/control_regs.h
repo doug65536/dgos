@@ -467,6 +467,16 @@ static __always_inline uintptr_t cpu_change_flags(
     return flags;
 }
 
+static __always_inline void cpu_stac()
+{
+    __asm__ __volatile__ ("stac");
+}
+
+static __always_inline void cpu_clac()
+{
+    __asm__ __volatile__ ("clac");
+}
+
 static __always_inline bool cpu_irq_disable(void)
 {
     uintptr_t rflags;
