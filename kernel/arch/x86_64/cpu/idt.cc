@@ -749,12 +749,6 @@ void dump_context(isr_context_t *ctx, int to_screen)
     snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ", gsbase);
     con_draw_xy(6, 21, fmt_buf, color);
 
-    // last branch
-    //con_draw_xy(0, 22, "lastbr", color);
-    //snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ",
-    //                 msr_get(0x1DD));
-    //con_draw_xy(6, 22, fmt_buf, color);
-
     if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)
         apic_dump_regs(0);
 
