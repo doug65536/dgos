@@ -252,6 +252,11 @@ isr_common:
     cmpl $INTR_SOFT_BASE,%edi
     cmovaeq %rcx,%rax
 
+    // Fast path page fault
+    movq $mmu_page_fault_handler,%rcx
+    cmpl $INTR_EX_PAGE,%edi
+    cmoveq %rcx,%rax
+
     // Call handler
     call *%rax
 
