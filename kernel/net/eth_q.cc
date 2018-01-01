@@ -31,10 +31,10 @@ int ethq_init(void)
     if (ethq_pkts)
         return 1;
 
-    // Allocate 16MB of packets
+    // Allocate 64KB of packets
     //  + 64KB of packet pointers
     //  + 8KB of free chain indices
-    ethq_pkt_count = 1 << 13;
+    ethq_pkt_count = 1 << 4;
     size_t ethq_pool_size = ethq_pkt_count *
             (sizeof(ethq_pkt2K_t) +
              sizeof(ethq_pkt2K_t*) +
