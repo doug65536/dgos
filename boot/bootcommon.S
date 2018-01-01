@@ -323,6 +323,7 @@ update_eflags:
 idt_init:
     mov $idt,%edx
     mov $0,%ecx
+
 0:
     movw isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
@@ -334,6 +335,7 @@ idt_init:
     cmpl $32,%ecx
     jb 0b
 
+    // Set limit
     movw $32 * 8 - 1,idtr_64 + 6
     movw $idt,idtr_64 + 8
 
