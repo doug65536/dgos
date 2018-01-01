@@ -149,25 +149,65 @@
 //
 // CR4
 
-#define CPU_CR4_VME_BIT         0	// Virtual 8086 Mode Extensions
-#define CPU_CR4_PVI_BIT         1	// Protected-mode Virtual Interrupts
-#define CPU_CR4_TSD_BIT         2	// Time Stamp Disable
-#define CPU_CR4_DE_BIT          3	// Debugging Extensions
-#define CPU_CR4_PSE_BIT         4	// Page Size Extension
-#define CPU_CR4_PAE_BIT         5	// Physical Address Extension
-#define CPU_CR4_MCE_BIT         6	// Machine Check Exception
-#define CPU_CR4_PGE_BIT         7	// Page Global Enabled
-#define CPU_CR4_PCE_BIT         8	// Performance-Monitoring Counter
-#define CPU_CR4_OFXSR_BIT       9	// OS support for FXSAVE and FXRSTOR
-#define CPU_CR4_OSXMMEX_BIT     10	// OS Support for Unmasked SIMD Floating-Point Exceptions
-#define CPU_CR4_VMXE_BIT        13	// Virtual Machine Extensions Enable
-#define CPU_CR4_SMXE_BIT        14	// Safer Mode Extensions Enable
-#define CPU_CR4_FSGSBASE_BIT    16	// Enables instructions RDFSBASE, RDGSBASE, WRFSBASE, and WRGSBASE
-#define CPU_CR4_PCIDE_BIT       17	// PCID Enable
-#define CPU_CR4_OSXSAVE_BIT     18	// XSAVE
-#define CPU_CR4_SMEP_BIT        20	// Supervisor Mode Execution Protection Enable
-#define CPU_CR4_SMAP_BIT        21	// Supervisor Mode Access Protection Enable
-#define CPU_CR4_PKE_BIT         22	// Protection Key Enable
+// Virtual 8086 Mode Extensions
+#define CPU_CR4_VME_BIT         0
+
+// Protected-mode Virtual Interrupts
+#define CPU_CR4_PVI_BIT         1
+
+// Time Stamp Disable
+#define CPU_CR4_TSD_BIT         2
+
+// Debugging Extensions
+#define CPU_CR4_DE_BIT          3
+
+// Page Size Extension
+#define CPU_CR4_PSE_BIT         4
+
+// Physical Address Extension
+#define CPU_CR4_PAE_BIT         5
+
+// Machine Check Exception
+#define CPU_CR4_MCE_BIT         6
+
+// Page Global Enabled
+#define CPU_CR4_PGE_BIT         7
+
+// Performance-Monitoring Counter
+#define CPU_CR4_PCE_BIT         8
+
+// OS support for FXSAVE and FXRSTOR
+#define CPU_CR4_OFXSR_BIT       9
+
+// OS Support for Unmasked SIMD Floating-Point Exceptions
+#define CPU_CR4_OSXMMEX_BIT     10
+
+// (Intel) User mode instruction prevention
+#define CPU_CR4_UMIP_BIT        11
+
+// (Intel) Virtual Machine Extensions Enable
+#define CPU_CR4_VMXE_BIT        13
+
+// (Intel) Safer Mode Extensions Enable
+#define CPU_CR4_SMXE_BIT        14
+
+// Enables instructions RDFSBASE, RDGSBASE, WRFSBASE, and WRGSBASE
+#define CPU_CR4_FSGSBASE_BIT    16
+
+// (Intel) PCID Enable
+#define CPU_CR4_PCIDE_BIT       17
+
+// XSAVE
+#define CPU_CR4_OSXSAVE_BIT     18
+
+// Supervisor Mode Execution Protection Enable
+#define CPU_CR4_SMEP_BIT        20
+
+// (Intel) Supervisor Mode Access Protection Enable
+#define CPU_CR4_SMAP_BIT        21
+
+// (Intel) Protection Key Enable
+#define CPU_CR4_PKE_BIT         22
 
 #define CPU_CR4_VME             (1U << CPU_CR4_VME_BIT     )
 #define CPU_CR4_PVI             (1U << CPU_CR4_PVI_BIT     )
@@ -180,6 +220,7 @@
 #define CPU_CR4_PCE             (1U << CPU_CR4_PCE_BIT     )
 #define CPU_CR4_OFXSR           (1U << CPU_CR4_OFXSR_BIT   )
 #define CPU_CR4_OSXMMEX         (1U << CPU_CR4_OSXMMEX_BIT )
+#define CPU_CR4_UMIP            (1U << CPU_CR4_UMIP_BIT    )
 #define CPU_CR4_VMXE            (1U << CPU_CR4_VMXE_BIT    )
 #define CPU_CR4_SMXE            (1U << CPU_CR4_SMXE_BIT    )
 #define CPU_CR4_FSGSBASE        (1U << CPU_CR4_FSGSBASE_BIT)
@@ -224,16 +265,35 @@
 //
 // XCR0
 
-#define XCR0_X87_BIT            0   // x87 FPU state
-#define XCR0_SSE_BIT            1   // SSE state
-#define XCR0_AVX_BIT            2   // AVX state
-#define XCR0_MPX_BNDREG_BIT     3   // Memory Protection BNDREGS
-#define XCR0_MPX_BNDCSR_BIT     4   // Memory Protection BNDCSR
-#define XCR0_AVX512_OPMASK_BIT  5   // AVX-512 opmask registers k0-k7
-#define XCR0_AVX512_UPPER_BIT   6   // AVX-512 upper 256 bits
-#define XCR0_AVX512_XREGS_BIT   7   // AVX-512 extra 16 registers
-#define XCR0_PT_BIT             8   // Processor Trace MSRs
-#define XCR0_PKRU_BIT           9   // Protection Key
+// x87 FPU state
+#define XCR0_X87_BIT            0
+
+// SSE state
+#define XCR0_SSE_BIT            1
+
+// AVX state
+#define XCR0_AVX_BIT            2
+
+// Memory Protection BNDREGS
+#define XCR0_MPX_BNDREG_BIT     3
+
+// Memory Protection BNDCSR
+#define XCR0_MPX_BNDCSR_BIT     4
+
+// AVX-512 opmask registers k0-k7
+#define XCR0_AVX512_OPMASK_BIT  5
+
+// AVX-512 upper 256 bits
+#define XCR0_AVX512_UPPER_BIT   6
+
+// AVX-512 extra 16 registers
+#define XCR0_AVX512_XREGS_BIT   7
+
+// Processor Trace MSRs
+#define XCR0_PT_BIT             8
+
+// Protection Key
+#define XCR0_PKRU_BIT           9
 
 #define XCR0_X87                (1U<<XCR0_X87_BIT)
 #define XCR0_SSE                (1U<<XCR0_SSE_BIT)

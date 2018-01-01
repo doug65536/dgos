@@ -13,14 +13,16 @@ int cpuid_nx_mask;
 
 void cpuid_init(void)
 {
-    cpuid_cache.has_nx      = cpuid_edx_bit(20, CPUID_EXTINFO_FEATURES, 0);
+
+    cpuid_cache.has_de      = cpuid_edx_bit(2, CPUID_INFO_FEATURES, 0);
+    cpuid_cache.has_pge     = cpuid_edx_bit(13, CPUID_INFO_FEATURES, 0);
+    cpuid_cache.has_sysenter= cpuid_edx_bit(11, CPUID_INFO_FEATURES, 0);
+
     cpuid_cache.has_sse3    = cpuid_ecx_bit(0, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_mwait   = cpuid_ecx_bit(3, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_ssse3   = cpuid_ecx_bit(9, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_fma     = cpuid_ecx_bit(12, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_pge     = cpuid_edx_bit(13, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_pcid    = cpuid_ecx_bit(17, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_invpcid = cpuid_ebx_bit(10, 7, 0);
     cpuid_cache.has_sse4_1  = cpuid_ecx_bit(19, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_sse4_2  = cpuid_ecx_bit(20, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_x2apic  = cpuid_ecx_bit(21, CPUID_INFO_FEATURES, 0);
@@ -28,12 +30,20 @@ void cpuid_init(void)
     cpuid_cache.has_xsave   = cpuid_ecx_bit(26, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_avx     = cpuid_ecx_bit(28, CPUID_INFO_FEATURES, 0);
     cpuid_cache.has_rdrand  = cpuid_ecx_bit(30, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_smep    = cpuid_ebx_bit(7, 7, 0);
-    cpuid_cache.has_de      = cpuid_edx_bit(2, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_inrdtsc = cpuid_edx_bit(8, 0x80000007, 0);
-    cpuid_cache.has_avx512f = cpuid_ebx_bit(16, 7, 0);
+
+    cpuid_cache.has_2mpage  = cpuid_edx_bit(3, CPUID_EXTINFO_FEATURES, 0);
+    cpuid_cache.has_1gpage  = cpuid_edx_bit(26, CPUID_EXTINFO_FEATURES, 0);
+    cpuid_cache.has_nx      = cpuid_edx_bit(20, CPUID_EXTINFO_FEATURES, 0);
+
     cpuid_cache.has_fsgsbase= cpuid_ebx_bit(0, 7, 0);
-    cpuid_cache.has_sysenter= cpuid_edx_bit(11, 1, 0);
+    cpuid_cache.has_umip    = cpuid_ecx_bit(2, 7, 0);
+    cpuid_cache.has_smep    = cpuid_ebx_bit(7, 7, 0);
+    cpuid_cache.has_erms    = cpuid_ebx_bit(9, 7, 0);
+    cpuid_cache.has_invpcid = cpuid_ebx_bit(10, 7, 0);
+    cpuid_cache.has_avx512f = cpuid_ebx_bit(16, 7, 0);
+    cpuid_cache.has_smap    = cpuid_ebx_bit(20, 7, 0);
+
+    cpuid_cache.has_inrdtsc = cpuid_edx_bit(8, CPUID_APM, 0);
 
     cpuid_nx_mask = -!!cpuid_cache.has_nx;
 
@@ -41,6 +51,13 @@ void cpuid_init(void)
     if (cpuid(&info, CPUID_MONITOR, 0)) {
         cpuid_cache.min_monitor_line = uint16_t(info.eax);
         cpuid_cache.max_monitor_line = uint16_t(info.ebx);
+    }
+
+    if (cpuid(&info, CPUID_HIGHESTFUNC, 0)) {
+        if (!memcmp(&info.ebx, "AuthenticAMD", 12))
+            cpuid_cache.is_amd = 1;
+        else if (!memcmp(&info.ebx, "GenuineIntel", 12))
+            cpuid_cache.is_intel = 1;
     }
 }
 

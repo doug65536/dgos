@@ -2,11 +2,12 @@
 
 #include "types.h"
 
+// In this order to allow trivial memcmp for vendor signature checks
 struct cpuid_t {
     uint32_t eax;
-    uint32_t ecx;
-    uint32_t edx;
     uint32_t ebx;
+    uint32_t edx;
+    uint32_t ecx;
 };
 
 extern "C" void __generic_target cpuid_init(void);
@@ -32,27 +33,35 @@ __generic_target bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
 __generic_target bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
 
 struct cpuid_cache_t {
-    bool has_nx      :1;
-    bool has_sse3    :1;
-    bool has_mwait   :1;
-    bool has_ssse3   :1;
-    bool has_fma     :1;
-    bool has_pge     :1;
-    bool has_pcid    :1;
-    bool has_invpcid :1;
-    bool has_sse4_1  :1;
-    bool has_sse4_2  :1;
-    bool has_x2apic  :1;
-    bool has_aes     :1;
-    bool has_xsave   :1;
-    bool has_avx     :1;
-    bool has_rdrand  :1;
-    bool has_smep    :1;
-    bool has_de      :1;
-    bool has_inrdtsc :1;
-    bool has_avx512f :1;
-    bool has_fsgsbase:1;
-    bool has_sysenter:1;
+    bool is_amd         :1;
+    bool is_intel       :1;
+
+    bool has_de         :1;
+    bool has_pge        :1;
+    bool has_sysenter   :1;
+    bool has_sse3       :1;
+    bool has_mwait      :1;
+    bool has_ssse3      :1;
+    bool has_fma        :1;
+    bool has_pcid       :1;
+    bool has_sse4_1     :1;
+    bool has_sse4_2     :1;
+    bool has_x2apic     :1;
+    bool has_aes        :1;
+    bool has_xsave      :1;
+    bool has_avx        :1;
+    bool has_rdrand     :1;
+    bool has_2mpage     :1;
+    bool has_1gpage     :1;
+    bool has_nx         :1;
+    bool has_fsgsbase   :1;
+    bool has_umip       :1;
+    bool has_smep       :1;
+    bool has_erms       :1;
+    bool has_invpcid    :1;
+    bool has_avx512f    :1;
+    bool has_smap       :1;
+    bool has_inrdtsc    :1;
 
     uint16_t min_monitor_line;
     uint16_t max_monitor_line;
@@ -68,6 +77,18 @@ struct cpuid_cache_t {
 
 extern cpuid_cache_t cpuid_cache;
 extern int cpuid_nx_mask;
+
+// CPU is AuthenticAMD
+CPUID_CONST_INLINE bool cpuid_is_amd(void)
+{
+    return cpuid_cache.is_amd;
+}
+
+// CPU is GenuineIntel
+CPUID_CONST_INLINE bool cpuid_is_intel(void)
+{
+    return cpuid_cache.is_intel;
+}
 
 // No eXecute bit in page tables
 CPUID_CONST_INLINE bool cpuid_has_nx(void)
@@ -193,4 +214,28 @@ CPUID_CONST_INLINE bool cpuid_has_fsgsbase(void)
 CPUID_CONST_INLINE bool cpuid_has_sysenter(void)
 {
     return cpuid_cache.has_sysenter;
+}
+
+// 2MB pages
+CPUID_CONST_INLINE bool cpuid_has_2mpage(void)
+{
+    return cpuid_cache.has_2mpage;
+}
+
+// 1GB pages
+CPUID_CONST_INLINE bool cpuid_has_1gpage(void)
+{
+    return cpuid_cache.has_1gpage;
+}
+
+// User mode instruction prevention
+CPUID_CONST_INLINE bool cpuid_has_umip(void)
+{
+    return cpuid_cache.has_umip;
+}
+
+// Enhanced rep move string
+CPUID_CONST_INLINE bool cpuid_has_erms(void)
+{
+    return cpuid_cache.has_erms;
 }

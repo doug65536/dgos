@@ -41,21 +41,31 @@ void cpu_init(int ap)
     if (cpuid_has_smep())
         set |= CPU_CR4_SMEP;
 
+    // Allow access to rdtsc in user mode
+    set |= CPU_CR4_PCE;
+
     // Enable global pages feature if available
     if (cpuid_has_pge())
         set |= CPU_CR4_PGE;
+
+    // Disable 36 bit paging
+    clr |= CPU_CR4_PSE;
 
     // Enable debugging extensions feature if available
     if (cpuid_has_de())
         set |= CPU_CR4_DE;
 
-    // Disable paging context identifiers feature if available
-    if (cpuid_has_pcid())
-        clr |= CPU_CR4_PCIDE;
+    // Disable paging context identifiers feature
+    clr |= CPU_CR4_PCIDE;
 
     // Enable {RD|WR}{FS|GS}BASE instructions
     if (cpuid_has_fsgsbase())
         set |= CPU_CR4_FSGSBASE;
+
+    if (cpuid_has_umip()) {
+        // Enable user mode instruction prevention
+        set |= CPU_CR4_UMIP;
+    }
 
     set |= CPU_CR4_OFXSR | CPU_CR4_OSXMMEX;
     clr |= CPU_CR4_TSD;
@@ -65,17 +75,22 @@ void cpu_init(int ap)
     //
     // Adjust IA32_MISC_ENABLES
 
-    // crashes on non-intel
-//    set = CPU_MSR_MISC_ENABLE_FAST_STR;
-//    clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
+    // Enable enhanced rep move string
+    if (cpuid_has_erms())
+        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, 0,
+                            CPU_MSR_MISC_ENABLE_FAST_STR);
+
+//    if (cpuid_is_intel()) {
+//        clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
 //
-//    if (cpuid_has_mwait())
-//        set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
+//        if (cpuid_has_mwait())
+//            set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
 //
-//    if (cpuid_has_nx())
-//        clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
+//        if (cpuid_has_nx())
+//            clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
 //
-//    cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
+//        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
+//    }
 
     // Enable syscall/sysret
     set = CPU_MSR_EFER_SCE;
