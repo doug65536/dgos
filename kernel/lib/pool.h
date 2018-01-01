@@ -14,7 +14,7 @@ struct pool_t {
 
 // Isolate pool items onto separate cache lines
 #define POOL_LOG2_ALIGN     6
-#define POOL_ALIGN          (1<<POOL_LOG2_ALIGN)
+#define POOL_ALIGN          (1U<<POOL_LOG2_ALIGN)
 
 C_ASSERT(sizeof(pool_t) < POOL_ALIGN);
 

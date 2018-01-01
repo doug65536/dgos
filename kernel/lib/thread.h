@@ -19,7 +19,7 @@ extern int spincount_mask;
 
 // Implemented in arch
 thread_t thread_create(thread_fn_t fn, void *userdata,
-                       void *stack, size_t stack_size, bool user);
+                       size_t stack_size, bool user);
 
 void thread_yield(void);
 void thread_sleep_until(uint64_t expiry);

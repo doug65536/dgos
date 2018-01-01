@@ -37,10 +37,9 @@
 size_t constexpr kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size] __section(".bspstk");
 
-static void smp_main(void *arg)
+static void smp_main(void *)
 {
     printdbg("AP in smp_main...\n");
-    (void)arg;
     cpu_init(1);
 }
 
@@ -871,20 +870,20 @@ static int init_thread(void *p)
 
     //modload_init();
 
-    thread_create(find_vbe, (void*)0xC0000, 0, 0, false);
-    thread_create(find_vbe, (void*)0xF0000, 0, 0, false);
+    thread_create(find_vbe, (void*)0xC0000, 0, false);
+    thread_create(find_vbe, (void*)0xF0000, 0, false);
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
     printdbg("Running context switch stress with %d threads\n",
              ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
-        thread_create(ctx_sw_thread, 0, 0, 0, false);
+        thread_create(ctx_sw_thread, 0, 0, false);
     }
 #endif
 
 #if ENABLE_SHELL_THREAD > 0
     printdbg("Running shell thread\n");
-    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, 0, false);
+    thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, false);
 #endif
 
 #if ENABLE_SLEEP_THREAD
@@ -896,7 +895,7 @@ static int init_thread(void *p)
     for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
         ttp[i].sleep = i * 100;
         ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
-        thread_create(other_thread, ttp + i, 0, 0, false);
+        thread_create(other_thread, ttp + i, 0, false);
     }
 #endif
 
@@ -905,7 +904,7 @@ static int init_thread(void *p)
              ENABLE_READ_STRESS_THREAD);
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         thread_create(read_stress, (char*)(uintptr_t)
-                      (0xb8000+ 80*2 + 2*i), 0, 0, false);
+                      (0xb8000+ 80*2 + 2*i), 0, false);
     }
 #endif
 
@@ -915,7 +914,7 @@ static int init_thread(void *p)
     for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
         thread_create(register_check, (void*)
                       (0xDEADFEEDF00DD00D +
-                       (1<<ENABLE_READ_STRESS_THREAD)), 0, 0, false);
+                       (1<<ENABLE_READ_STRESS_THREAD)), 0, false);
     }
 #endif
 
@@ -923,7 +922,7 @@ static int init_thread(void *p)
     printdbg("Running mutex stress with %d threads\n", ENABLE_MUTEX_THREAD);
     mutex_init(&stress_lock);
     for (int i = 0; i < ENABLE_MUTEX_THREAD; ++i) {
-        thread_create(stress_mutex, 0, 0, 0, false);
+        thread_create(stress_mutex, 0, 0, false);
     }
 #endif
 
@@ -931,7 +930,7 @@ static int init_thread(void *p)
     printdbg("Running mmap stress with %d threads\n",
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
-        thread_create(stress_mmap_thread, 0, 0, 0, false);
+        thread_create(stress_mmap_thread, 0, 0, false);
     }
 #endif
 
@@ -939,7 +938,7 @@ static int init_thread(void *p)
     printdbg("Running heap stress with %d threads\n",
              ENABLE_HEAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_HEAP_STRESS_THREAD; ++i) {
-        thread_create(stress_heap_thread, 0, 0, 0, false);
+        thread_create(stress_heap_thread, 0, 0, false);
     }
 #endif
 
@@ -948,7 +947,7 @@ static int init_thread(void *p)
 
 extern "C" int main(void)
 {
-    thread_create(init_thread, 0, 0, 0, false);
+    thread_create(init_thread, 0, 0, false);
 
     thread_idle_set_ready();
 

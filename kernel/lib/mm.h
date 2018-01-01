@@ -114,11 +114,13 @@ int munmap(void *__addr,
 
 /// Permit a mapping to be moved to a new address
 /// Without this flag, mremap fails if it cannot be resized
-#define MREMAP_MAYMOVE      0100000002
+#define MREMAP_MAYMOVE      0x00000002
 
 /// Move the mapping to the specified __new_address
 /// Fail if not possible
 #define MREMAP_FIXED        0x00000001
+
+#define MREMAP_INVALID_MASK 0xFFFFFFFC
 
 /// Move and/or resize a range of address space
 /// __old_address, address of mapping to be remapped

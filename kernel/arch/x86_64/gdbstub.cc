@@ -2250,7 +2250,7 @@ void gdb_cpu_ctrl_t::start()
         cpus.emplace_back(apic_id, cpu + 1);
     }
 
-    stub_tid = thread_create(gdb_thread, 0, 0, 0, false);
+    stub_tid = thread_create(gdb_thread, 0, 0, false);
 
     while (!stub_running)
         pause();

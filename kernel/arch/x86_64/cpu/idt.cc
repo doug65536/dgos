@@ -775,9 +775,7 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
     }
 
     printk("\nUnhandled exception 0x%zx (%s) at RIP=%p\n",
-           ISR_CTX_INTR(ctx),
-           name ? name : "??",
-           (void*)ISR_CTX_REG_RIP(ctx));
+           ISR_CTX_INTR(ctx), name ? name : "??", (void*)ISR_CTX_REG_RIP(ctx));
 
     dump_context(ctx, 1);
     cpu_debug_break();

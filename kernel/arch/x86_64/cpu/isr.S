@@ -132,49 +132,49 @@ isr_common:
     //  7*8(%rbp) -> ss
 
     pushq %r15
-    .cfi_rel_offset r15,72+0*8
+    .cfi_rel_offset r15,-8-0*8
 
     pushq %r14
-    .cfi_rel_offset r14,72+1*8
+    .cfi_rel_offset r14,-8-1*8
 
     pushq %r13
-    .cfi_rel_offset r13,72+2*8
+    .cfi_rel_offset r13,-8-2*8
 
     pushq %r12
-    .cfi_rel_offset r12,72+3*8
+    .cfi_rel_offset r12,-8-3*8
 
     pushq %r11
-    .cfi_rel_offset r11,72+4*8
+    .cfi_rel_offset r11,-8-4*8
 
     pushq %r10
-    .cfi_rel_offset r10,72+5*8
+    .cfi_rel_offset r10,-8-5*8
 
     pushq %rbx
-    .cfi_rel_offset rbx,72+6*8
+    .cfi_rel_offset rbx,-8-6*8
 
     pushq %rax
-    .cfi_rel_offset rax,72+7*8
+    .cfi_rel_offset rax,-8-7*8
 
     cld
     pushq %r9
-    .cfi_rel_offset r9,72+8*8
+    .cfi_rel_offset r9,-8-8*8
 
     movq %cr3,%rax
 
     pushq %r8
-    .cfi_rel_offset r8,72+9*8
+    .cfi_rel_offset r8,-8-9*8
 
     pushq %rcx
-    .cfi_rel_offset rcx,72+10*8
+    .cfi_rel_offset rcx,-8-10*8
 
     pushq %rdx
-    .cfi_rel_offset rdx,72+11*8
+    .cfi_rel_offset rdx,-8-11*8
 
     pushq %rsi
-    .cfi_rel_offset rsi,72+12*8
+    .cfi_rel_offset rsi,-8-12*8
 
     pushq %rdi
-    .cfi_rel_offset rdi,72+13*8
+    .cfi_rel_offset rdi,-8-13*8
 
     // Register usage:
     //  r13: segment register values at interrupt entry
@@ -216,8 +216,8 @@ isr_common:
 
 .align 16
 .Lsse_context_save_resume:
-    // Make structure on the stack
-    pushq %rax
+    // Push FPU context pointer
+    pushq %rdi
     pushq $0
     pushq $0
 
@@ -392,32 +392,34 @@ isr_common:
 
 // Expects ds loaded with kernel data segment
 // Clobbers rcx,rdx,rax,rdi
-// Returns rax=pointer to context
+// Returns rdi=pointer to context
 .macro xsave_ctx insn
     .cfi_startproc
     .cfi_def_cfa_register rbp
     .cfi_def_cfa_offset 32
 
     // Get pointer to current thread from CPU-local storage
-    mov %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+    movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+
+    test %rcx,%rcx
+    jz 1f
+
+    // Read xsave stack pointer from thread
+    movq THREAD_XSAVE_PTR_OFS(%rcx),%rdi
+    sub sse_context_size,%rdi
 
     // Set all bits of edx:eax
     movl $-1,%eax
     movl $-1,%edx
 
-    // Skip if threading not initialized yet (still needed?)
-    testq %rcx,%rcx
-    jz 1f
-
-    // Read xsave stack pointer from thread
-    movq THREAD_XSAVE_PTR_OFS(%rcx),%rdi
+    //// Skip if threading not initialized yet (still needed?)
+    //testq %rcx,%rcx
+    //jz 1f
 
     // Save context using instruction passed to macro
     \insn (%rdi)
-    movq %rdi,%rax
 
     // Update xsave stack pointer in thread
-    addq sse_context_size,%rdi
     movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 1:
     jmp .Lsse_context_save_resume
@@ -433,6 +435,9 @@ isr_common:
     .cfi_def_cfa_register rbp
     .cfi_def_cfa_offset 32
 
+    // Get pointer to current thread from CPU-local storage
+    movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+
     // Set all bits of edx:eax
     movl $-1,%eax
     movl $-1,%edx
@@ -440,8 +445,7 @@ isr_common:
     // Restore context using instruction passed to macro
     \insn (%rdi)
 
-    // Get pointer to current thread from CPU-local storage
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+    add sse_context_size,%rdi
     movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
 
     jmp .Lsse_context_restore_resume

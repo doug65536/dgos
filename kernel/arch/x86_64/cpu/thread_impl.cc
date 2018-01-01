@@ -75,13 +75,13 @@ struct cpu_info_t;
 struct alignas(64) thread_info_t {
     isr_context_t * volatile ctx;
 
-    void *xsave_ptr;
-    void *xsave_stack;
+    char *xsave_ptr;
+    char *xsave_stack;
 
     uintptr_t fsbase;
     uintptr_t gsbase;
 
-    void *syscall_stack;
+    char *syscall_stack;
 
     process_t *process;
 
@@ -130,9 +130,6 @@ C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
-
-#define THREAD_FLAG_OWNEDSTACK_BIT  1
-#define THREAD_FLAG_OWNEDSTACK      (1<<THREAD_FLAG_OWNEDSTACK_BIT)
 
 // Store in a big array, for now
 #define MAX_THREADS 512
@@ -276,11 +273,43 @@ static void thread_startup(thread_fn_t fn, void *p, thread_t id)
     thread_cleanup();
 }
 
+static constexpr size_t stack_guard_size = (4<<20);
+
+static char *thread_allocate_stack(
+        thread_t tid, size_t stack_size, char const *noun, int fill)
+{
+    char *stack;
+    stack = (char*)mmap(0, stack_guard_size + stack_size + stack_guard_size,
+                 PROT_READ | PROT_WRITE,
+                 MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
+
+    // Guard pages
+    madvise(stack, stack_guard_size, MADV_DONTNEED);
+    mprotect(stack, stack_guard_size, PROT_NONE);
+    madvise(stack + stack_guard_size + stack_size,
+            stack_guard_size, MADV_DONTNEED);
+    mprotect(stack + stack_guard_size + stack_size,
+             stack_guard_size, PROT_NONE);
+
+    THREAD_TRACE("Thread %d %s stack range=%p-%p,"
+                 " stack=%p-%p\n", tid, noun,
+                 (void*)stack,
+                 (void*)(stack + stack_guard_size + stack_size +
+                         stack_guard_size),
+                 (void*)(stack + stack_guard_size),
+                 (void*)(stack + stack_guard_size + stack_size));
+
+    memset(stack + stack_guard_size, fill, stack_size);
+
+    stack += stack_guard_size + stack_size;
+
+    return stack;
+}
+
 // Returns threads array index or 0 on error
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
-        thread_fn_t fn, void *userdata,
-        void *stack, size_t stack_size,
+        thread_fn_t fn, void *userdata, size_t stack_size,
         thread_state_t state, uint64_t affinity,
         thread_priority_t priority, bool user)
 {
@@ -289,172 +318,129 @@ static thread_t thread_create_with_state(
     else if (stack_size < 16384)
         return -1;
 
-    for (size_t i = 0; ; ++i) {
+    thread_info_t *thread = nullptr;
+    size_t i;
+
+    for (i = 0; ; ++i) {
         if (unlikely(i >= MAX_THREADS)) {
             printdbg("Out of threads, yielding\n");
             thread_yield();
             i = 0;
         }
 
-        thread_info_t *thread = threads + i;
+        thread = threads + i;
 
         if (thread->state != THREAD_IS_UNINITIALIZED)
             continue;
 
         // Atomically grab the thread
-        if (unlikely(atomic_cmpxchg(
-                         &thread->state,
-                         THREAD_IS_UNINITIALIZED,
-                         THREAD_IS_INITIALIZING) !=
-                     THREAD_IS_UNINITIALIZED)) {
-            pause();
-            continue;
+        if (likely(atomic_cmpxchg(&thread->state,
+                                  THREAD_IS_UNINITIALIZED,
+                                  THREAD_IS_INITIALIZING) ==
+                   THREAD_IS_UNINITIALIZED))
+        {
+            break;
         }
 
-        atomic_barrier();
-
-        thread->flags = 0;
-
-        if (!stack) {
-            // Allocate one extra page for guard page
-            stack = mmap(0, stack_size + PAGE_SIZE,
-                         PROT_READ | PROT_WRITE,
-                         MAP_STACK, -1, 0);
-            // Guard page
-            madvise(stack, PAGE_SIZE, MADV_DONTNEED);
-            mprotect(stack, PAGE_SIZE, PROT_NONE);
-            //memset((char*)stack + PAGE_SIZE, 0xcc, stack_size);
-            thread->flags |= THREAD_FLAG_OWNEDSTACK;
-
-            THREAD_TRACE("Thread %zd stack guard=0x%zx,"
-                         " stack=0x%zx-0x%zx\n",
-                         i,
-                         uintptr_t(stack),
-                         uintptr_t(stack) + PAGE_SIZE,
-                         uintptr_t(stack) + PAGE_SIZE + stack_size);
-        }
-
-        stack = (char*)stack + PAGE_SIZE + stack_size;
-
-        // Syscall stack
-        // Allocate one extra page for guard page
-        thread->syscall_stack = (char*)mmap(
-                    0, syscall_stack_size + PAGE_SIZE,
-                    PROT_READ | PROT_WRITE,
-                    MAP_STACK, -1, 0);
-        madvise(thread->syscall_stack, PAGE_SIZE, MADV_DONTNEED);
-        mprotect(thread->syscall_stack, PAGE_SIZE, PROT_NONE);
-        THREAD_TRACE("Thread %zd syscall stack guard=0x%zx,"
-                     " stack=0x%zx-0x%zx\n",
-                     i,
-                     uintptr_t(thread->syscall_stack),
-                     uintptr_t(thread->syscall_stack) + PAGE_SIZE,
-                     uintptr_t(thread->syscall_stack) + PAGE_SIZE +
-                     syscall_stack_size);
-        thread->syscall_stack = (char*)thread->syscall_stack + PAGE_SIZE +
-                syscall_stack_size;
-
-        // XSave stack
-        // Allocate one extra page for guard page
-        thread->xsave_stack = mmap(
-                    0, xsave_stack_size + PAGE_SIZE,
-                    PROT_READ | PROT_WRITE,
-                    MAP_STACK, -1, 0);
-        thread->xsave_ptr = thread->xsave_stack;
-        madvise((char*)thread->xsave_stack + xsave_stack_size,
-                PAGE_SIZE, MADV_DONTNEED);
-        mprotect((char*)thread->xsave_stack + xsave_stack_size,
-                 PAGE_SIZE, PROT_NONE);
-        THREAD_TRACE("Thread %zd xsave stack guard=0x%zx,"
-                     " stack=0x%zx-0x%zx\n",
-                     i,
-                     uintptr_t(thread->xsave_stack) + stack_size,
-                     uintptr_t(thread->xsave_stack),
-                     uintptr_t(thread->xsave_stack) + stack_size);
-
-        thread->stack = stack;
-        thread->stack_size = stack_size;
-        thread->priority = priority;
-        thread->priority_boost = 0;
-        thread->cpu_affinity = affinity ? affinity : ~0UL;
-        thread->fsbase = 0;
-        thread->gsbase = 0;
-
-        // APs inherit BSP's process
-        thread->process = cpus[0].cur_thread->process;
-
-        uintptr_t stack_addr = uintptr_t(stack);
-        uintptr_t stack_end = stack_addr + stack_size + PAGE_SIZE;
-
-        size_t ctx_size = sizeof(isr_context_t);
-
-        // Adjust start of context to make room for context
-        uintptr_t ctx_addr = stack_end - ctx_size;
-
-        isr_context_t *ctx = (isr_context_t*)ctx_addr;
-        memset(ctx, 0, ctx_size);
-        ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
-
-        ISR_CTX_REG_RSP(ctx) = stack_end - 8;
-        assert((ISR_CTX_REG_RSP(ctx) & 0xF) == 0x8);
-
-        ISR_CTX_REG_SS(ctx) = user
-                ? GDT_SEL_USER_DATA | 3
-                : GDT_SEL_KERNEL_DATA;
-
-        ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
-
-        ISR_CTX_REG_RIP(ctx) = (thread_fn_t)(uintptr_t)thread_startup;
-
-        ISR_CTX_REG_CS(ctx) = user
-                ? GDT_SEL_USER_CODE64 | 3
-                : GDT_SEL_KERNEL_CODE64;
-        ISR_CTX_REG_DS(ctx) = GDT_SEL_USER_DATA | 3;
-        ISR_CTX_REG_ES(ctx) = GDT_SEL_USER_DATA | 3;
-        ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
-        ISR_CTX_REG_GS(ctx) = GDT_SEL_USER_DATA | 3;
-
-        ISR_CTX_REG_RDI(ctx) = (uintptr_t)fn;
-        ISR_CTX_REG_RSI(ctx) = (uintptr_t)userdata;
-        ISR_CTX_REG_RDX(ctx) = (uintptr_t)i;
-        ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
-
-        memset(ctx->fpr, 0, sse_context_size);
-
-        ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
-                CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
-                default_mxcsr_mask;
-        ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
-
-        // All FPU registers empty
-        ISR_CTX_FPU_FSW(ctx) = CPU_FPUSW_TOP_n(7);
-
-        // 53 bit FPU precision
-        ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
-                CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
-                CPU_FPUCW_UM | CPU_FPUCW_PM;
-
-        thread->ctx = ctx;
-
-        // Check available stack space
-        assert((char*)thread->ctx - (char*)thread->stack > 4096);
-
-        atomic_barrier();
-        thread->state = state;
-
-        // Atomically make sure thread_count > i
-        atomic_max(&thread_count, i + 1);
-
-        return i;
+        pause();
     }
+
+    atomic_barrier();
+
+    thread->flags = 0;
+
+    char *stack = thread_allocate_stack(i, stack_size, "", 0xFE);
+
+    char *syscall_stack = nullptr;
+    if (user)
+        syscall_stack = thread_allocate_stack(
+                    i, syscall_stack_size, "syscall", 0xFE);
+    thread->syscall_stack = syscall_stack;
+
+    // XSave stack
+    // Allocate one extra page for guard page
+    char *xsave_stack = thread_allocate_stack(i, xsave_stack_size, "xsave", 0);
+
+    thread->xsave_stack = xsave_stack;
+    thread->xsave_ptr = xsave_stack - sse_context_size;
+
+    thread->stack = stack;
+    thread->stack_size = stack_size;
+    thread->priority = priority;
+    thread->priority_boost = 0;
+    thread->cpu_affinity = affinity ? affinity : ~0UL;
+    thread->fsbase = 0;
+    thread->gsbase = 0;
+
+    // APs inherit BSP's process
+    thread->process = cpus[0].cur_thread->process;
+
+    uintptr_t stack_addr = uintptr_t(stack);
+    uintptr_t stack_end = stack_addr;
+
+    constexpr size_t ctx_size = sizeof(isr_context_t);
+
+    // Adjust start of context to make room for context
+    uintptr_t ctx_addr = stack_end - ctx_size;
+
+    isr_context_t *ctx = (isr_context_t*)ctx_addr;
+    memset(ctx, 0, ctx_size);
+    ctx->fpr = (isr_fxsave_context_t*)thread->xsave_ptr;
+
+    ISR_CTX_REG_RSP(ctx) = stack_end - 8;
+    assert((ISR_CTX_REG_RSP(ctx) & 0xF) == 0x8);
+
+    ISR_CTX_REG_SS(ctx) = GDT_SEL_KERNEL_DATA;
+
+    ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
+
+    ISR_CTX_REG_RIP(ctx) = (thread_fn_t)(uintptr_t)thread_startup;
+
+    ISR_CTX_REG_CS(ctx) = GDT_SEL_KERNEL_CODE64;
+    ISR_CTX_REG_DS(ctx) = GDT_SEL_USER_DATA | 3;
+    ISR_CTX_REG_ES(ctx) = GDT_SEL_USER_DATA | 3;
+    ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
+    ISR_CTX_REG_GS(ctx) = GDT_SEL_USER_DATA | 3;
+
+    ISR_CTX_REG_RDI(ctx) = (uintptr_t)fn;
+    ISR_CTX_REG_RSI(ctx) = (uintptr_t)userdata;
+    ISR_CTX_REG_RDX(ctx) = (uintptr_t)i;
+    ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
+
+    memset(ctx->fpr, 0, sse_context_size);
+
+    ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
+            CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
+            default_mxcsr_mask;
+    ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
+
+    // All FPU registers empty
+    ISR_CTX_FPU_FSW(ctx) = CPU_FPUSW_TOP_n(7);
+
+    // 53 bit FPU precision
+    ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
+            CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
+            CPU_FPUCW_UM | CPU_FPUCW_PM;
+
+    thread->ctx = ctx;
+
+    // Check available stack space
+    //assert((char*)thread->ctx - (char*)thread->stack > 4096);
+
+    atomic_barrier();
+    thread->state = state;
+
+    // Atomically make sure thread_count > i
+    atomic_max(&thread_count, i + 1);
+
+    return i;
 }
 
 EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
-                       void *stack, size_t stack_size, bool user)
+                              size_t stack_size, bool user)
 {
     return thread_create_with_state(
-                fn, userdata,
-                stack, stack_size,
+                fn, userdata, stack_size,
                 THREAD_IS_READY, 0, 0, user);
 }
 
@@ -532,39 +518,15 @@ void thread_init(int ap)
         thread->priority = -256;
 
         // BSP stack (grows down)
-        thread->stack = kernel_stack + kernel_stack_size + PAGE_SIZE;
-        thread->stack_size = kernel_stack_size;
-        madvise(kernel_stack, PAGE_SIZE, MADV_DONTNEED);
-        mprotect(kernel_stack, PAGE_SIZE, PROT_NONE);
-        THREAD_TRACE("Thread %d stack, guard=0x%zx,"
-                     " stack=0x%zx-0x%zx\n",
-                     0,
-                     uintptr_t(kernel_stack),
-                     uintptr_t(kernel_stack) + PAGE_SIZE,
-                     uintptr_t(kernel_stack) + PAGE_SIZE +
-                     kernel_stack_size);
+        thread->stack = thread_allocate_stack(
+                    0, kernel_stack_size, "idle", 0xFE);
 
         // BSP XSAVE stack (grows up)
-        thread->xsave_stack = mmap(0, xsave_stack_size + PAGE_SIZE,
-                                   PROT_READ | PROT_WRITE,
-                                   MAP_STACK, -1, 0);
-        madvise((char*)thread->xsave_stack + xsave_stack_size,
-                PAGE_SIZE, MADV_DONTNEED);
-        mprotect((char*)thread->xsave_stack + xsave_stack_size,
-                 PAGE_SIZE, PROT_NONE);
-        THREAD_TRACE("Thread %d xsave stack, guard=0x%zx,"
-                     " stack=0x%zx-0x%zx\n",
-                     0,
-                     uintptr_t(thread->xsave_stack) + xsave_stack_size,
-                     uintptr_t(thread->xsave_stack),
-                     uintptr_t(thread->xsave_stack) + xsave_stack_size);
+        char *xsave_stack = thread_allocate_stack(
+                    0, xsave_stack_size, "idle", 0);
 
-        madvise((char*)thread->xsave_stack + xsave_stack_size,
-                PAGE_SIZE, MADV_DONTNEED);
-        mprotect((char*)thread->xsave_stack + xsave_stack_size,
-                 PAGE_SIZE, PROT_NONE);
-
-        thread->xsave_ptr = thread->xsave_stack;
+        thread->xsave_stack = xsave_stack;
+        thread->xsave_ptr = xsave_stack;
         thread->cpu_affinity = 1;
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
@@ -573,7 +535,7 @@ void thread_init(int ap)
         cpu_irq_disable();
 
         thread = threads + thread_create_with_state(
-                    smp_idle_thread, 0, 0, 0,
+                    smp_idle_thread, 0, 0,
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
                     -256, false);
@@ -713,10 +675,11 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         thread->state = THREAD_IS_READY_BUSY;
         atomic_barrier();
     } else if (unlikely(thread->state == THREAD_IS_DESTRUCTING)) {
-        if (thread->flags & THREAD_FLAG_OWNEDSTACK)
-            munmap(thread->stack, thread->stack_size);
+        munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
+               stack_guard_size + thread->stack_size + stack_guard_size);
 
-        munmap(thread->xsave_stack, 1 << 16);
+        munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
+               stack_guard_size + xsave_stack_size + stack_guard_size);
 
         mutex_lock_noyield(&thread->lock);
         thread->state = THREAD_IS_FINISHED;
@@ -750,8 +713,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         }
         pause();
     }
-    if (unlikely(retries > 0))
-        printdbg("Scheduler retries: %d\n", retries);
+    //if (unlikely(retries > 0))
+    //    printdbg("Scheduler retries: %d\n", retries);
     atomic_barrier();
 
     thread->sched_timestamp = now;
@@ -954,9 +917,9 @@ void thread_check_stack(void)
 
     void *sp = cpu_get_stack_ptr();
 
-    if (sp < thread->stack ||
-            (char*)sp > (char*)thread->stack +
-            thread->stack_size + PAGE_SIZE) {
+    if (sp > thread->stack ||
+            (char*)sp < (char*)thread->stack - thread->stack_size)
+    {
         cpu_debug_break();
         cpu_crash();
     }

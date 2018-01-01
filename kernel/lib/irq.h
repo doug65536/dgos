@@ -42,37 +42,37 @@ typedef bool (*irq_setcpu_handler_t)(int irq, int cpu);
 // Vectors set by interrupt controller implementation
 
 // Change irq mask
-void irq_setmask_set_handler(irq_setmask_handler_t handler);
+extern "C" void irq_setmask_set_handler(irq_setmask_handler_t handler);
 
 // Set the appropriate interrupt vector for the specified irq
-void irq_hook_set_handler(irq_hook_handler_t handler);
+extern "C" void irq_hook_set_handler(irq_hook_handler_t handler);
 
 // Reset the appropriate interrupt vector for the specified irq
-void irq_unhook_set_handler(irq_unhook_handler_t handler);
+extern "C" void irq_unhook_set_handler(irq_unhook_handler_t handler);
 
 // Allocate MSI IRQ vector(s) and return address and data to use
-void msi_irq_alloc_set_handler(msi_irq_alloc_handler_t handler);
+extern "C" void msi_irq_alloc_set_handler(msi_irq_alloc_handler_t handler);
 
 // Route the specified IRQ to the specified CPU
-void irq_setcpu_set_handler(irq_setcpu_handler_t handler);
+extern "C" void irq_setcpu_set_handler(irq_setcpu_handler_t handler);
 
 // Change irq mask
-void irq_setmask(int irq, bool unmask);
+extern "C" void irq_setmask(int irq, bool unmask);
 
 // Set the appropriate interrupt vector for the specified irq
-void irq_hook(int irq, intr_handler_t handler);
+extern "C" void irq_hook(int irq, intr_handler_t handler);
 
 // Reset the appropriate interrupt vector for the specified irq
-void irq_unhook(int irq, intr_handler_t handler);
+extern "C" void irq_unhook(int irq, intr_handler_t handler);
 
 //
 // Interrupt vector manipulation and dispatch
 
 // Set interrupt vector
-void intr_hook(int intr, intr_handler_t handler);
+extern "C" void intr_hook(int intr, intr_handler_t handler);
 
 // Reset interrupt vector
-void intr_unhook(int intr, intr_handler_t handler);
+extern "C" void intr_unhook(int intr, intr_handler_t handler);
 
 // Call the interrupt handler
 extern "C" isr_context_t *intr_invoke(int intr, isr_context_t *ctx);

@@ -10,6 +10,11 @@
 .global syscall_entry
 .hidden syscall_entry
 syscall_entry:
+    .cfi_startproc
+    .cfi_register rip,rcx
+    .cfi_def_cfa_register rsp
+    .cfi_def_cfa_offset 0
+
     // syscall rax
     // params rdi, rsi, rdx, r10, r8, r9
     // return rax
@@ -37,6 +42,8 @@ syscall_entry:
     // Switch to this thread's syscall stack
     xchgq %rsp,%r11
 
+    .cfi_def_cfa_register r11
+
     // IRQs are okay at this point
     sti
 
@@ -45,6 +52,24 @@ syscall_entry:
 
     // Push return address to syscall stack
     pushq %rcx
+
+    .cfi_def_cfa_register rsp
+    .cfi_def_cfa_offset 8
+
+    nop
+    .cfi_rel_offset rsp,0
+
+    nop
+    .cfi_rel_offset rsp,8
+
+    nop
+    .cfi_rel_offset rsp,16
+
+    nop
+    .cfi_rel_offset rsp,-8
+
+    nop
+    .cfi_rel_offset rsp,-16
 
     // Move 4th parameter to proper place
     movq %r10,%rcx
@@ -111,6 +136,8 @@ syscall_entry:
 
 .Lvzeroall_st:
     vzeroall
+
+    .cfi_endproc
 
 .section .rodata
 .global syscall_patch_jmp

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stdint-gcc.h>
+#include <stdint.h>
 #include <stddef.h>
 #include <limits.h>
 
@@ -32,10 +32,14 @@
 #define __artificial            __attribute__((__artificial__))
 
 #define __generic_target \
-    __attribute__((__target__( \
-            "no-sse3", "no-ssse3", "no-sse4.1", "no-sse4.2", \
-            "no-avx", "no-avx2" \
-    )))
+    __attribute__(( \
+    __target__("no-sse3"), \
+    __target__("no-ssse3"), \
+    __target__("no-sse4.1"), \
+    __target__("no-sse4.2"), \
+    __target__("no-avx"), \
+    __target__("no-avx2") \
+    ))
 
 typedef int_fast64_t off_t;
 typedef __SIZE_TYPE__ size_t;

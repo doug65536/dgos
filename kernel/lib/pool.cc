@@ -19,7 +19,8 @@ int pool_create(pool_t *pool, uint32_t item_size, uint32_t capacity)
     size_t ext_cap = item_size * capacity;
     size_t size = hdr_size + ext_cap;
 
-    void *items = mmap(0, size, PROT_READ | PROT_WRITE, 0, -1, 0);
+    void *items = mmap(0, size, PROT_READ | PROT_WRITE,
+                       MAP_UNINITIALIZED, -1, 0);
 
     if (!pool || pool == MAP_FAILED)
         return 0;

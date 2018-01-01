@@ -254,7 +254,7 @@ physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
 
-static pte_t *mm_create_pagetables(uintptr_t start, size_t size);
+//static pte_t *mm_create_pagetables(uintptr_t start, size_t size);
 
 class mmu_phys_allocator_t {
     typedef uint32_t entry_t;
@@ -427,18 +427,27 @@ static int ptes_present(pte_t **ptes)
     int present_mask;
 
     present_mask = (*ptes[0] & PTE_PRESENT);
-    present_mask |= (present_mask == 1 &&
+    present_mask |= (likely(present_mask == 1) &&
                      (*ptes[1] & PTE_PRESENT)) << 1;
-    present_mask |= (present_mask == 3 &&
+    present_mask |= (likely(present_mask == 3) &&
                      (*ptes[2] & PTE_PRESENT)) << 2;
-    present_mask |= (present_mask == 7 &&
+    present_mask |= (likely(present_mask == 7) &&
                      (*ptes[3] & PTE_PRESENT)) << 3;
 
     return present_mask;
 }
 
+static __always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
+{
+    addr &= 0xFFFFFFFFFFFFU;
+    pte[3] = PT3_PTR + (addr >> (9*0 + 12));
+    pte[2] = PT2_PTR + (addr >> (9*1 + 12));
+    pte[1] = PT1_PTR + (addr >> (9*2 + 12));
+    pte[0] = PT0_PTR + (addr >> (9*3 + 12));
+}
+
 // Returns the linear addresses of the page tables for the given path
-static __always_inline void pte_from_path(pte_t **pte, unsigned *path)
+static __always_inline void ptes_from_path(pte_t **pte, unsigned *path)
 {
     uintptr_t page_index =
             (((uintptr_t)path[0]) << (9 * 3)) +
@@ -461,7 +470,7 @@ static __always_inline void pte_from_path(pte_t **pte, unsigned *path)
 
 static int path_present(unsigned *path, pte_t **ptes)
 {
-    pte_from_path(ptes, path);
+    ptes_from_path(ptes, path);
     return ptes_present(ptes);
 }
 
@@ -796,10 +805,9 @@ void mm_phys_clear_init()
 {
     clear_area = linear_allocator.alloc_linear(PAGE_SIZE * 64);
 
-    unsigned path[4];
     pte_t *ptes[4];
 
-    addr_present(clear_area, path, ptes);
+    ptes_from_addr(ptes, clear_area);
 
     for (int i = 0; i < 3; ) {
         assert(*ptes[i] == 0);
@@ -859,30 +867,30 @@ void clear_phys(physaddr_t addr)
 
 static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
 {
-    unsigned path[4];
-    pte_t *pte_linaddr[4];
+    pte_t *ptes[4];
     pte_t pte;
 
-    int present_mask = addr_present(addr, path, pte_linaddr);
+    ptes_from_addr(ptes, addr);
+    int present_mask = ptes_present(ptes);
 
     if (unlikely((present_mask & 0x07) != 0x07)) {
         pte_t path_flags = PTE_PRESENT | PTE_WRITABLE |
                 (addr <= 0x7FFFFFFFFFFF ? PTE_USER : 0);
 
         for (int i = 0; i < 3; ++i) {
-            pte = *pte_linaddr[i];
+            pte = *ptes[i];
 
             if (!pte) {
                 physaddr_t ptaddr = init_take_page(0);
                 clear_phys(ptaddr);
-                *pte_linaddr[i] = ptaddr | path_flags;
+                *ptes[i] = ptaddr | path_flags;
             }
         }
     }
 
-    pte = *pte_linaddr[3];
+    pte = *ptes[3];
 
-    *pte_linaddr[3] = (physaddr & PTE_ADDR) | flags;
+    *ptes[3] = (physaddr & PTE_ADDR) | flags;
 }
 
 static void mmu_tlb_perform_shootdown(void)
@@ -992,7 +1000,7 @@ static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 }
 
 // Page fault
-static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
+isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 {
     (void)intr;
     assert(intr == INTR_EX_PAGE);
@@ -1001,14 +1009,21 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
     uintptr_t fault_addr = cpu_get_fault_address();
 
+    pte_t *ptes[4];
+
+    ptes_from_addr(ptes, fault_addr);
+    int present_mask = ptes_present(ptes);
+
+    // Examine the error code
+    if (unlikely(ctx->gpr.info.error_code & CTX_ERRCODE_PF_R)) {
+        // Reserved bit violation?!
+        cpu_debug_break();
+        return ctx;
+    }
+
 #if DEBUG_PAGE_FAULT
     printdbg("Page fault at %lx\n", fault_addr);
 #endif
-
-    unsigned path[4];
-    pte_t *ptes[4];
-
-    int present_mask = addr_present(fault_addr, path, ptes);
 
     pte_t pte = (present_mask >= 0x07) ? *ptes[3] : 0;
 
@@ -1074,7 +1089,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             // Round down to nearest 64KB boundary
             mapping_offset &= -0x10000;
 
-            rounded_addr = (linaddr_t)mapping->base_addr + mapping_offset;
+            rounded_addr = linaddr_t(mapping->base_addr) + mapping_offset;
 
             pte_t volatile *vpte = ptes[3];
 
@@ -1098,7 +1113,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
             if (likely(io_result >= 0)) {
                 // Mark the range present from end to start
-                addr_present(rounded_addr, path, ptes);
+                ptes_from_addr(ptes, rounded_addr);
                 for (size_t i = (0x10000 >> PAGE_SIZE_BIT); i > 0; --i)
                     atomic_or(ptes[3] + (i - 1), PTE_PRESENT | PTE_ACCESSED);
             }
@@ -1158,7 +1173,7 @@ static isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              present_mask);
 
     for (int i = 3; i >= 0; --i) {
-        if (!((0x8 >> i) & present_mask))
+        if (i && !((1 << (i - 1)) & present_mask))
             continue;
         printdbg("%s:\n"
                  "     present=%d\n"
@@ -1749,60 +1764,103 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 #endif
 }
 
+// Returns the present mask for the new page
+static __always_inline int ptes_step(pte_t **ptes)
+{
+    ++ptes[3];
+    if (unlikely(!(uintptr_t(ptes[3]) & 0xFF8))) {
+        // Carry
+        ++ptes[2];
+        if (unlikely(!(uintptr_t(ptes[2]) & 0xFF8))) {
+            // Carry
+            ++ptes[1];
+            if (unlikely(!(uintptr_t(ptes[1]) & 0xFF8))) {
+                // Carry
+                ++ptes[0];
+            }
+        }
+    }
+    return ptes_present(ptes);
+}
+
+// Returns number of last level PTEs to skip forward
+// to get to next entry at the lowest level that is not present
+// Makes sense when we are at a 4KB or 2MB or 1GB or 512GB boundary
+static __always_inline ptrdiff_t ptes_mask_skip(int present_mask)
+{
+    // See if we need to advance 512GB
+    if (unlikely(!(present_mask & 1)))
+        return ptrdiff_t(512) * 512 * 512;
+
+    // See if we need to advance 1GB
+    if (unlikely(!(present_mask & 2)))
+        return ptrdiff_t(512) * 512;
+
+    // See if we need to advance 2MB
+    if (unlikely(!(present_mask & 4)))
+        return 512;
+
+    // No skip
+    return 0;
+}
+
+// Returns true at 2MB boundaries,
+// which indicates that the present mask needs to be checked
+static __always_inline bool ptes_advance(pte_t **ptes, ptrdiff_t distance)
+{
+    size_t page_index = (ptes[3] - PT3_PTR) + distance;
+    ptes[3] += distance;
+    ptes[2] = PT2_PTR + (page_index >> (9 * 1));
+    ptes[1] = PT1_PTR + (page_index >> (9 * 2));
+    ptes[0] = PT0_PTR + (page_index >> (9 * 3));
+    return (page_index & 0x1FF) == 0;
+}
+
 //
 // Public API
 
 bool mpresent(uintptr_t addr, size_t size)
 {
-    unsigned path[4];
     pte_t *ptes[4];
 
-    do {
-        if (addr_present(addr, path, ptes) != 0x0F)
+    unsigned misalignment = addr & PAGE_MASK;
+    addr -= misalignment;
+    size += misalignment;
+    size = round_up(size);
+
+    ptes_from_addr(ptes, addr);
+    pte_t *end = ptes[3] + (size >> PAGE_SCALE);
+
+    while (ptes[3] < end) {
+        if (ptes_present(ptes) != 0x0F)
             return false;
-
-        uintptr_t remainder = ((addr + PAGE_SIZE) & -PAGE_SIZE) - addr;
-
-        if (remainder >= size)
-            break;
-
-        addr += remainder;
-        size -= remainder;
-    } while (size);
+        ptes_step(ptes);
+    }
 
     return true;
 }
 
 bool mwritable(uintptr_t addr, size_t size)
 {
-    uintptr_t end_addr = addr + size - 1;
-    unsigned path[4], end_path[4];
+
+    unsigned misalignment = addr & PAGE_MASK;
+    addr -= misalignment;
+    size += misalignment;
+    size = round_up(size);
+
     pte_t *ptes[4];
+    ptes_from_addr(ptes, addr);
+    pte_t *end = ptes[3] + (size >> PAGE_SCALE);
 
-    // Check last page in range and get path to last PTE
-    if (addr_present(end_addr, end_path, ptes) != 0xF)
-        return false;
-
-    do {
-        if (addr_present(addr, path, ptes) != 0x0F)
+    while (ptes[3] < end) {
+        if (ptes_present(ptes) != 0x0F)
             return false;
 
-        while (path[3] < 512 &&
-               (path[2] < end_path[2] || path[3] <= end_path[3])) {
-            if (unlikely((*ptes[3]++ & (PTE_PRESENT | PTE_WRITABLE)) !=
-                    (PTE_PRESENT | PTE_WRITABLE)))
-                return false;
-            path[3]++;
-        }
+        if (!(*ptes[3] & PTE_WRITABLE))
+            return false;
 
-        uintptr_t remainder = ((addr + PAGE_SIZE) & -PAGE_SIZE) - addr;
-
-        if (remainder >= size)
-            break;
-
-        addr += remainder;
-        size -= remainder;
-    } while (size);
+        ptes_step(ptes);
+    }
 
     return true;
 }
@@ -1811,15 +1869,11 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 {
     pte_t *pte_st[4];
     pte_t *pte_en[4];
-    unsigned path_st[4];
-    unsigned path_en[4];
 
     uintptr_t const end = start + size - 1;
 
-    path_from_addr(path_st, start);
-    path_from_addr(path_en, end);
-    pte_from_path(pte_st, path_st);
-    pte_from_path(pte_en, path_en);
+    ptes_from_addr(pte_st, start);
+    ptes_from_addr(pte_en, end);
 
     // Fastpath small allocations fully within a 2MB region,
     // where there is nothing to do
@@ -1829,7 +1883,7 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
             (*pte_st[2] & PTE_PRESENT))
         return pte_st[3];
 
-    bool const low = (path_st[0] < 256);
+    bool const low = (start & 0xFFFFFFFFFFFFU) < 0x800000000000U;
 
     // Mark high pages PTE_GLOBAL, low pages PTE_USER
     // First 3 levels PTE_ACCESSED and PTE_DIRTY
@@ -1855,22 +1909,24 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
     return pte_st[3];
 }
 
-static pte_t *mm_create_pagetables(uintptr_t start, size_t size)
-{
-    unsigned const misalignment = unsigned(start & PAGE_MASK);
-    start -= misalignment;
-    size += misalignment;
-    size = round_up(size);
+//static pte_t *mm_create_pagetables(uintptr_t start, size_t size)
+//{
+//    unsigned const misalignment = unsigned(start & PAGE_MASK);
+//    start -= misalignment;
+//    size += misalignment;
+//    size = round_up(size);
+//
+//    return mm_create_pagetables_aligned(start, size);
+//}
 
-    return mm_create_pagetables_aligned(start, size);
-}
-
-static __always_inline int zero_if_false(bool cond, int bits)
+template<typename T>
+static __always_inline T zero_if_false(bool cond, T bits)
 {
     return bits & -cond;
 }
 
-static __always_inline int select_mask(bool cond, int true_val, int false_val)
+template<typename T>
+static __always_inline T select_mask(bool cond, T true_val, T false_val)
 {
     int mask = -cond;
     return (true_val & mask) | (false_val & ~mask);
@@ -1976,7 +2032,10 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
     assert(linear_addr > 0x100000);
 
     if (likely(!usable_mem_ranges)) {
-        pte_t *base_pte = mm_create_pagetables(linear_addr, len);
+        pte_t *base_pte = mm_create_pagetables_aligned(linear_addr, len);
+
+        //printdbg("mmap %zx bytes at %zx-%zx\n",
+        //         len, linear_addr, linear_addr + len);
 
         if ((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) {
             // POPULATE, not PHYSICAL
@@ -1994,7 +2053,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                     pte_t old = atomic_xchg(base_pte + (ofs >> 12),
                                             pte_t(paddr | page_flags));
 
-                    if (old && old != PTE_ADDR)
+                    if (old && ((old & PTE_ADDR) != PTE_ADDR))
                         mmu_free_phys(old & PTE_ADDR);
 
                     return true;
@@ -2123,76 +2182,106 @@ void *mremap(
     new_size = round_up(new_size);
 
     // Convert pointer to address
-    uintptr_t old_st = uintptr_t(old_address);
-    uintptr_t new_st = uintptr_t(new_address);
+    linaddr_t old_st = linaddr_t(old_address);
+    linaddr_t new_st = linaddr_t(new_address);
 
-    // old_address must be page aligned
-    assert(!(old_st & PAGE_MASK));
-    if (unlikely(old_st & PAGE_MASK))
-        return 0;
+    // Fail with EINVAL if:
+    //  - old_address and new_address must be page aligned
+    //  - Flags must be valid
+    //  - New size must be nonzero
+    //  - Old address must be sane
+    //  - new_address is zero and MREMAP_FIXED was set in flags
+    //  - new_address is nonzero and MREMAP_FIXED was not set in flags
+    if (unlikely(old_st & PAGE_MASK) ||
+            unlikely(old_st < 0x400000) ||
+            unlikely(new_st & PAGE_MASK) ||
+            unlikely(new_st && new_st < 0x400000) ||
+            unlikely(old_size == 0) ||
+            unlikely(new_size == 0) ||
+            unlikely(flags & MREMAP_INVALID_MASK) ||
+            unlikely((!(flags & MREMAP_FIXED)) == (new_st == 0))) {
+        thread_set_error(errno_t::EINVAL);
+        return MAP_FAILED;
+    }
 
-    // new_address must be page aligned
-    assert(!(new_st & PAGE_MASK));
-    if (unlikely(old_st & PAGE_MASK))
-        return 0;
-
-    // new_address must be nonzero if MREMAP_FIXED was set in flags
-    // new_address must be zero if MREMAP_FIXED was not set in flags
-    if (unlikely((!(flags & MREMAP_FIXED)) == (new_st == 0)))
-        return 0;
+    // Only support simplified API:
+    //  - Must pass MREMAP_MAYMOVE
+    //  - Must not pass MREMAP_FIXED
+    if (flags != MREMAP_MAYMOVE) {
+        thread_set_error(errno_t::ENOSYS);
+        return MAP_FAILED;
+    }
 
     if (new_size < old_size) {
         //
         // Got smaller
 
-        uintptr_t freed_size = old_size - new_size;
+        size_t freed_size = old_size - new_size;
 
         // Release space at the end
         munmap((void*)(old_st + new_size), freed_size);
-    } else if (new_size > old_size) {
-        //
-        // Got bigger
 
-        linaddr_t new_linear = linear_allocator.alloc_linear(new_size);
-
-        unsigned path[4];
-        path_from_addr(path, new_linear);
-
-        pte_t *new_pte[4];
-        pte_from_path(new_pte, path);
-
-        pte_t *old_pte[4];
-        path_from_addr(path, old_st);
-        pte_from_path(old_pte, path);
-
-        // FIXME: Move PTEs...
-
+        return (void*)old_st;
+    } else if (unlikely(new_size == old_size)) {
+        return (void*)new_st;
     }
 
-    return 0;
+    bool const low = (old_st < 0x800000000000U);
+    contiguous_allocator_t *allocator = low ?
+                (contiguous_allocator_t*)
+                thread_current_process()->get_allocator() :
+                &linear_allocator;
+
+    pte_t *new_base;
+
+    if (allocator->take_linear(old_st + old_size, new_size - old_size, true)) {
+        // Expand in place
+        new_st = old_st + old_size;
+        new_size -= old_size;
+        new_base = mm_create_pagetables_aligned(new_st, new_size);
+        pte_t new_pte = (low ? PTE_USER : PTE_GLOBAL) |
+                PTE_WRITABLE | PTE_ADDR;
+        for (size_t i = 0, e = new_size >> 3; i < e; ++i) {
+            pte_t pte = atomic_xchg(new_base + i, new_pte);
+            if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+                mmu_free_phys(pte & PTE_ADDR);
+        }
+        return (void*)old_st;
+    }
+
+    pte_t *old_pte[4];
+    ptes_from_addr(old_pte, old_st);
+
+    new_st = allocator->alloc_linear(new_size);
+    new_base = mm_create_pagetables_aligned(new_st, new_size);
+
+    for (size_t i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
+        pte_t pte = atomic_xchg(old_pte[3] + i, 0);
+        pte = atomic_xchg(new_base + i, 0);
+        if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+            mmu_free_phys(pte & PTE_ADDR);
+    }
+
+    return (void*)new_st;
 }
 
 int munmap(void *addr, size_t size)
 {
     linaddr_t a = (linaddr_t)addr;
 
-    uintptr_t misalignment = 0;
-
-    misalignment = a & PAGE_MASK;
+    uintptr_t misalignment = a & PAGE_MASK;
     a -= misalignment;
     size += misalignment;
     size = round_up(size);
 
-    unsigned path[4];
-    path_from_addr(path, a);
+    pte_t *ptes[4];
+    ptes_from_addr(ptes, a);
 
-    pte_t *pteptr[4];
-
-    int present_mask = path_present(path, pteptr);
-    for (size_t ofs = 0; ofs < size; ofs += PAGE_SIZE)
-    {
+    size_t freed = 0;
+    int present_mask = ptes_present(ptes);
+    for (size_t ofs = 0; ofs < size; ofs += PAGE_SIZE) {
         if ((present_mask & 0x07) == 0x07) {
-            pte_t pte = atomic_xchg(pteptr[3], 0);
+            pte_t pte = atomic_xchg(ptes[3], 0);
 
             if (likely(!(pte & PTE_EX_PHYSICAL))) {
                 physaddr_t physaddr = pte & PTE_ADDR;
@@ -2201,17 +2290,29 @@ int munmap(void *addr, size_t size)
                     mmu_free_phys(physaddr);
             }
 
-            if (present_mask == 0x0F)
+            if (pte & PTE_PRESENT) {
+                ++freed;
                 cpu_invalidate_page(a);
+            }
         }
 
         a += PAGE_SIZE;
-        present_mask = path_inc(path, pteptr);
+
+        if (ptes_advance(ptes, 1))
+            present_mask = ptes_present(ptes);
     }
 
-    mmu_send_tlb_shootdown();
+    if (freed)
+        mmu_send_tlb_shootdown();
 
-    linear_allocator.release_linear((linaddr_t)addr - misalignment, size);
+    contiguous_allocator_t *allocator =
+            (a < 0x800000000000U) ?
+                (contiguous_allocator_t*)
+                thread_current_process()->get_allocator()
+            : (a >= 0xFFFFFFFF80000000) ? &near_allocator
+            : &linear_allocator;
+
+    allocator->release_linear((linaddr_t)addr - misalignment, size);
 
     return 0;
 }
@@ -2275,21 +2376,19 @@ int mprotect(void *addr, size_t len, int prot)
              ? 0
              : PTE_WRITABLE);
 
-    unsigned path[4];
-    unsigned path_en[4];
     pte_t *pt[4];
-    pte_t *pt_en[4];
-    addr_present(linaddr_t(addr), path, pt);
-    addr_present(linaddr_t(addr) + len, path_en, pt_en);
+    ptes_from_addr(pt, linaddr_t(addr));
+    pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    while (((pt[3] != pt_en[3]) | (pt[2] != pt_en[2]) |
-            (pt[1] != pt_en[1]) | (pt[0] != pt_en[0])) &&
+    while (pt[3] < end &&
            (*pt[0] & PTE_PRESENT) &&
            (*pt[1] & PTE_PRESENT) &&
-           (*pt[2] & PTE_PRESENT)) {
+           (*pt[2] & PTE_PRESENT))
+    {
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
-            int demand_paged = ((expect & demand_no_read) == demand_no_read);
+            pte_t demand_paged = ((expect & demand_no_read) == demand_no_read);
+
             if (expect == 0)
                 return -1;
             else if (demand_paged && (prot & PROT_READ))
@@ -2312,7 +2411,7 @@ int mprotect(void *addr, size_t len, int prot)
         cpu_invalidate_page((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
-        path_inc(path, pt);
+        ptes_step(pt);
     }
 
     mmu_send_tlb_shootdown();
@@ -2326,9 +2425,6 @@ int mprotect(void *addr, size_t len, int prot)
 // with MADV_WEAKORDER/MADV_STRONGORDER
 int madvise(void *addr, size_t len, int advice)
 {
-    unsigned path[4];
-    unsigned path_en[4];
-
     if (unlikely(len == 0))
         return 0;
 
@@ -2351,33 +2447,34 @@ int madvise(void *addr, size_t len, int advice)
         return 0;
     }
 
-    path_from_addr(path, (linaddr_t)addr);
-    path_from_addr(path_en, (linaddr_t)addr + len - 1);
-
     pte_t *pt[4];
-    pte_from_path(pt, path);
+    ptes_from_addr(pt, linaddr_t(addr));
+    pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
     pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
 
-    while (((path[0] != path_en[0]) | (path[1] != path_en[1]) |
-            (path[2] != path_en[2]) | (path[3] != path_en[3])) &&
+    while (pt[3] < end &&
            (*pt[0] & PTE_PRESENT) &&
            (*pt[1] & PTE_PRESENT) &&
-           (*pt[2] & PTE_PRESENT)) {
+           (*pt[2] & PTE_PRESENT))
+    {
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
-            if (order_bits == (pte_t)-1) {
+            if (order_bits == pte_t(-1)) {
+                // Discarding
                 physaddr_t page = 0;
                 if (expect && (expect & demand_mask) != demand_mask) {
                     page = expect & PTE_ADDR;
                     replace = expect | PTE_ADDR;
 
-                    if (atomic_cmpxchg_upd(pt[3], &expect, replace)) {
-                        mmu_free_phys(page);
-                    }
+                    if (!atomic_cmpxchg_upd(pt[3], &expect, replace))
+                        continue;
+
+                    mmu_free_phys(page);
                 }
                 break;
             } else {
+                // Weak/Strong order
                 replace = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
                         order_bits;
 
@@ -2389,7 +2486,7 @@ int madvise(void *addr, size_t len, int advice)
         cpu_invalidate_page((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
-        path_inc(path, pt);
+        ptes_step(pt);
     }
 
     mmu_send_tlb_shootdown();
@@ -2408,12 +2505,12 @@ static int present_ranges(F callback, linaddr_t rounded_addr, size_t len)
     assert(((rounded_addr) & PAGE_MASK) == 0);
     assert(((len) & PAGE_MASK) == 0);
 
-    unsigned path[4];
     pte_t *ptes[4];
 
     linaddr_t end = rounded_addr + len;
 
-    int present_mask = addr_present(rounded_addr, path, ptes);
+    ptes_from_addr(ptes, rounded_addr);
+    int present_mask = ptes_present(ptes);
 
     int result = 0;
     linaddr_t range_start = 0;
@@ -2430,7 +2527,8 @@ static int present_ranges(F callback, linaddr_t rounded_addr, size_t len)
             range_start = 0;
         }
 
-        present_mask = path_inc(path, ptes);
+        ptes_step(ptes);
+        present_mask = ptes_present(ptes);
     }
 
     if (range_start && result >= 0)
@@ -2444,7 +2542,7 @@ int msync(void const *addr, size_t len, int flags)
     // Check for validity, particularly accidentally using O_SYNC
     assert((flags & (MS_SYNC | MS_INVALIDATE)) == flags);
 
-    linaddr_t rounded_addr = (linaddr_t)addr & -(intptr_t)PAGE_SIZE;
+    linaddr_t rounded_addr = linaddr_t(addr) & -intptr_t(PAGE_SIZE);
     len = round_up(len);
 
     if (unlikely(len == 0))
@@ -2476,13 +2574,14 @@ int msync(void const *addr, size_t len, int flags)
 
 uintptr_t mphysaddr(void volatile *addr)
 {
-    linaddr_t linaddr = (linaddr_t)addr;
+    linaddr_t linaddr = linaddr_t(addr);
 
-    uintptr_t misalignment = linaddr & PAGE_MASK;
+    unsigned misalignment = linaddr & PAGE_MASK;
+    linaddr -= misalignment;
 
-    unsigned path[4];
     pte_t *ptes[4];
-    int present_mask = addr_present(linaddr, path, ptes);
+    ptes_from_addr(ptes, linaddr);
+    int present_mask = ptes_present(ptes);
 
     if ((present_mask & 0x07) != 0x07)
         return 0;
@@ -2791,34 +2890,27 @@ void mmu_phys_allocator_t::addref(physaddr_t addr)
 
 void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 {
+    unsigned misalignment = start & PAGE_SCALE;
+    start -= misalignment;
+    len += misalignment;
+    len = round_up(len);
+
+    pte_t *ptes[4];
+    ptes_from_addr(ptes, start);
+
     size_t count = len >> log2_pagesz;
 
     unique_lock<spinlock> lock_(lock);
 
-    unsigned path[4];
-    pte_t *ptes[4];
-    int present_mask;
-
-    present_mask = addr_present(start, path, ptes);
-    assert((present_mask & 7) == 7);
-
     for (size_t i = 0; i < count; ++i) {
-        // Check path at start and every time we wrap into next page table
-        if (unlikely(i && !((path[3] + i) & 511))) {
-            present_mask = addr_present(start, path, ptes);
-
-            // Make sure the last level page table is present
-            assert((present_mask & 7) == 7);
-        }
-
-        physaddr_t addr = ptes[3][i] & PTE_ADDR;
+        physaddr_t addr = *ptes[3] & PTE_ADDR;
 
         if (addr && addr != PTE_ADDR) {
             entry_t index = index_from_addr(addr);
             ++entries[index];
         }
 
-        path_inc(path);
+        ++ptes[3];
     }
 }
 
@@ -2845,17 +2937,20 @@ void munmap_window(void *addr, size_t size)
 int alias_window(void *addr, size_t size,
                   mmphysrange_t const *ranges, size_t range_count)
 {
-    linaddr_t base = (linaddr_t)addr;
+    linaddr_t base = linaddr_t(addr);
+    unsigned misalignment = base & PAGE_MASK;
+    base -= misalignment;
+    size += misalignment;
+    size = round_up(size);
+
     mmphysrange_t const *range = ranges;
     mmphysrange_t const *ranges_end = ranges + range_count;
 
     size_t range_offset = 0;
 
-    size = round_up(size);
-
-    unsigned path[4];
     pte_t *ptes[4];
-    int present_mask = addr_present((uintptr_t)base, path, ptes);
+    ptes_from_addr(ptes, base);
+    int present_mask = ptes_present(ptes);
     size_t pte_index = 0;
 
     assert((present_mask & 0x7) == 0x7);
@@ -2872,14 +2967,14 @@ int alias_window(void *addr, size_t size,
                 range_offset = 0;
             }
 
-            ptes[3][pte_index++] = ((range->physaddr + range_offset) &
-                                    PTE_ADDR) |
+            ptes[3][pte_index++] =
+                    ((range->physaddr + range_offset) & PTE_ADDR) |
                     PTE_ACCESSED | PTE_DIRTY | PTE_WRITABLE | PTE_PRESENT;
         }
     } else {
         for (size_t offset = 0; offset < size; offset += PAGE_SIZE) {
-            ptes[3][pte_index++] = PTE_ADDR |
-                    PTE_ACCESSED | PTE_DIRTY | PTE_WRITABLE;
+            ptes[3][pte_index++] = PTE_ADDR | PTE_ACCESSED |
+                    PTE_DIRTY | PTE_WRITABLE;
         }
     }
 

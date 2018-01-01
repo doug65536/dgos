@@ -11,7 +11,7 @@ public:
     workq_impl()
     {
         heap_create();
-        tid = thread_create(worker, this, nullptr, 0, false);
+        tid = thread_create(worker, this, 0, false);
     }
 
     workq_impl(workq_impl const&) = delete;
