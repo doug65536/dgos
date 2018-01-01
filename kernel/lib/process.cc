@@ -59,7 +59,7 @@ process_t *process_t::add_locked(unique_lock<spinlock> const&)
     if (realloc_count) {
         // Expand process list
         if (!processes.resize(realloc_count)) {
-            free(process);
+            delete process;
             return nullptr;
         }
 
@@ -123,8 +123,7 @@ int process_t::spawn(pid_t * pid_result,
     // Return the assigned PID
     *pid_result = process->pid;
 
-    thread_t tid = thread_create(&process_t::start, process,
-                                 nullptr, 0, false);
+    thread_t tid = thread_create(&process_t::start, process, 0, true);
 
     process->add_thread(process->pid, tid);
 

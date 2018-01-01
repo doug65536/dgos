@@ -605,7 +605,7 @@ static int stress_heap_thread(void *p)
                                     STRESS_HEAP_MAXSIZE);
 
                 heap_free(heap, history[history_index]);
-                history[history_index] = 0;
+                history[history_index] = nullptr;
 
                 uint64_t st = cpu_rdtsc();
                 void *block = heap_alloc(heap, size);
@@ -810,7 +810,6 @@ static int init_thread(void *p)
         file_close(create_test);
         printk(" created %s\n\n", name);
     }
-#endif
 
 //    for (int i = 0; i < 10000; ++i) {
 //        printdbg("%d=%f\n", i, i / 1000.0);
@@ -819,12 +818,6 @@ static int init_thread(void *p)
     //void *user_test = mmap((void*)0x400000, 1<<20,
     //                       PROT_READ | PROT_WRITE, MAP_USER, -1, 0);
     //munmap(user_test, 1<<20);
-
-    printdbg("Running mprotect self test\n");
-    mprotect_test(0);
-
-    printdbg("Running red-black tree self test\n");
-    rbtree_t<>::test();
 
     printdbg("Testing floating point formatter\n");
     printdbg("Float formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
@@ -860,6 +853,13 @@ static int init_thread(void *p)
         printdbg("File: %s\n", de.d_name);
     }
     file_closedir(od);
+#endif
+
+    printdbg("Running mprotect self test\n");
+    mprotect_test(0);
+
+    printdbg("Running red-black tree self test\n");
+    rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
     printdbg("Starting framebuffer stress\n");

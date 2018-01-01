@@ -132,6 +132,28 @@ EXPORT char *strstr(char const *str, char const *substr)
     return 0;
 }
 
+static void memset16(char *&d, uint64_t s, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep stosw"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
+}
+
+static void memset32(char *&d, uint64_t s, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep stosl"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
+}
+
 static void memset64(char *&d, uint64_t s, size_t n)
 {
     __asm__ __volatile__ (
@@ -158,28 +180,26 @@ static void memset_byte(char *&d, uint64_t s, uint32_t &ofs)
 EXPORT void *memset(void *dest, int c, size_t n)
 {
     char *d = (char*)dest;
-    uint64_t s = size_t(0x0101010101010101) * (c & 0xFF);
+    uint64_t s = size_t(0x0101010101010101U) * (c & 0xFFU);
 
-    if (n >= 7) {
-        if (unlikely(uintptr_t(d) & 7)) {
-            uint32_t ofs = 0;
-            switch (uintptr_t(d) & 7) {
-            case 1: memset_byte(d, s, ofs); // fall thru
-            case 2: memset_byte(d, s, ofs); // fall thru
-            case 3: memset_byte(d, s, ofs); // fall thru
-            case 4: memset_byte(d, s, ofs); // fall thru
-            case 5: memset_byte(d, s, ofs); // fall thru
-            case 6: memset_byte(d, s, ofs); // fall thru
-            case 7: memset_byte(d, s, ofs); // fall thru
-            }
-
-            n -= ofs;
-            if (unlikely(!n))
-                return dest;
-
-            d += ofs;
-            s += ofs;
+    if (likely(n >= 7) && unlikely(uintptr_t(d) & 7)) {
+        uint32_t ofs = 0;
+        switch (uintptr_t(d) & 7) {
+        case 1: memset_byte(d, s, ofs); // fall thru
+        case 2: memset_byte(d, s, ofs); // fall thru
+        case 3: memset_byte(d, s, ofs); // fall thru
+        case 4: memset_byte(d, s, ofs); // fall thru
+        case 5: memset_byte(d, s, ofs); // fall thru
+        case 6: memset_byte(d, s, ofs); // fall thru
+        case 7: memset_byte(d, s, ofs); // fall thru
         }
+
+        n -= ofs;
+        if (unlikely(!n))
+            return dest;
+
+        d += ofs;
+        s += ofs;
     }
 
     size_t quads = n >> 3;
@@ -195,6 +215,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
         case 3: memset_byte(d, s, ofs); // fall thru
         case 2: memset_byte(d, s, ofs); // fall thru
         case 1: memset_byte(d, s, ofs); // fall thru
+        case 0: break;
         }
     }
 
@@ -636,28 +657,22 @@ EXPORT int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end)
     return 0;
 }
 
-void *memfill_16(void *dest, uint16_t v, size_t count)
+void memfill_16(void *dest, uint16_t v, size_t count)
 {
-    uint16_t *d = (uint16_t*)dest;
-    for (size_t i = 0; i < count; ++i)
-        d[i] = v;
-    return dest;
+    char *d = (char*)dest;
+    memset16(d, v, count);
 }
 
-void *memfill_32(void *dest, uint32_t v, size_t count)
+void memfill_32(void *dest, uint32_t v, size_t count)
 {
-    uint32_t *d = (uint32_t*)dest;
-    for (size_t i = 0; i < count; ++i)
-        d[i] = v;
-    return dest;
+    char *d = (char*)dest;
+    memset32(d, v, count);
 }
 
-void *memfill_64(void *dest, uint64_t v, size_t count)
+void memfill_64(void *dest, uint64_t v, size_t count)
 {
-    uint64_t *d = (uint64_t*)dest;
-    for (size_t i = 0; i < count; ++i)
-        d[i] = v;
-    return dest;
+    char *d = (char*)dest;
+    memset64(d, v, count);
 }
 
 size_t utf8_count(char const *in)

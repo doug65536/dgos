@@ -40,9 +40,9 @@ size_t utf16_count(uint16_t const *in);
 void *aligned16_memset(void *dest, int c, size_t n);
 
 // Aligned fill of naturally aligned values
-void *memfill_16(void *dest, uint16_t v, size_t count);
-void *memfill_32(void *dest, uint32_t v, size_t count);
-void *memfill_64(void *dest, uint64_t v, size_t count);
+void memfill_16(void *dest, uint16_t v, size_t count);
+void memfill_32(void *dest, uint32_t v, size_t count);
+void memfill_64(void *dest, uint64_t v, size_t count);
 
 __END_DECLS
 
@@ -65,7 +65,7 @@ static __always_inline unsigned devload_impl(
     __asm__ __volatile__ (
         "movzbl %[src],%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" ((uint8_t *)p)
+        : [src] "m" (*(uint8_t *)p)
     );
     return result;
 }
@@ -119,7 +119,7 @@ static __always_inline int devload_impl(
     __asm__ __volatile__ (
         "movsbl %[src],%k[result]\n\t"
         : [result] "=r" (result)
-        : [src] "m" ((uint8_t *)p)
+        : [src] "m" (*(uint8_t *)p)
     );
     return result;
 }
@@ -172,9 +172,8 @@ static __always_inline void devstore_impl(
     uint8_t result;
     __asm__ __volatile__ (
         "movb %b[src],%[dest]\n\t"
-        :
         : [dest] "=m" (*(uint8_t *)p)
-        , [src] "r" (val)
+        : [src] "r" (val)
     );
 }
 
