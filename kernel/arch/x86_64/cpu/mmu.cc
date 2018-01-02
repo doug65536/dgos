@@ -23,6 +23,10 @@
 #include "errno.h"
 #include "vector.h"
 
+// Allow G bit set in PDPT and PD in recursive page table mapping
+// This causes KVM to throw #PF(reserved_bit_set|present)
+#define GLOBAL_RECURSIVE_MAPPING    0
+
 #define DEBUG_CREATE_PT         0
 #define DEBUG_ADDR_ALLOC        0
 #define DEBUG_PHYS_ALLOC        0
@@ -873,6 +877,9 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
     ptes_from_addr(ptes, addr);
     int present_mask = ptes_present(ptes);
 
+    // G is MBZ in PML4e on AMD
+    pte_t global_mask = ~PTE_GLOBAL;
+
     if (unlikely((present_mask & 0x07) != 0x07)) {
         pte_t path_flags = PTE_PRESENT | PTE_WRITABLE |
                 (addr <= 0x7FFFFFFFFFFF ? PTE_USER : 0);
@@ -883,9 +890,13 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
             if (!pte) {
                 physaddr_t ptaddr = init_take_page(0);
                 clear_phys(ptaddr);
-                *ptes[i] = ptaddr | path_flags;
+                *ptes[i] = (ptaddr | path_flags) & global_mask;
             }
         }
+
+#if GLOBAL_RECURSIVE_MAPPING
+        global_mask = -1;
+#endif
     }
 
     pte = *ptes[3];
@@ -1408,7 +1419,8 @@ void mmu_init()
         if (PT0_PTR[i] == 0) {
             physaddr_t page = mmu_alloc_phys(0);
             clear_phys(page);
-            PT0_PTR[i] = page | PTE_GLOBAL | PTE_WRITABLE | PTE_PRESENT;
+            // Global bit MBZ in PML4e on AMD
+            PT0_PTR[i] = page | PTE_WRITABLE | PTE_PRESENT;
         }
     }
 
@@ -1890,6 +1902,8 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
     pte_t const page_flags = (low ? PTE_USER : PTE_GLOBAL) |
             PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT | PTE_WRITABLE;
 
+    pte_t global_mask = ~PTE_GLOBAL;
+
     for (unsigned level = 0; level < 3; ++level) {
         pte_t * const base = pte_st[level];
         size_t const range_count = (pte_en[level] - base) + 1;
@@ -1900,10 +1914,15 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 
                 clear_phys(page);
 
-                if (atomic_cmpxchg(base + i, old, page | page_flags) != old)
+                if (atomic_cmpxchg(base + i, old,
+                                   (page | page_flags) & global_mask) != old)
                     mmu_free_phys(page);
             }
         }
+
+#if GLOBAL_RECURSIVE_MAPPING
+        global_mask = -1;
+#endif
     }
 
     return pte_st[3];
