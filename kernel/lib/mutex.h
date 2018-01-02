@@ -1,5 +1,6 @@
 #pragma once
 #include "threadsync.h"
+#include "utility.h"
 
 // Meets BasicLockable requirements
 class mutex {
@@ -161,14 +162,14 @@ class unique_lock
 {
 public:
     unique_lock(T& m)
-        : m(m)
+        : m(&m)
         , locked(false)
     {
         lock();
     }
 
     unique_lock(T& lock, defer_lock_t)
-        : m(lock)
+        : m(&lock)
         , locked(false)
     {
     }
@@ -181,7 +182,7 @@ public:
     void lock()
     {
         assert(!locked);
-        m.lock();
+        m->lock();
         locked = true;
     }
 
@@ -189,17 +190,29 @@ public:
     {
         if (locked) {
             locked = false;
-            m.unlock();
+            m->unlock();
         }
+    }
+
+    void release()
+    {
+        locked = false;
+        m = nullptr;
+    }
+
+    void swap(unique_lock& rhs)
+    {
+        ::swap(rhs.m, m);
+        ::swap(rhs.locked, locked);
     }
 
     typename T::mutex_type& native_handle()
     {
-        return m.native_handle();
+        return m->native_handle();
     }
 
 private:
-    T& m;
+    T* m;
     bool locked;
 };
 
@@ -208,14 +221,14 @@ class shared_lock
 {
 public:
     shared_lock(T& m)
-        : m(m)
+        : m(&m)
         , locked(false)
     {
         lock();
     }
 
     shared_lock(T& lock, defer_lock_t)
-        : m(lock)
+        : m(&lock)
         , locked(false)
     {
     }
@@ -228,7 +241,7 @@ public:
     void lock()
     {
         assert(!locked);
-        m.lock_shared();
+        m->lock_shared();
         locked = true;
     }
 
@@ -236,17 +249,29 @@ public:
     {
         if (locked) {
             locked = false;
-            m.unlock_shared();
+            m->unlock_shared();
         }
     }
 
     typename T::mutex_type& native_handle()
     {
-        return m.native_handle();
+        return m->native_handle();
+    }
+
+    void release()
+    {
+        locked = false;
+        m = nullptr;
+    }
+
+    void swap(unique_lock<T>& rhs)
+    {
+        ::swap(rhs.m, m);
+        ::swap(rhs.locked, locked);
     }
 
 private:
-    T& m;
+    T* m;
     bool locked;
 };
 
