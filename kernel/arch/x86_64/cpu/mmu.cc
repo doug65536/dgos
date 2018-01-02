@@ -216,6 +216,81 @@ typedef uintptr_t pte_t;
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
+static format_flag_info_t pte_flags[] = {
+    { "XD",     1,                  0, PTE_NX_BIT       },
+    { "PK",     PTE_PK_MASK,        0, PTE_PK_BIT       },
+    { "62:52",  PTE_AVAIL2_MASK,    0, PTE_AVAIL2_BIT   },
+    { "PADDR",  PTE_ADDR,           0, 0                },
+    { "11:9",   PTE_AVAIL1_MASK,    0, PTE_AVAIL1_BIT   },
+    { "G",      1,                  0, PTE_GLOBAL_BIT   },
+    { "PS",     1,                  0, PTE_PAGESIZE_BIT },
+    { "D",      1,                  0, PTE_DIRTY_BIT    },
+    { "A",      1,                  0, PTE_ACCESSED_BIT },
+    { "PCD",    1,                  0, PTE_PCD_BIT      },
+    { "PWT",    1,                  0, PTE_PWT_BIT      },
+    { "U",      1,                  0, PTE_USER_BIT     },
+    { "W",      1,                  0, PTE_WRITABLE_BIT },
+    { "P",      1,                  0, PTE_PRESENT_BIT  },
+    { 0,        0,                  0, -1               }
+};
+
+static format_flag_info_t pf_err_flags[] = {
+    { "Pr",         1,      0, CTX_ERRCODE_PF_P_BIT   },
+    { "Wr",         1,      0, CTX_ERRCODE_PF_W_BIT   },
+    { "Usr",        1,      0, CTX_ERRCODE_PF_U_BIT   },
+    { "RsvdBit",    1,      0, CTX_ERRCODE_PF_R_BIT   },
+    { "Insn",       1,      0, CTX_ERRCODE_PF_I_BIT   },
+    { "PK",         1,      0, CTX_ERRCODE_PF_PK_BIT  },
+    { "14:6",       0x1FF,  0, 6                      },
+    { "SGX",        1,      0, CTX_ERRCODE_PF_SGX_BIT },
+    { "31:16",      0xFFFF, 0, 16                     },
+    { 0,            1,      0, -1                     }
+};
+
+static char const *pte_level_names[] = {
+    "PML4",
+    "PDPT",
+    "PD",
+    "PTE"
+};
+
+static size_t mmu_describe_pte(char *buf, size_t sz, pte_t pte)
+{
+    return format_flags_register(buf, sz, pte, pte_flags);
+}
+
+static size_t mmu_describe_pf(char *buf, size_t sz, int err_code)
+{
+    return format_flags_register(buf, sz, err_code, pf_err_flags);
+}
+
+static void mmu_dump_ptes(pte_t **ptes)
+{
+    char fmt_buf[64];
+
+    bool present = true;
+
+    for (size_t i = 0; i < 4; ++i) {
+        if (present) {
+            mmu_describe_pte(fmt_buf, sizeof(fmt_buf), *ptes[i]);
+            printdbg("%5s: %016lx %s\n",
+                     pte_level_names[i], *ptes[i], fmt_buf);
+        } else {
+            printdbg("%5s: <not present>\n", pte_level_names[i]);
+        }
+
+        if (!(*ptes[i] & PTE_PRESENT))
+            present = false;
+    }
+}
+
+static void mmu_dump_pf(uintptr_t pf)
+{
+    char fmt_buf[64];
+    mmu_describe_pf(fmt_buf, sizeof(fmt_buf), pf);
+    printdbg("#PF: %04zx %s\n", pf, fmt_buf);
+}
+
 //
 // Device mapping
 
@@ -1173,45 +1248,12 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
              !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_I),
              !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_PK),
              !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_SGX));
-    static char const *pagetable_names[] = {
-        "PML4",
-        "PDPT",
-        "PD",
-        "PTE"
-    };
 
     printdbg("     present_mask=0x%x\n",
              present_mask);
 
-    for (int i = 3; i >= 0; --i) {
-        if (i && !((1 << (i - 1)) & present_mask))
-            continue;
-        printdbg("%s:\n"
-                 "     present=%d\n"
-                 "     writable=%d\n"
-                 "     user=%d\n"
-                 "     write through=%d\n"
-                 "     cache disable=%d\n"
-                 "     accessed=%d\n"
-                 "     dirty=%d\n"
-                 "     PAT=%d\n"
-                 "     global=%d\n"
-                 "     physaddr=0x%lx\n"
-                 "     no execute=%d\n"
-                 "------------------\n",
-                 pagetable_names[i],
-                 !!(*ptes[i] & PTE_PRESENT),
-                 !!(*ptes[i] & PTE_WRITABLE),
-                 !!(*ptes[i] & PTE_USER),
-                 !!(*ptes[i] & PTE_PWT),
-                 !!(*ptes[i] & PTE_PCD),
-                 !!(*ptes[i] & PTE_ACCESSED),
-                 !!(*ptes[i] & PTE_DIRTY),
-                 !!(*ptes[i] & PTE_PTEPAT),
-                 !!(*ptes[i] & PTE_GLOBAL),
-                 (*ptes[i] & PTE_ADDR),
-                 !!(*ptes[i] & PTE_NX));
-    }
+    mmu_dump_pf(ISR_CTX_ERRCODE(ctx));
+    mmu_dump_ptes(ptes);
 
     return 0;
 }
