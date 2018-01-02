@@ -200,7 +200,7 @@ typedef uintptr_t pte_t;
 #define PT0_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,PT_RECURSE))
 
 // Canonicalize the given address
-#define CANONICALIZE(n) (((uintptr_t)(-(((intptr_t)(n))>>47))<<47)|(n))
+#define CANONICALIZE(n) uintptr_t(intptr_t(uintptr_t(n) << 16) >> 16)
 
 #define PT3_ADDR        (CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
 #define PT2_ADDR        (CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
