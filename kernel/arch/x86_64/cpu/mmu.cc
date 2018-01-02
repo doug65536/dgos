@@ -404,10 +404,6 @@ extern uintptr_t ___top_physaddr;
 static linaddr_t near_base = (linaddr_t)___init_brk;
 static linaddr_t volatile linear_base = PT_MAX_ADDR;
 
-static uint64_t volatile clear_busy;
-static uintptr_t clear_area;
-static pte_t *clear_ptes;
-
 mmu_phys_allocator_t phys_allocators[2];
 
 // Incremented every time the page tables are changed
@@ -438,7 +434,6 @@ public:
     uintptr_t alloc_linear(size_t size);
     bool take_linear(linaddr_t addr, size_t size, bool require_free);
     void release_linear(uintptr_t addr, size_t size);
-    int take_at(uintptr_t addr, size_t size);
 private:
     mutex free_addr_lock;
     typedef rbtree_t<> tree_t;
@@ -880,15 +875,46 @@ static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 //
 // Zero initialization
 
+struct clear_phys_state_t {
+    padded_spinlock locks[64];
+
+    pte_t *pte;
+    int log2_window_sz;
+    int level;
+
+    // 2TB before end of address space
+    static constexpr linaddr_t addr = 0xFFFFFE0000000000;
+
+    void clear(physaddr_t addr);
+};
+
+clear_phys_state_t clear_phys_state;
+
 void mm_phys_clear_init()
 {
-    clear_area = linear_allocator.alloc_linear(PAGE_SIZE * 64);
+    if (cpuid_has_1gpage()) {
+        clear_phys_state.log2_window_sz = 30;
+        clear_phys_state.level = 1;
+    } else if (cpuid_has_2mpage()) {
+        clear_phys_state.log2_window_sz = 21;
+        clear_phys_state.level = 2;
+    } else {
+        clear_phys_state.log2_window_sz = 12;
+        clear_phys_state.level = 3;
+    }
 
     pte_t *ptes[4];
+    ptes_from_addr(ptes, clear_phys_state_t::addr);
 
-    ptes_from_addr(ptes, clear_area);
+    pte_t *page_base = nullptr;
+    for (int i = 0; i < clear_phys_state.level; ) {
+        page_base = (pte_t*)(uintptr_t(ptes[i + 1]) & -PAGE_SIZE);
 
-    for (int i = 0; i < 3; ) {
+        if (*ptes[i] & PTE_PRESENT) {
+            ++i;
+            continue;
+        }
+
         assert(*ptes[i] == 0);
         physaddr_t page = init_take_page(0);
         *ptes[i] = page | PTE_PRESENT | PTE_WRITABLE |
@@ -896,49 +922,46 @@ void mm_phys_clear_init()
 
         // Clear new page table page
         cpu_invalidate_page(uintptr_t(ptes[++i]));
-        pte_t *page_base = (pte_t*)(uintptr_t(ptes[i]) & -PAGE_SIZE);
         memset(page_base, 0, PAGE_SIZE);
     }
 
-    clear_busy = 0;
-
-    clear_ptes = ptes[3];
-
-    for (size_t i = 0; i < PAGE_SIZE * 64; i += PAGE_SIZE)
-        cpu_invalidate_page(clear_area + i);
+    clear_phys_state.pte = page_base;
+    memset(page_base, 0, PAGE_SIZE);
 }
 
 void clear_phys(physaddr_t addr)
 {
-    assert(clear_area != 0);
+    unsigned index = 0;
+    pte_t& pte = clear_phys_state.pte[index << 3];
 
-    uint64_t old_busy = clear_busy;
-
-    for (;; pause()) {
-        if (unlikely(~old_busy == 0)) {
-            old_busy = clear_busy;
-            continue;
-        }
-
-        uint8_t bit = bit_lsb_set(~old_busy);
-        uint64_t new_busy = old_busy | (uint64_t(1) << bit);
-
-        if (unlikely(!atomic_cmpxchg_upd(&clear_busy, &old_busy, new_busy)))
-            continue;
-
-        clear_ptes[bit] = addr | PTE_PRESENT | PTE_WRITABLE |
-                PTE_ACCESSED | PTE_DIRTY;
-
-        atomic_barrier();
-
-        void *area = (void*)(clear_area + (bit << PAGE_SIZE_BIT));
-        memset(area, 0, 4096);
-
-        clear_ptes[bit] = 0;
-        cpu_invalidate_page(uintptr_t(area));
-        atomic_and(&clear_busy, ~(uint64_t(1) << bit));
-        return;
+    pte_t page_flags;
+    size_t offset;
+    physaddr_t base;
+    if (clear_phys_state.log2_window_sz == 30) {
+        offset = addr & 0x3FFFF000;
+        base = addr & 0x000FFFFFC0000000;
+        page_flags = PTE_PAGESIZE;
+    } else if (clear_phys_state.log2_window_sz == 21) {
+        offset = addr & 0x1FF000;
+        base = addr & 0x000FFFFFFFE00000;
+        page_flags = PTE_PAGESIZE;
+    } else if (clear_phys_state.log2_window_sz == 12) {
+        offset = 0;
+        base = addr & 0x000FFFFFFFFFF000;
+        page_flags = 0;
+    } else {
+        __builtin_unreachable();
     }
+
+    unique_lock<spinlock> lock(clear_phys_state.locks[index]);
+
+    if ((pte & PTE_ADDR) != base) {
+        pte = base | page_flags | PTE_WRITABLE |
+                PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT;
+        cpu_invalidate_page(clear_phys_state_t::addr);
+    }
+
+    memset((char*)clear_phys_state_t::addr + offset, 0, PAGE_SIZE);
 }
 
 //
@@ -1448,7 +1471,7 @@ void mmu_init()
     contig_phys_allocator.early_init(&contiguous_start, 4 << 20);
 
     linear_allocator.early_init((linaddr_t*)&linear_base,
-                                PT_KERNBASE - linear_base);
+                                clear_phys_state_t::addr - linear_base);
 
     near_allocator.early_init((linaddr_t*)&near_base, 0ULL - near_base);
 
