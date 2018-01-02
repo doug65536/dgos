@@ -532,7 +532,10 @@ void uart_t::out(port_t ofs, uint8_t value) const
 
 void uart_t::outs(port_t ofs, void const *value, size_t len) const
 {
-    outsb(io_base + ioport_t(ofs), value, len);
+    if (len > 1)
+        outsb(io_base + ioport_t(ofs), value, len);
+    else if (len == 1)
+        outb(io_base + ioport_t(ofs), ((uint8_t*)value)[0]);
 }
 
 // ===========================================================================
