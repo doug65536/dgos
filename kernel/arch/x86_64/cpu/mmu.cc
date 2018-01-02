@@ -1128,10 +1128,13 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
     int present_mask = ptes_present(ptes);
 
     // Examine the error code
-    if (unlikely(ctx->gpr.info.error_code & CTX_ERRCODE_PF_R)) {
+    if (unlikely(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_R)) {
         // Reserved bit violation?!
+        mmu_dump_pf(ISR_CTX_ERRCODE(ctx));
+        mmu_dump_ptes(ptes);
         cpu_debug_break();
-        return ctx;
+        cpu_invalidate_page(fault_addr);
+        return nullptr;
     }
 
 #if DEBUG_PAGE_FAULT
