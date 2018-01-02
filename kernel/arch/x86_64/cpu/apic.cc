@@ -1749,8 +1749,7 @@ static void apic_detect_topology_intel(void)
     if (topo_thread_count <= 0)
         topo_thread_count = 1;
 
-    topo_cpu_count = apic_id_count *
-            topo_core_count * topo_thread_count;
+    topo_cpu_count = apic_id_count * topo_core_count * topo_thread_count;
 }
 
 __aligned(16) char const vendor_intel[16] = "GenuineIntel";
