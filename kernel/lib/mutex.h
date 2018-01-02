@@ -42,6 +42,9 @@ private:
     mutex_t m;
 };
 
+class alignas(64) padded_mutex : public mutex {
+};
+
 // Meets SharedMutex requirements
 class shared_mutex {
 public:
@@ -98,6 +101,9 @@ private:
     mutex_type m;
 };
 
+class alignas(64) padded_shared_mutex : public shared_mutex {
+};
+
 // Meets BasicLockable requirements
 class spinlock {
 public:
@@ -137,6 +143,9 @@ public:
 
 private:
     spinlock_t m;
+};
+
+struct alignas(64) padded_spinlock : public spinlock {
 };
 
 struct defer_lock_t {
@@ -271,4 +280,7 @@ public:
 
 private:
     condition_var_t m;
+};
+
+struct alignas(64) padded_condition_variable : public condition_variable {
 };
