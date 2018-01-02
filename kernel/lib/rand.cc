@@ -1,5 +1,7 @@
 #include "rand.h"
 #include "time.h"
+#include "utility.h"
+#include "cpuid.h"
 
 void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
 {
@@ -46,4 +48,48 @@ int rand_r(uint64_t *seed)
 int rand_r_range(uint64_t *seed, int min, int max)
 {
     return (((int64_t)rand_r(seed) * (max-min)) >> 31) + min;
+}
+
+void c4rand::seed(const void *data, size_t len)
+{
+    for (size_t i = 0; i < 256; ++i)
+        state[i] = i;
+
+    b = 0;
+
+    write(data, len);
+}
+
+void c4rand::write(const void *data, size_t len)
+{
+    uint8_t const *key = (uint8_t const *)data;
+
+    bool done = false;
+
+    for (size_t i = 0, ki = 0; i || !done; ++i, ++ki) {
+        if (ki >= len) {
+            ki = 0;
+            done = true;
+        }
+
+        if (i >= 256)
+            i = 0;
+
+        b = (b + state[i] + key[ki]) & 0xFF;
+        swap(state[i], state[b]);
+    }
+
+    a = 0;
+}
+
+void c4rand::read(void *data, size_t len)
+{
+    uint8_t *k = (uint8_t*)data;
+
+    for (size_t i = 0; i < len; ++i) {
+        a = (a + 1) & 0xFF;
+        b = (b + state[a]) & 0xFF;
+        swap(state[a], state[b]);
+        k[i] ^= state[(state[a] + state[b]) & 0xFF];
+    }
 }
