@@ -513,11 +513,15 @@ static int ptes_present(pte_t **ptes)
 
 static __always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
 {
-    addr &= 0xFFFFFFFFFFFFU;
-    pte[3] = PT3_PTR + (addr >> (9*0 + 12));
-    pte[2] = PT2_PTR + (addr >> (9*1 + 12));
-    pte[1] = PT1_PTR + (addr >> (9*2 + 12));
-    pte[0] = PT0_PTR + (addr >> (9*3 + 12));
+    addr &= 0xFFFFFFFFF000U;
+    addr >>= 12;
+    pte[3] = PT3_PTR + addr;
+    addr >>= 9;
+    pte[2] = PT2_PTR + addr;
+    addr >>= 9;
+    pte[1] = PT1_PTR + addr;
+    addr >>= 9;
+    pte[0] = PT0_PTR + addr;
 }
 
 // Returns the linear addresses of the page tables for the given path
@@ -853,7 +857,7 @@ static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
     if ((linaddr_t)aliasing_pte >= PT_MAX_ADDR) {
         uintptr_t pt3_index = aliasing_pte - PT3_PTR;
         linaddr = (pt3_index << PAGE_SIZE_BIT);
-        linaddr |= -(linaddr >> 47) << 47;
+        linaddr = CANONICALIZE(linaddr);
     } else {
         linaddr = 0xFFFFFFFF80000000 - PAGE_SIZE;
     }
