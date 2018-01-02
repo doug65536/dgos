@@ -6658,7 +6658,8 @@ for flag in \
 		ggdb3 fno-integrated-as Wno-unused-command-line-argument \
 		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
-		Wno-shadow Wno-strict-overflow Wno-overlength-strings
+		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
+		-ffunction-sections
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5

@@ -55,7 +55,8 @@ for flag in \
 		ggdb3 fno-integrated-as Wno-unused-command-line-argument \
 		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
-		Wno-shadow Wno-strict-overflow Wno-overlength-strings
+		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
+		-ffunction-sections
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[COMPILER_FLAGS+=" -$flag"],
