@@ -92,6 +92,11 @@ public:
         rwlock_sh_unlock(&m);
     }
 
+    void upgrade_lock()
+    {
+        rwlock_upgrade(&m);
+    }
+
     mutex_type& native_handle()
     {
         return m;
