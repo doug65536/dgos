@@ -4,7 +4,7 @@
 #include "printk.h"
 #include "serial-uart.h"
 #include "callout.h"
-
+#include "string.h"
 #include "cpu/spinlock.h"
 
 static spinlock_t e9debug_lock;
@@ -26,9 +26,15 @@ static void e9debug_serial_ready(void*)
 static int e9debug_write_debug_str(char const *str, intptr_t len)
 {
     int n = 0;
+
+    if (!len)
+        len = strlen(str);
+
     //spinlock_lock_noirq(&e9debug_lock);
-    if (len && str) {
+    if (len > 1 && str) {
         outsb(0xE9, str, len);
+    } else if (len == 1 && str) {
+        outb(0xE9, str[0]);
     } else if (str) {
         while (*str) {
             outb(0xE9, *str++);
