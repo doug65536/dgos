@@ -898,10 +898,11 @@ static int vsnprintf_emit_chars(char const *s, intptr_t ch, void *context)
     }
 
     for (intptr_t i = 0; i < len; ++i) {
-        if (ctx->level >= ctx->limit)
+        if (ctx->limit && ctx->level >= ctx->limit)
             break;
 
-        ctx->buf[ctx->level++] = s[i];
+        if (ctx->limit)
+            ctx->buf[ctx->level++] = s[i];
     }
 
     return len;
@@ -927,9 +928,9 @@ EXPORT int vsnprintf(char *buf, size_t limit, char const *format, va_list ap)
                 format, ap,
                 vsnprintf_emit_chars, &context);
 
-    if ((size_t)chars_needed < limit)
+    if ((size_t)chars_needed < limit && limit)
         buf[chars_needed] = 0;
-    else
+    else if (limit)
         buf[limit-1] = 0;
 
     return chars_needed;
@@ -1036,6 +1037,7 @@ size_t format_flags_register(
 {
     size_t total_written = 0;
     int chars_needed;
+    bool measure = !buf_size;
 
     for (format_flag_info_t const *fi = info;
          fi->name; ++fi) {
@@ -1048,23 +1050,23 @@ size_t format_flags_register(
                 // Text value
                 chars_needed = snprintf(
                             buf + total_written,
-                            buf_size - total_written,
+                            measure ? 0 : buf_size - total_written,
                             "%s%s=%s", prefix, fi->name,
                             fi->value_names[value]);
             } else if (fi->mask == 1) {
                 // Single bit flag
                 chars_needed = snprintf(
                             buf + total_written,
-                            buf_size - total_written,
+                            measure ? 0 : buf_size - total_written,
                             "%s%s", prefix, fi->name);
             } else {
                 // Multi-bit flag
                 chars_needed = snprintf(
                             buf + total_written,
-                            buf_size - total_written,
+                            measure ? 0 : buf_size - total_written,
                             "%s%s=%lX", prefix, fi->name, value);
             }
-            if (chars_needed + total_written >= buf_size) {
+            if (!measure && chars_needed + total_written >= buf_size) {
                 if (buf_size > 3) {
                     // Truncate with ellipsis
                     strcpy(buf + buf_size - 4, "...");
@@ -1083,7 +1085,8 @@ size_t format_flags_register(
         }
     }
 
-    buf[total_written] = 0;
+    if (!measure)
+        buf[total_written] = 0;
 
     return total_written;
 }
