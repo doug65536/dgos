@@ -333,8 +333,6 @@ physaddr_t root_physaddr;
 static pte_t const * master_pagedir;
 static pte_t *current_pagedir;
 
-//static pte_t *mm_create_pagetables(uintptr_t start, size_t size);
-
 class mmu_phys_allocator_t {
     typedef uint32_t entry_t;
 public:
@@ -351,12 +349,12 @@ public:
         return next_free != 0;
     }
 
-    physaddr_t alloc_one();
+    physaddr_t alloc_one(bool low);
 
     // Take multiple pages and receive each physical address in callback
     // Returns false with no memory allocated on failure
     template<typename F>
-    bool __always_inline alloc_multiple(size_t size, F callback);
+    bool __always_inline alloc_multiple(bool low, size_t size, F callback);
 
     void release_one(physaddr_t addr);
 
@@ -364,7 +362,40 @@ public:
 
     void addref_virtual_range(linaddr_t start, size_t len);
 
-    void set_fallback(mmu_phys_allocator_t *fallback);
+    class free_batch_t {
+    public:
+        void release(physaddr_t addr)
+        {
+            if (count == countof(pages))
+                flush();
+            pages[count++] = addr;
+        }
+
+        void flush()
+        {
+            unique_lock<spinlock> lock(owner.lock);
+            for (size_t i = 0; i < count; ++i)
+                owner.release_one_locked(pages[i]);
+            count = 0;
+        }
+
+        free_batch_t(mmu_phys_allocator_t& owner)
+            : owner(owner)
+            , count(0)
+        {
+        }
+
+        ~free_batch_t()
+        {
+            if (count)
+                flush();
+        }
+
+    private:
+        physaddr_t pages[16];
+        mmu_phys_allocator_t &owner;
+        unsigned count;
+    };
 
 private:
     __always_inline size_t index_from_addr(physaddr_t addr) const
@@ -380,10 +411,11 @@ private:
     __always_inline void release_one_locked(physaddr_t addr)
     {
         size_t index = index_from_addr(addr);
+        unsigned low = addr < 0x100000000;
         if (entries[index] == 1) {
             // Free the page
-            entries[index] = next_free;
-            next_free = index;
+            entries[index] = next_free[low];
+            next_free[low] = index;
         } else {
             // Reduce reference count
             --entries[index];
@@ -391,9 +423,8 @@ private:
     }
 
     entry_t *entries;
-    mmu_phys_allocator_t *fallback;
     physaddr_t begin;
-    entry_t next_free;
+    entry_t next_free[2];
     entry_t free_page_count;
     spinlock lock;
     uint8_t log2_pagesz;
@@ -404,7 +435,7 @@ extern uintptr_t ___top_physaddr;
 static linaddr_t near_base = (linaddr_t)___init_brk;
 static linaddr_t volatile linear_base = PT_MAX_ADDR;
 
-mmu_phys_allocator_t phys_allocators[2];
+mmu_phys_allocator_t phys_allocator;
 
 // Incremented every time the page tables are changed
 // Used to detect lazy TLB shootdown
@@ -463,7 +494,7 @@ void mm_free_contiguous(uintptr_t addr, size_t size)
 
 static void mmu_free_phys(physaddr_t addr)
 {
-    phys_allocators[addr < 0x100000000].release_one(addr);
+    phys_allocator.release_one(addr);
 }
 
 static physaddr_t mmu_alloc_phys(int low)
@@ -471,18 +502,11 @@ static physaddr_t mmu_alloc_phys(int low)
     physaddr_t page;
 
     // Try to get high/low page as specified
-    if (phys_allocators[low]) {
-        page = phys_allocators[low].alloc_one();
-        if (likely(page))
-            return page;
-    }
-
-    // If we already checked for low page, we failed
-    if (unlikely(low))
+    page = phys_allocator.alloc_one(low);
+    if (unlikely(!page))
         return 0;
 
-    // Resort to low page
-    return phys_allocators[1].alloc_one();
+    return page;
 }
 
 //
@@ -892,41 +916,45 @@ struct clear_phys_state_t {
     void clear(physaddr_t addr);
 };
 
-clear_phys_state_t clear_phys_state;
+static clear_phys_state_t clear_phys_state;
 
 void mm_phys_clear_init()
 {
     if (cpuid_has_1gpage()) {
         clear_phys_state.log2_window_sz = 30;
         clear_phys_state.level = 1;
+        printdbg("Using %s page(s) to clear page frames\n", "1GB");
     } else if (cpuid_has_2mpage()) {
         clear_phys_state.log2_window_sz = 21;
         clear_phys_state.level = 2;
+        printdbg("Using %s page(s) to clear page frames\n", "2MB");
     } else {
         clear_phys_state.log2_window_sz = 12;
         clear_phys_state.level = 3;
+        printdbg("Using %s page(s) to clear page frames\n", "4KB");
     }
 
     pte_t *ptes[4];
     ptes_from_addr(ptes, clear_phys_state_t::addr);
 
+    pte_t global_mask = ~PTE_GLOBAL;
+
     pte_t *page_base = nullptr;
     for (int i = 0; i < clear_phys_state.level; ) {
-        page_base = (pte_t*)(uintptr_t(ptes[i + 1]) & -PAGE_SIZE);
-
-        if (*ptes[i] & PTE_PRESENT) {
-            ++i;
-            continue;
-        }
-
         assert(*ptes[i] == 0);
         physaddr_t page = init_take_page(0);
-        *ptes[i] = page | PTE_PRESENT | PTE_WRITABLE |
-                PTE_ACCESSED | PTE_DIRTY;
+        printdbg("Assigning phys_clear_init table pte=%p page=0x%lx\n",
+                 (void*)ptes[i], page);
+        *ptes[i] = (page | PTE_PRESENT | PTE_WRITABLE |
+                PTE_ACCESSED | PTE_DIRTY | PTE_GLOBAL) & global_mask;
 
         // Clear new page table page
         cpu_invalidate_page(uintptr_t(ptes[++i]));
+        page_base = (pte_t*)(uintptr_t(ptes[i]) & -PAGE_SIZE);
+        printdbg("page_base=0x%p", (void*)page_base);
         memset(page_base, 0, PAGE_SIZE);
+
+        global_mask = -1;
     }
 
     clear_phys_state.pte = page_base;
@@ -960,7 +988,7 @@ void clear_phys(physaddr_t addr)
     unique_lock<spinlock> lock(clear_phys_state.locks[index]);
 
     if ((pte & PTE_ADDR) != base) {
-        pte = base | page_flags | PTE_WRITABLE |
+        pte = base | page_flags | PTE_WRITABLE | PTE_GLOBAL |
                 PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT;
         cpu_invalidate_page(clear_phys_state_t::addr);
     }
@@ -1434,8 +1462,7 @@ void mmu_init()
     physaddr_t contiguous_start = top_of_kernel;
     top_of_kernel += 4 << 20;
 
-    phys_allocators[0].init(phys_alloc, 0x100000);
-    phys_allocators[1].init(phys_alloc, 0x100000);
+    phys_allocator.init(phys_alloc, 0x100000);
 
     // Put all of the remaining physical memory into the free lists
     uintptr_t free_count = 0;
@@ -1452,8 +1479,7 @@ void mmu_init()
         assert((range.base <= 0x100000) ==
                ((range.base + range.size) <= 0x100000));
 
-        int low = range.base < 0x100000000;
-        phys_allocators[low].add_free_space(range.base, range.size);
+        phys_allocator.add_free_space(range.base, range.size);
         --usable_mem_ranges;
 
         if (range.base == top_of_kernel) {
@@ -1976,6 +2002,8 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 
     pte_t global_mask = ~PTE_GLOBAL;
 
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
     for (unsigned level = 0; level < 3; ++level) {
         pte_t * const base = pte_st[level];
         size_t const range_count = (pte_en[level] - base) + 1;
@@ -1988,7 +2016,7 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 
                 if (atomic_cmpxchg(base + i, old,
                                    (page | page_flags) & global_mask) != old)
-                    mmu_free_phys(page);
+                    free_batch.release(page);
             }
         }
 
@@ -1999,16 +2027,6 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 
     return pte_st[3];
 }
-
-//static pte_t *mm_create_pagetables(uintptr_t start, size_t size)
-//{
-//    unsigned const misalignment = unsigned(start & PAGE_MASK);
-//    start -= misalignment;
-//    size += misalignment;
-//    size = round_up(size);
-//
-//    return mm_create_pagetables_aligned(start, size);
-//}
 
 template<typename T>
 static __always_inline T zero_if_false(bool cond, T bits)
@@ -2122,6 +2140,8 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     assert(linear_addr > 0x100000);
 
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
     if (likely(!usable_mem_ranges)) {
         pte_t *base_pte = mm_create_pagetables_aligned(linear_addr, len);
 
@@ -2131,37 +2151,25 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         if ((flags & (MAP_POPULATE | MAP_PHYSICAL)) == MAP_POPULATE) {
             // POPULATE, not PHYSICAL
 
-            mmu_phys_allocator_t *phys_allocator = phys_allocators +
-                    !!(flags & MAP_32BIT);
+            bool low = !!(flags & MAP_32BIT);
 
             bool success;
-            for (;;) {
-                success = phys_allocator->alloc_multiple(
-                            len, [&](size_t ofs, physaddr_t paddr) {
-                    if (likely(!(flags & MAP_UNINITIALIZED)))
-                        clear_phys(paddr);
+            success = phys_allocator.alloc_multiple(
+                        low, len, [&](size_t ofs, physaddr_t paddr) {
+                if (likely(!(flags & MAP_UNINITIALIZED)))
+                    clear_phys(paddr);
 
-                    pte_t old = atomic_xchg(base_pte + (ofs >> 12),
-                                            pte_t(paddr | page_flags));
+                pte_t old = atomic_xchg(base_pte + (ofs >> 12),
+                                        pte_t(paddr | page_flags));
 
-                    if (old && ((old & PTE_ADDR) != PTE_ADDR))
-                        mmu_free_phys(old & PTE_ADDR);
+                if (old && ((old & PTE_ADDR) != PTE_ADDR))
+                    free_batch.release(old & PTE_ADDR);
 
-                    return true;
-                });
-
-                // If it failed, retry with low memory allocator
-                if (success)
-                    break;
-
-                if (phys_allocator == phys_allocators)
-                    phys_allocator++;
-                else
-                    break;
-            }
+                return true;
+            });
 
             if (unlikely(!success))
-                return 0;
+                return MAP_FAILED;
         } else if (!(flags & MAP_PHYSICAL)) {
             // Demand paged
 
@@ -2195,14 +2203,14 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             }
 
             if (unlikely(pte && pte != PTE_ADDR))
-                mmu_free_phys(pte & PTE_ADDR);
+                free_batch.release(pte & PTE_ADDR);
 
             for ( ; ofs < end; ++ofs) {
                 pte = pte_t(PTE_ADDR | page_flags);
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (unlikely(pte && pte != PTE_ADDR))
-                    mmu_free_phys(pte & PTE_ADDR);
+                    free_batch.release(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
             pte_t pte;
@@ -2213,7 +2221,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (pte && pte != PTE_ADDR)
-                    mmu_free_phys(pte & PTE_ADDR);
+                    free_batch.release(pte & PTE_ADDR);
             }
         } else {
             assert(!"Unhandled condition");
@@ -2325,6 +2333,8 @@ void *mremap(
 
     pte_t *new_base;
 
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
     if (allocator->take_linear(old_st + old_size, new_size - old_size, true)) {
         // Expand in place
         new_st = old_st + old_size;
@@ -2335,7 +2345,7 @@ void *mremap(
         for (size_t i = 0, e = new_size >> 3; i < e; ++i) {
             pte_t pte = atomic_xchg(new_base + i, new_pte);
             if (pte && (pte & PTE_ADDR) != PTE_ADDR)
-                mmu_free_phys(pte & PTE_ADDR);
+                free_batch.release(pte & PTE_ADDR);
         }
         return (void*)old_st;
     }
@@ -2350,7 +2360,7 @@ void *mremap(
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
         pte = atomic_xchg(new_base + i, 0);
         if (pte && (pte & PTE_ADDR) != PTE_ADDR)
-            mmu_free_phys(pte & PTE_ADDR);
+            free_batch.release(pte & PTE_ADDR);
     }
 
     return (void*)new_st;
@@ -2368,6 +2378,8 @@ int munmap(void *addr, size_t size)
     pte_t *ptes[4];
     ptes_from_addr(ptes, a);
 
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
     size_t freed = 0;
     int present_mask = ptes_present(ptes);
     for (size_t ofs = 0; ofs < size; ofs += PAGE_SIZE) {
@@ -2378,7 +2390,7 @@ int munmap(void *addr, size_t size)
                 physaddr_t physaddr = pte & PTE_ADDR;
 
                 if (physaddr && (physaddr != PTE_ADDR))
-                    mmu_free_phys(physaddr);
+                    free_batch.release(physaddr);
             }
 
             if (pte & PTE_PRESENT) {
@@ -2544,6 +2556,8 @@ int madvise(void *addr, size_t len, int advice)
 
     pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
 
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
     while (pt[3] < end &&
            (*pt[0] & PTE_PRESENT) &&
            (*pt[1] & PTE_PRESENT) &&
@@ -2561,7 +2575,7 @@ int madvise(void *addr, size_t len, int advice)
                     if (!atomic_cmpxchg_upd(pt[3], &expect, replace))
                         continue;
 
-                    mmu_free_phys(page);
+                    free_batch.release(page);
                 }
                 break;
             } else {
@@ -2872,11 +2886,6 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
     return 0;
 }
 
-void mmu_phys_allocator_t::set_fallback(mmu_phys_allocator_t *fallback)
-{
-    this->fallback = fallback;
-}
-
 size_t mmu_phys_allocator_t::size_from_highest_page(physaddr_t page_index)
 {
     return page_index * sizeof(entry_t);
@@ -2894,28 +2903,32 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 {
     unique_lock<spinlock> lock_(lock);
     physaddr_t free_end = base + size;
+    unsigned low = base < 0x100000000;
     size_t pagesz = uint64_t(1) << log2_pagesz;
     entry_t index = index_from_addr(free_end) - 1;
     while (size != 0) {
-        entries[index] = next_free;
-        next_free = index;
+        entries[index] = next_free[low];
+        next_free[low] = index;
         --index;
         size -= pagesz;
         ++free_page_count;
     }
 }
 
-physaddr_t mmu_phys_allocator_t::alloc_one()
+physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 {
     unique_lock<spinlock> lock_(lock);
 
-    size_t item = next_free;
+    size_t item = next_free[low];
 
-    if (unlikely(!item) && fallback)
-        return fallback->alloc_one();
+    if (unlikely(!item) && !low)
+        item = next_free[1];
+
+    if (unlikely(!item))
+        return 0;
 
     entry_t new_next = entries[item];
-    next_free = new_next;
+    next_free[low] = new_next;
     entries[item] = 1;
 
     lock_.unlock();
@@ -2924,29 +2937,43 @@ physaddr_t mmu_phys_allocator_t::alloc_one()
 }
 
 template<typename F>
-bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
+bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 {
     size_t count = size >> log2_pagesz;
 
     unique_lock<spinlock> lock_(lock);
 
-    entry_t first = next_free;
-    entry_t new_next = next_free;
-    size_t i;
-    for (i = 0; i < count && new_next; ++i)
-        new_next = entries[new_next];
+    // Fall back to low memory immediately if no free high memory
+    if (!next_free[0])
+        low = true;
 
-    // If we found enough pages, commit the change
-    if (i == count) {
-        next_free = new_next;
-        free_page_count -= count;
-    } else {
-        return false;
+    entry_t first;
+
+    for (;;) {
+        first = next_free[low];
+        entry_t new_next = first;
+        size_t i;
+        for (i = 0; i < count && new_next; ++i)
+            new_next = entries[new_next];
+
+        // If we found enough pages, commit the change
+        if (i == count) {
+            next_free[low] = new_next;
+            free_page_count -= count;
+            break;
+        } else if (low) {
+            return false;
+        } else {
+            low = true;
+            continue;
+        }
     }
 
     lock_.unlock();
 
-    for (i = 0; i < count; ++i) {
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
+    for (size_t i = 0; i < count; ++i) {
         entry_t next = entries[first];
 
         physaddr_t paddr = addr_from_index(first);
@@ -2956,7 +2983,7 @@ bool mmu_phys_allocator_t::alloc_multiple(size_t size, F callback)
             // Set reference count to 1
             entries[first] = 1;
         } else {
-            mmu_free_phys(paddr);
+            free_batch.release(paddr);
         }
 
         // Follow chain to next free
@@ -3127,9 +3154,11 @@ void mm_destroy_process()
     vector<physaddr_t> pending_frees;
     pending_frees.reserve(4);
 
+    mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
     for (linaddr_t addr = 0; addr <= 0x800000000000; ) {
         for (physaddr_t physaddr : pending_frees)
-            mmu_free_phys(physaddr);
+            free_batch.release(physaddr);
         pending_frees.clear();
 
         if (addr == 0x800000000000)
@@ -3179,7 +3208,7 @@ void mm_destroy_process()
 
     cpu_set_page_directory(root_physaddr);
 
-    mmu_free_phys(dir);
+    free_batch.release(dir);
 }
 
 void mm_init_process(process_t *process)
