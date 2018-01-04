@@ -1095,7 +1095,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
         }
     }
 
-    if (synchronous) {
+    if (unlikely(synchronous)) {
         uint64_t wait_st = nano_time();
         uint64_t loops = 0;
         for (int wait_count = cpu_count - 1; wait_count > 0; pause()) {
