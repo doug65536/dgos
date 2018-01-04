@@ -2035,7 +2035,7 @@ static __always_inline T zero_if_false(bool cond, T bits)
 template<typename T>
 static __always_inline T select_mask(bool cond, T true_val, T false_val)
 {
-    int mask = -cond;
+    T mask = -cond;
     return (true_val & mask) | (false_val & ~mask);
 }
 
