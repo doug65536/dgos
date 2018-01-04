@@ -950,15 +950,13 @@ void mm_phys_clear_init()
 
         // Clear new page table page
         cpu_invalidate_page(uintptr_t(ptes[++i]));
+        clear_phys_state.pte = ptes[i];
         page_base = (pte_t*)(uintptr_t(ptes[i]) & -PAGE_SIZE);
-        printdbg("page_base=0x%p", (void*)page_base);
+        printdbg("page_base=0x%p\n", (void*)page_base);
         memset(page_base, 0, PAGE_SIZE);
 
         global_mask = -1;
     }
-
-    clear_phys_state.pte = page_base;
-    memset(page_base, 0, PAGE_SIZE);
 }
 
 void clear_phys(physaddr_t addr)
@@ -971,29 +969,35 @@ void clear_phys(physaddr_t addr)
     physaddr_t base;
     if (clear_phys_state.log2_window_sz == 30) {
         offset = addr & 0x3FFFF000;
-        base = addr & 0x000FFFFFC0000000;
+        base = addr & -(1 << 30);
         page_flags = PTE_PAGESIZE;
     } else if (clear_phys_state.log2_window_sz == 21) {
         offset = addr & 0x1FF000;
-        base = addr & 0x000FFFFFFFE00000;
+        base = addr & -(1 << 21);
         page_flags = PTE_PAGESIZE;
     } else if (clear_phys_state.log2_window_sz == 12) {
         offset = 0;
-        base = addr & 0x000FFFFFFFFFF000;
+        base = addr & -(1 << 12);
         page_flags = 0;
     } else {
+        cpu_debug_break();
         __builtin_unreachable();
     }
 
     unique_lock<spinlock> lock(clear_phys_state.locks[index]);
 
-    if ((pte & PTE_ADDR) != base) {
-        pte = base | page_flags | PTE_WRITABLE | PTE_GLOBAL |
-                PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT;
-        cpu_invalidate_page(clear_phys_state_t::addr);
-    }
+    linaddr_t window = clear_phys_state_t::addr +
+            (index << clear_phys_state.log2_window_sz);
 
-    memset((char*)clear_phys_state_t::addr + offset, 0, PAGE_SIZE);
+    pte_t expect = base | page_flags | PTE_WRITABLE | PTE_GLOBAL |
+            PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT;
+
+    if (pte != expect)
+        pte = expect;
+
+    cpu_invalidate_page(window);
+
+    memset((char*)window + offset, 0, PAGE_SIZE);
 }
 
 //
