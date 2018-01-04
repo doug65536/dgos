@@ -583,55 +583,86 @@ static int stress_heap_thread(void *p)
     (void)p;
 
     heap_t *heap = heap_create();
-    uint64_t min_el;
-    uint64_t max_el;
-    uint64_t tot_el;
+    uint64_t mina_el, maxa_el, tota_el;
+    uint64_t minf_el, maxf_el, totf_el;
+    uint64_t st, el;
     uint64_t seed = 42;
     while (1) {
         for (int pass = 0; pass < 16; ++pass) {
-            tot_el = 0;
-            max_el = 0;
-            min_el = ~0L;
+            tota_el = 0;
+            totf_el = 0;
+            maxa_el = 0;
+            maxf_el = 0;
+            mina_el = ~0L;
+            minf_el = ~0L;
 
             void *history[16];
             int history_index = 0;
             memset(history, 0, sizeof(history));
 
-            int count = 0;
+            unsigned count = 0;
             int size;
+            static constexpr unsigned iters = 0x100000;
             uint64_t overall = cpu_rdtsc();
-            for (count = 0; count < 0x100000; ++count) {
+            for (count = 0; count < iters; ++count) {
                 size = rand_r_range(&seed, STRESS_HEAP_MINSIZE,
                                     STRESS_HEAP_MAXSIZE);
 
-                heap_free(heap, history[history_index]);
-                history[history_index] = nullptr;
+                cpu_irq_disable();
 
-                uint64_t st = cpu_rdtsc();
+                if (likely(history[history_index])) {
+                    st = cpu_rdtsc();
+                    heap_free(heap, history[history_index]);
+                    history[history_index] = nullptr;
+                    el = cpu_rdtsc() - st;
+
+                    if (maxf_el < el)
+                        maxf_el = el;
+                    if (minf_el > el)
+                        minf_el = el;
+                    totf_el += el;
+                }
+
+                st = cpu_rdtsc();
                 void *block = heap_alloc(heap, size);
-                uint64_t el = cpu_rdtsc() - st;
+                el = cpu_rdtsc() - st;
+
+                cpu_irq_enable();
 
                 history[history_index++] = block;
                 history_index &= countof(history)-1;
 
-                if (max_el < el)
-                    max_el = el;
-                if (min_el > el)
-                    min_el = el;
-                tot_el += el;
+                if (maxa_el < el)
+                    maxa_el = el;
+                if (mina_el > el)
+                    mina_el = el;
+                tota_el += el;
             }
+
+            for (unsigned i = 0; i < (unsigned)countof(history); ++i) {
+                st = cpu_rdtsc();
+                heap_free(heap, history[i]);
+                history[i] = nullptr;
+                el = cpu_rdtsc() - st;
+
+                if (maxf_el < el)
+                    maxf_el = el;
+                if (minf_el > el)
+                    minf_el = el;
+                totf_el += el;
+            }
+
             overall = cpu_rdtsc() - overall;
 
-            for (int i = 0; i < (int)countof(history); ++i) {
-                heap_free(heap, history[i]);
-                history[i] = 0;
-            }
-
             printdbg("heap_alloc+memset+heap_free:"
-                     " min=%8ld (%luns @ 3.2GHz), max=%8ld, avg=%8ld,"
+                     " mna=%8ld (%5luns @ 3.2GHz), mxa=%8ld, ava=%8ld,\n"
+                     "                            "
+                     " mnf=%8ld (%5luns @ 3.2GHz), mxf=%8ld, avf=%8ld,\n"
+                     "                            "
                      " withfree=%8ld cycles\n",
-                     min_el, min_el * 10 / 32, max_el, tot_el / count,
-                     overall / count);
+                     mina_el, mina_el * 10 / 32, maxa_el, tota_el / iters,
+                     minf_el, minf_el * 10 / 32, maxf_el, totf_el / iters,
+                     overall / iters);
         }
     }
     heap_destroy(heap);
