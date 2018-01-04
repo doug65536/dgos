@@ -1450,8 +1450,6 @@ void mmu_init()
     void *phys_alloc = mmap(0, physalloc_size,
                             PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
 
-    memset(phys_alloc, 0, physalloc_size);
-
     printdbg("Building physical memory free list\n");
 
     // Get the highest address taken by the kernel
