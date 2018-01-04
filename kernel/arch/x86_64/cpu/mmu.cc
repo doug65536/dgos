@@ -1439,9 +1439,11 @@ void mmu_init()
     //pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
     cpu_set_page_directory(root_phys_addr);
 
+
     // Make zero page not present to catch null pointers
     *PT3_PTR = 0;
     cpu_invalidate_page(0);
+    cpu_flush_tlb();
 
     mm_phys_clear_init();
 
