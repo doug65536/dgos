@@ -968,15 +968,12 @@ void clear_phys(physaddr_t addr)
     size_t offset;
     physaddr_t base;
     if (clear_phys_state.log2_window_sz == 30) {
-        offset = addr & 0x3FFFF000;
         base = addr & -(1 << 30);
         page_flags = PTE_PAGESIZE;
     } else if (clear_phys_state.log2_window_sz == 21) {
-        offset = addr & 0x1FF000;
         base = addr & -(1 << 21);
         page_flags = PTE_PAGESIZE;
     } else if (clear_phys_state.log2_window_sz == 12) {
-        offset = 0;
         base = addr & -(1 << 12);
         page_flags = 0;
     } else {
@@ -984,10 +981,12 @@ void clear_phys(physaddr_t addr)
         __builtin_unreachable();
     }
 
+    offset = addr - base;
+
     unique_lock<spinlock> lock(clear_phys_state.locks[index]);
 
     linaddr_t window = clear_phys_state_t::addr +
-            (index << clear_phys_state.log2_window_sz);
+            (index << (3 + clear_phys_state.log2_window_sz));
 
     pte_t expect = base | page_flags | PTE_WRITABLE | PTE_GLOBAL |
             PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT;
