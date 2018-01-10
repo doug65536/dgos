@@ -15,7 +15,9 @@ cleanbuild=
 #export LDFLAGS='-static'
 
 function log() {
-	if [[ $quiet = 0 ]]; then
+	if [[ -z $logfile ]]; then
+		"$@"
+	elif [[ $quiet = 0 ]]; then
 		"$@" | tee -a "$logfile"
 	else
 		"$@" 2>&1 >> "$logfile"
