@@ -367,6 +367,10 @@ void *mmap_register_device(void *context,
 uintptr_t mm_alloc_contiguous(size_t size);
 void mm_free_contiguous(uintptr_t addr, size_t size);
 
+// Allocate/free memory hole (for I/O devices)
+uintptr_t mm_alloc_hole(size_t size);
+void mm_free_hole(uintptr_t addr, size_t size);
+
 uintptr_t mm_new_process(process_t *process);
 
 void *mmap_window(size_t size);

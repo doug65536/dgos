@@ -364,7 +364,7 @@ public:
 
     class free_batch_t {
     public:
-        void release(physaddr_t addr)
+        void free(physaddr_t addr)
         {
             if (count == countof(pages))
                 flush();
@@ -475,6 +475,7 @@ private:
 static contiguous_allocator_t linear_allocator;
 static contiguous_allocator_t near_allocator;
 static contiguous_allocator_t contig_phys_allocator;
+static contiguous_allocator_t hole_allocator;
 
 //
 // Contiguous physical memory allocator
@@ -1532,6 +1533,43 @@ void mmu_init()
 
     current_pagedir = (pte_t*)(PT0_PTR);
 
+    // Find holes in address space suitable for mapping hardware
+    bool first_hole = true;
+
+    physaddr_t last_hole_end = 0x100000;
+    for (size_t i = 0; i < phys_mem_map_count; ++i) {
+        physmem_range_t const& range = phys_mem_map[i];
+
+        // Ignore holes in 1st MB
+        if (range.base < 0x100000)
+            continue;
+
+        if (range.base > last_hole_end) {
+            if (!first_hole) {
+                hole_allocator.release_linear(last_hole_end,
+                                              range.base - last_hole_end);
+            } else {
+                first_hole = false;
+                hole_allocator.init(last_hole_end, range.base - last_hole_end);
+            }
+        }
+
+        last_hole_end = range.base + range.size;
+    }
+
+    physaddr_t max_physaddr = physaddr_t(1) << cpuid_paddr_bits();
+
+    if (max_physaddr > last_hole_end) {
+        if (!first_hole) {
+            hole_allocator.release_linear(last_hole_end,
+                                          max_physaddr - last_hole_end);
+        } else {
+            first_hole = false;
+            hole_allocator.init(last_hole_end,
+                                max_physaddr - last_hole_end);
+        }
+    }
+
     callout_call(callout_type_t::vmm_ready);
 }
 
@@ -1625,15 +1663,15 @@ void contiguous_allocator_t::init(linaddr_t addr, size_t size)
 {
     free_addr_by_addr.init(contiguous_allocator_cmp_key, 0);
     free_addr_by_size.init(contiguous_allocator_cmp_both, 0);
-    free_addr_by_size.insert(size, addr);
-    free_addr_by_addr.insert(addr, size);
+
+    if (size) {
+        free_addr_by_size.insert(size, addr);
+        free_addr_by_addr.insert(addr, size);
+    }
 }
 
 uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 {
-    // Round up to a multiple of the page size
-    size = round_up(size);
-
     linaddr_t addr;
 
     if (likely(free_addr_by_addr && free_addr_by_size)) {
@@ -2017,9 +2055,10 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 
                 clear_phys(page);
 
-                if (atomic_cmpxchg(base + i, old,
-                                   (page | page_flags) & global_mask) != old)
-                    free_batch.release(page);
+                pte_t new_pte = (page | page_flags) & global_mask;
+
+                if (atomic_cmpxchg(base + i, old, new_pte) != old)
+                    free_batch.free(page);
             }
         }
 
@@ -2059,8 +2098,8 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     static constexpr int user_prohibited =
             MAP_NEAR | MAP_DEVICE | MAP_GLOBAL |
-            MAP_GLOBAL | MAP_UNINITIALIZED |
-            MAP_WEAKORDER | MAP_NOCACHE | MAP_WRITETHRU;
+            MAP_UNINITIALIZED | MAP_WEAKORDER |
+            MAP_NOCACHE | MAP_WRITETHRU;
 
     if (unlikely((flags & MAP_USER) && (flags & user_prohibited)))
         return MAP_FAILED;
@@ -2166,7 +2205,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                                         pte_t(paddr | page_flags));
 
                 if (old && ((old & PTE_ADDR) != PTE_ADDR))
-                    free_batch.release(old & PTE_ADDR);
+                    free_batch.free(old & PTE_ADDR);
 
                 return true;
             });
@@ -2206,14 +2245,14 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             }
 
             if (unlikely(pte && pte != PTE_ADDR))
-                free_batch.release(pte & PTE_ADDR);
+                free_batch.free(pte & PTE_ADDR);
 
             for ( ; ofs < end; ++ofs) {
                 pte = pte_t(PTE_ADDR | page_flags);
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (unlikely(pte && pte != PTE_ADDR))
-                    free_batch.release(pte & PTE_ADDR);
+                    free_batch.free(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
             pte_t pte;
@@ -2224,7 +2263,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (pte && pte != PTE_ADDR)
-                    free_batch.release(pte & PTE_ADDR);
+                    free_batch.free(pte & PTE_ADDR);
             }
         } else {
             assert(!"Unhandled condition");
@@ -2348,7 +2387,7 @@ void *mremap(
         for (size_t i = 0, e = new_size >> 3; i < e; ++i) {
             pte_t pte = atomic_xchg(new_base + i, new_pte);
             if (pte && (pte & PTE_ADDR) != PTE_ADDR)
-                free_batch.release(pte & PTE_ADDR);
+                free_batch.free(pte & PTE_ADDR);
         }
         return (void*)old_st;
     }
@@ -2363,7 +2402,7 @@ void *mremap(
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
         pte = atomic_xchg(new_base + i, 0);
         if (pte && (pte & PTE_ADDR) != PTE_ADDR)
-            free_batch.release(pte & PTE_ADDR);
+            free_batch.free(pte & PTE_ADDR);
     }
 
     return (void*)new_st;
@@ -2393,7 +2432,7 @@ int munmap(void *addr, size_t size)
                 physaddr_t physaddr = pte & PTE_ADDR;
 
                 if (physaddr && (physaddr != PTE_ADDR))
-                    free_batch.release(physaddr);
+                    free_batch.free(physaddr);
             }
 
             if (pte & PTE_PRESENT) {
@@ -2578,7 +2617,7 @@ int madvise(void *addr, size_t len, int advice)
                     if (!atomic_cmpxchg_upd(pt[3], &expect, replace))
                         continue;
 
-                    free_batch.release(page);
+                    free_batch.free(page);
                 }
                 break;
             } else {
@@ -2986,7 +3025,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
             // Set reference count to 1
             entries[first] = 1;
         } else {
-            free_batch.release(paddr);
+            free_batch.free(paddr);
         }
 
         // Follow chain to next free
@@ -3033,6 +3072,17 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 
         ++ptes[3];
     }
+}
+
+uintptr_t mm_alloc_hole(size_t size)
+{
+    size = (size + 63) & -64;
+    return hole_allocator.alloc_linear(size);
+}
+
+void mm_free_hole(uintptr_t addr, size_t size)
+{
+    hole_allocator.release_linear(addr, size);
 }
 
 void *mmap_window(size_t size)
@@ -3161,7 +3211,7 @@ void mm_destroy_process()
 
     for (linaddr_t addr = 0; addr <= 0x800000000000; ) {
         for (physaddr_t physaddr : pending_frees)
-            free_batch.release(physaddr);
+            free_batch.free(physaddr);
         pending_frees.clear();
 
         if (addr == 0x800000000000)
@@ -3211,7 +3261,7 @@ void mm_destroy_process()
 
     cpu_set_page_directory(root_physaddr);
 
-    free_batch.release(dir);
+    free_batch.free(dir);
 }
 
 void mm_init_process(process_t *process)
