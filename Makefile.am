@@ -637,7 +637,8 @@ KERNEL_LDFLAGS_SHARED = \
 #-Wl,-export-dynamic
 
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
-	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
+	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
+	generated_headers \
 	$(DUMPDIR)
 
 #$(ZLIBSTATICLIB) \

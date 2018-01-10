@@ -1586,7 +1586,9 @@ KERNEL_LDFLAGS_SHARED = \
 
 #-Wl,-export-dynamic
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
-	$(top_srcdir)/kernel/arch/x86_64/kernel.ld
+	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
+	generated_headers \
+	$(DUMPDIR)
 
 
 #$(ZLIBSTATICLIB) \
@@ -11164,7 +11166,6 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libc_aHEADERS
 
 .PRECIOUS: Makefile
 
-	$(DUMPDIR)
 	$(KERNEL_INCLUDES_SHARED)
 
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
