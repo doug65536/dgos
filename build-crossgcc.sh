@@ -277,7 +277,8 @@ gcc_config="--target=$arches --with-system-zlib \
 
 bin_config="--target=$arches \
 --enable-gold --enable-ld \
---enable-plugins --enable-lto"
+--enable-plugins --enable-lto
+--enable-shared"
 
 gdb_config="--target=$arches \
 --with-python --with-expat --with-system-readline
