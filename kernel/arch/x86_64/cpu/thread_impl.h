@@ -11,7 +11,7 @@ extern uint32_t volatile thread_smp_running;
 isr_context_t *thread_schedule(isr_context_t *ctx);
 isr_context_t *thread_schedule_if_idle(isr_context_t *ctx);
 void thread_init(int ap);
-uint32_t thread_cpu_count(void);
+int thread_cpu_count(void);
 uint32_t thread_cpus_started(void);
 uint32_t thread_get_cpu_apic_id(int cpu);
 

@@ -830,7 +830,7 @@ EXPORT int thread_wait(thread_t thread_id)
     return thread->exit_code;
 }
 
-uint32_t thread_cpu_count(void)
+int thread_cpu_count(void)
 {
     return cpu_count;
 }
