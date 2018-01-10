@@ -1230,7 +1230,7 @@ STORAGE_REGISTER_FACTORY(ahci_if);
 // AHCI interface instance
 class ahci_if_t : public storage_if_base_t {
 public:
-    bool init(pci_dev_t const &pci_dev);
+    bool init(const pci_dev_iterator_t &pci_dev);
 
     unsigned io(unsigned port_num, slot_request_t &request);
 
@@ -1267,8 +1267,6 @@ private:
                    hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
                    size_t fis_size, hba_prdt_ent_t const *prdts,
                    size_t ranges_count);
-
-    pci_config_hdr_t config;
 
     // Linear addresses
     hba_host_ctl_t volatile *mmio_base;
@@ -1636,13 +1634,10 @@ void ahci_if_t::configure_ncq(unsigned port_num, bool enable,
     }
 }
 
-bool ahci_if_t::init(pci_dev_t const& pci_dev)
+bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
 {
-    config = pci_dev.config;
-
     // Enable MMIO and bus master, disable port I/O
-    pci_adj_control_bits(pci_dev, PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
-                         PCI_CMD_IOEN);
+    pci_adj_control_bits(pci_dev, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
 
     mmio_base = (hba_host_ctl_t*)
             mmap((void*)(uintptr_t)pci_dev.config.base_addr[5],
@@ -1688,7 +1683,7 @@ bool ahci_if_t::init(pci_dev_t const& pci_dev)
     rebase();
 
     // Try to use MSI IRQ
-    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 1, false, 0,
+    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, false, 1,
                               &ahci_if_t::irq_handler);
 
     AHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
@@ -2209,7 +2204,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     blocking_iocp_t block;
 
-    errno_t status = io(identify, 1, 0, false, slot_op_t::identify, block);
+    errno_t status = io(identify, 1, 0, false, slot_op_t::identify, &block);
     if (unlikely(status != errno_t::OK))
         return false;
 

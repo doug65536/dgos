@@ -534,3 +534,181 @@
 
 #define PCI_MLAT_LAT_SET(r,n)  (r = ((r) & ~PCI_MLAT_LAT) | PCI_MLAT_LAT_n(n))
 
+// PCI_MSI_MSG_CTRL
+
+#define PCI_MSI_MSG_CTRL_VMASK_BIT       8
+#define PCI_MSI_MSG_CTRL_CAP64_BIT       7
+#define PCI_MSI_MSG_CTRL_MME_BIT         4
+#define PCI_MSI_MSG_CTRL_MMC_BIT         1
+#define PCI_MSI_MSG_CTRL_EN_BIT          0
+
+#define PCI_MSI_MSG_CTRL_VMASK_BITS      1
+#define PCI_MSI_MSG_CTRL_CAP64_BITS      1
+#define PCI_MSI_MSG_CTRL_MME_BITS        3
+#define PCI_MSI_MSG_CTRL_MMC_BITS        3
+#define PCI_MSI_MSG_CTRL_EN_BITS         1
+#define PCI_MSI_MSG_CTRL_VMASK_MASK \
+    ((1U << PCI_MSI_MSG_CTRL_VMASK_BITS)-1)
+#define PCI_MSI_MSG_CTRL_CAP64_MASK \
+    ((1U << PCI_MSI_MSG_CTRL_CAP64_BITS)-1)
+#define PCI_MSI_MSG_CTRL_MME_MASK        ((1U << PCI_MSI_MSG_CTRL_MME_BITS)-1)
+#define PCI_MSI_MSG_CTRL_MMC_MASK        ((1U << PCI_MSI_MSG_CTRL_MMC_BITS)-1)
+#define PCI_MSI_MSG_CTRL_EN_MASK         ((1U << PCI_MSI_MSG_CTRL_EN_BITS)-1)
+
+// Per-vector mask capable
+#define PCI_MSI_MSG_CTRL_VMASK \
+    (PCI_MSI_MSG_CTRL_VMASK_MASK << PCI_MSI_MSG_CTRL_VMASK_BIT)
+
+// 64-bit capable
+#define PCI_MSI_MSG_CTRL_CAP64 \
+    (PCI_MSI_MSG_CTRL_CAP64_MASK << PCI_MSI_MSG_CTRL_CAP64_BIT)
+
+// Multiple message enable
+#define PCI_MSI_MSG_CTRL_MME \
+    (PCI_MSI_MSG_CTRL_MME_MASK << PCI_MSI_MSG_CTRL_MME_BIT)
+
+// Multiple message capable (log2 N)
+#define PCI_MSI_MSG_CTRL_MMC \
+    (PCI_MSI_MSG_CTRL_MMC_MASK << PCI_MSI_MSG_CTRL_MMC_BIT)
+
+// Enable
+#define PCI_MSI_MSG_CTRL_EN \
+    (PCI_MSI_MSG_CTRL_EN_MASK << PCI_MSI_MSG_CTRL_EN_BIT)
+
+#define PCI_MSI_MSG_CTRL_VMASK_n(n)      ((n) << PCI_MSI_MSG_CTRL_VMASK_BIT)
+#define PCI_MSI_MSG_CTRL_CAP64_n(n)      ((n) << PCI_MSI_MSG_CTRL_CAP64_BIT)
+#define PCI_MSI_MSG_CTRL_MME_n(n)        ((n) << PCI_MSI_MSG_CTRL_MME_BIT)
+#define PCI_MSI_MSG_CTRL_MMC_n(n)        ((n) << PCI_MSI_MSG_CTRL_MMC_BIT)
+#define PCI_MSI_MSG_CTRL_EN_n(n)         ((n) << PCI_MSI_MSG_CTRL_EN_BIT)
+
+#define PCI_MSI_MSG_CTRL_VMASK_GET(n) \
+    (((n) & PCI_MSI_MSG_CTRL_VMASK) >> PCI_MSI_MSG_CTRL_VMASK_BIT)
+#define PCI_MSI_MSG_CTRL_CAP64_GET(n) \
+    (((n) & PCI_MSI_MSG_CTRL_CAP64) >> PCI_MSI_MSG_CTRL_CAP64_BIT)
+#define PCI_MSI_MSG_CTRL_MME_GET(n) \
+    (((n) & PCI_MSI_MSG_CTRL_MME) >> PCI_MSI_MSG_CTRL_MME_BIT)
+#define PCI_MSI_MSG_CTRL_MMC_GET(n) \
+    (((n) & PCI_MSI_MSG_CTRL_MMC) >> PCI_MSI_MSG_CTRL_MMC_BIT)
+#define PCI_MSI_MSG_CTRL_EN_GET(n) \
+    (((n) & PCI_MSI_MSG_CTRL_EN) >> PCI_MSI_MSG_CTRL_EN_BIT)
+
+#define PCI_MSI_MSG_CTRL_VMASK_SET(r,n) \
+    (r = ((r) & ~PCI_MSI_MSG_CTRL_VMASK) | PCI_MSI_MSG_CTRL_VMASK_n(n))
+#define PCI_MSI_MSG_CTRL_CAP64_SET(r,n) \
+    (r = ((r) & ~PCI_MSI_MSG_CTRL_CAP64) | PCI_MSI_MSG_CTRL_CAP64_n(n))
+#define PCI_MSI_MSG_CTRL_MME_SET(r,n) \
+    (r = ((r) & ~PCI_MSI_MSG_CTRL_MME) | PCI_MSI_MSG_CTRL_MME_n(n))
+#define PCI_MSI_MSG_CTRL_MMC_SET(r,n) \
+    (r = ((r) & ~PCI_MSI_MSG_CTRL_MMC) | PCI_MSI_MSG_CTRL_MMC_n(n))
+#define PCI_MSI_MSG_CTRL_EN_SET(r,n) \
+    (r = ((r) & ~PCI_MSI_MSG_CTRL_EN) | PCI_MSI_MSG_CTRL_EN_n(n))
+
+// PCI_MSIX_MSG_CTRL
+
+#define PCI_MSIX_MSG_CTRL_EN_BIT          15
+#define PCI_MSIX_MSG_CTRL_MASK_BIT        14
+#define PCI_MSIX_MSG_CTRL_TBLSZ_BIT       0
+
+#define PCI_MSIX_MSG_CTRL_EN_BITS         1
+#define PCI_MSIX_MSG_CTRL_MASK_BITS       1
+#define PCI_MSIX_MSG_CTRL_TBLSZ_BITS      11
+#define PCI_MSIX_MSG_CTRL_EN_MASK         ((1U << PCI_MSIX_MSG_CTRL_EN_BITS)-1)
+#define PCI_MSIX_MSG_CTRL_MASK_MASK \
+    ((1U << PCI_MSIX_MSG_CTRL_MASK_BITS)-1)
+#define PCI_MSIX_MSG_CTRL_TBLSZ_MASK \
+    ((1U << PCI_MSIX_MSG_CTRL_TBLSZ_BITS)-1)
+
+// Enable
+#define PCI_MSIX_MSG_CTRL_EN \
+    (PCI_MSIX_MSG_CTRL_EN_MASK << PCI_MSIX_MSG_CTRL_EN_BIT)
+
+// Function mask
+#define PCI_MSIX_MSG_CTRL_MASK \
+    (PCI_MSIX_MSG_CTRL_MASK_MASK << PCI_MSIX_MSG_CTRL_MASK_BIT)
+
+// Table size
+#define PCI_MSIX_MSG_CTRL_TBLSZ \
+    (PCI_MSIX_MSG_CTRL_TBLSZ_MASK << PCI_MSIX_MSG_CTRL_TBLSZ_BIT)
+
+#define PCI_MSIX_MSG_CTRL_EN_n(n)         ((n) << PCI_MSIX_MSG_CTRL_EN_BIT)
+#define PCI_MSIX_MSG_CTRL_MASK_n(n)       ((n) << PCI_MSIX_MSG_CTRL_MASK_BIT)
+#define PCI_MSIX_MSG_CTRL_TBLSZ_n(n)      ((n) << PCI_MSIX_MSG_CTRL_TBLSZ_BIT)
+
+#define PCI_MSIX_MSG_CTRL_EN_GET(n) \
+    (((n) & PCI_MSIX_MSG_CTRL_EN) >> PCI_MSIX_MSG_CTRL_EN_BIT)
+#define PCI_MSIX_MSG_CTRL_MASK_GET(n) \
+    (((n) & PCI_MSIX_MSG_CTRL_MASK) >> PCI_MSIX_MSG_CTRL_MASK_BIT)
+#define PCI_MSIX_MSG_CTRL_TBLSZ_GET(n) \
+    (((n) & PCI_MSIX_MSG_CTRL_TBLSZ) >> PCI_MSIX_MSG_CTRL_TBLSZ_BIT)
+
+#define PCI_MSIX_MSG_CTRL_EN_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_MSG_CTRL_EN) | PCI_MSIX_MSG_CTRL_EN_n(n))
+#define PCI_MSIX_MSG_CTRL_MASK_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_MSG_CTRL_MASK) | PCI_MSIX_MSG_CTRL_MASK_n(n))
+#define PCI_MSIX_MSG_CTRL_TBLSZ_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_MSG_CTRL_TBLSZ) | PCI_MSIX_MSG_CTRL_TBLSZ_n(n))
+
+// PCI_MSIX_TBL
+#define PCI_MSIX_TBL               4
+
+#define PCI_MSIX_TBL_OFS_BIT       3
+#define PCI_MSIX_TBL_BIR_BIT       0
+
+#define PCI_MSIX_TBL_OFS_BITS      29
+#define PCI_MSIX_TBL_BIR_BITS      3
+#define PCI_MSIX_TBL_OFS_MASK      ((1U << PCI_MSIX_TBL_OFS_BITS)-1)
+#define PCI_MSIX_TBL_BIR_MASK      ((1U << PCI_MSIX_TBL_BIR_BITS)-1)
+
+// Table offset
+#define PCI_MSIX_TBL_OFS \
+    (PCI_MSIX_TBL_OFS_MASK << PCI_MSIX_TBL_OFS_BIT)
+
+// BAR indicator register
+#define PCI_MSIX_TBL_BIR \
+    (PCI_MSIX_TBL_BIR_MASK << PCI_MSIX_TBL_BIR_BIT)
+
+#define PCI_MSIX_TBL_OFS_n(n)      ((n) << PCI_MSIX_TBL_OFS_BIT)
+#define PCI_MSIX_TBL_BIR_n(n)      ((n) << PCI_MSIX_TBL_BIR_BIT)
+
+#define PCI_MSIX_TBL_OFS_GET(n) \
+    (((n) & PCI_MSIX_TBL_OFS) >> PCI_MSIX_TBL_OFS_BIT)
+#define PCI_MSIX_TBL_BIR_GET(n) \
+    (((n) & PCI_MSIX_TBL_BIR) >> PCI_MSIX_TBL_BIR_BIT)
+
+#define PCI_MSIX_TBL_OFS_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_TBL_OFS) | PCI_MSIX_TBL_OFS_n(n))
+#define PCI_MSIX_TBL_BIR_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_TBL_BIR) | PCI_MSIX_TBL_BIR_n(n))
+
+// PCI_MSIX_PBA
+#define PCI_MSIX_PBA               8
+
+#define PCI_MSIX_PBA_OFS_BIT       3
+#define PCI_MSIX_PBA_BIR_BIT       0
+
+#define PCI_MSIX_PBA_OFS_BITS      29
+#define PCI_MSIX_PBA_BIR_BITS      3
+#define PCI_MSIX_PBA_OFS_MASK      ((1U << PCI_MSIX_PBA_OFS_BITS)-1)
+#define PCI_MSIX_PBA_BIR_MASK      ((1U << PCI_MSIX_PBA_BIR_BITS)-1)
+
+// Table offset
+#define PCI_MSIX_PBA_OFS \
+    (PCI_MSIX_PBA_OFS_MASK << PCI_MSIX_PBA_OFS_BIT)
+
+// BAR indicator register
+#define PCI_MSIX_PBA_BIR \
+    (PCI_MSIX_PBA_BIR_MASK << PCI_MSIX_PBA_BIR_BIT)
+
+#define PCI_MSIX_PBA_OFS_n(n)      ((n) << PCI_MSIX_PBA_OFS_BIT)
+#define PCI_MSIX_PBA_BIR_n(n)      ((n) << PCI_MSIX_PBA_BIR_BIT)
+
+#define PCI_MSIX_PBA_OFS_GET(n) \
+    (((n) & PCI_MSIX_PBA_OFS) >> PCI_MSIX_PBA_OFS_BIT)
+#define PCI_MSIX_PBA_BIR_GET(n) \
+    (((n) & PCI_MSIX_PBA_BIR) >> PCI_MSIX_PBA_BIR_BIT)
+
+#define PCI_MSIX_PBA_OFS_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_PBA_OFS) | PCI_MSIX_PBA_OFS_n(n))
+#define PCI_MSIX_PBA_BIR_SET(r,n) \
+    (r = ((r) & ~PCI_MSIX_PBA_BIR) | PCI_MSIX_PBA_BIR_n(n))
+

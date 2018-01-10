@@ -1,7 +1,7 @@
 #pragma once
 #include "threadsync.h"
+#include "cpu/atomic.h"
 #include "utility.h"
-
 // Meets BasicLockable requirements
 class mutex {
 public:
@@ -122,6 +122,8 @@ public:
 
     ~spinlock()
     {
+        while (m != 0)
+            pause();
         assert(m == 0);
     }
 

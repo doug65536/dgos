@@ -486,7 +486,7 @@ EXPORT void condvar_init(condition_var_t *var)
 
 EXPORT void condvar_destroy(condition_var_t *var)
 {
-    if (var->link.prev != &var->link) {
+    if (unlikely(var->link.prev != &var->link)) {
         spinlock_lock_noirq(&var->lock);
         for (thread_wait_link_t volatile *node = var->link.next;
              node != &var->link; node = thread_wait_del(node));

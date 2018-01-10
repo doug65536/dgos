@@ -1,7 +1,88 @@
 #pragma once
 #include "types.h"
+#include "pcibits.h"
 #include "assert.h"
 #include "irq.h"
+
+struct pci_addr_t {
+    pci_addr_t()
+        : addr(0)
+    {
+    }
+
+    pci_addr_t(int bus, int slot, int func)
+        : addr((bus << 16) | (slot << 11) | (func << 8))
+    {
+        assert(bus >= 0);
+        assert(bus < 256);
+        assert(slot >= 0);
+        assert(slot < 32);
+        assert(func >= 0);
+        assert(func < 8);
+    }
+
+    int bus() const
+    {
+        return (addr >> 16) & 0xFF;
+    }
+
+    void bus(int n)
+    {
+        addr = (addr & ~(255 << 16)) | (n << 16);
+    }
+
+    bool next_bus()
+    {
+        int n = bus();
+        if (n + 1 < 256) {
+            bus(n + 1);
+            return true;
+        }
+        return false;
+    }
+
+    int slot() const
+    {
+        return (addr >> 11) & 0x1F;
+    }
+
+    void slot(int n)
+    {
+        addr = (addr & ~(31 << 11)) | (n << 11);
+    }
+
+    bool next_slot()
+    {
+        int n = slot();
+        if (n + 1 < 32) {
+            slot(n + 1);
+            return true;
+        }
+        return false;
+    }
+
+    int func() const
+    {
+        return (addr >> 8) & 7;
+    }
+
+    void func(int n)
+    {
+        addr = (addr & ~(7 << 8)) | (n << 8);
+    }
+
+    bool next_func()
+    {
+        int n = func();
+        if (n + 1 < 8) {
+            func(n + 1);
+            return true;
+        }
+        return false;
+    }
+
+    int addr;
+};
 
 struct pci_config_hdr_t {
     uint16_t vendor;
@@ -39,27 +120,27 @@ struct pci_config_hdr_t {
 };
 
 // PCI config command register
-#define PCI_CMD_IOEN_BIT            0
-#define PCI_CMD_MEMEN_BIT           1
-#define PCI_CMD_BUSMASTER_BIT       2
-#define PCI_CMD_SPECIALCYCLE_BIT    3
-#define PCI_CMD_MEMWRINVEN_BIT      4
-#define PCI_CMD_VGASNOOP_BIT        5
-#define PCI_CMD_PARITYERR_BIT       6
-#define PCI_CMD_STEPPING_BIT        7
-#define PCI_CMD_SERR_BIT            8
-#define PCI_CMD_FASTB2B_BIT         9
-
-#define PCI_CMD_IOEN                (1<<PCI_CMD_IOEN_BIT)
-#define PCI_CMD_MEMEN               (1<<PCI_CMD_MEMEN_BIT)
-#define PCI_CMD_BUSMASTER           (1<<PCI_CMD_BUSMASTER_BIT)
-#define PCI_CMD_SPECIALCYCLE        (1<<PCI_CMD_SPECIALCYCLE_BIT)
-#define PCI_CMD_MEMWRINVEN          (1<<PCI_CMD_MEMWRINVEN_BIT)
-#define PCI_CMD_VGASNOOP            (1<<PCI_CMD_VGASNOOP_BIT)
-#define PCI_CMD_PARITYERR           (1<<PCI_CMD_PARITYERR_BIT)
-#define PCI_CMD_STEPPING            (1<<PCI_CMD_STEPPING_BIT)
-#define PCI_CMD_SERR                (1<<PCI_CMD_SERR_BIT)
-#define PCI_CMD_FASTB2B             (1<<PCI_CMD_FASTB2B_BIT)
+//#define PCI_CMD_IOEN_BIT            0
+//#define PCI_CMD_MEMEN_BIT           1
+//#define PCI_CMD_BUSMASTER_BIT       2
+//#define PCI_CMD_SPECIALCYCLE_BIT    3
+//#define PCI_CMD_MEMWRINVEN_BIT      4
+//#define PCI_CMD_VGASNOOP_BIT        5
+//#define PCI_CMD_PARITYERR_BIT       6
+//#define PCI_CMD_STEPPING_BIT        7
+//#define PCI_CMD_SERR_BIT            8
+//#define PCI_CMD_FASTB2B_BIT         9
+//
+//#define PCI_CMD_IOEN                (1<<PCI_CMD_IOEN_BIT)
+//#define PCI_CMD_MEMEN               (1<<PCI_CMD_MEMEN_BIT)
+//#define PCI_CMD_BUSMASTER           (1<<PCI_CMD_BUSMASTER_BIT)
+//#define PCI_CMD_SPECIALCYCLE        (1<<PCI_CMD_SPECIALCYCLE_BIT)
+//#define PCI_CMD_MEMWRINVEN          (1<<PCI_CMD_MEMWRINVEN_BIT)
+//#define PCI_CMD_VGASNOOP            (1<<PCI_CMD_VGASNOOP_BIT)
+//#define PCI_CMD_PARITYERR           (1<<PCI_CMD_PARITYERR_BIT)
+//#define PCI_CMD_STEPPING            (1<<PCI_CMD_STEPPING_BIT)
+//#define PCI_CMD_SERR                (1<<PCI_CMD_SERR_BIT)
+//#define PCI_CMD_FASTB2B             (1<<PCI_CMD_FASTB2B_BIT)
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01
@@ -128,15 +209,21 @@ C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 
 struct pci_dev_t {
     pci_config_hdr_t config;
+    pci_addr_t addr;
+};
+
+struct pci_dev_iterator_t : public pci_dev_t {
+    operator pci_addr_t() const
+    {
+        return pci_addr_t(bus, slot, func);
+    }
+
+    int dev_class;
+    int subclass;
 
     int bus;
     int slot;
     int func;
-};
-
-struct pci_dev_iterator_t : public pci_dev_t {
-    int dev_class;
-    int subclass;
 
     uint8_t header_type;
 
@@ -150,21 +237,18 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
                         int dev_class, int subclass);
 int pci_enumerate_next(pci_dev_iterator_t *iter);
 
-uint32_t pci_config_read(
-        int bus, int slot, int func,
-        int offset, int size);
+uint32_t pci_config_read(pci_addr_t addr, int offset, int size);
 
-int pci_config_write(int bus, int slot, int func,
+int pci_config_write(pci_addr_t addr,
         size_t offset, void *values, size_t size);
 
-void pci_config_copy(int bus, int slot, int func,
+void pci_config_copy(pci_addr_t addr,
                      void *dest, int ofs, size_t size);
 
-int pci_find_capability(
-        int bus, int slot, int func,
+int pci_find_capability(pci_addr_t addr,
         int capability_id);
 
-int pci_enum_capabilities(int bus, int slot, int func,
+int pci_enum_capabilities(pci_addr_t addr,
         int (*callback)(uint8_t, int, uintptr_t), uintptr_t context);
 
 //
@@ -188,71 +272,28 @@ int pci_enum_capabilities(int bus, int slot, int func,
 // CompactPCI Hotswap
 #define PCICAP_HOTSWAP  6
 
-//
-// MSI
-
-struct pci_msi_caps_hdr_t {
-    uint8_t capability_id;
-    uint8_t next_ptr;
-    uint16_t msg_ctrl;
-};
-
-// 64-bit capable
-#define PCI_MSI_HDR_64_BIT      7
-
-// Multiple Message Enable
-#define PCI_MSI_HDR_MME_BIT     4
-#define PCI_MSI_HDR_MME_BITS    3
-
-// Multiple Message Capable (log2 N)
-#define PCI_MSI_HDR_MMC_BIT     1
-#define PCI_MSI_HDR_MMC_BITS    3
-
-// Enable
-#define PCI_MSI_HDR_EN_BIT      0
-
-#define PCI_MSI_HDR_MMC_MASK    ((1U<<PCI_MSI_HDR_MMC_BITS)-1)
-#define PCI_MSI_HDR_MME_MASK    ((1U<<PCI_MSI_HDR_MME_BITS)-1)
-
-#define PCI_MSI_HDR_64          (1U<<PCI_MSI_HDR_64_BIT)
-#define PCI_MSI_HDR_EN          (1U<<PCI_MSI_HDR_EN_BIT)
-
-#define PCI_MSI_HDR_MMC         (PCI_MSI_HDR_MMC_MASK<<PCI_MSI_HDR_MMC_BIT)
-#define PCI_MSI_HDR_MME         (PCI_MSI_HDR_MME_MASK<<PCI_MSI_HDR_MME_BIT)
-
-#define PCI_MSI_HDR_MMC_n(n)    ((n)<<PCI_MSI_HDR_MMC_BIT)
-#define PCI_MSI_HDR_MME_n(n)    ((n)<<PCI_MSI_HDR_MME_BIT)
-
-struct pci_msi32_t {
-    uint32_t addr;
-    uint16_t data;
-} __packed;
-
-struct pci_msi64_t {
-    uint32_t addr_lo;
-    uint32_t addr_hi;
-    uint16_t data;
-} __packed;
+// MSI-X
+#define PCICAP_MSIX     0x11
 
 struct pci_irq_range_t {
     uint8_t base;
     uint8_t count;
 };
 
-bool pci_try_msi_irq(pci_dev_t const& pci_dev,
+bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,
-                     int cpu, bool distribute, int multiple,
-                     intr_handler_t handler);
+                     int cpu, bool distribute, int req_count,
+                     intr_handler_t handler, int const *target_cpus = nullptr);
 
-bool pci_set_msi_irq(int bus, int slot, int func,
+bool pci_set_msi_irq(pci_addr_t addr,
                     pci_irq_range_t *irq_range,
-                    int cpu, bool distribute, int multiple,
-                    intr_handler_t handler);
+                    int cpu, bool distribute, int req_count,
+                    intr_handler_t handler, int const *target_cpus = nullptr);
 
-void pci_set_irq_line(int bus, int slot, int func,
+void pci_set_irq_line(pci_addr_t addr,
                       uint8_t irq_line);
 
-void pci_set_irq_pin(int bus, int slot, int func,
+void pci_set_irq_pin(pci_addr_t addr,
                      uint8_t irq_pin);
 
 void pci_adj_control_bits(pci_dev_t const& pci_dev,
@@ -261,7 +302,7 @@ void pci_adj_control_bits(pci_dev_t const& pci_dev,
 void pci_adj_control_bits(int bus, int slot, int func,
                           uint16_t set, uint16_t clr);
 
-void pci_clear_status_bits(int bus, int slot, int func,
+void pci_clear_status_bits(pci_addr_t addr,
                            uint16_t bits);
 
 char const * pci_device_class_text(uint8_t cls);

@@ -19,8 +19,11 @@ void apic_dump_regs(int ap);
 int apic_enable(void);
 bool ioapic_irq_cpu(int irq, int cpu);
 
+void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector);
+
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
-                       int cpu, bool distribute, intr_handler_t handler);
+                       int cpu, bool distribute, intr_handler_t handler,
+                       int const *target_cpus = nullptr);
 
 int acpi_have8259pic(void);
 

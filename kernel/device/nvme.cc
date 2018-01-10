@@ -252,7 +252,7 @@ public:
     T dequeue()
     {
         T item = entries[head];
-        take();
+        take(1);
         return item;
     }
 
@@ -371,7 +371,6 @@ public:
     {
         scoped_lock hold(lock);
         done = true;
-        hold.unlock();
         done_cond.notify_all();
     }
 
@@ -520,7 +519,7 @@ STORAGE_REGISTER_FACTORY(nvme_if);
 // NVMe interface instance
 class nvme_if_t : public storage_if_base_t {
 public:
-    bool init(pci_dev_t const& pci_dev);
+    bool init(const pci_dev_iterator_t &pci_dev);
     size_t get_queue_count() const;
 
 private:
@@ -612,6 +611,8 @@ if_list_t nvme_if_factory_t::detect(void)
         0
     };
 
+    //return list;
+
     pci_dev_iterator_t pci_iter;
 
     NVME_TRACE("enumerating PCI busses for devices...\n");
@@ -636,6 +637,7 @@ if_list_t nvme_if_factory_t::detect(void)
             nvme_if_t *self = nvme_devices + nvme_count++;
 
             if (!self->init(pci_iter)) {
+                // Destruct and restore zero initialization
                 self->~nvme_if_t();
                 memset(self, 0, sizeof(*self));
                 new (self) nvme_if_t;
@@ -651,7 +653,7 @@ if_list_t nvme_if_factory_t::detect(void)
     return list;
 }
 
-bool nvme_if_t::init(pci_dev_t const &pci_dev)
+bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 {
     config = pci_dev.config;
 
@@ -666,12 +668,26 @@ bool nvme_if_t::init(pci_dev_t const &pci_dev)
     // 7.6.1 Initialization
 
     // Enable bus master DMA, enable MMIO, disable port I/O
-    pci_adj_control_bits(pci_dev, PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
-                         PCI_CMD_IOEN);
+    pci_adj_control_bits(pci_dev, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
+
+    size_t requested_queue_count = thread_get_cpu_count() + 1;
+
+    // The admin queue is queue[0],
+    // and the I/O command queue for CPU 0 is queue[1],
+    // and the I/O command queue for CPU 1 is queue[2], etc,
+    // so provide a target CPU list that targets the MSI-X interrupts
+    // appropriately, in case MSI-X is supported
+    unique_ptr<int[]> target_cpus(new int[requested_queue_count]);
+    target_cpus[0] = 0;
+    for (size_t i = 1; i < requested_queue_count; ++i)
+        target_cpus[i] = i - 1;
 
     // Try to use MSI IRQ
-    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, false, 0,
-                              irq_handler);
+    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, true,
+                              min(requested_queue_count - 1, size_t(32)),
+                              irq_handler, target_cpus.get());
+
+    target_cpus.reset();
 
     NVME_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
                use_msi, irq_range.base, irq_range.count);
@@ -697,8 +713,6 @@ bool nvme_if_t::init(pci_dev_t const &pci_dev)
     size_t queue_bytes = queue_slots * sizeof(nvme_cmd_t) +
             queue_slots * sizeof(nvme_cmp_t);
 
-    size_t requested_queue_count = thread_get_cpu_count() + 1;
-
     queue_count = 1;
     queue_bytes *= requested_queue_count;
 
@@ -719,6 +733,7 @@ bool nvme_if_t::init(pci_dev_t const &pci_dev)
     // Submission queue address
     mmio_base->asq = (uint64_t)queue_memory_physaddr;
 
+    // 3.1.10 The vector for the admin queues is always 0
     // Completion queue address
     mmio_base->acq = (uint64_t)queue_memory_physaddr +
             (sizeof(nvme_cmd_t) * queue_slots * requested_queue_count);
@@ -783,7 +798,7 @@ bool nvme_if_t::init(pci_dev_t const &pci_dev)
                                requested_queue_count - 1,
                                requested_queue_count - 1),
                            &nvme_if_t::setfeat_queues_handler,
-                           (iocp_t*)blocking_setfeatures);
+                           (iocp_t*)&blocking_setfeatures);
 
     blocking_setfeatures.set_expect(1);
     errno_t status = blocking_setfeatures.wait();
@@ -873,8 +888,7 @@ void nvme_if_t::identify_ns_handler(
     auto ctx = (nvme_detect_dev_ctx_t*)data;
     auto ns_ident = (nvme_ns_identify_t*)ctx->identify_data;
 
-    size_t cur_format_index = NVME_NS_IDENT_FLBAS_LBAIDX_GET(
-                ns_ident->flbas);
+    size_t cur_format_index = NVME_NS_IDENT_FLBAS_LBAIDX_GET(ns_ident->flbas);
     uint32_t lba_format = ns_ident->lbaf[cur_format_index];
     uint8_t log2_sectorsize = NVME_NS_IDENT_LBAF_LBADS_GET(lba_format);
 
@@ -994,8 +1008,6 @@ uint32_t volatile* nvme_if_t::doorbell_ptr(bool completion, size_t queue)
 unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
                        uint8_t log2_sectorsize)
 {
-//	cpu_scoped_irq_disable intr_were_enabled;
-
     size_t cur_cpu = thread_cpu_number();
 
     int queue_index;
@@ -1222,7 +1234,6 @@ void nvme_queue_state_t::advance_head(uint16_t new_head, bool need_lock)
         hold.lock();
 
     sub_queue.take_until(new_head);
-    hold.unlock();
     not_full.notify_all();
 }
 

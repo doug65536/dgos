@@ -189,6 +189,12 @@ static void *heap_large_alloc(size_t size)
     heap_hdr_t *hdr = (heap_hdr_t*)mmap(0, size,
                            PROT_READ | PROT_WRITE,
                            MAP_UNINITIALIZED, -1, 0);
+
+    assert(hdr != MAP_FAILED);
+
+    if (hdr == MAP_FAILED)
+        return nullptr;
+
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
     hdr->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);

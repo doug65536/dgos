@@ -299,7 +299,7 @@ if_list_t ide_if_factory_t::detect(void)
             dev->chan[0].ports.irq = 14;
             dev->chan[1].ports.irq = 14;
             IDE_TRACE("Updating PCI config IRQ line\n");
-            pci_config_write(pci_iter.bus, pci_iter.slot, pci_iter.func,
+            pci_config_write(pci_iter.addr,
                            offsetof(pci_config_hdr_t, irq_line),
                            &dev->chan[0].ports.irq, sizeof(uint8_t));
         }
@@ -320,8 +320,8 @@ if_list_t ide_if_factory_t::detect(void)
             continue;
         }
 
-        // Enable bus master DMA and I/O ports
-        pci_adj_control_bits(pci_iter, PCI_CMD_BUSMASTER | PCI_CMD_IOEN, 0);
+        // Enable bus master DMA and I/O ports, disable MMIO
+        pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_IOSE, PCI_CMD_MSE);
     } while (pci_enumerate_next(&pci_iter));
 
     list.count = ide_if_count - start_at;

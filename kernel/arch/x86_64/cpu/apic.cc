@@ -244,6 +244,8 @@ static mp_ioapic_t ioapic_list[16];
 
 static spinlock ioapic_msi_alloc_lock;
 static uint8_t ioapic_msi_next_irq = INTR_APIC_IRQ_BASE;
+
+// Bit 0 of this corresponds to vector INTR_APIC_IRQ_BASE
 static uint64_t ioapic_msi_alloc_map[] = {
     0x0000000000000000L,
     0x0000000000000000L,
@@ -1979,16 +1981,16 @@ public:
     int64_t read() const override final
     {
         value_type result;
-        pci_config_copy(0, (dfo >> 32) & 0xFF,
-                        (dfo >> 16) & 0xFF, &result,
+        pci_config_copy(pci_addr_t(0, (dfo >> 32) & 0xFF,
+                        (dfo >> 16) & 0xFF), &result,
                         dfo & 0xFF, size);
         return result;
     }
 
     void write(int64_t value) const override final
     {
-        pci_config_write(0, (dfo >> 32) & 0xFF,
-                         (dfo >> 16) & 0xFF, dfo & 0xFF, &value, size);
+        pci_config_write(pci_addr_t(0, (dfo >> 32) & 0xFF,
+                         (dfo >> 16) & 0xFF), dfo & 0xFF, &value, size);
     }
 
 private:
@@ -2416,18 +2418,30 @@ int apic_enable(void)
 //
 // MSI IRQ
 
+void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
+{
+    int cpu_count = thread_cpu_count();
+    assert(cpu >= 0);
+    assert(cpu < cpu_count);
+    assert(vector >= INTR_APIC_IRQ_BASE);
+    assert(vector < INTR_APIC_IRQ_END);
+    result->addr = (0xFEEU << 20) |
+            (apic_id_list[cpu % cpu_count] << 12);
+    result->data = vector;
+}
+
 // Returns the starting IRQ number of allocated range
 // Returns 0 for failure
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute,
-                       intr_handler_t handler)
+                       intr_handler_t handler, int const *target_cpus)
 {
     // Don't try to use MSI if there are no IOAPIC devices
     if (ioapic_count == 0)
         return 0;
 
     // If out of range starting CPU number, force to zero
-    if (cpu < 0 || (unsigned)cpu >= apic_id_count)
+    if (cpu < 0 || unsigned(cpu) >= apic_id_count)
         cpu = 0;
 
     uint8_t vector_base = ioapic_aligned_vectors(bit_log2(count));
@@ -2437,9 +2451,9 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
         return 0;
 
     for (int i = 0; i < count; ++i) {
-        results[i].addr = (0xFEEU << 20) |
-                (apic_id_list[cpu] << 12);
-        results[i].data = (vector_base + i);
+        apic_msi_target(results + i,
+                        target_cpus ? target_cpus[i] : cpu,
+                        vector_base + i);
 
         irq_to_intr[vector_base + i - INTR_APIC_IRQ_BASE] = vector_base + i;
         intr_to_irq[vector_base + i] = vector_base + i - INTR_APIC_IRQ_BASE;

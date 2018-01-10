@@ -73,3 +73,22 @@
 -- PCI_MLAT Maximum latency
 7:0 LAT Maximum latency
 
+-- PCI_MSI_MSG_CTRL
+8 VMASK Per-vector mask capable
+7 CAP64 64-bit capable
+6:4 MME Multiple message enable
+3:1 MMC Multiple message capable (log2 N)
+0 EN Enable
+
+-- PCI_MSIX_MSG_CTRL
+15 EN Enable
+14 MASK Function mask
+10:0 TBLSZ Table size
+
+-- PCI_MSIX_TBL=4
+31:3 OFS Table offset
+2:0 BIR BAR indicator register
+
+-- PCI_MSIX_PBA=8
+31:3 OFS Table offset
+2:0 BIR BAR indicator register

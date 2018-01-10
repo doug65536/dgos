@@ -54,11 +54,14 @@ struct iocp_t {
 
         if (done_count == expect)
             invoke_once(hold);
+        atomic_barrier();
     }
 
     void set_result(errno_t err_code)
     {
-        err = err_code;
+        // Only write not-ok to err to avoid losing split command errors
+        if (unlikely(err_code != errno_t::OK))
+            err = err_code;
     }
 
     void invoke()
@@ -66,6 +69,7 @@ struct iocp_t {
         unique_lock<spinlock> hold(lock);
         if (expect_count && ++done_count >= expect_count)
             invoke_once(hold);
+        atomic_barrier();
     }
 
     void operator()()
@@ -79,11 +83,13 @@ struct iocp_t {
     }
 
 private:
-    void invoke_once(unique_lock<spinlock> const&)
+    void invoke_once(unique_lock<spinlock> &hold)
     {
         if (callback != nullptr) {
-            callback(err, arg);
+            callback_t temp = callback;
             callback = nullptr;
+            hold.unlock();
+            temp(err, arg);
         }
     }
 
@@ -95,10 +101,10 @@ private:
     errno_t err;
 };
 
-class blocking_iocp_t {
+class blocking_iocp_t : public iocp_t {
 public:
     blocking_iocp_t()
-        : iocp(&blocking_iocp_t::handler, uintptr_t(this))
+        : iocp_t(&blocking_iocp_t::handler, uintptr_t(this))
         , done(false)
     {
     }
@@ -116,16 +122,7 @@ public:
         done_cond.notify_all();
         // Hold lock until after notify to ensure that the object
         // won't get destructed from under us
-    }
-
-    operator iocp_t*()
-    {
-        return &iocp;
-    }
-
-    void set_expect(uint16_t expect)
-    {
-        iocp.set_expect(expect);
+        atomic_barrier();
     }
 
     errno_t wait()
@@ -133,11 +130,11 @@ public:
         unique_lock<spinlock> hold(lock);
         while (!done)
             done_cond.wait(hold);
-        return iocp.get_error();
+        errno_t status = get_error();
+        return status;
     }
 
 private:
-    iocp_t iocp;
     spinlock lock;
     condition_variable done_cond;
     bool done;

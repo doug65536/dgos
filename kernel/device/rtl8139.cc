@@ -102,7 +102,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
         return RTL8139_MMIO(uint32_t, reg);
     }
 
-    void detect(pci_dev_t const& pci_dev);
+    void detect(const pci_dev_iterator_t &pci_dev);
 
     void tx_packet(int slot, ethq_pkt_t *pkt);
     void rx_irq_handler(uint16_t isr);
@@ -946,7 +946,7 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
     return rtl8139_device_count;
 }
 
-void rtl8139_dev_t::detect(pci_dev_t const &pci_dev)
+void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 {
     mmio_physaddr = pci_dev.config.base_addr[1] & -16;
 
@@ -955,8 +955,8 @@ void rtl8139_dev_t::detect(pci_dev_t const &pci_dev)
                       MAP_PHYSICAL, -1, 0);
 
     // Enable MMIO and bus master, disable port I/O
-    pci_adj_control_bits(pci_dev, PCI_CMD_BUSMASTER | PCI_CMD_MEMEN,
-                         PCI_CMD_IOEN);
+    pci_adj_control_bits(pci_dev, PCI_CMD_BME | PCI_CMD_MSE,
+                         PCI_CMD_IOSE);
 
     // Power on
     RTL8139_MM_WR_8(RTL8139_IO_CONFIG1, 0);
@@ -987,7 +987,7 @@ void rtl8139_dev_t::detect(pci_dev_t const &pci_dev)
     memcpy(mac_addr, &mac_hi, sizeof(uint32_t));
 
     // Use MSI IRQ if possible
-    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 1, false, 0,
+    use_msi = pci_try_msi_irq(pci_dev, &irq_range, 1, false, 1,
                               &rtl8139_dev_t::irq_dispatcher);
 
     RTL8139_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",

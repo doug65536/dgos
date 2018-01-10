@@ -214,7 +214,7 @@ int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
     cpu_scoped_irq_disable intr_were_enabled;
 
     blocking_iocp_t block;
-    errno_t err = read_async(data, count, lba, block);
+    errno_t err = read_async(data, count, lba, &block);
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
     err = block.wait();
@@ -227,7 +227,7 @@ int storage_dev_base_t::write_blocks(
         const void *data, int64_t count, uint64_t lba, bool fua)
 {
     blocking_iocp_t block;
-    errno_t err = write_async(data, count, lba, fua, block);
+    errno_t err = write_async(data, count, lba, fua, &block);
     err = block.wait();
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
@@ -236,7 +236,7 @@ int storage_dev_base_t::write_blocks(
 int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
 {
     blocking_iocp_t block;
-    errno_t err = trim_async(count, lba, block);
+    errno_t err = trim_async(count, lba, &block);
     err = block.wait();
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);
@@ -246,7 +246,7 @@ int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
 int storage_dev_base_t::flush()
 {
     blocking_iocp_t block;
-    errno_t err = flush_async(block);
+    errno_t err = flush_async(&block);
     err = block.wait();
     if (unlikely(err != errno_t::OK))
         return -int64_t(err);

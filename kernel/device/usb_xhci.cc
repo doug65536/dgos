@@ -2194,7 +2194,7 @@ void usbxhci_detect(void *arg)
         memset(self, 0, sizeof(*self));
 
         self->use_msi = pci_try_msi_irq(pci_iter, &self->irq_range,
-                                        1, false, 1, usbxhci_irq_handler);
+                                        0, false, 1, usbxhci_irq_handler);
 
         USBXHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
                    self->use_msi, self->irq_range.base, self->irq_range.count);
