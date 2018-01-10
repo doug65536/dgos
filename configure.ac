@@ -56,7 +56,7 @@ for flag in \
 		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
-		-ffunction-sections
+		ffunction-sections Wno-unused-parameter Werror=return-type
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[COMPILER_FLAGS+=" -$flag"],
