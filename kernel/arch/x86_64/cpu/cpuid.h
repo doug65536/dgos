@@ -65,6 +65,8 @@ struct cpuid_cache_t {
 
     uint16_t min_monitor_line;
     uint16_t max_monitor_line;
+    uint8_t laddr_bits;
+    uint8_t paddr_bits;
 };
 
 #ifdef CPUID_CC
@@ -238,4 +240,16 @@ CPUID_CONST_INLINE bool cpuid_has_umip(void)
 CPUID_CONST_INLINE bool cpuid_has_erms(void)
 {
     return cpuid_cache.has_erms;
+}
+
+// Linear address size in bits
+CPUID_CONST_INLINE uint8_t cpuid_laddr_bits(void)
+{
+    return cpuid_cache.laddr_bits;
+}
+
+// Physical address size in bits
+CPUID_CONST_INLINE uint8_t cpuid_paddr_bits(void)
+{
+    return cpuid_cache.paddr_bits;
 }

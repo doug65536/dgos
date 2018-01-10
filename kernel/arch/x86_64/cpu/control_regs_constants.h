@@ -467,6 +467,7 @@
 #define CPUID_SERIALNUM         0x3
 #define CPUID_TOPOLOGY1         0x4
 #define CPUID_MONITOR           0x5
+#define CPUID_INFO_EXT_FEATURES 0x7
 #define CPUID_TOPOLOGY2         0xB
 #define CPUID_INFO_XSAVE        0xD
 #define CPUID_EXTHIGHESTFUNC    0x80000000

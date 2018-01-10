@@ -13,51 +13,68 @@ int cpuid_nx_mask;
 
 void cpuid_init(void)
 {
-
-    cpuid_cache.has_de      = cpuid_edx_bit(2, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_pge     = cpuid_edx_bit(13, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_sysenter= cpuid_edx_bit(11, CPUID_INFO_FEATURES, 0);
-
-    cpuid_cache.has_sse3    = cpuid_ecx_bit(0, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_mwait   = cpuid_ecx_bit(3, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_ssse3   = cpuid_ecx_bit(9, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_fma     = cpuid_ecx_bit(12, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_pcid    = cpuid_ecx_bit(17, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_sse4_1  = cpuid_ecx_bit(19, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_sse4_2  = cpuid_ecx_bit(20, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_x2apic  = cpuid_ecx_bit(21, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_aes     = cpuid_ecx_bit(25, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_xsave   = cpuid_ecx_bit(26, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_avx     = cpuid_ecx_bit(28, CPUID_INFO_FEATURES, 0);
-    cpuid_cache.has_rdrand  = cpuid_ecx_bit(30, CPUID_INFO_FEATURES, 0);
-
-    cpuid_cache.has_2mpage  = cpuid_edx_bit(3, CPUID_EXTINFO_FEATURES, 0);
-    cpuid_cache.has_1gpage  = cpuid_edx_bit(26, CPUID_EXTINFO_FEATURES, 0);
-    cpuid_cache.has_nx      = cpuid_edx_bit(20, CPUID_EXTINFO_FEATURES, 0);
-
-    cpuid_cache.has_fsgsbase= cpuid_ebx_bit(0, 7, 0);
-    cpuid_cache.has_umip    = cpuid_ecx_bit(2, 7, 0);
-    cpuid_cache.has_smep    = cpuid_ebx_bit(7, 7, 0);
-    cpuid_cache.has_erms    = cpuid_ebx_bit(9, 7, 0);
-    cpuid_cache.has_invpcid = cpuid_ebx_bit(10, 7, 0);
-    cpuid_cache.has_avx512f = cpuid_ebx_bit(16, 7, 0);
-    cpuid_cache.has_smap    = cpuid_ebx_bit(20, 7, 0);
-
-    cpuid_cache.has_inrdtsc = cpuid_edx_bit(8, CPUID_APM, 0);
-
-    cpuid_nx_mask = -!!cpuid_cache.has_nx;
-
     cpuid_t info;
-    if (cpuid(&info, CPUID_MONITOR, 0)) {
-        cpuid_cache.min_monitor_line = uint16_t(info.eax);
-        cpuid_cache.max_monitor_line = uint16_t(info.ebx);
-    }
 
     if (cpuid(&info, CPUID_HIGHESTFUNC, 0)) {
         if (!memcmp(&info.ebx, "AuthenticAMD", 12))
             cpuid_cache.is_amd = 1;
         else if (!memcmp(&info.ebx, "GenuineIntel", 12))
             cpuid_cache.is_intel = 1;
+    }
+
+    if (cpuid(&info, CPUID_INFO_FEATURES, 0)) {
+        cpuid_cache.has_de      = info.edx & (1U << 2);
+        cpuid_cache.has_pge     = info.edx & (1U << 13);
+        cpuid_cache.has_sysenter= info.edx & (1U << 11);
+
+        cpuid_cache.has_sse3    = info.ecx & (1U << 0);
+        cpuid_cache.has_mwait   = info.ecx & (1U << 3);
+        cpuid_cache.has_ssse3   = info.ecx & (1U << 9);
+        cpuid_cache.has_fma     = info.ecx & (1U << 12);
+        cpuid_cache.has_pcid    = info.ecx & (1U << 17);
+        cpuid_cache.has_sse4_1  = info.ecx & (1U << 19);
+        cpuid_cache.has_sse4_2  = info.ecx & (1U << 20);
+        cpuid_cache.has_x2apic  = info.ecx & (1U << 21);
+        cpuid_cache.has_aes     = info.ecx & (1U << 25);
+        cpuid_cache.has_xsave   = info.ecx & (1U << 26);
+        cpuid_cache.has_avx     = info.ecx & (1U << 28);
+        cpuid_cache.has_rdrand  = info.ecx & (1U << 30);
+    }
+
+    if (cpuid(&info, CPUID_EXTINFO_FEATURES, 0)) {
+        cpuid_cache.has_2mpage  = info.edx & (1U << 3);
+        cpuid_cache.has_1gpage  = info.edx & (1U << 26);
+        cpuid_cache.has_nx      = info.edx & (1U << 20);
+    }
+
+    if (cpuid(&info, CPUID_INFO_EXT_FEATURES, 0)) {
+        cpuid_cache.has_fsgsbase= info.ebx & (1U << 0);
+        cpuid_cache.has_umip    = info.ecx & (1U << 2);
+        cpuid_cache.has_smep    = info.ebx & (1U << 7);
+        cpuid_cache.has_erms    = info.ebx & (1U << 9);
+        cpuid_cache.has_invpcid = info.ebx & (1U << 10);
+        cpuid_cache.has_avx512f = info.ebx & (1U << 16);
+        cpuid_cache.has_smap    = info.ebx & (1U << 20);
+    }
+
+    if (cpuid(&info, CPUID_APM, 0)) {
+        cpuid_cache.has_inrdtsc = info.edx & (1U << 8);
+    }
+
+    cpuid_nx_mask = -!!cpuid_cache.has_nx;
+
+    if (cpuid(&info, CPUID_MONITOR, 0)) {
+        cpuid_cache.min_monitor_line = uint16_t(info.eax);
+        cpuid_cache.max_monitor_line = uint16_t(info.ebx);
+    }
+
+    if (cpuid(&info, CPUID_ADDRSIZES, 0)) {
+        cpuid_cache.laddr_bits = info.eax & 0xFF;
+        cpuid_cache.paddr_bits = (info.eax >> 8) & 0xFF;
+    } else {
+        // Make reasonable guess
+        cpuid_cache.laddr_bits = 48;
+        cpuid_cache.paddr_bits = 52;
     }
 }
 
