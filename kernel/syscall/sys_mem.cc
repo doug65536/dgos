@@ -102,5 +102,5 @@ int clone(int flags, void *child_stack,
           int *ptid, unsigned long newtls,
           int *ctid)
 {
-
+    return -1;
 }
