@@ -5,6 +5,7 @@ src/fcntl/open.cc
 src/fcntl/openat.cc
 src/fcntl/posix_fadvise.cc
 src/fcntl/posix_fallocate.cc
+src/stdlib/malloc.cc
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
 src/sys/syscall.S
