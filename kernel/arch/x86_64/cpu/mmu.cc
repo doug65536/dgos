@@ -1208,10 +1208,6 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
                                (page & PTE_ADDR) |
                                page_flags) != pte) {
                 // Another thread beat us to it
-                printdbg("Racing thread already assigned page"
-                         " for %lx, freeing page %lx\n",
-                         fault_addr, page);
-
                 mmu_free_phys(page);
                 cpu_invalidate_page(fault_addr);
             }
