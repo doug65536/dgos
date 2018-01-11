@@ -40,6 +40,8 @@
 - Mutex, Condition Variable, Reader/Writer locks
 - 8259 or LAPIC/IO-APIC support, multiple IO-APICs supported
 - PCI MSI IRQ support including multiple message capability
+- PCI MSI-X IRQ support including routing IRQs to arbitrary CPUs
+- PCIe ECAM (enhanced configuration access method) MMIO configuration space
 - IRQ sharing
 - Fast PCI enumerator with recursive bridge traversal
 - 8042 legacy keyboard and mouse driver

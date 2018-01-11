@@ -14,7 +14,61 @@
 #define PCI_DEBUGMSG(...) ((void)0)
 #endif
 
+struct pci_ecam_t;
+
+class pci_config_rw {
+public:
+    // Read up to 32 bits from PCI config space.
+    // Value must be entirely within a single 32 bit dword.
+    virtual uint32_t read(pci_addr_t addr, size_t offset, size_t size) = 0;
+
+    // Write an arbitrarily sized and aligned block of values
+    virtual bool write(pci_addr_t addr, size_t offset,
+                           void const *values, size_t size) = 0;
+
+    // Read an arbitrarily sized and aligned block of values
+    virtual bool copy(pci_addr_t addr, void *dest, size_t offset, size_t size) = 0;
+};
+
+// Legacy I/O port PCI configuration space accessor
+class pci_config_pio : public pci_config_rw {
+public:
+    // pci_config_rw interface
+    uint32_t read(pci_addr_t addr, size_t offset, size_t size) final;
+    bool write(pci_addr_t addr, size_t offset,
+               void const *values, size_t size) final;
+    bool copy(pci_addr_t addr, void *dest, size_t offset, size_t size) final;
+};
+
+// Modern PCIe ECAM MMIO PCI configuration space accessor
+class pci_config_mmio : public pci_config_rw {
+    inline pci_ecam_t *find_ecam(int bus);
+public:
+    // pci_config_rw interface
+    uint32_t read(pci_addr_t addr, size_t offset, size_t size) final;
+    bool write(pci_addr_t addr, size_t offset,
+               void const *values, size_t size) final;
+    bool copy(pci_addr_t addr, void *dest, size_t offset, size_t size) final;
+};
+
+//
+// ECAM
+
+struct pci_ecam_t {
+    uint64_t base;
+    char *mapping;
+    uint16_t segment;
+    uint8_t st_bus;
+    uint8_t en_bus;
+};
+
+static vector<pci_ecam_t> pci_ecam_list;
+
+static pci_config_pio pci_pio_accessor;
+static pci_config_mmio pci_mmio_accessor;
+
 static spinlock_t pci_spinlock;
+static pci_config_rw *pci_accessor = &pci_pio_accessor;
 
 #define PCI_ADDR    0xCF8
 #define PCI_DATA    0xCFC
@@ -73,9 +127,15 @@ static char const *pci_device_class_text_lookup[] = {
     "Data Acquisition and Signal Processing Controllers"
 };
 
-uint32_t pci_config_read(pci_addr_t addr, int offset, int size)
+//
+// Legacy port I/O access
+
+uint32_t pci_config_pio::read(pci_addr_t addr, size_t offset, size_t size)
 {
-    uint32_t pci_address = (1 << 31) | addr.addr | (offset & -4);
+    assert(offset < 256);
+    assert((offset & -4) == ((offset + size - 1) & -4));
+
+    uint32_t pci_address = (1 << 31) | addr.get_addr() | (offset & -4);
 
     spinlock_lock_noirq(&pci_spinlock);
 
@@ -92,16 +152,17 @@ uint32_t pci_config_read(pci_addr_t addr, int offset, int size)
     return data;
 }
 
-int pci_config_write(pci_addr_t addr, size_t offset, void *values, size_t size)
+bool pci_config_pio::write(pci_addr_t addr, size_t offset,
+                           void const *values, size_t size)
 {
     // Validate
     if (!(offset < 256 && size <= 256 && offset + size <= 256))
-        return 0;
+        return false;
 
     // Pointer to input data
     char *p = (char*)values;
 
-    uint32_t pci_address = (1 << 31) | addr.addr;
+    uint32_t pci_address = (1 << 31) | addr.get_addr();
 
     spinlock_lock_noirq(&pci_spinlock);
 
@@ -157,22 +218,111 @@ int pci_config_write(pci_addr_t addr, size_t offset, void *values, size_t size)
 
     spinlock_unlock_noirq(&pci_spinlock);
 
-    return 1;
+    return true;
 }
 
-void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
+bool pci_config_pio::copy(pci_addr_t addr, void *dest, size_t offset, size_t size)
 {
     uint32_t value;
     char *out = (char*)dest;
 
     for (size_t i = 0; i < size; i += sizeof(uint32_t)) {
-        value = pci_config_read(addr, ofs + i, sizeof(value));
+        value = pci_config_read(addr, offset + i, sizeof(value));
 
         if (i + sizeof(value) <= size)
             memcpy(out + i, &value, sizeof(value));
         else
             memcpy(out + i, &value, size - i);
     }
+
+    return true;
+}
+
+pci_ecam_t *pci_config_mmio::find_ecam(int bus)
+{
+    size_t i, e;
+
+    pci_ecam_t *ent = pci_ecam_list.data();
+    for (i = 0, e = pci_ecam_list.size(); i < e; ++i, ++ent) {
+        if (ent->st_bus <= bus && ent->en_bus > bus)
+            return ent;
+    }
+
+    return nullptr;
+}
+
+uint32_t pci_config_mmio::read(pci_addr_t addr, size_t offset, size_t size)
+{
+    assert(size <= sizeof(uint32_t));
+
+    int bus = addr.bus();
+
+    pci_ecam_t *ent = find_ecam(bus);
+
+    if (unlikely(!ent))
+        return ~0;
+
+    uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
+            (addr.func() << 12) + unsigned(offset & -4);
+
+    uint32_t data = *(uint32_t*)(ent->mapping + ecam_offset);
+
+    data >>= (offset & 3) << 3;
+
+    if (size != sizeof(uint32_t))
+        data &= ~((uint32_t)-1 << (size << 3));
+
+    return data;
+}
+
+bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
+                            void const *values, size_t size)
+{
+    int bus = addr.bus();
+
+    pci_ecam_t *ent = find_ecam(bus);
+
+    if (unlikely(!ent))
+        return false;
+
+    uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
+            (addr.func() << 12) + unsigned(offset);
+
+    memcpy(ent->mapping + ecam_offset, values, size);
+
+    return true;
+}
+
+bool pci_config_mmio::copy(pci_addr_t addr, void *dest, size_t offset, size_t size)
+{
+    int bus = addr.bus();
+
+    pci_ecam_t *ent = find_ecam(bus);
+
+    if (unlikely(!ent))
+        return false;
+
+    uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
+            (addr.func() << 12) + unsigned(offset);
+
+    memcpy(dest, ent->mapping + ecam_offset, size);
+
+    return true;
+}
+
+uint32_t pci_config_read(pci_addr_t addr, int offset, int size)
+{
+    return pci_accessor->read(addr, offset, size);
+}
+
+bool pci_config_write(pci_addr_t addr, size_t offset, void *values, size_t size)
+{
+    return pci_accessor->write(addr, offset, values, size);
+}
+
+void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
+{
+    pci_accessor->copy(addr, dest, ofs, size);
 }
 
 static void pci_enumerate_read(pci_addr_t addr, pci_config_hdr_t *config)
@@ -558,4 +708,25 @@ char const *pci_device_class_text(uint8_t cls)
     if (cls < sizeof(pci_device_class_text_lookup))
         return pci_device_class_text_lookup[cls];
     return nullptr;
+}
+
+void pci_init_ecam(size_t ecam_count)
+{
+    pci_ecam_list.reserve(ecam_count);
+}
+
+void pci_init_ecam_entry(uint64_t base, uint16_t seg,
+                         uint8_t st_bus, uint8_t en_bus)
+{
+    char *mapping = (char*)mmap((void*)base, uint64_t(en_bus - st_bus) << 20,
+                         PROT_READ | PROT_WRITE,
+                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+    assert(mapping != MAP_FAILED);
+    pci_ecam_list.push_back(pci_ecam_t{base, mapping, seg, st_bus, en_bus});
+}
+
+void pci_init_ecam_enable()
+{
+    printdbg("Using PCIe ECAM for configuration space accesses\n");
+    pci_accessor = &pci_mmio_accessor;
 }

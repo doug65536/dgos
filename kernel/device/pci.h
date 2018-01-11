@@ -5,14 +5,38 @@
 #include "irq.h"
 
 struct pci_addr_t {
+    // Legacy PCI supports 256 busses, 32 slots, 8 functions, and 64 dwords
+    // PCIe supports 16777216 busses, 32 slots, 8 functions, 1024 dwords
+    // PCIe organizes the busses into up to 65536 segments of 256 busses
+
+    //        43       28 27   20 19  15 14  12 11       2 1  0
+    //       +-----------+-------+------+------+----------+----+
+    //  PCIe |  segment  |  bus  | slot | func |   dword  |byte|
+    //       +-----------+-------+------+------+----------+----+
+    //            16         8       5      3       10       2
+    //
+    //                    27   20 19  15 14  12 .. 7     2 1  0
+    //                   +-------+------+------+--+-------+----+
+    //  PCI              |  bus  | slot | func |xx| dword |byte|
+    //                   +-------+------+------+--+-------+----+
+    //                       8       5      3       10       2
+    //
+    //                        31       16 15    8 7    3 2    0
+    //                       +-----------+-------+------+------+
+    //  addr                 |  segment  |  bus  | slot | func |
+    //                       +-----------+-------+------+------+
+    //                            16         8       5      3
+
     pci_addr_t()
         : addr(0)
     {
     }
 
-    pci_addr_t(int bus, int slot, int func)
-        : addr((bus << 16) | (slot << 11) | (func << 8))
+    pci_addr_t(int seg, int bus, int slot, int func)
+        : addr((uint32_t(seg) << 16) | (bus << 8) | (slot << 3) | (func))
     {
+        assert(seg >= 0);
+        assert(seg < 65536);
         assert(bus >= 0);
         assert(bus < 256);
         assert(slot >= 0);
@@ -23,65 +47,32 @@ struct pci_addr_t {
 
     int bus() const
     {
-        return (addr >> 16) & 0xFF;
-    }
-
-    void bus(int n)
-    {
-        addr = (addr & ~(255 << 16)) | (n << 16);
-    }
-
-    bool next_bus()
-    {
-        int n = bus();
-        if (n + 1 < 256) {
-            bus(n + 1);
-            return true;
-        }
-        return false;
+        return (addr >> 8) & 0xFF;
     }
 
     int slot() const
     {
-        return (addr >> 11) & 0x1F;
-    }
-
-    void slot(int n)
-    {
-        addr = (addr & ~(31 << 11)) | (n << 11);
-    }
-
-    bool next_slot()
-    {
-        int n = slot();
-        if (n + 1 < 32) {
-            slot(n + 1);
-            return true;
-        }
-        return false;
+        return (addr >> 3) & 0x1F;
     }
 
     int func() const
     {
-        return (addr >> 8) & 7;
+        return addr & 0x7;
     }
 
-    void func(int n)
+    // Returns true if segment is zero
+    bool is_legacy() const
     {
-        addr = (addr & ~(7 << 8)) | (n << 8);
+        return (addr < 65536);
     }
 
-    bool next_func()
+    uint64_t get_addr() const
     {
-        int n = func();
-        if (n + 1 < 8) {
-            func(n + 1);
-            return true;
-        }
-        return false;
+        return addr << 12;
     }
 
-    int addr;
+private:
+    uint32_t addr;
 };
 
 struct pci_config_hdr_t {
@@ -215,15 +206,16 @@ struct pci_dev_t {
 struct pci_dev_iterator_t : public pci_dev_t {
     operator pci_addr_t() const
     {
-        return pci_addr_t(bus, slot, func);
+        return pci_addr_t(segment, bus, slot, func);
     }
 
-    int dev_class;
-    int subclass;
-
+    int segment;
     int bus;
     int slot;
     int func;
+
+    int dev_class;
+    int subclass;
 
     uint8_t header_type;
 
@@ -239,7 +231,7 @@ int pci_enumerate_next(pci_dev_iterator_t *iter);
 
 uint32_t pci_config_read(pci_addr_t addr, int offset, int size);
 
-int pci_config_write(pci_addr_t addr,
+bool pci_config_write(pci_addr_t addr,
         size_t offset, void *values, size_t size);
 
 void pci_config_copy(pci_addr_t addr,
@@ -279,6 +271,11 @@ struct pci_irq_range_t {
     uint8_t base;
     uint8_t count;
 };
+
+void pci_init_ecam(size_t ecam_count);
+void pci_init_ecam_entry(uint64_t base, uint16_t seg,
+                         uint8_t st_bus, uint8_t en_bus);
+void pci_init_ecam_enable();
 
 bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,

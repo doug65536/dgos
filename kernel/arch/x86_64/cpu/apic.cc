@@ -595,6 +595,22 @@ struct acpi_sdt_hdr_t {
 
 C_ASSERT(sizeof(acpi_sdt_hdr_t) == 36);
 
+// PCIe Enhanced Configuration Access Mechanism record in MCFG table
+struct acpi_ecam_rec_t {
+    uint64_t ecam_base;
+    uint16_t segment_group;
+    uint8_t st_bus;
+    uint8_t en_bus;
+    uint32_t reserved;
+} __packed;
+
+// MCFG table
+struct acpi_mcfg_hdr_t {
+    acpi_sdt_hdr_t hdr;
+    uint64_t reserved;
+    // followed by instances of acpi_ecam_record_t
+} __packed;
+
 // Generic Address Structure
 struct acpi_gas_t {
     uint8_t addr_space;
@@ -1144,6 +1160,26 @@ static void acpi_parse_rsdt()
                 acpi_process_hpet(hpet_hdr);
             } else {
                 ACPI_ERROR("ACPI MADT checksum mismatch!\n");
+            }
+        } else if (!memcmp(hdr->sig, "MCFG", 4)) {
+            acpi_mcfg_hdr_t *mcfg_hdr = (acpi_mcfg_hdr_t*)hdr;
+
+            if (acpi_chk_hdr(&mcfg_hdr->hdr) == 0) {
+                acpi_ecam_rec_t *ecam_ptr = (acpi_ecam_rec_t*)(mcfg_hdr+1);
+                acpi_ecam_rec_t *ecam_end = (acpi_ecam_rec_t*)
+                        ((char*)mcfg_hdr + mcfg_hdr->hdr.len);
+                size_t ecam_count = ecam_end - ecam_ptr;
+                pci_init_ecam(ecam_count);
+                for (size_t i = 0; i < ecam_count; ++i) {
+                    ACPI_TRACE("PCIe ECAM ptr=%lx busses=%u-%u\n",
+                               ecam_ptr[i].ecam_base,
+                               ecam_ptr[i].st_bus, ecam_ptr[i].en_bus);
+                    pci_init_ecam_entry(ecam_ptr[i].ecam_base,
+                                        ecam_ptr[i].segment_group,
+                                        ecam_ptr[i].st_bus,
+                                        ecam_ptr[i].en_bus);
+                }
+                pci_init_ecam_enable();
             }
         } else {
             if (acpi_chk_hdr(hdr) == 0) {
@@ -1981,7 +2017,7 @@ public:
     int64_t read() const override final
     {
         value_type result;
-        pci_config_copy(pci_addr_t(0, (dfo >> 32) & 0xFF,
+        pci_config_copy(pci_addr_t(0, 0, (dfo >> 32) & 0xFF,
                         (dfo >> 16) & 0xFF), &result,
                         dfo & 0xFF, size);
         return result;
@@ -1989,7 +2025,7 @@ public:
 
     void write(int64_t value) const override final
     {
-        pci_config_write(pci_addr_t(0, (dfo >> 32) & 0xFF,
+        pci_config_write(pci_addr_t(0, 0, (dfo >> 32) & 0xFF,
                          (dfo >> 16) & 0xFF), dfo & 0xFF, &value, size);
     }
 
