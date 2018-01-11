@@ -934,8 +934,9 @@ static int init_thread(void *p)
     printdbg("Running block read stress with %d threads\n",
              ENABLE_READ_STRESS_THREAD);
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
-        thread_create(read_stress, (char*)(uintptr_t)
+        thread_t tid = thread_create(read_stress, (char*)(uintptr_t)
                       (0xb8000+ 80*2 + 2*i), 0, false);
+        printdbg("Read stress id[%d]=%d\n", i, tid);
     }
 #endif
 
