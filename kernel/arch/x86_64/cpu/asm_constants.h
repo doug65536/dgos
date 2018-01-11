@@ -7,7 +7,6 @@
 #define CPU_INFO_TSS_PTR_OFS        16
 #define TSS_RSP0_OFS                8
 #define THREAD_XSAVE_PTR_OFS        8
-#define THREAD_XSAVE_STACK_OFS      16
 #define THREAD_FSBASE_OFS           24
 #define THREAD_GSBASE_OFS           32
 #define THREAD_STACK_OFS            96

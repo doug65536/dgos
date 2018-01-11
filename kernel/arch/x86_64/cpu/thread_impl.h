@@ -37,8 +37,8 @@ void thread_cls_for_each_cpu(size_t slot, int other_only,
 
 void thread_send_ipi(int cpu, int intr);
 
-uintptr_t thread_get_fsbase(int thread);
-uintptr_t thread_get_gsbase(int thread);
+void *thread_get_fsbase(int thread);
+void *thread_get_gsbase(int thread);
 
 __const
 static __always_inline process_t *fast_cur_process()

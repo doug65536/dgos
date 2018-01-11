@@ -75,13 +75,13 @@ struct cpu_info_t;
 struct alignas(64) thread_info_t {
     isr_context_t * volatile ctx;
 
-    char *xsave_ptr;
-    char *xsave_stack;
+    char * volatile xsave_ptr;
+    uint64_t volatile cpu_affinity;
 
-    uintptr_t fsbase;
-    uintptr_t gsbase;
+    void * volatile fsbase;
+    void * volatile gsbase;
 
-    char *syscall_stack;
+    char * volatile syscall_stack;
 
     process_t *process;
 
@@ -91,14 +91,13 @@ struct alignas(64) thread_info_t {
     thread_state_t volatile state;
 
     // --- cache line ---
+    char *xsave_stack;
 
     uint32_t flags;
     // Doesn't include guard page
     uint32_t stack_size;
 
     uint64_t volatile wake_time;
-
-    uint64_t volatile cpu_affinity;
 
     void *exception_chain;
 
@@ -120,13 +119,12 @@ struct alignas(64) thread_info_t {
     uint64_t sched_timestamp;
 };
 
-C_ASSERT(offsetof(thread_info_t, flags) == 64);
+C_ASSERT(offsetof(thread_info_t, xsave_stack) == 64);
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_stack) == THREAD_SYSCALL_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, xsave_stack) == THREAD_XSAVE_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
@@ -1035,13 +1033,13 @@ errno_t thread_get_error()
     return info->errno;
 }
 
-uintptr_t thread_get_fsbase(int thread)
+void *thread_get_fsbase(int thread)
 {
     thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
     return info->fsbase;
 }
 
-uintptr_t thread_get_gsbase(int thread)
+void *thread_get_gsbase(int thread)
 {
     thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
     return info->gsbase;

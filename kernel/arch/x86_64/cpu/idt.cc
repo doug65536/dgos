@@ -551,8 +551,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
         "ds", "es", "fs", "gs"
     };
 
-    uintptr_t fsbase = thread_get_fsbase(-1);
-    uintptr_t gsbase = thread_get_gsbase(-1);
+    void *fsbase = thread_get_fsbase(-1);
+    void *gsbase = thread_get_gsbase(-1);
 
     //
     // Dump context to debug console
@@ -634,10 +634,10 @@ void dump_context(isr_context_t *ctx, int to_screen)
     printdbg("rflags=%06lx %s\n", ISR_CTX_REG_RFLAGS(ctx), fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%16zx\n", fsbase);
+    printdbg("fsbase=%16p\n", fsbase);
 
     // gsbase
-    printdbg("gsbase=%16lx\n", gsbase);
+    printdbg("gsbase=%16p\n", gsbase);
 
     printdbg("-------------------------------------------\n");
 
@@ -741,12 +741,12 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%16zx ", fsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%16p ", fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx ", gsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%16p ", gsbase);
     con_draw_xy(6, 21, fmt_buf, color);
 
     if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)
