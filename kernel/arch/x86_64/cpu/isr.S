@@ -318,19 +318,8 @@ isr_common:
     // If segments are not changing, avoid 136*4 cycles
     cmpq %r13,%rdx
     jnz .Lsegments_changed
-    jmp .Lsegments_not_changed
 
-.align 16
-.Lsegments_changed:
-    // Restore segments
-    movl $(GDT_SEL_USER_DATA | 3),%eax
-    movw %ax,%ds
-    movw %ax,%es
-    movw %ax,%fs
-    movw %ax,%gs
-
-.align 16
-.Lsegments_not_changed:
+.Lsegments_restored:
 .Lreturning_to_kernel:
     // Restore CR3
     popq %rax
@@ -379,6 +368,7 @@ isr_common:
     .cfi_restore r15
 
     popq %rbp
+    .cfi_remember_state
     .cfi_restore rbp
     .cfi_def_cfa_register rsp
     .cfi_def_cfa_offset 24
@@ -387,7 +377,18 @@ isr_common:
 
     iretq
 
-    .cfi_endproc
+.align 16
+.Lsegments_changed:
+   .cfi_restore_state
+   // Restore segments
+   movl $(GDT_SEL_USER_DATA | 3),%eax
+   movw %ax,%ds
+   movw %ax,%es
+   movw %ax,%fs
+   movw %ax,%gs
+   jmp .Lsegments_restored
+
+   .cfi_endproc
 
 // Expects ds loaded with kernel data segment
 // Clobbers rcx,rdx,rax,rdi
