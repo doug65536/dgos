@@ -215,7 +215,7 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
                              (iter->config.base_addr[2] >> 8) & 0xFF;
                      iter->bus_todo[iter->bus_todo_len++] = secondary_bus;
                 } else {
-                    printdbg("Too many PCI bridges! Droppped one\n");
+                    printdbg("Too many PCI bridges! Dropped one\n");
                 }
             }
 

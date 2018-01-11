@@ -302,7 +302,6 @@ isr_common:
 
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
-    // Compare against user segment because the CPU pushes nonsense for #DF
     cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
     je .Lreturning_to_kernel
 
