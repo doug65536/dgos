@@ -12,6 +12,7 @@
 syscall_entry:
     .cfi_startproc
     .cfi_register rip,rcx
+    .cfi_return_column rcx
     .cfi_def_cfa_register rsp
     .cfi_def_cfa_offset 0
 
