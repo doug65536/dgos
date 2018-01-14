@@ -146,7 +146,7 @@ static int read_stress(void *p)
     uint64_t seed = 42;
     char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 24];
     while (1) {
-        ++*(char*)p;
+        ++*(short*)p;
 
         uint64_t lba = rand_r_range(&seed, 16, 1000 - data_blocks);
         //int64_t count = rand_r_range(&seed, 1, data_blocks);
@@ -173,7 +173,9 @@ static int read_stress(void *p)
             if (delta_time > 1000000000) {
                 uint64_t completion_delta = completions - last_completions;
                 ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu/sec",
-                                (1000 * completion_delta) / (now - last_time));
+                                (delta_time * completion_delta) /
+                                (now - last_time));
+//                                completion_delta);
                 last_completions = completions;
                 last_time = now;
             }
