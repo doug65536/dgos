@@ -83,7 +83,7 @@ struct alignas(64) thread_info_t {
 
     char * volatile syscall_stack;
 
-    process_t *process;
+    uint64_t volatile wake_time;
 
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
@@ -97,7 +97,7 @@ struct alignas(64) thread_info_t {
     // Doesn't include guard page
     uint32_t stack_size;
 
-    uint64_t volatile wake_time;
+    process_t *process;
 
     void *exception_chain;
 
@@ -108,6 +108,9 @@ struct alignas(64) thread_info_t {
     errno_t errno;
 
     // 3 bytes...
+
+    spinlock state_lock;
+    int wake_count;
 
     mutex_t lock;
     condition_var_t done_cond;
@@ -141,7 +144,7 @@ size_t storage_next_slot;
 static size_t constexpr syscall_stack_size = (size_t(8) << 10);
 static size_t constexpr xsave_stack_size = (size_t(64) << 10);
 
-struct alignas(64) cpu_info_t {
+struct alignas(128) cpu_info_t {
     cpu_info_t *self;
     thread_info_t * volatile cur_thread;
     tss_t *tss_ptr;
@@ -152,6 +155,11 @@ struct alignas(64) cpu_info_t {
     // Used for lazy TLB shootdown
     uint64_t mmu_seq;
     uint64_t volatile tlb_shootdown_count;
+
+    uint32_t time_ratio;
+    uint32_t busy_ratio;
+    uint32_t busy_percent;
+    uint64_t irq_count;
 
     spinlock_t queue_lock;
 
@@ -165,7 +173,7 @@ C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
-    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0,
+    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0,
       { 0, 0, 0, 0, 0, 0, 0, 0 }
     }
 };
@@ -592,6 +600,13 @@ static thread_info_t *thread_choose_next(
                 ? THREAD_IS_READY
                 : THREAD_IS_READY_BUSY;
 
+        unique_lock<spinlock> hold(candidate->state_lock);
+        if (candidate->state == THREAD_IS_SUSPENDED && candidate->wake_count) {
+            --candidate->wake_count;
+            candidate->state = THREAD_IS_READY;
+        }
+        hold.unlock();
+
         if (unlikely(candidate->state == expected_sleep)) {
             // The thread is sleeping, see if it should wake up yet
 
@@ -664,8 +679,26 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     // Store context pointer for resume later
     assert(thread->ctx == nullptr);
     thread->ctx = (isr_context_t*)ctx;
+
     uint64_t now = cpu_rdtsc();
-    thread->used_time += now - thread->sched_timestamp;
+    uint64_t elapsed = now - thread->sched_timestamp;
+
+    thread->used_time += elapsed;
+
+    // Accumulate used and busy time on this CPU
+    cpu->time_ratio += elapsed;
+    cpu->busy_ratio += elapsed & -(thread >= threads + cpu_count);
+
+    // Normalize ratio to < 32768
+    uint8_t time_scale = bit_msb_set(cpu->time_ratio);
+    if (time_scale > 15) {
+        time_scale -= 15;
+        cpu->time_ratio >>= time_scale;
+        cpu->busy_ratio >>= time_scale;
+    }
+
+    if (likely(cpu->time_ratio))
+        cpu->busy_percent = 100 * cpu->busy_ratio / cpu->time_ratio;
 
     // Change to ready if running
     if (likely(thread->state == THREAD_IS_RUNNING)) {
@@ -791,9 +824,17 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     thread_info_t *thread = this_thread();
 
     *thread_id = thread - threads;
-    atomic_barrier();
+
+    // See if we can consume a stored wakeup
+    unique_lock<spinlock> hold(thread->state_lock);
+    if (thread->wake_count) {
+        --thread->wake_count;
+        return;
+    }
 
     thread->state = THREAD_IS_SUSPENDED_BUSY;
+    hold.unlock();
+
     atomic_barrier();
     spinlock_t saved_lock = spinlock_unlock_save(lock);
     thread_yield();
@@ -801,21 +842,17 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     spinlock_lock_restore(lock, saved_lock);
 }
 
-EXPORT void thread_resume(thread_t thread)
+EXPORT void thread_resume(thread_t tid)
 {
-    // Wait for it to reach suspended state in case of race
-    int wait_count = 0;
-    for ( ; threads[thread].state != THREAD_IS_SUSPENDED;
-          ++wait_count)
-        pause();
+    thread_info_t *thread = threads + tid;
 
-    if (wait_count > 2) {
-        printdbg("Resuming thread %d with old state %x, waited %d\n",
-                 thread, threads[thread].state, wait_count);
+    unique_lock<spinlock> hold(thread->state_lock);
+
+    if (thread->state == THREAD_IS_SUSPENDED) {
+        thread->state = THREAD_IS_READY;
+    } else {
+        ++thread->wake_count;
     }
-
-    //threads[thread].priority_boost = 128;
-    threads[thread].state = THREAD_IS_READY;
 }
 
 EXPORT int thread_wait(thread_t thread_id)
