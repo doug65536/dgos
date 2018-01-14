@@ -46,8 +46,8 @@
 // DH,DL = row,column at which to start writing.
 // ES:BP -> string to write
 static void bios_print_at(
-        uint8_t row, uint8_t col, uint8_t attr,
-        uint16_t length, char const *text)
+        int row, int col, uint8_t attr,
+        size_t length, char const *text)
 {
     bios_regs_t regs;
 
@@ -358,10 +358,10 @@ void print_line(char const* format, ...)
     va_end(ap);
 }
 
-void print_xy(int x, int y, uint8_t ch, uint16_t attr, uint16_t count)
+void print_xy(int x, int y, uint8_t ch, uint16_t attr, size_t count)
 {
     char *buf = (char*)__builtin_alloca(count+1);
-    for (uint16_t ofs = 0; ofs < count; ++ofs)
+    for (size_t ofs = 0; ofs < count; ++ofs)
         buf[ofs] = (char)ch;
     buf[count] = 0;
     print_at(y, x, attr, count, buf);

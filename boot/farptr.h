@@ -28,7 +28,7 @@ static __always_inline void *far_to_ptr(far_ptr_t const& ptr)
     return (void*)far_to_addr(ptr);
 }
 
-static __always_inline void far_zero(far_ptr_t dest, uint16_t paragraphs)
+static __always_inline void far_zero(far_ptr_t dest, unsigned paragraphs)
 {
     void *addr = far_to_ptr(dest);
     size_t size = paragraphs << 4;
@@ -53,7 +53,7 @@ static __always_inline far_ptr_t far_ptr2(uint16_t seg, uint16_t ofs)
 
 static __always_inline far_ptr_t far_ptr(uint32_t addr)
 {
-    return far_ptr2(addr >> 4, addr & 0x0F);
+    return far_ptr2(uint16_t(addr >> 4), uint16_t(addr & 0x0F));
 }
 
 static __always_inline void far_copy_to(
@@ -74,5 +74,5 @@ static __always_inline far_ptr_t far_adj(far_ptr_t ptr, int32_t distance)
 {
     uint32_t addr = ((uint32_t)ptr.segment << 4) + ptr.offset;
     addr += distance;
-    return far_ptr2(addr >> 4, addr & 0x0F);
+    return far_ptr2(uint16_t(addr >> 4), uint16_t(addr & 0x0F));
 }

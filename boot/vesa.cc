@@ -118,8 +118,12 @@ static uint16_t vbe_set_mode(uint16_t mode)
     return (regs.eax & 0xFFFF) == 0x4F;
 }
 
-static uint16_t gcd(uint16_t a, uint16_t b)
+__const
+static unsigned gcd(unsigned a, unsigned b)
 {
+    if (!a || !b)
+        return a > b ? a : b;
+
     while (a != b) {
         if (a > b)
             a -= b;
@@ -152,7 +156,7 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
     if (vbe_detect(info)) {
         VESA_TRACE("VBE Memory %dMB\n", info->mem_size_64k >> 4);
 
-        for (uint16_t ofs = 0; !done; ofs += sizeof(uint16_t)) {
+        for (int ofs = 0; !done; ofs += sizeof(uint16_t)) {
             // Get mode number
             far_copy_to(&mode,
                         far_adj(info->mode_list_ptr, ofs),

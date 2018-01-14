@@ -62,8 +62,8 @@ size_t utf8_to_utf16(uint16_t *output, size_t out_size_words, char const *in)
             return 0;
         } else {
             ch -= 0x10000;
-            *out++ = 0xD800 + ((ch >> 10) & 0x3FF);
-            *out++ = 0xDC00 + (ch & 0x3FF);
+            *out++ = uint16_t(0xD800 + ((ch >> 10) & 0x3FF));
+            *out++ = uint16_t(0xDC00 + (ch & 0x3FF));
         }
     }
 

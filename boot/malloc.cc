@@ -16,10 +16,10 @@
 
 // Next free location for aligned far allocations
 // Starts at top of first 64KB
-static uint16_t free_seg_st = 0x1000;
+static unsigned free_seg_st = 0x1000;
 
 // Aligned top of memory for far allocations
-static uint16_t free_seg_en;
+static unsigned free_seg_en;
 
 static uint16_t get_top_of_low_memory() {
     // Read top of memory from BIOS data area
@@ -32,8 +32,8 @@ uint16_t far_malloc(uint32_t bytes)
     if (free_seg_en == 0)
         free_seg_en = get_top_of_low_memory();
 
-    uint16_t paragraphs = (bytes - 1 + (1 << 4)) >> 4;
-    uint16_t segment = (free_seg_en -= paragraphs);
+    unsigned paragraphs = (bytes - 1 + (1 << 4)) >> 4;
+    unsigned segment = (free_seg_en -= paragraphs);
     far_zero(far_ptr2(segment, 0), paragraphs);
 
     MALLOC_TRACE("far malloc %u bytes returns segment %u\n",
@@ -45,8 +45,8 @@ uint16_t far_malloc(uint32_t bytes)
 // Returns segment guaranteed aligned on page boundary
 uint16_t far_malloc_aligned(uint32_t bytes)
 {
-    uint16_t segment = free_seg_st;
-    uint16_t paragraphs = ((bytes - 1 + (1 << 12)) & -4096) >> 4;
+    unsigned segment = free_seg_st;
+    unsigned paragraphs = ((bytes - 1 + (1 << 12)) & -4096) >> 4;
     free_seg_st += paragraphs;
     far_zero(far_ptr2(segment, 0), paragraphs);
 
@@ -95,12 +95,12 @@ static void check_valid_header(uint16_t v)
 }
 #endif
 
-static __always_inline uint16_t addr_of(void *p)
+static __always_inline unsigned addr_of(void *p)
 {
-    return (uint16_t)(uint32_t)p;
+    return unsigned(p);
 }
 
-static __always_inline uint16_t payload_of(uint16_t addr)
+static __always_inline unsigned payload_of(uint16_t addr)
 {
     DEBUG_ONLY(check_valid_header(addr))
     return addr + 3;
@@ -319,7 +319,7 @@ void free(void *p)
     }
 }
 
-void *calloc(uint16_t num, uint16_t size)
+void *calloc(unsigned num, unsigned size)
 {
     uint16_t bytes = num * size;
     void *block = malloc(bytes);
@@ -430,6 +430,7 @@ void *operator new(size_t size) noexcept
     return malloc(size);
 }
 
+__const
 void *operator new(size_t, void *p) noexcept
 {
     return p;

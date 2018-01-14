@@ -235,7 +235,7 @@ static int iso9660_find_available_file_handle()
 
 static uint16_t bswap_16(uint16_t n)
 {
-    return (n >> 8) | (n << 8);
+    return (n >> 8) | uint16_t(n << 8);
 }
 
 static int iso9660_lvl2_cmp(void const *candidate,
