@@ -20,8 +20,8 @@ struct fat32_bpb_data_t {
     uint8_t number_of_fats;		// 0x10 Always 2
 
     // Inferred from data in on-disk BPB
-    uint32_t first_fat_lba;
-    uint32_t cluster_begin_lba;
+    uint64_t first_fat_lba;
+    uint64_t cluster_begin_lba;
 } __packed;
 
 // DOS date bitfields
