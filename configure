@@ -6658,7 +6658,10 @@ for flag in \
 		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
-		ffunction-sections Wno-unused-parameter Werror=return-type
+		ffunction-sections Wno-unused-parameter Werror=return-type \
+		Wstrict-aliasing \
+		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
+		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
@@ -6699,6 +6702,54 @@ fi
 
 done
 
+#Wsuggest-attribute=noreturn
+#Wsuggest-attribute=format
+#Wsuggest-attribute=pure
+#Wsuggest-attribute=const
+
+OPTIMIZATION_FLAGS=
+for flag in \
+	O2 fipa-pta fgcse-las fsched-pressure fipa-bit-cp ftree-vectorize \
+	fstrict-aliasing
+do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
+$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CFLAGS
+  CFLAGS="$CFLAGS $COMPILER_WERROR -$flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
+  OPTIMIZATION_FLAGS+=" -$flag"
+else
+  :
+fi
+
+done
 
 for flag in Wa,-g g ggdb3
 do
@@ -7562,7 +7613,10 @@ if test "${enable_optimize+set}" = set; then :
   enableval=$enable_optimize;
 		echo Enabling optimizations
 		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS $ENABLE_FRAMEPOINTER_FLAGS" # $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="$OPTIMIZATION_FLAGS"
+		OPTIMIZE_SPEED_FLAGS+=" $VECTORIZE_FLAGS $ENABLE_FRAMEPOINTER_FLAGS"
+
+		# $DISABLE_FRAMEPOINTER_FLAGS"
 		OPTIMIZE_SPEED_FLAGS+=" $TUNE_FLAGS"
 
 else

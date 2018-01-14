@@ -56,13 +56,30 @@ for flag in \
 		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
-		ffunction-sections Wno-unused-parameter Werror=return-type
+		ffunction-sections Wno-unused-parameter Werror=return-type \
+		Wstrict-aliasing \
+		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
+		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[COMPILER_FLAGS+=" -$flag"],
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([COMPILER_FLAGS])
+#Wsuggest-attribute=noreturn
+#Wsuggest-attribute=format
+#Wsuggest-attribute=pure
+#Wsuggest-attribute=const
+
+OPTIMIZATION_FLAGS=
+for flag in \
+	O2 fipa-pta fgcse-las fsched-pressure fipa-bit-cp ftree-vectorize \
+	fstrict-aliasing
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[OPTIMIZATION_FLAGS+=" -$flag"],
+		[], [$COMPILER_WERROR])
+done
 
 for flag in Wa,-g g ggdb3
 do
@@ -219,7 +236,10 @@ AC_ARG_ENABLE(optimize,
 	[
 		echo Enabling optimizations
 		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="-O2 $VECTORIZE_FLAGS $ENABLE_FRAMEPOINTER_FLAGS" # $DISABLE_FRAMEPOINTER_FLAGS"
+		OPTIMIZE_SPEED_FLAGS="$OPTIMIZATION_FLAGS"
+		OPTIMIZE_SPEED_FLAGS+=" $VECTORIZE_FLAGS $ENABLE_FRAMEPOINTER_FLAGS"
+
+		# $DISABLE_FRAMEPOINTER_FLAGS"
 		OPTIMIZE_SPEED_FLAGS+=" $TUNE_FLAGS"
 	],[
 		echo Disabling optimizations
