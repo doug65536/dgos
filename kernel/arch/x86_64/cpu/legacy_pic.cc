@@ -4,6 +4,7 @@
 #include "cpu/halt.h"
 #include "control_regs.h"
 #include "interrupts.h"
+#include "picbits.h"
 
 // Implements legacy Programmable Interrupt Controller,
 // used if the APIC is not available
@@ -26,29 +27,33 @@ static uint16_t pic8259_mask;
 static void pic8259_init(uint8_t pic1_irq_base,
                          uint8_t pic2_irq_base)
 {
-    // Expect BIOS has configured master/slave
-    outb(PIC1_CMD, 0x11);
-    outb(PIC2_CMD, 0x11);
+    // Base IRQ must be aligned to a multiple of 8
+    assert((pic1_irq_base & PIC_ICW2_VECTOR) == pic1_irq_base);
+    assert((pic2_irq_base & PIC_ICW2_VECTOR) == pic2_irq_base);
+
+    // It doesn't make sense for them both to be at the same base
+    assert(pic1_irq_base != pic2_irq_base);
+
+    // ICW1 - ICW4 needed
+    outb(PIC1_BASE + PIC_ICW1, PIC_ICW1_IC4 | PIC_ICW1_MBS);
+    outb(PIC2_BASE + PIC_ICW1, PIC_ICW1_IC4 | PIC_ICW1_MBS);
 
     // Base IRQs
-    outb(PIC1_DATA, pic1_irq_base);
-    outb(PIC2_DATA, pic2_irq_base);
+    outb(PIC1_BASE + PIC_ICW2, pic1_irq_base);
+    outb(PIC2_DATA + PIC_ICW2, pic2_irq_base);
 
-    // Slave at IRQ 2
-    outb(PIC1_DATA, 1 << 2);
-
-    // Cascade identity
-    outb(PIC2_DATA, 2);
+    // Slave at IRQ 2, cascade ID
+    outb(PIC1_BASE + PIC_ICW3_M, PIC_ICW3_M_S2);
+    outb(PIC2_BASE + PIC_ICW3_S, PIC_ICW3_S_ID_n(2));
 
     // 8086 mode
-    outb(PIC1_DATA, 0x01);
-    outb(PIC2_DATA, 0x01);
+    outb(PIC1_BASE + PIC_ICW4, PIC_ICW4_8086);
+    outb(PIC2_BASE + PIC_ICW4, PIC_ICW4_8086);
 
     // Initially all IRQs masked
     pic8259_mask = 0xFFFF;
-
-    outb(PIC1_DATA, pic8259_mask & 0xFF);
-    outb(PIC2_DATA, (pic8259_mask >> 8) & 0xFF);
+    outb(PIC1_BASE + PIC_OCW1, pic8259_mask & 0xFF);
+    outb(PIC2_BASE + PIC_OCW1, (pic8259_mask >> 8) & 0xFF);
 }
 
 // Get command port for master or slave

@@ -1043,7 +1043,8 @@ generated_headers: \
 	$(top_srcdir)/kernel/device/nvmebits.h \
 	$(top_srcdir)/kernel/device/pcibits.h \
 	$(top_srcdir)/kernel/device/i350bits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h
+	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h
 
 .PHONY: generated_headers
 
@@ -1070,6 +1071,13 @@ $(top_srcdir)/kernel/device/i350bits.h: \
 
 $(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
 		$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h: \
+		$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
