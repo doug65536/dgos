@@ -148,7 +148,8 @@ template<typename T>
 __const
 static constexpr __always_inline uint8_t bit_msb_set(T const& n)
 {
-    return bit_msb_set_n(n, integral_constant<uint8_t, sizeof(n)>::type());
+    return bit_msb_set_n(n, typename integral_constant<
+                         uint8_t, sizeof(n)>::type());
 }
 
 //
@@ -246,5 +247,6 @@ template<typename T>
 __const
 static constexpr __always_inline uint8_t bit_popcnt(T const& n)
 {
-    return bit_popcnt_n(n, integral_constant<uint8_t, sizeof(n)>::type());
+    return bit_popcnt_n(n, typename integral_constant<
+                        uint8_t, sizeof(n)>::type());
 }
