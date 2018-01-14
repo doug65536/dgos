@@ -166,10 +166,10 @@ struct storage_dev_base_t {
 
     // Synchronous wrappers
 
-    virtual int read_blocks(
+    int read_blocks(
             void *data, int64_t count, uint64_t lba);
 
-    virtual int write_blocks(
+    int write_blocks(
             void const *data, int64_t count, uint64_t lba, bool fua);
 
     virtual int64_t trim_blocks(int64_t count, uint64_t lba);
