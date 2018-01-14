@@ -28,7 +28,6 @@ C_ASSERT((SYSCALL_RFLAGS & ~uintptr_t(0x3C7FD7)) == 0);
 
 idt_entry_64_t idt[256];
 
-static irq_dispatcher_handler_t irq_dispatcher_vec;
 static idt_unhandled_exception_handler_t unhandled_exception_handler_vec;
 
 uint32_t xsave_supported_states;
@@ -226,16 +225,6 @@ extern "C" isr_entry_t const isr_entry_points[256] = {
     isr_entry_248, isr_entry_249, isr_entry_250, isr_entry_251,
     isr_entry_252, isr_entry_253, isr_entry_254, isr_entry_255
 };
-
-void irq_dispatcher_set_handler(irq_dispatcher_handler_t handler)
-{
-    irq_dispatcher_vec = handler;
-}
-
-isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx)
-{
-    return irq_dispatcher_vec(intr, ctx);
-}
 
 #if 0
 static void idtr_load(table_register_64_t *table_reg)
