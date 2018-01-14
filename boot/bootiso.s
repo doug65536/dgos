@@ -1,3 +1,5 @@
+.code32
+
 .code16
 .section .head
 .globl entry
@@ -45,37 +47,22 @@ entry_start:
 	movw %ax,%ds
 	movw %ax,%es
 
-	# Relocate to 0x800
-	mov $__initialized_data_end,%cx
-	sub $entry,%cx
-	mov $0x7c00,%si
-	mov $0x800,%di
+	# Relocate to linked address
+	movw $256,%cx
+	movw $0x7c00,%si
+	movw $entry,%di
 	cld
-	rep movsb
+	rep movsw
 
-	ljmp $0,$reloc_entry
+	ljmpw $0,$reloc_entry
 reloc_entry:
-	call clear_bss
 	mov %dl,boot_drive
-
-call_constructors:
-	movl $__ctors_start,%ebx
-0:
-	cmpl $__ctors_end,%ebx
-	jae 0f
-	movl (%ebx),%eax
-	test %eax,%eax
-	jz 1f
-	cmpl $entry,%eax
-	jb 1f
-	call *%eax
-1:
-	addl $4,%ebx
-	jmp 0b
-0:
+	call clear_bss
 
 	mov bootinfo_primary_volume_desc,%eax
-	call iso9660_boot_partition
+	xor %edx,%edx
+	mov $iso9660_boot_partition,%ecx
+	call boot
 unreachable:
 	hlt
 	jmp unreachable

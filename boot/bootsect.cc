@@ -23,7 +23,7 @@ struct disk_address_packet_t {
 // 0 on success, otherwise BIOS error code
 uint8_t read_lba_sectors(
         char *buf, uint8_t drive,
-        uint32_t lba, uint16_t count)
+        uint64_t lba, uint16_t count)
 {
     // Extended Read LBA sectors
     // INT 13h AH=42h

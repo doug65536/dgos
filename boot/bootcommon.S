@@ -106,13 +106,16 @@ gdtr:
 .code16
 
 // Inputs:
-//  eax: parameter to partition boot call
-//  edx: pointer to partition boot function
+//  edx:eax: parameter to partition boot call
+//  ecx: pointer to partition boot function
 
 .global boot
 boot:
+    // ebx:esi holds boot LBA
+    // edi holds boot function
     mov %eax,%ebx
     mov %edx,%esi
+    mov %ecx,%edi
 
     call idt_init
     call check_a20
@@ -146,10 +149,11 @@ pmode_entry:
 
     call call_constructors
 
-    mov %esp,%edi
+    mov %esp,%ebp
     mov %ebx,%eax
-    call *%esi
-    mov %edi,%esp
+    mov %esi,%edx
+    call *%edi
+    mov %ebp,%esp
 
     call cpu_a20_exitpm
 

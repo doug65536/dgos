@@ -10,7 +10,7 @@ struct fat32_sector_iterator_t {
     uint32_t start_cluster;
 
     // Cluster number of current position
-    uint32_t cluster;
+    uint64_t cluster;
 
     // Offset from start_cluster in sectors
     // (This being 32 bit means max file size is 2TB)
@@ -35,4 +35,4 @@ struct dir_iterator_t {
     uint16_t sector_index;
 };
 
-extern "C" void fat32_boot_partition(uint32_t partition_lba);
+extern "C" void fat32_boot_partition(uint64_t partition_lba);

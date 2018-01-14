@@ -196,7 +196,7 @@ struct iso9660_pvd_t {
 };
 
 struct iso9660_sector_iterator_t {
-    uint32_t lba;
+    uint64_t lba;
     uint32_t size;
     uint16_t err;
 };
@@ -283,7 +283,7 @@ static void *iso9660_joliet_search(void const *candidate,
 }
 
 static uint32_t find_file_by_name(char const *filename,
-                                  uint32_t dir_lba,
+                                  uint64_t dir_lba,
                                   uint32_t dir_size,
                                   uint32_t *file_size)
 {
@@ -327,7 +327,7 @@ static uint32_t find_file_by_name(char const *filename,
 static int8_t iso9660_sector_iterator_begin(
         iso9660_sector_iterator_t *iter,
         char *sector,
-        uint32_t cluster,
+        uint64_t cluster,
         uint32_t size)
 {
     iter->lba = cluster;

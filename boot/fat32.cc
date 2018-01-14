@@ -21,12 +21,13 @@ static char *sector_buffer;
 static char *fat_buffer;
 uint32_t fat_buffer_lba;
 
-static uint32_t next_cluster(uint32_t current_cluster, char *sector, uint8_t *err_ptr);
+static uint32_t next_cluster(uint64_t current_cluster,
+                             char *sector, uint8_t *err_ptr);
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
 // Returns
-static uint8_t read_bpb(uint32_t partition_lba)
+static uint8_t read_bpb(uint64_t partition_lba)
 {
     sector_buffer = (char*)malloc(512);
     fat_buffer = (char*)malloc(512);
@@ -61,7 +62,7 @@ static bool is_eof_cluster(uint32_t cluster)
 static int fat32_sector_iterator_begin(
         fat32_sector_iterator_t *iter,
         char *sector,
-        uint32_t cluster)
+        uint64_t cluster)
 {
     iter->err = 0;
     iter->start_cluster = cluster;
@@ -104,12 +105,12 @@ static int fat32_sector_iterator_begin(
 // Returns new cluster number, returns 0 at end of file
 // Returns 0xFFFFFFFF on error
 static uint32_t next_cluster(
-        uint32_t current_cluster, char *sector, uint8_t *err_ptr)
+        uint64_t current_cluster, char *sector, uint8_t *err_ptr)
 {
     uint32_t fat_sector_index = current_cluster >> (9-2);
     uint32_t fat_sector_offset = current_cluster & ((1 << (9-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
-    uint32_t lba = bpb.first_fat_lba + fat_sector_index;
+    uint64_t lba = bpb.first_fat_lba + fat_sector_index;
 
     uint8_t err = 0;
     if (fat_buffer_lba != lba) {
@@ -716,14 +717,14 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     return total;
 }
 
-void fat32_boot_partition(uint32_t partition_lba)
+void fat32_boot_partition(uint64_t partition_lba)
 {
     file_handles = (fat32_sector_iterator_t *)calloc(
                 MAX_HANDLES, sizeof(*file_handles));
 
     paging_init();
 
-    print_line("Booting partition at LBA %lu", partition_lba);
+    print_line("Booting partition at LBA %llu", partition_lba);
 
     uint8_t err = read_bpb(partition_lba);
     if (err) {

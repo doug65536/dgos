@@ -52,16 +52,16 @@ dap_length = dap_end - dap_start
 entry:
 	jmp .+0x5C
 
-// MBR calls this entry point with
-//  dl = drive number
-//  ds:si -> partition table entry
+# MBR calls this entry point with
+#  dl = drive number
+#  ds:si -> partition table entry
 .section .early
 entry_start:
-	// Save pointer to partition table entry in registers
+	# Save pointer to partition table entry in registers
 	movw %si,%bx
 	movw %ds,%bp
 
-	// Initialize segment registers
+	# Initialize segment registers
 	xorw %ax,%ax
 	movw %ax,%ds
 	movw %ax,%es
@@ -73,15 +73,17 @@ entry_start:
 	cld
 	rep movsw
 
-	// Save boot drive and pointer to partition entry
+	# Save boot drive and pointer to partition entry
 	movb %dl,boot_drive
 	movw %bx,partition_entry_ptr
 	movw %bp,2+partition_entry_ptr
 
-	// Initialize stack pointer
-	lssw initial_stack_ptr,%sp
+	# Initialize stack pointer (lss is 386+ instruction)
+	# Must load ss first to disable interrupts for one instruction
+	movw initial_stack_ptr+2,%ss
+	movw initial_stack_ptr,%sp
 
-	// Load cs register
+	# Load cs register
 	ljmpw $0,$reloc_entry
 reloc_entry:
 
@@ -98,13 +100,17 @@ reloc_entry:
 	#
 	# Get LBA of first sector after this one
 
-	# Read 32-bit LBA from ds:si saved above
-	ldsw partition_entry_ptr,%bx
+	# Read 32-bit LBA from ds:si saved above (lds is 386+ instruction)
+	movw partition_entry_ptr,%bx
+	movw partition_entry_ptr+2,%ds
 
-	// Get partition start LBA into bp:di
+	# Get partition start LBA into bp:di (using ds loaded just above)
 	movw ptbl_ent_stsec(%bx),%di
 	movw 2+ptbl_ent_stsec(%bx),%bp
-	movw zerow,%ds
+
+	# Reset ds
+	xorw %ax,%ax
+	movw %ax,%ds
 
 	# Add 1 to 32 bit LBA in bp:di
 	addw $1,%di
@@ -128,16 +134,17 @@ disk_read:
 
 	call detect_ancient_cpu
 
-	// 32 bit instructions are okay if detect_ancient_cpu returned...
+	# 32 bit instructions are okay if detect_ancient_cpu returned...
 
 	movzwl %sp,%esp
 
-	// Copy bp:dp into eax
+	# Zero extend bp:dp into edx:eax
 	movzwl %bp,%eax
 	shll $16,%eax
 	movw %di,%ax
+	xor %edx,%edx
 
-	movl $fat32_boot_partition,%edx
+	movl $fat32_boot_partition,%ecx
 	call boot
 	cli
 unreachable:
@@ -161,7 +168,4 @@ partition_entry_ptr:
 
 initial_stack_ptr:
 	.short __initial_stack
-	.short 0
-
-zerow:
 	.short 0
