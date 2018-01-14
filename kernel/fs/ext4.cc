@@ -5,7 +5,7 @@
 #include "printk.h"
 #include "vector.h"
 
-class ext4_fs_t : public fs_base_t {
+class ext4_fs_t final : public fs_base_t {
     FS_BASE_IMPL
 
     friend class ext4_factory_t;

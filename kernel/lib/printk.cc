@@ -92,6 +92,7 @@ static char const *parse_int(char const *p, int *result)
 }
 
 #if 1
+__const
 static long double ipowl(int base, int exponent)
 {
     long double result = 1;

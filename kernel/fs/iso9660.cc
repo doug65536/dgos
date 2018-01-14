@@ -19,7 +19,7 @@ public:
 static iso9660_factory_t iso9660_factory;
 STORAGE_REGISTER_FACTORY(iso9660);
 
-struct iso9660_fs_t : public fs_base_t {
+struct iso9660_fs_t final : public fs_base_t {
     FS_BASE_IMPL
 
     struct file_handle_t : public fs_file_info_t {

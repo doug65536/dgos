@@ -182,6 +182,7 @@ private:
 
     void freeze_one(gdb_cpu_t &cpu);
 
+    __noreturn
     static int gdb_thread(void*);
 
     __noreturn

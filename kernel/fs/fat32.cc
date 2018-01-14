@@ -20,7 +20,7 @@
 
 typedef int32_t cluster_t;
 
-struct fat32_fs_t : public fs_base_t {
+struct fat32_fs_t final : public fs_base_t {
     FS_BASE_IMPL
 
     fat32_fs_t();

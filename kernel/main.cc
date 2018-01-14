@@ -977,7 +977,7 @@ static int init_thread(void *p)
     return 0;
 }
 
-extern "C" int main(void)
+extern "C" __noreturn int main(void)
 {
     thread_create(init_thread, 0, 0, false);
 
@@ -987,6 +987,4 @@ extern "C" int main(void)
 
     while (1)
         halt();
-
-    return 0;
 }

@@ -2,7 +2,7 @@
 
 #include "mm.h"
 
-class tmpfs_fs_t : public fs_base_t {
+class tmpfs_fs_t final : public fs_base_t {
     FS_BASE_IMPL
 
     void* mount(fs_init_info_t *conn);
