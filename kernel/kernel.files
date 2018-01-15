@@ -1,6 +1,7 @@
 ../README.md
 arch/x86_64/cpu/pic.bits
 lib/cc/memory.cc
+lib/cc/union_storage.h
 lib/sys/sys_types.h
 syscall/sys_fd.cc
 syscall/sys_fd.h

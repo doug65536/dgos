@@ -210,25 +210,32 @@ template<> struct type_from_size<4, false> { using type = int32_t; };
 template<> struct type_from_size<8, false> { using type = int64_t; };
 
 // Helper that gives underlying type for enums and is not an error otherwise
-template<typename T>
+template<typename _T>
 class safe_underlying_type
 {
 private:
     template<typename, typename>
     struct helper;
 
-    template<typename U>
-    struct helper<U, true_type>
+    template<typename _U>
+    struct helper<_U, true_type>
     {
-        using type = typename underlying_type<U>::type;
+        using type = typename underlying_type<_U>::type;
     };
 
-    template<typename U>
-    struct helper<U, false_type>
+    template<typename _U>
+    struct helper<_U, false_type>
     {
-        using type = U;
+        using type = _U;
     };
 
 public:
-    using type = typename helper<T, typename is_enum<T>::type>::type;
+    using type = typename helper<_T, typename is_enum<_T>::type>::type;
+};
+
+template<size_t _Len, size_t _Align = alignof(max_align_t)>
+struct aligned_storage {
+    struct type {
+        alignas(_Align) unsigned char data[_Len];
+    };
 };
