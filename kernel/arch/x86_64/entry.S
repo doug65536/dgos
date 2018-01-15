@@ -359,11 +359,8 @@ invoke_function_array:
     ret
 
 #define XSAVE_WANTED \
-    XCR0_X87 | \
-    XCR0_SSE | XCR0_AVX | \
-    XCR0_AVX512_OPMASK | \
-    XCR0_AVX512_UPPER | \
-    XCR0_AVX512_XREGS
+    XCR0_X87 | XCR0_SSE | XCR0_AVX | \
+    XCR0_AVX512_OPMASK | XCR0_AVX512_UPPER | XCR0_AVX512_XREGS
 
 .align 16
 detect_xsave_states_bsp:
