@@ -62,7 +62,7 @@ libmbr_a_SOURCES = \
 libmbr_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) -static
 
 EXTRA_libmbr_a_DEPENDENCIES = \
 	$(DUMPDIR)
@@ -86,7 +86,8 @@ mbr_elf_SOURCES = \
 
 mbr_elf_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(NO_PIC_FLAGS)
 
 mbr_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
@@ -190,6 +191,8 @@ libbootsect_a_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
+	$(REGPARM_FLAGS) \
+	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
@@ -208,7 +211,7 @@ libbootsect_a_CFLAGS = \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) \
+	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
@@ -244,7 +247,7 @@ bootfat_elf_CXXFLAGS = \
 
 bootfat_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(NO_PIC_FLAGS) \
+	$(NO_PIC_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -952,7 +955,7 @@ libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
 	$(FREESTANDING_FLAGS) \
-	-std=c++14 \
+	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
