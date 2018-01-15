@@ -1,6 +1,9 @@
 ENTRY(entry)
 
 PHDRS {
+	/* 4 = read */
+	/* 5 = 4+1 = read+execute */
+	/* 6 = 4+2 = read+write */
 	text PT_LOAD FLAGS(5);
 	readonly PT_LOAD FLAGS(4);
 	data PT_LOAD FLAGS(6);
@@ -14,7 +17,7 @@ SECTIONS {
 	PROVIDE_HIDDEN(___text_st = .);
 
 	/* Code and read-only data */
-	.text : AT (0x100000) ALIGN(4096) {
+	.text : AT (0x100000) {
 		/* ISR code is hot and should be page aligned because it is cloned */
 		___isr_st = .;
 		*(.text.isr)
@@ -170,12 +173,12 @@ SECTIONS {
 	} :data
 
 	/* Initialized data */
-	.data  : ALIGN(4096) {
+	.data : ALIGN(4096) {
 		*(.data)
 		*(SORT(.data.*))
 	} :data
 
-	.bss : {
+	.bss (NOLOAD) : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(SORT(.bss.*))
@@ -183,11 +186,11 @@ SECTIONS {
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
 
-	.bspguard : ALIGN(4096) {
+	.bspguard (NOLOAD) : ALIGN(4096) {
 		. += 4096;
 	} :guard
 
-	.bspstk : ALIGN(4096) {
+	.bspstk (NOLOAD) : ALIGN(4096) {
 		/* emergency stack for early bootstrap */
 		. = . + 65536;
 		/* bootstrap CPU stack */
@@ -201,19 +204,19 @@ SECTIONS {
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
-	.debug          0 : { *(.debug)             }
-	.debug_info		0 : { *(.debug_info)		}
-	.debug_abbrev	0 : { *(.debug_abbrev)		}
-	.debug_aranges	0 : { *(.debug_aranges)		}
-	.debug_ranges	0 : { *(.debug_ranges)		}
-	.debug_frame	0 : { *(.debug_frame)		}
-	.debug_macro	0 : { *(.debug_macro)		}
-	.debug_line		0 : { *(.debug_line)		}
-	.debug_str		0 : { *(.debug_str)			}
-	.debug_loc		0 : { *(.debug_loc)			}
-	.comment        0 : { *(.comment)           }
+	.debug          0 : { *(.debug)         }
+	.debug_info		0 : { *(.debug_info)    }
+	.debug_abbrev	0 : { *(.debug_abbrev)  }
+	.debug_aranges	0 : { *(.debug_aranges) }
+	.debug_ranges	0 : { *(.debug_ranges)  }
+	.debug_frame	0 : { *(.debug_frame)   }
+	.debug_macro	0 : { *(.debug_macro)   }
+	.debug_line		0 : { *(.debug_line)    }
+	.debug_str		0 : { *(.debug_str)     }
+	.debug_loc		0 : { *(.debug_loc)     }
+	.comment        0 : { *(.comment)       }
 
-	/DISCARD/		0 : { *(.interp)			}
-	/DISCARD/		0 : { *(.comment)			}
-	/DISCARD/		0 : { *(.note.gnu.build-id)	}
+	/DISCARD/		0 : { *(.interp)               }
+	/DISCARD/		0 : { *(.comment)              }
+	/DISCARD/		0 : { *(.note.gnu.build-id)    }
 }
