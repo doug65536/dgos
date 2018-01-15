@@ -1,6 +1,7 @@
 #pragma once
 
 #include <time.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 // The <signal.h> header shall define the following macros,
@@ -39,8 +40,8 @@ typedef long sigset_t;
 
 // The <signal.h> header shall define the pthread_attr_t type as
 // described in <sys/types.h>.
-struct pthread_attr_t {
-
+struct __pthread_attr_t {
+    // ...
 };
 
 union sigval {
@@ -195,6 +196,10 @@ typedef struct sigevent {
 // The <signal.h> header shall declare the sigaction structure,
 // which shall include at least the following members:
 
+typedef struct __siginfo_t siginfo_t;
+typedef struct __stack_t stack_t;
+typedef struct __ucontext_t ucontext_t;
+
 struct sigaction {
     // Pointer to a signal-catching function or one of the
     // SIG_IGN or SIG_DFL.
@@ -271,10 +276,23 @@ struct sigaction {
 typedef struct mcontext_t {
 } mcontext_t;
 
+// The <signal.h> header shall define the stack_t type as a structure,
+// which shall include at least the following members:
+
+struct __stack_t {
+    // Stack base or pointer.
+    void     *ss_sp;
+
+    // Stack size.
+    size_t    ss_size;
+    // Flags.
+    int       ss_flags;
+};
+
 // The <signal.h> header shall define the ucontext_t type as a structure
 // that shall include at least the following members:
 
-struct ucontext_t {
+struct __ucontext_t {
     // Pointer to the context that is resumed when this context returns.
     ucontext_t *uc_link;
     // The set of signals that are blocked when this context is active.
@@ -285,23 +303,10 @@ struct ucontext_t {
     mcontext_t uc_mcontext;
 };
 
-// The <signal.h> header shall define the stack_t type as a structure,
-// which shall include at least the following members:
-
-struct stack_t {
-    // Stack base or pointer.
-    void     *ss_sp;
-
-    // Stack size.
-    size_t    ss_size;
-    // Flags.
-    int       ss_flags;
-};
-
 // The <signal.h> header shall define the siginfo_t type as a structure,
 // which shall include at least the following members:
 
-struct siginfo_t {
+struct __siginfo_t {
     // Signal number.
     int           si_signo;
     // Signal code.

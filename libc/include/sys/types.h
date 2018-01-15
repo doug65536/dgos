@@ -52,7 +52,7 @@ typedef int64_t off_t;
 typedef uint32_t pid_t;
 
 // Used to identify a thread attribute object.
-typedef struct pthread_addr_t pthread_attr_t;
+typedef struct __pthread_attr_t pthread_attr_t;
 
 #if 0   // not implemented yet
 // Used for condition variables.

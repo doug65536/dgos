@@ -924,6 +924,27 @@ libc_a_SOURCES = \
 	libc/src/unistd/unlinkat.cc \
 	libc/src/unistd/unlink.cc \
 	libc/src/unistd/write.cc \
+	libc/src/posix_spawn/posix_spawn.cc \
+	libc/src/posix_spawn/posix_spawnp.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_init.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc \
+	libc/src/posix_spawn/posix_spawnattr_init.cc \
+	libc/src/posix_spawn/posix_spawnattr_destroy.cc \
+	libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc \
+	libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc \
+	libc/src/posix_spawn/posix_spawnattr_setsigmask.cc \
+	libc/src/posix_spawn/posix_spawnattr_getsigmask.cc \
+	libc/src/posix_spawn/posix_spawnattr_setschedparam.cc \
+	libc/src/posix_spawn/posix_spawnattr_getschedparam.cc \
+	libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc \
+	libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc \
+	libc/src/posix_spawn/posix_spawnattr_setflags.cc \
+	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
+	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
+	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
 	libc/src/sys/syscall.S \
 	$(libc_a_HEADERS)
 

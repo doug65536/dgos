@@ -4,10 +4,21 @@
 #include <signal.h>
 #include <sys/types.h>
 
+typedef struct __posix_spawn_file_action_t __posix_spawn_file_action_t;
+
+__BEGIN_DECLS
+
 // The <spawn.h> header shall define the posix_spawnattr_t and
 // posix_spawn_file_actions_t types used in performing spawn operations.
-typedef struct posix_spawn_file_actions_t posix_spawn_file_actions_t;
-typedef struct posix_spawnattr_t posix_spawnattr_t;
+typedef struct __posix_spawn_file_actions_t {
+    __posix_spawn_file_action_t *__actions;
+    unsigned __allocated;
+    unsigned __used;
+} posix_spawn_file_actions_t;
+
+typedef struct __posix_spawnattr_t {
+
+} posix_spawnattr_t;
 
 //
 // The <spawn.h> header shall define the flags that may be set in a
@@ -37,9 +48,8 @@ int posix_spawn_file_actions_adddup2(
         posix_spawn_file_actions_t *fact,
         int from, int to);
 
-int posix_spawn_file_actions_addopen(
-        posix_spawn_file_actions_t *restrict fact,
-        int fd, const char *restrict path, int, mode_t mode);
+int posix_spawn_file_actions_addopen(posix_spawn_file_actions_t *restrict fact,
+        int fd, const char *restrict path, int oflag, mode_t mode);
 
 int posix_spawn_file_actions_destroy(
         posix_spawn_file_actions_t *fa);
@@ -111,3 +121,4 @@ int posix_spawnp(pid_t *restrict pid,
                  char * const * restrict argv,
                  char *const * restrict envp);
 
+__END_DECLS

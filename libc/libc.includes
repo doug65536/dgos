@@ -7,3 +7,5 @@ src/sys
 tests
 src/fcntl
 src/unistd
+src/posix_spawn
+src/posix_spawn/bits

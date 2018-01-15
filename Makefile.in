@@ -270,6 +270,27 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/unistd/libc_a-unlinkat.$(OBJEXT) \
 	libc/src/unistd/libc_a-unlink.$(OBJEXT) \
 	libc/src/unistd/libc_a-write.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawn.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnp.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_init.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.$(OBJEXT) \
+	libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT) \
 	libc/src/sys/syscall.$(OBJEXT) $(am__objects_1)
 libc_a_OBJECTS = $(am_libc_a_OBJECTS)
 libkernel_avx_a_AR = $(AR) $(ARFLAGS)
@@ -1863,6 +1884,27 @@ libc_a_SOURCES = \
 	libc/src/unistd/unlinkat.cc \
 	libc/src/unistd/unlink.cc \
 	libc/src/unistd/write.cc \
+	libc/src/posix_spawn/posix_spawn.cc \
+	libc/src/posix_spawn/posix_spawnp.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_init.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc \
+	libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc \
+	libc/src/posix_spawn/posix_spawnattr_init.cc \
+	libc/src/posix_spawn/posix_spawnattr_destroy.cc \
+	libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc \
+	libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc \
+	libc/src/posix_spawn/posix_spawnattr_setsigmask.cc \
+	libc/src/posix_spawn/posix_spawnattr_getsigmask.cc \
+	libc/src/posix_spawn/posix_spawnattr_setschedparam.cc \
+	libc/src/posix_spawn/posix_spawnattr_getschedparam.cc \
+	libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc \
+	libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc \
+	libc/src/posix_spawn/posix_spawnattr_setflags.cc \
+	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
+	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
+	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
 	libc/src/sys/syscall.S \
 	$(libc_a_HEADERS)
 
@@ -2470,6 +2512,75 @@ libc/src/unistd/libc_a-unlink.$(OBJEXT):  \
 libc/src/unistd/libc_a-write.$(OBJEXT):  \
 	libc/src/unistd/$(am__dirstamp) \
 	libc/src/unistd/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/posix_spawn
+	@: > libc/src/posix_spawn/$(am__dirstamp)
+libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/posix_spawn/$(DEPDIR)
+	@: > libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawn.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnp.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_init.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT):  \
+	libc/src/posix_spawn/$(am__dirstamp) \
+	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/sys
 	@: > libc/src/sys/$(am__dirstamp)
@@ -3550,6 +3661,7 @@ mostlyclean-compile:
 	-rm -f kernel/net/*.$(OBJEXT)
 	-rm -f kernel/syscall/*.$(OBJEXT)
 	-rm -f libc/src/fcntl/*.$(OBJEXT)
+	-rm -f libc/src/posix_spawn/*.$(OBJEXT)
 	-rm -f libc/src/stdlib/*.$(OBJEXT)
 	-rm -f libc/src/string/*.$(OBJEXT)
 	-rm -f libc/src/sys/*.$(OBJEXT)
@@ -3911,6 +4023,27 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-openat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-posix_fadvise.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-posix_fallocate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-_Exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memccpy.Po@am__quote@
@@ -6235,6 +6368,300 @@ libc/src/unistd/libc_a-write.obj: libc/src/unistd/write.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/unistd/write.cc' object='libc/src/unistd/libc_a-write.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/unistd/libc_a-write.obj `if test -f 'libc/src/unistd/write.cc'; then $(CYGPATH_W) 'libc/src/unistd/write.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/unistd/write.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawn.o: libc/src/posix_spawn/posix_spawn.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn.o `test -f 'libc/src/posix_spawn/posix_spawn.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn.cc' object='libc/src/posix_spawn/libc_a-posix_spawn.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn.o `test -f 'libc/src/posix_spawn/posix_spawn.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn.cc
+
+libc/src/posix_spawn/libc_a-posix_spawn.obj: libc/src/posix_spawn/posix_spawn.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn.obj `if test -f 'libc/src/posix_spawn/posix_spawn.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn.cc' object='libc/src/posix_spawn/libc_a-posix_spawn.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn.obj `if test -f 'libc/src/posix_spawn/posix_spawn.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnp.o: libc/src/posix_spawn/posix_spawnp.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnp.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnp.o `test -f 'libc/src/posix_spawn/posix_spawnp.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnp.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnp.cc' object='libc/src/posix_spawn/libc_a-posix_spawnp.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnp.o `test -f 'libc/src/posix_spawn/posix_spawnp.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnp.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnp.obj: libc/src/posix_spawn/posix_spawnp.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnp.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnp.obj `if test -f 'libc/src/posix_spawn/posix_spawnp.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnp.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnp.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnp.cc' object='libc/src/posix_spawn/libc_a-posix_spawnp.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnp.obj `if test -f 'libc/src/posix_spawn/posix_spawnp.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnp.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnp.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.o: libc/src/posix_spawn/posix_spawn_file_actions_init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_init.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_init.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_init.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_init.cc
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.obj: libc/src/posix_spawn/posix_spawn_file_actions_init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_init.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_init.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_init.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_init.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_init.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_init.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_init.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_init.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.o: libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.obj: libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_destroy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_destroy.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_destroy.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.o: libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.obj: libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addopen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addopen.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_addopen.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.o: libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.obj: libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_adddup2.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_adddup2.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_adddup2.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.o: libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.o `test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc
+
+libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.obj: libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn_file_actions_addclose.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc' object='libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawn_file_actions_addclose.obj `if test -f 'libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawn_file_actions_addclose.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_init.o: libc/src/posix_spawn/posix_spawnattr_init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_init.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_init.o `test -f 'libc/src/posix_spawn/posix_spawnattr_init.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_init.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_init.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_init.o `test -f 'libc/src/posix_spawn/posix_spawnattr_init.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_init.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_init.obj: libc/src/posix_spawn/posix_spawnattr_init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_init.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_init.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_init.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_init.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_init.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_init.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_init.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_init.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_init.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_init.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_init.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_init.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.o: libc/src/posix_spawn/posix_spawnattr_destroy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.o `test -f 'libc/src/posix_spawn/posix_spawnattr_destroy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_destroy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_destroy.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.o `test -f 'libc/src/posix_spawn/posix_spawnattr_destroy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_destroy.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.obj: libc/src/posix_spawn/posix_spawnattr_destroy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_destroy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_destroy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_destroy.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_destroy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_destroy.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_destroy.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_destroy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_destroy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_destroy.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.o: libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.obj: libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigdefault.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setsigdefault.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.o: libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.obj: libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigdefault.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigdefault.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getsigdefault.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.o: libc/src/posix_spawn/posix_spawnattr_setsigmask.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setsigmask.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setsigmask.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setsigmask.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setsigmask.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setsigmask.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.obj: libc/src/posix_spawn/posix_spawnattr_setsigmask.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setsigmask.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setsigmask.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setsigmask.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setsigmask.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setsigmask.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setsigmask.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setsigmask.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setsigmask.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.o: libc/src/posix_spawn/posix_spawnattr_getsigmask.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getsigmask.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getsigmask.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getsigmask.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getsigmask.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getsigmask.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.obj: libc/src/posix_spawn/posix_spawnattr_getsigmask.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getsigmask.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getsigmask.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getsigmask.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getsigmask.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getsigmask.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getsigmask.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getsigmask.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getsigmask.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getsigmask.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.o: libc/src/posix_spawn/posix_spawnattr_setschedparam.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setschedparam.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setschedparam.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setschedparam.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setschedparam.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setschedparam.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.obj: libc/src/posix_spawn/posix_spawnattr_setschedparam.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setschedparam.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setschedparam.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setschedparam.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedparam.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setschedparam.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedparam.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setschedparam.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setschedparam.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setschedparam.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.o: libc/src/posix_spawn/posix_spawnattr_getschedparam.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getschedparam.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getschedparam.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getschedparam.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getschedparam.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getschedparam.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.obj: libc/src/posix_spawn/posix_spawnattr_getschedparam.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getschedparam.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getschedparam.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getschedparam.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedparam.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getschedparam.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedparam.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getschedparam.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getschedparam.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getschedparam.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.o: libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.obj: libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getschedpolicy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getschedpolicy.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getschedpolicy.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.o: libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.obj: libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setschedpolicy.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setschedpolicy.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setschedpolicy.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.o: libc/src/posix_spawn/posix_spawnattr_setflags.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setflags.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setflags.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setflags.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setflags.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setflags.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.obj: libc/src/posix_spawn/posix_spawnattr_setflags.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setflags.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setflags.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setflags.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setflags.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setflags.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setflags.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setflags.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setflags.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setflags.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.o: libc/src/posix_spawn/posix_spawnattr_getflags.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getflags.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getflags.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getflags.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getflags.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getflags.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.obj: libc/src/posix_spawn/posix_spawnattr_getflags.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getflags.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getflags.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getflags.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getflags.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getflags.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getflags.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getflags.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getflags.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.o: libc/src/posix_spawn/posix_spawnattr_setpgroup.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setpgroup.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setpgroup.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.o `test -f 'libc/src/posix_spawn/posix_spawnattr_setpgroup.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_setpgroup.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.obj: libc/src/posix_spawn/posix_spawnattr_setpgroup.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setpgroup.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setpgroup.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_setpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_setpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_setpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_setpgroup.cc'; fi`
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.o: libc/src/posix_spawn/posix_spawnattr_getpgroup.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getpgroup.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.o `test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawnattr_getpgroup.cc
+
+libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj: libc/src/posix_spawn/posix_spawnattr_getpgroup.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_getpgroup.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; fi`
 
 kernel/arch/x86_64/cpu/libkernel_avx_a-nontemporal_avx.o: kernel/arch/x86_64/cpu/nontemporal_avx.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkernel_avx_a_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/cpu/libkernel_avx_a-nontemporal_avx.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/libkernel_avx_a-nontemporal_avx.Tpo -c -o kernel/arch/x86_64/cpu/libkernel_avx_a-nontemporal_avx.o `test -f 'kernel/arch/x86_64/cpu/nontemporal_avx.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/nontemporal_avx.cc
@@ -11052,6 +11479,8 @@ distclean-generic:
 	-rm -f kernel/syscall/$(am__dirstamp)
 	-rm -f libc/src/fcntl/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/fcntl/$(am__dirstamp)
+	-rm -f libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/posix_spawn/$(am__dirstamp)
 	-rm -f libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/stdlib/$(am__dirstamp)
 	-rm -f libc/src/string/$(DEPDIR)/$(am__dirstamp)
@@ -11076,7 +11505,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -11124,7 +11553,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
