@@ -118,6 +118,9 @@ bsp_init:
 
     // Read CPU_MXCSR_MASK from fxsave output and store it
     mov 28(%rsp),%eax
+    mov $0x0000FFBF,%ecx
+    test %eax,%eax
+    cmove %ecx,%eax
     mov %eax,default_mxcsr_mask
 
     // Set MXCSR
