@@ -110,29 +110,6 @@ struct pci_config_hdr_t {
     uint8_t max_latency;
 };
 
-// PCI config command register
-//#define PCI_CMD_IOEN_BIT            0
-//#define PCI_CMD_MEMEN_BIT           1
-//#define PCI_CMD_BUSMASTER_BIT       2
-//#define PCI_CMD_SPECIALCYCLE_BIT    3
-//#define PCI_CMD_MEMWRINVEN_BIT      4
-//#define PCI_CMD_VGASNOOP_BIT        5
-//#define PCI_CMD_PARITYERR_BIT       6
-//#define PCI_CMD_STEPPING_BIT        7
-//#define PCI_CMD_SERR_BIT            8
-//#define PCI_CMD_FASTB2B_BIT         9
-//
-//#define PCI_CMD_IOEN                (1<<PCI_CMD_IOEN_BIT)
-//#define PCI_CMD_MEMEN               (1<<PCI_CMD_MEMEN_BIT)
-//#define PCI_CMD_BUSMASTER           (1<<PCI_CMD_BUSMASTER_BIT)
-//#define PCI_CMD_SPECIALCYCLE        (1<<PCI_CMD_SPECIALCYCLE_BIT)
-//#define PCI_CMD_MEMWRINVEN          (1<<PCI_CMD_MEMWRINVEN_BIT)
-//#define PCI_CMD_VGASNOOP            (1<<PCI_CMD_VGASNOOP_BIT)
-//#define PCI_CMD_PARITYERR           (1<<PCI_CMD_PARITYERR_BIT)
-//#define PCI_CMD_STEPPING            (1<<PCI_CMD_STEPPING_BIT)
-//#define PCI_CMD_SERR                (1<<PCI_CMD_SERR_BIT)
-//#define PCI_CMD_FASTB2B             (1<<PCI_CMD_FASTB2B_BIT)
-
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01
 #define PCI_DEV_CLASS_NETWORK           0x02
@@ -140,7 +117,7 @@ struct pci_config_hdr_t {
 #define PCI_DEV_CLASS_MULTIMEDIA        0x04
 #define PCI_DEV_CLASS_MEMORY            0x05
 #define PCI_DEV_CLASS_BRIDGE            0x06
-#define PCI_DEV_CLASS_COMMUNICATION     0x07
+#define PCI_DEV_CLASS_COMM              0x07
 #define PCI_DEV_CLASS_SYSTEM            0x08
 #define PCI_DEV_CLASS_INPUT             0x09
 #define PCI_DEV_CLASS_DOCKING           0x0A
@@ -156,8 +133,17 @@ struct pci_config_hdr_t {
 #define PCI_DEV_CLASS_COPROCESSOR       0x40
 #define PCI_DEV_CLASS_UNASSIGNED        0xFF
 
+// PCI_DEV_CLASS_NETWORK
 #define PCI_SUBCLASS_NETWORK_ETHERNET   0x00
+#define PCI_SUBCLASS_NETWORK_TOKENRING  0x01
+#define PCI_SUBCLASS_NETWORK_FDDI       0x02
+#define PCI_SUBCLASS_NETWORK_ATM        0x03
+#define PCI_SUBCLASS_NETWORK_ISDN       0x04
+#define PCI_SUBCLASS_NETWORK_WFLIP      0x05
+#define PCI_SUBCLASS_NETWORK_PICMGMC    0x06
+#define PCI_SUBCLASS_NETWORK_OTHER      0x80
 
+// PCI_DEV_CLASS_STORAGE
 #define PCI_SUBCLASS_STORAGE_SCSI       0x00
 #define PCI_SUBCLASS_STORAGE_IDE        0x01
 #define PCI_SUBCLASS_STORAGE_FLOPPY     0x02
@@ -169,6 +155,7 @@ struct pci_config_hdr_t {
 #define PCI_SUBCLASS_STORAGE_NVM        0x08
 #define PCI_SUBCLASS_STORAGE_MASS       0x80
 
+// PCI_DEV_CLASS_SERIAL
 #define PCI_SUBCLASS_SERIAL_IEEE1394    0x00
 #define PCI_SUBCLASS_SERIAL_ACCESS      0x01
 #define PCI_SUBCLASS_SERIAL_SSA         0x02
@@ -180,12 +167,15 @@ struct pci_config_hdr_t {
 #define PCI_SUBCLASS_SERIAL_SERCOS      0x08
 #define PCI_SUBCLASS_SERIAL_CANBUS      0x09
 
+// PCI_SUBCLASS_STORAGE_SATA
 #define PCI_PROGIF_STORAGE_SATA_VEND    0x00
 #define PCI_PROGIF_STORAGE_SATA_AHCI    0x01
 #define PCI_PROGIF_STORAGE_SATA_SERIAL  0x02
 
+// PCI_SUBCLASS_STORAGE_NVM
 #define PCI_PROGIF_STORAGE_NVM_NVME		0x02
 
+// PCI_SUBCLASS_SERIAL_USB
 #define PCI_PROGIF_SERIAL_USB_UHCI      0x00
 #define PCI_PROGIF_SERIAL_USB_OHCI      0x10
 #define PCI_PROGIF_SERIAL_USB_EHCI      0x20
@@ -247,22 +237,52 @@ int pci_enum_capabilities(pci_addr_t addr,
 // PCI capability IDs
 
 // Power management
-#define PCICAP_PM       1
+#define PCICAP_PM       0x1
 
 // Accelerated Graphics Port
-#define PCICAP_AGP      2
+#define PCICAP_AGP      0x2
 
 // Vital Product Data
-#define PCICAP_VPD      3
+#define PCICAP_VPD      0x3
 
 // Slot Identification (external expansion)
-#define PCICAP_SLOTID   4
+#define PCICAP_SLOTID   0x4
 
 // Message Signaled Interrupts
-#define PCICAP_MSI      5
+#define PCICAP_MSI      0x5
 
 // CompactPCI Hotswap
-#define PCICAP_HOTSWAP  6
+#define PCICAP_HOTSWAP  0x6
+
+// PCI-X
+#define PCICAP_PCIX     0x7
+
+// HyperTransport
+#define PCICAP_HTT      0x8
+
+// Vendor specific
+#define PCICAP_VENDOR   0x9
+
+// Debug port
+#define PCICAP_DEBUG    0xA
+
+// CompactPCI central resource control
+#define PCICAP_CPCI     0xB
+
+// PCI Hot-plug
+#define PCICAP_HOTPLUG  0xC
+
+// PCI bridge subsystem vendor ID
+#define PCICAP_BRID     0xD
+
+// AGP 8x
+#define PCICAP_AGP8x    0xE
+
+// Secure device
+#define PCICAP_SECDEV   0xF
+
+// PCI Express
+#define PCICAP_PCIE     0x10
 
 // MSI-X
 #define PCICAP_MSIX     0x11
