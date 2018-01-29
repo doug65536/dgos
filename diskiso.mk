@@ -4,8 +4,7 @@ isodisk.img: bootiso-bin \
 		$(top_srcdir)/mkposixdirs.sh \
 		bootiso.sym mbr.sym \
 		kernel-generic.dis \
-		kernel-sse4.dis \
-		kernel-avx2.dis \
+		kernel-bmi.dis \
 		bootiso.dis  \
 		mbr.dis
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)

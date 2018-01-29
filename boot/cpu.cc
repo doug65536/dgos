@@ -159,31 +159,62 @@ bool cpu_has_global_pages()
     return has > 0;
 }
 
-// Return true if the CPU supports:
-//  sse, sse2, sse3, ssse3, sse4, sse4.1, sse4.2
-static bool cpu_has_upto_sse42()
+// Return true if the ABM, BMI1, BMI2
+static bool cpu_has_bmi()
 {
-    cpuid_t cpuinfo;
+    cpuid_t info;
 
     static int has;
 
     if (has)
         return has > 0;
 
-    if (!cpuid(&cpuinfo, 1U, 0)) {
-        has = -1;
-        return false;
-    }
+    bool result = true;
 
-    // bit0=sse3, bit9=ssse3, bit19=sse4.1, bit20=sse4.2
-    has = ((cpuinfo.ecx & (1U<<0)) &&
-           (cpuinfo.ecx & (1U<<9)) &&
-           (cpuinfo.ecx & (1U<<19)) &&
-           (cpuinfo.ecx & (1U<<20)))
-            ? 1 : -1;
+    // ABM=CPUID[0x80000001].ecx[5]
+    // BMI1=CPUID[7].ebx[3]
+    // BMI2=CPUID[7].ebx[8]
+    if (!cpuid(&info, 0x80000001, 0))
+        result = false;
+    else if (!(info.ecx & (1 << 5)))
+        result = false;
+    else if (!cpuid(&info, 7, 0))
+        result = false;
+    else if (!(info.ebx & (1 << 3)))
+        result = false;
+    else if (!(info.ebx & (1 << 8)))
+        result = false;
+
+    has = result ? 1 : -1;
 
     return has > 0;
 }
+
+//// Return true if the CPU supports:
+////  sse, sse2, sse3, ssse3, sse4, sse4.1, sse4.2
+//static bool cpu_has_upto_sse42()
+//{
+//    cpuid_t cpuinfo;
+
+//    static int has;
+
+//    if (has)
+//        return has > 0;
+
+//    if (!cpuid(&cpuinfo, 1U, 0)) {
+//        has = -1;
+//        return false;
+//    }
+
+//    // bit0=sse3, bit9=ssse3, bit19=sse4.1, bit20=sse4.2
+//    has = ((cpuinfo.ecx & (1U<<0)) &&
+//           (cpuinfo.ecx & (1U<<9)) &&
+//           (cpuinfo.ecx & (1U<<19)) &&
+//           (cpuinfo.ecx & (1U<<20)))
+//            ? 1 : -1;
+
+//    return has > 0;
+//}
 
 static __always_inline uintptr_t cpu_cr4_change_bits(
         uintptr_t clear, uintptr_t set)
@@ -271,12 +302,10 @@ bool cpu_has_upto_avx2()
 
 const char *cpu_choose_kernel()
 {
-    if (cpu_has_upto_sse42()) {
-//        if (cpu_has_upto_avx2())
-//            return "dgos-kernel-avx2";
-//        else
-            return "dgos-kernel-sse4";
-    } else
+    // Disabled because BMI is broken in QEMU TCG
+    //if (cpu_has_bmi())
+    //    return "dgos-kernel-bmi";
+    //else
         return "dgos-kernel-generic";
 }
 

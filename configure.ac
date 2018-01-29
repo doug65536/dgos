@@ -71,9 +71,10 @@ AC_SUBST([COMPILER_FLAGS])
 #Wsuggest-attribute=pure
 #Wsuggest-attribute=const
 
+# fgcse-las causes compiler segfaults
 OPTIMIZATION_FLAGS=
 for flag in \
-	O2 fipa-pta fgcse-las fsched-pressure fipa-bit-cp ftree-vectorize \
+	O2 fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize \
 	fstrict-aliasing
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
@@ -115,7 +116,7 @@ done
 AC_SUBST([FREESTANDING_FLAGS])
 
 REAL_MODE_FLAGS=
-for flag in m32 mno-sse mno-sse2 mno-avx mno-avx2 mfpmath=387
+for flag in m32 mgeneral-regs-only
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[REAL_MODE_FLAGS+=" -$flag"]
@@ -141,23 +142,14 @@ do
 done
 AC_SUBST([NO_PIC_FLAGS])
 
-SSE4_FLAGS=
-for flag in msse msse2 msse3 mssse3 msse4 msse4.1 msse4.2
+BMI_FLAGS=
+for flag in mabm mbmi mbmi2
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[SSE4_FLAGS+=" -$flag"]
+		[BMI_FLAGS+=" -$flag"]
 		[], [$COMPILER_WERROR])
 done
-AC_SUBST([SSE4_FLAGS])
-
-AVX2_FLAGS=
-for flag in mavx mavx2 msse2avx
-do
-	AX_CHECK_COMPILE_FLAG([-$flag],
-		[AVX2_FLAGS+=" -$flag"]
-		[], [$COMPILER_WERROR])
-done
-AC_SUBST([AVX2_FLAGS])
+AC_SUBST([BMI_FLAGS])
 
 DISABLE_FRAMEPOINTER_FLAGS=
 AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],

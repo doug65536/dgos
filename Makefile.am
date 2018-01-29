@@ -2,9 +2,6 @@
 
 DUMPDIR = $(top_builddir)/dump
 
-#$(ZLIBSTATICLIB) \
-#$(ZLIBPUBLICINCLUDES)
-
 BUILT_SOURCES = \
 	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
@@ -18,7 +15,7 @@ BUILT_SOURCES = \
 #  -> Link bootfat-bin
 #  -> Link bootiso-elf
 #  -> Link bootiso-bin
-# Build libkernel-sse41.a libkernel-avx libkernel-avx512
+# Build libkernel-{generic,bmi,avx512}
 #  -> Build kernel-*
 
 #LINKER_SEL = -fuse-ld=gold -z max-page-size=256
@@ -30,9 +27,6 @@ LINKER_DEBUG =
 noinst_LIBRARIES = \
 	libmbr.a \
 	libbootsect.a \
-	libkernel-sse41.a \
-	libkernel-avx.a \
-	libkernel-avx512.a \
 	libc.a
 
 bin_PROGRAMS = \
@@ -43,16 +37,11 @@ bin_PROGRAMS = \
 	bootiso-elf \
 	bootiso-bin \
 	kernel-generic \
-	kernel-sse4 \
-	kernel-avx2 \
+	kernel-bmi \
 	user-shell
 
-KERNEL_SSE4_FLAGS = \
-	$(SSE4_FLAGS)
-
-KERNEL_AVX2_FLAGS = \
-	$(SSE4_FLAGS) \
-	$(AVX2_FLAGS)
+KERNEL_BMI_FLAGS = \
+	$(BMI_FLAGS)
 
 # libmbr.a
 
@@ -95,7 +84,7 @@ mbr_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS)
 
 mbr_elf_LDADD = \
-	libmbr.a
+	libmbr.a -lgcc
 
 # mbr-bin
 
@@ -127,7 +116,7 @@ mbr_bin_LDFLAGS = \
 EXTRA_mbr_bin_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
-mbr_bin_LDADD = libmbr.a
+mbr_bin_LDADD = libmbr.a -lgcc
 
 # libbootsect.a
 
@@ -205,7 +194,6 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS)
 
-
 libbootsect_a_CFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
@@ -222,7 +210,6 @@ libbootsect_a_CFLAGS = \
 	-std=c++14 \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
-
 
 libbootsect_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
@@ -268,7 +255,7 @@ EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
-	libbootsect.a
+	libbootsect.a -lgcc
 
 # bootfat-bin
 
@@ -282,7 +269,6 @@ bootfat_bin_CXXFLAGS = \
 bootfat_bin_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(bootfat_elf_CCASFLAGS)
-
 
 bootfat_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
@@ -301,7 +287,7 @@ EXTRA_bootfat_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_bin_LDADD = \
-	libbootsect.a
+	libbootsect.a -lgcc
 
 # bootiso-elf
 
@@ -310,7 +296,6 @@ bootiso_elf_SOURCES = \
 
 bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
-
 
 bootiso_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
@@ -336,7 +321,7 @@ EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_elf_LDADD = \
-	libbootsect.a
+	libbootsect.a -lgcc
 
 # bootiso-bin
 
@@ -370,7 +355,7 @@ EXTRA_bootiso_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_bin_LDADD = \
-	libbootsect.a
+	libbootsect.a -lgcc
 
 # kernel
 
@@ -620,6 +605,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=default \
 	-export-dynamic \
+	-mgeneral-regs-only \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -646,30 +632,7 @@ EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 #$(ZLIBSTATICLIB) \
 #$(ZLIBPUBLICINCLUDES)
 
-libkernel_sse41_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) -msse4.1
-libkernel_avx_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) -mavx
-libkernel_avx512_a_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) -mavx512f
-
-KERNEL_LDADD_SHARED = \
-	libkernel-sse41.a \
-	libkernel-avx.a \
-	libkernel-avx512.a \
-	$(ZLIBSTATICLIB)
-
-# ----------------------------------------------------------------------------
-# architecture dependent libraries (need different flags)
-
-libkernel_sse41_a_SOURCES = \
-	kernel/arch/x86_64/cpu/nontemporal_sse4_1.cc
-
-libkernel_avx_a_SOURCES = \
-	kernel/arch/x86_64/cpu/nontemporal_avx.cc
-
-libkernel_avx512_a_SOURCES = \
-	kernel/arch/x86_64/cpu/nontemporal_avx512.cc
+KERNEL_LDADD_SHARED = -lgcc
 
 # ----------------------------------------------------------------------------
 # kernel variations
@@ -689,40 +652,29 @@ kernel_generic_LDADD = $(KERNEL_LDADD_SHARED)
 
 EXTRA_kernel_generic_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
-kernel_sse4_SOURCES = $(KERNEL_SOURCES_SHARED)
+kernel_bmi_SOURCES = $(KERNEL_SOURCES_SHARED)
 
-kernel_sse4_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_SSE4_FLAGS)
+kernel_bmi_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
 
-kernel_sse4_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED)$(KERNEL_SSE4_FLAGS)
+kernel_bmi_CFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
 
-kernel_sse4_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_SSE4_FLAGS)
+kernel_bmi_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
 
-kernel_sse4_LDADD = $(KERNEL_LDADD_SHARED)
+kernel_bmi_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
 
-EXTRA_kernel_sse4_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+kernel_bmi_LDADD = $(KERNEL_LDADD_SHARED)
 
-kernel_avx2_SOURCES = $(KERNEL_SOURCES_SHARED)
-
-kernel_avx2_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_AVX2_FLAGS)
-
-kernel_avx2_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_AVX2_FLAGS)
-
-kernel_avx2_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_AVX2_FLAGS)
-
-kernel_avx2_LDADD = $(KERNEL_LDADD_SHARED)
-
-EXTRA_kernel_avx2_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+EXTRA_kernel_bmi_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
 # ----------------------------------------------------------------------------
 # libc
 
-libc_adir = $(includedir)/wtfadir
+libc_adir = $(includedir)/libc
+
 libc_a_HEADERS = \
 	libc/include/termios.h \
 	libc/include/complex.h \
@@ -1044,14 +996,11 @@ clean-local:
 	rm -f $(top_builddir)/bootiso.sym
 	rm -f $(top_builddir)/bootiso.map
 	rm -f $(top_builddir)/kernel-generic.sym
-	rm -f $(top_builddir)/kernel-sse4.sym
-	rm -f $(top_builddir)/kernel-avx2.sym
+	rm -f $(top_builddir)/kernel-bmi.sym
 	rm -f $(top_builddir)/kernel-generic.dis
-	rm -f $(top_builddir)/kernel-sse4.dis
-	rm -f $(top_builddir)/kernel-avx2.dis
+	rm -f $(top_builddir)/kernel-bmi.dis
 	rm -f $(top_builddir)/kernel-generic.map
-	rm -f $(top_builddir)/kernel-sse4.map
-	rm -f $(top_builddir)/kernel-avx2.map
+	rm -f $(top_builddir)/kernel-bmi.map
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
@@ -1213,7 +1162,7 @@ $(abs_top_builddir)/bochs-debugger-boot-commands: \
 
 debug-iso-bochs: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/bochs-iso-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-commands
 	$(BOCHS) \
@@ -1225,7 +1174,7 @@ debug-iso-bochs: $(QEMU_IMAGE_iso) \
 
 debug-fat-bochs: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/bochs-fat-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-commands
 	$(BOCHS) \
@@ -1237,7 +1186,7 @@ debug-fat-bochs: $(QEMU_IMAGE_fat) \
 
 debug-iso-bochs-boot: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/bochs-iso-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-boot-commands
 	$(BOCHS) \
@@ -1249,7 +1198,7 @@ debug-iso-bochs-boot: $(QEMU_IMAGE_iso) \
 
 debug-fat-bochs-boot: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/bochs-fat-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-boot-commands
 	$(BOCHS) \
@@ -1261,7 +1210,7 @@ debug-fat-bochs-boot: $(QEMU_IMAGE_fat) \
 
 run-iso-bochs: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/bochs-iso-config.bxrc
 	$(BOCHS) -f $(top_srcdir)/bochs-iso-config.bxrc -q \
 		$(BOCHS_FLAGS)
@@ -1270,7 +1219,7 @@ run-iso-bochs: $(QEMU_IMAGE_iso) \
 
 run-fat-bochs: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-sse4.sym kernel-avx2.sym \
+		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/bochs-fat-config.bxrc
 	$(BOCHS) -f $(top_srcdir)/bochs-fat-config.bxrc -q \
 		$(BOCHS_FLAGS)

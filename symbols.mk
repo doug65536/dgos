@@ -23,14 +23,9 @@ kernel-generic.sym: kernel-generic \
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-kernel-sse4.sym: kernel-sse4 \
+kernel-bmi.sym: kernel-bmi \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
 	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
-		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
-
-kernel-avx2.sym: kernel-avx2 \
-		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
-	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
 mbr.dis: mbr-elf $(top_srcdir)/symbols.mk
@@ -45,8 +40,5 @@ bootiso.dis: bootiso-elf $(top_srcdir)/symbols.mk
 kernel-generic.dis: kernel-generic $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< > $@
 
-kernel-sse4.dis: kernel-sse4 $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< > $@
-
-kernel-avx2.dis: kernel-avx2 $(top_srcdir)/symbols.mk
+kernel-bmi.dis: kernel-bmi $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< > $@

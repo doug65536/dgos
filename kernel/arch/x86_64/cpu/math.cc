@@ -22,6 +22,7 @@ int ilogbl(long double n)
     return INT_MAX;
 }
 
+#ifndef __DGOS_KERNEL__
 long double nextafterl(long double n, long double t)
 {
     uint64_t old_mantissa;
@@ -92,3 +93,4 @@ long double nextafterl(long double n, long double t)
     memcpy((char*)&n, &new_exponent, sizeof(new_exponent));
     return n;
 }
+#endif

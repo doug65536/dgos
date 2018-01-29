@@ -91,7 +91,7 @@ static char const *parse_int(char const *p, int *result)
     return p;
 }
 
-#if 1
+#ifndef __DGOS_KERNEL__
 __const
 static long double ipowl(int base, int exponent)
 {
@@ -623,6 +623,7 @@ static intptr_t formatter(
                 }
                 break;
 
+#ifndef __DGOS_KERNEL__
             case 'e':
                 flags.scientific = 1;
                 // fall through
@@ -649,6 +650,7 @@ static intptr_t formatter(
                 }
 
                 break;
+#endif
             }
 
             //
@@ -712,11 +714,13 @@ static intptr_t formatter(
 
                 break;
 
+#ifndef __DGOS_KERNEL__
             case arg_type_double_value:
                 dtoa(digits, sizeof(digits), (long double)flags.arg.double_value, &flags);
                 flags.arg_type = arg_type_char_ptr;
                 flags.arg.char_ptr_value = digits;
                 break;
+#endif
 
             }
 
