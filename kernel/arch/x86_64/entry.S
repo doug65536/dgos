@@ -111,7 +111,7 @@ bsp_init:
     // Initialize FPU to 64 bit precision,
     // all exceptions masked, round to nearest
     fninit
-    movw $((0 << 10) | (2 << 8) | 0x3F),(%rsp)
+    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
     fldcw (%rsp)
 
     fxsave64 (%rsp)
