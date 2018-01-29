@@ -1,5 +1,4 @@
 .code64
-.section .text.isr, "ax"
 
 #include "asm_constants.h"
 #include "control_regs_constants.h"
@@ -9,6 +8,18 @@
 // This must be position independent code because the GDB stub clones off
 // a redundant copy to protect against infinite recursion
 
+.struct 0
+     frame_rbp:  .struct frame_rbp+8
+     frame_intr: .struct frame_intr+8
+     frame_err:  .struct frame_err+8
+     frame_rip:  .struct frame_rip+8
+     frame_cs:   .struct frame_cs+8
+     frame_efl:  .struct frame_efl+8
+     frame_rsp:  .struct frame_rsp+8
+     frame_ss:   .struct frame_ss+8
+     frame_end:
+
+.section .text.isr, "ax"
 
 .macro isr_entry has_code int_num
 .global isr_entry_\int_num\()
@@ -106,6 +117,8 @@ isr_entry 0 INTR_TLB_SHOOTDOWN
 isr_entry 0 INTR_THREAD_YIELD
 isr_entry 0 INTR_APIC_TIMER
 
+.section .text.isr
+
 .type isr_common,@function
 .align 16
 isr_common:
@@ -140,35 +153,65 @@ isr_common:
     pushq %r13
     .cfi_rel_offset r13,-8-2*8
 
+    // Schedule in r13=ds, r12=es, r11=fs, r10=gs
+    movl %ds,%r13d
+
     pushq %r12
     .cfi_rel_offset r12,-8-3*8
+
+    movl %es,%r12d
 
     pushq %r11
     .cfi_rel_offset r11,-8-4*8
 
+    mov %fs,%r11d
+
     pushq %r10
     .cfi_rel_offset r10,-8-5*8
+
+    movl %gs,%r10d
 
     pushq %rbx
     .cfi_rel_offset rbx,-8-6*8
 
+    // Schedule in r12<<=16, r11<<=32, r10<<=48
+    shll $16,%r12d
+
     pushq %rax
     .cfi_rel_offset rax,-8-7*8
+
+    shlq $32,%r11
+
+    movq %cr3,%rax
 
     cld
     pushq %r9
     .cfi_rel_offset r9,-8-8*8
 
-    movq %cr3,%rax
+    shlq $48,%r10
 
     pushq %r8
     .cfi_rel_offset r8,-8-9*8
 
+    // merge ds,es
+    orl %r12d,%r13d
+
     pushq %rcx
     .cfi_rel_offset rcx,-8-10*8
 
+    // merge fs,gs
+    orq %r10,%r11
+
+    // Get interrupted code segment
+    movzwl frame_cs(%rbp),%ecx
+
     pushq %rdx
     .cfi_rel_offset rdx,-8-11*8
+
+    // Merge ds,es,fs,gs
+    orq %r11,%r13
+
+    //  r13: segment register values at interrupt entry
 
     pushq %rsi
     .cfi_rel_offset rsi,-8-12*8
@@ -176,28 +219,17 @@ isr_common:
     pushq %rdi
     .cfi_rel_offset rdi,-8-13*8
 
-    // Register usage:
-    //  r13: segment register values at interrupt entry
+    // Assume null FPU context pointer
+    xorl %edi,%edi
 
+    // Save CR3
     pushq %rax
 
-    // Get segment registers packed into %r13
-    movl %gs,%eax
-    movl %es,%r13d
-    shll $16,%eax
-    shll $16,%r13d
-    movw %fs,%ax
-    movw %ds,%r13w
-    shlq $32,%rax
-    orq %rax,%r13
-
+    // Save segments
     pushq %r13
 
-    // Get interrupted code segment
-    movl 4*8(%rbp),%ecx
-
     // Check for doublefault nonsense cs
-    test %ecx,%ecx
+    testl %ecx,%ecx
     jz .Lfrom_kernel
 
     // See if we are coming from kernel code
@@ -207,14 +239,13 @@ isr_common:
     // ...came from user code
     swapgs
 
-.Lfrom_kernel:
-
     // Save entire sse/mmx/fpu state
     // NOTE: this instruction may be patched to call one of the xsave versions!
     jmp isr_save_fxsave
 .Lsse_context_save_jmp:
 
 .align 16
+.Lfrom_kernel:
 .Lsse_context_save_resume:
     // Push FPU context pointer
     pushq %rdi
@@ -223,7 +254,7 @@ isr_common:
 
     // Pass intr, ctx
     movq %rsp,%rsi
-    movl 1*8(%rbp),%edi
+    movl frame_intr(%rbp),%edi
 
     // Align stack pointer
     subq $8,%rsp
@@ -264,6 +295,7 @@ isr_common:
     // the passed one to continue with this thread
     mov %rax,%rsp
 
+    // Infer pointer to incoming thread's interrupt frame from ctx pointer
     lea 19*8(%rax),%rbp
 
     // Pop outgoing cleanup data
@@ -278,12 +310,6 @@ isr_common:
     // Pop the pointer to the FPU context
     popq %rdi
 
-    // NOTE: this instruction may be patched to call one of the xsave versions!
-    jmp isr_restore_fxrstor
-.Lsse_context_restore_jmp:
-
-.align 16
-.Lsse_context_restore_resume:
     // pop packed segments qword into rdx
     // if not returning to kernel
     //   update tss rsp0
@@ -295,7 +321,7 @@ isr_common:
     // endif
 
     // Load return cs
-    movl 4*8(%rbp),%ecx
+    movzwl frame_cs(%rbp),%ecx
 
     // Pop segments
     popq %rdx
@@ -307,9 +333,16 @@ isr_common:
 
     // ...returning to user code
 
+    // NOTE: this instruction may be patched to call one of the xsave versions!
+    jmp isr_restore_fxrstor
+.Lsse_context_restore_jmp:
+
+    .align 16
+.Lsse_context_restore_resume:
+
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
     movq %gs:CPU_INFO_TSS_PTR_OFS,%rbx
-    leaq 8*8(%rbp),%rax
+    leaq frame_end(%rbp),%rax
     movq %rax,TSS_RSP0_OFS(%rbx)
 
     // Restore user gs
@@ -563,35 +596,38 @@ isr_sysret64:
     push_cfi %rbp
     movq %rsp,%rbp
 
-    xorl %eax,%eax
+    // Need to prevent context switch while initializing FPU
+    cli
+
+    // Initialize MXCSR and FCW
+    pushq $(CPU_FPUCW_ELF_INIT)
+
+    movl $(CPU_MXCSR_MASK_ALL),%eax
+    andl default_mxcsr_mask,%eax
+    pushq %rax
+
+    fldcw 8(%rsp)
 
     // Clear the opmask registers
 
+    xorl %eax,%eax
+
     cmpw $0,sse_avx512_opmask_offset(%rip)
     jne .Lclear_opmask
-    jmp .Ldone_opmask
 
-.Lclear_opmask:
-    kmovw %eax,%k1
-    kmovw %eax,%k2
-    kmovw %eax,%k3
-    kmovw %eax,%k4
-    kmovw %eax,%k5
-    kmovw %eax,%k6
-    kmovw %eax,%k7
-
-.align 16
 .Ldone_opmask:
     // Check for AVX
     cmpw $0,sse_avx_offset(%rip)
     je .Lno_avx
 
     // Clear all vector registers
+    vldmxcsr (%rsp)
     vzeroall
     jmp .Ldone_sse
 
 .align 16
 .Lno_avx:
+    ldmxcsr (%rsp)
     pxor %xmm0,%xmm0
     movq %xmm0,%xmm1
     movq %xmm0,%xmm2
@@ -656,10 +692,20 @@ isr_sysret64:
     mov %eax,%r13d
     mov %eax,%r14d
     mov %eax,%r15d
-    cli
     swapgs
     mov %rsi,%rsp
     sysretq
+
+.align 16
+.Lclear_opmask:
+    kmovw %eax,%k1
+    kmovw %eax,%k2
+    kmovw %eax,%k3
+    kmovw %eax,%k4
+    kmovw %eax,%k5
+    kmovw %eax,%k6
+    kmovw %eax,%k7
+    jmp .Ldone_opmask
 
     .cfi_endproc
 
