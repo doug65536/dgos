@@ -29,10 +29,14 @@ void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock);
 //
 // Reader/writer spinlock
 
-typedef int volatile rwspinlock_t;
+typedef int rwspinlock_value_t;
+typedef rwspinlock_value_t volatile rwspinlock_t;
 
 void rwspinlock_ex_lock(rwspinlock_t *lock);
 void rwspinlock_ex_unlock(rwspinlock_t *lock);
+
+bool rwspinlock_ex_try_lock(rwspinlock_t *lock);
+bool rwspinlock_sh_try_lock(rwspinlock_t *lock);
 
 // Upgrade from shared lock to exclusive lock
 void rwspinlock_upgrade(rwspinlock_t *lock);

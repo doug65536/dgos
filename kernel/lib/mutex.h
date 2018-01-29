@@ -110,6 +110,60 @@ private:
 class alignas(64) padded_shared_mutex : public shared_mutex {
 };
 
+class shared_spinlock {
+public:
+    typedef rwspinlock_t mutex_type;
+
+    shared_spinlock()
+        : m(0)
+    {
+    }
+
+
+    void lock()
+    {
+        rwspinlock_ex_lock(&m);
+    }
+
+    bool try_lock()
+    {
+        return rwspinlock_ex_try_lock(&m);
+    }
+
+    void unlock()
+    {
+        rwspinlock_ex_unlock(&m);
+    }
+
+    void lock_shared()
+    {
+        rwspinlock_sh_lock(&m);
+    }
+
+    void try_lock_shared()
+    {
+        rwspinlock_sh_try_lock(&m);
+    }
+
+    void unlock_shared()
+    {
+        rwspinlock_sh_unlock(&m);
+    }
+
+    void upgrade_lock()
+    {
+        rwspinlock_upgrade(&m);
+    }
+
+    mutex_type& native_handle()
+    {
+        return m;
+    }
+
+private:
+    rwspinlock_t m;
+};
+
 // Meets BasicLockable requirements
 class spinlock {
 public:

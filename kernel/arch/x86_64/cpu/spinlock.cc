@@ -54,7 +54,6 @@ void spinlock_unlock(spinlock_t *lock)
 {
     assert(*lock != 0);
     *lock = 0;
-    atomic_barrier();
 }
 
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
@@ -65,7 +64,6 @@ spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 
 void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 {
-    atomic_barrier();
     while (*lock != 0 || atomic_cmpxchg(lock, 0, saved_lock) != 0)
         pause();
 }
@@ -76,7 +74,6 @@ void spinlock_lock_noirq(spinlock_t *lock)
     // Disable IRQs
     int intr_enabled = cpu_irq_disable() << 1;
 
-    atomic_barrier();
     if (intr_enabled) {
         while (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
             // Allow IRQs if they were enabled
@@ -102,7 +99,6 @@ bool spinlock_try_lock_noirq(spinlock_t *lock)
 {
     int intr_enabled = cpu_irq_disable() << 1;
 
-    atomic_barrier();
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         cpu_irq_toggle(intr_enabled);
 
@@ -116,10 +112,8 @@ void spinlock_unlock_noirq(spinlock_t *lock)
 {
     int intr_enabled = *lock >> 1;
     assert(*lock & 1);
-    atomic_barrier();
     *lock = 0;
     cpu_irq_toggle(intr_enabled);
-    atomic_barrier();
 }
 
 //
@@ -128,16 +122,15 @@ void spinlock_unlock_noirq(spinlock_t *lock)
 // to lock out readers
 
 // Expect 0 when acquring, expect 1 when upgrading
-static void rwspinlock_ex_lock_impl(rwspinlock_t *lock, int expect)
+static void rwspinlock_ex_lock_impl(rwspinlock_t *lock,
+                                    rwspinlock_value_t expect)
 {
     atomic_barrier();
 
     bool own_bit30 = false;
 
-    for (rwspinlock_t old_value = *lock; ; pause()) {
-        rwspinlock_t upd_value;
-
-        if (unlikely(!own_bit30)) {
+    for (rwspinlock_value_t old_value = *lock; ; pause()) {
+        if (!own_bit30) {
             //
             // We haven't locked out readers yet
 
@@ -147,14 +140,11 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock, int expect)
                 break;
 
             // Try to acquire ownership of bit 30
+            // If nobody has locked out readers and there is at least one reader
             if (old_value < (1 << 30) && old_value > 0) {
-                upd_value = atomic_cmpxchg(
-                        lock, old_value, old_value | (1<<30));
-
-                if (upd_value == old_value)
+                if (atomic_cmpxchg_upd(lock, &old_value, old_value | (1<<30)))
                     own_bit30 = true;
 
-                old_value = upd_value;
                 continue;
             }
 
@@ -167,17 +157,13 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock, int expect)
 
             // Wait for readers to drain out and acquire
             // exclusive lock when they have
-            if (old_value == (1<<30)) {
+            if (old_value == (1<<30) + expect) {
                 //
-                // All readers drained out
+                // All (other, when upgrading) readers drained out
 
-                upd_value = atomic_cmpxchg(
-                        lock, old_value, -1);
-
-                if (upd_value == old_value)
+                if (atomic_cmpxchg_upd(lock, &old_value, -1))
                     break;
 
-                old_value = upd_value;
                 continue;
             }
         }
@@ -209,57 +195,51 @@ void rwspinlock_ex_unlock(rwspinlock_t *lock)
 {
     assert(*lock == -1);
     *lock = 0;
-    atomic_barrier();
 }
 
 void rwspinlock_sh_lock(rwspinlock_t *lock)
 {
-    atomic_barrier();
-    rwspinlock_t old_value = *lock;
-    for (;;) {
+    for (rwspinlock_value_t old_value = *lock; ; pause()) {
         if (old_value >= 0 && old_value < (1<<30)) {
             // It is unlocked or already shared
             // and no writer has acquired bit 30
             // Try to increase shared count
-            rwspinlock_t new_value = old_value + 1;
-            rwspinlock_t cur_value = atomic_cmpxchg(
-                        lock, old_value, new_value);
-
-            if (cur_value == old_value)
+            if (atomic_cmpxchg_upd(lock, &old_value, old_value + 1))
                 break;
-
-            old_value = cur_value;
-            pause();
         } else if (old_value < 0) {
-            // It is exclusive, go into reading-only
-            // loop to allow shared cache line
-            do {
-                pause();
-                old_value = *lock;
-            } while (old_value < 0);
-        } else {
-            pause();
+            old_value = *lock;
         }
     }
 }
 
 void rwspinlock_sh_unlock(rwspinlock_t *lock)
 {
-    atomic_barrier();
-    rwspinlock_t old_value = *lock;
-    for (;; pause()) {
+    for (rwspinlock_value_t old_value = *lock; ; pause()) {
         if (old_value > 0) {
             // Try to decrease shared count
-            rwspinlock_t cur_value = atomic_cmpxchg(
-                        lock, old_value, old_value - 1);
-
-            if (cur_value == old_value)
+            if (atomic_cmpxchg_upd(lock, &old_value, old_value - 1))
                 break;
-
-            old_value = cur_value;
         } else {
             // Make sure shared lock is actually held
             assert(old_value > 0);
         }
     }
+}
+
+bool rwspinlock_ex_try_lock(rwspinlock_t *lock)
+{
+    if (*lock == 0)
+        return atomic_cmpxchg(lock, 0, -1) == 0;
+
+    return false;
+}
+
+bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
+{
+    for (rwspinlock_value_t expect = *lock; expect >= 0; pause()) {
+        if (atomic_cmpxchg_upd(lock, &expect, expect + 1))
+            return true;
+    }
+
+    return false;
 }
