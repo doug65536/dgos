@@ -453,12 +453,12 @@ static __always_inline uintptr_t cpu_change_flags(
 {
     uintptr_t flags;
     __asm__ __volatile__ (
-        "pushf\n\t"
-        "pop %[flags]\n\t"
-        "and %[clear],%[flags]\n\t"
-        "or %[set],%[flags]\n\t"
-        "push %[flags]\n\t"
-        "popf"
+        "pushfq\n\t"
+        "popq %q[flags]\n\t"
+        "andq %q[clear],%q[flags]\n\t"
+        "orq %q[set],%q[flags]\n\t"
+        "pushq %q[flags]\n\t"
+        "popfq"
         : [flags] "=&r" (flags)
         : [clear] "ir" (clear)
         , [set] "ir" (set)
@@ -481,8 +481,8 @@ static __always_inline bool cpu_irq_disable(void)
 {
     uintptr_t rflags;
     __asm__ __volatile__ (
-        "pushf\n\t"
-        "pop %[rflags]\n\t"
+        "pushfq\n\t"
+        "popq %q[rflags]\n\t"
         "cli\n\t"
         : [rflags] "=r" (rflags)
         :
@@ -501,10 +501,10 @@ static __always_inline void cpu_irq_toggle(int enable)
     uintptr_t temp;
     __asm__ __volatile__ (
         "pushfq\n\t"
-        "pop %q[temp]\n\t"
-        "and $~(1<<9),%k[temp]\n\t"
-        "or %k[enable],%k[temp]\n\t"
-        "push %q[temp]\n\t"
+        "popq %q[temp]\n\t"
+        "andl $~(1<<9),%k[temp]\n\t"
+        "orl %k[enable],%k[temp]\n\t"
+        "pushq %q[temp]\n\t"
         "popfq\n\t"
         : [temp] "=&r" (temp)
         : [enable] "ir" ((enable != 0) << 9)
