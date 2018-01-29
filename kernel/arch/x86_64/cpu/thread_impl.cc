@@ -109,7 +109,6 @@ struct alignas(64) thread_info_t {
 
     // 3 bytes...
 
-    spinlock state_lock;
     int wake_count;
 
     mutex_t lock;
@@ -600,13 +599,6 @@ static thread_info_t *thread_choose_next(
                 ? THREAD_IS_READY
                 : THREAD_IS_READY_BUSY;
 
-        unique_lock<spinlock> hold(candidate->state_lock);
-        if (candidate->state == THREAD_IS_SUSPENDED && candidate->wake_count) {
-            --candidate->wake_count;
-            candidate->state = THREAD_IS_READY;
-        }
-        hold.unlock();
-
         if (unlikely(candidate->state == expected_sleep)) {
             // The thread is sleeping, see if it should wake up yet
 
@@ -825,15 +817,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 
     *thread_id = thread - threads;
 
-    // See if we can consume a stored wakeup
-    unique_lock<spinlock> hold(thread->state_lock);
-    if (thread->wake_count) {
-        --thread->wake_count;
-        return;
-    }
-
     thread->state = THREAD_IS_SUSPENDED_BUSY;
-    hold.unlock();
 
     atomic_barrier();
     spinlock_t saved_lock = spinlock_unlock_save(lock);
@@ -846,13 +830,8 @@ EXPORT void thread_resume(thread_t tid)
 {
     thread_info_t *thread = threads + tid;
 
-    unique_lock<spinlock> hold(thread->state_lock);
-
-    if (thread->state == THREAD_IS_SUSPENDED) {
-        thread->state = THREAD_IS_READY;
-    } else {
-        ++thread->wake_count;
-    }
+    cpu_wait_value(&thread->state, THREAD_IS_SUSPENDED);
+    thread->state = THREAD_IS_READY;
 }
 
 EXPORT int thread_wait(thread_t thread_id)
