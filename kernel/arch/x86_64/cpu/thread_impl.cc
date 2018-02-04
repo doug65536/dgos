@@ -610,11 +610,8 @@ static thread_info_t *thread_choose_next(
                 continue;
 
             // Race to transition it to ready
-            if (unlikely(atomic_cmpxchg(
-                             &candidate->state,
-                             expected_sleep,
-                             expected_ready) !=
-                         expected_sleep)) {
+            if (unlikely(atomic_cmpxchg(&candidate->state, expected_sleep,
+                                        expected_ready) != expected_sleep)) {
                 // Another CPU beat us to it
                 continue;
             }
