@@ -46,3 +46,13 @@ void rwspinlock_downgrade(rwspinlock_t *lock);
 
 void rwspinlock_sh_lock(rwspinlock_t *lock);
 void rwspinlock_sh_unlock(rwspinlock_t *lock);
+
+typedef unsigned ticketlock_value_t;
+struct ticketlock_t {
+    ticketlock_value_t volatile next_ticket;
+    ticketlock_value_t volatile now_serving;
+};
+
+void ticketlock_lock(ticketlock_t *lock);
+bool ticketlock_try_lock(ticketlock_t *lock);
+void ticketlock_unlock(ticketlock_t *lock);

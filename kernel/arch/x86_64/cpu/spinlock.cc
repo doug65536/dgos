@@ -243,3 +243,40 @@ bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
 
     return false;
 }
+
+void ticketlock_lock(ticketlock_t *lock)
+{
+    unsigned my_ticket = atomic_xadd(&lock->next_ticket, 1);
+
+    for (;;) {
+        unsigned pause_count = my_ticket - lock->now_serving;
+
+        if (pause_count == 0)
+            return;
+
+        while (pause_count--)
+            pause();
+    }
+}
+
+bool ticketlock_try_lock(ticketlock_t *lock)
+{
+    ticketlock_value_t intr_enabled = cpu_irq_disable() << 31;
+
+    for (unsigned old_next = lock->next_ticket; ; ) {
+        if (lock->now_serving == old_next) {
+            if (atomic_cmpxchg_upd(&lock->next_ticket, &old_next,
+                                   ((old_next + 1) & 0x7FFFFFFF) |
+                                   intr_enabled))
+                return true;
+        } else {
+            cpu_irq_toggle(intr_enabled);
+            return false;
+        }
+    }
+}
+
+void ticketlock_unlock(ticketlock_t *lock)
+{
+    ++lock->now_serving;
+}

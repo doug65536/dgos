@@ -2,6 +2,7 @@
 #include "threadsync.h"
 #include "cpu/atomic.h"
 #include "utility.h"
+
 // Meets BasicLockable requirements
 class mutex {
 public:
@@ -208,6 +209,34 @@ private:
 };
 
 struct alignas(64) padded_spinlock : public spinlock {
+};
+
+class ticket_lock {
+public:
+    typedef ticketlock_t mutex_type;
+
+    ticket_lock()
+        : m{}
+    {
+    }
+
+    void lock() {
+        ticketlock_lock(&m);
+    }
+
+    bool try_lock() {
+        return ticketlock_try_lock(&m);
+    }
+
+    void unlock() {
+        ticketlock_unlock(&m);
+    }
+
+private:
+    ticketlock_t m;
+};
+
+struct alignas(64) padded_ticket_lock : public ticket_lock {
 };
 
 struct defer_lock_t {
