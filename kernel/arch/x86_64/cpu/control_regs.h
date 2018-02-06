@@ -496,18 +496,19 @@ static __always_inline void cpu_irq_enable(void)
     __asm__ __volatile__ ( "sti" : : : "cc" );
 }
 
-static __always_inline void cpu_irq_toggle(int enable)
+static __always_inline void cpu_irq_toggle(bool enable)
 {
     uintptr_t temp;
     __asm__ __volatile__ (
         "pushfq\n\t"
         "popq %q[temp]\n\t"
-        "andl $~(1<<9),%k[temp]\n\t"
+        "andl %[not_eflags_if],%k[temp]\n\t"
         "orl %k[enable],%k[temp]\n\t"
         "pushq %q[temp]\n\t"
         "popfq\n\t"
         : [temp] "=&r" (temp)
-        : [enable] "ir" ((enable != 0) << 9)
+        : [enable] "ir" (enable << CPU_EFLAGS_IF_BIT)
+        , [not_eflags_if] "i" (~CPU_EFLAGS_IF)
         : "cc"
     );
 }
