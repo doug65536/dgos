@@ -59,7 +59,7 @@ ap_init:
     // Initialize AP MXCSR
     movl $(CPU_MXCSR_ELF_INIT),%eax
     andl default_mxcsr_mask,%eax
-    push %rax
+    pushq %rax
     ldmxcsr (%rsp)
 
     // Initialize AP FPU control word
@@ -386,7 +386,7 @@ detect_xsave_states_bsp:
 
 .align 16
 set_xsave_states_ap:
-    push %rbx
+    pushq %rbx
 
     call cpuid_has_xsave
     testb %al,%al
