@@ -85,14 +85,14 @@ entry_start:
 
 	fninit
 
-	xorl %eax,%eax
+	xorw %ax,%ax
 	movw %ax,%ds
 	movw %ax,%es
 
 	# Initialize stack to top of first 64KB
 	cli
-	lssw init_stack+0x7c00-0x600,%sp
-	movzwl %sp,%esp
+	movw init_stack-0x600+0x7c00+2,%ss
+	movw init_stack-0x600+0x7c00,%sp
 	sti
 
 	# Relocate to 0x600
