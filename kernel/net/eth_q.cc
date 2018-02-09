@@ -3,6 +3,7 @@
 #include "assert.h"
 #include "cpu/atomic.h"
 #include "printk.h"
+#include "mutex.h"
 
 #define ETHQ_DEBUG  1
 #if ETHQ_DEBUG
@@ -101,28 +102,23 @@ int ethq_init(void)
 }
 
 #if 1
-#include "cpu/spinlock.h"
-static spinlock_t ethq_lock;
+static ticketlock ethq_lock;
 ethq_pkt_t *ethq_pkt_acquire(void)
 {
-    spinlock_lock_noirq(&ethq_lock);
+    unique_lock<ticketlock> lock(ethq_lock);
 
     ethq_pkt_t *pkt = ethq_first_free;
     ethq_first_free = pkt->next;
-
-    spinlock_unlock_noirq(&ethq_lock);
 
     return pkt;
 }
 
 void ethq_pkt_release(ethq_pkt_t *pkt)
 {
-    spinlock_lock_noirq(&ethq_lock);
+    unique_lock<ticketlock> lock(ethq_lock);
 
     pkt->next = ethq_first_free;
     ethq_first_free = pkt;
-
-    spinlock_unlock_noirq(&ethq_lock);
 }
 
 #else

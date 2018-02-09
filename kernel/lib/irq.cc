@@ -1,7 +1,7 @@
 #include "irq.h"
 #include "types.h"
 #include "string.h"
-#include "cpu/spinlock.h"
+#include "mutex.h"
 #include "cpu/atomic.h"
 #include "assert.h"
 #include "printk.h"
@@ -43,7 +43,7 @@ static intr_link_t intr_first_free;
 static intr_link_t intr_handlers_count;
 static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
-static spinlock_t intr_handler_reg_lock;
+static ticketlock intr_handler_reg_lock;
 
 // Vectors
 static irq_setmask_handler_t irq_setmask_vec;
@@ -79,13 +79,12 @@ void irq_setcpu_set_handler(irq_setcpu_handler_t handler)
 
 void irq_setmask(int irq, bool unmask)
 {
-    spinlock_lock_noirq(&intr_handler_reg_lock);
+    unique_lock<ticketlock> lock(intr_handler_reg_lock);
     // Unmask when unmask count transitions from 0 to 1
     // Mask when unmask count transitions from 1 to 0
     assert(intr_unmask_count[irq] != (unmask ? 255U : 0U));
     if ((intr_unmask_count[irq] += (unmask ? 1 : -1)) == (unmask ? 1 : 0))
         irq_setmask_vec(irq, unmask);
-    spinlock_unlock_noirq(&intr_handler_reg_lock);
 }
 
 void irq_hook(int irq, intr_handler_t handler)
@@ -114,7 +113,7 @@ static intr_handler_reg_t *intr_alloc(void)
 
 void intr_hook(int intr, intr_handler_t handler)
 {
-    spinlock_lock_noirq(&intr_handler_reg_lock);
+    unique_lock<ticketlock> lock(intr_handler_reg_lock);
 
     if (intr_handlers_count == 0) {
         // First time initialization
@@ -151,8 +150,6 @@ void intr_hook(int intr, intr_handler_t handler)
         atomic_barrier();
         *prev_link = entry - intr_handlers;
     }
-
-    spinlock_unlock_noirq(&intr_handler_reg_lock);
 }
 
 static void intr_delete(intr_link_t *prev_link,
@@ -165,7 +162,7 @@ static void intr_delete(intr_link_t *prev_link,
 
 void intr_unhook(int intr, intr_handler_t handler)
 {
-    spinlock_lock_noirq(&intr_handler_reg_lock);
+    unique_lock<ticketlock> lock(intr_handler_reg_lock);
 
     intr_link_t *prev_link = &intr_first[intr];
 
@@ -183,8 +180,6 @@ void intr_unhook(int intr, intr_handler_t handler)
 
         entry = 0;
     }
-
-    spinlock_unlock_noirq(&intr_handler_reg_lock);
 }
 
 int intr_has_handler(int intr)

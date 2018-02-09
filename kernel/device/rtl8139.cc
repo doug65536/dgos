@@ -5,7 +5,7 @@
 #include "cpu/atomic.h"
 #include "mm.h"
 #include "irq.h"
-#include "threadsync.h"
+#include "mutex.h"
 #include "string.h"
 #include "bswap.h"
 #include "eth_q.h"
@@ -123,7 +123,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     unsigned tx_head;
     unsigned tx_tail;
 
-    spinlock_t lock;
+    ticketlock lock;
 
     ethq_queue_t tx_queue;
     ethq_queue_t rx_queue;
@@ -812,7 +812,7 @@ isr_context_t *rtl8139_dev_t::irq_dispatcher(int irq, isr_context_t *ctx)
 
 void rtl8139_dev_t::irq_handler()
 {
-    spinlock_lock_noyield(&lock);
+    unique_lock<ticketlock> lock_(lock);
 
     uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
 
@@ -852,7 +852,7 @@ void rtl8139_dev_t::irq_handler()
             RTL8139_TRACE("*** IRQ: Rx Overflow Error\n");
         }
 
-        // Dequeue all received packets inside spinlock
+        // Dequeue all received packets inside the lock
         rx_first = ethq_dequeue_all(&rx_queue);
 
         for (int n = 0; n < 4; ++n) {
@@ -866,9 +866,9 @@ void rtl8139_dev_t::irq_handler()
         }
     }
 
-    spinlock_unlock(&lock);
+    lock_.unlock();
 
-    // Service the receive queue outside spinlock
+    // Service the receive queue outside the lock
     if (rx_first) {
         ethq_pkt_t *rx_next;
         for (ethq_pkt_t *rx_packet = rx_first; rx_packet;
@@ -882,7 +882,7 @@ void rtl8139_dev_t::irq_handler()
 
 int rtl8139_dev_t::send(ethq_pkt_t *pkt)
 {
-    spinlock_lock_noirq(&lock);
+    unique_lock<ticketlock> lock_(lock);
 
     memcpy(pkt->pkt.hdr.s_mac, mac_addr, 6);
 
@@ -892,8 +892,6 @@ int rtl8139_dev_t::send(ethq_pkt_t *pkt)
     } else {
         ethq_enqueue(&tx_queue, pkt);
     }
-
-    spinlock_unlock_noirq(&lock);
 
     return 1;
 }

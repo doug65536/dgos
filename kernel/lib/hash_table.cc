@@ -22,16 +22,14 @@ void htbl_create(hashtbl_t *self,
     self->key_ofs = key_ofs;
     self->key_size = key_size;
     self->log2_capacity = 0;
-    self->lock = 0;
 }
 
 void htbl_destroy(hashtbl_t *self)
 {
-    rwspinlock_ex_lock(&self->lock);
+    unique_lock<shared_mutex> lock(self->lock);
     free(self->items);
     self->items = 0;
     self->log2_capacity = 0;
-    rwspinlock_ex_unlock(&self->lock);
 }
 
 static int htbl_rehash(hashtbl_t *self)
@@ -84,7 +82,7 @@ void *htbl_lookup(hashtbl_t *self, void *key)
 {
     void *item = 0;
 
-    rwspinlock_sh_lock(&self->lock);
+    shared_lock<shared_mutex> lock(self->lock);
     if (self->count) {
         uint32_t hash = hash_32(key, self->key_size);
         uint32_t mask = ~((uint32_t)-1 << self->log2_capacity);
@@ -103,21 +101,18 @@ void *htbl_lookup(hashtbl_t *self, void *key)
             }
         }
     }
-    rwspinlock_sh_unlock(&self->lock);
 
     return item;
 }
 
 int htbl_insert(hashtbl_t *self, void *item)
 {
-    rwspinlock_ex_lock(&self->lock);
+    unique_lock<shared_mutex> lock(self->lock);
 
     if (!self->items ||
             self->count >= ((1U<<self->log2_capacity) * 3U) >> 2) {
-        if (!htbl_rehash(self)) {
-            rwspinlock_ex_unlock(&self->lock);
+        if (!htbl_rehash(self))
             return 0;
-        }
     }
 
     uint32_t hash = hash_32((char*)item + self->key_ofs,
@@ -135,14 +130,13 @@ int htbl_insert(hashtbl_t *self, void *item)
             break;
         }
     }
-    rwspinlock_ex_unlock(&self->lock);
 
     return 1;
 }
 
 void htbl_delete(hashtbl_t *self, void *key)
 {
-    rwspinlock_sh_lock(&self->lock);
+    shared_lock<shared_mutex> lock(self->lock);
     if (self->count) {
         uint32_t hash = hash_32(key, self->key_size);
         uint32_t mask = ~((uint32_t)-1 << self->log2_capacity);
@@ -171,5 +165,4 @@ void htbl_delete(hashtbl_t *self, void *key)
             }
         }
     }
-    rwspinlock_sh_unlock(&self->lock);
 }

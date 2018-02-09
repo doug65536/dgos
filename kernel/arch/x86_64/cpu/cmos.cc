@@ -6,7 +6,6 @@
 #include "idt.h"
 #include "irq.h"
 #include "control_regs.h"
-#include "spinlock.h"
 #include "mutex.h"
 #include "bootinfo.h"
 #include "printk.h"
@@ -149,21 +148,22 @@
 // JMP DWORD with INT init
 #define CMOS_SHUTDOWN_STATUS_AP     0xB
 
-static spinlock cmos_lock;
+typedef ticketlock cmos_lock_t;
+static cmos_lock_t cmos_lock;
 static time_of_day_t time_of_day;
 static uint64_t time_of_day_timestamp;
 
 static uint8_t cmos_status_b;
 
 static uint8_t cmos_read(uint8_t reg,
-                         unique_lock<spinlock> const&)
+                         unique_lock<cmos_lock_t> const&)
 {
     outb(CMOS_ADDR_PORT, reg);
     return inb(CMOS_DATA_PORT);
 }
 
 static void cmos_write(uint8_t reg, uint8_t val,
-                       unique_lock<spinlock> const&)
+                       unique_lock<cmos_lock_t> const&)
 {
     outb(CMOS_ADDR_PORT, reg);
     outb(CMOS_DATA_PORT, val);
@@ -171,7 +171,7 @@ static void cmos_write(uint8_t reg, uint8_t val,
 
 void cmos_prepare_ap(void)
 {
-    unique_lock<spinlock> lock(cmos_lock);
+    unique_lock<cmos_lock_t> lock(cmos_lock);
 
     // Read vector immediately after boot sector structure
     uint32_t ap_entry_point = //*(uint32_t*)0x7C40;
@@ -215,7 +215,8 @@ static time_of_day_t cmos_fixup_timeofday(time_of_day_t t)
     return t;
 }
 
-static time_of_day_t cmos_read_gettimeofday(unique_lock<spinlock> const& lock)
+static time_of_day_t cmos_read_gettimeofday(
+        unique_lock<cmos_lock_t> const& lock)
 {
     time_of_day_t result;
 
@@ -234,7 +235,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 {
     //printdbg("CMOS IRQ\n");
 
-    unique_lock<spinlock> lock(cmos_lock);
+    unique_lock<cmos_lock_t> lock(cmos_lock);
 
     uint8_t intr_cause = cmos_read(CMOS_REG_STATUS_C, lock);
 
@@ -249,7 +250,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 
 time_of_day_t cmos_gettimeofday()
 {
-    unique_lock<spinlock> lock(cmos_lock);
+    unique_lock<cmos_lock_t> lock(cmos_lock);
 
     time_of_day_t result = time_of_day;
     uint64_t now = time_ns();
@@ -264,7 +265,7 @@ time_of_day_t cmos_gettimeofday()
 
 void cmos_init(void)
 {
-    unique_lock<spinlock> lock(cmos_lock);
+    unique_lock<cmos_lock_t> lock(cmos_lock);
 
     irq_hook(8, cmos_irq_handler);
 

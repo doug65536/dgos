@@ -6,6 +6,7 @@
 #include "stdlib.h"
 #include "string.h"
 #include "vector.h"
+#include "mutex.h"
 
 struct filetab_t {
     fs_file_info_t *fi;
@@ -15,13 +16,13 @@ struct filetab_t {
     int refcount;
 };
 
-static spinlock file_table_lock;
+static ticketlock file_table_lock;
 static vector<filetab_t> file_table;
 static filetab_t *file_table_ff;
 
 static void file_init(void *)
 {
-    unique_lock<spinlock> lock(file_table_lock);
+    unique_lock<ticketlock> lock(file_table_lock);
     file_table.reserve(1000);
 }
 
@@ -33,7 +34,7 @@ static fs_base_t *file_fs_from_path(char const *path)
 
 static filetab_t *file_new_filetab(void)
 {
-    unique_lock<spinlock> lock(file_table_lock);
+    unique_lock<ticketlock> lock(file_table_lock);
     filetab_t *item = nullptr;
     if (file_table_ff) {
         // Reuse freed item
@@ -59,19 +60,19 @@ static bool file_del_filetab(filetab_t *item)
         file_table_ff = item;
         return true;
     }
-    
+
     return false;
 }
 
 bool file_ref_filetab(int id)
 {
-    unique_lock<spinlock> lock(file_table_lock);
+    unique_lock<ticketlock> lock(file_table_lock);
     if (id >= 0 && id < (int)file_table.size() &&
             file_table[id].refcount > 0) {
         ++file_table[id].refcount;
         return true;
     }
-    
+
     return false;
 }
 
@@ -118,10 +119,10 @@ int file_open(char const *path, int flags, mode_t mode)
 int file_close(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
-    
+
     if (unlikely(!fh))
         return -1;
-    
+
     if (file_del_filetab(fh)) {
         fh->fs->release(fh->fi);
         memset(fh, 0, sizeof(*fh));
@@ -316,7 +317,7 @@ off_t file_seekdir(int id, off_t ofs)
 int file_closedir(int id)
 {
     filetab_t *fh = file_fh_from_id(id);
-    
+
     if (!fh)
         return -1;
 

@@ -49,7 +49,7 @@ struct iocp_t {
     // called.
     void set_expect(unsigned expect)
     {
-        unique_lock<spinlock> hold(lock);
+        unique_lock<ticketlock> hold(lock);
         expect_count = expect;
 
         if (done_count == expect)
@@ -66,7 +66,7 @@ struct iocp_t {
 
     void invoke()
     {
-        unique_lock<spinlock> hold(lock);
+        unique_lock<ticketlock> hold(lock);
         if (expect_count && ++done_count >= expect_count)
             invoke_once(hold);
         atomic_barrier();
@@ -83,7 +83,7 @@ struct iocp_t {
     }
 
 private:
-    void invoke_once(unique_lock<spinlock> &hold)
+    void invoke_once(unique_lock<ticketlock> &hold)
     {
         if (callback != nullptr) {
             callback_t temp = callback;
@@ -97,7 +97,7 @@ private:
     uintptr_t arg;
     unsigned done_count;
     unsigned expect_count;
-    spinlock lock;
+    ticketlock lock;
     errno_t err;
 };
 
@@ -116,7 +116,7 @@ public:
 
     void handler(errno_t)
     {
-        unique_lock<spinlock> hold(lock);
+        unique_lock<ticketlock> hold(lock);
         assert(!done);
         done = true;
         done_cond.notify_all();
@@ -127,7 +127,7 @@ public:
 
     errno_t wait()
     {
-        unique_lock<spinlock> hold(lock);
+        unique_lock<ticketlock> hold(lock);
         while (!done)
             done_cond.wait(hold);
         errno_t status = get_error();
@@ -135,7 +135,7 @@ public:
     }
 
 private:
-    spinlock lock;
+    ticketlock lock;
     condition_variable done_cond;
     bool done;
 };

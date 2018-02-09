@@ -10,7 +10,6 @@
 #include "string.h"
 #include "cpu/atomic.h"
 #include "time.h"
-#include "cpu/spinlock.h"
 #include "threadsync.h"
 #include "cpu/control_regs.h"
 #include "unique_ptr.h"

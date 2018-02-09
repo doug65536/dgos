@@ -160,7 +160,7 @@ struct alignas(128) cpu_info_t {
     uint32_t busy_percent;
     uint64_t irq_count;
 
-    spinlock_t queue_lock;
+    ticketlock queue_lock;
 
     void *storage[8];
 };
@@ -172,7 +172,7 @@ C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
-    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0,
+    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, {},
       { 0, 0, 0, 0, 0, 0, 0, 0 }
     }
 };
@@ -198,7 +198,7 @@ private:
     vector<thread_info_t*> priorities;
     uint32_t empty_flags;
 
-    spinlock lock;
+    ticketlock lock;
 };
 
 // Get executing APIC ID (the slow expensive way, for early initialization)

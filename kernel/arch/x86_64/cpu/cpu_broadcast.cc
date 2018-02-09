@@ -1,7 +1,7 @@
 #include "cpu_broadcast.h"
 #include "string.h"
 #include "stdlib.h"
-#include "spinlock.h"
+#include "mutex.h"
 #include "thread_impl.h"
 #include "apic.h"
 #include "printk.h"
@@ -22,7 +22,7 @@ struct cpu_broadcast_queue_t {
     cpu_broadcast_work_t *tail;
     cpu_broadcast_work_t *free;
 
-    spinlock_t lock;
+    ticketlock lock;
 };
 
 void cpu_broadcast_service(int intr, size_t slot)
@@ -32,7 +32,7 @@ void cpu_broadcast_service(int intr, size_t slot)
     cpu_broadcast_work_t *work;
     int eoi_done = 0;
 
-    spinlock_lock_noyield(&queue->lock);
+    unique_lock<ticketlock> lock(queue->lock);
     for (;;) {
         // Take whole list and release lock ASAP
         cpu_broadcast_work_t *head = queue->head;
@@ -43,7 +43,7 @@ void cpu_broadcast_service(int intr, size_t slot)
         }
         queue->head = 0;
         queue->tail = 0;
-        spinlock_unlock_noirq(&queue->lock);
+        lock.unlock();
 
         // End loop when no
         if (!head)
@@ -53,7 +53,7 @@ void cpu_broadcast_service(int intr, size_t slot)
             work->handler(work->data);
 
         // Insert into free list
-        spinlock_lock_noyield(&queue->lock);
+        lock.lock();
         tail->next = queue->free;
         queue->free = head;
     }
@@ -84,14 +84,12 @@ static void cpu_broadcast_add_work(
 {
     cpu_broadcast_queue_t *queue = (cpu_broadcast_queue_t *)slot_data;
 
-    spinlock_lock_noirq(&queue->lock);
+    unique_lock<ticketlock> lock(queue->lock);
 
     cpu_broadcast_work_t *incoming_work = (cpu_broadcast_work_t *)arg;
 
-    if (incoming_work->unique && queue->head) {
-        spinlock_unlock_noirq(&queue->lock);
+    if (incoming_work->unique && queue->head)
         return;
-    }
 
     cpu_broadcast_work_t *queued_work =
             (cpu_broadcast_work_t *)malloc(sizeof(*queued_work) + size);
@@ -111,8 +109,7 @@ static void cpu_broadcast_add_work(
         queue->tail->next = queued_work;
         queue->tail = queued_work;
     }
-    queued_work->next = 0;
-    spinlock_unlock_noirq(&queue->lock);
+    queued_work->next = nullptr;
 }
 
 void cpu_broadcast_message(int intr, size_t slot, int other_only,

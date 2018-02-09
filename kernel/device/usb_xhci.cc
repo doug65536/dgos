@@ -6,6 +6,7 @@
 #include "cpu/atomic.h"
 #include "string.h"
 #include "hash_table.h"
+#include "mutex.h"
 #include "usb.h"
 
 #define USBXHCI_DEBUG   1
@@ -1372,7 +1373,7 @@ struct usbxhci_dev_t {
 
     usbxhci_interrupter_info_t *interrupters;
 
-    spinlock_t endpoints_lock;
+    padded_ticketlock endpoints_lock;
     usbxhci_endpoint_data_t **endpoints;
     uint32_t endpoint_count;
 
@@ -1403,7 +1404,7 @@ struct usbxhci_dev_t {
     pci_irq_range_t irq_range;
 
     // Command issue lock
-    spinlock_t lock_cmd;
+    padded_ticketlock lock_cmd;
 };
 
 struct usbxhci_pending_cmd_t;
@@ -1478,7 +1479,7 @@ static void usbxhci_issue_cmd(usbxhci_dev_t *self, void *cmd,
                        usbxhci_complete_handler_t handler,
                        uintptr_t data)
 {
-    spinlock_lock_noirq(&self->lock_cmd);
+    unique_lock<ticketlock> hold_command_lock(self->lock_cmd);
 
     usbxhci_cmd_trb_t *s =
             (usbxhci_cmd_trb_t *)&self->dev_cmd_ring[self->cr_next++];
@@ -1489,8 +1490,6 @@ static void usbxhci_issue_cmd(usbxhci_dev_t *self, void *cmd,
 
     usbxhci_insert_pending_command(self->cmd_ring_physaddr + offset,
                                    handler, data);
-
-    spinlock_unlock_noirq(&self->lock_cmd);
 }
 
 static void usbxhci_add_xfer_trbs(usbxhci_dev_t *self,
@@ -1713,16 +1712,16 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
     newepd->target.slotid = slotid;
     newepd->target.epid = epid;
 
-    spinlock_lock_noirq(&self->endpoints_lock);
+    unique_lock<ticketlock> hold_endpoints_lock(self->endpoints_lock);
 
     usbxhci_endpoint_data_t **new_endpoints = (usbxhci_endpoint_data_t **)
             realloc(self->endpoints,
                     sizeof(*self->endpoints) *
                     (self->endpoint_count + 1));
     if (unlikely(!new_endpoints)) {
-        spinlock_unlock_noirq(&self->endpoints_lock);
+        hold_endpoints_lock.unlock();
         free(newepd);
-        return 0;
+        return nullptr;
     }
 
     self->endpoints = new_endpoints;
@@ -1735,7 +1734,6 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
                  PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
     if (unlikely(newepd->xfer_ring == MAP_FAILED || !newepd->xfer_ring)) {
         free(self->endpoints[--self->endpoint_count]);
-        spinlock_lock_noirq(&self->endpoints_lock);
         return 0;
     }
     newepd->ccs = 1;
@@ -1748,8 +1746,6 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
     newepd->xfer_ring_physaddr = xfer_ring_physaddr;
 
     htbl_insert(&self->endpoint_lookup, newepd);
-
-    spinlock_unlock_noirq(&self->endpoints_lock);
 
     return newepd;
 }
@@ -2089,7 +2085,7 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
         return;
 
     // Lookup pending command
-    spinlock_lock_noirq(&self->lock_cmd);
+    unique_lock<ticketlock> lock(self->lock_cmd);
     usbxhci_pending_cmd_t *pcp = (usbxhci_pending_cmd_t*)
             htbl_lookup(&usbxhci_pending_ht, &cmdaddr);
     assert(pcp);
@@ -2097,7 +2093,7 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
     htbl_delete(&usbxhci_pending_ht, &cmdaddr);
     uint64_t cmd_physaddr = pcp->cmd_physaddr;
     free(pcp);
-    spinlock_unlock_noirq(&self->lock_cmd);
+    lock.unlock();
 
     // Invoke completion handler
     pc.handler(self, (usbxhci_cmd_trb_t*)((char*)self->dev_cmd_ring +

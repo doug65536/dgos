@@ -15,7 +15,6 @@
 #include "likely.h"
 #include "time.h"
 #include "cpuid.h"
-#include "spinlock.h"
 #include "assert.h"
 #include "bitsearch.h"
 #include "callout.h"
@@ -229,7 +228,7 @@ struct mp_ioapic_t {
     uint8_t irq_base;
     uint32_t addr;
     uint32_t volatile *ptr;
-    spinlock lock;
+    ticketlock lock;
 };
 
 static char *mp_tables;
@@ -242,7 +241,7 @@ static uint64_t apic_timer_freq;
 static unsigned ioapic_count;
 static mp_ioapic_t ioapic_list[16];
 
-static spinlock ioapic_msi_alloc_lock;
+static ticketlock ioapic_msi_alloc_lock;
 static uint8_t ioapic_msi_next_irq = INTR_APIC_IRQ_BASE;
 
 // Bit 0 of this corresponds to vector INTR_APIC_IRQ_BASE
@@ -258,10 +257,10 @@ static void ioapic_reset(mp_ioapic_t *ioapic);
 static void ioapic_set_flags(mp_ioapic_t *ioapic,
                              uint8_t intin, uint16_t intr_flags);
 static uint32_t ioapic_read(
-        mp_ioapic_t *ioapic, uint32_t reg, unique_lock<spinlock> const&);
+        mp_ioapic_t *ioapic, uint32_t reg, unique_lock<ticketlock> const&);
 static void ioapic_write(
         mp_ioapic_t *ioapic, uint32_t reg, uint32_t value,
-        unique_lock<spinlock> const&);
+        unique_lock<ticketlock> const&);
 
 static uint8_t ioapic_next_irq_base = 16;
 
@@ -845,7 +844,7 @@ int acpi_have8259pic(void)
 
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {
-    unique_lock<spinlock> lock(ioapic_msi_alloc_lock);
+    unique_lock<ticketlock> lock(ioapic_msi_alloc_lock);
 
     uint8_t base = ioapic_msi_next_irq;
     ioapic_msi_next_irq += count;
@@ -870,7 +869,7 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
     uint64_t checked = mask;
     uint8_t result = 0;
 
-    unique_lock<spinlock> lock(ioapic_msi_alloc_lock);
+    unique_lock<ticketlock> lock(ioapic_msi_alloc_lock);
 
     for (size_t bit = 0; bit < 128; bit += count)
     {
@@ -2249,7 +2248,7 @@ static void apic_calibrate()
 // IOAPIC
 
 static uint32_t ioapic_read(
-        mp_ioapic_t *ioapic, uint32_t reg, unique_lock<spinlock> const&)
+        mp_ioapic_t *ioapic, uint32_t reg, unique_lock<ticketlock> const&)
 {
     ioapic->ptr[IOAPIC_IOREGSEL] = reg;
     return ioapic->ptr[IOAPIC_IOREGWIN];
@@ -2257,7 +2256,7 @@ static uint32_t ioapic_read(
 
 static void ioapic_write(
         mp_ioapic_t *ioapic, uint32_t reg, uint32_t value,
-        unique_lock<spinlock> const&)
+        unique_lock<ticketlock> const&)
 {
     ioapic->ptr[IOAPIC_IOREGSEL] = reg;
     ioapic->ptr[IOAPIC_IOREGWIN] = value;
@@ -2274,7 +2273,7 @@ static mp_ioapic_t *ioapic_by_id(uint8_t id)
 
 static void ioapic_reset(mp_ioapic_t *ioapic)
 {
-    unique_lock<spinlock> lock(ioapic->lock);
+    unique_lock<ticketlock> lock(ioapic->lock);
 
     // Fill entries in interrupt-to-ioapic lookup table
     fill_n(intr_to_ioapic + ioapic->base_intr,
@@ -2307,7 +2306,7 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
 static void ioapic_set_flags(mp_ioapic_t *ioapic,
                              uint8_t intin, uint16_t intr_flags)
 {
-    unique_lock<spinlock> lock(ioapic->lock);
+    unique_lock<ticketlock> lock(ioapic->lock);
 
     uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
 
@@ -2383,7 +2382,7 @@ static void ioapic_setmask(int irq, bool unmask)
     int intin = irq_intr - ioapic->base_intr;
     assert(intin >= 0 && intin < ioapic->vector_count);
 
-    unique_lock<spinlock> lock(ioapic->lock);
+    unique_lock<ticketlock> lock(ioapic->lock);
 
     uint32_t ent = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
 
@@ -2430,7 +2429,7 @@ bool ioapic_irq_cpu(int irq, int cpu)
     int irq_intr = irq_to_intr[irq];
     int ioapic_index = intr_to_ioapic[irq_intr];
     mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
-    unique_lock<spinlock> lock(ioapic->lock);
+    unique_lock<ticketlock> lock(ioapic->lock);
     ioapic_write(ioapic, IOAPIC_RED_HI_n(irq_intr - ioapic->base_intr),
                  IOAPIC_REDHI_DEST_n(apic_id_list[cpu]), lock);
     return true;

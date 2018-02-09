@@ -379,7 +379,7 @@ public:
     uint8_t cur_ns;
 
 private:
-    using lock_t = spinlock;
+    using lock_t = ticketlock;
     using scoped_lock = unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
     lock_t lock;
@@ -495,7 +495,7 @@ private:
     vector<nvme_callback_t> cmp_handlers;
     uint64_t *prp_lists;
 
-    using lock_t = spinlock;
+    using lock_t = ticketlock;
     using scoped_lock = unique_lock<lock_t>;
     lock_t lock;
     condition_variable not_full;

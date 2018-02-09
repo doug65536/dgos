@@ -3,7 +3,7 @@
 #include "callout.h"
 #include "vector.h"
 #include "irq.h"
-#include "threadsync.h"
+#include "mutex.h"
 #include "cpu/control_regs.h"
 #include "nano_time.h"
 
@@ -575,15 +575,15 @@ private:
     uint16_t tx_peek_value() const;
     void tx_take_value();
 
-    condition_var_t tx_not_full;
-    condition_var_t rx_not_empty;
+    condition_variable tx_not_full;
+    condition_variable rx_not_empty;
 
     // Use 16 bit values to allow buffering of error information
     // as values >= 256
     unique_ptr<uint16_t> rx_buffer;
     unique_ptr<uint16_t> tx_buffer;
 
-    spinlock_t lock;
+    ticketlock lock;
 
     uint16_t tx_head;
     uint16_t tx_tail;
@@ -596,16 +596,12 @@ private:
 
 uart_async_t::uart_async_t()
     : uart_t()
-    , lock(0)
     , tx_head(0)
     , tx_tail(0)
     , log2_buffer_size(16)
     , sending_break(false)
     , sending_data(false)
 {
-    condvar_init(&tx_not_full);
-    condvar_init(&rx_not_empty);
-
     rx_buffer = new uint16_t[1 << log2_buffer_size];
     tx_buffer = new uint16_t[1 << log2_buffer_size];
 
@@ -616,14 +612,11 @@ uart_async_t::~uart_async_t()
 {
     irq_setmask(irq, false);
     irq_unhook(irq, &uart_t::irq_handler);
-
-    condvar_destroy(&tx_not_full);
-    condvar_destroy(&rx_not_empty);
 }
 
 ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
 {
-    spinlock_lock_noirq(&lock);
+    unique_lock<ticketlock> lock_(lock);
 
     auto data = (char const *)buf;
 
@@ -637,7 +630,7 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
                 if (!sending_data)
                     send_some_locked();
 
-                condvar_wait_spinlock(&tx_not_full, &lock);
+                tx_not_full.wait(lock_);
             } while (is_tx_full());
         }
 
@@ -648,15 +641,12 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
     if (!sending_data)
         send_some_locked();
 
-    spinlock_unlock_noirq(&lock);
-
     return i;
 }
 
 ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
 {
-    cpu_scoped_irq_disable intr_was_enabled;
-    spinlock_lock_noirq(&lock);
+    unique_lock<ticketlock> lock_(lock);
 
     auto data = (uint8_t *)buf;
 
@@ -671,15 +661,13 @@ ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
                 break;
 
             do {
-                condvar_wait_spinlock(&rx_not_empty, &lock);
+                rx_not_empty.wait(lock_);
             } while (is_rx_empty());
         }
 
         *data++ = rx_buffer[rx_tail];
         rx_tail = queue_next(rx_tail, log2_buffer_size);
     }
-
-    spinlock_unlock_noirq(&lock);
 
     return i;
 }
@@ -773,7 +761,7 @@ void uart_async_t::tx_take_value()
 
 isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
 {
-    spinlock_lock_noyield(&lock);
+    unique_lock<ticketlock> lock_(lock);
 
     bool wake_tx = false;
     bool wake_rx = false;
@@ -813,13 +801,13 @@ isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
         }
     }
 
-    spinlock_unlock_noirq(&lock);
+    lock_.unlock();
 
     if (wake_tx)
-        condvar_wake_all(&tx_not_full);
+        tx_not_full.notify_all();
 
     if (wake_rx)
-        condvar_wake_all(&rx_not_empty);
+        rx_not_empty.notify_all();
 
     return ctx;
 }

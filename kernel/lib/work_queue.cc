@@ -27,7 +27,7 @@ private:
     };
 
     int tid;
-    spinlock lock;
+    ticketlock lock;
     condition_variable not_empty;
 
     workq_work *head;
@@ -41,7 +41,7 @@ private:
 
     workq_work *dequeue_work()
     {
-        unique_lock<spinlock> hold(lock);
+        unique_lock<ticketlock> hold(lock);
         while (!head)
             not_empty.wait(hold);
         workq_work *item = head;
@@ -65,7 +65,7 @@ void workq::init(int cpu_count)
 
 void workq_impl::enqueue(workq_work *work)
 {
-    unique_lock<spinlock> hold(lock);
+    unique_lock<ticketlock> hold(lock);
     if (head == nullptr) {
         head = tail = work;
     } else {

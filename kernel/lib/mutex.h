@@ -120,7 +120,6 @@ public:
     {
     }
 
-
     void lock()
     {
         rwspinlock_ex_lock(&m);
@@ -211,32 +210,78 @@ private:
 struct alignas(64) padded_spinlock : public spinlock {
 };
 
-class ticket_lock {
+class ticketlock {
 public:
     typedef ticketlock_t mutex_type;
 
-    ticket_lock()
+    ticketlock()
         : m{}
     {
     }
 
-    void lock() {
+    void lock()
+    {
         ticketlock_lock(&m);
     }
 
-    bool try_lock() {
+    bool try_lock()
+    {
         return ticketlock_try_lock(&m);
     }
 
-    void unlock() {
+    void unlock()
+    {
         ticketlock_unlock(&m);
+    }
+
+    ticketlock_t& native_handle()
+    {
+        return m;
     }
 
 private:
     ticketlock_t m;
 };
 
-struct alignas(64) padded_ticket_lock : public ticket_lock {
+struct alignas(64) padded_ticketlock : public ticketlock {
+};
+
+class mcslock {
+public:
+    void lock()
+    {
+        queue_node node;
+
+        node.next = nullptr;
+
+        queue_node *pred = atomic_xchg(&m->next, &node);
+
+        if (pred) {
+            node.locked = true;
+            pred->next = &node;
+
+            while (node.locked)
+                pause();
+        }
+    }
+
+//    bool try_lock()
+//    {
+
+//    }
+
+    void unlock()
+    {
+
+    }
+
+private:
+    struct queue_node {
+        queue_node *next;
+        bool volatile locked;
+    };
+
+    queue_node *m;
 };
 
 struct defer_lock_t {
@@ -391,6 +436,11 @@ public:
     void wait(unique_lock<spinlock>& lock)
     {
         condvar_wait_spinlock(&m, &lock.native_handle());
+    }
+
+    void wait(unique_lock<ticketlock>& lock)
+    {
+        condvar_wait_ticketlock(&m, &lock.native_handle());
     }
 
 private:

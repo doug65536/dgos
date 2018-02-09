@@ -4,7 +4,7 @@
 #include "string.h"
 #include "conio.h"
 #include "debug.h"
-#include "cpu/spinlock.h"
+#include "mutex.h"
 #include "export.h"
 #include "assert.h"
 #include "math.h"
@@ -950,18 +950,18 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
     return result;
 }
 
-static spinlock_t printdbg_user_lock;
+static ticketlock printdbg_user_lock;
 
 __used
 static void printdbg_lock_noirq(void)
 {
-    spinlock_lock_noirq(&printdbg_user_lock);
+    printdbg_user_lock.lock();
 }
 
 __used
 static void printdbg_unlock_noirq()
 {
-    spinlock_unlock_noirq(&printdbg_user_lock);
+    printdbg_user_lock.unlock();
 }
 
 static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)

@@ -426,18 +426,18 @@ static __always_inline void cpu_xsave(void *fpuctx)
     );
 }
 
-static __always_inline uintptr_t cpu_get_flags(void)
+static __always_inline uint32_t cpu_get_eflags(void)
 {
-    uintptr_t flags;
+    uint32_t eflags;
     __asm__ __volatile__ (
         "pushf\n\t"
-        "pop %[flags]\n\t"
-        : [flags] "=r" (flags)
+        "pop %q[eflags]\n\t"
+        : [eflags] "=r" (eflags)
     );
-    return flags;
+    return eflags;
 }
 
-static __always_inline void cpu_set_flags(uintptr_t flags)
+static __always_inline void cpu_set_eflags(uint32_t flags)
 {
     __asm__ __volatile__ (
         "push %[flags]\n\t"
@@ -448,10 +448,10 @@ static __always_inline void cpu_set_flags(uintptr_t flags)
     );
 }
 
-static __always_inline uintptr_t cpu_change_flags(
-        uintptr_t clear, uintptr_t set)
+static __always_inline uint32_t cpu_change_eflags(
+        uint32_t clear, uint32_t set)
 {
-    uintptr_t flags;
+    uint32_t flags;
     __asm__ __volatile__ (
         "pushfq\n\t"
         "popq %q[flags]\n\t"
@@ -479,16 +479,16 @@ static __always_inline void cpu_clac()
 
 static __always_inline bool cpu_irq_disable(void)
 {
-    uintptr_t rflags;
+    uint32_t eflags;
     __asm__ __volatile__ (
         "pushfq\n\t"
-        "popq %q[rflags]\n\t"
+        "popq %q[eflags]\n\t"
         "cli\n\t"
-        : [rflags] "=r" (rflags)
+        : [eflags] "=r" (eflags)
         :
         : "cc"
     );
-    return rflags & CPU_EFLAGS_IF;
+    return eflags & CPU_EFLAGS_IF;
 }
 
 static __always_inline void cpu_irq_enable(void)
@@ -498,7 +498,7 @@ static __always_inline void cpu_irq_enable(void)
 
 static __always_inline void cpu_irq_toggle(bool enable)
 {
-    uintptr_t temp;
+    uint32_t temp;
     __asm__ __volatile__ (
         "pushfq\n\t"
         "popq %q[temp]\n\t"
@@ -515,7 +515,7 @@ static __always_inline void cpu_irq_toggle(bool enable)
 
 static __always_inline bool cpu_irq_is_enabled(void)
 {
-    return cpu_get_flags() & CPU_EFLAGS_IF;
+    return cpu_get_eflags() & CPU_EFLAGS_IF;
 }
 
 static __always_inline uint64_t cpu_rdtsc(void)

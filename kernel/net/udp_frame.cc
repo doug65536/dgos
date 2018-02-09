@@ -1,6 +1,5 @@
 #include "udp_frame.h"
 #include "udp.h"
-#include "cpu/spinlock.h"
 #include "stdlib.h"
 #include "rbtree.h"
 #include "hash_table.h"

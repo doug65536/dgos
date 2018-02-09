@@ -2,10 +2,10 @@
 #include "control_regs.h"
 #include "mm.h"
 #include "string.h"
-#include "spinlock.h"
 #include "printk.h"
 #include "assert.h"
 #include "callout.h"
+#include "mutex.h"
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
@@ -77,7 +77,7 @@ C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 
 // Holds exclusive access to TSS segment descriptor
 // while loading task register
-static spinlock_t gdt_tss_lock;
+static ticketlock gdt_tss_lock;
 tss_t tss_list[];
 
 void gdt_init(int)
@@ -143,10 +143,8 @@ void gdt_init_tss(int cpu_count)
 
 void gdt_load_tr(int cpu_number)
 {
-    spinlock_lock_noirq(&gdt_tss_lock);
+    unique_lock<ticketlock> lock(gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
     cpu_set_tr(GDT_SEL_TSS);
-
-    spinlock_unlock_noirq(&gdt_tss_lock);
 }

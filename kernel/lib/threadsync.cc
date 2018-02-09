@@ -500,16 +500,33 @@ struct condvar_spinlock_t {
     spinlock_t *lock;
 };
 
-static void condvar_lock_spinlock(void *mutex)
+struct condvar_ticketlock_t {
+    ticketlock_t *lock;
+};
+
+static void condvar_lock_spinlock(void *lock)
 {
-    condvar_spinlock_t *state = (condvar_spinlock_t *)mutex;
+    condvar_spinlock_t *state = (condvar_spinlock_t *)lock;
     spinlock_lock_noirq(state->lock);
 }
 
-static void condvar_unlock_spinlock(void *mutex)
+
+static void condvar_unlock_spinlock(void *lock)
 {
-    condvar_spinlock_t *state = (condvar_spinlock_t *)mutex;
+    condvar_spinlock_t *state = (condvar_spinlock_t *)lock;
     spinlock_unlock_noirq(state->lock);
+}
+
+static void condvar_lock_ticketlock(void *lock)
+{
+    condvar_ticketlock_t *state = (condvar_ticketlock_t *)lock;
+    ticketlock_lock(state->lock);
+}
+
+static void condvar_unlock_ticketlock(void *mutex)
+{
+    condvar_ticketlock_t *state = (condvar_ticketlock_t *)mutex;
+    ticketlock_unlock(state->lock);
 }
 
 static void condvar_lock_mutex_noyield(void *mutex)
@@ -549,13 +566,20 @@ static void condvar_wait_ex(condition_var_t *var,
     assert(wait.link.prev == 0);
 }
 
-EXPORT void condvar_wait_spinlock(condition_var_t *var,
-                                  spinlock_t *spinlock)
+EXPORT void condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock)
 {
     condvar_spinlock_t state;
-    state.lock = spinlock;
+    state.lock = lock;
     condvar_wait_ex(var, condvar_lock_spinlock,
                     condvar_unlock_spinlock, &state);
+}
+
+EXPORT void condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock)
+{
+    condvar_ticketlock_t state;
+    state.lock = lock;
+    condvar_wait_ex(var, condvar_lock_ticketlock,
+                    condvar_unlock_ticketlock, &state);
 }
 
 EXPORT void condvar_wait(condition_var_t *var, mutex_t *mutex)

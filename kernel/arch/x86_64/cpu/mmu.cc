@@ -308,7 +308,7 @@ struct mmap_device_mapping_t {
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
 static vector<mmap_device_mapping_t*> mm_dev_mappings;
-static spinlock_t mm_dev_mapping_lock;
+static ticketlock mm_dev_mapping_lock;
 
 /// Physical page allocation map
 /// Consists of array of entries, one per physical page
@@ -373,7 +373,7 @@ public:
 
         void flush()
         {
-            unique_lock<spinlock> lock(owner.lock);
+            unique_lock<ticketlock> lock(owner.lock);
             for (size_t i = 0; i < count; ++i)
                 owner.release_one_locked(pages[i]);
             count = 0;
@@ -426,7 +426,7 @@ private:
     physaddr_t begin;
     entry_t next_free[2];
     entry_t free_page_count;
-    spinlock lock;
+    ticketlock lock;
     uint8_t log2_pagesz;
 };
 
@@ -905,7 +905,7 @@ static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    padded_spinlock locks[64];
+    padded_ticketlock locks[64];
 
     pte_t *pte;
     int log2_window_sz;
@@ -984,7 +984,7 @@ void clear_phys(physaddr_t addr)
 
     offset = addr - base;
 
-    unique_lock<spinlock> lock(clear_phys_state.locks[index]);
+    unique_lock<ticketlock> lock(clear_phys_state.locks[index]);
 
     linaddr_t window = clear_phys_state_t::addr +
             (index << (3 + clear_phys_state.log2_window_sz));
@@ -1131,15 +1131,13 @@ static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
 
 static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 {
-    spinlock_lock_noirq(&mm_dev_mapping_lock);
+    unique_lock<ticketlock> lock(mm_dev_mapping_lock);
 
     intptr_t device = binary_search(
                 mm_dev_mappings.data(), mm_dev_mappings.size(),
                 sizeof(mmap_device_mapping_t),
                 (void*)rounded_addr,
                 mm_dev_map_search, 0, 1);
-
-    spinlock_unlock_noirq(&mm_dev_mapping_lock);
 
     return device;
 }
@@ -2883,7 +2881,7 @@ void *mmap_register_device(void *context,
                            mm_dev_mapping_callback_t callback,
                            void *addr)
 {
-    spinlock_lock_noirq(&mm_dev_mapping_lock);
+    unique_lock<ticketlock> lock(mm_dev_mapping_lock);
 
     auto ins = find(mm_dev_mappings.begin(), mm_dev_mappings.end(), nullptr);
 
@@ -2903,8 +2901,6 @@ void *mmap_register_device(void *context,
         mm_dev_mappings.push_back(mapping);
     else
         *ins = mapping;
-
-    spinlock_unlock_noirq(&mm_dev_mapping_lock);
 
     return likely(mapping) ? mapping->base_addr : 0;
 }
@@ -2939,7 +2935,7 @@ void mmu_phys_allocator_t::init(
 
 void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 {
-    unique_lock<spinlock> lock_(lock);
+    unique_lock<ticketlock> lock_(lock);
     physaddr_t free_end = base + size;
     unsigned low = base < 0x100000000;
     size_t pagesz = uint64_t(1) << log2_pagesz;
@@ -2955,7 +2951,7 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 
 physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 {
-    unique_lock<spinlock> lock_(lock);
+    unique_lock<ticketlock> lock_(lock);
 
     size_t item = next_free[low];
 
@@ -2979,7 +2975,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 {
     size_t count = size >> log2_pagesz;
 
-    unique_lock<spinlock> lock_(lock);
+    unique_lock<ticketlock> lock_(lock);
 
     // Fall back to low memory immediately if no free high memory
     if (!next_free[0])
@@ -3033,14 +3029,14 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 
 void mmu_phys_allocator_t::release_one(physaddr_t addr)
 {
-    unique_lock<spinlock> lock_(lock);
+    unique_lock<ticketlock> lock_(lock);
     release_one_locked(addr);
 }
 
 void mmu_phys_allocator_t::addref(physaddr_t addr)
 {
     entry_t index = index_from_addr(addr);
-    unique_lock<spinlock> lock_(lock);
+    unique_lock<ticketlock> lock_(lock);
     ++entries[index];
 }
 
@@ -3056,7 +3052,7 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 
     size_t count = len >> log2_pagesz;
 
-    unique_lock<spinlock> lock_(lock);
+    unique_lock<ticketlock> lock_(lock);
 
     for (size_t i = 0; i < count; ++i) {
         physaddr_t addr = *ptes[3] & PTE_ADDR;

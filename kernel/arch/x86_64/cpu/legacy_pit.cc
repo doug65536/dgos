@@ -6,7 +6,7 @@
 #include "time.h"
 #include "cpu/thread_impl.h"
 #include "interrupts.h"
-#include "spinlock.h"
+#include "mutex.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -63,7 +63,7 @@
 // Timer crystal runs at 1.193181666... MHz
 // Freq * 6 = 7159090.0 even
 
-static spinlock_t pit8253_lock;
+static ticketlock pit8253_lock;
 
 // Total timer interrupts, no time relationship
 static uint64_t volatile timer_ticks;
@@ -93,7 +93,7 @@ static void pit8254_set_rate(unsigned hz)
     rate_hz = hz;
     accumulator = 0U;
 
-    spinlock_lock_noirq(&pit8253_lock);
+    unique_lock<ticketlock> lock(pit8253_lock);
 
     outb(PIT_CMD,
          PIT_CHANNEL(0) |
@@ -102,8 +102,6 @@ static void pit8254_set_rate(unsigned hz)
          PIT_FORMAT_BINARY);
     outb(PIT_DATA(0), divisor & 0xFF);
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
-
-    spinlock_unlock_noirq(&pit8253_lock);
 }
 
 static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
@@ -138,7 +136,7 @@ static void pit8254_time_ns_stop()
 
     irq_setmask(0, 0);
 
-    spinlock_lock_noirq(&pit8253_lock);
+    unique_lock<ticketlock> lock(pit8253_lock);
     outb(PIT_CMD,
          PIT_CHANNEL(0) |
          PIT_ACCESS_BOTH |
@@ -146,7 +144,7 @@ static void pit8254_time_ns_stop()
          PIT_FORMAT_BINARY);
     outb(PIT_DATA(0), 0);
     outb(PIT_DATA(0), 0);
-    spinlock_unlock_noirq(&pit8253_lock);
+    lock.unlock();
 
     irq_unhook(0, pit8254_irq_handler);
 }
@@ -182,7 +180,7 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
     if (count > 0xFFFF)
         count = 0xFFFF;
 
-    spinlock_lock_noirq(&pit8253_lock);
+    unique_lock<ticketlock> lock(pit8253_lock);
 
     outb(PIT_CMD, PIT_CHANNEL(2) | PIT_ACCESS_BOTH |
          PIT_MODE_ONESHOT | PIT_FORMAT_BINARY);
@@ -199,7 +197,7 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
         pause();
     } while (readback > 64);
 
-    spinlock_unlock_noirq(&pit8253_lock);
+    lock.unlock();
 
     return mul_64_64_div_64(count - readback, 1000000000, 1193182);
 }

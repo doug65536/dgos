@@ -246,29 +246,40 @@ bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
 
 void ticketlock_lock(ticketlock_t *lock)
 {
-    unsigned my_ticket = atomic_xadd(&lock->next_ticket, 1);
+    ticketlock_value_t intr_enabled = cpu_irq_disable();
+
+    ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
 
     for (;;) {
-        unsigned pause_count = my_ticket - lock->now_serving;
+        ticketlock_value_t serving = lock->now_serving;
 
-        if (pause_count == 0)
+        ticketlock_value_t pause_count = my_ticket - (serving & -2);
+
+        if (likely(pause_count == 0)) {
+            // Store the interrupt flag in bit 0
+            lock->now_serving = (serving & -2) | intr_enabled;
             return;
+        }
 
-        while (pause_count--)
+        do {
             pause();
+        } while (pause_count -= 2);
     }
 }
 
 bool ticketlock_try_lock(ticketlock_t *lock)
 {
-    ticketlock_value_t intr_enabled = cpu_irq_disable() << 31;
+    ticketlock_value_t intr_enabled = cpu_irq_disable();
 
-    for (unsigned old_next = lock->next_ticket; ; ) {
-        if (lock->now_serving == old_next) {
-            if (atomic_cmpxchg_upd(&lock->next_ticket, &old_next,
-                                   ((old_next + 1) & 0x7FFFFFFF) |
-                                   intr_enabled))
+    for (ticketlock_value_t old_next = lock->next_ticket; ; ) {
+        ticketlock_value_t serving = lock->now_serving;
+        if (likely(serving == old_next)) {
+            if (likely(atomic_cmpxchg_upd(&lock->next_ticket, &old_next,
+                                          (old_next + 2) & -2))) {
+                // Store interrupt flag
+                lock->now_serving = (serving & -2) | intr_enabled;
                 return true;
+            }
         } else {
             cpu_irq_toggle(intr_enabled);
             return false;
@@ -278,5 +289,7 @@ bool ticketlock_try_lock(ticketlock_t *lock)
 
 void ticketlock_unlock(ticketlock_t *lock)
 {
-    ++lock->now_serving;
+    ticketlock_value_t serving = lock->now_serving;
+    lock->now_serving = (serving + 2) & -2;
+    cpu_irq_toggle(serving & 1);
 }

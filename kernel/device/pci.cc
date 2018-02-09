@@ -1,6 +1,6 @@
 #include "pci.h"
 #include "cpu/ioport.h"
-#include "cpu/spinlock.h"
+#include "mutex.h"
 #include "printk.h"
 #include "string.h"
 //#include "irq.h"
@@ -67,7 +67,7 @@ static vector<pci_ecam_t> pci_ecam_list;
 static pci_config_pio pci_pio_accessor;
 static pci_config_mmio pci_mmio_accessor;
 
-static spinlock_t pci_spinlock;
+static ticketlock pci_lock;
 static pci_config_rw *pci_accessor = &pci_pio_accessor;
 
 #define PCI_ADDR    0xCF8
@@ -137,12 +137,12 @@ uint32_t pci_config_pio::read(pci_addr_t addr, size_t offset, size_t size)
 
     uint32_t pci_address = (1 << 31) | addr.get_addr() | (offset & -4);
 
-    spinlock_lock_noirq(&pci_spinlock);
+    unique_lock<ticketlock> lock(pci_lock);
 
     outd(PCI_ADDR, pci_address);
     uint32_t data = ind(PCI_DATA);
 
-    spinlock_unlock_noirq(&pci_spinlock);
+    lock.unlock();
 
     data >>= (offset & 3) << 3;
 
@@ -164,7 +164,7 @@ bool pci_config_pio::write(pci_addr_t addr, size_t offset,
 
     uint32_t pci_address = (1 << 31) | addr.get_addr();
 
-    spinlock_lock_noirq(&pci_spinlock);
+    unique_lock<ticketlock> lock(pci_lock);
 
     while (size > 0) {
         // Choose an I/O size that will realign
@@ -215,8 +215,6 @@ bool pci_config_pio::write(pci_addr_t addr, size_t offset,
         // Write 32 bits
         outd(PCI_DATA, write);
     }
-
-    spinlock_unlock_noirq(&pci_spinlock);
 
     return true;
 }

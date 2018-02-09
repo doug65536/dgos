@@ -1,6 +1,6 @@
 #pragma once
 #include "types.h"
-#include "cpu/spinlock.h"
+#include "mutex.h"
 
 struct hashtbl_t {
     void **items;
@@ -8,7 +8,7 @@ struct hashtbl_t {
     uint32_t key_ofs;
     uint32_t key_size;
     uint8_t log2_capacity;
-    rwspinlock_t lock;
+    shared_mutex lock;
 };
 
 void htbl_create(hashtbl_t *self,

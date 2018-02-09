@@ -87,7 +87,7 @@ struct process_t
     uintptr_t mmu_context;
     void *linear_allocator;
     pid_t pid;
-    spinlock process_lock;
+    ticketlock process_lock;
     condition_variable cond;
     int exitcode;
 
@@ -111,7 +111,7 @@ private:
 
     static process_t *lookup(pid_t pid);
 
-    static process_t *add_locked(unique_lock<spinlock> const&);
+    static process_t *add_locked(unique_lock<ticketlock> const&);
     void remove();
     static process_t *add();
     static int start(void *process_arg);
