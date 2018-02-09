@@ -24,24 +24,24 @@ entry:
     debugind '1'
 
     // Align the stack
-    and $-16,%rsp
+    andq $-16,%rsp
 
     // Save parameter in call-preserved register
-    mov %ecx,%r15d
-    xor %ebp,%ebp
+    movl %ecx,%r15d
+    xorl %ebp,%ebp
 
     // Enable SSE
     // This must be done before jumping into C code
-    mov %cr4,%rax
-    or $(CPU_CR4_OFXSR | CPU_CR4_OSXMMEX),%rax
-    mov %rax,%cr4
+    movq %cr4,%rax
+    orq $(CPU_CR4_OFXSR | CPU_CR4_OSXMMEX),%rax
+    movq %rax,%cr4
 
     debugind '2'
 
     // See if this is the bootstrap processor
-    mov $0x1B,%ecx
+    movl $0x1B,%ecx
     rdmsr
-    test $0x100,%eax
+    testl $0x100,%eax
     jnz bsp_init
 
     debugind 'Z'
@@ -50,15 +50,15 @@ ap_init:
     // This is not the bootstrap CPU
 
     // Load kernel memory mapping ASAP
-    mov root_physaddr,%rax
-    mov %rax,%cr3
+    movq root_physaddr,%rax
+    movq %rax,%cr3
 
     // Get IDT and TSS up asap
     call idt_gdt_tss_init_ap
 
     // Initialize AP MXCSR
-    mov $(CPU_MXCSR_ELF_INIT),%eax
-    and default_mxcsr_mask,%eax
+    movl $(CPU_MXCSR_ELF_INIT),%eax
+    andl default_mxcsr_mask,%eax
     push %rax
     ldmxcsr (%rsp)
 
@@ -67,14 +67,14 @@ ap_init:
     movw $(CPU_FPUCW_ELF_INIT),(%rsp)
     fldcw (%rsp)
 
-    pop %rax
+    popq %rax
 
     // xsave-enable AVX on AP
     call set_xsave_states_ap
 
     // Align stack
-    xor %ebp,%ebp
-    push %rbp
+    xorl %ebp,%ebp
+    pushq %rbp
 
     // MP processor entry
     jmp mp_main
@@ -84,19 +84,19 @@ bsp_init:
 
     debugind '3'
 
-    lea kernel_stack,%rdx
-    mov kernel_stack_size,%rbx
-    lea (%rdx,%rbx),%rsp
+    leaq kernel_stack,%rdx
+    movq kernel_stack_size,%rbx
+    leaq (%rdx,%rbx),%rsp
 
     // Store the physical memory map address
     // passed in from bootloader
-    mov %r15d,%eax
-    shr $20,%eax
-    mov %rax,phys_mem_map_count
+    movl %r15d,%eax
+    shrl $20,%eax
+    movq %rax,phys_mem_map_count
 
-    mov %r15d,%eax
-    and $0x000FFFFF,%eax
-    mov %rax,phys_mem_map
+    movl %r15d,%eax
+    andl $0x000FFFFF,%eax
+    movq %rax,phys_mem_map
 
     // Get IDT and TSS up asap
     call idt_gdt_tss_init
@@ -104,9 +104,9 @@ bsp_init:
     // Save the CPU_MXCSR_MASK
 
     // Allocate 512 bytes and cache line align stack
-    mov %rsp,%rdx
-    sub $512,%rsp
-    and $-64,%rsp
+    movq %rsp,%rdx
+    subq $512,%rsp
+    andq $-64,%rsp
 
     // Initialize FPU to 64 bit precision,
     // all exceptions masked, round to nearest
@@ -117,22 +117,22 @@ bsp_init:
     fxsave64 (%rsp)
 
     // Read CPU_MXCSR_MASK from fxsave output and store it
-    mov 28(%rsp),%eax
-    mov $0x0000FFBF,%ecx
-    test %eax,%eax
-    cmove %ecx,%eax
-    mov %eax,default_mxcsr_mask
+    movl 28(%rsp),%eax
+    movl $0x0000FFBF,%ecx
+    testl %eax,%eax
+    cmovel %ecx,%eax
+    movl %eax,default_mxcsr_mask
 
     // Set MXCSR
     // 0x3F = all exceptions masked
     // 0 = round to nearest
-    mov $(CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL),%ecx
-    and %eax,%ecx
-    mov %ecx,24(%rsp)
+    movl $(CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL),%ecx
+    andl %eax,%ecx
+    movl %ecx,24(%rsp)
     ldmxcsr 24(%rsp)
 
     // Restore stack pointer
-    mov %rdx,%rsp
+    movq %rdx,%rsp
 
     debugind '4'
     call cpuid_init
@@ -143,21 +143,21 @@ bsp_init:
     call detect_xsave_states_bsp
 
     // Get SSE context offsets
-    xor %edi,%edi
+    xorl %edi,%edi
     call idt_xsave_detect
 
     // Call the constructors
-    mov $___init_st,%rdi
-    mov $___init_en,%rsi
+    movq $___init_st,%rdi
+    movq $___init_en,%rsi
     call invoke_function_array
 
     // Notify constructors ran
-    mov $'C',%edi
+    movl $'C',%edi
     call callout_call
 
     debugind '7'
 
-    xor %edi,%edi
+    xorl %edi,%edi
     call cpu_init
 
     call e9debug_init
@@ -165,15 +165,15 @@ bsp_init:
     debugind '8'
 
     // Initialize text devices
-    mov $'V',%edi
+    movl $'V',%edi
     call callout_call
 
-    xor %edi,%edi
+    xorl %edi,%edi
     call cpu_init_stage2
 
     debugind '9'
 
-    xor %edi,%edi
+    xorl %edi,%edi
     call cpu_hw_init
 
     debugind 'A'
@@ -182,7 +182,7 @@ bsp_init:
     //call gdb_init
 
     // Initialize early-initialized devices
-    mov $'E',%edi
+    movl $'E',%edi
     call callout_call
 
     debugind 'B'
@@ -191,14 +191,14 @@ bsp_init:
 
     debugind '?'
 
-    mov %rax,%rdi
+    movq %rax,%rdi
     call exit
 
 .align 16
 idt_gdt_tss_init:
-    push %rbx
-    xor %ebx,%ebx
-    mov $256,%ecx
+    pushq %rbx
+    xorl %ebx,%ebx
+    movl $256,%ecx
 
 .align 16
 0:
@@ -220,8 +220,8 @@ idt_gdt_tss_init:
     sarq $16,%rax
     movl %eax,8+idt(,%rbx,2)
     movl $0,12+idt(,%rbx,2)
-    add $8,%ebx
-    dec %ecx
+    addl $8,%ebx
+    decl %ecx
     jnz 0b
 
     // Setup IST entries
@@ -236,7 +236,7 @@ idt_gdt_tss_init:
     //	uint8_t flags_limit_high;
     //	uint8_t base_high;
 
-    pop %rbx
+    popq %rbx
 
     movl $INTR_EX_DEBUG,%edi
     movq $debug_exception_handler,%rsi
@@ -247,7 +247,7 @@ idt_gdt_tss_init:
 .align 16
 idt_gdt_tss_init_ap:
     // Load IDTR
-    sub $(24*8),%rsp
+    subq $(24*8),%rsp
     movw $(16 * 256 - 1),6(%rsp)
     movq $idt,8(%rsp)
     lidtq 6(%rsp)
@@ -280,10 +280,10 @@ idt_gdt_tss_init_ap:
     movl $0,12+GDT_SEL_TSS+gdt
 
     // Load TR
-    mov $GDT_SEL_TSS,%eax
+    movl $GDT_SEL_TSS,%eax
     ltr %ax
 
-    add $(24*8),%rsp
+    addq $(24*8),%rsp
     ret
 
 .section .data
@@ -336,29 +336,29 @@ exit:
     // Kernel exit just calls destructors
     // and deliberately hangs
 0:
-    lea ___fini_st(%rip),%rdi
-    lea ___fini_en(%rip),%rsi
+    leaq ___fini_st(%rip),%rdi
+    leaq ___fini_en(%rip),%rsi
     call invoke_function_array
 
     call halt_forever
 
 .align 16
 invoke_function_array:
-    push %rbx
-    push %rbp
-    push %rbp
-    mov %rdi,%rbx
-    mov %rsi,%rbp
+    pushq %rbx
+    pushq %rbp
+    pushq %rbp
+    movq %rdi,%rbx
+    movq %rsi,%rbp
 0:
-    cmp %rbx,%rbp
+    cmpq %rbx,%rbp
     jbe 0f
     call *(%rbx)
-    add $8,%rbx
+    addq $8,%rbx
     jmp 0b
 0:
-    pop %rbp
-    pop %rbp
-    pop %rbx
+    popq %rbp
+    popq %rbp
+    popq %rbx
     ret
 
 #define XSAVE_WANTED \
@@ -367,21 +367,21 @@ invoke_function_array:
 
 .align 16
 detect_xsave_states_bsp:
-    push %rbx
+    pushq %rbx
     call cpuid_has_xsave
-    test %al,%al
+    testb %al,%al
     jz 0f
 
-    mov $CPUID_INFO_XSAVE,%eax
-    xor %ecx,%ecx
+    movl $CPUID_INFO_XSAVE,%eax
+    xorl %ecx,%ecx
     cpuid
 
-    mov %eax,xsave_supported_states
-    and $XSAVE_WANTED,%eax
-    mov %eax,xsave_enabled_states
+    movl %eax,xsave_supported_states
+    andl $XSAVE_WANTED,%eax
+    movl %eax,xsave_enabled_states
 
 0:
-    pop %rbx
+    popq %rbx
     jmp set_xsave_states_ap
 
 .align 16
@@ -389,21 +389,21 @@ set_xsave_states_ap:
     push %rbx
 
     call cpuid_has_xsave
-    test %al,%al
+    testb %al,%al
     jz 0f
 
-    mov %cr4,%rax
-    or $CPU_CR4_OSXSAVE,%rax
-    mov %rax,%cr4
+    movq %cr4,%rax
+    orq $CPU_CR4_OSXSAVE,%rax
+    movq %rax,%cr4
 
-    xor %ecx,%ecx
+    xorl %ecx,%ecx
     xgetbv
-    and xsave_supported_states,%eax
-    or xsave_enabled_states,%eax
+    andl xsave_supported_states,%eax
+    orl xsave_enabled_states,%eax
     xsetbv
 
 0:
-    pop %rbx
+    popq %rbx
     ret
 
 // Callout to initialize AP CPU
@@ -411,20 +411,20 @@ set_xsave_states_ap:
 .global mp_main
 .hidden mp_main
 mp_main:
-    push %rbp
-    mov %rsp,%rbp
+    pushq %rbp
+    movq %rsp,%rbp
 
-    mov $'S',%edi
+    movl $'S',%edi
     call callout_call
 
-    pop %rbp
+    popq %rbp
     ret
 
 .align 16
 .global __cxa_pure_virtual
 .hidden __cxa_pure_virtual
 __cxa_pure_virtual:
-    mov $pure_call_message,%rdi
+    movq $pure_call_message,%rdi
     jmp panic
 
 .align 16
