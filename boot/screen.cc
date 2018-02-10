@@ -362,7 +362,7 @@ void print_xy(int x, int y, uint8_t ch, uint16_t attr, size_t count)
 {
     char *buf = (char*)__builtin_alloca(count+1);
     for (size_t ofs = 0; ofs < count; ++ofs)
-        buf[ofs] = (char)ch;
+        buf[ofs] = char(ch);
     buf[count] = 0;
     print_at(y, x, attr, count, buf);
 }

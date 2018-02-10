@@ -261,8 +261,8 @@ bool elf64_run(char const *filename)
             paddr += chunk_size;
             vaddr += chunk_size;
 
-            progress_bar_draw(20, 10, 70,
-                              100 * done_bytes / total_bytes);
+            progress_bar_draw(20, 10, 70, int((100 * done_bytes) /
+                                              total_bytes));
         }
 
         // Clear modified bits if uninitialized data
