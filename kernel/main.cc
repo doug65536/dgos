@@ -144,7 +144,7 @@ static int read_stress(void *p)
     uint64_t last_completions = completion_count;
 
     uint64_t seed = 42;
-    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 24];
+    char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 64];
     while (1) {
         ++*(short*)p;
 
@@ -161,28 +161,32 @@ static int read_stress(void *p)
 
         uint64_t completions = atomic_xadd(&completion_count, 1);
 
-        if (!(completions & ~-32768)) {
-            int ofs = 0;
-            for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
-                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
-                                counts[s << 6]);
-            }
-
+        if ((completions & 32767) == 32767) {
             uint64_t now = time_ns();
             uint64_t delta_time = now - last_time;
-            if (delta_time > 1000000000) {
+            int ofs = 0;
+            if (delta_time >= 1000000000) {
+                for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
+                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
+                                    counts[s << 6]);
+                }
+
                 uint64_t completion_delta = completions - last_completions;
-                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu/sec",
-                                (delta_time * completion_delta) /
-                                (now - last_time));
-//                                completion_delta);
                 last_completions = completions;
+
+                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu",
+                                completion_delta);
+
+                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, " %lu ms",
+                                (now - last_time) / 1000000);
+
                 last_time = now;
             }
 
-            buf[ofs++] = 0;
-
-            printdbg("%s\n", buf);
+            if (ofs) {
+                buf[ofs++] = 0;
+                printdbg("%s\n", buf);
+            }
         }
     }
 
