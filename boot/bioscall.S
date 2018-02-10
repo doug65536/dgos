@@ -4,16 +4,16 @@
 
 .global bioscall
 bioscall:
-    push %ebp
-    push %ebx
-    push %esi
-    push %edi
+    pushl %ebp
+    pushl %ebx
+    pushl %esi
+    pushl %edi
 
     // Save pointer to bios_regs_t parameter on stack
-    push %eax
+    pushl %eax
 
     // Use ebp for accessing the stack
-    mov %eax,%ebp
+    movl %eax,%ebp
 
     // Save interrupt vector on the stack
     pushl (,%edx,4)
@@ -27,44 +27,44 @@ bioscall:
     // 16-bit protected mode
 
     // Load 16-bit data segments
-    mov $GDT_SEL_PM_DATA16,%edx
-    mov %dx,%ds
-    mov %dx,%es
-    mov %dx,%fs
-    mov %dx,%gs
-    mov %dx,%ss
+    movw $GDT_SEL_PM_DATA16,%dx
+    movw %dx,%ds
+    movw %dx,%es
+    movw %dx,%fs
+    movw %dx,%gs
+    movw %dx,%ss
 
     // Turn off protected mode
-    mov %cr0,%edx
-    btr $0,%edx
+    movl %cr0,%edx
+    and $-2,%dx
     mov %edx,%cr0
 
     // Real mode
     ljmp $0,$0f
 0:
-    xor %edx,%edx
-    mov %dx,%ds
-    mov %dx,%es
-    mov %dx,%fs
-    mov %dx,%gs
-    mov %dx,%ss
+    xorw %dx,%dx
+    movw %dx,%ds
+    movw %dx,%es
+    movw %dx,%fs
+    movw %dx,%gs
+    movw %dx,%ss
 
     // Sane enough to allow BIOS to handle IRQs now
     sti
 
-    mov   (%ebp),%eax
-    mov  4(%ebp),%ebx
-    mov  8(%ebp),%ecx
-    mov 12(%ebp),%edx
-    mov 16(%ebp),%esi
-    mov 20(%ebp),%edi
+    movl   (%bp),%eax
+    movl  4(%bp),%ebx
+    movl  8(%bp),%ecx
+    movl 12(%bp),%edx
+    movl 16(%bp),%esi
+    movl 20(%bp),%edi
     // ...do ebp last
-    mov 28(%ebp),%ds
-    mov 30(%ebp),%es
-    mov 32(%ebp),%fs
-    mov 34(%ebp),%gs
+    movw 28(%bp),%ds
+    movw 30(%bp),%es
+    movw 32(%bp),%fs
+    movw 34(%bp),%gs
     // Lose ebp last
-    mov 24(%ebp),%ebp
+    movl 24(%bp),%ebp
     // Ignore incoming eflags
 
     // Simulate interrupt call
@@ -75,57 +75,57 @@ bioscall:
     pushfl
 
     // Save returned ebp
-    push %ebp
+    pushl %ebp
 
     // get regs pointer off stack into ebp
-    mov 12(%esp),%ebp
+    movl 12(%esp),%ebp
 
     // Write back output registers to regs
-    mov %eax,  (%ebp)
-    mov %ebx, 4(%ebp)
-    mov %ecx, 8(%ebp)
-    mov %edx,12(%ebp)
-    mov %esi,16(%ebp)
-    mov %edi,20(%ebp)
+    movl %eax,  (%bp)
+    movl %ebx, 4(%bp)
+    movl %ecx, 8(%bp)
+    movl %edx,12(%bp)
+    movl %esi,16(%bp)
+    movl %edi,20(%bp)
     // store ebp last
-    mov %ds ,28(%ebp)
-    mov %es ,30(%ebp)
-    mov %fs ,32(%ebp)
-    mov %gs ,34(%ebp)
+    movw %ds ,28(%bp)
+    movw %es ,30(%bp)
+    movw %fs ,32(%bp)
+    movw %gs ,34(%bp)
 
     // ecx = saved ebp, edx = saved flags
-    pop %ecx
-    pop %edx
+    popl %ecx
+    popl %edx
 
     // Write back output ebp and flags
-    mov %ecx,24(%ebp)
-    mov %edx,36(%ebp)
+    movl %ecx,24(%bp)
+    movl %edx,36(%bp)
 
     // Go back into protected mode
     cli
     lgdt gdtr
 
     // Turn on protected mode
-    mov %cr0,%edx
-    bts $0,%edx
-    mov %edx,%cr0
+    movl %cr0,%edx
+    or $1,%dx
+    movl %edx,%cr0
 
     ljmpw $GDT_SEL_PM_CODE32,$0f
 0:
 .code32
-    mov $GDT_SEL_KERNEL_DATA,%eax
-    mov %ax,%ds
-    mov %ax,%es
-    mov %ax,%fs
-    mov %ax,%gs
-    mov %ax,%ss
+    movl $GDT_SEL_KERNEL_DATA,%eax
+    movl %eax,%ds
+    movl %eax,%es
+    movl %eax,%fs
+    movl %eax,%gs
+    movl %eax,%ss
 
-    add $8,%esp
+    addl $8,%esp
 
     call cpu_a20_enterpm
 
-    pop %edi
-    pop %esi
-    pop %ebx
-    pop %ebp
+    popl %edi
+    popl %esi
+    popl %ebx
+    popl %ebp
     ret
