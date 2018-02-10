@@ -601,6 +601,7 @@ ENABLE_FRAMEPOINTER_FLAGS
 DISABLE_FRAMEPOINTER_FLAGS
 BMI_FLAGS
 NO_PIC_FLAGS
+GCC_REALMODE_LIB
 REGPARM_FLAGS
 REAL_MODE_FLAGS
 FREESTANDING_FLAGS
@@ -6559,7 +6560,6 @@ else
 fi
 
 
-
 for ac_prog in mkisofs genisoimage
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
@@ -7039,6 +7039,10 @@ else
 fi
 
 done
+
+
+GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $REAL_MODE_FLAGS -print-libgcc-file-name)
+#GCC_REALMODE_LIB="-static-libgcc -lgcc"
 
 
 NO_PIC_FLAGS=

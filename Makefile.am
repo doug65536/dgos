@@ -48,8 +48,15 @@ KERNEL_BMI_FLAGS = \
 libmbr_a_SOURCES = \
 	mbr/mbr.s
 
+libmbr_a_CFLAGS = \
+	$(REAL_MODE_FLAGS)
+
+libmbr_a_CXXFLAGS = \
+	$(REAL_MODE_FLAGS)
+
 libmbr_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS) -static
 
@@ -60,6 +67,7 @@ EXTRA_libmbr_a_DEPENDENCIES = \
 
 mbr_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
@@ -80,11 +88,12 @@ mbr_elf_CXXFLAGS = \
 
 mbr_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_elf_LDADD = \
-	libmbr.a -lgcc
+	libmbr.a $(GCC_REALMODE_LIB)
 
 # mbr-bin
 
@@ -104,6 +113,7 @@ mbr_bin_CFLAGS = \
 
 mbr_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/mbr.map \
@@ -116,7 +126,8 @@ mbr_bin_LDFLAGS = \
 EXTRA_mbr_bin_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
-mbr_bin_LDADD = libmbr.a -lgcc
+mbr_bin_LDADD = \
+	libmbr.a $(GCC_REALMODE_LIB)
 
 # libbootsect.a
 
@@ -177,10 +188,9 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -196,9 +206,9 @@ libbootsect_a_CXXFLAGS = \
 
 libbootsect_a_CFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -213,8 +223,8 @@ libbootsect_a_CFLAGS = \
 
 libbootsect_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
+	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
@@ -228,19 +238,18 @@ bootfat_elf_SOURCES = \
 	boot/bootfat.s
 
 bootfat_elf_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
-
 
 bootfat_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-
 bootfat_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -255,7 +264,7 @@ EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 # bootfat-bin
 
@@ -263,15 +272,14 @@ bootfat_bin_SOURCES = \
 	$(bootfat_elf_SOURCES)
 
 bootfat_bin_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_bin_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
 	$(bootfat_elf_CCASFLAGS)
 
 bootfat_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -287,7 +295,7 @@ EXTRA_bootfat_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_bin_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 # bootiso-elf
 
@@ -299,6 +307,7 @@ bootiso_elf_CXXFLAGS = \
 
 bootiso_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -308,6 +317,7 @@ bootiso_elf_CCASFLAGS = \
 
 bootiso_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -321,7 +331,7 @@ EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_elf_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 # bootiso-bin
 
@@ -332,14 +342,13 @@ bootiso_bin_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_bin_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
-	$(ASM_DEBUG_INFO_FLAGS) \
 	$(bootiso_elf_CCASFLAGS)
 
 # $(REAL_MODE_FLAGS)
 
 bootiso_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,elf_i386 \
@@ -355,7 +364,7 @@ EXTRA_bootiso_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_bin_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 # kernel
 

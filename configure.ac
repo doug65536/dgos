@@ -13,14 +13,13 @@ AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_FILES([Makefile])
 : ${CFLAGS=""}
 : ${CXXFLAGS=""}
-AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall])
+AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall -Wno-portability])
 AX_PROG_CC_FOR_BUILD
 AX_PROG_CXX_FOR_BUILD
 AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
 AC_PROG_RANLIB
-
 
 AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
 if test x"$MKISOFS" == x"NOT_FOUND"
@@ -132,6 +131,10 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([REGPARM_FLAGS])
+
+GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $REAL_MODE_FLAGS -print-libgcc-file-name)
+#GCC_REALMODE_LIB="-static-libgcc -lgcc"
+AC_SUBST([GCC_REALMODE_LIB])
 
 NO_PIC_FLAGS=
 for flag in fno-pie fno-pic

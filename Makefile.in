@@ -302,23 +302,24 @@ PROGRAMS = $(bin_PROGRAMS)
 am__objects_2 = boot/bootfat_bin-bootfat.$(OBJEXT)
 am_bootfat_bin_OBJECTS = $(am__objects_2)
 bootfat_bin_OBJECTS = $(am_bootfat_bin_OBJECTS)
-bootfat_bin_DEPENDENCIES = libbootsect.a
+am__DEPENDENCIES_1 =
+bootfat_bin_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootfat_bin_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootfat_bin_LDFLAGS) $(LDFLAGS) -o $@
 am_bootfat_elf_OBJECTS = boot/bootfat_elf-bootfat.$(OBJEXT)
 bootfat_elf_OBJECTS = $(am_bootfat_elf_OBJECTS)
-bootfat_elf_DEPENDENCIES = libbootsect.a
+bootfat_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootfat_elf_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootfat_elf_LDFLAGS) $(LDFLAGS) -o $@
 am__objects_3 = boot/bootiso_bin-bootiso.$(OBJEXT)
 am_bootiso_bin_OBJECTS = $(am__objects_3)
 bootiso_bin_OBJECTS = $(am_bootiso_bin_OBJECTS)
-bootiso_bin_DEPENDENCIES = libbootsect.a
+bootiso_bin_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootiso_bin_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootiso_bin_LDFLAGS) $(LDFLAGS) -o $@
 am_bootiso_elf_OBJECTS = boot/bootiso_elf-bootiso.$(OBJEXT)
 bootiso_elf_OBJECTS = $(am_bootiso_elf_OBJECTS)
-bootiso_elf_DEPENDENCIES = libbootsect.a
+bootiso_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootiso_elf_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootiso_elf_LDFLAGS) $(LDFLAGS) -o $@
 am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
@@ -431,7 +432,6 @@ am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/syscall/kernel_bmi-sys_process.$(OBJEXT)
 am_kernel_bmi_OBJECTS = $(am__objects_4)
 kernel_bmi_OBJECTS = $(am_kernel_bmi_OBJECTS)
-am__DEPENDENCIES_1 =
 kernel_bmi_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_bmi_LINK = $(CXXLD) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_bmi_LDFLAGS) $(LDFLAGS) -o $@
@@ -550,12 +550,12 @@ kernel_generic_LINK = $(CXXLD) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_generic_LDFLAGS) $(LDFLAGS) -o $@
 am_mbr_bin_OBJECTS = mbr/mbr_bin-empty.$(OBJEXT)
 mbr_bin_OBJECTS = $(am_mbr_bin_OBJECTS)
-mbr_bin_DEPENDENCIES = libmbr.a
+mbr_bin_DEPENDENCIES = libmbr.a $(am__DEPENDENCIES_1)
 mbr_bin_LINK = $(CXXLD) $(mbr_bin_CXXFLAGS) $(CXXFLAGS) \
 	$(mbr_bin_LDFLAGS) $(LDFLAGS) -o $@
 am_mbr_elf_OBJECTS = mbr/mbr_elf-empty.$(OBJEXT)
 mbr_elf_OBJECTS = $(am_mbr_elf_OBJECTS)
-mbr_elf_DEPENDENCIES = libmbr.a
+mbr_elf_DEPENDENCIES = libmbr.a $(am__DEPENDENCIES_1)
 mbr_elf_LINK = $(CXXLD) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) \
 	$(mbr_elf_LDFLAGS) $(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
@@ -761,6 +761,7 @@ ECHO_T = @ECHO_T@
 ENABLE_FRAMEPOINTER_FLAGS = @ENABLE_FRAMEPOINTER_FLAGS@
 EXEEXT = @EXEEXT@
 FREESTANDING_FLAGS = @FREESTANDING_FLAGS@
+GCC_REALMODE_LIB = @GCC_REALMODE_LIB@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -894,8 +895,15 @@ KERNEL_BMI_FLAGS = \
 libmbr_a_SOURCES = \
 	mbr/mbr.s
 
+libmbr_a_CFLAGS = \
+	$(REAL_MODE_FLAGS)
+
+libmbr_a_CXXFLAGS = \
+	$(REAL_MODE_FLAGS)
+
 libmbr_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS) -static
 
@@ -906,6 +914,7 @@ EXTRA_libmbr_a_DEPENDENCIES = \
 # mbr-elf
 mbr_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
@@ -926,11 +935,12 @@ mbr_elf_CXXFLAGS = \
 
 mbr_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_elf_LDADD = \
-	libmbr.a -lgcc
+	libmbr.a $(GCC_REALMODE_LIB)
 
 
 # mbr-bin
@@ -950,6 +960,7 @@ mbr_bin_CFLAGS = \
 
 mbr_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/mbr.map \
@@ -962,7 +973,9 @@ mbr_bin_LDFLAGS = \
 EXTRA_mbr_bin_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
-mbr_bin_LDADD = libmbr.a -lgcc
+mbr_bin_LDADD = \
+	libmbr.a $(GCC_REALMODE_LIB)
+
 
 # libbootsect.a
 libbootsect_a_SOURCES = \
@@ -1022,10 +1035,9 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -1041,9 +1053,9 @@ libbootsect_a_CXXFLAGS = \
 
 libbootsect_a_CFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
-	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -1058,8 +1070,8 @@ libbootsect_a_CFLAGS = \
 
 libbootsect_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
-	$(SMALLEST_CODE_FLAGS) \
 	$(REGPARM_FLAGS) \
+	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
@@ -1073,17 +1085,18 @@ bootfat_elf_SOURCES = \
 	boot/bootfat.s
 
 bootfat_elf_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 bootfat_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -1098,7 +1111,7 @@ EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 
 # bootfat-bin
@@ -1106,15 +1119,14 @@ bootfat_bin_SOURCES = \
 	$(bootfat_elf_SOURCES)
 
 bootfat_bin_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_bin_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
 	$(bootfat_elf_CCASFLAGS)
 
 bootfat_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -1130,7 +1142,7 @@ EXTRA_bootfat_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_bin_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 
 # bootiso-elf
@@ -1142,6 +1154,7 @@ bootiso_elf_CXXFLAGS = \
 
 bootiso_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -1151,6 +1164,7 @@ bootiso_elf_CCASFLAGS = \
 # $(REAL_MODE_FLAGS)
 bootiso_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-melf_i386 \
@@ -1164,7 +1178,7 @@ EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_elf_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 
 # bootiso-bin
@@ -1175,14 +1189,13 @@ bootiso_bin_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_bin_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
-	$(ASM_DEBUG_INFO_FLAGS) \
 	$(bootiso_elf_CCASFLAGS)
 
 
 # $(REAL_MODE_FLAGS)
 bootiso_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-m,elf_i386 \
@@ -1198,7 +1211,7 @@ EXTRA_bootiso_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_bin_LDADD = \
-	libbootsect.a -lgcc
+	libbootsect.a $(GCC_REALMODE_LIB)
 
 
 # kernel

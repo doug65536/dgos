@@ -1,7 +1,7 @@
 diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf
 --- gcc-6.2.0/gcc/config/i386/t-x86_64-elf	1969-12-31 16:00:00.000000000 -0800
 +++ gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf	2016-09-30 11:55:53.602700086 -0700
-@@ -0,0 +1,7 @@
+@@ -0,0 +1,14 @@
 +# Add redzoneless libgcc
 +MULTILIB_OPTIONS  += mno-red-zone
 +MULTILIB_DIRNAMES += no-red-zone
@@ -9,15 +9,22 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +# Build a 32bit libgcc as well
 +MULTILIB_OPTIONS  += m32
 +MULTILIB_DIRNAMES  += 32
++
++MULTILIB_OPTIONS  += mrtd
++MULTILIB_DIRNAMES  += rtd
++
++MULTILIB_OPTIONS  += mregparm=3
++MULTILIB_DIRNAMES  += regparm3
++
 Binary files gcc-6.2.0/gcc/config/i386/.t-x86_64-elf.swp and gcc-6.2.0.patched/gcc/config/i386/.t-x86_64-elf.swp differ
 diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
 --- gcc-6.2.0/gcc/config.gcc	2016-06-08 06:34:25.000000000 -0700
 +++ gcc-6.2.0.patched/gcc/config.gcc	2016-09-30 11:41:23.318385513 -0700
 @@ -1418,6 +1418,7 @@
- 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
- 	;;
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h"
+	;;
  x86_64-*-elf*)
 +	tmake_file="${tmake_file} i386/t-x86_64-elf"
- 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
- 	;;
+	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
+	;;
  x86_64-*-rtems*)
