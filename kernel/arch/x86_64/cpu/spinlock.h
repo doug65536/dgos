@@ -59,3 +59,13 @@ struct ticketlock_t {
 void ticketlock_lock(ticketlock_t *lock);
 bool ticketlock_try_lock(ticketlock_t *lock);
 void ticketlock_unlock(ticketlock_t *lock);
+
+struct mcs_queue_ent_t {
+    mcs_queue_ent_t * volatile next;
+    bool volatile locked;
+    bool irq_enabled;
+};
+
+void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node);
+bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node);
+void mcslock_unlock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node);

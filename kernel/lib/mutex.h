@@ -1,6 +1,5 @@
 #pragma once
 #include "threadsync.h"
-#include "cpu/atomic.h"
 #include "utility.h"
 
 // Meets BasicLockable requirements
@@ -176,8 +175,8 @@ public:
 
     ~spinlock()
     {
-        while (m != 0)
-            pause();
+//        while (m != 0)
+//            pause();
         assert(m == 0);
     }
 
@@ -246,42 +245,32 @@ private:
 struct alignas(64) padded_ticketlock : public ticketlock {
 };
 
+// Does not meet BasicLockable requirements, lock holder maintains node
 class mcslock {
 public:
-    void lock()
+    using mutex_type = mcs_queue_ent_t *;
+    void lock(mcs_queue_ent_t *node)
     {
-        queue_node node;
-
-        node.next = nullptr;
-
-        queue_node *pred = atomic_xchg(&m->next, &node);
-
-        if (pred) {
-            node.locked = true;
-            pred->next = &node;
-
-            while (node.locked)
-                pause();
-        }
+        mcslock_lock(&m, node);
     }
 
-//    bool try_lock()
-//    {
-
-//    }
-
-    void unlock()
+    bool try_lock(mcs_queue_ent_t *node)
     {
+        return mcslock_try_lock(&m, node);
+    }
 
+    void unlock(mcs_queue_ent_t *node)
+    {
+        mcslock_unlock(&m, node);
+    }
+
+    mcs_queue_ent_t *&native_handle()
+    {
+        return m;
     }
 
 private:
-    struct queue_node {
-        queue_node *next;
-        bool volatile locked;
-    };
-
-    queue_node *m;
+    mcs_queue_ent_t *m;
 };
 
 struct defer_lock_t {
@@ -343,6 +332,66 @@ public:
 
 private:
     T* m;
+    bool locked;
+};
+
+template<>
+class unique_lock<mcslock>
+{
+public:
+    unique_lock(mcslock& m)
+        : m(&m)
+        , locked(false)
+    {
+        lock();
+    }
+
+    unique_lock(mcslock& lock, defer_lock_t)
+        : m(&lock)
+        , locked(false)
+    {
+    }
+
+    ~unique_lock()
+    {
+        unlock();
+    }
+
+    void lock()
+    {
+        assert(!locked);
+        m->lock(&node);
+        locked = true;
+    }
+
+    void unlock()
+    {
+        if (locked) {
+            locked = false;
+            m->unlock(&node);
+        }
+    }
+
+    void release()
+    {
+        locked = false;
+        m = nullptr;
+    }
+
+    void swap(unique_lock& rhs)
+    {
+        ::swap(rhs.m, m);
+        ::swap(rhs.locked, locked);
+    }
+
+    typename mcslock::mutex_type& native_handle()
+    {
+        return m->native_handle();
+    }
+
+private:
+    mcslock *m;
+    mcs_queue_ent_t node;
     bool locked;
 };
 

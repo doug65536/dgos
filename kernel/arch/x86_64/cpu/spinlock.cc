@@ -293,3 +293,46 @@ void ticketlock_unlock(ticketlock_t *lock)
     lock->now_serving = (serving + 2) & -2;
     cpu_irq_toggle(serving & 1);
 }
+
+void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
+{
+    node->irq_enabled = cpu_irq_disable();
+
+    node->next = nullptr;
+    mcs_queue_ent_t *pred = atomic_xchg(lock, node);
+    if (pred) {
+        // queue was non-empty
+        node->locked = true;
+        pred->next = node;
+
+        while (node->locked)
+            pause();
+    }
+}
+
+bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
+{
+    node->irq_enabled = cpu_irq_disable();
+
+    node->next = nullptr;
+    if (atomic_cmpxchg(lock, nullptr, node) == nullptr)
+        return true;
+
+    cpu_irq_toggle(node->irq_enabled);
+    return false;
+}
+
+void mcslock_unlock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
+{
+    if (!node->next) {
+        // no known successor
+        if (atomic_cmpxchg(lock, node, nullptr)) {
+            cpu_irq_toggle(node->irq_enabled);
+            return;
+        }
+        while (!node->next)
+            pause();
+    }
+    node->next->locked = false;
+    cpu_irq_toggle(node->irq_enabled);
+}
