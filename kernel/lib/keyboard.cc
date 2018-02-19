@@ -1,7 +1,5 @@
 #include "keyboard.h"
-#include "printk.h"
 #include "mutex.h"
-#include "cpu/control_regs.h"
 
 struct keyboard_buffer_t {
     keyboard_event_t buffer[16];
