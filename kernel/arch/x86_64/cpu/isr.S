@@ -144,80 +144,78 @@ isr_common:
     //  6*8(%rbp) -> rsp
     //  7*8(%rbp) -> ss
 
+    pushq %rbx
+    .cfi_rel_offset rbx,-1*8
+
     pushq %r15
-    .cfi_rel_offset r15,-8-0*8
+    .cfi_rel_offset r15,-2*8
+
+    // r15d=ds, r14d=es, r13d=fs, r12d=gs
+    movl %ds,%r15d
 
     pushq %r14
-    .cfi_rel_offset r14,-8-1*8
+    .cfi_rel_offset r14,-3*8
+
+    movl %es,%r14d
 
     pushq %r13
-    .cfi_rel_offset r13,-8-2*8
+    .cfi_rel_offset r13,-4*8
 
-    // Schedule in r13=ds, r12=es, r11=fs, r10=gs
-    movl %ds,%r13d
+    movl %fs,%r13d
 
     pushq %r12
-    .cfi_rel_offset r12,-8-3*8
+    .cfi_rel_offset r12,-5*8
 
-    movl %es,%r12d
+    movl %gs,%r12d
 
     pushq %r11
-    .cfi_rel_offset r11,-8-4*8
+    .cfi_rel_offset r11,-6*8
 
-    mov %fs,%r11d
+    // shift es, fs, gs into position to pack into r13
+    shll $16,%r14d
 
     pushq %r10
-    .cfi_rel_offset r10,-8-5*8
+    .cfi_rel_offset r10,-7*8
 
-    movl %gs,%r10d
-
-    pushq %rbx
-    .cfi_rel_offset rbx,-8-6*8
-
-    // Schedule in r12<<=16, r11<<=32, r10<<=48
-    shll $16,%r12d
+    shlq $32,%r13
 
     pushq %rax
-    .cfi_rel_offset rax,-8-7*8
+    .cfi_rel_offset rax,-8*8
 
-    shlq $32,%r11
+    shlq $48,%r12
 
     movq %cr3,%rax
 
+    // Merge ds,es into r15
+    orl %r14d,%r15d
+
     cld
     pushq %r9
-    .cfi_rel_offset r9,-8-8*8
+    .cfi_rel_offset r9,-9*8
 
-    shlq $48,%r10
+    // Merge fs,gs into r13
+    orq %r12,%r13
 
     pushq %r8
-    .cfi_rel_offset r8,-8-9*8
+    .cfi_rel_offset r8,-10*8
 
-    // merge ds,es
-    orl %r12d,%r13d
+    // Merge ds|es,fs|gs into r13
+    orq %r15,%r13
 
     pushq %rcx
-    .cfi_rel_offset rcx,-8-10*8
-
-    // merge fs,gs
-    orq %r10,%r11
+    .cfi_rel_offset rcx,-11*8
 
     // Get interrupted code segment
     movzwl frame_cs(%rbp),%ecx
 
     pushq %rdx
-    .cfi_rel_offset rdx,-8-11*8
-
-    // Merge ds,es,fs,gs
-    orq %r11,%r13
-
-    //  r13: segment register values at interrupt entry
+    .cfi_rel_offset rdx,-12*8
 
     pushq %rsi
-    .cfi_rel_offset rsi,-8-12*8
+    .cfi_rel_offset rsi,-13*8
 
     pushq %rdi
-    .cfi_rel_offset rdi,-8-13*8
+    .cfi_rel_offset rdi,-14*8
 
     // Assume null FPU context pointer
     xorl %edi,%edi
@@ -358,6 +356,8 @@ isr_common:
     popq %rax
     movq %rax,%cr3
 
+    .cfi_remember_state
+
     popq %rdi
     .cfi_restore rdi
 
@@ -379,9 +379,6 @@ isr_common:
     popq %rax
     .cfi_restore rax
 
-    popq %rbx
-    .cfi_restore rbx
-
     popq %r10
     .cfi_restore r10
 
@@ -400,8 +397,10 @@ isr_common:
     popq %r15
     .cfi_restore r15
 
+    popq %rbx
+    .cfi_restore rbx
+
     popq %rbp
-    .cfi_remember_state
     .cfi_restore rbp
     .cfi_def_cfa_register rsp
     .cfi_def_cfa_offset 24
@@ -414,11 +413,13 @@ isr_common:
 .Lsegments_changed:
    .cfi_restore_state
    // Restore segments
-   movl $(GDT_SEL_USER_DATA | 3),%eax
-   movw %ax,%ds
-   movw %ax,%es
-   movw %ax,%fs
-   movw %ax,%gs
+   movw %dx,%ds
+   shrq $16,%rdx
+   movw %dx,%es
+   shrq $16,%rdx
+   movw %dx,%fs
+   shrl $16,%edx
+   movw %dx,%gs
    jmp .Lsegments_restored
 
    .cfi_endproc

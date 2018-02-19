@@ -3,9 +3,8 @@
 
 __BEGIN_DECLS
 
-
-#define ISR_CTX_REG_GPR_n(ctx, i) ((ctx)->gpr.r.r[(i)])
-#define ISR_CTX_REG_SEG_n(ctx, i) ((ctx)->gpr.s.r[(i)])
+#define ISR_CTX_REG_GPR_n(ctx, i)       ((ctx)->gpr.r.r[(i)])
+#define ISR_CTX_REG_SEG_n(ctx, i)       ((ctx)->gpr.s.r[(i)])
 
 // isr_context->gpr.r order
 #define ISR_CTX_REG_RDI(ctx)            ((ctx)->gpr.r.n.rdi)
@@ -15,13 +14,13 @@ __BEGIN_DECLS
 #define ISR_CTX_REG_R8(ctx)             ((ctx)->gpr.r.n.r8)
 #define ISR_CTX_REG_R9(ctx)             ((ctx)->gpr.r.n.r9)
 #define ISR_CTX_REG_RAX(ctx)            ((ctx)->gpr.r.n.rax)
-#define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr.r.n.rbx)
 #define ISR_CTX_REG_R10(ctx)            ((ctx)->gpr.r.n.r10)
 #define ISR_CTX_REG_R11(ctx)            ((ctx)->gpr.r.n.r11)
 #define ISR_CTX_REG_R12(ctx)            ((ctx)->gpr.r.n.r12)
 #define ISR_CTX_REG_R13(ctx)            ((ctx)->gpr.r.n.r13)
 #define ISR_CTX_REG_R14(ctx)            ((ctx)->gpr.r.n.r14)
 #define ISR_CTX_REG_R15(ctx)            ((ctx)->gpr.r.n.r15)
+#define ISR_CTX_REG_RBX(ctx)            ((ctx)->gpr.r.n.rbx)
 #define ISR_CTX_REG_RBP(ctx)            ((ctx)->gpr.r.n.rbp)
 
 #define ISR_CTX_REG_RIP(ctx)            ((ctx)->gpr.iret.rip)
@@ -39,6 +38,8 @@ __BEGIN_DECLS
 
 #define ISR_CTX_ERRCODE(ctx)            ((ctx)->gpr.info.error_code)
 #define ISR_CTX_INTR(ctx)               ((ctx)->gpr.info.interrupt)
+
+#define ISR_CTX_FPU(ctx)                ((ctx)->fpr)
 
 #define ISR_CTX_FPU_FCW(ctx)            ((ctx)->fpr->fcw)
 #define ISR_CTX_FPU_FOP(ctx)            ((ctx)->fpr->fop)
@@ -83,20 +84,23 @@ struct isr_iret_frame_t {
 };
 
 struct isr_gpr_t {
+    // Parameter registers
     uintptr_t rdi;
     uintptr_t rsi;
     uintptr_t rdx;
     uintptr_t rcx;
     uintptr_t r8;
     uintptr_t r9;
+    // Call clobbered registers
     uintptr_t rax;
-    uintptr_t rbx;
     uintptr_t r10;
     uintptr_t r11;
+    // Call preserved registers
     uintptr_t r12;
     uintptr_t r13;
     uintptr_t r14;
     uintptr_t r15;
+    uintptr_t rbx;
     uintptr_t rbp;
 };
 
