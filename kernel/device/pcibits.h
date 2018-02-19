@@ -25,8 +25,8 @@
 #define PCI_ID_DID_GET(n)    (((n) & PCI_ID_DID) >> PCI_ID_DID_BIT)
 #define PCI_ID_VID_GET(n)    (((n) & PCI_ID_VID) >> PCI_ID_VID_BIT)
 
-#define PCI_ID_DID_SET(r,n)  (r = ((r) & ~PCI_ID_DID) | PCI_ID_DID_n(n))
-#define PCI_ID_VID_SET(r,n)  (r = ((r) & ~PCI_ID_VID) | PCI_ID_VID_n(n))
+#define PCI_ID_DID_SET(r,n)  ((r) = ((r) & ~PCI_ID_DID) | PCI_ID_DID_n((n)))
+#define PCI_ID_VID_SET(r,n)  ((r) = ((r) & ~PCI_ID_VID) | PCI_ID_VID_n((n)))
 
 //
 // PCI_CMD: Command
@@ -116,16 +116,25 @@
 #define PCI_CMD_MSE_GET(n)     (((n) & PCI_CMD_MSE) >> PCI_CMD_MSE_BIT)
 #define PCI_CMD_IOSE_GET(n)    (((n) & PCI_CMD_IOSE) >> PCI_CMD_IOSE_BIT)
 
-#define PCI_CMD_ID_SET(r,n)    (r = ((r) & ~PCI_CMD_ID) | PCI_CMD_ID_n(n))
-#define PCI_CMD_FBE_SET(r,n)   (r = ((r) & ~PCI_CMD_FBE) | PCI_CMD_FBE_n(n))
-#define PCI_CMD_SEE_SET(r,n)   (r = ((r) & ~PCI_CMD_SEE) | PCI_CMD_SEE_n(n))
-#define PCI_CMD_PEE_SET(r,n)   (r = ((r) & ~PCI_CMD_PEE) | PCI_CMD_PEE_n(n))
-#define PCI_CMD_VGA_SET(r,n)   (r = ((r) & ~PCI_CMD_VGA) | PCI_CMD_VGA_n(n))
-#define PCI_CMD_MWIE_SET(r,n)  (r = ((r) & ~PCI_CMD_MWIE) | PCI_CMD_MWIE_n(n))
-#define PCI_CMD_SCE_SET(r,n)   (r = ((r) & ~PCI_CMD_SCE) | PCI_CMD_SCE_n(n))
-#define PCI_CMD_BME_SET(r,n)   (r = ((r) & ~PCI_CMD_BME) | PCI_CMD_BME_n(n))
-#define PCI_CMD_MSE_SET(r,n)   (r = ((r) & ~PCI_CMD_MSE) | PCI_CMD_MSE_n(n))
-#define PCI_CMD_IOSE_SET(r,n)  (r = ((r) & ~PCI_CMD_IOSE) | PCI_CMD_IOSE_n(n))
+#define PCI_CMD_ID_SET(r,n)    ((r) = ((r) & ~PCI_CMD_ID) | PCI_CMD_ID_n((n)))
+#define PCI_CMD_FBE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_FBE) | PCI_CMD_FBE_n((n)))
+#define PCI_CMD_SEE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_SEE) | PCI_CMD_SEE_n((n)))
+#define PCI_CMD_PEE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_PEE) | PCI_CMD_PEE_n((n)))
+#define PCI_CMD_VGA_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_VGA) | PCI_CMD_VGA_n((n)))
+#define PCI_CMD_MWIE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_MWIE) | PCI_CMD_MWIE_n((n)))
+#define PCI_CMD_SCE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_SCE) | PCI_CMD_SCE_n((n)))
+#define PCI_CMD_BME_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_BME) | PCI_CMD_BME_n((n)))
+#define PCI_CMD_MSE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_MSE) | PCI_CMD_MSE_n((n)))
+#define PCI_CMD_IOSE_SET(r,n) \
+    ((r) = ((r) & ~PCI_CMD_IOSE) | PCI_CMD_IOSE_n((n)))
 
 //
 // PCI_STS: Device status
@@ -223,17 +232,26 @@
 #define PCI_STS_CL_GET(n)      (((n) & PCI_STS_CL) >> PCI_STS_CL_BIT)
 #define PCI_STS_IS_GET(n)      (((n) & PCI_STS_IS) >> PCI_STS_IS_BIT)
 
-#define PCI_STS_DPE_SET(r,n)   (r = ((r) & ~PCI_STS_DPE) | PCI_STS_DPE_n(n))
-#define PCI_STS_SSE_SET(r,n)   (r = ((r) & ~PCI_STS_SSE) | PCI_STS_SSE_n(n))
-#define PCI_STS_RMA_SET(r,n)   (r = ((r) & ~PCI_STS_RMA) | PCI_STS_RMA_n(n))
-#define PCI_STS_RTA_SET(r,n)   (r = ((r) & ~PCI_STS_RTA) | PCI_STS_RTA_n(n))
-#define PCI_STS_STO_SET(r,n)   (r = ((r) & ~PCI_STS_STO) | PCI_STS_STO_n(n))
-#define PCI_STS_DEVT_SET(r,n)  (r = ((r) & ~PCI_STS_DEVT) | PCI_STS_DEVT_n(n))
-#define PCI_STS_DPD_SET(r,n)   (r = ((r) & ~PCI_STS_DPD) | PCI_STS_DPD_n(n))
-#define PCI_STS_FBC_SET(r,n)   (r = ((r) & ~PCI_STS_FBC) | PCI_STS_FBC_n(n))
-#define PCI_STS_C66_SET(r,n)   (r = ((r) & ~PCI_STS_C66) | PCI_STS_C66_n(n))
-#define PCI_STS_CL_SET(r,n)    (r = ((r) & ~PCI_STS_CL) | PCI_STS_CL_n(n))
-#define PCI_STS_IS_SET(r,n)    (r = ((r) & ~PCI_STS_IS) | PCI_STS_IS_n(n))
+#define PCI_STS_DPE_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_DPE) | PCI_STS_DPE_n((n)))
+#define PCI_STS_SSE_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_SSE) | PCI_STS_SSE_n((n)))
+#define PCI_STS_RMA_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_RMA) | PCI_STS_RMA_n((n)))
+#define PCI_STS_RTA_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_RTA) | PCI_STS_RTA_n((n)))
+#define PCI_STS_STO_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_STO) | PCI_STS_STO_n((n)))
+#define PCI_STS_DEVT_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_DEVT) | PCI_STS_DEVT_n((n)))
+#define PCI_STS_DPD_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_DPD) | PCI_STS_DPD_n((n)))
+#define PCI_STS_FBC_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_FBC) | PCI_STS_FBC_n((n)))
+#define PCI_STS_C66_SET(r,n) \
+    ((r) = ((r) & ~PCI_STS_C66) | PCI_STS_C66_n((n)))
+#define PCI_STS_CL_SET(r,n)    ((r) = ((r) & ~PCI_STS_CL) | PCI_STS_CL_n((n)))
+#define PCI_STS_IS_SET(r,n)    ((r) = ((r) & ~PCI_STS_IS) | PCI_STS_IS_n((n)))
 
 //
 // PCI_RID: Revision ID
@@ -251,7 +269,7 @@
 
 #define PCI_RID_RID_GET(n)    (((n) & PCI_RID_RID) >> PCI_RID_RID_BIT)
 
-#define PCI_RID_RID_SET(r,n)  (r = ((r) & ~PCI_RID_RID) | PCI_RID_RID_n(n))
+#define PCI_RID_RID_SET(r,n)  ((r) = ((r) & ~PCI_RID_RID) | PCI_RID_RID_n((n)))
 
 //
 // PCI_CC: Class code
@@ -285,9 +303,9 @@
 #define PCI_CC_SCC_GET(n)    (((n) & PCI_CC_SCC) >> PCI_CC_SCC_BIT)
 #define PCI_CC_PI_GET(n)     (((n) & PCI_CC_PI) >> PCI_CC_PI_BIT)
 
-#define PCI_CC_BCC_SET(r,n)  (r = ((r) & ~PCI_CC_BCC) | PCI_CC_BCC_n(n))
-#define PCI_CC_SCC_SET(r,n)  (r = ((r) & ~PCI_CC_SCC) | PCI_CC_SCC_n(n))
-#define PCI_CC_PI_SET(r,n)   (r = ((r) & ~PCI_CC_PI) | PCI_CC_PI_n(n))
+#define PCI_CC_BCC_SET(r,n)  ((r) = ((r) & ~PCI_CC_BCC) | PCI_CC_BCC_n((n)))
+#define PCI_CC_SCC_SET(r,n)  ((r) = ((r) & ~PCI_CC_SCC) | PCI_CC_SCC_n((n)))
+#define PCI_CC_PI_SET(r,n)   ((r) = ((r) & ~PCI_CC_PI) | PCI_CC_PI_n((n)))
 
 //
 // PCI_CLS: Cache line size
@@ -305,7 +323,7 @@
 
 #define PCI_CLS_CLS_GET(n)    (((n) & PCI_CLS_CLS) >> PCI_CLS_CLS_BIT)
 
-#define PCI_CLS_CLS_SET(r,n)  (r = ((r) & ~PCI_CLS_CLS) | PCI_CLS_CLS_n(n))
+#define PCI_CLS_CLS_SET(r,n)  ((r) = ((r) & ~PCI_CLS_CLS) | PCI_CLS_CLS_n((n)))
 
 //
 // PCI_MLT: Master latency timer
@@ -323,7 +341,7 @@
 
 #define PCI_MLT_MLT_GET(n)    (((n) & PCI_MLT_MLT) >> PCI_MLT_MLT_BIT)
 
-#define PCI_MLT_MLT_SET(r,n)  (r = ((r) & ~PCI_MLT_MLT) | PCI_MLT_MLT_n(n))
+#define PCI_MLT_MLT_SET(r,n)  ((r) = ((r) & ~PCI_MLT_MLT) | PCI_MLT_MLT_n((n)))
 
 //
 // PCI_HTYPE: Header type
@@ -350,8 +368,9 @@
 #define PCI_HTYPE_HL_GET(n)     (((n) & PCI_HTYPE_HL) >> PCI_HTYPE_HL_BIT)
 
 #define PCI_HTYPE_MFD_SET(r,n) \
-    (r = ((r) & ~PCI_HTYPE_MFD) | PCI_HTYPE_MFD_n(n))
-#define PCI_HTYPE_HL_SET(r,n)   (r = ((r) & ~PCI_HTYPE_HL) | PCI_HTYPE_HL_n(n))
+    ((r) = ((r) & ~PCI_HTYPE_MFD) | PCI_HTYPE_MFD_n((n)))
+#define PCI_HTYPE_HL_SET(r,n) \
+    ((r) = ((r) & ~PCI_HTYPE_HL) | PCI_HTYPE_HL_n((n)))
 
 //
 // PCI_BIST: Built in self test (optional)
@@ -385,24 +404,24 @@
 #define PCI_BIST_SB_GET(n)    (((n) & PCI_BIST_SB) >> PCI_BIST_SB_BIT)
 #define PCI_BIST_CC_GET(n)    (((n) & PCI_BIST_CC) >> PCI_BIST_CC_BIT)
 
-#define PCI_BIST_BC_SET(r,n)  (r = ((r) & ~PCI_BIST_BC) | PCI_BIST_BC_n(n))
-#define PCI_BIST_SB_SET(r,n)  (r = ((r) & ~PCI_BIST_SB) | PCI_BIST_SB_n(n))
-#define PCI_BIST_CC_SET(r,n)  (r = ((r) & ~PCI_BIST_CC) | PCI_BIST_CC_n(n))
+#define PCI_BIST_BC_SET(r,n)  ((r) = ((r) & ~PCI_BIST_BC) | PCI_BIST_BC_n((n)))
+#define PCI_BIST_SB_SET(r,n)  ((r) = ((r) & ~PCI_BIST_SB) | PCI_BIST_SB_n((n)))
+#define PCI_BIST_CC_SET(r,n)  ((r) = ((r) & ~PCI_BIST_CC) | PCI_BIST_CC_n((n)))
 
 // PCI_BAR
 
-#define PCI_BAR_BA_BIT         14
+#define PCI_BAR_BA_BIT         4
 #define PCI_BAR_PF_BIT         3
-#define PCI_BAR_Type_BIT       1
+#define PCI_BAR_TYPE_BIT       1
 #define PCI_BAR_RTE_BIT        0
 
-#define PCI_BAR_BA_BITS        18
+#define PCI_BAR_BA_BITS        28
 #define PCI_BAR_PF_BITS        1
-#define PCI_BAR_Type_BITS      2
+#define PCI_BAR_TYPE_BITS      2
 #define PCI_BAR_RTE_BITS       1
 #define PCI_BAR_BA_MASK        ((1U << PCI_BAR_BA_BITS)-1)
 #define PCI_BAR_PF_MASK        ((1U << PCI_BAR_PF_BITS)-1)
-#define PCI_BAR_Type_MASK      ((1U << PCI_BAR_Type_BITS)-1)
+#define PCI_BAR_TYPE_MASK      ((1U << PCI_BAR_TYPE_BITS)-1)
 #define PCI_BAR_RTE_MASK       ((1U << PCI_BAR_RTE_BITS)-1)
 
 // Base address
@@ -410,25 +429,29 @@
 
 // Prefetchable
 #define PCI_BAR_PF             (PCI_BAR_PF_MASK << PCI_BAR_PF_BIT)
-#define PCI_BAR_Type           (PCI_BAR_Type_MASK << PCI_BAR_Type_BIT)
+
+// (0=32-bit, 2=64-bit, 1=reserved, 3=reserved)
+#define PCI_BAR_TYPE           (PCI_BAR_TYPE_MASK << PCI_BAR_TYPE_BIT)
 
 // Resource type indicator
 #define PCI_BAR_RTE            (PCI_BAR_RTE_MASK << PCI_BAR_RTE_BIT)
 
 #define PCI_BAR_BA_n(n)        ((n) << PCI_BAR_BA_BIT)
 #define PCI_BAR_PF_n(n)        ((n) << PCI_BAR_PF_BIT)
-#define PCI_BAR_Type_n(n)      ((n) << PCI_BAR_Type_BIT)
+#define PCI_BAR_TYPE_n(n)      ((n) << PCI_BAR_TYPE_BIT)
 #define PCI_BAR_RTE_n(n)       ((n) << PCI_BAR_RTE_BIT)
 
 #define PCI_BAR_BA_GET(n)      (((n) & PCI_BAR_BA) >> PCI_BAR_BA_BIT)
 #define PCI_BAR_PF_GET(n)      (((n) & PCI_BAR_PF) >> PCI_BAR_PF_BIT)
-#define PCI_BAR_Type_GET(n)    (((n) & PCI_BAR_Type) >> PCI_BAR_Type_BIT)
+#define PCI_BAR_TYPE_GET(n)    (((n) & PCI_BAR_TYPE) >> PCI_BAR_TYPE_BIT)
 #define PCI_BAR_RTE_GET(n)     (((n) & PCI_BAR_RTE) >> PCI_BAR_RTE_BIT)
 
-#define PCI_BAR_BA_SET(r,n)    (r = ((r) & ~PCI_BAR_BA) | PCI_BAR_BA_n(n))
-#define PCI_BAR_PF_SET(r,n)    (r = ((r) & ~PCI_BAR_PF) | PCI_BAR_PF_n(n))
-#define PCI_BAR_Type_SET(r,n)  (r = ((r) & ~PCI_BAR_Type) | PCI_BAR_Type_n(n))
-#define PCI_BAR_RTE_SET(r,n)   (r = ((r) & ~PCI_BAR_RTE) | PCI_BAR_RTE_n(n))
+#define PCI_BAR_BA_SET(r,n)    ((r) = ((r) & ~PCI_BAR_BA) | PCI_BAR_BA_n((n)))
+#define PCI_BAR_PF_SET(r,n)    ((r) = ((r) & ~PCI_BAR_PF) | PCI_BAR_PF_n((n)))
+#define PCI_BAR_TYPE_SET(r,n) \
+    ((r) = ((r) & ~PCI_BAR_TYPE) | PCI_BAR_TYPE_n((n)))
+#define PCI_BAR_RTE_SET(r,n) \
+    ((r) = ((r) & ~PCI_BAR_RTE) | PCI_BAR_RTE_n((n)))
 
 //
 // PCI_SS: Subsystem identifiers
@@ -453,8 +476,10 @@
 #define PCI_SS_SSID_GET(n)     (((n) & PCI_SS_SSID) >> PCI_SS_SSID_BIT)
 #define PCI_SS_SSVID_GET(n)    (((n) & PCI_SS_SSVID) >> PCI_SS_SSVID_BIT)
 
-#define PCI_SS_SSID_SET(r,n)   (r = ((r) & ~PCI_SS_SSID) | PCI_SS_SSID_n(n))
-#define PCI_SS_SSVID_SET(r,n)  (r = ((r) & ~PCI_SS_SSVID) | PCI_SS_SSVID_n(n))
+#define PCI_SS_SSID_SET(r,n) \
+    ((r) = ((r) & ~PCI_SS_SSID) | PCI_SS_SSID_n((n)))
+#define PCI_SS_SSVID_SET(r,n) \
+    ((r) = ((r) & ~PCI_SS_SSVID) | PCI_SS_SSVID_n((n)))
 
 //
 // PCI_CAP: Capabilities pointer
@@ -471,7 +496,7 @@
 
 #define PCI_CAP_CP_GET(n)    (((n) & PCI_CAP_CP) >> PCI_CAP_CP_BIT)
 
-#define PCI_CAP_CP_SET(r,n)  (r = ((r) & ~PCI_CAP_CP) | PCI_CAP_CP_n(n))
+#define PCI_CAP_CP_SET(r,n)  ((r) = ((r) & ~PCI_CAP_CP) | PCI_CAP_CP_n((n)))
 
 // PCI_INTR
 
@@ -496,9 +521,9 @@
 #define PCI_INTR_ILINE_GET(n)    (((n) & PCI_INTR_ILINE) >> PCI_INTR_ILINE_BIT)
 
 #define PCI_INTR_IPIN_SET(r,n) \
-    (r = ((r) & ~PCI_INTR_IPIN) | PCI_INTR_IPIN_n(n))
+    ((r) = ((r) & ~PCI_INTR_IPIN) | PCI_INTR_IPIN_n((n)))
 #define PCI_INTR_ILINE_SET(r,n) \
-    (r = ((r) & ~PCI_INTR_ILINE) | PCI_INTR_ILINE_n(n))
+    ((r) = ((r) & ~PCI_INTR_ILINE) | PCI_INTR_ILINE_n((n)))
 
 //
 // PCI_MGNT: Minimum grant
@@ -515,7 +540,8 @@
 
 #define PCI_MGNT_GNT_GET(n)    (((n) & PCI_MGNT_GNT) >> PCI_MGNT_GNT_BIT)
 
-#define PCI_MGNT_GNT_SET(r,n)  (r = ((r) & ~PCI_MGNT_GNT) | PCI_MGNT_GNT_n(n))
+#define PCI_MGNT_GNT_SET(r,n) \
+    ((r) = ((r) & ~PCI_MGNT_GNT) | PCI_MGNT_GNT_n((n)))
 
 //
 // PCI_MLAT: Maximum latency
@@ -532,7 +558,8 @@
 
 #define PCI_MLAT_LAT_GET(n)    (((n) & PCI_MLAT_LAT) >> PCI_MLAT_LAT_BIT)
 
-#define PCI_MLAT_LAT_SET(r,n)  (r = ((r) & ~PCI_MLAT_LAT) | PCI_MLAT_LAT_n(n))
+#define PCI_MLAT_LAT_SET(r,n) \
+    ((r) = ((r) & ~PCI_MLAT_LAT) | PCI_MLAT_LAT_n((n)))
 
 // PCI_MSI_MSG_CTRL
 
@@ -593,15 +620,15 @@
     (((n) & PCI_MSI_MSG_CTRL_EN) >> PCI_MSI_MSG_CTRL_EN_BIT)
 
 #define PCI_MSI_MSG_CTRL_VMASK_SET(r,n) \
-    (r = ((r) & ~PCI_MSI_MSG_CTRL_VMASK) | PCI_MSI_MSG_CTRL_VMASK_n(n))
+    ((r) = ((r) & ~PCI_MSI_MSG_CTRL_VMASK) | PCI_MSI_MSG_CTRL_VMASK_n((n)))
 #define PCI_MSI_MSG_CTRL_CAP64_SET(r,n) \
-    (r = ((r) & ~PCI_MSI_MSG_CTRL_CAP64) | PCI_MSI_MSG_CTRL_CAP64_n(n))
+    ((r) = ((r) & ~PCI_MSI_MSG_CTRL_CAP64) | PCI_MSI_MSG_CTRL_CAP64_n((n)))
 #define PCI_MSI_MSG_CTRL_MME_SET(r,n) \
-    (r = ((r) & ~PCI_MSI_MSG_CTRL_MME) | PCI_MSI_MSG_CTRL_MME_n(n))
+    ((r) = ((r) & ~PCI_MSI_MSG_CTRL_MME) | PCI_MSI_MSG_CTRL_MME_n((n)))
 #define PCI_MSI_MSG_CTRL_MMC_SET(r,n) \
-    (r = ((r) & ~PCI_MSI_MSG_CTRL_MMC) | PCI_MSI_MSG_CTRL_MMC_n(n))
+    ((r) = ((r) & ~PCI_MSI_MSG_CTRL_MMC) | PCI_MSI_MSG_CTRL_MMC_n((n)))
 #define PCI_MSI_MSG_CTRL_EN_SET(r,n) \
-    (r = ((r) & ~PCI_MSI_MSG_CTRL_EN) | PCI_MSI_MSG_CTRL_EN_n(n))
+    ((r) = ((r) & ~PCI_MSI_MSG_CTRL_EN) | PCI_MSI_MSG_CTRL_EN_n((n)))
 
 // PCI_MSIX_MSG_CTRL
 
@@ -642,11 +669,11 @@
     (((n) & PCI_MSIX_MSG_CTRL_TBLSZ) >> PCI_MSIX_MSG_CTRL_TBLSZ_BIT)
 
 #define PCI_MSIX_MSG_CTRL_EN_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_MSG_CTRL_EN) | PCI_MSIX_MSG_CTRL_EN_n(n))
+    ((r) = ((r) & ~PCI_MSIX_MSG_CTRL_EN) | PCI_MSIX_MSG_CTRL_EN_n((n)))
 #define PCI_MSIX_MSG_CTRL_MASK_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_MSG_CTRL_MASK) | PCI_MSIX_MSG_CTRL_MASK_n(n))
+    ((r) = ((r) & ~PCI_MSIX_MSG_CTRL_MASK) | PCI_MSIX_MSG_CTRL_MASK_n((n)))
 #define PCI_MSIX_MSG_CTRL_TBLSZ_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_MSG_CTRL_TBLSZ) | PCI_MSIX_MSG_CTRL_TBLSZ_n(n))
+    ((r) = ((r) & ~PCI_MSIX_MSG_CTRL_TBLSZ) | PCI_MSIX_MSG_CTRL_TBLSZ_n((n)))
 
 // PCI_MSIX_TBL
 #define PCI_MSIX_TBL               4
@@ -676,9 +703,9 @@
     (((n) & PCI_MSIX_TBL_BIR) >> PCI_MSIX_TBL_BIR_BIT)
 
 #define PCI_MSIX_TBL_OFS_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_TBL_OFS) | PCI_MSIX_TBL_OFS_n(n))
+    ((r) = ((r) & ~PCI_MSIX_TBL_OFS) | PCI_MSIX_TBL_OFS_n((n)))
 #define PCI_MSIX_TBL_BIR_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_TBL_BIR) | PCI_MSIX_TBL_BIR_n(n))
+    ((r) = ((r) & ~PCI_MSIX_TBL_BIR) | PCI_MSIX_TBL_BIR_n((n)))
 
 // PCI_MSIX_PBA
 #define PCI_MSIX_PBA               8
@@ -708,7 +735,29 @@
     (((n) & PCI_MSIX_PBA_BIR) >> PCI_MSIX_PBA_BIR_BIT)
 
 #define PCI_MSIX_PBA_OFS_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_PBA_OFS) | PCI_MSIX_PBA_OFS_n(n))
+    ((r) = ((r) & ~PCI_MSIX_PBA_OFS) | PCI_MSIX_PBA_OFS_n((n)))
 #define PCI_MSIX_PBA_BIR_SET(r,n) \
-    (r = ((r) & ~PCI_MSIX_PBA_BIR) | PCI_MSIX_PBA_BIR_n(n))
+    ((r) = ((r) & ~PCI_MSIX_PBA_BIR) | PCI_MSIX_PBA_BIR_n((n)))
+
+// PCI_MSIX_VEC_CTL
+#define PCI_MSIX_VEC_CTL                   12
+
+#define PCI_MSIX_VEC_CTL_MASKIRQ_BIT       0
+
+#define PCI_MSIX_VEC_CTL_MASKIRQ_BITS      1
+#define PCI_MSIX_VEC_CTL_MASKIRQ_MASK \
+    ((1U << PCI_MSIX_VEC_CTL_MASKIRQ_BITS)-1)
+
+// 1=masked
+#define PCI_MSIX_VEC_CTL_MASKIRQ \
+    (PCI_MSIX_VEC_CTL_MASKIRQ_MASK << PCI_MSIX_VEC_CTL_MASKIRQ_BIT)
+
+#define PCI_MSIX_VEC_CTL_MASKIRQ_n(n) \
+    ((n) << PCI_MSIX_VEC_CTL_MASKIRQ_BIT)
+
+#define PCI_MSIX_VEC_CTL_MASKIRQ_GET(n) \
+    (((n) & PCI_MSIX_VEC_CTL_MASKIRQ) >> PCI_MSIX_VEC_CTL_MASKIRQ_BIT)
+
+#define PCI_MSIX_VEC_CTL_MASKIRQ_SET(r,n) \
+    ((r) = ((r) & ~PCI_MSIX_VEC_CTL_MASKIRQ) | PCI_MSIX_VEC_CTL_MASKIRQ_n((n)))
 

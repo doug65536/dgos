@@ -51,9 +51,9 @@
 3:0 CC Completion code
 
 -- PCI_BAR
-31:14 BA Base address
+31:4 BA Base address
 3 PF Prefetchable
-2:1 Type
+2:1 TYPE (0=32-bit, 2=64-bit, 1=reserved, 3=reserved)
 0 RTE Resource type indicator
 
 -- PCI_SS Subsystem identifiers
@@ -92,3 +92,6 @@
 -- PCI_MSIX_PBA=8
 31:3 OFS Table offset
 2:0 BIR BAR indicator register
+
+-- PCI_MSIX_VEC_CTL=12
+0 MASKIRQ 1=masked

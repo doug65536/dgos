@@ -99,7 +99,14 @@ struct pci_msix64_t {
     uint32_t ctrl;
 };
 
-static vector<pair<pci_addr_t, pci_msix64_t volatile *>> pcix_tables;
+struct pci_msix_mappings {
+    pci_msix64_t volatile *tbl;
+    uint32_t volatile *pba;
+    uint32_t tbl_sz;
+    uint32_t pba_sz;
+};
+
+static vector<pair<pci_addr_t, pci_msix_mappings>> pcix_tables;
 
 #define offset_of(type, member) \
     ((uintptr_t)&(((type*)0x10U)->member) - 0x10U)
@@ -291,7 +298,8 @@ bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
     return true;
 }
 
-bool pci_config_mmio::copy(pci_addr_t addr, void *dest, size_t offset, size_t size)
+bool pci_config_mmio::copy(pci_addr_t addr, void *dest,
+                           size_t offset, size_t size)
 {
     int bus = addr.bus();
 
@@ -425,6 +433,48 @@ int pci_init(void)
     return 0;
 }
 
+static uint64_t pci_set_bar(pci_addr_t addr, int bir)
+{
+    uint64_t bar;
+    uint32_t bar_ofs = offsetof(pci_config_hdr_t, base_addr) +
+            bir * sizeof(uint32_t);
+
+    pci_config_copy(addr, &bar, bar_ofs, sizeof(bar));
+
+    bool use32 = (PCI_BAR_TYPE_GET(bar) == 0);
+
+    if (use32)
+        bar &= 0xFFFFFFFF;
+
+    int bar_width = use32 ? sizeof(uint32_t) : sizeof(uint64_t);
+
+    // Autodetect address space needed by writing all bits one in BAR
+    uint64_t new_bar = bar;
+    PCI_BAR_BA_SET(new_bar, PCI_BAR_BA_MASK);
+    pci_config_write(addr, bar_ofs, &new_bar, bar_width);
+
+    // Read back BAR, size needed is indicated by number of LSB zero bits
+    pci_config_copy(addr, &new_bar, bar_ofs, bar_width);
+
+    uint8_t log2_sz = bit_lsb_set_64(new_bar & PCI_BAR_BA_MASK);
+
+    uint32_t alloc_sz = 1U << log2_sz;
+
+    // Allocate twice as much to align
+    uint32_t bar_addr = mm_alloc_hole(alloc_sz << 1);
+
+    // Naturally align
+    bar_addr = (bar_addr + alloc_sz) & -(alloc_sz);
+
+    // Update base address
+    PCI_BAR_BA_SET(new_bar, bar_addr);
+
+    // Write back BAR
+    pci_config_write(addr, bar_ofs, &new_bar, bar_width);
+
+    return bar_addr;
+}
+
 static int pci_enum_capabilities_match(
         uint8_t id, int ofs, uintptr_t context)
 {
@@ -518,15 +568,18 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
     if (msix) {
         // 6.8.3.2 MSI-X configuration
 
+        // Disable MSI-X while messing with its configuration
+        PCI_MSIX_MSG_CTRL_MASK_SET(caps.msg_ctrl, 0);
+
         // "Software must not modify the MSI-X table when any IRQ is unmasked",
         // so we mask the whole function
-        PCI_MSIX_MSG_CTRL_MASK_SET(caps.msg_ctrl, 1);
         PCI_MSIX_MSG_CTRL_EN_SET(caps.msg_ctrl, 1);
+
         pci_config_write(addr,
                          capability + offsetof(pci_msi_caps_hdr_t, msg_ctrl),
                          &caps.msg_ctrl, sizeof(caps.msg_ctrl));
 
-        int table_size = PCI_MSIX_MSG_CTRL_TBLSZ_GET(caps.msg_ctrl) + 1;
+        int table_count = PCI_MSIX_MSG_CTRL_TBLSZ_GET(caps.msg_ctrl) + 1;
 
         uint32_t tbl_pba[2];
         pci_config_copy(addr, tbl_pba,
@@ -534,42 +587,61 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
 
         // See which BIR it uses initially
         int tbl_bir = PCI_MSIX_TBL_BIR_GET(tbl_pba[0]);
+        uint32_t tbl_ofs = tbl_pba[0] & -8;
 
-        size_t tbl_sz = sizeof(pci_msix64_t) * table_size;
-        uint32_t pba_sz = ((table_size + 63) & -64) >> 3;
+        int pba_bir = PCI_MSIX_TBL_BIR_GET(tbl_pba[1]);
+        uint32_t pba_ofs = tbl_pba[1] & -8;
 
-        uint64_t tbl_physaddr = mm_alloc_hole(tbl_sz + pba_sz);
+        uint32_t tbl_sz = sizeof(pci_msix64_t) * table_count;
+        // Round up to a multiple of 64 bits and scale down to byte count
+        uint32_t pba_sz = ((table_count + 63) & -64) >> 3;
 
-        pci_msix64_t volatile *table = (pci_msix64_t*)
-                mmap((void*)tbl_physaddr, tbl_sz + pba_sz,
-                     PROT_READ | PROT_WRITE,
+        uint64_t tbl_base = 0;
+        uint64_t pba_base = 0;
+
+        // Read the BAR indicated by the table BIR
+        pci_config_copy(addr, &tbl_base,
+                        offsetof(pci_config_hdr_t, base_addr) +
+                        sizeof(uint32_t) * tbl_bir, sizeof(tbl_base));
+
+        // Read the BAR indicated by the PBA BIR
+        pci_config_copy(addr, &pba_base,
+                        offsetof(pci_config_hdr_t, base_addr) +
+                        sizeof(uint32_t) * pba_bir, sizeof(pba_base));
+
+        // Mask off upper 32 bits of BAR is 32 bit
+        if (PCI_BAR_TYPE_GET(tbl_base) == 0)
+            tbl_base &= 0xFFFFFFFF;
+        if (PCI_BAR_TYPE_GET(pba_base) == 0)
+            pba_base &= 0xFFFFFFFF;
+
+        // Handle uninitialized table BAR
+        if (unlikely(PCI_BAR_BA_GET(tbl_base) == 0)) {
+            tbl_base = pci_set_bar(addr, tbl_bir);
+
+            if (tbl_bir == pba_bir)
+                pba_base = tbl_base;
+        }
+
+        // Handle uninitialized PBA BAR
+        if (unlikely((pba_base & -8) == 0 && tbl_bir != pba_bir))
+            pba_base = pci_set_bar(addr, pba_bir);
+
+        tbl_base += tbl_ofs;
+        pba_base += pba_ofs;
+
+        pci_msix64_t volatile *tbl = (pci_msix64_t*)
+                mmap((void*)(tbl_base & -16), tbl_sz, PROT_READ | PROT_WRITE,
                      MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
-        pcix_tables.emplace_back(addr, table);
+        uint32_t volatile *pba = (uint32_t*)
+                mmap((void*)(pba_base & -16), pba_sz, PROT_READ | PROT_WRITE,
+                     MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
-        // Both table and PBA use same BIR, set PBA offset to after table
-        PCI_MSIX_TBL_OFS_SET(tbl_pba[0], 0);
-        PCI_MSIX_TBL_BIR_SET(tbl_pba[0], tbl_bir);
-        PCI_MSIX_TBL_OFS_SET(tbl_pba[1], (tbl_sz) >> 3);
-        PCI_MSIX_TBL_BIR_SET(tbl_pba[1], tbl_bir);
+        pcix_tables.emplace_back(addr,  pci_msix_mappings{
+                                     tbl, pba, tbl_sz, pba_sz });
 
-        // Write table and PBA configuration
-        pci_config_write(addr, capability + PCI_MSIX_TBL,
-                         tbl_pba, sizeof(tbl_pba));
-
-        // Set BAR
-        pci_config_write(addr, offsetof(pci_config_hdr_t, base_addr) +
-                         tbl_bir * sizeof(uint32_t),
-                         &tbl_physaddr, sizeof(tbl_physaddr));
-
-        // Set enable (but still masked)
-        PCI_MSIX_MSG_CTRL_EN_SET(caps.msg_ctrl, 1);
-
-        pci_config_write(addr,
-                         capability + offsetof(pci_msi_caps_hdr_t, msg_ctrl),
-                         &caps.msg_ctrl, sizeof(caps.msg_ctrl));
-
-        int tbl_cnt = min(req_count, table_size);
+        int tbl_cnt = min(req_count, table_count);
 
         vector<msi_irq_mem_t> msi_writes(tbl_cnt);
 
@@ -579,20 +651,14 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         irq_range->count = tbl_cnt;
 
         int i;
-        for (i = 0; i != tbl_cnt; ++i) {
-            msi_irq_mem_t const& write = msi_writes[i];
-            table[i].addr = write.addr;
-            table[i].data = write.data;
+        int n = 0;
+        for (i = 0; i != table_count; ++i) {
+            msi_irq_mem_t const& write = msi_writes[n++];
+            n *= (n < tbl_cnt);
+            tbl[i].addr = write.addr;
+            tbl[i].data = write.data;
             // 0 = Not masked
-            table[i].ctrl = 0;
-        }
-
-        while (i < table_size) {
-            table[i].addr = 0;
-            table[i].data = 0;
-            // 1 = masked
-            table[i].ctrl = 1;
-            ++i;
+            PCI_MSIX_VEC_CTL_MASKIRQ_SET(tbl[i].ctrl, 0);
         }
 
         // Unmask function
