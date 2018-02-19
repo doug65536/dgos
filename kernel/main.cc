@@ -991,6 +991,5 @@ extern "C" __noreturn int main(void)
 
     cpu_irq_enable();
 
-    while (1)
-        halt();
+    thread_idle();
 }

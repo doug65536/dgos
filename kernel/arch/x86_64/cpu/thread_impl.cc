@@ -473,9 +473,13 @@ static int smp_idle_thread(void *arg)
     atomic_inc(&thread_smp_running);
     (void)arg;
     thread_check_stack();
+    thread_idle();
+}
+
+void thread_idle()
+{
     while (1)
         halt();
-    return 0;
 }
 
 static isr_context_t *thread_context_switch_handler(
