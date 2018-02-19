@@ -1,5 +1,7 @@
 #pragma once
 #include "types.h"
+#include "vector.h"
+#include "assert.h"
 
 //
 // USB Descriptor types (USB 3.1 spec, Table 9.5)
@@ -95,7 +97,7 @@ struct usb_desc_config {
     uint8_t len;
 
     // USB_DESCTYPE_*
-    uint8_t desc_type;
+    usb_desctype_t desc_type;
 
     uint16_t total_len;
     uint8_t num_iface;
@@ -104,3 +106,53 @@ struct usb_desc_config {
     uint8_t attr;
     uint8_t max_power;
 } __packed;
+
+//
+// Interface descriptor
+
+struct usb_desc_iface {
+    // Length of descriptor
+    uint8_t len;
+
+    // USB_DESCTYPE_*
+    usb_desctype_t desc_type;
+
+    uint8_t iface_num;
+    uint8_t alt_setting;
+    uint8_t num_ep;
+    uint8_t iface_class;
+    uint8_t iface_subclass;
+    uint8_t iface_proto;
+    uint8_t iface_index;
+};
+
+//
+// Endpoint descriptor
+
+struct usb_desc_ep {
+    // Length of descriptor
+    uint8_t len;
+
+    // USB_DESCTYPE_*
+    usb_desctype_t desc_type;
+
+    uint8_t ep_addr;
+    uint8_t ep_attr;
+    uint16_t max_packet_sz;
+    uint8_t interval;
+};
+
+class usb_config_helper {
+public:
+    usb_config_helper(void *data, size_t len);
+
+    usb_desc_config *find_config(int cfg_index);
+    static usb_desc_iface *find_iface(usb_desc_config *cfg, int iface_index);
+    static usb_desc_ep *find_ep(usb_desc_iface *iface, int ep_index);
+
+    static char const *class_code_text(uint8_t cls);
+
+private:
+    void *data;
+    int len;
+};

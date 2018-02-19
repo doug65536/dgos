@@ -94,8 +94,10 @@ void *htbl_lookup(hashtbl_t *self, void *key)
             if (self->items[hash] > (void*)1) {
                 void *check = (char*)self->items[hash] +
                         self->key_ofs;
-                if (!memcmp(check, key, self->key_size))
-                    item = check;
+                if (!memcmp(check, key, self->key_size)) {
+                    item = self->items[hash];
+                    break;
+                }
             } else if (!self->items[hash]) {
                 break;
             }

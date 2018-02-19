@@ -8,6 +8,11 @@
 #include "hash_table.h"
 #include "mutex.h"
 #include "usb.h"
+#include "vector.h"
+#include "dev_usb_ctl.h"
+#include "iocp.h"
+
+#include "usb_xhcibits.h"
 
 #define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
@@ -52,129 +57,6 @@ struct usbxhci_capreg_t {
 
 C_ASSERT(sizeof(usbxhci_capreg_t) == 0x20);
 
-//
-// 5.3.3 Structural Parameters 1 (HCSPARAMS1)
-
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_BIT   0
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_BITS  8
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_BIT       8
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_BITS      11
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BIT      24
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BITS     8
-
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_MASK \
-    ((1U<<USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_BITS)-1)
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_n(n) \
-    ((n)<<USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_BIT)
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS \
-    (USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_MASK<< \
-    USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_BIT)
-
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_MASK \
-    ((1U<<USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_BITS)-1)
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_n(n) \
-    ((n)<<USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_BIT)
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXINTR \
-    (USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_MASK<< \
-    USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_BIT)
-
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_MASK \
-    ((1U<<USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BITS)-1)
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_n(n) \
-    ((n)<<USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BIT)
-#define USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS \
-    (USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_MASK<< \
-    USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BIT)
-
-// 5.3.6 HCCPARAMS1
-
-#define USBXHCI_CAPREG_HCCPARAMS1_AC64_BIT      0
-#define USBXHCI_CAPREG_HCCPARAMS1_BNC_BIT       1
-#define USBXHCI_CAPREG_HCCPARAMS1_CSZ_BIT       2
-#define USBXHCI_CAPREG_HCCPARAMS1_PPC_BIT       3
-#define USBXHCI_CAPREG_HCCPARAMS1_PIND_BIT      4
-#define USBXHCI_CAPREG_HCCPARAMS1_LHRC_BIT      5
-#define USBXHCI_CAPREG_HCCPARAMS1_LTC_BIT       6
-#define USBXHCI_CAPREG_HCCPARAMS1_NSS_BIT       7
-#define USBXHCI_CAPREG_HCCPARAMS1_PAE_BIT       8
-#define USBXHCI_CAPREG_HCCPARAMS1_SPC_BIT       9
-#define USBXHCI_CAPREG_HCCPARAMS1_SEC_BIT       10
-#define USBXHCI_CAPREG_HCCPARAMS1_CFC_BIT       11
-#define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BIT  12
-#define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BITS 4
-#define USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT      16
-#define USBXHCI_CAPREG_HCCPARAMS1_XECP_BITS     16
-
-// 64 bit addressing capability
-#define USBXHCI_CAPREG_HCCPARAMS1_AC64 \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_AC64_BIT)
-
-// Bandwidth Negotiation Capability
-#define USBXHCI_CAPREG_HCCPARAMS1_BNC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_BNC_BIT)
-
-// Context Size
-#define USBXHCI_CAPREG_HCCPARAMS1_CSZ \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_CSZ_BIT)
-
-// Port Power Control
-#define USBXHCI_CAPREG_HCCPARAMS1_PPC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_PPC_BIT)
-
-// Port Indicators
-#define USBXHCI_CAPREG_HCCPARAMS1_PIND \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_PIND_BIT)
-
-// Light HC Reset Capability
-#define USBXHCI_CAPREG_HCCPARAMS1_LHRC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_LHRC_BIT)
-
-// Latency Tolerance Messaging Capability
-#define USBXHCI_CAPREG_HCCPARAMS1_LTC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_LTC_BIT)
-
-// No Secondary SID Support
-#define USBXHCI_CAPREG_HCCPARAMS1_NSS \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_NSS_BIT)
-
-// Parse All Event Data
-#define USBXHCI_CAPREG_HCCPARAMS1_PAE \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_PAE_BIT)
-
-// Stopped Short Packet Capability
-#define USBXHCI_CAPREG_HCCPARAMS1_SPC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_SPC_BIT)
-
-// Stopped EDTLA Capability
-#define USBXHCI_CAPREG_HCCPARAMS1_SEC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_SEC_BIT)
-
-// Contiguous Frame ID Capability
-#define USBXHCI_CAPREG_HCCPARAMS1_CFC \
-    (1U<<USBXHCI_CAPREG_HCCPARAMS1_CFC_BIT)
-
-// Maximum Primary Stream Array Size
-#define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_MASK \
-    ((1U<<USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BITS)-1)
-
-#define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ \
-    (USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_MASK<< \
-    USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BIT)
-
-#define USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_n(n) \
-    ((n)<<USBXHCI_CAPREG_HCCPARAMS1_MAXPSASZ_BIT)
-
-// xHCI Extended Capabilities Pointer
-#define USBXHCI_CAPREG_HCCPARAMS1_XECP_MASK \
-    ((1U<<USBXHCI_CAPREG_HCCPARAMS1_XECP_BITS)-1)
-
-#define USBXHCI_CAPREG_HCCPARAMS1_XECP \
-    (USBXHCI_CAPREG_HCCPARAMS1_XECP_MASK<< \
-    USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT)
-
-#define USBXHCI_CAPREG_HCCPARAMS1_XECP_n(n) \
-    ((n)<<USBXHCI_CAPREG_HCCPARAMS1_XECP_BIT)
-
 // 5.5.2 Interrupt Register Set
 
 struct usbxhci_intr_t {
@@ -196,15 +78,6 @@ struct usbxhci_intr_t {
     // 5.5.2.3.3 Event Ring Dequeue Pointer Register
     uint64_t erdp;
 } __packed;
-
-#define USBXHCI_INTR_IMAN_IP_BIT    0
-#define USBXHCI_INTR_IMAN_IE_BIT    1
-
-// Interrupt Pending
-#define USBXHCI_INTR_IMAN_IP        (1U<<USBXHCI_INTR_IMAN_IP_BIT)
-
-// Interrupt Enable
-#define USBXHCI_INTR_IMAN_IE        (1U<<USBXHCI_INTR_IMAN_IE_BIT)
 
 C_ASSERT(sizeof(usbxhci_intr_t) == 0x20);
 
@@ -277,405 +150,6 @@ struct usbxhci_opreg_t {
 } __packed;
 
 C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
-
-//
-// 5.4.1 USB Command Register (USBCMD)
-
-#define USBXHCI_USBCMD_RUNSTOP_BIT  0
-#define USBXHCI_USBCMD_HCRST_BIT    1
-#define USBXHCI_USBCMD_INTE_BIT     2
-#define USBXHCI_USBCMD_HSEE_BIT     3
-#define USBXHCI_USBCMD_LHCRST_BIT   7
-#define USBXHCI_USBCMD_CSS_BIT      8
-#define USBXHCI_USBCMD_CRS_BIT      9
-#define USBXHCI_USBCMD_EWE_BIT      10
-#define USBXHCI_USBCMD_EU3S_BIT     11
-#define USBXHCI_USBCMD_SPE_BIT      12
-#define USBXHCI_USBCMD_CME_BIT      13
-
-// RW Run/Stop: 1=run, 0=stop
-#define USBXHCI_USBCMD_RUNSTOP      (1U<<USBXHCI_USBCMD_RUNSTOP_BIT)
-
-// RW Reset: 1=reset, xHC resets it to 0 when reset is complete
-#define USBXHCI_USBCMD_HCRST        (1U<<USBXHCI_USBCMD_HCRST_BIT)
-
-// RW Interrupter Enable: 1=enabled
-#define USBXHCI_USBCMD_INTE         (1U<<USBXHCI_USBCMD_INTE_BIT)
-
-// RW Host System Error Enable: 1=enable
-#define USBXHCI_USBCMD_HSEE         (1U<<USBXHCI_USBCMD_HSEE_BIT)
-
-// RO or RW Light Host Controller Reset: 1=Reset,
-// xHC resets it to 0 when reset is complete
-#define USBXHCI_USBCMD_LHCRST       (1U<<USBXHCI_USBCMD_LHCRST_BIT)
-
-// RW Controller Save State: 0=Normal, 1=Save
-#define USBXHCI_USBCMD_CSS          (1U<<USBXHCI_USBCMD_CSS_BIT)
-
-// RW Controller Restore State: 0=Normal, 1=Restore
-#define USBXHCI_USBCMD_CRS          (1U<<USBXHCI_USBCMD_CRS_BIT)
-
-// RW Event Wrap Enable: 0=Normal, 1=Generate MFINDEX wrap event
-#define USBXHCI_USBCMD_EWE          (1U<<USBXHCI_USBCMD_EWE_BIT)
-
-// RW Enable U3 MFINDEX Stop: 0=normal, 1=Stop counting if all ports off
-#define USBXHCI_USBCMD_EU3S         (1U<<USBXHCI_USBCMD_EU3S_BIT)
-
-// Stopped - Short Packet Enable: 0=normal, 1=Generate completion code
-#define USBXHCI_USBCMD_SPE          (1U<<USBXHCI_USBCMD_SPE_BIT)
-
-// RW CEM Enable: 0=normal, 1=Enable Max Exit Latency Too Large Capability Error
-#define USBXHCI_USBCMD_CME          (1U<<USBXHCI_USBCMD_CME_BIT)
-
-//
-// 5.4.2 USB Status Register (USBSTS)
-
-#define USBXHCI_USBSTS_HCH_BIT      0
-#define USBXHCI_USBSTS_HSE_BIT      2
-#define USBXHCI_USBSTS_EINT_BIT     3
-#define USBXHCI_USBSTS_PCD_BIT      4
-#define USBXHCI_USBSTS_SSS_BIT      8
-#define USBXHCI_USBSTS_RSS_BIT      9
-#define USBXHCI_USBSTS_SRE_BIT      10
-#define USBXHCI_USBSTS_CNR_BIT      11
-#define USBXHCI_USBSTS_HCE_BIT      12
-
-// RO HC Halted: 0=running, 1=halted
-#define USBXHCI_USBSTS_HCH          (1U<<USBXHCI_USBSTS_HCH_BIT)
-
-// RW1C Host System Error: 0=ok, 1=serious error
-#define USBXHCI_USBSTS_HSE          (1U<<USBXHCI_USBSTS_HSE_BIT)
-
-// RW1C Event Interrupt: 1=interrupt pending
-#define USBXHCI_USBSTS_EINT         (1U<<USBXHCI_USBSTS_EINT_BIT)
-
-// RW1C Port Change Detect: 1=changed
-#define USBXHCI_USBSTS_PCD          (1U<<USBXHCI_USBSTS_PCD_BIT)
-
-// RO Save State Status: 1=still saving
-#define USBXHCI_USBSTS_SSS          (1U<<USBXHCI_USBSTS_SSS_BIT)
-
-// RO Restore State Status: 1=still restoring
-#define USBXHCI_USBSTS_RSS          (1U<<USBXHCI_USBSTS_RSS_BIT)
-
-// RW1C Save/Restore Error: 1=error
-#define USBXHCI_USBSTS_SRE          (1U<<USBXHCI_USBSTS_SRE_BIT)
-
-// RO Controller Not Ready: 1=not ready
-#define USBXHCI_USBSTS_CNR          (1U<<USBXHCI_USBSTS_CNR_BIT)
-
-// RO Host Controller Error: 1=xHC error
-#define USBXHCI_USBSTS_HCE          (1U<<USBXHCI_USBSTS_HCE_BIT)
-
-//
-// 5.4.3 Page Size Register (PAGESIZE)
-
-// One bit may be set. The value of the register times 4096 is the page size
-#define USBXHCI_PAGESIZE_BIT        0
-#define USBXHCI_PAGESIZE_BITS       16
-#define USBXHCI_PAGESIZE_MASK       ((1U<<USBXHCI_PAGESIZE_BITS)-1)
-#define USBXHCI_PAGESIZE \
-    (USBXHCI_PAGESIZE_MASK<<USBXHCI_PAGESIZE_BIT)
-#define USBXHCI_PAGESIZE_n(n)       ((n)<<USBXHCI_PAGESIZE_BIT)
-
-//
-// 5.4.4 Device Notification Control Register (DNCTRL)
-
-// RW Notification enable (only bit 1 should be set, normally)
-#define USBXHCI_DNCTRL_N_BITS       16
-#define USBXHCI_DNCTRL_N_MASK       ((1U<<USBXHCI_DNCTRL_N_BITS)-1)
-#define USBXHCI_DNCTRL_N \
-    (USBXHCI_DNCTRL_N_MASK<<USBXHCI_DNCTRL_N_BITS)
-#define USBXHCI_DNCTRL_N_n(n)       (1U<<(n))
-
-//
-// 5.4.5 Command Ring Control Register (CRCR)
-
-#define USBXHCI_CRCR_RCS_BIT        0
-#define USBXHCI_CRCR_CS_BIT         1
-#define USBXHCI_CRCR_CA_BIT         2
-#define USBXHCI_CRCR_CRR_BIT        3
-
-// RW Command ring pointer, 512-bit aligned start address of command ring
-#define USBXHCI_CRCR_CRPTR_BIT      6
-#define USBXHCI_CRCR_CRPTR_BITS     58
-#define USBXHCI_CRCR_CRPTR_MASK     ((1UL<<USBXHCI_CRCR_CRPTR_BITS)-1)
-#define USBXHCI_CRCR_CRPTR \
-    (USBXHCI_CRCR_CRPTR_MASK<<USBXHCI_CRCR_CRPTR_BIT)
-#define USBXHCI_CRCR_CRPTR_n(ptr)   ((uintptr_t)(ptr) & USBXHCI_CRCR_CRPTR)
-
-// RW Ring Cycle State: ?
-#define USBXHCI_CRCR_RCS            (1U<<USBXHCI_CRCR_RCS_BIT)
-
-// RW1S Command Stop: 0=normal, 1=stop command ring
-#define USBXHCI_CRCR_CS             (1U<<USBXHCI_CRCR_CS_BIT)
-
-// RW1S Command Abort: 0=normal, 1=abort
-#define USBXHCI_CRCR_CA             (1U<<USBXHCI_CRCR_CA_BIT)
-
-// RO Command Ring Running, 0=normal, 1=running
-#define USBXHCI_CRCR_CRR            (1U<<USBXHCI_CRCR_CRR_BIT)
-#define USBXHCI_CRCR_CRPTR_BITS     58
-
-//
-// 5.4.6 Device Context Base Address Array Pointer Register (DCBAAP)
-
-// RW 512 bit aligned address of device context base address array
-#define USBXHCI_DCBAAP_BIT          6
-#define USBXHCI_DCBAAP_BITS         58
-#define USBXHCI_DCBAAP_MASK         ((1UL<<USBXHCI_DCBAAP_BITS)-1)
-#define USBXHCI_DCBAAP              (USBXHCI_DCBAAP_MASK<<USBXHCI_DCBAAP_BIT)
-#define USBXHCI_DCBAAP_n(ptr)       ((uintptr_t)(ptr) & USBXHCI_DCBAAP)
-
-//
-// 5.4.7 Configure Register (CONFIG)
-
-#define USBXHCI_CONFIG_MAXSLOTSEN_BIT   0
-#define USBXHCI_CONFIG_MAXSLOTSEN_BITS  8
-#define USBXHCI_CONFIG_U3E_BIT          8
-#define USBXHCI_CONFIG_CIE_BIT          9
-
-// RW Maximum device slots enabled, 0=all disabled, n=n slots enabled
-#define USBXHCI_CONFIG_MAXSLOTSEN_BITS  8
-#define USBXHCI_CONFIG_MAXSLOTSEN_MASK \
-    ((1U<<USBXHCI_CONFIG_MAXSLOTSEN_BITS)-1)
-#define USBXHCI_CONFIG_MAXSLOTSEN \
-    (USBXHCI_CONFIG_MAXSLOTSEN_MASK<<USBXHCI_CONFIG_MAXSLOTSEN_BIT)
-#define USBXHCI_CONFIG_MAXSLOTSEN_n(n) \
-    ((n)<<USBXHCI_CONFIG_MAXSLOTSEN_BIT)
-
-// RW U3 Entry Enable: 0=normal, 1=assert PLC flag on transition to the U3 state
-#define USBXHCI_CONFIG_U3E              (1U<<USBXHCI_CONFIG_U3E_BIT)
-
-// RW Configuration Information Enable: 1=enable
-#define USBXHCI_CONFIG_CIE              (1U<<USBXHCI_CONFIG_CIE_BIT)
-
-//
-// 5.4.8 Port Status and Control Register (PORTSC)
-
-#define USBXHCI_PORTSC_CCS_BIT      0
-#define USBXHCI_PORTSC_PED_BIT      1
-#define USBXHCI_PORTSC_OCA_BIT      3
-#define USBXHCI_PORTSC_PR_BIT       4
-#define USBXHCI_PORTSC_PLS_BIT      5
-#define USBXHCI_PORTSC_PLS_BITS     4
-#define USBXHCI_PORTSC_PP_BIT       9
-#define USBXHCI_PORTSC_SPD_BIT      10
-#define USBXHCI_PORTSC_SPD_BITS     4
-#define USBXHCI_PORTSC_PIC_BIT      14
-#define USBXHCI_PORTSC_LWS_BIT      16
-#define USBXHCI_PORTSC_CSC_BIT      17
-#define USBXHCI_PORTSC_PEC_BIT      18
-#define USBXHCI_PORTSC_WRC_BIT      19
-#define USBXHCI_PORTSC_OCC_BIT      20
-#define USBXHCI_PORTSC_PRC_BIT      21
-#define USBXHCI_PORTSC_PLC_BIT      22
-#define USBXHCI_PORTSC_CEC_BIT      23
-#define USBXHCI_PORTSC_CAS_BIT      24
-#define USBXHCI_PORTSC_WCE_BIT      25
-#define USBXHCI_PORTSC_WDE_BIT      26
-#define USBXHCI_PORTSC_WOE_BIT      27
-#define USBXHCI_PORTSC_DR_BIT       30
-#define USBXHCI_PORTSC_WPR_BIT      31
-
-#define USBXHCI_PORTSC_PLS_MASK     ((1U<<USBXHCI_PORTSC_PLS_BITS)-1)
-
-// ROS Current Connect Status, 0=no device, 1=device is connected
-#define USBXHCI_PORTSC_CCS          (1U<<USBXHCI_PORTSC_CCS_BIT)
-
-// RW1CS Port Enabled/Disabled: 1=enabled
-#define USBXHCI_PORTSC_PED          (1U<<USBXHCI_PORTSC_PED_BIT)
-
-// RO Overcurrent Active: 1=overcurrent
-#define USBXHCI_PORTSC_OCA          (1U<<USBXHCI_PORTSC_OCA_BIT)
-
-// RW1S Port Reset: 1=reset, xHC clears bit when reset is finished
-#define USBXHCI_PORTSC_PR           (1U<<USBXHCI_PORTSC_PR_BIT)
-
-// RWS Port Link State: 0=U0 state, 2=U2 state, 3=U3 state, 5=detect state,
-// 10=compliance state, 15=resume state (page 311)
-#define USBXHCI_PORTSC_PLS \
-    (USBXHCI_PORTSC_PLS_MASK<<USBXHCI_PORTSC_PLS_BIT)
-#define USBXHCI_PORTSC_PLS_n(n)     ((n)<<USBXHCI_PORTSC_PLS_BIT)
-
-// RWS Port Power: 1=on
-#define USBXHCI_PORTSC_PP           (1U<<USBXHCI_PORTSC_PP_BIT)
-
-// ROS Port Speed: 0=undefined, 1-15=protocol speed ID
-#define USBXHCI_PORTSC_SPD_MASK     ((1U<<USBXHCI_PORTSC_SPD_BITS)-1)
-#define USBXHCI_PORTSC_SPD_n(n)     ((n)<<USBXHCI_PORTSC_SPD_BIT)
-#define USBXHCI_PORTSC_SPD \
-    (USBXHCI_PORTSC_SPD_MASK<<USBXHCI_PORTSC_SPD_BIT)
-
-// RWS Port Indicator Control: 0=off, 1=amber, 2=green, 3=undefined
-#define USBXHCI_PORTSC_PIC          (1U<<USBXHCI_PORTSC_PIC_BIT)
-
-// RW Link State Write Strobe: 1=enable PLS field writes
-#define USBXHCI_PORTSC_LWS          (1U<<USBXHCI_PORTSC_LWS_BIT)
-
-// RW1CS Connect Status Change: 1=changed
-#define USBXHCI_PORTSC_CSC          (1U<<USBXHCI_PORTSC_CSC_BIT)
-
-// RW1CS Port Enable/Disable Change: 1=changed
-#define USBXHCI_PORTSC_PEC          (1U<<USBXHCI_PORTSC_PEC_BIT)
-
-// WRC Warm Reset Change: 1=reset complete
-#define USBXHCI_PORTSC_WRC          (1U<<USBXHCI_PORTSC_WRC_BIT)
-
-// RW1CS Overcurrent Change: 1=changed
-#define USBXHCI_PORTSC_OCC          (1U<<USBXHCI_PORTSC_OCC_BIT)
-
-// RW1CS Port Reset Change: 1=reset complete
-#define USBXHCI_PORTSC_PRC          (1U<<USBXHCI_PORTSC_PRC_BIT)
-
-// RW1CS Port Link State Change: 1=changed
-#define USBXHCI_PORTSC_PLC          (1U<<USBXHCI_PORTSC_PLC_BIT)
-
-// RW1CS/RsvdZ Port Config Error Change: 1=failed
-#define USBXHCI_PORTSC_CEC          (1U<<USBXHCI_PORTSC_CEC_BIT)
-
-// RO Cold Attach Status: 1=terminated
-#define USBXHCI_PORTSC_CAS          (1U<<USBXHCI_PORTSC_CAS_BIT)
-
-// RWS Wake on Connect Enable: 1=enable
-#define USBXHCI_PORTSC_WCE          (1U<<USBXHCI_PORTSC_WCE_BIT)
-
-// RWS Wake on Disconnect Enable: 1=enable
-#define USBXHCI_PORTSC_WDE          (1U<<USBXHCI_PORTSC_WDE_BIT)
-
-// RWS Wake on Overcurrent Enable: 1=enable
-#define USBXHCI_PORTSC_WOE          (1U<<USBXHCI_PORTSC_WOE_BIT)
-
-// RO Device Removable: 1=not removable
-#define USBXHCI_PORTSC_DR           (1U<<USBXHCI_PORTSC_DR_BIT)
-
-// EW1S/RsvdZ Warm Port Reset, 1=initiate warm reset
-#define USBXHCI_PORTSC_WPR          (1U<<USBXHCI_PORTSC_WPR_BIT)
-
-#define USBXHCI_USB3_PORTPMSC_U1TO_BIT  0
-#define USBXHCI_USB3_PORTPMSC_U2TO_BIT  8
-#define USBXHCI_USB3_PORTPMSC_U1TO_BITS 8
-#define USBXHCI_USB3_PORTPMSC_U2TO_BITS 8
-#define USBXHCI_USB3_PORTPMSC_FLA_BIT   16
-
-// RWS U1 Timeout: n=timeout in microseconds
-#define USBXHCI_USB3_PORTPMSC_U1TO_MASK \
-    ((1U<<USBXHCI_USB3_PORTPMSC_U1TO_BITS)-1)
-#define USBXHCI_USB3_PORTPMSC_U1TO_n(n) \
-    ((n)<<USBXHCI_USB3_PORTPMSC_U1TO_BIT)
-#define USBXHCI_USB3_PORTPMSC_U1TO \
-    (USBXHCI_USB3_PORTPMSC_U1TO_MASK<<USBXHCI_USB3_PORTPMSC_U1TO_BIT)
-
-// RWS U1 Timeout: n=timeout in microseconds
-#define USBXHCI_USB3_PORTPMSC_U2TO_MASK \
-    ((1U<<USBXHCI_USB3_PORTPMSC_U2TO_BITS)-1)
-#define USBXHCI_USB3_PORTPMSC_U2TO_n(n) \
-    ((n)<<USBXHCI_USB3_PORTPMSC_U2TO_BIT)
-#define USBXHCI_USB3_PORTPMSC_U2TO \
-    (USBXHCI_USB3_PORTPMSC_U2TO_MASK<<USBXHCI_USB3_PORTPMSC_U2TO_BITS)
-// RW Force Link PM Accept (for testing)
-#define USBXHCI_USB3_PORTPMSC_FLA       (1U<<USBXHCI_USB3_PORTPMSC_FLA_BIT)
-
-#define USBXHCI_USB2_PORTPMSC_L1S_BIT   0
-#define USBXHCI_USB2_PORTPMSC_L1S_BITS  3
-#define USBXHCI_USB2_PORTPMSC_RWE_BIT   3
-#define USBXHCI_USB2_PORTPMSC_BESL_BIT  4
-#define USBXHCI_USB2_PORTPMSC_BESL_BITS 4
-#define USBXHCI_USB2_PORTPMSC_L1DS_BIT  8
-#define USBXHCI_USB2_PORTPMSC_L1DS_BITS 8
-#define USBXHCI_USB2_PORTPMSC_HLE_BIT   16
-#define USBXHCI_USB2_PORTPMSC_PTC_BIT   28
-#define USBXHCI_USB2_PORTPMSC_PTC_BITS  4
-
-// RO L1 Status, 0=ignore, 1=success, 2=not yet, 3=not supported, 4=timeout
-#define USBXHCI_USB2_PORTPMSC_L1S \
-    (1U<<USBXHCI_USB2_PORTPMSC_L1S_BIT)
-#define USBXHCI_USB2_PORTPMSC_MASK \
-    ((1U<<USBXHCI_USB2_PORTPMSC_L1S_BITS)-1)
-#define USBXHCI_USB2_PORTPMSC_n(n) \
-    ((n)<<USBXHCI_USB2_PORTPMSC_L1S_BIT)
-#define USBXHCI_USB2_PORTPMSC \
-    (USBXHCI_USB2_PORTPMSC_MASK<<USBXHCI_USB2_PORTPMSC_L1S_BITS)
-
-// RWE Remote Wake Enable, 1=enable
-#define USBXHCI_USB2_PORTPMSC_RWE       (1U<<USBXHCI_USB2_PORTPMSC_RWE_BIT)
-
-// RW Best Effort Service Latency: 0=default
-#define USBXHCI_USB2_PORTPMSC_BESL_MASK \
-    ((1U<<USBXHCI_USB2_PORTPMSC_BESL_BITS)-1)
-#define USBXHCI_USB2_PORTPMSC_BESL_n(n) \
-    ((n)<<USBXHCI_USB2_PORTPMSC_BESL_BIT)
-#define USBXHCI_USB2_PORTPMSC_BESL \
-    (USBXHCI_USB2_PORTPMSC_BESL_MASK<<USBXHCI_USB2_PORTPMSC_BESL_BIT)
-
-// RW L1 Device slot
-#define USBXHCI_USB2_PORTPMSC_L1DS_MASK \
-    ((1U<<USBXHCI_USB2_PORTPMSC_L1DS_BITS)-1)
-#define USBXHCI_USB2_PORTPMSC_L1DS_n(n) \
-    ((n)<<USBXHCI_USB2_PORTPMSC_L1DS_BIT)
-#define USBXHCI_USB2_PORTPMSC_L1DS \
-    (USBXHCI_USB2_PORTPMSC_L1DS_MASK<<USBXHCI_USB2_PORTPMSC_L1DS_BIT)
-
-// RW Hardware LPM Enable 1=enable
-#define USBXHCI_USB2_PORTPMSC_HLE       (1U<<USBXHCI_USB2_PORTPMSC_HLE_BIT)
-
-// RW Port Test Control: 0=no test
-#define USBXHCI_USB2_PORTPMSC_PTC_MASK \
-    ((1U<<USBXHCI_USB2_PORTPMSC_PTC_BITS)-1)
-#define USBXHCI_USB2_PORTPMSC_PTC_n(n)  ((n)<<USBXHCI_USB2_PORTPMSC_PTC_BIT)
-#define USBXHCI_USB2_PORTPMSC_PTC \
-    (USBXHCI_USB2_PORTPMSC_PTC_MASK<<USBXHCI_USB2_PORTPMSC_PTC_BIT)
-
-#define USBXHCI_PORTLI_LEC_BIT  0
-#define USBXHCI_PORTLI_LEC_BITS 16
-#define USBXHCI_PORTLI_RLC_BIT  16
-#define USBXHCI_PORTLI_RLC_BITS 4
-#define USBXHCI_PORTLI_TLC_BIT  20
-#define USBXHCI_PORTLI_TLC_BITS 4
-
-// RO Link Error Count:
-#define USBXHCI_PORTLI_LEC_MASK ((1U<<USBXHCI_PORTLI_LEC_BITS)-1)
-#define USBXHCI_PORTLI_LEC_n(n) ((n)<<USBXHCI_PORTLI_LEC_BIT)
-#define USBXHCI_PORTLI_LEC \
-    (USBXHCI_PORTLI_LEC_MASK<<USBXHCI_PORTLI_LEC_BIT)
-
-// RO Rx Lane Count
-#define USBXHCI_PORTLI_RLC_MASK ((1U<<USBXHCI_PORTLI_RLC_BITS)-1)
-#define USBXHCI_PORTLI_RLC_n(n) ((n)<<USBXHCI_PORTLI_RLC_BIT)
-#define USBXHCI_PORTLI_RLC \
-    (USBXHCI_PORTLI_RLC_MASK<<USBXHCI_PORTLI_RLC_BIT)
-
-// RO Tx Lane Count
-#define USBXHCI_PORTLI_TLC_MASK ((1U<<USBXHCI_PORTLI_TLC_BITS)-1)
-#define USBXHCI_PORTLI_TLC_n(n) ((n)<<USBXHCI_PORTLI_TLC_BIT)
-#define USBXHCI_PORTLI_TLC \
-    (USBXHCI_PORTLI_TLC_MASK<<USBXHCI_PORTLI_TLC_BIT)
-
-#define USBXHCI_PORTHLPMC_HIRDM_BIT     0
-#define USBXHCI_PORTHLPMC_HIRDM_BITS    2
-#define USBXHCI_PORTHLPMC_L1TO_BIT      2
-#define USBXHCI_PORTHLPMC_L1TO_BITS     8
-#define USBXHCI_PORTHLPMC_BESLD_BIT     10
-#define USBXHCI_PORTHLPMC_BESLD_BITS    4
-
-// RWS Host Initiated Resume Duration Mode
-#define USBXHCI_PORTHLPMC_HIRDM_MASK    ((1U<<USBXHCI_PORTHLPMC_HIRDM_BITS)-1)
-#define USBXHCI_PORTHLPMC_HIRDM_n(n)    ((n)<<USBXHCI_PORTHLPMC_HIRDM_BIT)
-#define USBXHCI_PORTHLPMC_HIRDM \
-    (USBXHCI_PORTHLPMC_HIRDM_MASK<<USBXHCI_PORTHLPMC_HIRDM_BIT)
-
-// RWS L1 Timeout
-#define USBXHCI_PORTHLPMC_L1TO_MASK     ((1U<<USBXHCI_PORTHLPMC_L1TO_BITS)-1)
-#define USBXHCI_PORTHLPMC_L1TO_n(n)     ((n)<<USBXHCI_PORTHLPMC_L1TO_BIT)
-#define USBXHCI_PORTHLPMC_L1TO \
-    (USBXHCI_PORTHLPMC_L1TO_MASK<<USBXHCI_PORTHLPMC_L1TO_BIT)
-
-// RWS Best Effort Service Latency Deep,
-// n=how long to drive resume on exit from U2
-#define USBXHCI_PORTHLPMC_BESLD_MASK    ((1U<<USBXHCI_PORTHLPMC_BESLD_BITS)-1)
-#define USBXHCI_PORTHLPMC_BESLD_n(n)    ((n)<<USBXHCI_PORTHLPMC_BESLD_BIT)
-#define USBXHCI_PORTHLPMC_BESLD \
-    (USBXHCI_PORTHLPMC_BESLD_MASK<<USBXHCI_PORTHLPMC_BESLD_BIT)
 
 // 6.2.2 Slot Context
 
@@ -1022,31 +496,56 @@ C_ASSERT(sizeof(usbxhci_evt_t) == 0x10);
 
 struct usbxhci_evt_cmdcomp_t {
     uint64_t command_trb_ptr;
+
+    // USBXHCI_EVT_CMDCOMP_INFO
     uint32_t info;
+
     uint16_t flags;
     uint8_t id;
     uint8_t slotid;
 } __packed;
 
-// Command completion parameter
-#define USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT    0
-#define USBXHCI_EVT_CMDCOMP_INFO_CCP_BITS   24
-#define USBXHCI_EVT_CMDCOMP_INFO_CCP_MASK \
-    ((1U<<USBXHCI_EVT_CMDCOMP_INFO_CCP_BITS)-1)
-#define USBXHCI_EVT_CMDCOMP_INFO_CCP_n(n) \
-    ((n)<<USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT)
-#define USBXHCI_EVT_CMDCOMP_INFO_CCP \
-    (USBXHCI_EVT_CMDCOMP_INFO_CCP_MASK<<USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT)
-
-// Command completion code
-#define USBXHCI_EVT_CMDCOMP_INFO_CC_BIT     24
-#define USBXHCI_EVT_CMDCOMP_INFO_CC_BITS    8
-#define USBXHCI_EVT_CMDCOMP_INFO_CC_MASK \
-    ((1U<<USBXHCI_EVT_CMDCOMP_INFO_CC_BITS)-1)
-#define USBXHCI_EVT_CMDCOMP_INFO_CC_n(n) \
-    ((n)<<USBXHCI_EVT_CMDCOMP_INFO_CC_BIT)
-#define USBXHCI_EVT_CMDCOMP_INFO_CC \
-    (USBXHCI_EVT_CMDCOMP_INFO_CC_MASK<<USBXHCI_EVT_CMDCOMP_INFO_CC_BIT)
+enum struct usbxhci_cc_t : uint8_t {
+    invalid,
+    success,
+    data_buf_err,   // can't keep up with tx or rx
+    babble,
+    usb_txn_err,
+    trb_err,
+    stall_err,
+    resource_err,
+    bw_err,
+    no_slots_avail,
+    invalid_stream_type,
+    slot_not_enabled,
+    ep_not_enabled,
+    short_pkt,
+    ring_underrun,
+    ring_overrun,
+    vf_evt_ring_full,
+    parameter_err,
+    bw_overrun,
+    ctx_state_err,
+    no_ping_response,
+    evt_ring_full,
+    incompatible_device,
+    missed_service,
+    cmd_ring_stopped,
+    cmd_aborted,
+    stopped,
+    stopped_len_invalid,
+    stopped_short_pkt,
+    max_exit_lat_too_large,
+    reserved,
+    isoch_buf_overrun,
+    event_lost,
+    undefined_err,
+    invalid_stream_id,
+    secondary_bw_err,
+    split_txn_err
+    // 192-223 vendor defined error
+    // 224-255 vendor defined info
+};
 
 C_ASSERT(sizeof(usbxhci_evt_cmdcomp_t) == 0x10);
 
@@ -1163,23 +662,12 @@ struct usbxhci_evt_db_t {
 
 struct usbxhci_ctl_trb_generic_t {
     uint32_t data[3];
-    uint8_t flags;
-    uint8_t trb_type;
+    uint16_t flags;
     uint16_t trt;
 } __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_generic_t) == 0x10);
-
-//
-// 6.4.3.6 Evaluate Context command
-
-struct usbxhci_ctl_trb_evalctx_t {
-    uint64_t input_ctx_ptr;
-    uint32_t rsvd[1];
-    uint8_t flags;
-    uint8_t trb_type;
-    uint16_t trt;
-} __packed;
+C_ASSERT(offsetof(usbxhci_ctl_trb_generic_t, flags) == 0x0c);
 
 // 6.4.1.2.1 Setup stage TRB
 
@@ -1201,33 +689,33 @@ struct usbxhci_ctl_trb_setup_t {
     // xHCI fields
 
     uint32_t xferlen_intr;
-    uint8_t flags;
-    uint8_t trb_type;
+    uint16_t flags;
     uint16_t trt;
 } __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_setup_t) == 0x10);
+C_ASSERT(offsetof(usbxhci_ctl_trb_setup_t, flags) == 0x0c);
 
 struct usbxhci_ctl_trb_data_t {
     uint64_t data_physaddr;
     uint32_t xfer_td_intr;
-    uint8_t flags;
-    uint8_t trb_type;
+    uint16_t flags;
     uint16_t dir;
 } __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_data_t) == 0x10);
+C_ASSERT(offsetof(usbxhci_ctl_trb_data_t, flags) == 0x0c);
 
 struct usbxhci_ctl_trb_status_t {
     uint64_t rsvd;
     uint16_t rsvd2;
     uint16_t intr;
-    uint8_t flags;
-    uint8_t trb_type;
+    uint16_t flags;
     uint16_t dir;
 } __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_status_t) == 0x10);
+C_ASSERT(offsetof(usbxhci_ctl_trb_status_t, flags) == 0x0c);
 
 union usbxhci_ctl_trb_t {
     usbxhci_ctl_trb_generic_t generic;
@@ -1237,6 +725,16 @@ union usbxhci_ctl_trb_t {
 } __packed;
 
 C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
+
+//
+// 6.4.3.6 Evaluate Context command
+
+struct usbxhci_ctl_trb_evalctx_t {
+    uint64_t input_ctx_ptr;
+    uint32_t rsvd[1];
+    uint16_t flags;
+    uint16_t trt;
+} __packed;
 
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_BIT    0
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_BITS   5
@@ -1270,28 +768,6 @@ C_ASSERT(sizeof(usbxhci_ctl_trb_t) == 0x10);
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_ENDPOINT   2
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_OTHER      3
 #define USBXHCI_CTL_TRB_BMREQT_RECIP_VENDOR     31
-
-#define USBXHCI_CTL_TRB_FLAGS_C_BIT     0
-#define USBXHCI_CTL_TRB_FLAGS_IOC_BIT   5
-#define USBXHCI_CTL_TRB_FLAGS_IDT_BIT   6
-
-// Cycle flag
-#define USBXHCI_CTL_TRB_FLAGS_C         (1<<USBXHCI_CTL_TRB_FLAGS_C_BIT)
-
-// Interrupt on completion
-#define USBXHCI_CTL_TRB_FLAGS_IOC       (1<<USBXHCI_CTL_TRB_FLAGS_IOC_BIT)
-
-// Immediate data (the pointer field actually contains
-// up to 8 bytes of data, not a pointer)
-#define USBXHCI_CTL_TRB_FLAGS_IDT       (1<<USBXHCI_CTL_TRB_FLAGS_IDT_BIT)
-
-#define USBXHCI_CTL_TRB_TRB_TYPE_BIT    2
-#define USBXHCI_CTL_TRB_TRB_TYPE_BITS   6
-
-#define USBXHCI_CTL_TRB_TRB_TYPE_MASK   ((1U<<USBXHCI_CTL_TRB_TRB_TYPE_BITS)-1)
-#define USBXHCI_CTL_TRB_TRB_TYPE_n(n)   ((n)<<USBXHCI_CTL_TRB_TRB_TYPE_BIT)
-#define USBXHCI_CTL_TRB_TRB_TYPE \
-    (USBXHCI_CTL_TRB_TRB_TYPE_MASK<<USBXHCI_CTL_TRB_TRB_TYPE_BIT)
 
 #define USBXHCI_CTL_TRB_XFERLEN_INTR_XFERLEN_BIT    0
 #define USBXHCI_CTL_TRB_XFERLEN_INTR_XFERLEN_BITS   17
@@ -1354,8 +830,131 @@ struct usbxhci_endpoint_data_t {
     uint8_t ccs;
 };
 
-struct usbxhci_dev_t {
-    usbxhci_device_vtbl_t *vtbl;
+struct usbxhci_pending_cmd_t;
+
+class usbxhci;
+
+struct usb_blocking_iocp_t : public blocking_iocp_t {
+    usb_blocking_iocp_t()
+        : cmd{}
+        , cmd_comp{}
+    {
+    }
+
+    usbxhci_cc_t cc() const
+    {
+        return usbxhci_cc_t(USBXHCI_EVT_CMDCOMP_INFO_CC_GET(cmd_comp.info));
+    }
+
+    uint32_t ccp() const
+    {
+        return USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(cmd_comp.info);
+    }
+
+    operator bool() const
+    {
+        return cc() == usbxhci_cc_t::success;
+    }
+
+    usbxhci_cmd_trb_noop_t cmd;
+    usbxhci_evt_cmdcomp_t cmd_comp;
+};
+
+struct usbxhci_pending_cmd_t {
+    usbxhci *dev;
+    uint64_t cmd_physaddr;
+    usb_blocking_iocp_t *iocp;
+};
+
+//struct usbxhci_port_init_data_t {
+//    usbxhci_inpctx_t inpctx;
+//    usbxhci_ctl_trb_t *trbs;
+//    void *buf;
+//    uint8_t port;
+//    uint8_t slotid;
+//};
+
+class usbxhci : public usb_bus_t {
+public:
+    static void detect();
+
+protected:
+    //
+    // usb_bus_t interface
+
+    int get_max_ports() override
+    {
+        return maxports;
+    }
+
+    bool port_device_present(int port) override
+    {
+        if (likely(port >= 0 && port < maxports))
+            return mmio_op->ports[port].portsc & USBXHCI_PORTSC_CCS;
+        return false;
+    }
+
+    int enable_slot(int port) override;
+    int set_address(int port, int slotid) override;
+
+    bool setup_trb(uint8_t request_type, uint8_t request, uint16_t value,
+                   uint16_t index, uint16_t length, void *data) override;
+
+private:
+
+    usbxhci_slotctx_t *dev_ctx_ent_slot(size_t i);
+
+    usbxhci_ep_ctx_t *dev_ctx_ent_ep(size_t slot, size_t i);
+
+    void set_cmd_trb_cycle(void *cmd) {
+        char *c = (char*)cmd + 0xc;
+        *c |= (pcs != 0);
+    }
+
+    void ring_doorbell(uint32_t doorbell, uint8_t value,
+                       uint16_t stream_id);
+
+    void issue_cmd(void *cmd, usb_blocking_iocp_t *iocp);
+
+    void add_xfer_trbs(uint8_t slotid, uint8_t epid, size_t count,
+                       usbxhci_ctl_trb_t *trbs,
+                       usb_blocking_iocp_t *iocp);
+
+    void insert_pending_command(uint64_t cmd_physaddr,
+                                usb_blocking_iocp_t *iocp);
+
+    usbxhci_ctl_trb_t *make_setup_trbs(
+            void *response, uint16_t length,
+            uint8_t bmreq_type, uint8_t bmreq_recip,
+            bool to_host, usb_rqcode_t request,
+            uint16_t value, uint16_t index);
+
+    int get_descriptor(void *desc, uint16_t desc_size,
+                       usb_desctype_t desc_type,
+                       uint8_t desc_index, uint8_t slotid);
+
+    int update_max_pkt(int slotid, usb_desc_device *dev_desc);
+
+    usbxhci_ctl_trb_t *get_config(usb_desc_config *desc,
+                                  uint8_t desc_size, uint8_t slotid,
+                                  usb_blocking_iocp_t *iocp);
+
+    void cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
+                  usb_blocking_iocp_t *iocp);
+
+    usbxhci_endpoint_data_t *add_endpoint(uint8_t slotid, uint8_t epid);
+
+    usbxhci_endpoint_data_t *lookup_endpoint(uint8_t slotid, uint8_t epid);
+
+    void evt_handler(usbxhci_interrupter_info_t *ir_info,
+                     usbxhci_intr_t *ir, usbxhci_evt_t *evt, size_t ii);
+
+    static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
+    void irq_handler(int irq);
+
+    void init(pci_dev_iterator_t& pci_iter);
+
+    //
 
     uint64_t mmio_addr;
 
@@ -1383,6 +982,7 @@ struct usbxhci_dev_t {
     // Maximums
     uint32_t maxslots;
     uint32_t maxintr;
+    int maxports;
 
     // Next command slot
     uint32_t cr_next;
@@ -1407,107 +1007,80 @@ struct usbxhci_dev_t {
     padded_ticketlock lock_cmd;
 };
 
-struct usbxhci_pending_cmd_t;
-
-typedef void (*usbxhci_complete_handler_t)(usbxhci_dev_t *self,
-                                           usbxhci_cmd_trb_t *cmd,
-                                           usbxhci_evt_t *evt,
-                                           uintptr_t data);
-
-struct usbxhci_pending_cmd_t {
-    uint64_t cmd_physaddr;
-    usbxhci_complete_handler_t handler;
-    uintptr_t data;
-};
-
-struct usbxhci_port_init_data_t {
-    usbxhci_inpctx_t inpctx;
-    usbxhci_ctl_trb_t *trbs;
-    usb_desc_device dev_desc[1];
-    usb_desc_config cfg_desc[1];
-    uint8_t port;
-    uint8_t slotid;
-    uint8_t current_descriptor;
-    uint8_t descriptor_count;
-};
-
-static usbxhci_dev_t *usbxhci_devices;
-static unsigned usbxhci_device_count;
+static vector<usbxhci*> usbxhci_devices;
 
 static hashtbl_t usbxhci_pending_ht;
 
 // Handle 32 or 64 byte device context size
-static usbxhci_slotctx_t *usbxhci_dev_ctx_ent_slot(
-        usbxhci_dev_t *self, size_t i)
+usbxhci_slotctx_t *usbxhci::dev_ctx_ent_slot(size_t i)
 {
-    if (self->dev_ctx_large)
-        return &self->dev_ctx.large[i].slotctx;
-    return &self->dev_ctx.small[i].slotctx;
+    if (dev_ctx_large)
+        return &dev_ctx.large[i].slotctx;
+    return &dev_ctx.small[i].slotctx;
 }
 
 // Handle 32 or 64 byte device context size
 __used
-static usbxhci_ep_ctx_t *usbxhci_dev_ctx_ent_ep(usbxhci_dev_t *self,
-                                                size_t slot, size_t i)
+usbxhci_ep_ctx_t *usbxhci::dev_ctx_ent_ep(size_t slot, size_t i)
 {
-    if (self->dev_ctx_large)
-        return &self->dev_ctx.large[slot].epctx[i];
-    return &self->dev_ctx.small[slot].epctx[i];
+    if (dev_ctx_large)
+        return &dev_ctx.large[slot].epctx[i];
+    return &dev_ctx.small[slot].epctx[i];
 }
 
-static void usbxhci_ring_doorbell(usbxhci_dev_t *self,
-                                  uint32_t doorbell, uint8_t value,
-                                  uint16_t stream_id)
+void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
+                            uint16_t stream_id)
 {
-    self->mmio_db[doorbell] = value | (stream_id << 16);
+    atomic_barrier();
+    mmio_db[doorbell] = value | (stream_id << 16);
+    atomic_barrier();
 }
 
-static void usbxhci_insert_pending_command(
-        uint64_t cmd_physaddr,
-        usbxhci_complete_handler_t handler,
-        uintptr_t data)
+void usbxhci::insert_pending_command(uint64_t cmd_physaddr,
+                                     usb_blocking_iocp_t *iocp)
 {
     usbxhci_pending_cmd_t *pc = (usbxhci_pending_cmd_t *)
             malloc(sizeof(usbxhci_pending_cmd_t));
+    pc->dev = this;
     pc->cmd_physaddr = cmd_physaddr;
-    pc->handler = handler;
-    pc->data = data;
+    pc->iocp = iocp;
     htbl_insert(&usbxhci_pending_ht, pc);
 }
 
-static void usbxhci_issue_cmd(usbxhci_dev_t *self, void *cmd,
-                       usbxhci_complete_handler_t handler,
-                       uintptr_t data)
+void usbxhci::issue_cmd(void *cmd, usb_blocking_iocp_t *iocp)
 {
-    unique_lock<ticketlock> hold_command_lock(self->lock_cmd);
+    unique_lock<ticketlock> hold_command_lock(lock_cmd);
 
-    usbxhci_cmd_trb_t *s =
-            (usbxhci_cmd_trb_t *)&self->dev_cmd_ring[self->cr_next++];
+    USBXHCI_TRACE("Writing command to command ring at %u\n", cr_next);
 
+    usbxhci_cmd_trb_t *s = (usbxhci_cmd_trb_t *)&dev_cmd_ring[cr_next++];
+
+    if (cr_next == cr_size) {
+        pcs = !pcs;
+        cr_next = 0;
+    }
+
+    set_cmd_trb_cycle(cmd);
+
+    // This memcpy write at least 32 bits at a time!
+    // Cycle byte is at offset 12
     memcpy(s, cmd, sizeof(*s));
 
-    size_t offset = (uint64_t)s - (uint64_t)self->dev_cmd_ring;
+    size_t offset = uintptr_t(s) - uintptr_t(dev_cmd_ring);
 
-    usbxhci_insert_pending_command(self->cmd_ring_physaddr + offset,
-                                   handler, data);
+    insert_pending_command(cmd_ring_physaddr + offset, iocp);
+
+    hold_command_lock.unlock();
+
+    // Ring controller command doorbell
+    ring_doorbell(0, 0, 0);
 }
 
-static void usbxhci_add_xfer_trbs(usbxhci_dev_t *self,
-                                  uint8_t slotid,
-                                  size_t count,
-                                  usbxhci_ctl_trb_t *trbs,
-                                  usbxhci_complete_handler_t handler,
-                                  uintptr_t handler_data)
+void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, size_t count,
+                            usbxhci_ctl_trb_t *trbs,
+                            usb_blocking_iocp_t *iocp)
 {
-    //usbxhci_slotctx_t *slot = usbxhci_dev_ctx_ent_slot(self, slotid);
-    //usbxhci_ep_ctx_t *ep = usbxhci_dev_ctx_ent_ep(self, slotid, 0);
-
-    usbxhci_endpoint_target_t ept;
-    ept.slotid = slotid;
-    ept.epid = 0;
-
-    usbxhci_endpoint_data_t *epd = (usbxhci_endpoint_data_t *)
-            htbl_lookup(&self->endpoint_lookup, &ept);
+    usbxhci_endpoint_data_t *epd = lookup_endpoint(slotid, epid);
 
     for (size_t i = 0; i < count; ++i) {
         USBXHCI_TRACE("Writing TRB to %zx\n",
@@ -1515,17 +1088,16 @@ static void usbxhci_add_xfer_trbs(usbxhci_dev_t *self,
         trbs[i].generic.flags |= (!!epd->ccs) << USBXHCI_CTL_TRB_FLAGS_C_BIT;
         memcpy(&epd->xfer_ring[epd->xfer_next], trbs + i, sizeof(*trbs));
 
-        if (handler && ((i + 1) == count)) {
-            usbxhci_insert_pending_command(
-                        epd->xfer_ring_physaddr + epd->xfer_next *
-                        sizeof(*epd->xfer_ring), handler, handler_data);
+        if (iocp && ((i + 1) == count)) {
+            insert_pending_command(epd->xfer_ring_physaddr + epd->xfer_next *
+                                   sizeof(*epd->xfer_ring), iocp);
         }
 
         ++epd->xfer_next;
     }
 }
 
-static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
+usbxhci_ctl_trb_t *usbxhci::make_setup_trbs(
         void *response, uint16_t length,
         uint8_t bmreq_type, uint8_t bmreq_recip, bool to_host,
         usb_rqcode_t request, uint16_t value, uint16_t index)
@@ -1533,8 +1105,9 @@ static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
     usbxhci_ctl_trb_t *trbs = (usbxhci_ctl_trb_t *)
             calloc(3, sizeof(*trbs));
 
-    trbs[0].setup.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
-                USBXHCI_TRB_TYPE_SETUP);
+    assert(bmreq_type < 4);
+    assert(bmreq_recip < 32);
+
     trbs[0].setup.trt = USBXHCI_CTL_TRB_TRT_IN;
     trbs[0].setup.bm_req_type = USBXHCI_CTL_TRB_BMREQT_RECIP_n(bmreq_recip) |
             USBXHCI_CTL_TRB_BMREQT_TYPE_n(bmreq_type) |
@@ -1545,164 +1118,83 @@ static usbxhci_ctl_trb_t *usbxhci_make_setup_trbs(
     trbs[0].setup.length = length;
     // Always 8
     trbs[0].setup.xferlen_intr = 8;
-    trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_IDT;
+    trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_SETUP) | USBXHCI_CTL_TRB_FLAGS_IDT;
 
-    trbs[1].data.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA);
     trbs[1].data.dir = 1;
     trbs[1].data.xfer_td_intr = length;
     trbs[1].data.data_physaddr = mphysaddr(response);
+    trbs[1].data.flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_DATA);
 
-    trbs[2].status.trb_type = USBXHCI_CTL_TRB_TRB_TYPE_n(
-                USBXHCI_TRB_TYPE_STATUS);
     trbs[2].status.dir = 0;
-    trbs[2].status.flags = USBXHCI_CTL_TRB_FLAGS_IOC;
+    trbs[2].status.flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_STATUS) |
+            USBXHCI_CTL_TRB_FLAGS_IOC;
 
     return trbs;
 }
 
-static usbxhci_ctl_trb_t *usbxhci_get_descriptor(
-        usbxhci_dev_t *self, usb_desc_device *desc, uint8_t desc_size,
-        uint8_t desc_index, uint8_t slotid,
-        usbxhci_complete_handler_t handler, uintptr_t handler_data)
+usbxhci_ctl_trb_t *usbxhci::get_config(
+        usb_desc_config *desc, uint8_t desc_size, uint8_t slotid,
+        usb_blocking_iocp_t *iocp)
 {
-    usbxhci_ctl_trb_t *trbs = usbxhci_make_setup_trbs(
-                desc, desc_size,
-                USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
-                USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
-                true, usb_rqcode_t::GET_DESCRIPTOR,
-                (uint8_t(usb_desctype_t::DEVICE) << 8) | desc_index, 0);
-
-    usbxhci_add_xfer_trbs(self, slotid, 3, trbs,
-                          handler, handler_data);
-
-    usbxhci_ring_doorbell(self, 1, USBXHCI_DB_VAL_CTL_EP_UPD, 0);
-
-    return trbs;
-}
-
-__used
-static usbxhci_ctl_trb_t *usbxhci_get_config(
-        usbxhci_dev_t *self, usb_desc_config *desc,
-        uint8_t desc_size, uint8_t slotid,
-        usbxhci_complete_handler_t handler, uintptr_t handler_data)
-{
-    usbxhci_ctl_trb_t *trbs = usbxhci_make_setup_trbs(
+    usbxhci_ctl_trb_t *trbs = make_setup_trbs(
                 desc, desc_size,
                 USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
                 USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
                 true, usb_rqcode_t::GET_CONFIGURATION,
                 0, 0);
 
-    usbxhci_add_xfer_trbs(self, slotid, 3, trbs,
-                          handler, handler_data);
+    add_xfer_trbs(slotid, 0, 3, trbs, iocp);
 
-    usbxhci_ring_doorbell(self, USBXHCI_DB_VAL_OUT_EP_UPD_n(slotid),
-                          USBXHCI_DB_VAL_CTL_EP_UPD, 0);
+    ring_doorbell(USBXHCI_DB_VAL_OUT_EP_UPD_n(slotid),
+                  USBXHCI_DB_VAL_CTL_EP_UPD, 0);
 
     return trbs;
 }
 
-static void usbxhci_get_descriptor_handler(
-        usbxhci_dev_t *self, usbxhci_cmd_trb_t *cmd,
-        usbxhci_evt_t *evt, uintptr_t data)
+int usbxhci::get_descriptor(void *desc, uint16_t desc_size,
+                            usb_desctype_t desc_type,
+                            uint8_t desc_index, uint8_t slotid)
 {
-    usbxhci_port_init_data_t *init_data = (usbxhci_port_init_data_t*)data;
-    usbxhci_evt_xfer_t *xferevt = (usbxhci_evt_xfer_t*)evt;
-    xferevt->len_hi = xferevt->len_hi;
+    usbxhci_ctl_trb_t *trbs = make_setup_trbs(
+                desc, desc_size,
+                USBXHCI_CTL_TRB_BMREQT_TYPE_STD,
+                USBXHCI_CTL_TRB_BMREQT_RECIP_DEVICE,
+                true, usb_rqcode_t::GET_DESCRIPTOR,
+                (uint8_t(desc_type) << 8) | desc_index, 0);
 
-    USBXHCI_TRACE("Device descriptor: \n");
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
 
-    // Update max packet size
-    usbxhci_slotctx_t *ctx = usbxhci_dev_ctx_ent_slot(self, init_data->slotid);
-    usbxhci_ep_ctx_t *ep = usbxhci_dev_ctx_ent_ep(self, init_data->slotid, 0);
-    if (init_data->dev_desc[0].usb_spec >= 0x300)
-        ep->max_packet = 1U << init_data->dev_desc[0].log2_maxpktsz;
-    else
-        ep->max_packet = init_data->dev_desc[0].log2_maxpktsz;
+    add_xfer_trbs(slotid, 0, 3, trbs, &block);
+    ring_doorbell(slotid, USBXHCI_DB_VAL_CTL_EP_UPD, 0);
 
-    usbxhci_inpctx_t inp;
-    usbxhci_inpctlctx_t *ctlctx;
-    usbxhci_slotctx_t *inpslotctx;
-    usbxhci_ep_ctx_t *inpepctx;
+    block.wait();
 
-    if (self->dev_ctx_large) {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-        ctlctx = &inp.large->inpctl;
-        inpslotctx = &inp.large->slotctx;
-        inpepctx = inp.large->epctx;
-    } else {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-        ctlctx = &inp.small->inpctl;
-        inpslotctx = &inp.small->slotctx;
-        inpepctx = inp.small->epctx;
-    }
+    free(trbs);
 
-    init_data->inpctx = inp;
+    if (unlikely(!block))
+        return -int(block.cc());
 
-    // 4.3.3 Device slot initialization to initialize the
-    // slot context and endpoint 0 context
-    // Set A0 and A1
-    ctlctx->add_bits = (1 << 0);// | (1 << 1);
-
-    inpslotctx[0] = *ctx;
-    inpepctx[0] = *ep;
-
-    // Issue evaluate context command
-    usbxhci_ctl_trb_evalctx_t *eval = (usbxhci_ctl_trb_evalctx_t *)
-            calloc(1, sizeof(*eval));
-    eval->trb_type = USBXHCI_TRB_TYPE_EVALCTXCMD << 2;
-    eval->trt = USBXHCI_CTL_TRB_TRT_SLOTID_n(init_data->slotid);
-    eval->input_ctx_ptr = mphysaddr(inp.any);
-    eval->flags = self->endpoints[init_data->slotid]->ccs;
-    usbxhci_issue_cmd(self, eval,
-                      usbxhci_get_descriptor_handler, uintptr_t(init_data));
-    usbxhci_ring_doorbell(self, 0, 0, 0);
-
-    free(init_data->trbs);
-    init_data->trbs = usbxhci_get_config(
-                self, init_data->cfg_desc, sizeof(init_data->cfg_desc),
-                init_data->slotid,
-                usbxhci_get_descriptor_handler, (uintptr_t)init_data);
-
-    (void)cmd;
+    return 0;
 }
 
-static void usbxhci_cmd_comp_setaddr(
-        usbxhci_dev_t *self, usbxhci_cmd_trb_t *cmd,
-        usbxhci_evt_t *evt, uintptr_t data)
+void usbxhci::cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
+                       usb_blocking_iocp_t *iocp)
 {
-    usbxhci_port_init_data_t *init_data = (usbxhci_port_init_data_t*)data;
+    memcpy(&iocp->cmd, cmd, sizeof(iocp->cmd));
+    memcpy(&iocp->cmd_comp, evt, sizeof(iocp->cmd_comp));
 
-    usbxhci_evt_cmdcomp_t *cmdcomp = (usbxhci_evt_cmdcomp_t*)evt;
+    C_ASSERT(sizeof(iocp->cmd) == sizeof(*cmd));
+    C_ASSERT(sizeof(iocp->cmd_comp) == sizeof(*evt));
 
-    uint32_t cc = ((cmdcomp->info & USBXHCI_EVT_CMDCOMP_INFO_CC) >>
-                   USBXHCI_EVT_CMDCOMP_INFO_CC_BIT);
-    uint32_t ccp = ((cmdcomp->info & USBXHCI_EVT_CMDCOMP_INFO_CCP) >>
-                    USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT);
-    USBXHCI_TRACE("setaddr completed: completion code=%x, "
-                  "parameter=%x, slotid=%d\n", cc, ccp, cmdcomp->slotid);
-
-    if (self->dev_ctx_large) {
-        munmap(init_data->inpctx.large, sizeof(*init_data->inpctx.large));
-    } else {
-        munmap(init_data->inpctx.small, sizeof(*init_data->inpctx.small));
-    }
-    init_data->inpctx.any = 0;
-
-    memzero(init_data->dev_desc);
-
-    init_data->trbs = usbxhci_get_descriptor(
-                self, init_data->dev_desc, sizeof(init_data->dev_desc),
-                0, init_data->slotid,
-                usbxhci_get_descriptor_handler, (uintptr_t)init_data);
-
-    (void)cmd;
+    iocp->invoke();
 }
 
-static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
-        usbxhci_dev_t * self, uint8_t slotid, uint8_t epid)
+usbxhci_endpoint_data_t *usbxhci::add_endpoint(
+        uint8_t slotid, uint8_t epid)
 {
     usbxhci_endpoint_data_t *newepd = (usbxhci_endpoint_data_t*)
             malloc(sizeof(*newepd));
@@ -1712,20 +1204,18 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
     newepd->target.slotid = slotid;
     newepd->target.epid = epid;
 
-    unique_lock<ticketlock> hold_endpoints_lock(self->endpoints_lock);
+    unique_lock<ticketlock> hold_endpoints_lock(endpoints_lock);
 
     usbxhci_endpoint_data_t **new_endpoints = (usbxhci_endpoint_data_t **)
-            realloc(self->endpoints,
-                    sizeof(*self->endpoints) *
-                    (self->endpoint_count + 1));
+            realloc(endpoints, sizeof(*endpoints) * (endpoint_count + 1));
     if (unlikely(!new_endpoints)) {
         hold_endpoints_lock.unlock();
         free(newepd);
         return nullptr;
     }
 
-    self->endpoints = new_endpoints;
-    self->endpoints[self->endpoint_count++] = newepd;
+    endpoints = new_endpoints;
+    endpoints[endpoint_count++] = newepd;
 
     newepd->xfer_next = 0;
     newepd->xfer_count = PAGESIZE / sizeof(*newepd->xfer_ring);
@@ -1733,7 +1223,7 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
             mmap(0, sizeof(*newepd->xfer_ring) * newepd->xfer_count,
                  PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
     if (unlikely(newepd->xfer_ring == MAP_FAILED || !newepd->xfer_ring)) {
-        free(self->endpoints[--self->endpoint_count]);
+        free(endpoints[--endpoint_count]);
         return 0;
     }
     newepd->ccs = 1;
@@ -1745,38 +1235,284 @@ static usbxhci_endpoint_data_t *usbxhci_add_endpoint(
 
     newepd->xfer_ring_physaddr = xfer_ring_physaddr;
 
-    htbl_insert(&self->endpoint_lookup, newepd);
+    htbl_insert(&endpoint_lookup, newepd);
 
     return newepd;
 }
 
-static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
-                                        usbxhci_cmd_trb_t * cmd,
-                                        usbxhci_evt_t * evt,
-                                        uintptr_t data)
+usbxhci_endpoint_data_t *usbxhci::lookup_endpoint(uint8_t slotid, uint8_t epid)
 {
-    usbxhci_port_init_data_t *init_data = (usbxhci_port_init_data_t*)data;
+    usbxhci_endpoint_target_t key{ slotid, epid };
+    usbxhci_endpoint_data_t *data = (usbxhci_endpoint_data_t *)
+            htbl_lookup(&endpoint_lookup, &key);
+    return data;
+}
 
-    usbxhci_cmd_trb_noop_t *escmd = (usbxhci_cmd_trb_noop_t*)cmd;
-    (void)escmd;
+void usbxhci::init(pci_dev_iterator_t& pci_iter)
+{
+    mmio_addr = (pci_iter.config.base_addr[0] & -16) |
+            (uint64_t(pci_iter.config.base_addr[1]) << 32);
 
-    usbxhci_evt_cmdcomp_t *cmdcomp = (usbxhci_evt_cmdcomp_t*)evt;
+    mmio_cap = (usbxhci_capreg_t*)
+            mmap((void*)uintptr_t(mmio_addr),
+                 64<<10, PROT_READ | PROT_WRITE,
+                 MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
-    init_data->slotid = cmdcomp->slotid;
+    mmio_op = (usbxhci_opreg_t*)((char*)mmio_cap + mmio_cap->caplength);
 
-    uint32_t cc = ((cmdcomp->info & USBXHCI_EVT_CMDCOMP_INFO_CC) >>
-                   USBXHCI_EVT_CMDCOMP_INFO_CC_BIT);
+    mmio_rt = (usbxhci_rtreg_t*)((char*)mmio_cap + (mmio_cap->rtsoff & -32));
 
-    uint32_t ccp = ((cmdcomp->info & USBXHCI_EVT_CMDCOMP_INFO_CCP) >>
-                    USBXHCI_EVT_CMDCOMP_INFO_CCP_BIT);
+    mmio_db = (usbxhci_dbreg_t*)((char*)mmio_cap + (mmio_cap->dboff & -4));
+
+    // Pending commands hash table
+    htbl_create(&usbxhci_pending_ht,
+                offsetof(usbxhci_pending_cmd_t, cmd_physaddr),
+                sizeof(uint64_t));
+
+    // Endpoint lookup hash table
+    htbl_create(&endpoint_lookup,
+                offsetof(usbxhci_endpoint_data_t, target),
+                sizeof(usbxhci_endpoint_target_t));
+
+    // 4.2 Host Controller Initialization
+
+    USBXHCI_TRACE("Stopping controller\n");
+
+    // Stop the controller
+    mmio_op->usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
+
+    // Wait for controller to stop
+    while (!(mmio_op->usbsts & USBXHCI_USBSTS_HCH))
+        pause();
+
+    USBXHCI_TRACE("Resetting controller\n");
+
+    // Reset the controller
+    mmio_op->usbcmd |= USBXHCI_USBCMD_HCRST;
+
+    // Wait for reset to complete
+    while (mmio_op->usbcmd & USBXHCI_USBCMD_HCRST)
+        pause();
+
+    uint32_t hcsparams1 = mmio_cap->hcsparams1;
+    maxslots = USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_GET(hcsparams1);
+    maxintr = USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_GET(hcsparams1);
+    maxports = USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_GET(hcsparams1);
+
+    dev_ctx_large = USBXHCI_CAPREG_HCCPARAMS1_CSZ_GET(mmio_cap->hccparams1);
+
+    USBXHCI_CONFIG_MAXSLOTSEN_SET(mmio_op->config, maxslots);
+
+    USBXHCI_TRACE("devslots=%d, maxintr=%d, maxports=%d\n",
+                  maxslots, maxintr, maxports);
+
+    use_msi = pci_try_msi_irq(pci_iter, &irq_range,
+                              0, false, min(16U, maxintr),
+                              &usbxhci::irq_handler);
+
+    USBXHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
+               use_msi, irq_range.base, irq_range.count);
+
+    size_t dev_ctx_size = dev_ctx_large
+            ? sizeof(usbxhci_devctx_large_t)
+            : sizeof(usbxhci_devctx_small_t);
+
+    // Program device context address array pointer
+    dev_ctx_ptrs = (uint64_t*)
+            mmap(0, sizeof(*dev_ctx_ptrs) * maxslots,
+                 PROT_READ | PROT_WRITE,
+                 MAP_POPULATE, -1, 0);
+
+    dev_ctx.any = mmap(0, dev_ctx_size * maxslots,
+                        PROT_READ | PROT_WRITE,
+                        MAP_POPULATE, -1, 0);
+
+    // Device Context Base Address Array
+    for (size_t i = 0; i < maxslots; ++i) {
+        dev_ctx_ptrs[i] = mphysaddr(dev_ctx_ent_slot(i));
+    }
+
+    // Device Context Base Address Array Pointer
+    mmio_op->dcbaap = mphysaddr(dev_ctx_ptrs);
+
+    // Command Ring
+    dev_cmd_ring = (usbxhci_cmd_trb_t*)
+            mmap(0, sizeof(usbxhci_cmd_trb_t) * maxslots,
+                 PROT_READ | PROT_WRITE,
+                 MAP_POPULATE, -1, 0);
+
+    cmd_ring_physaddr = mphysaddr(dev_cmd_ring);
+
+    // Command Ring Control Register
+    mmio_op->crcr = cmd_ring_physaddr;
+
+    // Event segments
+    dev_evt_segs = (usbxhci_evtring_seg_t*)
+            mmap(0, sizeof(*dev_evt_segs) *
+                 maxintr * 4,
+                 PROT_READ | PROT_WRITE,
+                 MAP_POPULATE, -1, 0);
+
+    interrupters = (usbxhci_interrupter_info_t*)
+            malloc(sizeof(*interrupters) * maxintr);
+
+    for (size_t i = 0; i < maxintr; ++i) {
+        // Initialize Consumer Cycle State
+        interrupters[i].ccs = 1;
+
+        // Event ring
+        interrupters[i].evt_ring = (usbxhci_evt_t*)
+                mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
+                     MAP_POPULATE, -1, 0);
+        interrupters[i].count =
+                PAGESIZE / sizeof(*interrupters[i].evt_ring);
+        interrupters[i].next = 0;
+
+        interrupters[i].evt_ring_physaddr =
+                mphysaddr(interrupters[i].evt_ring);
+
+        dev_evt_segs[i*4].base =
+                interrupters[i].evt_ring_physaddr;
+
+        dev_evt_segs[i*4].trb_count =
+                PAGESIZE / sizeof(*interrupters[i].evt_ring);
+
+        // Event ring segment table size
+        USBXHCI_ERSTSZ_SZ_SET(mmio_rt->ir[i].erstsz, 1);
+
+        // Event ring dequeue pointer
+        mmio_rt->ir[i].erdp = dev_evt_segs[i*4].base;
+
+        // Event ring segment table base address
+        mmio_rt->ir[i].erstba = mphysaddr((void*)(dev_evt_segs + i*4));
+
+        // Set interrupt moderation rate (1000 * 250ns = 250us = 4000/sec)
+        USBXHCI_INTR_IMOD_IMODI_SET(mmio_rt->ir[i].imod, 1000);
+
+        // Enable interrupt
+        USBXHCI_INTR_IMAN_IE_SET(mmio_rt->ir[i].iman, 1);
+    }
+
+    for (int i = 0; i < maxports; ++i) {
+        if (mmio_op->ports[i].portsc & USBXHCI_PORTSC_CCS) {
+            USBXHCI_TRACE("Device is connected to port %d\n", i);
+
+            // Reset the port
+            mmio_op->ports[i].portsc |= USBXHCI_PORTSC_PR;
+
+            USBXHCI_TRACE("Waiting for reset on port %d\n", i);
+
+            while (mmio_op->ports[i].portsc & USBXHCI_PORTSC_PR)
+                pause();
+
+            USBXHCI_TRACE("Reset finished on port %d\n", i);
+        }
+    }
+
+    mmio_op->usbcmd |= USBXHCI_USBCMD_INTE;
+
+    mmio_op->usbcmd |= USBXHCI_USBCMD_RUNSTOP;
+
+    port_count = 0;
+
+    // Initialize producer cycle state for command ring
+    pcs = 1;
+    cr_next = 0;
+
+    for (int port = 0; port < maxports; ++port) {
+        if (!USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc))
+            continue;
+
+        int slotid = enable_slot(port);
+
+        int err = set_address(port, slotid);
+        if (err < 0)
+            continue;
+
+        // Get first 8 bytes of device descriptor to get max packet size
+        unique_ptr<usb_desc_device> desc_buf((usb_desc_device*)calloc(1, 512));
+
+        err = get_descriptor(desc_buf, 8, usb_desctype_t::DEVICE, 0, slotid);
+        if (err < 0)
+            continue;
+
+        err = update_max_pkt(slotid, desc_buf);
+        if (err < 0)
+            continue;
+
+        err = get_descriptor(desc_buf, 512, usb_desctype_t::CONFIGURATION,
+                             0, slotid);
+        if (err < 0)
+            continue;
+
+        usb_config_helper cfg_hlp(desc_buf, 512);
+
+        USBXHCI_TRACE("Parsing configuration descriptors\n");
+
+        usb_desc_config *cfg;
+        usb_desc_iface *iface;
+        usb_desc_ep *ep;
+
+        for (int cfg_idx = 0;
+             (cfg = cfg_hlp.find_config(cfg_idx)) != nullptr;
+             ++cfg_idx) {
+            USBXHCI_TRACE("cfg #0x%x max_power=%umA {\n",
+                          cfg_idx, cfg->max_power * 2);
+            for (int iface_idx = 0;
+                 (iface = cfg_hlp.find_iface(cfg, iface_idx)) != nullptr;
+                 ++iface_idx) {
+                USBXHCI_TRACE("  iface #0x%x: class=0x%x (%s)"
+                              " subclass=0x%x, proto=0x%x {\n",
+                              iface->iface_num, iface->iface_class,
+                              cfg_hlp.class_code_text(iface->iface_class),
+                              iface->iface_subclass, iface->iface_proto);
+                for (int ep_idx = 0;
+                     (ep = cfg_hlp.find_ep(iface, ep_idx)) != nullptr;
+                     ++ep_idx) {
+                    USBXHCI_TRACE("    ep #0x%x: addr=0x%x attr=0x%x,"
+                                  " maxpktsz=0x%x\n",
+                                  ep_idx, ep->ep_addr, ep->ep_attr,
+                                  ep->max_packet_sz);
+                }
+                USBXHCI_TRACE("  }\n");
+            }
+            USBXHCI_TRACE("}\n");
+        }
+
+        USBXHCI_TRACE("Done configuration descriptors\n");
+    }
+}
+
+int usbxhci::enable_slot(int port)
+{
+    usbxhci_cmd_trb_noop_t cmd;
+    memset(&cmd, 0, sizeof(cmd));
+    cmd.trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_ENABLESLOTCMD);
+
+    USBXHCI_TRACE("Enabling slot for port %x\n", port);
+
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
+
+    issue_cmd(&cmd, &block);
+
+    block.wait();
 
     USBXHCI_TRACE("enableslot completed: completion code=%x, "
-                  "parameter=%x, slotid=%d\n", cc, ccp, cmdcomp->slotid);
+                  "parameter=%x, slotid=%d\n",
+                  unsigned(block.cc()), block.ccp(), block.cmd_comp.slotid);
 
+    return block.cc() == usbxhci_cc_t::success
+            ? block.cmd_comp.slotid
+            : -int(block.cc());
+}
+
+int usbxhci::set_address(int port, int slotid)
+{
     // Create a new device context
     usbxhci_slotctx_t *ctx;
 
-    ctx = usbxhci_dev_ctx_ent_slot(self, cmdcomp->slotid);
+    ctx = dev_ctx_ent_slot(slotid);
 
     memset(ctx, 0, sizeof(*ctx));
 
@@ -1788,7 +1524,7 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
     usbxhci_slotctx_t *inpslotctx;
     usbxhci_ep_ctx_t *inpepctx;
 
-    if (self->dev_ctx_large) {
+    if (dev_ctx_large) {
         inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
         ctlctx = &inp.large->inpctl;
@@ -1802,16 +1538,12 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
         inpepctx = inp.small->epctx;
     }
 
-    init_data->inpctx = inp;
-
     ctlctx->add_bits = 3;
 
-    usbxhci_portreg_t *pr = (usbxhci_portreg_t*)
-            (self->mmio_op->ports + init_data->port);
+    usbxhci_portreg_t *pr = (usbxhci_portreg_t*)(mmio_op->ports + port);
 
     // Get speed of port
-    uint8_t speed = ((pr->portsc & USBXHCI_PORTSC_SPD) >>
-                     USBXHCI_PORTSC_SPD_BIT);
+    uint8_t speed = USBXHCI_PORTSC_SPD_GET(pr->portsc);
 
     inpslotctx->rsmhc = USBXHCI_SLOTCTX_RSMHC_ROUTE_n(0) |
             USBXHCI_SLOTCTX_RSMHC_SPEED_n(speed) |
@@ -1824,7 +1556,7 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
     inpslotctx->num_ports = 0;
 
     // Root hub port number
-    inpslotctx->root_hub_port_num = init_data->port;
+    inpslotctx->root_hub_port_num = port;
 
     // Device address
     inpslotctx->usbdevaddr = 0;
@@ -1832,201 +1564,110 @@ static void usbxhci_cmd_comp_enableslot(usbxhci_dev_t * self,
     // 6.2.3.1 Input endpoint context 0
     inpepctx->ceh = USBXHCI_EPCTX_CEH_EPTYPE_n(USBXHCI_EPTYPE_CTLBIDIR);
 
-    usbxhci_endpoint_data_t *epdata =
-            usbxhci_add_endpoint(self, cmdcomp->slotid, 0);
+    usbxhci_endpoint_data_t *epdata = add_endpoint(slotid, 0);
 
     inpepctx->tr_dq_ptr = epdata->xfer_ring_physaddr | epdata->ccs;
 
     usbxhci_cmd_trb_setaddr_t setaddr;
     memset(&setaddr, 0, sizeof(setaddr));
     setaddr.input_ctx_physaddr = mphysaddr(inp.any);
-    setaddr.cycle = self->pcs;
     setaddr.trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_ADDRDEVCMD);
 
-    setaddr.slotid = evt->slotid;
-    usbxhci_issue_cmd(self, &setaddr,
-                      usbxhci_cmd_comp_setaddr, (uintptr_t)init_data);
-    usbxhci_ring_doorbell(self, 0, 0, 0);
+    setaddr.slotid = slotid;
+
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
+
+    issue_cmd(&setaddr, &block);
+
+    block.wait();
+
+    USBXHCI_TRACE("setaddr completed: completion code=%x, "
+                  "parameter=%x, slotid=%d\n",
+                  (unsigned)block.cc(), block.ccp(), slotid);
+
+    if (dev_ctx_large) {
+        munmap(inp.large, sizeof(*inp.large));
+        inp.large = nullptr;
+    } else {
+        munmap(inp.small, sizeof(*inp.small));
+        inp.small = nullptr;
+    }
+
+    if (unlikely(!block))
+        return -int(block.cc());
+
+    return 0;
 }
 
-static void usbxhci_init(usbxhci_dev_t *self)
+int usbxhci::update_max_pkt(int slotid, usb_desc_device *dev_desc)
 {
-    // 4.2 Host Controller Initialization
+    USBXHCI_TRACE("Device descriptor: class=%u, sub_class=%u, protocol=%u\n",
+                  dev_desc->dev_class, dev_desc->dev_subclass,
+                  dev_desc->dev_protocol);
 
-    // Stop the controller
-    self->mmio_op->usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
+    // Update max packet size
+    usbxhci_slotctx_t *ctx = dev_ctx_ent_slot(slotid);
+    usbxhci_ep_ctx_t *ep = dev_ctx_ent_ep(slotid, 0);
+    if (dev_desc->usb_spec >= 0x300)
+        ep->max_packet = 1U << dev_desc->log2_maxpktsz;
+    else
+        ep->max_packet = dev_desc->log2_maxpktsz;
 
-    // Wait for controller to stop
-    while (!(self->mmio_op->usbsts & USBXHCI_USBSTS_HCH))
-        pause();
+    usbxhci_inpctx_t inp;
+    usbxhci_inpctlctx_t *ctlctx;
+    usbxhci_slotctx_t *inpslotctx;
+    usbxhci_ep_ctx_t *inpepctx;
 
-    // Reset the controller
-    self->mmio_op->usbcmd |= USBXHCI_USBCMD_HCRST;
-
-    // Wait for reset to complete
-    while (self->mmio_op->usbcmd & USBXHCI_USBCMD_HCRST)
-        pause();
-
-    uint32_t hcsparams1 = self->mmio_cap->hcsparams1;
-    self->maxslots = (hcsparams1 >>
-                      USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_BIT) &
-            USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_MASK;
-    self->maxintr = (hcsparams1 >>
-                     USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_BIT) &
-            USBXHCI_CAPREG_HCSPARAMS1_MAXINTR_MASK;
-    uint32_t maxports = (hcsparams1 >>
-                    USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_BIT) &
-            USBXHCI_CAPREG_HCSPARAMS1_MAXPORTS_MASK;
-
-    self->dev_ctx_large = !!(self->mmio_cap->hccparams1 &
-                             USBXHCI_CAPREG_HCCPARAMS1_CSZ);
-
-    self->mmio_op->config = (self->mmio_op->config &
-            ~USBXHCI_CONFIG_MAXSLOTSEN) |
-            USBXHCI_CONFIG_MAXSLOTSEN_n(self->maxslots);
-
-    USBXHCI_TRACE("devslots=%d, maxintr=%d, maxports=%d\n",
-                  self->maxslots, self->maxintr, maxports);
-
-    size_t dev_ctx_size = self->dev_ctx_large
-            ? sizeof(usbxhci_devctx_large_t)
-            : sizeof(usbxhci_devctx_small_t);
-
-    // Program device context address array pointer
-    self->dev_ctx_ptrs = (uint64_t*)
-            mmap(0, sizeof(*self->dev_ctx_ptrs) * self->maxslots,
-                 PROT_READ | PROT_WRITE,
-                 MAP_POPULATE, -1, 0);
-
-    self->dev_ctx.any = mmap(0, dev_ctx_size * self->maxslots,
-                        PROT_READ | PROT_WRITE,
-                        MAP_POPULATE, -1, 0);
-
-    // Device Context Base Address Array
-    for (size_t i = 0; i < self->maxslots; ++i) {
-        self->dev_ctx_ptrs[i] = mphysaddr(usbxhci_dev_ctx_ent_slot(self, i));
+    if (dev_ctx_large) {
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
+                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        ctlctx = &inp.large->inpctl;
+        inpslotctx = &inp.large->slotctx;
+        inpepctx = inp.large->epctx;
+    } else {
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
+                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        ctlctx = &inp.small->inpctl;
+        inpslotctx = &inp.small->slotctx;
+        inpepctx = inp.small->epctx;
     }
 
-    // Device Context Base Address Array Pointer
-    self->mmio_op->dcbaap = mphysaddr(self->dev_ctx_ptrs);
+    // 4.3.3 Device slot initialization to initialize the
+    // slot context and endpoint 0 context
+    // Set A0 and A1
+    ctlctx->add_bits = (1 << 0);// | (1 << 1);
 
-    // Command Ring
-    self->dev_cmd_ring = (usbxhci_cmd_trb_t*)
-            mmap(0, sizeof(usbxhci_cmd_trb_t) * self->maxslots,
-                 PROT_READ | PROT_WRITE,
-                 MAP_POPULATE, -1, 0);
+    inpslotctx[0] = *ctx;
+    inpepctx[0] = *ep;
 
-    self->cmd_ring_physaddr = mphysaddr(self->dev_cmd_ring);
+    usbxhci_endpoint_data_t *epd = lookup_endpoint(slotid, 0);
 
-    // Command Ring Control Register
-    self->mmio_op->crcr = self->cmd_ring_physaddr;
+    // Issue evaluate context command
+    usbxhci_ctl_trb_evalctx_t *eval = (usbxhci_ctl_trb_evalctx_t *)
+            calloc(1, sizeof(*eval));
+    eval->trt = USBXHCI_CTL_TRB_TRT_SLOTID_n(slotid);
+    eval->input_ctx_ptr = mphysaddr(inp.any);
+    eval->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_EVALCTXCMD) |
+            USBXHCI_CTL_TRB_FLAGS_C_n(epd->ccs);
 
-    // Event segments
-    self->dev_evt_segs = (usbxhci_evtring_seg_t*)
-            mmap(0, sizeof(*self->dev_evt_segs) *
-                 self->maxintr * 4,
-                 PROT_READ | PROT_WRITE,
-                 MAP_POPULATE, -1, 0);
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
 
-    self->interrupters = (usbxhci_interrupter_info_t*)
-            malloc(sizeof(*self->interrupters) * self->maxintr);
+    issue_cmd(eval, &block);
 
-    for (size_t i = 0; i < self->maxintr; ++i) {
-        // Initialize Consumer Cycle State
-        self->interrupters[i].ccs = 1;
+    block.wait();
 
-        // Event ring
-        self->interrupters[i].evt_ring = (usbxhci_evt_t*)
-                mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
-                     MAP_POPULATE, -1, 0);
-        self->interrupters[i].count =
-                PAGESIZE / sizeof(*self->interrupters[i].evt_ring);
-        self->interrupters[i].next = 0;
+    if (unlikely(!block))
+        return -int(block.cc());
 
-        self->interrupters[i].evt_ring_physaddr =
-                mphysaddr(self->interrupters[i].evt_ring);
-
-        self->dev_evt_segs[i*4].base =
-                self->interrupters[i].evt_ring_physaddr;
-
-        self->dev_evt_segs[i*4].trb_count =
-                PAGESIZE / sizeof(*self->interrupters[i].evt_ring);
-
-        // Event ring segment table size
-        self->mmio_rt->ir[i].erstsz = 1;
-
-        // Event ring dequeue pointer
-        self->mmio_rt->ir[i].erdp = self->dev_evt_segs[i*4].base;
-
-        // Event ring segment table base address
-        self->mmio_rt->ir[i].erstba =
-                mphysaddr((void*)(self->dev_evt_segs + i*4));
-
-        // Set interrupt moderation rate (1000 * 250ns = 250us = 4000/sec)
-        self->mmio_rt->ir[i].imod = 1000;
-
-        // Enable interrupt
-        self->mmio_rt->ir[i].iman = USBXHCI_INTR_IMAN_IE;
-    }
-
-    for (size_t i = 0; i < maxports; ++i) {
-        if (self->mmio_op->ports[i].portsc & USBXHCI_PORTSC_CCS) {
-            USBXHCI_TRACE("Device is connected to port %zd\n", i);
-
-            // Reset the port
-            self->mmio_op->ports[i].portsc |= USBXHCI_PORTSC_PR;
-
-            USBXHCI_TRACE("Waiting for reset on port %zd\n", i);
-
-            while (self->mmio_op->ports[i].portsc & USBXHCI_PORTSC_PR)
-                pause();
-
-            USBXHCI_TRACE("Reset finished on port %zd\n", i);
-        }
-    }
-
-    self->mmio_op->usbcmd |= USBXHCI_USBCMD_INTE;
-
-    self->mmio_op->usbcmd |= USBXHCI_USBCMD_RUNSTOP;
-
-    // Initialize producer cycle state for command ring
-    self->pcs = 1;
-    self->cr_next = 0;
-
-    for (size_t i = 0; i < maxports; ++i) {
-        if (self->mmio_op->ports[i].portsc & USBXHCI_PORTSC_CCS) {
-            usbxhci_cmd_trb_noop_t cmd;
-            memset(&cmd, 0, sizeof(cmd));
-            cmd.cycle = self->pcs;
-            cmd.trb_type = USBXHCI_CMD_TRB_TYPE_n(
-                        USBXHCI_TRB_TYPE_ENABLESLOTCMD);
-
-            usbxhci_port_init_data_t *init_data = (usbxhci_port_init_data_t*)
-                    calloc(1, sizeof(*init_data));
-
-            init_data->port = i + 1;
-
-            USBXHCI_TRACE("Enabling slot for port %zx\n", i);
-
-            usbxhci_issue_cmd(self, &cmd,
-                              usbxhci_cmd_comp_enableslot,
-                              (uintptr_t)init_data);
-        }
-    }
-
-    // Ring controller command doorbell
-    usbxhci_ring_doorbell(self, 0, 0, 0);
-
-    self->port_count = 0;
+    return 0;
 }
 
-static void usbxhci_evt_handler(usbxhci_dev_t *self,
-                                usbxhci_interrupter_info_t *ir_info,
-                                usbxhci_intr_t *ir,
-                                usbxhci_evt_t *evt,
-                                size_t ii)
+void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
+                          usbxhci_intr_t *ir, usbxhci_evt_t *evt, size_t ii)
 {
-    (void)self;
     (void)ir_info;
     (void)ir;
     (void)ii;
@@ -2046,6 +1687,7 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
         break;
 
     case USBXHCI_TRB_TYPE_CMDCOMPEVT:
+        USBXHCI_TRACE("CMDCOMPEVT\n");
         cmdcomp = (usbxhci_evt_cmdcomp_t*)evt;
         cmdaddr = cmdcomp->command_trb_ptr;
 
@@ -2085,7 +1727,7 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
         return;
 
     // Lookup pending command
-    unique_lock<ticketlock> lock(self->lock_cmd);
+    unique_lock<ticketlock> lock(lock_cmd);
     usbxhci_pending_cmd_t *pcp = (usbxhci_pending_cmd_t*)
             htbl_lookup(&usbxhci_pending_ht, &cmdaddr);
     assert(pcp);
@@ -2094,138 +1736,133 @@ static void usbxhci_evt_handler(usbxhci_dev_t *self,
     uint64_t cmd_physaddr = pcp->cmd_physaddr;
     free(pcp);
     lock.unlock();
+    pcp = nullptr;
+
+    // Pointer to TRB that completed
+    usbxhci_cmd_trb_t *trb = (usbxhci_cmd_trb_t*)
+            ((char*)dev_cmd_ring + (cmd_physaddr - cmd_ring_physaddr));
 
     // Invoke completion handler
-    pc.handler(self, (usbxhci_cmd_trb_t*)((char*)self->dev_cmd_ring +
-               (cmd_physaddr - self->cmd_ring_physaddr)),
-               (usbxhci_evt_t*)evt, pc.data);
+    if (pc.iocp)
+        pc.dev->cmd_comp(trb, evt, pc.iocp);
 }
 
-static isr_context_t *usbxhci_irq_handler(int irq, isr_context_t *ctx)
+isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
 {
-    (void)irq;
-    USBXHCI_TRACE("IRQ %d!\n", irq);
-
-    for (size_t i = 0; i < usbxhci_device_count; ++i) {
-        usbxhci_dev_t *self = usbxhci_devices + i;
-
-        int irq_ofs = irq - self->irq_range.base;
-
-        // Skip this device if it is not in the irq range
-        if (irq_ofs < 0 || irq_ofs >= self->irq_range.count)
-            continue;
-
-        // Skip if interrupt is not pending
-        if (!(self->mmio_op->usbsts & USBXHCI_USBSTS_EINT))
-            continue;
-
-        // Acknowledge the IRQ
-        self->mmio_op->usbsts = USBXHCI_USBSTS_EINT;
-
-        // The IRQ is the interrupter index % the number of IRQs
-        for (size_t ii = irq_ofs; ii < self->maxintr;
-             ii += self->irq_range.count) {
-            usbxhci_interrupter_info_t *ir_info = self->interrupters + ii;
-            usbxhci_intr_t *ir = (usbxhci_intr_t*)(self->mmio_rt->ir + ii);
-
-            if (ir->iman & USBXHCI_INTR_IMAN_IP) {
-                // Interrupt is pending
-                USBXHCI_TRACE("Interrupt pending on interrupter %zu\n", ii);
-
-                // Acknowledge the interrupt
-                ir->iman |= USBXHCI_INTR_IMAN_IP;
-
-                while (!ir_info->ccs ==
-                       !(ir_info->evt_ring[ir_info->next].flags &
-                         USBXHCI_EVT_FLAGS_C)) {
-                    usbxhci_evt_t *evt = (usbxhci_evt_t*)(ir_info->evt_ring +
-                            ir_info->next++);
-
-                    if (ir_info->next >= ir_info->count) {
-                        ir_info->next = 0;
-                        ir_info->ccs = !ir_info->ccs;
-                    }
-
-                    usbxhci_evt_handler(self, ir_info, ir, evt, ii);
-                }
-
-                // Notify HC that we have consumed some events
-                ir->erdp = ir_info->evt_ring_physaddr +
-                        ir_info->next * sizeof(*ir_info->evt_ring);
-            }
-        }
-    }
+    for (usbxhci* dev : usbxhci_devices)
+        dev->irq_handler(irq);
 
     return ctx;
 }
 
-void usbxhci_detect(void *arg);
-void usbxhci_detect(void *arg)
+void usbxhci::irq_handler(int irq)
 {
-    (void)arg;
+    int irq_ofs = irq - irq_range.base;
 
-    return;
+    // Skip this device if it is not in the irq range
+    if (irq_ofs < 0 && irq_ofs >= irq_range.count)
+        return;
 
+    // Skip if interrupt is not pending
+    if (!USBXHCI_USBSTS_EINT_GET(mmio_op->usbsts))
+        return;
+
+    // Acknowledge the IRQ
+    mmio_op->usbsts = USBXHCI_USBSTS_EINT;
+
+    // The IRQ is the interrupter index % the number of IRQs
+    for (size_t ii = irq_ofs; ii < maxintr; ii += irq_range.count) {
+        usbxhci_interrupter_info_t *ir_info = interrupters + ii;
+        usbxhci_intr_t *ir = (usbxhci_intr_t*)(mmio_rt->ir + ii);
+
+        if (USBXHCI_INTR_IMAN_IP_GET(ir->iman)) {
+            // Interrupt is pending
+            USBXHCI_TRACE("Interrupt pending on interrupter %zu\n", ii);
+
+            // Acknowledge the interrupt
+            ir->iman |= USBXHCI_INTR_IMAN_IP;
+
+            while (!ir_info->ccs ==
+                   !(ir_info->evt_ring[ir_info->next].flags &
+                     USBXHCI_EVT_FLAGS_C)) {
+                usbxhci_evt_t *evt = (usbxhci_evt_t*)(ir_info->evt_ring +
+                        ir_info->next++);
+
+                if (ir_info->next >= ir_info->count) {
+                    ir_info->next = 0;
+                    ir_info->ccs = !ir_info->ccs;
+                }
+
+                evt_handler(ir_info, ir, evt, ii);
+            }
+
+            // Notify HC that we have consumed some events
+            ir->erdp = (ir_info->evt_ring_physaddr +
+                    ir_info->next * sizeof(*ir_info->evt_ring)) |
+                    (1<<3);
+        }
+    }
+}
+
+void usbxhci::detect()
+{
     pci_dev_iterator_t pci_iter;
 
-    if (!pci_enumerate_begin(
-                &pci_iter,
-                PCI_DEV_CLASS_SERIAL,
-                PCI_SUBCLASS_SERIAL_USB))
+    if (!pci_enumerate_begin(&pci_iter, PCI_DEV_CLASS_SERIAL,
+                             PCI_SUBCLASS_SERIAL_USB))
         return;
 
     do {
         if (pci_iter.config.prog_if != PCI_PROGIF_SERIAL_USB_XHCI)
             continue;
 
-        usbxhci_dev_t *dev_list = (usbxhci_dev_t*)realloc(
-                    usbxhci_devices, sizeof(*usbxhci_devices) *
-                    (usbxhci_device_count + 1));
-        if (!dev_list)
-            panic("Out of memory!");
-        usbxhci_devices = dev_list;
+        usbxhci *self = new (calloc(1, sizeof(usbxhci))) usbxhci();
 
-        usbxhci_dev_t *self = dev_list + usbxhci_device_count++;
+        if (!usbxhci_devices.push_back(self)) {
+            USBXHCI_TRACE("Out of memory!");
+            break;
+        }
 
-        memset(self, 0, sizeof(*self));
-
-        self->use_msi = pci_try_msi_irq(pci_iter, &self->irq_range,
-                                        0, false, 1, usbxhci_irq_handler);
-
-        USBXHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
-                   self->use_msi, self->irq_range.base, self->irq_range.count);
-
-        self->mmio_addr = (pci_iter.config.base_addr[0] & -16) |
-                ((uint64_t)pci_iter.config.base_addr[1] << 32);
-
-        self->mmio_cap = (usbxhci_capreg_t*)
-                mmap((void*)(uintptr_t)self->mmio_addr,
-                     64<<10, PROT_READ | PROT_WRITE,
-                     MAP_PHYSICAL, -1, 0);
-
-        self->mmio_op = (usbxhci_opreg_t*)((char*)self->mmio_cap +
-                               self->mmio_cap->caplength);
-
-        self->mmio_rt = (usbxhci_rtreg_t*)((char*)self->mmio_cap +
-                               (self->mmio_cap->rtsoff & -32));
-
-        self->mmio_db = (usbxhci_dbreg_t*)((char*)self->mmio_cap +
-                               (self->mmio_cap->dboff & -4));
-
-        self->mmio_db = self->mmio_db;
-
-        // Pending commands hash table
-        htbl_create(&usbxhci_pending_ht,
-                    offsetof(usbxhci_pending_cmd_t, cmd_physaddr),
-                    sizeof(uint64_t));
-
-        // Endpoint lookup hash table
-        htbl_create(&self->endpoint_lookup,
-                    offsetof(usbxhci_endpoint_data_t, target),
-                    sizeof(usbxhci_endpoint_target_t));
-
-        usbxhci_init(self);
+        self->init(pci_iter);
     } while (pci_enumerate_next(&pci_iter));
+}
+
+bool usbxhci::setup_trb(uint8_t request_type, uint8_t request, uint16_t value,
+                        uint16_t index, uint16_t length, void *data)
+{
+    usbxhci_ctl_trb_t *trbs = (usbxhci_ctl_trb_t *)
+            calloc(3, sizeof(*trbs));
+
+    //bool in = request_type & USBXHCI_CTL_TRB_BMREQT_TOHOST;
+
+    trbs[0].setup.trt = USBXHCI_CTL_TRB_TRT_IN;
+    trbs[0].setup.bm_req_type = request_type;
+    trbs[0].setup.request = usb_rqcode_t(request);
+    trbs[0].setup.value = value;
+    trbs[0].setup.index = index;
+    trbs[0].setup.length = length;
+    // Always 8
+    trbs[0].setup.xferlen_intr = 8;
+    trbs[0].setup.flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_SETUP) |
+            USBXHCI_CTL_TRB_FLAGS_IDT;
+
+    trbs[1].data.dir = 0;
+    trbs[1].data.xfer_td_intr = length;
+    trbs[1].data.data_physaddr = mphysaddr(data);
+    trbs[1].data.flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_DATA);
+
+    trbs[2].status.dir = 1;
+    trbs[2].status.flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(
+                USBXHCI_TRB_TYPE_STATUS) | USBXHCI_CTL_TRB_FLAGS_IOC;
+
+    return trbs;
+}
+
+void usbxhci_detect(void *)
+{
+    usbxhci::detect();
 }
 
 REGISTER_CALLOUT(usbxhci_detect, 0, callout_type_t::usb, "000");

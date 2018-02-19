@@ -1,0 +1,190 @@
+
+-- USBXHCI_CAPREG_HCSPARAMS1 5.3.3 HCSPARAMS1
+7:0 MAXDEVSLOTS
+18:8 MAXINTR
+31:24 MAXPORTS
+
+-- USBXHCI_CAPREG_HCSPARAMS2 5.3.4 HXSPARAMS2
+
+3:0 IST Isochronous scheduling threshold
+7:4 ERSTMAX Event ring segment table max (log2)
+25:21 MAXSCRBUFHI Max scratchpad bufs hi
+26 SPR Scratchpad restore
+31:27 MAXSCRBUFLO Max scratchpad bufs lo
+
+-- USBXHCI_CAPREG_HCSPARAMS3 5.3.5 HCSPARAMS3
+
+7:0 U1EXITLAT U1 device exit latency
+31:16 U2EXITLAT U2 device exit latency
+
+-- USBXHCI_CAPREG_HCCPARAMS1 5.3.6 HCCPARAMS1
+0 AC64 64-bit addressing capability
+1 BNC Bandwidth negotiation capability
+2 CSZ Context size (1=64 byte, 0=32 byte)
+3 PPC Port power control (1=each port's power can be turned off)
+4 PIND Port indicators
+5 LHRC Light HC reset capability
+6 LTC Latency tolerance messaging capability
+7 NSS No secondary SID support
+8 PAE Parse all event data
+9 SPC Stopped short packet capability
+10 SEC Stopped EDTLA capability
+11 CFC Contiguous frame ID capability
+15:12 MAXPSASZ Maximum primary stream array size
+31:16 XECP xHCI extended capabilities pointer
+
+-- USBXHCI_CAPREG_HCCPARAMS2
+
+0 U3C U3 entry capability
+1 CMC Configure endpoint command max exit latency too large capability
+2 FSC Force save context capability
+3 CTC Compliance transition capability
+4 LEC Large ESIT payload capability
+5 CIC Configuration information capability
+
+-- USBXHCI_USBCMD 5.4.1 USBCMD USB command
+0 RUNSTOP Run/stop (1=run, 0=stop)
+1 HCRST Host controller reset
+2 INTE Interrupter enable (1=enable)
+3 HSEE Host system error enable
+7 LHCRST Light host controller reset
+8 CSS Controller save state
+9 CRS Controller restore state
+10 EWE Enable wrap event
+11 EU3S Enable U3 MFINDEX stop
+12 SPE Stopped short packet enable
+13 CME CEM enable
+
+-- USBXHCI_USBSTS 5.4.2 USBSTS USB status
+0 HCH Halted (1=halted)
+2 HSE (RW1C) Host system error (0=ok, 1=serious error)
+3 EINT (RW1C) Event interrupt (1=interrupt pending)
+4 PCD (RW1C) Port change detect (1=changed)
+8 SSS Save state status (1=still saving)
+9 RSS Restore state status (1=still restoring)
+10 SRE (RW1C) Save/restore error (1=error)
+11 CNR Controller not ready (1=not ready)
+12 HCE Host controller error (1=xHC error)
+
+-- USBXHCI_PAGESIZE 5.4.3 PAGESIZE
+15:0 X4K Page size (2**(value+12))
+
+-- USBXHCI_DNCTRL 5.4.4 DNCTRL Device notification control
+15:0 N0_15 Notification enable (bit significant)
+
+-- USBXHCI_CRCR 5.4.5 CRCR Command ring control register
+0 RCS Consumer ring cycle state
+1 CS (RW1S) Command stop (0=normal, 1=stop command ring)
+2 CA (RW1S) Command abort (0=normal, 1=abort command)
+3 CRR Command ring running (1=running)
+63:6 CRPTR Command ring pointer (512-bit aligned start address of command ring)
+
+-- USBXHCI_DCBAAP 5.4.6 DCBAAP Device context base address
+
+63:6 DCPTR Device context base address array pointer (512-bit aligned)
+
+-- USBXHCI_CONFIG 5.4.7 CONFIG
+
+7:0 MAXSLOTSEN (RW) Max device slots enabled
+8 U3E U3 entry enable
+9 CIE Configuration information enable
+
+-- USBXHCI_PORTSC
+0 CCS Current connect status (1=connected)
+1 PED (RW1CS) Port enabled/disabled (1=enabled)
+3 OCA Overcurrent active (0=normal, 1=over current)
+4 PR (RW1S) Port reset
+8:5 PLS Port link state
+9 PP Port power
+13:10 SPD Port speed (section 7.2.1)
+15:14 PIC Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
+16 LWS Port link state write strobe
+17 CSC (RW1CS) Connect status change
+18 PEC (RW1CS) Port enabled/disabled change (1=changed)
+19 WRC (RW1CS) Warn port reset change (1=changed)
+20 OCC (RW1CS) Overcurrent change (1=changed)
+21 PRC (RW1CS) Port reset change (1=changed)
+22 PLC (RW1CS) Port link state change (1=changed)
+23 CEC (RW1CS) Port config error change (1=changed)
+24 CAS Cold attach status
+25 WCE Wake on connect enable (1=wake)
+26 WDE Wake on disconnect enable (1=wake)
+27 WOE Wake on overcurrent enable (1=wake)
+30 DR Device removable
+31 WPR (RW1S) Warm port reset (0=normal, 1=warm reset)
+
+-- USBXHCI_USB3_PORTPMSC 5.4.9.1 PORTPMSC Port PM status and control
+
+7:0 U1TO U1 timeout (0xFF=disabled)
+15:8 U2TO U2 timeout (0xFF=disabled)
+16 FLA Force link PM accept
+
+-- USBXHCI_USB2_PORTPMSC 5.4.9.2 PORTPMSC Port PM status and control
+
+2:0 L1S L1 suspend request status
+3 RWE Remote wake enable (1=enable)
+7:4 BESL Best effort service latency
+15:8 L1DS L1 device slot (1=attached)
+16 HLE Hardware LPM enable (1=enable)
+31:28 PTC Port test control (0=test mode not enabled)
+
+-- USBXHCI_PORTLI 5.4.10.1 Port link info (USB3 only)
+
+15:0 LEC Link error count
+19:16 RLC Rx lane count
+23:20 TLC Tx lane count
+
+-- USBXHCI_PORTHLPMC 5.4.11 Port hardware LPM control (USB2 only)
+
+1:0 HIRDM Host initiated resume duration mode
+9:2 L1TO L1 timeout
+13:10 BESLD Best effort service latency deep
+
+-- USBXHCI_MFINDEX 5.5.1 Microframe index
+
+13:0 INDEX Current microframe index
+
+-- USBXHCI_INTR_IMAN 5.5.2 Interrupter management
+
+0 IP (RW1C) Interrupt pending (1=pending)
+1 IE Interrupt enable (1=enabled)
+
+-- USBXHCI_INTR_IMOD 5.5.2.2 Interrupter moderation
+
+15:0 IMODI Minimum interval (1=250ns, 4000=1ms)
+31:16 IMODC Interrupt moderation countdown
+
+-- USBXHCI_ERSTSZ 5.5.2.3.1 Event ring segment table size
+
+15:0 SZ Number of event ring segment table entries
+
+-- USBXHCI_ERSTBA 5.5.2.3.2 Event ring segment table base address
+
+63:6 BASEADDR Event ring segment table base address
+
+-- USBXHCI_ERDP 5.5.2.3.3 Event ring dequeue pointer
+
+2:0 DESI Dequeue ERST segment index
+3 EHB (RW1C) Event handler busy
+63:4 Event ring dequeue pointer
+
+-- USBXHCI_DB 5.6 Doorbell
+
+7:0 TARGET Target endpoint
+31:16 STREAM Target stream
+
+-- USBXHCI_CTL_TRB_FLAGS
+0 C Cycle bit
+1 ENT Evaluate next TRB
+2 ISP Interrupt on short packet
+3 NS No snoop
+4 CH Chain bit
+5 IOC Interrupt on completion
+6 IDT Immediate data
+9 BEI Block event interrupt
+15:10 TRB_TYPE type
+
+-- USBXHCI_EVT_CMDCOMP_INFO 6.4.2.2
+
+23:0 CCP Command completion parameter
+31:24 CC Completion code

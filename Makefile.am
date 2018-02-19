@@ -553,6 +553,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
 	kernel/arch/x86_64/cpu/thread_impl.h \
+	kernel/device/iocp.cc \
+	kernel/device/iocp.h \
 	kernel/device/ahci.cc \
 	kernel/device/ata.cc \
 	kernel/device/ata.h \
@@ -575,8 +577,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/serial-uart.cc \
 	kernel/device/serial-uart.h \
 	kernel/device/serial-uart.h \
-	kernel/device/usb.h \
 	kernel/device/usb.h	\
+	kernel/device/usb.cc \
 	kernel/device/usb_xhci.cc \
 	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \
@@ -1025,6 +1027,7 @@ generated_headers: \
 	$(top_srcdir)/kernel/device/nvmebits.h \
 	$(top_srcdir)/kernel/device/pcibits.h \
 	$(top_srcdir)/kernel/device/i350bits.h \
+	$(top_srcdir)/kernel/device/usb_xhcibits.h \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h
 
@@ -1046,6 +1049,13 @@ $(top_srcdir)/kernel/device/pcibits.h: \
 
 $(top_srcdir)/kernel/device/i350bits.h: \
 		$(top_srcdir)/kernel/device/i350.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/device/usb_xhcibits.h: \
+		$(top_srcdir)/kernel/device/usb_xhci.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
@@ -1081,9 +1091,14 @@ QEMU_CPU = max,migratable=false,host-cache-info=true
 
 QEMU_RAM = 5G
 
-QEMU_USB = -device nec-usb-xhci \
-	-device usb-kbd \
-	-device usb-mouse
+QEMU_USB = -device nec-usb-xhci,id=xhci \
+	-device usb-kbd,bus=xhci.0 \
+	-device usb-mouse,bus=xhci.0 \
+	-device usb-audio,bus=xhci.0 \
+	-drive if=none,id=stick,file=usb_disk.img,format=raw \
+	-device usb-storage,bus=xhci.0,drive=stick \
+	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
+	-trace 'usb*'
 
 QEMU_NET = \
 	-net nic,model=rtl8139 \
@@ -1113,16 +1128,14 @@ QEMU_COMMON = \
 	$(QEMU_NET) \
 	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
-	$(QEMU_FLAGS)
-
-#	$(QEMU_USB)
+	$(QEMU_FLAGS) \
+	$(QEMU_USB)
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme = \
 	-machine q35 \
-	-device nvme,drive=nvmedrv,serial=42424242 \
-	-boot order=c,menu=on
+	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0
 QEMU_HDCTL_DEV_ahci = -machine q35
 QEMU_HDCTL_DEV_ide = -machine pc
 QEMU_DIF_nvme = ,if=none,id=nvmedrv
