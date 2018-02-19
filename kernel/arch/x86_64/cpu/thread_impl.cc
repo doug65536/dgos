@@ -580,12 +580,21 @@ static thread_info_t *thread_choose_next(
 
     for (size_t checked = 0; ++i, checked <= count; ++checked) {
         // Wrap
-        if (unlikely(i >= count))
-            i = 0;
+        if (unlikely(i >= count)) {
+            // Skip directly to the idle thread for this CPU
+            i = cpu_number;
+        } else if (unlikely(i == cpu_number + 1)) {
+            // Skip directly to non-idle threads after considering idle thread
+            i = cpu_count;
+        }
 
         atomic_barrier();
 
         candidate = threads + i;
+
+        // Quickly ignore running threads
+        if (candidate->state == THREAD_IS_RUNNING)
+            continue;
 
         // If this thread is not allowed to run on this CPU
         // then skip it
