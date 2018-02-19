@@ -17,6 +17,8 @@ int strncmp(char const *lhs, char const *rhs, size_t count);
 int memcmp(void const *lhs, void const *rhs, size_t count);
 char *strstr(char const *str, char const *substr);
 
+void clear64(void *dest, size_t n);
+
 void *memset(void *dest, int c, size_t n);
 void *memcpy(void *dest, void const *src, size_t n);
 void *memmove(void *dest, void const *src, size_t n);

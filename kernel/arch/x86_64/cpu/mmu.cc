@@ -997,7 +997,7 @@ void clear_phys(physaddr_t addr)
 
     cpu_invalidate_page(window);
 
-    memset((char*)window + offset, 0, PAGE_SIZE);
+    clear64((char*)window + offset, PAGE_SIZE);
 }
 
 //
