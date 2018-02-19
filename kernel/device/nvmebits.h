@@ -85,22 +85,23 @@
 #define NVME_CAP_MQES_GET(n)      (((n) & NVME_CAP_MQES) >> NVME_CAP_MQES_BIT)
 
 #define NVME_CAP_MPSMAX_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_MPSMAX) | NVME_CAP_MPSMAX_n(n))
+    ((r) = ((r) & ~NVME_CAP_MPSMAX) | NVME_CAP_MPSMAX_n((n)))
 #define NVME_CAP_MPSMIN_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_MPSMIN) | NVME_CAP_MPSMIN_n(n))
+    ((r) = ((r) & ~NVME_CAP_MPSMIN) | NVME_CAP_MPSMIN_n((n)))
 #define NVME_CAP_CSS_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_CSS) | NVME_CAP_CSS_n(n))
+    ((r) = ((r) & ~NVME_CAP_CSS) | NVME_CAP_CSS_n((n)))
 #define NVME_CAP_NSSRS_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_NSSRS) | NVME_CAP_NSSRS_n(n))
+    ((r) = ((r) & ~NVME_CAP_NSSRS) | NVME_CAP_NSSRS_n((n)))
 #define NVME_CAP_DSTRD_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_DSTRD) | NVME_CAP_DSTRD_n(n))
-#define NVME_CAP_TO_SET(r,n)      (r = ((r) & ~NVME_CAP_TO) | NVME_CAP_TO_n(n))
+    ((r) = ((r) & ~NVME_CAP_DSTRD) | NVME_CAP_DSTRD_n((n)))
+#define NVME_CAP_TO_SET(r,n) \
+    ((r) = ((r) & ~NVME_CAP_TO) | NVME_CAP_TO_n((n)))
 #define NVME_CAP_AMS_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_AMS) | NVME_CAP_AMS_n(n))
+    ((r) = ((r) & ~NVME_CAP_AMS) | NVME_CAP_AMS_n((n)))
 #define NVME_CAP_CQR_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_CQR) | NVME_CAP_CQR_n(n))
+    ((r) = ((r) & ~NVME_CAP_CQR) | NVME_CAP_CQR_n((n)))
 #define NVME_CAP_MQES_SET(r,n) \
-    (r = ((r) & ~NVME_CAP_MQES) | NVME_CAP_MQES_n(n))
+    ((r) = ((r) & ~NVME_CAP_MQES) | NVME_CAP_MQES_n((n)))
 
 //
 // NVME_VS: Version
@@ -133,9 +134,9 @@
 #define NVME_VS_MNR_GET(n)    (((n) & NVME_VS_MNR) >> NVME_VS_MNR_BIT)
 #define NVME_VS_TER_GET(n)    (((n) & NVME_VS_TER) >> NVME_VS_TER_BIT)
 
-#define NVME_VS_MJR_SET(r,n)  (r = ((r) & ~NVME_VS_MJR) | NVME_VS_MJR_n(n))
-#define NVME_VS_MNR_SET(r,n)  (r = ((r) & ~NVME_VS_MNR) | NVME_VS_MNR_n(n))
-#define NVME_VS_TER_SET(r,n)  (r = ((r) & ~NVME_VS_TER) | NVME_VS_TER_n(n))
+#define NVME_VS_MJR_SET(r,n)  ((r) = ((r) & ~NVME_VS_MJR) | NVME_VS_MJR_n((n)))
+#define NVME_VS_MNR_SET(r,n)  ((r) = ((r) & ~NVME_VS_MNR) | NVME_VS_MNR_n((n)))
+#define NVME_VS_TER_SET(r,n)  ((r) = ((r) & ~NVME_VS_TER) | NVME_VS_TER_n((n)))
 
 //
 // NVME_CC: Configuration
@@ -201,14 +202,19 @@
 #define NVME_CC_EN_GET(n)        (((n) & NVME_CC_EN) >> NVME_CC_EN_BIT)
 
 #define NVME_CC_IOCQES_SET(r,n) \
-    (r = ((r) & ~NVME_CC_IOCQES) | NVME_CC_IOCQES_n(n))
+    ((r) = ((r) & ~NVME_CC_IOCQES) | NVME_CC_IOCQES_n((n)))
 #define NVME_CC_IOSQES_SET(r,n) \
-    (r = ((r) & ~NVME_CC_IOSQES) | NVME_CC_IOSQES_n(n))
-#define NVME_CC_SHN_SET(r,n)     (r = ((r) & ~NVME_CC_SHN) | NVME_CC_SHN_n(n))
-#define NVME_CC_AMS_SET(r,n)     (r = ((r) & ~NVME_CC_AMS) | NVME_CC_AMS_n(n))
-#define NVME_CC_MPS_SET(r,n)     (r = ((r) & ~NVME_CC_MPS) | NVME_CC_MPS_n(n))
-#define NVME_CC_CCS_SET(r,n)     (r = ((r) & ~NVME_CC_CCS) | NVME_CC_CCS_n(n))
-#define NVME_CC_EN_SET(r,n)      (r = ((r) & ~NVME_CC_EN) | NVME_CC_EN_n(n))
+    ((r) = ((r) & ~NVME_CC_IOSQES) | NVME_CC_IOSQES_n((n)))
+#define NVME_CC_SHN_SET(r,n) \
+    ((r) = ((r) & ~NVME_CC_SHN) | NVME_CC_SHN_n((n)))
+#define NVME_CC_AMS_SET(r,n) \
+    ((r) = ((r) & ~NVME_CC_AMS) | NVME_CC_AMS_n((n)))
+#define NVME_CC_MPS_SET(r,n) \
+    ((r) = ((r) & ~NVME_CC_MPS) | NVME_CC_MPS_n((n)))
+#define NVME_CC_CCS_SET(r,n) \
+    ((r) = ((r) & ~NVME_CC_CCS) | NVME_CC_CCS_n((n)))
+#define NVME_CC_EN_SET(r,n) \
+    ((r) = ((r) & ~NVME_CC_EN) | NVME_CC_EN_n((n)))
 
 // NVME_CSTS
 
@@ -259,15 +265,15 @@
 #define NVME_CSTS_RDY_GET(n)      (((n) & NVME_CSTS_RDY) >> NVME_CSTS_RDY_BIT)
 
 #define NVME_CSTS_PP_SET(r,n) \
-    (r = ((r) & ~NVME_CSTS_PP) | NVME_CSTS_PP_n(n))
+    ((r) = ((r) & ~NVME_CSTS_PP) | NVME_CSTS_PP_n((n)))
 #define NVME_CSTS_NSSRO_SET(r,n) \
-    (r = ((r) & ~NVME_CSTS_NSSRO) | NVME_CSTS_NSSRO_n(n))
+    ((r) = ((r) & ~NVME_CSTS_NSSRO) | NVME_CSTS_NSSRO_n((n)))
 #define NVME_CSTS_SHST_SET(r,n) \
-    (r = ((r) & ~NVME_CSTS_SHST) | NVME_CSTS_SHST_n(n))
+    ((r) = ((r) & ~NVME_CSTS_SHST) | NVME_CSTS_SHST_n((n)))
 #define NVME_CSTS_CFS_SET(r,n) \
-    (r = ((r) & ~NVME_CSTS_CFS) | NVME_CSTS_CFS_n(n))
+    ((r) = ((r) & ~NVME_CSTS_CFS) | NVME_CSTS_CFS_n((n)))
 #define NVME_CSTS_RDY_SET(r,n) \
-    (r = ((r) & ~NVME_CSTS_RDY) | NVME_CSTS_RDY_n(n))
+    ((r) = ((r) & ~NVME_CSTS_RDY) | NVME_CSTS_RDY_n((n)))
 
 // NVME_AQA
 
@@ -292,9 +298,9 @@
 #define NVME_AQA_ASQS_GET(n)    (((n) & NVME_AQA_ASQS) >> NVME_AQA_ASQS_BIT)
 
 #define NVME_AQA_ACQS_SET(r,n) \
-    (r = ((r) & ~NVME_AQA_ACQS) | NVME_AQA_ACQS_n(n))
+    ((r) = ((r) & ~NVME_AQA_ACQS) | NVME_AQA_ACQS_n((n)))
 #define NVME_AQA_ASQS_SET(r,n) \
-    (r = ((r) & ~NVME_AQA_ASQS) | NVME_AQA_ASQS_n(n))
+    ((r) = ((r) & ~NVME_AQA_ASQS) | NVME_AQA_ASQS_n((n)))
 
 // NVME_ASQ
 
@@ -311,7 +317,7 @@
 #define NVME_ASQ_ASQB_GET(n)    (((n) & NVME_ASQ_ASQB) >> NVME_ASQ_ASQB_BIT)
 
 #define NVME_ASQ_ASQB_SET(r,n) \
-    (r = ((r) & ~NVME_ASQ_ASQB) | NVME_ASQ_ASQB_n(n))
+    ((r) = ((r) & ~NVME_ASQ_ASQB) | NVME_ASQ_ASQB_n((n)))
 
 // NVME_ACQ
 
@@ -328,7 +334,7 @@
 #define NVME_ACQ_ACQB_GET(n)    (((n) & NVME_ACQ_ACQB) >> NVME_ACQ_ACQB_BIT)
 
 #define NVME_ACQ_ACQB_SET(r,n) \
-    (r = ((r) & ~NVME_ACQ_ACQB) | NVME_ACQ_ACQB_n(n))
+    ((r) = ((r) & ~NVME_ACQ_ACQB) | NVME_ACQ_ACQB_n((n)))
 
 // NVME_CMBLOC
 
@@ -357,9 +363,9 @@
     (((n) & NVME_CMBLOC_BIR) >> NVME_CMBLOC_BIR_BIT)
 
 #define NVME_CMBLOC_OFST_SET(r,n) \
-    (r = ((r) & ~NVME_CMBLOC_OFST) | NVME_CMBLOC_OFST_n(n))
+    ((r) = ((r) & ~NVME_CMBLOC_OFST) | NVME_CMBLOC_OFST_n((n)))
 #define NVME_CMBLOC_BIR_SET(r,n) \
-    (r = ((r) & ~NVME_CMBLOC_BIR) | NVME_CMBLOC_BIR_n(n))
+    ((r) = ((r) & ~NVME_CMBLOC_BIR) | NVME_CMBLOC_BIR_n((n)))
 
 // NVME_CMBSZ
 
@@ -431,19 +437,19 @@
     (((n) & NVME_CMBSZ_SQS) >> NVME_CMBSZ_SQS_BIT)
 
 #define NVME_CMBSZ_SZ_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_SZ) | NVME_CMBSZ_SZ_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_SZ) | NVME_CMBSZ_SZ_n((n)))
 #define NVME_CMBSZ_SZU_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_SZU) | NVME_CMBSZ_SZU_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_SZU) | NVME_CMBSZ_SZU_n((n)))
 #define NVME_CMBSZ_WDS_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_WDS) | NVME_CMBSZ_WDS_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_WDS) | NVME_CMBSZ_WDS_n((n)))
 #define NVME_CMBSZ_RDS_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_RDS) | NVME_CMBSZ_RDS_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_RDS) | NVME_CMBSZ_RDS_n((n)))
 #define NVME_CMBSZ_LISTS_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_LISTS) | NVME_CMBSZ_LISTS_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_LISTS) | NVME_CMBSZ_LISTS_n((n)))
 #define NVME_CMBSZ_CQS_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_CQS) | NVME_CMBSZ_CQS_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_CQS) | NVME_CMBSZ_CQS_n((n)))
 #define NVME_CMBSZ_SQS_SET(r,n) \
-    (r = ((r) & ~NVME_CMBSZ_SQS) | NVME_CMBSZ_SQS_n(n))
+    ((r) = ((r) & ~NVME_CMBSZ_SQS) | NVME_CMBSZ_SQS_n((n)))
 
 //
 // NVME_SQyTDBL: Completion queue doorbell
@@ -463,7 +469,7 @@
     (((n) & NVME_SQyTDBL_SQT) >> NVME_SQyTDBL_SQT_BIT)
 
 #define NVME_SQyTDBL_SQT_SET(r,n) \
-    (r = ((r) & ~NVME_SQyTDBL_SQT) | NVME_SQyTDBL_SQT_n(n))
+    ((r) = ((r) & ~NVME_SQyTDBL_SQT) | NVME_SQyTDBL_SQT_n((n)))
 
 //
 // NVME_CQyHDBL: Completion queue doorbell
@@ -483,7 +489,7 @@
     (((n) & NVME_CQyHDBL_SQT) >> NVME_CQyHDBL_SQT_BIT)
 
 #define NVME_CQyHDBL_SQT_SET(r,n) \
-    (r = ((r) & ~NVME_CQyHDBL_SQT) | NVME_CQyHDBL_SQT_n(n))
+    ((r) = ((r) & ~NVME_CQyHDBL_SQT) | NVME_CQyHDBL_SQT_n((n)))
 
 //
 // NVME_CMD_SDW0: Submission queue entry command dword 0
@@ -533,13 +539,13 @@
     (((n) & NVME_CMD_SDW0_OPC) >> NVME_CMD_SDW0_OPC_BIT)
 
 #define NVME_CMD_SDW0_CID_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_SDW0_CID) | NVME_CMD_SDW0_CID_n(n))
+    ((r) = ((r) & ~NVME_CMD_SDW0_CID) | NVME_CMD_SDW0_CID_n((n)))
 #define NVME_CMD_SDW0_PSDT_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_SDW0_PSDT) | NVME_CMD_SDW0_PSDT_n(n))
+    ((r) = ((r) & ~NVME_CMD_SDW0_PSDT) | NVME_CMD_SDW0_PSDT_n((n)))
 #define NVME_CMD_SDW0_FUSE_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_SDW0_FUSE) | NVME_CMD_SDW0_FUSE_n(n))
+    ((r) = ((r) & ~NVME_CMD_SDW0_FUSE) | NVME_CMD_SDW0_FUSE_n((n)))
 #define NVME_CMD_SDW0_OPC_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_SDW0_OPC) | NVME_CMD_SDW0_OPC_n(n))
+    ((r) = ((r) & ~NVME_CMD_SDW0_OPC) | NVME_CMD_SDW0_OPC_n((n)))
 
 // NVME_CMD_CCQ_CDW10
 
@@ -571,9 +577,9 @@
     (((n) & NVME_CMD_CCQ_CDW10_QID) >> NVME_CMD_CCQ_CDW10_QID_BIT)
 
 #define NVME_CMD_CCQ_CDW10_QSIZE_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CCQ_CDW10_QSIZE) | NVME_CMD_CCQ_CDW10_QSIZE_n(n))
+    ((r) = ((r) & ~NVME_CMD_CCQ_CDW10_QSIZE) | NVME_CMD_CCQ_CDW10_QSIZE_n((n)))
 #define NVME_CMD_CCQ_CDW10_QID_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CCQ_CDW10_QID) | NVME_CMD_CCQ_CDW10_QID_n(n))
+    ((r) = ((r) & ~NVME_CMD_CCQ_CDW10_QID) | NVME_CMD_CCQ_CDW10_QID_n((n)))
 
 // NVME_CMD_CCQ_CDW11
 
@@ -613,11 +619,11 @@
     (((n) & NVME_CMD_CCQ_CDW11_PC) >> NVME_CMD_CCQ_CDW11_PC_BIT)
 
 #define NVME_CMD_CCQ_CDW11_IV_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CCQ_CDW11_IV) | NVME_CMD_CCQ_CDW11_IV_n(n))
+    ((r) = ((r) & ~NVME_CMD_CCQ_CDW11_IV) | NVME_CMD_CCQ_CDW11_IV_n((n)))
 #define NVME_CMD_CCQ_CDW11_IEN_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CCQ_CDW11_IEN) | NVME_CMD_CCQ_CDW11_IEN_n(n))
+    ((r) = ((r) & ~NVME_CMD_CCQ_CDW11_IEN) | NVME_CMD_CCQ_CDW11_IEN_n((n)))
 #define NVME_CMD_CCQ_CDW11_PC_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CCQ_CDW11_PC) | NVME_CMD_CCQ_CDW11_PC_n(n))
+    ((r) = ((r) & ~NVME_CMD_CCQ_CDW11_PC) | NVME_CMD_CCQ_CDW11_PC_n((n)))
 
 //
 // NVME_CMD_CSQ_CDW10: Create I/O submission queue
@@ -650,9 +656,9 @@
     (((n) & NVME_CMD_CSQ_CDW10_QID) >> NVME_CMD_CSQ_CDW10_QID_BIT)
 
 #define NVME_CMD_CSQ_CDW10_QSIZE_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CSQ_CDW10_QSIZE) | NVME_CMD_CSQ_CDW10_QSIZE_n(n))
+    ((r) = ((r) & ~NVME_CMD_CSQ_CDW10_QSIZE) | NVME_CMD_CSQ_CDW10_QSIZE_n((n)))
 #define NVME_CMD_CSQ_CDW10_QID_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CSQ_CDW10_QID) | NVME_CMD_CSQ_CDW10_QID_n(n))
+    ((r) = ((r) & ~NVME_CMD_CSQ_CDW10_QID) | NVME_CMD_CSQ_CDW10_QID_n((n)))
 
 //
 // NVME_CMD_CSQ_CDW11: Create I/O submission queue
@@ -696,11 +702,11 @@
     (((n) & NVME_CMD_CSQ_CDW11_PC) >> NVME_CMD_CSQ_CDW11_PC_BIT)
 
 #define NVME_CMD_CSQ_CDW11_CQID_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CSQ_CDW11_CQID) | NVME_CMD_CSQ_CDW11_CQID_n(n))
+    ((r) = ((r) & ~NVME_CMD_CSQ_CDW11_CQID) | NVME_CMD_CSQ_CDW11_CQID_n((n)))
 #define NVME_CMD_CSQ_CDW11_QPRIO_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CSQ_CDW11_QPRIO) | NVME_CMD_CSQ_CDW11_QPRIO_n(n))
+    ((r) = ((r) & ~NVME_CMD_CSQ_CDW11_QPRIO) | NVME_CMD_CSQ_CDW11_QPRIO_n((n)))
 #define NVME_CMD_CSQ_CDW11_PC_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_CSQ_CDW11_PC) | NVME_CMD_CSQ_CDW11_PC_n(n))
+    ((r) = ((r) & ~NVME_CMD_CSQ_CDW11_PC) | NVME_CMD_CSQ_CDW11_PC_n((n)))
 
 // NVME_CMD_READ_CDW10
 
@@ -721,7 +727,7 @@
     (((n) & NVME_CMD_READ_CDW10_SLBA) >> NVME_CMD_READ_CDW10_SLBA_BIT)
 
 #define NVME_CMD_READ_CDW10_SLBA_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW10_SLBA) | NVME_CMD_READ_CDW10_SLBA_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW10_SLBA) | NVME_CMD_READ_CDW10_SLBA_n((n)))
 
 // NVME_CMD_READ_CDW11
 
@@ -742,7 +748,7 @@
     (((n) & NVME_CMD_READ_CDW11_SLBA) >> NVME_CMD_READ_CDW11_SLBA_BIT)
 
 #define NVME_CMD_READ_CDW11_SLBA_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW11_SLBA) | NVME_CMD_READ_CDW11_SLBA_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW11_SLBA) | NVME_CMD_READ_CDW11_SLBA_n((n)))
 
 // NVME_CMD_READ_CDW12
 
@@ -799,13 +805,13 @@
     (((n) & NVME_CMD_READ_CDW12_NLB) >> NVME_CMD_READ_CDW12_NLB_BIT)
 
 #define NVME_CMD_READ_CDW12_LR_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW12_LR) | NVME_CMD_READ_CDW12_LR_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW12_LR) | NVME_CMD_READ_CDW12_LR_n((n)))
 #define NVME_CMD_READ_CDW12_FUA_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW12_FUA) | NVME_CMD_READ_CDW12_FUA_n(n))
-#define NVME_CMD_READ_CDW12_PRINFO_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW12_PRINFO) | NVME_CMD_READ_CDW12_PRINFO_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW12_FUA) | NVME_CMD_READ_CDW12_FUA_n((n)))
+#define NVME_CMD_READ_CDW12_PRINFO_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_READ_CDW12_PRINFO) | NVME_CMD_READ_CDW12_PRINFO_n((n)))
 #define NVME_CMD_READ_CDW12_NLB_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW12_NLB) | NVME_CMD_READ_CDW12_NLB_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW12_NLB) | NVME_CMD_READ_CDW12_NLB_n((n)))
 
 // NVME_CMD_READ_CDW13
 
@@ -861,14 +867,14 @@
 #define NVME_CMD_READ_CDW13_AF_GET(n) \
     (((n) & NVME_CMD_READ_CDW13_AF) >> NVME_CMD_READ_CDW13_AF_BIT)
 
-#define NVME_CMD_READ_CDW13_INCOMP_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW13_INCOMP) | NVME_CMD_READ_CDW13_INCOMP_n(n))
+#define NVME_CMD_READ_CDW13_INCOMP_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_READ_CDW13_INCOMP) | NVME_CMD_READ_CDW13_INCOMP_n((n)))
 #define NVME_CMD_READ_CDW13_SEQ_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW13_SEQ) | NVME_CMD_READ_CDW13_SEQ_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW13_SEQ) | NVME_CMD_READ_CDW13_SEQ_n((n)))
 #define NVME_CMD_READ_CDW13_LAT_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW13_LAT) | NVME_CMD_READ_CDW13_LAT_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW13_LAT) | NVME_CMD_READ_CDW13_LAT_n((n)))
 #define NVME_CMD_READ_CDW13_AF_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW13_AF) | NVME_CMD_READ_CDW13_AF_n(n))
+    ((r) = ((r) & ~NVME_CMD_READ_CDW13_AF) | NVME_CMD_READ_CDW13_AF_n((n)))
 
 //
 // NVME_CMD_READ_CDW14: End-to-end protection
@@ -889,8 +895,8 @@
 #define NVME_CMD_READ_CDW14_EILBRT_GET(n) \
     (((n) & NVME_CMD_READ_CDW14_EILBRT) >> NVME_CMD_READ_CDW14_EILBRT_BIT)
 
-#define NVME_CMD_READ_CDW14_EILBRT_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW14_EILBRT) | NVME_CMD_READ_CDW14_EILBRT_n(n))
+#define NVME_CMD_READ_CDW14_EILBRT_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_READ_CDW14_EILBRT) | NVME_CMD_READ_CDW14_EILBRT_n((n)))
 
 //
 // NVME_CMD_READ_CDW15: End-to-end protection
@@ -923,10 +929,10 @@
 #define NVME_CMD_READ_CDW15_ELBAT_GET(n) \
     (((n) & NVME_CMD_READ_CDW15_ELBAT) >> NVME_CMD_READ_CDW15_ELBAT_BIT)
 
-#define NVME_CMD_READ_CDW15_ELBATM_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW15_ELBATM) | NVME_CMD_READ_CDW15_ELBATM_n(n))
-#define NVME_CMD_READ_CDW15_ELBAT_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_READ_CDW15_ELBAT) | NVME_CMD_READ_CDW15_ELBAT_n(n))
+#define NVME_CMD_READ_CDW15_ELBATM_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_READ_CDW15_ELBATM) | NVME_CMD_READ_CDW15_ELBATM_n((n)))
+#define NVME_CMD_READ_CDW15_ELBAT_SET(r,n)   ((r) \
+    = ((r) & ~NVME_CMD_READ_CDW15_ELBAT) | NVME_CMD_READ_CDW15_ELBAT_n((n)))
 
 // NVME_CMD_WRITE_CDW10
 
@@ -946,8 +952,8 @@
 #define NVME_CMD_WRITE_CDW10_SLBA_GET(n) \
     (((n) & NVME_CMD_WRITE_CDW10_SLBA) >> NVME_CMD_WRITE_CDW10_SLBA_BIT)
 
-#define NVME_CMD_WRITE_CDW10_SLBA_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW10_SLBA) | NVME_CMD_WRITE_CDW10_SLBA_n(n))
+#define NVME_CMD_WRITE_CDW10_SLBA_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_WRITE_CDW10_SLBA) | NVME_CMD_WRITE_CDW10_SLBA_n((n)))
 
 // NVME_CMD_WRITE_CDW11
 
@@ -967,8 +973,8 @@
 #define NVME_CMD_WRITE_CDW11_SLBA_GET(n) \
     (((n) & NVME_CMD_WRITE_CDW11_SLBA) >> NVME_CMD_WRITE_CDW11_SLBA_BIT)
 
-#define NVME_CMD_WRITE_CDW11_SLBA_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW11_SLBA) | NVME_CMD_WRITE_CDW11_SLBA_n(n))
+#define NVME_CMD_WRITE_CDW11_SLBA_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_WRITE_CDW11_SLBA) | NVME_CMD_WRITE_CDW11_SLBA_n((n)))
 
 // NVME_CMD_WRITE_CDW12
 
@@ -1025,13 +1031,13 @@
     (((n) & NVME_CMD_WRITE_CDW12_NLB) >> NVME_CMD_WRITE_CDW12_NLB_BIT)
 
 #define NVME_CMD_WRITE_CDW12_LR_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW12_LR) | NVME_CMD_WRITE_CDW12_LR_n(n))
+    ((r) = ((r) & ~NVME_CMD_WRITE_CDW12_LR) | NVME_CMD_WRITE_CDW12_LR_n((n)))
 #define NVME_CMD_WRITE_CDW12_FUA_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW12_FUA) | NVME_CMD_WRITE_CDW12_FUA_n(n))
-#define NVME_CMD_WRITE_CDW12_PRINFO_SET(r,n)  (r \
-    = ((r) & ~NVME_CMD_WRITE_CDW12_PRINFO) | NVME_CMD_WRITE_CDW12_PRINFO_n(n))
+    ((r) = ((r) & ~NVME_CMD_WRITE_CDW12_FUA) | NVME_CMD_WRITE_CDW12_FUA_n((n)))
+#define NVME_CMD_WRITE_CDW12_PRINFO_SET(r,n)  ((r) = \
+    ((r) & ~NVME_CMD_WRITE_CDW12_PRINFO) | NVME_CMD_WRITE_CDW12_PRINFO_n((n)))
 #define NVME_CMD_WRITE_CDW12_NLB_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW12_NLB) | NVME_CMD_WRITE_CDW12_NLB_n(n))
+    ((r) = ((r) & ~NVME_CMD_WRITE_CDW12_NLB) | NVME_CMD_WRITE_CDW12_NLB_n((n)))
 
 // NVME_CMD_WRITE_CDW13
 
@@ -1087,14 +1093,14 @@
 #define NVME_CMD_WRITE_CDW13_AF_GET(n) \
     (((n) & NVME_CMD_WRITE_CDW13_AF) >> NVME_CMD_WRITE_CDW13_AF_BIT)
 
-#define NVME_CMD_WRITE_CDW13_INCOMP_SET(r,n)  (r \
-    = ((r) & ~NVME_CMD_WRITE_CDW13_INCOMP) | NVME_CMD_WRITE_CDW13_INCOMP_n(n))
+#define NVME_CMD_WRITE_CDW13_INCOMP_SET(r,n)  ((r) = \
+    ((r) & ~NVME_CMD_WRITE_CDW13_INCOMP) | NVME_CMD_WRITE_CDW13_INCOMP_n((n)))
 #define NVME_CMD_WRITE_CDW13_SEQ_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW13_SEQ) | NVME_CMD_WRITE_CDW13_SEQ_n(n))
+    ((r) = ((r) & ~NVME_CMD_WRITE_CDW13_SEQ) | NVME_CMD_WRITE_CDW13_SEQ_n((n)))
 #define NVME_CMD_WRITE_CDW13_LAT_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW13_LAT) | NVME_CMD_WRITE_CDW13_LAT_n(n))
+    ((r) = ((r) & ~NVME_CMD_WRITE_CDW13_LAT) | NVME_CMD_WRITE_CDW13_LAT_n((n)))
 #define NVME_CMD_WRITE_CDW13_AF_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_WRITE_CDW13_AF) | NVME_CMD_WRITE_CDW13_AF_n(n))
+    ((r) = ((r) & ~NVME_CMD_WRITE_CDW13_AF) | NVME_CMD_WRITE_CDW13_AF_n((n)))
 
 //
 // NVME_CMP_DW2: Completion queue entry dword 2
@@ -1124,9 +1130,9 @@
     (((n) & NVME_CMP_DW2_SQHD) >> NVME_CMP_DW2_SQHD_BIT)
 
 #define NVME_CMP_DW2_SQID_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW2_SQID) | NVME_CMP_DW2_SQID_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW2_SQID) | NVME_CMP_DW2_SQID_n((n)))
 #define NVME_CMP_DW2_SQHD_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW2_SQHD) | NVME_CMP_DW2_SQHD_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW2_SQHD) | NVME_CMP_DW2_SQHD_n((n)))
 
 //
 // NVME_CMP_DW3: Completion queue entry dword 3
@@ -1194,17 +1200,17 @@
     (((n) & NVME_CMP_DW3_CID) >> NVME_CMP_DW3_CID_BIT)
 
 #define NVME_CMP_DW3_DNR_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW3_DNR) | NVME_CMP_DW3_DNR_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW3_DNR) | NVME_CMP_DW3_DNR_n((n)))
 #define NVME_CMP_DW3_M_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW3_M) | NVME_CMP_DW3_M_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW3_M) | NVME_CMP_DW3_M_n((n)))
 #define NVME_CMP_DW3_SCT_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW3_SCT) | NVME_CMP_DW3_SCT_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW3_SCT) | NVME_CMP_DW3_SCT_n((n)))
 #define NVME_CMP_DW3_SC_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW3_SC) | NVME_CMP_DW3_SC_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW3_SC) | NVME_CMP_DW3_SC_n((n)))
 #define NVME_CMP_DW3_P_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW3_P) | NVME_CMP_DW3_P_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW3_P) | NVME_CMP_DW3_P_n((n)))
 #define NVME_CMP_DW3_CID_SET(r,n) \
-    (r = ((r) & ~NVME_CMP_DW3_CID) | NVME_CMP_DW3_CID_n(n))
+    ((r) = ((r) & ~NVME_CMP_DW3_CID) | NVME_CMP_DW3_CID_n((n)))
 
 //
 // NVME_CMD_IDENT_CDW10: Identify command dword 10
@@ -1237,10 +1243,10 @@
 #define NVME_CMD_IDENT_CDW10_CNS_GET(n) \
     (((n) & NVME_CMD_IDENT_CDW10_CNS) >> NVME_CMD_IDENT_CDW10_CNS_BIT)
 
-#define NVME_CMD_IDENT_CDW10_CNTID_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_IDENT_CDW10_CNTID) | NVME_CMD_IDENT_CDW10_CNTID_n(n))
+#define NVME_CMD_IDENT_CDW10_CNTID_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_IDENT_CDW10_CNTID) | NVME_CMD_IDENT_CDW10_CNTID_n((n)))
 #define NVME_CMD_IDENT_CDW10_CNS_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_IDENT_CDW10_CNS) | NVME_CMD_IDENT_CDW10_CNS_n(n))
+    ((r) = ((r) & ~NVME_CMD_IDENT_CDW10_CNS) | NVME_CMD_IDENT_CDW10_CNS_n((n)))
 
 // NVME_NS_IDENT_FLBAS
 
@@ -1272,10 +1278,10 @@
 #define NVME_NS_IDENT_FLBAS_LBAIDX_GET(n) \
     (((n) & NVME_NS_IDENT_FLBAS_LBAIDX) >> NVME_NS_IDENT_FLBAS_LBAIDX_BIT)
 
-#define NVME_NS_IDENT_FLBAS_EXTLBA_SET(r,n) \
-    (r = ((r) & ~NVME_NS_IDENT_FLBAS_EXTLBA) | NVME_NS_IDENT_FLBAS_EXTLBA_n(n))
-#define NVME_NS_IDENT_FLBAS_LBAIDX_SET(r,n) \
-    (r = ((r) & ~NVME_NS_IDENT_FLBAS_LBAIDX) | NVME_NS_IDENT_FLBAS_LBAIDX_n(n))
+#define NVME_NS_IDENT_FLBAS_EXTLBA_SET(r,n)  ((r) \
+    = ((r) & ~NVME_NS_IDENT_FLBAS_EXTLBA) | NVME_NS_IDENT_FLBAS_EXTLBA_n((n)))
+#define NVME_NS_IDENT_FLBAS_LBAIDX_SET(r,n)  ((r) \
+    = ((r) & ~NVME_NS_IDENT_FLBAS_LBAIDX) | NVME_NS_IDENT_FLBAS_LBAIDX_n((n)))
 
 // NVME_NS_IDENT_LBAF
 
@@ -1318,11 +1324,11 @@
     (((n) & NVME_NS_IDENT_LBAF_MS) >> NVME_NS_IDENT_LBAF_MS_BIT)
 
 #define NVME_NS_IDENT_LBAF_RP_SET(r,n) \
-    (r = ((r) & ~NVME_NS_IDENT_LBAF_RP) | NVME_NS_IDENT_LBAF_RP_n(n))
+    ((r) = ((r) & ~NVME_NS_IDENT_LBAF_RP) | NVME_NS_IDENT_LBAF_RP_n((n)))
 #define NVME_NS_IDENT_LBAF_LBADS_SET(r,n) \
-    (r = ((r) & ~NVME_NS_IDENT_LBAF_LBADS) | NVME_NS_IDENT_LBAF_LBADS_n(n))
+    ((r) = ((r) & ~NVME_NS_IDENT_LBAF_LBADS) | NVME_NS_IDENT_LBAF_LBADS_n((n)))
 #define NVME_NS_IDENT_LBAF_MS_SET(r,n) \
-    (r = ((r) & ~NVME_NS_IDENT_LBAF_MS) | NVME_NS_IDENT_LBAF_MS_n(n))
+    ((r) = ((r) & ~NVME_NS_IDENT_LBAF_MS) | NVME_NS_IDENT_LBAF_MS_n((n)))
 
 //
 // NVME_CMD_DSMGMT_CDW10: Dataset management command
@@ -1344,7 +1350,7 @@
     (((n) & NVME_CMD_DSMGMT_CDW10_NR) >> NVME_CMD_DSMGMT_CDW10_NR_BIT)
 
 #define NVME_CMD_DSMGMT_CDW10_NR_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CDW10_NR) | NVME_CMD_DSMGMT_CDW10_NR_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CDW10_NR) | NVME_CMD_DSMGMT_CDW10_NR_n((n)))
 
 //
 // NVME_CMD_DSMGMT_CDW11: Dataset management command
@@ -1390,11 +1396,11 @@
     (((n) & NVME_CMD_DSMGMT_CDW11_IDR) >> NVME_CMD_DSMGMT_CDW11_IDR_BIT)
 
 #define NVME_CMD_DSMGMT_CDW11_AD_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CDW11_AD) | NVME_CMD_DSMGMT_CDW11_AD_n(n))
-#define NVME_CMD_DSMGMT_CDW11_IDW_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CDW11_IDW) | NVME_CMD_DSMGMT_CDW11_IDW_n(n))
-#define NVME_CMD_DSMGMT_CDW11_IDR_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CDW11_IDR) | NVME_CMD_DSMGMT_CDW11_IDR_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CDW11_AD) | NVME_CMD_DSMGMT_CDW11_AD_n((n)))
+#define NVME_CMD_DSMGMT_CDW11_IDW_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_DSMGMT_CDW11_IDW) | NVME_CMD_DSMGMT_CDW11_IDW_n((n)))
+#define NVME_CMD_DSMGMT_CDW11_IDR_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_DSMGMT_CDW11_IDR) | NVME_CMD_DSMGMT_CDW11_IDR_n((n)))
 
 //
 // NVME_CMD_DSMGMT_CA: Context attributes
@@ -1465,17 +1471,17 @@
     (((n) & NVME_CMD_DSMGMT_CA_AF) >> NVME_CMD_DSMGMT_CA_AF_BIT)
 
 #define NVME_CMD_DSMGMT_CA_CAS_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CA_CAS) | NVME_CMD_DSMGMT_CA_CAS_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CA_CAS) | NVME_CMD_DSMGMT_CA_CAS_n((n)))
 #define NVME_CMD_DSMGMT_CA_WP_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CA_WP) | NVME_CMD_DSMGMT_CA_WP_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CA_WP) | NVME_CMD_DSMGMT_CA_WP_n((n)))
 #define NVME_CMD_DSMGMT_CA_SW_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CA_SW) | NVME_CMD_DSMGMT_CA_SW_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CA_SW) | NVME_CMD_DSMGMT_CA_SW_n((n)))
 #define NVME_CMD_DSMGMT_CA_SR_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CA_SR) | NVME_CMD_DSMGMT_CA_SR_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CA_SR) | NVME_CMD_DSMGMT_CA_SR_n((n)))
 #define NVME_CMD_DSMGMT_CA_AL_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CA_AL) | NVME_CMD_DSMGMT_CA_AL_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CA_AL) | NVME_CMD_DSMGMT_CA_AL_n((n)))
 #define NVME_CMD_DSMGMT_CA_AF_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_DSMGMT_CA_AF) | NVME_CMD_DSMGMT_CA_AF_n(n))
+    ((r) = ((r) & ~NVME_CMD_DSMGMT_CA_AF) | NVME_CMD_DSMGMT_CA_AF_n((n)))
 
 //
 // NVME_CMD_SETFEAT_CDW10: Set features command dword 10
@@ -1508,10 +1514,10 @@
 #define NVME_CMD_SETFEAT_CDW10_FID_GET(n) \
     (((n) & NVME_CMD_SETFEAT_CDW10_FID) >> NVME_CMD_SETFEAT_CDW10_FID_BIT)
 
-#define NVME_CMD_SETFEAT_CDW10_SV_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_SETFEAT_CDW10_SV) | NVME_CMD_SETFEAT_CDW10_SV_n(n))
-#define NVME_CMD_SETFEAT_CDW10_FID_SET(r,n) \
-    (r = ((r) & ~NVME_CMD_SETFEAT_CDW10_FID) | NVME_CMD_SETFEAT_CDW10_FID_n(n))
+#define NVME_CMD_SETFEAT_CDW10_SV_SET(r,n)   ((r) \
+    = ((r) & ~NVME_CMD_SETFEAT_CDW10_SV) | NVME_CMD_SETFEAT_CDW10_SV_n((n)))
+#define NVME_CMD_SETFEAT_CDW10_FID_SET(r,n)  ((r) \
+    = ((r) & ~NVME_CMD_SETFEAT_CDW10_FID) | NVME_CMD_SETFEAT_CDW10_FID_n((n)))
 
 //
 // NVME_CMD_SETFEAT_NQ_CDW11: Set features number of queues command dword 11
@@ -1544,10 +1550,10 @@
 #define NVME_CMD_SETFEAT_NQ_CDW11_NSQR_GET(n)    (((n) \
     & NVME_CMD_SETFEAT_NQ_CDW11_NSQR) >> NVME_CMD_SETFEAT_NQ_CDW11_NSQR_BIT)
 
-#define NVME_CMD_SETFEAT_NQ_CDW11_NCQR_SET(r,n)  (r = ((r) \
-    & ~NVME_CMD_SETFEAT_NQ_CDW11_NCQR) | NVME_CMD_SETFEAT_NQ_CDW11_NCQR_n(n))
-#define NVME_CMD_SETFEAT_NQ_CDW11_NSQR_SET(r,n)  (r = ((r) \
-    & ~NVME_CMD_SETFEAT_NQ_CDW11_NSQR) | NVME_CMD_SETFEAT_NQ_CDW11_NSQR_n(n))
+#define NVME_CMD_SETFEAT_NQ_CDW11_NCQR_SET(r,n)  ((r) = ((r) \
+    & ~NVME_CMD_SETFEAT_NQ_CDW11_NCQR) | NVME_CMD_SETFEAT_NQ_CDW11_NCQR_n((n)))
+#define NVME_CMD_SETFEAT_NQ_CDW11_NSQR_SET(r,n)  ((r) = ((r) \
+    & ~NVME_CMD_SETFEAT_NQ_CDW11_NSQR) | NVME_CMD_SETFEAT_NQ_CDW11_NSQR_n((n)))
 
 //
 // NVME_CMP_SETFEAT_NQ_DW0: Set features number of queues completion dword 0
@@ -1580,8 +1586,8 @@
 #define NVME_CMP_SETFEAT_NQ_DW0_NSQA_GET(n) \
     (((n) & NVME_CMP_SETFEAT_NQ_DW0_NSQA) >> NVME_CMP_SETFEAT_NQ_DW0_NSQA_BIT)
 
-#define NVME_CMP_SETFEAT_NQ_DW0_NCQA_SET(r,n)  (r = \
-    ((r) & ~NVME_CMP_SETFEAT_NQ_DW0_NCQA) | NVME_CMP_SETFEAT_NQ_DW0_NCQA_n(n))
-#define NVME_CMP_SETFEAT_NQ_DW0_NSQA_SET(r,n)  (r = \
-    ((r) & ~NVME_CMP_SETFEAT_NQ_DW0_NSQA) | NVME_CMP_SETFEAT_NQ_DW0_NSQA_n(n))
+#define NVME_CMP_SETFEAT_NQ_DW0_NCQA_SET(r,n)  ((r) = ((r) \
+    & ~NVME_CMP_SETFEAT_NQ_DW0_NCQA) | NVME_CMP_SETFEAT_NQ_DW0_NCQA_n((n)))
+#define NVME_CMP_SETFEAT_NQ_DW0_NSQA_SET(r,n)  ((r) = ((r) \
+    & ~NVME_CMP_SETFEAT_NQ_DW0_NSQA) | NVME_CMP_SETFEAT_NQ_DW0_NSQA_n((n)))
 

@@ -24,9 +24,9 @@
     (((n) & MP_CPU_FLAGS_BSP) >> MP_CPU_FLAGS_BSP_BIT)
 
 #define MP_CPU_FLAGS_ENABLED_SET(r,n) \
-    (r = ((r) & ~MP_CPU_FLAGS_ENABLED) | MP_CPU_FLAGS_ENABLED_n(n))
+    ((r) = ((r) & ~MP_CPU_FLAGS_ENABLED) | MP_CPU_FLAGS_ENABLED_n((n)))
 #define MP_CPU_FLAGS_BSP_SET(r,n) \
-    (r = ((r) & ~MP_CPU_FLAGS_BSP) | MP_CPU_FLAGS_BSP_n(n))
+    ((r) = ((r) & ~MP_CPU_FLAGS_BSP) | MP_CPU_FLAGS_BSP_n((n)))
 
 // MP_IOAPIC_FLAGS
 
@@ -44,7 +44,7 @@
     (((n) & MP_IOAPIC_FLAGS_ENABLED) >> MP_IOAPIC_FLAGS_ENABLED_BIT)
 
 #define MP_IOAPIC_FLAGS_ENABLED_SET(r,n) \
-    (r = ((r) & ~MP_IOAPIC_FLAGS_ENABLED) | MP_IOAPIC_FLAGS_ENABLED_n(n))
+    ((r) = ((r) & ~MP_IOAPIC_FLAGS_ENABLED) | MP_IOAPIC_FLAGS_ENABLED_n((n)))
 
 // MP_INTR_FLAGS
 
@@ -70,9 +70,9 @@
     (((n) & MP_INTR_FLAGS_TRIGGER) >> MP_INTR_FLAGS_TRIGGER_BIT)
 
 #define MP_INTR_FLAGS_POLARITY_SET(r,n) \
-    (r = ((r) & ~MP_INTR_FLAGS_POLARITY) | MP_INTR_FLAGS_POLARITY_n(n))
+    ((r) = ((r) & ~MP_INTR_FLAGS_POLARITY) | MP_INTR_FLAGS_POLARITY_n((n)))
 #define MP_INTR_FLAGS_TRIGGER_SET(r,n) \
-    (r = ((r) & ~MP_INTR_FLAGS_TRIGGER) | MP_INTR_FLAGS_TRIGGER_n(n))
+    ((r) = ((r) & ~MP_INTR_FLAGS_TRIGGER) | MP_INTR_FLAGS_TRIGGER_n((n)))
 
 // IOAPIC_VER
 
@@ -97,9 +97,9 @@
     (((n) & IOAPIC_VER_ENTRIES) >> IOAPIC_VER_ENTRIES_BIT)
 
 #define IOAPIC_VER_VERSION_SET(r,n) \
-    (r = ((r) & ~IOAPIC_VER_VERSION) | IOAPIC_VER_VERSION_n(n))
+    ((r) = ((r) & ~IOAPIC_VER_VERSION) | IOAPIC_VER_VERSION_n((n)))
 #define IOAPIC_VER_ENTRIES_SET(r,n) \
-    (r = ((r) & ~IOAPIC_VER_ENTRIES) | IOAPIC_VER_ENTRIES_n(n))
+    ((r) = ((r) & ~IOAPIC_VER_ENTRIES) | IOAPIC_VER_ENTRIES_n((n)))
 
 // IOAPIC_REDLO
 
@@ -173,21 +173,21 @@
     (((n) & IOAPIC_REDLO_MASKIRQ) >> IOAPIC_REDLO_MASKIRQ_BIT)
 
 #define IOAPIC_REDLO_VECTOR_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_VECTOR) | IOAPIC_REDLO_VECTOR_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_VECTOR) | IOAPIC_REDLO_VECTOR_n((n)))
 #define IOAPIC_REDLO_DELIVERY_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_DELIVERY) | IOAPIC_REDLO_DELIVERY_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_DELIVERY) | IOAPIC_REDLO_DELIVERY_n((n)))
 #define IOAPIC_REDLO_DESTMODE_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_DESTMODE) | IOAPIC_REDLO_DESTMODE_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_DESTMODE) | IOAPIC_REDLO_DESTMODE_n((n)))
 #define IOAPIC_REDLO_STATUS_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_STATUS) | IOAPIC_REDLO_STATUS_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_STATUS) | IOAPIC_REDLO_STATUS_n((n)))
 #define IOAPIC_REDLO_POLARITY_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_POLARITY) | IOAPIC_REDLO_POLARITY_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_POLARITY) | IOAPIC_REDLO_POLARITY_n((n)))
 #define IOAPIC_REDLO_REMOTEIRR_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_REMOTEIRR) | IOAPIC_REDLO_REMOTEIRR_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_REMOTEIRR) | IOAPIC_REDLO_REMOTEIRR_n((n)))
 #define IOAPIC_REDLO_TRIGGER_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_TRIGGER) | IOAPIC_REDLO_TRIGGER_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_TRIGGER) | IOAPIC_REDLO_TRIGGER_n((n)))
 #define IOAPIC_REDLO_MASKIRQ_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDLO_MASKIRQ) | IOAPIC_REDLO_MASKIRQ_n(n))
+    ((r) = ((r) & ~IOAPIC_REDLO_MASKIRQ) | IOAPIC_REDLO_MASKIRQ_n((n)))
 
 // IOAPIC_REDHI
 
@@ -204,7 +204,7 @@
     (((n) & IOAPIC_REDHI_DEST) >> IOAPIC_REDHI_DEST_BIT)
 
 #define IOAPIC_REDHI_DEST_SET(r,n) \
-    (r = ((r) & ~IOAPIC_REDHI_DEST) | IOAPIC_REDHI_DEST_n(n))
+    ((r) = ((r) & ~IOAPIC_REDHI_DEST) | IOAPIC_REDHI_DEST_n((n)))
 
 //
 // APIC: Only used in xAPIC mode
@@ -219,7 +219,7 @@
 
 #define APIC_DEST_GET(n)    (((n) & APIC_DEST) >> APIC_DEST_BIT)
 
-#define APIC_DEST_SET(r,n)  (r = ((r) & ~APIC_DEST) | APIC_DEST_n(n))
+#define APIC_DEST_SET(r,n)  ((r) = ((r) & ~APIC_DEST) | APIC_DEST_n((n)))
 
 // APIC_CMD
 
@@ -290,21 +290,21 @@
     (((n) & APIC_CMD_DEST_TYPE) >> APIC_CMD_DEST_TYPE_BIT)
 
 #define APIC_CMD_VECTOR_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_VECTOR) | APIC_CMD_VECTOR_n(n))
+    ((r) = ((r) & ~APIC_CMD_VECTOR) | APIC_CMD_VECTOR_n((n)))
 #define APIC_CMD_SIPI_PAGE_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_SIPI_PAGE) | APIC_CMD_SIPI_PAGE_n(n))
+    ((r) = ((r) & ~APIC_CMD_SIPI_PAGE) | APIC_CMD_SIPI_PAGE_n((n)))
 #define APIC_CMD_DELIVERY_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_DELIVERY) | APIC_CMD_DELIVERY_n(n))
+    ((r) = ((r) & ~APIC_CMD_DELIVERY) | APIC_CMD_DELIVERY_n((n)))
 #define APIC_CMD_DEST_MODE_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_DEST_MODE) | APIC_CMD_DEST_MODE_n(n))
+    ((r) = ((r) & ~APIC_CMD_DEST_MODE) | APIC_CMD_DEST_MODE_n((n)))
 #define APIC_CMD_PENDING_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_PENDING) | APIC_CMD_PENDING_n(n))
+    ((r) = ((r) & ~APIC_CMD_PENDING) | APIC_CMD_PENDING_n((n)))
 #define APIC_CMD_LEVEL_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_LEVEL) | APIC_CMD_LEVEL_n(n))
+    ((r) = ((r) & ~APIC_CMD_LEVEL) | APIC_CMD_LEVEL_n((n)))
 #define APIC_CMD_ILD_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_ILD) | APIC_CMD_ILD_n(n))
+    ((r) = ((r) & ~APIC_CMD_ILD) | APIC_CMD_ILD_n((n)))
 #define APIC_CMD_DEST_TYPE_SET(r,n) \
-    (r = ((r) & ~APIC_CMD_DEST_TYPE) | APIC_CMD_DEST_TYPE_n(n))
+    ((r) = ((r) & ~APIC_CMD_DEST_TYPE) | APIC_CMD_DEST_TYPE_n((n)))
 
 // APIC_LVT
 
@@ -383,21 +383,21 @@
     (((n) & APIC_LVT_TR_MODE) >> APIC_LVT_TR_MODE_BIT)
 
 #define APIC_LVT_VECTOR_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_VECTOR) | APIC_LVT_VECTOR_n(n))
+    ((r) = ((r) & ~APIC_LVT_VECTOR) | APIC_LVT_VECTOR_n((n)))
 #define APIC_LVT_DELIVERY_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_DELIVERY) | APIC_LVT_DELIVERY_n(n))
+    ((r) = ((r) & ~APIC_LVT_DELIVERY) | APIC_LVT_DELIVERY_n((n)))
 #define APIC_LVT_DELIVERY_STATUS_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_DELIVERY_STATUS) | APIC_LVT_DELIVERY_STATUS_n(n))
+    ((r) = ((r) & ~APIC_LVT_DELIVERY_STATUS) | APIC_LVT_DELIVERY_STATUS_n((n)))
 #define APIC_LVT_LINTn_POLARITY_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_LINTn_POLARITY) | APIC_LVT_LINTn_POLARITY_n(n))
+    ((r) = ((r) & ~APIC_LVT_LINTn_POLARITY) | APIC_LVT_LINTn_POLARITY_n((n)))
 #define APIC_LVT_LINTn_REMOTEIRR_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_LINTn_REMOTEIRR) | APIC_LVT_LINTn_REMOTEIRR_n(n))
+    ((r) = ((r) & ~APIC_LVT_LINTn_REMOTEIRR) | APIC_LVT_LINTn_REMOTEIRR_n((n)))
 #define APIC_LVT_LINTn_LEVEL_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_LINTn_LEVEL) | APIC_LVT_LINTn_LEVEL_n(n))
+    ((r) = ((r) & ~APIC_LVT_LINTn_LEVEL) | APIC_LVT_LINTn_LEVEL_n((n)))
 #define APIC_LVT_MASK_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_MASK) | APIC_LVT_MASK_n(n))
+    ((r) = ((r) & ~APIC_LVT_MASK) | APIC_LVT_MASK_n((n)))
 #define APIC_LVT_TR_MODE_SET(r,n) \
-    (r = ((r) & ~APIC_LVT_TR_MODE) | APIC_LVT_TR_MODE_n(n))
+    ((r) = ((r) & ~APIC_LVT_TR_MODE) | APIC_LVT_TR_MODE_n((n)))
 
 //
 // APIC_ESR: Error status register
@@ -493,21 +493,21 @@
     (((n) & APIC_ESR_TX_CHECKSUM_ERR) >> APIC_ESR_TX_CHECKSUM_ERR_BIT)
 
 #define APIC_ESR_ILL_REG_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_ILL_REG) | APIC_ESR_ILL_REG_n(n))
+    ((r) = ((r) & ~APIC_ESR_ILL_REG) | APIC_ESR_ILL_REG_n((n)))
 #define APIC_ESR_RX_ILL_VEC_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_RX_ILL_VEC) | APIC_ESR_RX_ILL_VEC_n(n))
+    ((r) = ((r) & ~APIC_ESR_RX_ILL_VEC) | APIC_ESR_RX_ILL_VEC_n((n)))
 #define APIC_ESR_TX_ILL_VEC_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_TX_ILL_VEC) | APIC_ESR_TX_ILL_VEC_n(n))
+    ((r) = ((r) & ~APIC_ESR_TX_ILL_VEC) | APIC_ESR_TX_ILL_VEC_n((n)))
 #define APIC_ESR_REDIR_IPI_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_REDIR_IPI) | APIC_ESR_REDIR_IPI_n(n))
+    ((r) = ((r) & ~APIC_ESR_REDIR_IPI) | APIC_ESR_REDIR_IPI_n((n)))
 #define APIC_ESR_RX_ACCEPT_ERR_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_RX_ACCEPT_ERR) | APIC_ESR_RX_ACCEPT_ERR_n(n))
+    ((r) = ((r) & ~APIC_ESR_RX_ACCEPT_ERR) | APIC_ESR_RX_ACCEPT_ERR_n((n)))
 #define APIC_ESR_TX_ACCEPT_ERR_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_TX_ACCEPT_ERR) | APIC_ESR_TX_ACCEPT_ERR_n(n))
+    ((r) = ((r) & ~APIC_ESR_TX_ACCEPT_ERR) | APIC_ESR_TX_ACCEPT_ERR_n((n)))
 #define APIC_ESR_RX_CHECKSUM_ERR_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_RX_CHECKSUM_ERR) | APIC_ESR_RX_CHECKSUM_ERR_n(n))
+    ((r) = ((r) & ~APIC_ESR_RX_CHECKSUM_ERR) | APIC_ESR_RX_CHECKSUM_ERR_n((n)))
 #define APIC_ESR_TX_CHECKSUM_ERR_SET(r,n) \
-    (r = ((r) & ~APIC_ESR_TX_CHECKSUM_ERR) | APIC_ESR_TX_CHECKSUM_ERR_n(n))
+    ((r) = ((r) & ~APIC_ESR_TX_CHECKSUM_ERR) | APIC_ESR_TX_CHECKSUM_ERR_n((n)))
 
 //
 // ACPI_FADT_FFF: FADT Fixed Feature Flags
@@ -738,49 +738,50 @@
     ACPI_FADT_FFF_LOCAL_POWER_S0_BIT) >> ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BIT)
 
 #define ACPI_FADT_FFF_WBINVD_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_WBINVD) | ACPI_FADT_FFF_WBINVD_n(n))
-#define ACPI_FADT_FFF_WBINVD_FLUSH_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_WBINVD_FLUSH) | ACPI_FADT_FFF_WBINVD_FLUSH_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_WBINVD) | ACPI_FADT_FFF_WBINVD_n((n)))
+#define ACPI_FADT_FFF_WBINVD_FLUSH_SET(r,n)        ((r) \
+    = ((r) & ~ACPI_FADT_FFF_WBINVD_FLUSH) | ACPI_FADT_FFF_WBINVD_FLUSH_n((n)))
 #define ACPI_FADT_FFF_PROC_C1_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_PROC_C1) | ACPI_FADT_FFF_PROC_C1_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_PROC_C1) | ACPI_FADT_FFF_PROC_C1_n((n)))
 #define ACPI_FADT_FFF_P_LVL2_MP_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_P_LVL2_MP) | ACPI_FADT_FFF_P_LVL2_MP_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_P_LVL2_MP) | ACPI_FADT_FFF_P_LVL2_MP_n((n)))
 #define ACPI_FADT_FFF_PWR_BUTTON_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_PWR_BUTTON) | ACPI_FADT_FFF_PWR_BUTTON_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_PWR_BUTTON) | ACPI_FADT_FFF_PWR_BUTTON_n((n)))
 #define ACPI_FADT_FFF_SLP_BUTTON_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_SLP_BUTTON) | ACPI_FADT_FFF_SLP_BUTTON_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_SLP_BUTTON) | ACPI_FADT_FFF_SLP_BUTTON_n((n)))
 #define ACPI_FADT_FFF_FIX_RTC_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_FIX_RTC) | ACPI_FADT_FFF_FIX_RTC_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_FIX_RTC) | ACPI_FADT_FFF_FIX_RTC_n((n)))
 #define ACPI_FADT_FFF_RTC_S4_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_RTC_S4) | ACPI_FADT_FFF_RTC_S4_n(n))
-#define ACPI_FADT_FFF_TMR_VAL_EXT_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_TMR_VAL_EXT) | ACPI_FADT_FFF_TMR_VAL_EXT_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_RTC_S4) | ACPI_FADT_FFF_RTC_S4_n((n)))
+#define ACPI_FADT_FFF_TMR_VAL_EXT_SET(r,n)         ((r) \
+    = ((r) & ~ACPI_FADT_FFF_TMR_VAL_EXT) | ACPI_FADT_FFF_TMR_VAL_EXT_n((n)))
 #define ACPI_FADT_FFF_DCK_CAP_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_DCK_CAP) | ACPI_FADT_FFF_DCK_CAP_n(n))
-#define ACPI_FADT_FFF_RESET_REG_SUP_SET(r,n)       (r \
-    = ((r) & ~ACPI_FADT_FFF_RESET_REG_SUP) | ACPI_FADT_FFF_RESET_REG_SUP_n(n))
-#define ACPI_FADT_FFF_SEALED_CASE_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_SEALED_CASE) | ACPI_FADT_FFF_SEALED_CASE_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_DCK_CAP) | ACPI_FADT_FFF_DCK_CAP_n((n)))
+#define ACPI_FADT_FFF_RESET_REG_SUP_SET(r,n)       ((r) = \
+    ((r) & ~ACPI_FADT_FFF_RESET_REG_SUP) | ACPI_FADT_FFF_RESET_REG_SUP_n((n)))
+#define ACPI_FADT_FFF_SEALED_CASE_SET(r,n)         ((r) \
+    = ((r) & ~ACPI_FADT_FFF_SEALED_CASE) | ACPI_FADT_FFF_SEALED_CASE_n((n)))
 #define ACPI_FADT_FFF_HEADLESS_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_HEADLESS) | ACPI_FADT_FFF_HEADLESS_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_HEADLESS) | ACPI_FADT_FFF_HEADLESS_n((n)))
 #define ACPI_FADT_FFF_CPU_SW_SLP_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_CPU_SW_SLP) | ACPI_FADT_FFF_CPU_SW_SLP_n(n))
-#define ACPI_FADT_FFF_PCI_EXP_WAK_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_PCI_EXP_WAK) | ACPI_FADT_FFF_PCI_EXP_WAK_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_CPU_SW_SLP) | ACPI_FADT_FFF_CPU_SW_SLP_n((n)))
+#define ACPI_FADT_FFF_PCI_EXP_WAK_SET(r,n)         ((r) \
+    = ((r) & ~ACPI_FADT_FFF_PCI_EXP_WAK) | ACPI_FADT_FFF_PCI_EXP_WAK_n((n)))
 #define ACPI_FADT_FFF_PLAT_CLOCK_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_PLAT_CLOCK) | ACPI_FADT_FFF_PLAT_CLOCK_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_PLAT_CLOCK) | ACPI_FADT_FFF_PLAT_CLOCK_n((n)))
 #define ACPI_FADT_FFF_S4_RTC_STS_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_S4_RTC_STS) | ACPI_FADT_FFF_S4_RTC_STS_n(n))
-#define ACPI_FADT_FFF_REMOTE_ON_CAP_SET(r,n)       (r \
-    = ((r) & ~ACPI_FADT_FFF_REMOTE_ON_CAP) | ACPI_FADT_FFF_REMOTE_ON_CAP_n(n))
-#define ACPI_FADT_FFF_FORCE_CLUSTER_SET(r,n)       (r \
-    = ((r) & ~ACPI_FADT_FFF_FORCE_CLUSTER) | ACPI_FADT_FFF_FORCE_CLUSTER_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_S4_RTC_STS) | ACPI_FADT_FFF_S4_RTC_STS_n((n)))
+#define ACPI_FADT_FFF_REMOTE_ON_CAP_SET(r,n)       ((r) = \
+    ((r) & ~ACPI_FADT_FFF_REMOTE_ON_CAP) | ACPI_FADT_FFF_REMOTE_ON_CAP_n((n)))
+#define ACPI_FADT_FFF_FORCE_CLUSTER_SET(r,n)       ((r) = \
+    ((r) & ~ACPI_FADT_FFF_FORCE_CLUSTER) | ACPI_FADT_FFF_FORCE_CLUSTER_n((n)))
 #define ACPI_FADT_FFF_FORCE_PHYS_SET(r,n) \
-    (r = ((r) & ~ACPI_FADT_FFF_FORCE_PHYS) | ACPI_FADT_FFF_FORCE_PHYS_n(n))
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI_SET(r,n)     (r = ((r) \
-    & ~ACPI_FADT_FFF_HW_REDUCED_ACPI) | ACPI_FADT_FFF_HW_REDUCED_ACPI_n(n))
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_SET(r,n)  (r = ((r) & \
-    ~ACPI_FADT_FFF_LOCAL_POWER_S0_BIT) | ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_n(n))
+    ((r) = ((r) & ~ACPI_FADT_FFF_FORCE_PHYS) | ACPI_FADT_FFF_FORCE_PHYS_n((n)))
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI_SET(r,n)     ((r) = ((r) \
+    & ~ACPI_FADT_FFF_HW_REDUCED_ACPI) | ACPI_FADT_FFF_HW_REDUCED_ACPI_n((n)))
+#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_SET(r,n) \
+    ((r) = ((r) & ~ACPI_FADT_FFF_LOCAL_POWER_S0_BIT) \
+    | ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_n((n)))
 
 // ACPI_MADT_FLAGS
 
@@ -801,7 +802,7 @@
     (((n) & ACPI_MADT_FLAGS_HAVE_PIC) >> ACPI_MADT_FLAGS_HAVE_PIC_BIT)
 
 #define ACPI_MADT_FLAGS_HAVE_PIC_SET(r,n) \
-    (r = ((r) & ~ACPI_MADT_FLAGS_HAVE_PIC) | ACPI_MADT_FLAGS_HAVE_PIC_n(n))
+    ((r) = ((r) & ~ACPI_MADT_FLAGS_HAVE_PIC) | ACPI_MADT_FLAGS_HAVE_PIC_n((n)))
 
 // ACPI_HPET_BLKID
 
@@ -880,16 +881,16 @@
     (((n) & ACPI_HPET_BLKID_REV_ID) >> ACPI_HPET_BLKID_REV_ID_BIT)
 
 #define ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_SET(r,n) \
-    (r = ((r) & ~ACPI_HPET_BLKID_COUNTER_CLK_PERIOD) \
-    | ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_n(n))
+    ((r) = ((r) & ~ACPI_HPET_BLKID_COUNTER_CLK_PERIOD) \
+    | ACPI_HPET_BLKID_COUNTER_CLK_PERIOD_n((n)))
 #define ACPI_HPET_BLKID_PCI_VEN_SET(r,n) \
-    (r = ((r) & ~ACPI_HPET_BLKID_PCI_VEN) | ACPI_HPET_BLKID_PCI_VEN_n(n))
-#define ACPI_HPET_BLKID_LEGACY_CAP_SET(r,n) \
-    (r = ((r) & ~ACPI_HPET_BLKID_LEGACY_CAP) | ACPI_HPET_BLKID_LEGACY_CAP_n(n))
-#define ACPI_HPET_BLKID_COUNTER_SZ_SET(r,n) \
-    (r = ((r) & ~ACPI_HPET_BLKID_COUNTER_SZ) | ACPI_HPET_BLKID_COUNTER_SZ_n(n))
-#define ACPI_HPET_BLKID_NUM_TIM_CMP_SET(r,n)         (r \
-    = ((r) & ~ACPI_HPET_BLKID_NUM_TIM_CMP) | ACPI_HPET_BLKID_NUM_TIM_CMP_n(n))
+    ((r) = ((r) & ~ACPI_HPET_BLKID_PCI_VEN) | ACPI_HPET_BLKID_PCI_VEN_n((n)))
+#define ACPI_HPET_BLKID_LEGACY_CAP_SET(r,n)          ((r) \
+    = ((r) & ~ACPI_HPET_BLKID_LEGACY_CAP) | ACPI_HPET_BLKID_LEGACY_CAP_n((n)))
+#define ACPI_HPET_BLKID_COUNTER_SZ_SET(r,n)          ((r) \
+    = ((r) & ~ACPI_HPET_BLKID_COUNTER_SZ) | ACPI_HPET_BLKID_COUNTER_SZ_n((n)))
+#define ACPI_HPET_BLKID_NUM_TIM_CMP_SET(r,n)         ((r) = \
+    ((r) & ~ACPI_HPET_BLKID_NUM_TIM_CMP) | ACPI_HPET_BLKID_NUM_TIM_CMP_n((n)))
 #define ACPI_HPET_BLKID_REV_ID_SET(r,n) \
-    (r = ((r) & ~ACPI_HPET_BLKID_REV_ID) | ACPI_HPET_BLKID_REV_ID_n(n))
+    ((r) = ((r) & ~ACPI_HPET_BLKID_REV_ID) | ACPI_HPET_BLKID_REV_ID_n((n)))
 

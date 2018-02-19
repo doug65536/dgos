@@ -120,7 +120,7 @@ def write_one_prefix(prefix_data):
 
 	print('')
 	for item in items:
-		print_line('{0} (r = ((r) & ~{1}_{2}) | {1}_{2}_n(n))'.format(
+		print_line('{0} ((r) = ((r) & ~{1}_{2}) | {1}_{2}_n((n)))'.format(
 			define(prefix, item['name'], '_SET(r,n)', max_len),
 			prefix, item['name']
 		))

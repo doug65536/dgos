@@ -70,17 +70,17 @@
     (((n) & PIC_ICW1_IC4) >> PIC_ICW1_IC4_BIT)
 
 #define PIC_ICW1_VECADDR_MCS80_SET(r,n) \
-    (r = ((r) & ~PIC_ICW1_VECADDR_MCS80) | PIC_ICW1_VECADDR_MCS80_n(n))
+    ((r) = ((r) & ~PIC_ICW1_VECADDR_MCS80) | PIC_ICW1_VECADDR_MCS80_n((n)))
 #define PIC_ICW1_MBS_SET(r,n) \
-    (r = ((r) & ~PIC_ICW1_MBS) | PIC_ICW1_MBS_n(n))
+    ((r) = ((r) & ~PIC_ICW1_MBS) | PIC_ICW1_MBS_n((n)))
 #define PIC_ICW1_LTIM_SET(r,n) \
-    (r = ((r) & ~PIC_ICW1_LTIM) | PIC_ICW1_LTIM_n(n))
+    ((r) = ((r) & ~PIC_ICW1_LTIM) | PIC_ICW1_LTIM_n((n)))
 #define PIC_ICW1_ADI_SET(r,n) \
-    (r = ((r) & ~PIC_ICW1_ADI) | PIC_ICW1_ADI_n(n))
+    ((r) = ((r) & ~PIC_ICW1_ADI) | PIC_ICW1_ADI_n((n)))
 #define PIC_ICW1_SNGL_SET(r,n) \
-    (r = ((r) & ~PIC_ICW1_SNGL) | PIC_ICW1_SNGL_n(n))
+    ((r) = ((r) & ~PIC_ICW1_SNGL) | PIC_ICW1_SNGL_n((n)))
 #define PIC_ICW1_IC4_SET(r,n) \
-    (r = ((r) & ~PIC_ICW1_IC4) | PIC_ICW1_IC4_n(n))
+    ((r) = ((r) & ~PIC_ICW1_IC4) | PIC_ICW1_IC4_n((n)))
 
 // PIC_ICW2
 #define PIC_ICW2                  1
@@ -99,7 +99,7 @@
     (((n) & PIC_ICW2_VECTOR) >> PIC_ICW2_VECTOR_BIT)
 
 #define PIC_ICW2_VECTOR_SET(r,n) \
-    (r = ((r) & ~PIC_ICW2_VECTOR) | PIC_ICW2_VECTOR_n(n))
+    ((r) = ((r) & ~PIC_ICW2_VECTOR) | PIC_ICW2_VECTOR_n((n)))
 
 //
 // PIC_ICW3_M: On master device
@@ -174,21 +174,21 @@
 #define PIC_ICW3_M_S0_GET(n)    (((n) & PIC_ICW3_M_S0) >> PIC_ICW3_M_S0_BIT)
 
 #define PIC_ICW3_M_S7_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S7) | PIC_ICW3_M_S7_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S7) | PIC_ICW3_M_S7_n((n)))
 #define PIC_ICW3_M_S6_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S6) | PIC_ICW3_M_S6_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S6) | PIC_ICW3_M_S6_n((n)))
 #define PIC_ICW3_M_S5_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S5) | PIC_ICW3_M_S5_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S5) | PIC_ICW3_M_S5_n((n)))
 #define PIC_ICW3_M_S4_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S4) | PIC_ICW3_M_S4_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S4) | PIC_ICW3_M_S4_n((n)))
 #define PIC_ICW3_M_S3_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S3) | PIC_ICW3_M_S3_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S3) | PIC_ICW3_M_S3_n((n)))
 #define PIC_ICW3_M_S2_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S2) | PIC_ICW3_M_S2_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S2) | PIC_ICW3_M_S2_n((n)))
 #define PIC_ICW3_M_S1_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S1) | PIC_ICW3_M_S1_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S1) | PIC_ICW3_M_S1_n((n)))
 #define PIC_ICW3_M_S0_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_M_S0) | PIC_ICW3_M_S0_n(n))
+    ((r) = ((r) & ~PIC_ICW3_M_S0) | PIC_ICW3_M_S0_n((n)))
 
 //
 // PIC_ICW3_S: On slave device
@@ -207,7 +207,7 @@
 #define PIC_ICW3_S_ID_GET(n)    (((n) & PIC_ICW3_S_ID) >> PIC_ICW3_S_ID_BIT)
 
 #define PIC_ICW3_S_ID_SET(r,n) \
-    (r = ((r) & ~PIC_ICW3_S_ID) | PIC_ICW3_S_ID_n(n))
+    ((r) = ((r) & ~PIC_ICW3_S_ID) | PIC_ICW3_S_ID_n((n)))
 
 // PIC_ICW4
 #define PIC_ICW4                1
@@ -257,13 +257,15 @@
 #define PIC_ICW4_8086_GET(n)    (((n) & PIC_ICW4_8086) >> PIC_ICW4_8086_BIT)
 
 #define PIC_ICW4_SFNM_SET(r,n) \
-    (r = ((r) & ~PIC_ICW4_SFNM) | PIC_ICW4_SFNM_n(n))
-#define PIC_ICW4_BUF_SET(r,n)   (r = ((r) & ~PIC_ICW4_BUF) | PIC_ICW4_BUF_n(n))
-#define PIC_ICW4_MS_SET(r,n)    (r = ((r) & ~PIC_ICW4_MS) | PIC_ICW4_MS_n(n))
+    ((r) = ((r) & ~PIC_ICW4_SFNM) | PIC_ICW4_SFNM_n((n)))
+#define PIC_ICW4_BUF_SET(r,n) \
+    ((r) = ((r) & ~PIC_ICW4_BUF) | PIC_ICW4_BUF_n((n)))
+#define PIC_ICW4_MS_SET(r,n) \
+    ((r) = ((r) & ~PIC_ICW4_MS) | PIC_ICW4_MS_n((n)))
 #define PIC_ICW4_AEOI_SET(r,n) \
-    (r = ((r) & ~PIC_ICW4_AEOI) | PIC_ICW4_AEOI_n(n))
+    ((r) = ((r) & ~PIC_ICW4_AEOI) | PIC_ICW4_AEOI_n((n)))
 #define PIC_ICW4_8086_SET(r,n) \
-    (r = ((r) & ~PIC_ICW4_8086) | PIC_ICW4_8086_n(n))
+    ((r) = ((r) & ~PIC_ICW4_8086) | PIC_ICW4_8086_n((n)))
 
 // PIC_OCW1
 #define PIC_OCW1              1
@@ -336,14 +338,14 @@
 #define PIC_OCW1_M1_GET(n)    (((n) & PIC_OCW1_M1) >> PIC_OCW1_M1_BIT)
 #define PIC_OCW1_M0_GET(n)    (((n) & PIC_OCW1_M0) >> PIC_OCW1_M0_BIT)
 
-#define PIC_OCW1_M7_SET(r,n)  (r = ((r) & ~PIC_OCW1_M7) | PIC_OCW1_M7_n(n))
-#define PIC_OCW1_M6_SET(r,n)  (r = ((r) & ~PIC_OCW1_M6) | PIC_OCW1_M6_n(n))
-#define PIC_OCW1_M5_SET(r,n)  (r = ((r) & ~PIC_OCW1_M5) | PIC_OCW1_M5_n(n))
-#define PIC_OCW1_M4_SET(r,n)  (r = ((r) & ~PIC_OCW1_M4) | PIC_OCW1_M4_n(n))
-#define PIC_OCW1_M3_SET(r,n)  (r = ((r) & ~PIC_OCW1_M3) | PIC_OCW1_M3_n(n))
-#define PIC_OCW1_M2_SET(r,n)  (r = ((r) & ~PIC_OCW1_M2) | PIC_OCW1_M2_n(n))
-#define PIC_OCW1_M1_SET(r,n)  (r = ((r) & ~PIC_OCW1_M1) | PIC_OCW1_M1_n(n))
-#define PIC_OCW1_M0_SET(r,n)  (r = ((r) & ~PIC_OCW1_M0) | PIC_OCW1_M0_n(n))
+#define PIC_OCW1_M7_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M7) | PIC_OCW1_M7_n((n)))
+#define PIC_OCW1_M6_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M6) | PIC_OCW1_M6_n((n)))
+#define PIC_OCW1_M5_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M5) | PIC_OCW1_M5_n((n)))
+#define PIC_OCW1_M4_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M4) | PIC_OCW1_M4_n((n)))
+#define PIC_OCW1_M3_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M3) | PIC_OCW1_M3_n((n)))
+#define PIC_OCW1_M2_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M2) | PIC_OCW1_M2_n((n)))
+#define PIC_OCW1_M1_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M1) | PIC_OCW1_M1_n((n)))
+#define PIC_OCW1_M0_SET(r,n)  ((r) = ((r) & ~PIC_OCW1_M0) | PIC_OCW1_M0_n((n)))
 
 // PIC_OCW2
 #define PIC_OCW2               0
@@ -372,9 +374,12 @@
 #define PIC_OCW2_OP_GET(n)     (((n) & PIC_OCW2_OP) >> PIC_OCW2_OP_BIT)
 #define PIC_OCW2_IR_GET(n)     (((n) & PIC_OCW2_IR) >> PIC_OCW2_IR_BIT)
 
-#define PIC_OCW2_EOI_SET(r,n)  (r = ((r) & ~PIC_OCW2_EOI) | PIC_OCW2_EOI_n(n))
-#define PIC_OCW2_OP_SET(r,n)   (r = ((r) & ~PIC_OCW2_OP) | PIC_OCW2_OP_n(n))
-#define PIC_OCW2_IR_SET(r,n)   (r = ((r) & ~PIC_OCW2_IR) | PIC_OCW2_IR_n(n))
+#define PIC_OCW2_EOI_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW2_EOI) | PIC_OCW2_EOI_n((n)))
+#define PIC_OCW2_OP_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW2_OP) | PIC_OCW2_OP_n((n)))
+#define PIC_OCW2_IR_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW2_IR) | PIC_OCW2_IR_n((n)))
 
 //
 // PIC_OCW2_OP_RAEM: Rotate in automatic EOI mode (clear)
@@ -495,9 +500,13 @@
 #define PIC_OCW3_RR_GET(n)     (((n) & PIC_OCW3_RR) >> PIC_OCW3_RR_BIT)
 #define PIC_OCW3_RIS_GET(n)    (((n) & PIC_OCW3_RIS) >> PIC_OCW3_RIS_BIT)
 
-#define PIC_OCW3_SMM_SET(r,n)  (r = ((r) & ~PIC_OCW3_SMM) | PIC_OCW3_SMM_n(n))
-#define PIC_OCW3_SET_SET(r,n)  (r = ((r) & ~PIC_OCW3_SET) | PIC_OCW3_SET_n(n))
-#define PIC_OCW3_P_SET(r,n)    (r = ((r) & ~PIC_OCW3_P) | PIC_OCW3_P_n(n))
-#define PIC_OCW3_RR_SET(r,n)   (r = ((r) & ~PIC_OCW3_RR) | PIC_OCW3_RR_n(n))
-#define PIC_OCW3_RIS_SET(r,n)  (r = ((r) & ~PIC_OCW3_RIS) | PIC_OCW3_RIS_n(n))
+#define PIC_OCW3_SMM_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW3_SMM) | PIC_OCW3_SMM_n((n)))
+#define PIC_OCW3_SET_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW3_SET) | PIC_OCW3_SET_n((n)))
+#define PIC_OCW3_P_SET(r,n)    ((r) = ((r) & ~PIC_OCW3_P) | PIC_OCW3_P_n((n)))
+#define PIC_OCW3_RR_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW3_RR) | PIC_OCW3_RR_n((n)))
+#define PIC_OCW3_RIS_SET(r,n) \
+    ((r) = ((r) & ~PIC_OCW3_RIS) | PIC_OCW3_RIS_n((n)))
 
