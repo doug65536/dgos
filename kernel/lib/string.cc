@@ -222,6 +222,27 @@ EXPORT void *memset(void *dest, int c, size_t n)
     return dest;
 }
 
+// GCC erroneously disables __builtin_ia32_movnti64
+// when using mgeneral-regs-only
+__attribute__((target("sse2")))
+void clear64(void *dest, size_t n)
+{
+    long long *d = (long long *)dest;
+
+    do {
+        __builtin_ia32_movnti64(d, 0);
+        __builtin_ia32_movnti64(d+1, 0);
+        __builtin_ia32_movnti64(d+2, 0);
+        __builtin_ia32_movnti64(d+3, 0);
+        __builtin_ia32_movnti64(d+4, 0);
+        __builtin_ia32_movnti64(d+5, 0);
+        __builtin_ia32_movnti64(d+6, 0);
+        __builtin_ia32_movnti64(d+7, 0);
+        d += 8;
+    } while (n -= 64);
+    __builtin_ia32_sfence();
+}
+
 static __always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
 {
     uint32_t eax;
