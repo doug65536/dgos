@@ -20,7 +20,7 @@ void progress_bar_draw(int top, int left, int right, int percent)
 {
     print_xy(left, top, boxchars[TL], 0x1F, 1);
     print_xy(left + 1, top, boxchars[H], 0x1F, right - left - 1);
-    print_xy(right, top, boxchars[TR], 0x0F, 1);
+    print_xy(right, top, boxchars[TR], 0x1F, 1);
     print_xy(left, top + 1, boxchars[V], 0x1F, 1);
     print_xy(right, top + 1, boxchars[V], 0x1F, 1);
     print_xy(left, top + 2, boxchars[BL], 0x1F, 1);
