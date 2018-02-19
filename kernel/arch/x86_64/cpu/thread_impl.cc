@@ -657,7 +657,8 @@ static thread_info_t *thread_choose_next(
 static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
-    thread->state = thread_state_t(int(thread->state) & ~THREAD_BUSY);
+    atomic_and(&thread->state, ~THREAD_BUSY);
+    //thread->state = thread_state_t(int(thread->state) & ~THREAD_BUSY);
 }
 
 isr_context_t *thread_schedule(isr_context_t *ctx)
