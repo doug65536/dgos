@@ -1,6 +1,6 @@
 #include "keyboard.h"
 #include "printk.h"
-#include "threadsync.h"
+#include "mutex.h"
 #include "cpu/control_regs.h"
 
 struct keyboard_buffer_t {
@@ -8,8 +8,8 @@ struct keyboard_buffer_t {
     size_t head;
     size_t tail;
 
-    mutex_t lock;
-    condition_var_t not_empty;
+    ticketlock lock;
+    condition_variable not_empty;
 };
 
 static keyboard_buffer_t keybd_buffer;
@@ -95,12 +95,11 @@ static size_t keybd_queue_next(size_t index)
 
 int keybd_event(keyboard_event_t event)
 {
-    mutex_lock(&keybd_buffer.lock);
+    unique_lock<ticketlock> buffer_lock(keybd_buffer.lock);
 
     size_t next_head = keybd_queue_next(keybd_buffer.head);
     if (next_head == keybd_buffer.tail) {
         // Buffer is full
-        mutex_unlock(&keybd_buffer.lock);
         return 0;
     }
 
@@ -110,18 +109,7 @@ int keybd_event(keyboard_event_t event)
     // Advance head
     keybd_buffer.head = keybd_queue_next(keybd_buffer.head);
 
-    //char const *special_text = keybd_special_text(event.vk);
-    //
-    //printk("%8d (%c) vk=%8x (%s)\n",
-    //       event.codepoint,
-    //       event.codepoint >= 0 ?
-    //           event.codepoint :
-    //           -event.codepoint,
-    //       event.vk,
-    //       special_text);
-
-    mutex_unlock(&keybd_buffer.lock);
-    condvar_wake_one(&keybd_buffer.not_empty);
+    keybd_buffer.not_empty.notify_all();
 
     return 1;
 }
@@ -129,19 +117,15 @@ int keybd_event(keyboard_event_t event)
 keyboard_event_t keybd_waitevent(void)
 {
     keyboard_event_t event;
-    cpu_scoped_irq_disable intr_was_enabled;
 
-    mutex_lock(&keybd_buffer.lock);
+    unique_lock<ticketlock> buffer_lock(keybd_buffer.lock);
 
     while (keybd_buffer.head == keybd_buffer.tail)
-        condvar_wait(&keybd_buffer.not_empty,
-                     &keybd_buffer.lock);
+        keybd_buffer.not_empty.wait(buffer_lock);
 
     event = keybd_buffer.buffer[keybd_buffer.tail];
 
     keybd_buffer.tail = keybd_queue_next(keybd_buffer.tail);
-
-    mutex_unlock(&keybd_buffer.lock);
 
     return event;
 }
@@ -161,6 +145,4 @@ char const *keybd_special_text(int codepoint)
 
 void keybd_init(void)
 {
-    mutex_init(&keybd_buffer.lock);
-    condvar_init(&keybd_buffer.not_empty);
 }
