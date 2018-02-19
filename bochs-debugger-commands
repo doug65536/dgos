@@ -1,3 +1,3 @@
 u switch-mode
-ldsym global "kernel-bmi.sym"
+ldsym global "kernel-generic.sym"
 lb "cpu_debug_break"
