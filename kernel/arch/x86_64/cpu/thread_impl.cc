@@ -841,8 +841,17 @@ EXPORT void thread_resume(thread_t tid)
 {
     thread_info_t *thread = threads + tid;
 
-    cpu_wait_value(&thread->state, THREAD_IS_SUSPENDED);
-    thread->state = THREAD_IS_READY;
+    for (;;) {
+        cpu_wait_value(&thread->state, THREAD_IS_SUSPENDED,
+                       thread_state_t(~THREAD_BUSY));
+
+        thread_state_t busy = thread_state_t(thread->state & THREAD_BUSY);
+
+        if (atomic_cmpxchg(&thread->state,
+                           THREAD_IS_SUSPENDED | busy,
+                           THREAD_IS_READY | busy))
+            break;
+    }
 }
 
 EXPORT int thread_wait(thread_t thread_id)
