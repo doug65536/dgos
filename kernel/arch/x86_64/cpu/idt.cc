@@ -555,6 +555,8 @@ void dump_context(isr_context_t *ctx, int to_screen)
                  ctx->gpr.r.r[i]);
     }
 
+    bool has_fpu_ctx = ISR_CTX_FPU(ctx) != nullptr;
+
     if (sse_avx512_xregs_offset && sse_avx512_xregs_size) {
         // 32 register AVX-512
 
@@ -563,7 +565,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     } else if (sse_avx_offset && sse_avx_size) {
         // AVX
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; has_fpu_ctx && i < 16; ++i) {
             uint64_t const *lo = cpu_get_fpr_reg(ctx, i);
             uint64_t const *hi = cpu_get_fpr_reg(ctx, i + 16);
             printdbg("%symm%d=%16lx:%16lx:%16lx:%16lx\n",
@@ -572,7 +574,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
         }
     } else {
         // xmm registers
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; has_fpu_ctx && i < 16; ++i) {
             printdbg("%sxmm%d=%16lx%16lx\n",
                      i > 9 ? "" : " ", i,
                      ISR_CTX_SSE_XMMn_q(ctx, i, 1),
@@ -601,16 +603,18 @@ void dump_context(isr_context_t *ctx, int to_screen)
     }
 
     // mxcsr and description
-    cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf), ISR_CTX_SSE_MXCSR(ctx));
-    printdbg("mxcsr=%04x %s\n", ISR_CTX_SSE_MXCSR(ctx), fmt_buf);
+    if (has_fpu_ctx) {
+        cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf), ISR_CTX_SSE_MXCSR(ctx));
+        printdbg("mxcsr=%04x %s\n", ISR_CTX_SSE_MXCSR(ctx), fmt_buf);
 
-    // fpucw and description
-    cpu_describe_fpucw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FCW(ctx));
-    printdbg("fpucw=%04x %s\n", ISR_CTX_FPU_FCW(ctx), fmt_buf);
+        // fpucw and description
+        cpu_describe_fpucw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FCW(ctx));
+        printdbg("fpucw=%04x %s\n", ISR_CTX_FPU_FCW(ctx), fmt_buf);
 
-    // fpusw and description
-    cpu_describe_fpusw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FSW(ctx));
-    printdbg("fpusw=%04x %s\n", ISR_CTX_FPU_FSW(ctx), fmt_buf);
+        // fpusw and description
+        cpu_describe_fpusw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FSW(ctx));
+        printdbg("fpusw=%04x %s\n", ISR_CTX_FPU_FSW(ctx), fmt_buf);
+    }
 
     // fault address
     printdbg("cr2=%16lx\n", cpu_get_fault_address());
@@ -646,17 +650,19 @@ void dump_context(isr_context_t *ctx, int to_screen)
             con_draw_xy(3, i, fmt_buf, color);
         }
 
-        // XMM register name
-        snprintf(fmt_buf, sizeof(fmt_buf), " %sxmm%d",
-                 i < 10 ? " " : "",
-                 i);
-        con_draw_xy(29, i, fmt_buf, color);
+        if (has_fpu_ctx) {
+            // XMM register name
+            snprintf(fmt_buf, sizeof(fmt_buf), " %sxmm%d",
+                     i < 10 ? " " : "",
+                     i);
+            con_draw_xy(29, i, fmt_buf, color);
 
-        // XMM register value
-        snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx%16lx ",
-                ISR_CTX_SSE_XMMn_q(ctx, i, 1),
-                ISR_CTX_SSE_XMMn_q(ctx, i, 0));
-        con_draw_xy(35, i, fmt_buf, color);
+            // XMM register value
+            snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx%16lx ",
+                    ISR_CTX_SSE_XMMn_q(ctx, i, 1),
+                    ISR_CTX_SSE_XMMn_q(ctx, i, 0));
+            con_draw_xy(35, i, fmt_buf, color);
+        }
     }
 
     for (int i = 0; i < 4; ++i) {
@@ -694,16 +700,18 @@ void dump_context(isr_context_t *ctx, int to_screen)
         con_draw_xy(9, 17, fmt_buf, color);
     }
 
-    // MXCSR
-    width = snprintf(fmt_buf, sizeof(fmt_buf), "=%04x",
-                     ISR_CTX_SSE_MXCSR(ctx));
-    con_draw_xy(63-width, 16, "mxcsr", color);
-    con_draw_xy(68-width, 16, fmt_buf, color);
+    if (has_fpu_ctx) {
+        // MXCSR
+        width = snprintf(fmt_buf, sizeof(fmt_buf), "=%04x",
+                         ISR_CTX_SSE_MXCSR(ctx));
+        con_draw_xy(63-width, 16, "mxcsr", color);
+        con_draw_xy(68-width, 16, fmt_buf, color);
 
-    // MXCSR description
-    width = cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
-                       ISR_CTX_SSE_MXCSR(ctx));
-    con_draw_xy(68-width, 17, fmt_buf, color);
+        // MXCSR description
+        width = cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf),
+                           ISR_CTX_SSE_MXCSR(ctx));
+        con_draw_xy(68-width, 17, fmt_buf, color);
+    }
 
     // fault address
     con_draw_xy(48, 19, "cr2", color);
