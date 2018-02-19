@@ -2251,8 +2251,9 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         } else if (flags & MAP_PHYSICAL) {
             pte_t pte;
 
-            for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end; ++ofs) {
-                physaddr_t paddr = uintptr_t(addr) + (ofs << PAGE_SCALE);
+            physaddr_t paddr = physaddr_t(addr);
+            for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end;
+                 ++ofs, paddr += PAGE_SIZE) {
                 pte = pte_t(paddr | page_flags);
                 pte = atomic_xchg(base_pte + ofs, pte);
 
@@ -2608,7 +2609,7 @@ int madvise(void *addr, size_t len, int advice)
                     page = expect & PTE_ADDR;
                     replace = expect | PTE_ADDR;
 
-                    if (!atomic_cmpxchg_upd(pt[3], &expect, replace))
+                    if (unlikely(!atomic_cmpxchg_upd(pt[3], &expect, replace)))
                         continue;
 
                     free_batch.free(page);
@@ -2619,7 +2620,7 @@ int madvise(void *addr, size_t len, int advice)
                 replace = (expect & ~(PTE_PTEPAT | PTE_PCD | PTE_PWT)) |
                         order_bits;
 
-                if (atomic_cmpxchg_upd(pt[3], &expect, replace))
+                if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace)))
                     break;
             }
         }
