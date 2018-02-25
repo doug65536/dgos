@@ -97,32 +97,6 @@ enum keyb8042_key_state_t {
     IN_E1_2
 };
 
-// Bit positions for each shift key
-#define KEYB_LSHIFT_DOWN_BIT 0
-#define KEYB_RSHIFT_DOWN_BIT 1
-#define KEYB_LCTRL_DOWN_BIT  2
-#define KEYB_RCTRL_DOWN_BIT  3
-#define KEYB_LALT_DOWN_BIT   4
-#define KEYB_RALT_DOWN_BIT   5
-#define KEYB_LGUI_DOWN_BIT   6
-#define KEYB_RGUI_DOWN_BIT   7
-
-// Bitmasks for checking each shift key
-#define KEYB_LSHIFT_DOWN    (1 << KEYB_LSHIFT_DOWN_BIT)
-#define KEYB_RSHIFT_DOWN    (1 << KEYB_RSHIFT_DOWN_BIT)
-#define KEYB_LALT_DOWN      (1 << KEYB_LALT_DOWN_BIT)
-#define KEYB_RALT_DOWN      (1 << KEYB_RALT_DOWN_BIT)
-#define KEYB_LCTRL_DOWN     (1 << KEYB_LCTRL_DOWN_BIT)
-#define KEYB_RCTRL_DOWN     (1 << KEYB_RCTRL_DOWN_BIT)
-#define KEYB_LGUI_DOWN      (1 << KEYB_LGUI_DOWN_BIT)
-#define KEYB_RGUI_DOWN      (1 << KEYB_RGUI_DOWN_BIT)
-
-// Bitmasks for checking either left or right
-#define KEYB_SHIFT_DOWN     (KEYB_LSHIFT_DOWN | KEYB_RSHIFT_DOWN)
-#define KEYB_CTRL_DOWN      (KEYB_LCTRL_DOWN | KEYB_RCTRL_DOWN)
-#define KEYB_ALT_DOWN       (KEYB_LALT_DOWN | KEYB_RALT_DOWN)
-#define KEYB_GUI_DOWN       (KEYB_LGUI_DOWN | KEYB_RGUI_DOWN)
-
 static keyb8042_key_state_t keyb8042_state = NORMAL;
 static int volatile keyb8042_shift_state;
 static int keyb8042_alt_code;

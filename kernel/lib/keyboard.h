@@ -7,10 +7,8 @@ typedef enum keyboard_virtual_key_t {
     KEYB_VK_BASE = 0x120000,
 
     // Modifier keys
-    KEYB_VK_LCTRL, KEYB_VK_RCTRL,
-    KEYB_VK_LSHIFT, KEYB_VK_RSHIFT,
-    KEYB_VK_LALT, KEYB_VK_RALT,
-    KEYB_VK_LGUI, KEYB_VK_RGUI,
+    KEYB_VK_LCTRL, KEYB_VK_LSHIFT, KEYB_VK_LALT, KEYB_VK_LGUI,
+    KEYB_VK_RCTRL, KEYB_VK_RSHIFT, KEYB_VK_RALT, KEYB_VK_RGUI,
 
     // Lock keys
     KEYB_VK_CAPSLOCK, KEYB_VK_NUMLOCK, KEYB_VK_SCRLOCK,
@@ -160,15 +158,41 @@ struct keyboard_event_t {
 
 // Mouse events use these too:
 
-#define KEYMODIFIER_FLAG_SHIFT_BIT     0
-#define KEYMODIFIER_FLAG_CTRL_BIT      2
-#define KEYMODIFIER_FLAG_ALT_BIT       4
-#define KEYMODIFIER_FLAG_GUI_BIT       6
+#define KEYMODIFIER_FLAG_CTRL_BIT      0
+#define KEYMODIFIER_FLAG_SHIFT_BIT     1
+#define KEYMODIFIER_FLAG_ALT_BIT       2
+#define KEYMODIFIER_FLAG_GUI_BIT       3
 
-#define KEYMODIFIER_FLAG_SHIFT         (1 << KEYMODIFIER_FLAG_SHIFT_BIT)
 #define KEYMODIFIER_FLAG_CTRL          (1 << KEYMODIFIER_FLAG_CTRL_BIT)
+#define KEYMODIFIER_FLAG_SHIFT         (1 << KEYMODIFIER_FLAG_SHIFT_BIT)
 #define KEYMODIFIER_FLAG_ALT           (1 << KEYMODIFIER_FLAG_ALT_BIT)
 #define KEYMODIFIER_FLAG_GUI           (1 << KEYMODIFIER_FLAG_GUI_BIT)
+
+// Bit positions for each shift key
+#define KEYB_LCTRL_DOWN_BIT  0
+#define KEYB_LSHIFT_DOWN_BIT 1
+#define KEYB_LALT_DOWN_BIT   2
+#define KEYB_LGUI_DOWN_BIT   3
+#define KEYB_RCTRL_DOWN_BIT  4
+#define KEYB_RSHIFT_DOWN_BIT 5
+#define KEYB_RALT_DOWN_BIT   6
+#define KEYB_RGUI_DOWN_BIT   7
+
+// Bitmasks for checking each shift key
+#define KEYB_LCTRL_DOWN     (1 << KEYB_LCTRL_DOWN_BIT)
+#define KEYB_LSHIFT_DOWN    (1 << KEYB_LSHIFT_DOWN_BIT)
+#define KEYB_LALT_DOWN      (1 << KEYB_LALT_DOWN_BIT)
+#define KEYB_LGUI_DOWN      (1 << KEYB_LGUI_DOWN_BIT)
+#define KEYB_RCTRL_DOWN     (1 << KEYB_RCTRL_DOWN_BIT)
+#define KEYB_RSHIFT_DOWN    (1 << KEYB_RSHIFT_DOWN_BIT)
+#define KEYB_RALT_DOWN      (1 << KEYB_RALT_DOWN_BIT)
+#define KEYB_RGUI_DOWN      (1 << KEYB_RGUI_DOWN_BIT)
+
+// Bitmasks for checking either left or right
+#define KEYB_SHIFT_DOWN     (KEYB_LSHIFT_DOWN | KEYB_RSHIFT_DOWN)
+#define KEYB_CTRL_DOWN      (KEYB_LCTRL_DOWN | KEYB_RCTRL_DOWN)
+#define KEYB_ALT_DOWN       (KEYB_LALT_DOWN | KEYB_RALT_DOWN)
+#define KEYB_GUI_DOWN       (KEYB_LGUI_DOWN | KEYB_RGUI_DOWN)
 
 // Get the human readable text for a special codepoint
 char const *keybd_special_text(int codepoint);

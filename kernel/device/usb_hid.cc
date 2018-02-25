@@ -10,7 +10,7 @@
 #define USBHID_TRACE(...) ((void)0)
 #endif
 
-static int const usb_hid_code_to_ascii[] = {
+static int const usb_hid_keybd_lookup[] = {
     // 00-03 <special>
     0,  // no event
     0,  // error rollover
@@ -514,7 +514,7 @@ static int const usb_hid_code_to_ascii[] = {
     // e8-ffff <reserved>
 };
 
-C_ASSERT(countof(usb_hid_code_to_ascii) == 0xe8);
+C_ASSERT(countof(usb_hid_keybd_lookup) == 0xe8);
 
 class usb_hid_t : public usb_class_drv_t {
 protected:
@@ -528,11 +528,11 @@ protected:
     virtual bool probe(usb_config_helper *cfg, usb_bus_t *bus) override final;
 
 private:
-    static int keyboard_poll_thread(void *p);
-    int keyboard_poll_thread();
+    static int keybd_poll_thread(void *p);
+    int keybd_poll_thread();
 
-    static int keyboard_in_thread(void *p);
-    int keyboard_in_thread();
+    static int keybd_in_thread(void *p);
+    int keybd_in_thread();
 
     static int mouse_poll_thread(void *p);
     int mouse_poll_thread();
@@ -540,8 +540,13 @@ private:
     static int mouse_in_thread(void *p);
     int mouse_in_thread();
 
+    void detect_keybd_changes();
+
     uint8_t last_keybd_state[8];
+    uint8_t this_keybd_state[8];
+
     uint8_t last_mouse_state[8];
+    uint8_t this_mouse_state[8];
 
     ticketlock print_lock;
     usb_pipe_t keybd_control;
@@ -584,14 +589,14 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
                                 ep_desc->max_packet_sz, ep_desc->interval,
                                 ep_desc->ep_attr)) {
                 USBHID_TRACE("using interrupt pipe for keyboard input\n");
-                tid = thread_create(keyboard_in_thread, this, 0, false);
+                tid = thread_create(keybd_in_thread, this, 0, false);
             }
         }
 
         // Fallback to polling if we didn't create the interrupt IN endpoint
         if (tid == -1) {
             USBHID_TRACE("using polling for keyboard input\n");
-            tid = thread_create(keyboard_poll_thread, this, 0, false);
+            tid = thread_create(keybd_poll_thread, this, 0, false);
         }
 
         thread_set_priority(tid, 16);
@@ -635,12 +640,12 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     return false;
 }
 
-int usb_hid_t::keyboard_poll_thread(void *p)
+int usb_hid_t::keybd_poll_thread(void *p)
 {
-    return ((usb_hid_t*)p)->keyboard_poll_thread();
+    return ((usb_hid_t*)p)->keybd_poll_thread();
 }
 
-int usb_hid_t::keyboard_poll_thread()
+int usb_hid_t::keybd_poll_thread()
 {
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
@@ -655,6 +660,9 @@ int usb_hid_t::keyboard_poll_thread()
                     0, 0, 8, data);
 
         unique_lock<ticketlock> lock(print_lock);
+        detect_keybd_changes();
+        memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
+
         USBHID_TRACE("  Key: %02x %02x %02x %02x %02x %02x %02x %02x\n",
                 data[0], data[1], data[2], data[3],
                 data[4], data[5], data[6], data[7]);
@@ -665,24 +673,21 @@ int usb_hid_t::keyboard_poll_thread()
     return true;
 }
 
-int usb_hid_t::keyboard_in_thread(void *p)
+int usb_hid_t::keybd_in_thread(void *p)
 {
-    return ((usb_hid_t*)p)->keyboard_in_thread();
+    return ((usb_hid_t*)p)->keybd_in_thread();
 }
 
-int usb_hid_t::keyboard_in_thread()
+int usb_hid_t::keybd_in_thread()
 {
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
     while (true) {
-        uint8_t data[12] = {};
-
-        int sz = keybd_in.recv(12, data);
+        keybd_in.recv(sizeof(this_keybd_state), this_keybd_state);
 
         unique_lock<ticketlock> lock(print_lock);
-        USBHID_TRACE("  Key: %02x %02x %02x %02x %02x %02x %02x %02x sz=%d\n",
-                data[0], data[1], data[2], data[3],
-                data[4], data[5], data[6], data[7], sz);
+        detect_keybd_changes();
+        memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
     }
 
     return true;
@@ -753,6 +758,76 @@ int usb_hid_t::mouse_in_thread()
     }
 
     return true;
+}
+
+void usb_hid_t::detect_keybd_changes()
+{
+    // Detect modifier changes
+    uint8_t modifier_changes = last_keybd_state[0] ^ this_keybd_state[0];
+
+    keyboard_event_t evt;
+
+    static int modifier_vk[] = {
+        KEYB_VK_LCTRL,
+        KEYB_VK_LSHIFT,
+        KEYB_VK_LALT,
+        KEYB_VK_LGUI,
+        KEYB_VK_RCTRL,
+        KEYB_VK_RSHIFT,
+        KEYB_VK_RALT,
+        KEYB_VK_RGUI
+    };
+
+    // Generate modifier key up/down events
+    for (int i = 0; i < 8; ++i) {
+        int mask = 1 << i;
+        int sign = (((this_keybd_state[0] & mask) != 0) * 2) - 1;
+
+        if (modifier_changes & mask) {
+            evt.codepoint = 0;
+            evt.vk = modifier_vk[i] * sign;
+            evt.flags = this_keybd_state[0];
+            keybd_event(evt);
+        }
+    }
+
+    // Scan for keys released since last event
+    for (int i = 2; i < 8; ++i) {
+        uint8_t scancode = last_keybd_state[i];
+
+        if (scancode < 4)
+            continue;
+
+        bool pressed = memchr(this_keybd_state + 2, scancode, 6);
+
+        if (!pressed) {
+            // Generate keyup event
+            int vk = (scancode < countof(usb_hid_keybd_lookup))
+                    ? usb_hid_keybd_lookup[scancode] : 0;
+
+            evt.codepoint = vk < KEYB_VK_BASE ? -vk : 0;
+            evt.vk = -vk;
+            evt.flags = this_keybd_state[0];
+            keybd_event(evt);
+        }
+    }
+
+    // Scan for keys pressed down in this event
+    for (int i = 2; i < 8; ++i) {
+        uint8_t scancode = this_keybd_state[i];
+
+        if (scancode < 4)
+            continue;
+
+        // Generate keydown event
+        int vk = (scancode < countof(usb_hid_keybd_lookup))
+                ? usb_hid_keybd_lookup[scancode] : 0;
+
+        evt.codepoint = vk < KEYB_VK_BASE ? vk : 0;
+        evt.vk = vk;
+        evt.flags = this_keybd_state[0];
+        keybd_event(evt);
+    }
 }
 
 usb_hid_t usb_hid_t::usb_hid;

@@ -1,5 +1,13 @@
 #include "keyboard.h"
 #include "mutex.h"
+#include "printk.h"
+
+#define DEBUG_KEYBD 1
+#if DEBUG_KEYBD
+#define KEYBD_TRACE(...) printdbg("keybd: " __VA_ARGS__)
+#else
+#define KEYBD_TRACE(...) ((void)0)
+#endif
 
 struct keyboard_buffer_t {
     keyboard_event_t buffer[16];
@@ -18,10 +26,8 @@ int (*keybd_set_layout_name)(char const *name);
 
 static char const *keyboard_special_text[] = {
     // Modifier keys
-    "KEYB_VK_LCTRL", "KEYB_VK_RCTRL",
-    "KEYB_VK_LSHIFT", "KEYB_VK_RSHIFT",
-    "KEYB_VK_LALT", "KEYB_VK_RALT",
-    "KEYB_VK_LGUI", "KEYB_VK_RGUI",
+    "KEYB_VK_LCTRL", "KEYB_VK_LSHIFT", "KEYB_VK_LALT", "KEYB_VK_LGUI",
+    "KEYB_VK_RCTRL", "KEYB_VK_RSHIFT", "KEYB_VK_RALT", "KEYB_VK_RGUI",
 
     // Lock keys
     "KEYB_VK_CAPSLOCK", "KEYB_VK_NUMLOCK", "KEYB_VK_SCRLOCK",
@@ -146,7 +152,7 @@ static char const *keyboard_special_text[] = {
     // Lang
     "KEYB_VK_LANG_1", "KEYB_VK_LANG_2", "KEYB_VK_LANG_3",
     "KEYB_VK_LANG_4", "KEYB_VK_LANG_5", "KEYB_VK_LANG_6",
-    "KEYB_VK_LANG_7", "KEYB_VK_LANG_8", "KEYB_VK_LANG_9"
+    "KEYB_VK_LANG_7", "KEYB_VK_LANG_8", "KEYB_VK_LANG_9",
 };
 
 static size_t keybd_queue_next(size_t index)
@@ -165,6 +171,9 @@ int keybd_event(keyboard_event_t event)
         // Buffer is full
         return 0;
     }
+
+    KEYBD_TRACE("event codepoint=%c, vk=%s (%d)\n",
+                event.codepoint, keybd_special_text(event.vk), event.vk);
 
     // Insert into circular buffer
     keybd_buffer.buffer[keybd_buffer.head] = event;
