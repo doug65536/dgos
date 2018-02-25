@@ -2,6 +2,13 @@
 #include "dev_usb_ctl.h"
 #include "mouse.h"
 
+#define USBHID_DEBUG 1
+#if USBHID_DEBUG
+#define USBHID_TRACE(...) printdbg("usbhid: " __VA_ARGS__)
+#else
+#define USBHID_TRACE(...) ((void)0)
+#endif
+
 class usb_hid_t : public usb_class_drv_t {
 protected:
     static usb_hid_t usb_hid;
