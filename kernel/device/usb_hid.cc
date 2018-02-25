@@ -30,6 +30,9 @@ private:
     static int mouse_poll_thread(void *p);
     int mouse_poll_thread();
 
+    static int mouse_in_thread(void *p);
+    int mouse_in_thread();
+
     ticketlock print_lock;
     usb_pipe_t keybd_control;
     usb_pipe_t keybd_in;
@@ -70,21 +73,21 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
             if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc->ep_addr, keybd_in,
                                 ep_desc->max_packet_sz, ep_desc->interval,
                                 ep_desc->ep_attr)) {
+                USBHID_TRACE("using interrupt pipe for keyboard input\n");
                 tid = thread_create(keyboard_in_thread, this, 0, false);
             }
         }
 
         // Fallback to polling if we didn't create the interrupt IN endpoint
-        if (tid == -1)
+        if (tid == -1) {
+            USBHID_TRACE("using polling for keyboard input\n");
             tid = thread_create(keyboard_poll_thread, this, 0, false);
+        }
 
         thread_set_priority(tid, 16);
 
         return true;
     } else if (match.iface->iface_proto == 2) {
-        // FIXME Mouse disabled
-        return false;
-
         mouse_iface_idx = match.iface_idx;
 
         bus->get_pipe(cfg_hlp->slot(), 0, mouse_control);
@@ -96,7 +99,24 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
                     uint8_t(hid_request_t::SET_PROTOCOL),
                     0, 0, 0, nullptr);
 
-        int tid = thread_create(mouse_poll_thread, this, 0, false);
+        usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
+
+        int tid = -1;
+
+        if (ep_desc) {
+            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc->ep_addr, mouse_in,
+                                ep_desc->max_packet_sz, ep_desc->interval,
+                                ep_desc->ep_attr)) {
+                USBHID_TRACE("using interrupt pipe for mouse input\n");
+                tid = thread_create(mouse_in_thread, this, 0, false);
+            }
+        }
+
+        if (tid == -1) {
+            USBHID_TRACE("using polling for mouse input\n");
+            tid = thread_create(mouse_in_thread, this, 0, false);
+        }
+
         thread_set_priority(tid, 16);
 
         return true;
@@ -143,8 +163,6 @@ int usb_hid_t::keyboard_in_thread(void *p)
 
 int usb_hid_t::keyboard_in_thread()
 {
-    thread_sleep_for(1000);
-    //uint8_t zeros[8] = {};
     while (true) {
         uint8_t data[12] = {};
 
@@ -154,8 +172,6 @@ int usb_hid_t::keyboard_in_thread()
         printdbg("  Key: %02x %02x %02x %02x %02x %02x %02x %02x sz=%d\n",
                 data[0], data[1], data[2], data[3],
                 data[4], data[5], data[6], data[7], sz);
-
-        //thread_sleep_for(20);
     }
 
     return true;
@@ -194,6 +210,34 @@ int usb_hid_t::mouse_poll_thread()
         }
 
         thread_sleep_for(20);
+    }
+
+    return true;
+}
+
+int usb_hid_t::mouse_in_thread(void *p)
+{
+    return ((usb_hid_t*)p)->mouse_in_thread();
+}
+
+int usb_hid_t::mouse_in_thread()
+{
+    while (true) {
+        uint8_t data[8] = {};
+
+        int sz = mouse_in.recv(sizeof(data), data);
+
+        unique_lock<ticketlock> lock(print_lock);
+        printdbg("Mouse: %02x %02x %02x %02x %02x %02x %02x %02x sz=%d\n",
+                data[0], data[1], data[2], data[3],
+                data[4], data[5], data[6], data[7], sz);
+
+        mouse_raw_event_t evt;
+        evt.hdist = (char)data[1];
+        evt.vdist = -(char)data[2];
+        evt.wdist = (char)data[3];
+        evt.buttons = data[0];
+        mouse_event(evt);
     }
 
     return true;
