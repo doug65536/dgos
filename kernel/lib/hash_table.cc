@@ -32,7 +32,7 @@ void htbl_destroy(hashtbl_t *self)
     self->log2_capacity = 0;
 }
 
-static int htbl_rehash(hashtbl_t *self)
+static int htbl_rehash(hashtbl_t *self, unique_lock<shared_mutex> const&)
 {
     unsigned new_log2 = self->log2_capacity
             ? self->log2_capacity + 1
@@ -80,7 +80,7 @@ static int htbl_rehash(hashtbl_t *self)
 
 void *htbl_lookup(hashtbl_t *self, void *key)
 {
-    void *item = 0;
+    void *item = nullptr;
 
     shared_lock<shared_mutex> lock(self->lock);
     if (self->count) {
@@ -113,7 +113,7 @@ int htbl_insert(hashtbl_t *self, void *item)
 
     if (!self->items ||
             self->count >= ((1U<<self->log2_capacity) * 3U) >> 2) {
-        if (!htbl_rehash(self))
+        if (!htbl_rehash(self, lock))
             return 0;
     }
 
@@ -141,14 +141,14 @@ void htbl_delete(hashtbl_t *self, void *key)
     shared_lock<shared_mutex> lock(self->lock);
     if (self->count) {
         uint32_t hash = hash_32(key, self->key_size);
-        uint32_t mask = ~((uint32_t)-1 << self->log2_capacity);
+        uint32_t mask = ~(uint32_t(-1) << self->log2_capacity);
 
         hash &= mask;
 
-        for (uint32_t k = 0, e = 1 << self->log2_capacity;
+        for (uint32_t k = 0, e = 1U << self->log2_capacity;
              k < e; ++k, hash = (hash + 1) & mask) {
             if (self->items[hash] > (void*)1) {
-                void *check = (char*)self->items[hash] +
+                void const *check = (char const *)self->items[hash] +
                         self->key_ofs;
 
                 if (!memcmp(check, key, self->key_size)) {
@@ -157,7 +157,7 @@ void htbl_delete(hashtbl_t *self, void *key)
                         self->items[hash] = (void*)1;
                     } else {
                         // Next item is null, really delete
-                        self->items[hash] = 0;
+                        self->items[hash] = nullptr;
                         --self->count;
                     }
                     break;
