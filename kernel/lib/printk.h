@@ -32,7 +32,7 @@ int cprintf(char const *format, ...)
 
 int vcprintf(char const *format, va_list ap);
 
-int hex_dump(void const *mem, size_t size);
+int hex_dump(void const *mem, size_t size, size_t base = 0);
 
 struct format_flag_info_t {
     char const * const name;

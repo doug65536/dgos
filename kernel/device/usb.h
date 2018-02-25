@@ -33,6 +33,21 @@ enum struct usb_rqcode_t : uint8_t {
     SET_ISOCH_DELAY      = 49,
 };
 
+enum struct usb_req_type : uint8_t {
+    STD     = 0,
+    CLASS   = 1,
+    VENDOR  = 2
+};
+
+enum struct usb_req_recip_t : uint8_t {
+    DEVICE      = 0,
+    INTERFACE   = 1,
+    CLASS       = 2,
+    ENDPOINT    = 3,
+    OTHER       = 3,
+    VENDOR      = 31
+};
+
 //
 // Descriptor Types (USB 3.1 spec, Table 9-6)
 
@@ -50,6 +65,39 @@ enum struct usb_desctype_t : uint8_t {
     DEVICE_CAPABILITY          = 16,
     SS_EP_COMPANION            = 48,
     SSPLUS_ISOCH_EP_COMPANION  = 49,
+
+    // Class types
+
+    HUB_SS = 0x2A
+};
+
+enum struct usb_dir_t : uint8_t {
+    OUT = 0,
+    IN = 0x80
+};
+
+enum struct usb_class_t : uint8_t {
+    audio = 0x01,
+    comm = 0x02,
+    hid = 0x03,
+    physical = 0x05,
+    image = 0x06,
+    printer = 0x07,
+    mass_storage = 0x08,
+    hub = 0x09,
+    cdc_data = 0x0A,
+    smart_card = 0x0B,
+    content_sec = 0x0D,
+    video = 0x0E,
+    healthcare = 0x0F,
+    av = 0x10,
+    billboard = 0x11,
+    typec_bridge = 0x12,
+    diag = 0xDC,
+    wireless_ctrl = 0xE0,
+    misc = 0xEF,
+    app_specific = 0xFE,
+    vendor_specific = 0xFF
 };
 
 //
@@ -70,8 +118,8 @@ struct usb_desc_device {
     uint8_t dev_subclass;
     uint8_t dev_protocol;
 
-    // 4=max 16 bytes, 12=max 4kb, 64=unlimited, etc
-    uint8_t log2_maxpktsz;
+    // USB3, log2(size), USB < 3, size in bytes
+    uint8_t maxpktsz;
 
     // Vendor, product, revision
     uint16_t vendor_id;
@@ -124,10 +172,17 @@ struct usb_desc_iface {
     uint8_t iface_subclass;
     uint8_t iface_proto;
     uint8_t iface_index;
-};
+} __packed;
 
 //
 // Endpoint descriptor
+
+enum struct usb_ep_attr : uint8_t {
+    control,
+    isoch,
+    bulk,
+    interrupt
+};
 
 struct usb_desc_ep {
     // Length of descriptor
@@ -137,22 +192,65 @@ struct usb_desc_ep {
     usb_desctype_t desc_type;
 
     uint8_t ep_addr;
-    uint8_t ep_attr;
+    usb_ep_attr ep_attr;
     uint16_t max_packet_sz;
     uint8_t interval;
-};
+} __packed;
+
+C_ASSERT(sizeof(usb_desc_ep) == 7);
 
 class usb_config_helper {
 public:
-    usb_config_helper(void *data, size_t len);
+    usb_config_helper(int slotid, usb_desc_device const& dev_desc,
+                      void *data, size_t len);
 
-    usb_desc_config *find_config(int cfg_index);
-    static usb_desc_iface *find_iface(usb_desc_config *cfg, int iface_index);
-    static usb_desc_ep *find_ep(usb_desc_iface *iface, int ep_index);
+    int slot() const;
+    usb_desc_device const& device() const;
+    usb_desc_config const *find_config(int cfg_index) const;
+    static usb_desc_iface const *find_iface(
+            usb_desc_config const *cfg, int iface_index);
+    static usb_desc_ep const *find_ep(
+            usb_desc_iface const *iface, int ep_index);
 
     static char const *class_code_text(uint8_t cls);
+    static char const *ep_attr_text(usb_ep_attr attr);
 
 private:
-    void *data;
+    usb_desc_device const dev_desc;
+    void const * const data;
     int len;
+    int slotid;
 };
+
+struct usb_hub_desc {
+    uint8_t len;
+
+    uint8_t desc_type;  // 0x2A for enhanced superspeed hub
+    uint8_t num_ports;
+    uint16_t characteristics;
+    uint8_t pwr2pwr_good;   // in 2ms increments
+    uint8_t current;
+    uint8_t hdr_decode_lat;
+    uint16_t hub_delay;
+    uint16_t removable;
+} __packed;
+
+C_ASSERT(sizeof(usb_hub_desc) == 12);
+
+// Interface association
+
+struct usb_iface_assoc {
+    uint8_t len;
+
+    // usb_desctype_t::INTERFACE_ASSOCIATION
+    uint8_t desc_type;
+
+    uint8_t first_iface;
+    uint8_t num_iface;
+    uint8_t func_class;
+    uint8_t func_subclass;
+    uint8_t func_proto;
+    uint8_t func_index;
+} __packed;
+
+C_ASSERT(sizeof(usb_iface_assoc) == 8);

@@ -785,9 +785,9 @@ void ide_if_t::ide_chan_t::detect_devices()
                         dma_bounce, unit.max_multiple << log2_sector_size,
                         65536);
 
-            dma_range_count = mphysranges_split(
-                        io_window_ranges, dma_range_count,
-                        countof(io_window_ranges), 16);
+            // PRDs must not cross 64KB boundaries
+            mphysranges_split(io_window_ranges, dma_range_count,
+                              countof(io_window_ranges), 16);
 
             IDE_TRACE("PRD list has %zu entries\n", dma_range_count);
 

@@ -996,7 +996,7 @@ EXPORT int printdbg(char const *format, ...)
     return result;
 }
 
-static int hex_dump_formatter(void const *mem, size_t size,
+static int hex_dump_formatter(void const *mem, size_t size, size_t base,
                               int (*output)(char const *format, ...))
 {
     uint8_t *buf = (uint8_t*)mem;
@@ -1004,21 +1004,30 @@ static int hex_dump_formatter(void const *mem, size_t size,
     int written = 0;
 
     int line_ofs = 0;
-    for (size_t i = 0; i < size; ++i) {
+    for (size_t i = 0; (i < size) || (i & 15); ++i) {
         if (!(i & 15)) {
-            line_ofs = snprintf(line_buf, sizeof(line_buf), "%08zx: ", i);
+            line_ofs = snprintf(line_buf, sizeof(line_buf),
+                                "%08zx:", i + base);
         }
 
-        line_ofs += snprintf(line_buf + line_ofs,
-                             sizeof(line_buf) - line_ofs,
-                             "%02x ", buf[i]);
+        if (i < size) {
+            line_ofs += snprintf(line_buf + line_ofs,
+                                 sizeof(line_buf) - line_ofs, " %02x",
+                                 buf[i]);
+        } else {
+            line_ofs += snprintf(line_buf + line_ofs,
+                                 sizeof(line_buf) - line_ofs, "   ");
+        }
 
         if ((i & 15) == 15) {
             line_buf[line_ofs++] = ' ';
 
-            for (int k = -15; k <= 0; ++k)
+            for (int k = -15; k <= 0; ++k) {
                 line_buf[line_ofs++] =
-                        buf[i + k] < ' ' ? '.' : buf[i + k];
+                        (i + k) < size
+                        ? (buf[i + k] < ' ' ? '.' : buf[i + k])
+                        : ' ';
+            }
 
             line_buf[line_ofs++] = '\n';
             line_buf[line_ofs++] = 0;
@@ -1031,9 +1040,9 @@ static int hex_dump_formatter(void const *mem, size_t size,
     return written;
 }
 
-int hex_dump(void const *mem, size_t size)
+int hex_dump(void const *mem, size_t size, size_t base)
 {
-    return hex_dump_formatter(mem, size, printdbg);
+    return hex_dump_formatter(mem, size, base, printdbg);
 }
 
 size_t format_flags_register(

@@ -1,8 +1,11 @@
 ../README.md
 arch/x86_64/cpu/pic.bits
+device/dev_usb_ctl.cc
 device/iocp.cc
 device/iocp.h
 device/usb.cc
+device/usb_hid.cc
+device/usb_hid.h
 device/usb_xhci.bits
 lib/cc/memory.cc
 lib/cc/union_storage.h

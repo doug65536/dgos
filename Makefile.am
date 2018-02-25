@@ -579,6 +579,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/serial-uart.h \
 	kernel/device/usb.h	\
 	kernel/device/usb.cc \
+	kernel/device/dev_usb_ctl.cc \
+	kernel/device/usb_hid.h \
+	kernel/device/usb_hid.cc \
 	kernel/device/usb_xhci.cc \
 	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \

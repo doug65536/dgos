@@ -2825,6 +2825,9 @@ size_t mphysranges(mmphysrange_t *ranges,
                    void *addr, size_t size,
                    size_t max_size)
 {
+    if (unlikely(size == 0))
+        return 0;
+
     mphysranges_state_t state;
 
     // Request data
@@ -2850,9 +2853,12 @@ size_t mphysranges(mmphysrange_t *ranges,
     return state.count;
 }
 
-size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
+bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
                          size_t count_limit, uint8_t log2_boundary)
 {
+    if (unlikely(ranges_count == 0))
+        return true;
+
     size_t boundary = size_t(1) << log2_boundary;
 
     for (size_t i = ranges_count; i > 0 && ranges_count < count_limit; --i) {
@@ -2865,6 +2871,10 @@ size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
 
         if (chk1 != chk2) {
             // Needs split
+
+            if (unlikely(ranges_count >= count_limit))
+                return false;
+
             uintptr_t new_end = end & -intptr_t(boundary);
             memmove(range + 1, range, (++ranges_count - i) * sizeof(*range));
             range[0].size = new_end - range[0].physaddr;
@@ -2872,7 +2882,8 @@ size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
             range[1].size = end - range[1].physaddr;
         }
     }
-    return ranges_count;
+
+    return true;
 }
 
 void *mmap_register_device(void *context,

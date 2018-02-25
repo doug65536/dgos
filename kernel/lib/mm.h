@@ -248,7 +248,7 @@ size_t mphysranges(mmphysrange_t *ranges,
 // Ensure no range crosses the specified boundary
 // For example, pass 16 in log2_boundary to modify
 // the region list to never cross a 64KB boundary
-size_t mphysranges_split(mmphysrange_t *ranges, size_t ranges_count,
+bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
                          size_t count_limit, uint8_t log2_boundary);
 
 // Return true if the address is present

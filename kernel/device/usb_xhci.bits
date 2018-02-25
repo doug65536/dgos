@@ -188,3 +188,50 @@
 
 23:0 CCP Command completion parameter
 31:24 CC Completion code
+
+-- USBXHCI_SLOTCTX_RSMHC 6.2.2 Slot context
+
+19:0 ROUTE Route string
+23:20 SPEED PSIV value same as PORTSC speed
+25 MTT Multi-transaction-translator
+26 HUB Hub flag
+31:27 CTXENT Context entries
+
+-- USBXHCI_CMD_TRB
+
+7:2 TYPE TRB type
+0 C Cycle
+1 TC Toggle cycle (link trbs)
+15:6 INTRTARGET Interrupter target
+
+-- USBXHCI_EPCTX_MML
+
+1:0 MULT
+6:2 MAXPSTREAMS
+7 LSA
+
+-- USBXHCI_EPCTX_CEH
+
+2:1 CERR Error count
+5:3 EPTYPE Endpoint type
+7 HID Host initiate disable
+
+-- USBXHCI_EPCTX_TR_DQ_PTR
+
+0 DCS Dequeue cycle state
+63:4 PTR Dequeue pointer
+
+-- USBXHCI_CTL_TRB_BMREQT
+
+4:0 RECIP Recipient
+6:5 TYPE Type
+7 TOHOST IN
+
+-- USBXHCI_CTL_TRB_XFERLEN_INTR
+
+16:0 XFERLEN
+31:22 INTR
+
+-- USBXHCI_CTL_TRB_TRT
+
+15:8 SLOTID
