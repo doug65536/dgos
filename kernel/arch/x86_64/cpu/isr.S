@@ -145,42 +145,42 @@ isr_common:
     //  7*8(%rbp) -> ss
 
     pushq %rbx
-    .cfi_rel_offset rbx,-1*8
+    .cfi_rel_offset rbx,1*8
 
     pushq %r15
-    .cfi_rel_offset r15,-2*8
+    .cfi_rel_offset r15,2*8
 
     // r15d=ds, r14d=es, r13d=fs, r12d=gs
     movl %ds,%r15d
 
     pushq %r14
-    .cfi_rel_offset r14,-3*8
+    .cfi_rel_offset r14,3*8
 
     movl %es,%r14d
 
     pushq %r13
-    .cfi_rel_offset r13,-4*8
+    .cfi_rel_offset r13,4*8
 
     movl %fs,%r13d
 
     pushq %r12
-    .cfi_rel_offset r12,-5*8
+    .cfi_rel_offset r12,5*8
 
     movl %gs,%r12d
 
     pushq %r11
-    .cfi_rel_offset r11,-6*8
+    .cfi_rel_offset r11,6*8
 
     // shift es, fs, gs into position to pack into r13
     shll $16,%r14d
 
     pushq %r10
-    .cfi_rel_offset r10,-7*8
+    .cfi_rel_offset r10,7*8
 
     shlq $32,%r13
 
     pushq %rax
-    .cfi_rel_offset rax,-8*8
+    .cfi_rel_offset rax,8*8
 
     shlq $48,%r12
 
@@ -191,31 +191,31 @@ isr_common:
 
     cld
     pushq %r9
-    .cfi_rel_offset r9,-9*8
+    .cfi_rel_offset r9,9*8
 
     // Merge fs,gs into r13
     orq %r12,%r13
 
     pushq %r8
-    .cfi_rel_offset r8,-10*8
+    .cfi_rel_offset r8,10*8
 
     // Merge ds|es,fs|gs into r13
     orq %r15,%r13
 
     pushq %rcx
-    .cfi_rel_offset rcx,-11*8
+    .cfi_rel_offset rcx,11*8
 
     // Get interrupted code segment
     movzwl frame_cs(%rbp),%ecx
 
     pushq %rdx
-    .cfi_rel_offset rdx,-12*8
+    .cfi_rel_offset rdx,12*8
 
     pushq %rsi
-    .cfi_rel_offset rsi,-13*8
+    .cfi_rel_offset rsi,13*8
 
     pushq %rdi
-    .cfi_rel_offset rdi,-14*8
+    .cfi_rel_offset rdi,14*8
 
     // Assume null FPU context pointer
     xorl %edi,%edi
