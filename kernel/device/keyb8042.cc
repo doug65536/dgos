@@ -87,9 +87,6 @@ static keyb8042_layout_t *keyb8042_layouts[] = {
 static char const keyb8042_passthru_lookup[] =
         " \b\n";
 
-static char const keyb8042_numpad_ascii[] =
-        "0123456789.\n+-*/";
-
 enum keyb8042_key_state_t {
     NORMAL,
     IN_E0,
@@ -98,8 +95,6 @@ enum keyb8042_key_state_t {
 };
 
 static keyb8042_key_state_t keyb8042_state = NORMAL;
-static int volatile keyb8042_shift_state;
-static int keyb8042_alt_code;
 
 // Mouse packet data
 static uint64_t keyb8042_last_mouse_packet_time;
@@ -108,36 +103,16 @@ static size_t keyb8042_mouse_packet_size;
 static size_t keyb8042_mouse_button_count;
 static uint8_t keyb8042_mouse_packet[5];
 
-static int keyb8042_get_modifiers(void)
-{
-    int flags = 0;
-
-    int shift_state = keyb8042_shift_state;
-
-    if (shift_state & KEYB_SHIFT_DOWN)
-        flags |= KEYMODIFIER_FLAG_SHIFT;
-
-    if (shift_state & KEYB_CTRL_DOWN)
-        flags |= KEYMODIFIER_FLAG_CTRL;
-
-    if (shift_state & KEYB_ALT_DOWN)
-        flags |= KEYMODIFIER_FLAG_ALT;
-
-    if (shift_state & KEYB_GUI_DOWN)
-        flags |= KEYMODIFIER_FLAG_GUI;
-
-    return flags;
-}
+static keybd_fsa_t keyb8042_fsa;
 
 static void keyb8042_keyboard_handler(void)
 {
     uint8_t scancode = 0;
 
     scancode = inb(KEYB_DATA);
-    //KEYB8042_DEBUGMSG(("Key code = %02x\n", scancode))
 
     int32_t vk = 0;
-    int is_keyup = !!(scancode & 0x80);
+    int sign = -!!(scancode & 0x80) * 2 - 1;
 
     switch (keyb8042_state) {
     case NORMAL:
@@ -173,103 +148,7 @@ static void keyb8042_keyboard_handler(void)
         break;
     }
 
-    //
-    // Update shift state bits
-
-    if (vk > KEYB_VK_BASE) {
-        int shift_mask;
-
-        // Update shift state
-        switch (vk) {
-        default: shift_mask = 0; break;
-        case KEYB_VK_LSHIFT: shift_mask = KEYB_LSHIFT_DOWN; break;
-        case KEYB_VK_RSHIFT: shift_mask = KEYB_RSHIFT_DOWN; break;
-        case KEYB_VK_LALT: shift_mask = KEYB_LALT_DOWN; break;
-        case KEYB_VK_RALT: shift_mask = KEYB_RALT_DOWN; break;
-        case KEYB_VK_LCTRL: shift_mask = KEYB_LCTRL_DOWN; break;
-        case KEYB_VK_RCTRL: shift_mask = KEYB_RCTRL_DOWN; break;
-        case KEYB_VK_LGUI: shift_mask = KEYB_LGUI_DOWN; break;
-        case KEYB_VK_RGUI: shift_mask = KEYB_RGUI_DOWN; break;
-        }
-
-        // Update shift state bit
-        int up_mask = -is_keyup;
-        int down_mask = ~up_mask;
-        keyb8042_shift_state |= (shift_mask & down_mask);
-        keyb8042_shift_state &= ~(shift_mask & up_mask);
-    }
-
-    //
-    // Determine ASCII code
-
-    int codepoint = 0;
-    if (vk >= 'A' && vk <= 'Z') {
-        if (keyb8042_shift_state & KEYB_ALT_DOWN) {
-            // No ascii
-        } else if (keyb8042_shift_state & KEYB_SHIFT_DOWN) {
-            codepoint = vk;
-        } else {
-            // Not shifted
-            codepoint = vk - 'A' + 'a';
-        }
-    } else if (vk >= KEYB_VK_NUMPAD_0 &&
-               vk <= KEYB_VK_NUMPAD_9) {
-        //printk("shiftstate=%x altdown=%d\n", keyb8042_shift_state,
-        //       keyb8042_shift_state & KEYB_ALT_DOWN);
-        if (keyb8042_shift_state & KEYB_ALT_DOWN) {
-            if (is_keyup) {
-                // Add decimal digit to alt code
-                keyb8042_alt_code = keyb8042_alt_code * 10 +
-                        vk - KEYB_VK_NUMPAD_ST;
-            }
-        } else {
-            codepoint = keyb8042_numpad_ascii[vk - KEYB_VK_NUMPAD_ST];
-        }
-    } else if (strchr(keyb8042_passthru_lookup, vk)) {
-        codepoint = vk;
-    } else if (vk < 0x100) {
-        char const *lookup = strchr(keyb8042_layout->shifted_lookup,
-                                    vk);
-        if (lookup) {
-            codepoint = (keyb8042_shift_state & KEYB_SHIFT_DOWN)
-                    ? lookup[1]
-                    : lookup[0];
-        }
-    }
-
-    if (keyb8042_shift_state & KEYB_CTRL_DOWN)
-        codepoint &= 0x1F;
-
-    keyboard_event_t event;
-
-    event.flags = keyb8042_get_modifiers();
-
-    if (vk || codepoint) {
-        event.codepoint = is_keyup ? -codepoint : codepoint;
-        event.vk = is_keyup ? -vk : vk;
-        keybd_event(event);
-    }
-
-    //KEYB8042_DEBUGMSG(("is_keyup=%d vk=%d altcode=%d\n",
-    //                   is_keyup, vk, keyb8042_alt_code))
-
-    if (is_keyup && (vk == KEYB_VK_LALT || vk == KEYB_VK_RALT)) {
-        if (keyb8042_alt_code != 0) {
-            if (keyb8042_alt_code < 0x101000) {
-                event.vk = 0;
-
-                // Generate keydown and keyup event for entered codepoint
-
-                event.codepoint = keyb8042_alt_code;
-                keybd_event(event);
-
-                event.codepoint = -keyb8042_alt_code;
-                keybd_event(event);
-            }
-
-            keyb8042_alt_code = 0;
-        }
-    }
+    keyb8042_fsa.deliver_vk(vk * sign);
 }
 
 static void keyb8042_process_mouse_packet(uint8_t const *packet)
@@ -457,6 +336,11 @@ static int keyb8042_set_layout_name(char const *name)
 
     // Not found
     return 0;
+}
+
+static int keyb8042_get_modifiers()
+{
+    return keyb8042_fsa.get_modifiers();
 }
 
 void keyb8042_init(void)

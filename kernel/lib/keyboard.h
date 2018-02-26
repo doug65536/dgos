@@ -26,32 +26,34 @@ typedef enum keyboard_virtual_key_t {
     // Menu keys
     KEYB_VK_LMENU, KEYB_VK_RMENU,
 
+    //
+    // Printable numpad keys
+
+    // 0123456789ABCDEF+-*/=,.\n\t\b^# @!&|<>(){}
+
     // Numpad digits
     KEYB_VK_NUMPAD_0,
     KEYB_VK_NUMPAD_1, KEYB_VK_NUMPAD_2, KEYB_VK_NUMPAD_3,
     KEYB_VK_NUMPAD_4, KEYB_VK_NUMPAD_5, KEYB_VK_NUMPAD_6,
     KEYB_VK_NUMPAD_7, KEYB_VK_NUMPAD_8, KEYB_VK_NUMPAD_9,
 
-    // Numpad other
-    KEYB_VK_NUMPAD_DOT, KEYB_VK_NUMPAD_ENTER,
-    KEYB_VK_NUMPAD_PLUS, KEYB_VK_NUMPAD_MINUS,
-    KEYB_VK_NUMPAD_STAR, KEYB_VK_NUMPAD_SLASH,
-    KEYB_VK_NUMPAD_EQUALS, KEYB_VK_NUMPAD_COMMA,
-    KEYB_VK_NUMPAD_ALT_ERASE,
-
     // Numpad Hex
     KEYB_VK_NUMPAD_A, KEYB_VK_NUMPAD_B, KEYB_VK_NUMPAD_C,
     KEYB_VK_NUMPAD_D, KEYB_VK_NUMPAD_E, KEYB_VK_NUMPAD_F,
 
-    // Numpad mem
-    KEYB_VK_NUMPAD_MEM_STORE,
-    KEYB_VK_NUMPAD_MEM_RECALL,
-    KEYB_VK_NUMPAD_MEM_ADD,
-    KEYB_VK_NUMPAD_MEM_SUB,
-    KEYB_VK_NUMPAD_MEM_MUL,
-    KEYB_VK_NUMPAD_MEM_DIV,
+    // Numpad printable
+    KEYB_VK_NUMPAD_PLUS, KEYB_VK_NUMPAD_MINUS,
+    KEYB_VK_NUMPAD_STAR, KEYB_VK_NUMPAD_SLASH,
+    KEYB_VK_NUMPAD_EQUALS, KEYB_VK_NUMPAD_COMMA,
+    KEYB_VK_NUMPAD_DOT, KEYB_VK_NUMPAD_ENTER,
+    KEYB_VK_NUMPAD_TAB, KEYB_VK_NUMPAD_BACKSPACE,
+    KEYB_VK_NUMPAD_CARET, KEYB_VK_NUMPAD_PERCENT,
+    KEYB_VK_NUMPAD_COLON, KEYB_VK_NUMPAD_HASH, KEYB_VK_NUMPAD_SPACE,
+    KEYB_VK_NUMPAD_AT, KEYB_VK_NUMPAD_EXCLAMATION,
+    KEYB_VK_NUMPAD_AMPERSAND,  KEYB_VK_NUMPAD_PIPE,
 
-    // Numpad parentheses/braces
+    // Numpad relational/parentheses/braces
+    KEYB_VK_NUMPAD_LESSTHAN, KEYB_VK_NUMPAD_GREATERTHAN,
     KEYB_VK_NUMPAD_PAREN_OPEN, KEYB_VK_NUMPAD_PAREN_CLOSE,
     KEYB_VK_NUMPAD_BRACE_OPEN, KEYB_VK_NUMPAD_BRACE_CLOSE,
 
@@ -59,17 +61,20 @@ typedef enum keyboard_virtual_key_t {
     KEYB_VK_NUMPAD_BINARY, KEYB_VK_NUMPAD_OCTAL,
     KEYB_VK_NUMPAD_DECIMAL, KEYB_VK_NUMPAD_HEX,
 
-    KEYB_VK_NUMPAD_TAB,
-    KEYB_VK_NUMPAD_BACKSPACE,
+    KEYB_VK_NUMPAD_XOR,
 
-    KEYB_VK_NUMPAD_XOR, KEYB_VK_NUMPAD_CARET, KEYB_VK_NUMPAD_PERCENT,
-    KEYB_VK_NUMPAD_LESSTHAN, KEYB_VK_NUMPAD_GREATERTHAN,
-    KEYB_VK_NUMPAD_AMPERSAND, KEYB_VK_NUMPAD_AMPERSAND2,
-    KEYB_VK_NUMPAD_PIPE, KEYB_VK_NUMPAD_PIPE2,
-    KEYB_VK_NUMPAD_COLON, KEYB_VK_NUMPAD_HASH,
-    KEYB_VK_NUMPAD_SPACE, KEYB_VK_NUMPAD_AT,
-    KEYB_VK_NUMPAD_EXCLAMATION, KEYB_VK_NUMPAD_SIGN,
+    // Numpad mem
+    KEYB_VK_NUMPAD_MEM_STORE, KEYB_VK_NUMPAD_MEM_RECALL,
+    KEYB_VK_NUMPAD_MEM_ADD, KEYB_VK_NUMPAD_MEM_SUB,
+    KEYB_VK_NUMPAD_MEM_MUL, KEYB_VK_NUMPAD_MEM_DIV,
+
+    // Numpad other
+    KEYB_VK_NUMPAD_ALT_ERASE,
+    KEYB_VK_NUMPAD_SIGN,
     KEYB_VK_NUMPAD_CLEAR, KEYB_VK_NUMPAD_CLEAR_ENTRY,
+
+    // Numpad multi character
+    KEYB_VK_NUMPAD_AMPERSAND2, KEYB_VK_NUMPAD_PIPE2,
 
     // Editing keys
     KEYB_VK_INS, KEYB_VK_DEL,
@@ -107,8 +112,9 @@ typedef enum keyboard_virtual_key_t {
     // Obscure keys
     KEYB_VK_HELP, KEYB_VK_MENU, KEYB_VK_SELECT, KEYB_VK_STOP,
     KEYB_VK_AGAIN, KEYB_VK_UNDO, KEYB_VK_FIND,
-    KEYB_VK_OUT, KEYB_VK_OPER, KEYB_VK_CLEAR, KEYB_VK_CRSEL, KEYB_VK_EXSEL,
-    KEYB_VK_SEPARATOR, KEYB_VK_CANCEL, KEYB_VK_PRIOR, KEYB_VK_EXECUTE,
+    KEYB_VK_OUT, KEYB_VK_OPER, KEYB_VK_CLEAR, KEYB_VK_CRSEL,
+    KEYB_VK_EXSEL, KEYB_VK_SEPARATOR, KEYB_VK_CANCEL, KEYB_VK_PRIOR,
+    KEYB_VK_EXECUTE,
 
     // Separators
     KEYB_VK_THOUSANDS_SEP, KEYB_VK_DECIMAL_SEP,
@@ -142,9 +148,9 @@ typedef enum keyboard_virtual_key_t {
     KEYB_VK_FN_ST = KEYB_VK_F1,
     KEYB_VK_FN_EN = KEYB_VK_F24,
 
-    // Numpad range
+    // Numpad printable range
     KEYB_VK_NUMPAD_ST = KEYB_VK_NUMPAD_0,
-    KEYB_VK_NUMPAD_EN = KEYB_VK_NUMPAD_CLEAR_ENTRY
+    KEYB_VK_NUMPAD_EN = KEYB_VK_NUMPAD_BRACE_CLOSE
 } keyboard_virtual_key_t;
 
 struct keyboard_event_t {
@@ -208,3 +214,24 @@ extern int (*keybd_set_layout_name)(char const *name);
 extern int (*keybd_get_modifiers)(void);
 
 void keybd_init(void);
+
+class keybd_fsa_t {
+public:
+    keybd_fsa_t();
+
+    void deliver_vk(int vk);
+
+    int get_modifiers(void);
+
+private:
+    static char const numpad_ascii[];
+    static char const passthru_lookup[];
+    static char const shifted_lookup_us[];
+
+    // The shifted character is stored immediately after
+    // its corresponding unshifted character
+    char const *shifted_lookup;
+
+    int alt_code;
+    uint8_t shift_state;
+};

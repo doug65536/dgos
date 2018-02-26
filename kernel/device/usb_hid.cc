@@ -521,6 +521,12 @@ protected:
     static usb_hid_t usb_hid;
 
     enum struct hid_request_t : uint8_t {
+        GET_REPORT = 0x1,
+        GET_IDLE = 0x2,
+        GET_PROTOCOL = 0x3,
+
+        SET_REPORT = 0x9,
+        SET_IDLE = 0xA,
         SET_PROTOCOL = 0xB
     };
 
@@ -528,6 +534,9 @@ protected:
     virtual bool probe(usb_config_helper *cfg, usb_bus_t *bus) override final;
 
 private:
+    bool set_protocol(usb_pipe_t &pipe, uint16_t proto);
+    bool set_idle(usb_pipe_t &pipe, uint16_t value);
+
     static int keybd_poll_thread(void *p);
     int keybd_poll_thread();
 
@@ -541,6 +550,8 @@ private:
     int mouse_in_thread();
 
     void detect_keybd_changes();
+
+    keybd_fsa_t fsa;
 
     uint8_t last_keybd_state[8];
     uint8_t this_keybd_state[8];
@@ -571,12 +582,8 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
         bus->get_pipe(cfg_hlp->slot(), 0, keybd_control);
 
-        keybd_control.send_default_control(
-                    uint8_t(usb_dir_t::OUT) |
-                    (uint8_t(usb_req_type::CLASS) << 5) |
-                    uint8_t(usb_req_recip_t::INTERFACE),
-                    uint8_t(hid_request_t::SET_PROTOCOL),
-                    0, 0, 0, nullptr);
+        set_protocol(keybd_control, 0);
+        set_idle(keybd_control, 0);
 
         // Try to find interrupt pipe
         usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
@@ -607,12 +614,8 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
         bus->get_pipe(cfg_hlp->slot(), 0, mouse_control);
 
-        mouse_control.send_default_control(
-                    uint8_t(usb_dir_t::OUT) |
-                    (uint8_t(usb_req_type::CLASS) << 5) |
-                    uint8_t(usb_req_recip_t::INTERFACE),
-                    uint8_t(hid_request_t::SET_PROTOCOL),
-                    0, 0, 0, nullptr);
+        set_protocol(mouse_control, 0);
+        set_idle(mouse_control, 0);
 
         usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
 
@@ -638,6 +641,26 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     }
 
     return false;
+}
+
+bool usb_hid_t::set_protocol(usb_pipe_t &pipe, uint16_t proto)
+{
+    return pipe.send_default_control(
+                uint8_t(usb_dir_t::OUT) |
+                (uint8_t(usb_req_type::CLASS) << 5) |
+                uint8_t(usb_req_recip_t::INTERFACE),
+                uint8_t(hid_request_t::SET_PROTOCOL),
+                proto, keybd_iface_idx, 0, nullptr) >= 0;
+}
+
+bool usb_hid_t::set_idle(usb_pipe_t &pipe, uint16_t value)
+{
+    return pipe.send_default_control(
+                uint8_t(usb_dir_t::OUT) |
+                (uint8_t(usb_req_type::CLASS) << 5) |
+                uint8_t(usb_req_recip_t::INTERFACE),
+                uint8_t(hid_request_t::SET_IDLE),
+                value, mouse_iface_idx, 0, nullptr) >= 0;
 }
 
 int usb_hid_t::keybd_poll_thread(void *p)
@@ -762,11 +785,6 @@ int usb_hid_t::mouse_in_thread()
 
 void usb_hid_t::detect_keybd_changes()
 {
-    // Detect modifier changes
-    uint8_t modifier_changes = last_keybd_state[0] ^ this_keybd_state[0];
-
-    keyboard_event_t evt;
-
     static int modifier_vk[] = {
         KEYB_VK_LCTRL,
         KEYB_VK_LSHIFT,
@@ -778,17 +796,16 @@ void usb_hid_t::detect_keybd_changes()
         KEYB_VK_RGUI
     };
 
+    // Detect modifier changes
+    uint8_t modifier_changes = last_keybd_state[0] ^ this_keybd_state[0];
+
     // Generate modifier key up/down events
     for (int i = 0; i < 8; ++i) {
         int mask = 1 << i;
         int sign = (((this_keybd_state[0] & mask) != 0) * 2) - 1;
 
-        if (modifier_changes & mask) {
-            evt.codepoint = 0;
-            evt.vk = modifier_vk[i] * sign;
-            evt.flags = this_keybd_state[0];
-            keybd_event(evt);
-        }
+        if (modifier_changes & mask)
+            fsa.deliver_vk(modifier_vk[i] * sign);
     }
 
     // Scan for keys released since last event
@@ -805,10 +822,7 @@ void usb_hid_t::detect_keybd_changes()
             int vk = (scancode < countof(usb_hid_keybd_lookup))
                     ? usb_hid_keybd_lookup[scancode] : 0;
 
-            evt.codepoint = vk < KEYB_VK_BASE ? -vk : 0;
-            evt.vk = -vk;
-            evt.flags = this_keybd_state[0];
-            keybd_event(evt);
+            fsa.deliver_vk(-vk);
         }
     }
 
@@ -823,10 +837,7 @@ void usb_hid_t::detect_keybd_changes()
         int vk = (scancode < countof(usb_hid_keybd_lookup))
                 ? usb_hid_keybd_lookup[scancode] : 0;
 
-        evt.codepoint = vk < KEYB_VK_BASE ? vk : 0;
-        evt.vk = vk;
-        evt.flags = this_keybd_state[0];
-        keybd_event(evt);
+        fsa.deliver_vk(vk);
     }
 }
 

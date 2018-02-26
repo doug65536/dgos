@@ -113,14 +113,9 @@ static int const keyb8042_scancode_us_0xE0[128] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
-// The shifted character is stored immediately after
-// its corresponding unshifted character
-static char const keyb8042_shifted_lookup_us[] =
-        "`~1!2@3#4$5%6^7&8*9(0)-_=+[{]};:'\"\\|,<.>/?";
-
 keyb8042_layout_t keyb8042_layout_us = {
     "us",
     keyb8042_scancode_us,
     keyb8042_scancode_us_0xE0,
-    keyb8042_shifted_lookup_us
+    nullptr
 };
