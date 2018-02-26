@@ -89,12 +89,12 @@ int usb_pipe_t::send_default_control(uint8_t request_type, uint8_t request,
                 slotid, request_type, request, value, index, length, data);
 }
 
-int usb_pipe_t::recv(uint16_t length, void *data)
+int usb_pipe_t::recv(void *data, uint16_t length)
 {
     return bus->xfer(slotid, epid, 0, length, data, 1);
 }
 
-int usb_pipe_t::send(uint16_t length, const void *data)
+int usb_pipe_t::send(const void *data, uint16_t length)
 {
     return bus->xfer(slotid, epid, 0, length, const_cast<void*>(data), 0);
 }

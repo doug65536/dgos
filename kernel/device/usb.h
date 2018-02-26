@@ -177,6 +177,49 @@ struct usb_desc_iface {
 //
 // Endpoint descriptor
 
+
+enum struct usb_cc_t : uint8_t {
+    invalid,
+    success,
+    data_buf_err,   // can't keep up with tx or rx
+    babble,
+    usb_txn_err,
+    trb_err,
+    stall_err,
+    resource_err,
+    bw_err,
+    no_slots_avail,
+    invalid_stream_type,
+    slot_not_enabled,
+    ep_not_enabled,
+    short_pkt,
+    ring_underrun,
+    ring_overrun,
+    vf_evt_ring_full,
+    parameter_err,
+    bw_overrun,
+    ctx_state_err,
+    no_ping_response,
+    evt_ring_full,
+    incompatible_device,
+    missed_service,
+    cmd_ring_stopped,
+    cmd_aborted,
+    stopped,
+    stopped_len_invalid,
+    stopped_short_pkt,
+    max_exit_lat_too_large,
+    reserved,
+    isoch_buf_overrun,
+    event_lost,
+    undefined_err,
+    invalid_stream_id,
+    secondary_bw_err,
+    split_txn_err
+    // 192-223 vendor defined error
+    // 224-255 vendor defined info
+};
+
 enum struct usb_ep_attr : uint8_t {
     control,
     isoch,

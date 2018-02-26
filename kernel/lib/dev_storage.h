@@ -104,9 +104,9 @@ struct storage_if_base_t {
     virtual if_list_t detect_devices() = 0;
 };
 
-#define STORAGE_IF_IMPL                 \
-    void cleanup() override final;      \
-    if_list_t detect_devices() final;
+#define STORAGE_IF_IMPL                         \
+    void cleanup() override final;              \
+    if_list_t detect_devices() override final;
 
 #define STORAGE_REGISTER_FACTORY(name) \
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
@@ -346,8 +346,10 @@ struct fs_base_t {
     int releasedir(fs_file_info_t *fi) override final;                  \
     int getattr(fs_cpath_t path, fs_stat_t* stbuf) override final;      \
     int access(fs_cpath_t path, int mask) override final;               \
-    int readlink(fs_cpath_t path, char* buf, size_t size) final;        \
-    int mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev) final;    \
+    int readlink(fs_cpath_t path, char* buf,                            \
+                 size_t size) override final;                           \
+    int mknod(fs_cpath_t path, fs_mode_t mode,                          \
+              fs_dev_t rdev) override final;                            \
     int mkdir(fs_cpath_t path, fs_mode_t mode) override final;          \
     int rmdir(fs_cpath_t path) override final;                          \
     int symlink(fs_cpath_t to, fs_cpath_t from) override final;         \
@@ -429,3 +431,5 @@ void part_register_factory(char const *name, part_factory_t *factory);
 
 void fs_mount(char const *fs_name, fs_init_info_t *info);
 fs_base_t *fs_from_id(size_t id);
+
+void probe_storage_factory(storage_if_factory_t *factory);

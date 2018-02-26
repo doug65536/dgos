@@ -423,6 +423,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/device/kernel_bmi-usb.$(OBJEXT) \
 	kernel/device/kernel_bmi-dev_usb_ctl.$(OBJEXT) \
 	kernel/device/kernel_bmi-usb_hid.$(OBJEXT) \
+	kernel/device/kernel_bmi-usb_storage.$(OBJEXT) \
 	kernel/device/kernel_bmi-usb_xhci.$(OBJEXT) \
 	kernel/device/kernel_bmi-vga.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_bmi-elf64.$(OBJEXT) \
@@ -540,6 +541,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/device/kernel_generic-usb.$(OBJEXT) \
 	kernel/device/kernel_generic-dev_usb_ctl.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_hid.$(OBJEXT) \
+	kernel/device/kernel_generic-usb_storage.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_xhci.$(OBJEXT) \
 	kernel/device/kernel_generic-vga.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-elf64.$(OBJEXT) \
@@ -1437,6 +1439,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/dev_usb_ctl.cc \
 	kernel/device/usb_hid.h \
 	kernel/device/usb_hid.cc \
+	kernel/device/usb_storage.h \
+	kernel/device/usb_storage.cc \
 	kernel/device/usb_xhci.cc \
 	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \
@@ -1808,14 +1812,15 @@ QEMU_THREADS = 1
 QEMU_CPU = max,migratable=false,host-cache-info=true
 QEMU_RAM = 5G
 QEMU_USB = -device nec-usb-xhci,id=xhci \
-	-device usb-kbd,bus=xhci.0 \
-	-device usb-mouse,bus=xhci.0 \
-	-device usb-audio,bus=xhci.0 \
 	-drive if=none,id=stick,file=usb_disk.img,format=raw \
 	-device usb-storage,bus=xhci.0,drive=stick \
-	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
+	-device usb-kbd,bus=xhci.0 \
+	-device usb-mouse,bus=xhci.0 \
 	-trace 'usb*'
 
+
+#-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
+#-device usb-audio,bus=xhci.0
 QEMU_NET = \
 	-net nic,model=rtl8139 \
 	-net nic,model=ne2k_pci \
@@ -2830,6 +2835,9 @@ kernel/device/kernel_bmi-dev_usb_ctl.$(OBJEXT):  \
 kernel/device/kernel_bmi-usb_hid.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_bmi-usb_storage.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_bmi-usb_xhci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3147,6 +3155,9 @@ kernel/device/kernel_generic-dev_usb_ctl.$(OBJEXT):  \
 kernel/device/kernel_generic-usb_hid.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-usb_storage.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-usb_xhci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3332,6 +3343,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-serial-uart.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb_hid.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-vga.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ahci.Po@am__quote@
@@ -3348,6 +3360,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-serial-uart.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_hid.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-vga.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_bmi-keyb8042_layout_us.Po@am__quote@
@@ -7438,6 +7451,20 @@ kernel/device/kernel_bmi-usb_hid.obj: kernel/device/usb_hid.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-usb_hid.obj `if test -f 'kernel/device/usb_hid.cc'; then $(CYGPATH_W) 'kernel/device/usb_hid.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_hid.cc'; fi`
 
+kernel/device/kernel_bmi-usb_storage.o: kernel/device/usb_storage.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-usb_storage.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Tpo -c -o kernel/device/kernel_bmi-usb_storage.o `test -f 'kernel/device/usb_storage.cc' || echo '$(srcdir)/'`kernel/device/usb_storage.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Tpo kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_storage.cc' object='kernel/device/kernel_bmi-usb_storage.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-usb_storage.o `test -f 'kernel/device/usb_storage.cc' || echo '$(srcdir)/'`kernel/device/usb_storage.cc
+
+kernel/device/kernel_bmi-usb_storage.obj: kernel/device/usb_storage.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-usb_storage.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Tpo -c -o kernel/device/kernel_bmi-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Tpo kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_storage.cc' object='kernel/device/kernel_bmi-usb_storage.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
+
 kernel/device/kernel_bmi-usb_xhci.o: kernel/device/usb_xhci.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-usb_xhci.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-usb_xhci.Tpo -c -o kernel/device/kernel_bmi-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_bmi-usb_xhci.Po
@@ -8949,6 +8976,20 @@ kernel/device/kernel_generic-usb_hid.obj: kernel/device/usb_hid.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_hid.cc' object='kernel/device/kernel_generic-usb_hid.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_hid.obj `if test -f 'kernel/device/usb_hid.cc'; then $(CYGPATH_W) 'kernel/device/usb_hid.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_hid.cc'; fi`
+
+kernel/device/kernel_generic-usb_storage.o: kernel/device/usb_storage.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-usb_storage.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Tpo -c -o kernel/device/kernel_generic-usb_storage.o `test -f 'kernel/device/usb_storage.cc' || echo '$(srcdir)/'`kernel/device/usb_storage.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Tpo kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_storage.cc' object='kernel/device/kernel_generic-usb_storage.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_storage.o `test -f 'kernel/device/usb_storage.cc' || echo '$(srcdir)/'`kernel/device/usb_storage.cc
+
+kernel/device/kernel_generic-usb_storage.obj: kernel/device/usb_storage.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-usb_storage.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Tpo -c -o kernel/device/kernel_generic-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Tpo kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_storage.cc' object='kernel/device/kernel_generic-usb_storage.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
 
 kernel/device/kernel_generic-usb_xhci.o: kernel/device/usb_xhci.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-usb_xhci.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Tpo -c -o kernel/device/kernel_generic-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc

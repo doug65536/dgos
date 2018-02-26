@@ -699,7 +699,7 @@ int usb_hid_t::keybd_in_thread()
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
     while (true) {
-        keybd_in.recv(sizeof(this_keybd_state), this_keybd_state);
+        keybd_in.recv(this_keybd_state, sizeof(this_keybd_state));
 
         unique_lock<ticketlock> lock(change_lock);
         detect_keybd_changes();
@@ -749,7 +749,7 @@ int usb_hid_t::mouse_in_thread()
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
     while (true) {
-        mouse_in.recv(sizeof(this_mouse_state), this_mouse_state);
+        mouse_in.recv(this_mouse_state, sizeof(this_mouse_state));
 
         unique_lock<ticketlock> hold_change_lock(change_lock);
 

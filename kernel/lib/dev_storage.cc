@@ -50,43 +50,47 @@ void storage_if_register_factory(char const *name,
     STORAGE_TRACE("Registered storage driver %s\n", name);
 }
 
-void invoke_storage_factories(void *)
+void probe_storage_factory(storage_if_factory_t *factory)
 {
-    for (storage_if_factory_t* factory : storage_factories) {
-        STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
+    STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
 
-        // Get a list of storage devices of this type
-        if_list_t if_list = factory->detect();
+    // Get a list of storage devices of this type
+    if_list_t if_list = factory->detect();
 
-        STORAGE_TRACE("Found %u %s interfaces\n", if_list.count, factory->name);
+    STORAGE_TRACE("Found %u %s interfaces\n", if_list.count, factory->name);
 
-        for (unsigned i = 0; i < if_list.count; ++i) {
-            // Calculate pointer to storage interface instance
-            storage_if_base_t *if_ = (storage_if_base_t *)
-                    ((char*)if_list.base + i * if_list.stride);
+    for (unsigned i = 0; i < if_list.count; ++i) {
+        // Calculate pointer to storage interface instance
+        storage_if_base_t *if_ = (storage_if_base_t *)
+                ((char*)if_list.base + i * if_list.stride);
 
-            // Store interface instance
-            storage_ifs.push_back(if_);
+        // Store interface instance
+        storage_ifs.push_back(if_);
 
-            STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
+        STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
 
-            // Get a list of storage devices on this interface
-            if_list_t dev_list;
-            dev_list = if_->detect_devices();
+        // Get a list of storage devices on this interface
+        if_list_t dev_list;
+        dev_list = if_->detect_devices();
 
-            STORAGE_TRACE("Found %u %s[%u] drives\n", dev_list.count,
-                          factory->name, i);
+        STORAGE_TRACE("Found %u %s[%u] drives\n", dev_list.count,
+                      factory->name, i);
 
-            for (unsigned k = 0; k < dev_list.count; ++k) {
-                // Calculate pointer to storage device instance
-                storage_dev_base_t *dev = (storage_dev_base_t*)
-                        ((char*)dev_list.base +
-                        k * dev_list.stride);
-                // Store device instance
-                storage_devs.push_back(dev);
-            }
+        for (unsigned k = 0; k < dev_list.count; ++k) {
+            // Calculate pointer to storage device instance
+            storage_dev_base_t *dev = (storage_dev_base_t*)
+                    ((char*)dev_list.base +
+                    k * dev_list.stride);
+            // Store device instance
+            storage_devs.push_back(dev);
         }
     }
+}
+
+void invoke_storage_factories(void *)
+{
+    for (storage_if_factory_t* factory : storage_factories)
+        probe_storage_factory(factory);
 }
 
 REGISTER_CALLOUT(invoke_storage_factories, 0,

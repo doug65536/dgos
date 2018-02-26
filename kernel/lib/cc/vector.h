@@ -229,7 +229,8 @@ typename vector<_T,_Allocator>::pointer
 vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
 {
     if (__capacity < __sz + __count)
-        __grow(__sz + __count - __capacity);
+        if (!__grow(__sz + __count - __capacity))
+            return nullptr;
 
     size_t e = __pos.__p - __m;
     for (size_t i = __sz; i > e; --i) {
@@ -784,7 +785,7 @@ template<typename... _Args>
 bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
 {
     if (unlikely(__sz + 1 > __capacity)) {
-        if (unlikely(__grow()))
+        if (unlikely(!__grow()))
             return false;
     }
 

@@ -429,48 +429,6 @@ struct usbxhci_evt_cmdcomp_t {
     uint8_t slotid;
 } __packed;
 
-enum struct usbxhci_cc_t : uint8_t {
-    invalid,
-    success,
-    data_buf_err,   // can't keep up with tx or rx
-    babble,
-    usb_txn_err,
-    trb_err,
-    stall_err,
-    resource_err,
-    bw_err,
-    no_slots_avail,
-    invalid_stream_type,
-    slot_not_enabled,
-    ep_not_enabled,
-    short_pkt,
-    ring_underrun,
-    ring_overrun,
-    vf_evt_ring_full,
-    parameter_err,
-    bw_overrun,
-    ctx_state_err,
-    no_ping_response,
-    evt_ring_full,
-    incompatible_device,
-    missed_service,
-    cmd_ring_stopped,
-    cmd_aborted,
-    stopped,
-    stopped_len_invalid,
-    stopped_short_pkt,
-    max_exit_lat_too_large,
-    reserved,
-    isoch_buf_overrun,
-    event_lost,
-    undefined_err,
-    invalid_stream_id,
-    secondary_bw_err,
-    split_txn_err
-    // 192-223 vendor defined error
-    // 224-255 vendor defined info
-};
-
 C_ASSERT(sizeof(usbxhci_evt_cmdcomp_t) == 0x10);
 
 //
@@ -725,37 +683,11 @@ struct usbxhci_pending_cmd_t;
 
 class usbxhci;
 
-struct usb_blocking_iocp_t : public blocking_iocp_t {
-    usb_blocking_iocp_t()
-        : cmd{}
-        , cmd_comp{}
-    {
-    }
-
-    usbxhci_cc_t cc() const
-    {
-        return usbxhci_cc_t(USBXHCI_EVT_CMDCOMP_INFO_CC_GET(cmd_comp.info));
-    }
-
-    uint32_t ccp() const
-    {
-        return USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(cmd_comp.info);
-    }
-
-    operator bool() const
-    {
-        return cc() == usbxhci_cc_t::success;
-    }
-
-    usbxhci_cmd_trb_noop_t cmd;
-    usbxhci_evt_cmdcomp_t cmd_comp;
-};
-
 struct usbxhci_pending_cmd_t {
     usbxhci_cmd_trb_t *cmd_ptr;
     uint64_t cmd_physaddr;
     uint64_t ring_physaddr;
-    usb_blocking_iocp_t *iocp;
+    usb_iocp_t *iocp;
 };
 
 //struct usbxhci_port_init_data_t {
@@ -795,13 +727,24 @@ protected:
                     int max_packet_sz, int interval,
                     usb_ep_attr ep_type) override final;
 
+    int send_control_async(uint8_t slotid, uint8_t request_type, uint8_t request,
+            uint16_t value, uint16_t index, uint16_t length, void *data,
+            usb_iocp_t *iocp) override final;
+
+    int xfer_async(
+            uint8_t slotid, uint8_t epid, uint16_t stream_id,
+            uint16_t length, void *data, int dir,
+            usb_iocp_t *iocp) override final;
+
     int send_control(uint8_t slotid, uint8_t request_type, uint8_t request,
                      uint16_t value, uint16_t index, uint16_t length,
                      void *data) override final;
 
-    int xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id, uint16_t length, void *data, int dir) override final;
+    int xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
+             uint16_t length, void *data, int dir) override final;
 
 private:
+    errno_t cc_to_errno(usb_cc_t cc);
 
     usbxhci_slotctx_t *dev_ctx_ent_slot(size_t i);
 
@@ -815,16 +758,14 @@ private:
     void ring_doorbell(uint32_t doorbell, uint8_t value,
                        uint16_t stream_id);
 
-    void issue_cmd(void *cmd, usb_blocking_iocp_t *iocp);
+    void issue_cmd(void *cmd, usb_iocp_t *iocp);
 
     void add_xfer_trbs(uint8_t slotid, uint8_t epid,
                        uint16_t stream_id, size_t count, int dir,
-                       void *trbs,
-                       usb_blocking_iocp_t *iocp);
+                       void *trbs, usb_iocp_t *iocp);
 
     void insert_pending_command(usbxhci_cmd_trb_t *cmd_ptr,
-                                uint64_t cmd_physaddr,
-                                usb_blocking_iocp_t *iocp,
+                                uint64_t cmd_physaddr, usb_iocp_t *iocp,
                                 unique_lock<ticketlock> const&);
 
     int make_data_trbs(usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
@@ -850,20 +791,19 @@ private:
                        usb_desctype_t desc_type,
                        uint8_t desc_index);
 
-    usbxhci_cc_t fetch_inp_ctx(int slotid, int epid, usbxhci_inpctx_t &inp,
+    usb_cc_t fetch_inp_ctx(int slotid, int epid, usbxhci_inpctx_t &inp,
                       usbxhci_inpctlctx_t **p_ctlctx,
                       usbxhci_slotctx_t **p_inpslotctx,
                       usbxhci_ep_ctx_t **p_inpepctx);
 
-    usbxhci_cc_t commit_inp_ctx(int slotid, int epid, usbxhci_inpctx_t &inp, uint32_t trb_type);
+    usb_cc_t commit_inp_ctx(int slotid, int epid, usbxhci_inpctx_t &inp, uint32_t trb_type);
 
     int update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc);
 
     void get_config(uint8_t slotid, usb_desc_config *desc, uint8_t desc_size,
-                    usb_blocking_iocp_t *iocp);
+                    usb_iocp_t *iocp);
 
-    void cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
-                  usb_blocking_iocp_t *iocp);
+    void cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt, usb_iocp_t *iocp);
 
     usbxhci_endpoint_data_t *add_endpoint(uint8_t slotid, uint8_t epid);
 
@@ -896,8 +836,7 @@ private:
     usbxhci_interrupter_info_t *interrupters;
 
     padded_ticketlock endpoints_lock;
-    usbxhci_endpoint_data_t **endpoints;
-    uint32_t endpoint_count;
+    vector<unique_ptr<usbxhci_endpoint_data_t>> endpoints;
 
     // Endpoint data keyed on usbxhci_endpoint_target_t
     hashtbl_t endpoint_lookup;
@@ -961,7 +900,7 @@ void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
 
 void usbxhci::insert_pending_command(usbxhci_cmd_trb_t *cmd_ptr,
                                      uint64_t cmd_physaddr,
-                                     usb_blocking_iocp_t *iocp,
+                                     usb_iocp_t *iocp,
                                      unique_lock<ticketlock> const&)
 {
     usbxhci_pending_cmd_t *pc = (usbxhci_pending_cmd_t *)
@@ -972,7 +911,7 @@ void usbxhci::insert_pending_command(usbxhci_cmd_trb_t *cmd_ptr,
     htbl_insert(&usbxhci_pending_ht, pc);
 }
 
-void usbxhci::issue_cmd(void *cmd, usb_blocking_iocp_t *iocp)
+void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
 {
     unique_lock<ticketlock> hold_cmd_lock(lock_cmd);
 
@@ -1004,7 +943,7 @@ void usbxhci::issue_cmd(void *cmd, usb_blocking_iocp_t *iocp)
 
 void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
                             size_t count, int dir, void *trbs,
-                            usb_blocking_iocp_t *iocp)
+                            usb_iocp_t *iocp)
 {
     unique_lock<ticketlock> hold_cmd_lock(lock_cmd);
 
@@ -1059,10 +998,7 @@ int usbxhci::set_config(uint8_t slotid, uint8_t config)
 
     block.wait();
 
-    if (unlikely(!block))
-        return -int(block.cc());
-
-    return 0;
+    return block.get_result().len_or_error();
 }
 
 int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
@@ -1086,22 +1022,18 @@ int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
 
     block.wait();
 
-    if (unlikely(!block))
-        return -int(block.cc());
-
-    return 0;
+    return block.get_result().len_or_error();
 }
 
 void usbxhci::cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
-                       usb_blocking_iocp_t *iocp)
+                       usb_iocp_t *iocp)
 {
-    C_ASSERT(sizeof(iocp->cmd) == sizeof(*cmd));
-    C_ASSERT(sizeof(iocp->cmd_comp) == sizeof(*evt));
-
     if (iocp) {
-        memcpy(&iocp->cmd, cmd, sizeof(iocp->cmd));
-        memcpy(&iocp->cmd_comp, evt, sizeof(iocp->cmd_comp));
-
+        usb_iocp_result_t result{};
+        result.cc = usb_cc_t(USBXHCI_EVT_CMDCOMP_INFO_CC_GET(evt->data[2]));
+        result.ccp = USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(evt->data[2]);
+        result.slotid = evt->slotid;
+        iocp->set_result(result);
         iocp->invoke();
     } else {
         USBXHCI_TRACE("Got cmd_comp with null iocp\n");
@@ -1110,8 +1042,7 @@ void usbxhci::cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
 
 usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 {
-    usbxhci_endpoint_data_t *newepd = (usbxhci_endpoint_data_t*)
-            malloc(sizeof(*newepd));
+    usbxhci_endpoint_data_t *newepd = new usbxhci_endpoint_data_t;
     if (!newepd)
         return nullptr;
 
@@ -1120,16 +1051,8 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 
     unique_lock<ticketlock> hold_endpoints_lock(endpoints_lock);
 
-    usbxhci_endpoint_data_t **new_endpoints = (usbxhci_endpoint_data_t **)
-            realloc(endpoints, sizeof(*endpoints) * (endpoint_count + 1));
-    if (unlikely(!new_endpoints)) {
-        hold_endpoints_lock.unlock();
-        free(newepd);
+    if (!endpoints.emplace_back(newepd))
         return nullptr;
-    }
-
-    endpoints = new_endpoints;
-    endpoints[endpoint_count++] = newepd;
 
     newepd->xfer_next = 0;
     newepd->xfer_count = PAGESIZE / sizeof(*newepd->xfer_ring);
@@ -1137,7 +1060,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
             mmap(0, sizeof(*newepd->xfer_ring) * newepd->xfer_count,
                  PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
     if (unlikely(newepd->xfer_ring == MAP_FAILED || !newepd->xfer_ring)) {
-        free(endpoints[--endpoint_count]);
+        endpoints.pop_back();
         return nullptr;
     }
     newepd->ccs = 1;
@@ -1430,17 +1353,15 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
 
         usb_config_helper cfg_hlp(slotid, dev_desc, cfg_buf, 512);
 
-        usb_class_drv_t::find_driver(&cfg_hlp, this);
-
-        //hex_dump(cfg_buf, 512);
         dump_config_desc(cfg_hlp);
+
+        usb_class_drv_t::find_driver(&cfg_hlp, this);
     }
 }
 
 int usbxhci::enable_slot(int port)
 {
-    usbxhci_cmd_trb_noop_t cmd;
-    memset(&cmd, 0, sizeof(cmd));
+    usbxhci_cmd_trb_noop_t cmd{};
     cmd.trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_ENABLESLOTCMD);
 
     USBXHCI_TRACE("Enabling slot for port %x\n", port);
@@ -1454,21 +1375,19 @@ int usbxhci::enable_slot(int port)
 
     USBXHCI_TRACE("enableslot completed: completion code=%x, "
                   "parameter=%x, slotid=%d\n",
-                  unsigned(block.cc()), block.ccp(), block.cmd_comp.slotid);
+                  unsigned(block.get_result().cc()),
+                  block.get_result().ccp(),
+                  block.get_result().cmd_comp.slotid);
 
-    return block.cc() == usbxhci_cc_t::success
-            ? block.cmd_comp.slotid
-            : -int(block.cc());
+    return block.get_result().slot_or_error();
 }
 
 int usbxhci::set_address(int slotid, int port, uint32_t route)
 {
     // Create a new device context
-    usbxhci_slotctx_t *ctx;
-
-    ctx = dev_ctx_ent_slot(slotid);
-
-    memset(ctx, 0, sizeof(*ctx));
+    //usbxhci_slotctx_t *ctx;
+    //ctx = dev_ctx_ent_slot(slotid);
+    //memset(ctx, 0, sizeof(*ctx));
 
     // Issue a SET_ADDRESS command
 
@@ -1478,34 +1397,32 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     usbxhci_slotctx_t *inpslotctx;
     usbxhci_ep_ctx_t *inpepctx;
 
-    if (dev_ctx_large) {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
-                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-        ctlctx = &inp.large->inpctl;
-        inpslotctx = &inp.large->slotctx;
-        inpepctx = inp.large->epctx;
-    } else {
+    if (!dev_ctx_large) {
         inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
         ctlctx = &inp.small->inpctl;
         inpslotctx = &inp.small->slotctx;
         inpepctx = inp.small->epctx;
+    } else {
+        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
+                   PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        ctlctx = &inp.large->inpctl;
+        inpslotctx = &inp.large->slotctx;
+        inpepctx = inp.large->epctx;
     }
 
-    ctlctx->add_bits = 3;
+    ctlctx->add_bits = (1 << 0) | (1 << 1);
 
     usbxhci_portreg_t *pr = (usbxhci_portreg_t*)(mmio_op->ports + port);
 
     // Get speed of port
     uint8_t speed = USBXHCI_PORTSC_SPD_GET(pr->portsc);
 
-    inpslotctx->rsmhc = USBXHCI_SLOTCTX_RSMHC_ROUTE_n(0) |
+    assert(speed == (speed & USBXHCI_SLOTCTX_RSMHC_SPEED_MASK));
+    assert(route == (route & USBXHCI_SLOTCTX_RSMHC_ROUTE_MASK));
+    inpslotctx->rsmhc = USBXHCI_SLOTCTX_RSMHC_ROUTE_n(route) |
             USBXHCI_SLOTCTX_RSMHC_SPEED_n(speed) |
             USBXHCI_SLOTCTX_RSMHC_CTXENT_n(1);
-
-    // Route
-    assert(route == (route & USBXHCI_SLOTCTX_RSMHC_ROUTE_MASK));
-    USBXHCI_SLOTCTX_RSMHC_ROUTE_SET(inpslotctx->rsmhc, route);
 
     // Max wakeup latency
     inpslotctx->max_exit_lat = 0;
@@ -1514,7 +1431,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     inpslotctx->num_ports = 0;
 
     // Root hub port number
-    inpslotctx->root_hub_port_num = port;
+    inpslotctx->root_hub_port_num = port + 1;
 
     // Device address
     inpslotctx->usbdevaddr = 0;
@@ -1529,8 +1446,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     inpepctx->tr_dq_ptr = epdata->xfer_ring_physaddr | epdata->ccs;
 
-    usbxhci_cmd_trb_setaddr_t setaddr;
-    memset(&setaddr, 0, sizeof(setaddr));
+    usbxhci_cmd_trb_setaddr_t setaddr{};
     setaddr.input_ctx_physaddr = mphysaddr(inp.any);
     setaddr.trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_ADDRDEVCMD);
 
@@ -1547,16 +1463,16 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
                   "parameter=%x, slotid=%d\n",
                   (unsigned)block.cc(), block.ccp(), slotid);
 
-    if (dev_ctx_large) {
-        munmap(inp.large, sizeof(*inp.large));
-        inp.large = nullptr;
-    } else {
+    if (!dev_ctx_large) {
         munmap(inp.small, sizeof(*inp.small));
         inp.small = nullptr;
+    } else {
+        munmap(inp.large, sizeof(*inp.large));
+        inp.large = nullptr;
     }
 
     if (unlikely(!block))
-        return -int(block.cc());
+        return -int(block.get_result().cc);
 
     return 0;
 }
@@ -1626,9 +1542,9 @@ bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
 
     USBXHCI_EPCTX_CEH_EPTYPE_SET(ep->ceh, ep_type_value);
 
-    usbxhci_cc_t cc = commit_inp_ctx(slotid, epid, inp,
+    usb_cc_t cc = commit_inp_ctx(slotid, epid, inp,
                                      USBXHCI_TRB_TYPE_CONFIGUREEPCMD);
-    if (cc == usbxhci_cc_t::success) {
+    if (cc == usb_cc_t::success) {
         pipe = usb_pipe_t(this, slotid, epid);
         return true;
     }
@@ -1637,7 +1553,68 @@ bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
     return false;
 }
 
-usbxhci_cc_t usbxhci::fetch_inp_ctx(
+int usbxhci::send_control(uint8_t slotid, uint8_t request_type,
+                          uint8_t request, uint16_t value,
+                          uint16_t index, uint16_t length, void *data)
+{
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
+
+    send_control_async(slotid, request_type, request, value,
+                       index, length, data, &block);
+
+    block.wait();
+
+    return block.get_result().len_or_error();
+}
+
+int usbxhci::send_control_async(uint8_t slotid, uint8_t request_type,
+                                uint8_t request, uint16_t value,
+                                uint16_t index, uint16_t length,
+                                void *data, usb_iocp_t *iocp)
+{
+    usbxhci_ctl_trb_t trbs[64/4+2] = {};
+
+    int dir = (request_type & USBXHCI_CTL_TRB_BMREQT_TOHOST) != 0;
+
+    int trb_count = make_setup_trbs(
+                trbs, countof(trbs), data, length, dir,
+                request_type, request, value, index);
+
+    iocp->set_expect(1);
+    add_xfer_trbs(slotid, 0, 0, trb_count, dir, trbs, iocp);
+
+    return 0;
+}
+
+int usbxhci::xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
+                  uint16_t length, void *data, int dir)
+{
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
+
+    xfer_async(slotid, epid, stream_id, length, data, dir, &block);
+
+    block.wait();
+
+    return block.get_result();
+}
+
+int usbxhci::xfer_async(uint8_t slotid, uint8_t epid, uint16_t stream_id,
+                        uint16_t length, void *data, int dir, usb_iocp_t *iocp)
+{
+    // Worst case is 64KB
+    usbxhci_ctl_trb_data_t trbs[64/4] = {};
+
+    int data_trb_count = make_data_trbs(trbs, countof(trbs),
+                                        data, length, dir, true);
+
+    add_xfer_trbs(slotid, epid, stream_id, data_trb_count, dir, trbs, iocp);
+
+    return 0;
+}
+
+usb_cc_t usbxhci::fetch_inp_ctx(
         int slotid, int epid, usbxhci_inpctx_t &inp,
         usbxhci_inpctlctx_t **p_ctlctx,
         usbxhci_slotctx_t **p_inpslotctx,
@@ -1665,7 +1642,7 @@ usbxhci_cc_t usbxhci::fetch_inp_ctx(
     }
 
     if (inp.any == MAP_FAILED)
-        return usbxhci_cc_t::resource_err;
+        return usb_cc_t::resource_err;
 
     *inpslotctx = *ctx;
     memcpy(inpepctx, ep, sizeof(*inpepctx) * 16);
@@ -1679,10 +1656,10 @@ usbxhci_cc_t usbxhci::fetch_inp_ctx(
     if (p_inpepctx)
         *p_inpepctx = inpepctx;
 
-    return (usbxhci_cc_t::success);
+    return (usb_cc_t::success);
 }
 
-usbxhci_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
+usb_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
                                      usbxhci_inpctx_t &inp,
                                      uint32_t trb_type)
 {
@@ -1706,7 +1683,7 @@ usbxhci_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
     else
         munmap(inp.any, sizeof(usbxhci_inpctx_large_t));
 
-    return block.cc();
+    return block.get_result().cc;
 }
 
 int usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
@@ -1918,50 +1895,6 @@ int usbxhci::make_setup_trbs(
                            USBXHCI_CTL_TRB_BMREQT_TYPE_n(bmreq_type) |
                            (to_host ? USBXHCI_CTL_TRB_BMREQT_TOHOST : 0),
                            uint8_t(request), value, index);
-}
-
-int usbxhci::send_control(uint8_t slotid, uint8_t request_type,
-                          uint8_t request, uint16_t value,
-                          uint16_t index, uint16_t length, void *data)
-{
-    usbxhci_ctl_trb_t trbs[64/4+2] = {};
-
-    int dir = (request_type & USBXHCI_CTL_TRB_BMREQT_TOHOST) != 0;
-
-    int trb_count = make_setup_trbs(
-                trbs, countof(trbs), data, length, dir,
-                request_type, request, value, index);
-
-    usb_blocking_iocp_t block;
-    block.set_expect(1);
-
-    add_xfer_trbs(slotid, 0, 0, trb_count, dir, trbs, &block);
-
-    block.wait();
-
-    if (unlikely(!block))
-        return -int(block.cc());
-
-    return 0;
-}
-
-int usbxhci::xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
-                  uint16_t length, void *data, int dir)
-{
-    // Worst case is 64KB
-    usbxhci_ctl_trb_data_t trbs[64/4] = {};
-
-    int data_trb_count = make_data_trbs(trbs, countof(trbs),
-                                        data, length, 1, true);
-
-    usb_blocking_iocp_t block;
-    block.set_expect(1);
-
-    add_xfer_trbs(slotid, epid, stream_id, data_trb_count, 1, trbs, &block);
-
-    block.wait();
-
-    return block ? 0 : -int(block.cc());
 }
 
 int usbxhci::make_data_trbs(
