@@ -218,7 +218,6 @@ enum struct errno_t : int8_t {
     /// the specified pathname is a dangling symbolic link.
     ENOENT,
 
-
     /// Exec format error (POSIX.1).
     ENOEXEC,
 
@@ -380,6 +379,20 @@ enum struct errno_t : int8_t {
 
     /// Exchange full.
     EXFULL,
+
+    // Extensions
+
+    // Unable to accept/provide data at the required rate
+    EOVERLOAD,
+
+    // Insufficient bandwidth
+    EBANDWIDTH,
+
+    // Stopped
+    ESTOPPED,
+
+    // Did not receive expected amount of data
+    ESHORT,
 
     MAX_ERRNO
 };
