@@ -535,7 +535,7 @@ protected:
 
 private:
     bool set_protocol(usb_pipe_t &pipe, uint16_t proto);
-    bool set_idle(usb_pipe_t &pipe, uint16_t value);
+    bool set_idle(usb_pipe_t &pipe, uint8_t report_id, uint8_t idle);
 
     static int keybd_poll_thread(void *p);
     int keybd_poll_thread();
@@ -559,7 +559,7 @@ private:
     uint8_t last_mouse_state[8];
     uint8_t this_mouse_state[8];
 
-    ticketlock print_lock;
+    ticketlock change_lock;
     usb_pipe_t keybd_control;
     usb_pipe_t keybd_in;
     usb_pipe_t mouse_control;
@@ -583,7 +583,7 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
         bus->get_pipe(cfg_hlp->slot(), 0, keybd_control);
 
         set_protocol(keybd_control, 0);
-        set_idle(keybd_control, 0);
+        set_idle(keybd_control, 0, 0);
 
         // Try to find interrupt pipe
         usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
@@ -615,7 +615,7 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
         bus->get_pipe(cfg_hlp->slot(), 0, mouse_control);
 
         set_protocol(mouse_control, 0);
-        set_idle(mouse_control, 0);
+        set_idle(mouse_control, 0, 0);
 
         usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
 
@@ -653,14 +653,14 @@ bool usb_hid_t::set_protocol(usb_pipe_t &pipe, uint16_t proto)
                 proto, keybd_iface_idx, 0, nullptr) >= 0;
 }
 
-bool usb_hid_t::set_idle(usb_pipe_t &pipe, uint16_t value)
+bool usb_hid_t::set_idle(usb_pipe_t &pipe, uint8_t report_id, uint8_t idle)
 {
     return pipe.send_default_control(
                 uint8_t(usb_dir_t::OUT) |
                 (uint8_t(usb_req_type::CLASS) << 5) |
                 uint8_t(usb_req_recip_t::INTERFACE),
                 uint8_t(hid_request_t::SET_IDLE),
-                value, mouse_iface_idx, 0, nullptr) >= 0;
+                report_id | (idle << 8), mouse_iface_idx, 0, nullptr) >= 0;
 }
 
 int usb_hid_t::keybd_poll_thread(void *p)
@@ -673,22 +673,15 @@ int usb_hid_t::keybd_poll_thread()
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
     while (true) {
-        uint8_t data[8] = {};
-
         keybd_control.send_default_control(
                     uint8_t(usb_dir_t::IN) |
                     (uint8_t(usb_req_type::CLASS) << 5) |
                     uint8_t(usb_req_recip_t::INTERFACE),
                     1,
-                    0, 0, 8, data);
+                    0, 0, sizeof(this_keybd_state), this_keybd_state);
 
-        unique_lock<ticketlock> lock(print_lock);
+        unique_lock<ticketlock> hold_change_lock(change_lock);
         detect_keybd_changes();
-        memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
-
-        USBHID_TRACE("  Key: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                data[0], data[1], data[2], data[3],
-                data[4], data[5], data[6], data[7]);
 
         thread_sleep_for(20);
     }
@@ -708,9 +701,8 @@ int usb_hid_t::keybd_in_thread()
     while (true) {
         keybd_in.recv(sizeof(this_keybd_state), this_keybd_state);
 
-        unique_lock<ticketlock> lock(print_lock);
+        unique_lock<ticketlock> lock(change_lock);
         detect_keybd_changes();
-        memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
     }
 
     return true;
@@ -726,28 +718,22 @@ int usb_hid_t::mouse_poll_thread()
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
     while (true) {
-        uint8_t data[8] = {};
-
         mouse_control.send_default_control(
                     uint8_t(usb_dir_t::IN) |
                     (uint8_t(usb_req_type::CLASS) << 5) |
                     uint8_t(usb_req_recip_t::INTERFACE),
                     1,
-                    0x100, mouse_iface_idx, 8, data);
+                    0x100, mouse_iface_idx,
+                    sizeof(this_mouse_state), this_mouse_state);
 
-        unique_lock<ticketlock> lock(print_lock);
-        USBHID_TRACE("Mouse: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-                data[0], data[1], data[2], data[3],
-                data[4], data[5], data[6], data[7]);
+        unique_lock<ticketlock> hold_change_lock(change_lock);
 
         mouse_raw_event_t evt;
-        evt.hdist = (char)data[1];
-        evt.vdist = -(char)data[2];
-        evt.wdist = (char)data[3];
-        evt.buttons = data[0];
+        evt.hdist = (int8_t)this_mouse_state[1];
+        evt.vdist = -(int8_t)this_mouse_state[2];
+        evt.wdist = (int8_t)this_mouse_state[3];
+        evt.buttons = this_mouse_state[0];
         mouse_event(evt);
-
-        thread_sleep_for(20);
     }
 
     return true;
@@ -763,20 +749,15 @@ int usb_hid_t::mouse_in_thread()
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
 
     while (true) {
-        uint8_t data[8] = {};
+        mouse_in.recv(sizeof(this_mouse_state), this_mouse_state);
 
-        int sz = mouse_in.recv(sizeof(data), data);
-
-        unique_lock<ticketlock> lock(print_lock);
-        USBHID_TRACE("Mouse: %02x %02x %02x %02x %02x %02x %02x %02x sz=%d\n",
-                data[0], data[1], data[2], data[3],
-                data[4], data[5], data[6], data[7], sz);
+        unique_lock<ticketlock> hold_change_lock(change_lock);
 
         mouse_raw_event_t evt;
-        evt.hdist = (char)data[1];
-        evt.vdist = -(char)data[2];
-        evt.wdist = (char)data[3];
-        evt.buttons = data[0];
+        evt.hdist = (int8_t)this_mouse_state[1];
+        evt.vdist = -(int8_t)this_mouse_state[2];
+        evt.wdist = (int8_t)this_mouse_state[3];
+        evt.buttons = this_mouse_state[0];
         mouse_event(evt);
     }
 
@@ -833,12 +814,18 @@ void usb_hid_t::detect_keybd_changes()
         if (scancode < 4)
             continue;
 
+        // Detect edges
+        if (memchr(last_keybd_state + 2, scancode, 6))
+            continue;
+
         // Generate keydown event
         int vk = (scancode < countof(usb_hid_keybd_lookup))
                 ? usb_hid_keybd_lookup[scancode] : 0;
 
         fsa.deliver_vk(vk);
     }
+
+    memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
 }
 
 usb_hid_t usb_hid_t::usb_hid;

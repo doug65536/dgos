@@ -14,7 +14,7 @@
 
 #include "usb_xhcibits.h"
 
-#define USBXHCI_DEBUG   1
+#define USBXHCI_DEBUG   0
 #if USBXHCI_DEBUG
 #define USBXHCI_TRACE(...) printdbg("xhci: " __VA_ARGS__)
 #else
