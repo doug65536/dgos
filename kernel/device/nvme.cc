@@ -425,14 +425,6 @@ enum struct nvme_op_t : uint8_t {
     flush
 };
 
-typedef void (*nvme_async_callback_fn_t)(int error, uintptr_t arg);
-
-struct nvme_request_callback_t {
-    nvme_async_callback_fn_t callback;
-    uintptr_t callback_arg;
-    int error;
-};
-
 struct nvme_request_t {
     void *data;
     int64_t count;

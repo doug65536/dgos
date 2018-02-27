@@ -218,47 +218,47 @@
     (((n) & I350_CTRL_PHY_RST) >> I350_CTRL_PHY_RST_BIT)
 
 #define I350_CTRL_FD_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_FD) | I350_CTRL_FD_n(n))
+    ((r) = ((r) & ~I350_CTRL_FD) | I350_CTRL_FD_n((n)))
 #define I350_CTRL_GIOMD_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_GIOMD) | I350_CTRL_GIOMD_n(n))
+    ((r) = ((r) & ~I350_CTRL_GIOMD) | I350_CTRL_GIOMD_n((n)))
 #define I350_CTRL_SLU_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SLU) | I350_CTRL_SLU_n(n))
+    ((r) = ((r) & ~I350_CTRL_SLU) | I350_CTRL_SLU_n((n)))
 #define I350_CTRL_ILOS_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_ILOS) | I350_CTRL_ILOS_n(n))
+    ((r) = ((r) & ~I350_CTRL_ILOS) | I350_CTRL_ILOS_n((n)))
 #define I350_CTRL_SPEED_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SPEED) | I350_CTRL_SPEED_n(n))
+    ((r) = ((r) & ~I350_CTRL_SPEED) | I350_CTRL_SPEED_n((n)))
 #define I350_CTRL_FRCSPC_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_FRCSPC) | I350_CTRL_FRCSPC_n(n))
+    ((r) = ((r) & ~I350_CTRL_FRCSPC) | I350_CTRL_FRCSPC_n((n)))
 #define I350_CTRL_FRCDPLX_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_FRCDPLX) | I350_CTRL_FRCDPLX_n(n))
+    ((r) = ((r) & ~I350_CTRL_FRCDPLX) | I350_CTRL_FRCDPLX_n((n)))
 #define I350_CTRL_SDP0_GPIEN_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP0_GPIEN) | I350_CTRL_SDP0_GPIEN_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP0_GPIEN) | I350_CTRL_SDP0_GPIEN_n((n)))
 #define I350_CTRL_SDP1_GPIEN_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP1_GPIEN) | I350_CTRL_SDP1_GPIEN_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP1_GPIEN) | I350_CTRL_SDP1_GPIEN_n((n)))
 #define I350_CTRL_SDP0_DATA_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP0_DATA) | I350_CTRL_SDP0_DATA_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP0_DATA) | I350_CTRL_SDP0_DATA_n((n)))
 #define I350_CTRL_SDP1_DATA_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP1_DATA) | I350_CTRL_SDP1_DATA_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP1_DATA) | I350_CTRL_SDP1_DATA_n((n)))
 #define I350_CTRL_ADVD3WUC_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_ADVD3WUC) | I350_CTRL_ADVD3WUC_n(n))
+    ((r) = ((r) & ~I350_CTRL_ADVD3WUC) | I350_CTRL_ADVD3WUC_n((n)))
 #define I350_CTRL_SDP0_WDE_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP0_WDE) | I350_CTRL_SDP0_WDE_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP0_WDE) | I350_CTRL_SDP0_WDE_n((n)))
 #define I350_CTRL_SDP0_IODIR_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP0_IODIR) | I350_CTRL_SDP0_IODIR_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP0_IODIR) | I350_CTRL_SDP0_IODIR_n((n)))
 #define I350_CTRL_SDP1_IODIR_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_SDP1_IODIR) | I350_CTRL_SDP1_IODIR_n(n))
+    ((r) = ((r) & ~I350_CTRL_SDP1_IODIR) | I350_CTRL_SDP1_IODIR_n((n)))
 #define I350_CTRL_RST_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_RST) | I350_CTRL_RST_n(n))
+    ((r) = ((r) & ~I350_CTRL_RST) | I350_CTRL_RST_n((n)))
 #define I350_CTRL_RFCE_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_RFCE) | I350_CTRL_RFCE_n(n))
+    ((r) = ((r) & ~I350_CTRL_RFCE) | I350_CTRL_RFCE_n((n)))
 #define I350_CTRL_TFCE_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_TFCE) | I350_CTRL_TFCE_n(n))
+    ((r) = ((r) & ~I350_CTRL_TFCE) | I350_CTRL_TFCE_n((n)))
 #define I350_CTRL_DEV_RST_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_DEV_RST) | I350_CTRL_DEV_RST_n(n))
+    ((r) = ((r) & ~I350_CTRL_DEV_RST) | I350_CTRL_DEV_RST_n((n)))
 #define I350_CTRL_VME_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_VME) | I350_CTRL_VME_n(n))
+    ((r) = ((r) & ~I350_CTRL_VME) | I350_CTRL_VME_n((n)))
 #define I350_CTRL_PHY_RST_SET(r,n) \
-    (r = ((r) & ~I350_CTRL_PHY_RST) | I350_CTRL_PHY_RST_n(n))
+    ((r) = ((r) & ~I350_CTRL_PHY_RST) | I350_CTRL_PHY_RST_n((n)))
 
 //
 // I350_STATUS: Device status register
@@ -399,29 +399,29 @@
     (((n) & I350_STATUS_MAC_CLK_GE) >> I350_STATUS_MAC_CLK_GE_BIT)
 
 #define I350_STATUS_FD_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_FD) | I350_STATUS_FD_n(n))
+    ((r) = ((r) & ~I350_STATUS_FD) | I350_STATUS_FD_n((n)))
 #define I350_STATUS_LU_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_LU) | I350_STATUS_LU_n(n))
+    ((r) = ((r) & ~I350_STATUS_LU) | I350_STATUS_LU_n((n)))
 #define I350_STATUS_LAN_ID_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_LAN_ID) | I350_STATUS_LAN_ID_n(n))
+    ((r) = ((r) & ~I350_STATUS_LAN_ID) | I350_STATUS_LAN_ID_n((n)))
 #define I350_STATUS_TXOFF_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_TXOFF) | I350_STATUS_TXOFF_n(n))
+    ((r) = ((r) & ~I350_STATUS_TXOFF) | I350_STATUS_TXOFF_n((n)))
 #define I350_STATUS_SPEED_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_SPEED) | I350_STATUS_SPEED_n(n))
+    ((r) = ((r) & ~I350_STATUS_SPEED) | I350_STATUS_SPEED_n((n)))
 #define I350_STATUS_ASDV_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_ASDV) | I350_STATUS_ASDV_n(n))
+    ((r) = ((r) & ~I350_STATUS_ASDV) | I350_STATUS_ASDV_n((n)))
 #define I350_STATUS_PHYRA_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_PHYRA) | I350_STATUS_PHYRA_n(n))
+    ((r) = ((r) & ~I350_STATUS_PHYRA) | I350_STATUS_PHYRA_n((n)))
 #define I350_STATUS_NUM_VFS_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_NUM_VFS) | I350_STATUS_NUM_VFS_n(n))
+    ((r) = ((r) & ~I350_STATUS_NUM_VFS) | I350_STATUS_NUM_VFS_n((n)))
 #define I350_STATUS_IOV_MODE_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_IOV_MODE) | I350_STATUS_IOV_MODE_n(n))
+    ((r) = ((r) & ~I350_STATUS_IOV_MODE) | I350_STATUS_IOV_MODE_n((n)))
 #define I350_STATUS_GIO_MES_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_GIO_MES) | I350_STATUS_GIO_MES_n(n))
+    ((r) = ((r) & ~I350_STATUS_GIO_MES) | I350_STATUS_GIO_MES_n((n)))
 #define I350_STATUS_DEV_RST_SET_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_DEV_RST_SET) | I350_STATUS_DEV_RST_SET_n(n))
+    ((r) = ((r) & ~I350_STATUS_DEV_RST_SET) | I350_STATUS_DEV_RST_SET_n((n)))
 #define I350_STATUS_PF_RST_DONE_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_PF_RST_DONE) | I350_STATUS_PF_RST_DONE_n(n))
+    ((r) = ((r) & ~I350_STATUS_PF_RST_DONE) | I350_STATUS_PF_RST_DONE_n((n)))
 #define I350_STATUS_MAC_CLK_GE_SET(r,n) \
-    (r = ((r) & ~I350_STATUS_MAC_CLK_GE) | I350_STATUS_MAC_CLK_GE_n(n))
+    ((r) = ((r) & ~I350_STATUS_MAC_CLK_GE) | I350_STATUS_MAC_CLK_GE_n((n)))
 
