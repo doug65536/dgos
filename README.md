@@ -45,7 +45,9 @@
 - IRQ sharing
 - Fast PCI enumerator with recursive bridge traversal
 - 8042 legacy keyboard and mouse driver
-- XHCI USB 3.1 driver (partial)
+- XHCI USB 3.1 driver
+- USB Mouse, Keyboard support
+- USB mass storage support (for flash drives and external hard drives)
 - IRQ driven IDE with bus master DMA support, IORDY, 48-bit addressing, ATAPI,
   bounce buffering
 - IRQ driven AHCI with native command queueing (NCQ), asynchronous I/O,

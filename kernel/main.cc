@@ -619,6 +619,10 @@ static int init_thread(void *p)
     printdbg("Initializing late devices\n");
     callout_call(callout_type_t::late_dev);
 
+    // Register USB interfaces
+    printdbg("Initializing USB interfaces\n");
+    callout_call(callout_type_t::usb);
+
     // Register filesystems
     printdbg("Initializing filesystems\n");
     callout_call(callout_type_t::reg_filesys);
@@ -634,10 +638,6 @@ static int init_thread(void *p)
     // Register network interfaces
     printdbg("Initializing network interfaces\n");
     callout_call(callout_type_t::nic);
-
-    // Register USB interfaces
-    printdbg("Initializing USB interfaces\n");
-    callout_call(callout_type_t::usb);
 
     //bootdev_info(0, 0, 0);
 

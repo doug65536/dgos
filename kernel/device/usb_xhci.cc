@@ -354,6 +354,14 @@ struct usbxhci_cmd_trb_noop_t {
     uint16_t rsvd2;
 } __packed;
 
+struct usbxhci_cmd_trb_reset_ep_t {
+    uint32_t rsvd1[3];
+    uint8_t cycle;
+    uint8_t trb_type_tsp;
+    uint8_t epid;
+    uint8_t slotid;
+} __packed;
+
 struct usbxhci_cmd_trb_setaddr_t {
     uint64_t input_ctx_physaddr;
     uint32_t rsvd;
@@ -721,27 +729,35 @@ protected:
     }
 
     int enable_slot(int port) override final;
+
     int set_address(int slotid, int port, uint32_t route) override final;
+
     bool get_pipe(int slotid, int epid, usb_pipe_t &pipe) override final;
+
     bool alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
                     int max_packet_sz, int interval,
                     usb_ep_attr ep_type) override final;
 
-    int send_control_async(uint8_t slotid, uint8_t request_type, uint8_t request,
-            uint16_t value, uint16_t index, uint16_t length, void *data,
-            usb_iocp_t *iocp) override final;
-
-    int xfer_async(
-            uint8_t slotid, uint8_t epid, uint16_t stream_id,
-            uint16_t length, void *data, int dir,
-            usb_iocp_t *iocp) override final;
-
-    int send_control(uint8_t slotid, uint8_t request_type, uint8_t request,
+    int send_control(int slotid, uint8_t request_type, uint8_t request,
                      uint16_t value, uint16_t index, uint16_t length,
                      void *data) override final;
 
-    int xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
-             uint16_t length, void *data, int dir) override final;
+    int send_control_async(int slotid, uint8_t request_type, uint8_t request,
+            uint16_t value, uint16_t index, uint16_t length, void *data,
+            usb_iocp_t *iocp) override final;
+
+    int xfer(int slotid, uint8_t epid, uint16_t stream_id,
+             uint32_t length, void *data, int dir) override final;
+
+    int xfer_async(int slotid, uint8_t epid, uint16_t stream_id,
+                   uint32_t length, void *data, int dir,
+                   usb_iocp_t *iocp) override final;
+
+    usb_ep_state_t get_ep_state(int slotid, uint8_t epid) override final;
+
+    int reset_ep_async(int slotid, uint8_t epid, usb_iocp_t *iocp) override final;
+
+    int reset_ep(int slotid, uint8_t epid) override final;
 
 private:
     errno_t cc_to_errno(usb_cc_t cc);
@@ -769,7 +785,7 @@ private:
                                 unique_lock<ticketlock> const&);
 
     int make_data_trbs(usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
-                       void *data, uint16_t length, int dir, bool intr);
+                       void *data, uint32_t length, int dir, bool intr);
 
     int make_setup_trbs(usbxhci_ctl_trb_t *trbs, int trb_capacity,
                         void *data, uint16_t length, int dir,
@@ -1553,7 +1569,7 @@ bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
     return false;
 }
 
-int usbxhci::send_control(uint8_t slotid, uint8_t request_type,
+int usbxhci::send_control(int slotid, uint8_t request_type,
                           uint8_t request, uint16_t value,
                           uint16_t index, uint16_t length, void *data)
 {
@@ -1568,7 +1584,7 @@ int usbxhci::send_control(uint8_t slotid, uint8_t request_type,
     return block.get_result().len_or_error();
 }
 
-int usbxhci::send_control_async(uint8_t slotid, uint8_t request_type,
+int usbxhci::send_control_async(int slotid, uint8_t request_type,
                                 uint8_t request, uint16_t value,
                                 uint16_t index, uint16_t length,
                                 void *data, usb_iocp_t *iocp)
@@ -1587,8 +1603,8 @@ int usbxhci::send_control_async(uint8_t slotid, uint8_t request_type,
     return 0;
 }
 
-int usbxhci::xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
-                  uint16_t length, void *data, int dir)
+int usbxhci::xfer(int slotid, uint8_t epid, uint16_t stream_id,
+                  uint32_t length, void *data, int dir)
 {
     usb_blocking_iocp_t block;
     block.set_expect(1);
@@ -1600,8 +1616,8 @@ int usbxhci::xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
     return block.get_result();
 }
 
-int usbxhci::xfer_async(uint8_t slotid, uint8_t epid, uint16_t stream_id,
-                        uint16_t length, void *data, int dir, usb_iocp_t *iocp)
+int usbxhci::xfer_async(int slotid, uint8_t epid, uint16_t stream_id,
+                        uint32_t length, void *data, int dir, usb_iocp_t *iocp)
 {
     // Worst case is 64KB
     usbxhci_ctl_trb_data_t trbs[64/4] = {};
@@ -1610,6 +1626,42 @@ int usbxhci::xfer_async(uint8_t slotid, uint8_t epid, uint16_t stream_id,
                                         data, length, dir, true);
 
     add_xfer_trbs(slotid, epid, stream_id, data_trb_count, dir, trbs, iocp);
+
+    return 0;
+}
+
+usb_ep_state_t usbxhci::get_ep_state(int slotid, uint8_t epid)
+{
+    usbxhci_ep_ctx_t *epctx = dev_ctx_ent_ep(slotid, epid & 0xF);
+
+    return usb_ep_state_t(USBXHCI_EPCTX_EP_STATE_STATE_GET(epctx->ep_state));
+}
+
+int usbxhci::reset_ep(int slotid, uint8_t epid)
+{
+    usb_blocking_iocp_t block;
+    block.set_expect(1);
+
+    reset_ep_async(slotid, epid, &block);
+
+    block.wait();
+
+    return block.get_result().len_or_error();
+}
+
+int usbxhci::reset_ep_async(int slotid, uint8_t epid, usb_iocp_t *iocp)
+{
+    usbxhci_cmd_trb_reset_ep_t cmd{};
+
+    USBXHCI_CTL_TRB_RESETEP_TRBTYPE_TSP_TRB_TYPE_SET(
+                cmd.trb_type_tsp, USBXHCI_TRB_TYPE_RESETEPCMD);
+
+    cmd.epid = !epid || epid > 0x80
+            ? USBXHCI_DB_VAL_IN_EP_UPD_n(epid & 0xF)
+            : USBXHCI_DB_VAL_OUT_EP_UPD_n(epid & 0xF);
+    cmd.slotid = slotid;
+
+    issue_cmd(&cmd, iocp);
 
     return 0;
 }
@@ -1899,12 +1951,12 @@ int usbxhci::make_setup_trbs(
 
 int usbxhci::make_data_trbs(
         usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
-        void *data, uint16_t length, int dir, bool intr)
+        void *data, uint32_t length, int dir, bool intr)
 {
     // Worst case is 64KB
     mmphysrange_t ranges[64/4];
     size_t range_count = mphysranges(ranges, countof(ranges),
-                                     data, length, 32 << 10);
+                                     data, length, 64 << 10);
 
     // TRBs must not cross 64KB boundaries
     if (unlikely(!mphysranges_split(ranges, range_count, countof(ranges), 16)))
@@ -1918,7 +1970,11 @@ int usbxhci::make_data_trbs(
 
     for (size_t i = 0; i < range_count; ++i) {
         trb->data_physaddr = ranges[i].physaddr;
-        trb->xfer_td_intr = ranges[i].size;
+        trb->xfer_td_intr =
+                USBXHCI_CTL_TRB_XFERLEN_INTR_XFERLEN_n(ranges[i].size) |
+                USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_n(
+                    min(size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
+                        range_count - i - 1));
         trb->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA) |
                 USBXHCI_CTL_TRB_FLAGS_CH_n(i + 1 < range_count) |
                 USBXHCI_CTL_TRB_FLAGS_IOC_n(intr && i + 1 >= range_count) |

@@ -36,6 +36,8 @@ struct basic_iocp_t {
         return S::succeeded(result);
     }
 
+    void reset(callback_t callback);
+
 private:
     void invoke_once(unique_lock<ticketlock> &hold);
 
@@ -43,8 +45,8 @@ private:
     uintptr_t arg;
     unsigned done_count;
     unsigned expect_count;
-    ticketlock lock;
     int result_count;
+    ticketlock lock;
     T result;
 };
 
@@ -117,6 +119,15 @@ void basic_iocp_t<T, S>::invoke()
     unique_lock<ticketlock> hold(lock);
     if (expect_count && ++done_count >= expect_count)
         invoke_once(hold);
+}
+
+template<typename T, typename S>
+void basic_iocp_t<T, S>::reset(callback_t callback)
+{
+    this->callback = callback;
+    done_count = 0;
+    expect_count = 0;
+    result_count = 0;
 }
 
 template<typename T, typename S>

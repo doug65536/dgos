@@ -33,6 +33,23 @@ enum struct usb_rqcode_t : uint8_t {
     SET_ISOCH_DELAY      = 49,
 };
 
+enum struct usb_featcode_t : uint8_t {
+    ENDPOINT_HALT = 0,
+    FUNCTION_SUSPEND = 0,
+    DEVICE_REMOTE_WAKEUP = 1,
+    TEST_MODE = 2,
+    b_hnp_enable = 3,
+    a_hnp_support = 4,
+    a_alt_hnp_support = 5,
+    WUSB_DEVICE = 6,
+    U1_ENABLE = 48,
+    U2_ENABLE = 49,
+    LTM_ENABLE = 50,
+    B3_NTF_HOST_REL = 51,
+    B3_RSP_ENABLE = 52,
+    LDM_ENABLE = 53
+};
+
 enum struct usb_req_type : uint8_t {
     STD     = 0,
     CLASS   = 1,
@@ -225,6 +242,14 @@ enum struct usb_ep_attr : uint8_t {
     isoch,
     bulk,
     interrupt
+};
+
+enum struct usb_ep_state_t : uint8_t {
+    disabled,
+    running,
+    stopped,
+    halted,
+    error
 };
 
 struct usb_desc_ep {

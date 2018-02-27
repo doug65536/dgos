@@ -89,12 +89,47 @@ int usb_pipe_t::send_default_control(uint8_t request_type, uint8_t request,
                 slotid, request_type, request, value, index, length, data);
 }
 
-int usb_pipe_t::recv(void *data, uint16_t length)
+int usb_pipe_t::recv(void *data, uint32_t length) const
 {
     return bus->xfer(slotid, epid, 0, length, data, 1);
 }
 
-int usb_pipe_t::send(const void *data, uint16_t length)
+int usb_pipe_t::recv_async(void *data, uint32_t length, usb_iocp_t *iocp) const
+{
+    return bus->xfer_async(slotid, epid, 0, length, data, 1, iocp);
+}
+
+int usb_pipe_t::send(void const *data, uint32_t length) const
 {
     return bus->xfer(slotid, epid, 0, length, const_cast<void*>(data), 0);
+}
+
+int usb_pipe_t::send_async(void const *data, uint32_t length,
+                           usb_iocp_t *iocp) const
+{
+    return bus->xfer_async(slotid, epid, 0, length, const_cast<void*>(data),
+                           0, iocp);
+}
+
+int usb_pipe_t::clear_ep_halt(usb_pipe_t const& target)
+{
+    // Must be sent to control pipe
+    assert(epid == 0);
+
+    usb_ep_state_t state = bus->get_ep_state(slotid, epid);
+
+    if (state != usb_ep_state_t::halted)
+        return 0;
+
+    bus->reset_ep(slotid, epid);
+
+    int ncc = send_default_control(
+               uint8_t(usb_dir_t::OUT) |
+               (uint8_t(usb_req_type::STD) << 5) |
+               uint8_t(usb_req_recip_t::ENDPOINT),
+               uint8_t(usb_rqcode_t::CLEAR_FEATURE),
+               uint16_t(usb_featcode_t::ENDPOINT_HALT),
+               target.epid, 0, nullptr);
+
+    return ncc;
 }

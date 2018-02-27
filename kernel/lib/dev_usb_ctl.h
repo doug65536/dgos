@@ -65,8 +65,18 @@ public:
                              uint16_t value, uint16_t index,
                              uint16_t length, void *data);
 
-    int recv(void *data, uint16_t length);
-    int send(void const *data, uint16_t length);
+    int send_default_control_async(uint8_t request_type, uint8_t request,
+                                   uint16_t value, uint16_t index,
+                                   uint16_t length, void *data,
+                                   usb_iocp_t *iocp);
+
+    int recv(void *data, uint32_t length) const;
+    int recv_async(void *data, uint32_t length, usb_iocp_t *iocp) const;
+
+    int send(void const *data, uint32_t length) const;
+    int send_async(void const *data, uint32_t length, usb_iocp_t *iocp) const;
+
+    int clear_ep_halt(usb_pipe_t const& target);
 
 private:
     usb_bus_t *bus;
@@ -98,22 +108,27 @@ public:
                             int max_packet_sz, int interval,
                             usb_ep_attr ep_type) = 0;
 
+    virtual int send_control(
+            int slotid, uint8_t request_type, uint8_t request,
+            uint16_t value, uint16_t index, uint16_t length, void *data) = 0;
+
     virtual int send_control_async(
-            uint8_t slotid, uint8_t request_type, uint8_t request,
+            int slotid, uint8_t request_type, uint8_t request,
             uint16_t value, uint16_t index, uint16_t length, void *data,
             usb_iocp_t *iocp) = 0;
 
+    virtual int xfer(int slotid, uint8_t epid, uint16_t stream_id,
+                     uint32_t length, void *data, int dir) = 0;
+
     virtual int xfer_async(
-            uint8_t slotid, uint8_t epid, uint16_t stream_id,
-            uint16_t length, void *data, int dir,
+            int slotid, uint8_t epid, uint16_t stream_id,
+            uint32_t length, void *data, int dir,
             usb_iocp_t *iocp) = 0;
 
-    virtual int send_control(
-            uint8_t slotid, uint8_t request_type, uint8_t request,
-            uint16_t value, uint16_t index, uint16_t length, void *data) = 0;
+    virtual usb_ep_state_t get_ep_state(int slotid, uint8_t epid) = 0;
 
-    virtual int xfer(uint8_t slotid, uint8_t epid, uint16_t stream_id,
-                     uint16_t length, void *data, int dir) = 0;
+    virtual int reset_ep(int slotid, uint8_t epid) = 0;
+    virtual int reset_ep_async(int slotid, uint8_t epid, usb_iocp_t *iocp) = 0;
 
 private:
 

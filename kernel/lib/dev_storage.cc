@@ -175,6 +175,8 @@ static void invoke_part_factories(void *arg)
             }
         }
     }
+
+    STORAGE_TRACE("Partition probe complete\n");
 }
 
 REGISTER_CALLOUT(invoke_part_factories, nullptr,
