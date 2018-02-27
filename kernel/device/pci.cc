@@ -364,8 +364,8 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
                 continue;
 
             // If device is bridge, add bus to todo list
-            if (iter->config.dev_class == 0x06 &&
-                    iter->config.subclass == 4) {
+            if (iter->config.dev_class == PCI_DEV_CLASS_BRIDGE &&
+                    iter->config.subclass == PCI_SUBCLASS_BRIDGE_PCI2PCI) {
                 if (iter->bus_todo_len < countof(iter->bus_todo)) {
                      uint8_t secondary_bus =
                              (iter->config.base_addr[2] >> 8) & 0xFF;
