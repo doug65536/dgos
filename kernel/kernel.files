@@ -6,6 +6,8 @@ device/iocp.h
 device/usb.cc
 device/usb_hid.cc
 device/usb_hid.h
+device/usb_hub.cc
+device/usb_hub.h
 device/usb_storage.cc
 device/usb_storage.h
 device/usb_xhci.bits

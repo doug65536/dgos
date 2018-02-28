@@ -582,6 +582,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/dev_usb_ctl.cc \
 	kernel/device/usb_hid.h \
 	kernel/device/usb_hid.cc \
+	kernel/device/usb_hub.h \
+	kernel/device/usb_hub.cc \
 	kernel/device/usb_storage.h \
 	kernel/device/usb_storage.cc \
 	kernel/device/usb_xhci.cc \
@@ -1098,13 +1100,14 @@ QEMU_RAM = 5G
 
 QEMU_USB = -device nec-usb-xhci,id=xhci \
 	-drive if=none,id=stick,file=usb_disk.img,format=raw \
-	-device usb-storage,bus=xhci.0,drive=stick \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
+	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
+	-device usb-audio,bus=xhci.0 \
+	-device usb-net,bus=xhci.0 \
+	-device usb-storage,bus=xhci.0,drive=stick \
 	-trace 'usb*'
 
-#-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
-#-device usb-audio,bus=xhci.0
 
 QEMU_NET = \
 	-net nic,model=rtl8139 \

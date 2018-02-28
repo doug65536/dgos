@@ -592,9 +592,7 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
         if (ep_desc) {
             // Allocate interrupt IN endpoint and use it
-            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc->ep_addr, keybd_in,
-                                ep_desc->max_packet_sz, ep_desc->interval,
-                                ep_desc->ep_attr)) {
+            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc, keybd_in)) {
                 USBHID_TRACE("using interrupt pipe for keyboard input\n");
                 tid = thread_create(keybd_in_thread, this, 0, false);
             }
@@ -622,9 +620,7 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
         int tid = -1;
 
         if (ep_desc) {
-            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc->ep_addr, mouse_in,
-                                ep_desc->max_packet_sz, ep_desc->interval,
-                                ep_desc->ep_attr)) {
+            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc, mouse_in)) {
                 USBHID_TRACE("using interrupt pipe for mouse input\n");
                 tid = thread_create(mouse_in_thread, this, 0, false);
             }

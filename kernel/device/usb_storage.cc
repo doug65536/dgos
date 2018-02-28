@@ -346,8 +346,7 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     for (int i = 0; (ep = cfg_hlp->find_ep(match.iface, i)) != nullptr; ++i) {
         usb_pipe_t &pipe = ep->ep_addr >= 0x80 ? bulk_in : bulk_out;
-        if (!bus->alloc_pipe(cfg_hlp->slot(), ep->ep_addr, pipe,
-                             ep->max_packet_sz, ep->interval, ep->ep_attr))
+        if (!bus->alloc_pipe(cfg_hlp->slot(), ep, pipe))
             return false;
     }
 

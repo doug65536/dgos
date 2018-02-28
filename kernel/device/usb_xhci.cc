@@ -14,7 +14,7 @@
 
 #include "usb_xhcibits.h"
 
-#define USBXHCI_DEBUG   0
+#define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
 #define USBXHCI_TRACE(...) printdbg("xhci: " __VA_ARGS__)
 #else
@@ -712,6 +712,8 @@ public:
 
     void dump_config_desc(const usb_config_helper &cfg_hlp);
 
+    bool add_device(int port, int route);
+
 protected:
     //
     // usb_bus_t interface
@@ -755,14 +757,20 @@ protected:
 
     usb_ep_state_t get_ep_state(int slotid, uint8_t epid) override final;
 
-    int reset_ep_async(int slotid, uint8_t epid, usb_iocp_t *iocp) override final;
-
     int reset_ep(int slotid, uint8_t epid) override final;
+
+    int reset_ep_async(int slotid, uint8_t epid,
+                       usb_iocp_t *iocp) override final;
+
+    bool configure_hub_port(int slotid, int port) override final;
+
+    bool set_hub_port_count(int slotid,
+                            usb_hub_desc const &hub_desc) override final;
 
 private:
     errno_t cc_to_errno(usb_cc_t cc);
 
-    usbxhci_slotctx_t *dev_ctx_ent_slot(size_t i);
+    usbxhci_slotctx_t *dev_ctx_ent_slot(size_t slotid);
 
     usbxhci_ep_ctx_t *dev_ctx_ent_ep(size_t slot, size_t i);
 
@@ -812,7 +820,8 @@ private:
                       usbxhci_slotctx_t **p_inpslotctx,
                       usbxhci_ep_ctx_t **p_inpepctx);
 
-    usb_cc_t commit_inp_ctx(int slotid, int epid, usbxhci_inpctx_t &inp, uint32_t trb_type);
+    usb_cc_t commit_inp_ctx(int slotid, int epid,
+                            usbxhci_inpctx_t &inp, uint32_t trb_type);
 
     int update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc);
 
@@ -890,11 +899,11 @@ private:
 static vector<usbxhci*> usbxhci_devices;
 
 // Handle 32 or 64 byte device context size
-usbxhci_slotctx_t *usbxhci::dev_ctx_ent_slot(size_t i)
+usbxhci_slotctx_t *usbxhci::dev_ctx_ent_slot(size_t slotid)
 {
     if (dev_ctx_large)
-        return &dev_ctx.large[i].slotctx;
-    return &dev_ctx.small[i].slotctx;
+        return &dev_ctx.large[slotid].slotctx;
+    return &dev_ctx.small[slotid].slotctx;
 }
 
 // Handle 32 or 64 byte device context size
@@ -1165,6 +1174,44 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
     USBXHCI_TRACE("Done configuration descriptors\n");
 }
 
+bool usbxhci::add_device(int port, int route)
+{
+    int slotid = enable_slot(port);
+
+    int err = set_address(slotid, port, route);
+    if (err < 0)
+        return false;
+
+    usb_desc_device dev_desc{};
+
+    err = get_descriptor(slotid, 0, &dev_desc, 8, usb_req_type::STD,
+                         usb_req_recip_t::DEVICE,
+                         usb_desctype_t::DEVICE, 0);
+    if (err < 0)
+        return false;
+
+    err = update_slot_ctx(slotid, &dev_desc);
+    if (err < 0)
+        return false;
+
+    // Get first 8 bytes of device descriptor to get max packet size
+    unique_ptr<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 512));
+
+    err = get_descriptor(slotid, 0, cfg_buf, 512, usb_req_type::STD,
+                         usb_req_recip_t::DEVICE,
+                         usb_desctype_t::CONFIGURATION, 0);
+    if (err < 0)
+        return false;
+
+    usb_config_helper cfg_hlp(slotid, dev_desc, cfg_buf, 512);
+
+    dump_config_desc(cfg_hlp);
+
+    usb_class_drv_t::find_driver(&cfg_hlp, this);
+
+    return true;
+}
+
 void usbxhci::init(pci_dev_iterator_t& pci_iter)
 {
     mmio_addr = (pci_iter.config.base_addr[0] & -16) |
@@ -1336,42 +1383,11 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
     pcs = 1;
     cr_next = 0;
 
-    for (int port = 0; port < maxports; ++port) {
+    for (int port = 1; port <= maxports; ++port) {
         if (!USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc))
             continue;
 
-        int slotid = enable_slot(port);
-
-        int err = set_address(slotid, port, 0);
-        if (err < 0)
-            continue;
-
-        usb_desc_device dev_desc{};
-
-        err = get_descriptor(slotid, 0, &dev_desc, 8, usb_req_type::STD,
-                             usb_req_recip_t::DEVICE,
-                             usb_desctype_t::DEVICE, 0);
-        if (err < 0)
-            continue;
-
-        err = update_slot_ctx(slotid, &dev_desc);
-        if (err < 0)
-            continue;
-
-        // Get first 8 bytes of device descriptor to get max packet size
-        unique_ptr<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 512));
-
-        err = get_descriptor(slotid, 0, cfg_buf, 512, usb_req_type::STD,
-                             usb_req_recip_t::DEVICE,
-                             usb_desctype_t::CONFIGURATION, 0);
-        if (err < 0)
-            continue;
-
-        usb_config_helper cfg_hlp(slotid, dev_desc, cfg_buf, 512);
-
-        dump_config_desc(cfg_hlp);
-
-        usb_class_drv_t::find_driver(&cfg_hlp, this);
+        add_device(port, 0);
     }
 }
 
@@ -1391,9 +1407,9 @@ int usbxhci::enable_slot(int port)
 
     USBXHCI_TRACE("enableslot completed: completion code=%x, "
                   "parameter=%x, slotid=%d\n",
-                  unsigned(block.get_result().cc()),
-                  block.get_result().ccp(),
-                  block.get_result().cmd_comp.slotid);
+                  unsigned(block.get_result().cc),
+                  block.get_result().ccp,
+                  block.get_result().slotid);
 
     return block.get_result().slot_or_error();
 }
@@ -1447,7 +1463,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     inpslotctx->num_ports = 0;
 
     // Root hub port number
-    inpslotctx->root_hub_port_num = port + 1;
+    inpslotctx->root_hub_port_num = port;
 
     // Device address
     inpslotctx->usbdevaddr = 0;
@@ -1477,7 +1493,8 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     USBXHCI_TRACE("setaddr completed: completion code=%x, "
                   "parameter=%x, slotid=%d\n",
-                  (unsigned)block.cc(), block.ccp(), slotid);
+                  (unsigned)block.get_result().cc,
+                  block.get_result().ccp, slotid);
 
     if (!dev_ctx_large) {
         munmap(inp.small, sizeof(*inp.small));
@@ -1637,6 +1654,45 @@ usb_ep_state_t usbxhci::get_ep_state(int slotid, uint8_t epid)
     return usb_ep_state_t(USBXHCI_EPCTX_EP_STATE_STATE_GET(epctx->ep_state));
 }
 
+bool usbxhci::configure_hub_port(int slotid, int port)
+{
+    usbxhci_slotctx_t *slotctx = this->dev_ctx_ent_slot(slotid);
+
+    int route = USBXHCI_SLOTCTX_RSMHC_ROUTE_GET(slotctx->rsmhc);
+
+    // Find the bit shift to place the new port number at the end of the route
+    int route_bit = route ? (bit_msb_set_32(route) + 4) & -4 : 0;
+
+    // Add the port to the route
+    route |= port << route_bit;
+
+    add_device(slotctx->root_hub_port_num, route);
+
+    return true;
+}
+
+bool usbxhci::set_hub_port_count(int slotid, usb_hub_desc const& hub_desc)
+{
+    usbxhci_inpctx_t inp;
+    usbxhci_inpctlctx_t *ctlctx;
+    usbxhci_slotctx_t *inpslotctx;
+    usbxhci_ep_ctx_t *inpepctx;
+
+    fetch_inp_ctx(slotid, 0, inp, &ctlctx, &inpslotctx, &inpepctx);
+
+    // Update hub flag
+    USBXHCI_SLOTCTX_RSMHC_HUB_SET(inpslotctx->rsmhc, 1);
+    inpslotctx->num_ports = hub_desc.num_ports;
+
+    // 4.3.3 Device slot initialization to initialize the
+    // slot context and endpoint 0 context
+    // Set A0 and A1
+    ctlctx->add_bits = (1 << 0) | (1 << 1);
+
+    return commit_inp_ctx(slotid, 0, inp, USBXHCI_TRB_TYPE_EVALCTXCMD) ==
+            usb_cc_t::success;
+}
+
 int usbxhci::reset_ep(int slotid, uint8_t epid)
 {
     usb_blocking_iocp_t block;
@@ -1757,11 +1813,6 @@ int usbxhci::update_slot_ctx(uint8_t slotid, usb_desc_device *dev_desc)
         inpepctx->max_packet = 1U << dev_desc->maxpktsz;
     } else {
         inpepctx->max_packet = dev_desc->maxpktsz;
-    }
-
-    // Update hub flag
-    if (dev_desc->dev_class == 9) {
-        inpslotctx->num_ports = 1;
     }
 
     // 4.3.3 Device slot initialization to initialize the

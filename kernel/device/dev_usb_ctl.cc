@@ -133,3 +133,19 @@ int usb_pipe_t::clear_ep_halt(usb_pipe_t const& target)
 
     return ncc;
 }
+
+bool usb_pipe_t::add_hub_port(int port)
+{
+    return bus->configure_hub_port(slotid, port);
+}
+
+bool usb_pipe_t::set_hub_port_count(usb_hub_desc const& hub_desc)
+{
+    return bus->set_hub_port_count(slotid, hub_desc);
+}
+
+bool usb_bus_t::alloc_pipe(int slotid, usb_desc_ep const *ep, usb_pipe_t &pipe)
+{
+    return alloc_pipe(slotid, ep->ep_addr, pipe,
+                      ep->max_packet_sz, ep->interval, ep->ep_attr);
+}

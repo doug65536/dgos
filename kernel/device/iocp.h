@@ -7,6 +7,7 @@ template<typename T, typename S = T>
 struct basic_iocp_t {
     typedef void (*callback_t)(T const& err, uintptr_t arg);
 
+    basic_iocp_t();
     basic_iocp_t(callback_t callback, uintptr_t arg);
 
     // A single request can be split into multiple requests at
@@ -81,6 +82,17 @@ private:
     condition_variable done_cond;
     bool done;
 };
+
+template<typename T, typename S>
+basic_iocp_t<T, S>::basic_iocp_t()
+    : callback(nullptr)
+    , arg(0)
+    , done_count(0)
+    , expect_count(0)
+    , result_count(0)
+    , result{}
+{
+}
 
 template<typename T, typename S>
 basic_iocp_t<T, S>::basic_iocp_t(

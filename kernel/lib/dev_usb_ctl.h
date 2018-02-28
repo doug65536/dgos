@@ -78,6 +78,10 @@ public:
 
     int clear_ep_halt(usb_pipe_t const& target);
 
+    bool add_hub_port(int port);
+
+    bool set_hub_port_count(usb_hub_desc const& hub_desc);
+
 private:
     usb_bus_t *bus;
     int slotid;
@@ -108,6 +112,8 @@ public:
                             int max_packet_sz, int interval,
                             usb_ep_attr ep_type) = 0;
 
+    bool alloc_pipe(int slotid, usb_desc_ep const* ep, usb_pipe_t &pipe);
+
     virtual int send_control(
             int slotid, uint8_t request_type, uint8_t request,
             uint16_t value, uint16_t index, uint16_t length, void *data) = 0;
@@ -129,6 +135,11 @@ public:
 
     virtual int reset_ep(int slotid, uint8_t epid) = 0;
     virtual int reset_ep_async(int slotid, uint8_t epid, usb_iocp_t *iocp) = 0;
+
+    virtual bool configure_hub_port(int slotid, int port) = 0;
+
+    virtual bool set_hub_port_count(int slotid,
+                                    usb_hub_desc const& hub_desc) = 0;
 
 private:
 
