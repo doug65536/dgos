@@ -302,10 +302,8 @@ init_tss:
     .quad 0
     .quad 0
     //
-    // uint64_t reserved;
-    .quad 0
-
     //  uint64_t ist[8];
+    .quad 0
     .quad kernel_stack-32768
     .quad kernel_stack-32768
     .space 6*8
