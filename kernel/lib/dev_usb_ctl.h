@@ -63,12 +63,12 @@ public:
 
     int send_default_control(uint8_t request_type, uint8_t request,
                              uint16_t value, uint16_t index,
-                             uint16_t length, void *data);
+                             uint16_t length, void *data) const;
 
     int send_default_control_async(uint8_t request_type, uint8_t request,
                                    uint16_t value, uint16_t index,
                                    uint16_t length, void *data,
-                                   usb_iocp_t *iocp);
+                                   usb_iocp_t *iocp) const;
 
     int recv(void *data, uint32_t length) const;
     int recv_async(void *data, uint32_t length, usb_iocp_t *iocp) const;

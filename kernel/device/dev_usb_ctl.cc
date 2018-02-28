@@ -79,7 +79,7 @@ usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
 
 int usb_pipe_t::send_default_control(uint8_t request_type, uint8_t request,
                                      uint16_t value, uint16_t index,
-                                     uint16_t length, void *data)
+                                     uint16_t length, void *data) const
 {
 //    printdbg("Sending USB control: reqt=0x%02x req=0x%02x, val=0x%04x,"
 //             " idx=0x%02x, len=0x%04x, data=%p\n",
@@ -87,6 +87,15 @@ int usb_pipe_t::send_default_control(uint8_t request_type, uint8_t request,
 
     return bus->send_control(
                 slotid, request_type, request, value, index, length, data);
+}
+
+int usb_pipe_t::send_default_control_async(uint8_t request_type,
+                                           uint8_t request, uint16_t value,
+                                           uint16_t index, uint16_t length,
+                                           void *data, usb_iocp_t *iocp) const
+{
+    return bus->send_control_async(slotid, request_type, request, value, index,
+                                   length, data, iocp);
 }
 
 int usb_pipe_t::recv(void *data, uint32_t length) const
