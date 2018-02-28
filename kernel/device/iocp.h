@@ -40,6 +40,7 @@ struct basic_iocp_t {
     void reset(callback_t callback);
 
 private:
+
     void invoke_once(unique_lock<ticketlock> &hold);
 
     callback_t callback;
