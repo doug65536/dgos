@@ -164,6 +164,51 @@ struct is_unsigned
 {
 };
 
+template<typename T>
+struct remove_const
+{
+    using type = T;
+};
+
+template<typename T>
+struct remove_const<const T> {
+    using type = T;
+};
+
+template<typename T>
+struct remove_volatile
+{
+    using type = T;
+};
+template<typename T>
+struct remove_volatile<volatile T>
+{
+    using type = T;
+};
+
+template< class T >
+struct remove_cv {
+    typedef typename remove_volatile<typename remove_const<T>::type>::type type;
+};
+
+template<typename _T>
+struct __is_member_pointer_helper
+        : public false_type
+{
+};
+
+template<typename _T, typename _U >
+struct __is_member_pointer_helper<_T _U::*>
+        : public true_type
+{
+};
+
+template< class _T >
+struct is_member_pointer :
+    public __is_member_pointer_helper<typename remove_cv<_T>::type>
+{
+};
+
 template<typename _T>
 struct underlying_type
 {
