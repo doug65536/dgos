@@ -280,6 +280,8 @@ public:
     static usb_desc_ep const *find_ep(
             usb_desc_iface const *iface, int ep_index);
 
+    static usb_desc_ep const *match_ep(usb_desc_iface const *iface, int dir, usb_ep_attr attr);
+
     static char const *class_code_text(uint8_t cls);
     static char const *ep_attr_text(usb_ep_attr attr);
 

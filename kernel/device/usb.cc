@@ -76,6 +76,19 @@ usb_desc_ep const *usb_config_helper::find_ep(
     return index < iface->num_ep ? ep : nullptr;
 }
 
+usb_desc_ep const *usb_config_helper::match_ep(
+        usb_desc_iface const *iface, int dir, usb_ep_attr attr)
+{
+    usb_desc_ep const *ep;
+    for (int i = 0; (ep = find_ep(iface, i)) != nullptr; ++i) {
+        if (ep->ep_addr >= 0x80 && dir && ep->ep_attr == attr)
+            break;
+        if (ep->ep_addr < 0x80 && !dir && ep->ep_attr == attr)
+            break;
+    }
+    return ep;
+}
+
 char const *usb_config_helper::class_code_text(uint8_t cls)
 {
     switch (usb_class_t(cls)) {
