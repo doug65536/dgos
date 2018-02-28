@@ -516,10 +516,8 @@ static int const usb_hid_keybd_lookup[] = {
 
 C_ASSERT(countof(usb_hid_keybd_lookup) == 0xe8);
 
-class usb_hid_t : public usb_class_drv_t {
+class usb_hid_dev_t {
 protected:
-    static usb_hid_t usb_hid;
-
     enum struct hid_request_t : uint8_t {
         GET_REPORT = 0x1,
         GET_IDLE = 0x2,
@@ -530,45 +528,72 @@ protected:
         SET_PROTOCOL = 0xB
     };
 
-    // usb_class_drv_t interface
-    virtual bool probe(usb_config_helper *cfg, usb_bus_t *bus) override final;
+    usb_hid_dev_t(usb_pipe_t const& control,
+                  usb_pipe_t const& in,
+                  usb_pipe_t const& out,
+                  uint8_t iface_idx, usb_iocp_t::callback_t in_callback);
+
+    bool set_protocol(uint16_t proto) const;
+    bool set_idle(uint8_t report_id, uint8_t idle) const;
+
+    usb_iocp_t in_iocp;
+
+    usb_pipe_t control;
+    usb_pipe_t in;
+    usb_pipe_t out;
+    uint8_t iface_idx;
+};
+
+class usb_hid_keybd_t : public usb_hid_dev_t {
+public:
+    usb_hid_keybd_t(usb_pipe_t const& control,
+                    usb_pipe_t const& in,
+                    usb_pipe_t const& out,
+                    uint8_t iface_idx);
 
 private:
-    bool set_protocol(usb_pipe_t &pipe, uint16_t proto);
-    bool set_idle(usb_pipe_t &pipe, uint8_t report_id, uint8_t idle);
-
-    static int keybd_poll_thread(void *p);
-    int keybd_poll_thread();
-
-    static int keybd_in_thread(void *p);
-    int keybd_in_thread();
-
-    static int mouse_poll_thread(void *p);
-    int mouse_poll_thread();
-
-    static int mouse_in_thread(void *p);
-    int mouse_in_thread();
+    void post_keybd_in();
+    static void keybd_completion(usb_iocp_result_t const& result,
+                                 uintptr_t arg);
+    void keybd_completion(usb_iocp_result_t const& result);
 
     void detect_keybd_changes();
 
+    ticketlock change_lock;
     keybd_fsa_t fsa;
 
     uint8_t last_keybd_state[8];
     uint8_t this_keybd_state[8];
+};
+
+class usb_hid_mouse_t : public usb_hid_dev_t {
+public:
+    usb_hid_mouse_t(usb_pipe_t const& control,
+                    usb_pipe_t const& in,
+                    usb_pipe_t const& out,
+                    uint8_t iface_idx);
+
+private:
+    void post_mouse_in();
+    static void mouse_completion(usb_iocp_result_t const& result,
+                                 uintptr_t arg);
+    void mouse_completion(usb_iocp_result_t const& result);
 
     uint8_t last_mouse_state[8];
     uint8_t this_mouse_state[8];
-
-    ticketlock change_lock;
-    usb_pipe_t keybd_control;
-    usb_pipe_t keybd_in;
-    usb_pipe_t mouse_control;
-    usb_pipe_t mouse_in;
-    uint8_t keybd_iface_idx;
-    uint8_t mouse_iface_idx;
 };
 
-bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
+static vector<usb_hid_dev_t*> hid_devs;
+
+class usb_hid_class_drv_t : public usb_class_drv_t {
+protected:
+    static usb_hid_class_drv_t usb_hid;
+
+    // usb_class_drv_t interface
+    virtual bool probe(usb_config_helper *cfg, usb_bus_t *bus) override final;
+};
+
+bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
     match_result match = match_config(
                 cfg_hlp, 0, int(usb_class_t::hid), 1, -1, -1);
@@ -576,191 +601,92 @@ bool usb_hid_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     if (!match.dev)
         return false;
 
+    usb_pipe_t control, in, out;
+
+    bus->get_pipe(cfg_hlp->slot(), 0, control);
+
+    // Try to find interrupt pipes
+    usb_desc_ep const *in_ep_desc = cfg_hlp->match_ep(
+                match.iface, 1, usb_ep_attr::interrupt);
+
+    usb_desc_ep const *out_ep_desc = cfg_hlp->match_ep(
+                match.iface, 0, usb_ep_attr::interrupt);
+
+    if (in_ep_desc)
+        bus->alloc_pipe(cfg_hlp->slot(), in_ep_desc, in);
+
+    if (out_ep_desc)
+        bus->alloc_pipe(cfg_hlp->slot(), out_ep_desc, out);
+
+    usb_hid_dev_t *dev = nullptr;
+
     // Keyboard
     if (match.iface->iface_proto == 1) {
-        keybd_iface_idx = match.iface_idx;
-
-        bus->get_pipe(cfg_hlp->slot(), 0, keybd_control);
-
-        set_protocol(keybd_control, 0);
-        set_idle(keybd_control, 0, 0);
-
-        // Try to find interrupt pipe
-        usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
-
-        int tid = -1;
-
-        if (ep_desc) {
-            // Allocate interrupt IN endpoint and use it
-            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc, keybd_in)) {
-                USBHID_TRACE("using interrupt pipe for keyboard input\n");
-                tid = thread_create(keybd_in_thread, this, 0, false);
-            }
-        }
-
-        // Fallback to polling if we didn't create the interrupt IN endpoint
-        if (tid == -1) {
-            USBHID_TRACE("using polling for keyboard input\n");
-            tid = thread_create(keybd_poll_thread, this, 0, false);
-        }
-
-        thread_set_priority(tid, 16);
-
-        return true;
+        dev = new usb_hid_keybd_t(control, in, out, match.iface_idx);
     } else if (match.iface->iface_proto == 2) {
-        mouse_iface_idx = match.iface_idx;
-
-        bus->get_pipe(cfg_hlp->slot(), 0, mouse_control);
-
-        set_protocol(mouse_control, 0);
-        set_idle(mouse_control, 0, 0);
-
-        usb_desc_ep const *ep_desc = cfg_hlp->find_ep(match.iface, 0);
-
-        int tid = -1;
-
-        if (ep_desc) {
-            if (bus->alloc_pipe(cfg_hlp->slot(), ep_desc, mouse_in)) {
-                USBHID_TRACE("using interrupt pipe for mouse input\n");
-                tid = thread_create(mouse_in_thread, this, 0, false);
-            }
-        }
-
-        if (tid == -1) {
-            USBHID_TRACE("using polling for mouse input\n");
-            tid = thread_create(mouse_in_thread, this, 0, false);
-        }
-
-        thread_set_priority(tid, 16);
-
-        return true;
+        dev = new usb_hid_mouse_t(control, in, out, match.iface_idx);
     }
 
-    return false;
+    if (dev)
+        hid_devs.push_back(dev);
+
+    return dev != nullptr;
 }
 
-bool usb_hid_t::set_protocol(usb_pipe_t &pipe, uint16_t proto)
+usb_hid_dev_t::usb_hid_dev_t(usb_pipe_t const& control,
+                             usb_pipe_t const& in,
+                             usb_pipe_t const& out,
+                             uint8_t iface_idx,
+                             usb_iocp_t::callback_t in_callback)
+    : in_iocp(in_callback, uintptr_t(this))
+    , control(control)
+    , in(in)
+    , out(out)
+    , iface_idx(iface_idx)
 {
-    return pipe.send_default_control(
+}
+
+bool usb_hid_dev_t::set_protocol(uint16_t proto) const
+{
+    return control.send_default_control(
                 uint8_t(usb_dir_t::OUT) |
                 (uint8_t(usb_req_type::CLASS) << 5) |
                 uint8_t(usb_req_recip_t::INTERFACE),
                 uint8_t(hid_request_t::SET_PROTOCOL),
-                proto, keybd_iface_idx, 0, nullptr) >= 0;
+                proto, iface_idx, 0, nullptr) >= 0;
 }
 
-bool usb_hid_t::set_idle(usb_pipe_t &pipe, uint8_t report_id, uint8_t idle)
+bool usb_hid_dev_t::set_idle(uint8_t report_id, uint8_t idle) const
 {
-    return pipe.send_default_control(
+    return control.send_default_control(
                 uint8_t(usb_dir_t::OUT) |
                 (uint8_t(usb_req_type::CLASS) << 5) |
                 uint8_t(usb_req_recip_t::INTERFACE),
                 uint8_t(hid_request_t::SET_IDLE),
-                report_id | (idle << 8), mouse_iface_idx, 0, nullptr) >= 0;
+                report_id | (idle << 8), iface_idx, 0, nullptr) >= 0;
 }
 
-int usb_hid_t::keybd_poll_thread(void *p)
+void usb_hid_keybd_t::post_keybd_in()
 {
-    return ((usb_hid_t*)p)->keybd_poll_thread();
+    in_iocp.reset(&usb_hid_keybd_t::keybd_completion);
+    in_iocp.set_expect(1);
+    in.recv_async(this_keybd_state, sizeof(this_keybd_state), &in_iocp);
 }
 
-int usb_hid_t::keybd_poll_thread()
+void usb_hid_keybd_t::keybd_completion(
+        usb_iocp_result_t const& result, uintptr_t arg)
 {
-    memset(last_keybd_state, 0, sizeof(last_keybd_state));
-
-    while (true) {
-        keybd_control.send_default_control(
-                    uint8_t(usb_dir_t::IN) |
-                    (uint8_t(usb_req_type::CLASS) << 5) |
-                    uint8_t(usb_req_recip_t::INTERFACE),
-                    1,
-                    0, 0, sizeof(this_keybd_state), this_keybd_state);
-
-        unique_lock<ticketlock> hold_change_lock(change_lock);
-        detect_keybd_changes();
-
-        thread_sleep_for(20);
-    }
-
-    return true;
+    reinterpret_cast<usb_hid_keybd_t*>(arg)->keybd_completion(result);
 }
 
-int usb_hid_t::keybd_in_thread(void *p)
+void usb_hid_keybd_t::keybd_completion(usb_iocp_result_t const& result)
 {
-    return ((usb_hid_t*)p)->keybd_in_thread();
+    detect_keybd_changes();
+
+    post_keybd_in();
 }
 
-int usb_hid_t::keybd_in_thread()
-{
-    memset(last_keybd_state, 0, sizeof(last_keybd_state));
-
-    while (true) {
-        keybd_in.recv(this_keybd_state, sizeof(this_keybd_state));
-
-        unique_lock<ticketlock> lock(change_lock);
-        detect_keybd_changes();
-    }
-
-    return true;
-}
-
-int usb_hid_t::mouse_poll_thread(void *p)
-{
-    return ((usb_hid_t*)p)->mouse_poll_thread();
-}
-
-int usb_hid_t::mouse_poll_thread()
-{
-    memset(last_keybd_state, 0, sizeof(last_keybd_state));
-
-    while (true) {
-        mouse_control.send_default_control(
-                    uint8_t(usb_dir_t::IN) |
-                    (uint8_t(usb_req_type::CLASS) << 5) |
-                    uint8_t(usb_req_recip_t::INTERFACE),
-                    1,
-                    0x100, mouse_iface_idx,
-                    sizeof(this_mouse_state), this_mouse_state);
-
-        unique_lock<ticketlock> hold_change_lock(change_lock);
-
-        mouse_raw_event_t evt;
-        evt.hdist = (int8_t)this_mouse_state[1];
-        evt.vdist = -(int8_t)this_mouse_state[2];
-        evt.wdist = (int8_t)this_mouse_state[3];
-        evt.buttons = this_mouse_state[0];
-        mouse_event(evt);
-    }
-
-    return true;
-}
-
-int usb_hid_t::mouse_in_thread(void *p)
-{
-    return ((usb_hid_t*)p)->mouse_in_thread();
-}
-
-int usb_hid_t::mouse_in_thread()
-{
-    memset(last_keybd_state, 0, sizeof(last_keybd_state));
-
-    while (true) {
-        mouse_in.recv(this_mouse_state, sizeof(this_mouse_state));
-
-        unique_lock<ticketlock> hold_change_lock(change_lock);
-
-        mouse_raw_event_t evt;
-        evt.hdist = (int8_t)this_mouse_state[1];
-        evt.vdist = -(int8_t)this_mouse_state[2];
-        evt.wdist = (int8_t)this_mouse_state[3];
-        evt.buttons = this_mouse_state[0];
-        mouse_event(evt);
-    }
-
-    return true;
-}
-
-void usb_hid_t::detect_keybd_changes()
+void usb_hid_keybd_t::detect_keybd_changes()
 {
     static int modifier_vk[] = {
         KEYB_VK_LCTRL,
@@ -772,6 +698,8 @@ void usb_hid_t::detect_keybd_changes()
         KEYB_VK_RALT,
         KEYB_VK_RGUI
     };
+
+    unique_lock<ticketlock> hold_change_lock(change_lock);
 
     // Detect modifier changes
     uint8_t modifier_changes = last_keybd_state[0] ^ this_keybd_state[0];
@@ -824,4 +752,56 @@ void usb_hid_t::detect_keybd_changes()
     memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
 }
 
-usb_hid_t usb_hid_t::usb_hid;
+void usb_hid_mouse_t::post_mouse_in()
+{
+    in_iocp.reset(&usb_hid_mouse_t::mouse_completion);
+    in_iocp.set_expect(1);
+    in.recv_async(this_mouse_state, sizeof(this_mouse_state), &in_iocp);
+}
+
+void usb_hid_mouse_t::mouse_completion(
+        usb_iocp_result_t const& result, uintptr_t arg)
+{
+    reinterpret_cast<usb_hid_mouse_t*>(arg)->mouse_completion(result);
+}
+
+void usb_hid_mouse_t::mouse_completion(const usb_iocp_result_t &result)
+{
+    mouse_raw_event_t evt;
+    evt.hdist = (int8_t)this_mouse_state[1];
+    evt.vdist = -(int8_t)this_mouse_state[2];
+    evt.wdist = (int8_t)this_mouse_state[3];
+    evt.buttons = this_mouse_state[0];
+    mouse_event(evt);
+
+    post_mouse_in();
+}
+
+usb_hid_keybd_t::usb_hid_keybd_t(usb_pipe_t const& control,
+                                 usb_pipe_t const& in,
+                                 usb_pipe_t const& out,
+                                 uint8_t iface_idx)
+    : usb_hid_dev_t(control, in, out, iface_idx,
+                    &usb_hid_keybd_t::keybd_completion)
+{
+    set_protocol(0);
+    set_idle(0, 0);
+
+    memset(last_keybd_state, 0, sizeof(last_keybd_state));
+    post_keybd_in();
+}
+
+usb_hid_mouse_t::usb_hid_mouse_t(usb_pipe_t const& control,
+                                 usb_pipe_t const& in,
+                                 usb_pipe_t const& out,
+                                 uint8_t iface_idx)
+    : usb_hid_dev_t(control, in, out, iface_idx,
+                    usb_hid_mouse_t::mouse_completion)
+{
+    set_protocol(0);
+    set_idle(0, 0);
+
+    post_mouse_in();
+}
+
+usb_hid_class_drv_t usb_hid_class_drv_t::usb_hid;
