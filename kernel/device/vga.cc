@@ -174,7 +174,7 @@ static void fill_region(text_display_t *self,
 
         memcpy(video_row + sx,
                shadow_row + sx,
-               sizeof(*self->video_mem) * (ey - sy + 1));
+               sizeof(*self->video_mem) * (ex - sx + 1));
 
         shadow_row += self->width;
         video_row += self->width;
