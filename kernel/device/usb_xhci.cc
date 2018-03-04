@@ -324,7 +324,7 @@ struct usbxhci_inpctx_small_t {
 
     usbxhci_slotctx_t slotctx;
 
-    usbxhci_ep_ctx_t epctx[16];
+    usbxhci_ep_ctx_t epctx[32];
 } __packed;
 
 struct usbxhci_inpctx_large_t {
@@ -333,7 +333,7 @@ struct usbxhci_inpctx_large_t {
     usbxhci_slotctx_t slotctx;
     uint8_t rsvd[32];
 
-    usbxhci_ep_ctx_t epctx[16];
+    usbxhci_ep_ctx_t epctx[32];
 } __packed;
 
 union usbxhci_inpctx_t {
