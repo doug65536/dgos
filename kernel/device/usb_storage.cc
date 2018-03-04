@@ -43,8 +43,6 @@ protected:
 class usb_msc_if_t : public storage_if_base_t {
     // storage_if_base_t interface
 public:
-    STORAGE_IF_IMPL
-
     enum cmd_op_t : uint8_t {
         cmd_read_capacity_10 = 0x25,
         cmd_read_12 = 0xA8,
@@ -190,7 +188,10 @@ public:
     int get_max_lun();
     int reset();
 
-    hashtbl_t pending_cmds;
+private:
+    STORAGE_IF_IMPL
+
+    //hashtbl_t pending_cmds;
 
     usb_pipe_t control, bulk_in, bulk_out;
     int iface_idx;
