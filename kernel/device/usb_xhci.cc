@@ -1198,9 +1198,11 @@ bool usbxhci::add_device(int port, int route)
     if (err < 0)
         return false;
 
-    err = update_slot_ctx(slotid, &dev_desc);
-    if (err < 0)
-        return false;
+    if (dev_desc.maxpktsz != 8) {
+        err = update_slot_ctx(slotid, &dev_desc);
+        if (err < 0)
+            return false;
+    }
 
     // Get first 8 bytes of device descriptor to get max packet size
     unique_ptr<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 512));
