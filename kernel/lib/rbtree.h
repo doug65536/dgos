@@ -503,6 +503,9 @@ rbtree_t<Tkey,Tval>::init(cmp_t init_cmp, void *p)
 
     nodes = nullptr;
 
+    // Cause initial allocation
+    free_node(alloc_node());
+
     return *this;
 }
 
