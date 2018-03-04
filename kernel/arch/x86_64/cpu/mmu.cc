@@ -2756,6 +2756,8 @@ uintptr_t mphysaddr(void volatile *addr)
         // Commit a page
         page = mmu_alloc_phys(0);
 
+        clear_phys(page);
+
         pte_t new_pte = (pte & ~PTE_ADDR) | page;
 
         if (atomic_cmpxchg_upd(ptes[3], &pte, new_pte))
@@ -2763,6 +2765,8 @@ uintptr_t mphysaddr(void volatile *addr)
         else
             mmu_free_phys(page);
     } else if (!(pte & PTE_PRESENT)) {
+        // Assert that it is not a PROT_NONE page
+        assert(pte != ((PTE_ADDR >> 1) & PTE_ADDR));
         return 0;
     }
 
