@@ -1047,6 +1047,8 @@ int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
                 usb_rqcode_t::GET_DESCRIPTOR,
                 (uint8_t(desc_type) << 8) | desc_index, 0);
 
+    assert(trb_count >= 0 && trb_count <= (int)countof(trbs));
+
     usb_blocking_iocp_t block;
     block.set_expect(1);
 
@@ -1061,11 +1063,10 @@ void usbxhci::cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
                        usb_iocp_t *iocp)
 {
     if (iocp) {
-        usb_iocp_result_t result{};
+        usb_iocp_result_t& result = iocp->get_result();
         result.cc = usb_cc_t(USBXHCI_EVT_CMDCOMP_INFO_CC_GET(evt->data[2]));
         result.ccp = USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(evt->data[2]);
         result.slotid = evt->slotid;
-        iocp->set_result(result);
         iocp->invoke();
     } else {
         USBXHCI_TRACE("Got cmd_comp with null iocp\n");
