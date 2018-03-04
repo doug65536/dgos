@@ -1564,8 +1564,7 @@ bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
     bool in = epid & 0x80;
     int ep_index = epid & 0xF;
 
-    fetch_inp_ctx(slotid, ep_index, inp,
-                  &ctlctx, &inpslotctx, &inpepctx);
+    fetch_inp_ctx(slotid, ep_index, inp, &ctlctx, &inpslotctx, &inpepctx);
 
     int bit_index;
     if (in)
