@@ -815,11 +815,11 @@ bool vector<_T,_Allocator>::resize(size_type __count,
     if (__sz > __count) {
         do {
             pop_back();
-        } while (--__sz);
+        } while (--__sz > __count);
     } else {
         if (unlikely(!reserve(__count)))
             return false;
-        fill_n(__m + __sz, __count - __sz, __value);
+        uninitialized_fill(__m + __sz, __m + __count, __value);
         __sz = __count;
     }
 
