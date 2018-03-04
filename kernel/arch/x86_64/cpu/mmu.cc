@@ -2539,11 +2539,12 @@ int mprotect(void *addr, size_t len, int prot)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    while (pt[3] < end &&
-           (*pt[0] & PTE_PRESENT) &&
-           (*pt[1] & PTE_PRESENT) &&
-           (*pt[2] & PTE_PRESENT))
+    while (pt[3] < end)
     {
+        assert((*pt[0] & PTE_PRESENT) &&
+                (*pt[1] & PTE_PRESENT) &&
+                (*pt[2] & PTE_PRESENT));
+
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
             pte_t demand_paged = ((expect & demand_no_read) == demand_no_read);
