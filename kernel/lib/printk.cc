@@ -854,9 +854,9 @@ EXPORT void printk(char const *format, ...)
     va_start(ap, format);
     vprintdbg(format, ap);
     va_end(ap);
-//    va_start(ap, format);
-//    vprintk(format, ap);
-//    va_end(ap);
+    va_start(ap, format);
+    vprintk(format, ap);
+    va_end(ap);
 }
 
 EXPORT void vprintk(char const *format, va_list ap)
