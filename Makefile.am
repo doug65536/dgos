@@ -450,6 +450,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/rand.h \
 	kernel/lib/rbtree.cc \
 	kernel/lib/rbtree.h \
+	kernel/lib/refcount.h \
+	kernel/lib/refcount.cc \
 	kernel/lib/stddef.h \
 	kernel/lib/stdlib.cc \
 	kernel/lib/stdlib.h \

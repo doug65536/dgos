@@ -358,6 +358,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/lib/kernel_bmi-process.$(OBJEXT) \
 	kernel/lib/kernel_bmi-rand.$(OBJEXT) \
 	kernel/lib/kernel_bmi-rbtree.$(OBJEXT) \
+	kernel/lib/kernel_bmi-refcount.$(OBJEXT) \
 	kernel/lib/kernel_bmi-stdlib.$(OBJEXT) \
 	kernel/lib/kernel_bmi-string.$(OBJEXT) \
 	kernel/lib/kernel_bmi-thread.$(OBJEXT) \
@@ -477,6 +478,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-process.$(OBJEXT) \
 	kernel/lib/kernel_generic-rand.$(OBJEXT) \
 	kernel/lib/kernel_generic-rbtree.$(OBJEXT) \
+	kernel/lib/kernel_generic-refcount.$(OBJEXT) \
 	kernel/lib/kernel_generic-stdlib.$(OBJEXT) \
 	kernel/lib/kernel_generic-string.$(OBJEXT) \
 	kernel/lib/kernel_generic-thread.$(OBJEXT) \
@@ -1309,6 +1311,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/rand.h \
 	kernel/lib/rbtree.cc \
 	kernel/lib/rbtree.h \
+	kernel/lib/refcount.h \
+	kernel/lib/refcount.cc \
 	kernel/lib/stddef.h \
 	kernel/lib/stdlib.cc \
 	kernel/lib/stdlib.h \
@@ -2644,6 +2648,8 @@ kernel/lib/kernel_bmi-rand.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_bmi-rbtree.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_bmi-refcount.$(OBJEXT): kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_bmi-stdlib.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_bmi-string.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -2978,6 +2984,9 @@ kernel/lib/kernel_generic-process.$(OBJEXT):  \
 kernel/lib/kernel_generic-rand.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-rbtree.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_generic-refcount.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-stdlib.$(OBJEXT):  \
@@ -3420,6 +3429,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-process.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-rbtree.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-stdlib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-string.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_bmi-thread.Po@am__quote@
@@ -3459,6 +3469,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-process.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-rbtree.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-refcount.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-stdlib.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-string.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-thread.Po@am__quote@
@@ -6553,6 +6564,20 @@ kernel/lib/kernel_bmi-rbtree.obj: kernel/lib/rbtree.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_bmi-rbtree.obj `if test -f 'kernel/lib/rbtree.cc'; then $(CYGPATH_W) 'kernel/lib/rbtree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/rbtree.cc'; fi`
 
+kernel/lib/kernel_bmi-refcount.o: kernel/lib/refcount.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_bmi-refcount.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Tpo -c -o kernel/lib/kernel_bmi-refcount.o `test -f 'kernel/lib/refcount.cc' || echo '$(srcdir)/'`kernel/lib/refcount.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Tpo kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/refcount.cc' object='kernel/lib/kernel_bmi-refcount.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_bmi-refcount.o `test -f 'kernel/lib/refcount.cc' || echo '$(srcdir)/'`kernel/lib/refcount.cc
+
+kernel/lib/kernel_bmi-refcount.obj: kernel/lib/refcount.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_bmi-refcount.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Tpo -c -o kernel/lib/kernel_bmi-refcount.obj `if test -f 'kernel/lib/refcount.cc'; then $(CYGPATH_W) 'kernel/lib/refcount.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/refcount.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Tpo kernel/lib/$(DEPDIR)/kernel_bmi-refcount.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/refcount.cc' object='kernel/lib/kernel_bmi-refcount.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_bmi-refcount.obj `if test -f 'kernel/lib/refcount.cc'; then $(CYGPATH_W) 'kernel/lib/refcount.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/refcount.cc'; fi`
+
 kernel/lib/kernel_bmi-stdlib.o: kernel/lib/stdlib.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_bmi-stdlib.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_bmi-stdlib.Tpo -c -o kernel/lib/kernel_bmi-stdlib.o `test -f 'kernel/lib/stdlib.cc' || echo '$(srcdir)/'`kernel/lib/stdlib.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_bmi-stdlib.Tpo kernel/lib/$(DEPDIR)/kernel_bmi-stdlib.Po
@@ -8092,6 +8117,20 @@ kernel/lib/kernel_generic-rbtree.obj: kernel/lib/rbtree.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/rbtree.cc' object='kernel/lib/kernel_generic-rbtree.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-rbtree.obj `if test -f 'kernel/lib/rbtree.cc'; then $(CYGPATH_W) 'kernel/lib/rbtree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/rbtree.cc'; fi`
+
+kernel/lib/kernel_generic-refcount.o: kernel/lib/refcount.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-refcount.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-refcount.Tpo -c -o kernel/lib/kernel_generic-refcount.o `test -f 'kernel/lib/refcount.cc' || echo '$(srcdir)/'`kernel/lib/refcount.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-refcount.Tpo kernel/lib/$(DEPDIR)/kernel_generic-refcount.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/refcount.cc' object='kernel/lib/kernel_generic-refcount.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-refcount.o `test -f 'kernel/lib/refcount.cc' || echo '$(srcdir)/'`kernel/lib/refcount.cc
+
+kernel/lib/kernel_generic-refcount.obj: kernel/lib/refcount.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-refcount.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-refcount.Tpo -c -o kernel/lib/kernel_generic-refcount.obj `if test -f 'kernel/lib/refcount.cc'; then $(CYGPATH_W) 'kernel/lib/refcount.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/refcount.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-refcount.Tpo kernel/lib/$(DEPDIR)/kernel_generic-refcount.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/refcount.cc' object='kernel/lib/kernel_generic-refcount.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-refcount.obj `if test -f 'kernel/lib/refcount.cc'; then $(CYGPATH_W) 'kernel/lib/refcount.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/refcount.cc'; fi`
 
 kernel/lib/kernel_generic-stdlib.o: kernel/lib/stdlib.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-stdlib.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-stdlib.Tpo -c -o kernel/lib/kernel_generic-stdlib.o `test -f 'kernel/lib/stdlib.cc' || echo '$(srcdir)/'`kernel/lib/stdlib.cc
