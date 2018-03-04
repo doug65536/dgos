@@ -535,6 +535,8 @@ protected:
 
     bool set_protocol(uint16_t proto) const;
     bool set_idle(uint8_t report_id, uint8_t idle) const;
+    bool get_descriptor(void *data, uint16_t len,
+                        uint8_t type, uint8_t index, uint8_t lang_id);
 
     usb_iocp_t in_iocp;
 
@@ -664,6 +666,18 @@ bool usb_hid_dev_t::set_idle(uint8_t report_id, uint8_t idle) const
                 uint8_t(usb_req_recip_t::INTERFACE),
                 uint8_t(hid_request_t::SET_IDLE),
                 report_id | (idle << 8), iface_idx, 0, nullptr) >= 0;
+}
+
+bool usb_hid_dev_t::get_descriptor(void *data, uint16_t len,
+                                   uint8_t type, uint8_t index,
+                                   uint8_t lang_id)
+{
+    return control.send_default_control(
+            uint8_t(usb_dir_t::IN) |
+            (uint8_t(usb_req_type::STD) << 5) |
+            uint8_t(usb_req_recip_t::INTERFACE),
+            uint8_t(usb_rqcode_t::GET_DESCRIPTOR),
+            (type << 8) | index, lang_id, sizeof(data), data) >= 0;
 }
 
 void usb_hid_keybd_t::post_keybd_in()
