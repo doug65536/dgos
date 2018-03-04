@@ -153,7 +153,7 @@ _OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
 {
     using T = decltype(*__first);
     while (__first != __last) {
-        new (&*__first) T(__value);
+        new (&*__first) typename remove_reference<T>::type(__value);
         ++__first;
     }
     return __first;
