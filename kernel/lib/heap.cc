@@ -15,6 +15,17 @@
 #define mutex_unlock pthread_mutex_unlock
 #endif
 
+// Enable wiping freed memory with 0xfe
+// and filling allocated memory with 0xf0
+#define HEAP_DEBUG  1
+
+// Always use paged allocation with guard pages
+// Realloc always moves the memory to a new range
+#define HEAP_PAGEONLY 0
+
+// Don't free virtual address ranges, just free physical pages
+#define HEAP_NOVFREE 1
+
 struct heap_hdr_t {
     uintptr_t size_next;
     uint32_t sig1;
@@ -23,8 +34,10 @@ struct heap_hdr_t {
 
 C_ASSERT(sizeof(heap_hdr_t) == 16);
 
-static constexpr uint32_t HEAP_BLK_TYPE_USED = 0xa10ca1ed;
-static constexpr uint32_t HEAP_BLK_TYPE_FREE = 0xfeeeb10c;
+static constexpr uint32_t HEAP_BLK_TYPE_USED = 0xeda10ca1;  // "a10ca1ed"
+static constexpr uint32_t HEAP_BLK_TYPE_FREE = 0x0cb1eefe;  // "feeeb10c"
+
+#if !HEAP_PAGEONLY
 
 /// bucket  slot sz item sz items efficiency
 /// [ 0] ->      32      16  2048     50.00%
@@ -263,6 +276,10 @@ void *heap_alloc(heap_t *heap, size_t size)
         first_free->sig1 = HEAP_BLK_TYPE_USED;
         first_free->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
 
+#if HEAP_DEBUG
+        memset(first_free + 1, 0xf0, size - sizeof(*first_free));
+#endif
+
         return first_free + 1;
     }
 
@@ -277,6 +294,10 @@ void heap_free(heap_t *heap, void *block)
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
 
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
+
+#if HEAP_DEBUG
+    memset(block, 0xfe, hdr->size_next - sizeof(*hdr));
+#endif
 
     uint8_t log2size = bit_log2(hdr->size_next);
     assert(log2size >= 5 && log2size < 32);
@@ -338,3 +359,102 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
     return block;
 }
 
+#endif
+
+#if HEAP_PAGEONLY
+
+struct heap_t {
+};
+
+heap_t *heap_create(void)
+{
+    return (heap_t*)0x42;
+}
+
+void heap_destroy(heap_t *)
+{
+}
+
+__assume_aligned(16)
+void *heap_calloc(heap_t *heap, size_t num, size_t size)
+{
+    void *blk = heap_alloc(heap, num * size);
+    return memset(blk, 0, size);
+}
+
+// |      ...     |
+// +--------------+ <-- mmap return value
+// |  Guard Page  |
+// +--------------+ <-- 4KB aligned
+// |//// 0xFB ////| <-- 0 to 4080 bytes ("fill before")
+// +--------------+ <-- 16 byte aligned
+// |  heap_hdr_t  |
+// +--------------+ <-- 16 byte aligned, return value
+// |     data     | <-- 0xF0 filled
+// +--------------+
+// |//// 0xFA ////| <-- 0 to 15 bytes ("fill after")
+// +--------------+ <-- 4KB aligned
+// |  Guard Page  |
+// +--------------+ <-- mmap size
+// |      ...     |
+
+__assume_aligned(16)
+void *heap_alloc(heap_t *heap, size_t size)
+{
+    // Round size up to a multiple of 16 bytes, include header in size
+    size = ((size + 15) & -16) + sizeof(heap_hdr_t);
+
+    // Accessible data size in multiples of pages
+    size_t reserve = (size + PAGESIZE - 1) & -PAGESIZE;
+
+    // Allocate accessible range plus guard pages at both ends
+    size_t alloc = reserve + PAGESIZE * 2;
+
+    // Offset to guard page at end of range
+    size_t end_guard = alloc - PAGESIZE;
+
+    // Reserve virtual address space
+    char *blk = (char*)mmap(nullptr, alloc,
+                            PROT_READ | PROT_WRITE, MAP_NOCOMMIT, -1, 0);
+
+    heap_hdr_t *hdr = (heap_hdr_t*)(blk + (end_guard - size));
+
+    hdr->size_next = size;
+    hdr->sig1 = HEAP_BLK_TYPE_USED;
+    hdr->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
+
+    mprotect(blk, PAGESIZE, PROT_NONE);
+    mprotect(blk + end_guard, PAGESIZE, PROT_NONE);
+
+    memset(blk + PAGESIZE, 0xFA, (char*)hdr - (blk + PAGESIZE));
+
+    memset(hdr + 1, 0xF0, size - sizeof(heap_hdr_t));
+
+    return hdr + 1;
+}
+
+void heap_free(heap_t *heap, void *block)
+{
+    heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
+    assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
+    uintptr_t end = uintptr_t(hdr) + hdr->size_next;
+    uintptr_t st = (uintptr_t(hdr) & -PAGESIZE);
+    mprotect((void*)st, end - st, PROT_NONE);
+}
+
+__assume_aligned(16)
+void *heap_realloc(heap_t *heap, void *block, size_t size)
+{
+    if (unlikely(!block))
+        return heap_alloc(heap, size);
+
+    if (unlikely(size == 0)) {
+        heap_free(heap, block);
+    }
+
+    heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
+    char *other = (char*)heap_alloc(heap, size);
+    return memcpy(other, block, hdr->size_next - sizeof(heap_hdr_t));
+}
+
+#endif
