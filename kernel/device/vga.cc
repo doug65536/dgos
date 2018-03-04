@@ -162,18 +162,24 @@ static void fill_region(text_display_t *self,
     int mouse_was_shown = mouse_hide_if_within(
                 self, sx, sy, ex, ey);
     int row_count = ey - sy;
-    int row_ofs;
-    uint16_t *dst = self->shadow + (sy * self->width);
+    int x;
+    int row_ofs = (sy * self->width);
+    uint16_t *shadow_row = self->shadow + row_ofs;
+    uint16_t *video_row = self->video_mem + row_ofs;
 
     character &= 0xFF;
     while (row_count--) {
-        for (row_ofs = sx; row_ofs < ex; ++row_ofs)
-            dst[row_ofs] = character | (self->attrib << 8);
-        dst += self->width;
+        for (x = sx; x < ex; ++x)
+            shadow_row[x] = character | (self->attrib << 8);
+
+        memcpy(video_row + sx,
+               shadow_row + sx,
+               sizeof(*self->video_mem) * (ey - sy + 1));
+
+        shadow_row += self->width;
+        video_row += self->width;
     }
-    memcpy(self->video_mem + self->width * sy,
-           self->shadow + self->width * sy,
-           sizeof(*self->video_mem) * (ey - sy + 1));
+
     mouse_toggle(self, mouse_was_shown);
 }
 
