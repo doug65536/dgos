@@ -460,16 +460,18 @@ static uint64_t volatile page_fault_count;
 
 struct contiguous_allocator_t {
 public:
-    void early_init(linaddr_t *addr, size_t size);
-    void init(linaddr_t addr, size_t size);
+    void early_init(linaddr_t *addr, size_t size, const char *name);
+    void init(linaddr_t addr, size_t size, const char *name);
     uintptr_t alloc_linear(size_t size);
     bool take_linear(linaddr_t addr, size_t size, bool require_free);
     void release_linear(uintptr_t addr, size_t size);
+    void dump(char const *format, ...);
 private:
     mutex free_addr_lock;
     typedef rbtree_t<> tree_t;
     tree_t free_addr_by_size;
     tree_t free_addr_by_addr;
+    char const *name;
 };
 
 static contiguous_allocator_t linear_allocator;
@@ -1315,22 +1317,25 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 }
 
 #if DEBUG_ADDR_ALLOC
-static int dump_addr_node(rbtree_t *tree,
-                           rbtree_t::kvp_t *kvp,
-                           void *p)
+template<typename K, typename V>
+static int dump_addr_node(typename rbtree_t<K,V>::kvp_t *kvp, void *p)
 {
-    (void)tree;
-    (void)p;
-    printdbg("key=%16lx val=%16lx\n",
-             kvp->key, kvp->val);
+    char const **names = (char const **)p;
+    printdbg("%s=%16lx %s=%16lx\n",
+             names[0], kvp->key, names[1], kvp->val);
     return 0;
 }
 
-static void dump_addr_tree(rbtree_t *tree, char const *name)
+template<typename K, typename V>
+static void dump_addr_tree(rbtree_t<K,V> *tree,
+                           char const *key_name, char const *val_name)
 {
-    printdbg("%s dump\n", name);
-    tree->walk(dump_addr_node, 0);
-    printdbg("---------------------------------\n");
+    char const *names[] = {
+        key_name,
+        val_name
+    };
+
+    tree->walk(dump_addr_node<K,V>, names);
 }
 #endif
 
@@ -1499,12 +1504,15 @@ void mmu_init()
 
     // Prepare 4MB contiguous physical memory
     // allocator with a capacity of 128
-    contig_phys_allocator.early_init(&contiguous_start, 4 << 20);
+    contig_phys_allocator.early_init(&contiguous_start, 4 << 20,
+                                     "contig_phys_allocator");
 
     linear_allocator.early_init((linaddr_t*)&linear_base,
-                                clear_phys_state_t::addr - linear_base);
+                                clear_phys_state_t::addr - linear_base,
+                                "linear_allocator");
 
-    near_allocator.early_init((linaddr_t*)&near_base, 0ULL - near_base);
+    near_allocator.early_init((linaddr_t*)&near_base, 0ULL - near_base,
+                              "near_allocator");
 
     // Allocate guard page
     linear_allocator.alloc_linear(PAGE_SIZE);
@@ -1544,7 +1552,8 @@ void mmu_init()
                                               range.base - last_hole_end);
             } else {
                 first_hole = false;
-                hole_allocator.init(last_hole_end, range.base - last_hole_end);
+                hole_allocator.init(last_hole_end, range.base - last_hole_end,
+                                    "hole_allocator");
             }
         }
 
@@ -1560,7 +1569,8 @@ void mmu_init()
         } else {
             first_hole = false;
             hole_allocator.init(last_hole_end,
-                                max_physaddr - last_hole_end);
+                                max_physaddr - last_hole_end,
+                                "hole_allocator");
         }
     }
 
@@ -1637,8 +1647,11 @@ static void sanity_check_by_addr(rbtree_t *tree)
 }
 #endif
 
-void contiguous_allocator_t::early_init(linaddr_t *addr, size_t size)
+void contiguous_allocator_t::early_init(linaddr_t *addr, size_t size,
+                                        char const *name)
 {
+    this->name = name;
+
     linaddr_t initial_addr = *addr;
 
     free_addr_by_addr.init(contiguous_allocator_cmp_key, 0);
@@ -1651,10 +1664,15 @@ void contiguous_allocator_t::early_init(linaddr_t *addr, size_t size)
 
     free_addr_by_size.insert(size, *addr);
     free_addr_by_addr.insert(*addr, size);
+
+    dump("After early_init\n");
 }
 
-void contiguous_allocator_t::init(linaddr_t addr, size_t size)
+void contiguous_allocator_t::init(linaddr_t addr, size_t size,
+                                  char const *name)
 {
+    this->name = name;
+
     free_addr_by_addr.init(contiguous_allocator_cmp_key, 0);
     free_addr_by_size.init(contiguous_allocator_cmp_both, 0);
 
@@ -1662,6 +1680,8 @@ void contiguous_allocator_t::init(linaddr_t addr, size_t size)
         free_addr_by_size.insert(size, addr);
         free_addr_by_addr.insert(addr, size);
     }
+
+    dump("After init\n");
 }
 
 uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
@@ -1673,9 +1693,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         unique_lock<mutex> lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
-        printdbg("---- Alloc %lx\n", size);
-        //dump_addr_tree(free_addr_by_addr, "Addr map by addr (before alloc)");
-        //dump_addr_tree(free_addr_by_size, "Addr map by size (before alloc)");
+        dump("Before Alloc %lx\n", size);
 #endif
 
         // Find the lowest address item that is big enough
@@ -1704,12 +1722,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         addr = by_size.val;
 
 #if DEBUG_ADDR_ALLOC
-        dump_addr_tree(free_addr_by_addr,
-                       "Addr map by addr (after alloc)");
-        //dump_addr_tree(free_addr_by_size,
-        //    "Addr map by size (after alloc)");
-
-        printdbg("%lx ----\n", addr);
+        dump("after alloc_linear sz=%zx addr=%zx\n", size, addr);
 #endif
 
 #if DEBUG_LINEAR_SANITY
@@ -1843,11 +1856,6 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
     return false;
 }
 
-//int contiguous_allocator_t::take_at(uintptr_t addr, size_t size)
-//{
-//
-//}
-
 void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 {
     // Round address down to page boundary
@@ -1864,11 +1872,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     unique_lock<mutex> lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
-    printdbg("---- Free %lx @ %lx\n", size, addr);
-    dump_addr_tree(allocator->free_addr_by_addr,
-                   "Addr map by addr (before free)");
-    //dump_addr_tree(allocator->free_addr_by_size,
-    //               "Addr map by size (before free)");
+    dump("---- Free %lx @ %lx\n", size, addr);
 #endif
 
     // Find the nearest free block before the freed range
@@ -1902,10 +1906,22 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     free_addr_by_addr.insert(addr, size);
 
 #if DEBUG_ADDR_ALLOC
-    dump_addr_tree(free_addr_by_addr,
-                   "Addr map by addr (after free)");
-    //dump_addr_tree(free_addr_by_size,
-    /                "Addr map by size (after free)");
+    dump("Addr map by addr (after free)");
+#endif
+}
+
+void contiguous_allocator_t::dump(const char *format, ...)
+{
+#if DEBUG_ADDR_ALLOC
+    va_list ap;
+    va_start(ap, format);
+    vprintdbg(format, ap);
+    va_end(ap);
+
+    printdbg("By addr\n");
+    dump_addr_tree(&free_addr_by_addr, "addr", "size");
+    printdbg("By size\n");
+    dump_addr_tree(&free_addr_by_size, "size", "addr");
 #endif
 }
 
@@ -3271,7 +3287,7 @@ void mm_destroy_process()
 void mm_init_process(process_t *process)
 {
     contiguous_allocator_t *allocator = new contiguous_allocator_t{};
-    allocator->init(0x400000, 0x800000000000 - 0x400000);
+    allocator->init(0x400000, 0x800000000000 - 0x400000, "process");
     process->set_allocator(allocator);
 }
 
