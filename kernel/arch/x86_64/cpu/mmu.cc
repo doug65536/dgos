@@ -2232,11 +2232,14 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
             size_t end = len >> PAGE_SCALE;
 
-            if (!(flags & MAP_DEVICE))
+            if (flags & MAP_NOCOMMIT) {
+                paddr = PTE_ADDR;
+            } else if (!(flags & MAP_DEVICE)) {
                 paddr = mmu_alloc_phys(0);
 
-            if (paddr && !(flags & MAP_UNINITIALIZED))
-                clear_phys(paddr);
+                if (paddr && !(flags & MAP_UNINITIALIZED))
+                    clear_phys(paddr);
+            }
 
             pte = 0;
 

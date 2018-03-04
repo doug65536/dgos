@@ -54,10 +54,13 @@
 #define MAP_ANONYMOUS       0x00000200
 
 // Undefined flag mask
-#define MAP_INVALID_MASK    0x007FFC00
+#define MAP_INVALID_MASK    0x003FFC00
 
 // Allowed in user mode
 #define MAP_USER_MASK       0x000003FF
+
+// Kernel only: Commit no pages
+#define MAP_NOCOMMIT        0x00400000
 
 // Kernel only: Exclusive (fail if address range is not free)
 #define MAP_EXCLUSIVE       0x00800000
