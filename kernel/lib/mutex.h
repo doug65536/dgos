@@ -280,14 +280,14 @@ template<typename T>
 class unique_lock
 {
 public:
-    unique_lock(T& m)
+    explicit unique_lock(T& m)
         : m(&m)
         , locked(false)
     {
         lock();
     }
 
-    unique_lock(T& lock, defer_lock_t)
+    explicit unique_lock(T& lock, defer_lock_t)
         : m(&lock)
         , locked(false)
     {
@@ -339,14 +339,14 @@ template<>
 class unique_lock<mcslock>
 {
 public:
-    unique_lock(mcslock& m)
+    explicit unique_lock(mcslock& m)
         : m(&m)
         , locked(false)
     {
         lock();
     }
 
-    unique_lock(mcslock& lock, defer_lock_t)
+    explicit unique_lock(mcslock& lock, defer_lock_t)
         : m(&lock)
         , locked(false)
     {
