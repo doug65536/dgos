@@ -14,6 +14,8 @@ device/usb_xhci.bits
 lib/cc/memory.cc
 lib/cc/union_storage.h
 lib/dev_usb_ctl.h
+lib/refcount.cc
+lib/refcount.h
 lib/sys/sys_types.h
 syscall/sys_fd.cc
 syscall/sys_fd.h
