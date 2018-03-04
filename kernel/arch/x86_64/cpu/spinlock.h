@@ -49,6 +49,12 @@ void rwspinlock_sh_unlock(rwspinlock_t *lock);
 
 typedef unsigned ticketlock_value_t;
 struct ticketlock_t {
+    ticketlock_t()
+        : now_serving(0)
+        , next_ticket(0)
+    {
+    }
+
     // Bit 0 holds the saved interrupt flag
     ticketlock_value_t volatile now_serving;
 
