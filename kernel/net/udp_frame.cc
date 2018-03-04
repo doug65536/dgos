@@ -4,25 +4,21 @@
 #include "rbtree.h"
 #include "hash_table.h"
 #include "cpu/atomic.h"
+#include "refcount.h"
 
-struct udp_bind_t {
+struct udp_bind_t : public refcounted<udp_bind_t> {
     ipv4_addr_pair_t pair;
     int handle;
 };
 
-static hashtbl_t udp_handle_lookup;
-static hashtbl_t udp_addr_lookup;
+static hashtbl_t<udp_bind_t, ipv4_addr_pair_t,
+    &udp_bind_t::pair> udp_handle_lookup;
+static hashtbl_t<udp_bind_t, int, &udp_bind_t::handle> udp_addr_lookup;
 static int next_handle;
 
 __attribute__((constructor))
 static void udp_handle_tbl_init(void)
 {
-    htbl_create(&udp_addr_lookup,
-                offsetof(udp_bind_t, pair),
-                sizeof(ipv4_addr_pair_t));
-    htbl_create(&udp_handle_lookup,
-                offsetof(udp_bind_t, handle),
-                sizeof(int));
     next_handle = 1;
 }
 
@@ -35,7 +31,7 @@ void udp_frame_received(ethq_pkt_t *pkt)
     udp_port_get(&pair, p);
     ipv4_ip_get(&pair, &p->ipv4_hdr);
 
-    udp_bind_t *bind = (udp_bind_t*)htbl_lookup(&udp_addr_lookup, &pair);
+    udp_bind_t *bind = (udp_bind_t*)udp_addr_lookup.lookup(&pair);
 
     (void)bind;
     (void)p;
@@ -47,6 +43,5 @@ int udp_bind(ipv4_addr_pair_t const *pair)
     udp_bind_t *bind = (udp_bind_t*)malloc(sizeof(*bind));
     bind->handle = handle;
     bind->pair = *pair;
-    return htbl_insert(&udp_handle_lookup, bind) &&
-            htbl_insert(&udp_addr_lookup, bind);
+    return udp_handle_lookup.insert(bind) && udp_addr_lookup.insert(bind);
 }

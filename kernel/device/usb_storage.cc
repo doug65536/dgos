@@ -427,10 +427,6 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     for (uint32_t i = 0; i < cmd_capacity; ++i)
         new (cmd_queue + i) pending_cmd_t();
 
-    // Initialize pending command table
-    htbl_create(&pending_cmds, offsetof(pending_cmd_t, tag),
-                sizeof(pending_cmd_t::tag));
-
     reset();
 
     int max_lun = get_max_lun();

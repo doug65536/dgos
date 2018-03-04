@@ -11,6 +11,7 @@
 #include "vector.h"
 #include "dev_usb_ctl.h"
 #include "iocp.h"
+#include "refcount.h"
 
 #include "usb_xhcibits.h"
 
@@ -677,7 +678,7 @@ struct usbxhci_endpoint_target_t {
     uint8_t epid;
 };
 
-struct usbxhci_endpoint_data_t {
+struct usbxhci_endpoint_data_t : public refcounted<usbxhci_endpoint_data_t> {
     usbxhci_endpoint_target_t target;
 
     usbxhci_evt_xfer_t *xfer_ring;
@@ -691,23 +692,22 @@ struct usbxhci_pending_cmd_t;
 
 class usbxhci;
 
-struct usbxhci_pending_cmd_t {
+struct usbxhci_pending_cmd_t final
+        : public refcounted<usbxhci_pending_cmd_t> {
     usbxhci_cmd_trb_t *cmd_ptr;
     uint64_t cmd_physaddr;
-    uint64_t ring_physaddr;
     usb_iocp_t *iocp;
-};
 
-//struct usbxhci_port_init_data_t {
-//    usbxhci_inpctx_t inpctx;
-//    usbxhci_ctl_trb_t *trbs;
-//    void *buf;
-//    uint8_t port;
-//    uint8_t slotid;
-//};
+    size_t hash() const
+    {
+        return cmd_physaddr;
+    }
+};
 
 class usbxhci : public usb_bus_t {
 public:
+    usbxhci();
+
     static void detect();
 
     void dump_config_desc(const usb_config_helper &cfg_hlp);
@@ -861,10 +861,11 @@ private:
     usbxhci_interrupter_info_t *interrupters;
 
     padded_ticketlock endpoints_lock;
-    vector<unique_ptr<usbxhci_endpoint_data_t>> endpoints;
+    vector<refptr<usbxhci_endpoint_data_t>> endpoints;
 
     // Endpoint data keyed on usbxhci_endpoint_target_t
-    hashtbl_t endpoint_lookup;
+    hashtbl_t<usbxhci_endpoint_data_t, usbxhci_endpoint_target_t,
+    &usbxhci_endpoint_data_t::target> endpoint_lookup;
 
     // Maximums
     uint32_t maxslots;
@@ -890,7 +891,8 @@ private:
 
     pci_irq_range_t irq_range;
 
-    hashtbl_t usbxhci_pending_ht;
+    hashtbl_t<usbxhci_pending_cmd_t,
+    uint64_t, &usbxhci_pending_cmd_t::cmd_physaddr> usbxhci_pending_ht;
 
     // Command issue lock
     padded_ticketlock lock_cmd;
@@ -928,12 +930,11 @@ void usbxhci::insert_pending_command(usbxhci_cmd_trb_t *cmd_ptr,
                                      usb_iocp_t *iocp,
                                      unique_lock<ticketlock> const&)
 {
-    usbxhci_pending_cmd_t *pc = (usbxhci_pending_cmd_t *)
-            malloc(sizeof(usbxhci_pending_cmd_t));
+    usbxhci_pending_cmd_t *pc = new usbxhci_pending_cmd_t;
     pc->cmd_ptr = cmd_ptr;
     pc->cmd_physaddr = cmd_physaddr;
     pc->iocp = iocp;
-    htbl_insert(&usbxhci_pending_ht, pc);
+    usbxhci_pending_ht.insert(pc);
 }
 
 void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
@@ -944,11 +945,6 @@ void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
 
     usbxhci_cmd_trb_t *s = (usbxhci_cmd_trb_t *)&dev_cmd_ring[cr_next++];
 
-    if (cr_next == cr_size) {
-        pcs = !pcs;
-        cr_next = 0;
-    }
-
     set_cmd_trb_cycle(cmd);
 
     // This memcpy write at least 32 bits at a time!
@@ -957,8 +953,19 @@ void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
 
     size_t offset = uintptr_t(s) - uintptr_t(dev_cmd_ring);
 
-    insert_pending_command(s, cmd_ring_physaddr + offset,
-                           iocp, hold_cmd_lock);
+    uint64_t cmd_physaddr = cmd_ring_physaddr + offset;
+
+    insert_pending_command(s, cmd_physaddr, iocp, hold_cmd_lock);
+
+    if (cr_next == cr_size) {
+        usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
+                &dev_cmd_ring[cr_next];
+
+        USBXHCI_CMD_TRB_C_SET(link->c_tc_ch_ioc, pcs != 0);
+
+        pcs = !pcs;
+        cr_next = 0;
+    }
 
     // Ring controller command doorbell
     ring_doorbell(0, 0, 0);
@@ -975,7 +982,7 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
     usbxhci_endpoint_data_t *epd = lookup_endpoint(slotid, epid);
 
     for (size_t i = 0; i < count; ++i) {
-        USBXHCI_TRACE("Writing TRB to %zx\n",
+        USBXHCI_TRACE("Writing TRB s%d:ep%d to %zx\n", slotid, epid,
                       mphysaddr(&epd->xfer_ring[epd->xfer_next]));
         usbxhci_ctl_trb_generic_t *trb = (usbxhci_ctl_trb_generic_t*)trbs + i;
         USBXHCI_CTL_TRB_FLAGS_C_SET(trb->flags, epd->ccs != 0);
@@ -1090,7 +1097,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
     }
     newepd->ccs = 1;
 
-    uint64_t xfer_ring_physaddr = mphysaddr(newepd->xfer_ring);
+    newepd->xfer_ring_physaddr = mphysaddr(newepd->xfer_ring);
 
     // Create link TRB to wrap transfer ring
     usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
@@ -1098,18 +1105,16 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 
     *link = {};
     link->trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_LINK);
-    link->ring_physaddr = xfer_ring_physaddr;
+    link->ring_physaddr = newepd->xfer_ring_physaddr;
     link->c_tc_ch_ioc = USBXHCI_CMD_TRB_TC | USBXHCI_CMD_TRB_C_n(!newepd->ccs);
 
     // Avoid overwriting link TRB
     --newepd->xfer_count;
 
     USBXHCI_TRACE("Transfer ring physical address for slot=%d, ep=%d: %lx\n",
-                  slotid, epid, xfer_ring_physaddr);
+                  slotid, epid, newepd->xfer_ring_physaddr);
 
-    newepd->xfer_ring_physaddr = xfer_ring_physaddr;
-
-    htbl_insert(&endpoint_lookup, newepd);
+    endpoint_lookup.insert(newepd);
 
     return newepd;
 }
@@ -1120,7 +1125,7 @@ usbxhci_endpoint_data_t *usbxhci::lookup_endpoint(uint8_t slotid, uint8_t epid)
 
     usbxhci_endpoint_target_t key{ slotid, epid };
     usbxhci_endpoint_data_t *data = (usbxhci_endpoint_data_t *)
-            htbl_lookup(&endpoint_lookup, &key);
+            endpoint_lookup.lookup(&key);
 
     return data;
 }
@@ -1227,16 +1232,6 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
     mmio_rt = (usbxhci_rtreg_t*)((char*)mmio_cap + (mmio_cap->rtsoff & -32));
 
     mmio_db = (usbxhci_dbreg_t*)((char*)mmio_cap + (mmio_cap->dboff & -4));
-
-    // Pending commands hash table
-    htbl_create(&usbxhci_pending_ht,
-                offsetof(usbxhci_pending_cmd_t, cmd_physaddr),
-                sizeof(uint64_t));
-
-    // Endpoint lookup hash table
-    htbl_create(&endpoint_lookup,
-                offsetof(usbxhci_endpoint_data_t, target),
-                sizeof(usbxhci_endpoint_target_t));
 
     // 4.2 Host Controller Initialization
 
@@ -1888,19 +1883,13 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
 
     // Lookup pending command
     unique_lock<ticketlock> hold_cmd_lock(lock_cmd);
-    usbxhci_pending_cmd_t *pcp = (usbxhci_pending_cmd_t*)
-            htbl_lookup(&usbxhci_pending_ht, &cmdaddr);
-    usbxhci_pending_cmd_t pc{};
-    if (pcp) {
-        pc = *pcp;
-        htbl_delete(&usbxhci_pending_ht, &cmdaddr);
-        free(pcp);
-        pcp = nullptr;
-    }
+    refptr<usbxhci_pending_cmd_t> pcp = usbxhci_pending_ht.lookup(&cmdaddr);
+    if (pcp)
+        usbxhci_pending_ht.del(&cmdaddr);
     hold_cmd_lock.unlock();
 
     // Invoke completion handler
-    cmd_comp(pc.cmd_ptr, evt, pc.iocp);
+    cmd_comp(pcp->cmd_ptr, evt, pcp->iocp);
 }
 
 isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
@@ -1958,6 +1947,10 @@ void usbxhci::irq_handler(int irq)
                     (1<<3);
         }
     }
+}
+
+usbxhci::usbxhci()
+{
 }
 
 void usbxhci::detect()

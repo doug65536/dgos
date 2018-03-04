@@ -1309,8 +1309,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/process.h \
 	kernel/lib/rand.cc \
 	kernel/lib/rand.h \
-	kernel/lib/rbtree.cc \
 	kernel/lib/rbtree.h \
+	kernel/lib/rbtree.cc \
 	kernel/lib/refcount.h \
 	kernel/lib/refcount.cc \
 	kernel/lib/stddef.h \
