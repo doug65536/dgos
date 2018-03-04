@@ -1,5 +1,6 @@
 #include "cpu/control_regs_constants.h"
 #include "cpu/interrupts.h"
+#include "cfi_helpers.h"
 
 .section .entry, "ax"
 
@@ -342,9 +343,13 @@ exit:
 
 .align 16
 invoke_function_array:
-    pushq %rbx
-    pushq %rbp
-    pushq %rbp
+    .cfi_startproc
+    .cfi_def_cfa_offset 8
+
+    push_cfi %rbx
+    push_cfi %rbp
+    push_cfi %rbp
+
     movq %rdi,%rbx
     movq %rsi,%rbp
 0:
@@ -354,9 +359,11 @@ invoke_function_array:
     addq $8,%rbx
     jmp 0b
 0:
-    popq %rbp
-    popq %rbp
-    popq %rbx
+    pop_cfi %rbp
+    pop_cfi %rbp
+    pop_cfi %rbx
+
+    .cfi_endproc
     ret
 
 #define XSAVE_WANTED \
@@ -365,7 +372,10 @@ invoke_function_array:
 
 .align 16
 detect_xsave_states_bsp:
-    pushq %rbx
+    .cfi_startproc
+    .cfi_def_cfa_offset 8
+
+    push_cfi %rbx
     call cpuid_has_xsave
     testb %al,%al
     jz 0f
@@ -379,12 +389,16 @@ detect_xsave_states_bsp:
     movl %eax,xsave_enabled_states
 
 0:
-    popq %rbx
+    pop_cfi %rbx
+    .cfi_endproc
     jmp set_xsave_states_ap
 
 .align 16
 set_xsave_states_ap:
-    pushq %rbx
+    .cfi_startproc
+    .cfi_def_cfa_offset 8
+
+    push_cfi %rbx
 
     call cpuid_has_xsave
     testb %al,%al
@@ -401,7 +415,8 @@ set_xsave_states_ap:
     xsetbv
 
 0:
-    popq %rbx
+    pop_cfi %rbx
+    .cfi_endproc
     ret
 
 // Callout to initialize AP CPU
