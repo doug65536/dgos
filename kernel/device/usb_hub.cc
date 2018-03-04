@@ -147,9 +147,12 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     usb_pipe_t control, status;
 
     bus->get_pipe(cfg_hlp->slot(), 0, control);
+    assert(control);
 
     usb_desc_ep const *ep = cfg_hlp->find_ep(match.iface, 0);
     bus->alloc_pipe(cfg_hlp->slot(), ep, status);
+
+    assert(status);
 
     usb_hub_t *hub = new usb_hub_t(control, status);
     hubs.push_back(hub);
