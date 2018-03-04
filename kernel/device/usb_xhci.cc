@@ -1205,15 +1205,15 @@ bool usbxhci::add_device(int port, int route)
     }
 
     // Get first 8 bytes of device descriptor to get max packet size
-    unique_ptr<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 512));
+    unique_ptr<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 128));
 
-    err = get_descriptor(slotid, 0, cfg_buf, 512, usb_req_type::STD,
+    err = get_descriptor(slotid, 0, cfg_buf, 128, usb_req_type::STD,
                          usb_req_recip_t::DEVICE,
                          usb_desctype_t::CONFIGURATION, 0);
     if (err < 0)
         return false;
 
-    usb_config_helper cfg_hlp(slotid, dev_desc, cfg_buf, 512);
+    usb_config_helper cfg_hlp(slotid, dev_desc, cfg_buf, 128);
 
     dump_config_desc(cfg_hlp);
 
