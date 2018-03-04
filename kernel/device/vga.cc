@@ -71,8 +71,7 @@ static int mouse_toggle(text_display_t *self,
         size_t place = self->mouse_y *
                 self->width +
                 self->mouse_x;
-        uint8_t attr =
-                (devload(self->shadow + place) >> 8) & 0xFF;
+        uint8_t attr = (self->shadow[place] >> 8) & 0xFF;
         uint8_t set_attr = show
                 ? ((attr >> 4) | (attr << 4)) & 0x7F
                 : attr;
@@ -82,9 +81,7 @@ static int mouse_toggle(text_display_t *self,
         if (show && ((set_attr >> 4) == (set_attr & 0x0F)))
             set_attr ^= 7 << 4;
 
-        devstore(self->video_mem + place,
-                      uint16_t((devload(self->shadow + place) & 0xFF) |
-                      (set_attr << 8)));
+        self->video_mem[place] = (self->shadow[place] & 0xFF) | (set_attr << 8);
         self->mouse_on = !!show;
         return !show;
     }
@@ -139,8 +136,8 @@ static void write_char_at(
     int mouse_was_shown = mouse_hide_if_at(self, x, y);
     size_t place = y * self->width + x;
     uint16_t pair = (character & 0xFF) | ((attrib & 0xFF) << 8);
-    devstore(self->shadow + place, pair);
-    devstore(self->video_mem + place, pair);
+    self->shadow[place] = pair;
+    self->video_mem[place] = pair;
     mouse_toggle(self, mouse_was_shown);
 }
 
@@ -150,7 +147,7 @@ static void clear_screen(text_display_t *self)
     uint16_t *p = self->shadow;
     for (int y = 0; y < self->height; ++y)
         for (int x = 0; x < self->width; ++x)
-            devstore(p++, uint16_t(' ' | (self->attrib << 8)));
+            *p++ = uint16_t(' ' | (self->attrib << 8));
     memcpy(self->video_mem, self->shadow,
            self->width * self->height *
            sizeof(*self->shadow));
@@ -171,7 +168,7 @@ static void fill_region(text_display_t *self,
     character &= 0xFF;
     while (row_count--) {
         for (row_ofs = sx; row_ofs < ex; ++row_ofs)
-            devstore(dst + row_ofs, uint16_t(character | (self->attrib << 8)));
+            dst[row_ofs] = character | (self->attrib << 8);
         dst += self->width;
     }
     memcpy(self->video_mem + self->width * sy,
