@@ -61,6 +61,11 @@ public:
     {
     }
 
+    operator bool() const
+    {
+        return bus && slotid > 0 && epid >= 0;
+    }
+
     int send_default_control(uint8_t request_type, uint8_t request,
                              uint16_t value, uint16_t index,
                              uint16_t length, void *data) const;
