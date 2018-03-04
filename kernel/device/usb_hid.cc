@@ -607,6 +607,8 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     bus->get_pipe(cfg_hlp->slot(), 0, control);
 
+    assert(control);
+
     // Try to find interrupt pipes
     usb_desc_ep const *in_ep_desc = cfg_hlp->match_ep(
                 match.iface, 1, usb_ep_attr::interrupt);
@@ -614,11 +616,15 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     usb_desc_ep const *out_ep_desc = cfg_hlp->match_ep(
                 match.iface, 0, usb_ep_attr::interrupt);
 
-    if (in_ep_desc)
+    if (in_ep_desc) {
         bus->alloc_pipe(cfg_hlp->slot(), in_ep_desc, in);
+        assert(in);
+    }
 
-    if (out_ep_desc)
+    if (out_ep_desc) {
         bus->alloc_pipe(cfg_hlp->slot(), out_ep_desc, out);
+        assert(out);
+    }
 
     usb_hid_dev_t *dev = nullptr;
 
