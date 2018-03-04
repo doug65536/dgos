@@ -62,6 +62,18 @@ struct fd_table_t
 
 struct process_t
 {
+    process_t()
+        : path(nullptr)
+        , args(nullptr)
+        , env(nullptr)
+        , mmu_context(0)
+        , linear_allocator(nullptr)
+        , pid(0)
+        , exitcode(0)
+        , state(state_t::unused)
+    {
+    }
+
     bool valid_fd(int fd)
     {
         return fd >= 0 &&
