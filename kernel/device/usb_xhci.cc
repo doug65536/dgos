@@ -1809,6 +1809,8 @@ usb_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
     else
         munmap(inp.any, sizeof(usbxhci_inpctx_large_t));
 
+    block.wait();
+
     return block.get_result().cc;
 }
 
