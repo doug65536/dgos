@@ -2505,7 +2505,7 @@ int mprotect(void *addr, size_t len, int prot)
     // Unreadable demand paged has MSB of physical address cleared
     pte_t const demand_no_read = (PTE_ADDR >> 1) & PTE_ADDR;
 
-    pte_t no_exec = cpuid_has_nx() ? PTE_NX : 0;
+    pte_t no_exec = cpuid_nx_mask & PTE_NX;
 
     // Bits to set in PTE
     pte_t set_bits =
