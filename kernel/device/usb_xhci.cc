@@ -1292,9 +1292,8 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
                         MAP_POPULATE, -1, 0);
 
     // Device Context Base Address Array
-    for (size_t i = 0; i < maxslots; ++i) {
+    for (size_t i = 0; i < maxslots; ++i)
         dev_ctx_ptrs[i] = mphysaddr(dev_ctx_ent_slot(i));
-    }
 
     // Device Context Base Address Array Pointer
     mmio_op->dcbaap = mphysaddr(dev_ctx_ptrs);
