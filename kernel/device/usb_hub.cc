@@ -70,6 +70,8 @@ static vector<usb_hub_t*> hubs;
 usb_hub_t::usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status)
     : control(control)
     , status(status)
+    , hub_desc{}
+    , status_data(0)
 {
 }
 
