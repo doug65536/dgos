@@ -1182,6 +1182,8 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
 
 bool usbxhci::add_device(int port, int route)
 {
+    USBXHCI_TRACE("Adding device, port=%d, route=0x%x\n", port, route);
+
     int slotid = enable_slot(port);
 
     int err = set_address(slotid, port, route);
