@@ -1298,13 +1298,32 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
     // Device Context Base Address Array Pointer
     mmio_op->dcbaap = mphysaddr(dev_ctx_ptrs);
 
+    // Command ring size in entries
+    cr_size = PAGESIZE / sizeof(usbxhci_cmd_trb_t);
+
+    uint64_t cmd_ring_sz = cr_size * sizeof(usbxhci_cmd_trb_t);
+
+    // Reserve entry for link TRB
+    --cr_size;
+
     // Command Ring
-    dev_cmd_ring = (usbxhci_cmd_trb_t*)
-            mmap(0, sizeof(usbxhci_cmd_trb_t) * maxslots,
-                 PROT_READ | PROT_WRITE,
-                 MAP_POPULATE, -1, 0);
+    dev_cmd_ring = (usbxhci_cmd_trb_t*)mmap(
+                nullptr, cmd_ring_sz, PROT_READ | PROT_WRITE,
+                MAP_POPULATE, -1, 0);
+
+    usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
+            &dev_cmd_ring[cr_size];
+
+    *link = {};
+    link->ring_physaddr = cmd_ring_physaddr;
+    link->c_tc_ch_ioc = USBXHCI_CMD_TRB_TC |
+            USBXHCI_CMD_TRB_C_n(pcs != 0);
+    link->trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_LINK);
 
     cmd_ring_physaddr = mphysaddr(dev_cmd_ring);
+
+    USBXHCI_TRACE("Command ring at %zx-%zx\n",
+                  cmd_ring_physaddr, cmd_ring_physaddr + cmd_ring_sz);
 
     // Command Ring Control Register
     mmio_op->crcr = cmd_ring_physaddr;
