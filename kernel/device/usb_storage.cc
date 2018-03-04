@@ -343,6 +343,8 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     if (!bus->get_pipe(cfg_hlp->slot(), 0, control))
         return false;
 
+    assert(control);
+
     usb_desc_ep const *ep = nullptr;
 
     for (int i = 0; (ep = cfg_hlp->find_ep(match.iface, i)) != nullptr; ++i) {
@@ -350,6 +352,9 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
         if (!bus->alloc_pipe(cfg_hlp->slot(), ep, pipe))
             return false;
     }
+
+    assert(bulk_in);
+    assert(bulk_out);
 
     if (usb_msc_count == countof(usb_msc_devices)) {
         USB_MSC_TRACE("Too many USB mass storage interfaces! Dropped one\n");
