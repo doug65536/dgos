@@ -1329,11 +1329,9 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
     mmio_op->crcr = cmd_ring_physaddr;
 
     // Event segments
-    dev_evt_segs = (usbxhci_evtring_seg_t*)
-            mmap(0, sizeof(*dev_evt_segs) *
-                 maxintr * 4,
-                 PROT_READ | PROT_WRITE,
-                 MAP_POPULATE, -1, 0);
+    dev_evt_segs = (usbxhci_evtring_seg_t*)mmap(
+                nullptr, sizeof(*dev_evt_segs) * maxintr * 4,
+                PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
 
     interrupters = (usbxhci_interrupter_info_t*)
             malloc(sizeof(*interrupters) * maxintr);
@@ -1346,8 +1344,7 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
         interrupters[i].evt_ring = (usbxhci_evt_t*)
                 mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
                      MAP_POPULATE, -1, 0);
-        interrupters[i].count =
-                PAGESIZE / sizeof(*interrupters[i].evt_ring);
+        interrupters[i].count = PAGESIZE / sizeof(*interrupters[i].evt_ring);
         interrupters[i].next = 0;
 
         interrupters[i].evt_ring_physaddr =
