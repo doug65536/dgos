@@ -38,6 +38,7 @@ struct basic_iocp_t {
     }
 
     void reset(callback_t callback);
+    void reset(callback_t callback, uintptr_t arg);
 
 private:
 
@@ -141,6 +142,13 @@ void basic_iocp_t<T, S>::reset(callback_t callback)
     done_count = 0;
     expect_count = 0;
     result_count = 0;
+}
+
+template<typename T, typename S>
+void basic_iocp_t<T, S>::reset(basic_iocp_t::callback_t callback, uintptr_t arg)
+{
+    reset(callback);
+    this->arg = arg;
 }
 
 template<typename T, typename S>
