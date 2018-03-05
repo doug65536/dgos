@@ -25,7 +25,7 @@ do
 						$'\n' $'\t' \
 						'echo -e -n ' $'\'' '\ec' $'\'' ' >> dump/qemu-debug-out' \
 						$'\n' $'\t' \
-						'$(QEMU) $(QEMU_COMMON)' \
+						'$(QEMU_SUDO) $(QEMU) $(QEMU_COMMON)' \
 						' \' $'\n' $'\t\t' \
 						$QUP \
 						' \' $'\n' $'\t\t' \
