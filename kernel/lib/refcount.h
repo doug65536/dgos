@@ -48,6 +48,20 @@ public:
         return *this;
     }
 
+    refptr& operator=(refptr&& rhs)
+    {
+        if (&rhs != this) {
+            T* old = ptr;
+
+            ptr = rhs.ptr;
+            rhs.ptr = nullptr;
+
+            if (uintptr_t(old) > 0x7F)
+                old->releaseref();
+        }
+        return *this;
+    }
+
     refptr& operator=(T *rhs)
     {
         T *old = ptr;
