@@ -21,7 +21,7 @@
 
 // Always use paged allocation with guard pages
 // Realloc always moves the memory to a new range
-#define HEAP_PAGEONLY 0
+#define HEAP_PAGEONLY 1
 
 // Don't free virtual address ranges, just free physical pages
 #define HEAP_NOVFREE 1
