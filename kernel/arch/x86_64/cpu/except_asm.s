@@ -18,7 +18,7 @@ __exception_setjmp:
 	mov %r13,5*8(%rdi)
 	mov %r14,6*8(%rdi)
 	mov %r15,7*8(%rdi)
-	pushf
+	pushfq
 	popq 8*8(%rdi)
 	xor %eax,%eax
 	ret
@@ -34,7 +34,7 @@ __exception_longjmp:
 	mov 6*8(%rdi),%r14
 	mov 7*8(%rdi),%r15
 	pushq 8*8(%rdi)
-	popf
+	popfq
 	# Return value is second parameter
 	mov %rsi,%rax
 	# Restore stack pointer and "return" from setjmp again
