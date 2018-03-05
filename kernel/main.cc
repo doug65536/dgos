@@ -107,9 +107,6 @@ static int shell_thread(void *p)
             printk("%c", event.codepoint);
     }
 
-    //printk("From shell thread!! %16lx", (uint64_t)p);
-    //
-
     return 0;
 }
 #endif
