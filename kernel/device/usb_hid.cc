@@ -538,7 +538,11 @@ protected:
     bool get_descriptor(void *data, uint16_t len,
                         uint8_t type, uint8_t index, uint8_t lang_id);
 
-    usb_iocp_t in_iocp;
+    static constexpr unsigned phase_count = 4;
+
+    ticketlock change_lock;
+    usb_iocp_t in_iocp[phase_count];
+    unsigned phase;
 
     usb_pipe_t control;
     usb_pipe_t in;
@@ -546,7 +550,7 @@ protected:
     uint8_t iface_idx;
 };
 
-class usb_hid_keybd_t : public usb_hid_dev_t {
+class usb_hid_keybd_t final : public usb_hid_dev_t {
 public:
     usb_hid_keybd_t(usb_pipe_t const& control,
                     usb_pipe_t const& in,
@@ -554,21 +558,20 @@ public:
                     uint8_t iface_idx);
 
 private:
-    void post_keybd_in();
+    void post_keybd_in(unsigned phase);
     static void keybd_completion(usb_iocp_result_t const& result,
                                  uintptr_t arg);
     void keybd_completion(usb_iocp_result_t const& result);
 
     void detect_keybd_changes();
 
-    ticketlock change_lock;
     keybd_fsa_t fsa;
 
     uint8_t last_keybd_state[8];
-    uint8_t this_keybd_state[8];
+    uint8_t this_keybd_state[phase_count][8];
 };
 
-class usb_hid_mouse_t : public usb_hid_dev_t {
+class usb_hid_mouse_t final : public usb_hid_dev_t {
 public:
     usb_hid_mouse_t(usb_pipe_t const& control,
                     usb_pipe_t const& in,
@@ -576,18 +579,19 @@ public:
                     uint8_t iface_idx);
 
 private:
-    void post_mouse_in();
+    void post_mouse_in(unsigned phase);
     static void mouse_completion(usb_iocp_result_t const& result,
                                  uintptr_t arg);
     void mouse_completion(usb_iocp_result_t const& result);
 
-    uint8_t last_mouse_state[8];
-    uint8_t this_mouse_state[8];
+    unsigned phase;
+
+    uint8_t this_mouse_state[phase_count][8];
 };
 
 static vector<usb_hid_dev_t*> hid_devs;
 
-class usb_hid_class_drv_t : public usb_class_drv_t {
+class usb_hid_class_drv_t final : public usb_class_drv_t {
 protected:
     static usb_hid_class_drv_t usb_hid;
 
@@ -646,7 +650,7 @@ usb_hid_dev_t::usb_hid_dev_t(usb_pipe_t const& control,
                              usb_pipe_t const& out,
                              uint8_t iface_idx,
                              usb_iocp_t::callback_t in_callback)
-    : in_iocp(in_callback, uintptr_t(this))
+    : phase(0)
     , control(control)
     , in(in)
     , out(out)
@@ -686,11 +690,12 @@ bool usb_hid_dev_t::get_descriptor(void *data, uint16_t len,
             (type << 8) | index, lang_id, sizeof(data), data) >= 0;
 }
 
-void usb_hid_keybd_t::post_keybd_in()
+void usb_hid_keybd_t::post_keybd_in(unsigned phase)
 {
-    in_iocp.reset(&usb_hid_keybd_t::keybd_completion);
-    in_iocp.set_expect(1);
-    in.recv_async(this_keybd_state, sizeof(this_keybd_state), &in_iocp);
+    in_iocp[phase].reset(&usb_hid_keybd_t::keybd_completion, uintptr_t(this));
+    in_iocp[phase].set_expect(1);
+    in.recv_async(this_keybd_state[phase], sizeof(this_keybd_state[phase]),
+                  &in_iocp[phase]);
 }
 
 void usb_hid_keybd_t::keybd_completion(
@@ -702,13 +707,11 @@ void usb_hid_keybd_t::keybd_completion(
 void usb_hid_keybd_t::keybd_completion(usb_iocp_result_t const& result)
 {
     detect_keybd_changes();
-
-    post_keybd_in();
 }
 
 void usb_hid_keybd_t::detect_keybd_changes()
 {
-    static int modifier_vk[] = {
+    static int constexpr modifier_vk[] = {
         KEYB_VK_LCTRL,
         KEYB_VK_LSHIFT,
         KEYB_VK_LALT,
@@ -721,13 +724,15 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
     unique_lock<ticketlock> hold_change_lock(change_lock);
 
+    uint8_t const *state = this_keybd_state[phase];
+
     // Detect modifier changes
-    uint8_t modifier_changes = last_keybd_state[0] ^ this_keybd_state[0];
+    uint8_t modifier_changes = last_keybd_state[0] ^ state[0];
 
     // Generate modifier key up/down events
     for (int i = 0; i < 8; ++i) {
         int mask = 1 << i;
-        int sign = (((this_keybd_state[0] & mask) != 0) * 2) - 1;
+        int sign = (((state[0] & mask) != 0) * 2) - 1;
 
         if (modifier_changes & mask)
             fsa.deliver_vk(modifier_vk[i] * sign);
@@ -740,7 +745,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
         if (scancode < 4)
             continue;
 
-        bool pressed = memchr(this_keybd_state + 2, scancode, 6);
+        bool pressed = memchr(state + 2, scancode, 6);
 
         if (!pressed) {
             // Generate keyup event
@@ -753,7 +758,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
     // Scan for keys pressed down in this event
     for (int i = 2; i < 8; ++i) {
-        uint8_t scancode = this_keybd_state[i];
+        uint8_t scancode = state[i];
 
         if (scancode < 4)
             continue;
@@ -769,14 +774,19 @@ void usb_hid_keybd_t::detect_keybd_changes()
         fsa.deliver_vk(vk);
     }
 
-    memcpy(last_keybd_state, this_keybd_state, sizeof(last_keybd_state));
+    memcpy(last_keybd_state, state, sizeof(last_keybd_state));
+
+    post_keybd_in(phase);
+
+    phase = (phase + 1) & (phase_count - 1);
 }
 
-void usb_hid_mouse_t::post_mouse_in()
+void usb_hid_mouse_t::post_mouse_in(unsigned phase)
 {
-    in_iocp.reset(&usb_hid_mouse_t::mouse_completion);
-    in_iocp.set_expect(1);
-    in.recv_async(this_mouse_state, sizeof(this_mouse_state), &in_iocp);
+    in_iocp[phase].reset(&usb_hid_mouse_t::mouse_completion, uintptr_t(this));
+    in_iocp[phase].set_expect(1);
+    in.recv_async(this_mouse_state[phase], sizeof(this_mouse_state[phase]),
+                  &in_iocp[phase]);
 }
 
 void usb_hid_mouse_t::mouse_completion(
@@ -787,14 +797,19 @@ void usb_hid_mouse_t::mouse_completion(
 
 void usb_hid_mouse_t::mouse_completion(const usb_iocp_result_t &result)
 {
+    unique_lock<ticketlock> hold_change_lock(change_lock);
+
     mouse_raw_event_t evt;
-    evt.hdist = (int8_t)this_mouse_state[1];
-    evt.vdist = -(int8_t)this_mouse_state[2];
-    evt.wdist = (int8_t)this_mouse_state[3];
-    evt.buttons = this_mouse_state[0];
+    uint8_t *state = this_mouse_state[phase];
+    evt.buttons = state[0];
+    evt.hdist = int8_t(state[1]);
+    evt.vdist = -int8_t(state[2]);
+    evt.wdist = int8_t(state[3]);
     mouse_event(evt);
 
-    post_mouse_in();
+    post_mouse_in(phase);
+
+    phase = (phase + 1) & (phase_count - 1);
 }
 
 usb_hid_keybd_t::usb_hid_keybd_t(usb_pipe_t const& control,
@@ -804,11 +819,25 @@ usb_hid_keybd_t::usb_hid_keybd_t(usb_pipe_t const& control,
     : usb_hid_dev_t(control, in, out, iface_idx,
                     &usb_hid_keybd_t::keybd_completion)
 {
+    uint8_t hid_desc[256] = {};
+    uint8_t report_desc[256] = {};
+    uint8_t phys_desc[256] = {};
+
+    // Report protocol
+    //int proto_cc = set_protocol(1);
+
+    // Try to read report descriptor
+    //get_descriptor(hid_desc, sizeof(hid_desc), 0x21, 0, 0);
+    //get_descriptor(report_desc, sizeof(report_desc), 0x22, 0, 0);
+    //get_descriptor(phys_desc, sizeof(phys_desc), 0x23, 0, 0);
+
     set_protocol(0);
     set_idle(0, 0);
 
     memset(last_keybd_state, 0, sizeof(last_keybd_state));
-    post_keybd_in();
+
+    for (unsigned phase = 0; phase < phase_count; ++phase)
+        post_keybd_in(phase);
 }
 
 usb_hid_mouse_t::usb_hid_mouse_t(usb_pipe_t const& control,
@@ -821,7 +850,8 @@ usb_hid_mouse_t::usb_hid_mouse_t(usb_pipe_t const& control,
     set_protocol(0);
     set_idle(0, 0);
 
-    post_mouse_in();
+    for (unsigned phase = 0; phase < phase_count; ++phase)
+        post_mouse_in(phase);
 }
 
 usb_hid_class_drv_t usb_hid_class_drv_t::usb_hid;
