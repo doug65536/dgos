@@ -1823,6 +1823,7 @@ QEMU_USB = -device nec-usb-xhci,id=xhci \
 	-drive if=none,id=stick,file=usb_disk.img,format=raw \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
+	$(QEMU_USB_EXTRA) \
 	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
 	-device usb-audio,bus=xhci.0 \
 	-device usb-net,bus=xhci.0 \
