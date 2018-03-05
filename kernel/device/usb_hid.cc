@@ -584,8 +584,6 @@ private:
                                  uintptr_t arg);
     void mouse_completion(usb_iocp_result_t const& result);
 
-    unsigned phase;
-
     uint8_t this_mouse_state[phase_count][8];
 };
 
