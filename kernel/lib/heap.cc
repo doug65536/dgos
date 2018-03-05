@@ -437,6 +437,7 @@ void heap_free(heap_t *heap, void *block)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
+    assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ uint32_t(hdr->size_next)));
     uintptr_t end = uintptr_t(hdr) + hdr->size_next;
     uintptr_t st = (uintptr_t(hdr) & -PAGESIZE);
     mprotect((void*)st, end - st, PROT_NONE);
