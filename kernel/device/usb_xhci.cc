@@ -681,7 +681,7 @@ struct usbxhci_endpoint_target_t {
 struct usbxhci_endpoint_data_t : public refcounted<usbxhci_endpoint_data_t> {
     usbxhci_endpoint_target_t target;
 
-    usbxhci_evt_xfer_t *xfer_ring;
+    usbxhci_cmd_trb_t *xfer_ring;
     uint64_t xfer_ring_physaddr;
     uint32_t xfer_next;
     uint32_t xfer_count;
@@ -1089,7 +1089,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 
     newepd->xfer_next = 0;
     newepd->xfer_count = PAGESIZE / sizeof(*newepd->xfer_ring);
-    newepd->xfer_ring = (usbxhci_evt_xfer_t *)
+    newepd->xfer_ring = (usbxhci_cmd_trb_t *)
             mmap(0, sizeof(*newepd->xfer_ring) * newepd->xfer_count,
                  PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
     if (unlikely(newepd->xfer_ring == MAP_FAILED || !newepd->xfer_ring)) {
