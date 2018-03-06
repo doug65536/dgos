@@ -555,6 +555,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
 	kernel/arch/x86_64/cpu/thread_impl.h \
+	kernel/device/acpigas.cc \
+	kernel/device/acpigas.h \
 	kernel/device/iocp.cc \
 	kernel/device/iocp.h \
 	kernel/device/ahci.cc \
@@ -1038,7 +1040,8 @@ generated_headers: \
 	$(top_srcdir)/kernel/device/i350bits.h \
 	$(top_srcdir)/kernel/device/usb_xhcibits.h \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h
+	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h \
+	$(top_srcdir)/kernel/device/acpibits.h
 
 .PHONY: generated_headers
 
@@ -1079,6 +1082,13 @@ $(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
 
 $(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h: \
 		$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/device/acpibits.h: \
+		$(top_srcdir)/kernel/device/acpi.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"

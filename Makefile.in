@@ -409,6 +409,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-spinlock.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-syscall_dispatch.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-thread_impl.$(OBJEXT) \
+	kernel/device/kernel_bmi-acpigas.$(OBJEXT) \
 	kernel/device/kernel_bmi-iocp.$(OBJEXT) \
 	kernel/device/kernel_bmi-ahci.$(OBJEXT) \
 	kernel/device/kernel_bmi-ata.$(OBJEXT) \
@@ -529,6 +530,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-spinlock.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-syscall_dispatch.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-thread_impl.$(OBJEXT) \
+	kernel/device/kernel_generic-acpigas.$(OBJEXT) \
 	kernel/device/kernel_generic-iocp.$(OBJEXT) \
 	kernel/device/kernel_generic-ahci.$(OBJEXT) \
 	kernel/device/kernel_generic-ata.$(OBJEXT) \
@@ -1416,6 +1418,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
 	kernel/arch/x86_64/cpu/thread_impl.h \
+	kernel/device/acpigas.cc \
+	kernel/device/acpigas.h \
 	kernel/device/iocp.cc \
 	kernel/device/iocp.h \
 	kernel/device/ahci.cc \
@@ -2799,6 +2803,9 @@ kernel/device/$(am__dirstamp):
 kernel/device/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) kernel/device/$(DEPDIR)
 	@: > kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_bmi-acpigas.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_bmi-iocp.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3127,6 +3134,9 @@ kernel/arch/x86_64/cpu/kernel_generic-syscall_dispatch.$(OBJEXT):  \
 kernel/arch/x86_64/cpu/kernel_generic-thread_impl.$(OBJEXT):  \
 	kernel/arch/x86_64/cpu/$(am__dirstamp) \
 	kernel/arch/x86_64/cpu/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-acpigas.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-iocp.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3349,6 +3359,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-syscall.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-syscall_dispatch.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-thread_impl.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-ahci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-ata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-dev_usb_ctl.Po@am__quote@
@@ -3367,6 +3378,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-vga.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-acpigas.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ahci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-dev_usb_ctl.Po@am__quote@
@@ -7279,6 +7291,20 @@ kernel/arch/x86_64/cpu/kernel_bmi-thread_impl.obj: kernel/arch/x86_64/cpu/thread
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_bmi-thread_impl.obj `if test -f 'kernel/arch/x86_64/cpu/thread_impl.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/thread_impl.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/thread_impl.cc'; fi`
 
+kernel/device/kernel_bmi-acpigas.o: kernel/device/acpigas.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-acpigas.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Tpo -c -o kernel/device/kernel_bmi-acpigas.o `test -f 'kernel/device/acpigas.cc' || echo '$(srcdir)/'`kernel/device/acpigas.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Tpo kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpigas.cc' object='kernel/device/kernel_bmi-acpigas.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-acpigas.o `test -f 'kernel/device/acpigas.cc' || echo '$(srcdir)/'`kernel/device/acpigas.cc
+
+kernel/device/kernel_bmi-acpigas.obj: kernel/device/acpigas.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-acpigas.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Tpo -c -o kernel/device/kernel_bmi-acpigas.obj `if test -f 'kernel/device/acpigas.cc'; then $(CYGPATH_W) 'kernel/device/acpigas.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpigas.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Tpo kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpigas.cc' object='kernel/device/kernel_bmi-acpigas.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-acpigas.obj `if test -f 'kernel/device/acpigas.cc'; then $(CYGPATH_W) 'kernel/device/acpigas.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpigas.cc'; fi`
+
 kernel/device/kernel_bmi-iocp.o: kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-iocp.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-iocp.Tpo -c -o kernel/device/kernel_bmi-iocp.o `test -f 'kernel/device/iocp.cc' || echo '$(srcdir)/'`kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-iocp.Tpo kernel/device/$(DEPDIR)/kernel_bmi-iocp.Po
@@ -8833,6 +8859,20 @@ kernel/arch/x86_64/cpu/kernel_generic-thread_impl.obj: kernel/arch/x86_64/cpu/th
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-thread_impl.obj `if test -f 'kernel/arch/x86_64/cpu/thread_impl.cc'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/thread_impl.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/thread_impl.cc'; fi`
 
+kernel/device/kernel_generic-acpigas.o: kernel/device/acpigas.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-acpigas.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-acpigas.Tpo -c -o kernel/device/kernel_generic-acpigas.o `test -f 'kernel/device/acpigas.cc' || echo '$(srcdir)/'`kernel/device/acpigas.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-acpigas.Tpo kernel/device/$(DEPDIR)/kernel_generic-acpigas.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpigas.cc' object='kernel/device/kernel_generic-acpigas.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-acpigas.o `test -f 'kernel/device/acpigas.cc' || echo '$(srcdir)/'`kernel/device/acpigas.cc
+
+kernel/device/kernel_generic-acpigas.obj: kernel/device/acpigas.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-acpigas.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-acpigas.Tpo -c -o kernel/device/kernel_generic-acpigas.obj `if test -f 'kernel/device/acpigas.cc'; then $(CYGPATH_W) 'kernel/device/acpigas.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpigas.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-acpigas.Tpo kernel/device/$(DEPDIR)/kernel_generic-acpigas.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpigas.cc' object='kernel/device/kernel_generic-acpigas.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-acpigas.obj `if test -f 'kernel/device/acpigas.cc'; then $(CYGPATH_W) 'kernel/device/acpigas.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpigas.cc'; fi`
+
 kernel/device/kernel_generic-iocp.o: kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-iocp.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-iocp.Tpo -c -o kernel/device/kernel_generic-iocp.o `test -f 'kernel/device/iocp.cc' || echo '$(srcdir)/'`kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-iocp.Tpo kernel/device/$(DEPDIR)/kernel_generic-iocp.Po
@@ -9915,7 +9955,8 @@ generated_headers: \
 	$(top_srcdir)/kernel/device/i350bits.h \
 	$(top_srcdir)/kernel/device/usb_xhcibits.h \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h
+	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h \
+	$(top_srcdir)/kernel/device/acpibits.h
 
 .PHONY: generated_headers
 
@@ -9956,6 +9997,13 @@ $(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
 
 $(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h: \
 		$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/device/acpibits.h: \
+		$(top_srcdir)/kernel/device/acpi.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"

@@ -1,0 +1,56 @@
+# ACPI bit definitions
+
+-- ACPI_PM1_STS
+0 TMR_STS (RW1C) Timer carry status bit (1=MSB of timer changed)
+4 BM_STS (RW1C) Bus master status bit (1=Bus master event occurred)
+5 GBL_STS BIOS raised IRQ after releasing global lock with pending bit set
+8 PWRBTN_STS (RW1C) Set when power button pressed and PWRBTN_EN is set
+9 SLPBTN_STS (RW1C) Set when sleep button pressed and SLPBTN_EN is set
+10 RTC_STS (RW1C) Set when RTC generates alarm and RTC_EN is set
+14 PCIEXP_WAKE_STS (RW1C) Set on PCI Express wake event
+15 WAK_STS (RW1C) Set when sleeping and wake event occurs
+
+-- ACPI_PM1_EVT
+0 TMR_EN Timer carry interrupt enable
+5 GBL_EN Global enable
+8 PWRBTN_EN Power button enable
+9 SLPBTN_EN Sleep button enable
+10 RTC_EN RTC wake enable
+14 PCIEXP_WAKE_DIS PCI wake disable
+
+-- ACPI_PM1_CTL
+0 SCI_EN  SCI IRQ enable (1=SCI, 0=SMI)
+1 BM_RLD Transition to C0 from C3 on bus master event
+2 GBL_RLS (WO) Notify firmware global lock released
+12:10 SLP_TYP Sleep type
+13 SLP_EN (WO) Enter sleeping state when set
+
+-- ACPI_PM_TMR
+23:0 CNT_24 24 bit timer value
+31:0 CNT_32 32 bit timer value
+
+-- ACPI_PM2_CTL
+0 ARB_DIS Disable arbiter (1=prevent bus master)
+
+-- ACPI_P_CNT
+3:0 CLK_VAL1 DUTY_OFFSET and DUTY_WIDTH describe which bits are the value
+4 THT_EN Throttle enable (must be disabled when changing clock value)
+31:5 CLK_VAL2 DUTY_OFFSET and DUTY_WIDTH describe which bits are the value
+
+-- ACPI_P_LVL2
+
+7:0 P_LVL2 Reading this register enters C2 power state
+
+-- ACPI_P_LVL3
+
+7:0 P_LVL3 Reading this register enters C3 power state
+
+-- ACPI_SLEEP_CTL
+
+4:2 SLP_TYP Select sleep type to enter when SLP_EN is set
+5 SLP_EN (WO) Enter sleep type specified in SLP_TYP
+
+-- ACPI_SLEEP_STS
+
+7 WAK_STS Set when system wakes from sleep
+

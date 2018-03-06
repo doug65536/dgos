@@ -1,5 +1,10 @@
 ../README.md
 arch/x86_64/cpu/pic.bits
+device/acpi.bits
+device/acpigas.cc
+device/acpigas.h
+device/acpihw.cc
+device/acpihw.h
 device/dev_usb_ctl.cc
 device/iocp.cc
 device/iocp.h

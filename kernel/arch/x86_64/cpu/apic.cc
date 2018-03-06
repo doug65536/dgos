@@ -1,4 +1,5 @@
 #include "apic.h"
+#include "device/acpigas.h"
 #include "types.h"
 #include "gdt.h"
 #include "bios_data.h"
@@ -610,31 +611,6 @@ struct acpi_mcfg_hdr_t {
     // followed by instances of acpi_ecam_record_t
 } __packed;
 
-// Generic Address Structure
-struct acpi_gas_t {
-    uint8_t addr_space;
-    uint8_t bit_width;
-    uint8_t bit_offset;
-    uint8_t access_size;
-    uint32_t addr_lo;
-    uint32_t addr_hi;
-};
-
-C_ASSERT(sizeof(acpi_gas_t) == 12);
-
-#define ACPI_GAS_ADDR_SYSMEM    0
-#define ACPI_GAS_ADDR_SYSIO     1
-#define ACPI_GAS_ADDR_PCICFG    2
-#define ACPI_GAS_ADDR_EMBED     3
-#define ACPI_GAS_ADDR_SMBUS     4
-#define ACPI_GAS_ADDR_FIXED     0x7F
-
-#define ACPI_GAS_ASZ_UNDEF  0
-#define ACPI_GAS_ASZ_8      0
-#define ACPI_GAS_ASZ_16     0
-#define ACPI_GAS_ASZ_32     0
-#define ACPI_GAS_ASZ_64     0
-
 struct acpi_fadt_t {
     acpi_sdt_hdr_t hdr;
     uint32_t fw_ctl;
@@ -899,6 +875,8 @@ static __always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
 static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
 {
     acpi_fadt = *fadt_hdr;
+
+
 }
 
 static void acpi_process_madt(acpi_madt_t *madt_hdr)
@@ -1946,92 +1924,6 @@ uint32_t apic_timer_count(void)
 //
 // ACPI timer
 
-class acpi_gas_accessor_t {
-public:
-    static acpi_gas_accessor_t *from_gas(acpi_gas_t const& gas);
-    static acpi_gas_accessor_t *from_ioport(uint16_t ioport, int size);
-
-    virtual ~acpi_gas_accessor_t() {}
-    virtual size_t get_size() const = 0;
-    virtual int64_t read() const = 0;
-    virtual void write(int64_t value) const = 0;
-};
-
-template<int size>
-class acpi_gas_accessor_sysmem_t : public acpi_gas_accessor_t {
-public:
-    typedef typename type_from_size<size, true>::type value_type;
-
-    acpi_gas_accessor_sysmem_t(uint64_t mem_addr)
-    {
-        mem = (value_type*)mmap((void*)mem_addr, size,
-                                PROT_READ | PROT_WRITE,
-                                MAP_PHYSICAL, -1, 0);
-    }
-
-    size_t get_size() const override final { return size; }
-
-    int64_t read() const override final { return *mem; }
-
-    void write(int64_t value) const override final
-    {
-        *mem = value_type(value);
-    }
-
-private:
-    value_type *mem;
-};
-
-template<int size>
-class acpi_gas_accessor_sysio_t : public acpi_gas_accessor_t {
-public:
-    typedef typename type_from_size<size, true>::type value_type;
-
-    acpi_gas_accessor_sysio_t(uint64_t io_port)
-        : port(ioport_t(io_port)) {}
-
-    size_t get_size() const override final { return size; }
-
-    int64_t read() const override final { return inp<size>(port); }
-
-    void write(int64_t value) const override final
-    {
-        outp<size>(port, value_type(value));
-    }
-
-private:
-    ioport_t port;
-};
-
-template<int size>
-class acpi_gas_accessor_pcicfg_t : public acpi_gas_accessor_t {
-public:
-    typedef typename type_from_size<size, true>::type value_type;
-
-    acpi_gas_accessor_pcicfg_t(uint64_t pci_dfo)
-        : dfo(pci_dfo) {}
-
-    size_t get_size() const override final { return size; }
-
-    int64_t read() const override final
-    {
-        value_type result;
-        pci_config_copy(pci_addr_t(0, 0, (dfo >> 32) & 0xFF,
-                        (dfo >> 16) & 0xFF), &result,
-                        dfo & 0xFF, size);
-        return result;
-    }
-
-    void write(int64_t value) const override final
-    {
-        pci_config_write(pci_addr_t(0, 0, (dfo >> 32) & 0xFF,
-                         (dfo >> 16) & 0xFF), dfo & 0xFF, &value, size);
-    }
-
-private:
-    uint64_t dfo;
-};
-
 //template<int size>
 //class acpi_gas_accessor_embed_t : public acpi_gas_accessor_t {
 //public:
@@ -2071,11 +1963,16 @@ static int64_t acpi_pm_timer_raw()
                   acpi_fadt.x_pm_timer_block.access_size))) {
         if (likely(acpi_fadt.pm_timer_block)) {
             ACPI_TRACE("PM Timer at I/O port 0x%x\n", acpi_fadt.pm_timer_block);
-            accessor = new acpi_gas_accessor_sysio_t<4>(
-                        acpi_fadt.pm_timer_block);
+            accessor = acpi_gas_accessor_t::from_ioport(
+                        acpi_fadt.pm_timer_block, 4, 0, 32);
         } else if (acpi_fadt.x_pm_timer_block.access_size) {
-            accessor = acpi_gas_accessor_t::from_gas(
-                        acpi_fadt.x_pm_timer_block);
+            acpi_gas_t const& gas = acpi_fadt.x_pm_timer_block;
+            ACPI_TRACE("Using extended PM Timer Generic Address Structure: "
+                       " addr_space: 0x%x, addr=0x%x%08x, size=0x%x,"
+                       " width=0x%x, bit=0x%x\n",
+                       gas.addr_space, gas.addr_hi, gas.addr_lo,
+                       gas.access_size, gas.bit_width, gas.bit_offset);
+            accessor = acpi_gas_accessor_t::from_gas(gas);
         }
 
         if (likely(accessor))
@@ -2508,50 +2405,4 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     }
 
     return vector_base - INTR_APIC_IRQ_BASE;
-}
-
-acpi_gas_accessor_t *acpi_gas_accessor_t::from_gas(acpi_gas_t const& gas)
-{
-    uint64_t addr = gas.addr_lo | (uint64_t(gas.addr_hi) << 32);
-
-    ACPI_TRACE("Using extended PM Timer Generic Address Structure: "
-               " addr_space: 0x%x, addr=0x%lx, size=0x%x,"
-               " width=0x%x, bit=0x%x\n",
-               gas.addr_space, addr, gas.access_size,
-               gas.bit_width, gas.bit_offset);
-
-    switch (gas.addr_space) {
-    case ACPI_GAS_ADDR_SYSMEM:
-        ACPI_TRACE("ACPI PM Timer using MMIO address space: 0x%lx\n", addr);
-        switch (gas.access_size) {
-        case 1: return new acpi_gas_accessor_sysmem_t<1>(addr);
-        case 2: return new acpi_gas_accessor_sysmem_t<2>(addr);
-        case 4: return new acpi_gas_accessor_sysmem_t<4>(addr);
-        case 8: return new acpi_gas_accessor_sysmem_t<8>(addr);
-        default: return nullptr;
-        }
-    case ACPI_GAS_ADDR_SYSIO:
-        ACPI_TRACE("ACPI PM Timer using I/O address space: 0x%lx\n", addr);
-        switch (gas.access_size) {
-        case 1: return new acpi_gas_accessor_sysio_t<1>(addr);
-        case 2: return new acpi_gas_accessor_sysio_t<2>(addr);
-        case 4: return new acpi_gas_accessor_sysio_t<4>(addr);
-        case 8: return nullptr;
-        default: return nullptr;
-        }
-    case ACPI_GAS_ADDR_PCICFG:
-        ACPI_TRACE("ACPI PM Timer using PCI config address space: 0x%lx\n",
-                   addr);
-        switch (gas.access_size) {
-        case 1: return new acpi_gas_accessor_pcicfg_t<1>(addr);
-        case 2: return new acpi_gas_accessor_pcicfg_t<2>(addr);
-        case 4: return new acpi_gas_accessor_pcicfg_t<4>(addr);
-        case 8: return new acpi_gas_accessor_pcicfg_t<8>(addr);
-        default: return nullptr;
-        }
-    default:
-        ACPI_TRACE("Unhandled ACPI PM Timer address space: 0x%x\n",
-                   gas.addr_space);
-        return nullptr;
-    }
 }
