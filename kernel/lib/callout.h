@@ -21,6 +21,7 @@ enum struct callout_type_t : uint32_t {
     vmm_ready = 'M',
     smp_start = 'S',
     txt_dev = 'V',
+    acpi_ready = 'A',
     early_dev = 'E',
     smp_online = 'T',
     constructors_ran = 'C',

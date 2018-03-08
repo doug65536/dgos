@@ -410,6 +410,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-syscall_dispatch.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-thread_impl.$(OBJEXT) \
 	kernel/device/kernel_bmi-acpigas.$(OBJEXT) \
+	kernel/device/kernel_bmi-acpihw.$(OBJEXT) \
 	kernel/device/kernel_bmi-iocp.$(OBJEXT) \
 	kernel/device/kernel_bmi-ahci.$(OBJEXT) \
 	kernel/device/kernel_bmi-ata.$(OBJEXT) \
@@ -531,6 +532,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-syscall_dispatch.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-thread_impl.$(OBJEXT) \
 	kernel/device/kernel_generic-acpigas.$(OBJEXT) \
+	kernel/device/kernel_generic-acpihw.$(OBJEXT) \
 	kernel/device/kernel_generic-iocp.$(OBJEXT) \
 	kernel/device/kernel_generic-ahci.$(OBJEXT) \
 	kernel/device/kernel_generic-ata.$(OBJEXT) \
@@ -1420,6 +1422,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/thread_impl.h \
 	kernel/device/acpigas.cc \
 	kernel/device/acpigas.h \
+	kernel/device/acpihw.cc \
+	kernel/device/acpihw.h \
 	kernel/device/iocp.cc \
 	kernel/device/iocp.h \
 	kernel/device/ahci.cc \
@@ -2806,6 +2810,9 @@ kernel/device/$(DEPDIR)/$(am__dirstamp):
 kernel/device/kernel_bmi-acpigas.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_bmi-acpihw.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_bmi-iocp.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3137,6 +3144,9 @@ kernel/arch/x86_64/cpu/kernel_generic-thread_impl.$(OBJEXT):  \
 kernel/device/kernel_generic-acpigas.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-acpihw.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-iocp.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3360,6 +3370,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-syscall_dispatch.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-thread_impl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-acpigas.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-ahci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-ata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-dev_usb_ctl.Po@am__quote@
@@ -3379,6 +3390,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-vga.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-acpigas.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-acpihw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ahci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-dev_usb_ctl.Po@am__quote@
@@ -7305,6 +7317,20 @@ kernel/device/kernel_bmi-acpigas.obj: kernel/device/acpigas.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-acpigas.obj `if test -f 'kernel/device/acpigas.cc'; then $(CYGPATH_W) 'kernel/device/acpigas.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpigas.cc'; fi`
 
+kernel/device/kernel_bmi-acpihw.o: kernel/device/acpihw.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-acpihw.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Tpo -c -o kernel/device/kernel_bmi-acpihw.o `test -f 'kernel/device/acpihw.cc' || echo '$(srcdir)/'`kernel/device/acpihw.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Tpo kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpihw.cc' object='kernel/device/kernel_bmi-acpihw.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-acpihw.o `test -f 'kernel/device/acpihw.cc' || echo '$(srcdir)/'`kernel/device/acpihw.cc
+
+kernel/device/kernel_bmi-acpihw.obj: kernel/device/acpihw.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-acpihw.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Tpo -c -o kernel/device/kernel_bmi-acpihw.obj `if test -f 'kernel/device/acpihw.cc'; then $(CYGPATH_W) 'kernel/device/acpihw.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpihw.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Tpo kernel/device/$(DEPDIR)/kernel_bmi-acpihw.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpihw.cc' object='kernel/device/kernel_bmi-acpihw.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-acpihw.obj `if test -f 'kernel/device/acpihw.cc'; then $(CYGPATH_W) 'kernel/device/acpihw.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpihw.cc'; fi`
+
 kernel/device/kernel_bmi-iocp.o: kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-iocp.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-iocp.Tpo -c -o kernel/device/kernel_bmi-iocp.o `test -f 'kernel/device/iocp.cc' || echo '$(srcdir)/'`kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-iocp.Tpo kernel/device/$(DEPDIR)/kernel_bmi-iocp.Po
@@ -8872,6 +8898,20 @@ kernel/device/kernel_generic-acpigas.obj: kernel/device/acpigas.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpigas.cc' object='kernel/device/kernel_generic-acpigas.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-acpigas.obj `if test -f 'kernel/device/acpigas.cc'; then $(CYGPATH_W) 'kernel/device/acpigas.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpigas.cc'; fi`
+
+kernel/device/kernel_generic-acpihw.o: kernel/device/acpihw.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-acpihw.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-acpihw.Tpo -c -o kernel/device/kernel_generic-acpihw.o `test -f 'kernel/device/acpihw.cc' || echo '$(srcdir)/'`kernel/device/acpihw.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-acpihw.Tpo kernel/device/$(DEPDIR)/kernel_generic-acpihw.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpihw.cc' object='kernel/device/kernel_generic-acpihw.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-acpihw.o `test -f 'kernel/device/acpihw.cc' || echo '$(srcdir)/'`kernel/device/acpihw.cc
+
+kernel/device/kernel_generic-acpihw.obj: kernel/device/acpihw.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-acpihw.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-acpihw.Tpo -c -o kernel/device/kernel_generic-acpihw.obj `if test -f 'kernel/device/acpihw.cc'; then $(CYGPATH_W) 'kernel/device/acpihw.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpihw.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-acpihw.Tpo kernel/device/$(DEPDIR)/kernel_generic-acpihw.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/acpihw.cc' object='kernel/device/kernel_generic-acpihw.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-acpihw.obj `if test -f 'kernel/device/acpihw.cc'; then $(CYGPATH_W) 'kernel/device/acpihw.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/acpihw.cc'; fi`
 
 kernel/device/kernel_generic-iocp.o: kernel/device/iocp.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-iocp.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-iocp.Tpo -c -o kernel/device/kernel_generic-iocp.o `test -f 'kernel/device/iocp.cc' || echo '$(srcdir)/'`kernel/device/iocp.cc

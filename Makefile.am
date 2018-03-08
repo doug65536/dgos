@@ -557,6 +557,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/thread_impl.h \
 	kernel/device/acpigas.cc \
 	kernel/device/acpigas.h \
+	kernel/device/acpihw.cc \
+	kernel/device/acpihw.h \
 	kernel/device/iocp.cc \
 	kernel/device/iocp.h \
 	kernel/device/ahci.cc \
