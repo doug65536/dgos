@@ -565,30 +565,28 @@ static thread_info_t *thread_choose_next(
 {
     size_t cpu_number = cpu - cpus;
     size_t i = outgoing - threads;
-    thread_info_t *best = 0;
+    thread_info_t *best = nullptr;
     thread_info_t *candidate;
     uint64_t now = 0;
 
     assert(i < countof(threads));
 
-    size_t count = thread_count;
+    // If we have not created all of the idle threads yet, don't context switch
+    if (unlikely(thread_count < cpu_count))
+        return outgoing;
 
-    // If this thread is not allowed on this CPU, best is the idle thread
-    // until proven otherwise
+    // Consider each thread, excluding idle threads
+    size_t count = thread_count - cpu_count;
+
+    // If this thread is not allowed on this CPU,
+    // then best is the idle thread until proven otherwise
     if (unlikely(!(outgoing->cpu_affinity & (1 << cpu_number))))
         best = threads + cpu_number;
 
     for (size_t checked = 0; ++i, checked <= count; ++checked) {
-        // Wrap
-        if (unlikely(i >= count)) {
-            // Skip directly to the idle thread for this CPU
-            i = cpu_number;
-        } else if (unlikely(i == cpu_number + 1)) {
-            // Skip directly to non-idle threads after considering idle thread
+        // Wrap to the first non-idle thread
+        if (unlikely(i >= thread_count))
             i = cpu_count;
-        }
-
-        atomic_barrier();
 
         candidate = threads + i;
 
@@ -604,11 +602,11 @@ static thread_info_t *thread_choose_next(
         //
         // Expect states to have busy bit set if it is the outgoing thread
 
-        thread_state_t expected_sleep = (outgoing != threads + i)
+        thread_state_t expected_sleep = (outgoing != candidate)
                 ? THREAD_IS_SLEEPING
                 : THREAD_IS_SLEEPING_BUSY;
 
-        thread_state_t expected_ready = (outgoing != threads + i)
+        thread_state_t expected_ready = (outgoing != candidate)
                 ? THREAD_IS_READY
                 : THREAD_IS_READY_BUSY;
 
@@ -616,10 +614,10 @@ static thread_info_t *thread_choose_next(
             // The thread is sleeping, see if it should wake up yet
 
             // If we didn't get current time yet, get it
-            if (now == 0)
+            if (unlikely(now == 0))
                 now = time_ns();
 
-            if (now < candidate->wake_time)
+            if (likely(now < candidate->wake_time))
                 continue;
 
             // Race to transition it to ready
@@ -633,13 +631,13 @@ static thread_info_t *thread_choose_next(
 
         if (likely(best)) {
             // Must be better than best
-            if (candidate->priority + candidate->priority_boost >
-                    best->priority + best->priority_boost)
+            if (likely(candidate->priority + candidate->priority_boost >
+                       best->priority + best->priority_boost))
                 best = candidate;
-        } else if (outgoing->state == THREAD_IS_READY_BUSY) {
+        } else if (likely(outgoing->state == THREAD_IS_READY_BUSY)) {
             // Must be at least the same priority as outgoing
-            if (candidate->priority + candidate->priority_boost >=
-                    outgoing->priority + outgoing->priority_boost)
+            if (likely(candidate->priority + candidate->priority_boost >=
+                       outgoing->priority + outgoing->priority_boost))
                 best = candidate;
         } else {
             // Outgoing thread is not ready, any thread is better
@@ -647,11 +645,15 @@ static thread_info_t *thread_choose_next(
         }
     }
 
+    // Did not find any ready thread, choose idle thread
+    if (unlikely(!best))
+        best = threads + cpu_number;
+
     assert(best
            ? best >= threads && best <= threads + countof(threads)
            : outgoing >= threads && outgoing <= threads + countof(threads));
 
-    return best ? best : outgoing;
+    return best;
 }
 
 static void thread_clear_busy(void *outgoing)
@@ -783,6 +785,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         assert(thread->state == THREAD_IS_RUNNING);
     }
 
+    assert(ctx);
+
     return ctx;
 }
 
@@ -831,7 +835,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     thread->state = THREAD_IS_SUSPENDED_BUSY;
 
     atomic_barrier();
-    spinlock_t saved_lock = spinlock_unlock_save(lock);
+    spinlock_value_t saved_lock = spinlock_unlock_save(lock);
     thread_yield();
     assert(thread->state == THREAD_IS_RUNNING);
     spinlock_lock_restore(lock, saved_lock);
