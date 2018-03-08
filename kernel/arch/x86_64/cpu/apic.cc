@@ -2238,6 +2238,13 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
 {
     unique_lock<ticketlock> lock(ioapic->lock);
 
+    // If this is the first IOAPIC, initialize some lookup tables
+    if (ioapic_count == 1) {
+        fill_n(intr_to_irq, countof(irq_to_intr), -1);
+        fill_n(irq_to_intr, countof(irq_to_intr), -1);
+        fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
+    }
+
     // Fill entries in interrupt-to-ioapic lookup table
     fill_n(intr_to_ioapic + ioapic->base_intr,
            ioapic->vector_count, ioapic - ioapic_list);
