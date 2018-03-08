@@ -3318,19 +3318,18 @@ uintptr_t mm_fork_kernel_text()
     // Clone root page directory
     physaddr_t page = mmu_alloc_phys(0);
     mmu_map_page(uintptr_t(window), page, flags);
+    cpu_invalidate_page(uintptr_t(window));
     memcpy(window, master_pagedir, PAGE_SIZE);
     window[PT_RECURSE] = page | flags;
 
     uintptr_t orig_pagedir = cpu_get_page_directory();
     cpu_set_page_directory(page);
 
-    unsigned st_path[4];
-    unsigned en_path[4];
     pte_t *st_ptes[4];
     pte_t *en_ptes[4];
 
-    addr_present(st, st_path, st_ptes);
-    addr_present(en, en_path, en_ptes);
+    ptes_from_addr(st_ptes, st);
+    ptes_from_addr(en_ptes, en);
 
     for (size_t level = 0; level < 4; ++level) {
         for (pte_t *pte = st_ptes[level]; pte <= en_ptes[level]; ++pte) {
@@ -3343,9 +3342,8 @@ uintptr_t mm_fork_kernel_text()
             // Map clone
             mmu_map_page(dst_linaddr, page, flags);
 
-            // Flush tlb each iteration to ensure that stale entries
-            // from prefetch won't cause a problem
-            cpu_flush_tlb();
+            cpu_invalidate_page(src_linaddr);
+            cpu_invalidate_page(dst_linaddr);
 
             // Copy original to clone
             memcpy(window + 512, window, PAGE_SIZE);
