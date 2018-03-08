@@ -406,6 +406,13 @@ static __always_inline void cpu_crash()
     );
 }
 
+static __always_inline void cpu_breakpoint()
+{
+    __asm__ __volatile__ (
+        "int3"
+    );
+}
+
 static __always_inline void cpu_fxsave(void *fpuctx)
 {
     __asm__ __volatile__ (
