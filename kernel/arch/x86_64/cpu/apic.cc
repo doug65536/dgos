@@ -255,6 +255,8 @@ static uint64_t ioapic_msi_alloc_map[] = {
 
 static mp_ioapic_t *ioapic_by_id(uint8_t id);
 static void ioapic_reset(mp_ioapic_t *ioapic);
+static void ioapic_set_type(mp_ioapic_t *ioapic,
+                            uint8_t intin, uint8_t intr_type);
 static void ioapic_set_flags(mp_ioapic_t *ioapic,
                              uint8_t intin, uint16_t intr_flags);
 static uint32_t ioapic_read(
@@ -693,6 +695,9 @@ struct acpi_madt_rec_hdr_t {
 #define ACPI_MADT_REC_TYPE_LAPIC    0
 #define ACPI_MADT_REC_TYPE_IOAPIC   1
 #define ACPI_MADT_REC_TYPE_IRQ      2
+#define ACPI_MADT_REC_TYPE_NMI      3
+#define ACPI_MADT_REC_TYPE_LNMI     4
+#define ACPI_MADT_REC_TYPE_LIRQ     5
 
 struct acpi_madt_lapic_t {
     acpi_madt_rec_hdr_t hdr;
@@ -715,6 +720,20 @@ struct acpi_madt_irqsrc_t {
     uint8_t irq_src;
     uint32_t gsi;
     uint16_t flags;
+} __packed;
+
+// Which IOAPIC inputs should be NMI
+struct acpi_madt_nmisrc_t {
+    acpi_madt_rec_hdr_t hdr;
+    uint16_t flags;
+    uint32_t gsi;
+} __packed;
+
+struct acpi_madt_lnmi_t {
+    acpi_madt_rec_hdr_t hdr;
+    uint8_t apic_id;
+    uint16_t flags;
+    uint8_t lapic_lint;
 } __packed;
 
 //
@@ -762,9 +781,21 @@ struct acpi_madt_irqsrc_t {
 
 union acpi_madt_ent_t {
     acpi_madt_rec_hdr_t hdr;
+
+    // ACPI_MADT_REC_TYPE_LAPIC
     acpi_madt_lapic_t lapic;
+
+    // ACPI_MADT_REC_TYPE_IOAPIC
     acpi_madt_ioapic_t ioapic;
+
+    // ACPI_MADT_REC_TYPE_IRQ
     acpi_madt_irqsrc_t irq_src;
+
+    // ACPI_MADT_REC_TYPE_NMI
+    acpi_madt_nmisrc_t nmi_src;
+
+    // ACPI_MADT_REC_TYPE_LNMI
+    acpi_madt_lnmi_t lnmi;
 } __packed;
 
 struct acpi_madt_t {
@@ -802,6 +833,9 @@ struct acpi_hpet_t {
 
 static vector<acpi_gas_t> acpi_hpet_list;
 static int acpi_madt_flags;
+
+// Local interrupt NMI LINT MADT records
+static vector<acpi_madt_lnmi_t> lapic_lint_nmi;
 
 static acpi_fadt_t acpi_fadt;
 
@@ -957,8 +991,37 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
             break;
         }
+
+        case ACPI_MADT_REC_TYPE_NMI:
+        {
+            ACPI_TRACE("Got IOAPIC NMI mapping\n");
+
+            uint8_t gsi = ent->nmi_src.gsi;
+            uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
+            int ioapic_index = intr_to_ioapic[intr];
+            if (ioapic_index < 0) {
+                ACPI_TRACE("Got IOAPIC NMI mapping"
+                           " but failed to lookup IOAPIC\n");
+                break;
+            }
+            mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
+            // flags is delivery type?
+            ioapic_set_type(ioapic, gsi - ioapic->irq_base, ent->nmi_src.flags);
+            break;
+        }
+
+        case ACPI_MADT_REC_TYPE_LNMI:
+        {
+            ACPI_TRACE("Got IOAPIC LNMI mapping\n");
+
+            lapic_lint_nmi.push_back(ent->lnmi);
+
+            break;
+        }
+
         default:
-            ACPI_TRACE("Unrecognized FADT record\n");
+            ACPI_TRACE("Unrecognized FADT record, entry_type=%02x\n",
+                       ent->hdr.entry_type);
             break;
 
         }
@@ -1910,6 +1973,9 @@ void apic_start_smp(void)
         }
     }
 
+    // Do per-cpu ACPI configuration
+    apic_config_cpu();
+
     // SMP online
     callout_call(callout_type_t::smp_online);
 
@@ -2200,6 +2266,38 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
     }
 }
 
+static void ioapic_set_type(mp_ioapic_t *ioapic,
+                            uint8_t intin, uint8_t intr_type)
+{
+    unique_lock<ticketlock> lock(ioapic->lock);
+
+    uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
+
+    switch (intr_type) {
+    case MP_INTR_TYPE_APIC:
+        IOAPIC_REDLO_DELIVERY_SET(reg, IOAPIC_REDLO_DELIVERY_APIC);
+        break;
+
+    case MP_INTR_TYPE_NMI:
+        IOAPIC_REDLO_DELIVERY_SET(reg, IOAPIC_REDLO_DELIVERY_NMI);
+        break;
+
+    case MP_INTR_TYPE_SMI:
+        IOAPIC_REDLO_DELIVERY_SET(reg, IOAPIC_REDLO_DELIVERY_SMI);
+        break;
+
+    case MP_INTR_TYPE_EXTINT:
+        IOAPIC_REDLO_DELIVERY_SET(reg, IOAPIC_REDLO_DELIVERY_EXTINT);
+        break;
+
+    default:
+        IOAPIC_TRACE("Unrecognized delivery type %d!\n", intr_type);
+        return;
+    }
+
+    ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), reg, lock);
+}
+
 static void ioapic_set_flags(mp_ioapic_t *ioapic,
                              uint8_t intin, uint16_t intr_flags)
 {
@@ -2239,6 +2337,41 @@ static void ioapic_set_flags(mp_ioapic_t *ioapic,
     }
 
     ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), reg, lock);
+}
+
+// Call on each CPU to configure local APIC using gathered MPS/ACPI records
+void apic_config_cpu()
+{
+    int cpu_number = thread_cpu_number();
+    uint32_t apic_id = thread_get_cpu_apic_id(cpu_number);
+
+    // Apply NMI input delivery types
+    for (acpi_madt_lnmi_t const& mapping : lapic_lint_nmi) {
+        // 0xFF entries apply to all CPUs
+        // Skip mappings for other CPUs
+        if (mapping.apic_id != 0xFF && mapping.apic_id != apic_id)
+            continue;
+
+        unsigned reg_ofs;
+
+        switch (mapping.lapic_lint) {
+        case 0:
+            reg_ofs = APIC_REG_LVT_LNT0;
+            break;
+        case 1:
+            reg_ofs = APIC_REG_LVT_LNT1;
+            break;
+
+        default:
+            ACPI_TRACE("Out of range LNMI lint: %u\n", mapping.lapic_lint);
+            break;
+
+        }
+
+        uint32_t reg = apic->read32(reg_ofs);
+        APIC_LVT_DELIVERY_SET(reg, APIC_LVT_DELIVERY_NMI);
+        apic->write32(reg_ofs, reg);
+    }
 }
 
 //

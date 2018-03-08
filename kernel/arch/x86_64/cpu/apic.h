@@ -25,6 +25,8 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute, intr_handler_t handler,
                        int const *target_cpus = nullptr);
 
+void apic_config_cpu();
+
 int acpi_have8259pic(void);
 
 extern "C" isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx);

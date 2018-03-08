@@ -469,6 +469,8 @@ static int smp_idle_thread(void *arg)
     // Enable spinning
     spincount_mask = -1;
 
+    apic_config_cpu();
+
     printdbg("SMP thread running\n");
     atomic_inc(&thread_smp_running);
     (void)arg;
