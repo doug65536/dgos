@@ -252,6 +252,8 @@ if_list_t usb_msc_if_factory_t::detect()
         usb_msc_count
     };
 
+    USB_MSC_TRACE("Reporting %d USB mass storage interfaces\n", usb_msc_count);
+
     return list;
 }
 
@@ -269,6 +271,9 @@ if_list_t usb_msc_if_t::detect_devices()
         sizeof(*usb_msc_drives),
         usb_msc_drive_count
     };
+
+    USB_MSC_TRACE("Reporting %d USB mass storage drives\n",
+                  usb_msc_drive_count);
 
     return list;
 }
@@ -338,6 +343,9 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     if (!match.dev)
         return false;
 
+    USB_MSC_TRACE("found USB mass storage interface, slot=%d\n",
+                  cfg_hlp->slot());
+
     usb_pipe_t control;
     usb_pipe_t bulk_in;
     usb_pipe_t bulk_out;
@@ -366,6 +374,9 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     // Allocate an interface
     usb_msc_if_t *if_ = usb_msc_devices + usb_msc_count++;
+
+    USB_MSC_TRACE("initializing interface, slot=%d\n",
+                  cfg_hlp->slot());
 
     int status = if_->init(control, bulk_in, bulk_out, iface_idx);
 
@@ -436,9 +447,15 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     for (uint32_t i = 0; i < cmd_capacity; ++i)
         new (cmd_queue + i) pending_cmd_t();
 
+    USB_MSC_TRACE("Resetting interface\n");
+
     reset();
 
+    USB_MSC_TRACE("Getting max LUN\n");
+
     int max_lun = get_max_lun();
+
+    USB_MSC_TRACE("max_lun=%d\n", max_lun);
 
     if (max_lun < 0)
         return false;
@@ -449,9 +466,15 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
             continue;
         }
 
+        USB_MSC_TRACE("Initializing lun %d\n", lun);
+
         usb_msc_dev_t *drv = usb_msc_drives + usb_msc_drive_count++;
         drv->init(this, lun);
+
+        USB_MSC_TRACE("initializing lun %d complete\n", lun);
     }
+
+    USB_MSC_TRACE("interface initialization complete\n");
 
     return true;
 }
