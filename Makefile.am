@@ -1138,11 +1138,11 @@ QEMU_DEBUGCON = \
 	-mon qemu-monitor,mode=readline \
 	-device isa-debugcon,chardev=qemu-debug-out
 
-#-chardev socket,id=qemu-serial-socket,host=localhost,port=7778,server,nowait
+#-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
 
 QEMU_SERIAL = \
-	-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0 \
-	-serial chardev:qemu-serial-socket
+	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait \
+	-device isa-serial,chardev=qemu-serial-socket,id="com1"
 
 QEMU_COMMON = \
 	$(QEMU_MONITOR) \
