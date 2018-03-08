@@ -227,7 +227,7 @@ static __always_inline void cpu_set_page_directory(uintptr_t addr)
     );
 }
 
-static __always_inline uintptr_t cpu_get_page_directory(void)
+static __always_inline uintptr_t cpu_get_page_directory()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
@@ -237,7 +237,7 @@ static __always_inline uintptr_t cpu_get_page_directory(void)
     return addr;
 }
 
-static __always_inline uintptr_t cpu_get_fault_address(void)
+static __always_inline uintptr_t cpu_get_fault_address()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
@@ -276,7 +276,7 @@ static __always_inline void cpu_invalidate_pcid(
     );
 }
 
-static __always_inline void cpu_flush_tlb(void)
+static __always_inline void cpu_flush_tlb()
 {
     if (cpuid_has_invpcid()) {
         //
@@ -336,7 +336,7 @@ static __always_inline void cpu_set_altgsbase(void *gs_base)
     cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)gs_base);
 }
 
-static __always_inline table_register_64_t cpu_get_gdtr(void)
+static __always_inline table_register_64_t cpu_get_gdtr()
 {
     table_register_64_t gdtr;
     __asm__ __volatile__ (
@@ -358,7 +358,7 @@ static __always_inline void cpu_set_gdtr(table_register_64_t gdtr)
     );
 }
 
-static __always_inline uint16_t cpu_get_tr(void)
+static __always_inline uint16_t cpu_get_tr()
 {
     uint16_t tr;
     __asm__ __volatile__ (
@@ -389,7 +389,7 @@ static __always_inline void cpu_set_ldt(uint16_t ldt)
     );
 }
 
-static __always_inline void *cpu_get_stack_ptr(void)
+static __always_inline void *cpu_get_stack_ptr()
 {
     void *rsp;
     __asm__ __volatile__ (
@@ -399,7 +399,7 @@ static __always_inline void *cpu_get_stack_ptr(void)
     return rsp;
 }
 
-static __always_inline void cpu_crash(void)
+static __always_inline void cpu_crash()
 {
     __asm__ __volatile__ (
         "ud2"
@@ -426,7 +426,7 @@ static __always_inline void cpu_xsave(void *fpuctx)
     );
 }
 
-static __always_inline uint32_t cpu_get_eflags(void)
+static __always_inline uint32_t cpu_get_eflags()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -477,7 +477,7 @@ static __always_inline void cpu_clac()
     __asm__ __volatile__ ("clac");
 }
 
-static __always_inline bool cpu_irq_disable(void)
+static __always_inline bool cpu_irq_disable()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -491,7 +491,7 @@ static __always_inline bool cpu_irq_disable(void)
     return eflags & CPU_EFLAGS_IF;
 }
 
-static __always_inline void cpu_irq_enable(void)
+static __always_inline void cpu_irq_enable()
 {
     __asm__ __volatile__ ( "sti" : : : "cc" );
 }
@@ -513,12 +513,12 @@ static __always_inline void cpu_irq_toggle(bool enable)
     );
 }
 
-static __always_inline bool cpu_irq_is_enabled(void)
+static __always_inline bool cpu_irq_is_enabled()
 {
     return cpu_get_eflags() & CPU_EFLAGS_IF;
 }
 
-static __always_inline uint64_t cpu_rdtsc(void)
+static __always_inline uint64_t cpu_rdtsc()
 {
     uint32_t tsc_lo;
     uint32_t tsc_hi;
