@@ -7,14 +7,14 @@
 #include "cpu/control_regs.h"
 #include "nano_time.h"
 
-#define DEBUG_UART  1
+#define DEBUG_UART  0
 #if DEBUG_UART
 #define UART_TRACE(...) printdbg("uart: " __VA_ARGS__)
 #else
 #define UART_TRACE(...) ((void)0)
 #endif
 
-// Null model connections:
+// Null modem connections:
 //
 //  Peer      Peer
 //   TxD  ->   RxD
@@ -155,8 +155,8 @@ enum struct lcr_stopbits_t : uint8_t {
 enum struct lcr_parity_t : uint8_t {
     ODD = 0,
     EVEN = 1,
-    ONE = 2,
-    ZERO = 3
+    MARK = 2,
+    SPACE = 3
 };
 
 union lcr_t {
@@ -311,10 +311,12 @@ class uart_t : public uart_dev_t
 public:
     // Configure the UART specified by port and IRQ using 8N1
     uart_t();
-    ~uart_t();
+    virtual ~uart_t() override;
 
 protected:
-    void init(ioport_t port, uint8_t port_irq, uint32_t baud, bool use_irq);
+    bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
+              uint8_t data_bits, char parity_type, uint8_t stop_bits,
+              bool use_irq);
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
 
@@ -348,6 +350,47 @@ protected:
         return (value + 1) & ~-(1 << log2_buffer_size);
     }
 
+    // Updates shadow register only, no I/O done
+    bool set_framing(uint8_t data, char parity, uint8_t stop)
+    {
+        lcr_wordlen_t reg_wordlen;
+        lcr_parity_t reg_parity;
+        bool reg_parity_en;
+        lcr_stopbits_t reg_stop;
+
+        switch (data) {
+        case 5: reg_wordlen = lcr_wordlen_t::DATA5; break;
+        case 6: reg_wordlen = lcr_wordlen_t::DATA6; break;
+        case 7: reg_wordlen = lcr_wordlen_t::DATA7; break;
+        case 8: reg_wordlen = lcr_wordlen_t::DATA8; break;
+        default: return false;
+        }
+
+        switch (parity) {
+        case 'N': reg_parity = lcr_parity_t::SPACE; break;
+        case 'O': reg_parity = lcr_parity_t::ODD; break;
+        case 'E': reg_parity = lcr_parity_t::EVEN; break;
+        case 'M': reg_parity = lcr_parity_t::MARK; break;
+        case 'S': reg_parity = lcr_parity_t::SPACE; break;
+        default: return false;
+        }
+
+        reg_parity_en = (parity != 'N');
+
+        switch (stop) {
+        case 1: reg_stop = lcr_stopbits_t::STOP1; break;
+        case 2: reg_stop = lcr_stopbits_t::STOP2; break;
+        default: return false;
+        }
+
+        reg_lcr.bits.wordlen = uint8_t(reg_wordlen);
+        reg_lcr.bits.stopbits = uint8_t(reg_stop);
+        reg_lcr.bits.parity_en = reg_parity_en;
+        reg_lcr.bits.parity = uint8_t(reg_parity);
+
+        return true;
+    }
+
     // Shadow registers
     ier_t reg_ier;
     iir_t reg_iir;
@@ -363,6 +406,7 @@ protected:
 
     ioport_t io_base;
     uint8_t irq;
+    bool irq_hooked;
 
     chiptype_t chip;
     uint8_t fifo_size;
@@ -375,6 +419,7 @@ uart_t::uart_t()
     , rx_tail(0)
     , io_base(0)
     , irq(0)
+    , irq_hooked(false)
     , chip(chiptype_t::UNKNOWN)
     , fifo_size(0)
 {
@@ -388,7 +433,9 @@ uart_t::uart_t()
     reg_scr.value = 0;
 }
 
-void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud, bool use_irq)
+bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
+                  uint8_t data_bits, char parity_type, uint8_t stop_bits,
+                  bool use_irq)
 {
     io_base = port;
     irq = port_irq;
@@ -445,10 +492,7 @@ void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud, bool use_irq)
     reg_lcr.bits.baud_latch = 1;
 
     // Might as well program the rest of LCR here
-    reg_lcr.bits.wordlen = uint8_t(lcr_wordlen_t::DATA8);
-    reg_lcr.bits.stopbits = uint8_t(lcr_stopbits_t::STOP1);
-    reg_lcr.bits.parity = uint8_t(lcr_parity_t::ZERO);
-    reg_lcr.bits.parity_en = 0;
+    set_framing(data_bits, parity_type, stop_bits);
     reg_lcr.bits.tx_break = 0;
 
     outp(reg_lcr);
@@ -499,8 +543,13 @@ void uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud, bool use_irq)
 
     outp(reg_mcr);
 
-    if (use_irq)
+    if (use_irq) {
+        irq_hook(irq, &uart_t::irq_handler);
         irq_setmask(irq, true);
+        irq_hooked = true;
+    }
+
+    return true;
 }
 
 uart_t::~uart_t()
@@ -514,7 +563,7 @@ isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
     //printdbg("UART IRQ\n");
 
     for (uart_t *uart : uarts) {
-        if (uart->irq == irq)
+        if (uart->irq_hooked && uart->irq == irq)
             ctx = uart->port_irq_handler(ctx);
     }
     return ctx;
@@ -546,6 +595,8 @@ public:
     uart_async_t();
     ~uart_async_t();
 
+    bool init(ioport_t port, uint8_t port_irq, uint32_t baud, uint8_t data_bits, char parity_type, uint8_t stop_bits);
+
     ssize_t write(void const *buf, size_t size, size_t min_write);
     ssize_t read(void *buf, size_t size, size_t min_read);
 
@@ -557,7 +608,7 @@ private:
 
     void rx_enqueue(uint16_t value);
 
-    void send_some_locked();
+    void send_some(unique_lock<ticketlock> const&);
 
     bool is_rx_full() const;
     bool is_tx_full() const;
@@ -604,14 +655,22 @@ uart_async_t::uart_async_t()
 {
     rx_buffer = new uint16_t[1 << log2_buffer_size];
     tx_buffer = new uint16_t[1 << log2_buffer_size];
-
-    irq_hook(irq, &uart_t::irq_handler);
 }
 
 uart_async_t::~uart_async_t()
 {
-    irq_setmask(irq, false);
-    irq_unhook(irq, &uart_t::irq_handler);
+    if (irq_hooked) {
+        irq_setmask(irq, false);
+        irq_unhook(irq, &uart_t::irq_handler);
+        irq_hooked = false;
+    }
+}
+
+bool uart_async_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
+                        uint8_t data_bits, char parity_type, uint8_t stop_bits)
+{
+    return uart_t::init(port, port_irq, baud,
+                        data_bits, parity_type, stop_bits, true);
 }
 
 ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
@@ -628,9 +687,11 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
 
             do {
                 if (!sending_data)
-                    send_some_locked();
+                    send_some(lock_);
 
+                UART_TRACE("Blocking on tx\n");
                 tx_not_full.wait(lock_);
+                UART_TRACE("Unblocked tx\n");
             } while (is_tx_full());
         }
 
@@ -639,7 +700,7 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
     }
 
     if (!sending_data)
-        send_some_locked();
+        send_some(lock_);
 
     return i;
 }
@@ -661,7 +722,9 @@ ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
                 break;
 
             do {
+                UART_TRACE("Blocking rx\n");
                 rx_not_empty.wait(lock_);
+                UART_TRACE("Unblocked rx\n");
             } while (is_rx_empty());
         }
 
@@ -677,11 +740,11 @@ void uart_async_t::route_irq(int cpu)
     irq_setcpu(irq, cpu);
 }
 
-void uart_async_t::send_some_locked()
+void uart_async_t::send_some(unique_lock<ticketlock> const&)
 {
     sending_data = !is_tx_empty();
 
-    for (size_t i = 0; i < 16 && !is_tx_empty(); ++i) {
+    for (size_t i = 0; i < fifo_size && !is_tx_empty(); ++i) {
         // Peek at next value without removing it from the queue
         uint16_t tx_value = tx_peek_value();
 
@@ -715,8 +778,10 @@ void uart_async_t::send_some_locked()
             // time)
             out(port_t::DAT, 0);
 
+            tx_take_value();
+
             // Don't put more data into Tx FIFO after a break byte
-            i = 16;
+            i = fifo_size;
 
             break;
         }
@@ -789,7 +854,7 @@ isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
             break;
 
         case uint8_t(iir_source_t::TX_EMPTY):
-            send_some_locked();
+            send_some(lock_);
             wake_tx = true;
 
             break;
@@ -801,13 +866,15 @@ isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
         }
     }
 
-    lock_.unlock();
-
-    if (wake_tx)
+    if (wake_tx) {
+        UART_TRACE("Notifying tx\n");
         tx_not_full.notify_all();
+    }
 
-    if (wake_rx)
+    if (wake_rx) {
+        UART_TRACE("Notifying rx\n");
         rx_not_empty.notify_all();
+    }
 
     return ctx;
 }
@@ -820,7 +887,8 @@ class uart_poll_t : public uart_t {
 public:
     uart_poll_t();
 
-    void init(ioport_t port, uint8_t port_irq, uint32_t baud);
+    bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
+              uint8_t data_bits, char parity_type, uint8_t stop_bits);
     virtual ssize_t write(const void *buf, size_t size, size_t min_write);
     virtual ssize_t read(void *buf, size_t size, size_t min_read);
 
@@ -847,9 +915,11 @@ uart_poll_t::uart_poll_t()
 {
 }
 
-void uart_poll_t::init(ioport_t port, uint8_t port_irq, uint32_t baud)
+bool uart_poll_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
+                       uint8_t data_bits, char parity_type, uint8_t stop_bits)
 {
-    uart_t::init(port, port_irq, baud, false);
+    return uart_t::init(port, port_irq, baud,
+                        data_bits, parity_type, stop_bits, false);
 }
 
 ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
@@ -959,12 +1029,29 @@ static uart_poll_t debug_uart;
 // ===========================================================================
 //
 
-uart_dev_t *uart_dev_t::open(size_t id, bool simple)
+uart_dev_t *uart_dev_t::open(size_t id, bool simple, uint8_t data_bits,
+                             char parity_type, uint8_t stop_bits)
 {
     if (!simple)
         return id < uart_defs::uarts.size()
                 ? uart_defs::uarts[id].get()
-                : nullptr;
-    uart_defs::debug_uart.init(0x3F8, 4, 115200);
+                : new uart_defs::uart_async_t();
+    uart_defs::debug_uart.init(0x3F8, 4, 115200,
+                               data_bits, parity_type, stop_bits);
     return &uart_defs::debug_uart;
+}
+
+uart_dev_t *uart_dev_t::open(uint16_t port, uint8_t irq,
+                             uint32_t baud, uint8_t data_bits,
+                             char parity_type, uint8_t stop_bits,
+                             bool polled)
+{
+    uart_dev_t *uart = polled
+            ? static_cast<uart_dev_t*>(new uart_defs::uart_poll_t())
+            : static_cast<uart_dev_t*>(new uart_defs::uart_async_t());
+
+    uart_defs::uarts.emplace_back(static_cast<uart_defs::uart_t*>(uart));
+    uart->init(port, irq, baud, data_bits, parity_type, stop_bits);
+
+    return uart;
 }
