@@ -185,19 +185,16 @@ public:
     void lock()
     {
         spinlock_lock(&m);
-        spinlock_lock_noirq(&m);
     }
 
     bool try_lock()
     {
         return spinlock_try_lock(&m);
-        return spinlock_try_lock_noirq(&m);
     }
 
     void unlock()
     {
         spinlock_unlock(&m);
-        spinlock_unlock_noirq(&m);
     }
 
     spinlock_t& native_handle()
