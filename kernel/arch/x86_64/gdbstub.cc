@@ -21,11 +21,10 @@
 #if DEBUG_GDBSTUB
 #define GDBSTUB_TRACE(...) printdbg("gdbstub: " __VA_ARGS__)
 #else
-#define TRACE_GDBSTUB(...) ((void)0)
+#define GDBSTUB_TRACE(...) ((void)0)
 #endif
 
 static uint8_t constexpr X86_BREAKPOINT_OPCODE = 0xCC;
-static size_t constexpr X86_64_CONTEXT_SIZE = 1120;
 static uint8_t constexpr X86_MAX_HW_BP = 4;
 
 enum struct gdb_signal_idx_t {
@@ -93,7 +92,8 @@ struct gdb_cpu_t {
     gdb_cpu_t(uint32_t init_apic_id, int nr)
         : cpu_nr(nr)
         , apic_id(init_apic_id)
-
+        , ctx(nullptr)
+        , state(gdb_cpu_state_t::RUNNING)
     {
     }
 };
@@ -254,7 +254,7 @@ private:
         RUNNING
     };
 
-    static size_t constexpr MAX_BUFFER_SIZE = 4096 - _MALLOC_OVERHEAD;
+    static size_t constexpr MAX_BUFFER_SIZE = 8192 - _MALLOC_OVERHEAD;
 
     using sender_fn_t = function<ssize_t(char const *, size_t)>;
 
@@ -458,7 +458,7 @@ private:
     rx_state_t handle_packet();
     rx_state_t handle_memop_read(char const *input);
     rx_state_t handle_memop_write(char const *&input);
-    static bool get_target_desc(unique_ptr<char[]> &result, size_t &result_sz,
+    bool get_target_desc(unique_ptr<char[]> &result, size_t &result_sz,
                                 const char *annex, size_t annex_sz);
     rx_state_t handle_query_features(char const *input);
 
@@ -467,9 +467,12 @@ private:
     rx_state_t reply(char const *data);
     rx_state_t reply_hex(char const *format, size_t size);
     rx_state_t reply(char const *data, size_t size);
-    static size_t get_context(char *reply, isr_context_t const *ctx);
-    static size_t set_context(isr_context_t *ctx,
-                              char const *data, size_t data_len);
+
+    template<typename T>
+    static void append_ctx_reply(char *reply, int& ofs, T *value_ptr);
+
+    size_t get_context(char *reply, isr_context_t const *ctx);
+    size_t set_context(isr_context_t *ctx, char const *data, size_t data_len);
 
     uart_dev_t *port;
 
@@ -492,6 +495,8 @@ private:
 
     run_state_t run_state;
     int step_cpu_nr;
+
+    int encoded_ctx_sz;
 
     // Escaped input/output
     char rx_buf[MAX_BUFFER_SIZE];
@@ -666,7 +671,7 @@ gdbstub_t::reg_info_t gdbstub_t::regs[] = {
     { "zmm31h",  32, 0 },
 };
 
-extern "C" void gdb_init()
+void gdb_init()
 {
     gdb_cpu_ctrl_t::start_stub();
 }
@@ -761,8 +766,10 @@ gdbstub_t::rx_state_t gdbstub_t::reply(const char *data, size_t size)
     do {
         assert(ack == 0 || ack == '-');
 
+        GDBSTUB_TRACE("Sending reply\n");
         port->write(reply_buf, reply_index, reply_index);
 
+        GDBSTUB_TRACE("Waiting for ACK\n");
         port->read(&ack, 1, 1);
 
         if (ack != '+')
@@ -859,7 +866,7 @@ void gdbstub_t::run()
     // will not interfere with the stub
     mm_fork_kernel_text();
 
-    port = uart_dev_t::open(0, true);
+    port = uart_dev_t::open(0x3f8, 4, 115200, 8, 'N', 1, false);
 
     port->route_irq(gdb_cpu_ctrl_t::get_gdb_cpu());
 
@@ -927,7 +934,6 @@ void gdbstub_t::init_reg_offsets()
         regs[i].size *= 2;
         ofs += regs[i].size;
     }
-    //assert(ofs == X86_64_CONTEXT_SIZE);
 }
 
 bool gdbstub_t::match(char const *&input, char const *pattern,
@@ -1072,6 +1078,24 @@ bool gdbstub_t::get_target_desc(
     // provided the copyright notice and this notice are
     // preserved.
 
+    static constexpr int x86_64_core_bits =
+            16*64 +         // General registers
+            64 +            // rip
+            7*32 +          // flags and segments
+            8*80 + 8*32 +   // x87 fpu
+            16*128 +        // xmm0-xmm15 127:0
+            32 +            // mxcsr
+            2*64;           // fsbase, gsbase
+
+    static constexpr int x86_64_avx_bits =
+            16*128;         // ymm0-ymm15 255:128
+
+    static constexpr int x86_64_avx512_bits =
+            16*128 +        // xmm16-xmm31 127:0
+            16*128 +        // ymm16-ymm31 255:128
+            8*64 +          // k0-k7
+            32*256;         // zmm0-zmm31 511:256
+
     static constexpr char const x86_64_target_header[] =
         R"*(<?xml version="1.0"?>)*"
         R"*(<!DOCTYPE feature SYSTEM "gdb-target.dtd">)*"
@@ -1100,6 +1124,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<field name="ID" start="21" end="21"/>)*"
         R"*(</flags>)*"
 
+        // 16*64
         R"*(<reg name="rax" bitsize="64" type="int64"/>)*"
         R"*(<reg name="rbx" bitsize="64" type="int64"/>)*"
         R"*(<reg name="rcx" bitsize="64" type="int64"/>)*"
@@ -1117,6 +1142,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<reg name="r14" bitsize="64" type="int64"/>)*"
         R"*(<reg name="r15" bitsize="64" type="int64"/>)*"
 
+        // 64 + 7*32
         R"*(<reg name="rip" bitsize="64" type="code_ptr"/>)*"
         R"*(<reg name="eflags" bitsize="32" type="i386_eflags"/>)*"
         R"*(<reg name="cs" bitsize="32" type="int32"/>)*"
@@ -1126,6 +1152,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<reg name="fs" bitsize="32" type="int32"/>)*"
         R"*(<reg name="gs" bitsize="32" type="int32"/>)*"
 
+        // 8*80
         R"*(<reg name="st0" bitsize="80" type="i387_ext"/>)*"
         R"*(<reg name="st1" bitsize="80" type="i387_ext"/>)*"
         R"*(<reg name="st2" bitsize="80" type="i387_ext"/>)*"
@@ -1135,6 +1162,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<reg name="st6" bitsize="80" type="i387_ext"/>)*"
         R"*(<reg name="st7" bitsize="80" type="i387_ext"/>)*"
 
+        // 8*32
         R"*(<reg name="fctrl" bitsize="32" type="int" group="float"/>)*"
         R"*(<reg name="fstat" bitsize="32" type="int" group="float"/>)*"
         R"*(<reg name="ftag" bitsize="32" type="int" group="float"/>)*"
@@ -1179,6 +1207,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<field name="FZ" start="15" end="15"/>)*"
         R"*(</flags>)*"
 
+        // 16*128
         R"*(<reg name="xmm0" bitsize="128" type="vec128" regnum="40"/>)*"
         R"*(<reg name="xmm1" bitsize="128" type="vec128"/>)*"
         R"*(<reg name="xmm2" bitsize="128" type="vec128"/>)*"
@@ -1196,11 +1225,13 @@ bool gdbstub_t::get_target_desc(
         R"*(<reg name="xmm14" bitsize="128" type="vec128"/>)*"
         R"*(<reg name="xmm15" bitsize="128" type="vec128"/>)*"
 
+        // 1*32
         R"*(<reg name="mxcsr" bitsize="32" type="i386_mxcsr")*"
         R"*( group="vector"/>)*"
         R"*(</feature>)*";
 
     static constexpr char const x86_64_segments[] =
+        // 2*64
         R"*(<feature name="org.gnu.gdb.i386.segments">)*"
         R"*(<reg name="fs_base" bitsize="64" type="int"/>)*"
         R"*(<reg name="gs_base" bitsize="64" type="int"/>)*"
@@ -1208,6 +1239,7 @@ bool gdbstub_t::get_target_desc(
 
     static constexpr char const x86_64_avx[] =
         R"*(<feature name="org.gnu.gdb.i386.avx">)*"
+        // 16*128
         R"*(<reg name="ymm0h" bitsize="128" type="uint128"/>)*"
         R"*(<reg name="ymm1h" bitsize="128" type="uint128"/>)*"
         R"*(<reg name="ymm2h" bitsize="128" type="uint128"/>)*"
@@ -1245,6 +1277,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<field name="uint128" type="uint128"/>)*"
         R"*(</union>)*"
 
+        // 16*128
         R"*(<reg name="xmm16" bitsize="128" type="vec128"/>)*"
         R"*(<reg name="xmm17" bitsize="128" type="vec128"/>)*"
         R"*(<reg name="xmm18" bitsize="128" type="vec128"/>)*"
@@ -1262,6 +1295,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<reg name="xmm30" bitsize="128" type="vec128"/>)*"
         R"*(<reg name="xmm31" bitsize="128" type="vec128"/>)*"
 
+        // 16*128
         R"*(<reg name="ymm16h" bitsize="128" type="uint128"/>)*"
         R"*(<reg name="ymm17h" bitsize="128" type="uint128"/>)*"
         R"*(<reg name="ymm18h" bitsize="128" type="uint128"/>)*"
@@ -1281,6 +1315,7 @@ bool gdbstub_t::get_target_desc(
 
         R"*(<vector id="v2ui128" type="uint128" count="2"/>)*"
 
+        // 8*64
         R"*(<reg name="k0" bitsize="64" type="uint64"/>)*"
         R"*(<reg name="k1" bitsize="64" type="uint64"/>)*"
         R"*(<reg name="k2" bitsize="64" type="uint64"/>)*"
@@ -1290,6 +1325,7 @@ bool gdbstub_t::get_target_desc(
         R"*(<reg name="k6" bitsize="64" type="uint64"/>)*"
         R"*(<reg name="k7" bitsize="64" type="uint64"/>)*"
 
+        // 32*256
         R"*(<reg name="zmm0h" bitsize="256" type="v2ui128"/>)*"
         R"*(<reg name="zmm1h" bitsize="256" type="v2ui128"/>)*"
         R"*(<reg name="zmm2h" bitsize="256" type="v2ui128"/>)*"
@@ -1332,15 +1368,21 @@ bool gdbstub_t::get_target_desc(
 
     result_sz = (countof(x86_64_target_header) - 1);
 
+    int bits = x86_64_core_bits;
+
     result_sz += (countof(x86_64_core) - 1);
     result_sz += (countof(x86_64_sse) - 1);
     result_sz += (countof(x86_64_segments) - 1);
 
-    if (sse_avx_offset)
+    if (sse_avx_offset) {
         result_sz += (countof(x86_64_avx) - 1);
+        bits += x86_64_avx_bits;
+    }
 
-    if (sse_avx512_upper_offset)
+    if (sse_avx512_upper_offset) {
         result_sz += (countof(x86_64_avx512) - 1);
+        bits += x86_64_avx512_bits;
+    }
 
     result_sz += (countof(x86_64_target_footer) - 1);
 
@@ -1358,6 +1400,9 @@ bool gdbstub_t::get_target_desc(
         strcat(result, x86_64_avx512);
 
     strcat(result, x86_64_target_footer);
+
+    // 4 bits per encoded hex digit
+    encoded_ctx_sz = bits >> 2;
 
     return true;
 }
@@ -1555,7 +1600,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
     case 'T':
         thread = from_hex<int>(&input);
 
-        if (thread > 0 && thread < gdb_cpu_ctrl_t::get_gdb_cpu())
+        if (thread >= 1 && thread <= gdb_cpu_ctrl_t::get_gdb_cpu())
             return reply("OK");
 
         return reply("E01");
@@ -1675,9 +1720,20 @@ uint8_t gdbstub_t::calc_checksum(const char *data, size_t size)
     return checksum;
 }
 
+template<typename T>
+void gdbstub_t::append_ctx_reply(char *reply, int& ofs, T *value_ptr)
+{
+    if (uintptr_t(value_ptr) > 0x400000) {
+        ofs += to_hex_bytes(reply + ofs, *value_ptr);
+    } else {
+        memset(reply + ofs, 'x', sizeof(T)*2);
+        ofs += sizeof(T)*2;
+    }
+}
+
 size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
 {
-    size_t ofs = 0;
+    int ofs = 0;
 
     ofs += to_hex_bytes(reply + ofs, ISR_CTX_REG_RAX(ctx));
     ofs += to_hex_bytes(reply + ofs, ISR_CTX_REG_RBX(ctx));
@@ -1706,41 +1762,86 @@ size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
     ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_REG_FS(ctx)));
     ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_REG_GS(ctx)));
 
+    bool has_fpu_ctx = ISR_CTX_FPU(ctx);
+    uint32_t temp;
+
     for (size_t st = 0; st < 8; ++st) {
-        ofs += to_hex_bytes(reply + ofs, ISR_CTX_FPU_STn_31_0(ctx, st));
-        ofs += to_hex_bytes(reply + ofs, ISR_CTX_FPU_STn_63_32(ctx, st));
-        ofs += to_hex_bytes(reply + ofs, ISR_CTX_FPU_STn_79_64(ctx, st));
+        temp = has_fpu_ctx ? ISR_CTX_FPU_STn_31_0(ctx, st) : 0;
+        append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+        temp = has_fpu_ctx ? ISR_CTX_FPU_STn_63_32(ctx, st) : 0;
+        append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+        temp = has_fpu_ctx ? ISR_CTX_FPU_STn_79_64(ctx, st) : 0;
+        append_ctx_reply<uint16_t>(reply, ofs,
+                                   has_fpu_ctx ? (uint16_t*)&temp : nullptr);
     }
 
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FCW(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FSW(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FTW(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FIS(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FIP(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FDS(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FDP(ctx)));
-    ofs += to_hex_bytes(reply + ofs, uint32_t(ISR_CTX_FPU_FOP(ctx)));
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FCW(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FSW(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FTW(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FIS(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FIP(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FDS(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FDP(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
+
+    temp = has_fpu_ctx ? ISR_CTX_FPU_FOP(ctx) : 0;
+    append_ctx_reply<uint32_t>(reply, ofs, has_fpu_ctx ? &temp : nullptr);
 
     for (size_t xmm = 0; xmm < 16; ++xmm) {
         for (size_t i = 0; i < 2; ++i) {
-            ofs += to_hex_bytes(reply + ofs, ISR_CTX_SSE_XMMn_q(ctx, xmm, i));
+            append_ctx_reply(reply, ofs, &ISR_CTX_SSE_XMMn_q(ctx, xmm, i));
         }
     }
 
-    ofs += to_hex_bytes(reply + ofs, ISR_CTX_SSE_MXCSR(ctx));
-
-    // orig_rax
-    memset(reply + ofs, 'x', 16);
-    ofs += 16;
+    append_ctx_reply(reply, ofs, &ISR_CTX_SSE_MXCSR(ctx));
 
     // fsbase
     memset(reply + ofs, 'x', 16);
     ofs += 16;
 
+    // gsbase
     memset(reply + ofs, 'x', 16);
     ofs += 16;
 
-    assert(ofs == X86_64_CONTEXT_SIZE);
+    if (sse_avx_offset) {
+        // ymm0-ymm15 255:128
+        memset(reply, 'x', 16*16*2);
+        ofs += 16*16*2;
+    }
+
+    if (sse_avx512_upper_offset) {
+        // xmm16-xmm31 127:0
+        memset(reply + ofs, 'x', 16*16*2);
+        ofs += 16*16*2;
+
+        // ymm16-ymm31 127:0
+        memset(reply + ofs, 'x', 16*16*2);
+        ofs += 16*16*2;
+
+        // k0-k7
+        memset(reply + ofs, 'x', 8*8*2);
+        ofs += 8*8*2;
+
+        // zmm0-zmm31 511:256
+        memset(reply + ofs, 'x', 32*64*2);
+        ofs += 32*64*2;
+    }
+
+    assert(ofs == encoded_ctx_sz);
 
     return ofs;
 }
@@ -1859,7 +1960,7 @@ size_t gdbstub_t::set_context(isr_context_t *ctx,
     if (input + 16 <= end)
         input += 16;
 
-    assert(input - data == X86_64_CONTEXT_SIZE);
+    assert(input - data == encoded_ctx_sz);
 
     return input - data;
 }
@@ -2253,8 +2354,10 @@ void gdb_cpu_ctrl_t::start()
 
     stub_tid = thread_create(gdb_thread, 0, 0, false);
 
-    while (!stub_running)
-        pause();
+    cpu_wait_value(&stub_running, true);
+
+    cpu_irq_disable();
+    halt();
 }
 
 void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t& cpu)
@@ -2330,8 +2433,8 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             // We are in a single step breakpoint workaround
 
             // Find the breakpoint we stepped over
-            bp_list::iterator it = breakpoint_find(bp_sw, bp_workaround_addr,
-                                                   0, 0);
+            bp_list::iterator it = breakpoint_find(
+                        bp_sw, bp_workaround_addr, 0, 0);
             if (it == bp_sw.end())
                 return 0;
 
