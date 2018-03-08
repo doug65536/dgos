@@ -33,6 +33,7 @@
 #include "numeric_limits.h"
 #include "vector.h"
 #include "process.h"
+#include "gdbstub.h"
 
 size_t constexpr kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size] __section(".bspstk");
@@ -803,9 +804,18 @@ static int init_thread(void *p)
     return 0;
 }
 
+int debugger_thread(void *)
+{
+    gdb_init();
+
+    thread_create(init_thread, 0, 0, false);
+
+    return 0;
+}
+
 extern "C" __noreturn int main(void)
 {
-    thread_create(init_thread, 0, 0, false);
+    thread_create(debugger_thread, 0, 0, false);
 
     thread_idle_set_ready();
 
