@@ -289,6 +289,10 @@ isr_common:
     // Call handler
     call *%rax
 
+    // If context pointer is null, invoke the exception handler for this thread
+    test %rax,%rax
+    jz .Linvoke_catch
+
     // isr can return a new stack pointer, or just return
     // the passed one to continue with this thread
     mov %rax,%rsp
@@ -551,20 +555,22 @@ exception_isr_handler:
     movq %r12,%rsi
     callq *%rax
 
-    // See if the handler rejected it
-    testl %eax,%eax
-    jz 0f
-
 1:
-    // Handler handled it
     movq %r12,%rax
     pop_cfi %r12
     pop_cfi %rbx
     pop_cfi %rbp
     retq
 
-.align 16
 0:
+    pop_cfi %r12
+    pop_cfi %rbx
+    pop_cfi %rbp
+
+// fall through...
+
+.align 16
+.Linvoke_catch:
     // ...no handler or handler rejected it
     movq $__exception_handler_invoke,%rax
     movl %ebx,%edi
@@ -574,7 +580,6 @@ exception_isr_handler:
 
     movq $cpu_debug_break,%rax
     call *%rax
-    jmp 1b
 
     // Tail call to unhandled_exception_handler
 .align 16
