@@ -47,6 +47,8 @@ typedef long ssize_t;
 
 #endif
 
+typedef decltype(nullptr) nullptr_t;
+
 /// SSE vectors
 typedef int8_t __vector_size(16) __i8_vec16;
 typedef int16_t __vector_size(16) __i16_vec8;
