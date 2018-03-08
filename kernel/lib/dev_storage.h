@@ -24,7 +24,8 @@ struct if_list_t {
 enum storage_dev_info_t : uint32_t {
     STORAGE_INFO_NONE = 0,
     STORAGE_INFO_BLOCKSIZE,
-    STORAGE_INFO_HAVE_TRIM
+    STORAGE_INFO_HAVE_TRIM,
+    STORAGE_INFO_NAME
 };
 
 struct storage_dev_base_t {

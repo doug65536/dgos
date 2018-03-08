@@ -154,7 +154,9 @@ static void invoke_part_factories(void *arg)
         // For each storage device
         for (storage_dev_base_t *drive : storage_devs) {
             if (drive) {
-                STORAGE_TRACE("Probing for %s partitions...\n", factory->name);
+                STORAGE_TRACE("Probing %s for %s partitions...\n",
+                              (char const *)drive->info(STORAGE_INFO_NAME),
+                              factory->name);
 
                 if_list_t part_list = factory->detect(drive);
 

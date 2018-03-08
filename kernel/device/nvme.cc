@@ -1162,6 +1162,9 @@ long nvme_dev_t::info(storage_dev_info_t key)
     case STORAGE_INFO_HAVE_TRIM:
         return 1;
 
+    case STORAGE_INFO_NAME:
+        return long("NVME");
+
     default:
         return 0;
     }
