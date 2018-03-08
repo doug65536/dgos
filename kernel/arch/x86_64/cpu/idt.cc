@@ -444,7 +444,7 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
     int index = 0;
     bool bit;
 
-    static uint64_t constexpr zero = 0;
+    static uint64_t constexpr zero[8] = {};
 
     if (reg < 16) {
         // reg  0-15 xmm0-xmm15 (128 bits each)
@@ -464,7 +464,7 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
             }
 
             if (!bit)
-                return &zero;
+                return zero;
 
             return area + (index * 2);
         } else {
@@ -472,7 +472,7 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
 
             return area + (reg * 2);
         }
-    } else if (sse_avx512_upper_offset && reg < 48) {
+    } else if (sse_avx512_upper_offset && reg < 64) {
         // reg 32-47 zmm0h-zmm15h (256 bits each)
         reg -= 32;
 
