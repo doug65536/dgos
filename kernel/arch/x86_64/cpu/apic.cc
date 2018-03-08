@@ -2148,9 +2148,9 @@ static void apic_calibrate()
 
         apic_timer_freq = ccr_freq;
 
-//        // Round APIC frequency to nearest multiple of 1MHz
-//        apic_timer_freq += 1790;
-//        apic_timer_freq -= apic_timer_freq % 1790;
+        // Round APIC frequency to nearest multiple of 333kHz
+        apic_timer_freq += 166666;
+        apic_timer_freq -= apic_timer_freq % 333333;
 
         // Round CPU frequency to nearest multiple of 1MHz
         cpu_freq += 500000;
