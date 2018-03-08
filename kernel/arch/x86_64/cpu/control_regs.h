@@ -601,38 +601,74 @@ static __always_inline void cpu_mwait(uint32_t ext, uint32_t hint)
     );
 }
 
+// is_equal: true to wait for value, false to wait for not equal to value
+// value: address to watch
+// wait_value: comparison value
+// mask: masks value before comparison
 template<typename T>
-static __always_inline void cpu_wait_value(
-        T const volatile *value, T wait_value)
+static __always_inline void cpu_wait_masked(
+        bool is_equal, T const volatile *value, T wait_value, T mask)
 {
     if (cpuid_has_mwait()) {
-        while (*value != wait_value) {
+        while (is_equal != ((*value & mask) == wait_value)) {
             cpu_monitor(value, 0, 0);
 
-            if (*value != wait_value)
+            if (is_equal != ((*value & mask) == wait_value))
                 cpu_mwait(0, 0);
         }
     } else {
-        while (*value != wait_value)
+        while (is_equal != ((*value & mask) == wait_value))
+            pause();
+    }
+}
+
+// is_equal: true to wait for value, false to wait for not equal to value
+// value: address to watch
+// wait_value: comparison value
+template<typename T>
+static __always_inline void cpu_wait_unmasked(
+        bool is_equal, T const volatile *value, T wait_value)
+{
+    if (cpuid_has_mwait()) {
+        while (is_equal != (*value == wait_value)) {
+            cpu_monitor(value, 0, 0);
+
+            if (is_equal != (*value == wait_value))
+                cpu_mwait(0, 0);
+        }
+    } else {
+        while (is_equal != (*value == wait_value))
             pause();
     }
 }
 
 template<typename T>
 static __always_inline void cpu_wait_value(
+        T const volatile *value, T wait_value)
+{
+    return cpu_wait_unmasked(true, value, wait_value);
+}
+
+template<typename T>
+static __always_inline void cpu_wait_not_value(
+        T const volatile *value, T wait_value)
+{
+    return cpu_wait_unmasked(false, value, wait_value);
+}
+
+
+template<typename T>
+static __always_inline void cpu_wait_value(
         T const volatile *value, T wait_value, T mask)
 {
-    if (cpuid_has_mwait()) {
-        while ((*value & mask) != wait_value) {
-            cpu_monitor(value, 0, 0);
+    return cpu_wait_masked(true, value, wait_value, mask);
+}
 
-            if ((*value & mask) != wait_value)
-                cpu_mwait(0, 0);
-        }
-    } else {
-        while ((*value & mask) != wait_value)
-            pause();
-    }
+template<typename T>
+static __always_inline void cpu_wait_not_value(
+        T const volatile *value, T wait_value, T mask)
+{
+    return cpu_wait_masked(false, value, wait_value, mask);
 }
 
 template<typename T>

@@ -8,54 +8,7 @@
 //
 // Exclusive lock. 0 is unlocked, 1 is locked
 
-void spinlock_lock_noyield(spinlock_t *lock)
-{
-    // Disable IRQs
-    int intr_enabled = cpu_irq_disable() << 1;
-
-    atomic_barrier();
-    while (*lock != 0 ||
-           atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
-        // Allow IRQs if they were enabled
-        cpu_irq_toggle(intr_enabled);
-
-        if (likely(spincount_mask))
-            pause();
-        else
-            panic("Deadlock acquiring spinlock in IRQ handler!");
-
-        // Disable IRQs
-        cpu_irq_disable();
-    }
-
-    // Return with interrupts disabled
-}
-
-void spinlock_lock(spinlock_t *lock)
-{
-    atomic_barrier();
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0) {
-        if (spincount_mask)
-            pause();
-        else
-            thread_yield();
-    }
-}
-
-bool spinlock_try_lock(spinlock_t *lock)
-{
-    atomic_barrier();
-    if (*lock != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
-        return false;
-    return true;
-}
-
-void spinlock_unlock(spinlock_t *lock)
-{
-    assert(*lock != 0);
-    *lock = 0;
-}
-
+// Unlock spinlock and return state without reenabling interrupts
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 {
     assert(*lock != 0);
@@ -69,25 +22,24 @@ void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 }
 
 // Spin to acquire lock, return with IRQs disabled
-void spinlock_lock_noirq(spinlock_t *lock)
+void spinlock_lock(spinlock_t *lock)
 {
-    // Disable IRQs
-    int intr_enabled = cpu_irq_disable() << 1;
+    spinlock_value_t intr_enabled = cpu_irq_disable() << 1;
 
-    if (intr_enabled) {
-        while (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
-            // Allow IRQs if they were enabled
+    for (;; pause()) {
+        // Test and test and set
+        if (*lock == 0 && atomic_cmpxchg(lock, 0, 1 | intr_enabled) == 0)
+            return;
+
+        // If IRQs were enabled, enable IRQs while waiting
+        if (unlikely(intr_enabled))
             cpu_irq_enable();
 
-            pause();
+        cpu_wait_value(lock, spinlock_value_t(0));
 
-            // Disable IRQs
+        // If IRQs were enabled, disable IRQs before acquiring
+        if (unlikely(intr_enabled))
             cpu_irq_disable();
-        }
-    } else {
-        while (*lock != 0 ||
-               atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0)
-            pause();
     }
 
     // Return with interrupts disabled
@@ -95,7 +47,7 @@ void spinlock_lock_noirq(spinlock_t *lock)
 
 // Returns 1 with interrupts disabled if lock was acquired
 // Returns 0 with interrupts preserved if lock was not acquired
-bool spinlock_try_lock_noirq(spinlock_t *lock)
+bool spinlock_try_lock(spinlock_t *lock)
 {
     int intr_enabled = cpu_irq_disable() << 1;
 
@@ -108,9 +60,9 @@ bool spinlock_try_lock_noirq(spinlock_t *lock)
     return true;
 }
 
-void spinlock_unlock_noirq(spinlock_t *lock)
+void spinlock_unlock(spinlock_t *lock)
 {
-    int intr_enabled = *lock >> 1;
+    int intr_enabled = (*lock >> 1) & 1;
     assert(*lock & 1);
     *lock = 0;
     cpu_irq_toggle(intr_enabled);
@@ -125,8 +77,6 @@ void spinlock_unlock_noirq(spinlock_t *lock)
 static void rwspinlock_ex_lock_impl(rwspinlock_t *lock,
                                     rwspinlock_value_t expect)
 {
-    atomic_barrier();
-
     bool own_bit30 = false;
 
     for (rwspinlock_value_t old_value = *lock; ; pause()) {
@@ -137,7 +87,7 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock,
             // Simple scenario, acquire unowned lock
             if (old_value == expect &&
                     atomic_cmpxchg(lock, expect, -1) == expect)
-                break;
+                return;
 
             // Try to acquire ownership of bit 30
             // If nobody has locked out readers and there is at least one reader
@@ -162,7 +112,7 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock,
                 // All (other, when upgrading) readers drained out
 
                 if (atomic_cmpxchg_upd(lock, &old_value, -1))
-                    break;
+                    return;
 
                 continue;
             }
@@ -205,8 +155,12 @@ void rwspinlock_sh_lock(rwspinlock_t *lock)
             // and no writer has acquired bit 30
             // Try to increase shared count
             if (atomic_cmpxchg_upd(lock, &old_value, old_value + 1))
-                break;
+                return;
         } else if (old_value < 0) {
+            // Wait for it to not be exclusively held and readers not locked out
+            cpu_wait_value(lock, rwspinlock_value_t(0),
+                           (rwspinlock_value_t(1U << 31) |
+                            rwspinlock_value_t(1U << 30)));
             old_value = *lock;
         }
     }
@@ -239,6 +193,10 @@ bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
     for (rwspinlock_value_t expect = *lock; expect >= 0; pause()) {
         if (atomic_cmpxchg_upd(lock, &expect, expect + 1))
             return true;
+
+        // Wait for sign bit to clear
+        cpu_wait_value(lock, 0, rwspinlock_value_t(1U << 31));
+        expect = *lock;
     }
 
     return false;
@@ -294,6 +252,35 @@ void ticketlock_unlock(ticketlock_t *lock)
     cpu_irq_toggle(serving & 1);
 }
 
+ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
+{
+    ticketlock_value_t intr_state = lock->now_serving & 1;
+    ticketlock_value_t serving = lock->now_serving;
+    lock->now_serving = (serving + 2) & -2;
+    return intr_state;
+}
+
+void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
+{
+    ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
+
+    for (;;) {
+        ticketlock_value_t serving = lock->now_serving;
+
+        ticketlock_value_t pause_count = my_ticket - (serving & -2);
+
+        if (likely(pause_count == 0)) {
+            // Store the interrupt flag in bit 0
+            lock->now_serving = (serving & -2) | saved_lock;
+            return;
+        }
+
+        do {
+            pause();
+        } while (pause_count -= 2);
+    }
+}
+
 void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
 {
     node->irq_enabled = cpu_irq_disable();
@@ -305,8 +292,7 @@ void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
         node->locked = true;
         pred->next = node;
 
-        while (node->locked)
-            pause();
+        cpu_wait_value(&node->locked, false);
     }
 }
 
@@ -330,9 +316,11 @@ void mcslock_unlock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
             cpu_irq_toggle(node->irq_enabled);
             return;
         }
-        while (!node->next)
-            pause();
+
+        // Wait until node->next is not null
+        cpu_wait_not_value(&node->next, (mcs_queue_ent_t*)nullptr);
     }
     node->next->locked = false;
     cpu_irq_toggle(node->irq_enabled);
 }
+

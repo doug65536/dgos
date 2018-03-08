@@ -1,27 +1,15 @@
 #pragma once
 #include "types.h"
 
-typedef int spinlock_value_t;
-typedef spinlock_value_t volatile spinlock_t;
-
 //
 // Mutex spinlock
 
-// This is equivalent to spinlock_lock_noirq,
-// but for IRQ handlers. Panic if lock is not
-// available and there is one CPU.
-// (This is would be a bug, any lock acquired
-// in an IRQ handler should disable IRQ when
-// acquired by the non-IRQ code)
-void spinlock_lock_noyield(spinlock_t *lock);
+typedef int spinlock_value_t;
+typedef spinlock_value_t volatile spinlock_t;
 
 void spinlock_lock(spinlock_t *lock);
 bool spinlock_try_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
-
-void spinlock_lock_noirq(spinlock_t *lock);
-bool spinlock_try_lock_noirq(spinlock_t *lock);
-void spinlock_unlock_noirq(spinlock_t *lock);
 
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock);
 void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock);
@@ -48,6 +36,7 @@ void rwspinlock_sh_lock(rwspinlock_t *lock);
 void rwspinlock_sh_unlock(rwspinlock_t *lock);
 
 typedef unsigned ticketlock_value_t;
+
 struct ticketlock_t {
     ticketlock_t()
         : now_serving(0)
@@ -65,6 +54,8 @@ struct ticketlock_t {
 void ticketlock_lock(ticketlock_t *lock);
 bool ticketlock_try_lock(ticketlock_t *lock);
 void ticketlock_unlock(ticketlock_t *lock);
+ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock);
+void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock);
 
 struct mcs_queue_ent_t {
     mcs_queue_ent_t * volatile next;
