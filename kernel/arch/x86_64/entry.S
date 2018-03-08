@@ -179,9 +179,6 @@ bsp_init:
 
     debugind 'A'
 
-    // Initialize GDB stub
-    //call gdb_init
-
     // Initialize early-initialized devices
     movl $'E',%edi
     call callout_call
