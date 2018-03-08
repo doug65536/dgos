@@ -199,7 +199,6 @@ EXPORT void *memset(void *dest, int c, size_t n)
             return dest;
 
         d += ofs;
-        s += ofs;
     }
 
     size_t quads = n >> 3;
