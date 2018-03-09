@@ -2404,8 +2404,8 @@ gdb_cpu_t *gdb_cpu_ctrl_t::cpu_from_nr(int cpu_nr)
         cpu_nr = thread_cpu_number() + 1;
 
     auto it = find_if(cpus.begin(), cpus.end(), [&](gdb_cpu_t const& cpu) {
-            return cpu.cpu_nr == cpu_nr;
-});
+        return cpu.cpu_nr == cpu_nr;
+    });
 
     return likely(it != cpus.end()) ? &*it : nullptr;
 }
