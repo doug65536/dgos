@@ -218,7 +218,8 @@ __BEGIN_DECLS
 #define POSIX_FADV_NOREUSE (0)
 
 // The application has no advice to give on its behavior with respect to the
-// specified data. It is the default characteristic if no advice is given for an open file.
+// specified data. It is the default characteristic if no advice is
+// given for an open file.
 #define POSIX_FADV_NORMAL (0)
 
 // The application expects to access the specified data in a random order.
@@ -235,11 +236,20 @@ __BEGIN_DECLS
 // file lock. It shall include the following members:
 
 struct flock {
-    short  l_type;   // Type of lock; F_RDLCK, F_WRLCK, F_UNLCK.
-    short  l_whence; // Flag for starting offset.
-    off_t  l_start;  // Relative offset in bytes.
-    off_t  l_len;    // Size; if 0 then until EOF.
-    pid_t  l_pid;    // Process ID of the process holding the lock; returned with F_GETLK.
+    // Type of lock; F_RDLCK, F_WRLCK, F_UNLCK.
+    short  l_type;
+
+    // Flag for starting offset.
+    short  l_whence;
+
+    // Relative offset in bytes.
+    off_t  l_start;
+
+    // Size; if 0 then until EOF.
+    off_t  l_len;
+
+    // Process ID of the process holding the lock; returned with F_GETLK.
+    pid_t  l_pid;
 };
 
 // The <fcntl.h> header shall define the mode_t, off_t, and pid_t types

@@ -94,30 +94,69 @@ struct Elf64_Shdr {
     Elf64_Xword sh_entsize; /* Size of entries, if section has table */
 } __packed;
 
+//
 // sh_type
-#define SHT_NULL 0 // Marks an unused section header
-#define SHT_PROGBITS 1 // Contains information defined by the program
-#define SHT_SYMTAB 2 // Contains a linker symbol table
-#define SHT_STRTAB 3 // Contains a string table
-#define SHT_RELA 4 // Contains “Rela” type relocation entries
-#define SHT_HASH 5 // Contains a symbol hash table
-#define SHT_DYNAMIC 6 // Contains dynamic linking tables
-#define SHT_NOTE 7 // Contains note information
-#define SHT_NOBITS 8 // Contains uninitialized space; does not occupy any space in the file
-#define SHT_REL 9 // Contains “Rel” type relocation entries
-#define SHT_SHLIB 10 // Reserved
-#define SHT_DYNSYM 11 // Contains a dynamic loader symbol table
-#define SHT_LOOS 0x60000000 // Environment-specific use
+
+// Marks an unused section header
+#define SHT_NULL 0
+
+// Contains information defined by the program
+#define SHT_PROGBITS 1
+
+// Contains a linker symbol table
+#define SHT_SYMTAB 2
+
+// Contains a string table
+#define SHT_STRTAB 3
+
+// Contains “Rela” type relocation entries
+#define SHT_RELA 4
+
+// Contains a symbol hash table
+#define SHT_HASH 5
+
+// Contains dynamic linking tables
+#define SHT_DYNAMIC 6
+
+// Contains note information
+#define SHT_NOTE 7
+
+// Contains uninitialized space; does not occupy any space in the file
+#define SHT_NOBITS 8
+
+// Contains “Rel” type relocation entries
+#define SHT_REL 9
+
+// Reserved
+#define SHT_SHLIB 10
+
+// Contains a dynamic loader symbol table
+#define SHT_DYNSYM 11
+
+// Environment-specific use
+#define SHT_LOOS 0x60000000
 #define SHT_HIOS 0x6FFFFFFF
-#define SHT_LOPROC 0x70000000 // Processor-specific use
+
+// Processor-specific use
+#define SHT_LOPROC 0x70000000
 #define SHT_HIPROC 0x7FFFFFFF
 
 // sh_flags
-#define SHF_WRITE 0x1 // Section contains writable data
-#define SHF_ALLOC 0x2 // Section is allocated in memory image of program
-#define SHF_EXECINSTR 0x4 // Section contains executable instructions
-#define SHF_MASKOS 0x0F000000 // Environment-specific use
-#define SHF_MASKPROC 0xF0000000 // Processor-specific use
+
+// Section contains writable data
+#define SHF_WRITE 0x1
+
+// Section is allocated in memory image of program
+#define SHF_ALLOC 0x2
+
+// Section contains executable instructions
+#define SHF_EXECINSTR 0x4
+
+// Environment-specific use
+#define SHF_MASKOS 0x0F000000
+
+// Processor-specific use
+#define SHF_MASKPROC 0xF0000000
 
 // ADDED: Apparent flags from looking at build executables
 #define SHF_TLS 0x400
@@ -207,11 +246,21 @@ struct Elf64_Phdr {
 #define PT_HIPROC 0x7FFFFFFF
 
 // Segment attributes
-#define PF_R 0x4 // Read permission
-#define PF_W 0x2 // Write permission
-#define PF_X 0x1 // Execute permission
-#define PF_MASKOS 0x00FF0000 // These flag bits are reserved for environment-specific use
-#define PF_MASKPROC 0xFF000000 // These flag bits are reserved for processor-specific use
+
+// Read permission
+#define PF_R 0x4
+
+// Write permission
+#define PF_W 0x2
+
+// Execute permission
+#define PF_X 0x1
+
+// These flag bits are reserved for environment-specific use
+#define PF_MASKOS 0x00FF0000
+
+// These flag bits are reserved for processor-specific use
+#define PF_MASKPROC 0xFF000000
 
 // Dynamic table
 struct Elf64_Dyn {
@@ -222,38 +271,111 @@ struct Elf64_Dyn {
     } d_un;
 } __packed;
 
-#define DT_NULL 0  // ignored Marks the end of the dynamic array
-#define DT_NEEDED 1  // d_val The string table offset of the name of a needed library
-#define DT_PLTRELSZ 2  // d_val Total size, in bytes, of the relocation entries associated with the procedure linkage table.
-#define DT_PLTGOT 3  // d_ptr Contains an address associated with the linkage table. The specific meaning of this field is processor-dependent.
-#define DT_HASH 4  // d_ptr Address of the symbol hash table, described below.
-#define DT_STRTAB 5  // d_ptr Address of the dynamic string table.
-#define DT_SYMTAB 6  // d_ptr Address of the dynamic symbol table.
-#define DT_RELA 7  // d_ptr Address of a relocation table with Elf64_Rela entries.
-#define DT_RELASZ 8  // d_val Total size, in bytes, of the DT_RELA relocation table.
-#define DT_RELAENT 9  // d_val Size, in bytes, of each DT_RELA relocation entry.
-#define DT_STRSZ 10  // d_val Total size, in bytes, of the string table.
-#define DT_SYMENT 11  // d_val Size, in bytes, of each symbol table entry.
-#define DT_INIT 12  // d_ptr Address of the initialization function.
-#define DT_FINI 13  // d_ptr Address of the termination function.
-#define DT_SONAME 14  // d_val The string table offset of the name of this shared object.
-#define DT_RPATH 15  // d_val The string table offset of a shared library search path string.
-#define DT_SYMBOLIC 16  // ignored The presence of this dynamic table entry modifies the symbol resolution algorithm for references within the library. Symbols defined within the library are used to resolve references before the dynamic linker searches the usual search path.
-#define DT_REL 17  // d_ptr Address of a relocation table with Elf64_Rel entries.
-#define DT_RELSZ 18  // d_val Total size, in bytes, of the DT_REL relocation table.
-#define DT_RELENT 19  // d_val Size, in bytes, of each DT_REL relocation entry.
-#define DT_PLTREL 20  // d_val Type of relocation entry used for the procedure linkage table. The d_val member contains either DT_REL or DT_RELA.
-#define DT_DEBUG 21  // d_ptr Reserved for debugger use.
-#define DT_TEXTREL 22  // ignored The presence of this dynamic table entry signals that the relocation table contains relocations for a non-writable segment.
-#define DT_JMPREL 23  // d_ptr Address of the relocations associated with the procedure linkage table.
-#define DT_BIND_NOW 24  // ignored The presence of this dynamic table entry signals that the dynamic loader should process all relocations for this object before transferring control to the program.
-#define DT_INIT_ARRAY 25  // d_ptr Pointer to an array of pointers to initialization functions.
-#define DT_FINI_ARRAY 26  // d_ptr Pointer to an array of pointers to termination functions.
-#define DT_INIT_ARRAYSZ 27  // d_val Size, in bytes, of the array of initialization functions.
-#define DT_FINI_ARRAYSZ 28  // d_val Size, in bytes, of the array of termination functions.
-#define DT_LOOS 0x60000000  // Defines a range of dynamic table tags that are reserved for environment-specific use.
+
+// ignored Marks the end of the dynamic array
+#define DT_NULL 0
+
+// d_val The string table offset of the name of a needed library
+#define DT_NEEDED 1
+
+// d_val Total size, in bytes, of the relocation entries
+// associated with the procedure linkage table.
+#define DT_PLTRELSZ 2
+
+// d_ptr Contains an address associated with the linkage table.
+// The specific meaning of this field is processor-dependent.
+#define DT_PLTGOT 3
+
+// d_ptr Address of the symbol hash table, described below.
+#define DT_HASH 4
+
+// d_ptr Address of the dynamic string table.
+#define DT_STRTAB 5
+
+// d_ptr Address of the dynamic symbol table.
+#define DT_SYMTAB 6
+
+// d_ptr Address of a relocation table with Elf64_Rela entries.
+#define DT_RELA 7
+
+// d_val Total size, in bytes, of the DT_RELA relocation table.
+#define DT_RELASZ 8
+
+// d_val Size, in bytes, of each DT_RELA relocation entry.
+#define DT_RELAENT 9
+
+// d_val Total size, in bytes, of the string table.
+#define DT_STRSZ 10
+
+// d_val Size, in bytes, of each symbol table entry.
+#define DT_SYMENT 11
+
+// d_ptr Address of the initialization function.
+#define DT_INIT 12
+
+// d_ptr Address of the termination function.
+#define DT_FINI 13
+
+// d_val The string table offset of the name of this shared object.
+#define DT_SONAME 14
+
+// d_val The string table offset of a shared library search path string.
+#define DT_RPATH 15
+
+// ignored The presence of this dynamic table entry modifies the
+// symbol resolution algorithm for references within the library.
+// Symbols defined within the library are used to resolve references
+// before the dynamic linker searches the usual search path.
+#define DT_SYMBOLIC 16
+
+// d_ptr Address of a relocation table with Elf64_Rel entries.
+#define DT_REL 17
+
+// d_val Total size, in bytes, of the DT_REL relocation table.
+#define DT_RELSZ 18
+
+// d_val Size, in bytes, of each DT_REL relocation entry.
+#define DT_RELENT 19
+
+// d_val Type of relocation entry used for the procedure linkage table.
+// The d_val member contains either DT_REL or DT_RELA.
+#define DT_PLTREL 20
+
+// d_ptr Reserved for debugger use.
+#define DT_DEBUG 21
+
+// ignored The presence of this dynamic table entry signals that the
+// relocation table contains relocations for a non-writable segment.
+#define DT_TEXTREL 22
+
+// d_ptr Address of the relocations associated with the procedure linkage table.
+#define DT_JMPREL 23
+
+// ignored The presence of this dynamic table entry signals that the
+// dynamic loader should process all relocations for this object before
+// transferring control to the program.
+#define DT_BIND_NOW 24
+
+// d_ptr Pointer to an array of pointers to initialization functions.
+#define DT_INIT_ARRAY 25
+
+// d_ptr Pointer to an array of pointers to termination functions.
+#define DT_FINI_ARRAY 26
+
+// d_val Size, in bytes, of the array of initialization functions.
+#define DT_INIT_ARRAYSZ 27
+
+// d_val Size, in bytes, of the array of termination functions.
+#define DT_FINI_ARRAYSZ 28
+
+// Defines a range of dynamic table tags that are reserved
+// for environment-specific use.
+#define DT_LOOS 0x60000000
 #define DT_HIOS 0x6FFFFFFF
-#define DT_LOPROC 0x70000000  // Defines a range of dynamic table tags that are reserved for processor-specific use.
+
+// Defines a range of dynamic table tags that are reserved
+// for processor-specific use.
+#define DT_LOPROC 0x70000000
 #define DT_HIPROC 0x7FFFFFFF
 
 //

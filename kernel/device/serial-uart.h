@@ -18,9 +18,12 @@ public:
     virtual void route_irq(int) {}
 
     // Simple early UART that does not allocate memory
-    static uart_dev_t *open(size_t id, bool simple, uint8_t data_bits, char parity_type, uint8_t stop_bits);
+    static uart_dev_t *open(size_t id, bool simple,
+                            uint8_t data_bits, char parity_type,
+                            uint8_t stop_bits);
 
     // Requires memory allocation
     static uart_dev_t *open(uint16_t port, uint8_t irq,
-                            uint32_t baud, uint8_t data_bits, char parity_type, uint8_t stop_bits, bool polled);
+                            uint32_t baud, uint8_t data_bits, char parity_type,
+                            uint8_t stop_bits, bool polled);
 };

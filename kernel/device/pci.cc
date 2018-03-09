@@ -27,7 +27,8 @@ public:
                            void const *values, size_t size) = 0;
 
     // Read an arbitrarily sized and aligned block of values
-    virtual bool copy(pci_addr_t addr, void *dest, size_t offset, size_t size) = 0;
+    virtual bool copy(pci_addr_t addr, void *dest,
+                      size_t offset, size_t size) = 0;
 };
 
 // Legacy I/O port PCI configuration space accessor
@@ -226,7 +227,8 @@ bool pci_config_pio::write(pci_addr_t addr, size_t offset,
     return true;
 }
 
-bool pci_config_pio::copy(pci_addr_t addr, void *dest, size_t offset, size_t size)
+bool pci_config_pio::copy(pci_addr_t addr, void *dest,
+                          size_t offset, size_t size)
 {
     uint32_t value;
     char *out = (char*)dest;

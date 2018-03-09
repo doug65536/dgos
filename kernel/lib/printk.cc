@@ -716,7 +716,8 @@ static intptr_t formatter(
 
 #ifndef __DGOS_KERNEL__
             case arg_type_double_value:
-                dtoa(digits, sizeof(digits), (long double)flags.arg.double_value, &flags);
+                dtoa(digits, sizeof(digits),
+                     (long double)flags.arg.double_value, &flags);
                 flags.arg_type = arg_type_char_ptr;
                 flags.arg.char_ptr_value = digits;
                 break;

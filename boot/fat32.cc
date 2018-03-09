@@ -76,12 +76,14 @@ static int fat32_sector_iterator_begin(
         walk = next_cluster(walk, nullptr, &iter->err);
 
     iter->cluster_count = cluster_count;
-    iter->clusters.segment = far_malloc(sizeof(uint32_t) * (cluster_count - 1));
+    iter->clusters.segment = far_malloc(sizeof(uint32_t) *
+                                        (cluster_count - 1));
     iter->clusters.offset = 0;
 
     cluster_count = 0;
     for (int walk = cluster; walk; ++cluster_count) {
-        far_copy_from(far_adj(iter->clusters, cluster_count * sizeof(uint32_t)),
+        far_copy_from(far_adj(iter->clusters,
+                              cluster_count * sizeof(uint32_t)),
                       &walk, sizeof(uint32_t));
         //iter->clusters[cluster_count++] = walk;
         walk = next_cluster(walk, nullptr, &iter->err);

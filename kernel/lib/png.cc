@@ -332,7 +332,8 @@ png_image_t *png_load(char const *path)
             if (unlikely(ihdr.bit_depth != 8))
                 return 0;
 
-            state.pixel_bytes = ((3 & -!!(ihdr.color_type & PNG_IHDR_COLORTYPE_C)) +
+            state.pixel_bytes = ((3 & -!!(ihdr.color_type &
+                                          PNG_IHDR_COLORTYPE_C)) +
                     !!(ihdr.color_type & PNG_IHDR_COLORTYPE_A)) *
                     (ihdr.bit_depth >> 3);
             state.scanline_bytes = state.pixel_bytes * ihdr.width;

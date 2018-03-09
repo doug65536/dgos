@@ -104,12 +104,15 @@ typedef int64_t useconds_t;
 /// All of the types are defined as arithmetic types of an
 /// appropriate length, with the following exceptions:
 ///  key_t, pthread_attr_t, pthread_cond_t, pthread_condattr_t, pthread_key_t,
-///  pthread_mutex_t, pthread_mutexattr_t, pthread_once_t, pthread_rwlock_t, pthread_rwlockattr_t.
-/// Additionally, blkcnt_t and off_t are  extended signed integral types,
-/// fsblkcnt_t, fsfilcnt_t and ino_t are defined as extended unsigned integral types,
+///  pthread_mutex_t, pthread_mutexattr_t, pthread_once_t,
+///  pthread_rwlock_t, pthread_rwlockattr_t.
+/// Additionally, blkcnt_t and off_t are extended signed integral types,
+/// fsblkcnt_t, fsfilcnt_t and ino_t are defined as
+///  extended unsigned integral types,
 /// size_t is an unsigned integral type,
 /// blksize_t, pid_t and ssize_t are signed integral types.
-/// The type ssize_t is capable of storing values at least in the range [-1, SSIZE_MAX].
+/// The type ssize_t is capable of storing values at least
+///  in the range [-1, SSIZE_MAX].
 /// The type useconds_t is an unsigned integral type capable of storing values
 ///  at least in the range [0, 1,000,000].
 /// The type suseconds_t is a signed integral type capable of storing values
