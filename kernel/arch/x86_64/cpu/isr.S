@@ -5,9 +5,6 @@
 #include "../cfi_helpers.h"
 #include "interrupts.h"
 
-// This must be position independent code because the GDB stub clones off
-// a redundant copy to protect against infinite recursion
-
 .struct 0
      frame_rbp:  .struct frame_rbp+8
      frame_intr: .struct frame_intr+8
@@ -237,16 +234,12 @@ isr_common:
     // ...came from user code
     swapgs
 
-    // Save entire sse/mmx/fpu state
-    // NOTE: this instruction may be patched to call one of the xsave versions!
-    jmp isr_save_fxsave
-.Lsse_context_save_jmp:
-
 .align 16
 .Lfrom_kernel:
-.Lsse_context_save_resume:
-    // Push FPU context pointer
-    pushq %rdi
+    // Push FPU context pointer field, initially null
+    pushq $0
+
+    // Outgoing cleanup
     pushq $0
     pushq $0
 
@@ -335,13 +328,6 @@ isr_common:
 
     // ...returning to user code
 
-    // NOTE: this instruction may be patched to call one of the xsave versions!
-    jmp isr_restore_fxrstor
-.Lsse_context_restore_jmp:
-
-    .align 16
-.Lsse_context_restore_resume:
-
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
     movq %gs:CPU_INFO_TSS_PTR_OFS,%rbx
     leaq frame_end(%rbp),%rax
@@ -429,38 +415,28 @@ isr_common:
    .cfi_endproc
 
 // Expects ds loaded with kernel data segment
-// Clobbers rcx,rdx,rax,rdi
+// Pass context pointer in rdi
+// Clobbers rsi,rdx,rax
 // Returns rdi=pointer to context
 .macro xsave_ctx insn
     .cfi_startproc
     .cfi_def_cfa_register rbp
     .cfi_def_cfa_offset 32
 
-    // Get pointer to current thread from CPU-local storage
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
-
-    test %rcx,%rcx
-    jz 1f
-
     // Read xsave stack pointer from thread
-    movq THREAD_XSAVE_PTR_OFS(%rcx),%rdi
-    sub sse_context_size,%rdi
+    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
+    sub sse_context_size,%rsi
 
     // Set all bits of edx:eax
     movl $-1,%eax
-    movl $-1,%edx
-
-    //// Skip if threading not initialized yet (still needed?)
-    //testq %rcx,%rcx
-    //jz 1f
+    movl %eax,%edx
 
     // Save context using instruction passed to macro
-    \insn (%rdi)
+    \insn (%rsi)
 
     // Update xsave stack pointer in thread
-    movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
-1:
-    jmp .Lsse_context_save_resume
+    movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
+    ret
 
     .cfi_endproc
 .endm
@@ -473,23 +449,40 @@ isr_common:
     .cfi_def_cfa_register rbp
     .cfi_def_cfa_offset 32
 
-    // Get pointer to current thread from CPU-local storage
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%rcx
+    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
 
     // Set all bits of edx:eax
     movl $-1,%eax
-    movl $-1,%edx
+    movl %eax,%edx
 
     // Restore context using instruction passed to macro
     \insn (%rdi)
 
-    add sse_context_size,%rdi
-    movq %rdi,THREAD_XSAVE_PTR_OFS(%rcx)
+    add sse_context_size,%rsi
+    movq %rdi,THREAD_XSAVE_PTR_OFS(%rdi)
 
-    jmp .Lsse_context_restore_resume
+    ret
 
     .cfi_endproc
 .endm
+
+// Branch directly to appropriate save/restore
+
+.align 16
+.global isr_save_fpu_ctx
+.hidden isr_save_fpu_ctx
+isr_save_fpu_ctx:
+    jmp isr_save_fxsave
+.Lsse_context_save_jmp:
+
+.align 16
+.global isr_restore_fpu_ctx
+.hidden isr_restore_fpu_ctx
+isr_restore_fpu_ctx:
+    jmp isr_restore_fxrstor
+.Lsse_context_restore_jmp:
+
+// Save/restore implementations
 
 .align 16
 .global isr_save_xsaveopt

@@ -131,6 +131,8 @@ C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
 
+#define THREAD_FLAGS_USES_FPU   (1U<<0)
+
 // Store in a big array, for now
 #define MAX_THREADS 512
 static thread_info_t threads[MAX_THREADS];
@@ -380,6 +382,8 @@ static thread_t thread_create_with_state(
     // APs inherit BSP's process
     thread->process = cpus[0].cur_thread->process;
 
+    thread->flags = user ? THREAD_FLAGS_USES_FPU : 0;
+
     uintptr_t stack_addr = uintptr_t(stack);
     uintptr_t stack_end = stack_addr;
 
@@ -567,7 +571,7 @@ static thread_info_t *thread_choose_next(
 {
     size_t cpu_number = cpu - cpus;
     size_t i = outgoing - threads;
-    thread_info_t *best = nullptr;
+    thread_info_t *incoming = nullptr;
     thread_info_t *candidate;
     uint64_t now = 0;
 
@@ -583,7 +587,7 @@ static thread_info_t *thread_choose_next(
     // If this thread is not allowed on this CPU,
     // then best is the idle thread until proven otherwise
     if (unlikely(!(outgoing->cpu_affinity & (1 << cpu_number))))
-        best = threads + cpu_number;
+        incoming = threads + cpu_number;
 
     for (size_t checked = 0; ++i, checked <= count; ++checked) {
         // Wrap to the first non-idle thread
@@ -631,31 +635,38 @@ static thread_info_t *thread_choose_next(
         } else if (unlikely(candidate->state != expected_ready))
             continue;
 
-        if (likely(best)) {
+        if (likely(incoming)) {
             // Must be better than best
             if (likely(candidate->priority + candidate->priority_boost >
-                       best->priority + best->priority_boost))
-                best = candidate;
+                       incoming->priority + incoming->priority_boost))
+                incoming = candidate;
         } else if (likely(outgoing->state == THREAD_IS_READY_BUSY)) {
             // Must be at least the same priority as outgoing
             if (likely(candidate->priority + candidate->priority_boost >=
                        outgoing->priority + outgoing->priority_boost))
-                best = candidate;
+                incoming = candidate;
         } else {
             // Outgoing thread is not ready, any thread is better
-            best = candidate;
+            incoming = candidate;
         }
     }
 
     // Did not find any ready thread, choose idle thread
-    if (unlikely(!best))
-        best = threads + cpu_number;
+    if (unlikely(!incoming))
+        incoming = threads + cpu_number;
 
-    assert(best
-           ? best >= threads && best <= threads + countof(threads)
+    assert(incoming
+           ? incoming >= threads && incoming <= threads + countof(threads)
            : outgoing >= threads && outgoing <= threads + countof(threads));
 
-    return best;
+    if (incoming != outgoing) {
+        if (outgoing->flags & THREAD_FLAGS_USES_FPU)
+            isr_save_fpu_ctx(outgoing->ctx);
+        if (incoming->flags & THREAD_FLAGS_USES_FPU)
+            isr_restore_fpu_ctx(incoming->ctx);
+    }
+
+    return incoming;
 }
 
 static void thread_clear_busy(void *outgoing)
