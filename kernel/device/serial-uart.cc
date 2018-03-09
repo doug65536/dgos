@@ -517,12 +517,14 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
     //
     // Configure and reset FIFO
 
-    reg_fcr.value = 0;
-    reg_fcr.bits.fifo_en = 1;
-    reg_fcr.bits.fifo_rx_reset = 1;
-    reg_fcr.bits.fifo_tx_reset = 1;
-    reg_fcr.bits.rx_trigger = uint8_t(fcr_rx_trigger_t::FIFO8);
-    outp(reg_fcr);
+    if (fifo_size > 1) {
+        reg_fcr.value = 0;
+        reg_fcr.bits.fifo_en = 1;
+        reg_fcr.bits.fifo_rx_reset = 1;
+        reg_fcr.bits.fifo_tx_reset = 1;
+        reg_fcr.bits.rx_trigger = uint8_t(fcr_rx_trigger_t::FIFO8);
+        outp(reg_fcr);
+    }
 
     //
     // Unmask interrupts
