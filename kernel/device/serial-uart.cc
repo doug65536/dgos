@@ -544,9 +544,9 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
     // Assert DTR, port is now open
     reg_mcr.bits.dtr = 1;
 
-    // Enable IRQ if requested
-    reg_mcr.bits.out1 = use_irq;
-    reg_mcr.bits.int_en = use_irq;
+    // Disable IRQ
+    reg_mcr.bits.out1 = 0;
+    reg_mcr.bits.int_en = 0;
 
     // Don't assert RTS immediately when polling
     reg_mcr.bits.rts = use_irq;
@@ -557,6 +557,10 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
         irq_hook(irq, &uart_t::irq_handler);
         irq_setmask(irq, true);
         irq_hooked = true;
+
+        // Enable IRQ if requested
+        reg_mcr.bits.out1 = use_irq;
+        reg_mcr.bits.int_en = use_irq;
     }
 
     return true;
@@ -605,7 +609,8 @@ public:
     uart_async_t();
     ~uart_async_t();
 
-    bool init(ioport_t port, uint8_t port_irq, uint32_t baud, uint8_t data_bits, char parity_type, uint8_t stop_bits);
+    bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
+              uint8_t data_bits, char parity_type, uint8_t stop_bits);
 
     ssize_t write(void const *buf, size_t size, size_t min_write);
     ssize_t read(void *buf, size_t size, size_t min_read);
