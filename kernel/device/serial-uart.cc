@@ -410,6 +410,7 @@ protected:
 
     chiptype_t chip;
     uint8_t fifo_size;
+    uint32_t max_baud;
 };
 
 static vector<unique_ptr<uart_t>> uarts;
@@ -422,6 +423,7 @@ uart_t::uart_t()
     , irq_hooked(false)
     , chip(chiptype_t::UNKNOWN)
     , fifo_size(0)
+    , max_baud(0)
 {
     reg_ier.value = 0;
     reg_iir.value = 0;
@@ -464,26 +466,32 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
         // 64 byte fifo bit was writable, it is a 16750
         chip = chiptype_t::U16750;
         fifo_size = 64;
+        max_baud = 115200;
     } else if (reg_fcr.bits.rx_trigger == 3 && !reg_fcr.bits.fifo64) {
         // Both rx_trigger bits were writable, it is a good 16550A
         // Good 16550A
         chip = chiptype_t::U16550A;
         fifo_size = 16;
+        max_baud = 115200;
     } else if (reg_fcr.bits.rx_trigger == 1) {
         // Bit 6 was not preserved, is a crap 16550
         // Buggy 16550
         chip = chiptype_t::U16550;
         fifo_size = 1;
+        max_baud = 57600;
     } else {
         // If the scratch register preserves value, it is a 16450
         reg_scr.value = 0x55;
         outp(reg_scr);
         inp(reg_scr);
 
-        if (reg_scr.value == 0x55)
+        if (reg_scr.value == 0x55) {
             chip = chiptype_t::U16450;
-        else
+            max_baud = 38400;
+        } else {
             chip = chiptype_t::U8250;
+            max_baud = 19200;
+        }
 
         fifo_size = 1;
     }
