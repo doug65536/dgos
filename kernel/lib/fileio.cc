@@ -110,7 +110,6 @@ int file_open(char const *path, int flags, mode_t mode)
         return status;
 
     fh->fs = fs;
-    //fh->path = strdup(path);
     fh->pos = 0;
 
     return fh - file_table.data();
