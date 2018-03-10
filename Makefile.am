@@ -38,7 +38,8 @@ bin_PROGRAMS = \
 	bootiso-bin \
 	kernel-generic \
 	kernel-bmi \
-	user-shell
+	user-shell \
+	hello.km
 
 KERNEL_BMI_FLAGS = \
 	$(BMI_FLAGS)
@@ -985,6 +986,18 @@ test: test_compile
 
 # ----------------------------------------------------------------------------
 # User programs
+
+hello_km_SOURCES = \
+	modules/hello/hello.cc
+
+hello_km_CXXFLAGS = \
+	-I$(top_srcdir)/kernel/lib \
+	-I$(top_srcdir)/kernel/arch/x86_64 \
+	-I$(top_srcdir)/kernel/lib/cc \
+	-I$(top_srcdir)/kernel/lib/sys
+
+hello_km_LDFLAGS = \
+	-Wl,-r -Wl,-g -Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld
 
 user_shell_SOURCES = \
 	user/test/test.S

@@ -731,7 +731,11 @@ static int init_thread(void *p)
     printdbg("draw thread id=%d\n", draw_thread_id);
 #endif
 
-    //modload_init();
+    modload_init();
+
+    module_entry_fn_t mod_entry = modload_load("hello.km");
+    if (mod_entry)
+        mod_entry();
 
     thread_create(find_vbe, (void*)0xC0000, 0, false);
     thread_create(find_vbe, (void*)0xF0000, 0, false);

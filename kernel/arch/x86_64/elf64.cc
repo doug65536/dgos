@@ -398,9 +398,6 @@ void modload_init(void)
     export_ht.hash_buckets = ___hash_st + 2;
     export_ht.hash_chains = export_ht.hash_buckets +
             export_ht.hash_nbucket;
-
-    module_entry_fn_t hello = modload_load("hello.km");
-    hello();
 }
 
 void dl_debug_state(void);

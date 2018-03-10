@@ -93,7 +93,7 @@ host_triplet = @host@
 bin_PROGRAMS = mbr-elf$(EXEEXT) mbr-bin$(EXEEXT) bootfat-elf$(EXEEXT) \
 	bootfat-bin$(EXEEXT) bootiso-elf$(EXEEXT) bootiso-bin$(EXEEXT) \
 	kernel-generic$(EXEEXT) kernel-bmi$(EXEEXT) \
-	user-shell$(EXEEXT)
+	user-shell$(EXEEXT) hello.km$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -322,6 +322,11 @@ bootiso_elf_OBJECTS = $(am_bootiso_elf_OBJECTS)
 bootiso_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootiso_elf_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(bootiso_elf_LDFLAGS) $(LDFLAGS) -o $@
+am_hello_km_OBJECTS = modules/hello/hello_km-hello.$(OBJEXT)
+hello_km_OBJECTS = $(am_hello_km_OBJECTS)
+hello_km_LDADD = $(LDADD)
+hello_km_LINK = $(CXXLD) $(hello_km_CXXFLAGS) $(CXXFLAGS) \
+	$(hello_km_LDFLAGS) $(LDFLAGS) -o $@
 am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-except_asm.$(OBJEXT) \
@@ -640,15 +645,15 @@ am__v_CCLD_1 =
 SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libmbr_a_SOURCES) $(bootfat_bin_SOURCES) \
 	$(bootfat_elf_SOURCES) $(bootiso_bin_SOURCES) \
-	$(bootiso_elf_SOURCES) $(kernel_bmi_SOURCES) \
-	$(kernel_generic_SOURCES) $(mbr_bin_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(bootiso_elf_SOURCES) $(hello_km_SOURCES) \
+	$(kernel_bmi_SOURCES) $(kernel_generic_SOURCES) \
+	$(mbr_bin_SOURCES) $(mbr_elf_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libmbr_a_SOURCES) $(bootfat_bin_SOURCES) \
 	$(bootfat_elf_SOURCES) $(bootiso_bin_SOURCES) \
-	$(bootiso_elf_SOURCES) $(kernel_bmi_SOURCES) \
-	$(kernel_generic_SOURCES) $(mbr_bin_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(bootiso_elf_SOURCES) $(hello_km_SOURCES) \
+	$(kernel_bmi_SOURCES) $(kernel_generic_SOURCES) \
+	$(mbr_bin_SOURCES) $(mbr_elf_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1812,6 +1817,18 @@ LIBC_CXXFLAGS = \
 
 # ----------------------------------------------------------------------------
 # User programs
+hello_km_SOURCES = \
+	modules/hello/hello.cc
+
+hello_km_CXXFLAGS = \
+	-I$(top_srcdir)/kernel/lib \
+	-I$(top_srcdir)/kernel/arch/x86_64 \
+	-I$(top_srcdir)/kernel/lib/cc \
+	-I$(top_srcdir)/kernel/lib/sys
+
+hello_km_LDFLAGS = \
+	-Wl,-r -Wl,-g -Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld
+
 user_shell_SOURCES = \
 	user/test/test.S
 
@@ -2554,6 +2571,18 @@ boot/bootiso_elf-bootiso.$(OBJEXT): boot/$(am__dirstamp) \
 bootiso-elf$(EXEEXT): $(bootiso_elf_OBJECTS) $(bootiso_elf_DEPENDENCIES) $(EXTRA_bootiso_elf_DEPENDENCIES) 
 	@rm -f bootiso-elf$(EXEEXT)
 	$(AM_V_CCLD)$(bootiso_elf_LINK) $(bootiso_elf_OBJECTS) $(bootiso_elf_LDADD) $(LIBS)
+modules/hello/$(am__dirstamp):
+	@$(MKDIR_P) modules/hello
+	@: > modules/hello/$(am__dirstamp)
+modules/hello/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) modules/hello/$(DEPDIR)
+	@: > modules/hello/$(DEPDIR)/$(am__dirstamp)
+modules/hello/hello_km-hello.$(OBJEXT): modules/hello/$(am__dirstamp) \
+	modules/hello/$(DEPDIR)/$(am__dirstamp)
+
+hello.km$(EXEEXT): $(hello_km_OBJECTS) $(hello_km_DEPENDENCIES) $(EXTRA_hello_km_DEPENDENCIES) 
+	@rm -f hello.km$(EXEEXT)
+	$(AM_V_CXXLD)$(hello_km_LINK) $(hello_km_OBJECTS) $(hello_km_LDADD) $(LIBS)
 kernel/arch/x86_64/$(am__dirstamp):
 	@$(MKDIR_P) kernel/arch/x86_64
 	@: > kernel/arch/x86_64/$(am__dirstamp)
@@ -3281,6 +3310,7 @@ mostlyclean-compile:
 	-rm -f libc/src/sys/*.$(OBJEXT)
 	-rm -f libc/src/unistd/*.$(OBJEXT)
 	-rm -f mbr/*.$(OBJEXT)
+	-rm -f modules/hello/*.$(OBJEXT)
 	-rm -f user/test/*.$(OBJEXT)
 
 distclean-compile:
@@ -3687,6 +3717,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-write.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_bin-empty.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-empty.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@modules/hello/$(DEPDIR)/hello_km-hello.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
 
 .S.o:
@@ -6142,6 +6173,20 @@ libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj: libc/src/posix_spawn/
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; fi`
+
+modules/hello/hello_km-hello.o: modules/hello/hello.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hello_km_CXXFLAGS) $(CXXFLAGS) -MT modules/hello/hello_km-hello.o -MD -MP -MF modules/hello/$(DEPDIR)/hello_km-hello.Tpo -c -o modules/hello/hello_km-hello.o `test -f 'modules/hello/hello.cc' || echo '$(srcdir)/'`modules/hello/hello.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) modules/hello/$(DEPDIR)/hello_km-hello.Tpo modules/hello/$(DEPDIR)/hello_km-hello.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='modules/hello/hello.cc' object='modules/hello/hello_km-hello.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hello_km_CXXFLAGS) $(CXXFLAGS) -c -o modules/hello/hello_km-hello.o `test -f 'modules/hello/hello.cc' || echo '$(srcdir)/'`modules/hello/hello.cc
+
+modules/hello/hello_km-hello.obj: modules/hello/hello.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hello_km_CXXFLAGS) $(CXXFLAGS) -MT modules/hello/hello_km-hello.obj -MD -MP -MF modules/hello/$(DEPDIR)/hello_km-hello.Tpo -c -o modules/hello/hello_km-hello.obj `if test -f 'modules/hello/hello.cc'; then $(CYGPATH_W) 'modules/hello/hello.cc'; else $(CYGPATH_W) '$(srcdir)/modules/hello/hello.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) modules/hello/$(DEPDIR)/hello_km-hello.Tpo modules/hello/$(DEPDIR)/hello_km-hello.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='modules/hello/hello.cc' object='modules/hello/hello_km-hello.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hello_km_CXXFLAGS) $(CXXFLAGS) -c -o modules/hello/hello_km-hello.obj `if test -f 'modules/hello/hello.cc'; then $(CYGPATH_W) 'modules/hello/hello.cc'; else $(CYGPATH_W) '$(srcdir)/modules/hello/hello.cc'; fi`
 
 kernel/kernel_bmi-main.o: kernel/main.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/kernel_bmi-main.o -MD -MP -MF kernel/$(DEPDIR)/kernel_bmi-main.Tpo -c -o kernel/kernel_bmi-main.o `test -f 'kernel/main.cc' || echo '$(srcdir)/'`kernel/main.cc
@@ -9719,6 +9764,8 @@ distclean-generic:
 	-rm -f libc/src/unistd/$(am__dirstamp)
 	-rm -f mbr/$(DEPDIR)/$(am__dirstamp)
 	-rm -f mbr/$(am__dirstamp)
+	-rm -f modules/hello/$(DEPDIR)/$(am__dirstamp)
+	-rm -f modules/hello/$(am__dirstamp)
 	-rm -f user/test/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/test/$(am__dirstamp)
 
@@ -9733,7 +9780,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -9781,7 +9828,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
