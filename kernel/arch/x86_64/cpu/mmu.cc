@@ -22,6 +22,7 @@
 #include "cpu_broadcast.h"
 #include "errno.h"
 #include "vector.h"
+#include "main.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
