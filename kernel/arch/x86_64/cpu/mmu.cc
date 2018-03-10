@@ -1225,7 +1225,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             // Lookup the device mapping
             intptr_t device = mmu_device_from_addr(rounded_addr);
             if (unlikely(device < 0))
-                return 0;
+                return nullptr;
 
             mmap_device_mapping_t *mapping = mm_dev_mappings[device];
 
@@ -1279,7 +1279,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             printdbg("Invalid page fault at 0x%zx, RIP=%p\n",
                      fault_addr, (void*)ISR_CTX_REG_RIP(ctx));
             if (thread_get_exception_top())
-                return 0;
+                return nullptr;
 
             dump_context(ctx, 1);
 
@@ -1287,7 +1287,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
         }
     } else if (present_mask != 0x0F) {
         if (thread_get_exception_top())
-            return 0;
+            return nullptr;
 
         dump_context(ctx, 1);
 
@@ -1315,7 +1315,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
     mmu_dump_pf(ISR_CTX_ERRCODE(ctx));
     mmu_dump_ptes(ptes);
 
-    return 0;
+    return nullptr;
 }
 
 #if DEBUG_ADDR_ALLOC
