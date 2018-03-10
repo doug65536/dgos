@@ -7,7 +7,7 @@
 #include "printk.h"
 #include "utility.h"
 #include "bootinfo.h"
-#include "../boot/vesainfo.h"
+#include "vesainfo.h"
 
 #define USE_NONTEMPORAL 1
 

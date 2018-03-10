@@ -1,30 +1,23 @@
 #include "bootinfo.h"
 #include "bios_data.h"
-
-struct bootinfo_data_t {
-    uint32_t ap_entry_addr;
-    uint32_t vbe_info_addr;
-    uint32_t bootdev_info_addr;
-};
+#include "main.h"
 
 uintptr_t bootinfo_parameter(bootparam_t param)
 {
-    bootinfo_data_t const *data =
-            (bootinfo_data_t*)(uintptr_t)
-            *(uint16_t*)&zero_page[0x9A0];
+    auto data = (kernel_params_t const *)&zero_page[uintptr_t(kernel_params)];
 
     if ((uintptr_t)data < 0x1000)
-        data = (bootinfo_data_t*)(zero_page + (uintptr_t)data);
+        data = (kernel_params_t*)(zero_page + (uintptr_t)data);
 
     switch (param) {
     case bootparam_t::ap_entry_point:
-        return data->ap_entry_addr;
+        return data->mp_entry;
 
     case bootparam_t::boot_device:
-        return data->bootdev_info_addr;
+        return data->boot_device_info;
 
     case bootparam_t::vbe_mode_info:
-        return data->vbe_info_addr;
+        return data->vbe_selected_mode;
 
     default:
         return 0;

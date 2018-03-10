@@ -12,6 +12,8 @@
 #include "farptr.h"
 #include "vesa.h"
 #include "progressbar.h"
+#include "bootloader.h"
+#include "driveinfo.h"
 
 #define ELF64_DEBUG    0
 #if ELF64_DEBUG
@@ -27,7 +29,7 @@ uint64_t mp_enter_kernel;
 
 static void enter_kernel_initial(uint64_t entry_point)
 {
-    vbe_info_vector = vbe_select_mode(65535, 800, 1) << 4;
+    uintptr_t vbe_info_vector = vbe_select_mode(65535, 800, 1) << 4;
     //vbe_info_vector = vbe_select_mode(1920, 1080, 1) << 4;
 
     //
@@ -39,11 +41,11 @@ static void enter_kernel_initial(uint64_t entry_point)
     print_line("SMP trampoline at 0x%x:%x",
                ap_entry_ptr.segment, ap_entry_ptr.offset);
 
-    far_copy(ap_entry_ptr, far_ptr2(0, (uint16_t)(uint32_t)ap_entry),
+    far_copy(ap_entry_ptr, far_ptr2(0, uint16_t(uintptr_t(ap_entry))),
              ap_entry_size);
 
     // Write address of AP entrypoint to ap_entry_vector
-    ap_entry_vector = (uintptr_t)ap_entry_seg << 4;
+    uintptr_t ap_entry_vector = (uintptr_t)ap_entry_seg << 4;
 
     //
     // Build physical memory table
@@ -69,14 +71,21 @@ static void enter_kernel_initial(uint64_t entry_point)
                      PTE_PRESENT | PTE_WRITABLE |
                      (-cpu_has_global_pages() & PTE_GLOBAL), 2);
 
-    // Pack the size into the high 12 bits
-    phys_mem_table |= phys_mem_table_size << 20;
+    kernel_params_t params;
+
+    params.size = sizeof(params);
+
+    params.mp_entry = ap_entry_vector;
+    params.phys_mem_table = phys_mem_table;
+    params.phys_mem_table_size = phys_mem_table_size;
+    params.vbe_selected_mode = vbe_info_vector;
+    params.boot_device_info = boot_device_info_vector;
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
     print_line("Entering kernel at 0x%llx\n", entry_point);
 
-    copy_or_enter(entry_point, 0, phys_mem_table);
+    copy_or_enter(entry_point, 0, uint32_t(uintptr_t(&params)));
 }
 
 void enter_kernel(uint64_t entry_point)

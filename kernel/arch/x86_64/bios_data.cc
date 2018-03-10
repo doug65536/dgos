@@ -8,7 +8,7 @@ static void biosdata_remap(void *arg)
 {
     (void)arg;
     zero_page = (char*)mmap(
-            0, PAGESIZE, PROT_READ | PROT_WRITE,
+            0, 64 << 10, PROT_READ | PROT_WRITE,
             MAP_PHYSICAL, -1, 0);
 }
 

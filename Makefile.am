@@ -184,7 +184,8 @@ libbootsect_a_SOURCES = \
 	boot/tui.cc
 
 libbootsect_a_INCLUDES = \
-	-I$(top_srcdir)/boot
+	-I$(top_srcdir)/boot \
+	-I$(top_srcdir)/boot/include
 
 libbootsect_a_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
@@ -611,6 +612,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_process.cc
 
 KERNEL_INCLUDES_SHARED = \
+	-I$(top_srcdir)/boot/include \
 	-I$(top_srcdir)/kernel \
 	-I$(top_srcdir)/kernel/lib \
 	-I$(top_srcdir)/kernel/net \

@@ -322,7 +322,8 @@ static ticketlock mm_dev_mapping_lock;
 /// This results in a 0.098% overhead for the physical page
 /// allocation map at 4 bytes per 4KB.
 
-physmem_range_t *phys_mem_map;
+// Original memory map
+physmem_range_t phys_mem_map[64];
 size_t phys_mem_map_count;
 
 // Memory map
@@ -1364,6 +1365,10 @@ void mmu_init()
 {
     // Hook IPI for TLB shootdown
     intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler);
+
+    memcpy(phys_mem_map, kernel_params->phys_mem_table,
+           sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size);
+    phys_mem_map_count = kernel_params->phys_mem_table_size;
 
     usable_mem_ranges = mmu_fixup_mem_map(phys_mem_map);
 

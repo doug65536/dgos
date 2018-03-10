@@ -4,6 +4,8 @@
 #include "farptr.h"
 #include "bioscall.h"
 
+uint32_t boot_device_info_vector;
+
 // Returns 0 on success, otherwise BIOS error code
 uint8_t driveinfo()
 {

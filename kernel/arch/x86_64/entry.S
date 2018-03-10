@@ -91,13 +91,7 @@ bsp_init:
 
     // Store the physical memory map address
     // passed in from bootloader
-    movl %r15d,%eax
-    shrl $20,%eax
-    movq %rax,phys_mem_map_count
-
-    movl %r15d,%eax
-    andl $0x000FFFFF,%eax
-    movq %rax,phys_mem_map
+    movq %r15,kernel_params
 
     // Get IDT and TSS up asap
     call idt_gdt_tss_init

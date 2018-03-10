@@ -34,6 +34,11 @@
 #include "vector.h"
 #include "process.h"
 #include "gdbstub.h"
+#include "conio.h"
+
+#include "bootloader.h"
+
+kernel_params_t *kernel_params;
 
 size_t constexpr kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size] __section(".bspstk");

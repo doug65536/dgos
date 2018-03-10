@@ -34,20 +34,6 @@ clear_bss:
 	popw %di
 	ret
 
-.section .bootinfo
-
-.globl ap_entry_vector
-ap_entry_vector:
-	.int 0
-
-.globl vbe_info_vector
-vbe_info_vector:
-	.int 0
-
-.globl bootdev_info_vector
-bootdev_info_vector:
-	.int 0
-
 .section .parttab
 	.space 16*4
 	.word 0xAA55

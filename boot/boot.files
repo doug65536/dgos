@@ -5,12 +5,16 @@ cpu_constants.h
 cpu_constants.h
 emulators.mk
 gdt.h
+include/bootdev_info.h
+include/bootloader.h
+include/physmem_data.h
+include/vesainfo.h
+include/farptr.h
 mpentry.S
 tui.cc
 tui.h
 utils/bochs-fat-config.bxrc.template
 utils/bochs-iso-config.bxrc.template
-vesainfo.h
 debug.cc
 debug.h
 driveinfo.cc
@@ -57,7 +61,6 @@ exception.s
 exception.h
 physmem.cc
 physmem.h
-farptr.h
 farptr.cc
 mpentry.h
 vesa.cc
