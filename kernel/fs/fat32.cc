@@ -1432,7 +1432,7 @@ int fat32_fs_t::open(fs_file_info_t **fi,
     }
 
     if (!file)
-        return -1;
+        return -int(errno_t::ENOENT);
 
     *fi = file;
 

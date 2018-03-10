@@ -891,6 +891,10 @@ int iso9660_fs_t::open(fs_file_info_t **fi,
     *fi = file;
 
     file->dirent = lookup_dirent(path);
+
+    if (!file->dirent)
+        return -int(errno_t::ENOENT);
+
     file->content = (char*)lookup_sector(dirent_lba(file->dirent));
 
     return 0;
