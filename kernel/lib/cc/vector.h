@@ -653,26 +653,30 @@ template<typename _T, typename _Allocator>
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos, _T const& __value)
 {
+    iterator __it(__pos.__p);
+
     constexpr size_t __count = 1;
 
     new (__make_space(__pos, __count)) value_type(__value);
 
     __sz += __count;
 
-    return iterator(__pos);
+    return __it;
 }
 
 template<typename _T, typename _Allocator>
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos, _T&& __value)
 {
+    iterator __it(__pos.__p);
+
     constexpr size_t __count = 1;
 
-    new (__make_space(__pos, __count)) value_type(move(__value));
+    new (__make_space(__it, __count)) value_type(move(__value));
 
     __sz += __count;
 
-    return iterator(__pos);
+    return __it;
 }
 
 template<typename _T, typename _Allocator>
@@ -680,12 +684,13 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(
         const_iterator __pos, size_type __count, _T const& __value)
 {
-    pointer place = __make_space(__pos, __count);
+    iterator __it = iterator(__pos.p);
+    pointer place = __make_space(__it, __count);
     uninitialized_fill(place, place + __count, __value);
 
     __sz += __count;
 
-    return iterator(__pos);
+    return __it;
 }
 
 template<typename _T, typename _Allocator>
@@ -694,11 +699,12 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               InputIt __first, InputIt __last)
 {
+    iterator __it(__pos.__p);
     constexpr size_t __count = __last - __first;
-    pointer place = __make_space(__pos, __count);
+    pointer place = __make_space(__it, __count);
     uninitialized_copy(__first, __last, place);
 
-    return iterator(__pos);
+    return __it;
 }
 
 template<typename _T, typename _Allocator>
@@ -706,7 +712,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               initializer_list<_T> __ilist)
 {
-    return insert(__pos, __ilist.begin(), __ilist.end());
+    return insert(iterator(__pos.__p), __ilist.begin(), __ilist.end());
 }
 
 template<typename _T, typename _Allocator>
