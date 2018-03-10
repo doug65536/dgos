@@ -1001,31 +1001,6 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
         if (unit.max_dma >= 0) {
             iface->bmdma_acquire();
 
-//            // Work around incorrectly implemented hardware
-//            // Build PRD list that is exactly the transfer size
-//
-//            uint32_t prd_index = 0;
-//            for (uint32_t prd_remain = sub_size; prd_remain > 0; ++prd_index) {
-//                bmdma_prd_t& full = dma_full_prd[prd_index];
-//                bmdma_prd_t& curr = dma_cur_prd[prd_index];
-//                size_t chunk;
-//
-//                curr.physaddr = full.physaddr;
-//
-//                chunk = full.size ? full.size : 0x10000;
-//
-//                if (prd_remain <= chunk) {
-//                    chunk = prd_remain;
-//                    curr.eot = 0x8000;
-//                } else {
-//                    curr.eot = 0;
-//                }
-//
-//                curr.size = uint16_t(chunk);
-//
-//                prd_remain -= chunk;
-//            }
-
             // Set PRD address register
             assert(dma_prd_physaddr && dma_prd_physaddr < 0x100000000);
             iface->bmdma_outd(ATA_BMDMA_REG_PRD_n(secondary),
