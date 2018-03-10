@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "stdlib.h"
 
 template<typename T>
 struct default_delete

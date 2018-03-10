@@ -80,6 +80,7 @@ static void enter_kernel_initial(uint64_t entry_point)
     params.phys_mem_table_size = phys_mem_table_size;
     params.vbe_selected_mode = vbe_info_vector;
     params.boot_device_info = boot_device_info_vector;
+    params.boot_serial = boot_serial();
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 

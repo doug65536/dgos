@@ -222,6 +222,11 @@ struct fs_base_t {
     virtual void unmount() = 0;
 
     //
+    // Identification of boot drive
+
+    virtual bool is_boot() const = 0;
+
+    //
     // Scan directories
 
     virtual int opendir(fs_file_info_t **fi, fs_cpath_t path) = 0;
@@ -341,6 +346,7 @@ struct fs_base_t {
 
 #define FS_BASE_IMPL \
     void unmount() override final;                                      \
+    bool is_boot() const override final;                                \
     int opendir(fs_file_info_t **fi, fs_cpath_t path) override final;   \
     ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  \
                     off_t offset) override final;                       \

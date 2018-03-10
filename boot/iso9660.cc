@@ -221,8 +221,14 @@ static iso9660_name_cmp_t iso9660_name_comparer = iso9660_lvl2_cmp;
 
 static uint32_t iso9660_root_dir_lba;
 static uint32_t iso9660_root_dir_size;
+static uint64_t iso9660_serial;
 
 static uint8_t iso9660_char_shift;
+
+static uint64_t iso9660_boot_serial()
+{
+    return iso9660_serial;
+}
 
 static int iso9660_find_available_file_handle()
 {
@@ -468,9 +474,25 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     iso9660_root_dir_size = pvd->root_dirent.size_lo_le |
             (pvd->root_dirent.size_hi_le << 16);
 
+    iso9660_serial = 0;
+    for (size_t i = 0, c; i < sizeof(pvd->app_id) && (c = pvd->app_id[i]); ++i) {
+        if (c >= '0' && c <= '9')
+            c -= '0';
+        else if (c >= 'a' && c <= 'z')
+            c-= 'a';
+        else if (c >= 'A' && c <= 'Z')
+            c -= 'A';
+        else
+            continue;
+
+        iso9660_serial = ((iso9660_serial << 8) |
+                          (iso9660_serial >> 56)) ^ (uint8_t)c;
+    }
+
     fs_api.boot_open = iso9660_boot_open;
     fs_api.boot_close = iso9660_boot_close;
     fs_api.boot_pread = iso9660_boot_pread;
+    fs_api.boot_serial = iso9660_boot_serial;
 
     elf64_run(cpu_choose_kernel());
 }

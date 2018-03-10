@@ -16,3 +16,8 @@ ssize_t boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 {
     return fs_api.boot_pread(file, buf, bytes, ofs);
 }
+
+uint64_t boot_serial()
+{
+    return fs_api.boot_serial();
+}

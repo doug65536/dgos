@@ -10,6 +10,7 @@
 #include "threadsync.h"
 #include "time.h"
 #include "vector.h"
+#include "main.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -125,6 +126,8 @@ struct fat32_fs_t final : public fs_base_t {
     // Partition range
     uint64_t lba_st;
     uint64_t lba_en;
+
+    uint64_t serial;
 
     cluster_t *fat;
     cluster_t *fat2;
@@ -1105,6 +1108,8 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
     // Pass 0 partition cluster to get partition relative values
     fat32_parse_bpb(&bpb, 0, sector_buffer);
 
+    serial = bpb.serial;
+
     root_cluster = bpb.root_dir_start;
 
     memset(&root_dirent, 0, sizeof(root_dirent));
@@ -1166,6 +1171,11 @@ void fat32_fs_t::unmount()
     unique_lock<shared_mutex> lock(rwlock);
 
     munmap(mm_dev, (uint64_t)(lba_en - lba_st) << sector_shift);
+}
+
+bool fat32_fs_t::is_boot() const
+{
+    return serial == kernel_params->boot_serial;
 }
 
 //

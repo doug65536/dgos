@@ -128,7 +128,10 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
     printdbg("Mounting %s filesystem\n", fs_name);
 
     fs_base_t *mfs = fs_reg->factory->mount(info);
-    if (mfs)
+
+    if (mfs && mfs->is_boot())
+        fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, mfs });
+    else if (mfs)
         fs_mounts.push_back(fs_mount_t{ fs_reg, mfs });
 }
 

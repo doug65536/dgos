@@ -17,6 +17,8 @@ static fat32_bpb_data_t bpb;
 static fat32_sector_iterator_t *file_handles;
 #define MAX_HANDLES 5
 
+uint64_t fat32_serial;
+
 static char *sector_buffer;
 static char *fat_buffer;
 uint32_t fat_buffer_lba;
@@ -626,6 +628,11 @@ static int fat32_find_available_file_handle()
     return -1;
 }
 
+static uint64_t fat32_boot_serial()
+{
+    return fat32_serial;
+}
+
 static int fat32_boot_open(char const *filename)
 {
     uint32_t cluster;
@@ -758,6 +765,7 @@ void fat32_boot_partition(uint64_t partition_lba)
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_close = fat32_boot_close;
     fs_api.boot_pread = fat32_boot_pread;
+    fs_api.boot_serial = fat32_boot_serial;
 
     elf64_run(cpu_choose_kernel());
 }

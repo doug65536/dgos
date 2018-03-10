@@ -11,13 +11,14 @@
 // Root Directory First Cluster	BPB_RootClus	0x2C	32 Bits	Usually 0x00000002
 // Signature	(none)	0x1FE	16 Bits	Always 0xAA55
 struct fat32_bpb_data_t {
-    uint32_t root_dir_start;	// 0x2C LBA
-    uint32_t sec_per_fat;		// 0x24 1 per 128 clusters
-    uint16_t reserved_sectors;	// 0x0E Usually 32
     uint16_t bytes_per_sec;		// 0x0B Always 512
-    uint16_t signature;			// 0x1FE Always 0xAA55
     uint8_t sec_per_cluster;	// 0x0D 8=4KB cluster
+    uint16_t reserved_sectors;	// 0x0E Usually 32
     uint8_t number_of_fats;		// 0x10 Always 2
+    uint32_t sec_per_fat;		// 0x24 1 per 128 clusters
+    uint32_t root_dir_start;	// 0x2C LBA
+    uint64_t serial;            // 0x43 serial number
+    uint16_t signature;			// 0x1FE Always 0xAA55
 
     // Inferred from data in on-disk BPB
     uint64_t first_fat_lba;
@@ -187,13 +188,14 @@ static __always_inline void fat32_parse_bpb(fat32_bpb_data_t *bpb,
                                    uint64_t partition_lba,
                                    char const *sector_buffer)
 {
-    bpb->root_dir_start = *(uint32_t*)(sector_buffer + 0x2C);
-    bpb->sec_per_fat = *(uint32_t*)(sector_buffer + 0x24);
-    bpb->reserved_sectors = *(uint16_t*)(sector_buffer + 0x0E);
     bpb->bytes_per_sec = *(uint16_t*)(sector_buffer + 0x0B);
-    bpb->signature = *(uint16_t*)(sector_buffer + 0x1FE);
     bpb->sec_per_cluster = *(uint8_t*)(sector_buffer + 0x0D);
+    bpb->reserved_sectors = *(uint16_t*)(sector_buffer + 0x0E);
     bpb->number_of_fats = *(uint8_t*)(sector_buffer + 0x10);
+    bpb->sec_per_fat = *(uint32_t*)(sector_buffer + 0x24);
+    bpb->root_dir_start = *(uint32_t*)(sector_buffer + 0x2C);
+    bpb->serial = *(uint32_t*)(sector_buffer + 0x43);
+    bpb->signature = *(uint16_t*)(sector_buffer + 0x1FE);
 
     bpb->first_fat_lba = partition_lba + bpb->reserved_sectors;
     bpb->cluster_begin_lba = bpb->first_fat_lba +

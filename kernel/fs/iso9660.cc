@@ -126,6 +126,8 @@ struct iso9660_fs_t final : public fs_base_t {
     uint32_t pt_lba;
     uint32_t pt_bytes;
 
+    unique_ptr_free<char> serial;
+
     int (*name_convert)(void *encoded_buf,
                         char const *utf8);
     int (*lookup_path_cmp)(void const *v,
@@ -582,6 +584,8 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
             return false;
     }
 
+    serial.reset(strdup(pvd.app_id));
+
     root_lba = dirent_lba(&pvd.root_dirent);
 
     root_bytes = dirent_size(&pvd.root_dirent);
@@ -633,6 +637,11 @@ void iso9660_fs_t::unmount()
 
     munmap(pt_ptrs, sizeof(*pt_ptrs) * pt_count);
     pt_ptrs = 0;
+}
+
+bool iso9660_fs_t::is_boot() const
+{
+    return serial && !strcmp(serial, "ea870ef2-2483-11e8-9bba-3f1a71a07f83");
 }
 
 //

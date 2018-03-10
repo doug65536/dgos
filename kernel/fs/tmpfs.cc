@@ -32,6 +32,11 @@ void tmpfs_fs_t::unmount()
 {
 }
 
+bool tmpfs_fs_t::is_boot() const
+{
+    return false;
+}
+
 //
 // Read directory entry information
 

@@ -85,4 +85,5 @@ struct alignas(8) kernel_params_t {
     ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
     ptr64_t<bootdev_drive_params_t> boot_device_info;
+    uint64_t boot_serial;
 };
