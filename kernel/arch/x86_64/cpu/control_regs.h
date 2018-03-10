@@ -161,6 +161,25 @@ static __always_inline uintptr_t cpu_cr4_change_bits(
     return rax;
 }
 
+static __always_inline uintptr_t cpu_get_cr8()
+{
+    uintptr_t cr8;
+    __asm__ __volatile__ (
+        "mov %%cr8,%[cr8]\n\t"
+        : [cr8] "=r" (cr8)
+    );
+    return cr8;
+}
+
+static __always_inline void cpu_set_cr8(uintptr_t cr8)
+{
+    __asm__ __volatile__ (
+        "mov %[cr8],%%cr8\n\t"
+        :
+        : [cr8] "r" (cr8)
+    );
+}
+
 template<int dr>
 static __always_inline uintptr_t cpu_get_debug_reg()
 {
