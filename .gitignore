@@ -76,3 +76,8 @@ Thumbs.db
 
 # Annoying qtcreator file
 boot/boot.creator.user
+
+autom4te.cache/
+aclocal.m4
+m4/
+*.creator.user
