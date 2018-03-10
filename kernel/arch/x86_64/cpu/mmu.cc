@@ -1138,7 +1138,7 @@ static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 
     intptr_t device = binary_search(
                 mm_dev_mappings.data(), mm_dev_mappings.size(),
-                sizeof(mmap_device_mapping_t),
+                sizeof(*mm_dev_mappings.data()),
                 (void*)rounded_addr,
                 mm_dev_map_search, 0, 1);
 
