@@ -357,22 +357,31 @@ static thread_t thread_create_with_state(
     thread->flags = 0;
 
     char *stack = thread_allocate_stack(i, stack_size, "", 0xFE);
-
-    char *syscall_stack = nullptr;
-    if (user)
-        syscall_stack = thread_allocate_stack(
-                    i, syscall_stack_size, "syscall", 0xFE);
-    thread->syscall_stack = syscall_stack;
-
-    // XSave stack
-    // Allocate one extra page for guard page
-    char *xsave_stack = thread_allocate_stack(i, xsave_stack_size, "xsave", 0);
-
-    thread->xsave_stack = xsave_stack;
-    thread->xsave_ptr = xsave_stack - sse_context_size;
-
     thread->stack = stack;
     thread->stack_size = stack_size;
+
+    char *syscall_stack = nullptr;
+    char *xsave_stack = nullptr;
+    if (user) {
+        // Syscall stack
+
+        syscall_stack = thread_allocate_stack(
+                    i, syscall_stack_size, "syscall", 0xFE);
+
+        // XSave stack
+
+        thread->flags |= THREAD_FLAGS_USES_FPU;
+
+        xsave_stack = thread_allocate_stack(
+                    i, xsave_stack_size, "xsave", 0);
+
+        thread->xsave_ptr = xsave_stack - sse_context_size;
+    } else {
+        thread->xsave_ptr = nullptr;
+    }
+    thread->syscall_stack = syscall_stack;
+    thread->xsave_stack = xsave_stack;
+
     thread->priority = priority;
     thread->priority_boost = 0;
     thread->cpu_affinity = affinity ? affinity : ~0UL;
@@ -381,8 +390,6 @@ static thread_t thread_create_with_state(
 
     // APs inherit BSP's process
     thread->process = cpus[0].cur_thread->process;
-
-    thread->flags = user ? THREAD_FLAGS_USES_FPU : 0;
 
     uintptr_t stack_addr = uintptr_t(stack);
     uintptr_t stack_end = stack_addr;
@@ -416,20 +423,20 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_RDX(ctx) = (uintptr_t)i;
     ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
 
-    memset(ctx->fpr, 0, sse_context_size);
+    if (thread->flags & THREAD_FLAGS_USES_FPU) {
+        ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
+                CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
+                default_mxcsr_mask;
+        ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
 
-    ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
-            CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
-            default_mxcsr_mask;
-    ISR_CTX_SSE_MXCSR_MASK(ctx) = default_mxcsr_mask;
+        // All FPU registers empty
+        ISR_CTX_FPU_FSW(ctx) = CPU_FPUSW_TOP_n(7);
 
-    // All FPU registers empty
-    ISR_CTX_FPU_FSW(ctx) = CPU_FPUSW_TOP_n(7);
-
-    // 53 bit FPU precision
-    ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
-            CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
-            CPU_FPUCW_UM | CPU_FPUCW_PM;
+        // 53 bit FPU precision
+        ISR_CTX_FPU_FCW(ctx) = CPU_FPUCW_PC_n(CPU_FPUCW_PC_53) | CPU_FPUCW_IM |
+                CPU_FPUCW_DM | CPU_FPUCW_ZM | CPU_FPUCW_OM |
+                CPU_FPUCW_UM | CPU_FPUCW_PM;
+    }
 
     thread->ctx = ctx;
 
@@ -536,12 +543,8 @@ void thread_init(int ap)
         thread->stack = thread_allocate_stack(
                     0, kernel_stack_size, "idle", 0xFE);
 
-        // BSP XSAVE stack (grows up)
-        char *xsave_stack = thread_allocate_stack(
-                    0, xsave_stack_size, "idle", 0);
-
-        thread->xsave_stack = xsave_stack;
-        thread->xsave_ptr = xsave_stack;
+        thread->xsave_stack = nullptr;
+        thread->xsave_ptr = nullptr;
         thread->cpu_affinity = 1;
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
@@ -727,8 +730,11 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
                stack_guard_size + thread->stack_size + stack_guard_size);
 
-        munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
-               stack_guard_size + xsave_stack_size + stack_guard_size);
+        if (thread->flags & THREAD_FLAGS_USES_FPU) {
+            assert(thread->xsave_stack != nullptr);
+            munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
+                   stack_guard_size + xsave_stack_size + stack_guard_size);
+        }
 
         mutex_lock_noyield(&thread->lock);
         thread->state = THREAD_IS_FINISHED;
