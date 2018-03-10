@@ -46,4 +46,9 @@ size_t format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, format_flag_info_t const *info);
 
+intptr_t formatter(
+        char const *format, va_list ap,
+        int (*emit_chars)(char const *, intptr_t, void*),
+        void *emit_context);
+
 __END_DECLS

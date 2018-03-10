@@ -276,14 +276,18 @@ static char *dtoa(char *txt, size_t txt_sz,
 
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
+ticketlock formatter_lock;
+
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
 /// or, a pointer to an unterminated string and a length
-static intptr_t formatter(
+intptr_t formatter(
         char const *format, va_list ap,
         int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
+    unique_lock<ticketlock> hold_formatter_lock(formatter_lock);
+
     formatter_flags_t flags;
     intptr_t chars_written = 0;
     int *output_arg;
