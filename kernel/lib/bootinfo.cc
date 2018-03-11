@@ -19,6 +19,9 @@ uintptr_t bootinfo_parameter(bootparam_t param)
     case bootparam_t::vbe_mode_info:
         return data->vbe_selected_mode;
 
+    case bootparam_t::boot_serial:
+        return data->boot_serial;
+
     default:
         return 0;
     }

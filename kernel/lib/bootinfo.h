@@ -4,7 +4,8 @@
 enum struct bootparam_t {
     ap_entry_point,
     vbe_mode_info,
-    boot_device
+    boot_device,
+    boot_serial
 };
 
 extern "C" uintptr_t bootinfo_parameter(bootparam_t param);
