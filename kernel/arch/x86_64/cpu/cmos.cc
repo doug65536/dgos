@@ -314,5 +314,6 @@ void cmos_init(void)
     // EOI just in case
     cmos_read(CMOS_REG_STATUS_C, lock);
 
+    irq_setcpu(8, -1);
     irq_setmask(8, true);
 }
