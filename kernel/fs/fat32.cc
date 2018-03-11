@@ -1231,7 +1231,7 @@ void fat32_fs_t::unmount()
 
 bool fat32_fs_t::is_boot() const
 {
-    return serial == kernel_params->boot_serial;
+    return serial == bootinfo_parameter(bootparam_t::boot_serial);
 }
 
 //
