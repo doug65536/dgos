@@ -10,7 +10,7 @@
 #include "threadsync.h"
 #include "time.h"
 #include "vector.h"
-#include "main.h"
+#include "bootinfo.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32

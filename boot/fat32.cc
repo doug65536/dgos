@@ -741,6 +741,8 @@ void fat32_boot_partition(uint64_t partition_lba)
         return;
     }
 
+    fat32_serial = bpb.serial;
+
     // 0x2C LBA
     print_line("root_dir_start:	  %ld", bpb.root_dir_start);
 
