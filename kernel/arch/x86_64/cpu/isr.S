@@ -556,6 +556,8 @@ exception_isr_handler:
     retq
 
 0:
+    mov %ebx,%edi
+    mov %r12,%rsi
     pop_cfi %r12
     pop_cfi %rbx
     pop_cfi %rbp
@@ -564,6 +566,9 @@ exception_isr_handler:
 
 .align 16
 .Linvoke_catch:
+    mov %edi,%ebx
+    mov %rsi,%r12
+
     // ...no handler or handler rejected it
     movq $__exception_handler_invoke,%rax
     movl %ebx,%edi
@@ -579,9 +584,6 @@ exception_isr_handler:
 2:
     movq $unhandled_exception_handler,%rax
     movq %r12,%rdi
-    pop_cfi %r12
-    pop_cfi %rbx
-    pop_cfi %rbp
     jmpq *%rax
 
     .cfi_endproc
