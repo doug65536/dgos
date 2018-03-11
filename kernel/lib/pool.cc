@@ -70,7 +70,7 @@ void *pool_alloc(pool_t *pool)
         slot = (uint32_t*)pool_item(pool, pool->item_count++);
     } else {
         // Full
-        slot = 0;
+        slot = nullptr;
     }
 
     mutex_unlock(&pool->lock);
