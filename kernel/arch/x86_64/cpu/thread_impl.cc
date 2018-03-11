@@ -204,7 +204,7 @@ private:
 };
 
 // Get executing APIC ID (the slow expensive way, for early initialization)
-static uint32_t get_apic_id(void)
+static uint32_t get_apic_id()
 {
     cpuid_t cpuid_info;
     cpuid(&cpuid_info, CPUID_INFO_FEATURES, 0);
@@ -212,17 +212,17 @@ static uint32_t get_apic_id(void)
     return apic_id;
 }
 
-static __always_inline cpu_info_t *this_cpu(void)
+static __always_inline cpu_info_t *this_cpu()
 {
     return (cpu_info_t *)cpu_gs_read_ptr<0>();
 }
 
-static __always_inline thread_info_t *this_thread(void)
+static __always_inline thread_info_t *this_thread()
 {
     return (thread_info_t*)cpu_gs_read_ptr<offsetof(cpu_info_t, cur_thread)>();
 }
 
-EXPORT void thread_yield(void)
+EXPORT void thread_yield()
 {
 #if 1
     __asm__ __volatile__ (
@@ -259,7 +259,7 @@ EXPORT void thread_yield(void)
 #endif
 }
 
-static void thread_cleanup(void)
+static void thread_cleanup()
 {
     thread_info_t *thread = this_thread();
 
@@ -440,9 +440,6 @@ static thread_t thread_create_with_state(
 
     thread->ctx = ctx;
 
-    // Check available stack space
-    //assert((char*)thread->ctx - (char*)thread->stack > 4096);
-
     atomic_barrier();
     thread->state = state;
 
@@ -461,7 +458,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
 }
 
 #if 0
-static void thread_monitor_mwait(void)
+static void thread_monitor_mwait()
 {
     uint64_t rax = 0;
     __asm__ __volatile__ (
@@ -475,7 +472,7 @@ static void thread_monitor_mwait(void)
 }
 #endif
 
-static int smp_idle_thread(void *arg)
+static int smp_idle_thread(void *)
 {
     // Enable spinning
     spincount_mask = -1;
@@ -484,7 +481,6 @@ static int smp_idle_thread(void *arg)
 
     printdbg("SMP thread running\n");
     atomic_inc(&thread_smp_running);
-    (void)arg;
     thread_check_stack();
     thread_idle();
 }
@@ -895,17 +891,17 @@ EXPORT int thread_wait(thread_t thread_id)
     return thread->exit_code;
 }
 
-int thread_cpu_count(void)
+int thread_cpu_count()
 {
     return cpu_count;
 }
 
-uint32_t thread_cpus_started(void)
+uint32_t thread_cpus_started()
 {
     return thread_smp_running + 1;
 }
 
-uint64_t thread_get_cpu_mmu_seq(void)
+uint64_t thread_get_cpu_mmu_seq()
 {
     cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
@@ -919,7 +915,7 @@ void thread_set_cpu_mmu_seq(uint64_t seq)
     cpu->mmu_seq = seq;
 }
 
-EXPORT thread_t thread_get_id(void)
+EXPORT thread_t thread_get_id()
 {
     if (thread_count) {
         thread_t thread_id;
@@ -976,7 +972,7 @@ EXPORT void thread_set_priority(thread_t thread_id,
     threads[thread_id].priority = priority;
 }
 
-void thread_check_stack(void)
+void thread_check_stack()
 {
     thread_info_t *thread = this_thread();
 
@@ -990,12 +986,12 @@ void thread_check_stack(void)
     }
 }
 
-void thread_idle_set_ready(void)
+void thread_idle_set_ready()
 {
     thread_idle_ready = 1;
 }
 
-void *thread_get_exception_top(void)
+void *thread_get_exception_top()
 {
     thread_info_t *thread = this_thread();
     return thread->exception_chain;
@@ -1009,7 +1005,7 @@ void *thread_set_exception_top(void *chain)
     return old;
 }
 
-size_t thread_cls_alloc(void)
+size_t thread_cls_alloc()
 {
     return atomic_xadd(&storage_next_slot, 1);
 }
