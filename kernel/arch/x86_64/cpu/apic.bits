@@ -1,7 +1,7 @@
 
 -- MP_CPU_FLAGS
-0 ENABLED
-1 BSP
+0 ENABLED CPU is enabled
+1 BSP 1=bootstrap processor, 0=application processor
 
 -- MP_IOAPIC_FLAGS
 0 ENABLED
@@ -10,9 +10,23 @@
 1:0 POLARITY
 3:2 TRIGGER
 
+-- MP_INTR_FLAGS_POLARITY_DEFAULT=0
+-- MP_INTR_FLAGS_POLARITY_ACTIVEHI=1
+-- MP_INTR_FLAGS_POLARITY_ACTIVELO=3
+
+-- MP_INTR_FLAGS_TRIGGER_DEFAULT=0
+-- MP_INTR_FLAGS_TRIGGER_EDGE=1
+-- MP_INTR_FLAGS_TRIGGER_LEVEL=3
+
+# Entry type 3 and 4 flags
+-- MP_INTR_TYPE_APIC=0
+-- MP_INTR_TYPE_NMI=1
+-- MP_INTR_TYPE_SMI=2
+-- MP_INTR_TYPE_EXTINT=3
+
 -- IOAPIC_VER
 7:0 VERSION
-23:16 ENTRIES
+23:16 ENTRIES The number of I/O redirection entries implemented
 
 -- IOAPIC_REDLO
 7:0 VECTOR
@@ -23,6 +37,22 @@
 14 REMOTEIRR
 15 TRIGGER
 16 MASKIRQ
+
+-- IOAPIC_REDLO_DELIVERY_APIC=0
+-- IOAPIC_REDLO_DELIVERY_LOWPRI=1
+-- IOAPIC_REDLO_DELIVERY_SMI=2
+-- IOAPIC_REDLO_DELIVERY_NMI=4
+-- IOAPIC_REDLO_DELIVERY_INIT=5
+-- IOAPIC_REDLO_DELIVERY_EXTINT=7
+
+-- IOAPIC_REDLO_DESTMODE_PHYSICAL=0
+-- IOAPIC_REDLO_DESTMODE_LOGICAL=1
+
+-- IOAPIC_REDLO_TRIGGER_EDGE=0
+-- IOAPIC_REDLO_TRIGGER_LEVEL=1
+
+-- IOAPIC_REDLO_POLARITY_ACTIVEHI=0
+-- IOAPIC_REDLO_POLARITY_ACTIVELO=1
 
 -- IOAPIC_REDHI
 31:24 DEST
@@ -62,28 +92,28 @@
 0 TX_CHECKSUM_ERR Send checksum error (old processors)
 
 -- ACPI_FADT_FFF FADT Fixed Feature Flags
-0 WBINVD
-1 WBINVD_FLUSH
-2 PROC_C1
-3 P_LVL2_MP
-4 PWR_BUTTON
-5 SLP_BUTTON
-6 FIX_RTC
-7 RTC_S4
-8 TMR_VAL_EXT
-9 DCK_CAP
-10 RESET_REG_SUP
-11 SEALED_CASE
-12 HEADLESS
-13 CPU_SW_SLP
-14 PCI_EXP_WAK
-15 PLAT_CLOCK
-16 S4_RTC_STS
-17 REMOTE_ON_CAP
-18 FORCE_CLUSTER
-19 FORCE_PHYS
-20 HW_REDUCED_ACPI
-21 LOCAL_POWER_S0_BIT
+0 WBINVD The WBINVD instruction works correctly
+1 WBINVD_FLUSH The WBINVD instruction does not invalidate the caches
+2 PROC_C1 The C1 state is supported on all processors
+3 P_LVL2_MP The C2 state works with multiple processors
+4 PWR_BUTTON Power button: 0=fixed feature, 1=control method
+5 SLP_BUTTON Sleep button: 0=fixed feature, 1=control method
+6 FIX_RTC RTC wake: 0=fixed feature, 1=not fixed feature
+7 RTC_S4 RTC can wake from S4 state
+8 TMR_VAL_EXT Timer width: 0=24 bit, 1=32 bit
+9 DCK_CAP Docking capable
+10 RESET_REG_SUP FADT RESET_REG support: 1=supported
+11 SEALED_CASE No internal expansion capabilities
+12 HEADLESS Cannot detect monitor/keyboard devices
+13 CPU_SW_SLP A native instruction must be executed after writing SLP_TYPx
+14 PCI_EXP_WAK Supports PCI express wake PCIEXP_WAKE_STS/_EN
+15 PLAT_CLOCK Use platform clock - long confusing explanation in spec
+16 S4_RTC_STS System has RTC_STS errata when walking from S4
+17 REMOTE_ON_CAP Remote power on capable
+18 FORCE_CLUSTER Force APIC to use cluster destination mode
+19 FORCE_PHYS Force xAPIC to use physical destination mode (N/A to APIC)
+20 HW_REDUCED_ACPI ACPI hardware interface is not supported
+21 LOW_POWER_S0_IDLE_BIT System power saving in S0 is as good as typical S3
 
 -- ACPI_MADT_FLAGS
 0 HAVE_PIC Dual 8259 PIC present

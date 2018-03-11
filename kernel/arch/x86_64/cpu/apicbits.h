@@ -10,8 +10,12 @@
 #define MP_CPU_FLAGS_BSP_BITS          1
 #define MP_CPU_FLAGS_ENABLED_MASK      ((1U << MP_CPU_FLAGS_ENABLED_BITS)-1)
 #define MP_CPU_FLAGS_BSP_MASK          ((1U << MP_CPU_FLAGS_BSP_BITS)-1)
+
+// CPU is enabled
 #define MP_CPU_FLAGS_ENABLED \
     (MP_CPU_FLAGS_ENABLED_MASK << MP_CPU_FLAGS_ENABLED_BIT)
+
+// 1=bootstrap processor, 0=application processor
 #define MP_CPU_FLAGS_BSP \
     (MP_CPU_FLAGS_BSP_MASK << MP_CPU_FLAGS_BSP_BIT)
 
@@ -74,6 +78,86 @@
 #define MP_INTR_FLAGS_TRIGGER_SET(r,n) \
     ((r) = ((r) & ~MP_INTR_FLAGS_TRIGGER) | MP_INTR_FLAGS_TRIGGER_n((n)))
 
+// MP_INTR_FLAGS_POLARITY_DEFAULT
+#define MP_INTR_FLAGS_POLARITY_DEFAULT 0
+
+
+
+
+
+
+// MP_INTR_FLAGS_POLARITY_ACTIVEHI
+#define MP_INTR_FLAGS_POLARITY_ACTIVEHI 1
+
+
+
+
+
+
+// MP_INTR_FLAGS_POLARITY_ACTIVELO
+#define MP_INTR_FLAGS_POLARITY_ACTIVELO 3
+
+
+
+
+
+
+// MP_INTR_FLAGS_TRIGGER_DEFAULT
+#define MP_INTR_FLAGS_TRIGGER_DEFAULT 0
+
+
+
+
+
+
+// MP_INTR_FLAGS_TRIGGER_EDGE
+#define MP_INTR_FLAGS_TRIGGER_EDGE 1
+
+
+
+
+
+
+// MP_INTR_FLAGS_TRIGGER_LEVEL
+#define MP_INTR_FLAGS_TRIGGER_LEVEL 3
+
+
+
+
+
+
+// MP_INTR_TYPE_APIC
+#define MP_INTR_TYPE_APIC 0
+
+
+
+
+
+
+// MP_INTR_TYPE_NMI
+#define MP_INTR_TYPE_NMI 1
+
+
+
+
+
+
+// MP_INTR_TYPE_SMI
+#define MP_INTR_TYPE_SMI 2
+
+
+
+
+
+
+// MP_INTR_TYPE_EXTINT
+#define MP_INTR_TYPE_EXTINT 3
+
+
+
+
+
+
 // IOAPIC_VER
 
 #define IOAPIC_VER_VERSION_BIT       0
@@ -85,6 +169,8 @@
 #define IOAPIC_VER_ENTRIES_MASK      ((1U << IOAPIC_VER_ENTRIES_BITS)-1)
 #define IOAPIC_VER_VERSION \
     (IOAPIC_VER_VERSION_MASK << IOAPIC_VER_VERSION_BIT)
+
+// The number of I/O redirection entries implemented
 #define IOAPIC_VER_ENTRIES \
     (IOAPIC_VER_ENTRIES_MASK << IOAPIC_VER_ENTRIES_BIT)
 
@@ -188,6 +274,102 @@
     ((r) = ((r) & ~IOAPIC_REDLO_TRIGGER) | IOAPIC_REDLO_TRIGGER_n((n)))
 #define IOAPIC_REDLO_MASKIRQ_SET(r,n) \
     ((r) = ((r) & ~IOAPIC_REDLO_MASKIRQ) | IOAPIC_REDLO_MASKIRQ_n((n)))
+
+// IOAPIC_REDLO_DELIVERY_APIC
+#define IOAPIC_REDLO_DELIVERY_APIC 0
+
+
+
+
+
+
+// IOAPIC_REDLO_DELIVERY_LOWPRI
+#define IOAPIC_REDLO_DELIVERY_LOWPRI 1
+
+
+
+
+
+
+// IOAPIC_REDLO_DELIVERY_SMI
+#define IOAPIC_REDLO_DELIVERY_SMI 2
+
+
+
+
+
+
+// IOAPIC_REDLO_DELIVERY_NMI
+#define IOAPIC_REDLO_DELIVERY_NMI 4
+
+
+
+
+
+
+// IOAPIC_REDLO_DELIVERY_INIT
+#define IOAPIC_REDLO_DELIVERY_INIT 5
+
+
+
+
+
+
+// IOAPIC_REDLO_DELIVERY_EXTINT
+#define IOAPIC_REDLO_DELIVERY_EXTINT 7
+
+
+
+
+
+
+// IOAPIC_REDLO_DESTMODE_PHYSICAL
+#define IOAPIC_REDLO_DESTMODE_PHYSICAL 0
+
+
+
+
+
+
+// IOAPIC_REDLO_DESTMODE_LOGICAL
+#define IOAPIC_REDLO_DESTMODE_LOGICAL 1
+
+
+
+
+
+
+// IOAPIC_REDLO_TRIGGER_EDGE
+#define IOAPIC_REDLO_TRIGGER_EDGE 0
+
+
+
+
+
+
+// IOAPIC_REDLO_TRIGGER_LEVEL
+#define IOAPIC_REDLO_TRIGGER_LEVEL 1
+
+
+
+
+
+
+// IOAPIC_REDLO_POLARITY_ACTIVEHI
+#define IOAPIC_REDLO_POLARITY_ACTIVEHI 0
+
+
+
+
+
+
+// IOAPIC_REDLO_POLARITY_ACTIVELO
+#define IOAPIC_REDLO_POLARITY_ACTIVELO 1
+
+
+
+
+
 
 // IOAPIC_REDHI
 
@@ -512,51 +694,51 @@
 //
 // ACPI_FADT_FFF: FADT Fixed Feature Flags
 
-#define ACPI_FADT_FFF_WBINVD_BIT                   0
-#define ACPI_FADT_FFF_WBINVD_FLUSH_BIT             1
-#define ACPI_FADT_FFF_PROC_C1_BIT                  2
-#define ACPI_FADT_FFF_P_LVL2_MP_BIT                3
-#define ACPI_FADT_FFF_PWR_BUTTON_BIT               4
-#define ACPI_FADT_FFF_SLP_BUTTON_BIT               5
-#define ACPI_FADT_FFF_FIX_RTC_BIT                  6
-#define ACPI_FADT_FFF_RTC_S4_BIT                   7
-#define ACPI_FADT_FFF_TMR_VAL_EXT_BIT              8
-#define ACPI_FADT_FFF_DCK_CAP_BIT                  9
-#define ACPI_FADT_FFF_RESET_REG_SUP_BIT            10
-#define ACPI_FADT_FFF_SEALED_CASE_BIT              11
-#define ACPI_FADT_FFF_HEADLESS_BIT                 12
-#define ACPI_FADT_FFF_CPU_SW_SLP_BIT               13
-#define ACPI_FADT_FFF_PCI_EXP_WAK_BIT              14
-#define ACPI_FADT_FFF_PLAT_CLOCK_BIT               15
-#define ACPI_FADT_FFF_S4_RTC_STS_BIT               16
-#define ACPI_FADT_FFF_REMOTE_ON_CAP_BIT            17
-#define ACPI_FADT_FFF_FORCE_CLUSTER_BIT            18
-#define ACPI_FADT_FFF_FORCE_PHYS_BIT               19
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT          20
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BIT       21
+#define ACPI_FADT_FFF_WBINVD_BIT                      0
+#define ACPI_FADT_FFF_WBINVD_FLUSH_BIT                1
+#define ACPI_FADT_FFF_PROC_C1_BIT                     2
+#define ACPI_FADT_FFF_P_LVL2_MP_BIT                   3
+#define ACPI_FADT_FFF_PWR_BUTTON_BIT                  4
+#define ACPI_FADT_FFF_SLP_BUTTON_BIT                  5
+#define ACPI_FADT_FFF_FIX_RTC_BIT                     6
+#define ACPI_FADT_FFF_RTC_S4_BIT                      7
+#define ACPI_FADT_FFF_TMR_VAL_EXT_BIT                 8
+#define ACPI_FADT_FFF_DCK_CAP_BIT                     9
+#define ACPI_FADT_FFF_RESET_REG_SUP_BIT               10
+#define ACPI_FADT_FFF_SEALED_CASE_BIT                 11
+#define ACPI_FADT_FFF_HEADLESS_BIT                    12
+#define ACPI_FADT_FFF_CPU_SW_SLP_BIT                  13
+#define ACPI_FADT_FFF_PCI_EXP_WAK_BIT                 14
+#define ACPI_FADT_FFF_PLAT_CLOCK_BIT                  15
+#define ACPI_FADT_FFF_S4_RTC_STS_BIT                  16
+#define ACPI_FADT_FFF_REMOTE_ON_CAP_BIT               17
+#define ACPI_FADT_FFF_FORCE_CLUSTER_BIT               18
+#define ACPI_FADT_FFF_FORCE_PHYS_BIT                  19
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT             20
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT       21
 
-#define ACPI_FADT_FFF_WBINVD_BITS                  1
-#define ACPI_FADT_FFF_WBINVD_FLUSH_BITS            1
-#define ACPI_FADT_FFF_PROC_C1_BITS                 1
-#define ACPI_FADT_FFF_P_LVL2_MP_BITS               1
-#define ACPI_FADT_FFF_PWR_BUTTON_BITS              1
-#define ACPI_FADT_FFF_SLP_BUTTON_BITS              1
-#define ACPI_FADT_FFF_FIX_RTC_BITS                 1
-#define ACPI_FADT_FFF_RTC_S4_BITS                  1
-#define ACPI_FADT_FFF_TMR_VAL_EXT_BITS             1
-#define ACPI_FADT_FFF_DCK_CAP_BITS                 1
-#define ACPI_FADT_FFF_RESET_REG_SUP_BITS           1
-#define ACPI_FADT_FFF_SEALED_CASE_BITS             1
-#define ACPI_FADT_FFF_HEADLESS_BITS                1
-#define ACPI_FADT_FFF_CPU_SW_SLP_BITS              1
-#define ACPI_FADT_FFF_PCI_EXP_WAK_BITS             1
-#define ACPI_FADT_FFF_PLAT_CLOCK_BITS              1
-#define ACPI_FADT_FFF_S4_RTC_STS_BITS              1
-#define ACPI_FADT_FFF_REMOTE_ON_CAP_BITS           1
-#define ACPI_FADT_FFF_FORCE_CLUSTER_BITS           1
-#define ACPI_FADT_FFF_FORCE_PHYS_BITS              1
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI_BITS         1
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BITS      1
+#define ACPI_FADT_FFF_WBINVD_BITS                     1
+#define ACPI_FADT_FFF_WBINVD_FLUSH_BITS               1
+#define ACPI_FADT_FFF_PROC_C1_BITS                    1
+#define ACPI_FADT_FFF_P_LVL2_MP_BITS                  1
+#define ACPI_FADT_FFF_PWR_BUTTON_BITS                 1
+#define ACPI_FADT_FFF_SLP_BUTTON_BITS                 1
+#define ACPI_FADT_FFF_FIX_RTC_BITS                    1
+#define ACPI_FADT_FFF_RTC_S4_BITS                     1
+#define ACPI_FADT_FFF_TMR_VAL_EXT_BITS                1
+#define ACPI_FADT_FFF_DCK_CAP_BITS                    1
+#define ACPI_FADT_FFF_RESET_REG_SUP_BITS              1
+#define ACPI_FADT_FFF_SEALED_CASE_BITS                1
+#define ACPI_FADT_FFF_HEADLESS_BITS                   1
+#define ACPI_FADT_FFF_CPU_SW_SLP_BITS                 1
+#define ACPI_FADT_FFF_PCI_EXP_WAK_BITS                1
+#define ACPI_FADT_FFF_PLAT_CLOCK_BITS                 1
+#define ACPI_FADT_FFF_S4_RTC_STS_BITS                 1
+#define ACPI_FADT_FFF_REMOTE_ON_CAP_BITS              1
+#define ACPI_FADT_FFF_FORCE_CLUSTER_BITS              1
+#define ACPI_FADT_FFF_FORCE_PHYS_BITS                 1
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI_BITS            1
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BITS      1
 #define ACPI_FADT_FFF_WBINVD_MASK \
     ((1U << ACPI_FADT_FFF_WBINVD_BITS)-1)
 #define ACPI_FADT_FFF_WBINVD_FLUSH_MASK \
@@ -599,53 +781,97 @@
     ((1U << ACPI_FADT_FFF_FORCE_PHYS_BITS)-1)
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_MASK \
     ((1U << ACPI_FADT_FFF_HW_REDUCED_ACPI_BITS)-1)
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_MASK \
-    ((1U << ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BITS)-1)
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_MASK \
+    ((1U << ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BITS)-1)
+
+// The WBINVD instruction works correctly
 #define ACPI_FADT_FFF_WBINVD \
     (ACPI_FADT_FFF_WBINVD_MASK << ACPI_FADT_FFF_WBINVD_BIT)
+
+// The WBINVD instruction does not invalidate the caches
 #define ACPI_FADT_FFF_WBINVD_FLUSH \
     (ACPI_FADT_FFF_WBINVD_FLUSH_MASK << ACPI_FADT_FFF_WBINVD_FLUSH_BIT)
+
+// The C1 state is supported on all processors
 #define ACPI_FADT_FFF_PROC_C1 \
     (ACPI_FADT_FFF_PROC_C1_MASK << ACPI_FADT_FFF_PROC_C1_BIT)
+
+// The C2 state works with multiple processors
 #define ACPI_FADT_FFF_P_LVL2_MP \
     (ACPI_FADT_FFF_P_LVL2_MP_MASK << ACPI_FADT_FFF_P_LVL2_MP_BIT)
+
+// Power button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_PWR_BUTTON \
     (ACPI_FADT_FFF_PWR_BUTTON_MASK << ACPI_FADT_FFF_PWR_BUTTON_BIT)
+
+// Sleep button: 0=fixed feature, 1=control method
 #define ACPI_FADT_FFF_SLP_BUTTON \
     (ACPI_FADT_FFF_SLP_BUTTON_MASK << ACPI_FADT_FFF_SLP_BUTTON_BIT)
+
+// RTC wake: 0=fixed feature, 1=not fixed feature
 #define ACPI_FADT_FFF_FIX_RTC \
     (ACPI_FADT_FFF_FIX_RTC_MASK << ACPI_FADT_FFF_FIX_RTC_BIT)
+
+// RTC can wake from S4 state
 #define ACPI_FADT_FFF_RTC_S4 \
     (ACPI_FADT_FFF_RTC_S4_MASK << ACPI_FADT_FFF_RTC_S4_BIT)
+
+// Timer width: 0=24 bit, 1=32 bit
 #define ACPI_FADT_FFF_TMR_VAL_EXT \
     (ACPI_FADT_FFF_TMR_VAL_EXT_MASK << ACPI_FADT_FFF_TMR_VAL_EXT_BIT)
+
+// Docking capable
 #define ACPI_FADT_FFF_DCK_CAP \
     (ACPI_FADT_FFF_DCK_CAP_MASK << ACPI_FADT_FFF_DCK_CAP_BIT)
+
+// FADT RESET_REG support: 1=supported
 #define ACPI_FADT_FFF_RESET_REG_SUP \
     (ACPI_FADT_FFF_RESET_REG_SUP_MASK << ACPI_FADT_FFF_RESET_REG_SUP_BIT)
+
+// No internal expansion capabilities
 #define ACPI_FADT_FFF_SEALED_CASE \
     (ACPI_FADT_FFF_SEALED_CASE_MASK << ACPI_FADT_FFF_SEALED_CASE_BIT)
+
+// Cannot detect monitor/keyboard devices
 #define ACPI_FADT_FFF_HEADLESS \
     (ACPI_FADT_FFF_HEADLESS_MASK << ACPI_FADT_FFF_HEADLESS_BIT)
+
+// A native instruction must be executed after writing SLP_TYPx
 #define ACPI_FADT_FFF_CPU_SW_SLP \
     (ACPI_FADT_FFF_CPU_SW_SLP_MASK << ACPI_FADT_FFF_CPU_SW_SLP_BIT)
+
+// Supports PCI express wake PCIEXP_WAKE_STS/_EN
 #define ACPI_FADT_FFF_PCI_EXP_WAK \
     (ACPI_FADT_FFF_PCI_EXP_WAK_MASK << ACPI_FADT_FFF_PCI_EXP_WAK_BIT)
+
+// Use platform clock - long confusing explanation in spec
 #define ACPI_FADT_FFF_PLAT_CLOCK \
     (ACPI_FADT_FFF_PLAT_CLOCK_MASK << ACPI_FADT_FFF_PLAT_CLOCK_BIT)
+
+// System has RTC_STS errata when walking from S4
 #define ACPI_FADT_FFF_S4_RTC_STS \
     (ACPI_FADT_FFF_S4_RTC_STS_MASK << ACPI_FADT_FFF_S4_RTC_STS_BIT)
+
+// Remote power on capable
 #define ACPI_FADT_FFF_REMOTE_ON_CAP \
     (ACPI_FADT_FFF_REMOTE_ON_CAP_MASK << ACPI_FADT_FFF_REMOTE_ON_CAP_BIT)
+
+// Force APIC to use cluster destination mode
 #define ACPI_FADT_FFF_FORCE_CLUSTER \
     (ACPI_FADT_FFF_FORCE_CLUSTER_MASK << ACPI_FADT_FFF_FORCE_CLUSTER_BIT)
+
+// Force xAPIC to use physical destination mode (N/A to APIC)
 #define ACPI_FADT_FFF_FORCE_PHYS \
     (ACPI_FADT_FFF_FORCE_PHYS_MASK << ACPI_FADT_FFF_FORCE_PHYS_BIT)
+
+// ACPI hardware interface is not supported
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI \
     (ACPI_FADT_FFF_HW_REDUCED_ACPI_MASK << ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT)
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT \
-    (ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_MASK \
-    << ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BIT)
+
+// System power saving in S0 is as good as typical S3
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT \
+    (ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_MASK \
+    << ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT)
 
 #define ACPI_FADT_FFF_WBINVD_n(n) \
     ((n) << ACPI_FADT_FFF_WBINVD_BIT)
@@ -689,8 +915,8 @@
     ((n) << ACPI_FADT_FFF_FORCE_PHYS_BIT)
 #define ACPI_FADT_FFF_HW_REDUCED_ACPI_n(n) \
     ((n) << ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT)
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_n(n) \
-    ((n) << ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BIT)
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_n(n) \
+    ((n) << ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT)
 
 #define ACPI_FADT_FFF_WBINVD_GET(n) \
     (((n) & ACPI_FADT_FFF_WBINVD) >> ACPI_FADT_FFF_WBINVD_BIT)
@@ -732,14 +958,15 @@
     (((n) & ACPI_FADT_FFF_FORCE_CLUSTER) >> ACPI_FADT_FFF_FORCE_CLUSTER_BIT)
 #define ACPI_FADT_FFF_FORCE_PHYS_GET(n) \
     (((n) & ACPI_FADT_FFF_FORCE_PHYS) >> ACPI_FADT_FFF_FORCE_PHYS_BIT)
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI_GET(n)       (((n) \
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI_GET(n)          (((n) \
     & ACPI_FADT_FFF_HW_REDUCED_ACPI) >> ACPI_FADT_FFF_HW_REDUCED_ACPI_BIT)
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_GET(n)    (((n) & \
-    ACPI_FADT_FFF_LOCAL_POWER_S0_BIT) >> ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_BIT)
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_GET(n) \
+    (((n) & ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT) \
+    >> ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_BIT)
 
 #define ACPI_FADT_FFF_WBINVD_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_WBINVD) | ACPI_FADT_FFF_WBINVD_n((n)))
-#define ACPI_FADT_FFF_WBINVD_FLUSH_SET(r,n)        ((r) \
+#define ACPI_FADT_FFF_WBINVD_FLUSH_SET(r,n)           ((r) \
     = ((r) & ~ACPI_FADT_FFF_WBINVD_FLUSH) | ACPI_FADT_FFF_WBINVD_FLUSH_n((n)))
 #define ACPI_FADT_FFF_PROC_C1_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_PROC_C1) | ACPI_FADT_FFF_PROC_C1_n((n)))
@@ -753,35 +980,35 @@
     ((r) = ((r) & ~ACPI_FADT_FFF_FIX_RTC) | ACPI_FADT_FFF_FIX_RTC_n((n)))
 #define ACPI_FADT_FFF_RTC_S4_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_RTC_S4) | ACPI_FADT_FFF_RTC_S4_n((n)))
-#define ACPI_FADT_FFF_TMR_VAL_EXT_SET(r,n)         ((r) \
+#define ACPI_FADT_FFF_TMR_VAL_EXT_SET(r,n)            ((r) \
     = ((r) & ~ACPI_FADT_FFF_TMR_VAL_EXT) | ACPI_FADT_FFF_TMR_VAL_EXT_n((n)))
 #define ACPI_FADT_FFF_DCK_CAP_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_DCK_CAP) | ACPI_FADT_FFF_DCK_CAP_n((n)))
-#define ACPI_FADT_FFF_RESET_REG_SUP_SET(r,n)       ((r) = \
+#define ACPI_FADT_FFF_RESET_REG_SUP_SET(r,n)          ((r) = \
     ((r) & ~ACPI_FADT_FFF_RESET_REG_SUP) | ACPI_FADT_FFF_RESET_REG_SUP_n((n)))
-#define ACPI_FADT_FFF_SEALED_CASE_SET(r,n)         ((r) \
+#define ACPI_FADT_FFF_SEALED_CASE_SET(r,n)            ((r) \
     = ((r) & ~ACPI_FADT_FFF_SEALED_CASE) | ACPI_FADT_FFF_SEALED_CASE_n((n)))
 #define ACPI_FADT_FFF_HEADLESS_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_HEADLESS) | ACPI_FADT_FFF_HEADLESS_n((n)))
 #define ACPI_FADT_FFF_CPU_SW_SLP_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_CPU_SW_SLP) | ACPI_FADT_FFF_CPU_SW_SLP_n((n)))
-#define ACPI_FADT_FFF_PCI_EXP_WAK_SET(r,n)         ((r) \
+#define ACPI_FADT_FFF_PCI_EXP_WAK_SET(r,n)            ((r) \
     = ((r) & ~ACPI_FADT_FFF_PCI_EXP_WAK) | ACPI_FADT_FFF_PCI_EXP_WAK_n((n)))
 #define ACPI_FADT_FFF_PLAT_CLOCK_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_PLAT_CLOCK) | ACPI_FADT_FFF_PLAT_CLOCK_n((n)))
 #define ACPI_FADT_FFF_S4_RTC_STS_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_S4_RTC_STS) | ACPI_FADT_FFF_S4_RTC_STS_n((n)))
-#define ACPI_FADT_FFF_REMOTE_ON_CAP_SET(r,n)       ((r) = \
+#define ACPI_FADT_FFF_REMOTE_ON_CAP_SET(r,n)          ((r) = \
     ((r) & ~ACPI_FADT_FFF_REMOTE_ON_CAP) | ACPI_FADT_FFF_REMOTE_ON_CAP_n((n)))
-#define ACPI_FADT_FFF_FORCE_CLUSTER_SET(r,n)       ((r) = \
+#define ACPI_FADT_FFF_FORCE_CLUSTER_SET(r,n)          ((r) = \
     ((r) & ~ACPI_FADT_FFF_FORCE_CLUSTER) | ACPI_FADT_FFF_FORCE_CLUSTER_n((n)))
 #define ACPI_FADT_FFF_FORCE_PHYS_SET(r,n) \
     ((r) = ((r) & ~ACPI_FADT_FFF_FORCE_PHYS) | ACPI_FADT_FFF_FORCE_PHYS_n((n)))
-#define ACPI_FADT_FFF_HW_REDUCED_ACPI_SET(r,n)     ((r) = ((r) \
+#define ACPI_FADT_FFF_HW_REDUCED_ACPI_SET(r,n)        ((r) = ((r) \
     & ~ACPI_FADT_FFF_HW_REDUCED_ACPI) | ACPI_FADT_FFF_HW_REDUCED_ACPI_n((n)))
-#define ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_SET(r,n) \
-    ((r) = ((r) & ~ACPI_FADT_FFF_LOCAL_POWER_S0_BIT) \
-    | ACPI_FADT_FFF_LOCAL_POWER_S0_BIT_n((n)))
+#define ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_SET(r,n) \
+    ((r) = ((r) & ~ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT) \
+    | ACPI_FADT_FFF_LOW_POWER_S0_IDLE_BIT_n((n)))
 
 // ACPI_MADT_FLAGS
 

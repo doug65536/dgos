@@ -121,21 +121,6 @@ struct mp_cfg_ioapic_t {
     uint32_t addr;
 };
 
-// entry_type 3 and 4 flags
-
-#define MP_INTR_FLAGS_POLARITY_DEFAULT    0
-#define MP_INTR_FLAGS_POLARITY_ACTIVEHI   1
-#define MP_INTR_FLAGS_POLARITY_ACTIVELO   3
-
-#define MP_INTR_FLAGS_TRIGGER_DEFAULT     0
-#define MP_INTR_FLAGS_TRIGGER_EDGE        1
-#define MP_INTR_FLAGS_TRIGGER_LEVEL       3
-
-#define MP_INTR_TYPE_APIC   0
-#define MP_INTR_TYPE_NMI    1
-#define MP_INTR_TYPE_SMI    2
-#define MP_INTR_TYPE_EXTINT 3
-
 //
 // IOAPIC registers
 
@@ -148,19 +133,6 @@ struct mp_cfg_ioapic_t {
 
 #define IOAPIC_RED_LO_n(n)      (0x10 + (n) * 2)
 #define IOAPIC_RED_HI_n(n)      (0x10 + (n) * 2 + 1)
-
-#define IOAPIC_REDLO_DELIVERY_APIC      0
-#define IOAPIC_REDLO_DELIVERY_LOWPRI    1
-#define IOAPIC_REDLO_DELIVERY_SMI       2
-#define IOAPIC_REDLO_DELIVERY_NMI       4
-#define IOAPIC_REDLO_DELIVERY_INIT      5
-#define IOAPIC_REDLO_DELIVERY_EXTINT    7
-
-#define IOAPIC_REDLO_TRIGGER_EDGE   0
-#define IOAPIC_REDLO_TRIGGER_LEVEL  1
-
-#define IOAPIC_REDLO_POLARITY_ACTIVELO  1
-#define IOAPIC_REDLO_POLARITY_ACTIVEHI  0
 
 static char const * const intr_type_text[] = {
     "APIC",
@@ -1979,7 +1951,7 @@ void apic_start_smp(void)
     // SMP online
     callout_call(callout_type_t::smp_online);
 
-    ioapic_irq_cpu(0, 1);
+    ioapic_irq_setcpu(0, 1);
 }
 
 uint32_t apic_timer_count(void)
@@ -2453,13 +2425,9 @@ static void ioapic_map_all(void)
     ioapic_msi_base_irq = ioapic->irq_base + ioapic->vector_count;
 }
 
-// Pass negative cpu value to get highest CPU number
 // Returns 0 on failure, 1 on success
-bool ioapic_irq_cpu(int irq, int cpu)
+bool ioapic_irq_setcpu(int irq, int cpu)
 {
-    if (cpu < 0)
-        return ioapic_count > 0;
-
     if (unsigned(cpu) >= apic_id_count)
         return false;
 
@@ -2467,8 +2435,33 @@ bool ioapic_irq_cpu(int irq, int cpu)
     int ioapic_index = intr_to_ioapic[irq_intr];
     mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
     unique_lock<ticketlock> lock(ioapic->lock);
-    ioapic_write(ioapic, IOAPIC_RED_HI_n(irq_intr - ioapic->base_intr),
-                 IOAPIC_REDHI_DEST_n(apic_id_list[cpu]), lock);
+    unsigned intin = irq_intr - ioapic->base_intr;
+    uint32_t lo;
+    uint32_t hi;
+
+    if (cpu >= 0) {
+        hi = ioapic_read(ioapic, IOAPIC_RED_HI_n(intin), lock);
+        IOAPIC_REDHI_DEST_SET(hi, apic_id_list[cpu]);
+        ioapic_write(ioapic, IOAPIC_RED_HI_n(intin), hi, lock);
+    } else {
+        // Read current values
+        lo = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
+        hi = ioapic_read(ioapic, IOAPIC_RED_HI_n(intin), lock);
+
+        // Modify fields
+        IOAPIC_REDLO_DELIVERY_SET(lo, IOAPIC_REDLO_DELIVERY_LOWPRI);
+        IOAPIC_REDLO_DESTMODE_SET(lo, IOAPIC_REDLO_DESTMODE_PHYSICAL);
+        IOAPIC_REDHI_DEST_SET(hi, 0xFF);
+
+        // Write it back masked
+        ioapic_write(ioapic, IOAPIC_RED_LO_n(intin),
+                     lo | IOAPIC_REDLO_MASKIRQ, lock);
+        ioapic_write(ioapic, IOAPIC_RED_HI_n(intin), hi, lock);
+
+        // If not masked, unmask after completing changes
+        if (!(lo & IOAPIC_REDLO_MASKIRQ))
+            ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), lo, lock);
+    }
     return true;
 }
 
@@ -2482,7 +2475,7 @@ int apic_enable(void)
     irq_setmask_set_handler(ioapic_setmask);
     irq_hook_set_handler(ioapic_hook);
     irq_unhook_set_handler(ioapic_unhook);
-    irq_setcpu_set_handler(ioapic_irq_cpu);
+    irq_setcpu_set_handler(ioapic_irq_setcpu);
 
     return 1;
 }

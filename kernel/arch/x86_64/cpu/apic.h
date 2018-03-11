@@ -17,7 +17,7 @@ uint32_t apic_timer_count(void);
 void apic_dump_regs(int ap);
 
 int apic_enable(void);
-bool ioapic_irq_cpu(int irq, int cpu);
+bool ioapic_irq_setcpu(int irq, int cpu);
 
 void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector);
 
