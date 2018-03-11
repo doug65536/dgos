@@ -1083,6 +1083,23 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
 // Startup and shutdown
 
 fat32_fs_t::fat32_fs_t()
+    : drive(nullptr)
+    , mm_dev(nullptr)
+    , lba_st(0)
+    , lba_en(0)
+    , serial(0)
+    , fat(nullptr)
+    , fat2(nullptr)
+    , fat_size(0)
+    , root_cluster(0)
+    , cluster_ofs(0)
+    , end_cluster(0)
+    , block_size(0)
+    , sector_size(0)
+    , sector_shift(0)
+    , block_shift(0)
+    , fat_block_shift(0)
+    , root_dirent{}
 {
 }
 
