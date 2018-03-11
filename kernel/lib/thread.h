@@ -3,6 +3,8 @@
 #include "cpu/spinlock.h"
 #include "errno.h"
 
+__BEGIN_DECLS
+
 struct process_t;
 
 // Platform independent thread API
@@ -63,3 +65,5 @@ errno_t thread_get_error();
 
 __noreturn
 void thread_idle();
+
+__END_DECLS

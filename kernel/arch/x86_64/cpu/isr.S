@@ -589,6 +589,7 @@ exception_isr_handler:
     .cfi_endproc
 
 // __noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
+.hidden isr_sysret64
 .global isr_sysret64
 isr_sysret64:
     .cfi_startproc
@@ -714,10 +715,12 @@ isr_sysret64:
 .align 8
 
 // Pointers to patch points
+.hidden sse_context_save
 .global sse_context_save
 sse_context_save:
     .quad .Lsse_context_save_jmp
 
+.hidden sse_context_restore
 .global sse_context_restore
 sse_context_restore:
     .quad .Lsse_context_restore_jmp

@@ -4,6 +4,8 @@
 #include "thread.h"
 #include "type_traits.h"
 
+__BEGIN_DECLS
+
 struct thread_wait_link_t;
 struct condition_var_t;
 struct thread_wait_t;
@@ -86,6 +88,8 @@ void condvar_wake_all(condition_var_t *var);
 void condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock);
 void condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock);
 void condvar_wait_noyield(condition_var_t *var, mutex_t *mutex);
+
+__END_DECLS
 
 class scoped_rwlock_t {
 public:

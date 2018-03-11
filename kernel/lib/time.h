@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_DECLS
+
 struct time_of_day_t {
     uint8_t centisec;
     uint8_t second;
@@ -32,3 +34,5 @@ uint64_t nano_time_add(uint64_t after, uint64_t ns);
 
 void time_ofday_set_handler(time_ofday_handler_t handler);
 time_of_day_t time_ofday(void);
+
+__END_DECLS
