@@ -60,8 +60,7 @@ struct fat32_fs_t final : public fs_base_t {
 
     static uint8_t lfn_checksum(char const *fcb_name);
 
-    static void fcbname_from_lfn(
-            char *fcbname, uint16_t const *lfn, size_t lfn_len);
+    static void fcbname_from_lfn(full_lfn_t *full, char *fcbname, uint16_t const *lfn, size_t lfn_len);
 
     static void dirents_from_name(full_lfn_t *full,
                                   char const *pathname, size_t name_len);
@@ -235,15 +234,20 @@ uint8_t fat32_fs_t::lfn_checksum(char const *fcb_name)
    for (i = 11; i; i--)
       sum = ((sum & 1) << 7) +
               (sum >> 1) +
-              (uint8_t)*fcb_name++;
+              uint8_t(*fcb_name++);
 
    return sum;
 }
 
 void fat32_fs_t::fcbname_from_lfn(
-        char *fcbname, uint16_t const *lfn, size_t lfn_len)
+        full_lfn_t *full, char *fcbname,
+        uint16_t const *lfn, size_t lfn_len)
 {
     memset(fcbname, ' ', 11);
+
+    bool any_upper = false;
+    bool any_lower = false;
+    bool any_long = false;
 
     size_t last_dot = 0;
     for (size_t i = lfn_len; !last_dot && i > 0; --i)
@@ -258,33 +262,62 @@ void fat32_fs_t::fcbname_from_lfn(
         if ((lfn[i] >= 'A' && lfn[i] <= 'Z') ||
                 (lfn[i] >= '0' && lfn[i] <= '9')) {
             // Accept uppercase alphanumeric as is
+            any_upper = true;
             fcbname[out++] = lfn[i];
         } else if (lfn[i] >= 'a' && lfn[i] <= 'z') {
             // Convert lowercase alphabetic to uppercase
+            any_lower = true;
             fcbname[out++] = lfn[i] + ('A' - 'a');
-        } else if (lfn[i] < ' ' || lfn[i] >= 0x7F ||
+        } else if (lfn[i] <= ' ' || lfn[i] >= 0x7F ||
                    strchr("\"'*+,/:;<=>?[\\]|", lfn[i])) {
             // Convert disallowed to underscore
+            any_long = true;
             fcbname[out++] = '_';
         } else {
             // Accept everything else as is
+            any_long = true;
             fcbname[out++] = lfn[i];
         }
     }
+
+    fat32_dir_entry_t &fcbfrag = full->fragments[
+            full->lfn_entry_count].short_entry;
+
+    if (!any_long && any_lower && !any_upper)
+        fcbfrag.lowercase_flags |= FAT_LOWERCASE_NAME;
 
     if (i < last_dot) {
         fcbname[6] = '~';
         fcbname[7] = '1';
     }
 
+    any_upper = false;
+    any_lower = false;
+    any_long = false;
+
     out = 8;
     for (i = last_dot + 1; i < lfn_len && out < 11; ++i) {
         if ((lfn[i] >= 'A' && lfn[i] <= 'Z') ||
                 (lfn[i] >= '0' && lfn[i] <= '9')) {
+            any_upper = true;
             fcbname[out++] = lfn[i];
         } else if (lfn[i] >= 'a' && lfn[i] <= 'z') {
+            any_lower = true;
             fcbname[out++] = lfn[i] + ('A' - 'a');
+        } else {
+            any_long = true;
         }
+    }
+
+    if (i < lfn_len)
+        any_long = true;
+
+    if (!any_long && any_lower && !any_upper)
+        fcbfrag.lowercase_flags |= FAT_LOWERCASE_EXT;
+
+    if (fcbfrag.lowercase_flags) {
+        full->fragments[0].short_entry = fcbfrag;
+        full->lfn_entry_count = 0;
     }
 }
 
@@ -308,23 +341,17 @@ void fat32_fs_t::dirents_from_name(
 
     size_t len = utf16_out - lfn;
 
-    char fcbname[11];
+    uint8_t &lfn_entries = full->lfn_entry_count;
 
-    fcbname_from_lfn(fcbname, lfn, len);
-
-    uint8_t checksum = lfn_checksum(fcbname);
-
-    int lfn_entries = (len + 12) / 13;
+    lfn_entries = (len + 12) / 13;
 
     int fragment_ofs = 0;
     fat32_dir_union_t *frag = full->fragments + lfn_entries - 1;
     for (size_t ofs = 0; ofs < len || fragment_ofs != 0; ++ofs) {
         uint8_t *dest;
 
-        if (fragment_ofs == 0) {
+        if (fragment_ofs == 0)
             frag->long_entry.attr = FAT_LONGNAME;
-            frag->long_entry.checksum = checksum;
-        }
 
         if (fragment_ofs < 5) {
             dest = frag->long_entry.name +
@@ -351,12 +378,15 @@ void fat32_fs_t::dirents_from_name(
         }
     }
 
-    memcpy(full->fragments[lfn_entries].short_entry.name,
-           fcbname, sizeof(frag->short_entry.name));
-
     full->lfn_entry_count = lfn_entries;
 
-    for (size_t i = 0; i < full->lfn_entry_count; ++i) {
+    char *fcbname = full->fragments[lfn_entries].short_entry.name;
+    fcbname_from_lfn(full, fcbname, lfn, len);
+
+    uint8_t checksum = lfn_checksum(fcbname);
+
+    for (size_t i = 0; i < lfn_entries; ++i) {
+        full->fragments[i].long_entry.checksum = checksum;
         full->fragments[i].long_entry.ordinal =
                 i == 0
                 ? full->lfn_entry_count | FAT_LAST_LFN_ORDINAL
@@ -570,14 +600,23 @@ fat32_dir_union_t *fat32_fs_t::search_dir(
         // If this is a short filename entry
         if (de->long_entry.attr != FAT_LONGNAME) {
             uint8_t checksum = lfn_checksum(de->short_entry.name);
-            if (match_index == lfn.lfn_entry_count &&
-                    last_checksum == checksum &&
+
+            if (lfn.lfn_entry_count == 0 &&
                     !memcmp(de->short_entry.name,
-                            lfn.fragments[lfn.lfn_entry_count]
-                            .short_entry.name,
-                            sizeof(de->short_entry.name)))
+                            lfn.fragments[0].short_entry.name,
+                            sizeof(de->short_entry.name))) {
+                // Found short-name-only directory entry
+                result = de;
+                return false;
+            } else if (lfn.lfn_entry_count &&
+                       match_index == lfn.lfn_entry_count &&
+                       last_checksum == checksum &&
+                       !memcmp(de->short_entry.name,
+                               lfn.fragments[lfn.lfn_entry_count]
+                               .short_entry.name,
+                               sizeof(de->short_entry.name)))
             {
-                // Found
+                // Found long filename
                 result = de;
                 return false;
             }
@@ -621,43 +660,45 @@ off_t fat32_fs_t::walk_cluster_chain(
 {
     off_t walked = 0;
 
-    cluster_t& cluster = file->cached_cluster;
+    cluster_t& c_clus = file->cached_cluster;
+    off_t& c_ofs = file->cached_offset;
 
     vector<cluster_t> sync_pending;
 
     while (walked + block_size <= offset) {
-        if (is_eof(fat[cluster])) {
+        if (is_eof(fat[c_clus])) {
             if (!append)
                 break;
 
-            cluster_t alloc = allocate_near(cluster);
+            cluster_t alloc = allocate_near(c_clus);
             if (unlikely(alloc == 0))
                 break;
 
             if (dirent_start_cluster(file->dirent) == 0)
                 dirent_start_cluster(file->dirent, alloc);
 
-            cluster_t fat_block = cluster >> fat_block_shift;
+            cluster_t fat_block = c_clus >> fat_block_shift;
             if (sync_pending.empty() || sync_pending.back() != fat_block)
                 sync_pending.push_back(fat_block);
 
-            fat[cluster] = alloc;
-            fat2[cluster] = alloc;
+            fat[c_clus] = alloc;
+            fat2[c_clus] = alloc;
 
-            file->cached_cluster = alloc;
-            file->cached_offset += block_size;
+            c_clus = alloc;
         }
 
-        cluster = fat[cluster];
+        c_ofs += block_size;
+
+        c_clus = fat[c_clus];
         walked += block_size;
     }
 
-    if (append && file->cached_cluster == 0) {
+    if (append && c_clus == 0) {
         // Initial block in empty file (try to reserve first MB to metadata)
-        file->cached_cluster = allocate_near(2047);
-        file->cached_offset = 0;
+        c_clus = allocate_near(2047);
+        c_ofs = 0;
 
-        cluster_t fat_block = cluster >> fat_block_shift;
+        cluster_t fat_block = c_clus >> fat_block_shift;
         if (sync_pending.empty() || sync_pending.back() != fat_block)
             sync_pending.push_back(fat_block);
     }
@@ -669,8 +710,8 @@ off_t fat32_fs_t::walk_cluster_chain(
         if (status < 0)
             return status;
 
-        if (file->cached_offset == 0) {
-            dirent_start_cluster(file->dirent, file->cached_cluster);
+        if (c_ofs == 0) {
+            dirent_start_cluster(file->dirent, c_clus);
             status = msync(file->dirent, sizeof(*file->dirent), MS_SYNC);
             if (status < 0)
                 return status;
@@ -984,8 +1025,6 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
     }
 
     file_handle_t *file = (file_handle_t*)pool_alloc(&fat32_handles);
-
-    memzero(*file);
 
     file->fs = this;
     file->dirent = &fde->short_entry;
