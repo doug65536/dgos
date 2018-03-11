@@ -469,7 +469,8 @@ public:
     void release_linear(uintptr_t addr, size_t size);
     void dump(char const *format, ...);
 private:
-    mutex free_addr_lock;
+    using scoped_lock = unique_lock<mcslock>;
+    mcslock free_addr_lock;
     typedef rbtree_t<> tree_t;
     tree_t free_addr_by_size;
     tree_t free_addr_by_addr;
@@ -1696,7 +1697,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
     if (likely(free_addr_by_addr && free_addr_by_size)) {
         cpu_scoped_irq_disable intr_was_enabled;
-        unique_lock<mutex> lock(free_addr_lock);
+        scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
         dump("Before Alloc %lx\n", size);
@@ -1758,7 +1759,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
     assert(free_addr_by_size);
 
     cpu_scoped_irq_disable intr_was_enabled;
-    unique_lock<mutex> lock(free_addr_lock);
+    scoped_lock lock(free_addr_lock);
 
     // Round to pages
     addr &= -PAGE_SIZE;
@@ -1875,7 +1876,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     linaddr_t end = addr + size;
 
     cpu_scoped_irq_disable intr_was_enabled;
-    unique_lock<mutex> lock(free_addr_lock);
+    scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
     dump("---- Free %lx @ %lx\n", size, addr);
