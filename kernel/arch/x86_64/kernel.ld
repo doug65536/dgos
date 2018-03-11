@@ -19,9 +19,9 @@ SECTIONS {
 	/* Code and read-only data */
 	.text : AT (0x100000) {
 		/* ISR code is hot and should be page aligned because it is cloned */
-		___isr_st = .;
+		PROVIDE_HIDDEN(___isr_st = .);
 		*(.text.isr)
-		___isr_en = .;
+		PROVIDE_HIDDEN(___isr_en = .);
 
 		/* cache line align start of hot code */
 		. = ALIGN(64);
@@ -96,12 +96,14 @@ SECTIONS {
 	.dynsym : ALIGN(64) {
 		PROVIDE_HIDDEN(___dynsym_st = .);
 		*(.dynsym);
+		*(.dynsym*);
 		PROVIDE_HIDDEN(___dynsym_en = .);
 	} :readonly
 
 	.dynstr : ALIGN(64) {
 		PROVIDE_HIDDEN(___dynstr_st = .);
 		*(.dynstr);
+		*(.dynstr*);
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	} :readonly
 

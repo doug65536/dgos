@@ -50,7 +50,7 @@ static void modload_find_syms(Elf64_Shdr const **symtab,
 
 static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
 {
-    Elf64_Word hash = elf64_hash((unsigned char*)name);
+    Elf64_Word hash = elf64_hash((unsigned char const*)name);
     Elf64_Word bucket = hash % ht->hash_nbucket;
 
     Elf64_Word i = ht->hash_buckets[bucket];
@@ -298,6 +298,12 @@ module_entry_fn_t modload_load(char const *path)
                          fixup_addr, *(uint32_t*)fixup_addr, (void*)match,
                          name, rel_type, sym->st_value);
 
+                // ???
+                if (!match) {
+                    printdbg("Could not find relocation for \"%s\"\n", name);
+                    continue;
+                }
+
                 switch (rel_type) {
                 case R_AMD64_PLT32: // L + A - P
                     *(uint32_t*)fixup_addr = match->st_value +
@@ -329,6 +335,17 @@ module_entry_fn_t modload_load(char const *path)
 
                 case R_AMD64_64:
                     *(uint64_t*)fixup_addr =
+                            (internal
+                             ? uint64_t(module) +
+                               scn_hdrs[sym->st_shndx].sh_addr
+                             : (uint64_t(module) +
+                                scn_hdrs[match->st_shndx].sh_addr)) +
+                            r->r_addend + match->st_value;
+                    break;
+
+                case R_AMD64_32:
+                    // Untested
+                    *(uint32_t*)fixup_addr =
                             (internal
                              ? uint64_t(module) +
                                scn_hdrs[sym->st_shndx].sh_addr
@@ -400,7 +417,7 @@ void modload_init(void)
             export_ht.hash_nbucket;
 }
 
-void dl_debug_state(void);
+extern "C" void dl_debug_state(void);
 EXPORT void dl_debug_state(void)
 {
 }

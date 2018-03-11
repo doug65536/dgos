@@ -1499,7 +1499,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
-	-fvisibility=default \
+	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
 	$(FREESTANDING_FLAGS) \
@@ -1515,7 +1515,7 @@ KERNEL_LDFLAGS_SHARED = \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
-	-export-dynamic \
+	-export-dynamic -Wl,--no-dynamic-linker \
 	-Wl,-z,max-page-size=4096 \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -1827,7 +1827,11 @@ hello_km_CXXFLAGS = \
 	-I$(top_srcdir)/kernel/lib/sys
 
 hello_km_LDFLAGS = \
-	-Wl,-r -Wl,-g -Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld
+	-Wl,-r \
+	-Wl,-g \
+	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
+	-Wl,-z,max-page-size=4096 \
+	-mcmodel=kernel
 
 user_shell_SOURCES = \
 	user/test/test.S
