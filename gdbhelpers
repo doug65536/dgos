@@ -10,3 +10,62 @@ define startupbreakpoints
 		b isr_entry_8
 	end
 end
+
+define walkstack
+	set $addr = $arg0
+	set $depth = $arg1
+	while $depth--
+		set $retaddr=*(long*)($addr+8)
+		set $nextframe=*(long*)$addr
+		if $retaddr < 0xffffffff80000000
+			echo Invalid address, stopping backtrace
+			loop_break
+		end
+		x /1i $retaddr
+		set $addr=$nextframe
+	end
+end
+
+define walkstacksafe
+	set $initframe = $arg0
+	python
+try:
+	gdb.execute("walkstack $initframe 8")
+except:
+	pass
+	end
+end
+
+define walkthreads
+	if $argc == 1
+		set $depth = $arg0
+	else
+		set $depth = 7
+	end
+
+	set $threadcount = thread_count
+	set $tid = cpu_count
+	while $tid < $threadcount
+		set $ctx = threads[$tid].ctx
+		if $ctx != 0
+			printf "Thread %d trace:\n", $tid
+			x /1i $ctx->gpr.iret.rip
+			set $initframe = $ctx->gpr.r.n.rbp
+			if $initframe != 0
+				walkstacksafe $initframe
+			end
+		else
+			set $icpu = 0
+			while $icpu < cpu_count
+				if cpus[$icpu].cur_thread == &threads[$tid]
+					set $savecpu = $_thread
+					thread $icpu + 1
+					bt
+					thread $savecpu
+				end
+				set $icpu = $icpu + 1
+			end
+		end
+		set $tid = $tid + 1
+	end
+end
