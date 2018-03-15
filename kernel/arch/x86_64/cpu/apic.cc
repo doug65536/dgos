@@ -2343,7 +2343,7 @@ void apic_config_cpu()
 
         default:
             ACPI_TRACE("Out of range LNMI lint: %u\n", mapping.lapic_lint);
-            break;
+            continue;
 
         }
 
