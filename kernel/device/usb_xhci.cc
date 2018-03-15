@@ -1745,9 +1745,9 @@ usb_cc_t usbxhci::fetch_inp_ctx(
     usbxhci_slotctx_t const *ctx = dev_ctx_ent_slot(slotid);
     usbxhci_ep_ctx_t const *ep = dev_ctx_ent_ep(slotid, 0);
 
-    usbxhci_inpctlctx_t *ctlctx;
-    usbxhci_slotctx_t *inpslotctx;
-    usbxhci_ep_ctx_t *inpepctx;
+    usbxhci_inpctlctx_t *ctlctx = nullptr;
+    usbxhci_slotctx_t *inpslotctx = nullptr;
+    usbxhci_ep_ctx_t *inpepctx = nullptr;
 
     if (!dev_ctx_large) {
         inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
