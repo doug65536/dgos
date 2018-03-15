@@ -2420,7 +2420,7 @@ void *mremap(
 
     for (size_t i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
-        pte = atomic_xchg(new_base + i, 0);
+        pte = atomic_xchg(new_base + i, pte);
         if (pte && (pte & PTE_ADDR) != PTE_ADDR)
             free_batch.free(pte & PTE_ADDR);
     }
