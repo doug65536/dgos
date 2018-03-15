@@ -1042,8 +1042,6 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
 #endif
     }
 
-    pte = *ptes[3];
-
     *ptes[3] = (physaddr & PTE_ADDR) | flags;
 }
 
