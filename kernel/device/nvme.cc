@@ -1066,7 +1066,7 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
         }
 
         nvme_queue_state_t& queue = queues[queue_index];
-        queue.submit_cmd(move(cmd), &nvme_if_t::io_handler, request.callback,
+        queue.submit_cmd(move(cmd), &nvme_if_t::io_handler, request.iocp,
                          ranges, range_count);
     }
 
