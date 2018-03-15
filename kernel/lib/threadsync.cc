@@ -561,8 +561,8 @@ static void condvar_wait_ex(condition_var_t *var,
     spinlock_unlock(&var->lock);
     lock(mutex);
 
-    assert(wait.link.next == 0);
-    assert(wait.link.prev == 0);
+    assert(wait.link.next == nullptr);
+    assert(wait.link.prev == nullptr);
 }
 
 EXPORT void condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock)
