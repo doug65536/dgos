@@ -72,7 +72,6 @@ void workq_impl::enqueue(workq_work *work)
         tail->next = work;
         tail = work;
     }
-    hold.unlock();
     not_empty.notify_one();
 }
 
