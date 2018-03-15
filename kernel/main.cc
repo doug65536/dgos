@@ -126,6 +126,9 @@ static int read_stress(void *p)
     int id = atomic_xadd(&next_id, 1);
     assert(id < ENABLE_READ_STRESS_THREAD);
 
+    static size_t constexpr queue_depth = 4;
+    blocking_iocp_t iocp[queue_depth];
+
     (void)p;
     thread_t tid = thread_get_id();
 
@@ -136,15 +139,29 @@ static int read_stress(void *p)
 
     size_t data_size = 4096;
 
-    char *data = (char*)mmap(0, data_size, PROT_READ | PROT_WRITE,
-                             0, -1, 0);
+    char *data[queue_depth];
+    for (size_t i = 0; i < queue_depth; ++i)
+        data[i] = (char*)mmap(0, data_size, PROT_READ | PROT_WRITE, 0, -1, 0);
 
     size_t data_blocks = data_size / drive->info(STORAGE_INFO_BLOCKSIZE);
 
     printk("read buffer at %lx\n", (uint64_t)data);
+    printk("read stress iocp list at %p\n", (void*)iocp);
 
     uint64_t last_time = time_ns();
     uint64_t last_completions = completion_count;
+
+    errno_t status;
+
+    // Prime the queue
+    for (size_t i = 0; i < queue_depth; ++i) {
+        status = drive->read_async(data[i], 1, i, &iocp[i]);
+        if (status != errno_t::OK)
+            printdbg("(%3d) Storage read (completion failed) status=%d\n",
+                     tid, (int)status);
+    }
+
+    size_t slot = 0;
 
     uint64_t seed = 42;
     char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 64];
@@ -153,12 +170,20 @@ static int read_stress(void *p)
 
         uint64_t lba = rand_r_range(&seed, 16, 1000 - data_blocks);
         //int64_t count = rand_r_range(&seed, 1, data_blocks);
-        int64_t count = data_blocks;
-        int status = drive->read_blocks(data, count, lba);
 
-        if (status < 0)
-            printdbg("(%3d) Storage read status=%d count=%lu\n",
-                     tid, status, count);
+        status = iocp[slot].wait();
+        if (status != errno_t::OK)
+            printdbg("(%3d) Storage read (completion failed) status=%d\n",
+                     tid, (int)status);
+        iocp[slot].reset();
+        int64_t count = data_blocks;
+        status = drive->read_async(data, count, lba, &iocp[slot]);
+        if (++slot == queue_depth)
+            slot = 0;
+
+        if (status != errno_t::OK)
+            printdbg("(%3d) Storage read (issue failed) status=%d\n",
+                     tid, (int)status);
 
         atomic_inc(counts + (id << 6));
 
