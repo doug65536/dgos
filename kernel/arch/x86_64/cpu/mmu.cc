@@ -375,7 +375,7 @@ public:
 
         void flush()
         {
-            unique_lock<ticketlock> lock(owner.lock);
+            scoped_lock lock(owner.lock);
             for (size_t i = 0; i < count; ++i)
                 owner.release_one_locked(pages[i]);
             count = 0;
@@ -424,11 +424,14 @@ private:
         }
     }
 
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
     entry_t *entries;
     physaddr_t begin;
     entry_t next_free[2];
     entry_t free_page_count;
-    ticketlock lock;
+    lock_type lock;
     uint8_t log2_pagesz;
 };
 
@@ -469,8 +472,9 @@ public:
     void release_linear(uintptr_t addr, size_t size);
     void dump(char const *format, ...);
 private:
-    using scoped_lock = unique_lock<mcslock>;
-    mcslock free_addr_lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type free_addr_lock;
     typedef rbtree_t<> tree_t;
     tree_t free_addr_by_size;
     tree_t free_addr_by_addr;
@@ -2978,7 +2982,7 @@ void mmu_phys_allocator_t::init(
 
 void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
     physaddr_t free_end = base + size;
     unsigned low = base < 0x100000000;
     size_t pagesz = uint64_t(1) << log2_pagesz;
@@ -2994,7 +2998,7 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 
 physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     size_t item = next_free[low];
 
@@ -3018,7 +3022,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 {
     size_t count = size >> log2_pagesz;
 
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     // Fall back to low memory immediately if no free high memory
     if (!next_free[0])
@@ -3072,14 +3076,14 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 
 void mmu_phys_allocator_t::release_one(physaddr_t addr)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
     release_one_locked(addr);
 }
 
 void mmu_phys_allocator_t::addref(physaddr_t addr)
 {
     entry_t index = index_from_addr(addr);
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
     ++entries[index];
 }
 
@@ -3095,7 +3099,7 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 
     size_t count = len >> log2_pagesz;
 
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     for (size_t i = 0; i < count; ++i) {
         physaddr_t addr = *ptes[3] & PTE_ADDR;

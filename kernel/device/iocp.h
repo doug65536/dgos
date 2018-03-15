@@ -41,6 +41,8 @@ struct basic_iocp_t {
     void reset(callback_t callback, uintptr_t arg);
 
 private:
+    using lock_type = ticketlock;
+    using scoped_lock = unique_lock<lock_type>;
 
     void invoke_once(unique_lock<ticketlock> &hold);
 
@@ -49,7 +51,7 @@ private:
     unsigned done_count;
     unsigned expect_count;
     int result_count;
-    ticketlock lock;
+    lock_type lock;
     T result;
 };
 
@@ -80,7 +82,10 @@ public:
     T wait();
 
 private:
-    ticketlock lock;
+    using lock_type = ticketlock;
+    using scoped_lock = unique_lock<lock_type>;
+
+    lock_type lock;
     condition_variable done_cond;
     bool done;
 };
@@ -112,7 +117,7 @@ basic_iocp_t<T, S>::basic_iocp_t(
 template<typename T, typename S>
 void basic_iocp_t<T, S>::set_expect(unsigned expect)
 {
-    unique_lock<ticketlock> hold(lock);
+    scoped_lock hold(lock);
     expect_count = expect;
 
     if (done_count == expect)
@@ -130,7 +135,7 @@ void basic_iocp_t<T, S>::set_result(T const& sub_result)
 template<typename T, typename S>
 void basic_iocp_t<T, S>::invoke()
 {
-    unique_lock<ticketlock> hold(lock);
+    scoped_lock hold(lock);
     if (expect_count && ++done_count >= expect_count)
         invoke_once(hold);
 }
@@ -165,7 +170,7 @@ void basic_iocp_t<T, S>::invoke_once(unique_lock<ticketlock> &hold)
 template<typename T, typename S>
 T basic_blocking_iocp_t<T, S>::wait()
 {
-    unique_lock<ticketlock> hold(lock);
+    scoped_lock hold(lock);
     while (!done)
         done_cond.wait(hold);
     T status = basic_iocp_t<T, S>::get_result();
