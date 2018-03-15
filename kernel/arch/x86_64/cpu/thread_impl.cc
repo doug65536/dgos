@@ -410,7 +410,7 @@ static thread_t thread_create_with_state(
 
     ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
 
-    ISR_CTX_REG_RIP(ctx) = (thread_fn_t)(uintptr_t)thread_startup;
+    ISR_CTX_REG_RIP(ctx) = thread_fn_t(uintptr_t(thread_startup));
 
     ISR_CTX_REG_CS(ctx) = GDT_SEL_KERNEL_CODE64;
     ISR_CTX_REG_DS(ctx) = GDT_SEL_USER_DATA | 3;
@@ -418,9 +418,9 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_FS(ctx) = GDT_SEL_USER_DATA | 3;
     ISR_CTX_REG_GS(ctx) = GDT_SEL_USER_DATA | 3;
 
-    ISR_CTX_REG_RDI(ctx) = (uintptr_t)fn;
-    ISR_CTX_REG_RSI(ctx) = (uintptr_t)userdata;
-    ISR_CTX_REG_RDX(ctx) = (uintptr_t)i;
+    ISR_CTX_REG_RDI(ctx) = uintptr_t(fn);
+    ISR_CTX_REG_RSI(ctx) = uintptr_t(userdata);
+    ISR_CTX_REG_RDX(ctx) = uintptr_t(i);
     ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
 
     if (thread->flags & THREAD_FLAGS_USES_FPU) {
@@ -491,11 +491,8 @@ void thread_idle()
         halt();
 }
 
-static isr_context_t *thread_context_switch_handler(
-        int intr, isr_context_t *ctx)
+static isr_context_t *thread_context_switch_handler(int, isr_context_t *ctx)
 {
-    (void)intr;
-    assert(intr == INTR_THREAD_YIELD);
     return thread_schedule(ctx);
 }
 
