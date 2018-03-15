@@ -495,6 +495,7 @@ EXPORT void condvar_destroy(condition_var_t *var)
 
 struct condvar_spinlock_t {
     spinlock_t *lock;
+    spinlock_value_t saved_lock;
 };
 
 struct condvar_ticketlock_t {
@@ -505,14 +506,14 @@ struct condvar_ticketlock_t {
 static void condvar_lock_spinlock(void *lock)
 {
     condvar_spinlock_t *state = (condvar_spinlock_t *)lock;
-    spinlock_lock(state->lock);
+    spinlock_lock_restore(state->lock, state->saved_lock);
 }
 
 
 static void condvar_unlock_spinlock(void *lock)
 {
     condvar_spinlock_t *state = (condvar_spinlock_t *)lock;
-    spinlock_unlock(state->lock);
+    state->saved_lock = spinlock_unlock_save(state->lock);
 }
 
 static void condvar_lock_ticketlock(void *lock)
