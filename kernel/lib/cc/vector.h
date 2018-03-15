@@ -134,6 +134,12 @@ public:
     iterator erase(const_iterator __first,
                    const_iterator __last);
 
+    // Move the last element into the erased position with assignment
+    iterator assign_erase(const_iterator __pos);
+
+    // Move the last element into the erased position with move constructor
+    iterator move_erase(const_iterator __pos);
+
     bool push_back(_T const& __value);
     bool push_back(_T&& __value);
 
@@ -754,6 +760,25 @@ vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
     __alloc.destruct(__e);
     __sz -= __count;
     return iterator(__first);
+}
+
+template<typename _T, typename _Allocator>
+typename vector<_T, _Allocator>::iterator
+vector<_T, _Allocator>::assign_erase(const_iterator __pos)
+{
+    *__pos.__p = move(__m[--__sz]);
+    __m[__sz].~value_type();
+    return iterator(__pos.__p);
+}
+
+template<typename _T, typename _Allocator>
+typename vector<_T, _Allocator>::iterator
+vector<_T, _Allocator>::move_erase(const_iterator __pos)
+{
+    __alloc.destruct(__pos.__p);
+    new (__pos.__p) value_type(move(__m[--__sz]));
+    __m[__sz].~value_type();
+    return iterator(__pos.__p);
 }
 
 template<typename _T, typename _Allocator>
