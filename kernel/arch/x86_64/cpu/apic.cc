@@ -1513,6 +1513,7 @@ static isr_context_t *apic_spurious_handler(int intr, isr_context_t *ctx)
     (void)intr;
     assert(intr == INTR_APIC_SPURIOUS);
     APIC_ERROR("Spurious APIC interrupt!\n");
+    cpu_debug_break();
     return ctx;
 }
 
