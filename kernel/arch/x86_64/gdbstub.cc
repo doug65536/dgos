@@ -217,7 +217,7 @@ public:
     __noreturn
     void run();
 
-    void *operator new(size_t)
+    void *operator new(size_t) noexcept
     {
         return calloc(1, sizeof(gdbstub_t));
     }
