@@ -1269,8 +1269,8 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
             lock.lock();
             mapping->active_read = -1;
-            lock.unlock();
             mapping->done_cond.notify_all();
+            lock.unlock();
 
             // Restart the instruction, or unhandled exception on I/O error
             return likely(io_result >= 0) ? ctx : 0;
