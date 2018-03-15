@@ -52,10 +52,6 @@ string.h
 types.h
 utf.cc
 utf.h
-dump/bootsect.map
-dump/bootsect.dis
-dump/bootsect-debug.disasm
-dump/bootsect.hex
 elf64decl.h
 exception.s
 exception.h
