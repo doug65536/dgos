@@ -1767,7 +1767,7 @@ usb_cc_t usbxhci::fetch_inp_ctx(
         return usb_cc_t::resource_err;
 
     *inpslotctx = *ctx;
-    memcpy(inpepctx, ep, sizeof(*inpepctx) * 16);
+    memcpy(inpepctx, ep, sizeof(*inpepctx) * 32);
 
     if (p_ctlctx)
         *p_ctlctx = ctlctx;
