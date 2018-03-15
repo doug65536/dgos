@@ -6,7 +6,7 @@
 #include "control_regs.h"
 #include "interrupts.h"
 #include "irq.h"
-#include "idt.h"
+#include "isr.h"
 #include "thread_impl.h"
 #include "mm.h"
 #include "cpuid.h"

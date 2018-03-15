@@ -2,7 +2,7 @@
 #include "cpu.h"
 #include "mmu.h"
 #include "gdt.h"
-#include "idt.h"
+#include "isr.h"
 #include "gdt.h"
 #include "control_regs.h"
 #include "legacy_pic.h"

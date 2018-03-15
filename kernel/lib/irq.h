@@ -1,6 +1,6 @@
 #pragma once
 #include "types.h"
-#include "cpu/idt.h"
+#include "cpu/isr.h"
 
 // Located nearby data touched in interrupt handling
 extern size_t sse_context_size;

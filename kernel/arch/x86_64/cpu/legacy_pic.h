@@ -1,5 +1,5 @@
 #pragma once
-#include "idt.h"
+#include "isr.h"
 
 void pic8259_enable(void);
 void pic8259_disable(void);

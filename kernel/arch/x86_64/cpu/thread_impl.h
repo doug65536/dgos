@@ -1,6 +1,6 @@
 #pragma once
 #include "types.h"
-#include "cpu/idt.h"
+#include "cpu/isr.h"
 #include "segrw.h"
 #include "asm_constants.h"
 

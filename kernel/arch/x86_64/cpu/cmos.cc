@@ -3,7 +3,7 @@
 #include "ioport.h"
 #include "bios_data.h"
 #include "string.h"
-#include "idt.h"
+#include "isr.h"
 #include "irq.h"
 #include "control_regs.h"
 #include "mutex.h"

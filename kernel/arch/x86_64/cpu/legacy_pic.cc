@@ -5,6 +5,7 @@
 #include "control_regs.h"
 #include "interrupts.h"
 #include "picbits.h"
+#include "assert.h"
 
 // Implements legacy Programmable Interrupt Controller,
 // used if the APIC is not available
