@@ -29,13 +29,11 @@
 static void thread_wait_add(thread_wait_link_t volatile *root,
                             thread_wait_link_t volatile *node)
 {
-    atomic_barrier();
     thread_wait_link_t volatile *insafter = root->prev;
     node->next = root;
     node->prev = insafter;
     insafter->next = node;
-    root->prev = node;
-    atomic_barrier();
+    atomic_st_rel(&root->prev, node);
 }
 
 static thread_wait_link_t volatile *thread_wait_del(
@@ -46,9 +44,8 @@ static thread_wait_link_t volatile *thread_wait_del(
     thread_wait_link_t volatile *prev = node->prev;
     prev->next = next;
     next->prev = prev;
-    node->next = 0;
-    node->prev = 0;
-    atomic_barrier();
+    atomic_st_rel(&node->next, nullptr);
+    atomic_st_rel(&node->prev, nullptr);
     return next;
 }
 

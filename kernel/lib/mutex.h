@@ -248,6 +248,11 @@ struct alignas(64) padded_ticketlock : public ticketlock {
 // Does not meet BasicLockable requirements, lock holder maintains node
 class mcslock {
 public:
+    mcslock()
+        : m(nullptr)
+    {
+    }
+
     using mutex_type = mcs_queue_ent_t *;
     void lock(mcs_queue_ent_t *node)
     {
@@ -339,8 +344,8 @@ template<>
 class unique_lock<mcslock>
 {
 public:
-    explicit unique_lock(mcslock& m)
-        : m(&m)
+    explicit unique_lock(mcslock& attached_lock)
+        : m(&attached_lock)
         , locked(false)
     {
         lock();

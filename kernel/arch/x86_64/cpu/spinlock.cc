@@ -11,14 +11,19 @@
 // Unlock spinlock and return state without reenabling interrupts
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 {
-    assert(*lock != 0);
-    return atomic_xchg(lock, 0);
+    assert(atomic_ld_acq(lock) & 1);
+    return atomic_xchg(lock, spinlock_value_t(0));
 }
 
 void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 {
-    while (*lock != 0 || atomic_cmpxchg(lock, 0, saved_lock) != 0)
-        pause();
+    for (;;) {
+        if (atomic_ld_acq(lock) == 0 &&
+                atomic_cmpxchg(lock, 0, saved_lock) == 0)
+            return;
+
+        cpu_wait_value(lock, spinlock_value_t(0));
+    }
 }
 
 // Spin to acquire lock, return with IRQs disabled
@@ -26,20 +31,17 @@ void spinlock_lock(spinlock_t *lock)
 {
     spinlock_value_t intr_enabled = cpu_irq_is_enabled() << 1;
 
-    for (;; pause()) {
+    for (;;) {
         // Test and test and set
-        if (*lock == 0 && atomic_cmpxchg(lock, 0, 1 | intr_enabled) == 0)
-            return;
-
-        // If IRQs were enabled, enable IRQs while waiting
-        if (unlikely(intr_enabled))
-            cpu_irq_enable();
+        if (atomic_ld_acq(lock) == 0) {
+            cpu_irq_disable();
+            if (atomic_cmpxchg(lock, 0, 1 | intr_enabled) == 0)
+                return;
+            if (intr_enabled)
+                cpu_irq_enable();
+        }
 
         cpu_wait_value(lock, spinlock_value_t(0));
-
-        // If IRQs were enabled, disable IRQs before acquiring
-        if (unlikely(intr_enabled))
-            cpu_irq_disable();
     }
 
     // Return with interrupts disabled
@@ -62,9 +64,9 @@ bool spinlock_try_lock(spinlock_t *lock)
 
 void spinlock_unlock(spinlock_t *lock)
 {
-    int intr_enabled = (*lock >> 1) & 1;
+    bool intr_enabled = *lock & 2;
     assert(*lock & 1);
-    *lock = 0;
+    atomic_st_rel(lock, 0);
     cpu_irq_toggle(intr_enabled);
 }
 
@@ -209,19 +211,32 @@ void ticketlock_lock(ticketlock_t *lock)
     ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
 
     for (;;) {
-        ticketlock_value_t serving = lock->now_serving;
+        ticketlock_value_t serving = atomic_ld_acq(&lock->now_serving);
 
-        ticketlock_value_t pause_count = my_ticket - (serving & -2);
-
-        if (likely(pause_count == 0)) {
+        if (likely(my_ticket == (serving & -2))) {
             // Store the interrupt flag in bit 0
-            lock->now_serving = (serving & -2) | intr_enabled;
+            atomic_st_rel(&lock->now_serving, (serving & -2) | intr_enabled);
             return;
         }
 
-        do {
-            pause();
-        } while (pause_count -= 2);
+        cpu_wait_value(&lock->now_serving, my_ticket);
+    }
+}
+
+void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
+{
+    ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
+
+    for (;;) {
+        ticketlock_value_t serving = lock->now_serving;
+
+        if (likely(my_ticket == (serving & -2))) {
+            // Store the interrupt flag in bit 0
+            atomic_st_rel(&lock->now_serving, (serving & -2) | saved_lock);
+            return;
+        }
+
+        cpu_wait_value(&lock->now_serving, my_ticket);
     }
 }
 
@@ -229,20 +244,28 @@ bool ticketlock_try_lock(ticketlock_t *lock)
 {
     ticketlock_value_t intr_enabled = cpu_irq_save_disable();
 
-    for (ticketlock_value_t old_next = lock->next_ticket; ; ) {
-        ticketlock_value_t serving = lock->now_serving;
-        if (likely(serving == old_next)) {
-            if (likely(atomic_cmpxchg_upd(&lock->next_ticket, &old_next,
-                                          (old_next + 2) & -2))) {
-                // Store interrupt flag
-                lock->now_serving = (serving & -2) | intr_enabled;
-                return true;
-            }
-        } else {
-            cpu_irq_toggle(intr_enabled);
-            return false;
+    ticketlock_value_t old_next = lock->next_ticket;
+    ticketlock_value_t serving = lock->now_serving;
+
+    if (likely(serving == old_next)) {
+        // The lock is available, atomically get a ticket value
+        if (likely(atomic_cmpxchg_upd(&lock->next_ticket, &old_next,
+                                      (old_next + 2) & -2))) {
+            // Got next ticket value
+
+            // Store the interrupt flag in bit 0
+            atomic_st_rel(&lock->now_serving,
+                          (serving & -2) | intr_enabled);
+
+            return true;
         }
+
+        // Racing thread got next ticket, give up
     }
+
+    // There are threads queued for it, give up
+    cpu_irq_toggle(intr_enabled);
+    return false;
 }
 
 void ticketlock_unlock(ticketlock_t *lock)
@@ -260,48 +283,12 @@ ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
     return intr_state;
 }
 
-void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
-{
-    node->irq_enabled = cpu_irq_save_disable();
-    ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
-
-    for (;;) {
-        ticketlock_value_t serving = lock->now_serving;
-
-        ticketlock_value_t pause_count = my_ticket - (serving & -2);
-
-        if (likely(pause_count == 0)) {
-            // Store the interrupt flag in bit 0
-            lock->now_serving = (serving & -2) | saved_lock;
-            return;
-        }
-
-        do {
-            pause();
-        } while (pause_count -= 2);
-    }
-}
-
-void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
-{
-    node->irq_enabled = cpu_irq_disable();
-
-    node->next = nullptr;
-    mcs_queue_ent_t *pred = atomic_xchg(lock, node);
-    if (pred) {
-        // queue was non-empty
-        node->locked = true;
-        pred->next = node;
-
-        cpu_wait_value(&node->locked, false);
-    }
-}
-
 bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
 {
-    node->irq_enabled = cpu_irq_disable();
+    node->irq_enabled = cpu_irq_save_disable();
 
-    node->next = nullptr;
+    atomic_st_rel(&node->next, nullptr);
+
     if (atomic_cmpxchg(lock, nullptr, node) == nullptr)
         return true;
 
@@ -309,19 +296,48 @@ bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
     return false;
 }
 
-void mcslock_unlock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
+void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
 {
-    if (!node->next) {
+    node->irq_enabled = cpu_irq_save_disable();
+    node->thread_id = thread_get_id();
+
+    atomic_st_rel(&node->next, nullptr);
+
+    mcs_queue_ent_t *pred = atomic_xchg(lock, node);
+
+    if (unlikely(pred)) {
+        // queue was non-empty
+        atomic_st_rel(&node->locked, true);
+
+        // Link predecessor to this node
+        atomic_st_rel(&pred->next, node);
+
+        // The predecessor will set locked to false when they unlock it
+        cpu_wait_value(&node->locked, false);
+    }
+}
+
+void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+{
+    if (!atomic_ld_acq(&node->next)) {
         // no known successor
+
+        // Attempt to empty the list
         if (atomic_cmpxchg(lock, node, nullptr)) {
+            // List now empty
             cpu_irq_toggle(node->irq_enabled);
             return;
         }
 
         // Wait until node->next is not null
+        // To be sure successor has initialized locked field
         cpu_wait_not_value(&node->next, (mcs_queue_ent_t*)nullptr);
+
+        assert(node->next != nullptr);
     }
-    node->next->locked = false;
+
+    assert(atomic_ld_acq(&node->locked) == true);
+    atomic_st_rel(&node->next->locked, false);
     cpu_irq_toggle(node->irq_enabled);
 }
 

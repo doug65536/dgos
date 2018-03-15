@@ -636,14 +636,16 @@ static __always_inline void cpu_wait_masked(
         bool is_equal, T const volatile *value, T wait_value, T mask)
 {
     if (cpuid_has_mwait()) {
-        while (is_equal != ((*value & mask) == wait_value)) {
+        while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value)) {
             cpu_monitor(value, 0, 0);
 
-            if (is_equal != ((*value & mask) == wait_value))
+            if (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
                 cpu_mwait(0, 0);
+            else
+                break;
         }
     } else {
-        while (is_equal != ((*value & mask) == wait_value))
+        while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
             pause();
     }
 }
@@ -656,14 +658,16 @@ static __always_inline void cpu_wait_unmasked(
         bool is_equal, T const volatile *value, T wait_value)
 {
     if (cpuid_has_mwait()) {
-        while (is_equal != (*value == wait_value)) {
+        while (is_equal != (atomic_ld_acq(value) == wait_value)) {
             cpu_monitor(value, 0, 0);
 
-            if (is_equal != (*value == wait_value))
+            if (is_equal != (atomic_ld_acq(value) == wait_value))
                 cpu_mwait(0, 0);
+            else
+                break;
         }
     } else {
-        while (is_equal != (*value == wait_value))
+        while (is_equal != (atomic_ld_acq(value) == wait_value))
             pause();
     }
 }
