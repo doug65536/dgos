@@ -1865,8 +1865,7 @@ QEMU_NET = \
 	-net nic,model=rtl8139 \
 	-net nic,model=ne2k_pci \
 	-net nic,model=e1000 \
-	$(QEMU_BRIDGE) \
-	-net dump,file="$(DUMPDIR)/netdump"
+	$(QEMU_BRIDGE)
 
 QEMU_MONITOR = \
 	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
