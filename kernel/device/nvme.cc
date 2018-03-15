@@ -1216,6 +1216,7 @@ void nvme_queue_state_t::submit_cmd(
         cmd.hdr.dptr.prpp[0].addr = ranges[0].physaddr;
     }
 
+    assert(index < cmp_handlers.size());
     cmp_handlers[index] = nvme_callback_t(callback, data);
 
     sub_queue.enqueue(move(cmd));
@@ -1236,6 +1237,7 @@ void nvme_queue_state_t::invoke_completion(
         nvme_if_t *owner, nvme_cmp_t &packet,
         uint16_t cmd_id, int status_type, int status)
 {
+    assert(cmd_id < cmp_handlers.size());
     cmp_handlers[cmd_id](owner, packet, cmd_id, status_type, status);
 }
 
