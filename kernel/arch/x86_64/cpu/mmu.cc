@@ -1698,7 +1698,6 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
     linaddr_t addr;
 
     if (likely(free_addr_by_addr && free_addr_by_size)) {
-        cpu_scoped_irq_disable intr_was_enabled;
         scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
@@ -1760,7 +1759,6 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
     assert(free_addr_by_addr);
     assert(free_addr_by_size);
 
-    cpu_scoped_irq_disable intr_was_enabled;
     scoped_lock lock(free_addr_lock);
 
     // Round to pages
@@ -1877,7 +1875,6 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 
     linaddr_t end = addr + size;
 
-    cpu_scoped_irq_disable intr_was_enabled;
     scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
