@@ -1276,7 +1276,6 @@ void nvme_queue_state_t::process_completions(
     hold.unlock();
 
     for (nvme_cmp_t& packet : cmp_buf) {
-
         //bool dnr = NVME_CMP_DW3_DNR_GET(packet.cmp_dword[3]);
         int status_type = NVME_CMP_DW3_SCT_GET(packet.cmp_dword[3]);
         int status = NVME_CMP_DW3_SC_GET(packet.cmp_dword[3]);
