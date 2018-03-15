@@ -429,7 +429,7 @@ struct nvme_request_t {
     void *data;
     int64_t count;
     uint64_t lba;
-    iocp_t *callback;
+    iocp_t *iocp;
     nvme_op_t op;
     bool fua;
 };
@@ -1116,9 +1116,7 @@ errno_t nvme_dev_t::io(
    request.lba = lba;
    request.op = op;
    request.fua = fua;
-   request.callback = iocp;
-
-   cpu_scoped_irq_disable intr_were_enabled;
+   request.iocp = iocp;
 
    int expect = parent->io(ns, request, log2_sectorsize);
    iocp->set_expect(expect);
