@@ -1,6 +1,7 @@
 #pragma once
 #include "errno.h"
 #include "mutex.h"
+#include "cpu/atomic.h"
 
 // I/O completion
 template<typename T, typename S = T>
@@ -9,6 +10,8 @@ struct basic_iocp_t {
 
     basic_iocp_t();
     basic_iocp_t(callback_t callback, uintptr_t arg);
+
+    ~basic_iocp_t();
 
     // A single request can be split into multiple requests at
     // the device driver layer. This allows a single completion
@@ -44,11 +47,11 @@ private:
     using lock_type = ticketlock;
     using scoped_lock = unique_lock<lock_type>;
 
-    void invoke_once(unique_lock<ticketlock> &hold);
+    void invoke_once(scoped_lock &hold);
 
     callback_t callback;
     uintptr_t arg;
-    unsigned done_count;
+    unsigned volatile done_count;
     unsigned expect_count;
     int result_count;
     lock_type lock;
@@ -64,20 +67,19 @@ public:
     {
     }
 
+    void reset()
+    {
+        basic_iocp_t<T, S>::reset(
+                    &basic_blocking_iocp_t::handler, uintptr_t(this));
+        done = false;
+    }
+
     static void handler(T const& err, uintptr_t arg)
     {
         return ((basic_blocking_iocp_t<T, S>*)arg)->handler(err);
     }
 
-    void handler(T const&)
-    {
-        unique_lock<ticketlock> hold(lock);
-        assert(!done);
-        done = true;
-        done_cond.notify_all();
-        // Hold lock until after notify to ensure that the object
-        // won't get destructed from under us
-    }
+    void handler(T const&);
 
     T wait();
 
@@ -87,7 +89,7 @@ private:
 
     lock_type lock;
     condition_variable done_cond;
-    bool done;
+    bool volatile done;
 };
 
 template<typename T, typename S>
@@ -112,6 +114,13 @@ basic_iocp_t<T, S>::basic_iocp_t(
     , result()
 {
     assert(callback);
+}
+
+template<typename T, typename S>
+basic_iocp_t<T, S>::~basic_iocp_t()
+{
+    assert(expect_count > 0);
+    assert(done_count == expect_count);
 }
 
 template<typename T, typename S>
@@ -157,7 +166,7 @@ void basic_iocp_t<T, S>::reset(basic_iocp_t::callback_t callback, uintptr_t arg)
 }
 
 template<typename T, typename S>
-void basic_iocp_t<T, S>::invoke_once(unique_lock<ticketlock> &hold)
+void basic_iocp_t<T, S>::invoke_once(scoped_lock &hold)
 {
     if (callback != nullptr) {
         callback_t temp = callback;
@@ -165,6 +174,17 @@ void basic_iocp_t<T, S>::invoke_once(unique_lock<ticketlock> &hold)
         hold.unlock();
         temp(result, arg);
     }
+}
+
+template<typename T, typename S>
+void basic_blocking_iocp_t<T, S>::handler(const T &)
+{
+    scoped_lock hold(lock);
+    assert(!done);
+    done = true;
+    done_cond.notify_all();
+    // Hold lock until after notify to ensure that the object
+    // won't get destructed from under us
 }
 
 template<typename T, typename S>
