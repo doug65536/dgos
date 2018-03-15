@@ -1027,11 +1027,11 @@ unsigned nvme_if_t::io(uint8_t ns, nvme_request_t &request,
         case nvme_op_t::write:
             chunk = min(bytes, size_t(0x10000));
             range_count = mphysranges(ranges, countof(ranges),
-                                             request.data, chunk,
-                                             PAGE_SIZE);
+                                      request.data, chunk, PAGE_SIZE);
 
             lba_count = chunk >> log2_sectorsize;
             request.count -= lba_count;
+            request.data = (char*)request.data + (lba_count << log2_sectorsize);
             break;
 
         case nvme_op_t::flush:
