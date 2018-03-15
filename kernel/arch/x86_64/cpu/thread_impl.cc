@@ -233,7 +233,7 @@ EXPORT void thread_yield()
         // Push ss:rsp
         "movq %%rsp,%%rax\n\t"
         "pushq %[gdt_data]\n\t"
-        "push %%rax\n\t"
+        "pushq %%rax\n\t"
 
         // Push rflags
         "pushfq\n\t"
@@ -242,7 +242,7 @@ EXPORT void thread_yield()
         "cli\n\t"
 
         // Push cs:rip and jump to isr_entry
-        "push %[gdt_code64]\n\t"
+        "pushq %[gdt_code64]\n\t"
         "call isr_entry_%c[yield]\n\t"
         :
         : [yield] "i" (INTR_THREAD_YIELD)
