@@ -1692,7 +1692,11 @@ bool usbxhci::set_hub_port_count(int slotid, usb_hub_desc const& hub_desc)
     usbxhci_slotctx_t *inpslotctx;
     usbxhci_ep_ctx_t *inpepctx;
 
-    fetch_inp_ctx(slotid, 0, inp, &ctlctx, &inpslotctx, &inpepctx);
+    usb_cc_t cc = fetch_inp_ctx(slotid, 0, inp,
+                                &ctlctx, &inpslotctx, &inpepctx);
+
+    if (cc != usb_cc_t::success)
+        return false;
 
     // Update hub flag
     USBXHCI_SLOTCTX_RSMHC_HUB_SET(inpslotctx->rsmhc, 1);
