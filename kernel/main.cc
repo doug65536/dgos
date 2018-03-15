@@ -840,16 +840,16 @@ static int init_thread(void *p)
 
 int debugger_thread(void *)
 {
-    gdb_init();
+    //gdb_init();
 
-    thread_create(init_thread, 0, 0, false);
 
     return 0;
 }
 
 extern "C" __noreturn int main(void)
 {
-    thread_create(debugger_thread, 0, 0, false);
+    thread_create(init_thread, 0, 0, false);
+    //thread_create(debugger_thread, 0, 0, false);
 
     thread_idle_set_ready();
 
