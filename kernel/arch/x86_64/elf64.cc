@@ -261,8 +261,8 @@ module_entry_fn_t modload_load(char const *path)
         case SHT_REL:
             end = (char*)rel + hdr->sh_size;
             for (Elf64_Rel const *r = rel; (void*)r < end; ++r) {
-                symtab_idx = ELF64_R_SYM(r->r_info);
-                rel_type = ELF64_R_TYPE(r->r_info);
+                //symtab_idx = ELF64_R_SYM(r->r_info);
+                //rel_type = ELF64_R_TYPE(r->r_info);
                 assert(!"Unhandled relocation type!");
                 return 0;
             }
