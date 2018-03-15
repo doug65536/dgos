@@ -30,6 +30,10 @@
 
 // The <signal.h> header shall define the following data types:
 
+#ifndef __SIG_ATOMIC_TYPE__
+#define __SIG_ATOMIC_TYPE__ long
+#endif
+
 // Possibly volatile-qualified integer type of an object that can be
 // accessed as an atomic entity, even in the presence of
 // asynchronous interrupts.
