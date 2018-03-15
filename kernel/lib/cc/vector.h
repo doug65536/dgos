@@ -732,10 +732,10 @@ vector<_T,_Allocator>::erase(const_iterator __pos)
     pointer __p = __pos.__p;
     pointer __e = __m + __sz - __count;
     for ( ; __p < __e; ++__p) {
-        __p->~value_type();
+        __alloc.destruct(__p);
         new (__p) value_type(move(__p[__count]));
     }
-    __e->~value_type();
+    __alloc.destruct(__e);
     --__sz;
     return iterator(__pos.__p);
 }
@@ -748,10 +748,10 @@ vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
     pointer __p = __first.__p;
     pointer __e = __m + __sz - __count;
     for ( ; __p < __e; ++__p) {
-        __p->~value_type();
+        __alloc.destruct(__p);
         new (__p) value_type(move(__p[__count]));
     }
-    __e->~value_type();
+    __alloc.destruct(__e);
     __sz -= __count;
     return iterator(__first);
 }
