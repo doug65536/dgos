@@ -52,12 +52,12 @@ void auto_free(void *mem)
     }
 }
 
-void *operator new(size_t size)
+void *operator new(size_t size) noexcept
 {
     return malloc(size);
 }
 
-void *operator new[](size_t size)
+void *operator new[](size_t size) noexcept
 {
     return malloc(size);
 }

@@ -40,8 +40,8 @@ void auto_free(void *mem);
 
 void *operator new(size_t, void *p) noexcept;
 
-void *operator new(size_t size);
-void *operator new[](size_t size);
-void operator delete(void *block, unsigned long size);
-void operator delete(void *block) throw();
-void operator delete[](void *block) throw();
+void *operator new(size_t size) noexcept;
+void *operator new[](size_t size) noexcept;
+void operator delete(void *block, unsigned long size) noexcept;
+//void operator delete(void *block) throw();
+//void operator delete[](void *block) throw();
