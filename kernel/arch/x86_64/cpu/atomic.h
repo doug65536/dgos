@@ -49,6 +49,12 @@ static __always_inline void pause()
 #define atomic_cmpxchg(value, expect, replacement) \
     __sync_val_compare_and_swap((value), (expect), (replacement))
 
+#define atomic_ld_acq(value) \
+    __atomic_load_n(value, __ATOMIC_ACQUIRE)
+
+#define atomic_st_rel(value, rhs) \
+    __atomic_store_n(value, rhs, __ATOMIC_RELEASE)
+
 // Returns true if the exchange was successful. Otherwise, returns
 // false and updates expect. Expect is a pointer to a variable.
 #define atomic_cmpxchg_upd(value, expect, replacement) \
