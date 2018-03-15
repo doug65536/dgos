@@ -850,7 +850,7 @@ EXPORT uint64_t thread_get_usage(int id)
 
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 {
-    cpu_scoped_irq_disable intr_was_enabled;
+    //cpu_scoped_irq_disable intr_was_enabled;
     thread_info_t *thread = this_thread();
 
     *thread_id = thread - threads;

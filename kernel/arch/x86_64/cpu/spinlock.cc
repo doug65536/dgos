@@ -24,7 +24,7 @@ void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 // Spin to acquire lock, return with IRQs disabled
 void spinlock_lock(spinlock_t *lock)
 {
-    spinlock_value_t intr_enabled = cpu_irq_disable() << 1;
+    spinlock_value_t intr_enabled = cpu_irq_is_enabled() << 1;
 
     for (;; pause()) {
         // Test and test and set
@@ -49,7 +49,7 @@ void spinlock_lock(spinlock_t *lock)
 // Returns 0 with interrupts preserved if lock was not acquired
 bool spinlock_try_lock(spinlock_t *lock)
 {
-    int intr_enabled = cpu_irq_disable() << 1;
+    int intr_enabled = cpu_irq_save_disable() << 1;
 
     if (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         cpu_irq_toggle(intr_enabled);
@@ -204,7 +204,7 @@ bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
 
 void ticketlock_lock(ticketlock_t *lock)
 {
-    ticketlock_value_t intr_enabled = cpu_irq_disable();
+    ticketlock_value_t intr_enabled = cpu_irq_save_disable();
 
     ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
 
@@ -227,7 +227,7 @@ void ticketlock_lock(ticketlock_t *lock)
 
 bool ticketlock_try_lock(ticketlock_t *lock)
 {
-    ticketlock_value_t intr_enabled = cpu_irq_disable();
+    ticketlock_value_t intr_enabled = cpu_irq_save_disable();
 
     for (ticketlock_value_t old_next = lock->next_ticket; ; ) {
         ticketlock_value_t serving = lock->now_serving;
@@ -262,6 +262,7 @@ ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
 
 void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
 {
+    node->irq_enabled = cpu_irq_save_disable();
     ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
 
     for (;;) {

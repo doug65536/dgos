@@ -503,7 +503,14 @@ static __always_inline void cpu_clac()
     __asm__ __volatile__ ("clac");
 }
 
-static __always_inline bool cpu_irq_disable()
+static __always_inline void cpu_irq_disable()
+{
+    __asm__ __volatile__ (
+        "cli\n\t"
+    );
+}
+
+static __always_inline bool cpu_irq_save_disable()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -563,7 +570,7 @@ class cpu_scoped_irq_disable
 public:
     __always_inline
     cpu_scoped_irq_disable()
-        : intr_was_enabled((cpu_irq_disable() << 1) - 1)
+        : intr_was_enabled((cpu_irq_save_disable() << 1) - 1)
     {
     }
 

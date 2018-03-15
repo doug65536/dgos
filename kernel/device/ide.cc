@@ -507,7 +507,7 @@ ide_if_t::ide_chan_t::~ide_chan_t()
 
 int ide_if_t::ide_chan_t::acquire_access()
 {
-    int intr_was_enabled = cpu_irq_disable();
+    int intr_was_enabled = cpu_irq_save_disable();
     mutex_lock(&lock);
 
     while (busy)
