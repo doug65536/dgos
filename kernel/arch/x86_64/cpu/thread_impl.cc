@@ -487,7 +487,8 @@ static int smp_idle_thread(void *)
 
 void thread_idle()
 {
-    while (1)
+    assert(cpu_irq_is_enabled());
+    for(;;)
         halt();
 }
 
@@ -580,20 +581,16 @@ static thread_info_t *thread_choose_next(
     // Consider each thread, excluding idle threads
     size_t count = thread_count - cpu_count;
 
-    // If this thread is not allowed on this CPU,
-    // then best is the idle thread until proven otherwise
-    if (unlikely(!(outgoing->cpu_affinity & (1 << cpu_number))))
-        incoming = threads + cpu_number;
-
-    for (size_t checked = 0; ++i, checked <= count; ++checked) {
-        // Wrap to the first non-idle thread
-        if (unlikely(i >= thread_count))
+    for (size_t checked = 0; ++i, checked < count; ++checked) {
+        // Skip idle threads, or wrap to the first non-idle thread
+        if (i < cpu_count || i >= thread_count)
             i = cpu_count;
 
         candidate = threads + i;
 
         // Quickly ignore running threads
-        if (candidate->state == THREAD_IS_RUNNING)
+        if (candidate->state == THREAD_IS_RUNNING ||
+                candidate->state == THREAD_IS_UNINITIALIZED)
             continue;
 
         // If this thread is not allowed to run on this CPU
@@ -677,7 +674,6 @@ static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
     atomic_and(&thread->state, ~THREAD_BUSY);
-    //thread->state = thread_state_t(int(thread->state) & ~THREAD_BUSY);
 }
 
 isr_context_t *thread_schedule(isr_context_t *ctx)
@@ -691,8 +687,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         thread = cpu->goto_thread;
         cpu->cur_thread = thread;
         cpu->goto_thread = 0;
-        atomic_barrier();
-        thread->state = THREAD_IS_RUNNING;
+        atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
         ctx = thread->ctx;
         thread->ctx = nullptr;
         return ctx;
@@ -722,12 +717,12 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     if (likely(cpu->time_ratio))
         cpu->busy_percent = 100 * cpu->busy_ratio / cpu->time_ratio;
 
+    thread_state_t state = atomic_ld_acq(&thread->state);
+
     // Change to ready if running
-    if (likely(thread->state == THREAD_IS_RUNNING)) {
-        atomic_barrier();
-        thread->state = THREAD_IS_READY_BUSY;
-        atomic_barrier();
-    } else if (unlikely(thread->state == THREAD_IS_DESTRUCTING)) {
+    if (likely(state == THREAD_IS_RUNNING)) {
+        atomic_st_rel(&thread->state, THREAD_IS_READY_BUSY);
+    } else if (state == THREAD_IS_DESTRUCTING) {
         munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
                stack_guard_size + thread->stack_size + stack_guard_size);
 
@@ -738,9 +733,9 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         }
 
         mutex_lock_noyield(&thread->lock);
-        thread->state = THREAD_IS_FINISHED;
-        mutex_unlock(&thread->lock);
+        atomic_st_rel(&thread->state, THREAD_IS_FINISHED);
         condvar_wake_all(&thread->done_cond);
+        mutex_unlock(&thread->lock);
     }
 
     // Retry because another CPU might steal this
@@ -750,15 +745,17 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     for ( ; ; ++retries) {
         thread = thread_choose_next(cpu, outgoing);
 
-        assert(thread >= threads &&
-               thread < threads + countof(threads));
+        if (thread - threads >= cpu_count)
+            THREAD_TRACE("Switching to thread %zd\n", thread - threads);
 
-        if (thread == outgoing &&
-                thread->state == THREAD_IS_READY_BUSY) {
-            // This doesn't need to be atomic because the
+        assert((thread >= threads + cpu_count &&
+                thread < threads + countof(threads)) ||
+               thread == threads + (cpu - cpus));
+
+        if (thread == outgoing && thread->state == THREAD_IS_READY_BUSY) {
+            // This doesn't need to be cmpxchg because the
             // outgoing thread is still marked busy
-            atomic_barrier();
-            thread->state = THREAD_IS_RUNNING;
+            atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
             break;
         } else if (thread->state == THREAD_IS_READY &&
                 atomic_cmpxchg(&thread->state,
@@ -769,9 +766,6 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         }
         pause();
     }
-    //if (unlikely(retries > 0))
-    //    printdbg("Scheduler retries: %d\n", retries);
-    atomic_barrier();
 
     thread->sched_timestamp = now;
 
@@ -783,7 +777,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     ctx = thread->ctx;
     thread->ctx = nullptr;
     assert(ctx != nullptr);
-    cpu->cur_thread = thread;
+    atomic_st_rel(&cpu->cur_thread, thread);
 
     assert(ctx->gpr.s.r[0] == (GDT_SEL_USER_DATA | 3));
     assert(ctx->gpr.s.r[1] == (GDT_SEL_USER_DATA | 3));
@@ -852,9 +846,9 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 
     *thread_id = thread - threads;
 
-    thread->state = THREAD_IS_SUSPENDED_BUSY;
+    assert(thread->state == THREAD_IS_RUNNING);
+    atomic_st_rel(&thread->state, THREAD_IS_SUSPENDED_BUSY);
 
-    atomic_barrier();
     spinlock_value_t saved_lock = spinlock_unlock_save(lock);
     thread_yield();
     assert(thread->state == THREAD_IS_RUNNING);
@@ -866,15 +860,12 @@ EXPORT void thread_resume(thread_t tid)
     thread_info_t *thread = threads + tid;
 
     for (;;) {
-        cpu_wait_value(&thread->state, THREAD_IS_SUSPENDED,
-                       thread_state_t(~THREAD_BUSY));
-
-        thread_state_t busy = thread_state_t(thread->state & THREAD_BUSY);
-
-        if (atomic_cmpxchg(&thread->state,
-                           THREAD_IS_SUSPENDED | busy,
-                           THREAD_IS_READY | busy))
-            break;
+        assert(thread->state == THREAD_IS_SUSPENDED);
+        THREAD_TRACE("Resuming %d\n", tid);
+        cpu_wait_value(&thread->state, THREAD_IS_SUSPENDED);
+        if (atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED,
+                           THREAD_IS_READY))
+            return;
     }
 }
 
