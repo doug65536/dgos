@@ -72,7 +72,7 @@ static __always_inline void cpu_msr_set_lo(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
-        "mov %k[value],%%eax\n\t"
+        "movl %k[value],%%eax\n\t"
         "wrmsr"
         :
         : [value] "S" (value)
@@ -85,7 +85,7 @@ static __always_inline void cpu_msr_set_hi(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
-        "mov %k[value],%%edx\n\t"
+        "movl %k[value],%%edx\n\t"
         "wrmsr"
         :
         : [value] "S" (value)
@@ -111,12 +111,12 @@ static __always_inline uint64_t cpu_xcr_change_bits(
     uint32_t edx;
     __asm__ __volatile__ (
         "xgetbv\n\t"
-        "shl $32,%%rdx\n\t"
-        "or %%rdx,%%rax\n\t"
-        "and %[clear_mask],%%rax\n\t"
-        "or %[set],%%rax\n\t"
-        "mov %%rax,%%rdx\n\t"
-        "shr $32,%%rdx\n\t"
+        "shlq $32,%%rdx\n\t"
+        "orq %%rdx,%%rax\n\t"
+        "andq %[clear_mask],%%rax\n\t"
+        "orq %[set],%%rax\n\t"
+        "movq %%rax,%%rdx\n\t"
+        "shrq $32,%%rdx\n\t"
         "xsetbv\n\t"
         : "=a" (eax), "=d" (edx)
         : "c" (xcr)
@@ -165,7 +165,7 @@ static __always_inline uintptr_t cpu_get_cr8()
 {
     uintptr_t cr8;
     __asm__ __volatile__ (
-        "mov %%cr8,%[cr8]\n\t"
+        "movq %%cr8,%[cr8]\n\t"
         : [cr8] "=r" (cr8)
     );
     return cr8;
@@ -174,7 +174,7 @@ static __always_inline uintptr_t cpu_get_cr8()
 static __always_inline void cpu_set_cr8(uintptr_t cr8)
 {
     __asm__ __volatile__ (
-        "mov %[cr8],%%cr8\n\t"
+        "movq %[cr8],%%cr8\n\t"
         :
         : [cr8] "r" (cr8)
     );
@@ -185,7 +185,7 @@ static __always_inline uintptr_t cpu_get_debug_reg()
 {
     uintptr_t value;
     __asm__ __volatile__ (
-        "mov %%dr%c[dr],%[value]\n\t"
+        "movq %%dr%c[dr],%[value]\n\t"
         : [value] "=r" (value)
         : [dr] "i" (dr)
     );
@@ -196,7 +196,7 @@ template<int dr>
 static __always_inline void cpu_set_debug_reg(uintptr_t value)
 {
     __asm__ __volatile__ (
-        "mov %[value],%%dr%c[dr]\n\t"
+        "movq %[value],%%dr%c[dr]\n\t"
         :
         : [value] "r" (value)
         , [dr] "i" (dr)
@@ -239,7 +239,7 @@ void cpu_set_debug_breakpoint_indirect(uintptr_t addr, int rw,
 static __always_inline void cpu_set_page_directory(uintptr_t addr)
 {
     __asm__ __volatile__ (
-        "mov %[addr],%%cr3\n\t"
+        "movq %[addr],%%cr3\n\t"
         :
         : [addr] "r" (addr)
         : "memory"
@@ -250,7 +250,7 @@ static __always_inline uintptr_t cpu_get_page_directory()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
-        "mov %%cr3,%[addr]\n\t"
+        "movq %%cr3,%[addr]\n\t"
         : [addr] "=r" (addr)
     );
     return addr;
@@ -260,7 +260,7 @@ static __always_inline uintptr_t cpu_get_fault_address()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
-        "mov %%cr2,%[addr]\n\t"
+        "movq %%cr2,%[addr]\n\t"
         : [addr] "=r" (addr)
     );
     return addr;
@@ -325,7 +325,7 @@ static __always_inline void cpu_flush_cache()
 static __always_inline void cpu_set_fs(uint16_t selector)
 {
     __asm__ __volatile__ (
-        "mov %w[selector],%%fs\n\t"
+        "movw %w[selector],%%fs\n\t"
         :
         : [selector] "r" (selector)
     );
@@ -334,7 +334,7 @@ static __always_inline void cpu_set_fs(uint16_t selector)
 static __always_inline void cpu_set_gs(uint16_t selector)
 {
     __asm__ __volatile__ (
-        "mov %w[selector],%%gs\n\t"
+        "movw %w[selector],%%gs\n\t"
         :
         : [selector] "r" (selector)
     );
@@ -402,7 +402,7 @@ static __always_inline void cpu_set_tr(uint16_t tr)
 static __always_inline void cpu_set_ldt(uint16_t ldt)
 {
     __asm__ __volatile__ (
-        "lldt %w[ldt]\n\t"
+        "lldtw %w[ldt]\n\t"
         :
         : [ldt] "r" (ldt)
     );
@@ -412,7 +412,7 @@ static __always_inline void *cpu_get_stack_ptr()
 {
     void *rsp;
     __asm__ __volatile__ (
-        "mov %%rsp,%[rsp]\n\t"
+        "movq %%rsp,%[rsp]\n\t"
         : [rsp] "=r" (rsp)
     );
     return rsp;
@@ -456,8 +456,8 @@ static __always_inline uint32_t cpu_get_eflags()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
-        "pushf\n\t"
-        "pop %q[eflags]\n\t"
+        "pushfq\n\t"
+        "popq %q[eflags]\n\t"
         : [eflags] "=r" (eflags)
     );
     return eflags;
