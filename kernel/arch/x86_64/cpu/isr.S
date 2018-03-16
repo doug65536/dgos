@@ -123,8 +123,7 @@ isr_common:
     .cfi_def_cfa_offset 24
     .cfi_rel_offset rsp,16
 
-    // Save call-clobbered registers
-    // (in System-V parameter order in memory)
+    // push order: rbp, rbx, r15-r10, rax, r9-8, rcx, rdx, rsi, rdi
     push_cfi %rbp
     .cfi_rel_offset rbp,0
     mov %rsp,%rbp
@@ -132,14 +131,28 @@ isr_common:
     .cfi_def_cfa_register rbp
     .cfi_def_cfa_offset 32
 
-    //  0*8(%rbp) -> caller's rbp
-    //  1*8(%rbp) -> interrupt
-    //  2*8(%rbp) -> error code
-    //  3*8(%rbp) -> rip
-    //  4*8(%rbp) -> cs
-    //  5*8(%rbp) -> flags
-    //  6*8(%rbp) -> rsp
-    //  7*8(%rbp) -> ss
+    //   7*8(%rbp) -> ss            ┐
+    //   6*8(%rbp) -> rsp           │
+    //   5*8(%rbp) -> flags         │
+    //   4*8(%rbp) -> cs            ├ interrupt frame
+    //   3*8(%rbp) -> rip           │
+    //   2*8(%rbp) -> error code    │
+    //   1*8(%rbp) -> interrupt     ┘
+    //   0*8(%rbp) -> caller's rbp  ┐
+    //  -1*8(%rbp) -> rbx           │
+    //  -2*8(%rbp) -> r15           ├ call preserved
+    //  -3*8(%rbp) -> r14           │
+    //  -4*8(%rbp) -> r13           │
+    //  -5*8(%rbp) -> r12           ┘
+    //  -6*8(%rbp) -> r11           ┐
+    //  -7*8(%rbp) -> r10           │
+    //  -8*8(%rbp) -> rax           │
+    //  -9*8(%rbp) -> r9            │
+    // -10*8(%rbp) -> r8            ├ call clobbered
+    // -11*8(%rbp) -> rcx           │
+    // -12*8(%rbp) -> rdx           │
+    // -13*8(%rbp) -> rsi           │
+    // -14*8(%rbp) -> rdi           ┘
 
     pushq %rbx
     .cfi_rel_offset rbx,1*8
