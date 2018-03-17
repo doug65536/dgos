@@ -20,26 +20,11 @@ struct basic_iocp_t {
     // times. Invoke will never be called if set_expect is never
     // called.
     void set_expect(unsigned expect);
-
     void set_result(T const& sub_result);
-
     void invoke();
-
-    void operator()()
-    {
-        invoke();
-    }
-
-    T& get_result()
-    {
-        return result;
-    }
-
-    operator bool() const
-    {
-        return S::succeeded(result);
-    }
-
+    void operator()();
+    T& get_result();
+    operator bool() const;
     void reset(callback_t callback);
     void reset(callback_t callback, uintptr_t arg);
 
@@ -67,17 +52,9 @@ public:
     {
     }
 
-    void reset()
-    {
-        basic_iocp_t<T, S>::reset(
-                    &basic_blocking_iocp_t::handler, uintptr_t(this));
-        done = false;
-    }
+    void reset();
 
-    static void handler(T const& err, uintptr_t arg)
-    {
-        return ((basic_blocking_iocp_t<T, S>*)arg)->handler(err);
-    }
+    static void handler(T const& err, uintptr_t arg);
 
     void handler(T const&);
 
@@ -119,6 +96,7 @@ basic_iocp_t<T, S>::basic_iocp_t(
 template<typename T, typename S>
 basic_iocp_t<T, S>::~basic_iocp_t()
 {
+    scoped_lock hold(lock);
     assert(expect_count > 0);
     assert(done_count == expect_count);
 }
@@ -145,8 +123,26 @@ template<typename T, typename S>
 void basic_iocp_t<T, S>::invoke()
 {
     scoped_lock hold(lock);
-    if (expect_count && ++done_count >= expect_count)
+    if (++done_count >= expect_count && expect_count)
         invoke_once(hold);
+}
+
+template<typename T, typename S>
+void basic_iocp_t<T, S>::operator()()
+{
+    invoke();
+}
+
+template<typename T, typename S>
+T &basic_iocp_t<T, S>::get_result()
+{
+    return result;
+}
+
+template<typename T, typename S>
+basic_iocp_t<T, S>::operator bool() const
+{
+    return S::succeeded(result);
 }
 
 template<typename T, typename S>
@@ -174,6 +170,20 @@ void basic_iocp_t<T, S>::invoke_once(scoped_lock &hold)
         hold.unlock();
         temp(result, arg);
     }
+}
+
+template<typename T, typename S>
+void basic_blocking_iocp_t<T, S>::reset()
+{
+    basic_iocp_t<T, S>::reset(
+                &basic_blocking_iocp_t::handler, uintptr_t(this));
+    done = false;
+}
+
+template<typename T, typename S>
+void basic_blocking_iocp_t<T, S>::handler(const T &err, uintptr_t arg)
+{
+    return ((basic_blocking_iocp_t<T, S>*)arg)->handler(err);
 }
 
 template<typename T, typename S>
