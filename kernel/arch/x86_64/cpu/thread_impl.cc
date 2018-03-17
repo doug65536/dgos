@@ -660,11 +660,11 @@ static thread_info_t *thread_choose_next(
 
         // Update TPL. Idle CPUs have TPL==0, busy CPUs have TPL=8
 
-        bool incoming_idle = incoming < threads + cpu_count;
-        bool outgoing_idle = outgoing < threads + cpu_count;
-
-        if (incoming_idle != outgoing_idle)
-            cpu_set_cr8(incoming_idle ? 0 : 8);
+//        bool incoming_idle = incoming < threads + cpu_count;
+//        bool outgoing_idle = outgoing < threads + cpu_count;
+//
+//        if (incoming_idle != outgoing_idle)
+//            cpu_set_cr8(incoming_idle ? 0 : 8);
     }
 
     return incoming;
