@@ -283,7 +283,7 @@ ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
     return intr_state;
 }
 
-bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
+bool mcslock_try_lock(mcs_queue_ent_t * volatile*lock, mcs_queue_ent_t *node)
 {
     node->irq_enabled = cpu_irq_save_disable();
 
@@ -296,18 +296,19 @@ bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
     return false;
 }
 
-void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
+// Lock mcslock without restoring/disabling interrupts
+void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
+                          mcs_queue_ent_t *node)
 {
-    node->irq_enabled = cpu_irq_save_disable();
     node->thread_id = thread_get_id();
 
+    node->locked = true;
     atomic_st_rel(&node->next, nullptr);
 
     mcs_queue_ent_t *pred = atomic_xchg(lock, node);
 
     if (unlikely(pred)) {
         // queue was non-empty
-        atomic_st_rel(&node->locked, true);
 
         // Link predecessor to this node
         atomic_st_rel(&pred->next, node);
@@ -317,15 +318,22 @@ void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node)
     }
 }
 
-void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+{
+    node->irq_enabled = cpu_irq_save_disable();
+    mcslock_lock_nodis(lock, node);
+}
+
+// Unlock mcslock without saving+enabling interrupts
+void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
+                         mcs_queue_ent_t *node)
 {
     if (!atomic_ld_acq(&node->next)) {
         // no known successor
 
-        // Attempt to empty the list
+        // If the root still points at this node, null it
         if (atomic_cmpxchg(lock, node, nullptr)) {
             // List now empty
-            cpu_irq_toggle(node->irq_enabled);
             return;
         }
 
@@ -336,8 +344,13 @@ void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
         assert(node->next != nullptr);
     }
 
-    assert(atomic_ld_acq(&node->locked) == true);
+    assert(atomic_ld_acq(&node->next->locked) == true);
     atomic_st_rel(&node->next->locked, false);
+}
+
+void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+{
+    mcslock_unlock_noena(lock, node);
     cpu_irq_toggle(node->irq_enabled);
 }
 

@@ -64,6 +64,10 @@ struct mcs_queue_ent_t {
     bool irq_enabled;
 };
 
-void mcslock_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node);
-bool mcslock_try_lock(mcs_queue_ent_t **lock, mcs_queue_ent_t *node);
-void mcslock_unlock(mcs_queue_ent_t * volatile*lock, mcs_queue_ent_t *node);
+void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
+void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
+                          mcs_queue_ent_t *node);
+bool mcslock_try_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
+void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
+void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
+                         mcs_queue_ent_t *node);
