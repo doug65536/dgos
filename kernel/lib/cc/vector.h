@@ -238,6 +238,9 @@ vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
         if (!__grow(__sz + __count - __capacity))
             return nullptr;
 
+    if (__pos.__p == nullptr)
+        __pos.__p = __m;
+
     size_t e = __pos.__p - __m;
     for (size_t i = __sz; i > e; --i) {
         new (__m + i + __count - 1) value_type(move(__m[i - 1]));
