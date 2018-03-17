@@ -43,9 +43,12 @@ define walkthreads
 		set $depth = 7
 	end
 
+	set $savecpu = $_thread
+
 	set $threadcount = thread_count
-	set $tid = cpu_count
+	set $tid = 0
 	while $tid < $threadcount
+		echo ---------------------------------------------
 		set $ctx = threads[$tid].ctx
 		if $ctx != 0
 			printf "Thread %d trace:\n", $tid
@@ -53,19 +56,26 @@ define walkthreads
 			set $initframe = $ctx->gpr.r.n.rbp
 			if $initframe != 0
 				walkstacksafe $initframe
+				set $tid = $tid + 1
+				loop_continue
+			else
+				echo rbp is null
 			end
-		else
-			set $icpu = 0
-			while $icpu < cpu_count
-				if cpus[$icpu].cur_thread == &threads[$tid]
-					set $savecpu = $_thread
-					thread $icpu + 1
-					bt
-					thread $savecpu
-				end
-				set $icpu = $icpu + 1
+		end
+		set $icpu = 0
+		while $icpu < cpu_count
+			if cpus[$icpu].cur_thread == &threads[$tid]
+				printf "Found thread %d on CPU %d\n", $tid, $icpu
+				eval "thread %d", ($icpu + 1)
+				walkstacksafe $rbp
+				loop_break
 			end
+			set $icpu = $icpu + 1
+		end
+		if $icpu == cpu_count
+			echo Could not find thread
 		end
 		set $tid = $tid + 1
 	end
+	eval "thread %d", $savecpu
 end
