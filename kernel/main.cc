@@ -126,7 +126,7 @@ static int read_stress(void *p)
     int id = atomic_xadd(&next_id, 1);
     assert(id < ENABLE_READ_STRESS_THREAD);
 
-    static size_t constexpr queue_depth = 4;
+    static size_t constexpr queue_depth = 16;
     blocking_iocp_t iocp[queue_depth];
 
     (void)p;
@@ -140,12 +140,12 @@ static int read_stress(void *p)
     size_t data_size = 4096;
 
     char *data[queue_depth];
-    for (size_t i = 0; i < queue_depth; ++i)
+    for (size_t i = 0; i < queue_depth; ++i) {
         data[i] = (char*)mmap(0, data_size, PROT_READ | PROT_WRITE, 0, -1, 0);
+        printk("read buffer at %lx\n", (uint64_t)data[i]);
+    }
 
     size_t data_blocks = data_size / drive->info(STORAGE_INFO_BLOCKSIZE);
-
-    printk("read buffer at %lx\n", (uint64_t)data);
     printk("read stress iocp list at %p\n", (void*)iocp);
 
     uint64_t last_time = time_ns();
@@ -168,7 +168,7 @@ static int read_stress(void *p)
     while (1) {
         ++*(short*)p;
 
-        uint64_t lba = rand_r_range(&seed, 16, 1000 - data_blocks);
+        uint64_t lba = rand_r_range(&seed, 16, data_blocks);
         //int64_t count = rand_r_range(&seed, 1, data_blocks);
 
         status = iocp[slot].wait();
@@ -177,7 +177,7 @@ static int read_stress(void *p)
                      tid, (int)status);
         iocp[slot].reset();
         int64_t count = data_blocks;
-        status = drive->read_async(data, count, lba, &iocp[slot]);
+        status = drive->read_async(data[slot], count, lba, &iocp[slot]);
         if (++slot == queue_depth)
             slot = 0;
 
