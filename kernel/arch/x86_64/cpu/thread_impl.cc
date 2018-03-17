@@ -745,9 +745,6 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     for ( ; ; ++retries) {
         thread = thread_choose_next(cpu, outgoing);
 
-        if (thread - threads >= cpu_count)
-            THREAD_TRACE("Switching to thread %zd\n", thread - threads);
-
         assert((thread >= threads + cpu_count &&
                 thread < threads + countof(threads)) ||
                thread == threads + (cpu - cpus));
@@ -756,14 +753,22 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
             // This doesn't need to be cmpxchg because the
             // outgoing thread is still marked busy
             atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
+
+//            if (thread - threads >= cpu_count)
+//                THREAD_TRACE("Staying on thread %zd\n", thread - threads);
             break;
         } else if (thread->state == THREAD_IS_READY &&
                 atomic_cmpxchg(&thread->state,
                            THREAD_IS_READY,
                            THREAD_IS_RUNNING) ==
                 THREAD_IS_READY) {
+
+//            if (thread - threads >= cpu_count)
+//                THREAD_TRACE("Switched to thread %zd\n", thread - threads);
+
             break;
         }
+
         pause();
     }
 
@@ -818,7 +823,6 @@ EXPORT void thread_sleep_until(uint64_t expiry)
         thread->wake_time = expiry;
         atomic_barrier();
         thread->state = THREAD_IS_SLEEPING_BUSY;
-        //thread->priority_boost = 100;
         thread_yield();
     } else {
         thread_early_sleep(expiry);
@@ -841,13 +845,13 @@ EXPORT uint64_t thread_get_usage(int id)
 
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 {
-    //cpu_scoped_irq_disable intr_was_enabled;
     thread_info_t *thread = this_thread();
 
     *thread_id = thread - threads;
 
-    assert(thread->state == THREAD_IS_RUNNING);
-    atomic_st_rel(&thread->state, THREAD_IS_SUSPENDED_BUSY);
+    //assert(thread->state == THREAD_IS_RUNNING);
+    assert(atomic_cmpxchg(&thread->state, THREAD_IS_RUNNING, THREAD_IS_SUSPENDED_BUSY) == THREAD_IS_RUNNING);
+    //atomic_st_rel(&thread->state, THREAD_IS_SUSPENDED_BUSY);
 
     spinlock_value_t saved_lock = spinlock_unlock_save(lock);
     thread_yield();
