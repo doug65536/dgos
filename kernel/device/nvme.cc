@@ -1176,7 +1176,7 @@ void nvme_queue_state_t::init(
     cmp_handlers.resize(count);
     cmp_buf.reserve(count);
 
-    // Allocate enough memory for 4 PRP list entries per slot
+    // Allocate enough memory for 16 PRP list entries per slot
     prp_lists = (uint64_t*)mmap(
                 nullptr, count * sizeof(*prp_lists) * 16,
                 PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
