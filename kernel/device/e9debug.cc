@@ -37,7 +37,6 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
     if (!len)
         len = strlen(str);
 
-    //spinlock_lock_noirq(&e9debug_lock);
     if (len > 1 && str) {
         outsb(0xE9, str, len);
     } else if (len == 1 && str) {
