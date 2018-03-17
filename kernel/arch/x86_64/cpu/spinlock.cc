@@ -8,7 +8,7 @@
 //
 // Exclusive lock. 0 is unlocked, 1 is locked
 
-// Unlock spinlock and return state without reenabling interrupts
+// Unlock spinlock and return state without restoring interrupt mask
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 {
     assert(atomic_ld_acq(lock) & 1);
@@ -29,22 +29,24 @@ void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 // Spin to acquire lock, return with IRQs disabled
 void spinlock_lock(spinlock_t *lock)
 {
-    spinlock_value_t intr_enabled = cpu_irq_is_enabled() << 1;
-
-    for (;;) {
-        // Test and test and set
-        if (atomic_ld_acq(lock) == 0) {
-            cpu_irq_disable();
-            if (atomic_cmpxchg(lock, 0, 1 | intr_enabled) == 0)
-                return;
-            if (intr_enabled)
+    if (cpu_irq_is_enabled()) {
+        for (;;) {
+            // Test and test and set
+            if (atomic_ld_acq(lock) == 0) {
+                // Make sure we can't get preempted while holding the lock
+                cpu_irq_disable();
+                if (atomic_cmpxchg(lock, 0, 3) == 0)
+                    return;
                 cpu_irq_enable();
+            }
+
+            cpu_wait_value(lock, spinlock_value_t(0));
         }
+    } else {
+        while (atomic_ld_acq(lock) != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
+            cpu_wait_value(lock, spinlock_value_t(0));
 
-        cpu_wait_value(lock, spinlock_value_t(0));
     }
-
-    // Return with interrupts disabled
 }
 
 // Returns 1 with interrupts disabled if lock was acquired
