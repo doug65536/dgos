@@ -28,6 +28,7 @@ src/posix_spawn/posix_spawnattr_setschedpolicy.cc
 src/posix_spawn/posix_spawnattr_setsigdefault.cc
 src/posix_spawn/posix_spawnattr_setsigmask.cc
 src/posix_spawn/posix_spawnp.cc
+src/stdlib/abs.cc
 src/stdlib/malloc.cc
 src/stdlib/new.cc
 src/string/__bytebitmap.cc

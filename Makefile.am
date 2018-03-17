@@ -818,6 +818,7 @@ libc_a_SOURCES = \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
 	libc/src/stdlib/_Exit.cc \
+	libc/src/stdlib/abs.cc \
 	libc/src/fcntl/creat.cc \
 	libc/src/fcntl/fcntl.cc \
 	libc/src/fcntl/open.cc \

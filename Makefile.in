@@ -182,6 +182,7 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/string/libc_a-strxfrm_l.$(OBJEXT) \
 	libc/src/string/libc_a-strncmp.$(OBJEXT) \
 	libc/src/stdlib/libc_a-_Exit.$(OBJEXT) \
+	libc/src/stdlib/libc_a-abs.$(OBJEXT) \
 	libc/src/fcntl/libc_a-creat.$(OBJEXT) \
 	libc/src/fcntl/libc_a-fcntl.$(OBJEXT) \
 	libc/src/fcntl/libc_a-open.$(OBJEXT) \
@@ -1677,6 +1678,7 @@ libc_a_SOURCES = \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
 	libc/src/stdlib/_Exit.cc \
+	libc/src/stdlib/abs.cc \
 	libc/src/fcntl/creat.cc \
 	libc/src/fcntl/fcntl.cc \
 	libc/src/fcntl/open.cc \
@@ -3600,6 +3602,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-_Exit.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-abs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memccpy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memchr.Po@am__quote@
@@ -4650,6 +4653,20 @@ libc/src/stdlib/libc_a-_Exit.obj: libc/src/stdlib/_Exit.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/_Exit.cc' object='libc/src/stdlib/libc_a-_Exit.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-_Exit.obj `if test -f 'libc/src/stdlib/_Exit.cc'; then $(CYGPATH_W) 'libc/src/stdlib/_Exit.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/_Exit.cc'; fi`
+
+libc/src/stdlib/libc_a-abs.o: libc/src/stdlib/abs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-abs.o -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-abs.Tpo -c -o libc/src/stdlib/libc_a-abs.o `test -f 'libc/src/stdlib/abs.cc' || echo '$(srcdir)/'`libc/src/stdlib/abs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-abs.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-abs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/abs.cc' object='libc/src/stdlib/libc_a-abs.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-abs.o `test -f 'libc/src/stdlib/abs.cc' || echo '$(srcdir)/'`libc/src/stdlib/abs.cc
+
+libc/src/stdlib/libc_a-abs.obj: libc/src/stdlib/abs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-abs.obj -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-abs.Tpo -c -o libc/src/stdlib/libc_a-abs.obj `if test -f 'libc/src/stdlib/abs.cc'; then $(CYGPATH_W) 'libc/src/stdlib/abs.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/abs.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-abs.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-abs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/abs.cc' object='libc/src/stdlib/libc_a-abs.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-abs.obj `if test -f 'libc/src/stdlib/abs.cc'; then $(CYGPATH_W) 'libc/src/stdlib/abs.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/abs.cc'; fi`
 
 libc/src/fcntl/libc_a-creat.o: libc/src/fcntl/creat.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/fcntl/libc_a-creat.o -MD -MP -MF libc/src/fcntl/$(DEPDIR)/libc_a-creat.Tpo -c -o libc/src/fcntl/libc_a-creat.o `test -f 'libc/src/fcntl/creat.cc' || echo '$(srcdir)/'`libc/src/fcntl/creat.cc
