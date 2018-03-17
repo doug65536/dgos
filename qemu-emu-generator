@@ -23,7 +23,8 @@ do
 						$IMG \
 						' dump/qemu-debug-out' \
 						$'\n' $'\t' \
-						'echo -e -n ' $'\'' '\ec' $'\'' ' >> dump/qemu-debug-out' \
+						'echo -e -n ' $'\'' '\ec' $'\'' \
+						' >> dump/qemu-debug-out' \
 						$'\n' $'\t' \
 						'$(QEMU_SUDO) $(QEMU) $(QEMU_COMMON)' \
 						' \' $'\n' $'\t\t' \
@@ -35,6 +36,7 @@ do
 						' \' $'\n' $'\t\t' \
 						'-drive' \
 						" file=$IMG$DIF,format=raw,media=$QM" \
+						",werror=report,rerror=report" \
 						' \' $'\n' $'\t\t' \
 						$QRT \
 						' \' $'\n' $'\t\t' \
