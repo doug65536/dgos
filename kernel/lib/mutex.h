@@ -175,8 +175,6 @@ public:
 
     ~spinlock()
     {
-//        while (m != 0)
-//            pause();
         assert(m == 0);
     }
 
@@ -253,7 +251,7 @@ public:
     {
     }
 
-    using mutex_type = mcs_queue_ent_t *;
+    using mutex_type = mcs_queue_ent_t * volatile;
     void lock(mcs_queue_ent_t *node)
     {
         mcslock_lock(&m, node);
@@ -269,13 +267,13 @@ public:
         mcslock_unlock(&m, node);
     }
 
-    mcs_queue_ent_t *&native_handle()
+    mcs_queue_ent_t * volatile &native_handle()
     {
         return m;
     }
 
 private:
-    mcs_queue_ent_t *m;
+    mcs_queue_ent_t * volatile m;
 };
 
 struct defer_lock_t {
@@ -285,32 +283,32 @@ template<typename T>
 class unique_lock
 {
 public:
-    explicit unique_lock(T& m)
+    explicit unique_lock(T& m) noexcept
         : m(&m)
         , locked(false)
     {
         lock();
     }
 
-    explicit unique_lock(T& lock, defer_lock_t)
+    explicit unique_lock(T& lock, defer_lock_t) noexcept
         : m(&lock)
         , locked(false)
     {
     }
 
-    ~unique_lock()
+    ~unique_lock() noexcept
     {
         unlock();
     }
 
-    void lock()
+    void lock() noexcept
     {
         assert(!locked);
         m->lock();
         locked = true;
     }
 
-    void unlock()
+    void unlock() noexcept
     {
         if (locked) {
             locked = false;
@@ -318,21 +316,26 @@ public:
         }
     }
 
-    void release()
+    void release() noexcept
     {
         locked = false;
         m = nullptr;
     }
 
-    void swap(unique_lock& rhs)
+    void swap(unique_lock& rhs) noexcept
     {
         ::swap(rhs.m, m);
         ::swap(rhs.locked, locked);
     }
 
-    typename T::mutex_type& native_handle()
+    typename T::mutex_type& native_handle() noexcept
     {
         return m->native_handle();
+    }
+
+    bool is_locked() const noexcept
+    {
+        return locked;
     }
 
 private:
@@ -351,25 +354,29 @@ public:
         lock();
     }
 
-    explicit unique_lock(mcslock& lock, defer_lock_t)
+    explicit unique_lock(mcslock& lock, defer_lock_t) noexcept
         : m(&lock)
         , locked(false)
     {
     }
 
-    ~unique_lock()
+    unique_lock(unique_lock const&) = delete;
+    unique_lock(unique_lock&&) = delete;
+    unique_lock& operator=(unique_lock) = delete;
+
+    ~unique_lock() noexcept
     {
         unlock();
     }
 
-    void lock()
+    void lock() noexcept
     {
         assert(!locked);
         m->lock(&node);
         locked = true;
     }
 
-    void unlock()
+    void unlock() noexcept
     {
         if (locked) {
             locked = false;
@@ -377,21 +384,31 @@ public:
         }
     }
 
-    void release()
+    void release() noexcept
     {
         locked = false;
         m = nullptr;
     }
 
-    void swap(unique_lock& rhs)
+    void swap(unique_lock& rhs) noexcept
     {
         ::swap(rhs.m, m);
         ::swap(rhs.locked, locked);
     }
 
-    typename mcslock::mutex_type& native_handle()
+    typename mcslock::mutex_type& native_handle() noexcept
     {
         return m->native_handle();
+    }
+
+    mcs_queue_ent_t &wait_node()
+    {
+        return node;
+    }
+
+    bool is_locked() const noexcept
+    {
+        return locked;
     }
 
 private:
@@ -484,17 +501,30 @@ public:
 
     void wait(unique_lock<mutex>& lock)
     {
+        assert(lock.is_locked());
         condvar_wait(&m, &lock.native_handle());
+        assert(lock.is_locked());
     }
 
     void wait(unique_lock<spinlock>& lock)
     {
+        assert(lock.is_locked());
         condvar_wait_spinlock(&m, &lock.native_handle());
+        assert(lock.is_locked());
     }
 
     void wait(unique_lock<ticketlock>& lock)
     {
+        assert(lock.is_locked());
         condvar_wait_ticketlock(&m, &lock.native_handle());
+        assert(lock.is_locked());
+    }
+
+    void wait(unique_lock<mcslock>& lock)
+    {
+        assert(lock.is_locked());
+        condvar_wait_mcslock(&m, &lock.native_handle(), &lock.wait_node());
+        assert(lock.is_locked());
     }
 
 private:
