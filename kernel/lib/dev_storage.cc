@@ -222,8 +222,6 @@ void part_factory_t::register_factory(void *p)
 
 int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
 {
-    //cpu_scoped_irq_disable intr_were_enabled;
-
     blocking_iocp_t block;
     errno_t err = read_async(data, count, lba, &block);
     if (unlikely(err != errno_t::OK))
