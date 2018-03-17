@@ -864,12 +864,24 @@ EXPORT void thread_resume(thread_t tid)
     thread_info_t *thread = threads + tid;
 
     for (;;) {
-        assert(thread->state == THREAD_IS_SUSPENDED);
-        THREAD_TRACE("Resuming %d\n", tid);
+        //THREAD_TRACE("Resuming %d\n", tid);
+
         cpu_wait_value(&thread->state, THREAD_IS_SUSPENDED);
-        if (atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED,
+
+        // If the thread is suspended_busy, make it ready_busy
+        // If the thread is suspended, make it ready
+
+        if (thread->state == THREAD_IS_SUSPENDED &&
+                atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED,
                            THREAD_IS_READY))
             return;
+
+//        if (thread->state == THREAD_IS_SUSPENDED_BUSY &&
+//                atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED_BUSY,
+//                           THREAD_IS_READY_BUSY))
+//            return;
+
+        THREAD_TRACE("Did not resume %d! Retrying I guess\n", tid);
     }
 }
 
