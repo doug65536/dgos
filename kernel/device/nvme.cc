@@ -783,7 +783,6 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     NVME_TRACE("Requesting queue count %zd\n", requested_queue_count - 1);
 
     blocking_iocp_t blocking_setfeatures;
-    cpu_scoped_irq_disable intr_were_enabled;
 
     // Do a Set Features command to request the desired number of queues
     admin_queue.submit_cmd(nvme_cmd_t::create_setfeatures(
@@ -794,7 +793,6 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 
     blocking_setfeatures.set_expect(1);
     errno_t status = blocking_setfeatures.wait();
-    intr_were_enabled.restore();
 
     if (status != errno_t::OK)
         return false;
@@ -930,7 +928,6 @@ if_list_t nvme_if_t::detect_devices()
 
     NVME_TRACE("enumerating namespaces\n");
 
-    cpu_scoped_irq_disable intr_was_enabled;
     nvme_detect_dev_ctx_t ctx(list);
 
     // Get namespace list
