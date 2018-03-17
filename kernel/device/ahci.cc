@@ -1189,16 +1189,18 @@ struct hba_port_info_t {
     slot_request_t slot_requests[32];
 
     // Wake every time a slot is released
-    condition_var_t slotalloc_avail;
+    condition_variable slotalloc_avail;
 
     // Wake when all slots are released
-    condition_var_t idle_cond;
+    condition_variable idle_cond;
 
     // Wake after a non-NCQ command finishes (when NCQ capable)
-    condition_var_t non_ncq_done_cond;
+    condition_variable non_ncq_done_cond;
 
     // Keep track of slot order
-    mutex_t lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type lock;
 
     // Set to true to block slot acquires to idle the controller for a
     // non-NCQ command (when NCQ is enabled). non_ncq_done_cond is signalled
@@ -1229,6 +1231,8 @@ STORAGE_REGISTER_FACTORY(ahci_if);
 // AHCI interface instance
 class ahci_if_t : public storage_if_base_t {
 public:
+    ahci_if_t();
+
     bool init(const pci_dev_iterator_t &pci_dev);
 
     unsigned io(unsigned port_num, slot_request_t &request);
@@ -1240,12 +1244,17 @@ public:
     void configure_48bit(unsigned port_num, bool enable);
     void configure_fua(unsigned port_num, bool enable);
 
-    int8_t slot_wait(hba_port_info_t &pi);
+    int8_t slot_wait(hba_port_info_t &pi,
+                     hba_port_info_t::scoped_lock &hold_port_lock);
 
 private:
     STORAGE_IF_IMPL
 
-    unsigned io_locked(unsigned port_num, slot_request_t &request);
+    using port_lock_type = hba_port_info_t::lock_type;
+    using scoped_port_lock = hba_port_info_t::scoped_lock;
+
+    unsigned io_locked(unsigned port_num, slot_request_t &request,
+                       scoped_port_lock &hold_port_lock);
 
     bool supports_64bit();
     void slot_release(unsigned port_num, int slot);
@@ -1260,7 +1269,8 @@ private:
 
     void bios_handoff();
 
-    int8_t slot_acquire(hba_port_info_t& pi);
+    int8_t slot_acquire(hba_port_info_t& pi,
+                        scoped_port_lock &hold_port_lock);
 
     void cmd_issue(unsigned port_num, unsigned slot,
                    hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
@@ -1325,21 +1335,22 @@ void ahci_if_t::slot_release(unsigned port_num, int slot)
     pi->cmd_issued &= ~(1U<<slot);
 
     // Wake a thread that may be waiting for a slot
-    condvar_wake_one(&pi->slotalloc_avail);
+    pi->slotalloc_avail.notify_one();
 
     // Wake non-ncq thread if non-ncq is pending when every slot is free
     if (pi->non_ncq_pending && ((pi->cmd_issued & pi->slot_mask) == 0))
-        condvar_wake_one(&pi->idle_cond);
+        pi->idle_cond.notify_one();
 }
 
 // Acquire slot that is not in use
 // Returns -1 if all slots are in use
 // Must be holding port lock
-int8_t ahci_if_t::slot_acquire(hba_port_info_t& pi)
+int8_t ahci_if_t::slot_acquire(hba_port_info_t& pi,
+                               scoped_port_lock& hold_port_lock)
 {
     // Wait for non-NCQ command to finish
     while (unlikely(pi.use_ncq && pi.non_ncq_pending))
-        condvar_wait(&pi.non_ncq_done_cond, &pi.lock);
+        pi.non_ncq_done_cond.wait(hold_port_lock);
 
     // Build bitmask of slots in use
     uint32_t busy_mask = pi.cmd_issued;
@@ -1365,7 +1376,7 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
     iocp_t *pending_callbacks[32];
     unsigned callback_count = 0;
 
-    mutex_lock_noyield(&pi->lock);
+    scoped_port_lock hold_port_lock(pi->lock);
 
     uint32_t port_intr_status = port->intr_status;
 
@@ -1426,56 +1437,58 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
                 slot_request_t &request = pending[reissue];
 
-                io_locked(port_num, request);
+                io_locked(port_num, request, hold_port_lock);
             }
         }
     } else {
         uint32_t issue_changed = (pi->cmd_issued ^ port->cmd_issue) &
                 pi->slot_mask;
 
-        slot = bit_lsb_set(issue_changed);
+        while (issue_changed) {
+            slot = bit_lsb_set(issue_changed);
 
-        assert((issue_changed & ~(1 << slot)) == 0);
+            issue_changed &= ~(1U << slot);
 
-        slot_request_t &request = pi->slot_requests[slot];
+            slot_request_t &request = pi->slot_requests[slot];
 
-        int error = 0;
+            int error = 0;
 
-        if (unlikely(port_intr_status & AHCI_HP_IS_TFES) &&
-                (port->taskfile_data & AHCI_HP_TFD_SERR)) {
-            // Taskfile error
-            error = (port->taskfile_data >> AHCI_HP_TFD_ERR_BIT) &
-                    AHCI_HP_TFD_ERR_MASK;
+            if (unlikely(port_intr_status & AHCI_HP_IS_TFES) &&
+                    (port->taskfile_data & AHCI_HP_TFD_SERR)) {
+                // Taskfile error
+                error = (port->taskfile_data >> AHCI_HP_TFD_ERR_BIT) &
+                        AHCI_HP_TFD_ERR_MASK;
 
-            AHCI_TRACE("Error: port=%u, err=%x\n", port_num, error);
-        }
+                AHCI_TRACE("Error: port=%u, err=%x\n", port_num, error);
+            }
 
-        if (error != 0) {
-            AHCI_TRACE("Error %d on interface=%zu port=%zu\n",
-                       error, this - ahci_devices,
-                       pi - port_info);
-        }
+            if (error != 0) {
+                AHCI_TRACE("Error %d on interface=%zu port=%zu\n",
+                           error, this - ahci_devices,
+                           pi - port_info);
+            }
 
-        request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
+            request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
 
-        // Invoke completion callback
-        assert(request.callback);
-        assert(callback_count < countof(pending_callbacks));
-        pending_callbacks[callback_count++] = request.callback;
-        request.callback = nullptr;
+            // Invoke completion callback
+            assert(request.callback);
+            assert(callback_count < countof(pending_callbacks));
+            pending_callbacks[callback_count++] = request.callback;
+            request.callback = nullptr;
 
-        slot_release(port_num, slot);
+            slot_release(port_num, slot);
 
-        if (pi->use_ncq && int(request.op) > int(slot_op_t::non_ncq)) {
-            pi->non_ncq_pending = false;
-            condvar_wake_all(&pi->non_ncq_done_cond);
+            if (pi->use_ncq && int(request.op) > int(slot_op_t::non_ncq)) {
+                pi->non_ncq_pending = false;
+                pi->non_ncq_done_cond.notify_all();
+            }
         }
     }
 
     // Acknowledge slot interrupt
     port->intr_status |= port_intr_status;
 
-    mutex_unlock(&pi->lock);
+    hold_port_lock.unlock();
 
     // Make all callbacks outside lock
     for (unsigned i = 0; i < callback_count; ++i) {
@@ -1633,6 +1646,10 @@ void ahci_if_t::configure_ncq(unsigned port_num, bool enable,
     }
 }
 
+ahci_if_t::ahci_if_t()
+{
+}
+
 bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
 {
     // Enable MMIO and bus master, disable port I/O
@@ -1695,11 +1712,9 @@ unsigned ahci_if_t::io(unsigned port_num, slot_request_t &request)
 {
     unsigned expect_count;
 
-    mutex_lock(&port_info[port_num].lock);
+    scoped_port_lock hold_port_lock(port_info[port_num].lock);
 
-    expect_count = io_locked(port_num, request);
-
-    mutex_unlock(&port_info[port_num].lock);
+    expect_count = io_locked(port_num, request, hold_port_lock);
 
     return expect_count;
 }
@@ -1708,7 +1723,7 @@ int ahci_if_t::port_flush(unsigned port_num, iocp_t *iocp)
 {
     hba_port_info_t &pi = port_info[port_num];
 
-    mutex_lock(&pi.lock);
+    scoped_port_lock hold_port_lock(pi.lock);
 
     bool save_ncq = false;
 
@@ -1718,7 +1733,7 @@ int ahci_if_t::port_flush(unsigned port_num, iocp_t *iocp)
 
         // Wait for all slots to become available
         while (pi.cmd_issued & pi.slot_mask)
-            condvar_wait(&pi.idle_cond, &pi.lock);
+            pi.idle_cond.wait(hold_port_lock);
 
         // Disable NCQ for duration of flush
         save_ncq = pi.use_ncq;
@@ -1736,21 +1751,20 @@ int ahci_if_t::port_flush(unsigned port_num, iocp_t *iocp)
     if (save_ncq)
         pi.use_ncq = save_ncq;
 
-    mutex_unlock(&pi.lock);
-
     return 0;
 }
 
 // Acquire a slot, waiting if necessary
-int8_t ahci_if_t::slot_wait(hba_port_info_t &pi)
+int8_t ahci_if_t::slot_wait(hba_port_info_t &pi,
+                            scoped_port_lock& hold_port_lock)
 {
     int8_t slot;
     for (;;) {
-        slot = slot_acquire(pi);
+        slot = slot_acquire(pi, hold_port_lock);
         if (slot >= 0)
             break;
 
-        condvar_wait(&pi.slotalloc_avail, &pi.lock);
+        pi.slotalloc_avail.wait(hold_port_lock);
     }
 
     return slot;
@@ -1758,7 +1772,8 @@ int8_t ahci_if_t::slot_wait(hba_port_info_t &pi)
 
 // Expects interrupts disabled
 // Returns the number of async completions to expect
-unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request)
+unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
+                              scoped_port_lock& hold_port_lock)
 {
     mmphysrange_t ranges[AHCI_CMD_TBL_ENT_MAX_PRD];
     size_t ranges_count;
@@ -1804,7 +1819,7 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request)
         size_t transferred_blocks = transferred >> pi.log2_sector_size;
 
         // Wait for a slot
-        uint8_t slot = slot_wait(pi);
+        uint8_t slot = slot_wait(pi, hold_port_lock);
 
         hba_cmd_cfis_t cfis;
         size_t fis_size;
@@ -1964,11 +1979,6 @@ void ahci_if_t::rebase()
 
         hba_port_t volatile *port = mmio_base->ports + port_num;
         hba_port_info_t *pi = port_info + port_num;
-
-        mutex_init(&pi->lock);
-        condvar_init(&pi->slotalloc_avail);
-        condvar_init(&pi->idle_cond);
-        condvar_init(&pi->non_ncq_done_cond);
 
         AHCI_TRACE("Performing detection, port %d\n", port_num);
         port_reset(port_num);
@@ -2207,10 +2217,12 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     if (unlikely(status != errno_t::OK))
         return false;
 
+    AHCI_TRACE("Waiting for identify to complete\n");
     block.set_expect(1);
     status = block.wait();
     if (unlikely(status != errno_t::OK))
         return false;
+    AHCI_TRACE("Identify completed successfully\n");
 
     identify->fixup_strings();
 
@@ -2230,30 +2242,6 @@ void ahci_dev_t::cleanup()
 {
 }
 
-struct ahci_blocking_io_t {
-    ahci_blocking_io_t()
-        : expect_count(0)
-        , done_count(0)
-        , err(0)
-    {
-        mutex_init(&lock);
-        condvar_init(&done_cond);
-    }
-
-    ~ahci_blocking_io_t()
-    {
-        condvar_destroy(&done_cond);
-        mutex_destroy(&lock);
-    }
-
-    mutex_t lock;
-    condition_var_t done_cond;
-
-    int expect_count;
-    int done_count;
-    int err;
-};
-
 errno_t ahci_dev_t::io(
         void *data, int64_t count,
         uint64_t lba, bool fua, slot_op_t op,
@@ -2267,7 +2255,7 @@ errno_t ahci_dev_t::io(
     request.fua = fua;
     request.callback = iocp;
 
-    cpu_scoped_irq_disable intr_were_enabled;
+    //cpu_scoped_irq_disable intr_were_enabled;
 
     int expect = iface->io(port, request);
 
@@ -2280,7 +2268,6 @@ errno_t ahci_dev_t::read_async(
         void *data, int64_t count,
         uint64_t lba, iocp_t *iocp)
 {
-    cpu_scoped_irq_disable intr_were_enabled;
     return io(data, count, lba, false, slot_op_t::read, iocp);
 }
 
@@ -2289,7 +2276,6 @@ errno_t ahci_dev_t::write_async(
         uint64_t lba, bool fua,
         iocp_t *iocp)
 {
-    cpu_scoped_irq_disable intr_were_enabled;
     return io((void*)data, count, lba, fua, slot_op_t::write, iocp);
 }
 
@@ -2304,7 +2290,7 @@ errno_t ahci_dev_t::trim_async(
 
 errno_t ahci_dev_t::flush_async(iocp_t *iocp)
 {
-    cpu_scoped_irq_disable intr_were_enabled;
+    //cpu_scoped_irq_disable intr_were_enabled;
 
     int expect = iface->port_flush(port, iocp);
     iocp->set_expect(expect);
