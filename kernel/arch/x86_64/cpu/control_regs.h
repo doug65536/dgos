@@ -642,7 +642,7 @@ static __always_inline void cpu_wait_masked(
             if (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
                 cpu_mwait(0, 0);
             else
-                break;
+                return;
         }
     } else {
         while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
