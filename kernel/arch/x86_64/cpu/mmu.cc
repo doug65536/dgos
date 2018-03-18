@@ -916,7 +916,9 @@ static pte_t *init_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    padded_ticketlock locks[64];
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type locks[64];
 
     pte_t *pte;
     int log2_window_sz;
@@ -995,7 +997,7 @@ void clear_phys(physaddr_t addr)
 
     offset = addr - base;
 
-    unique_lock<ticketlock> lock(clear_phys_state.locks[index]);
+    clear_phys_state_t::scoped_lock lock(clear_phys_state.locks[index]);
 
     linaddr_t window = clear_phys_state_t::addr +
             (index << (3 + clear_phys_state.log2_window_sz));
