@@ -2451,7 +2451,7 @@ bool ioapic_irq_setcpu(int irq, int cpu)
 
         // Modify fields
         IOAPIC_REDLO_DELIVERY_SET(lo, IOAPIC_REDLO_DELIVERY_LOWPRI);
-        IOAPIC_REDLO_DESTMODE_SET(lo, IOAPIC_REDLO_DESTMODE_PHYSICAL);
+        IOAPIC_REDLO_DESTMODE_SET(lo, IOAPIC_REDLO_DESTMODE_LOGICAL);
         IOAPIC_REDHI_DEST_SET(hi, 0xFF);
 
         // Write it back masked
