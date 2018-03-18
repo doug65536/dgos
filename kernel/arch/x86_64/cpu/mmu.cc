@@ -309,7 +309,9 @@ struct mmap_device_mapping_t {
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
 static vector<mmap_device_mapping_t*> mm_dev_mappings;
-static ticketlock mm_dev_mapping_lock;
+using mm_dev_mapping_lock_type = mcslock;
+using mm_dev_mapping_scoped_lock = unique_lock<mm_dev_mapping_lock_type>;
+static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 
 /// Physical page allocation map
 /// Consists of array of entries, one per physical page
@@ -1138,7 +1140,7 @@ static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
 
 static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 {
-    unique_lock<ticketlock> lock(mm_dev_mapping_lock);
+    mm_dev_mapping_scoped_lock lock(mm_dev_mapping_lock);
 
     intptr_t device = binary_search(
                 mm_dev_mappings.data(), mm_dev_mappings.size(),
@@ -2923,7 +2925,7 @@ void *mmap_register_device(void *context,
                            mm_dev_mapping_callback_t callback,
                            void *addr)
 {
-    unique_lock<ticketlock> lock(mm_dev_mapping_lock);
+    mm_dev_mapping_scoped_lock lock(mm_dev_mapping_lock);
 
     auto ins = find(mm_dev_mappings.begin(), mm_dev_mappings.end(), nullptr);
 
