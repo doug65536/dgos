@@ -1996,20 +1996,30 @@ size_t gdbstub_t::set_context(isr_context_t *ctx,
     from_hex_bytes(&ISR_CTX_REG_FS(ctx), input, sizeof(uint32_t));
     from_hex_bytes(&ISR_CTX_REG_GS(ctx), input, sizeof(uint32_t));
 
+    bool has_fpu_ctx = ISR_CTX_FPU(ctx);
+
     for (size_t st = 0; st < 8; ++st) {
-        from_hex_bytes(&ISR_CTX_FPU_STn_31_0(ctx, st), input);
-        from_hex_bytes(&ISR_CTX_FPU_STn_63_32(ctx, st), input);
-        from_hex_bytes(&ISR_CTX_FPU_STn_79_64(ctx, st), input);
+        if (has_fpu_ctx) {
+            from_hex_bytes(&ISR_CTX_FPU_STn_31_0(ctx, st), input);
+            from_hex_bytes(&ISR_CTX_FPU_STn_63_32(ctx, st), input);
+            from_hex_bytes(&ISR_CTX_FPU_STn_79_64(ctx, st), input);
+        } else {
+            input += 20;
+        }
     }
 
-    from_hex_bytes(&ISR_CTX_FPU_FCW(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FSW(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FTW(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FIS(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FIP(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FDS(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FDP(ctx), input, sizeof(uint32_t));
-    from_hex_bytes(&ISR_CTX_FPU_FOP(ctx), input, sizeof(uint32_t));
+    if (has_fpu_ctx) {
+        from_hex_bytes(&ISR_CTX_FPU_FCW(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FSW(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FTW(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FIS(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FIP(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FDS(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FDP(ctx), input, sizeof(uint32_t));
+        from_hex_bytes(&ISR_CTX_FPU_FOP(ctx), input, sizeof(uint32_t));
+    } else {
+        input += 8 * 8;
+    }
 
     for (size_t xmm = 0; xmm < 16; ++xmm) {
         for (size_t i = 0; i < 2; ++i) {
