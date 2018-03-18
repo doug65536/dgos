@@ -1880,8 +1880,8 @@ QEMU_DEBUGCON = \
 
 #-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
 QEMU_SERIAL = \
-	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait \
-	-device isa-serial,chardev=qemu-serial-socket,id="com1"
+	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
+	-device isa-serial,chardev=qemu-serial-socket,id=com1
 
 QEMU_COMMON = \
 	$(QEMU_MONITOR) \
