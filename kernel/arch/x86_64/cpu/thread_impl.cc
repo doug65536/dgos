@@ -382,9 +382,11 @@ static thread_t thread_create_with_state(
     thread->syscall_stack = syscall_stack;
     thread->xsave_stack = xsave_stack;
 
+    thread_info_t *creator_thread = this_thread();
+
     thread->priority = priority;
     thread->priority_boost = 0;
-    thread->cpu_affinity = affinity ? affinity : ~0UL;
+    thread->cpu_affinity = affinity ? affinity : creator_thread->cpu_affinity;
     thread->fsbase = 0;
     thread->gsbase = 0;
 
