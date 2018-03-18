@@ -89,6 +89,10 @@ struct gdb_cpu_t {
     gdb_cpu_state_t volatile state;
     function<void()> sync_bp;
 
+    // Ignore steps within this range and immediately single step again
+    uintptr_t range_step_st;
+    uintptr_t range_step_en;
+
     gdb_cpu_t(uint32_t init_apic_id, int nr)
         : cpu_nr(nr)
         , apic_id(init_apic_id)
@@ -106,6 +110,7 @@ public:
     static int is_cpu_frozen(int cpu_nr);
     static void freeze_all(int first = 1);
     static void continue_frozen(int cpu_nr, bool single_step);
+    static void set_step_range(int cpu_nr, uintptr_t st, uintptr_t en);
     static void sync_hw_bp();
 
     static void hook_exceptions();
@@ -252,6 +257,21 @@ private:
         STOPPED,
         STEPPING,
         RUNNING
+    };
+
+    struct step_action_t {
+        enum type_t {
+            NONE,
+            CONT,
+            STEP,
+            RANGE
+        };
+
+        type_t type;
+
+        // Range [start,end)
+        uintptr_t start;
+        uintptr_t end;
     };
 
     static size_t constexpr MAX_BUFFER_SIZE = 8192 - _MALLOC_OVERHEAD;
@@ -450,7 +470,7 @@ private:
     void data_received(char const *data, size_t size);
     bool match(const char *&input, char const *pattern,
                char const *separators, char *sep = nullptr);
-    bool parse_memop(uintptr_t& addr, size_t& size, const char *input);
+    bool parse_memop(uintptr_t& addr, size_t& size, const char *&input);
 
 
     uint8_t calc_checksum(char const *data, size_t size);
@@ -953,7 +973,7 @@ bool gdbstub_t::match(char const *&input, char const *pattern,
     return false;
 }
 
-bool gdbstub_t::parse_memop(uintptr_t& addr, size_t& size, char const *input)
+bool gdbstub_t::parse_memop(uintptr_t& addr, size_t& size, char const *&input)
 {
     from_hex<uintptr_t>(&addr, input);
     if (*input++ != ',')
@@ -1471,8 +1491,6 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
     bool add;
     size_t reg;
 
-    vector<char> step_actions;
-
     switch (ch) {
     case 3:
         // Ctrl-c pressed on client
@@ -1608,24 +1626,43 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
     case 'v':
         if (!strcmp(input, "Cont?")) {
             // "vCont?" command
-            return reply("vCont;s;c;S;C");
+            return reply("vCont;s;c;S;C;r");
         } else if (match(input, "Cont", ":;")) {
             // Initialize an array with one entry per CPU
             // Values are set once, only entries with 0 value are modified
-            step_actions.resize(gdb_cpu_ctrl_t::get_gdb_cpu(), 0);
+
+            vector<step_action_t> step_actions(gdb_cpu_ctrl_t::get_gdb_cpu());
 
             step_cpu_nr = 0;
 
             while (*input) {
-                char action = 0;
+                step_action_t action{};
                 char sep = 0;
 
                 if (match(input, "c", ":", &sep))
-                    action = 'c';
+                    action.type = step_action_t::CONT;
                 else if (match(input, "s", ":", &sep))
-                    action = 's';
-                else
+                    action.type = step_action_t::STEP;
+                else if (*input == 'r') {
+                    ++input;
+                    while (*input && *input == ' ')
+                        ++input;
+                    from_hex<uintptr_t>(&action.start, input);
+                    if (*input != ',')
+                        break;
+                    ++input;
+                    from_hex<uintptr_t>(&action.end, input);
+
+                    if (*input == ':')
+                        ++input;
+
+                    if (action.end > action.start)
+                        action.type = step_action_t::RANGE;
+                    else
+                        action.type = step_action_t::STEP;
+                } else {
                     break;
+                }
 
                 thread = 0;
                 if (*input)
@@ -1633,16 +1670,18 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
                 if (thread > 0) {
                     // Step a specific CPU
-                    if (step_actions.at(thread - 1) == 0) {
+                    if (step_actions.at(thread - 1).type ==
+                            step_action_t::NONE) {
                         step_actions[thread - 1] = action;
 
-                        if (action == 's' && step_cpu_nr == 0)
+                        if (action.type == step_action_t::STEP &&
+                                step_cpu_nr == 0)
                             step_cpu_nr = thread;
                     }
                 } else {
                     // Step all CPUs that don't have an action assigned
-                    for (char& cpu_action : step_actions) {
-                        if (cpu_action == 0)
+                    for (step_action_t& cpu_action : step_actions) {
+                        if (cpu_action.type == step_action_t::NONE)
                             cpu_action = action;
                     }
                 }
@@ -1653,17 +1692,32 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
                 // Do all of the continues (if any)
                 int wake = 1;
-                for (char& cpu_action : step_actions) {
-                    if (cpu_action == 'c')
+                for (step_action_t& cpu_action : step_actions) {
+                    if (cpu_action.type == step_action_t::CONT) {
+                        gdb_cpu_ctrl_t::set_step_range(wake, 0, 0);
                         gdb_cpu_ctrl_t::continue_frozen(wake, false);
+                    }
+                    ++wake;
+                }
+
+                // Do all of the range steps (if any)
+                wake = 1;
+                for (step_action_t& cpu_action : step_actions) {
+                    if (cpu_action.type == step_action_t::RANGE) {
+                        gdb_cpu_ctrl_t::set_step_range(
+                                    wake, cpu_action.start, cpu_action.end);
+                        gdb_cpu_ctrl_t::continue_frozen(wake, true);
+                    }
                     ++wake;
                 }
 
                 // Do all of the steps (if any)
                 wake = 1;
-                for (char& cpu_action : step_actions) {
-                    if (cpu_action == 's')
+                for (step_action_t& cpu_action : step_actions) {
+                    if (cpu_action.type == step_action_t::STEP) {
+                        gdb_cpu_ctrl_t::set_step_range(wake, 0, 0);
                         gdb_cpu_ctrl_t::continue_frozen(wake, true);
+                    }
                     ++wake;
                 }
 
@@ -2194,6 +2248,17 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
     }
 }
 
+void gdb_cpu_ctrl_t::set_step_range(int cpu_nr, uintptr_t st, uintptr_t en)
+{
+    for (gdb_cpu_t& cpu : instance.cpus) {
+        if (cpu_nr > 0 && cpu.cpu_nr != cpu_nr)
+            continue;
+
+        cpu.range_step_st = st;
+        cpu.range_step_en = en;
+    }
+}
+
 void gdb_cpu_ctrl_t::sync_hw_bp()
 {
     GDBSTUB_TRACE("Synchronizing hardware breakpoints\n");
@@ -2480,6 +2545,15 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
     if (ISR_CTX_INTR(ctx) == INTR_EX_NMI &&
             cpu->state != gdb_cpu_state_t::FREEZING) {
         GDBSTUB_TRACE("Received NMI on cpu %d, continuing\n", cpu->cpu_nr);
+        return ctx;
+    }
+
+    // Ignore single step inside step range
+    if (ISR_CTX_INTR(ctx) == INTR_EX_DEBUG &&
+            uintptr_t(ISR_CTX_REG_RIP(ctx)) >= cpu->range_step_st &&
+            uintptr_t(ISR_CTX_REG_RIP(ctx)) < cpu->range_step_en) {
+        // Ignore single step inside range
+        ISR_CTX_REG_RFLAGS(ctx) |= CPU_EFLAGS_RF | CPU_EFLAGS_TF;
         return ctx;
     }
 
