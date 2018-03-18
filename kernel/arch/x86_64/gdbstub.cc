@@ -2288,8 +2288,7 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
             apic_send_ipi(cpu.apic_id, INTR_EX_NMI);
 
             // Wait for CPU to pick it up
-            while (cpu.state == gdb_cpu_state_t::RESUMING)
-                pause();
+            cpu_wait_not_value(&cpu.state, gdb_cpu_state_t::RESUMING);
         }
     }
 }
@@ -2478,8 +2477,7 @@ void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t& cpu)
 
         apic_send_ipi(cpu.apic_id, INTR_EX_NMI);
 
-        while (cpu.state != gdb_cpu_state_t::FROZEN)
-            pause();
+        cpu_wait_value(&cpu.state, gdb_cpu_state_t::FROZEN);
     }
 }
 
