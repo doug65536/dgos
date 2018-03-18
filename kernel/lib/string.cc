@@ -449,6 +449,15 @@ EXPORT char *strcpy(char *dest, char const *src)
     return dest;
 }
 
+EXPORT char *stpcpy(char *lhs, const char *rhs)
+{
+    auto d = (char *)lhs;
+    auto s = (char const *)rhs;
+    size_t i;
+    for (i = 0; (d[i] = s[i]) != 0; ++i);
+    return d + i;
+}
+
 EXPORT char *strcat(char *dest, char const *src)
 {
     strcpy(dest + strlen(dest), src);

@@ -26,6 +26,8 @@ void *memmove(void *dest, void const *src, size_t n);
 char *strcpy(char *dest, char const *src);
 char *strcat(char *dest, char const *src);
 
+char *stpcpy(char *dest, char const *src);
+
 char *strncpy(char *dest, char const *src, size_t n);
 char *strncat(char *dest, char const *src, size_t n);
 
