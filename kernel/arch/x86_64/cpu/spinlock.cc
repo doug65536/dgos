@@ -302,8 +302,6 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile*lock, mcs_queue_ent_t *node)
 void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
                           mcs_queue_ent_t *node)
 {
-    node->thread_id = thread_get_id();
-
     node->locked = true;
     atomic_st_rel(&node->next, nullptr);
 
@@ -322,6 +320,7 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
 
 void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
+    node->thread_id = thread_get_id();
     node->irq_enabled = cpu_irq_save_disable();
     mcslock_lock_nodis(lock, node);
 }
