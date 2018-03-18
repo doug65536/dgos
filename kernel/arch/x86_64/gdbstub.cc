@@ -2467,7 +2467,9 @@ void gdb_cpu_ctrl_t::start()
     cpu_wait_value(&stub_running, true);
 
     cpu_irq_disable();
-    halt();
+    bool wait = true;
+    while (wait)
+        thread_yield();
 }
 
 void gdb_cpu_ctrl_t::freeze_one(gdb_cpu_t& cpu)
