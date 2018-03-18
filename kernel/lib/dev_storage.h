@@ -118,8 +118,9 @@ void storage_if_register_factory(char const *name,
 
 typedef int dev_t;
 
-storage_dev_base_t *open_storage_dev(dev_t dev);
-void close_storage_dev(storage_dev_base_t *dev);
+size_t storage_dev_count();
+storage_dev_base_t *storage_dev_open(dev_t dev);
+void storage_dev_close(storage_dev_base_t *dev);
 
 //
 // Filesystem (FAT32, etc)

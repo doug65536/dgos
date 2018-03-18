@@ -30,13 +30,18 @@ static vector<part_factory_t*> part_factories;
 static vector<fs_reg_t*> fs_regs;
 static vector<fs_mount_t> fs_mounts;
 
-storage_dev_base_t *open_storage_dev(dev_t dev)
+size_t storage_dev_count()
 {
-    assert(size_t(dev) <= storage_devs.size());
-    return size_t(dev) < storage_devs.size() ? storage_devs[dev] : 0;
+    return storage_devs.size();
 }
 
-void close_storage_dev(storage_dev_base_t *dev)
+storage_dev_base_t *storage_dev_open(dev_t dev)
+{
+    assert(size_t(dev) <= storage_devs.size());
+    return size_t(dev) < storage_devs.size() ? storage_devs[dev] : nullptr;
+}
+
+void storage_dev_close(storage_dev_base_t *dev)
 {
     (void)dev;
 }
@@ -173,7 +178,7 @@ static void invoke_part_factories(void *arg)
                     info.part_len = part->lba_len;
                     fs_mount(part->name, &info);
                 }
-                close_storage_dev(drive);
+                storage_dev_close(drive);
 
                 STORAGE_TRACE("Found %u %s partitions\n", part_list.count,
                               factory->name);
