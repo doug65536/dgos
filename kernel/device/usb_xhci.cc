@@ -694,7 +694,6 @@ class usbxhci;
 
 struct usbxhci_pending_cmd_t final
         : public refcounted<usbxhci_pending_cmd_t> {
-    usbxhci_cmd_trb_t *cmd_ptr;
     uint64_t cmd_physaddr;
     usb_iocp_t *iocp;
 
@@ -788,8 +787,7 @@ private:
                        uint16_t stream_id, size_t count, int dir,
                        void *trbs, usb_iocp_t *iocp);
 
-    void insert_pending_command(usbxhci_cmd_trb_t *cmd_ptr,
-                                uint64_t cmd_physaddr, usb_iocp_t *iocp,
+    void insert_pending_command(uint64_t cmd_physaddr, usb_iocp_t *iocp,
                                 unique_lock<ticketlock> const&);
 
     int make_data_trbs(usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
@@ -828,7 +826,7 @@ private:
     void get_config(uint8_t slotid, usb_desc_config *desc, uint8_t desc_size,
                     usb_iocp_t *iocp);
 
-    void cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt, usb_iocp_t *iocp);
+    void cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp);
 
     usbxhci_endpoint_data_t *add_endpoint(uint8_t slotid, uint8_t epid);
 
@@ -894,6 +892,8 @@ private:
     hashtbl_t<usbxhci_pending_cmd_t,
     uint64_t, &usbxhci_pending_cmd_t::cmd_physaddr> usbxhci_pending_ht;
 
+    vector<usb_iocp_t*> completed_iocp;
+
     // Command issue lock
     padded_ticketlock lock_cmd;
 };
@@ -925,13 +925,11 @@ void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
     atomic_barrier();
 }
 
-void usbxhci::insert_pending_command(usbxhci_cmd_trb_t *cmd_ptr,
-                                     uint64_t cmd_physaddr,
+void usbxhci::insert_pending_command(uint64_t cmd_physaddr,
                                      usb_iocp_t *iocp,
                                      unique_lock<ticketlock> const&)
 {
     usbxhci_pending_cmd_t *pc = new usbxhci_pending_cmd_t;
-    pc->cmd_ptr = cmd_ptr;
     pc->cmd_physaddr = cmd_physaddr;
     pc->iocp = iocp;
     usbxhci_pending_ht.insert(pc);
@@ -955,7 +953,7 @@ void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
 
     uint64_t cmd_physaddr = cmd_ring_physaddr + offset;
 
-    insert_pending_command(s, cmd_physaddr, iocp, hold_cmd_lock);
+    insert_pending_command(cmd_physaddr, iocp, hold_cmd_lock);
 
     if (cr_next == cr_size) {
         usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
@@ -992,7 +990,7 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
 
         if (iocp && ((i + 1) == count)) {
             insert_pending_command(
-                        s, epd->xfer_ring_physaddr + epd->xfer_next *
+                        epd->xfer_ring_physaddr + epd->xfer_next *
                         sizeof(*epd->xfer_ring), iocp, hold_cmd_lock);
         }
 
@@ -1059,15 +1057,14 @@ int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
     return block.get_result().len_or_error();
 }
 
-void usbxhci::cmd_comp(usbxhci_cmd_trb_t *cmd, usbxhci_evt_t *evt,
-                       usb_iocp_t *iocp)
+void usbxhci::cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp)
 {
     if (iocp) {
         usb_iocp_result_t& result = iocp->get_result();
         result.cc = usb_cc_t(USBXHCI_EVT_CMDCOMP_INFO_CC_GET(evt->data[2]));
         result.ccp = USBXHCI_EVT_CMDCOMP_INFO_CCP_GET(evt->data[2]);
         result.slotid = evt->slotid;
-        iocp->invoke();
+        completed_iocp.push_back(iocp);
     } else {
         USBXHCI_TRACE("Got cmd_comp with null iocp\n");
     }
@@ -1914,7 +1911,7 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
     hold_cmd_lock.unlock();
 
     // Invoke completion handler
-    cmd_comp(pcp->cmd_ptr, evt, pcp->iocp);
+    cmd_comp(evt, pcp->iocp);
 }
 
 isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
@@ -1971,6 +1968,11 @@ void usbxhci::irq_handler(int irq)
                     ir_info->next * sizeof(*ir_info->evt_ring)) |
                     (1<<3);
         }
+
+        // Run completions after consuming events
+        for (usb_iocp_t *iocp : completed_iocp)
+            iocp->invoke();
+        completed_iocp.clear();
     }
 }
 
