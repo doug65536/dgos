@@ -479,17 +479,20 @@ public:
     nvme_cmp_t *cmp_queue_ptr();
 
 private:
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
     sub_queue_t sub_queue;
     cmp_queue_t cmp_queue;
+
+    void wait_sub_queue_not_full(scoped_lock& lock_);
 
     vector<nvme_cmp_t> cmp_buf;
 
     vector<nvme_callback_t> cmp_handlers;
     uint64_t *prp_lists;
 
-    using lock_t = ticketlock;
-    using scoped_lock = unique_lock<lock_t>;
-    lock_t lock;
+    lock_type lock;
     condition_variable not_full;
     condition_variable not_empty;
     bool ready;
@@ -1188,8 +1191,7 @@ void nvme_queue_state_t::submit_cmd(
 {
     scoped_lock hold(lock);
 
-    while (sub_queue.is_full())
-        not_full.wait(hold);
+    wait_sub_queue_not_full(hold);
 
     uint32_t index = sub_queue.get_tail();
 
@@ -1215,6 +1217,12 @@ void nvme_queue_state_t::submit_cmd(
     cmp_handlers[index] = nvme_callback_t(callback, data);
 
     sub_queue.enqueue(move(cmd));
+}
+
+void nvme_queue_state_t::wait_sub_queue_not_full(scoped_lock& lock_)
+{
+    while (sub_queue.is_full())
+        not_full.wait(lock_);
 }
 
 void nvme_queue_state_t::advance_head(uint16_t new_head, bool need_lock)

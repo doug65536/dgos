@@ -618,12 +618,18 @@ public:
     void route_irq(int cpu);
 
 private:
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     isr_context_t *port_irq_handler(isr_context_t *ctx);
 
+    void wait_tx_not_full(scoped_lock &lock_);
+    void wait_rx_not_empty(scoped_lock& lock_);
+
     void rx_enqueue(uint16_t value);
 
-    void send_some(unique_lock<ticketlock> const&);
+    void send_some(scoped_lock const&);
 
     bool is_rx_full() const;
     bool is_tx_full() const;
@@ -649,7 +655,7 @@ private:
     unique_ptr<uint16_t> rx_buffer;
     unique_ptr<uint16_t> tx_buffer;
 
-    ticketlock lock;
+    lock_type lock;
 
     uint16_t tx_head;
     uint16_t tx_tail;
@@ -690,7 +696,7 @@ bool uart_async_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
 
 ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     auto data = (char const *)buf;
 
@@ -704,9 +710,7 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
                 if (!sending_data)
                     send_some(lock_);
 
-                UART_TRACE("Blocking on tx\n");
-                tx_not_full.wait(lock_);
-                UART_TRACE("Unblocked tx\n");
+                wait_tx_not_full(lock_);
             } while (is_tx_full());
         }
 
@@ -722,7 +726,7 @@ ssize_t uart_async_t::write(void const *buf, size_t size, size_t min_write)
 
 ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     auto data = (uint8_t *)buf;
 
@@ -736,11 +740,7 @@ ssize_t uart_async_t::read(void *buf, size_t size, size_t min_read)
             if (i >= min_read)
                 break;
 
-            do {
-                UART_TRACE("Blocking rx\n");
-                rx_not_empty.wait(lock_);
-                UART_TRACE("Unblocked rx\n");
-            } while (is_rx_empty());
+            wait_rx_not_empty(lock_);
         }
 
         *data++ = rx_buffer[rx_tail];
@@ -755,7 +755,7 @@ void uart_async_t::route_irq(int cpu)
     irq_setcpu(irq, cpu);
 }
 
-void uart_async_t::send_some(unique_lock<ticketlock> const&)
+void uart_async_t::send_some(scoped_lock const&)
 {
     sending_data = !is_tx_empty();
 
@@ -841,7 +841,7 @@ void uart_async_t::tx_take_value()
 
 isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     bool wake_tx = false;
     bool wake_rx = false;
@@ -892,6 +892,23 @@ isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
     }
 
     return ctx;
+}
+
+void uart_async_t::wait_tx_not_full(scoped_lock& lock_)
+{
+    UART_TRACE("Blocking on tx\n");
+    tx_not_full.wait(lock_);
+    UART_TRACE("Unblocked tx\n");
+}
+
+void uart_async_t::wait_rx_not_empty(scoped_lock& lock_)
+{
+    do {
+        wait_rx_not_empty(lock_);
+        UART_TRACE("Blocking rx\n");
+        rx_not_empty.wait(lock_);
+        UART_TRACE("Unblocked rx\n");
+    } while (is_rx_empty());
 }
 
 

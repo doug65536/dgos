@@ -140,8 +140,11 @@ public:
         }
 
         enum struct phase_t : uint8_t {
+            // Command block wrapper
             tx_cbw,
+            // Data transfer
             xfer,
+            // Status block wrapper
             rx_sbw,
             check
         };
@@ -161,12 +164,17 @@ public:
         phase_t phase;
     };
 
+    // Commands are enqueued at head from I/O requests
+    // Next command is dequeued at tail for issue to device
     pending_cmd_t *cmd_queue;
     uint32_t cmd_head;
     uint32_t cmd_tail;
     static constexpr uint32_t cmd_capacity =
-            PAGE_SIZE / sizeof(pending_cmd_t);
-    ticketlock cmd_lock;
+            min(PAGE_SIZE / sizeof(pending_cmd_t), size_t(32U));
+
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type cmd_lock;
     condition_variable cmd_cond;
 
     static uint32_t cmd_wrap(uint32_t n);
@@ -180,10 +188,12 @@ public:
                bool fua, usb_msc_op_t op, iocp_t *iocp,
                int lun, uint8_t log2_sectorsize);
 
+    void wait_cmd_not_full(scoped_lock &hold_cmd_lock);
+
     static void usb_completion(usb_iocp_result_t const& result, uintptr_t arg);
     void usb_completion(pending_cmd_t *cmd);
 
-    bool advance_cmd(pending_cmd_t *cmd);
+    bool advance_cmd(pending_cmd_t *cmd, scoped_lock &hold_cmd_lock);
 
     int get_max_lun();
     int reset();
@@ -290,17 +300,21 @@ errno_t usb_msc_dev_t::read_async(
         uint64_t lba, iocp_t *iocp)
 {
     //USB_MSC_TRACE("Reading %ld blocks at LBA %lx", count, lba);
-    iocp->set_expect(1);
 
-    return io(data, count, lba, false, usb_msc_op_t::read, iocp);
+    errno_t status = io(data, count, lba, false,
+                        usb_msc_op_t::read, iocp);
+    iocp->set_expect(1);
+    return status;
 }
 
 errno_t usb_msc_dev_t::write_async(
         void const *data, int64_t count,
         uint64_t lba, bool fua, iocp_t *iocp)
 {
+    errno_t status = io((void*)data, count, lba, fua,
+                        usb_msc_op_t::write, iocp);
     iocp->set_expect(1);
-    return io((void*)data, count, lba, fua, usb_msc_op_t::write, iocp);
+    return status;
 }
 
 errno_t usb_msc_dev_t::flush_async(iocp_t *iocp)
@@ -483,17 +497,16 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
                          bool fua, usb_msc_op_t op, iocp_t *iocp,
                          int lun, uint8_t log2_sectorsize)
 {
-    unique_lock<ticketlock> hold_cmd_lock(cmd_lock);
+    scoped_lock hold_cmd_lock(cmd_lock);
 
-    // Wait for room in the command queue
-    while (cmd_wrap(cmd_head + 1) == cmd_tail)
-        cmd_cond.wait(hold_cmd_lock);
+    bool was_empty = (cmd_head == cmd_tail);
+
+    wait_cmd_not_full(hold_cmd_lock);
 
     // Get a pointer to the next available entry in the command queue
     pending_cmd_t *cmd = cmd_queue + cmd_head;
 
-    // Advance command queue head
-    cmd_head = cmd_wrap(cmd_head + 1);
+    USB_MSC_TRACE("Enqueueing command at slot %u\n", cmd_head);
 
     // Compute number of transfers in chunks of up to 64KB
     uint64_t sz = count << log2_sectorsize;
@@ -511,9 +524,24 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
     cmd->op = op;
     cmd->phase = pending_cmd_t::phase_t::tx_cbw;
 
-    advance_cmd(cmd);
+    // Advance command queue head
+    cmd_head = cmd_wrap(cmd_head + 1);
+
+    if (was_empty) {
+        USB_MSC_TRACE("Starting command from idle\n");
+        advance_cmd(cmd, hold_cmd_lock);
+    }
 
     return errno_t::OK;
+}
+
+void usb_msc_if_t::wait_cmd_not_full(scoped_lock& hold_cmd_lock)
+{
+    while (cmd_wrap(cmd_head + 1) == cmd_tail) {
+        USB_MSC_TRACE("Waiting for full queue\n");
+        cmd_cond.wait(hold_cmd_lock);
+        USB_MSC_TRACE("Wait for full queue completed\n");
+    }
 }
 
 void usb_msc_if_t::usb_completion(
@@ -525,23 +553,35 @@ void usb_msc_if_t::usb_completion(
 
 void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
 {
-    if (!advance_cmd(cmd))
-        return;
+    scoped_lock hold_cmd_lock(cmd_lock);
+    for (;;) {
+        if (!advance_cmd(cmd, hold_cmd_lock))
+            return;
 
-    // Entry is finished
+        USB_MSC_TRACE("Command completed\n");
 
-    unique_lock<ticketlock> hold_cmd_lock(cmd_lock);
-    cmd_tail = cmd_wrap(cmd_tail + 1);
-    cmd_cond.notify_one();
+        // Entry is finished
+
+        cmd_tail = cmd_wrap(cmd_tail + 1);
+        cmd_cond.notify_one();
+
+        // Queue empty?
+        if (cmd_head == cmd_tail)
+            return;
+
+        USB_MSC_TRACE("Continuing with next command\n");
+
+        // Start next command from queue
+        cmd = cmd_queue + cmd_tail;
+    }
 }
 
-bool usb_msc_if_t::advance_cmd(pending_cmd_t *cmd)
+bool usb_msc_if_t::advance_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
 {
-    if (cmd->count == 0)
-        return true;
-
     switch (cmd->phase) {
     case pending_cmd_t::phase_t::tx_cbw:
+        USB_MSC_TRACE("Sending command block wrapper\n");
+
         cmd->packet.cbw.sig = 0x43425355;
         cmd->packet.cbw.tag = cmd->tag;
         cmd->packet.cbw.xfer_len = cmd->count << cmd->log2_sector_sz;
@@ -562,14 +602,20 @@ bool usb_msc_if_t::advance_cmd(pending_cmd_t *cmd)
         cmd->packet.cbw.cmd.rw12.control = 0;
 
         cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
-        cmd->io_iocp.set_expect(1);
         bulk_out.send_async(&cmd->packet, sizeof(cmd->packet), &cmd->io_iocp);
-        cmd->phase = pending_cmd_t::phase_t::xfer;
+
+        if (cmd->count)
+            cmd->phase = pending_cmd_t::phase_t::xfer;
+        else
+            cmd->phase = pending_cmd_t::phase_t::rx_sbw;
+
+        cmd->io_iocp.set_expect(1);
         break;
 
     case pending_cmd_t::phase_t::xfer:
+        USB_MSC_TRACE("Doing data transfer\n");
+
         cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
-        cmd->io_iocp.set_expect(1);
 
         if (cmd->op == usb_msc_op_t::read) {
             bulk_in.recv_async(cmd->data, cmd->count << cmd->log2_sector_sz,
@@ -578,25 +624,31 @@ bool usb_msc_if_t::advance_cmd(pending_cmd_t *cmd)
             bulk_out.send_async(cmd->data, cmd->count << cmd->log2_sector_sz,
                                 &cmd->io_iocp);
         }
-
         cmd->phase = pending_cmd_t::phase_t::rx_sbw;
+
+        cmd->io_iocp.set_expect(1);
         break;
 
     case pending_cmd_t::phase_t::rx_sbw:
-        cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
-        cmd->io_iocp.set_expect(1);
+        USB_MSC_TRACE("Getting status block wrapper\n");
 
+        cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
         bulk_in.recv_async(&cmd->packet.csw, sizeof(cmd->packet.csw),
                            &cmd->io_iocp);
-
         cmd->phase = pending_cmd_t::phase_t::check;
+
+        cmd->io_iocp.set_expect(1);
         break;
 
     case pending_cmd_t::phase_t::check:
-        if (cmd->packet.csw.status != cmd_status_t::success)
-            cmd->caller_iocp->set_result(errno_t::EIO);
-        else
+
+        if (cmd->packet.csw.status == cmd_status_t::success) {
+            USB_MSC_TRACE("Command completed successfully\n");
             cmd->caller_iocp->set_result(errno_t::OK);
+        } else {
+            USB_MSC_TRACE("Command failed \n");
+            cmd->caller_iocp->set_result(errno_t::EIO);
+        }
 
         cmd->caller_iocp->invoke();
 
