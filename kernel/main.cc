@@ -60,7 +60,7 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   8
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -70,7 +70,7 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
 #define ENABLE_SPAWN_STRESS         0
-
+#define ENABLE_CONDVAR_STRESS       0
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     1
@@ -118,108 +118,136 @@ static int shell_thread(void *p)
 #endif
 
 #if ENABLE_READ_STRESS_THREAD > 0
-static int read_stress(void *p)
-{
-    static uint8_t counts[ENABLE_READ_STRESS_THREAD << 6];
-    static int next_id;
-    static int completion_count;
-    int id = atomic_xadd(&next_id, 1);
-    assert(id < ENABLE_READ_STRESS_THREAD);
+class read_stress_thread_t {
+public:
+    thread_t start(dev_t devid, uint16_t *indicator)
+    {
+        this->devid = devid;
+        this->indicator = indicator;
+        tid = thread_create(&read_stress_thread_t::worker, this, 0, 0);
+        return tid;
+    }
+
+private:
+    static int worker(void *arg)
+    {
+        return reinterpret_cast<read_stress_thread_t*>(arg)->worker();
+    }
+
+    int worker()
+    {
+        //static uint8_t counts[ENABLE_READ_STRESS_THREAD << 6];
+        static uint8_t counts[256 << 6];
+        static int volatile next_id;
+        static int completion_count;
+        int id = atomic_xadd(&next_id, 1);
+
+        thread_t tid = thread_get_id();
+
+        storage_dev_base_t *drive = storage_dev_open(devid);
+
+        if (!drive) {
+            printk("(devid %d) failed to open\n", devid);
+            return 0;
+        }
+
+        size_t data_size = 4096;
+
+        for (size_t i = 0; i < queue_depth; ++i) {
+            data[i] = (char*)mmap(0, data_size,
+                                  PROT_READ | PROT_WRITE, 0, -1, 0);
+            printk("(devid %d) read buffer at %lx\n",
+                   devid, (uint64_t)data[i]);
+        }
+
+        size_t data_blocks = data_size / drive->info(STORAGE_INFO_BLOCKSIZE);
+        printk("(dev %d) read stress iocp list at %p\n",
+               devid, (void*)iocp);
+
+        uint64_t last_time = time_ns();
+        uint64_t last_completions = completion_count;
+
+        errno_t status;
+
+        // Prime the queue
+        for (size_t i = 0; i < queue_depth; ++i) {
+            status = drive->read_async(data[i], 1, i, &iocp[i]);
+            if (status != errno_t::OK)
+                printdbg("(devid %d) (tid %3d)"
+                         " Storage read (completion failed) status=%d\n",
+                         devid, tid, (int)status);
+        }
+
+        size_t slot = 0;
+
+        uint64_t seed = 42;
+        while (1) {
+            ++*indicator;
+
+            uint64_t lba = rand_r_range(&seed, 16, data_blocks);
+            //int64_t count = rand_r_range(&seed, 1, data_blocks);
+
+            status = iocp[slot].wait();
+            if (status != errno_t::OK)
+                printdbg("(devid %d) (tid %3d)"
+                         " Storage read (completion failed) status=%d\n",
+                         devid, tid, (int)status);
+            iocp[slot].reset();
+            int64_t count = data_blocks;
+            status = drive->read_async(data[slot], count, lba, &iocp[slot]);
+            if (++slot == queue_depth)
+                slot = 0;
+
+            if (status != errno_t::OK)
+                printdbg("(devid %d) (%3d)"
+                         " Storage read (issue failed) status=%d\n",
+                         devid, tid, (int)status);
+
+            atomic_inc(counts + (id << 6));
+
+            uint64_t completions = atomic_xadd(&completion_count, 1);
+
+            if ((completions & 32767) == 32767) {
+                uint64_t now = time_ns();
+                uint64_t delta_time = now - last_time;
+                int ofs = 0;
+                if (delta_time >= 1000000000) {
+                    for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
+                        ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
+                                        counts[s << 6]);
+                    }
+
+                    uint64_t completion_delta = completions - last_completions;
+                    last_completions = completions;
+
+                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu",
+                                    completion_delta);
+
+                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, " %lu ms",
+                                    (now - last_time) / 1000000);
+
+                    last_time = now;
+                }
+
+                if (ofs) {
+                    buf[ofs++] = 0;
+                    printdbg("%s\n", buf);
+                }
+            }
+        }
+
+        return 0;
+    }
 
     static size_t constexpr queue_depth = 16;
     blocking_iocp_t iocp[queue_depth];
-
-    (void)p;
-    thread_t tid = thread_get_id();
-
-    storage_dev_base_t *drive = open_storage_dev(1);
-
-    if (!drive)
-        return 0;
-
-    size_t data_size = 4096;
-
     char *data[queue_depth];
-    for (size_t i = 0; i < queue_depth; ++i) {
-        data[i] = (char*)mmap(0, data_size, PROT_READ | PROT_WRITE, 0, -1, 0);
-        printk("read buffer at %lx\n", (uint64_t)data[i]);
-    }
-
-    size_t data_blocks = data_size / drive->info(STORAGE_INFO_BLOCKSIZE);
-    printk("read stress iocp list at %p\n", (void*)iocp);
-
-    uint64_t last_time = time_ns();
-    uint64_t last_completions = completion_count;
-
-    errno_t status;
-
-    // Prime the queue
-    for (size_t i = 0; i < queue_depth; ++i) {
-        status = drive->read_async(data[i], 1, i, &iocp[i]);
-        if (status != errno_t::OK)
-            printdbg("(%3d) Storage read (completion failed) status=%d\n",
-                     tid, (int)status);
-    }
-
-    size_t slot = 0;
-
-    uint64_t seed = 42;
     char buf[ENABLE_READ_STRESS_THREAD * 3 + 2 + 64];
-    while (1) {
-        ++*(short*)p;
 
-        uint64_t lba = rand_r_range(&seed, 16, data_blocks);
-        //int64_t count = rand_r_range(&seed, 1, data_blocks);
-
-        status = iocp[slot].wait();
-        if (status != errno_t::OK)
-            printdbg("(%3d) Storage read (completion failed) status=%d\n",
-                     tid, (int)status);
-        iocp[slot].reset();
-        int64_t count = data_blocks;
-        status = drive->read_async(data[slot], count, lba, &iocp[slot]);
-        if (++slot == queue_depth)
-            slot = 0;
-
-        if (status != errno_t::OK)
-            printdbg("(%3d) Storage read (issue failed) status=%d\n",
-                     tid, (int)status);
-
-        atomic_inc(counts + (id << 6));
-
-        uint64_t completions = atomic_xadd(&completion_count, 1);
-
-        if ((completions & 32767) == 32767) {
-            uint64_t now = time_ns();
-            uint64_t delta_time = now - last_time;
-            int ofs = 0;
-            if (delta_time >= 1000000000) {
-                for (int s = 0; s < ENABLE_READ_STRESS_THREAD; ++s) {
-                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%2x ",
-                                    counts[s << 6]);
-                }
-
-                uint64_t completion_delta = completions - last_completions;
-                last_completions = completions;
-
-                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu",
-                                completion_delta);
-
-                ofs += snprintf(buf + ofs, sizeof(buf) - ofs, " %lu ms",
-                                (now - last_time) / 1000000);
-
-                last_time = now;
-            }
-
-            if (ofs) {
-                buf[ofs++] = 0;
-                printdbg("%s\n", buf);
-            }
-        }
-    }
-
-    return 0;
-}
+    uint16_t *indicator;
+    dev_t devid;
+    thread_t tid;
+};
 #endif
 
 #if ENABLE_SLEEP_THREAD
@@ -792,12 +820,21 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_READ_STRESS_THREAD > 0
-    printdbg("Running block read stress with %d threads\n",
-             ENABLE_READ_STRESS_THREAD);
+    int dev_cnt = storage_dev_count();
+    vector<read_stress_thread_t*> *read_stress_threads =
+            new vector<read_stress_thread_t*>();
+    read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD);
+
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
-        thread_t tid = thread_create(read_stress, (char*)(uintptr_t)
-                      (0xb8000+ 80*2 + 2*i), 0, false);
-        printdbg("Read stress id[%d]=%d\n", i, tid);
+        for (int devid = 0; devid < dev_cnt; ++devid) {
+            printdbg("(devid %d) Running block read stress with %d threads\n",
+                     devid, ENABLE_READ_STRESS_THREAD);
+            read_stress_thread_t *thread = new read_stress_thread_t();
+            read_stress_threads->push_back(thread);
+            uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
+            thread_t tid = thread->start(devid, indicator);
+            printdbg("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
+        }
     }
 #endif
 
