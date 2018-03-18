@@ -553,6 +553,16 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
 
     outp(reg_mcr);
 
+    // Acknowledge everything one more time, just in case
+    inp(reg_ier);
+    inp(reg_iir);
+    inp(reg_lcr);
+    inp(reg_mcr);
+    inp(reg_lsr);
+    inp(reg_msr);
+    inp(reg_scr);
+    in(port_t::DAT);
+
     if (use_irq) {
         irq_hook(irq, &uart_t::irq_handler);
         irq_setmask(irq, true);
