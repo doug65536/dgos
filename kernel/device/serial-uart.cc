@@ -914,7 +914,6 @@ void uart_async_t::wait_tx_not_full(scoped_lock& lock_)
 void uart_async_t::wait_rx_not_empty(scoped_lock& lock_)
 {
     do {
-        wait_rx_not_empty(lock_);
         UART_TRACE("Blocking rx\n");
         rx_not_empty.wait(lock_);
         UART_TRACE("Unblocked rx\n");
