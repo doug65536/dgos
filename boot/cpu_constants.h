@@ -20,13 +20,13 @@
 #define CPU_CR0_MP_BIT 1	// Monitor co-processor
 #define CPU_CR0_EM_BIT 2	// Emulation
 #define CPU_CR0_TS_BIT 3	// Task switched
-#define CPU_CR0_ET_BIT 4	// Extension type
-#define CPU_CR0_NE_BIT 5	// Numeric error
-#define CPU_CR0_WP_BIT 16	// Write protect
-#define CPU_CR0_AM_BIT 18	// Alignment mask
+#define CPU_CR0_ET_BIT 4	// Extension type (0=80287)
+#define CPU_CR0_NE_BIT 5	// Numeric error (1=exception, 0=IRQ)
+#define CPU_CR0_WP_BIT 16	// Write protect (1=enforce in ring0)
+#define CPU_CR0_AM_BIT 18	// Alignment mask (1=enable EFLAGS.AC)
 #define CPU_CR0_NW_BIT 29	// Not-write through
 #define CPU_CR0_CD_BIT 30	// Cache disable
-#define CPU_CR0_PG_BIT 31	// Paging
+#define CPU_CR0_PG_BIT 31	// Paging (1=enable paging)
 
 #define CPU_CR0_PE  (1U << CPU_CR0_PE_BIT)
 #define CPU_CR0_MP  (1U << CPU_CR0_MP_BIT)
