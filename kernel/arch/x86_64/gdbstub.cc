@@ -1394,12 +1394,12 @@ bool gdbstub_t::get_target_desc(
     result_sz += (countof(x86_64_sse) - 1);
     result_sz += (countof(x86_64_segments) - 1);
 
-    if (sse_avx_offset) {
+    if (1 || sse_avx_offset) {
         result_sz += (countof(x86_64_avx) - 1);
         bits += x86_64_avx_bits;
     }
 
-    if (sse_avx512_upper_offset) {
+    if (1 || sse_avx512_upper_offset) {
         result_sz += (countof(x86_64_avx512) - 1);
         bits += x86_64_avx512_bits;
     }
@@ -1408,21 +1408,27 @@ bool gdbstub_t::get_target_desc(
 
     result.reset(new char[result_sz + 1]);
 
-    strcpy(result, x86_64_target_header);
-    strcat(result, x86_64_core);
-    strcat(result, x86_64_sse);
-    strcat(result, x86_64_segments);
+    char *output = result;
 
-    if (sse_avx_offset)
-        strcat(result, x86_64_avx);
+    output = stpcpy(output, x86_64_target_header);
+    output = stpcpy(output, x86_64_core);
+    output = stpcpy(output, x86_64_sse);
+    output = stpcpy(output, x86_64_segments);
 
-    if (sse_avx512_upper_offset)
-        strcat(result, x86_64_avx512);
+    if (1 || sse_avx_offset)
+        output = stpcpy(output, x86_64_avx);
 
-    strcat(result, x86_64_target_footer);
+    if (1 || sse_avx512_upper_offset)
+        output = stpcpy(output, x86_64_avx512);
+
+    output = stpcpy(output, x86_64_target_footer);
 
     // 4 bits per encoded hex digit
     encoded_ctx_sz = bits >> 2;
+
+    size_t len_chk = strlen(result);
+
+    assert(len_chk == result_sz);
 
     return true;
 }
@@ -1450,6 +1456,10 @@ gdbstub_t::rx_state_t gdbstub_t::handle_query_features(char const *input)
         return reply("E01");
 
     size_t length = from_hex<size_t>(&input);
+
+    // Allow room for $m#xx envelope
+    if (length > 5)
+        length -= 5;
 
     char prefix;
     size_t reply_len = 0;
@@ -1871,13 +1881,13 @@ size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
     memset(reply + ofs, 'x', 16);
     ofs += 16;
 
-    if (sse_avx_offset) {
+    if (1 || sse_avx_offset) {
         // ymm0-ymm15 255:128
-        memset(reply, 'x', 16*16*2);
+        memset(reply + ofs, 'x', 16*16*2);
         ofs += 16*16*2;
     }
 
-    if (sse_avx512_upper_offset) {
+    if (1 || sse_avx512_upper_offset) {
         // xmm16-xmm31 127:0
         memset(reply + ofs, 'x', 16*16*2);
         ofs += 16*16*2;
@@ -1891,9 +1901,11 @@ size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
         ofs += 8*8*2;
 
         // zmm0-zmm31 511:256
-        memset(reply + ofs, 'x', 32*64*2);
-        ofs += 32*64*2;
+        memset(reply + ofs, 'x', 32*32*2);
+        ofs += 32*32*2;
     }
+
+    reply[ofs] = 0;
 
     assert(ofs == encoded_ctx_sz);
 
@@ -2013,6 +2025,25 @@ size_t gdbstub_t::set_context(isr_context_t *ctx,
     // Skip gs_base
     if (input + 16 <= end)
         input += 16;
+
+    if (1 || sse_avx_offset) {
+        // ymm0-ymm15 255:128
+        input += 16*16*2;
+    }
+
+    if (1 || sse_avx512_upper_offset) {
+        // xmm16-xmm31 127:0
+        input += 16*16*2;
+
+        // ymm16-ymm31 127:0
+        input += 16*16*2;
+
+        // k0-k7
+        input += 8*8*2;
+
+        // zmm0-zmm31 511:256
+        input += 32*64*2;
+    }
 
     assert(input - data == encoded_ctx_sz);
 
