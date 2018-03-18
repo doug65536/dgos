@@ -88,8 +88,8 @@ void condvar_wake_all(condition_var_t *var);
 void condvar_wait_spinlock(condition_var_t *var, spinlock_t *spinlock);
 void condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *spinlock);
 void condvar_wait_mcslock(condition_var_t *var,
-                          mcs_queue_ent_t * volatile *lock,
-                          mcs_queue_ent_t * ent);
+                          mcs_queue_ent_t * volatile *root,
+                          mcs_queue_ent_t * node);
 void condvar_wait_noyield(condition_var_t *var, mutex_t *mutex);
 
 __END_DECLS
