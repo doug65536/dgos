@@ -1622,6 +1622,11 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
             bool cpu_running = gdb_cpu_ctrl_t::is_cpu_running(thread);
             return replyf_hex("CPU#%d [%s]", thread,
                               cpu_running ? "running" : "halted");
+        } else if (!strncmp(input, "Attached", 8)) {
+            return reply("1");
+        } else if (!strncmp(input, "Symbol::", 8)) {
+            // Can request symbol lookups here, for now say we don't want any
+            return reply("OK");
         }
         break;
 
