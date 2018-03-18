@@ -876,10 +876,10 @@ EXPORT void thread_resume(thread_t tid)
                            THREAD_IS_READY))
             return;
 
-//        if (thread->state == THREAD_IS_SUSPENDED_BUSY &&
-//                atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED_BUSY,
-//                           THREAD_IS_READY_BUSY))
-//            return;
+        if (thread->state == THREAD_IS_SUSPENDED_BUSY &&
+                atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED_BUSY,
+                           THREAD_IS_READY_BUSY))
+            return;
 
         THREAD_TRACE("Did not resume %d! Retrying I guess\n", tid);
     }
