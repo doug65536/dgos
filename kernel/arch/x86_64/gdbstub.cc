@@ -17,6 +17,8 @@
 #include "cpu/except.h"
 #include "cpu/control_regs.h"
 
+#define GDBSTUB_FORCE_FULL_CTX 0
+
 #define DEBUG_GDBSTUB   1
 #if DEBUG_GDBSTUB
 #define GDBSTUB_TRACE(...) printdbg("gdbstub: " __VA_ARGS__)
@@ -736,7 +738,7 @@ gdbstub_t::rx_state_t gdbstub_t::reply(const char *data)
 
 gdbstub_t::rx_state_t gdbstub_t::reply(const char *data, size_t size)
 {
-    //GDBSTUB_TRACE("Unencoded reply: \"%*.*s\"\n", int(size), int(size), data);
+    printk("gdbstub reply: \"%*.*s\"\n", int(size), int(size), data);
 
     reply_index = 0;
     reply_buf[reply_index++] = '$';
@@ -858,7 +860,7 @@ void gdbstub_t::data_received(char const *data, size_t size)
 
             if (cmd_sum == cmd_checksum) {
                 // Send ACK
-                GDBSTUB_TRACE("command: %s\n", cmd_buf);
+                printk("gdbstub command: %s\n", cmd_buf);
                 port->write("+", 1, 1);
                 cmd_state = handle_packet();
                 nonsense = false;
@@ -1394,12 +1396,12 @@ bool gdbstub_t::get_target_desc(
     result_sz += (countof(x86_64_sse) - 1);
     result_sz += (countof(x86_64_segments) - 1);
 
-    if (1 || sse_avx_offset) {
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx_offset) {
         result_sz += (countof(x86_64_avx) - 1);
         bits += x86_64_avx_bits;
     }
 
-    if (1 || sse_avx512_upper_offset) {
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx512_upper_offset) {
         result_sz += (countof(x86_64_avx512) - 1);
         bits += x86_64_avx512_bits;
     }
@@ -1415,10 +1417,10 @@ bool gdbstub_t::get_target_desc(
     output = stpcpy(output, x86_64_sse);
     output = stpcpy(output, x86_64_segments);
 
-    if (1 || sse_avx_offset)
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx_offset)
         output = stpcpy(output, x86_64_avx);
 
-    if (1 || sse_avx512_upper_offset)
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx512_upper_offset)
         output = stpcpy(output, x86_64_avx512);
 
     output = stpcpy(output, x86_64_target_footer);
@@ -1886,13 +1888,13 @@ size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
     memset(reply + ofs, 'x', 16);
     ofs += 16;
 
-    if (1 || sse_avx_offset) {
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx_offset) {
         // ymm0-ymm15 255:128
         memset(reply + ofs, 'x', 16*16*2);
         ofs += 16*16*2;
     }
 
-    if (1 || sse_avx512_upper_offset) {
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx512_upper_offset) {
         // xmm16-xmm31 127:0
         memset(reply + ofs, 'x', 16*16*2);
         ofs += 16*16*2;
@@ -2041,12 +2043,12 @@ size_t gdbstub_t::set_context(isr_context_t *ctx,
     if (input + 16 <= end)
         input += 16;
 
-    if (1 || sse_avx_offset) {
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx_offset) {
         // ymm0-ymm15 255:128
         input += 16*16*2;
     }
 
-    if (1 || sse_avx512_upper_offset) {
+    if (GDBSTUB_FORCE_FULL_CTX || sse_avx512_upper_offset) {
         // xmm16-xmm31 127:0
         input += 16*16*2;
 
