@@ -31,7 +31,8 @@ struct msi_irq_mem_t {
 typedef isr_context_t *(*intr_handler_t)(int intr, isr_context_t*);
 
 typedef void (*irq_setmask_handler_t)(int irq, bool unmask);
-typedef void (*irq_hook_handler_t)(int irq, intr_handler_t handler);
+typedef void (*irq_hook_handler_t)(int irq, intr_handler_t handler,
+                                   char const * name);
 typedef void (*irq_unhook_handler_t)(int irq, intr_handler_t handler);
 typedef int (*msi_irq_alloc_handler_t)(
         msi_irq_mem_t *results, int count,
@@ -60,7 +61,7 @@ extern "C" void irq_setcpu_set_handler(irq_setcpu_handler_t handler);
 extern "C" void irq_setmask(int irq, bool unmask);
 
 // Set the appropriate interrupt vector for the specified irq
-extern "C" void irq_hook(int irq, intr_handler_t handler);
+extern "C" void irq_hook(int irq, intr_handler_t handler, const char *name);
 
 // Reset the appropriate interrupt vector for the specified irq
 extern "C" void irq_unhook(int irq, intr_handler_t handler);
@@ -69,7 +70,7 @@ extern "C" void irq_unhook(int irq, intr_handler_t handler);
 // Interrupt vector manipulation and dispatch
 
 // Set interrupt vector
-extern "C" void intr_hook(int intr, intr_handler_t handler);
+extern "C" void intr_hook(int intr, intr_handler_t handler, const char *name);
 
 // Reset interrupt vector
 extern "C" void intr_unhook(int intr, intr_handler_t handler);

@@ -1372,7 +1372,7 @@ static void mmu_configure_pat(void)
 void mmu_init()
 {
     // Hook IPI for TLB shootdown
-    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler);
+    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler, "sw_tlbshoot");
 
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
            sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size);
@@ -1511,7 +1511,7 @@ void mmu_init()
            free_count,
            free_count >> (20 - PAGE_SIZE_BIT));
 
-    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler);
+    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler, "sw_page");
 
     malloc_startup(nullptr);
 

@@ -680,7 +680,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     // Try to use MSI IRQ
     use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, true,
                               min(requested_queue_count - 1, size_t(32)),
-                              irq_handler, target_cpus.get());
+                              irq_handler, "nvme", target_cpus.get());
 
     target_cpus.reset();
 

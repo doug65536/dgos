@@ -1700,7 +1700,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
 
     // Try to use MSI IRQ
     use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, false, 1,
-                              &ahci_if_t::irq_handler);
+                              &ahci_if_t::irq_handler, "ahci");
 
     AHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
                use_msi, irq_range.base, irq_range.count);

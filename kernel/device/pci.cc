@@ -521,7 +521,8 @@ int pci_find_capability(pci_addr_t addr, int capability_id)
 bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, int req_count,
-                     intr_handler_t handler, int const *target_cpus)
+                     intr_handler_t handler,
+                     char const *name, int const *target_cpus)
 {
     // Assume we can't use MSI at first, prepare to use pin interrupt
     irq_range->base = pci_dev.config.irq_line;
@@ -529,14 +530,14 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
 
     bool use_msi = pci_set_msi_irq(pci_dev, irq_range, cpu,
                                    distribute, req_count,
-                                   handler, target_cpus);
+                                   handler, name, target_cpus);
 
     if (!use_msi) {
         // Plain IRQ pin
         pci_set_irq_pin(pci_dev.addr, pci_dev.config.irq_pin);
         pci_set_irq_line(pci_dev.addr, pci_dev.config.irq_line);
 
-        irq_hook(pci_dev.config.irq_line, handler);
+        irq_hook(pci_dev.config.irq_line, handler, name);
         irq_setmask(pci_dev.config.irq_line, true);
     }
 
@@ -545,7 +546,8 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
 
 bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                     int cpu, bool distribute, int req_count,
-                    intr_handler_t handler, int const *target_cpus)
+                    intr_handler_t handler, char const *name,
+                    int const *target_cpus)
 {
     int capability = 0;
     bool msix = true;
@@ -649,7 +651,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
 
         irq_range->base = apic_msi_irq_alloc(
                     msi_writes.data(), tbl_cnt, cpu, distribute,
-                    handler, target_cpus);
+                    handler, name, target_cpus);
         irq_range->count = tbl_cnt;
 
         int i;
@@ -691,8 +693,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         irq_range->count = 1 << multi_en;
         irq_range->base = apic_msi_irq_alloc(
                     mem, irq_range->count,
-                    cpu, distribute,
-                    handler);
+                    cpu, distribute, handler, name);
 
         // Use 32-bit or 64-bit according to capability
         if (caps.msg_ctrl & PCI_MSI_MSG_CTRL_CAP64) {

@@ -266,7 +266,7 @@ void cmos_init(void)
 {
     cmos_scoped_lock lock(cmos_lock);
 
-    irq_hook(8, cmos_irq_handler);
+    irq_hook(8, cmos_irq_handler, "cmosrtc");
 
     // Set IRQ rate to 2Hz, just in case
     uint8_t cmos_status_a = cmos_read(CMOS_REG_STATUS_A, lock);

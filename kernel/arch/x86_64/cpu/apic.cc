@@ -1687,9 +1687,9 @@ int apic_init(int ap)
     }
 
     if (!ap) {
-        intr_hook(INTR_APIC_TIMER, apic_timer_handler);
-        intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler);
-        intr_hook(INTR_APIC_ERROR, apic_err_handler);
+        intr_hook(INTR_APIC_TIMER, apic_timer_handler, "apic_timer");
+        intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler, "apic_spurious");
+        intr_hook(INTR_APIC_ERROR, apic_err_handler, "apic_error");
 
         APIC_TRACE("Parsing boot tables\n");
 
@@ -2406,11 +2406,12 @@ static void ioapic_setmask(int irq, bool unmask)
     ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), ent, lock);
 }
 
-static void ioapic_hook(int irq, intr_handler_t handler)
+static void ioapic_hook(int irq, intr_handler_t handler,
+                        char const *name)
 {
     int intr = irq_to_intr[irq];
     assert(intr >= 0);
-    intr_hook(intr, handler);
+    intr_hook(intr, handler, name);
 }
 
 static void ioapic_unhook(int irq, intr_handler_t handler)
@@ -2502,7 +2503,8 @@ void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
 // Returns 0 for failure
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute,
-                       intr_handler_t handler, int const *target_cpus)
+                       intr_handler_t handler, char const *name,
+                       int const *target_cpus)
 {
     // Don't try to use MSI if there are no IOAPIC devices
     if (ioapic_count == 0)
@@ -2527,8 +2529,7 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
         intr_to_irq[vector_base + i] = vector_base + i - INTR_APIC_IRQ_BASE;
 
         ioapic_hook(vector_base + i - ioapic_msi_base_intr +
-                 ioapic_msi_base_irq,
-                 handler);
+                 ioapic_msi_base_irq, handler, name);
 
         if (distribute) {
             if (++cpu >= int(apic_id_count))

@@ -830,7 +830,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
         set_irq_enable(1);
 
-        irq_hook(ports.irq, &ide_chan_t::irq_handler);
+        irq_hook(ports.irq, &ide_chan_t::irq_handler, "ide");
         irq_setmask(ports.irq, 1);
 
         IDE_TRACE("if=%d, slave=%d, done\n", secondary, slave);

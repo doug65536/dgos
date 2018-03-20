@@ -986,7 +986,8 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 
     // Use MSI IRQ if possible
     use_msi = pci_try_msi_irq(pci_dev, &irq_range, 1, false, 1,
-                              &rtl8139_dev_t::irq_dispatcher);
+                              &rtl8139_dev_t::irq_dispatcher,
+                              "rtl8139");
 
     RTL8139_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
                use_msi, irq_range.base, irq_range.count);

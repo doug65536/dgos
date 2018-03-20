@@ -9,6 +9,7 @@
 typedef int16_t intr_link_t;
 
 struct intr_handler_reg_t {
+    char const *name;
     intr_link_t next;
     int16_t refcount;
     int16_t intr;
@@ -87,9 +88,9 @@ void irq_setmask(int irq, bool unmask)
         irq_setmask_vec(irq, unmask);
 }
 
-void irq_hook(int irq, intr_handler_t handler)
+void irq_hook(int irq, intr_handler_t handler, char const *name)
 {
-    irq_hook_vec(irq, handler);
+    irq_hook_vec(irq, handler, name);
 }
 
 void irq_unhook(int irq, intr_handler_t handler)
@@ -111,7 +112,7 @@ static intr_handler_reg_t *intr_alloc(void)
     return entry;
 }
 
-void intr_hook(int intr, intr_handler_t handler)
+void intr_hook(int intr, intr_handler_t handler, char const *name)
 {
     unique_lock<ticketlock> lock(intr_handler_reg_lock);
 
@@ -141,6 +142,7 @@ void intr_hook(int intr, intr_handler_t handler)
     if (!entry) {
         entry = intr_alloc();
 
+        entry->name = name;
         entry->next = -1;
         entry->refcount = 1;
         entry->intr = intr;

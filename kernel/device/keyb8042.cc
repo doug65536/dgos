@@ -512,12 +512,12 @@ void keyb8042_init(void)
 
     printk("Keyboard/mouse initialization complete\n");
 
-    irq_hook(1, keyb8042_handler);
+    irq_hook(1, keyb8042_handler, "keyb8042");
     irq_setmask(1, 1);
 
     if (port2_exists) {
         printk("Mouse enabled\n");
-        irq_hook(12, keyb8042_handler);
+        irq_hook(12, keyb8042_handler, "keyb8042_mouse");
         irq_setmask(12, 1);
     }
 

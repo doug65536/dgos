@@ -23,7 +23,7 @@ void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector);
 
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute, intr_handler_t handler,
-                       int const *target_cpus = nullptr);
+                       char const *name, int const *target_cpus = nullptr);
 
 void apic_config_cpu();
 

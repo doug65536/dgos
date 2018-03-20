@@ -2380,9 +2380,9 @@ void gdb_cpu_ctrl_t::sync_hw_bp()
 
 void gdb_cpu_ctrl_t::hook_exceptions()
 {
-    intr_hook(INTR_EX_DEBUG, &gdb_cpu_ctrl_t::exception_handler);
-    intr_hook(INTR_EX_NMI, &gdb_cpu_ctrl_t::exception_handler);
-    intr_hook(INTR_EX_BREAKPOINT, &gdb_cpu_ctrl_t::exception_handler);
+    intr_hook(INTR_EX_DEBUG, &gdb_cpu_ctrl_t::exception_handler, "sw_debug");
+    intr_hook(INTR_EX_NMI, &gdb_cpu_ctrl_t::exception_handler, "sw_nmi");
+    intr_hook(INTR_EX_BREAKPOINT, &gdb_cpu_ctrl_t::exception_handler, "sw_bp");
     idt_set_unhandled_exception_handler(&gdb_cpu_ctrl_t::exception_handler);
 
     idt_clone_debug_exception_dispatcher();

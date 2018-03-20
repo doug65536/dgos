@@ -522,7 +522,7 @@ void thread_init(int ap)
     cpu_set_altgsbase((void*)0xFFFFD1D1D1D1D1D1);
 
     if (!ap) {
-        intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler);
+        intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler, "sw_yield");
 
         thread->process = process_t::init(cpu_get_page_directory());
 
