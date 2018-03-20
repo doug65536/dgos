@@ -2151,6 +2151,8 @@ libc/src/stdlib/$(DEPDIR)/$(am__dirstamp):
 libc/src/stdlib/libc_a-_Exit.$(OBJEXT):  \
 	libc/src/stdlib/$(am__dirstamp) \
 	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdlib/libc_a-abs.$(OBJEXT): libc/src/stdlib/$(am__dirstamp) \
+	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 libc/src/fcntl/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/fcntl
 	@: > libc/src/fcntl/$(am__dirstamp)
