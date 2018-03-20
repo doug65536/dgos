@@ -113,7 +113,7 @@ def write_one_prefix(prefix_data):
 
 	print('')
 	for item in items:
-		print_line('{0} (((n) & {1}_{2}) >> {1}_{2}_BIT)'.format(
+		print_line('{0} (((n) >> {1}_{2}_BIT) & {1}_{2}_MASK)'.format(
 			define(prefix, item['name'], '_GET(n)', max_len),
 			prefix, item['name']
 		))
