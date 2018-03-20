@@ -139,17 +139,8 @@ public:
         {
         }
 
-        enum struct phase_t : uint8_t {
-            // Command block wrapper
-            tx_cbw,
-            // Data transfer
-            xfer,
-            // Status block wrapper
-            rx_sbw,
-            check
-        };
-
-        wrapper_t packet;
+        cbw_t cbw;
+        csw_t csw;
 
         usb_msc_if_t *if_;
         iocp_t *caller_iocp;
@@ -161,7 +152,6 @@ public:
         uint8_t lun;
         uint8_t log2_sector_sz;
         usb_msc_op_t op;
-        phase_t phase;
     };
 
     // Commands are enqueued at head from I/O requests
@@ -193,7 +183,7 @@ public:
     static void usb_completion(usb_iocp_result_t const& result, uintptr_t arg);
     void usb_completion(pending_cmd_t *cmd);
 
-    bool advance_cmd(pending_cmd_t *cmd, scoped_lock &hold_cmd_lock);
+    void issue_cmd(pending_cmd_t *cmd, scoped_lock &hold_cmd_lock);
 
     int get_max_lun();
     int reset();
@@ -501,7 +491,8 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
 
     bool was_empty = (cmd_head == cmd_tail);
 
-    wait_cmd_not_full(hold_cmd_lock);
+    if (!was_empty)
+        wait_cmd_not_full(hold_cmd_lock);
 
     // Get a pointer to the next available entry in the command queue
     pending_cmd_t *cmd = cmd_queue + cmd_head;
@@ -511,6 +502,9 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
     // Compute number of transfers in chunks of up to 64KB
     uint64_t sz = count << log2_sectorsize;
     int tx_count = (sz + (1 << 16) - 1) >> 16;
+
+    // FIXME: handle multiple chunks
+    assert(tx_count == 1);
 
     cmd->if_ = this;
     cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
@@ -522,14 +516,13 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
     cmd->lun = lun;
     cmd->log2_sector_sz = log2_sectorsize;
     cmd->op = op;
-    cmd->phase = pending_cmd_t::phase_t::tx_cbw;
 
     // Advance command queue head
     cmd_head = cmd_wrap(cmd_head + 1);
 
     if (was_empty) {
         USB_MSC_TRACE("Starting command from idle\n");
-        advance_cmd(cmd, hold_cmd_lock);
+        issue_cmd(cmd, hold_cmd_lock);
     }
 
     return errno_t::OK;
@@ -551,71 +544,35 @@ void usb_msc_if_t::usb_completion(
     cmd->if_->usb_completion(cmd);
 }
 
-void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
+void usb_msc_if_t::issue_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
 {
-    scoped_lock hold_cmd_lock(cmd_lock);
-    for (;;) {
-        if (!advance_cmd(cmd, hold_cmd_lock))
-            return;
+    // command block wrapper
 
-        USB_MSC_TRACE("Command completed\n");
+    cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
 
-        // Entry is finished
+    cmd->cbw.sig = 0x43425355;
+    cmd->cbw.tag = cmd->tag;
+    cmd->cbw.xfer_len = cmd->count << cmd->log2_sector_sz;
 
-        cmd_tail = cmd_wrap(cmd_tail + 1);
-        cmd_cond.notify_one();
+    if (cmd->op == usb_msc_op_t::read)
+        cmd->cbw.flags = 0x80;
+    else
+        cmd->cbw.flags = 0;
 
-        // Queue empty?
-        if (cmd_head == cmd_tail)
-            return;
+    cmd->cbw.lun = cmd->lun;
 
-        USB_MSC_TRACE("Continuing with next command\n");
+    cmd->cbw.wcb_len = sizeof(cmd_rw12_t);
+    cmd->cbw.cmd.rw12.op = cmd_read_12;
+    cmd->cbw.cmd.rw12.flags = 0;
+    cmd->cbw.cmd.rw12.lba = bswap_32(cmd->lba);
+    cmd->cbw.cmd.rw12.len = bswap_32(cmd->count);
+    cmd->cbw.cmd.rw12.group = 0;
+    cmd->cbw.cmd.rw12.control = 0;
 
-        // Start next command from queue
-        cmd = cmd_queue + cmd_tail;
-    }
-}
+    bulk_out.send_async(&cmd->cbw, sizeof(cmd->cbw), &cmd->io_iocp);
 
-bool usb_msc_if_t::advance_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
-{
-    switch (cmd->phase) {
-    case pending_cmd_t::phase_t::tx_cbw:
-        USB_MSC_TRACE("Sending command block wrapper\n");
-
-        cmd->packet.cbw.sig = 0x43425355;
-        cmd->packet.cbw.tag = cmd->tag;
-        cmd->packet.cbw.xfer_len = cmd->count << cmd->log2_sector_sz;
-
-        if (cmd->op == usb_msc_op_t::read)
-            cmd->packet.cbw.flags = 0x80;
-        else
-            cmd->packet.cbw.flags = 0;
-
-        cmd->packet.cbw.lun = cmd->lun;
-
-        cmd->packet.cbw.wcb_len = sizeof(cmd_rw12_t);
-        cmd->packet.cbw.cmd.rw12.op = cmd_read_12;
-        cmd->packet.cbw.cmd.rw12.flags = 0;
-        cmd->packet.cbw.cmd.rw12.lba = bswap_32(cmd->lba);
-        cmd->packet.cbw.cmd.rw12.len = bswap_32(cmd->count);
-        cmd->packet.cbw.cmd.rw12.group = 0;
-        cmd->packet.cbw.cmd.rw12.control = 0;
-
-        cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
-        bulk_out.send_async(&cmd->packet, sizeof(cmd->packet), &cmd->io_iocp);
-
-        if (cmd->count)
-            cmd->phase = pending_cmd_t::phase_t::xfer;
-        else
-            cmd->phase = pending_cmd_t::phase_t::rx_sbw;
-
-        cmd->io_iocp.set_expect(1);
-        break;
-
-    case pending_cmd_t::phase_t::xfer:
-        USB_MSC_TRACE("Doing data transfer\n");
-
-        cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
+    if (cmd->count) {
+        // data transfer
 
         if (cmd->op == usb_msc_op_t::read) {
             bulk_in.recv_async(cmd->data, cmd->count << cmd->log2_sector_sz,
@@ -624,38 +581,41 @@ bool usb_msc_if_t::advance_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
             bulk_out.send_async(cmd->data, cmd->count << cmd->log2_sector_sz,
                                 &cmd->io_iocp);
         }
-        cmd->phase = pending_cmd_t::phase_t::rx_sbw;
-
-        cmd->io_iocp.set_expect(1);
-        break;
-
-    case pending_cmd_t::phase_t::rx_sbw:
-        USB_MSC_TRACE("Getting status block wrapper\n");
-
-        cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
-        bulk_in.recv_async(&cmd->packet.csw, sizeof(cmd->packet.csw),
-                           &cmd->io_iocp);
-        cmd->phase = pending_cmd_t::phase_t::check;
-
-        cmd->io_iocp.set_expect(1);
-        break;
-
-    case pending_cmd_t::phase_t::check:
-
-        if (cmd->packet.csw.status == cmd_status_t::success) {
-            USB_MSC_TRACE("Command completed successfully\n");
-            cmd->caller_iocp->set_result(errno_t::OK);
-        } else {
-            USB_MSC_TRACE("Command failed \n");
-            cmd->caller_iocp->set_result(errno_t::EIO);
-        }
-
-        cmd->caller_iocp->invoke();
-
-        return true;
     }
 
-    return false;
+    // status block wrapper
+    bulk_in.recv_async(&cmd->csw, sizeof(cmd->csw), &cmd->io_iocp);
+
+    cmd->io_iocp.set_expect(3);
+}
+
+void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
+{
+    if (cmd->csw.status == cmd_status_t::success) {
+        USB_MSC_TRACE("Command completed successfully\n");
+        cmd->caller_iocp->set_result(errno_t::OK);
+    } else {
+        USB_MSC_TRACE("Command failed \n");
+        cmd->caller_iocp->set_result(errno_t::EIO);
+    }
+
+    // Entry is finished
+    scoped_lock hold_cmd_lock(cmd_lock);
+    cmd_tail = cmd_wrap(cmd_tail + 1);
+    cmd_cond.notify_one();
+
+    // Queue empty?
+    if (cmd_head == cmd_tail)
+        return;
+
+    // Start next command from queue
+    pending_cmd_t *next_cmd = cmd_queue + cmd_tail;
+
+    issue_cmd(next_cmd, hold_cmd_lock);
+
+    hold_cmd_lock.unlock();
+
+    cmd->caller_iocp->invoke();
 }
 
 int usb_msc_if_t::usb_msc_if_t::get_max_lun()
