@@ -32,7 +32,6 @@ entry:
     xorl %ebp,%ebp
 
     // Enable SSE
-    // This must be done before jumping into C code
     movq %cr4,%rax
     orq $(CPU_CR4_OFXSR | CPU_CR4_OSXMMEX),%rax
     movq %rax,%cr4

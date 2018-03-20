@@ -2255,8 +2255,6 @@ errno_t ahci_dev_t::io(
     request.fua = fua;
     request.callback = iocp;
 
-    //cpu_scoped_irq_disable intr_were_enabled;
-
     int expect = iface->io(port, request);
 
     iocp->set_expect(expect);
@@ -2290,8 +2288,6 @@ errno_t ahci_dev_t::trim_async(
 
 errno_t ahci_dev_t::flush_async(iocp_t *iocp)
 {
-    //cpu_scoped_irq_disable intr_were_enabled;
-
     int expect = iface->port_flush(port, iocp);
     iocp->set_expect(expect);
 
