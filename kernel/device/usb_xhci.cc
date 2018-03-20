@@ -767,6 +767,9 @@ protected:
                             usb_hub_desc const &hub_desc) override final;
 
 private:
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
     errno_t cc_to_errno(usb_cc_t cc);
 
     usbxhci_slotctx_t *dev_ctx_ent_slot(size_t slotid);
@@ -788,7 +791,7 @@ private:
                        void *trbs, usb_iocp_t *iocp);
 
     void insert_pending_command(uint64_t cmd_physaddr, usb_iocp_t *iocp,
-                                unique_lock<ticketlock> const&);
+                                scoped_lock const&);
 
     int make_data_trbs(usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
                        void *data, uint32_t length, int dir, bool intr);
@@ -858,7 +861,7 @@ private:
 
     usbxhci_interrupter_info_t *interrupters;
 
-    padded_ticketlock endpoints_lock;
+    lock_type endpoints_lock;
     vector<refptr<usbxhci_endpoint_data_t>> endpoints;
 
     // Endpoint data keyed on usbxhci_endpoint_target_t
@@ -895,7 +898,7 @@ private:
     vector<usb_iocp_t*> completed_iocp;
 
     // Command issue lock
-    padded_ticketlock lock_cmd;
+    lock_type lock_cmd;
 };
 
 static vector<usbxhci*> usbxhci_devices;
@@ -927,7 +930,7 @@ void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
 
 void usbxhci::insert_pending_command(uint64_t cmd_physaddr,
                                      usb_iocp_t *iocp,
-                                     unique_lock<ticketlock> const&)
+                                     const scoped_lock &)
 {
     usbxhci_pending_cmd_t *pc = new usbxhci_pending_cmd_t;
     pc->cmd_physaddr = cmd_physaddr;
@@ -937,7 +940,7 @@ void usbxhci::insert_pending_command(uint64_t cmd_physaddr,
 
 void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
 {
-    unique_lock<ticketlock> hold_cmd_lock(lock_cmd);
+    scoped_lock hold_cmd_lock(lock_cmd);
 
     USBXHCI_TRACE("Writing command to command ring at %u\n", cr_next);
 
@@ -975,7 +978,7 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
                             size_t count, int dir, void *trbs,
                             usb_iocp_t *iocp)
 {
-    unique_lock<ticketlock> hold_cmd_lock(lock_cmd);
+    scoped_lock hold_cmd_lock(lock_cmd);
 
     usbxhci_endpoint_data_t *epd = lookup_endpoint(slotid, epid);
 
@@ -1079,7 +1082,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
     newepd->target.slotid = slotid;
     newepd->target.epid = epid;
 
-    unique_lock<ticketlock> hold_endpoints_lock(endpoints_lock);
+    scoped_lock hold_endpoints_lock(endpoints_lock);
 
     if (!endpoints.emplace_back(newepd))
         return nullptr;
@@ -1119,7 +1122,7 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 
 usbxhci_endpoint_data_t *usbxhci::lookup_endpoint(uint8_t slotid, uint8_t epid)
 {
-    unique_lock<ticketlock> hold_endpoints_lock(endpoints_lock);
+    scoped_lock hold_endpoints_lock(endpoints_lock);
 
     usbxhci_endpoint_target_t key{ slotid, epid };
     usbxhci_endpoint_data_t *data = (usbxhci_endpoint_data_t *)
@@ -1905,7 +1908,7 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
         return;
 
     // Lookup pending command
-    unique_lock<ticketlock> hold_cmd_lock(lock_cmd);
+    scoped_lock hold_cmd_lock(lock_cmd);
     refptr<usbxhci_pending_cmd_t> pcp = usbxhci_pending_ht.lookup(&cmdaddr);
     if (pcp)
         usbxhci_pending_ht.del(&cmdaddr);
