@@ -2373,9 +2373,8 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 
     assert(irq < INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE);
 
-    apic_eoi(intr);
-
     ctx = (isr_context_t*)irq_invoke(intr, irq, ctx);
+    apic_eoi(intr);
 
     if (ctx == orig_ctx)
         return thread_schedule_if_idle(ctx);
