@@ -1022,9 +1022,9 @@ int usbxhci::set_config(uint8_t slotid, uint8_t config)
                 usb_rqcode_t::SET_CONFIGURATION, config, 0);
 
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     add_xfer_trbs(slotid, 0, 0, trb_count, 1, trbs, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1048,9 +1048,9 @@ int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
     assert(trb_count >= 0 && trb_count <= (int)countof(trbs));
 
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     add_xfer_trbs(slotid, epid, 0, trb_count, 1, trbs, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1412,9 +1412,9 @@ int usbxhci::enable_slot(int port)
     USBXHCI_TRACE("Enabling slot for port %x\n", port);
 
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     issue_cmd(&cmd, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1498,9 +1498,9 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     setaddr.slotid = slotid;
 
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     issue_cmd(&setaddr, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1603,10 +1603,10 @@ int usbxhci::send_control(int slotid, uint8_t request_type,
                           uint16_t index, uint16_t length, void *data)
 {
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     send_control_async(slotid, request_type, request, value,
                        index, length, data, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1626,8 +1626,8 @@ int usbxhci::send_control_async(int slotid, uint8_t request_type,
                 trbs, countof(trbs), data, length, dir,
                 request_type, request, value, index);
 
-    iocp->set_expect(1);
     add_xfer_trbs(slotid, 0, 0, trb_count, dir, trbs, iocp);
+    iocp->set_expect(1);
 
     return 0;
 }
@@ -1636,9 +1636,9 @@ int usbxhci::xfer(int slotid, uint8_t epid, uint16_t stream_id,
                   uint32_t length, void *data, int dir)
 {
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     xfer_async(slotid, epid, stream_id, length, data, dir, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1712,9 +1712,9 @@ bool usbxhci::set_hub_port_count(int slotid, usb_hub_desc const& hub_desc)
 int usbxhci::reset_ep(int slotid, uint8_t epid)
 {
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     reset_ep_async(slotid, epid, &block);
+    block.set_expect(1);
 
     block.wait();
 
@@ -1798,9 +1798,9 @@ usb_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
             USBXHCI_CTL_TRB_FLAGS_C_n(epd->ccs);
 
     usb_blocking_iocp_t block;
-    block.set_expect(1);
 
     issue_cmd(eval, &block);
+    block.set_expect(1);
 
     if (!dev_ctx_large)
         munmap(inp.any, sizeof(usbxhci_inpctx_small_t));

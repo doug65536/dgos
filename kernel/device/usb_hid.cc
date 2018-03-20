@@ -691,9 +691,9 @@ bool usb_hid_dev_t::get_descriptor(void *data, uint16_t len,
 void usb_hid_keybd_t::post_keybd_in(unsigned phase)
 {
     in_iocp[phase].reset(&usb_hid_keybd_t::keybd_completion, uintptr_t(this));
-    in_iocp[phase].set_expect(1);
     in.recv_async(this_keybd_state[phase], sizeof(this_keybd_state[phase]),
                   &in_iocp[phase]);
+    in_iocp[phase].set_expect(1);
 }
 
 void usb_hid_keybd_t::keybd_completion(
@@ -782,9 +782,9 @@ void usb_hid_keybd_t::detect_keybd_changes()
 void usb_hid_mouse_t::post_mouse_in(unsigned phase)
 {
     in_iocp[phase].reset(&usb_hid_mouse_t::mouse_completion, uintptr_t(this));
-    in_iocp[phase].set_expect(1);
     in.recv_async(this_mouse_state[phase], sizeof(this_mouse_state[phase]),
                   &in_iocp[phase]);
+    in_iocp[phase].set_expect(1);
 }
 
 void usb_hid_mouse_t::mouse_completion(

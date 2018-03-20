@@ -121,8 +121,8 @@ int usb_hub_t::get_port_status(int port)
 void usb_hub_t::post_status_recv()
 {
     status_iocp.reset(&usb_hub_t::status_completion);
-    status_iocp.set_expect(1);
     status.recv_async(&status_data, sizeof(status_data), &status_iocp);
+    status_iocp.set_expect(1);
 }
 
 void usb_hub_t::status_completion(usb_iocp_result_t const& result,
