@@ -29,6 +29,12 @@ struct bios_regs_t {
         return eflags_out & (1 << 0);
     }
 
+    // Helper to get zero flag
+    bool flags_ZF() const
+    {
+        return eflags_out & (1 << 6);
+    }
+
     uint8_t ah_if_carry() const
     {
         if (flags_CF())

@@ -767,7 +767,7 @@ void fat32_boot_partition(uint64_t partition_lba)
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_close = fat32_boot_close;
     fs_api.boot_pread = fat32_boot_pread;
-    fs_api.boot_serial = fat32_boot_serial;
+    fs_api.boot_drv_serial = fat32_boot_serial;
 
     elf64_run(cpu_choose_kernel());
 }

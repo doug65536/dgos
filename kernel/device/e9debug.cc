@@ -6,28 +6,25 @@
 #include "callout.h"
 #include "string.h"
 #include "cpu/spinlock.h"
-
-#define UART_DEBUGOUT 0
+#include "bootinfo.h"
 
 static spinlock_t e9debug_lock;
 
-#if UART_DEBUGOUT
 static uart_dev_t *uart;
 static bool uart_ready;
 
 static char vt102_reset[] = "\x1B" "c";
-#endif
 
 static void e9debug_serial_ready(void*)
 {
-#if UART_DEBUGOUT
-    uart = uart_dev_t::open(0, true);
-    uart_ready = true;
+    if (bootinfo_parameter(bootparam_t::boot_drv_serial)) {
+        uart = uart_dev_t::open(0, true, 8, 'N', 1);
+        uart_ready = true;
+    }
 
     // Send some VT102 initialization sequences
 
     uart->write(vt102_reset, sizeof(vt102_reset)-1, sizeof(vt102_reset)-1);
-#endif
 }
 
 static int e9debug_write_debug_str(char const *str, intptr_t len)
@@ -48,11 +45,9 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
         }
     }
 
-#if UART_DEBUGOUT
     if (uart_ready)
         uart->write(str, len, len);
-#endif
-    //spinlock_unlock_noirq(&e9debug_lock);
+
     return n;
 }
 

@@ -1,24 +1,71 @@
 #pragma once
 #include "types.h"
 
-enum struct tui_menu_ent_type_t {
-    command,
-    checkbox,
-    separator
+struct tui_str_t
+{
+    template<size_t sz>
+    constexpr tui_str_t(char const(&txt)[sz])
+        : len(sz-1)
+        , str(txt)
+    {
+    }
+
+    constexpr operator char const *() const
+    {
+        return str;
+    }
+
+    constexpr operator size_t() const
+    {
+        return len;
+    }
+
+    size_t const len;
+    char const * const str;
 };
 
-struct tui_menu_ent_t {
-    char const *label;
+template<typename T>
+struct tui_list_t {
+    template<int sz>
+    constexpr tui_list_t(T(&items)[sz])
+        : count(sz)
+        , items(items)
+    {
+    }
 
-    union specific_t {
-        void (*command_fn)();
-        bool checkbox_checked;
-    } u;
+    T& operator[](size_t index)
+    {
+        return items[index];
+    }
 
-    tui_menu_ent_type_t type;
+    int const count;
+    T * const items;
 };
 
-struct tui_menu_t {
-    tui_menu_ent_t const *entries;
-    size_t count;
+struct tui_menu_item_t {
+    tui_str_t title;
+    tui_list_t<tui_str_t> options;
+    int index;
+};
+
+class tui_menu_renderer_t {
+public:
+    tui_menu_renderer_t(tui_list_t<tui_menu_item_t> *items);
+
+    void center();
+    void position(int x, int y);
+    void draw(int selection);
+    void interact_timeout(int ms);
+
+private:
+    void measure();
+    void resize(int width, int height);
+
+    tui_list_t<tui_menu_item_t> *items;
+    int left;
+    int top;
+    int right;
+    int bottom;
+    int max_title;
+    int max_value;
 };

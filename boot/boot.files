@@ -1,6 +1,10 @@
+array_list.cc
+array_list.h
 bioscall.S
 bootcommon.S
 bootinfo.s
+bootmenu.cc
+bootmenu.h
 cpu_constants.h
 cpu_constants.h
 emulators.mk

@@ -121,6 +121,7 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-bioscall.$(OBJEXT) \
 	boot/libbootsect_a-bootsect.$(OBJEXT) \
 	boot/libbootsect_a-bootinfo.$(OBJEXT) \
+	boot/libbootsect_a-array_list.$(OBJEXT) \
 	boot/libbootsect_a-screen.$(OBJEXT) \
 	boot/libbootsect_a-fs.$(OBJEXT) \
 	boot/libbootsect_a-fat32.$(OBJEXT) \
@@ -141,7 +142,8 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-part.$(OBJEXT) \
 	boot/libbootsect_a-mpentry.$(OBJEXT) \
 	boot/libbootsect_a-exception.$(OBJEXT) \
-	boot/libbootsect_a-tui.$(OBJEXT)
+	boot/libbootsect_a-tui.$(OBJEXT) \
+	boot/libbootsect_a-bootmenu.$(OBJEXT)
 libbootsect_a_OBJECTS = $(am_libbootsect_a_OBJECTS)
 libc_a_AR = $(AR) $(ARFLAGS)
 libc_a_LIBADD =
@@ -1007,6 +1009,7 @@ libbootsect_a_SOURCES = \
 	boot/bioscall.S \
 	boot/bootsect.cc \
 	boot/bootinfo.s \
+	boot/array_list.cc \
 	boot/screen.cc \
 	boot/fs.cc \
 	boot/fat32.cc \
@@ -1052,7 +1055,8 @@ libbootsect_a_SOURCES = \
 	boot/fs.h \
 	boot/vesa.h \
 	boot/tui.h \
-	boot/tui.cc
+	boot/tui.cc \
+	boot/bootmenu.cc
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \
@@ -1976,6 +1980,8 @@ boot/libbootsect_a-bootsect.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-bootinfo.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-array_list.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-screen.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-fs.$(OBJEXT): boot/$(am__dirstamp) \
@@ -2017,6 +2023,8 @@ boot/libbootsect_a-mpentry.$(OBJEXT): boot/$(am__dirstamp) \
 boot/libbootsect_a-exception.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-tui.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-bootmenu.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 
 libbootsect.a: $(libbootsect_a_OBJECTS) $(libbootsect_a_DEPENDENCIES) $(EXTRA_libbootsect_a_DEPENDENCIES) 
@@ -3321,7 +3329,9 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-array_list.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bioscall.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootmenu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootsect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-cpu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-debug.Po@am__quote@
@@ -3898,6 +3908,20 @@ boot/libbootsect_a-bootsect.obj: boot/bootsect.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-bootsect.obj `if test -f 'boot/bootsect.cc'; then $(CYGPATH_W) 'boot/bootsect.cc'; else $(CYGPATH_W) '$(srcdir)/boot/bootsect.cc'; fi`
 
+boot/libbootsect_a-array_list.o: boot/array_list.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-array_list.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-array_list.Tpo -c -o boot/libbootsect_a-array_list.o `test -f 'boot/array_list.cc' || echo '$(srcdir)/'`boot/array_list.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-array_list.Tpo boot/$(DEPDIR)/libbootsect_a-array_list.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/array_list.cc' object='boot/libbootsect_a-array_list.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-array_list.o `test -f 'boot/array_list.cc' || echo '$(srcdir)/'`boot/array_list.cc
+
+boot/libbootsect_a-array_list.obj: boot/array_list.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-array_list.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-array_list.Tpo -c -o boot/libbootsect_a-array_list.obj `if test -f 'boot/array_list.cc'; then $(CYGPATH_W) 'boot/array_list.cc'; else $(CYGPATH_W) '$(srcdir)/boot/array_list.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-array_list.Tpo boot/$(DEPDIR)/libbootsect_a-array_list.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/array_list.cc' object='boot/libbootsect_a-array_list.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-array_list.obj `if test -f 'boot/array_list.cc'; then $(CYGPATH_W) 'boot/array_list.cc'; else $(CYGPATH_W) '$(srcdir)/boot/array_list.cc'; fi`
+
 boot/libbootsect_a-screen.o: boot/screen.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-screen.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-screen.Tpo -c -o boot/libbootsect_a-screen.o `test -f 'boot/screen.cc' || echo '$(srcdir)/'`boot/screen.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-screen.Tpo boot/$(DEPDIR)/libbootsect_a-screen.Po
@@ -4149,6 +4173,20 @@ boot/libbootsect_a-tui.obj: boot/tui.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/tui.cc' object='boot/libbootsect_a-tui.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-tui.obj `if test -f 'boot/tui.cc'; then $(CYGPATH_W) 'boot/tui.cc'; else $(CYGPATH_W) '$(srcdir)/boot/tui.cc'; fi`
+
+boot/libbootsect_a-bootmenu.o: boot/bootmenu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-bootmenu.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-bootmenu.Tpo -c -o boot/libbootsect_a-bootmenu.o `test -f 'boot/bootmenu.cc' || echo '$(srcdir)/'`boot/bootmenu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-bootmenu.Tpo boot/$(DEPDIR)/libbootsect_a-bootmenu.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/bootmenu.cc' object='boot/libbootsect_a-bootmenu.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-bootmenu.o `test -f 'boot/bootmenu.cc' || echo '$(srcdir)/'`boot/bootmenu.cc
+
+boot/libbootsect_a-bootmenu.obj: boot/bootmenu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-bootmenu.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-bootmenu.Tpo -c -o boot/libbootsect_a-bootmenu.obj `if test -f 'boot/bootmenu.cc'; then $(CYGPATH_W) 'boot/bootmenu.cc'; else $(CYGPATH_W) '$(srcdir)/boot/bootmenu.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-bootmenu.Tpo boot/$(DEPDIR)/libbootsect_a-bootmenu.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/bootmenu.cc' object='boot/libbootsect_a-bootmenu.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-bootmenu.obj `if test -f 'boot/bootmenu.cc'; then $(CYGPATH_W) 'boot/bootmenu.cc'; else $(CYGPATH_W) '$(srcdir)/boot/bootmenu.cc'; fi`
 
 libc/src/string/libc_a-__bytebitmap.o: libc/src/string/__bytebitmap.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/string/libc_a-__bytebitmap.o -MD -MP -MF libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo -c -o libc/src/string/libc_a-__bytebitmap.o `test -f 'libc/src/string/__bytebitmap.cc' || echo '$(srcdir)/'`libc/src/string/__bytebitmap.cc

@@ -492,7 +492,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     fs_api.boot_open = iso9660_boot_open;
     fs_api.boot_close = iso9660_boot_close;
     fs_api.boot_pread = iso9660_boot_pread;
-    fs_api.boot_serial = iso9660_boot_serial;
+    fs_api.boot_drv_serial = iso9660_boot_serial;
 
     elf64_run(cpu_choose_kernel());
 }

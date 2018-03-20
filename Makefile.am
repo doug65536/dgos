@@ -137,6 +137,7 @@ libbootsect_a_SOURCES = \
 	boot/bioscall.S \
 	boot/bootsect.cc \
 	boot/bootinfo.s \
+	boot/array_list.cc \
 	boot/screen.cc \
 	boot/fs.cc \
 	boot/fat32.cc \
@@ -182,7 +183,8 @@ libbootsect_a_SOURCES = \
 	boot/fs.h \
 	boot/vesa.h \
 	boot/tui.h \
-	boot/tui.cc
+	boot/tui.cc \
+	boot/bootmenu.cc
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \

@@ -12,21 +12,6 @@
 #define scroll_screen bios_scroll_screen
 #endif
 
-//void print_int(uint32_t n)
-//{
-//    char buf[12];
-//    char *p;
-//    p = buf + 12;
-//    *--p = 0;
-//    do {
-//        *(--p) = '0' + (n % 10);
-//        n /= 10;
-//    } while (p > buf && n != 0);
-//    //wtfgcc(p);
-//    print_raw(1, 0, 0x0F, (buf + 12) - p, p);
-//    //bochs_out(p);
-//}
-
 #if !DIRECT_VGA
 
 // INT 0x10
@@ -334,8 +319,6 @@ void print_line(char const* format, ...)
 
                 if (!s)
                     s = "{[(null)]}";
-                else if ((uint32_t)s >= 0x10000)
-                    s = "{[(invalid)]}";
             }
 
             while (*s)
@@ -367,6 +350,14 @@ void print_xy(int x, int y, uint8_t ch, uint16_t attr, size_t count)
     print_at(y, x, attr, count, buf);
 }
 
+void print_str_xy(int x, int y, char const *s, size_t len,
+                  uint16_t attr, size_t min_len)
+{
+    print_at(y, x, attr, len, s);
+    if (min_len > len)
+        print_xy(x + len, y, ' ', attr, min_len - len);
+}
+
 void print_lba(uint32_t lba)
 {
     print_line("%lu\n", lba);
@@ -387,4 +378,35 @@ void dump_regs(bios_regs_t& regs, bool show_flags)
     print_line(" gs=%x\n", regs.gs);
     if (show_flags)
         print_line("flg=%lx\n", regs.eflags_out);
+}
+
+// ╔╗║╚╝═█
+// 01234567
+static char const boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
+
+enum boxchar_index_t {
+    TL,
+    TR,
+    V,
+    BL,
+    BR,
+    H,
+    S,
+    X
+};
+
+void print_box(int left, int top, int right, int bottom, int attr, bool clear)
+{
+    print_xy(left, top, boxchars[TL], attr, 1);
+    print_xy(left + 1, top, boxchars[H], attr, right - left - 1);
+    print_xy(right, top, boxchars[TR], attr, 1);
+    for (int y = top + 1; y < bottom; ++y) {
+        print_xy(left, y, boxchars[V], attr, 1);
+        if (clear)
+            print_xy(left + 1, y, ' ', attr, right - left - 1);
+        print_xy(right, y, boxchars[V], attr, 1);
+    }
+    print_xy(left, bottom, boxchars[BL], attr, 1);
+    print_xy(left + 1, bottom, boxchars[H], attr, right - left - 1);
+    print_xy(right, bottom, boxchars[BR], attr, 1);
 }
