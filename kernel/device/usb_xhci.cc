@@ -986,6 +986,7 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
         USBXHCI_TRACE("Writing TRB s%d:ep%d to %zx\n", slotid, epid,
                       mphysaddr(&epd->xfer_ring[epd->xfer_next]));
         usbxhci_ctl_trb_generic_t *trb = (usbxhci_ctl_trb_generic_t*)trbs + i;
+        assert(USBXHCI_CTL_TRB_FLAGS_C_GET(trb->flags) != (epd->ccs != 0));
         USBXHCI_CTL_TRB_FLAGS_C_SET(trb->flags, epd->ccs != 0);
         usbxhci_cmd_trb_t *s = (usbxhci_cmd_trb_t *)
                 &epd->xfer_ring[epd->xfer_next];
