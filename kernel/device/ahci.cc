@@ -14,7 +14,7 @@
 #include "cpu/control_regs.h"
 #include "unique_ptr.h"
 
-#define AHCI_DEBUG  1
+#define AHCI_DEBUG  0
 #if AHCI_DEBUG
 #define AHCI_TRACE(...) printdbg("ahci: " __VA_ARGS__)
 #else
