@@ -1269,7 +1269,8 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
 
     use_msi = pci_try_msi_irq(pci_iter, &irq_range,
                               0, false, min(16U, maxintr),
-                              &usbxhci::irq_handler);
+                              &usbxhci::irq_handler,
+                              "usb_xhci");
 
     USBXHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
                use_msi, irq_range.base, irq_range.count);
