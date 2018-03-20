@@ -3362,6 +3362,8 @@ uintptr_t mm_fork_kernel_text()
 
             // Point PTE to clone
             *pte = page | flags;
+
+            cpu_flush_tlb();
         }
     }
     cpu_flush_tlb();
