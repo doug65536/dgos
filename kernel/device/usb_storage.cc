@@ -45,11 +45,25 @@ class usb_msc_if_t : public storage_if_base_t {
 public:
     enum cmd_op_t : uint8_t {
         cmd_read_capacity_10 = 0x25,
+        cmd_read_capacity_16 = 0x9E,
+        cmd_read_10 = 0x28,
         cmd_read_12 = 0xA8,
         cmd_write_12 = 0xAA,
         cmd_read_16 = 0x88,
         cmd_write_16 = 0x8A
     };
+
+    // read capacity 16
+    struct cmd_rdcap_16_t {
+        cmd_op_t op;  // 0x9E
+        uint8_t serv_act;   // 0x10
+        uint64_t lba;
+        uint32_t alloc;
+        uint8_t pmi;
+        uint8_t control;
+    } __packed;
+
+    C_ASSERT(sizeof(cmd_rdcap_16_t) == 16);
 
     // read capacity 10
     struct cmd_rdcap_10_t {
@@ -80,8 +94,8 @@ public:
     C_ASSERT(sizeof(cmd_rw16_t) == 16);
 
     struct cmd_rw12_t {
-        cmd_op_t op;     // read=0xA8, write=0xAA
-        uint8_t flags;  // bits: 1=fua_nv, 3=fua, 4=dpo, 7:5 protect
+        cmd_op_t op;    // read=0xA8, write=0xAA
+        uint8_t flags;  // bits: 1=fua_nv, 3=fua, 4=dpo, 7:5=protect
         uint32_t lba;
         uint32_t len;
         uint8_t group;
@@ -90,9 +104,22 @@ public:
 
     C_ASSERT(sizeof(cmd_rw12_t) == 12);
 
+    struct cmd_rw10_t {
+        uint8_t op;     // read=0x28
+        uint8_t flags;  // bits: 1=fua_nv, 3=fua, 4=dpo, 7:5=rdprotect
+        uint32_t lba;
+        uint8_t group;
+        uint16_t len;
+        uint8_t control;
+    } __packed;
+
+    C_ASSERT(sizeof(cmd_rw10_t) == 10);
+
     union cmdblk_t {
         uint8_t raw[16];
         cmd_rdcap_10_t rdcap10;
+        cmd_rdcap_16_t rdcap16;
+        cmd_rw10_t rw10;
         cmd_rw12_t rw12;
         cmd_rw16_t rw16;
     } __packed;
@@ -112,6 +139,8 @@ public:
 
     C_ASSERT(sizeof(cbw_t) == 31);
 
+    static constexpr uint32_t cbw_sig = 0x43425355;
+
     enum struct cmd_status_t : uint8_t {
         success,
         failed,
@@ -128,10 +157,28 @@ public:
 
     C_ASSERT(sizeof(csw_t) == 13);
 
+    static constexpr uint32_t csw_sig = 0x53425255;
+
     union wrapper_t {
         cbw_t cbw;
         csw_t csw;
     };
+
+    struct rdcap_10_response_t {
+        uint32_t max_lba;
+        uint32_t blk_size;
+    } __packed;
+
+    struct rdcap_16_response_t {
+        uint64_t max_lba;
+        uint32_t blk_size;
+        // Rest of stuff not used and not transferred
+    } __packed;
+
+    union rdcap_wrapper_t {
+        rdcap_10_response_t rdcap10;
+        rdcap_16_response_t rdcap16;
+    } __packed;
 
     struct pending_cmd_t {
         pending_cmd_t()
@@ -204,7 +251,8 @@ public:
     usb_msc_dev_t();
     ~usb_msc_dev_t();
 
-    bool init(usb_msc_if_t *if_, int lun);
+    bool init(usb_msc_if_t *if_, int lun,
+              uint64_t max_lba, uint8_t log2_blk_sz);
 
 protected:
     // storage_dev_base_t interface
@@ -218,9 +266,9 @@ protected:
     int trim();
 
     usb_msc_if_t *if_;
+    uint64_t max_lba;
+    uint8_t log2_blk_size;
     uint8_t lun;
-
-    uint8_t log2_sectorsize;
 };
 
 // USB mass storage class driver
@@ -322,7 +370,7 @@ long usb_msc_dev_t::info(storage_dev_info_t key)
 {
     switch (key) {
     case STORAGE_INFO_BLOCKSIZE:
-        return 1L << log2_sectorsize;
+        return 1L << log2_blk_size;
 
     case STORAGE_INFO_HAVE_TRIM:
         return 0;
@@ -397,13 +445,14 @@ usb_msc_dev_t::~usb_msc_dev_t()
 
 }
 
-bool usb_msc_dev_t::init(usb_msc_if_t *if_, int lun)
+bool usb_msc_dev_t::init(usb_msc_if_t *if_, int lun,
+                         uint64_t max_lba, uint8_t log2_blk_sz)
 {
     this->if_ = if_;
     this->lun = lun;
 
-    // hack!
-    log2_sectorsize = 9;
+    this->log2_blk_size = log2_blk_sz;
+    this->max_lba = max_lba;
 
     return true;
 }
@@ -411,7 +460,7 @@ bool usb_msc_dev_t::init(usb_msc_if_t *if_, int lun)
 errno_t usb_msc_dev_t::io(void *data, uint64_t count, uint64_t lba,
                           bool fua, usb_msc_op_t op, iocp_t *iocp)
 {
-    return if_->io(data, count, lba, fua, op, iocp, lun, log2_sectorsize);
+    return if_->io(data, count, lba, fua, op, iocp, lun, log2_blk_size);
 }
 
 int usb_msc_dev_t::flush()
@@ -473,7 +522,52 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
         USB_MSC_TRACE("Initializing lun %d\n", lun);
 
         usb_msc_dev_t *drv = usb_msc_drives + usb_msc_drive_count++;
-        drv->init(this, lun);
+
+        // Get size and block size
+        wrapper_t cap;
+        rdcap_wrapper_t rdcap;
+
+        cap.cbw = cbw_t{};
+        cap.cbw.lun = lun;
+        cap.cbw.sig = cbw_sig;
+        cap.cbw.wcb_len = sizeof(cap.cbw.cmd.rdcap10);
+        cap.cbw.flags = 0x80;
+        cap.cbw.xfer_len = sizeof(rdcap.rdcap10);
+        cap.cbw.cmd.rdcap10.op = cmd_read_capacity_10;
+        bulk_out.send(&cap.cbw, sizeof(cap.cbw));
+
+        rdcap.rdcap10 = rdcap_10_response_t{};
+        bulk_in.recv(&rdcap.rdcap10, sizeof(rdcap.rdcap10));
+
+        cap.csw = csw_t{};
+        bulk_in.recv(&cap.csw, sizeof(cap.csw));
+
+        uint64_t max_lba = 0;
+        uint32_t blk_sz = 0;
+
+        if (rdcap.rdcap10.max_lba != 0xFFFFFFFF) {
+            max_lba = bswap_32(rdcap.rdcap10.max_lba);
+            blk_sz = bswap_32(rdcap.rdcap10.blk_size);
+        } else {
+            cap.cbw = cbw_t{};
+            cap.cbw.lun = lun;
+            cap.cbw.sig = cbw_sig;
+            cap.cbw.wcb_len = sizeof(cap.cbw.cmd.rdcap16);
+            cap.cbw.xfer_len = sizeof(rdcap.rdcap16);
+            cap.cbw.cmd.rdcap16.op = cmd_read_capacity_16;
+            cap.cbw.cmd.rdcap16.serv_act = 0x10;
+            cap.cbw.cmd.rdcap16.alloc = sizeof(rdcap.rdcap16);
+
+            bulk_out.send(&cap.cbw, sizeof(cap.cbw));
+            bulk_in.recv(&rdcap.rdcap10, sizeof(rdcap.rdcap10));
+            bulk_in.recv(&cap.csw, sizeof(cap.csw));
+            max_lba = bswap_64(rdcap.rdcap16.max_lba);
+            blk_sz = bswap_32(rdcap.rdcap16.blk_size);
+        }
+
+        uint8_t log2_blk_sz = bit_msb_set(blk_sz);
+
+        drv->init(this, lun, max_lba, log2_blk_sz);
 
         USB_MSC_TRACE("initializing lun %d complete\n", lun);
     }
@@ -550,7 +644,7 @@ void usb_msc_if_t::issue_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
 
     cmd->io_iocp.reset(&usb_msc_if_t::usb_completion);
 
-    cmd->cbw.sig = 0x43425355;
+    cmd->cbw.sig = cbw_sig;
     cmd->cbw.tag = cmd->tag;
     cmd->cbw.xfer_len = cmd->count << cmd->log2_sector_sz;
 
@@ -561,13 +655,13 @@ void usb_msc_if_t::issue_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
 
     cmd->cbw.lun = cmd->lun;
 
-    cmd->cbw.wcb_len = sizeof(cmd_rw12_t);
-    cmd->cbw.cmd.rw12.op = cmd_read_12;
-    cmd->cbw.cmd.rw12.flags = 0;
-    cmd->cbw.cmd.rw12.lba = bswap_32(cmd->lba);
-    cmd->cbw.cmd.rw12.len = bswap_32(cmd->count);
-    cmd->cbw.cmd.rw12.group = 0;
-    cmd->cbw.cmd.rw12.control = 0;
+    cmd->cbw.wcb_len = sizeof(cmd->cbw.cmd.rw10);
+    cmd->cbw.cmd.rw10.op = cmd_read_10;
+    cmd->cbw.cmd.rw10.flags = 0;
+    cmd->cbw.cmd.rw10.lba = bswap_32(cmd->lba);
+    cmd->cbw.cmd.rw10.len = bswap_16(cmd->count);
+    cmd->cbw.cmd.rw10.group = 0;
+    cmd->cbw.cmd.rw10.control = 0;
 
     bulk_out.send_async(&cmd->cbw, sizeof(cmd->cbw), &cmd->io_iocp);
 
@@ -604,14 +698,13 @@ void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
     cmd_tail = cmd_wrap(cmd_tail + 1);
     cmd_cond.notify_one();
 
-    // Queue empty?
-    if (cmd_head == cmd_tail)
-        return;
+    // Queue not empty?
+    if (cmd_head != cmd_tail) {
+        // Start next command from queue
+        pending_cmd_t *next_cmd = cmd_queue + cmd_tail;
 
-    // Start next command from queue
-    pending_cmd_t *next_cmd = cmd_queue + cmd_tail;
-
-    issue_cmd(next_cmd, hold_cmd_lock);
+        issue_cmd(next_cmd, hold_cmd_lock);
+    }
 
     hold_cmd_lock.unlock();
 
