@@ -379,7 +379,7 @@ public:
     uint8_t cur_ns;
 
 private:
-    using lock_t = ticketlock;
+    using lock_t = mcslock;
     using scoped_lock = unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
     lock_t lock;

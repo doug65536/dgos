@@ -44,7 +44,9 @@ static intr_link_t intr_first_free;
 static intr_link_t intr_handlers_count;
 static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
-static ticketlock intr_handler_reg_lock;
+using intr_handler_reg_lock_type = mcslock;
+using intr_handler_reg_scoped_lock = unique_lock<intr_handler_reg_lock_type>;
+static intr_handler_reg_lock_type intr_handler_reg_lock;
 
 // Vectors
 static irq_setmask_handler_t irq_setmask_vec;
@@ -80,7 +82,7 @@ void irq_setcpu_set_handler(irq_setcpu_handler_t handler)
 
 void irq_setmask(int irq, bool unmask)
 {
-    unique_lock<ticketlock> lock(intr_handler_reg_lock);
+    intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
     // Unmask when unmask count transitions from 0 to 1
     // Mask when unmask count transitions from 1 to 0
     assert(intr_unmask_count[irq] != (unmask ? 255U : 0U));
@@ -114,7 +116,7 @@ static intr_handler_reg_t *intr_alloc(void)
 
 void intr_hook(int intr, intr_handler_t handler, char const *name)
 {
-    unique_lock<ticketlock> lock(intr_handler_reg_lock);
+    intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
 
     if (intr_handlers_count == 0) {
         // First time initialization
@@ -164,7 +166,7 @@ static void intr_delete(intr_link_t *prev_link,
 
 void intr_unhook(int intr, intr_handler_t handler)
 {
-    unique_lock<ticketlock> lock(intr_handler_reg_lock);
+    intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
 
     intr_link_t *prev_link = &intr_first[intr];
 

@@ -99,7 +99,9 @@ struct process_t
     uintptr_t mmu_context;
     void *linear_allocator;
     pid_t pid;
-    ticketlock process_lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type process_lock;
     condition_variable cond;
     int exitcode;
 
@@ -123,7 +125,7 @@ private:
 
     static process_t *lookup(pid_t pid);
 
-    static process_t *add_locked(unique_lock<ticketlock> const&);
+    static process_t *add_locked(scoped_lock const&);
     void remove();
     static process_t *add();
     static int start(void *process_arg);

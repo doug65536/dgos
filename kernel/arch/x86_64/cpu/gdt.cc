@@ -77,7 +77,7 @@ C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 
 // Holds exclusive access to TSS segment descriptor
 // while loading task register
-static ticketlock gdt_tss_lock;
+static spinlock gdt_tss_lock;
 tss_t tss_list[];
 
 void gdt_init(int)
@@ -143,7 +143,7 @@ void gdt_init_tss(int cpu_count)
 
 void gdt_load_tr(int cpu_number)
 {
-    unique_lock<ticketlock> lock(gdt_tss_lock);
+    unique_lock<spinlock> lock(gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
     cpu_set_tr(GDT_SEL_TSS);

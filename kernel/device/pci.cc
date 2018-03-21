@@ -68,7 +68,9 @@ static vector<pci_ecam_t> pci_ecam_list;
 static pci_config_pio pci_pio_accessor;
 static pci_config_mmio pci_mmio_accessor;
 
-static ticketlock pci_lock;
+using pci_lock_type = mcslock;
+using pci_scoped_lock = unique_lock<pci_lock_type>;
+static pci_lock_type pci_lock;
 static pci_config_rw *pci_accessor = &pci_pio_accessor;
 
 #define PCI_ADDR    0xCF8
@@ -145,7 +147,7 @@ uint32_t pci_config_pio::read(pci_addr_t addr, size_t offset, size_t size)
 
     uint32_t pci_address = (1 << 31) | addr.get_addr() | (offset & -4);
 
-    unique_lock<ticketlock> lock(pci_lock);
+    pci_scoped_lock lock(pci_lock);
 
     outd(PCI_ADDR, pci_address);
     uint32_t data = ind(PCI_DATA);
@@ -172,7 +174,7 @@ bool pci_config_pio::write(pci_addr_t addr, size_t offset,
 
     uint32_t pci_address = (1 << 31) | addr.get_addr();
 
-    unique_lock<ticketlock> lock(pci_lock);
+    pci_scoped_lock lock(pci_lock);
 
     while (size > 0) {
         // Choose an I/O size that will realign

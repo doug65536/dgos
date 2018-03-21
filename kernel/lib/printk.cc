@@ -276,7 +276,9 @@ static char *dtoa(char *txt, size_t txt_sz,
 
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
-ticketlock formatter_lock;
+using formatter_lock_type = mcslock;
+using formatter_scoped_lock = unique_lock<formatter_lock_type>;
+formatter_lock_type formatter_lock;
 
 /// emit_chars callback takes null pointer and a character,
 /// or, a pointer to null terminated string and a 0
@@ -286,7 +288,7 @@ intptr_t formatter(
         int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
-    unique_lock<ticketlock> hold_formatter_lock(formatter_lock);
+    formatter_scoped_lock hold_formatter_lock(formatter_lock);
 
     formatter_flags_t flags;
     intptr_t chars_written = 0;
@@ -953,20 +955,6 @@ EXPORT int snprintf(char *buf, size_t limit, char const *format, ...)
     int result = vsnprintf(buf, limit, format, ap);
     va_end(ap);
     return result;
-}
-
-static ticketlock printdbg_user_lock;
-
-__used
-static void printdbg_lock_noirq(void)
-{
-    printdbg_user_lock.lock();
-}
-
-__used
-static void printdbg_unlock_noirq()
-{
-    printdbg_user_lock.unlock();
 }
 
 static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)

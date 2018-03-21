@@ -123,7 +123,9 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     unsigned tx_head;
     unsigned tx_tail;
 
-    ticketlock lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type lock;
 
     ethq_queue_t tx_queue;
     ethq_queue_t rx_queue;
@@ -812,7 +814,7 @@ isr_context_t *rtl8139_dev_t::irq_dispatcher(int irq, isr_context_t *ctx)
 
 void rtl8139_dev_t::irq_handler()
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
 
@@ -882,7 +884,7 @@ void rtl8139_dev_t::irq_handler()
 
 int rtl8139_dev_t::send(ethq_pkt_t *pkt)
 {
-    unique_lock<ticketlock> lock_(lock);
+    scoped_lock lock_(lock);
 
     memcpy(pkt->pkt.hdr.s_mac, mac_addr, 6);
 

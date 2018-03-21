@@ -540,7 +540,9 @@ protected:
 
     static constexpr unsigned phase_count = 4;
 
-    ticketlock change_lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<mcslock>;
+    lock_type change_lock;
     usb_iocp_t in_iocp[phase_count];
     unsigned phase;
 
@@ -720,7 +722,7 @@ void usb_hid_keybd_t::detect_keybd_changes()
         KEYB_VK_RGUI
     };
 
-    unique_lock<ticketlock> hold_change_lock(change_lock);
+    scoped_lock hold_change_lock(change_lock);
 
     uint8_t const *state = this_keybd_state[phase];
 
@@ -795,7 +797,7 @@ void usb_hid_mouse_t::mouse_completion(
 
 void usb_hid_mouse_t::mouse_completion(const usb_iocp_result_t &result)
 {
-    unique_lock<ticketlock> hold_change_lock(change_lock);
+    scoped_lock hold_change_lock(change_lock);
 
     mouse_raw_event_t evt;
     uint8_t *state = this_mouse_state[phase];

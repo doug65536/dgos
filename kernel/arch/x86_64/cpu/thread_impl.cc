@@ -163,7 +163,10 @@ struct alignas(128) cpu_info_t {
     uint32_t busy_percent;
     uint64_t irq_count;
 
-    ticketlock queue_lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
+    lock_type queue_lock;
 
     void *storage[8];
 };
@@ -201,7 +204,10 @@ private:
     vector<thread_info_t*> priorities;
     uint32_t empty_flags;
 
-    ticketlock lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
+    lock_type lock;
 };
 
 // Get executing APIC ID (the slow expensive way, for early initialization)

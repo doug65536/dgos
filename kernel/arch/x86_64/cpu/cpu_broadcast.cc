@@ -22,7 +22,9 @@ struct cpu_broadcast_queue_t {
     cpu_broadcast_work_t *tail;
     cpu_broadcast_work_t *free;
 
-    ticketlock lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type lock;
 };
 
 void cpu_broadcast_service(int intr, size_t slot)
@@ -32,7 +34,7 @@ void cpu_broadcast_service(int intr, size_t slot)
     cpu_broadcast_work_t *work;
     int eoi_done = 0;
 
-    unique_lock<ticketlock> lock(queue->lock);
+    cpu_broadcast_queue_t::scoped_lock lock(queue->lock);
     for (;;) {
         // Take whole list and release lock ASAP
         cpu_broadcast_work_t *head = queue->head;
@@ -85,7 +87,7 @@ static void cpu_broadcast_add_work(
 {
     cpu_broadcast_queue_t *queue = (cpu_broadcast_queue_t *)slot_data;
 
-    unique_lock<ticketlock> lock(queue->lock);
+    cpu_broadcast_queue_t::scoped_lock lock(queue->lock);
 
     cpu_broadcast_work_t *incoming_work = (cpu_broadcast_work_t *)arg;
 

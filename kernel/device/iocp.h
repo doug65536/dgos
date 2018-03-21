@@ -29,7 +29,7 @@ struct basic_iocp_t {
     void reset(callback_t callback, uintptr_t arg);
 
 private:
-    using lock_type = ticketlock;
+    using lock_type = mcslock;
     using scoped_lock = unique_lock<lock_type>;
 
     void invoke_once(scoped_lock &hold);
@@ -61,7 +61,7 @@ public:
     T wait();
 
 private:
-    using lock_type = ticketlock;
+    using lock_type = mcslock;
     using scoped_lock = unique_lock<lock_type>;
 
     lock_type lock;
@@ -107,7 +107,7 @@ void basic_iocp_t<T, S>::set_expect(unsigned expect)
     scoped_lock hold(lock);
     expect_count = expect;
 
-    if (done_count == expect)
+    if (done_count >= expect)
         invoke_once(hold);
 }
 

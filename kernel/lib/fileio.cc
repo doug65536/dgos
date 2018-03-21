@@ -16,13 +16,15 @@ struct filetab_t {
     int refcount;
 };
 
-static ticketlock file_table_lock;
+using file_table_lock_type = mcslock;
+using file_table_scoped_lock = unique_lock<file_table_lock_type>;
+static file_table_lock_type file_table_lock;
 static vector<filetab_t> file_table;
 static filetab_t *file_table_ff;
 
 static void file_init(void *)
 {
-    unique_lock<ticketlock> lock(file_table_lock);
+    file_table_scoped_lock lock(file_table_lock);
     file_table.reserve(1000);
 }
 
@@ -34,7 +36,7 @@ static fs_base_t *file_fs_from_path(char const *path)
 
 static filetab_t *file_new_filetab(void)
 {
-    unique_lock<ticketlock> lock(file_table_lock);
+    file_table_scoped_lock lock(file_table_lock);
     filetab_t *item = nullptr;
     if (file_table_ff) {
         // Reuse freed item
@@ -66,7 +68,7 @@ static bool file_del_filetab(filetab_t *item)
 
 bool file_ref_filetab(int id)
 {
-    unique_lock<ticketlock> lock(file_table_lock);
+    file_table_scoped_lock lock(file_table_lock);
     if (id >= 0 && id < (int)file_table.size() &&
             file_table[id].refcount > 0) {
         ++file_table[id].refcount;

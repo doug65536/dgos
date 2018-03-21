@@ -14,7 +14,10 @@ struct keyboard_buffer_t {
     size_t head;
     size_t tail;
 
-    ticketlock lock;
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
+    lock_type lock;
     condition_variable not_empty;
 };
 
@@ -179,7 +182,7 @@ static size_t keybd_queue_next(size_t index)
 
 int keybd_event(keyboard_event_t event)
 {
-    unique_lock<ticketlock> buffer_lock(keybd_buffer.lock);
+    keyboard_buffer_t::scoped_lock buffer_lock(keybd_buffer.lock);
 
     size_t next_head = keybd_queue_next(keybd_buffer.head);
     if (next_head == keybd_buffer.tail) {
@@ -207,7 +210,7 @@ keyboard_event_t keybd_waitevent(void)
 {
     keyboard_event_t event;
 
-    unique_lock<ticketlock> buffer_lock(keybd_buffer.lock);
+    keyboard_buffer_t::scoped_lock buffer_lock(keybd_buffer.lock);
 
     while (keybd_buffer.head == keybd_buffer.tail)
         keybd_buffer.not_empty.wait(buffer_lock);

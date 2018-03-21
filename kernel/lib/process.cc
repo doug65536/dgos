@@ -27,11 +27,13 @@ union process_ptr_t {
 
 static vector<process_ptr_t> processes;
 static size_t process_count;
-static ticketlock processes_lock;
+using processes_lock_type = mcslock;
+using processes_scoped_lock = unique_lock<processes_lock_type>;
+static processes_lock_type processes_lock;
 static pid_t process_first_free;
 static pid_t process_last_free;
 
-process_t *process_t::add_locked(unique_lock<ticketlock> const&)
+process_t *process_t::add_locked(processes_scoped_lock const&)
 {
     pid_t pid;
     size_t realloc_count = 0;
@@ -84,7 +86,7 @@ void process_t::remove()
 
 process_t *process_t::add()
 {
-    unique_lock<ticketlock> lock(processes_lock);
+    processes_scoped_lock lock(processes_lock);
     process_t *result = process_t::add_locked(lock);
     return result;
 }
@@ -127,7 +129,7 @@ int process_t::spawn(pid_t * pid_result,
 
     process->add_thread(process->pid, tid);
 
-    unique_lock<ticketlock> lock(process->process_lock);
+    processes_scoped_lock lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
         process->cond.wait(lock);
 
@@ -230,7 +232,7 @@ int process_t::start()
     void *stack = mmap(0, stack_size, PROT_READ | PROT_WRITE,
                        MAP_STACK | MAP_USER, -1, 0);
 
-    unique_lock<ticketlock> lock(processes_lock);
+    processes_scoped_lock lock(processes_lock);
     state = state_t::running;
     lock.unlock();
     cond.notify_all();
