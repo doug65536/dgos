@@ -2542,3 +2542,8 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
 
     return vector_base - INTR_APIC_IRQ_BASE;
 }
+
+uint32_t acpi_cpu_count()
+{
+    return apic_id_count;
+}

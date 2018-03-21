@@ -141,6 +141,7 @@ uint32_t volatile thread_smp_running;
 int thread_idle_ready;
 int spincount_mask;
 size_t storage_next_slot;
+bool thread_cls_ready;
 
 static size_t constexpr syscall_stack_size = (size_t(8) << 10);
 static size_t constexpr xsave_stack_size = (size_t(64) << 10);
@@ -484,6 +485,10 @@ static int smp_idle_thread(void *)
     printdbg("SMP thread running\n");
     atomic_inc(&thread_smp_running);
     thread_check_stack();
+
+    if (cpu_count == acpi_cpu_count())
+        thread_cls_ready = true;
+
     thread_idle();
 }
 
@@ -923,7 +928,7 @@ void thread_set_cpu_mmu_seq(uint64_t seq)
 
 EXPORT thread_t thread_get_id()
 {
-    if (thread_count) {
+    if (thread_cls_ready) {
         thread_t thread_id;
 
         thread_info_t *cur_thread = this_thread();
