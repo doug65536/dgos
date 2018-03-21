@@ -48,8 +48,9 @@ public:
         cmd_read_capacity_16 = 0x9E,
         cmd_read_10 = 0x28,
         cmd_read_12 = 0xA8,
-        cmd_write_12 = 0xAA,
         cmd_read_16 = 0x88,
+        cmd_write_10 = 0x2A,
+        cmd_write_12 = 0xAA,
         cmd_write_16 = 0x8A
     };
 
