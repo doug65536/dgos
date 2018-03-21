@@ -63,8 +63,9 @@ static void *cpu_broadcast_init_cpu(void *arg)
 {
     (void)arg;
 
-    cpu_broadcast_queue_t *queue = (cpu_broadcast_queue_t *)
-            calloc(1, sizeof(*queue));
+    cpu_broadcast_queue_t *queue;
+    void *mem = calloc(1, sizeof(*queue));
+    queue = new (mem) cpu_broadcast_queue_t();
 
     return queue;
 }
@@ -91,8 +92,10 @@ static void cpu_broadcast_add_work(
     if (incoming_work->unique && queue->head)
         return;
 
-    cpu_broadcast_work_t *queued_work =
-            (cpu_broadcast_work_t *)malloc(sizeof(*queued_work) + size);
+    cpu_broadcast_work_t *queued_work;
+    void *mem = malloc(sizeof(*queued_work) + size);
+
+    queued_work = new (mem) cpu_broadcast_work_t();
     memcpy(queued_work, arg, sizeof(*queued_work));
     memcpy(queued_work + 1, queued_work->data, size);
     queued_work->data = queued_work + 1;
