@@ -959,8 +959,7 @@ void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
     insert_pending_command(cmd_physaddr, iocp, hold_cmd_lock);
 
     if (cr_next == cr_size) {
-        usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
-                &dev_cmd_ring[cr_next];
+        auto link = (usbxhci_cmd_trb_link_t *)&dev_cmd_ring[cr_next];
 
         USBXHCI_CMD_TRB_C_SET(link->c_tc_ch_ioc, pcs != 0);
 
@@ -1018,13 +1017,16 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
             // Update link TRB cycle bit
             auto link = (usbxhci_cmd_trb_t*)(epd->xfer_ring + epd->xfer_next);
 
+            // Make sure the cycle bit is as expected
+            assert((USBXHCI_CTL_TRB_FLAGS_C_GET(link->data[3]) != epd->ccs));
+
             // Copy the chain bit from the last TRB to propagate possible
             // chain across the link TRB
             bool chain = USBXHCI_CTL_TRB_FLAGS_CH_GET(src->data[3]);
             USBXHCI_CTL_TRB_FLAGS_CH_SET(link->data[3], chain);
 
-            atomic_st_rel(&dst->data[3],
-                    (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+            atomic_st_rel(&link->data[3],
+                    (link->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
                     USBXHCI_CTL_TRB_FLAGS_C_n(epd->ccs));
 
             epd->ccs = !epd->ccs;
