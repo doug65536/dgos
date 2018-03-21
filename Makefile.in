@@ -1530,9 +1530,6 @@ EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(DUMPDIR)
 
-
-#$(ZLIBSTATICLIB) \
-#$(ZLIBPUBLICINCLUDES)
 KERNEL_LDADD_SHARED = -lgcc
 
 # ----------------------------------------------------------------------------
@@ -9958,8 +9955,6 @@ test: test_compile
 	$(top_builddir)/libc_tests
 
 .PHONY: test_compile test
-
-#user_hello_SOURCES =
 
 # ----------------------------------------------------------------------------
 # Misc make rules

@@ -658,9 +658,6 @@ EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(DUMPDIR)
 
-#$(ZLIBSTATICLIB) \
-#$(ZLIBPUBLICINCLUDES)
-
 KERNEL_LDADD_SHARED = -lgcc
 
 # ----------------------------------------------------------------------------
@@ -1018,8 +1015,6 @@ user_shell_CCASFLAGS = \
 user_shell_LDADD = libc.a
 
 EXTRA_user_shell_DEPENDENCIES = libc.a
-
-#user_hello_SOURCES =
 
 # ----------------------------------------------------------------------------
 # Misc make rules
