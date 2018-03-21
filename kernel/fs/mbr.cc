@@ -70,6 +70,7 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
                     part_dev_t *part;
 
                     switch (ptbl[i].system_id) {
+                    case 0x0B:// fall thru
                     case 0x0C:
                         // FAT32 LBA filesystem
                         part = partitions + partition_count++;
