@@ -1035,16 +1035,16 @@ include diskiso.mk
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/mbr.map
-	rm -f $(top_builddir)/mbr.dis
+	rm -f $(top_builddir)/mbr.dis.gz
 	rm -f $(top_builddir)/bootfat.sym
 	rm -f $(top_builddir)/bootfat.map
-	rm -f $(top_builddir)/bootfat.dis
+	rm -f $(top_builddir)/bootfat.dis.gz
 	rm -f $(top_builddir)/bootiso.sym
 	rm -f $(top_builddir)/bootiso.map
 	rm -f $(top_builddir)/kernel-generic.sym
 	rm -f $(top_builddir)/kernel-bmi.sym
-	rm -f $(top_builddir)/kernel-generic.dis
-	rm -f $(top_builddir)/kernel-bmi.dis
+	rm -f $(top_builddir)/kernel-generic.dis.gz
+	rm -f $(top_builddir)/kernel-bmi.dis.gz
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-bmi.map
 

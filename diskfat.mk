@@ -6,10 +6,11 @@ $(top_builddir)/fatdisk.img: mbr-bin bootfat-bin user-shell \
 		bootfat.sym \
 		kernel-generic.sym \
 		kernel-bmi.sym \
-		kernel-generic.dis \
-		kernel-bmi.dis \
-		bootfat.dis \
-		mbr.dis
+		kernel-generic.dis.gz \
+		kernel-bmi.dis.gz \
+		bootfat.dis.gz \
+		hello.km \
+		mbr.dis.gz
 	set -x && \
 		rm -f fatpart.img fatdisk.img && \
 		truncate --size=261120K fatpart.img && \

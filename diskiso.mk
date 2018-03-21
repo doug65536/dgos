@@ -3,10 +3,11 @@ isodisk.img: bootiso-bin \
 		$(top_srcdir)/populate_iso.sh \
 		$(top_srcdir)/mkposixdirs.sh \
 		bootiso.sym mbr.sym \
-		kernel-generic.dis \
-		kernel-bmi.dis \
-		bootiso.dis  \
-		mbr.dis
+		kernel-generic.dis.gz \
+		kernel-bmi.dis.gz \
+		bootiso.dis.gz  \
+		mbr.dis.gz \
+		hello.km
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)
 	export size=$$(wc -c < bootiso-bin) && \
 	export blocks=$$(( (size + 511) / 512 )) && \

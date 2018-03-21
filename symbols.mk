@@ -2,6 +2,7 @@ OBJDUMP ?= objdump
 GREP ?= grep
 SED ?= sed
 SORT ?= sort
+GZIP ?= gzip
 
 bootfat.sym: bootfat-elf \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
@@ -28,17 +29,17 @@ kernel-bmi.sym: kernel-bmi \
 	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" "$@" "$<"
 
-mbr.dis: mbr-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< > $@
+mbr.dis.gz: mbr-elf $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< | $(GZIP) > $@
 
-bootfat.dis: bootfat-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< > $@
+bootfat.dis.gz: bootfat-elf $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-bootiso.dis: bootiso-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< > $@
+bootiso.dis.gz: bootiso-elf $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-kernel-generic.dis: kernel-generic $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< > $@
+kernel-generic.dis.gz: kernel-generic $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-kernel-bmi.dis: kernel-bmi $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< > $@
+kernel-bmi.dis.gz: kernel-bmi $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
