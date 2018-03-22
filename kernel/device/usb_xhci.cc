@@ -991,17 +991,18 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
         USBXHCI_CTL_TRB_FLAGS_C_SET(src->data[3], !epd->ccs);
         auto dst = (usbxhci_cmd_trb_t *)&epd->xfer_ring[epd->xfer_next];
 
-        // Verify that the cycle bit of the existing TRB is as expected
-        assert(USBXHCI_CTL_TRB_FLAGS_C_GET(dst->data[3]) != (epd->ccs != 0));
-
         // Copy the TRB carefully, ensuring cycle bit is set last
         dst->data[0] = src->data[0];
         dst->data[1] = src->data[1];
         dst->data[2] = src->data[2];
+
+        // Verify that the cycle bit of the existing TRB is as expected
+        assert(USBXHCI_CTL_TRB_FLAGS_C_GET(dst->data[3]) != (epd->ccs != 0));
+
         // Initially set the cycle bit to the value that prevents TRB execution
-        atomic_st_rel(&dst->data[3],
-                (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
-                USBXHCI_CTL_TRB_FLAGS_C_n(!epd->ccs));
+        dst->data[3] = (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+                USBXHCI_CTL_TRB_FLAGS_C_n(!epd->ccs);
+
         // Guarantee ordering and set cycle bit last
         atomic_st_rel(&dst->data[3],
                 (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
