@@ -584,10 +584,7 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
 {
     scoped_lock hold_cmd_lock(cmd_lock);
 
-    bool was_empty = (cmd_head == cmd_tail);
-
-    if (!was_empty)
-        wait_cmd_not_full(hold_cmd_lock);
+    wait_cmd_not_full(hold_cmd_lock);
 
     // Get a pointer to the next available entry in the command queue
     pending_cmd_t *cmd = cmd_queue + cmd_head;
@@ -615,10 +612,7 @@ errno_t usb_msc_if_t::io(void *data, uint64_t count, uint64_t lba,
     // Advance command queue head
     cmd_head = cmd_wrap(cmd_head + 1);
 
-    if (was_empty) {
-        USB_MSC_TRACE("Starting command from idle\n");
-        issue_cmd(cmd, hold_cmd_lock);
-    }
+    issue_cmd(cmd, hold_cmd_lock);
 
     return errno_t::OK;
 }
@@ -698,14 +692,6 @@ void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
     scoped_lock hold_cmd_lock(cmd_lock);
     cmd_tail = cmd_wrap(cmd_tail + 1);
     cmd_cond.notify_one();
-
-    // Queue not empty?
-    if (cmd_head != cmd_tail) {
-        // Start next command from queue
-        pending_cmd_t *next_cmd = cmd_queue + cmd_tail;
-
-        issue_cmd(next_cmd, hold_cmd_lock);
-    }
 
     hold_cmd_lock.unlock();
 
