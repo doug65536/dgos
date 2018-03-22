@@ -3004,7 +3004,7 @@ physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
     if (unlikely(!item) && !low)
         item = next_free[1];
 
-    if (unlikely(!item))
+    if (unlikely(!assert(item)))
         return 0;
 
     entry_t new_next = entries[item];
@@ -3042,6 +3042,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
             free_page_count -= count;
             break;
         } else if (low) {
+            assert(!"Out of memory!");
             return false;
         } else {
             low = true;
