@@ -294,519 +294,514 @@ intptr_t formatter(
     intptr_t chars_written = 0;
     int *output_arg;
     char digits[32], *digit_out;
-    char const *literal_st = 0;
 
-    for (char const *fp = format; ; ++fp) {
+    for (char const *fp = format; *fp; ++fp) {
         char ch = *fp;
 
-        if (ch == 0 || ch == '%') {
-            if (literal_st) {
-                chars_written += emit_chars(
-                            literal_st,  fp - literal_st,
-                            emit_context);
-                literal_st = 0;
-            }
+        // Look for a span of literal characters
+        if (ch != '%') {
+            size_t literal_len = strcspn(fp, "%");
 
-            if (ch == 0)
-                break;
-        } else if (!literal_st) {
-            literal_st = fp;
+            chars_written += emit_chars(fp, literal_len, emit_context);
+            fp += literal_len - 1;
+            continue;
         }
 
-        if (ch == '%') {
-            flags = empty_formatter_flags;
+        // At '%'
+        assert(ch == '%');
 
+        flags = empty_formatter_flags;
+
+        ch = *++fp;
+
+        switch (ch) {
+        case '%':
+            // Literal %
+            chars_written += emit_chars(0, '%', emit_context);
+            continue;
+
+        case '-':
+            // Left justify
+            flags.left_justify = 1;
+            ch = *++fp;
+            break;
+
+        case '+':
+            // Use leading plus if positive
+            flags.leading_plus = 1;
+            ch = *++fp;
+            break;
+
+        case '#':
+            // Varies
+            flags.hash = 1;
+            ch = *++fp;
+            break;
+        }
+
+        switch(ch) {
+        case '0':
+            // Use leading zeros
+            flags.leading_zero = 1;
+            ch = *++fp;
+            break;
+        }
+
+        if (ch == '*') {
+            // Get minimum field width from arguments
+            flags.has_min_width = 1;
+            flags.min_width = va_arg(ap, int);
+            ch = *++fp;
+        } else if (ch >= '0' && ch <= '9') {
+            // Parse numeric field width
+            flags.has_min_width = 1;
+            fp = parse_int(fp, &flags.min_width);
+            // Leading 0 on width specifies 0 padding
+            if (ch == '0')
+                flags.precision = flags.min_width;
+            ch = *fp;
+        }
+
+        if (ch == '.') {
             ch = *++fp;
 
-            switch (ch) {
-            case '%':
-                // Literal %
-                chars_written += emit_chars(0, '%', emit_context);
-                continue;
-
-            case '-':
-                // Left justify
-                flags.left_justify = 1;
+            if (flags.precision == 0 && ch == '*') {
+                // Get precision from arguments
+                flags.has_precision = 1;
+                flags.precision = va_arg(ap, int);
                 ch = *++fp;
-                break;
+            } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
+                // Parse numeric precision
+                flags.has_precision = 1;
+                fp = parse_int(fp,
+                               flags.precision
+                               ? 0
+                               : &flags.precision);
 
-            case '+':
-                // Use leading plus if positive
-                flags.leading_plus = 1;
-                ch = *++fp;
-                break;
-
-            case '#':
-                // Varies
-                flags.hash = 1;
-                ch = *++fp;
-                break;
-            }
-
-            switch(ch) {
-            case '0':
-                // Use leading zeros
-                flags.leading_zero = 1;
-                ch = *++fp;
-                break;
-            }
-
-            if (ch == '*') {
-                // Get minimum field width from arguments
-                flags.has_min_width = 1;
-                flags.min_width = va_arg(ap, int);
-                ch = *++fp;
-            } else if (ch >= '0' && ch <= '9') {
-                // Parse numeric field width
-                flags.has_min_width = 1;
-                fp = parse_int(fp, &flags.min_width);
-                // Leading 0 on width specifies 0 padding
-                if (ch == '0')
-                    flags.precision = flags.min_width;
+                // Negative values are ignored
+                if (flags.precision < 0)
+                    flags.precision = 0;
                 ch = *fp;
             }
+        }
 
-            if (ch == '.') {
-                ch = *++fp;
+        // If no precision specified and leading zero
+        // was given on min_width, then use min_width
+        // for the precision
+        if (!flags.has_precision && flags.leading_zero)
+            flags.precision = flags.min_width;
 
-                if (flags.precision == 0 && ch == '*') {
-                    // Get precision from arguments
-                    flags.has_precision = 1;
-                    flags.precision = va_arg(ap, int);
-                    ch = *++fp;
-                } else if (ch == '-' || (ch >= '0' && ch <= '9')) {
-                    // Parse numeric precision
-                    flags.has_precision = 1;
-                    fp = parse_int(fp,
-                                   flags.precision
-                                   ? 0
-                                   : &flags.precision);
-
-                    // Negative values are ignored
-                    if (flags.precision < 0)
-                        flags.precision = 0;
-                    ch = *fp;
-                }
+        // Length modifier
+        switch (ch) {
+        case 'h':
+            if (fp[1] == 'h') {
+                flags.length = length_hh;
+                fp += 2;
+            } else {
+                flags.length = length_h;
+                fp += 1;
             }
+            ch = *fp;
+            break;
 
-            // If no precision specified and leading zero
-            // was given on min_width, then use min_width
-            // for the precision
-            if (!flags.has_precision && flags.leading_zero)
-                flags.precision = flags.min_width;
-
-            // Length modifier
-            switch (ch) {
-            case 'h':
-                if (fp[1] == 'h') {
-                    flags.length = length_hh;
-                    fp += 2;
-                } else {
-                    flags.length = length_h;
-                    fp += 1;
-                }
-                ch = *fp;
-                break;
-
-            case 'l':
-                if (fp[1] == 'l') {
-                    flags.length = length_ll;
-                    fp += 2;
-                } else {
-                    flags.length = length_l;
-                    fp += 1;
-                }
-                ch = *fp;
-                break;
-
-            case 'j':
-                flags.length = length_j;
-                ch = *++fp;
-                break;
-
-            case 'z':
-                flags.length = length_z;
-                ch = *++fp;
-                break;
-
-            case 't':
-                flags.length = length_t;
-                ch = *++fp;
-                break;
-
-            case 'L':
-                flags.length = length_L;
-                ch = *++fp;
-                break;
-
+        case 'l':
+            if (fp[1] == 'l') {
+                flags.length = length_ll;
+                fp += 2;
+            } else {
+                flags.length = length_l;
+                fp += 1;
             }
+            ch = *fp;
+            break;
 
-            switch (ch) {
-            case 'c':
-                switch (flags.length) {
-                case length_l:
-                    flags.arg_type = arg_type_character;
-                    flags.arg.character = va_arg(ap, int);
-                    break;
-                case length_none:
-                    flags.arg_type = arg_type_character;
-                    flags.arg.character = (char)va_arg(ap, int);
-                    break;
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
+        case 'j':
+            flags.length = length_j;
+            ch = *++fp;
+            break;
+
+        case 'z':
+            flags.length = length_z;
+            ch = *++fp;
+            break;
+
+        case 't':
+            flags.length = length_t;
+            ch = *++fp;
+            break;
+
+        case 'L':
+            flags.length = length_L;
+            ch = *++fp;
+            break;
+
+        }
+
+        switch (ch) {
+        case 'c':
+            switch (flags.length) {
+            case length_l:
+                flags.arg_type = arg_type_character;
+                flags.arg.character = va_arg(ap, int);
                 break;
-
-            case 's':
-                if (flags.has_precision) {
-                    flags.limit_string = 1;
-                    flags.max_chars = flags.precision;
-                }
-
-                switch (flags.length) {
-                case length_l:
-                    flags.arg_type = arg_type_wchar_ptr;
-                    flags.arg.wchar_ptr_value = va_arg(ap, wchar_t *);
-                    if (!flags.arg.wchar_ptr_value) {
-                        if (!flags.has_precision || flags.precision >= 6) {
-                            flags.arg.wchar_ptr_value = L"(null)";
-                        } else {
-                            flags.arg.wchar_ptr_value = L"";
-                        }
-                    }
-                    break;
-                case length_none:
-                    flags.arg_type = arg_type_char_ptr;
-                    flags.arg.char_ptr_value = va_arg(ap, char *);
-                    if (!flags.arg.char_ptr_value) {
-                        if (!flags.has_precision || flags.precision >= 6) {
-                            flags.arg.char_ptr_value = "(null)";
-                        } else {
-                            flags.arg.char_ptr_value = "";
-                        }
-                    }
-                    break;
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
+            case length_none:
+                flags.arg_type = arg_type_character;
+                flags.arg.character = (char)va_arg(ap, int);
                 break;
-
-            case 'd':
-            case 'i':
-                flags.base = 10;
-
-                flags.arg_type = arg_type_intptr_value;
-                switch (flags.length) {
-                case length_hh:
-                    // signed char
-                    flags.arg.intptr_value =
-                            (signed char)va_arg(ap, int);
-                    break;
-                case length_h:
-                    // short
-                    flags.arg.intptr_value =
-                            (short)va_arg(ap, int);
-                    break;
-                case length_none:
-                    // int
-                    flags.arg.intptr_value =
-                            va_arg(ap, int);
-                    break;
-                case length_l:
-                    // long
-                    flags.arg.intptr_value =
-                            va_arg(ap, long);
-                    break;
-                case length_ll:
-                    // long long
-                    flags.arg.intptr_value =
-                            va_arg(ap, long long);
-                    break;
-                case length_j:
-                    // intmax_t
-                    flags.arg.intptr_value =
-                            va_arg(ap, intmax_t);
-                    break;
-                case length_z:
-                    // signed size_t
-                    flags.arg.intptr_value =
-                            va_arg(ap, ssize_t);
-                    break;
-                case length_t:
-                    // ptrdiff_t
-                    flags.arg.intptr_value =
-                            va_arg(ap, ptrdiff_t);
-                    break;
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
-                break;
-
-            case 'X':
-            case 'x':
-            case 'u':
-            case 'o':
-                flags.upper = (ch >= 'A' && ch <= 'Z');
-                flags.base = (ch == 'o' ? 8 : ch == 'u' ? 10 : 16);
-
-                flags.arg_type = arg_type_uintptr_value;
-                switch (flags.length) {
-                case length_hh:
-                    // unsigned signed char
-                    flags.arg.uintptr_value =
-                            (unsigned char)va_arg(ap, unsigned int);
-                    break;
-
-                case length_h:
-                    // unsigned short
-                    flags.arg.uintptr_value =
-                            (unsigned short)va_arg(ap, unsigned int);
-                    break;
-
-                case length_none:
-                    // unsigned int
-                    flags.arg.uintptr_value =
-                            va_arg(ap, unsigned int);
-                    break;
-
-                case length_l:
-                    // unsigned long
-                    flags.arg.uintptr_value =
-                            va_arg(ap, unsigned long);
-                    break;
-
-                case length_ll:
-                    // unsigned long long
-                    flags.arg.uintptr_value =
-                            va_arg(ap, unsigned long long);
-                    break;
-
-                case length_j:
-                    // uintmax_t
-                    flags.arg.uintptr_value =
-                            va_arg(ap, uintmax_t);
-                    break;
-
-                case length_z:
-                    // ssize_t
-                    flags.arg.uintptr_value =
-                            va_arg(ap, size_t);
-                    break;
-
-                case length_t:
-                    // uptrdiff_t
-                    flags.arg.uintptr_value =
-                            va_arg(ap, uintptr_t);
-                    break;
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
-                break;
-
-            case 'p':
-                flags.base = 16;
-                switch (flags.length) {
-                case length_none:
-                    flags.arg_type = arg_type_uintptr_value;
-                    flags.arg.uintptr_value =
-                            (uintptr_t)va_arg(ap, void*);
-                    break;
-
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
-                break;
-
-            case 'n':
-                switch (flags.length) {
-                case length_none:
-                    output_arg = va_arg(ap, int *);
-                    *output_arg = chars_written;
-                    break;
-
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
-                break;
-
-#ifndef __DGOS_KERNEL__
-            case 'e':
-                flags.scientific = 1;
-                // fall through
-            case 'f':
-                if (!flags.has_precision) {
-                    flags.has_precision = 1;
-                    flags.precision = 6;
-                }
-
-                switch (flags.length) {
-                case length_none:
-                case length_l:
-                    flags.arg_type = arg_type_double_value;
-                    flags.arg.double_value = va_arg(ap, double);
-                    break;
-
-                case length_L:
-                    flags.arg_type = arg_type_long_double_value;
-                    flags.arg.long_double_value = va_arg(ap, long double);
-                    break;
-
-                default:
-                    RETURN_FORMATTER_ERROR(chars_written);
-                }
-
-                break;
-#endif
-            }
-
-            //
-            // Convert digits to text then change them to strings
-            // to handle padding later
-
-            int len;
-
-            switch (flags.arg_type) {
             default:
-                break;
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+            break;
 
-            case arg_type_none:
-                // Nothing to do!
-                continue;
-
-            case arg_type_character:
-                if (flags.min_width > 1)
-                    flags.pending_padding = flags.min_width - 1;
-                break;
-
-            case arg_type_char_ptr:
-                len = strlen(flags.arg.char_ptr_value);
-                if (flags.limit_string && len > flags.precision)
-                    len = flags.precision;
-
-                if (flags.min_width > len)
-                    flags.pending_padding = flags.min_width - len;
-
-                break;
-
-            case arg_type_intptr_value:
-                if (flags.arg.intptr_value < 0) {
-                    flags.negative = 1;
-                    flags.arg.intptr_value = -flags.arg.intptr_value;
-                }
-                flags.arg.uintptr_value = (uintptr_t)flags.arg.intptr_value;
-                // fall through
-            case arg_type_uintptr_value:
-                flags.pending_leading_zeros = flags.precision;
-                flags.pending_padding = flags.min_width;
-
-                digit_out = digits + sizeof(digits);
-                *--digit_out = 0;
-                do {
-                    *--digit_out = formatter_hexlookup[
-                            (flags.upper << 4) +
-                            flags.arg.uintptr_value % flags.base];
-                    flags.arg.uintptr_value /= flags.base;
-
-                    flags.pending_leading_zeros -=
-                            (flags.pending_leading_zeros > 0);
-                    flags.pending_padding -=
-                            (flags.pending_padding > 0);
-                } while (digit_out > digits && flags.arg.uintptr_value);
-
-                // Now treat as string
-                // Don't forget to emit negative and leading zeros later
-                flags.arg_type = arg_type_char_ptr;
-                flags.arg.char_ptr_value = digit_out;
-
-                break;
-
-#ifndef __DGOS_KERNEL__
-            case arg_type_double_value:
-                dtoa(digits, sizeof(digits),
-                     (long double)flags.arg.double_value, &flags);
-                flags.arg_type = arg_type_char_ptr;
-                flags.arg.char_ptr_value = digits;
-                break;
-#endif
-
+        case 's':
+            if (flags.has_precision) {
+                flags.limit_string = 1;
+                flags.max_chars = flags.precision;
             }
 
-            // Make room for minus/plus
-            if (flags.negative || flags.leading_plus) {
+            switch (flags.length) {
+            case length_l:
+                flags.arg_type = arg_type_wchar_ptr;
+                flags.arg.wchar_ptr_value = va_arg(ap, wchar_t *);
+                if (!flags.arg.wchar_ptr_value) {
+                    if (!flags.has_precision || flags.precision >= 6) {
+                        flags.arg.wchar_ptr_value = L"(null)";
+                    } else {
+                        flags.arg.wchar_ptr_value = L"";
+                    }
+                }
+                break;
+            case length_none:
+                flags.arg_type = arg_type_char_ptr;
+                flags.arg.char_ptr_value = va_arg(ap, char *);
+                if (!flags.arg.char_ptr_value) {
+                    if (!flags.has_precision || flags.precision >= 6) {
+                        flags.arg.char_ptr_value = "(null)";
+                    } else {
+                        flags.arg.char_ptr_value = "";
+                    }
+                }
+                break;
+            default:
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+            break;
+
+        case 'd':
+        case 'i':
+            flags.base = 10;
+
+            flags.arg_type = arg_type_intptr_value;
+            switch (flags.length) {
+            case length_hh:
+                // signed char
+                flags.arg.intptr_value =
+                        (signed char)va_arg(ap, int);
+                break;
+            case length_h:
+                // short
+                flags.arg.intptr_value =
+                        (short)va_arg(ap, int);
+                break;
+            case length_none:
+                // int
+                flags.arg.intptr_value =
+                        va_arg(ap, int);
+                break;
+            case length_l:
+                // long
+                flags.arg.intptr_value =
+                        va_arg(ap, long);
+                break;
+            case length_ll:
+                // long long
+                flags.arg.intptr_value =
+                        va_arg(ap, long long);
+                break;
+            case length_j:
+                // intmax_t
+                flags.arg.intptr_value =
+                        va_arg(ap, intmax_t);
+                break;
+            case length_z:
+                // signed size_t
+                flags.arg.intptr_value =
+                        va_arg(ap, ssize_t);
+                break;
+            case length_t:
+                // ptrdiff_t
+                flags.arg.intptr_value =
+                        va_arg(ap, ptrdiff_t);
+                break;
+            default:
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+            break;
+
+        case 'X':
+        case 'x':
+        case 'u':
+        case 'o':
+            flags.upper = (ch >= 'A' && ch <= 'Z');
+            flags.base = (ch == 'o' ? 8 : ch == 'u' ? 10 : 16);
+
+            flags.arg_type = arg_type_uintptr_value;
+            switch (flags.length) {
+            case length_hh:
+                // unsigned signed char
+                flags.arg.uintptr_value =
+                        (unsigned char)va_arg(ap, unsigned int);
+                break;
+
+            case length_h:
+                // unsigned short
+                flags.arg.uintptr_value =
+                        (unsigned short)va_arg(ap, unsigned int);
+                break;
+
+            case length_none:
+                // unsigned int
+                flags.arg.uintptr_value =
+                        va_arg(ap, unsigned int);
+                break;
+
+            case length_l:
+                // unsigned long
+                flags.arg.uintptr_value =
+                        va_arg(ap, unsigned long);
+                break;
+
+            case length_ll:
+                // unsigned long long
+                flags.arg.uintptr_value =
+                        va_arg(ap, unsigned long long);
+                break;
+
+            case length_j:
+                // uintmax_t
+                flags.arg.uintptr_value =
+                        va_arg(ap, uintmax_t);
+                break;
+
+            case length_z:
+                // ssize_t
+                flags.arg.uintptr_value =
+                        va_arg(ap, size_t);
+                break;
+
+            case length_t:
+                // uptrdiff_t
+                flags.arg.uintptr_value =
+                        va_arg(ap, uintptr_t);
+                break;
+            default:
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+            break;
+
+        case 'p':
+            flags.base = 16;
+            switch (flags.length) {
+            case length_none:
+                flags.arg_type = arg_type_uintptr_value;
+                flags.arg.uintptr_value =
+                        (uintptr_t)va_arg(ap, void*);
+                break;
+
+            default:
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+            break;
+
+        case 'n':
+            switch (flags.length) {
+            case length_none:
+                output_arg = va_arg(ap, int *);
+                *output_arg = chars_written;
+                break;
+
+            default:
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+            break;
+
+#ifndef __DGOS_KERNEL__
+        case 'e':
+            flags.scientific = 1;
+            // fall through
+        case 'f':
+            if (!flags.has_precision) {
+                flags.has_precision = 1;
+                flags.precision = 6;
+            }
+
+            switch (flags.length) {
+            case length_none:
+            case length_l:
+                flags.arg_type = arg_type_double_value;
+                flags.arg.double_value = va_arg(ap, double);
+                break;
+
+            case length_L:
+                flags.arg_type = arg_type_long_double_value;
+                flags.arg.long_double_value = va_arg(ap, long double);
+                break;
+
+            default:
+                RETURN_FORMATTER_ERROR(chars_written);
+            }
+
+            break;
+#endif
+        }
+
+        //
+        // Convert digits to text then change them to strings
+        // to handle padding later
+
+        int len;
+
+        switch (flags.arg_type) {
+        default:
+            break;
+
+        case arg_type_none:
+            // Nothing to do!
+            continue;
+
+        case arg_type_character:
+            if (flags.min_width > 1)
+                flags.pending_padding = flags.min_width - 1;
+            break;
+
+        case arg_type_char_ptr:
+            len = strlen(flags.arg.char_ptr_value);
+            if (flags.limit_string && len > flags.precision)
+                len = flags.precision;
+
+            if (flags.min_width > len)
+                flags.pending_padding = flags.min_width - len;
+
+            break;
+
+        case arg_type_intptr_value:
+            if (flags.arg.intptr_value < 0) {
+                flags.negative = 1;
+                flags.arg.intptr_value = -flags.arg.intptr_value;
+            }
+            flags.arg.uintptr_value = (uintptr_t)flags.arg.intptr_value;
+            // fall through
+        case arg_type_uintptr_value:
+            flags.pending_leading_zeros = flags.precision;
+            flags.pending_padding = flags.min_width;
+
+            digit_out = digits + sizeof(digits);
+            *--digit_out = 0;
+            do {
+                *--digit_out = formatter_hexlookup[
+                        (flags.upper << 4) +
+                        flags.arg.uintptr_value % flags.base];
+                flags.arg.uintptr_value /= flags.base;
+
+                flags.pending_leading_zeros -=
+                        (flags.pending_leading_zeros > 0);
                 flags.pending_padding -=
                         (flags.pending_padding > 0);
-            }
+            } while (digit_out > digits && flags.arg.uintptr_value);
 
-            if (flags.pending_padding != 0 &&
-                    !flags.left_justify) {
-                // Reduce padding by number of leading zeros
-                if (flags.pending_padding > flags.pending_leading_zeros)
-                    flags.pending_padding -= flags.pending_leading_zeros;
-                else
-                    flags.pending_padding = 0;
+            // Now treat as string
+            // Don't forget to emit negative and leading zeros later
+            flags.arg_type = arg_type_char_ptr;
+            flags.arg.char_ptr_value = digit_out;
 
-                // Write leading padding for right justification
-                for (int i = 0; i < flags.pending_padding; ++i)
-                    chars_written += emit_chars(0, ' ', emit_context);
-            }
+            break;
 
-            if (flags.negative) {
-                flags.negative = 0;
-                chars_written += emit_chars(0, '-', emit_context);
-            } else if (flags.leading_plus) {
-                flags.leading_plus = 0;
-                chars_written += emit_chars(0, '+', emit_context);
-            }
+#ifndef __DGOS_KERNEL__
+        case arg_type_double_value:
+            dtoa(digits, sizeof(digits),
+                 (long double)flags.arg.double_value, &flags);
+            flags.arg_type = arg_type_char_ptr;
+            flags.arg.char_ptr_value = digits;
+            break;
+#endif
 
-            // Write leading zeros
-            for (int i = 0; i < flags.pending_leading_zeros; ++i)
-                chars_written += emit_chars(0, '0', emit_context);
+        }
 
-            //
-            // Now print stuff...
+        // Make room for minus/plus
+        if (flags.negative || flags.leading_plus) {
+            flags.pending_padding -=
+                    (flags.pending_padding > 0);
+        }
 
-            switch (flags.arg_type) {
-            default:
-                // Nothing to do!
-                continue;
+        if (flags.pending_padding != 0 &&
+                !flags.left_justify) {
+            // Reduce padding by number of leading zeros
+            if (flags.pending_padding > flags.pending_leading_zeros)
+                flags.pending_padding -= flags.pending_leading_zeros;
+            else
+                flags.pending_padding = 0;
 
-            case arg_type_char_ptr:
-                if (flags.limit_string) {
-                    // Limit string output
-                    for (size_t i = 0; flags.arg.char_ptr_value[i] &&
-                         flags.max_chars > 0 &&
-                         i < (size_t)flags.max_chars; ++i) {
-                        chars_written += emit_chars(
-                                    0, flags.arg.char_ptr_value[i],
-                                    emit_context);
-                    }
-                } else {
+            // Write leading padding for right justification
+            for (int i = 0; i < flags.pending_padding; ++i)
+                chars_written += emit_chars(0, ' ', emit_context);
+        }
+
+        if (flags.negative) {
+            flags.negative = 0;
+            chars_written += emit_chars(0, '-', emit_context);
+        } else if (flags.leading_plus) {
+            flags.leading_plus = 0;
+            chars_written += emit_chars(0, '+', emit_context);
+        }
+
+        // Write leading zeros
+        for (int i = 0; i < flags.pending_leading_zeros; ++i)
+            chars_written += emit_chars(0, '0', emit_context);
+
+        //
+        // Now print stuff...
+
+        switch (flags.arg_type) {
+        default:
+            // Nothing to do!
+            continue;
+
+        case arg_type_char_ptr:
+            if (flags.limit_string) {
+                // Limit string output
+                for (size_t i = 0; flags.arg.char_ptr_value[i] &&
+                     flags.max_chars > 0 &&
+                     i < (size_t)flags.max_chars; ++i) {
                     chars_written += emit_chars(
-                                flags.arg.char_ptr_value, 0,
+                                0, flags.arg.char_ptr_value[i],
                                 emit_context);
                 }
-                break;
-
-            case arg_type_wchar_ptr:
-                for (size_t i = 0; flags.arg.wchar_ptr_value[i]; ++i)
-                    chars_written += emit_chars(
-                                0, flags.arg.wchar_ptr_value[i],
-                                emit_context);
-                break;
-
-            case arg_type_character:
+            } else {
                 chars_written += emit_chars(
-                            0, flags.arg.character,
+                            flags.arg.char_ptr_value, 0,
                             emit_context);
-                break;
-
             }
+            break;
 
-            // Write trailing padding for left justification
-            if (flags.left_justify) {
-                for (int i = 0; i < flags.pending_padding; ++i)
-                    chars_written += emit_chars(0, ' ', emit_context);
-            }
+        case arg_type_wchar_ptr:
+            for (size_t i = 0; flags.arg.wchar_ptr_value[i]; ++i)
+                chars_written += emit_chars(
+                            0, flags.arg.wchar_ptr_value[i],
+                            emit_context);
+            break;
+
+        case arg_type_character:
+            chars_written += emit_chars(
+                        0, flags.arg.character,
+                        emit_context);
+            break;
+
+        }
+
+        // Write trailing padding for left justification
+        if (flags.left_justify) {
+            for (int i = 0; i < flags.pending_padding; ++i)
+                chars_written += emit_chars(0, ' ', emit_context);
         }
     }
 
