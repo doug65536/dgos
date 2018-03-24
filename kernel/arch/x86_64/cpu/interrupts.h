@@ -40,10 +40,12 @@
 // Reserved range from 0xF0-0xFA
 #define INTR_SOFT_BASE      0xF0
 
-#define INTR_APIC_ERROR     0xF0
-#define INTR_APIC_SPURIOUS  0xF1
+#define INTR_APIC_ERROR     0xF1
+
+// Spurious interrupt vector must be aligned to 8 on really old processors
+#define INTR_APIC_SPURIOUS  0xF8
 
 // Software interrupts
-#define INTR_TLB_SHOOTDOWN  253
-#define INTR_THREAD_YIELD   254
-#define INTR_APIC_TIMER     255
+#define INTR_TLB_SHOOTDOWN  0xFD
+#define INTR_THREAD_YIELD   0xFE
+#define INTR_APIC_TIMER     0xFF
