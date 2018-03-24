@@ -380,9 +380,6 @@ static uint32_t volatile *apic_ptr;
 #define APIC_LVT_DCR_BY_128         (8+2)
 #define APIC_LVT_DCR_BY_1           (8+3)
 
-#define APIC_SIR_APIC_ENABLE_BIT    8
-#define APIC_SIR_APIC_ENABLE        (1<<APIC_SIR_APIC_ENABLE_BIT)
-
 #define APIC_LVT_TR_MODE_ONESHOT    0
 #define APIC_LVT_TR_MODE_PERIODIC   1
 #define APIC_LVT_TR_MODE_DEADLINE   2
@@ -1579,13 +1576,18 @@ static void apic_online(int enabled, int spurious_intr, int err_intr)
 {
     uint32_t sir = apic->read32(APIC_REG_SIR);
 
-    if (enabled)
-        sir |= APIC_SIR_APIC_ENABLE;
-    else
-        sir &= ~APIC_SIR_APIC_ENABLE;
+    if (enabled) {
+        // Enable APIC, enable EOI broadcast, enable focus processor checking
+        APIC_SIR_APIC_ENABLE_SET(sir, 1);
+        APIC_SIR_NO_EOI_BCAST_SET(sir, 0);
+        APIC_SIR_NO_FOCUS_CHK_SET(sir, 0);
+    } else {
+        // Disable APIC
+        APIC_SIR_APIC_ENABLE_SET(sir, 0);
+    }
 
     if (spurious_intr >= 32)
-        sir = (sir & -256) | spurious_intr;
+        APIC_SIR_VECTOR_SET(sir, spurious_intr);
 
     // LDR is read only in x2APIC mode
     if (apic != &apic_x2)
@@ -2489,16 +2491,62 @@ int apic_enable(void)
 void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
 {
     int cpu_count = thread_cpu_count();
-    assert(cpu >= 0);
+    assert(cpu >= -1);
     assert(cpu < cpu_count);
     assert(vector >= INTR_APIC_IRQ_BASE);
     assert(vector < INTR_APIC_IRQ_END);
-    result->addr = (0xFEEU << 20) |
-            (apic_id_list[cpu % cpu_count] << 12);
+
+    // Intel's ridiculous documentation for DM and RH fields:
+    ///  This bit indicates whether the Destination ID field should be
+    ///  interpreted as logical or physical APIC ID for delivery of the
+    ///  lowest priority interrupt. If RH is 1 and DM is 0, the Destination ID
+    ///  field is in physical destination mode and only the processor in the
+    ///  system that has the matching APIC ID is considered for delivery of
+    ///  that interrupt (this means no re-direction). If RH is 1 and DM is 1,
+    ///  the Destination ID Field is interpreted as in logical destination
+    ///  mode and the redirection is limited to only those processors that are
+    ///  part of the logical group of processors based on the processor’s
+    ///  logical APIC ID and the Destination ID field in the message. The
+    ///  logical group of processors consists of those identified by matching
+    ///  the 8-bit Destination ID with the logical destination identified by
+    ///  the Destination Format Register and the Logical Destination Register
+    ///  in each local APIC. The details are similar to those described in
+    ///  Section 10.6.2, “Determining IPI Destination.”
+    ///  If RH is 0, then the DM bit is ignored and the message is sent ahead
+    ///  independent of whether the physical or logical destination mode
+    ///  is used.
+    ///
+    /// It is ridiculous because:
+    ///
+    ///  1) It does not specify what "sent ahead" means. Sent ahead to where?
+    ///  2) It says that the handling of LDR and DFR are "similar" to
+    ///     another section. Similar?
+    ///
+    /// Translation:
+    ///
+    /// +----+----+---------------------------------------------------------+
+    /// | RH | DM |                                                         |
+    /// |bit3|bit2|                                                         |
+    /// +----+----+---------------------------------------------------------+
+    /// |  0 |  x | Apparently "sent ahead", no idea what that means        |
+    /// |  1 |  0 | Physical APIC ID                                        |
+    /// |  1 |  1 | Target CPU based on DFR and LDR in each LAPIC           |
+    /// +----+----+---------------------------------------------------------+
+
+    if (cpu >= 0) {
+        // Specific CPU
+        result->addr = (0xFEEU << 20) |
+                ((apic_id_list[cpu % cpu_count] << 12) & 0xFF);
+    } else {
+        // Lowest priority
+        result->addr = (0xFEEU << 20) | (1 << 2) | (1 << 3) |
+                (0xFF << 12);
+    }
     result->data = vector;
 }
 
 // Returns the starting IRQ number of allocated range
+// If cpu is -1, then enable lowest priority mode
 // Returns 0 for failure
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute,
@@ -2530,7 +2578,7 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
         ioapic_hook(vector_base + i - ioapic_msi_base_intr +
                  ioapic_msi_base_irq, handler, name);
 
-        if (distribute) {
+        if (distribute && cpu >= 0) {
             if (++cpu >= int(apic_id_count))
                 cpu = 0;
         }

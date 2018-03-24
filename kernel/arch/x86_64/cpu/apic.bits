@@ -91,6 +91,13 @@
 1 RX_CHECKSUM_ERR Receive checksum error (old processors)
 0 TX_CHECKSUM_ERR Send checksum error (old processors)
 
+-- APIC_SIR Spurious interrupt register
+
+7:0 VECTOR Spurious interrupt vector
+8 APIC_ENABLE 1=enable
+9 NO_FOCUS_CHK 0=enable focus processor checking
+12 NO_EOI_BCAST 0=enable EOI broadcast to IOAPICs
+
 -- ACPI_FADT_FFF FADT Fixed Feature Flags
 0 WBINVD The WBINVD instruction works correctly
 1 WBINVD_FLUSH The WBINVD instruction does not invalidate the caches

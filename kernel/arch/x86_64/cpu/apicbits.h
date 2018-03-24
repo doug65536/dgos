@@ -693,6 +693,62 @@
     ((r) = ((r) & ~APIC_ESR_TX_CHECKSUM_ERR) | APIC_ESR_TX_CHECKSUM_ERR_n((n)))
 
 //
+// APIC_SIR: Spurious interrupt register
+
+#define APIC_SIR_VECTOR_BIT             0
+#define APIC_SIR_APIC_ENABLE_BIT        8
+#define APIC_SIR_NO_FOCUS_CHK_BIT       9
+#define APIC_SIR_NO_EOI_BCAST_BIT       12
+
+#define APIC_SIR_VECTOR_BITS            8
+#define APIC_SIR_APIC_ENABLE_BITS       1
+#define APIC_SIR_NO_FOCUS_CHK_BITS      1
+#define APIC_SIR_NO_EOI_BCAST_BITS      1
+#define APIC_SIR_VECTOR_MASK            ((1U << APIC_SIR_VECTOR_BITS)-1)
+#define APIC_SIR_APIC_ENABLE_MASK       ((1U << APIC_SIR_APIC_ENABLE_BITS)-1)
+#define APIC_SIR_NO_FOCUS_CHK_MASK      ((1U << APIC_SIR_NO_FOCUS_CHK_BITS)-1)
+#define APIC_SIR_NO_EOI_BCAST_MASK      ((1U << APIC_SIR_NO_EOI_BCAST_BITS)-1)
+
+// Spurious interrupt vector
+#define APIC_SIR_VECTOR \
+    (APIC_SIR_VECTOR_MASK << APIC_SIR_VECTOR_BIT)
+
+// 1=enable
+#define APIC_SIR_APIC_ENABLE \
+    (APIC_SIR_APIC_ENABLE_MASK << APIC_SIR_APIC_ENABLE_BIT)
+
+// 0=enable focus processor checking
+#define APIC_SIR_NO_FOCUS_CHK \
+    (APIC_SIR_NO_FOCUS_CHK_MASK << APIC_SIR_NO_FOCUS_CHK_BIT)
+
+// 0=enable EOI broadcast to IOAPICs
+#define APIC_SIR_NO_EOI_BCAST \
+    (APIC_SIR_NO_EOI_BCAST_MASK << APIC_SIR_NO_EOI_BCAST_BIT)
+
+#define APIC_SIR_VECTOR_n(n)            ((n) << APIC_SIR_VECTOR_BIT)
+#define APIC_SIR_APIC_ENABLE_n(n)       ((n) << APIC_SIR_APIC_ENABLE_BIT)
+#define APIC_SIR_NO_FOCUS_CHK_n(n)      ((n) << APIC_SIR_NO_FOCUS_CHK_BIT)
+#define APIC_SIR_NO_EOI_BCAST_n(n)      ((n) << APIC_SIR_NO_EOI_BCAST_BIT)
+
+#define APIC_SIR_VECTOR_GET(n) \
+    (((n) >> APIC_SIR_VECTOR_BIT) & APIC_SIR_VECTOR_MASK)
+#define APIC_SIR_APIC_ENABLE_GET(n) \
+    (((n) >> APIC_SIR_APIC_ENABLE_BIT) & APIC_SIR_APIC_ENABLE_MASK)
+#define APIC_SIR_NO_FOCUS_CHK_GET(n) \
+    (((n) >> APIC_SIR_NO_FOCUS_CHK_BIT) & APIC_SIR_NO_FOCUS_CHK_MASK)
+#define APIC_SIR_NO_EOI_BCAST_GET(n) \
+    (((n) >> APIC_SIR_NO_EOI_BCAST_BIT) & APIC_SIR_NO_EOI_BCAST_MASK)
+
+#define APIC_SIR_VECTOR_SET(r,n) \
+    ((r) = ((r) & ~APIC_SIR_VECTOR) | APIC_SIR_VECTOR_n((n)))
+#define APIC_SIR_APIC_ENABLE_SET(r,n) \
+    ((r) = ((r) & ~APIC_SIR_APIC_ENABLE) | APIC_SIR_APIC_ENABLE_n((n)))
+#define APIC_SIR_NO_FOCUS_CHK_SET(r,n) \
+    ((r) = ((r) & ~APIC_SIR_NO_FOCUS_CHK) | APIC_SIR_NO_FOCUS_CHK_n((n)))
+#define APIC_SIR_NO_EOI_BCAST_SET(r,n) \
+    ((r) = ((r) & ~APIC_SIR_NO_EOI_BCAST) | APIC_SIR_NO_EOI_BCAST_n((n)))
+
+//
 // ACPI_FADT_FFF: FADT Fixed Feature Flags
 
 #define ACPI_FADT_FFF_WBINVD_BIT                      0
