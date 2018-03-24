@@ -136,47 +136,57 @@ bsp_init:
     // Must xsave-enable AVX early if available
     call detect_xsave_states_bsp
 
+    debugind '7'
+
     // Get SSE context offsets
     xorl %edi,%edi
     call idt_xsave_detect
+
+    debugind '8'
+
+    call e9debug_init
+
+    debugind '9'
 
     // Call the constructors
     movq $___init_st,%rdi
     movq $___init_en,%rsi
     call invoke_function_array
 
+    debugind 'A'
+
     // Notify constructors ran
     movl $'C',%edi
     call callout_call
 
-    debugind '7'
+    debugind 'B'
 
     xorl %edi,%edi
     call cpu_init
 
-    call e9debug_init
-
-    debugind '8'
+    debugind 'C'
 
     // Initialize text devices
     movl $'V',%edi
     call callout_call
 
+    debugind 'D'
+
     xorl %edi,%edi
     call cpu_init_stage2
 
-    debugind '9'
+    debugind 'E'
 
     xorl %edi,%edi
     call cpu_hw_init
 
-    debugind 'A'
+    debugind 'F'
 
     // Initialize early-initialized devices
     movl $'E',%edi
     call callout_call
 
-    debugind 'B'
+    debugind 'G'
 
     call main
 

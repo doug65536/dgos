@@ -316,7 +316,7 @@ static int mprotect_test(void *p)
         *mem = 'H';
     }
     __catch {
-        printdbg("Caught!!\n");
+        printk("Caught!!\n");
     }
 
     if (-1 != mprotect(0, 42, PROT_NONE))
@@ -456,7 +456,7 @@ static int stress_mmap_thread(void *p)
 
         }
         //uint64_t time_en = time_ns();
-        //printdbg("Ran mmap test iteration %luns\n", (time_en - time_st)/50);
+        //printk("Ran mmap test iteration %luns\n", (time_en - time_st)/50);
     }
     return 0;
 }
@@ -539,7 +539,7 @@ static int stress_heap_thread(void *p)
 
             overall = cpu_rdtsc() - overall;
 
-            printdbg("heap_alloc+memset+heap_free:"
+            printk("heap_alloc+memset+heap_free:"
                      " mna=%8ld (%5luns @ 3.2GHz), mxa=%8ld, ava=%8ld,\n"
                      "                            "
                      " mnf=%8ld (%5luns @ 3.2GHz), mxf=%8ld, avf=%8ld,\n"
@@ -562,7 +562,7 @@ int clks_unhalted(void *cpu)
     //while (1) {
     //    thread_sleep_for(1000);
     //    uint64_t curr = thread_get_usage(-1);
-    //    printdbg("CPU %zx: %lu clocks\n", cpu_nr, curr - last);
+    //    printk("CPU %zx: %lu clocks\n", cpu_nr, curr - last);
     //    last = curr;
     //}
     return 0;
@@ -590,14 +590,14 @@ static int find_vbe(void *p)
                 bios[i+2] == 'M' &&
                 bios[i+3] == 'P' &&
                 sum_bytes(bios + i, 20) == 0) {
-            printdbg("Found VBE PM Interface at %x!\n",
+            printk("Found VBE PM Interface at %x!\n",
                      (uint32_t)(uintptr_t)p + i);
             break;
         }
     }
 
     if (i == 0x8000 - 20)
-        printdbg("No VBE PM Interface at %p\n", p);
+        printk("No VBE PM Interface at %p\n", p);
 
     munmap(bios, 0x8000);
     return 0;
@@ -640,14 +640,14 @@ static int draw_test(void *p)
             fb_draw_aa_line(40, 60, sx+640, sy+300, 0xBFBFBF & -!(sx & 1));
 
             //uint64_t line_en = cpu_rdtsc();
-            //printdbg("Line draw %ld cycles\n", line_en - line_st);
+            //printk("Line draw %ld cycles\n", line_en - line_st);
 
             fb_update();
             ++frames;
         }
     }
     uint64_t en_tm = time_ns();
-    printdbg("Benchmark time: %d frames, %ldms\n", frames,
+    printk("Benchmark time: %d frames, %ldms\n", frames,
              (en_tm - st_tm) / 1000000);
 
     return 0;
@@ -658,65 +658,100 @@ static int init_thread(void *p)
 {
     (void)p;
 
-    printdbg("Initializing PCI\n");
+    printk("Initializing PCI\n");
     pci_init();
 
-    printdbg("Initializing keyboard event queue\n");
+    printk("Initializing keyboard event queue\n");
     keybd_init();
 
-    printdbg("Initializing 8042 keyboard\n");
+    printk("Initializing 8042 keyboard\n");
     keyb8042_init();
 
     // Facilities needed by drivers
-    printdbg("Initializing driver base\n");
+    printk("Initializing driver base\n");
     callout_call(callout_type_t::driver_base);
 
     // Run late initializations
-    printdbg("Initializing late devices\n");
+    printk("Initializing late devices\n");
     callout_call(callout_type_t::late_dev);
 
     // Register USB interfaces
-    printdbg("Initializing USB interfaces\n");
+    printk("Initializing USB interfaces\n");
     callout_call(callout_type_t::usb);
 
     // Register filesystems
-    printdbg("Initializing filesystems\n");
+    printk("Initializing filesystems\n");
     callout_call(callout_type_t::reg_filesys);
 
     // Storage interfaces
-    printdbg("Initializing storage devices\n");
+    printk("Initializing storage devices\n");
     callout_call(callout_type_t::storage_dev);
 
     // Register partition schemes
-    printdbg("Initializing partition probes\n");
+    printk("Initializing partition probes\n");
     callout_call(callout_type_t::partition_probe);
 
     // Register network interfaces
-    printdbg("Initializing network interfaces\n");
+    printk("Initializing network interfaces\n");
     callout_call(callout_type_t::nic);
 
     //bootdev_info(0, 0, 0);
 
 #if ENABLE_SPAWN_STRESS > 0
-    printdbg("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
+    printk("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
     for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
         pid_t pid = 0;
         int spawn_result = process_t::spawn(
                     &pid, "user-shell", nullptr, nullptr);
         //thread_sleep_for(10000);
-        printdbg("Started user mode process with PID=%d, status=%d\n",
+        printk("Started user mode process with PID=%d, status=%d\n",
                  pid, spawn_result);
         assert(spawn_result == 0 || pid < 0);
     }
 #endif
 
-    printdbg("Initializing framebuffer\n");
-    fb_init();
+    //printk("Initializing framebuffer\n");
+    //fb_init();
 
     //priqueue_test.test();
 
+#if ENABLE_CONDVAR_STRESS
+    condvar_test();
+#endif
+
+#if 0
+    //    for (int i = 0; i < 10000; ++i) {
+    //        printk("%d=%f\n", i, i / 1000.0);
+    //    }
+
+    printk("Testing floating point formatter\n");
+    printk("Float formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
+    printk("Float formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
+    printk("Float formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
+    printk("Float formatter: %%+17.5f    42.8e-60  -> %+17.5f\n", 42.8e-60);
+    printk("Float formatter: %%17.5f    -42.8      -> %17.5f\n", -42.8);
+    printk("Float formatter: %%17.5f    -42.8e+60  -> %17.5f\n", -42.8e+60);
+    printk("Float formatter: %%17.5f    -42.8e-60  -> %17.5f\n", -42.8e-60);
+    printk("Float formatter: %%017.5f    42.8      -> %017.5f\n", 42.8);
+    printk("Float formatter: %%017.5f   -42.8e+60  -> %017.5f\n", -42.8e+60);
+    printk("Float formatter: %%+017.5f   42.8      -> %+017.5f\n", 42.8);
+    printk("Float formatter: %%+017.5f  -42.8e+60  -> %+017.5f\n", -42.8e+60);
+
+    printk("Float formatter: %%17.5e     42.8      -> %17.5e\n", 42.8);
+    printk("Float formatter: %%17.5e     42.8e+60  -> %17.5e\n", 42.8e+60);
+    printk("Float formatter: %%17.5e     42.8e-60  -> %17.5e\n", 42.8e-60);
+    printk("Float formatter: %%+17.5e    42.8e-60  -> %+17.5e\n", 42.8e-60);
+    printk("Float formatter: %%17.5e    -42.8      -> %17.5e\n", -42.8);
+    printk("Float formatter: %%17.5e    -42.8e+60  -> %17.5e\n", -42.8e+60);
+    printk("Float formatter: %%17.5e    -42.8e-60  -> %17.5e\n", -42.8e-60);
+    printk("Float formatter: %%017.5e    42.8      -> %017.5e\n", 42.8);
+    printk("Float formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
+    printk("Float formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
+    printk("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
+#endif
+
 #if ENABLE_FILESYSTEM_TEST
-    printdbg("Starting filesystem test\n");
+    printk("Starting filesystem test\n");
     for (int n = 0; n < 1000; ++n) {
         char name[16];
         snprintf(name, sizeof(name), "created_%d", n);
@@ -727,65 +762,38 @@ static int init_thread(void *p)
         printk(" created %s\n\n", name);
     }
 
-//    for (int i = 0; i < 10000; ++i) {
-//        printdbg("%d=%f\n", i, i / 1000.0);
-//    }
-
     //void *user_test = mmap((void*)0x400000, 1<<20,
     //                       PROT_READ | PROT_WRITE, MAP_USER, -1, 0);
     //munmap(user_test, 1<<20);
 
-    printdbg("Testing floating point formatter\n");
-    printdbg("Float formatter: %%17.5f     42.8      -> %17.5f\n", 42.8);
-    printdbg("Float formatter: %%17.5f     42.8e+60  -> %17.5f\n", 42.8e+60);
-    printdbg("Float formatter: %%17.5f     42.8e-60  -> %17.5f\n", 42.8e-60);
-    printdbg("Float formatter: %%+17.5f    42.8e-60  -> %+17.5f\n", 42.8e-60);
-    printdbg("Float formatter: %%17.5f    -42.8      -> %17.5f\n", -42.8);
-    printdbg("Float formatter: %%17.5f    -42.8e+60  -> %17.5f\n", -42.8e+60);
-    printdbg("Float formatter: %%17.5f    -42.8e-60  -> %17.5f\n", -42.8e-60);
-    printdbg("Float formatter: %%017.5f    42.8      -> %017.5f\n", 42.8);
-    printdbg("Float formatter: %%017.5f   -42.8e+60  -> %017.5f\n", -42.8e+60);
-    printdbg("Float formatter: %%+017.5f   42.8      -> %+017.5f\n", 42.8);
-    printdbg("Float formatter: %%+017.5f  -42.8e+60  -> %+017.5f\n", -42.8e+60);
 
-    printdbg("Float formatter: %%17.5e     42.8      -> %17.5e\n", 42.8);
-    printdbg("Float formatter: %%17.5e     42.8e+60  -> %17.5e\n", 42.8e+60);
-    printdbg("Float formatter: %%17.5e     42.8e-60  -> %17.5e\n", 42.8e-60);
-    printdbg("Float formatter: %%+17.5e    42.8e-60  -> %+17.5e\n", 42.8e-60);
-    printdbg("Float formatter: %%17.5e    -42.8      -> %17.5e\n", -42.8);
-    printdbg("Float formatter: %%17.5e    -42.8e+60  -> %17.5e\n", -42.8e+60);
-    printdbg("Float formatter: %%17.5e    -42.8e-60  -> %17.5e\n", -42.8e-60);
-    printdbg("Float formatter: %%017.5e    42.8      -> %017.5e\n", 42.8);
-    printdbg("Float formatter: %%017.5e   -42.8e+60  -> %017.5e\n", -42.8e+60);
-    printdbg("Float formatter: %%+017.5e   42.8      -> %+017.5e\n", 42.8);
-    printdbg("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
-
-    printdbg("Opening root directory\n");
+    printk("Opening root directory\n");
 
     int od = file_opendir("");
     dirent_t de;
     dirent_t *dep;
     while (file_readdir_r(od, &de, &dep) > 0) {
-        printdbg("File: %s\n", de.d_name);
+        printk("File: %s\n", de.d_name);
     }
     file_closedir(od);
 #endif
 
-    printdbg("Running mprotect self test\n");
+    printk("Running mprotect self test\n");
     mprotect_test(0);
 
-    printdbg("Running red-black tree self test\n");
+    printk("Running red-black tree self test\n");
     rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
-    printdbg("Starting framebuffer stress\n");
-    printdbg("Running framebuffer stress\n");
+    printk("Starting framebuffer stress\n");
+    printk("Running framebuffer stress\n");
     thread_t draw_thread_id = thread_create(draw_test, 0, 0, 0);
-    printdbg("draw thread id=%d\n", draw_thread_id);
+    printk("draw thread id=%d\n", draw_thread_id);
 #endif
 
     modload_init();
 
+    printk("Running module load test\n");
     module_entry_fn_t mod_entry = modload_load("hello.km");
     if (mod_entry)
         mod_entry();
@@ -794,7 +802,7 @@ static int init_thread(void *p)
     thread_create(find_vbe, (void*)0xF0000, 0, false);
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
-    printdbg("Running context switch stress with %d threads\n",
+    printk("Running context switch stress with %d threads\n",
              ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
         thread_create(ctx_sw_thread, 0, 0, false);
@@ -802,12 +810,12 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_SHELL_THREAD > 0
-    printdbg("Running shell thread\n");
+    printk("Running shell thread\n");
     thread_create(shell_thread, (void*)0xfeedbeeffacef00d, 0, false);
 #endif
 
 #if ENABLE_SLEEP_THREAD
-    printdbg("Running sleep stress with %d threads\n",
+    printk("Running sleep stress with %d threads\n",
              ENABLE_SLEEP_THREAD);
 
     static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
@@ -827,19 +835,19 @@ static int init_thread(void *p)
 
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         for (int devid = 0; devid < dev_cnt; ++devid) {
-            printdbg("(devid %d) Running block read stress with %d threads\n",
+            printk("(devid %d) Running block read stress with %d threads\n",
                      devid, ENABLE_READ_STRESS_THREAD);
             read_stress_thread_t *thread = new read_stress_thread_t();
             read_stress_threads->push_back(thread);
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
             thread_t tid = thread->start(devid, indicator);
-            printdbg("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
+            printk("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
         }
     }
 #endif
 
 #if ENABLE_REGISTER_THREAD > 0
-    printdbg("Running register stress with %d threads\n",
+    printk("Running register stress with %d threads\n",
              ENABLE_READ_STRESS_THREAD);
     for (int i = 0; i < ENABLE_REGISTER_THREAD; ++i) {
         thread_create(register_check, (void*)
@@ -849,7 +857,7 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_MUTEX_THREAD > 0
-    printdbg("Running mutex stress with %d threads\n", ENABLE_MUTEX_THREAD);
+    printk("Running mutex stress with %d threads\n", ENABLE_MUTEX_THREAD);
     mutex_init(&stress_lock);
     for (int i = 0; i < ENABLE_MUTEX_THREAD; ++i) {
         thread_create(stress_mutex, 0, 0, false);
@@ -857,7 +865,7 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_MMAP_STRESS_THREAD > 0
-    printdbg("Running mmap stress with %d threads\n",
+    printk("Running mmap stress with %d threads\n",
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
         thread_create(stress_mmap_thread, 0, 0, false);
@@ -865,7 +873,7 @@ static int init_thread(void *p)
 #endif
 
 #if ENABLE_HEAP_STRESS_THREAD > 0
-    printdbg("Running heap stress with %d threads\n",
+    printk("Running heap stress with %d threads\n",
              ENABLE_HEAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_HEAP_STRESS_THREAD; ++i) {
         thread_create(stress_heap_thread, 0, 0, false);
