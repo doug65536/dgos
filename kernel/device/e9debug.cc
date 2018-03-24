@@ -20,11 +20,10 @@ static void e9debug_serial_ready(void*)
     if (bootinfo_parameter(bootparam_t::boot_drv_serial)) {
         uart = uart_dev_t::open(0, true, 8, 'N', 1);
         uart_ready = true;
+
+        // Send some VT102 initialization sequences
+        uart->write(vt102_reset, sizeof(vt102_reset)-1, sizeof(vt102_reset)-1);
     }
-
-    // Send some VT102 initialization sequences
-
-    uart->write(vt102_reset, sizeof(vt102_reset)-1, sizeof(vt102_reset)-1);
 }
 
 static int e9debug_write_debug_str(char const *str, intptr_t len)
@@ -36,8 +35,10 @@ static int e9debug_write_debug_str(char const *str, intptr_t len)
 
     if (len > 1 && str) {
         outsb(0xE9, str, len);
+        n = len;
     } else if (len == 1 && str) {
         outb(0xE9, str[0]);
+        n = 1;
     } else if (str) {
         while (*str) {
             outb(0xE9, *str++);
