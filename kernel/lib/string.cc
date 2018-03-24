@@ -458,6 +458,61 @@ EXPORT char *stpcpy(char *lhs, const char *rhs)
     return d + i;
 }
 
+static void makeByteBitmap(uint32_t *map, char const *chars)
+{
+    memset(map, 0, sizeof(*map) * (256 / sizeof(*map)));
+
+    while (*(uint8_t*)chars) {
+        size_t ch = *(uint8_t*)chars++;
+        map[ch >> 5] |= (1U << (ch & 31));
+    }
+}
+
+EXPORT size_t strspn(char const *src, char const *chars)
+{
+    size_t i = 0;
+
+    if (chars[0] && !chars[1]) {
+        // One character special case
+        while (src[i] && src[i] == chars[0])
+            ++i;
+    } else {
+        // Generalize
+        uint32_t map[256 / sizeof(uint32_t)];
+
+        for (makeByteBitmap(map, chars); src[i]; ++i) {
+            size_t ch = (uint8_t)src[i];
+            if (!(map[ch >> 5] & (1U << (ch & 31))))
+                break;
+        }
+    }
+
+    return i;
+}
+
+EXPORT size_t strcspn(char const *src, char const *chars)
+{
+    size_t i = 0;
+
+    if (chars[0] && !chars[1]) {
+        // One character special case
+        while (src[i] && src[i] != chars[0])
+            ++i;
+    } else {
+        // Generalize
+        uint32_t map[256 / sizeof(uint32_t)];
+
+        for (makeByteBitmap(map, chars); src[i]; ++i) {
+            size_t ch = (uint8_t)src[i];
+            if (map[ch >> 5] & (1U << (ch & 31)))
+                break;
+        }
+    }
+
+    return i;
+}
+
+
 EXPORT char *strcat(char *dest, char const *src)
 {
     strcpy(dest + strlen(dest), src);

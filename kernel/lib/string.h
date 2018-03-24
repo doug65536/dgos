@@ -28,6 +28,9 @@ char *strcat(char *dest, char const *src);
 
 char *stpcpy(char *dest, char const *src);
 
+size_t strspn(char const *src, char const *chars);
+size_t strcspn(char const *src, char const *chars);
+
 char *strncpy(char *dest, char const *src, size_t n);
 char *strncat(char *dest, char const *src, size_t n);
 
