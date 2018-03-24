@@ -1,6 +1,7 @@
 #pragma once
 #include "assert.h"
 #include "cpu/atomic.h"
+#include "utility.h"
 
 template<typename T>
 class refcounted;
@@ -88,6 +89,18 @@ public:
     {
         if (uintptr_t(ptr) > 0x7F)
             ptr->releaseref();
+    }
+
+    __always_inline
+    explicit operator T const*() const
+    {
+        return ptr;
+    }
+
+    __always_inline
+    explicit operator T*()
+    {
+        return ptr;
     }
 
     __always_inline

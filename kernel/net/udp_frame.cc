@@ -11,9 +11,9 @@ struct udp_bind_t : public refcounted<udp_bind_t> {
     int handle;
 };
 
-static hashtbl_t<udp_bind_t, ipv4_addr_pair_t,
+static ref_hashtbl_t<udp_bind_t, ipv4_addr_pair_t,
     &udp_bind_t::pair> udp_handle_lookup;
-static hashtbl_t<udp_bind_t, int, &udp_bind_t::handle> udp_addr_lookup;
+static ref_hashtbl_t<udp_bind_t, int, &udp_bind_t::handle> udp_addr_lookup;
 static int next_handle;
 
 __attribute__((constructor))

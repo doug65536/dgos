@@ -15,7 +15,7 @@
 
 #include "usb_xhcibits.h"
 
-#define USBXHCI_DEBUG   0
+#define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
 #define USBXHCI_TRACE(...) printdbg("xhci: " __VA_ARGS__)
 #else
@@ -660,13 +660,28 @@ struct usbxhci_device_vtbl_t {
     void (*init)(void);
 };
 
-struct usbxhci_interrupter_info_t {
-    usbxhci_evt_t volatile *evt_ring;
-    uint64_t evt_ring_physaddr;
+class usbxhci;
+class usbxhci_pending_cmd_t;
+
+template<typename T>
+struct usbxhci_ring_data_t {
+    usbxhci_pending_cmd_t *pending;
+    T volatile *ptr;
+    uint64_t physaddr;
     uint32_t next;
     uint32_t count;
-    uint8_t ccs;
+    uint8_t cycle;
+
+    void insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src, usb_iocp_t *iocp,
+                bool ins_pending);
+
+    bool alloc(uint32_t trb_count);
+
+    void reserve_link();
 };
+
+using usbxhci_trb_ring_data_t = usbxhci_ring_data_t<usbxhci_cmd_trb_t>;
+using usbxhci_interrupter_info_t = usbxhci_ring_data_t<usbxhci_evt_t>;
 
 struct usbxhci_portinfo_t {
     usbxhci_evtring_seg_t volatile *dev_evt_segs;
@@ -678,22 +693,17 @@ struct usbxhci_endpoint_target_t {
     uint8_t epid;
 };
 
-struct usbxhci_endpoint_data_t : public refcounted<usbxhci_endpoint_data_t> {
+struct usbxhci_endpoint_data_t {
     usbxhci_endpoint_target_t target;
 
-    usbxhci_cmd_trb_t *xfer_ring;
-    uint64_t xfer_ring_physaddr;
-    uint32_t xfer_next;
-    uint32_t xfer_count;
-    uint8_t ccs;
+    usbxhci_trb_ring_data_t ring;
 };
 
 struct usbxhci_pending_cmd_t;
 
 class usbxhci;
 
-struct usbxhci_pending_cmd_t final
-        : public refcounted<usbxhci_pending_cmd_t> {
+struct usbxhci_pending_cmd_t {
     uint64_t cmd_physaddr;
     usb_iocp_t *iocp;
 
@@ -709,9 +719,12 @@ public:
 
     static void detect();
 
-    void dump_config_desc(const usb_config_helper &cfg_hlp);
+    void dump_config_desc(usb_config_helper const& cfg_hlp);
 
     bool add_device(int port, int route);
+
+    template<typename T>
+    friend class usbxhci_ring_data_t;
 
 protected:
     //
@@ -776,22 +789,17 @@ private:
 
     usbxhci_ep_ctx_t *dev_ctx_ent_ep(size_t slot, size_t i);
 
-    void set_cmd_trb_cycle(void *cmd) {
-        char *c = (char*)cmd + 0xc;
-        *c |= (pcs != 0);
-    }
-
     void ring_doorbell(uint32_t doorbell, uint8_t value,
                        uint16_t stream_id);
 
-    void issue_cmd(void *cmd, usb_iocp_t *iocp);
+    void issue_cmd(usbxhci_cmd_trb_t *cmd, usb_iocp_t *iocp);
 
     void add_xfer_trbs(uint8_t slotid, uint8_t epid,
                        uint16_t stream_id, size_t count, int dir,
                        void *trbs, usb_iocp_t *iocp);
 
-    void insert_pending_command(uint64_t cmd_physaddr, usb_iocp_t *iocp,
-                                scoped_lock const&);
+    void insert_pending_command(usbxhci_pending_cmd_t *pc,
+                                uint64_t cmd_physaddr, usb_iocp_t *iocp);
 
     int make_data_trbs(usbxhci_ctl_trb_data_t *trbs, size_t trb_capacity,
                        void *data, uint32_t length, int dir, bool intr);
@@ -854,15 +862,15 @@ private:
 
     uint64_t volatile *dev_ctx_ptrs;
     usbxhci_devctx_t dev_ctx;
-    usbxhci_cmd_trb_t volatile *dev_cmd_ring;
-    uint64_t cmd_ring_physaddr;
+
+    usbxhci_trb_ring_data_t cmd_ring;
 
     usbxhci_evtring_seg_t volatile *dev_evt_segs;
 
     usbxhci_interrupter_info_t *interrupters;
 
     lock_type endpoints_lock;
-    vector<refptr<usbxhci_endpoint_data_t>> endpoints;
+    vector<usbxhci_endpoint_data_t*> endpoints;
 
     // Endpoint data keyed on usbxhci_endpoint_target_t
     hashtbl_t<usbxhci_endpoint_data_t, usbxhci_endpoint_target_t,
@@ -873,19 +881,10 @@ private:
     uint32_t maxintr;
     int maxports;
 
-    // Next command slot
-    uint32_t cr_next;
-
-    // Command ring size
-    uint32_t cr_size;
-
     usbxhci_portinfo_t *ports;
     unsigned port_count;
 
     bool use_msi;
-
-    // Producer Cycle State
-    uint8_t pcs;
 
     // 0 for 32 byte usbxhci_devctx_t, 1 for 64 byte usbxhci_devctx_large_t
     uint32_t dev_ctx_large;
@@ -928,49 +927,24 @@ void usbxhci::ring_doorbell(uint32_t doorbell, uint8_t value,
     atomic_barrier();
 }
 
-void usbxhci::insert_pending_command(uint64_t cmd_physaddr,
-                                     usb_iocp_t *iocp,
-                                     const scoped_lock &)
+void usbxhci::insert_pending_command(usbxhci_pending_cmd_t *pc,
+                                     uint64_t cmd_physaddr, usb_iocp_t *iocp)
 {
-    usbxhci_pending_cmd_t *pc = new usbxhci_pending_cmd_t;
     pc->cmd_physaddr = cmd_physaddr;
     pc->iocp = iocp;
     usbxhci_pending_ht.insert(pc);
 }
 
-void usbxhci::issue_cmd(void *cmd, usb_iocp_t *iocp)
+void usbxhci::issue_cmd(usbxhci_cmd_trb_t *cmd, usb_iocp_t *iocp)
 {
     scoped_lock hold_cmd_lock(lock_cmd);
 
-    USBXHCI_TRACE("Writing command to command ring at %u\n", cr_next);
+    USBXHCI_TRACE("Writing command to command ring at %u\n", cmd_ring.next);
 
-    usbxhci_cmd_trb_t *s = (usbxhci_cmd_trb_t *)&dev_cmd_ring[cr_next++];
-
-    set_cmd_trb_cycle(cmd);
-
-    // This memcpy write at least 32 bits at a time!
-    // Cycle byte is at offset 12
-    memcpy(s, cmd, sizeof(*s));
-
-    size_t offset = uintptr_t(s) - uintptr_t(dev_cmd_ring);
-
-    uint64_t cmd_physaddr = cmd_ring_physaddr + offset;
-
-    insert_pending_command(cmd_physaddr, iocp, hold_cmd_lock);
-
-    if (cr_next == cr_size) {
-        auto link = (usbxhci_cmd_trb_link_t *)&dev_cmd_ring[cr_next];
-
-        USBXHCI_CMD_TRB_C_SET(link->c_tc_ch_ioc, pcs != 0);
-
-        pcs = !pcs;
-        cr_next = 0;
-    }
+    cmd_ring.insert(this, cmd, iocp, true);
 
     // Ring controller command doorbell
     ring_doorbell(0, 0, 0);
-
-    hold_cmd_lock.unlock();
 }
 
 void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
@@ -982,57 +956,10 @@ void usbxhci::add_xfer_trbs(uint8_t slotid, uint8_t epid, uint16_t stream_id,
     usbxhci_endpoint_data_t *epd = lookup_endpoint(slotid, epid);
 
     for (size_t i = 0; i < count; ++i) {
-        USBXHCI_TRACE("Writing TRB s%d:ep%d to %zx\n", slotid, epid,
-                      mphysaddr(&epd->xfer_ring[epd->xfer_next]));
-
         // Get pointer to source TRB
         auto src = (usbxhci_cmd_trb_t *)trbs + i;
 
-        USBXHCI_CTL_TRB_FLAGS_C_SET(src->data[3], !epd->ccs);
-        auto dst = (usbxhci_cmd_trb_t *)&epd->xfer_ring[epd->xfer_next];
-
-        // Copy the TRB carefully, ensuring cycle bit is set last
-        dst->data[0] = src->data[0];
-        dst->data[1] = src->data[1];
-        dst->data[2] = src->data[2];
-
-        // Verify that the cycle bit of the existing TRB is as expected
-        assert(USBXHCI_CTL_TRB_FLAGS_C_GET(dst->data[3]) != (epd->ccs != 0));
-
-        // Initially set the cycle bit to the value that prevents TRB execution
-        dst->data[3] = (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
-                USBXHCI_CTL_TRB_FLAGS_C_n(!epd->ccs);
-
-        // Guarantee ordering and set cycle bit last
-        atomic_st_rel(&dst->data[3],
-                (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
-                USBXHCI_CTL_TRB_FLAGS_C_n(epd->ccs));
-
-        if (iocp && ((i + 1) == count)) {
-            insert_pending_command(
-                        epd->xfer_ring_physaddr + epd->xfer_next *
-                        sizeof(*epd->xfer_ring), iocp, hold_cmd_lock);
-        }
-
-        if (++epd->xfer_next >= epd->xfer_count) {
-            // Update link TRB cycle bit
-            auto link = (usbxhci_cmd_trb_t*)(epd->xfer_ring + epd->xfer_next);
-
-            // Make sure the cycle bit is as expected
-            assert((USBXHCI_CTL_TRB_FLAGS_C_GET(link->data[3]) != epd->ccs));
-
-            // Copy the chain bit from the last TRB to propagate possible
-            // chain across the link TRB
-            bool chain = USBXHCI_CTL_TRB_FLAGS_CH_GET(src->data[3]);
-            USBXHCI_CTL_TRB_FLAGS_CH_SET(link->data[3], chain);
-
-            atomic_st_rel(&link->data[3],
-                    (link->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
-                    USBXHCI_CTL_TRB_FLAGS_C_n(epd->ccs));
-
-            epd->ccs = !epd->ccs;
-            epd->xfer_next = 0;
-        }
+        epd->ring.insert(this, src, iocp, iocp && (i + 1) == count);
     }
 
     ring_doorbell(slotid, (dir || !epid)
@@ -1114,33 +1041,11 @@ usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
     if (!endpoints.emplace_back(newepd))
         return nullptr;
 
-    newepd->xfer_next = 0;
-    newepd->xfer_count = PAGESIZE / sizeof(*newepd->xfer_ring);
-    newepd->xfer_ring = (usbxhci_cmd_trb_t *)
-            mmap(0, sizeof(*newepd->xfer_ring) * newepd->xfer_count,
-                 PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-    if (unlikely(newepd->xfer_ring == MAP_FAILED || !newepd->xfer_ring)) {
+    if (unlikely(!newepd->ring.alloc(PAGESIZE / sizeof(*newepd->ring.ptr)))) {
         endpoints.pop_back();
         return nullptr;
     }
-    newepd->ccs = 1;
-
-    newepd->xfer_ring_physaddr = mphysaddr(newepd->xfer_ring);
-
-    // Create link TRB to wrap transfer ring
-    usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
-            newepd->xfer_ring + (newepd->xfer_count - 1);
-
-    *link = {};
-    link->trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_LINK);
-    link->ring_physaddr = newepd->xfer_ring_physaddr;
-    link->c_tc_ch_ioc = USBXHCI_CMD_TRB_TC | USBXHCI_CMD_TRB_C_n(!newepd->ccs);
-
-    // Avoid overwriting link TRB
-    --newepd->xfer_count;
-
-    USBXHCI_TRACE("Transfer ring physical address for slot=%d, ep=%d: %lx\n",
-                  slotid, epid, newepd->xfer_ring_physaddr);
+    newepd->ring.reserve_link();
 
     endpoint_lookup.insert(newepd);
 
@@ -1327,34 +1232,11 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
     mmio_op->dcbaap = mphysaddr(dev_ctx_ptrs);
 
     // Command ring size in entries
-    cr_size = PAGESIZE / sizeof(usbxhci_cmd_trb_t);
-
-    uint64_t cmd_ring_sz = cr_size * sizeof(usbxhci_cmd_trb_t);
-
-    // Reserve entry for link TRB
-    --cr_size;
-
-    // Command Ring
-    dev_cmd_ring = (usbxhci_cmd_trb_t*)mmap(
-                nullptr, cmd_ring_sz, PROT_READ | PROT_WRITE,
-                MAP_POPULATE, -1, 0);
-
-    usbxhci_cmd_trb_link_t *link = (usbxhci_cmd_trb_link_t *)
-            &dev_cmd_ring[cr_size];
-
-    *link = {};
-    link->ring_physaddr = cmd_ring_physaddr;
-    link->c_tc_ch_ioc = USBXHCI_CMD_TRB_TC |
-            USBXHCI_CMD_TRB_C_n(pcs != 0);
-    link->trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_LINK);
-
-    cmd_ring_physaddr = mphysaddr(dev_cmd_ring);
-
-    USBXHCI_TRACE("Command ring at %zx-%zx\n",
-                  cmd_ring_physaddr, cmd_ring_physaddr + cmd_ring_sz);
+    cmd_ring.alloc(PAGESIZE / sizeof(usbxhci_cmd_trb_t));
+    cmd_ring.reserve_link();
 
     // Command Ring Control Register
-    mmio_op->crcr = cmd_ring_physaddr;
+    mmio_op->crcr = cmd_ring.physaddr;
 
     // Event segments
     dev_evt_segs = (usbxhci_evtring_seg_t*)mmap(
@@ -1365,24 +1247,12 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
             malloc(sizeof(*interrupters) * maxintr);
 
     for (size_t i = 0; i < maxintr; ++i) {
-        // Initialize Consumer Cycle State
-        interrupters[i].ccs = 1;
+        interrupters[i].alloc(PAGESIZE / sizeof(*interrupters[i].ptr));
 
-        // Event ring
-        interrupters[i].evt_ring = (usbxhci_evt_t*)
-                mmap(0, PAGESIZE, PROT_READ | PROT_WRITE,
-                     MAP_POPULATE, -1, 0);
-        interrupters[i].count = PAGESIZE / sizeof(*interrupters[i].evt_ring);
-        interrupters[i].next = 0;
-
-        interrupters[i].evt_ring_physaddr =
-                mphysaddr(interrupters[i].evt_ring);
-
-        dev_evt_segs[i*4].base =
-                interrupters[i].evt_ring_physaddr;
+        dev_evt_segs[i*4].base = interrupters[i].physaddr;
 
         dev_evt_segs[i*4].trb_count =
-                PAGESIZE / sizeof(*interrupters[i].evt_ring);
+                PAGESIZE / sizeof(*interrupters[i].ptr);
 
         // Event ring segment table size
         USBXHCI_ERSTSZ_SZ_SET(mmio_rt->ir[i].erstsz, 1);
@@ -1422,10 +1292,6 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
 
     port_count = 0;
 
-    // Initialize producer cycle state for command ring
-    pcs = 1;
-    cr_next = 0;
-
     for (int port = 1; port <= maxports; ++port) {
         if (!USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc))
             continue;
@@ -1443,7 +1309,7 @@ int usbxhci::enable_slot(int port)
 
     usb_blocking_iocp_t block;
 
-    issue_cmd(&cmd, &block);
+    issue_cmd((usbxhci_cmd_trb_t*)&cmd, &block);
     block.set_expect(1);
 
     block.wait();
@@ -1519,7 +1385,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     usbxhci_endpoint_data_t *epdata = add_endpoint(slotid, 0);
 
-    inpepctx->tr_dq_ptr = epdata->xfer_ring_physaddr | epdata->ccs;
+    inpepctx->tr_dq_ptr = epdata->ring.physaddr | epdata->ring.cycle;
 
     usbxhci_cmd_trb_setaddr_t setaddr{};
     setaddr.input_ctx_physaddr = mphysaddr(inp.any);
@@ -1529,7 +1395,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     usb_blocking_iocp_t block;
 
-    issue_cmd(&setaddr, &block);
+    issue_cmd((usbxhci_cmd_trb_t*)&setaddr, &block);
     block.set_expect(1);
 
     block.wait();
@@ -1608,8 +1474,8 @@ bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
     ep->interval = interval;
 
     ep->tr_dq_ptr = (USBXHCI_EPCTX_TR_DQ_PTR_PTR_MASK &
-            epd->xfer_ring_physaddr) |
-            USBXHCI_EPCTX_TR_DQ_PTR_DCS_n(epd->ccs);
+            epd->ring.physaddr) |
+            USBXHCI_EPCTX_TR_DQ_PTR_DCS_n(epd->ring.cycle);
 
     uint8_t ep_type_value = uint8_t(ep_type);
     if (in)
@@ -1763,7 +1629,7 @@ int usbxhci::reset_ep_async(int slotid, uint8_t epid, usb_iocp_t *iocp)
             : USBXHCI_DB_VAL_OUT_EP_UPD_n(epid & 0xF);
     cmd.slotid = slotid;
 
-    issue_cmd(&cmd, iocp);
+    issue_cmd((usbxhci_cmd_trb_t*)&cmd, iocp);
 
     return 0;
 }
@@ -1817,27 +1683,24 @@ usb_cc_t usbxhci::commit_inp_ctx(int slotid, int epid,
                                      usbxhci_inpctx_t &inp,
                                      uint32_t trb_type)
 {
-    usbxhci_endpoint_data_t *epd = lookup_endpoint(slotid, epid);
-
     // Issue evaluate context command
     usbxhci_ctl_trb_evalctx_t *eval = (usbxhci_ctl_trb_evalctx_t *)
             calloc(1, sizeof(*eval));
     eval->trt = USBXHCI_CTL_TRB_TRT_SLOTID_n(slotid);
     eval->input_ctx_ptr = mphysaddr(inp.any);
-    eval->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(trb_type) |
-            USBXHCI_CTL_TRB_FLAGS_C_n(epd->ccs);
+    eval->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(trb_type);
 
     usb_blocking_iocp_t block;
 
-    issue_cmd(eval, &block);
+    issue_cmd((usbxhci_cmd_trb_t*)eval, &block);
     block.set_expect(1);
+
+    block.wait();
 
     if (!dev_ctx_large)
         munmap(inp.any, sizeof(usbxhci_inpctx_small_t));
     else
         munmap(inp.any, sizeof(usbxhci_inpctx_large_t));
-
-    block.wait();
 
     return block.get_result().cc;
 }
@@ -1936,13 +1799,14 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
 
     // Lookup pending command
     scoped_lock hold_cmd_lock(lock_cmd);
-    refptr<usbxhci_pending_cmd_t> pcp = usbxhci_pending_ht.lookup(&cmdaddr);
-    if (pcp)
+    usbxhci_pending_cmd_t *pcp = usbxhci_pending_ht.lookup(&cmdaddr);
+    assert(pcp);
+    if (pcp) {
         usbxhci_pending_ht.del(&cmdaddr);
-    hold_cmd_lock.unlock();
 
-    // Invoke completion handler
-    cmd_comp(evt, pcp->iocp);
+        // Invoke completion handler
+        cmd_comp(evt, pcp->iocp);
+    }
 }
 
 isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
@@ -1980,24 +1844,30 @@ void usbxhci::irq_handler(int irq)
             // Acknowledge the interrupt
             ir->iman |= USBXHCI_INTR_IMAN_IP;
 
-            while (!ir_info->ccs ==
-                   !(ir_info->evt_ring[ir_info->next].flags &
+            bool any_consumed = false;
+
+            while (!ir_info->cycle ==
+                   !(ir_info->ptr[ir_info->next].flags &
                      USBXHCI_EVT_FLAGS_C)) {
-                usbxhci_evt_t *evt = (usbxhci_evt_t*)(ir_info->evt_ring +
+                usbxhci_evt_t *evt = (usbxhci_evt_t*)(ir_info->ptr +
                         ir_info->next++);
 
                 if (ir_info->next >= ir_info->count) {
                     ir_info->next = 0;
-                    ir_info->ccs = !ir_info->ccs;
+                    ir_info->cycle = !ir_info->cycle;
                 }
+
+                any_consumed = true;
 
                 evt_handler(ir_info, ir, evt, ii);
             }
 
-            // Notify HC that we have consumed some events
-            ir->erdp = (ir_info->evt_ring_physaddr +
-                    ir_info->next * sizeof(*ir_info->evt_ring)) |
-                    (1<<3);
+            if (any_consumed) {
+                // Notify HC that we have consumed some events
+                ir->erdp = (ir_info->physaddr +
+                        ir_info->next * sizeof(*ir_info->ptr)) |
+                        (1<<3);
+            }
         }
 
         // Run completions after consuming events
@@ -2137,3 +2007,88 @@ void usbxhci_detect(void *)
 }
 
 REGISTER_CALLOUT(usbxhci_detect, 0, callout_type_t::usb, "000");
+
+template<typename T>
+void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,
+                                    usb_iocp_t *iocp, bool ins_pending)
+{
+    USBXHCI_CTL_TRB_FLAGS_C_SET(src->data[3], !cycle);
+    usbxhci_cmd_trb_t volatile *dst = &ptr[next];
+
+    // Copy the TRB carefully, ensuring cycle bit is set last
+    dst->data[0] = src->data[0];
+    dst->data[1] = src->data[1];
+    dst->data[2] = src->data[2];
+
+    // Verify that the cycle bit of the existing TRB is as expected
+    assert(USBXHCI_CTL_TRB_FLAGS_C_GET(dst->data[3]) != (cycle != 0));
+
+    // Initially set the cycle bit to the value that prevents TRB execution
+    dst->data[3] = (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+            USBXHCI_CTL_TRB_FLAGS_C_n(!cycle);
+
+    // Guarantee ordering and set cycle bit last
+    atomic_st_rel(&dst->data[3],
+            (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+            USBXHCI_CTL_TRB_FLAGS_C_n(cycle));
+
+
+    if (ins_pending) {
+        usbxhci_pending_cmd_t *pending_cmd = pending + next;
+        ctrl->insert_pending_command(pending_cmd, physaddr +
+                                     next * sizeof(*ptr), iocp);
+    }
+
+    if (++next >= count) {
+        // Update link TRB cycle bit
+        usbxhci_cmd_trb_t volatile *link = ptr + next;
+
+        // Make sure the cycle bit is as expected
+        assert(USBXHCI_CTL_TRB_FLAGS_C_GET(link->data[3]) != cycle);
+
+        // Copy the chain bit from the last TRB to propagate possible
+        // chain across the link TRB
+        bool chain = USBXHCI_CTL_TRB_FLAGS_CH_GET(src->data[3]);
+        USBXHCI_CTL_TRB_FLAGS_CH_SET(link->data[3], chain);
+
+        // Guarantee ordering and set cycle bit last
+        atomic_st_rel(&link->data[3],
+                (link->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
+                USBXHCI_CTL_TRB_FLAGS_C_n(cycle));
+
+        cycle = !cycle;
+        next = 0;
+    }
+}
+
+template<typename T>
+bool usbxhci_ring_data_t<T>::alloc(uint32_t trb_count)
+{
+    pending = (usbxhci_pending_cmd_t*)
+                 mmap(0, sizeof(*pending) * trb_count,
+                      PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+
+    ptr = (T *)mmap(0, sizeof(*ptr) * trb_count,
+                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    physaddr = mphysaddr(ptr);
+
+    next = 0;
+    count = trb_count;
+    cycle = 1;
+
+    return pending != MAP_FAILED && ptr != MAP_FAILED;
+}
+
+template<typename T>
+void usbxhci_ring_data_t<T>::reserve_link()
+{
+    // Reserve entry for link TRB
+    --count;
+
+    auto link = (usbxhci_cmd_trb_link_t *)&ptr[count];
+
+    *link = {};
+    link->ring_physaddr = physaddr;
+    link->c_tc_ch_ioc = USBXHCI_CMD_TRB_TC | USBXHCI_CMD_TRB_C_n(!cycle);
+    link->trb_type = USBXHCI_CMD_TRB_TYPE_n(USBXHCI_TRB_TYPE_LINK);
+}
