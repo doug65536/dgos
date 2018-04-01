@@ -819,9 +819,9 @@ usb_hid_keybd_t::usb_hid_keybd_t(usb_pipe_t const& control,
     : usb_hid_dev_t(control, in, out, iface_idx,
                     &usb_hid_keybd_t::keybd_completion)
 {
-    uint8_t hid_desc[256] = {};
-    uint8_t report_desc[256] = {};
-    uint8_t phys_desc[256] = {};
+//    uint8_t hid_desc[256] = {};
+//    uint8_t report_desc[256] = {};
+//    uint8_t phys_desc[256] = {};
 
     // Report protocol
     //int proto_cc = set_protocol(1);
