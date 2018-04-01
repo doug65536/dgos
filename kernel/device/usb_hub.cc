@@ -77,8 +77,6 @@ usb_hub_t::usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status)
 
 bool usb_hub_t::init()
 {
-    post_status_recv();
-
     control.send_default_control(
                 uint8_t(usb_dir_t::IN) |
                 (uint8_t(usb_req_type::CLASS) << 5) |
@@ -101,6 +99,8 @@ bool usb_hub_t::init()
         }
     }
 
+    post_status_recv();
+
     return true;
 }
 
@@ -120,7 +120,8 @@ int usb_hub_t::get_port_status(int port)
 
 void usb_hub_t::post_status_recv()
 {
-    status_iocp.reset(&usb_hub_t::status_completion);
+    status_data = 0;
+    status_iocp.reset(&usb_hub_t::status_completion, uintptr_t(this));
     status.recv_async(&status_data, sizeof(status_data), &status_iocp);
     status_iocp.set_expect(1);
 }
