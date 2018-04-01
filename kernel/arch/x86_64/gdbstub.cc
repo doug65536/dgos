@@ -888,6 +888,8 @@ void gdbstub_t::run()
     // will not interfere with the stub
     mm_fork_kernel_text();
 
+    GDBSTUB_TRACE("Opening serial port\n");
+
     port = uart_dev_t::open(0x3f8, 4, 115200, 8, 'N', 1, false);
 
     port->route_irq(gdb_cpu_ctrl_t::get_gdb_cpu());
@@ -904,9 +906,12 @@ void gdbstub_t::run()
     for (;;) {
         ssize_t rcvd = port->read(rx_buf, MAX_BUFFER_SIZE, 0);
 
-        if (rcvd != 0)
+        if (rcvd != 0) {
+            GDBSTUB_TRACE("Received serial data:\n");
+            hex_dump(rx_buf, rcvd);
+
             data_received(rx_buf, rcvd);
-        else {
+        } else {
             // Poll for a frozen CPU
             int cpu_nr;
 
