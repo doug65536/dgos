@@ -2577,11 +2577,14 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                         target_cpus ? target_cpus[i] : cpu,
                         vector_base + i);
 
-        irq_to_intr[vector_base + i - INTR_APIC_IRQ_BASE] = vector_base + i;
-        intr_to_irq[vector_base + i] = vector_base + i - INTR_APIC_IRQ_BASE;
+        uint8_t intr = vector_base + i;
+        uint8_t irq = vector_base + i - INTR_APIC_IRQ_BASE;
 
-        ioapic_hook(vector_base + i - ioapic_msi_base_intr +
-                 ioapic_msi_base_irq, handler, name);
+        APIC_TRACE("%s msi(x) IRQ %u = vector %u\n", name, irq, intr);
+        irq_to_intr[irq] = intr;
+        intr_to_irq[intr] = irq;
+
+        ioapic_hook(irq, handler, name);
 
         if (distribute && cpu >= 0) {
             if (++cpu >= int(apic_id_count))
