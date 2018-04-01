@@ -21,7 +21,7 @@ do
 					printf %s \
 						"$rt-$np-$fs-$sc-$em: " \
 						$IMG \
-						' dump/qemu-debug-out' \
+						' $(QEMU_EXTRA_DEPS)' \
 						$'\n' $'\t' \
 						'echo -e -n ' $'\'' '\ec' $'\'' \
 						' >> dump/qemu-debug-out' \

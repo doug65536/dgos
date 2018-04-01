@@ -1,9 +1,3 @@
-OBJDUMP ?= objdump
-GREP ?= grep
-SED ?= sed
-SORT ?= sort
-GZIP ?= gzip
-
 bootfat.sym: bootfat-elf \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \

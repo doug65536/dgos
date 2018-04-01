@@ -20,11 +20,54 @@ AC_PROG_CXX
 AM_PROG_AS
 AM_PROG_AR
 AC_PROG_RANLIB
+AC_LANG([C++])
+
+AC_CHECK_TOOL([OBJDUMP], [objdump], [NOT_FOUND])
+if test x"$OBJDUMP" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find disassembler])
+fi
 
 AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
 if test x"$MKISOFS" == x"NOT_FOUND"
 then
-	AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])
+    AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])
+fi
+
+AC_CHECK_PROGS([GREP], [grep], [NOT_FOUND])
+if test x"$GREP" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find grep])
+fi
+
+AC_CHECK_PROGS([SED], [sed], [NOT_FOUND])
+if test x"$SED" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find sed])
+fi
+
+AC_CHECK_PROGS([SORT], [sort], [NOT_FOUND])
+if test x"$SORT" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find sort])
+fi
+
+AC_CHECK_PROGS([GZIP], [gzip], [NOT_FOUND])
+if test x"$GZIP" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find gzip])
+fi
+
+AC_CHECK_PROGS([TRUNCATE], [truncate], [NOT_FOUND])
+if test x"$TRUNCATE" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find truncate])
+fi
+
+AC_CHECK_PROGS([SHRED], [shred], [NOT_FOUND])
+if test x"$SHRED" == x"NOT_FOUND"
+then
+    AC_MSG_FAILURE([Cannot find shred])
 fi
 
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
@@ -34,8 +77,8 @@ AC_CACHE_CHECK([whether _AC_LANG compiler accepts $1], CACHEVAR, [
   ax_check_save_flags=$[]_AC_LANG_PREFIX[]FLAGS
   _AC_LANG_PREFIX[]FLAGS="$[]_AC_LANG_PREFIX[]FLAGS $4 $1"
   AC_COMPILE_IFELSE([m4_default([$5],[AC_LANG_PROGRAM()])],
-	[AS_VAR_SET(CACHEVAR,[yes])],
-	[AS_VAR_SET(CACHEVAR,[no])])
+    [AS_VAR_SET(CACHEVAR,[yes])],
+    [AS_VAR_SET(CACHEVAR,[no])])
   _AC_LANG_PREFIX[]FLAGS=$ax_check_save_flags])
 AS_VAR_IF(CACHEVAR,yes,
   [m4_default([$2], :)],
@@ -47,6 +90,13 @@ COMPILER_WERROR=
 for flag in Wall Wextra Wpedantic Werror; do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[COMPILER_WERROR+=" -$flag"])
+done
+
+CXX_STD_FLAGS=
+for flag in 'std=c++14'; do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[CXX_STD_FLAGS+=" -$flag"],
+		[], [$COMPILER_WERROR])
 done
 
 COMPILER_FLAGS=

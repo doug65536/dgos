@@ -608,7 +608,14 @@ FREESTANDING_FLAGS
 SMALLEST_CODE_FLAGS
 ASM_DEBUG_INFO_FLAGS
 COMPILER_FLAGS
+SHRED
+TRUNCATE
+GZIP
+SORT
+SED
+GREP
 MKISOFS
+OBJDUMP
 RANLIB
 ac_ct_AR
 AR
@@ -6559,6 +6566,112 @@ else
   RANLIB="$ac_cv_prog_RANLIB"
 fi
 
+ac_ext=cpp
+ac_cpp='$CXXCPP $CPPFLAGS'
+ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
+ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
+ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
+
+
+if test -n "$ac_tool_prefix"; then
+  # Extract the first word of "${ac_tool_prefix}objdump", so it can be a program name with args.
+set dummy ${ac_tool_prefix}objdump; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_OBJDUMP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$OBJDUMP"; then
+  ac_cv_prog_OBJDUMP="$OBJDUMP" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_OBJDUMP="${ac_tool_prefix}objdump"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+OBJDUMP=$ac_cv_prog_OBJDUMP
+if test -n "$OBJDUMP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $OBJDUMP" >&5
+$as_echo "$OBJDUMP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+fi
+if test -z "$ac_cv_prog_OBJDUMP"; then
+  ac_ct_OBJDUMP=$OBJDUMP
+  # Extract the first word of "objdump", so it can be a program name with args.
+set dummy objdump; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_ac_ct_OBJDUMP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$ac_ct_OBJDUMP"; then
+  ac_cv_prog_ac_ct_OBJDUMP="$ac_ct_OBJDUMP" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_ac_ct_OBJDUMP="objdump"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+ac_ct_OBJDUMP=$ac_cv_prog_ac_ct_OBJDUMP
+if test -n "$ac_ct_OBJDUMP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_ct_OBJDUMP" >&5
+$as_echo "$ac_ct_OBJDUMP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+  if test "x$ac_ct_OBJDUMP" = x; then
+    OBJDUMP="NOT_FOUND"
+  else
+    case $cross_compiling:$ac_tool_warned in
+yes:)
+{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: using cross tools not prefixed with host triplet" >&5
+$as_echo "$as_me: WARNING: using cross tools not prefixed with host triplet" >&2;}
+ac_tool_warned=yes ;;
+esac
+    OBJDUMP=$ac_ct_OBJDUMP
+  fi
+else
+  OBJDUMP="$ac_cv_prog_OBJDUMP"
+fi
+
+if test x"$OBJDUMP" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find disassembler
+See \`config.log' for more details" "$LINENO" 5; }
+fi
 
 for ac_prog in mkisofs genisoimage
 do
@@ -6605,22 +6718,329 @@ test -n "$MKISOFS" || MKISOFS="NOT_FOUND"
 
 if test x"$MKISOFS" == x"NOT_FOUND"
 then
-	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Install mkisofs (or genisoimage) to build CD images" >&5
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Install mkisofs (or genisoimage) to build CD images" >&5
 $as_echo "$as_me: WARNING: Install mkisofs (or genisoimage) to build CD images" >&2;}
+fi
+
+for ac_prog in grep
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_GREP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$GREP"; then
+  ac_cv_prog_GREP="$GREP" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_GREP="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+GREP=$ac_cv_prog_GREP
+if test -n "$GREP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GREP" >&5
+$as_echo "$GREP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$GREP" && break
+done
+test -n "$GREP" || GREP="NOT_FOUND"
+
+if test x"$GREP" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find grep
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
+for ac_prog in sed
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_SED+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$SED"; then
+  ac_cv_prog_SED="$SED" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_SED="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+SED=$ac_cv_prog_SED
+if test -n "$SED"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SED" >&5
+$as_echo "$SED" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$SED" && break
+done
+test -n "$SED" || SED="NOT_FOUND"
+
+if test x"$SED" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find sed
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
+for ac_prog in sort
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_SORT+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$SORT"; then
+  ac_cv_prog_SORT="$SORT" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_SORT="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+SORT=$ac_cv_prog_SORT
+if test -n "$SORT"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SORT" >&5
+$as_echo "$SORT" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$SORT" && break
+done
+test -n "$SORT" || SORT="NOT_FOUND"
+
+if test x"$SORT" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find sort
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
+for ac_prog in gzip
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_GZIP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$GZIP"; then
+  ac_cv_prog_GZIP="$GZIP" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_GZIP="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+GZIP=$ac_cv_prog_GZIP
+if test -n "$GZIP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $GZIP" >&5
+$as_echo "$GZIP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$GZIP" && break
+done
+test -n "$GZIP" || GZIP="NOT_FOUND"
+
+if test x"$GZIP" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find gzip
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
+for ac_prog in truncate
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_TRUNCATE+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$TRUNCATE"; then
+  ac_cv_prog_TRUNCATE="$TRUNCATE" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_TRUNCATE="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+TRUNCATE=$ac_cv_prog_TRUNCATE
+if test -n "$TRUNCATE"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $TRUNCATE" >&5
+$as_echo "$TRUNCATE" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$TRUNCATE" && break
+done
+test -n "$TRUNCATE" || TRUNCATE="NOT_FOUND"
+
+if test x"$TRUNCATE" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find truncate
+See \`config.log' for more details" "$LINENO" 5; }
+fi
+
+for ac_prog in shred
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_SHRED+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$SHRED"; then
+  ac_cv_prog_SHRED="$SHRED" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_SHRED="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+SHRED=$ac_cv_prog_SHRED
+if test -n "$SHRED"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $SHRED" >&5
+$as_echo "$SHRED" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$SHRED" && break
+done
+test -n "$SHRED" || SHRED="NOT_FOUND"
+
+if test x"$SHRED" == x"NOT_FOUND"
+then
+    { { $as_echo "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+$as_echo "$as_me: error: in \`$ac_pwd':" >&2;}
+as_fn_error $? "Cannot find shred
+See \`config.log' for more details" "$LINENO" 5; }
 fi
 
 
 COMPILER_WERROR=
 for flag in Wall Wextra Wpedantic Werror; do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+
+as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6632,19 +7052,60 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
   COMPILER_WERROR+=" -$flag"
+else
+  :
+fi
+
+done
+
+CXX_STD_FLAGS=
+for flag in 'std=c++14'; do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $COMPILER_WERROR -$flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
+  CXX_STD_FLAGS+=" -$flag"
 else
   :
 fi
@@ -6662,15 +7123,15 @@ for flag in \
 		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS $COMPILER_WERROR -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $COMPILER_WERROR -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6682,13 +7143,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -6712,15 +7173,15 @@ for flag in \
 	O2 fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize \
 	fstrict-aliasing
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS $COMPILER_WERROR -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $COMPILER_WERROR -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6732,13 +7193,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -6753,15 +7214,15 @@ done
 
 for flag in Wa,-g g ggdb3
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS $COMPILER_WERROR -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $COMPILER_WERROR -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6773,13 +7234,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -6795,15 +7256,15 @@ done
 
 
 SMALLEST_CODE_FLAGS=
-as_CACHEVAR=`$as_echo "ax_cv_check_cflags_$COMPILER_WERROR_-Oz" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Oz" >&5
-$as_echo_n "checking whether C compiler accepts -Oz... " >&6; }
+as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-Oz" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -Oz" >&5
+$as_echo_n "checking whether C++ compiler accepts -Oz... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS $COMPILER_WERROR -Oz"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $COMPILER_WERROR -Oz"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6815,13 +7276,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -6829,14 +7290,14 @@ $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
   SMALLEST_CODE_FLAGS=-Oz
 else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -Os" >&5
-$as_echo_n "checking whether C compiler accepts -Os... " >&6; }
-if ${ax_cv_check_cflags___Os+:} false; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -Os" >&5
+$as_echo_n "checking whether C++ compiler accepts -Os... " >&6; }
+if ${ax_cv_check_cxxflags___Os+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -Os"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -Os"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6848,17 +7309,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___Os=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___Os=yes
 else
-  ax_cv_check_cflags___Os=no
+  ax_cv_check_cxxflags___Os=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___Os" >&5
-$as_echo "$ax_cv_check_cflags___Os" >&6; }
-if test "x$ax_cv_check_cflags___Os" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___Os" >&5
+$as_echo "$ax_cv_check_cxxflags___Os" >&6; }
+if test "x$ax_cv_check_cxxflags___Os" = xyes; then :
   SMALLEST_CODE_FLAGS=-Os
 else
   $COMPILER_WERROR
@@ -6869,15 +7330,15 @@ fi
 for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
 		mno-align-stringops Wno-ignored-optimization-argument
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6889,13 +7350,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -6912,15 +7373,15 @@ done
 
 for flag in ffreestanding
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6932,13 +7393,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -6956,15 +7417,15 @@ done
 REAL_MODE_FLAGS=
 for flag in m32 mgeneral-regs-only
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -6976,13 +7437,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -7000,15 +7461,15 @@ done
 REGPARM_FLAGS=
 for flag in mrtd mregparm=3
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7020,13 +7481,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -7048,15 +7509,15 @@ GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $REAL_MODE_FLAGS -print-libgcc-file-name)
 NO_PIC_FLAGS=
 for flag in fno-pie fno-pic
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7068,13 +7529,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -7092,15 +7553,15 @@ done
 BMI_FLAGS=
 for flag in mabm mbmi mbmi2
 do
-	as_CACHEVAR=`$as_echo "ax_cv_check_cflags__-$flag" | $as_tr_sh`
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -$flag" >&5
-$as_echo_n "checking whether C compiler accepts -$flag... " >&6; }
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -$flag"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7112,13 +7573,13 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+if ac_fn_cxx_try_compile "$LINENO"; then :
   eval "$as_CACHEVAR=yes"
 else
   eval "$as_CACHEVAR=no"
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
 eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
@@ -7134,14 +7595,14 @@ done
 
 
 DISABLE_FRAMEPOINTER_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-omit-frame-pointer" >&5
-$as_echo_n "checking whether C compiler accepts -fno-omit-frame-pointer... " >&6; }
-if ${ax_cv_check_cflags___fno_omit_frame_pointer+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-omit-frame-pointer" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-omit-frame-pointer... " >&6; }
+if ${ax_cv_check_cxxflags___fno_omit_frame_pointer+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-omit-frame-pointer"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-omit-frame-pointer"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7153,17 +7614,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_omit_frame_pointer=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_omit_frame_pointer=yes
 else
-  ax_cv_check_cflags___fno_omit_frame_pointer=no
+  ax_cv_check_cxxflags___fno_omit_frame_pointer=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_omit_frame_pointer" >&5
-$as_echo "$ax_cv_check_cflags___fno_omit_frame_pointer" >&6; }
-if test "x$ax_cv_check_cflags___fno_omit_frame_pointer" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_omit_frame_pointer" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_omit_frame_pointer" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_omit_frame_pointer" = xyes; then :
   DISABLE_FRAMEPOINTER_FLAGS=" -fomit-frame-pointer"
 
 else
@@ -7173,14 +7634,14 @@ fi
 
 
 ENABLE_FRAMEPOINTER_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fomit-frame-pointer" >&5
-$as_echo_n "checking whether C compiler accepts -fomit-frame-pointer... " >&6; }
-if ${ax_cv_check_cflags___fomit_frame_pointer+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fomit-frame-pointer" >&5
+$as_echo_n "checking whether C++ compiler accepts -fomit-frame-pointer... " >&6; }
+if ${ax_cv_check_cxxflags___fomit_frame_pointer+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fomit-frame-pointer"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fomit-frame-pointer"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7192,17 +7653,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fomit_frame_pointer=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fomit_frame_pointer=yes
 else
-  ax_cv_check_cflags___fomit_frame_pointer=no
+  ax_cv_check_cxxflags___fomit_frame_pointer=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fomit_frame_pointer" >&5
-$as_echo "$ax_cv_check_cflags___fomit_frame_pointer" >&6; }
-if test "x$ax_cv_check_cflags___fomit_frame_pointer" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fomit_frame_pointer" >&5
+$as_echo "$ax_cv_check_cxxflags___fomit_frame_pointer" >&6; }
+if test "x$ax_cv_check_cxxflags___fomit_frame_pointer" = xyes; then :
   ENABLE_FRAMEPOINTER_FLAGS=" -fno-omit-frame-pointer"
 
 else
@@ -7212,14 +7673,14 @@ fi
 
 
 NO_REDZONE_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -mno-red-zone" >&5
-$as_echo_n "checking whether C compiler accepts -mno-red-zone... " >&6; }
-if ${ax_cv_check_cflags___mno_red_zone+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -mno-red-zone" >&5
+$as_echo_n "checking whether C++ compiler accepts -mno-red-zone... " >&6; }
+if ${ax_cv_check_cxxflags___mno_red_zone+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -mno-red-zone"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -mno-red-zone"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7231,17 +7692,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___mno_red_zone=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___mno_red_zone=yes
 else
-  ax_cv_check_cflags___mno_red_zone=no
+  ax_cv_check_cxxflags___mno_red_zone=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___mno_red_zone" >&5
-$as_echo "$ax_cv_check_cflags___mno_red_zone" >&6; }
-if test "x$ax_cv_check_cflags___mno_red_zone" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___mno_red_zone" >&5
+$as_echo "$ax_cv_check_cxxflags___mno_red_zone" >&6; }
+if test "x$ax_cv_check_cxxflags___mno_red_zone" = xyes; then :
   NO_REDZONE_FLAGS=" -mno-red-zone"
 
 else
@@ -7251,14 +7712,14 @@ fi
 
 
 NO_STACKPROTECTOR_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-stack-protector" >&5
-$as_echo_n "checking whether C compiler accepts -fno-stack-protector... " >&6; }
-if ${ax_cv_check_cflags___fno_stack_protector+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-stack-protector" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-stack-protector... " >&6; }
+if ${ax_cv_check_cxxflags___fno_stack_protector+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-stack-protector"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-stack-protector"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7270,17 +7731,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_stack_protector=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_stack_protector=yes
 else
-  ax_cv_check_cflags___fno_stack_protector=no
+  ax_cv_check_cxxflags___fno_stack_protector=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_stack_protector" >&5
-$as_echo "$ax_cv_check_cflags___fno_stack_protector" >&6; }
-if test "x$ax_cv_check_cflags___fno_stack_protector" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_stack_protector" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_stack_protector" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_stack_protector" = xyes; then :
   NO_STACKPROTECTOR_FLAGS=" -fno-stack-protector"
 
 else
@@ -7290,14 +7751,14 @@ fi
 
 
 STACK_CHECK_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fstack-check" >&5
-$as_echo_n "checking whether C compiler accepts -fstack-check... " >&6; }
-if ${ax_cv_check_cflags___fstack_check+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fstack-check" >&5
+$as_echo_n "checking whether C++ compiler accepts -fstack-check... " >&6; }
+if ${ax_cv_check_cxxflags___fstack_check+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fstack-check"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fstack-check"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7309,17 +7770,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fstack_check=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fstack_check=yes
 else
-  ax_cv_check_cflags___fstack_check=no
+  ax_cv_check_cxxflags___fstack_check=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fstack_check" >&5
-$as_echo "$ax_cv_check_cflags___fstack_check" >&6; }
-if test "x$ax_cv_check_cflags___fstack_check" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fstack_check" >&5
+$as_echo "$ax_cv_check_cxxflags___fstack_check" >&6; }
+if test "x$ax_cv_check_cxxflags___fstack_check" = xyes; then :
   STACK_CHECK_FLAGS=" -fstack-check"
 
 else
@@ -7329,14 +7790,14 @@ fi
 
 
 NO_STACK_CHECK_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-stack-check" >&5
-$as_echo_n "checking whether C compiler accepts -fno-stack-check... " >&6; }
-if ${ax_cv_check_cflags___fno_stack_check+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-stack-check" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-stack-check... " >&6; }
+if ${ax_cv_check_cxxflags___fno_stack_check+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-stack-check"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-stack-check"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7348,17 +7809,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_stack_check=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_stack_check=yes
 else
-  ax_cv_check_cflags___fno_stack_check=no
+  ax_cv_check_cxxflags___fno_stack_check=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_stack_check" >&5
-$as_echo "$ax_cv_check_cflags___fno_stack_check" >&6; }
-if test "x$ax_cv_check_cflags___fno_stack_check" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_stack_check" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_stack_check" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_stack_check" = xyes; then :
   NO_STACK_CHECK_FLAGS=" -fno-stack-check"
 
 else
@@ -7368,14 +7829,14 @@ fi
 
 
 NO_RTTI_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-rtti" >&5
-$as_echo_n "checking whether C compiler accepts -fno-rtti... " >&6; }
-if ${ax_cv_check_cflags___fno_rtti+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-rtti" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-rtti... " >&6; }
+if ${ax_cv_check_cxxflags___fno_rtti+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-rtti"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-rtti"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7387,17 +7848,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_rtti=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_rtti=yes
 else
-  ax_cv_check_cflags___fno_rtti=no
+  ax_cv_check_cxxflags___fno_rtti=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_rtti" >&5
-$as_echo "$ax_cv_check_cflags___fno_rtti" >&6; }
-if test "x$ax_cv_check_cflags___fno_rtti" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_rtti" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_rtti" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_rtti" = xyes; then :
   NO_RTTI_FLAGS=" -fno-rtti"
 
 else
@@ -7407,14 +7868,14 @@ fi
 
 
 NO_UNWIND_TABLES_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-asynchronous-unwind-tables" >&5
-$as_echo_n "checking whether C compiler accepts -fno-asynchronous-unwind-tables... " >&6; }
-if ${ax_cv_check_cflags___fno_asynchronous_unwind_tables+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-asynchronous-unwind-tables" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-asynchronous-unwind-tables... " >&6; }
+if ${ax_cv_check_cxxflags___fno_asynchronous_unwind_tables+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-asynchronous-unwind-tables"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-asynchronous-unwind-tables"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7426,17 +7887,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_asynchronous_unwind_tables=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_asynchronous_unwind_tables=yes
 else
-  ax_cv_check_cflags___fno_asynchronous_unwind_tables=no
+  ax_cv_check_cxxflags___fno_asynchronous_unwind_tables=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_asynchronous_unwind_tables" >&5
-$as_echo "$ax_cv_check_cflags___fno_asynchronous_unwind_tables" >&6; }
-if test "x$ax_cv_check_cflags___fno_asynchronous_unwind_tables" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_asynchronous_unwind_tables" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_asynchronous_unwind_tables" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_asynchronous_unwind_tables" = xyes; then :
   NO_UNWIND_TABLES_FLAGS=" -fno-asynchronous-unwind-tables"
 
 else
@@ -7446,14 +7907,14 @@ fi
 
 
 NO_EXCEPTIONS_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-exceptions" >&5
-$as_echo_n "checking whether C compiler accepts -fno-exceptions... " >&6; }
-if ${ax_cv_check_cflags___fno_exceptions+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-exceptions" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-exceptions... " >&6; }
+if ${ax_cv_check_cxxflags___fno_exceptions+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-exceptions"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-exceptions"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7465,17 +7926,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_exceptions=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_exceptions=yes
 else
-  ax_cv_check_cflags___fno_exceptions=no
+  ax_cv_check_cxxflags___fno_exceptions=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_exceptions" >&5
-$as_echo "$ax_cv_check_cflags___fno_exceptions" >&6; }
-if test "x$ax_cv_check_cflags___fno_exceptions" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_exceptions" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_exceptions" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_exceptions" = xyes; then :
   NO_EXCEPTIONS_FLAGS=" -fno-exceptions"
 
 else
@@ -7485,14 +7946,14 @@ fi
 
 
 NO_COMMON_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -fno-common" >&5
-$as_echo_n "checking whether C compiler accepts -fno-common... " >&6; }
-if ${ax_cv_check_cflags___fno_common+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-common" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-common... " >&6; }
+if ${ax_cv_check_cxxflags___fno_common+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -fno-common"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-common"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7504,17 +7965,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___fno_common=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_common=yes
 else
-  ax_cv_check_cflags___fno_common=no
+  ax_cv_check_cxxflags___fno_common=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___fno_common" >&5
-$as_echo "$ax_cv_check_cflags___fno_common" >&6; }
-if test "x$ax_cv_check_cflags___fno_common" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_common" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_common" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_common" = xyes; then :
   NO_COMMON_FLAGS=" -fno-common"
 
 else
@@ -7524,14 +7985,14 @@ fi
 
 
 VECTORIZE_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C compiler accepts -ftree-vectorize" >&5
-$as_echo_n "checking whether C compiler accepts -ftree-vectorize... " >&6; }
-if ${ax_cv_check_cflags___ftree_vectorize+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -ftree-vectorize" >&5
+$as_echo_n "checking whether C++ compiler accepts -ftree-vectorize... " >&6; }
+if ${ax_cv_check_cxxflags___ftree_vectorize+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
-  ax_check_save_flags=$CFLAGS
-  CFLAGS="$CFLAGS  -ftree-vectorize"
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -ftree-vectorize"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -7543,17 +8004,17 @@ main ()
   return 0;
 }
 _ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  ax_cv_check_cflags___ftree_vectorize=yes
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___ftree_vectorize=yes
 else
-  ax_cv_check_cflags___ftree_vectorize=no
+  ax_cv_check_cxxflags___ftree_vectorize=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CFLAGS=$ax_check_save_flags
+  CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cflags___ftree_vectorize" >&5
-$as_echo "$ax_cv_check_cflags___ftree_vectorize" >&6; }
-if test "x$ax_cv_check_cflags___ftree_vectorize" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___ftree_vectorize" >&5
+$as_echo "$ax_cv_check_cxxflags___ftree_vectorize" >&6; }
+if test "x$ax_cv_check_cxxflags___ftree_vectorize" = xyes; then :
   VECTORIZE_FLAGS=" -ftree-vectorize"
 
 else

@@ -1114,6 +1114,14 @@ $(top_srcdir)/kernel/device/acpibits.h: \
 	$(top_srcdir)/genregs.py "$<" > "$@"
 
 # ----------------------------------------------------------------------------
+# Randomize RAM content
+
+random-mem.img:
+	echo Building $(QEMU_RAM) random initial memory content image...
+	$(TRUNCATE) --size $(QEMU_RAM) "$@"
+	$(SHRED) --iterations=1 "$@"
+
+# ----------------------------------------------------------------------------
 # QEMU launcher
 
 $(DUMPDIR)/qemu-debug-out:
@@ -1122,23 +1130,35 @@ $(DUMPDIR)/qemu-debug-out:
 
 QEMU = qemu-system-x86_64
 
-QEMU_CPUS = 8
+QEMU_EXTRA_DEPS = random-mem.img $(DUMPDIR)/qemu-debug-out
+
+QEMU_CPUS = 16
 QEMU_CORES = 4
 QEMU_THREADS = 1
 QEMU_CPU = max,migratable=false,host-cache-info=true
 
 QEMU_RAM = 5G
 
-QEMU_USB = -device nec-usb-xhci,id=xhci \
-	-drive if=none,id=stick,file=usb_disk.img,format=raw \
+QEMU_MEMFILL = \
+	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
+	-numa node,nodeid=0,cpus=0-15,memdev=ram-node0
+
+QEMU_USB = \
+	-device nec-usb-xhci,id=xhci \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
 	$(QEMU_USB_EXTRA) \
+	-device usb-uas,bus=xhci.0,id=uas \
+	-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none \
+	-device scsi-hd,drive=stick \
 	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
 	-device usb-audio,bus=xhci.0 \
 	-device usb-net,bus=xhci.0 \
-	-device usb-storage,bus=xhci.0,drive=stick \
 	-trace 'usb*'
+
+#-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none \
+#-device usb-storage,bus=xhci.0,drive=stick
+#
 
 QEMU_NET = \
 	-net nic,model=rtl8139 \
@@ -1168,7 +1188,8 @@ QEMU_COMMON = \
 	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS) \
-	$(QEMU_USB)
+	$(QEMU_USB) \
+	$(QEMU_MEMFILL)
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
