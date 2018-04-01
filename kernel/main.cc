@@ -143,8 +143,6 @@ private:
         static int completion_count;
         int id = atomic_xadd(&next_id, 1);
 
-        thread_t tid = thread_get_id();
-
         storage_dev_base_t *drive = storage_dev_open(devid);
 
         if (!drive) {
@@ -173,10 +171,10 @@ private:
         // Prime the queue
         for (size_t i = 0; i < queue_depth; ++i) {
             status = drive->read_async(data[i], 1, i, &iocp[i]);
-            if (status != errno_t::OK)
-                printdbg("(devid %d) (tid %3d)"
-                         " Storage read (completion failed) status=%d\n",
-                         devid, tid, (int)status);
+//            if (status != errno_t::OK)
+//                printdbg("(devid %d) (tid %3d)"
+//                         " Storage read (completion failed) status=%d\n",
+//                         devid, tid, (int)status);
         }
 
         size_t slot = 0;
@@ -189,20 +187,22 @@ private:
             //int64_t count = rand_r_range(&seed, 1, data_blocks);
 
             status = iocp[slot].wait();
-            if (status != errno_t::OK)
-                printdbg("(devid %d) (tid %3d)"
-                         " Storage read (completion failed) status=%d\n",
-                         devid, tid, (int)status);
+//            if (status != errno_t::OK)
+//                printdbg("(devid %d) (tid %3d)"
+//                         " Storage read (completion failed) status=%d\n",
+//                         devid, tid, (int)status);
             iocp[slot].reset();
             int64_t count = data_blocks;
             status = drive->read_async(data[slot], count, lba, &iocp[slot]);
             if (++slot == queue_depth)
                 slot = 0;
 
-            if (status != errno_t::OK)
-                printdbg("(devid %d) (%3d)"
-                         " Storage read (issue failed) status=%d\n",
-                         devid, tid, (int)status);
+            //thread_sleep_for(100);
+
+//            if (status != errno_t::OK)
+//                printdbg("(devid %d) (%3d)"
+//                         " Storage read (issue failed) status=%d\n",
+//                         devid, tid, (int)status);
 
             atomic_inc(counts + (id << 6));
 
