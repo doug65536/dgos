@@ -2552,8 +2552,10 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int const *target_cpus)
 {
     // Don't try to use MSI if there are no IOAPIC devices
-    if (ioapic_count == 0)
+    if (ioapic_count == 0) {
+        APIC_TRACE("Can't allocate MSI interrupts, no APIC devices\n");
         return 0;
+    }
 
     // If out of range starting CPU number, force to zero
     if (cpu < 0 || unsigned(cpu) >= apic_id_count)
