@@ -112,7 +112,7 @@ static void keyb8042_keyboard_handler(void)
     scancode = inb(KEYB_DATA);
 
     int32_t vk = 0;
-    int sign = -!!(scancode & 0x80) * 2 - 1;
+    int sign = !!(scancode & 0x80) * -2 + 1;
 
     switch (keyb8042_state) {
     case NORMAL:
