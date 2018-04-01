@@ -834,8 +834,12 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
     return 0;
 }
 
+static mcslock cprintf_lock;
+
 EXPORT int vcprintf(char const *format, va_list ap)
 {
+    unique_lock<mcslock> hold_cprintf_lock(cprintf_lock);
+
     int chars_written = 0;
     if (con_exists()) {
         int cursor_was_shown = con_cursor_toggle(0);
