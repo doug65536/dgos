@@ -72,7 +72,7 @@ struct cpu_info_t;
 //  THREAD_IS_UNINITIALIZED
 //
 
-struct alignas(64) thread_info_t {
+struct alignas(256) thread_info_t {
     isr_context_t * volatile ctx;
 
     char * volatile xsave_ptr;
@@ -120,6 +120,8 @@ struct alignas(64) thread_info_t {
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
 };
+
+C_ASSERT_ISPO2(sizeof(thread_info_t));
 
 C_ASSERT(offsetof(thread_info_t, xsave_stack) == 64);
 
