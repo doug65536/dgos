@@ -67,7 +67,7 @@
 12 HCE Host controller error (1=xHC error)
 
 -- USBXHCI_PAGESIZE 5.4.3 PAGESIZE
-15:0 X4K Page size (2**(value+12))
+15:0 X4K Page size (2**12 * X4K))
 
 -- USBXHCI_DNCTRL 5.4.4 DNCTRL Device notification control
 15:0 N0_15 Notification enable (bit significant)
@@ -91,7 +91,7 @@
 
 -- USBXHCI_PORTSC
 0 CCS Current connect status (1=connected)
-1 PED (RW1CS) Port enabled/disabled (1=enabled)
+1 PED (RW1CS) Port enabled/disabled (1=enabled, write 1 to disable)
 3 OCA Overcurrent active (0=normal, 1=over current)
 4 PR (RW1S) Port reset
 8:5 PLS Port link state
@@ -99,7 +99,7 @@
 13:10 SPD Port speed (section 7.2.1)
 15:14 PIC Port indicator control (0=off, 1=amber, 2=green, 3=undefined)
 16 LWS Port link state write strobe
-17 CSC (RW1CS) Connect status change
+17 CSC (RW1CS) Connect status change (1=changed)
 18 PEC (RW1CS) Port enabled/disabled change (1=changed)
 19 WRC (RW1CS) Warn port reset change (1=changed)
 20 OCC (RW1CS) Overcurrent change (1=changed)
@@ -245,3 +245,9 @@
 
 1 TSP Transfer state preserve
 7:2 TRB_TYPE Type
+
+-- USBXHCI_EXTCAP
+
+7:0 CAPID Capability ID
+15:8 NEXT Offset in dwords to next capability ID
+31:16 SPECIFIC Capability specific
