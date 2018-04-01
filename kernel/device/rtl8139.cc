@@ -52,7 +52,7 @@
 
 struct rtl8139_factory_t : public eth_dev_factory_t {
     rtl8139_factory_t() : eth_dev_factory_t("rtl8139") {}
-    virtual int detect(eth_dev_base_t ***result);
+    virtual int detect(eth_dev_base_t ***result) override;
 };
 
 static rtl8139_factory_t rtl8139_factory;
@@ -1000,7 +1000,7 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 
     // Set rx buffer physical address
     RTL8139_MM_WR_32(RTL8139_IO_RBSTART,
-                     (uint32_t)(uintptr_t)rx_buffer_physaddr);
+                     (uint32_t)rx_buffer_physaddr);
 
     // Set tx buffer physical addresses
     for (unsigned i = 0; i < 4; ++i)

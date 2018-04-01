@@ -180,7 +180,7 @@ static void memset_byte(char *&d, uint64_t s, uint32_t &ofs)
 EXPORT void *memset(void *dest, int c, size_t n)
 {
     char *d = (char*)dest;
-    uint64_t s = size_t(0x0101010101010101U) * (c & 0xFFU);
+    uint64_t s = 0x0101010101010101U * (c & 0xFFU);
 
     if (likely(n >= 7) && unlikely(uintptr_t(d) & 7)) {
         uint32_t ofs = 0;
@@ -451,8 +451,8 @@ EXPORT char *strcpy(char *dest, char const *src)
 
 EXPORT char *stpcpy(char *lhs, const char *rhs)
 {
-    auto d = (char *)lhs;
-    auto s = (char const *)rhs;
+    auto d = lhs;
+    auto s = rhs;
     size_t i;
     for (i = 0; (d[i] = s[i]) != 0; ++i);
     return d + i;

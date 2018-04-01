@@ -1141,7 +1141,7 @@ static void acpi_parse_rsdt()
             hdr_addr = *(uint64_t*)rsdp_ptr;
 
         acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
-                mmap((void*)(uintptr_t)hdr_addr,
+                mmap((void*)hdr_addr,
                       64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
 
         hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, hdr->len);
@@ -1361,7 +1361,7 @@ static void mp_parse_fps()
                 uint8_t intin = entry_lintr->dest_lapic_lintin;
                 MPS_TRACE("PCI device %u INT_%c# ->"
                           " LAPIC ID 0x%02x INTIN %d\n",
-                          device, (int)(pci_irq & 3) + 'A',
+                          device, (pci_irq & 3) + 'A',
                           lapic_id, intin);
             } else if (entry_lintr->source_bus == mp_isa_bus_id) {
                 uint8_t isa_irq = entry_lintr->source_bus_irq;
@@ -2121,8 +2121,8 @@ static void apic_calibrate()
         uint32_t ccr_elap = ccr_st - ccr_en;
         uint64_t tmr_nsec = acpi_pm_timer_ns(tmr_diff);
 
-        uint64_t cpu_freq = (uint64_t(tsc_elap) * 1000000000) / tmr_nsec;
-        uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
+        uint64_t cpu_freq = (tsc_elap * 1000000000) / tmr_nsec;
+        uint64_t ccr_freq = (ccr_elap * 1000000000) / tmr_nsec;
 
         apic_timer_freq = ccr_freq;
 
@@ -2151,8 +2151,8 @@ static void apic_calibrate()
         uint64_t tsc_elap = tsc_en - tsc_st;
         uint32_t ccr_elap = ccr_st - ccr_en;
 
-        uint64_t cpu_freq = (uint64_t(tsc_elap) * 1000000000) / tmr_nsec;
-        uint64_t ccr_freq = (uint64_t(ccr_elap) * 1000000000) / tmr_nsec;
+        uint64_t cpu_freq = (tsc_elap * 1000000000) / tmr_nsec;
+        uint64_t ccr_freq = (ccr_elap * 1000000000) / tmr_nsec;
 
         apic_timer_freq = ccr_freq;
         rdtsc_mhz = (cpu_freq + 500000) / 1000000;
@@ -2375,7 +2375,7 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 
     assert(irq < INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE);
 
-    ctx = (isr_context_t*)irq_invoke(intr, irq, ctx);
+    ctx = irq_invoke(intr, irq, ctx);
     apic_eoi(intr);
 
     if (ctx == orig_ctx)

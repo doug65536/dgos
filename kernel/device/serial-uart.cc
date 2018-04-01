@@ -620,19 +620,21 @@ public:
     ~uart_async_t();
 
     bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
-              uint8_t data_bits, char parity_type, uint8_t stop_bits);
+              uint8_t data_bits, char parity_type,
+              uint8_t stop_bits) override final;
 
-    ssize_t write(void const *buf, size_t size, size_t min_write);
-    ssize_t read(void *buf, size_t size, size_t min_read);
+    ssize_t write(void const *buf, size_t size,
+                  size_t min_write) override final;
+    ssize_t read(void *buf, size_t size, size_t min_read) override final;
 
-    void route_irq(int cpu);
+    void route_irq(int cpu) override final;
 
 private:
     using lock_type = mcslock;
     using scoped_lock = unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
-    isr_context_t *port_irq_handler(isr_context_t *ctx);
+    isr_context_t *port_irq_handler(isr_context_t *ctx) override final;
 
     void wait_tx_not_full(scoped_lock &lock_);
     void wait_rx_not_empty(scoped_lock& lock_);
@@ -929,9 +931,12 @@ public:
     uart_poll_t();
 
     bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
-              uint8_t data_bits, char parity_type, uint8_t stop_bits);
-    virtual ssize_t write(const void *buf, size_t size, size_t min_write);
-    virtual ssize_t read(void *buf, size_t size, size_t min_read);
+              uint8_t data_bits, char parity_type,
+              uint8_t stop_bits) override final;
+    virtual ssize_t write(const void *buf, size_t size,
+                          size_t min_write) override final;
+    virtual ssize_t read(void *buf, size_t size,
+                         size_t min_read) override final;
 
 private:
     bool is_rx_full() const;

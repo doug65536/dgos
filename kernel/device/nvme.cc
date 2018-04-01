@@ -347,8 +347,7 @@ public:
         identify_data = mmap((void*)identify_data_physaddr, 4096,
                              PROT_READ, MAP_PHYSICAL, -1, 0);
 
-        NVME_TRACE("namespace identify data at vaddr=%p\n",
-                   (void*)identify_data);
+        NVME_TRACE("namespace identify data at vaddr=%p\n", identify_data);
 
         if (!identify_data_physaddr)
             panic("Failed to map identify data!\n");
@@ -505,7 +504,7 @@ class nvme_if_factory_t : public storage_if_factory_t {
 public:
     nvme_if_factory_t() : storage_if_factory_t("nvme") {}
 private:
-    virtual if_list_t detect(void) final;
+    virtual if_list_t detect(void) override final;
 };
 
 static nvme_if_factory_t nvme_if_factory;
@@ -726,11 +725,11 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
             NVME_AQA_ASQS_n(queue_slots);
 
     // Submission queue address
-    mmio_base->asq = (uint64_t)queue_memory_physaddr;
+    mmio_base->asq = queue_memory_physaddr;
 
     // 3.1.10 The vector for the admin queues is always 0
     // Completion queue address
-    mmio_base->acq = (uint64_t)queue_memory_physaddr +
+    mmio_base->acq = queue_memory_physaddr +
             (sizeof(nvme_cmd_t) * queue_slots * requested_queue_count);
 
     // 7.6.1 4) The controller settings should be configured

@@ -263,7 +263,7 @@ protected:
                uint64_t lba, bool fua,
                usb_msc_op_t op, iocp_t *iocp);
 
-    int flush();
+    int flush() override final;
     int trim();
 
     usb_msc_if_t *if_;

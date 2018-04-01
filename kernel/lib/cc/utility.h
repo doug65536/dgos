@@ -174,7 +174,7 @@ template<> struct hash<long long>
 
 template<> struct hash<unsigned long>
 {
-    size_t operator()(unsigned long __k) const { return size_t(__k); }
+    size_t operator()(unsigned long __k) const { return __k; }
 };
 
 template<> struct hash<unsigned long long>

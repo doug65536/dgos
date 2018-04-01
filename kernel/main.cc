@@ -74,6 +74,7 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
 #define ENABLE_STRESS_HEAP_SMALL    0
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     1
+#define ENABLE_FIND_VBE             0
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE         64
@@ -305,9 +306,8 @@ static int stress_mutex(void *p)
 #include "cpu/except.h"
 
 #if 1
-static int mprotect_test(void *p)
+static int mprotect_test(void *)
 {
-    (void)p;
     return 0;
 
     char *mem = (char*)mmap(0, 256 << 20, PROT_NONE, 0, -1, 0);
@@ -571,6 +571,7 @@ int clks_unhalted(void *cpu)
 extern void usbxhci_detect(void*);
 void (*usbxhci_pull_in)(void*) = usbxhci_detect;
 
+#if ENABLE_FIND_VBE
 static uint8_t sum_bytes(char *st, size_t len)
 {
     uint8_t sum = 0;
@@ -602,6 +603,7 @@ static int find_vbe(void *p)
     munmap(bios, 0x8000);
     return 0;
 }
+#endif
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
 static int draw_test(void *p)
@@ -798,8 +800,10 @@ static int init_thread(void *p)
     if (mod_entry)
         mod_entry();
 
+#if ENABLE_FIND_VBE
     thread_create(find_vbe, (void*)0xC0000, 0, false);
     thread_create(find_vbe, (void*)0xF0000, 0, false);
+#endif
 
 #if ENABLE_CTXSW_STRESS_THREAD > 0
     printk("Running context switch stress with %d threads\n",

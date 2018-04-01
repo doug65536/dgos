@@ -181,11 +181,11 @@ int fat32_fs_t::mm_fault_handler(
 
     int result;
     if (likely(read)) {
-        printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
+        printdbg("Demand paging LBA %ld at addr %p\n", lba, addr);
 
         result = drive->read_blocks(addr, length >> sector_shift, lba);
     } else {
-        printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
+        printdbg("Writing back LBA %ld at addr %p\n", lba, addr);
         result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
     }
 
@@ -1226,7 +1226,7 @@ void fat32_fs_t::unmount()
 {
     unique_lock<shared_mutex> lock(rwlock);
 
-    munmap(mm_dev, (uint64_t)(lba_en - lba_st) << sector_shift);
+    munmap(mm_dev, (lba_en - lba_st) << sector_shift);
 }
 
 bool fat32_fs_t::is_boot() const
@@ -1529,7 +1529,7 @@ ssize_t fat32_fs_t::read(fs_file_info_t *fi,
 {
     shared_lock<shared_mutex> lock(rwlock);
 
-    return internal_rw((file_handle_t*)fi, (char*)buf, size, offset, true);
+    return internal_rw((file_handle_t*)fi, buf, size, offset, true);
 }
 
 ssize_t fat32_fs_t::write(fs_file_info_t *fi,

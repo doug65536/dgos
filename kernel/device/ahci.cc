@@ -1222,7 +1222,7 @@ class ahci_if_factory_t : public storage_if_factory_t {
 public:
     ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
-    virtual if_list_t detect(void) final;
+    virtual if_list_t detect(void) override final;
 };
 
 static ahci_if_factory_t ahci_if_factory;

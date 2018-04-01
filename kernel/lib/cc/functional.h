@@ -66,12 +66,12 @@ private:
         {
         }
 
-        CallableBase *copy() const final
+        CallableBase *copy() const override final
         {
             return new Callable(storage);
         }
 
-        R invoke(Args&& ...args) const final
+        R invoke(Args&& ...args) const override final
         {
             return storage(forward<Args>(args)...);
         }

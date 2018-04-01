@@ -35,10 +35,11 @@ public:
 class pci_config_pio : public pci_config_rw {
 public:
     // pci_config_rw interface
-    uint32_t read(pci_addr_t addr, size_t offset, size_t size) final;
+    uint32_t read(pci_addr_t addr, size_t offset, size_t size) override final;
     bool write(pci_addr_t addr, size_t offset,
-               void const *values, size_t size) final;
-    bool copy(pci_addr_t addr, void *dest, size_t offset, size_t size) final;
+               void const *values, size_t size) override final;
+    bool copy(pci_addr_t addr, void *dest,
+              size_t offset, size_t size) override final;
 };
 
 // Modern PCIe ECAM MMIO PCI configuration space accessor
@@ -46,10 +47,11 @@ class pci_config_mmio : public pci_config_rw {
     inline pci_ecam_t *find_ecam(int bus);
 public:
     // pci_config_rw interface
-    uint32_t read(pci_addr_t addr, size_t offset, size_t size) final;
+    uint32_t read(pci_addr_t addr, size_t offset, size_t size) override final;
     bool write(pci_addr_t addr, size_t offset,
-               void const *values, size_t size) final;
-    bool copy(pci_addr_t addr, void *dest, size_t offset, size_t size) final;
+               void const *values, size_t size) override final;
+    bool copy(pci_addr_t addr, void *dest,
+              size_t offset, size_t size) override final;
 };
 
 //
@@ -516,8 +518,8 @@ int pci_enum_capabilities(pci_addr_t addr,
 
 int pci_find_capability(pci_addr_t addr, int capability_id)
 {
-    return pci_enum_capabilities(
-                addr, pci_enum_capabilities_match, capability_id);
+    return pci_enum_capabilities(addr, pci_enum_capabilities_match,
+                                 capability_id);
 }
 
 bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
@@ -702,7 +704,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
             // 64 bit address
             pci_msi64_t cfg;
             cfg.addr_lo = (uint32_t)mem[0].addr;
-            cfg.addr_hi = (uint32_t)((uint64_t)mem[0].addr >> 32);
+            cfg.addr_hi = (uint32_t)(mem[0].addr >> 32);
             cfg.data = (uint16_t)mem[0].data;
 
             pci_config_write(addr, capability + sizeof(caps),

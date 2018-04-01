@@ -5,5 +5,5 @@
 
 off_t lseek(int fd, off_t off, int whence)
 {
-    return syscall3(long(fd), long(off), long(whence), SYS_lseek);
+    return syscall3(long(fd), off, long(whence), SYS_lseek);
 }

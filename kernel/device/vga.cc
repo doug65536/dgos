@@ -360,7 +360,7 @@ static int vga_detect(text_display_base_t **result)
 
     // Off-screen shadow buffer
     // Uses video memory until memory manager is online
-    self->shadow = (uint16_t*)self->video_mem + (80 * 25);
+    self->shadow = self->video_mem + (80 * 25);
 
     mouse_toggle(self, 1);
 

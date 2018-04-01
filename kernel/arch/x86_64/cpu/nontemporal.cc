@@ -64,7 +64,7 @@ void *memcpy512_nt(void *dest, void const *src, size_t n)
 {
     assert(!((uintptr_t)dest & 63));
     assert(!((uintptr_t)src & 63));
-    assert(!((uintptr_t)n & 63));
+    assert(!(n & 63));
     return memcpy512_nt_fn(dest, src, n);
 }
 
@@ -140,6 +140,6 @@ static void *resolve_memset32_nt(void *dest, uint32_t val, size_t n)
 void memset32_nt(void *dest, uint32_t val, size_t n)
 {
     assert(!((uintptr_t)dest & 3));
-    assert(!((uintptr_t)n & 3));
+    assert(!(n & 3));
     memset32_nt_fn(dest, val, n);
 }

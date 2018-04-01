@@ -27,7 +27,7 @@ struct iso9660_fs_t final : public fs_base_t {
         iso9660_dir_ent_t *dirent;
         char *content;
 
-        ino_t get_inode() const
+        ino_t get_inode() const override
         {
             return fs->dirent_lba(dirent);
         }
@@ -280,7 +280,7 @@ uint32_t iso9660_fs_t::walk_pt(
         void *p)
 {
     uint32_t i = 0;
-    for (iso9660_pt_rec_t *pt_rec = (iso9660_pt_rec_t *)pt,
+    for (iso9660_pt_rec_t *pt_rec = pt,
          *pt_end = (iso9660_pt_rec_t*)((char*)pt + pt_bytes);
          pt_rec < pt_end;
          ++i,
@@ -311,7 +311,7 @@ int iso9660_fs_t::name_compare_ascii(
     char const *chk = (char const *)name;
     char const *find_limit = (char const *)memrchr(find, '.', find_len);
     char const *chk_limit = (char const *)memrchr(chk, '.', name_len);
-    char const *find_end = (char const *)(find + find_len);
+    char const *find_end = find + find_len;
     char const *chk_end = (char const *)memrchr(chk, ';', name_len);
 
     // ISO9660 uses a goofy DOS-like algorithm where the

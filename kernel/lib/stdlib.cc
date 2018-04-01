@@ -62,7 +62,7 @@ void *operator new[](size_t size) noexcept
     return malloc(size);
 }
 
-void operator delete(void *block, size_t)
+void operator delete(void *block, size_t) noexcept
 {
     free(block);
 }

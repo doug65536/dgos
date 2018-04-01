@@ -31,7 +31,7 @@ void udp_frame_received(ethq_pkt_t *pkt)
     udp_port_get(&pair, p);
     ipv4_ip_get(&pair, &p->ipv4_hdr);
 
-    udp_bind_t *bind = (udp_bind_t*)udp_addr_lookup.lookup(&pair);
+    udp_bind_t *bind = udp_addr_lookup.lookup(&pair);
 
     (void)bind;
     (void)p;

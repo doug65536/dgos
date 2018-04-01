@@ -32,7 +32,7 @@ struct partition_tbl_ent_t {
 
 struct mbr_part_factory_t : public part_factory_t {
     mbr_part_factory_t() : part_factory_t("mbr") {}
-    if_list_t detect(storage_dev_base_t *drive);
+    if_list_t detect(storage_dev_base_t *drive) override;
 };
 
 static mbr_part_factory_t mbr_part_factory;

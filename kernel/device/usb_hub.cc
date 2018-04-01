@@ -126,7 +126,7 @@ void usb_hub_t::post_status_recv()
 }
 
 void usb_hub_t::status_completion(usb_iocp_result_t const& result,
-                                        uintptr_t arg)
+                                  uintptr_t arg)
 {
     reinterpret_cast<usb_hub_t*>(arg)->status_completion(result);
 }

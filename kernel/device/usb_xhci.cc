@@ -1159,10 +1159,9 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
     mmio_addr = (pci_iter.config.base_addr[0] & -16) |
             (uint64_t(pci_iter.config.base_addr[1]) << 32);
 
-    mmio_cap = (usbxhci_capreg_t*)
-            mmap((void*)uintptr_t(mmio_addr),
-                 64<<10, PROT_READ | PROT_WRITE,
-                 MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
+    mmio_base = (char*)mmap(
+                (void*)mmio_addr, 64<<10, PROT_READ | PROT_WRITE,
+                MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
     mmio_op = (usbxhci_opreg_t*)((char*)mmio_cap + mmio_cap->caplength);
 

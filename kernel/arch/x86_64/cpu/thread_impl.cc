@@ -429,7 +429,7 @@ static thread_t thread_create_with_state(
 
     ISR_CTX_REG_RDI(ctx) = uintptr_t(fn);
     ISR_CTX_REG_RSI(ctx) = uintptr_t(userdata);
-    ISR_CTX_REG_RDX(ctx) = uintptr_t(i);
+    ISR_CTX_REG_RDX(ctx) = i;
     ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
 
     if (thread->flags & THREAD_FLAGS_USES_FPU) {
@@ -708,7 +708,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     // Store context pointer for resume later
     assert(thread->ctx == nullptr);
-    thread->ctx = (isr_context_t*)ctx;
+    thread->ctx = ctx;
 
     uint64_t now = cpu_rdtsc();
     uint64_t elapsed = now - thread->sched_timestamp;

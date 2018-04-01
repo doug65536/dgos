@@ -21,11 +21,11 @@ struct eth_dev_base_t {
     virtual void set_promiscuous(int promiscuous) = 0;
 };
 
-#define ETH_DEV_IMPL                                \
-    virtual int send(ethq_pkt_t *pkt);              \
-    virtual void get_mac(void *mac_addr);           \
-    virtual void set_mac(void const *mac_addr);     \
-    virtual int get_promiscuous();                  \
-    virtual void set_promiscuous(int promiscuous);
+#define ETH_DEV_IMPL                                        \
+    virtual int send(ethq_pkt_t *pkt) override;             \
+    virtual void get_mac(void *mac_addr) override;          \
+    virtual void set_mac(void const *mac_addr) override;    \
+    virtual int get_promiscuous() override;                 \
+    virtual void set_promiscuous(int promiscuous) override;
 
 void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory);

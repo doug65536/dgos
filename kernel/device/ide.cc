@@ -35,7 +35,7 @@ struct ide_chan_ports_t {
 
 struct ide_if_factory_t : public storage_if_factory_t {
     ide_if_factory_t() : storage_if_factory_t("ide") {}
-    virtual if_list_t detect(void);
+    virtual if_list_t detect(void) override;
 };
 
 static ide_if_factory_t ide_if_factory;
@@ -1044,7 +1044,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
                               unit.max_dma >= 0);
         }
 
-        size_t io_window_misalignment = (uintptr_t)data & ~(int)-PAGESIZE;
+        size_t io_window_misalignment = (uintptr_t)data & ~-PAGESIZE;
 
         if (unit.max_dma >= 0 && op != io_op_t::flush) {
             IDE_TRACE("Starting DMA\n");

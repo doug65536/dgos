@@ -40,7 +40,7 @@ static __always_inline void fb_reset_dirty(void)
 
 void fb_init(void)
 {
-    vbe_selected_mode_t *mode_info = (vbe_selected_mode_t*)(uintptr_t)
+    vbe_selected_mode_t *mode_info = (vbe_selected_mode_t*)
             bootinfo_parameter(bootparam_t::vbe_mode_info);
 
     if (!mode_info)

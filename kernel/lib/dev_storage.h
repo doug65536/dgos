@@ -67,28 +67,28 @@ struct storage_dev_base_t {
     virtual long info(storage_dev_info_t key) = 0;
 };
 
-#define STORAGE_DEV_IMPL                        \
-    void cleanup() override final;              \
-                                                \
-    errno_t read_async(                         \
-            void *data, int64_t count,          \
-            uint64_t lba,                       \
-            iocp_t *iocp) override final;       \
-                                                \
-    errno_t write_async(                        \
-            void const *data, int64_t count,    \
-            uint64_t lba, bool fua,             \
-            iocp_t *iocp) override final;       \
-                                                \
-    errno_t flush_async(                        \
-            iocp_t *iocp) override final;       \
-                                                \
-    errno_t trim_async(                         \
-            int64_t count,                      \
-            uint64_t lba,                       \
-            iocp_t *iocp) override final;       \
-                                                \
-    long info(storage_dev_info_t key) final;
+#define STORAGE_DEV_IMPL                                \
+    void cleanup() override final;                      \
+                                                        \
+    errno_t read_async(                                 \
+            void *data, int64_t count,                  \
+            uint64_t lba,                               \
+            iocp_t *iocp) override final;               \
+                                                        \
+    errno_t write_async(                                \
+            void const *data, int64_t count,            \
+            uint64_t lba, bool fua,                     \
+            iocp_t *iocp) override final;               \
+                                                        \
+    errno_t flush_async(                                \
+            iocp_t *iocp) override final;               \
+                                                        \
+    errno_t trim_async(                                 \
+            int64_t count,                              \
+            uint64_t lba,                               \
+            iocp_t *iocp) override final;               \
+                                                        \
+    long info(storage_dev_info_t key) final override;
 
 //
 // Storage Interface (IDE, AHCI, etc)
@@ -410,7 +410,7 @@ struct fs_base_t {
          int cmd, void* arg,                                            \
          unsigned int flags, void* data) override final;                \
     int poll(fs_file_info_t *fi,                                        \
-        fs_pollhandle_t* ph, unsigned* reventsp) final;
+        fs_pollhandle_t* ph, unsigned* reventsp) override final;
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 

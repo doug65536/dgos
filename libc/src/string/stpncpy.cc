@@ -2,8 +2,8 @@
 
 char *stpncpy(char *restrict lhs, const char *restrict rhs, size_t sz)
 {
-    auto d = (char *)lhs;
-    auto s = (char const *)rhs;
+    auto d = lhs;
+    auto s = rhs;
     size_t i;
     for (i = 0; i < sz && (d[i] = s[i]) != 0; ++i);
     char *r = d + i;

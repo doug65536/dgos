@@ -201,7 +201,7 @@ typedef uintptr_t pte_t;
 #define PT0_INDEX       (PT_ENTRY(PT_RECURSE,PT_RECURSE,PT_RECURSE,PT_RECURSE))
 
 // Canonicalize the given address
-#define CANONICALIZE(n) uintptr_t(intptr_t(uintptr_t(n) << 16) >> 16)
+#define CANONICALIZE(n) uintptr_t(intptr_t(n << 16) >> 16)
 
 #define PT3_ADDR        (CANONICALIZE(PT3_INDEX*sizeof(pte_t)))
 #define PT2_ADDR        (CANONICALIZE(PT2_INDEX*sizeof(pte_t)))
@@ -440,7 +440,7 @@ private:
 extern char ___init_brk[];
 extern uintptr_t ___top_physaddr;
 static linaddr_t near_base = (linaddr_t)___init_brk;
-static linaddr_t volatile linear_base = PT_MAX_ADDR;
+static linaddr_t linear_base = PT_MAX_ADDR;
 
 mmu_phys_allocator_t phys_allocator;
 
@@ -498,7 +498,7 @@ uintptr_t mm_alloc_contiguous(size_t size)
 
 void mm_free_contiguous(uintptr_t addr, size_t size)
 {
-    contig_phys_allocator.release_linear((linaddr_t)addr, size);
+    contig_phys_allocator.release_linear(addr, size);
 }
 
 //
@@ -1226,8 +1226,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             //
             // Device mapping
 
-            linaddr_t rounded_addr = (linaddr_t)fault_addr &
-                    -(intptr_t)PAGE_SIZE;
+            linaddr_t rounded_addr = fault_addr & -(intptr_t)PAGE_SIZE;
 
             // Lookup the device mapping
             intptr_t device = mmu_device_from_addr(rounded_addr);
@@ -1520,11 +1519,11 @@ void mmu_init()
     contig_phys_allocator.early_init(&contiguous_start, 4 << 20,
                                      "contig_phys_allocator");
 
-    linear_allocator.early_init((linaddr_t*)&linear_base,
+    linear_allocator.early_init(&linear_base,
                                 clear_phys_state_t::addr - linear_base,
                                 "linear_allocator");
 
-    near_allocator.early_init((linaddr_t*)&near_base, 0ULL - near_base,
+    near_allocator.early_init(&near_base, 0ULL - near_base,
                               "near_allocator");
 
     // Allocate guard page
@@ -1546,7 +1545,7 @@ void mmu_init()
     master_pagedir = (pte_t*)mmap((void*)root_physaddr, PAGE_SIZE, PROT_READ,
                           MAP_PHYSICAL, -1, 0);
 
-    current_pagedir = (pte_t*)(PT0_PTR);
+    current_pagedir = PT0_PTR;
 
     // Find holes in address space suitable for mapping hardware
     bool first_hole = true;
@@ -2222,7 +2221,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                     clear_phys(paddr);
 
                 pte_t old = atomic_xchg(base_pte + (ofs >> 12),
-                                        pte_t(paddr | page_flags));
+                                        paddr | page_flags);
 
                 if (old && ((old & PTE_ADDR) != PTE_ADDR))
                     free_batch.free(old & PTE_ADDR);
@@ -2254,7 +2253,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             pte = 0;
 
             if (paddr)
-                pte = pte_t(paddr | page_flags | PTE_PRESENT);
+                pte = paddr | page_flags | PTE_PRESENT;
 
             if (paddr && !(flags & MAP_STACK)) {
                 // Commit first page
@@ -2271,7 +2270,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
                 free_batch.free(pte & PTE_ADDR);
 
             for ( ; ofs < end; ++ofs) {
-                pte = pte_t(PTE_ADDR | page_flags);
+                pte = PTE_ADDR | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (unlikely(pte && pte != PTE_ADDR))
@@ -2283,7 +2282,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             physaddr_t paddr = physaddr_t(addr);
             for (size_t ofs = 0, end = (len >> PAGE_SCALE); ofs < end;
                  ++ofs, paddr += PAGE_SIZE) {
-                pte = pte_t(paddr | page_flags);
+                pte = paddr | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
                 if (pte && pte != PTE_ADDR)

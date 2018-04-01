@@ -397,10 +397,9 @@ int pci_enumerate_next(pci_dev_iterator_t *iter);
 uint32_t pci_config_read(pci_addr_t addr, int offset, int size);
 
 bool pci_config_write(pci_addr_t addr,
-        size_t offset, void *values, size_t size);
+                      size_t offset, void *values, size_t size);
 
-void pci_config_copy(pci_addr_t addr,
-                     void *dest, int ofs, size_t size);
+void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size);
 
 int pci_find_capability(pci_addr_t addr,
         int capability_id);
@@ -483,11 +482,9 @@ bool pci_set_msi_irq(pci_addr_t addr,
                     int cpu, bool distribute, int req_count,
                     intr_handler_t handler, const char *name, int const *target_cpus = nullptr);
 
-void pci_set_irq_line(pci_addr_t addr,
-                      uint8_t irq_line);
+void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line);
 
-void pci_set_irq_pin(pci_addr_t addr,
-                     uint8_t irq_pin);
+void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin);
 
 void pci_adj_control_bits(pci_dev_t const& pci_dev,
                           uint16_t set, uint16_t clr);
@@ -495,7 +492,6 @@ void pci_adj_control_bits(pci_dev_t const& pci_dev,
 void pci_adj_control_bits(int bus, int slot, int func,
                           uint16_t set, uint16_t clr);
 
-void pci_clear_status_bits(pci_addr_t addr,
-                           uint16_t bits);
+void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
 
 char const * pci_device_class_text(uint8_t cls);

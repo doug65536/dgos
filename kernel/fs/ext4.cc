@@ -255,7 +255,7 @@ class ext4_fs_t final : public fs_base_t {
 };
 
 class ext4_factory_t : public fs_factory_t {
-    fs_base_t *mount(fs_init_info_t *conn);
+    fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
 static vector<ext4_fs_t*> ext4_mounts;
@@ -279,12 +279,12 @@ int ext4_fs_t::mm_fault_handler(
     uint64_t lba = part_st + sector_offset;
 
     if (likely(read)) {
-        printdbg("Demand paging LBA %ld at addr %p\n", lba, (void*)addr);
+        printdbg("Demand paging LBA %ld at addr %p\n", lba, addr);
 
         return drive->read_blocks(addr, length >> sector_shift, lba);
     }
 
-    printdbg("Writing back LBA %ld at addr %p\n", lba, (void*)addr);
+    printdbg("Writing back LBA %ld at addr %p\n", lba, addr);
     int result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
 
     return result;

@@ -12,7 +12,7 @@
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 {
     assert(atomic_ld_acq(lock) & 1);
-    return atomic_xchg(lock, spinlock_value_t(0));
+    return atomic_xchg(lock, 0);
 }
 
 void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
@@ -22,7 +22,7 @@ void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
                 atomic_cmpxchg(lock, 0, saved_lock) == 0)
             return;
 
-        cpu_wait_value(lock, spinlock_value_t(0));
+        cpu_wait_value(lock, 0);
     }
 }
 
@@ -40,11 +40,11 @@ void spinlock_lock(spinlock_t *lock)
                 cpu_irq_enable();
             }
 
-            cpu_wait_value(lock, spinlock_value_t(0));
+            cpu_wait_value(lock, 0);
         }
     } else {
         while (atomic_ld_acq(lock) != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
-            cpu_wait_value(lock, spinlock_value_t(0));
+            cpu_wait_value(lock, 0);
 
     }
 }
@@ -162,7 +162,7 @@ void rwspinlock_sh_lock(rwspinlock_t *lock)
                 return;
         } else if (old_value < 0) {
             // Wait for it to not be exclusively held and readers not locked out
-            cpu_wait_value(lock, rwspinlock_value_t(0),
+            cpu_wait_value(lock, 0,
                            (rwspinlock_value_t(1U << 31) |
                             rwspinlock_value_t(1U << 30)));
             old_value = *lock;
