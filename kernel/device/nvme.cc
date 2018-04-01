@@ -683,8 +683,9 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 
     target_cpus.reset();
 
-    NVME_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
-               use_msi, irq_range.base, irq_range.count);
+    NVME_TRACE("Using IRQs %s=%d, base=%u, count=%u\n",
+               irq_range.msix ? "msix" : "msi", use_msi,
+               irq_range.base, irq_range.count);
 
     // Disable the controller
     if (mmio_base->cc & NVME_CC_EN)
@@ -781,6 +782,9 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
                    cmp_queue_ptr, doorbell_ptr(true, 0));
     sub_queue_ptr += queue_slots;
     cmp_queue_ptr += queue_slots;
+
+    // Unmask IRQs
+    pci_set_irq_unmask(pci_dev, true);
 
     NVME_TRACE("Requesting queue count %zd\n", requested_queue_count - 1);
 

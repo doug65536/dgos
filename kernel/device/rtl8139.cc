@@ -991,8 +991,9 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
                               &rtl8139_dev_t::irq_dispatcher,
                               "rtl8139");
 
-    RTL8139_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
-               use_msi, irq_range.base, irq_range.count);
+    RTL8139_TRACE("Using IRQs %s=%d, base=%u, count=%u\n",
+                  irq_range.msix ? "msix" : "msi", use_msi,
+                  irq_range.base, irq_range.count);
 
     // Reset receive ring buffer offset
     rx_offset = 0;
@@ -1051,6 +1052,8 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 
     // Unmask IRQs
     RTL8139_MM_WR_16(RTL8139_IO_IMR, unmask);
+
+    pci_set_irq_unmask(pci_dev, true);
 }
 
 void rtl8139_dev_t::get_mac(void *mac_addr_ret)

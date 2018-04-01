@@ -463,8 +463,9 @@ int pci_enum_capabilities(pci_addr_t addr,
 
 struct pci_irq_range_t {
     uint8_t base;
-    uint8_t count;
-};
+    uint8_t count:7;
+    bool msix:1;
+} __packed;
 
 void pci_init_ecam(size_t ecam_count);
 void pci_init_ecam_entry(uint64_t base, uint16_t seg,
@@ -478,9 +479,13 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      int const *target_cpus = nullptr);
 
 bool pci_set_msi_irq(pci_addr_t addr,
-                    pci_irq_range_t *irq_range,
-                    int cpu, bool distribute, int req_count,
-                    intr_handler_t handler, const char *name, int const *target_cpus = nullptr);
+                     pci_irq_range_t *irq_range,
+                     int cpu, bool distribute, int req_count,
+                     intr_handler_t handler, const char *name,
+                     int const *target_cpus = nullptr);
+
+bool pci_set_irq_unmask(pci_addr_t addr,
+                        bool unmask);
 
 void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line);
 

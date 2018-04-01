@@ -1269,6 +1269,9 @@ void usbxhci::init(pci_dev_iterator_t& pci_iter)
         USBXHCI_INTR_IMAN_IE_SET(mmio_rt->ir[i].iman, 1);
     }
 
+
+    pci_set_irq_unmask(pci_iter, true);
+
     for (int i = 0; i < maxports; ++i) {
         if (mmio_op->ports[i].portsc & USBXHCI_PORTSC_CCS) {
             USBXHCI_TRACE("Device is connected to port %d\n", i);

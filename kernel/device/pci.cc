@@ -3,15 +3,14 @@
 #include "mutex.h"
 #include "printk.h"
 #include "string.h"
-//#include "irq.h"
 #include "cpu/apic.h"
 #include "vector.h"
 
-#define PCI_DEBUG   0
+#define PCI_DEBUG   1
 #if PCI_DEBUG
-#define PCI_DEBUGMSG(...) printk(__VA_ARGS__)
+#define PCI_TRACE(...) printk("pci: " __VA_ARGS__)
 #else
-#define PCI_DEBUGMSG(...) ((void)0)
+#define PCI_TRACE(...) ((void)0)
 #endif
 
 struct pci_ecam_t;
@@ -90,12 +89,14 @@ struct pci_msi_caps_hdr_t {
 struct pci_msi32_t {
     uint32_t addr;
     uint16_t data;
+    uint16_t rsvd;
 } __packed;
 
 struct pci_msi64_t {
     uint32_t addr_lo;
     uint32_t addr_hi;
     uint16_t data;
+    uint16_t rsvd;
 } __packed;
 
 struct pci_msix64_t {
@@ -103,6 +104,26 @@ struct pci_msix64_t {
     uint32_t data;
     uint32_t ctrl;
 };
+
+// With per-vector masking
+struct pci_msi32_pvm_t {
+    pci_msi32_t base;
+    uint32_t irq_mask;
+    uint32_t irq_pending;
+} __packed;
+
+C_ASSERT(sizeof(pci_msi32_pvm_t) == 0x10);
+C_ASSERT(offsetof(pci_msi32_pvm_t, irq_mask) == 0x08);
+
+// With per-vector masking
+struct pci_msi64_pvm_t {
+    pci_msi64_t base;
+    uint32_t irq_mask;
+    uint32_t irq_pending;
+} __packed;
+
+C_ASSERT(sizeof(pci_msi64_pvm_t) == 0x14);
+C_ASSERT(offsetof(pci_msi64_pvm_t, irq_mask) == 0x0C);
 
 struct pci_msix_mappings {
     pci_msix64_t volatile *tbl;
@@ -433,9 +454,6 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
 
 int pci_init(void)
 {
-#if PCI_DEBUG
-    pci_enumerate();
-#endif
     return 0;
 }
 
@@ -531,6 +549,7 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
     // Assume we can't use MSI at first, prepare to use pin interrupt
     irq_range->base = pci_dev.config.irq_line;
     irq_range->count = 1;
+    irq_range->msix = false;
 
     bool use_msi = pci_set_msi_irq(pci_dev, irq_range, cpu,
                                    distribute, req_count,
@@ -538,6 +557,8 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
 
     if (!use_msi) {
         // Plain IRQ pin
+        PCI_TRACE("Using pin IRQ for IRQ %d\n", irq_range->base);
+
         pci_set_irq_pin(pci_dev.addr, pci_dev.config.irq_pin);
         pci_set_irq_line(pci_dev.addr, pci_dev.config.irq_line);
 
@@ -548,30 +569,52 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
     return use_msi;
 }
 
+static int pci_find_msi_msix(pci_addr_t addr,
+                             bool& msix, pci_msi_caps_hdr_t& caps)
+{
+    // Look for the MSI-X extended capability
+    int capability = pci_find_capability(addr, PCICAP_MSIX);
+
+    if (capability) {
+        msix = true;
+        PCI_TRACE("Found MSI-X capability for PCI %u:%u:%u\n",
+                  addr.bus(), addr.slot(), addr.func());
+    } else {
+        // Fall back to MSI
+        msix = false;
+        capability = pci_find_capability(addr, PCICAP_MSI);
+
+        if (capability) {
+            PCI_TRACE("Found MSI capability for PCI %u:%u:%u\n",
+                      addr.bus(), addr.slot(), addr.func());
+        }
+    }
+
+    if (capability) {
+        // Read the header
+        pci_config_copy(addr, &caps, capability, sizeof(caps));
+    } else {
+        PCI_TRACE("No MSI/MSI-X capability for PCI %u:%u:%u\n",
+                  addr.bus(), addr.slot(), addr.func());
+        return 0;
+    }
+
+    return capability;
+}
+
+// Returns with the function masked if possible
+// Use pci_set_irq_mask to unmask it when appropriate
 bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                     int cpu, bool distribute, int req_count,
                     intr_handler_t handler, char const *name,
                     int const *target_cpus)
 {
-    int capability = 0;
-    bool msix = true;
-
-    // Look for the MSI-X extended capability
-    capability = pci_find_capability(addr, PCICAP_MSIX);
-
-    if (!capability) {
-        // Fall back to MSI
-        msix = false;
-        capability = pci_find_capability(addr, PCICAP_MSI);
-    }
+    bool msix;
+    pci_msi_caps_hdr_t caps;
+    int capability = pci_find_msi_msix(addr, msix, caps);
 
     if (!capability)
-        return 0;
-
-    pci_msi_caps_hdr_t caps;
-
-    // Read the header
-    pci_config_copy(addr, &caps, capability, sizeof(caps));
+        return false;
 
     if (msix) {
         // 6.8.3.2 MSI-X configuration
@@ -646,17 +689,21 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                 mmap((void*)(pba_base & -16), pba_sz, PROT_READ | PROT_WRITE,
                      MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
-        pcix_tables.emplace_back(addr,  pci_msix_mappings{
+        pcix_tables.emplace_back(addr, pci_msix_mappings{
                                      tbl, pba, tbl_sz, pba_sz });
 
         int tbl_cnt = min(req_count, table_count);
 
         vector<msi_irq_mem_t> msi_writes(tbl_cnt);
 
+        irq_range->count = tbl_cnt;
+        irq_range->msix = true;
         irq_range->base = apic_msi_irq_alloc(
                     msi_writes.data(), tbl_cnt, cpu, distribute,
                     handler, name, target_cpus);
-        irq_range->count = tbl_cnt;
+
+        PCI_TRACE("Allocated MSI-X IRQ %d-%d\n",
+                  irq_range->base, irq_range->base + irq_range->count - 1);
 
         int i;
         int n = 0;
@@ -669,13 +716,12 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
             PCI_MSIX_VEC_CTL_MASKIRQ_SET(tbl[i].ctrl, 0);
         }
 
-        // Unmask function
-        PCI_MSIX_MSG_CTRL_MASK_SET(caps.msg_ctrl, 0);
-
         pci_config_write(addr,
                          capability + offsetof(pci_msi_caps_hdr_t, msg_ctrl),
                          &caps.msg_ctrl, sizeof(caps.msg_ctrl));
     } else {
+        irq_range->msix = false;
+
         // Extract the multi message capability value
         uint8_t multi_exp = PCI_MSI_MSG_CTRL_MMC_GET(caps.msg_ctrl);
         uint8_t multi_cap = 1U << multi_exp;
@@ -695,13 +741,19 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         // Allocate IRQs
         msi_irq_mem_t mem[32];
         irq_range->count = 1 << multi_en;
+        irq_range->msix = false;
         irq_range->base = apic_msi_irq_alloc(
                     mem, irq_range->count,
                     cpu, distribute, handler, name);
 
+        PCI_TRACE("Allocated MSI IRQ %d-%d\n",
+                  irq_range->base, irq_range->base + irq_range->count - 1);
+
         // Use 32-bit or 64-bit according to capability
         if (caps.msg_ctrl & PCI_MSI_MSG_CTRL_CAP64) {
             // 64 bit address
+            PCI_TRACE("Writing %d-bit MSI config\n", 64);
+
             pci_msi64_t cfg;
             cfg.addr_lo = (uint32_t)mem[0].addr;
             cfg.addr_hi = (uint32_t)(mem[0].addr >> 32);
@@ -711,6 +763,8 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                              &cfg, sizeof(cfg));
         } else {
             // 32 bit address
+            PCI_TRACE("Writing %d-bit MSI config\n", 32);
+
             pci_msi32_t cfg;
             cfg.addr = (uint32_t)mem[0].addr;
             cfg.data = (uint16_t)mem[0].data;
@@ -723,6 +777,39 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         pci_config_write(addr,
                          capability + offsetof(pci_msi_caps_hdr_t, msg_ctrl),
                          &caps.msg_ctrl, sizeof(caps.msg_ctrl));
+    }
+
+    return true;
+}
+
+bool pci_set_irq_unmask(pci_addr_t addr, bool unmask)
+{
+    bool msix;
+    pci_msi_caps_hdr_t caps;
+    int capability = pci_find_msi_msix(addr, msix, caps);
+
+    if (!capability)
+        return false;
+
+    if (msix) {
+        // Update function mask
+        PCI_MSIX_MSG_CTRL_MASK_SET(caps.msg_ctrl, !unmask);
+
+        pci_config_write(addr,
+                         capability + offsetof(pci_msi_caps_hdr_t, msg_ctrl),
+                         &caps.msg_ctrl, sizeof(caps.msg_ctrl));
+    } else {
+        if (PCI_MSI_MSG_CTRL_VMASK_GET(caps.msg_ctrl) &&
+                PCI_MSI_MSG_CTRL_CAP64_GET(caps.msg_ctrl)) {
+            // Function supports per-vector mask
+            uint32_t irq_mask = -!unmask;
+            pci_config_write(addr, capability + sizeof(pci_msi_caps_hdr_t) +
+                             offsetof(pci_msi32_pvm_t, irq_mask),
+                             &irq_mask, sizeof(irq_mask));
+        } else {
+            // Hardware does not support masking!
+            return false;
+        }
     }
 
     return true;

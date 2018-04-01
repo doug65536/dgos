@@ -1702,8 +1702,12 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, false, 1,
                               &ahci_if_t::irq_handler, "ahci");
 
-    AHCI_TRACE("Using IRQs msi=%d, base=%u, count=%u\n",
-               use_msi, irq_range.base, irq_range.count);
+    if (use_msi)
+        pci_set_irq_unmask(pci_dev, true);
+
+    AHCI_TRACE("Using IRQs %s=%d, base=%u, count=%u\n",
+               irq_range.msix ? "msix" : "msi", use_msi,
+               irq_range.base, irq_range.count);
 
     return true;
 }
