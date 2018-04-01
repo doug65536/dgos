@@ -2410,7 +2410,12 @@ static void ioapic_hook(int irq, intr_handler_t handler,
 {
     int intr = irq_to_intr[irq];
     assert(intr >= 0);
-    intr_hook(intr, handler, name);
+    if (intr >= 0) {
+        intr_hook(intr, handler, name);
+    } else {
+        APIC_TRACE("Hooking %s IRQ %d failed, irq_to_intr[%d]==%d\n",
+                   name, irq, irq, intr);
+    }
 }
 
 static void ioapic_unhook(int irq, intr_handler_t handler)
