@@ -2563,7 +2563,7 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     }
 
     // If out of range starting CPU number, force to zero
-    if (cpu < 0 || unsigned(cpu) >= apic_id_count)
+    if (cpu < -1 || unsigned(cpu) >= apic_id_count)
         cpu = 0;
 
     uint8_t vector_base = ioapic_aligned_vectors(bit_log2(count));
