@@ -17,7 +17,7 @@ static char vt102_reset[] = "\x1B" "c";
 
 static void e9debug_serial_ready(void*)
 {
-    if (bootinfo_parameter(bootparam_t::boot_drv_serial)) {
+    if (bootinfo_parameter(bootparam_t::boot_serial_log)) {
         uart = uart_dev_t::open(0, true, 8, 'N', 1);
         uart_ready = true;
 
