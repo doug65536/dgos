@@ -911,7 +911,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                     ACPI_TRACE("Disabled processor detected\n");
                 }
             } else {
-                ACPI_ERROR("Too many CPU packages! Dropped one\n");
+                ACPI_ERROR("Too many CPUs! Dropped one\n");
             }
             break;
 
@@ -1853,7 +1853,7 @@ void apic_start_smp(void)
                          APIC_LVT_TR_MODE_PERIODIC,
                          INTR_APIC_TIMER);
 
-    APIC_TRACE("%d CPU packages\n", apic_id_count);
+    APIC_TRACE("%d CPUs\n", apic_id_count);
 
     if (!acpi_rsdt_addr)
         apic_detect_topology();
