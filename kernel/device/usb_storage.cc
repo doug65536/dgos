@@ -6,7 +6,7 @@
 
 // USB mass storage class driver
 
-#define DEBUG_USB_MSC 1
+#define DEBUG_USB_MSC 0
 #if DEBUG_USB_MSC
 #define USB_MSC_TRACE(...) printdbg("usbmsc: " __VA_ARGS__)
 #else
