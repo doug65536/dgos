@@ -139,7 +139,7 @@ void usb_hub_t::status_completion(const usb_iocp_result_t &result)
 bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
     match_result match = match_config(cfg_hlp, 0, int(usb_class_t::hub),
-                                      -1, -1, -1);
+                                      -1, -1, -1, -1);
 
     if (!match.dev)
         return false;

@@ -34,7 +34,7 @@ usb_class_drv_t::usb_class_drv_t()
 
 usb_class_drv_t::match_result
 usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
-                              int dev_class, int dev_subclass,
+                              int dev_class, int dev_subclass, int dev_proto,
                               int vendor_id, int product_id)
 {
     usb_desc_device const &dev_desc = cfg_hlp->device();
@@ -50,17 +50,22 @@ usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
     }
 
     if (dev_class >= 0 || dev_subclass >= 0) {
+        // For each configuration
         for (result.cfg_idx = 0;
              (result.cfg = cfg_hlp->find_config(result.cfg_idx)) != nullptr;
              ++result.cfg_idx) {
+            // For each interface
             for (result.iface_idx = 0;
                  (result.iface = cfg_hlp->find_iface(
                       result.cfg, result.iface_idx)) != nullptr;
                  ++result.iface_idx) {
+                // Match filter parameters
                 if ((dev_class < 0 ||
                      dev_class == result.iface->iface_class) &&
                         (dev_subclass < 0 ||
-                         dev_subclass == result.iface->iface_subclass)) {
+                         dev_subclass == result.iface->iface_subclass) &&
+                        ((dev_proto < 0 ||
+                          dev_proto == result.iface->iface_proto))) {
                     if (++match_index == index)
                         return result;
                 }

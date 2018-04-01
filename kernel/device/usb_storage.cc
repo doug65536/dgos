@@ -390,8 +390,10 @@ long usb_msc_dev_t::info(storage_dev_info_t key)
 bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
     // Match SCSI mass storage devices
+    // 6 = SCSI command set
+    // 0x50 = bulk only
     match_result match = match_config(
-                cfg_hlp, 0, int(usb_class_t::mass_storage), -1, -1, -1);
+                cfg_hlp, 0, int(usb_class_t::mass_storage), 6, 0x50, -1, -1);
 
     if (!match.dev)
         return false;

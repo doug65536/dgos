@@ -96,6 +96,8 @@ private:
 // Interface to a host controller
 class usb_bus_t {
 public:
+    virtual ~usb_bus_t() {}
+
     // Reset the host controller
     virtual bool reset() { return false; }
 
@@ -166,9 +168,8 @@ protected:
         int iface_idx;
     };
 
-    static match_result match_config(
-            usb_config_helper *cfg_hlp, int index,
-            int dev_class, int dev_subclass,
+    static match_result match_config(usb_config_helper *cfg_hlp, int index,
+            int dev_class, int dev_subclass, int dev_proto,
             int vendor_id, int product_id);
 
 private:
