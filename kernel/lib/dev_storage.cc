@@ -6,9 +6,9 @@
 #include "vector.h"
 #include "cpu/control_regs.h"
 
-#define DEBUG_STORAGE   1
+#define DEBUG_STORAGE   0
 #if DEBUG_STORAGE
-#define STORAGE_TRACE(...) printdbg("storage: " __VA_ARGS__)
+#define STORAGE_TRACE(...) printk("storage: " __VA_ARGS__)
 #else
 #define STORAGE_TRACE(...) ((void)0)
 #endif
