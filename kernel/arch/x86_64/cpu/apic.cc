@@ -930,8 +930,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
                 ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
                 uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
-                entries >>= IOAPIC_VER_ENTRIES_BIT;
-                entries &= IOAPIC_VER_ENTRIES_MASK;
+                entries = IOAPIC_VER_ENTRIES_GET(entries) + 1;
 
                 ioapic->vector_count = entries;
                 ioapic->base_intr = ioapic_alloc_vectors(entries);
@@ -1318,8 +1317,7 @@ static void mp_parse_fps()
                 uint32_t ioapic_ver = ioapic_ptr[IOAPIC_IOREGWIN];
 
                 uint8_t ioapic_intr_count =
-                        (ioapic_ver >> IOAPIC_VER_ENTRIES_BIT) &
-                        IOAPIC_VER_ENTRIES_MASK;
+                        IOAPIC_VER_ENTRIES_GET(ioapic_ver) + 1;
 
                 // Allocate virtual IRQ numbers
                 ioapic->irq_base = ioapic_next_irq_base;
