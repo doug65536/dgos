@@ -151,6 +151,7 @@ struct usbxhci_opreg_t {
     usbxhci_portreg_t ports[256];
 } __packed;
 
+C_ASSERT(offsetof(usbxhci_opreg_t, ports) == 0x400);
 C_ASSERT(sizeof(usbxhci_opreg_t) == 0x1400);
 
 // 6.2.2 Slot Context
@@ -700,10 +701,6 @@ struct usbxhci_endpoint_data_t {
     usbxhci_trb_ring_data_t ring;
 };
 
-struct usbxhci_pending_cmd_t;
-
-class usbxhci;
-
 struct usbxhci_pending_cmd_t {
     uint64_t cmd_physaddr;
     usb_iocp_t *iocp;
@@ -714,7 +711,24 @@ struct usbxhci_pending_cmd_t {
     }
 };
 
-class usbxhci : public usb_bus_t {
+struct usbxhci_slot_data_t {
+    usbxhci_slot_data_t()
+        : parent_slot(0)
+        , port(0)
+        , is_hub(false)
+        , is_multi_tt(false)
+    {
+    }
+
+    int parent_slot;
+    uint8_t port;
+
+    // Flags
+    bool is_hub:1;
+    bool is_multi_tt:1;
+};
+
+class usbxhci final : public usb_bus_t {
 public:
     usbxhci();
 
@@ -722,7 +736,7 @@ public:
 
     void dump_config_desc(usb_config_helper const& cfg_hlp);
 
-    bool add_device(int port, int route);
+    bool add_device(int parent_slot, int port, int route);
 
     template<typename T>
     friend class usbxhci_ring_data_t;
@@ -759,7 +773,9 @@ protected:
 
     bool get_pipe(int slotid, int epid, usb_pipe_t &pipe) override final;
 
-    bool alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
+    bool alloc_pipe(int slotid, usb_pipe_t &pipe,
+                    int epid, int cfg_value,
+                    int iface_num, int alt_iface,
                     int max_packet_sz, int interval,
                     usb_ep_attr ep_type) override final;
 
@@ -862,7 +878,7 @@ private:
 
     void walk_caps(char const volatile *caps);
 
-    void init(const pci_dev_iterator_t &pci_iter);
+    void init(const pci_dev_iterator_t &pci_iter, size_t busid);
 
     //
 
@@ -882,6 +898,8 @@ private:
     usbxhci_evtring_seg_t volatile *dev_evt_segs;
 
     usbxhci_interrupter_info_t *interrupters;
+
+    size_t busid;
 
     lock_type endpoints_lock;
     vector<usbxhci_endpoint_data_t*> endpoints;
@@ -911,6 +929,8 @@ private:
     vector<void*> scratch_buffers;
 
     vector<usb_iocp_t*> completed_iocp;
+
+    vector<usbxhci_slot_data_t> slot_data;
 
     // Command issue lock
     lock_type lock_cmd;
@@ -1011,6 +1031,8 @@ int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
 {
     usbxhci_ctl_trb_t trbs[4] = {};
 
+    USBXHCI_TRACE("getting descriptor, slot=%u, epid=%u\n", slotid, epid);
+
     int trb_count = make_setup_trbs(
                 trbs, countof(trbs),
                 desc, desc_size, 1, uint8_t(req_type),
@@ -1026,6 +1048,8 @@ int usbxhci::get_descriptor(uint8_t slotid, uint8_t epid,
     block.set_expect(1);
 
     block.wait();
+
+    USBXHCI_TRACE("got descriptor, slot=%u, epid=%u\n", slotid, epid);
 
     return block.get_result().len_or_error();
 }
@@ -1127,11 +1151,14 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
     USBXHCI_TRACE("Done configuration descriptors\n");
 }
 
-bool usbxhci::add_device(int port, int route)
+bool usbxhci::add_device(int parent_slot, int port, int route)
 {
     USBXHCI_TRACE("Adding device, port=%d, route=0x%x\n", port, route);
 
     int slotid = enable_slot(port);
+
+    // Remember the parent hub slot
+    slot_data.at(parent_slot).parent_slot = slotid;
 
     int err = set_address(slotid, port, route);
     if (err < 0)
@@ -1151,6 +1178,12 @@ bool usbxhci::add_device(int port, int route)
             return false;
     }
 
+    err = get_descriptor(slotid, 0, &dev_desc, sizeof(dev_desc),
+                         usb_req_type::STD, usb_req_recip_t::DEVICE,
+                         usb_desctype_t::DEVICE, 0);
+    if (err < 0)
+        return false;
+
     // Get first 8 bytes of device descriptor to get max packet size
     unique_ptr_free<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 128));
 
@@ -1160,7 +1193,35 @@ bool usbxhci::add_device(int port, int route)
     if (err < 0)
         return false;
 
-    usb_config_helper cfg_hlp(slotid, dev_desc, cfg_buf, 128);
+    // 9.2.6.6 - Speed Dependent Descriptors
+    // Devices with a value of at least 0210H in the bcdUSB field of
+    // their device descriptor shall support GetDescriptor (BOS Descriptor)
+    // requests
+    usb_desc_bos bos_hdr{};
+    unique_ptr<usb_desc_bos> bos;
+    do {
+        if (dev_desc.usb_spec >= 0x210) {
+            err = get_descriptor(slotid, 0, &bos_hdr, sizeof(bos_hdr),
+                                 usb_req_type::STD, usb_req_recip_t::DEVICE,
+                                 usb_desctype_t::BOS, 0);
+
+            if (err < 0)
+                break;
+
+            void *bos_mem = malloc(bos_hdr.total_len);
+
+            if (!bos_mem)
+                break;
+
+            bos.reset(new (bos_mem) usb_desc_bos{});
+
+            err = get_descriptor(slotid, 0, bos.get(), bos_hdr.total_len,
+                                 usb_req_type::STD, usb_req_recip_t::DEVICE,
+                                 usb_desctype_t::BOS, 0);
+        }
+    } while (false);
+
+    usb_config_helper cfg_hlp(slotid, dev_desc, bos, cfg_buf, 128);
 
     dump_config_desc(cfg_hlp);
 
@@ -1213,8 +1274,8 @@ void usbxhci::walk_caps(char const volatile *caps)
                 }
             }
 
-            USBXHCI_TRACE("Legacy handoff completed in %ldns\n",
-                          1000000000 - (timeout_ns - now));
+            USBXHCI_TRACE("Legacy handoff completed in %ldms\n",
+                          (1000000000 - (timeout_ns - now)) / 1000000);
 
             break;
 
@@ -1253,8 +1314,12 @@ void usbxhci::walk_caps(char const volatile *caps)
     }
 }
 
-void usbxhci::init(pci_dev_iterator_t const& pci_iter)
+void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 {
+    uint64_t time_st;
+
+    this->busid = busid;
+
     // Bus master enable, memory space enable, I/O space disable
     pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
 
@@ -1287,6 +1352,8 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter)
 
     USBXHCI_TRACE("Stopping controller\n");
 
+    time_st = time_ns();
+
     // Stop the controller
     mmio_op->usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
 
@@ -1294,7 +1361,12 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter)
     while (!(mmio_op->usbsts & USBXHCI_USBSTS_HCH))
         pause();
 
+    USBXHCI_TRACE("Stop completed in %lums\n",
+                  (time_ns() - time_st) / 1000000);
+
     USBXHCI_TRACE("Resetting controller\n");
+
+    time_st = time_ns();
 
     // Reset the controller
     mmio_op->usbcmd |= USBXHCI_USBCMD_HCRST;
@@ -1302,6 +1374,9 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter)
     // Wait for reset to complete
     while (mmio_op->usbcmd & USBXHCI_USBCMD_HCRST)
         pause();
+
+    USBXHCI_TRACE("Reset completed in %lums\n",
+                  (time_ns() - time_st) / 1000000);
 
     uint32_t hcsparams1 = mmio_cap->hcsparams1;
     maxslots = USBXHCI_CAPREG_HCSPARAMS1_MAXDEVSLOTS_GET(hcsparams1);
@@ -1314,6 +1389,8 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter)
 
     USBXHCI_TRACE("devslots=%d, maxintr=%d, maxports=%d\n",
                   maxslots, maxintr, maxports);
+
+    slot_data.resize(maxslots);
 
     use_msi = pci_try_msi_irq(pci_iter, &irq_range,
                               0, false, min(16U, maxintr),
@@ -1422,8 +1499,8 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter)
         // Enable interrupt
         USBXHCI_INTR_IMAN_IE_SET(mmio_rt->ir[i].iman, 1);
 
-        // Acknowldge possible pending interrupt
-        mmio_rt->ir[i].iman |= USBXHCI_INTR_IMAN_IP;
+        //// Acknowldge possible pending interrupt
+        //mmio_rt->ir[i].iman |= USBXHCI_INTR_IMAN_IP;
     }
 
     // Acknowledge possible pending interrupt
@@ -1435,29 +1512,29 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter)
 
     mmio_op->usbcmd |= USBXHCI_USBCMD_RUNSTOP;
 
-    for (int i = 0; i < maxports; ++i) {
-        if (mmio_op->ports[i].portsc & USBXHCI_PORTSC_CCS) {
-            USBXHCI_TRACE("Device is connected to port %d\n", i);
+    for (int port = 0; port < maxports; ++port) {
+        if (mmio_op->ports[port].portsc & USBXHCI_PORTSC_CCS) {
+            USBXHCI_TRACE("Device is connected to port %d\n", port);
 
             // Reset the port
-            mmio_op->ports[i].portsc |= USBXHCI_PORTSC_PR;
+            mmio_op->ports[port].portsc |= USBXHCI_PORTSC_PR;
 
-            USBXHCI_TRACE("Waiting for reset on port %d\n", i);
+            USBXHCI_TRACE("Waiting for reset on port %d\n", port);
 
-            while (mmio_op->ports[i].portsc & USBXHCI_PORTSC_PR)
+            while (mmio_op->ports[port].portsc & USBXHCI_PORTSC_PR)
                 pause();
 
-            USBXHCI_TRACE("Reset finished on port %d\n", i);
+            USBXHCI_TRACE("Reset finished on port %d\n", port);
         }
     }
 
     port_count = 0;
 
-    for (int port = 1; port <= maxports; ++port) {
-        if (!USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc))
-            continue;
-
-        add_device(port, 0);
+    for (int port = 0; port < maxports; ++port) {
+        if (USBXHCI_PORTSC_CCS_GET(mmio_op->ports[port].portsc)) {
+            USBXHCI_TRACE("Adding device on port %d\n", port);
+            add_device(0, port, 0);
+        }
     }
 }
 
@@ -1487,6 +1564,18 @@ int usbxhci::enable_slot(int port)
 int usbxhci::set_address(int slotid, int port, uint32_t route)
 {
     // Issue a SET_ADDRESS command
+
+    usbxhci_slot_data_t &slot = slot_data.at(slotid);
+
+    slot.port = port;
+
+    int root_port_slot = slotid;
+
+    // Follow parent chain and find the root hub port number for this slot
+    while (slot_data[root_port_slot].parent_slot)
+        root_port_slot = slot_data[root_port_slot].parent_slot;
+
+    uint8_t root_port = slot_data[root_port_slot].port;
 
     // Allocate an input context
     usbxhci_inpctx_t inp;
@@ -1528,7 +1617,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     inpslotctx->num_ports = 0;
 
     // Root hub port number
-    inpslotctx->root_hub_port_num = port;
+    inpslotctx->root_hub_port_num = root_port;
 
     // Device address
     inpslotctx->usbdevaddr = 0;
@@ -1588,8 +1677,11 @@ bool usbxhci::get_pipe(int slotid, int epid, usb_pipe_t &pipe)
     return false;
 }
 
-bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
-                         int max_packet_sz, int interval, usb_ep_attr ep_type)
+bool usbxhci::alloc_pipe(int slotid, usb_pipe_t &pipe,
+                         int epid, int cfg_value,
+                         int iface_num, int alt_iface,
+                         int max_packet_sz, int interval,
+                         usb_ep_attr ep_type)
 {
     if (slotid < 0)
         return false;
@@ -1623,6 +1715,10 @@ bool usbxhci::alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
         bit_index = USBXHCI_DB_VAL_OUT_EP_UPD_n(ep_index);
 
     ctlctx->add_bits = (1 << 0) | (1U << bit_index);
+
+    ctlctx->cfg = cfg_value;
+    ctlctx->iface_num = iface_num;
+    ctlctx->alternate = alt_iface;
 
     usbxhci_ep_ctx_t *ep = inpepctx + (bit_index - 1);
 
@@ -1730,7 +1826,7 @@ bool usbxhci::configure_hub_port(int slotid, int port)
     // Add the port to the route
     route |= port << route_bit;
 
-    add_device(slotctx->root_hub_port_num, route);
+    add_device(slotid, slotctx->root_hub_port_num, route);
 
     return true;
 }
@@ -2044,7 +2140,11 @@ void usbxhci::irq_handler(int irq)
             USBXHCI_TRACE("Interrupt pending on interrupter %zu\n", ii);
 
             // Acknowledge the interrupt
-            ir->iman |= USBXHCI_INTR_IMAN_IP;
+            //  4.17.5: "If MSI or MSI-X interrupts are enabled, IP shall be
+            //  cleared to ‘0’ automatically when the PCI Dword write
+            //  generated by the Interrupt assertion is complete."
+            if (!use_msi)
+                ir->iman |= USBXHCI_INTR_IMAN_IP;
 
             bool any_consumed = false;
 
@@ -2068,7 +2168,7 @@ void usbxhci::irq_handler(int irq)
                 // Notify HC that we have consumed some events
                 ir->erdp = (ir_info->physaddr +
                         ir_info->next * sizeof(*ir_info->ptr)) |
-                        (1<<3);
+                        USBXHCI_ERDP_EHB;
             }
         }
 
@@ -2102,7 +2202,7 @@ void usbxhci::detect()
             break;
         }
 
-        self->init(pci_iter);
+        self->init(pci_iter, usbxhci_devices.size()-1);
     } while (pci_enumerate_next(&pci_iter));
 }
 

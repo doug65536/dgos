@@ -85,7 +85,7 @@ public:
 
     bool add_hub_port(int port);
 
-    bool set_hub_port_count(usb_hub_desc const& hub_desc);
+    bool set_hub_port_config(usb_hub_desc const& hub_desc, const usb_config_helper *cfg_hlp);
 
 private:
     usb_bus_t *bus;
@@ -115,11 +115,14 @@ public:
 
     virtual bool get_pipe(int slotid, int epid, usb_pipe_t &pipe) = 0;
 
-    virtual bool alloc_pipe(int slotid, int epid, usb_pipe_t &pipe,
+    virtual bool alloc_pipe(int slotid, usb_pipe_t &pipe,
+                            int epid, int cfg_value,
+                            int iface_num, int alt_iface,
                             int max_packet_sz, int interval,
                             usb_ep_attr ep_type) = 0;
 
-    bool alloc_pipe(int slotid, usb_desc_ep const* ep, usb_pipe_t &pipe);
+    bool alloc_pipe(int slotid, const usb_desc_iface *iface,
+                    usb_desc_ep const* ep, usb_pipe_t &pipe);
 
     virtual int send_control(
             int slotid, uint8_t request_type, uint8_t request,
@@ -169,7 +172,7 @@ protected:
     };
 
     static match_result match_config(usb_config_helper *cfg_hlp, int index,
-            int dev_class, int dev_subclass, int dev_proto,
+            int dev_class, int dev_subclass, int dev_proto, int iface_proto,
             int vendor_id, int product_id);
 
 private:

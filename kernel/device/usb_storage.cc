@@ -393,7 +393,8 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     // 6 = SCSI command set
     // 0x50 = bulk only
     match_result match = match_config(
-                cfg_hlp, 0, int(usb_class_t::mass_storage), 6, 0x50, -1, -1);
+                cfg_hlp, 0, int(usb_class_t::mass_storage), 6, 0x50,
+                -1, -1, -1);
 
     if (!match.dev)
         return false;
@@ -415,7 +416,7 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 
     for (int i = 0; (ep = cfg_hlp->find_ep(match.iface, i)) != nullptr; ++i) {
         usb_pipe_t &pipe = ep->ep_addr >= 0x80 ? bulk_in : bulk_out;
-        if (!bus->alloc_pipe(cfg_hlp->slot(), ep, pipe))
+        if (!bus->alloc_pipe(cfg_hlp->slot(), match.iface, ep, pipe))
             return false;
     }
 

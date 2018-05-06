@@ -12,7 +12,7 @@ class usb_hub_t {
 public:
     usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status);
 
-    bool init();
+    bool init(const usb_config_helper *cfg_hlp);
 
 private:
     enum struct hub_request_t : uint8_t {
@@ -75,7 +75,7 @@ usb_hub_t::usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status)
 {
 }
 
-bool usb_hub_t::init()
+bool usb_hub_t::init(usb_config_helper const* cfg_hlp)
 {
     control.send_default_control(
                 uint8_t(usb_dir_t::IN) |
@@ -84,7 +84,7 @@ bool usb_hub_t::init()
                 uint8_t(usb_rqcode_t::GET_DESCRIPTOR),
                 0, 0, sizeof(hub_desc), &hub_desc);
 
-    control.set_hub_port_count(hub_desc);
+    control.set_hub_port_config(hub_desc, cfg_hlp);
 
     for (int port = 1; port <= hub_desc.num_ports; ++port) {
         uint32_t status = get_port_status(port);
@@ -134,31 +134,51 @@ void usb_hub_t::status_completion(usb_iocp_result_t const& result,
 
 void usb_hub_t::status_completion(const usb_iocp_result_t &result)
 {
-    //post_status_recv();
+    post_status_recv();
 }
 
 bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
-    match_result match = match_config(cfg_hlp, 0, int(usb_class_t::hub),
-                                      -1, -1, -1, -1);
+    bool multi_tt = true;
 
-    if (!match.dev)
-        return false;
+    // Try to find multi-TT interface
+    match_result match = match_config(cfg_hlp, 0, int(usb_class_t::hub),
+                                      0, 2, 1, -1, -1);
+
+    // If not found, try to find single-TT interface
+    if (match.dev)
+        USBHUB_TRACE("Found Multi-TT hub interface\n");
+    else {
+        multi_tt = false;
+
+        match = match_config(cfg_hlp, 0, int(usb_class_t::hub), 0, 1,
+                             -1, -1, -1);
+
+        if (match.dev)
+            USBHUB_TRACE("Found Single-TT hub interface\n");
+        else
+            return false;
+    }
 
     usb_pipe_t control, status;
+
 
     bus->get_pipe(cfg_hlp->slot(), 0, control);
     assert(control);
 
     usb_desc_ep const *ep = cfg_hlp->find_ep(match.iface, 0);
-    bus->alloc_pipe(cfg_hlp->slot(), ep, status);
+
+    usb_desc_ep_companion const* epc = cfg_hlp->get_ep_companion(ep);
+    int max_burst = epc ? epc->max_burst : 1;
+
+    bus->alloc_pipe(cfg_hlp->slot(), match.iface, ep, status);
 
     assert(status);
 
     usb_hub_t *hub = new usb_hub_t(control, status);
     hubs.push_back(hub);
 
-    return hub->init();
+    return hub->init(cfg_hlp);
 }
 
 static usb_hub_class_t usb_hub_class;

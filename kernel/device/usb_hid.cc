@@ -602,7 +602,7 @@ protected:
 bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
 {
     match_result match = match_config(
-                cfg_hlp, 0, int(usb_class_t::hid), 1, -1, -1, -1);
+                cfg_hlp, 0, int(usb_class_t::hid), 1, -1, -1, -1, -1);
 
     if (!match.dev)
         return false;
@@ -621,12 +621,12 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
                 match.iface, 0, usb_ep_attr::interrupt);
 
     if (in_ep_desc) {
-        bus->alloc_pipe(cfg_hlp->slot(), in_ep_desc, in);
+        bus->alloc_pipe(cfg_hlp->slot(), match.iface, in_ep_desc, in);
         assert(in);
     }
 
     if (out_ep_desc) {
-        bus->alloc_pipe(cfg_hlp->slot(), out_ep_desc, out);
+        bus->alloc_pipe(cfg_hlp->slot(), match.iface, out_ep_desc, out);
         assert(out);
     }
 

@@ -3,9 +3,11 @@
 
 usb_config_helper::usb_config_helper(int slotid,
                                      usb_desc_device const& dev_desc,
+                                     usb_desc_bos *bos,
                                      void *data, size_t len)
     : dev_desc(dev_desc)
     , data(data)
+    , bos(bos)
     , len(len)
     , slotid(slotid)
 {
@@ -30,14 +32,14 @@ usb_desc_config const *usb_config_helper::find_config(int cfg_index) const
 
     int index = 0;
     int ofs = 0;
-    while (index < cfg_index && ofs < len && cfg->len) {
+    while (index < cfg_index && ofs < len && cfg->hdr.len) {
         cfg = (usb_desc_config*)((char*)cfg + cfg->total_len);
         ofs += cfg->total_len;
         ++index;
     }
 
     return ofs < len &&
-            cfg->desc_type == usb_desctype_t::CONFIGURATION
+            cfg->hdr.desc_type == usb_desctype_t::CONFIGURATION
             ? cfg : nullptr;
 }
 
@@ -47,12 +49,12 @@ usb_desc_iface const *usb_config_helper::find_iface(
     if (unlikely(!cfg || iface_index >= cfg->num_iface || iface_index < 0))
         return nullptr;
 
-    usb_desc_iface const *iface_st = (usb_desc_iface*)((char*)cfg + cfg->len);
-    usb_desc_iface const *iface_en = iface_st + cfg->num_iface;
-    usb_desc_iface const *iface = iface_st;
+    auto const *iface_st = (usb_desc_iface const*)((char*)cfg + cfg->hdr.len);
+    auto const *iface_en = iface_st + cfg->num_iface;
+    auto const *iface = iface_st;
     int index = 0;
-    while (index < iface_index && iface < iface_en && iface->len) {
-        iface = (usb_desc_iface*)((char*)iface + iface->len);
+    while (index < iface_index && iface < iface_en && iface->hdr.len) {
+        iface = (usb_desc_iface*)((char*)iface + iface->hdr.len);
         ++index;
     }
     return iface < iface_en ? iface : nullptr;
@@ -64,16 +66,27 @@ usb_desc_ep const *usb_config_helper::find_ep(
     if (unlikely(!iface || ep_index >= iface->num_ep || ep_index < 0))
         return nullptr;
 
-    usb_desc_ep const *ep_st = (usb_desc_ep*)((char*)iface + iface->len);
+    usb_desc_ep const *ep_st = (usb_desc_ep*)((char*)iface + iface->hdr.len);
     usb_desc_ep const *ep = ep_st;
     int index = 0;
-    while ((ep->desc_type != usb_desctype_t::ENDPOINT ||
-           index < ep_index) && ep->len &&
+    while ((ep->hdr.desc_type != usb_desctype_t::ENDPOINT ||
+           index < ep_index) && ep->hdr.len &&
            index < iface->num_ep) {
-        index += (ep->desc_type == usb_desctype_t::ENDPOINT);
-        ep = (usb_desc_ep*)((char*)ep + ep->len);
+        index += (ep->hdr.desc_type == usb_desctype_t::ENDPOINT);
+        ep = (usb_desc_ep*)((char*)ep + ep->hdr.len);
     }
     return index < iface->num_ep ? ep : nullptr;
+}
+
+usb_desc_iface const *usb_config_helper::match_iface(
+        usb_desc_config const* cfg, int protocol)
+{
+    for (int index = 0; index < cfg->num_iface; ++index) {
+        usb_desc_iface const* iface = find_iface(cfg, index);
+        if (iface->iface_proto == protocol)
+            return iface;
+    }
+    return nullptr;
 }
 
 usb_desc_ep const *usb_config_helper::match_ep(
@@ -87,6 +100,20 @@ usb_desc_ep const *usb_config_helper::match_ep(
             break;
     }
     return ep;
+}
+
+usb_desc_ep_companion const*
+usb_config_helper::get_ep_companion(const usb_desc_ep *ep)
+{
+    usb_desc_ep_companion const* end = (usb_desc_ep_companion const*)
+            ((char*)data + len);
+
+    usb_desc_ep_companion const* epc =(usb_desc_ep_companion const*)(ep + 1);
+
+    if (epc < end && epc->hdr.desc_type == usb_desctype_t::SS_EP_COMPANION)
+        return epc;
+
+    return nullptr;
 }
 
 char const *usb_config_helper::class_code_text(uint8_t cls)
@@ -126,4 +153,20 @@ const char *usb_config_helper::ep_attr_text(usb_ep_attr attr)
     case usb_ep_attr::interrupt: return "interrupt";
     default: return "unknown";
     }
+}
+
+void const *usb_config_helper::get_bos_raw(usb_dev_cap_type cap_type, int index) const
+{
+    uint8_t const* bos_raw = (uint8_t const*)bos;
+    uint8_t const* bos_end = bos_raw + bos->total_len;
+
+    int n = 0;
+    for (usb_dev_cap_hdr_t const* dch = (usb_dev_cap_hdr_t const*)bos_raw + 1;
+         (uint8_t const*)dch < bos_end;
+         dch = (usb_dev_cap_hdr_t const*)((uint8_t const*)dch + dch->hdr.len)) {
+        if (dch->cap_type == cap_type && n++ == index)
+            return dch;
+    }
+
+    return nullptr;
 }

@@ -141,13 +141,16 @@ bool usb_pipe_t::add_hub_port(int port)
     return bus->configure_hub_port(slotid, port);
 }
 
-bool usb_pipe_t::set_hub_port_count(usb_hub_desc const& hub_desc)
+bool usb_pipe_t::set_hub_port_config(usb_hub_desc const& hub_desc,
+                                     usb_config_helper const* cfg_hlp)
 {
     return bus->set_hub_port_count(slotid, hub_desc);
 }
 
-bool usb_bus_t::alloc_pipe(int slotid, usb_desc_ep const *ep, usb_pipe_t &pipe)
+bool usb_bus_t::alloc_pipe(int slotid, usb_desc_iface const *iface,
+                           usb_desc_ep const *ep, usb_pipe_t &pipe)
 {
-    return alloc_pipe(slotid, ep->ep_addr, pipe,
+    return alloc_pipe(slotid, pipe, ep->ep_addr, iface->iface_index,
+                      iface->iface_num, iface->alt_setting,
                       ep->max_packet_sz, ep->interval, ep->ep_attr);
 }
