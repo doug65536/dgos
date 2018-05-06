@@ -1870,9 +1870,10 @@ QEMU_USB = \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
 	$(QEMU_USB_EXTRA) \
-	-device usb-uas,bus=xhci.0,id=uas \
 	-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none \
-	-device scsi-hd,drive=stick \
+	-device usb-uas,bus=xhci.0,id=uas \
+	-drive if=none,id=scsidrv,file=scsi_disk.img,format=raw,cache=none \
+	-device scsi-hd,drive=scsidrv \
 	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
 	-device usb-audio,bus=xhci.0 \
 	-device usb-net,bus=xhci.0 \
@@ -1920,7 +1921,7 @@ QEMU_HDCTL_DEV_nvme = \
 
 QEMU_HDCTL_DEV_ahci = -machine q35
 QEMU_HDCTL_DEV_ide = -machine pc
-QEMU_DIF_nvme = ,if=none,id=nvmedrv
+QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none
 QEMU_DIF_ahci = 
 QEMU_DIF_ide = 
 QEMU_MEDIA_fat = disk
