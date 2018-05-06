@@ -493,9 +493,12 @@ EXPORT void condvar_destroy(condition_var_t *var)
     assert(var->link.prev == &var->link);
 }
 
-struct condvar_spinlock_t {
-    spinlock_t *spinlock;
-    spinlock_value_t saved_lock;
+class condvar_spinlock_t {
+public:
+    condvar_spinlock_t(spinlock_t *spinlock)
+        : spinlock(spinlock)
+    {
+    }
 
     __always_inline void lock()
     {
@@ -506,11 +509,18 @@ struct condvar_spinlock_t {
     {
         saved_lock = spinlock_unlock_save(spinlock);
     }
+
+protected:
+    spinlock_t *spinlock;
+    spinlock_value_t saved_lock;
 };
 
-struct condvar_ticketlock_t {
-    ticketlock_t *ticketlock;
-    ticketlock_value_t saved_lock;
+class condvar_ticketlock_t {
+public:
+    condvar_ticketlock_t(ticketlock_t *ticketlock)
+        : ticketlock(ticketlock)
+    {
+    }
 
     __always_inline void lock()
     {
@@ -521,11 +531,19 @@ struct condvar_ticketlock_t {
     {
         saved_lock = ticketlock_unlock_save(ticketlock);
     }
+
+protected:
+    ticketlock_t *ticketlock;
+    ticketlock_value_t saved_lock;
 };
 
-struct condvar_mcslock_t {
-    mcs_queue_ent_t * volatile *root;
-    mcs_queue_ent_t * node;
+class condvar_mcslock_t {
+public:
+    condvar_mcslock_t(mcs_queue_ent_t * volatile *root, mcs_queue_ent_t * node)
+        : root(root)
+        , node(node)
+    {
+    }
 
     __always_inline void lock()
     {
@@ -536,10 +554,18 @@ struct condvar_mcslock_t {
     {
         mcslock_unlock_noena(root, node);
     }
+
+protected:
+    mcs_queue_ent_t * volatile *root;
+    mcs_queue_ent_t * node;
 };
 
-struct condvar_mutex_t {
-    mutex_t *mutex;
+class condvar_mutex_t {
+public:
+    condvar_mutex_t(mutex_t *mutex)
+        : mutex(mutex)
+    {
+    }
 
     __always_inline void lock()
     {
@@ -550,10 +576,16 @@ struct condvar_mutex_t {
     {
         mutex_unlock(mutex);
     }
+
+protected:
+    mutex_t *mutex;
 };
 
 struct condvar_mutex_noyield_t : public condvar_mutex_t {
-    mutex_t *mutex;
+    condvar_mutex_noyield_t(mutex_t *mutex)
+        : condvar_mutex_t(mutex)
+    {
+    }
 
     __always_inline void lock()
     {
@@ -583,15 +615,13 @@ static void condvar_wait_ex(condition_var_t *var, T& lock_upd)
 
 EXPORT void condvar_wait_spinlock(condition_var_t *var, spinlock_t *lock)
 {
-    condvar_spinlock_t state;
-    state.spinlock = lock;
+    condvar_spinlock_t state(lock);
     condvar_wait_ex(var, state);
 }
 
 EXPORT void condvar_wait_ticketlock(condition_var_t *var, ticketlock_t *lock)
 {
-    condvar_ticketlock_t state;
-    state.ticketlock = lock;
+    condvar_ticketlock_t state(lock);
     condvar_wait_ex(var, state);
 }
 
@@ -599,24 +629,21 @@ EXPORT void condvar_wait_mcslock(condition_var_t *var,
                                  mcs_queue_ent_t * volatile *root,
                                  mcs_queue_ent_t *node)
 {
-    condvar_mcslock_t state;
-    state.root = root;
-    state.node = node;
+    condvar_mcslock_t state(root, node);
     condvar_wait_ex(var, state);
 }
 
 EXPORT void condvar_wait(condition_var_t *var, mutex_t *mutex)
 {
     assert(mutex->owner == thread_get_id());
-    condvar_mutex_t state;
-    state.mutex = mutex;
+    condvar_mutex_t state(mutex);
     condvar_wait_ex(var, state);
 }
 
 EXPORT void condvar_wait_noyield(condition_var_t *var,
                                  mutex_t *mutex)
 {
-    condvar_mutex_noyield_t state;
+    condvar_mutex_noyield_t state(mutex);
     assert(mutex->owner >= 0);
     condvar_wait_ex(var, state);
 }
