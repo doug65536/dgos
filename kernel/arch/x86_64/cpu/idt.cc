@@ -267,7 +267,21 @@ void idt_xsave_detect(int ap)
         if (cpuid(&info, CPUID_INFO_XSAVE, 1)) {
             sse_context_size = (sse_context_size + 63) & -64;
 
-            if (info.eax & 1) {
+			if (info.eax & (1 << 3)) {
+				// xsaves available
+
+				// Patch jmp instruction
+                cpu_patch_insn(sse_context_save - 1,
+                               uintptr_t(isr_save_xsaves) -
+                               uintptr_t(sse_context_save),
+                               sizeof(*sse_context_save));
+                cpu_patch_insn(sse_context_restore - 1,
+                               uintptr_t(isr_restore_xrstors) -
+                               uintptr_t(sse_context_restore),
+                               sizeof(*sse_context_restore));
+			} else if (info.eax & (1 << 0)) {
+				// xsaveopt available
+
                 // Patch jmp instruction
                 cpu_patch_insn(sse_context_save - 1,
                                uintptr_t(isr_save_xsaveopt) -

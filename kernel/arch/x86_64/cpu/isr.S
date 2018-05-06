@@ -516,6 +516,18 @@ isr_save_xsavec:
     xsave_ctx xsavec64
 
 .align 16
+.global isr_save_xsaves
+.hidden isr_save_xsaves
+isr_save_xsaves:
+    xsave_ctx xsaves64
+
+.align 16
+.global isr_restore_xrstors
+.hidden isr_restore_xrstors
+isr_restore_xrstors:
+    xrstor_ctx xrstors64
+
+.align 16
 .global isr_restore_xrstor
 .hidden isr_restore_xrstor
 isr_restore_xrstor:

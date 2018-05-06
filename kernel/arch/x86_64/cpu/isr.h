@@ -188,8 +188,10 @@ struct isr_context_t {
 // Modern xsave
 void isr_save_xsaveopt(void);
 void isr_save_xsavec(void);
+void isr_save_xsaves(void);
 void isr_save_xsave(void);
 void isr_restore_xrstor(void);
+void isr_restore_xrstors(void);
 
 // Legacy fxsave
 void isr_save_fxsave(void);
