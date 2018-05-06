@@ -5,6 +5,7 @@ device/acpigas.cc
 device/acpigas.h
 device/acpihw.cc
 device/acpihw.h
+device/ahci.bits
 device/dev_usb_ctl.cc
 device/iocp.cc
 device/iocp.h

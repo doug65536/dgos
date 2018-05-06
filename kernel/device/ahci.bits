@@ -1,0 +1,132 @@
+
+-- AHCI_HC_CAP 3.1.1 HBA capabilities
+
+31 S64A 64 bit capable
+30 SNCQ Supports native command queuing
+29 SSNTF Supports SNotification register
+28 SMPS Supports mechanical presence switch
+27 SSS Supports staggered spinup
+26 SALP Supports aggressive link power management
+25 SAL Supports activity LED
+24 SCLO Supports command list override
+23:20 ISS Interface speed support
+18 SAM Supports ACHI mode only
+17 SPM Supports port multiplier
+16 FBSS FIS based switching support
+15 PMD PIO multiple DRQ block
+14 SSC Slumber state capable
+13 PSC Partial state capable
+12:8 NCS Number of command slots
+7 CCCS Command completion coalescing supported
+6 EMS Enclosure management supported
+5 SXS Supports eXternal SATA
+4:0 NP Number of ports
+
+-- AHCI_HC_HC 3.1.2 Global HBA control
+
+31 AE AHCI enable
+2 MRSM MSI revert to single message
+1 IE Interrupt enable
+0 HR HBA reset
+
+-- AHCI_HP_IS 3.3.5 PxIS Port interrupt status
+
+31 CPDS (RWC) Cold port presence detect
+30 TFES (RWC) Task file error status
+29 HBFS (RWC) Host bus fatal error status
+28 HBDS (RWC) Host bus data error status
+27 IFS (RWC) Interface fatal error status
+26 INFS (RWC) Interface non-fatal error status
+24 OFS (RWC) Overflow status
+23 IPMS (RWC) Incorrect port multiplier status
+22 PRCS (RWC) PhyRdy change status
+7 DMPS (RWC) Device mechanical presence detect
+6 PCS (RO) Port connect status
+5 DPS (RWC) Descriptor processed
+4 UFS (RO) Unknown FIS interrupt
+3 SDBS (RWC) Set device bits interrupt
+2 DSS (RWC) DMA setup FIS interrupt
+1 PSS (RWC) PIO setup FIS interrupt
+0 DHRS (RWC) D2H FIS interrupt
+
+-- AHCI_HP_IE 3.3.6 Port intrerupt enable
+
+31 CPDE (RW/RO) Cold port presence detect enable
+30 TFEE (RW) Task file error status enable
+29 HBFE (RW) Host bus fatal error status enable
+28 HBDE (RW) Host bus data error status enable
+27 IFE (RW) Interface fatal error status enable
+26 INFE (RW) Interface non-fatal error status enable
+24 OFE (RW) Overflow status enable
+23 IPME (RW) Incorrect port multiplier status enable
+22 PRCE (RW) PhyRdy change status enable
+7 DMPE (RW/RO) Device mechanical presence detect enable
+6 PCE (RO) Port connect status enable
+5 DPE (RW) Descriptor processed enable
+4 UFE (RW) Unknown FIS interrupt enable
+3 SDBE (RW) Set device bits interrupt enable
+2 DSE (RW) DMA setup FIS interrupt enable
+1 PSE (RW) PIO setup FIS interrupt enable
+0 DHRE (RW) D2H FIS interrupt enable
+
+#-- AHCI_FIS_CTL
+#
+#-- AHCI_FIS
+#
+#-- AHCI_FIS_FUA
+#
+#-- AHCI_FIS_CTL
+
+-- AHCI_HP_CMD 3.3.7 Port command and status
+
+31:28 ICC Interface communication control
+27 ASP Aggressive slumber/partial
+26 ALPE Aggressive link power management enabled
+25 DLAE Drive LED on ATAPI enable
+24 ATAPI Device is ATAPI
+23 APSTE Automatic partial to slumber transitions enabled
+22 FBSCP FIS based switching capable port
+21 ESP External SATA port
+20 CPD Cold presence detection
+19 MPSP Mechanical presence switch attached to port
+18 HPCP Hot plug capable port
+17 PMA Port multiplier attached
+16 CPS Cold presence state
+15 CR Command list running
+14 FR FIS receive running
+13 MPSS Mechanical presence switch state
+12:8 CCS Current command slot
+4 FRE FIS receive enable
+3 CLO Command list override
+2 POD Power on device
+1 SUD Spin up device
+0 ST Start
+
+-- AHCI_HP_SIG 3.3.9 Port signature
+
+31:24 HIGH LBA high
+23:16 MID LBA mid
+15:8 LOW LBA low
+7:0 SECCOUNT
+
+-- AHCI_HP_SS 3.3.10 Port SATA status
+
+11:8 IPM Interface power management
+7:4 SPD Interface speed
+3:0 DET Device detection
+
+-- AHCI_HP_SS_DET_NODEV=0
+-- AHCI_HP_SS_DET_NOPHY=1
+-- AHCI_HP_SS_DET_ONLINE=3
+-- AHCI_HP_SS_DET_OFFLINE=4
+
+-- AHCI_HP_SS_SPD_NODEV=0
+-- AHCI_HP_SS_SPD_GEN1=1
+-- AHCI_HP_SS_SPD_GEN2=2
+-- AHCI_HP_SS_SPD_GEN3=3
+
+-- AHCI_HP_SS_IPM_NODEV=0
+-- AHCI_HP_SS_IPM_ACTIVE=1
+-- AHCI_HP_SS_IPM_PARTIAL=2
+-- AHCI_HP_SS_IPM_SLUMBER=6
+-- AHCI_HP_SS_IPM_DEVSLEEP=8

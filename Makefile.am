@@ -1060,7 +1060,8 @@ generated_headers: \
 	$(top_srcdir)/kernel/device/usb_xhcibits.h \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h \
-	$(top_srcdir)/kernel/device/acpibits.h
+	$(top_srcdir)/kernel/device/acpibits.h \
+	$(top_srcdir)/kernel/device/ahcibits.h
 
 .PHONY: generated_headers
 
@@ -1108,6 +1109,13 @@ $(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h: \
 
 $(top_srcdir)/kernel/device/acpibits.h: \
 		$(top_srcdir)/kernel/device/acpi.bits \
+		$(top_srcdir)/genregs.py
+	mkdir -p "$(@D)"
+	rm -f "$@"
+	$(top_srcdir)/genregs.py "$<" > "$@"
+
+$(top_srcdir)/kernel/device/ahcibits.h: \
+		$(top_srcdir)/kernel/device/ahci.bits \
 		$(top_srcdir)/genregs.py
 	mkdir -p "$(@D)"
 	rm -f "$@"
