@@ -23,6 +23,8 @@ static void e9debug_serial_ready(void*)
 
         // Send some VT102 initialization sequences
         uart->write(vt102_reset, sizeof(vt102_reset)-1, sizeof(vt102_reset)-1);
+    } else {
+        uart_ready = false;
     }
 }
 
