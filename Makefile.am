@@ -1149,7 +1149,7 @@ QEMU_RAM = 5G
 
 QEMU_MEMFILL = \
 	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
-	-numa node,nodeid=0,cpus=0-15,memdev=ram-node0
+	-numa node,nodeid=0,memdev=ram-node0
 
 QEMU_USB_ROOT_PORTS ?= 16
 
