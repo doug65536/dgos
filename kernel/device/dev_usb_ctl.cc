@@ -14,64 +14,52 @@ usb_class_drv_t::usb_class_drv_t()
     first_driver = this;
 }
 
-
-//        USBXHCI_TRACE("cfg #0x%x max_power=%umA {\n",
-//                      cfg_idx, cfg->max_power * 2);
-//            USBXHCI_TRACE("  iface #0x%x: class=0x%x (%s)"
-//                          " subclass=0x%x, proto=0x%x {\n",
-//                          iface->iface_num, iface->iface_class,
-//                          cfg_hlp.class_code_text(iface->iface_class),
-//                          iface->iface_subclass, iface->iface_proto);
-//                USBXHCI_TRACE("    ep #0x%x: dir=%s addr=0x%x attr=%s,"
-//                              " maxpktsz=0x%x, interval=%u\n",
-//                              ep_idx, ep->ep_addr >= 0x80 ? "IN" : "OUT",
-//                              ep->ep_addr,
-//                              usb_config_helper::ep_attr_text(ep->ep_attr),
-//                              ep->max_packet_sz, ep->interval);
-//            USBXHCI_TRACE("  }\n");
-//        USBXHCI_TRACE("}\n");
-//    USBXHCI_TRACE("Done configuration descriptors\n");
-
 usb_class_drv_t::match_result
 usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
                               int dev_class, int dev_subclass, int dev_proto,
+                              int iface_proto,
                               int vendor_id, int product_id)
 {
     usb_desc_device const &dev_desc = cfg_hlp->device();
 
     match_result result{ &dev_desc, nullptr, nullptr, -1, -1 };
 
-    int match_index = -1;
+    do {
+        if (dev_proto >= 0 && dev_desc.dev_protocol != dev_proto)
+            break;
 
-    if (vendor_id == dev_desc.vendor_id &&
-        product_id == dev_desc.vendor_id) {
-        if (++match_index == index)
-            return result;
-    }
+        int match_index = -1;
 
-    if (dev_class >= 0 || dev_subclass >= 0) {
-        // For each configuration
-        for (result.cfg_idx = 0;
-             (result.cfg = cfg_hlp->find_config(result.cfg_idx)) != nullptr;
-             ++result.cfg_idx) {
-            // For each interface
-            for (result.iface_idx = 0;
-                 (result.iface = cfg_hlp->find_iface(
-                      result.cfg, result.iface_idx)) != nullptr;
-                 ++result.iface_idx) {
-                // Match filter parameters
-                if ((dev_class < 0 ||
-                     dev_class == result.iface->iface_class) &&
-                        (dev_subclass < 0 ||
-                         dev_subclass == result.iface->iface_subclass) &&
-                        ((dev_proto < 0 ||
-                          dev_proto == result.iface->iface_proto))) {
-                    if (++match_index == index)
-                        return result;
+        if (vendor_id == dev_desc.vendor_id &&
+            product_id == dev_desc.vendor_id) {
+            if (++match_index == index)
+                return result;
+        }
+
+        if (dev_class >= 0 || dev_subclass >= 0) {
+            // For each configuration
+            for (result.cfg_idx = 0;
+                 (result.cfg = cfg_hlp->find_config(result.cfg_idx)) != nullptr;
+                 ++result.cfg_idx) {
+                // For each interface
+                for (result.iface_idx = 0;
+                     (result.iface = cfg_hlp->find_iface(
+                          result.cfg, result.iface_idx)) != nullptr;
+                     ++result.iface_idx) {
+                    // Match filter parameters
+                    if ((dev_class < 0 ||
+                         dev_class == result.iface->iface_class) &&
+                            (dev_subclass < 0 ||
+                             dev_subclass == result.iface->iface_subclass) &&
+                            ((iface_proto < 0 ||
+                              iface_proto == result.iface->iface_proto))) {
+                        if (++match_index == index)
+                            return result;
+                    }
                 }
             }
         }
-    }
+    } while (false);
 
     result.dev = nullptr;
     result.cfg = nullptr;
