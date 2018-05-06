@@ -1,20 +1,21 @@
-.code64
 
 #include "asm_constants.h"
 #include "control_regs_constants.h"
 #include "../cfi_helpers.h"
 #include "interrupts.h"
 
+.code64
+
 .struct 0
-     frame_rbp:  .struct frame_rbp+8
-     frame_intr: .struct frame_intr+8
-     frame_err:  .struct frame_err+8
-     frame_rip:  .struct frame_rip+8
-     frame_cs:   .struct frame_cs+8
-     frame_efl:  .struct frame_efl+8
-     frame_rsp:  .struct frame_rsp+8
-     frame_ss:   .struct frame_ss+8
-     frame_end:
+	frame_rbp:  .struct frame_rbp+8
+    frame_intr: .struct frame_intr+8
+    frame_err:  .struct frame_err+8
+    frame_rip:  .struct frame_rip+8
+    frame_cs:   .struct frame_cs+8
+    frame_efl:  .struct frame_efl+8
+    frame_rsp:  .struct frame_rsp+8
+    frame_ss:   .struct frame_ss+8
+    frame_end:
 
 .section .text.isr, "ax"
 
