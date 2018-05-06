@@ -1866,7 +1866,7 @@ QEMU_MEMFILL = \
 	-numa node,nodeid=0,cpus=0-15,memdev=ram-node0
 
 QEMU_USB = \
-	-device nec-usb-xhci,id=xhci \
+	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
 	$(QEMU_USB_EXTRA) \
@@ -1879,9 +1879,8 @@ QEMU_USB = \
 	-trace 'usb*'
 
 
-#-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none \
+#-device nec-usb-xhci,id=xhci,p2=16,p3=16,msix=on,streams=on \
 #-device usb-storage,bus=xhci.0,drive=stick
-#
 QEMU_NET = \
 	-net nic,model=rtl8139 \
 	-net nic,model=ne2k_pci \
@@ -10192,6 +10191,8 @@ random-mem.img:
 $(DUMPDIR)/qemu-debug-out:
 	mkdir -p "$(@D)"
 	mkfifo "$@"
+
+QEMU_USB_ROOT_PORTS ?= 16
 
 # Connect to debug log
 monitor-debug-output:

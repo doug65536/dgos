@@ -1151,8 +1151,10 @@ QEMU_MEMFILL = \
 	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
 	-numa node,nodeid=0,cpus=0-15,memdev=ram-node0
 
+QEMU_USB_ROOT_PORTS ?= 16
+
 QEMU_USB = \
-	-device nec-usb-xhci,id=xhci \
+	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
 	$(QEMU_USB_EXTRA) \
@@ -1164,9 +1166,8 @@ QEMU_USB = \
 	-device usb-net,bus=xhci.0 \
 	-trace 'usb*'
 
-#-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none \
+#-device nec-usb-xhci,id=xhci,p2=16,p3=16,msix=on,streams=on \
 #-device usb-storage,bus=xhci.0,drive=stick
-#
 
 QEMU_NET = \
 	-net nic,model=rtl8139 \
