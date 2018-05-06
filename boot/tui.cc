@@ -246,6 +246,11 @@ void tui_menu_renderer_t::interact_timeout(int ms)
                     ++menuitem->index;
                 break;
 
+            case key_F10:
+                // Same as esc
+                key = '\x1b';
+                break;
+
             }
             break;
 
