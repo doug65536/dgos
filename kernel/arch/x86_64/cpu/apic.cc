@@ -585,6 +585,68 @@ struct acpi_mcfg_hdr_t {
     // followed by instances of acpi_ecam_record_t
 } __packed;
 
+// SRAT
+struct acpi_srat_hdr_t {
+    acpi_sdt_hdr_t hdr;
+    uint8_t reserved[12];
+} __packed;
+
+C_ASSERT(sizeof(acpi_srat_hdr_t) == 48);
+
+struct acpi_srat_rec_hdr_t {
+    uint8_t type;
+    uint8_t len;
+} __packed;
+
+C_ASSERT(sizeof(acpi_srat_rec_hdr_t) == 2);
+
+struct acpi_srat_lapic_t {
+    acpi_srat_rec_hdr_t rec_hdr;
+
+    uint8_t domain_lo;
+    uint8_t apic_id;
+    uint32_t flags;
+    uint8_t sapic_eid;
+    uint8_t domain_hi[3];
+    uint32_t clk_domain;
+} __packed;
+
+C_ASSERT(sizeof(acpi_srat_lapic_t) == 16);
+
+struct acpi_srat_mem_t {
+    acpi_srat_rec_hdr_t rec_hdr;
+
+    // Domain of the memory region
+    uint32_t domain;
+
+    uint8_t reserved1[2];
+
+    // Range base and length
+    uint64_t range_base;
+    uint64_t range_length;
+
+    uint8_t reserved2[4];
+
+    // Only bit 0 is not reserved: 1=enabled
+    uint32_t flags;
+    uint8_t reserved3[8];
+} __packed;
+
+C_ASSERT(sizeof(acpi_srat_mem_t) == 40);
+
+struct acpi_srat_x2apic_t {
+    acpi_srat_rec_hdr_t rec_hdr;
+
+    uint16_t reserved1;
+    uint32_t domain;
+    uint32_t x2apic_id;
+    uint32_t flags;
+    uint32_t clk_domain;
+    uint32_t reserved2;
+} __packed;
+
+C_ASSERT(sizeof(acpi_srat_x2apic_t) == 24);
+
 struct acpi_fadt_t {
     acpi_sdt_hdr_t hdr;
     uint32_t fw_ctl;
@@ -1191,6 +1253,48 @@ static void acpi_parse_rsdt()
                                         ecam_ptr[i].en_bus);
                 }
                 pci_init_ecam_enable();
+            }
+        } else if (!memcmp(hdr->sig, "SRAT", 4)) {
+            acpi_srat_hdr_t *srat_hdr = (acpi_srat_hdr_t *)hdr;
+
+            if (acpi_chk_hdr(&srat_hdr->hdr) == 0) {
+                ACPI_TRACE("SRAT found\n");
+
+                acpi_srat_rec_hdr_t *srat_end = (acpi_srat_rec_hdr_t *)
+                        ((char*)srat_hdr + srat_hdr->hdr.len);
+
+                for (auto rec_hdr = (acpi_srat_rec_hdr_t*)(srat_hdr+1);
+                     rec_hdr < srat_end;
+                     rec_hdr = (acpi_srat_rec_hdr_t*)
+                     ((char*)rec_hdr + rec_hdr->len)) {
+                    acpi_srat_lapic_t *lapic_rec;
+                    acpi_srat_mem_t *mem_rec;
+                    acpi_srat_x2apic_t *x2apic_rec;
+                    switch (rec_hdr->type) {
+                    case 0:
+                        // LAPIC affinity
+                        lapic_rec = (acpi_srat_lapic_t*)rec_hdr;
+                        ACPI_TRACE("Got LAPIC affinity record\n");
+                        break;
+
+                    case 1:
+                        // Memory affinity
+                        mem_rec = (acpi_srat_mem_t*)rec_hdr;
+                        ACPI_TRACE("Got memory affinity record\n");
+                        break;
+
+                    case 2:
+                        // x2APIC affinity
+                        x2apic_rec = (acpi_srat_x2apic_t*)rec_hdr;
+                        ACPI_TRACE("Got x2APIC affinity record\n");
+                        break;
+
+                    default:
+                        ACPI_TRACE("Got unrecognized affinity record\n");
+                        break;
+
+                    }
+                }
             }
         } else {
             if (acpi_chk_hdr(hdr) == 0) {
