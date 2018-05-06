@@ -72,7 +72,7 @@ static void enter_kernel_initial(uint64_t entry_point)
                      PTE_PRESENT | PTE_WRITABLE |
                      (-cpu_has_global_pages() & PTE_GLOBAL), 2);
 
-    kernel_params_t params;
+    kernel_params_t params{};
 
     params.size = sizeof(params);
 
@@ -84,6 +84,18 @@ static void enter_kernel_initial(uint64_t entry_point)
     params.boot_drv_serial = boot_serial();
 
     boot_menu_show(params);
+
+    print_line("           ap_entry: 0x%llx\n", uint64_t(params.ap_entry));
+    print_line("     phys_mem_table: 0x%llx\n", uint64_t(params.phys_mem_table));
+    print_line("phys_mem_table_size: 0x%llx\n", params.phys_mem_table_size);
+    print_line("  vbe_selected_mode: 0x%llx\n",
+               uint64_t(params.vbe_selected_mode));
+    print_line("   boot_device_info: 0x%llx\n",
+               uint64_t(params.boot_device_info));
+    print_line("    boot_drv_serial: 0x%llx\n", params.boot_drv_serial);
+    print_line("    serial_debugout: 0x%llx\n",
+               uint64_t(params.serial_debugout));
+    print_line("           wait_gdb: 0x%x\n", params.wait_gdb);
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
