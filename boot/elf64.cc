@@ -76,7 +76,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     params.size = sizeof(params);
 
-    params.mp_entry = ap_entry_vector;
+    params.ap_entry = ap_entry_vector;
     params.phys_mem_table = phys_mem_table;
     params.phys_mem_table_size = phys_mem_table_size;
     params.vbe_selected_mode = vbe_info_vector;

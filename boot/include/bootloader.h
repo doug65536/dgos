@@ -80,7 +80,7 @@ struct alignas(8) kernel_params_t {
     size_t size;
     ptr64_t<physmem_range_t> phys_mem_table;
     uint64_t phys_mem_table_size;
-    ptr64_t<void(*)()> mp_entry;
+    ptr64_t<void(*)()> ap_entry;
     ptr64_t<vbe_info_t> vbe_info;
     ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
