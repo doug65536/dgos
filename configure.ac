@@ -173,6 +173,15 @@ do
 done
 AC_SUBST([REAL_MODE_FLAGS])
 
+NO_LTO_FLAGS=
+for flag in m32 fno-lto
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[NO_LTO_FLAGS+=" -$flag"]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([NO_LTO_FLAGS])
+
 REGPARM_FLAGS=
 for flag in mrtd mregparm=3
 do
