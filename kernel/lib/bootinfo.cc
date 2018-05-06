@@ -11,7 +11,7 @@ uintptr_t bootinfo_parameter(bootparam_t param)
 
     switch (param) {
     case bootparam_t::ap_entry_point:
-        return data->mp_entry;
+        return data->ap_entry;
 
     case bootparam_t::boot_device:
         return data->boot_device_info;
