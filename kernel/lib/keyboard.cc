@@ -27,8 +27,9 @@ static keyboard_buffer_t keybd_buffer;
 int (*keybd_get_modifiers)(void);
 int (*keybd_set_layout_name)(char const *name);
 
+// The order here must match the order of KEYB_VK_NUMPAD_* enum
 char const keybd_fsa_t::numpad_ascii[] =
-        "0123456789ABCDEF+-*/=,.\n\t\b^# @!&|<>(){}";
+        "0123456789ABCDEF+-*/=,.\n\t\b^%:# @!&|<>(){}";
 
 char const keybd_fsa_t::passthru_lookup[] =
     " \b\n";
@@ -290,11 +291,12 @@ void keybd_fsa_t::deliver_vk(int vk)
             codepoint = vk - 'A' + 'a';
         }
     } else if (vk >= KEYB_VK_NUMPAD_0 &&
-               vk <= KEYB_VK_NUMPAD_9) {
-        if (shift_state & KEYB_ALT_DOWN) {
+               vk < KEYB_VK_NUMPAD_ASCIIEND) {
+        if (shift_state & KEYB_ALT_DOWN &&
+				vk >= KEYB_VK_NUMPAD_0 && vk <= KEYB_VK_NUMPAD_9) {
             if (is_keyup) {
                 // Add decimal digit to alt code
-                alt_code = alt_code * 10 + vk - KEYB_VK_NUMPAD_ST;
+                alt_code = alt_code * 10 + vk - KEYB_VK_NUMPAD_0;
             }
         } else {
             codepoint = numpad_ascii[vk - KEYB_VK_NUMPAD_ST];
