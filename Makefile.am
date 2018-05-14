@@ -41,9 +41,6 @@ bin_PROGRAMS = \
 	user-shell \
 	hello.km
 
-KERNEL_BMI_FLAGS = \
-	$(BMI_FLAGS)
-
 # libmbr.a
 
 libmbr_a_SOURCES = \
@@ -626,7 +623,8 @@ KERNEL_INCLUDES_SHARED = \
 KERNEL_CXXFLAGS_SHARED = \
 	-D__DGOS_KERNEL__=0x00000001 \
 	-std=c++14 \
-	-mcmodel=kernel $(NO_PIC_FLAGS) $(NO_REDZONE_FLAGS) \
+	-fPIE \
+	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
@@ -644,12 +642,12 @@ KERNEL_CCASFLAGS_SHARED = \
 
 KERNEL_LDFLAGS_SHARED = \
 	-Wl,-melf_x86_64 \
-	-Wl,-Map,$(top_builddir)/kernel.map \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
 	-export-dynamic -Wl,--no-dynamic-linker \
 	-Wl,-z,max-page-size=4096 \
+	-Wl,-pie \
 	-nostartfiles -nodefaultlibs -nostdlib
 
 #-Wl,-export-dynamic
@@ -663,38 +661,63 @@ KERNEL_LDADD_SHARED = -lgcc
 # ----------------------------------------------------------------------------
 # kernel variations
 
+KERNEL_BMI_FLAGS = \
+	$(BMI_FLAGS) \
+	-Wl,-Map,$(top_builddir)/kernel-bmi.map
+
+KERNEL_GENERIC_FLAGS = \
+	-Wl,-Map,$(top_builddir)/kernel-generic.map
+
 kernel_generic_SOURCES = $(KERNEL_SOURCES_SHARED)
 
-kernel_generic_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED)
+kernel_generic_CXXFLAGS = \
+	$(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_GENERIC_FLAGS)
 
-kernel_generic_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED)
-	$(KERNEL_INCLUDES_SHARED)
+kernel_generic_CCASFLAGS = \
+	$(KERNEL_CCASFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_GENERIC_FLAGS)
 
-kernel_generic_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED)
+kernel_generic_LDFLAGS = \
+	$(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_GENERIC_FLAGS)
 
-kernel_generic_LDADD = $(KERNEL_LDADD_SHARED)
+kernel_generic_LDADD = \
+	$(KERNEL_LDADD_SHARED)
 
-EXTRA_kernel_generic_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+EXTRA_kernel_generic_DEPENDENCIES = \
+	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
-kernel_bmi_SOURCES = $(KERNEL_SOURCES_SHARED)
+kernel_bmi_SOURCES = \
+	$(KERNEL_SOURCES_SHARED)
 
-kernel_bmi_CXXFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
+kernel_bmi_CXXFLAGS = \
+	$(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_BMI_FLAGS)
 
-kernel_bmi_CFLAGS = $(KERNEL_CXXFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
+kernel_bmi_CFLAGS = \
+	$(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_BMI_FLAGS)
 
-kernel_bmi_CCASFLAGS = $(KERNEL_CCASFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
+kernel_bmi_CCASFLAGS = \
+	$(KERNEL_CCASFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_BMI_FLAGS)
 
-kernel_bmi_LDFLAGS = $(KERNEL_LDFLAGS_SHARED) \
-	$(KERNEL_INCLUDES_SHARED) $(KERNEL_BMI_FLAGS)
+kernel_bmi_LDFLAGS = \
+	$(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(KERNEL_BMI_FLAGS)
 
 kernel_bmi_LDADD = $(KERNEL_LDADD_SHARED)
 
-EXTRA_kernel_bmi_DEPENDENCIES = $(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+EXTRA_kernel_bmi_DEPENDENCIES = \
+	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
 # ----------------------------------------------------------------------------
 # libc

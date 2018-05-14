@@ -29,7 +29,8 @@ syscall_entry:
     jae 0f
 
     // Read function pointer from vector table
-    movq syscall_handlers(,%rax,8),%rax
+    lea syscall_handlers(%rip),%r11
+    movq (%r11,%rax,8),%rax
 
     // Switch to CPU-local data gs
     swapgs

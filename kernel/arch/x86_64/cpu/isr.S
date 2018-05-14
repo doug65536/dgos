@@ -274,22 +274,22 @@ isr_common:
     leaq exception_isr_handler(%rip),%rax
 
     // 0x20-0x2F -> pic_dispatcher
-    movq $pic8259_dispatcher,%rcx
+    leaq pic8259_dispatcher(%rip),%rcx
     cmpl $INTR_PIC1_IRQ_BASE,%edi
     cmovaeq %rcx,%rax
 
     // 0x30-0xEF -> apic_dispatcher
-    movq $apic_dispatcher,%rcx
+    leaq apic_dispatcher(%rip),%rcx
     cmpl $INTR_APIC_IRQ_BASE,%edi
     cmovaeq %rcx,%rax
 
     // 0xF0-0xFF -> intr_invoke
-    movq $intr_invoke,%rcx
+    leaq intr_invoke(%rip),%rcx
     cmpl $INTR_SOFT_BASE,%edi
     cmovaeq %rcx,%rax
 
     // Fast path page fault
-    movq $mmu_page_fault_handler,%rcx
+    leaq mmu_page_fault_handler(%rip),%rcx
     cmpl $INTR_EX_PAGE,%edi
     cmoveq %rcx,%rax
 
@@ -439,7 +439,7 @@ isr_common:
 
     // Read xsave stack pointer from thread
     movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
-    sub sse_context_size,%rsi
+    sub sse_context_size(%rip),%rsi
 
     // Set all bits of edx:eax
     movl $-1,%eax
@@ -472,7 +472,7 @@ isr_common:
     // Restore context using instruction passed to macro
     \insn (%rdi)
 
-    add sse_context_size,%rsi
+    add sse_context_size(%rip),%rsi
     movq %rdi,THREAD_XSAVE_PTR_OFS(%rdi)
 
     ret
@@ -557,7 +557,7 @@ exception_isr_handler:
     push_cfi %rbx
     push_cfi %r12
 
-    movq $intr_has_handler,%rax
+    leaq intr_has_handler(%rip),%rax
 
     // ebx=intr, r12=ctx
     movl %edi,%ebx
@@ -569,7 +569,7 @@ exception_isr_handler:
     jz 0f
 
     // There is a handler
-    movq $intr_invoke,%rax
+    leaq intr_invoke(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
     callq *%rax
@@ -596,19 +596,19 @@ exception_isr_handler:
     mov %rsi,%r12
 
     // ...no handler or handler rejected it
-    movq $__exception_handler_invoke,%rax
+    leaq __exception_handler_invoke(%rip),%rax
     movl %ebx,%edi
     callq *%rax
     testl %eax,%eax
     jnz 2f
 
-    movq $cpu_debug_break,%rax
+    leaq cpu_debug_break(%rip),%rax
     call *%rax
 
     // Tail call to unhandled_exception_handler
 .align 16
 2:
-    movq $unhandled_exception_handler,%rax
+    leaq unhandled_exception_handler(%rip),%rax
     movq %r12,%rdi
     jmpq *%rax
 
@@ -631,7 +631,7 @@ isr_sysret64:
     pushq $(CPU_FPUCW_ELF_INIT)
 
     movl $(CPU_MXCSR_MASK_ALL),%eax
-    andl default_mxcsr_mask,%eax
+    andl default_mxcsr_mask(%rip),%eax
     pushq %rax
 
     fldcw 8(%rsp)

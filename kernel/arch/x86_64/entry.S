@@ -50,7 +50,7 @@ ap_init:
     // This is not the bootstrap CPU
 
     // Load kernel memory mapping ASAP
-    movq root_physaddr,%rax
+    movq root_physaddr(%rip),%rax
     movq %rax,%cr3
 
     // Get IDT and TSS up asap
@@ -58,7 +58,7 @@ ap_init:
 
     // Initialize AP MXCSR
     movl $(CPU_MXCSR_ELF_INIT),%eax
-    andl default_mxcsr_mask,%eax
+    andl default_mxcsr_mask(%rip),%eax
     pushq %rax
     ldmxcsr (%rsp)
 
@@ -84,13 +84,13 @@ bsp_init:
 
     debugind '3'
 
-    leaq kernel_stack,%rdx
-    movq kernel_stack_size,%rbx
+    leaq kernel_stack(%rip),%rdx
+    movq kernel_stack_size(%rip),%rbx
     leaq (%rdx,%rbx),%rsp
 
     // Store the physical memory map address
     // passed in from bootloader
-    movq %r15,kernel_params
+    movq %r15,kernel_params(%rip)
 
     // Get IDT and TSS up asap
     call idt_gdt_tss_init
@@ -115,7 +115,7 @@ bsp_init:
     movl $0x0000FFBF,%ecx
     testl %eax,%eax
     cmovel %ecx,%eax
-    movl %eax,default_mxcsr_mask
+    movl %eax,default_mxcsr_mask(%rip)
 
     // Set MXCSR
     // 0x3F = all exceptions masked
@@ -149,8 +149,8 @@ bsp_init:
     debugind '9'
 
     // Call the constructors
-    movq $___init_st,%rdi
-    movq $___init_en,%rsi
+    leaq ___init_st(%rip),%rdi
+    leaq ___init_en(%rip),%rsi
     call invoke_function_array
 
     debugind 'A'
@@ -202,8 +202,10 @@ idt_gdt_tss_init:
     movl $256,%ecx
 
 .align 16
+    lea idt(%rip),%rdx
 0:
-    movq isr_entry_points(%rbx),%rax
+	lea isr_entry_points(%rip),%rax
+    movq (%rax,%rbx),%rax
     // IDT structure:
     //  uint16_t offset_lo;     // offset bits 15:0
     //  uint16_t selector;      // a code segment selector in GDT
@@ -212,22 +214,22 @@ idt_gdt_tss_init:
     //  uint16_t offset_hi;     // offset bits 31:16
     //  uint32_t offset_64_31;  // offset bits 63:32
     //  uint32_t reserved;
-    movw %ax,idt(,%rbx,2)
+    movw %ax,(%rdx,%rbx,2)
     sarq $16,%rax
-    movw $GDT_SEL_KERNEL_CODE64,2+idt(,%rbx,2)
-    movb $0,4+idt(,%rbx,2)
-    movb $(IDT_PRESENT | IDT_INTR),5+idt(,%rbx,2)
-    movw %ax,6+idt(,%rbx,2)
+    movw $GDT_SEL_KERNEL_CODE64,2(%rdx,%rbx,2)
+    movb $0,4(%rdx,%rbx,2)
+    movb $(IDT_PRESENT | IDT_INTR),5(%rdx,%rbx,2)
+    movw %ax,6(%rdx,%rbx,2)
     sarq $16,%rax
-    movl %eax,8+idt(,%rbx,2)
-    movl $0,12+idt(,%rbx,2)
+    movl %eax,8(%rdx,%rbx,2)
+    movl $0,12(%rdx,%rbx,2)
     addl $8,%ebx
     decl %ecx
     jnz 0b
 
     // Setup IST entries
-    movb $1,idt+4+16*INTR_EX_STACK
-    movb $2,idt+4+16*INTR_EX_DBLFAULT
+    movb $1,4+16*INTR_EX_STACK(%rdx)
+    movb $2,4+16*INTR_EX_DBLFAULT(%rdx)
 
     // Poke initial TSS into TSS GDT entry
     //  uint16_t limit_low;
@@ -240,7 +242,7 @@ idt_gdt_tss_init:
     popq %rbx
 
     movl $INTR_EX_DEBUG,%edi
-    movq $debug_exception_handler,%rsi
+    leaq debug_exception_handler(%rip),%rsi
     call intr_hook
 
     // fall through...
@@ -248,37 +250,39 @@ idt_gdt_tss_init:
 .align 16
 idt_gdt_tss_init_ap:
     // Load IDTR
+    lea idt(%rip),%rdx
     subq $(24*8),%rsp
     movw $(16 * 256 - 1),6(%rsp)
-    movq $idt,8(%rsp)
+    movq %rdx,8(%rsp)
     lidtq 6(%rsp)
 
     // Load GDTR
+    lea gdt(%rip),%rdx
     movw $(GDT_SEL_END - 1),6(%rsp)
-    movq $gdt,8(%rsp)
+    movq %rdx,8(%rsp)
     lgdtq 6(%rsp)
 
-    movq $init_tss,%rax
+    leaq init_tss(%rip),%rax
     // Limit 15:0
-    movw $(init_tss_end - init_tss - 1),GDT_SEL_TSS+gdt
+    movw $(init_tss_end - init_tss - 1),GDT_SEL_TSS(%rdx)
     // Base 15:0
-    movw %ax,2+GDT_SEL_TSS+gdt
+    movw %ax,2+GDT_SEL_TSS(%rdx)
     sarq $16,%rax
     // Base 23:16
-    movb %al,4+GDT_SEL_TSS+gdt
+    movb %al,4+GDT_SEL_TSS(%rdx)
     sarq $8,%rax
     // access
     movb $(GDT_ACCESS_PRESENT | \
-        GDT_ACCESS_ACCESSED | GDT_TYPE_TSS),5+GDT_SEL_TSS+gdt
+        GDT_ACCESS_ACCESSED | GDT_TYPE_TSS),5+GDT_SEL_TSS(%rdx)
     // Limit 19:16, flags
-    movb $0,6+GDT_SEL_TSS+gdt
+    movb $0,6+GDT_SEL_TSS(%rdx)
     // Base 21:24
-    movb %al,7+GDT_SEL_TSS+gdt
+    movb %al,7+GDT_SEL_TSS(%rdx)
     sarq $8,%rax
     // Base 63:32
-    movl %eax,8+GDT_SEL_TSS+gdt
+    movl %eax,8+GDT_SEL_TSS(%rdx)
     // Reserved
-    movl $0,12+GDT_SEL_TSS+gdt
+    movl $0,12+GDT_SEL_TSS(%rdx)
 
     // Load TR
     movl $GDT_SEL_TSS,%eax
@@ -384,9 +388,9 @@ detect_xsave_states_bsp:
     xorl %ecx,%ecx
     cpuid
 
-    movl %eax,xsave_supported_states
+    movl %eax,xsave_supported_states(%rip)
     andl $XSAVE_WANTED,%eax
-    movl %eax,xsave_enabled_states
+    movl %eax,xsave_enabled_states(%rip)
 
 0:
     pop_cfi %rbx
@@ -410,8 +414,8 @@ set_xsave_states_ap:
 
     xorl %ecx,%ecx
     xgetbv
-    andl xsave_supported_states,%eax
-    orl xsave_enabled_states,%eax
+    andl xsave_supported_states(%rip),%eax
+    orl xsave_enabled_states(%rip),%eax
     xsetbv
 
 0:
@@ -437,7 +441,7 @@ mp_main:
 .global __cxa_pure_virtual
 .hidden __cxa_pure_virtual
 __cxa_pure_virtual:
-    movq $pure_call_message,%rdi
+    leaq pure_call_message(%rip),%rdi
     jmp panic
 
 .align 16
