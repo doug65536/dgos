@@ -94,16 +94,19 @@ enum keyb8042_key_state_t {
     IN_E1_2
 };
 
-static keyb8042_key_state_t keyb8042_state = NORMAL;
+static struct keyb8042_data_t {
+    // Keyboard state (to handle multi-byte scancodes)
+    keyb8042_key_state_t state;
 
-// Mouse packet data
-static uint64_t keyb8042_last_mouse_packet_time;
-static size_t keyb8042_mouse_packet_level;
-static size_t keyb8042_mouse_packet_size;
-static size_t keyb8042_mouse_button_count;
-static uint8_t keyb8042_mouse_packet[5];
+    // Mouse packet data
+    uint64_t last_mouse_packet_time;
+    size_t mouse_packet_level;
+    size_t mouse_packet_size;
+    size_t mouse_button_count;
+    uint8_t mouse_packet[5];
 
-static keybd_fsa_t keyb8042_fsa;
+    keybd_fsa_t fsa;
+} keyb8042;
 
 static void keyb8042_keyboard_handler(void)
 {
@@ -114,14 +117,14 @@ static void keyb8042_keyboard_handler(void)
     int32_t vk = 0;
     int sign = !!(scancode & 0x80) * -2 + 1;
 
-    switch (keyb8042_state) {
+    switch (keyb8042.state) {
     case NORMAL:
         if (scancode == 0xE0) {
-            keyb8042_state = IN_E0;
+            keyb8042.state = IN_E0;
             break;
         }
         if (scancode == 0xE1) {
-            keyb8042_state = IN_E1_1;
+            keyb8042.state = IN_E1_1;
             break;
         }
         scancode &= 0x7F;
@@ -131,24 +134,24 @@ static void keyb8042_keyboard_handler(void)
     case IN_E0:
         scancode &= 0x7F;
         vk = keyb8042_layout->scancode_0xE0[scancode];
-        keyb8042_state = NORMAL;
+        keyb8042.state = NORMAL;
         break;
 
     case IN_E1_1:
-        keyb8042_state = IN_E1_2;
+        keyb8042.state = IN_E1_2;
         break;
 
     case IN_E1_2:
-        keyb8042_state = NORMAL;
+        keyb8042.state = NORMAL;
         vk = KEYB_VK_PAUSE;
         break;
 
     default:
-        keyb8042_state = NORMAL;
+        keyb8042.state = NORMAL;
         break;
     }
 
-    keyb8042_fsa.deliver_vk(vk * sign);
+    keyb8042.fsa.deliver_vk(vk * sign);
 }
 
 static void keyb8042_process_mouse_packet(uint8_t const *packet)
@@ -159,9 +162,9 @@ static void keyb8042_process_mouse_packet(uint8_t const *packet)
     event.wdist = 0;
     event.buttons = 0;
 
-    switch (keyb8042_mouse_packet_size) {
+    switch (keyb8042.mouse_packet_size) {
     case 4:
-        if (keyb8042_mouse_button_count == 5)
+        if (keyb8042.mouse_button_count == 5)
             event.buttons |= (packet[3] >> 1) & 0x18;
 
         // Sign extend 4 bit wheel distance
@@ -205,18 +208,18 @@ static void keyb8042_mouse_handler(void)
     // with the mouse
 
     uint64_t now = time_ns();
-    if (keyb8042_last_mouse_packet_time + 500000000 < now)
-        keyb8042_mouse_packet_level = 0;
-    keyb8042_last_mouse_packet_time = now;
+    if (keyb8042.last_mouse_packet_time + 500000000 < now)
+        keyb8042.mouse_packet_level = 0;
+    keyb8042.last_mouse_packet_time = now;
 
-    if (keyb8042_mouse_packet_size > 0)
-        keyb8042_mouse_packet[keyb8042_mouse_packet_level++] = data;
+    if (keyb8042.mouse_packet_size > 0)
+        keyb8042.mouse_packet[keyb8042.mouse_packet_level++] = data;
 
-    if (keyb8042_mouse_packet_size &&
-            keyb8042_mouse_packet_level ==
-            keyb8042_mouse_packet_size) {
-        keyb8042_process_mouse_packet(keyb8042_mouse_packet);
-        keyb8042_mouse_packet_level = 0;
+    if (keyb8042.mouse_packet_size &&
+            keyb8042.mouse_packet_level ==
+            keyb8042.mouse_packet_size) {
+        keyb8042_process_mouse_packet(keyb8042.mouse_packet);
+        keyb8042.mouse_packet_level = 0;
     }
 }
 
@@ -340,7 +343,7 @@ static int keyb8042_set_layout_name(char const *name)
 
 static int keyb8042_get_modifiers()
 {
-    return keyb8042_fsa.get_modifiers();
+    return keyb8042.fsa.get_modifiers();
 }
 
 void keyb8042_init(void)
@@ -482,8 +485,8 @@ void keyb8042_init(void)
     if (keyb8042_retry_mouse_command(PS2MOUSE_ENABLE) < 0)
         return;
 
-    keyb8042_mouse_packet_size = 3;
-    keyb8042_mouse_button_count = 2;
+    keyb8042.mouse_packet_size = 3;
+    keyb8042.mouse_button_count = 2;
 
     // Attempt to detect better mouse
 
@@ -492,15 +495,15 @@ void keyb8042_init(void)
         // Attempt to detect 5 button mouse with wheel
         // (Intellimouse Explorer compatible)
         printk("Detected 5 button mouse with wheel\n");
-        keyb8042_mouse_button_count = 5;
-        keyb8042_mouse_packet_size = 4;
+        keyb8042.mouse_button_count = 5;
+        keyb8042.mouse_packet_size = 4;
     } else if (keyb8042_magic_sequence(
                    0x03, 6, 0xF3, 0xC8, 0xF3, 0x64, 0xF3, 0x50) > 0) {
         // Attempt to detect 3 button mouse with wheel
         // (Intellimouse compatible)
         printk("Detected mouse with wheel\n");
-        keyb8042_mouse_button_count = 3;
-        keyb8042_mouse_packet_size = 4;
+        keyb8042.mouse_button_count = 3;
+        keyb8042.mouse_packet_size = 4;
     }
 
     // Set mouse sampling rate

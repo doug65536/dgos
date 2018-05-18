@@ -202,6 +202,11 @@ struct keyboard_event_t {
 #define KEYB_ALT_DOWN       (KEYB_LALT_DOWN | KEYB_RALT_DOWN)
 #define KEYB_GUI_DOWN       (KEYB_LGUI_DOWN | KEYB_RGUI_DOWN)
 
+// Indicator LED
+#define KEYB_SCRLOCK_BIT    0
+#define KEYB_NUMLOCK_BIT    1
+#define KEYB_CAPLOCK_BIT    2
+
 // Get the human readable text for a special codepoint
 char const *keybd_special_text(int codepoint);
 
@@ -211,9 +216,16 @@ int keybd_event(keyboard_event_t event);
 // Called to read the keyboard queue
 keyboard_event_t keybd_waitevent(void);
 
+class keybd_dev_t {
+    virtual int set_layout_name(char const *name);
+    virtual int get_modifiers(char const *name);
+    virtual int set_indicators(int indicators);
+};
+
 // Plugged in by drivers
 extern int (*keybd_set_layout_name)(char const *name);
 extern int (*keybd_get_modifiers)(void);
+extern int (*keybd_set_indicators)(int indicators);
 
 void keybd_init(void);
 
