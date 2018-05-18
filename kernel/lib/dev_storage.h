@@ -37,28 +37,21 @@ struct storage_dev_base_t {
 
     typedef void (*completion_callback_t)(errno_t err, uintptr_t arg);
 
-    virtual errno_t read_async(
-            void *data, int64_t count, uint64_t lba,
-            iocp_t *iocp) = 0;
+    virtual errno_t read_async(void *data, int64_t count,
+                               uint64_t lba, iocp_t *iocp) = 0;
 
-    virtual errno_t write_async(
-            void const *data, int64_t count, uint64_t lba, bool fua,
-            iocp_t *iocp) = 0;
+    virtual errno_t write_async(void const *data, int64_t count,
+                                uint64_t lba, bool fua, iocp_t *iocp) = 0;
 
-    virtual errno_t trim_async(
-            int64_t count, uint64_t lba,
-            iocp_t *iocp) = 0;
+    virtual errno_t trim_async(int64_t count, uint64_t lba, iocp_t *iocp) = 0;
 
-    virtual errno_t flush_async(
-            iocp_t *iocp) = 0;
+    virtual errno_t flush_async(iocp_t *iocp) = 0;
 
     // Synchronous wrappers
 
-    int read_blocks(
-            void *data, int64_t count, uint64_t lba);
+    int read_blocks(void *data, int64_t count, uint64_t lba);
 
-    int write_blocks(
-            void const *data, int64_t count, uint64_t lba, bool fua);
+    int write_blocks(void const *data, int64_t count, uint64_t lba, bool fua);
 
     virtual int64_t trim_blocks(int64_t count, uint64_t lba);
 
