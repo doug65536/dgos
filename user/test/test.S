@@ -47,7 +47,7 @@ _start:
 	mov %rax,%rdi
 	mov $60,%eax
 	syscall
-	jmp _start
+	ud2
 
 test_nanosleep:
 	push $0
