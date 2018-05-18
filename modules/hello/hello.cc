@@ -29,3 +29,4 @@ int entry(void)
     printk("pointer to text: ");
     text_ptr();
 }
+
