@@ -7,6 +7,7 @@ bootmenu.cc
 bootmenu.h
 cpu_constants.h
 cpu_constants.h
+cxxexcep.h
 emulators.mk
 gdt.h
 include/bootdev_info.h
@@ -58,7 +59,6 @@ utf.cc
 utf.h
 elf64decl.h
 exception.s
-exception.h
 physmem.cc
 physmem.h
 farptr.cc

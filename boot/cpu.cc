@@ -1,7 +1,7 @@
 #include "cpu.h"
 #include "paging.h"
 #include "bootsect.h"
-#include "exception.h"
+#include "cxxexcep.h"
 #include "farptr.h"
 #include "string.h"
 #include "gdt.h"

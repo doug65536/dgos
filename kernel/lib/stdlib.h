@@ -11,6 +11,12 @@
 
 #define _MALLOC_OVERHEAD    16
 
+#ifdef __cplusplus
+struct bad_alloc
+{
+};
+#endif
+
 extern "C" {
 
 void malloc_startup(void *p);

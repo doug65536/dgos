@@ -387,7 +387,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/bswap.cc \
 	kernel/lib/bswap.h \
 	kernel/lib/callout.cc \
-	kernel/lib/callout.h \
+    kernel/lib/callout.h \
+    kernel/lib/cxxexcept.h \
+    kernel/lib/cxxexcept.cc \
 	kernel/lib/cc/algorithm.h \
 	kernel/lib/cc/functional.h \
 	kernel/lib/cc/initializer_list.h \

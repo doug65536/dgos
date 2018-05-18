@@ -19,6 +19,8 @@ device/usb_storage.h
 device/usb_xhci.bits
 lib/cc/memory.cc
 lib/cc/union_storage.h
+lib/cxxexcept.cc
+lib/cxxexcept.h
 lib/dev_usb_ctl.h
 lib/refcount.cc
 lib/refcount.h
