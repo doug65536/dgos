@@ -83,6 +83,8 @@ entry_start:
 	movw initial_stack_ptr+2,%ss
 	movw initial_stack_ptr,%sp
 
+	call showplace
+
 	# Load cs register
 	ljmpw $0,$reloc_entry
 reloc_entry:
@@ -150,6 +152,45 @@ disk_read:
 unreachable:
 	hlt
 	jmp unreachable
+
+showplace:
+	pushw %bp
+	movw %sp,%bp
+	pushaw
+	pushfw
+
+	pushw %es
+
+	pushw $0xb800
+	popw %es
+
+	# xlat base
+	movw $hexlookup,%bx
+
+	movw 2(%bp),%dx
+	xorw %di,%di
+
+	# shift distance
+	movb $12,%cl
+.Lnibble_loop:
+	movw %dx,%ax
+	shrw %cl,%ax
+	andb $0xF,%al
+	xlat
+	movb $7,%ah
+	stosw
+	sub $4,%cl
+	jae .Lnibble_loop
+
+	pop %es
+	popfw
+	popaw
+	leavew
+	ret
+
+hexlookup:
+.byte '0', '1', '2', '3', '4', '5', '6', '7'
+.byte '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
 
 dap:
 	.byte dap_length
