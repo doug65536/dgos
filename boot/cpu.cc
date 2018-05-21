@@ -305,9 +305,9 @@ bool cpu_has_upto_avx2()
 
 const char *cpu_choose_kernel()
 {
-    if (cpu_has_bmi())
-        return "dgos-kernel-bmi";
-    else
+//    if (cpu_has_bmi())
+//        return "dgos-kernel-bmi";
+//    else
         return "dgos-kernel-generic";
 }
 
