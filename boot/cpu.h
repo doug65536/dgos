@@ -124,7 +124,7 @@ extern "C" void cpu_a20_enterpm();
 extern "C" void cpu_a20_exitpm();
 extern "C" bool toggle_a20(uint8_t enable);
 
-extern "C" void copy_or_enter(uint64_t address, uint32_t src, uint32_t size);
+extern "C" void run_code64(void (*fn)(void *), void *arg);
 
 static __always_inline void outb(uint16_t dx, uint8_t al)
 {
@@ -193,6 +193,25 @@ static __always_inline void cpu_flush_cache()
     __asm__ __volatile__ ("wbinvd\n\t");
 }
 
+static __always_inline uint64_t cpu_rdtsc()
+{
+    uint32_t hi, lo;
+    __asm__ __volatile__ ("rdtsc" : "=d" (hi), "=a" (lo));
+    return (uint64_t(hi) << 32) | lo;
+}
+
+static __always_inline uint64_t cpu_rdrand()
+{
+    uint32_t hi, lo;
+    __asm__ __volatile__ ("rdtsc" : "=d" (hi), "=a" (lo));
+    return (uint64_t(hi) << 32) | lo;
+}
+
+static __always_inline uint64_t rol64(uint64_t n, uint8_t bits)
+{
+    return (n << bits) | (n >> (64 - bits));
+}
+
 #define USE_8259_PIC_FUNCTIONS 0
 #if USE_8259_PIC_FUNCTIONS
 void ack_irq(uint8_t irq);
@@ -205,6 +224,9 @@ bool cpu_has_no_execute();
 bool cpu_has_global_pages();
 
 const char *cpu_choose_kernel();
+void run_kernel(uint64_t entry, void *param);
+void copy_kernel(uint64_t dest_addr, void *src, size_t sz);
+void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt);
 
 extern "C" uint8_t xcr0_value;
 

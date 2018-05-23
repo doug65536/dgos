@@ -127,6 +127,7 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-fat32.$(OBJEXT) \
 	boot/libbootsect_a-iso9660.$(OBJEXT) \
 	boot/libbootsect_a-cpu.$(OBJEXT) \
+	boot/libbootsect_a-cpu64.$(OBJEXT) \
 	boot/libbootsect_a-malloc.$(OBJEXT) \
 	boot/libbootsect_a-string.$(OBJEXT) \
 	boot/libbootsect_a-utf.$(OBJEXT) \
@@ -1022,6 +1023,7 @@ libbootsect_a_SOURCES = \
 	boot/fat32.cc \
 	boot/iso9660.cc \
 	boot/cpu.cc \
+	boot/cpu64.S \
 	boot/malloc.cc \
 	boot/string.cc \
 	boot/utf.cc \
@@ -2041,6 +2043,8 @@ boot/libbootsect_a-fat32.$(OBJEXT): boot/$(am__dirstamp) \
 boot/libbootsect_a-iso9660.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-cpu.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-cpu64.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-malloc.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3391,6 +3395,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootmenu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootsect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-cpu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-cpu64.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-driveinfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64.Po@am__quote@
@@ -3824,6 +3829,20 @@ boot/libbootsect_a-bioscall.obj: boot/bioscall.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bioscall.S' object='boot/libbootsect_a-bioscall.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bioscall.obj `if test -f 'boot/bioscall.S'; then $(CYGPATH_W) 'boot/bioscall.S'; else $(CYGPATH_W) '$(srcdir)/boot/bioscall.S'; fi`
+
+boot/libbootsect_a-cpu64.o: boot/cpu64.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-cpu64.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-cpu64.Tpo -c -o boot/libbootsect_a-cpu64.o `test -f 'boot/cpu64.S' || echo '$(srcdir)/'`boot/cpu64.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-cpu64.Tpo boot/$(DEPDIR)/libbootsect_a-cpu64.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/cpu64.S' object='boot/libbootsect_a-cpu64.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-cpu64.o `test -f 'boot/cpu64.S' || echo '$(srcdir)/'`boot/cpu64.S
+
+boot/libbootsect_a-cpu64.obj: boot/cpu64.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-cpu64.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-cpu64.Tpo -c -o boot/libbootsect_a-cpu64.obj `if test -f 'boot/cpu64.S'; then $(CYGPATH_W) 'boot/cpu64.S'; else $(CYGPATH_W) '$(srcdir)/boot/cpu64.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-cpu64.Tpo boot/$(DEPDIR)/libbootsect_a-cpu64.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/cpu64.S' object='boot/libbootsect_a-cpu64.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-cpu64.obj `if test -f 'boot/cpu64.S'; then $(CYGPATH_W) 'boot/cpu64.S'; else $(CYGPATH_W) '$(srcdir)/boot/cpu64.S'; fi`
 
 boot/libbootsect_a-mpentry.o: boot/mpentry.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-mpentry.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-mpentry.Tpo -c -o boot/libbootsect_a-mpentry.o `test -f 'boot/mpentry.S' || echo '$(srcdir)/'`boot/mpentry.S

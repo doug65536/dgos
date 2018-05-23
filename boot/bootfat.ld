@@ -29,6 +29,9 @@ SECTIONS {
 		*(.text.*)
 		*(.text.unlikely)
 
+		/* Place 64 bit code high enough to be outside first 4KB */
+		*(.text.code64)
+
 		*(.data)
 		*(.data.*)
 		*(.rodata)

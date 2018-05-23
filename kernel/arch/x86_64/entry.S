@@ -88,8 +88,7 @@ bsp_init:
     movq kernel_stack_size(%rip),%rbx
     leaq (%rdx,%rbx),%rsp
 
-    // Store the physical memory map address
-    // passed in from bootloader
+    // Store the kernel parameters passed in from bootloader
     movq %r15,kernel_params(%rip)
 
     // Get IDT and TSS up asap

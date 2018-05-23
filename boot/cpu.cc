@@ -336,19 +336,17 @@ void cpu_a20_exitpm()
 
 // If src is > 0, copy size bytes from src to address
 // If src is == 0, jumps to entry point in address, passing size as an argument
-void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
+void run_code64(void (*fn)(void *), void *arg)
 {
     uint32_t pdbr = paging_root_addr();
 
     struct params_t {
-        uint64_t addr;
-        uint32_t src;
-        uint32_t size;
+        void (*fn)(void*);
+        void *arg;
         uint32_t pdbr;
     } params = {
-        address,
-        src,
-        size,
+        fn,
+        arg,
         pdbr
     };
 
@@ -379,9 +377,6 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         "btsl $%c[cr0_pg_bit],%%eax\n\t"
         "movl %%eax,%%cr0\n\t"
 
-        "jmp 0f\n\t"
-        "0:"
-
         // Now in 64 bit compatibility mode (still really 32 bit)
 
         // Far jump to selector that has L bit set (64 bit)
@@ -406,46 +401,14 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
 
         "lidtq (%%eax)\n\t"
 
-        // Load 64 bit data segments
-        "movl %[gdt_data64],%%eax\n\t"
-        "movl %%eax,%%ds\n\t"
-        "movl %%eax,%%es\n\t"
-        "movl %%eax,%%fs\n\t"
-        "movl %%eax,%%gs\n\t"
-        "movl %[gdt_stkseg],%%eax\n\t"
-        "movl %%eax,%%ss\n\t"
-
-        // Load copy/entry parameters
-        "mov %c[addr_ofs](%[params]),%%rdi\n\t"
-        "movl %c[src_ofs](%[params]),%%esi\n\t"
-        "movl %c[size_ofs](%[params]),%%ecx\n\t"
-
-        // Check whether it is copy or entry
-        "testl %%esi,%%esi\n\t"
-        "jz 2f\n\t"
-
-        // Copy memory
-        "cld\n\t"
-        "rep movsb\n\t"
-        "jmp 3f\n\t"
-
-        //
-        // Enter kernel
-        "2:\n\t"
-        "movb $'Y',0xb8000\n\t"  // <-- debug hack
-
-        // Enable CR0.WP write protection
-        "mov %%cr0,%%rax\n\t"
-        "bts $%c[cr0_wp_bit],%%rax\n\t"
-        "mov %%rax,%%cr0\n\t"
+        // Load parameters
+        "movl %c[fn_ofs](%[params]),%%eax\n\t"
+        "movl %c[arg_ofs](%[params]),%%edi\n\t"
 
         "mov %%rsp,%%r15\n\t"
         "andq $-16,%%rsp\n\t"
-        "call *%%rdi\n\t"
-        // Should not be possible to reach here
+        "call *%%rax\n\t"
         "mov %%r15,%%rsp\n\t"
-
-        "3:\n\t"
 
         // Far return to 32 bit compatibility mode code segment
         "lret\n\t"
@@ -485,9 +448,8 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         : [params] "b" (&params)
         , [nx_available] "m" (nx_available)
         , [gp_available] "m" (gp_available)
-        , [addr_ofs] "e" (offsetof(params_t, addr))
-        , [src_ofs] "e" (offsetof(params_t, src))
-        , [size_ofs] "e" (offsetof(params_t, size))
+        , [fn_ofs] "e" (offsetof(params_t, fn))
+        , [arg_ofs] "e" (offsetof(params_t, arg))
         , [pdbr_ofs] "e" (offsetof(params_t, pdbr))
         , [gdt_code64] "n" (GDT_SEL_KERNEL_CODE64)
         , [gdt_data64] "n" (GDT_SEL_USER_DATA | 3)
@@ -505,3 +467,53 @@ void copy_or_enter(uint64_t address, uint32_t src, uint32_t size)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
 }
+
+// 64-bit assembly code
+
+extern "C" void code64_run_kernel(void *p);
+extern "C" void code64_reloc_kernel(void *p);
+extern "C" void code64_copy_kernel(void *p);
+
+void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt)
+{
+    struct {
+        uint64_t distance;
+        void *elf_rela;
+        size_t relcnt;
+    } arg = {
+        distance,
+        elf_rela,
+        relcnt
+    };
+
+    run_code64(code64_reloc_kernel, &arg);
+}
+
+void run_kernel(uint64_t entry, void *param)
+{
+    struct {
+        uint64_t entry;
+        void *param;
+    } arg = {
+        entry,
+        param
+    };
+
+    run_code64(code64_run_kernel, &arg);
+}
+
+void copy_kernel(uint64_t dest_addr, void *src, size_t sz)
+{
+    struct {
+        uint64_t dest_addr;
+        void *src;
+        size_t sz;
+    } arg = {
+        dest_addr,
+        src,
+        sz
+    };
+
+    run_code64(code64_copy_kernel, &arg);
+}
+

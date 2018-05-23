@@ -213,7 +213,10 @@ typedef uintptr_t pte_t;
 #define PT1_PTR         ((pte_t*)PT1_ADDR)
 #define PT0_PTR         ((pte_t*)PT0_ADDR)
 
-#define PT_KERNBASE     0xFFFFFFFF80000000
+extern char ___text_st[];
+extern char ___text_en[];
+
+#define PT_KERNBASE     uintptr_t(___text_st);
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
@@ -875,7 +878,7 @@ static pte_t *init_find_aliasing_pte(void)
 {
     pte_t *pte = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
     unsigned path[4];
-    path_from_addr(path, 0xFFFFFFFF80000000UL - PAGE_SIZE);
+    path_from_addr(path, uintptr_t(___text_st) - PAGE_SIZE);
 
     for (unsigned level = 0; level < 3; ++level)
         pte = (pte_t*)(pte[path[level]] & PTE_ADDR);
@@ -895,7 +898,7 @@ static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
         linaddr = (pt3_index << PAGE_SIZE_BIT);
         linaddr = CANONICALIZE(linaddr);
     } else {
-        linaddr = 0xFFFFFFFF80000000 - PAGE_SIZE;
+        linaddr = uintptr_t(___text_st) - PAGE_SIZE;
     }
 
     *aliasing_pte = (*aliasing_pte & ~PTE_ADDR) |
@@ -2477,7 +2480,7 @@ int munmap(void *addr, size_t size)
             (a < 0x800000000000U) ?
                 (contiguous_allocator_t*)
                 thread_current_process()->get_allocator()
-            : (a >= 0xFFFFFFFF80000000) ? &near_allocator
+            : (a >= uintptr_t(___text_st)) ? &near_allocator
             : &linear_allocator;
 
     allocator->release_linear((linaddr_t)addr - misalignment, size);
@@ -3308,9 +3311,6 @@ void mm_init_process(process_t *process)
     allocator->init(0x400000, 0x800000000000 - 0x400000, "process");
     process->set_allocator(allocator);
 }
-
-extern char ___text_st[];
-extern char ___text_en[];
 
 // Returns the physical address of the original page directory
 uintptr_t mm_fork_kernel_text()

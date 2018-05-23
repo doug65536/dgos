@@ -28,6 +28,8 @@ extern "C" void enter_kernel(uint64_t entry_point);
 // Save the entry point address for later MP processor startup
 uint64_t mp_enter_kernel;
 
+static int64_t base_adj;
+
 static void enter_kernel_initial(uint64_t entry_point)
 {
     uintptr_t vbe_info_vector = vbe_select_mode(65535, 800, 1) << 4;
@@ -62,8 +64,8 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
-    paging_map_range(0xFFFFFFFF80000000ULL - PAGE_SIZE, PAGE_SIZE, 0,
-                     PTE_PRESENT | PTE_WRITABLE, 0);
+    paging_map_range((0xFFFFFFFF80000000ULL - PAGE_SIZE) + base_adj,
+                     PAGE_SIZE, 0, PTE_PRESENT | PTE_WRITABLE, 0);
 
     print_line("Mapping first 768KB\n");
 
@@ -101,7 +103,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     print_line("Entering kernel at 0x%llx\n", entry_point);
 
-    copy_or_enter(entry_point, 0, uint32_t(uintptr_t(&params)));
+    run_kernel(entry_point, &params);
 }
 
 void enter_kernel(uint64_t entry_point)
@@ -112,11 +114,26 @@ void enter_kernel(uint64_t entry_point)
         return;
     }
 
-    copy_or_enter(entry_point, 0, 0);
+    run_kernel(entry_point, nullptr);
 }
+
+//static void apply_reloc(uint64_t new_base,
+//                        Elf64_Rela const *rela, size_t relcnt)
+//{
+//    int64_t dist = new_base - 0xFFFFFFFF80000000;
+
+//    for (size_t r = 0; r < relcnt; ++r) {
+//        print_line("Relocation ofs=%llx, addend=%llx, info=%llx",
+//                   rela[r].r_offset,
+//                   rela[r].r_addend,
+//                   rela[r].r_info);
+//    }
+//}
 
 bool elf64_run(char const *filename)
 {
+    uint64_t time_hash = cpu_rdtsc();
+
     cpu_init();
 
     if (!cpu_has_long_mode())
@@ -145,6 +162,9 @@ bool elf64_run(char const *filename)
 
     int file = boot_open(filename);
 
+    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
+    time_hash ^= ~cpu_rdtsc();
+
     if (file < 0)
         halt("Could not open kernel file");
 
@@ -155,6 +175,9 @@ bool elf64_run(char const *filename)
 
     if (read_size != sizeof(file_hdr))
         halt("Could not read ELF header");
+
+    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
+    time_hash ^= ~cpu_rdtsc();
 
     // Check magic number
     if (memcmp(&file_hdr.e_ident[EI_MAG0],
@@ -174,19 +197,45 @@ bool elf64_run(char const *filename)
                 file_hdr.e_phoff))
         halt("Could not read program headers");
 
+    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
+    time_hash ^= ~cpu_rdtsc();
+
     uint64_t total_bytes = 0;
     for (unsigned i = 0; i < file_hdr.e_phnum; ++i)
         total_bytes += program_hdrs[i].p_memsz;
+
+    // Load relocations
+    if (file_hdr.e_shentsize != sizeof(Elf64_Shdr))
+        print_line("Executable has unexpected section header size");
+
+    ssize_t shbytes = file_hdr.e_shentsize * file_hdr.e_shnum;
+    Elf64_Shdr *shdrs;
+    shdrs = (Elf64_Shdr*)(uintptr_t(far_malloc(shbytes)) << 4);
+
+    if (shbytes != boot_pread(file, shdrs, shbytes, file_hdr.e_shoff))
+        halt("Could not read section headers\n");
+
+    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
+    time_hash ^= ~cpu_rdtsc();
+
+    time_hash &= 0x7FFFFFFF000;
 
     bool failed = false;
 
     uint64_t done_bytes = 0;
 
+    uint64_t new_base = 0xFFFFFFFF80000000;
+    //uint64_t new_base = 0xFFFFF80000000000;
+    //uint64_t new_base = 0xFFFFFFFF80000000 - time_hash;//0xFFFFF80000000000;
+    base_adj = new_base - 0xFFFFFFFF80000000;
+
     print_line("Loading kernel...");
 
-    // For each section
+    // For each program header
     for (size_t i = 0; !failed && i < file_hdr.e_phnum; ++i) {
         Elf64_Phdr *blk = program_hdrs + i;
+
+        blk->p_vaddr += base_adj;
 
         uint64_t page_flags = (-cpu_has_global_pages() & PTE_GLOBAL);
 
@@ -279,8 +328,8 @@ bool elf64_run(char const *filename)
 
                 // Copy to alias region
                 // Add misalignment offset
-                copy_or_enter(address_window + page_ofs,
-                              (uint32_t)read_buffer, chunk_size);
+                copy_kernel(address_window + page_ofs,
+                            read_buffer, chunk_size);
             }
 
             paddr += chunk_size;
@@ -297,6 +346,25 @@ bool elf64_run(char const *filename)
                                 PTE_DIRTY | PTE_ACCESSED, 0);
         }
     }
+
+    for (size_t i = 0; i < file_hdr.e_shnum; ++i) {
+        if (shdrs[i].sh_type == SHT_RELA) {
+            Elf64_Rela *rela;
+            rela = (Elf64_Rela*)(uintptr_t(far_malloc(shdrs[i].sh_size)) << 4);
+            size_t relcnt = shdrs[i].sh_size / sizeof(*rela);
+
+            paging_map_range(uint64_t(rela),
+                             uint64_t(rela + relcnt) - uint64_t(rela),
+                             uint64_t(rela), PTE_PRESENT | PTE_ACCESSED, 1);
+
+            if (ssize_t(shdrs[i].sh_size) != boot_pread(
+                        file, rela, shdrs[i].sh_size, shdrs[i].sh_offset))
+                halt("Could not read relocation section");
+
+            reloc_kernel(base_adj, rela, relcnt);
+        }
+    }
+
     boot_close(file);
 
     paging_modify_flags(address_window, PAGE_SIZE << 1,
@@ -307,7 +375,7 @@ bool elf64_run(char const *filename)
     ELF64_TRACE("Entering kernel");
 
     if (!failed)
-        enter_kernel(file_hdr.e_entry);
+        enter_kernel(file_hdr.e_entry + base_adj);
 
     halt("Failed to load kernel");
 

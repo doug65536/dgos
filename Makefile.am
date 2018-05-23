@@ -140,6 +140,7 @@ libbootsect_a_SOURCES = \
 	boot/fat32.cc \
 	boot/iso9660.cc \
 	boot/cpu.cc \
+	boot/cpu64.S \
 	boot/malloc.cc \
 	boot/string.cc \
 	boot/utf.cc \

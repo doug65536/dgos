@@ -5,6 +5,7 @@ bootcommon.S
 bootinfo.s
 bootmenu.cc
 bootmenu.h
+cpu64.S
 cpu_constants.h
 cpu_constants.h
 cxxexcep.h
