@@ -216,6 +216,9 @@ typedef uintptr_t pte_t;
 extern char ___text_st[];
 extern char ___text_en[];
 
+// -512GB
+static uint64_t min_kern_addr = 0xFFFFFF8000000000;
+
 #define PT_KERNBASE     uintptr_t(___text_st);
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
@@ -931,6 +934,7 @@ struct clear_phys_state_t {
     static constexpr linaddr_t addr = 0xFFFFFE0000000000;
 
     void clear(physaddr_t addr);
+    void reserve_addr();
 };
 
 static clear_phys_state_t clear_phys_state;
@@ -1522,9 +1526,10 @@ void mmu_init()
     contig_phys_allocator.early_init(&contiguous_start, 4 << 20,
                                      "contig_phys_allocator");
 
-    linear_allocator.early_init(&linear_base,
-                                clear_phys_state_t::addr - linear_base,
+    linear_allocator.early_init(&linear_base, min_kern_addr - linear_base,
                                 "linear_allocator");
+
+    clear_phys_state.reserve_addr();
 
     near_allocator.early_init(&near_base, 0ULL - near_base,
                               "near_allocator");
@@ -3369,4 +3374,11 @@ uintptr_t mm_fork_kernel_text()
     cpu_tlb_flush();
 
     return orig_pagedir;
+}
+
+void clear_phys_state_t::reserve_addr()
+{
+    bool ok;
+    ok = linear_allocator.take_linear(addr, size_t(1) << log2_window_sz, true);
+    assert(ok);
 }
