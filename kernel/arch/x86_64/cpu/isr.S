@@ -37,7 +37,8 @@ isr_entry_\int_num\():
     .cfi_endproc
 .endm
 
-.irp int_num,255,254,253,252,251,250,249,248,247,246,245,244,243,242,241,240
+// 253, 254, 255 are hot entries that are nearby the ISR code below
+.irp int_num,252,251,250,249,248,247,246,245,244,243,242,241,240
      isr_entry 0 \int_num
 .endr
 .irp int_num,239,238,237,236,235,234,233,232,231,230,229,228,227,226,225,224
@@ -83,7 +84,7 @@ isr_entry_\int_num\():
 .endr
 
 // Reserved (unused) exception vectors
-.irp int_num,31,30,29,28,27,26,25,24,23,22,21
+.irp int_num,31,30,29,28,27,26,25,24,23,22,21,15
      isr_entry 0 \int_num
 .endr
 
@@ -93,7 +94,6 @@ isr_entry 0 INTR_EX_SIMD
 isr_entry 0 INTR_EX_MACHINE
 isr_entry 1 INTR_EX_ALIGNMENT
 isr_entry 0 INTR_EX_MATH
-isr_entry 0 15
 isr_entry 1 INTR_EX_GPF
 isr_entry 1 INTR_EX_STACK
 isr_entry 1 INTR_EX_SEGMENT
