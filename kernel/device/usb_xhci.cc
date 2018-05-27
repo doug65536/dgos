@@ -18,7 +18,7 @@
 
 #define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
-#define USBXHCI_TRACE(...) printk("xhci: " __VA_ARGS__)
+#define USBXHCI_TRACE(...) printdbg("xhci: " __VA_ARGS__)
 #else
 #define USBXHCI_TRACE(...) (void)0
 #endif
