@@ -20,7 +20,7 @@ static __always_inline void *cpu_gs_read_ptr(size_t offset)
     __asm__ __volatile__ (
         "mov %%gs:(%[offset]),%[ptr]\n\t"
         : [ptr] "=r" (ptr)
-        : [offset] "r" ((uintptr_t*)offset)
+        : [offset] "er" (*(uintptr_t*)offset)
         : "memory"
     );
     return ptr;
