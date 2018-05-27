@@ -16,7 +16,6 @@ SECTIONS {
 	/* Code and read-only data */
 	.text 0xFFFFFFFF80000000 : AT (0x100000) {
 		PROVIDE_HIDDEN(___text_st = .);
-
 		/* ISR code is hot and should be page aligned because it is cloned */
 		PROVIDE_HIDDEN(___isr_st = .);
 		*(.text.isr)
