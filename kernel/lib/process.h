@@ -60,11 +60,64 @@ struct fd_table_t
     entry_t ids[max_file];
 };
 
+struct auxv_t {
+    enum type_t {
+        AT_NULL    =  0,    // ignored
+        AT_IGNORE  =  1,    // ignored
+        AT_EXECFD  =  2,    // a_val
+        AT_PHDR    =  3,    // a_ptr
+        AT_PHENT   =  4,    // a_val
+        AT_PHNUM   =  5,    // a_val
+        AT_PAGESZ  =  6,    // a_val
+        AT_BASE    =  7,    // a_ptr
+        AT_FLAGS   =  8,    // a_val
+        AT_ENTRY   =  9,    // a_ptr
+        AT_NOTELF  = 10,    // a_val
+        AT_UID     = 11,    // a_val
+        AT_EUID    = 12,    // a_val
+        AT_GID     = 13,    // a_val
+        AT_EGID    = 14     // a_val
+    };
+
+    auxv_t()
+        : a_type(AT_NULL)
+    {
+        a_un.a_val = 0;
+    }
+
+    auxv_t(type_t type, long val)
+        : a_type(type)
+    {
+        a_un.a_val = val;
+    }
+
+    auxv_t(type_t type, void *ptr)
+        : a_type(type)
+    {
+        a_un.a_ptr = ptr;
+    }
+
+    auxv_t(type_t type, void (*fnc)())
+        : a_type(type)
+    {
+        a_un.a_fnc = fnc;
+    }
+
+    int a_type;
+    union {
+        long a_val;
+        void *a_ptr;
+        void (*a_fnc)();
+    } a_un;
+};
+
+C_ASSERT(sizeof(auxv_t) == sizeof(uintptr_t) * 2);
+
 struct process_t
 {
     process_t()
         : path(nullptr)
-        , args(nullptr)
+        , argv(nullptr)
         , env(nullptr)
         , mmu_context(0)
         , linear_allocator(nullptr)
@@ -94,8 +147,10 @@ struct process_t
     };
 
     char *path;
-    char **args;
+    char **argv;
     char **env;
+    size_t argc;
+    size_t envc;
     uintptr_t mmu_context;
     void *linear_allocator;
     pid_t pid;

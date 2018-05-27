@@ -111,16 +111,18 @@ int process_t::spawn(pid_t * pid_result,
     while (envp && envp[env_count++]);
 
     // Make a copy of the arguments and environment variables
-    process->args = (char**)calloc(arg_count + 1, sizeof(*argv));
+    process->argv = (char**)calloc(arg_count + 1, sizeof(*argv));
     process->env = (char**)calloc(env_count + 1, sizeof(*envp));
 
     for (size_t i = 0; i < arg_count; ++i)
-        process->args[i] = strdup(argv[i]);
-    process->args[arg_count] = 0;
+        process->argv[i] = strdup(argv[i]);
+    process->argv[arg_count] = 0;
+    process->argc = arg_count;
 
     for (size_t i = 0; i < env_count; ++i)
         process->env[i] = strdup(envp[i]);
     process->env[env_count] = 0;
+    process->envc = env_count;
 
     // Return the assigned PID
     *pid_result = process->pid;
@@ -231,6 +233,45 @@ int process_t::start()
     size_t stack_size = 65536;
     void *stack = mmap(0, stack_size, PROT_READ | PROT_WRITE,
                        MAP_STACK | MAP_USER, -1, 0);
+
+    // Initialize the stack according to the ELF ABI
+    //
+    // lowest address
+    // +---------------------------+--------------------------+
+    // | argc                      | sizeof(uintptr_t)        |
+    // | argv[]                    | sizeof(uintptr_t)*argc   |
+    // | nullptr                   | sizeof(uintptr_t)        |
+    // | envp[]                    | sizeof(uintptr_t)*envc   |
+    // | nullptr                   | sizeof(uintptr_t)        |
+    // | auxv[]                    | sizeof(auxv_t)*auxc      |
+    // | zeroes                    | auxv_t filled with zeros |
+    // | strings/structs for above | variable sized           |
+    // +---------------------------+--------------------------+
+    // highest address
+
+    // Calculate size of variable sized area
+    size_t info_sz = 0;
+
+    size_t info_arg_ofs = info_sz;
+    for (size_t i = 0; i < argc; ++i)
+        info_sz += strlen(argv[i]) + 1;
+    size_t info_arg_sz = info_sz - info_arg_ofs;
+
+    size_t info_env_ofs = info_sz;
+    for (size_t i = 0; i < envc; ++i)
+        info_sz += strlen(env[i]) + 1;
+    size_t info_env_sz = info_sz - info_env_ofs;
+
+    size_t info_ph_ofs = info_sz;
+    info_sz += hdr.e_phentsize * hdr.e_phnum;
+    size_t info_ph_sz = info_sz - info_ph_ofs;
+
+    vector<auxv_t> auxent;
+
+    auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry });
+    auxent.push_back({ auxv_t::AT_PAGESZ, PAGESIZE });
+    auxent.push_back({ auxv_t::AT_PHENT, hdr.e_phentsize });
+    auxent.push_back({ auxv_t::AT_EXECFD, fd.release() });
 
     processes_scoped_lock lock(processes_lock);
     state = state_t::running;
