@@ -692,6 +692,8 @@ void usb_hid_keybd_t::detect_keybd_changes()
 
         if (!pressed) {
             // Generate keyup event
+            USBHID_TRACE("keydown, scancode=%x\n", scancode);
+
             int vk = (scancode < countof(usb_hid_keybd_lookup))
                     ? usb_hid_keybd_lookup[scancode] : 0;
 
@@ -709,6 +711,8 @@ void usb_hid_keybd_t::detect_keybd_changes()
         // Detect edges
         if (memchr(last_keybd_state + 2, scancode, 6))
             continue;
+
+        USBHID_TRACE("keydown, scancode=%x\n", scancode);
 
         // Generate keydown event
         int vk = (scancode < countof(usb_hid_keybd_lookup))
