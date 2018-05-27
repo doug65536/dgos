@@ -18,43 +18,11 @@ static int const usb_hid_keybd_lookup[] = {
     0,  // undefined error
 
     // 04-1d A-Z
-    'A',
-    'B',
-    'C',
-    'D',
-    'E',
-    'F',
-    'G',
-    'H',
-    'I',
-    'J',
-    'K',
-    'L',
-    'M',
-    'N',
-    'O',
-    'P',
-    'Q',
-    'R',
-    'S',
-    'T',
-    'U',
-    'V',
-    'W',
-    'X',
-    'Y',
-    'Z',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+    'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 
     // 1e-26  1-9
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
+    '1', '2', '3', '4', '5', '6', '7', '8', '9',
 
     // 27 0
     '0',
@@ -114,18 +82,9 @@ static int const usb_hid_keybd_lookup[] = {
     KEYB_VK_CAPSLOCK,
 
     // 3a-45 F1-F12
-    KEYB_VK_F1,
-    KEYB_VK_F2,
-    KEYB_VK_F3,
-    KEYB_VK_F4,
-    KEYB_VK_F5,
-    KEYB_VK_F6,
-    KEYB_VK_F7,
-    KEYB_VK_F8,
-    KEYB_VK_F9,
-    KEYB_VK_F10,
-    KEYB_VK_F11,
-    KEYB_VK_F12,
+    KEYB_VK_F1, KEYB_VK_F2, KEYB_VK_F3, KEYB_VK_F4,
+    KEYB_VK_F5, KEYB_VK_F6, KEYB_VK_F7, KEYB_VK_F8,
+    KEYB_VK_F9, KEYB_VK_F10, KEYB_VK_F11, KEYB_VK_F12,
 
     // 46 Printscreen
     KEYB_VK_PRNSCR,
@@ -185,15 +144,9 @@ static int const usb_hid_keybd_lookup[] = {
     KEYB_VK_NUMPAD_ENTER,
 
     // 59-61 np1-np9
-    KEYB_VK_NUMPAD_1,
-    KEYB_VK_NUMPAD_2,
-    KEYB_VK_NUMPAD_3,
-    KEYB_VK_NUMPAD_4,
-    KEYB_VK_NUMPAD_5,
-    KEYB_VK_NUMPAD_6,
-    KEYB_VK_NUMPAD_7,
-    KEYB_VK_NUMPAD_8,
-    KEYB_VK_NUMPAD_9,
+    KEYB_VK_NUMPAD_1, KEYB_VK_NUMPAD_2, KEYB_VK_NUMPAD_3,
+    KEYB_VK_NUMPAD_4, KEYB_VK_NUMPAD_5, KEYB_VK_NUMPAD_6,
+    KEYB_VK_NUMPAD_7, KEYB_VK_NUMPAD_8, KEYB_VK_NUMPAD_9,
 
     // 62 np0
     KEYB_VK_NUMPAD_0,
@@ -214,18 +167,9 @@ static int const usb_hid_keybd_lookup[] = {
     KEYB_VK_NUMPAD_EQUALS,
 
     // 68-73 F13-F24
-    KEYB_VK_F13,
-    KEYB_VK_F14,
-    KEYB_VK_F15,
-    KEYB_VK_F16,
-    KEYB_VK_F17,
-    KEYB_VK_F18,
-    KEYB_VK_F19,
-    KEYB_VK_F20,
-    KEYB_VK_F21,
-    KEYB_VK_F22,
-    KEYB_VK_F23,
-    KEYB_VK_F24,
+    KEYB_VK_F13, KEYB_VK_F14, KEYB_VK_F15, KEYB_VK_F16,
+    KEYB_VK_F17, KEYB_VK_F18, KEYB_VK_F19, KEYB_VK_F20,
+    KEYB_VK_F21, KEYB_VK_F22, KEYB_VK_F23, KEYB_VK_F24,
 
     // 74 Execute
     KEYB_VK_EXECUTE,
@@ -285,26 +229,14 @@ static int const usb_hid_keybd_lookup[] = {
     KEYB_VK_NUMPAD_EQUALS,
 
     // 87-8F International1-International9
-    KEYB_VK_INTL_1,
-    KEYB_VK_INTL_2,
-    KEYB_VK_INTL_3,
-    KEYB_VK_INTL_4,
-    KEYB_VK_INTL_5,
-    KEYB_VK_INTL_6,
-    KEYB_VK_INTL_7,
-    KEYB_VK_INTL_8,
-    KEYB_VK_INTL_9,
+    KEYB_VK_INTL_1, KEYB_VK_INTL_2, KEYB_VK_INTL_3,
+    KEYB_VK_INTL_4, KEYB_VK_INTL_5, KEYB_VK_INTL_6,
+    KEYB_VK_INTL_7, KEYB_VK_INTL_8, KEYB_VK_INTL_9,
 
     // 90-98 Lang1-Lang9
-    KEYB_VK_LANG_1,
-    KEYB_VK_LANG_2,
-    KEYB_VK_LANG_3,
-    KEYB_VK_LANG_4,
-    KEYB_VK_LANG_5,
-    KEYB_VK_LANG_6,
-    KEYB_VK_LANG_7,
-    KEYB_VK_LANG_8,
-    KEYB_VK_LANG_9,
+    KEYB_VK_LANG_1, KEYB_VK_LANG_2, KEYB_VK_LANG_3,
+    KEYB_VK_LANG_4, KEYB_VK_LANG_5, KEYB_VK_LANG_6,
+    KEYB_VK_LANG_7, KEYB_VK_LANG_8, KEYB_VK_LANG_9,
 
     // 99 Alternate erase
     KEYB_VK_NUMPAD_ALT_ERASE,
@@ -392,12 +324,8 @@ static int const usb_hid_keybd_lookup[] = {
     KEYB_VK_NUMPAD_BACKSPACE,
 
     // bc-c1 npA-npF
-    KEYB_VK_NUMPAD_A,
-    KEYB_VK_NUMPAD_B,
-    KEYB_VK_NUMPAD_C,
-    KEYB_VK_NUMPAD_D,
-    KEYB_VK_NUMPAD_E,
-    KEYB_VK_NUMPAD_F,
+    KEYB_VK_NUMPAD_A, KEYB_VK_NUMPAD_B, KEYB_VK_NUMPAD_C,
+    KEYB_VK_NUMPAD_D, KEYB_VK_NUMPAD_E, KEYB_VK_NUMPAD_F,
 
     // c2 npXor
     KEYB_VK_NUMPAD_XOR,
