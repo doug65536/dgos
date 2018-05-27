@@ -465,7 +465,7 @@ EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
 {
     return thread_create_with_state(
                 fn, userdata, stack_size,
-                THREAD_IS_READY, 0, 0, user);
+                THREAD_IS_READY, -1, 0, user);
 }
 
 #if 0
