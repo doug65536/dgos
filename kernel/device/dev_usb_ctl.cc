@@ -28,7 +28,8 @@ usb_class_drv_t::match_config(usb_config_helper *cfg_hlp, int index,
     match_result result{ &dev_desc, nullptr, nullptr, -1, -1 };
 
     do {
-        if (dev_proto >= 0 && dev_desc.dev_protocol != dev_proto)
+        if (dev_proto >= 0 && dev_desc.dev_protocol != 0 &&
+                dev_desc.dev_protocol != dev_proto)
             break;
 
         int match_index = -1;
