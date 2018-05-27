@@ -223,6 +223,36 @@ static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 #define PT_BASEADDR     (PT0_ADDR)
 #define PT_MAX_ADDR     (PT0_ADDR + (512UL << 30))
 
+// Virtual address space map
+// Low half
+// +---------------+-----------------------------------+
+// |    4M - 128TB | User space                        |
+// +---------------+-----------------------------------+
+// |    1M - 4M    | User guard page                   |
+// +---------------+-----------------------------------+
+// |    4K - 1M    | Boot and legacy                   |
+// +---------------+-----------------------------------+
+// |     0 - 4K    | NULL Guard page                   |
+// +---------------+-----------------------------------+
+// High half
+// +---------------+-----------------------------------+
+// |   -4M - 0     | Reserved per elf64 spec           |
+// +---------------+-----------------------------------+
+// | -512G - -4M   | Reserved for kernel and modules   |
+// +---------------+-----------------------------------+
+// | -513G - -512G | Zeroing page                      |
+// +---------------+-----------------------------------+
+// | -255T - -513G | Kernel heap                       |
+// +---------------+-----------------------------------+
+
+// Page tables for entire address, worst case, consists of
+//  68719476736 4KB pages  (134217728 PT pages,   0x8000000000 bytes, 512GB)
+//    134217728 2MB pages  (   262144 PD pages,     0x40000000 bytes,   1GB)
+//       262144 1GB pages  (      512 PDPT pages,     0x200000 bytes,   4MB)
+//                         (        1 PML4 page,        0x1000 bytes,   4KB)
+//                          ---------
+//                          134480385 total pages, 550,831,656,960 bytes)
+
 static format_flag_info_t pte_flags[] = {
     { "XD",     1,                  0, PTE_NX_BIT       },
     { "PK",     PTE_PK_MASK,        0, PTE_PK_BIT       },
