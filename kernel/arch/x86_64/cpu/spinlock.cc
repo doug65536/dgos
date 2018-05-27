@@ -5,6 +5,13 @@
 #include "thread.h"
 #include "printk.h"
 
+#define DEBUG_MCSLOCK 0
+#if DEBUG_MCSLOCK
+#define MCSLOCK_TRACE(...) printdbg("mcslock: " __VA_ARGS__)
+#else
+#define MCSLOCK_TRACE(...) ((void)0)
+#endif
+
 //
 // Exclusive lock. 0 is unlocked, 1 is locked
 
@@ -323,6 +330,9 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
 
 void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
+    MCSLOCK_TRACE("Acquiring lock @ 0x%p threadid=%d\n",
+                  (void*)lock, thread_get_id());
+
     node->thread_id = thread_get_id();
     node->irq_enabled = cpu_irq_save_disable();
     mcslock_lock_nodis(lock, node);
@@ -354,6 +364,8 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
 
 void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
+    MCSLOCK_TRACE("Releasing lock @ 0x%p threadid=%d\n",
+                  (void*)lock, thread_get_id());
     mcslock_unlock_noena(lock, node);
     cpu_irq_toggle(node->irq_enabled);
 }
