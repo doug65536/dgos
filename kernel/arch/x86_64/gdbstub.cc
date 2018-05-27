@@ -1009,11 +1009,11 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
     memop_ptr = (uint8_t *)memop_addr;
 
     ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
-    saved_cr3 = cpu_get_page_directory();
+    saved_cr3 = cpu_page_directory_get();
 
     __try {
-        cpu_set_page_directory(ctx->gpr.cr3);
-        cpu_flush_tlb();
+        cpu_page_directory_set(ctx->gpr.cr3);
+        cpu_tlb_flush();
         __try {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
                 size_t index = memop_index;
@@ -1037,8 +1037,8 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
     __catch {
     }
 
-    cpu_set_page_directory(saved_cr3);
-    cpu_flush_tlb();
+    cpu_page_directory_set(saved_cr3);
+    cpu_tlb_flush();
 
     if (memop_index)
         return reply(tx_buf, memop_index * 2);
@@ -1062,13 +1062,13 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
     memop_ptr = (uint8_t *)memop_addr;
 
     ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
-    saved_cr3 = cpu_get_page_directory();
+    saved_cr3 = cpu_page_directory_get();
 
     ok = false;
 
     __try {
-        cpu_set_page_directory(ctx->gpr.cr3);
-        cpu_flush_tlb();
+        cpu_page_directory_set(ctx->gpr.cr3);
+        cpu_tlb_flush();
         __try {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
                 uint8_t& mem_value = memop_ptr[memop_index];
@@ -1086,8 +1086,8 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
     __catch {
     }
 
-    cpu_set_page_directory(saved_cr3);
-    cpu_flush_tlb();
+    cpu_page_directory_set(saved_cr3);
+    cpu_tlb_flush();
 
     return reply(ok ? "OK" : "E14");
 }
@@ -2102,19 +2102,19 @@ bool gdb_cpu_ctrl_t::breakpoint_write_target(
     if (!mpresent(addr, sizeof(T)))
         return false;
 
-    uintptr_t orig_pagedir = cpu_get_page_directory();
+    uintptr_t orig_pagedir = cpu_page_directory_get();
     GDBSTUB_TRACE("Switching from stub pagedir (%zx)"
                   " to target pagedir (%zx)\n", orig_pagedir, page_dir);
 
-    cpu_set_page_directory(page_dir);
-    cpu_flush_tlb();
+    cpu_page_directory_set(page_dir);
+    cpu_tlb_flush();
     cpu_cr0_change_bits(CPU_CR0_WP, 0);
     *old_value = atomic_xchg((uint8_t*)addr, value);
     GDBSTUB_TRACE("Wrote 0x%lx to %zx, replaced 0x%lx\n",
                   uintptr_t(value), addr, uintptr_t(*old_value));
     cpu_cr0_change_bits(0, CPU_CR0_WP);
-    cpu_set_page_directory(orig_pagedir);
-    cpu_flush_tlb();
+    cpu_page_directory_set(orig_pagedir);
+    cpu_tlb_flush();
     GDBSTUB_TRACE("Switched back to stub pagedir (%zx)\n", orig_pagedir);
 
     return true;
@@ -2364,7 +2364,7 @@ void gdb_cpu_ctrl_t::sync_hw_bp()
                 rw = 0;
             }
 
-            cpu_set_debug_breakpoint_indirect(addr, rw, len, enable, i);
+            cpu_debug_breakpoint_set_indirect(addr, rw, len, enable, i);
         }
     };
 

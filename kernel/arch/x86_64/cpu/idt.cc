@@ -631,7 +631,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     }
 
     // fault address
-    printdbg("cr2=%16lx\n", cpu_get_fault_address());
+    printdbg("cr2=%16lx\n", cpu_fault_address_get());
 
     // error code
     printdbg("Error code 0x%16lx\n", ISR_CTX_ERRCODE(ctx));
@@ -730,7 +730,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     // fault address
     con_draw_xy(48, 19, "cr2", color);
     snprintf(fmt_buf, sizeof(fmt_buf), "=%16lx",
-             cpu_get_fault_address());
+             cpu_fault_address_get());
     con_draw_xy(51, 19, fmt_buf, color);
 
     // error code

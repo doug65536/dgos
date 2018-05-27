@@ -129,7 +129,7 @@ void cpu_init(int ap)
     }
 
     // Load null LDT
-    cpu_set_ldt(0);
+    cpu_ldt_set(0);
 }
 
 void cpu_init_stage2(int ap)

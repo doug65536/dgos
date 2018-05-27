@@ -85,7 +85,7 @@ void gdt_init(int)
     table_register_64_t gdtr;
     gdtr.limit = sizeof(gdt) - 1;
     gdtr.base = (uintptr_t)gdt;
-    cpu_set_gdtr(gdtr);
+    cpu_gdtr_set(gdtr);
 }
 
 static void gdt_set_tss_base(tss_t *base)
@@ -146,5 +146,5 @@ void gdt_load_tr(int cpu_number)
     unique_lock<spinlock> lock(gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
-    cpu_set_tr(GDT_SEL_TSS);
+    cpu_tr_set(GDT_SEL_TSS);
 }

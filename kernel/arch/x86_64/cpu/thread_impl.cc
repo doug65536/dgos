@@ -432,7 +432,7 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_RDI(ctx) = uintptr_t(fn);
     ISR_CTX_REG_RSI(ctx) = uintptr_t(userdata);
     ISR_CTX_REG_RDX(ctx) = i;
-    ISR_CTX_REG_CR3(ctx) = cpu_get_page_directory();
+    ISR_CTX_REG_CR3(ctx) = cpu_page_directory_get();
 
     if (thread->flags & THREAD_FLAGS_USES_FPU) {
         ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
@@ -531,13 +531,13 @@ void thread_init(int ap)
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
-    cpu_set_gsbase(cpu);
-    cpu_set_altgsbase((void*)0xFFFFD1D1D1D1D1D1);
+    cpu_gsbase_set(cpu);
+    cpu_altgsbase_set((void*)0xFFFFD1D1D1D1D1D1);
 
     if (!ap) {
         intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler, "sw_yield");
 
-        thread->process = process_t::init(cpu_get_page_directory());
+        thread->process = process_t::init(cpu_page_directory_get());
 
         cpu->cur_thread = thread;
 
@@ -995,7 +995,7 @@ void thread_check_stack()
 {
     thread_info_t *thread = this_thread();
 
-    void *sp = cpu_get_stack_ptr();
+    void *sp = cpu_stack_ptr_get();
 
     if (sp > thread->stack ||
             (char*)sp < (char*)thread->stack - thread->stack_size)

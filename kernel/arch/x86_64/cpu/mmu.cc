@@ -876,7 +876,7 @@ static physaddr_t init_take_page(int low)
 
 static pte_t *init_find_aliasing_pte(void)
 {
-    pte_t *pte = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
+    pte_t *pte = (pte_t*)(cpu_page_directory_get() & PTE_ADDR);
     unsigned path[4];
     path_from_addr(path, uintptr_t(___text_st) - PAGE_SIZE);
 
@@ -905,7 +905,7 @@ static pte_t *mm_map_aliasing_pte(pte_t *aliasing_pte, physaddr_t addr)
             (addr & PTE_ADDR) |
             (PTE_PRESENT | PTE_WRITABLE);
 
-    cpu_invalidate_page(linaddr);
+    cpu_page_invalidate(linaddr);
 
     return (pte_t*)linaddr;
 }
@@ -966,7 +966,7 @@ void mm_phys_clear_init()
                 PTE_ACCESSED | PTE_DIRTY | PTE_GLOBAL) & global_mask;
 
         // Clear new page table page
-        cpu_invalidate_page(uintptr_t(ptes[++i]));
+        cpu_page_invalidate(uintptr_t(ptes[++i]));
         clear_phys_state.pte = ptes[i];
         page_base = (pte_t*)(uintptr_t(ptes[i]) & -PAGE_SIZE);
         printdbg("page_base=0x%p\n", (void*)page_base);
@@ -1011,7 +1011,7 @@ void clear_phys(physaddr_t addr)
     if (pte != expect)
         pte = expect;
 
-    cpu_invalidate_page(window);
+    cpu_page_invalidate(window);
 
     clear64((char*)window + offset, PAGE_SIZE);
 }
@@ -1054,7 +1054,7 @@ static void mmu_map_page(linaddr_t addr, physaddr_t physaddr, pte_t flags)
 
 static void mmu_tlb_perform_shootdown(void)
 {
-    cpu_flush_tlb();
+    cpu_tlb_flush();
     thread_shootdown_notify();
 }
 
@@ -1137,7 +1137,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
 static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
 {
     thread_set_cpu_mmu_seq(mmu_seq);
-    cpu_flush_tlb();
+    cpu_tlb_flush();
 
     // Restart instruction
     return ctx;
@@ -1164,7 +1164,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
 
     atomic_inc(&page_fault_count);
 
-    uintptr_t fault_addr = cpu_get_fault_address();
+    uintptr_t fault_addr = cpu_fault_address_get();
 
     pte_t *ptes[4];
 
@@ -1177,7 +1177,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
         mmu_dump_pf(ISR_CTX_ERRCODE(ctx));
         mmu_dump_ptes(ptes);
         cpu_debug_break();
-        cpu_invalidate_page(fault_addr);
+        cpu_page_invalidate(fault_addr);
         return nullptr;
     }
 
@@ -1221,7 +1221,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
                                page_flags) != pte) {
                 // Another thread beat us to it
                 mmu_free_phys(page);
-                cpu_invalidate_page(fault_addr);
+                cpu_page_invalidate(fault_addr);
             }
 
             return ctx;
@@ -1439,7 +1439,7 @@ void mmu_init()
     root_phys_addr = init_take_page(0);
     assert(root_phys_addr != 0);
 
-    pte_t *old_root = (pte_t*)(cpu_get_page_directory() & PTE_ADDR);
+    pte_t *old_root = (pte_t*)(cpu_page_directory_get() & PTE_ADDR);
 
     pt = init_map_aliasing_pte(aliasing_pte, root_phys_addr);
     memcpy(pt, old_root, PAGESIZE);
@@ -1455,13 +1455,13 @@ void mmu_init()
     mmu_configure_pat();
 
     //pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
-    cpu_set_page_directory(root_phys_addr);
+    cpu_page_directory_set(root_phys_addr);
 
 
     // Make zero page not present to catch null pointers
     *PT3_PTR = 0;
-    cpu_invalidate_page(0);
-    cpu_flush_tlb();
+    cpu_page_invalidate(0);
+    cpu_tlb_flush();
 
     mm_phys_clear_init();
 
@@ -2463,7 +2463,7 @@ int munmap(void *addr, size_t size)
 
             if (pte & PTE_PRESENT) {
                 ++freed;
-                cpu_invalidate_page(a);
+                cpu_page_invalidate(a);
             }
         }
 
@@ -2580,7 +2580,7 @@ int mprotect(void *addr, size_t len, int prot)
                 break;
         }
 
-        cpu_invalidate_page((uintptr_t)addr);
+        cpu_page_invalidate((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
         ptes_step(pt);
@@ -2657,7 +2657,7 @@ int madvise(void *addr, size_t len, int advice)
             }
         }
 
-        cpu_invalidate_page((uintptr_t)addr);
+        cpu_page_invalidate((uintptr_t)addr);
         addr = (char*)addr + PAGE_SIZE;
 
         ptes_step(pt);
@@ -3191,7 +3191,7 @@ int alias_window(void *addr, size_t size,
     }
 
     for (size_t offset = 0; offset < size; offset += PAGE_SIZE)
-        cpu_invalidate_page(base + offset);
+        cpu_page_invalidate(base + offset);
 
     return 1;
 }
@@ -3227,9 +3227,9 @@ uintptr_t mm_new_process(process_t *process)
             PTE_ACCESSED | PTE_DIRTY;
 
     // Switch to new page directory
-    cpu_set_page_directory(dir_physaddr);
+    cpu_page_directory_set(dir_physaddr);
 
-    cpu_flush_tlb();
+    cpu_tlb_flush();
 
     mm_init_process(process);
 
@@ -3238,7 +3238,7 @@ uintptr_t mm_new_process(process_t *process)
 
 void mm_destroy_process()
 {
-    physaddr_t dir = cpu_get_page_directory() & PTE_ADDR;
+    physaddr_t dir = cpu_page_directory_get() & PTE_ADDR;
 
     assert(dir != root_physaddr);
 
@@ -3300,7 +3300,7 @@ void mm_destroy_process()
         addr += 1L << (12 + (9*0));
     }
 
-    cpu_set_page_directory(root_physaddr);
+    cpu_page_directory_set(root_physaddr);
 
     free_batch.free(dir);
 }
@@ -3328,12 +3328,12 @@ uintptr_t mm_fork_kernel_text()
     // Clone root page directory
     physaddr_t page = mmu_alloc_phys(0);
     mmu_map_page(uintptr_t(window), page, flags);
-    cpu_invalidate_page(uintptr_t(window));
+    cpu_page_invalidate(uintptr_t(window));
     memcpy(window, master_pagedir, PAGE_SIZE);
     window[PT_RECURSE] = page | flags;
 
-    uintptr_t orig_pagedir = cpu_get_page_directory();
-    cpu_set_page_directory(page);
+    uintptr_t orig_pagedir = cpu_page_directory_get();
+    cpu_page_directory_set(page);
 
     pte_t *st_ptes[4];
     pte_t *en_ptes[4];
@@ -3352,8 +3352,8 @@ uintptr_t mm_fork_kernel_text()
             // Map clone
             mmu_map_page(dst_linaddr, page, flags);
 
-            cpu_invalidate_page(src_linaddr);
-            cpu_invalidate_page(dst_linaddr);
+            cpu_page_invalidate(src_linaddr);
+            cpu_page_invalidate(dst_linaddr);
 
             // Copy original to clone
             memcpy(window + 512, window, PAGE_SIZE);
@@ -3363,10 +3363,10 @@ uintptr_t mm_fork_kernel_text()
             // Point PTE to clone
             *pte = page | flags;
 
-            cpu_flush_tlb();
+            cpu_tlb_flush();
         }
     }
-    cpu_flush_tlb();
+    cpu_tlb_flush();
 
     return orig_pagedir;
 }
