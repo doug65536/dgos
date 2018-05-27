@@ -2018,11 +2018,6 @@ void apic_start_smp(void)
                 apic_id_count;
         uint32_t stagger = 16666666 / total_cpus;
 
-        // The AP might have CD/NW bits set, and therefore might not be
-        // cache coherent when it fetches the instructions in the trampoline,
-        // so write all caches back to RAM before issuing any SIPIs
-        //cpu_flush_cache();
-
         for (unsigned thread = 0;
              thread < topo_thread_count; ++thread) {
             for (unsigned core = 0; core < topo_core_count; ++core) {
