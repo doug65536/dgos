@@ -132,8 +132,6 @@ void enter_kernel(uint64_t entry_point)
 
 bool elf64_run(char const *filename)
 {
-    uint64_t time_hash = cpu_rdtsc();
-
     cpu_init();
 
     if (!cpu_has_long_mode())
@@ -162,9 +160,6 @@ bool elf64_run(char const *filename)
 
     int file = boot_open(filename);
 
-    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
-    time_hash ^= ~cpu_rdtsc();
-
     if (file < 0)
         halt("Could not open kernel file");
 
@@ -175,9 +170,6 @@ bool elf64_run(char const *filename)
 
     if (read_size != sizeof(file_hdr))
         halt("Could not read ELF header");
-
-    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
-    time_hash ^= ~cpu_rdtsc();
 
     // Check magic number
     if (memcmp(&file_hdr.e_ident[EI_MAG0],
@@ -197,9 +189,6 @@ bool elf64_run(char const *filename)
                 file_hdr.e_phoff))
         halt("Could not read program headers");
 
-    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
-    time_hash ^= ~cpu_rdtsc();
-
     uint64_t total_bytes = 0;
     for (unsigned i = 0; i < file_hdr.e_phnum; ++i)
         total_bytes += program_hdrs[i].p_memsz;
@@ -215,18 +204,11 @@ bool elf64_run(char const *filename)
     if (shbytes != boot_pread(file, shdrs, shbytes, file_hdr.e_shoff))
         halt("Could not read section headers\n");
 
-    time_hash = rol64(time_hash, cpu_rdtsc() & 63);
-    time_hash ^= ~cpu_rdtsc();
-
-    time_hash &= 0x7FFFFFFF000;
-
     bool failed = false;
 
     uint64_t done_bytes = 0;
 
     uint64_t new_base = 0xFFFFFFFF80000000;
-    //uint64_t new_base = 0xFFFFF80000000000;
-    //uint64_t new_base = 0xFFFFFFFF80000000 - time_hash;//0xFFFFF80000000000;
     base_adj = new_base - 0xFFFFFFFF80000000;
 
     print_line("Loading kernel...");
