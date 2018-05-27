@@ -1621,7 +1621,7 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     inpslotctx->num_ports = 0;
 
     // Root hub port number
-    inpslotctx->root_hub_port_num = root_port;
+    inpslotctx->root_hub_port_num = root_port + 1;
 
     // Device address
     inpslotctx->usbdevaddr = 0;
