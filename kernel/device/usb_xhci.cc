@@ -1223,6 +1223,9 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
 
     usb_config_helper cfg_hlp(slotid, dev_desc, bos, cfg_buf, 128);
 
+    USBXHCI_TRACE("Searching for driver for %04x:%04x\n",
+                  cfg_hlp.device().vendor_id, cfg_hlp.device().product_id);
+
     dump_config_desc(cfg_hlp);
 
     usb_class_drv_t *drv = usb_class_drv_t::find_driver(&cfg_hlp, this);
