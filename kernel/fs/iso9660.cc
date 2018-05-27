@@ -545,7 +545,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
 
     sector_shift = bit_log2(sector_size);
     block_shift = 11 - sector_shift;
-    block_size = sector_size << block_size;
+    block_size = sector_size << block_shift;
 
     iso9660_pvd_t pvd;
     uint32_t best_ofs = 0;
@@ -558,7 +558,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {
         // Read logical block 16
         int err = drive->read_blocks(&pvd,
-                    1 << block_size,
+                    1 << block_shift,
                     (16 + ofs) << block_shift);
 
         if (err < 0)
@@ -577,7 +577,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
 
     if (best_ofs == 0) {
         // We didn't find Joliet PVD, reread first one
-        int err = drive->read_blocks(&pvd, 1 << block_size,
+        int err = drive->read_blocks(&pvd, 1 << block_shift,
                            16 << block_shift);
 
         if (err < 0)
