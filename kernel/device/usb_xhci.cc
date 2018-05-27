@@ -1574,9 +1574,8 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
 
     slot.port = port;
 
-    int root_port_slot = slotid;
-
     // Follow parent chain and find the root hub port number for this slot
+    int root_port_slot = slotid;
     while (slot_data[root_port_slot].parent_slot)
         root_port_slot = slot_data[root_port_slot].parent_slot;
 
