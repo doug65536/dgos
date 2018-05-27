@@ -525,6 +525,8 @@ protected:
 
     // usb_class_drv_t interface
     virtual bool probe(usb_config_helper *cfg, usb_bus_t *bus) override final;
+
+    virtual const char *name() const override final;
 };
 
 bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
@@ -571,6 +573,11 @@ bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
         hid_devs.push_back(dev);
 
     return dev != nullptr;
+}
+
+char const *usb_hid_class_drv_t::name() const
+{
+    return "USB HID";
 }
 
 usb_hid_dev_t::usb_hid_dev_t(usb_pipe_t const& control,

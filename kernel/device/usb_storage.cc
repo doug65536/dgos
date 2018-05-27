@@ -276,10 +276,11 @@ protected:
 class usb_msc_classdrv_t : public usb_class_drv_t {
 public:
 
-
 protected:
     // usb_class_drv_t interface
     bool probe(usb_config_helper *cfg_hlp, usb_bus_t *bus) override final;
+
+    char const *name() const override final;
 };
 
 #define USB_MSC_MAX_DEVICES    16
@@ -437,6 +438,11 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     int status = if_->init(control, bulk_in, bulk_out, iface_idx);
 
     return status >= 0;
+}
+
+const char *usb_msc_classdrv_t::name() const
+{
+    return "USB mass storage (bulk)";
 }
 
 usb_msc_dev_t::usb_msc_dev_t()

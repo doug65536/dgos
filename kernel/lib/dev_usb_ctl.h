@@ -157,10 +157,12 @@ private:
 
 class usb_class_drv_t {
 public:
-    static void find_driver(usb_config_helper *cfg, usb_bus_t *bus);
+    static usb_class_drv_t *find_driver(usb_config_helper *cfg, usb_bus_t *bus);
 
     usb_class_drv_t();
     virtual bool probe(usb_config_helper *cfg_hlp, usb_bus_t *bus) = 0;
+
+    virtual char const *name() const = 0;
 
 protected:
     struct match_result {

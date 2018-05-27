@@ -2,10 +2,13 @@
 
 usb_class_drv_t *usb_class_drv_t::first_driver;
 
-void usb_class_drv_t::find_driver(usb_config_helper *cfg, usb_bus_t *bus)
+usb_class_drv_t *usb_class_drv_t::find_driver(
+        usb_config_helper *cfg, usb_bus_t *bus)
 {
-    for (usb_class_drv_t *drv = first_driver;
-         drv && !drv->probe(cfg, bus); drv = drv->next_driver);
+    usb_class_drv_t *drv = first_driver;
+    while (drv && !drv->probe(cfg, bus))
+        drv = drv->next_driver;
+    return drv;
 }
 
 usb_class_drv_t::usb_class_drv_t()

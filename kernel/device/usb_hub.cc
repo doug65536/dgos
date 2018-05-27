@@ -62,6 +62,8 @@ protected:
     // usb_class_drv_t interface
     bool probe(usb_config_helper *cfg_hlp, usb_bus_t *bus) override;
 
+    char const *name() const override final;
+
 private:
 };
 
@@ -179,6 +181,11 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     hubs.push_back(hub);
 
     return hub->init(cfg_hlp);
+}
+
+const char *usb_hub_class_t::name() const
+{
+    return "USB hub";
 }
 
 static usb_hub_class_t usb_hub_class;

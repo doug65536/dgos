@@ -1225,7 +1225,9 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
 
     dump_config_desc(cfg_hlp);
 
-    usb_class_drv_t::find_driver(&cfg_hlp, this);
+    usb_class_drv_t *drv = usb_class_drv_t::find_driver(&cfg_hlp, this);
+
+    USBXHCI_TRACE("Driver: %s\n", drv ? drv->name() : "<not found>");
 
     return true;
 }
