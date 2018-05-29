@@ -55,6 +55,7 @@ libmbr_a_CXXFLAGS = \
 libmbr_a_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(REGPARM_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(COMPILER_FLAGS) -static
 
@@ -68,8 +69,9 @@ mbr_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	-Wl,-melf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
+	-Wl,-N \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) -fuse-ld=bfd -static \
+	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib
 
 EXTRA_mbr_elf_DEPENDENCIES = \
@@ -116,8 +118,9 @@ mbr_bin_LDFLAGS = \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
+	-Wl,-N \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) -fuse-ld=bfd -static \
+	$(LINKER_SEL) -static \
 	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
 
@@ -249,6 +252,7 @@ bootfat_elf_CCASFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+# -N to turn off section alignment and make all sections rwx
 bootfat_elf_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(REGPARM_FLAGS) \
@@ -257,6 +261,7 @@ bootfat_elf_LDFLAGS = \
 	-Wl,-melf_i386 \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
+	-Wl,-N \
 	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -279,6 +284,7 @@ bootfat_bin_CXXFLAGS = \
 bootfat_bin_CCASFLAGS = \
 	$(bootfat_elf_CCASFLAGS)
 
+# -N to turn off section alignment and make all sections rwx
 bootfat_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(REGPARM_FLAGS) \
@@ -287,7 +293,8 @@ bootfat_bin_LDFLAGS = \
 	-Wl,-melf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	$(LINKER_SEL) -fuse-ld=bfd -static \
+	-Wl,-N \
+	$(LINKER_SEL) -static \
 	-Wl,-nostdlib \
 	-nostartfiles -nodefaultlibs -nostdlib -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -357,7 +364,8 @@ bootiso_bin_LDFLAGS = \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/bootiso.map \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	-fuse-ld=bfd -static \
+	-Wl,-N \
+	-static \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
