@@ -572,6 +572,7 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
         // Enable IRQ if requested
         reg_mcr.bits.out1 = use_irq;
         reg_mcr.bits.int_en = use_irq;
+        outp(reg_mcr);
     }
 
     return true;
