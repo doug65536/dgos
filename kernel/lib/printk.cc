@@ -276,7 +276,7 @@ static char *dtoa(char *txt, size_t txt_sz,
 
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
-using formatter_lock_type = mcslock;
+using formatter_lock_type = spinlock;
 using formatter_scoped_lock = unique_lock<formatter_lock_type>;
 formatter_lock_type formatter_lock;
 
