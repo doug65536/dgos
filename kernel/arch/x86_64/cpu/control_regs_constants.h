@@ -394,7 +394,7 @@
 #define CPU_MXCSR_RC_n(rc)      (((rc) & CPU_MXCSR_RC_MASK) << CPU_MXCSR_RC_BIT)
 
 #define CPU_MXCSR_ELF_INIT \
-    CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL
+    (CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL)
 
 //
 // Floating point control word
@@ -480,30 +480,6 @@
 #define CPUID_APM               0x80000007
 #define CPUID_ADDRSIZES         0x80000008
 
-
-// idt_entry_t selector field
-#define IDT_SEL         0x08
-
-// idt_entry_t type_attr field
-#define IDT_PRESENT_BIT 7
-#define IDT_DPL_BIT     5
-#define IDT_TYPE_BIT    0
-
-#define IDT_TYPE_TASK   0x5
-#define IDT_TYPE_INTR   0xE
-#define IDT_TYPE_TRAP   0xF
-
-#define IDT_PRESENT     (1 << IDT_PRESENT_BIT)
-
-#define IDT_DPL_BITS    2
-#define IDT_DPL_MASK    ((1 << IDT_DPL_BITS)-1)
-#define IDT_DPL         (IDT_DPL_MASK << IDT_DPL_BIT)
-
-#define IDT_DPL_n(dpl)  (((dpl) & IDT_DPL_MASK) << IDT_DPL_BIT)
-
-#define IDT_TASK        (IDT_TYPE_TASK << IDT_TYPE_BIT)
-#define IDT_INTR        (IDT_TYPE_INTR << IDT_TYPE_BIT)
-#define IDT_TRAP        (IDT_TYPE_TRAP << IDT_TYPE_BIT)
 
 //
 // Exception error code
@@ -593,3 +569,45 @@
 
 #define GDT_BASE_HIGH_BIT       24
 #define GDT_BASE_HIGH           0xFF
+
+// idt_entry_t selector field
+#define IDT_SEL         GDT_SEL_KERNEL_CODE64
+
+// idt_entry_t type_attr field
+#define IDT_PRESENT_BIT 7
+#define IDT_DPL_BIT     5
+#define IDT_TYPE_BIT    0
+
+#define IDT_TYPE_TASK   0x5
+#define IDT_TYPE_INTR   0xE
+#define IDT_TYPE_TRAP   0xF
+
+#define IDT_PRESENT     (1 << IDT_PRESENT_BIT)
+
+#define IDT_DPL_BITS    2
+#define IDT_DPL_MASK    ((1 << IDT_DPL_BITS)-1)
+#define IDT_DPL         (IDT_DPL_MASK << IDT_DPL_BIT)
+
+#define IDT_DPL_n(dpl)  (((dpl) & IDT_DPL_MASK) << IDT_DPL_BIT)
+
+#define IDT_TASK        (IDT_TYPE_TASK << IDT_TYPE_BIT)
+#define IDT_INTR        (IDT_TYPE_INTR << IDT_TYPE_BIT)
+#define IDT_TRAP        (IDT_TYPE_TRAP << IDT_TYPE_BIT)
+
+//
+// APIC_BASE MSR
+
+#define CPU_APIC_BASE_MSR           0x1B
+
+#define CPU_APIC_BASE_ADDR_BIT      12
+#define CPU_APIC_BASE_ADDR_BITS     40
+#define CPU_APIC_BASE_GENABLE_BIT   11
+#define CPU_APIC_BASE_X2ENABLE_BIT  10
+#define CPU_APIC_BASE_BSP_BIT       8
+
+#define CPU_APIC_BASE_GENABLE       (1UL<<CPU_APIC_BASE_GENABLE_BIT)
+#define CPU_APIC_BASE_X2ENABLE      (1UL<<CPU_APIC_BASE_X2ENABLE_BIT)
+#define CPU_APIC_BASE_BSP           (1UL<<CPU_APIC_BASE_BSP_BIT)
+#define CPU_APIC_BASE_ADDR_MASK     ((1UL<<CPU_APIC_BASE_ADDR_BITS)-1)
+#define CPU_APIC_BASE_ADDR          \
+    (CPU_APIC_BASE_ADDR_MASK<<CPU_APIC_BASE_ADDR_BIT)

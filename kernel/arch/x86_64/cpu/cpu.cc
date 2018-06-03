@@ -1,5 +1,6 @@
 
 #include "cpu.h"
+#include "mm.h"
 #include "mmu.h"
 #include "gdt.h"
 #include "isr.h"
@@ -13,9 +14,40 @@
 #include "cpuid.h"
 #include "callout.h"
 #include "printk.h"
+#include "idt.h"
 #include "interrupts.h"
 #include "syscall.h"
 #include "string.h"
+
+uint32_t default_mxcsr_mask;
+
+void cpu_init_early(int ap)
+{
+    if (ap)
+        mm_set_master_pagedir();
+
+    gdt_init(ap);
+    gdt_init_tss_early();
+    idt_init(ap);
+
+    // Enable SSE early
+    cpu_cr4_change_bits(0, CPU_CR4_OFXSR | CPU_CR4_OSXMMEX);
+
+    cpu_fninit();
+
+    if (!ap) {
+        // Detect the MXCSR mask from fxsave context
+        isr_fxsave_context_t __aligned(64) fctx;
+        cpu_fxsave(&fctx);
+        if (fctx.mxcsr_mask)
+            default_mxcsr_mask = fctx.mxcsr_mask;
+        else
+            default_mxcsr_mask = 0xFFBF;
+    }
+
+    cpu_mxcsr_set(CPU_MXCSR_ELF_INIT & default_mxcsr_mask);
+    cpu_fcw_set(CPU_FPUCW_ELF_INIT);
+}
 
 void cpu_init(int ap)
 {

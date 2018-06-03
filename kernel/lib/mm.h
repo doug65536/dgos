@@ -384,3 +384,5 @@ int alias_window(void *addr, size_t size,
 void mm_init_process(process_t *process);
 
 uintptr_t mm_fork_kernel_text();
+
+void mm_set_master_pagedir();

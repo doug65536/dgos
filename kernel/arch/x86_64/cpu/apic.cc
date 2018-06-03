@@ -1,4 +1,5 @@
 #include "apic.h"
+#include "cpu/asm_constants.h"
 #include "device/acpigas.h"
 #include "types.h"
 #include "gdt.h"
@@ -389,20 +390,6 @@ static uint32_t volatile *apic_ptr;
 #define APIC_LVT_DELIVERY_NMI       4
 #define APIC_LVT_DELIVERY_EXINT     7
 #define APIC_LVT_DELIVERY_INIT      5
-
-#define APIC_BASE_MSR               0x1B
-
-#define APIC_BASE_ADDR_BIT          12
-#define APIC_BASE_ADDR_BITS         40
-#define APIC_BASE_GENABLE_BIT       11
-#define APIC_BASE_X2ENABLE_BIT      10
-#define APIC_BASE_BSP_BIT           8
-
-#define APIC_BASE_GENABLE           (1UL<<APIC_BASE_GENABLE_BIT)
-#define APIC_BASE_X2ENABLE          (1UL<<APIC_BASE_X2ENABLE_BIT)
-#define APIC_BASE_BSP               (1UL<<APIC_BASE_BSP_BIT)
-#define APIC_BASE_ADDR_MASK         ((1UL<<APIC_BASE_ADDR_BITS)-1)
-#define APIC_BASE_ADDR              (APIC_BASE_ADDR_MASK<<APIC_BASE_ADDR_BIT)
 
 class lapic_t {
 public:
@@ -1748,12 +1735,12 @@ static void apic_configure_timer(
 
 int apic_init(int ap)
 {
-    uint64_t apic_base_msr = cpu_msr_get(APIC_BASE_MSR);
+    uint64_t apic_base_msr = cpu_msr_get(CPU_APIC_BASE_MSR);
 
     if (!apic_base)
-        apic_base = apic_base_msr & APIC_BASE_ADDR;
+        apic_base = apic_base_msr & CPU_APIC_BASE_ADDR;
 
-    if (!(apic_base_msr & APIC_BASE_GENABLE)) {
+    if (!(apic_base_msr & CPU_APIC_BASE_GENABLE)) {
         APIC_TRACE("APIC was globally disabled!"
                    " Enabling...\n");
     }
@@ -1763,8 +1750,8 @@ int apic_init(int ap)
         if (!ap)
             apic = &apic_x2;
 
-        cpu_msr_set(APIC_BASE_MSR, apic_base_msr |
-                APIC_BASE_GENABLE | APIC_BASE_X2ENABLE);
+        cpu_msr_set(CPU_APIC_BASE_MSR, apic_base_msr |
+                CPU_APIC_BASE_GENABLE| CPU_APIC_BASE_X2ENABLE);
     } else {
         APIC_TRACE("Using xAPIC\n");
 
@@ -1780,12 +1767,13 @@ int apic_init(int ap)
             apic = &apic_x;
         }
 
-        cpu_msr_set(APIC_BASE_MSR,
-                    (apic_base_msr & ~APIC_BASE_X2ENABLE) | APIC_BASE_GENABLE);
+        cpu_msr_set(CPU_APIC_BASE_MSR,
+                    (apic_base_msr & ~CPU_APIC_BASE_X2ENABLE) |
+                    CPU_APIC_BASE_GENABLE);
     }
 
     // Set global enable if it is clear
-    if (!(apic_base_msr & APIC_BASE_GENABLE)) {
+    if (!(apic_base_msr & CPU_APIC_BASE_GENABLE)) {
         APIC_TRACE("APIC was globally disabled!"
                    " Enabling...\n");
     }
@@ -1810,7 +1798,7 @@ int apic_init(int ap)
 
     apic->write32(APIC_REG_TPR, 0x0);
 
-    assert(apic_base == (cpu_msr_get(APIC_BASE_MSR) & APIC_BASE_ADDR));
+    assert(apic_base == (cpu_msr_get(CPU_APIC_BASE_MSR) & CPU_APIC_BASE_ADDR));
 
     if (ap) {
         APIC_TRACE("Configuring AP timer\n");

@@ -10,6 +10,7 @@
 #include "control_regs.h"
 #include "main.h"
 #include "halt.h"
+#include "cpu.h"
 #include "gdt.h"
 #include "mm.h"
 #include "time.h"
@@ -186,9 +187,6 @@ static cpu_info_t cpus[MAX_CPUS] = {
 };
 
 static volatile uint32_t cpu_count;
-
-// Set in startup code (entry.s)
-uint32_t default_mxcsr_mask;
 
 ///
 
@@ -864,9 +862,10 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 
     *thread_id = thread - threads;
 
-    //assert(thread->state == THREAD_IS_RUNNING);
-    assert(atomic_cmpxchg(&thread->state, THREAD_IS_RUNNING, THREAD_IS_SUSPENDED_BUSY) == THREAD_IS_RUNNING);
-    //atomic_st_rel(&thread->state, THREAD_IS_SUSPENDED_BUSY);
+    thread_state_t old_state;
+    old_state = atomic_cmpxchg(&thread->state,
+                               THREAD_IS_RUNNING, THREAD_IS_SUSPENDED_BUSY);
+    assert(old_state == THREAD_IS_RUNNING);
 
     spinlock_value_t saved_lock = spinlock_unlock_save(lock);
     thread_yield();

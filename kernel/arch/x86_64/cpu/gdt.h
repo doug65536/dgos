@@ -21,7 +21,19 @@ struct gdt_entry_t {
     uint8_t access;
     uint8_t flags_limit_high;
     uint8_t base_high;
+
+    void set_type(uint8_t type)
+    {
+        access = (access & ~0xF) | type;
+    }
+
+    uint8_t get_type()
+    {
+        return access & 0xF;
+    }
 };
+
+C_ASSERT(sizeof(gdt_entry_t) == 8);
 
 struct gdt_entry_tss_ldt_t {
     constexpr gdt_entry_tss_ldt_t(uint64_t base)
@@ -163,10 +175,11 @@ C_ASSERT_ISPO2((sizeof(tss_t) & 63) == 0);
 // Ensure no spanning page boundaries
 C_ASSERT(4096 % sizeof(tss_t) == 0);
 
-extern tss_t tss_list[MAX_CPUS];
+extern tss_t tss_list[];
 
 void gdt_init(int ap);
 void gdt_init_tss(int cpu_count);
 void gdt_load_tr(int cpu_number);
 
 extern "C" gdt_entry_combined_t gdt[];
+extern "C" void gdt_init_tss_early();

@@ -43,7 +43,7 @@ kernel_params_t *kernel_params;
 size_t constexpr kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size] __section(".bspstk");
 
-static void smp_main(void *)
+static void smp_main(void*)
 {
     printdbg("AP in smp_main...\n");
     cpu_init(1);
@@ -908,4 +908,13 @@ extern "C" __noreturn int main(void)
     cpu_irq_enable();
 
     thread_idle();
+}
+
+extern "C" __noreturn void mp_main()
+{
+    cpu_init_early(1);
+
+    callout_call(callout_type_t::smp_start);
+
+    __builtin_unreachable();
 }

@@ -78,7 +78,7 @@ C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 // Holds exclusive access to TSS segment descriptor
 // while loading task register
 static spinlock gdt_tss_lock;
-tss_t tss_list[];
+tss_t tss_list[MAX_CPUS];
 
 void gdt_init(int)
 {
@@ -141,10 +141,22 @@ void gdt_init_tss(int cpu_count)
    callout_call(callout_type_t::tss_list_ready);
 }
 
+extern tss_t early_tss;
+
+void gdt_init_tss_early()
+{
+    gdt_set_tss_base(&early_tss);
+    assert(gdt[GDT_SEL_TSS >> 3].mem.get_type() == GDT_TYPE_TSS);
+    cpu_tr_set(GDT_SEL_TSS);
+    gdt[GDT_SEL_TSS >> 3].mem.set_type(GDT_TYPE_TSS);
+}
+
 void gdt_load_tr(int cpu_number)
 {
     unique_lock<spinlock> lock(gdt_tss_lock);
 
     gdt_set_tss_base(tss_list + cpu_number);
+    assert(gdt[GDT_SEL_TSS >> 3].mem.get_type() == GDT_TYPE_TSS);
     cpu_tr_set(GDT_SEL_TSS);
+    gdt[GDT_SEL_TSS >> 3].mem.set_type(GDT_TYPE_TSS);
 }

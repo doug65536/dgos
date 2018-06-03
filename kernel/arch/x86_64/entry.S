@@ -11,11 +11,7 @@
 // Things that must be done before entering any compiler
 // generated code:
 //  - Set up stack (aligned!)
-//  - Enable SSE
-//  - Initialize SSE control word (mxcsr)
-//  - Initialize x87 control word
-//  - Initialize SSE control word mask
-//  - Initialize xsave
+//  - Clear EFLAGS.DF
 
 .align 16
 .global entry
@@ -27,21 +23,18 @@ entry:
     // Align the stack
     andq $-16,%rsp
 
+    cld
+
     // Save parameter in call-preserved register
     movl %ecx,%r15d
     xorl %ebp,%ebp
 
-    // Enable SSE
-    movq %cr4,%rax
-    orq $(CPU_CR4_OFXSR | CPU_CR4_OSXMMEX),%rax
-    movq %rax,%cr4
-
     debugind '2'
 
     // See if this is the bootstrap processor
-    movl $0x1B,%ecx
+    movl $(CPU_APIC_BASE_MSR),%ecx
     rdmsr
-    testl $0x100,%eax
+    testl $(CPU_APIC_BASE_BSP),%eax
     jnz bsp_init
 
     debugind 'Z'
@@ -50,24 +43,24 @@ ap_init:
     // This is not the bootstrap CPU
 
     // Load kernel memory mapping ASAP
-    movq root_physaddr(%rip),%rax
-    movq %rax,%cr3
+//    movq root_physaddr(%rip),%rax
+//    movq %rax,%cr3
 
     // Get IDT and TSS up asap
-    call idt_gdt_tss_init_ap
+    //call idt_gdt_tss_init_ap
 
-    // Initialize AP MXCSR
-    movl $(CPU_MXCSR_ELF_INIT),%eax
-    andl default_mxcsr_mask(%rip),%eax
-    pushq %rax
-    ldmxcsr (%rsp)
+//    // Initialize AP MXCSR
+//    movl $(CPU_MXCSR_ELF_INIT),%eax
+//    andl default_mxcsr_mask(%rip),%eax
+//    pushq %rax
+//    ldmxcsr (%rsp)
 
     // Initialize AP FPU control word
     // Round nearest, 53 bit significand, all exceptions masked
-    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
-    fldcw (%rsp)
+//    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
+//    fldcw (%rsp)
 
-    popq %rax
+//    popq %rax
 
     // xsave-enable AVX on AP
     call set_xsave_states_ap
@@ -91,41 +84,44 @@ bsp_init:
     // Store the kernel parameters passed in from bootloader
     movq %r15,kernel_params(%rip)
 
+    xor %edi,%edi
+    call cpu_init_early
+
     // Get IDT and TSS up asap
-    call idt_gdt_tss_init
+    //call idt_gdt_tss_init
 
     // Save the CPU_MXCSR_MASK
 
-    // Allocate 512 bytes and cache line align stack
-    movq %rsp,%rdx
-    subq $512,%rsp
-    andq $-64,%rsp
+//    // Allocate 512 bytes and cache line align stack
+//    movq %rsp,%rdx
+//    subq $512,%rsp
+//    andq $-64,%rsp
 
-    // Initialize FPU to 64 bit precision,
-    // all exceptions masked, round to nearest
-    fninit
-    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
-    fldcw (%rsp)
+//    // Initialize FPU to 64 bit precision,
+//    // all exceptions masked, round to nearest
+//    fninit
+//    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
+//    fldcw (%rsp)
 
-    fxsave64 (%rsp)
+//    fxsave64 (%rsp)
 
-    // Read CPU_MXCSR_MASK from fxsave output and store it
-    movl 28(%rsp),%eax
-    movl $0x0000FFBF,%ecx
-    testl %eax,%eax
-    cmovel %ecx,%eax
-    movl %eax,default_mxcsr_mask(%rip)
+//    // Read CPU_MXCSR_MASK from fxsave output and store it
+//    movl 28(%rsp),%eax
+//    movl $0x0000FFBF,%ecx
+//    testl %eax,%eax
+//    cmovel %ecx,%eax
+//    movl %eax,default_mxcsr_mask(%rip)
 
-    // Set MXCSR
-    // 0x3F = all exceptions masked
-    // 0 = round to nearest
-    movl $(CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL),%ecx
-    andl %eax,%ecx
-    movl %ecx,24(%rsp)
-    ldmxcsr 24(%rsp)
+//    // Set MXCSR
+//    // 0x3F = all exceptions masked
+//    // 0 = round to nearest
+//    movl $(CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL),%ecx
+//    andl %eax,%ecx
+//    movl %ecx,24(%rsp)
+//    ldmxcsr 24(%rsp)
 
-    // Restore stack pointer
-    movq %rdx,%rsp
+//    // Restore stack pointer
+//    movq %rdx,%rsp
 
     debugind '4'
     call cpuid_init
@@ -194,101 +190,101 @@ bsp_init:
     movq %rax,%rdi
     call exit
 
-.align 16
-idt_gdt_tss_init:
-    pushq %rbx
-    xorl %ebx,%ebx
-    movl $256,%ecx
+//.align 16
+//idt_gdt_tss_init:
+//    pushq %rbx
+//    xorl %ebx,%ebx
+//    movl $256,%ecx
 
-.align 16
-    lea idt(%rip),%rdx
-0:
-	lea isr_entry_points(%rip),%rax
-    movq (%rax,%rbx),%rax
-    // IDT structure:
-    //  uint16_t offset_lo;     // offset bits 15:0
-    //  uint16_t selector;      // a code segment selector in GDT
-    //  uint8_t ist;            // interrupt stack table index
-    //  uint8_t type_attr;      // type and attributes
-    //  uint16_t offset_hi;     // offset bits 31:16
-    //  uint32_t offset_64_31;  // offset bits 63:32
-    //  uint32_t reserved;
-    movw %ax,(%rdx,%rbx,2)
-    sarq $16,%rax
-    movw $GDT_SEL_KERNEL_CODE64,2(%rdx,%rbx,2)
-    movb $0,4(%rdx,%rbx,2)
-    movb $(IDT_PRESENT | IDT_INTR),5(%rdx,%rbx,2)
-    movw %ax,6(%rdx,%rbx,2)
-    sarq $16,%rax
-    movl %eax,8(%rdx,%rbx,2)
-    movl $0,12(%rdx,%rbx,2)
-    addl $8,%ebx
-    decl %ecx
-    jnz 0b
+//.align 16
+//    lea idt(%rip),%rdx
+//0:
+//	lea isr_entry_points(%rip),%rax
+//    movq (%rax,%rbx),%rax
+//    // IDT structure:
+//    //  uint16_t offset_lo;     // offset bits 15:0
+//    //  uint16_t selector;      // a code segment selector in GDT
+//    //  uint8_t ist;            // interrupt stack table index
+//    //  uint8_t type_attr;      // type and attributes
+//    //  uint16_t offset_hi;     // offset bits 31:16
+//    //  uint32_t offset_64_31;  // offset bits 63:32
+//    //  uint32_t reserved;
+//    movw %ax,(%rdx,%rbx,2)
+//    sarq $16,%rax
+//    movw $GDT_SEL_KERNEL_CODE64,2(%rdx,%rbx,2)
+//    movb $0,4(%rdx,%rbx,2)
+//    movb $(IDT_PRESENT | IDT_INTR),5(%rdx,%rbx,2)
+//    movw %ax,6(%rdx,%rbx,2)
+//    sarq $16,%rax
+//    movl %eax,8(%rdx,%rbx,2)
+//    movl $0,12(%rdx,%rbx,2)
+//    addl $8,%ebx
+//    decl %ecx
+//    jnz 0b
 
-    // Setup IST entries
-    movb $1,4+16*INTR_EX_STACK(%rdx)
-    movb $2,4+16*INTR_EX_DBLFAULT(%rdx)
+//    // Setup IST entries
+//    movb $1,4+16*INTR_EX_STACK(%rdx)
+//    movb $2,4+16*INTR_EX_DBLFAULT(%rdx)
 
-    // Poke initial TSS into TSS GDT entry
-    //  uint16_t limit_low;
-    //	uint16_t base_low;
-    //	uint8_t base_middle;
-    //	uint8_t access;
-    //	uint8_t flags_limit_high;
-    //	uint8_t base_high;
+//    // Poke initial TSS into TSS GDT entry
+//    //  uint16_t limit_low;
+//    //	uint16_t base_low;
+//    //	uint8_t base_middle;
+//    //	uint8_t access;
+//    //	uint8_t flags_limit_high;
+//    //	uint8_t base_high;
 
-    popq %rbx
+//    popq %rbx
 
-    movl $INTR_EX_DEBUG,%edi
-    leaq debug_exception_handler(%rip),%rsi
-    call intr_hook
+//    movl $INTR_EX_DEBUG,%edi
+//    leaq debug_exception_handler(%rip),%rsi
+//    call intr_hook
 
-    // fall through...
+//    // fall through...
 
-.align 16
-idt_gdt_tss_init_ap:
-    // Load IDTR
-    lea idt(%rip),%rdx
-    subq $(24*8),%rsp
-    movw $(16 * 256 - 1),6(%rsp)
-    movq %rdx,8(%rsp)
-    lidtq 6(%rsp)
+//.align 16
+//idt_gdt_tss_init_ap:
+//    // Load IDTR
+//    lea idt(%rip),%rdx
+//    subq $(24*8),%rsp
+//    movw $(16 * 256 - 1),6(%rsp)
+//    movq %rdx,8(%rsp)
+//    lidtq 6(%rsp)
 
-    // Load GDTR
-    lea gdt(%rip),%rdx
-    movw $(GDT_SEL_END - 1),6(%rsp)
-    movq %rdx,8(%rsp)
-    lgdtq 6(%rsp)
+//    // Load GDTR
+//    lea gdt(%rip),%rdx
+//    movw $(GDT_SEL_END - 1),6(%rsp)
+//    movq %rdx,8(%rsp)
+//    lgdtq 6(%rsp)
 
-    leaq init_tss(%rip),%rax
-    // Limit 15:0
-    movw $(init_tss_end - init_tss - 1),GDT_SEL_TSS(%rdx)
-    // Base 15:0
-    movw %ax,2+GDT_SEL_TSS(%rdx)
-    sarq $16,%rax
-    // Base 23:16
-    movb %al,4+GDT_SEL_TSS(%rdx)
-    sarq $8,%rax
-    // access
-    movb $(GDT_ACCESS_PRESENT | \
-        GDT_ACCESS_ACCESSED | GDT_TYPE_TSS),5+GDT_SEL_TSS(%rdx)
-    // Limit 19:16, flags
-    movb $0,6+GDT_SEL_TSS(%rdx)
-    // Base 21:24
-    movb %al,7+GDT_SEL_TSS(%rdx)
-    sarq $8,%rax
-    // Base 63:32
-    movl %eax,8+GDT_SEL_TSS(%rdx)
-    // Reserved
-    movl $0,12+GDT_SEL_TSS(%rdx)
+//    leaq early_tss(%rip),%rax
+//    // Limit 15:0
+//    movw $(early_tss_end - early_tss - 1),GDT_SEL_TSS(%rdx)
+//    // Base 15:0
+//    movw %ax,2+GDT_SEL_TSS(%rdx)
+//    sarq $16,%rax
+//    // Base 23:16
+//    movb %al,4+GDT_SEL_TSS(%rdx)
+//    sarq $8,%rax
+//    // access
+//    movb $(GDT_ACCESS_PRESENT |
+//        GDT_ACCESS_ACCESSED | GDT_TYPE_TSS),5+GDT_SEL_TSS(%rdx)
+//    // Limit 19:16, flags
+//    movb $0,6+GDT_SEL_TSS(%rdx)
+//    // Base 21:24
+//    movb %al,7+GDT_SEL_TSS(%rdx)
+//    sarq $8,%rax
+//    // Base 63:32
+//    movl %eax,8+GDT_SEL_TSS(%rdx)
+//    // Reserved
+//    movl $0,12+GDT_SEL_TSS(%rdx)
 
-    // Load TR
-    movl $GDT_SEL_TSS,%eax
-    ltr %ax
+//    // Load TR
+//    movl $GDT_SEL_TSS,%eax
+//    ltr %ax
 
-    addq $(24*8),%rsp
-    ret
+//    addq $(24*8),%rsp
+//    ret
 
 .section .data
 
@@ -296,7 +292,8 @@ idt_gdt_tss_init_ap:
     // TSS layout is completely misaligned without nudging it up 4 bytes
     //  uint32_t dummy_align;
     .space 4
-init_tss:
+    .global early_tss
+early_tss:
     // TSS structure
     //  uint32_t reserved0;
     .int 0
@@ -320,14 +317,14 @@ init_tss:
     //  uint16_t reserved5;
     .short 0
     //  uint16_t iomap_base;
-    .short init_tss_end-init_tss
+    .short early_tss_end-early_tss
     //  uint32_t dummy_align2;
     .int 0
     //
     //  // entry 0 is rsp[0], rest are ist stacks
     //  void *stack[8];
     .space 8*8
-init_tss_end:
+early_tss_end:
 
 .section .text
 .align 16
@@ -420,20 +417,6 @@ set_xsave_states_ap:
 0:
     pop_cfi %rbx
     .cfi_endproc
-    ret
-
-// Callout to initialize AP CPU
-.align 16
-.global mp_main
-.hidden mp_main
-mp_main:
-    pushq %rbp
-    movq %rsp,%rbp
-
-    movl $'S',%edi
-    call callout_call
-
-    popq %rbp
     ret
 
 .align 16

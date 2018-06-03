@@ -377,7 +377,6 @@ isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-#if 0
 int idt_init(int ap)
 {
     uintptr_t addr;
@@ -400,6 +399,8 @@ int idt_init(int ap)
         //idt[INTR_EX_TSS].ist = 3;
         //idt[INTR_EX_GPF].ist = 4;
         //idt[INTR_EX_PAGE].ist = 5;
+
+        intr_hook(INTR_EX_DEBUG, debug_exception_handler, "debug");
     }
 
     table_register_64_t idtr;
@@ -408,13 +409,10 @@ int idt_init(int ap)
     idtr.base = addr;
     idtr.limit = sizeof(idt) - 1;
 
-    idtr_load(&idtr);
-
-    intr_hook(INTR_EX_DEBUG, debug_exception_handler);
+    cpu_idtr_set(idtr);
 
     return 0;
 }
-#endif
 
 size_t cpu_describe_eflags(char *buf, size_t buf_size, uintptr_t rflags)
 {
@@ -813,8 +811,8 @@ void idt_clone_debug_exception_dispatcher(void)
     // From linker script
     extern char ___isr_st[];
     extern char ___isr_en[];
-    char const * bp_entry = (char const * const)isr_entry_3;
-    char const * debug_entry = (char const * const)isr_entry_1;
+    char const * bp_entry = (char const *)isr_entry_3;
+    char const * debug_entry = (char const *)isr_entry_1;
 
     size_t isr_size = ___isr_en - ___isr_st;
     size_t bp_entry_ofs = bp_entry - ___isr_st;

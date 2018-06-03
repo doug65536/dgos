@@ -3412,3 +3412,8 @@ void clear_phys_state_t::reserve_addr()
     ok = linear_allocator.take_linear(addr, size_t(1) << log2_window_sz, true);
     assert(ok);
 }
+
+void mm_set_master_pagedir()
+{
+    cpu_page_directory_set(root_physaddr);
+}

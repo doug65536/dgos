@@ -377,6 +377,28 @@ static __always_inline void cpu_gdtr_set(table_register_64_t gdtr)
     );
 }
 
+static __always_inline table_register_64_t cpu_idtr_get()
+{
+    table_register_64_t idtr{};
+    __asm__ __volatile__ (
+        "sidtq (%[idtr])\n\t"
+        :
+        : [idtr] "r" (&idtr.limit)
+        : "memory"
+    );
+    return idtr;
+}
+
+static __always_inline void cpu_idtr_set(table_register_64_t idtr)
+{
+    __asm__ __volatile__ (
+        "lidtq (%[idtr])\n\t"
+        :
+        : [idtr] "r" (&idtr.limit)
+        : "memory"
+    );
+}
+
 static __always_inline uint16_t cpu_tr_get()
 {
     uint16_t tr;
@@ -408,6 +430,44 @@ static __always_inline void cpu_ldt_set(uint16_t ldt)
     );
 }
 
+static __always_inline void cpu_mxcsr_set(uint32_t mxcsr)
+{
+    __asm__ __volatile__ (
+        "ldmxcsr %[mxcsr]\n\t"
+        :
+        : [mxcsr] "m" (mxcsr)
+    );
+}
+
+static __always_inline uint32_t cpu_mxcsr_get()
+{
+    uint32_t mxcsr;
+    __asm__ __volatile__ (
+        "stmxcsr %[mxcsr]\n\t"
+        : [mxcsr] "=m" (mxcsr)
+    );
+    return mxcsr;
+}
+
+static __always_inline void cpu_fcw_set(uint16_t fcw)
+{
+    __asm__ __volatile__ (
+        "fldcw %w[fcw]\n\t"
+        :
+        : [fcw] "m" (fcw)
+    );
+}
+
+static __always_inline uint16_t cpu_fcw_get()
+{
+    uint16_t fcw;
+    __asm__ __volatile__ (
+        "fnstcw %w[fcw]\n\t"
+        : [fcw] "=m" (fcw)
+    );
+    return fcw;
+}
+
 static __always_inline void *cpu_stack_ptr_get()
 {
     void *rsp;
@@ -432,10 +492,27 @@ static __always_inline void cpu_breakpoint()
     );
 }
 
+static __always_inline void cpu_fninit()
+{
+    __asm__ __volatile__ (
+        "fninit\n\t"
+    );
+}
+
 static __always_inline void cpu_fxsave(void *fpuctx)
 {
     __asm__ __volatile__ (
         "fxsave64 (%0)\n\t"
+        :
+        : "r" (fpuctx)
+        : "memory"
+    );
+}
+
+static __always_inline void cpu_fxrstor(void const *fpuctx)
+{
+    __asm__ __volatile__ (
+        "fxrstor64 (%0)\n\t"
         :
         : "r" (fpuctx)
         : "memory"
