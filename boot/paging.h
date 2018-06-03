@@ -67,7 +67,7 @@
 //                     uint16_t size);
 
 void paging_init();
-uint32_t paging_root_addr();
+__pure uint32_t paging_root_addr();
 
 typedef uint64_t pte_t;
 typedef uint64_t addr64_t;

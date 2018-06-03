@@ -223,7 +223,7 @@ bool cpu_has_long_mode();
 bool cpu_has_no_execute();
 bool cpu_has_global_pages();
 
-const char *cpu_choose_kernel();
+__pure const char *cpu_choose_kernel();
 void run_kernel(uint64_t entry, void *param);
 void copy_kernel(uint64_t dest_addr, void *src, size_t sz);
 void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt);
