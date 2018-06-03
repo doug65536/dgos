@@ -32,6 +32,46 @@ static uint64_t nsleep_dummy(uint64_t)
     return 0;
 }
 
+unsigned time_day_of_year(time_of_day_t const& time)
+{
+    int days[] = {
+        31,
+        time.year % 4 ? 28 :
+        time.year % 100 ? 29 :
+        time.year % 400 ? 28 :
+        29,
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31
+    };
+
+    int yday = 0;
+    for (int m = 1; m < time.month; ++m)
+        yday += days[m-1];
+    yday += time.day - 1;
+
+    return yday;
+}
+
+uint64_t time_unix(time_of_day_t const& time)
+{
+    return uint64_t(time.second) +
+            time.minute * 60 +
+            time.hour * 3600 +
+            time_day_of_year(time) * 86400 +
+            (time.year - 70) * 365 * 86400 +
+            ((time.year - 69) / 4) * 86400 -
+            ((time.year - 1) / 100) * 86400 +
+            ((time.year + 299) / 400) * 86400;
+}
+
 bool time_ns_set_handler(uint64_t (*vec)(), void (*stop)(), bool override)
 {
     if (time_ns_vec != time_ns_dummy && !override)
