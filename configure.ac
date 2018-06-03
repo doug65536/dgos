@@ -198,7 +198,7 @@ GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $REAL_MODE_FLAGS -print-libgcc-file-name)
 AC_SUBST([GCC_REALMODE_LIB])
 
 NO_PIC_FLAGS=
-for flag in fno-pie fno-pic
+for flag in fno-pie fno-PIE fno-pic
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[NO_PIC_FLAGS+=" -$flag"]
