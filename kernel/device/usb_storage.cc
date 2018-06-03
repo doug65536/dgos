@@ -702,9 +702,11 @@ void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
     cmd_tail = cmd_wrap(cmd_tail + 1);
     cmd_cond.notify_one();
 
+    iocp_t *caller_iocp = cmd->caller_iocp;
+
     hold_cmd_lock.unlock();
 
-    cmd->caller_iocp->invoke();
+    caller_iocp->invoke();
 }
 
 int usb_msc_if_t::usb_msc_if_t::get_max_lun()
