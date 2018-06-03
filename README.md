@@ -14,6 +14,9 @@
 - Enumerates VESA BIOS video modes and configures video card for kernel
 - Implements basic exception handlers
 - Shows loading progress bar
+- Processes position independent executable relocations, allowing the
+  kernel to be loaded to an arbitrary address for kernel address space
+  layout randomization.
 
 ## Kernel
 
