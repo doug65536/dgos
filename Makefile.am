@@ -18,9 +18,6 @@ BUILT_SOURCES = \
 # Build libkernel-{generic,bmi,avx512}
 #  -> Build kernel-*
 
-#LINKER_SEL = -fuse-ld=gold -z max-page-size=256
-LINKER_SEL =
-
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG =
 
@@ -47,12 +44,15 @@ libmbr_a_SOURCES = \
 	mbr/mbr.s
 
 libmbr_a_CFLAGS = \
+	-DFROMCFLAGS \
 	$(REAL_MODE_FLAGS)
 
 libmbr_a_CXXFLAGS = \
+	-DFROMCXXFLAGS \
 	$(REAL_MODE_FLAGS)
 
 libmbr_a_CCASFLAGS = \
+	-DFROMCCASFLAGS \
 	$(REAL_MODE_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
@@ -64,10 +64,30 @@ EXTRA_libmbr_a_DEPENDENCIES = \
 
 # mbr-elf
 
-mbr_elf_LDFLAGS = \
+mbr_elf_SOURCES = \
+	mbr/mbr.ld \
+	mbr/empty.cc
+
+mbr_elf_CXXFLAGS = \
+	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	$(COMPILER_FLAGS)
+
+mbr_elf_CFLAGS = \
+	$(REAL_MODE_FLAGS) \
+	$(COMPILER_FLAGS) \
+	$(NO_PIC_FLAGS)
+
+mbr_elf_CCASFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(REGPARM_FLAGS) \
-	-Wl,-melf_i386 \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	$(COMPILER_FLAGS) -static
+
+mbr_elf_LDFLAGS = \
+	$(REGPARM_FLAGS) \
+	-Wl,-m,elf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
@@ -77,31 +97,18 @@ mbr_elf_LDFLAGS = \
 EXTRA_mbr_elf_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
-mbr_elf_SOURCES = \
-	mbr/mbr.ld \
-	mbr/empty.cc
-
-mbr_elf_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
-	$(COMPILER_FLAGS) \
-	$(NO_PIC_FLAGS)
-
-mbr_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
-	$(REGPARM_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
-
 mbr_elf_LDADD = \
 	libmbr.a $(GCC_REALMODE_LIB)
 
 # mbr-bin
 
 mbr_bin_SOURCES = \
+	mbr/mbr.ld \
 	mbr/empty.cc
 
 mbr_bin_CXXFLAGS = \
 	$(REAL_MODE_FLAGS) \
+	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -114,7 +121,7 @@ mbr_bin_CFLAGS = \
 mbr_bin_LDFLAGS = \
 	$(REAL_MODE_FLAGS) \
 	$(REGPARM_FLAGS) \
-	-Wl,-melf_i386 \
+	-Wl,-m,elf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-Map,$(top_builddir)/mbr.map \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
@@ -258,7 +265,7 @@ bootfat_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-melf_i386 \
+	-Wl,-m,elf_i386 \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
@@ -290,7 +297,7 @@ bootfat_bin_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-melf_i386 \
+	-Wl,-m,elf_i386 \
 	-Wl,--oformat,binary \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
@@ -329,7 +336,7 @@ bootiso_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-melf_i386 \
+	-Wl,-m,elf_i386 \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
@@ -652,7 +659,7 @@ KERNEL_CCASFLAGS_SHARED = \
 	$(COMPILER_FLAGS)
 
 KERNEL_LDFLAGS_SHARED = \
-	-Wl,-melf_x86_64 \
+	-Wl,-m,elf_x86_64 \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
