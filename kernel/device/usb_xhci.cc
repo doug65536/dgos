@@ -241,7 +241,8 @@ struct usbxhci_ep_ctx_t {
     //   if MaxPStreams is 0, this must be zero
     uint8_t mml;
 
-    // delay between consecutive requests. (2**interval) * 125us units
+    // LS/FS: delay between consecutive requests. interval * 1ms units
+    // SS: delay between consecutive requests. (2**interval) * 125us units
     uint8_t interval;
 
     // Max Endpoint Service Time Interval Payload Hi
