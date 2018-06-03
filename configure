@@ -7172,6 +7172,8 @@ done
 OPTIMIZATION_FLAGS=
 for flag in \
 	O2 fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize \
+	-fgcse-after-reload fgcse-las -fdeclone-ctor-dtor \
+	-fdevirtualize-at-ltrans -fsched-stalled-insns=0 \
 	fstrict-aliasing
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`

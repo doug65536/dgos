@@ -124,6 +124,8 @@ AC_SUBST([COMPILER_FLAGS])
 OPTIMIZATION_FLAGS=
 for flag in \
 	O2 fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize \
+	-fgcse-after-reload fgcse-las -fdeclone-ctor-dtor \
+	-fdevirtualize-at-ltrans -fsched-stalled-insns=0 \
 	fstrict-aliasing
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
