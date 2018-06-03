@@ -1,11 +1,4 @@
 #include "types.h"
-
-#include "bootsect.h"
-#include "part.h"
-#include "fat32.h"
-#include "iso9660.h"
-#include "driveinfo.h"
-#include "screen.h"
 #include "bioscall.h"
 
 uint8_t fully_loaded __used;
