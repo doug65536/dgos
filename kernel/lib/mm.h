@@ -24,9 +24,7 @@
 /// Lock the mapped region in memory
 #define MAP_LOCKED          0x00000002
 
-/// Ignored. Hint that pages will be used as stacks
-/// Just in case platform needs to use special memory
-/// area for stacks
+/// Hint that pages will be used as stacks
 #define MAP_STACK           0x00000004
 
 /// Mapping grows downward in memory
