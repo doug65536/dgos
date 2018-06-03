@@ -127,10 +127,10 @@ boot:
     bts $0,%eax
     mov %eax,%cr0
 
+    movw $GDT_SEL_PM_DATA32,%dx
     ljmp $GDT_SEL_PM_CODE32,$pmode_entry
 pmode_entry:
 .code32
-    movl $GDT_SEL_PM_DATA32,%edx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
