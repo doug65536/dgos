@@ -676,10 +676,16 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     for (size_t i = 1; i < requested_queue_count; ++i)
         target_cpus[i] = i - 1;
 
-    // Try to use MSI IRQ
+    // Prepare to use the same vector for all CPU-local queues
+    unique_ptr<int[]> vector_offsets(new int[requested_queue_count]);
+    vector_offsets[0] = 0;
+    fill_n(vector_offsets.get() + 1, requested_queue_count - 1, 1);
+
+    // Try to use MSI(X) IRQ
     use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, true,
                               min(requested_queue_count - 1, size_t(32)),
-                              irq_handler, "nvme", target_cpus.get());
+                              irq_handler, "nvme", target_cpus.get(),
+                              vector_offsets.get());
 
     target_cpus.reset();
 
@@ -987,10 +993,18 @@ void nvme_if_t::irq_handler(int irq_offset)
 
     int queue_stride = irq_range.count;
 
-    for (size_t i = irq_offset; i < queue_count; i += queue_stride)
-    {
-        nvme_queue_state_t& queue = queues[i];
+    if (irq_offset && irq_range.msix && irq_range.count == queue_count) {
+        // Infer queue index from CPU number
+        int current_cpu = thread_cpu_number();
+        nvme_queue_state_t& queue = queues[1 + current_cpu];
         queue.process_completions(this, queues);
+    } else {
+        // Fallback to vector that is not shared across CPUs
+        for (size_t i = irq_offset; i < queue_count; i += queue_stride)
+        {
+            nvme_queue_state_t& queue = queues[i];
+            queue.process_completions(this, queues);
+        }
     }
 }
 

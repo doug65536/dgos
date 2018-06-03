@@ -476,13 +476,15 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, int req_count,
                      intr_handler_t handler, const char *name,
-                     int const *target_cpus = nullptr);
+                     int const *target_cpus = nullptr,
+                     int const *vector_offsets = nullptr);
 
 bool pci_set_msi_irq(pci_addr_t addr,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, int req_count,
                      intr_handler_t handler, const char *name,
-                     int const *target_cpus = nullptr);
+                     int const *target_cpus = nullptr,
+                     int const *vector_offsets = nullptr);
 
 bool pci_set_irq_unmask(pci_addr_t addr,
                         bool unmask);
@@ -500,3 +502,5 @@ void pci_adj_control_bits(int bus, int slot, int func,
 void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
 
 char const * pci_device_class_text(uint8_t cls);
+
+int pci_vector_count_from_offsets(int const *vector_offsets, int count);

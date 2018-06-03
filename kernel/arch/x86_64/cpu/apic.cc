@@ -2637,11 +2637,14 @@ void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
 
 // Returns the starting IRQ number of allocated range
 // If cpu is -1, then enable lowest priority mode
+// target_cpus must be null or an array of count 'count'
+// vector_offsets must be null or an array of count 'count'
+// vector_offsets must be null if not using MSIX
 // Returns 0 for failure
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute,
                        intr_handler_t handler, char const *name,
-                       int const *target_cpus)
+                       int const *target_cpus, int const *vector_offsets)
 {
     // Don't try to use MSI if there are no IOAPIC devices
     if (ioapic_count == 0) {
@@ -2653,19 +2656,35 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
     if (cpu < -1 || unsigned(cpu) >= apic_id_count)
         cpu = 0;
 
-    uint8_t vector_base = ioapic_aligned_vectors(bit_log2(count));
+    int vector_cnt;
+    uint8_t vector_base;
+
+    // If using MSIX and a vector offset table was passed...
+    if (vector_offsets) {
+        // ...compute how many vectors to allocate from vector_offsets
+        vector_cnt = pci_vector_count_from_offsets(vector_offsets, count);
+
+        // Allocate only as many vectors as we need per vector_offsets
+        vector_base = ioapic_alloc_vectors(vector_cnt);
+    } else{
+        // Allocate power of two count of suitably aligned vectors
+        vector_cnt = count;
+        vector_base = ioapic_aligned_vectors(bit_log2(count));
+    }
 
     // See if we ran out of vectors
     if (vector_base == 0)
         return 0;
 
     for (int i = 0; i < count; ++i) {
+        int vec_ofs = vector_offsets ? vector_offsets[i] : i;
+
         apic_msi_target(results + i,
                         target_cpus ? target_cpus[i] : cpu,
-                        vector_base + i);
+                        vector_base + vec_ofs);
 
-        uint8_t intr = vector_base + i;
-        uint8_t irq = vector_base + i - INTR_APIC_IRQ_BASE;
+        uint8_t intr = vector_base + vec_ofs;
+        uint8_t irq = vector_base + vec_ofs - INTR_APIC_IRQ_BASE;
 
         APIC_TRACE("%s msi(x) IRQ %u = vector %u\n", name, irq, intr);
         irq_to_intr[irq] = intr;

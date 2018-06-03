@@ -5,6 +5,7 @@
 #include "string.h"
 #include "cpu/apic.h"
 #include "vector.h"
+#include "numeric.h"
 
 #define PCI_DEBUG   1
 #if PCI_DEBUG
@@ -544,7 +545,8 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, int req_count,
                      intr_handler_t handler,
-                     char const *name, int const *target_cpus)
+                     char const *name, int const *target_cpus,
+                     int const *vector_offsets)
 {
     // Assume we can't use MSI at first, prepare to use pin interrupt
     irq_range->base = pci_dev.config.irq_line;
@@ -552,8 +554,8 @@ bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
     irq_range->msix = false;
 
     bool use_msi = pci_set_msi_irq(pci_dev, irq_range, cpu,
-                                   distribute, req_count,
-                                   handler, name, target_cpus);
+                                   distribute, req_count, handler, name,
+                                   target_cpus, vector_offsets);
 
     if (!use_msi) {
         // Plain IRQ pin
@@ -602,12 +604,21 @@ static int pci_find_msi_msix(pci_addr_t addr,
     return capability;
 }
 
+// Infer the number of vectors needed from the highest vector offset
+int pci_vector_count_from_offsets(int const *vector_offsets, int count)
+{
+    return accumulate(vector_offsets, vector_offsets + count, 0,
+                      [&](int highest, int const& item) {
+        return max(highest, item);
+    }) + 1;
+}
+
 // Returns with the function masked if possible
 // Use pci_set_irq_mask to unmask it when appropriate
 bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                     int cpu, bool distribute, int req_count,
                     intr_handler_t handler, char const *name,
-                    int const *target_cpus)
+                    int const *target_cpus, int const *vector_offsets)
 {
     bool msix;
     pci_msi_caps_hdr_t caps;
@@ -696,11 +707,16 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
 
         vector<msi_irq_mem_t> msi_writes(tbl_cnt);
 
-        irq_range->count = tbl_cnt;
+        if (vector_offsets) {
+            irq_range->count = pci_vector_count_from_offsets(
+                        vector_offsets, tbl_cnt);
+        } else {
+            irq_range->count = tbl_cnt;
+        }
         irq_range->msix = true;
         irq_range->base = apic_msi_irq_alloc(
                     msi_writes.data(), tbl_cnt, cpu, distribute,
-                    handler, name, target_cpus);
+                    handler, name, target_cpus, vector_offsets);
 
         PCI_TRACE("Allocated MSI-X IRQ %d-%d\n",
                   irq_range->base, irq_range->base + irq_range->count - 1);
