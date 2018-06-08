@@ -15,6 +15,8 @@ BUILT_SOURCES = \
 #  -> Link bootfat-bin
 #  -> Link bootiso-elf
 #  -> Link bootiso-bin
+#  -> Link bootefi-pe
+#  -> Link bootefi-elf
 # Build libkernel-{generic,bmi,avx512}
 #  -> Build kernel-*
 
@@ -33,10 +35,13 @@ bin_PROGRAMS = \
 	bootfat-bin \
 	bootiso-elf \
 	bootiso-bin \
+	bootefi-pe \
 	kernel-generic \
 	kernel-bmi \
 	user-shell \
 	hello.km
+
+#bootefi-elf
 
 # libmbr.a
 
@@ -143,13 +148,17 @@ libbootsect_a_SOURCES = \
 	boot/bootcommon.s \
 	boot/bioscall.S \
 	boot/bootsect.cc \
+	boot/gdt.S \
+	boot/cpu_bios.cc \
 	boot/bootinfo.s \
 	boot/array_list.cc \
 	boot/screen.cc \
+	boot/screen_bios.cc \
 	boot/fs.cc \
 	boot/fat32.cc \
 	boot/iso9660.cc \
 	boot/cpu.cc \
+	boot/cpuid.cc \
 	boot/cpu64.S \
 	boot/malloc.cc \
 	boot/string.cc \
@@ -157,11 +166,10 @@ libbootsect_a_SOURCES = \
 	boot/paging.cc \
 	boot/elf64.cc \
 	boot/rand.cc \
-	boot/physmem.cc \
+	boot/physmem_bios.cc \
 	boot/farptr.cc \
 	boot/vesa.cc \
 	boot/progressbar.cc \
-	boot/driveinfo.cc \
 	boot/debug.cc \
 	boot/part.s \
 	boot/mpentry.S \
@@ -183,7 +191,6 @@ libbootsect_a_SOURCES = \
 	boot/mpentry.h \
 	boot/screen.h \
 	boot/fat32.h \
-	boot/driveinfo.h \
 	boot/string.h \
 	boot/physmem.h \
 	boot/bootsect.h \
@@ -192,6 +199,7 @@ libbootsect_a_SOURCES = \
 	boot/vesa.h \
 	boot/tui.h \
 	boot/tui.cc \
+	boot/tui_bios.cc \
 	boot/bootmenu.cc
 
 libbootsect_a_INCLUDES = \
@@ -383,6 +391,79 @@ EXTRA_bootiso_bin_DEPENDENCIES = \
 bootiso_bin_LDADD = \
 	libbootsect.a $(GCC_REALMODE_LIB)
 
+# efi
+
+bootefi_pe_SOURCES = \
+	boot/bootefi.cc \
+	boot/cpu_efi.cc \
+	boot/physmem_efi.cc \
+	boot/cpu.cc \
+	boot/cpu64.S \
+	boot/gdt.S \
+	boot/debug.cc \
+	boot/fs.cc \
+	boot/elf64.cc \
+	boot/string.cc \
+	boot/paging.cc \
+	boot/malloc.cc \
+	boot/mpentry.S \
+	boot/cpuid.cc \
+	boot/rand.cc \
+	boot/screen.cc \
+	boot/screen_efi.cc \
+	boot/progressbar.cc \
+	boot/bootmenu.cc \
+	boot/tui.cc \
+	boot/tui_efi.cc
+
+bootefi_pe_CFLAGS = \
+	-D__efi \
+	-g \
+	-fshort-wchar \
+	-I$(top_srcdir)/boot \
+	-I$(top_srcdir)/boot/include \
+	-std=c++14 \
+	$(NO_REDZONE_FLAGS) \
+	$(STACK_CHECK_FLAGS) \
+	$(NO_STACKPROTECTOR_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_COMMON_FLAGS) \
+	$(NO_RTTI_FLAGS)
+
+bootefi_pe_CXXFLAGS = \
+	$(bootefi_pe_CFLAGS)
+
+bootefi_pe_CCASFLAGS = \
+	$(bootefi_pe_CFLAGS)
+
+bootefi_pe_LDFLAGS = \
+	-g \
+	-Wl,-m,i386pep \
+	-Wl,-pie \
+	-Wl,--dynamicbase \
+	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
+	-Wl,--subsystem,10 \
+	-Wl,--image-base,0x400000 \
+	-Wl,-Map,$(top_builddir)/bootefi-pe.map
+
+EXTRA_bootefi_pe_DEPENDENCIES = \
+	$(top_srcdir)/boot/bootefi.ld \
+	$(top_srcdir)/Makefile.am
+
+#bootefi_elf_SOURCES = $(bootefi_pe_SOURCES)
+#bootefi_elf_CFLAGS = $(bootefi_pe_CFLAGS)
+#bootefi_elf_CXXFLAGS = $(bootefi_pe_CXXFLAGS)
+#bootefi_elf_CCASFLAGS = $(bootefi_pe_CCASFLAGS)
+#bootefi_elf_LDFLAGS = \
+#	-g \
+#	-Wl,-defsym,__section_alignment__=4096 \
+#	-Wl,-defsym,__image_base__=0x400000 \
+#	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
+#	-Wl,-m,elf_i386 \
+#	-Wl,-Map,$(top_builddir)/bootefi-elf.map
+#
+#EXTRA_bootefi_elf_DEPENDENCIES = $(EXTRA_bootefi_pe_DEPENDENCIES)
+
 # kernel
 
 KERNEL_SOURCES_SHARED = \
@@ -527,8 +608,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/mmu.h \
 	kernel/arch/x86_64/bios_data.cc \
 	kernel/arch/x86_64/bios_data.h \
-	kernel/arch/x86_64/bootdev.cc \
-	kernel/arch/x86_64/bootdev.h \
 	kernel/arch/x86_64/cpu/apic.cc \
 	kernel/arch/x86_64/cpu/apic.h \
 	kernel/arch/x86_64/cpu/asm_constants.h \
@@ -1199,16 +1278,17 @@ QEMU_USB = \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
 	$(QEMU_USB_EXTRA) \
-	-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none \
-	-device usb-uas,bus=xhci.0,id=uas \
-	-drive if=none,id=scsidrv,file=scsi_disk.img,format=raw,cache=none \
-	-device scsi-hd,drive=scsidrv \
-	-device usb-mtp,bus=xhci.0,x-root=$(builddir) \
-	-device usb-audio,bus=xhci.0 \
-	-device usb-net,bus=xhci.0 \
 	-trace 'usb*'
 
-#-device nec-usb-xhci,id=xhci,p2=16,p3=16,msix=on,streams=on \
+#-device usb-storage,bus=xhci.0,drive=stick
+#-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none
+#-device usb-audio,bus=xhci.0
+#-device usb-net,bus=xhci.0
+#-device usb-mtp,bus=xhci.0,x-root=$(builddir)
+#-drive if=none,id=scsidrv,file=scsi_disk.img,format=raw,cache=none
+#-device scsi-hd,drive=scsidrv
+#-device usb-uas,bus=xhci.0,id=uas
+#-device nec-usb-xhci,id=xhci,p2=16,p3=16,msix=on,streams=on
 #-device usb-storage,bus=xhci.0,drive=stick
 
 QEMU_NET = \
@@ -1247,11 +1327,15 @@ QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme = \
 	-machine q35 \
 	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0
+QEMU_HDCTL_DEV_usb = \
+	-machine q35 \
+	-device usb-storage,bus=xhci.0,drive=bootdrv,bootindex=0
 QEMU_HDCTL_DEV_ahci = -machine q35
 QEMU_HDCTL_DEV_ide = -machine pc
-QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none
+QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none,id=bootdrv
 QEMU_DIF_ahci =
 QEMU_DIF_ide =
+QEMU_DIF_usb = ,if=none
 QEMU_MEDIA_fat = disk
 QEMU_MEDIA_iso = cdrom
 QEMU_IMAGE_fat = fatdisk.img
@@ -1259,11 +1343,11 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu max
+QEMU_EMU_tcg = -cpu max,la57
 #-cpu EPYC
 
-#QEMU_BIOS = -bios $(top_srcdir)/qemu-q35-20170927.rom
-QEMU_BIOS = -bios $(top_srcdir)/qemu-seabios.rom
+QEMU_BOOT_bios = -bios $(top_srcdir)/qemu-seabios.rom
+QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
 
 # Connect to debug log
 monitor-debug-output:

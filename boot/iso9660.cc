@@ -296,7 +296,8 @@ static uint32_t find_file_by_name(char const *filename,
     size_t filename_len = strlen(filename);
 
     for (uint32_t ofs = 0; ofs < (dir_size >> 11); ++ofs) {
-        read_lba_sectors(iso9660_sector_buffer, boot_drive, dir_lba + ofs, 1);
+        if (!read_lba_sectors(iso9660_sector_buffer, dir_lba + ofs, 1))
+            return 0;
 
         iso9660_dir_ent_t *de = (iso9660_dir_ent_t*)iso9660_sector_buffer;
         iso9660_dir_ent_t *de_end = (iso9660_dir_ent_t*)((char*)de + 2048);
@@ -339,7 +340,7 @@ static int8_t iso9660_sector_iterator_begin(
     iter->lba = cluster;
     iter->size = size;
 
-    return read_lba_sectors(sector, boot_drive, cluster, 1);
+    return read_lba_sectors(sector, cluster, 1);
 }
 
 static int iso9660_boot_open(char const *filename)
@@ -397,16 +398,15 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 
     char *output = (char*)buf;
 
-    uint8_t err;
+    uint8_t ok;
 
-    err = read_lba_sectors(iso9660_sector_buffer, boot_drive,
-                     file_handles[file].lba +
-                     sector_offset, 1);
+    ok = read_lba_sectors(iso9660_sector_buffer,
+                           file_handles[file].lba + sector_offset, 1);
 
     int total = 0;
     for (;;) {
         // Error?
-        if (err)
+        if (!ok)
             return -1;
 
         // EOF?
@@ -430,8 +430,8 @@ static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         byte_offset = 0;
 
         if (bytes > 0) {
-            err = read_lba_sectors(
-                        iso9660_sector_buffer, boot_drive,
+            ok = read_lba_sectors(
+                        iso9660_sector_buffer,
                         file_handles[file].lba + (++sector_offset), 1);
         }
     }
@@ -452,8 +452,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     uint32_t best_ofs = 0;
 
     for (uint32_t ofs = 0; ofs < 4; ++ofs) {
-        read_lba_sectors(iso9660_sector_buffer,
-                         boot_drive, pvd_lba + ofs, 1);
+        read_lba_sectors(iso9660_sector_buffer, pvd_lba + ofs, 1);
 
         if (pvd->type_code == 2) {
             best_ofs = ofs;
@@ -465,8 +464,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     }
 
     if (best_ofs == 0)
-        read_lba_sectors(iso9660_sector_buffer,
-                         boot_drive, pvd_lba + best_ofs, 1);
+        read_lba_sectors(iso9660_sector_buffer, pvd_lba + best_ofs, 1);
 
     iso9660_root_dir_lba = pvd->root_dirent.lba_lo_le |
             (pvd->root_dirent.lba_hi_le << 16);

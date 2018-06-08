@@ -262,7 +262,9 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
-gcc_config="--target=$arches --with-system-zlib \
+gcc_config="--target=$arches \
+--enable-targets=all \
+--with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
 --with-gnu-as --with-gnu-ld \
 --enable-initfini-array \
@@ -276,6 +278,7 @@ gcc_config="--target=$arches --with-system-zlib \
 # disable for now: --enable-threads=posix
 
 bin_config="--target=$arches \
+--enable-targets=all \
 --enable-gold --enable-ld \
 --enable-plugins --enable-lto
 --enable-shared"

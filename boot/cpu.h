@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types.h"
+#include "cpuid.h"
 #include "cpu_constants.h"
 
 struct gdt_entry_t {
@@ -92,13 +93,6 @@ struct table_register_64_t {
     uint32_t base_hi;
 };
 
-struct cpuid_t {
-    uint32_t eax;
-    uint32_t ebx;
-    uint32_t edx;
-    uint32_t ecx;
-};
-
 struct idt_entry_t {
     uint16_t offset_lo; // offset bits 0..15
     uint16_t selector;  // a code segment selector in GDT or LDT
@@ -117,8 +111,6 @@ struct idt_entry_64_t {
     uint32_t offset_64_31;  // offset bits 63..32
     uint32_t reserved;
 };
-
-bool cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx);
 
 extern "C" void cpu_a20_enterpm();
 extern "C" void cpu_a20_exitpm();
@@ -219,9 +211,6 @@ void init_irq();
 #endif
 
 extern "C" void cpu_init();
-bool cpu_has_long_mode();
-bool cpu_has_no_execute();
-bool cpu_has_global_pages();
 
 __pure const char *cpu_choose_kernel();
 void run_kernel(uint64_t entry, void *param);
@@ -230,3 +219,5 @@ void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt);
 
 extern "C" uint8_t xcr0_value;
 
+extern bool nx_available;
+extern uint32_t gp_available;

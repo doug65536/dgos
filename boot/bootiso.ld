@@ -1,7 +1,7 @@
 ENTRY(entry)
 
 SECTIONS {
-	.text 0x800 : AT(0x800) {
+	.text 0x1000 : AT(0x1000) {
 		__initialized_data_start = .;
 		*(.head)
 		*(.early)
@@ -48,8 +48,12 @@ SECTIONS {
 		__bss_end = .;
 	}
 
-	/DISCARD/ : { *(.eh_frame) }
+	.uninit : {
+		*(.stack)
 
-	__initial_stack = 0xfff0;
-	__heap_end = 0xd000;
+		. = ALIGN(16);
+		__heap_st = .;
+	}
+
+	/DISCARD/ : { *(.eh_frame) }
 }

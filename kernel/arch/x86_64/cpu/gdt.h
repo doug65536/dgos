@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "assert.h"
+#include "control_regs.h"
 #include "control_regs_constants.h"
 
 struct gdt_entry_t {
@@ -183,3 +184,5 @@ void gdt_load_tr(int cpu_number);
 
 extern "C" gdt_entry_combined_t gdt[];
 extern "C" void gdt_init_tss_early();
+
+extern "C" table_register_64_t gdtr;

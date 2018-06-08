@@ -1,7 +1,6 @@
 #include "tui.h"
 #include "screen.h"
 #include "string.h"
-#include "bioscall.h"
 
 void tui_menu_renderer_t::measure()
 {
@@ -67,29 +66,6 @@ void tui_menu_renderer_t::draw(int selection)
     }
 }
 
-static void idle()
-{
-    // Perform APM "CPU Idle" call
-    bios_regs_t regs{};
-    regs.eax = 0x5305;
-    bioscall(&regs, 0x15);
-}
-
-// Returns true if a key is availble
-static bool pollkey()
-{
-    bios_regs_t regs{};
-    regs.eax = 0x1100;
-    bioscall(&regs, 0x16);
-
-    if (regs.flags_ZF()) {
-        idle();
-        return false;
-    }
-
-    return true;
-}
-
 // Returns scancode in ah, ascii in al
 //       esc -> 0x011B
 //       '0' -> 0x0B30
@@ -147,29 +123,11 @@ static char const bios_numpad[] = {
     '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0', '.'
 };
 
-static int readkey()
-{
-    bios_regs_t regs{};
-    regs.eax = 0x1000;
-    bioscall(&regs, 0x16);
-
-    return regs.eax & 0xFFFF;
-}
-
 // Wait for a key
-static int waitkey()
+int waitkey()
 {
     while (!pollkey());
     return readkey();
-}
-
-// Get ticks since midnight (54.9ms units)
-static int systime()
-{
-    bios_regs_t regs{};
-    regs.eax = 0;
-    bioscall(&regs, 0x1A);
-    return (regs.ecx << 16) | (regs.edx & 0xFFFF);
 }
 
 void tui_menu_renderer_t::interact_timeout(int ms)
@@ -213,7 +171,7 @@ void tui_menu_renderer_t::interact_timeout(int ms)
         case 0x00:
             key >>= 8;
             if (key >= key_num_first && key <= key_num_last) {
-                key = bios_numpad[key];
+                key = bios_numpad[key - key_num_first];
                 break;
             }
             break;

@@ -18,3 +18,11 @@ void debug_out(char const *s, int len)
         len = strlen(s);
     e9out(s, len);
 }
+
+void debug_out(char16_t const *s, int len)
+{
+    char *tmp = (char*)__builtin_alloca(len+1);
+    for (int i = 0; i < len; ++i)
+        tmp[i] = char(s[i]);
+    e9out(tmp, len);
+}

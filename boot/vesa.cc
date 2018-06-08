@@ -11,7 +11,7 @@
 
 #define VESA_DEBUG 1
 #if VESA_DEBUG
-#define VESA_TRACE(...) print_line("vesa: " __VA_ARGS__)
+#define VESA_TRACE(...) PRINT("vesa: " __VA_ARGS__)
 #else
 #define VESA_TRACE(...) ((void)0)
 #endif
@@ -159,17 +159,14 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
         }
     }
 
-    far_ptr_t kernel_data;
-    kernel_data.segment = 0;
-    kernel_data.offset = 0;
+    void *kernel_data = nullptr;
 
     if (done) {
-        kernel_data.segment = far_malloc(sizeof(sel));
-        kernel_data.offset = 0;
-        far_copy_from(kernel_data, &sel, sizeof(sel));
+        kernel_data = malloc(sizeof(sel));
+        memcpy(kernel_data, &sel, sizeof(sel));
 
-        paging_map_range(kernel_data.segment << 4, sizeof(sel),
-                         kernel_data.segment << 4,
+        paging_map_range(uintptr_t(kernel_data), sizeof(sel),
+                         uintptr_t(kernel_data),
                          PTE_PRESENT | PTE_WRITABLE, 2);
 
         uint8_t log2_pagesize = 12;
@@ -191,5 +188,5 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
     free(mode_info);
     free(info);
 
-    return kernel_data.segment;
+    return uintptr_t(kernel_data) >> 4;
 }

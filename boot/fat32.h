@@ -19,9 +19,10 @@ struct fat32_sector_iterator_t {
     // Sector offset from beginning of cluster
     uint16_t sector_offset;
 
-    uint8_t err;
+    // Set to false when a disk error occurs
+    bool ok;
 
-    far_ptr_t clusters;
+    uint32_t *clusters;
     uint32_t cluster_count;
 };
 

@@ -181,7 +181,6 @@ arch/x86_64/cpu/nontemporal_avx.cc
 arch/x86_64/bios_data.cc
 arch/x86_64/gdbstub.cc
 arch/x86_64/stacktrace.h
-arch/x86_64/bootdev.cc
 arch/x86_64/nano_time.cc
 arch/x86_64/kernel.ld
 arch/x86_64/bootdev.h

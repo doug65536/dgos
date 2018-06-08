@@ -13,9 +13,6 @@ uintptr_t bootinfo_parameter(bootparam_t param)
     case bootparam_t::ap_entry_point:
         return data->ap_entry;
 
-    case bootparam_t::boot_device:
-        return data->boot_device_info;
-
     case bootparam_t::vbe_mode_info:
         return data->vbe_selected_mode;
 

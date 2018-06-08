@@ -5,7 +5,12 @@
 extern "C" uint8_t boot_drive;
 extern "C" uint32_t vbe_info_vector;
 
-extern "C" void halt(char const*);
+extern "C" void halt(tchar const*);
 
-uint8_t read_lba_sectors(char *buf, uint8_t drive,
-                         uint64_t lba, uint16_t count);
+bool read_lba_sectors(char *buf, uint64_t lba, uint16_t count);
+
+#ifdef __efi
+#define HALT(s) halt(TEXT(s))
+#else
+#define HALT(s) halt(s)
+#endif

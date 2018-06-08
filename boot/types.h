@@ -20,3 +20,14 @@ typedef int64_t off_t;
 #define __noinline              __attribute__((__noinline__))
 #define __assume_aligned(n)     __attribute__((__assume_aligned__(n)))
 #define __printf_format(m,n)    __attribute__((__format__(__printf__, m, n)))
+
+#define CONCATENATE2(a, b) a##b
+#define CONCATENATE(a, b) CONCATENATE2(a, b)
+
+#ifdef __efi
+typedef char16_t tchar;
+#define TEXT(s) CONCATENATE(u, s)
+#else
+typedef char tchar;
+#define TEXT(s) s
+#endif

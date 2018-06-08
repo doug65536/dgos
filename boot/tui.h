@@ -4,13 +4,13 @@
 struct tui_str_t
 {
     template<size_t sz>
-    constexpr tui_str_t(char const(&txt)[sz])
+    constexpr tui_str_t(tchar const(&txt)[sz])
         : len(sz-1)
         , str(txt)
     {
     }
 
-    constexpr operator char const *() const
+    constexpr operator tchar const *() const
     {
         return str;
     }
@@ -21,7 +21,7 @@ struct tui_str_t
     }
 
     size_t const len;
-    char const * const str;
+    tchar const * const str;
 };
 
 template<typename T>
@@ -69,3 +69,10 @@ private:
     int max_title;
     int max_value;
 };
+
+int readkey();
+int systime();
+void idle();
+bool pollkey();
+
+

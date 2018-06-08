@@ -30,7 +30,7 @@ static uint16_t get_ram_region(physmem_range_t *range,
     return !regs.ah_if_carry();
 }
 
-uint16_t get_ram_regions(uint32_t *ret_size)
+void *get_ram_regions(uint32_t *ret_size)
 {
     physmem_range_t temp;
 
@@ -56,25 +56,23 @@ uint16_t get_ram_regions(uint32_t *ret_size)
         if (result[i].type == PHYSMEM_TYPE_NORMAL)
             total_memory += result[i].size;
 
-        print_line("base=%llx length=%llx type=%lx valid=%lx",
+        PRINT("base=%llx length=%llx type=%lx valid=%lx",
                    result[i].base,
                    result[i].size,
                    result[i].type,
                    result[i].valid);
     }
 
-    far_ptr_t far_result;
     // Allocate extra space in case entries get split
     // Worst case is every entry overlaps and becomes 3 entries
     int size = (count + 1) * sizeof(*result);
-    far_result.segment = far_malloc(size * 3);
-    far_result.offset = 0;
-    far_copy(far_result, far_ptr((uint32_t)result), size);
+    void *far_result = malloc(size * 3);
+    memcpy(far_result, result, size);
     free(result);
 
     *ret_size = count;
 
-    print_line("Usable memory: %dMB", (int)(total_memory >> 20));
+    PRINT("Usable memory: %dMB", (int)(total_memory >> 20));
 
-    return far_result.segment;
+    return far_result;
 }

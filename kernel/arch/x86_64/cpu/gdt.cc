@@ -79,10 +79,10 @@ C_ASSERT(sizeof(gdt) == GDT_SEL_END);
 // while loading task register
 static spinlock gdt_tss_lock;
 tss_t tss_list[MAX_CPUS];
+table_register_64_t gdtr;
 
 void gdt_init(int)
 {
-    table_register_64_t gdtr;
     gdtr.limit = sizeof(gdt) - 1;
     gdtr.base = (uintptr_t)gdt;
     cpu_gdtr_set(gdtr);

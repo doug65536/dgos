@@ -7,294 +7,186 @@
 
 #define MALLOC_DEBUG 0
 #if MALLOC_DEBUG
-#define MALLOC_TRACE(...) print_line("malloc: " __VA_ARGS__)
+#define MALLOC_TRACE(...) PRINT("malloc: " __VA_ARGS__)
 #else
 #define MALLOC_TRACE(...) ((void)0)
 #endif
 
-// Allocate-only (no free) far pointer allocator
+struct blk_hdr_t {
+    // Size including this header, in bytes
+    uint32_t size;
 
-// Next free location for aligned far allocations
-// Starts at top of first 64KB
-static unsigned free_seg_st = 0x1000;
+    enum sig_t : uint32_t {
+        FREE = 0xFEEEB10C,
+        USED = 0xA10CA1ED
+    };
 
-// Aligned top of memory for far allocations
-static unsigned free_seg_en;
+    // Signature
+    sig_t sig;
 
-static uint16_t get_top_of_low_memory() {
-    // Read top of memory from BIOS data area
-    return *(uint16_t*)0x40E;
-}
-
-// Allocate from top of memory
-uint16_t far_malloc(uint32_t bytes)
-{
-    if (free_seg_en == 0)
-        free_seg_en = get_top_of_low_memory();
-
-    unsigned paragraphs = (bytes - 1 + (1 << 4)) >> 4;
-    unsigned segment = (free_seg_en -= paragraphs);
-    far_zero(far_ptr2(segment, 0), paragraphs);
-
-    MALLOC_TRACE("far malloc %u bytes returns segment %u\n",
-                 bytes, segment);
-
-    return segment;
-}
-
-// Returns segment guaranteed aligned on page boundary
-uint16_t far_malloc_aligned(uint32_t bytes)
-{
-    unsigned segment = free_seg_st;
-    unsigned paragraphs = ((bytes - 1 + (1 << 12)) & -4096) >> 4;
-    free_seg_st += paragraphs;
-    far_zero(far_ptr2(segment, 0), paragraphs);
-
-    MALLOC_TRACE("far malloc aligned %u bytes returns segment %u\n",
-                 bytes, segment);
-
-    return segment;
-}
-
-// Simple heap allocator
-
-// This must be small enough to fit before first header
-// Maximum 13 bytes
-struct alloc_state_t {
-    uint8_t alloc_id;
-    uint8_t heap_ready;
-
-    // Simplify starting at the beginning of the heap
-    uint16_t first_header;
-
-    // Optimize starting point for free block search
-    uint16_t first_free;
+    uint32_t neg_size;
+    blk_hdr_t *self;
 };
 
-extern alloc_state_t __heap;
-extern char __heap_end[];
+static blk_hdr_t *heap_st;
+static blk_hdr_t *first_free;
 
-#if !defined(NDEBUG) || 0
-#define DEBUG_ONLY(e) e;
-#else
-#define DEBUG_ONLY(e)
+void malloc_init(void *st, void *en)
+{
+    heap_st = (blk_hdr_t*)((uintptr_t(st) + 15) & -16);
+
+    // Initialize end of heap sentinel, just before end of heap
+    blk_hdr_t *heap_end = (blk_hdr_t*)en - 1;
+    heap_end->size = 0;
+    heap_end->sig = blk_hdr_t::USED;
+    heap_end->neg_size = -heap_end->size;
+    heap_end->self = heap_end;
+
+    // Make a free block covering the entire heap
+    first_free = heap_st;
+    heap_st->size = uintptr_t(heap_end) - uintptr_t(heap_st);
+    heap_st->sig = blk_hdr_t::FREE;
+    heap_st->neg_size = -heap_st->size;
+    heap_st->self = heap_st;
+}
+
+#ifndef __efi
+static __pure uintptr_t get_top_of_low_memory() {
+    // Read top of memory from BIOS data area
+    return *(uint16_t*)0x40E << 4;
+}
+
+extern "C" blk_hdr_t __heap_st[];
+__attribute__((__constructor__)) void malloc_init_auto()
+{
+    // Memory map
+    //
+    // +-------------------------+ <- Start of BIOS data area (usually 0x9FC00)
+    // |  blk_hdr_t with 0 size  |
+    // +-------------------------+ <- 16 byte aligned
+    // |         blocks          |
+    // +-------------------------+ <- __heap_st, 16 byte aligned
+    // |         .bss            |
+    // |         .data           |
+    // |         .text           |
+    // +-------------------------+ <- 0x1000
+
+    malloc_init(__heap_st, (void*)get_top_of_low_memory());
+}
 #endif
 
-static void debug_break()
+static blk_hdr_t *next_blk(blk_hdr_t *blk)
 {
-    __asm__ __volatile__ (
-        "int $3\n"
-    );
+    return (blk_hdr_t*)(uintptr_t(blk) + blk->size);
 }
 
-#ifndef NDEBUG
-static void check_valid_header(uint16_t v)
+void __aligned(16) *malloc(size_t bytes)
 {
-    if ((v & 0x0F) != 0x0D)
-        debug_break();
-}
-#endif
-
-static __always_inline unsigned addr_of(void *p)
-{
-    return unsigned(p);
+    return malloc_aligned(bytes, 16);
 }
 
-static __always_inline unsigned payload_of(uint16_t addr)
+void malloc_panic()
 {
-    DEBUG_ONLY(check_valid_header(addr))
-    return addr + 3;
+    HALT("Corrupt heap block header!");
 }
 
-static __always_inline char *payload_ptr_of(uint16_t addr)
+void *malloc_aligned(size_t bytes, size_t alignment)
 {
-    DEBUG_ONLY(check_valid_header(addr))
-    return (char*)(uint32_t)payload_of(addr);
-}
+    if (bytes == 0)
+        return nullptr;
 
-static __always_inline uint16_t id_of(uint16_t addr)
-{
-    DEBUG_ONLY(check_valid_header(addr))
-    return *(uint8_t*)(uint32_t)addr;
-}
+    // Remember starting point so we know when we have searched whole heap
+    blk_hdr_t *blk = first_free;
+    blk_hdr_t * const start_pos = blk;
 
-static __always_inline uint16_t size_of(uint16_t addr)
-{
-    DEBUG_ONLY(check_valid_header(addr))
-    return *(uint16_t*)(uint32_t)(addr + 1);
-}
+    // Round up to a multiple of 16 bytes, increase by size of block header
+    bytes = ((bytes + 15) & -16) + sizeof(blk_hdr_t);
 
-static __always_inline uint8_t set_id_of(uint16_t addr, uint8_t id)
-{
-    DEBUG_ONLY(check_valid_header(addr))
-    return *(uint8_t*)(uint32_t)addr = id;
-}
+    if (blk->size + blk->neg_size || blk->self != blk)
+        malloc_panic();
 
-static __always_inline uint16_t set_size_of(uint16_t addr, uint16_t size)
-{
-    DEBUG_ONLY(check_valid_header(addr))
-    return *(uint16_t*)(uint32_t)(addr + 1) = size;
-}
+    do {
+        blk_hdr_t *next = next_blk(blk);
 
-static __always_inline uint16_t inc_size_of(uint16_t addr, uint16_t inc)
-{
-    DEBUG_ONLY(check_valid_header(addr))
-    return *(uint16_t*)(uint32_t)(addr + 1) += inc;
-}
+        if (next->size + next->neg_size || next->self != next)
+            malloc_panic();
 
-// This controls alignment
-static uint16_t malloc_next_header(uint16_t addr)
-{
-    // Is there enough room to squeeze header in
-    // after previous block and before this block?
-    if ((addr & 0x0F) <= 0x0D) {
-        // Nice, header will fit after previous block
-        addr = (addr & ~15) | 0x0D;
-    } else {
-        // Won't fit, move forward to next 16-byte aligned area
-        addr = ((addr + 16) & ~15) | 0x0D;
-    }
+        // Coalesce adjacent consecutive free blocks
+        while (blk->sig == blk_hdr_t::FREE && next->sig == blk_hdr_t::FREE) {
+            blk->size += next->size;
+            blk->neg_size = -blk->size;
 
-    return addr;
-}
+            next->self = nullptr;
+            next->size = 0xBAD11111;
+            next->neg_size = 0;
 
-static uint8_t malloc_take_id()
-{
-    uint8_t id = ++__heap.alloc_id;
+            // Enforce that malloc_rover is always pointing to a block header
+            if (first_free == next)
+                first_free = blk;
 
-    // Don't let next allocation id be 0xFF or 0x00
-    __heap.alloc_id += (__heap.alloc_id == 0xFE) << 1;
+            next = next_blk(blk);
+        }
 
-    return id;
-}
+        if (blk->sig == blk_hdr_t::FREE) {
+            if (first_free > blk || first_free->sig == blk_hdr_t::USED)
+                first_free = blk;
 
-static void debug_ff(uint16_t addr)
-{
-    (void)addr;
-//    print_line("FF=%x", addr);
-}
+            // Calculate how much more we would need to align the payload
+            size_t align_adj =
+                    ((uintptr_t(blk + 1) + alignment - 1) & -alignment) -
+                    uintptr_t(blk + 1);
 
-void *malloc(uint16_t bytes)
-{
-    uintptr_t addr;
-    uintptr_t best_size = 0;
-    uintptr_t best_addr;
+            if (blk->size >= bytes + align_adj) {
+                // Found a sufficiently large free block
 
-    // Initialize heap if necessary
-    if (!__heap.heap_ready) {
-        memset(&__heap, 0, __heap_end - (char*)&__heap);
+                if (align_adj) {
+                    // Split the free block into two, and position the second
+                    // one so its payload is at the alignment boundary
+                    blk_hdr_t *aligned_hdr =
+                            (blk_hdr_t*)(uintptr_t(blk) + align_adj);
+                    aligned_hdr->size = blk->size - align_adj;
+                    aligned_hdr->neg_size = -aligned_hdr->size;
+                    aligned_hdr->self = aligned_hdr;
+                    aligned_hdr->sig = blk_hdr_t::FREE;
 
-        __heap.heap_ready = 1;
+                    if (first_free > aligned_hdr)
+                        first_free = aligned_hdr;
 
-        // Mark end of heap with special id 0xFF
-        addr = addr_of(__heap_end);
-        addr = malloc_next_header(addr);
-        set_id_of(addr, 0xFF);
-        set_size_of(addr, 0);
-
-        // Create free block for entire size of heap
-        addr = malloc_next_header(addr_of(&__heap));
-        set_id_of(addr, 0);
-        set_size_of(addr, addr_of(__heap_end) - payload_of(addr));
-
-        __heap.first_header = addr;
-        __heap.first_free = addr;
-        debug_ff(addr);
-    }
-
-    bool seen_free = false;
-    addr = __heap.first_free;
-
-    for (;;) {
-        addr = malloc_next_header(addr);
-
-        // See if this block is free
-        uint8_t id = id_of(addr);
-        uint16_t size = size_of(addr);
-
-        // See if we reached the end of the heap
-        if (id == 0xFF)
-            break;
-
-        if (id == 0) {
-            // Yes, it is free
-
-            if (!seen_free) {
-                seen_free = true;
-
-                // Make first free precise
-                if (__heap.first_free != addr) {
-                    __heap.first_free = addr;
-                    debug_ff(addr);
+                    blk->size = align_adj;
+                    blk->neg_size = -blk->size;
+                    blk = aligned_hdr;
                 }
+
+                size_t remain = blk->size - bytes;
+
+                if (remain > 16) {
+                    // Take some of the block
+                    // Make new block with unused portion
+                    next = (blk_hdr_t*)(uintptr_t(blk) + bytes);
+
+                    next->size = remain;
+                    next->neg_size = -next->size;
+                    next->sig = blk_hdr_t::FREE;
+                    next->self = next;
+                }
+
+                blk->size = bytes;
+                blk->neg_size = -blk->size;
+                blk->sig = blk_hdr_t::USED;
+
+                return blk + 1;
             }
+        }
 
-            // See if we can coalesce this block with the next
-            uint16_t next_header = malloc_next_header(addr + size + 3);
-            uint16_t next_size = size_of(next_header);
-
-            if (next_size && id_of(next_header) == 0) {
-                // Free space rover can't possibly point to the
-                // block we coalesce because this block is free
-                // and freeing moves it back
-
-                // Coalesce
-                inc_size_of(addr, next_size + 3);
-                continue;
-            }
-
-            // If it is big enough and is better fit
-            if (size >= bytes && (best_size == 0 || best_size > size)) {
-                // Found better fit
-                best_addr = addr;
-                best_size = size;
-            }
-
-            addr += size + 3;
+        if (blk->size > 0) {
+            blk = next;
         } else {
-            // Not free, skip forward to next header
-            addr += size + 3;
+            // Reached the end of the heap, wrap around
+            blk = heap_st;
         }
-    }
+    } while (blk != start_pos);
 
-    // See if a sufficient free block was found
-    if (best_size == 0)
-        return 0;
-
-    // Mark taken block as not free
-    set_id_of(best_addr, malloc_take_id());
-
-    // Figure out where the header would be immediately after needed space
-    uint16_t new_header = malloc_next_header(best_addr + 3 + bytes);
-
-    // Figure out where the next header is, after currently free space
-    uint16_t next_header = malloc_next_header(best_addr + 3 + best_size);
-
-    // Insert a new free block, if there is sufficient space
-    if (next_header - new_header >= 32)
-    {
-        // Make free block after space we took
-        set_id_of(new_header, 0);
-        set_size_of(new_header, next_header - new_header - 3);
-
-        // Reduce the size of the block we took
-        set_size_of(best_addr, new_header - best_addr - 3);
-
-        // Move free block rover forward if we split first free block
-        if (__heap.first_free == best_addr) {
-            __heap.first_free = new_header;
-            debug_ff(new_header);
-        }
-    }
-
-    // Maybe __heap.first_free still points to this block?
-    // That's okay. Only freeing and coalescing blocks moves it back.
-    // Only splitting the first free block moves it forward
-
-    MALLOC_TRACE("near malloc %u bytes returns segment %x\n",
-                 bytes, (size_t)payload_ptr_of(best_addr));
-
-    return payload_ptr_of(best_addr);
+    return nullptr;
 }
 
 void free(void *p)
@@ -302,21 +194,17 @@ void free(void *p)
     if (!p)
         return;
 
-    uint16_t addr = addr_of(p);
+    blk_hdr_t *blk = (blk_hdr_t*)p - 1;
 
-    if (__heap.first_header + 3 > addr)
-        debug_break();
+    if (blk->sig != blk_hdr_t::USED)
+        HALT("Bad free call, block signature is not USED");
 
-    // Mark as free
-    set_id_of(addr - 3, 0);
+    if (blk->size + blk->neg_size || blk->self != blk)
+        HALT("Bad free call, header corrupted");
 
-    // Move free space rover back to this block
-    // if this block is before the old first free
-    // block
-    if (__heap.first_free > addr) {
-        __heap.first_free = addr - 3;
-        debug_ff(addr);
-    }
+    blk->sig = blk_hdr_t::FREE;
+    if (first_free > blk)
+        first_free = blk;
 }
 
 void *calloc(unsigned num, unsigned size)
@@ -327,104 +215,6 @@ void *calloc(unsigned num, unsigned size)
     return block;
 }
 
-#ifndef NDEBUG
-
-static uint16_t *alloc_random_block()
-{
-    uint16_t size = rand_range(8, 512) >> 1;
-    uint16_t *block = (uint16_t*)malloc(size * sizeof(uint16_t));
-
-    if (!block) {
-        print_line("Warning, malloc failed, size=%d", size);
-        return 0;
-    }
-
-    uint16_t addr = addr_of(block);
-
-    block[0] = size;
-    block[1] = ~size ^ addr;
-    for (uint16_t i = 2; i < size; ++i)
-        block[i] = (0x8000 + i) ^ addr;
-    return block;
-}
-
-static void check_random_block(uint16_t *block)
-{
-    uint16_t size = block[0];
-
-    if (size < 4)
-    {
-        print_line("check_random_block failed, size=%d", size);
-        debug_break();
-    }
-
-    uint16_t addr = addr_of(block);
-    uint16_t expect = ~size ^ addr;
-    uint16_t got = block[1];
-
-    if (got != expect) {
-        print_line("check_random_block failed,"
-                   " expected=%d, value=%d", expect, got);
-        debug_break();
-    }
-
-    for (uint16_t i = 2; i < size; ++i)
-    {
-        expect = (0x8000 + i) ^ addr;
-        got = block[i];
-        if (got != expect) {
-            print_line("check_random_block failed,"
-                       " expected=%d, value=%d", expect, got);
-            debug_break();
-        }
-    }
-}
-
-#define TEST_SIZE 48
-void test_malloc()
-{
-    uint16_t *ptrs[TEST_SIZE];
-    uint32_t const iters = 0xFFFFFF;
-
-    // Populate with random blocks
-    for (uint16_t i = 0; i < TEST_SIZE; ++i) {
-        ptrs[i] = alloc_random_block();
-
-        if (!ptrs[i])
-            debug_break();
-    }
-
-    for (uint32_t i = 0; i < iters; ++i)
-    {
-        // Pick something to free
-        uint16_t f = rand_range(0, TEST_SIZE);
-        if (ptrs[f])
-            check_random_block(ptrs[f]);
-        free(ptrs[f]);
-
-        ptrs[f] = alloc_random_block();
-        if (!ptrs[f])
-            debug_break();
-
-        if (!(i & 0xFFFF))
-            print_line("Iter %ld", i);
-    }
-
-    // Free everything
-    for (uint16_t i = 0; i < TEST_SIZE; ++i)
-        free(ptrs[i]);
-
-    // Try huge allocation and make sure it fails
-    // Also coalesces all free blocks
-    ptrs[0] = (uint16_t *)malloc(0xFFFF);
-
-    // Should fail
-    if (ptrs[0])
-        debug_break();
-}
-
-#endif
-
 void *operator new(size_t size) noexcept
 {
     return malloc(size);
@@ -434,6 +224,11 @@ __const
 void *operator new(size_t, void *p) noexcept
 {
     return p;
+}
+
+void *operator new[](size_t size) noexcept
+{
+    return malloc(size);
 }
 
 void operator delete(void *block, unsigned long size) noexcept

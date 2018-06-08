@@ -10,6 +10,9 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +MULTILIB_OPTIONS  += m32
 +MULTILIB_DIRNAMES  += 32
 +
++MULTILIB_OPTIONS  += fPIE
++MULTILIB_DIRNAMES  += PIE
++
 +MULTILIB_OPTIONS  += mrtd
 +MULTILIB_DIRNAMES  += rtd
 +

@@ -1,5 +1,5 @@
 #include "cpu_constants.h"
-#include "gdt.h"
+#include "gdt_sel.h"
 
 .code16
 .section .text, "ax"
@@ -21,7 +21,11 @@ ap_entry:
     movw %ax,%ss
     movl $0x0000FFF0,%esp
 
+#ifndef __efi
     lgdtl gdtr
+#else
+    // fixme!!!
+#endif
 
     // Calculate the linear address of this trampoline from cs register
     xor %ecx,%ecx

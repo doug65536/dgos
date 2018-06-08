@@ -1,4 +1,4 @@
-$(top_builddir)/fatdisk.img: mbr-bin bootfat-bin user-shell \
+$(top_builddir)/fatdisk.img: mbr-bin bootfat-bin bootefi-pe user-shell \
 		diskfat.mk \
 		$(top_srcdir)/populate_fat.sh \
 		$(top_srcdir)/mkposixdirs.sh \

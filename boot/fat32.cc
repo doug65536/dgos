@@ -24,25 +24,21 @@ static char *fat_buffer;
 uint32_t fat_buffer_lba;
 
 static uint32_t next_cluster(uint64_t current_cluster,
-                             char *sector, uint8_t *err_ptr);
+                             char *sector, bool *ok_ptr);
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
-// Returns
-static uint8_t read_bpb(uint64_t partition_lba)
+static bool read_bpb(uint64_t partition_lba)
 {
     sector_buffer = (char*)malloc(512);
     fat_buffer = (char*)malloc(512);
 
-    uint8_t err = read_lba_sectors(
-                sector_buffer,
-                boot_drive, partition_lba, 1);
-    if (err)
-        return err;
+    if (!read_lba_sectors(sector_buffer, partition_lba, 1))
+        return false;
 
     fat32_parse_bpb(&bpb, partition_lba, sector_buffer);
 
-    return 0;
+    return true;
 }
 
 static uint32_t lba_from_cluster(uint32_t cluster)
@@ -66,7 +62,7 @@ static int fat32_sector_iterator_begin(
         char *sector,
         uint64_t cluster)
 {
-    iter->err = 0;
+    iter->ok = true;
     iter->start_cluster = cluster;
     iter->cluster = cluster;
     iter->position = 0;
@@ -74,29 +70,29 @@ static int fat32_sector_iterator_begin(
 
     // Cache cluster chain
     int cluster_count = 0;
-    for (int walk = cluster; walk; ++cluster_count)
-        walk = next_cluster(walk, nullptr, &iter->err);
+    for (int walk = cluster; walk; ++cluster_count) {
+        walk = next_cluster(walk, nullptr, &iter->ok);
+        if (!iter->ok)
+            return -1;
+    }
 
     iter->cluster_count = cluster_count;
-    iter->clusters.segment = far_malloc(sizeof(uint32_t) *
-                                        (cluster_count - 1));
-    iter->clusters.offset = 0;
+    iter->clusters = new uint32_t[cluster_count];
 
     cluster_count = 0;
     for (int walk = cluster; walk; ++cluster_count) {
-        far_copy_from(far_adj(iter->clusters,
-                              cluster_count * sizeof(uint32_t)),
-                      &walk, sizeof(uint32_t));
-        //iter->clusters[cluster_count++] = walk;
-        walk = next_cluster(walk, nullptr, &iter->err);
+        iter->clusters[cluster_count] = walk;
+        walk = next_cluster(walk, nullptr, &iter->ok);
+        if (!iter->ok)
+            return -1;
     }
 
     if (!is_eof_cluster(cluster)) {
         int32_t lba = lba_from_cluster(cluster);
 
-        iter->err = read_lba_sectors(sector, boot_drive, lba, 1);
+        iter->ok = read_lba_sectors(sector, lba, 1);
 
-        if (!iter->err)
+        if (iter->ok)
             return 1;
 
         return -1;
@@ -109,19 +105,19 @@ static int fat32_sector_iterator_begin(
 // Returns new cluster number, returns 0 at end of file
 // Returns 0xFFFFFFFF on error
 static uint32_t next_cluster(
-        uint64_t current_cluster, char *sector, uint8_t *err_ptr)
+        uint64_t current_cluster, char *sector, bool *ok_ptr)
 {
     uint32_t fat_sector_index = current_cluster >> (9-2);
     uint32_t fat_sector_offset = current_cluster & ((1 << (9-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
     uint64_t lba = bpb.first_fat_lba + fat_sector_index;
 
-    uint8_t err = 0;
+    uint8_t ok = true;
     if (fat_buffer_lba != lba) {
-        err = read_lba_sectors(fat_buffer, boot_drive, lba, 1);
-        if (err_ptr)
-            *err_ptr = err;
-        if (err)
+        ok = read_lba_sectors(fat_buffer, lba, 1);
+        if (ok_ptr)
+            *ok_ptr = ok;
+        if (!ok)
             return 0xFFFFFFFF;
         fat_buffer_lba = lba;
     }
@@ -138,10 +134,10 @@ static uint32_t next_cluster(
     if (sector) {
         lba = lba_from_cluster(current_cluster);
 
-        err = read_lba_sectors(sector, boot_drive, lba, 1);
-        if (err_ptr)
-            *err_ptr = err;
-        if (err)
+        ok = read_lba_sectors(sector, lba, 1);
+        if (ok_ptr)
+            *ok_ptr = ok;
+        if (ok)
             return 0xFFFFFFFF;
     }
 
@@ -168,7 +164,7 @@ static int sector_iterator_next(
 
         // Advance to the next cluster
         iter->cluster = next_cluster(
-                    iter->cluster, sector, &iter->err);
+                    iter->cluster, sector, &iter->ok);
 
         if (iter->cluster == 0)
             return 0;
@@ -179,10 +175,9 @@ static int sector_iterator_next(
         uint32_t lba = lba_from_cluster(iter->cluster) +
                 iter->sector_offset;
 
-        iter->err = read_lba_sectors(
-                    sector, boot_drive, lba, 1);
+        iter->ok = read_lba_sectors(sector, lba, 1);
 
-        if (iter->err)
+        if (!iter->ok)
             return -1;
     }
 
@@ -200,7 +195,7 @@ static int sector_iterator_seek(
         return is_eof_now ? 0 : 1;
     }
 
-    //print_line("Seeking to %u\n", sector_offset);
+    //PRINT("Seeking to %u\n", sector_offset);
 
     uint32_t cluster_index = sector_offset / bpb.sec_per_cluster;
     uint32_t cluster_offset = sector_offset % bpb.sec_per_cluster;
@@ -211,13 +206,10 @@ static int sector_iterator_seek(
         return 0;
 
     uint32_t cluster;
-    far_copy_to(&cluster, far_adj(iter->clusters,
-                                  cluster_index * sizeof(uint32_t)),
-                sizeof(uint32_t));
+    cluster = iter->clusters[cluster_index];
     uint32_t lba = lba_from_cluster(cluster);
-    iter->err = read_lba_sectors(sector, boot_drive,
-                     lba + cluster_offset, 1);
-    if (iter->err)
+    iter->ok = read_lba_sectors(sector, lba + cluster_offset, 1);
+    if (!iter->ok)
         return -1;
 
     return 1;
@@ -253,14 +245,14 @@ static uint8_t lfn_checksum(char const *fcb_name)
    return sum;
 }
 
-// Returns
 static fat32_dir_union_t const *read_directory_current(
         dir_iterator_t const *iter,
         char const* sector)
 {
-    if (iter->dir_file.err == 0)
+    if (iter->dir_file.ok)
         return (fat32_dir_union_t const*)sector + iter->sector_index;
-    return 0;
+
+    return nullptr;
 }
 
 static int16_t read_directory_move_next(
@@ -665,10 +657,10 @@ static int fat32_boot_close(int file)
     int result = 0;
 
     // Fail the close if the file is in error state
-    if (file_handles[file].err)
+    if (!file_handles[file].ok)
         result = -1;
 
-    //free(file_handles[file].clusters);
+    delete[] file_handles[file].clusters;
 
     // Mark as available
     memset(file_handles + file, 0, sizeof(*file_handles));
@@ -733,36 +725,35 @@ void fat32_boot_partition(uint64_t partition_lba)
 
     paging_init();
 
-    print_line("Booting partition at LBA %llu", partition_lba);
+    PRINT("Booting partition at LBA %llu", partition_lba);
 
-    uint8_t err = read_bpb(partition_lba);
-    if (err) {
-        print_line("Error reading BPB!");
+    if (!read_bpb(partition_lba)) {
+        PRINT("Error reading BPB!");
         return;
     }
 
     fat32_serial = bpb.serial;
 
     // 0x2C LBA
-    print_line("root_dir_start:	  %ld", bpb.root_dir_start);
+    PRINT("root_dir_start:	  %ld", bpb.root_dir_start);
 
     // 0x24 1 per 128 clusters
-    print_line("sec_per_fat:      %ld", bpb.sec_per_fat);
+    PRINT("sec_per_fat:      %ld", bpb.sec_per_fat);
 
     // 0x0E Usually 32
-    print_line("reserved_sectors: %d", bpb.reserved_sectors);
+    PRINT("reserved_sectors: %d", bpb.reserved_sectors);
 
     // 0x0B Always 512
-    print_line("bytes_per_sec:	  %d", bpb.bytes_per_sec);
+    PRINT("bytes_per_sec:	  %d", bpb.bytes_per_sec);
 
     // 0x1FE Always 0xAA55
-    print_line("signature:		  %x", bpb.signature);
+    PRINT("signature:		  %x", bpb.signature);
 
     // 0x0D 8=4KB cluster
-    print_line("sec_per_cluster:  %d", bpb.sec_per_cluster);
+    PRINT("sec_per_cluster:  %d", bpb.sec_per_cluster);
 
     // 0x10 Always 2
-    print_line("number_of_fats:	  %d", bpb.number_of_fats);
+    PRINT("number_of_fats:	  %d", bpb.number_of_fats);
 
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_close = fat32_boot_close;

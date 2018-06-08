@@ -14,5 +14,8 @@ cp -u hello.km stage/hello.km || exit
 cp -u user-shell stage || exit
 cp -u "$TOPSRC/user/background.png" stage || exit
 
+mkdir -p stage/EFI/boot || exit
+cp -u bootefi-pe stage/EFI/boot/bootia32.efi || exit
+
 echo Populating FAT image
-mcopy -i "$IMG" stage/* ::/ || exit
+mcopy -s -Q -i "$IMG" stage/* ::/ || exit
