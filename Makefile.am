@@ -45,15 +45,15 @@ libmbr_a_SOURCES = \
 
 libmbr_a_CFLAGS = \
 	-DFROMCFLAGS \
-	$(REAL_MODE_FLAGS)
+	$(BOOTLOADER_FLAGS)
 
 libmbr_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
-	$(REAL_MODE_FLAGS)
+	$(BOOTLOADER_FLAGS)
 
 libmbr_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -69,18 +69,18 @@ mbr_elf_SOURCES = \
 	mbr/empty.cc
 
 mbr_elf_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_elf_CFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(NO_PIC_FLAGS)
 
 mbr_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS) -static
@@ -107,19 +107,19 @@ mbr_bin_SOURCES = \
 	mbr/empty.cc
 
 mbr_bin_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_bin_CFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 mbr_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	-Wl,-m,elf_i386 \
 	-Wl,--oformat,binary \
@@ -199,7 +199,7 @@ libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot/include
 
 libbootsect_a_CXXFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
@@ -217,7 +217,7 @@ libbootsect_a_CXXFLAGS = \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
@@ -234,7 +234,7 @@ libbootsect_a_CFLAGS = \
 	$(COMPILER_FLAGS)
 
 libbootsect_a_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -253,7 +253,7 @@ bootfat_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -261,7 +261,7 @@ bootfat_elf_CCASFLAGS = \
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_elf_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -293,7 +293,7 @@ bootfat_bin_CCASFLAGS = \
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -322,17 +322,17 @@ bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_elf_CCASFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-# $(REAL_MODE_FLAGS)
+# $(BOOTLOADER_FLAGS)
 
 bootiso_elf_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -360,10 +360,10 @@ bootiso_bin_CXXFLAGS = \
 bootiso_bin_CCASFLAGS = \
 	$(bootiso_elf_CCASFLAGS)
 
-# $(REAL_MODE_FLAGS)
+# $(BOOTLOADER_FLAGS)
 
 bootiso_bin_LDFLAGS = \
-	$(REAL_MODE_FLAGS) \
+	$(BOOTLOADER_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \

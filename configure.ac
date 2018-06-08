@@ -166,14 +166,14 @@ do
 done
 AC_SUBST([FREESTANDING_FLAGS])
 
-REAL_MODE_FLAGS=
+BOOTLOADER_FLAGS=
 for flag in m32 mgeneral-regs-only
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[REAL_MODE_FLAGS+=" -$flag"]
+		[BOOTLOADER_FLAGS+=" -$flag"]
 		[], [$COMPILER_WERROR])
 done
-AC_SUBST([REAL_MODE_FLAGS])
+AC_SUBST([BOOTLOADER_FLAGS])
 
 NO_LTO_FLAGS=
 for flag in m32 fno-lto
@@ -193,8 +193,7 @@ do
 done
 AC_SUBST([REGPARM_FLAGS])
 
-GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $REAL_MODE_FLAGS -print-libgcc-file-name)
-#GCC_REALMODE_LIB="-static-libgcc -lgcc"
+GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $BOOTLOADER_FLAGS -print-libgcc-file-name)
 AC_SUBST([GCC_REALMODE_LIB])
 
 NO_PIC_FLAGS=

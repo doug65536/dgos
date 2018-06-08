@@ -604,7 +604,7 @@ NO_PIC_FLAGS
 GCC_REALMODE_LIB
 REGPARM_FLAGS
 NO_LTO_FLAGS
-REAL_MODE_FLAGS
+BOOTLOADER_FLAGS
 FREESTANDING_FLAGS
 SMALLEST_CODE_FLAGS
 ASM_DEBUG_INFO_FLAGS
@@ -7417,7 +7417,7 @@ fi
 done
 
 
-REAL_MODE_FLAGS=
+BOOTLOADER_FLAGS=
 for flag in m32 mgeneral-regs-only
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
@@ -7452,7 +7452,7 @@ eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
-  REAL_MODE_FLAGS+=" -$flag"
+  BOOTLOADER_FLAGS+=" -$flag"
 
 else
   $COMPILER_WERROR
@@ -7549,8 +7549,7 @@ fi
 done
 
 
-GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $REAL_MODE_FLAGS -print-libgcc-file-name)
-#GCC_REALMODE_LIB="-static-libgcc -lgcc"
+GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $BOOTLOADER_FLAGS -print-libgcc-file-name)
 
 
 NO_PIC_FLAGS=
