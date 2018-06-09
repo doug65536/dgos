@@ -174,6 +174,7 @@ libbootsect_a_SOURCES = \
 	boot/part.s \
 	boot/mpentry.S \
 	boot/exception.s \
+	boot/likely.h \
 	boot/part.h \
 	boot/vesainfo.h \
 	boot/progressbar.h \

@@ -25,6 +25,7 @@ include/bootloader.h
 include/physmem_data.h
 include/vesainfo.h
 include/farptr.h
+likely.h
 mpentry.S
 physmem_bios.cc
 physmem_efi.cc
