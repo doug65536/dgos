@@ -4,10 +4,13 @@
 
 void *malloc(size_t bytes);
 void *calloc(unsigned num, unsigned size);
+
 void free(void *p);
 
-void *far_malloc(uint32_t bytes);
 void *malloc_aligned(size_t bytes, size_t alignment);
+
+void *realloc(void *p, size_t bytes);
+void *realloc_aligned(void *p, size_t bytes, size_t alignment);
 
 #ifndef NDEBUG
 void test_malloc();

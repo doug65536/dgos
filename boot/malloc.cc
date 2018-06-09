@@ -4,6 +4,7 @@
 #include "bootsect.h"
 #include "rand.h"
 #include "farptr.h"
+#include "likely.h"
 
 #define MALLOC_DEBUG 0
 #if MALLOC_DEBUG
@@ -80,19 +81,45 @@ static blk_hdr_t *next_blk(blk_hdr_t *blk)
     return (blk_hdr_t*)(uintptr_t(blk) + blk->size);
 }
 
+__noreturn void malloc_panic()
+{
+    HALT("Corrupt heap block header!");
+}
+
+static void malloc_invalidate(blk_hdr_t *blk)
+{
+    blk->self = nullptr;
+    blk->size = 0xBAD11111;
+    blk->neg_size = 0;
+}
+
+static blk_hdr_t *malloc_coalesce(blk_hdr_t *blk, blk_hdr_t *next)
+{
+    // Coalesce adjacent consecutive free blocks
+    while (blk->sig == blk_hdr_t::FREE && next->sig == blk_hdr_t::FREE) {
+        blk->size += next->size;
+        blk->neg_size = -blk->size;
+
+        malloc_invalidate(next);
+
+        // Enforce that malloc_rover is always pointing to a block header
+        if (first_free == next)
+            first_free = blk;
+
+        next = next_blk(blk);
+    }
+
+    return next;
+}
+
 void __aligned(16) *malloc(size_t bytes)
 {
     return malloc_aligned(bytes, 16);
 }
 
-void malloc_panic()
-{
-    HALT("Corrupt heap block header!");
-}
-
 void *malloc_aligned(size_t bytes, size_t alignment)
 {
-    if (bytes == 0)
+    if (unlikely(bytes == 0))
         return nullptr;
 
     // Remember starting point so we know when we have searched whole heap
@@ -102,30 +129,16 @@ void *malloc_aligned(size_t bytes, size_t alignment)
     // Round up to a multiple of 16 bytes, increase by size of block header
     bytes = ((bytes + 15) & -16) + sizeof(blk_hdr_t);
 
-    if (blk->size + blk->neg_size || blk->self != blk)
+    if (unlikely(blk->size + blk->neg_size || blk->self != blk))
         malloc_panic();
 
     do {
         blk_hdr_t *next = next_blk(blk);
 
-        if (next->size + next->neg_size || next->self != next)
+        if (unlikely(next->size + next->neg_size || next->self != next))
             malloc_panic();
 
-        // Coalesce adjacent consecutive free blocks
-        while (blk->sig == blk_hdr_t::FREE && next->sig == blk_hdr_t::FREE) {
-            blk->size += next->size;
-            blk->neg_size = -blk->size;
-
-            next->self = nullptr;
-            next->size = 0xBAD11111;
-            next->neg_size = 0;
-
-            // Enforce that malloc_rover is always pointing to a block header
-            if (first_free == next)
-                first_free = blk;
-
-            next = next_blk(blk);
-        }
+        next = malloc_coalesce(blk, next);
 
         if (blk->sig == blk_hdr_t::FREE) {
             if (first_free > blk || first_free->sig == blk_hdr_t::USED)
@@ -159,9 +172,11 @@ void *malloc_aligned(size_t bytes, size_t alignment)
 
                 size_t remain = blk->size - bytes;
 
-                if (remain > 16) {
+                if (remain) {
                     // Take some of the block
                     // Make new block with unused portion
+                    // It might be so small that there is a zero sized
+                    // payload area, but it will coalesce eventually
                     next = (blk_hdr_t*)(uintptr_t(blk) + bytes);
 
                     next->size = remain;
@@ -189,20 +204,104 @@ void *malloc_aligned(size_t bytes, size_t alignment)
     return nullptr;
 }
 
+void *realloc(void *p, size_t bytes)
+{
+    return realloc_aligned(p, bytes, 16);
+}
+
+// Note, alignment is only used when forced to allocate a new block
+// Expanding or shrinking a block in-place ignores alignment parameter
+void *realloc_aligned(void *p, size_t bytes, size_t alignment)
+{
+    if (unlikely(!p))
+        return malloc_aligned(bytes, alignment);
+
+    blk_hdr_t *blk = (blk_hdr_t*)p - 1;
+
+    if (unlikely(blk->size + blk->neg_size || blk->self != blk))
+        malloc_panic();
+
+    bytes = ((bytes + 15) & -16) + sizeof(blk_hdr_t);
+
+    blk_hdr_t *next = next_blk(blk);
+
+    if (blk->size < bytes) {
+        // Try to expand block in-place
+
+        if (unlikely(next->size + next->neg_size || next->self != blk))
+            malloc_panic();
+
+        // If we are expanding and the next block is free
+        // then coalesce free blocks after the next block
+        if (blk->size < bytes && next->sig == blk_hdr_t::FREE)
+            next = malloc_coalesce(next, next_blk(next));
+
+        if (next->sig == blk_hdr_t::FREE && blk->size + next->size >= bytes) {
+            // Expand in place
+
+            blk_hdr_t *new_blk = (blk_hdr_t*)(uintptr_t(blk) + bytes);
+
+            new_blk->size = uintptr_t(next) - uintptr_t(new_blk);
+            new_blk->neg_size = -new_blk->size;
+            new_blk->sig = blk_hdr_t::FREE;
+            new_blk->self = new_blk;
+
+            blk->size = uintptr_t(new_blk) - uintptr_t(blk);
+            blk->neg_size = -blk->size;
+
+            malloc_invalidate(next);
+
+            return blk + 1;
+        }
+
+        // Unable to expand in place
+        void *other_blk = malloc_aligned(bytes, alignment);
+        if (!other_blk)
+            return nullptr;
+
+        memcpy(other_blk, blk + 1, blk->size - sizeof(*blk));
+
+        blk->sig = blk_hdr_t::FREE;
+        if (first_free > blk)
+            first_free = blk;
+
+        return other_blk;
+    }
+
+    if (blk->size > bytes) {
+        // Shrink the block
+        blk_hdr_t *new_blk = (blk_hdr_t*)(uintptr_t(blk) + bytes);
+
+        new_blk->size = uintptr_t(next) - uintptr_t(new_blk);
+        new_blk->neg_size = -new_blk->size;
+        new_blk->self = new_blk;
+        new_blk->sig = blk_hdr_t::FREE;
+
+        blk->size = uintptr_t(new_blk) - uintptr_t(blk);
+        blk->neg_size = -blk->size;
+
+        return blk + 1;
+    }
+
+    // Block size did not change, do nothing
+    return blk + 1;
+}
+
 void free(void *p)
 {
-    if (!p)
+    if (unlikely(!p))
         return;
 
     blk_hdr_t *blk = (blk_hdr_t*)p - 1;
 
-    if (blk->sig != blk_hdr_t::USED)
+    if (unlikely(blk->sig != blk_hdr_t::USED))
         HALT("Bad free call, block signature is not USED");
 
-    if (blk->size + blk->neg_size || blk->self != blk)
-        HALT("Bad free call, header corrupted");
+    if (unlikely(blk->size + blk->neg_size || blk->self != blk))
+        malloc_panic();
 
     blk->sig = blk_hdr_t::FREE;
+
     if (first_free > blk)
         first_free = blk;
 }
