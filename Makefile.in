@@ -2188,16 +2188,18 @@ QEMU_COMMON = \
 
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
-QEMU_HDCTL_DEV_nvme = \
+QEMU_HDCTL_DEV_nvme_fat = \
 	-machine q35 \
 	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0
 
-QEMU_HDCTL_DEV_usb = \
+QEMU_HDCTL_DEV_usb_fat = \
 	-machine q35 \
 	-device usb-storage,bus=xhci.0,drive=bootdrv,bootindex=0
 
-QEMU_HDCTL_DEV_ahci = -machine q35
-QEMU_HDCTL_DEV_ide = -machine pc
+QEMU_HDCTL_DEV_ahci_fat = -machine q35
+QEMU_HDCTL_DEV_ahci_iso = -machine q35
+QEMU_HDCTL_DEV_ide_fat = -machine pc
+QEMU_HDCTL_DEV_ide_iso = -machine pc
 QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none,id=bootdrv
 QEMU_DIF_ahci = 
 QEMU_DIF_ide = 
@@ -2205,7 +2207,7 @@ QEMU_DIF_usb = ,if=none
 QEMU_MEDIA_fat = disk
 QEMU_MEDIA_iso = cdrom
 QEMU_IMAGE_fat = fatdisk.img
-QEMU_IMAGE_iso = isodisk.img -boot d
+QEMU_IMAGE_iso = isodisk.img
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)

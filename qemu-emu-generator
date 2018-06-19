@@ -15,7 +15,7 @@ do
 					do
 						IMG="\$(QEMU_IMAGE_$fs)"
 						QUP="\$(QEMU_NP_$np)"
-						CTL="\$(QEMU_HDCTL_DEV_$sc)"
+						CTL="\$(QEMU_HDCTL_DEV_{$sc}_{$fs})"
 						DIF="\$(QEMU_DIF_$sc)"
 						QM="\$(QEMU_MEDIA_$fs)"
 						BOOT="\$(QEMU_BOOT_$bt)"
