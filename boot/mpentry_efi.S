@@ -5,17 +5,6 @@
 .code16
 .section .smp.entry
 
-.macro message txt
-    mov %cx,%bp
-    mov %al,%cl
-    mov $\txt,%al
-    outb %al,$0xe9
-    mov $'\n',%al
-    outb %al,$0xe9
-    mov %cl,%al
-    mov %bp,%cx
-.endm
-
 // This must be position independent code
 // Note that this code is called with the cs set to
 // some segment and ip is zero
@@ -122,8 +111,6 @@ pm_entry:
     rdmsr
     or $ CPU_MSR_EFER_LME,%eax
     wrmsr
-
-    message 'h'
 
     // Enable paging
     mov %cr0,%eax
