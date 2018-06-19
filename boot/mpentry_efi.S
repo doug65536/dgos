@@ -128,8 +128,7 @@ lm_entry:
     // rdi = linear address of mp_entry_point and load entry point
     mov $smp_entry_point,%esi
     sub $ap_entry,%esi
-    add %ebx,%esi
-    mov (%esi),%rdi
+    mov (%ebx,%esi),%rdi
 
     // eax = code64_run_kernel - ap_entry + linear address of trampoline
     mov $code64_run_kernel,%eax
