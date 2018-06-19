@@ -7,7 +7,7 @@
 #include "malloc.h"
 #include "paging.h"
 #include "cpu.h"
-#include "bootsect.h"
+#include "diskio.h"
 #include "physmem.h"
 #include "mpentry.h"
 #include "farptr.h"

@@ -1,5 +1,5 @@
 #include "types.h"
-#include "bootsect.h"
+#include "diskio.h"
 #include "bioscall.h"
 #include "likely.h"
 #include "assert.h"

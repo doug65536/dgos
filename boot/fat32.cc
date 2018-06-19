@@ -1,6 +1,6 @@
 #include "fat32.h"
 #include "malloc.h"
-#include "bootsect.h"
+#include "diskio.h"
 #include "paging.h"
 #include "screen.h"
 #include "string.h"

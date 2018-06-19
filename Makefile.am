@@ -148,7 +148,7 @@ mbr_bin_LDADD = \
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
 	boot/bioscall.S \
-	boot/bootsect.cc \
+	boot/diskio.cc \
 	boot/ctors.cc \
 	boot/assert.cc \
 	boot/halt_bios.cc \
@@ -199,7 +199,7 @@ libbootsect_a_SOURCES = \
 	boot/fat32.h \
 	boot/string.h \
 	boot/physmem.h \
-	boot/bootsect.h \
+	boot/diskio.h \
 	boot/malloc.h \
 	boot/fs.h \
 	boot/vesa.h \

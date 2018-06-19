@@ -1,6 +1,6 @@
 #include "iso9660.h"
 #include "malloc.h"
-#include "bootsect.h"
+#include "diskio.h"
 #include "paging.h"
 #include "string.h"
 #include "cpu.h"

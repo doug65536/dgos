@@ -1,7 +1,7 @@
 #include "malloc.h"
 #include "screen.h"
 #include "string.h"
-#include "bootsect.h"
+#include "diskio.h"
 #include "rand.h"
 #include "farptr.h"
 #include "likely.h"

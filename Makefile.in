@@ -123,7 +123,7 @@ libbootsect_a_LIBADD =
 am__dirstamp = $(am__leading_dot)dirstamp
 am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-bioscall.$(OBJEXT) \
-	boot/libbootsect_a-bootsect.$(OBJEXT) \
+	boot/libbootsect_a-diskio.$(OBJEXT) \
 	boot/libbootsect_a-ctors.$(OBJEXT) \
 	boot/libbootsect_a-assert.$(OBJEXT) \
 	boot/libbootsect_a-halt_bios.$(OBJEXT) \
@@ -141,6 +141,7 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-cpu64_bios.$(OBJEXT) \
 	boot/libbootsect_a-malloc.$(OBJEXT) \
 	boot/libbootsect_a-string.$(OBJEXT) \
+	boot/libbootsect_a-string_char16.$(OBJEXT) \
 	boot/libbootsect_a-utf.$(OBJEXT) \
 	boot/libbootsect_a-paging.$(OBJEXT) \
 	boot/libbootsect_a-elf64.$(OBJEXT) \
@@ -1093,7 +1094,7 @@ mbr_bin_LDADD = \
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
 	boot/bioscall.S \
-	boot/bootsect.cc \
+	boot/diskio.cc \
 	boot/ctors.cc \
 	boot/assert.cc \
 	boot/halt_bios.cc \
@@ -1144,7 +1145,7 @@ libbootsect_a_SOURCES = \
 	boot/fat32.h \
 	boot/string.h \
 	boot/physmem.h \
-	boot/bootsect.h \
+	boot/diskio.h \
 	boot/malloc.h \
 	boot/fs.h \
 	boot/vesa.h \
@@ -2265,7 +2266,7 @@ boot/libbootsect_a-bootcommon.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-bioscall.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
-boot/libbootsect_a-bootsect.$(OBJEXT): boot/$(am__dirstamp) \
+boot/libbootsect_a-diskio.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-ctors.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3766,7 +3767,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootcommon.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootinfo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootmenu.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bootsect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-boottable.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-boottable_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-cpu.Po@am__quote@
@@ -3775,6 +3775,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-cpuid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-ctors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-debug.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-diskio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-farptr.Po@am__quote@
@@ -4534,19 +4535,19 @@ user/test/user_shell-test.obj: user/test/test.S
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXXCOMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
-boot/libbootsect_a-bootsect.o: boot/bootsect.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-bootsect.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-bootsect.Tpo -c -o boot/libbootsect_a-bootsect.o `test -f 'boot/bootsect.cc' || echo '$(srcdir)/'`boot/bootsect.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-bootsect.Tpo boot/$(DEPDIR)/libbootsect_a-bootsect.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/bootsect.cc' object='boot/libbootsect_a-bootsect.o' libtool=no @AMDEPBACKSLASH@
+boot/libbootsect_a-diskio.o: boot/diskio.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-diskio.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-diskio.Tpo -c -o boot/libbootsect_a-diskio.o `test -f 'boot/diskio.cc' || echo '$(srcdir)/'`boot/diskio.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-diskio.Tpo boot/$(DEPDIR)/libbootsect_a-diskio.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/diskio.cc' object='boot/libbootsect_a-diskio.o' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-bootsect.o `test -f 'boot/bootsect.cc' || echo '$(srcdir)/'`boot/bootsect.cc
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-diskio.o `test -f 'boot/diskio.cc' || echo '$(srcdir)/'`boot/diskio.cc
 
-boot/libbootsect_a-bootsect.obj: boot/bootsect.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-bootsect.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-bootsect.Tpo -c -o boot/libbootsect_a-bootsect.obj `if test -f 'boot/bootsect.cc'; then $(CYGPATH_W) 'boot/bootsect.cc'; else $(CYGPATH_W) '$(srcdir)/boot/bootsect.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-bootsect.Tpo boot/$(DEPDIR)/libbootsect_a-bootsect.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/bootsect.cc' object='boot/libbootsect_a-bootsect.obj' libtool=no @AMDEPBACKSLASH@
+boot/libbootsect_a-diskio.obj: boot/diskio.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-diskio.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-diskio.Tpo -c -o boot/libbootsect_a-diskio.obj `if test -f 'boot/diskio.cc'; then $(CYGPATH_W) 'boot/diskio.cc'; else $(CYGPATH_W) '$(srcdir)/boot/diskio.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-diskio.Tpo boot/$(DEPDIR)/libbootsect_a-diskio.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/diskio.cc' object='boot/libbootsect_a-diskio.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-bootsect.obj `if test -f 'boot/bootsect.cc'; then $(CYGPATH_W) 'boot/bootsect.cc'; else $(CYGPATH_W) '$(srcdir)/boot/bootsect.cc'; fi`
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-diskio.obj `if test -f 'boot/diskio.cc'; then $(CYGPATH_W) 'boot/diskio.cc'; else $(CYGPATH_W) '$(srcdir)/boot/diskio.cc'; fi`
 
 boot/libbootsect_a-ctors.o: boot/ctors.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-ctors.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-ctors.Tpo -c -o boot/libbootsect_a-ctors.o `test -f 'boot/ctors.cc' || echo '$(srcdir)/'`boot/ctors.cc
