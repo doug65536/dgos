@@ -115,8 +115,8 @@ pm_entry:
     // Enable paging
     mov %cr0,%eax
     or $ CPU_CR0_PG,%eax
-	mov %eax,%cr0
-	ljmpl *(%edi)
+    mov %eax,%cr0
+    ljmpl *(%edi)
 
 .align 16
 lm_entry:
