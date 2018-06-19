@@ -7,17 +7,29 @@ SECTIONS {
 			(__section_alignment__ < 0x1000
 			? .
 			: __section_alignment__ ) : {
-		__initialized_data_start = .;
+		___initialized_data_st = .;
+
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
+	}
 
-		__ctors_start = .;
+	.rodata ALIGN(4K) : {
+		. = ALIGN(16);
+		___ctors_st = .;
 		*(.ctors)
-		*(.ctors.*)
+		*(SORT(.ctors.*))
 		*(.init_array)
 		*(SORT(.init_array.*))
-		__ctors_end = .;
+		___ctors_en = .;
+
+		. = ALIGN(16);
+		___dtors_st = .;
+		*(.dtors)
+		*(SORT(.dtors.*))
+		*(.fini_array)
+		*(SORT(.fini_array.*))
+		___dtors_en = .;
 
 		/* Place 64 bit code high enough to be outside first 4KB */
 		*(.text.code64)
@@ -26,13 +38,100 @@ SECTIONS {
 		*(.rodata.*)
 		*(.comment)
 
+/*
 		. = ALIGN(4K);
-		__initialized_data_end = .;
+		___initialized_data_en = .;
+*/
 	}
 
-	.got : ALIGN(4K) {
-		PROVIDE(_GLOBAL_OFFSET_TABLE_ = .);
+	.edata ALIGN(16) : { *(.edata) }
+	.reloc ALIGN(16) : { *(.reloc) }
+
+	.hash : ALIGN(64) {
+		PROVIDE_HIDDEN(___hash_st = .);
+		*(.hash);
+		PROVIDE_HIDDEN(___hash_en = .);
+	}
+
+	.dynsym : ALIGN(64) {
+		PROVIDE_HIDDEN(___dynsym_st = .);
+		*(.dynsym);
+		*(.dynsym*);
+		PROVIDE_HIDDEN(___dynsym_en = .);
+	}
+
+	.dynstr : ALIGN(64) {
+		PROVIDE_HIDDEN(___dynstr_st = .);
+		*(.dynstr);
+		*(.dynstr*);
+		PROVIDE_HIDDEN(___dynstr_en = .);
+	}
+
+	.got : ALIGN(64) {
+		PROVIDE_HIDDEN(___got = .);
 		*(.got)
+		*(.got.plt)
+	}
+
+	.rela.dyn : ALIGN(64) {
+		PROVIDE_HIDDEN(___rela_dyn = .);
+		*(.rela.init)
+		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
+		*(.rela.fini)
+		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
+		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
+		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
+		*(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
+		*(.rela.ctors)
+		*(.rela.dtors)
+		*(.rela.got)
+		*(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
+		*(.rela.ldata .rela.ldata.* .rela.gnu.linkonce.l.*)
+		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
+		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
+		*(.rela.ifunc)
+	}
+
+	.rela.plt : ALIGN(64) {
+		PROVIDE_HIDDEN(___rela_entry_start = .);
+		*(.rela.entry)
+		PROVIDE_HIDDEN(___rela_entry_end = .);
+
+		PROVIDE_HIDDEN(___rela_plt_start = .);
+		*(.rela.plt)
+		PROVIDE_HIDDEN(___rela_plt_end = .);
+
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
+	}
+
+	.plt.got : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_got = .);
+		*(.plt.got)
+	}
+
+	.plt.bnd : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_bnd = .);
+		*(.plt.bnd)
+	}
+
+	.plt : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt = .);
+		*(.plt)
+		*(.iplt)
+	}
+
+	.dynamic : ALIGN(4096) {
+		PROVIDE_HIDDEN(___dynamic_st = .);
+		*(.dynamic);
+		PROVIDE_HIDDEN(___dynamic_en = .);
+	}
+
+	.got : ALIGN(64) {
+		PROVIDE_HIDDEN(___got = .);
+		*(.got*)
+		*(.got.plt)
 	}
 
 	.data ALIGN(4K) : {
@@ -40,8 +139,20 @@ SECTIONS {
 		*(.data.*)
 	}
 
+	/* Gather all trampoline-critical code and data into this section */
+	/* It will protect data from being lost when exiting boot services */
+	/* This section is copied to a 4KB aligned heap block */
+	.smp ALIGN(4K) : {
+		___smp_st = ABSOLUTE(.);
+		*(.smp.entry)
+		*(.smp.text)
+		. = ALIGN(64);
+		*(.smp.data)
+		___smp_en = ABSOLUTE(.);
+	}
+
 	.bss : {
-		__bss_start = .;
+		___bss_start = .;
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
@@ -51,8 +162,26 @@ SECTIONS {
 		. = ALIGN(16);
 		__heap = .;
 		. += 8;
-		__bss_end = .;
+		___bss_end = .;
 	}
 
+/*
+	.eh_frame : { *(.eh_frame) }
+	.debug_info  : { *(.debug_info) }
+	.debug_abbrev : { *(.debug_abbrev) }
+	.debug_aranges : { *(.debug_aranges) }
+	.debug_ranges : { *(.debug_ranges) }
+	.debug_line : { *(.debug_line) }
+	.debug_str : { *(.debug_str) }
+*/
+
+/*
 	/DISCARD/ : { *(.eh_frame) }
+	/DISCARD/ : { *(.debug_info) }
+	/DISCARD/ : { *(.debug_abbrev) }
+	/DISCARD/ : { *(.debug_ranges) }
+	/DISCARD/ : { *(.debug_aranges) }
+	/DISCARD/ : { *(.debug_line) }
+	/DISCARD/ : { *(.debug_str) }
+*/
 }

@@ -3,6 +3,9 @@
 #include "malloc.h"
 #include "screen.h"
 #include "farptr.h"
+#include "ctors.h"
+#include "assert.h"
+#include "halt.h"
 
 // Builds 64-bit page tables
 //
@@ -25,7 +28,7 @@
 #define PAGING_TRACE(...) ((void)0)
 #endif
 
-static pte_t *root_page_dir;
+__section(".smp.data") pte_t *root_page_dir;
 
 static __always_inline pte_t *pte_ptr(pte_t *page, size_t slot)
 {
@@ -52,13 +55,15 @@ static void clear_page_table(pte_t *page)
 static pte_t *allocate_page_table()
 {
     pte_t *page = (pte_t*)malloc_aligned(PAGE_SIZE, PAGE_SIZE);
+    assert(page != nullptr);
     clear_page_table(page);
     return page;
 }
 
 // Returns with segment == 0 if it does mapping does not exist
-static pte_t *paging_find_pte(addr64_t linear_addr, bool create,
-                              uint8_t log2_pagesize = 12)
+static pte_t *paging_find_pte(addr64_t linear_addr,
+                              uint8_t log2_pagesize,
+                              bool create)
 {
     pte_t *ref = root_page_dir;
     pte_t pte;
@@ -79,14 +84,11 @@ static pte_t *paging_find_pte(addr64_t linear_addr, bool create,
         // Read page table entry
         pte = read_pte(ref, slot);
 
-        pte_t next_segment = (pte & 0xFFFFF000);
+        pte_t next_segment = (pte & PTE_ADDR);
 
         if (next_segment == 0) {
             if (!create)
                 return nullptr;
-
-            //PRINT("Creating page directory for %llx",
-            //           (pte_t)(linear_addr >> shift) << shift);
 
             // Allocate a page table on first use
             next_segment = (pte_t)allocate_page_table();
@@ -101,33 +103,6 @@ static pte_t *paging_find_pte(addr64_t linear_addr, bool create,
     return ref + slot;
 }
 
-// If keep is != 0 and the page had a mapping, return 0
-// Otherwise, return 1
-static uint16_t paging_map_page(
-        uint64_t linear_addr,
-        uint64_t phys_addr,
-        uint64_t pte_flags,
-        uint16_t keep,
-        uint8_t log2_pagesize = 12)
-{
-    pte_t *ref = paging_find_pte(linear_addr, 1, log2_pagesize);
-
-    // Read page table entry
-    uint64_t pte = *ref;
-
-    // If keep flag is set, avoid overwriting mapping
-    if (keep && (pte & PTE_ADDR))
-        return 0;
-
-    //PRINT("mapping %llx to physaddr %llx pageseg=%x slot=%x",
-    //           linear_addr, phys_addr,
-    //           ref.segment, ref.slot);
-
-    *ref = phys_addr | pte_flags;
-
-    return 1;
-}
-
 void paging_alias_range(addr64_t alias_addr,
                         addr64_t linear_addr,
                         size64_t size,
@@ -137,8 +112,8 @@ void paging_alias_range(addr64_t alias_addr,
                  size, linear_addr, alias_addr);
 
     for (uint64_t offset = 0; offset < size; offset += PAGE_SIZE) {
-        pte_t *original = paging_find_pte(linear_addr, 0);
-        pte_t *alias_ref = paging_find_pte(alias_addr, 1);
+        pte_t *original = paging_find_pte(linear_addr, 12, false);
+        pte_t *alias_ref = paging_find_pte(alias_addr, 12, false);
 
         if (original) {
             *alias_ref = (*original & PTE_ADDR) | alias_flags;
@@ -148,36 +123,170 @@ void paging_alias_range(addr64_t alias_addr,
     }
 }
 
-// If keep is 1, then only advance phys_addr when a new
-// page was assigned, otherwise
-// If keep is 2, then always advance phys_addr
-uint64_t paging_map_range(
+void paging_map_range(
+        page_factory_t *allocator,
         uint64_t linear_base,
         uint64_t length,
-        uint64_t phys_addr,
-        uint64_t pte_flags,
-        uint16_t keep,
-        uint8_t log2_pagesize)
+        uint64_t pte_flags)
 {
-    uint32_t page_size = 1U << log2_pagesize;
-    size_t misalignment = linear_base & (page_size - 1);
+    size_t misalignment = linear_base & PAGE_MASK;
     linear_base -= misalignment;
     length += misalignment;
-    length = (length + (page_size - 1)) & -(int)page_size;
+    length = (length + PAGE_MASK) & -PAGE_SIZE;
 
+    uint64_t const end = linear_base + length;
 
-    uint64_t allocated = 0;
-    for (uint64_t offset = 0; offset < length; offset += page_size) {
-        if (paging_map_page(linear_base + offset,
-                            phys_addr,
-                            pte_flags,
-                            keep, log2_pagesize) || keep > 1)
-        {
-            ++allocated;
-            phys_addr += page_size;
-        }
+    pte_t *pte = nullptr;
+
+    // Scan the region to calculate memory allocation size
+    uint64_t needed = 0;
+    for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE) {
+        // Calculate pte pointer at start and at 2MB boundaries
+        if (!pte || ((addr & -(1<<21)) == addr))
+            pte = paging_find_pte(addr, 12, true);
+
+        if (!(*pte++ & PTE_PRESENT))
+            needed += PAGE_SIZE;
     }
-    return allocated;
+
+    pte = nullptr;
+
+    // Rescan the region and assign pages to uncommitted page table entries
+    phys_alloc_t allocation{};
+    for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
+        // Calculate pte pointer at start and at 2MB boundaries
+        if (!pte || ((addr & -(1<<21)) == addr))
+            pte = paging_find_pte(addr, 12, true);
+
+        if ((*pte & PTE_PRESENT))
+            continue;
+
+        // At start and when allocation runs out of space, allocate more
+        if (!allocation.size) {
+            allocation = allocator->alloc(needed);
+            needed -= allocation.size;
+        }
+
+        *pte = allocation.base | pte_flags | PTE_PRESENT;
+        allocation.base += PAGE_SIZE;
+        allocation.size -= PAGE_SIZE;
+    }
+}
+
+int paging_iovec(iovec_t **ret, uint64_t vaddr,
+                 uint64_t size, uint64_t max_chunk)
+{
+    size_t capacity = 16;
+    iovec_t *iovec = (iovec_t*)malloc(sizeof(**ret) * capacity);
+
+    size_t count = 0;
+    size_t misalignment = vaddr & PAGE_MASK;
+    uint64_t offset = 0;
+
+    for (pte_t *pte = nullptr; offset < size; ++pte) {
+        if (!pte || ((vaddr & -(1<<21)) == vaddr))
+            pte = paging_find_pte(vaddr, 12, false);
+
+        if (unlikely(!pte))
+            PANIC("Failed to find PTE for iovec");
+
+        if (count + 1 > capacity) {
+            iovec = (iovec_t*)realloc(iovec, sizeof(*iovec) * (capacity *= 2));
+
+            if (!iovec)
+                PANIC("Out of memory growing iovec array");
+        }
+
+        uint64_t paddr = (*pte & PTE_ADDR) + misalignment;
+        uint64_t chunk = PAGE_SIZE - misalignment;
+        misalignment = 0;
+
+        if (offset + chunk > size)
+            chunk = size - offset;
+
+        iovec[count].size = chunk;
+        iovec[count].base = paddr;
+        paddr += chunk;
+        vaddr += chunk;
+
+        // If this entry is contiguous with the previous entry,
+        // and it would not exceed the specified max chunk size,
+        // then merge them
+        if (count && iovec[count-1].base + iovec[count-1].size ==
+                iovec[count].base &&
+                iovec[count-1].size + chunk <= max_chunk) {
+            iovec[count-1].size += iovec[count].size;
+        } else {
+            ++count;
+        }
+
+        offset += chunk;
+    }
+
+    assert(offset == size);
+
+    // The caller is likely to leak the memory if we tell them there are zero
+    if (!count) {
+        free(iovec);
+        iovec = nullptr;
+    }
+
+    *ret = iovec;
+    return count;
+}
+
+// Incoming pte_flags should be as if 4KB page (bit 7 is PAT bit)
+void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
+                         uint64_t length, uint64_t pte_flags)
+{
+    // Make sure the flags don't set any address bits
+    assert((pte_flags & PTE_ADDR) == 0);
+
+    // Automatically infer the optimal page size
+    size_t page_size;
+    uint8_t log2_pagesize;
+
+    page_size = 1 << 30;
+    for (log2_pagesize = 30; log2_pagesize > 12; log2_pagesize -= 9) {
+        if ((phys_addr & -page_size) == phys_addr &&
+                (linear_base & -page_size) == linear_base &&
+                (length & -page_size) == length) {
+            // Use huge page
+
+            // Move PAT bit over to PDPT/PD location
+            pte_flags |= unsigned(!!(pte_flags & PTE_PAGESIZE)) << PTE_PAT_BIT;
+
+            // Set PSE bit
+            pte_flags |= PTE_PAGESIZE;
+
+            break;
+        }
+        page_size >>= 9;
+    }
+
+    // Make sure the parameters are feasible
+    assert((phys_addr & (page_size - 1)) == (linear_base & (page_size - 1)));
+
+    // Page align and round length up to a multiple of the page size
+    size_t misalignment = linear_base & (page_size - 1);
+    linear_base -= misalignment;
+    phys_addr -= misalignment;
+    length += misalignment;
+    length = (length + page_size - 1) & -page_size;
+
+    uint64_t end = linear_base + length;
+
+    pte_t *pte = nullptr;
+
+    for (uint64_t vaddr = linear_base; vaddr < end; vaddr += page_size) {
+        // Calculate pte pointer at start
+        // or when transitioning to another table
+        if (!pte || ((vaddr & -(1 << (log2_pagesize + 9))) == vaddr))
+            pte = paging_find_pte(vaddr, log2_pagesize, true);
+
+        *pte++ = phys_addr | pte_flags;
+        phys_addr += page_size;
+    }
 }
 
 uint32_t paging_root_addr()
@@ -187,7 +296,7 @@ uint32_t paging_root_addr()
 
 // Identity map the first 64KB of physical addresses and
 // prepare to populate tables
-void paging_init()
+__constructor(500) void paging_init()
 {
     // Clear the root page directory
     root_page_dir = (pte_t*)malloc_aligned(PAGE_SIZE, PAGE_SIZE);
@@ -195,15 +304,14 @@ void paging_init()
     clear_page_table(root_page_dir);
 
     // Identity map first 64KB
-    paging_map_range(0, 0x10000, 0,
-                     PTE_PRESENT | PTE_WRITABLE, 0);
+    paging_map_physical(0, 0, 0x10000, PTE_PRESENT | PTE_WRITABLE);
 }
 
 void paging_modify_flags(addr64_t addr, size64_t size,
                          pte_t clear, pte_t set)
 {
     for (addr64_t offset = 0; offset < size; offset += PAGE_SIZE) {
-        pte_t *original = paging_find_pte(addr + offset, 0);
+        pte_t *original = paging_find_pte(addr + offset, 12, false);
         if (original) {
             pte_t pte = *original;
             pte &= ~clear;
@@ -211,4 +319,13 @@ void paging_modify_flags(addr64_t addr, size64_t size,
             *original = pte;
         }
     }
+}
+
+uint64_t paging_physaddr_of(uint64_t linear_addr)
+{
+    unsigned misalignment = linear_addr & PAGE_MASK;
+
+    pte_t *p = paging_find_pte(linear_addr - misalignment, 12, false);
+
+    return (p && *p & PTE_PRESENT) ? (*p & PTE_ADDR) + misalignment : -1;
 }

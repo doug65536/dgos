@@ -60,11 +60,11 @@ REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   8
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_MMAP_STRESS_THREAD   0
+#define ENABLE_MMAP_STRESS_THREAD   1
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
@@ -187,11 +187,14 @@ private:
             //int64_t count = rand_r_range(&seed, 1, data_blocks);
 
             status = iocp[slot].wait();
-//            if (status != errno_t::OK)
-//                printdbg("(devid %d) (tid %3d)"
-//                         " Storage read (completion failed) status=%d\n",
-//                         devid, tid, (int)status);
             iocp[slot].reset();
+            if (status != errno_t::OK) {
+                printdbg("(devid %d) (tid %3d)"
+                         " Storage read (completion failed asynchronously)"
+                         " status=%d\n",
+                         devid, tid, (int)status);
+                return 0;
+            }
             int64_t count = data_blocks;
             status = drive->read_async(data[slot], count, lba, &iocp[slot]);
             if (++slot == queue_depth)
@@ -199,10 +202,12 @@ private:
 
             //thread_sleep_for(100);
 
-//            if (status != errno_t::OK)
-//                printdbg("(devid %d) (%3d)"
-//                         " Storage read (issue failed) status=%d\n",
-//                         devid, tid, (int)status);
+            if (status != errno_t::OK) {
+                printdbg("(devid %d) (%3d)"
+                         " Storage read (issue failed) status=%d\n",
+                         devid, tid, (int)status);
+                return 0;
+            }
 
             atomic_inc(counts + (id << 6));
 
@@ -440,23 +445,26 @@ static int stress_mmap_thread(void *p)
     void *block;
     uint64_t seed = 42;
     for (;;) {
-        //uint64_t time_st = time_ns();
-        for (unsigned iter = 0; iter < 50; ++iter) {
-            int size = rand_r_range(&seed, 1, 131072);
-            assert(size >= 1);
-            assert(size < 131072);
+        for (size_t sz = 4096; sz <= (4 << 20); sz <<= 1) {
+            uint64_t time_st = time_ns();
+            for (unsigned iter = 0; iter < 10000; ++iter) {
+                //int size = rand_r_range(&seed, 1, 4 << 20);
+                //assert(size >= 1);
+                //assert(size < 131072);
 
-            block = mmap(0, size,
-                         PROT_READ | PROT_WRITE,
-                         0, -1, 0);
+                block = mmap(0, sz,
+                             PROT_READ | PROT_WRITE,
+                             0, -1, 0);
 
-            memset(block, 0xcc, size);
+                memset(block, 0xcc, sz);
 
-            munmap(block, size);
+                munmap(block, sz);
+            }
 
+            uint64_t time_en = time_ns();
+            printk("Ran mmap test iteration, sz: %7zd, time: %6lu ns\n",
+                   sz, (time_en - time_st)/10000);
         }
-        //uint64_t time_en = time_ns();
-        //printk("Ran mmap test iteration %luns\n", (time_en - time_st)/50);
     }
     return 0;
 }
@@ -839,8 +847,9 @@ static int init_thread(void *p)
 
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         for (int devid = 0; devid < dev_cnt; ++devid) {
-            printk("(devid %d) Running block read stress with %d threads\n",
-                     devid, ENABLE_READ_STRESS_THREAD);
+            printk("(devid %d, worker %d)"
+                   " Running block read stress\n",
+                     devid, i);
             read_stress_thread_t *thread = new read_stress_thread_t();
             read_stress_threads->push_back(thread);
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;

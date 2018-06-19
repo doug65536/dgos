@@ -139,7 +139,7 @@ static void keyb8042_keyboard_handler(void)
 
     case IN_E1_1:
         keyb8042.state = IN_E1_2;
-        break;
+        return;
 
     case IN_E1_2:
         keyb8042.state = NORMAL;
@@ -148,10 +148,11 @@ static void keyb8042_keyboard_handler(void)
 
     default:
         keyb8042.state = NORMAL;
-        break;
+        return;
     }
 
-    keyb8042.fsa.deliver_vk(vk * sign);
+    if (vk != 0)
+        keyb8042.fsa.deliver_vk(vk * sign);
 }
 
 static void keyb8042_process_mouse_packet(uint8_t const *packet)
@@ -450,7 +451,8 @@ void keyb8042_init(void)
         return;
 
     config &= ~KEYB_CONFIG_CLKDIS_PORT1;
-    config |= KEYB_CONFIG_IRQEN_PORT1 | KEYB_CONFIG_XLAT_PORT1;
+    config |= KEYB_CONFIG_IRQEN_PORT1;
+    //config |= KEYB_CONFIG_XLAT_PORT1;
     if (port2_exists) {
         config &= ~KEYB_CONFIG_CLKDIS_PORT2;
         config |= KEYB_CONFIG_IRQEN_PORT2;

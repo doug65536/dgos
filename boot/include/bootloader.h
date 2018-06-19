@@ -4,6 +4,8 @@
 #include "vesainfo.h"
 #include "physmem_data.h"
 #include "bootdev_info.h"
+#include "boottable.h"
+#include "assert.h"
 
 // Helper class to enforce 64 bit pointer in 32 bit code
 template<typename T>
@@ -74,17 +76,24 @@ public:
 
 private:
     uint64_t addr;
-};
+} __packed;
 
 struct alignas(8) kernel_params_t {
-    size_t size;
+    uint64_t size;
     ptr64_t<physmem_range_t> phys_mem_table;
     uint64_t phys_mem_table_size;
     ptr64_t<void(*)()> ap_entry;
     ptr64_t<vbe_info_t> vbe_info;
     ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
+    boottbl_acpi_info_t acpi_rsdt;
+    boottbl_mptables_info_t mptables;
     uint64_t boot_drv_serial;
     uint8_t wait_gdb;
     uint8_t serial_debugout;
-};
+    uint8_t reserved[6];
+} __packed;
+
+// Ensure that all of the architectures have the same layout
+C_ASSERT(sizeof(kernel_params_t) == 12 * 8 + 2 + 6);
+C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 12 * 8);

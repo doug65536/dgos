@@ -82,61 +82,12 @@ const char *cpu_choose_kernel()
         return "dgos-kernel-generic";
 }
 
-bool nx_available;
+__section(".smp.data") bool nx_available;
 uint32_t gp_available;
 
 void cpu_init()
 {
     nx_available = cpu_has_no_execute();
     gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
-}
-
-// 64-bit assembly code
-
-extern "C" void code64_run_kernel(void *p);
-extern "C" void code64_reloc_kernel(void *p);
-extern "C" void code64_copy_kernel(void *p);
-
-void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt)
-{
-    struct {
-        uint64_t distance;
-        void *elf_rela;
-        size_t relcnt;
-    } arg = {
-        distance,
-        elf_rela,
-        relcnt
-    };
-
-    run_code64(code64_reloc_kernel, &arg);
-}
-
-void run_kernel(uint64_t entry, void *param)
-{
-    struct {
-        uint64_t entry;
-        void *param;
-    } arg = {
-        entry,
-        param
-    };
-
-    run_code64(code64_run_kernel, &arg);
-}
-
-void copy_kernel(uint64_t dest_addr, void *src, size_t sz)
-{
-    struct {
-        uint64_t dest_addr;
-        void *src;
-        size_t sz;
-    } arg = {
-        dest_addr,
-        src,
-        sz
-    };
-
-    run_code64(code64_copy_kernel, &arg);
 }
 

@@ -1,16 +1,33 @@
-$(top_builddir)/fatdisk.img: mbr-bin bootfat-bin bootefi-pe user-shell \
+
+#bootia32.efi
+
+$(top_builddir)/fatdisk.img: \
+		kernel-generic \
+		kernel-generic.sym \
+		kernel-generic.dis.gz \
+		\
+		kernel-bmi \
+		kernel-bmi.sym \
+		kernel-bmi.dis.gz \
+		\
+		bootx64.efi \
+		bootx64-efi.sym \
+		\
+		user-shell \
+		hello.km \
+		\
+		$(top_srcdir)/mkposixdirs.sh \
+		\
 		diskfat.mk \
 		$(top_srcdir)/populate_fat.sh \
-		$(top_srcdir)/mkposixdirs.sh \
+		\
+		mbr-bin \
 		mbr.sym \
+		mbr.dis.gz \
+		\
+		bootfat-bin \
 		bootfat.sym \
-		kernel-generic.sym \
-		kernel-bmi.sym \
-		kernel-generic.dis.gz \
-		kernel-bmi.dis.gz \
-		bootfat.dis.gz \
-		hello.km \
-		mbr.dis.gz
+		bootfat.dis.gz
 	set -x && \
 		rm -f fatpart.img fatdisk.img && \
 		truncate --size=261120K fatpart.img && \

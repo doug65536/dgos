@@ -322,6 +322,24 @@ static __always_inline void cpu_cache_flush()
     __asm__ __volatile__ ("wbinvd\n\t" : : : "memory");
 }
 
+static __always_inline void cpu_ds_set(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "movw %w[selector],%%ds\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
+static __always_inline void cpu_es_set(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "movw %w[selector],%%es\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
 static __always_inline void cpu_fs_set(uint16_t selector)
 {
     __asm__ __volatile__ (
@@ -336,6 +354,30 @@ static __always_inline void cpu_gs_set(uint16_t selector)
     __asm__ __volatile__ (
         "movw %w[selector],%%gs\n\t"
         :
+        : [selector] "r" (selector)
+    );
+}
+
+static __always_inline void cpu_ss_set(uint16_t selector)
+{
+    __asm__ __volatile__ (
+        "movw %w[selector],%%ss\n\t"
+        :
+        : [selector] "r" (selector)
+    );
+}
+
+static __always_inline void cpu_cs_set(uint16_t selector)
+{
+    uint64_t temp;
+    __asm__ __volatile__ (
+        "leaq 0f(%%rip),%[temp]\n\t"
+        "pushq %q[selector]\n\t"
+        "pushq %q[temp]\n\t"
+        "lretq\n\t"
+        "0:\n\t"
+        "add $8,%%rsp\n\t"
+        : [temp] "=&r" (temp)
         : [selector] "r" (selector)
     );
 }

@@ -17,6 +17,7 @@ int dummy(void)
 int worked(void)
 {
     printk("worked!\n");
+    return 0;
 }
 
 int entry(void)
@@ -28,5 +29,6 @@ int entry(void)
     printk("text_ptr = %p\n", (void*)text_ptr);
     printk("pointer to text: ");
     text_ptr();
+    return 0;
 }
 

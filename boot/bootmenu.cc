@@ -2,18 +2,18 @@
 #include "bootloader.h"
 
 static tui_str_t tui_ena_dis[] = {
-    TEXT("disabled"),
-    TEXT("enabled")
+    TSTR "disabled",
+    TSTR "enabled"
 };
 
 static tui_menu_item_t tui_menu[] = {
     {
-        TEXT("kernel debugger"),
+        TSTR "kernel debugger",
         tui_ena_dis,
         0
     },
     {
-        TEXT("serial debug output"),
+        TSTR "serial debug output",
         tui_ena_dis,
         0
     }

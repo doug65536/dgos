@@ -1,0 +1,40 @@
+#!/bin/bash
+
+${XXX%/*}
+
+while read project_file; do
+	PROJDIR="${project_file%/*}"
+
+	echo ---- $PROJDIR
+
+	unset -v is_referenced
+	declare -A is_referenced
+
+	while read direntry; do
+		relative_name="./${direntry#$PROJDIR/*}"
+		#printf "Saw file: %s\n" "$relative_name"
+		is_referenced+=(["$relative_name"]=0)
+	done < <(find "$PROJDIR" -type f)
+
+	while read entry; do
+		relative_name="${entry#./*}"
+		#printf "Saw project entry: %s\n" "./$relative_name"
+		is_referenced+=(["./$relative_name"]=1)
+	done < $project_file
+
+	for key in "${!is_referenced[@]}"; do
+		if [[ ${is_referenced["$key"]} == "0" ]]; then
+			if [[ $key == *.config ]]; then
+				:
+			elif [[ $key == *.creator ]]; then :
+				:
+			elif [[ $key == *.files ]]; then :
+				:
+			elif [[ $key == *.includes ]]; then :
+				:
+			else
+				printf "Not in project: %s\n" "$key"
+			fi
+		fi
+	done
+done < <(find -type f -name '*.files')

@@ -15,8 +15,8 @@ BUILT_SOURCES = \
 #  -> Link bootfat-bin
 #  -> Link bootiso-elf
 #  -> Link bootiso-bin
-#  -> Link bootefi-pe
-#  -> Link bootefi-elf
+#  -> Link bootefi-amd64
+#  -> Link bootefi-i386
 # Build libkernel-{generic,bmi,avx512}
 #  -> Build kernel-*
 
@@ -35,34 +35,32 @@ bin_PROGRAMS = \
 	bootfat-bin \
 	bootiso-elf \
 	bootiso-bin \
-	bootefi-pe \
+	bootefi-amd64 \
 	kernel-generic \
 	kernel-bmi \
 	user-shell \
 	hello.km
 
-#bootefi-elf
+#bootefi-i386
 
 # libmbr.a
 
 libmbr_a_SOURCES = \
 	mbr/mbr.s
 
-libmbr_a_CFLAGS = \
-	-DFROMCFLAGS \
-	$(BOOTLOADER_FLAGS)
+libmbr_a_CFLAGS =
 
 libmbr_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
-	$(BOOTLOADER_FLAGS)
+	$(ELF32_FLAGS)
 
 libmbr_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
-	$(BOOTLOADER_FLAGS) \
-	$(REGPARM_FLAGS) \
+	$(COMPILER_FLAGS) \
+	$(ELF32_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(COMPILER_FLAGS) -static
+	$(REGPARM_FLAGS) \
+	$(NO_PIC_FLAGS) -static
 
 EXTRA_libmbr_a_DEPENDENCIES = \
 	$(DUMPDIR)
@@ -74,23 +72,25 @@ mbr_elf_SOURCES = \
 	mbr/empty.cc
 
 mbr_elf_CXXFLAGS = \
-	$(BOOTLOADER_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
-
-mbr_elf_CFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
-	$(NO_PIC_FLAGS)
+	$(OPTIMIZE_SIZE_FLAGS) \
+	$(ELF32_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(NO_LTO_FLAGS) -static
+
+mbr_elf_CFLAGS =
 
 mbr_elf_CCASFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_CCASFLAGS \
+	$(COMPILER_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS) -static
+	$(OPTIMIZE_SIZE_FLAGS)-static
 
 mbr_elf_LDFLAGS = \
+	-DFROM_LDFLAGS \
 	$(REGPARM_FLAGS) \
 	-Wl,-m,elf_i386 \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
@@ -103,7 +103,9 @@ EXTRA_mbr_elf_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
 mbr_elf_LDADD = \
-	libmbr.a $(GCC_REALMODE_LIB)
+	libmbr.a \
+	$(LIBGCC_ELF32)
+#$(GCC_REALMODE_LIB)
 
 # mbr-bin
 
@@ -112,19 +114,17 @@ mbr_bin_SOURCES = \
 	mbr/empty.cc
 
 mbr_bin_CXXFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROMCXXFLAGS \
+	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-mbr_bin_CFLAGS = \
-	$(BOOTLOADER_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+mbr_bin_CFLAGS =
 
 mbr_bin_LDFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROMLDFLAGS \
+	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	-Wl,-m,elf_i386 \
 	-Wl,--oformat,binary \
@@ -140,17 +140,21 @@ EXTRA_mbr_bin_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
 mbr_bin_LDADD = \
-	libmbr.a $(GCC_REALMODE_LIB)
+	libmbr.a \
+	$(LIBGCC_ELF32)
 
 # libbootsect.a
 
 libbootsect_a_SOURCES = \
-	boot/bootcommon.s \
+	boot/bootcommon.S \
 	boot/bioscall.S \
 	boot/bootsect.cc \
+	boot/ctors.cc \
+	boot/assert.cc \
+	boot/halt_bios.cc \
 	boot/gdt.S \
 	boot/cpu_bios.cc \
-	boot/bootinfo.s \
+	boot/bootinfo.S \
 	boot/array_list.cc \
 	boot/screen.cc \
 	boot/screen_bios.cc \
@@ -159,20 +163,21 @@ libbootsect_a_SOURCES = \
 	boot/iso9660.cc \
 	boot/cpu.cc \
 	boot/cpuid.cc \
-	boot/cpu64.S \
+	boot/cpu64_bios.S \
 	boot/malloc.cc \
 	boot/string.cc \
 	boot/utf.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
+	boot/elf64_bios.cc \
 	boot/rand.cc \
+	boot/physmap.cc \
 	boot/physmem_bios.cc \
 	boot/farptr.cc \
 	boot/vesa.cc \
 	boot/progressbar.cc \
 	boot/debug.cc \
 	boot/part.s \
-	boot/mpentry.S \
 	boot/exception.s \
 	boot/likely.h \
 	boot/part.h \
@@ -201,14 +206,19 @@ libbootsect_a_SOURCES = \
 	boot/tui.h \
 	boot/tui.cc \
 	boot/tui_bios.cc \
-	boot/bootmenu.cc
+	boot/bootmenu.cc \
+	boot/include/boottable.h \
+	boot/include/boottable_decl.h \
+	boot/boottable.cc \
+	boot/boottable_bios.cc
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \
 	-I$(top_srcdir)/boot/include
 
 libbootsect_a_CXXFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROMCXXFLAGS \
+	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(SMALLEST_CODE_FLAGS) \
@@ -219,50 +229,44 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_RTTI_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	-mrtd -mregparm=3 \
-	-std=c++14 $(NO_PIC_FLAGS) \
+	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS)
 
-libbootsect_a_CFLAGS = \
-	$(BOOTLOADER_FLAGS) \
-	$(REGPARM_FLAGS) \
-	$(libbootsect_a_INCLUDES) \
-	$(SMALLEST_CODE_FLAGS) \
-	$(NO_PIC_FLAGS) -static \
-	$(FREESTANDING_FLAGS) \
-	$(NO_STACKPROTECTOR_FLAGS) \
-	$(NO_STACK_CHECK_FLAGS) \
-	$(NO_COMMON_FLAGS) \
-	$(NO_RTTI_FLAGS) \
-	$(NO_UNWIND_TABLES_FLAGS) \
-	$(NO_COMMON_FLAGS) \
-	-std=c++14 \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+libbootsect_a_CFLAGS =
 
 libbootsect_a_CCASFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROMCCASFLAGS \
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
-	$(NO_UNWIND_TABLES_FLAGS) \
-	-std=c++14 \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(NO_UNWIND_TABLES_FLAGS)
+
+# boot code
+
+BOOT_SOURCES_SHARED = \
+	boot/malloc_bios.cc \
+	boot/mpentry_bios.S
 
 # bootfat-elf
 
 bootfat_elf_SOURCES = \
-	boot/bootfat.s
+	boot/bootfat.S \
+	$(BOOT_SOURCES_SHARED)
 
 bootfat_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootfat_elf_CCASFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROMCCASFLAGS \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS) \
@@ -270,7 +274,9 @@ bootfat_elf_CCASFLAGS = \
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_elf_LDFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_LDFLAGS \
+	$(ELF32_FLAGS) \
+	$(LIBGCC_ELF32) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -287,7 +293,8 @@ EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_elf_LDADD = \
-	libbootsect.a $(GCC_REALMODE_LIB)
+	libbootsect.a \
+	$(LIBGCC_ELF32)
 
 # bootfat-bin
 
@@ -302,7 +309,9 @@ bootfat_bin_CCASFLAGS = \
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_bin_LDFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_LDFLAGS \
+	$(ELF32_FLAGS) \
+	$(LIBGCC_ELF32) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -320,28 +329,32 @@ EXTRA_bootfat_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
 
 bootfat_bin_LDADD = \
-	libbootsect.a $(GCC_REALMODE_LIB)
+	libbootsect.a \
+	$(LIBGCC_ELF32)
 
 # bootiso-elf
 
 bootiso_elf_SOURCES = \
-	boot/bootiso.s
+	boot/bootiso.S \
+	$(BOOT_SOURCES_SHARED)
 
 bootiso_elf_CXXFLAGS = \
 	$(libbootsect_a_CXXFLAGS)
 
 bootiso_elf_CCASFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_CCASFLAGS \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(COMPILER_FLAGS)
 
-# $(BOOTLOADER_FLAGS)
-
 bootiso_elf_LDFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_LDFLAGS \
+	$(ELF32_FLAGS) \
+	$(LIBGCC_ELF32) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -356,7 +369,8 @@ EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_elf_LDADD = \
-	libbootsect.a $(GCC_REALMODE_LIB)
+	libbootsect.a \
+	$(LIBGCC_ELF32)
 
 # bootiso-bin
 
@@ -369,10 +383,10 @@ bootiso_bin_CXXFLAGS = \
 bootiso_bin_CCASFLAGS = \
 	$(bootiso_elf_CCASFLAGS)
 
-# $(BOOTLOADER_FLAGS)
-
 bootiso_bin_LDFLAGS = \
-	$(BOOTLOADER_FLAGS) \
+	-DFROM_LDFLAGS \
+	$(ELF32_FLAGS) \
+	$(LIBGCC_ELF32) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
@@ -390,40 +404,20 @@ EXTRA_bootiso_bin_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_bin_LDADD = \
-	libbootsect.a $(GCC_REALMODE_LIB)
+	libbootsect.a \
+	$(LIBGCC_ELF32)
 
 # efi
 
-bootefi_pe_SOURCES = \
-	boot/bootefi.cc \
-	boot/cpu_efi.cc \
-	boot/physmem_efi.cc \
-	boot/cpu.cc \
-	boot/cpu64.S \
-	boot/gdt.S \
-	boot/debug.cc \
-	boot/fs.cc \
-	boot/elf64.cc \
-	boot/string.cc \
-	boot/paging.cc \
-	boot/malloc.cc \
-	boot/mpentry.S \
-	boot/cpuid.cc \
-	boot/rand.cc \
-	boot/screen.cc \
-	boot/screen_efi.cc \
-	boot/progressbar.cc \
-	boot/bootmenu.cc \
-	boot/tui.cc \
-	boot/tui_efi.cc
-
-bootefi_pe_CFLAGS = \
+BOOTLOADER_EFI_FLAGS = \
 	-D__efi \
-	-g \
 	-fshort-wchar \
 	-I$(top_srcdir)/boot \
 	-I$(top_srcdir)/boot/include \
-	-std=c++14 \
+	-Wl,--no-dynamic-linker \
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(NOFLOAT_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -431,39 +425,128 @@ bootefi_pe_CFLAGS = \
 	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS)
 
-bootefi_pe_CXXFLAGS = \
-	$(bootefi_pe_CFLAGS)
+bootefi_amd64_SOURCES = \
+	boot/bootefi.cc \
+	boot/ctors.cc \
+	boot/fs.cc \
+	boot/cpu_efi.cc \
+	boot/physmap.cc \
+	boot/physmem_efi.cc \
+	boot/cpu.cc \
+	boot/cpuid.cc \
+	boot/cpu64_efi.S \
+	boot/gdt.S \
+	boot/debug.cc \
+	boot/assert.cc \
+	boot/string.cc \
+	boot/halt_efi.cc \
+	boot/screen.cc \
+	boot/screen_efi.cc \
+	boot/malloc.cc \
+	boot/malloc_efi.cc \
+	boot/rand.cc \
+	boot/paging.cc \
+	boot/elf64.cc \
+	boot/elf64_efi.cc \
+	boot/mpentry_efi.S \
+	boot/progressbar.cc \
+	boot/bootmenu.cc \
+	boot/tui.cc \
+	boot/tui_efi.cc \
+	boot/include/boottable.h \
+	boot/include/boottable_decl.h \
+	boot/boottable.cc \
+	boot/boottable_efi.cc
 
-bootefi_pe_CCASFLAGS = \
-	$(bootefi_pe_CFLAGS)
+#bootefi_i386_SOURCES = \
+	$(bootefi_amd64_SOURCES)
 
-bootefi_pe_LDFLAGS = \
+bootefi_amd64_CFLAGS = \
+	-DFROM_CFLAGS \
+	$(PE64_FLAGS) \
+	$(BOOTLOADER_EFI_FLAGS)
+
+#bootefi_i386_CFLAGS = \
+	-DFROM_CFLAGS \
+	$(PE32_FLAGS) \
+	$(BOOTLOADER_EFI_FLAGS)
+
+bootefi_amd64_CXXFLAGS = \
+	-DFROM_CXXFLAGS \
+	$(PE64_FLAGS) \
+	$(BOOTLOADER_EFI_FLAGS)
+
+#bootefi_i386_CXXFLAGS = \
+	-DFROM_CXXFLAGS \
+	$(PE32_FLAGS) \
+	$(BOOTLOADER_EFI_FLAGS)
+
+bootefi_amd64_CCASFLAGS = \
+	-DFROM_CCASFLAGS \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(bootefi_amd64_CXXFLAGS)
+
+#bootefi_i386_CCASFLAGS = \
+	$(bootefi_amd64_CCASFLAGS)
+
+bootefi_amd64_LDFLAGS = \
+	-DFROM_LDFLAGS \
+	$(PE64_FLAGS) \
+	$(LIBGCC_PE64) \
 	-g \
-	-Wl,-m,i386pep \
+	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
+	-Wl,-Map,$(top_builddir)/bootefi-amd64.map
+
+#-Wl,--subsystem,10 \
+#-Wl,-pie \
+#-Wl,-N \
+#-Wl,-m,i386pep
+
+#bootefi_i386_LDFLAGS = \
+	-DFROM_LDFLAGS \
+	$(PE32_FLAGS) \
+	$(LIBGCC_PE32) \
+	-g \
 	-Wl,-pie \
-	-Wl,--dynamicbase \
+	-Wl,-N \
+	-Wl,-m,i386pe \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
 	-Wl,--subsystem,10 \
-	-Wl,--image-base,0x400000 \
-	-Wl,-Map,$(top_builddir)/bootefi-pe.map
+	-Wl,-Map,$(top_builddir)/bootefi-i386.map
 
-EXTRA_bootefi_pe_DEPENDENCIES = \
+bootefi_amd64_LDADD = \
+   $(LIBGCC_PE64)
+
+#bootefi_i386_LDADD = \
+   $(LIBGCC_PE32)
+
+EXTRA_bootefi_amd64_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootefi.ld \
 	$(top_srcdir)/Makefile.am
 
-#bootefi_elf_SOURCES = $(bootefi_pe_SOURCES)
-#bootefi_elf_CFLAGS = $(bootefi_pe_CFLAGS)
-#bootefi_elf_CXXFLAGS = $(bootefi_pe_CXXFLAGS)
-#bootefi_elf_CCASFLAGS = $(bootefi_pe_CCASFLAGS)
-#bootefi_elf_LDFLAGS = \
-#	-g \
-#	-Wl,-defsym,__section_alignment__=4096 \
-#	-Wl,-defsym,__image_base__=0x400000 \
-#	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
-#	-Wl,-m,elf_i386 \
-#	-Wl,-Map,$(top_builddir)/bootefi-elf.map
-#
-#EXTRA_bootefi_elf_DEPENDENCIES = $(EXTRA_bootefi_pe_DEPENDENCIES)
+bootx64.efi: bootefi-amd64
+	$(OBJCOPY) \
+		--remove-section=.eh_frame \
+		--remove-section=.debug_info \
+		--remove-section=.debug_abbrev \
+		--remove-section=.debug_ranges \
+		--remove-section=.debug_aranges \
+		--remove-section=.debug_line \
+		--remove-section=.debug_str \
+		--remove-section=.debug_macro \
+		$< $@
+
+#bootia32.efi: bootefi-i386
+#	$(OBJCOPY) \
+#		--remove-section=.eh_frame \
+#		--remove-section=.debug_info \
+#		--remove-section=.debug_abbrev \
+#		--remove-section=.debug_ranges \
+#		--remove-section=.debug_aranges \
+#		--remove-section=.debug_line \
+#		--remove-section=.debug_str \
+#		--remove-section=.debug_macro \
+#		$< $@
 
 # kernel
 
@@ -719,9 +802,12 @@ KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/kernel/arch/x86_64
 
 KERNEL_CXXFLAGS_SHARED = \
+	-DFROM_CXXFLAGS \
 	-D__DGOS_KERNEL__=0x00000001 \
 	-std=c++14 \
 	-fPIE \
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -731,14 +817,14 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
-	$(FREESTANDING_FLAGS) \
-	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(FREESTANDING_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
+	-DFROM_CCASFLAGS \
 	$(COMPILER_FLAGS)
 
 KERNEL_LDFLAGS_SHARED = \
+	-DFROM_LDFLAGS \
 	-Wl,-m,elf_x86_64 \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
@@ -1150,26 +1236,41 @@ include diskiso.mk
 
 clean-local:
 	rm -f $(top_builddir)/mbr.sym
-	rm -f $(top_builddir)/mbr.map
-	rm -f $(top_builddir)/mbr.dis.gz
 	rm -f $(top_builddir)/bootfat.sym
-	rm -f $(top_builddir)/bootfat.map
-	rm -f $(top_builddir)/bootfat.dis.gz
 	rm -f $(top_builddir)/bootiso.sym
-	rm -f $(top_builddir)/bootiso.map
+	rm -f $(top_builddir)/bootx64-efi.sym
 	rm -f $(top_builddir)/kernel-generic.sym
 	rm -f $(top_builddir)/kernel-bmi.sym
-	rm -f $(top_builddir)/kernel-generic.dis.gz
-	rm -f $(top_builddir)/kernel-bmi.dis.gz
+	
+	rm -f $(top_builddir)/mbr.map
+	rm -f $(top_builddir)/bootfat.map
+	rm -f $(top_builddir)/bootiso.map
+	rm -f $(top_builddir)/bootefi-pe.map
+	rm -f $(top_builddir)/bootefi-amd64.map
+	rm -f $(top_builddir)/bootefi-i386.map
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-bmi.map
+	
+	rm -f $(top_builddir)/bootefi-pe
+	rm -f $(top_builddir)/bootx64.efi
+	rm -f $(top_builddir)/bootia32.efi
+	
+	rm -f $(top_builddir)/mbr.dis.gz
+	rm -f $(top_builddir)/bootefi-i386.dis.gz
+	rm -f $(top_builddir)/bootefi-amd64.dis.gz
+	rm -f $(top_builddir)/bootiso.dis.gz
+	rm -f $(top_builddir)/bootfat.dis.gz
+	rm -f $(top_builddir)/kernel-generic.dis.gz
+	rm -f $(top_builddir)/kernel-bmi.dis.gz
+
+	rm -f $(top_builddir)/bochs-debuglog
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
 	rm -f $(top_builddir)/fatdisk.img
 	rm -f $(top_builddir)/fatpart.img
+	rm -f $(top_builddir)/isodisk.img
 	rm -f $(top_builddir)/qemu-emu.mk
-	rm -rf $(DUMPDIR)
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -1261,8 +1362,8 @@ QEMU = qemu-system-x86_64
 
 QEMU_EXTRA_DEPS = random-mem.img $(DUMPDIR)/qemu-debug-out
 
-QEMU_CPUS = 16
-QEMU_CORES = 4
+QEMU_CPUS = 2
+QEMU_CORES = 2
 QEMU_THREADS = 1
 QEMU_CPU = max,migratable=false,host-cache-info=true
 
@@ -1317,7 +1418,7 @@ QEMU_COMMON = \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
 	$(QEMU_NET) \
-	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
+	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset,int \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS) \
 	$(QEMU_USB) \
@@ -1340,14 +1441,14 @@ QEMU_DIF_usb = ,if=none
 QEMU_MEDIA_fat = disk
 QEMU_MEDIA_iso = cdrom
 QEMU_IMAGE_fat = fatdisk.img
-QEMU_IMAGE_iso = isodisk.img
+QEMU_IMAGE_iso = isodisk.img -boot d
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
 QEMU_EMU_tcg = -cpu max,la57
 #-cpu EPYC
 
-QEMU_BOOT_bios = -bios $(top_srcdir)/qemu-seabios.rom
+QEMU_BOOT_bios = -bios $(top_srcdir)/emu/seabios.rom
 QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
 
 # Connect to debug log
@@ -1370,76 +1471,177 @@ $(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
 
 BOCHS=bochs
 
-$(abs_top_builddir)/bochs-debugger-commands: \
-		$(top_srcdir)/bochs-debugger-commands
+$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-fat-bios-kernel-commands
 	cp "$<" "$@"
 
-$(abs_top_builddir)/bochs-debugger-boot-commands: \
-		$(top_srcdir)/bochs-debugger-boot-commands
+$(abs_top_builddir)/bochs-debugger-fat-efi-kernel-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-fat-efi-kernel-commands
 	cp "$<" "$@"
 
-debug-iso-bochs: $(QEMU_IMAGE_iso) \
+$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-fat-bios-boot-commands
+	cp "$<" "$@"
+
+$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-fat-efi-boot-commands
+	cp "$<" "$@"
+
+$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-iso-bios-kernel-commands
+	cp "$<" "$@"
+
+$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-iso-efi-kernel-commands
+	cp "$<" "$@"
+
+$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-iso-bios-boot-commands
+	cp "$<" "$@"
+
+$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands: \
+		$(top_srcdir)/emu/bochs/bochs-debugger-iso-efi-boot-commands
+	cp "$<" "$@"
+
+## debug iso
+
+debug-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
 		kernel-generic.sym kernel-bmi.sym \
-		$(top_srcdir)/bochs-iso-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-commands
+		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands
 	$(BOCHS) \
-		-f $(top_srcdir)/bochs-iso-config.bxrc \
-		-rc bochs-debugger-commands \
+		-f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands \
 		$(BOCHS_FLAGS)
 
-.PHONY: debug-iso-bochs
+.PHONY: debug-iso-bios-bochs-kernel
 
-debug-fat-bochs: $(QEMU_IMAGE_fat) \
+debug-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
 		kernel-generic.sym kernel-bmi.sym \
-		$(top_srcdir)/bochs-fat-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-commands
+		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands
 	$(BOCHS) \
-		-f $(top_srcdir)/bochs-fat-config.bxrc \
-		-rc bochs-debugger-commands \
+		-f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands \
 		$(BOCHS_FLAGS)
 
-.PHONY: debug-fat-bochs
+.PHONY: debug-iso-efi-bochs-kernel
 
-debug-iso-bochs-boot: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
+## debug fat
+
+debug-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
 		kernel-generic.sym kernel-bmi.sym \
-		$(top_srcdir)/bochs-iso-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-boot-commands
+		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
+		$(abs_top_builddir)/bochs-bios-debugger-kernel-commands
 	$(BOCHS) \
-		-f $(top_srcdir)/bochs-iso-config.bxrc \
-		-rc bochs-debugger-boot-commands \
+		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands \
 		$(BOCHS_FLAGS)
 
-.PHONY: debug-iso-bochs-boot
+.PHONY: debug-fat-bios-bochs-kernel
 
-debug-fat-bochs-boot: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym \
+debug-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
 		kernel-generic.sym kernel-bmi.sym \
-		$(top_srcdir)/bochs-fat-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-boot-commands
+		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
+		$(abs_top_builddir)/bochs-efi-debugger-kernel-commands
 	$(BOCHS) \
-		-f $(top_srcdir)/bochs-fat-config.bxrc \
-		-rc bochs-debugger-boot-commands \
+		-f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-fat-efi-kernel-commands \
 		$(BOCHS_FLAGS)
 
-.PHONY: debug-fat-bochs-boot
+.PHONY: debug-fat-efi-bochs-kernel
 
-run-iso-bochs: $(QEMU_IMAGE_iso) \
+## debug iso boot
+
+debug-iso-bios-bochs-boot: $(QEMU_IMAGE_iso) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
+		kernel-generic.sym kernel-bmi.sym \
+		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-iso-bios-bochs-boot
+
+debug-iso-efi-bochs-boot: $(QEMU_IMAGE_iso) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
+		kernel-generic.sym kernel-bmi.sym \
+		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-iso-efi-bochs-boot
+
+## debug fat boot
+
+debug-fat-bios-bochs-boot: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
+		kernel-generic.sym kernel-bmi.sym \
+		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-fat-bios-bochs-boot
+
+debug-fat-efi-bochs-boot: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
+		kernel-generic.sym kernel-bmi.sym \
+		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
+		$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands
+	$(BOCHS) \
+		-f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
+		-rc $(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands \
+		$(BOCHS_FLAGS)
+
+.PHONY: debug-fat-efi-bochs-boot
+
+# run iso
+
+run-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
 		kernel-generic.sym kernel-bmi.sym \
-		$(top_srcdir)/bochs-iso-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/bochs-iso-config.bxrc -q \
+		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc
+	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc -q \
 		$(BOCHS_FLAGS)
 
-.PHONY: run-iso-bochs
+.PHONY: run-iso-bios-bochs-kernel
 
-run-fat-bochs: $(QEMU_IMAGE_fat) \
+run-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
 		kernel-generic.sym kernel-bmi.sym \
-		$(top_srcdir)/bochs-fat-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/bochs-fat-config.bxrc -q \
+		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc
+	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc -q \
 		$(BOCHS_FLAGS)
 
-.PHONY: run-fat-bochs
+.PHONY: run-iso-efi-bochs-kernel
+
+# run fat
+
+run-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
+		mbr.sym bootfat.sym bootx64-efi.sym \
+		kernel-generic.sym kernel-bmi.sym \
+		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc
+	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc -q \
+		$(BOCHS_FLAGS)
+
+.PHONY: run-fat-bios-bochs-kernel
+
+run-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
+		bootx64-efi.sym kernel-generic.sym kernel-bmi.sym \
+		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc
+	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc -q \
+		$(BOCHS_FLAGS)
+
+.PHONY: run-fat-efi-bochs-kernel

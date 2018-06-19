@@ -242,7 +242,7 @@ isr_common:
     jz .Lfrom_kernel
 
     // See if we are coming from kernel code
-    cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
+    cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
     je .Lfrom_kernel
 
     // ...came from user code
@@ -337,7 +337,7 @@ isr_common:
 
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
-    cmpl $(GDT_SEL_KERNEL_CODE64),%ecx
+    cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
     je .Lreturning_to_kernel
 
     // ...returning to user code
@@ -628,9 +628,9 @@ isr_sysret64:
     cli
 
     // Initialize MXCSR and FCW
-    pushq $(CPU_FPUCW_ELF_INIT)
+    pushq $ CPU_FPUCW_ELF_INIT
 
-    movl $(CPU_MXCSR_MASK_ALL),%eax
+    movl $ CPU_MXCSR_MASK_ALL,%eax
     andl default_mxcsr_mask(%rip),%eax
     pushq %rax
 
@@ -696,7 +696,7 @@ isr_sysret64:
 
     cli
     mov %rdi,%rcx
-    mov $(CPU_EFLAGS_IF | 2),%r11d
+    mov $ CPU_EFLAGS_IF | 2,%r11d
 
     // Initialize kernel stack pointer for this thread
     movq %gs:CPU_INFO_SELF_OFS,%rbx

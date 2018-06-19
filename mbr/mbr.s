@@ -83,8 +83,6 @@ entry_start:
 	# Incoming registers:
 	#  DL = drive
 
-	fninit
-
 	xorw %ax,%ax
 	movw %ax,%ds
 	movw %ax,%es

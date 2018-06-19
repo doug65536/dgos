@@ -2,7 +2,7 @@
 
 fs_api_t fs_api;
 
-int boot_open(char const *filename)
+int boot_open(tchar const *filename)
 {
     return fs_api.boot_open(filename);
 }

@@ -34,20 +34,20 @@ SECTIONS {
 	} :text
 
 	.rodata : ALIGN(64) {
-		PROVIDE_HIDDEN(___init_st = .);
+		PROVIDE_HIDDEN(___ctors_st = .);
 		*(.init_array)
 		*(SORT(.init_array.*))
 		*(.ctors)
 		*(.ctors.*)
-		PROVIDE_HIDDEN(___init_en = .);
+		PROVIDE_HIDDEN(___ctors_en = .);
 
 		. = ALIGN(16);
-		PROVIDE_HIDDEN(___fini_st = .);
+		PROVIDE_HIDDEN(___dtors_st = .);
 		*(.fini_array)
 		*(SORT(.fini_array.*))
 		*(.dtors)
 		*(.dtors.*)
-		PROVIDE_HIDDEN(___fini_en = .);
+		PROVIDE_HIDDEN(___dtors_en = .);
 
 		. = ALIGN(32);
 
@@ -107,7 +107,7 @@ SECTIONS {
 
 	.got : ALIGN(64) {
 		PROVIDE_HIDDEN(___got = .);
-		*(.got*)
+		*(.got)
 		*(.got.plt)
 	} :readonly
 

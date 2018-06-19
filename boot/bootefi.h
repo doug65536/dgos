@@ -1,5 +1,9 @@
 #pragma once
 
+#include "types.h"
+
+extern "C" void halt(tchar const *s);
+
 /*
  * Portions Copyright (c) 2006 - 2016, Intel Corporation. All rights reserved.
  * Portions copyright (c) 2008 - 2009, Apple Inc. All rights reserved.
@@ -8,7 +12,6 @@
  * found at http://opensource.org/licenses/bsd-license.php.
  */
 
-#include "types.h"
 
 #define EFI_SYSTEM_TABLE_SIGNATURE 0x5453595320494249
 #define EFI_SYSTEM_TABLE_REVISION ((1<<16) | (10))
@@ -59,10 +62,10 @@ union EFI_IP_ADDRESS {
 };
 
 struct EFI_GUID {
-  UINT32  Data1;
-  UINT16  Data2;
-  UINT16  Data3;
-  UINT8   Data4[8];
+    UINT32  Data1;
+    UINT16  Data2;
+    UINT16  Data3;
+    UINT8   Data4[8];
 };
 
 #define EFIAPI __attribute__((__ms_abi__))
@@ -110,6 +113,37 @@ struct EFI_SYSTEM_TABLE {
 #define EFI_BOOT_SERVICES_SIGNATURE 0x56524553544f4f42
 #define EFI_BOOT_SERVICES_REVISION ((1<<16) | (10))
 
+//*******************************************************
+// EFI_TPL
+//*******************************************************
+typedef UINTN EFI_TPL;
+
+//*******************************************************
+// Task Priority Levels
+//*******************************************************
+#define TPL_APPLICATION 4
+#define TPL_CALLBACK 8
+#define TPL_NOTIFY 16
+#define TPL_HIGH_LEVEL 31
+
+//*******************************************************
+// EFI_EVENT
+//*******************************************************
+typedef VOID *EFI_EVENT;
+
+//*******************************************************
+// Event Types
+//*******************************************************
+// These types can be “ORed” together as needed – for example, 
+// EVT_TIMER might be “Ored” with EVT_NOTIFY_WAIT or 
+// EVT_NOTIFY_SIGNAL.
+#define EVT_TIMER 0x80000000
+#define EVT_RUNTIME  0x40000000
+#define EVT_NOTIFY_WAIT  0x00000100
+#define EVT_NOTIFY_SIGNAL  0x00000200
+#define EVT_SIGNAL_EXIT_BOOT_SERVICES 0x00000201
+#define EVT_SIGNAL_VIRTUAL_ADDRESS_CHANGE 0x60000202
+
 /**
   Raises a task's priority level and returns its previous level.
   @param[in]  NewTpl          The new task priority level.
@@ -118,8 +152,8 @@ struct EFI_SYSTEM_TABLE {
 typedef
 EFI_TPL
 (EFIAPI *EFI_RAISE_TPL)(
-  IN EFI_TPL      NewTpl
-  );
+        IN EFI_TPL      NewTpl
+        );
 
 /**
   Restores a task's priority level to its previous value.
@@ -128,98 +162,98 @@ EFI_TPL
 typedef
 VOID
 (EFIAPI *EFI_RESTORE_TPL)(
-  IN EFI_TPL      OldTpl
-  );
+        IN EFI_TPL      OldTpl
+        );
 
 enum EFI_ALLOCATE_TYPE {
-  ///
-  /// Allocate any available range of pages that satisfies the request.
-  ///
-  AllocateAnyPages,
-  ///
-  /// Allocate any available range of pages whose uppermost address is less than
-  /// or equal to a specified maximum address.
-  ///
-  AllocateMaxAddress,
-  ///
-  /// Allocate pages at a specified address.
-  ///
-  AllocateAddress,
-  ///
-  /// Maximum enumeration value that may be used for bounds checking.
-  ///
-  MaxAllocateType
+    ///
+    /// Allocate any available range of pages that satisfies the request.
+    ///
+    AllocateAnyPages,
+    ///
+    /// Allocate any available range of pages whose uppermost address is less than
+    /// or equal to a specified maximum address.
+    ///
+    AllocateMaxAddress,
+    ///
+    /// Allocate pages at a specified address.
+    ///
+    AllocateAddress,
+    ///
+    /// Maximum enumeration value that may be used for bounds checking.
+    ///
+    MaxAllocateType
 };
 
 enum EFI_MEMORY_TYPE {
-  ///
-  /// Not used.
-  ///
-  EfiReservedMemoryType,
-  ///
-  /// The code portions of a loaded application.
-  /// (Note that UEFI OS loaders are UEFI applications.)
-  ///
-  EfiLoaderCode,
-  ///
-  /// The data portions of a loaded application and the default data allocation
-  /// type used by an application to allocate pool memory.
-  ///
-  EfiLoaderData,
-  ///
-  /// The code portions of a loaded Boot Services Driver.
-  ///
-  EfiBootServicesCode,
-  ///
-  /// The data portions of a loaded Boot Serves Driver, and the default data
-  /// allocation type used by a Boot Services Driver to allocate pool memory.
-  ///
-  EfiBootServicesData,
-  ///
-  /// The code portions of a loaded Runtime Services Driver.
-  ///
-  EfiRuntimeServicesCode,
-  ///
-  /// The data portions of a loaded Runtime Services Driver and the default
-  /// data allocation type used by a Runtime Services Driver to allocate pool memory.
-  ///
-  EfiRuntimeServicesData,
-  ///
-  /// Free (unallocated) memory.
-  ///
-  EfiConventionalMemory,
-  ///
-  /// Memory in which errors have been detected.
-  ///
-  EfiUnusableMemory,
-  ///
-  /// Memory that holds the ACPI tables.
-  ///
-  EfiACPIReclaimMemory,
-  ///
-  /// Address space reserved for use by the firmware.
-  ///
-  EfiACPIMemoryNVS,
-  ///
-  /// Used by system firmware to request that a memory-mapped IO region
-  /// be mapped by the OS to a virtual address so it can be accessed by EFI runtime services.
-  ///
-  EfiMemoryMappedIO,
-  ///
-  /// System memory-mapped IO region that is used to translate memory
-  /// cycles to IO cycles by the processor.
-  ///
-  EfiMemoryMappedIOPortSpace,
-  ///
-  /// Address space reserved by the firmware for code that is part of the processor.
-  ///
-  EfiPalCode,
-  ///
-  /// A memory region that operates as EfiConventionalMemory,
-  /// however it happens to also support byte-addressable non-volatility.
-  ///
-  EfiPersistentMemory,
-  EfiMaxMemoryType
+    ///
+    /// Not used.
+    ///
+    EfiReservedMemoryType,
+    ///
+    /// The code portions of a loaded application.
+    /// (Note that UEFI OS loaders are UEFI applications.)
+    ///
+    EfiLoaderCode,
+    ///
+    /// The data portions of a loaded application and the default data allocation
+    /// type used by an application to allocate pool memory.
+    ///
+    EfiLoaderData,
+    ///
+    /// The code portions of a loaded Boot Services Driver.
+    ///
+    EfiBootServicesCode,
+    ///
+    /// The data portions of a loaded Boot Serves Driver, and the default data
+    /// allocation type used by a Boot Services Driver to allocate pool memory.
+    ///
+    EfiBootServicesData,
+    ///
+    /// The code portions of a loaded Runtime Services Driver.
+    ///
+    EfiRuntimeServicesCode,
+    ///
+    /// The data portions of a loaded Runtime Services Driver and the default
+    /// data allocation type used by a Runtime Services Driver to allocate pool memory.
+    ///
+    EfiRuntimeServicesData,
+    ///
+    /// Free (unallocated) memory.
+    ///
+    EfiConventionalMemory,
+    ///
+    /// Memory in which errors have been detected.
+    ///
+    EfiUnusableMemory,
+    ///
+    /// Memory that holds the ACPI tables.
+    ///
+    EfiACPIReclaimMemory,
+    ///
+    /// Address space reserved for use by the firmware.
+    ///
+    EfiACPIMemoryNVS,
+    ///
+    /// Used by system firmware to request that a memory-mapped IO region
+    /// be mapped by the OS to a virtual address so it can be accessed by EFI runtime services.
+    ///
+    EfiMemoryMappedIO,
+    ///
+    /// System memory-mapped IO region that is used to translate memory
+    /// cycles to IO cycles by the processor.
+    ///
+    EfiMemoryMappedIOPortSpace,
+    ///
+    /// Address space reserved by the firmware for code that is part of the processor.
+    ///
+    EfiPalCode,
+    ///
+    /// A memory region that operates as EfiConventionalMemory,
+    /// however it happens to also support byte-addressable non-volatility.
+    ///
+    EfiPersistentMemory,
+    EfiMaxMemoryType
 };
 
 /**
@@ -246,11 +280,11 @@ enum EFI_MEMORY_TYPE {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_ALLOCATE_PAGES)(
-  IN     EFI_ALLOCATE_TYPE            Type,
-  IN     EFI_MEMORY_TYPE              MemoryType,
-  IN     UINTN                        Pages,
-  IN OUT EFI_PHYSICAL_ADDRESS         *Memory
-  );
+    IN     EFI_ALLOCATE_TYPE            Type,
+    IN     EFI_MEMORY_TYPE              MemoryType,
+    IN     UINTN                        Pages,
+    IN OUT EFI_PHYSICAL_ADDRESS         *Memory
+    );
 
 /**
   Frees memory pages.
@@ -264,35 +298,35 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FREE_PAGES)(
-  IN  EFI_PHYSICAL_ADDRESS         Memory,
-  IN  UINTN                        Pages
-  );
+    IN  EFI_PHYSICAL_ADDRESS         Memory,
+    IN  UINTN                        Pages
+    );
 
 struct EFI_MEMORY_DESCRIPTOR {
-  ///
-  /// Type of the memory region.  See EFI_MEMORY_TYPE.
-  ///
-  UINT32                Type;
-  ///
-  /// Physical address of the first byte of the memory region.  Must aligned
-  /// on a 4 KB boundary.
-  ///
-  EFI_PHYSICAL_ADDRESS  PhysicalStart;
-  ///
-  /// Virtual address of the first byte of the memory region.  Must aligned
-  /// on a 4 KB boundary.
-  ///
-  EFI_VIRTUAL_ADDRESS   VirtualStart;
-  ///
-  /// Number of 4KB pages in the memory region.
-  ///
-  UINT64                NumberOfPages;
-  ///
-  /// Attributes of the memory region that describe the bit mask of capabilities
-  /// for that memory region, and not necessarily the current settings for that
-  /// memory region.
-  ///
-  UINT64                Attribute;
+    ///
+    /// Type of the memory region.  See EFI_MEMORY_TYPE.
+    ///
+    UINT32                Type;
+    ///
+    /// Physical address of the first byte of the memory region.  Must aligned
+    /// on a 4 KB boundary.
+    ///
+    EFI_PHYSICAL_ADDRESS  PhysicalStart;
+    ///
+    /// Virtual address of the first byte of the memory region.  Must aligned
+    /// on a 4 KB boundary.
+    ///
+    EFI_VIRTUAL_ADDRESS   VirtualStart;
+    ///
+    /// Number of 4KB pages in the memory region.
+    ///
+    UINT64                NumberOfPages;
+    ///
+    /// Attributes of the memory region that describe the bit mask of capabilities
+    /// for that memory region, and not necessarily the current settings for that
+    /// memory region.
+    ///
+    UINT64                Attribute;
 };
 
 /**
@@ -320,12 +354,12 @@ struct EFI_MEMORY_DESCRIPTOR {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_GET_MEMORY_MAP)(
-  IN OUT UINTN                       *MemoryMapSize,
-  IN OUT EFI_MEMORY_DESCRIPTOR       *MemoryMap,
-  OUT    UINTN                       *MapKey,
-  OUT    UINTN                       *DescriptorSize,
-  OUT    UINT32                      *DescriptorVersion
-  );
+    IN OUT UINTN                       *MemoryMapSize,
+    IN OUT EFI_MEMORY_DESCRIPTOR       *MemoryMap,
+    OUT    UINTN                       *MapKey,
+    OUT    UINTN                       *DescriptorSize,
+    OUT    UINT32                      *DescriptorVersion
+    );
 
 /**
   Allocates pool memory.
@@ -346,10 +380,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_ALLOCATE_POOL)(
-  IN  EFI_MEMORY_TYPE              PoolType,
-  IN  UINTN                        Size,
-  OUT VOID                         **Buffer
-  );
+    IN  EFI_MEMORY_TYPE              PoolType,
+    IN  UINTN                        Size,
+    OUT VOID                         **Buffer
+    );
 
 /**
   Returns pool memory to the system.
@@ -360,8 +394,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FREE_POOL)(
-  IN  VOID                         *Buffer
-  );
+    IN  VOID                         *Buffer
+    );
 
 /**
   Invoke a notification event
@@ -372,9 +406,9 @@ EFI_STATUS
 typedef
 VOID
 (EFIAPI *EFI_EVENT_NOTIFY)(
-  IN  EFI_EVENT                Event,
-  IN  VOID                     *Context
-  );
+    IN  EFI_EVENT                Event,
+    IN  VOID                     *Context
+    );
 
 /**
   Creates an event.
@@ -392,26 +426,26 @@ VOID
 typedef
 EFI_STATUS
 (EFIAPI *EFI_CREATE_EVENT)(
-  IN  UINT32                       Type,
-  IN  EFI_TPL                      NotifyTpl,
-  IN  EFI_EVENT_NOTIFY             NotifyFunction,
-  IN  VOID                         *NotifyContext,
-  OUT EFI_EVENT                    *Event
-  );
+    IN  UINT32                       Type,
+    IN  EFI_TPL                      NotifyTpl,
+    IN  EFI_EVENT_NOTIFY             NotifyFunction,
+    IN  VOID                         *NotifyContext,
+    OUT EFI_EVENT                    *Event
+    );
 
 enum EFI_TIMER_DELAY {
- ///
- /// An event's timer settings is to be cancelled and not trigger time is to be set/
- ///
- TimerCancel,
- ///
- /// An event is to be signaled periodically at a specified interval from the current time.
- ///
- TimerPeriodic,
- ///
- /// An event is to be signaled once at a specified interval from the current time.
- ///
- TimerRelative
+    ///
+    /// An event's timer settings is to be cancelled and not trigger time is to be set/
+    ///
+    TimerCancel,
+    ///
+    /// An event is to be signaled periodically at a specified interval from the current time.
+    ///
+    TimerPeriodic,
+    ///
+    /// An event is to be signaled once at a specified interval from the current time.
+    ///
+    TimerRelative
 };
 
 /**
@@ -430,10 +464,10 @@ enum EFI_TIMER_DELAY {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_SET_TIMER)(
-  IN  EFI_EVENT                Event,
-  IN  EFI_TIMER_DELAY          Type,
-  IN  UINT64                   TriggerTime
-  );
+    IN  EFI_EVENT                Event,
+    IN  EFI_TIMER_DELAY          Type,
+    IN  UINT64                   TriggerTime
+    );
 
 /**
   Stops execution until an event is signaled.
@@ -449,10 +483,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_WAIT_FOR_EVENT)(
-  IN  UINTN                    NumberOfEvents,
-  IN  EFI_EVENT                *Event,
-  OUT UINTN                    *Index
-  );
+    IN  UINTN                    NumberOfEvents,
+    IN  EFI_EVENT                *Event,
+    OUT UINTN                    *Index
+    );
 
 /**
   Signals an event.
@@ -462,8 +496,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_SIGNAL_EVENT)(
-  IN  EFI_EVENT                Event
-  );
+    IN  EFI_EVENT                Event
+    );
 
 /**
   Closes an event.
@@ -473,8 +507,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_CLOSE_EVENT)(
-  IN EFI_EVENT                Event
-  );
+    IN EFI_EVENT                Event
+    );
 
 /**
   Checks whether an event is in the signaled state.
@@ -486,14 +520,14 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_CHECK_EVENT)(
-  IN EFI_EVENT                Event
-  );
+    IN EFI_EVENT                Event
+    );
 
 enum EFI_INTERFACE_TYPE {
-  ///
-  /// Indicates that the supplied protocol interface is supplied in native form.
-  ///
-  EFI_NATIVE_INTERFACE
+    ///
+    /// Indicates that the supplied protocol interface is supplied in native form.
+    ///
+    EFI_NATIVE_INTERFACE
 };
 
 /**
@@ -516,11 +550,11 @@ enum EFI_INTERFACE_TYPE {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_INSTALL_PROTOCOL_INTERFACE)(
-  IN OUT EFI_HANDLE               *Handle,
-  IN     EFI_GUID                 *Protocol,
-  IN     EFI_INTERFACE_TYPE       InterfaceType,
-  IN     VOID                     *Interface
-  );
+    IN OUT EFI_HANDLE               *Handle,
+    IN     EFI_GUID         const   *Protocol,
+    IN     EFI_INTERFACE_TYPE       InterfaceType,
+    IN     VOID                     *Interface
+    );
 
 /**
   Reinstalls a protocol interface on a device handle.
@@ -540,11 +574,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_REINSTALL_PROTOCOL_INTERFACE)(
-  IN EFI_HANDLE               Handle,
-  IN EFI_GUID                 *Protocol,
-  IN VOID                     *OldInterface,
-  IN VOID                     *NewInterface
-  );
+    IN EFI_HANDLE               Handle,
+    IN EFI_GUID        const    *Protocol,
+    IN VOID                     *OldInterface,
+    IN VOID                     *NewInterface
+    );
 
 /**
   Removes a protocol interface from a device handle. It is recommended that
@@ -563,10 +597,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_UNINSTALL_PROTOCOL_INTERFACE)(
-  IN EFI_HANDLE               Handle,
-  IN EFI_GUID                 *Protocol,
-  IN VOID                     *Interface
-  );
+    IN EFI_HANDLE               Handle,
+    IN EFI_GUID         const   *Protocol,
+    IN VOID                     *Interface
+    );
 
 /**
   Queries a handle to determine if it supports a specified protocol.
@@ -583,10 +617,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_HANDLE_PROTOCOL)(
-  IN  EFI_HANDLE               Handle,
-  IN  EFI_GUID                 *Protocol,
-  OUT VOID                     **Interface
-  );
+    IN  EFI_HANDLE               Handle,
+    IN  EFI_GUID          const  *Protocol,
+    OUT VOID                     **Interface
+    );
 
 /**
   Creates an event that is to be signaled whenever an interface is installed for a specified protocol.
@@ -603,25 +637,25 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_REGISTER_PROTOCOL_NOTIFY)(
-  IN  EFI_GUID                 *Protocol,
-  IN  EFI_EVENT                Event,
-  OUT VOID                     **Registration
-  );
+    IN  EFI_GUID       const     *Protocol,
+    IN  EFI_EVENT                Event,
+    OUT VOID                     **Registration
+    );
 
 enum EFI_LOCATE_SEARCH_TYPE {
-  ///
-  /// Retrieve all the handles in the handle database.
-  ///
-  AllHandles,
-  ///
-  /// Retrieve the next handle fron a RegisterProtocolNotify() event.
-  ///
-  ByRegisterNotify,
-  ///
-  /// Retrieve the set of handles from the handle database that support a
-  /// specified protocol.
-  ///
-  ByProtocol
+    ///
+    /// Retrieve all the handles in the handle database.
+    ///
+    AllHandles,
+    ///
+    /// Retrieve the next handle fron a RegisterProtocolNotify() event.
+    ///
+    ByRegisterNotify,
+    ///
+    /// Retrieve the set of handles from the handle database that support a
+    /// specified protocol.
+    ///
+    ByProtocol
 };
 
 /**
@@ -646,12 +680,12 @@ enum EFI_LOCATE_SEARCH_TYPE {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_LOCATE_HANDLE)(
-  IN     EFI_LOCATE_SEARCH_TYPE   SearchType,
-  IN     EFI_GUID                 *Protocol,    OPTIONAL
-  IN     VOID                     *SearchKey,   OPTIONAL
-  IN OUT UINTN                    *BufferSize,
-  OUT    EFI_HANDLE               *Buffer
-  );
+    IN     EFI_LOCATE_SEARCH_TYPE   SearchType,
+    IN     EFI_GUID          const  *Protocol,    OPTIONAL
+    IN     VOID                     *SearchKey,   OPTIONAL
+    IN OUT UINTN                    *BufferSize,
+    OUT    EFI_HANDLE               *Buffer
+    );
 
 /**
   This protocol can be used on any device handle to obtain generic path/location
@@ -662,21 +696,20 @@ EFI_STATUS
   that make up the Device Path.
 **/
 struct EFI_DEVICE_PATH_PROTOCOL {
-  UINT8 Type;       ///< 0x01 Hardware Device Path.
+    UINT8 Type;       ///< 0x01 Hardware Device Path.
                     ///< 0x02 ACPI Device Path.
                     ///< 0x03 Messaging Device Path.
                     ///< 0x04 Media Device Path.
                     ///< 0x05 BIOS Boot Specification Device Path.
                     ///< 0x7F End of Hardware Device Path.
 
-  UINT8 SubType;    ///< Varies by Type
+    UINT8 SubType;    ///< Varies by Type
                     ///< 0xFF End Entire Device Path, or
                     ///< 0x01 End This Instance of a Device Path and start a new
                     ///< Device Path.
 
-  UINT8 Length[2];  ///< Specific Device Path data. Type and Sub-Type define
+    UINT8 Length[2];  ///< Specific Device Path data. Type and Sub-Type define
                     ///< type of data. Size of data is included in Length.
-
 };
 
 /**
@@ -695,10 +728,10 @@ struct EFI_DEVICE_PATH_PROTOCOL {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_LOCATE_DEVICE_PATH)(
-  IN     EFI_GUID                         *Protocol,
-  IN OUT EFI_DEVICE_PATH_PROTOCOL         **DevicePath,
-  OUT    EFI_HANDLE                       *Device
-  );
+    IN     EFI_GUID                 const   *Protocol,
+    IN OUT EFI_DEVICE_PATH_PROTOCOL         **DevicePath,
+    OUT    EFI_HANDLE                       *Device
+    );
 
 /**
   Adds, updates, or removes a configuration table entry from the EFI System Table.
@@ -713,9 +746,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_INSTALL_CONFIGURATION_TABLE)(
-  IN EFI_GUID                 *Guid,
-  IN VOID                     *Table
-  );
+    IN EFI_GUID          const  *Guid,
+    IN VOID                     *Table
+    );
 
 /**
   Loads an EFI image into memory.
@@ -748,13 +781,13 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_IMAGE_LOAD)(
-  IN  BOOLEAN                      BootPolicy,
-  IN  EFI_HANDLE                   ParentImageHandle,
-  IN  EFI_DEVICE_PATH_PROTOCOL     *DevicePath,
-  IN  VOID                         *SourceBuffer OPTIONAL,
-  IN  UINTN                        SourceSize,
-  OUT EFI_HANDLE                   *ImageHandle
-  );
+    IN  BOOLEAN                      BootPolicy,
+    IN  EFI_HANDLE                   ParentImageHandle,
+    IN  EFI_DEVICE_PATH_PROTOCOL     *DevicePath,
+    IN  VOID                         *SourceBuffer OPTIONAL,
+    IN  UINTN                        SourceSize,
+    OUT EFI_HANDLE                   *ImageHandle
+    );
 
 /**
   Transfers control to a loaded image's entry point.
@@ -770,10 +803,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_IMAGE_START)(
-  IN  EFI_HANDLE                  ImageHandle,
-  OUT UINTN                       *ExitDataSize,
-  OUT CHAR16                      **ExitData    OPTIONAL
-  );
+    IN  EFI_HANDLE                  ImageHandle,
+    OUT UINTN                       *ExitDataSize,
+    OUT CHAR16                      **ExitData    OPTIONAL
+    );
 
 /**
   Terminates a loaded EFI image and returns control to boot services.
@@ -795,11 +828,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_EXIT)(
-  IN  EFI_HANDLE                   ImageHandle,
-  IN  EFI_STATUS                   ExitStatus,
-  IN  UINTN                        ExitDataSize,
-  IN  CHAR16                       *ExitData     OPTIONAL
-  );
+    IN  EFI_HANDLE                   ImageHandle,
+    IN  EFI_STATUS                   ExitStatus,
+    IN  UINTN                        ExitDataSize,
+    IN  CHAR16                       *ExitData     OPTIONAL
+    );
 
 /**
   Unloads an image.
@@ -810,8 +843,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_IMAGE_UNLOAD)(
-  IN  EFI_HANDLE                   ImageHandle
-  );
+    IN  EFI_HANDLE                   ImageHandle
+    );
 
 /**
   Terminates all boot services.
@@ -823,9 +856,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_EXIT_BOOT_SERVICES)(
-  IN  EFI_HANDLE                   ImageHandle,
-  IN  UINTN                        MapKey
-  );
+    IN  EFI_HANDLE                   ImageHandle,
+    IN  UINTN                        MapKey
+    );
 
 /**
   Returns a monotonically increasing count for the platform.
@@ -837,8 +870,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_GET_NEXT_MONOTONIC_COUNT)(
-  OUT UINT64                  *Count
-  );
+    OUT UINT64                  *Count
+    );
 
 /**
   Induces a fine-grained stall.
@@ -849,8 +882,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_STALL)(
-  IN  UINTN                    Microseconds
-  );
+    IN  UINTN                    Microseconds
+    );
 
 /**
   Sets the system's watchdog timer.
@@ -868,11 +901,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_SET_WATCHDOG_TIMER)(
-  IN UINTN                    Timeout,
-  IN UINT64                   WatchdogCode,
-  IN UINTN                    DataSize,
-  IN CHAR16                   *WatchdogData OPTIONAL
-  );
+    IN UINTN                    Timeout,
+    IN UINT64                   WatchdogCode,
+    IN UINTN                    DataSize,
+    IN CHAR16                   *WatchdogData OPTIONAL
+    );
 
 /**
   Connects one or more drivers to a controller.
@@ -900,11 +933,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_CONNECT_CONTROLLER)(
-  IN  EFI_HANDLE                    ControllerHandle,
-  IN  EFI_HANDLE                    *DriverImageHandle,   OPTIONAL
-  IN  EFI_DEVICE_PATH_PROTOCOL      *RemainingDevicePath, OPTIONAL
-  IN  BOOLEAN                       Recursive
-  );
+    IN  EFI_HANDLE                    ControllerHandle,
+    IN  EFI_HANDLE                    *DriverImageHandle,   OPTIONAL
+    IN  EFI_DEVICE_PATH_PROTOCOL      *RemainingDevicePath, OPTIONAL
+    IN  BOOLEAN                       Recursive
+    );
 
 /**
   Disconnects one or more drivers from a controller.
@@ -930,10 +963,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_DISCONNECT_CONTROLLER)(
-  IN  EFI_HANDLE                     ControllerHandle,
-  IN  EFI_HANDLE                     DriverImageHandle, OPTIONAL
-  IN  EFI_HANDLE                     ChildHandle        OPTIONAL
-  );
+    IN  EFI_HANDLE                     ControllerHandle,
+    IN  EFI_HANDLE                     DriverImageHandle, OPTIONAL
+    IN  EFI_HANDLE                     ChildHandle        OPTIONAL
+    );
 
 /**
   Queries a handle to determine if it supports a specified protocol. If the protocol is supported by the
@@ -962,13 +995,13 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_OPEN_PROTOCOL)(
-  IN  EFI_HANDLE                Handle,
-  IN  EFI_GUID                  *Protocol,
-  OUT VOID                      **Interface, OPTIONAL
-  IN  EFI_HANDLE                AgentHandle,
-  IN  EFI_HANDLE                ControllerHandle,
-  IN  UINT32                    Attributes
-  );
+    IN  EFI_HANDLE                Handle,
+    IN  EFI_GUID           const  *Protocol,
+    OUT VOID                      **Interface, OPTIONAL
+    IN  EFI_HANDLE                AgentHandle,
+    IN  EFI_HANDLE                ControllerHandle,
+    IN  UINT32                    Attributes
+    );
 
 /**
   Closes a protocol on a handle that was opened using OpenProtocol().
@@ -991,17 +1024,17 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_CLOSE_PROTOCOL)(
-  IN EFI_HANDLE               Handle,
-  IN EFI_GUID                 *Protocol,
-  IN EFI_HANDLE               AgentHandle,
-  IN EFI_HANDLE               ControllerHandle
-  );
+    IN EFI_HANDLE               Handle,
+    IN EFI_GUID         const   *Protocol,
+    IN EFI_HANDLE               AgentHandle,
+    IN EFI_HANDLE               ControllerHandle
+    );
 
 struct EFI_OPEN_PROTOCOL_INFORMATION_ENTRY {
-  EFI_HANDLE  AgentHandle;
-  EFI_HANDLE  ControllerHandle;
-  UINT32      Attributes;
-  UINT32      OpenCount;
+    EFI_HANDLE  AgentHandle;
+    EFI_HANDLE  ControllerHandle;
+    UINT32      Attributes;
+    UINT32      OpenCount;
 };
 
 /**
@@ -1019,11 +1052,11 @@ struct EFI_OPEN_PROTOCOL_INFORMATION_ENTRY {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_OPEN_PROTOCOL_INFORMATION)(
-  IN  EFI_HANDLE                          Handle,
-  IN  EFI_GUID                            *Protocol,
-  OUT EFI_OPEN_PROTOCOL_INFORMATION_ENTRY **EntryBuffer,
-  OUT UINTN                               *EntryCount
-  );
+    IN  EFI_HANDLE                          Handle,
+    IN  EFI_GUID                  const     *Protocol,
+    OUT EFI_OPEN_PROTOCOL_INFORMATION_ENTRY **EntryBuffer,
+    OUT UINTN                               *EntryCount
+    );
 
 /**
   Retrieves the list of protocol interface GUIDs that are installed on a handle in a buffer allocated
@@ -1046,10 +1079,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_PROTOCOLS_PER_HANDLE)(
-  IN  EFI_HANDLE      Handle,
-  OUT EFI_GUID        ***ProtocolBuffer,
-  OUT UINTN           *ProtocolBufferCount
-  );
+    IN  EFI_HANDLE      Handle,
+    OUT EFI_GUID const  ***ProtocolBuffer,
+    OUT UINTN           *ProtocolBufferCount
+    );
 
 /**
   Returns an array of handles that support the requested protocol in a buffer allocated from pool.
@@ -1070,12 +1103,12 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_LOCATE_HANDLE_BUFFER)(
-  IN     EFI_LOCATE_SEARCH_TYPE       SearchType,
-  IN     EFI_GUID                     *Protocol,      OPTIONAL
-  IN     VOID                         *SearchKey,     OPTIONAL
-  IN OUT UINTN                        *NoHandles,
-  OUT    EFI_HANDLE                   **Buffer
-  );
+    IN     EFI_LOCATE_SEARCH_TYPE       SearchType,
+    IN     EFI_GUID              const  *Protocol,      OPTIONAL
+    IN     VOID                         *SearchKey,     OPTIONAL
+    IN OUT UINTN                        *NoHandles,
+    OUT    EFI_HANDLE                   **Buffer
+    );
 
 /**
   Returns the first protocol instance that matches the given protocol.
@@ -1093,10 +1126,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_LOCATE_PROTOCOL)(
-  IN  EFI_GUID  *Protocol,
-  IN  VOID      *Registration, OPTIONAL
-  OUT VOID      **Interface
-  );
+    IN  EFI_GUID const *Protocol,
+    IN  VOID      *Registration, OPTIONAL
+    OUT VOID      **Interface
+    );
 
 /**
   Installs one or more protocol interfaces into the boot services environment.
@@ -1114,9 +1147,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_INSTALL_MULTIPLE_PROTOCOL_INTERFACES)(
-  IN OUT EFI_HANDLE           *Handle,
-  ...
-  );
+    IN OUT EFI_HANDLE           *Handle,
+    ...
+    );
 
 /**
   Removes one or more protocol interfaces into the boot services environment.
@@ -1129,9 +1162,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_UNINSTALL_MULTIPLE_PROTOCOL_INTERFACES)(
-  IN EFI_HANDLE           Handle,
-  ...
-  );
+    IN EFI_HANDLE           Handle,
+    ...
+    );
 
 /**
   Computes and returns a 32-bit CRC for a data buffer.
@@ -1148,10 +1181,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_CALCULATE_CRC32)(
-  IN  VOID                              *Data,
-  IN  UINTN                             DataSize,
-  OUT UINT32                            *Crc32
-  );
+    IN  VOID                              *Data,
+    IN  UINTN                             DataSize,
+    OUT UINT32                            *Crc32
+    );
 
 /**
   Copies the contents of one buffer to another buffer.
@@ -1162,10 +1195,10 @@ EFI_STATUS
 typedef
 VOID
 (EFIAPI *EFI_COPY_MEM)(
-  IN VOID     *Destination,
-  IN VOID     *Source,
-  IN UINTN    Length
-  );
+    IN VOID     *Destination,
+    IN VOID     *Source,
+    IN UINTN    Length
+    );
 
 /**
   The SetMem() function fills a buffer with a specified value.
@@ -1176,10 +1209,10 @@ VOID
 typedef
 VOID
 (EFIAPI *EFI_SET_MEM)(
-  IN VOID     *Buffer,
-  IN UINTN    Size,
-  IN UINT8    Value
-  );
+    IN VOID     *Buffer,
+    IN UINTN    Size,
+    IN UINT8    Value
+    );
 
 struct EFI_BOOT_SERVICES {
     EFI_TABLE_HEADER Hdr;
@@ -1277,11 +1310,6 @@ struct EFI_CONFIGURATION_TABLE {
     EFI_GUID VendorGuid;
     VOID *VendorTable;
 };
-
-#define EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL_GUID \
-  { \
-    0x387477c2, 0x69c7, 0x11d2, {0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
-  }
 
 ///
 /// Protocol GUID defined in EFI1.1.
@@ -1423,9 +1451,9 @@ struct EFI_CONFIGURATION_TABLE {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_RESET)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN BOOLEAN                                ExtendedVerification
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN BOOLEAN                                ExtendedVerification
+    );
 
 /**
   Write a string to the output device.
@@ -1445,9 +1473,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_STRING)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN CHAR16                                 *String
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN CHAR16                         const   *String   // <-- DGOS added const
+    );
 
 /**
   Verifies that all characters in a string can be output to the
@@ -1463,9 +1491,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_TEST_STRING)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN CHAR16                                 *String
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN CHAR16                                 *String
+    );
 
 /**
   Returns information for an available text mode that the output device(s)
@@ -1484,11 +1512,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_QUERY_MODE)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN UINTN                                  ModeNumber,
-  OUT UINTN                                 *Columns,
-  OUT UINTN                                 *Rows
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN UINTN                                  ModeNumber,
+    OUT UINTN                                 *Columns,
+    OUT UINTN                                 *Rows
+    );
 
 /**
   Sets the output device(s) to a specified mode.
@@ -1501,9 +1529,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_SET_MODE)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN UINTN                                  ModeNumber
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN UINTN                                  ModeNumber
+    );
 
 /**
   Sets the background and foreground colors for the OutputString () and
@@ -1519,9 +1547,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_SET_ATTRIBUTE)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN UINTN                                  Attribute
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN UINTN                                  Attribute
+    );
 
 /**
   Clears the output device(s) display to the currently selected background
@@ -1535,8 +1563,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_CLEAR_SCREEN)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL   *This
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL   *This
+    );
 
 /**
   Sets the current coordinates of the cursor position
@@ -1555,10 +1583,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_SET_CURSOR_POSITION)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN UINTN                                  Column,
-  IN UINTN                                  Row
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN UINTN                                  Column,
+    IN UINTN                                  Row
+    );
 
 /**
   Makes the cursor visible or invisible
@@ -1574,44 +1602,44 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_TEXT_ENABLE_CURSOR)(
-  IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
-  IN BOOLEAN                                Visible
-  );
+    IN EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL        *This,
+    IN BOOLEAN                                Visible
+    );
 
 /**
   @par Data Structure Description:
   Mode Structure pointed to by Simple Text Out protocol.
 **/
 struct EFI_SIMPLE_TEXT_OUTPUT_MODE {
-  ///
-  /// The number of modes supported by QueryMode () and SetMode ().
-  ///
-  INT32   MaxMode;
+    ///
+    /// The number of modes supported by QueryMode () and SetMode ().
+    ///
+    INT32   MaxMode;
 
-  //
-  // current settings
-  //
+    //
+    // current settings
+    //
 
-  ///
-  /// The text mode of the output device(s).
-  ///
-  INT32   Mode;
-  ///
-  /// The current character output attribute.
-  ///
-  INT32   Attribute;
-  ///
-  /// The cursor's column.
-  ///
-  INT32   CursorColumn;
-  ///
-  /// The cursor's row.
-  ///
-  INT32   CursorRow;
-  ///
-  /// The cursor is currently visbile or not.
-  ///
-  BOOLEAN CursorVisible;
+    ///
+    /// The text mode of the output device(s).
+    ///
+    INT32   Mode;
+    ///
+    /// The current character output attribute.
+    ///
+    INT32   Attribute;
+    ///
+    /// The cursor's column.
+    ///
+    INT32   CursorColumn;
+    ///
+    /// The cursor's row.
+    ///
+    INT32   CursorRow;
+    ///
+    /// The cursor is currently visbile or not.
+    ///
+    BOOLEAN CursorVisible;
 };
 
 ///
@@ -1621,25 +1649,124 @@ struct EFI_SIMPLE_TEXT_OUTPUT_MODE {
 /// devices is at least 80 x 25 characters.
 ///
 struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
-  EFI_TEXT_RESET                Reset;
+    EFI_TEXT_RESET                Reset;
 
-  EFI_TEXT_STRING               OutputString;
-  EFI_TEXT_TEST_STRING          TestString;
+    EFI_TEXT_STRING               OutputString;
+    EFI_TEXT_TEST_STRING          TestString;
 
-  EFI_TEXT_QUERY_MODE           QueryMode;
-  EFI_TEXT_SET_MODE             SetMode;
-  EFI_TEXT_SET_ATTRIBUTE        SetAttribute;
+    EFI_TEXT_QUERY_MODE           QueryMode;
+    EFI_TEXT_SET_MODE             SetMode;
+    EFI_TEXT_SET_ATTRIBUTE        SetAttribute;
 
-  EFI_TEXT_CLEAR_SCREEN         ClearScreen;
-  EFI_TEXT_SET_CURSOR_POSITION  SetCursorPosition;
-  EFI_TEXT_ENABLE_CURSOR        EnableCursor;
+    EFI_TEXT_CLEAR_SCREEN         ClearScreen;
+    EFI_TEXT_SET_CURSOR_POSITION  SetCursorPosition;
+    EFI_TEXT_ENABLE_CURSOR        EnableCursor;
 
-  ///
-  /// Pointer to SIMPLE_TEXT_OUTPUT_MODE data.
-  ///
-  EFI_SIMPLE_TEXT_OUTPUT_MODE   *Mode;
+    ///
+    /// Pointer to SIMPLE_TEXT_OUTPUT_MODE data.
+    ///
+    EFI_SIMPLE_TEXT_OUTPUT_MODE   *Mode;
 };
 
+#define EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID \
+  { \
+    0x387477c1, 0x69c7, 0x11d2, {0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b } \
+  }
+
+typedef struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL  EFI_SIMPLE_TEXT_INPUT_PROTOCOL;
+
+///
+/// Protocol GUID name defined in EFI1.1.
+///
+#define SIMPLE_INPUT_PROTOCOL   EFI_SIMPLE_TEXT_INPUT_PROTOCOL_GUID
+
+///
+/// The keystroke information for the key that was pressed.
+///
+typedef struct {
+    UINT16  ScanCode;
+    CHAR16  UnicodeChar;
+} EFI_INPUT_KEY;
+
+//
+// Required unicode control chars
+//
+#define EFI_CHAR_NULL             0x0000
+#define EFI_CHAR_BACKSPACE        0x0008
+#define EFI_CHAR_TAB              0x0009
+#define EFI_CHAR_LINEFEED         0x000A
+#define EFI_CHAR_CARRIAGE_RETURN  0x000D
+
+//
+// EFI Scan codes
+//
+#define EFI_SCAN_NULL       0x0000
+#define EFI_SCAN_UP         0x0001
+#define EFI_SCAN_DOWN       0x0002
+#define EFI_SCAN_RIGHT      0x0003
+#define EFI_SCAN_LEFT       0x0004
+#define EFI_SCAN_HOME       0x0005
+#define EFI_SCAN_END        0x0006
+#define EFI_SCAN_INSERT     0x0007
+#define EFI_SCAN_DELETE     0x0008
+#define EFI_SCAN_PAGE_UP    0x0009
+#define EFI_SCAN_PAGE_DOWN  0x000A
+#define EFI_SCAN_F1         0x000B
+#define EFI_SCAN_F2         0x000C
+#define EFI_SCAN_F3         0x000D
+#define EFI_SCAN_F4         0x000E
+#define EFI_SCAN_F5         0x000F
+#define EFI_SCAN_F6         0x0010
+#define EFI_SCAN_F7         0x0011
+#define EFI_SCAN_F8         0x0012
+#define EFI_SCAN_F9         0x0013
+#define EFI_SCAN_F10        0x0014
+#define EFI_SCAN_ESC        0x0017
+
+/**
+  Reset the input device and optionally run diagnostics
+  @param  This                 Protocol instance pointer.
+  @param  ExtendedVerification Driver may perform diagnostics on reset.
+  @retval EFI_SUCCESS          The device was reset.
+  @retval EFI_DEVICE_ERROR     The device is not functioning properly and could not be reset.
+**/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_INPUT_RESET)(
+    IN EFI_SIMPLE_TEXT_INPUT_PROTOCOL       *This,
+    IN BOOLEAN                              ExtendedVerification
+    );
+
+/**
+  Reads the next keystroke from the input device. The WaitForKey Event can
+  be used to test for existence of a keystroke via WaitForEvent () call.
+  @param  This  Protocol instance pointer.
+  @param  Key   A pointer to a buffer that is filled in with the keystroke
+                information for the key that was pressed.
+  @retval EFI_SUCCESS      The keystroke information was returned.
+  @retval EFI_NOT_READY    There was no keystroke data available.
+  @retval EFI_DEVICE_ERROR The keystroke information was not returned due to
+                           hardware errors.
+**/
+typedef
+EFI_STATUS
+(EFIAPI *EFI_INPUT_READ_KEY)(
+    IN EFI_SIMPLE_TEXT_INPUT_PROTOCOL       *This,
+    OUT EFI_INPUT_KEY                       *Key
+    );
+
+///
+/// The EFI_SIMPLE_TEXT_INPUT_PROTOCOL is used on the ConsoleIn device.
+/// It is the minimum required protocol for ConsoleIn.
+///
+struct _EFI_SIMPLE_TEXT_INPUT_PROTOCOL {
+    EFI_INPUT_RESET     Reset;
+    EFI_INPUT_READ_KEY  ReadKeyStroke;
+    ///
+    /// Event to use with WaitForEvent() to wait for a key to be available
+    ///
+    EFI_EVENT           WaitForKey;
+};
 
 #define ACPI_20_TABLE_GUID \
     {0x8868e871,0xe4f1,0x11d3,0xbc,0x22,0x0,0x80,0xc7,0x3c,0x88,0x81}
@@ -1656,7 +1783,9 @@ struct EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL {
 //
 // Status codes common to all execution phases
 //
-typedef UINTN RETURN_STATUS;
+typedef EFI_STATUS RETURN_STATUS;
+
+#define MAX_BIT (~((UINTN)-1 >> 1))
 
 /**
   Produces a RETURN_STATUS code with the highest bit set.
@@ -1681,7 +1810,7 @@ typedef UINTN RETURN_STATUS;
   @retval TRUE          The high bit of StatusCode is set.
   @retval FALSE         The high bit of StatusCode is clear.
 **/
-#define RETURN_ERROR(StatusCode)     (((INTN)(RETURN_STATUS)(StatusCode)) < 0)
+#define RETURN_ERROR(StatusCode)     (((StatusCode)) < 0)
 
 ///
 /// The operation completed successfully.
@@ -1891,78 +2020,6 @@ typedef UINTN RETURN_STATUS;
 ///
 #define RETURN_WARN_FILE_SYSTEM      ENCODE_WARNING (6)
 
-
-/**
-  Returns a 16-bit signature built from 2 ASCII characters.
-  This macro returns a 16-bit value built from the two ASCII characters specified
-  by A and B.
-  @param  A    The first ASCII character.
-  @param  B    The second ASCII character.
-  @return A 16-bit value built from the two ASCII characters specified by A and B.
-**/
-#define SIGNATURE_16(A, B)        ((A) | (B << 8))
-
-/**
-  Returns a 32-bit signature built from 4 ASCII characters.
-  This macro returns a 32-bit value built from the four ASCII characters specified
-  by A, B, C, and D.
-  @param  A    The first ASCII character.
-  @param  B    The second ASCII character.
-  @param  C    The third ASCII character.
-  @param  D    The fourth ASCII character.
-  @return A 32-bit value built from the two ASCII characters specified by A, B,
-          C and D.
-**/
-#define SIGNATURE_32(A, B, C, D)  (SIGNATURE_16 (A, B) | (SIGNATURE_16 (C, D) << 16))
-
-/**
-  Returns a 64-bit signature built from 8 ASCII characters.
-  This macro returns a 64-bit value built from the eight ASCII characters specified
-  by A, B, C, D, E, F, G,and H.
-  @param  A    The first ASCII character.
-  @param  B    The second ASCII character.
-  @param  C    The third ASCII character.
-  @param  D    The fourth ASCII character.
-  @param  E    The fifth ASCII character.
-  @param  F    The sixth ASCII character.
-  @param  G    The seventh ASCII character.
-  @param  H    The eighth ASCII character.
-  @return A 64-bit value built from the two ASCII characters specified by A, B,
-          C, D, E, F, G and H.
-**/
-#define SIGNATURE_64(A, B, C, D, E, F, G, H) \
-    (SIGNATURE_32 (A, B, C, D) | ((UINT64) (SIGNATURE_32 (E, F, G, H)) << 32))
-
-#if defined(_MSC_EXTENSIONS) && !defined (__INTEL_COMPILER) && !defined (MDE_CPU_EBC)
-  #pragma intrinsic(_ReturnAddress)
-  /**
-    Get the return address of the calling funcation.
-    Based on intrinsic function _ReturnAddress that provides the address of
-    the instruction in the calling function that will be executed after
-    control returns to the caller.
-    @param L    Return Level.
-    @return The return address of the calling funcation or 0 if L != 0.
-  **/
-  #define RETURN_ADDRESS(L)     ((L == 0) ? _ReturnAddress() : (VOID *) 0)
-#elif defined(__GNUC__)
-  void * __builtin_return_address (unsigned int level);
-  /**
-    Get the return address of the calling funcation.
-    Based on built-in Function __builtin_return_address that returns
-    the return address of the current function, or of one of its callers.
-    @param L    Return Level.
-    @return The return address of the calling funcation.
-  **/
-  #define RETURN_ADDRESS(L)     __builtin_return_address (L)
-#else
-  /**
-    Get the return address of the calling funcation.
-    @param L    Return Level.
-    @return 0 as compilers don't support this feature.
-  **/
-  #define RETURN_ADDRESS(L)     ((VOID *) 0)
-#endif
-
 ///
 /// Enumeration of EFI_STATUS.
 ///@{
@@ -2033,34 +2090,34 @@ typedef UINTN RETURN_STATUS;
 ///@}
 
 struct EFI_LOADED_IMAGE_PROTOCOL {
-  UINT32            Revision;       ///< Defines the revision of the EFI_LOADED_IMAGE_PROTOCOL structure.
+    UINT32            Revision;       ///< Defines the revision of the EFI_LOADED_IMAGE_PROTOCOL structure.
                                     ///< All future revisions will be backward compatible to the current revision.
-  EFI_HANDLE        ParentHandle;   ///< Parent image's image handle. NULL if the image is loaded directly from
+    EFI_HANDLE        ParentHandle;   ///< Parent image's image handle. NULL if the image is loaded directly from
                                     ///< the firmware's boot manager.
-  EFI_SYSTEM_TABLE  *SystemTable;   ///< the image's EFI system table pointer.
+    EFI_SYSTEM_TABLE  *SystemTable;   ///< the image's EFI system table pointer.
 
-  //
-  // Source location of image
-  //
-  EFI_HANDLE        DeviceHandle;   ///< The device handle that the EFI Image was loaded from.
-  EFI_DEVICE_PATH_PROTOCOL  *FilePath;  ///< A pointer to the file path portion specific to DeviceHandle
+    //
+    // Source location of image
+    //
+    EFI_HANDLE        DeviceHandle;   ///< The device handle that the EFI Image was loaded from.
+    EFI_DEVICE_PATH_PROTOCOL  *FilePath;  ///< A pointer to the file path portion specific to DeviceHandle
                                         ///< that the EFI Image was loaded from.
-  VOID              *Reserved;      ///< Reserved. DO NOT USE.
+    VOID              *Reserved;      ///< Reserved. DO NOT USE.
 
-  //
-  // Images load options
-  //
-  UINT32            LoadOptionsSize;///< The size in bytes of LoadOptions.
-  VOID              *LoadOptions;   ///< A pointer to the image's binary load options.
+    //
+    // Images load options
+    //
+    UINT32            LoadOptionsSize;///< The size in bytes of LoadOptions.
+    VOID              *LoadOptions;   ///< A pointer to the image's binary load options.
 
-  //
-  // Location of where image was loaded
-  //
-  VOID              *ImageBase;     ///< The base address at which the image was loaded.
-  UINT64            ImageSize;      ///< The size in bytes of the loaded image.
-  EFI_MEMORY_TYPE   ImageCodeType;  ///< The memory type that the code sections were loaded as.
-  EFI_MEMORY_TYPE   ImageDataType;  ///< The memory type that the data sections were loaded as.
-  EFI_IMAGE_UNLOAD  Unload;
+    //
+    // Location of where image was loaded
+    //
+    VOID              *ImageBase;     ///< The base address at which the image was loaded.
+    UINT64            ImageSize;      ///< The size in bytes of the loaded image.
+    EFI_MEMORY_TYPE   ImageCodeType;  ///< The memory type that the code sections were loaded as.
+    EFI_MEMORY_TYPE   ImageDataType;  ///< The memory type that the data sections were loaded as.
+    EFI_IMAGE_UNLOAD  Unload;
 };
 
 //
@@ -2077,9 +2134,9 @@ struct EFI_LOADED_IMAGE_PROTOCOL {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_BLOCK_RESET)(
-  IN EFI_BLOCK_IO_PROTOCOL          *This,
-  IN BOOLEAN                        ExtendedVerification
-  );
+    IN EFI_BLOCK_IO_PROTOCOL          *This,
+    IN BOOLEAN                        ExtendedVerification
+    );
 
 /**
   Read BufferSize bytes from Lba into Buffer.
@@ -2100,12 +2157,12 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_BLOCK_READ)(
-  IN EFI_BLOCK_IO_PROTOCOL          *This,
-  IN UINT32                         MediaId,
-  IN EFI_LBA                        Lba,
-  IN UINTN                          BufferSize,
-  OUT VOID                          *Buffer
-  );
+    IN EFI_BLOCK_IO_PROTOCOL          *This,
+    IN UINT32                         MediaId,
+    IN EFI_LBA                        Lba,
+    IN UINTN                          BufferSize,
+    OUT VOID                          *Buffer
+    );
 
 /**
   Write BufferSize bytes from Lba into Buffer.
@@ -2127,12 +2184,12 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_BLOCK_WRITE)(
-  IN EFI_BLOCK_IO_PROTOCOL          *This,
-  IN UINT32                         MediaId,
-  IN EFI_LBA                        Lba,
-  IN UINTN                          BufferSize,
-  IN VOID                           *Buffer
-  );
+    IN EFI_BLOCK_IO_PROTOCOL          *This,
+    IN UINT32                         MediaId,
+    IN EFI_LBA                        Lba,
+    IN UINTN                          BufferSize,
+    IN VOID                           *Buffer
+    );
 
 /**
   Flush the Block Device.
@@ -2144,84 +2201,84 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_BLOCK_FLUSH)(
-  IN EFI_BLOCK_IO_PROTOCOL  *This
-  );
+    IN EFI_BLOCK_IO_PROTOCOL  *This
+    );
 
 /**
   Block IO read only mode data and updated only via members of BlockIO
 **/
 typedef struct {
-  ///
-  /// The curent media Id. If the media changes, this value is changed.
-  ///
-  UINT32  MediaId;
+    ///
+    /// The curent media Id. If the media changes, this value is changed.
+    ///
+    UINT32  MediaId;
 
-  ///
-  /// TRUE if the media is removable; otherwise, FALSE.
-  ///
-  BOOLEAN RemovableMedia;
+    ///
+    /// TRUE if the media is removable; otherwise, FALSE.
+    ///
+    BOOLEAN RemovableMedia;
 
-  ///
-  /// TRUE if there is a media currently present in the device;
-  /// othersise, FALSE. THis field shows the media present status
-  /// as of the most recent ReadBlocks() or WriteBlocks() call.
-  ///
-  BOOLEAN MediaPresent;
+    ///
+    /// TRUE if there is a media currently present in the device;
+    /// othersise, FALSE. THis field shows the media present status
+    /// as of the most recent ReadBlocks() or WriteBlocks() call.
+    ///
+    BOOLEAN MediaPresent;
 
-  ///
-  /// TRUE if LBA 0 is the first block of a partition; otherwise
-  /// FALSE. For media with only one partition this would be TRUE.
-  ///
-  BOOLEAN LogicalPartition;
+    ///
+    /// TRUE if LBA 0 is the first block of a partition; otherwise
+    /// FALSE. For media with only one partition this would be TRUE.
+    ///
+    BOOLEAN LogicalPartition;
 
-  ///
-  /// TRUE if the media is marked read-only otherwise, FALSE.
-  /// This field shows the read-only status as of the most recent WriteBlocks () call.
-  ///
-  BOOLEAN ReadOnly;
+    ///
+    /// TRUE if the media is marked read-only otherwise, FALSE.
+    /// This field shows the read-only status as of the most recent WriteBlocks () call.
+    ///
+    BOOLEAN ReadOnly;
 
-  ///
-  /// TRUE if the WriteBlock () function caches write data.
-  ///
-  BOOLEAN WriteCaching;
+    ///
+    /// TRUE if the WriteBlock () function caches write data.
+    ///
+    BOOLEAN WriteCaching;
 
-  ///
-  /// The intrinsic block size of the device. If the media changes, then
-  /// this field is updated.
-  ///
-  UINT32  BlockSize;
+    ///
+    /// The intrinsic block size of the device. If the media changes, then
+    /// this field is updated.
+    ///
+    UINT32  BlockSize;
 
-  ///
-  /// Supplies the alignment requirement for any buffer to read or write block(s).
-  ///
-  UINT32  IoAlign;
+    ///
+    /// Supplies the alignment requirement for any buffer to read or write block(s).
+    ///
+    UINT32  IoAlign;
 
-  ///
-  /// The last logical block address on the device.
-  /// If the media changes, then this field is updated.
-  ///
-  EFI_LBA LastBlock;
+    ///
+    /// The last logical block address on the device.
+    /// If the media changes, then this field is updated.
+    ///
+    EFI_LBA LastBlock;
 
-  ///
-  /// Only present if EFI_BLOCK_IO_PROTOCOL.Revision is greater than or equal to
-  /// EFI_BLOCK_IO_PROTOCOL_REVISION2. Returns the first LBA is aligned to
-  /// a physical block boundary.
-  ///
-  EFI_LBA LowestAlignedLba;
+    ///
+    /// Only present if EFI_BLOCK_IO_PROTOCOL.Revision is greater than or equal to
+    /// EFI_BLOCK_IO_PROTOCOL_REVISION2. Returns the first LBA is aligned to
+    /// a physical block boundary.
+    ///
+    EFI_LBA LowestAlignedLba;
 
-  ///
-  /// Only present if EFI_BLOCK_IO_PROTOCOL.Revision is greater than or equal to
-  /// EFI_BLOCK_IO_PROTOCOL_REVISION2. Returns the number of logical blocks
-  /// per physical block.
-  ///
-  UINT32 LogicalBlocksPerPhysicalBlock;
+    ///
+    /// Only present if EFI_BLOCK_IO_PROTOCOL.Revision is greater than or equal to
+    /// EFI_BLOCK_IO_PROTOCOL_REVISION2. Returns the number of logical blocks
+    /// per physical block.
+    ///
+    UINT32 LogicalBlocksPerPhysicalBlock;
 
-  ///
-  /// Only present if EFI_BLOCK_IO_PROTOCOL.Revision is greater than or equal to
-  /// EFI_BLOCK_IO_PROTOCOL_REVISION3. Returns the optimal transfer length
-  /// granularity as a number of logical blocks.
-  ///
-  UINT32 OptimalTransferLengthGranularity;
+    ///
+    /// Only present if EFI_BLOCK_IO_PROTOCOL.Revision is greater than or equal to
+    /// EFI_BLOCK_IO_PROTOCOL_REVISION3. Returns the optimal transfer length
+    /// granularity as a number of logical blocks.
+    ///
+    UINT32 OptimalTransferLengthGranularity;
 } EFI_BLOCK_IO_MEDIA;
 
 #define EFI_BLOCK_IO_PROTOCOL_REVISION  0x00010000
@@ -2237,21 +2294,21 @@ typedef struct {
 ///  This protocol provides control over block devices.
 ///
 struct EFI_BLOCK_IO_PROTOCOL {
-  ///
-  /// The revision to which the block IO interface adheres. All future
-  /// revisions must be backwards compatible. If a future version is not
-  /// back wards compatible, it is not the same GUID.
-  ///
-  UINT64              Revision;
-  ///
-  /// Pointer to the EFI_BLOCK_IO_MEDIA data for this device.
-  ///
-  EFI_BLOCK_IO_MEDIA  *Media;
+    ///
+    /// The revision to which the block IO interface adheres. All future
+    /// revisions must be backwards compatible. If a future version is not
+    /// back wards compatible, it is not the same GUID.
+    ///
+    UINT64              Revision;
+    ///
+    /// Pointer to the EFI_BLOCK_IO_MEDIA data for this device.
+    ///
+    EFI_BLOCK_IO_MEDIA  *Media;
 
-  EFI_BLOCK_RESET     Reset;
-  EFI_BLOCK_READ      ReadBlocks;
-  EFI_BLOCK_WRITE     WriteBlocks;
-  EFI_BLOCK_FLUSH     FlushBlocks;
+    EFI_BLOCK_RESET     Reset;
+    EFI_BLOCK_READ      ReadBlocks;
+    EFI_BLOCK_WRITE     WriteBlocks;
+    EFI_BLOCK_FLUSH     FlushBlocks;
 };
 
 //
@@ -2277,20 +2334,20 @@ struct EFI_BLOCK_IO_PROTOCOL {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME)(
-  IN EFI_SIMPLE_FILE_SYSTEM_PROTOCOL    *This,
-  OUT EFI_FILE_PROTOCOL                 **Root
-  );
+    IN EFI_SIMPLE_FILE_SYSTEM_PROTOCOL    *This,
+    OUT EFI_FILE_PROTOCOL                 **Root
+    );
 
 #define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION  0x00010000
 
 struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
-  ///
-  /// The version of the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL. The version
-  /// specified by this specification is 0x00010000. All future revisions
-  /// must be backwards compatible.
-  ///
-  UINT64                                      Revision;
-  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME OpenVolume;
+    ///
+    /// The version of the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL. The version
+    /// specified by this specification is 0x00010000. All future revisions
+    /// must be backwards compatible.
+    ///
+    UINT64                                      Revision;
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME OpenVolume;
 };
 
 /**
@@ -2323,12 +2380,12 @@ struct EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_OPEN)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT EFI_FILE_PROTOCOL       **NewHandle,
-  IN CHAR16                   *FileName,
-  IN UINT64                   OpenMode,
-  IN UINT64                   Attributes
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    OUT EFI_FILE_PROTOCOL       **NewHandle,
+    IN CHAR16          const    *FileName,    // <-- DGOS: hacked in const
+    IN UINT64                   OpenMode,
+    IN UINT64                   Attributes
+    );
 
 //
 // Open modes
@@ -2357,8 +2414,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_CLOSE)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
+    IN EFI_FILE_PROTOCOL  *This
+    );
 
 /**
   Close and delete the file handle.
@@ -2370,8 +2427,8 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_DELETE)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
+    IN EFI_FILE_PROTOCOL  *This
+    );
 
 /**
   Reads data from a file.
@@ -2393,10 +2450,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_READ)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT UINTN                *BufferSize,
-  OUT VOID                    *Buffer
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    IN OUT UINTN                *BufferSize,
+    OUT VOID                    *Buffer
+    );
 
 /**
   Writes data to a file.
@@ -2418,10 +2475,10 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_WRITE)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT UINTN                *BufferSize,
-  IN VOID                     *Buffer
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    IN OUT UINTN                *BufferSize,
+    IN VOID                     *Buffer
+    );
 
 /**
   Sets a file's current position.
@@ -2436,9 +2493,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_SET_POSITION)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN UINT64                   Position
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    IN UINT64                   Position
+    );
 
 /**
   Returns a file's current position.
@@ -2452,9 +2509,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_GET_POSITION)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT UINT64                  *Position
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    OUT UINT64                  *Position
+    );
 
 /**
   Returns information about a file.
@@ -2477,11 +2534,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_GET_INFO)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN EFI_GUID                 *InformationType,
-  IN OUT UINTN                *BufferSize,
-  OUT VOID                    *Buffer
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    IN EFI_GUID          const  *InformationType,
+    IN OUT UINTN                *BufferSize,
+    OUT VOID                    *Buffer
+    );
 
 /**
   Sets information about a file.
@@ -2517,11 +2574,11 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_SET_INFO)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN EFI_GUID                 *InformationType,
-  IN UINTN                    BufferSize,
-  IN VOID                     *Buffer
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    IN EFI_GUID          const  *InformationType,
+    IN UINTN                    BufferSize,
+    IN VOID                     *Buffer
+    );
 
 /**
   Flushes all modified data associated with a file to a device.
@@ -2538,41 +2595,41 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_FLUSH)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
+    IN EFI_FILE_PROTOCOL  *This
+    );
 
 struct EFI_FILE_IO_TOKEN {
-  //
-  // If Event is NULL, then blocking I/O is performed.
-  // If Event is not NULL and non-blocking I/O is supported, then non-blocking I/O is performed,
-  // and Event will be signaled when the read request is completed.
-  // The caller must be prepared to handle the case where the callback associated with Event
-  // occurs before the original asynchronous I/O request call returns.
-  //
-  EFI_EVENT                   Event;
+    //
+    // If Event is NULL, then blocking I/O is performed.
+    // If Event is not NULL and non-blocking I/O is supported, then non-blocking I/O is performed,
+    // and Event will be signaled when the read request is completed.
+    // The caller must be prepared to handle the case where the callback associated with Event
+    // occurs before the original asynchronous I/O request call returns.
+    //
+    EFI_EVENT                   Event;
 
-  //
-  // Defines whether or not the signaled event encountered an error.
-  //
-  EFI_STATUS                  Status;
+    //
+    // Defines whether or not the signaled event encountered an error.
+    //
+    EFI_STATUS                  Status;
 
-  //
-  // For OpenEx():  Not Used, ignored.
-  // For ReadEx():  On input, the size of the Buffer. On output, the amount of data returned in Buffer.
-  //                In both cases, the size is measured in bytes.
-  // For WriteEx(): On input, the size of the Buffer. On output, the amount of data actually written.
-  //                In both cases, the size is measured in bytes.
-  // For FlushEx(): Not used, ignored.
-  //
-  UINTN                       BufferSize;
+    //
+    // For OpenEx():  Not Used, ignored.
+    // For ReadEx():  On input, the size of the Buffer. On output, the amount of data returned in Buffer.
+    //                In both cases, the size is measured in bytes.
+    // For WriteEx(): On input, the size of the Buffer. On output, the amount of data actually written.
+    //                In both cases, the size is measured in bytes.
+    // For FlushEx(): Not used, ignored.
+    //
+    UINTN                       BufferSize;
 
-  //
-  // For OpenEx():  Not Used, ignored.
-  // For ReadEx():  The buffer into which the data is read.
-  // For WriteEx(): The buffer of data to write.
-  // For FlushEx(): Not Used, ignored.
-  //
-  VOID                        *Buffer;
+    //
+    // For OpenEx():  Not Used, ignored.
+    // For ReadEx():  The buffer into which the data is read.
+    // For WriteEx(): The buffer of data to write.
+    // For FlushEx(): Not Used, ignored.
+    //
+    VOID                        *Buffer;
 };
 
 /**
@@ -2607,13 +2664,13 @@ struct EFI_FILE_IO_TOKEN {
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_OPEN_EX)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT EFI_FILE_PROTOCOL       **NewHandle,
-  IN CHAR16                   *FileName,
-  IN UINT64                   OpenMode,
-  IN UINT64                   Attributes,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    OUT EFI_FILE_PROTOCOL       **NewHandle,
+    IN CHAR16                   *FileName,
+    IN UINT64                   OpenMode,
+    IN UINT64                   Attributes,
+    IN OUT EFI_FILE_IO_TOKEN    *Token
+    );
 
 
 /**
@@ -2633,9 +2690,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_READ_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-);
+    IN EFI_FILE_PROTOCOL        *This,
+    IN OUT EFI_FILE_IO_TOKEN    *Token
+    );
 
 
 /**
@@ -2681,9 +2738,9 @@ EFI_STATUS
 typedef
 EFI_STATUS
 (EFIAPI *EFI_FILE_FLUSH_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-  );
+    IN EFI_FILE_PROTOCOL        *This,
+    IN OUT EFI_FILE_IO_TOKEN    *Token
+    );
 
 #define EFI_FILE_PROTOCOL_REVISION        0x00010000
 #define EFI_FILE_PROTOCOL_REVISION2       0x00020000
@@ -2702,26 +2759,26 @@ EFI_STATUS
 /// relative to this file's location, yielding new file handles.
 ///
 struct EFI_FILE_PROTOCOL {
-  ///
-  /// The version of the EFI_FILE_PROTOCOL interface. The version specified
-  /// by this specification is EFI_FILE_PROTOCOL_LATEST_REVISION.
-  /// Future versions are required to be backward compatible to version 1.0.
-  ///
-  UINT64                Revision;
-  EFI_FILE_OPEN         Open;
-  EFI_FILE_CLOSE        Close;
-  EFI_FILE_DELETE       Delete;
-  EFI_FILE_READ         Read;
-  EFI_FILE_WRITE        Write;
-  EFI_FILE_GET_POSITION GetPosition;
-  EFI_FILE_SET_POSITION SetPosition;
-  EFI_FILE_GET_INFO     GetInfo;
-  EFI_FILE_SET_INFO     SetInfo;
-  EFI_FILE_FLUSH        Flush;
-  EFI_FILE_OPEN_EX      OpenEx;
-  EFI_FILE_READ_EX      ReadEx;
-  EFI_FILE_WRITE_EX     WriteEx;
-  EFI_FILE_FLUSH_EX     FlushEx;
+    ///
+    /// The version of the EFI_FILE_PROTOCOL interface. The version specified
+    /// by this specification is EFI_FILE_PROTOCOL_LATEST_REVISION.
+    /// Future versions are required to be backward compatible to version 1.0.
+    ///
+    UINT64                Revision;
+    EFI_FILE_OPEN         Open;
+    EFI_FILE_CLOSE        Close;
+    EFI_FILE_DELETE       Delete;
+    EFI_FILE_READ         Read;
+    EFI_FILE_WRITE        Write;
+    EFI_FILE_GET_POSITION GetPosition;
+    EFI_FILE_SET_POSITION SetPosition;
+    EFI_FILE_GET_INFO     GetInfo;
+    EFI_FILE_SET_INFO     SetInfo;
+    EFI_FILE_FLUSH        Flush;
+    EFI_FILE_OPEN_EX      OpenEx;
+    EFI_FILE_READ_EX      ReadEx;
+    EFI_FILE_WRITE_EX     WriteEx;
+    EFI_FILE_FLUSH_EX     FlushEx;
 };
 
 //
@@ -2740,404 +2797,10 @@ typedef struct _EFI_FILE_PROTOCOL         *EFI_FILE_HANDLE;
 typedef EFI_SIMPLE_FILE_SYSTEM_PROTOCOL   EFI_FILE_IO_INTERFACE;
 typedef EFI_FILE_PROTOCOL                 EFI_FILE;
 
-/**
-  Open the root directory on a volume.
-  @param  This A pointer to the volume to open the root directory.
-  @param  Root A pointer to the location to return the opened file handle for the
-               root directory.
-  @retval EFI_SUCCESS          The device was opened.
-  @retval EFI_UNSUPPORTED      This volume does not support the requested file system type.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_ACCESS_DENIED    The service denied access to the file.
-  @retval EFI_OUT_OF_RESOURCES The volume was not opened due to lack of resources.
-  @retval EFI_MEDIA_CHANGED    The device has a different medium in it or the medium is no
-                               longer supported. Any existing file handles for this volume are
-                               no longer valid. To access the files on the new medium, the
-                               volume must be reopened with OpenVolume().
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME)(
-  IN EFI_SIMPLE_FILE_SYSTEM_PROTOCOL    *This,
-  OUT EFI_FILE_PROTOCOL                 **Root
-  );
-
-#define EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION  0x00010000
-
 ///
 /// Revision defined in EFI1.1
 ///
 #define EFI_FILE_IO_INTERFACE_REVISION  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_REVISION
-
-struct _EFI_SIMPLE_FILE_SYSTEM_PROTOCOL {
-  ///
-  /// The version of the EFI_SIMPLE_FILE_SYSTEM_PROTOCOL. The version
-  /// specified by this specification is 0x00010000. All future revisions
-  /// must be backwards compatible.
-  ///
-  UINT64                                      Revision;
-  EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_OPEN_VOLUME OpenVolume;
-};
-
-/**
-  Opens a new file relative to the source file's location.
-  @param  This       A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                     handle to the source location. This would typically be an open
-                     handle to a directory.
-  @param  NewHandle  A pointer to the location to return the opened handle for the new
-                     file.
-  @param  FileName   The Null-terminated string of the name of the file to be opened.
-                     The file name may contain the following path modifiers: "\", ".",
-                     and "..".
-  @param  OpenMode   The mode to open the file. The only valid combinations that the
-                     file may be opened with are: Read, Read/Write, or Create/Read/Write.
-  @param  Attributes Only valid for EFI_FILE_MODE_CREATE, in which case these are the
-                     attribute bits for the newly created file.
-  @retval EFI_SUCCESS          The file was opened.
-  @retval EFI_NOT_FOUND        The specified file could not be found on the device.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_MEDIA_CHANGED    The device has a different medium in it or the medium is no
-                               longer supported.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  An attempt was made to create a file, or open a file for write
-                               when the media is write-protected.
-  @retval EFI_ACCESS_DENIED    The service denied access to the file.
-  @retval EFI_OUT_OF_RESOURCES Not enough resources were available to open the file.
-  @retval EFI_VOLUME_FULL      The volume is full.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_OPEN)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT EFI_FILE_PROTOCOL       **NewHandle,
-  IN CHAR16                   *FileName,
-  IN UINT64                   OpenMode,
-  IN UINT64                   Attributes
-  );
-
-//
-// Open modes
-//
-#define EFI_FILE_MODE_READ    0x0000000000000001ULL
-#define EFI_FILE_MODE_WRITE   0x0000000000000002ULL
-#define EFI_FILE_MODE_CREATE  0x8000000000000000ULL
-
-//
-// File attributes
-//
-#define EFI_FILE_READ_ONLY  0x0000000000000001ULL
-#define EFI_FILE_HIDDEN     0x0000000000000002ULL
-#define EFI_FILE_SYSTEM     0x0000000000000004ULL
-#define EFI_FILE_RESERVED   0x0000000000000008ULL
-#define EFI_FILE_DIRECTORY  0x0000000000000010ULL
-#define EFI_FILE_ARCHIVE    0x0000000000000020ULL
-#define EFI_FILE_VALID_ATTR 0x0000000000000037ULL
-
-/**
-  Closes a specified file handle.
-  @param  This          A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                        handle to close.
-  @retval EFI_SUCCESS   The file was closed.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_CLOSE)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
-
-/**
-  Close and delete the file handle.
-  @param  This                     A pointer to the EFI_FILE_PROTOCOL instance that is the
-                                   handle to the file to delete.
-  @retval EFI_SUCCESS              The file was closed and deleted, and the handle was closed.
-  @retval EFI_WARN_DELETE_FAILURE  The handle was closed, but the file was not deleted.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_DELETE)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
-
-/**
-  Reads data from a file.
-  @param  This       A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                     handle to read data from.
-  @param  BufferSize On input, the size of the Buffer. On output, the amount of data
-                     returned in Buffer. In both cases, the size is measured in bytes.
-  @param  Buffer     The buffer into which the data is read.
-  @retval EFI_SUCCESS          Data was read.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_DEVICE_ERROR     An attempt was made to read from a deleted file.
-  @retval EFI_DEVICE_ERROR     On entry, the current file position is beyond the end of the file.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_BUFFER_TOO_SMALL The BufferSize is too small to read the current directory
-                               entry. BufferSize has been updated with the size
-                               needed to complete the request.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_READ)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT UINTN                *BufferSize,
-  OUT VOID                    *Buffer
-  );
-
-/**
-  Writes data to a file.
-  @param  This       A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                     handle to write data to.
-  @param  BufferSize On input, the size of the Buffer. On output, the amount of data
-                     actually written. In both cases, the size is measured in bytes.
-  @param  Buffer     The buffer of data to write.
-  @retval EFI_SUCCESS          Data was written.
-  @retval EFI_UNSUPPORTED      Writes to open directory files are not supported.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_DEVICE_ERROR     An attempt was made to write to a deleted file.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  The file or medium is write-protected.
-  @retval EFI_ACCESS_DENIED    The file was opened read only.
-  @retval EFI_VOLUME_FULL      The volume is full.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_WRITE)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT UINTN                *BufferSize,
-  IN VOID                     *Buffer
-  );
-
-/**
-  Sets a file's current position.
-  @param  This            A pointer to the EFI_FILE_PROTOCOL instance that is the
-                          file handle to set the requested position on.
-  @param  Position        The byte position from the start of the file to set.
-  @retval EFI_SUCCESS      The position was set.
-  @retval EFI_UNSUPPORTED  The seek request for nonzero is not valid on open
-                           directories.
-  @retval EFI_DEVICE_ERROR An attempt was made to set the position of a deleted file.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_SET_POSITION)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN UINT64                   Position
-  );
-
-/**
-  Returns a file's current position.
-  @param  This            A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                          handle to get the current position on.
-  @param  Position        The address to return the file's current position value.
-  @retval EFI_SUCCESS      The position was returned.
-  @retval EFI_UNSUPPORTED  The request is not valid on open directories.
-  @retval EFI_DEVICE_ERROR An attempt was made to get the position from a deleted file.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_GET_POSITION)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT UINT64                  *Position
-  );
-
-/**
-  Returns information about a file.
-  @param  This            A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                          handle the requested information is for.
-  @param  InformationType The type identifier for the information being requested.
-  @param  BufferSize      On input, the size of Buffer. On output, the amount of data
-                          returned in Buffer. In both cases, the size is measured in bytes.
-  @param  Buffer          A pointer to the data buffer to return. The buffer's type is
-                          indicated by InformationType.
-  @retval EFI_SUCCESS          The information was returned.
-  @retval EFI_UNSUPPORTED      The InformationType is not known.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_BUFFER_TOO_SMALL The BufferSize is too small to read the current directory entry.
-                               BufferSize has been updated with the size needed to complete
-                               the request.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_GET_INFO)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN EFI_GUID                 *InformationType,
-  IN OUT UINTN                *BufferSize,
-  OUT VOID                    *Buffer
-  );
-
-/**
-  Sets information about a file.
-  @param  File            A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                          handle the information is for.
-  @param  InformationType The type identifier for the information being set.
-  @param  BufferSize      The size, in bytes, of Buffer.
-  @param  Buffer          A pointer to the data buffer to write. The buffer's type is
-                          indicated by InformationType.
-  @retval EFI_SUCCESS          The information was set.
-  @retval EFI_UNSUPPORTED      The InformationType is not known.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  InformationType is EFI_FILE_INFO_ID and the media is
-                               read-only.
-  @retval EFI_WRITE_PROTECTED  InformationType is EFI_FILE_PROTOCOL_SYSTEM_INFO_ID
-                               and the media is read only.
-  @retval EFI_WRITE_PROTECTED  InformationType is EFI_FILE_SYSTEM_VOLUME_LABEL_ID
-                               and the media is read-only.
-  @retval EFI_ACCESS_DENIED    An attempt is made to change the name of a file to a
-                               file that is already present.
-  @retval EFI_ACCESS_DENIED    An attempt is being made to change the EFI_FILE_DIRECTORY
-                               Attribute.
-  @retval EFI_ACCESS_DENIED    An attempt is being made to change the size of a directory.
-  @retval EFI_ACCESS_DENIED    InformationType is EFI_FILE_INFO_ID and the file was opened
-                               read-only and an attempt is being made to modify a field
-                               other than Attribute.
-  @retval EFI_VOLUME_FULL      The volume is full.
-  @retval EFI_BAD_BUFFER_SIZE  BufferSize is smaller than the size of the type indicated
-                               by InformationType.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_SET_INFO)(
-  IN EFI_FILE_PROTOCOL        *This,
-  IN EFI_GUID                 *InformationType,
-  IN UINTN                    BufferSize,
-  IN VOID                     *Buffer
-  );
-
-/**
-  Flushes all modified data associated with a file to a device.
-  @param  This A pointer to the EFI_FILE_PROTOCOL instance that is the file
-               handle to flush.
-  @retval EFI_SUCCESS          The data was flushed.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  The file or medium is write-protected.
-  @retval EFI_ACCESS_DENIED    The file was opened read-only.
-  @retval EFI_VOLUME_FULL      The volume is full.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_FLUSH)(
-  IN EFI_FILE_PROTOCOL  *This
-  );
-
-/**
-  Opens a new file relative to the source directory's location.
-  @param  This       A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                     handle to the source location.
-  @param  NewHandle  A pointer to the location to return the opened handle for the new
-                     file.
-  @param  FileName   The Null-terminated string of the name of the file to be opened.
-                     The file name may contain the following path modifiers: "\", ".",
-                     and "..".
-  @param  OpenMode   The mode to open the file. The only valid combinations that the
-                     file may be opened with are: Read, Read/Write, or Create/Read/Write.
-  @param  Attributes Only valid for EFI_FILE_MODE_CREATE, in which case these are the
-                     attribute bits for the newly created file.
-  @param  Token      A pointer to the token associated with the transaction.
-  @retval EFI_SUCCESS          If Event is NULL (blocking I/O): The data was read successfully.
-                               If Event is not NULL (asynchronous I/O): The request was successfully
-                                                                        queued for processing.
-  @retval EFI_NOT_FOUND        The specified file could not be found on the device.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_MEDIA_CHANGED    The device has a different medium in it or the medium is no
-                               longer supported.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  An attempt was made to create a file, or open a file for write
-                               when the media is write-protected.
-  @retval EFI_ACCESS_DENIED    The service denied access to the file.
-  @retval EFI_OUT_OF_RESOURCES Not enough resources were available to open the file.
-  @retval EFI_VOLUME_FULL      The volume is full.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_OPEN_EX)(
-  IN EFI_FILE_PROTOCOL        *This,
-  OUT EFI_FILE_PROTOCOL       **NewHandle,
-  IN CHAR16                   *FileName,
-  IN UINT64                   OpenMode,
-  IN UINT64                   Attributes,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-  );
-
-
-/**
-  Reads data from a file.
-  @param  This       A pointer to the EFI_FILE_PROTOCOL instance that is the file handle to read data from.
-  @param  Token      A pointer to the token associated with the transaction.
-  @retval EFI_SUCCESS          If Event is NULL (blocking I/O): The data was read successfully.
-                               If Event is not NULL (asynchronous I/O): The request was successfully
-                                                                        queued for processing.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_DEVICE_ERROR     An attempt was made to read from a deleted file.
-  @retval EFI_DEVICE_ERROR     On entry, the current file position is beyond the end of the file.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_OUT_OF_RESOURCES Unable to queue the request due to lack of resources.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_READ_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-);
-
-
-/**
-  Writes data to a file.
-  @param  This       A pointer to the EFI_FILE_PROTOCOL instance that is the file handle to write data to.
-  @param  Token      A pointer to the token associated with the transaction.
-  @retval EFI_SUCCESS          If Event is NULL (blocking I/O): The data was read successfully.
-                               If Event is not NULL (asynchronous I/O): The request was successfully
-                                                                        queued for processing.
-  @retval EFI_UNSUPPORTED      Writes to open directory files are not supported.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_DEVICE_ERROR     An attempt was made to write to a deleted file.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  The file or medium is write-protected.
-  @retval EFI_ACCESS_DENIED    The file was opened read only.
-  @retval EFI_VOLUME_FULL      The volume is full.
-  @retval EFI_OUT_OF_RESOURCES Unable to queue the request due to lack of resources.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_WRITE_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-);
-
-/**
-  Flushes all modified data associated with a file to a device.
-  @param  This  A pointer to the EFI_FILE_PROTOCOL instance that is the file
-                handle to flush.
-  @param  Token A pointer to the token associated with the transaction.
-  @retval EFI_SUCCESS          If Event is NULL (blocking I/O): The data was read successfully.
-                               If Event is not NULL (asynchronous I/O): The request was successfully
-                                                                        queued for processing.
-  @retval EFI_NO_MEDIA         The device has no medium.
-  @retval EFI_DEVICE_ERROR     The device reported an error.
-  @retval EFI_VOLUME_CORRUPTED The file system structures are corrupted.
-  @retval EFI_WRITE_PROTECTED  The file or medium is write-protected.
-  @retval EFI_ACCESS_DENIED    The file was opened read-only.
-  @retval EFI_VOLUME_FULL      The volume is full.
-  @retval EFI_OUT_OF_RESOURCES Unable to queue the request due to lack of resources.
-**/
-typedef
-EFI_STATUS
-(EFIAPI *EFI_FILE_FLUSH_EX) (
-  IN EFI_FILE_PROTOCOL        *This,
-  IN OUT EFI_FILE_IO_TOKEN    *Token
-  );
 
 #define EFI_FILE_PROTOCOL_REVISION        0x00010000
 #define EFI_FILE_PROTOCOL_REVISION2       0x00020000
@@ -3178,3 +2841,5 @@ struct _EFI_FILE_PROTOCOL {
   EFI_FILE_FLUSH_EX     FlushEx;
 };
 
+extern EFI_HANDLE efi_image_handle;
+extern EFI_SYSTEM_TABLE *efi_systab;

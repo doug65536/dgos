@@ -29,6 +29,8 @@
 #include "cmos.h"
 #include "apicbits.h"
 #include "mutex.h"
+#include "bootinfo.h"
+#include "boottable.h"
 
 #define ENABLE_ACPI 1
 
@@ -207,7 +209,7 @@ struct mp_ioapic_t {
     lock_type lock;
 };
 
-static char *mp_tables;
+static char const *mp_tables;
 
 static vector<uint8_t> mp_pci_bus_ids;
 static uint16_t mp_isa_bus_id;
@@ -1058,84 +1060,6 @@ static __always_inline uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
     return checksum_bytes((char const *)hdr, hdr->len);
 }
 
-static bool acpi_find_rsdp(void *start, size_t len)
-{
-    for (size_t offset = 0; offset < len; offset += 16) {
-        acpi_rsdp2_t *rsdp2 = (acpi_rsdp2_t*)
-                ((char*)start + offset);
-
-        // Check for ACPI 2.0+ RSDP
-        if (!memcmp(rsdp2->rsdp1.sig, "RSD PTR ", 8)) {
-            // Check checksum
-            if (rsdp2->rsdp1.rev != 0 &&
-                    checksum_bytes((char*)rsdp2,
-                               sizeof(*rsdp2)) == 0 &&
-                    checksum_bytes((char*)&rsdp2->rsdp1,
-                                   sizeof(rsdp2->rsdp1)) == 0) {
-                if (rsdp2->xsdt_addr_lo | rsdp2->xsdt_addr_hi) {
-                    ACPI_TRACE("Found 64-bit XSDT\n");
-                    acpi_rsdt_addr = rsdp2->xsdt_addr_lo |
-                            ((uint64_t)rsdp2->xsdt_addr_hi << 32);
-                    acpi_rsdt_ptrsz = sizeof(uint64_t);
-                } else {
-                    ACPI_TRACE("Found 32-bit RSDT\n");
-                    acpi_rsdt_addr = rsdp2->rsdp1.rsdt_addr;
-                    acpi_rsdt_ptrsz = sizeof(uint32_t);
-                }
-
-                acpi_rsdt_len = rsdp2->length;
-
-                ACPI_TRACE("Found ACPI 2.0+ RSDP at 0x%zx\n", acpi_rsdt_addr);
-
-                return true;
-            }
-        }
-
-        // Check for ACPI 1.0 RSDP
-        acpi_rsdp_t *rsdp = (acpi_rsdp_t*)rsdp2;
-        if (rsdp->rev == 0 &&
-                !memcmp(rsdp->sig, "RSD PTR ", 8)) {
-            // Check checksum
-            if (checksum_bytes((char*)rsdp, sizeof(*rsdp)) == 0) {
-                acpi_rsdt_addr = rsdp->rsdt_addr;
-                acpi_rsdt_ptrsz = sizeof(uint32_t);
-
-                // Leave acpi_rsdt_len 0 in this case, it is
-                // handled later
-
-                ACPI_TRACE("Found ACPI 1.0 RSDP at 0x%zx\n", acpi_rsdt_addr);
-
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
-static bool mp_find_fps(void *start, size_t len)
-{
-    for (size_t offset = 0; offset < len; offset += 16) {
-        mp_table_hdr_t *sig_srch = (mp_table_hdr_t*)
-                ((char*)start + offset);
-
-        // Check for MP tables signature
-        if (!memcmp(sig_srch->sig, "_MP_", 4)) {
-            // Check checksum
-            if (checksum_bytes((char*)sig_srch,
-                               sizeof(*sig_srch)) == 0) {
-                mp_tables = (char*)(uintptr_t)sig_srch->phys_addr;
-
-                ACPI_TRACE("Found MPS tables at %zx\n", size_t(mp_tables));
-
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 // Sometimes we have to guess the size
 // then read the header to get the actual size.
 // This handles that.
@@ -1154,6 +1078,9 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
 
 static void acpi_parse_rsdt()
 {
+    // Sanity check length (<= 1MB)
+    assert(acpi_rsdt_len <= (1 << 20));
+
     acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
                 (void*)acpi_rsdt_addr,
                 acpi_rsdt_len ? acpi_rsdt_len : sizeof(*rsdt_hdr),
@@ -1299,7 +1226,7 @@ static void acpi_parse_rsdt()
 static void mp_parse_fps()
 {
     mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
-            mmap(mp_tables, 0x10000,
+            mmap((void*)mp_tables, 0x10000,
                  PROT_READ, MAP_PHYSICAL, -1, 0);
 
     cth = acpi_remap_len(cth, uintptr_t(mp_tables),
@@ -1530,63 +1457,28 @@ static void mp_parse_fps()
 
 static int parse_mp_tables(void)
 {
-    uint16_t ebda_seg = *BIOS_DATA_AREA(uint16_t, 0x40E);
-    uintptr_t ebda = uintptr_t(ebda_seg << 4);
+    boottbl_acpi_info_t const *acpi_info;
+    acpi_info = (boottbl_acpi_info_t const *)bootinfo_parameter(
+                bootparam_t::boot_acpi_rsdp);
 
-    // ACPI RSDP can be found:
-    //  - in the first 1KB of the EBDA
-    //  - in the 128KB range starting at 0xE0000
-
-    // MP table floating pointer structure can be found:
-    //  - in the first 1KB of the EBDA
-    //  - in the 1KB range starting at 0x9FC00
-    //  - in the 64KB range starting at 0xF0000
-
-    void *p_9fc00 = mmap((void*)0x9FC00, 0x400, PROT_READ,
-                         MAP_PHYSICAL, -1, 0);
-    void *p_e0000 = mmap((void*)0xE0000, 0x20000, PROT_READ,
-                       MAP_PHYSICAL, -1, 0);
-    void *p_f0000 = (char*)p_e0000 + 0x10000;
-
-    void *p_ebda;
-    if (ebda == 0x9FC00) {
-        p_ebda = p_9fc00;
-    } else {
-        p_ebda = mmap((void*)ebda, 0x400, PROT_READ,
-                      MAP_PHYSICAL, -1, 0);
+    if (acpi_info) {
+        acpi_rsdt_addr = acpi_info->rsdt_addr;
+        acpi_rsdt_len = acpi_info->rsdt_size;
+        acpi_rsdt_ptrsz = acpi_info->ptrsz;
     }
 
-    struct range {
-        void *start;
-        size_t len;
-        bool (*search_fn)(void *start, size_t len);
-    } const search_data[] = {
-#if ENABLE_ACPI
-        range{ p_ebda, 0x400, acpi_find_rsdp },
-        range{ p_e0000, 0x20000, acpi_find_rsdp },
-#endif
-        range{ p_ebda, 0x400, mp_find_fps },
-        range{ p_9fc00 != p_ebda ? p_9fc00 : nullptr, 0x400, mp_find_fps },
-        range{ p_f0000, 0x10000, mp_find_fps }
-    };
+    boottbl_mptables_info_t *mps_info;
+    mps_info = (boottbl_mptables_info_t *)bootinfo_parameter(
+                bootparam_t::boot_mptables);
 
-    for (size_t i = 0; i < countof(search_data); ++i) {
-        if (unlikely(!search_data[i].start))
-            continue;
-        if (search_data[i].search_fn(
-                    search_data[i].start, search_data[i].len))
-            break;
+    if (mps_info) {
+        mp_tables = (char const *)mps_info->mp_addr;
     }
 
     if (acpi_rsdt_addr)
         acpi_parse_rsdt();
     else if (mp_tables)
         mp_parse_fps();
-
-    munmap(p_9fc00, 0x400);
-    munmap(p_e0000, 0x20000);
-    if (p_ebda != p_9fc00)
-        munmap(p_ebda, 0x400);
 
     return !!mp_tables;
 }
@@ -1695,6 +1587,11 @@ static void apic_online(int enabled, int spurious_intr, int err_intr)
 void apic_dump_regs(int ap)
 {
 #if DEBUG_APIC
+    if (apic == nullptr) {
+        printdbg("APIC not initialized\n");
+        return;
+    }
+
     for (int i = 0; i < 64; i += 4) {
         printdbg("ap=%d APIC: ", ap);
         for (int x = 0; x < 4; ++x) {

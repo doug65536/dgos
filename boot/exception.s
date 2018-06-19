@@ -3,7 +3,7 @@
 .section .text.unlikely, "ax"
 
 .macro isr_entry has_code int_num
-.globl isr_entry_\int_num\()
+.global isr_entry_\int_num\()
 isr_entry_\int_num\():
 	.if \has_code == 0
 		pushq $0
@@ -153,7 +153,7 @@ isr_handler:
 	call hex16_out
 
 	# Next line
-	movl $(0xb8000 + 80*2),%edi
+	movl $ 0xb8000 + 80*2,%edi
 
 	# Name of exception
 	movzbq 16*8(%r10),%r12
@@ -217,13 +217,13 @@ text_out:
 
 # print 2 digit hex (8 bits), see hex_common
 hex2_out:
-	shl $(64-8),%rsi
+	shl $ 64-8,%rsi
 	mov $2,%r8b
 	jmp hex_common
 
 # print 8 digit hex (16 bits), see hex_common
 hex8_out:
-	shl $(64-32),%rsi
+	shl $ 64-32,%rsi
 	mov $8,%r8b
 	jmp hex_common
 
@@ -257,7 +257,7 @@ hex_common:
 	ret
 
 # Table for populating IDT
-.globl isr_table
+.global isr_table
 isr_table:
 .word isr_entry_0
 .word isr_entry_1
@@ -314,7 +314,7 @@ isr_name_18: .string "#MC Machine Check"
 isr_name_19: .string "#XM SIMD"
 isr_name_20: .string "#VE Virtualization"
 
-.globl isr_names
+.global isr_names
 isr_names:
 .word isr_name_0
 .word isr_name_1

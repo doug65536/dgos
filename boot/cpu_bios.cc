@@ -3,6 +3,7 @@
 #include "gdt_sel.h"
 #include "screen.h"
 #include "bioscall.h"
+#include "elf64decl.h"
 
 bool need_a20_toggle;
 
@@ -51,7 +52,7 @@ bool toggle_a20(uint8_t enable)
                 method = a20_method::port92;
             }
         } else {
-            PRINT("BIOS doesn't support A20! Guessing port 0x92...");
+            PRINT(TSTR "BIOS doesn't support A20! Guessing port 0x92...");
             method = a20_method::port92;
         }
     }
@@ -139,7 +140,7 @@ void run_code64(void (*fn)(void *), void *arg)
 
         // Now in 64 bit compatibility mode (still really 32 bit)
 
-        // Far jump to selector that has L bit set (64 bit)
+        // Far call to selector that has L bit set (64 bit)
         "lea 6+idtr_64,%%eax\n\t"
         "lcall %[gdt_code64],$0f\n\t"
 
@@ -226,4 +227,53 @@ void run_code64(void (*fn)(void *), void *arg)
         , [msr_efer_nx_bit] "n" (CPU_MSR_EFER_NX_BIT)
         : "eax", "ecx", "edx", "esi", "edi", "memory"
     );
+}
+
+// 64-bit assembly code
+
+extern "C" void code64_run_kernel(void *p);
+extern "C" void code64_reloc_kernel(void *p);
+extern "C" void code64_copy_kernel(void *p);
+
+void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt)
+{
+    struct {
+        uint64_t distance;
+        void *elf_rela;
+        size_t relcnt;
+    } arg = {
+        distance,
+        elf_rela,
+        relcnt
+    };
+
+    run_code64(code64_reloc_kernel, &arg);
+}
+
+void run_kernel(uint64_t entry, void *param)
+{
+    struct {
+        uint64_t entry;
+        void *param;
+    } arg = {
+        entry,
+        param
+    };
+
+    run_code64(code64_run_kernel, &arg);
+}
+
+void copy_kernel(uint64_t dest_addr, void *src, size_t sz)
+{
+    struct {
+        uint64_t dest_addr;
+        void *src;
+        size_t sz;
+    } arg = {
+        dest_addr,
+        src,
+        sz
+    };
+
+    run_code64(code64_copy_kernel, &arg);
 }

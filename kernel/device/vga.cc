@@ -346,6 +346,9 @@ static int vga_detect(text_display_base_t **result)
     // Get I/O port base from BIOS data area
     self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
 
+    if (self->io_base == 0)
+        self->io_base = 0x3B4;
+
     // Map frame buffer
     self->video_mem = (uint16_t*)0xb8000;
     self->cursor_on = 1;

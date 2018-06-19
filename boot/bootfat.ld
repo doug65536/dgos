@@ -2,14 +2,11 @@ ENTRY(entry)
 
 SECTIONS {
 	.text 0x1000 : AT(0x1000) {
-		__initialized_data_start = .;
+		___initialized_data_st = .;
 		*(.head)
 
 		. = 0x5C;
 		*(.early)
-
-		. = 0x1A0;
-		SHORT(bootinfo_start);
 
 		. = 0x1BE;
 		*(.parttab)
@@ -17,12 +14,19 @@ SECTIONS {
 		/* Reserve 512 bytes for FS Information sector */
 		. = 0x400;
 
-		__ctors_start = .;
+		___ctors_st = .;
 		*(.ctors)
 		*(.ctors.*)
 		*(.init_array)
 		*(SORT(.init_array.*))
-		__ctors_end = .;
+		___ctors_en = .;
+
+		___dtors_st = .;
+		*(.dtors)
+		*(.dtors.*)
+		*(.fini_array)
+		*(SORT(.fini_array.*))
+		___dtors_en = .;
 
 		/* --- additional sectors --- */
 		*(.text)
@@ -37,30 +41,36 @@ SECTIONS {
 		*(.rodata)
 		*(.rodata.*)
 
+		___smp_st = .;
+		*(.smp.entry)
+		*(.smp.text)
+		. = ALIGN(64);
+		*(.smp.data)
+		___smp_en = .;
+
 		bootinfo_start = .;
 		*(.bootinfo)
 
 		/* sector align end */
 		. = ALIGN(512);
-		__initialized_data_end = .;
+		___initialized_data_en = .;
 	} = 0
 
 	.bss : {
-		__bss_start = .;
+		___bss_start = .;
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
 		*(COMMON.*)
 		*(COMMON*)
-		__bss_end = .;
+		___bss_end = .;
 	}
 
-	.uninit : {
-		*(.stack)
-
-		. = ALIGN(16);
-		__heap_st = .;
-	}
+	___initial_stack_limit = .;
+	. = ABSOLUTE(0xFFF0);
+	___initial_stack = .;
+	___heap_st = .;
+	___end = .;
 
 	/DISCARD/ : { *(.eh_frame) }
 }

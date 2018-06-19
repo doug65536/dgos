@@ -2,7 +2,6 @@
 
 quiet=0
 scriptroot="$(cd "$(dirname "$0")" && pwd)"
-patches="$scriptroot/patches/"
 gnu_mirror="https://mirrors.kernel.org/gnu"
 outdir=
 archives=
@@ -16,11 +15,11 @@ cleanbuild=
 
 function log() {
 	if [[ -z $logfile ]]; then
-		"$@"
+		"$@" || exit
 	elif [[ $quiet = 0 ]]; then
-		"$@" | tee -a "$logfile"
+		"$@" | tee -a "$logfile" || exit
 	else
-		"$@" 2>&1 >> "$logfile"
+		"$@" 2>&1 >> "$logfile" || exit
 	fi
 }
 
@@ -150,7 +149,7 @@ function process_tarball() {
 		*)         err "Unrecognized archive extension" ;;
 	esac
 
-	log $action "$base" "$ext" "$config" "$target" "${@:5}"
+	log $action "$base" "$ext" "$config" "$target" "${@:5}" || exit
 }
 
 function help() {
@@ -262,16 +261,14 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
 
-gcc_config="--target=$arches \
---enable-targets=all \
---with-system-zlib \
+gcc_config="--target=$arches --with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
 --with-gnu-as --with-gnu-ld \
 --enable-initfini-array \
 --enable-link-mutex \
 --disable-nls \
 --enable-shared --enable-system-zlib \
---enable-multiarch --enable-targets=all \
+--enable-multiarch \
 --with-arch-32=i686 --with-abi=m64 \
 --with-multilib-list=m32,m64,mx32"
 
@@ -292,8 +289,7 @@ gdb_config="--target=$arches \
 process_tarball "$archives/$bintar" "make_tool" all "$bin_config" || exit
 process_tarball "$archives/$bintar" "make_tool" install "$bin_config" || exit
 
-process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" \
-	CFLAGS="-g -O0" CXXFLAGS="-g -O0" LDFLAGS="-g -O0" || exit
+process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" || exit
 process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" || exit
 for target in all-gcc all-target-libgcc install-gcc install-target-libgcc; do
 	process_tarball "$archives/$gcctar" "make_tool" "$target" "$gcc_config" || exit

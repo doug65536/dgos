@@ -1,0 +1,174 @@
+#include "gdt_sel.h"
+#include "gdt_macros.h"
+#include "cpu_constants.h"
+
+.code16
+.section .smp.entry
+
+.macro message txt
+    mov %cx,%bp
+    mov %al,%cl
+    mov $\txt,%al
+    outb %al,$0xe9
+    mov $'\n',%al
+    outb %al,$0xe9
+    mov %cl,%al
+    mov %bp,%cx
+.endm
+
+// This must be position independent code
+// Note that this code is called with the cs set to
+// some segment and ip is zero
+.align 16
+.global ap_entry
+ap_entry:
+    xor %ax,%ax
+    mov %ax,%ss
+    mov $0xFFF0,%sp
+
+    // Enable the cache immediately, in case the BIOS is bad
+    // Enable write protection and configure FPU to modern operation
+    movl %cr0,%eax
+    andl $~CPU_CR0_CD & ~CPU_CR0_NW & ~CPU_CR0_EM,%eax
+    orl $ CPU_CR0_WP | CPU_CR0_MP | CPU_CR0_NE,%eax
+    movl %eax,%cr0
+
+    // Get absolute address of ap_entry into ebx
+    movl %cs,%ebx
+    shll $4,%ebx
+
+    //
+    // Patch the linear address of the trampoline GDT into the trampoline GDTR
+    //
+
+    // Calculate the cs-relative offset of ap_gdtr
+    movw $ap_gdtr - ap_entry,%di
+
+    // Calculate the linear address of ap_gdt
+    leal ap_gdt - ap_entry(%ebx),%ecx
+
+    // Update the offset of the GDTR
+    cs movl %ecx,2(%di)
+
+    // Load the cs-relative GDTR
+    cs lgdtl (%di)
+
+    //
+    // Patch the linear address of the pm_entry label into pm_entry_vector
+
+    // Calculate the cs-relative offset of pm_entry_vector
+    movw $ pm_entry_vector - ap_entry,%di
+
+    // Calculate the linear address of pm_entry
+    leal pm_entry - ap_entry(%ebx),%ecx
+
+    // Update the offset part of the pm_entry_vector far pointer
+    cs movl %ecx,(%di)
+
+    // Enable protected mode and far jump into protected mode, loading cs
+    orl $ CPU_CR0_PE,%eax
+    movl %eax,%cr0
+    cs ljmpl *(%di)
+
+.align 16
+pm_entry:
+.code32
+    // Load all of the segment registers with 32 bit data segments
+    movl $ GDT_SEL_PM_DATA32,%eax
+    movw %ax,%ds
+    movw %ax,%es
+    movw %ax,%fs
+    movw %ax,%gs
+    movw %ax,%ss
+    movl $0xFFF0,%esp
+
+    //
+    // Patch the linear address of lm_entry into lm_entry_vector
+    //
+
+    // Calculate the linear address of lm_entry_vector
+    lea (lm_entry_vector - ap_entry)(%ebx),%edi
+
+    // Calculate the linear address of the lm_entry label
+    lea (lm_entry - ap_entry)(%ebx),%ecx
+
+    // Update the lm_entry_vector far pointer offset to point to lm_entry
+    mov %ecx,(%edi)
+
+    //
+    // Enter long mode
+    //
+
+    // Enable PAE
+    mov %cr4,%eax
+    or $ CPU_CR4_PAE,%eax
+    mov %eax,%cr4
+
+    //
+    // Load the PDBR
+    //
+
+    // Calculate linear address of root_page_dir
+    mov $root_page_dir,%eax
+    sub $ap_entry,%eax
+    add %ebx,%eax
+
+    // Load PDBR
+    mov (%eax),%eax
+    mov %eax,%cr3
+
+    // Enable long mode (set MSR bit EFER.LME)
+    mov $ CPU_MSR_EFER,%ecx
+    rdmsr
+    or $ CPU_MSR_EFER_LME,%eax
+    wrmsr
+
+    message 'h'
+
+    // Enable paging
+    mov %cr0,%eax
+    or $ CPU_CR0_PG,%eax
+	mov %eax,%cr0
+	ljmpl *(%edi)
+
+.align 16
+lm_entry:
+.code64
+    //
+    // Get mp_entry_point
+    //
+
+    // rdi = linear address of mp_entry_point and load entry point
+    mov $smp_entry_point,%esi
+    sub $ap_entry,%esi
+    add %ebx,%esi
+    mov (%esi),%rdi
+
+    // eax = code64_run_kernel - ap_entry + linear address of trampoline
+    mov $code64_run_kernel,%eax
+    sub $ap_entry,%eax
+    add %ebx,%eax
+
+    // rsi = params parameter, nullptr
+    xor %esi,%esi
+
+    // set cr3 parameter
+    mov %cr3,%rdx
+
+    // jump to code64_run_kernel
+    jmp *%rax
+
+.align 8
+pm_entry_vector:
+    .int 0
+    .word GDT_SEL_PM_CODE32
+
+.align 8
+lm_entry_vector:
+    .int 0
+    .word GDT_SEL_KERNEL_CODE64
+
+    // Emit a copy of the GDT here so it ends up in low memory
+    // The main GDT is likely relocated far above 1MB boundary
+.align 64
+    gdt_emit ap_gdt, ap_gdtr

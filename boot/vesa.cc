@@ -165,24 +165,11 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
         kernel_data = malloc(sizeof(sel));
         memcpy(kernel_data, &sel, sizeof(sel));
 
-        paging_map_range(uintptr_t(kernel_data), sizeof(sel),
-                         uintptr_t(kernel_data),
-                         PTE_PRESENT | PTE_WRITABLE, 2);
-
-        uint8_t log2_pagesize = 12;
         uint64_t pte_flags = PTE_PRESENT | PTE_WRITABLE |
                 (-cpu_has_global_pages() & PTE_GLOBAL);
 
-        if (((sel.framebuffer_addr & -(1 << 21)) ==
-             sel.framebuffer_addr) &&
-                ((sel.framebuffer_bytes & -(1 << 21)) ==
-                 sel.framebuffer_bytes)) {
-            log2_pagesize = 21;
-            pte_flags |= PTE_PAGESIZE;
-        }
-
-        paging_map_range(sel.framebuffer_addr, sel.framebuffer_bytes,
-                         sel.framebuffer_addr, pte_flags, 2, log2_pagesize);
+        paging_map_physical(sel.framebuffer_addr, sel.framebuffer_addr,
+                            sel.framebuffer_bytes, pte_flags);
     }
 
     free(mode_info);

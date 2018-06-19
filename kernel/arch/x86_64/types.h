@@ -65,7 +65,7 @@ typedef double __vector_size(16) __d64_vec2;
 typedef long long __vector_size(16) __i64_vec2LL;
 typedef unsigned long long __vector_size(16) __ivec2ULL;
 
-#define countof(arr) (sizeof(arr)/sizeof(*arr))
+#define countof(arr) (sizeof((arr))/sizeof(*(arr)))
 
 typedef int pid_t;
 

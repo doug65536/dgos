@@ -4,9 +4,9 @@
 
 uintptr_t bootinfo_parameter(bootparam_t param)
 {
-    auto data = (kernel_params_t const *)&zero_page[uintptr_t(kernel_params)];
+    auto data = kernel_params;
 
-    if ((uintptr_t)data < 0x1000)
+    if (uintptr_t(data) < 0x1000)
         data = (kernel_params_t*)(zero_page + (uintptr_t)data);
 
     switch (param) {
@@ -24,6 +24,12 @@ uintptr_t bootinfo_parameter(bootparam_t param)
 
     case bootparam_t::boot_debugger:
         return data->wait_gdb;
+
+    case bootparam_t::boot_acpi_rsdp:
+        return uintptr_t(&data->acpi_rsdt);
+
+    case bootparam_t::boot_mptables:
+        return uintptr_t(&data->mptables);
 
     default:
         return 0;

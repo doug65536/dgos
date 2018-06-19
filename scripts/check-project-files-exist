@@ -1,0 +1,10 @@
+#!/bin/bash
+
+while read f; do
+	echo ---- $f
+	while read s; do
+		if ! [[ -e ${f%/*}/$s ]]; then
+			echo ${f%/*}/$s
+		fi
+	done < $f
+done < <(find -type f -name '*.files')

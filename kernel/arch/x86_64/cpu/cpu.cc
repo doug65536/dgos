@@ -30,6 +30,13 @@ void cpu_init_early(int ap)
     gdt_init_tss_early();
     idt_init(ap);
 
+    cpu_cs_set(GDT_SEL_KERNEL_CODE64);
+    cpu_ss_set(GDT_SEL_KERNEL_DATA);
+    cpu_ds_set(GDT_SEL_USER_DATA | 3);
+    cpu_es_set(GDT_SEL_USER_DATA | 3);
+    cpu_fs_set(GDT_SEL_USER_DATA | 3);
+    cpu_gs_set(GDT_SEL_USER_DATA | 3);
+
     // Enable SSE early
     cpu_cr4_change_bits(0, CPU_CR4_OFXSR | CPU_CR4_OSXMMEX);
 
@@ -47,6 +54,22 @@ void cpu_init_early(int ap)
 
     cpu_mxcsr_set(CPU_MXCSR_ELF_INIT & default_mxcsr_mask);
     cpu_fcw_set(CPU_FPUCW_ELF_INIT);
+
+    // Configure xsave
+    if (cpuid_has_xsave()) {
+        if (!ap) {
+            cpuid_t info;
+            if (cpuid(&info, CPUID_INFO_XSAVE, 0)) {
+                xsave_supported_states = info.eax;
+                xsave_enabled_states = info.eax &
+                        (XCR0_X87 | XCR0_SSE | XCR0_AVX | XCR0_AVX512_UPPER |
+                         XCR0_AVX512_XREGS | XCR0_AVX512_OPMASK);
+            }
+        }
+
+        cpu_cr4_change_bits(0, CPU_CR4_OSXSAVE);
+        cpu_xcr_change_bits(0, ~xsave_supported_states, xsave_enabled_states);
+    }
 }
 
 void cpu_init(int ap)

@@ -5,7 +5,7 @@ define startupbreakpoints
 	commands
 		#too much hbreak isr_entry_14
 		hbreak isr_entry_13
-		b cpu_debug_break
+		hb cpu_debug_break
 		b unhandled_exception_handler
 		b apic_spurious_handler
 		b isr_entry_8

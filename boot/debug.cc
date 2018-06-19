@@ -21,6 +21,8 @@ void debug_out(char const *s, int len)
 
 void debug_out(char16_t const *s, int len)
 {
+    if (len < 0)
+        len = strlen(s);
     char *tmp = (char*)__builtin_alloca(len+1);
     for (int i = 0; i < len; ++i)
         tmp[i] = char(s[i]);

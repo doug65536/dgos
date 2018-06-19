@@ -3,8 +3,12 @@
 #include "farptr.h"
 #include "screen.h"
 #include "bioscall.h"
+#include "likely.h"
+#include "halt.h"
+#include "assert.h"
+#include "physmap.h"
 
-static uint16_t get_ram_region(physmem_range_t *range,
+static uint16_t get_e820_region(physmem_range_t *range,
                                uint32_t *continuation_ptr)
 {
     // AX = E820h
@@ -21,7 +25,8 @@ static uint16_t get_ram_region(physmem_range_t *range,
     regs.edx = 0x534D4150;
     regs.ebx = *continuation_ptr;
     regs.ecx = sizeof(physmem_range_t);
-    regs.edi = (uint32_t)range;
+    regs.edi = uint32_t(range) & 0xF;
+    regs.es = uint32_t(range) >> 4;
 
     bioscall(&regs, 0x15);
 
@@ -30,7 +35,7 @@ static uint16_t get_ram_region(physmem_range_t *range,
     return !regs.ah_if_carry();
 }
 
-void *get_ram_regions(uint32_t *ret_size)
+bool get_ram_regions()
 {
     physmem_range_t temp;
 
@@ -38,41 +43,41 @@ void *get_ram_regions(uint32_t *ret_size)
     uint32_t continuation = 0;
     uint16_t count = 0;
     do {
-        if (!get_ram_region(&temp, &continuation))
+        if (!get_e820_region(&temp, &continuation))
             break;
 
         ++count;
     } while (continuation != 0);
 
-    physmem_range_t *result = (physmem_range_t*)
-            calloc(count + 1, sizeof(*result));
-
     continuation = 0;
     uint64_t total_memory = 0;
     for (uint16_t i = 0; i < count; ++i) {
-        if (!get_ram_region(result + i, &continuation))
+        physmem_range_t entry{};
+
+        if (!get_e820_region(&entry, &continuation))
             break;
 
-        if (result[i].type == PHYSMEM_TYPE_NORMAL)
-            total_memory += result[i].size;
+        // Drop invalid entries
+        if (unlikely(!entry.valid))
+            continue;
 
-        PRINT("base=%llx length=%llx type=%lx valid=%lx",
-                   result[i].base,
-                   result[i].size,
-                   result[i].type,
-                   result[i].valid);
+        if (entry.type == PHYSMEM_TYPE_NORMAL)
+            total_memory += entry.size;
+
+        physmap_insert(entry);
+
+        PRINT(TSTR "base=%llx length=%llx type=%lx valid=%lx",
+                   entry.base,
+                   entry.size,
+                   entry.type,
+                   entry.valid);
     }
 
-    // Allocate extra space in case entries get split
-    // Worst case is every entry overlaps and becomes 3 entries
-    int size = (count + 1) * sizeof(*result);
-    void *far_result = malloc(size * 3);
-    memcpy(far_result, result, size);
-    free(result);
+    PRINT(TSTR "Usable memory: %dMB", (int)(total_memory >> 20));
 
-    *ret_size = count;
+    return true;
+}
 
-    PRINT("Usable memory: %dMB", (int)(total_memory >> 20));
-
-    return far_result;
+void take_pages(uint64_t, uint64_t)
+{
 }

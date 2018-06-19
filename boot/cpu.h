@@ -116,8 +116,6 @@ extern "C" void cpu_a20_enterpm();
 extern "C" void cpu_a20_exitpm();
 extern "C" bool toggle_a20(uint8_t enable);
 
-extern "C" void run_code64(void (*fn)(void *), void *arg);
-
 static __always_inline void outb(uint16_t dx, uint8_t al)
 {
     __asm__ __volatile__ (

@@ -1011,8 +1011,12 @@ void thread_idle_set_ready()
 
 void *thread_get_exception_top()
 {
-    thread_info_t *thread = this_thread();
-    return thread->exception_chain;
+    // Ensure that threading is initialized, in case of early exception
+    if (thread_get_cpu_count()) {
+        thread_info_t *thread = this_thread();
+        return thread->exception_chain;
+    }
+    return nullptr;
 }
 
 void *thread_set_exception_top(void *chain)
@@ -1104,26 +1108,37 @@ void thread_shootdown_notify()
 
 void thread_set_error(errno_t errno)
 {
-    thread_info_t *info = this_thread();
-    info->errno = errno;
+    if (cpu_count) {
+        thread_info_t *info = this_thread();
+        info->errno = errno;
+    }
 }
 
 errno_t thread_get_error()
 {
-    thread_info_t *info = this_thread();
-    return info->errno;
+    if (cpu_count) {
+        thread_info_t *info = this_thread();
+        return info->errno;
+    }
+    return errno_t::OK;
 }
 
 void *thread_get_fsbase(int thread)
 {
-    thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
-    return info->fsbase;
+    if (cpu_count) {
+        thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
+        return info->fsbase;
+    }
+    return nullptr;
 }
 
 void *thread_get_gsbase(int thread)
 {
-    thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
-    return info->gsbase;
+    if (cpu_count) {
+        thread_info_t *info = thread >= 0 ? threads + thread : this_thread();
+        return info->gsbase;
+    }
+    return nullptr;
 }
 
 void thread_set_process(int thread, process_t *process)

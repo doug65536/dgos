@@ -1,6 +1,6 @@
 #include "time.h"
 #include "sys_time.h"
-#include "nano_time.h"
+#include "time.h"
 #include "thread.h"
 
 int sys_nanosleep(timespec const *req, timespec *rem)

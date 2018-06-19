@@ -1,0 +1,12 @@
+diff -durN gdb-8.1/gdb/remote-original.c gdb-8.1/gdb/remote.c
+--- gdb-8.1/gdb/remote-original.c	2018-06-17 03:03:53.086269371 -0400
++++ gdb-8.1/gdb/remote.c	2018-06-17 03:15:01.954346521 -0400
+@@ -7569,7 +7569,7 @@
+   buf_len = strlen (rs->buf);
+
+   /* Further sanity checks, with knowledge of the architecture.  */
+-  if (buf_len > 2 * rsa->sizeof_g_packet)
++  if (0 && (buf_len > 2 * rsa->sizeof_g_packet))
+     error (_("Remote 'g' packet reply is too long (expected %ld bytes, got %d "
+ 	     "bytes): %s"), rsa->sizeof_g_packet, buf_len / 2, rs->buf);
+

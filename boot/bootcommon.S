@@ -10,6 +10,12 @@
 
 .global boot
 boot:
+    push %ebp
+    mov %esp,%ebp
+    push %edi
+    push %esi
+    push %ebx
+
     // ebx:esi holds boot LBA
     // edi holds boot function
     mov %eax,%ebx
@@ -20,6 +26,7 @@ boot:
     call check_a20
 
     cli
+    movl $gdt,2+gdtr
     lgdt gdtr
 
     mov %cr0,%eax
@@ -35,7 +42,7 @@ pmode_entry:
     movw %dx,%fs
     movw %dx,%gs
     movw %dx,%ss
-    mov $__initial_stack,%esp
+    mov $___initial_stack,%esp
 
     xor %eax,%eax
     lldt %ax
@@ -46,13 +53,11 @@ pmode_entry:
 
     call cpu_a20_enterpm
 
-    call call_constructors
+    call ctors_invoke
 
-    mov %esp,%ebp
     mov %ebx,%eax
     mov %esi,%edx
     call *%edi
-    mov %ebp,%esp
 
     call cpu_a20_exitpm
 
@@ -83,6 +88,11 @@ pmode_entry:
     mov %dx,%gs
     mov %dx,%ss
 
+    pop %ebx
+    pop %esi
+    pop %edi
+    pop %ebp
+
     ret
 
 .code16
@@ -108,16 +118,16 @@ detect_ancient_cpu:
 
     // An 80386 has eflags 18 (AC) permanently clear
     or $-1,%ecx
-    mov $(1 << 18),%edx
+    mov $ 1 << 18,%edx
     call change_eflags
-    test $(1 << 18),%eax
+    test $ 1 << 18,%eax
     jz detected_80386
 
     //
     // An early 80486 has eflags 21 (ID) stuck
 
     // Isolate bit 21 and save it
-    and $(1 << 21),%eax
+    and $ 1 << 21,%eax
     push %eax
 
     // Clear nothing, set nothing
@@ -128,7 +138,7 @@ detect_ancient_cpu:
     xor %eax,%ecx
 
     // Set it if it was clear
-    xor $(1 << 21),%eax
+    xor $ 1 << 21,%eax
     or %eax,%edx
 
     call change_eflags
@@ -284,31 +294,32 @@ check_a20:
     movw $0,%ax
     ret
 
-.code32
+.code16
+.section .early
 
-call_constructors:
-    push %ebx
-    movl $__ctors_start,%ebx
-0:
-    cmpl $__ctors_end,%ebx
-    jae 0f
-    movl (%ebx),%eax
-    test %eax,%eax
-    jz 1f
-    cmpl $entry,%eax
-    jb 1f
-    call *%eax
-1:
-    addl $4,%ebx
-    jmp 0b
-0:
-    pop %ebx
+.global clear_bss
+clear_bss:
+    pushw %di
+    pushw %cx
+    pushw %ax
+    movw $ ___bss_start,%di
+    movw $ ___bss_end,%cx
+    subw %di,%cx
+    xorb %al,%al
+    cld
+    rep
+    stosb
+    popw %ax
+    popw %cx
+    popw %di
     ret
 
-.section .stack
-.align 16
-.global __initial_stack_limit
-.global __initial_stack
-__initial_stack_limit:
-    .space 16*1024
-__initial_stack:
+.section .parttab
+.space 16*4
+.word 0xAA55
+
+.global first_sector_end
+first_sector_end:
+
+.code32
+.section .text

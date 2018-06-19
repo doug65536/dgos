@@ -5,12 +5,21 @@
 #include "rand.h"
 #include "farptr.h"
 #include "likely.h"
+#include "ctors.h"
+#include "halt.h"
 
 #define MALLOC_DEBUG 0
 #if MALLOC_DEBUG
 #define MALLOC_TRACE(...) PRINT("malloc: " __VA_ARGS__)
 #else
 #define MALLOC_TRACE(...) ((void)0)
+#endif
+
+#define MALLOC_CHECKS 1
+#if MALLOC_CHECKS
+#define MALLOC_CHECK() malloc_validate_or_panic()
+#else
+#define MALLOC_CHECK() ((void)0)
 #endif
 
 struct blk_hdr_t {
@@ -26,55 +35,57 @@ struct blk_hdr_t {
     sig_t sig;
 
     uint32_t neg_size;
-    blk_hdr_t *self;
+    uint32_t self;
+
+    __always_inline bool invalid() const
+    {
+        return size + neg_size ||
+                uint32_t(intptr_t(self)) != uint32_t(intptr_t(this));
+    }
+
+    __always_inline void make_invalid()
+    {
+        self = uint32_t(uintptr_t(nullptr));
+        size = 0xBAD11111;
+        neg_size = 0;
+    }
+
+    __always_inline void make_valid()
+    {
+        self = uint32_t(intptr_t(this));
+    }
+
+    __always_inline void set_size(uint32_t new_size)
+    {
+        size = new_size;
+        neg_size = -new_size;
+    }
 };
 
-static blk_hdr_t *heap_st;
+static_assert(sizeof(blk_hdr_t) == 16, "Unexpected malloc block header size");
+
+static blk_hdr_t *heap_st, *heap_en;
 static blk_hdr_t *first_free;
 
 void malloc_init(void *st, void *en)
 {
-    heap_st = (blk_hdr_t*)((uintptr_t(st) + 15) & -16);
+    // Align boundaries
+    st = (void*)((uintptr_t(st) + 15) & -16);
+    en = (void*)(uintptr_t(en) & -16);
+    heap_st = (blk_hdr_t*)st;
 
     // Initialize end of heap sentinel, just before end of heap
-    blk_hdr_t *heap_end = (blk_hdr_t*)en - 1;
-    heap_end->size = 0;
-    heap_end->sig = blk_hdr_t::USED;
-    heap_end->neg_size = -heap_end->size;
-    heap_end->self = heap_end;
+    heap_en = (blk_hdr_t*)en - 1;
+    heap_en->set_size(0);
+    heap_en->make_valid();
+    heap_en->sig = blk_hdr_t::USED;
 
     // Make a free block covering the entire heap
     first_free = heap_st;
-    heap_st->size = uintptr_t(heap_end) - uintptr_t(heap_st);
+    heap_st->set_size(uintptr_t(heap_en) - uintptr_t(heap_st));
+    heap_st->make_valid();
     heap_st->sig = blk_hdr_t::FREE;
-    heap_st->neg_size = -heap_st->size;
-    heap_st->self = heap_st;
 }
-
-#ifndef __efi
-static __pure uintptr_t get_top_of_low_memory() {
-    // Read top of memory from BIOS data area
-    return *(uint16_t*)0x40E << 4;
-}
-
-extern "C" blk_hdr_t __heap_st[];
-__attribute__((__constructor__)) void malloc_init_auto()
-{
-    // Memory map
-    //
-    // +-------------------------+ <- Start of BIOS data area (usually 0x9FC00)
-    // |  blk_hdr_t with 0 size  |
-    // +-------------------------+ <- 16 byte aligned
-    // |         blocks          |
-    // +-------------------------+ <- __heap_st, 16 byte aligned
-    // |         .bss            |
-    // |         .data           |
-    // |         .text           |
-    // +-------------------------+ <- 0x1000
-
-    malloc_init(__heap_st, (void*)get_top_of_low_memory());
-}
-#endif
 
 static blk_hdr_t *next_blk(blk_hdr_t *blk)
 {
@@ -83,24 +94,16 @@ static blk_hdr_t *next_blk(blk_hdr_t *blk)
 
 __noreturn void malloc_panic()
 {
-    HALT("Corrupt heap block header!");
-}
-
-static void malloc_invalidate(blk_hdr_t *blk)
-{
-    blk->self = nullptr;
-    blk->size = 0xBAD11111;
-    blk->neg_size = 0;
+    PANIC("Corrupt heap block header!");
 }
 
 static blk_hdr_t *malloc_coalesce(blk_hdr_t *blk, blk_hdr_t *next)
 {
     // Coalesce adjacent consecutive free blocks
     while (blk->sig == blk_hdr_t::FREE && next->sig == blk_hdr_t::FREE) {
-        blk->size += next->size;
-        blk->neg_size = -blk->size;
+        blk->set_size(blk->size + next->size);
 
-        malloc_invalidate(next);
+        next->make_invalid();
 
         // Enforce that malloc_rover is always pointing to a block header
         if (first_free == next)
@@ -129,13 +132,13 @@ void *malloc_aligned(size_t bytes, size_t alignment)
     // Round up to a multiple of 16 bytes, increase by size of block header
     bytes = ((bytes + 15) & -16) + sizeof(blk_hdr_t);
 
-    if (unlikely(blk->size + blk->neg_size || blk->self != blk))
+    if (unlikely(blk->invalid()))
         malloc_panic();
 
     do {
         blk_hdr_t *next = next_blk(blk);
 
-        if (unlikely(next->size + next->neg_size || next->self != next))
+        if (unlikely(next->invalid()))
             malloc_panic();
 
         next = malloc_coalesce(blk, next);
@@ -157,16 +160,14 @@ void *malloc_aligned(size_t bytes, size_t alignment)
                     // one so its payload is at the alignment boundary
                     blk_hdr_t *aligned_hdr =
                             (blk_hdr_t*)(uintptr_t(blk) + align_adj);
-                    aligned_hdr->size = blk->size - align_adj;
-                    aligned_hdr->neg_size = -aligned_hdr->size;
-                    aligned_hdr->self = aligned_hdr;
+                    aligned_hdr->set_size(blk->size - align_adj);
+                    aligned_hdr->make_valid();
                     aligned_hdr->sig = blk_hdr_t::FREE;
 
                     if (first_free > aligned_hdr)
                         first_free = aligned_hdr;
 
-                    blk->size = align_adj;
-                    blk->neg_size = -blk->size;
+                    blk->set_size(align_adj);
                     blk = aligned_hdr;
                 }
 
@@ -179,15 +180,15 @@ void *malloc_aligned(size_t bytes, size_t alignment)
                     // payload area, but it will coalesce eventually
                     next = (blk_hdr_t*)(uintptr_t(blk) + bytes);
 
-                    next->size = remain;
-                    next->neg_size = -next->size;
+                    next->set_size(remain);
+                    next->make_valid();
                     next->sig = blk_hdr_t::FREE;
-                    next->self = next;
                 }
 
-                blk->size = bytes;
-                blk->neg_size = -blk->size;
+                blk->set_size(bytes);
                 blk->sig = blk_hdr_t::USED;
+
+                MALLOC_CHECK();
 
                 return blk + 1;
             }
@@ -200,6 +201,8 @@ void *malloc_aligned(size_t bytes, size_t alignment)
             blk = heap_st;
         }
     } while (blk != start_pos);
+
+    MALLOC_CHECK();
 
     return nullptr;
 }
@@ -218,7 +221,7 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
 
     blk_hdr_t *blk = (blk_hdr_t*)p - 1;
 
-    if (unlikely(blk->size + blk->neg_size || blk->self != blk))
+    if (unlikely(blk->invalid()))
         malloc_panic();
 
     bytes = ((bytes + 15) & -16) + sizeof(blk_hdr_t);
@@ -228,7 +231,7 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
     if (blk->size < bytes) {
         // Try to expand block in-place
 
-        if (unlikely(next->size + next->neg_size || next->self != blk))
+        if (unlikely(next->invalid()))
             malloc_panic();
 
         // If we are expanding and the next block is free
@@ -241,15 +244,13 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
 
             blk_hdr_t *new_blk = (blk_hdr_t*)(uintptr_t(blk) + bytes);
 
-            new_blk->size = uintptr_t(next) - uintptr_t(new_blk);
-            new_blk->neg_size = -new_blk->size;
+            new_blk->set_size(uintptr_t(next) - uintptr_t(new_blk));
+            new_blk->make_valid();
             new_blk->sig = blk_hdr_t::FREE;
-            new_blk->self = new_blk;
 
-            blk->size = uintptr_t(new_blk) - uintptr_t(blk);
-            blk->neg_size = -blk->size;
+            blk->set_size(uintptr_t(new_blk) - uintptr_t(blk));
 
-            malloc_invalidate(next);
+            next->make_invalid();
 
             return blk + 1;
         }
@@ -270,15 +271,17 @@ void *realloc_aligned(void *p, size_t bytes, size_t alignment)
 
     if (blk->size > bytes) {
         // Shrink the block
+
+        // Make a new free block with deallocated region
         blk_hdr_t *new_blk = (blk_hdr_t*)(uintptr_t(blk) + bytes);
 
-        new_blk->size = uintptr_t(next) - uintptr_t(new_blk);
-        new_blk->neg_size = -new_blk->size;
-        new_blk->self = new_blk;
+        new_blk->set_size(uintptr_t(next) - uintptr_t(new_blk));
+        new_blk->make_valid();
         new_blk->sig = blk_hdr_t::FREE;
 
-        blk->size = uintptr_t(new_blk) - uintptr_t(blk);
-        blk->neg_size = -blk->size;
+        blk->set_size(uintptr_t(new_blk) - uintptr_t(blk));
+
+        MALLOC_CHECK();
 
         return blk + 1;
     }
@@ -295,15 +298,17 @@ void free(void *p)
     blk_hdr_t *blk = (blk_hdr_t*)p - 1;
 
     if (unlikely(blk->sig != blk_hdr_t::USED))
-        HALT("Bad free call, block signature is not USED");
+        PANIC("Bad free call, block signature is not USED");
 
-    if (unlikely(blk->size + blk->neg_size || blk->self != blk))
+    if (unlikely(blk->invalid()))
         malloc_panic();
 
     blk->sig = blk_hdr_t::FREE;
 
     if (first_free > blk)
         first_free = blk;
+
+    MALLOC_CHECK();
 }
 
 void *calloc(unsigned num, unsigned size)
@@ -311,7 +316,50 @@ void *calloc(unsigned num, unsigned size)
     uint16_t bytes = num * size;
     void *block = malloc(bytes);
     memset(block, 0, bytes);
+
+    MALLOC_CHECK();
+
     return block;
+}
+
+bool malloc_validate_or_panic()
+{
+    if (!malloc_validate())
+        PANIC("Heap validation failed");
+    return true;
+}
+
+bool malloc_validate()
+{
+    for (blk_hdr_t *blk = heap_st; ;
+         blk = (blk_hdr_t*)(uintptr_t(blk) + blk->size)) {
+        if (blk->invalid() ||
+                (blk->sig != blk_hdr_t::FREE && blk->sig != blk_hdr_t::USED)) {
+            PRINT(TSTR "Invalid block header at %zx\n", uintptr_t(blk));
+            return false;
+        }
+
+        if (blk->size & 15) {
+            PRINT(TSTR "Block size is not a multiple of 16\n");
+            return false;
+        }
+
+        if (blk > heap_en) {
+            PRINT(TSTR "Fell off the end of the heap\n");
+            return false;
+        }
+
+        if (blk == heap_en) {
+            if (blk->size != 0) {
+                PRINT(TSTR "Heap end sentinel has invalid size\n");
+                return false;
+            }
+
+            break;
+        }
+    }
+
+    return true;
 }
 
 void *operator new(size_t size) noexcept
@@ -355,4 +403,15 @@ void operator delete[](void *block) noexcept
 void operator delete[](void *block, unsigned int) noexcept
 {
     free(block);
+}
+
+void operator delete[](void *block, unsigned long) noexcept
+{
+    free(block);
+}
+
+void malloc_get_heap_range(void **st, void **en)
+{
+    *st = heap_st;
+    *en = heap_en + 1;
 }

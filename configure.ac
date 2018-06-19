@@ -23,52 +23,48 @@ AC_PROG_RANLIB
 AC_LANG([C++])
 
 AC_CHECK_TOOL([OBJDUMP], [objdump], [NOT_FOUND])
-if test x"$OBJDUMP" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find disassembler])
-fi
+AS_IF([test x"$OBJDUMP" == x"NOT_FOUND"],
+    [AC_MSG_FAILURE([Cannot find objdump])])
 
-AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
-if test x"$MKISOFS" == x"NOT_FOUND"
-then
-    AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])
-fi
+AC_CHECK_TOOL([OBJCOPY], [objcopy], [NOT_FOUND])
+AS_IF([test x"$OBJCOPY" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find objcopy])])
 
-AC_CHECK_PROGS([GREP], [grep], [NOT_FOUND])
-if test x"$GREP" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find grep])
-fi
+AC_CHECK_PROGS([CP], [cp], [NOT_FOUND])
+AS_IF([test x"$CP" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find cp])])
 
 AC_CHECK_PROGS([SED], [sed], [NOT_FOUND])
-if test x"$SED" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find sed])
-fi
+AS_IF([test x"$SED" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find sed])])
+
+AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
+AS_IF([test x"$MKISOFS" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])])
+
+AC_CHECK_PROGS([GREP], [grep], [NOT_FOUND])
+AS_IF([test x"$GREP" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find grep])])
+
+AC_CHECK_PROGS([SED], [sed], [NOT_FOUND])
+AS_IF([test x"$SED" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find sed])])
 
 AC_CHECK_PROGS([SORT], [sort], [NOT_FOUND])
-if test x"$SORT" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find sort])
-fi
+AS_IF([test x"$SORT" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find sort])])
 
 AC_CHECK_PROGS([GZIP], [gzip], [NOT_FOUND])
-if test x"$GZIP" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find gzip])
-fi
+AS_IF([test x"$GZIP" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find gzip])])
 
 AC_CHECK_PROGS([TRUNCATE], [truncate], [NOT_FOUND])
-if test x"$TRUNCATE" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find truncate])
-fi
+AS_IF([test x"$TRUNCATE" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find truncate])])
 
 AC_CHECK_PROGS([SHRED], [shred], [NOT_FOUND])
-if test x"$SHRED" == x"NOT_FOUND"
-then
-    AC_MSG_FAILURE([Cannot find shred])
-fi
+AS_IF([test x"$SHRED" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find shred])])
 
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
 [AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_IF
@@ -86,32 +82,26 @@ AS_VAR_IF(CACHEVAR,yes,
 AS_VAR_POPDEF([CACHEVAR])dnl
 ])dnl AX_CHECK_COMPILE_FLAGS
 
-COMPILER_WERROR=
+AS_VAR_SET([COMPILER_WERROR],[])
 for flag in Wall Wextra Wpedantic Werror; do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[COMPILER_WERROR+=" -$flag"])
+		[AS_VAR_APPEND([COMPILER_WERROR], [" -$flag"])])
 done
 
-CXX_STD_FLAGS=
-for flag in 'std=c++14'; do
-	AX_CHECK_COMPILE_FLAG([-$flag],
-		[CXX_STD_FLAGS+=" -$flag"],
-		[], [$COMPILER_WERROR])
-done
-
-COMPILER_FLAGS=
+AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
+		std=c++14 \
 		ggdb3 fno-integrated-as Wno-unused-command-line-argument \
-		Wa,-g Wall Wextra Wpedantic Wdouble-promotion Wformat \
+		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
-		ffunction-sections Wno-unused-parameter Werror=return-type \
-		Wstrict-aliasing \
+		Wno-unused-parameter Wtautological-compare \
+		Wstrict-aliasing Wlogical-op Werror=return-type \
 		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[COMPILER_FLAGS+=" -$flag"],
+		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([COMPILER_FLAGS])
@@ -120,40 +110,41 @@ AC_SUBST([COMPILER_FLAGS])
 #Wsuggest-attribute=pure
 #Wsuggest-attribute=const
 
+# fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize
+# fgcse-after-reload fdeclone-ctor-dtor
+# fdevirtualize-at-ltrans fsched-stalled-insns=0
+
 # fgcse-las causes compiler segfaults
-OPTIMIZATION_FLAGS=
+AS_VAR_SET([OPTIMIZATION_FLAGS],[])
 for flag in \
-	O2 fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize \
-	-fgcse-after-reload fgcse-las -fdeclone-ctor-dtor \
-	-fdevirtualize-at-ltrans -fsched-stalled-insns=0 \
-	fstrict-aliasing
+	O2 fstrict-aliasing
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[OPTIMIZATION_FLAGS+=" -$flag"],
+		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
 		[], [$COMPILER_WERROR])
 done
 
 for flag in Wa,-g g ggdb3
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[ASM_DEBUG_INFO_FLAGS+=" -$flag"],
+		[AS_VAR_APPEND([ASM_DEBUG_INFO_FLAGS], [" -$flag"])],
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([ASM_DEBUG_INFO_FLAGS])
 
 
-SMALLEST_CODE_FLAGS=
+AS_VAR_SET([SMALLEST_CODE_FLAGS],[])
 AX_CHECK_COMPILE_FLAG([-Oz],
-	[SMALLEST_CODE_FLAGS=-Oz],
+	[AS_VAR_SET([SMALLEST_CODE_FLAGS], [-Oz])],
 	[AX_CHECK_COMPILE_FLAG([-Os],
-		[SMALLEST_CODE_FLAGS=-Os],
+		[AS_VAR_SET([SMALLEST_CODE_FLAGS],[-Os])],
 		[$COMPILER_WERROR])],
 	[$COMPILER_WERROR])
 for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
 		mno-align-stringops Wno-ignored-optimization-argument
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[SMALLEST_CODE_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([SMALLEST_CODE_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([SMALLEST_CODE_FLAGS])
@@ -161,128 +152,198 @@ AC_SUBST([SMALLEST_CODE_FLAGS])
 for flag in ffreestanding
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[FREESTANDING_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([FREESTANDING_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([FREESTANDING_FLAGS])
 
-BOOTLOADER_FLAGS=
-for flag in m32 mgeneral-regs-only
+AS_VAR_SET([NOFLOAT_FLAGS], [])
+for flag in mgeneral-regs-only
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[BOOTLOADER_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([NOFLOAT_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
-AC_SUBST([BOOTLOADER_FLAGS])
+AC_SUBST([NOFLOAT_FLAGS])
 
-NO_LTO_FLAGS=
-for flag in m32 fno-lto
+ELF32_FLAGS=$NOFLOAT_FLAGS
+for flag in \
+	m32 \
+	Wl,-m,elf_i386 \
+	Wl,-N \
+	Wl,--no-dynamic-linker
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[NO_LTO_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([ELF32_FLAGS], [" -$flag"])]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([ELF32_FLAGS])
+
+ELF64_FLAGS=$NOFLOAT_FLAGS
+for flag in \
+	m64 \
+	Wl,-m,elf_x86_64 \
+	Wl,-N \
+	Wl,--no-dynamic-linker
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([ELF64_FLAGS], [" -$flag"])]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([ELF64_FLAGS])
+
+PE32_FLAGS=$NOFLOAT_FLAGS
+for flag in \
+	m32 \
+	D__efi \
+	fshort-wchar \
+	Wl,-m,i386pe \
+	Wl,-pie \
+	Wl,-N \
+	Wl,--no-dynamic-linker \
+	Wl,--subsystem,10
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([PE32_FLAGS], [" -$flag"])]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([PE32_FLAGS])
+
+PE64_FLAGS=$NOFLOAT_FLAGS
+for flag in \
+	m64 \
+	D__efi \
+	fshort-wchar \
+	Wl,-m,i386pep \
+	Wl,-pie Wl,-N \
+	Wl,--no-dynamic-linker \
+	Wl,--subsystem,10
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([PE64_FLAGS], [" -$flag"])]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([PE64_FLAGS])
+
+AS_VAR_SET([NO_LTO_FLAGS], [])
+for flag in fno-lto
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([NO_LTO_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([NO_LTO_FLAGS])
 
-REGPARM_FLAGS=
+AS_VAR_SET([REGPARM_FLAGS], [])
 for flag in mrtd mregparm=3
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[REGPARM_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([REGPARM_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([REGPARM_FLAGS])
 
-GCC_REALMODE_LIB=$($CXX $REGPARM_FLAGS $BOOTLOADER_FLAGS -print-libgcc-file-name)
-AC_SUBST([GCC_REALMODE_LIB])
+AC_MSG_NOTICE([Using libgcc parameters: $REGPARM_FLAGS $BOOTLOADER_FLAGS])
+LIBGCC_ELF32=$($CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)
+LIBGCC_ELF64=$($CXX $REGPARM_FLAGS $ELF64_FLAGS -print-libgcc-file-name)
+LIBGCC_PE32=$($CXX $REGPARM_FLAGS $PE32_FLAGS -print-libgcc-file-name)
+LIBGCC_PE64=$($CXX $REGPARM_FLAGS $PE64_FLAGS -print-libgcc-file-name)
+AC_MSG_NOTICE([Using elf32 libgcc: $LIBGCC_ELF32])
+AC_MSG_NOTICE([Using elf64 libgcc: $LIBGCC_ELF64])
+AC_MSG_NOTICE([Using pe32 libgcc: $LIBGCC_PE32])
+AC_MSG_NOTICE([Using pe64 libgcc: $LIBGCC_PE64])
+AC_SUBST([LIBGCC_ELF32])
+AC_SUBST([LIBGCC_ELF64])
+AC_SUBST([LIBGCC_PE32])
+AC_SUBST([LIBGCC_PE64])
 
-NO_PIC_FLAGS=
+AS_VAR_SET([NO_PIC_FLAGS], [])
 for flag in fno-pie fno-PIE fno-pic
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[NO_PIC_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([NO_PIC_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([NO_PIC_FLAGS])
 
-BMI_FLAGS=
+AS_VAR_SET([BMI_FLAGS], [])
 for flag in mabm mbmi mbmi2
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[BMI_FLAGS+=" -$flag"]
+		[AS_VAR_APPEND([BMI_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([BMI_FLAGS])
 
-DISABLE_FRAMEPOINTER_FLAGS=
+AS_VAR_SET([DISABLE_FRAMEPOINTER_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
-	[DISABLE_FRAMEPOINTER_FLAGS=" -fomit-frame-pointer"]
+	[AS_VAR_SET([DISABLE_FRAMEPOINTER_FLAGS], [" -fomit-frame-pointer"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([DISABLE_FRAMEPOINTER_FLAGS])
 
-ENABLE_FRAMEPOINTER_FLAGS=
+AS_VAR_SET([ENABLE_FRAMEPOINTER_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],
-	[ENABLE_FRAMEPOINTER_FLAGS=" -fno-omit-frame-pointer"]
+	[AS_VAR_SET([ENABLE_FRAMEPOINTER_FLAGS], [" -fno-omit-frame-pointer"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([ENABLE_FRAMEPOINTER_FLAGS])
 
-NO_REDZONE_FLAGS=
+AS_VAR_SET([NO_REDZONE_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-mno-red-zone],
-	[NO_REDZONE_FLAGS=" -mno-red-zone"]
+	[AS_VAR_SET([NO_REDZONE_FLAGS], [" -mno-red-zone"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_REDZONE_FLAGS])
 
-NO_STACKPROTECTOR_FLAGS=
+AS_VAR_SET([NO_STACKPROTECTOR_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-stack-protector],
-	[NO_STACKPROTECTOR_FLAGS=" -fno-stack-protector"]
+	[AS_VAR_SET([NO_STACKPROTECTOR_FLAGS], [" -fno-stack-protector"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_STACKPROTECTOR_FLAGS])
 
-STACK_CHECK_FLAGS=
+AS_VAR_SET([STACK_CHECK_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fstack-check],
-	[STACK_CHECK_FLAGS=" -fstack-check"]
+	[AS_VAR_SET([STACK_CHECK_FLAGS], [" -fstack-check"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([STACK_CHECK_FLAGS])
 
-NO_STACK_CHECK_FLAGS=
+AS_VAR_SET([NO_STACK_CHECK_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-stack-check],
-	[NO_STACK_CHECK_FLAGS=" -fno-stack-check"]
+	[AS_VAR_SET([NO_STACK_CHECK_FLAGS], [" -fno-stack-check"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_STACK_CHECK_FLAGS])
 
-NO_RTTI_FLAGS=
+AS_VAR_SET([NO_RTTI_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-rtti],
-	[NO_RTTI_FLAGS=" -fno-rtti"]
+	[AS_VAR_SET([NO_RTTI_FLAGS], [" -fno-rtti"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_RTTI_FLAGS])
 
-NO_UNWIND_TABLES_FLAGS=
+AS_VAR_SET([NO_UNWIND_TABLES_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-asynchronous-unwind-tables],
-	[NO_UNWIND_TABLES_FLAGS=" -fno-asynchronous-unwind-tables"]
+	[AS_VAR_SET([NO_UNWIND_TABLES_FLAGS], [" -fno-asynchronous-unwind-tables"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_UNWIND_TABLES_FLAGS])
 
-NO_EXCEPTIONS_FLAGS=
+AS_VAR_SET([NO_EXCEPTIONS_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-exceptions],
-	[NO_EXCEPTIONS_FLAGS=" -fno-exceptions"]
+	[AS_VAR_SET([NO_EXCEPTIONS_FLAGS], [" -fno-exceptions"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_EXCEPTIONS_FLAGS])
 
-NO_COMMON_FLAGS=
+AS_VAR_SET([NO_COMMON_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-common],
-	[NO_COMMON_FLAGS=" -fno-common"]
+	[AS_VAR_SET([NO_COMMON_FLAGS], [" -fno-common"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([NO_COMMON_FLAGS])
 
-VECTORIZE_FLAGS=
+AS_VAR_SET([VECTORIZE_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-ftree-vectorize],
-	[VECTORIZE_FLAGS=" -ftree-vectorize"]
+	[AS_VAR_SET([VECTORIZE_FLAGS], [" -ftree-vectorize"])]
 	[], [$COMPILER_WERROR])
 AC_SUBST([VECTORIZE_FLAGS])
 
-TUNE_FLAGS=
-#AX_CHECK_COMPILE_FLAG([-mtune=znver1],
-#	[TUNE_FLAGS=" -mtune=znver1"]
+AS_VAR_SET([TUNE_FLAGS], [])
+#AX_CHECK_COMPILE_FLAG([AS_VAR_SET([-mtune], [znver1])],
+#	[AS_VAR_SET([TUNE_FLAGS], [" -mtune=znver1"])]
 #	[], [$COMPILER_WERROR])
 #AC_SUBST([TUNE_FLAGS])
 

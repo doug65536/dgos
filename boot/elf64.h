@@ -2,4 +2,4 @@
 
 #include "types.h"
 
-bool elf64_run(char const *filename);
+bool elf64_run(const tchar *filename);

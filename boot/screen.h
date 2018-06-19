@@ -4,7 +4,7 @@
 #include "bioscall.h"
 
 #if defined(__GNUC__) && !defined(__efi)
-#define ATTRIBUTE_FORMAT(m,n) __attribute__((format(printf, m, n)))
+#define ATTRIBUTE_FORMAT(m,n) __attribute__((__format__(__printf__, (m), (n))))
 #else
 #define ATTRIBUTE_FORMAT(m,n)
 #endif
@@ -29,8 +29,4 @@ void print_lba(uint32_t lba);
 
 void dump_regs(bios_regs_t& regs, bool show_flags = false);
 
-#ifdef __efi
-#define PRINT(fmt, ...) print_line(TEXT(fmt), ## __VA_ARGS__)
-#else
 #define PRINT(...) print_line(__VA_ARGS__)
-#endif

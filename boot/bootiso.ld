@@ -1,41 +1,59 @@
 ENTRY(entry)
 
+/* NOTE: only the first 4KB is loaded by the BIOS, */
+/* in case a dumbass BIOS has its stack in the 1st 64KB (seabios), */
+/* the startup code loads the rest */
+
 SECTIONS {
 	.text 0x1000 : AT(0x1000) {
-		__initialized_data_start = .;
+		___initialized_data_st = .;
 		*(.head)
 		*(.early)
+		
+		. = ALIGN(4096);
 
-		. = 0x1A0;
-		SHORT(bootinfo_start);
-
-		__ctors_start = .;
-		*(.ctors)
-		*(.ctors.*)
-		*(.init_array)
-		*(SORT(.init_array.*))
-		__ctors_end = .;
-
-		/* --- additional sectors --- */
+		. = ALIGN(64);
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
 
+		. = ALIGN(64);
 		*(.data)
 		*(.data.*)
 		*(.rodata)
 		*(.rodata.*)
 
-		bootinfo_start = .;
-		*(.bootinfo)
+		. = ALIGN(16);
+		___ctors_st = .;
+		*(.ctors)
+		*(.ctors.*)
+		*(.init_array)
+		*(SORT(.init_array.*))
+		___ctors_en = .;
 
+		. = ALIGN(16);
+		___dtors_st = .;
+		*(.dtors)
+		*(.dtors.*)
+		*(.fini_array)
+		*(SORT(.fini_array.*))
+		___dtors_en = .;
+
+		. = ALIGN(16);
+		___smp_st = .;
+		*(.smp.entry)
+		*(.smp.text)
+		. = ALIGN(64);
+		*(.smp.data)
+		___smp_en = .;
+		
 		/* sector align end */
 		. = ALIGN(2048);
-		__initialized_data_end = .;
+		___initialized_data_en = .;
 	} = 0
 
 	.bss : {
-		__bss_start = .;
+		___bss_start = .;
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
@@ -43,17 +61,15 @@ SECTIONS {
 		*(COMMON*)
 
 		. = ALIGN(16);
-		__heap = .;
 		. += 8;
-		__bss_end = .;
+		___bss_end = .;
 	}
 
-	.uninit : {
-		*(.stack)
-
-		. = ALIGN(16);
-		__heap_st = .;
-	}
+	___initial_stack_limit = .;
+	. = ABSOLUTE(0xFFF0);
+	___initial_stack = .;
+	___heap_st = .;
+	___end = .;
 
 	/DISCARD/ : { *(.eh_frame) }
 }

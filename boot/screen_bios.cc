@@ -1,6 +1,9 @@
 #include "screen.h"
+#include "screen_abstract.h"
 
 #define DIRECT_VGA 0
+
+char const boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
 
 #if !DIRECT_VGA
 

@@ -2,6 +2,8 @@
 #include <stdarg.h>
 #include "debug.h"
 #include "bioscall.h"
+#include "malloc.h"
+#include "screen_abstract.h"
 
 static void buffer_char(tchar *buf, tchar **pptr, tchar c)
 {
@@ -24,7 +26,7 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c)
 
 char const hexlookup[] = "0123456789ABCDEF";
 
-void print_line(tchar const* format, ...)
+void print_line(tchar const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -36,7 +38,7 @@ void print_line(tchar const* format, ...)
     tchar *out = buf;
     tchar const *p = format;
     uint32_t base;
-    uint64_t n;
+    unsigned long long n;
     uint8_t flags;
 
     for (p = format; *p; ++p) {
@@ -47,7 +49,8 @@ void print_line(tchar const* format, ...)
             if (p[1] == 'l' && p[2] == 'l') {
                 flags |= FLAG_LONGLONG;
                 p += 2;
-            } else if (p[1] == 'l' || p[1] == 'z') {
+            } else if (p[1] == 'l' || p[1] == 'z' ||
+                       p[1] == 't' || p[1] == 'j') {
                 flags |= FLAG_LONG;
                 ++p;
             }
@@ -62,8 +65,7 @@ void print_line(tchar const* format, ...)
                 break;
             case 'd':
                 base = 10;
-                if (!(flags & FLAG_LONGLONG))
-                    flags |= FLAG_SIGNED;
+                flags |= FLAG_SIGNED;
                 break;
             case 'u':
                 base = 10;
@@ -94,31 +96,37 @@ void print_line(tchar const* format, ...)
                 // Read correct sized vararg and sign extend if needed
                 if (flags & FLAG_SIGNED) {
                     if (flags & FLAG_LONGLONG) {
-                        n = (uint64_t)va_arg(ap, int64_t);
-                        if ((int64_t)n < 0)
+                        n = (unsigned long long)va_arg(ap, long long);
+                        if ((long long)n < 0)
+                            flags |= FLAG_NEG;
+                    } else if (flags & FLAG_LONG) {
+                        n = (unsigned long long)va_arg(ap, long);
+                        if ((long)n < 0)
                             flags |= FLAG_NEG;
                     } else {
                         // Sign extend to 64 bit
-                        n = (uint64_t)(int64_t)va_arg(ap, int32_t);
-                        if ((int32_t)n < 0)
+                        n = (unsigned long long)va_arg(ap, int);
+                        if ((int)n < 0)
                             flags |= FLAG_NEG;
                     }
                 } else {
                     if (flags & FLAG_LONGLONG) {
-                        n = va_arg(ap, uint64_t);
+                        n = va_arg(ap, unsigned long long);
+                    } else if (flags & FLAG_LONG) {
+                        n = va_arg(ap, unsigned long);
                     } else {
-                        n = va_arg(ap, uint32_t);
+                        n = va_arg(ap, unsigned);
                     }
                 }
 
                 // If it is signed and it is negative
                 // then emit '-' and make it positive
-                if ((flags & FLAG_SIGNED) && (int64_t)n < 0) {
+                if ((flags & FLAG_SIGNED) && ((long long)n < 0)) {
                     // Emit negative sign
                     buffer_char(buf, &out, '-');
 
                     // Get absolute value
-                    n = (uint64_t)-(int64_t)n;
+                    n = (unsigned long long)-(long long)n;
                 }
 
                 // Build null terminated string in digit
@@ -143,7 +151,7 @@ void print_line(tchar const* format, ...)
                 s = va_arg(ap, tchar const*);
 
                 if (!s)
-                    s = TEXT("{[(null)]}");
+                    s = TSTR "{[(null)]}";
             }
 
             while (*s)
@@ -157,6 +165,7 @@ void print_line(tchar const* format, ...)
         }
     }
     if (out != buf) {
+        *out = 0;
         print_at(24, 0, 0x07, out - buf, buf);
         debug_out(buf, out - buf);
 
@@ -168,57 +177,64 @@ void print_line(tchar const* format, ...)
 
 void print_xy(int x, int y, tchar ch, uint16_t attr, size_t count)
 {
-    tchar *buf = (tchar*)__builtin_alloca(count+1);
+    tchar lbuf[81];
+    tchar *fbuf = nullptr;
+    if (count > 80)
+        fbuf = (tchar*)malloc(count+1);
+    tchar *buf = fbuf ? fbuf : lbuf;
+
     for (size_t ofs = 0; ofs < count; ++ofs)
         buf[ofs] = ch;
     buf[count] = 0;
     print_at(y, x, attr, count, buf);
+
+    if (fbuf)
+        free(fbuf);
 }
 
 void print_str_xy(int x, int y, tchar const *s, size_t len,
                   uint16_t attr, size_t min_len)
 {
-    print_at(y, x, attr, len, s);
-    if (min_len > len)
-        print_xy(x + len, y, ' ', attr, min_len - len);
+    tchar lbuf[81];
+    tchar *fbuf = nullptr;
+    size_t alloc_len = len > min_len ? len : min_len;
+    if (alloc_len > 80)
+        fbuf = (tchar*)malloc(alloc_len+1);
+    tchar *buf = fbuf ? fbuf : lbuf;
+    size_t ofs;
+    for (ofs = 0; ofs < len; ++ ofs)
+        buf[ofs] = s[ofs];
+    while (ofs < min_len)
+        buf[ofs++] = ' ';
+    buf[ofs] = 0;
+    print_at(y, x, attr, ofs, buf);
+
+    if (fbuf)
+        free(fbuf);
 }
 
 void print_lba(uint32_t lba)
 {
-    PRINT("%lu\n", lba);
+    PRINT(TSTR "%lu\n", lba);
 }
 
 void dump_regs(bios_regs_t& regs, bool show_flags)
 {
-    PRINT("eax=%lx\n", regs.eax);
-    PRINT("ebx=%lx\n", regs.ebx);
-    PRINT("ecx=%lx\n", regs.ecx);
-    PRINT("edx=%lx\n", regs.edx);
-    PRINT("esi=%lx\n", regs.esi);
-    PRINT("edi=%lx\n", regs.edi);
-    PRINT("ebp=%lx\n", regs.ebp);
-    PRINT(" ds=%x\n", regs.ds);
-    PRINT(" es=%x\n", regs.es);
-    PRINT(" fs=%x\n", regs.fs);
-    PRINT(" gs=%x\n", regs.gs);
+    PRINT(TSTR "eax=%lx\n", regs.eax);
+    PRINT(TSTR "ebx=%lx\n", regs.ebx);
+    PRINT(TSTR "ecx=%lx\n", regs.ecx);
+    PRINT(TSTR "edx=%lx\n", regs.edx);
+    PRINT(TSTR "esi=%lx\n", regs.esi);
+    PRINT(TSTR "edi=%lx\n", regs.edi);
+    PRINT(TSTR "ebp=%lx\n", regs.ebp);
+    PRINT(TSTR " ds=%x\n", regs.ds);
+    PRINT(TSTR " es=%x\n", regs.es);
+    PRINT(TSTR " fs=%x\n", regs.fs);
+    PRINT(TSTR " gs=%x\n", regs.gs);
     if (show_flags)
-        PRINT("flg=%lx\n", regs.eflags);
+        PRINT(TSTR "flg=%lx\n", regs.eflags);
 }
 
-// ╔╗║╚╝═█
-// 01234567
-static char const boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
-
-enum boxchar_index_t {
-    TL,
-    TR,
-    V,
-    BL,
-    BR,
-    H,
-    S,
-    X
-};
 
 void print_box(int left, int top, int right, int bottom, int attr, bool clear)
 {

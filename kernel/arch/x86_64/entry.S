@@ -32,9 +32,9 @@ entry:
     debugind '2'
 
     // See if this is the bootstrap processor
-    movl $(CPU_APIC_BASE_MSR),%ecx
+    movl $ CPU_APIC_BASE_MSR,%ecx
     rdmsr
-    testl $(CPU_APIC_BASE_BSP),%eax
+    testl $ CPU_APIC_BASE_BSP,%eax
     jnz bsp_init
 
     debugind 'Z'
@@ -42,35 +42,17 @@ entry:
 ap_init:
     // This is not the bootstrap CPU
 
-    // Load kernel memory mapping ASAP
-//    movq root_physaddr(%rip),%rax
-//    movq %rax,%cr3
-
-    // Get IDT and TSS up asap
-    //call idt_gdt_tss_init_ap
-
-//    // Initialize AP MXCSR
-//    movl $(CPU_MXCSR_ELF_INIT),%eax
-//    andl default_mxcsr_mask(%rip),%eax
-//    pushq %rax
-//    ldmxcsr (%rsp)
-
-    // Initialize AP FPU control word
-    // Round nearest, 53 bit significand, all exceptions masked
-//    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
-//    fldcw (%rsp)
-
-//    popq %rax
-
-    // xsave-enable AVX on AP
-    call set_xsave_states_ap
-
-    // Align stack
     xorl %ebp,%ebp
     pushq %rbp
 
     // MP processor entry
-    jmp mp_main
+    call mp_main
+
+    // mp_main should not return
+0:
+    call halt_forever
+    // halt_forever should not return either!
+    jmp 0b
 
 bsp_init:
     // This is the bootstrap processor
@@ -84,52 +66,11 @@ bsp_init:
     // Store the kernel parameters passed in from bootloader
     movq %r15,kernel_params(%rip)
 
-    xor %edi,%edi
-    call cpu_init_early
-
-    // Get IDT and TSS up asap
-    //call idt_gdt_tss_init
-
-    // Save the CPU_MXCSR_MASK
-
-//    // Allocate 512 bytes and cache line align stack
-//    movq %rsp,%rdx
-//    subq $512,%rsp
-//    andq $-64,%rsp
-
-//    // Initialize FPU to 64 bit precision,
-//    // all exceptions masked, round to nearest
-//    fninit
-//    movw $(CPU_FPUCW_ELF_INIT),(%rsp)
-//    fldcw (%rsp)
-
-//    fxsave64 (%rsp)
-
-//    // Read CPU_MXCSR_MASK from fxsave output and store it
-//    movl 28(%rsp),%eax
-//    movl $0x0000FFBF,%ecx
-//    testl %eax,%eax
-//    cmovel %ecx,%eax
-//    movl %eax,default_mxcsr_mask(%rip)
-
-//    // Set MXCSR
-//    // 0x3F = all exceptions masked
-//    // 0 = round to nearest
-//    movl $(CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST) | CPU_MXCSR_MASK_ALL),%ecx
-//    andl %eax,%ecx
-//    movl %ecx,24(%rsp)
-//    ldmxcsr 24(%rsp)
-
-//    // Restore stack pointer
-//    movq %rdx,%rsp
-
     debugind '4'
     call cpuid_init
 
-    debugind '6'
-
-    // Must xsave-enable AVX early if available
-    call detect_xsave_states_bsp
+    xor %edi,%edi
+    call cpu_init_early
 
     debugind '7'
 
@@ -144,8 +85,8 @@ bsp_init:
     debugind '9'
 
     // Call the constructors
-    leaq ___init_st(%rip),%rdi
-    leaq ___init_en(%rip),%rsi
+    leaq ___ctors_st(%rip),%rdi
+    leaq ___ctors_en(%rip),%rsi
     call invoke_function_array
 
     debugind 'A'
@@ -189,102 +130,6 @@ bsp_init:
 
     movq %rax,%rdi
     call exit
-
-//.align 16
-//idt_gdt_tss_init:
-//    pushq %rbx
-//    xorl %ebx,%ebx
-//    movl $256,%ecx
-
-//.align 16
-//    lea idt(%rip),%rdx
-//0:
-//	lea isr_entry_points(%rip),%rax
-//    movq (%rax,%rbx),%rax
-//    // IDT structure:
-//    //  uint16_t offset_lo;     // offset bits 15:0
-//    //  uint16_t selector;      // a code segment selector in GDT
-//    //  uint8_t ist;            // interrupt stack table index
-//    //  uint8_t type_attr;      // type and attributes
-//    //  uint16_t offset_hi;     // offset bits 31:16
-//    //  uint32_t offset_64_31;  // offset bits 63:32
-//    //  uint32_t reserved;
-//    movw %ax,(%rdx,%rbx,2)
-//    sarq $16,%rax
-//    movw $GDT_SEL_KERNEL_CODE64,2(%rdx,%rbx,2)
-//    movb $0,4(%rdx,%rbx,2)
-//    movb $(IDT_PRESENT | IDT_INTR),5(%rdx,%rbx,2)
-//    movw %ax,6(%rdx,%rbx,2)
-//    sarq $16,%rax
-//    movl %eax,8(%rdx,%rbx,2)
-//    movl $0,12(%rdx,%rbx,2)
-//    addl $8,%ebx
-//    decl %ecx
-//    jnz 0b
-
-//    // Setup IST entries
-//    movb $1,4+16*INTR_EX_STACK(%rdx)
-//    movb $2,4+16*INTR_EX_DBLFAULT(%rdx)
-
-//    // Poke initial TSS into TSS GDT entry
-//    //  uint16_t limit_low;
-//    //	uint16_t base_low;
-//    //	uint8_t base_middle;
-//    //	uint8_t access;
-//    //	uint8_t flags_limit_high;
-//    //	uint8_t base_high;
-
-//    popq %rbx
-
-//    movl $INTR_EX_DEBUG,%edi
-//    leaq debug_exception_handler(%rip),%rsi
-//    call intr_hook
-
-//    // fall through...
-
-//.align 16
-//idt_gdt_tss_init_ap:
-//    // Load IDTR
-//    lea idt(%rip),%rdx
-//    subq $(24*8),%rsp
-//    movw $(16 * 256 - 1),6(%rsp)
-//    movq %rdx,8(%rsp)
-//    lidtq 6(%rsp)
-
-//    // Load GDTR
-//    lea gdt(%rip),%rdx
-//    movw $(GDT_SEL_END - 1),6(%rsp)
-//    movq %rdx,8(%rsp)
-//    lgdtq 6(%rsp)
-
-//    leaq early_tss(%rip),%rax
-//    // Limit 15:0
-//    movw $(early_tss_end - early_tss - 1),GDT_SEL_TSS(%rdx)
-//    // Base 15:0
-//    movw %ax,2+GDT_SEL_TSS(%rdx)
-//    sarq $16,%rax
-//    // Base 23:16
-//    movb %al,4+GDT_SEL_TSS(%rdx)
-//    sarq $8,%rax
-//    // access
-//    movb $(GDT_ACCESS_PRESENT |
-//        GDT_ACCESS_ACCESSED | GDT_TYPE_TSS),5+GDT_SEL_TSS(%rdx)
-//    // Limit 19:16, flags
-//    movb $0,6+GDT_SEL_TSS(%rdx)
-//    // Base 21:24
-//    movb %al,7+GDT_SEL_TSS(%rdx)
-//    sarq $8,%rax
-//    // Base 63:32
-//    movl %eax,8+GDT_SEL_TSS(%rdx)
-//    // Reserved
-//    movl $0,12+GDT_SEL_TSS(%rdx)
-
-//    // Load TR
-//    movl $GDT_SEL_TSS,%eax
-//    ltr %ax
-
-//    addq $(24*8),%rsp
-//    ret
 
 .section .data
 
@@ -335,8 +180,8 @@ exit:
     // Kernel exit just calls destructors
     // and deliberately hangs
 0:
-    leaq ___fini_st(%rip),%rdi
-    leaq ___fini_en(%rip),%rsi
+    leaq ___dtors_st(%rip),%rdi
+    leaq ___dtors_en(%rip),%rsi
     call invoke_function_array
 
     call halt_forever
@@ -363,59 +208,6 @@ invoke_function_array:
     pop_cfi %rbp
     pop_cfi %rbx
 
-    .cfi_endproc
-    ret
-
-#define XSAVE_WANTED \
-    XCR0_X87 | XCR0_SSE | XCR0_AVX | \
-    XCR0_AVX512_OPMASK | XCR0_AVX512_UPPER | XCR0_AVX512_XREGS
-
-.align 16
-detect_xsave_states_bsp:
-    .cfi_startproc
-    .cfi_def_cfa_offset 8
-
-    push_cfi %rbx
-    call cpuid_has_xsave
-    testb %al,%al
-    jz 0f
-
-    movl $CPUID_INFO_XSAVE,%eax
-    xorl %ecx,%ecx
-    cpuid
-
-    movl %eax,xsave_supported_states(%rip)
-    andl $XSAVE_WANTED,%eax
-    movl %eax,xsave_enabled_states(%rip)
-
-0:
-    pop_cfi %rbx
-    .cfi_endproc
-    jmp set_xsave_states_ap
-
-.align 16
-set_xsave_states_ap:
-    .cfi_startproc
-    .cfi_def_cfa_offset 8
-
-    push_cfi %rbx
-
-    call cpuid_has_xsave
-    testb %al,%al
-    jz 0f
-
-    movq %cr4,%rax
-    orq $CPU_CR4_OSXSAVE,%rax
-    movq %rax,%cr4
-
-    xorl %ecx,%ecx
-    xgetbv
-    andl xsave_supported_states(%rip),%eax
-    orl xsave_enabled_states(%rip),%eax
-    xsetbv
-
-0:
-    pop_cfi %rbx
     .cfi_endproc
     ret
 

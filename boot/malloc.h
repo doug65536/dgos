@@ -12,6 +12,13 @@ void *malloc_aligned(size_t bytes, size_t alignment);
 void *realloc(void *p, size_t bytes);
 void *realloc_aligned(void *p, size_t bytes, size_t alignment);
 
+bool malloc_validate();
+bool malloc_validate_or_panic();
+
+void malloc_init(void *st, void *en);
+
+void malloc_get_heap_range(void **st, void **en);
+
 #ifndef NDEBUG
 void test_malloc();
 #endif

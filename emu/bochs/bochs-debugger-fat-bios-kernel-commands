@@ -1,3 +1,4 @@
 u switch-mode
 ldsym global "kernel-generic.sym"
+#0xfffff80000000000-0xffffffff80000000
 lb "cpu_debug_break"

@@ -709,132 +709,141 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list)
     do {
         did_something = 0;
 
-        // Make invalid and zero size entries get removed
-        for (size_t i = 1; i < phys_mem_map_count; ++i) {
-            if (list[i].size == 0 && !list[i].valid) {
-                list[i].base = ~0UL;
-                list[i].size = ~0UL;
-            }
-        }
+//        // Make invalid and zero size entries get removed
+//        for (size_t i = 1; i < phys_mem_map_count; ++i) {
+//            if (list[i].size == 0 || !list[i].valid) {
+//                list[i].base = ~0UL;
+//                list[i].size = ~0UL;
+//            }
+//        }
 
-        // Simple sort algorithm for small list.
-        // Bubble sort is actually fast for nearly-sorted
-        // or already-sorted list. The list is probably
-        // already sorted
-        for (size_t i = 1; i < phys_mem_map_count; ++i) {
-            // Slide it back to where it should be
-            for (size_t j = i; j > 0; --j) {
-                if (list[j - 1].base < list[j].base)
-                    break;
+//        // Simple sort algorithm for small list.
+//        // Bubble sort is actually fast for nearly-sorted
+//        // or already-sorted list. The list is probably
+//        // already sorted
+//        for (size_t i = 1; i < phys_mem_map_count; ++i) {
+//            // Slide it back to where it should be
+//            for (size_t j = i; j > 0; --j) {
+//                if (list[j - 1].base < list[j].base)
+//                    break;
 
-                mmu_mem_map_swap(list + j - 1, list + j);
-                did_something = 1;
-            }
-        }
+//                mmu_mem_map_swap(list + j - 1, list + j);
+//                did_something = 1;
+//            }
+//        }
 
-        if (did_something) {
-            printk("Memory map order fixed up\n");
-            continue;
-        }
+//        if (did_something) {
+//            printk("Memory map order fixed up\n");
+//            continue;
+//        }
 
-        // Discard entries marked for removal from the end
-        while (phys_mem_map_count > 0 &&
-               list[phys_mem_map_count-1].base == ~0UL &&
-               list[phys_mem_map_count-1].size == ~0UL) {
-            --phys_mem_map_count;
-            did_something = 1;
-        }
+//        // Discard entries marked for removal from the end
+//        while (phys_mem_map_count > 0 &&
+//               list[phys_mem_map_count-1].base == ~0UL &&
+//               list[phys_mem_map_count-1].size == ~0UL) {
+//            --phys_mem_map_count;
+//            did_something = 1;
+//        }
 
-        if (did_something) {
-            printk("Memory map entries were eliminated\n");
-            continue;
-        }
+//        if (did_something) {
+//            printk("Memory map entries were eliminated\n");
+//            continue;
+//        }
 
-        // Fixup overlaps
-        for (size_t i = 1; i < phys_mem_map_count; ++i) {
-            if (list[i-1].base + list[i-1].size > list[i].base) {
-                // Overlap
+//        // Fixup overlaps
+//        for (size_t i = 1; i < phys_mem_map_count; ++i) {
+//            if (list[i-1].base + list[i-1].size > list[i].base) {
+//                // Overlap
 
-                did_something = 1;
+//                did_something = 1;
 
-                // Compute bounds of prev
-                physaddr_t prev_st = list[i-1].base;
-                physaddr_t prev_en = prev_st + list[i-1].size;
+//                // Compute bounds of prev
+//                physaddr_t prev_st = list[i-1].base;
+//                physaddr_t prev_en = prev_st + list[i-1].size;
 
-                // Compute bounds of this
-                physaddr_t this_st = list[i].base;
-                physaddr_t this_en = this_st + list[i].size;
+//                // Compute bounds of this
+//                physaddr_t this_st = list[i].base;
+//                physaddr_t this_en = this_st + list[i].size;
 
-                // Start at lowest bound, end at highest bound
-                physaddr_t st = prev_st < this_st ? prev_st : this_st;
-                physaddr_t en = prev_en > this_en ? prev_en : this_en;
+//                // Start at lowest bound, end at highest bound
+//                physaddr_t st = prev_st < this_st ? prev_st : this_st;
+//                physaddr_t en = prev_en > this_en ? prev_en : this_en;
 
-                if (list[i-1].type == list[i].type) {
-                    // Both same type,
-                    // make one cover combined range
+//                if (list[i-1].type == list[i].type) {
+//                    // Both same type,
+//                    // make one cover combined range
 
-                    printk("Combining overlapping ranges of same type\n");
+//                    printk("Combining overlapping ranges of same type\n");
 
-                    // Remove previous entry
-                    list[i-1].base = ~0UL;
-                    list[i-1].size = ~0UL;
+//                    // Remove previous entry
+//                    list[i-1].base = ~0UL;
+//                    list[i-1].size = ~0UL;
 
-                    list[i].base = st;
-                    list[i].size = en - st;
+//                    list[i].base = st;
+//                    list[i].size = en - st;
 
-                    break;
-                } else if (list[i-1].type == PHYSMEM_TYPE_NORMAL) {
-                    // This entry takes precedence over prev entry
+//                    break;
+//                } else if (list[i-1].type == PHYSMEM_TYPE_NORMAL) {
+//                    // This entry takes precedence over prev entry
 
-                    if (st < this_st && en > this_en) {
-                        // Punching a hole in the prev entry
+//                    if (st < this_st && en > this_en) {
+//                        // Punching a hole in the prev entry
 
-                        printk("Punching hole in memory range\n");
+//                        printk("Punching hole in memory range\n");
 
-                        // Reduce size of prev one to not overlap
-                        list[i-1].size = this_st - prev_st;
+//                        // Reduce size of prev one to not overlap
+//                        list[i-1].size = this_st - prev_st;
 
-                        // Make new entry with normal memory after this one
-                        // Sort will put it in the right position later
-                        list[phys_mem_map_count].base = this_en;
-                        list[phys_mem_map_count].size = en - this_en;
-                        list[phys_mem_map_count].type = PHYSMEM_TYPE_NORMAL;
-                        list[phys_mem_map_count].valid = 1;
-                        ++phys_mem_map_count;
+//                        // Make new entry with normal memory after this one
+//                        // Sort will put it in the right position later
+//                        list[phys_mem_map_count].base = this_en;
+//                        list[phys_mem_map_count].size = en - this_en;
+//                        list[phys_mem_map_count].type = PHYSMEM_TYPE_NORMAL;
+//                        list[phys_mem_map_count].valid = 1;
+//                        ++phys_mem_map_count;
 
-                        break;
-                    } else if (st < this_st && en >= this_en) {
-                        // Prev entry partially overlaps this entry
+//                        break;
+//                    } else if (st < this_st && en >= this_en) {
+//                        // Prev entry partially overlaps this entry
 
-                        printk("Correcting overlap\n");
+//                        printk("Correcting overlap\n");
 
-                        list[i-1].size = this_st - prev_st;
-                    }
-                } else {
-                    // Prev entry takes precedence over this entry
+//                        list[i-1].size = this_st - prev_st;
+//                    }
+//                } else {
+//                    // Prev entry takes precedence over this entry
 
-                    if (st < this_st && en > this_en) {
-                        // Prev entry eliminates this entry
-                        list[i].base = ~0UL;
-                        list[i].size = ~0UL;
+//                    if (st < this_st && en > this_en) {
+//                        // Prev entry eliminates this entry
+//                        list[i].base = ~0UL;
+//                        list[i].size = ~0UL;
 
-                        printk("Removing completely overlapped range\n");
-                    } else if (st < this_st && en >= this_en) {
-                        // Prev entry partially overlaps this entry
+//                        printk("Removing completely overlapped range\n");
+//                    } else if (st < this_st && en >= this_en) {
+//                        // Prev entry partially overlaps this entry
 
-                        printk("Correcting overlap\n");
+//                        printk("Correcting overlap\n");
 
-                        list[i].base = prev_en;
-                        list[i].size = this_en - prev_en;
-                    }
-                }
-            }
-        }
+//                        list[i].base = prev_en;
+//                        list[i].size = this_en - prev_en;
+//                    }
+//                }
+//            } else if (list[i-1].type == list[i].type &&
+//                       list[i-1].base + list[i-1].size == list[i].base) {
+//                // Merge adjacent ranges of the same type
+//                list[i].size += list[i-1].size;
+//                list[i].base -= list[i-1].size;
+//                list[i-1].base = ~0;
+//                list[i-1].size = ~0;
 
-        if (did_something) {
-            printk("Memory map overlap fixed up\n");
-            continue;
-        }
+//                did_something = 1;
+
+//                printk("Merging adjacent range of same type\n");
+//            }
+//        }
+
+//        if (did_something)
+//            continue;
 
         usable_count = 0;
 
@@ -853,7 +862,7 @@ static size_t mmu_fixup_mem_map(physmem_range_t *list)
                 // Align end to a page boundary
                 en -= en & PAGE_MASK;
 
-                if (st != list[i].base ||
+                if (st == en || st != list[i].base ||
                         en != list[i].base + list[i].size) {
                     if (en > st) {
                         list[i].base = st;
@@ -1533,6 +1542,8 @@ void mmu_init()
 
         phys_allocator.add_free_space(range.base, range.size);
         --usable_mem_ranges;
+
+        free_count += range.size >> PAGE_SCALE;
 
         if (range.base == top_of_kernel) {
             usable_mem_ranges = 0;

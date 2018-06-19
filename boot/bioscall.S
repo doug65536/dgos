@@ -108,6 +108,9 @@ bioscall:
     cli
     cs lgdt gdtr
 
+    // Compiled code is assuming EFLAGS.DF is 0
+    cld
+
     // Turn on protected mode
     movl %cr0,%eax
     or $1,%eax
@@ -116,7 +119,7 @@ bioscall:
     ljmpw $GDT_SEL_PM_CODE32,$0f
 0:
 .code32
-    movl $GDT_SEL_KERNEL_DATA,%eax
+    movl $ GDT_SEL_KERNEL_DATA,%eax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs

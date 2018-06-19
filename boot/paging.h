@@ -54,29 +54,37 @@
 #define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
 #define PTE_PK              (PTE_PK_MASK << PTE_PK_BIT)
 
-//struct far_ptr_realmode_t {
-//    uint16_t offset;
-//    uint16_t seg;
-//};
-//
-//far_ptr_realmode_t paging_far_realmode_ptr(uint32_t addr);
-//far_ptr_realmode_t paging_far_realmode_ptr2(uint16_t seg, uint16_t ofs);
-//
-//void paging_copy_far(far_ptr_realmode_t const *dest,
-//                     far_ptr_realmode_t const *src,
-//                     uint16_t size);
-
-void paging_init();
+extern "C"
 __pure uint32_t paging_root_addr();
 
 typedef uint64_t pte_t;
 typedef uint64_t addr64_t;
 typedef uint64_t size64_t;
 
-uint64_t paging_map_range(uint64_t linear_base,
+struct phys_alloc_t {
+    uint64_t base;
+    uint64_t size;
+};
+
+class page_factory_t {
+public:
+    virtual phys_alloc_t alloc(size64_t size) noexcept = 0;
+
+protected:
+    virtual ~page_factory_t() noexcept {}
+};
+
+void paging_map_range(
+        page_factory_t *allocator,
+        uint64_t linear_base,
         uint64_t length,
+        uint64_t pte_flags);
+
+void paging_map_physical(
         uint64_t phys_addr,
-        uint64_t pte_flags, uint16_t keep, uint8_t log2_pagesize = 12);
+        uint64_t linear_base,
+        uint64_t length,
+        uint64_t pte_flags);
 
 void paging_alias_range(addr64_t alias_addr,
                         addr64_t linear_addr,
@@ -85,3 +93,12 @@ void paging_alias_range(addr64_t alias_addr,
 
 void paging_modify_flags(addr64_t addr, size64_t size,
                          pte_t clear, pte_t set);
+
+uint64_t paging_physaddr_of(uint64_t linear_addr);
+
+struct iovec_t {
+    uint64_t base;
+    uint64_t size;
+};
+
+int paging_iovec(iovec_t **ret, uint64_t vaddr, uint64_t size, uint64_t max_chunk);

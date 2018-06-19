@@ -4,11 +4,11 @@ plugin_ctrl: parallel=1, serial=1, gameport=1, iodebug=1
 config_interface: textconfig
 display_library: x
 memory: host=64, guest=64
-romimage: file="/usr/local/share/bochs/BIOS-bochs-latest"
+romimage: file="/usr/share/ovmf/OVMF.fd"
 vgaromimage: file="/usr/local/share/bochs/VGABIOS-lgpl-latest"
 boot: cdrom
 ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
-ata0-master: type=cdrom, path="dgos.iso", status=inserted
+ata0-master: type=cdrom, path="isodisk.img", status=inserted
 ata0-master: model="Generic 1234", biosdetect=auto
 ata0-slave: type=none
 ata1: enabled=1, ioaddr1=0x170, ioaddr2=0x370, irq=15
