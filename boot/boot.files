@@ -62,6 +62,7 @@ ptbl.h
 screen_abstract.h
 screen_bios.cc
 screen_efi.cc
+string_char16.cc
 tui.cc
 tui.h
 tui_bios.cc

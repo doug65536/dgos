@@ -7,24 +7,9 @@ size_t strlen(char const *src)
     return len;
 }
 
-size_t strlen(char16_t const *src)
-{
-    size_t len = 0;
-    for ( ; src[len]; ++len);
-    return len;
-}
-
-void *memchr(void const *mem, int ch, size_t count)
-{
-    for (char const *p = (char const *)mem; count--; ++p)
-        if (*p == (char)ch)
-            return (void *)p;
-   return 0;
-}
-
 // The terminating null character is considered to be a part
 // of the string and can be found when searching for '\0'.
-void *strchr(tchar const *s, int ch)
+void *strchr(char const *s, int ch)
 {
     for (;; ++s) {
         char c = *s;
@@ -35,7 +20,7 @@ void *strchr(tchar const *s, int ch)
     }
 }
 
-int strcmp(tchar const *lhs, char const *rhs)
+int strcmp(char const *lhs, char const *rhs)
 {
     int cmp = 0;
     do {
@@ -45,7 +30,7 @@ int strcmp(tchar const *lhs, char const *rhs)
     return cmp;
 }
 
-int strncmp(tchar const *lhs, char const *rhs, size_t count)
+int strncmp(char const *lhs, char const *rhs, size_t count)
 {
     int cmp = 0;
     if (count) {
@@ -55,6 +40,57 @@ int strncmp(tchar const *lhs, char const *rhs, size_t count)
         } while (--count && cmp == 0 && *lhs++);
     }
     return cmp;
+}
+
+char *strcpy(char *dest, char const *src)
+{
+    char *d = dest;
+    while ((*d++ = *src++) != 0);
+    return dest;
+}
+
+char *strncpy(char *dest, char const *src, size_t n)
+{
+    char *d = dest;
+
+    size_t i = 0;
+
+    // Copy from src up to but not including null terminator
+    for ( ; i < n && src[i]; ++i)
+        d[i] = src[i];
+
+    // Fill dest with zeros until at least n bytes are written
+    for ( ; i < n; ++i)
+        d[i] = 0;
+
+    return dest;
+}
+
+char *strcat(char *dest, char const *src)
+{
+    strcpy(dest + strlen(dest), src);
+    return dest;
+}
+
+// The behavior is undefined if the destination array
+// does not have enough space for the contents of both
+// dest and the first count characters of src, plus the
+// terminating null character. The behavior is undefined
+// if the source and destination objects overlap. The
+// behavior is undefined if either dest is not a pointer
+// to a null-terminated byte string or src is not a
+// pointer to a character array.
+char *strncat(char *dest, char const *src, size_t n)
+{
+    return strncpy(dest + strlen(dest), src, n);
+}
+
+void *memchr(void const *mem, int ch, size_t count)
+{
+    for (char const *p = (char const *)mem; count--; ++p)
+        if (*p == (char)ch)
+            return (void *)p;
+   return 0;
 }
 
 int memcmp(void const *lhs, void const *rhs, size_t count)
@@ -92,6 +128,59 @@ char *strstr(char const *str, char const *substr)
             return (char*)(str + i);
 
     return 0;
+}
+
+void *memcpy_rev(void *dest, void const *src, size_t n)
+{
+#if 1
+    if ((n & 3) == 0) {
+        src = (char*)src + n - 1;
+        char *d = (char*)dest + n - 1;
+        n >>= 2;
+        __asm__ __volatile__ (
+            "std\n\t"
+            "rep movsl\n\t"
+            "cld\n\t"
+            : "+S" (src)
+            , "+D" (d)
+            , "+c" (n)
+        );
+    } else {
+        src = (char*)src + n - 4;
+        char *d = (char*)dest + n - 4;
+        __asm__ __volatile__ (
+            "std\n\t"
+            "rep movsb\n\t"
+            "cld\n\t"
+            : "+S" (src)
+            , "+D" (d)
+            , "+c" (n)
+        );
+    }
+    return dest;
+#else
+    char *d = (char*)dest;
+    char const *s = (char const *)src;
+    while (n--)
+        *d++ = *s++;
+#endif
+    return dest;
+}
+
+void *memmove(void *dest, void const *src, size_t n)
+{
+    char *d = (char*)dest;
+    char const *s = (char const *)src;
+
+    if (d < s || s + n <= d)
+        return memcpy(d, s, n);
+
+    if (d > s) {
+        for (size_t i = n; i; --i)
+            d[i-1] = s[i-1];
+    }
+
+    return dest;
 }
 
 void *memset(void *dest, int c, size_t n)
@@ -151,135 +240,4 @@ void *memcpy(void *dest, void const *src, size_t n)
         *d++ = *s++;
 #endif
     return dest;
-}
-
-void *memcpy_rev(void *dest, void const *src, size_t n)
-{
-#if 1
-    if ((n & 3) == 0) {
-        src = (char*)src + n - 1;
-        char *d = (char*)dest + n - 1;
-        n >>= 2;
-        __asm__ __volatile__ (
-            "std\n\t"
-            "rep movsl\n\t"
-            "cld\n\t"
-            : "+S" (src)
-            , "+D" (d)
-            , "+c" (n)
-        );
-    } else {
-        src = (char*)src + n - 4;
-        char *d = (char*)dest + n - 4;
-        __asm__ __volatile__ (
-            "std\n\t"
-            "rep movsb\n\t"
-            "cld\n\t"
-            : "+S" (src)
-            , "+D" (d)
-            , "+c" (n)
-        );
-    }
-    return dest;
-#else
-    char *d = (char*)dest;
-    char const *s = (char const *)src;
-    while (n--)
-        *d++ = *s++;
-#endif
-    return dest;
-}
-
-void *memmove(void *dest, void const *src, size_t n)
-{
-    char *d = (char*)dest;
-    char const *s = (char const *)src;
-
-    if (d < s || s + n <= d)
-        return memcpy(d, s, n);
-
-    if (d > s) {
-        for (size_t i = n; i; --i)
-            d[i-1] = s[i-1];
-    }
-
-    return dest;
-}
-
-char *strcpy(char *dest, char const *src)
-{
-    char *d = dest;
-    while ((*d++ = *src++) != 0);
-    return dest;
-}
-
-char16_t *strcpy(char16_t *dest, char16_t const *src)
-{
-    char16_t *d = dest;
-    while ((*d++ = *src++) != 0);
-    return dest;
-}
-
-char *strcat(char *dest, char const *src)
-{
-    strcpy(dest + strlen(dest), src);
-    return dest;
-}
-
-char16_t *strcat(char16_t *dest, char16_t const *src)
-{
-    strcpy(dest + strlen(dest), src);
-    return dest;
-}
-
-char *strncpy(char *dest, char const *src, size_t n)
-{
-    char *d = dest;
-
-    size_t i = 0;
-
-    // Copy from src up to but not including null terminator
-    for ( ; i < n && src[i]; ++i)
-        d[i] = src[i];
-
-    // Fill dest with zeros until at least n bytes are written
-    for ( ; i < n; ++i)
-        d[i] = 0;
-
-    return dest;
-}
-
-char16_t *strncpy(char16_t *dest, char16_t const *src, size_t n)
-{
-    char16_t *d = dest;
-
-    size_t i = 0;
-
-    // Copy from src up to but not including null terminator
-    for ( ; i < n && src[i]; ++i)
-        d[i] = src[i];
-
-    // Fill dest with zeros until at least n bytes are written
-    for ( ; i < n; ++i)
-        d[i] = 0;
-
-    return dest;
-}
-
-// The behavior is undefined if the destination array
-// does not have enough space for the contents of both
-// dest and the first count characters of src, plus the
-// terminating null character. The behavior is undefined
-// if the source and destination objects overlap. The
-// behavior is undefined if either dest is not a pointer
-// to a null-terminated byte string or src is not a
-// pointer to a character array.
-char *strncat(char *dest, char const *src, size_t n)
-{
-    return strncpy(dest + strlen(dest), src, n);
-}
-
-char16_t *strncat(char16_t *dest, char16_t const *src, size_t n)
-{
-    return strncpy(dest + strlen(dest), src, n);
 }

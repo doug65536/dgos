@@ -331,6 +331,7 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-debug.$(OBJEXT) \
 	boot/bootefi_amd64-assert.$(OBJEXT) \
 	boot/bootefi_amd64-string.$(OBJEXT) \
+	boot/bootefi_amd64-string_char16.$(OBJEXT) \
 	boot/bootefi_amd64-halt_efi.$(OBJEXT) \
 	boot/bootefi_amd64-screen.$(OBJEXT) \
 	boot/bootefi_amd64-screen_efi.$(OBJEXT) \
@@ -1112,6 +1113,7 @@ libbootsect_a_SOURCES = \
 	boot/cpu64_bios.S \
 	boot/malloc.cc \
 	boot/string.cc \
+	boot/string_char16.cc \
 	boot/utf.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
@@ -1386,6 +1388,7 @@ bootefi_amd64_SOURCES = \
 	boot/debug.cc \
 	boot/assert.cc \
 	boot/string.cc \
+	boot/string_char16.cc \
 	boot/halt_efi.cc \
 	boot/screen.cc \
 	boot/screen_efi.cc \
@@ -2302,6 +2305,8 @@ boot/libbootsect_a-malloc.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-string.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-string_char16.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-utf.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-paging.$(OBJEXT): boot/$(am__dirstamp) \
@@ -2899,6 +2904,8 @@ boot/bootefi_amd64-debug.$(OBJEXT): boot/$(am__dirstamp) \
 boot/bootefi_amd64-assert.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-string.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootefi_amd64-string_char16.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-halt_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3747,6 +3754,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-screen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-screen_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-string.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-string_char16.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_bin-bootfat.Po@am__quote@
@@ -3793,6 +3801,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-screen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-screen_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-string.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-string_char16.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-tui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-tui_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-utf.Po@am__quote@
@@ -4744,6 +4753,20 @@ boot/libbootsect_a-string.obj: boot/string.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/string.cc' object='boot/libbootsect_a-string.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-string.obj `if test -f 'boot/string.cc'; then $(CYGPATH_W) 'boot/string.cc'; else $(CYGPATH_W) '$(srcdir)/boot/string.cc'; fi`
+
+boot/libbootsect_a-string_char16.o: boot/string_char16.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-string_char16.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-string_char16.Tpo -c -o boot/libbootsect_a-string_char16.o `test -f 'boot/string_char16.cc' || echo '$(srcdir)/'`boot/string_char16.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-string_char16.Tpo boot/$(DEPDIR)/libbootsect_a-string_char16.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/string_char16.cc' object='boot/libbootsect_a-string_char16.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-string_char16.o `test -f 'boot/string_char16.cc' || echo '$(srcdir)/'`boot/string_char16.cc
+
+boot/libbootsect_a-string_char16.obj: boot/string_char16.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-string_char16.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-string_char16.Tpo -c -o boot/libbootsect_a-string_char16.obj `if test -f 'boot/string_char16.cc'; then $(CYGPATH_W) 'boot/string_char16.cc'; else $(CYGPATH_W) '$(srcdir)/boot/string_char16.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-string_char16.Tpo boot/$(DEPDIR)/libbootsect_a-string_char16.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/string_char16.cc' object='boot/libbootsect_a-string_char16.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-string_char16.obj `if test -f 'boot/string_char16.cc'; then $(CYGPATH_W) 'boot/string_char16.cc'; else $(CYGPATH_W) '$(srcdir)/boot/string_char16.cc'; fi`
 
 boot/libbootsect_a-utf.o: boot/utf.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-utf.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-utf.Tpo -c -o boot/libbootsect_a-utf.o `test -f 'boot/utf.cc' || echo '$(srcdir)/'`boot/utf.cc
@@ -7166,6 +7189,20 @@ boot/bootefi_amd64-string.obj: boot/string.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/string.cc' object='boot/bootefi_amd64-string.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-string.obj `if test -f 'boot/string.cc'; then $(CYGPATH_W) 'boot/string.cc'; else $(CYGPATH_W) '$(srcdir)/boot/string.cc'; fi`
+
+boot/bootefi_amd64-string_char16.o: boot/string_char16.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-string_char16.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-string_char16.Tpo -c -o boot/bootefi_amd64-string_char16.o `test -f 'boot/string_char16.cc' || echo '$(srcdir)/'`boot/string_char16.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-string_char16.Tpo boot/$(DEPDIR)/bootefi_amd64-string_char16.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/string_char16.cc' object='boot/bootefi_amd64-string_char16.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-string_char16.o `test -f 'boot/string_char16.cc' || echo '$(srcdir)/'`boot/string_char16.cc
+
+boot/bootefi_amd64-string_char16.obj: boot/string_char16.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-string_char16.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-string_char16.Tpo -c -o boot/bootefi_amd64-string_char16.obj `if test -f 'boot/string_char16.cc'; then $(CYGPATH_W) 'boot/string_char16.cc'; else $(CYGPATH_W) '$(srcdir)/boot/string_char16.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-string_char16.Tpo boot/$(DEPDIR)/bootefi_amd64-string_char16.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/string_char16.cc' object='boot/bootefi_amd64-string_char16.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-string_char16.obj `if test -f 'boot/string_char16.cc'; then $(CYGPATH_W) 'boot/string_char16.cc'; else $(CYGPATH_W) '$(srcdir)/boot/string_char16.cc'; fi`
 
 boot/bootefi_amd64-halt_efi.o: boot/halt_efi.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-halt_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-halt_efi.Tpo -c -o boot/bootefi_amd64-halt_efi.o `test -f 'boot/halt_efi.cc' || echo '$(srcdir)/'`boot/halt_efi.cc

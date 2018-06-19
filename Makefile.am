@@ -166,6 +166,7 @@ libbootsect_a_SOURCES = \
 	boot/cpu64_bios.S \
 	boot/malloc.cc \
 	boot/string.cc \
+	boot/string_char16.cc \
 	boot/utf.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
@@ -439,6 +440,7 @@ bootefi_amd64_SOURCES = \
 	boot/debug.cc \
 	boot/assert.cc \
 	boot/string.cc \
+	boot/string_char16.cc \
 	boot/halt_efi.cc \
 	boot/screen.cc \
 	boot/screen_efi.cc \
