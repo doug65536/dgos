@@ -21,7 +21,7 @@ static bool disk_support_64bit_addr_bioscall()
     bioscall(&regs, 0x13);
 
     if (regs.flags_CF())
-        return 0;
+        return false;
 
     bool signature = ((regs.ebx & 0xFFFF) == 0xAA55);
     int version = ((regs.eax >> 8) & 0xFF);
