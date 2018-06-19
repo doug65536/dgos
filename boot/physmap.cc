@@ -16,7 +16,12 @@ static int physalloc_20bit_st;
 static int physalloc_64bit_st;
 static int physalloc_20bit_1st;
 
-bool physmap_init()
+// Special block for taking pages from the top of 32 bit range
+static void physmap_realloc(int capacity_hint);
+static int physmap_replace(int index, physmem_range_t const& entry);
+static void physmap_delete(int index);
+
+static bool physmap_init()
 {
     if (!get_ram_regions())
         return false;
@@ -121,30 +126,13 @@ __constructor((ctor_physmem)) void physmap_startup()
         PANIC("Could not initialize physical memory map");
 }
 
-void physmap_clear()
-{
-    physalloc_count = 0;
-    free(physalloc_ranges);
-    physalloc_ranges = nullptr;
-    physalloc_capacity = 0;
-    physalloc_20bit_st = 0;
-    physalloc_64bit_st = 0;
-}
-
 physmem_range_t *physmap_get(int *ret_count)
 {
     *ret_count = physalloc_count;
     return physalloc_ranges;
 }
 
-physmem_range_t *physmap_entry(int index)
-{
-    assert(index > 0);
-    assert(index < physalloc_count);
-    return physalloc_ranges + index;
-}
-
-void physmap_realloc(int capacity_hint)
+static void physmap_realloc(int capacity_hint)
 {
     if (capacity_hint < 16)
         capacity_hint = 16;
@@ -163,7 +151,7 @@ static void physmap_grow()
     physmap_realloc(physalloc_capacity * 2);
 }
 
-void physmap_delete(int index)
+static void physmap_delete(int index)
 {
     assert(index >= 0);
     assert(index < physalloc_count);
@@ -177,7 +165,7 @@ void physmap_delete(int index)
             sizeof(*physalloc_ranges) * --physalloc_count - index);
 }
 
-int physmap_replace(int index, physmem_range_t const& entry)
+static int physmap_replace(int index, physmem_range_t const& entry)
 {
     physmap_delete(index);
     return physmap_insert(entry);
@@ -225,28 +213,6 @@ int physmap_insert(physmem_range_t const& entry)
     }
 
     return physmap_insert_at(st, entry);
-}
-
-// Find the entry in the physical map
-// that contains the specified range, and has the specified type
-// Fails if the specified range spans more than one entry
-// Returns -1 on failure
-int physmap_find(uint64_t base, uint64_t size, uint32_t type)
-{
-    uint64_t end = base + size;
-    for (int i = 0; i < physalloc_count; ++i) {
-        physmem_range_t& candidate = physalloc_ranges[i];
-
-        if (candidate.base <= base && candidate.base + candidate.size >= end) {
-            if (candidate.type == type)
-                return i;
-
-            // Wrong type
-            return -1;
-        }
-    }
-
-    return -1;
 }
 
 phys_alloc_t alloc_phys(uint64_t size)
