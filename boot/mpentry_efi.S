@@ -155,7 +155,7 @@ lm_entry_vector:
     .word GDT_SEL_KERNEL_CODE64
 
     // Emit a copy of the GDT here so it ends up in low memory
-    // The main GDT is likely relocated far above 1MB boundary
+    // The BSP GDT is relocated far above 1MB boundary
 .align 64
 .global gdt
 .global gdtr
