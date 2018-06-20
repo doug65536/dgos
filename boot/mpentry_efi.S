@@ -22,7 +22,7 @@ ap_entry:
     orl $ CPU_CR0_WP | CPU_CR0_MP | CPU_CR0_NE,%eax
     movl %eax,%cr0
 
-    // Get absolute address of ap_entry into ebx
+    // Get linear address of ap_entry into ebx
     movl %cs,%ebx
     shll $4,%ebx
 
