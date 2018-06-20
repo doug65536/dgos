@@ -140,6 +140,11 @@ lm_entry:
 
     // set cr3 parameter
     movq %cr3,%rdx
+                                  
+    // cl = nx_available
+    leal nx_available(%rbx),%ecx
+    subl $ap_entry,%ecx
+    movzbl (%rcx),%ecx
 
     // jump to code64_run_kernel
     jmpq *%rax

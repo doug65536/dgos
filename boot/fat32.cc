@@ -667,7 +667,7 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 
     uint32_t sector_offset = ofs >> 9;
     uint16_t byte_offset = ofs & ((1 << 9)-1);
-
+    
     int status = sector_iterator_seek(
                 file_handles + file,
                 sector_offset,
