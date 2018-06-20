@@ -174,7 +174,6 @@ libbootsect_a_SOURCES = \
 	boot/rand.cc \
 	boot/physmap.cc \
 	boot/physmem_bios.cc \
-	boot/farptr.cc \
 	boot/vesa.cc \
 	boot/progressbar.cc \
 	boot/debug.cc \
@@ -193,7 +192,6 @@ libbootsect_a_SOURCES = \
 	boot/utf.h \
 	boot/elf64.h \
 	boot/exception.h \
-	boot/farptr.h \
 	boot/elf64decl.h \
 	boot/mpentry.h \
 	boot/screen.h \

@@ -149,7 +149,6 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-rand.$(OBJEXT) \
 	boot/libbootsect_a-physmap.$(OBJEXT) \
 	boot/libbootsect_a-physmem_bios.$(OBJEXT) \
-	boot/libbootsect_a-farptr.$(OBJEXT) \
 	boot/libbootsect_a-vesa.$(OBJEXT) \
 	boot/libbootsect_a-progressbar.$(OBJEXT) \
 	boot/libbootsect_a-debug.$(OBJEXT) \
@@ -1120,7 +1119,6 @@ libbootsect_a_SOURCES = \
 	boot/rand.cc \
 	boot/physmap.cc \
 	boot/physmem_bios.cc \
-	boot/farptr.cc \
 	boot/vesa.cc \
 	boot/progressbar.cc \
 	boot/debug.cc \
@@ -1139,7 +1137,6 @@ libbootsect_a_SOURCES = \
 	boot/utf.h \
 	boot/elf64.h \
 	boot/exception.h \
-	boot/farptr.h \
 	boot/elf64decl.h \
 	boot/mpentry.h \
 	boot/screen.h \
@@ -2320,8 +2317,6 @@ boot/libbootsect_a-rand.$(OBJEXT): boot/$(am__dirstamp) \
 boot/libbootsect_a-physmap.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-physmem_bios.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/libbootsect_a-farptr.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-vesa.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3783,7 +3778,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-diskio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64_bios.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-farptr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-fat32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-fs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-gdt.Po@am__quote@
@@ -4848,20 +4842,6 @@ boot/libbootsect_a-physmem_bios.obj: boot/physmem_bios.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/physmem_bios.cc' object='boot/libbootsect_a-physmem_bios.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-physmem_bios.obj `if test -f 'boot/physmem_bios.cc'; then $(CYGPATH_W) 'boot/physmem_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/physmem_bios.cc'; fi`
-
-boot/libbootsect_a-farptr.o: boot/farptr.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-farptr.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-farptr.Tpo -c -o boot/libbootsect_a-farptr.o `test -f 'boot/farptr.cc' || echo '$(srcdir)/'`boot/farptr.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-farptr.Tpo boot/$(DEPDIR)/libbootsect_a-farptr.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/farptr.cc' object='boot/libbootsect_a-farptr.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-farptr.o `test -f 'boot/farptr.cc' || echo '$(srcdir)/'`boot/farptr.cc
-
-boot/libbootsect_a-farptr.obj: boot/farptr.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-farptr.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-farptr.Tpo -c -o boot/libbootsect_a-farptr.obj `if test -f 'boot/farptr.cc'; then $(CYGPATH_W) 'boot/farptr.cc'; else $(CYGPATH_W) '$(srcdir)/boot/farptr.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-farptr.Tpo boot/$(DEPDIR)/libbootsect_a-farptr.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/farptr.cc' object='boot/libbootsect_a-farptr.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-farptr.obj `if test -f 'boot/farptr.cc'; then $(CYGPATH_W) 'boot/farptr.cc'; else $(CYGPATH_W) '$(srcdir)/boot/farptr.cc'; fi`
 
 boot/libbootsect_a-vesa.o: boot/vesa.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-vesa.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-vesa.Tpo -c -o boot/libbootsect_a-vesa.o `test -f 'boot/vesa.cc' || echo '$(srcdir)/'`boot/vesa.cc

@@ -97,7 +97,6 @@ utf.h
 elf64decl.h
 exception.s
 physmem.h
-farptr.cc
 mpentry.h
 vesa.cc
 vesa.h
