@@ -125,15 +125,15 @@ lm_entry:
     // Get mp_entry_point
     //
 
-    // rdi = linear address of mp_entry_point and load entry point
+    // calculate offset of smp_entry_point from trampoline
+    // and rdi = entry point
     mov $smp_entry_point,%esi
     sub $ap_entry,%esi
-    mov (%ebx,%esi),%rdi
+    mov (%rbx,%rsi),%rdi
 
     // eax = code64_run_kernel - ap_entry + linear address of trampoline
-    mov $code64_run_kernel,%eax
+    lea code64_run_kernel(%rbx),%rax
     sub $ap_entry,%eax
-    add %ebx,%eax
 
     // rsi = params parameter, nullptr
     xor %esi,%esi
