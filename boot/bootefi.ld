@@ -14,7 +14,9 @@ SECTIONS {
 		*(.text.unlikely)
 	}
 
-	.rodata ALIGN(4K) : {
+	.edata ALIGN(4K) : {
+		*(.edata)
+	
 		. = ALIGN(16);
 		___ctors_st = .;
 		*(.ctors)
@@ -22,7 +24,7 @@ SECTIONS {
 		*(.init_array)
 		*(SORT(.init_array.*))
 		___ctors_en = .;
-
+	
 		. = ALIGN(16);
 		___dtors_st = .;
 		*(.dtors)
@@ -30,22 +32,28 @@ SECTIONS {
 		*(.fini_array)
 		*(SORT(.fini_array.*))
 		___dtors_en = .;
-
+	
 		/* Place 64 bit code high enough to be outside first 4KB */
 		*(.text.code64)
-
+	
 		*(.rodata)
 		*(.rodata.*)
 		*(.comment)
-
-/*
-		. = ALIGN(4K);
-		___initialized_data_en = .;
-*/
 	}
-
-	.edata ALIGN(16) : { *(.edata) }
-	.reloc ALIGN(16) : { *(.reloc) }
+	
+	.smp ALIGN(4K) : {
+		/* Gather all trampoline-critical code and data into this section */
+		/* It will protect data from being lost when exiting boot services */
+		/* This section is copied to a 4KB aligned heap block */
+		___smp_st = ABSOLUTE(.);
+		*(.smp.entry)
+		*(.smp.text)
+		. = ALIGN(64);
+		*(.smp.data)
+		___smp_en = ABSOLUTE(.);
+	}
+	
+	.reloc ALIGN(4K) : { *(.reloc) }
 
 	.hash : ALIGN(64) {
 		PROVIDE_HIDDEN(___hash_st = .);
@@ -139,18 +147,6 @@ SECTIONS {
 		*(.data.*)
 	}
 
-	/* Gather all trampoline-critical code and data into this section */
-	/* It will protect data from being lost when exiting boot services */
-	/* This section is copied to a 4KB aligned heap block */
-	.smp ALIGN(4K) : {
-		___smp_st = ABSOLUTE(.);
-		*(.smp.entry)
-		*(.smp.text)
-		. = ALIGN(64);
-		*(.smp.data)
-		___smp_en = ABSOLUTE(.);
-	}
-
 	.bss : {
 		___bss_start = .;
 		*(.bss)
@@ -164,24 +160,4 @@ SECTIONS {
 		. += 8;
 		___bss_end = .;
 	}
-
-/*
-	.eh_frame : { *(.eh_frame) }
-	.debug_info  : { *(.debug_info) }
-	.debug_abbrev : { *(.debug_abbrev) }
-	.debug_aranges : { *(.debug_aranges) }
-	.debug_ranges : { *(.debug_ranges) }
-	.debug_line : { *(.debug_line) }
-	.debug_str : { *(.debug_str) }
-*/
-
-/*
-	/DISCARD/ : { *(.eh_frame) }
-	/DISCARD/ : { *(.debug_info) }
-	/DISCARD/ : { *(.debug_abbrev) }
-	/DISCARD/ : { *(.debug_ranges) }
-	/DISCARD/ : { *(.debug_aranges) }
-	/DISCARD/ : { *(.debug_line) }
-	/DISCARD/ : { *(.debug_str) }
-*/
 }
