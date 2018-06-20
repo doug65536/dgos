@@ -15,7 +15,7 @@ do
 					do
 						IMG="\$(QEMU_IMAGE_$fs)"
 						QUP="\$(QEMU_NP_$np)"
-						CTL="\$(QEMU_HDCTL_DEV_{$sc}_{$fs})"
+						CTL="\$(QEMU_HDCTL_DEV_""$sc""_""$fs"")"
 						DIF="\$(QEMU_DIF_$sc)"
 						QM="\$(QEMU_MEDIA_$fs)"
 						BOOT="\$(QEMU_BOOT_$bt)"
@@ -47,7 +47,7 @@ do
 							' \' $'\n' $'\t\t' \
 							"\$(QEMU_EXTRA)" \
 							$'\n' $'\n' \
-							'.PHONY: ' "$rt-$np-$fs-$sc-$em" \
+							'.PHONY: ' "$rt-$np-$bt-$fs-$sc-$em" \
 							$'\n' $'\n' \
 							>> qemu-emu.mk
 					done
