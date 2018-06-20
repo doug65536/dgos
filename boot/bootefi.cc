@@ -208,7 +208,7 @@ EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 
     elf64_run(TSTR "dgos-kernel-generic");
 
-    ctors_invoke();
+    dtors_invoke();
 
     systab->BootServices->Exit(image_handle, 0, 0, 0);
     return EFI_SUCCESS;
