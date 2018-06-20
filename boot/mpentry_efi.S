@@ -76,10 +76,10 @@ pm_entry:
     //
 
     // Calculate the linear address of lm_entry_vector
-    leal (lm_entry_vector - ap_entry)(%ebx),%edi
+    leal lm_entry_vector - ap_entry(%ebx),%edi
 
     // Calculate the linear address of the lm_entry label
-    leal (lm_entry - ap_entry)(%ebx),%ecx
+    leal lm_entry - ap_entry(%ebx),%ecx
 
     // Update the lm_entry_vector far pointer offset to point to lm_entry
     movl %ecx,(%edi)
@@ -98,7 +98,7 @@ pm_entry:
     //
 
     // Calculate linear address of root_page_dir
-    leal (root_page_dir - ap_entry)(%ebx),%eax
+    leal root_page_dir - ap_entry(%ebx),%eax
 
     // Load PDBR
     movl (%eax),%eax
@@ -124,13 +124,13 @@ lm_entry:
     //
 
     // Calculate linear address of smp_entry_point
-    leal (smp_entry_point - ap_entry)(%rbx),%edi
+    leal smp_entry_point - ap_entry(%rbx),%edi
                            
     // rdi = entry point
     movq (%rdi),%rdi
 
     // rax = code64_run_kernel - ap_entry + linear address of trampoline
-    leal (code64_run_kernel - ap_entry)(%rbx),%eax
+    leal code64_run_kernel - ap_entry(%rbx),%eax
 
     // rsi = params parameter, nullptr
     xorl %esi,%esi
@@ -139,7 +139,7 @@ lm_entry:
     movq %cr3,%rdx
                                   
     // rcx = nx_available
-    leal (nx_available - ap_entry)(%rbx),%ecx
+    leal nx_available - ap_entry(%rbx),%ecx
     movzbl (%rcx),%ecx
 
     // jump to code64_run_kernel
