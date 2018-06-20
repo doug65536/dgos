@@ -20,7 +20,7 @@ code64_run_kernel:
     mov %rsi,%r14
     mov %rdx,%r13
     
-    // See if CPU supports no-execute
+    // Skip setting EFER.NX if CPU does not support it
     test %cl,%cl
     jz 0f
     

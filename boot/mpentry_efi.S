@@ -131,7 +131,7 @@ lm_entry:
     // rdi = entry point
     movq (%rbx,%rsi),%rdi
 
-    // eax = code64_run_kernel - ap_entry + linear address of trampoline
+    // rax = code64_run_kernel - ap_entry + linear address of trampoline
     leal code64_run_kernel(%rbx),%eax
     subl $ap_entry,%eax
 
@@ -141,7 +141,7 @@ lm_entry:
     // set cr3 parameter
     movq %cr3,%rdx
                                   
-    // cl = nx_available
+    // rcx = nx_available
     leal nx_available(%rbx),%ecx
     subl $ap_entry,%ecx
     movzbl (%rcx),%ecx
