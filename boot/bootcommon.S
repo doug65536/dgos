@@ -62,10 +62,10 @@ pmode_entry:
     call cpu_a20_exitpm
 
     // Jump to 16 bit protected mode and load segments
-    ljmp $GDT_SEL_PM_CODE16,$0f
+    ljmp $ GDT_SEL_PM_CODE16,$ 0f
 .code16
 0:
-    movw $GDT_SEL_PM_DATA16,%dx
+    movw $ GDT_SEL_PM_DATA16,%dx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
@@ -78,7 +78,7 @@ pmode_entry:
     mov %eax,%cr0
 
     // Jump to real mode
-    ljmp $0,$0f
+    ljmp $0,$ 0f
 0:
 
     xor %edx,%edx
