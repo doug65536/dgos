@@ -76,45 +76,45 @@ pm_entry:
     //
 
     // Calculate the linear address of lm_entry_vector
-    lea (lm_entry_vector - ap_entry)(%ebx),%edi
+    leal (lm_entry_vector - ap_entry)(%ebx),%edi
 
     // Calculate the linear address of the lm_entry label
-    lea (lm_entry - ap_entry)(%ebx),%ecx
+    leal (lm_entry - ap_entry)(%ebx),%ecx
 
     // Update the lm_entry_vector far pointer offset to point to lm_entry
-    mov %ecx,(%edi)
+    movl %ecx,(%edi)
 
     //
     // Enter long mode
     //
 
     // Enable PAE
-    mov %cr4,%eax
-    or $ CPU_CR4_PAE,%eax
-    mov %eax,%cr4
+    movl %cr4,%eax
+    orl $ CPU_CR4_PAE,%eax
+    movl %eax,%cr4
 
     //
     // Load the PDBR
     //
 
     // Calculate linear address of root_page_dir
-    lea root_page_dir(%ebx),%eax
-    sub $ap_entry,%eax
+    leal root_page_dir(%ebx),%eax
+    subl $ap_entry,%eax
 
     // Load PDBR
-    mov (%eax),%eax
-    mov %eax,%cr3
+    movl (%eax),%eax
+    movl %eax,%cr3
 
     // Enable long mode (set MSR bit EFER.LME)
-    mov $ CPU_MSR_EFER,%ecx
+    movl $ CPU_MSR_EFER,%ecx
     rdmsr
-    or $ CPU_MSR_EFER_LME,%eax
+    orl $ CPU_MSR_EFER_LME,%eax
     wrmsr
 
     // Enable paging
-    mov %cr0,%eax
-    or $ CPU_CR0_PG,%eax
-    mov %eax,%cr0
+    movl %cr0,%eax
+    orl $ CPU_CR0_PG,%eax
+    movl %eax,%cr0
     ljmpl *(%edi)
 
 .align 16
@@ -124,24 +124,25 @@ lm_entry:
     // Get mp_entry_point
     //
 
-    // calculate offset of smp_entry_point from trampoline
-    // and rdi = entry point
-    mov $smp_entry_point,%esi
-    sub $ap_entry,%esi
-    mov (%rbx,%rsi),%rdi
+    // Calculate linear address of smp_entry_point
+    movl $smp_entry_point,%esi
+    subl $ap_entry,%esi
+                           
+    // rdi = entry point
+    movq (%rbx,%rsi),%rdi
 
     // eax = code64_run_kernel - ap_entry + linear address of trampoline
-    lea code64_run_kernel(%rbx),%rax
-    sub $ap_entry,%eax
+    leal code64_run_kernel(%rbx),%eax
+    subl $ap_entry,%eax
 
     // rsi = params parameter, nullptr
-    xor %esi,%esi
+    xorl %esi,%esi
 
     // set cr3 parameter
-    mov %cr3,%rdx
+    movq %cr3,%rdx
 
     // jump to code64_run_kernel
-    jmp *%rax
+    jmpq *%rax
 
 .align 8
 pm_entry_vector:
