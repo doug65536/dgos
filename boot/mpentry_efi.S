@@ -98,9 +98,8 @@ pm_entry:
     //
 
     // Calculate linear address of root_page_dir
-    mov $root_page_dir,%eax
+    lea root_page_dir(%ebx),%eax
     sub $ap_entry,%eax
-    add %ebx,%eax
 
     // Load PDBR
     mov (%eax),%eax
