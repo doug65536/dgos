@@ -327,7 +327,6 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-cpu.$(OBJEXT) \
 	boot/bootefi_amd64-cpuid.$(OBJEXT) \
 	boot/bootefi_amd64-cpu64_efi.$(OBJEXT) \
-	boot/bootefi_amd64-gdt.$(OBJEXT) \
 	boot/bootefi_amd64-debug.$(OBJEXT) \
 	boot/bootefi_amd64-assert.$(OBJEXT) \
 	boot/bootefi_amd64-string.$(OBJEXT) \
@@ -1384,7 +1383,6 @@ bootefi_amd64_SOURCES = \
 	boot/cpu.cc \
 	boot/cpuid.cc \
 	boot/cpu64_efi.S \
-	boot/gdt.S \
 	boot/debug.cc \
 	boot/assert.cc \
 	boot/string.cc \
@@ -2899,8 +2897,6 @@ boot/bootefi_amd64-cpuid.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-cpu64_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
-boot/bootefi_amd64-gdt.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-debug.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-assert.$(OBJEXT): boot/$(am__dirstamp) \
@@ -3743,7 +3739,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-elf64.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-fs.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-gdt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-halt_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-malloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-malloc_efi.Po@am__quote@
@@ -4291,20 +4286,6 @@ boot/bootefi_amd64-cpu64_efi.obj: boot/cpu64_efi.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/cpu64_efi.S' object='boot/bootefi_amd64-cpu64_efi.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-cpu64_efi.obj `if test -f 'boot/cpu64_efi.S'; then $(CYGPATH_W) 'boot/cpu64_efi.S'; else $(CYGPATH_W) '$(srcdir)/boot/cpu64_efi.S'; fi`
-
-boot/bootefi_amd64-gdt.o: boot/gdt.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-gdt.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-gdt.Tpo -c -o boot/bootefi_amd64-gdt.o `test -f 'boot/gdt.S' || echo '$(srcdir)/'`boot/gdt.S
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-gdt.Tpo boot/$(DEPDIR)/bootefi_amd64-gdt.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/gdt.S' object='boot/bootefi_amd64-gdt.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-gdt.o `test -f 'boot/gdt.S' || echo '$(srcdir)/'`boot/gdt.S
-
-boot/bootefi_amd64-gdt.obj: boot/gdt.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-gdt.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-gdt.Tpo -c -o boot/bootefi_amd64-gdt.obj `if test -f 'boot/gdt.S'; then $(CYGPATH_W) 'boot/gdt.S'; else $(CYGPATH_W) '$(srcdir)/boot/gdt.S'; fi`
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-gdt.Tpo boot/$(DEPDIR)/bootefi_amd64-gdt.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/gdt.S' object='boot/bootefi_amd64-gdt.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-gdt.obj `if test -f 'boot/gdt.S'; then $(CYGPATH_W) 'boot/gdt.S'; else $(CYGPATH_W) '$(srcdir)/boot/gdt.S'; fi`
 
 boot/bootefi_amd64-mpentry_efi.o: boot/mpentry_efi.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-mpentry_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-mpentry_efi.Tpo -c -o boot/bootefi_amd64-mpentry_efi.o `test -f 'boot/mpentry_efi.S' || echo '$(srcdir)/'`boot/mpentry_efi.S

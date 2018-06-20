@@ -436,7 +436,6 @@ bootefi_amd64_SOURCES = \
 	boot/cpu.cc \
 	boot/cpuid.cc \
 	boot/cpu64_efi.S \
-	boot/gdt.S \
 	boot/debug.cc \
 	boot/assert.cc \
 	boot/string.cc \
