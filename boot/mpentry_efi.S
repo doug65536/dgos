@@ -125,11 +125,11 @@ lm_entry:
     //
 
     // Calculate linear address of smp_entry_point
-    movl $smp_entry_point,%esi
-    subl $ap_entry,%esi
+    leal smp_entry_point(%rbx),%edi
+    subl $ap_entry,%edi
                            
     // rdi = entry point
-    movq (%rbx,%rsi),%rdi
+    movq (%rdi),%rdi
 
     // rax = code64_run_kernel - ap_entry + linear address of trampoline
     leal code64_run_kernel(%rbx),%eax
