@@ -98,8 +98,7 @@ pm_entry:
     //
 
     // Calculate linear address of root_page_dir
-    leal root_page_dir(%ebx),%eax
-    subl $ap_entry,%eax
+    leal (root_page_dir - ap_entry)(%ebx),%eax
 
     // Load PDBR
     movl (%eax),%eax
@@ -125,15 +124,13 @@ lm_entry:
     //
 
     // Calculate linear address of smp_entry_point
-    leal smp_entry_point(%rbx),%edi
-    subl $ap_entry,%edi
+    leal (smp_entry_point - ap_entry)(%rbx),%edi
                            
     // rdi = entry point
     movq (%rdi),%rdi
 
     // rax = code64_run_kernel - ap_entry + linear address of trampoline
-    leal code64_run_kernel(%rbx),%eax
-    subl $ap_entry,%eax
+    leal (code64_run_kernel - ap_entry)(%rbx),%eax
 
     // rsi = params parameter, nullptr
     xorl %esi,%esi
@@ -142,8 +139,7 @@ lm_entry:
     movq %cr3,%rdx
                                   
     // rcx = nx_available
-    leal nx_available(%rbx),%ecx
-    subl $ap_entry,%ecx
+    leal (nx_available - ap_entry)(%rbx),%ecx
     movzbl (%rcx),%ecx
 
     // jump to code64_run_kernel
