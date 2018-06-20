@@ -31,10 +31,10 @@ ap_entry:
     //
 
     // Calculate the cs-relative offset of ap_gdtr
-    movw $ap_gdtr - ap_entry,%di
+    movw $gdtr - ap_entry,%di
 
     // Calculate the linear address of ap_gdt
-    leal ap_gdt - ap_entry(%ebx),%ecx
+    leal gdt - ap_entry(%ebx),%ecx
 
     // Update the offset of the GDTR
     cs movl %ecx,2(%di)
@@ -157,4 +157,6 @@ lm_entry_vector:
     // Emit a copy of the GDT here so it ends up in low memory
     // The main GDT is likely relocated far above 1MB boundary
 .align 64
-    gdt_emit ap_gdt, ap_gdtr
+.global gdt
+.global gdtr
+    gdt_emit gdt, gdtr
