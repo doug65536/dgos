@@ -12,6 +12,7 @@ $(top_builddir)/fatdisk.img: \
 		\
 		bootx64.efi \
 		bootx64-efi.sym \
+		bootefi-amd64.dis.gz \
 		\
 		user-shell \
 		hello.km \
