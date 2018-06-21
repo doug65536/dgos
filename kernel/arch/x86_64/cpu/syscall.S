@@ -58,21 +58,6 @@ syscall_entry:
     .cfi_def_cfa_register rsp
     .cfi_def_cfa_offset 8
 
-    nop
-    .cfi_rel_offset rsp,0
-
-    nop
-    .cfi_rel_offset rsp,8
-
-    nop
-    .cfi_rel_offset rsp,16
-
-    nop
-    .cfi_rel_offset rsp,-8
-
-    nop
-    .cfi_rel_offset rsp,-16
-
     // Move 4th parameter to proper place
     movq %r10,%rcx
 
