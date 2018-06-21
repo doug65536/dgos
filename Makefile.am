@@ -7,14 +7,15 @@ BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	generated_headers
 
-# Build libmbr
 #  -> Link mbr-elf
-#  -> Link mbr-bin
+#  -> Generate mbr-bin
 # Build libbootsect
+#  -> Link boot1-elf
+#  -> Generate boot1-bin
 #  -> Link bootfat-elf
-#  -> Link bootfat-bin
+#  -> Generate bootfat-bin
 #  -> Link bootiso-elf
-#  -> Link bootiso-bin
+#  -> Generate bootiso-bin
 #  -> Link bootefi-amd64
 #  -> Link bootefi-i386
 # Build libkernel-{generic,bmi,avx512}
@@ -24,17 +25,14 @@ BUILT_SOURCES = \
 LINKER_DEBUG =
 
 noinst_LIBRARIES = \
-	libmbr.a \
 	libbootsect.a \
 	libc.a
 
 bin_PROGRAMS = \
 	mbr-elf \
-	mbr-bin \
+	boot1-elf \
 	bootfat-elf \
-	bootfat-bin \
 	bootiso-elf \
-	bootiso-bin \
 	bootefi-amd64 \
 	kernel-generic \
 	kernel-bmi \
@@ -43,33 +41,11 @@ bin_PROGRAMS = \
 
 #bootefi-i386
 
-# libmbr.a
-
-libmbr_a_SOURCES = \
-	mbr/mbr.s
-
-libmbr_a_CFLAGS =
-
-libmbr_a_CXXFLAGS = \
-	-DFROMCXXFLAGS \
-	$(ELF32_FLAGS)
-
-libmbr_a_CCASFLAGS = \
-	-DFROMCCASFLAGS \
-	$(COMPILER_FLAGS) \
-	$(ELF32_FLAGS) \
-	$(ASM_DEBUG_INFO_FLAGS) \
-	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) -static
-
-EXTRA_libmbr_a_DEPENDENCIES = \
-	$(DUMPDIR)
-
 # mbr-elf
 
 mbr_elf_SOURCES = \
 	mbr/mbr.ld \
-	mbr/empty.cc
+	mbr/mbr.S
 
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
@@ -87,7 +63,7 @@ mbr_elf_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS)-static
+	$(OPTIMIZE_SIZE_FLAGS) -static
 
 mbr_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
@@ -103,45 +79,57 @@ EXTRA_mbr_elf_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
 mbr_elf_LDADD = \
-	libmbr.a \
 	$(LIBGCC_ELF32)
-#$(GCC_REALMODE_LIB)
-
+	
 # mbr-bin
 
-mbr_bin_SOURCES = \
-	mbr/mbr.ld \
-	mbr/empty.cc
+$(top_builddir)/mbr-bin: $(top_builddir)/mbr-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
-mbr_bin_CXXFLAGS = \
-	-DFROMCXXFLAGS \
+# boot1-elf
+
+boot1_elf_SOURCES = \
+	boot/boot1.S \
+	boot/boot1.ld
+
+boot1_elf_CXXFLAGS = \
+	-DFROM_CXXFLAGS \
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(NO_LTO_FLAGS) -static
 
-mbr_bin_CFLAGS =
+boot1_elf_CFLAGS =
 
-mbr_bin_LDFLAGS = \
-	-DFROMLDFLAGS \
+boot1_elf_CCASFLAGS = \
+	-DFROM_CCASFLAGS \
+	$(COMPILER_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) -static
+
+boot1_elf_LDFLAGS = \
+	-DFROM_LDFLAGS \
+	$(REGPARM_FLAGS) \
 	-Wl,-m,elf_i386 \
-	-Wl,--oformat,binary \
-	-Wl,-Map,$(top_builddir)/mbr.map \
-	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
+	-Wl,-T,$(top_srcdir)/boot/boot1.ld \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static \
-	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
 
-EXTRA_mbr_bin_DEPENDENCIES = \
-	$(top_srcdir)/mbr/mbr.ld
+EXTRA_boot1_elf_DEPENDENCIES = \
+	$(top_srcdir)/boot/boot1.ld
 
-mbr_bin_LDADD = \
-	libmbr.a \
+boot1_elf_LDADD = \
 	$(LIBGCC_ELF32)
+
+# boot1-bin
+
+$(top_builddir)/boot1-bin: $(top_builddir)/boot1-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # libbootsect.a
 
@@ -297,39 +285,8 @@ bootfat_elf_LDADD = \
 
 # bootfat-bin
 
-bootfat_bin_SOURCES = \
-	$(bootfat_elf_SOURCES)
-
-bootfat_bin_CXXFLAGS = \
-	$(libbootsect_a_CXXFLAGS)
-
-bootfat_bin_CCASFLAGS = \
-	$(bootfat_elf_CCASFLAGS)
-
-# -N to turn off section alignment and make all sections rwx
-bootfat_bin_LDFLAGS = \
-	-DFROM_LDFLAGS \
-	$(ELF32_FLAGS) \
-	$(LIBGCC_ELF32) \
-	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
-	-Wl,--oformat,binary \
-	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	-Wl,-N \
-	$(LINKER_SEL) -static \
-	-Wl,-nostdlib \
-	-nostartfiles -nodefaultlibs -nostdlib -static \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
-
-EXTRA_bootfat_bin_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootfat.ld
-
-bootfat_bin_LDADD = \
-	libbootsect.a \
-	$(LIBGCC_ELF32)
+$(top_builddir)/bootfat-bin: $(top_builddir)/bootfat-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # bootiso-elf
 
@@ -373,38 +330,8 @@ bootiso_elf_LDADD = \
 
 # bootiso-bin
 
-bootiso_bin_SOURCES = \
-	$(bootiso_elf_SOURCES)
-
-bootiso_bin_CXXFLAGS = \
-	$(libbootsect_a_CXXFLAGS)
-
-bootiso_bin_CCASFLAGS = \
-	$(bootiso_elf_CCASFLAGS)
-
-bootiso_bin_LDFLAGS = \
-	-DFROM_LDFLAGS \
-	$(ELF32_FLAGS) \
-	$(LIBGCC_ELF32) \
-	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
-	-Wl,--oformat,binary \
-	-Wl,-Map,$(top_builddir)/bootiso.map \
-	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	-Wl,-N \
-	-static \
-	-nostartfiles -nodefaultlibs -nostdlib \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
-
-EXTRA_bootiso_bin_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootiso.ld
-
-bootiso_bin_LDADD = \
-	libbootsect.a \
-	$(LIBGCC_ELF32)
+$(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # efi
 
@@ -1234,6 +1161,9 @@ include diskfat.mk
 include diskiso.mk
 
 clean-local:
+	rm -f $(top_builddir)/mbr-bin
+	rm -f $(top_builddir)/bootfat-bin
+	rm -f $(top_builddir)/bootiso-bin
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/bootfat.sym
 	rm -f $(top_builddir)/bootiso.sym
@@ -1410,7 +1340,9 @@ QEMU_DEBUGCON = \
 
 QEMU_SERIAL = \
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-serial-socket,id=com1
+	-device isa-serial,chardev=qemu-serial-socket,id=com1 \
+	-chardev stdio,id=seabios \
+	-device isa-debugcon,iobase=0x402,chardev=seabios
 
 QEMU_COMMON = \
 	$(QEMU_MONITOR) \
@@ -1423,20 +1355,22 @@ QEMU_COMMON = \
 	$(QEMU_USB) \
 	$(QEMU_MEMFILL)
 
+SECTOR_SZ = 512
+
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme_fat = \
 	-machine q35 \
-	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0
+	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0,logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 QEMU_HDCTL_DEV_usb_fat = \
 	-machine q35 \
 	-device usb-storage,bus=xhci.0,drive=bootdrv,bootindex=0
-QEMU_HDCTL_DEV_ahci_fat = -machine q35
+QEMU_HDCTL_DEV_ahci_fat = -machine q35 -global ide-hd.logical_block_size=$(SECTOR_SZ)
 QEMU_HDCTL_DEV_ahci_iso = -machine q35
 QEMU_HDCTL_DEV_ide_fat = -machine pc
 QEMU_HDCTL_DEV_ide_iso = -machine pc
 QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none,id=bootdrv
-QEMU_DIF_ahci =
+QEMU_DIF_ahci = ,id=ahcictl
 QEMU_DIF_ide =
 QEMU_DIF_usb = ,if=none
 QEMU_MEDIA_fat = disk

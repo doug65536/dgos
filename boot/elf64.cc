@@ -168,9 +168,11 @@ bool elf64_run(tchar const *filename)
 
     elf64_context_t *ctx = load_kernel_begin();
 
-    for (unsigned i = 0; i < file_hdr.e_phnum; ++i)
-        ctx->total_bytes += program_hdrs[i].p_memsz;
-
+    for (unsigned i = 0; i < file_hdr.e_phnum; ++i) {
+        if ((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0)
+            ctx->total_bytes += program_hdrs[i].p_memsz;
+    }
+    
     // Load relocations
     if (file_hdr.e_shentsize != sizeof(Elf64_Shdr))
         PRINT(TSTR "Executable has unexpected section header size");
@@ -195,40 +197,39 @@ bool elf64_run(tchar const *filename)
         blk->p_vaddr += base_adj;
 
         // If it is not readable, writable or executable, ignore
-        if ((blk->p_flags & (PF_R | PF_W | PF_X)) == 0)
-            continue;
-
-        ELF64_TRACE("vaddr=0x%llx, filesz=0x%llx, memsz=0x%llx, paddr=0x%llx",
-                   blk->p_vaddr,
-                   blk->p_filesz,
-                   blk->p_memsz,
-                   blk->p_paddr);
-
-        if (blk->p_memsz == 0)
-            continue;
-
-        ctx->page_flags = (-cpu_has_global_pages() & PTE_GLOBAL);
-
-        // Pages present
-        ctx->page_flags |= PTE_PRESENT;
-
-        // Global if possible
-        ctx->page_flags |= pge_page_flags;
-
-        // If not executable, mark as no execute
-        if ((blk->p_flags & PF_X) == 0)
-            ctx->page_flags |= nx_page_flags;
-
-        // Writable
-        if ((blk->p_flags & PF_W) != 0)
-            ctx->page_flags |= PTE_WRITABLE;
-
-        load_kernel_chunk(blk, file, ctx);
+        if ((blk->p_flags & (PF_R | PF_W | PF_X)) != 0) {
+            ELF64_TRACE("vaddr=0x%llx, filesz=0x%llx,"
+                        " memsz=0x%llx, paddr=0x%llx",
+                       blk->p_vaddr, blk->p_filesz,
+                       blk->p_memsz, blk->p_paddr);
+    
+            if (blk->p_memsz == 0)
+                continue;
+    
+            ctx->page_flags = (-cpu_has_global_pages() & PTE_GLOBAL);
+    
+            // Pages present
+            ctx->page_flags |= PTE_PRESENT;
+    
+            // Global if possible
+            ctx->page_flags |= pge_page_flags;
+    
+            // If not executable, mark as no execute
+            if ((blk->p_flags & PF_X) == 0)
+                ctx->page_flags |= nx_page_flags;
+    
+            // Writable
+            if ((blk->p_flags & PF_W) != 0)
+                ctx->page_flags |= PTE_WRITABLE;
+    
+            load_kernel_chunk(blk, file, ctx);
+        }
 
         ctx->done_bytes += blk->p_memsz;
+        
+        int percent = 100 * ctx->done_bytes / ctx->total_bytes;
 
-        progress_bar_draw(20, 10, 70,
-                          100 * ctx->done_bytes / ctx->total_bytes);
+        progress_bar_draw(20, 10, 70, percent);
     }
 
     load_kernel_end(ctx);

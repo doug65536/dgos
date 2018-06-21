@@ -2,13 +2,18 @@
 
 .code32
 
-// eax points to bios_regs_t structure, edx contains interrupt number
+// eax points to bios_regs_t structure,
+// edx contains interrupt number,
+// cl is true if A20 should be toggled
 .global bioscall
 bioscall:
     pushl %ebp
     pushl %ebx
     pushl %esi
     pushl %edi
+    
+    // Save A20 toggle flag
+    pushl %ecx
 
     // Save pointer to bios_regs_t parameter on stack
     pushl %eax
@@ -28,7 +33,10 @@ bioscall:
     pushl 4(%eax)
     pushl (%eax)
 
+    test %cl,%cl
+    jz 0f
     call cpu_a20_exitpm
+0:
 
     // Set up %dx:%bp to be a real mode far pointer to the same place as %esp
     // With 4KB of stack space available before sp underflows
@@ -38,7 +46,7 @@ bioscall:
     and $0xF,%ebp
 
     // Jump to 16 bit protected mode to load 64KB segment limits
-    ljmp $GDT_SEL_PM_CODE16,$0f
+    ljmp $ GDT_SEL_PM_CODE16,$ 0f
 0:
 .code16
     // 16-bit protected mode
@@ -146,10 +154,18 @@ bioscall:
     popl (%eax)
 
     addl $8,%esp
+             
+    // Restore A20 toggle parameter
+    popl %ecx
 
     // Restore callee saved registers and tail call
     popl %edi
     popl %esi
     popl %ebx
     popl %ebp
+
+    // Either tail call or just return
+    test %cl,%cl
+    jz 0f
     jmp cpu_a20_enterpm
+0:  ret

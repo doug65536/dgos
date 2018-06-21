@@ -49,4 +49,5 @@ struct bios_regs_t {
 
 static_assert(sizeof(bios_regs_t) == 40, "Unexpected structure size");
 
-extern "C" void bioscall(bios_regs_t *regs, uint32_t intr);
+extern "C" void bioscall(bios_regs_t *regs, uint32_t intr, 
+                         bool a20_toggle = true);

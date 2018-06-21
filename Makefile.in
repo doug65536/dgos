@@ -16,6 +16,12 @@
 
 #bootia32.efi
 
+# Stitch byte 0-0xA of boot1-bin into offset 0 of partition
+# Stitch byte 0x5A-0x1FD of boot1-bin into offset 0x5A of partition
+#  (Avoids overwriting BPB)
+# Copy the entire bootfat-bin into sector 2 of the partition
+#  (Avoids overwriting FS information sector)
+
 #bootia32.efi
 
 
@@ -94,8 +100,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-bin_PROGRAMS = mbr-elf$(EXEEXT) mbr-bin$(EXEEXT) bootfat-elf$(EXEEXT) \
-	bootfat-bin$(EXEEXT) bootiso-elf$(EXEEXT) bootiso-bin$(EXEEXT) \
+bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
+	bootfat-elf$(EXEEXT) bootiso-elf$(EXEEXT) \
 	bootefi-amd64$(EXEEXT) kernel-generic$(EXEEXT) \
 	kernel-bmi$(EXEEXT) user-shell$(EXEEXT) hello.km$(EXEEXT)
 subdir = .
@@ -311,12 +317,14 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT) \
 	libc/src/sys/syscall.$(OBJEXT) $(am__objects_1)
 libc_a_OBJECTS = $(am_libc_a_OBJECTS)
-libmbr_a_AR = $(AR) $(ARFLAGS)
-libmbr_a_LIBADD =
-am_libmbr_a_OBJECTS = mbr/libmbr_a-mbr.$(OBJEXT)
-libmbr_a_OBJECTS = $(am_libmbr_a_OBJECTS)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libc_adir)"
 PROGRAMS = $(bin_PROGRAMS)
+am_boot1_elf_OBJECTS = boot/boot1_elf-boot1.$(OBJEXT)
+boot1_elf_OBJECTS = $(am_boot1_elf_OBJECTS)
+am__DEPENDENCIES_1 =
+boot1_elf_DEPENDENCIES = $(am__DEPENDENCIES_1)
+boot1_elf_LINK = $(CCLD) $(boot1_elf_CFLAGS) $(CFLAGS) \
+	$(boot1_elf_LDFLAGS) $(LDFLAGS) -o $@
 am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-ctors.$(OBJEXT) \
 	boot/bootefi_amd64-fs.$(OBJEXT) \
@@ -347,38 +355,21 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-boottable.$(OBJEXT) \
 	boot/bootefi_amd64-boottable_efi.$(OBJEXT)
 bootefi_amd64_OBJECTS = $(am_bootefi_amd64_OBJECTS)
-am__DEPENDENCIES_1 =
 bootefi_amd64_DEPENDENCIES = $(am__DEPENDENCIES_1)
 bootefi_amd64_LINK = $(CXXLD) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) \
 	$(bootefi_amd64_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_2 = boot/bootfat_bin-malloc_bios.$(OBJEXT) \
-	boot/bootfat_bin-mpentry_bios.$(OBJEXT)
-am__objects_3 = boot/bootfat_bin-bootfat.$(OBJEXT) $(am__objects_2)
-am_bootfat_bin_OBJECTS = $(am__objects_3)
-bootfat_bin_OBJECTS = $(am_bootfat_bin_OBJECTS)
-bootfat_bin_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
-bootfat_bin_LINK = $(CXXLD) $(bootfat_bin_CXXFLAGS) $(CXXFLAGS) \
-	$(bootfat_bin_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_4 = boot/bootfat_elf-malloc_bios.$(OBJEXT) \
+am__objects_2 = boot/bootfat_elf-malloc_bios.$(OBJEXT) \
 	boot/bootfat_elf-mpentry_bios.$(OBJEXT)
 am_bootfat_elf_OBJECTS = boot/bootfat_elf-bootfat.$(OBJEXT) \
-	$(am__objects_4)
+	$(am__objects_2)
 bootfat_elf_OBJECTS = $(am_bootfat_elf_OBJECTS)
 bootfat_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootfat_elf_LINK = $(CXXLD) $(bootfat_elf_CXXFLAGS) $(CXXFLAGS) \
 	$(bootfat_elf_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_5 = boot/bootiso_bin-malloc_bios.$(OBJEXT) \
-	boot/bootiso_bin-mpentry_bios.$(OBJEXT)
-am__objects_6 = boot/bootiso_bin-bootiso.$(OBJEXT) $(am__objects_5)
-am_bootiso_bin_OBJECTS = $(am__objects_6)
-bootiso_bin_OBJECTS = $(am_bootiso_bin_OBJECTS)
-bootiso_bin_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
-bootiso_bin_LINK = $(CXXLD) $(bootiso_bin_CXXFLAGS) $(CXXFLAGS) \
-	$(bootiso_bin_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_7 = boot/bootiso_elf-malloc_bios.$(OBJEXT) \
+am__objects_3 = boot/bootiso_elf-malloc_bios.$(OBJEXT) \
 	boot/bootiso_elf-mpentry_bios.$(OBJEXT)
 am_bootiso_elf_OBJECTS = boot/bootiso_elf-bootiso.$(OBJEXT) \
-	$(am__objects_7)
+	$(am__objects_3)
 bootiso_elf_OBJECTS = $(am_bootiso_elf_OBJECTS)
 bootiso_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootiso_elf_LINK = $(CXXLD) $(bootiso_elf_CXXFLAGS) $(CXXFLAGS) \
@@ -388,7 +379,7 @@ hello_km_OBJECTS = $(am_hello_km_OBJECTS)
 hello_km_LDADD = $(LDADD)
 hello_km_LINK = $(CXXLD) $(hello_km_CXXFLAGS) $(CXXFLAGS) \
 	$(hello_km_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_8 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
+am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_bmi-syscall.$(OBJEXT) \
@@ -505,12 +496,12 @@ am__objects_8 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/syscall/kernel_bmi-sys_mem.$(OBJEXT) \
 	kernel/syscall/kernel_bmi-sys_time.$(OBJEXT) \
 	kernel/syscall/kernel_bmi-sys_process.$(OBJEXT)
-am_kernel_bmi_OBJECTS = $(am__objects_8)
+am_kernel_bmi_OBJECTS = $(am__objects_4)
 kernel_bmi_OBJECTS = $(am_kernel_bmi_OBJECTS)
 kernel_bmi_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_bmi_LINK = $(CXXLD) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_bmi_LDFLAGS) $(LDFLAGS) -o $@
-am__objects_9 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
+am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-isr.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-except_asm.$(OBJEXT) \
 	kernel/arch/x86_64/cpu/kernel_generic-syscall.$(OBJEXT) \
@@ -627,21 +618,16 @@ am__objects_9 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_mem.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_time.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_process.$(OBJEXT)
-am_kernel_generic_OBJECTS = $(am__objects_9)
+am_kernel_generic_OBJECTS = $(am__objects_5)
 kernel_generic_OBJECTS = $(am_kernel_generic_OBJECTS)
 kernel_generic_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_generic_LINK = $(CXXLD) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_generic_LDFLAGS) $(LDFLAGS) -o $@
-am_mbr_bin_OBJECTS = mbr/mbr_bin-empty.$(OBJEXT)
-mbr_bin_OBJECTS = $(am_mbr_bin_OBJECTS)
-mbr_bin_DEPENDENCIES = libmbr.a $(am__DEPENDENCIES_1)
-mbr_bin_LINK = $(CXXLD) $(mbr_bin_CXXFLAGS) $(CXXFLAGS) \
-	$(mbr_bin_LDFLAGS) $(LDFLAGS) -o $@
-am_mbr_elf_OBJECTS = mbr/mbr_elf-empty.$(OBJEXT)
+am_mbr_elf_OBJECTS = mbr/mbr_elf-mbr.$(OBJEXT)
 mbr_elf_OBJECTS = $(am_mbr_elf_OBJECTS)
-mbr_elf_DEPENDENCIES = libmbr.a $(am__DEPENDENCIES_1)
-mbr_elf_LINK = $(CXXLD) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) \
-	$(mbr_elf_LDFLAGS) $(LDFLAGS) -o $@
+mbr_elf_DEPENDENCIES = $(am__DEPENDENCIES_1)
+mbr_elf_LINK = $(CCLD) $(mbr_elf_CFLAGS) $(CFLAGS) $(mbr_elf_LDFLAGS) \
+	$(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
 user_shell_DEPENDENCIES = libc.a
@@ -704,19 +690,17 @@ am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
 SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
-	$(libmbr_a_SOURCES) $(bootefi_amd64_SOURCES) \
-	$(bootfat_bin_SOURCES) $(bootfat_elf_SOURCES) \
-	$(bootiso_bin_SOURCES) $(bootiso_elf_SOURCES) \
+	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
+	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
 	$(hello_km_SOURCES) $(kernel_bmi_SOURCES) \
-	$(kernel_generic_SOURCES) $(mbr_bin_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(kernel_generic_SOURCES) $(mbr_elf_SOURCES) \
+	$(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
-	$(libmbr_a_SOURCES) $(bootefi_amd64_SOURCES) \
-	$(bootfat_bin_SOURCES) $(bootfat_elf_SOURCES) \
-	$(bootiso_bin_SOURCES) $(bootiso_elf_SOURCES) \
+	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
+	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
 	$(hello_km_SOURCES) $(kernel_bmi_SOURCES) \
-	$(kernel_generic_SOURCES) $(mbr_bin_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(kernel_generic_SOURCES) $(mbr_elf_SOURCES) \
+	$(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -969,14 +953,15 @@ BUILT_SOURCES = \
 	generated_headers
 
 
-# Build libmbr
 #  -> Link mbr-elf
-#  -> Link mbr-bin
+#  -> Generate mbr-bin
 # Build libbootsect
+#  -> Link boot1-elf
+#  -> Generate boot1-bin
 #  -> Link bootfat-elf
-#  -> Link bootfat-bin
+#  -> Generate bootfat-bin
 #  -> Link bootiso-elf
-#  -> Link bootiso-bin
+#  -> Generate bootiso-bin
 #  -> Link bootefi-amd64
 #  -> Link bootefi-i386
 # Build libkernel-{generic,bmi,avx512}
@@ -985,38 +970,16 @@ BUILT_SOURCES = \
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG = 
 noinst_LIBRARIES = \
-	libmbr.a \
 	libbootsect.a \
 	libc.a
 
 
 #bootefi-i386
 
-# libmbr.a
-libmbr_a_SOURCES = \
-	mbr/mbr.s
-
-libmbr_a_CFLAGS = 
-libmbr_a_CXXFLAGS = \
-	-DFROMCXXFLAGS \
-	$(ELF32_FLAGS)
-
-libmbr_a_CCASFLAGS = \
-	-DFROMCCASFLAGS \
-	$(COMPILER_FLAGS) \
-	$(ELF32_FLAGS) \
-	$(ASM_DEBUG_INFO_FLAGS) \
-	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) -static
-
-EXTRA_libmbr_a_DEPENDENCIES = \
-	$(DUMPDIR)
-
-
 # mbr-elf
 mbr_elf_SOURCES = \
 	mbr/mbr.ld \
-	mbr/empty.cc
+	mbr/mbr.S
 
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
@@ -1033,7 +996,7 @@ mbr_elf_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS)-static
+	$(OPTIMIZE_SIZE_FLAGS) -static
 
 mbr_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
@@ -1049,43 +1012,45 @@ EXTRA_mbr_elf_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
 
 mbr_elf_LDADD = \
-	libmbr.a \
 	$(LIBGCC_ELF32)
 
-#$(GCC_REALMODE_LIB)
 
-# mbr-bin
-mbr_bin_SOURCES = \
-	mbr/mbr.ld \
-	mbr/empty.cc
+# boot1-elf
+boot1_elf_SOURCES = \
+	boot/boot1.S \
+	boot/boot1.ld
 
-mbr_bin_CXXFLAGS = \
-	-DFROMCXXFLAGS \
+boot1_elf_CXXFLAGS = \
+	-DFROM_CXXFLAGS \
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(NO_LTO_FLAGS) -static
 
-mbr_bin_CFLAGS = 
-mbr_bin_LDFLAGS = \
-	-DFROMLDFLAGS \
+boot1_elf_CFLAGS = 
+boot1_elf_CCASFLAGS = \
+	-DFROM_CCASFLAGS \
+	$(COMPILER_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) -static
+
+boot1_elf_LDFLAGS = \
+	-DFROM_LDFLAGS \
+	$(REGPARM_FLAGS) \
 	-Wl,-m,elf_i386 \
-	-Wl,--oformat,binary \
-	-Wl,-Map,$(top_builddir)/mbr.map \
-	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
+	-Wl,-T,$(top_srcdir)/boot/boot1.ld \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static \
-	$(NO_PIC_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib
 
-EXTRA_mbr_bin_DEPENDENCIES = \
-	$(top_srcdir)/mbr/mbr.ld
+EXTRA_boot1_elf_DEPENDENCIES = \
+	$(top_srcdir)/boot/boot1.ld
 
-mbr_bin_LDADD = \
-	libmbr.a \
+boot1_elf_LDADD = \
 	$(LIBGCC_ELF32)
 
 
@@ -1241,43 +1206,6 @@ bootfat_elf_LDADD = \
 	$(LIBGCC_ELF32)
 
 
-# bootfat-bin
-bootfat_bin_SOURCES = \
-	$(bootfat_elf_SOURCES)
-
-bootfat_bin_CXXFLAGS = \
-	$(libbootsect_a_CXXFLAGS)
-
-bootfat_bin_CCASFLAGS = \
-	$(bootfat_elf_CCASFLAGS)
-
-
-# -N to turn off section alignment and make all sections rwx
-bootfat_bin_LDFLAGS = \
-	-DFROM_LDFLAGS \
-	$(ELF32_FLAGS) \
-	$(LIBGCC_ELF32) \
-	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
-	-Wl,--oformat,binary \
-	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
-	-Wl,-N \
-	$(LINKER_SEL) -static \
-	-Wl,-nostdlib \
-	-nostartfiles -nodefaultlibs -nostdlib -static \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
-
-EXTRA_bootfat_bin_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootfat.ld
-
-bootfat_bin_LDADD = \
-	libbootsect.a \
-	$(LIBGCC_ELF32)
-
-
 # bootiso-elf
 bootiso_elf_SOURCES = \
 	boot/bootiso.S \
@@ -1314,41 +1242,6 @@ EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
 
 bootiso_elf_LDADD = \
-	libbootsect.a \
-	$(LIBGCC_ELF32)
-
-
-# bootiso-bin
-bootiso_bin_SOURCES = \
-	$(bootiso_elf_SOURCES)
-
-bootiso_bin_CXXFLAGS = \
-	$(libbootsect_a_CXXFLAGS)
-
-bootiso_bin_CCASFLAGS = \
-	$(bootiso_elf_CCASFLAGS)
-
-bootiso_bin_LDFLAGS = \
-	-DFROM_LDFLAGS \
-	$(ELF32_FLAGS) \
-	$(LIBGCC_ELF32) \
-	$(REGPARM_FLAGS) \
-	$(NO_PIC_FLAGS) \
-	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
-	-Wl,--oformat,binary \
-	-Wl,-Map,$(top_builddir)/bootiso.map \
-	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
-	-Wl,-N \
-	-static \
-	-nostartfiles -nodefaultlibs -nostdlib \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
-
-EXTRA_bootiso_bin_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootiso.ld
-
-bootiso_bin_LDADD = \
 	libbootsect.a \
 	$(LIBGCC_ELF32)
 
@@ -2168,7 +2061,9 @@ QEMU_DEBUGCON = \
 #-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
 QEMU_SERIAL = \
 	-chardev socket,id=qemu-serial-socket,host=localhost,port=7788,server,nowait,nodelay \
-	-device isa-serial,chardev=qemu-serial-socket,id=com1
+	-device isa-serial,chardev=qemu-serial-socket,id=com1 \
+	-chardev stdio,id=seabios \
+	-device isa-debugcon,iobase=0x402,chardev=seabios
 
 QEMU_COMMON = \
 	$(QEMU_MONITOR) \
@@ -2181,22 +2076,23 @@ QEMU_COMMON = \
 	$(QEMU_USB) \
 	$(QEMU_MEMFILL)
 
+SECTOR_SZ = 512
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_HDCTL_DEV_nvme_fat = \
 	-machine q35 \
-	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0
+	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0,logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 
 QEMU_HDCTL_DEV_usb_fat = \
 	-machine q35 \
 	-device usb-storage,bus=xhci.0,drive=bootdrv,bootindex=0
 
-QEMU_HDCTL_DEV_ahci_fat = -machine q35
+QEMU_HDCTL_DEV_ahci_fat = -machine q35 -global ide-hd.logical_block_size=$(SECTOR_SZ)
 QEMU_HDCTL_DEV_ahci_iso = -machine q35
 QEMU_HDCTL_DEV_ide_fat = -machine pc
 QEMU_HDCTL_DEV_ide_iso = -machine pc
 QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none,id=bootdrv
-QEMU_DIF_ahci = 
+QEMU_DIF_ahci = ,id=ahcictl
 QEMU_DIF_ide = 
 QEMU_DIF_usb = ,if=none
 QEMU_MEDIA_fat = disk
@@ -2819,19 +2715,6 @@ libc.a: $(libc_a_OBJECTS) $(libc_a_DEPENDENCIES) $(EXTRA_libc_a_DEPENDENCIES)
 	$(AM_V_at)-rm -f libc.a
 	$(AM_V_AR)$(libc_a_AR) libc.a $(libc_a_OBJECTS) $(libc_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libc.a
-mbr/$(am__dirstamp):
-	@$(MKDIR_P) mbr
-	@: > mbr/$(am__dirstamp)
-mbr/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) mbr/$(DEPDIR)
-	@: > mbr/$(DEPDIR)/$(am__dirstamp)
-mbr/libmbr_a-mbr.$(OBJEXT): mbr/$(am__dirstamp) \
-	mbr/$(DEPDIR)/$(am__dirstamp)
-
-libmbr.a: $(libmbr_a_OBJECTS) $(libmbr_a_DEPENDENCIES) $(EXTRA_libmbr_a_DEPENDENCIES) 
-	$(AM_V_at)-rm -f libmbr.a
-	$(AM_V_AR)$(libmbr_a_AR) libmbr.a $(libmbr_a_OBJECTS) $(libmbr_a_LIBADD)
-	$(AM_V_at)$(RANLIB) libmbr.a
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
@@ -2874,6 +2757,12 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+boot/boot1_elf-boot1.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+
+boot1-elf$(EXEEXT): $(boot1_elf_OBJECTS) $(boot1_elf_DEPENDENCIES) $(EXTRA_boot1_elf_DEPENDENCIES) 
+	@rm -f boot1-elf$(EXEEXT)
+	$(AM_V_CCLD)$(boot1_elf_LINK) $(boot1_elf_OBJECTS) $(boot1_elf_LDADD) $(LIBS)
 boot/bootefi_amd64-bootefi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-ctors.$(OBJEXT): boot/$(am__dirstamp) \
@@ -2936,16 +2825,6 @@ boot/bootefi_amd64-boottable_efi.$(OBJEXT): boot/$(am__dirstamp) \
 bootefi-amd64$(EXEEXT): $(bootefi_amd64_OBJECTS) $(bootefi_amd64_DEPENDENCIES) $(EXTRA_bootefi_amd64_DEPENDENCIES) 
 	@rm -f bootefi-amd64$(EXEEXT)
 	$(AM_V_CXXLD)$(bootefi_amd64_LINK) $(bootefi_amd64_OBJECTS) $(bootefi_amd64_LDADD) $(LIBS)
-boot/bootfat_bin-bootfat.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/bootfat_bin-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/bootfat_bin-mpentry_bios.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-
-bootfat-bin$(EXEEXT): $(bootfat_bin_OBJECTS) $(bootfat_bin_DEPENDENCIES) $(EXTRA_bootfat_bin_DEPENDENCIES) 
-	@rm -f bootfat-bin$(EXEEXT)
-	$(AM_V_CXXLD)$(bootfat_bin_LINK) $(bootfat_bin_OBJECTS) $(bootfat_bin_LDADD) $(LIBS)
 boot/bootfat_elf-bootfat.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootfat_elf-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
@@ -2956,16 +2835,6 @@ boot/bootfat_elf-mpentry_bios.$(OBJEXT): boot/$(am__dirstamp) \
 bootfat-elf$(EXEEXT): $(bootfat_elf_OBJECTS) $(bootfat_elf_DEPENDENCIES) $(EXTRA_bootfat_elf_DEPENDENCIES) 
 	@rm -f bootfat-elf$(EXEEXT)
 	$(AM_V_CXXLD)$(bootfat_elf_LINK) $(bootfat_elf_OBJECTS) $(bootfat_elf_LDADD) $(LIBS)
-boot/bootiso_bin-bootiso.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/bootiso_bin-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/bootiso_bin-mpentry_bios.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-
-bootiso-bin$(EXEEXT): $(bootiso_bin_OBJECTS) $(bootiso_bin_DEPENDENCIES) $(EXTRA_bootiso_bin_DEPENDENCIES) 
-	@rm -f bootiso-bin$(EXEEXT)
-	$(AM_V_CXXLD)$(bootiso_bin_LINK) $(bootiso_bin_OBJECTS) $(bootiso_bin_LDADD) $(LIBS)
 boot/bootiso_elf-bootiso.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootiso_elf-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
@@ -3670,18 +3539,18 @@ kernel/syscall/kernel_generic-sys_process.$(OBJEXT):  \
 kernel-generic$(EXEEXT): $(kernel_generic_OBJECTS) $(kernel_generic_DEPENDENCIES) $(EXTRA_kernel_generic_DEPENDENCIES) 
 	@rm -f kernel-generic$(EXEEXT)
 	$(AM_V_CXXLD)$(kernel_generic_LINK) $(kernel_generic_OBJECTS) $(kernel_generic_LDADD) $(LIBS)
-mbr/mbr_bin-empty.$(OBJEXT): mbr/$(am__dirstamp) \
-	mbr/$(DEPDIR)/$(am__dirstamp)
-
-mbr-bin$(EXEEXT): $(mbr_bin_OBJECTS) $(mbr_bin_DEPENDENCIES) $(EXTRA_mbr_bin_DEPENDENCIES) 
-	@rm -f mbr-bin$(EXEEXT)
-	$(AM_V_CXXLD)$(mbr_bin_LINK) $(mbr_bin_OBJECTS) $(mbr_bin_LDADD) $(LIBS)
-mbr/mbr_elf-empty.$(OBJEXT): mbr/$(am__dirstamp) \
+mbr/$(am__dirstamp):
+	@$(MKDIR_P) mbr
+	@: > mbr/$(am__dirstamp)
+mbr/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) mbr/$(DEPDIR)
+	@: > mbr/$(DEPDIR)/$(am__dirstamp)
+mbr/mbr_elf-mbr.$(OBJEXT): mbr/$(am__dirstamp) \
 	mbr/$(DEPDIR)/$(am__dirstamp)
 
 mbr-elf$(EXEEXT): $(mbr_elf_OBJECTS) $(mbr_elf_DEPENDENCIES) $(EXTRA_mbr_elf_DEPENDENCIES) 
 	@rm -f mbr-elf$(EXEEXT)
-	$(AM_V_CXXLD)$(mbr_elf_LINK) $(mbr_elf_OBJECTS) $(mbr_elf_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(mbr_elf_LINK) $(mbr_elf_OBJECTS) $(mbr_elf_LDADD) $(LIBS)
 user/test/$(am__dirstamp):
 	@$(MKDIR_P) user/test
 	@: > user/test/$(am__dirstamp)
@@ -3720,6 +3589,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/boot1_elf-boot1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-bootefi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-bootmenu.Po@am__quote@
@@ -3749,15 +3619,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-string_char16.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui_efi.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_bin-bootfat.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_bin-malloc_bios.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-bootfat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-malloc_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-mpentry_bios.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_bin-bootiso.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_bin-malloc_bios.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-bootiso.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-malloc_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-mpentry_bios.Po@am__quote@
@@ -4176,8 +4040,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-unlink.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-unlinkat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-write.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_bin-empty.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-empty.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-mbr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@modules/hello/$(DEPDIR)/hello_km-hello.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
 
@@ -4267,6 +4130,20 @@ boot/libbootsect_a-cpu64_bios.obj: boot/cpu64_bios.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-cpu64_bios.obj `if test -f 'boot/cpu64_bios.S'; then $(CYGPATH_W) 'boot/cpu64_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/cpu64_bios.S'; fi`
 
+boot/boot1_elf-boot1.o: boot/boot1.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(boot1_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/boot1_elf-boot1.o -MD -MP -MF boot/$(DEPDIR)/boot1_elf-boot1.Tpo -c -o boot/boot1_elf-boot1.o `test -f 'boot/boot1.S' || echo '$(srcdir)/'`boot/boot1.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/boot1_elf-boot1.Tpo boot/$(DEPDIR)/boot1_elf-boot1.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/boot1.S' object='boot/boot1_elf-boot1.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(boot1_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/boot1_elf-boot1.o `test -f 'boot/boot1.S' || echo '$(srcdir)/'`boot/boot1.S
+
+boot/boot1_elf-boot1.obj: boot/boot1.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(boot1_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/boot1_elf-boot1.obj -MD -MP -MF boot/$(DEPDIR)/boot1_elf-boot1.Tpo -c -o boot/boot1_elf-boot1.obj `if test -f 'boot/boot1.S'; then $(CYGPATH_W) 'boot/boot1.S'; else $(CYGPATH_W) '$(srcdir)/boot/boot1.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/boot1_elf-boot1.Tpo boot/$(DEPDIR)/boot1_elf-boot1.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/boot1.S' object='boot/boot1_elf-boot1.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(boot1_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/boot1_elf-boot1.obj `if test -f 'boot/boot1.S'; then $(CYGPATH_W) 'boot/boot1.S'; else $(CYGPATH_W) '$(srcdir)/boot/boot1.S'; fi`
+
 boot/bootefi_amd64-cpu64_efi.o: boot/cpu64_efi.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-cpu64_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-cpu64_efi.Tpo -c -o boot/bootefi_amd64-cpu64_efi.o `test -f 'boot/cpu64_efi.S' || echo '$(srcdir)/'`boot/cpu64_efi.S
 @am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-cpu64_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-cpu64_efi.Po
@@ -4295,34 +4172,6 @@ boot/bootefi_amd64-mpentry_efi.obj: boot/mpentry_efi.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-mpentry_efi.obj `if test -f 'boot/mpentry_efi.S'; then $(CYGPATH_W) 'boot/mpentry_efi.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_efi.S'; fi`
 
-boot/bootfat_bin-bootfat.o: boot/bootfat.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootfat_bin-bootfat.o -MD -MP -MF boot/$(DEPDIR)/bootfat_bin-bootfat.Tpo -c -o boot/bootfat_bin-bootfat.o `test -f 'boot/bootfat.S' || echo '$(srcdir)/'`boot/bootfat.S
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_bin-bootfat.Tpo boot/$(DEPDIR)/bootfat_bin-bootfat.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bootfat.S' object='boot/bootfat_bin-bootfat.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootfat_bin-bootfat.o `test -f 'boot/bootfat.S' || echo '$(srcdir)/'`boot/bootfat.S
-
-boot/bootfat_bin-bootfat.obj: boot/bootfat.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootfat_bin-bootfat.obj -MD -MP -MF boot/$(DEPDIR)/bootfat_bin-bootfat.Tpo -c -o boot/bootfat_bin-bootfat.obj `if test -f 'boot/bootfat.S'; then $(CYGPATH_W) 'boot/bootfat.S'; else $(CYGPATH_W) '$(srcdir)/boot/bootfat.S'; fi`
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_bin-bootfat.Tpo boot/$(DEPDIR)/bootfat_bin-bootfat.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bootfat.S' object='boot/bootfat_bin-bootfat.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootfat_bin-bootfat.obj `if test -f 'boot/bootfat.S'; then $(CYGPATH_W) 'boot/bootfat.S'; else $(CYGPATH_W) '$(srcdir)/boot/bootfat.S'; fi`
-
-boot/bootfat_bin-mpentry_bios.o: boot/mpentry_bios.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootfat_bin-mpentry_bios.o -MD -MP -MF boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Tpo -c -o boot/bootfat_bin-mpentry_bios.o `test -f 'boot/mpentry_bios.S' || echo '$(srcdir)/'`boot/mpentry_bios.S
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Tpo boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootfat_bin-mpentry_bios.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootfat_bin-mpentry_bios.o `test -f 'boot/mpentry_bios.S' || echo '$(srcdir)/'`boot/mpentry_bios.S
-
-boot/bootfat_bin-mpentry_bios.obj: boot/mpentry_bios.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootfat_bin-mpentry_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Tpo -c -o boot/bootfat_bin-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Tpo boot/$(DEPDIR)/bootfat_bin-mpentry_bios.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootfat_bin-mpentry_bios.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootfat_bin-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
-
 boot/bootfat_elf-bootfat.o: boot/bootfat.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootfat_elf-bootfat.o -MD -MP -MF boot/$(DEPDIR)/bootfat_elf-bootfat.Tpo -c -o boot/bootfat_elf-bootfat.o `test -f 'boot/bootfat.S' || echo '$(srcdir)/'`boot/bootfat.S
 @am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_elf-bootfat.Tpo boot/$(DEPDIR)/bootfat_elf-bootfat.Po
@@ -4350,34 +4199,6 @@ boot/bootfat_elf-mpentry_bios.obj: boot/mpentry_bios.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootfat_elf-mpentry_bios.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootfat_elf-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
-
-boot/bootiso_bin-bootiso.o: boot/bootiso.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootiso_bin-bootiso.o -MD -MP -MF boot/$(DEPDIR)/bootiso_bin-bootiso.Tpo -c -o boot/bootiso_bin-bootiso.o `test -f 'boot/bootiso.S' || echo '$(srcdir)/'`boot/bootiso.S
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootiso_bin-bootiso.Tpo boot/$(DEPDIR)/bootiso_bin-bootiso.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bootiso.S' object='boot/bootiso_bin-bootiso.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_bin-bootiso.o `test -f 'boot/bootiso.S' || echo '$(srcdir)/'`boot/bootiso.S
-
-boot/bootiso_bin-bootiso.obj: boot/bootiso.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootiso_bin-bootiso.obj -MD -MP -MF boot/$(DEPDIR)/bootiso_bin-bootiso.Tpo -c -o boot/bootiso_bin-bootiso.obj `if test -f 'boot/bootiso.S'; then $(CYGPATH_W) 'boot/bootiso.S'; else $(CYGPATH_W) '$(srcdir)/boot/bootiso.S'; fi`
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootiso_bin-bootiso.Tpo boot/$(DEPDIR)/bootiso_bin-bootiso.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bootiso.S' object='boot/bootiso_bin-bootiso.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_bin-bootiso.obj `if test -f 'boot/bootiso.S'; then $(CYGPATH_W) 'boot/bootiso.S'; else $(CYGPATH_W) '$(srcdir)/boot/bootiso.S'; fi`
-
-boot/bootiso_bin-mpentry_bios.o: boot/mpentry_bios.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootiso_bin-mpentry_bios.o -MD -MP -MF boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Tpo -c -o boot/bootiso_bin-mpentry_bios.o `test -f 'boot/mpentry_bios.S' || echo '$(srcdir)/'`boot/mpentry_bios.S
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Tpo boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootiso_bin-mpentry_bios.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_bin-mpentry_bios.o `test -f 'boot/mpentry_bios.S' || echo '$(srcdir)/'`boot/mpentry_bios.S
-
-boot/bootiso_bin-mpentry_bios.obj: boot/mpentry_bios.S
-@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -MT boot/bootiso_bin-mpentry_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Tpo -c -o boot/bootiso_bin-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
-@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Tpo boot/$(DEPDIR)/bootiso_bin-mpentry_bios.Po
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootiso_bin-mpentry_bios.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_bin-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
 
 boot/bootiso_elf-bootiso.o: boot/bootiso.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootiso_elf-bootiso.o -MD -MP -MF boot/$(DEPDIR)/bootiso_elf-bootiso.Tpo -c -o boot/bootiso_elf-bootiso.o `test -f 'boot/bootiso.S' || echo '$(srcdir)/'`boot/bootiso.S
@@ -4490,6 +4311,20 @@ kernel/arch/x86_64/cpu/kernel_generic-syscall.obj: kernel/arch/x86_64/cpu/syscal
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/syscall.S' object='kernel/arch/x86_64/cpu/kernel_generic-syscall.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-syscall.obj `if test -f 'kernel/arch/x86_64/cpu/syscall.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/syscall.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/syscall.S'; fi`
+
+mbr/mbr_elf-mbr.o: mbr/mbr.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CCASFLAGS) $(CCASFLAGS) -MT mbr/mbr_elf-mbr.o -MD -MP -MF mbr/$(DEPDIR)/mbr_elf-mbr.Tpo -c -o mbr/mbr_elf-mbr.o `test -f 'mbr/mbr.S' || echo '$(srcdir)/'`mbr/mbr.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) mbr/$(DEPDIR)/mbr_elf-mbr.Tpo mbr/$(DEPDIR)/mbr_elf-mbr.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='mbr/mbr.S' object='mbr/mbr_elf-mbr.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CCASFLAGS) $(CCASFLAGS) -c -o mbr/mbr_elf-mbr.o `test -f 'mbr/mbr.S' || echo '$(srcdir)/'`mbr/mbr.S
+
+mbr/mbr_elf-mbr.obj: mbr/mbr.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CCASFLAGS) $(CCASFLAGS) -MT mbr/mbr_elf-mbr.obj -MD -MP -MF mbr/$(DEPDIR)/mbr_elf-mbr.Tpo -c -o mbr/mbr_elf-mbr.obj `if test -f 'mbr/mbr.S'; then $(CYGPATH_W) 'mbr/mbr.S'; else $(CYGPATH_W) '$(srcdir)/mbr/mbr.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) mbr/$(DEPDIR)/mbr_elf-mbr.Tpo mbr/$(DEPDIR)/mbr_elf-mbr.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='mbr/mbr.S' object='mbr/mbr_elf-mbr.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CCASFLAGS) $(CCASFLAGS) -c -o mbr/mbr_elf-mbr.obj `if test -f 'mbr/mbr.S'; then $(CYGPATH_W) 'mbr/mbr.S'; else $(CYGPATH_W) '$(srcdir)/mbr/mbr.S'; fi`
 
 user/test/user_shell-test.o: user/test/test.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(user_shell_CCASFLAGS) $(CCASFLAGS) -MT user/test/user_shell-test.o -MD -MP -MF user/test/$(DEPDIR)/user_shell-test.Tpo -c -o user/test/user_shell-test.o `test -f 'user/test/test.S' || echo '$(srcdir)/'`user/test/test.S
@@ -7377,20 +7212,6 @@ boot/bootefi_amd64-boottable_efi.obj: boot/boottable_efi.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-boottable_efi.obj `if test -f 'boot/boottable_efi.cc'; then $(CYGPATH_W) 'boot/boottable_efi.cc'; else $(CYGPATH_W) '$(srcdir)/boot/boottable_efi.cc'; fi`
 
-boot/bootfat_bin-malloc_bios.o: boot/malloc_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CXXFLAGS) $(CXXFLAGS) -MT boot/bootfat_bin-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootfat_bin-malloc_bios.Tpo -c -o boot/bootfat_bin-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_bin-malloc_bios.Tpo boot/$(DEPDIR)/bootfat_bin-malloc_bios.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootfat_bin-malloc_bios.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootfat_bin-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
-
-boot/bootfat_bin-malloc_bios.obj: boot/malloc_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CXXFLAGS) $(CXXFLAGS) -MT boot/bootfat_bin-malloc_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootfat_bin-malloc_bios.Tpo -c -o boot/bootfat_bin-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_bin-malloc_bios.Tpo boot/$(DEPDIR)/bootfat_bin-malloc_bios.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootfat_bin-malloc_bios.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_bin_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootfat_bin-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
-
 boot/bootfat_elf-malloc_bios.o: boot/malloc_bios.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootfat_elf-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootfat_elf-malloc_bios.Tpo -c -o boot/bootfat_elf-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_elf-malloc_bios.Tpo boot/$(DEPDIR)/bootfat_elf-malloc_bios.Po
@@ -7404,20 +7225,6 @@ boot/bootfat_elf-malloc_bios.obj: boot/malloc_bios.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootfat_elf-malloc_bios.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootfat_elf-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
-
-boot/bootiso_bin-malloc_bios.o: boot/malloc_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CXXFLAGS) $(CXXFLAGS) -MT boot/bootiso_bin-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootiso_bin-malloc_bios.Tpo -c -o boot/bootiso_bin-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootiso_bin-malloc_bios.Tpo boot/$(DEPDIR)/bootiso_bin-malloc_bios.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootiso_bin-malloc_bios.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootiso_bin-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
-
-boot/bootiso_bin-malloc_bios.obj: boot/malloc_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CXXFLAGS) $(CXXFLAGS) -MT boot/bootiso_bin-malloc_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootiso_bin-malloc_bios.Tpo -c -o boot/bootiso_bin-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootiso_bin-malloc_bios.Tpo boot/$(DEPDIR)/bootiso_bin-malloc_bios.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootiso_bin-malloc_bios.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_bin_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootiso_bin-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
 
 boot/bootiso_elf-malloc_bios.o: boot/malloc_bios.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootiso_elf-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootiso_elf-malloc_bios.Tpo -c -o boot/bootiso_elf-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
@@ -10611,34 +10418,6 @@ kernel/syscall/kernel_generic-sys_process.obj: kernel/syscall/sys_process.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_process.obj `if test -f 'kernel/syscall/sys_process.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_process.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_process.cc'; fi`
 
-mbr/mbr_bin-empty.o: mbr/empty.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_bin_CXXFLAGS) $(CXXFLAGS) -MT mbr/mbr_bin-empty.o -MD -MP -MF mbr/$(DEPDIR)/mbr_bin-empty.Tpo -c -o mbr/mbr_bin-empty.o `test -f 'mbr/empty.cc' || echo '$(srcdir)/'`mbr/empty.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) mbr/$(DEPDIR)/mbr_bin-empty.Tpo mbr/$(DEPDIR)/mbr_bin-empty.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='mbr/empty.cc' object='mbr/mbr_bin-empty.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_bin_CXXFLAGS) $(CXXFLAGS) -c -o mbr/mbr_bin-empty.o `test -f 'mbr/empty.cc' || echo '$(srcdir)/'`mbr/empty.cc
-
-mbr/mbr_bin-empty.obj: mbr/empty.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_bin_CXXFLAGS) $(CXXFLAGS) -MT mbr/mbr_bin-empty.obj -MD -MP -MF mbr/$(DEPDIR)/mbr_bin-empty.Tpo -c -o mbr/mbr_bin-empty.obj `if test -f 'mbr/empty.cc'; then $(CYGPATH_W) 'mbr/empty.cc'; else $(CYGPATH_W) '$(srcdir)/mbr/empty.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) mbr/$(DEPDIR)/mbr_bin-empty.Tpo mbr/$(DEPDIR)/mbr_bin-empty.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='mbr/empty.cc' object='mbr/mbr_bin-empty.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_bin_CXXFLAGS) $(CXXFLAGS) -c -o mbr/mbr_bin-empty.obj `if test -f 'mbr/empty.cc'; then $(CYGPATH_W) 'mbr/empty.cc'; else $(CYGPATH_W) '$(srcdir)/mbr/empty.cc'; fi`
-
-mbr/mbr_elf-empty.o: mbr/empty.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) -MT mbr/mbr_elf-empty.o -MD -MP -MF mbr/$(DEPDIR)/mbr_elf-empty.Tpo -c -o mbr/mbr_elf-empty.o `test -f 'mbr/empty.cc' || echo '$(srcdir)/'`mbr/empty.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) mbr/$(DEPDIR)/mbr_elf-empty.Tpo mbr/$(DEPDIR)/mbr_elf-empty.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='mbr/empty.cc' object='mbr/mbr_elf-empty.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) -c -o mbr/mbr_elf-empty.o `test -f 'mbr/empty.cc' || echo '$(srcdir)/'`mbr/empty.cc
-
-mbr/mbr_elf-empty.obj: mbr/empty.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) -MT mbr/mbr_elf-empty.obj -MD -MP -MF mbr/$(DEPDIR)/mbr_elf-empty.Tpo -c -o mbr/mbr_elf-empty.obj `if test -f 'mbr/empty.cc'; then $(CYGPATH_W) 'mbr/empty.cc'; else $(CYGPATH_W) '$(srcdir)/mbr/empty.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) mbr/$(DEPDIR)/mbr_elf-empty.Tpo mbr/$(DEPDIR)/mbr_elf-empty.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='mbr/empty.cc' object='mbr/mbr_elf-empty.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(mbr_elf_CXXFLAGS) $(CXXFLAGS) -c -o mbr/mbr_elf-empty.obj `if test -f 'mbr/empty.cc'; then $(CYGPATH_W) 'mbr/empty.cc'; else $(CYGPATH_W) '$(srcdir)/mbr/empty.cc'; fi`
-
 .s.o:
 	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ $<
 
@@ -10656,12 +10435,6 @@ boot/libbootsect_a-exception.o: boot/exception.s
 
 boot/libbootsect_a-exception.obj: boot/exception.s
 	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-exception.obj `if test -f 'boot/exception.s'; then $(CYGPATH_W) 'boot/exception.s'; else $(CYGPATH_W) '$(srcdir)/boot/exception.s'; fi`
-
-mbr/libmbr_a-mbr.o: mbr/mbr.s
-	$(AM_V_CCAS)$(CCAS) $(libmbr_a_CCASFLAGS) $(CCASFLAGS) -c -o mbr/libmbr_a-mbr.o `test -f 'mbr/mbr.s' || echo '$(srcdir)/'`mbr/mbr.s
-
-mbr/libmbr_a-mbr.obj: mbr/mbr.s
-	$(AM_V_CCAS)$(CCAS) $(libmbr_a_CCASFLAGS) $(CCASFLAGS) -c -o mbr/libmbr_a-mbr.obj `if test -f 'mbr/mbr.s'; then $(CYGPATH_W) 'mbr/mbr.s'; else $(CYGPATH_W) '$(srcdir)/mbr/mbr.s'; fi`
 
 kernel/arch/x86_64/cpu/kernel_bmi-except_asm.o: kernel/arch/x86_64/cpu/except_asm.s
 	$(AM_V_CCAS)$(CCAS) $(kernel_bmi_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_bmi-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.s' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.s
@@ -11092,6 +10865,26 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libc_aHEADERS
 .PRECIOUS: Makefile
 
 
+# mbr-bin
+
+$(top_builddir)/mbr-bin: $(top_builddir)/mbr-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+
+# boot1-bin
+
+$(top_builddir)/boot1-bin: $(top_builddir)/boot1-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+
+# bootfat-bin
+
+$(top_builddir)/bootfat-bin: $(top_builddir)/bootfat-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+
+# bootiso-bin
+
+$(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+
 bootx64.efi: bootefi-amd64
 	$(OBJCOPY) \
 		--remove-section=.eh_frame \
@@ -11193,59 +10986,105 @@ kernel-bmi.dis.gz: kernel-bmi $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
 $(top_builddir)/fatdisk.img: \
-		kernel-generic \
-		kernel-generic.sym \
-		kernel-generic.dis.gz \
+		$(top_builddir)/kernel-generic \
+		$(top_builddir)/kernel-generic.sym \
+		$(top_builddir)/kernel-generic.dis.gz \
 		\
-		kernel-bmi \
-		kernel-bmi.sym \
-		kernel-bmi.dis.gz \
+		$(top_builddir)/kernel-bmi \
+		$(top_builddir)/kernel-bmi.sym \
+		$(top_builddir)/kernel-bmi.dis.gz \
 		\
-		bootx64.efi \
-		bootx64-efi.sym \
-		bootefi-amd64.dis.gz \
+		$(top_builddir)/bootx64.efi \
+		$(top_builddir)/bootx64-efi.sym \
+		$(top_builddir)/bootefi-amd64.dis.gz \
 		\
-		user-shell \
-		hello.km \
+		$(top_builddir)/user-shell \
+		$(top_builddir)/hello.km \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
 		\
-		diskfat.mk \
+		$(top_srcdir)/diskfat.mk \
 		$(top_srcdir)/populate_fat.sh \
 		\
-		mbr-bin \
-		mbr.sym \
-		mbr.dis.gz \
+		$(top_builddir)/mbr-bin \
+		$(top_builddir)/mbr.sym \
+		$(top_builddir)/mbr.dis.gz \
 		\
-		bootfat-bin \
-		bootfat.sym \
-		bootfat.dis.gz
+		$(top_builddir)/boot1-bin \
+		$(top_builddir)/boot1-elf \
+		\
+		$(top_builddir)/bootfat-bin \
+		$(top_builddir)/bootfat.sym \
+		$(top_builddir)/bootfat.dis.gz
 	set -x && \
-		rm -f fatpart.img fatdisk.img && \
-		truncate --size=261120K fatpart.img && \
-		mkfs.vfat -R 128 -F 32 fatpart.img && \
-		dd if=bootfat-bin of=fatpart.img \
-			bs=1 count=2 conv=notrunc && \
-		dd if=bootfat-bin of=fatpart.img \
-			bs=1 seek=90 skip=90 \
-			count=422 conv=notrunc && \
-		dd if=bootfat-bin of=fatpart.img \
-			bs=1 seek=1024 skip=1024 \
+		rm -f $(top_builddir)/fatpart.img \
+			$(top_builddir)/fatdisk.img && \
+		\
+		truncate --size=261120K $(top_builddir)/fatpart.img && \
+		\
+		mkfs.vfat \
+			-F 32 \
+			-S $(SECTOR_SZ) \
+			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
+			-b $$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
+			$(top_builddir)/fatpart.img && \
+			\
+		dd \
+			if=$(top_builddir)/boot1-bin \
+			of=$(top_builddir)/fatpart.img \
+			bs=1 count=$$(( 0xB )) \
 			conv=notrunc && \
+			\
+		dd if=$(top_builddir)/boot1-bin \
+			of=$(top_builddir)/fatpart.img \
+			bs=1 \
+			seek=$$(( 0x5A )) \
+			skip=$$(( 0x5A )) \
+			count=$$(( 0x1FE - 0x5A )) \
+			conv=notrunc && \
+			\
+		dd if=$(top_builddir)/bootfat-bin \
+			of=$(top_builddir)/fatpart.img \
+			bs=$(SECTOR_SZ) \
+			seek=2 \
+			skip=0 \
+			conv=notrunc && \
+			\
+		dd if=$(top_builddir)/fatpart.img \
+			of=$(top_builddir)/fatpart.img \
+			bs=$(SECTOR_SZ) \
+			count=1 \
+			skip=0 \
+			seek=$$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
+			conv=notrunc && \
+			\
 		SRCDIR="$(top_srcdir)" \
 			$(top_srcdir)/populate_fat.sh \
-				fatpart.img "$(top_srcdir)" && \
+				$(top_builddir)/fatpart.img "$(top_srcdir)" && \
+				\
 		truncate --size=262144K fatdisk.img && \
-		echo -e 'o\nn\np\n1\n2048\n\nt\nc\na\np\nw\n' | \
-			fdisk fatdisk.img && \
-		dd if=fatpart.img of=fatdisk.img \
-			bs=512 seek=2048 conv=notrunc && \
-		dd if=mbr-bin of=fatdisk.img \
-			bs=1 count=446 conv=notrunc && \
-		dd if=mbr-bin of=fatdisk.img \
-			bs=1 seek=510 skip=510 count=2 conv=notrunc
-
-#		fsck.vfat -v fatpart.img &&
+		\
+		echo -e 'o\nn\np\n1\n2048\n\nt\nc\na\np\ni\nw\n' | \
+			fdisk -b $(SECTOR_SZ) $(top_builddir)/fatdisk.img && \
+			\
+		dd if=$(top_builddir)/fatpart.img \
+			of=$(top_builddir)/fatdisk.img \
+			bs=$(SECTOR_SZ) \
+			seek=2048 \
+			conv=notrunc && \
+			\
+		dd if=$(top_builddir)/mbr-bin \
+			of=$(top_builddir)/fatdisk.img \
+			bs=1 \
+			count=446 \
+			conv=notrunc && \
+			\
+		dd if=$(top_builddir)/mbr-bin \
+			of=$(top_builddir)/fatdisk.img \
+			bs=1 seek=510 \
+			skip=510 \
+			count=2 \
+			conv=notrunc
 
 $(top_builddir)/isodisk.img: \
 		kernel-generic \
@@ -11290,6 +11129,9 @@ $(top_builddir)/isodisk.img: \
 #include zlib.mk
 
 clean-local:
+	rm -f $(top_builddir)/mbr-bin
+	rm -f $(top_builddir)/bootfat-bin
+	rm -f $(top_builddir)/bootiso-bin
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/bootfat.sym
 	rm -f $(top_builddir)/bootiso.sym

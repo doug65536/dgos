@@ -9,17 +9,21 @@ bool need_a20_toggle;
 
 void cpu_a20_enterpm()
 {
-    if (need_a20_toggle)
-        toggle_a20(1);
+    if (need_a20_toggle) {
+        toggle_a20(true);
+        wait_a20(true);
+    }
 }
 
 void cpu_a20_exitpm()
 {
-    if (need_a20_toggle)
-        toggle_a20(0);
+    if (need_a20_toggle) {
+        toggle_a20(false);
+        wait_a20(false);
+    }
 }
 
-bool toggle_a20(uint8_t enable)
+bool toggle_a20(bool enabled)
 {
     enum struct a20_method {
         unknown,
@@ -34,46 +38,44 @@ bool toggle_a20(uint8_t enable)
     bios_regs_t regs{};
 
     if (method == a20_method::unknown) {
-        // Try to use the BIOS
-        regs.eax = enable ? 0x2401 : 0x2400;
-        bioscall(&regs, 0x15);
-        if (!regs.flags_CF()) {
-            method = a20_method::bios;
-            return true;
-        }
-
         // Ask the BIOS which method to use
         regs.eax = 0x2403;
-        bioscall(&regs, 0x15);
+        bioscall(&regs, 0x15, false);
         if (!regs.flags_CF() && (regs.ebx & 3)) {
-            if (regs.ebx & 1) {
+            if (regs.ebx & 2) {
+                // Use port 0x92
+                method = a20_method::port92;
+            } else if (regs.ebx & 1) {
+                // Use the keyboard controller
                 method = a20_method::keybd;
             } else {
-                method = a20_method::port92;
+                // Try to use the BIOS
+                regs.eax = enabled ? 0x2401 : 0x2400;
+                bioscall(&regs, 0x15, false);
+                if (!regs.flags_CF()) {
+                    method = a20_method::bios;
+                    return true;
+                }
             }
-        } else {
+        }
+        
+        // Still don't know? Guess!
+        if (method == a20_method::unknown) {
             PRINT(TSTR "BIOS doesn't support A20! Guessing port 0x92...");
             method = a20_method::port92;
         }
     }
 
     switch (method) {
-    case a20_method::bios:
-        regs.eax = enable ? 0x2401 : 0x2400;
-        bioscall(&regs, 0x15);
-        return !regs.flags_CF();
-
     case a20_method::port92:
-        uint8_t value;
-        enable = (enable != 0) << 1;
+        uint8_t temp;
         __asm__ __volatile__ (
-            "inb $0x92,%[value]\n\t"
-            "andb $~2,%[value]\n\t"
-            "orb %[enable],%[value]\n\t"
-            "wbinvd\n\t"
-            "outb %1,$0x92\n\t"
-            : [enable] "+c" (enable)
-            , [value] "=a" (value)
+            "inb $0x92,%b[temp]\n\t"
+            "andb $~2,%b[temp]\n\t"
+            "orb %b[bit],%b[temp]\n\t"
+            "outb %b[temp],$0x92\n\t"
+            : [temp] "=&a" (temp)
+            : [bit] "ri" (enabled ? 2 : 0)
         );
         return true;
 
@@ -84,12 +86,17 @@ bool toggle_a20(uint8_t enable)
 
         // Write command
         while (inb(0x64) & 2);
-        outb(0x60, enable ? 0xDF : 0xDD);
+        outb(0x60, enabled ? 0xDF : 0xDD);
 
         // Wait for empty and cover signal propagation delay
         while (inb(0x64) & 2);
 
         return true;
+
+    case a20_method::bios:
+        regs.eax = enabled ? 0x2401 : 0x2400;
+        bioscall(&regs, 0x15, false);
+        return !regs.flags_CF();
 
     default:
         return false;

@@ -23,18 +23,67 @@ uint64_t fat32_serial;
 static char *sector_buffer;
 static char *fat_buffer;
 uint32_t fat_buffer_lba;
+static uint_least32_t sector_sz;
+static uint8_t log2_sector_sz;
 
 static uint32_t next_cluster(uint64_t current_cluster,
                              char *sector, bool *ok_ptr);
+
+template<typename T, T n>
+struct integral_constant
+{
+    static constexpr T value = n;
+    using type = integral_constant<T, n>;
+};
+
+#define clz_32 __builtin_clz
+#if __SIZEOF_LONG__ == 8
+#define clz_64 __builtin_clzl
+#elif __SIZEOF_LONG_LONG__ == 8
+#define clz_64 __builtin_clzll
+#else
+#error Unhandled type sizes!
+#endif
+
+template<typename T>
+static __always_inline uint8_t bit_clz_(
+        T n, integral_constant<size_t, 4>::type)
+{
+    return clz_32(n);
+}
+
+template<typename T>
+static __always_inline uint8_t bit_clz_(
+        T n, integral_constant<size_t, 8>::type)
+{
+    return clz_64(n);
+}
+
+template<typename T>
+static __always_inline uint8_t bit_clz(T n)
+{
+    return bit_clz_(n, typename integral_constant<size_t, sizeof(T)>::type());
+}
+
+template<typename T>
+static __always_inline uint8_t bit_log2_n(T n)
+{
+    uint8_t top = (sizeof(T)*8-1) - bit_clz(n);
+    return top + !!(~-(T(1) << top) & n);
+}
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
 static bool read_bpb(uint64_t partition_lba)
 {
-    sector_buffer = (char*)malloc(512);
-    fat_buffer = (char*)malloc(512);
+    sector_sz = disk_sector_size();
+    log2_sector_sz = bit_log2_n(sector_sz);
+    
+    sector_buffer = (char*)malloc(sector_sz);
+    fat_buffer = (char*)malloc(sector_sz);
 
-    if (!disk_read_lba(uint64_t(sector_buffer), partition_lba, 9, 1))
+    if (!disk_read_lba(uint64_t(sector_buffer), 
+                       partition_lba, log2_sector_sz, 1))
         return false;
 
     fat32_parse_bpb(&bpb, partition_lba, sector_buffer);
@@ -91,7 +140,7 @@ static int fat32_sector_iterator_begin(
     if (!is_eof_cluster(cluster)) {
         int32_t lba = lba_from_cluster(cluster);
 
-        iter->ok = disk_read_lba(uint64_t(sector), lba, 9, 1);
+        iter->ok = disk_read_lba(uint64_t(sector), lba, log2_sector_sz, 1);
 
         if (iter->ok)
             return 1;
@@ -108,14 +157,15 @@ static int fat32_sector_iterator_begin(
 static uint32_t next_cluster(
         uint64_t current_cluster, char *sector, bool *ok_ptr)
 {
-    uint32_t fat_sector_index = current_cluster >> (9-2);
-    uint32_t fat_sector_offset = current_cluster & ((1 << (9-2))-1);
+    uint32_t fat_sector_index = current_cluster >> (log2_sector_sz-2);
+    uint32_t fat_sector_offset = current_cluster & 
+            ((1 << (log2_sector_sz-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
     uint64_t lba = bpb.first_fat_lba + fat_sector_index;
 
     uint8_t ok = true;
     if (fat_buffer_lba != lba) {
-        ok = disk_read_lba(uint64_t(fat_buffer), lba, 9, 1);
+        ok = disk_read_lba(uint64_t(fat_buffer), lba, log2_sector_sz, 1);
         if (ok_ptr)
             *ok_ptr = ok;
         if (!ok)
@@ -124,7 +174,7 @@ static uint32_t next_cluster(
     }
     fat_array = (uint32_t*)fat_buffer;
     if (sector)
-        memcpy(sector, fat_buffer, 512);
+        memcpy(sector, fat_buffer, sector_sz);
 
     current_cluster = fat_array[fat_sector_offset] & 0x0FFFFFFF;
 
@@ -135,7 +185,7 @@ static uint32_t next_cluster(
     if (sector) {
         lba = lba_from_cluster(current_cluster);
 
-        ok = disk_read_lba(uint64_t(sector), lba, 9, 1);
+        ok = disk_read_lba(uint64_t(sector), lba, log2_sector_sz, 1);
         if (ok_ptr)
             *ok_ptr = ok;
         if (ok)
@@ -176,7 +226,7 @@ static int sector_iterator_next(
         uint32_t lba = lba_from_cluster(iter->cluster) +
                 iter->sector_offset;
 
-        iter->ok = disk_read_lba(uint64_t(sector), lba, 9, 1);
+        iter->ok = disk_read_lba(uint64_t(sector), lba, log2_sector_sz, 1);
 
         if (!iter->ok)
             return -1;
@@ -207,7 +257,8 @@ static int sector_iterator_seek(
     uint32_t cluster;
     cluster = iter->clusters[cluster_index];
     uint32_t lba = lba_from_cluster(cluster);
-    iter->ok = disk_read_lba(uint64_t(sector), lba + cluster_offset, 9, 1);
+    iter->ok = disk_read_lba(uint64_t(sector), lba + cluster_offset, 
+                             log2_sector_sz, 1);
     if (!iter->ok)
         return -1;
 
@@ -665,8 +716,8 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     if (file < 0 || file >= MAX_HANDLES)
         return -1;
 
-    uint32_t sector_offset = ofs >> 9;
-    uint16_t byte_offset = ofs & ((1 << 9)-1);
+    uint32_t sector_offset = ofs >> log2_sector_sz;
+    uint16_t byte_offset = ofs & (sector_sz-1);
     
     int status = sector_iterator_seek(
                 file_handles + file,
@@ -685,7 +736,7 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         if (status == 0)
             return 0;
 
-        size_t limit = 512 - byte_offset;
+        size_t limit = sector_sz - byte_offset;
         if (limit > bytes)
             limit = bytes;
 
@@ -735,7 +786,7 @@ void fat32_boot_partition(uint64_t partition_lba)
     // 0x0E Usually 32
     PRINT(TSTR "reserved_sectors: %d", bpb.reserved_sectors);
 
-    // 0x0B Always 512
+    // 0x0B Always 512 (yeah, sure it is)
     PRINT(TSTR "bytes_per_sec:	  %d", bpb.bytes_per_sec);
 
     // 0x1FE Always 0xAA55

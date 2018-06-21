@@ -1,8 +1,11 @@
 array_list.cc
 array_list.h
+asmstruct.h
 assert.cc
 assert.h
 bioscall.S
+boot1.S
+boot1.ld
 bootcommon.S
 bootefi.cc
 bootefi.h

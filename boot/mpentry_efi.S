@@ -30,10 +30,10 @@ ap_entry:
     // Patch the linear address of the trampoline GDT into the trampoline GDTR
     //
 
-    // Calculate the cs-relative offset of ap_gdtr
-    movw $gdtr - ap_entry,%di
+    // Calculate the cs-relative offset of gdtr
+    movw $ gdtr - ap_entry,%di
 
-    // Calculate the linear address of ap_gdt
+    // Calculate the linear address of gdt
     leal gdt - ap_entry(%ebx),%ecx
 
     // Update the offset of the GDTR

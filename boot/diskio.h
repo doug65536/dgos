@@ -7,5 +7,8 @@ extern "C" uint32_t vbe_info_vector;
 
 bool disk_support_64bit_addr();
 
+int disk_sector_size();
+
 bool disk_read_lba(uint64_t addr, uint64_t lba,
                       uint8_t log2_sector_size, unsigned sector_count);
+

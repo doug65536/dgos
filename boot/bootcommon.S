@@ -1,7 +1,6 @@
 #include "gdt_sel.h"
 
 .section .text
-
 .code16
 
 // Inputs:
@@ -16,7 +15,7 @@ boot:
     push %esi
     push %ebx
 
-    // ebx:esi holds boot LBA
+    // esi:ebx holds boot LBA
     // edi holds boot function
     mov %eax,%ebx
     mov %edx,%esi
@@ -24,6 +23,9 @@ boot:
 
     call idt_init
     call check_a20
+    // Do need a20 toggles if A20 was off
+    xor $1,%al
+    movb %al,need_a20_toggle
 
     cli
     movl $gdt,2+gdtr
@@ -254,47 +256,55 @@ idt_init:
 
     ret
 
+// Returns true if a20 is on
 .global check_a20
 check_a20:
-    mov $0xFFFF,%ax
-    movw %ax,%fs
+    push %es
+              
+    // Setup es for wraparound
+    orl $ -1,%eax
+    movw %ax,%es
+              
+    // Zero ax
+    incl %eax
 
-    // Attempt to read boot sector signature through wraparound
-    movw %fs:entry + 0x1fe + 0x10,%ax
+    // a20_chk = wraparound(a20_chk) + 1
+    movb %es:a20_chk + 0x10,%al
+    incb %al
+    movb %al,a20_chk
 
-    // Read the boot sector signature without wraparound
-    movw entry + 0x1fe,%cx
-    cmp %ax,%cx
-    je 0f
+    // If wraparound(a20_chk) has not changed, a20 is on
+    decb %al
+    cmpb %al,%es:a20_chk + 0x10
+    sete %al
 
-    // A20 is on
-1:
-    movw $0,%ax
-    movw %ax,%fs
-    movw $0,need_a20_toggle
-    movw $1,%ax
+    pop %es
     ret
 
-0:
-    // They were the same value! Change the boot sector signature
+.code32
+// Wait for the a20 line to be in the specified state
+//  %al = 1 to expect on, 0 to expect off
+.global wait_a20
+wait_a20:
+    movb %al,%dl
 
-    notw entry + 0x1fe
-    wbinvd
-
-    // Attempt to read boot sector signature through wraparound again
-    movw %fs:entry + 0x1fe + 0x10,%ax
-
-    cmp %ax,%cx
-    jne 1b
-
-    // A20 is off
-    movw $0,%ax
-    movw %ax,%fs
-    movw $1,need_a20_toggle
-    movw $0,%ax
+    // a20_chk = wraparound(a20_chk) + 1
+0:  movb a20_chk + 0x100000,%al
+    incb %al
+    movb %al,a20_chk
+    
+    // If wraparound(a20_chk) has not changed, a20 is on
+    decb %al
+    cmpb %al,a20_chk + 0x100000
+    sete %al
+    cmp %al,%dl
+              
+    // Statically predict equal
+    jne 1f
     ret
-
+1:  jmp 0b
 .code16
+
 .section .early
 
 .global clear_bss
@@ -312,14 +322,7 @@ clear_bss:
     popw %ax
     popw %cx
     popw %di
-    ret
-
-.section .parttab
-.space 16*4
-.word 0xAA55
-
-.global first_sector_end
-first_sector_end:
-
-.code32
-.section .text
+    ret              
+              
+.section .bss
+a20_chk: .space 1

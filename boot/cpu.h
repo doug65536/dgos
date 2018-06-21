@@ -114,7 +114,8 @@ struct idt_entry_64_t {
 
 extern "C" void cpu_a20_enterpm();
 extern "C" void cpu_a20_exitpm();
-extern "C" bool toggle_a20(uint8_t enable);
+extern "C" bool toggle_a20(bool enabled);
+extern "C" void wait_a20(bool enabled);
 
 static __always_inline void outb(uint16_t dx, uint8_t al)
 {

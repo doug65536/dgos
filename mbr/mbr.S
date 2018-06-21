@@ -1,83 +1,29 @@
 .code16
 
-# ----------------------------------------------------------------------
-# ptbl_ent
-.struct 0
-ptbl_ent_start:
-ptbl_ent_bootflag:
-	.struct ptbl_ent_bootflag + 1
-ptbl_ent_sthead:
-	.struct ptbl_ent_sthead + 1
-ptbl_ent_stseccyl:
-	.struct ptbl_ent_stseccyl + 2
-ptbl_ent_sysid:
-	.struct ptbl_ent_sysid + 1
-ptbl_ent_enhead:
-	.struct ptbl_ent_enhead + 1
-ptbl_ent_enseccyl:
-	.struct ptbl_ent_enseccyl + 2
-ptbl_ent_stsec:
-	.struct ptbl_ent_stsec + 4
-ptbl_ent_numsec:
-	.struct ptbl_ent_numsec + 4
-ptbl_ent_end:
-ptbl_ent_length = ptbl_ent_end - ptbl_ent_start
+#include "../boot/ptbl.h"
+#include "../boot/dap.h"
 
-# ----------------------------------------------------------------------
-# dap
+#define UNRELOCATED(n) n+0x7C00-0x600
 
-.struct 0
-dap_start:
-dap_sizeof_packet:
-	.struct dap_sizeof_packet + 1
-dap_reserved:
-	.struct dap_reserved + 1
-dap_block_count:
-	.struct dap_block_count + 2
-dap_address:
-	.struct dap_address + 4
-dap_lba:
-	.struct dap_lba + 8
-dap_end:
-dap_length = dap_end - dap_start
+// BIOS calls this code with:
+//  DL = boot drive
+//  ES:DI -> PnP installation check stucture
+//
+// If the OS fails to boot, it should invoke INT 0x18
 
 .text
 
 # ----------------------------------------------------------------------
 .globl entry
 entry:
-	ljmp $0,$entry_start+(0x7c00-0x600)
-
-#
-# CDROM boot requires this space to be allocated in the boot sector
-# The CD mastering tool populates it with information
-#
-
-.globl bootinfo_primary_volume_desc
-bootinfo_primary_volume_desc:
-	.space 4
-
-.globl bootinfo_file_location
-bootinfo_file_location:
-	.space 4
-
-.globl bootinfo_file_length
-bootinfo_file_length:
-	.space 4
-
-.globl bootinfo_checksum
-bootinfo_checksum:
-	.space 4
-
-.globl bootinfo_reserved
-bootinfo_reserved:
-	.space 10*4
+	ljmp $0,$ UNRELOCATED(entry_start)
 
 init_stack:
 	.int 0x0000FFF8
 
 # ----------------------------------------------------------------------
 # The bootstrap code starts here
+.align 64
 .globl entry_start
 entry_start:
 	# Incoming registers:
@@ -86,12 +32,15 @@ entry_start:
 	xorw %ax,%ax
 	movw %ax,%ds
 	movw %ax,%es
+	
+// hang and wait for gdb
+//0:
+//	test %ax,%ax
+//	jz 0b
 
 	# Initialize stack to top of first 64KB
-	cli
 	movw init_stack-0x600+0x7c00+2,%ss
 	movw init_stack-0x600+0x7c00,%sp
-	sti
 
 	# Relocate to 0x600
 	movw $0x7c00,%si
@@ -99,7 +48,7 @@ entry_start:
 	movw $256,%cx
 	cld
 	rep movsw
-	ljmp $0,$relocated_entry
+	ljmpw $ 0,$ relocated_entry
 relocated_entry:
 
 	# Search for first bootable partition
@@ -110,7 +59,7 @@ relocated_entry:
 	je found_partition
 bad_signature:
 	addw $ptbl_ent_length,%si
-	dec %cx
+	decw %cx
 	jnz 0b
 	jmp no_active_partition
 
@@ -118,14 +67,17 @@ dap:
 	.byte dap_length
 	.byte 0
 	.word 1
-	.long 0x7c00
+	.word 0x7c00
+	.word 0x0000
 	.quad 0
 
 found_partition:
 	pushw %si
-	movl ptbl_ent_stsec(%si),%ecx
+	movw ptbl_ent_stsec(%si),%cx
+	movw ptbl_ent_stsec+2(%si),%ax
 	movw $dap,%si
-	movl %ecx,dap_lba(%si)
+	movw %cx,dap_lba(%si)
+	movw %ax,dap_lba+2(%si)
 	movw $0x4200,%ax
 	int $0x13
 	jc disk_error

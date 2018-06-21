@@ -4,34 +4,27 @@ SECTIONS {
 	.text 0x1000 : AT(0x1000) {
 		___initialized_data_st = .;
 		*(.head)
-
-		. = 0x5C;
 		*(.early)
 
-		. = 0x1BE;
-		*(.parttab)
-
-		/* Reserve 512 bytes for FS Information sector */
-		. = 0x400;
-
+		/* --- additional sectors --- */
+		*(.text)
+		*(.text.*)
+		*(.text.unlikely)
+		
+		. = ALIGN(4);
 		___ctors_st = .;
 		*(.ctors)
 		*(.ctors.*)
 		*(.init_array)
 		*(SORT(.init_array.*))
 		___ctors_en = .;
-
+		
 		___dtors_st = .;
 		*(.dtors)
 		*(.dtors.*)
 		*(.fini_array)
 		*(SORT(.fini_array.*))
 		___dtors_en = .;
-
-		/* --- additional sectors --- */
-		*(.text)
-		*(.text.*)
-		*(.text.unlikely)
 
 		/* Place 64 bit code high enough to be outside first 4KB */
 		*(.text.code64)
@@ -67,7 +60,7 @@ SECTIONS {
 	}
 
 	___initial_stack_limit = .;
-	. = ABSOLUTE(0xFFF0);
+	. = ABSOLUTE(0xF000);
 	___initial_stack = .;
 	___heap_st = .;
 	___end = .;
