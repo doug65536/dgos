@@ -11332,7 +11332,7 @@ debug-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
 		kernel-generic.sym kernel-bmi.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-bios-debugger-kernel-commands
+		$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands
 	$(BOCHS) \
 		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
 		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands \
