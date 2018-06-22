@@ -12,7 +12,7 @@ struct tcp_hdr_t {
     uint16_t window;
     uint16_t checksum;
     uint16_t urgent;
-} __packed;
+} _packed;
 
 #define TCP_FLAGS_FIN_BIT       0
 #define TCP_FLAGS_SYN_BIT       1

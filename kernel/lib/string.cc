@@ -242,7 +242,7 @@ void clear64(void *dest, size_t n)
     __builtin_ia32_sfence();
 }
 
-static __always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
+static _always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
 {
     uint32_t eax;
     __asm__ __volatile__(
@@ -257,7 +257,7 @@ static __always_inline void memcpy_byte(char *d, char const *s, uint32_t &ofs)
     );
 }
 
-static __always_inline void memcpy64(char *&d, char const *&s, size_t count)
+static _always_inline void memcpy64(char *&d, char const *&s, size_t count)
 {
     __asm__ __volatile__ (
         "rep movsq\n\t"
@@ -345,7 +345,7 @@ EXPORT void *memcpy(void *dest, void const *src, size_t n)
     return dest;
 }
 
-static __always_inline void memcpy_byte_reverse(
+static _always_inline void memcpy_byte_reverse(
         char *d, char const *s, size_t &count)
 {
     uint32_t eax;
@@ -361,7 +361,7 @@ static __always_inline void memcpy_byte_reverse(
     );
 }
 
-static __always_inline void memcpy64_reverse(
+static _always_inline void memcpy64_reverse(
         char *&d, char const *&s, size_t count)
 {
     __asm__ __volatile__ (
@@ -376,7 +376,7 @@ static __always_inline void memcpy64_reverse(
     );
 }
 
-static __always_inline void memcpy_reverse(
+static _always_inline void memcpy_reverse(
         void *dest, void const *src, size_t n)
 {
 #if USE_REP_STRING

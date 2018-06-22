@@ -59,7 +59,7 @@ struct disk_drive_parameters_t {
     uint64_t dev_path;
     uint8_t reserved3;
     uint8_t dpi_checksum;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(disk_drive_parameters_t) == 66);
 
@@ -89,12 +89,12 @@ struct disk_address_packet_t {
     uint16_t block_count;
     uint32_t segoff;
     uint64_t lba;
-} __packed;
+} _packed;
 
 struct disk_address_packet_64_t {
     disk_address_packet_t hdr;
     uint64_t address;
-} __packed;
+} _packed;
 
 static bool disk_read_lba_bouncebuffer(
         uint64_t addr, uint64_t lba,

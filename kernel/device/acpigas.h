@@ -11,7 +11,7 @@ struct acpi_gas_t {
     uint8_t access_size;
     uint32_t addr_lo;
     uint32_t addr_hi;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_gas_t) == 12);
 

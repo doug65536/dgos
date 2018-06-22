@@ -4,7 +4,7 @@
 #include "malloc.h"
 #include "assert.h"
 
-extern "C" __noreturn void code64_run_kernel(
+extern "C" _noreturn void code64_run_kernel(
         uint64_t entry, void *params, uint64_t cr3, bool nx_available);
 extern char code64_run_kernel_end[];
 

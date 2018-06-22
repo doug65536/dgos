@@ -91,43 +91,43 @@ public:
             ptr->releaseref();
     }
 
-    __always_inline
+    _always_inline
     explicit operator T const*() const
     {
         return ptr;
     }
 
-    __always_inline
+    _always_inline
     explicit operator T*()
     {
         return ptr;
     }
 
-    __always_inline
+    _always_inline
     T* get()
     {
         return ptr;
     }
 
-    __always_inline
+    _always_inline
     T const* get() const
     {
         return ptr;
     }
 
-    __always_inline
+    _always_inline
     T* operator ->()
     {
         return ptr;
     }
 
-    __always_inline
+    _always_inline
     T const* operator ->() const
     {
         return ptr;
     }
 
-    __always_inline
+    _always_inline
     operator bool() const
     {
         return ptr != nullptr;
@@ -140,7 +140,7 @@ private:
 template<typename T>
 class refcounted {
 public:
-    __always_inline
+    _always_inline
     void addref()
     {
         atomic_inc(&refcount);
@@ -153,13 +153,13 @@ public:
     }
 
 protected:
-    __always_inline
+    _always_inline
     refcounted()
         : refcount(0)
     {
     }
 
-    __always_inline
+    _always_inline
     ~refcounted()
     {
         assert(refcount == 0);

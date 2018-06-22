@@ -1,13 +1,13 @@
 #include "malloc.h"
 #include "ctors.h"
 
-static __pure uintptr_t get_top_of_low_memory() {
+static _pure uintptr_t get_top_of_low_memory() {
     // Read top of memory from BIOS data area
     return *(uint16_t*)0x40E << 4;
 }
 
 extern "C" char ___heap_st[];
-__constructor(ctor_malloc) void malloc_init_auto()
+_constructor(ctor_malloc) void malloc_init_auto()
 {
     // Memory map
     //

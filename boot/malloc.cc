@@ -37,25 +37,25 @@ struct blk_hdr_t {
     uint32_t neg_size;
     uint32_t self;
 
-    __always_inline bool invalid() const
+    _always_inline bool invalid() const
     {
         return size + neg_size ||
                 uint32_t(intptr_t(self)) != uint32_t(intptr_t(this));
     }
 
-    __always_inline void make_invalid()
+    _always_inline void make_invalid()
     {
         self = uint32_t(uintptr_t(nullptr));
         size = 0xBAD11111;
         neg_size = 0;
     }
 
-    __always_inline void make_valid()
+    _always_inline void make_valid()
     {
         self = uint32_t(intptr_t(this));
     }
 
-    __always_inline void set_size(uint32_t new_size)
+    _always_inline void set_size(uint32_t new_size)
     {
         size = new_size;
         neg_size = -new_size;
@@ -92,7 +92,7 @@ static blk_hdr_t *next_blk(blk_hdr_t *blk)
     return (blk_hdr_t*)(uintptr_t(blk) + blk->size);
 }
 
-__noreturn void malloc_panic()
+_noreturn void malloc_panic()
 {
     PANIC("Corrupt heap block header!");
 }
@@ -115,7 +115,7 @@ static blk_hdr_t *malloc_coalesce(blk_hdr_t *blk, blk_hdr_t *next)
     return next;
 }
 
-void __aligned(16) *malloc(size_t bytes)
+void _aligned(16) *malloc(size_t bytes)
 {
     return malloc_aligned(bytes, 16);
 }
@@ -367,7 +367,7 @@ void *operator new(size_t size) noexcept
     return malloc(size);
 }
 
-__const
+_const
 void *operator new(size_t, void *p) noexcept
 {
     return p;

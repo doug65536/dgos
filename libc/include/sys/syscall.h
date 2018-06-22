@@ -19,7 +19,7 @@ extern long syscall2(long p0, long p1, long num);
 extern long syscall1(long p0, long num);
 extern long syscall0(long num);
 
-static __always_inline long syscallv(long number, va_list ap)
+static _always_inline long syscallv(long number, va_list ap)
 {
     long p0 = va_arg(ap, long);
     long p1 = va_arg(ap, long);
@@ -30,7 +30,7 @@ static __always_inline long syscallv(long number, va_list ap)
     return syscall6(p0, p1, p2, p3, p4, p5, number);
 }
 
-static __always_inline long syscalln(int number, ...)
+static _always_inline long syscalln(int number, ...)
 {
     va_list ap;
     va_start(ap, number);
@@ -42,40 +42,40 @@ static __always_inline long syscalln(int number, ...)
 __END_DECLS
 
 #if 0 //def __cplusplus
-static __always_inline long syscall(long p0, long p1, long p2, long p3,
+static _always_inline long syscall(long p0, long p1, long p2, long p3,
                      long p4, long p5, long num)
 {
     return syscall6(p0, p1, p2, p3, p4, p5, num);
 }
 
-static __always_inline long syscall(long p0, long p1, long p2, long p3,
+static _always_inline long syscall(long p0, long p1, long p2, long p3,
                      long p4, long num)
 {
     return syscall5(p0, p1, p2, p3, p4, num);
 }
 
-static __always_inline long syscall(long p0, long p1, long p2, long p3,
+static _always_inline long syscall(long p0, long p1, long p2, long p3,
                      long num)
 {
     return syscall4(p0, p1, p2, p3, num);
 }
 
-static __always_inline long syscall(long p0, long p1, long p2, long num)
+static _always_inline long syscall(long p0, long p1, long p2, long num)
 {
     return syscall3(p0, p1, p2, num);
 }
 
-static __always_inline long syscall(long p0, long p1, long num)
+static _always_inline long syscall(long p0, long p1, long num)
 {
     return syscall2(p0, p1, num);
 }
 
-static __always_inline long syscall(long p0, long num)
+static _always_inline long syscall(long p0, long num)
 {
     return syscall1(p0, num);
 }
 
-static __always_inline long syscall(long num)
+static _always_inline long syscall(long num)
 {
     return syscall0(num);
 }

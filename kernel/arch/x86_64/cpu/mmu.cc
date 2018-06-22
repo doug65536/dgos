@@ -394,7 +394,7 @@ public:
     // Take multiple pages and receive each physical address in callback
     // Returns false with no memory allocated on failure
     template<typename F>
-    bool __always_inline alloc_multiple(bool low, size_t size, F callback);
+    bool _always_inline alloc_multiple(bool low, size_t size, F callback);
 
     void release_one(physaddr_t addr);
 
@@ -438,17 +438,17 @@ public:
     };
 
 private:
-    __always_inline size_t index_from_addr(physaddr_t addr) const
+    _always_inline size_t index_from_addr(physaddr_t addr) const
     {
         return (addr - begin) >> log2_pagesz;
     }
 
-    __always_inline physaddr_t addr_from_index(size_t index) const
+    _always_inline physaddr_t addr_from_index(size_t index) const
     {
         return (index << log2_pagesz) + begin;
     }
 
-    __always_inline void release_one_locked(physaddr_t addr)
+    _always_inline void release_one_locked(physaddr_t addr)
     {
         size_t index = index_from_addr(addr);
         unsigned low = addr < 0x100000000;
@@ -560,7 +560,7 @@ static physaddr_t mmu_alloc_phys(int low)
 //
 // Path to PTE
 
-static __always_inline void path_from_addr(unsigned *path, linaddr_t addr)
+static _always_inline void path_from_addr(unsigned *path, linaddr_t addr)
 {
     path[3] = (addr >>= 12) & 0x1FF;
     path[2] = (addr >>= 9) & 0x1FF;
@@ -583,7 +583,7 @@ static int ptes_present(pte_t **ptes)
     return present_mask;
 }
 
-static __always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
+static _always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
 {
     addr &= 0xFFFFFFFFF000U;
     addr >>= 12;
@@ -597,7 +597,7 @@ static __always_inline void ptes_from_addr(pte_t **pte, linaddr_t addr)
 }
 
 // Returns the linear addresses of the page tables for the given path
-static __always_inline void ptes_from_path(pte_t **pte, unsigned *path)
+static _always_inline void ptes_from_path(pte_t **pte, unsigned *path)
 {
     uintptr_t page_index =
             (((uintptr_t)path[0]) << (9 * 3)) +
@@ -632,7 +632,7 @@ static int addr_present(uintptr_t addr,
 }
 
 // Returns linear page index (addr>>12) represented by the specified path
-static __always_inline uintptr_t path_inc(unsigned *path)
+static _always_inline uintptr_t path_inc(unsigned *path)
 {
     // Branchless algorithm
 
@@ -653,7 +653,7 @@ static __always_inline uintptr_t path_inc(unsigned *path)
 }
 
 // Returns present mask for new page
-static __always_inline int path_inc(unsigned *path, pte_t **ptes)
+static _always_inline int path_inc(unsigned *path, pte_t **ptes)
 {
     uintptr_t n = path_inc(path);
 
@@ -672,7 +672,7 @@ static void mmu_mem_map_swap(physmem_range_t *a, physmem_range_t *b)
     *b = temp;
 }
 
-__used
+_used
 static int ptes_leaf_level(pte_t const **ptes)
 {
     pte_t constexpr present_large = PTE_PRESENT | PTE_PAGESIZE;
@@ -1984,7 +1984,7 @@ void contiguous_allocator_t::dump(const char *format, ...)
 }
 
 // Returns the present mask for the new page
-static __always_inline int ptes_step(pte_t **ptes)
+static _always_inline int ptes_step(pte_t **ptes)
 {
     ++ptes[3];
     if (unlikely(!(uintptr_t(ptes[3]) & 0xFF8))) {
@@ -2005,7 +2005,7 @@ static __always_inline int ptes_step(pte_t **ptes)
 // Returns number of last level PTEs to skip forward
 // to get to next entry at the lowest level that is not present
 // Makes sense when we are at a 4KB or 2MB or 1GB or 512GB boundary
-static __always_inline ptrdiff_t ptes_mask_skip(int present_mask)
+static _always_inline ptrdiff_t ptes_mask_skip(int present_mask)
 {
     // See if we need to advance 512GB
     if (unlikely(!(present_mask & 1)))
@@ -2025,7 +2025,7 @@ static __always_inline ptrdiff_t ptes_mask_skip(int present_mask)
 
 // Returns true at 2MB boundaries,
 // which indicates that the present mask needs to be checked
-static __always_inline bool ptes_advance(pte_t **ptes, ptrdiff_t distance)
+static _always_inline bool ptes_advance(pte_t **ptes, ptrdiff_t distance)
 {
     size_t page_index = (ptes[3] - PT3_PTR) + distance;
     ptes[3] += distance;
@@ -2139,13 +2139,13 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 }
 
 template<typename T>
-static __always_inline T zero_if_false(bool cond, T bits)
+static _always_inline T zero_if_false(bool cond, T bits)
 {
     return bits & -cond;
 }
 
 template<typename T>
-static __always_inline T select_mask(bool cond, T true_val, T false_val)
+static _always_inline T select_mask(bool cond, T true_val, T false_val)
 {
     T mask = -cond;
     return (true_val & mask) | (false_val & ~mask);
@@ -2831,7 +2831,7 @@ uintptr_t mphysaddr(void volatile *addr)
     return (pte & PTE_ADDR) + misalignment;
 }
 
-static __always_inline int mphysranges_enum(
+static _always_inline int mphysranges_enum(
         void *addr, size_t size,
         int (*callback)(mmphysrange_t, void*),
         void *context)
@@ -2877,7 +2877,7 @@ struct mphysranges_state_t {
     mmphysrange_t cur_range;
 };
 
-static __always_inline int mphysranges_callback(
+static _always_inline int mphysranges_callback(
         mmphysrange_t range, void *context)
 {
     mphysranges_state_t *state = (mphysranges_state_t *)context;

@@ -500,12 +500,12 @@ public:
     {
     }
 
-    __always_inline void lock()
+    _always_inline void lock()
     {
         spinlock_lock_restore(spinlock, saved_lock);
     }
 
-    __always_inline void unlock()
+    _always_inline void unlock()
     {
         saved_lock = spinlock_unlock_save(spinlock);
     }
@@ -522,12 +522,12 @@ public:
     {
     }
 
-    __always_inline void lock()
+    _always_inline void lock()
     {
         ticketlock_lock_restore(ticketlock, saved_lock);
     }
 
-    __always_inline void unlock()
+    _always_inline void unlock()
     {
         saved_lock = ticketlock_unlock_save(ticketlock);
     }
@@ -545,12 +545,12 @@ public:
     {
     }
 
-    __always_inline void lock()
+    _always_inline void lock()
     {
         mcslock_lock_nodis(root, node);
     }
 
-    __always_inline void unlock()
+    _always_inline void unlock()
     {
         mcslock_unlock_noena(root, node);
     }
@@ -567,12 +567,12 @@ public:
     {
     }
 
-    __always_inline void lock()
+    _always_inline void lock()
     {
         mutex_lock(mutex);
     }
 
-    __always_inline void unlock()
+    _always_inline void unlock()
     {
         mutex_unlock(mutex);
     }
@@ -587,7 +587,7 @@ struct condvar_mutex_noyield_t : public condvar_mutex_t {
     {
     }
 
-    __always_inline void lock()
+    _always_inline void lock()
     {
         mutex_lock_noyield(mutex);
     }

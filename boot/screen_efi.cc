@@ -14,7 +14,7 @@ static EFI_GUID efi_simple_text_output_protocol_guid = {
 
 static EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *efi_simple_text_output;
 
-__constructor(ctor_console) void conout_init()
+_constructor(ctor_console) void conout_init()
 {
     EFI_STATUS status;
 

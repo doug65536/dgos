@@ -322,29 +322,29 @@ protected:
 
     virtual isr_context_t *port_irq_handler(isr_context_t *ctx);
 
-    __always_inline void out(port_t ofs, uint8_t value) const;
-    __always_inline void outs(port_t ofs, const void *value, size_t len) const;
+    _always_inline void out(port_t ofs, uint8_t value) const;
+    _always_inline void outs(port_t ofs, const void *value, size_t len) const;
 
     template<typename T>
-    __always_inline void outp(T const& reg)
+    _always_inline void outp(T const& reg)
     {
         out(reg_t<T>::ofs, reg.value);
     }
 
-    __always_inline uint8_t in(port_t ofs)
+    _always_inline uint8_t in(port_t ofs)
     {
         return inb(io_base + ioport_t(ofs));
     }
 
     template<typename T>
-    __always_inline T inp(T& reg)
+    _always_inline T inp(T& reg)
     {
         reg.value = in(reg_t<T>::ofs);
         return reg;
     }
 
     __const
-    __always_inline uint16_t queue_next(
+    _always_inline uint16_t queue_next(
             uint16_t value, uint8_t log2_buffer_size) const
     {
         return (value + 1) & ~-(1 << log2_buffer_size);
@@ -648,12 +648,12 @@ private:
     bool is_rx_full() const;
     bool is_tx_full() const;
 
-    __always_inline bool is_tx_empty() const
+    _always_inline bool is_tx_empty() const
     {
         return tx_head == tx_tail;
     }
 
-    __always_inline bool is_rx_empty() const
+    _always_inline bool is_rx_empty() const
     {
         return rx_head == rx_tail;
     }
@@ -943,7 +943,7 @@ public:
 private:
     bool is_rx_full() const;
 
-    __always_inline bool is_rx_empty() const
+    _always_inline bool is_rx_empty() const
     {
         return rx_tail == rx_head;
     }

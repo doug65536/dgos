@@ -2,7 +2,7 @@
 #include "ctors.h"
 #include "bootefi.h"
 
-__constructor(ctor_malloc) void malloc_init_auto()
+_constructor(ctor_malloc) void malloc_init_auto()
 {
     EFI_STATUS status;
 

@@ -28,7 +28,7 @@ struct partition_tbl_ent_t {
 
     uint32_t start_lba;
     uint32_t total_sectors;
-} __packed;
+} _packed;
 
 struct mbr_part_factory_t : public part_factory_t {
     mbr_part_factory_t() : part_factory_t("mbr") {}

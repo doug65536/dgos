@@ -2,21 +2,21 @@
 
 #include "types.h"
 
-__use_result __malloc __leaf
+_use_result _malloc _leaf
 void *malloc(size_t bytes);
 
-__use_result __malloc __leaf
+_use_result _malloc _leaf
 void *calloc(unsigned num, unsigned size);
 
 void free(void *p);
 
-__use_result __malloc __alloc_align(1) __leaf
+_use_result _malloc _alloc_align(1) _leaf
 void *malloc_aligned(size_t bytes, size_t alignment);
 
-__use_result __malloc __leaf
+_use_result _malloc _leaf
 void *realloc(void *p, size_t bytes);
 
-__use_result __malloc __alloc_align(1)
+_use_result _malloc _alloc_align(1)
 void *realloc_aligned(void *p, size_t bytes, size_t alignment);
 
 bool malloc_validate();

@@ -1,7 +1,7 @@
 #include "assert.h"
 #include "screen.h"
 
-__noinline void cpu_debug_break()
+_noinline void cpu_debug_break()
 {
 }
 

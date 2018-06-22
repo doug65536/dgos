@@ -215,7 +215,7 @@ class ext4_fs_t final : public fs_base_t {
         le32 s_overhead_blocks;
         le32 s_reserved[108];
         le32 s_checksum;
-    } __packed;
+    } _packed;
 
     C_ASSERT(offsetof(superblock_t, s_default_mount_opts) == 0x100);
     C_ASSERT(offsetof(superblock_t, s_snapshot_inum) == 0x180);

@@ -2,15 +2,15 @@
 
 #include "types.h"
 
-__pure size_t strlen(char const *src);
-__pure size_t strlen(char16_t const *src);
-__pure void *memchr(void const *mem, int ch, size_t count);
-__pure void *strchr(tchar const *s, int ch);
+_pure size_t strlen(char const *src);
+_pure size_t strlen(char16_t const *src);
+_pure void *memchr(void const *mem, int ch, size_t count);
+_pure void *strchr(tchar const *s, int ch);
 
-__pure int strcmp(tchar const *lhs, tchar const *rhs);
-__pure int strncmp(tchar const *lhs, tchar const *rhs, size_t count);
-__pure int memcmp(void const *lhs, void const *rhs, size_t count);
-__pure char *strstr(tchar const *str, tchar const *substr);
+_pure int strcmp(tchar const *lhs, tchar const *rhs);
+_pure int strncmp(tchar const *lhs, tchar const *rhs, size_t count);
+_pure int memcmp(void const *lhs, void const *rhs, size_t count);
+_pure char *strstr(tchar const *str, tchar const *substr);
 
 void *memset(void *dest, int c, size_t n);
 void *memcpy(void *dest, void const *src, size_t n);

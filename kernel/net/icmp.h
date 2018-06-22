@@ -7,7 +7,7 @@ struct icmp_hdr_t {
     uint8_t type;
     uint8_t code;
     uint16_t checksum;
-} __packed;
+} _packed;
 
 // Echo reply
 #define ICMP_TYPE_ECHO_REPLY    0

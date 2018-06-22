@@ -461,7 +461,7 @@ extern void isr_entry_253(void);
 extern void isr_entry_254(void);
 extern void isr_entry_255(void);
 
-__noreturn
+_noreturn
 void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 
 void isr_save_fpu_ctx(isr_context_t *outgoing_ctx);

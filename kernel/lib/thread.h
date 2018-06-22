@@ -63,7 +63,7 @@ void thread_shootdown_notify();
 void thread_set_error(errno_t errno);
 errno_t thread_get_error();
 
-__noreturn
+_noreturn
 void thread_idle();
 
 __END_DECLS

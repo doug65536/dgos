@@ -127,7 +127,7 @@ static EFIAPI VOID efi_timer_callback(EFI_EVENT Event, VOID *Context)
     systime_counter.pre_inc();
 }
 
-__constructor(ctor_console) void conin_init()
+_constructor(ctor_console) void conin_init()
 {
     EFI_STATUS status;
 

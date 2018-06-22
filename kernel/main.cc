@@ -41,7 +41,7 @@
 kernel_params_t *kernel_params;
 
 size_t constexpr kernel_stack_size = 16384;
-char kernel_stack[kernel_stack_size] __section(".bspstk");
+char kernel_stack[kernel_stack_size] _section(".bspstk");
 
 static void smp_main(void*)
 {
@@ -905,7 +905,7 @@ int debugger_thread(void *)
     return 0;
 }
 
-extern "C" __noreturn int main(void)
+extern "C" _noreturn int main(void)
 {
     if (!kernel_params->wait_gdb)
         thread_create(init_thread, 0, 0, false);
@@ -919,7 +919,7 @@ extern "C" __noreturn int main(void)
     thread_idle();
 }
 
-extern "C" __noreturn void mp_main()
+extern "C" _noreturn void mp_main()
 {
     cpu_init_early(1);
 

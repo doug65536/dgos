@@ -19,7 +19,7 @@ protected:
     {
     }
 
-    __always_inline
+    _always_inline
     value_type mask_shift(value_type old, value_type value) const
     {
         return (old & ~mask) | ((value & mask) << bit);

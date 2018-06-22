@@ -4,7 +4,7 @@
 #include "string.h"
 
 template<typename _T>
-__always_inline
+_always_inline
 constexpr _T&&
 forward(typename remove_reference<_T>::type& __t) noexcept
 {
@@ -12,7 +12,7 @@ forward(typename remove_reference<_T>::type& __t) noexcept
 }
 
 template<typename _T>
-__always_inline
+_always_inline
 constexpr _T&&
 forward(typename remove_reference<_T>::type&& __t) noexcept
 {
@@ -21,7 +21,7 @@ forward(typename remove_reference<_T>::type&& __t) noexcept
 }
 
 template<typename _T>
-__always_inline
+_always_inline
 constexpr typename remove_reference<_T>::type&&
 move(_T&& __t) noexcept
 {

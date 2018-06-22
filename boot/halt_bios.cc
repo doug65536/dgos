@@ -1,6 +1,6 @@
 #include "halt.h"
 
-extern "C" __noreturn void panic(tchar const *s)
+extern "C" _noreturn void panic(tchar const *s)
 {
     uint16_t *screen = (uint16_t*)0xB8000;
     while (*s)

@@ -13,7 +13,7 @@ EFI_SYSTEM_TABLE *efi_systab;
 #if 1
 #include "fs.h"
 
-int x __used;
+int x _used;
 
 static UINTN efi_num_filesys_handles;
 static EFI_HANDLE *efi_filesys_handles;
@@ -147,7 +147,7 @@ extern "C" void halt(tchar const *s)
 }
 
 // Register EFI filesystem shim
-__constructor(ctor_fs) void register_efi_fs()
+_constructor(ctor_fs) void register_efi_fs()
 {
     EFI_STATUS status;
 

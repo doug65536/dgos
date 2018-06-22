@@ -76,7 +76,7 @@ public:
 
 private:
     uint64_t addr;
-} __packed;
+} _packed;
 
 struct alignas(8) kernel_params_t {
     uint64_t size;
@@ -92,7 +92,7 @@ struct alignas(8) kernel_params_t {
     uint8_t wait_gdb;
     uint8_t serial_debugout;
     uint8_t reserved[6];
-} __packed;
+} _packed;
 
 // Ensure that all of the architectures have the same layout
 C_ASSERT(sizeof(kernel_params_t) == 12 * 8 + 2 + 6);

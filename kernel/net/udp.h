@@ -7,7 +7,7 @@ struct udp_hdr_t {
     uint16_t d_port;
     uint16_t len;
     uint16_t checksum;
-} __packed;
+} _packed;
 
 uint16_t udp_checksum(const udp_hdr_t *hdr);
 

@@ -31,4 +31,4 @@ struct arp_packet_t {
 
     // Target IPv4 address
     uint8_t target_ip[4];
-} __packed;
+} _packed;

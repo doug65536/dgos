@@ -126,7 +126,7 @@ struct usb_desc_hdr_t {
 
     // USB_DESCTYPE_*
     usb_desctype_t desc_type;
-} __packed;
+} _packed;
 
 struct usb_desc_device {
     usb_desc_hdr_t hdr;
@@ -154,7 +154,7 @@ struct usb_desc_device {
 
     // Number of possible configurations
     uint8_t num_config;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(usb_desc_device) == 18);
 
@@ -170,7 +170,7 @@ struct usb_desc_config {
     uint8_t cfg;
     uint8_t attr;
     uint8_t max_power;
-} __packed;
+} _packed;
 
 //
 // Interface descriptor
@@ -185,7 +185,7 @@ struct usb_desc_iface {
     uint8_t iface_subclass;
     uint8_t iface_proto;
     uint8_t iface_index;
-} __packed;
+} _packed;
 
 //
 // Endpoint descriptor
@@ -255,7 +255,7 @@ struct usb_desc_ep {
     usb_ep_attr ep_attr;
     uint16_t max_packet_sz;
     uint8_t interval;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(usb_desc_ep) == 7);
 
@@ -263,7 +263,7 @@ struct usb_desc_ep_companion {
     usb_desc_hdr_t hdr;
 
     uint8_t max_burst;
-} __packed;
+} _packed;
 
 // Binary device object store (BOS)
 struct usb_desc_bos {
@@ -271,7 +271,7 @@ struct usb_desc_bos {
 
     uint16_t total_len;
     uint8_t num_device_caps;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(usb_desc_bos) == 5);
 
@@ -293,7 +293,7 @@ enum struct usb_dev_cap_type : uint8_t {
 struct usb_dev_cap_hdr_t {
     usb_desc_hdr_t hdr;
     usb_dev_cap_type cap_type;
-} __packed;
+} _packed;
 
 template<usb_dev_cap_type cap_type>
 struct usb_dev_cap
@@ -312,7 +312,7 @@ struct usb_dev_cap<usb_dev_cap_type::superspeed_usb>
         uint8_t func_support;       // minimum speed supported
         uint8_t u1_dev_exit_lat;
         uint16_t u2_dev_exit_lat;
-    } __packed;
+    } _packed;
 };
 
 // 9.6.2.2
@@ -322,7 +322,7 @@ struct usb_dev_cap<usb_dev_cap_type::usb2ext>
     struct pod {
         usb_dev_cap_hdr_t hdr;
         uint8_t attr;
-    } __packed;
+    } _packed;
 };
 
 // 9.6.2.3
@@ -331,7 +331,7 @@ struct usb_dev_cap<usb_dev_cap_type::container_id>
 {
     struct pod {
         usb_dev_cap_hdr_t hdr;
-    } __packed;
+    } _packed;
 };
 
 // 9.6.2.4
@@ -343,7 +343,7 @@ struct usb_dev_cap<usb_dev_cap_type::platform>
         uint8_t reserved;
         uint8_t uuid[16];
         // Followed by variable length platform specific data
-    } __packed;
+    } _packed;
 };
 
 // 9.6.2.5
@@ -358,7 +358,7 @@ struct usb_dev_cap<usb_dev_cap_type::superspeed_plus>
         uint16_t reserved2;
         uint32_t sublink_speed_attr;
         // Followed by variable number of additional sublink speed attributes
-    } __packed;
+    } _packed;
 };
 
 // 9.5.2.6
@@ -367,7 +367,7 @@ struct usb_dev_cap<usb_dev_cap_type::precision_time_meas>
 {
     struct pod {
         usb_dev_cap_hdr_t hdr;
-    } __packed;
+    } _packed;
 };
 
 class usb_config_helper {
@@ -421,7 +421,7 @@ struct usb_hub_desc {
     uint8_t hdr_decode_lat;
     uint16_t hub_delay;
     uint16_t removable;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(usb_hub_desc) == 12);
 
@@ -436,6 +436,6 @@ struct usb_iface_assoc {
     uint8_t func_subclass;
     uint8_t func_proto;
     uint8_t func_index;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(usb_iface_assoc) == 8);

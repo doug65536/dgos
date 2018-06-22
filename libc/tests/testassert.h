@@ -68,7 +68,7 @@ bool compare(TE (&expect)[sz], TA (&actual)[sz])
     return true;
 }
 
-static __always_inline bool compare(char const *expect, char const *actual)
+static _always_inline bool compare(char const *expect, char const *actual)
 {
     return !strcmp(expect, actual);
 }

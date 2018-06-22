@@ -10,7 +10,7 @@ struct ethernet_hdr_t {
     uint16_t len_ethertype;
     // ... followed by 64 to 1500 byte payload
     // ... followed by 32 bit CRC
-} __packed;
+} _packed;
 
 // 1518 bytes
 struct ethernet_pkt_t {
@@ -19,7 +19,7 @@ struct ethernet_pkt_t {
 
     // 1500 byte packet plus room for CRC
     uint8_t packet[1500 + sizeof(uint32_t)];
-} __packed;
+} _packed;
 
 #define ETHERTYPE_IPv4      0x0800
 #define ETHERTYPE_ARP       0x0806

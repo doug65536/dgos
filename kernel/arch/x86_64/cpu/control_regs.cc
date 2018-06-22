@@ -1,7 +1,7 @@
 #include "control_regs.h"
 #include "assert.h"
 
-__noinline
+_noinline
 void cpu_debug_break()
 {
 }

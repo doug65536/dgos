@@ -6,7 +6,7 @@
 extern gdt_entry_t gdt[];
 
 table_register_64_t idtr_64;
-table_register_t idtr_16 __used = {
+table_register_t idtr_16 _used = {
     0,
     4 * 256,
     0
@@ -14,7 +14,7 @@ table_register_t idtr_16 __used = {
 
 idt_entry_64_t idt[32];
 
-static __always_inline uintptr_t cpu_cr4_change_bits(
+static _always_inline uintptr_t cpu_cr4_change_bits(
         uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
@@ -31,7 +31,7 @@ static __always_inline uintptr_t cpu_cr4_change_bits(
     return rax;
 }
 
-static __always_inline uint64_t cpu_xcr_change_bits(
+static _always_inline uint64_t cpu_xcr_change_bits(
         uint32_t xcr, uint64_t clear, uint64_t set)
 {
     clear = ~clear;
@@ -82,7 +82,7 @@ const char *cpu_choose_kernel()
         return "dgos-kernel-generic";
 }
 
-__section(".smp.data") bool nx_available;
+_section(".smp.data") bool nx_available;
 uint32_t gp_available;
 
 void cpu_init()

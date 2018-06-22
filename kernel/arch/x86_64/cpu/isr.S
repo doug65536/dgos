@@ -614,7 +614,7 @@ exception_isr_handler:
 
     .cfi_endproc
 
-// __noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
+// _noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 .hidden isr_sysret64
 .global isr_sysret64
 isr_sysret64:

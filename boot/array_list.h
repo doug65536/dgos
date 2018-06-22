@@ -40,15 +40,15 @@ public:
     void clear();
 
     void remove_at(S index);
-    __always_inline T &item(S index) { return items[index]; }
-    __always_inline T &operator[](S index) { return item(index); }
-    __always_inline T const& operator[](S index) const { return item(index); }
-    __always_inline T* begin() { return items; }
-    __always_inline T* end() { return items + count; }
-    __always_inline T const* begin() const { return items; }
-    __always_inline T const* end() const { return items + count; }
-    __always_inline T const* cbegin() const { return begin(); }
-    __always_inline T const* cend() const { return end(); }
+    _always_inline T &item(S index) { return items[index]; }
+    _always_inline T &operator[](S index) { return item(index); }
+    _always_inline T const& operator[](S index) const { return item(index); }
+    _always_inline T* begin() { return items; }
+    _always_inline T* end() { return items + count; }
+    _always_inline T const* begin() const { return items; }
+    _always_inline T const* end() const { return items + count; }
+    _always_inline T const* cbegin() const { return begin(); }
+    _always_inline T const* cend() const { return end(); }
 
 private:
     T *items;

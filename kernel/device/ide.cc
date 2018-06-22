@@ -48,7 +48,7 @@ struct ide_if_t : public storage_if_base_t {
         uint32_t physaddr;
         uint16_t size;
         uint16_t eot;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(bmdma_prd_t) == 8);
 
@@ -124,15 +124,15 @@ struct ide_if_t : public storage_if_base_t {
         void detect_devices();
 
         // Automatically use the correct port based on the enumeration type
-        __always_inline uint8_t inb(ata_reg_cmd reg);
-        __always_inline uint16_t inw(ata_reg_cmd reg);
-        __always_inline void outb(ata_reg_cmd reg, uint8_t value);
-        __always_inline void outw(ata_reg_cmd reg, uint16_t value);
-        __always_inline void outsw(ata_reg_cmd reg,
+        _always_inline uint8_t inb(ata_reg_cmd reg);
+        _always_inline uint16_t inw(ata_reg_cmd reg);
+        _always_inline void outb(ata_reg_cmd reg, uint8_t value);
+        _always_inline void outw(ata_reg_cmd reg, uint16_t value);
+        _always_inline void outsw(ata_reg_cmd reg,
                                    void const *values, size_t count);
-        __always_inline void insw(ata_reg_cmd reg, void *values, size_t count);
-        __always_inline uint8_t inb(ata_reg_ctl reg);
-        __always_inline void outb(ata_reg_ctl reg, uint8_t value);
+        _always_inline void insw(ata_reg_cmd reg, void *values, size_t count);
+        _always_inline uint8_t inb(ata_reg_ctl reg);
+        _always_inline void outb(ata_reg_ctl reg, uint8_t value);
 
         void set_drv(int slave);
         void set_lba(unit_data_t &unit, uint64_t lba);

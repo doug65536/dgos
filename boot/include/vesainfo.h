@@ -15,7 +15,7 @@ struct vbe_info_t {
     far_ptr_t product_rev_str;
     char reserved[222];
     char oemdata[256];
-} __packed;
+} _packed;
 
 // 256 bytes
 struct vbe_mode_info_t {
@@ -58,7 +58,7 @@ struct vbe_mode_info_t {
     uint32_t offscreen_mem_offset;
     uint16_t offscreen_mem_size_kb;
     char reserved2[206];
-} __packed;
+} _packed;
 
 struct vbe_selected_mode_t {
     uint32_t framebuffer_addr;

@@ -10,27 +10,27 @@ struct cpuid_t {
     uint32_t ecx;
 };
 
-extern "C" void __generic_target cpuid_init(void);
+extern "C" void _generic_target cpuid_init(void);
 
 // Force use of CPUID instruction (for getting APIC ID)
 // Returns true if the CPU supports that leaf
-__generic_target int cpuid_nocache(
+_generic_target int cpuid_nocache(
         cpuid_t *output, uint32_t eax, uint32_t ecx);
 
 // Allow cached data
 // Returns true if the CPU supports that leaf
-__generic_target int cpuid(
+_generic_target int cpuid(
         cpuid_t *output, uint32_t eax, uint32_t ecx);
 
-__generic_target uint32_t cpuid_eax(uint32_t eax, uint32_t ecx);
-__generic_target uint32_t cpuid_ebx(uint32_t eax, uint32_t ecx);
-__generic_target uint32_t cpuid_ecx(uint32_t eax, uint32_t ecx);
-__generic_target uint32_t cpuid_edx(uint32_t eax, uint32_t ecx);
+_generic_target uint32_t cpuid_eax(uint32_t eax, uint32_t ecx);
+_generic_target uint32_t cpuid_ebx(uint32_t eax, uint32_t ecx);
+_generic_target uint32_t cpuid_ecx(uint32_t eax, uint32_t ecx);
+_generic_target uint32_t cpuid_edx(uint32_t eax, uint32_t ecx);
 
-__generic_target bool cpuid_eax_bit(int bit, uint32_t eax, uint32_t ecx);
-__generic_target bool cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx);
-__generic_target bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
-__generic_target bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
+_generic_target bool cpuid_eax_bit(int bit, uint32_t eax, uint32_t ecx);
+_generic_target bool cpuid_ebx_bit(int bit, uint32_t eax, uint32_t ecx);
+_generic_target bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
+_generic_target bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
 
 struct cpuid_cache_t {
     bool is_amd         :1;
@@ -74,7 +74,7 @@ struct cpuid_cache_t {
     extern "C" __const
 #else
 #define CPUID_CONST_INLINE \
-    static __always_inline __const
+    static _always_inline __const
 #endif
 
 extern cpuid_cache_t cpuid_cache;

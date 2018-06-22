@@ -219,12 +219,12 @@ static uint32_t get_apic_id()
     return apic_id;
 }
 
-static __always_inline cpu_info_t *this_cpu()
+static _always_inline cpu_info_t *this_cpu()
 {
     return (cpu_info_t *)cpu_gs_read_ptr<0>();
 }
 
-static __always_inline thread_info_t *this_thread()
+static _always_inline thread_info_t *this_thread()
 {
     return (thread_info_t*)cpu_gs_read_ptr<offsetof(cpu_info_t, cur_thread)>();
 }

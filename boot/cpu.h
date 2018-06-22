@@ -117,7 +117,7 @@ extern "C" void cpu_a20_exitpm();
 extern "C" bool toggle_a20(bool enabled);
 extern "C" void wait_a20(bool enabled);
 
-static __always_inline void outb(uint16_t dx, uint8_t al)
+static _always_inline void outb(uint16_t dx, uint8_t al)
 {
     __asm__ __volatile__ (
         "outb %b[val],%w[port]"
@@ -126,7 +126,7 @@ static __always_inline void outb(uint16_t dx, uint8_t al)
         , [port] "Nd" (dx));
 }
 
-static __always_inline void outw(uint16_t dx, uint16_t ax)
+static _always_inline void outw(uint16_t dx, uint16_t ax)
 {
     __asm__ __volatile__ (
         "outw %w[val],%w[port]"
@@ -135,7 +135,7 @@ static __always_inline void outw(uint16_t dx, uint16_t ax)
         , [port] "Nd" (dx));
 }
 
-static __always_inline void outl(uint16_t dx, uint32_t eax)
+static _always_inline void outl(uint16_t dx, uint32_t eax)
 {
     __asm__ __volatile__ (
         "outl %[val],%w[port]"
@@ -144,7 +144,7 @@ static __always_inline void outl(uint16_t dx, uint32_t eax)
         , [port] "Nd" (dx));
 }
 
-static __always_inline uint8_t inb(uint16_t dx)
+static _always_inline uint8_t inb(uint16_t dx)
 {
     uint8_t al;
     __asm__ __volatile__ (
@@ -154,7 +154,7 @@ static __always_inline uint8_t inb(uint16_t dx)
     return al;
 }
 
-static __always_inline uint16_t inw(uint16_t dx)
+static _always_inline uint16_t inw(uint16_t dx)
 {
     uint16_t ax;
     __asm__ __volatile__ (
@@ -164,7 +164,7 @@ static __always_inline uint16_t inw(uint16_t dx)
     return ax;
 }
 
-static __always_inline uint32_t inl(uint16_t dx)
+static _always_inline uint32_t inl(uint16_t dx)
 {
     uint32_t eax;
     __asm__ __volatile__ (
@@ -174,31 +174,31 @@ static __always_inline uint32_t inl(uint16_t dx)
     return eax;
 }
 
-static __always_inline void pause()
+static _always_inline void pause()
 {
     __asm__ __volatile__ ("pause");
 }
 
-static __always_inline void cpu_flush_cache()
+static _always_inline void cpu_flush_cache()
 {
     __asm__ __volatile__ ("wbinvd\n\t");
 }
 
-static __always_inline uint64_t cpu_rdtsc()
+static _always_inline uint64_t cpu_rdtsc()
 {
     uint32_t hi, lo;
     __asm__ __volatile__ ("rdtsc" : "=d" (hi), "=a" (lo));
     return (uint64_t(hi) << 32) | lo;
 }
 
-static __always_inline uint64_t cpu_rdrand()
+static _always_inline uint64_t cpu_rdrand()
 {
     uint32_t hi, lo;
     __asm__ __volatile__ ("rdtsc" : "=d" (hi), "=a" (lo));
     return (uint64_t(hi) << 32) | lo;
 }
 
-static __always_inline uint64_t rol64(uint64_t n, uint8_t bits)
+static _always_inline uint64_t rol64(uint64_t n, uint8_t bits)
 {
     return (n << bits) | (n >> (64 - bits));
 }
@@ -211,7 +211,7 @@ void init_irq();
 
 extern "C" void cpu_init();
 
-__pure const char *cpu_choose_kernel();
+_pure const char *cpu_choose_kernel();
 void run_kernel(uint64_t entry, void *param);
 void copy_kernel(uint64_t dest_addr, void *src, size_t sz);
 void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt);

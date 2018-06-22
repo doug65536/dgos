@@ -17,10 +17,10 @@
 #include "bootmenu.h"
 #include "physmap.h"
 
-extern "C" void enter_kernel(uint64_t entry_point) __section(".smp.text");
+extern "C" void enter_kernel(uint64_t entry_point) _section(".smp.text");
 
 // Save the entry point address for later MP processor startup
-__section(".smp.data") uint64_t smp_entry_point;
+_section(".smp.data") uint64_t smp_entry_point;
 
 static int64_t base_adj;
 

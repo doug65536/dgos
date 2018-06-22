@@ -37,6 +37,6 @@ struct mp_table_hdr_t {
     uint8_t spec;
     uint8_t checksum;
     uint8_t features[5];
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(mp_table_hdr_t) == 16);

@@ -21,7 +21,7 @@ struct table_register_64_t {
     uintptr_t base;
 };
 
-static __always_inline uint64_t cpu_msr_get(uint32_t msr)
+static _always_inline uint64_t cpu_msr_get(uint32_t msr)
 {
     uint32_t lo, hi;
     __asm__ __volatile__ (
@@ -33,7 +33,7 @@ static __always_inline uint64_t cpu_msr_get(uint32_t msr)
     return ((uint64_t)hi << 32) | lo;
 }
 
-static __always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
+static _always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
 {
     uint64_t result;
     __asm__ __volatile__ (
@@ -45,7 +45,7 @@ static __always_inline uint32_t cpu_msr_get_lo(uint32_t msr)
     return result;
 }
 
-static __always_inline uint32_t cpu_msr_get_hi(uint32_t msr)
+static _always_inline uint32_t cpu_msr_get_hi(uint32_t msr)
 {
     uint64_t result;
     __asm__ __volatile__ (
@@ -57,7 +57,7 @@ static __always_inline uint32_t cpu_msr_get_hi(uint32_t msr)
     return result;
 }
 
-static __always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
+static _always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
 {
     __asm__ __volatile__ (
         "wrmsr\n\t"
@@ -68,7 +68,7 @@ static __always_inline void cpu_msr_set(uint32_t msr, uint64_t value)
     );
 }
 
-static __always_inline void cpu_msr_lo_set(uint32_t msr, uint32_t value)
+static _always_inline void cpu_msr_lo_set(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
@@ -81,7 +81,7 @@ static __always_inline void cpu_msr_lo_set(uint32_t msr, uint32_t value)
     );
 }
 
-static __always_inline void cpu_msr_hi_set(uint32_t msr, uint32_t value)
+static _always_inline void cpu_msr_hi_set(uint32_t msr, uint32_t value)
 {
     __asm__ __volatile__ (
         "rdmsr\n\t"
@@ -94,7 +94,7 @@ static __always_inline void cpu_msr_hi_set(uint32_t msr, uint32_t value)
     );
 }
 
-static __always_inline uint64_t cpu_msr_change_bits(
+static _always_inline uint64_t cpu_msr_change_bits(
         uint32_t msr, uint64_t clr, uint64_t set)
 {
     uint64_t n = cpu_msr_get(msr);
@@ -104,7 +104,7 @@ static __always_inline uint64_t cpu_msr_change_bits(
     return n;
 }
 
-static __always_inline uint64_t cpu_xcr_change_bits(
+static _always_inline uint64_t cpu_xcr_change_bits(
         uint32_t xcr, uint64_t clear, uint64_t set)
 {
     uint32_t eax;
@@ -127,7 +127,7 @@ static __always_inline uint64_t cpu_xcr_change_bits(
     return ((uint64_t)edx << 32) | eax;
 }
 
-static __always_inline uintptr_t cpu_cr0_change_bits(
+static _always_inline uintptr_t cpu_cr0_change_bits(
         uintptr_t clear, uintptr_t set)
 {
     uintptr_t rax;
@@ -144,7 +144,7 @@ static __always_inline uintptr_t cpu_cr0_change_bits(
     return rax;
 }
 
-static __always_inline uintptr_t cpu_cr4_change_bits(
+static _always_inline uintptr_t cpu_cr4_change_bits(
         uintptr_t clear, uintptr_t set)
 {
     uintptr_t r;
@@ -161,7 +161,7 @@ static __always_inline uintptr_t cpu_cr4_change_bits(
     return r;
 }
 
-static __always_inline uintptr_t cpu_cr8_get()
+static _always_inline uintptr_t cpu_cr8_get()
 {
     uintptr_t cr8;
     __asm__ __volatile__ (
@@ -171,7 +171,7 @@ static __always_inline uintptr_t cpu_cr8_get()
     return cr8;
 }
 
-static __always_inline void cpu_cr8_set(uintptr_t cr8)
+static _always_inline void cpu_cr8_set(uintptr_t cr8)
 {
     __asm__ __volatile__ (
         "movq %[cr8],%%cr8\n\t"
@@ -181,7 +181,7 @@ static __always_inline void cpu_cr8_set(uintptr_t cr8)
 }
 
 template<int dr>
-static __always_inline uintptr_t cpu_debug_reg_get()
+static _always_inline uintptr_t cpu_debug_reg_get()
 {
     uintptr_t value;
     __asm__ __volatile__ (
@@ -193,7 +193,7 @@ static __always_inline uintptr_t cpu_debug_reg_get()
 }
 
 template<int dr>
-static __always_inline void cpu_debug_reg_set(uintptr_t value)
+static _always_inline void cpu_debug_reg_set(uintptr_t value)
 {
     __asm__ __volatile__ (
         "movq %[value],%%dr%c[dr]\n\t"
@@ -204,7 +204,7 @@ static __always_inline void cpu_debug_reg_set(uintptr_t value)
 }
 
 template<int dr>
-static __always_inline uintptr_t cpu_debug_reg_change(
+static _always_inline uintptr_t cpu_debug_reg_change(
         uintptr_t clear, uintptr_t set)
 {
     uintptr_t value = cpu_debug_reg_get<dr>();
@@ -215,7 +215,7 @@ static __always_inline uintptr_t cpu_debug_reg_change(
 }
 
 template<int dr>
-static __always_inline void cpu_debug_breakpoint_set(
+static _always_inline void cpu_debug_breakpoint_set(
         uintptr_t addr, int rw, int len, int enable)
 {
     constexpr uintptr_t enable_mask = ~CPU_DR7_BPn_MASK(dr);
@@ -236,7 +236,7 @@ static __always_inline void cpu_debug_breakpoint_set(
 void cpu_debug_breakpoint_set_indirect(uintptr_t addr, int rw,
                                        int len, int enable, size_t index);
 
-static __always_inline void cpu_page_directory_set(uintptr_t addr)
+static _always_inline void cpu_page_directory_set(uintptr_t addr)
 {
     __asm__ __volatile__ (
         "movq %[addr],%%cr3\n\t"
@@ -246,7 +246,7 @@ static __always_inline void cpu_page_directory_set(uintptr_t addr)
     );
 }
 
-static __always_inline uintptr_t cpu_page_directory_get()
+static _always_inline uintptr_t cpu_page_directory_get()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
@@ -256,7 +256,7 @@ static __always_inline uintptr_t cpu_page_directory_get()
     return addr;
 }
 
-static __always_inline uintptr_t cpu_fault_address_get()
+static _always_inline uintptr_t cpu_fault_address_get()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
@@ -266,7 +266,7 @@ static __always_inline uintptr_t cpu_fault_address_get()
     return addr;
 }
 
-static __always_inline void cpu_page_invalidate(uintptr_t addr)
+static _always_inline void cpu_page_invalidate(uintptr_t addr)
 {
     __asm__ __volatile__ (
         "invlpg %[addr]\n\t"
@@ -276,7 +276,7 @@ static __always_inline void cpu_page_invalidate(uintptr_t addr)
     );
 }
 
-static __always_inline void cpu_pcid_invalidate(
+static _always_inline void cpu_pcid_invalidate(
         uintptr_t type, int32_t pcid, uintptr_t addr)
 {
     struct {
@@ -295,7 +295,7 @@ static __always_inline void cpu_pcid_invalidate(
     );
 }
 
-static __always_inline void cpu_tlb_flush()
+static _always_inline void cpu_tlb_flush()
 {
     if (cpuid_has_invpcid()) {
         //
@@ -317,12 +317,12 @@ static __always_inline void cpu_tlb_flush()
     }
 }
 
-static __always_inline void cpu_cache_flush()
+static _always_inline void cpu_cache_flush()
 {
     __asm__ __volatile__ ("wbinvd\n\t" : : : "memory");
 }
 
-static __always_inline void cpu_ds_set(uint16_t selector)
+static _always_inline void cpu_ds_set(uint16_t selector)
 {
     __asm__ __volatile__ (
         "movw %w[selector],%%ds\n\t"
@@ -331,7 +331,7 @@ static __always_inline void cpu_ds_set(uint16_t selector)
     );
 }
 
-static __always_inline void cpu_es_set(uint16_t selector)
+static _always_inline void cpu_es_set(uint16_t selector)
 {
     __asm__ __volatile__ (
         "movw %w[selector],%%es\n\t"
@@ -340,7 +340,7 @@ static __always_inline void cpu_es_set(uint16_t selector)
     );
 }
 
-static __always_inline void cpu_fs_set(uint16_t selector)
+static _always_inline void cpu_fs_set(uint16_t selector)
 {
     __asm__ __volatile__ (
         "movw %w[selector],%%fs\n\t"
@@ -349,7 +349,7 @@ static __always_inline void cpu_fs_set(uint16_t selector)
     );
 }
 
-static __always_inline void cpu_gs_set(uint16_t selector)
+static _always_inline void cpu_gs_set(uint16_t selector)
 {
     __asm__ __volatile__ (
         "movw %w[selector],%%gs\n\t"
@@ -358,7 +358,7 @@ static __always_inline void cpu_gs_set(uint16_t selector)
     );
 }
 
-static __always_inline void cpu_ss_set(uint16_t selector)
+static _always_inline void cpu_ss_set(uint16_t selector)
 {
     __asm__ __volatile__ (
         "movw %w[selector],%%ss\n\t"
@@ -367,7 +367,7 @@ static __always_inline void cpu_ss_set(uint16_t selector)
     );
 }
 
-static __always_inline void cpu_cs_set(uint16_t selector)
+static _always_inline void cpu_cs_set(uint16_t selector)
 {
     uint64_t temp;
     __asm__ __volatile__ (
@@ -382,22 +382,22 @@ static __always_inline void cpu_cs_set(uint16_t selector)
     );
 }
 
-static __always_inline void cpu_fsbase_set(void *fs_base)
+static _always_inline void cpu_fsbase_set(void *fs_base)
 {
     cpu_msr_set(CPU_MSR_FSBASE, (uintptr_t)fs_base);
 }
 
-static __always_inline void cpu_gsbase_set(void *gs_base)
+static _always_inline void cpu_gsbase_set(void *gs_base)
 {
     cpu_msr_set(CPU_MSR_GSBASE, (uintptr_t)gs_base);
 }
 
-static __always_inline void cpu_altgsbase_set(void *gs_base)
+static _always_inline void cpu_altgsbase_set(void *gs_base)
 {
     cpu_msr_set(CPU_MSR_KGSBASE, (uintptr_t)gs_base);
 }
 
-static __always_inline table_register_64_t cpu_gdtr_get()
+static _always_inline table_register_64_t cpu_gdtr_get()
 {
     table_register_64_t gdtr;
     __asm__ __volatile__ (
@@ -409,7 +409,7 @@ static __always_inline table_register_64_t cpu_gdtr_get()
     return gdtr;
 }
 
-static __always_inline void cpu_gdtr_set(table_register_64_t gdtr)
+static _always_inline void cpu_gdtr_set(table_register_64_t gdtr)
 {
     __asm__ __volatile__ (
         "lgdtq (%[gdtr])\n\t"
@@ -419,7 +419,7 @@ static __always_inline void cpu_gdtr_set(table_register_64_t gdtr)
     );
 }
 
-static __always_inline table_register_64_t cpu_idtr_get()
+static _always_inline table_register_64_t cpu_idtr_get()
 {
     table_register_64_t idtr{};
     __asm__ __volatile__ (
@@ -431,7 +431,7 @@ static __always_inline table_register_64_t cpu_idtr_get()
     return idtr;
 }
 
-static __always_inline void cpu_idtr_set(table_register_64_t idtr)
+static _always_inline void cpu_idtr_set(table_register_64_t idtr)
 {
     __asm__ __volatile__ (
         "lidtq (%[idtr])\n\t"
@@ -441,7 +441,7 @@ static __always_inline void cpu_idtr_set(table_register_64_t idtr)
     );
 }
 
-static __always_inline uint16_t cpu_tr_get()
+static _always_inline uint16_t cpu_tr_get()
 {
     uint16_t tr;
     __asm__ __volatile__ (
@@ -453,7 +453,7 @@ static __always_inline uint16_t cpu_tr_get()
     return tr;
 }
 
-static __always_inline void cpu_tr_set(uint16_t tr)
+static _always_inline void cpu_tr_set(uint16_t tr)
 {
     __asm__ __volatile__ (
         "ltr %w[tr]\n\t"
@@ -463,7 +463,7 @@ static __always_inline void cpu_tr_set(uint16_t tr)
     );
 }
 
-static __always_inline void cpu_ldt_set(uint16_t ldt)
+static _always_inline void cpu_ldt_set(uint16_t ldt)
 {
     __asm__ __volatile__ (
         "lldtw %w[ldt]\n\t"
@@ -472,7 +472,7 @@ static __always_inline void cpu_ldt_set(uint16_t ldt)
     );
 }
 
-static __always_inline void cpu_mxcsr_set(uint32_t mxcsr)
+static _always_inline void cpu_mxcsr_set(uint32_t mxcsr)
 {
     __asm__ __volatile__ (
         "ldmxcsr %[mxcsr]\n\t"
@@ -481,7 +481,7 @@ static __always_inline void cpu_mxcsr_set(uint32_t mxcsr)
     );
 }
 
-static __always_inline uint32_t cpu_mxcsr_get()
+static _always_inline uint32_t cpu_mxcsr_get()
 {
     uint32_t mxcsr;
     __asm__ __volatile__ (
@@ -491,7 +491,7 @@ static __always_inline uint32_t cpu_mxcsr_get()
     return mxcsr;
 }
 
-static __always_inline void cpu_fcw_set(uint16_t fcw)
+static _always_inline void cpu_fcw_set(uint16_t fcw)
 {
     __asm__ __volatile__ (
         "fldcw %w[fcw]\n\t"
@@ -500,7 +500,7 @@ static __always_inline void cpu_fcw_set(uint16_t fcw)
     );
 }
 
-static __always_inline uint16_t cpu_fcw_get()
+static _always_inline uint16_t cpu_fcw_get()
 {
     uint16_t fcw;
     __asm__ __volatile__ (
@@ -510,7 +510,7 @@ static __always_inline uint16_t cpu_fcw_get()
     return fcw;
 }
 
-static __always_inline void *cpu_stack_ptr_get()
+static _always_inline void *cpu_stack_ptr_get()
 {
     void *rsp;
     __asm__ __volatile__ (
@@ -520,28 +520,28 @@ static __always_inline void *cpu_stack_ptr_get()
     return rsp;
 }
 
-static __always_inline void cpu_crash()
+static _always_inline void cpu_crash()
 {
     __asm__ __volatile__ (
         "ud2"
     );
 }
 
-static __always_inline void cpu_breakpoint()
+static _always_inline void cpu_breakpoint()
 {
     __asm__ __volatile__ (
         "int3"
     );
 }
 
-static __always_inline void cpu_fninit()
+static _always_inline void cpu_fninit()
 {
     __asm__ __volatile__ (
         "fninit\n\t"
     );
 }
 
-static __always_inline void cpu_fxsave(void *fpuctx)
+static _always_inline void cpu_fxsave(void *fpuctx)
 {
     __asm__ __volatile__ (
         "fxsave64 (%0)\n\t"
@@ -551,7 +551,7 @@ static __always_inline void cpu_fxsave(void *fpuctx)
     );
 }
 
-static __always_inline void cpu_fxrstor(void const *fpuctx)
+static _always_inline void cpu_fxrstor(void const *fpuctx)
 {
     __asm__ __volatile__ (
         "fxrstor64 (%0)\n\t"
@@ -561,7 +561,7 @@ static __always_inline void cpu_fxrstor(void const *fpuctx)
     );
 }
 
-static __always_inline void cpu_xsave(void *fpuctx)
+static _always_inline void cpu_xsave(void *fpuctx)
 {
     __asm__ __volatile__ (
         "xsave64 (%[fpuctx])\n\t"
@@ -571,7 +571,7 @@ static __always_inline void cpu_xsave(void *fpuctx)
     );
 }
 
-static __always_inline uint32_t cpu_eflags_get()
+static _always_inline uint32_t cpu_eflags_get()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -582,7 +582,7 @@ static __always_inline uint32_t cpu_eflags_get()
     return eflags;
 }
 
-static __always_inline void cpu_eflags_set(uint32_t flags)
+static _always_inline void cpu_eflags_set(uint32_t flags)
 {
     __asm__ __volatile__ (
         "push %[flags]\n\t"
@@ -593,7 +593,7 @@ static __always_inline void cpu_eflags_set(uint32_t flags)
     );
 }
 
-static __always_inline uint32_t cpu_eflags_change(
+static _always_inline uint32_t cpu_eflags_change(
         uint32_t clear, uint32_t set)
 {
     uint32_t flags;
@@ -612,24 +612,24 @@ static __always_inline uint32_t cpu_eflags_change(
     return flags;
 }
 
-static __always_inline void cpu_stac()
+static _always_inline void cpu_stac()
 {
     __asm__ __volatile__ ("stac");
 }
 
-static __always_inline void cpu_clac()
+static _always_inline void cpu_clac()
 {
     __asm__ __volatile__ ("clac");
 }
 
-static __always_inline void cpu_irq_disable()
+static _always_inline void cpu_irq_disable()
 {
     __asm__ __volatile__ (
         "cli\n\t"
     );
 }
 
-static __always_inline bool cpu_irq_save_disable()
+static _always_inline bool cpu_irq_save_disable()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -643,12 +643,12 @@ static __always_inline bool cpu_irq_save_disable()
     return eflags & CPU_EFLAGS_IF;
 }
 
-static __always_inline void cpu_irq_enable()
+static _always_inline void cpu_irq_enable()
 {
     __asm__ __volatile__ ( "sti" : : : "cc" );
 }
 
-static __always_inline void cpu_irq_toggle(bool enable)
+static _always_inline void cpu_irq_toggle(bool enable)
 {
     uint32_t temp;
     __asm__ __volatile__ (
@@ -665,12 +665,12 @@ static __always_inline void cpu_irq_toggle(bool enable)
     );
 }
 
-static __always_inline bool cpu_irq_is_enabled()
+static _always_inline bool cpu_irq_is_enabled()
 {
     return cpu_eflags_get() & CPU_EFLAGS_IF;
 }
 
-static __always_inline uint64_t cpu_rdtsc()
+static _always_inline uint64_t cpu_rdtsc()
 {
     uint32_t tsc_lo;
     uint32_t tsc_hi;
@@ -687,26 +687,26 @@ static __always_inline uint64_t cpu_rdtsc()
 class cpu_scoped_irq_disable
 {
 public:
-    __always_inline
+    _always_inline
     cpu_scoped_irq_disable()
         : intr_was_enabled((cpu_irq_save_disable() << 1) - 1)
     {
     }
 
-    __always_inline
+    _always_inline
     ~cpu_scoped_irq_disable()
     {
         if (intr_was_enabled)
             cpu_irq_toggle(intr_was_enabled > 0);
     }
 
-    __always_inline
+    _always_inline
     operator bool() const
     {
         return intr_was_enabled > 0;
     }
 
-    __always_inline
+    _always_inline
     void restore()
     {
         if (intr_was_enabled) {
@@ -722,7 +722,7 @@ private:
 // Monitor/mwait
 
 template<typename T>
-static __always_inline void cpu_monitor(
+static _always_inline void cpu_monitor(
         T const volatile *addr, uint32_t ext, uint32_t hint)
 {
     __asm__ __volatile__ (
@@ -735,7 +735,7 @@ static __always_inline void cpu_monitor(
     );
 }
 
-static __always_inline void cpu_mwait(uint32_t ext, uint32_t hint)
+static _always_inline void cpu_mwait(uint32_t ext, uint32_t hint)
 {
     __asm__ __volatile__ (
         "mwait"
@@ -751,7 +751,7 @@ static __always_inline void cpu_mwait(uint32_t ext, uint32_t hint)
 // wait_value: comparison value
 // mask: masks value before comparison
 template<typename T>
-static __always_inline void cpu_wait_masked(
+static _always_inline void cpu_wait_masked(
         bool is_equal, T const volatile *value, T wait_value, T mask)
 {
     if (cpuid_has_mwait()) {
@@ -773,7 +773,7 @@ static __always_inline void cpu_wait_masked(
 // value: address to watch
 // wait_value: comparison value
 template<typename T>
-static __always_inline void cpu_wait_unmasked(
+static _always_inline void cpu_wait_unmasked(
         bool is_equal, T const volatile *value, T wait_value)
 {
     if (cpuid_has_mwait()) {
@@ -792,14 +792,14 @@ static __always_inline void cpu_wait_unmasked(
 }
 
 template<typename T>
-static __always_inline void cpu_wait_value(
+static _always_inline void cpu_wait_value(
         T const volatile *value, T wait_value)
 {
     return cpu_wait_unmasked(true, value, wait_value);
 }
 
 template<typename T>
-static __always_inline void cpu_wait_not_value(
+static _always_inline void cpu_wait_not_value(
         T const volatile *value, T wait_value)
 {
     return cpu_wait_unmasked(false, value, wait_value);
@@ -807,39 +807,39 @@ static __always_inline void cpu_wait_not_value(
 
 
 template<typename T>
-static __always_inline void cpu_wait_value(
+static _always_inline void cpu_wait_value(
         T const volatile *value, T wait_value, T mask)
 {
     return cpu_wait_masked(true, value, wait_value, mask);
 }
 
 template<typename T>
-static __always_inline void cpu_wait_not_value(
+static _always_inline void cpu_wait_not_value(
         T const volatile *value, T wait_value, T mask)
 {
     return cpu_wait_masked(false, value, wait_value, mask);
 }
 
 template<typename T>
-static __always_inline void cpu_wait_bit_value(
+static _always_inline void cpu_wait_bit_value(
         T const volatile *value, uint8_t bit, bool bit_value)
 {
     return cpu_wait_value(value, T(bit_value) << bit, T(1) << bit);
 }
 
 template<typename T>
-static __always_inline void cpu_wait_bit_clear(
+static _always_inline void cpu_wait_bit_clear(
         T const volatile *value, uint8_t bit)
 {
     return cpu_wait_bit_value(value, bit, false);
 }
 
 template<typename T>
-static __always_inline void cpu_wait_bit_set(
+static _always_inline void cpu_wait_bit_set(
         T const volatile *value, uint8_t bit)
 {
     return cpu_wait_bit_value(value, bit, true);
 }
 
-extern "C" __noinline
+extern "C" _noinline
 void cpu_debug_break();

@@ -28,7 +28,7 @@ struct Elf64_Ehdr {
     Elf64_Half e_shentsize; /* Size of section header entry */
     Elf64_Half e_shnum; /* Number of section header entries */
     Elf64_Half e_shstrndx; /* Section name string table index */
-} __packed;
+} _packed;
 
 #define EI_MAG0 0 // File identification
 #define EI_MAG1 1
@@ -92,7 +92,7 @@ struct Elf64_Shdr {
     Elf64_Word sh_info; /* Miscellaneous information */
     Elf64_Xword sh_addralign; /* Address alignment boundary */
     Elf64_Xword sh_entsize; /* Size of entries, if section has table */
-} __packed;
+} _packed;
 
 //
 // sh_type
@@ -183,7 +183,7 @@ struct Elf64_Sym {
     Elf64_Half st_shndx; /* Section table index */
     Elf64_Addr st_value; /* Symbol value */
     Elf64_Xword st_size; /* Size of object (e.g., common) */
-} __packed;
+} _packed;
 
 // Symbol bindings
 #define STB_LOCAL 0 Not visible outside the object file
@@ -209,13 +209,13 @@ struct Elf64_Sym {
 struct Elf64_Rel {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
-} __packed;
+} _packed;
 
 struct Elf64_Rela {
     Elf64_Addr r_offset; /* Address of reference */
     Elf64_Xword r_info; /* Symbol index and type of relocation */
     Elf64_Sxword r_addend; /* Constant part of expression */
-} __packed;
+} _packed;
 
 #define ELF64_R_SYM(i)      ((i) >> 32)
 #define ELF64_R_TYPE(i)     ((i) & 0xFFFFFFFFL)
@@ -231,7 +231,7 @@ struct Elf64_Phdr {
     Elf64_Xword p_filesz; /* Size of segment in file */
     Elf64_Xword p_memsz; /* Size of segment in memory */
     Elf64_Xword p_align; /* Alignment of segment */
-} __packed;
+} _packed;
 
 #define PT_NULL 0 // Unused entry
 #define PT_LOAD 1 // Loadable segment
@@ -269,7 +269,7 @@ struct Elf64_Dyn {
         Elf64_Xword d_val;
         Elf64_Addr d_ptr;
     } d_un;
-} __packed;
+} _packed;
 
 
 // ignored Marks the end of the dynamic array
@@ -429,7 +429,7 @@ struct Elf64_Dyn {
 
 #define R_AMD64_REX_GOTPCRELX   42  // ?
 
-static __always_inline unsigned long elf64_hash(unsigned char const *name)
+static _always_inline unsigned long elf64_hash(unsigned char const *name)
 {
     unsigned long h = 0, g;
     while (*name) {

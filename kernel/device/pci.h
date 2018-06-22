@@ -465,7 +465,7 @@ struct pci_irq_range_t {
     uint8_t base;
     uint8_t count:7;
     bool msix:1;
-} __packed;
+} _packed;
 
 void pci_init_ecam(size_t ecam_count);
 void pci_init_ecam_entry(uint64_t base, uint16_t seg,

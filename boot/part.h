@@ -17,6 +17,6 @@ struct partition_tbl_ent_t {
 
     uint32_t start_lba;
     uint32_t total_sectors;
-} __packed;
+} _packed;
 
 extern partition_tbl_ent_t partition_table[];

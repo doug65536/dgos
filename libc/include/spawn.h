@@ -13,7 +13,7 @@ __BEGIN_DECLS
 typedef struct __posix_spawn_file_actions_t {
     __posix_spawn_file_action_t *__actions;
     unsigned __allocated;
-    unsigned __used;
+    unsigned _used;
 } posix_spawn_file_actions_t;
 
 typedef struct __posix_spawnattr_t {

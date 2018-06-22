@@ -504,7 +504,7 @@ struct ata_identify_t {
         htons_buf(model, sizeof(model));
         htons_buf(media_serial, sizeof(media_serial));
     }
-} __packed;
+} _packed;
 
 C_ASSERT(offsetof(ata_identify_t, unused_1) == 1*2);
 C_ASSERT(offsetof(ata_identify_t, unused_3_9) == 3*2);
@@ -596,7 +596,7 @@ C_ASSERT(sizeof(atapi_fis_t) == 16);
 #define ATA_REG_STATUS_DRDY         (1U<<ATA_REG_STATUS_DRDY_BIT)
 #define ATA_REG_STATUS_BSY          (1U<<ATA_REG_STATUS_BSY_BIT)
 
-__used
+_used
 static format_flag_info_t const ide_flags_status[] = {
     { "ERR",  1, 0, ATA_REG_STATUS_ERR_BIT  },
     { "IDX",  1, 0, ATA_REG_STATUS_IDX_BIT  },

@@ -15,8 +15,8 @@ struct __exception_jmp_buf_t {
     uintptr_t rflags;
 };
 
-extern "C" __returns_twice
+extern "C" _returns_twice
 int __exception_setjmp(__exception_jmp_buf_t *__ctx);
 
-extern "C" __noreturn
+extern "C" _noreturn
 int __exception_longjmp(__exception_jmp_buf_t *__ctx, int value);

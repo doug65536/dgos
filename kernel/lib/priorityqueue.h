@@ -26,15 +26,15 @@ public:
     size_t size();
 
 private:
-    __always_inline T& item(size_t index)
+    _always_inline T& item(size_t index)
     {
         return items[index];
     }
 
     int grow();
-    __always_inline size_t leftchild(size_t index);
-    __always_inline size_t parent(size_t index);
-    __always_inline size_t swap(size_t a, size_t b);
+    _always_inline size_t leftchild(size_t index);
+    _always_inline size_t parent(size_t index);
+    _always_inline size_t swap(size_t a, size_t b);
     size_t siftup(size_t index);
     size_t siftdown(size_t index);
 
@@ -79,19 +79,19 @@ int priqueue_t<T>::grow()
 }
 
 template<typename T>
-__always_inline size_t priqueue_t<T>::leftchild(size_t index)
+_always_inline size_t priqueue_t<T>::leftchild(size_t index)
 {
     return (index + index) + 1;
 }
 
 template<typename T>
-__always_inline size_t priqueue_t<T>::parent(size_t index)
+_always_inline size_t priqueue_t<T>::parent(size_t index)
 {
     return (index - 1) >> 1;
 }
 
 template<typename T>
-__always_inline size_t priqueue_t<T>::swap(size_t a, size_t b)
+_always_inline size_t priqueue_t<T>::swap(size_t a, size_t b)
 {
     value_type &ap = item(a);
     value_type &bp = item(b);

@@ -375,7 +375,7 @@ void heap_destroy(heap_t *)
 {
 }
 
-__assume_aligned(16)
+_assume_aligned(16)
 void *heap_calloc(heap_t *heap, size_t num, size_t size)
 {
     void *blk = heap_alloc(heap, num * size);
@@ -398,7 +398,7 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
 // +--------------+ <-- mmap size
 // |      ...     |
 
-__assume_aligned(16)
+_assume_aligned(16)
 void *heap_alloc(heap_t *heap, size_t size)
 {
     // Round size up to a multiple of 16 bytes, include header in size
@@ -443,7 +443,7 @@ void heap_free(heap_t *heap, void *block)
     mprotect((void*)st, end - st, PROT_NONE);
 }
 
-__assume_aligned(16)
+_assume_aligned(16)
 void *heap_realloc(heap_t *heap, void *block, size_t size)
 {
     if (unlikely(!block))

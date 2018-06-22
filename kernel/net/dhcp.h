@@ -57,7 +57,7 @@ struct dhcp_pkt_t {
     //  3: (Router), offer=router ip address
     //  15: (Domain name)
     //  6: (DNS server), offer=dns server list
-} __packed;
+} _packed;
 
 void dhcp_builder_begin(void *buf);
 void dhcp_builder_s_mac(void *buf, uint8_t const *mac_addr);

@@ -14,7 +14,7 @@ struct ipv4_hdr_t {
     uint16_t hdr_checksum;
     uint8_t s_ip[4];
     uint8_t d_ip[4];
-} __packed;
+} _packed;
 
 #define IPV4_PROTO_ICMP     0x01
 #define IPV4_PROTO_TCP      0x06

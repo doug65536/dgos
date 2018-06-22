@@ -60,43 +60,43 @@ static rtl8139_factory_t rtl8139_factory;
 struct rtl8139_dev_t : public eth_dev_base_t {
     ETH_DEV_IMPL
 
-    __used
-    __always_inline void rtl8139_mm_out_8(uint32_t reg, uint8_t val)
+    _used
+    _always_inline void rtl8139_mm_out_8(uint32_t reg, uint8_t val)
     {
         RTL8139_MMIO(uint8_t, reg) = val;
         atomic_barrier();
     }
 
-    __used
-    __always_inline void rtl8139_mm_out_16(uint32_t reg, uint16_t val)
+    _used
+    _always_inline void rtl8139_mm_out_16(uint32_t reg, uint16_t val)
     {
         RTL8139_MMIO(uint16_t, reg) = val;
         atomic_barrier();
     }
 
-    __used
-    __always_inline void rtl8139_mm_out_32(uint32_t reg, uint32_t val)
+    _used
+    _always_inline void rtl8139_mm_out_32(uint32_t reg, uint32_t val)
     {
         RTL8139_MMIO(uint32_t, reg) = val;
         atomic_barrier();
     }
 
-    __used
-    __always_inline uint8_t rtl8139_mm_in_8(uint32_t reg)
+    _used
+    _always_inline uint8_t rtl8139_mm_in_8(uint32_t reg)
     {
         atomic_barrier();
         return RTL8139_MMIO(uint8_t, reg);
     }
 
-    __used
-    __always_inline uint16_t rtl8139_mm_in_16(uint32_t reg)
+    _used
+    _always_inline uint16_t rtl8139_mm_in_16(uint32_t reg)
     {
         atomic_barrier();
         return RTL8139_MMIO(uint16_t, reg);
     }
 
-    __used
-    __always_inline uint32_t rtl8139_mm_in_32(uint32_t reg)
+    _used
+    _always_inline uint32_t rtl8139_mm_in_32(uint32_t reg)
     {
         atomic_barrier();
         return RTL8139_MMIO(uint32_t, reg);

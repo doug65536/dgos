@@ -120,7 +120,7 @@ static bool physmap_init()
     return true;
 }
 
-__constructor((ctor_physmem)) void physmap_startup()
+_constructor((ctor_physmem)) void physmap_startup()
 {
     if (!physmap_init())
         PANIC("Could not initialize physical memory map");

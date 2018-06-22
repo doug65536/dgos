@@ -3,7 +3,7 @@
 #include "types.h"
 
 #ifdef __clang__
-static __always_inline void __builtin_ia32_movntdq(
+static _always_inline void __builtin_ia32_movntdq(
         __i64_vec2LL* d, __i64_vec2LL const& val128)
 {
     __asm__ __volatile__ (

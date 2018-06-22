@@ -91,14 +91,14 @@ struct pci_msi32_t {
     uint32_t addr;
     uint16_t data;
     uint16_t rsvd;
-} __packed;
+} _packed;
 
 struct pci_msi64_t {
     uint32_t addr_lo;
     uint32_t addr_hi;
     uint16_t data;
     uint16_t rsvd;
-} __packed;
+} _packed;
 
 struct pci_msix64_t {
     uint64_t addr;
@@ -111,7 +111,7 @@ struct pci_msi32_pvm_t {
     pci_msi32_t base;
     uint32_t irq_mask;
     uint32_t irq_pending;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(pci_msi32_pvm_t) == 0x10);
 C_ASSERT(offsetof(pci_msi32_pvm_t, irq_mask) == 0x08);
@@ -121,7 +121,7 @@ struct pci_msi64_pvm_t {
     pci_msi64_t base;
     uint32_t irq_mask;
     uint32_t irq_pending;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(pci_msi64_pvm_t) == 0x14);
 C_ASSERT(offsetof(pci_msi64_pvm_t, irq_mask) == 0x0C);

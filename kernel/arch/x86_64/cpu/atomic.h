@@ -4,13 +4,13 @@
 //
 // Some other concurrent code helpers
 
-static __always_inline void atomic_barrier(void)
+static _always_inline void atomic_barrier(void)
 {
     __asm__ __volatile__ ("" ::: "memory");
 }
 
 // Technically not atomic but needed in cmpxchg loops
-static __always_inline void pause()
+static _always_inline void pause()
 {
     __builtin_ia32_pause();
 }

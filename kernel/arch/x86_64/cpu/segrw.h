@@ -2,7 +2,7 @@
 #include "types.h"
 
 template<ptrdiff_t ofs = 0>
-static __always_inline void *cpu_gs_read_ptr(void)
+static _always_inline void *cpu_gs_read_ptr(void)
 {
     void *ptr;
     __asm__ __volatile__ (
@@ -14,7 +14,7 @@ static __always_inline void *cpu_gs_read_ptr(void)
     return ptr;
 }
 
-static __always_inline void *cpu_gs_read_ptr(size_t offset)
+static _always_inline void *cpu_gs_read_ptr(size_t offset)
 {
     void *ptr;
     __asm__ __volatile__ (

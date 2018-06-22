@@ -45,10 +45,10 @@ private:
 
 extern "C" {
 
-__noreturn
+_noreturn
 void abort();
 
-__noreturn
+_noreturn
 void __cxa_throw_bad_array_new_length();
 
 void *__cxa_allocate_exception(size_t thrown_size);

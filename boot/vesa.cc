@@ -60,7 +60,7 @@ static uint16_t vbe_set_mode(uint16_t mode)
     return (regs.eax & 0xFFFF) == 0x4F;
 }
 
-__const
+_const
 static unsigned gcd(unsigned a, unsigned b)
 {
     if (!a || !b)

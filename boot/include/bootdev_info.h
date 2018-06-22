@@ -64,4 +64,4 @@ struct bootdev_drive_params_t {
 
     uint8_t reserved2;
     uint8_t checksum;
-} __packed;
+} _packed;

@@ -5,7 +5,7 @@ int posix_spawn_file_actions_init(posix_spawn_file_actions_t *fact)
 {
     fact->__actions = nullptr;
     fact->__allocated = 0;
-    fact->__used = 0;
+    fact->_used = 0;
 
     return 0;
 }

@@ -28,21 +28,21 @@
 #define PAGING_TRACE(...) ((void)0)
 #endif
 
-__section(".smp.data") pte_t *root_page_dir;
+_section(".smp.data") pte_t *root_page_dir;
 
-static __always_inline pte_t *pte_ptr(pte_t *page, size_t slot)
+static _always_inline pte_t *pte_ptr(pte_t *page, size_t slot)
 {
     return page + slot;
 }
 
 // Read a 64-bit entry from the specified slot of the specified segment
-static __always_inline pte_t read_pte(pte_t *page, size_t slot)
+static _always_inline pte_t read_pte(pte_t *page, size_t slot)
 {
     return page[slot];
 }
 
 // Write a 64-bit entry to the specified slot of the specified segment
-static __always_inline void write_pte(pte_t *page, size_t slot, pte_t pte)
+static _always_inline void write_pte(pte_t *page, size_t slot, pte_t pte)
 {
     page[slot] = pte;
 }
@@ -296,7 +296,7 @@ uint32_t paging_root_addr()
 
 // Identity map the first 64KB of physical addresses and
 // prepare to populate tables
-__constructor(500) void paging_init()
+_constructor(500) void paging_init()
 {
     // Clear the root page directory
     root_page_dir = (pte_t*)malloc_aligned(PAGE_SIZE, PAGE_SIZE);

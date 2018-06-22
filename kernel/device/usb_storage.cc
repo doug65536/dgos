@@ -62,7 +62,7 @@ public:
         uint32_t alloc;
         uint8_t pmi;
         uint8_t control;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cmd_rdcap_16_t) == 16);
 
@@ -74,14 +74,14 @@ public:
         uint16_t reserved2;
         uint8_t pmi;
         uint8_t control;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cmd_rdcap_10_t) == 10);
 
     struct rdcap_10_data_t {
         uint32_t lba;
         uint32_t block_sz;
-    } __packed;
+    } _packed;
 
     struct cmd_rw16_t {
         cmd_op_t op;     // read=0x88, write=0x8A
@@ -90,7 +90,7 @@ public:
         uint32_t len;
         uint8_t group;
         uint8_t control;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cmd_rw16_t) == 16);
 
@@ -101,7 +101,7 @@ public:
         uint32_t len;
         uint8_t group;
         uint8_t control;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cmd_rw12_t) == 12);
 
@@ -112,7 +112,7 @@ public:
         uint8_t group;
         uint16_t len;
         uint8_t control;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cmd_rw10_t) == 10);
 
@@ -123,7 +123,7 @@ public:
         cmd_rw10_t rw10;
         cmd_rw12_t rw12;
         cmd_rw16_t rw16;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cmdblk_t) == 16);
 
@@ -136,7 +136,7 @@ public:
         uint8_t lun;
         uint8_t wcb_len;
         cmdblk_t cmd;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(cbw_t) == 31);
 
@@ -154,7 +154,7 @@ public:
         uint32_t tag;
         uint32_t residue;
         cmd_status_t status;
-    } __packed;
+    } _packed;
 
     C_ASSERT(sizeof(csw_t) == 13);
 
@@ -168,18 +168,18 @@ public:
     struct rdcap_10_response_t {
         uint32_t max_lba;
         uint32_t blk_size;
-    } __packed;
+    } _packed;
 
     struct rdcap_16_response_t {
         uint64_t max_lba;
         uint32_t blk_size;
         // Rest of stuff not used and not transferred
-    } __packed;
+    } _packed;
 
     union rdcap_wrapper_t {
         rdcap_10_response_t rdcap10;
         rdcap_16_response_t rdcap16;
-    } __packed;
+    } _packed;
 
     struct pending_cmd_t {
         pending_cmd_t()

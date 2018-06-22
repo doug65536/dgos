@@ -7,7 +7,7 @@ struct default_delete
 {
     constexpr default_delete() = default;
 
-    __always_inline void operator()(T* ptr) const
+    _always_inline void operator()(T* ptr) const
     {
         delete ptr;
     }
@@ -19,7 +19,7 @@ struct default_delete<T[]>
     constexpr default_delete() = default;
 
     template<typename U>
-    __always_inline void operator()(U ptr) const
+    _always_inline void operator()(U ptr) const
     {
         delete[] ptr;
     }
@@ -227,7 +227,7 @@ class free_deleter
 public:
     constexpr free_deleter() = default;
 
-    __always_inline void operator()(T* ptr) const
+    _always_inline void operator()(T* ptr) const
     {
         if (ptr) {
             destruct(ptr);

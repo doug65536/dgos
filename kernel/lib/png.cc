@@ -39,7 +39,7 @@ static char constexpr png_blk_types[][5] = {
 struct png_chunk_hdr_t {
     uint32_t len;
     char type[4];
-} __packed;
+} _packed;
 
 typedef uint32_t png_crc_t;
 
@@ -51,7 +51,7 @@ struct png_hdr_ihdr_t {
     uint8_t compr_method;
     uint8_t filter_method;
     uint8_t interlace_method;
-} __packed;
+} _packed;
 
 #define PNG_IHDR_COLORTYPE_P_BIT    0
 #define PNG_IHDR_COLORTYPE_C_BIT    1
@@ -108,7 +108,7 @@ static png_type_t png_hdr_type(png_chunk_hdr_t *hdr)
     return PNG_OTHER;
 }
 
-static __always_inline uint8_t png_paeth_predict(
+static _always_inline uint8_t png_paeth_predict(
         uint8_t a, uint8_t b, uint8_t c)
 {
     // a = left, b = above, c = upper left

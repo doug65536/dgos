@@ -41,7 +41,7 @@ void *thread_get_fsbase(int thread);
 void *thread_get_gsbase(int thread);
 
 __const
-static __always_inline process_t *fast_cur_process()
+static _always_inline process_t *fast_cur_process()
 {
     void *thread_info = cpu_gs_read_ptr<CPU_INFO_CURTHREAD_OFS>();
     return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);

@@ -2,7 +2,7 @@
 #include "types.h"
 
 // jenkins hash
-constexpr static __always_inline uint32_t hash_32(
+constexpr static _always_inline uint32_t hash_32(
         void const* k, size_t length)
 {
     uint8_t const* key = (uint8_t const *)k;

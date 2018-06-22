@@ -185,15 +185,15 @@ private:
     bool breakpoint_toggle(breakpoint_t& bp, bool activate);
     void breakpoint_toggle_list(bp_list& list, bool activate);
 
-    __always_inline void start();
+    _always_inline void start();
 
     void freeze_one(gdb_cpu_t &cpu);
 
-    __noreturn
+    _noreturn
     static int gdb_thread(void*);
 
-    __noreturn
-    __always_inline void gdb_thread();
+    _noreturn
+    _always_inline void gdb_thread();
 
     // Lookup currently executing cpu (cpu_nr == 0)
     // or specified cpu (cpu_nr > 0)
@@ -203,7 +203,7 @@ private:
 
     static isr_context_t *exception_handler(int, isr_context_t *ctx);
 
-    __always_inline isr_context_t *exception_handler(isr_context_t *ctx);
+    _always_inline isr_context_t *exception_handler(isr_context_t *ctx);
 
     static gdb_cpu_ctrl_t instance;
 
@@ -221,7 +221,7 @@ gdb_cpu_ctrl_t gdb_cpu_ctrl_t::instance;
 
 class gdbstub_t {
 public:
-    __noreturn
+    _noreturn
     void run();
 
     void *operator new(size_t) noexcept

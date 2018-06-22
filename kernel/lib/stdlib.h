@@ -21,9 +21,9 @@ extern "C" {
 
 void malloc_startup(void *p);
 
-__malloc void *calloc(size_t num, size_t size);
+_malloc void *calloc(size_t num, size_t size);
 
-__malloc void *malloc(size_t size);
+_malloc void *malloc(size_t size);
 
 void *realloc(void *p, size_t new_size);
 

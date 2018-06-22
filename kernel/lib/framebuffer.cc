@@ -30,7 +30,7 @@ struct framebuffer_t {
 
 static framebuffer_t fb;
 
-static __always_inline void fb_reset_dirty(void)
+static _always_inline void fb_reset_dirty(void)
 {
     fb.dirty.st.x = fb.mode.width;
     fb.dirty.st.y = fb.mode.height;
@@ -62,7 +62,7 @@ void fb_init(void)
     fb_reset_dirty();
 }
 
-static __always_inline void fb_update_dirty(
+static _always_inline void fb_update_dirty(
         int left, int top, int right, int bottom)
 {
     fb.dirty.en.x = (fb.dirty.en.x < right ? right : fb.dirty.en.x);

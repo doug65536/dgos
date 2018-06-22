@@ -554,7 +554,7 @@ struct acpi_sdt_hdr_t {
     uint32_t oem_rev;
     uint32_t creator_id;
     uint32_t creator_rev;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_sdt_hdr_t) == 36);
 
@@ -565,27 +565,27 @@ struct acpi_ecam_rec_t {
     uint8_t st_bus;
     uint8_t en_bus;
     uint32_t reserved;
-} __packed;
+} _packed;
 
 // MCFG table
 struct acpi_mcfg_hdr_t {
     acpi_sdt_hdr_t hdr;
     uint64_t reserved;
     // followed by instances of acpi_ecam_record_t
-} __packed;
+} _packed;
 
 // SRAT
 struct acpi_srat_hdr_t {
     acpi_sdt_hdr_t hdr;
     uint8_t reserved[12];
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_srat_hdr_t) == 48);
 
 struct acpi_srat_rec_hdr_t {
     uint8_t type;
     uint8_t len;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_srat_rec_hdr_t) == 2);
 
@@ -598,7 +598,7 @@ struct acpi_srat_lapic_t {
     uint8_t sapic_eid;
     uint8_t domain_hi[3];
     uint32_t clk_domain;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_srat_lapic_t) == 16);
 
@@ -619,7 +619,7 @@ struct acpi_srat_mem_t {
     // Only bit 0 is not reserved: 1=enabled
     uint32_t flags;
     uint8_t reserved3[8];
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_srat_mem_t) == 40);
 
@@ -632,7 +632,7 @@ struct acpi_srat_x2apic_t {
     uint32_t flags;
     uint32_t clk_domain;
     uint32_t reserved2;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(acpi_srat_x2apic_t) == 24);
 
@@ -703,12 +703,12 @@ struct acpi_fadt_t {
     acpi_gas_t x_pm_timer_block;
     acpi_gas_t x_gpe0_block;
     acpi_gas_t x_gpe1_block;
-} __packed;
+} _packed;
 
 struct acpi_ssdt_t {
     // sig == ?
     acpi_sdt_hdr_t hdr;
-} __packed;
+} _packed;
 
 struct acpi_madt_rec_hdr_t {
     uint8_t entry_type;
@@ -727,7 +727,7 @@ struct acpi_madt_lapic_t {
     uint8_t cpu_id;
     uint8_t apic_id;
     uint32_t flags;
-} __packed;
+} _packed;
 
 struct acpi_madt_ioapic_t {
     acpi_madt_rec_hdr_t hdr;
@@ -735,7 +735,7 @@ struct acpi_madt_ioapic_t {
     uint8_t reserved;
     uint32_t addr;
     uint32_t irq_base;
-} __packed;
+} _packed;
 
 struct acpi_madt_irqsrc_t {
     acpi_madt_rec_hdr_t hdr;
@@ -743,21 +743,21 @@ struct acpi_madt_irqsrc_t {
     uint8_t irq_src;
     uint32_t gsi;
     uint16_t flags;
-} __packed;
+} _packed;
 
 // Which IOAPIC inputs should be NMI
 struct acpi_madt_nmisrc_t {
     acpi_madt_rec_hdr_t hdr;
     uint16_t flags;
     uint32_t gsi;
-} __packed;
+} _packed;
 
 struct acpi_madt_lnmi_t {
     acpi_madt_rec_hdr_t hdr;
     uint8_t apic_id;
     uint16_t flags;
     uint8_t lapic_lint;
-} __packed;
+} _packed;
 
 //
 // The IRQ routing flags are identical to MPS flags
@@ -819,7 +819,7 @@ union acpi_madt_ent_t {
 
     // ACPI_MADT_REC_TYPE_LNMI
     acpi_madt_lnmi_t lnmi;
-} __packed;
+} _packed;
 
 struct acpi_madt_t {
     // sig == "APIC"
@@ -829,7 +829,7 @@ struct acpi_madt_t {
 
     // 1 = Dual 8259 PICs installed
     uint32_t flags;
-} __packed;
+} _packed;
 
 //
 // HPET ACPI info
@@ -921,7 +921,7 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
     return result;
 }
 
-static __always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
+static _always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
 {
     uint8_t sum = 0;
     for (size_t i = 0; i < len; ++i)
@@ -1055,7 +1055,7 @@ static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
     acpi_hpet_list.push_back(acpi_hdr->addr);
 }
 
-static __always_inline uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
+static _always_inline uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
 {
     return checksum_bytes((char const *)hdr, hdr->len);
 }
@@ -2027,7 +2027,7 @@ static uint64_t acpi_pm_timer_ns(uint32_t diff)
     return (uint64_t(diff) * 1000000000) / ACPI_PM_TIMER_HZ;
 }
 
-__used
+_used
 static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
 {
     uint32_t st = acpi_pm_timer_raw();

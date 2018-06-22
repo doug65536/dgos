@@ -270,7 +270,7 @@ struct iso9660_rr_hdr_t {
     char sig[2];
     uint8_t len;
     uint8_t ver;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_hdr_t) == 4);
 
@@ -282,7 +282,7 @@ struct iso9660_rr_px_t {
     uint32_both_t st_uid;
     uint32_both_t st_gid;
     uint32_both_t st_ino;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_px_t) == 44);
 
@@ -291,7 +291,7 @@ struct iso9660_rr_pn_t {
     iso9660_rr_hdr_t hdr;
     uint32_both_t dev_hi;
     uint32_both_t dev_lo;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_pn_t) == 20);
 
@@ -300,7 +300,7 @@ struct iso9660_rr_sl_t {
     iso9660_rr_hdr_t hdr;
     uint8_t flags;
     // followed by variable length component
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_sl_t) == 5);
 
@@ -309,13 +309,13 @@ struct iso9660_rr_nm_t {
     iso9660_rr_hdr_t hdr;
     uint8_t flags;
     // followed by variable length name
-} __packed;
+} _packed;
 
 // Child link
 struct iso9660_rr_cl_t {
     iso9660_rr_hdr_t hdr;
     uint32_both_t lba;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_cl_t) == 12);
 
@@ -323,14 +323,14 @@ C_ASSERT(sizeof(iso9660_rr_cl_t) == 12);
 struct iso9660_rr_pl_t {
     iso9660_rr_hdr_t hdr;
     uint32_both_t lba;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_pl_t) == 12);
 
 // Relocated directory
 struct iso9660_rr_re_t {
     iso9660_rr_hdr_t hdr;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_re_t) == 4);
 
@@ -339,7 +339,7 @@ struct iso9660_rr_tf_t {
     iso9660_rr_hdr_t hdr;
     uint8_t flags;
     // followed by timestamps
-} __packed;
+} _packed;
 
 //C_ASSERT(sizeof(iso9660_tf_re_t) == 12);
 
@@ -349,7 +349,7 @@ struct iso9660_rr_sf_t {
     uint32_both_t virtual_size_hi;
     uint32_both_t virtual_size_lo;
     uint8_t table_depth;
-} __packed;
+} _packed;
 
 C_ASSERT(sizeof(iso9660_rr_sf_t) == 21);
 

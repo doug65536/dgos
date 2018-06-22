@@ -4,7 +4,7 @@
 .code64
 .section .smp.text
 
-// extern "C" __noreturn void code64_run_kernel(
+// extern "C" _noreturn void code64_run_kernel(
 //      uint64_t entry, void *params, uint64_t cr3, bool nx_available)
 // rdi = entry
 // rsi = params
