@@ -3,7 +3,7 @@
 #include "types.h"
 #include "elf64decl.h"
 
-#define ELF64_DEBUG    1
+#define ELF64_DEBUG    0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) PRINT(TSTR "elf64: " __VA_ARGS__)
 #else
