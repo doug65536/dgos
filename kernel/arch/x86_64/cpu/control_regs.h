@@ -376,7 +376,6 @@ static _always_inline void cpu_cs_set(uint16_t selector)
         "pushq %q[temp]\n\t"
         "lretq\n\t"
         "0:\n\t"
-        "add $8,%%rsp\n\t"
         : [temp] "=&r" (temp)
         : [selector] "r" (selector)
     );
