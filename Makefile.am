@@ -460,6 +460,7 @@ bootx64.efi: bootefi-amd64
 		--remove-section=.debug_line \
 		--remove-section=.debug_str \
 		--remove-section=.debug_macro \
+		--remove-section=.debug_loc \
 		$< $@
 
 #bootia32.efi: bootefi-i386
