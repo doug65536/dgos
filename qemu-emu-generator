@@ -29,7 +29,15 @@ do
 							'echo -e -n ' $'\'' '\ec' $'\'' \
 							' >> dump/qemu-debug-out' \
 							$'\n' $'\t' \
-							'$(QEMU_SUDO) $(QEMU) $(QEMU_COMMON)' \
+							'$(QEMU_SUDO) $(QEMU)' \
+							' \' $'\n' $'\t\t' \
+							"\$(QEMU_EARLY)" \
+							' \' $'\n' $'\t\t' \
+							"\$(QEMU_COMMON)" \
+							' \' $'\n' $'\t\t' \
+							'-drive' \
+							" file=$IMG$DIF,format=raw,media=$QM" \
+							",werror=report,rerror=report,id=bootdrv" \
 							' \' $'\n' $'\t\t' \
 							$QUP \
 							' \' $'\n' $'\t\t' \
@@ -38,10 +46,6 @@ do
 							$QEM \
 							' \' $'\n' $'\t\t' \
 							$BOOT \
-							' \' $'\n' $'\t\t' \
-							'-drive' \
-							" file=$IMG$DIF,format=raw,media=$QM" \
-							",werror=report,rerror=report" \
 							' \' $'\n' $'\t\t' \
 							$QRT \
 							' \' $'\n' $'\t\t' \
