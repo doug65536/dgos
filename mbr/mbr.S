@@ -13,7 +13,7 @@
 
 .text
 
-# ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 .globl entry
 entry:
 	ljmp $0,$ UNRELOCATED(entry_start)
@@ -21,13 +21,13 @@ entry:
 init_stack:
 	.int 0x0000FFF8
 
-# ----------------------------------------------------------------------
-# The bootstrap code starts here
+// ----------------------------------------------------------------------
+// The bootstrap code starts here
 .align 64
 .globl entry_start
 entry_start:
-	# Incoming registers:
-	#  DL = drive
+	// Incoming registers:
+	//  DL = drive
 
 	xorw %ax,%ax
 	movw %ax,%ds
@@ -38,11 +38,11 @@ entry_start:
 //	test %ax,%ax
 //	jz 0b
 
-	# Initialize stack to top of first 64KB
+	// Initialize stack to top of first 64KB
 	movw init_stack-0x600+0x7c00+2,%ss
 	movw init_stack-0x600+0x7c00,%sp
 
-	# Relocate to 0x600
+	// Relocate to 0x600
 	movw $0x7c00,%si
 	movw $0x0600,%di
 	movw $256,%cx
@@ -51,7 +51,7 @@ entry_start:
 	ljmpw $ 0,$ relocated_entry
 relocated_entry:
 
-	# Search for first bootable partition
+	// Search for first bootable partition
 	movw $partition_table,%si
 	movw $4,%cx
 0:
@@ -106,7 +106,7 @@ give_up:
 	int $0x18
 	jmp give_up
 
-# ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 .section .parttab
 
 .macro partition_table_entry active,lba_start,lba_sectors,type
@@ -140,7 +140,7 @@ give_up:
 .endm
 
 partition_table:
-	# partition_table_entry 1,128,(1 << (24-9)),0x0C
+	// partition_table_entry 1,128,(1 << (24-9)),0x0C
 	partition_table_entry_unused
 	partition_table_entry_unused
 	partition_table_entry_unused
