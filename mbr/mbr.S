@@ -29,6 +29,11 @@ entry_start:
     // Incoming registers:
     //  DL = drive
 
+    // Workaround for faulty BIOS, if DL is <= 0x80, use 0x80
+    test %dl,%dl
+    js 0f
+    mov $0x80,%dl
+0:
 
     xorw %ax,%ax
     movw %ax,%ds
