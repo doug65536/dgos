@@ -190,10 +190,10 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
                 read_count = 0x7F;
 
             // Don't cross 64KB boundary
-            if (((addr + read_size) & 0xFFFF0000) !=
-                    (addr & 0xFFFF0000)) {
+            if (((addr + read_size) & -(UINT64_C(64) << 10)) !=
+                    (addr & -(UINT64_C(64) << 10))) {
                 // Read up to next 64KB boundary
-                read_size = ((addr + read_size) & 0xFFFF0000) -
+                read_size = ((addr + read_size) & -(UINT64_C(64) << 10)) -
                         addr;
                 read_count = read_size >> log2_sector_size;
                 read_size = read_count << log2_sector_size;
@@ -239,7 +239,7 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
         } else {
             pkt.address = addr;
         }
-    };
+    }
 
     return true;
 }
