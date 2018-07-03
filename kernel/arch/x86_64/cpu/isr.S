@@ -574,15 +574,13 @@ exception_isr_handler:
     movq %r12,%rsi
     callq *%rax
 
-1:
-    movq %r12,%rax
+1:  movq %r12,%rax
     pop_cfi %r12
     pop_cfi %rbx
     pop_cfi %rbp
     retq
 
-0:
-    mov %ebx,%edi
+0:  mov %ebx,%edi
     mov %r12,%rsi
     pop_cfi %r12
     pop_cfi %rbx
@@ -607,8 +605,7 @@ exception_isr_handler:
 
     // Tail call to unhandled_exception_handler
 .align 16
-2:
-    leaq unhandled_exception_handler(%rip),%rax
+2:  leaq unhandled_exception_handler(%rip),%rax
     movq %r12,%rdi
     jmpq *%rax
 

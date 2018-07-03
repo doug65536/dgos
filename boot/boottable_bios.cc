@@ -11,14 +11,13 @@
 #define BOOTTBL_TRACE(...) ((void)0)
 #endif
 
-
-static void *boottbl_ebda_ptr()
+void *boottbl_ebda_ptr()
 {
     // Read address of EBDA from BIOS data area
     return (void*)uintptr_t(*(uint16_t*)0x40E << 4);
 }
 
-static uint8_t boottbl_checksum(char const *bytes, size_t len)
+uint8_t boottbl_checksum(char const *bytes, size_t len)
 {
     uint8_t sum = 0;
     for (size_t i = 0; i < len; ++i)

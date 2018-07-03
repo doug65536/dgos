@@ -1529,7 +1529,7 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
 
         cmd_issue(port_num, slot, &cfis,
                   (request.op == slot_op_t::read &&
-                   pi.is_atapi) ? &atapifis : 0,
+                   pi.is_atapi) ? &atapifis : nullptr,
                   fis_size, prdts, ranges_count);
 
         data = (char*)data + transferred;
@@ -1632,7 +1632,7 @@ void ahci_if_t::rebase()
         // One cmd tbl per slot
         port_buffer_size += sizeof(hba_cmd_tbl_ent_t) * 32;
 
-        buffers = mmap(0, port_buffer_size,
+        buffers = mmap(nullptr, port_buffer_size,
                              PROT_READ | PROT_WRITE,
                              addr_type, -1, 0);
         memset(buffers, 0, port_buffer_size);

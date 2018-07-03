@@ -31,7 +31,7 @@ void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory)
 static void invoke_eth_dev_factories(void*)
 {
     for (unsigned df = 0; df < eth_factory_count; ++df) {
-        eth_dev_base_t **devices = 0;
+        eth_dev_base_t **devices = nullptr;
         unsigned added_devices = eth_factories[df]->detect(&devices);
         for (unsigned i = 0; i < added_devices; ++i)
             eth_devices[eth_device_count++] = devices[i];

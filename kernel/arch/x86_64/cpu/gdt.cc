@@ -105,7 +105,7 @@ static void gdt_set_tss_base(tss_t *base)
 
 void gdt_init_tss(int cpu_count)
 {
-    //tss_list = (tss_t*)mmap(0, sizeof(*tss_list) * cpu_count,
+    //tss_list = (tss_t*)mmap(nullptr, sizeof(*tss_list) * cpu_count,
     //                       PROT_READ | PROT_WRITE,
     //                       MAP_POPULATE, -1, 0);
 
@@ -113,7 +113,7 @@ void gdt_init_tss(int cpu_count)
         tss_t *tss = tss_list + i;
 
         for (int st = 0; st < 3; ++st) {
-            void *stack = mmap(0, TSS_STACK_SIZE,
+            void *stack = mmap(nullptr, TSS_STACK_SIZE,
                                PROT_READ | PROT_WRITE,
                                MAP_POPULATE, -1, 0);
             madvise(stack, PAGESIZE, MADV_DONTNEED);

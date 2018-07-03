@@ -29,9 +29,8 @@ code64_reloc_kernel:
 	// Relocation count
 	movl 12(%rdi),%r10d
 
-0:
 	// Read offset and addend
-	movq (%r9),%r11
+0:	movq (%r9),%r11
 	movq 16(%r9),%r12
 
 	// Add adjustment factor to addend

@@ -1,70 +1,88 @@
-AM_CXX=clang++
-AM_CC=clang
-AM_AR=gcc-ar
-AM_RANLIB=gcc-ranlib
-AC_SUBST([AM_CC])
-AC_SUBST([AM_CXX])
-AC_SUBST([AM_AR])
-AC_SUBST([AM_RANLIB])
+: ${CFLAGS=""}
+: ${CXXFLAGS=""}
 
 AC_INIT([dgos], [0.8])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIRS([m4])
 AC_CONFIG_FILES([Makefile])
-: ${CFLAGS=""}
-: ${CXXFLAGS=""}
 AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall -Wno-portability])
-AX_PROG_CC_FOR_BUILD
+#AX_PROG_CC_FOR_BUILD
 AX_PROG_CXX_FOR_BUILD
 AC_PROG_CXX
 AM_PROG_AS
-AM_PROG_AR
-AC_PROG_RANLIB
+#AM_PROG_AR
+#AC_PROG_RANLIB
 AC_LANG([C++])
 
 AC_CHECK_TOOL([OBJDUMP], [objdump], [NOT_FOUND])
 AS_IF([test x"$OBJDUMP" == x"NOT_FOUND"],
     [AC_MSG_FAILURE([Cannot find objdump])])
+AC_SUBST([OBJDUMP])
 
 AC_CHECK_TOOL([OBJCOPY], [objcopy], [NOT_FOUND])
 AS_IF([test x"$OBJCOPY" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find objcopy])])
+AC_SUBST([OBJCOPY])
+
+AC_CHECK_TOOL([AR], [ar], [NOT_FOUND])
+AS_IF([test x"$AR" == x"NOT_FOUND"],
+    [AC_MSG_FAILURE([Cannot find ar])])
+AC_SUBST([AR])
+
+AC_CHECK_TOOL([RANLIB], [ranlib], [NOT_FOUND])
+AS_IF([test x"$RANLIB" == x"NOT_FOUND"],
+    [AC_MSG_FAILURE([Cannot find ranlib])])
+AC_SUBST([RANLIB])
+
+AC_CHECK_PROGS([QEMU], [qemu-system-x86_64], [NOT_FOUND])
+AS_IF([test x"$QEMU" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find qemu-system-x86_64])])
+AC_SUBST([QEMU])
 
 AC_CHECK_PROGS([CP], [cp], [NOT_FOUND])
 AS_IF([test x"$CP" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find cp])])
+AC_SUBST([CP])
+
+AC_CHECK_PROGS([LN], [ln], [NOT_FOUND])
+AS_IF([test x"$LN" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find ln])])
+AC_SUBST([LN])
 
 AC_CHECK_PROGS([SED], [sed], [NOT_FOUND])
 AS_IF([test x"$SED" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find sed])])
+AC_SUBST([SED])
 
 AC_CHECK_PROGS([MKISOFS], [mkisofs genisoimage], [NOT_FOUND])
 AS_IF([test x"$MKISOFS" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Install mkisofs (or genisoimage) to build CD images])])
+AC_SUBST([MKISOFS])
 
 AC_CHECK_PROGS([GREP], [grep], [NOT_FOUND])
 AS_IF([test x"$GREP" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find grep])])
-
-AC_CHECK_PROGS([SED], [sed], [NOT_FOUND])
-AS_IF([test x"$SED" == x"NOT_FOUND"],
-	[AC_MSG_FAILURE([Cannot find sed])])
+AC_SUBST([GREP])
 
 AC_CHECK_PROGS([SORT], [sort], [NOT_FOUND])
 AS_IF([test x"$SORT" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find sort])])
+AC_SUBST([SORT])
 
 AC_CHECK_PROGS([GZIP], [gzip], [NOT_FOUND])
 AS_IF([test x"$GZIP" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find gzip])])
+AC_SUBST([GZIP])
 
 AC_CHECK_PROGS([TRUNCATE], [truncate], [NOT_FOUND])
 AS_IF([test x"$TRUNCATE" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find truncate])])
+AC_SUBST([TRUNCATE])
 
 AC_CHECK_PROGS([SHRED], [shred], [NOT_FOUND])
 AS_IF([test x"$SHRED" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find shred])])
+AC_SUBST([SHRED])
 
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
 [AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_IF
@@ -88,17 +106,39 @@ for flag in Wall Wextra Wpedantic Werror; do
 		[AS_VAR_APPEND([COMPILER_WERROR], [" -$flag"])])
 done
 
+AS_VAR_SET([INSTRUMENT_FUNCTIONS_FLAGS], [])
+AC_ARG_ENABLE(tracing,
+	AS_HELP_STRING([--enable-tracing],
+		[Enable call trace instrumentation]), [
+		AC_MSG_NOTICE([Call trace instrumentation enabled])
+
+		for flag in \
+			finstrument-functions D_CALL_TRACE_ENABLED
+		do
+			AX_CHECK_COMPILE_FLAG([-$flag],
+				[AS_VAR_APPEND([INSTRUMENT_FUNCTIONS_FLAGS], [" -$flag"])],
+				[], [$COMPILER_WERROR])
+		done
+	], [
+		# Not enabled, clear the value
+		AS_VAR_SET([INSTRUMENT_FUNCTION_FLAGS], [])
+	]
+)
+AC_SUBST([INSTRUMENT_FUNCTIONS_FLAGS])
+
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 \
-		ggdb3 fno-integrated-as Wno-unused-command-line-argument \
+		std=c++14 fno-fat-lto-objects gdwarf-4 \
+		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op Werror=return-type \
+		Wmultistatement-macros Warray-bounds Wformat-overflow \
 		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
-		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast
+		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
+		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
@@ -115,16 +155,26 @@ AC_SUBST([COMPILER_FLAGS])
 # fdevirtualize-at-ltrans fsched-stalled-insns=0
 
 # fgcse-las causes compiler segfaults
-AS_VAR_SET([OPTIMIZATION_FLAGS],[])
+AS_VAR_SET([OPTIMIZATION_FLAGS], [])
 for flag in \
-	O2 fstrict-aliasing
+	O2 fstrict-aliasing mtune=znver1
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
 		[], [$COMPILER_WERROR])
 done
 
-for flag in Wa,-g g ggdb3
+AS_VAR_SET([DEBUG_INFO_FLAGS], [])
+for flag in g gcolumn-info
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([DEBUG_INFO_FLAGS], [" -$flag"])],
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([DEBUG_INFO_FLAGS])
+
+AS_VAR_SET([ASM_DEBUG_INFO_FLAGS], [])
+for flag in Wa,-g g gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ASM_DEBUG_INFO_FLAGS], [" -$flag"])],
@@ -141,7 +191,8 @@ AX_CHECK_COMPILE_FLAG([-Oz],
 		[$COMPILER_WERROR])],
 	[$COMPILER_WERROR])
 for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
-		mno-align-stringops Wno-ignored-optimization-argument
+		mno-align-stringops Wno-ignored-optimization-argument \
+		fstack-usage
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([SMALLEST_CODE_FLAGS], [" -$flag"])]
@@ -149,7 +200,7 @@ do
 done
 AC_SUBST([SMALLEST_CODE_FLAGS])
 
-for flag in ffreestanding
+for flag in ffreestanding fbuiltin
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([FREESTANDING_FLAGS], [" -$flag"])]
@@ -171,7 +222,8 @@ for flag in \
 	m32 \
 	Wl,-m,elf_i386 \
 	Wl,-N \
-	Wl,--no-dynamic-linker
+	Wl,--no-dynamic-linker \
+	static
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ELF32_FLAGS], [" -$flag"])]
@@ -215,7 +267,8 @@ for flag in \
 	D__efi \
 	fshort-wchar \
 	Wl,-m,i386pep \
-	Wl,-pie Wl,-N \
+	Wl,-pie \
+	Wl,-N \
 	Wl,--no-dynamic-linker \
 	Wl,--subsystem,10
 do
@@ -258,10 +311,10 @@ AC_SUBST([LIBGCC_PE32])
 AC_SUBST([LIBGCC_PE64])
 
 AS_VAR_SET([NO_PIC_FLAGS], [])
-for flag in fno-pie fno-PIE fno-pic
+for flag in fno-pie fno-PIE fno-pic fno-PIC
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[AS_VAR_APPEND([NO_PIC_FLAGS], [" -$flag"])]
+		[AS_VAR_APPEND([NO_PIC_FLAGS], [" -$flag"])],
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([NO_PIC_FLAGS])
@@ -347,24 +400,68 @@ AS_VAR_SET([TUNE_FLAGS], [])
 #	[], [$COMPILER_WERROR])
 #AC_SUBST([TUNE_FLAGS])
 
-AC_ARG_ENABLE(optimize,
-	AS_HELP_STRING([--enable-optimize], [Enable size/speed optimizations]),
-	[
-		echo Enabling optimizations
-		OPTIMIZE_SIZE_FLAGS="$SMALLEST_CODE_FLAGS $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="$OPTIMIZATION_FLAGS"
-		OPTIMIZE_SPEED_FLAGS+=" $VECTORIZE_FLAGS $ENABLE_FRAMEPOINTER_FLAGS"
+AS_VAR_SET([OPTIMIZE_SPEED_FLAGS], [])
+AS_VAR_SET([OPTIMIZE_SIZE_FLAGS], [])
+AC_ARG_ENABLE(lto,
+	AS_HELP_STRING([--enable-lto],
+		[Enable link-time optimizations]), [
+		AC_MSG_NOTICE([Enabling LTO])
+
+		AS_VAR_SET([AR],[])
+		AC_CHECK_TOOL([AR], [gcc-ar], [NOT_FOUND])
+		AS_IF([test x"$AR" == x"NOT_FOUND"],
+			[AC_MSG_NOTICE([Cannot find gcc-ar, LTO probably won't work])])
+		AC_SUBST([AR])
+
+		AS_VAR_SET([RANLIB],[])
+		AC_CHECK_TOOL([RANLIB], [gcc-ranlib], [NOT_FOUND])
+		AS_IF([test x"$AR" == x"NOT_FOUND"],
+			[AC_MSG_NOTICE([Cannot find gcc-ranlib, LTO probably won't work])])
+		AC_SUBST([RANLIB])
+
+		AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" $SMALLEST_CODE_FLAGS"])
+		AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" $DISABLE_FRAMEPOINTER_FLAGS"])
+		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $OPTIMIZATION_FLAGS"])
+		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $VECTORIZE_FLAGS"])
+		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $ENABLE_FRAMEPOINTER_FLAGS"])
 
 		# $DISABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS+=" $TUNE_FLAGS"
-	],[
-		echo Disabling optimizations
-		OPTIMIZE_SIZE_FLAGS="-O0 $ENABLE_FRAMEPOINTER_FLAGS"
-		OPTIMIZE_SPEED_FLAGS="-O0 $ENABLE_FRAMEPOINTER_FLAGS"
-	])
+		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $TUNE_FLAGS"])
 
-AC_SUBST([DISABLE_OPTIMIZATION_FLAGS], ["-O0 $ENABLE_FRAMEPOINTER_FLAGS"])
+		# Disable debugging
+		AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" -g0"])
+		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" -g0"])
+	], [
+		AC_ARG_ENABLE(optimize,
+			AS_HELP_STRING([--enable-optimize],
+				[Enable size/speed optimizations]), [
+				AC_MSG_NOTICE([Enabling optimizations])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" $SMALLEST_CODE_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
+					[" $DISABLE_FRAMEPOINTER_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $OPTIMIZATION_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $VECTORIZE_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
+					[" $ENABLE_FRAMEPOINTER_FLAGS"])
 
+				# $DISABLE_FRAMEPOINTER_FLAGS"
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $TUNE_FLAGS"])
+			], [
+				AC_MSG_NOTICE([Disabling optimizations])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" -g -O0"])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
+					[" $ENABLE_FRAMEPOINTER_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" -g -O0"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
+					[" $ENABLE_FRAMEPOINTER_FLAGS"])
+			]
+		)
+	]
+)
+
+AS_VAR_SET([DISABLE_OPTIMIZATION_FLAGS], ["-O0 $ENABLE_FRAMEPOINTER_FLAGS"])
+
+AC_SUBST([DISABLE_OPTIMIZATION_FLAGS])
 AC_SUBST([OPTIMIZE_SIZE_FLAGS])
 AC_SUBST([OPTIMIZE_SPEED_FLAGS])
 

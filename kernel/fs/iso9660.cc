@@ -194,7 +194,7 @@ int iso9660_fs_t::name_to_ascii(
     char *ascii = (char*)ascii_buf;
     int codepoint;
     int out = 0;
-    char *lastdot = 0;
+    char *lastdot = nullptr;
 
     for (int i = 0; *utf8 && i < ISO9660_MAX_NAME; ++i) {
         codepoint = utf8_to_ucs4(utf8, &utf8);
@@ -423,13 +423,13 @@ iso9660_pt_rec_t *iso9660_fs_t::lookup_path(char const *path, int path_len)
                     lookup_path_cmp, this, 1);
 
         if (match < 0)
-            return 0;
+            return nullptr;
 
         key.parent = match + 1;
         key.name += key.len + 1;
     } while(!done);
 
-    return match >= 0 ? pt_ptrs[match] : 0;
+    return match >= 0 ? pt_ptrs[match] : nullptr;
 }
 
 void *iso9660_fs_t::lookup_sector(uint64_t lba)
@@ -479,11 +479,11 @@ iso9660_dir_ent_t *iso9660_fs_t::lookup_dirent(char const *pathname)
             lookup_sector(pt_rec_lba(pt_rec));
 
     if (!dir)
-        return 0;
+        return nullptr;
 
     size_t dir_len = dirent_size(dir);
 
-    iso9660_dir_ent_t *result = 0;
+    iso9660_dir_ent_t *result = nullptr;
     for (size_t ofs = 0; ofs < dir_len;
          ofs = next_dirent(dir, ofs)) {
         iso9660_dir_ent_t *de = (iso9660_dir_ent_t*)((char*)dir + ofs);
@@ -596,7 +596,7 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
     pt_alloc_size = round_up(pt_bytes, sector_shift);
 
     pt = (iso9660_pt_rec_t *)mmap(
-                0, pt_alloc_size, PROT_READ | PROT_WRITE,
+                nullptr, pt_alloc_size, PROT_READ | PROT_WRITE,
                 MAP_POPULATE, -1, 0);
     if (pt == MAP_FAILED)
         return false;
@@ -606,11 +606,11 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
         return false;
 
     // Count the path table entries
-    pt_count = walk_pt(0, 0);
+    pt_count = walk_pt(nullptr, nullptr);
 
     // Allocate path table entry pointer array
     pt_ptrs = (iso9660_pt_rec_t **)mmap(
-                0, sizeof(*pt_ptrs) * pt_count,
+                nullptr, sizeof(*pt_ptrs) * pt_count,
                 PROT_READ | PROT_WRITE, 0, -1, 0);
     if (pt_ptrs == MAP_FAILED)
         return false;
@@ -633,10 +633,10 @@ bool iso9660_fs_t::mount(fs_init_info_t *conn)
 void iso9660_fs_t::unmount()
 {
     munmap(pt, pt_bytes);
-    pt = 0;
+    pt = nullptr;
 
     munmap(pt_ptrs, sizeof(*pt_ptrs) * pt_count);
-    pt_ptrs = 0;
+    pt_ptrs = nullptr;
 }
 
 bool iso9660_fs_t::is_boot() const

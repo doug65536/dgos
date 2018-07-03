@@ -31,6 +31,36 @@ entry:
 
     debugind '2'
 
+#ifdef _CALL_TRACE_ENABLED
+    // Enable FSGSBASE ASAP if tracing
+    movq %cr4,%rax
+    orq $0x10000,%rax
+    movq %rax,%cr4
+
+    // Copy APIC ID into IA32_TSC_AUX
+    xorl %eax,%eax
+    cpuid
+    cmpl $ 0xB,%eax
+    jb .Lapic8bit
+
+    movl $ 0xB,%eax
+    cpuid
+    movl %edx,%eax
+    xorl %edx,%edx
+    jmp .Lset_tsc_aux
+
+.Lapic8bit:
+    movl $ 1,%eax
+    cpuid
+    shrl $ 24,%ebx
+    movl %ebx,%eax
+    xorl %edx,%edx
+
+.Lset_tsc_aux:
+    movl $ CPU_MSR_TSC_AUX,%ecx
+    wrmsr
+#endif
+
     // See if this is the bootstrap processor
     movl $ CPU_APIC_BASE_MSR,%ecx
     rdmsr
@@ -42,6 +72,13 @@ entry:
 ap_init:
     // This is not the bootstrap CPU
 
+    // Get off the bootloader stack immediately
+    // Use the low half of the BSP stack briefly until thread startup
+    leaq kernel_stack(%rip),%rdx
+    movq kernel_stack_size(%rip),%rbx
+    shrq $1,%rbx
+    leaq (%rdx,%rbx),%rsp
+
     xorl %ebp,%ebp
     pushq %rbp
 
@@ -49,8 +86,7 @@ ap_init:
     call mp_main
 
     // mp_main should not return
-0:
-    call halt_forever
+0:  call halt_forever
     // halt_forever should not return either!
     jmp 0b
 
@@ -179,8 +215,7 @@ exit:
     // Ignore exitcode
     // Kernel exit just calls destructors
     // and deliberately hangs
-0:
-    leaq ___dtors_st(%rip),%rdi
+0:  leaq ___dtors_st(%rip),%rdi
     leaq ___dtors_en(%rip),%rsi
     call invoke_function_array
 
@@ -197,14 +232,12 @@ invoke_function_array:
 
     movq %rdi,%rbx
     movq %rsi,%rbp
-0:
-    cmpq %rbx,%rbp
+0:  cmpq %rbx,%rbp
     jbe 0f
     call *(%rbx)
     addq $8,%rbx
     jmp 0b
-0:
-    pop_cfi %rbp
+0:  pop_cfi %rbp
     pop_cfi %rbp
     pop_cfi %rbx
 

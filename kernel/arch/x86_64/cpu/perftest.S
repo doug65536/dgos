@@ -10,8 +10,7 @@ mov_seg_perf:
 
 	xor %eax,%eax
 .align 16
-0:
-	mov (%rsp),%rax
+0:	mov (%rsp),%rax
 	mov %ax,%ds
 	shr $16,%rax
 	mov %ax,%es
@@ -535,8 +534,7 @@ str_seg_perf:
 	mov $1000000,%ecx
 
 .align 16
-0:
-	mov %ds,(%rsp)
+0:	mov %ds,(%rsp)
 	mov %es,2(%rsp)
 	mov %fs,4(%rsp)
 	mov %gs,6(%rsp)
@@ -849,8 +847,7 @@ rdfsbase_perf:
 	mov $60000000,%esi
 
 	.align 16
-0:
-	iter_block
+0:	iter_block
 	iter_block
 	iter_block
 	iter_block

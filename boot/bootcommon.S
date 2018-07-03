@@ -1,42 +1,64 @@
 #include "gdt_sel.h"
 
-.section .text
+.section .early
 .code16
 
+// Return address in bx
+.global early_init
+early_init:
+    lss initial_stack_ptr,%sp
+    
+    call clear_bss
+    
+    call detect_ancient_cpu
+    
+    fninit
+    
+    // 32 bit instructions are okay if detect_ancient_cpu returned...
+    
+    movzwl %sp,%esp
+    jmp *%bx
+
+initial_stack_ptr:
+    .word ___initial_stack
+    .word 0
+    
 // Inputs:
 //  edx:eax: parameter to partition boot call
 //  ecx: pointer to partition boot function
+//  ebx: return address
 
 .global boot
 boot:
-    push %ebp
-    mov %esp,%ebp
-    push %edi
-    push %esi
-    push %ebx
+    movl $ ___initial_stack,%esp
+    pushl %ebx
+    pushl %ebp
+    movl %esp,%ebp
+    pushl %edi
+    pushl %esi
 
-    // esi:ebx holds boot LBA
+    // esi:ebx holds boot function 64-bit parameter
     // edi holds boot function
-    mov %eax,%ebx
-    mov %edx,%esi
-    mov %ecx,%edi
+    movl %eax,%ebx
+    movl %edx,%esi
+    movl %ecx,%edi
 
     call idt_init
     call check_a20
     // Do need a20 toggles if A20 was off
-    xor $1,%al
+    xorb $1,%al
     movb %al,need_a20_toggle
 
     cli
-    movl $gdt,2+gdtr
-    lgdt gdtr
+    movl $ gdt,2+gdtr
+    lgdtl gdtr
 
-    mov %cr0,%eax
-    bts $0,%eax
-    mov %eax,%cr0
+    movl %cr0,%eax
+    btsl $0,%eax
+    movl %eax,%cr0
 
-    movw $GDT_SEL_PM_DATA32,%dx
-    ljmp $GDT_SEL_PM_CODE32,$pmode_entry
+    movw $ GDT_SEL_PM_DATA32,%dx
+    ljmp $ GDT_SEL_PM_CODE32,$ pmode_entry
 pmode_entry:
 .code32
     movw %dx,%ds
@@ -44,9 +66,8 @@ pmode_entry:
     movw %dx,%fs
     movw %dx,%gs
     movw %dx,%ss
-    mov $___initial_stack,%esp
 
-    xor %eax,%eax
+    xorl %eax,%eax
     lldt %ax
 
     // Clean eflags
@@ -57,8 +78,8 @@ pmode_entry:
 
     call ctors_invoke
 
-    mov %ebx,%eax
-    mov %esi,%edx
+    movl %ebx,%eax
+    movl %esi,%edx
     call *%edi
 
     call cpu_a20_exitpm
@@ -66,8 +87,7 @@ pmode_entry:
     // Jump to 16 bit protected mode and load segments
     ljmp $ GDT_SEL_PM_CODE16,$ 0f
 .code16
-0:
-    movw $ GDT_SEL_PM_DATA16,%dx
+0:  movw $ GDT_SEL_PM_DATA16,%dx
     movw %dx,%ds
     movw %dx,%es
     movw %dx,%fs
@@ -75,27 +95,23 @@ pmode_entry:
     movw %dx,%ss
 
     // Turn off protected mode
-    mov %cr0,%eax
-    btr $0,%eax
-    mov %eax,%cr0
+    movl %cr0,%eax
+    btrl $0,%eax
+    movl %eax,%cr0
 
     // Jump to real mode
     ljmp $0,$ 0f
-0:
+0:  xorw %dx,%dx
+    movw %dx,%ds
+    movw %dx,%es
+    movw %dx,%fs
+    movw %dx,%gs
+    movw %dx,%ss
 
-    xor %edx,%edx
-    mov %dx,%ds
-    mov %dx,%es
-    mov %dx,%fs
-    mov %dx,%gs
-    mov %dx,%ss
-
-    pop %ebx
-    pop %esi
-    pop %edi
-    pop %ebp
-
-    ret
+    popl %esi
+    popl %edi
+    leavel
+    retl
 
 .code16
 
@@ -182,8 +198,7 @@ detection_failed:
     mov $str_suffix,%di
     call fail_str
     cli
-0:
-    hlt
+0:  hlt
     jmp 0b
 
 // Clobbers si, di
@@ -191,14 +206,12 @@ fail_str:
     mov $0xb800,%ax
     mov %ax,%es
     mov $0x0800,%ax
-0:
-    lodsb
+0:  lodsb
     test %al,%al
     jz 0f
     stosw
     jmp 0b
-0:
-    xor %ax,%ax
+0:  xor %ax,%ax
     mov %ax,%es
     ret
 
@@ -239,8 +252,7 @@ idt_init:
     mov $idt,%edx
     mov $0,%ecx
 
-0:
-    movw isr_table(,%ecx,4),%ax
+0:  movw isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
     movw $GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
     movw $0,4(%edx,%ecx,8)
@@ -312,8 +324,8 @@ clear_bss:
     pushw %di
     pushw %cx
     pushw %ax
-    movw $ ___bss_start,%di
-    movw $ ___bss_end,%cx
+    movw $ ___bss_st,%di
+    movw $ ___bss_en,%cx
     subw %di,%cx
     xorb %al,%al
     cld

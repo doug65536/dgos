@@ -162,15 +162,14 @@ isr_handler:
 	ja 0f
 	movl $isr_names,%r11d
 	movzwl (%r11,%r12,2),%esi
-0:
-	call text_out
+0:	call text_out
 
 	# Registers
 
 	xor %r13d,%r13d
-1:
+	
 	# Line
-	imul $160,%r13d,%edi
+1:	imul $160,%r13d,%edi
 	add $0xb8000 + 80*4,%edi
 
 	# Register name
@@ -189,9 +188,9 @@ isr_handler:
 	cmp $14,%r13d
 	jb 1b
 
-0:
+
 	# Undocumented instruction "icebp"
-	.byte 0xf1
+0:	.byte 0xf1
 	hlt
 	jmp 0b
 
@@ -212,8 +211,7 @@ text_out:
 	jnz text_out
 	out %al,$0xe9
 	jmp text_out
-0:
-	ret
+0:	ret
 
 # print 2 digit hex (8 bits), see hex_common
 hex2_out:
@@ -238,8 +236,7 @@ hex16_out:
 # clobber: %rdx %r8b
 hex_common:
 	mov $hexlookup,%r9d
-0:
-	xorq %rdx,%rdx
+0:	xorq %rdx,%rdx
 	shld $4,%rsi,%rdx
 	shl $4,%rsi
 	movb (%r9,%rdx,1),%al
@@ -250,8 +247,7 @@ hex_common:
 	pop %rax
 	jnz 0f
 	out %al,$0xe9
-0:
-	leaq 2(%rdi),%rdi
+0:	leaq 2(%rdi),%rdi
 	decb %r8b
 	jnz 0b
 	ret

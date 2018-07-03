@@ -50,5 +50,5 @@ int con_draw_xy(int x, int y, char const *s, int attr)
 
 int con_exists()
 {
-    return console_display != 0;
+    return console_display != nullptr;
 }

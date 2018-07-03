@@ -1,3 +1,4 @@
 #pragma once
+#include "types.h"
 
-extern "C" void gdb_init();
+extern "C" _noreturn void gdb_init();

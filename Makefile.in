@@ -102,8 +102,9 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	bootfat-elf$(EXEEXT) bootiso-elf$(EXEEXT) \
-	bootefi-amd64$(EXEEXT) kernel-generic$(EXEEXT) \
-	kernel-bmi$(EXEEXT) user-shell$(EXEEXT) hello.km$(EXEEXT)
+	bootefi-amd64$(EXEEXT) bootpxe-bios-elf$(EXEEXT) \
+	kernel-generic$(EXEEXT) kernel-bmi$(EXEEXT) \
+	user-shell$(EXEEXT) hello.km$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -374,6 +375,14 @@ bootiso_elf_OBJECTS = $(am_bootiso_elf_OBJECTS)
 bootiso_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootiso_elf_LINK = $(CXXLD) $(bootiso_elf_CXXFLAGS) $(CXXFLAGS) \
 	$(bootiso_elf_LDFLAGS) $(LDFLAGS) -o $@
+am_bootpxe_bios_elf_OBJECTS =  \
+	boot/bootpxe_bios_elf-pxe-bios.$(OBJEXT) \
+	boot/bootpxe_bios_elf-pxemain.$(OBJEXT) \
+	boot/bootpxe_bios_elf-malloc_bios.$(OBJEXT)
+bootpxe_bios_elf_OBJECTS = $(am_bootpxe_bios_elf_OBJECTS)
+bootpxe_bios_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
+bootpxe_bios_elf_LINK = $(CXXLD) $(bootpxe_bios_elf_CXXFLAGS) \
+	$(CXXFLAGS) $(bootpxe_bios_elf_LDFLAGS) $(LDFLAGS) -o $@
 am_hello_km_OBJECTS = modules/hello/hello_km-hello.$(OBJEXT)
 hello_km_OBJECTS = $(am_hello_km_OBJECTS)
 hello_km_LDADD = $(LDADD)
@@ -472,6 +481,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_bmi-entry.$(OBJEXT) \
 	kernel/device/kernel_bmi-ahci.$(OBJEXT) \
 	kernel/device/kernel_bmi-ata.$(OBJEXT) \
 	kernel/device/kernel_bmi-e9debug.$(OBJEXT) \
+	kernel/device/kernel_bmi-eainstrument.$(OBJEXT) \
 	kernel/device/kernel_bmi-i350.$(OBJEXT) \
 	kernel/device/kernel_bmi-ide.$(OBJEXT) \
 	kernel/device/kernel_bmi-keyb8042.$(OBJEXT) \
@@ -594,6 +604,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/device/kernel_generic-ahci.$(OBJEXT) \
 	kernel/device/kernel_generic-ata.$(OBJEXT) \
 	kernel/device/kernel_generic-e9debug.$(OBJEXT) \
+	kernel/device/kernel_generic-eainstrument.$(OBJEXT) \
 	kernel/device/kernel_generic-i350.$(OBJEXT) \
 	kernel/device/kernel_generic-ide.$(OBJEXT) \
 	kernel/device/kernel_generic-keyb8042.$(OBJEXT) \
@@ -692,15 +703,15 @@ am__v_CCLD_1 =
 SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
 	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
-	$(hello_km_SOURCES) $(kernel_bmi_SOURCES) \
-	$(kernel_generic_SOURCES) $(mbr_elf_SOURCES) \
-	$(user_shell_SOURCES)
+	$(bootpxe_bios_elf_SOURCES) $(hello_km_SOURCES) \
+	$(kernel_bmi_SOURCES) $(kernel_generic_SOURCES) \
+	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
 	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
-	$(hello_km_SOURCES) $(kernel_bmi_SOURCES) \
-	$(kernel_generic_SOURCES) $(mbr_elf_SOURCES) \
-	$(user_shell_SOURCES)
+	$(bootpxe_bios_elf_SOURCES) $(hello_km_SOURCES) \
+	$(kernel_bmi_SOURCES) $(kernel_generic_SOURCES) \
+	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -757,7 +768,7 @@ CSCOPE = cscope
 AM_RECURSIVE_TARGETS = cscope
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/diskfat.mk \
 	$(srcdir)/diskiso.mk $(srcdir)/symbols.mk \
-	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
+	$(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
 	$(top_srcdir)/build-aux/config.sub \
 	$(top_srcdir)/build-aux/depcomp \
@@ -785,11 +796,7 @@ am__distuninstallcheck_listfiles = $(distuninstallcheck_listfiles) \
 distcleancheck_listfiles = find . -type f -print
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
-AM_AR = @AM_AR@
-AM_CC = @AM_CC@
-AM_CXX = @AM_CXX@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
-AM_RANLIB = @AM_RANLIB@
 AR = @AR@
 ASM_DEBUG_INFO_FLAGS = @ASM_DEBUG_INFO_FLAGS@
 AUTOCONF = @AUTOCONF@
@@ -822,6 +829,7 @@ CXXFLAGS = @CXXFLAGS@
 CXXFLAGS_FOR_BUILD = @CXXFLAGS_FOR_BUILD@
 CXX_FOR_BUILD = @CXX_FOR_BUILD@
 CYGPATH_W = @CYGPATH_W@
+DEBUG_INFO_FLAGS = @DEBUG_INFO_FLAGS@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DISABLE_FRAMEPOINTER_FLAGS = @DISABLE_FRAMEPOINTER_FLAGS@
@@ -841,6 +849,7 @@ INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
+INSTRUMENT_FUNCTIONS_FLAGS = @INSTRUMENT_FUNCTIONS_FLAGS@
 LDFLAGS = @LDFLAGS@
 LDFLAGS_FOR_BUILD = @LDFLAGS_FOR_BUILD@
 LIBGCC_ELF32 = @LIBGCC_ELF32@
@@ -849,6 +858,7 @@ LIBGCC_PE32 = @LIBGCC_PE32@
 LIBGCC_PE64 = @LIBGCC_PE64@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LN = @LN@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
@@ -878,6 +888,7 @@ PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PE32_FLAGS = @PE32_FLAGS@
 PE64_FLAGS = @PE64_FLAGS@
+QEMU = @QEMU@
 RANLIB = @RANLIB@
 REGPARM_FLAGS = @REGPARM_FLAGS@
 SED = @SED@
@@ -895,7 +906,6 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
-ac_ct_AR = @ac_ct_AR@
 ac_ct_CC = @ac_ct_CC@
 ac_ct_CC_FOR_BUILD = @ac_ct_CC_FOR_BUILD@
 ac_ct_CXX = @ac_ct_CXX@
@@ -950,7 +960,9 @@ DUMPDIR = $(top_builddir)/dump
 BUILT_SOURCES = \
 	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
-	generated_headers
+	$(DUMPDIR)/call-trace-out \
+	generated_headers \
+	trace-tool
 
 
 #  -> Link mbr-elf
@@ -984,10 +996,10 @@ mbr_elf_SOURCES = \
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static
+	$(NO_LTO_FLAGS) -static \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 mbr_elf_CFLAGS = 
 mbr_elf_CCASFLAGS = \
@@ -1001,7 +1013,7 @@ mbr_elf_CCASFLAGS = \
 mbr_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
 	$(REGPARM_FLAGS) \
-	-Wl,-m,elf_i386 \
+	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
@@ -1023,10 +1035,10 @@ boot1_elf_SOURCES = \
 boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static
+	$(NO_LTO_FLAGS) -static \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 boot1_elf_CFLAGS = 
 boot1_elf_CCASFLAGS = \
@@ -1119,7 +1131,8 @@ libbootsect_a_SOURCES = \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
 	boot/boottable.cc \
-	boot/boottable_bios.cc
+	boot/boottable_bios.cc \
+	boot/log2.h
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \
@@ -1130,7 +1143,6 @@ libbootsect_a_CXXFLAGS = \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
-	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -1141,20 +1153,21 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 libbootsect_a_CFLAGS = 
 libbootsect_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
 	$(COMPILER_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
-	$(NO_UNWIND_TABLES_FLAGS)
+	$(NO_UNWIND_TABLES_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 
 # boot code
@@ -1177,26 +1190,22 @@ bootfat_elf_CCASFLAGS = \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
-	$(ELF32_FLAGS) \
 	$(LIBGCC_ELF32) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
 	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	-nostartfiles -nodefaultlibs -nostdlib
 
 EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
@@ -1221,8 +1230,8 @@ bootiso_elf_CCASFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 bootiso_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
@@ -1231,12 +1240,11 @@ bootiso_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
@@ -1244,6 +1252,42 @@ EXTRA_bootiso_elf_DEPENDENCIES = \
 bootiso_elf_LDADD = \
 	libbootsect.a \
 	$(LIBGCC_ELF32)
+
+
+# bootpxe-bios
+bootpxe_bios_elf_SOURCES = \
+	boot/bootpxe-bios.ld \
+	boot/pxe-bios.S \
+	boot/pxe.h \
+	boot/pxemain.cc \
+	boot/pxemain.h \
+	boot/malloc_bios.cc
+
+bootpxe_bios_elf_CXXFLAGS = \
+	$(bootiso_elf_CXXFLAGS)
+
+bootpxe_bios_elf_CCASFLAGS = \
+	$(bootiso_elf_CCASFLAGS)
+
+bootpxe_bios_elf_LDFLAGS = \
+	-DFROM_LDFLAGS \
+	$(ELF32_FLAGS) \
+	$(LIBGCC_ELF32) \
+	$(REGPARM_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(LINKER_DEBUG) \
+	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
+	-Wl,-Map,$(top_builddir)/bootpxe-bios.map \
+	$(LINKER_SEL) -static -Bsymbolic \
+	-nostartfiles -nodefaultlibs -nostdlib \
+	$(COMPILER_FLAGS)
+
+bootpxe_bios_elf_LDADD = \
+	libbootsect.a \
+	$(LIBGCC_ELF32)
+
+EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
+	boot/bootpxe-bios.ld
 
 
 # efi
@@ -1575,6 +1619,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/ata.h \
 	kernel/device/e9debug.cc \
 	kernel/device/e9debug.h \
+	kernel/device/eainstrument.cc \
+	kernel/device/eainstrument.h \
 	kernel/device/e9debug.h \
 	kernel/device/i350.cc \
 	kernel/device/ide.cc \
@@ -1643,11 +1689,13 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
-	$(FREESTANDING_FLAGS)
+	$(FREESTANDING_FLAGS) \
+	$(INSTRUMENT_FUNCTIONS_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(INSTRUMENT_FUNCTIONS_FLAGS)
 
 KERNEL_LDFLAGS_SHARED = \
 	-DFROM_LDFLAGS \
@@ -1975,7 +2023,6 @@ LIBC_TESTS = \
 	$(top_srcdir)/libc/tests/test_string.cc
 
 LIBC_CXXFLAGS = \
-	-ggdb \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
@@ -2014,12 +2061,15 @@ user_shell_CCASFLAGS = \
 
 user_shell_LDADD = libc.a
 EXTRA_user_shell_DEPENDENCIES = libc.a
-QEMU = qemu-system-x86_64
-QEMU_EXTRA_DEPS = random-mem.img $(DUMPDIR)/qemu-debug-out
+QEMU_EXTRA_DEPS = \
+	random-mem.img \
+	$(DUMPDIR)/qemu-debug-out \
+	$(DUMPDIR)/call-trace-out
+
 QEMU_CPUS = 2
 QEMU_CORES = 2
 QEMU_THREADS = 1
-QEMU_CPU = max,migratable=false,host-cache-info=true
+QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 QEMU_RAM = 5G
 QEMU_MEMFILL = \
 	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
@@ -2054,8 +2104,10 @@ QEMU_MONITOR = \
 
 QEMU_DEBUGCON = \
 	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
-	-mon qemu-monitor,mode=readline \
-	-device isa-debugcon,chardev=qemu-debug-out
+	-device isa-debugcon,chardev=qemu-debug-out \
+	-chardev pipe,path=$(DUMPDIR)/call-trace-out,id=call-trace-out \
+	-device isa-debugcon,iobase=0xEA,chardev=call-trace-out \
+	-mon qemu-monitor,mode=readline
 
 
 #-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
@@ -2077,35 +2129,43 @@ QEMU_COMMON = \
 	$(QEMU_MEMFILL)
 
 SECTOR_SZ = 512
+QEMU_RT = $(QEMU_RT_$(1))
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
-QEMU_HDCTL_DEV_nvme_fat = \
-	-machine q35 \
-	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0,logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
-
-QEMU_HDCTL_DEV_usb_fat = \
-	-machine q35 \
-	-device usb-storage,bus=xhci.0,drive=bootdrv,bootindex=0
-
-QEMU_HDCTL_DEV_ahci_fat = -machine q35 -global ide-hd.logical_block_size=$(SECTOR_SZ)
-QEMU_HDCTL_DEV_ahci_iso = -machine q35
-QEMU_HDCTL_DEV_ide_fat = -machine pc
-QEMU_HDCTL_DEV_ide_iso = -machine pc
-QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none,id=bootdrv
-QEMU_DIF_ahci = ,id=ahcictl
-QEMU_DIF_ide = 
-QEMU_DIF_usb = ,if=none
+QEMU_DRV_COMMON = format=raw,werror=report,rerror=report,id=bootdrv
+QEMU_DRV = -drive id=bootdrv,if=none,file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
+QEMU_MACHINE = $(QEMU_MACHINE_$(1))
+QEMU_MACHINE_nvme = -machine q35
+QEMU_MACHINE_ahci = -machine q35
+QEMU_MACHINE_usb = -machine q35
+QEMU_MACHINE_ide = -machine pc
+QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
+QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_ahci = -device ich9-ahci,drive=bootdrv,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_ide = -device piix4-ide,drive=bootdrv,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_usb = -device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
+QEMU_HDCTL = $(QEMU_MACHINE_$(1)) $(QEMU_HDCTL_DEV_$(1))
+QEMU_MEDIA = $(QEMU_MEDIA_$(1))
 QEMU_MEDIA_fat = disk
 QEMU_MEDIA_iso = cdrom
+QEMU_IMAGE = $(QEMU_IMAGE_$(1))
 QEMU_IMAGE_fat = fatdisk.img
 QEMU_IMAGE_iso = isodisk.img
+QEMU_NP = $(QEMU_NP_$(1))
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
+QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu max,la57
-#-cpu EPYC
+QEMU_EMU_tcg = -cpu max,fsgsbase
+#-cpu max,la57
+QEMU_BOOT = $(QEMU_BOOT_$(1))
 QEMU_BOOT_bios = -bios $(top_srcdir)/emu/seabios.rom
 QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
+QEMU_BOOTMEDIA = $(QEMU_BOOTMEDIA_$(1)_$(2))
+QEMU_BOOTMEDIA_hd_bios = 
+QEMU_BOOTMEDIA_hd_efi = 
+QEMU_BOOTMEDIA_pxe_bios = -boot n -net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
+QEMU_BOOTMEDIA_pxe_efi = -boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
 
 # ----------------------------------------------------------------------------
 # Bochs launcher
@@ -2845,6 +2905,16 @@ boot/bootiso_elf-mpentry_bios.$(OBJEXT): boot/$(am__dirstamp) \
 bootiso-elf$(EXEEXT): $(bootiso_elf_OBJECTS) $(bootiso_elf_DEPENDENCIES) $(EXTRA_bootiso_elf_DEPENDENCIES) 
 	@rm -f bootiso-elf$(EXEEXT)
 	$(AM_V_CXXLD)$(bootiso_elf_LINK) $(bootiso_elf_OBJECTS) $(bootiso_elf_LDADD) $(LIBS)
+boot/bootpxe_bios_elf-pxe-bios.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootpxe_bios_elf-pxemain.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootpxe_bios_elf-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+
+bootpxe-bios-elf$(EXEEXT): $(bootpxe_bios_elf_OBJECTS) $(bootpxe_bios_elf_DEPENDENCIES) $(EXTRA_bootpxe_bios_elf_DEPENDENCIES) 
+	@rm -f bootpxe-bios-elf$(EXEEXT)
+	$(AM_V_CXXLD)$(bootpxe_bios_elf_LINK) $(bootpxe_bios_elf_OBJECTS) $(bootpxe_bios_elf_LDADD) $(LIBS)
 modules/hello/$(am__dirstamp):
 	@$(MKDIR_P) modules/hello
 	@: > modules/hello/$(am__dirstamp)
@@ -3126,6 +3196,9 @@ kernel/device/kernel_bmi-ahci.$(OBJEXT):  \
 kernel/device/kernel_bmi-ata.$(OBJEXT): kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_bmi-e9debug.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_bmi-eainstrument.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_bmi-i350.$(OBJEXT):  \
@@ -3463,6 +3536,9 @@ kernel/device/kernel_generic-ata.$(OBJEXT):  \
 kernel/device/kernel_generic-e9debug.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-eainstrument.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-i350.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3625,6 +3701,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-bootiso.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-malloc_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-mpentry_bios.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-array_list.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bioscall.Po@am__quote@
@@ -3729,6 +3808,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-ata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-dev_usb_ctl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-e9debug.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-i350.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-ide.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_bmi-iocp.Po@am__quote@
@@ -3749,6 +3829,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-dev_usb_ctl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-e9debug.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-i350.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ide.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-iocp.Po@am__quote@
@@ -4227,6 +4308,20 @@ boot/bootiso_elf-mpentry_bios.obj: boot/mpentry_bios.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootiso_elf-mpentry_bios.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_elf-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
+
+boot/bootpxe_bios_elf-pxe-bios.o: boot/pxe-bios.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootpxe_bios_elf-pxe-bios.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Tpo -c -o boot/bootpxe_bios_elf-pxe-bios.o `test -f 'boot/pxe-bios.S' || echo '$(srcdir)/'`boot/pxe-bios.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/pxe-bios.S' object='boot/bootpxe_bios_elf-pxe-bios.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootpxe_bios_elf-pxe-bios.o `test -f 'boot/pxe-bios.S' || echo '$(srcdir)/'`boot/pxe-bios.S
+
+boot/bootpxe_bios_elf-pxe-bios.obj: boot/pxe-bios.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootpxe_bios_elf-pxe-bios.obj -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Tpo -c -o boot/bootpxe_bios_elf-pxe-bios.obj `if test -f 'boot/pxe-bios.S'; then $(CYGPATH_W) 'boot/pxe-bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/pxe-bios.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/pxe-bios.S' object='boot/bootpxe_bios_elf-pxe-bios.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootpxe_bios_elf-pxe-bios.obj `if test -f 'boot/pxe-bios.S'; then $(CYGPATH_W) 'boot/pxe-bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/pxe-bios.S'; fi`
 
 kernel/arch/x86_64/kernel_bmi-entry.o: kernel/arch/x86_64/entry.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/kernel_bmi-entry.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_bmi-entry.Tpo -c -o kernel/arch/x86_64/kernel_bmi-entry.o `test -f 'kernel/arch/x86_64/entry.S' || echo '$(srcdir)/'`kernel/arch/x86_64/entry.S
@@ -7240,6 +7335,34 @@ boot/bootiso_elf-malloc_bios.obj: boot/malloc_bios.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootiso_elf-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
 
+boot/bootpxe_bios_elf-pxemain.o: boot/pxemain.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-pxemain.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Tpo -c -o boot/bootpxe_bios_elf-pxemain.o `test -f 'boot/pxemain.cc' || echo '$(srcdir)/'`boot/pxemain.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/pxemain.cc' object='boot/bootpxe_bios_elf-pxemain.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-pxemain.o `test -f 'boot/pxemain.cc' || echo '$(srcdir)/'`boot/pxemain.cc
+
+boot/bootpxe_bios_elf-pxemain.obj: boot/pxemain.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-pxemain.obj -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Tpo -c -o boot/bootpxe_bios_elf-pxemain.obj `if test -f 'boot/pxemain.cc'; then $(CYGPATH_W) 'boot/pxemain.cc'; else $(CYGPATH_W) '$(srcdir)/boot/pxemain.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/pxemain.cc' object='boot/bootpxe_bios_elf-pxemain.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-pxemain.obj `if test -f 'boot/pxemain.cc'; then $(CYGPATH_W) 'boot/pxemain.cc'; else $(CYGPATH_W) '$(srcdir)/boot/pxemain.cc'; fi`
+
+boot/bootpxe_bios_elf-malloc_bios.o: boot/malloc_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Tpo -c -o boot/bootpxe_bios_elf-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootpxe_bios_elf-malloc_bios.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
+
+boot/bootpxe_bios_elf-malloc_bios.obj: boot/malloc_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-malloc_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Tpo -c -o boot/bootpxe_bios_elf-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootpxe_bios_elf-malloc_bios.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
+
 modules/hello/hello_km-hello.o: modules/hello/hello.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hello_km_CXXFLAGS) $(CXXFLAGS) -MT modules/hello/hello_km-hello.o -MD -MP -MF modules/hello/$(DEPDIR)/hello_km-hello.Tpo -c -o modules/hello/hello_km-hello.o `test -f 'modules/hello/hello.cc' || echo '$(srcdir)/'`modules/hello/hello.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) modules/hello/$(DEPDIR)/hello_km-hello.Tpo modules/hello/$(DEPDIR)/hello_km-hello.Po
@@ -8499,6 +8622,20 @@ kernel/device/kernel_bmi-e9debug.obj: kernel/device/e9debug.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/e9debug.cc' object='kernel/device/kernel_bmi-e9debug.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-e9debug.obj `if test -f 'kernel/device/e9debug.cc'; then $(CYGPATH_W) 'kernel/device/e9debug.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/e9debug.cc'; fi`
+
+kernel/device/kernel_bmi-eainstrument.o: kernel/device/eainstrument.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-eainstrument.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Tpo -c -o kernel/device/kernel_bmi-eainstrument.o `test -f 'kernel/device/eainstrument.cc' || echo '$(srcdir)/'`kernel/device/eainstrument.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Tpo kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/eainstrument.cc' object='kernel/device/kernel_bmi-eainstrument.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-eainstrument.o `test -f 'kernel/device/eainstrument.cc' || echo '$(srcdir)/'`kernel/device/eainstrument.cc
+
+kernel/device/kernel_bmi-eainstrument.obj: kernel/device/eainstrument.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-eainstrument.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Tpo -c -o kernel/device/kernel_bmi-eainstrument.obj `if test -f 'kernel/device/eainstrument.cc'; then $(CYGPATH_W) 'kernel/device/eainstrument.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/eainstrument.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Tpo kernel/device/$(DEPDIR)/kernel_bmi-eainstrument.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/eainstrument.cc' object='kernel/device/kernel_bmi-eainstrument.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_bmi-eainstrument.obj `if test -f 'kernel/device/eainstrument.cc'; then $(CYGPATH_W) 'kernel/device/eainstrument.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/eainstrument.cc'; fi`
 
 kernel/device/kernel_bmi-i350.o: kernel/device/i350.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_bmi_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_bmi-i350.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_bmi-i350.Tpo -c -o kernel/device/kernel_bmi-i350.o `test -f 'kernel/device/i350.cc' || echo '$(srcdir)/'`kernel/device/i350.cc
@@ -10082,6 +10219,20 @@ kernel/device/kernel_generic-e9debug.obj: kernel/device/e9debug.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-e9debug.obj `if test -f 'kernel/device/e9debug.cc'; then $(CYGPATH_W) 'kernel/device/e9debug.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/e9debug.cc'; fi`
 
+kernel/device/kernel_generic-eainstrument.o: kernel/device/eainstrument.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-eainstrument.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Tpo -c -o kernel/device/kernel_generic-eainstrument.o `test -f 'kernel/device/eainstrument.cc' || echo '$(srcdir)/'`kernel/device/eainstrument.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Tpo kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/eainstrument.cc' object='kernel/device/kernel_generic-eainstrument.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-eainstrument.o `test -f 'kernel/device/eainstrument.cc' || echo '$(srcdir)/'`kernel/device/eainstrument.cc
+
+kernel/device/kernel_generic-eainstrument.obj: kernel/device/eainstrument.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-eainstrument.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Tpo -c -o kernel/device/kernel_generic-eainstrument.obj `if test -f 'kernel/device/eainstrument.cc'; then $(CYGPATH_W) 'kernel/device/eainstrument.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/eainstrument.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Tpo kernel/device/$(DEPDIR)/kernel_generic-eainstrument.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/eainstrument.cc' object='kernel/device/kernel_generic-eainstrument.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-eainstrument.obj `if test -f 'kernel/device/eainstrument.cc'; then $(CYGPATH_W) 'kernel/device/eainstrument.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/eainstrument.cc'; fi`
+
 kernel/device/kernel_generic-i350.o: kernel/device/i350.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-i350.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-i350.Tpo -c -o kernel/device/kernel_generic-i350.o `test -f 'kernel/device/i350.cc' || echo '$(srcdir)/'`kernel/device/i350.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-i350.Tpo kernel/device/$(DEPDIR)/kernel_generic-i350.Po
@@ -10885,6 +11036,11 @@ $(top_builddir)/bootfat-bin: $(top_builddir)/bootfat-elf
 $(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
+# bootpxe-bin
+
+$(top_builddir)/bootpxe-bios-bin: $(top_builddir)/bootpxe-bios-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+
 bootx64.efi: bootefi-amd64
 	$(OBJCOPY) \
 		--remove-section=.eh_frame \
@@ -10897,6 +11053,21 @@ bootx64.efi: bootefi-amd64
 		--remove-section=.debug_macro \
 		--remove-section=.debug_loc \
 		$< $@
+
+$(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
+	$(LN) -f "$<" "$@"
+
+# ----------------------------------------------------------------------------
+# parse-trace
+
+trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
+	$(CXX_FOR_BUILD) -g -o "$@" \
+		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
+		-fwhole-program \
+		$^ \
+		-Wl,--start-group \
+		-lncurses -ltinfo -lgpm -ldl \
+		-Wl,--end-group
 
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 	echo "#define TERMESC_RED" \
@@ -11133,6 +11304,12 @@ clean-local:
 	rm -f $(top_builddir)/mbr-bin
 	rm -f $(top_builddir)/bootfat-bin
 	rm -f $(top_builddir)/bootiso-bin
+	rm -f $(top_builddir)/bootpxe-bios-bin
+
+	rm -f $(top_builddir)/bootefi-pe
+	rm -f $(top_builddir)/bootx64.efi
+	rm -f $(top_builddir)/bootia32.efi
+
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/bootfat.sym
 	rm -f $(top_builddir)/bootiso.sym
@@ -11143,15 +11320,12 @@ clean-local:
 	rm -f $(top_builddir)/mbr.map
 	rm -f $(top_builddir)/bootfat.map
 	rm -f $(top_builddir)/bootiso.map
+	rm -f $(top_builddir)/bootpxe-bios.map
 	rm -f $(top_builddir)/bootefi-pe.map
 	rm -f $(top_builddir)/bootefi-amd64.map
 	rm -f $(top_builddir)/bootefi-i386.map
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-bmi.map
-
-	rm -f $(top_builddir)/bootefi-pe
-	rm -f $(top_builddir)/bootx64.efi
-	rm -f $(top_builddir)/bootia32.efi
 
 	rm -f $(top_builddir)/mbr.dis.gz
 	rm -f $(top_builddir)/bootefi-i386.dis.gz
@@ -11253,6 +11427,10 @@ random-mem.img:
 # QEMU launcher
 
 $(DUMPDIR)/qemu-debug-out:
+	mkdir -p "$(@D)"
+	mkfifo "$@"
+
+$(DUMPDIR)/call-trace-out:
 	mkdir -p "$(@D)"
 	mkfifo "$@"
 

@@ -30,10 +30,8 @@ code64_run_kernel:
     or $ CPU_MSR_EFER_NX,%eax
     wrmsr
 
-0:
-
     // Switch to kernel page tables
-    mov %r13,%cr3
+0:  mov %r13,%cr3
     
     // Flush global pages
     mov %cr4,%rax

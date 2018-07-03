@@ -160,7 +160,7 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
         pkt.hdr.sizeof_packet = sizeof(pkt.hdr);
         pkt.hdr.segoff = ((uint32_t(addr) >> 4) << 16) |
                 (uint32_t(addr) & 0xF);
-    } else if (disk_support_64bit_addr()) {
+    } else if (0 && disk_support_64bit_addr()) {
         pkt.hdr.sizeof_packet = sizeof(pkt);
         pkt.hdr.segoff = 0xFFFFFFFF;
         pkt.address = addr;
@@ -185,9 +185,11 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
         size_t read_size = read_count << log2_sector_size;
 
         if (unlikely(careful)) {
-            // Limit sector count to 7-bit number
-            if (read_count > 0x7F)
-                read_count = 0x7F;
+            // Limit to half of a 64KB region, since a full 64KB is impossible
+            if (read_count > 0x40) {
+                read_count = 0x40;
+                read_size = read_count << log2_sector_size;
+            }
 
             // Don't cross 64KB boundary
             if (((addr + read_size) & -(UINT64_C(64) << 10)) !=

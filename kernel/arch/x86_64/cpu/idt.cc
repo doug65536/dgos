@@ -34,24 +34,24 @@ uint32_t xsave_supported_states;
 uint32_t xsave_enabled_states;
 
 static format_flag_info_t const cpu_eflags_info[] = {
-    { "ID",   1,                    0, CPU_EFLAGS_ID_BIT   },
-    { "VIP",  1,                    0, CPU_EFLAGS_VIP_BIT  },
-    { "VIF",  1,                    0, CPU_EFLAGS_VIF_BIT  },
-    { "AC",   1,                    0, CPU_EFLAGS_AC_BIT   },
-    { "VM",   1,                    0, CPU_EFLAGS_VM_BIT   },
-    { "RF",   1,                    0, CPU_EFLAGS_RF_BIT   },
-    { "NT",   1,                    0, CPU_EFLAGS_NT_BIT   },
-    { "IOPL", CPU_EFLAGS_IOPL_MASK, 0, CPU_EFLAGS_IOPL_BIT },
-    { "OF",   1,                    0, CPU_EFLAGS_OF_BIT   },
-    { "DF",   1,                    0, CPU_EFLAGS_DF_BIT   },
-    { "IF",   1,                    0, CPU_EFLAGS_IF_BIT   },
-    { "TF",   1,                    0, CPU_EFLAGS_TF_BIT   },
-    { "SF",   1,                    0, CPU_EFLAGS_SF_BIT   },
-    { "ZF",   1,                    0, CPU_EFLAGS_ZF_BIT   },
-    { "AF",   1,                    0, CPU_EFLAGS_AF_BIT   },
-    { "PF",   1,                    0, CPU_EFLAGS_PF_BIT   },
-    { "CF",   1,                    0, CPU_EFLAGS_CF_BIT   },
-    { 0,      0,                    0, -1                  }
+    { "ID",   1,                    nullptr, CPU_EFLAGS_ID_BIT   },
+    { "VIP",  1,                    nullptr, CPU_EFLAGS_VIP_BIT  },
+    { "VIF",  1,                    nullptr, CPU_EFLAGS_VIF_BIT  },
+    { "AC",   1,                    nullptr, CPU_EFLAGS_AC_BIT   },
+    { "VM",   1,                    nullptr, CPU_EFLAGS_VM_BIT   },
+    { "RF",   1,                    nullptr, CPU_EFLAGS_RF_BIT   },
+    { "NT",   1,                    nullptr, CPU_EFLAGS_NT_BIT   },
+    { "IOPL", CPU_EFLAGS_IOPL_MASK, nullptr, CPU_EFLAGS_IOPL_BIT },
+    { "OF",   1,                    nullptr, CPU_EFLAGS_OF_BIT   },
+    { "DF",   1,                    nullptr, CPU_EFLAGS_DF_BIT   },
+    { "IF",   1,                    nullptr, CPU_EFLAGS_IF_BIT   },
+    { "TF",   1,                    nullptr, CPU_EFLAGS_TF_BIT   },
+    { "SF",   1,                    nullptr, CPU_EFLAGS_SF_BIT   },
+    { "ZF",   1,                    nullptr, CPU_EFLAGS_ZF_BIT   },
+    { "AF",   1,                    nullptr, CPU_EFLAGS_AF_BIT   },
+    { "PF",   1,                    nullptr, CPU_EFLAGS_PF_BIT   },
+    { "CF",   1,                    nullptr, CPU_EFLAGS_CF_BIT   },
+    { nullptr,0,                    nullptr, -1                  }
 };
 
 static char const *cpu_mxcsr_rc[] = {
@@ -62,22 +62,22 @@ static char const *cpu_mxcsr_rc[] = {
 };
 
 static format_flag_info_t const cpu_mxcsr_info[] = {
-    { "IE",  1,                 0,            CPU_MXCSR_IE_BIT  },
-    { "DE",  1,                 0,            CPU_MXCSR_DE_BIT  },
-    { "ZE",  1,                 0,            CPU_MXCSR_ZE_BIT  },
-    { "OE",  1,                 0,            CPU_MXCSR_OE_BIT  },
-    { "UE",  1,                 0,            CPU_MXCSR_UE_BIT  },
-    { "PE",  1,                 0,            CPU_MXCSR_PE_BIT  },
-    { "DAZ", 1,                 0,            CPU_MXCSR_DAZ_BIT },
-    { "IM",  1,                 0,            CPU_MXCSR_IM_BIT  },
-    { "DM",  1,                 0,            CPU_MXCSR_DM_BIT  },
-    { "ZM",  1,                 0,            CPU_MXCSR_ZM_BIT  },
-    { "OM",  1,                 0,            CPU_MXCSR_OM_BIT  },
-    { "UM",  1,                 0,            CPU_MXCSR_UM_BIT  },
-    { "PM",  1,                 0,            CPU_MXCSR_PM_BIT  },
-    { "RC",  CPU_MXCSR_RC_BITS, cpu_mxcsr_rc, CPU_MXCSR_RC_BIT  },
-    { "FZ",  1,                 0,            CPU_MXCSR_FZ_BIT  },
-    { 0,     0,                 0,            -1                }
+    { "IE",     1,                 nullptr,            CPU_MXCSR_IE_BIT  },
+    { "DE",     1,                 nullptr,            CPU_MXCSR_DE_BIT  },
+    { "ZE",     1,                 nullptr,            CPU_MXCSR_ZE_BIT  },
+    { "OE",     1,                 nullptr,            CPU_MXCSR_OE_BIT  },
+    { "UE",     1,                 nullptr,            CPU_MXCSR_UE_BIT  },
+    { "PE",     1,                 nullptr,            CPU_MXCSR_PE_BIT  },
+    { "DAZ",    1,                 nullptr,            CPU_MXCSR_DAZ_BIT },
+    { "IM",     1,                 nullptr,            CPU_MXCSR_IM_BIT  },
+    { "DM",     1,                 nullptr,            CPU_MXCSR_DM_BIT  },
+    { "ZM",     1,                 nullptr,            CPU_MXCSR_ZM_BIT  },
+    { "OM",     1,                 nullptr,            CPU_MXCSR_OM_BIT  },
+    { "UM",     1,                 nullptr,            CPU_MXCSR_UM_BIT  },
+    { "PM",     1,                 nullptr,            CPU_MXCSR_PM_BIT  },
+    { "RC",     CPU_MXCSR_RC_BITS, cpu_mxcsr_rc,       CPU_MXCSR_RC_BIT  },
+    { "FZ",     1,                 nullptr,            CPU_MXCSR_FZ_BIT  },
+    { nullptr,  0,                 nullptr,            -1                }
 };
 
 static char const *cpu_fpucw_pc[] = {
@@ -88,33 +88,33 @@ static char const *cpu_fpucw_pc[] = {
 };
 
 static format_flag_info_t const cpu_fpucw_info[] = {
-    { "IM", 1,                 0,            CPU_FPUCW_IM_BIT },
-    { "DM", 1,                 0,            CPU_FPUCW_DM_BIT },
-    { "ZM", 1,                 0,            CPU_FPUCW_ZM_BIT },
-    { "OM", 1,                 0,            CPU_FPUCW_OM_BIT },
-    { "UM", 1,                 0,            CPU_FPUCW_UM_BIT },
-    { "PM", 1,                 0,            CPU_FPUCW_PM_BIT },
-    { "PC", CPU_FPUCW_PC_BITS, cpu_fpucw_pc, CPU_FPUCW_PC_BIT },
-    { "RC", CPU_FPUCW_RC_BITS, cpu_mxcsr_rc, CPU_FPUCW_RC_BIT },
-    { 0,    0,                 0,            -1               }
+    { "IM",     1,                  nullptr,            CPU_FPUCW_IM_BIT },
+    { "DM",     1,                  nullptr,            CPU_FPUCW_DM_BIT },
+    { "ZM",     1,                  nullptr,            CPU_FPUCW_ZM_BIT },
+    { "OM",     1,                  nullptr,            CPU_FPUCW_OM_BIT },
+    { "UM",     1,                  nullptr,            CPU_FPUCW_UM_BIT },
+    { "PM",     1,                  nullptr,            CPU_FPUCW_PM_BIT },
+    { "PC",     CPU_FPUCW_PC_BITS,  cpu_fpucw_pc,       CPU_FPUCW_PC_BIT },
+    { "RC",     CPU_FPUCW_RC_BITS,  cpu_mxcsr_rc,       CPU_FPUCW_RC_BIT },
+    { nullptr,  0,                  nullptr,            -1               }
 };
 
 static format_flag_info_t const cpu_fpusw_info[] = {
-    { "IE",    1,                  0, CPU_FPUSW_IE_BIT  },
-    { "DE",    1,                  0, CPU_FPUSW_DE_BIT  },
-    { "ZE",    1,                  0, CPU_FPUSW_ZE_BIT  },
-    { "OE",    1,                  0, CPU_FPUSW_OE_BIT  },
-    { "UE",    1,                  0, CPU_FPUSW_UE_BIT  },
-    { "PE",    1,                  0, CPU_FPUSW_PE_BIT  },
-    { "SF",    1,                  0, CPU_FPUSW_SF_BIT  },
-    { "ES",    1,                  0, CPU_FPUSW_ES_BIT  },
-    { "C0(c)", 1,                  0, CPU_FPUSW_C0_BIT  },
-    { "C1",    1,                  0, CPU_FPUSW_C1_BIT  },
-    { "C2(p)", 1,                  0, CPU_FPUSW_C2_BIT  },
-    { "TOP",   CPU_FPUSW_TOP_BITS, 0, CPU_FPUSW_TOP_BIT },
-    { "C3(z)", 1,                  0, CPU_FPUSW_C3_BIT  },
-    { "B",     1,                  0, CPU_FPUSW_B_BIT   },
-    { 0,       0,                  0, -1,               }
+    { "IE",    1,                   nullptr, CPU_FPUSW_IE_BIT  },
+    { "DE",    1,                   nullptr, CPU_FPUSW_DE_BIT  },
+    { "ZE",    1,                   nullptr, CPU_FPUSW_ZE_BIT  },
+    { "OE",    1,                   nullptr, CPU_FPUSW_OE_BIT  },
+    { "UE",    1,                   nullptr, CPU_FPUSW_UE_BIT  },
+    { "PE",    1,                   nullptr, CPU_FPUSW_PE_BIT  },
+    { "SF",    1,                   nullptr, CPU_FPUSW_SF_BIT  },
+    { "ES",    1,                   nullptr, CPU_FPUSW_ES_BIT  },
+    { "C0(c)", 1,                   nullptr, CPU_FPUSW_C0_BIT  },
+    { "C1",    1,                   nullptr, CPU_FPUSW_C1_BIT  },
+    { "C2(p)", 1,                   nullptr, CPU_FPUSW_C2_BIT  },
+    { "TOP",   CPU_FPUSW_TOP_BITS,  nullptr, CPU_FPUSW_TOP_BIT },
+    { "C3(z)", 1,                   nullptr, CPU_FPUSW_C3_BIT  },
+    { "B",     1,                   nullptr, CPU_FPUSW_B_BIT   },
+    { nullptr, 0,                   nullptr, -1,               }
 };
 
 static char const reserved_exception[] = "Reserved";
@@ -596,7 +596,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // Segment registers
     for (int i = 0; i < 4; ++i) {
-        printdbg("%s=%04x\n",
+        printdbg("%s=%#.4x\n",
                  seg_names[i],
                  ctx->gpr.s.r[i]);
     }
@@ -607,42 +607,42 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // Exception
     if (ISR_CTX_INTR(ctx) < 32) {
-        printdbg("Exception 0x%02lx %s\n",
+        printdbg("Exception %#02lx %s\n",
                  ISR_CTX_INTR(ctx),
                  exception_names[ISR_CTX_INTR(ctx)]);
     } else {
-        printdbg("Interrupt 0x%02lx\n", ISR_CTX_INTR(ctx));
+        printdbg("Interrupt %#02lx\n", ISR_CTX_INTR(ctx));
     }
 
     // mxcsr and description
     if (has_fpu_ctx) {
         cpu_describe_mxcsr(fmt_buf, sizeof(fmt_buf), ISR_CTX_SSE_MXCSR(ctx));
-        printdbg("mxcsr=%04x %s\n", ISR_CTX_SSE_MXCSR(ctx), fmt_buf);
+        printdbg("mxcsr=%#.4x %s\n", ISR_CTX_SSE_MXCSR(ctx), fmt_buf);
 
         // fpucw and description
         cpu_describe_fpucw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FCW(ctx));
-        printdbg("fpucw=%04x %s\n", ISR_CTX_FPU_FCW(ctx), fmt_buf);
+        printdbg("fpucw=%#.4x %s\n", ISR_CTX_FPU_FCW(ctx), fmt_buf);
 
         // fpusw and description
         cpu_describe_fpusw(fmt_buf, sizeof(fmt_buf), ISR_CTX_FPU_FSW(ctx));
-        printdbg("fpusw=%04x %s\n", ISR_CTX_FPU_FSW(ctx), fmt_buf);
+        printdbg("fpusw=%#.4x %s\n", ISR_CTX_FPU_FSW(ctx), fmt_buf);
     }
 
     // fault address
     printdbg("cr2=%16lx\n", cpu_fault_address_get());
 
     // error code
-    printdbg("Error code 0x%16lx\n", ISR_CTX_ERRCODE(ctx));
+    printdbg("Error code %#16lx\n", ISR_CTX_ERRCODE(ctx));
 
     // rflags (it's actually only 22 bits) and description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf), ISR_CTX_REG_RFLAGS(ctx));
     printdbg("rflags=%06lx %s\n", ISR_CTX_REG_RFLAGS(ctx), fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%16p\n", fsbase);
+    printdbg("fsbase=%18p\n", fsbase);
 
     // gsbase
-    printdbg("gsbase=%16p\n", gsbase);
+    printdbg("gsbase=%18p\n", gsbase);
 
     printdbg("-------------------------------------------\n");
 
@@ -681,7 +681,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
         // Segment register name
         con_draw_xy(37+i*8, 18, seg_names[i], color);
         // Segment register value
-        snprintf(fmt_buf, sizeof(fmt_buf), "=%04x ",
+        snprintf(fmt_buf, sizeof(fmt_buf), "=%#.4x ",
                  ISR_CTX_REG_SEG_n(ctx, i));
         con_draw_xy(39+i*8, 18, fmt_buf, color);
     }
@@ -701,20 +701,20 @@ void dump_context(isr_context_t *ctx, int to_screen)
     if (ISR_CTX_INTR(ctx) < 32) {
         // exception
         con_draw_xy(0, 17, "Exception", color);
-        snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx %s",
+        snprintf(fmt_buf, sizeof(fmt_buf), " %#02lx %s",
                  ISR_CTX_INTR(ctx),
                  exception_names[ISR_CTX_INTR(ctx)]);
         con_draw_xy(9, 17, fmt_buf, color);
     } else {
         con_draw_xy(0, 17, "Interrupt", color);
-        snprintf(fmt_buf, sizeof(fmt_buf), " 0x%02lx",
+        snprintf(fmt_buf, sizeof(fmt_buf), " %#02lx",
                  ISR_CTX_INTR(ctx));
         con_draw_xy(9, 17, fmt_buf, color);
     }
 
     if (has_fpu_ctx) {
         // MXCSR
-        width = snprintf(fmt_buf, sizeof(fmt_buf), "=%04x",
+        width = snprintf(fmt_buf, sizeof(fmt_buf), "=%#.4x",
                          ISR_CTX_SSE_MXCSR(ctx));
         con_draw_xy(63-width, 16, "mxcsr", color);
         con_draw_xy(68-width, 16, fmt_buf, color);
@@ -733,7 +733,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // error code
     con_draw_xy(0, 18, "Error code", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), " 0x%16lx",
+    snprintf(fmt_buf, sizeof(fmt_buf), " %#16lx",
              ISR_CTX_ERRCODE(ctx));
     con_draw_xy(10, 18, fmt_buf, color);
 
@@ -750,12 +750,12 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%16p ", fsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%18p ", fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%16p ", gsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%18p ", gsbase);
     con_draw_xy(6, 21, fmt_buf, color);
 
     if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)
@@ -780,10 +780,10 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
 
     if (ISR_CTX_INTR(ctx) == INTR_EX_OPCODE) {
         uint8_t const *chk = (uint8_t const *)ISR_CTX_REG_RIP(ctx);
-        printk("Opcode = %02x\n", *chk);
+        printk("Opcode = %#.2x\n", *chk);
     }
 
-    printk("\nUnhandled exception 0x%zx (%s) at RIP=%p\n",
+    printk("\nUnhandled exception %#zx (%s) at RIP=%p\n",
            ISR_CTX_INTR(ctx), name ? name : "??", (void*)ISR_CTX_REG_RIP(ctx));
 
     dump_context(ctx, 1);
@@ -818,7 +818,7 @@ void idt_clone_debug_exception_dispatcher(void)
     size_t bp_entry_ofs = bp_entry - ___isr_st;
     size_t debug_entry_ofs = debug_entry - ___isr_st;
 
-    char *clone = (char*)mmap(0, isr_size, PROT_READ | PROT_WRITE | PROT_EXEC,
+    char *clone = (char*)mmap(nullptr, isr_size, PROT_READ | PROT_WRITE | PROT_EXEC,
                        MAP_POPULATE, -1, 0);
 
     memcpy(clone, ___isr_st, isr_size);

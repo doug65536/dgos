@@ -74,14 +74,6 @@ static _always_inline uint64_t cpu_xcr_change_bits(
 //#define XCR0_PT                 (1<<XCR0_PT_BIT)
 //#define XCR0_PKRU               (1<<XCR0_PKRU_BIT)
 
-const char *cpu_choose_kernel()
-{
-//    if (cpu_has_bmi())
-//        return "dgos-kernel-bmi";
-//    else
-        return "dgos-kernel-generic";
-}
-
 _section(".smp.data") bool nx_available;
 uint32_t gp_available;
 

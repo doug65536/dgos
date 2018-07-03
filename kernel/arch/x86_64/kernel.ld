@@ -111,7 +111,7 @@ SECTIONS {
 		*(.got.plt)
 	} :readonly
 
-	.rela.dyn : ALIGN(64) {
+	.rela : ALIGN(64) {
 		PROVIDE_HIDDEN(___rela_dyn = .);
 		*(.rela.init)
 		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
@@ -128,6 +128,8 @@ SECTIONS {
 		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
 		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
 		*(.rela.ifunc)
+		*(.rela*)
+		*(.rel*)
 	} :readonly
 
 	.rela.plt : ALIGN(64) {
@@ -182,6 +184,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(SORT(.bss.*))
+		*(.dynbss)
 		*(COMMON)
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
@@ -204,19 +207,34 @@ SECTIONS {
 	. = ALIGN(4096);
 	PROVIDE_HIDDEN(___init_brk = .);
 
-	.debug          0 : { *(.debug)         }
-	.debug_info		0 : { *(.debug_info)    }
-	.debug_abbrev	0 : { *(.debug_abbrev)  }
-	.debug_aranges	0 : { *(.debug_aranges) }
-	.debug_ranges	0 : { *(.debug_ranges)  }
-	.debug_frame	0 : { *(.debug_frame)   }
-	.debug_macro	0 : { *(.debug_macro)   }
-	.debug_line		0 : { *(.debug_line)    }
-	.debug_str		0 : { *(.debug_str)     }
-	.debug_loc		0 : { *(.debug_loc)     }
-	.comment        0 : { *(.comment)       }
+	.debug          0 : { *(.debug)         } :readonly
+	.debug_info		0 : { *(.debug_info)    } :readonly
+	.debug_abbrev	0 : { *(.debug_abbrev)  } :readonly
+	.debug_aranges	0 : { *(.debug_aranges) } :readonly
+	.debug_ranges	0 : { *(.debug_ranges)  } :readonly
+	.debug_frame	0 : { *(.debug_frame)   } :readonly
+	.debug_macro	0 : { *(.debug_macro)   } :readonly
+	.debug_line		0 : { *(.debug_line)    } :readonly
+	.debug_str		0 : { *(.debug_str)     } :readonly
+	.debug_loc		0 : { *(.debug_loc)     } :readonly
+	.comment        0 : { *(.comment)       } :readonly
+
+/*
+	/DISCARD/		0 : { *(.debug)         } :readonly
+	/DISCARD/		0 : { *(.debug_info)    } :readonly
+	/DISCARD/		0 : { *(.debug_abbrev)  } :readonly
+	/DISCARD/		0 : { *(.debug_aranges) } :readonly
+	/DISCARD/		0 : { *(.debug_ranges)  } :readonly
+	/DISCARD/		0 : { *(.debug_frame)   } :readonly
+	/DISCARD/		0 : { *(.debug_macro)   } :readonly
+	/DISCARD/		0 : { *(.debug_line)    } :readonly
+	/DISCARD/		0 : { *(.debug_str)     } :readonly
+	/DISCARD/		0 : { *(.debug_loc)     } :readonly
+	/DISCARD/		0 : { *(.comment)       } :readonly
+*/
 
 	/DISCARD/		0 : { *(.interp)               }
+	/DISCARD/		0 : { *(.gnu*)                 }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }
 }

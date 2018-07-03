@@ -304,8 +304,8 @@ if_list_t ide_if_factory_t::detect(void)
                            &dev->chan[0].ports.irq, sizeof(uint8_t));
         }
 
-        IDE_TRACE("Found PCI IDE interface at 0x%x/0x%x/irq%d"
-                  " - 0x%x/0x%x/irq%d\n",
+        IDE_TRACE("Found PCI IDE interface at %#x/%#x/irq%d"
+                  " - %#x/%#x/irq%d\n",
                   dev->chan[0].ports.cmd,
                 dev->chan[0].ports.ctl, dev->chan[0].ports.irq,
                 dev->chan[1].ports.cmd, dev->chan[1].ports.ctl,
@@ -763,7 +763,7 @@ void ide_if_t::ide_chan_t::detect_devices()
 
             // Allocate page for PRD list
             dma_cur_prd = (bmdma_prd_t*)mmap(
-                        0, PAGESIZE, PROT_READ | PROT_WRITE,
+                        nullptr, PAGESIZE, PROT_READ | PROT_WRITE,
                         MAP_32BIT | MAP_POPULATE |
                         MAP_UNINITIALIZED, -1, 0);
 
@@ -773,7 +773,7 @@ void ide_if_t::ide_chan_t::detect_devices()
             //dma_prd_physaddr = mphysaddr(dma_cur_prd);
 
             // Allocate bounce buffer for DMA
-            dma_bounce = mmap(0, unit.max_multiple << log2_sector_size,
+            dma_bounce = mmap(nullptr, unit.max_multiple << log2_sector_size,
                               PROT_READ | PROT_WRITE,
                               MAP_32BIT | MAP_POPULATE |
                               MAP_UNINITIALIZED, -1, 0);
@@ -936,7 +936,7 @@ void ide_if_t::ide_chan_t::trace_status(int slave, char const *msg,
     char status_text[64];
     format_flags_register(status_text, sizeof(status_text),
                           status, ide_flags_status);
-    IDE_TRACE("%s: chan=%d, slave=%d, status=0x%x (%s)\n",
+    IDE_TRACE("%s: chan=%d, slave=%d, status=%#x (%s)\n",
               msg, secondary, slave, status, status_text);
 }
 
@@ -953,7 +953,7 @@ void ide_if_t::ide_chan_t::trace_error(int slave,
     format_flags_register(status_text, sizeof(error_text),
                           err, ide_flags_error);
 
-    IDE_TRACE("%s: chan=%d, slave=%d, status=0x%x (%s), err=0x%x (%s)\n",
+    IDE_TRACE("%s: chan=%d, slave=%d, status=%#x (%s), err=%#x (%s)\n",
               msg, secondary, slave, status, status_text, err, error_text);
 }
 
@@ -1084,7 +1084,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
             // Write 1 to interrupt bit to acknowledge
             iface->bmdma_outb(ATA_BMDMA_REG_STATUS_n(secondary),
                             bmdma_status | (1 << 2));
-            IDE_TRACE("bmdma status=0x%x\n", bmdma_status);
+            IDE_TRACE("bmdma status=%#x\n", bmdma_status);
 
             // Stop DMA
             IDE_TRACE("Stopping DMA\n");

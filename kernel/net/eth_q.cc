@@ -41,7 +41,7 @@ int ethq_init(void)
              sizeof(ethq_pkt2K_t*) +
              sizeof(uint16_t));
 
-    ethq_pkts = (ethq_pkt2K_t*)mmap(0, ethq_pool_size,
+    ethq_pkts = (ethq_pkt2K_t*)mmap(nullptr, ethq_pool_size,
                           PROT_READ | PROT_WRITE,
                           MAP_POPULATE | MAP_32BIT, -1, 0);
     if (!ethq_pkts || ethq_pkts == MAP_FAILED)
@@ -190,7 +190,7 @@ void ethq_pkt_release(ethq_pkt_t *pkt)
 
 void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
 {
-    pkt->next = 0;
+    pkt->next = nullptr;
 
     ethq_pkt_t *head = queue->head;
     ethq_pkt_t *tail = queue->tail;
@@ -202,7 +202,7 @@ void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
         head->next = pkt;
         queue->head = pkt;
     }
-    pkt->next = 0;
+    pkt->next = nullptr;
 
     ++queue->count;
 }
@@ -214,12 +214,12 @@ ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
 
     if (tail && (head != tail)) {
         queue->tail = tail->next;
-        tail->next = 0;
+        tail->next = nullptr;
         --queue->count;
     } else if (tail) {
-        queue->tail = 0;
-        queue->head = 0;
-        tail->next = 0;
+        queue->tail = nullptr;
+        queue->head = nullptr;
+        tail->next = nullptr;
         --queue->count;
     }
 
@@ -229,9 +229,9 @@ ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
 ethq_pkt_t *ethq_dequeue_all(ethq_queue_t *queue)
 {
     ethq_pkt_t *all = queue->head;
-    queue->tail->next = 0;
-    queue->head = 0;
-    queue->tail = 0;
+    queue->tail->next = nullptr;
+    queue->head = nullptr;
+    queue->tail = nullptr;
     queue->count = 0;
     return all;
 }

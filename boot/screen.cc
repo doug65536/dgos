@@ -9,7 +9,7 @@ static void buffer_char(tchar *buf, tchar **pptr, tchar c)
 {
     if (*pptr - buf == 80 || c == '\n')
     {
-        scroll_screen();
+        scroll_screen(0x07);
         *(*pptr) = 0;
         print_at(24, 0, 0x07, *pptr - buf, buf);
         debug_out(buf, *pptr - buf);
@@ -130,7 +130,7 @@ void print_line(tchar const *format, ...)
                 }
 
                 // Build null terminated string in digit
-                dp = digit + 22;
+                dp = digit + countof(digit);
                 *--dp = 0;
                 if (base == 16) {
                     do
@@ -165,11 +165,11 @@ void print_line(tchar const *format, ...)
         }
     }
     if (out != buf) {
+        scroll_screen(0x07);
+        
         *out = 0;
         print_at(24, 0, 0x07, out - buf, buf);
         debug_out(buf, out - buf);
-
-        scroll_screen();
     }
 
     va_end(ap);
@@ -215,24 +215,24 @@ void print_str_xy(int x, int y, tchar const *s, size_t len,
 
 void print_lba(uint32_t lba)
 {
-    PRINT(TSTR "%lu\n", lba);
+    PRINT("%lu\n", lba);
 }
 
 void dump_regs(bios_regs_t& regs, bool show_flags)
 {
-    PRINT(TSTR "eax=%lx\n", regs.eax);
-    PRINT(TSTR "ebx=%lx\n", regs.ebx);
-    PRINT(TSTR "ecx=%lx\n", regs.ecx);
-    PRINT(TSTR "edx=%lx\n", regs.edx);
-    PRINT(TSTR "esi=%lx\n", regs.esi);
-    PRINT(TSTR "edi=%lx\n", regs.edi);
-    PRINT(TSTR "ebp=%lx\n", regs.ebp);
-    PRINT(TSTR " ds=%x\n", regs.ds);
-    PRINT(TSTR " es=%x\n", regs.es);
-    PRINT(TSTR " fs=%x\n", regs.fs);
-    PRINT(TSTR " gs=%x\n", regs.gs);
+    PRINT("eax=%lx\n", regs.eax);
+    PRINT("ebx=%lx\n", regs.ebx);
+    PRINT("ecx=%lx\n", regs.ecx);
+    PRINT("edx=%lx\n", regs.edx);
+    PRINT("esi=%lx\n", regs.esi);
+    PRINT("edi=%lx\n", regs.edi);
+    PRINT("ebp=%lx\n", regs.ebp);
+    PRINT(" ds=%x\n", regs.ds);
+    PRINT(" es=%x\n", regs.es);
+    PRINT(" fs=%x\n", regs.fs);
+    PRINT(" gs=%x\n", regs.gs);
     if (show_flags)
-        PRINT(TSTR "flg=%lx\n", regs.eflags);
+        PRINT("flg=%lx\n", regs.eflags);
 }
 
 

@@ -1,9 +1,23 @@
 #include "malloc.h"
 #include "ctors.h"
 
-static _pure uintptr_t get_top_of_low_memory() {
-    // Read top of memory from BIOS data area
-    return *(uint16_t*)0x40E << 4;
+//static void *set_top_of_low_memory(void *addr)
+//{
+//    // Read original top of low memory
+//    uintptr_t top = uintptr_t(*(uint16_t const*)0x413) << 10;
+//    
+//    // Adjust it
+//    *(uint16_t*)0x413 = uintptr_t(addr) >> 10;
+//    
+//    return (void*)top;
+//}
+
+static void *get_top_of_low_memory(void *addr)
+{
+    // Read original top of low memory
+    uintptr_t top = uintptr_t(*(uint16_t const*)0x413) << 10;
+    
+    return (void*)top;
 }
 
 extern "C" char ___heap_st[];
@@ -11,15 +25,20 @@ _constructor(ctor_malloc) void malloc_init_auto()
 {
     // Memory map
     //
-    // +-------------------------+ <- Start of BIOS data area (usually 0x9FC00)
+    // +-------------------------+ <- End of free base memory
     // |  blk_hdr_t with 0 size  |
     // +-------------------------+ <- 16 byte aligned
     // |         blocks          |
-    // +-------------------------+ <- ___heap_st, 16 byte aligned
+    // +-------------------------+ <- start of heap, 4KB byte aligned
+    // | /////// unused //////// |
+    // +-------------------------+ <- ___heap_st
     // |         .bss            |
     // |         .data           |
     // |         .text           |
     // +-------------------------+ <- 0x1000
+    
+    void *st = (void*)((uintptr_t(___heap_st) + 4095) & -4096);
+    void *en = get_top_of_low_memory(st);
 
-    malloc_init(___heap_st, (void*)get_top_of_low_memory());
+    malloc_init(st, en);
 }

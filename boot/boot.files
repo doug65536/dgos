@@ -15,6 +15,7 @@ bootinfo.S
 bootiso.S
 bootmenu.cc
 bootmenu.h
+bootpxe-bios.ld
 boottable.cc
 boottable_bios.cc
 boottable_decl.h
@@ -42,6 +43,7 @@ gdt.S
 gdt.h
 gdt_macros.h
 gdt_sel.h
+gdt_sel_pxe.h
 halt.h
 halt_bios.cc
 halt_efi.cc
@@ -53,6 +55,7 @@ include/physmem_data.h
 include/vesainfo.h
 include/farptr.h
 likely.h
+log2.h
 malloc_bios.cc
 malloc_efi.cc
 mpentry_bios.S
@@ -62,6 +65,11 @@ physmap.h
 physmem_bios.cc
 physmem_efi.cc
 ptbl.h
+pxe-bios.S
+pxe.h
+pxemain.cc
+pxemain.h
+pxestruct.h
 screen_abstract.h
 screen_bios.cc
 screen_efi.cc

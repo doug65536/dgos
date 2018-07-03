@@ -43,8 +43,8 @@ void cpu_broadcast_service(int intr, size_t slot)
             eoi_done = 1;
             apic_eoi(intr);
         }
-        queue->head = 0;
-        queue->tail = 0;
+        queue->head = nullptr;
+        queue->tail = nullptr;
         lock.unlock();
 
         // End loop when no
@@ -77,7 +77,7 @@ size_t cpu_broadcast_create(void)
     // Allocate a CPU-local storage slot
     size_t slot = thread_cls_alloc();
 
-    thread_cls_init_each_cpu(slot, cpu_broadcast_init_cpu, 0);
+    thread_cls_init_each_cpu(slot, cpu_broadcast_init_cpu, nullptr);
 
     return slot;
 }

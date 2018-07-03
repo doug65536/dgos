@@ -9,6 +9,7 @@
 #include "fs.h"
 #include "utf.h"
 #include "assert.h"
+#include "log2.h"
 
 #include "../kernel/fs/fat32_decl.h"
 
@@ -25,52 +26,10 @@ static char *fat_buffer;
 uint32_t fat_buffer_lba;
 static uint_least32_t sector_sz;
 static uint8_t log2_sector_sz;
+static uint8_t log2_sec_per_cluster;
 
 static uint32_t next_cluster(uint64_t current_cluster,
                              char *sector, bool *ok_ptr);
-
-template<typename T, T n>
-struct integral_constant
-{
-    static constexpr T value = n;
-    using type = integral_constant<T, n>;
-};
-
-#define clz_32 __builtin_clz
-#if __SIZEOF_LONG__ == 8
-#define clz_64 __builtin_clzl
-#elif __SIZEOF_LONG_LONG__ == 8
-#define clz_64 __builtin_clzll
-#else
-#error Unhandled type sizes!
-#endif
-
-template<typename T>
-static _always_inline uint8_t bit_clz_(
-        T n, integral_constant<size_t, 4>::type)
-{
-    return clz_32(n);
-}
-
-template<typename T>
-static _always_inline uint8_t bit_clz_(
-        T n, integral_constant<size_t, 8>::type)
-{
-    return clz_64(n);
-}
-
-template<typename T>
-static _always_inline uint8_t bit_clz(T n)
-{
-    return bit_clz_(n, typename integral_constant<size_t, sizeof(T)>::type());
-}
-
-template<typename T>
-static _always_inline uint8_t bit_log2_n(T n)
-{
-    uint8_t top = (sizeof(T)*8-1) - bit_clz(n);
-    return top + !!(~-(T(1) << top) & n);
-}
 
 // Initialize bpb data from sector buffer
 // Expects first sector of partition
@@ -87,6 +46,8 @@ static bool read_bpb(uint64_t partition_lba)
         return false;
 
     fat32_parse_bpb(&bpb, partition_lba, sector_buffer);
+    
+    log2_sec_per_cluster = bit_log2_n(bpb.sec_per_cluster);
 
     return true;
 }
@@ -94,7 +55,7 @@ static bool read_bpb(uint64_t partition_lba)
 static uint32_t lba_from_cluster(uint32_t cluster)
 {
     return bpb.cluster_begin_lba +
-            cluster * bpb.sec_per_cluster;
+            (cluster << log2_sec_per_cluster);
 }
 
 static bool is_eof_cluster(uint32_t cluster)
@@ -246,8 +207,8 @@ static int sector_iterator_seek(
         return is_eof_now ? 0 : 1;
     }
 
-    uint32_t cluster_index = sector_offset / bpb.sec_per_cluster;
-    uint32_t cluster_offset = sector_offset % bpb.sec_per_cluster;
+    uint32_t cluster_index = sector_offset >> log2_sec_per_cluster;
+    uint32_t cluster_offset = sector_offset & (bpb.sec_per_cluster - 1);
     iter->sector_offset = sector_offset;
 
     // Check for EOF
@@ -712,55 +673,108 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     assert(file >= 0 && file < MAX_HANDLES);
     assert(buf != nullptr);
     assert(bytes < 0x100000);
-
+    
     if (file < 0 || file >= MAX_HANDLES)
         return -1;
 
-    uint32_t sector_offset = ofs >> log2_sector_sz;
-    uint16_t byte_offset = ofs & (sector_sz-1);
+    auto& desc = file_handles[file];
     
-    int status = sector_iterator_seek(
-                file_handles + file,
-                sector_offset,
-                sector_buffer);
-
-    char *output = (char*)buf;
-
-    int total = 0;
-    for (;;) {
-        // Error?
-        if (status < 0)
-            return -1;
-
-        // EOF?
-        if (status == 0)
-            return 0;
-
-        size_t limit = sector_sz - byte_offset;
-        if (limit > bytes)
-            limit = bytes;
-
-        if (limit == 0)
-            break;
-
-        //PRINT(TEXT "Copying %zu byres of data to %zx\n", limit, uintptr_t(output));
-
-        // Copy data from sector buffer
-        memcpy(output, sector_buffer + byte_offset, limit);
-
-        bytes -= limit;
-        output += limit;
-        total += limit;
-
-        byte_offset = 0;
-
-        if (bytes > 0) {
-            status = sector_iterator_next(
-                        file_handles + file, sector_buffer, 1);
-        }
+    disk_io_plan_t plan(buf, log2_sector_sz);
+    
+    while (bytes) {
+        // Calculate how many sectors into the file to start the read
+        uint32_t sector_offset = ofs >> log2_sector_sz;
+        
+        // Calculate how far into the sector to start the read
+        uint16_t byte_offset = ofs & (sector_sz - 1);
+        
+        // Calculate the maximum we could read from this sector
+        uint16_t sector_read = sector_sz - byte_offset;
+        
+        // Cap it to read the remainder if we don't need that much
+        if (sector_read > bytes)
+            sector_read = bytes;
+        
+        // Calculate the cluster offset in the file
+        uint32_t cluster_ofs = sector_offset >> log2_sec_per_cluster;
+        uint32_t cluster_idx = sector_offset & (bpb.sec_per_cluster-1);
+        
+        if (!plan.add(lba_from_cluster(desc.clusters[cluster_ofs]) +
+                      cluster_idx, 1, byte_offset, sector_read))
+            return false;
+        
+        ofs += sector_read;
+        bytes -= sector_read;
     }
+    
+    int total_read = 0;
+    
+    for (size_t i = 0; i < plan.count; ++i) {
+        disk_vec_t const &item = plan.vec[i];
+        if (item.sector_ofs == 0 && item.byte_count == sector_sz) {
+            // Direct read
+            if (!disk_read_lba(uint64_t(plan.dest), item.lba, 
+                               log2_sector_sz, item.count))
+                return false;
+        } else {
+            // Read sector into buffer
+            if (!disk_read_lba(uint64_t(sector_buffer), item.lba, 
+                               log2_sector_sz, 1))
+                return false;
+            memcpy(plan.dest, sector_buffer + item.sector_ofs, item.byte_count);
+        }
+        uint32_t xfer = item.byte_count * item.count;
+        plan.dest = (char*)plan.dest + xfer;
+        total_read += xfer;
+    }
+    
+    return total_read;
+    
+//    uint32_t sector_offset = ofs >> log2_sector_sz;
+//    uint16_t byte_offset = ofs & (sector_sz-1);
+    
+//    int status = sector_iterator_seek(
+//                file_handles + file,
+//                sector_offset,
+//                sector_buffer);
 
-    return total;
+//    char *output = (char*)buf;
+
+//    int total = 0;
+//    for (;;) {
+//        // Error?
+//        if (status < 0)
+//            return -1;
+
+//        // EOF?
+//        if (status == 0)
+//            return 0;
+
+//        size_t limit = sector_sz - byte_offset;
+//        if (limit > bytes)
+//            limit = bytes;
+
+//        if (limit == 0)
+//            break;
+
+//        //PRINT(TEXT "Copying %zu byres of data to %zx\n", limit, uintptr_t(output));
+
+//        // Copy data from sector buffer
+//        memcpy(output, sector_buffer + byte_offset, limit);
+
+//        bytes -= limit;
+//        output += limit;
+//        total += limit;
+
+//        byte_offset = 0;
+
+//        if (bytes > 0) {
+//            status = sector_iterator_next(
+//                        file_handles + file, sector_buffer, 1);
+//        }
+//    }
+
+//    return total;
 }
 
 void fat32_boot_partition(uint64_t partition_lba)
@@ -768,35 +782,35 @@ void fat32_boot_partition(uint64_t partition_lba)
     file_handles = (fat32_sector_iterator_t *)calloc(
                 MAX_HANDLES, sizeof(*file_handles));
 
-    PRINT(TSTR "Booting partition at LBA %llu", partition_lba);
+    PRINT("Booting partition at LBA %llu", partition_lba);
 
     if (!read_bpb(partition_lba)) {
-        PRINT(TSTR "Error reading BPB!");
+        PRINT("Error reading BPB!");
         return;
     }
 
     fat32_serial = bpb.serial;
 
     // 0x2C LBA
-    PRINT(TSTR "root_dir_start:	  %ld", bpb.root_dir_start);
+    PRINT("root_dir_start:	  %ld", bpb.root_dir_start);
 
     // 0x24 1 per 128 clusters
-    PRINT(TSTR "sec_per_fat:      %ld", bpb.sec_per_fat);
+    PRINT("sec_per_fat:      %ld", bpb.sec_per_fat);
 
     // 0x0E Usually 32
-    PRINT(TSTR "reserved_sectors: %d", bpb.reserved_sectors);
+    PRINT("reserved_sectors: %d", bpb.reserved_sectors);
 
     // 0x0B Always 512 (yeah, sure it is)
-    PRINT(TSTR "bytes_per_sec:	  %d", bpb.bytes_per_sec);
+    PRINT("bytes_per_sec:	  %d", bpb.bytes_per_sec);
 
     // 0x1FE Always 0xAA55
-    PRINT(TSTR "signature:		  %x", bpb.signature);
+    PRINT("signature:		  %x", bpb.signature);
 
     // 0x0D 8=4KB cluster
-    PRINT(TSTR "sec_per_cluster:  %d", bpb.sec_per_cluster);
+    PRINT("sec_per_cluster:  %d", bpb.sec_per_cluster);
 
     // 0x10 Always 2
-    PRINT(TSTR "number_of_fats:	  %d", bpb.number_of_fats);
+    PRINT("number_of_fats:	  %d", bpb.number_of_fats);
 
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_close = fat32_boot_close;

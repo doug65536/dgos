@@ -38,8 +38,8 @@ static void modload_find_syms(Elf64_Shdr const **symtab,
                               Elf64_Shdr const *scn_hdrs,
                               size_t scn)
 {
-    *symtab = 0;
-    *strtab = 0;
+    *symtab = nullptr;
+    *strtab = nullptr;
 
     Elf64_Word symtab_idx = scn_hdrs[scn].sh_link;
     Elf64_Word strtab_idx = scn_hdrs[symtab_idx].sh_link;
@@ -63,7 +63,7 @@ static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
         i = ht->hash_chains[i];
     } while (i != 0);
 
-    return 0;
+    return nullptr;
 }
 
 static Elf64_Sym const *modload_lookup_in_module(
@@ -79,7 +79,7 @@ static Elf64_Sym const *modload_lookup_in_module(
                 return s;
         }
     }
-    return 0;
+    return nullptr;
 }
 
 module_entry_fn_t modload_load(char const *path)
@@ -88,14 +88,14 @@ module_entry_fn_t modload_load(char const *path)
 
     if (!fd.is_open()) {
         printdbg("Failed to open module \"%s\"\n", path);
-        return 0;
+        return nullptr;
     }
 
     Elf64_Ehdr file_hdr;
 
     if (sizeof(file_hdr) != file_read(fd, &file_hdr, sizeof(file_hdr))) {
         printdbg("Failed to read module file header\n");
-        return 0;
+        return nullptr;
     }
 
     ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
@@ -105,12 +105,12 @@ module_entry_fn_t modload_load(char const *path)
                 fd, scn_hdrs, scn_hdr_size,
                 file_hdr.e_shoff)) {
         printdbg("Error reading program headers\n");
-        return 0;
+        return nullptr;
     }
 
     size_t mod_str_scn = 0;
     unique_ptr_free<Elf64_Sym> mod_sym;
-    Elf64_Sym *mod_sym_end = 0;
+    Elf64_Sym *mod_sym_end = nullptr;
     unique_ptr_free<char> mod_str;
 
     Elf64_Xword max_addr = 0;
@@ -140,7 +140,7 @@ module_entry_fn_t modload_load(char const *path)
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_sym, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module symbols\n");
-                return 0;
+                return nullptr;
             }
             break;
         case SHT_STRTAB:
@@ -150,13 +150,13 @@ module_entry_fn_t modload_load(char const *path)
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_str, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module strings\n");
-                return 0;
+                return nullptr;
             }
             break;
         }
     }
 
-    char *module = (char *)mmap(0, max_addr - min_addr,
+    char *module = (char *)mmap(nullptr, max_addr - min_addr,
                         PROT_READ | PROT_WRITE,
                         MAP_NEAR, -1, 0);
 
@@ -170,7 +170,7 @@ module_entry_fn_t modload_load(char const *path)
                         fd, vaddr, hdr->sh_size,
                         hdr->sh_offset)) {
                 printdbg("Error reading module\n");
-                return 0;
+                return nullptr;
             }
         }
     }
@@ -222,7 +222,7 @@ module_entry_fn_t modload_load(char const *path)
         if ((ssize_t)hdr->sh_size != file_pread(
                     fd, rel_buf, hdr->sh_size, hdr->sh_offset)) {
             printdbg("Error reading module relocations\n");
-            return 0;
+            return nullptr;
         }
 
         Elf64_Shdr const * const target_scn = scn_hdrs + hdr->sh_info;
@@ -240,13 +240,13 @@ module_entry_fn_t modload_load(char const *path)
         if ((ssize_t)symtab->sh_size != file_pread(
                     fd, symdata, symtab->sh_size, symtab->sh_offset)) {
             printdbg("Error reading symbol table\n");
-            return 0;
+            return nullptr;
         }
 
         if ((ssize_t)strtab->sh_size != file_pread(
                     fd, strdata, strtab->sh_size, strtab->sh_offset)) {
             printdbg("Error reading string table\n");
-            return 0;
+            return nullptr;
         }
 
         uint32_t symtab_idx;
@@ -264,7 +264,7 @@ module_entry_fn_t modload_load(char const *path)
                 //symtab_idx = ELF64_R_SYM(r->r_info);
                 //rel_type = ELF64_R_TYPE(r->r_info);
                 assert(!"Unhandled relocation type!");
-                return 0;
+                return nullptr;
             }
             break;
 
@@ -277,7 +277,7 @@ module_entry_fn_t modload_load(char const *path)
                 Elf64_Sym *sym = symdata + symtab_idx;
                 char const *name = strdata + sym->st_name;
 
-                Elf64_Sym const *match = 0;
+                Elf64_Sym const *match = nullptr;
 
                 int internal = 0;
 
@@ -391,7 +391,7 @@ module_entry_fn_t modload_load(char const *path)
         }
     }
 
-    printdbg("add-symbol-file %s 0x%p\n", path, (void*)module);
+    printdbg("add-symbol-file %s %p\n", path, (void*)module);
 
     // Work around pedantic warning
     module_entry_fn_t fn;

@@ -21,6 +21,6 @@
         (void)arg; \
         register_##type##_device( #name, & name##_##type##_device_vtbl); \
     } \
-    REGISTER_CALLOUT((name##_##type##_register_device), 0, id, "1000")
+    REGISTER_CALLOUT((name##_##type##_register_device), nullptr, id, "1000")
 
 #define DEVICE_PTR(type, dev) type##_t *self = (type##_t*)dev

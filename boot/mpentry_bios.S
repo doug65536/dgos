@@ -42,9 +42,8 @@ ap_entry:
     mov %eax,%cr0
     ljmpl *(%esp)
 
-0:
 .code32
-    movl $ GDT_SEL_PM_DATA32,%ecx
+0:  movl $ GDT_SEL_PM_DATA32,%ecx
     mov %cx,%ds
     mov %cx,%es
     mov %cx,%fs
@@ -54,8 +53,7 @@ ap_entry:
     movl smp_entry_point+4,%edx
     mov $enter_kernel,%ecx
     jmp *%ecx
-0:
-    cli
+0:  cli
     hlt
     jmp 0b
 

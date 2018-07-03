@@ -727,7 +727,7 @@ void rtl8139_dev_t::tx_irq_handler()
             break;
 
         if (tsad & RTL8139_TSAD_TOK_n(tx_tail)) {
-            tx_pkts[tx_tail] = 0;
+            tx_pkts[tx_tail] = nullptr;
 
             RTL8139_TRACE("IRQ: TOK slot=%d\n", tx_tail);
 
@@ -821,7 +821,7 @@ void rtl8139_dev_t::irq_handler()
     // Acknowledge everything
     RTL8139_MM_WR_16(RTL8139_IO_ISR, isr);
 
-    ethq_pkt_t *rx_first = 0;
+    ethq_pkt_t *rx_first = nullptr;
 
     if (isr != 0) {
         RTL8139_TRACE("IRQ status = %x\n", isr);
@@ -863,7 +863,7 @@ void rtl8139_dev_t::irq_handler()
 
             tx_pkts[tx_head] = tx_next[n];
             tx_packet(tx_head, tx_next[n]);
-            tx_next[n] = 0;
+            tx_next[n] = nullptr;
             tx_head = ((tx_head + 1) & 3);
         }
     }
@@ -1116,11 +1116,11 @@ static void rtl8139_startup_hack(void *p)
 
         pkt->size = dhcp_build_discover(discover, self->mac_addr);
 
-        RTL8139_TRACE("Sending pkt 0x%p\n", (void*)pkt);
+        RTL8139_TRACE("Sending pkt %p\n", (void*)pkt);
 
         sleep(100);
         rtl8139_send(self, pkt);
     }
 }
-REGISTER_CALLOUT(rtl8139_startup_hack, 0, 'L', "000");
+REGISTER_CALLOUT(rtl8139_startup_hack, nullptr, 'L', "000");
 #endif

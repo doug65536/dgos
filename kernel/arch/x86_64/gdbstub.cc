@@ -4,6 +4,7 @@
 #include "vector.h"
 #include "mm.h"
 #include "printk.h"
+#include "inttypes.h"
 
 #include "device/serial-uart.h"
 
@@ -116,6 +117,7 @@ public:
     static void sync_hw_bp();
 
     static void hook_exceptions();
+    _noreturn
     static void start_stub();
 
     static int get_gdb_cpu();
@@ -185,7 +187,7 @@ private:
     bool breakpoint_toggle(breakpoint_t& bp, bool activate);
     void breakpoint_toggle_list(bp_list& list, bool activate);
 
-    _always_inline void start();
+    void start();
 
     void freeze_one(gdb_cpu_t &cpu);
 
@@ -822,7 +824,7 @@ void gdbstub_t::data_received(char const *data, size_t size)
                 nonsense = false;
             } else {
                 GDBSTUB_TRACE("Dropped nonsense character"
-                              " in IDLE state: 0x%x '%c'\n", uint8_t(ch),
+                              " in IDLE state: %#x '%c'\n", uint8_t(ch),
                               ch >= 32 && ch < 127 ? ch : '.');
                 nonsense = true;
             }
@@ -2110,7 +2112,7 @@ bool gdb_cpu_ctrl_t::breakpoint_write_target(
     cpu_tlb_flush();
     cpu_cr0_change_bits(CPU_CR0_WP, 0);
     *old_value = atomic_xchg((uint8_t*)addr, value);
-    GDBSTUB_TRACE("Wrote 0x%lx to %zx, replaced 0x%lx\n",
+    GDBSTUB_TRACE("Wrote %#lx to %zx, replaced %#" PRIx64 "\n",
                   uintptr_t(value), addr, uintptr_t(*old_value));
     cpu_cr0_change_bits(0, CPU_CR0_WP);
     cpu_page_directory_set(orig_pagedir);
@@ -2290,7 +2292,7 @@ void gdb_cpu_ctrl_t::continue_frozen(int cpu_nr, bool single_step)
             cpu.state = gdb_cpu_state_t::RESUMING;
 
             // Send an NMI to the CPU to wake it up from halt
-            GDBSTUB_TRACE("Sending NMI to cpu %d (APICID=0x%x)\n",
+            GDBSTUB_TRACE("Sending NMI to cpu %d (APICID=%#x)\n",
                           cpu.cpu_nr, cpu.apic_id);
             apic_send_ipi(cpu.apic_id, INTR_EX_NMI);
 
@@ -2469,7 +2471,7 @@ void gdb_cpu_ctrl_t::start()
         cpus.emplace_back(apic_id, cpu + 1);
     }
 
-    stub_tid = thread_create(gdb_thread, 0, 0, false);
+    stub_tid = thread_create(gdb_thread, nullptr, 0, false);
 
     cpu_wait_value(&stub_running, true);
 
@@ -2554,7 +2556,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             bp_list::iterator it = breakpoint_find(
                         bp_sw, bp_workaround_addr, 0, 0);
             if (it == bp_sw.end())
-                return 0;
+                return nullptr;
 
             bp_workaround_addr = 0;
 
@@ -2580,7 +2582,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
             bp_list::iterator it = breakpoint_find(
                         bp_sw, uintptr_t(ISR_CTX_REG_RIP(ctx)), 0, 0);
             if (it == bp_sw.end())
-                return 0;
+                return nullptr;
 
             // Disable it
             breakpoint_toggle(*it, false);

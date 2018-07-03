@@ -52,7 +52,7 @@ bool get_ram_regions()
 
     for (size_t i = 0; i < count;
          ++i, in = (EFI_MEMORY_DESCRIPTOR*)((char const*)in + descsz)) {
-        PRINT(TSTR "paddr=%lx, len=%lx, attr=%lx, type=%x (%s)",
+        PRINT("paddr=%lx, len=%lx, attr=%lx, type=%x (%s)",
               in->PhysicalStart, in->NumberOfPages << 12,
               in->Attribute, in->Type,
               in->Type < sizeof(efi_mem_types) / sizeof(*efi_mem_types) ?
@@ -80,8 +80,11 @@ bool get_ram_regions()
         case EfiRuntimeServicesCode:
         case EfiRuntimeServicesData:
         case EfiACPIReclaimMemory:
-        case 0x80000000:
             entry.type = PHYSMEM_TYPE_RECLAIMABLE;
+            break;
+            
+        case 0x80000000:
+            entry.type = PHYSMEM_TYPE_BOOTLOADER;
             break;
 
         /// Memory in which errors have been detected.
@@ -127,7 +130,7 @@ void take_pages(uint64_t phys_addr, uint64_t size)
 
     assert(size > 0);
 
-    PRINT(TSTR "Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
+    PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
 
     status = efi_systab->BootServices->AllocatePages(
                 AllocateAddress, EFI_MEMORY_TYPE(0x80000000),

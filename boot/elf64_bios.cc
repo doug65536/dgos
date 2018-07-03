@@ -30,7 +30,7 @@ bool load_kernel_chunk(Elf64_Phdr *blk, int file, elf64_context_t *ctx)
 
     iovec_t *iovec;
     int iovec_count = paging_iovec(&iovec, blk->p_vaddr,
-                                   blk->p_filesz, PAGE_SIZE * 4);
+                                   blk->p_filesz, 1 << 30);
 
     uint64_t offset = 0;
     for (int i = 0; i < iovec_count; ++i) {

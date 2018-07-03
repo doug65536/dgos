@@ -96,9 +96,8 @@ syscall_entry:
 
     sysretq
 
-0:
     // syscall number out of range
-    movl $SYSCALL_ENOSYS,%eax
+0:  movl $SYSCALL_ENOSYS,%eax
     sysretq
 
 .align 16

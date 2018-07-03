@@ -81,7 +81,7 @@ static keyb8042_layout_t *keyb8042_layout = &keyb8042_layout_us;
 // Lookup table of keyboard layouts
 static keyb8042_layout_t *keyb8042_layouts[] = {
     &keyb8042_layout_us,
-    0
+    nullptr
 };
 
 static char const keyb8042_passthru_lookup[] =

@@ -53,7 +53,7 @@ SECTIONS {
 	} = 0
 
 	.bss : {
-		___bss_start = .;
+		___bss_st = .;
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
@@ -62,7 +62,7 @@ SECTIONS {
 
 		. = ALIGN(16);
 		. += 8;
-		___bss_end = .;
+		___bss_en = .;
 	}
 
 	___initial_stack_limit = .;
@@ -71,5 +71,24 @@ SECTIONS {
 	___heap_st = .;
 	___end = .;
 
-	/DISCARD/ : { *(.eh_frame) }
+	.eh_frame       0 : { *(.eh_frame)      }
+	.debug          0 : { *(.debug)         }
+	.debug_info		0 : { *(.debug_info)    }
+	.debug_abbrev	0 : { *(.debug_abbrev)  }
+	.debug_aranges	0 : { *(.debug_aranges) }
+	.debug_ranges	0 : { *(.debug_ranges)  }
+	.debug_frame	0 : { *(.debug_frame)   }
+	.debug_macro	0 : { *(.debug_macro)   }
+	.debug_line		0 : { *(.debug_line)    }
+	.debug_str		0 : { *(.debug_str)     }
+	.debug_loc		0 : { *(.debug_loc)     }
+	.comment        0 : { *(.comment)       }
+	.got            0 : { *(.got*)          }
+	.rel            0 : { *(.rel*)          }
+	.iplt           0 : { *(.iplt*)         }
+	.igot           0 : { *(.igot*)         }
+	
+	/DISCARD/		0 : { *(.interp)               }
+	/DISCARD/		0 : { *(.comment)              }
+	/DISCARD/		0 : { *(.note.gnu.build-id)    }
 }

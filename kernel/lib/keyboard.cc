@@ -233,7 +233,7 @@ char const *keybd_special_text(int codepoint)
         return keyboard_special_text[index];
     } else if (codepoint < 0x101000)
         return "";
-    return 0;
+    return nullptr;
 }
 
 void keybd_init(void)

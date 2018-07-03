@@ -120,6 +120,8 @@ struct alignas(256) thread_info_t {
 
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
+
+    int thread_id;
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
@@ -133,6 +135,7 @@ C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
+C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
 
 #define THREAD_FLAGS_USES_FPU   (1U<<0)
 
@@ -182,7 +185,7 @@ C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
     { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, {},
-      { 0, 0, 0, 0, 0, 0, 0, 0 }
+      { }
     }
 };
 
@@ -239,18 +242,29 @@ EXPORT void thread_yield()
 
         // Push ss:rsp
         "movq %%rsp,%%rax\n\t"
+
+        ".cfi_remember_state\n\t"
+
         "pushq %[gdt_data]\n\t"
+        ".cfi_adjust_cfa_offset 8\n\t"
+
         "pushq %%rax\n\t"
+        ".cfi_adjust_cfa_offset 8\n\t"
 
         // Push rflags
         "pushfq\n\t"
+        ".cfi_adjust_cfa_offset 8\n\t"
 
         // Disable interrupts
         "cli\n\t"
 
         // Push cs:rip and jump to isr_entry
         "pushq %[gdt_code64]\n\t"
+        ".cfi_adjust_cfa_offset 8\n\t"
+
         "call isr_entry_%c[yield]\n\t"
+
+        ".cfi_restore_state\n\t"
         :
         : [yield] "i" (INTR_THREAD_YIELD)
         , [gdt_code64] "i" (GDT_SEL_KERNEL_CODE64)
@@ -287,13 +301,13 @@ static void thread_startup(thread_fn_t fn, void *p, thread_t id)
     thread_cleanup();
 }
 
-static constexpr size_t stack_guard_size = (4<<20);
+static constexpr size_t stack_guard_size = (64<<10);
 
 static char *thread_allocate_stack(
         thread_t tid, size_t stack_size, char const *noun, int fill)
 {
     char *stack;
-    stack = (char*)mmap(0, stack_guard_size + stack_size + stack_guard_size,
+    stack = (char*)mmap(nullptr, stack_guard_size + stack_size + stack_guard_size,
                  PROT_READ | PROT_WRITE,
                  MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
 
@@ -394,8 +408,8 @@ static thread_t thread_create_with_state(
     thread->priority = priority;
     thread->priority_boost = 0;
     thread->cpu_affinity = affinity ? affinity : creator_thread->cpu_affinity;
-    thread->fsbase = 0;
-    thread->gsbase = 0;
+    thread->fsbase = nullptr;
+    thread->gsbase = nullptr;
 
     // APs inherit BSP's process
     thread->process = cpus[0].cur_thread->process;
@@ -533,6 +547,9 @@ void thread_init(int ap)
     cpu_altgsbase_set((void*)0xFFFFD1D1D1D1D1D1);
 
     if (!ap) {
+        for (unsigned i = 0; i < countof(threads); ++i)
+            threads[i].thread_id = i;
+
         intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler, "sw_yield");
 
         thread->process = process_t::init(cpu_page_directory_get());
@@ -560,7 +577,7 @@ void thread_init(int ap)
         cpu_irq_disable();
 
         thread = threads + thread_create_with_state(
-                    smp_idle_thread, 0, 0,
+                    smp_idle_thread, nullptr, 0,
                     THREAD_IS_INITIALIZING,
                     1 << cpu_number,
                     -256, false);
@@ -699,7 +716,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
     if (unlikely(cpu->goto_thread)) {
         thread = cpu->goto_thread;
         cpu->cur_thread = thread;
-        cpu->goto_thread = 0;
+        cpu->goto_thread = nullptr;
         atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
         ctx = thread->ctx;
         thread->ctx = nullptr;
@@ -921,16 +938,21 @@ uint32_t thread_cpus_started()
 
 uint64_t thread_get_cpu_mmu_seq()
 {
-    cpu_scoped_irq_disable intr_was_enabled;
-    cpu_info_t *cpu = this_cpu();
-    return cpu->mmu_seq;
+    if (thread_get_cpu_count()) {
+        cpu_scoped_irq_disable intr_was_enabled;
+        cpu_info_t *cpu = this_cpu();
+        return cpu->mmu_seq;
+    }
+    return 0;
 }
 
 void thread_set_cpu_mmu_seq(uint64_t seq)
 {
-    cpu_scoped_irq_disable intr_was_enabled;
-    cpu_info_t *cpu = this_cpu();
-    cpu->mmu_seq = seq;
+    if (thread_cpu_count()) {
+        cpu_scoped_irq_disable intr_was_enabled;
+        cpu_info_t *cpu = this_cpu();
+        cpu->mmu_seq = seq;
+    }
 }
 
 EXPORT thread_t thread_get_id()
@@ -1055,7 +1077,7 @@ void thread_cls_for_each_cpu(
         size_t slot, int other_only,
         thread_cls_each_handler_t handler, void *arg, size_t size)
 {
-    cpu_info_t *cpu = other_only ? this_cpu() : 0;
+    cpu_info_t *cpu = other_only ? this_cpu() : nullptr;
     for (size_t c = 0; c < cpu_count; ++c) {
         if (cpus + c != cpu)
             handler(c, cpus[c].storage[slot], arg, size);
@@ -1152,4 +1174,4 @@ void thread_tss_ready(void*)
     cpus[0].tss_ptr = tss_list;
 }
 
-REGISTER_CALLOUT(thread_tss_ready, 0, callout_type_t::tss_list_ready, "000");
+REGISTER_CALLOUT(thread_tss_ready, nullptr, callout_type_t::tss_list_ready, "000");

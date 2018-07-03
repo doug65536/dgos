@@ -16,7 +16,7 @@ void *strchr(char const *s, int ch)
         if (c == (char)ch)
             return (void*)s;
         if (c == 0)
-            return 0;
+            return nullptr;
     }
 }
 
@@ -90,7 +90,7 @@ void *memchr(void const *mem, int ch, size_t count)
     for (char const *p = (char const *)mem; count--; ++p)
         if (*p == (char)ch)
             return (void *)p;
-   return 0;
+   return nullptr;
 }
 
 int memcmp(void const *lhs, void const *rhs, size_t count)
@@ -117,7 +117,7 @@ char *strstr(char const *str, char const *substr)
 
     // If substring is longer than string, impossible match
     if (blen > slen)
-        return 0;
+        return nullptr;
 
     // Only search as far as substr would fit within str
     size_t chklen = slen - blen;
@@ -127,7 +127,7 @@ char *strstr(char const *str, char const *substr)
         if (memcmp(str + i, substr, blen) == 0)
             return (char*)(str + i);
 
-    return 0;
+    return nullptr;
 }
 
 void *memcpy_rev(void *dest, void const *src, size_t n)

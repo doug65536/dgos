@@ -398,7 +398,7 @@ static void vga_remap_callback(void *)
 
         uint16_t *old_shadow = self->shadow;
 
-        self->shadow = (uint16_t*)mmap(0,
+        self->shadow = (uint16_t*)mmap(nullptr,
                             self->width * self->height *
                             sizeof(*self->shadow),
                             PROT_READ | PROT_WRITE,
@@ -411,7 +411,7 @@ static void vga_remap_callback(void *)
     }
 }
 
-REGISTER_CALLOUT(vga_remap_callback, 0,
+REGISTER_CALLOUT(vga_remap_callback, nullptr,
                  callout_type_t::vmm_ready, "000");
 
 // Set/get dimensions

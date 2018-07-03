@@ -139,8 +139,8 @@ EXPORT void mutex_lock(mutex_t *mutex)
         thread_suspend_release(&mutex->lock, &wait.thread);
 
         assert(mutex->lock != 0);
-        assert(wait.link.next == 0);
-        assert(wait.link.prev == 0);
+        assert(wait.link.next == nullptr);
+        assert(wait.link.prev == nullptr);
         assert(mutex->owner == wait.thread);
 
         break;
@@ -300,8 +300,8 @@ EXPORT void rwlock_ex_lock(rwlock_t *rwlock)
 
             assert(wait.thread == tid);
             assert(rwlock->lock != 0);
-            assert(wait.link.next == 0);
-            assert(wait.link.prev == 0);
+            assert(wait.link.next == nullptr);
+            assert(wait.link.prev == nullptr);
             assert(rwlock->reader_count == -wait.thread);
 
             done = true;
@@ -332,8 +332,8 @@ EXPORT void rwlock_upgrade(rwlock_t *rwlock)
 
         assert(wait.thread == tid);
         assert(rwlock->lock != 0);
-        assert(wait.link.next == 0);
-        assert(wait.link.prev == 0);
+        assert(wait.link.next == nullptr);
+        assert(wait.link.prev == nullptr);
         assert(rwlock->reader_count == -wait.thread);
     }
 
@@ -430,8 +430,8 @@ EXPORT void rwlock_sh_lock(rwlock_t *rwlock)
 
             // We were awakened
             assert(rwlock->lock != 0);
-            assert(wait.link.next == 0);
-            assert(wait.link.prev == 0);
+            assert(wait.link.next == nullptr);
+            assert(wait.link.prev == nullptr);
             assert(rwlock->reader_count > 0);
 
             done = true;

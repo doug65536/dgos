@@ -2,4 +2,6 @@
 
 #include "types.h"
 
-bool elf64_run(const tchar *filename);
+_noreturn
+void elf64_run(const tchar *filename);
+_pure tchar const *cpu_choose_kernel();

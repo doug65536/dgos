@@ -19,6 +19,8 @@ device/ahci.bits
 device/ahcibits.h
 device/ahcibits.h
 device/dev_usb_ctl.cc
+device/eainstrument.cc
+device/eainstrument.h
 device/i350bits.h
 device/iocp.cc
 device/iocp.h

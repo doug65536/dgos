@@ -61,7 +61,7 @@ bool toggle_a20(bool enabled)
         
         // Still don't know? Guess!
         if (method == a20_method::unknown) {
-            PRINT(TSTR "BIOS doesn't support A20! Guessing port 0x92...");
+            PRINT("BIOS doesn't support A20! Guessing port 0x92...");
             method = a20_method::port92;
         }
     }
@@ -268,6 +268,8 @@ void run_kernel(uint64_t entry, void *param)
     };
 
     run_code64(code64_run_kernel, &arg);
+    
+    __builtin_unreachable();
 }
 
 void copy_kernel(uint64_t dest_addr, void *src, size_t sz)

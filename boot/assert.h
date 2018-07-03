@@ -10,7 +10,7 @@ extern "C" _noinline int assert_failed(
 #ifndef NDEBUG
 // Plain assert
 #define assert(e) \
-    (likely(e) ? 1 : assert_failed(TSTR #e, 0, TSTR __FILE__, __LINE__))
+    (likely(e) ? 1 : assert_failed(TSTR #e, nullptr, TSTR __FILE__, __LINE__))
 
 // Assert with message
 #define assert_msg(e, msg) \

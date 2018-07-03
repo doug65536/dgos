@@ -8,6 +8,7 @@
 #define CPU_MSR_GSBASE          0xC0000101U
 #define CPU_MSR_KGSBASE         0xC0000102U
 #define CPU_MSR_EFER            0xC0000080U
+#define CPU_MSR_TSC_AUX         0xC0000103U
 
 #define CPU_MSR_EFER_SCE_BIT    0
 #define CPU_MSR_EFER_LME_BIT    8

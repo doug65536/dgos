@@ -14,7 +14,7 @@ void malloc_startup(void *p)
     default_heap = heap_create();
 }
 
-//REGISTER_CALLOUT(malloc_startup, 0, callout_type_t::vmm_ready, "000");
+//REGISTER_CALLOUT(malloc_startup, nullptr, callout_type_t::vmm_ready, "000");
 
 void *calloc(size_t num, size_t size)
 {
@@ -48,7 +48,7 @@ void auto_free(void *mem)
     void *blk = *(void**)mem;
     if (blk) {
         free(blk);
-        *(void**)mem = 0;
+        *(void**)mem = nullptr;
     }
 }
 

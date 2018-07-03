@@ -330,7 +330,7 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
 
 void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
-    MCSLOCK_TRACE("Acquiring lock @ 0x%p threadid=%d\n",
+    MCSLOCK_TRACE("Acquiring lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());
 
     node->thread_id = thread_get_id();
@@ -364,7 +364,7 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
 
 void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
-    MCSLOCK_TRACE("Releasing lock @ 0x%p threadid=%d\n",
+    MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());
     mcslock_unlock_noena(lock, node);
     cpu_irq_toggle(node->irq_enabled);

@@ -6,6 +6,7 @@
 #include "elf64.h"
 #include "malloc.h"
 #include "ctors.h"
+#include "cpu.h"
 
 EFI_HANDLE efi_image_handle;
 EFI_SYSTEM_TABLE *efi_systab;
@@ -192,24 +193,24 @@ _constructor(ctor_fs) void register_efi_fs()
     fs_api.boot_close = efi_close;
     fs_api.boot_drv_serial = efi_boot_drv_serial;
 
-    PRINT(TSTR "EFI FS API initialized");
+    PRINT("EFI FS API initialized");
 }
 #endif
 
-extern "C"
+extern "C" _noreturn
 EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 {
     ::efi_image_handle = image_handle;
     ::efi_systab = systab;
 
-    PRINT(TSTR "efi_main = %" PRIxPTR, uintptr_t(efi_main));
+    PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
 
     ctors_invoke();
 
-    elf64_run(TSTR "dgos-kernel-generic");
+    elf64_run(cpu_choose_kernel());// TSTR "dgos-kernel-generic");
 
-    dtors_invoke();
-
-    systab->BootServices->Exit(image_handle, 0, 0, 0);
-    return EFI_SUCCESS;
+    //dtors_invoke();
+    //
+    //systab->BootServices->Exit(image_handle, 0, 0, nullptr);
+    //return EFI_SUCCESS;
 }

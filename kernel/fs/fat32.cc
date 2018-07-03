@@ -751,7 +751,7 @@ fat32_dir_union_t *fat32_fs_t::lookup_dirent(char const *pathname,
         de = search_dir(cluster, name_st, name_len);
 
         if (!de)
-            return 0;
+            return nullptr;
 
         if (dde)
             *dde = de;
@@ -1003,24 +1003,24 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
         // Opening existing file
         if (unlikely(!fde)) {
             // File not found
-            return 0;
+            return nullptr;
         }
     } else {
         // Creating file
         if (unlikely(!dde)) {
             // Path not found
-            return 0;
+            return nullptr;
         }
 
         if ((flags & O_EXCL) && fde) {
             // File already exists
-            return 0;
+            return nullptr;
         }
 
         if (!fde) {
             fde = create_dirent(path, dde, mode);
             if (!fde)
-                return 0;
+                return nullptr;
         }
     }
 

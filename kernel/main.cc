@@ -49,7 +49,7 @@ static void smp_main(void*)
     cpu_init(1);
 }
 
-REGISTER_CALLOUT(smp_main, 0, callout_type_t::smp_start, "100");
+REGISTER_CALLOUT(smp_main, nullptr, callout_type_t::smp_start, "100");
 
 // Pull in the device constructors
 // to cause them to be initialized
@@ -105,7 +105,7 @@ static int shell_thread(void *p)
 {
     (void)p;
 
-    printk("Shell running\n");
+    printk("Shell running: %#.4x\n", 42);
 
     for (;;) {
         keyboard_event_t event = keybd_waitevent();
@@ -153,7 +153,7 @@ private:
         size_t data_size = 4096;
 
         for (size_t i = 0; i < queue_depth; ++i) {
-            data[i] = (char*)mmap(0, data_size,
+            data[i] = (char*)mmap(nullptr, data_size,
                                   PROT_READ | PROT_WRITE, 0, -1, 0);
             printk("(devid %d) read buffer at %lx\n",
                    devid, (uint64_t)data[i]);
@@ -315,7 +315,7 @@ static int mprotect_test(void *)
 {
     return 0;
 
-    char *mem = (char*)mmap(0, 256 << 20, PROT_NONE, 0, -1, 0);
+    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0, -1, 0);
 
     __try {
         *mem = 'H';
@@ -324,7 +324,7 @@ static int mprotect_test(void *)
         printk("Caught!!\n");
     }
 
-    if (-1 != mprotect(0, 42, PROT_NONE))
+    if (-1 != mprotect(nullptr, 42, PROT_NONE))
         assert_msg(0, "Expected error");
 
     if (1 != mprotect(mem, 42, PROT_NONE))
@@ -452,7 +452,7 @@ static int stress_mmap_thread(void *p)
                 //assert(size >= 1);
                 //assert(size < 131072);
 
-                block = mmap(0, sz,
+                block = mmap(nullptr, sz,
                              PROT_READ | PROT_WRITE,
                              0, -1, 0);
 
@@ -789,7 +789,7 @@ static int init_thread(void *p)
 #endif
 
     printk("Running mprotect self test\n");
-    mprotect_test(0);
+    mprotect_test(nullptr);
 
     printk("Running red-black tree self test\n");
     rbtree_t<>::test();
@@ -881,7 +881,7 @@ static int init_thread(void *p)
     printk("Running mmap stress with %d threads\n",
              ENABLE_MMAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_MMAP_STRESS_THREAD; ++i) {
-        thread_create(stress_mmap_thread, 0, 0, false);
+        thread_create(stress_mmap_thread, nullptr, 0, false);
     }
 #endif
 
@@ -900,7 +900,7 @@ int debugger_thread(void *)
 {
     printk("Starting GDB stub\n");
     gdb_init();
-    thread_create(init_thread, 0, 0, false);
+    thread_create(init_thread, nullptr, 0, false);
 
     return 0;
 }
@@ -908,9 +908,9 @@ int debugger_thread(void *)
 extern "C" _noreturn int main(void)
 {
     if (!kernel_params->wait_gdb)
-        thread_create(init_thread, 0, 0, false);
+        thread_create(init_thread, nullptr, 0, false);
     else
-        thread_create(debugger_thread, 0, 0, false);
+        thread_create(debugger_thread, nullptr, 0, false);
 
     thread_idle_set_ready();
 

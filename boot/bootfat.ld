@@ -1,4 +1,5 @@
 ENTRY(entry)
+OUTPUT_FORMAT(elf32-i386)
 
 SECTIONS {
 	.text 0x1000 : AT(0x1000) {
@@ -10,7 +11,7 @@ SECTIONS {
 		*(.text)
 		*(.text.*)
 		*(.text.unlikely)
-		
+
 		. = ALIGN(4);
 		___ctors_st = .;
 		*(.ctors)
@@ -18,7 +19,7 @@ SECTIONS {
 		*(.init_array)
 		*(SORT(.init_array.*))
 		___ctors_en = .;
-		
+
 		___dtors_st = .;
 		*(.dtors)
 		*(.dtors.*)
@@ -50,20 +51,41 @@ SECTIONS {
 	} = 0
 
 	.bss : {
-		___bss_start = .;
+		___bss_st = .;
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
 		*(COMMON.*)
 		*(COMMON*)
-		___bss_end = .;
+		___bss_en = .;
 	}
 
 	___initial_stack_limit = .;
-	. = ABSOLUTE(0xF000);
+	. = ABSOLUTE(0xFFF0);
 	___initial_stack = .;
+	. += 16;
 	___heap_st = .;
 	___end = .;
 
-	/DISCARD/ : { *(.eh_frame) }
+
+	.eh_frame       0 : { *(.eh_frame)      }
+	.debug          0 : { *(.debug)         }
+	.debug_info		0 : { *(.debug_info)    }
+	.debug_abbrev	0 : { *(.debug_abbrev)  }
+	.debug_aranges	0 : { *(.debug_aranges) }
+	.debug_ranges	0 : { *(.debug_ranges)  }
+	.debug_frame	0 : { *(.debug_frame)   }
+	.debug_macro	0 : { *(.debug_macro)   }
+	.debug_line		0 : { *(.debug_line)    }
+	.debug_str		0 : { *(.debug_str)     }
+	.debug_loc		0 : { *(.debug_loc)     }
+	.comment        0 : { *(.comment)       }
+	.got            0 : { *(.got*)          }
+	.rel            0 : { *(.rel*)          }
+	.iplt           0 : { *(.iplt*)         }
+	.igot           0 : { *(.igot*)         }
+
+	/DISCARD/		0 : { *(.interp)               }
+	/DISCARD/		0 : { *(.comment)              }
+	/DISCARD/		0 : { *(.note.gnu.build-id)    }
 }

@@ -1120,14 +1120,14 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
          (cfg = cfg_hlp.find_config(cfg_idx)) != nullptr;
          ++cfg_idx) {
 
-        USBXHCI_TRACE("cfg #0x%x max_power=%umA {\n",
+        USBXHCI_TRACE("cfg #%#x max_power=%umA {\n",
                       cfg_idx, cfg->max_power * 2);
 
         for (int iface_idx = 0;
              (iface = cfg_hlp.find_iface(cfg, iface_idx)) != nullptr;
              ++iface_idx) {
-            USBXHCI_TRACE("  iface #0x%x: class=0x%x (%s)"
-                          " subclass=0x%x, proto=0x%x {\n",
+            USBXHCI_TRACE("  iface #%#x: class=%#x (%s)"
+                          " subclass=%#x, proto=%#x {\n",
                           iface->iface_num, iface->iface_class,
                           cfg_hlp.class_code_text(iface->iface_class),
                           iface->iface_subclass, iface->iface_proto);
@@ -1135,8 +1135,8 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
             for (int ep_idx = 0;
                  (ep = cfg_hlp.find_ep(iface, ep_idx)) != nullptr;
                  ++ep_idx) {
-                USBXHCI_TRACE("    ep 0x%x: dir=%s attr=%s,"
-                              " maxpktsz=0x%x, interval=%u\n",
+                USBXHCI_TRACE("    ep %#x: dir=%s attr=%s,"
+                              " maxpktsz=%#x, interval=%u\n",
                               ep->ep_addr,
                               ep->ep_addr >= 0x80 ? "IN" : "OUT",
                               usb_config_helper::ep_attr_text(ep->ep_attr),
@@ -1154,7 +1154,7 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
 
 bool usbxhci::add_device(int parent_slot, int port, int route)
 {
-    USBXHCI_TRACE("Adding device, port=%d, route=0x%x\n", port, route);
+    USBXHCI_TRACE("Adding device, port=%d, route=%#x\n", port, route);
 
     int slotid = enable_slot(port);
 
@@ -1418,11 +1418,11 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     // Program device context address array pointer
     dev_ctx_ptrs = (uint64_t*)
-            mmap(0, sizeof(*dev_ctx_ptrs) * maxslots,
+            mmap(nullptr, sizeof(*dev_ctx_ptrs) * maxslots,
                  PROT_READ | PROT_WRITE,
                  MAP_POPULATE, -1, 0);
 
-    dev_ctx.any = mmap(0, dev_ctx_size * maxslots,
+    dev_ctx.any = mmap(nullptr, dev_ctx_size * maxslots,
                         PROT_READ | PROT_WRITE,
                         MAP_POPULATE, -1, 0);
 
@@ -1589,13 +1589,13 @@ int usbxhci::set_address(int slotid, int port, uint32_t route)
     usbxhci_ep_ctx_t *inpepctx;
 
     if (!dev_ctx_large) {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
+        inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_small_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
         ctlctx = &inp.small->inpctl;
         inpslotctx = &inp.small->slotctx;
         inpepctx = inp.small->epctx;
     } else {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
+        inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_large_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
         ctlctx = &inp.large->inpctl;
         inpslotctx = &inp.large->slotctx;
@@ -1905,13 +1905,13 @@ usb_cc_t usbxhci::fetch_inp_ctx(
     usbxhci_ep_ctx_t *inpepctx = nullptr;
 
     if (!dev_ctx_large) {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_small_t),
+        inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_small_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
         ctlctx = &inp.small->inpctl;
         inpslotctx = &inp.small->slotctx;
         inpepctx = inp.small->epctx;
     } else {
-        inp.any = mmap(0, sizeof(usbxhci_inpctx_large_t),
+        inp.any = mmap(nullptr, sizeof(usbxhci_inpctx_large_t),
                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
         ctlctx = &inp.large->inpctl;
         inpslotctx = &inp.large->slotctx;
@@ -2313,7 +2313,7 @@ void usbxhci_detect(void *)
     usbxhci::detect();
 }
 
-REGISTER_CALLOUT(usbxhci_detect, 0, callout_type_t::usb, "000");
+REGISTER_CALLOUT(usbxhci_detect, nullptr, callout_type_t::usb, "000");
 
 template<typename T>
 void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,
@@ -2374,10 +2374,10 @@ template<typename T>
 bool usbxhci_ring_data_t<T>::alloc(uint32_t trb_count)
 {
     pending = (usbxhci_pending_cmd_t*)
-                 mmap(0, sizeof(*pending) * trb_count,
+                 mmap(nullptr, sizeof(*pending) * trb_count,
                       PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
 
-    ptr = (T *)mmap(0, sizeof(*ptr) * trb_count,
+    ptr = (T *)mmap(nullptr, sizeof(*ptr) * trb_count,
                     PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
     physaddr = mphysaddr(ptr);
 

@@ -501,7 +501,7 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     this->iface_idx = iface_idx;
 
     // Allocate a page for the command queue
-    cmd_queue = (pending_cmd_t*)mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+    cmd_queue = (pending_cmd_t*)mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE,
                                      MAP_POPULATE, -1, 0);
     cmd_head = 0;
     cmd_tail = 0;

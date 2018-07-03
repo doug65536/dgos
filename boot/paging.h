@@ -50,6 +50,9 @@
 #define PTE_PAT             (1ULL << PTE_PAT_BIT)
 #define PTE_NX              (1ULL << PTE_NX_BIT)
 
+#define PTE_EX_PHYSICAL_BIT 9
+#define PTE_EX_PHYSICAL     (1 << PTE_EX_PHYSICAL_BIT)
+
 // Multi-bit field masks, in place
 #define PTE_ADDR            (PTE_ADDR_MASK << PTE_ADDR_BIT)
 #define PTE_PK              (PTE_PK_MASK << PTE_PK_BIT)

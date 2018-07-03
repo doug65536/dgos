@@ -3,6 +3,7 @@
 #include "types.h"
 #include "cpuid.h"
 #include "cpu_constants.h"
+#include "assert.h"
 
 struct gdt_entry_t {
     uint16_t limit_low;
@@ -11,7 +12,58 @@ struct gdt_entry_t {
     uint8_t access;
     uint8_t flags_limit_high;
     uint8_t base_high;
+    
+    gdt_entry_t &set_base(uint32_t base)
+    {
+        base_low = base & GDT_BASE_LOW_MASK;
+        base_middle = (base >> GDT_BASE_MIDDLE_BIT) & 0xFF;
+        base_high = base >> GDT_BASE_HIGH_BIT;
+        return *this;
+    }
+    
+    gdt_entry_t &set_limit(uint32_t limit)
+    {
+        if (limit > 0xFFFFFF) {
+            // Translate limit to page count and set granularity bit
+            limit >>= 12;
+            flags_limit_high |= GDT_FLAGS_GRAN;
+        } else {
+            // Clear granularity bit
+            flags_limit_high &= ~GDT_FLAGS_GRAN;
+        }
+        
+        limit_low = limit & GDT_BASE_LOW_MASK;
+        flags_limit_high = (flags_limit_high & ~GDT_LIMIT_HIGH_MASK) |
+                ((limit >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH_MASK);
+        return *this;
+    }
+    
+    gdt_entry_t &set_access(bool present, int priv, 
+                            bool exec, bool down, bool rw)
+    {
+        access = (present ? GDT_ACCESS_PRESENT : 0) |
+                GDT_ACCESS_DPL_n(priv) |
+                (1 << 4) |
+                (exec ? GDT_ACCESS_EXEC : 0) |
+                (down ? GDT_ACCESS_DOWN : 0) |
+                (rw ? GDT_ACCESS_RW : 0) |
+                GDT_ACCESS_ACCESSED;
+        return *this;
+    }
+    
+    gdt_entry_t &set_flags(bool is32, bool is64)
+    {
+        flags_limit_high = (flags_limit_high & GDT_FLAGS_GRAN) |
+                (is32 ? GDT_FLAGS_IS32 : 0) |
+                (is64 ? GDT_FLAGS_IS64 : 0) |
+                (flags_limit_high & GDT_LIMIT_HIGH_MASK);
+        return *this;
+    }
 };
+
+C_ASSERT(sizeof(gdt_entry_t) == 8);
+
+extern gdt_entry_t gdt[];
 
 #define GDT_MAKE_SEGMENT_DESCRIPTOR(base, \
             limit, \
@@ -40,7 +92,7 @@ struct gdt_entry_t {
         ((granularity) ? GDT_FLAGS_GRAN : 0) | \
         ((is32) ? GDT_FLAGS_IS32 : 0) | \
         ((is64) ? GDT_FLAGS_IS64 : 0) | \
-        (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH) \
+        (((limit) >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH_MASK) \
     ), \
     (((base) >> GDT_BASE_HIGH_BIT) & GDT_BASE_HIGH) \
 }
@@ -211,7 +263,7 @@ void init_irq();
 
 extern "C" void cpu_init();
 
-_pure const char *cpu_choose_kernel();
+_noreturn
 void run_kernel(uint64_t entry, void *param);
 void copy_kernel(uint64_t dest_addr, void *src, size_t sz);
 void reloc_kernel(uint64_t distance, void *elf_rela, size_t relcnt);

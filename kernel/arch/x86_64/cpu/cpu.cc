@@ -242,7 +242,7 @@ static void cpu_init_smp_apic(void *arg)
     thread_init(1);
 }
 
-REGISTER_CALLOUT(cpu_init_smp_apic, 0, callout_type_t::smp_start, "200");
+REGISTER_CALLOUT(cpu_init_smp_apic, nullptr, callout_type_t::smp_start, "200");
 
 void cpu_patch_insn(void *addr, uint64_t value, size_t size)
 {

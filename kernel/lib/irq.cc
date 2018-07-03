@@ -126,7 +126,7 @@ void intr_hook(int intr, intr_handler_t handler, char const *name)
 
     intr_link_t *prev_link = &intr_first[intr];
 
-    intr_handler_reg_t *entry = 0;
+    intr_handler_reg_t *entry = nullptr;
     while (*prev_link >= 0) {
         entry = intr_handlers + *prev_link;
 
@@ -138,7 +138,7 @@ void intr_hook(int intr, intr_handler_t handler, char const *name)
 
         prev_link = &entry->next;
 
-        entry = 0;
+        entry = nullptr;
     }
 
     if (!entry) {
@@ -170,7 +170,7 @@ void intr_unhook(int intr, intr_handler_t handler)
 
     intr_link_t *prev_link = &intr_first[intr];
 
-    intr_handler_reg_t *entry = 0;
+    intr_handler_reg_t *entry = nullptr;
     while (*prev_link != 0) {
         entry = intr_handlers + *prev_link;
 
@@ -182,7 +182,7 @@ void intr_unhook(int intr, intr_handler_t handler)
 
         prev_link = &entry->next;
 
-        entry = 0;
+        entry = nullptr;
     }
 }
 

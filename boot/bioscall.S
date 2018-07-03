@@ -36,23 +36,21 @@ bioscall:
     test %cl,%cl
     jz 0f
     call cpu_a20_exitpm
-0:
 
     // Set up %dx:%bp to be a real mode far pointer to the same place as %esp
     // With 4KB of stack space available before sp underflows
-    lea -4096(%esp),%edx
+0:  lea -4096(%esp),%edx
     mov %edx,%ebp
     shr $4,%edx
     and $0xF,%ebp
 
     // Jump to 16 bit protected mode to load 64KB segment limits
     ljmp $ GDT_SEL_PM_CODE16,$ 0f
-0:
 .code16
     // 16-bit protected mode
 
     // Load 16-bit data segments
-    movw $GDT_SEL_PM_DATA16,%ax
+0:  movw $ GDT_SEL_PM_DATA16,%ax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs
@@ -66,8 +64,7 @@ bioscall:
 
     // Real mode
     ljmp $0,$0f
-0:
-    xorw %ax,%ax
+0:  xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs
@@ -114,7 +111,7 @@ bioscall:
 
     // Go back into protected mode
     cli
-    cs lgdt gdtr
+    cs lgdtl gdtr
 
     // Compiled code is assuming EFLAGS.DF is 0
     cld
@@ -124,10 +121,10 @@ bioscall:
     or $1,%eax
     movl %eax,%cr0
 
-    ljmpw $GDT_SEL_PM_CODE32,$0f
-0:
+    ljmpw $ GDT_SEL_PM_CODE32,$0f
+
 .code32
-    movl $ GDT_SEL_KERNEL_DATA,%eax
+0:  movl $ GDT_SEL_KERNEL_DATA,%eax
     movw %ax,%ds
     movw %ax,%es
     movw %ax,%fs

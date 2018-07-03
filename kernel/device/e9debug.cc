@@ -62,5 +62,5 @@ void e9debug_init(void)
              "----------------------------------------------------\n");
 }
 
-REGISTER_CALLOUT(e9debug_serial_ready, 0,
+REGISTER_CALLOUT(e9debug_serial_ready, nullptr,
                  callout_type_t::constructors_ran, "000");

@@ -335,23 +335,23 @@ bool malloc_validate()
          blk = (blk_hdr_t*)(uintptr_t(blk) + blk->size)) {
         if (blk->invalid() ||
                 (blk->sig != blk_hdr_t::FREE && blk->sig != blk_hdr_t::USED)) {
-            PRINT(TSTR "Invalid block header at %zx\n", uintptr_t(blk));
+            PRINT("Invalid block header at %zx\n", uintptr_t(blk));
             return false;
         }
 
         if (blk->size & 15) {
-            PRINT(TSTR "Block size is not a multiple of 16\n");
+            PRINT("Block size is not a multiple of 16\n");
             return false;
         }
 
         if (blk > heap_en) {
-            PRINT(TSTR "Fell off the end of the heap\n");
+            PRINT("Fell off the end of the heap\n");
             return false;
         }
 
         if (blk == heap_en) {
             if (blk->size != 0) {
-                PRINT(TSTR "Heap end sentinel has invalid size\n");
+                PRINT("Heap end sentinel has invalid size\n");
                 return false;
             }
 
@@ -414,4 +414,13 @@ void malloc_get_heap_range(void **st, void **en)
 {
     *st = heap_st;
     *en = heap_en + 1;
+}
+
+char *strdup(const char *s)
+{
+    size_t len = strlen(s);
+    char *copy = (char*)malloc(len + 1);
+    if (likely(copy))
+        return (char*)memcpy(copy, s, len + 1);
+    return nullptr;
 }

@@ -5,7 +5,9 @@ DUMPDIR = $(top_builddir)/dump
 BUILT_SOURCES = \
 	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
-	generated_headers
+	$(DUMPDIR)/call-trace-out \
+	generated_headers \
+	trace-tool
 
 #  -> Link mbr-elf
 #  -> Generate mbr-bin
@@ -34,6 +36,7 @@ bin_PROGRAMS = \
 	bootfat-elf \
 	bootiso-elf \
 	bootefi-amd64 \
+	bootpxe-bios-elf \
 	kernel-generic \
 	kernel-bmi \
 	user-shell \
@@ -50,10 +53,10 @@ mbr_elf_SOURCES = \
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static
+	$(NO_LTO_FLAGS) -static \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 mbr_elf_CFLAGS =
 
@@ -68,7 +71,7 @@ mbr_elf_CCASFLAGS = \
 mbr_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
 	$(REGPARM_FLAGS) \
-	-Wl,-m,elf_i386 \
+	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
@@ -80,7 +83,7 @@ EXTRA_mbr_elf_DEPENDENCIES = \
 
 mbr_elf_LDADD = \
 	$(LIBGCC_ELF32)
-	
+
 # mbr-bin
 
 $(top_builddir)/mbr-bin: $(top_builddir)/mbr-elf
@@ -95,10 +98,10 @@ boot1_elf_SOURCES = \
 boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(NO_LTO_FLAGS) -static
+	$(NO_LTO_FLAGS) -static \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 boot1_elf_CFLAGS =
 
@@ -197,7 +200,8 @@ libbootsect_a_SOURCES = \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
 	boot/boottable.cc \
-	boot/boottable_bios.cc
+	boot/boottable_bios.cc \
+	boot/log2.h
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \
@@ -208,7 +212,6 @@ libbootsect_a_CXXFLAGS = \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
-	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(FREESTANDING_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
@@ -219,21 +222,22 @@ libbootsect_a_CXXFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 libbootsect_a_CFLAGS =
 
 libbootsect_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
 	$(COMPILER_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
-	$(SMALLEST_CODE_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
-	$(NO_UNWIND_TABLES_FLAGS)
+	$(NO_UNWIND_TABLES_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 # boot code
 
@@ -256,25 +260,21 @@ bootfat_elf_CCASFLAGS = \
 	$(ELF32_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 # -N to turn off section alignment and make all sections rwx
 bootfat_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
-	$(ELF32_FLAGS) \
 	$(LIBGCC_ELF32) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
 	-Wl,-Map,$(top_builddir)/bootfat.map \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
 	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	-nostartfiles -nodefaultlibs -nostdlib
 
 EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
@@ -304,8 +304,8 @@ bootiso_elf_CCASFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 bootiso_elf_LDFLAGS = \
 	-DFROM_LDFLAGS \
@@ -314,12 +314,11 @@ bootiso_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
-	-Wl,-m,elf_i386 \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
 	-nostartfiles -nodefaultlibs -nostdlib \
-	$(OPTIMIZE_SIZE_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(OPTIMIZE_SIZE_FLAGS)
 
 EXTRA_bootiso_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootiso.ld
@@ -331,6 +330,47 @@ bootiso_elf_LDADD = \
 # bootiso-bin
 
 $(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
+	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
+
+# bootpxe-bios
+
+bootpxe_bios_elf_SOURCES = \
+	boot/bootpxe-bios.ld \
+	boot/pxe-bios.S \
+	boot/pxe.h \
+	boot/pxemain.cc \
+	boot/pxemain.h \
+	boot/malloc_bios.cc
+
+bootpxe_bios_elf_CXXFLAGS = \
+	$(bootiso_elf_CXXFLAGS)
+
+bootpxe_bios_elf_CCASFLAGS = \
+	$(bootiso_elf_CCASFLAGS)
+
+bootpxe_bios_elf_LDFLAGS = \
+	-DFROM_LDFLAGS \
+	$(ELF32_FLAGS) \
+	$(LIBGCC_ELF32) \
+	$(REGPARM_FLAGS) \
+	$(NO_PIC_FLAGS) \
+	$(LINKER_DEBUG) \
+	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
+	-Wl,-Map,$(top_builddir)/bootpxe-bios.map \
+	$(LINKER_SEL) -static -Bsymbolic \
+	-nostartfiles -nodefaultlibs -nostdlib \
+	$(COMPILER_FLAGS)
+
+bootpxe_bios_elf_LDADD = \
+	libbootsect.a \
+	$(LIBGCC_ELF32)
+
+EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
+	boot/bootpxe-bios.ld
+
+# bootpxe-bin
+
+$(top_builddir)/bootpxe-bios-bin: $(top_builddir)/bootpxe-bios-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # efi
@@ -676,6 +716,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/ata.h \
 	kernel/device/e9debug.cc \
 	kernel/device/e9debug.h \
+	kernel/device/eainstrument.cc \
+	kernel/device/eainstrument.h \
 	kernel/device/e9debug.h \
 	kernel/device/i350.cc \
 	kernel/device/ide.cc \
@@ -744,11 +786,13 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
-	$(FREESTANDING_FLAGS)
+	$(FREESTANDING_FLAGS) \
+	$(INSTRUMENT_FUNCTIONS_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(INSTRUMENT_FUNCTIONS_FLAGS)
 
 KERNEL_LDFLAGS_SHARED = \
 	-DFROM_LDFLAGS \
@@ -829,6 +873,21 @@ kernel_bmi_LDADD = $(KERNEL_LDADD_SHARED)
 
 EXTRA_kernel_bmi_DEPENDENCIES = \
 	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+
+$(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
+	$(LN) -f "$<" "$@"
+
+# ----------------------------------------------------------------------------
+# parse-trace
+
+trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
+	$(CXX_FOR_BUILD) -g -o "$@" \
+		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
+		-fwhole-program \
+		$^ \
+		-Wl,--start-group \
+		-lncurses -ltinfo -lgpm -ldl \
+		-Wl,--end-group
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1080,7 +1139,6 @@ LIBC_TESTS = \
 	$(top_srcdir)/libc/tests/test_string.cc
 
 LIBC_CXXFLAGS = \
-	-ggdb \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
@@ -1165,26 +1223,29 @@ clean-local:
 	rm -f $(top_builddir)/mbr-bin
 	rm -f $(top_builddir)/bootfat-bin
 	rm -f $(top_builddir)/bootiso-bin
+	rm -f $(top_builddir)/bootpxe-bios-bin
+
+	rm -f $(top_builddir)/bootefi-pe
+	rm -f $(top_builddir)/bootx64.efi
+	rm -f $(top_builddir)/bootia32.efi
+
 	rm -f $(top_builddir)/mbr.sym
 	rm -f $(top_builddir)/bootfat.sym
 	rm -f $(top_builddir)/bootiso.sym
 	rm -f $(top_builddir)/bootx64-efi.sym
 	rm -f $(top_builddir)/kernel-generic.sym
 	rm -f $(top_builddir)/kernel-bmi.sym
-	
+
 	rm -f $(top_builddir)/mbr.map
 	rm -f $(top_builddir)/bootfat.map
 	rm -f $(top_builddir)/bootiso.map
+	rm -f $(top_builddir)/bootpxe-bios.map
 	rm -f $(top_builddir)/bootefi-pe.map
 	rm -f $(top_builddir)/bootefi-amd64.map
 	rm -f $(top_builddir)/bootefi-i386.map
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-bmi.map
-	
-	rm -f $(top_builddir)/bootefi-pe
-	rm -f $(top_builddir)/bootx64.efi
-	rm -f $(top_builddir)/bootia32.efi
-	
+
 	rm -f $(top_builddir)/mbr.dis.gz
 	rm -f $(top_builddir)/bootefi-i386.dis.gz
 	rm -f $(top_builddir)/bootefi-amd64.dis.gz
@@ -1288,14 +1349,19 @@ $(DUMPDIR)/qemu-debug-out:
 	mkdir -p "$(@D)"
 	mkfifo "$@"
 
-QEMU = qemu-system-x86_64
+$(DUMPDIR)/call-trace-out:
+	mkdir -p "$(@D)"
+	mkfifo "$@"
 
-QEMU_EXTRA_DEPS = random-mem.img $(DUMPDIR)/qemu-debug-out
+QEMU_EXTRA_DEPS = \
+	random-mem.img \
+	$(DUMPDIR)/qemu-debug-out \
+	$(DUMPDIR)/call-trace-out
 
 QEMU_CPUS = 2
 QEMU_CORES = 2
 QEMU_THREADS = 1
-QEMU_CPU = max,migratable=false,host-cache-info=true
+QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
 QEMU_RAM = 5G
 
@@ -1334,8 +1400,10 @@ QEMU_MONITOR = \
 
 QEMU_DEBUGCON = \
 	-chardev pipe,path=$(DUMPDIR)/qemu-debug-out,id=qemu-debug-out \
-	-mon qemu-monitor,mode=readline \
-	-device isa-debugcon,chardev=qemu-debug-out
+	-device isa-debugcon,chardev=qemu-debug-out \
+	-chardev pipe,path=$(DUMPDIR)/call-trace-out,id=call-trace-out \
+	-device isa-debugcon,iobase=0xEA,chardev=call-trace-out \
+	-mon qemu-monitor,mode=readline
 
 #-chardev tty,id=qemu-serial-socket,path=/dev/ttyS0
 
@@ -1358,34 +1426,54 @@ QEMU_COMMON = \
 
 SECTOR_SZ = 512
 
+QEMU_RT = $(QEMU_RT_$(1))
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
-QEMU_HDCTL_DEV_nvme_fat = \
-	-machine q35 \
-	-device nvme,drive=nvmedrv,serial=42424242,bootindex=0,logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
-QEMU_HDCTL_DEV_usb_fat = \
-	-machine q35 \
-	-device usb-storage,bus=xhci.0,drive=bootdrv,bootindex=0
-QEMU_HDCTL_DEV_ahci_fat = -machine q35 -global ide-hd.logical_block_size=$(SECTOR_SZ)
-QEMU_HDCTL_DEV_ahci_iso = -machine q35
-QEMU_HDCTL_DEV_ide_fat = -machine pc
-QEMU_HDCTL_DEV_ide_iso = -machine pc
-QEMU_DIF_nvme = ,if=none,id=nvmedrv,cache=none,id=bootdrv
-QEMU_DIF_ahci = ,id=ahcictl
-QEMU_DIF_ide =
-QEMU_DIF_usb = ,if=none
+
+QEMU_DRV_COMMON = format=raw,werror=report,rerror=report,id=bootdrv
+QEMU_DRV = -drive id=bootdrv,if=none,file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
+
+QEMU_MACHINE = $(QEMU_MACHINE_$(1))
+QEMU_MACHINE_nvme = -machine q35
+QEMU_MACHINE_ahci = -machine q35
+QEMU_MACHINE_usb = -machine q35
+QEMU_MACHINE_ide = -machine pc
+
+QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
+
+QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_ahci = -device ich9-ahci,drive=bootdrv,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_ide = -device piix4-ide,drive=bootdrv,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_usb = -device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
+
+QEMU_HDCTL = $(QEMU_MACHINE_$(1)) $(QEMU_HDCTL_DEV_$(1))
+
+QEMU_MEDIA = $(QEMU_MEDIA_$(1))
 QEMU_MEDIA_fat = disk
 QEMU_MEDIA_iso = cdrom
+
+QEMU_IMAGE = $(QEMU_IMAGE_$(1))
 QEMU_IMAGE_fat = fatdisk.img
 QEMU_IMAGE_iso = isodisk.img
+
+QEMU_NP = $(QEMU_NP_$(1))
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
-QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu max,la57
-#-cpu EPYC
 
+QEMU_EMU = $(QEMU_EMU_$(1))
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
+QEMU_EMU_tcg = -cpu max,fsgsbase
+#-cpu max,la57
+
+QEMU_BOOT = $(QEMU_BOOT_$(1))
 QEMU_BOOT_bios = -bios $(top_srcdir)/emu/seabios.rom
 QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
+
+QEMU_BOOTMEDIA = $(QEMU_BOOTMEDIA_$(1)_$(2))
+QEMU_BOOTMEDIA_hd_bios =
+QEMU_BOOTMEDIA_hd_efi =
+QEMU_BOOTMEDIA_pxe_bios = -boot n -net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
+QEMU_BOOTMEDIA_pxe_efi = -boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
 
 # Connect to debug log
 monitor-debug-output:

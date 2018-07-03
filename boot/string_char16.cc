@@ -16,7 +16,7 @@ void *strchr(char16_t const *s, int ch)
         if (c == (char)ch)
             return (void*)s;
         if (c == 0)
-            return 0;
+            return nullptr;
     }
 }
 

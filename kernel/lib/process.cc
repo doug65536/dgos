@@ -40,7 +40,7 @@ process_t *process_t::add_locked(processes_scoped_lock const&)
 
     process_t *process = new process_t;
     if (unlikely(!process))
-        return 0;
+        return nullptr;
 
     if (process_first_free != 0) {
         // Reuse oldest pid
@@ -66,7 +66,7 @@ process_t *process_t::add_locked(processes_scoped_lock const&)
         }
 
         if (unlikely(process_count == 2))
-            processes[0].p = 0;
+            processes[0].p = nullptr;
     }
     processes[pid].p = process;
     process->pid = pid;
@@ -116,12 +116,12 @@ int process_t::spawn(pid_t * pid_result,
 
     for (size_t i = 0; i < arg_count; ++i)
         process->argv[i] = strdup(argv[i]);
-    process->argv[arg_count] = 0;
+    process->argv[arg_count] = nullptr;
     process->argc = arg_count;
 
     for (size_t i = 0; i < env_count; ++i)
         process->env[i] = strdup(envp[i]);
-    process->env[env_count] = 0;
+    process->env[env_count] = nullptr;
     process->envc = env_count;
 
     // Return the assigned PID
@@ -231,7 +231,7 @@ int process_t::start()
     // Initialize the stack
 
     size_t stack_size = 65536;
-    void *stack = mmap(0, stack_size, PROT_READ | PROT_WRITE,
+    void *stack = mmap(nullptr, stack_size, PROT_READ | PROT_WRITE,
                        MAP_STACK | MAP_USER, -1, 0);
 
     // Initialize the stack according to the ELF ABI

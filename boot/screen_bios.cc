@@ -1,11 +1,7 @@
 #include "screen.h"
 #include "screen_abstract.h"
 
-#define DIRECT_VGA 0
-
 char const boxchars[] = "\xC9\xBB\xBA\xC8\xBC\xCD\xDB ";
-
-#if !DIRECT_VGA
 
 // INT 0x10
 // AH = 0x13
@@ -56,79 +52,7 @@ static void bios_scroll_region(uint16_t top_left, uint16_t bottom_right,
     bioscall(&regs, 0x10);
 }
 
-void scroll_screen()
+void scroll_screen(uint8_t attr)
 {
-    bios_scroll_region(0, ((24 << 8) | 79), 1, 0x00);
+    bios_scroll_region(0, ((24 << 8) | 79), 1, attr);
 }
-
-#else
-
-static void vga_scroll_screen()
-{
-    uint16_t di = 0;
-    uint16_t si = 80 * 2;
-    uint16_t cx = 80 * 24;
-    uint16_t ax = 0xb800;
-    __asm__ __volatile__ (
-        "pushw %%ds\n\t"
-        "pushw %%es\n\t"
-
-        "movw %%ax,%%ds\n\t"
-        "movw %%ax,%%es\n\t"
-
-        "cld\n\t"
-        "rep movsw\n\t"
-
-        "movl $80,%%ecx\n\t"
-        "movl $0,%%eax\n\t"
-        "rep stosw\n\t"
-
-        "popw %%es\n\t"
-        "popw %%ds\n\t"
-        : "=a" (ax), "=S" (si), "=D" (di), "=c" (cx)
-        : "a" (ax), "S" (si), "D" (di), "c" (cx)
-    );
-}
-
-static void vga_print_at(
-        uint8_t row, uint8_t col, uint8_t attr,
-        uint16_t length, char const *text)
-{
-    uint16_t offset = (uint16_t)(row * 80 + col) << 1;
-    __asm__ __volatile__ (
-        "pushl %%gs\n\t"
-
-        // point gs to physical address 0xB8000
-        "movw $0xb800,%%ax\n\t"
-        "movw %%ax,%%gs\n\t"
-
-        // Loop
-        "copy_to_screen_another%=:\n\t"
-
-        // Test length remaining before each iteration
-        "testw %%cx,%%cx\n\t"
-        "jz copy_to_screen_done%=\n\t"
-        "decw %%cx\n\t"
-
-        // Read a byte from message and postincrement
-        "movb (%%si),%%al\n\t"
-        "incw %%si\n\t"
-
-        // Write character and attribute byte and postincrement
-        "gs movb %%al,(%%di)\n\t"
-        "gs movb %%dl,1(%%di)\n\t"
-        "addw $2,%%di\n\t"
-
-        // Writes off the end of the screen are truncated
-        "cmpw $2000,%%di\n"
-        "ja copy_to_screen_another%=\n\t"
-
-        "copy_to_screen_done%=:\n\t"
-
-        "popl %%gs\n\t"
-        : "=D" (offset), "=S" (text), "=c" (length)
-        : "D" (offset), "S" (text), "c" (length), "d" (attr)
-        : "eax"
-    );
-}
-#endif

@@ -8,7 +8,7 @@ typedef long ssize_t;
 typedef int64_t off_t;
 
 #define _stdcall                __attribute__((__stdcall__))
-                                
+
 #define _packed                 __attribute((__packed__))
 #define _const                  __attribute__((__const__))
 #define _pure                   __attribute__((__pure__))

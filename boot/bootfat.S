@@ -18,33 +18,21 @@
 .global entry
 entry:
     mov %dl,boot_drive
-    lss initial_stack_ptr,%sp
     
-    call clear_bss
+    mov $ .Linit_ret,%bx
+    jmp early_init
+.Linit_ret:
 
-	call detect_ancient_cpu
-
-	fninit
-
-	// 32 bit instructions are okay if detect_ancient_cpu returned...
-
-	movzwl %sp,%esp
-
-	// Load partition start LBA into edx:eax
-	movl ptbl_ent_stsec(%si),%eax
+    // Load partition start LBA into edx:eax
+    movl ptbl_ent_stsec(%si),%eax
     xor %edx,%edx
 
-	movl $fat32_boot_partition,%ecx
-	call boot
-	cli
-unreachable:
-	hlt
-	jmp unreachable
+    movl $fat32_boot_partition,%ecx
+    movl $ 0f,%ebx
+    jmp boot
+0:  hlt
+    jmp 0b
 
 .global boot_drive
 boot_drive:
-	.byte 0
-
-initial_stack_ptr:
-	.word ___initial_stack
-	.word 0
+    .byte 0

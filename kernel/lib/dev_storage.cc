@@ -98,7 +98,7 @@ void invoke_storage_factories(void *)
         probe_storage_factory(factory);
 }
 
-REGISTER_CALLOUT(invoke_storage_factories, 0,
+REGISTER_CALLOUT(invoke_storage_factories, nullptr,
                  callout_type_t::storage_dev, "000");
 
 void fs_register_factory(char const *name, fs_factory_t *fs)
@@ -115,7 +115,7 @@ static fs_reg_t *find_fs(char const *name)
 
         return reg;
     }
-    return 0;
+    return nullptr;
 }
 
 void fs_mount(char const *fs_name, fs_init_info_t *info)

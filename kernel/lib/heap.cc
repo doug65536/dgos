@@ -97,7 +97,7 @@ C_ASSERT(sizeof(heap_t) == PAGESIZE);
 
 heap_t *heap_create(void)
 {
-    heap_t *heap = (heap_t*)mmap(0, sizeof(heap_t), PROT_READ | PROT_WRITE,
+    heap_t *heap = (heap_t*)mmap(nullptr, sizeof(heap_t), PROT_READ | PROT_WRITE,
                                  MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
     if (unlikely(heap == MAP_FAILED))
         return nullptr;
@@ -168,7 +168,7 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
 
     size_t bucket = log2size - 5;
 
-    char *arena = (char*)mmap(0, HEAP_BUCKET_SIZE, PROT_READ | PROT_WRITE,
+    char *arena = (char*)mmap(nullptr, HEAP_BUCKET_SIZE, PROT_READ | PROT_WRITE,
                        MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 
@@ -199,7 +199,7 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
 
 static void *heap_large_alloc(size_t size)
 {
-    heap_hdr_t *hdr = (heap_hdr_t*)mmap(0, size,
+    heap_hdr_t *hdr = (heap_hdr_t*)mmap(nullptr, size,
                            PROT_READ | PROT_WRITE,
                            MAP_UNINITIALIZED, -1, 0);
 

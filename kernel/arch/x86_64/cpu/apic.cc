@@ -31,6 +31,7 @@
 #include "mutex.h"
 #include "bootinfo.h"
 #include "boottable.h"
+#include "inttypes.h"
 
 #define ENABLE_ACPI 1
 
@@ -252,7 +253,7 @@ static uint8_t ioapic_msi_base_irq;
 static vector<uint8_t> isa_irq_lookup;
 
 static unsigned apic_id_count;
-static uint8_t apic_id_list[64];
+static uint32_t apic_id_list[64];
 
 static int16_t intr_to_irq[256];
 static int16_t irq_to_intr[256];
@@ -721,6 +722,7 @@ struct acpi_madt_rec_hdr_t {
 #define ACPI_MADT_REC_TYPE_NMI      3
 #define ACPI_MADT_REC_TYPE_LNMI     4
 #define ACPI_MADT_REC_TYPE_LIRQ     5
+#define ACPI_MADT_REC_TYPE_X2APIC   9
 
 struct acpi_madt_lapic_t {
     acpi_madt_rec_hdr_t hdr;
@@ -757,6 +759,14 @@ struct acpi_madt_lnmi_t {
     uint8_t apic_id;
     uint16_t flags;
     uint8_t lapic_lint;
+} _packed;
+
+struct acpi_madt_x2apic_t {
+    acpi_madt_rec_hdr_t hdr;
+    uint16_t reserved;
+    uint32_t x2apic_id;
+    uint32_t flags;
+    uint32_t uid;
 } _packed;
 
 //
@@ -819,6 +829,9 @@ union acpi_madt_ent_t {
 
     // ACPI_MADT_REC_TYPE_LNMI
     acpi_madt_lnmi_t lnmi;
+
+    // ACPI_MADT_REC_TYPE_X2APIC
+    acpi_madt_x2apic_t x2apic;
 } _packed;
 
 struct acpi_madt_t {
@@ -947,7 +960,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
     for ( ; ent < end;
           ent = (acpi_madt_ent_t*)((char*)ent + ent->ioapic.hdr.record_len)) {
-        ACPI_TRACE("FADT record, type=%x ptr=%p, len=%u\n",
+        ACPI_TRACE("FADT record, type=%#x ptr=%p, len=%u\n",
                    ent->hdr.entry_type, (void*)ent,
                    ent->ioapic.hdr.record_len);
         switch (ent->hdr.entry_type) {
@@ -988,7 +1001,7 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
 
                 ioapic_reset(ioapic);
 
-                ACPI_TRACE("IOAPIC registered, id=%u, addr=0x%x, irqbase=%d,"
+                ACPI_TRACE("IOAPIC registered, id=%u, addr=%#x, irqbase=%d,"
                            " entries=%u\n",
                            ioapic->id, ioapic->addr, ioapic->irq_base,
                            ioapic->vector_count);
@@ -1041,8 +1054,21 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
             break;
         }
 
+        case ACPI_MADT_REC_TYPE_X2APIC:
+        {
+            ACPI_TRACE("Got X2APIC\n");
+
+            if (apic_id_count < countof(apic_id_list)) {
+                if (ent->lapic.flags == 1)
+                    apic_id_list[apic_id_count++] = ent->x2apic.x2apic_id;
+            } else {
+                ACPI_ERROR("Too many CPUs! Dropped one\n");
+            }
+            break;
+        }
+
         default:
-            ACPI_TRACE("Unrecognized FADT record, entry_type=%02x\n",
+            ACPI_TRACE("Unrecognized FADT record, entry_type=%#.2x\n",
                        ent->hdr.entry_type);
             break;
 
@@ -1093,7 +1119,7 @@ static void acpi_parse_rsdt()
                                   sizeof(*rsdt_hdr), acpi_rsdt_len);
     }
 
-    ACPI_TRACE("RSDT version %x\n", rsdt_hdr->rev);
+    ACPI_TRACE("RSDT version %#x\n", rsdt_hdr->rev);
 
     if (acpi_chk_hdr(rsdt_hdr) != 0) {
         ACPI_ERROR("ACPI RSDT checksum mismatch!\n");
@@ -1259,7 +1285,7 @@ static void mp_parse_fps()
             entry_cpu = (mp_cfg_cpu_t *)entry;
 
             MPS_TRACE("CPU package found,"
-                      " base apic id=%u ver=0x%x\n",
+                      " base apic id=%u ver=%#x\n",
                       entry_cpu->apic_id, entry_cpu->apic_ver);
 
             if ((entry_cpu->flags & MP_CPU_FLAGS_ENABLED) &&
@@ -1308,8 +1334,8 @@ static void mp_parse_fps()
                     break;
                 }
 
-                MPS_TRACE("IOAPIC id=%d, addr=0x%x,"
-                          " flags=0x%x, ver=0x%x\n",
+                MPS_TRACE("IOAPIC id=%d, addr=%#x,"
+                          " flags=%#x, ver=%#x\n",
                           entry_ioapic->id,
                           entry_ioapic->addr,
                           entry_ioapic->flags,
@@ -1376,7 +1402,7 @@ static void mp_parse_fps()
                 uint8_t lapic_id = entry_lintr->dest_lapic_id;
                 uint8_t intin = entry_lintr->dest_lapic_lintin;
                 MPS_TRACE("PCI device %u INT_%c# ->"
-                          " LAPIC ID 0x%02x INTIN %d\n",
+                          " LAPIC ID %#.2x INTIN %d\n",
                           device, (pci_irq & 3) + 'A',
                           lapic_id, intin);
             } else if (entry_lintr->source_bus == mp_isa_bus_id) {
@@ -1384,12 +1410,12 @@ static void mp_parse_fps()
                 uint8_t lapic_id = entry_lintr->dest_lapic_id;
                 uint8_t intin = entry_lintr->dest_lapic_lintin;
 
-                MPS_TRACE("ISA IRQ %d -> LAPIC ID 0x%02x INTIN %u\n",
+                MPS_TRACE("ISA IRQ %d -> LAPIC ID %#.2x INTIN %u\n",
                           isa_irq, lapic_id, intin);
             } else {
                 // Unknown bus!
                 MPS_ERROR("IRQ %d on unknown bus ->"
-                          " IOAPIC ID 0x%02x INTIN %u\n",
+                          " IOAPIC ID %#.2x INTIN %u\n",
                           entry_lintr->source_bus_irq,
                           entry_lintr->dest_lapic_id,
                           entry_lintr->dest_lapic_lintin);
@@ -1596,7 +1622,7 @@ void apic_dump_regs(int ap)
         printdbg("ap=%d APIC: ", ap);
         for (int x = 0; x < 4; ++x) {
             if (apic->reg_readable(i + x)) {
-                printdbg("%s[%3x]=%08x%s",
+                printdbg("%s[%3x]=%#.8x%s",
                          x == 0 ? "apic: " : "",
                          (i + x),
                          apic->read32(i + x),
@@ -1609,7 +1635,7 @@ void apic_dump_regs(int ap)
             }
         }
     }
-    APIC_TRACE("Logical destination register value: 0x%x\n",
+    APIC_TRACE("Logical destination register value: %#x\n",
              apic->read32(APIC_REG_LDR));
 #endif
 }
@@ -1621,7 +1647,7 @@ static void apic_configure_timer(
         uint8_t intr, bool mask = false)
 {
     APIC_TRACE("configuring timer,"
-               " dcr=0x%x, icr=0x%x, mode=0x%x, intr=0x%x, mask=%d\n",
+               " dcr=%#x, icr=%#x, mode=%#x, intr=%#x, mask=%d\n",
                dcr, icr, timer_mode, intr, mask);
     apic->write32(APIC_REG_LVT_DCR, dcr);
     apic->write32(APIC_REG_LVT_TR, APIC_LVT_VECTOR_n(intr) |
@@ -1876,7 +1902,7 @@ void apic_start_smp(void)
         apic_send_command(0, APIC_CMD_DELIVERY_INIT |
                           APIC_CMD_DEST_MODE_LOGICAL |
                           APIC_CMD_DEST_TYPE_OTHER);
-//        APIC_TRACE("Sending INIT IPI to APIC ID 0x%x\n", apic_id_list[i]);
+//        APIC_TRACE("Sending INIT IPI to APIC ID %#x\n", apic_id_list[i]);
 //        __sync_synchronize();
 //        apic_send_command(apic_id_list[i],
 //                          APIC_CMD_DELIVERY_INIT |
@@ -1914,7 +1940,7 @@ void apic_start_smp(void)
                     continue;
 
                 APIC_TRACE("Sending SIPI to APIC ID %u, "
-                           "trampoline page=0x%x\n",
+                           "trampoline page=%#x\n",
                            target, mp_trampoline_page);
 
                 // Send SIPI to CPU
@@ -1988,15 +2014,16 @@ static int64_t acpi_pm_timer_raw()
                  (acpi_fadt.pm_timer_block ||
                   acpi_fadt.x_pm_timer_block.access_size))) {
         if (likely(acpi_fadt.pm_timer_block)) {
-            ACPI_TRACE("PM Timer at I/O port 0x%x\n", acpi_fadt.pm_timer_block);
+            ACPI_TRACE("PM Timer at I/O port %#x\n", acpi_fadt.pm_timer_block);
             accessor = acpi_gas_accessor_t::from_ioport(
                         acpi_fadt.pm_timer_block, 4, 0, 32);
         } else if (acpi_fadt.x_pm_timer_block.access_size) {
             acpi_gas_t const& gas = acpi_fadt.x_pm_timer_block;
             ACPI_TRACE("Using extended PM Timer Generic Address Structure: "
-                       " addr_space: 0x%x, addr=0x%x%08x, size=0x%x,"
-                       " width=0x%x, bit=0x%x\n",
-                       gas.addr_space, gas.addr_hi, gas.addr_lo,
+                       " addr_space: %#x, addr=%#.16" PRIx64 ", size=%#x,"
+                       " width=%#x, bit=%#x\n",
+                       gas.addr_space,
+                       (uint64_t(gas.addr_hi) << 32) | gas.addr_lo,
                        gas.access_size, gas.bit_width, gas.bit_offset);
             accessor = acpi_gas_accessor_t::from_gas(gas);
         }
@@ -2190,7 +2217,7 @@ static mp_ioapic_t *ioapic_by_id(uint8_t id)
         if (ioapic_list[i].id == id)
             return ioapic_list + i;
     }
-    return 0;
+    return nullptr;
 }
 
 static void ioapic_reset(mp_ioapic_t *ioapic)

@@ -78,8 +78,8 @@ int usb_pipe_t::send_default_control(uint8_t request_type, uint8_t request,
                                      uint16_t value, uint16_t index,
                                      uint16_t length, void *data) const
 {
-//    printdbg("Sending USB control: reqt=0x%02x req=0x%02x, val=0x%04x,"
-//             " idx=0x%02x, len=0x%04x, data=%p\n",
+//    printdbg("Sending USB control: reqt=%#.2x req=%#.2x, val=%#.4x,"
+//             " idx=%#.2x, len=%#.4x, data=%p\n",
 //             request_type, request, value, index, length, data);
 
     return bus->send_control(

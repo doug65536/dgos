@@ -5,9 +5,9 @@
 scriptroot="$(cd "$(dirname "$0")" && pwd)"
 
 HOST=x86_64-elf
-AR="$HOST-ar"
-RANLIB="$HOST-ranlib"
-NM="$HOST-nm"
+AR="$HOST-gcc-ar"
+RANLIB="$HOST-gcc-ranlib"
+NM="$HOST-gcc-nm"
 
 export AR
 export RANLIB
@@ -23,23 +23,10 @@ function join_by {
 	echo "$*"
 }
 
-while [[ $done == 0 ]]
-do
-	case "$1" in
-	--with-lto )
-		shift
-		compileflags+=("-flto=16")
-		configureflags+=("--enable-optimize")
-		AR="$HOST-gcc-ar"
-		RANLIB="$HOST-gcc-ranlib"
-		NM="$HOST-gcc-nm"
-		;;
-	* ) done=1 ;;
-	esac
-done
-
 echo flags: "${compileflags[@]}"
 
-CFLAGS="$(join_by ' ' ${compileflags[@]})" CXXFLAGS="$CFLAGS" LDFLAGS="$CFLAGS" \
+CFLAGS="$(join_by ' ' ${compileflags[@]})" \
+	CXXFLAGS="$CFLAGS" \
+	LDFLAGS="$CFLAGS" \
 	"$scriptroot/configure" --host "$HOST" \
 	$(join_by ' ' ${configureflags[@]}) "$@"

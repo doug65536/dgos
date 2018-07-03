@@ -22,7 +22,7 @@ floppy_bootsig_check: disabled=0
 # no floppyb
 pci: enabled=1, chipset=i440fx
 vga: extension=vbe, update_freq=5, realtime=1
-cpu: count=4:1:1, ips=8000000, quantum=1, model=bx_generic
+cpu: count=4:1:1, ips=24000000, quantum=1, model=bx_generic
 cpu: reset_on_triple_fault=0, cpuid_limit_winnt=0, ignore_bad_msrs=0
 cpu: mwait_is_nop=0
 cpuid: level=6, stepping=3, model=3, family=6, vendor_string="GenuineIntel",

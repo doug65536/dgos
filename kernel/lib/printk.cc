@@ -317,7 +317,7 @@ intptr_t formatter(
         switch (ch) {
         case '%':
             // Literal %
-            chars_written += emit_chars(0, '%', emit_context);
+            chars_written += emit_chars(nullptr, '%', emit_context);
             continue;
 
         case '-':
@@ -375,7 +375,7 @@ intptr_t formatter(
                 flags.has_precision = 1;
                 fp = parse_int(fp,
                                flags.precision
-                               ? 0
+                               ? nullptr
                                : &flags.precision);
 
                 // Negative values are ignored
@@ -695,6 +695,9 @@ intptr_t formatter(
             flags.pending_leading_zeros = flags.precision;
             flags.pending_padding = flags.min_width;
 
+            if (flags.arg.uintptr_value == 0)
+                flags.hash = 0;
+
             digit_out = digits + sizeof(digits);
             *--digit_out = 0;
             do {
@@ -728,10 +731,8 @@ intptr_t formatter(
         }
 
         // Make room for minus/plus
-        if (flags.negative || flags.leading_plus) {
-            flags.pending_padding -=
-                    (flags.pending_padding > 0);
-        }
+        if (flags.negative || flags.leading_plus)
+            flags.pending_padding -= (flags.pending_padding > 0);
 
         if (flags.pending_padding != 0 &&
                 !flags.left_justify) {
@@ -743,20 +744,26 @@ intptr_t formatter(
 
             // Write leading padding for right justification
             for (int i = 0; i < flags.pending_padding; ++i)
-                chars_written += emit_chars(0, ' ', emit_context);
+                chars_written += emit_chars(nullptr, ' ', emit_context);
         }
+
+        if (flags.hash && flags.base == 16)
+            chars_written += emit_chars(!flags.upper ? "0x" : "0X",  2,
+                                        emit_context);
+        else if (flags.hash && flags.base == 8)
+            chars_written += emit_chars(nullptr, '0', emit_context);
 
         if (flags.negative) {
             flags.negative = 0;
-            chars_written += emit_chars(0, '-', emit_context);
+            chars_written += emit_chars(nullptr, '-', emit_context);
         } else if (flags.leading_plus) {
             flags.leading_plus = 0;
-            chars_written += emit_chars(0, '+', emit_context);
+            chars_written += emit_chars(nullptr, '+', emit_context);
         }
 
         // Write leading zeros
         for (int i = 0; i < flags.pending_leading_zeros; ++i)
-            chars_written += emit_chars(0, '0', emit_context);
+            chars_written += emit_chars(nullptr, '0', emit_context);
 
         //
         // Now print stuff...
@@ -773,7 +780,7 @@ intptr_t formatter(
                      flags.max_chars > 0 &&
                      i < (size_t)flags.max_chars; ++i) {
                     chars_written += emit_chars(
-                                0, flags.arg.char_ptr_value[i],
+                                nullptr, flags.arg.char_ptr_value[i],
                                 emit_context);
                 }
             } else {
@@ -786,13 +793,13 @@ intptr_t formatter(
         case arg_type_wchar_ptr:
             for (size_t i = 0; flags.arg.wchar_ptr_value[i]; ++i)
                 chars_written += emit_chars(
-                            0, flags.arg.wchar_ptr_value[i],
+                            nullptr, flags.arg.wchar_ptr_value[i],
                             emit_context);
             break;
 
         case arg_type_character:
             chars_written += emit_chars(
-                        0, flags.arg.character,
+                        nullptr, flags.arg.character,
                         emit_context);
             break;
 
@@ -801,7 +808,7 @@ intptr_t formatter(
         // Write trailing padding for left justification
         if (flags.left_justify) {
             for (int i = 0; i < flags.pending_padding; ++i)
-                chars_written += emit_chars(0, ' ', emit_context);
+                chars_written += emit_chars(nullptr, ' ', emit_context);
         }
     }
 
@@ -845,7 +852,7 @@ EXPORT int vcprintf(char const *format, va_list ap)
         int cursor_was_shown = con_cursor_toggle(0);
 
         chars_written = formatter(format, ap,
-                                  vcprintf_emit_chars, 0);
+                                  vcprintf_emit_chars, nullptr);
 
         con_cursor_toggle(cursor_was_shown);
     } else {
@@ -975,7 +982,7 @@ static int printdbg_emit_chars(char const *s, intptr_t ch, void *context)
 EXPORT int vprintdbg(char const *format, va_list ap)
 {
     //spinlock_hold_t hold = printdbg_lock_noirq();
-    return formatter(format, ap, printdbg_emit_chars, 0);
+    return formatter(format, ap, printdbg_emit_chars, nullptr);
     //printdbg_unlock_noirq(&hold);
 }
 

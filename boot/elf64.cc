@@ -17,7 +17,8 @@
 #include "bootmenu.h"
 #include "physmap.h"
 
-extern "C" void enter_kernel(uint64_t entry_point) _section(".smp.text");
+extern "C" _noreturn
+void enter_kernel(uint64_t entry_point) _section(".smp.text");
 
 // Save the entry point address for later MP processor startup
 _section(".smp.data") uint64_t smp_entry_point;
@@ -28,6 +29,16 @@ static int64_t base_adj;
 extern char ___smp_st[];
 extern char ___smp_en[];
 
+
+tchar const *cpu_choose_kernel()
+{
+//    if (cpu_has_bmi())
+//        return TSTR "dgos-kernel-bmi";
+//    else
+        return TSTR "dgos-kernel-generic";
+}
+
+_noreturn
 static void enter_kernel_initial(uint64_t entry_point)
 {
     //uintptr_t vbe_info_vector = vbe_select_mode(65535, 800, 1) << 4;
@@ -38,7 +49,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     void *ap_entry_ptr = malloc_aligned(___smp_en - ___smp_st, PAGE_SIZE);
 
-    PRINT(TSTR "SMP trampoline at 0x%zx:%zx",
+    PRINT("SMP trampoline at 0x%zx:%zx",
           uintptr_t(ap_entry_ptr) >> 4,
           uintptr_t(ap_entry_ptr) & 0xF);
 
@@ -50,12 +61,17 @@ static void enter_kernel_initial(uint64_t entry_point)
     int phys_mem_table_size = 0;
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
-    PRINT(TSTR "Mapping aliasing window\n");
+    PRINT("Mapping aliasing window\n");
+    
+    // Map first 4GB of physical addresses at -518G
+    paging_map_physical(0, -(UINT64_C(518) << 30), 
+                        UINT64_C(4) << 30, 
+                        PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
     paging_map_physical(0, (0xFFFFFFFF80000000ULL - PAGE_SIZE) + base_adj,
-                     PAGE_SIZE, PTE_PRESENT | PTE_WRITABLE);
+                     PAGE_SIZE, PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
     void *heap_st, *heap_en;
     malloc_get_heap_range(&heap_st, &heap_en);
@@ -65,7 +81,7 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     kernel_params_t *params = new kernel_params_t{};
 
-    params->size = sizeof(params);
+    params->size = sizeof(*params);
 
     params->ap_entry = uintptr_t((void(*)())ap_entry_ptr);
     params->phys_mem_table = uint64_t(phys_mem_table);
@@ -78,20 +94,20 @@ static void enter_kernel_initial(uint64_t entry_point)
 
     boot_menu_show(*params);
 
-    PRINT(TSTR "           ap_entry: 0x%llx\n", uint64_t(params->ap_entry));
-    PRINT(TSTR "     phys_mem_table: 0x%llx\n",
+    PRINT("           ap_entry: 0x%llx\n", uint64_t(params->ap_entry));
+    PRINT("     phys_mem_table: 0x%llx\n",
           uint64_t(params->phys_mem_table));
-    PRINT(TSTR "phys_mem_table_size: 0x%llx\n", params->phys_mem_table_size);
-    PRINT(TSTR "  vbe_selected_mode: 0x%llx\n",
+    PRINT("phys_mem_table_size: 0x%llx\n", params->phys_mem_table_size);
+    PRINT("  vbe_selected_mode: 0x%llx\n",
                uint64_t(params->vbe_selected_mode));
-    PRINT(TSTR "    boot_drv_serial: 0x%llx\n", params->boot_drv_serial);
-    PRINT(TSTR "    serial_debugout: 0x%llx\n",
+    PRINT("    boot_drv_serial: 0x%llx\n", params->boot_drv_serial);
+    PRINT("    serial_debugout: 0x%llx\n",
                uint64_t(params->serial_debugout));
-    PRINT(TSTR "           wait_gdb: 0x%x\n", params->wait_gdb);
+    PRINT("           wait_gdb: 0x%x\n", params->wait_gdb);
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
-    PRINT(TSTR "Entering kernel at 0x%llx\n", entry_point);
+    PRINT("Entering kernel at 0x%llx\n", entry_point);
 
     run_kernel(entry_point, params);
 }
@@ -101,18 +117,14 @@ void enter_kernel(uint64_t entry_point)
     if (smp_entry_point == 0) {
         smp_entry_point = entry_point;
         enter_kernel_initial(entry_point);
-        return;
+    } else {
+        run_kernel(entry_point, nullptr);
     }
-
-    run_kernel(entry_point, nullptr);
 }
 
-bool elf64_run(tchar const *filename)
+void elf64_run(tchar const *filename)
 {
     cpu_init();
-
-    //if (!cpu_has_long_mode())
-    //    PANIC("Need 64-bit CPU");
 
     uint64_t pge_page_flags = 0;
     if (cpu_has_global_pages())
@@ -133,12 +145,12 @@ bool elf64_run(tchar const *filename)
     uintptr_t address_window =
             (uintptr_t)malloc_aligned(PAGE_SIZE << 1, PAGE_SIZE);
 
-    PRINT(TSTR "Loading %s...\n", filename);
+    PRINT("Loading %s...\n", filename);
 
     int file = boot_open(filename);
 
     if (file < 0)
-        PRINT(TSTR "Could not open kernel file");
+        PRINT("Could not open kernel file");
 
     ssize_t read_size;
     Elf64_Ehdr file_hdr;
@@ -175,7 +187,7 @@ bool elf64_run(tchar const *filename)
     
     // Load relocations
     if (file_hdr.e_shentsize != sizeof(Elf64_Shdr))
-        PRINT(TSTR "Executable has unexpected section header size");
+        PRINT("Executable has unexpected section header size");
 
     ssize_t shbytes = file_hdr.e_shentsize * file_hdr.e_shnum;
     Elf64_Shdr *shdrs = (Elf64_Shdr*)malloc(shbytes);
@@ -183,15 +195,13 @@ bool elf64_run(tchar const *filename)
     if (shbytes != boot_pread(file, shdrs, shbytes, file_hdr.e_shoff))
         PANIC("Could not read section headers\n");
 
-    bool failed = false;
-
     uint64_t new_base = 0xFFFFFFFF80000000;
     base_adj = new_base - 0xFFFFFFFF80000000;
 
-    PRINT(TSTR "Loading kernel...");
+    PRINT("Loading kernel...");
 
     // For each program header
-    for (size_t i = 0; !failed && i < file_hdr.e_phnum; ++i) {
+    for (size_t i = 0; i < file_hdr.e_phnum; ++i) {
         Elf64_Phdr *blk = program_hdrs + i;
 
         blk->p_vaddr += base_adj;
@@ -229,7 +239,7 @@ bool elf64_run(tchar const *filename)
         
         int percent = 100 * ctx->done_bytes / ctx->total_bytes;
 
-        progress_bar_draw(20, 10, 70, percent);
+        progress_bar_draw(0, 10, 70, percent);
     }
 
     load_kernel_end(ctx);
@@ -261,17 +271,18 @@ bool elf64_run(tchar const *filename)
 
     free(program_hdrs);
 
+    // This check is done late to make debugging easier
+    // It is impossible to debug 32 bit code on qemu-x86_64 target
+    if (!cpu_has_long_mode())
+        PANIC("Need 64-bit CPU");
+    
     ELF64_TRACE("Entering kernel");
 
-    if (!failed)
-        enter_kernel(file_hdr.e_entry + base_adj);
-
-    PANIC("Failed to load kernel");
-
-    return false;
+    enter_kernel(file_hdr.e_entry + base_adj);
 }
 
-extern "C" void __cxa_pure_virtual()
+extern "C" _noreturn
+void __cxa_pure_virtual()
 {
     PANIC("Pure virtual call!");
 }

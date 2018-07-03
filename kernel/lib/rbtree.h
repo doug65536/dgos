@@ -672,7 +672,7 @@ rbtree_t<Tkey,Tval>::find(kvp_t *kvp, iter_t *iter)
     if (iter)
         *iter = n;
 
-    return cmp_result ? 0 : &NODE(n)->kvp;
+    return cmp_result ? nullptr : &NODE(n)->kvp;
 }
 
 //
@@ -978,7 +978,7 @@ int rbtree_t<Tkey,Tval>::test(void)
     for (int pass = 0; pass < 4; ++pass) {
         for (int order = 0; order < 4; ++order) {
             rbtree_t tree;
-            tree.init(&rbtree_t::test_cmp, 0);
+            tree.init(&rbtree_t::test_cmp, nullptr);
 
             scenario[0] = orders[order][(0 + pass) & 3];
             scenario[1] = orders[order][(1 + pass) & 3];
@@ -996,7 +996,7 @@ int rbtree_t<Tkey,Tval>::test(void)
             tree.insert(values[scenario[2]], 0);
             tree.insert(values[scenario[3]], 0);
 
-            tree.walk(test_visit, 0);
+            tree.walk(test_visit, nullptr);
 
             RBTREE_TRACE("---\n");
 
@@ -1004,7 +1004,7 @@ int rbtree_t<Tkey,Tval>::test(void)
                 RBTREE_TRACE("Delete %d\n", values[scenario[del]]);
                 tree.delete_item(values[scenario[del]], 0);
                 //tree.dump();
-                tree.walk(test_visit, 0);
+                tree.walk(test_visit, nullptr);
                 RBTREE_TRACE("---\n");
             }
         }
@@ -1014,7 +1014,7 @@ int rbtree_t<Tkey,Tval>::test(void)
     for (int dist = 4; dist <= 24; ++dist) {
         for (int pass = 0; pass < 2; ++pass) {
             rbtree_t tree;
-            tree.init(&rbtree_t::test_cmp, 0);
+            tree.init(&rbtree_t::test_cmp, nullptr);
 
             for (int i = 0; i < dist; ++i) {
                 if (!pass)
@@ -1026,7 +1026,7 @@ int rbtree_t<Tkey,Tval>::test(void)
                 tree.validate();
             }
 
-            tree.walk(test_visit, 0);
+            tree.walk(test_visit, nullptr);
 
             RBTREE_TRACE("---\n");
         }

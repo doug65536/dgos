@@ -32,7 +32,7 @@
 #define _assume_aligned(n)     __attribute__((__assume_aligned__(n)))
 #define _printf_format(m,n)    __attribute__((__format__(printf, m, n)))
 #define _artificial            __attribute__((__artificial__))
-
+#define _no_instrument         __attribute__((__no_instrument_function__))
 #define _constructor(prio)     __attribute__((__constructor__ (prio)))
 #define _destructor(prio)      __attribute__((__destructor__ (prio)))
 

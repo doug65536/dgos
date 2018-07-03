@@ -53,7 +53,7 @@ void fb_init(void)
     // Round the back buffer size up to a multiple of the cache size
     screen_size = (screen_size + 63) & -64;
 
-    fb.back_buf = (uint8_t*)mmap(0, screen_size, PROT_READ | PROT_WRITE,
+    fb.back_buf = (uint8_t*)mmap(nullptr, screen_size, PROT_READ | PROT_WRITE,
                                  0, -1, 0);
     fb.video_mem = (uint8_t*)(uintptr_t)fb.mode.framebuffer_addr;
 

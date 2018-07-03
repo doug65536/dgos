@@ -9,7 +9,7 @@
 #define ATTRIBUTE_FORMAT(m,n)
 #endif
 
-void scroll_screen();
+void scroll_screen(uint8_t attr);
 void print_at(int row, int col, uint8_t attr,
               size_t length, tchar const *text);
 
@@ -29,4 +29,4 @@ void print_lba(uint32_t lba);
 
 void dump_regs(bios_regs_t& regs, bool show_flags = false);
 
-#define PRINT(...) print_line(__VA_ARGS__)
+#define PRINT(...) print_line(TSTR __VA_ARGS__)

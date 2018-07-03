@@ -26,6 +26,8 @@ void malloc_init(void *st, void *en);
 
 void malloc_get_heap_range(void **st, void **en);
 
+char *strdup(char const *s);
+
 #ifndef NDEBUG
 void test_malloc();
 #endif

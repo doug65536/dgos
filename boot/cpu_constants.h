@@ -134,7 +134,7 @@
 #define GDT_BASE_MIDDLE         0xFF
 
 #define GDT_LIMIT_HIGH_BIT      16
-#define GDT_LIMIT_HIGH          0x0F
+#define GDT_LIMIT_HIGH_MASK     0x0F
 
 #define GDT_BASE_HIGH_BIT       24
 #define GDT_BASE_HIGH           0xFF

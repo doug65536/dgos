@@ -20,7 +20,7 @@ EXPORT void *memchr(void const *mem, int ch, size_t count)
     for (char const *p = (char const *)mem; count--; ++p)
         if (*p == (char)ch)
             return (void *)p;
-   return 0;
+   return nullptr;
 }
 
 EXPORT void *memrchr(void const *mem, int ch, size_t count)
@@ -28,7 +28,7 @@ EXPORT void *memrchr(void const *mem, int ch, size_t count)
     for (char const *p = (char const *)mem + count; count--; --p)
         if (p[-1] == (char)ch)
             return (void*)(p - 1);
-   return 0;
+   return nullptr;
 }
 
 // The terminating null character is considered to be a part
@@ -40,7 +40,7 @@ EXPORT char *strchr(char const *s, int ch)
         if (c == (char)ch)
             return (char*)s;
         if (c == 0)
-            return 0;
+            return nullptr;
     }
 }
 
@@ -52,7 +52,7 @@ EXPORT char *strrchr(char const *s, int ch)
         if ((char)*p == (char)ch)
             return (char*)p;
     }
-    return 0;
+    return nullptr;
 }
 
 EXPORT int strcmp(char const *lhs, char const *rhs)
@@ -119,7 +119,7 @@ EXPORT char *strstr(char const *str, char const *substr)
 
     // If substring is longer than string, impossible match
     if (blen > slen)
-        return 0;
+        return nullptr;
 
     // Only search as far as substr would fit within str
     size_t chklen = slen - blen;
@@ -129,7 +129,7 @@ EXPORT char *strstr(char const *str, char const *substr)
         if (memcmp(str + i, substr, blen) == 0)
             return (char*)(str + i);
 
-    return 0;
+    return nullptr;
 }
 
 static void memset16(char *&d, uint64_t s, size_t n)

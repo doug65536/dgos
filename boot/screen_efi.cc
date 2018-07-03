@@ -42,12 +42,13 @@ _constructor(ctor_console) void conout_init()
     efi_simple_text_output->SetMode(efi_simple_text_output, 0);
 }
 
-void scroll_screen()
+void scroll_screen(uint8_t attr)
 {
     if (unlikely(!efi_simple_text_output))
         return;
 
-    efi_simple_text_output->SetCursorPosition(efi_simple_text_output, 24, 0);
+    efi_simple_text_output->SetAttribute(efi_simple_text_output, attr);
+    efi_simple_text_output->SetCursorPosition(efi_simple_text_output, 0, 24);
     efi_simple_text_output->OutputString(efi_simple_text_output, TSTR "\n");
 }
 

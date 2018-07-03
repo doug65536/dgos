@@ -37,21 +37,10 @@ static uint16_t get_e820_region(physmem_range_t *range,
 
 bool get_ram_regions()
 {
-    physmem_range_t temp;
-
     // Count them
     uint32_t continuation = 0;
-    uint16_t count = 0;
-    do {
-        if (!get_e820_region(&temp, &continuation))
-            break;
-
-        ++count;
-    } while (continuation != 0);
-
-    continuation = 0;
     uint64_t total_memory = 0;
-    for (uint16_t i = 0; i < count; ++i) {
+    for (int i = 0; continuation || i == 0; ++i) {
         physmem_range_t entry{};
 
         if (!get_e820_region(&entry, &continuation))
@@ -66,14 +55,14 @@ bool get_ram_regions()
 
         physmap_insert(entry);
 
-        PRINT(TSTR "base=%llx length=%llx type=%lx valid=%lx",
+        PRINT("base=%llx length=%llx type=%lx valid=%lx",
                    entry.base,
                    entry.size,
                    entry.type,
                    entry.valid);
     }
 
-    PRINT(TSTR "Usable memory: %dMB", (int)(total_memory >> 20));
+    PRINT("Usable memory: %dMB", (int)(total_memory >> 20));
 
     return true;
 }

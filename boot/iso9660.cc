@@ -285,7 +285,7 @@ static void *iso9660_joliet_search(void const *candidate,
     for (size_t i = 0; i < len; ++i)
         if (bswap_16(can[i]) == c)
             return (void*)can;
-    return 0;
+    return nullptr;
 }
 
 static uint32_t find_file_by_name(char const *filename,
