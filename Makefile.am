@@ -883,10 +883,11 @@ $(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 	$(CXX_FOR_BUILD) -g -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
-		-fwhole-program \
+		-std=c++14 \
+		-fwhole-program -O3 -march=native -pthread \
 		$^ \
 		-Wl,--start-group \
-		-lncurses -ltinfo -lgpm -ldl \
+		-lncurses -ltinfo -lgpm -ldl -lz \
 		-Wl,--end-group
 
 # ----------------------------------------------------------------------------
