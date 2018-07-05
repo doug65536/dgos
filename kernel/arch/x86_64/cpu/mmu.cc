@@ -1608,7 +1608,8 @@ void mmu_init()
     size_t physalloc_size = mmu_phys_allocator_t::size_from_highest_page(
                 highest_usable);
     void *phys_alloc = mmap(nullptr, physalloc_size,
-                            PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+                            PROT_READ | PROT_WRITE,
+                            MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
 
     printdbg("Building physical memory free list\n");
 
