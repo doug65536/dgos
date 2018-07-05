@@ -3,6 +3,7 @@
 #include "cpu.h"
 #include "cpuid.h"
 #include "../kernel/lib/bswap.h"
+
 bool qemu_present()
 {
     cpuid_t info{};
@@ -18,6 +19,7 @@ bool qemu_present()
             !memcmp(str, "KVMKVMKVM\0\0\0", 12);
 }
 
+// From https://github.com/qemu/qemu/blob/master/docs/specs/fw_cfg.txt
 struct FWCfgFile {      /* an individual file entry, 64 bytes total */
     uint32_t size;      /* size of referenced fw_cfg item, big-endian */
     uint16_t select;    /* selector key of fw_cfg item, big-endian */
@@ -41,7 +43,7 @@ ssize_t qemu_fw_cfg(void *buffer, size_t size, const char *name)
     if (!qemu_present())
         return -1;
 
-    char sig[8];
+    char sig[4];
 
     // Probe for fw_cfg hardware
     outw(FW_CFG_PORT_SEL, FW_CFG_SIGNATURE);
@@ -63,7 +65,7 @@ ssize_t qemu_fw_cfg(void *buffer, size_t size, const char *name)
     uint32_t file_size;
 
     for (uint32_t i = 0; i < file_count; ++i) {
-        insb(0x511, &file, sizeof(file));
+        insb(FW_CFG_PORT_DATA, &file, sizeof(file));
 
         if (!strcmp(file.name, name)) {
             sel = ntohs(file.select);
