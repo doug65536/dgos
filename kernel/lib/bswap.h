@@ -27,49 +27,49 @@
     ((a) << 8) | \
     (a))
 
-static _always_inline uint16_t bswap_16(uint16_t n)
+static _always_inline _const uint16_t bswap_16(uint16_t n)
 {
     return bswap_16_m(n);
 }
 
-static _always_inline uint32_t bswap_32(uint32_t n)
+static _always_inline _const uint32_t bswap_32(uint32_t n)
 {
     return bswap_32_m(n);
 }
 
-static _always_inline uint64_t bswap_64(uint64_t n)
+static _always_inline _const uint64_t bswap_64(uint64_t n)
 {
     return bswap_64_m(n);
 }
 
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 
-static _always_inline uint16_t htons(uint16_t n)
+static _always_inline _const uint16_t htons(uint16_t n)
 {
     return bswap_16(n);
 }
 
-static _always_inline uint32_t htonl(uint32_t n)
+static _always_inline _const uint32_t htonl(uint32_t n)
 {
     return bswap_32(n);
 }
 
-static _always_inline uint64_t htobe64(uint64_t n)
+static _always_inline _const uint64_t htobe64(uint64_t n)
 {
     return bswap_64(n);
 }
 
-static _always_inline uint16_t ntohs(uint16_t n)
+static _always_inline _const uint16_t ntohs(uint16_t n)
 {
     return bswap_16(n);
 }
 
-static _always_inline uint32_t ntohl(uint32_t n)
+static _always_inline _const uint32_t ntohl(uint32_t n)
 {
     return bswap_32(n);
 }
 
-static _always_inline uint64_t be64toh(uint64_t n)
+static _always_inline _const uint64_t be64toh(uint64_t n)
 {
     return bswap_64(n);
 }
@@ -85,32 +85,32 @@ static _always_inline void htons_buf(void *buf, size_t bytes)
 
 #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
 
-static _always_inline uint16_t htons(uint16_t n)
+static _always_inline _const uint16_t htons(uint16_t n)
 {
     return n;
 }
 
-static _always_inline uint32_t htonl(uint32_t n)
+static _always_inline _const uint32_t htonl(uint32_t n)
 {
     return n;
 }
 
-static _always_inline uint64_t htobe64(uint64_t n)
+static _always_inline _const uint64_t htobe64(uint64_t n)
 {
     return n;
 }
 
-static _always_inline uint16_t ntohs(uint16_t n)
+static _always_inline _const uint16_t ntohs(uint16_t n)
 {
     return n;
 }
 
-static _always_inline uint32_t ntohl(uint32_t n)
+static _always_inline _const uint32_t ntohl(uint32_t n)
 {
     return n;
 }
 
-static _always_inline uint64_t be64toh(uint64_t n)
+static _always_inline _const uint64_t be64toh(uint64_t n)
 {
     return n;
 }

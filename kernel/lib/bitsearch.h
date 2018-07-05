@@ -3,7 +3,7 @@
 #include "type_traits.h"
 
 // Return bit number of least significant set bit
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set_64(int64_t n)
 {
 #if __SIZEOF_LONG__ == 8
@@ -16,7 +16,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_64(int64_t n)
 }
 
 // Return bit number of least significant set bit
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set_32(int32_t n)
 {
 #if __SIZEOF_INT__ == 4
@@ -27,7 +27,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_32(int32_t n)
 }
 
 // Return bit number of most significant set bit
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set_64(int64_t n)
 {
 #if __SIZEOF_LONG__ == 8
@@ -40,7 +40,7 @@ static constexpr _always_inline uint8_t bit_msb_set_64(int64_t n)
 }
 
 // Return bit number of most significant set bit
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set_32(int32_t n)
 {
 #if __SIZEOF_INT__ == 4
@@ -50,7 +50,7 @@ static constexpr _always_inline uint8_t bit_msb_set_32(int32_t n)
 #endif
 }
 
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt_64(int64_t n)
 {
 #if __SIZEOF_LONG__ == 8
@@ -62,7 +62,7 @@ static constexpr _always_inline uint8_t bit_popcnt_64(int64_t n)
 #endif
 }
 
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt_32(int32_t n)
 {
 #if __SIZEOF_INT__ == 4
@@ -73,7 +73,7 @@ static constexpr _always_inline uint8_t bit_popcnt_32(int32_t n)
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
@@ -81,7 +81,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
@@ -89,7 +89,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
@@ -97,7 +97,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
@@ -105,7 +105,7 @@ static constexpr _always_inline uint8_t bit_lsb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_lsb_set(T const& n)
 {
     return bit_lsb_set_n(n, typename integral_constant<
@@ -113,7 +113,7 @@ static constexpr _always_inline uint8_t bit_lsb_set(T const& n)
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
@@ -121,7 +121,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
@@ -129,7 +129,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
@@ -137,7 +137,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set_n(
         T const& n, integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
@@ -145,7 +145,7 @@ static constexpr _always_inline uint8_t bit_msb_set_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_msb_set(T const& n)
 {
     return bit_msb_set_n(n, typename integral_constant<
@@ -156,7 +156,7 @@ static constexpr _always_inline uint8_t bit_msb_set(T const& n)
 // ceil(log2(n))
 
 // return ceil(log(n) / log(2))
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2_n_64(int64_t n)
 {
     uint8_t top = bit_msb_set_64(n);
@@ -164,7 +164,7 @@ static constexpr _always_inline uint8_t bit_log2_n_64(int64_t n)
 }
 
 // return ceil(log(n) / log(2))
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2_n_32(int32_t n)
 {
     uint8_t top = bit_msb_set_32(n);
@@ -172,7 +172,7 @@ static constexpr _always_inline uint8_t bit_log2_n_32(int32_t n)
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2_n(
         T const& n, integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
@@ -180,7 +180,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2_n(
         T const& n, integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
@@ -188,7 +188,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2_n(
         T const& n, integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
@@ -196,7 +196,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2_n(
         T const& n, integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
@@ -204,7 +204,7 @@ static constexpr _always_inline uint8_t bit_log2_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_log2(T const& n)
 {
     return bit_log2_n(n, typename integral_constant<
@@ -212,7 +212,7 @@ static constexpr _always_inline uint8_t bit_log2(T const& n)
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt_n(
         T const& n, integral_constant<uint8_t, sizeof(int64_t)>::type)
 {
@@ -220,7 +220,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt_n(
         T const& n, integral_constant<uint8_t, sizeof(int32_t)>::type)
 {
@@ -228,7 +228,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt_n(
         T const& n, integral_constant<uint8_t, sizeof(int16_t)>::type)
 {
@@ -236,7 +236,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt_n(
         T const& n, integral_constant<uint8_t, sizeof(int8_t)>::type)
 {
@@ -244,7 +244,7 @@ static constexpr _always_inline uint8_t bit_popcnt_n(
 }
 
 template<typename T>
-__const
+_const
 static constexpr _always_inline uint8_t bit_popcnt(T const& n)
 {
     return bit_popcnt_n(n, typename integral_constant<

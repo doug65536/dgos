@@ -71,10 +71,10 @@ struct cpuid_cache_t {
 
 #ifdef CPUID_CC
 #define CPUID_CONST_INLINE \
-    extern "C" __const
+    extern "C" _const
 #else
 #define CPUID_CONST_INLINE \
-    static _always_inline __const
+    static _always_inline _const
 #endif
 
 extern cpuid_cache_t cpuid_cache;

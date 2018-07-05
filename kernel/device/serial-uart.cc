@@ -343,7 +343,7 @@ protected:
         return reg;
     }
 
-    __const
+    _const
     _always_inline uint16_t queue_next(
             uint16_t value, uint8_t log2_buffer_size) const
     {

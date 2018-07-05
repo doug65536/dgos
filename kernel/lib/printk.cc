@@ -92,7 +92,7 @@ static char const *parse_int(char const *p, int *result)
 }
 
 #ifndef __DGOS_KERNEL__
-__const
+_const
 static long double ipowl(int base, int exponent)
 {
     long double result = 1;

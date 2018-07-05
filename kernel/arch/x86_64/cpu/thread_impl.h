@@ -40,7 +40,7 @@ void thread_send_ipi(int cpu, int intr);
 void *thread_get_fsbase(int thread);
 void *thread_get_gsbase(int thread);
 
-__const
+_const
 static _always_inline process_t *fast_cur_process()
 {
     void *thread_info = cpu_gs_read_ptr<CPU_INFO_CURTHREAD_OFS>();

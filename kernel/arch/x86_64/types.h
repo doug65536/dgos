@@ -16,7 +16,7 @@
 #if defined(__GNUC__)
 
 #define _packed                 __attribute__((__packed__))
-#define __const                 __attribute__((__const__))
+#define _const                 __attribute__((__const__))
 #define __pure                  __attribute__((__pure__))
 #define _malloc                __attribute__((__malloc__))
 #define _alloc_align(pi)       __attribute__((__alloc_align__(pi)))
