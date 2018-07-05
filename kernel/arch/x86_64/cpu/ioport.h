@@ -71,8 +71,7 @@ static _always_inline void outd(ioport_t port, uint32_t value)
 //
 // Block I/O
 
-static _always_inline void insb(
-        ioport_t port, void const *values, intptr_t count)
+static _always_inline void insb(ioport_t port, void *values, intptr_t count)
 {
     __asm__ __volatile__ (
         "rep insb\n\t"
@@ -83,8 +82,7 @@ static _always_inline void insb(
     );
 }
 
-static _always_inline void insw(
-        ioport_t port, void const *values, intptr_t count)
+static _always_inline void insw(ioport_t port, void *values, intptr_t count)
 {
     __asm__ __volatile__ (
         "rep insw\n\t"
@@ -95,8 +93,7 @@ static _always_inline void insw(
     );
 }
 
-static _always_inline void insd(
-        ioport_t port, void const *values, intptr_t count)
+static _always_inline void insd(ioport_t port, void *values, intptr_t count)
 {
     __asm__ __volatile__ (
         "rep insl\n\t"
@@ -163,13 +160,13 @@ struct io_helper<1> {
     }
 
     static _always_inline void ins(
-            ioport_t port, void const *values, size_t count)
+            ioport_t port, void *values, size_t count)
     {
         insb(port, values, count);
     }
 
     static _always_inline void outs(
-            ioport_t port, void const *values, size_t count)
+            ioport_t port, void *values, size_t count)
     {
         outsb(port, values, count);
     }
@@ -191,7 +188,7 @@ struct io_helper<2>
     }
 
     static _always_inline void ins(
-            ioport_t port, void const *values, size_t count)
+            ioport_t port, void *values, size_t count)
     {
         insw(port, values, count);
     }
@@ -219,7 +216,7 @@ struct io_helper<4>
     }
 
     static _always_inline void ins(
-            ioport_t port, void const *values, size_t count)
+            ioport_t port, void *values, size_t count)
     {
         insd(port, values, count);
     }
