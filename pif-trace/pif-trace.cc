@@ -44,7 +44,7 @@ using sym_tab = std::multimap<uint64_t, std::string>;
 
 using trace_item_vector = std::vector<trace_item>;
 
-char symbol_file[] = "kernel-generic.sym";
+char symbol_file[] = "kernel-tracing.sym";
 
 class trace_error : public std::runtime_error {
 public:
@@ -404,20 +404,535 @@ int capture()
     }
 }
 
-int main(int, char **)
+// Include down here because of ridiculous
+// #define namespace pollution
+#include <ncurses.h>
+
+struct alignas(16) trace_detail {
+    // The record from the trace log
+    trace_record rec;
+
+    // Indicates the order of occurence in the trace
+    uint64_t ordinal:48;
+
+    // The indent level at this point
+    uint16_t indent:16;
+
+    bool operator<(uint64_t n) const
+    {
+        return ordinal < n;
+    }
+} _packed;
+
+static_assert(sizeof(trace_detail) == 16, "Unexpected size");
+
+using trace_detail_vector = std::vector<trace_detail>;
+using trace_detail_iter = trace_detail_vector::iterator;
+using trace_thread_map = std::unordered_map<int, trace_detail_vector>;
+
+trace_thread_map load_trace(char const *filename)
 {
+    trace_thread_map thread_map;
+
+    trace_item_vector buffer;
+
+    static constexpr int buffer_count = 1048576 / sizeof(trace_item);
+    static constexpr int buffer_size = buffer_count * sizeof(trace_item);
+
+    gzFile file = gzopen64(filename, "r");
+
+    uint64_t ordinal = 0;
+
+    buffer.resize(buffer_count);
+    for (;;) {
+        int got = gzread(file, buffer.data(), buffer_size);
+        if (unlikely(got < 0))
+            throw trace_error("Error reading input file", errno);
+
+        if (got == 0)
+            break;
+
+        int got_count = got / sizeof(trace_item);
+
+        for (auto it = buffer.begin(), en = buffer.begin() + got_count;
+             it != en; ++it) {
+            trace_item const& item = *it;
+
+            int tid = item.get_tid();
+
+            if (!tid)
+                tid = item.get_cid();
+
+            trace_detail_vector &detail_vector = thread_map[tid];
+
+            trace_detail prev = !detail_vector.empty()
+                    ? detail_vector.back()
+                    : trace_detail{};
+
+            uint16_t indent;
+            if (prev.rec.call && item.call)
+                indent = prev.indent + 1;
+            else if (!prev.rec.call && !item.call && prev.indent > 0)
+                indent = prev.indent - 1;
+            else
+                indent = prev.indent;
+
+            trace_detail rec{ trace_record(item),
+                        ordinal++, indent };
+
+            detail_vector.push_back(rec);
+        }
+    }
+
+    for (trace_thread_map::value_type& thread_data : thread_map) {
+        thread_data.second.shrink_to_fit();
+
+        for (auto it = thread_data.second.begin(),
+             en = thread_data.second.end(); it != en; ++it) {
+            assert(it->rec.show == it->rec.showable);
+
+            if (it + 1 != en) {
+                it->rec.expandable = it[1].indent > it->indent;
+                it->rec.expanded = it->rec.expandable;
+
+                // Hide the return line for leaf calls
+                if (it[0].rec.call && !it[1].rec.call &&
+                        it[0].rec.fn == it[1].rec.fn &&
+                        it[0].indent == it[1].indent) {
+                    it[1].rec.showable = false;
+                    it[1].rec.show = false;
+                }
+            }
+
+            assert(it->rec.show == it->rec.showable);
+        }
+
+        fprintf(stderr, "tid %u, %zu records\n",
+                thread_data.first, thread_data.second.size());
+    }
+
+    return thread_map;
+}
+
+static bool is_detail_shown(trace_detail const& item)
+{
+    return item.rec.show;
+}
+
+class viewer {
+public:
+    viewer(char const *filename)
+        : filename(filename)
+        , symbols(load_symbols())
+        , data(load_trace(filename))
+        , done(false)
+        , tid(0)
+        , tid_detail(&data[tid])
+        , offset(0)
+        , cursor_row(0)
+    {
+        initscr();
+        noecho();
+        keypad(stdscr, TRUE);
+        scrollok(stdscr, FALSE);
+        curs_set(FALSE);
+    }
+
+    ~viewer()
+    {
+        endwin();
+    }
+
+    void run()
+    {
+        do {
+            draw();
+            read_input();
+        } while (!done);
+    }
+
+    void draw()
+    {
+        wclear(stdscr);
+
+        getmaxyx(stdscr, display_h, display_w);
+
+        trace_detail_iter item = update_selection();
+
+        for (int y = 0; y < display_h && item != tid_detail->end();
+             ++y, ++item) {
+            // Find visible item
+            item = std::find_if(item, tid_detail->end(), is_detail_shown);
+
+            // If this is the top row, adjust offset
+            if (y == 0)
+                offset = std::distance(tid_detail->begin(), item);
+
+            trace_record const& rec = item->rec;
+            uint64_t ip = uint64_t(rec.get_ip());
+            auto it = symbols->lower_bound(ip);
+
+            if (y <= cursor_row)
+                selection = item;
+
+            if (y == cursor_row) {
+                attron(WA_REVERSE);
+            } else {
+                attroff(WA_REVERSE);
+            }
+
+            char const *tree_widget;
+            if (rec.expandable) {
+                if (rec.expanded)
+                    tree_widget = "->";
+                else
+                    tree_widget = "+>";
+            } else {
+                if (rec.call)
+                    tree_widget = " >";
+                else
+                    tree_widget = " <";
+            }
+
+            mvprintw(y, 0, "(c: %3d, t: %3d, I: %d) %*s %s %s\n",
+                     rec.get_cid(), tid,
+                     rec.irq_en,
+                     item->indent, "",
+                     tree_widget,
+                     it->second.c_str());
+        }
+
+        refresh();
+    }
+
+    trace_detail_iter update_selection()
+    {
+        offset = std::min(tid_detail->size(), offset);
+        trace_detail_iter item = tid_detail->begin();
+        selection = item;
+        std::advance(item, offset);
+
+        for (int y = 0; y < display_h && item != tid_detail->end();
+             ++y, ++item) {
+            // Find visible item
+            item = std::find_if(item, tid_detail->end(), is_detail_shown);
+
+            // If this is the top row, adjust offset
+            if (y == 0)
+                offset = std::distance(tid_detail->begin(), item);
+
+            if (y <= cursor_row)
+                selection = item;
+            else
+                break;
+        }
+
+        return tid_detail->begin() + offset;
+    }
+
+    void read_input()
+    {
+        int key = getch();
+
+        switch (key) {
+        case 't':   // fall through
+        case KEY_HOME:
+            return move_home();
+
+        case 'b':   // fall through
+        case KEY_END:
+            return move_end();
+
+        case 'p':   // fall through
+        case KEY_UP:
+            return move_up();
+
+        case 'n':   // fall through
+        case KEY_F(7):   // fall through
+        case KEY_F(11):   // fall through
+        case KEY_DOWN:
+            return move_down();
+
+        case '-':   // fall through
+        case KEY_LEFT:
+            return tree_collapse();
+
+        case '+':   // fall through
+        case KEY_RIGHT:
+            return tree_expand();
+
+        case KEY_NPAGE:
+            return page_down();
+
+        case KEY_PPAGE:
+            return page_up();
+
+        case KEY_F(8):  // fall through
+        case KEY_F(10):
+            return move_next();
+
+        case '*':
+            return tree_expand_all();
+
+        case 'u':
+            return move_caller();
+
+        case 'e':
+            return elide_call();
+
+        case 'h':
+            return show_help();
+
+        case 'q':
+            done = true;
+            break;
+        }
+    }
+
+    // Only returns end when nothing at all is shown
+    // Tries to backtrack in the other direction to find a shown item
+    trace_detail_iter advance_shown(trace_detail_iter it, int distance)
+    {
+        bool full_scan;
+        trace_detail_iter limit;
+        int dir = (distance > 0 ? 1 : -1);
+
+        if (dir > 0) {
+            limit = tid_detail->end();
+            full_scan = (it == tid_detail->begin());
+        } else {
+            limit = tid_detail->begin();
+            full_scan = (it == tid_detail->end());
+        }
+
+        int seen = 0;
+        while (it != limit) {
+            it += dir;
+
+            if (it != tid_detail->end() && is_detail_shown(*it)) {
+                seen += dir;
+
+                if (seen == distance)
+                    break;
+            }
+        }
+
+        if (likely(it != tid_detail->end() && is_detail_shown(*it)))
+            return it;
+
+        // Prevent infinite recursion
+        if (unlikely(full_scan))
+            return tid_detail->end();
+
+        // Backtrack if we never reached a visible item
+        return advance_shown(it, -dir);
+    }
+
+    int visible_between(trace_detail_iter st, trace_detail_iter en)
+    {
+        int count;
+        for (count = 0; st != en; ++st)
+            count += is_detail_shown(*st);
+
+        return count;
+    }
+
+    void clamp_offset()
+    {
+        trace_detail_iter min_offset = advance_shown(
+                    selection, -(display_h - 1));
+        trace_detail_iter cur_offset = tid_detail->begin() + offset;
+
+        if (cur_offset > selection)
+            offset = selection - tid_detail->begin();
+        else if (cur_offset < min_offset)
+            offset = min_offset - tid_detail->begin();
+
+        cur_offset = tid_detail->begin() + offset;
+
+        cursor_row = visible_between(cur_offset, selection);
+    }
+
+    void move_home()
+    {
+        offset = 0;
+        cursor_row = 0;
+    }
+
+    void move_end()
+    {
+        selection = advance_shown(tid_detail->end(), -1);
+        clamp_offset();
+    }
+
+    void move_up()
+    {
+        selection = advance_shown(selection, -1);
+        clamp_offset();
+    }
+
+    void move_down()
+    {
+        selection = advance_shown(selection, 1);
+        clamp_offset();
+    }
+
+    void move_next()
+    {
+        if (selection == tid_detail->end())
+            return;
+
+        auto saved_selection = selection;
+
+        while (selection != tid_detail->end()) {
+            trace_detail_iter old_selection = selection;
+            selection = advance_shown(selection, 1);
+
+            if (selection == old_selection || selection == tid_detail->end()) {
+                selection = saved_selection;
+                break;
+            }
+
+            if (selection->indent == saved_selection->indent) {
+                // Skip the return line if necessary
+                if (selection->rec.fn == saved_selection->rec.fn &&
+                        !selection->rec.call) {
+                    selection = advance_shown(selection, 1);
+                }
+                break;
+            }
+        }
+        clamp_offset();
+    }
+
+    void page_down()
+    {
+        trace_detail_iter cur_offset = tid_detail->begin() + offset;
+        cur_offset = advance_shown(cur_offset, display_h);
+        selection = advance_shown(selection, display_h);
+        offset = cur_offset - tid_detail->begin();
+        clamp_offset();
+    }
+
+    void page_up()
+    {
+        trace_detail_iter cur_offset = tid_detail->begin() + offset;
+        cur_offset = advance_shown(cur_offset, -display_h);
+        selection = advance_shown(selection, -display_h);
+        offset = cur_offset - tid_detail->begin();
+        clamp_offset();
+    }
+
+    void tree_collapse(bool clamp_ofs = true)
+    {
+        if (selection->rec.expanded && selection->rec.expandable) {
+            selection->rec.expanded = false;
+            int scan_indent = selection->indent;
+            trace_detail_iter scan{selection};
+            while (++scan != tid_detail->end()) {
+                scan->rec.show = false;
+                scan->rec.expanded = false;
+
+                if (scan->indent == scan_indent)
+                    break;
+            }
+        }
+
+        if (clamp_ofs)
+            clamp_offset();
+    }
+
+    void tree_expand()
+    {
+        if (!selection->rec.expanded && selection->rec.expandable) {
+            selection->rec.expanded = true;
+
+            int scan_indent = selection->indent;
+            trace_detail_iter scan{selection};
+            while (++scan != tid_detail->end()) {
+                if (scan->indent == scan_indent + 1)
+                    scan->rec.show = scan->rec.showable;
+
+                if (scan->indent == scan_indent) {
+                    scan->rec.show = scan->rec.showable;
+                    break;
+                }
+            }
+
+            clamp_offset();
+        } else {
+            move_down();
+        }
+    }
+
+    void tree_expand_all()
+    {
+        selection->rec.expanded = true;
+
+        int scan_indent = selection->indent;
+        trace_detail_iter scan{selection};
+        while (++scan != tid_detail->end()) {
+            scan->rec.show = scan->rec.showable;
+            scan->rec.expanded = scan->rec.expandable;
+
+            if (scan->indent == scan_indent) {
+                scan->rec.show = scan->rec.showable;
+                break;
+            }
+        }
+    }
+
+    void move_caller()
+    {
+        int indent = selection->indent;
+
+        do {
+            selection = advance_shown(selection, -1);
+        } while (selection != tid_detail->begin() &&
+                 selection->indent >= indent);
+        clamp_offset();
+    }
+
+    void elide_call()
+    {
+        auto saved_selection = selection;
+        uint64_t fn = selection->rec.fn;
+        for (auto it = tid_detail->begin(), en = tid_detail->end();
+             it != en; ++it) {
+            if (it->rec.fn == fn) {
+                selection = it;
+                tree_collapse(false);
+            }
+        }
+        selection = saved_selection;
+        clamp_offset();
+    }
+
+    void show_help()
+    {
+
+    }
+
+    std::string filename;
+    std::unique_ptr<sym_tab> symbols;
+    trace_thread_map data;
+    bool done;
+    int tid;
+    trace_detail_vector *tid_detail;
+    trace_detail_iter selection;
+    uint64_t offset;
+    int cursor_row;
+    int display_h, display_w;
+};
 
 int main(int argc, char **argv)
 {
-
-    //initscr();
-    //noecho();
-    //keypad(stdscr, TRUE);
-    //scrollok(stdscr,TRUE);
-    //
     try {
         if (argc == 1)
             capture();
+        else if (argc == 2) {
+            std::unique_ptr<viewer>{new viewer(argv[1])}->run();
+        }
     } catch (std::exception const& ex) {
         fprintf(stderr, "Error: %s\n", ex.what());
         return 1;
@@ -425,7 +940,5 @@ int main(int argc, char **argv)
         fprintf(stderr, "Fatal error\n");
         return 1;
     }
-    //
-    //endwin();
     return 0;
 }

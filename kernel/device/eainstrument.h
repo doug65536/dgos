@@ -40,6 +40,53 @@ struct trace_item {
 
 static_assert(sizeof(trace_item) == 9, "Unexpected size");
 
+// The same as a trace_item with the thread id and sync field omitted
+// Intended for use in when the data has been filtered by thread id
+struct trace_record {
+    uint64_t fn:48; // Full virtual address range
+    bool show:1;
+    bool showable:1;
+    bool expanded:1;
+    bool expandable:1;
+    bool unused:4;
+    unsigned cid:6; // Up to 64 CPUs
+    bool irq_en:1;  // EFLAGS.IF
+    bool call:1;    // true for fn entry, false for fn exit
+
+    trace_record()
+        : fn(0)
+        , show(true)
+        , showable(true)
+        , expanded(true)
+        , expandable(true)
+        , unused(0)
+        , cid(0)
+        , irq_en(0)
+        , call(0)
+    {
+    }
+
+    trace_record(trace_item const& rhs)
+        : fn(rhs.fn)
+        , show(true)
+        , showable(true)
+        , expanded(true)
+        , expandable(true)
+        , unused(0)
+        , cid(rhs.cid)
+        , irq_en(rhs.irq_en)
+        , call(rhs.call)
+    {
+    }
+
+    __attribute__((__no_instrument_function__))
+    inline void *get_ip() const { return (void*)(int64_t(fn << 16) >> 16); }
+    __attribute__((__no_instrument_function__))
+    inline int get_cid() const { return cid < 63 ? cid : -1; }
+} _packed;
+
+static_assert(sizeof(trace_record) == 8, "Unexpected size");
+
 #ifdef __DGOS_KERNEL__
 extern "C" _no_instrument
 void __cyg_profile_func_enter(void *this_fn, void *call_site);
