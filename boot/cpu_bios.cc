@@ -5,25 +5,30 @@
 #include "bioscall.h"
 #include "elf64decl.h"
 
-bool need_a20_toggle;
+bool cpu_a20_need_toggle;
 
 void cpu_a20_enterpm()
 {
-    if (need_a20_toggle) {
-        toggle_a20(true);
-        wait_a20(true);
+    if (cpu_a20_need_toggle) {
+        cpu_a20_toggle(true);
+        cpu_a20_wait(true);
     }
 }
 
 void cpu_a20_exitpm()
 {
-    if (need_a20_toggle) {
-        toggle_a20(false);
-        wait_a20(false);
+    if (cpu_a20_need_toggle) {
+        cpu_a20_toggle(false);
+        cpu_a20_wait(false);
     }
 }
 
-bool toggle_a20(bool enabled)
+void cpu_a20_init()
+{
+    bios_regs_t regs{};
+}
+
+bool cpu_a20_toggle(bool enabled)
 {
     enum struct a20_method {
         unknown,
@@ -58,7 +63,7 @@ bool toggle_a20(bool enabled)
                 }
             }
         }
-        
+
         // Still don't know? Guess!
         if (method == a20_method::unknown) {
             PRINT("BIOS doesn't support A20! Guessing port 0x92...");
@@ -268,7 +273,7 @@ void run_kernel(uint64_t entry, void *param)
     };
 
     run_code64(code64_run_kernel, &arg);
-    
+
     __builtin_unreachable();
 }
 

@@ -7,10 +7,10 @@ rm -f qemu-emu.mk
 
 # Disallow nvme with iso
 
-for rt in debug run
+for rt in debug run trace
 do
 	for np in up smp
-	do	
+	do
 		for bt in bios efi
 		do
 			for bm in pxe hd

@@ -1,13 +1,17 @@
 #include "cpuid.h"
 
 // Returns true if the CPU supports that leaf
+// Hypervisor leaves are asinine and it always returns true for them
 bool cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
-    // Automatically check for support for the leaf
-    if ((eax & 0x7FFFFFFF) != 0) {
-        cpuid(output, eax & 0x80000000U, 0);
-        if (output->eax < eax)
-            return false;
+    // 0x4000xxxx (hypervisor) leaves are utterly ridiculous
+    if ((eax & 0xF0000000) != 0x40000000) {
+        // Automatically check for support for the leaf
+        if ((eax & 0x1FFFFFFF) != 0) {
+            cpuid(output, eax & 0xE0000000U, 0);
+            if (output->eax < eax)
+                return false;
+        }
     }
 
     output->eax = eax;

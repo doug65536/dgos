@@ -29,7 +29,7 @@ kernel-generic.sym: kernel-generic \
 	OBJDUMP=$(OBJDUMP) SORT=$(SORT) \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
-kernel-bmi.sym: kernel-bmi \
+kernel-tracing.sym: kernel-tracing \
 		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
 	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
@@ -49,5 +49,5 @@ bootiso.dis.gz: bootiso-elf $(top_srcdir)/symbols.mk
 kernel-generic.dis.gz: kernel-generic $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
-kernel-bmi.dis.gz: kernel-bmi $(top_srcdir)/symbols.mk
+kernel-tracing.dis.gz: kernel-tracing $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@

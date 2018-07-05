@@ -754,7 +754,6 @@ ac_user_opts='
 enable_option_checking
 enable_silent_rules
 enable_dependency_tracking
-enable_tracing
 enable_lto
 enable_optimize
 '
@@ -1408,7 +1407,6 @@ Optional Features:
                           do not reject slow dependency extractors
   --disable-dependency-tracking
                           speeds up one-time build
-  --enable-tracing        Enable call trace instrumentation
   --enable-lto            Enable link-time optimizations
   --enable-optimize       Enable size/speed optimizations
 
@@ -7267,16 +7265,10 @@ fi
 done
 
 INSTRUMENT_FUNCTIONS_FLAGS=
-# Check whether --enable-tracing was given.
-if test "${enable_tracing+set}" = set; then :
-  enableval=$enable_tracing;
-		{ $as_echo "$as_me:${as_lineno-$LINENO}: Call trace instrumentation enabled" >&5
-$as_echo "$as_me: Call trace instrumentation enabled" >&6;}
-
-		for flag in \
-			finstrument-functions D_CALL_TRACE_ENABLED
-		do
-			as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+for flag in \
+	finstrument-functions D_CALL_TRACE_ENABLED
+do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
 $as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
@@ -7313,16 +7305,7 @@ else
   :
 fi
 
-		done
-
-else
-
-		# Not enabled, clear the value
-		INSTRUMENT_FUNCTION_FLAGS=
-
-
-fi
-
+done
 
 
 COMPILER_FLAGS=

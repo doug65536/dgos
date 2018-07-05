@@ -7,22 +7,22 @@
 .global early_init
 early_init:
     lss initial_stack_ptr,%sp
-    
+
     call clear_bss
-    
+
     call detect_ancient_cpu
-    
+
     fninit
-    
+
     // 32 bit instructions are okay if detect_ancient_cpu returned...
-    
+
     movzwl %sp,%esp
     jmp *%bx
 
 initial_stack_ptr:
     .word ___initial_stack
     .word 0
-    
+
 // Inputs:
 //  edx:eax: parameter to partition boot call
 //  ecx: pointer to partition boot function
@@ -44,10 +44,10 @@ boot:
     movl %ecx,%edi
 
     call idt_init
-    call check_a20
+    call cpu_a20_check
     // Do need a20 toggles if A20 was off
     xorb $1,%al
-    movb %al,need_a20_toggle
+    movb %al,cpu_a20_need_toggle
 
     cli
     movl $ gdt,2+gdtr
@@ -269,25 +269,25 @@ idt_init:
     ret
 
 // Returns true if a20 is on
-.global check_a20
-check_a20:
+.global cpu_a20_check
+cpu_a20_check:
     push %es
-              
+
     // Setup es for wraparound
     orl $ -1,%eax
     movw %ax,%es
-              
+
     // Zero ax
     incl %eax
 
-    // a20_chk = wraparound(a20_chk) + 1
-    movb %es:a20_chk + 0x10,%al
+    // cpu_a20_chk = wraparound(cpu_a20_chk) + 1
+    movb %es:cpu_a20_chk + 0x10,%al
     incb %al
-    movb %al,a20_chk
+    movb %al,cpu_a20_chk
 
-    // If wraparound(a20_chk) has not changed, a20 is on
+    // If wraparound(cpu_a20_chk) has not changed, a20 is on
     decb %al
-    cmpb %al,%es:a20_chk + 0x10
+    cmpb %al,%es:cpu_a20_chk + 0x10
     sete %al
 
     pop %es
@@ -296,21 +296,21 @@ check_a20:
 .code32
 // Wait for the a20 line to be in the specified state
 //  %al = 1 to expect on, 0 to expect off
-.global wait_a20
-wait_a20:
+.global cpu_a20_wait
+cpu_a20_wait:
     movb %al,%dl
 
-    // a20_chk = wraparound(a20_chk) + 1
-0:  movb a20_chk + 0x100000,%al
+    // cpu_a20_chk = wraparound(cpu_a20_chk) + 1
+0:  movb cpu_a20_chk + 0x100000,%al
     incb %al
-    movb %al,a20_chk
-    
-    // If wraparound(a20_chk) has not changed, a20 is on
+    movb %al,cpu_a20_chk
+
+    // If wraparound(cpu_a20_chk) has not changed, a20 is on
     decb %al
-    cmpb %al,a20_chk + 0x100000
+    cmpb %al,cpu_a20_chk + 0x100000
     sete %al
     cmp %al,%dl
-              
+
     // Statically predict equal
     jne 1f
     ret
@@ -334,7 +334,7 @@ clear_bss:
     popw %ax
     popw %cx
     popw %di
-    ret              
-              
+    ret
+
 .section .bss
-a20_chk: .space 1
+cpu_a20_chk: .space 1

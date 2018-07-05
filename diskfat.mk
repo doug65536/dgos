@@ -12,9 +12,9 @@ $(top_builddir)/fatdisk.img: \
 		$(top_builddir)/kernel-generic.sym \
 		$(top_builddir)/kernel-generic.dis.gz \
 		\
-		$(top_builddir)/kernel-bmi \
-		$(top_builddir)/kernel-bmi.sym \
-		$(top_builddir)/kernel-bmi.dis.gz \
+		$(top_builddir)/kernel-tracing \
+		$(top_builddir)/kernel-tracing.sym \
+		$(top_builddir)/kernel-tracing.dis.gz \
 		\
 		$(top_builddir)/bootx64.efi \
 		$(top_builddir)/bootx64-efi.sym \

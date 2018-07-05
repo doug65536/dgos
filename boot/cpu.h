@@ -12,7 +12,7 @@ struct gdt_entry_t {
     uint8_t access;
     uint8_t flags_limit_high;
     uint8_t base_high;
-    
+
     gdt_entry_t &set_base(uint32_t base)
     {
         base_low = base & GDT_BASE_LOW_MASK;
@@ -20,7 +20,7 @@ struct gdt_entry_t {
         base_high = base >> GDT_BASE_HIGH_BIT;
         return *this;
     }
-    
+
     gdt_entry_t &set_limit(uint32_t limit)
     {
         if (limit > 0xFFFFFF) {
@@ -31,14 +31,14 @@ struct gdt_entry_t {
             // Clear granularity bit
             flags_limit_high &= ~GDT_FLAGS_GRAN;
         }
-        
+
         limit_low = limit & GDT_BASE_LOW_MASK;
         flags_limit_high = (flags_limit_high & ~GDT_LIMIT_HIGH_MASK) |
                 ((limit >> GDT_LIMIT_HIGH_BIT) & GDT_LIMIT_HIGH_MASK);
         return *this;
     }
-    
-    gdt_entry_t &set_access(bool present, int priv, 
+
+    gdt_entry_t &set_access(bool present, int priv,
                             bool exec, bool down, bool rw)
     {
         access = (present ? GDT_ACCESS_PRESENT : 0) |
@@ -50,7 +50,7 @@ struct gdt_entry_t {
                 GDT_ACCESS_ACCESSED;
         return *this;
     }
-    
+
     gdt_entry_t &set_flags(bool is32, bool is64)
     {
         flags_limit_high = (flags_limit_high & GDT_FLAGS_GRAN) |
@@ -164,10 +164,11 @@ struct idt_entry_64_t {
     uint32_t reserved;
 };
 
+extern "C" void cpu_a20_init();
 extern "C" void cpu_a20_enterpm();
 extern "C" void cpu_a20_exitpm();
-extern "C" bool toggle_a20(bool enabled);
-extern "C" void wait_a20(bool enabled);
+extern "C" bool cpu_a20_toggle(bool enabled);
+extern "C" void cpu_a20_wait(bool enabled);
 
 static _always_inline void outb(uint16_t dx, uint8_t al)
 {
@@ -194,6 +195,36 @@ static _always_inline void outl(uint16_t dx, uint32_t eax)
         :
         : [val] "a" (eax)
         , [port] "Nd" (dx));
+}
+
+static _always_inline void outsb(uint16_t dx, void const *src, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep outsb"
+        : [src] "+S" (src)
+        , [n] "+c" (n)
+        : [port] "d" (dx)
+        : "memory");
+}
+
+static _always_inline void outsw(uint16_t dx, void const *src, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep outsw"
+        : [src] "+S" (src)
+        , [n] "+c" (n)
+        : [port] "d" (dx)
+        : "memory");
+}
+
+static _always_inline void outsl(uint16_t dx, void const *src, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep outsl"
+        : [src] "+S" (src)
+        , [n] "+c" (n)
+        : [port] "d" (dx)
+        : "memory");
 }
 
 static _always_inline uint8_t inb(uint16_t dx)
@@ -224,6 +255,36 @@ static _always_inline uint32_t inl(uint16_t dx)
         : [val] "=a" (eax)
         : [port] "Nd" (dx));
     return eax;
+}
+
+static _always_inline void insb(uint16_t dx, void *dst, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep insb"
+        : [dst] "+D" (dst)
+        , [n] "+c" (n)
+        : [port] "d" (dx)
+        : "memory");
+}
+
+static _always_inline void insw(uint16_t dx, void *dst, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep insw"
+        : [dst] "+D" (dst)
+        , [n] "+c" (n)
+        : [port] "d" (dx)
+        : "memory");
+}
+
+static _always_inline void insl(uint16_t dx, void *dst, size_t n)
+{
+    __asm__ __volatile__ (
+        "rep insl"
+        : [dst] "+D" (dst)
+        , [n] "+c" (n)
+        : [port] "d" (dx)
+        : "memory");
 }
 
 static _always_inline void pause()

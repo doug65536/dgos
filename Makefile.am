@@ -20,7 +20,7 @@ BUILT_SOURCES = \
 #  -> Generate bootiso-bin
 #  -> Link bootefi-amd64
 #  -> Link bootefi-i386
-# Build libkernel-{generic,bmi,avx512}
+# Build libkernel-{generic,tracing}
 #  -> Build kernel-*
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
@@ -38,7 +38,7 @@ bin_PROGRAMS = \
 	bootefi-amd64 \
 	bootpxe-bios-elf \
 	kernel-generic \
-	kernel-bmi \
+	kernel-tracing \
 	user-shell \
 	hello.km
 
@@ -73,10 +73,8 @@ mbr_elf_LDFLAGS = \
 	$(REGPARM_FLAGS) \
 	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
-	-Wl,-N \
 	$(LINKER_DEBUG) \
-	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(LINKER_SEL) -static
 
 EXTRA_mbr_elf_DEPENDENCIES = \
 	$(top_srcdir)/mbr/mbr.ld
@@ -201,7 +199,9 @@ libbootsect_a_SOURCES = \
 	boot/include/boottable_decl.h \
 	boot/boottable.cc \
 	boot/boottable_bios.cc \
-	boot/log2.h
+	boot/log2.h \
+	boot/qemu.cc \
+	boot/qemu.h
 
 libbootsect_a_INCLUDES = \
 	-I$(top_srcdir)/boot \
@@ -422,7 +422,9 @@ bootefi_amd64_SOURCES = \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
 	boot/boottable.cc \
-	boot/boottable_efi.cc
+	boot/boottable_efi.cc \
+	boot/qemu.cc \
+	boot/qemu.h
 
 #bootefi_i386_SOURCES = \
 	$(bootefi_amd64_SOURCES)
@@ -786,13 +788,11 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
-	$(FREESTANDING_FLAGS) \
-	$(INSTRUMENT_FUNCTIONS_FLAGS)
+	$(FREESTANDING_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
-	$(COMPILER_FLAGS) \
-	$(INSTRUMENT_FUNCTIONS_FLAGS)
+	$(COMPILER_FLAGS)
 
 KERNEL_LDFLAGS_SHARED = \
 	-DFROM_LDFLAGS \
@@ -816,9 +816,9 @@ KERNEL_LDADD_SHARED = -lgcc
 # ----------------------------------------------------------------------------
 # kernel variations
 
-KERNEL_BMI_FLAGS = \
-	$(BMI_FLAGS) \
-	-Wl,-Map,$(top_builddir)/kernel-bmi.map
+KERNEL_TRACING_FLAGS = \
+	$(INSTRUMENT_FUNCTIONS_FLAGS) \
+	-Wl,-Map,$(top_builddir)/kernel-tracing.map
 
 KERNEL_GENERIC_FLAGS = \
 	-Wl,-Map,$(top_builddir)/kernel-generic.map
@@ -846,32 +846,32 @@ kernel_generic_LDADD = \
 EXTRA_kernel_generic_DEPENDENCIES = \
 	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
-kernel_bmi_SOURCES = \
+kernel_tracing_SOURCES = \
 	$(KERNEL_SOURCES_SHARED)
 
-kernel_bmi_CXXFLAGS = \
+kernel_tracing_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	$(KERNEL_BMI_FLAGS)
+	$(KERNEL_TRACING_FLAGS)
 
-kernel_bmi_CFLAGS = \
+kernel_tracing_CFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	$(KERNEL_BMI_FLAGS)
+	$(KERNEL_TRACING_FLAGS)
 
-kernel_bmi_CCASFLAGS = \
+kernel_tracing_CCASFLAGS = \
 	$(KERNEL_CCASFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	$(KERNEL_BMI_FLAGS)
+	$(KERNEL_TRACING_FLAGS)
 
-kernel_bmi_LDFLAGS = \
+kernel_tracing_LDFLAGS = \
 	$(KERNEL_LDFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	$(KERNEL_BMI_FLAGS)
+	$(KERNEL_TRACING_FLAGS)
 
-kernel_bmi_LDADD = $(KERNEL_LDADD_SHARED)
+kernel_tracing_LDADD = $(KERNEL_LDADD_SHARED)
 
-EXTRA_kernel_bmi_DEPENDENCIES = \
+EXTRA_kernel_tracing_DEPENDENCIES = \
 	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
 $(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
@@ -884,11 +884,14 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 	$(CXX_FOR_BUILD) -g -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
 		-std=c++14 \
-		-fwhole-program -O3 -march=native -pthread \
+		-fwhole-program -pthread \
+		-O0 \
 		$^ \
 		-Wl,--start-group \
 		-lncurses -ltinfo -lgpm -ldl -lz \
 		-Wl,--end-group
+
+#-O3 -march=native
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1235,7 +1238,7 @@ clean-local:
 	rm -f $(top_builddir)/bootiso.sym
 	rm -f $(top_builddir)/bootx64-efi.sym
 	rm -f $(top_builddir)/kernel-generic.sym
-	rm -f $(top_builddir)/kernel-bmi.sym
+	rm -f $(top_builddir)/kernel-tracing.sym
 
 	rm -f $(top_builddir)/mbr.map
 	rm -f $(top_builddir)/bootfat.map
@@ -1245,7 +1248,7 @@ clean-local:
 	rm -f $(top_builddir)/bootefi-amd64.map
 	rm -f $(top_builddir)/bootefi-i386.map
 	rm -f $(top_builddir)/kernel-generic.map
-	rm -f $(top_builddir)/kernel-bmi.map
+	rm -f $(top_builddir)/kernel-tracing.map
 
 	rm -f $(top_builddir)/mbr.dis.gz
 	rm -f $(top_builddir)/bootefi-i386.dis.gz
@@ -1253,7 +1256,7 @@ clean-local:
 	rm -f $(top_builddir)/bootiso.dis.gz
 	rm -f $(top_builddir)/bootfat.dis.gz
 	rm -f $(top_builddir)/kernel-generic.dis.gz
-	rm -f $(top_builddir)/kernel-bmi.dis.gz
+	rm -f $(top_builddir)/kernel-tracing.dis.gz
 
 	rm -f $(top_builddir)/bochs-debuglog
 
@@ -1428,6 +1431,7 @@ QEMU_COMMON = \
 SECTOR_SZ = 512
 
 QEMU_RT = $(QEMU_RT_$(1))
+QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.trace,string=1
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 
@@ -1532,7 +1536,7 @@ $(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands: \
 
 debug-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands
 	$(BOCHS) \
@@ -1544,7 +1548,7 @@ debug-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
 
 debug-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands
 	$(BOCHS) \
@@ -1558,7 +1562,7 @@ debug-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
 
 debug-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands
 	$(BOCHS) \
@@ -1570,7 +1574,7 @@ debug-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
 
 debug-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
 		$(abs_top_builddir)/bochs-efi-debugger-kernel-commands
 	$(BOCHS) \
@@ -1584,7 +1588,7 @@ debug-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
 
 debug-iso-bios-bochs-boot: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands
 	$(BOCHS) \
@@ -1596,7 +1600,7 @@ debug-iso-bios-bochs-boot: $(QEMU_IMAGE_iso) \
 
 debug-iso-efi-bochs-boot: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands
 	$(BOCHS) \
@@ -1610,7 +1614,7 @@ debug-iso-efi-bochs-boot: $(QEMU_IMAGE_iso) \
 
 debug-fat-bios-bochs-boot: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands
 	$(BOCHS) \
@@ -1622,7 +1626,7 @@ debug-fat-bios-bochs-boot: $(QEMU_IMAGE_fat) \
 
 debug-fat-efi-bochs-boot: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
 		$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands
 	$(BOCHS) \
@@ -1636,7 +1640,7 @@ debug-fat-efi-bochs-boot: $(QEMU_IMAGE_fat) \
 
 run-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc
 	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc -q \
 		$(BOCHS_FLAGS)
@@ -1645,7 +1649,7 @@ run-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
 
 run-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
 		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc
 	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc -q \
 		$(BOCHS_FLAGS)
@@ -1656,7 +1660,7 @@ run-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
 
 run-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
 		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-bmi.sym \
+		kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc
 	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc -q \
 		$(BOCHS_FLAGS)
@@ -1664,7 +1668,7 @@ run-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
 .PHONY: run-fat-bios-bochs-kernel
 
 run-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
-		bootx64-efi.sym kernel-generic.sym kernel-bmi.sym \
+		bootx64-efi.sym kernel-generic.sym kernel-tracing.sym \
 		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc
 	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc -q \
 		$(BOCHS_FLAGS)

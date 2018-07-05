@@ -107,23 +107,13 @@ for flag in Wall Wextra Wpedantic Werror; do
 done
 
 AS_VAR_SET([INSTRUMENT_FUNCTIONS_FLAGS], [])
-AC_ARG_ENABLE(tracing,
-	AS_HELP_STRING([--enable-tracing],
-		[Enable call trace instrumentation]), [
-		AC_MSG_NOTICE([Call trace instrumentation enabled])
-
-		for flag in \
-			finstrument-functions D_CALL_TRACE_ENABLED
-		do
-			AX_CHECK_COMPILE_FLAG([-$flag],
-				[AS_VAR_APPEND([INSTRUMENT_FUNCTIONS_FLAGS], [" -$flag"])],
-				[], [$COMPILER_WERROR])
-		done
-	], [
-		# Not enabled, clear the value
-		AS_VAR_SET([INSTRUMENT_FUNCTION_FLAGS], [])
-	]
-)
+for flag in \
+	finstrument-functions D_CALL_TRACE_ENABLED
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([INSTRUMENT_FUNCTIONS_FLAGS], [" -$flag"])],
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([INSTRUMENT_FUNCTIONS_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])

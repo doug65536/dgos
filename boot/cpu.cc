@@ -82,4 +82,3 @@ void cpu_init()
     nx_available = cpu_has_no_execute();
     gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
 }
-

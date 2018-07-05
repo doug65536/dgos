@@ -16,6 +16,7 @@
 #include "bootloader.h"
 #include "bootmenu.h"
 #include "physmap.h"
+#include "qemu.h"
 
 extern "C" _noreturn
 void enter_kernel(uint64_t entry_point) _section(".smp.text");
@@ -29,13 +30,17 @@ static int64_t base_adj;
 extern char ___smp_st[];
 extern char ___smp_en[];
 
-
 tchar const *cpu_choose_kernel()
 {
-//    if (cpu_has_bmi())
-//        return TSTR "dgos-kernel-bmi";
-//    else
-        return TSTR "dgos-kernel-generic";
+    char fw_cfg_tracing[1];
+
+    ssize_t got = qemu_fw_cfg(fw_cfg_tracing, sizeof(fw_cfg_tracing),
+                              "opt/com.doug16k.dgos.trace");
+
+    if (got >= 1 && fw_cfg_tracing[0] == '1')
+        return TSTR "dgos-kernel-tracing";
+
+    return TSTR "dgos-kernel-generic";
 }
 
 _noreturn
@@ -62,10 +67,10 @@ static void enter_kernel_initial(uint64_t entry_point)
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
     PRINT("Mapping aliasing window\n");
-    
+
     // Map first 4GB of physical addresses at -518G
-    paging_map_physical(0, -(UINT64_C(518) << 30), 
-                        UINT64_C(4) << 30, 
+    paging_map_physical(0, -(UINT64_C(518) << 30),
+                        UINT64_C(4) << 30,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
     // Map a page that the kernel can use to manipulate
@@ -184,7 +189,7 @@ void elf64_run(tchar const *filename)
         if ((program_hdrs[i].p_flags & (PF_R | PF_W | PF_X)) != 0)
             ctx->total_bytes += program_hdrs[i].p_memsz;
     }
-    
+
     // Load relocations
     if (file_hdr.e_shentsize != sizeof(Elf64_Shdr))
         PRINT("Executable has unexpected section header size");
@@ -212,31 +217,31 @@ void elf64_run(tchar const *filename)
                         " memsz=0x%llx, paddr=0x%llx",
                        blk->p_vaddr, blk->p_filesz,
                        blk->p_memsz, blk->p_paddr);
-    
+
             if (blk->p_memsz == 0)
                 continue;
-    
+
             ctx->page_flags = (-cpu_has_global_pages() & PTE_GLOBAL);
-    
+
             // Pages present
             ctx->page_flags |= PTE_PRESENT;
-    
+
             // Global if possible
             ctx->page_flags |= pge_page_flags;
-    
+
             // If not executable, mark as no execute
             if ((blk->p_flags & PF_X) == 0)
                 ctx->page_flags |= nx_page_flags;
-    
+
             // Writable
             if ((blk->p_flags & PF_W) != 0)
                 ctx->page_flags |= PTE_WRITABLE;
-    
+
             load_kernel_chunk(blk, file, ctx);
         }
 
         ctx->done_bytes += blk->p_memsz;
-        
+
         int percent = 100 * ctx->done_bytes / ctx->total_bytes;
 
         progress_bar_draw(0, 10, 70, percent);
@@ -275,7 +280,7 @@ void elf64_run(tchar const *filename)
     // It is impossible to debug 32 bit code on qemu-x86_64 target
     if (!cpu_has_long_mode())
         PANIC("Need 64-bit CPU");
-    
+
     ELF64_TRACE("Entering kernel");
 
     enter_kernel(file_hdr.e_entry + base_adj);

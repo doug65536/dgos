@@ -70,6 +70,8 @@ pxe.h
 pxemain.cc
 pxemain.h
 pxestruct.h
+qemu.cc
+qemu.h
 screen_abstract.h
 screen_bios.cc
 screen_efi.cc

@@ -6,9 +6,9 @@ $(top_builddir)/isodisk.img: \
 		kernel-generic.sym \
 		kernel-generic.dis.gz \
 		\
-		kernel-bmi \
-		kernel-bmi.sym \
-		kernel-bmi.dis.gz \
+		kernel-tracing \
+		kernel-tracing.sym \
+		kernel-tracing.dis.gz \
 		\
 		bootx64.efi \
 		bootx64-efi.sym \
