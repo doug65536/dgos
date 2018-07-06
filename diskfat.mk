@@ -7,7 +7,7 @@
 # Copy the entire bootfat-bin into sector 2 of the partition
 #  (Avoids overwriting FS information sector)
 
-$(top_builddir)/fatdisk.img: \
+$(top_builddir)/fatpart.img: \
 		$(top_builddir)/kernel-generic \
 		$(top_builddir)/kernel-generic.sym \
 		$(top_builddir)/kernel-generic.dis.gz \
@@ -42,7 +42,7 @@ $(top_builddir)/fatdisk.img: \
 		rm -f $(top_builddir)/fatpart.img \
 			$(top_builddir)/fatdisk.img && \
 		\
-		truncate --size=261120K $(top_builddir)/fatpart.img && \
+		truncate --size=40M $(top_builddir)/fatpart.img && \
 		\
 		mkfs.vfat \
 			-F 32 \
@@ -82,9 +82,24 @@ $(top_builddir)/fatdisk.img: \
 			\
 		SRCDIR="$(top_srcdir)" \
 			$(top_srcdir)/populate_fat.sh \
-				$(top_builddir)/fatpart.img "$(top_srcdir)" && \
-				\
-		truncate --size=262144K fatdisk.img && \
+				$(top_builddir)/fatpart.img "$(top_srcdir)"
+
+$(top_builddir)/fatdisk.img: \
+		$(top_srcdir)/diskfat.mk \
+		\
+		fatpart.img \
+		\
+		$(top_builddir)/mbr-bin \
+		$(top_builddir)/mbr.sym \
+		$(top_builddir)/mbr.dis.gz \
+		\
+		$(top_builddir)/boot1-bin \
+		$(top_builddir)/boot1-elf \
+		\
+		$(top_builddir)/bootfat-bin \
+		$(top_builddir)/bootfat.sym \
+		$(top_builddir)/bootfat.dis.gz
+	truncate --size=262144K fatdisk.img && \
 		\
 		echo -e 'o\nn\np\n1\n2048\n\nt\nc\na\np\ni\nw\n' | \
 			fdisk -b $(SECTOR_SZ) $(top_builddir)/fatdisk.img && \

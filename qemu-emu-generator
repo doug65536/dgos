@@ -41,7 +41,7 @@ do
 								' \' $'\n' $'\t\t' \
 								"\$(call QEMU_EMU,$em)" \
 								' \' $'\n' $'\t\t' \
-								"\$(call QEMU_DRV,$fs,$sc)" \
+								"\$(call QEMU_DRV,$fs)" \
 								' \' $'\n' $'\t\t' \
 								"\$(call QEMU_NP,$np)" \
 								' \' $'\n' $'\t\t' \

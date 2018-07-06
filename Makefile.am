@@ -1379,8 +1379,7 @@ QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
 	-device usb-kbd,bus=xhci.0 \
 	-device usb-mouse,bus=xhci.0 \
-	$(QEMU_USB_EXTRA) \
-	-trace 'usb*'
+	$(QEMU_USB_EXTRA)
 
 #-device usb-storage,bus=xhci.0,drive=stick
 #-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none
@@ -1438,20 +1437,30 @@ QEMU_RT_run = -s
 QEMU_DRV_COMMON = format=raw,werror=report,rerror=report,id=bootdrv
 QEMU_DRV = -drive id=bootdrv,if=none,file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
-QEMU_MACHINE = $(QEMU_MACHINE_$(1))
-QEMU_MACHINE_nvme = -machine q35
-QEMU_MACHINE_ahci = -machine q35
-QEMU_MACHINE_usb = -machine q35
-QEMU_MACHINE_ide = -machine pc
+#QEMU_MACHINE = $(QEMU_MACHINE_$(1))
+QEMU_MACHINE = -machine q35
+#QEMU_MACHINE_nvme = -machine q35
+#QEMU_MACHINE_ahci = -machine q35
+#QEMU_MACHINE_usb = -machine q35
+#QEMU_MACHINE_ide = -machine pc
 
 QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 
+QEMU_DISK_TYPE_iso = ide-cd
+QEMU_DISK_TYPE_fat = ide-hd
+
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
-QEMU_HDCTL_DEV_ahci = -device ich9-ahci,drive=bootdrv,$(QEMU_BLKSIZE)
-QEMU_HDCTL_DEV_ide = -device piix4-ide,drive=bootdrv,$(QEMU_BLKSIZE)
+
+#-device ich9-ahci,id=bootif
+
+QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv,wtf
+
+QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
+	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
+
 QEMU_HDCTL_DEV_usb = -device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
 
-QEMU_HDCTL = $(QEMU_MACHINE_$(1)) $(QEMU_HDCTL_DEV_$(1))
+QEMU_HDCTL = $(call QEMU_MACHINE,$(1)) $(call QEMU_HDCTL_DEV_$(1),$(2))
 
 QEMU_MEDIA = $(QEMU_MEDIA_$(1))
 QEMU_MEDIA_fat = disk
@@ -1475,8 +1484,8 @@ QEMU_BOOT_bios = -bios $(top_srcdir)/emu/seabios.rom
 QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
 
 QEMU_BOOTMEDIA = $(QEMU_BOOTMEDIA_$(1)_$(2))
-QEMU_BOOTMEDIA_hd_bios =
-QEMU_BOOTMEDIA_hd_efi =
+QEMU_BOOTMEDIA_hd_bios = -boot c
+QEMU_BOOTMEDIA_hd_efi = -boot c
 QEMU_BOOTMEDIA_pxe_bios = -boot n -net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
 QEMU_BOOTMEDIA_pxe_efi = -boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
 

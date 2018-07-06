@@ -16,4 +16,7 @@ cp -u "$1/user/background.png" iso_stage || exit
 
 mkdir -p iso_stage/EFI/boot || exit
 cp -u bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit
+
+ln -f fatpart.img iso_stage/efipart.img || exit
+
 #cp -u bootia32.efi iso_stage/EFI/boot/bootia32.efi || exit
