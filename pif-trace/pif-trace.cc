@@ -15,6 +15,7 @@
 #include <zlib.h>
 #include <thread>
 #include <condition_variable>
+#include <regex>
 #include <vector>
 #include <algorithm>
 #include <csignal>
@@ -270,6 +271,7 @@ int capture()
 
     writer_thread_t writer;
 
+    // 1048576 should be enough to completely drain the FIFO in one read call
     static constexpr int items_count = 1048576 / sizeof(trace_item);
     std::unique_ptr<trace_item[]> items(new trace_item[items_count]);
     static constexpr int sizeof_items = sizeof(items[0]) * items_count;
@@ -643,11 +645,9 @@ public:
         case KEY_END:
             return move_end();
 
-        case 'p':   // fall through
         case KEY_UP:
             return move_up();
 
-        case 'n':   // fall through
         case KEY_F(7):   // fall through
         case KEY_F(11):   // fall through
         case KEY_DOWN:
@@ -680,8 +680,20 @@ public:
         case 'e':
             return elide_call();
 
+        case '/':
+            return find_text();
+
+        case 'n':
+            return find_next(1);
+
+        case 'N':
+            return find_next(-1);
+
         case 'h':
             return show_help();
+
+        case KEY_RESIZE:
+            return handle_resize();
 
         case 'q':
             done = true;
@@ -908,6 +920,57 @@ public:
         clamp_offset();
     }
 
+    void find_text()
+    {
+        echo();
+        curs_set(TRUE);
+        mvhline(display_h - 1, 0, ' ', display_w);
+        mvprintw(display_h - 1, 0, ":");
+        std::unique_ptr<char[]> buf(new char[display_w]);
+        memset(buf.get(), 0, sizeof(buf[0]) * display_w);
+        mvgetnstr(display_h - 1, 1, buf.get(), display_w - 1);
+        noecho();
+        curs_set(FALSE);
+
+        search.reset(new std::regex(buf.get(), std::regex::optimize));
+
+        find_next(1);
+    }
+
+    void find_next(int dir)
+    {
+        if (!search)
+            return;
+
+        auto scan = selection;
+
+        for (;;) {
+            if (dir > 0 && scan == tid_detail->end())
+                return;
+
+            if (dir < 0 && scan == tid_detail->begin())
+                return;
+
+            scan += dir;
+
+            auto it = symbols->lower_bound(uint64_t(scan->rec.get_ip()));
+
+            auto wtf = it->second.c_str();
+
+            if (std::regex_search(it->second, *search)) {
+                selection = scan;
+                clamp_offset();
+                break;
+            }
+        }
+    }
+
+    void handle_resize()
+    {
+        getmaxyx(stdscr, display_h, display_w);
+        clamp_offset();
+    }
+
     void show_help()
     {
 
@@ -923,6 +986,7 @@ public:
     uint64_t offset;
     int cursor_row;
     int display_h, display_w;
+    std::unique_ptr<std::regex> search;
 };
 
 int main(int argc, char **argv)
