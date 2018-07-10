@@ -100,6 +100,10 @@ static bool disk_read_lba_bouncebuffer(
         uint64_t addr, uint64_t lba,
         uint8_t log2_sector_size, unsigned count)
 {
+    // Guarantee that reading one sector will never cross a 64KB boundary
+    size_t alignment = size_t(1) << log2_sector_size;
+
+    // Try to do a single read call, if heap space permits
     size_t buf_size = count << log2_sector_size;
 
     // Cap to 64KB
@@ -108,7 +112,7 @@ static bool disk_read_lba_bouncebuffer(
 
     void *buffer;
     do {
-        buffer = malloc(buf_size);
+        buffer = malloc_aligned(buf_size, alignment);
 
         // If allocation failed, try again with smaller buffer
         if (unlikely(!buffer))
@@ -156,11 +160,17 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
     pkt.hdr.reserved = 0;
     pkt.hdr.lba = lba;
 
-    if (addr < 0x100000) {
+    // Detect crossing a 64KB boundary with one sector read and force
+    // bounce buffering in that case (unlikely)
+    bool force_bounce_buffer =
+            (addr & -(64 << 10)) !=
+            ((addr + (size_t(1) << log2_sector_size)) & -(64 << 10));
+
+    if (!force_bounce_buffer && addr < 0x100000) {
         pkt.hdr.sizeof_packet = sizeof(pkt.hdr);
         pkt.hdr.segoff = ((uint32_t(addr) >> 4) << 16) |
                 (uint32_t(addr) & 0xF);
-    } else if (0 && disk_support_64bit_addr()) {
+    } else if (0 && !force_bounce_buffer && disk_support_64bit_addr()) {
         pkt.hdr.sizeof_packet = sizeof(pkt);
         pkt.hdr.segoff = 0xFFFFFFFF;
         pkt.address = addr;
@@ -186,9 +196,12 @@ bool disk_read_lba(uint64_t addr, uint64_t lba,
 
         if (unlikely(careful)) {
             // Limit to half of a 64KB region, since a full 64KB is impossible
-            if (read_count > 0x40) {
-                read_count = 0x40;
+            if (read_count > (1 << (15 - log2_sector_size))) {
+                read_count = (1 << (15 - log2_sector_size));
                 read_size = read_count << log2_sector_size;
+
+                // This should be guaranteed, see force_bounce_buffer above
+                assert(read_count > 0);
             }
 
             // Don't cross 64KB boundary
