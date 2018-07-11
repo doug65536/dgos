@@ -10,6 +10,11 @@ define startupbreakpoints
 		b apic_spurious_handler
 		b isr_entry_8
 	end
+
+	b modload_load_symbols
+	commands
+		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
+	end
 end
 
 define walkstack
