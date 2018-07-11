@@ -329,7 +329,7 @@ private:
 // asynchronous commands
 class nvme_detect_dev_ctx_t {
 public:
-    nvme_detect_dev_ctx_t(if_list_t& list)
+    nvme_detect_dev_ctx_t(vector<storage_dev_base_t*>& list)
         : identify_data(nullptr)
         , list(list)
         , cur_ns(0)
@@ -374,7 +374,7 @@ public:
     }
 
     void *identify_data;
-    if_list_t& list;
+    vector<storage_dev_base_t*>& list;
     uint8_t cur_ns;
 
 private:
@@ -504,7 +504,7 @@ class nvme_if_factory_t : public storage_if_factory_t {
 public:
     nvme_if_factory_t() : storage_if_factory_t("nvme") {}
 private:
-    virtual if_list_t detect(void) override final;
+    virtual vector<storage_if_base_t*> detect(void) override final;
 };
 
 static nvme_if_factory_t nvme_if_factory;
@@ -587,23 +587,12 @@ private:
     uint8_t log2_sectorsize;
 };
 
-#define NVME_MAX_DEVICES    8
-static nvme_if_t nvme_devices[NVME_MAX_DEVICES];
-static unsigned nvme_count;
+static vector<nvme_if_t*> nvme_devices;
+static vector<nvme_dev_t*> nvme_drives;
 
-#define NVME_MAX_DRIVES    8
-static nvme_dev_t nvme_drives[NVME_MAX_DRIVES];
-static unsigned nvme_drive_count;
-
-if_list_t nvme_if_factory_t::detect(void)
+vector<storage_if_base_t *> nvme_if_factory_t::detect(void)
 {
-    unsigned start_at = nvme_count;
-
-    if_list_t list = {
-        nvme_devices + start_at,
-        sizeof(*nvme_devices),
-        0
-    };
+    vector<storage_if_base_t *> list;
 
     //return list;
 
@@ -627,22 +616,17 @@ if_list_t nvme_if_factory_t::detect(void)
 
         NVME_TRACE("found device!\n");
 
-        if (nvme_count < countof(nvme_devices)) {
-            nvme_if_t *self = nvme_devices + nvme_count++;
+        unique_ptr<nvme_if_t> self(new nvme_if_t{});
 
-            if (!self->init(pci_iter)) {
-                // Destruct and restore zero initialization
-                self->~nvme_if_t();
-                memset(self, 0, sizeof(*self));
-                new (self) nvme_if_t;
-                --nvme_count;
-            }
+        nvme_devices.push_back(self);
+        if (self->init(pci_iter)) {
+            list.push_back(self.release());
+        } else {
+            nvme_devices.pop_back();
         }
     } while (pci_enumerate_next(&pci_iter));
 
-    list.count = nvme_count - start_at;
-
-    NVME_TRACE("found %u drives (namespaces)\n", list.count);
+    NVME_TRACE("found %zu drives (namespaces)\n", list.size());
 
     return list;
 }
@@ -894,9 +878,12 @@ void nvme_if_t::identify_ns_handler(
     uint32_t lba_format = ns_ident->lbaf[cur_format_index];
     uint8_t log2_sectorsize = NVME_NS_IDENT_LBAF_LBADS_GET(lba_format);
 
-    nvme_dev_t *drive = nvme_drives + nvme_drive_count++;
+    unique_ptr<nvme_dev_t> drive(new nvme_dev_t{});
 
     drive->init(this, namespaces[ctx->cur_ns], log2_sectorsize);
+
+    ctx->list.push_back(drive);
+    nvme_drives.push_back(drive.release());
 
     // Enumerate next namespace if there are more
     if (++ctx->cur_ns < namespaces.size()) {
@@ -928,15 +915,9 @@ void nvme_if_t::cleanup()
 {
 }
 
-if_list_t nvme_if_t::detect_devices()
+vector<storage_dev_base_t*> nvme_if_t::detect_devices()
 {
-    unsigned start_at = nvme_drive_count;
-
-    if_list_t list = {
-        nvme_drives + start_at,
-        sizeof(*nvme_drives),
-        0
-    };
+    vector<storage_dev_base_t*> list;
 
     NVME_TRACE("enumerating namespaces\n");
 
@@ -950,10 +931,8 @@ if_list_t nvme_if_t::detect_devices()
 
     ctx.wait();
 
-    list.count = nvme_drive_count - start_at;
-
     NVME_TRACE("enumerating namespaces complete,"
-               " found %u namespaces\n", ctx.list.count);
+               " found %zu namespaces\n", ctx.list.size());
 
     return list;
 }
@@ -973,8 +952,8 @@ void nvme_dev_t::cleanup()
 
 isr_context_t *nvme_if_t::irq_handler(int irq, isr_context_t *ctx)
 {
-    for (unsigned i = 0; i < nvme_count; ++i) {
-        nvme_if_t *dev = nvme_devices + i;
+    for (unsigned i = 0; i < nvme_devices.size(); ++i) {
+        nvme_if_t *dev = nvme_devices[i];
 
         int irq_offset = irq - dev->irq_range.base;
 
@@ -993,7 +972,7 @@ void nvme_if_t::irq_handler(int irq_offset)
 
     int queue_stride = irq_range.count;
 
-    if (irq_offset && irq_range.msix && irq_range.count == queue_count) {
+    if (irq_offset && irq_range.msix && irq_range.count == queue_count + 1) {
         // Infer queue index from CPU number
         int current_cpu = thread_cpu_number();
         nvme_queue_state_t& queue = queues[1 + current_cpu];

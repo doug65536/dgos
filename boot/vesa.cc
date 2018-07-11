@@ -122,7 +122,7 @@ uint16_t vbe_select_mode(uint16_t width, uint16_t height, uint16_t verbose)
 
                 if (verbose) {
                     VESA_TRACE("vbe mode %u w=%u h=%u"
-                               " %d:%d:%d:%d phys_addr=%lx %d:%d",
+                               " %d:%d:%d:%d phys_addr=%" PRIx32 " %d:%d",
                                mode,
                                mode_info->res_x,
                                mode_info->res_y,

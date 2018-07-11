@@ -3,6 +3,7 @@
 #include "dev_usb_ctl.h"
 #include "bswap.h"
 #include "hash_table.h"
+#include "algorithm.h"
 
 // USB mass storage class driver
 
@@ -36,7 +37,7 @@ public:
     usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
 protected:
     // storage_if_factory_t interface
-    if_list_t detect() override;
+    vector<storage_if_base_t *> detect() override;
 };
 
 // A USB storage interface
@@ -283,27 +284,17 @@ protected:
     char const *name() const override final;
 };
 
-#define USB_MSC_MAX_DEVICES    16
-static usb_msc_if_t usb_msc_devices[USB_MSC_MAX_DEVICES];
-static unsigned usb_msc_count;
-
-#define USB_MSC_MAX_DRIVES    64
-static usb_msc_dev_t usb_msc_drives[USB_MSC_MAX_DRIVES];
-static unsigned usb_msc_drive_count;
+static vector<usb_msc_if_t*> usb_msc_devices;
+static vector<usb_msc_dev_t*> usb_msc_drives;
 
 //
 // Storage interface factory
 
-if_list_t usb_msc_if_factory_t::detect()
+vector<storage_if_base_t *> usb_msc_if_factory_t::detect()
 {
-    if_list_t list = {
-        usb_msc_devices,
-        sizeof(*usb_msc_devices),
-        usb_msc_count
-    };
-
     USB_MSC_TRACE("Reporting %d USB mass storage interfaces\n", usb_msc_count);
 
+    vector<storage_if_base_t*> list(usb_msc_devices.begin(), usb_msc_devices.end());
     return list;
 }
 
@@ -314,16 +305,13 @@ void usb_msc_if_t::cleanup()
 {
 }
 
-if_list_t usb_msc_if_t::detect_devices()
+vector<storage_dev_base_t*> usb_msc_if_t::detect_devices()
 {
-    if_list_t list = {
-        usb_msc_drives,
-        sizeof(*usb_msc_drives),
-        usb_msc_drive_count
-    };
+    vector<storage_dev_base_t*> list(usb_msc_drives.begin(),
+                                     usb_msc_drives.end());
 
     USB_MSC_TRACE("Reporting %d USB mass storage drives\n",
-                  usb_msc_drive_count);
+                  list.size());
 
     return list;
 }
@@ -424,20 +412,19 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     assert(bulk_in);
     assert(bulk_out);
 
-    if (usb_msc_count == countof(usb_msc_devices)) {
-        USB_MSC_TRACE("Too many USB mass storage interfaces! Dropped one\n");
-        return false;
-    }
-
     // Allocate an interface
-    usb_msc_if_t *if_ = usb_msc_devices + usb_msc_count++;
+    unique_ptr<usb_msc_if_t> if_(new usb_msc_if_t{});
 
     USB_MSC_TRACE("initializing interface, slot=%d\n",
                   cfg_hlp->slot());
 
     int status = if_->init(control, bulk_in, bulk_out, iface_idx);
 
-    return status >= 0;
+    if (status < 0)
+        return false;
+
+    usb_msc_devices.push_back(if_.release());
+    return true;
 }
 
 const char *usb_msc_classdrv_t::name() const
@@ -524,14 +511,9 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
         return false;
 
     for (int lun = 0; lun <= max_lun; ++lun) {
-        if (usb_msc_drive_count >= countof(usb_msc_drives)) {
-            USB_MSC_TRACE("Too many drives! Dropped one\n");
-            continue;
-        }
-
         USB_MSC_TRACE("Initializing lun %d\n", lun);
 
-        usb_msc_dev_t *drv = usb_msc_drives + usb_msc_drive_count++;
+        unique_ptr<usb_msc_dev_t> drv(new usb_msc_dev_t{});
 
         // Get size and block size
         wrapper_t cap;
@@ -577,7 +559,8 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
 
         uint8_t log2_blk_sz = bit_msb_set(blk_sz);
 
-        drv->init(this, lun, max_lba, log2_blk_sz);
+        if (drv->init(this, lun, max_lba, log2_blk_sz))
+            usb_msc_drives.push_back(drv.release());
 
         USB_MSC_TRACE("initializing lun %d complete\n", lun);
     }

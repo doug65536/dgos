@@ -32,52 +32,44 @@ struct partition_tbl_ent_t {
 
 struct mbr_part_factory_t : public part_factory_t {
     mbr_part_factory_t() : part_factory_t("mbr") {}
-    if_list_t detect(storage_dev_base_t *drive) override;
+    vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
 static mbr_part_factory_t mbr_part_factory;
 STORAGE_REGISTER_FACTORY(mbr_part);
 
-#define MAX_PARTITIONS  128
-static part_dev_t partitions[MAX_PARTITIONS];
-static size_t partition_count;
+static vector<part_dev_t*> partitions;
 
-if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
+vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 {
-    unsigned start_at = partition_count;
-
-    if_list_t list = {
-        partitions + start_at,
-        sizeof(*partitions),
-        0
-    };
+    vector<part_dev_t *> list;
 
     long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     if (sector_size >= 512) {
-        unique_ptr<uint8_t[]> sector = new uint8_t[sector_size];
+        unique_ptr<uint8_t[]> sector(new uint8_t[sector_size]);
         memset(sector, 0, sector_size);
 
         if (drive->read_blocks(sector, 1, 0) >= 0) {
-            if (sector[510] == 0x55 &&
-                    sector[511] == 0xAA) {
+            if (sector[510] == 0x55 && sector[511] == 0xAA) {
                 partition_tbl_ent_t ptbl[4];
                 memcpy(ptbl, sector + 446, sizeof(ptbl));
 
-                for (int i = 0;
-                     i < 4 && partition_count < MAX_PARTITIONS; ++i) {
-
-                    part_dev_t *part;
+                for (int i = 0; i < 4; ++i) {
+                    unique_ptr<part_dev_t> part;
 
                     switch (ptbl[i].system_id) {
                     case 0x0B:// fall thru
                     case 0x0C:
                         // FAT32 LBA filesystem
-                        part = partitions + partition_count++;
+                        part.reset(new part_dev_t{});
                         part->drive = drive;
                         part->lba_st = ptbl[i].start_lba;
                         part->lba_len = ptbl[i].total_sectors;
                         part->name = "fat32";
+
+                        partitions.push_back(part);
+                        list.push_back(part.release());
                         break;
 
                     case 0x83:
@@ -92,18 +84,19 @@ if_list_t mbr_part_factory_t::detect(storage_dev_base_t *drive)
                             break;
                         }
 
-                        part = partitions + partition_count++;
+                        part.reset(new part_dev_t{});
                         part->drive = drive;
                         part->lba_st = ptbl[i].start_lba;
                         part->lba_len = ptbl[i].total_sectors;
                         part->name = "ext4";
+
+                        partitions.push_back(part);
+                        list.push_back(part.release());
                     }
                 }
             }
         }
     }
-
-    list.count = partition_count - start_at;
 
     return list;
 }

@@ -389,7 +389,7 @@ static int iso9660_boot_close(int file)
     return result;
 }
 
-static int iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
+static ssize_t iso9660_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 {
     if (file < 0 || file >= MAX_HANDLES)
         return -1;

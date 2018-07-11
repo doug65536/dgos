@@ -4,7 +4,6 @@ PHDRS {
 	text PT_LOAD FLAGS(5);
 	readonly PT_LOAD FLAGS(4);
 	data PT_LOAD FLAGS(6);
-	tls PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
@@ -47,14 +46,6 @@ SECTIONS {
 		*(.stub .text.* .gnu.linkonce.t.*)
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
-
-		/* Expose addresses/sizes to kernel as initialized data */
-
-		/* Provide the highest address taken by kernel as
-		   a global variable */
-		. = ALIGN(8);
-		PROVIDE_HIDDEN(___top_physaddr = .);
-		QUAD((___init_brk - ___text_st) + 0x100000);
 
 		PROVIDE_HIDDEN(___text_en = .);
 	} :readonly
@@ -164,30 +155,14 @@ SECTIONS {
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
 
-	.tdata : ALIGN(4096) {
-		PROVIDE_HIDDEN(___tdata_st = .);
-		*(.tdata)
-		. = ALIGN(16);
-		PROVIDE_HIDDEN(___tdata_en = .);
-	} :tls
-
-	.tbss : ALIGN(4096) {
-		PROVIDE_HIDDEN(___tbss_st = .);
-		*(.tbss)
-		*(.tcommon)
-		. = ALIGN(16);
-		PROVIDE_HIDDEN(___tbss_en = .);
-	} :tls
-
 	. = ALIGN(4096);
-	PROVIDE_HIDDEN(___init_brk = .);
 
-	.debug_info		: { *(.debug_info)    }
-	.debug_abbrev	: { *(.debug_abbrev)  }
-	.debug_aranges	: { *(.debug_aranges) }
-	.debug_macro	: { *(.debug_macro)   }
-	.debug_line		: { *(.debug_line)    }
-	.debug_str		: { *(.debug_str)     }
+	.debug_info		(NOLOAD) : { *(.debug_info)    }
+	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  }
+	.debug_aranges	(NOLOAD) : { *(.debug_aranges) }
+	.debug_macro	(NOLOAD) : { *(.debug_macro)   }
+	.debug_line		(NOLOAD) : { *(.debug_line)    }
+	.debug_str		(NOLOAD) : { *(.debug_str)     }
 
 	/DISCARD/       : { *(.interp)        }
 	/DISCARD/		: { *(.comment)       }

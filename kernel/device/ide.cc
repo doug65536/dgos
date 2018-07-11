@@ -35,13 +35,13 @@ struct ide_chan_ports_t {
 
 struct ide_if_factory_t : public storage_if_factory_t {
     ide_if_factory_t() : storage_if_factory_t("ide") {}
-    virtual if_list_t detect(void) override;
+    virtual vector<storage_if_base_t *> detect(void) override;
 };
 
 static ide_if_factory_t ide_if_factory;
 STORAGE_REGISTER_FACTORY(ide_if);
 
-struct ide_if_t : public storage_if_base_t {
+struct ide_if_t : public storage_if_base_t, public zero_init_t {
     STORAGE_IF_IMPL
 
     struct bmdma_prd_t {
@@ -121,7 +121,7 @@ struct ide_if_t : public storage_if_base_t {
         int acquire_access();
         void release_access(int intr_was_enabled);
 
-        void detect_devices();
+        void detect_devices(vector<storage_dev_base_t *> &list);
 
         // Automatically use the correct port based on the enumeration type
         _always_inline uint8_t inb(ata_reg_cmd reg);
@@ -197,13 +197,8 @@ struct ide_dev_t : public storage_dev_base_t {
     int is_atapi;
 };
 
-#define IDE_MAX_IF 8
-static ide_if_t ide_ifs[IDE_MAX_IF];
-static size_t ide_if_count;
-
-#define IDE_MAX_DEVS    16
-static ide_dev_t ide_devs[IDE_MAX_DEVS];
-static size_t ide_dev_count;
+static vector<ide_if_t*> ide_ifs;
+static vector<ide_dev_t*> ide_devs;
 
 // BMDMA
 //
@@ -227,15 +222,9 @@ static size_t ide_dev_count;
 #define ATA_BMDMA_REG_STATUS_n(secondary)   ((((secondary) != 0) << 3) + 2)
 #define ATA_BMDMA_REG_PRD_n(secondary)      ((((secondary) != 0) << 3) + 4)
 
-if_list_t ide_if_factory_t::detect(void)
+vector<storage_if_base_t *> ide_if_factory_t::detect(void)
 {
-    unsigned start_at = ide_if_count;
-
-    if_list_t list = {
-        ide_ifs + start_at,
-        sizeof(*ide_ifs),
-        0
-    };
+    vector<storage_if_base_t*> list;
 
     pci_dev_iterator_t pci_iter;
 
@@ -257,74 +246,73 @@ if_list_t ide_if_factory_t::detect(void)
     size_t std_idx = 0;
 
     do {
-        ide_if_t *dev = ide_ifs + ide_if_count++;
+        unique_ptr<ide_if_t> if_(new ide_if_t{});
 
-        dev->chan[0].ports.cmd = (pci_iter.config.base_addr[0] > 1)
+        if_->chan[0].ports.cmd = (pci_iter.config.base_addr[0] > 1)
                 ? pci_iter.config.base_addr[0]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->chan[0].ports.ctl = (pci_iter.config.base_addr[1] > 1)
+        if_->chan[0].ports.ctl = (pci_iter.config.base_addr[1] > 1)
                 ? pci_iter.config.base_addr[1]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->chan[1].ports.cmd = (pci_iter.config.base_addr[2] > 1)
+        if_->chan[1].ports.cmd = (pci_iter.config.base_addr[2] > 1)
                 ? pci_iter.config.base_addr[2]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->chan[1].ports.ctl = (pci_iter.config.base_addr[3] > 1)
+        if_->chan[1].ports.ctl = (pci_iter.config.base_addr[3] > 1)
                 ? pci_iter.config.base_addr[3]
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        dev->bmdma_base = pci_iter.config.base_addr[4];
+        if_->bmdma_base = pci_iter.config.base_addr[4];
 
         if (pci_iter.config.prog_if == 0x8A ||
                 pci_iter.config.prog_if == 0x80) {
             IDE_TRACE("On IRQ 14 and 15\n");
-            dev->chan[0].ports.irq = 14;
-            dev->chan[1].ports.irq = 15;
+            if_->chan[0].ports.irq = 14;
+            if_->chan[1].ports.irq = 15;
         } else if (pci_iter.config.irq_line != 0xFE) {
             IDE_TRACE("Both on IRQ %d\n", pci_iter.config.irq_line);
-            dev->chan[0].ports.irq = pci_iter.config.irq_line;
-            dev->chan[1].ports.irq = pci_iter.config.irq_line;
+            if_->chan[0].ports.irq = pci_iter.config.irq_line;
+            if_->chan[1].ports.irq = pci_iter.config.irq_line;
         } else {
             IDE_TRACE("Both on IRQ 14\n");
-            dev->chan[0].ports.irq = 14;
-            dev->chan[1].ports.irq = 14;
+            if_->chan[0].ports.irq = 14;
+            if_->chan[1].ports.irq = 14;
             IDE_TRACE("Updating PCI config IRQ line\n");
             pci_config_write(pci_iter.addr,
                            offsetof(pci_config_hdr_t, irq_line),
-                           &dev->chan[0].ports.irq, sizeof(uint8_t));
+                           &if_->chan[0].ports.irq, sizeof(uint8_t));
         }
 
         IDE_TRACE("Found PCI IDE interface at %#x/%#x/irq%d"
                   " - %#x/%#x/irq%d\n",
-                  dev->chan[0].ports.cmd,
-                dev->chan[0].ports.ctl, dev->chan[0].ports.irq,
-                dev->chan[1].ports.cmd, dev->chan[1].ports.ctl,
-                dev->chan[1].ports.irq);
+                  if_->chan[0].ports.cmd,
+                if_->chan[0].ports.ctl, if_->chan[0].ports.irq,
+                if_->chan[1].ports.cmd, if_->chan[1].ports.ctl,
+                if_->chan[1].ports.irq);
 
         // Sanity check ports, reject entry if any are zero
-        if (dev->chan[0].ports.cmd == 0 ||
-                dev->chan[0].ports.ctl == 0 ||
-                dev->chan[1].ports.cmd == 0 ||
-                dev->chan[1].ports.ctl == 0) {
-            --ide_if_count;
+        if (if_->chan[0].ports.cmd == 0 ||
+                if_->chan[0].ports.ctl == 0 ||
+                if_->chan[1].ports.cmd == 0 ||
+                if_->chan[1].ports.ctl == 0)
             continue;
-        }
 
         // Enable bus master DMA and I/O ports, disable MMIO
         pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_IOSE, PCI_CMD_MSE);
-    } while (pci_enumerate_next(&pci_iter));
 
-    list.count = ide_if_count - start_at;
+        ide_ifs.push_back(if_);
+        list.push_back(if_.release());
+    } while (pci_enumerate_next(&pci_iter));
 
     return list;
 }
@@ -527,7 +515,7 @@ void ide_if_t::ide_chan_t::release_access(int intr_was_enabled)
     cpu_irq_toggle(intr_was_enabled);
 }
 
-void ide_if_t::ide_chan_t::detect_devices()
+void ide_if_t::ide_chan_t::detect_devices(vector<storage_dev_base_t*>& list)
 {
     IDE_TRACE("Detecting IDE devices\n");
 
@@ -618,10 +606,12 @@ void ide_if_t::ide_chan_t::detect_devices()
             continue;
         }
 
-        ide_devs[ide_dev_count].chan = this;
-        ide_devs[ide_dev_count].slave = slave;
-        ide_devs[ide_dev_count].is_atapi = is_atapi;
-        ++ide_dev_count;
+        unique_ptr<ide_dev_t> dev(new ide_dev_t{});
+        dev->chan = this;
+        dev->slave = slave;
+        dev->is_atapi = is_atapi;
+        ide_devs.push_back(dev);
+        list.push_back(dev.release());
 
         unique_ptr<ata_identify_t> ident = new ata_identify_t;
 
@@ -1160,9 +1150,9 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
 isr_context_t *ide_if_t::ide_chan_t::irq_handler(int irq, isr_context_t *ctx)
 {
-    for (unsigned i = 0; i < ide_dev_count; ++i) {
-        if (ide_devs[i].chan->ports.irq == irq)
-            ide_devs[i].chan->irq_handler();
+    for (unsigned i = 0; i < ide_devs.size(); ++i) {
+        if (ide_devs[i]->chan->ports.irq == irq)
+            ide_devs[i]->chan->irq_handler();
     }
 
     return ctx;
@@ -1191,14 +1181,9 @@ errno_t ide_if_t::ide_chan_t::flush(int slave, int is_atapi, iocp_t *iocp)
     return errno_t::OK;
 }
 
-if_list_t ide_if_t::detect_devices()
+vector<storage_dev_base_t*> ide_if_t::detect_devices()
 {
-    int start_at = ide_dev_count;
-    if_list_t list = {
-        ide_devs + start_at,
-        sizeof(*ide_devs),
-        0
-    };
+    vector<storage_dev_base_t*> list;
 
     if (bmdma_base) {
         simplex_dma = (bmdma_inb(ATA_BMDMA_REG_STATUS_n(0)) & 0x80) != 0;
@@ -1211,9 +1196,7 @@ if_list_t ide_if_t::detect_devices()
     }
 
     for (int secondary = 0; secondary < 2; ++secondary)
-        chan[secondary].detect_devices();
-
-    list.count = ide_dev_count - start_at;
+        chan[secondary].detect_devices(list);
 
     return list;
 }

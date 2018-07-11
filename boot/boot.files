@@ -69,6 +69,8 @@ pxe-bios.S
 pxe.h
 pxemain.cc
 pxemain.h
+pxemain_abstract.h
+pxemain_bios.cc
 pxestruct.h
 qemu.cc
 qemu.h

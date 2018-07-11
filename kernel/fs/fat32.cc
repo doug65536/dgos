@@ -34,6 +34,21 @@ struct fat32_fs_t final : public fs_base_t {
     };
 
     struct file_handle_t : public fs_file_info_t {
+        file_handle_t()
+            : fs(nullptr)
+            , dirent(nullptr)
+            , cached_offset(0)
+            , cached_cluster(0)
+            , dirty(false)
+        {
+        }
+
+        // fs_file_info_t interface
+        ino_t get_inode() const override
+        {
+            return dirent->start_lo | (dirent->start_hi << 16);
+        }
+
         fat32_fs_t *fs;
         fat32_dir_entry_t *dirent;
 
@@ -1026,6 +1041,8 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
 
     file_handle_t *file = (file_handle_t*)pool_alloc(&fat32_handles);
 
+    file = new (file) file_handle_t;
+
     file->fs = this;
     file->dirent = &fde->short_entry;
 
@@ -1339,7 +1356,9 @@ int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
     shared_lock<shared_mutex> lock(rwlock);
 
+    ((file_handle_t*)fi)->~file_handle_t();
     pool_free(&fat32_handles, fi);
+
     return 0;
 }
 
@@ -1515,7 +1534,9 @@ int fat32_fs_t::release(fs_file_info_t *fi)
     if (file->dirty)
         status = msync(file->dirent, sizeof(*file->dirent), MS_SYNC);
 
+    file->~file_handle_t();
     pool_free(&fat32_handles, fi);
+
     return status;
 }
 

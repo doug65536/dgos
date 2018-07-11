@@ -9,8 +9,8 @@ mkdir -p stage || exit
 
 truncate --size 128K stage/.big || exit
 
-cp -u kernel-generic stage/dgos-kernel-generic || exit
-cp -u kernel-tracing stage/dgos-kernel-tracing || exit
+ln -f kernel-generic stage/dgos-kernel-generic || exit
+ln -f kernel-tracing stage/dgos-kernel-tracing || exit
 cp -u hello.km stage/hello.km || exit
 
 cp -u user-shell stage || exit

@@ -8,10 +8,14 @@
 #  (Avoids overwriting FS information sector)
 
 $(top_builddir)/fatpart.img: \
+		$(top_srcdir)/diskfat.mk \
+		\
+		$(top_builddir)/dgos-kernel-generic \
 		$(top_builddir)/kernel-generic \
 		$(top_builddir)/kernel-generic.sym \
 		$(top_builddir)/kernel-generic.dis.gz \
 		\
+		$(top_builddir)/dgos-kernel-tracing \
 		$(top_builddir)/kernel-tracing \
 		$(top_builddir)/kernel-tracing.sym \
 		$(top_builddir)/kernel-tracing.dis.gz \
@@ -19,6 +23,10 @@ $(top_builddir)/fatpart.img: \
 		$(top_builddir)/bootx64.efi \
 		$(top_builddir)/bootx64-efi.sym \
 		$(top_builddir)/bootefi-amd64.dis.gz \
+		\
+		$(top_builddir)/bootpxe-bios-elf \
+		$(top_builddir)/bootpxe-bios-bin \
+		$(top_builddir)/bootpxe-bios.map \
 		\
 		$(top_builddir)/user-shell \
 		$(top_builddir)/hello.km \

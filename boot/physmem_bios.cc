@@ -55,7 +55,8 @@ bool get_ram_regions()
 
         physmap_insert(entry);
 
-        PRINT("base=%llx length=%llx type=%lx valid=%lx",
+        PRINT("base=%" PRIx64 " length=%" PRIx64
+              " type=%" PRIx32 " valid=%" PRIx32,
                    entry.base,
                    entry.size,
                    entry.type,

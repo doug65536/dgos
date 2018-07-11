@@ -76,3 +76,65 @@ size_t utf8_to_utf16(uint16_t *output, size_t out_size_words, char const *in)
 
     return out - output;
 }
+
+int utf16_to_ucs4(char16_t const *in, char16_t const **ret_end)
+{
+    if (in[0] < 0xD800 || in[0] > 0xDFFF) {
+        if (ret_end)
+            *ret_end = in + (*in != 0);
+        return *in;
+    } else if (in[0] >= 0xD800 && in[0] <= 0xDBFF &&
+            in[1] >= 0xDC00 && in[1] <= 0xDFFF) {
+        if (ret_end)
+            *ret_end = in + 2;
+        return ((in[0] - 0xD800) << 10) |
+                ((in[1] - 0xDC00) & 0x3FF);
+    }
+
+    // Invalid surrogate pair
+    return 0;
+}
+
+// out should have room for at least 5 bytes
+// if out is null, returns how many bytes it
+// would have wrote to out, not including null terminator
+// Returns 0 for values outside 0 <= in < 0x101000 range
+// Always writes null terminator if out is not null
+int ucs4_to_utf8(char *out, int in)
+{
+    int len;
+    if (in >= 0 && in < 0x80) {
+        if (out) {
+            *out++ = (char)in;
+            *out++ = 0;
+        }
+        return 1;
+    }
+
+    if (in < 0x80) {
+        len = 2;
+    } else if (in < 0x800) {
+        len = 3;
+    } else if (in < 0x10000) {
+        len = 4;
+    } else {
+        // Invalid
+        if (out)
+            *out++ = 0;
+        return 0;
+    }
+
+    if (out) {
+        int shift = len - 1;
+
+        *out++ = (char)((signed char)0x80 >> shift) |
+                (in >> (6 * shift));
+
+        while (--shift >= 0)
+            *out++ = 0x80 | ((in >> (6 * shift)) & 0x3F);
+
+        *out++ = 0;
+    }
+
+    return len;
+}

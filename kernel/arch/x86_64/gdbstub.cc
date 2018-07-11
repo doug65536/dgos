@@ -117,7 +117,7 @@ public:
     static void sync_hw_bp();
 
     static void hook_exceptions();
-    _noreturn
+
     static void start_stub();
 
     static int get_gdb_cpu();

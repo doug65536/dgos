@@ -8,25 +8,17 @@
 
 struct iso9660_part_factory_t : public part_factory_t {
     iso9660_part_factory_t() : part_factory_t("iso9660") {}
-    if_list_t detect(storage_dev_base_t *drive) override;
+    vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
 static iso9660_part_factory_t iso9660_part_factory;
 STORAGE_REGISTER_FACTORY(iso9660_part);
 
-#define MAX_PARTITIONS  128
-static part_dev_t partitions[MAX_PARTITIONS];
-static size_t partition_count;
+static vector<part_dev_t*> partitions;
 
-if_list_t iso9660_part_factory_t::detect(storage_dev_base_t *drive)
+vector<part_dev_t *> iso9660_part_factory_t::detect(storage_dev_base_t *drive)
 {
-    unsigned start_at = partition_count;
-
-    if_list_t list = {
-        partitions + start_at,
-        sizeof(*partitions),
-        0
-    };
+    vector<part_dev_t *> list;
 
     long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
     char sig[5];
@@ -45,15 +37,16 @@ if_list_t iso9660_part_factory_t::detect(storage_dev_base_t *drive)
         memcpy(sig, sector + 1, sizeof(sig));
 
     if (err >= sector_mul && !memcmp(sig, "CD001", 5)) {
-        part_dev_t *part = partitions + partition_count++;
+        unique_ptr<part_dev_t> part(new part_dev_t{});
 
         part->drive = drive;
         part->lba_st = 0;
         part->lba_len = pvd->block_count.le;
         part->name = "iso9660";
-    }
 
-    list.count = partition_count - start_at;
+        partitions.push_back(part);
+        list.push_back(part.release());
+    }
 
     return list;
 }

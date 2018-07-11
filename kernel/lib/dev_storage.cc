@@ -60,14 +60,13 @@ void probe_storage_factory(storage_if_factory_t *factory)
     STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
 
     // Get a list of storage devices of this type
-    if_list_t if_list = factory->detect();
+    vector<storage_if_base_t *> list = factory->detect();
 
-    STORAGE_TRACE("Found %u %s interfaces\n", if_list.count, factory->name);
+    STORAGE_TRACE("Found %u %s interfaces\n", list.count, factory->name);
 
-    for (unsigned i = 0; i < if_list.count; ++i) {
+    for (unsigned i = 0; i < list.size(); ++i) {
         // Calculate pointer to storage interface instance
-        storage_if_base_t *if_ = (storage_if_base_t *)
-                ((char*)if_list.base + i * if_list.stride);
+        storage_if_base_t *if_ = list[i];
 
         // Store interface instance
         storage_ifs.push_back(if_);
@@ -75,17 +74,14 @@ void probe_storage_factory(storage_if_factory_t *factory)
         STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
 
         // Get a list of storage devices on this interface
-        if_list_t dev_list;
-        dev_list = if_->detect_devices();
+        vector<storage_dev_base_t*> dev_list = if_->detect_devices();
 
         STORAGE_TRACE("Found %u %s[%u] drives\n", dev_list.count,
                       factory->name, i);
 
-        for (unsigned k = 0; k < dev_list.count; ++k) {
+        for (unsigned k = 0; k < dev_list.size(); ++k) {
             // Calculate pointer to storage device instance
-            storage_dev_base_t *dev = (storage_dev_base_t*)
-                    ((char*)dev_list.base +
-                    k * dev_list.stride);
+            storage_dev_base_t *dev = dev_list[k];
             // Store device instance
             storage_devs.push_back(dev);
         }
@@ -166,12 +162,11 @@ static void invoke_part_factories(void *arg)
                               (char const *)drive->info(STORAGE_INFO_NAME),
                               factory->name);
 
-                if_list_t part_list = factory->detect(drive);
+                vector<part_dev_t*> part_list = factory->detect(drive);
 
                 // Mount partitions
-                for (unsigned i = 0; i < part_list.count; ++i) {
-                    part_dev_t *part = (part_dev_t*)
-                            ((char*)part_list.base + part_list.stride * i);
+                for (unsigned i = 0; i < part_list.size(); ++i) {
+                    part_dev_t *part = part_list[i];
                     fs_init_info_t info;
                     info.drive = drive;
                     info.part_st = part->lba_st;

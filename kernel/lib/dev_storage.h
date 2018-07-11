@@ -4,6 +4,7 @@
 #include "errno.h"
 #include "cpu/atomic.h"
 #include "device/iocp.h"
+#include "vector.h"
 
 // Storage device interface (IDE, AHCI, etc)
 
@@ -11,12 +12,6 @@
 
 //
 // Forward declarations
-
-struct if_list_t {
-    void *base;
-    unsigned stride;
-    unsigned count;
-};
 
 //
 // Storage Device (hard drive, CDROM, etc)
@@ -29,6 +24,8 @@ enum storage_dev_info_t : uint32_t {
 };
 
 struct storage_dev_base_t {
+    virtual ~storage_dev_base_t() {}
+
     // Startup/shutdown
     virtual void cleanup() = 0;
 
@@ -86,21 +83,24 @@ struct storage_dev_base_t {
 //
 // Storage Interface (IDE, AHCI, etc)
 
+struct storage_if_base_t;
+
 struct storage_if_factory_t {
     storage_if_factory_t(char const *factory_name);
-    virtual if_list_t detect(void) = 0;
+    virtual vector<storage_if_base_t *> detect(void) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
 
 struct storage_if_base_t {
+    virtual ~storage_if_base_t() {}
     virtual void cleanup() = 0;
-    virtual if_list_t detect_devices() = 0;
+    virtual vector<storage_dev_base_t*> detect_devices() = 0;
 };
 
 #define STORAGE_IF_IMPL                         \
     void cleanup() override final;              \
-    if_list_t detect_devices() override final;
+    vector<storage_dev_base_t*> detect_devices() override final;
 
 #define STORAGE_REGISTER_FACTORY(name) \
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
@@ -412,20 +412,18 @@ void fs_register_factory(char const *name, fs_factory_t *fs);
 //
 // Partitioning scheme (MBR, UEFI, etc)
 
-struct part_factory_t {
-    explicit part_factory_t(char const * factory_name);
-    virtual if_list_t detect(storage_dev_base_t *drive) = 0;
-    static void register_factory(void *p);
-    char const * const name;
-};
-
-struct part_dev_t;
-
 struct part_dev_t {
     storage_dev_base_t *drive;
     uint64_t lba_st;
     uint64_t lba_len;
     char const *name;
+};
+
+struct part_factory_t {
+    explicit part_factory_t(char const * factory_name);
+    virtual vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
+    static void register_factory(void *p);
+    char const * const name;
 };
 
 void part_register_factory(char const *name, part_factory_t *factory);

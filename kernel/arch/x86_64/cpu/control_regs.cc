@@ -5,7 +5,6 @@
 _noinline
 void cpu_debug_break()
 {
-    halt_forever();
 }
 
 void cpu_debug_breakpoint_set_indirect(uintptr_t addr, int rw,

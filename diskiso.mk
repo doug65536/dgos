@@ -14,6 +14,10 @@ $(top_builddir)/isodisk.img: \
 		bootx64-efi.sym \
 		bootefi-amd64.dis.gz \
 		\
+		$(top_builddir)/bootpxe-bios-elf \
+		$(top_builddir)/bootpxe-bios-bin \
+		$(top_builddir)/bootpxe-bios.map \
+		\
 		user-shell \
 		hello.km \
 		\

@@ -19,7 +19,7 @@ static fat32_bpb_data_t bpb;
 static fat32_sector_iterator_t *file_handles;
 #define MAX_HANDLES 5
 
-uint64_t fat32_serial;
+uint32_t fat32_serial;
 
 static char *sector_buffer;
 static char *fat_buffer;
@@ -37,16 +37,16 @@ static bool read_bpb(uint64_t partition_lba)
 {
     sector_sz = disk_sector_size();
     log2_sector_sz = bit_log2_n(sector_sz);
-    
+
     sector_buffer = (char*)malloc(sector_sz);
     fat_buffer = (char*)malloc(sector_sz);
 
-    if (!disk_read_lba(uint64_t(sector_buffer), 
+    if (!disk_read_lba(uint64_t(sector_buffer),
                        partition_lba, log2_sector_sz, 1))
         return false;
 
     fat32_parse_bpb(&bpb, partition_lba, sector_buffer);
-    
+
     log2_sec_per_cluster = bit_log2_n(bpb.sec_per_cluster);
 
     return true;
@@ -119,7 +119,7 @@ static uint32_t next_cluster(
         uint64_t current_cluster, char *sector, bool *ok_ptr)
 {
     uint32_t fat_sector_index = current_cluster >> (log2_sector_sz-2);
-    uint32_t fat_sector_offset = current_cluster & 
+    uint32_t fat_sector_offset = current_cluster &
             ((1 << (log2_sector_sz-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
     uint64_t lba = bpb.first_fat_lba + fat_sector_index;
@@ -196,35 +196,36 @@ static int sector_iterator_next(
     return 1;
 }
 
-static int sector_iterator_seek(
-        fat32_sector_iterator_t *iter,
-        uint32_t sector_offset,
-        char *sector)
-{
-    // See if we are already there
-    if (iter->position == sector_offset) {
-        bool is_eof_now = is_eof_cluster(iter->cluster);
-        return is_eof_now ? 0 : 1;
-    }
-
-    uint32_t cluster_index = sector_offset >> log2_sec_per_cluster;
-    uint32_t cluster_offset = sector_offset & (bpb.sec_per_cluster - 1);
-    iter->sector_offset = sector_offset;
-
-    // Check for EOF
-    if (cluster_index > iter->cluster_count)
-        return 0;
-
-    uint32_t cluster;
-    cluster = iter->clusters[cluster_index];
-    uint32_t lba = lba_from_cluster(cluster);
-    iter->ok = disk_read_lba(uint64_t(sector), lba + cluster_offset, 
-                             log2_sector_sz, 1);
-    if (!iter->ok)
-        return -1;
-
-    return 1;
-}
+// obsolete. keeping around until new implementation is completely proven
+//static int sector_iterator_seek(
+//        fat32_sector_iterator_t *iter,
+//        uint32_t sector_offset,
+//        char *sector)
+//{
+//    // See if we are already there
+//    if (iter->position == sector_offset) {
+//        bool is_eof_now = is_eof_cluster(iter->cluster);
+//        return is_eof_now ? 0 : 1;
+//    }
+//
+//    uint32_t cluster_index = sector_offset >> log2_sec_per_cluster;
+//    uint32_t cluster_offset = sector_offset & (bpb.sec_per_cluster - 1);
+//    iter->sector_offset = sector_offset;
+//
+//    // Check for EOF
+//    if (cluster_index > iter->cluster_count)
+//        return 0;
+//
+//    uint32_t cluster;
+//    cluster = iter->clusters[cluster_index];
+//    uint32_t lba = lba_from_cluster(cluster);
+//    iter->ok = disk_read_lba(uint64_t(sector), lba + cluster_offset,
+//                             log2_sector_sz, 1);
+//    if (!iter->ok)
+//        return -1;
+//
+//    return 1;
+//}
 
 // Read the first sector of a directory
 // and prepare to iterate it
@@ -668,57 +669,57 @@ static int fat32_boot_close(int file)
     return file_handles[file].close();
 }
 
-static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
+static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 {
     assert(file >= 0 && file < MAX_HANDLES);
     assert(buf != nullptr);
     assert(bytes < 0x100000);
-    
+
     if (file < 0 || file >= MAX_HANDLES)
         return -1;
 
     auto& desc = file_handles[file];
-    
+
     disk_io_plan_t plan(buf, log2_sector_sz);
-    
+
     while (bytes) {
         // Calculate how many sectors into the file to start the read
         uint32_t sector_offset = ofs >> log2_sector_sz;
-        
+
         // Calculate how far into the sector to start the read
         uint16_t byte_offset = ofs & (sector_sz - 1);
-        
+
         // Calculate the maximum we could read from this sector
         uint16_t sector_read = sector_sz - byte_offset;
-        
+
         // Cap it to read the remainder if we don't need that much
         if (sector_read > bytes)
             sector_read = bytes;
-        
+
         // Calculate the cluster offset in the file
         uint32_t cluster_ofs = sector_offset >> log2_sec_per_cluster;
         uint32_t cluster_idx = sector_offset & (bpb.sec_per_cluster-1);
-        
+
         if (!plan.add(lba_from_cluster(desc.clusters[cluster_ofs]) +
                       cluster_idx, 1, byte_offset, sector_read))
             return false;
-        
+
         ofs += sector_read;
         bytes -= sector_read;
     }
-    
+
     int total_read = 0;
-    
+
     for (size_t i = 0; i < plan.count; ++i) {
         disk_vec_t const &item = plan.vec[i];
         if (item.sector_ofs == 0 && item.byte_count == sector_sz) {
             // Direct read
-            if (!disk_read_lba(uint64_t(plan.dest), item.lba, 
+            if (!disk_read_lba(uint64_t(plan.dest), item.lba,
                                log2_sector_sz, item.count))
                 return false;
         } else {
             // Read sector into buffer
-            if (!disk_read_lba(uint64_t(sector_buffer), item.lba, 
+            if (!disk_read_lba(uint64_t(sector_buffer), item.lba,
                                log2_sector_sz, 1))
                 return false;
             memcpy(plan.dest, sector_buffer + item.sector_ofs, item.byte_count);
@@ -727,12 +728,12 @@ static int fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
         plan.dest = (char*)plan.dest + xfer;
         total_read += xfer;
     }
-    
+
     return total_read;
-    
+
 //    uint32_t sector_offset = ofs >> log2_sector_sz;
 //    uint16_t byte_offset = ofs & (sector_sz-1);
-    
+
 //    int status = sector_iterator_seek(
 //                file_handles + file,
 //                sector_offset,
@@ -792,10 +793,10 @@ void fat32_boot_partition(uint64_t partition_lba)
     fat32_serial = bpb.serial;
 
     // 0x2C LBA
-    PRINT("root_dir_start:	  %ld", bpb.root_dir_start);
+    PRINT("root_dir_start:	  %" PRIu32, bpb.root_dir_start);
 
     // 0x24 1 per 128 clusters
-    PRINT("sec_per_fat:      %ld", bpb.sec_per_fat);
+    PRINT("sec_per_fat:      %" PRIu32, bpb.sec_per_fat);
 
     // 0x0E Usually 32
     PRINT("reserved_sectors: %d", bpb.reserved_sectors);

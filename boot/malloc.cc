@@ -45,7 +45,7 @@ struct blk_hdr_t {
 
     _always_inline void make_invalid()
     {
-        self = uint32_t(uintptr_t(nullptr));
+        self = uintptr_t(nullptr);
         size = 0xBAD11111;
         neg_size = 0;
     }

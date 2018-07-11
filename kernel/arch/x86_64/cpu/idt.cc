@@ -818,8 +818,9 @@ void idt_clone_debug_exception_dispatcher(void)
     size_t bp_entry_ofs = bp_entry - ___isr_st;
     size_t debug_entry_ofs = debug_entry - ___isr_st;
 
-    char *clone = (char*)mmap(nullptr, isr_size, PROT_READ | PROT_WRITE | PROT_EXEC,
-                       MAP_POPULATE, -1, 0);
+    char *clone = (char*)mmap(nullptr, isr_size,
+                              PROT_READ | PROT_WRITE | PROT_EXEC,
+                              MAP_POPULATE, -1, 0);
 
     memcpy(clone, ___isr_st, isr_size);
 

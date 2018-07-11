@@ -24,6 +24,7 @@
 #include "vector.h"
 #include "main.h"
 #include "inttypes.h"
+#include "except.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)

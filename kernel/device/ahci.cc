@@ -843,14 +843,14 @@ class ahci_if_factory_t : public storage_if_factory_t {
 public:
     ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
-    virtual if_list_t detect(void) override final;
+    virtual vector<storage_if_base_t *> detect(void) override final;
 };
 
 static ahci_if_factory_t ahci_if_factory;
 STORAGE_REGISTER_FACTORY(ahci_if);
 
 // AHCI interface instance
-class ahci_if_t : public storage_if_base_t {
+class ahci_if_t : public storage_if_base_t, public zero_init_t {
 public:
     ahci_if_t();
 
@@ -929,13 +929,8 @@ private:
     bool is_atapi;
 };
 
-#define AHCI_MAX_DEVICES    16
-static ahci_if_t ahci_devices[AHCI_MAX_DEVICES];
-static unsigned ahci_count;
-
-#define AHCI_MAX_DRIVES    64
-static ahci_dev_t ahci_drives[AHCI_MAX_DRIVES];
-static unsigned ahci_drive_count;
+static vector<ahci_if_t*> ahci_devices;
+static vector<ahci_dev_t*> ahci_drives;
 
 bool ahci_if_t::supports_64bit()
 {
@@ -1084,9 +1079,8 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
             }
 
             if (error != 0) {
-                AHCI_TRACE("Error %d on interface=%zu port=%zu\n",
-                           error, this - ahci_devices,
-                           pi - port_info);
+                AHCI_TRACE("Error %d on interface=%p port=%zu\n",
+                           error, (void*)this, pi - port_info);
             }
 
             request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
@@ -1120,8 +1114,8 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
 isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
 {
-    for (unsigned i = 0; i < ahci_count; ++i) {
-        ahci_if_t *dev = ahci_devices + i;
+    for (unsigned i = 0; i < ahci_devices.size(); ++i) {
+        ahci_if_t *dev = ahci_devices[i];
 
         int irq_offset = irq - dev->irq_range.base;
 
@@ -1720,20 +1714,13 @@ void ahci_if_t::bios_handoff()
         thread_yield();
 }
 
-if_list_t ahci_if_factory_t::detect(void)
+vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 {
-    unsigned start_at = ahci_count;
-
-    if_list_t list = {
-        ahci_devices + start_at,
-        sizeof(*ahci_devices),
-        0
-    };
+    vector<storage_if_base_t *> list;
 
     pci_dev_iterator_t pci_iter;
 
     AHCI_TRACE("Enumerating PCI busses for AHCI...\n");
-    //sleep(3000);
 
     if (!pci_enumerate_begin(
                 &pci_iter,
@@ -1773,15 +1760,13 @@ if_list_t ahci_if_factory_t::detect(void)
 
         //sleep(3000);
 
-        if (ahci_count < countof(ahci_devices)) {
-            ahci_if_t *self = ahci_devices + ahci_count;
+        unique_ptr<ahci_if_t> self(new ahci_if_t{});
 
-            if (self->init(pci_iter))
-                ++ahci_count;
+        if (self->init(pci_iter)) {
+            ahci_devices.push_back(self);
+            list.push_back(self.release());
         }
     } while (pci_enumerate_next(&pci_iter));
-
-    list.count = ahci_count - start_at;
 
     return list;
 }
@@ -1789,15 +1774,9 @@ if_list_t ahci_if_factory_t::detect(void)
 //
 // device registration
 
-if_list_t ahci_if_t::detect_devices()
+vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 {
-    unsigned start_at = ahci_drive_count;
-
-    if_list_t list = {
-        ahci_drives + start_at,
-        sizeof(*ahci_drives),
-        0
-    };
+    vector<storage_dev_base_t*> list;
 
     uint8_t port_num;
     for (unsigned ports_impl = ports_impl_mask; ports_impl;
@@ -1808,16 +1787,15 @@ if_list_t ahci_if_t::detect_devices()
 
         if (port->sig == ahci_sig_t::SATA_SIG_ATA ||
                 port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
-            ahci_dev_t *drive = ahci_drives + ahci_drive_count++;
+            unique_ptr<ahci_dev_t> drive(new ahci_dev_t{});
 
-            if (!drive->init(this, port_num,
-                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
-                // FIXME
+            if (drive->init(this, port_num,
+                            port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
+                ahci_drives.push_back(drive);
+                list.push_back(drive.release());
             }
         }
     }
-
-    list.count = ahci_drive_count - start_at;
 
     return list;
 }

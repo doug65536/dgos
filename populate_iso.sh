@@ -7,8 +7,8 @@ mkdir -p iso_stage || exit
 
 cp -u bootiso-bin iso_stage/bootiso-bin || exit
 
-cp -u kernel-generic iso_stage/dgos-kernel-generic || exit
-cp -u kernel-tracing iso_stage/dgos-kernel-tracing || exit
+ln -f kernel-generic iso_stage/dgos-kernel-generic || exit
+ln -f kernel-tracing iso_stage/dgos-kernel-tracing || exit
 cp -u hello.km iso_stage/hello.km || exit
 
 cp -u user-shell iso_stage || exit

@@ -601,6 +601,7 @@ intptr_t formatter(
 
         case 'p':
             flags.base = 16;
+            flags.hash = 1;
             switch (flags.length) {
             case length_none:
                 flags.arg_type = arg_type_uintptr_value;
@@ -996,7 +997,8 @@ EXPORT int printdbg(char const *format, ...)
 }
 
 static int hex_dump_formatter(void const *mem, size_t size, size_t base,
-                              int (*output)(char const *format, ...))
+                              int (*output)(char const *format, ...)
+                              _printf_format(1, 2))
 {
     uint8_t *buf = (uint8_t*)mem;
     char line_buf[8 + 1 + 1 + 3*16 + 1 + 16 + 2];
@@ -1024,7 +1026,8 @@ static int hex_dump_formatter(void const *mem, size_t size, size_t base,
             for (int k = -15; k <= 0; ++k) {
                 line_buf[line_ofs++] =
                         (i + k) < size
-                        ? (buf[i + k] < ' ' ? '.' : buf[i + k])
+                        ? (buf[i + k] < ' ' || buf[i + k] > 126
+                        ? '.' : buf[i + k])
                         : ' ';
             }
 

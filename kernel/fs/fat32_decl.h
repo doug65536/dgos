@@ -17,7 +17,7 @@ struct fat32_bpb_data_t {
     uint8_t number_of_fats;		// 0x10 Always 2
     uint32_t sec_per_fat;		// 0x24 1 per 128 clusters
     uint32_t root_dir_start;	// 0x2C LBA
-    uint64_t serial;            // 0x43 serial number
+    uint32_t serial;            // 0x43 serial number
     uint16_t signature;			// 0x1FE Always 0xAA55
 
     // Inferred from data in on-disk BPB

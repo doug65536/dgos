@@ -31,17 +31,17 @@ SECTIONS {
 		*(SORT(.fini_array.*))
 		___dtors_en = .;
 
-		. = ALIGN(16);
+		. = ALIGN(64);
 		___smp_st = .;
 		*(.smp.entry)
 		*(.smp.text)
 		. = ALIGN(64);
 		*(.smp.data)
 		___smp_en = .;
-		
+
 		/* self relocation code at end to avoid overwriting itself */
 		*(.reloc)
-		
+
 		/* packet align end */
 		. = ALIGN(512);
 		___initialized_data_en = .;
@@ -65,7 +65,7 @@ SECTIONS {
 	___initial_stack = .;
 	___heap_st = .;
 	___end = .;
-	
+
 	.eh_frame       0 : { *(.eh_frame)      }
 	.debug          0 : { *(.debug)         }
 	.debug_info		0 : { *(.debug_info)    }
@@ -82,7 +82,7 @@ SECTIONS {
 	.rel            0 : { *(.rel*)          }
 	.iplt           0 : { *(.iplt*)         }
 	.igot           0 : { *(.igot*)         }
-	
+
 	/DISCARD/		0 : { *(.interp)               }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }

@@ -9,17 +9,6 @@ int (*text_ptr)(void) = worked;
 int volatile *data_ptr = &data_val;
 int volatile *bss_ptr = &bss_val;
 
-int dummy(void)
-{
-    return 40;
-}
-
-int worked(void)
-{
-    printk("worked!\n");
-    return 0;
-}
-
 int entry(void)
 {
     bss_val = 66;
@@ -29,6 +18,18 @@ int entry(void)
     printk("text_ptr = %p\n", (void*)text_ptr);
     printk("pointer to text: ");
     text_ptr();
+    return 40;
+}
+
+int dummy(void)
+{
+    printk("Dynamic link of printk worked\n");
+    return 40;
+}
+
+int worked(void)
+{
+    printk("worked!\n");
     return 0;
 }
 

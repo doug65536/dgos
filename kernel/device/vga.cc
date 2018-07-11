@@ -344,7 +344,7 @@ static int vga_detect(text_display_base_t **result)
     self->vtbl = &vga_text_display_device_vtbl;
 
     // Get I/O port base from BIOS data area
-    self->io_base = *BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
+    self->io_base = 0x3B4;//*BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
 
     if (self->io_base == 0)
         self->io_base = 0x3B4;

@@ -51,10 +51,6 @@ static void smp_main(void*)
 
 REGISTER_CALLOUT(smp_main, nullptr, callout_type_t::smp_start, "100");
 
-// Pull in the device constructors
-// to cause them to be initialized
-//void (** volatile device_list)(void) = device_constructor_list;
-
 #define TEST_FORMAT(f, t, v) \
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)
@@ -64,7 +60,7 @@ REGISTER_CALLOUT(smp_main, nullptr, callout_type_t::smp_start, "100");
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
-#define ENABLE_MMAP_STRESS_THREAD   1
+#define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
@@ -313,32 +309,30 @@ static int stress_mutex(void *p)
 #if 1
 static int mprotect_test(void *)
 {
-    return 0;
+//    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0, -1, 0);
 
-    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0, -1, 0);
+//    __try {
+//        *mem = 'H';
+//    }
+//    __catch {
+//        printk("Caught!!\n");
+//    }
 
-    __try {
-        *mem = 'H';
-    }
-    __catch {
-        printk("Caught!!\n");
-    }
+//    if (-1 != mprotect(nullptr, 42, PROT_NONE))
+//        assert_msg(0, "Expected error");
 
-    if (-1 != mprotect(nullptr, 42, PROT_NONE))
-        assert_msg(0, "Expected error");
+//    if (1 != mprotect(mem, 42, PROT_NONE))
+//        assert_msg(0, "Expected success");
 
-    if (1 != mprotect(mem, 42, PROT_NONE))
-        assert_msg(0, "Expected success");
+//    if (1 != mprotect(mem + 8192, 16384, PROT_NONE))
+//        assert_msg(0, "Expected success");
 
-    if (1 != mprotect(mem + 8192, 16384, PROT_NONE))
-        assert_msg(0, "Expected success");
+//    if (1 != mprotect(mem, 256 << 20, PROT_READ | PROT_WRITE))
+//        assert_msg(0, "Expected success");
 
-    if (1 != mprotect(mem, 256 << 20, PROT_READ | PROT_WRITE))
-        assert_msg(0, "Expected success");
+//    memset(mem, 0, 2 << 20);
 
-    memset(mem, 0, 2 << 20);
-
-    munmap(mem, 256 << 20);
+//    munmap(mem, 256 << 20);
 
     return 0;
 }
@@ -805,8 +799,11 @@ static int init_thread(void *p)
 
     printk("Running module load test\n");
     module_entry_fn_t mod_entry = modload_load("hello.km");
-    if (mod_entry)
-        mod_entry();
+    if (mod_entry) {
+        int check = mod_entry();
+        assert(check == 40);
+        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
+    }
 
 #if ENABLE_FIND_VBE
     thread_create(find_vbe, (void*)0xC0000, 0, false);

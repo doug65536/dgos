@@ -380,18 +380,22 @@ vector<_T,_Allocator>::operator=(vector const& other)
 
 template<typename _T, typename _Allocator>
 vector<_T,_Allocator>&
-vector<_T,_Allocator>::operator=(vector&& other)
+vector<_T,_Allocator>::operator=(vector&& __other)
 {
-    if (*this != other) {
+    if (*this != __other) {
         if (__m) {
-            __alloc.deallocate(__m);
+            __alloc.deallocate(__m, __capacity);
             __m = nullptr;
         }
-        __sz = 0;
 
-        __m = other.__m;
-        __sz = other.__sz;
-        __alloc = move(other.__alloc);
+
+        __m = __other.__m;
+        __sz = __other.__sz;
+        __capacity = __other.__capacity;
+        __alloc = move(__other.__alloc);
+        __other.__m = nullptr;
+        __other.__sz = 0;
+        __other.__capacity = 0;
     }
     return *this;
 }
@@ -625,7 +629,7 @@ bool vector<_T,_Allocator>::reserve(size_type __new_cap)
         for (size_t i = 0; i < __sz; ++i)
             __m[i].~value_type();
         if (__m != nullptr)
-            __alloc.deallocate(__m, __sz);
+            __alloc.deallocate(__m, __capacity);
         __m = new_p.release();
         __capacity = __new_cap;
     }
@@ -645,9 +649,9 @@ void vector<_T,_Allocator>::shrink_to_fit()
     if (__capacity > __sz) {
         pointer __tmp = __alloc.allocate(__sz * sizeof(value_type));
         uninitialized_copy(__m, __m + __sz, __tmp);
-        __alloc.deallocate(__m);
+        __alloc.deallocate(__m, __capacity);
         __m = __tmp;
-        __sz = __capacity;
+        __capacity = __sz;
     }
 }
 

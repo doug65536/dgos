@@ -170,16 +170,17 @@ static void cmos_write(uint8_t reg, uint8_t val, cmos_scoped_lock const&)
 
 void cmos_prepare_ap(void)
 {
-    cmos_scoped_lock lock(cmos_lock);
+//obsolete
+//    cmos_scoped_lock lock(cmos_lock);
 
-    // Read vector immediately after boot sector structure
-    uint32_t ap_entry_point = //*(uint32_t*)0x7C40;
-            (uint32_t)
-            bootinfo_parameter(bootparam_t::ap_entry_point);
-    *BIOS_DATA_AREA(uint32_t, 0x467) = ap_entry_point;
+//    // Read vector immediately after boot sector structure
+//    uint32_t ap_entry_point = //*(uint32_t*)0x7C40;
+//            (uint32_t)
+//            bootinfo_parameter(bootparam_t::ap_entry_point);
+//    *BIOS_DATA_AREA(uint32_t, 0x467) = ap_entry_point;
 
-    cmos_write(CMOS_REG_SHUTDOWN_STATUS, CMOS_SHUTDOWN_STATUS_AP, lock);
-    //cmos_write(CMOS_REG_SHUTDOWN_STATUS, CMOS_SHUTDOWN_STATUS_US, lock);
+//    cmos_write(CMOS_REG_SHUTDOWN_STATUS, CMOS_SHUTDOWN_STATUS_AP, lock);
+//    //cmos_write(CMOS_REG_SHUTDOWN_STATUS, CMOS_SHUTDOWN_STATUS_US, lock);
 }
 
 static uint8_t cmos_bcd_to_binary(uint8_t n)

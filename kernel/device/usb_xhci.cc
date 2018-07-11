@@ -16,7 +16,7 @@
 
 #include "usb_xhcibits.h"
 
-#define USBXHCI_DEBUG   1
+#define USBXHCI_DEBUG   0
 #if USBXHCI_DEBUG
 #define USBXHCI_TRACE(...) printdbg("xhci: " __VA_ARGS__)
 #else
@@ -2087,9 +2087,12 @@ void usbxhci::irq_handler(int irq)
 
     bool event_intr = USBXHCI_USBSTS_EINT_GET(usbsts);
 
-    bool host_err_intr = USBXHCI_USBSTS_HSE_GET(usbsts);
     bool port_chg_intr = USBXHCI_USBSTS_PCD_GET(usbsts);
+
+#if USBXHCI_DEBUG
+    bool host_err_intr = USBXHCI_USBSTS_HSE_GET(usbsts);
     bool save_err_intr = USBXHCI_USBSTS_SRE_GET(usbsts);
+#endif
 
     USBXHCI_TRACE("irq: evt=%d, hosterr=%d, portchg=%d, saveerr=%d\n",
                   event_intr, host_err_intr, port_chg_intr, save_err_intr);
@@ -2100,6 +2103,7 @@ void usbxhci::irq_handler(int irq)
 
             uint32_t portsc = p.portsc;
 
+#if USBXHCI_DEBUG
             bool conn_chg = USBXHCI_PORTSC_CSC_GET(portsc);
             bool enab_chg = USBXHCI_PORTSC_PEC_GET(portsc);
             bool wrst_chg = USBXHCI_PORTSC_WRC_GET(portsc);
@@ -2107,6 +2111,7 @@ void usbxhci::irq_handler(int irq)
             bool rset_chg = USBXHCI_PORTSC_PRC_GET(portsc);
             bool link_chg = USBXHCI_PORTSC_PLC_GET(portsc);
             bool cerr_chg = USBXHCI_PORTSC_CEC_GET(portsc);
+#endif
 
             USBXHCI_TRACE("pchg: port=%u, conn=%u, enab=%u wrst=%u"
                           ", curr=%u, rset=%u, link=%u, cerr=%u\n",

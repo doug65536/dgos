@@ -6,7 +6,8 @@
 // Return address in bx
 .global early_init
 early_init:
-    lss initial_stack_ptr,%sp
+    mov initial_stack_ptr+2,%ss
+    mov initial_stack_ptr,%sp
 
     call clear_bss
 
@@ -80,7 +81,10 @@ pmode_entry:
 
     movl %ebx,%eax
     movl %esi,%edx
+    mov %esp,%ebp
+    and $-16,%esp
     call *%edi
+    mov %ebp,%esp
 
     call cpu_a20_exitpm
 
@@ -329,8 +333,7 @@ clear_bss:
     subw %di,%cx
     xorb %al,%al
     cld
-    rep
-    stosb
+    rep stosb
     popw %ax
     popw %cx
     popw %di

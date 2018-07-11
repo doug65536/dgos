@@ -127,6 +127,7 @@ for flag in \
 		Wstrict-aliasing Wlogical-op Werror=return-type \
 		Wmultistatement-macros Warray-bounds Wformat-overflow \
 		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
+		Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn
 do

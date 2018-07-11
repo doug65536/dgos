@@ -22,7 +22,7 @@ extern "C" _noreturn
 void enter_kernel(uint64_t entry_point) _section(".smp.text");
 
 // Save the entry point address for later MP processor startup
-_section(".smp.data") uint64_t smp_entry_point;
+uint64_t smp_entry_point _section(".smp.data");
 
 static int64_t base_adj;
 
@@ -145,17 +145,12 @@ void elf64_run(tchar const *filename)
                         (-cpu_has_global_pages() & PTE_GLOBAL) |
                         PTE_PCD | PTE_PWT);
 
-    // Allocate a page of memory to be used to alias high memory
-    // Map two pages to simplify copies that are not page aligned
-    uintptr_t address_window =
-            (uintptr_t)malloc_aligned(PAGE_SIZE << 1, PAGE_SIZE);
-
     PRINT("Loading %s...\n", filename);
 
     int file = boot_open(filename);
 
     if (file < 0)
-        PRINT("Could not open kernel file");
+        PANIC("Could not open kernel file");
 
     ssize_t read_size;
     Elf64_Ehdr file_hdr;
@@ -270,9 +265,6 @@ void elf64_run(tchar const *filename)
     }
 
     boot_close(file);
-
-    paging_modify_flags(address_window, PAGE_SIZE << 1,
-                        ~(uint64_t)0, 0);
 
     free(program_hdrs);
 

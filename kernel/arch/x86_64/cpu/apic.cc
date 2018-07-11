@@ -1214,19 +1214,45 @@ static void acpi_parse_rsdt()
                     case 0:
                         // LAPIC affinity
                         lapic_rec = (acpi_srat_lapic_t*)rec_hdr;
-                        ACPI_TRACE("Got LAPIC affinity record\n");
+                        ACPI_TRACE("Got LAPIC affinity record"
+                                   ", domain=%#x"
+                                   ", apic_id=%#x"
+                                   ", enabled=%u"
+                                   "\n",
+                                   lapic_rec->domain_lo |
+                                   (lapic_rec->domain_hi[0] << 8) |
+                                   (lapic_rec->domain_hi[1] << 16) |
+                                   (lapic_rec->domain_hi[2] << 24),
+                                   lapic_rec->apic_id,
+                                   lapic_rec->flags);
                         break;
 
                     case 1:
                         // Memory affinity
                         mem_rec = (acpi_srat_mem_t*)rec_hdr;
-                        ACPI_TRACE("Got memory affinity record\n");
+                        ACPI_TRACE("Got memory affinity record"
+                                   ", domain=%#x"
+                                   ", enabled=%u"
+                                   ", base=%#" PRIx64
+                                   ", len=%#" PRIx64
+                                   "\n",
+                                   mem_rec->domain,
+                                   mem_rec->flags,
+                                   mem_rec->range_base,
+                                   mem_rec->range_length);
                         break;
 
                     case 2:
                         // x2APIC affinity
                         x2apic_rec = (acpi_srat_x2apic_t*)rec_hdr;
-                        ACPI_TRACE("Got x2APIC affinity record\n");
+                        ACPI_TRACE("Got x2APIC affinity record"
+                                   ", domain=%#x"
+                                   ", apic_id=%#x"
+                                   ", enabled=%u"
+                                   "\n",
+                                   x2apic_rec->domain,
+                                   x2apic_rec->x2apic_id,
+                                   x2apic_rec->flags);
                         break;
 
                     default:
@@ -2073,8 +2099,12 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
 template<typename T>
 constexpr T gcd(T a, T b)
 {
-    if (b)
-        return gcd(b, a % b);
+    T tmp;
+    while (b) {
+        tmp = a;
+        a = b;
+        b = tmp % b;
+    }
     return a;
 }
 

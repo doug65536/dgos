@@ -356,7 +356,8 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-tui_efi.$(OBJEXT) \
 	boot/bootefi_amd64-boottable.$(OBJEXT) \
 	boot/bootefi_amd64-boottable_efi.$(OBJEXT) \
-	boot/bootefi_amd64-qemu.$(OBJEXT)
+	boot/bootefi_amd64-qemu.$(OBJEXT) \
+	boot/bootefi_amd64-utf.$(OBJEXT)
 bootefi_amd64_OBJECTS = $(am_bootefi_amd64_OBJECTS)
 bootefi_amd64_DEPENDENCIES = $(am__DEPENDENCIES_1)
 bootefi_amd64_LINK = $(CXXLD) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) \
@@ -378,8 +379,10 @@ bootiso_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootiso_elf_LINK = $(CXXLD) $(bootiso_elf_CXXFLAGS) $(CXXFLAGS) \
 	$(bootiso_elf_LDFLAGS) $(LDFLAGS) -o $@
 am_bootpxe_bios_elf_OBJECTS =  \
+	boot/bootpxe_bios_elf-mpentry_bios.$(OBJEXT) \
 	boot/bootpxe_bios_elf-pxe-bios.$(OBJEXT) \
 	boot/bootpxe_bios_elf-pxemain.$(OBJEXT) \
+	boot/bootpxe_bios_elf-pxemain_bios.$(OBJEXT) \
 	boot/bootpxe_bios_elf-malloc_bios.$(OBJEXT)
 bootpxe_bios_elf_OBJECTS = $(am_bootpxe_bios_elf_OBJECTS)
 bootpxe_bios_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
@@ -1259,10 +1262,13 @@ bootiso_elf_LDADD = \
 # bootpxe-bios
 bootpxe_bios_elf_SOURCES = \
 	boot/bootpxe-bios.ld \
+	boot/mpentry_bios.S \
 	boot/pxe-bios.S \
 	boot/pxe.h \
 	boot/pxemain.cc \
 	boot/pxemain.h \
+	boot/pxemain_bios.cc \
+	boot/pxemain_bios.h \
 	boot/malloc_bios.cc
 
 bootpxe_bios_elf_CXXFLAGS = \
@@ -1342,7 +1348,9 @@ bootefi_amd64_SOURCES = \
 	boot/boottable.cc \
 	boot/boottable_efi.cc \
 	boot/qemu.cc \
-	boot/qemu.h
+	boot/qemu.h \
+	boot/utf.cc \
+	boot/utf.h
 
 
 #bootefi_i386_SOURCES = \
@@ -1394,7 +1402,6 @@ bootefi_amd64_LDFLAGS = \
 #	$(PE32_FLAGS) \
 #	$(LIBGCC_PE32) \
 #	-g \
-#	-Wl,-pie \
 #	-Wl,-N \
 #	-Wl,-m,i386pe \
 #	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
@@ -2042,6 +2049,8 @@ hello_km_SOURCES = \
 	modules/hello/hello.cc
 
 hello_km_CXXFLAGS = \
+	-fPIE \
+	-g \
 	-I$(top_srcdir)/kernel/lib \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	-I$(top_srcdir)/kernel/lib/cc \
@@ -2053,6 +2062,9 @@ hello_km_LDFLAGS = \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
 	-mcmodel=kernel
+
+EXTRA_hello_km_DEPENDENCIES = kernel/arch/x86_64/module.ld \
+	Makefile.am
 
 user_shell_SOURCES = \
 	user/test/test.S
@@ -2151,7 +2163,7 @@ QEMU_DISK_TYPE_fat = ide-hd
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
 
 #-device ich9-ahci,id=bootif
-QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv,wtf
+QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
 QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
 
@@ -2176,8 +2188,12 @@ QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
 QEMU_BOOTMEDIA = $(QEMU_BOOTMEDIA_$(1)_$(2))
 QEMU_BOOTMEDIA_hd_bios = -boot c
 QEMU_BOOTMEDIA_hd_efi = -boot c
-QEMU_BOOTMEDIA_pxe_bios = -boot n -net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
-QEMU_BOOTMEDIA_pxe_efi = -boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
+QEMU_BOOTMEDIA_pxe_bios = -boot n \
+	-net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
+
+QEMU_BOOTMEDIA_pxe_efi = \
+	-boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
+
 
 # ----------------------------------------------------------------------------
 # Bochs launcher
@@ -2897,6 +2913,8 @@ boot/bootefi_amd64-boottable_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-qemu.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootefi_amd64-utf.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 
 bootefi-amd64$(EXEEXT): $(bootefi_amd64_OBJECTS) $(bootefi_amd64_DEPENDENCIES) $(EXTRA_bootefi_amd64_DEPENDENCIES) 
 	@rm -f bootefi-amd64$(EXEEXT)
@@ -2921,9 +2939,13 @@ boot/bootiso_elf-mpentry_bios.$(OBJEXT): boot/$(am__dirstamp) \
 bootiso-elf$(EXEEXT): $(bootiso_elf_OBJECTS) $(bootiso_elf_DEPENDENCIES) $(EXTRA_bootiso_elf_DEPENDENCIES) 
 	@rm -f bootiso-elf$(EXEEXT)
 	$(AM_V_CXXLD)$(bootiso_elf_LINK) $(bootiso_elf_OBJECTS) $(bootiso_elf_LDADD) $(LIBS)
+boot/bootpxe_bios_elf-mpentry_bios.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootpxe_bios_elf-pxe-bios.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootpxe_bios_elf-pxemain.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootpxe_bios_elf-pxemain_bios.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootpxe_bios_elf-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3738,6 +3760,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-string_char16.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui_efi.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-utf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-bootfat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-malloc_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-mpentry_bios.Po@am__quote@
@@ -3745,8 +3768,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-malloc_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootiso_elf-mpentry_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-pxemain.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-array_list.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-bioscall.Po@am__quote@
@@ -4352,6 +4377,20 @@ boot/bootiso_elf-mpentry_bios.obj: boot/mpentry_bios.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootiso_elf-mpentry_bios.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootiso_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootiso_elf-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
+
+boot/bootpxe_bios_elf-mpentry_bios.o: boot/mpentry_bios.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootpxe_bios_elf-mpentry_bios.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Tpo -c -o boot/bootpxe_bios_elf-mpentry_bios.o `test -f 'boot/mpentry_bios.S' || echo '$(srcdir)/'`boot/mpentry_bios.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootpxe_bios_elf-mpentry_bios.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootpxe_bios_elf-mpentry_bios.o `test -f 'boot/mpentry_bios.S' || echo '$(srcdir)/'`boot/mpentry_bios.S
+
+boot/bootpxe_bios_elf-mpentry_bios.obj: boot/mpentry_bios.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootpxe_bios_elf-mpentry_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Tpo -c -o boot/bootpxe_bios_elf-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-mpentry_bios.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/mpentry_bios.S' object='boot/bootpxe_bios_elf-mpentry_bios.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootpxe_bios_elf-mpentry_bios.obj `if test -f 'boot/mpentry_bios.S'; then $(CYGPATH_W) 'boot/mpentry_bios.S'; else $(CYGPATH_W) '$(srcdir)/boot/mpentry_bios.S'; fi`
 
 boot/bootpxe_bios_elf-pxe-bios.o: boot/pxe-bios.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CCASFLAGS) $(CCASFLAGS) -MT boot/bootpxe_bios_elf-pxe-bios.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxe-bios.Tpo -c -o boot/bootpxe_bios_elf-pxe-bios.o `test -f 'boot/pxe-bios.S' || echo '$(srcdir)/'`boot/pxe-bios.S
@@ -7379,6 +7418,20 @@ boot/bootefi_amd64-qemu.obj: boot/qemu.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-qemu.obj `if test -f 'boot/qemu.cc'; then $(CYGPATH_W) 'boot/qemu.cc'; else $(CYGPATH_W) '$(srcdir)/boot/qemu.cc'; fi`
 
+boot/bootefi_amd64-utf.o: boot/utf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-utf.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-utf.Tpo -c -o boot/bootefi_amd64-utf.o `test -f 'boot/utf.cc' || echo '$(srcdir)/'`boot/utf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-utf.Tpo boot/$(DEPDIR)/bootefi_amd64-utf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/utf.cc' object='boot/bootefi_amd64-utf.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-utf.o `test -f 'boot/utf.cc' || echo '$(srcdir)/'`boot/utf.cc
+
+boot/bootefi_amd64-utf.obj: boot/utf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-utf.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-utf.Tpo -c -o boot/bootefi_amd64-utf.obj `if test -f 'boot/utf.cc'; then $(CYGPATH_W) 'boot/utf.cc'; else $(CYGPATH_W) '$(srcdir)/boot/utf.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-utf.Tpo boot/$(DEPDIR)/bootefi_amd64-utf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/utf.cc' object='boot/bootefi_amd64-utf.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-utf.obj `if test -f 'boot/utf.cc'; then $(CYGPATH_W) 'boot/utf.cc'; else $(CYGPATH_W) '$(srcdir)/boot/utf.cc'; fi`
+
 boot/bootfat_elf-malloc_bios.o: boot/malloc_bios.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootfat_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootfat_elf-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootfat_elf-malloc_bios.Tpo -c -o boot/bootfat_elf-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootfat_elf-malloc_bios.Tpo boot/$(DEPDIR)/bootfat_elf-malloc_bios.Po
@@ -7420,6 +7473,20 @@ boot/bootpxe_bios_elf-pxemain.obj: boot/pxemain.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/pxemain.cc' object='boot/bootpxe_bios_elf-pxemain.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-pxemain.obj `if test -f 'boot/pxemain.cc'; then $(CYGPATH_W) 'boot/pxemain.cc'; else $(CYGPATH_W) '$(srcdir)/boot/pxemain.cc'; fi`
+
+boot/bootpxe_bios_elf-pxemain_bios.o: boot/pxemain_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-pxemain_bios.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Tpo -c -o boot/bootpxe_bios_elf-pxemain_bios.o `test -f 'boot/pxemain_bios.cc' || echo '$(srcdir)/'`boot/pxemain_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/pxemain_bios.cc' object='boot/bootpxe_bios_elf-pxemain_bios.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-pxemain_bios.o `test -f 'boot/pxemain_bios.cc' || echo '$(srcdir)/'`boot/pxemain_bios.cc
+
+boot/bootpxe_bios_elf-pxemain_bios.obj: boot/pxemain_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-pxemain_bios.obj -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Tpo -c -o boot/bootpxe_bios_elf-pxemain_bios.obj `if test -f 'boot/pxemain_bios.cc'; then $(CYGPATH_W) 'boot/pxemain_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/pxemain_bios.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Tpo boot/$(DEPDIR)/bootpxe_bios_elf-pxemain_bios.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/pxemain_bios.cc' object='boot/bootpxe_bios_elf-pxemain_bios.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-pxemain_bios.obj `if test -f 'boot/pxemain_bios.cc'; then $(CYGPATH_W) 'boot/pxemain_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/pxemain_bios.cc'; fi`
 
 boot/bootpxe_bios_elf-malloc_bios.o: boot/malloc_bios.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -MT boot/bootpxe_bios_elf-malloc_bios.o -MD -MP -MF boot/$(DEPDIR)/bootpxe_bios_elf-malloc_bios.Tpo -c -o boot/bootpxe_bios_elf-malloc_bios.o `test -f 'boot/malloc_bios.cc' || echo '$(srcdir)/'`boot/malloc_bios.cc
@@ -11129,11 +11196,14 @@ bootx64.efi: bootefi-amd64
 $(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
 	$(LN) -f "$<" "$@"
 
+$(top_builddir)/dgos-kernel-tracing: $(top_builddir)/kernel-tracing
+	$(LN) -f "$<" "$@"
+
 # ----------------------------------------------------------------------------
 # parse-trace
 
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
-	$(CXX_FOR_BUILD) -g -o "$@" \
+	$(CXX_FOR_BUILD) -ggdb3 -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
 		-std=c++14 \
 		-fwhole-program -pthread \
@@ -11232,10 +11302,14 @@ kernel-tracing.dis.gz: kernel-tracing $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
 
 $(top_builddir)/fatpart.img: \
+		$(top_srcdir)/diskfat.mk \
+		\
+		$(top_builddir)/dgos-kernel-generic \
 		$(top_builddir)/kernel-generic \
 		$(top_builddir)/kernel-generic.sym \
 		$(top_builddir)/kernel-generic.dis.gz \
 		\
+		$(top_builddir)/dgos-kernel-tracing \
 		$(top_builddir)/kernel-tracing \
 		$(top_builddir)/kernel-tracing.sym \
 		$(top_builddir)/kernel-tracing.dis.gz \
@@ -11243,6 +11317,10 @@ $(top_builddir)/fatpart.img: \
 		$(top_builddir)/bootx64.efi \
 		$(top_builddir)/bootx64-efi.sym \
 		$(top_builddir)/bootefi-amd64.dis.gz \
+		\
+		$(top_builddir)/bootpxe-bios-elf \
+		$(top_builddir)/bootpxe-bios-bin \
+		$(top_builddir)/bootpxe-bios.map \
 		\
 		$(top_builddir)/user-shell \
 		$(top_builddir)/hello.km \
@@ -11359,6 +11437,10 @@ $(top_builddir)/isodisk.img: \
 		bootx64.efi \
 		bootx64-efi.sym \
 		bootefi-amd64.dis.gz \
+		\
+		$(top_builddir)/bootpxe-bios-elf \
+		$(top_builddir)/bootpxe-bios-bin \
+		$(top_builddir)/bootpxe-bios.map \
 		\
 		user-shell \
 		hello.km \

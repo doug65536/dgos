@@ -49,5 +49,19 @@ void *operator new(size_t, void *p) noexcept;
 void *operator new(size_t size) noexcept;
 void *operator new[](size_t size) noexcept;
 void operator delete(void *block, unsigned long size) noexcept;
+
+class zero_init_t
+{
+public:
+    void *operator new(size_t size)
+    {
+        return calloc(1, size);
+    }
+
+    void operator delete(void *p)
+    {
+        free(p);
+    }
+};
 //void operator delete(void *block) throw();
 //void operator delete[](void *block) throw();

@@ -336,10 +336,13 @@ $(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
 
 bootpxe_bios_elf_SOURCES = \
 	boot/bootpxe-bios.ld \
+	boot/mpentry_bios.S \
 	boot/pxe-bios.S \
 	boot/pxe.h \
 	boot/pxemain.cc \
 	boot/pxemain.h \
+	boot/pxemain_bios.cc \
+	boot/pxemain_bios.h \
 	boot/malloc_bios.cc
 
 bootpxe_bios_elf_CXXFLAGS = \
@@ -424,7 +427,9 @@ bootefi_amd64_SOURCES = \
 	boot/boottable.cc \
 	boot/boottable_efi.cc \
 	boot/qemu.cc \
-	boot/qemu.h
+	boot/qemu.h \
+	boot/utf.cc \
+	boot/utf.h
 
 #bootefi_i386_SOURCES = \
 	$(bootefi_amd64_SOURCES)
@@ -475,7 +480,6 @@ bootefi_amd64_LDFLAGS = \
 	$(PE32_FLAGS) \
 	$(LIBGCC_PE32) \
 	-g \
-	-Wl,-pie \
 	-Wl,-N \
 	-Wl,-m,i386pe \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
@@ -877,11 +881,14 @@ EXTRA_kernel_tracing_DEPENDENCIES = \
 $(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
 	$(LN) -f "$<" "$@"
 
+$(top_builddir)/dgos-kernel-tracing: $(top_builddir)/kernel-tracing
+	$(LN) -f "$<" "$@"
+
 # ----------------------------------------------------------------------------
 # parse-trace
 
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
-	$(CXX_FOR_BUILD) -g -o "$@" \
+	$(CXX_FOR_BUILD) -ggdb3 -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
 		-std=c++14 \
 		-fwhole-program -pthread \
@@ -1187,6 +1194,8 @@ hello_km_SOURCES = \
 	modules/hello/hello.cc
 
 hello_km_CXXFLAGS = \
+	-fPIE \
+	-g \
 	-I$(top_srcdir)/kernel/lib \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
 	-I$(top_srcdir)/kernel/lib/cc \
@@ -1198,6 +1207,9 @@ hello_km_LDFLAGS = \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
 	-mcmodel=kernel
+
+EXTRA_hello_km_DEPENDENCIES = kernel/arch/x86_64/module.ld \
+	Makefile.am
 
 user_shell_SOURCES = \
 	user/test/test.S
@@ -1453,7 +1465,7 @@ QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
 
 #-device ich9-ahci,id=bootif
 
-QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv,wtf
+QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
 
 QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 	-device $(QEMU_DISK_TYPE_$(1)),bus=bootif.0,drive=bootdrv
@@ -1486,8 +1498,10 @@ QEMU_BOOT_efi = -bios /usr/share/ovmf/OVMF.fd
 QEMU_BOOTMEDIA = $(QEMU_BOOTMEDIA_$(1)_$(2))
 QEMU_BOOTMEDIA_hd_bios = -boot c
 QEMU_BOOTMEDIA_hd_efi = -boot c
-QEMU_BOOTMEDIA_pxe_bios = -boot n -net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
-QEMU_BOOTMEDIA_pxe_efi = -boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
+QEMU_BOOTMEDIA_pxe_bios = -boot n \
+	-net user,tftp=$(top_builddir),bootfile=bootpxe-bios-bin
+QEMU_BOOTMEDIA_pxe_efi = \
+	-boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
 
 # Connect to debug log
 monitor-debug-output:
