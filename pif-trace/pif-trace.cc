@@ -107,8 +107,12 @@ private:
     {
         try {
             write_worker();
+            std::unique_lock<std::mutex> hold(lock);
+            close_output_file(hold);
         } catch (...) {
             caught_exception = std::current_exception();
+            std::unique_lock<std::mutex> hold(lock);
+            close_output_file(hold);
         }
     }
 
@@ -157,7 +161,7 @@ private:
                         : 2000;
                 std::chrono::milliseconds timeout{timeout_duration};
                 if (wake.wait_for(hold, timeout) == std::cv_status::timeout) {
-                    gzflush(out_file, 0);
+                    gzflush(out_file, Z_FINISH);
                     flushed = true;
                 }
             }
@@ -536,8 +540,16 @@ public:
         initscr();
         noecho();
         keypad(stdscr, TRUE);
+        mouseinterval(0);
+        mousemask(BUTTON1_PRESSED, nullptr);
         scrollok(stdscr, FALSE);
         curs_set(FALSE);
+        nodelay(stdscr, FALSE);
+        start_color();
+        use_default_colors();
+        init_pair(2, COLOR_WHITE, -1);
+        wbkgdset(stdscr, COLOR_PAIR(2));
+        timeout(-1);
     }
 
     ~viewer()
@@ -555,11 +567,15 @@ public:
 
     void draw()
     {
-        wclear(stdscr);
+        erase();
 
         getmaxyx(stdscr, display_h, display_w);
 
         trace_detail_iter item = update_selection();
+
+        update_highlight_range();
+
+        init_pair(1, COLOR_YELLOW, -1);
 
         for (int y = 0; y < display_h && item != tid_detail->end();
              ++y, ++item) {
@@ -578,9 +594,17 @@ public:
                 selection = item;
 
             if (y == cursor_row) {
-                attron(WA_REVERSE);
+                attron(A_STANDOUT);
             } else {
-                attroff(WA_REVERSE);
+                attroff(A_STANDOUT);
+            }
+
+            if (item >= highlight_st && item <= highlight_en) {
+                attron(COLOR_PAIR(1));
+                //attron(A_BOLD);
+            } else {
+                attroff(COLOR_PAIR(1));
+                //attroff(A_BOLD);
             }
 
             char const *tree_widget;
@@ -599,7 +623,7 @@ public:
             mvprintw(y, 0, "(c: %3d, t: %3d, I: %d) %*s %s %s\n",
                      rec.get_cid(), tid,
                      rec.irq_en,
-                     item->indent, "",
+                     item->indent * 2, "",
                      tree_widget,
                      it->second.c_str());
         }
@@ -607,9 +631,38 @@ public:
         refresh();
     }
 
+    void update_highlight_range()
+    {
+        highlight_st = tid_detail->end();
+        highlight_en = tid_detail->end();
+
+        if (unlikely(selection == tid_detail->end()))
+            return;
+
+        int indent = selection->indent;
+
+        highlight_st = selection;
+
+        // If on a return, scan back to corresponding call
+        if (!highlight_st->rec.call) {
+            while (highlight_st != tid_detail->begin()) {
+                --highlight_st;
+
+                if (highlight_st->indent == indent)
+                    break;
+            }
+        }
+
+        highlight_en = highlight_st + 1;
+
+        while (highlight_en != tid_detail->end() &&
+               highlight_en->indent != indent)
+            ++highlight_en;
+    }
+
     trace_detail_iter update_selection()
     {
-        offset = std::min(tid_detail->size(), offset);
+        offset = std::min(int64_t(tid_detail->size()), offset);
         trace_detail_iter item = tid_detail->begin();
         selection = item;
         std::advance(item, offset);
@@ -667,6 +720,12 @@ public:
         case KEY_PPAGE:
             return page_up();
 
+        case '[':
+            return scroll_view(-1);
+
+        case ']':
+            return scroll_view(1);
+
         case KEY_F(8):  // fall through
         case KEY_F(10):
             return move_next();
@@ -694,6 +753,9 @@ public:
 
         case KEY_RESIZE:
             return handle_resize();
+
+        case KEY_MOUSE:
+            return handle_mouse();
 
         case 'q':
             done = true;
@@ -835,6 +897,14 @@ public:
         clamp_offset();
     }
 
+    void scroll_view(int distance)
+    {
+        trace_detail_iter it = tid_detail->begin() + offset;
+        it = advance_shown(it, distance);
+        offset = it - tid_detail->begin();
+        clamp_offset();
+    }
+
     void tree_collapse(bool clamp_ofs = true)
     {
         if (selection->rec.expanded && selection->rec.expandable) {
@@ -971,6 +1041,18 @@ public:
         clamp_offset();
     }
 
+    void handle_mouse()
+    {
+        MEVENT event;
+        if (getmouse(&event) == OK) {
+            if (event.bstate & BUTTON1_PRESSED) {
+                selection = advance_shown(tid_detail->begin() + offset,
+                                          event.y);
+                clamp_offset();
+            }
+        }
+    }
+
     void show_help()
     {
 
@@ -983,7 +1065,9 @@ public:
     int tid;
     trace_detail_vector *tid_detail;
     trace_detail_iter selection;
-    uint64_t offset;
+    trace_detail_iter highlight_st;
+    trace_detail_iter highlight_en;
+    int64_t offset;
     int cursor_row;
     int display_h, display_w;
     std::unique_ptr<std::regex> search;
