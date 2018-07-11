@@ -26,7 +26,7 @@ static tui_menu_renderer_t boot_menu(&boot_menu_items);
 void boot_menu_show(kernel_params_t &params)
 {
     boot_menu.center();
-    boot_menu.interact_timeout(3000);
+    boot_menu.interact_timeout(1000);
     params.wait_gdb = tui_menu[0].index != 0;
     params.serial_debugout = tui_menu[1].index != 0;
 }
