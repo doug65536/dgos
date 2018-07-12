@@ -11,7 +11,7 @@ bioscall:
     pushl %ebx
     pushl %esi
     pushl %edi
-    
+
     // Save A20 toggle flag
     pushl %ecx
 
@@ -21,7 +21,7 @@ bioscall:
     // Save interrupt vector (read from real mode IDT) on the stack
     pushl (,%edx,4)
 
-    // Copy bios_regs_t to the stack, in case esp is outside first 64KB
+    // Copy bios_regs_t to the stack, in case eax is outside first 64KB
     pushl 36(%eax)
     pushl 32(%eax)
     pushl 28(%eax)
@@ -39,6 +39,7 @@ bioscall:
 
     // Set up %dx:%bp to be a real mode far pointer to the same place as %esp
     // With 4KB of stack space available before sp underflows
+    // In case esp is outside first 64KB range
 0:  lea -4096(%esp),%edx
     mov %edx,%ebp
     shr $4,%edx
@@ -151,7 +152,7 @@ bioscall:
     popl (%eax)
 
     addl $8,%esp
-             
+
     // Restore A20 toggle parameter
     popl %ecx
 
