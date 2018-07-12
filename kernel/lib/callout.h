@@ -51,7 +51,7 @@ struct callout_t {
 
 #define REGISTER_CALLOUT(fn, arg, type, order) \
     __attribute__((section(".callout_array." order), used, aligned(16))) \
-    static callout_t REGISTER_CALLOUT2(callout_, __COUNTER__) = { \
+    static constexpr callout_t REGISTER_CALLOUT2(callout_, __COUNTER__) = { \
         (fn), (arg), (type), 0, 0 \
     }
 

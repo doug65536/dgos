@@ -2,8 +2,7 @@
 
 #include "dev_text.h"
 
-extern text_display_base_t *console_display;
-extern text_display_vtbl_t console_display_vtbl;
+extern text_dev_base_t *console_display;
 
 int con_exists(void);
 void con_clear(void);

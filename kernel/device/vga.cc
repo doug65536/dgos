@@ -7,10 +7,20 @@
 #include "time.h"
 #include "callout.h"
 
-DECLARE_text_display_DEVICE(vga);
+class vga_factory_t : public text_dev_factory_t, public zero_init_t {
+public:
+    vga_factory_t()
+        : text_dev_factory_t("vga")
+    {
+    }
 
-struct text_display_t {
-    text_display_vtbl_t *vtbl;
+    int detect(text_dev_base_t ***ptrs) override final;
+};
+
+static vga_factory_t vga_factory;
+
+class vga_display_t : public text_dev_base_t {
+    friend class vga_factory_t;
 
     uint16_t *video_mem;
 
@@ -30,11 +40,49 @@ struct text_display_t {
     int mouse_on;
 
     uint16_t *shadow;
+
+    TEXT_DEV_IMPL
+
+    void cap_position(int *px, int *py);
+    int mouse_hide_if_at(int x, int y);
+    int mouse_hide_if_within(int sx, int sy, int ex, int ey);
+    void move_cursor_to(int x, int y);
+    void move_cursor_if_on();
+    void write_char_at(
+
+            int x, int y,
+            int character, int attrib);
+    void clear_screen();
+    void fill_region(int sx, int sy, int ex, int ey, int character);
+    void scroll_screen(int x, int y);
+    void advance_cursor(int distance);
+    void print_character(int ch);
+
+    friend void vga_remap_callback(void *);
+    void remap();
+
+    // This starts up extremely early, statically allocate
+    static vga_display_t instances[2];
+    static unsigned instance_count;
+
+    void *operator new(size_t) noexcept
+    {
+        if (instance_count < countof(instances))
+            return instances + instance_count++;
+        return nullptr;
+    }
+
+    void operator delete(void *p)
+    {
+        if (p == instances + instance_count - 1)
+            --instance_count;
+    }
 };
 
-#define MAX_VGA_DISPLAYS 2
+vga_display_t vga_display_t::instances[2];
+unsigned vga_display_t::instance_count;
 
-#define VGA_CRTC_PORT    (self->io_base)
+#define VGA_CRTC_PORT    (io_base)
 
 #define VGA_CRTC_CURSOR_LO  0x0F
 #define VGA_CRTC_CURSOR_HI  0x0E
@@ -45,33 +93,31 @@ struct text_display_t {
 #define VGA_SET_CURSOR_HI(pos) (VGA_CRTC_CURSOR_HI | \
     ((pos) & 0xFF00))
 
-static text_display_t vga_displays[MAX_VGA_DISPLAYS];
-static size_t vga_display_count;
+static vector<vga_display_t*> vga_displays;
 
 // === Internal API ===
 
-static void cap_position(text_display_t *self, int *px, int *py)
+void vga_display_t::cap_position(int *px, int *py)
 {
     if (*px < 0)
         *px = 0;
-    else if (*px >= self->width)
-        *px = self->width - 1;
+    else if (*px >= width)
+        *px = width - 1;
 
     if (*py < 0)
         *py = 0;
-    else if (*py >= self->height)
-        *py = self->height - 1;
+    else if (*py >= height)
+        *py = height - 1;
 }
 
-static int mouse_toggle(text_display_t *self,
-                 int show)
+int vga_display_t::mouse_toggle(int show)
 {
-    if (!self->mouse_on != !show) {
+    if (!mouse_on != !show) {
         // Invert color at mouse
-        size_t place = self->mouse_y *
-                self->width +
-                self->mouse_x;
-        uint8_t attr = (self->shadow[place] >> 8) & 0xFF;
+        size_t place = mouse_y *
+                width +
+                mouse_x;
+        uint8_t attr = (shadow[place] >> 8) & 0xFF;
         uint8_t set_attr = show
                 ? ((attr >> 4) | (attr << 4)) & 0x7F
                 : attr;
@@ -81,113 +127,102 @@ static int mouse_toggle(text_display_t *self,
         if (show && ((set_attr >> 4) == (set_attr & 0x0F)))
             set_attr ^= 7 << 4;
 
-        self->video_mem[place] = (self->shadow[place] & 0xFF) | (set_attr << 8);
-        self->mouse_on = !!show;
+        video_mem[place] = (shadow[place] & 0xFF) | (set_attr << 8);
+        mouse_on = !!show;
         return !show;
     }
     return !!show;
 }
 
-static int mouse_hide_if_at(text_display_t *self,
-                            int x, int y)
+int vga_display_t::mouse_hide_if_at(int x, int y)
 {
-    if (self->mouse_on &&
-            self->mouse_x == x &&
-            self->mouse_y == y) {
-        return mouse_toggle(self, 0);
+    if (mouse_on &&
+            mouse_x == x &&
+            mouse_y == y) {
+        return mouse_toggle(0);
     }
-    return self->mouse_on;
+    return mouse_on;
 }
 
-static int mouse_hide_if_within(text_display_t *self,
-                                int sx, int sy,
-                                int ex, int ey)
+int vga_display_t::mouse_hide_if_within(int sx, int sy, int ex, int ey)
 {
-    if (self->mouse_on &&
-            self->mouse_x >= sx &&
-            self->mouse_x < ex &&
-            self->mouse_y >= sy &&
-            self->mouse_y < ey) {
-        return mouse_toggle(self, 0);
+    if (mouse_on &&
+            mouse_x >= sx &&
+            mouse_x < ex &&
+            mouse_y >= sy &&
+            mouse_y < ey) {
+        return mouse_toggle(0);
     }
-    return self->mouse_on;
+    return mouse_on;
 }
 
-static void move_cursor_to(text_display_t *self, int x, int y)
+void vga_display_t::move_cursor_to(int x, int y)
 {
-    uint16_t position = y * self->width + x;
+    uint16_t position = y * width + x;
     outw(VGA_CRTC_PORT, VGA_SET_CURSOR_LO(position));
     outw(VGA_CRTC_PORT, VGA_SET_CURSOR_HI(position));
 }
 
-static void move_cursor_if_on(text_display_t *self)
+void vga_display_t::move_cursor_if_on()
 {
-    if (self->cursor_on)
-        move_cursor_to(self,
-                       self->cursor_x,
-                       self->cursor_y);
+    if (cursor_on)
+        move_cursor_to(cursor_x, cursor_y);
 }
 
-static void write_char_at(
-        text_display_t *self,
-        int x, int y,
-        int character, int attrib)
+void vga_display_t::write_char_at(int x, int y, int character, int attrib)
 {
-    int mouse_was_shown = mouse_hide_if_at(self, x, y);
-    size_t place = y * self->width + x;
+    int mouse_was_shown = mouse_hide_if_at(x, y);
+    size_t place = y * width + x;
     uint16_t pair = (character & 0xFF) | ((attrib & 0xFF) << 8);
-    self->shadow[place] = pair;
-    self->video_mem[place] = pair;
-    mouse_toggle(self, mouse_was_shown);
+    shadow[place] = pair;
+    video_mem[place] = pair;
+    mouse_toggle(mouse_was_shown);
 }
 
-static void clear_screen(text_display_t *self)
+void vga_display_t::clear_screen()
 {
-    int mouse_was_shown = mouse_toggle(self, 0);
-    uint16_t *p = self->shadow;
-    for (int y = 0; y < self->height; ++y)
-        for (int x = 0; x < self->width; ++x)
-            *p++ = uint16_t(' ' | (self->attrib << 8));
-    memcpy(self->video_mem, self->shadow,
-           self->width * self->height *
-           sizeof(*self->shadow));
-    mouse_toggle(self, mouse_was_shown);
+    int mouse_was_shown = mouse_toggle(0);
+    uint16_t *p = shadow;
+    for (int y = 0; y < height; ++y)
+        for (int x = 0; x < width; ++x)
+            *p++ = uint16_t(' ' | (attrib << 8));
+    memcpy(video_mem, shadow,
+           width * height *
+           sizeof(*shadow));
+    mouse_toggle(mouse_was_shown);
 }
 
-static void fill_region(text_display_t *self,
-                        int sx, int sy,
-                        int ex, int ey,
-                        int character)
+void vga_display_t::fill_region(int sx, int sy, int ex, int ey, int character)
 {
     int mouse_was_shown = mouse_hide_if_within(
-                self, sx, sy, ex, ey);
+                sx, sy, ex, ey);
     int row_count = ey - sy;
     int x;
-    int row_ofs = (sy * self->width);
-    uint16_t *shadow_row = self->shadow + row_ofs;
-    uint16_t *video_row = self->video_mem + row_ofs;
+    int row_ofs = (sy * width);
+    uint16_t *shadow_row = shadow + row_ofs;
+    uint16_t *video_row = video_mem + row_ofs;
 
     character &= 0xFF;
     while (row_count--) {
         for (x = sx; x < ex; ++x)
-            shadow_row[x] = character | (self->attrib << 8);
+            shadow_row[x] = character | (attrib << 8);
 
         memcpy(video_row + sx,
                shadow_row + sx,
-               sizeof(*self->video_mem) * (ex - sx));
+               sizeof(*video_mem) * (ex - sx));
 
-        shadow_row += self->width;
-        video_row += self->width;
+        shadow_row += width;
+        video_row += width;
     }
 
-    mouse_toggle(self, mouse_was_shown);
+    mouse_toggle(mouse_was_shown);
 }
 
 // negative x move the screen content left
 // negative y move the screen content up
-static void scroll_screen(text_display_t *self, int x, int y)
+void vga_display_t::scroll_screen(int x, int y)
 {
-    int row_size = self->width;
+    int row_size = width;
     int row_count;
     int row_step;
     int clear_start_row;
@@ -198,39 +233,39 @@ static void scroll_screen(text_display_t *self, int x, int y)
     uint16_t *dst;
 
     // Extreme move distance clears screen
-    if ((x < 0 && -x >= self->width) ||
-            (x > 0 && x >= self->width) ||
-            (y < 0 && -y >= self->height) ||
-            (y > 0 && y >= self->height)) {
-        clear_screen(self);
+    if ((x < 0 && -x >= width) ||
+            (x > 0 && x >= width) ||
+            (y < 0 && -y >= height) ||
+            (y > 0 && y >= height)) {
+        clear_screen();
 
         // Cursor tries to move with content
 
-        self->cursor_x += x;
-        self->cursor_y += y;
+        cursor_x += x;
+        cursor_y += y;
 
-        cap_position(self, &self->cursor_x, &self->cursor_y);
-        move_cursor_if_on(self);
+        cap_position(&cursor_x, &cursor_y);
+        move_cursor_if_on();
         return;
     }
 
     if (y <= 0) {
         // Up
-        src = self->shadow - (y * self->width);
-        dst = self->shadow;
-        row_count = self->height + y;
+        src = shadow - (y * width);
+        dst = shadow;
+        row_count = height + y;
         // Loop from top to bottom
-        row_step = self->width;
+        row_step = width;
         // Clear the bottom
-        clear_end_row = self->height;
+        clear_end_row = height;
         clear_start_row = clear_end_row + y;
     } else {
         // Down
-        dst = self->shadow + ((self->height - 1) * self->width);
-        src = self->shadow + ((self->height - y - 1) * self->width);
-        row_count = self->height - y;
+        dst = shadow + ((height - 1) * width);
+        src = shadow + ((height - y - 1) * width);
+        row_count = height - y;
         // Loop from bottom to top
-        row_step = -self->width;
+        row_step = -width;
         // Clear the top
         clear_start_row = 0;
         clear_end_row = y;
@@ -241,8 +276,8 @@ static void scroll_screen(text_display_t *self, int x, int y)
         row_size += x;
         src -= x;
         // Clear right side
-        clear_start_col = self->width + x;
-        clear_end_col = self->width;
+        clear_start_col = width + x;
+        clear_end_col = width;
     } else {
         // Right
         row_size -= x;
@@ -260,40 +295,40 @@ static void scroll_screen(text_display_t *self, int x, int y)
 
     // Clear top/bottom
     if (clear_start_row != clear_end_row) {
-        fill_region(self,
+        fill_region(
                     0,
                     clear_start_row,
-                    self->width,
+                    width,
                     clear_end_row,
                     ' ');
     }
 
     // Clear left/right
     if (clear_start_col != clear_end_col) {
-        fill_region(self,
+        fill_region(
                     clear_start_col,
                     clear_start_row ? clear_start_row : clear_end_row,
                     clear_end_col,
-                    clear_start_row ? self->height : clear_start_row,
+                    clear_start_row ? height : clear_start_row,
                     ' ');
     }
 
-    int mouse_was_shown = mouse_toggle(self, 0);
-    memcpy(self->video_mem, self->shadow,
-           self->width * self->height * sizeof(*self->shadow));
-    mouse_toggle(self, mouse_was_shown);
+    int mouse_was_shown = mouse_toggle(0);
+    memcpy(video_mem, shadow,
+           width * height * sizeof(*shadow));
+    mouse_toggle(mouse_was_shown);
 }
 
 // Advance the cursor, wrapping and scrolling as necessary.
 // Does not update hardware cursor.
-static void advance_cursor(text_display_t *self, int distance)
+void vga_display_t::advance_cursor(int distance)
 {
-    self->cursor_x += distance;
-    if (self->cursor_x >= self->width) {
-        self->cursor_x = 0;
-        if (++self->cursor_y >= self->height) {
-            self->cursor_y = self->height - 1;
-            scroll_screen(self, 0, -1);
+    cursor_x += distance;
+    if (cursor_x >= width) {
+        cursor_x = 0;
+        if (++cursor_y >= height) {
+            cursor_y = height - 1;
+            scroll_screen(0, -1);
         }
     }
 }
@@ -301,114 +336,125 @@ static void advance_cursor(text_display_t *self, int distance)
 // Handle linefeed and tab, advance cursor,
 // put character on the screen, but does not
 // update the hardware cursor
-static void print_character(text_display_t *self, int ch)
+void vga_display_t::print_character(int ch)
 {
     int advance;
     switch (ch) {
     case '\n':
-        advance_cursor(self, self->width - self->cursor_x);
+        advance_cursor(width - cursor_x);
         break;
 
     case '\t':
-        advance = ((self->cursor_x + 8) & -8) -
-                self->cursor_x;
-        advance_cursor(self, advance);
+        advance = ((cursor_x + 8) & -8) -
+                cursor_x;
+        advance_cursor(advance);
         break;
 
     case '\b':
-        if (self->cursor_x > 0)
-            advance_cursor(self, -1);
+        if (cursor_x > 0)
+            advance_cursor(-1);
         break;
 
     default:
-        write_char_at(self,
-                      self->cursor_x,
-                      self->cursor_y,
-                      ch, self->attrib);
-        advance_cursor(self, 1);
+        write_char_at(
+                      cursor_x,
+                      cursor_y,
+                      ch, attrib);
+        advance_cursor(1);
         break;
     }
 }
 
 // === Public API ===
 
-static int vga_detect(text_display_base_t **result)
+int vga_factory_t::detect(text_dev_base_t ***ptrs)
 {
-    if (vga_display_count >= MAX_VGA_DISPLAYS) {
-        *result = nullptr;
+    static text_dev_base_t *devs[4];
+    static size_t dev_count = 0;
+    *ptrs = devs + dev_count;
+
+    if (dev_count >= countof(devs)) {
+        printdbg("Too many VGA devices!\n");
         return 0;
     }
 
-    text_display_t *self = vga_displays + vga_display_count++;
+    // Does not work (in qemu anyway)
+    //pci_dev_iterator_t dev_iter;
+    //if (!pci_enumerate_begin(
+    //            &dev_iter,
+    //            PCI_DEV_CLASS_DISPLAY,
+    //            PCI_SUBCLASS_DISPLAY_VGA))
+    //    return 0;
 
-    self->vtbl = &vga_text_display_device_vtbl;
+    vga_display_t *self = new vga_display_t;
 
-    // Get I/O port base from BIOS data area
-    self->io_base = 0x3B4;//*BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
+    devs[dev_count++] = self;
 
-    if (self->io_base == 0)
-        self->io_base = 0x3B4;
-
-    // Map frame buffer
-    self->video_mem = (uint16_t*)0xb8000;
-    self->cursor_on = 1;
-    self->cursor_x = 0;
-    self->cursor_y = 0;
-    self->width = 80;
-    self->height = 25;
-    self->attrib = 0x07;
-    self->mouse_on = 0;
-    self->mouse_x = self->width >> 1;
-    self->mouse_y = self->height >> 1;
-
-    // Off-screen shadow buffer
-    // Uses video memory until memory manager is online
-    self->shadow = self->video_mem + (80 * 25);
-
-    mouse_toggle(self, 1);
-
-    *result = (text_display_base_t*)self;
+    self->init();
 
     return 1;
 }
 
 // Startup/shutdown
 
-static void vga_init(text_display_base_t *dev)
+void vga_display_t::init()
 {
-    TEXT_DEV_PTR_UNUSED(dev);
+    // (Don't...) get I/O port base from BIOS data area
+    io_base = 0x3B4;//*BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
+
+    if (io_base == 0)
+        io_base = 0x3B4;
+
+    // Map frame buffer
+    video_mem = (uint16_t*)0xb8000;
+    cursor_on = 1;
+    cursor_x = 0;
+    cursor_y = 0;
+    width = 80;
+    height = 25;
+    attrib = 0x07;
+    mouse_on = 0;
+    mouse_x = width >> 1;
+    mouse_y = height >> 1;
+
+    // Off-screen shadow buffer
+    // Uses video memory until memory manager is online
+    shadow = video_mem + (80 * 25);
+
+    mouse_toggle(1);
 }
 
-static void vga_cleanup(text_display_base_t *dev)
+void vga_display_t::cleanup()
 {
-    TEXT_DEV_PTR_UNUSED(dev);
 }
 
-static void vga_remap_callback(void *)
+void vga_remap_callback(void *)
 {
-    for (size_t i = 0; i < vga_display_count; ++i) {
-        text_display_t *self = vga_displays + i;
+    for (vga_display_t *self : vga_displays)
+        self->remap();
+}
 
-        self->video_mem = (uint16_t*)
-                mmap((void*)0xB8000, 0x8000,
-                     PROT_READ | PROT_WRITE,
-                     MAP_PHYSICAL, -1, 0);
+void vga_display_t::remap()
+{
+    video_mem = (uint16_t*)
+            mmap((void*)0xB8000, 0x8000,
+                 PROT_READ | PROT_WRITE,
+                 MAP_PHYSICAL, -1, 0);
 
-        // Start using system RAM shadow buffer
+    // Start using system RAM shadow buffer
 
-        uint16_t *old_shadow = self->shadow;
+    uint16_t *old_shadow = shadow;
 
-        self->shadow = (uint16_t*)mmap(nullptr,
-                            self->width * self->height *
-                            sizeof(*self->shadow),
-                            PROT_READ | PROT_WRITE,
-                            MAP_POPULATE, -1, 0);
+    shadow = (uint16_t*)mmap(nullptr,
+                        width * height *
+                        sizeof(*shadow),
+                        PROT_READ | PROT_WRITE,
+                        MAP_POPULATE, -1, 0);
 
-        memcpy(self->shadow, old_shadow,
-               self->width * self->height * sizeof(*self->shadow));
-        memset(old_shadow, 0,
-               self->width * self->height * sizeof(*self->shadow));
-    }
+    memcpy(shadow, old_shadow,
+           width * height * sizeof(*shadow));
+    memset(old_shadow, 0,
+           width * height * sizeof(*shadow));
 }
 
 REGISTER_CALLOUT(vga_remap_callback, nullptr,
@@ -416,231 +462,185 @@ REGISTER_CALLOUT(vga_remap_callback, nullptr,
 
 // Set/get dimensions
 
-static int vga_set_dimensions(text_display_base_t *dev,
-                      int width, int height)
+int vga_display_t::set_dimensions(int width, int height)
 {
-    TEXT_DEV_PTR(dev);
     // Succeed if they didn't change it
-    return width == self->width && height == self->height;
+    return width == this->width && height == this->height;
 }
 
-static void vga_get_dimensions(text_display_base_t *dev,
-                       int *width, int *height)
+void vga_display_t::get_dimensions(int *ret_width, int *ret_height)
 {
-    TEXT_DEV_PTR(dev);
-    *width = self->width;
-    *height = self->height;
+    *ret_width = width;
+    *ret_height = height;
 }
 
 
 // Set/get cursor position
 
-static void vga_goto_xy(text_display_base_t *dev,
-                        int x, int y)
+void vga_display_t::goto_xy(int x, int y)
 {
-    TEXT_DEV_PTR(dev);
-    cap_position(self, &x, &y);
-    if (self->cursor_x != x || self->cursor_y != y) {
-        self->cursor_x = x;
-        self->cursor_y = y;
-        move_cursor_if_on(self);
+    cap_position(&x, &y);
+    if (cursor_x != x || cursor_y != y) {
+        cursor_x = x;
+        cursor_y = y;
+        move_cursor_if_on();
     }
 }
 
-static int vga_get_x(text_display_base_t *dev)
+int vga_display_t::get_x()
 {
-    TEXT_DEV_PTR(dev);
-    return self->cursor_x;
+    return cursor_x;
 }
 
-static int vga_get_y(text_display_base_t *dev)
+int vga_display_t::get_y()
 {
-    TEXT_DEV_PTR(dev);
-    return self->cursor_y;
+    return cursor_y;
 }
 
 // Set/get foreground color
 
-static void vga_fg_set(text_display_base_t *dev,
-                       int color)
+void vga_display_t::fg_set(int color)
 {
-    TEXT_DEV_PTR(dev);
-    self->attrib = (self->attrib & 0xF0) |
+    attrib = (attrib & 0xF0) |
             (color & 0x0F);
 }
 
-static int vga_fg_get(text_display_base_t *dev)
+int vga_display_t::fg_get()
 {
-    TEXT_DEV_PTR(dev);
-    return self->attrib & 0x0F;
+    return attrib & 0x0F;
 }
 
 // Set/get background color
 
-static void vga_bg_set(text_display_base_t *dev,
-                       int color)
+void vga_display_t::bg_set(int color)
 {
-    TEXT_DEV_PTR(dev);
-    self->attrib = (self->attrib & 0x0F) |
+    attrib = (attrib & 0x0F) |
             ((color & 0x0F) << 4);
 }
 
-static int vga_bg_get(text_display_base_t *dev)
+int vga_display_t::bg_get()
 {
-    TEXT_DEV_PTR(dev);
-    return (self->attrib >> 4) & 0x0F;
+    return (attrib >> 4) & 0x0F;
 }
 
 // Show/hide cursor
 
-static int vga_cursor_toggle(text_display_base_t *dev,
-                              int show)
+int vga_display_t::cursor_toggle(int show)
 {
-    TEXT_DEV_PTR(dev);
-    int was_shown = self->cursor_on;
+    int was_shown = cursor_on;
 
-    if (!show != !self->cursor_on) {
-        self->cursor_on = show;
+    if (!show != !cursor_on) {
+        cursor_on = show;
         if (!show)
-            move_cursor_to(self, 0xFF, 0xFF);
+            move_cursor_to(0xFF, 0xFF);
         else
-            move_cursor_to(self, self->cursor_x, self->cursor_y);
+            move_cursor_to(cursor_x, cursor_y);
     }
 
     return was_shown;
 }
 
-static int vga_cursor_is_shown(text_display_base_t *dev)
+int vga_display_t::cursor_is_shown()
 {
-    TEXT_DEV_PTR(dev);
-    return !!self->cursor_on;
+    return !!cursor_on;
 }
 
 // Print character, updating cursor position
 // possibly scrolling the screen content up
 
-static void vga_putc(text_display_base_t *dev,
-                    int character)
+void vga_display_t::putc(int character)
 {
-    TEXT_DEV_PTR(dev);
-    print_character(self, character);
-    move_cursor_if_on(self);
+    print_character(character);
+    move_cursor_if_on();
 }
 
-static void vga_putc_xy(text_display_base_t *dev,
-                       int x, int y,
-                       int character)
+void vga_display_t::putc_xy(int x, int y, int character)
 {
-    TEXT_DEV_PTR(dev);
-    cap_position(self, &x, &y);
-    if (self->cursor_on &&
-            (self->cursor_x != x || self->cursor_y != y))
-        move_cursor_to(self, x, y);
+    cap_position(&x, &y);
+    if (cursor_on &&
+            (cursor_x != x || cursor_y != y))
+        move_cursor_to(x, y);
 
-    self->cursor_x = x;
-    self->cursor_y = y;
+    cursor_x = x;
+    cursor_y = y;
 
-    print_character(self, character);
+    print_character(character);
 }
 
-static int vga_print(text_display_base_t *dev,
-                     char const *s)
+int vga_display_t::print(char const *s)
 {
-    TEXT_DEV_PTR(dev);
-
     int written = 0;
     while (*s) {
         ++written;
-        print_character(self, *s++);
+        print_character(*s++);
     }
 
-    move_cursor_if_on(self);
+    move_cursor_if_on();
 
     return written;
 }
 
-static int vga_write(text_display_base_t *dev,
-                     char const *s, intptr_t len)
+int vga_display_t::write(char const *s, intptr_t len)
 {
-    TEXT_DEV_PTR(dev);
-
     int written = 0;
     while (len--) {
         ++written;
-        print_character(self, *s++);
+        print_character(*s++);
     }
 
-    move_cursor_if_on(self);
+    move_cursor_if_on();
 
     return written;
 }
 
-static int vga_print_xy(text_display_base_t *dev,
-                        int x, int y, char const *s)
+int vga_display_t::print_xy(int x, int y, char const *s)
 {
-    TEXT_DEV_PTR_UNUSED(dev);
-    vga_goto_xy(dev, x, y);
-    return vga_print(dev, s);
+    goto_xy(x, y);
+    return print(s);
 }
 
 // Draw text, no effect on cursor
 
-static int vga_draw(text_display_base_t *dev,
-                    char const *s)
+int vga_display_t::draw(char const *s)
 {
-    TEXT_DEV_PTR_UNUSED(dev);
     // FIXME
     (void)s;
     return 0;
 }
 
-static int vga_draw_xy(text_display_base_t *dev,
-                       int x, int y,
-                       char const *s, int attrib)
+int vga_display_t::draw_xy(int x, int y, char const *s, int attrib)
 {
-    TEXT_DEV_PTR(dev);
-
     while (*s) {
-        if (x >= self->width) {
+        if (x >= width) {
             x = 0;
-            if (++y >= self->height)
+            if (++y >= height)
                 y = 0;
         }
 
-        write_char_at(self, x++, y, *s++, attrib);
+        write_char_at(x++, y, *s++, attrib);
     }
     return 0;
 }
 
 // Fill an area with a character, and optionally a color
 
-static void vga_fill(text_display_base_t *dev,
-                     int sx, int sy,
-                     int ex, int ey,
-                     int character)
+void vga_display_t::fill(int sx, int sy, int ex, int ey, int character)
 {
-    TEXT_DEV_PTR(dev);
-    fill_region(self, sx, sy, ex, ey, character);
+    fill_region(sx, sy, ex, ey, character);
 }
 
-
 // Fill screen with spaces in the current colors
-static void vga_clear(text_display_base_t *dev)
+void vga_display_t::clear()
 {
-    TEXT_DEV_PTR(dev);
-    clear_screen(self);
+    clear_screen();
 }
 
 // Scroll an area horizontally and/or vertically
 // Optionally clearing exposed area
 
-static void vga_scroll(text_display_base_t *dev,
-                       int sx, int sy,
-                       int ex, int ey,
-                       int xd, int yd,
-                       int clear)
+void vga_display_t::scroll(int sx, int sy, int ex, int ey,
+                           int xd, int yd, int clear)
 {
-    TEXT_DEV_PTR_UNUSED(dev);
     // FIXME
     (void)sx; (void)sy; (void)ex; (void)ey; (void)xd; (void)yd;
     (void)clear;
@@ -648,63 +648,45 @@ static void vga_scroll(text_display_base_t *dev,
 
 
 // Returns 0 if mouse is not supported
-static int vga_mouse_supported(text_display_base_t *dev)
+int vga_display_t::mouse_supported()
 {
-    TEXT_DEV_PTR_UNUSED(dev);
     return 1;
 }
 
 // Show/hide mouse
-static int vga_mouse_is_shown(text_display_base_t *dev)
+int vga_display_t::mouse_is_shown()
 {
-    TEXT_DEV_PTR(dev);
-    return self->mouse_on;
+    return mouse_on;
 }
 
 // Get mouse position
-static int vga_mouse_get_x(text_display_base_t *dev)
+int vga_display_t::mouse_get_x()
 {
-    TEXT_DEV_PTR(dev);
-    return self->mouse_x;
+    return mouse_x;
 }
 
-static int vga_mouse_get_y(text_display_base_t *dev)
+int vga_display_t::mouse_get_y()
 {
-    TEXT_DEV_PTR(dev);
-    return self->mouse_y;
-}
-
-// Show/hide mouse
-static int vga_mouse_toggle(text_display_base_t *dev,
-                    int show)
-{
-    TEXT_DEV_PTR(dev);
-    return mouse_toggle(self, show);
+    return mouse_y;
 }
 
 // Move mouse to position
-static void vga_mouse_goto_xy(text_display_base_t *dev,
-                     int x, int y)
+void vga_display_t::mouse_goto_xy(int x, int y)
 {
-    TEXT_DEV_PTR(dev);
-    int was_shown = mouse_toggle(self, 0);
-    cap_position(self, &x, &y);
-    self->mouse_x = x;
-    self->mouse_y = y;
-    mouse_toggle(self, was_shown);
+    int was_shown = mouse_toggle(0);
+    cap_position(&x, &y);
+    mouse_x = x;
+    mouse_y = y;
+    mouse_toggle(was_shown);
 }
 
-static void vga_mouse_add_xy(text_display_base_t *dev,
-                     int x, int y)
+void vga_display_t::mouse_add_xy(int x, int y)
 {
-    TEXT_DEV_PTR(dev);
-    int was_shown = mouse_toggle(self, 0);
-    x += self->mouse_x;
-    y += self->mouse_y;
-    cap_position(self, &x, &y);
-    self->mouse_x = x;
-    self->mouse_y = y;
-    mouse_toggle(self, was_shown);
+    int was_shown = mouse_toggle(0);
+    x += mouse_x;
+    y += mouse_y;
+    cap_position(&x, &y);
+    mouse_x = x;
+    mouse_y = y;
+    mouse_toggle(was_shown);
 }
-
-REGISTER_text_display_DEVICE(vga);
