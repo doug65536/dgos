@@ -19,7 +19,7 @@ function log() {
 	elif [[ $quiet = 0 ]]; then
 		"$@" | tee -a "$logfile" || exit
 	else
-		"$@" 2>&1 >> "$logfile" || exit
+		"$@" >> "$logfile" 2>&1 || exit
 	fi
 }
 
@@ -267,7 +267,7 @@ gcc_config="--target=$arches --with-system-zlib \
 --enable-initfini-array \
 --enable-link-mutex \
 --disable-nls \
---enable-shared --enable-system-zlib \
+--enable-system-zlib \
 --enable-multiarch \
 --with-arch-32=i686 --with-abi=m64 \
 --with-multilib-list=m32,m64,mx32"
@@ -275,7 +275,7 @@ gcc_config="--target=$arches --with-system-zlib \
 # disable for now: --enable-threads=posix
 
 bin_config="--target=$arches \
---enable-targets=all \
+--enable-targets=x86_64-elf,i686-elf,x86_64-pe,i686-pe \
 --enable-gold --enable-ld \
 --enable-plugins --enable-lto
 --enable-shared"
