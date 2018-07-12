@@ -692,6 +692,8 @@ void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
             pkt->nic = (eth_dev_base_t *)this;
 
             ethq_enqueue(&rx_queue, pkt);
+        } else {
+            RTL8139_TRACE("Packed pool exhausted, incoming packet dropped");
         }
 
         // Advance to next packet, skipping header, CRC,

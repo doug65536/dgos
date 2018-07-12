@@ -108,7 +108,9 @@ ethq_pkt_t *ethq_pkt_acquire(void)
     unique_lock<ticketlock> lock(ethq_lock);
 
     ethq_pkt_t *pkt = ethq_first_free;
-    ethq_first_free = pkt->next;
+
+    if (pkt)
+        ethq_first_free = pkt->next;
 
     return pkt;
 }
