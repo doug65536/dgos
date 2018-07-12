@@ -1,7 +1,7 @@
 diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf
 --- gcc-6.2.0/gcc/config/i386/t-x86_64-elf	1969-12-31 16:00:00.000000000 -0800
 +++ gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf	2016-09-30 11:55:53.602700086 -0700
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,19 @@
 +# Add redzoneless libgcc
 +MULTILIB_OPTIONS  += mno-red-zone
 +MULTILIB_DIRNAMES += no-red-zone
@@ -18,6 +18,8 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +
 +MULTILIB_OPTIONS  += mregparm=3
 +MULTILIB_DIRNAMES  += regparm3
++
++#MULTILIB_EXCEPTIONS +=
 +
 Binary files gcc-6.2.0/gcc/config/i386/.t-x86_64-elf.swp and gcc-6.2.0.patched/gcc/config/i386/.t-x86_64-elf.swp differ
 diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
