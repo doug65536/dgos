@@ -501,6 +501,8 @@ am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_hub.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_storage.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_xhci.$(OBJEXT) \
+	kernel/device/kernel_generic-virtio-base.$(OBJEXT) \
+	kernel/device/kernel_generic-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_generic-vga.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-elf64.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-gdbstub.$(OBJEXT) \
@@ -624,6 +626,8 @@ am__objects_5 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb_hub.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb_storage.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb_xhci.$(OBJEXT) \
+	kernel/device/kernel_tracing-virtio-base.$(OBJEXT) \
+	kernel/device/kernel_tracing-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_tracing-vga.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_tracing-elf64.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_tracing-gdbstub.$(OBJEXT) \
@@ -1658,6 +1662,10 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/usb_storage.h \
 	kernel/device/usb_storage.cc \
 	kernel/device/usb_xhci.cc \
+	kernel/device/virtio-base.cc \
+	kernel/device/virtio-base.h \
+	kernel/device/virtio-gpu.cc \
+	kernel/device/virtio-gpu.h \
 	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
@@ -3309,6 +3317,12 @@ kernel/device/kernel_generic-usb_storage.$(OBJEXT):  \
 kernel/device/kernel_generic-usb_xhci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-virtio-base.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-virtio-gpu.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-vga.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3645,6 +3659,12 @@ kernel/device/kernel_tracing-usb_storage.$(OBJEXT):  \
 kernel/device/kernel_tracing-usb_xhci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_tracing-virtio-base.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_tracing-virtio-gpu.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_tracing-vga.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -3892,6 +3912,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-vga.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-acpigas.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-acpihw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-ahci.Po@am__quote@
@@ -3913,6 +3935,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-vga.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_generic-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_tracing-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-ext4.Po@am__quote@
@@ -8972,6 +8996,34 @@ kernel/device/kernel_generic-usb_xhci.obj: kernel/device/usb_xhci.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
 
+kernel/device/kernel_generic-virtio-base.o: kernel/device/virtio-base.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-virtio-base.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Tpo -c -o kernel/device/kernel_generic-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Tpo kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-base.cc' object='kernel/device/kernel_generic-virtio-base.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
+
+kernel/device/kernel_generic-virtio-base.obj: kernel/device/virtio-base.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-virtio-base.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Tpo -c -o kernel/device/kernel_generic-virtio-base.obj `if test -f 'kernel/device/virtio-base.cc'; then $(CYGPATH_W) 'kernel/device/virtio-base.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-base.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Tpo kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-base.cc' object='kernel/device/kernel_generic-virtio-base.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-virtio-base.obj `if test -f 'kernel/device/virtio-base.cc'; then $(CYGPATH_W) 'kernel/device/virtio-base.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-base.cc'; fi`
+
+kernel/device/kernel_generic-virtio-gpu.o: kernel/device/virtio-gpu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-virtio-gpu.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Tpo -c -o kernel/device/kernel_generic-virtio-gpu.o `test -f 'kernel/device/virtio-gpu.cc' || echo '$(srcdir)/'`kernel/device/virtio-gpu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Tpo kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-gpu.cc' object='kernel/device/kernel_generic-virtio-gpu.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-virtio-gpu.o `test -f 'kernel/device/virtio-gpu.cc' || echo '$(srcdir)/'`kernel/device/virtio-gpu.cc
+
+kernel/device/kernel_generic-virtio-gpu.obj: kernel/device/virtio-gpu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-virtio-gpu.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Tpo -c -o kernel/device/kernel_generic-virtio-gpu.obj `if test -f 'kernel/device/virtio-gpu.cc'; then $(CYGPATH_W) 'kernel/device/virtio-gpu.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-gpu.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Tpo kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-gpu.cc' object='kernel/device/kernel_generic-virtio-gpu.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-virtio-gpu.obj `if test -f 'kernel/device/virtio-gpu.cc'; then $(CYGPATH_W) 'kernel/device/virtio-gpu.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-gpu.cc'; fi`
+
 kernel/device/kernel_generic-vga.o: kernel/device/vga.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-vga.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-vga.Tpo -c -o kernel/device/kernel_generic-vga.o `test -f 'kernel/device/vga.cc' || echo '$(srcdir)/'`kernel/device/vga.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-vga.Tpo kernel/device/$(DEPDIR)/kernel_generic-vga.Po
@@ -10567,6 +10619,34 @@ kernel/device/kernel_tracing-usb_xhci.obj: kernel/device/usb_xhci.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_tracing-usb_xhci.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
+
+kernel/device/kernel_tracing-virtio-base.o: kernel/device/virtio-base.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-virtio-base.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Tpo -c -o kernel/device/kernel_tracing-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Tpo kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-base.cc' object='kernel/device/kernel_tracing-virtio-base.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
+
+kernel/device/kernel_tracing-virtio-base.obj: kernel/device/virtio-base.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-virtio-base.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Tpo -c -o kernel/device/kernel_tracing-virtio-base.obj `if test -f 'kernel/device/virtio-base.cc'; then $(CYGPATH_W) 'kernel/device/virtio-base.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-base.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Tpo kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-base.cc' object='kernel/device/kernel_tracing-virtio-base.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-virtio-base.obj `if test -f 'kernel/device/virtio-base.cc'; then $(CYGPATH_W) 'kernel/device/virtio-base.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-base.cc'; fi`
+
+kernel/device/kernel_tracing-virtio-gpu.o: kernel/device/virtio-gpu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-virtio-gpu.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Tpo -c -o kernel/device/kernel_tracing-virtio-gpu.o `test -f 'kernel/device/virtio-gpu.cc' || echo '$(srcdir)/'`kernel/device/virtio-gpu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Tpo kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-gpu.cc' object='kernel/device/kernel_tracing-virtio-gpu.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-virtio-gpu.o `test -f 'kernel/device/virtio-gpu.cc' || echo '$(srcdir)/'`kernel/device/virtio-gpu.cc
+
+kernel/device/kernel_tracing-virtio-gpu.obj: kernel/device/virtio-gpu.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-virtio-gpu.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Tpo -c -o kernel/device/kernel_tracing-virtio-gpu.obj `if test -f 'kernel/device/virtio-gpu.cc'; then $(CYGPATH_W) 'kernel/device/virtio-gpu.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-gpu.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Tpo kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/virtio-gpu.cc' object='kernel/device/kernel_tracing-virtio-gpu.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-virtio-gpu.obj `if test -f 'kernel/device/virtio-gpu.cc'; then $(CYGPATH_W) 'kernel/device/virtio-gpu.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/virtio-gpu.cc'; fi`
 
 kernel/device/kernel_tracing-vga.o: kernel/device/vga.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-vga.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-vga.Tpo -c -o kernel/device/kernel_tracing-vga.o `test -f 'kernel/device/vga.cc' || echo '$(srcdir)/'`kernel/device/vga.cc

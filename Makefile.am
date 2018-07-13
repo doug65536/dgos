@@ -750,6 +750,10 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/usb_storage.h \
 	kernel/device/usb_storage.cc \
 	kernel/device/usb_xhci.cc \
+	kernel/device/virtio-base.cc \
+	kernel/device/virtio-base.h \
+	kernel/device/virtio-gpu.cc \
+	kernel/device/virtio-gpu.h \
 	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
