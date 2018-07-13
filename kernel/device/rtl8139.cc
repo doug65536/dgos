@@ -13,6 +13,7 @@
 #include "time.h"
 #include "udp_frame.h"
 #include "dev_eth.h"
+#include "inttypes.h"
 
 // test
 #include "net/dhcp.h"
@@ -922,16 +923,17 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
             panic("Out of memory!\n");
 
         printdbg("Detected PCI device %d/%d/%d"
-                 " %x %x %x %x %x %x irq=%d\n",
+                 " %" PRIx64 " %" PRIx64 " %" PRIx64
+                 " %" PRIx64 " %" PRIx64 " %" PRIx64 " irq=%d\n",
                  pci_iter.bus,
                  pci_iter.slot,
                  pci_iter.func,
-                 pci_iter.config.base_addr[0],
-                 pci_iter.config.base_addr[1],
-                 pci_iter.config.base_addr[2],
-                 pci_iter.config.base_addr[3],
-                 pci_iter.config.base_addr[4],
-                 pci_iter.config.base_addr[5],
+                 pci_iter.config.get_bar(0),
+                 pci_iter.config.get_bar(1),
+                 pci_iter.config.get_bar(2),
+                 pci_iter.config.get_bar(3),
+                 pci_iter.config.get_bar(4),
+                 pci_iter.config.get_bar(5),
                  pci_iter.config.irq_line);
 
         rtl8139_dev_t *self = (rtl8139_dev_t*)calloc(1, sizeof(rtl8139_dev_t));
@@ -950,7 +952,7 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
 
 void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 {
-    mmio_physaddr = pci_dev.config.base_addr[1] & -16;
+    mmio_physaddr = pci_dev.config.get_bar(1);
 
     mmio = mmap((void*)mmio_physaddr, 256,
                       PROT_READ | PROT_WRITE,

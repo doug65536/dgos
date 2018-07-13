@@ -249,31 +249,35 @@ vector<storage_if_base_t *> ide_if_factory_t::detect(void)
     do {
         unique_ptr<ide_if_t> if_(new ide_if_t{});
 
-        if_->chan[0].ports.cmd = (pci_iter.config.base_addr[0] > 1)
-                ? pci_iter.config.base_addr[0]
+        if_->chan[0].ports.cmd = pci_iter.config.is_bar_portio(0) &&
+                pci_iter.config.get_bar(0)
+                ? pci_iter.config.get_bar(0)
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        if_->chan[0].ports.ctl = (pci_iter.config.base_addr[1] > 1)
-                ? pci_iter.config.base_addr[1]
+        if_->chan[0].ports.ctl = pci_iter.config.is_bar_portio(1) &&
+                pci_iter.config.get_bar(1)
+                ? pci_iter.config.get_bar(1)
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        if_->chan[1].ports.cmd = (pci_iter.config.base_addr[2] > 1)
-                ? pci_iter.config.base_addr[2]
+        if_->chan[1].ports.cmd = pci_iter.config.is_bar_portio(2) &&
+                pci_iter.config.get_bar(2)
+                ? pci_iter.config.get_bar(2)
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        if_->chan[1].ports.ctl = (pci_iter.config.base_addr[3] > 1)
-                ? pci_iter.config.base_addr[3]
+        if_->chan[1].ports.ctl = pci_iter.config.is_bar_portio(3) &&
+                pci_iter.config.get_bar(3)
+                ? pci_iter.config.get_bar(3)
                 : std_idx < countof(std_ports)
                 ? std_ports[std_idx++]
                 : 0;
 
-        if_->bmdma_base = pci_iter.config.base_addr[4];
+        if_->bmdma_base = pci_iter.config.get_bar(4);
 
         if (pci_iter.config.prog_if == 0x8A ||
                 pci_iter.config.prog_if == 0x80) {

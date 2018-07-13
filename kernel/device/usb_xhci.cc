@@ -1330,8 +1330,7 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     // Bus master enable, memory space enable, I/O space disable
     pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
 
-    mmio_addr = (pci_iter.config.base_addr[0] & -16) |
-            (uint64_t(pci_iter.config.base_addr[1]) << 32);
+    mmio_addr = pci_iter.config.get_bar(0);
 
     mmio_base = (char*)mmap(
                 (void*)mmio_addr, 64<<10, PROT_READ | PROT_WRITE,

@@ -108,6 +108,42 @@ struct pci_config_hdr_t {
     uint8_t irq_pin;
     uint8_t min_grant;
     uint8_t max_latency;
+
+    bool is_bar_mmio(ptrdiff_t bar) const
+    {
+        return (base_addr[bar] & 1) == 0;
+    }
+
+    bool is_bar_portio(ptrdiff_t bar) const
+    {
+        return base_addr[bar] & 1;
+    }
+
+    bool is_bar_prefetchable(ptrdiff_t bar) const
+    {
+        return base_addr[bar] & 8;
+    }
+
+    bool is_bar_64bit(ptrdiff_t bar) const
+    {
+        return (base_addr[bar] & 6) == 4;
+    }
+
+    uint64_t get_bar(ptrdiff_t bar) const
+    {
+        uint64_t addr;
+
+        if (is_bar_mmio(bar)) {
+            addr = base_addr[bar] & -16;
+
+            if (is_bar_64bit(bar))
+                addr |= uint64_t(base_addr[bar + 1]) << 32;
+        } else {
+            addr = base_addr[bar] & -4;
+        }
+
+        return addr;
+    }
 };
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
@@ -381,6 +417,8 @@ struct pci_dev_iterator_t : public pci_dev_t {
 
     int dev_class;
     int subclass;
+    int vendor;
+    int device;
 
     uint8_t header_type;
 
@@ -391,7 +429,8 @@ struct pci_dev_iterator_t : public pci_dev_t {
 int pci_init(void);
 
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
-                        int dev_class, int subclass);
+                        int dev_class = -1, int subclass = -1,
+                        int vendor = -1, int device = -1);
 int pci_enumerate_next(pci_dev_iterator_t *iter);
 
 uint32_t pci_config_read(pci_addr_t addr, int offset, int size);
@@ -402,10 +441,11 @@ bool pci_config_write(pci_addr_t addr,
 void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size);
 
 int pci_find_capability(pci_addr_t addr,
-        int capability_id);
+        int capability_id, int start = 0);
 
-int pci_enum_capabilities(pci_addr_t addr,
-        int (*callback)(uint8_t, int, uintptr_t), uintptr_t context);
+int pci_enum_capabilities(int start, pci_addr_t addr,
+                          int (*callback)(uint8_t, int, uintptr_t),
+                          uintptr_t context);
 
 //
 // PCI capability IDs
@@ -454,6 +494,9 @@ int pci_enum_capabilities(pci_addr_t addr,
 
 // Secure device
 #define PCICAP_SECDEV   0xF
+
+// Vendor specific
+#define PCICAP_VENDOR   0x9
 
 // PCI Express
 #define PCICAP_PCIE     0x10

@@ -367,9 +367,13 @@ static void pci_enumerate_read(pci_addr_t addr, pci_config_hdr_t *config)
 static int pci_enumerate_is_match(pci_dev_iterator_t *iter)
 {
     return (iter->dev_class == -1 ||
-            iter->config.dev_class == iter->dev_class) &&
+            iter->dev_class == iter->config.dev_class) &&
             (iter->subclass == -1 ||
-            iter->config.subclass == iter->subclass);
+             iter->subclass == iter->config.subclass) &&
+            (iter->vendor == -1 ||
+             iter->vendor == iter->config.vendor) &&
+            (iter->device == -1 ||
+             iter->device == iter->config.device);
 }
 
 int pci_enumerate_next(pci_dev_iterator_t *iter)
@@ -390,6 +394,11 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
             if (iter->config.dev_class == (uint8_t)~0 &&
                     iter->config.vendor == (uint16_t)~0)
                 continue;
+
+            printdbg("pci enumerator: encountered vendor=%#.4x, device=%#.4x"
+                     ", class=%#.4x, subclass=%#.4x\n",
+                     iter->config.vendor, iter->config.device,
+                     iter->config.dev_class, iter->config.subclass);
 
             // If device is bridge, add bus to todo list
             if (iter->config.dev_class == PCI_DEV_CLASS_BRIDGE &&
@@ -428,12 +437,14 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
 }
 
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
-                        int dev_class, int subclass)
+                        int dev_class, int subclass, int vendor, int device)
 {
     memset(iter, 0, sizeof(*iter));
 
     iter->dev_class = dev_class;
     iter->subclass = subclass;
+    iter->vendor = vendor;
+    iter->device = device;
 
     iter->bus = 0;
     iter->slot = 0;
@@ -508,23 +519,38 @@ static int pci_enum_capabilities_match(
     return 0;
 }
 
-int pci_enum_capabilities(pci_addr_t addr,
+int pci_enum_capabilities(int start, pci_addr_t addr,
                           int (*callback)(uint8_t, int, uintptr_t),
                           uintptr_t context)
 {
-    int status = pci_config_read(addr, offsetof(pci_config_hdr_t, status),
-                                 sizeof(uint16_t));
+    int ofs;
 
-    if (!(status & PCI_CFG_STATUS_CAPLIST))
-        return 0;
+    if (start == 0) {
+        // If not continuing a scan for capabilities, make sure the
+        // status register indicates that a capability list exists
+        int status = pci_config_read(
+                    addr, offsetof(pci_config_hdr_t, status),
+                    sizeof(uint16_t));
 
-    int ofs = pci_config_read(addr, offsetof(pci_config_hdr_t,
-                                             capabilities_ptr), 1);
+        if (!(status & PCI_CFG_STATUS_CAPLIST))
+            return 0;
+
+        // Read the offset of the first capability
+        start = offsetof(pci_config_hdr_t, capabilities_ptr);
+
+        ofs = pci_config_read(addr, start, 1);
+    } else {
+        // Read next link
+        ofs = pci_config_read(addr, start + 1, 1);
+    }
 
     while (ofs != 0) {
         uint16_t type_next = pci_config_read(addr, ofs, 2);
         uint8_t type = type_next & 0xFF;
         uint16_t next = (type_next >> 8) & 0xFF;
+
+        PCI_TRACE("cap: ofs=%#x, bus=%d, func=%d, type=%#x, next=%#x\n",
+                  ofs, addr.bus(), addr.func(), type, next);
 
         int result = callback(type, ofs, context);
         if (result != 0)
@@ -532,12 +558,13 @@ int pci_enum_capabilities(pci_addr_t addr,
 
         ofs = next;
     }
+
     return 0;
 }
 
-int pci_find_capability(pci_addr_t addr, int capability_id)
+int pci_find_capability(pci_addr_t addr, int capability_id, int start)
 {
-    return pci_enum_capabilities(addr, pci_enum_capabilities_match,
+    return pci_enum_capabilities(start, addr, pci_enum_capabilities_match,
                                  capability_id);
 }
 

@@ -1272,7 +1272,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     pci_adj_control_bits(pci_dev, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
 
     mmio_base = (hba_host_ctl_t*)
-            mmap((void*)(uintptr_t)pci_dev.config.base_addr[5],
+            mmap((void*)pci_dev.config.get_bar(5),
             0x1100, PROT_READ | PROT_WRITE,
             MAP_PHYSICAL, -1, 0);
 
@@ -1738,20 +1738,21 @@ vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
             continue;
 
         // Ignore controllers with AHCI base address not set
-        if (pci_iter.config.base_addr[5] == 0)
+        if (pci_iter.config.get_bar(5) == 0)
             continue;
 
         AHCI_TRACE("Found AHCI Device BAR ht=%x %u/%u/%u d=%x s=%x:"
-                   " %x %x %x %x %x %x\n",
+                   " %#" PRIx64 " %#" PRIx64 " %#" PRIx64
+                   " %#" PRIx64 " %#" PRIx64 " %#" PRIx64 "\n",
                    pci_iter.config.header_type,
                    pci_iter.bus, pci_iter.slot, pci_iter.func,
                    pci_iter.dev_class, pci_iter.subclass,
-                   pci_iter.config.base_addr[0],
-                pci_iter.config.base_addr[1],
-                pci_iter.config.base_addr[2],
-                pci_iter.config.base_addr[3],
-                pci_iter.config.base_addr[4],
-                pci_iter.config.base_addr[5]);
+                   pci_iter.config.get_bar(0),
+                   pci_iter.config.get_bar(1),
+                   pci_iter.config.get_bar(2),
+                   pci_iter.config.get_bar(3),
+                   pci_iter.config.get_bar(4),
+                   pci_iter.config.get_bar(5));
 
         AHCI_TRACE("IRQ line=%d, IRQ pin=%d\n",
                pci_iter.config.irq_line,

@@ -636,8 +636,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 {
     config = pci_dev.config;
 
-    uint64_t addr = (uint64_t(pci_dev.config.base_addr[1]) << 32) |
-            pci_dev.config.base_addr[0];
+    uint64_t addr = pci_dev.config.get_bar(0);
 
     mmio_base = (nvme_mmio_t*)mmap(
                 (void*)(addr & -8),
