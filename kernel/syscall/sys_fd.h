@@ -8,9 +8,9 @@ ssize_t sys_read(int fd, void *bufaddr, size_t count);
 ssize_t sys_write(int fd, void const *bufaddr, size_t count);
 int sys_close(int fd);
 off_t sys_lseek(int fd, off_t ofs, int whence);
-ssize_t sys_pread64(int fd, void *bufaddr, 
+ssize_t sys_pread64(int fd, void *bufaddr,
                     size_t count, off_t ofs);
-ssize_t sys_pwrite64(int fd, void const *bufaddr, 
+ssize_t sys_pwrite64(int fd, void const *bufaddr,
                      size_t count, off_t ofs);
 int sys_fsync(int fd);
 int sys_fdatasync(int fd);
@@ -19,7 +19,7 @@ int sys_dup2(int oldfd, int newfd);
 int sys_dup3(int oldfd, int newfd, int flags);
 int sys_ftruncate(int fd, off_t size);
 
-int sys_open(const char *pathname, int flags, mode_t mode);
+int sys_open(char const *pathname, int flags, mode_t mode);
 int sys_creat(char const *path, mode_t mode);
 int sys_rename(char const *old_path, char const *new_path);
 int sys_mkdir(char const *path, mode_t mode);
@@ -44,30 +44,30 @@ int sys_getxattr(char const *path,
 int sys_listxattr(char const *path,
          char const* list, size_t size);
 
-//int opendir(fs_file_info_t **fi, fs_cpath_t path) final;            
-//ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  
-//                off_t offset) final;                                
-//int releasedir(fs_file_info_t *fi) final;                           
-//int getattr(fs_cpath_t path, fs_stat_t* stbuf) final;               
-//int readlink(fs_cpath_t path, char* buf, size_t size) final;        
-//int symlink(fs_cpath_t to, fs_cpath_t from) final;                  
-//int utimens(fs_cpath_t path,                                        
-//       fs_timespec_t const *ts) final;                              
-//int release(fs_file_info_t *fi) final;                              
-//int fstat(fs_file_info_t *fi,                                       
-//     fs_stat_t *st) final;                                          
-//int fsyncdir(fs_file_info_t *fi,                                    
-//        int isdatasync) final;                                      
-//int flush(fs_file_info_t *fi) final;                                
-//int lock(fs_file_info_t *fi,                                        
-//    int cmd, fs_flock_t* locks) final;                              
-//int bmap(fs_cpath_t path, size_t blocksize,                         
-//    uint64_t* blockno) final;                                       
-//int statfs(fs_statvfs_t* stbuf) final;                              
-//int ioctl(fs_file_info_t *fi,                                       
-//     int cmd, void* arg,                                            
-//     unsigned int flags, void* data) final;                         
-//int poll(fs_file_info_t *fi,                                        
+//int opendir(fs_file_info_t **fi, fs_cpath_t path) final;
+//ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,
+//                off_t offset) final;
+//int releasedir(fs_file_info_t *fi) final;
+//int getattr(fs_cpath_t path, fs_stat_t* stbuf) final;
+//int readlink(fs_cpath_t path, char* buf, size_t size) final;
+//int symlink(fs_cpath_t to, fs_cpath_t from) final;
+//int utimens(fs_cpath_t path,
+//       fs_timespec_t const *ts) final;
+//int release(fs_file_info_t *fi) final;
+//int fstat(fs_file_info_t *fi,
+//     fs_stat_t *st) final;
+//int fsyncdir(fs_file_info_t *fi,
+//        int isdatasync) final;
+//int flush(fs_file_info_t *fi) final;
+//int lock(fs_file_info_t *fi,
+//    int cmd, fs_flock_t* locks) final;
+//int bmap(fs_cpath_t path, size_t blocksize,
+//    uint64_t* blockno) final;
+//int statfs(fs_statvfs_t* stbuf) final;
+//int ioctl(fs_file_info_t *fi,
+//     int cmd, void* arg,
+//     unsigned int flags, void* data) final;
+//int poll(fs_file_info_t *fi,
 //    fs_pollhandle_t* ph, unsigned* reventsp) final;
 
 }

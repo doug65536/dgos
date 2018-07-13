@@ -3,7 +3,7 @@
 #include <sys/syscall.h>
 #include <sys/syscall_num.h>
 
-int open(const char *path, int oflag, ...)
+int open(char const *path, int oflag, ...)
 {
     va_list ap;
     va_start(ap, oflag);

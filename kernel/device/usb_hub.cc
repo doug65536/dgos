@@ -183,7 +183,7 @@ bool usb_hub_class_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     return hub->init(cfg_hlp);
 }
 
-const char *usb_hub_class_t::name() const
+char const *usb_hub_class_t::name() const
 {
     return "USB hub";
 }

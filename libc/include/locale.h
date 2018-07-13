@@ -60,8 +60,8 @@ typedef struct __locale_struct *locale_t;
 locale_t      duplocale(locale_t);
 void          freelocale(locale_t);
 struct lconv *localeconv(void);
-locale_t      newlocale(int, const char *, locale_t);
-char         *setlocale(int, const char *);
+locale_t      newlocale(int, char const *, locale_t);
+char         *setlocale(int, char const *);
 locale_t      uselocale (locale_t);
 
 __END_DECLS

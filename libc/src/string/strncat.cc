@@ -8,7 +8,7 @@
 // behavior is undefined if either dest is not a pointer
 // to a null-terminated byte string or src is not a
 // pointer to a character array.
-char *strncat(char *restrict lhs, const char *restrict rhs, size_t sz)
+char *strncat(char *restrict lhs, char const *restrict rhs, size_t sz)
 {
     return strncpy(lhs + strlen(lhs), rhs, sz);
 }

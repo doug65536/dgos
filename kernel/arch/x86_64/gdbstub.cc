@@ -137,7 +137,7 @@ public:
                                uint8_t kind);
     static void breakpoint_toggle_all(bool activate);
 
-    static int breakpoint_get_byte(const uint8_t *addr, uintptr_t page_dir);
+    static int breakpoint_get_byte(uint8_t const *addr, uintptr_t page_dir);
     static bool breakpoint_set_byte(uint8_t *addr, uintptr_t page_dir,
                                     uint8_t value);
 
@@ -472,9 +472,9 @@ private:
                                size_t advance = sizeof(T));
 
     void data_received(char const *data, size_t size);
-    bool match(const char *&input, char const *pattern,
+    bool match(char const *&input, char const *pattern,
                char const *separators, char *sep = nullptr);
-    bool parse_memop(uintptr_t& addr, size_t& size, const char *&input);
+    bool parse_memop(uintptr_t& addr, size_t& size, char const *&input);
 
 
     uint8_t calc_checksum(char const *data, size_t size);
@@ -483,7 +483,7 @@ private:
     rx_state_t handle_memop_read(char const *input);
     rx_state_t handle_memop_write(char const *&input);
     bool get_target_desc(unique_ptr<char[]> &result, size_t &result_sz,
-                                const char *annex, size_t annex_sz);
+                                char const *annex, size_t annex_sz);
     rx_state_t handle_query_features(char const *input);
 
     rx_state_t replyf_hex(char const *format, ...);
@@ -733,12 +733,12 @@ gdbstub_t::rx_state_t gdbstub_t::replyf(char const *format, ...)
     return reply(tx_buf, tx_index);
 }
 
-gdbstub_t::rx_state_t gdbstub_t::reply(const char *data)
+gdbstub_t::rx_state_t gdbstub_t::reply(char const *data)
 {
     return reply(data, strlen(data));
 }
 
-gdbstub_t::rx_state_t gdbstub_t::reply(const char *data, size_t size)
+gdbstub_t::rx_state_t gdbstub_t::reply(char const *data, size_t size)
 {
     printk("gdbstub reply: \"%*.*s\"\n", int(size), int(size), data);
 
@@ -1790,7 +1790,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
     return reply("");
 }
 
-uint8_t gdbstub_t::calc_checksum(const char *data, size_t size)
+uint8_t gdbstub_t::calc_checksum(char const *data, size_t size)
 {
     uint8_t checksum = 0;
     for (size_t chk = 0; chk < size; ++chk)

@@ -209,7 +209,7 @@ void storage_if_factory_t::register_factory(void *p)
     storage_if_register_factory(instance->name, instance);
 }
 
-part_factory_t::part_factory_t(const char *factory_name)
+part_factory_t::part_factory_t(char const *factory_name)
     : name(factory_name)
 {
 }

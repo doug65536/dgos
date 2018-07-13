@@ -11,7 +11,7 @@ class type_info {
 public:
     virtual ~type_info();
 
-    const char* name() const
+    char const* name() const
     { return __name; }
 
     bool before(const type_info& __arg) const;
@@ -33,9 +33,9 @@ public:
                              void **__obj_ptr) const;
 
 protected:
-    const char *__name;
+    char const *__name;
 
-    explicit type_info(const char *__n): __name(__n) { }
+    explicit type_info(char const *__n): __name(__n) { }
 
 private:
     /// Assigning type_info is not supported.

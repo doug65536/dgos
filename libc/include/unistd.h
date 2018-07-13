@@ -868,14 +868,14 @@
 // The following shall be declared as functions and may also be defined
 // as macros. Function prototypes shall be provided.
 
-int          access(const char *, int);
+int          access(char const *, int);
 unsigned     alarm(unsigned);
-int          chdir(const char *);
-int          chown(const char *, uid_t, gid_t);
+int          chdir(char const *);
+int          chown(char const *, uid_t, gid_t);
 int          close(int);
 size_t       confstr(int, char *, size_t);
 
-char        *crypt(const char *, const char *);
+char        *crypt(char const *, char const *);
 
 int          dup(int);
 
@@ -885,16 +885,16 @@ void         _exit(int);
 
 void         encrypt(char [64], int);
 
-int          execl(const char *, const char *, ...);
-int          execle(const char *, const char *, ...);
-int          execlp(const char *, const char *, ...);
-int          execv(const char *, char *const []);
-int          execve(const char *, char *const [], char *const []);
-int          execvp(const char *, char *const []);
-int          faccessat(int, const char *, int, int);
+int          execl(char const *, char const *, ...);
+int          execle(char const *, char const *, ...);
+int          execlp(char const *, char const *, ...);
+int          execv(char const *, char *const []);
+int          execve(char const *, char *const [], char *const []);
+int          execvp(char const *, char *const []);
+int          faccessat(int, char const *, int, int);
 int          fchdir(int);
 int          fchown(int, uid_t, gid_t);
-int          fchownat(int, const char *, uid_t, gid_t, int);
+int          fchownat(int, char const *, uid_t, gid_t, int);
 
 int          fdatasync(int);
 
@@ -916,7 +916,7 @@ long         gethostid(void);
 int          gethostname(char *, size_t);
 char        *getlogin(void);
 int          getlogin_r(char *, size_t);
-int          getopt(int, char * const [], const char *);
+int          getopt(int, char * const [], char const *);
 pid_t        getpgid(pid_t);
 pid_t        getpgrp(void);
 pid_t        getpid(void);
@@ -924,9 +924,9 @@ pid_t        getppid(void);
 pid_t        getsid(pid_t);
 uid_t        getuid(void);
 int          isatty(int);
-int          lchown(const char *, uid_t, gid_t);
-int          link(const char *, const char *);
-int          linkat(int, const char *, int, const char *, int);
+int          lchown(char const *, uid_t, gid_t);
+int          link(char const *, char const *);
+int          linkat(int, char const *, int, char const *, int);
 
 int          lockf(int, int, off_t);
 
@@ -934,15 +934,15 @@ off_t        lseek(int, off_t, int);
 
 int          nice(int);
 
-long         pathconf(const char *, int);
+long         pathconf(char const *, int);
 int          pause(void);
 int          pipe(int *fds);
 ssize_t      pread(int, void *, size_t, off_t);
 ssize_t      pwrite(int, const void *, size_t, off_t);
 ssize_t      read(int, void *, size_t);
-ssize_t      readlink(const char *restrict, char *restrict, size_t);
-ssize_t      readlinkat(int, const char *restrict, char *restrict, size_t);
-int          rmdir(const char *);
+ssize_t      readlink(char const *restrict, char *restrict, size_t);
+ssize_t      readlinkat(int, char const *restrict, char *restrict, size_t);
+int          rmdir(char const *);
 int          setegid(gid_t);
 int          seteuid(uid_t);
 int          setgid(gid_t);
@@ -961,19 +961,19 @@ unsigned     sleep(unsigned);
 
 void         swab(const void *restrict, void *restrict, ssize_t);
 
-int          symlink(const char *, const char *);
-int          symlinkat(const char *, int, const char *);
+int          symlink(char const *, char const *);
+int          symlinkat(char const *, int, char const *);
 
 void         sync(void);
 
 long         sysconf(int);
 pid_t        tcgetpgrp(int);
 int          tcsetpgrp(int, pid_t);
-int          truncate(const char *, off_t);
+int          truncate(char const *, off_t);
 char        *ttyname(int);
 int          ttyname_r(int, char *, size_t);
-int          unlink(const char *);
-int          unlinkat(int, const char *, int);
+int          unlink(char const *);
+int          unlinkat(int, char const *, int);
 ssize_t      write(int, const void *, size_t);
 
 // Implementations may also include the pthread_atfork() prototype

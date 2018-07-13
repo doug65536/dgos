@@ -1,6 +1,6 @@
 #include <string.h>
 
-char *strchr(const char *s, int c)
+char *strchr(char const *s, int c)
 {
     auto cc = char(c);
     size_t i;

@@ -526,7 +526,7 @@ protected:
     // usb_class_drv_t interface
     virtual bool probe(usb_config_helper *cfg, usb_bus_t *bus) override final;
 
-    virtual const char *name() const override final;
+    virtual char const *name() const override final;
 };
 
 bool usb_hid_class_drv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)

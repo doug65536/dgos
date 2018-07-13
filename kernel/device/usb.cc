@@ -144,7 +144,7 @@ char const *usb_config_helper::class_code_text(uint8_t cls)
     }
 }
 
-const char *usb_config_helper::ep_attr_text(usb_ep_attr attr)
+char const *usb_config_helper::ep_attr_text(usb_ep_attr attr)
 {
     switch (attr) {
     case usb_ep_attr::control: return "control";

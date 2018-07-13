@@ -1,3 +1,3 @@
 #include <string.h>
 
-//char *strstr(const char *, const char *);
+//char *strstr(char const *, char const *);

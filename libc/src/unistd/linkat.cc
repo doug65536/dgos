@@ -3,8 +3,8 @@
 #include <sys/syscall_num.h>
 #include <sys/types.h>
 
-int linkat(int targetdirfd, const char *target,
-           int linkdirfd, const char *link, int flags)
+int linkat(int targetdirfd, char const *target,
+           int linkdirfd, char const *link, int flags)
 {
     return syscall5(targetdirfd, long(target), linkdirfd,
                     long(link), flags, SYS_linkat);

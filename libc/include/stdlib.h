@@ -28,15 +28,15 @@ typedef struct {
 
 void          _Exit(int);
 
-long          a64l(const char *);
+long          a64l(char const *);
 
 void          abort(void);
 int           abs(int);
 int           atexit(void (*)(void));
-double        atof(const char *);
-int           atoi(const char *);
-long          atol(const char *);
-long long     atoll(const char *);
+double        atof(char const *);
+int           atoi(char const *);
+long          atol(char const *);
+long long     atoll(char const *);
 void         *bsearch(const void *, const void *, size_t, size_t,
                   int (*)(const void *, const void *));
 void         *calloc(size_t, size_t);
@@ -47,7 +47,7 @@ double        erand48(unsigned short [3]);
 
 void          exit(int);
 void          free(void *);
-char         *getenv(const char *);
+char         *getenv(char const *);
 
 int           getsubopt(char **, char *const *, char **);
 
@@ -67,9 +67,9 @@ lldiv_t       lldiv(long long, long long);
 long          lrand48(void);
 
 void         *malloc(size_t);
-int           mblen(const char *, size_t);
-size_t        mbstowcs(wchar_t *restrict, const char *restrict, size_t);
-int           mbtowc(wchar_t *restrict, const char *restrict, size_t);
+int           mblen(char const *, size_t);
+size_t        mbstowcs(wchar_t *restrict, char const *restrict, size_t);
+int           mbtowc(wchar_t *restrict, char const *restrict, size_t);
 
 char         *mkdtemp(char *);
 int           mkstemp(char *);
@@ -93,12 +93,12 @@ long          random(void);
 
 void         *realloc(void *, size_t);
 
-char         *realpath(const char *restrict, char *restrict);
+char         *realpath(char const *restrict, char *restrict);
 unsigned short *seed48(unsigned short [3]);
 
-int           setenv(const char *, const char *, int);
+int           setenv(char const *, char const *, int);
 
-void          setkey(const char *);
+void          setkey(char const *);
 char         *setstate(char *);
 
 void          srand(unsigned);
@@ -106,19 +106,19 @@ void          srand(unsigned);
 void          srand48(long);
 void          srandom(unsigned);
 
-double        strtod(const char *restrict, char **restrict);
-float         strtof(const char *restrict, char **restrict);
-long          strtol(const char *restrict, char **restrict, int);
-long double   strtold(const char *restrict, char **restrict);
-long long     strtoll(const char *restrict, char **restrict, int);
-unsigned long strtoul(const char *restrict, char **restrict, int);
+double        strtod(char const *restrict, char **restrict);
+float         strtof(char const *restrict, char **restrict);
+long          strtol(char const *restrict, char **restrict, int);
+long double   strtold(char const *restrict, char **restrict);
+long long     strtoll(char const *restrict, char **restrict, int);
+unsigned long strtoul(char const *restrict, char **restrict, int);
 unsigned long long
-              strtoull(const char *restrict, char **restrict, int);
-int           system(const char *);
+              strtoull(char const *restrict, char **restrict, int);
+int           system(char const *);
 
 int           unlockpt(int);
 
-int           unsetenv(const char *);
+int           unsetenv(char const *);
 
 size_t        wcstombs(char *restrict, const wchar_t *restrict, size_t);
 int           wctomb(char *, wchar_t);

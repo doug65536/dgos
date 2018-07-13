@@ -1,6 +1,6 @@
 #include <string.h>
 
-char *stpncpy(char *restrict lhs, const char *restrict rhs, size_t sz)
+char *stpncpy(char *restrict lhs, char const *restrict rhs, size_t sz)
 {
     auto d = lhs;
     auto s = rhs;

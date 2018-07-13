@@ -416,7 +416,7 @@ void malloc_get_heap_range(void **st, void **en)
     *en = heap_en + 1;
 }
 
-char *strdup(const char *s)
+char *strdup(char const *s)
 {
     size_t len = strlen(s);
     char *copy = (char*)malloc(len + 1);

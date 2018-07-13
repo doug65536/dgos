@@ -1,3 +1,3 @@
 #include <string.h>
 
-//char *strtok(char *restrict, const char *restrict);
+//char *strtok(char *restrict, char const *restrict);

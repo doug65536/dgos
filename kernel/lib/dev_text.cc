@@ -63,23 +63,23 @@ protected:
     void putc_xy(int x, int y, int character) override final
     {
     }
-    int print(const char *s) override final
+    int print(char const *s) override final
     {
         return 0;
     }
-    int write(const char *s, intptr_t len) override final
+    int write(char const *s, intptr_t len) override final
     {
         return 0;
     }
-    int print_xy(int x, int y, const char *s) override final
+    int print_xy(int x, int y, char const *s) override final
     {
         return 0;
     }
-    int draw(const char *s) override final
+    int draw(char const *s) override final
     {
         return 0;
     }
-    int draw_xy(int x, int y, const char *s, int attrib) override final
+    int draw_xy(int x, int y, char const *s, int attrib) override final
     {
         return 0;
     }

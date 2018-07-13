@@ -427,7 +427,7 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     return true;
 }
 
-const char *usb_msc_classdrv_t::name() const
+char const *usb_msc_classdrv_t::name() const
 {
     return "USB mass storage (bulk)";
 }

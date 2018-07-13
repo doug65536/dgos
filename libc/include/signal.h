@@ -542,8 +542,8 @@ int kill(pid_t, int);
 int killpg(pid_t, int);
 
 
-void psiginfo(const siginfo_t *, const char *);
-void psignal(int, const char *);
+void psiginfo(const siginfo_t *, char const *);
+void psignal(int, char const *);
 int pthread_kill(pthread_t, int);
 int pthread_sigmask(int, const sigset_t *restrict,
            sigset_t *restrict);

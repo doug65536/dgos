@@ -60,7 +60,7 @@ void dhcp_builder_begin(void *buf)
     pkt->magic_cookie = htonl(0x63825363);
 }
 
-void dhcp_builder_s_mac(void *buf, const uint8_t *mac_addr)
+void dhcp_builder_s_mac(void *buf, uint8_t const *mac_addr)
 {
     dhcp_pkt_t *pkt = (dhcp_pkt_t*)buf;
 
@@ -68,7 +68,7 @@ void dhcp_builder_s_mac(void *buf, const uint8_t *mac_addr)
            sizeof(pkt->udp_hdr.ipv4_hdr.eth_hdr.s_mac));
 }
 
-void dhcp_builder_d_mac(void *buf, const uint8_t *mac_addr)
+void dhcp_builder_d_mac(void *buf, uint8_t const *mac_addr)
 {
     dhcp_pkt_t *pkt = (dhcp_pkt_t *)buf;
 

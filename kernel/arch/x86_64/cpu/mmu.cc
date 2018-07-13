@@ -510,8 +510,8 @@ static uint64_t volatile page_fault_count;
 
 struct contiguous_allocator_t {
 public:
-    void early_init(linaddr_t *addr, size_t size, const char *name);
-    void init(linaddr_t addr, size_t size, const char *name);
+    void early_init(linaddr_t *addr, size_t size, char const *name);
+    void init(linaddr_t addr, size_t size, char const *name);
     uintptr_t alloc_linear(size_t size);
     bool take_linear(linaddr_t addr, size_t size, bool require_free);
     void release_linear(uintptr_t addr, size_t size);
@@ -2051,7 +2051,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 #endif
 }
 
-void contiguous_allocator_t::dump(const char *format, ...)
+void contiguous_allocator_t::dump(char const *format, ...)
 {
 #if DEBUG_ADDR_ALLOC
     va_list ap;

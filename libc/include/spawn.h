@@ -35,7 +35,7 @@ typedef struct __posix_spawnattr_t {
 // defined as macros. Function prototypes shall be provided.
 
 int posix_spawn(pid_t *restrict pid,
-                const char *restrict path,
+                char const *restrict path,
                 const posix_spawn_file_actions_t *file_actions,
                 const posix_spawnattr_t *restrict attr,
                 char * const *restrict argv,
@@ -49,7 +49,7 @@ int posix_spawn_file_actions_adddup2(
         int from, int to);
 
 int posix_spawn_file_actions_addopen(posix_spawn_file_actions_t *restrict fact,
-        int fd, const char *restrict path, int oflag, mode_t mode);
+        int fd, char const *restrict path, int oflag, mode_t mode);
 
 int posix_spawn_file_actions_destroy(
         posix_spawn_file_actions_t *fa);
@@ -115,7 +115,7 @@ int posix_spawnattr_setsigmask(
         const sigset_t *restrict set);
 
 int posix_spawnp(pid_t *restrict pid,
-                 const char *restrict path,
+                 char const *restrict path,
                  const posix_spawn_file_actions_t *fact,
                  const posix_spawnattr_t *restrict fatt,
                  char * const * restrict argv,

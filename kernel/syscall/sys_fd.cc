@@ -243,7 +243,7 @@ int sys_open(char const* pathname, int flags, mode_t mode)
     return err(-id);
 }
 
-int sys_creat(const char *path, mode_t mode)
+int sys_creat(char const *path, mode_t mode)
 {
     process_t *p = fast_cur_process();
 
@@ -268,7 +268,7 @@ int sys_truncate(char const *path, off_t size)
     return err;
 }
 
-int sys_rename(const char *old_path, const char *new_path)
+int sys_rename(char const *old_path, char const *new_path)
 {
     int status = file_rename(old_path, new_path);
     if (likely(status >= 0))
@@ -277,7 +277,7 @@ int sys_rename(const char *old_path, const char *new_path)
     return err(status);
 }
 
-int sys_mkdir(const char *path, mode_t mode)
+int sys_mkdir(char const *path, mode_t mode)
 {
     int status = file_mkdir(path, mode);
     if (status >= 0)
@@ -286,7 +286,7 @@ int sys_mkdir(const char *path, mode_t mode)
     return err(status);
 }
 
-int sys_rmdir(const char *path)
+int sys_rmdir(char const *path)
 {
     int status = file_rmdir(path);
     if (likely(status >= 0))
@@ -295,7 +295,7 @@ int sys_rmdir(const char *path)
     return err(status);
 }
 
-int sys_unlink(const char *path)
+int sys_unlink(char const *path)
 {
     int status = file_unlink(path);
     if (likely(status >= 0))
@@ -304,19 +304,19 @@ int sys_unlink(const char *path)
     return err(status);
 }
 
-int sys_mknod(const char *path, mode_t mode, int rdev)
+int sys_mknod(char const *path, mode_t mode, int rdev)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
 
-int sys_link(const char *from, const char *to)
+int sys_link(char const *from, char const *to)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
 
-int sys_chmod(const char *path, mode_t mode)
+int sys_chmod(char const *path, mode_t mode)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
@@ -328,7 +328,7 @@ int sys_fchmod(int fd, mode_t mode)
     return -int(errno_t::ENOSYS);
 }
 
-int sys_chown(const char *path, int uid, int gid)
+int sys_chown(char const *path, int uid, int gid)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
@@ -340,29 +340,29 @@ int sys_fchown(int fd, int uid, int gid)
     return -int(errno_t::ENOSYS);
 }
 
-int sys_setxattr(const char *path,
-                 const char *name, const char *value,
+int sys_setxattr(char const *path,
+                 char const *name, char const *value,
                  size_t size, int flags)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
 
-int sys_getxattr(const char *path,
-                 const char *name, char *value,
+int sys_getxattr(char const *path,
+                 char const *name, char *value,
                  size_t size)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
 
-int sys_listxattr(const char *path, const char *list, size_t size)
+int sys_listxattr(char const *path, char const *list, size_t size)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
 
-int sys_access(const char *path, int mask)
+int sys_access(char const *path, int mask)
 {
     // FIXME: implement me
     return -int(errno_t::ENOSYS);

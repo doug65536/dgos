@@ -38,7 +38,7 @@ struct FWCfgFile {      /* an individual file entry, 64 bytes total */
 // Returns how much buffer should have been provided on success
 // Limits buffer fill to specified size
 // Returns -1 on error or if not running under qemu
-ssize_t qemu_fw_cfg(void *buffer, size_t size, const char *name)
+ssize_t qemu_fw_cfg(void *buffer, size_t size, char const *name)
 {
     if (!qemu_present())
         return -1;

@@ -1,6 +1,6 @@
 #include <string.h>
 
-char *strrchr(const char *s, int c)
+char *strrchr(char const *s, int c)
 {
     unsigned char const *us = (unsigned char const *)s;
     unsigned char uc = (unsigned char)c;

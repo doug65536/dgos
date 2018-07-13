@@ -475,14 +475,14 @@ void pci_init_ecam_enable();
 bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, int req_count,
-                     intr_handler_t handler, const char *name,
+                     intr_handler_t handler, char const *name,
                      int const *target_cpus = nullptr,
                      int const *vector_offsets = nullptr);
 
 bool pci_set_msi_irq(pci_addr_t addr,
                      pci_irq_range_t *irq_range,
                      int cpu, bool distribute, int req_count,
-                     intr_handler_t handler, const char *name,
+                     intr_handler_t handler, char const *name,
                      int const *target_cpus = nullptr,
                      int const *vector_offsets = nullptr);
 

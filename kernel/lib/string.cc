@@ -449,7 +449,7 @@ EXPORT char *strcpy(char *dest, char const *src)
     return dest;
 }
 
-EXPORT char *stpcpy(char *lhs, const char *rhs)
+EXPORT char *stpcpy(char *lhs, char const *rhs)
 {
     auto d = lhs;
     auto s = rhs;

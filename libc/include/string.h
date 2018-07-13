@@ -15,47 +15,47 @@ void *memcpy(void *restrict, const void *restrict, size_t);
 void *memmove(void *, const void *, size_t);
 void *memset(void *, int, size_t);
 
-char *stpcpy(char *restrict, const char *restrict);
-char *stpncpy(char *restrict, const char *restrict, size_t);
+char *stpcpy(char *restrict, char const *restrict);
+char *stpncpy(char *restrict, char const *restrict, size_t);
 
-char *strcat(char *restrict, const char *restrict);
-char *strchr(const char *, int);
-int strcmp(const char *, const char *);
-int strcoll(const char *, const char *);
+char *strcat(char *restrict, char const *restrict);
+char *strchr(char const *, int);
+int strcmp(char const *, char const *);
+int strcoll(char const *, char const *);
 
-int strcoll_l(const char *, const char *, locale_t);
+int strcoll_l(char const *, char const *, locale_t);
 
-char *strcpy(char *restrict, const char *restrict);
-size_t strcspn(const char *, const char *);
+char *strcpy(char *restrict, char const *restrict);
+size_t strcspn(char const *, char const *);
 
-char *strdup(const char *);
+char *strdup(char const *);
 
 char *strerror(int);
 
 char *strerror_l(int, locale_t);
 int strerror_r(int, char *, size_t);
 
-size_t strlen(const char *);
-char *strncat(char *restrict, const char *restrict, size_t);
-int strncmp(const char *, const char *, size_t);
-char *strncpy(char *restrict, const char *restrict, size_t);
+size_t strlen(char const *);
+char *strncat(char *restrict, char const *restrict, size_t);
+int strncmp(char const *, char const *, size_t);
+char *strncpy(char *restrict, char const *restrict, size_t);
 
-char *strndup(const char *, size_t);
-size_t strnlen(const char *, size_t);
+char *strndup(char const *, size_t);
+size_t strnlen(char const *, size_t);
 
-char *strpbrk(const char *, const char *);
-char *strrchr(const char *, int);
+char *strpbrk(char const *, char const *);
+char *strrchr(char const *, int);
 
 char *strsignal(int);
 
-size_t strspn(const char *, const char *);
-char *strstr(const char *, const char *);
-char *strtok(char *restrict, const char *restrict);
+size_t strspn(char const *, char const *);
+char *strstr(char const *, char const *);
+char *strtok(char *restrict, char const *restrict);
 
-char *strtok_r(char *restrict, const char *restrict, char **restrict);
+char *strtok_r(char *restrict, char const *restrict, char **restrict);
 
-size_t strxfrm(char *restrict, const char *restrict, size_t);
+size_t strxfrm(char *restrict, char const *restrict, size_t);
 
-size_t strxfrm_l(char *restrict, const char *restrict, size_t, locale_t);
+size_t strxfrm_l(char *restrict, char const *restrict, size_t, locale_t);
 
 __END_DECLS

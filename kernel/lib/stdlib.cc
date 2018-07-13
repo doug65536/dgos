@@ -90,7 +90,7 @@ void *operator new(size_t, void *p) noexcept
 
 // FIXME: Overflow is not handled properly
 template<typename T>
-static T strto(const char *str, char **end, int base)
+static T strto(char const *str, char **end, int base)
 {
     T n = 0;
     T digit;
@@ -129,17 +129,17 @@ static T strto(const char *str, char **end, int base)
     return !sign ? n : n * sign;
 }
 
-int strtoi(const char *str, char **end, int base)
+int strtoi(char const *str, char **end, int base)
 {
     return strto<int>(str, end, base);
 }
 
-long strtol(const char *str, char **end, int base)
+long strtol(char const *str, char **end, int base)
 {
     return strto<long>(str, end, base);
 }
 
-long long strtoll(const char *str, char **end, int base)
+long long strtoll(char const *str, char **end, int base)
 {
     return strto<long long>(str, end, base);
 }

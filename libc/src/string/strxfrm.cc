@@ -1,3 +1,3 @@
 #include <string.h>
 
-//size_t strxfrm(char *restrict, const char *restrict, size_t);
+//size_t strxfrm(char *restrict, char const *restrict, size_t);

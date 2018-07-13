@@ -1,6 +1,6 @@
 #include <string.h>
 
-char *strncpy(char *restrict lhs, const char *restrict rhs, size_t sz)
+char *strncpy(char *restrict lhs, char const *restrict rhs, size_t sz)
 {
     char *d = lhs;
 

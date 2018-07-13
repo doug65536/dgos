@@ -31,7 +31,7 @@ void free(void *p);
 
 char *strdup(char const *s);
 
-int strtoi(const char *str, char **end, int base);
+int strtoi(char const *str, char **end, int base);
 long strtol(char const *str, char **end, int base);
 long long strtoll(char const *str, char **end, int base);
 
