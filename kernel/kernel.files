@@ -33,6 +33,10 @@ device/usb_storage.cc
 device/usb_storage.h
 device/usb_xhci.bits
 device/usb_xhcibits.h
+device/virtio-base.cc
+device/virtio-base.h
+device/virtio-gpu.cc
+device/virtio-gpu.h
 lib/cc/memory.cc
 lib/cc/union_storage.h
 lib/cxxexcept.cc
