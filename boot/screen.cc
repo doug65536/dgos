@@ -232,7 +232,7 @@ void dump_regs(bios_regs_t& regs, bool show_flags)
     PRINT(" fs=%x\n", regs.fs);
     PRINT(" gs=%x\n", regs.gs);
     if (show_flags)
-        PRINT("flg=%lx\n", regs.eflags);
+        PRINT("flg=%" PRIx32 "\n", regs.eflags);
 }
 
 

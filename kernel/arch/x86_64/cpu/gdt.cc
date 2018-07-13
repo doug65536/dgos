@@ -6,6 +6,7 @@
 #include "assert.h"
 #include "callout.h"
 #include "mutex.h"
+#include "inttypes.h"
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
@@ -119,7 +120,7 @@ void gdt_init_tss(int cpu_count)
             madvise(stack, PAGESIZE, MADV_DONTNEED);
             mprotect(stack, PAGESIZE, PROT_NONE);
 
-            printdbg("Allocated IST cpu=%d slot=%d at %lx\n",
+            printdbg("Allocated IST cpu=%d slot=%d at %#" PRIx64 "\n",
                      i, st, (uintptr_t)stack);
 
             tss->stack[st] = stack;

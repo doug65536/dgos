@@ -52,7 +52,7 @@ struct lconv {
     LC_MONETARY_MASK | LC_NUMERIC_MASK | LC_TIME_MASK)
 
 struct __locale_struct {
-    
+
 };
 
 typedef struct __locale_struct *locale_t;

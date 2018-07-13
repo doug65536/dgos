@@ -35,6 +35,7 @@
 #include "process.h"
 #include "gdbstub.h"
 #include "conio.h"
+#include "inttypes.h"
 
 #include "bootloader.h"
 
@@ -151,7 +152,7 @@ private:
         for (size_t i = 0; i < queue_depth; ++i) {
             data[i] = (char*)mmap(nullptr, data_size,
                                   PROT_READ | PROT_WRITE, 0, -1, 0);
-            printk("(devid %d) read buffer at %lx\n",
+            printk("(devid %d) read buffer at %#" PRIx64 "\n",
                    devid, (uint64_t)data[i]);
         }
 
@@ -222,10 +223,11 @@ private:
                     uint64_t completion_delta = completions - last_completions;
                     last_completions = completions;
 
-                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%lu",
+                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%" PRIu64,
                                     completion_delta);
 
-                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs, " %lu ms",
+                    ofs += snprintf(buf + ofs, sizeof(buf) - ofs,
+                                    " %" PRIu64 " ms",
                                     (now - last_time) / 1000000);
 
                     last_time = now;
@@ -456,7 +458,8 @@ static int stress_mmap_thread(void *p)
             }
 
             uint64_t time_en = time_ns();
-            printk("Ran mmap test iteration, sz: %7zd, time: %6lu ns\n",
+            printk("Ran mmap test iteration, sz: %7zd"
+                   ", time: %6" PRIu64 " ns\n",
                    sz, (time_en - time_st)/10000);
         }
     }
@@ -542,11 +545,13 @@ static int stress_heap_thread(void *p)
             overall = cpu_rdtsc() - overall;
 
             printk("heap_alloc+memset+heap_free:"
-                     " mna=%8ld (%5luns @ 3.2GHz), mxa=%8ld, ava=%8ld,\n"
+                     " mna=%8" PRId64 " (%5" PRIu64 "ns @ 3.2GHz)"
+                     ", mxa=%8" PRId64 ", ava=%8" PRId64 ",\n"
                      "                            "
-                     " mnf=%8ld (%5luns @ 3.2GHz), mxf=%8ld, avf=%8ld,\n"
+                     " mnf=%8" PRId64 " (%5" PRIu64 "ns @ 3.2GHz)"
+                     ", mxf=%8" PRId64 ", avf=%8" PRId64 ",\n"
                      "                            "
-                     " withfree=%8ld cycles\n",
+                     " withfree=%8" PRId64 " cycles\n",
                      mina_el, mina_el * 10 / 32, maxa_el, tota_el / iters,
                      minf_el, minf_el * 10 / 32, maxf_el, totf_el / iters,
                      overall / iters);
@@ -564,7 +569,7 @@ int clks_unhalted(void *cpu)
     //while (1) {
     //    thread_sleep_for(1000);
     //    uint64_t curr = thread_get_usage(-1);
-    //    printk("CPU %zx: %lu clocks\n", cpu_nr, curr - last);
+    //    printk("CPU %zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
     //    last = curr;
     //}
     return 0;
@@ -644,14 +649,14 @@ static int draw_test(void *p)
             fb_draw_aa_line(40, 60, sx+640, sy+300, 0xBFBFBF & -!(sx & 1));
 
             //uint64_t line_en = cpu_rdtsc();
-            //printk("Line draw %ld cycles\n", line_en - line_st);
+            //printk("Line draw %" PRId64 " cycles\n", line_en - line_st);
 
             fb_update();
             ++frames;
         }
     }
     uint64_t en_tm = time_ns();
-    printk("Benchmark time: %d frames, %ldms\n", frames,
+    printk("Benchmark time: %d frames, %" PRId64 "ms\n", frames,
              (en_tm - st_tm) / 1000000);
 
     return 0;

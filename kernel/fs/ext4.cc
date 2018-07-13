@@ -4,6 +4,7 @@
 #include "mm.h"
 #include "printk.h"
 #include "vector.h"
+#include "inttypes.h"
 
 class ext4_fs_t final : public fs_base_t {
     FS_BASE_IMPL
@@ -279,12 +280,12 @@ int ext4_fs_t::mm_fault_handler(
     uint64_t lba = part_st + sector_offset;
 
     if (likely(read)) {
-        printdbg("Demand paging LBA %ld at addr %p\n", lba, addr);
+        printdbg("Demand paging LBA %" PRId64 " at addr %p\n", lba, addr);
 
         return drive->read_blocks(addr, length >> sector_shift, lba);
     }
 
-    printdbg("Writing back LBA %ld at addr %p\n", lba, addr);
+    printdbg("Writing back LBA %" PRId64 " at addr %p\n", lba, addr);
     int result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
 
     return result;

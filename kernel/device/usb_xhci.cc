@@ -13,6 +13,7 @@
 #include "iocp.h"
 #include "refcount.h"
 #include "time.h"
+#include "inttypes.h"
 
 #include "usb_xhcibits.h"
 
@@ -1280,7 +1281,7 @@ void usbxhci::walk_caps(char const volatile *caps)
                 }
             }
 
-            USBXHCI_TRACE("Legacy handoff completed in %ldms\n",
+            USBXHCI_TRACE("Legacy handoff completed in %" PRId64 "ms\n",
                           (1000000000 - (timeout_ns - now)) / 1000000);
 
             break;
@@ -1367,7 +1368,7 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     while (!(mmio_op->usbsts & USBXHCI_USBSTS_HCH))
         pause();
 
-    USBXHCI_TRACE("Stop completed in %lums\n",
+    USBXHCI_TRACE("Stop completed in %" PRIu64 "ms\n",
                   (time_ns() - time_st) / 1000000);
 
     USBXHCI_TRACE("Resetting controller\n");
@@ -1381,7 +1382,7 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     while (mmio_op->usbcmd & USBXHCI_USBCMD_HCRST)
         pause();
 
-    USBXHCI_TRACE("Reset completed in %lums\n",
+    USBXHCI_TRACE("Reset completed in %" PRIu64 "ms\n",
                   (time_ns() - time_st) / 1000000);
 
     uint32_t hcsparams1 = mmio_cap->hcsparams1;
@@ -2006,14 +2007,14 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
     case USBXHCI_TRB_TYPE_XFEREVT:
         xfer = (usbxhci_evt_xfer_t*)evt;
         cmdaddr = xfer->trb_ptr;
-        USBXHCI_TRACE("XFEREVT (CC=%d) (TRB=0x%lx)\n",
+        USBXHCI_TRACE("XFEREVT (CC=%d) (TRB=0x%#" PRIx64 ")\n",
                       xfer->cc, xfer->trb_ptr);
         break;
 
     case USBXHCI_TRB_TYPE_CMDCOMPEVT:
         cmdcomp = (usbxhci_evt_cmdcomp_t*)evt;
         cmdaddr = cmdcomp->command_trb_ptr;
-        USBXHCI_TRACE("CMDCOMPEVT (TRB=0x%lx)\n", cmdaddr);
+        USBXHCI_TRACE("CMDCOMPEVT (TRB=0x%#" PRIx64 ")\n", cmdaddr);
         break;
 
     case USBXHCI_TRB_TYPE_PORTSTSCHGEVT:

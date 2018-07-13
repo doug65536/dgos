@@ -8,6 +8,7 @@
 #include "export.h"
 #include "assert.h"
 #include "math.h"
+#include "inttypes.h"
 
 typedef enum length_mod_t {
     length_none,
@@ -1080,7 +1081,7 @@ size_t format_flags_register(
                 chars_needed = snprintf(
                             buf + total_written,
                             measure ? 0 : buf_size - total_written,
-                            "%s%s=%lX", prefix, fi->name, value);
+                            "%s%s=%#" PRIx64, prefix, fi->name, value);
             }
             if (!measure && chars_needed + total_written >= buf_size) {
                 if (buf_size > 3) {

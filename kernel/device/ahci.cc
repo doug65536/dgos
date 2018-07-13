@@ -14,6 +14,7 @@
 #include "threadsync.h"
 #include "cpu/control_regs.h"
 #include "unique_ptr.h"
+#include "inttypes.h"
 
 #define AHCI_DEBUG  1
 #if AHCI_DEBUG
@@ -1301,7 +1302,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
         return false;
     }
 
-    AHCI_TRACE("Reset complete in %lu ns\n", now - reset_st);
+    AHCI_TRACE("Reset complete in %" PRIu64 " ns\n", now - reset_st);
 
     // Cache number of command slots per port
     num_cmd_slots = 1 + ((mmio_base->cap >>

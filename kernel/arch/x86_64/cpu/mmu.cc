@@ -1452,7 +1452,7 @@ template<typename K, typename V>
 static int dump_addr_node(typename rbtree_t<K,V>::kvp_t *kvp, void *p)
 {
     char const **names = (char const **)p;
-    printdbg("%s=%16lx %s=%16lx\n",
+    printdbg("%s=%16#" PRIx64 " %s=%16#" PRIx64 "\n",
              names[0], kvp->key, names[1], kvp->val);
     return 0;
 }
@@ -1521,7 +1521,7 @@ void mmu_init()
     physaddr_t highest_usable = 0;
     for (physmem_range_t *mem = mem_ranges;
          mem < mem_ranges + usable_mem_ranges; ++mem) {
-        printdbg("Memory: addr=%lx size=%lx type=%x\n",
+        printdbg("Memory: addr=%#" PRIx64 " size=%#" PRIx64 " type=%x\n",
                mem->base, mem->size, mem->type);
 
         if (mem->base >= 0x100000) {
@@ -1541,7 +1541,8 @@ void mmu_init()
 
     // Compute number of slots needed
     highest_usable >>= PAGE_SIZE_BIT;
-    printdbg("Usable pages = %lu (%luMB) range_pages=%ld\n",
+    printdbg("Usable pages = %" PRIu64 " (%" PRIu64 "MB)"
+             " range_pages=%" PRId64 "\n",
              usable_pages, usable_pages >> (20 - PAGE_SIZE_BIT),
              highest_usable);
 
@@ -1874,15 +1875,16 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 #endif
 
 #if DEBUG_ADDR_ALLOC
-        printdbg("Took address space @ %lx,"
-                 " size=%lx\n", addr, size);
+        printdbg("Took address space @ %#" PRIx64
+                 ", size=%#" PRIx64 "\n", addr, size);
 #endif
     } else {
         addr = atomic_xadd(&linear_base, size);
 
-        printdbg("Took early address space @ %lx,"
-                 " size=%lx,"
-                 " new linear_base=%#lx\n", addr, size, linear_base);
+        printdbg("Took early address space @ %#" PRIx64
+                 ", size=%#" PRIx64 ""
+                 ", new linear_base=%#" PRIx64 "\n",
+                 addr, size, linear_base);
     }
 
     return addr;
@@ -2013,7 +2015,7 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
     scoped_lock lock(free_addr_lock);
 
 #if DEBUG_ADDR_ALLOC
-    dump("---- Free %lx @ %lx\n", size, addr);
+    dump("---- Free %#" PRIx64 " @ %#" PRIx64 "\n", size, addr);
 #endif
 
     // Find the nearest free block before the freed range
@@ -2302,7 +2304,7 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
     assert((flags & MAP_DEVICE) || (fd < 0));
 
 #if DEBUG_PAGE_TABLES
-    printdbg("Mapping len=%zx prot=%x flags=%x addr=%lx\n",
+    printdbg("Mapping len=%zx prot=%x flags=%x addr=%#" PRIx64 "\n",
              len, prot, flags, (uintptr_t)addr);
 #endif
 
@@ -2365,9 +2367,10 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             return MAP_FAILED;
     }
 
-    PROFILE_LINEAR_ALLOC_ONLY( printdbg("Allocation of %lu bytes of"
-                                        " address space took %lu cycles\n",
-                                        len, cpu_rdtsc() - profile_linear_st) );
+    PROFILE_LINEAR_ALLOC_ONLY(
+                printdbg("Allocation of %" PRIu64 " bytes of"
+                         " address space took %" PRIu64 " cycles\n",
+                         len, cpu_rdtsc() - profile_linear_st) );
 
     assert(linear_addr > 0x100000);
 

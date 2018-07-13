@@ -11,6 +11,7 @@
 #include "threadsync.h"
 #include "bswap.h"
 #include "unique_ptr.h"
+#include "inttypes.h"
 
 #define IDE_DEBUG   1
 #if IDE_DEBUG
@@ -961,7 +962,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
     uint8_t log2_sector_size = !is_atapi ? 9 : 11;
 
-    IDE_TRACE("Read lba=%lu, max_multiple=%u, count=%ld\n",
+    IDE_TRACE("Read lba=%" PRIu64 ", max_multiple=%u, count=%" PRId64 "\n",
               lba, unit.max_multiple, count);
 
     int64_t read_count = 0;
@@ -1131,7 +1132,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
         //hex_dump(data, sub_size);
 
-        IDE_TRACE("lba = %ld\n", lba + count_base);
+        IDE_TRACE("lba = %" PRId64 "\n", lba + count_base);
 
         data = (char*)data + sub_size;
         read_count += sub_count;

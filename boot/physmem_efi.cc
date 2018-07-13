@@ -52,7 +52,8 @@ bool get_ram_regions()
 
     for (size_t i = 0; i < count;
          ++i, in = (EFI_MEMORY_DESCRIPTOR*)((char const*)in + descsz)) {
-        PRINT("paddr=%lx, len=%lx, attr=%lx, type=%x (%s)",
+        PRINT("paddr=%" PRIx64 ", len=%" PRIx64
+              ", attr=%" PRIx64 ", type=%x (%s)",
               in->PhysicalStart, in->NumberOfPages << 12,
               in->Attribute, in->Type,
               in->Type < sizeof(efi_mem_types) / sizeof(*efi_mem_types) ?
@@ -82,7 +83,7 @@ bool get_ram_regions()
         case EfiACPIReclaimMemory:
             entry.type = PHYSMEM_TYPE_RECLAIMABLE;
             break;
-            
+
         case 0x80000000:
             entry.type = PHYSMEM_TYPE_BOOTLOADER;
             break;

@@ -7,6 +7,7 @@
 #include "cpu/thread_impl.h"
 #include "interrupts.h"
 #include "mutex.h"
+#include "inttypes.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -119,7 +120,7 @@ static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
     if (last_time + 1000000000 <= timer_ns) {
         last_time += 1000000000;
 
-        printdbg("PIT Time: %8ld\n", timer_ns);
+        printdbg("PIT Time: %8" PRId64 "\n", timer_ns);
 
         //con_draw_xy(70, 0, buf, 7);
     }

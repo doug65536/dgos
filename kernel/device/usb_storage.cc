@@ -327,7 +327,7 @@ errno_t usb_msc_dev_t::read_async(
         void *data, int64_t count,
         uint64_t lba, iocp_t *iocp)
 {
-    //USB_MSC_TRACE("Reading %ld blocks at LBA %lx", count, lba);
+    //USB_MSC_TRACE("Reading %" PRId64 " blocks at LBA %#" PRIx64, count, lba);
 
     errno_t status = io(data, count, lba, false,
                         usb_msc_op_t::read, iocp);

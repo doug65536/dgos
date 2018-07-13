@@ -11,6 +11,7 @@
 #include "time.h"
 #include "vector.h"
 #include "bootinfo.h"
+#include "inttypes.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -196,11 +197,11 @@ int fat32_fs_t::mm_fault_handler(
 
     int result;
     if (likely(read)) {
-        printdbg("Demand paging LBA %ld at addr %p\n", lba, addr);
+        printdbg("Demand paging LBA %" PRId64 " at addr %p\n", lba, addr);
 
         result = drive->read_blocks(addr, length >> sector_shift, lba);
     } else {
-        printdbg("Writing back LBA %ld at addr %p\n", lba, addr);
+        printdbg("Writing back LBA %" PRId64 " at addr %p\n", lba, addr);
         result = drive->write_blocks(addr, length >> sector_shift, lba, flush);
     }
 

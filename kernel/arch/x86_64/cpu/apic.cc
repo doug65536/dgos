@@ -1184,7 +1184,7 @@ static void acpi_parse_rsdt()
                 size_t ecam_count = ecam_end - ecam_ptr;
                 pci_init_ecam(ecam_count);
                 for (size_t i = 0; i < ecam_count; ++i) {
-                    ACPI_TRACE("PCIe ECAM ptr=%lx busses=%u-%u\n",
+                    ACPI_TRACE("PCIe ECAM ptr=%#" PRIx64 " busses=%u-%u\n",
                                ecam_ptr[i].ecam_base,
                                ecam_ptr[i].st_bus, ecam_ptr[i].en_bus);
                     pci_init_ecam_entry(ecam_ptr[i].ecam_base,
@@ -1459,7 +1459,8 @@ static void mp_parse_fps()
             uint64_t len =  entry_addrmap->addr_lo |
                     ((uint64_t)entry_addrmap->addr_hi << 32);
 
-            MPS_TRACE("Address map, bus=%d, addr=%lx, len=%lx\n",
+            MPS_TRACE("Address map, bus=%d, addr=%#" PRIx64
+                      ", len=%#" PRIx64 "\n",
                       bus, addr, len);
 
             entry += entry_addrmap->len;
@@ -2206,13 +2207,13 @@ static void apic_calibrate()
 
     uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
 
-    APIC_TRACE("CPU MHz GCD: %ld\n", clk_to_ns_gcd);
+    APIC_TRACE("CPU MHz GCD: %" PRId64 "\n", clk_to_ns_gcd);
 
     clk_to_ns_numer = 1000 / clk_to_ns_gcd;
     clk_to_ns_denom = rdtsc_mhz / clk_to_ns_gcd;
 
-    APIC_TRACE("clk_to_ns_numer: %ld\n", clk_to_ns_numer);
-    APIC_TRACE("clk_to_ns_denom: %ld\n", clk_to_ns_denom);
+    APIC_TRACE("clk_to_ns_numer: %" PRId64 "\n", clk_to_ns_numer);
+    APIC_TRACE("clk_to_ns_denom: %" PRId64 "\n", clk_to_ns_denom);
 
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
@@ -2220,8 +2221,8 @@ static void apic_calibrate()
         nsleep_set_handler(apic_rdtsc_nsleep_handler, nullptr, true);
     }
 
-    APIC_TRACE("CPU clock: %luMHz\n", rdtsc_mhz);
-    APIC_TRACE("APIC clock: %luHz\n", apic_timer_freq);
+    APIC_TRACE("CPU clock: %" PRIu64 "MHz\n", rdtsc_mhz);
+    APIC_TRACE("APIC clock: %" PRIu64 "Hz\n", apic_timer_freq);
 }
 
 //

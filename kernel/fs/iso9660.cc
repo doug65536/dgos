@@ -9,6 +9,7 @@
 #include "bsearch.h"
 #include "printk.h"
 #include "vector.h"
+#include "inttypes.h"
 
 struct iso9660_factory_t : public fs_factory_t {
 public:
@@ -515,7 +516,7 @@ int iso9660_fs_t::mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
     uint32_t sector_offset = (offset >> sector_shift);
     uint64_t lba = lba_st + sector_offset;
 
-    printdbg("Demand paging LBA %ld at addr %p\n", lba, addr);
+    printdbg("Demand paging LBA %" PRId64 " at addr %p\n", lba, addr);
 
     return drive->read_blocks(addr, length >> sector_shift, lba);
 }

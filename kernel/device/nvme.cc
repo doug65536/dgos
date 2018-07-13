@@ -11,6 +11,7 @@
 #include "vector.h"
 #include "cpu/control_regs.h"
 #include "mutex.h"
+#include "inttypes.h"
 
 #define NVME_DEBUG	1
 #if NVME_DEBUG
@@ -338,7 +339,7 @@ public:
     {
         identify_data_physaddr = mm_alloc_contiguous(4096);
 
-        NVME_TRACE("namespace identify data at physaddr=%lx\n",
+        NVME_TRACE("namespace identify data at physaddr=%#" PRIx64 "\n",
                    identify_data_physaddr);
 
         if (!identify_data_physaddr)
@@ -1124,7 +1125,7 @@ errno_t nvme_dev_t::read_async(
         void *data, int64_t count,
         uint64_t lba, iocp_t *iocp)
 {
-    //NVME_TRACE("Reading %ld blocks at LBA %lx", count, lba);
+    //NVME_TRACE("Reading %" PRId64 " blocks at LBA %#" PRIx64, count, lba);
 
     return io(data, count, lba, false, nvme_op_t::read, iocp);
 }
