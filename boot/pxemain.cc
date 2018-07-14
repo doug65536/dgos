@@ -152,7 +152,7 @@ public:
 
         pxe_end_current();
 
-        block_size = pxe_api_tftp_open(filename, PAGE_SIZE);
+        block_size = pxe_api_tftp_open(filename, 1024);
         if (unlikely(block_size < 0))
             return false;
 
