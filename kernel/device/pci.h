@@ -124,26 +124,17 @@ struct pci_config_hdr_t {
         return base_addr[bar] & 8;
     }
 
+    // Returns true if the BAR is MMIO and is 64 bit
     bool is_bar_64bit(ptrdiff_t bar) const
     {
-        return (base_addr[bar] & 6) == 4;
+        return (base_addr[bar] & 7) == 4;
     }
 
-    uint64_t get_bar(ptrdiff_t bar) const
-    {
-        uint64_t addr;
+    uint64_t get_bar(ptrdiff_t bar) const;
 
-        if (is_bar_mmio(bar)) {
-            addr = base_addr[bar] & -16;
-
-            if (is_bar_64bit(bar))
-                addr |= uint64_t(base_addr[bar + 1]) << 32;
-        } else {
-            addr = base_addr[bar] & -4;
-        }
-
-        return addr;
-    }
+    // Write the specified address to the BAR and read it back, updating
+    // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
+    void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
 };
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00

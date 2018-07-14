@@ -466,6 +466,98 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
 
 int pci_init(void)
 {
+    // Initialize every BAR
+    pci_dev_iterator_t pci_iter;
+
+    if (!pci_enumerate_begin(&pci_iter))
+        return 0;
+
+    printk("Autoconfiguring PCI BARs\n");
+
+    do {
+        printk("Probing %d:%d:%d\n",
+                  pci_iter.bus, pci_iter.slot, pci_iter.func);
+
+        bool any_mmio = false;
+        bool any_io = false;
+        bool is_64 = false;
+
+        for (int bar = 0; bar < 6; bar += is_64 ? 2 : 1) {
+            is_64 = pci_iter.config.is_bar_64bit(bar);
+
+            // Ignore I/O space BARs
+            if (!pci_iter.config.is_bar_mmio(bar)) {
+                any_io = true;
+                continue;
+            }
+
+            // Save original base
+            uint64_t orig = pci_iter.config.get_bar(bar);
+
+            // Skip already assigned
+            if (orig & -16)
+                continue;
+
+            // Write all ones
+            pci_iter.config.set_mmio_bar(pci_iter, bar, -1);
+
+            // Get readback value
+            uint64_t readback = pci_iter.config.get_bar(bar);
+
+            // Mask off information bits 3:0
+            readback &= -16;
+
+            // Ignore BAR if it resulted in zero
+            if (!readback)
+                continue;
+
+            any_mmio = true;
+
+            // Get size
+            uint8_t log2_size = bit_lsb_set(readback & -16);
+            uint64_t size = UINT64_C(1) << log2_size;
+
+            // Allocate twice the needed size to align
+            uint64_t newbase = mm_alloc_hole(size * 2);
+            uint64_t newend = newbase + size * 2;
+
+            // Calculate aligned range to use
+            uint64_t used_st = (newbase + size - 1) & -size;
+            uint64_t used_en = used_st + size;
+
+            // Compute unused portion at beginning of allocation
+            uint64_t unused_lo_st = newbase;
+            uint64_t unused_lo_en = used_st;
+            uint64_t unused_lo_sz = unused_lo_en - unused_lo_st;
+
+            // Compute unused portion at end of allocation
+            uint64_t unused_hi_st = used_en;
+            uint64_t unused_hi_en = newend;
+            uint64_t unused_hi_sz = unused_hi_en - unused_hi_st;
+
+            // Return unused beginning portion to allocator
+            if (unused_lo_sz)
+                mm_free_hole(unused_lo_st, unused_lo_sz);
+
+            // Return unused end portion to allocator
+            if (unused_hi_sz)
+                mm_free_hole(unused_hi_st, unused_hi_sz);
+
+            // Set the BAR
+            pci_iter.config.set_mmio_bar(pci_iter, bar, used_st);
+
+            printk("...assigned %d:%d:%d BAR[%d] to MMIO"
+                      "=%#" PRIx64 "-%#" PRIx64 "\n",
+                      pci_iter.bus, pci_iter.slot, pci_iter.func, bar,
+                      used_st, used_en-1);
+        }
+
+        pci_adj_control_bits(pci_iter, (any_mmio ? PCI_CMD_MSE : 0) |
+                             (any_io ? PCI_CMD_IOSE : 0) | PCI_CMD_BME,
+                             (!any_mmio ? PCI_CMD_MSE : 0) |
+                             (!any_io ? PCI_CMD_IOSE : 0));
+    } while (pci_enumerate_next(&pci_iter));
+
     return 0;
 }
 
@@ -930,4 +1022,42 @@ void pci_init_ecam_enable()
 {
     printdbg("Using PCIe ECAM for configuration space accesses\n");
     pci_accessor = &pci_mmio_accessor;
+}
+
+uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
+{
+    uint64_t addr;
+
+    if (is_bar_mmio(bar)) {
+        addr = base_addr[bar] & -16;
+
+        if (is_bar_64bit(bar))
+            addr |= uint64_t(base_addr[bar + 1]) << 32;
+    } else {
+        addr = base_addr[bar] & -4;
+    }
+
+    return addr;
+}
+
+void pci_config_hdr_t::set_mmio_bar(pci_addr_t pci_addr,
+                                    ptrdiff_t bar, uint64_t addr)
+{
+    // PCI 2.2 section 6.2.5
+
+    size_t size;
+
+    if (is_bar_mmio(bar) && is_bar_64bit(bar)) {
+        size = sizeof(uint64_t);
+    } else {
+        size = sizeof(uint32_t);
+    }
+
+    // Write the value
+    pci_config_write(pci_addr, (char*)&base_addr[bar] - (char*)this,
+                     &addr, size);
+
+    // Read it back
+    pci_config_copy(pci_addr, (char*)&base_addr[bar],
+                    (char*)&base_addr[bar] - (char*)this, size);
 }
