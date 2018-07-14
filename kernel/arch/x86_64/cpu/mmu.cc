@@ -1843,6 +1843,9 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         // Find the lowest address item that is big enough
         tree_t::iter_t place = free_addr_by_size.lower_bound(size, 0);
 
+        if (unlikely(!place))
+            return 0;
+
         tree_t::kvp_t by_size = free_addr_by_size.item(place);
 
         if (by_size.key < size) {
@@ -1850,10 +1853,13 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
             by_size = free_addr_by_size.item(place);
         }
 
+        assert(by_size.key >= size);
+
         free_addr_by_size.delete_at(place);
 
         // Delete corresponding entry by address
-        free_addr_by_addr.delete_item(by_size.val, by_size.key);
+        bool did_del = free_addr_by_addr.delete_item(by_size.val, by_size.key);
+        assert(did_del);
 
         if (by_size.key > size) {
             // Insert remainder by size
@@ -1897,10 +1903,6 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
     assert(free_addr_by_size);
 
     scoped_lock lock(free_addr_lock);
-
-    // Round to pages
-    addr &= -PAGE_SIZE;
-    size = round_up(size);
 
     linaddr_t end = addr + size;
 
@@ -2002,14 +2004,6 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
 
 void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 {
-    // Round address down to page boundary
-    size_t misalignment = addr & PAGE_MASK;
-    addr -= misalignment;
-    size += misalignment;
-
-    // Round size up to multiple of page size
-    size = round_up(size);
-
     linaddr_t end = addr + size;
 
     scoped_lock lock(free_addr_lock);
