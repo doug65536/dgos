@@ -33,6 +33,8 @@ do
 								'echo -e -n ' $'\'' '\ec' $'\'' \
 								' >> dump/qemu-debug-out' \
 								$'\n' $'\t' \
+								"echo Running $rt-$np-$bt-$bm-$fs-$sc-$em" \
+								$'\n' $'\t' \
 								"\$(QEMU_SUDO) \$(QEMU)" \
 								' \' $'\n' $'\t\t' \
 								"\$(QEMU_EARLY)" \
