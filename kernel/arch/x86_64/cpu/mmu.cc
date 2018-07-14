@@ -1452,7 +1452,7 @@ template<typename K, typename V>
 static int dump_addr_node(typename rbtree_t<K,V>::kvp_t *kvp, void *p)
 {
     char const **names = (char const **)p;
-    printdbg("%s=%16#" PRIx64 " %s=%16#" PRIx64 "\n",
+    printdbg("%s=%#16" PRIx64 " %s=%#16" PRIx64 "\n",
              names[0], kvp->key, names[1], kvp->val);
     return 0;
 }
