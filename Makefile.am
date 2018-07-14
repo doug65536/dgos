@@ -1450,8 +1450,8 @@ QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.trace,string=1
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 
-QEMU_DRV_COMMON = format=raw,werror=report,rerror=report,id=bootdrv
-QEMU_DRV = -drive id=bootdrv,if=none,file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
+QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report
+QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
 QEMU_MACHINE = -machine q35
