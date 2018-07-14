@@ -62,7 +62,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
     // Get a list of storage devices of this type
     vector<storage_if_base_t *> list = factory->detect();
 
-    STORAGE_TRACE("Found %u %s interfaces\n", list.count, factory->name);
+    STORAGE_TRACE("Found %zu %s interfaces\n", list.size(), factory->name);
 
     for (unsigned i = 0; i < list.size(); ++i) {
         // Calculate pointer to storage interface instance
@@ -76,7 +76,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
         // Get a list of storage devices on this interface
         vector<storage_dev_base_t*> dev_list = if_->detect_devices();
 
-        STORAGE_TRACE("Found %u %s[%u] drives\n", dev_list.count,
+        STORAGE_TRACE("Found %zu %s[%u] drives\n", dev_list.size(),
                       factory->name, i);
 
         for (unsigned k = 0; k < dev_list.size(); ++k) {
@@ -175,7 +175,7 @@ static void invoke_part_factories(void *arg)
                 }
                 storage_dev_close(drive);
 
-                STORAGE_TRACE("Found %u %s partitions\n", part_list.count,
+                STORAGE_TRACE("Found %zu %s partitions\n", part_list.size(),
                               factory->name);
             }
         }
