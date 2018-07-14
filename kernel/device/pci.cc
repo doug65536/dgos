@@ -6,6 +6,7 @@
 #include "cpu/apic.h"
 #include "vector.h"
 #include "numeric.h"
+#include "inttypes.h"
 
 #define PCI_DEBUG   1
 #if PCI_DEBUG
@@ -395,10 +396,10 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
                     iter->config.vendor == (uint16_t)~0)
                 continue;
 
-            printdbg("pci enumerator: encountered vendor=%#.4x, device=%#.4x"
-                     ", class=%#.4x, subclass=%#.4x\n",
-                     iter->config.vendor, iter->config.device,
-                     iter->config.dev_class, iter->config.subclass);
+            //printdbg("pci enumerator: encountered vendor=%#.4x, device=%#.4x"
+            //         ", class=%#.4x, subclass=%#.4x\n",
+            //         iter->config.vendor, iter->config.device,
+            //         iter->config.dev_class, iter->config.subclass);
 
             // If device is bridge, add bus to todo list
             if (iter->config.dev_class == PCI_DEV_CLASS_BRIDGE &&
