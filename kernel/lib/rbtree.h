@@ -671,6 +671,8 @@ rbtree_t<Tkey,Tval>::find(kvp_t *kvp, iter_t *iter)
 
     if (iter)
         *iter = n;
+    else
+        *iter = 0;
 
     return cmp_result ? nullptr : &NODE(n)->kvp;
 }
