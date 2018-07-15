@@ -251,7 +251,7 @@ void sigint_handler(int)
     quit = true;
 }
 
-int capture()
+int capture(bool verbose = false)
 {
     signal(SIGINT, sigint_handler);
 
@@ -382,23 +382,25 @@ int capture()
                 if (!item.call && thread.indent > 0)
                     --thread.indent;
 
-                // Lookup symbol from instruction pointer
-                auto it = symbols->lower_bound(uint64_t(item.get_ip()));
+                if (verbose) {
+                    // Lookup symbol from instruction pointer
+                    auto it = symbols->lower_bound(uint64_t(item.get_ip()));
 
-                if (likely(it != symbols->end())) {
-                    printf("(c: %3d, t: %3d, I: %d) %*s %s %s\n",
-                           item.get_cid(), item.get_tid(),
-                           item.irq_en,
-                           thread.indent, "",
-                           item.call ? "->" : "<-",
-                           it->second.c_str());
-                } else {
-                    printf("(c: %3d, t: %3d, I: %d) %*s %s <??? @ %p>\n",
-                           item.get_cid(), item.get_tid(),
-                           item.irq_en,
-                           thread.indent, "",
-                           item.call ? "->" : "<-",
-                           item.get_ip());
+                    if (likely(it != symbols->end())) {
+                        printf("(c: %3d, t: %3d, I: %d) %*s %s %s\n",
+                               item.get_cid(), item.get_tid(),
+                               item.irq_en,
+                               thread.indent, "",
+                               item.call ? "->" : "<-",
+                               it->second.c_str());
+                    } else {
+                        printf("(c: %3d, t: %3d, I: %d) %*s %s <??? @ %p>\n",
+                               item.get_cid(), item.get_tid(),
+                               item.irq_en,
+                               thread.indent, "",
+                               item.call ? "->" : "<-",
+                               item.get_ip());
+                    }
                 }
 
                 thread.indent += (int)item.call;
