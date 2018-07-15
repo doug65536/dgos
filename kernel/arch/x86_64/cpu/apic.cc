@@ -1592,7 +1592,7 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
 
     uint32_t dest = (target_apic_id >= 0) ? target_apic_id : 0;
 
-    if (intr != 0xFD) {
+    if (intr != INTR_TLB_SHOOTDOWN) {
         APIC_TRACE("IPI: intr=%x dest_type=%x dest_mode=%x cmd=%x\n",
                    intr, dest_type, dest_mode,
                    APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);

@@ -37,10 +37,22 @@ isr_entry_\int_num\():
     .cfi_endproc
 .endm
 
-// 253, 254, 255 are hot entries that are nearby the ISR code below
-.irp int_num,252,251,250,249,248,247,246,245,244,243,242,241,240
+// Reserved (unused) exception vectors furthest away - should never occur
+.irp int_num,31,30,29,28,27,26,25,24,23,22,21,15
+    isr_entry 0 \int_num
+.endr
+
+// Rarely invoked vectors (LAPIC spurious, LAPIC error, LAPIC thermal, reserved)
+.irp int_num,38,37,36,35,34,33,32
+    isr_entry 0 \int_num
+.endr
+
+// PIC vectors (typically never invoked)
+.irp int_num,255,254,253,252,251,250,249,248,247,246,245,244,243,242,241,240
      isr_entry 0 \int_num
 .endr
+
+// IOAPIC/MSI vectors
 .irp int_num,239,238,237,236,235,234,233,232,231,230,229,228,227,226,225,224
      isr_entry 0 \int_num
 .endr
@@ -78,13 +90,9 @@ isr_entry_\int_num\():
      isr_entry 0 \int_num
 .endr
 
-// PIC IRQ handlers (16 IRQs)
-.irp int_num,47,46,45,44,43,42,41,40,39,38,37,36,35,34,33,32
-     isr_entry 0 \int_num
-.endr
-
-// Reserved (unused) exception vectors
-.irp int_num,31,30,29,28,27,26,25,24,23,22,21,15
+// Software interrupt handlers and fixed LAPIC vectors
+// 39 is a hot vector (INTR_APIC_TIMER), below
+.irp int_num,47,46,45,44,43,42
      isr_entry 0 \int_num
 .endr
 
@@ -266,32 +274,32 @@ isr_common:
 
     // Interrupt dispatch
     // 0x00-0x1F -> exception_isr_handler
-    // 0x20-0x2F -> pic_dispatcher
+    // 0x20-0x2F -> intr_invoke
     // 0x30-0xEF -> apic_dispatcher
-    // 0xF0-0xFF -> intr_invoke
+    // 0xF0-0xFF -> pic_dispatcher
 
     // 0x00-0x1F -> exception_isr_handler
     leaq exception_isr_handler(%rip),%rax
 
-    // 0x20-0x2F -> pic_dispatcher
-    leaq pic8259_dispatcher(%rip),%rcx
-    cmpl $INTR_PIC1_IRQ_BASE,%edi
+    // Fast path page fault
+    leaq mmu_page_fault_handler(%rip),%rcx
+    cmpl $ INTR_EX_PAGE,%edi
+    cmoveq %rcx,%rax
+
+    // 0x20-0x2F -> intr_invoke
+    leaq intr_invoke(%rip),%rcx
+    cmpl $ INTR_SOFT_BASE,%edi
     cmovaeq %rcx,%rax
 
     // 0x30-0xEF -> apic_dispatcher
     leaq apic_dispatcher(%rip),%rcx
-    cmpl $INTR_APIC_IRQ_BASE,%edi
+    cmpl $ INTR_APIC_IRQ_BASE,%edi
     cmovaeq %rcx,%rax
 
-    // 0xF0-0xFF -> intr_invoke
-    leaq intr_invoke(%rip),%rcx
-    cmpl $INTR_SOFT_BASE,%edi
+    // 0xF0-0xFF -> pic_dispatcher
+    leaq pic8259_dispatcher(%rip),%rcx
+    cmpl $ INTR_PIC1_IRQ_BASE,%edi
     cmovaeq %rcx,%rax
-
-    // Fast path page fault
-    leaq mmu_page_fault_handler(%rip),%rcx
-    cmpl $INTR_EX_PAGE,%edi
-    cmoveq %rcx,%rax
 
     // Call handler
     call *%rax

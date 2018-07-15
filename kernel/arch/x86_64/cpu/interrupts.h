@@ -1,9 +1,11 @@
 #pragma once
 
-// Interrupts are ordered to simplify dispatch
-//  - Exceptions
-//  - PIC IRQs
-//  - IOAPIC IRQs
+// 0x00 - 0x1F (fixed)       - Exceptions
+// 0x20 - 0x27 (hi priority) - LAPIC IRQs (error, spurious, timer, etc)
+// 0x28 - 0x2F               - reserved for software interrupts
+// 0x30 - x-1                - MSI IRQs
+//    x - 0xEF               - IOAPIC IRQs
+// 0xF0 - 0xFF (lo priority) - PIC IRQs
 
 // If this is changed, update isr.S
 
@@ -30,22 +32,27 @@
 
 // 21-31 are reserved for future exceptions
 
-#define INTR_PIC1_IRQ_BASE  0x20
-#define INTR_PIC2_IRQ_BASE  (INTR_PIC1_IRQ_BASE+8)
+// Vectors >= 32 go through generic intr_invoke codepath
+#define INTR_SOFT_BASE      32
 
-// IOAPIC vectors followed by dynamically allocated MSI vectors
-#define INTR_APIC_IRQ_BASE  0x30
-#define INTR_APIC_IRQ_END   0xF0
+// Spurious vector must be aligned to 8 on really old processors
+#define INTR_APIC_SPURIOUS  32
+#define INTR_APIC_ERROR     33
+#define INTR_APIC_THERMAL   34
+// 35-38 reserved
+#define INTR_APIC_TIMER     39
 
-// Reserved range from 0xF0-0xFA
-#define INTR_SOFT_BASE      0xF0
+#define INTR_TLB_SHOOTDOWN  40
+#define INTR_THREAD_YIELD   41
 
-#define INTR_APIC_ERROR     0xF1
+// 42-47 reserved
 
-// Spurious interrupt vector must be aligned to 8 on really old processors
-#define INTR_APIC_SPURIOUS  0xF8
+// Vectors >= 48 go through apic_dispatcher codepath
+// 192 vectors for IOAPIC and MSI
+#define INTR_APIC_IRQ_BASE  48
+#define INTR_APIC_IRQ_END   239
 
-// Software interrupts (values in decimal because they are used in labels)
-#define INTR_TLB_SHOOTDOWN  253
-#define INTR_THREAD_YIELD   254
-#define INTR_APIC_TIMER     255
+// Vectors >= 240 go through pic_dispatcher codepath
+// PIC IRQs 0xF0-0xFF
+#define INTR_PIC1_IRQ_BASE  240
+#define INTR_PIC2_IRQ_BASE  248
