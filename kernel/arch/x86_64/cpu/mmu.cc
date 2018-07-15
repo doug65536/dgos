@@ -91,7 +91,7 @@
 #define PTE_PAGESIZE_BIT    7
 #define PTE_GLOBAL_BIT      8
 #define PTE_PDEPAT_BIT      12  // only PDPTE and PDE
-#define PTE_PTEPAT_BIT      7  // only PTE
+#define PTE_PTEPAT_BIT      7   // only PTE
 #define PTE_ADDR_BIT        12
 #define PTE_PK_BIT          59
 #define PTE_NX_BIT          63
@@ -1491,8 +1491,17 @@ static void mmu_configure_pat(void)
         cpu_msr_set(CPU_MSR_IA32_PAT, PAT_CFG);
 }
 
+#define INIT_DEBUG 1
+#if INIT_DEBUG
+#define TRACE_INIT(...) printdbg("mmu init: " __VA_ARGS__)
+#else
+#define TRACE_INIT(...) ((void)0)
+#endif
+
 void mmu_init()
 {
+    TRACE_INIT("Hooking TLB shootdown\n");
+
     // Hook IPI for TLB shootdown
     intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler, "sw_tlbshoot");
 
@@ -1553,6 +1562,7 @@ void mmu_init()
     pte_t *pt;
 
     // Create the new root
+    TRACE_INIT("Creating new PML4\n");
 
     // Get a page
     root_phys_addr = init_take_page(0);
@@ -1573,7 +1583,6 @@ void mmu_init()
 
     mmu_configure_pat();
 
-    //pt = init_map_aliasing_pte(aliasing_pte, root_physaddr);
     cpu_page_directory_set(root_phys_addr);
 
     // Make zero page not present to catch null pointers
@@ -1718,6 +1727,7 @@ void mmu_init()
 
     // Unmap physical mapping of first 4GB
     munmap(init_phys<void>(0), UINT64_C(4) << 30);
+    cpu_tlb_flush();
 
     callout_call(callout_type_t::vmm_ready);
 }
@@ -2216,8 +2226,9 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
     if (pte_st[2] == pte_en[2] &&
             (*pte_st[0] & PTE_PRESENT) &&
             (*pte_st[1] & PTE_PRESENT) &&
-            (*pte_st[2] & PTE_PRESENT))
+            (*pte_st[2] & PTE_PRESENT)) {
         return pte_st[3];
+    }
 
     bool const low = (start & 0xFFFFFFFFFFFFU) < 0x800000000000U;
 
