@@ -10,7 +10,7 @@ static _always_inline void atomic_barrier(void)
 }
 
 // Technically not atomic but needed in cmpxchg loops
-static _always_inline void pause()
+static _always_inline _no_instrument void pause()
 {
     __builtin_ia32_pause();
 }
