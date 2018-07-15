@@ -8,6 +8,7 @@
 #include "printk.h"
 #include "time.h"
 #include "string.h"
+#include "likely.h"
 
 // Read/write
 #define KEYB_DATA   0x60
@@ -28,21 +29,42 @@
 #define KEYB_KEY_IRQ            1
 #define KEYB_MOUSE_IRQ          12
 
-#define KEYB_CMD_DISABLE_PORT1  0xAD
-#define KEYB_CMD_DISABLE_PORT2  0xA7
-#define KEYB_CMD_ENABLE_PORT1   0xAE
-#define KEYB_CMD_ENABLE_PORT2   0xA8
+// Controller commands. These have no response unless corresponding
+// REPLY are defined, or otherwise noted.
+
+// Response is the configuration byte
 #define KEYB_CMD_RDCONFIG       0x20
 #define KEYB_CMD_WRCONFIG       0x60
+
 #define KEYB_CMD_CTLTEST        0xAA
+#define KEYB_REPLY_CTLTEST_OK   0x55
+#define KEYB_REPLY_CTLBAD       0xFC
+
 #define KEYB_CMD_TEST_PORT1     0xAB
 #define KEYB_CMD_TEST_PORT2     0xA9
-#define KEYB_REPLY_PASSED       0x55
-#define KEYB_REPLY_RESETOK_1    0xFA
-#define KEYB_REPLY_RESETOK_2    0xAA
+#define KEYB_CMD_TEST_PORTn_OK  0x00
+
+#define KEYB_CMD_ENABLE_PORT1   0xAE
+#define KEYB_CMD_DISABLE_PORT1  0xAD
+
+#define KEYB_CMD_ENABLE_PORT2   0xA8
+#define KEYB_CMD_DISABLE_PORT2  0xA7
+
+#define KEYB_REPLY_ACK          0xFA
+#define KEYB_REPLY_RESEND       0xFC
+
+#define KEYB_CMD_RESET          0xFF
+#define KEYB_CMD_RESEND         0xFE
+
 #define KEYB_CMD_MOUSECMD       0xD4
+#define KEYB_CMD_ENABLE_SCAN    0xF4
+#define KEYB_CMD_DISABLE_SCAN   0xF5
+#define KEYB_CMD_DEFAULTS       0xF6
+#define KEYB_CMD_SET_SCANSET    0xF0
 
 #define PS2MOUSE_RESET          0xFF
+#define KEYB_REPLY_RESETOK      0xAA
+
 #define PS2MOUSE_ENABLE         0xF4
 #define PS2MOUSE_SETSAMPLERATE  0xF3
 #define PS2MOUSE_SETRES         0xE8
@@ -71,10 +93,11 @@
 
 #define KEYB8042_DEBUG  0
 #if KEYB8042_DEBUG
-#define KEYB8042_DEBUGMSG(p) printk p
+#define KEYB8042_TRACE(...) printk(__VA_ARGS__)
 #else
-#define KEYB8042_DEBUGMSG(p) ((void)0)
+#define KEYB8042_TRACE(...) ((void)0)
 #endif
+#define KEYB8042_MSG(...) printk("keyb8042: " __VA_ARGS__)
 
 static keyb8042_layout_t *keyb8042_layout = &keyb8042_layout_us;
 
@@ -113,6 +136,8 @@ static void keyb8042_keyboard_handler(void)
     uint8_t scancode = 0;
 
     scancode = inb(KEYB_DATA);
+
+    printdbg("scancode: %x\n", scancode);
 
     int32_t vk = 0;
     int sign = !!(scancode & 0x80) * -2 + 1;
@@ -257,7 +282,7 @@ static int keyb8042_read_data(void)
         pause();
 
     if (!max_tries)
-        printk("Timeout reading keyboard\n");
+        KEYB8042_MSG("Timeout reading keyboard\n");
 
     return max_tries ? inb(KEYB_DATA) : -1;
 }
@@ -273,9 +298,60 @@ static int keyb8042_write_data(uint8_t data)
     if (max_tries > 0)
         outb(KEYB_DATA, data);
     else if (!max_tries)
-        printk("Timeout writing keyboard\n");
+        KEYB8042_MSG("Timeout writing keyboard\n");
 
     return max_tries > 0 ? 0 : -1;
+}
+
+static int keyb8042_ctrl_command(bool has_response, int cmd, int data = -1)
+{
+    if (unlikely(keyb8042_send_command(cmd) < 0))
+        return -1;
+
+    if (data != -1) {
+        if (keyb8042_write_data(data) < 0)
+            return -1;
+    }
+
+    if (has_response)
+        return keyb8042_read_data();
+
+    return 0;
+}
+
+static int keyb8042_retry_keyb_command(uint8_t command, int data = -1)
+{
+    int last_data;
+
+    int max_tries = 4;
+    do {
+        if (keyb8042_write_data(command) < 0)
+            return -1;
+
+        if (data != -1) {
+            if (keyb8042_write_data(data) < 0)
+                return -1;
+        }
+
+        last_data = keyb8042_read_data();
+
+        if (likely(last_data == KEYB_REPLY_ACK)) {
+            // Success
+            return 0;
+        }
+
+        if (last_data < 0) {
+            KEYB8042_MSG("Keyboard did not reply\n");
+            continue;
+        }
+
+        if (last_data == KEYB_REPLY_ACK) {
+            KEYB8042_MSG("Keyboard requested resend\n");
+            continue;
+        }
+    } while (--max_tries);
+
+    return -1;
 }
 
 static int keyb8042_retry_mouse_command(uint8_t command)
@@ -295,7 +371,7 @@ static int keyb8042_retry_mouse_command(uint8_t command)
         if (last_data == PS2MOUSE_REPLY_ACK)
             break;
 
-        printk("Mouse did not acknowledge\n");
+        KEYB8042_MSG("Mouse did not acknowledge\n");
     } while (--max_tries);
 
     return max_tries != 0 ? last_data : -1;
@@ -349,108 +425,127 @@ static int keyb8042_get_modifiers()
 
 void keyb8042_init(void)
 {
+    // FIXME: perform USB handoff before initializing
+
+    // FIXME: verify that ACPI bit 1 of IA PC boot architecture flags is 1
+
     // Disable both ports
-    KEYB8042_DEBUGMSG(("Disabling keyboard controller ports\n"));
+    KEYB8042_TRACE("Disabling keyboard controller ports\n");
     keyb8042_send_command(KEYB_CMD_DISABLE_PORT1);
     keyb8042_send_command(KEYB_CMD_DISABLE_PORT2);
 
     // Flush incoming byte, if any
-    KEYB8042_DEBUGMSG(("Flushing keyboard output buffer\n"));
+    KEYB8042_TRACE("Flushing keyboard output buffer\n");
     inb(KEYB_DATA);
 
     // Read config
-    KEYB8042_DEBUGMSG(("Reading keyboard controller config\n"));
-    if (keyb8042_send_command(KEYB_CMD_RDCONFIG) < 0)
+    KEYB8042_TRACE("Reading keyboard controller config\n");
+    int config = keyb8042_ctrl_command(true, KEYB_CMD_RDCONFIG);
+    if (unlikely(config < 0)) {
+        KEYB8042_MSG("Failed to read controller config\n");
         return;
-    int config = keyb8042_read_data();
-    if (config < 0)
-        return;
+    }
 
-    KEYB8042_DEBUGMSG(("Keyboard original config = %02x\n", config));
+    KEYB8042_TRACE("Keyboard original config = %02x\n", config);
 
     // Disable IRQs and translation
     config &= ~(KEYB_CONFIG_IRQEN_PORT1 |
                 KEYB_CONFIG_IRQEN_PORT2 |
                 KEYB_CONFIG_XLAT_PORT1);
 
-    int port2_exists = 1;
-            //!(config & KEYB_CONFIG_CLKDIS_PORT2);
-
     // Write config
-    KEYB8042_DEBUGMSG(("Writing keyboard controller config = %02x\n", config));
-    if (keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)
+    KEYB8042_TRACE("Writing keyboard controller config = %02x\n", config);
+    if (unlikely(keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)) {
+        KEYB8042_MSG("Failed to send write config command\n");
         return;
-    if (keyb8042_write_data(config) < 0)
+    }
+    if (unlikely(keyb8042_write_data(config) < 0)) {
+        KEYB8042_MSG("Failed to send write config data\n");
         return;
+    }
 
-#if 1
+    // Detect second channel
+    if (unlikely(keyb8042_send_command(KEYB_CMD_ENABLE_PORT2) < 0)) {
+        KEYB8042_MSG("Failed to send enable port 2 command\n");
+        return;
+    }
+
+    // Readback config
+    int detect_config = keyb8042_ctrl_command(true, KEYB_CMD_RDCONFIG);
+    if (unlikely(detect_config < 0)) {
+        KEYB8042_MSG("Failed to read controller config detecting port 2\n");
+        return;
+    }
+
+    // See if port 2 clock is disabled. If not, port 2 exists
+    bool port2_exists = !(detect_config & KEYB_CONFIG_CLKDIS_PORT2);
+
     int ctl_test_result;
     int port1_test_result;
 
-    if (keyb8042_send_command(KEYB_CMD_CTLTEST) < 0)
+    ctl_test_result = keyb8042_ctrl_command(true, KEYB_CMD_CTLTEST);
+    if (unlikely(ctl_test_result < 0)) {
+        KEYB8042_MSG("Failed to start controller test\n");
         return;
+    }
 
-    ctl_test_result = keyb8042_read_data();
-    if (ctl_test_result < 0)
+    if (unlikely(ctl_test_result != KEYB_REPLY_CTLTEST_OK))
+        KEYB8042_MSG("Keyboard controller self test failed! result=%#02x\n",
+                     ctl_test_result);
+
+    port1_test_result = keyb8042_ctrl_command(true, KEYB_CMD_TEST_PORT1);
+    if (unlikely(port1_test_result < 0)) {
+        KEYB8042_MSG("Failed to send test port 1 command\n");
         return;
+    }
 
-    if (ctl_test_result != KEYB_REPLY_PASSED)
-        printk("Keyboard controller self test failed! result=%02x\n",
-               ctl_test_result);
-
-    if (keyb8042_send_command(KEYB_CMD_TEST_PORT1) < 0)
+    if (unlikely(port1_test_result != KEYB_CMD_TEST_PORTn_OK)) {
+        KEYB8042_MSG("Keyboard port 1 self test failed! result=%02x\n",
+                     ctl_test_result);
         return;
-    port1_test_result = keyb8042_read_data();
-    if (port1_test_result < 0)
-        return;
-
-    if (port1_test_result != 0)
-        printk("Keyboard port 1 self test failed! result=%02x\n",
-               ctl_test_result);
+    }
 
     if (port2_exists) {
         int port2_test_result;
-        if (keyb8042_send_command(KEYB_CMD_TEST_PORT2) < 0)
+        port2_test_result = keyb8042_ctrl_command(true, KEYB_CMD_TEST_PORT2);
+        if (port2_test_result < 0) {
+            KEYB8042_MSG("Failed to start port 2 test");
             return;
-        port2_test_result = keyb8042_read_data();
-        if (port2_test_result < 0)
-            return;
+        }
 
-        if (port2_test_result != 0) {
-            printk("Keyboard port 2 self test failed! result=%02x\n",
-                   port2_test_result);
+        if (port2_test_result != KEYB_CMD_TEST_PORTn_OK) {
+            KEYB8042_MSG("Keyboard port 2 self test failed! result=%02x\n",
+                         port2_test_result);
             port2_exists = 0;
         }
     }
-#else
-    int port1_test_result;
-#endif
 
     // Reset
-    KEYB8042_DEBUGMSG(("Resetting keyboard\n"));
-    if (keyb8042_write_data(0xFF) < 0)
+    KEYB8042_TRACE("Resetting keyboard\n");
+    if (unlikely(keyb8042_retry_keyb_command(KEYB_CMD_RESET) < 0)) {
+        KEYB8042_MSG("Failed to send keyboard reset command\n");
         return;
-
-    port1_test_result = keyb8042_read_data();
-    if (port1_test_result < 0)
-        return;
-    if (port1_test_result == KEYB_REPLY_RESETOK_1) {
-        port1_test_result = keyb8042_read_data();
-        if (port1_test_result != KEYB_REPLY_RESETOK_2) {
-            KEYB8042_DEBUGMSG(("Keyboard reset failed!\n"));
-            return;
-        }
     }
 
-    KEYB8042_DEBUGMSG(("Enabling keyboard port\n"));
+    // Read reset result
+    port1_test_result = keyb8042_read_data();
+    if (port1_test_result != KEYB_REPLY_RESETOK) {
+        KEYB8042_TRACE("Keyboard reset failed, data=%x\n", port1_test_result);
+        return;
+    }
+
+    KEYB8042_TRACE("Enabling keyboard port\n");
     if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT1) < 0)
         return;
 
-    KEYB8042_DEBUGMSG(("Enabling mouse port\n"));
-    if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT2) < 0)
-        return;
+    if (port2_exists) {
+        KEYB8042_TRACE("Enabling mouse port\n");
+        if (keyb8042_send_command(KEYB_CMD_ENABLE_PORT2) < 0)
+            return;
+    }
 
     config &= ~KEYB_CONFIG_CLKDIS_PORT1;
+    config &= ~KEYB_CONFIG_XLAT_PORT1;
     config |= KEYB_CONFIG_IRQEN_PORT1;
     //config |= KEYB_CONFIG_XLAT_PORT1;
     if (port2_exists) {
@@ -458,32 +553,43 @@ void keyb8042_init(void)
         config |= KEYB_CONFIG_IRQEN_PORT2;
     }
 
-    KEYB8042_DEBUGMSG(("Writing keyboard controller config = %02x\n", config));
+    KEYB8042_TRACE("Writing keyboard controller config = %02x\n", config);
     if (keyb8042_send_command(KEYB_CMD_WRCONFIG) < 0)
         return;
     if (keyb8042_write_data(config) < 0)
         return;
 
+    // Choose scanset 1
+    if (keyb8042_retry_keyb_command(KEYB_CMD_SET_SCANSET, 1) < 0) {
+        KEYB8042_MSG("Failed to send set-scanset keyboard command\n");
+        return;
+    }
+
+    if (keyb8042_retry_keyb_command(KEYB_CMD_ENABLE_SCAN) < 0) {
+        KEYB8042_MSG("Failed to enable keyboard scanning\n");
+        return;
+    }
+
     // Reset mouse
-    KEYB8042_DEBUGMSG(("Resetting mouse\n"));
+    KEYB8042_TRACE("Resetting mouse\n");
     if (keyb8042_retry_mouse_command(PS2MOUSE_RESET) < 0)
         return;
-    KEYB8042_DEBUGMSG(("Reading reset ok\n"));
-    if (keyb8042_read_data() != KEYB_REPLY_RESETOK_2)
-        printk("Mouse did not acknowledge\n");
-    KEYB8042_DEBUGMSG(("Reading reset result\n"));
+    KEYB8042_TRACE("Reading reset ok\n");
+    if (keyb8042_read_data() != KEYB_REPLY_RESETOK)
+        KEYB8042_MSG("Mouse did not acknowledge\n");
+    KEYB8042_TRACE("Reading reset result\n");
     if (keyb8042_read_data() != 0x00)
-        printk("Mouse did not acknowledge\n");
+        KEYB8042_MSG("Mouse did not acknowledge\n");
 
     // Set mouse resolution
-    KEYB8042_DEBUGMSG(("Setting mouse resolution\n"));
+    KEYB8042_TRACE("Setting mouse resolution\n");
     if (keyb8042_retry_mouse_command(PS2MOUSE_SETRES) < 0)
         return;
     if (keyb8042_retry_mouse_command(PS2MOUSE_RES_1CPMM) < 0)
         return;
 
     // Enable mouse stream mode
-    KEYB8042_DEBUGMSG(("Setting mouse to stream mode\n"));
+    KEYB8042_TRACE("Setting mouse to stream mode\n");
     if (keyb8042_retry_mouse_command(PS2MOUSE_ENABLE) < 0)
         return;
 
@@ -509,7 +615,7 @@ void keyb8042_init(void)
     }
 
     // Set mouse sampling rate
-    KEYB8042_DEBUGMSG(("Setting mouse sampling rate\n"));
+    KEYB8042_TRACE("Setting mouse sampling rate\n");
     if (keyb8042_retry_mouse_command(PS2MOUSE_SETSAMPLERATE) < 0)
         return;
     if (keyb8042_retry_mouse_command(100) < 0)

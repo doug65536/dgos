@@ -89,6 +89,8 @@ static char const *keyboard_special_text[] = {
     "KEYB_VK_NUMPAD_PAREN_OPEN", "KEYB_VK_NUMPAD_PAREN_CLOSE",
     "KEYB_VK_NUMPAD_BRACE_OPEN", "KEYB_VK_NUMPAD_BRACE_CLOSE",
 
+    "<ASCII_END>",
+
     // Numpad number base
     "KEYB_VK_NUMPAD_BINARY", "KEYB_VK_NUMPAD_OCTAL",
     "KEYB_VK_NUMPAD_DECIMAL", "KEYB_VK_NUMPAD_HEX",
