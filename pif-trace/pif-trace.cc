@@ -1075,6 +1075,49 @@ public:
     std::unique_ptr<std::regex> search;
 };
 
+int dump_trace(char const *filename)
+{
+    std::unique_ptr<sym_tab> symbols = load_symbols();
+    trace_thread_map dump = load_trace(filename);
+
+    using record = std::pair<trace_detail_vector::value_type const&, uint16_t>;
+    using linear_map_t = std::map<uint64_t, record>;
+    linear_map_t linear_map;
+
+    for (trace_thread_map::value_type const& tid_data : dump) {
+        for (trace_detail_vector::value_type const& item : tid_data.second) {
+            linear_map.emplace_hint(linear_map.end(),
+                                    item.ordinal, record(item, tid_data.first));
+        }
+    }
+
+    for (linear_map_t::value_type const& item_pair : linear_map) {
+        record const& item = item_pair.second;
+        uint64_t ip = uint64_t(item.first.rec.get_ip());
+        auto it = symbols->lower_bound(ip);
+
+        char const *tree_widget;
+        if (item.first.rec.expandable) {
+            if (item.first.rec.expanded)
+                tree_widget = "->";
+            else
+                tree_widget = "+>";
+        } else {
+            if (item.first.rec.call)
+                tree_widget = " >";
+            else
+                tree_widget = " <";
+        }
+
+        printf("(c: %3d, t: %3d, I: %d) %*s %s %s\n",
+               item.first.rec.get_cid(), item.second,
+               item.first.rec.irq_en,
+               item.first.indent * 2, "",
+               tree_widget,
+               it->second.c_str());
+    }
+}
+
 int main(int argc, char **argv)
 {
     try {
@@ -1082,6 +1125,15 @@ int main(int argc, char **argv)
             capture();
         else if (argc == 2) {
             std::unique_ptr<viewer>{new viewer(argv[1])}->run();
+        } else if (argc > 2) {
+            if (!strcmp(argv[1], "--dump")) {
+                if (argc > 2)
+                    return dump_trace(argv[2]);
+                else {
+                    fprintf(stderr, "Missing --dump argument\n");
+                    exit(1);
+                }
+            }
         }
     } catch (std::exception const& ex) {
         fprintf(stderr, "Error: %s\n", ex.what());
