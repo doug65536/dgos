@@ -629,6 +629,9 @@ void dump_context(isr_context_t *ctx, int to_screen)
     }
 
     // fault address
+    printdbg("cr3=%16lx\n", cpu_page_directory_get());
+
+    // fault address
     printdbg("cr2=%16lx\n", cpu_fault_address_get());
 
     // error code
