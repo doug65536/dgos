@@ -37,6 +37,7 @@ device/virtio-base.cc
 device/virtio-base.h
 device/virtio-gpu.cc
 device/virtio-gpu.h
+lib/asan.cc
 lib/cc/memory.cc
 lib/cc/union_storage.h
 lib/cxxexcept.cc

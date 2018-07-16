@@ -289,7 +289,7 @@ intptr_t formatter(
         int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
-    formatter_scoped_lock hold_formatter_lock(formatter_lock);
+    //formatter_scoped_lock hold_formatter_lock(formatter_lock);
 
     formatter_flags_t flags;
     intptr_t chars_written = 0;

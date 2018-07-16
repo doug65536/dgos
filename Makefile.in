@@ -439,6 +439,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-unique_ptr.$(OBJEXT) \
 	kernel/lib/kernel_generic-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_generic-zlib_helper.$(OBJEXT) \
+	kernel/lib/kernel_generic-asan.$(OBJEXT) \
 	kernel/fs/kernel_generic-ext4.$(OBJEXT) \
 	kernel/fs/kernel_generic-fat32.$(OBJEXT) \
 	kernel/fs/kernel_generic-iso9660.$(OBJEXT) \
@@ -564,6 +565,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-unique_ptr.$(OBJEXT) \
 	kernel/lib/kernel_tracing-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_tracing-zlib_helper.$(OBJEXT) \
+	kernel/lib/kernel_tracing-asan.$(OBJEXT) \
 	kernel/fs/kernel_tracing-ext4.$(OBJEXT) \
 	kernel/fs/kernel_tracing-fat32.$(OBJEXT) \
 	kernel/fs/kernel_tracing-iso9660.$(OBJEXT) \
@@ -807,6 +809,7 @@ ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 AR = @AR@
+ASAN_FLAGS = @ASAN_FLAGS@
 ASM_DEBUG_INFO_FLAGS = @ASM_DEBUG_INFO_FLAGS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
@@ -1539,6 +1542,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/work_queue.cc \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/zlib_helper.h \
+	kernel/lib/asan.cc \
 	kernel/fs/ext4.cc \
 	kernel/fs/fat32.cc \
 	kernel/fs/fat32_decl.h \
@@ -1708,7 +1712,8 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
-	$(FREESTANDING_FLAGS)
+	$(FREESTANDING_FLAGS) \
+	$(ASAN_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
@@ -3119,6 +3124,8 @@ kernel/lib/kernel_generic-work_queue.$(OBJEXT):  \
 kernel/lib/kernel_generic-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_generic-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/$(am__dirstamp):
 	@$(MKDIR_P) kernel/fs
 	@: > kernel/fs/$(am__dirstamp)
@@ -3484,6 +3491,8 @@ kernel/lib/kernel_tracing-work_queue.$(OBJEXT):  \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_tracing-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_tracing-ext4.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
@@ -3951,6 +3960,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-iso9660_part.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-mbr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-tmpfs.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-asan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-bitsearch.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-bootinfo.Po@am__quote@
@@ -3992,6 +4002,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-unique_ptr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-work_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-zlib_helper.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-asan.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-bitsearch.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-bootinfo.Po@am__quote@
@@ -8128,6 +8139,20 @@ kernel/lib/kernel_generic-zlib_helper.obj: kernel/lib/zlib_helper.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-zlib_helper.obj `if test -f 'kernel/lib/zlib_helper.cc'; then $(CYGPATH_W) 'kernel/lib/zlib_helper.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/zlib_helper.cc'; fi`
 
+kernel/lib/kernel_generic-asan.o: kernel/lib/asan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-asan.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-asan.Tpo -c -o kernel/lib/kernel_generic-asan.o `test -f 'kernel/lib/asan.cc' || echo '$(srcdir)/'`kernel/lib/asan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-asan.Tpo kernel/lib/$(DEPDIR)/kernel_generic-asan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_generic-asan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-asan.o `test -f 'kernel/lib/asan.cc' || echo '$(srcdir)/'`kernel/lib/asan.cc
+
+kernel/lib/kernel_generic-asan.obj: kernel/lib/asan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-asan.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-asan.Tpo -c -o kernel/lib/kernel_generic-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-asan.Tpo kernel/lib/$(DEPDIR)/kernel_generic-asan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_generic-asan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+
 kernel/fs/kernel_generic-ext4.o: kernel/fs/ext4.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-ext4.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-ext4.Tpo -c -o kernel/fs/kernel_generic-ext4.o `test -f 'kernel/fs/ext4.cc' || echo '$(srcdir)/'`kernel/fs/ext4.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-ext4.Tpo kernel/fs/$(DEPDIR)/kernel_generic-ext4.Po
@@ -9751,6 +9776,20 @@ kernel/lib/kernel_tracing-zlib_helper.obj: kernel/lib/zlib_helper.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/zlib_helper.cc' object='kernel/lib/kernel_tracing-zlib_helper.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-zlib_helper.obj `if test -f 'kernel/lib/zlib_helper.cc'; then $(CYGPATH_W) 'kernel/lib/zlib_helper.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/zlib_helper.cc'; fi`
+
+kernel/lib/kernel_tracing-asan.o: kernel/lib/asan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-asan.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-asan.Tpo -c -o kernel/lib/kernel_tracing-asan.o `test -f 'kernel/lib/asan.cc' || echo '$(srcdir)/'`kernel/lib/asan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-asan.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-asan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_tracing-asan.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-asan.o `test -f 'kernel/lib/asan.cc' || echo '$(srcdir)/'`kernel/lib/asan.cc
+
+kernel/lib/kernel_tracing-asan.obj: kernel/lib/asan.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-asan.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-asan.Tpo -c -o kernel/lib/kernel_tracing-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-asan.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-asan.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_tracing-asan.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
 
 kernel/fs/kernel_tracing-ext4.o: kernel/fs/ext4.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-ext4.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-ext4.Tpo -c -o kernel/fs/kernel_tracing-ext4.o `test -f 'kernel/fs/ext4.cc' || echo '$(srcdir)/'`kernel/fs/ext4.cc

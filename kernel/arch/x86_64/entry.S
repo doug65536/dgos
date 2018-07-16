@@ -125,6 +125,39 @@ bsp_init:
     leaq ___ctors_en(%rip),%rsi
     call invoke_function_array
 
+#ifdef _ASAN_ENABLED
+    // Mark the callout array initialized
+    leaq ___callout_array_st(%rip),%rdi
+    leaq ___callout_array_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // Mark the kernel parameters initialized
+    movq %r15,%rdi
+    movl $ 13*8,%esi
+    call __asan_storeN_noabort
+
+    // Mark .data initialized
+    leaq ___data_st(%rip),%rdi
+    leaq ___data_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // Mark .bss initialized
+    leaq ___bss_st(%rip),%rdi
+    leaq ___bss_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // Mark VGA initialized
+    movl $ 0xb8000,%rdi
+    leaq $ 0x08000,%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    movb $1,asan_ready(%rip)
+#endif
+
     debugind 'A'
 
     // Notify constructors ran

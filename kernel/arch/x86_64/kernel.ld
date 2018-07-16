@@ -176,8 +176,10 @@ SECTIONS {
 
 	/* Initialized data */
 	.data : ALIGN(4096) {
+		PROVIDE_HIDDEN(___data_st = .);
 		*(.data)
 		*(SORT(.data.*))
+		PROVIDE_HIDDEN(___data_en = .);
 	} :data
 
 	.bss (NOLOAD) : {

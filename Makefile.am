@@ -627,6 +627,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/work_queue.cc \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/zlib_helper.h \
+	kernel/lib/asan.cc \
 	kernel/fs/ext4.cc \
 	kernel/fs/fat32.cc \
 	kernel/fs/fat32_decl.h \
@@ -796,7 +797,8 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility=hidden \
 	-export-dynamic \
 	-mgeneral-regs-only \
-	$(FREESTANDING_FLAGS)
+	$(FREESTANDING_FLAGS) \
+	$(ASAN_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
