@@ -2,6 +2,7 @@
 #include "types.h"
 #include "pci.h"
 #include "vector.h"
+#include "mutex.h"
 
 class virtio_base_t;
 
@@ -52,20 +53,45 @@ public:
     static_assert(sizeof(desc_t) == 16, "Unexpected size");
 
     virtio_virtqueue_t()
-        : buffer(nullptr)
+        : desc_tab(nullptr)
+        , avail_ring(nullptr)
+        , used_ring(nullptr)
+        , log2_queue_size(0)
+        , single_page(false)
     {
-
     }
 
     ~virtio_virtqueue_t()
     {
+        scoped_lock hold(lock);
+        if (single_page && desc_tab) {
+            munmap(desc_tab, (sizeof(*desc_tab) << log2_queue_size) +
+                   (sizeof(uint16_t) << log2_queue_size) +
+                   (sizeof(uint16_t) << log2_queue_size));
+            desc_tab = nullptr;
+            avail_ring = nullptr;
+            used_ring = nullptr;
+            log2_queue_size = 0;
+            single_page = false;
+        }
 
     }
 
     bool set_size(uint8_t log2_queue_size);
 
-    char *buffer;
+private:
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+
+    lock_type lock;
+    condition_variable not_full;
+
+    desc_t *desc_tab;
+    uint16_t *avail_ring;
+    uint16_t volatile *used_ring;
+
     uint8_t log2_queue_size;
+    bool single_page;
 };
 
 struct virtio_pci_cap_hdr_t {
@@ -163,6 +189,13 @@ protected:
     friend class virtio_factory_base_t;
 
     bool virtio_init(pci_dev_iterator_t const &pci_iter, char const *isr_name);
+    bool configure_queues_n(virtio_virtqueue_t *queues, size_t count);
+
+    template<size_t N>
+    bool configure_queues(virtio_virtqueue_t (&queues)[N])
+    {
+        return configure_queues_n(queues, N);
+    }
 
     virtual bool init(pci_dev_iterator_t const &pci_iter) = 0;
 
@@ -173,4 +206,13 @@ protected:
 
     bool use_msi;
     pci_irq_range_t irq_range;
+
+    virtio_virtqueue_t vq;
+
+    // MMIO
+    using lock_type = mcslock;
+    using scoped_lock = unique_lock<lock_type>;
+    lock_type cfg_lock;
+    virtio_pci_common_cfg volatile *common_cfg;
+    size_t common_cfg_size;
 };

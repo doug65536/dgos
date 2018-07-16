@@ -1,5 +1,6 @@
 #include "virtio-base.h"
 #include "likely.h"
+#include "cpu/atomic.h"
 
 #define DEBUG_VIRTIO 1
 #if DEBUG_VIRTIO
@@ -34,14 +35,24 @@ bool virtio_base_t::virtio_init(const pci_dev_iterator_t &pci_iter,
         case VIRTIO_PCI_CAP_COMMON_CFG:
             VIRTIO_TRACE("... VIRTIO_PCI_CAP_COMMON_CFG\n");
 
-            uint64_t bar;
-            bar = pci_iter.config.base_addr[cap_rec.bar];
+            bool is_mmio;
+            is_mmio = pci_iter.config.is_bar_mmio(cap_rec.bar);
 
-            // Get upper half of bar
-            if ((bar & 6) == 4) {
-                bar |= uint64_t(pci_iter.config.base_addr[
-                                cap_rec.bar + 1]) << 32;
-            }
+            // Not MMIO? Bail!
+            if (unlikely(!is_mmio))
+                return false;
+
+            uint64_t bar;
+            bar = pci_iter.config.get_bar(cap_rec.bar) + cap_rec.offset;
+
+            common_cfg_size = cap_rec.length;
+
+            common_cfg = (virtio_pci_common_cfg*)mmap(
+                        (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
+                        MAP_PHYSICAL, -1, 0);
+
+            // Reset the device
+            common_cfg->device_status = 0;
 
             break;
 
@@ -70,6 +81,26 @@ bool virtio_base_t::virtio_init(const pci_dev_iterator_t &pci_iter,
     return true;
 }
 
+bool virtio_base_t::configure_queues_n(virtio_virtqueue_t *queues, size_t count)
+{
+    for (size_t i = 0; i < count; ++i) {
+        virtio_virtqueue_t &vq = queues[i];
+
+        // Bank switch
+        atomic_st_rel(&common_cfg->queue_select, i);
+
+        int queue_sz = atomic_ld_acq(&common_cfg->queue_size);
+
+        if (unlikely(!vq.set_size(bit_log2(queue_sz))))
+            return false;
+    }
+
+    common_cfg->queue_select = 0;
+    atomic_fence();
+
+    return false;
+}
+
 isr_context_t *virtio_base_t::irq_handler(int irq, isr_context_t *ctx)
 {
     for (virtio_base_t *dev : virtio_devs) {
@@ -87,16 +118,39 @@ bool virtio_virtqueue_t::set_size(uint8_t log2_queue_size)
 
     this->log2_queue_size = log2_queue_size;
 
+    int queue_count = 1 << log2_queue_size;
+
     size_t bytes = (sizeof(desc_t) << log2_queue_size) +
             sizeof(avail_hdr_t) +
             (sizeof(uint16_t) << log2_queue_size) +
             sizeof(avail_ftr_t) +
             6 + (8 << log2_queue_size);
 
-    buffer = (char*)mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
-                         MAP_POPULATE, -1, 0);
-    if (buffer == MAP_FAILED)
-        return false;
+    single_page = bytes <= PAGE_SIZE;
+
+    if (single_page) {
+        char *buffer = (char*)mmap(nullptr, bytes, PROT_READ | PROT_WRITE,
+                                   MAP_POPULATE, -1, 0);
+        if (buffer == MAP_FAILED)
+            return false;
+
+        // Calculate pointers to descriptor table, available ring, used ring
+        desc_tab = (desc_t*)buffer;
+        avail_ring = (uint16_t*)(desc_tab + queue_count);
+        used_ring = avail_ring + queue_count;
+    } else {
+        desc_tab = (desc_t*)mmap(
+                    nullptr, sizeof(desc_t) << log2_queue_size,
+                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+
+        avail_ring = (uint16_t*)mmap(
+                    nullptr, sizeof(uint16_t) << log2_queue_size,
+                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+
+        used_ring = (uint16_t*)mmap(
+                    nullptr, sizeof(uint16_t) << log2_queue_size,
+                    PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+    }
 
     return true;
 }
