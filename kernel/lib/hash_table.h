@@ -188,7 +188,7 @@ bool basic_hashtbl_t<T, K, P, key_member, key_sz>::del(void *key)
                     --used;
 
                     // If too many holes have accumulated, rehash
-                    if (holes > (items.size() >> 1))
+                    if (holes > 64 && holes > (items.size() >> 1))
                         rehash(log2_capacity);
 
                     return true;
