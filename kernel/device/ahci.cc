@@ -1274,7 +1274,7 @@ bool ahci_if_t::init(pci_dev_iterator_t const& pci_dev)
     mmio_base = (hba_host_ctl_t*)
             mmap((void*)pci_dev.config.get_bar(5),
             0x1100, PROT_READ | PROT_WRITE,
-            MAP_PHYSICAL, -1, 0);
+            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
     // Set AHCI enable in GHC
     mmio_base->host_ctl |= AHCI_HC_HC_AE;

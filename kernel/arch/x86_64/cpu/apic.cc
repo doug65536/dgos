@@ -1375,9 +1375,7 @@ static void mp_parse_fps()
                 uint32_t volatile *ioapic_ptr = (uint32_t *)mmap(
                             (void*)(uintptr_t)entry_ioapic->addr,
                             12, PROT_READ | PROT_WRITE,
-                            MAP_PHYSICAL |
-                            MAP_NOCACHE |
-                            MAP_WRITETHRU, -1, 0);
+                            MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
                 ioapic->ptr = ioapic_ptr;
 
@@ -1711,8 +1709,7 @@ int apic_init(int ap)
             apic_ptr = (uint32_t *)mmap(
                         (void*)(apic_base),
                         4096, PROT_READ | PROT_WRITE,
-                        MAP_PHYSICAL | MAP_NOCACHE |
-                        MAP_WRITETHRU, -1, 0);
+                        MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
             apic = &apic_x;
         }

@@ -641,7 +641,7 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
     mmio_base = (nvme_mmio_t*)mmap(
                 (void*)(addr & -8),
                 0x2000, PROT_READ | PROT_WRITE,
-                MAP_PHYSICAL, -1, 0);
+                MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
     // 7.6.1 Initialization
 

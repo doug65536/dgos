@@ -439,7 +439,7 @@ void vga_display_t::remap()
     video_mem = (uint16_t*)
             mmap((void*)0xB8000, 0x8000,
                  PROT_READ | PROT_WRITE,
-                 MAP_PHYSICAL, -1, 0);
+                 MAP_PHYSICAL | MAP_WRITETHRU, -1, 0);
 
     // Start using system RAM shadow buffer
 

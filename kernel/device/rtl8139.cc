@@ -956,7 +956,7 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 
     mmio = mmap((void*)mmio_physaddr, 256,
                       PROT_READ | PROT_WRITE,
-                      MAP_PHYSICAL, -1, 0);
+                      MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
 
     // Enable MMIO and bus master, disable port I/O
     pci_adj_control_bits(pci_dev, PCI_CMD_BME | PCI_CMD_MSE,

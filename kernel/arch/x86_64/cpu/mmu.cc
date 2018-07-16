@@ -1681,8 +1681,8 @@ void mmu_init()
 
     // Alias master page directory to be accessible
     // from all process contexts
-    master_pagedir = (pte_t*)mmap((void*)root_physaddr, PAGE_SIZE, PROT_READ,
-                          MAP_PHYSICAL, -1, 0);
+    master_pagedir = (pte_t*)mmap((void*)root_physaddr, PAGE_SIZE,
+                                  PROT_READ, MAP_PHYSICAL, -1, 0);
 
     current_pagedir = PT0_PTR;
 
