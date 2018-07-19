@@ -138,7 +138,8 @@ for flag in \
 		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
-		Wstrict-aliasing Wlogical-op Werror=return-type \
+		Wstrict-aliasing Wlogical-op \
+		Werror=return-type Werror=array-bounds \
 		Wmultistatement-macros Warray-bounds Wformat-overflow \
 		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
 		Wsuggest-attribute=format \
