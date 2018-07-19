@@ -2,6 +2,8 @@
 #include "likely.h"
 #include "type_traits.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename _InputIt, typename _T>
 _InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
 {
@@ -241,3 +243,5 @@ constexpr _ForwardIt max_element(_ForwardIt __first, _ForwardIt __last,
 
     return __last;
 }
+
+__END_NAMESPACE_STD

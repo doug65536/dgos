@@ -3,6 +3,8 @@
 #include "initializer_list.h"
 #include "string.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename _T>
 _always_inline
 constexpr _T&&
@@ -228,3 +230,4 @@ template<typename _K, typename _V> struct hash<pair<_K, _V>>
     }
 };
 
+__END_NAMESPACE_STD

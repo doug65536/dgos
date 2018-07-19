@@ -2,6 +2,8 @@
 #include "threadsync.h"
 #include "utility.h"
 
+__BEGIN_NAMESPACE_STD
+
 // Meets BasicLockable requirements
 class mutex {
 public:
@@ -324,8 +326,8 @@ public:
 
     void swap(unique_lock& rhs) noexcept
     {
-        ::swap(rhs.m, m);
-        ::swap(rhs.locked, locked);
+        std::swap(rhs.m, m);
+        std::swap(rhs.locked, locked);
     }
 
     typename T::mutex_type& native_handle() noexcept
@@ -392,8 +394,8 @@ public:
 
     void swap(unique_lock& rhs) noexcept
     {
-        ::swap(rhs.m, m);
-        ::swap(rhs.locked, locked);
+        std::swap(rhs.m, m);
+        std::swap(rhs.locked, locked);
     }
 
     typename mcslock::mutex_type& native_handle() noexcept
@@ -467,8 +469,8 @@ public:
 
     void swap(unique_lock<T>& rhs)
     {
-        ::swap(rhs.m, m);
-        ::swap(rhs.locked, locked);
+        std::swap(rhs.m, m);
+        std::swap(rhs.locked, locked);
     }
 
 private:
@@ -533,3 +535,5 @@ private:
 
 struct alignas(64) padded_condition_variable : public condition_variable {
 };
+
+__END_NAMESPACE_STD

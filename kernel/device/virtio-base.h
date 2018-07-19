@@ -80,11 +80,11 @@ public:
     bool set_size(uint8_t log2_queue_size);
 
 private:
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
-    lock_type lock;
-    condition_variable not_full;
+    lock_type queue_lock;
+    std::condition_variable queue_not_full;
 
     desc_t *desc_tab;
     uint16_t *avail_ring;
@@ -202,16 +202,15 @@ protected:
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     virtual void irq_handler(int irq) = 0;
 
-    static vector<virtio_base_t*> virtio_devs;
+    static std::vector<virtio_base_t*> virtio_devs;
 
     bool use_msi;
     pci_irq_range_t irq_range;
 
     virtio_virtqueue_t vq;
 
-    // MMIO
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type cfg_lock;
     virtio_pci_common_cfg volatile *common_cfg;
     size_t common_cfg_size;

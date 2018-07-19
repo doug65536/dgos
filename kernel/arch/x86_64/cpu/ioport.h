@@ -229,7 +229,7 @@ struct io_helper<4>
 };
 
 template<int size>
-static _always_inline typename type_from_size<size>::type inp(ioport_t port)
+static _always_inline typename std::type_from_size<size>::type inp(ioport_t port)
 {
     return io_helper<size>::inp(port);
 }

@@ -169,8 +169,8 @@ struct alignas(128) cpu_info_t {
     uint32_t busy_percent;
     uint64_t irq_count;
 
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type queue_lock;
 
@@ -204,11 +204,11 @@ public:
 private:
     thread_info_t *current;
 
-    vector<thread_info_t*> priorities;
+    std::vector<thread_info_t*> priorities;
     uint32_t empty_flags;
 
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
 };

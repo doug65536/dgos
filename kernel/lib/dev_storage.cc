@@ -23,12 +23,12 @@ struct fs_mount_t {
     fs_base_t *fs;
 };
 
-static vector<storage_if_factory_t*> storage_factories;
-static vector<storage_if_base_t*> storage_ifs;
-static vector<storage_dev_base_t*> storage_devs;
-static vector<part_factory_t*> part_factories;
-static vector<fs_reg_t*> fs_regs;
-static vector<fs_mount_t> fs_mounts;
+static std::vector<storage_if_factory_t*> storage_factories;
+static std::vector<storage_if_base_t*> storage_ifs;
+static std::vector<storage_dev_base_t*> storage_devs;
+static std::vector<part_factory_t*> part_factories;
+static std::vector<fs_reg_t*> fs_regs;
+static std::vector<fs_mount_t> fs_mounts;
 
 size_t storage_dev_count()
 {
@@ -60,7 +60,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
     STORAGE_TRACE("Probing for %s interfaces...\n", factory->name);
 
     // Get a list of storage devices of this type
-    vector<storage_if_base_t *> list = factory->detect();
+    std::vector<storage_if_base_t *> list = factory->detect();
 
     STORAGE_TRACE("Found %zu %s interfaces\n", list.size(), factory->name);
 
@@ -74,7 +74,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
         STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
 
         // Get a list of storage devices on this interface
-        vector<storage_dev_base_t*> dev_list = if_->detect_devices();
+        std::vector<storage_dev_base_t*> dev_list = if_->detect_devices();
 
         STORAGE_TRACE("Found %zu %s[%u] drives\n", dev_list.size(),
                       factory->name, i);
@@ -162,7 +162,7 @@ static void invoke_part_factories(void *arg)
                               (char const *)drive->info(STORAGE_INFO_NAME),
                               factory->name);
 
-                vector<part_dev_t*> part_list = factory->detect(drive);
+                std::vector<part_dev_t*> part_list = factory->detect(drive);
 
                 // Mount partitions
                 for (unsigned i = 0; i < part_list.size(); ++i) {

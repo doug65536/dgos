@@ -76,7 +76,7 @@ void c4rand::write(const void *data, size_t len)
             i = 0;
 
         b = (b + state[i] + key[ki]) & 0xFF;
-        swap(state[i], state[b]);
+        std::swap(state[i], state[b]);
     }
 
     a = 0;
@@ -89,7 +89,7 @@ void c4rand::read(void *data, size_t len)
     for (size_t i = 0; i < len; ++i) {
         a = (a + 1) & 0xFF;
         b = (b + state[a]) & 0xFF;
-        swap(state[a], state[b]);
+        std::swap(state[a], state[b]);
         k[i] ^= state[(state[a] + state[b]) & 0xFF];
     }
 }

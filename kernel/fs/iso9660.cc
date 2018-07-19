@@ -127,7 +127,7 @@ struct iso9660_fs_t final : public fs_base_t {
     uint32_t pt_lba;
     uint32_t pt_bytes;
 
-    unique_ptr_free<char> serial;
+    std::unique_ptr_free<char> serial;
 
     int (*name_convert)(void *encoded_buf,
                         char const *utf8);
@@ -161,7 +161,7 @@ struct iso9660_fs_t final : public fs_base_t {
     uint8_t block_shift;
 };
 
-static vector<iso9660_fs_t*> iso9660_mounts;
+static std::vector<iso9660_fs_t*> iso9660_mounts;
 
 static pool_t iso9660_handles;
 
@@ -529,7 +529,7 @@ fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
     if (iso9660_mounts.empty())
         pool_create(&iso9660_handles, sizeof(iso9660_fs_t::handle_t), 512);
 
-    unique_ptr<iso9660_fs_t> self(new iso9660_fs_t);
+    std::unique_ptr<iso9660_fs_t> self(new iso9660_fs_t);
     if (self->mount(conn)) {
         iso9660_mounts.push_back(self);
         return self.release();

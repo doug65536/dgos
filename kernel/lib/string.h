@@ -66,7 +66,7 @@ void memzero(T &obj)
 
 template<typename T>
 static _always_inline unsigned devload_impl(
-        T const *p, integral_constant<size_t, 1>::type, false_type)
+        T const *p, std::integral_constant<size_t, 1>::type, std::false_type)
 {
     unsigned result;
     __asm__ __volatile__ (
@@ -79,7 +79,7 @@ static _always_inline unsigned devload_impl(
 
 template<typename T>
 static _always_inline unsigned devload_impl(
-        T const *p, integral_constant<size_t, 2>::type, false_type)
+        T const *p, std::integral_constant<size_t, 2>::type, std::false_type)
 {
     unsigned result;
     __asm__ __volatile__ (
@@ -92,7 +92,7 @@ static _always_inline unsigned devload_impl(
 
 template<typename T>
 static _always_inline unsigned devload_impl(
-        T const *p, integral_constant<size_t, 4>::type, false_type)
+        T const *p, std::integral_constant<size_t, 4>::type, std::false_type)
 {
     unsigned result;
     __asm__ __volatile__ (
@@ -105,7 +105,7 @@ static _always_inline unsigned devload_impl(
 
 template<typename T>
 static _always_inline uint64_t devload_impl(
-        T const *p, integral_constant<size_t, 8>::type, false_type)
+        T const *p, std::integral_constant<size_t, 8>::type, std::false_type)
 {
     uint64_t result;
     __asm__ __volatile__ (
@@ -120,7 +120,7 @@ static _always_inline uint64_t devload_impl(
 
 template<typename T>
 static _always_inline int devload_impl(
-        T const *p, integral_constant<size_t, 1>::type, true_type)
+        T const *p, std::integral_constant<size_t, 1>::type, std::true_type)
 {
     int result;
     __asm__ __volatile__ (
@@ -133,7 +133,7 @@ static _always_inline int devload_impl(
 
 template<typename T>
 static _always_inline int devload_impl(
-        T const *p, integral_constant<size_t, 2>::type, true_type)
+        T const *p, std::integral_constant<size_t, 2>::type, std::true_type)
 {
     int result;
     __asm__ __volatile__ (
@@ -146,7 +146,7 @@ static _always_inline int devload_impl(
 
 template<typename T>
 static _always_inline int devload_impl(
-        T const *p, integral_constant<size_t, 4>::type, true_type)
+        T const *p, std::integral_constant<size_t, 4>::type, std::true_type)
 {
     int result;
     __asm__ __volatile__ (
@@ -159,7 +159,7 @@ static _always_inline int devload_impl(
 
 template<typename T>
 static _always_inline int64_t devload_impl(
-        T const *p, integral_constant<size_t, 8>::type, true_type)
+        T const *p, std::integral_constant<size_t, 8>::type, std::true_type)
 {
     int64_t result;
     __asm__ __volatile__ (
@@ -174,7 +174,7 @@ static _always_inline int64_t devload_impl(
 
 template<typename T>
 static _always_inline void devstore_impl(
-        T *p, T const& val, integral_constant<size_t, 1>::type)
+        T *p, T const& val, std::integral_constant<size_t, 1>::type)
 {
     uint8_t result;
     __asm__ __volatile__ (
@@ -186,7 +186,7 @@ static _always_inline void devstore_impl(
 
 template<typename T>
 static _always_inline void devstore_impl(
-        T *p, T const& val, integral_constant<size_t, 2>::type)
+        T *p, T const& val, std::integral_constant<size_t, 2>::type)
 {
     __asm__ __volatile__ (
         "movw %w[src],%[dest]\n\t"
@@ -197,7 +197,7 @@ static _always_inline void devstore_impl(
 
 template<typename T>
 static _always_inline void devstore_impl(
-        T *p, T const& val, integral_constant<size_t, 4>::type)
+        T *p, T const& val, std::integral_constant<size_t, 4>::type)
 {
     __asm__ __volatile__ (
         "movl %k[src],%[dest]\n\t"
@@ -208,7 +208,7 @@ static _always_inline void devstore_impl(
 
 template<typename T>
 static _always_inline void devstore_impl(
-        T *p, T const& val, integral_constant<size_t, 8>::type)
+        T *p, T const& val, std::integral_constant<size_t, 8>::type)
 {
     __asm__ __volatile__ (
         "movq %q[src],%[dest]\n\t"
@@ -222,21 +222,21 @@ static _always_inline void devstore_impl(
 template<typename T>
 static _always_inline auto devload(T const *p) ->
     decltype(devload_impl(
-                 p, typename integral_constant<size_t, sizeof(T)>::type(),
-                 typename is_signed<T>::type()))
+                 p, typename std::integral_constant<size_t, sizeof(T)>::type(),
+                 typename std::is_signed<T>::type()))
 {
     return devload_impl(
-                p, typename integral_constant<size_t, sizeof(T)>::type(),
-                typename is_signed<T>::type());
+                p, typename std::integral_constant<size_t, sizeof(T)>::type(),
+                typename std::is_signed<T>::type());
 }
 
 template<typename T>
 static _always_inline auto devstore(T*p, T const& val) ->
     decltype(devstore_impl(
                  p, val,
-                 typename integral_constant<size_t, sizeof(T)>::type()))
+                 typename std::integral_constant<size_t, sizeof(T)>::type()))
 {
     return devstore_impl(
                 p, val,
-                typename integral_constant<size_t, sizeof(T)>::type());
+                typename std::integral_constant<size_t, sizeof(T)>::type());
 }

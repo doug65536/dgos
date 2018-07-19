@@ -620,7 +620,7 @@ static int draw_test(void *p)
     int frames = 0;
 
     // 1280x800
-    unique_ptr<png_image_t> img(png_load("background.png"));
+    std::unique_ptr<png_image_t> img(png_load("background.png"));
     uint64_t st_tm = time_ns();
     for (int sx = 1280-1920; sx < 0; sx += 15) {
         int step, sy1, sy2;
@@ -663,10 +663,8 @@ static int draw_test(void *p)
 }
 #endif
 
-static int init_thread(void *p)
+static int init_thread(void *)
 {
-    (void)p;
-
     printk("Initializing PCI\n");
     pci_init();
 
@@ -843,8 +841,8 @@ static int init_thread(void *p)
 
 #if ENABLE_READ_STRESS_THREAD > 0
     int dev_cnt = storage_dev_count();
-    vector<read_stress_thread_t*> *read_stress_threads =
-            new vector<read_stress_thread_t*>();
+    std::vector<read_stress_thread_t*> *read_stress_threads =
+            new std::vector<read_stress_thread_t*>();
     read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD);
 
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {

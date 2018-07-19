@@ -9,9 +9,9 @@
 #define VIRTIO_TRACE(...) ((void)0)
 #endif
 
-vector<virtio_base_t*> virtio_base_t::virtio_devs;
+std::vector<virtio_base_t*> virtio_base_t::virtio_devs;
 
-bool virtio_base_t::virtio_init(const pci_dev_iterator_t &pci_iter,
+bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                                 char const *isr_name)
 {
     use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false, 4,
@@ -170,7 +170,7 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
         VIRTIO_TRACE("Found %s device\n", name);
 
-        unique_ptr<virtio_base_t> self = create();
+        std::unique_ptr<virtio_base_t> self = create();
 
         if (self->init(pci_iter))
             virtio_base_t::virtio_devs.push_back(self.release());

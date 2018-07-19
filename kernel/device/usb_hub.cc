@@ -67,7 +67,7 @@ protected:
 private:
 };
 
-static vector<usb_hub_t*> hubs;
+static std::vector<usb_hub_t*> hubs;
 
 usb_hub_t::usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status)
     : control(control)

@@ -93,7 +93,7 @@ unsigned vga_display_t::instance_count;
 #define VGA_SET_CURSOR_HI(pos) (VGA_CRTC_CURSOR_HI | \
     ((pos) & 0xFF00))
 
-static vector<vga_display_t*> vga_displays;
+static std::vector<vga_display_t*> vga_displays;
 
 // === Internal API ===
 

@@ -32,22 +32,22 @@ struct partition_tbl_ent_t {
 
 struct mbr_part_factory_t : public part_factory_t {
     mbr_part_factory_t() : part_factory_t("mbr") {}
-    vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
+    std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 
 static mbr_part_factory_t mbr_part_factory;
 STORAGE_REGISTER_FACTORY(mbr_part);
 
-static vector<part_dev_t*> partitions;
+static std::vector<part_dev_t*> partitions;
 
-vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
+std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 {
-    vector<part_dev_t *> list;
+    std::vector<part_dev_t *> list;
 
     long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     if (sector_size >= 512) {
-        unique_ptr<uint8_t[]> sector(new uint8_t[sector_size]);
+        std::unique_ptr<uint8_t[]> sector(new uint8_t[sector_size]);
         memset(sector, 0, sector_size);
 
         if (drive->read_blocks(sector, 1, 0) >= 0) {
@@ -56,7 +56,7 @@ vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                 memcpy(ptbl, sector + 446, sizeof(ptbl));
 
                 for (int i = 0; i < 4; ++i) {
-                    unique_ptr<part_dev_t> part;
+                    std::unique_ptr<part_dev_t> part;
 
                     switch (ptbl[i].system_id) {
                     case 0x0B:// fall thru
@@ -74,7 +74,7 @@ vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
 
                     case 0x83:
                         // Linux filesystem
-                        unique_ptr<uint8_t> ext_superblock =
+                        std::unique_ptr<uint8_t> ext_superblock =
                                 new uint8_t[sector_size];
 
                         if (drive->read_blocks(ext_superblock, 1,

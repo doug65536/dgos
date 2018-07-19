@@ -16,10 +16,10 @@ struct filetab_t {
     int refcount;
 };
 
-using file_table_lock_type = mcslock;
-using file_table_scoped_lock = unique_lock<file_table_lock_type>;
+using file_table_lock_type = std::mcslock;
+using file_table_scoped_lock = std::unique_lock<file_table_lock_type>;
 static file_table_lock_type file_table_lock;
-static vector<filetab_t> file_table;
+static std::vector<filetab_t> file_table;
 static filetab_t *file_table_ff;
 
 static void file_init(void *)

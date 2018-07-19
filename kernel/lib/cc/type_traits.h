@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<bool _Condition, typename _T, typename _F>
 struct conditional
 {
@@ -284,3 +286,5 @@ struct aligned_storage {
         alignas(_Align) unsigned char data[_Len];
     };
 };
+
+__END_NAMESPACE_STD

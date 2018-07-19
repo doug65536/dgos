@@ -307,7 +307,7 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile*lock, mcs_queue_ent_t *node)
 
 // Lock mcslock without restoring/disabling interrupts
 void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
-                          mcs_queue_ent_t *node)
+                        mcs_queue_ent_t *node)
 {
     node->next = nullptr;
 

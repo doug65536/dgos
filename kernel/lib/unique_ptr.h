@@ -2,6 +2,8 @@
 #include "types.h"
 #include "stdlib.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename T>
 struct default_delete
 {
@@ -249,3 +251,5 @@ private:
 
 template<typename T>
 using unique_ptr_free = unique_ptr<T, free_deleter<T>>;
+
+__END_NAMESPACE_STD

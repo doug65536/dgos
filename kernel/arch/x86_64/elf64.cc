@@ -138,7 +138,7 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    unique_ptr<Elf64_Shdr> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
+    std::unique_ptr<Elf64_Shdr> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
 
     if (unlikely(scn_hdr_size != file_pread(
                      fd, scn_hdrs, scn_hdr_size,
@@ -148,9 +148,9 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     size_t mod_str_scn = 0;
-    unique_ptr_free<Elf64_Sym> mod_sym;
+    std::unique_ptr_free<Elf64_Sym> mod_sym;
     Elf64_Sym *mod_sym_end = nullptr;
-    unique_ptr_free<char> mod_str;
+    std::unique_ptr_free<char> mod_str;
 
     Elf64_Xword max_addr = 0;
     Elf64_Xword min_addr = (Elf64_Xword)-1;
@@ -239,7 +239,7 @@ module_entry_fn_t modload_load(char const *path)
         }
     }
 
-    unique_ptr_free<void> rel_buf(malloc(max_rel));
+    std::unique_ptr_free<void> rel_buf(malloc(max_rel));
 
     Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf.get();
     Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf.get();
@@ -281,9 +281,9 @@ module_entry_fn_t modload_load(char const *path)
 
         modload_find_syms(&symtab, &strtab, scn_hdrs, i);
 
-        unique_ptr_free<Elf64_Sym> symdata(
+        std::unique_ptr_free<Elf64_Sym> symdata(
                     (Elf64_Sym *)malloc(symtab->sh_size));
-        unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
+        std::unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
 
         if (unlikely((ssize_t)symtab->sh_size != file_pread(
                     fd, symdata, symtab->sh_size, symtab->sh_offset))) {
@@ -425,12 +425,12 @@ module_entry_fn_t modload_load(char const *path)
 
                 bool relocation_truncated = false;
                 if (!fixup_is_64) {
-                    if (fixup64 < numeric_limits<int32_t>::min() ||
-                            fixup64 > numeric_limits<int32_t>::max()) {
+                    if (fixup64 < std::numeric_limits<int32_t>::min() ||
+                            fixup64 > std::numeric_limits<int32_t>::max()) {
                         relocation_truncated = true;
                     } else if (fixup_is_unsigned) {
                         if (fixup64 < 0 ||
-                                fixup64 > numeric_limits<uint32_t>::max()) {
+                                fixup64 > std::numeric_limits<uint32_t>::max()) {
                             relocation_truncated = true;
                         }
                     }

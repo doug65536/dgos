@@ -34,7 +34,7 @@ struct ipv4_addr_pair_t {
 };
 
 template<>
-struct hash<ipv4_addr_t>
+struct std::hash<ipv4_addr_t>
 {
     size_t operator()(ipv4_addr_t const& __k) const
     {
@@ -44,7 +44,7 @@ struct hash<ipv4_addr_t>
 };
 
 template<>
-struct hash<ipv4_addr_pair_t>
+struct std::hash<ipv4_addr_pair_t>
 {
     size_t operator()(ipv4_addr_pair_t const& __k) const
     {

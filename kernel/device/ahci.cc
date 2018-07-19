@@ -811,17 +811,17 @@ struct hba_port_info_t {
     slot_request_t slot_requests[32];
 
     // Wake every time a slot is released
-    condition_variable slotalloc_avail;
+    std::condition_variable slotalloc_avail;
 
     // Wake when all slots are released
-    condition_variable idle_cond;
+    std::condition_variable idle_cond;
 
     // Wake after a non-NCQ command finishes (when NCQ capable)
-    condition_variable non_ncq_done_cond;
+    std::condition_variable non_ncq_done_cond;
 
     // Keep track of slot order
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
     // Set to true to block slot acquires to idle the controller for a
@@ -844,7 +844,7 @@ class ahci_if_factory_t : public storage_if_factory_t {
 public:
     ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
-    virtual vector<storage_if_base_t *> detect(void) override final;
+    virtual std::vector<storage_if_base_t *> detect(void) override final;
 };
 
 static ahci_if_factory_t ahci_if_factory;
@@ -930,8 +930,8 @@ private:
     bool is_atapi;
 };
 
-static vector<ahci_if_t*> ahci_devices;
-static vector<ahci_dev_t*> ahci_drives;
+static std::vector<ahci_if_t*> ahci_devices;
+static std::vector<ahci_dev_t*> ahci_drives;
 
 bool ahci_if_t::supports_64bit()
 {
@@ -1715,9 +1715,9 @@ void ahci_if_t::bios_handoff()
         thread_yield();
 }
 
-vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
+std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 {
-    vector<storage_if_base_t *> list;
+    std::vector<storage_if_base_t *> list;
 
     pci_dev_iterator_t pci_iter;
 
@@ -1762,7 +1762,7 @@ vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 
         //sleep(3000);
 
-        unique_ptr<ahci_if_t> self(new ahci_if_t{});
+        std::unique_ptr<ahci_if_t> self(new ahci_if_t{});
 
         if (self->init(pci_iter)) {
             ahci_devices.push_back(self);
@@ -1776,9 +1776,9 @@ vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 //
 // device registration
 
-vector<storage_dev_base_t*> ahci_if_t::detect_devices()
+std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 {
-    vector<storage_dev_base_t*> list;
+    std::vector<storage_dev_base_t*> list;
 
     uint8_t port_num;
     for (unsigned ports_impl = ports_impl_mask; ports_impl;
@@ -1789,7 +1789,7 @@ vector<storage_dev_base_t*> ahci_if_t::detect_devices()
 
         if (port->sig == ahci_sig_t::SATA_SIG_ATA ||
                 port->sig == ahci_sig_t::SATA_SIG_ATAPI) {
-            unique_ptr<ahci_dev_t> drive(new ahci_dev_t{});
+            std::unique_ptr<ahci_dev_t> drive(new ahci_dev_t{});
 
             if (drive->init(this, port_num,
                             port->sig == ahci_sig_t::SATA_SIG_ATAPI)) {
@@ -1814,7 +1814,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     port = dev_port;
     is_atapi = dev_is_atapi;
 
-    unique_ptr<ata_identify_t> identify = new ata_identify_t;
+    std::unique_ptr<ata_identify_t> identify = new ata_identify_t;
 
     blocking_iocp_t block;
 

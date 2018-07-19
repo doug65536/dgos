@@ -25,13 +25,13 @@ public:
     static T* construct(Args&& ...args)
     {
         void *mem = workq::allocate(sizeof(T));
-        return new (mem) T(forward<Args>(args)...);
+        return new (mem) T(std::forward<Args>(args)...);
     }
 
     template<typename T, typename... Args>
     static void emplace(Args&& ...args)
     {
-        T* item = construct(forward<Args>(args)...);
+        T* item = construct(std::forward<Args>(args)...);
         enqueue(item);
     }
 

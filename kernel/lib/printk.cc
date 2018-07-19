@@ -277,8 +277,8 @@ static char *dtoa(char *txt, size_t txt_sz,
 
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
-using formatter_lock_type = spinlock;
-using formatter_scoped_lock = unique_lock<formatter_lock_type>;
+using formatter_lock_type = std::spinlock;
+using formatter_scoped_lock = std::unique_lock<formatter_lock_type>;
 formatter_lock_type formatter_lock;
 
 /// emit_chars callback takes null pointer and a character,
@@ -843,11 +843,11 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
     return 0;
 }
 
-static mcslock cprintf_lock;
+static std::mcslock cprintf_lock;
 
 EXPORT int vcprintf(char const *format, va_list ap)
 {
-    unique_lock<mcslock> hold_cprintf_lock(cprintf_lock);
+    std::unique_lock<std::mcslock> hold_cprintf_lock(cprintf_lock);
 
     int chars_written = 0;
     if (con_exists()) {

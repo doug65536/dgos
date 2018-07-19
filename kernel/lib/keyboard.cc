@@ -14,11 +14,11 @@ struct keyboard_buffer_t {
     size_t head;
     size_t tail;
 
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
-    condition_variable not_empty;
+    std::condition_variable not_empty;
 };
 
 static keyboard_buffer_t keybd_buffer;

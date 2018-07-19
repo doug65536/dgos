@@ -259,7 +259,7 @@ class ext4_factory_t : public fs_factory_t {
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 
-static vector<ext4_fs_t*> ext4_mounts;
+static std::vector<ext4_fs_t*> ext4_mounts;
 
 // ---------------------------------------------------------------------------
 // Internal implementation
@@ -300,7 +300,7 @@ int ext4_fs_t::mm_fault_handler(
 
 fs_base_t *ext4_factory_t::mount(fs_init_info_t *conn)
 {
-    unique_ptr<ext4_fs_t> self(new ext4_fs_t);
+    std::unique_ptr<ext4_fs_t> self(new ext4_fs_t);
     if (self->mount(conn)) {
         ext4_mounts.push_back(self);
         return self.release();

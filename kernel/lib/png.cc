@@ -250,7 +250,7 @@ static uint32_t png_process_idata(
 png_image_t *png_load(char const *path)
 {
     // Allocate read buffer
-    unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE];
+    std::unique_ptr<uint8_t> buf = new uint8_t[PNG_BUFSIZE];
     if (!buf)
         return 0;
 
@@ -280,7 +280,7 @@ png_image_t *png_load(char const *path)
     uint32_t consumed;
     uint32_t read_size;
 
-    unique_ptr_free<png_image_t> img;
+    std::unique_ptr_free<png_image_t> img;
     png_read_state_t state;
     state.cur_row = 0;
     state.cur_filter = png_filter_type_t::UNSET;

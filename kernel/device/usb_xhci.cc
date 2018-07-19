@@ -809,8 +809,8 @@ protected:
                             usb_hub_desc const &hub_desc) override final;
 
 private:
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     errno_t cc_to_errno(usb_cc_t cc);
 
@@ -904,7 +904,7 @@ private:
     size_t busid;
 
     lock_type endpoints_lock;
-    vector<usbxhci_endpoint_data_t*> endpoints;
+    std::vector<usbxhci_endpoint_data_t*> endpoints;
 
     // Endpoint data keyed on usbxhci_endpoint_target_t
     hashtbl_t<usbxhci_endpoint_data_t, usbxhci_endpoint_target_t,
@@ -928,17 +928,17 @@ private:
     hashtbl_t<usbxhci_pending_cmd_t,
     uint64_t, &usbxhci_pending_cmd_t::cmd_physaddr> usbxhci_pending_ht;
 
-    vector<void*> scratch_buffers;
+    std::vector<void*> scratch_buffers;
 
-    vector<usb_iocp_t*> completed_iocp;
+    std::vector<usb_iocp_t*> completed_iocp;
 
-    vector<usbxhci_slot_data_t> slot_data;
+    std::vector<usbxhci_slot_data_t> slot_data;
 
     // Command issue lock
     lock_type lock_cmd;
 };
 
-static vector<unique_ptr<usbxhci>> usbxhci_devices;
+static std::vector<std::unique_ptr<usbxhci>> usbxhci_devices;
 
 // Handle 32 or 64 byte device context size
 usbxhci_slotctx_t *usbxhci::dev_ctx_ent_slot(size_t slotid)
@@ -1187,7 +1187,7 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
         return false;
 
     // Get first 8 bytes of device descriptor to get max packet size
-    unique_ptr_free<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 128));
+    std::unique_ptr_free<usb_desc_config> cfg_buf((usb_desc_config*)calloc(1, 128));
 
     err = get_descriptor(slotid, 0, cfg_buf, 128, usb_req_type::STD,
                          usb_req_recip_t::DEVICE,
@@ -1200,7 +1200,7 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
     // their device descriptor shall support GetDescriptor (BOS Descriptor)
     // requests
     usb_desc_bos bos_hdr{};
-    unique_ptr<usb_desc_bos> bos;
+    std::unique_ptr<usb_desc_bos> bos;
     do {
         if (dev_desc.usb_spec >= 0x210) {
             err = get_descriptor(slotid, 0, &bos_hdr, sizeof(bos_hdr),
@@ -1399,7 +1399,7 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     slot_data.resize(maxslots);
 
     use_msi = pci_try_msi_irq(pci_iter, &irq_range,
-                              0, false, min(16U, maxintr),
+                              0, false, std::min(16U, maxintr),
                               &usbxhci::irq_handler,
                               "usb_xhci");
 
@@ -2257,7 +2257,7 @@ int usbxhci::make_data_trbs(
         trb->xfer_td_intr =
                 USBXHCI_CTL_TRB_XFERLEN_INTR_XFERLEN_n(ranges[i].size) |
                 USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_n(
-                    min(size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
+                    std::min(size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
                         range_count - i - 1));
         trb->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA) |
                 USBXHCI_CTL_TRB_FLAGS_CH_n(i + 1 < range_count) |

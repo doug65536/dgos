@@ -205,14 +205,14 @@ struct mp_ioapic_t {
     uint8_t irq_base;
     uint32_t addr;
     uint32_t volatile *ptr;
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<mcslock>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<std::mcslock>;
     lock_type lock;
 };
 
 static char const *mp_tables;
 
-static vector<uint8_t> mp_pci_bus_ids;
+static std::vector<uint8_t> mp_pci_bus_ids;
 static uint16_t mp_isa_bus_id;
 
 static uint64_t apic_timer_freq;
@@ -220,8 +220,8 @@ static uint64_t apic_timer_freq;
 static unsigned ioapic_count;
 static mp_ioapic_t ioapic_list[16];
 
-using ioapic_msi_alloc_lock_type = mcslock;
-using ioapic_msi_alloc_scoped_lock = unique_lock<ioapic_msi_alloc_lock_type>;
+using ioapic_msi_alloc_lock_type = std::mcslock;
+using ioapic_msi_alloc_scoped_lock = std::unique_lock<ioapic_msi_alloc_lock_type>;
 static ioapic_msi_alloc_lock_type ioapic_msi_alloc_lock;
 static uint8_t ioapic_msi_next_irq = INTR_APIC_IRQ_BASE;
 
@@ -250,7 +250,7 @@ static uint8_t ioapic_next_irq_base = 16;
 static uint8_t ioapic_msi_base_intr;
 static uint8_t ioapic_msi_base_irq;
 
-static vector<uint8_t> isa_irq_lookup;
+static std::vector<uint8_t> isa_irq_lookup;
 
 static unsigned apic_id_count;
 static uint32_t apic_id_list[64];
@@ -867,11 +867,11 @@ struct acpi_hpet_t {
 #define ACPI_HPET_BLKID_NUM_CMP_BITS    8
 #define ACPI_HPET_BLKID_REV_ID_BITS     8
 
-static vector<acpi_gas_t> acpi_hpet_list;
+static std::vector<acpi_gas_t> acpi_hpet_list;
 static int acpi_madt_flags;
 
 // Local interrupt NMI LINT MADT records
-static vector<acpi_madt_lnmi_t> lapic_lint_nmi;
+static std::vector<acpi_madt_lnmi_t> lapic_lint_nmi;
 
 static acpi_fadt_t acpi_fadt;
 
@@ -1271,7 +1271,7 @@ static void acpi_parse_rsdt()
             }
         }
 
-        munmap(hdr, max(size_t(64 << 10), size_t(hdr->len)));
+        munmap(hdr, std::max(size_t(64 << 10), size_t(hdr->len)));
     }
 }
 
@@ -1292,9 +1292,9 @@ static void mp_parse_fps()
     // First slot reserved for BSP
     apic_id_count = 1;
 
-    fill_n(intr_to_irq, countof(intr_to_irq), -1);
-    fill_n(irq_to_intr, countof(irq_to_intr), -1);
-    fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
+    std::fill_n(intr_to_irq, countof(intr_to_irq), -1);
+    std::fill_n(irq_to_intr, countof(irq_to_intr), -1);
+    std::fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
 
     for (uint16_t i = 0; i < cth->entry_count; ++i) {
         mp_cfg_cpu_t *entry_cpu;
@@ -1503,7 +1503,7 @@ static void mp_parse_fps()
         }
     }
 
-    munmap(cth, max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
+    munmap(cth, std::max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
 }
 
 static int parse_mp_tables(void)
@@ -2254,13 +2254,13 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
 
     // If this is the first IOAPIC, initialize some lookup tables
     if (ioapic_count == 1) {
-        fill_n(intr_to_irq, countof(irq_to_intr), -1);
-        fill_n(irq_to_intr, countof(irq_to_intr), -1);
-        fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
+        std::fill_n(intr_to_irq, countof(irq_to_intr), -1);
+        std::fill_n(irq_to_intr, countof(irq_to_intr), -1);
+        std::fill_n(intr_to_ioapic, countof(intr_to_ioapic), -1);
     }
 
     // Fill entries in interrupt-to-ioapic lookup table
-    fill_n(intr_to_ioapic + ioapic->base_intr,
+    std::fill_n(intr_to_ioapic + ioapic->base_intr,
            ioapic->vector_count, ioapic - ioapic_list);
 
     // Assume GSIs are sequentially assigned to IOAPIC inputs

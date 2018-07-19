@@ -87,7 +87,7 @@ struct storage_if_base_t;
 
 struct storage_if_factory_t {
     storage_if_factory_t(char const *factory_name);
-    virtual vector<storage_if_base_t *> detect(void) = 0;
+    virtual std::vector<storage_if_base_t *> detect(void) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
@@ -95,12 +95,12 @@ struct storage_if_factory_t {
 struct storage_if_base_t {
     virtual ~storage_if_base_t() {}
     virtual void cleanup() = 0;
-    virtual vector<storage_dev_base_t*> detect_devices() = 0;
+    virtual std::vector<storage_dev_base_t*> detect_devices() = 0;
 };
 
 #define STORAGE_IF_IMPL                         \
     void cleanup() override final;              \
-    vector<storage_dev_base_t*> detect_devices() override final;
+    std::vector<storage_dev_base_t*> detect_devices() override final;
 
 #define STORAGE_REGISTER_FACTORY(name) \
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
@@ -421,7 +421,7 @@ struct part_dev_t {
 
 struct part_factory_t {
     explicit part_factory_t(char const * factory_name);
-    virtual vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
+    virtual std::vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
     static void register_factory(void *p);
     char const * const name;
 };

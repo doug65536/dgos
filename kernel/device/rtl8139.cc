@@ -124,8 +124,8 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     unsigned tx_head;
     unsigned tx_tail;
 
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
     ethq_queue_t tx_queue;

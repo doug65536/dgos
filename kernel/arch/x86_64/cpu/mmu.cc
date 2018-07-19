@@ -339,16 +339,16 @@ struct mmap_device_mapping_t {
     uint64_t len;
     mm_dev_mapping_callback_t callback;
     void *context;
-    mutex lock;
-    condition_variable done_cond;
+    std::mutex lock;
+    std::condition_variable done_cond;
     int64_t active_read;
 };
 
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
-static vector<mmap_device_mapping_t*> mm_dev_mappings;
-using mm_dev_mapping_lock_type = mcslock;
-using mm_dev_mapping_scoped_lock = unique_lock<mm_dev_mapping_lock_type>;
+static std::vector<mmap_device_mapping_t*> mm_dev_mappings;
+using mm_dev_mapping_lock_type = std::mcslock;
+using mm_dev_mapping_scoped_lock = std::unique_lock<mm_dev_mapping_lock_type>;
 static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 
 /// Physical page allocation map
@@ -465,8 +465,8 @@ private:
         }
     }
 
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     static constexpr entry_t used_mask =
             (entry_t(1) << (sizeof(entry_t) * 8 - 1));
@@ -528,8 +528,8 @@ public:
     template<typename F>
     void each_rv(F callback);
 private:
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type free_addr_lock;
     typedef rbtree_t<> tree_t;
     tree_t free_addr_by_size;
@@ -1037,8 +1037,8 @@ static _always_inline T *init_phys(uint64_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type locks[64];
 
     pte_t *pte;
@@ -1209,7 +1209,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     int old_pending = atomic_or(&shootdown_pending, other_cpu_mask);
     int need_ipi_mask = old_pending & other_cpu_mask;
 
-    vector<uint64_t> shootdown_counts;
+    std::vector<uint64_t> shootdown_counts;
     if (synchronous) {
         shootdown_counts.reserve(thread_cpu_count());
         for (int i = 0; i < cpu_count; ++i) {
@@ -1369,7 +1369,7 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
             pte_t volatile *vpte = ptes[3];
 
             // Attempt to be the first CPU to start reading a block
-            unique_lock<mutex> lock(mapping->lock);
+            std::unique_lock<std::mutex> lock(mapping->lock);
             while (mapping->active_read >= 0 &&
                    !(*vpte & PTE_PRESENT))
                 mapping->done_cond.wait(lock);
@@ -2075,7 +2075,7 @@ void contiguous_allocator_t::dump(char const *format, ...)
 template<typename F>
 void contiguous_allocator_t::each_fw(F callback)
 {
-    static_assert(is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
+    static_assert(std::is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
                   bool>::value,
                   "Callback must return boolean");
 
@@ -2095,7 +2095,7 @@ void contiguous_allocator_t::each_fw(F callback)
 template<typename F>
 void contiguous_allocator_t::each_rv(F callback)
 {
-    static_assert(is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
+    static_assert(std::is_same<decltype((*(F*)nullptr)(mmu_range_t{})),
                   bool>::value,
                   "Callback must return boolean");
 
@@ -2946,7 +2946,7 @@ int msync(void const *addr, size_t len, int flags)
 
     mmap_device_mapping_t *mapping = mm_dev_mappings[device];
 
-    unique_lock<mutex> lock(mapping->lock);
+    std::unique_lock<std::mutex> lock(mapping->lock);
 
     while (mapping->active_read >= 0)
         mapping->done_cond.wait(lock);
@@ -3199,7 +3199,7 @@ void mmu_phys_allocator_t::init(
     log2_pagesz = log2_pagesz_;
     highest_usable = highest_usable_;
 
-    fill_n(entries, highest_usable_, entry_t(-1));
+    std::fill_n(entries, highest_usable_, entry_t(-1));
 }
 
 void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
@@ -3505,7 +3505,7 @@ void mm_destroy_process()
     unsigned path[4];
     pte_t *ptes[4];
 
-    vector<physaddr_t> pending_frees;
+    std::vector<physaddr_t> pending_frees;
     pending_frees.reserve(4);
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);

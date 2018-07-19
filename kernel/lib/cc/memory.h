@@ -3,6 +3,8 @@
 #include "mm.h"
 #include "stdlib.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename _T>
 struct allocator
 {
@@ -58,3 +60,5 @@ struct page_allocator : public page_allocator_base
         deallocate_impl(p, n);
     }
 };
+
+__END_NAMESPACE_STD

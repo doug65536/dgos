@@ -413,7 +413,7 @@ protected:
     uint32_t max_baud;
 };
 
-static vector<unique_ptr<uart_t>> uarts;
+static std::vector<std::unique_ptr<uart_t>> uarts;
 
 uart_t::uart_t()
     : rx_head(0)
@@ -632,8 +632,8 @@ public:
     void route_irq(int cpu) override final;
 
 private:
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     isr_context_t *port_irq_handler(isr_context_t *ctx) override final;
@@ -661,13 +661,13 @@ private:
     uint16_t tx_peek_value() const;
     void tx_take_value();
 
-    condition_variable tx_not_full;
-    condition_variable rx_not_empty;
+    std::condition_variable tx_not_full;
+    std::condition_variable rx_not_empty;
 
     // Use 16 bit values to allow buffering of error information
     // as values >= 256
-    unique_ptr<uint16_t> rx_buffer;
-    unique_ptr<uint16_t> tx_buffer;
+    std::unique_ptr<uint16_t> rx_buffer;
+    std::unique_ptr<uint16_t> tx_buffer;
 
     lock_type lock;
 
@@ -1000,7 +1000,7 @@ ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
         }
 
         // Fill the FIFO or send the remainder
-        size_t block_size = min(size_t(fifo_size), size - i);
+        size_t block_size = std::min(size_t(fifo_size), size - i);
 
         outs(port_t::DAT, (char*)buf + i, block_size);
         i += block_size;

@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename _T>
 class initializer_list
 {
@@ -60,3 +62,5 @@ end(initializer_list<_T> __ils) noexcept
 {
     return __ils.end();
 }
+
+__END_NAMESPACE_STD

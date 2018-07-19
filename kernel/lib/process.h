@@ -154,10 +154,10 @@ struct process_t
     uintptr_t mmu_context;
     void *linear_allocator;
     pid_t pid;
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type process_lock;
-    condition_variable cond;
+    std::condition_variable cond;
     int exitcode;
 
     fd_table_t ids;
@@ -176,7 +176,7 @@ struct process_t
     static bool add_thread(pid_t pid, thread_t tid);
 
 private:
-    vector<thread_t> threads;
+    std::vector<thread_t> threads;
 
     static process_t *lookup(pid_t pid);
 

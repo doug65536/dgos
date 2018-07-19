@@ -9,6 +9,8 @@
 #include "unique_ptr.h"
 #include "memory.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename _T, typename _Allocator = allocator<_T>>
 class vector
 {
@@ -51,7 +53,7 @@ public:
     vector(vector&& __other, _Allocator const& __alloc_);
 
     vector(initializer_list<_T> __init,
-            const _Allocator& __alloc_ = _Allocator());
+            _Allocator const& __alloc_ = _Allocator());
 
     ~vector();
 
@@ -350,7 +352,7 @@ vector<_T,_Allocator>::vector(vector&& __other,
 
 template<typename _T, typename _Allocator>
 vector<_T,_Allocator>::vector(initializer_list<_T> __init,
-        const _Allocator& __alloc_)
+        _Allocator const& __alloc_)
     : __m(nullptr)
     , __sz(0)
     , __alloc(__alloc_)
@@ -867,10 +869,10 @@ bool vector<_T,_Allocator>::resize(size_type __count,
 template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::swap(vector &__other)
 {
-    ::swap(__m, __other.__m);
-    ::swap(__sz, __other.__sz);
-    ::swap(__capacity, __other.__capacity);
-    ::swap(__alloc, __other.__alloc);
+    std::swap(__m, __other.__m);
+    std::swap(__sz, __other.__sz);
+    std::swap(__capacity, __other.__capacity);
+    std::swap(__alloc, __other.__alloc);
 }
 
 //
@@ -1131,3 +1133,5 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
 {
     return __p - rhs.__p;
 }
+
+__END_NAMESPACE_STD

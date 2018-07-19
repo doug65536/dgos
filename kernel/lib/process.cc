@@ -25,10 +25,10 @@ union process_ptr_t {
     }
 };
 
-static vector<process_ptr_t> processes;
+static std::vector<process_ptr_t> processes;
 static size_t process_count;
-using processes_lock_type = mcslock;
-using processes_scoped_lock = unique_lock<processes_lock_type>;
+using processes_lock_type = std::mcslock;
+using processes_scoped_lock = std::unique_lock<processes_lock_type>;
 static processes_lock_type processes_lock;
 static pid_t process_first_free;
 static pid_t process_last_free;
@@ -163,7 +163,7 @@ int process_t::start()
         return -1;
 
     // Allocate memory for program headers
-    vector<Elf64_Phdr> program_hdrs;
+    std::vector<Elf64_Phdr> program_hdrs;
     program_hdrs.resize(hdr.e_phnum);
 
     // Read program headers
@@ -266,7 +266,7 @@ int process_t::start()
     info_sz += hdr.e_phentsize * hdr.e_phnum;
     size_t info_ph_sz = info_sz - info_ph_ofs;
 
-    vector<auxv_t> auxent;
+    std::vector<auxv_t> auxent;
 
     auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry });
     auxent.push_back({ auxv_t::AT_PAGESZ, PAGESIZE });

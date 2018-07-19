@@ -96,7 +96,7 @@ _always_inline size_t priqueue_t<T>::swap(size_t a, size_t b)
     value_type &ap = item(a);
     value_type &bp = item(b);
 
-    ::swap(ap, bp);
+    std::swap(ap, bp);
 
     if (swapped)
         swapped(ap, bp, ctx);

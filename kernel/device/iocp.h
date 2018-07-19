@@ -29,8 +29,8 @@ struct basic_iocp_t {
     void reset(callback_t callback, uintptr_t arg);
 
 private:
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     void invoke_once(scoped_lock &hold);
 
@@ -61,11 +61,11 @@ public:
     T wait();
 
 private:
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
-    condition_variable done_cond;
+    std::condition_variable done_cond;
     bool volatile done;
 };
 

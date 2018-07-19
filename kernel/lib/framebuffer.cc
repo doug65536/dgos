@@ -230,8 +230,8 @@ void fb_draw_line(int x0, int y0, int x1, int y1, uint32_t color, F setpixel)
 {
     int dx = x1 - x0;
     int dy = y1 - y0;
-    int adx = max(dx, -dx);
-    int ady = max(dy, -dy);
+    int adx = std::max(dx, -dx);
+    int ady = std::max(dy, -dy);
 
     if (adx >= ady) {
         // Shallow, x changes more than y

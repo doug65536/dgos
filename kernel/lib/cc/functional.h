@@ -3,6 +3,8 @@
 #include "utility.h"
 #include "algorithm.h"
 
+__BEGIN_NAMESPACE_STD
+
 template<typename>
 class function;
 
@@ -47,7 +49,7 @@ public:
 
     function& swap(function& rhs)
     {
-        ::swap(impl, rhs.impl);
+        std::swap(impl, rhs.impl);
     }
 
 private:
@@ -79,7 +81,7 @@ private:
         T storage;
     };
 
-    unique_ptr<CallableBase> impl;
+    std::unique_ptr<CallableBase> impl;
 };
 
 template<typename _T>
@@ -100,3 +102,5 @@ struct equal_to<void>
         return __lhs == __rhs;
     }
 };
+
+__END_NAMESPACE_STD

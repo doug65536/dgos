@@ -37,7 +37,7 @@ public:
     usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
 protected:
     // storage_if_factory_t interface
-    vector<storage_if_base_t *> detect() override;
+    std::vector<storage_if_base_t *> detect() override;
 };
 
 // A USB storage interface
@@ -209,12 +209,12 @@ public:
     uint32_t cmd_head;
     uint32_t cmd_tail;
     static constexpr uint32_t cmd_capacity =
-            min(PAGE_SIZE / sizeof(pending_cmd_t), size_t(32U));
+            std::min(PAGE_SIZE / sizeof(pending_cmd_t), size_t(32U));
 
-    using lock_type = mcslock;
-    using scoped_lock = unique_lock<lock_type>;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
     lock_type cmd_lock;
-    condition_variable cmd_cond;
+    std::condition_variable cmd_cond;
 
     static uint32_t cmd_wrap(uint32_t n);
 
@@ -284,17 +284,17 @@ protected:
     char const *name() const override final;
 };
 
-static vector<usb_msc_if_t*> usb_msc_devices;
-static vector<usb_msc_dev_t*> usb_msc_drives;
+static std::vector<usb_msc_if_t*> usb_msc_devices;
+static std::vector<usb_msc_dev_t*> usb_msc_drives;
 
 //
 // Storage interface factory
 
-vector<storage_if_base_t *> usb_msc_if_factory_t::detect()
+std::vector<storage_if_base_t *> usb_msc_if_factory_t::detect()
 {
     USB_MSC_TRACE("Reporting %d USB mass storage interfaces\n", usb_msc_count);
 
-    vector<storage_if_base_t*> list(usb_msc_devices.begin(), usb_msc_devices.end());
+    std::vector<storage_if_base_t*> list(usb_msc_devices.begin(), usb_msc_devices.end());
     return list;
 }
 
@@ -305,9 +305,9 @@ void usb_msc_if_t::cleanup()
 {
 }
 
-vector<storage_dev_base_t*> usb_msc_if_t::detect_devices()
+std::vector<storage_dev_base_t*> usb_msc_if_t::detect_devices()
 {
-    vector<storage_dev_base_t*> list(usb_msc_drives.begin(),
+    std::vector<storage_dev_base_t*> list(usb_msc_drives.begin(),
                                      usb_msc_drives.end());
 
     USB_MSC_TRACE("Reporting %d USB mass storage drives\n",
@@ -413,7 +413,7 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     assert(bulk_out);
 
     // Allocate an interface
-    unique_ptr<usb_msc_if_t> if_(new usb_msc_if_t{});
+    std::unique_ptr<usb_msc_if_t> if_(new usb_msc_if_t{});
 
     USB_MSC_TRACE("initializing interface, slot=%d\n",
                   cfg_hlp->slot());
@@ -513,7 +513,7 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     for (int lun = 0; lun <= max_lun; ++lun) {
         USB_MSC_TRACE("Initializing lun %d\n", lun);
 
-        unique_ptr<usb_msc_dev_t> drv(new usb_msc_dev_t{});
+        std::unique_ptr<usb_msc_dev_t> drv(new usb_msc_dev_t{});
 
         // Get size and block size
         wrapper_t cap;

@@ -131,7 +131,7 @@ struct fat32_fs_t final : public fs_base_t {
     ssize_t internal_rw(file_handle_t *file,
             void *buf, size_t size, off_t offset, bool read);
 
-    shared_mutex rwlock;
+    std::shared_mutex rwlock;
 
     storage_dev_base_t *drive;
 
@@ -174,7 +174,7 @@ public:
 static fat32_factory_t fat32_factory;
 STORAGE_REGISTER_FACTORY(fat32);
 
-static vector<fat32_fs_t*> fat32_mounts;
+static std::vector<fat32_fs_t*> fat32_mounts;
 
 static pool_t fat32_handles;
 
@@ -679,7 +679,7 @@ off_t fat32_fs_t::walk_cluster_chain(
     cluster_t& c_clus = file->cached_cluster;
     off_t& c_ofs = file->cached_offset;
 
-    vector<cluster_t> sync_pending;
+    std::vector<cluster_t> sync_pending;
 
     while (walked + block_size <= offset) {
         if (is_eof(fat[c_clus])) {
@@ -1166,7 +1166,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    unique_ptr<char[]> sector_buffer = new char[sector_size];
+    std::unique_ptr<char[]> sector_buffer = new char[sector_size];
 
     if (!sector_buffer)
         return false;
@@ -1231,7 +1231,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     if (fat32_mounts.empty())
         pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 510);
 
-    unique_ptr<fat32_fs_t> self(new fat32_fs_t);
+    std::unique_ptr<fat32_fs_t> self(new fat32_fs_t);
     if (self->mount(conn)) {
         fat32_mounts.push_back(self);
         return self.release();
@@ -1242,7 +1242,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 
 void fat32_fs_t::unmount()
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     munmap(mm_dev, (lba_en - lba_st) << sector_shift);
 }
@@ -1257,7 +1257,7 @@ bool fat32_fs_t::is_boot() const
 
 int fat32_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     file_handle_t *file = create_handle(path, O_RDONLY | O_DIRECTORY, 0);
 
@@ -1273,7 +1273,7 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
                              dirent_t *buf,
                              off_t offset)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     full_lfn_t lfn;
     size_t index;
@@ -1355,7 +1355,7 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
 
 int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     ((file_handle_t*)fi)->~file_handle_t();
     pool_free(&fat32_handles, fi);
@@ -1368,7 +1368,7 @@ int fat32_fs_t::releasedir(fs_file_info_t *fi)
 
 int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)stbuf;
@@ -1377,7 +1377,7 @@ int fat32_fs_t::getattr(fs_cpath_t path, fs_stat_t* stbuf)
 
 int fat32_fs_t::access(fs_cpath_t path, int mask)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)mask;
@@ -1386,7 +1386,7 @@ int fat32_fs_t::access(fs_cpath_t path, int mask)
 
 int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)buf;
@@ -1400,7 +1400,7 @@ int fat32_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 int fat32_fs_t::mknod(fs_cpath_t path,
                        fs_mode_t mode, fs_dev_t rdev)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)mode;
@@ -1410,7 +1410,7 @@ int fat32_fs_t::mknod(fs_cpath_t path,
 
 int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)mode;
@@ -1419,7 +1419,7 @@ int fat32_fs_t::mkdir(fs_cpath_t path, fs_mode_t mode)
 
 int fat32_fs_t::rmdir(fs_cpath_t path)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     return -int(errno_t::ENOSYS);
@@ -1427,7 +1427,7 @@ int fat32_fs_t::rmdir(fs_cpath_t path)
 
 int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)to;
     (void)from;
@@ -1436,7 +1436,7 @@ int fat32_fs_t::symlink(fs_cpath_t to, fs_cpath_t from)
 
 int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)from;
     (void)to;
@@ -1445,7 +1445,7 @@ int fat32_fs_t::rename(fs_cpath_t from, fs_cpath_t to)
 
 int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)from;
     (void)to;
@@ -1454,7 +1454,7 @@ int fat32_fs_t::link(fs_cpath_t from, fs_cpath_t to)
 
 int fat32_fs_t::unlink(fs_cpath_t path)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     return -int(errno_t::ENOSYS);
@@ -1465,7 +1465,7 @@ int fat32_fs_t::unlink(fs_cpath_t path)
 
 int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)mode;
@@ -1474,7 +1474,7 @@ int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
 
 int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)uid;
@@ -1484,7 +1484,7 @@ int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
 
 int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)size;
@@ -1494,7 +1494,7 @@ int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 int fat32_fs_t::utimens(fs_cpath_t path,
                          const fs_timespec_t *ts)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)ts;
@@ -1510,10 +1510,10 @@ int fat32_fs_t::open(fs_file_info_t **fi,
     file_handle_t *file;
 
     if (!(flags & O_CREAT)) {
-        shared_lock<shared_mutex> lock(rwlock);
+        std::shared_lock<std::shared_mutex> lock(rwlock);
         file = create_handle(path, flags, mode);
     } else {
-        unique_lock<shared_mutex> lock(rwlock);
+        std::unique_lock<std::shared_mutex> lock(rwlock);
         file = create_handle(path, flags, mode);
     }
 
@@ -1527,7 +1527,7 @@ int fat32_fs_t::open(fs_file_info_t **fi,
 
 int fat32_fs_t::release(fs_file_info_t *fi)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     file_handle_t *file = (file_handle_t*)fi;
     int status = 0;
@@ -1549,7 +1549,7 @@ ssize_t fat32_fs_t::read(fs_file_info_t *fi,
                           size_t size,
                           off_t offset)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     return internal_rw((file_handle_t*)fi, buf, size, offset, true);
 }
@@ -1559,7 +1559,7 @@ ssize_t fat32_fs_t::write(fs_file_info_t *fi,
                            size_t size,
                            off_t offset)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     return internal_rw((file_handle_t*)fi, (char*)buf, size, offset, false);
 }
@@ -1567,7 +1567,7 @@ ssize_t fat32_fs_t::write(fs_file_info_t *fi,
 int fat32_fs_t::ftruncate(fs_file_info_t *fi,
                            off_t offset)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)offset;
     (void)fi;
@@ -1580,7 +1580,7 @@ int fat32_fs_t::ftruncate(fs_file_info_t *fi,
 int fat32_fs_t::fstat(fs_file_info_t *fi,
                        fs_stat_t *st)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)fi;
     (void)st;
@@ -1593,7 +1593,7 @@ int fat32_fs_t::fstat(fs_file_info_t *fi,
 int fat32_fs_t::fsync(fs_file_info_t *fi,
                        int isdatasync)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)isdatasync;
     (void)fi;
@@ -1603,7 +1603,7 @@ int fat32_fs_t::fsync(fs_file_info_t *fi,
 int fat32_fs_t::fsyncdir(fs_file_info_t *fi,
                           int isdatasync)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)isdatasync;
     (void)fi;
@@ -1612,7 +1612,7 @@ int fat32_fs_t::fsyncdir(fs_file_info_t *fi,
 
 int fat32_fs_t::flush(fs_file_info_t *fi)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)fi;
     return 0;
@@ -1625,7 +1625,7 @@ int fat32_fs_t::lock(fs_file_info_t *fi,
                       int cmd,
                       fs_flock_t* locks)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)fi;
     (void)cmd;
@@ -1640,7 +1640,7 @@ int fat32_fs_t::bmap(fs_cpath_t path,
                       size_t blocksize,
                       uint64_t* blockno)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)blocksize;
@@ -1653,7 +1653,7 @@ int fat32_fs_t::bmap(fs_cpath_t path,
 
 int fat32_fs_t::statfs(fs_statvfs_t* stbuf)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)stbuf;
     return -int(errno_t::ENOSYS);
@@ -1667,7 +1667,7 @@ int fat32_fs_t::setxattr(fs_cpath_t path,
                           char const* value,
                           size_t size, int flags)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)name;
@@ -1682,7 +1682,7 @@ int fat32_fs_t::getxattr(fs_cpath_t path,
                           char* value,
                           size_t size)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)name;
@@ -1695,7 +1695,7 @@ int fat32_fs_t::listxattr(fs_cpath_t path,
                            char const* list,
                            size_t size)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)path;
     (void)list;
@@ -1712,7 +1712,7 @@ int fat32_fs_t::ioctl(fs_file_info_t *fi,
                        unsigned int flags,
                        void* data)
 {
-    unique_lock<shared_mutex> lock(rwlock);
+    std::unique_lock<std::shared_mutex> lock(rwlock);
 
     (void)cmd;
     (void)arg;
@@ -1729,7 +1729,7 @@ int fat32_fs_t::poll(fs_file_info_t *fi,
                       fs_pollhandle_t* ph,
                       unsigned* reventsp)
 {
-    shared_lock<shared_mutex> lock(rwlock);
+    std::shared_lock<std::shared_mutex> lock(rwlock);
 
     (void)fi;
     (void)ph;

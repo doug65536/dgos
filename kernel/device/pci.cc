@@ -66,13 +66,13 @@ struct pci_ecam_t {
     uint8_t en_bus;
 };
 
-static vector<pci_ecam_t> pci_ecam_list;
+static std::vector<pci_ecam_t> pci_ecam_list;
 
 static pci_config_pio pci_pio_accessor;
 static pci_config_mmio pci_mmio_accessor;
 
-using pci_lock_type = mcslock;
-using pci_scoped_lock = unique_lock<pci_lock_type>;
+using pci_lock_type = std::mcslock;
+using pci_scoped_lock = std::unique_lock<pci_lock_type>;
 static pci_lock_type pci_lock;
 static pci_config_rw *pci_accessor = &pci_pio_accessor;
 
@@ -134,7 +134,7 @@ struct pci_msix_mappings {
     uint32_t pba_sz;
 };
 
-static vector<pair<pci_addr_t, pci_msix_mappings>> pcix_tables;
+static std::vector<std::pair<pci_addr_t, pci_msix_mappings>> pcix_tables;
 
 #define offset_of(type, member) \
     ((uintptr_t)&(((type*)0x10U)->member) - 0x10U)
@@ -727,9 +727,9 @@ static int pci_find_msi_msix(pci_addr_t addr,
 // Infer the number of vectors needed from the highest vector offset
 int pci_vector_count_from_offsets(int const *vector_offsets, int count)
 {
-    return accumulate(vector_offsets, vector_offsets + count, 0,
+    return std::accumulate(vector_offsets, vector_offsets + count, 0,
                       [&](int highest, int const& item) {
-        return max(highest, item);
+        return std::max(highest, item);
     }) + 1;
 }
 
@@ -823,9 +823,9 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         pcix_tables.emplace_back(addr, pci_msix_mappings{
                                      tbl, pba, tbl_sz, pba_sz });
 
-        int tbl_cnt = min(req_count, table_count);
+        int tbl_cnt = std::min(req_count, table_count);
 
-        vector<msi_irq_mem_t> msi_writes(tbl_cnt);
+        std::vector<msi_irq_mem_t> msi_writes(tbl_cnt);
 
         if (vector_offsets) {
             irq_range->count = pci_vector_count_from_offsets(

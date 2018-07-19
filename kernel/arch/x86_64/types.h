@@ -13,6 +13,9 @@
 # define __END_DECLS
 #endif
 
+#define __BEGIN_NAMESPACE_STD   namespace std {
+#define __END_NAMESPACE_STD     }
+
 #if defined(__GNUC__)
 
 #define _packed                 __attribute__((__packed__))
