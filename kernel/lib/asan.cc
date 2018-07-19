@@ -1,3 +1,4 @@
+#ifdef _ASAN_ENABLED
 #include "types.h"
 #include "likely.h"
 #include "printk.h"
@@ -16,6 +17,7 @@ static size_t asan_alloc_ptr;
 
 bool asan_ready;
 
+_no_asan _always_optimize
 static void *asan_alloc_page()
 {
     if (likely(asan_alloc_ptr < countof(asan_pool))) {
@@ -30,7 +32,7 @@ static void *asan_alloc_page()
 // Compactly represent up to 128TB sparse array
 class radix_tree_t {
 public:
-    _no_asan __attribute__((optimize("-O2")))
+    _no_asan _always_optimize
     void *lookup(uint64_t addr, bool commit_pages)
     {
         unsigned misalignment = addr & PAGE_MASK;
@@ -92,7 +94,7 @@ public:
         return (char*)level3 + misalignment;
     }
 
-    _no_asan //__attribute__((optimize("-O2")))
+    _no_asan _always_optimize
     void fill(uint64_t start, uint8_t value, uint64_t len)
     {
         while (len) {
@@ -101,6 +103,9 @@ public:
             if (fill > len)
                 fill = len;
             uint8_t *p = (uint8_t*)lookup(start, true);
+
+            // Note, can't use memset here because that would cause
+            // recursive ASAN store calls, so just fill manually in a loop
             for (size_t i = 0; i < fill; ++i)
                 p[i] = value;
 
@@ -109,7 +114,7 @@ public:
         }
     }
 
-    _no_asan __attribute__((optimize("-O2")))
+    _no_asan _always_optimize
     bool is_filled_with(uint64_t start, uint8_t value, uint64_t len)
     {
         while (len) {
@@ -117,7 +122,10 @@ public:
             uint64_t fill = page_end - start;
             if (fill > len)
                 fill = len;
-            uint8_t *p = (uint8_t*)lookup(start, true);
+            uint8_t *p = (uint8_t*)lookup(start, false);
+
+            if (unlikely(!p))
+                return false;
 
             for (size_t i = 0; i < fill; ++i) {
                 if (p[i] != value)
@@ -133,7 +141,8 @@ public:
 
 private:
     template<typename T>
-    _no_asan void *commit(T &p) {
+    _no_asan _always_optimize
+    void *commit(T &p) {
         p = (T)asan_alloc_page();
         return p;
     }
@@ -162,7 +171,8 @@ static void asan_error(vaddr_t addr, size_t size)
     assert(!"ASAN error");
 }
 
-extern "C" _no_asan void __asan_load1_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_load1_noabort(vaddr_t addr)
 {
     addr &= 0xFFFFFFFFFFFF;
     uint8_t *byte = (uint8_t*)asan_shadow.lookup(addr >> 3, false);
@@ -171,7 +181,8 @@ extern "C" _no_asan void __asan_load1_noabort(vaddr_t addr)
         asan_error(addr, 1);
 }
 
-extern "C" _no_asan void __asan_load2_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_load2_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -185,7 +196,8 @@ extern "C" _no_asan void __asan_load2_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_load4_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_load4_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -201,7 +213,8 @@ extern "C" _no_asan void __asan_load4_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_load8_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_load8_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -215,7 +228,8 @@ extern "C" _no_asan void __asan_load8_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_load16_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_load16_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFD)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -229,7 +243,8 @@ extern "C" _no_asan void __asan_load16_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_loadN_noabort(vaddr_t addr, size_t size)
+extern "C" _no_asan _always_optimize
+void __asan_loadN_noabort(vaddr_t addr, size_t size)
 {
     addr &= 0xFFFFFFFFFFFF;
 
@@ -261,7 +276,8 @@ extern "C" _no_asan void __asan_loadN_noabort(vaddr_t addr, size_t size)
     }
 }
 
-extern "C" _no_asan void __asan_store1_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_store1_noabort(vaddr_t addr)
 {
     addr &= 0xFFFFFFFFFFFF;
     uint8_t *byte = (uint8_t*)asan_shadow.lookup(addr >> 3, true);
@@ -269,7 +285,8 @@ extern "C" _no_asan void __asan_store1_noabort(vaddr_t addr)
     *byte |= mask;
 }
 
-extern "C" _no_asan void __asan_store2_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_store2_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -282,7 +299,8 @@ extern "C" _no_asan void __asan_store2_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_store4_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_store4_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -297,7 +315,8 @@ extern "C" _no_asan void __asan_store4_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_store8_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_store8_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -310,7 +329,8 @@ extern "C" _no_asan void __asan_store8_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_store16_noabort(vaddr_t addr)
+extern "C" _no_asan _always_optimize
+void __asan_store16_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFD)) {
         addr &= 0xFFFFFFFFFFFF;
@@ -323,7 +343,8 @@ extern "C" _no_asan void __asan_store16_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan void __asan_storeN_noabort(vaddr_t addr, size_t size)
+extern "C" _no_asan _always_optimize
+void __asan_storeN_noabort(vaddr_t addr, size_t size)
 {
     addr &= 0xFFFFFFFFFFFF;
 
@@ -355,17 +376,21 @@ extern "C" _no_asan void __asan_storeN_noabort(vaddr_t addr, size_t size)
 }
 
 // Called before dynamic initializers of a single module run
-extern "C" _no_asan void __asan_before_dynamic_init(char const *module_name)
+extern "C" _no_asan
+void __asan_before_dynamic_init(char const *module_name)
 {
 }
 
 // Called after dynamic initializers of a single module run
-extern "C" _no_asan void __asan_after_dynamic_init()
+extern "C" _no_asan
+void __asan_after_dynamic_init()
 {
 }
 
 // Performs cleanup before a NoReturn function. Must be called before things
 // like _exit and execl to avoid false positives on stack.
-extern "C" _no_asan void __asan_handle_no_return()
+extern "C" _no_asan
+void __asan_handle_no_return()
 {
 }
+#endif
