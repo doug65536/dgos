@@ -888,6 +888,15 @@ int acpi_have8259pic(void)
             !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
 }
 
+static void ioapic_take_vectors(int base, int count)
+{
+    assert(base >= 0);
+    assert(base + count <= (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1));
+
+    for (size_t intr = base, end = base + count; intr < end; ++intr)
+        ioapic_msi_alloc_map[intr >> 6] |= UINT64_C(1) << (intr & 0x3F);
+}
+
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {
     ioapic_msi_alloc_scoped_lock lock(ioapic_msi_alloc_lock);
@@ -895,10 +904,7 @@ static uint8_t ioapic_alloc_vectors(uint8_t count)
     uint8_t base = ioapic_msi_next_irq;
     ioapic_msi_next_irq += count;
 
-    for (size_t intr = base - INTR_APIC_IRQ_BASE, end = intr + count;
-         intr < end; ++intr) {
-        ioapic_msi_alloc_map[intr >> 6] |= (1UL << (intr & 0x3F));
-    }
+    ioapic_take_vectors(base - INTR_APIC_IRQ_BASE, count);
 
     return base;
 }
@@ -1393,8 +1399,7 @@ static void mp_parse_fps()
 
                 // Allocate vectors, assign range to IOAPIC
                 ioapic->vector_count = ioapic_intr_count;
-                ioapic->base_intr = ioapic_alloc_vectors(
-                            ioapic_intr_count);
+                ioapic->base_intr = ioapic_alloc_vectors(ioapic_intr_count);
 
                 ioapic_reset(ioapic);
             }
@@ -2408,9 +2413,10 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 
     isr_context_t *orig_ctx = ctx;
 
-    uint8_t irq = intr_to_irq[intr];
+    int irq = intr_to_irq[intr];
 
-    assert(irq < INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE);
+    assert(irq >= 0);
+    assert(irq < (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1));
 
     ctx = irq_invoke(intr, irq, ctx);
     apic_eoi(intr);
@@ -2596,7 +2602,8 @@ void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
 int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute,
                        intr_handler_t handler, char const *name,
-                       int const *target_cpus, int const *vector_offsets)
+                       int const *target_cpus, int const *vector_offsets,
+                       bool contiguous)
 {
     // Don't try to use MSI if there are no IOAPIC devices
     if (ioapic_count == 0) {
@@ -2618,10 +2625,13 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
 
         // Allocate only as many vectors as we need per vector_offsets
         vector_base = ioapic_alloc_vectors(vector_cnt);
-    } else{
+    } else {
         // Allocate power of two count of suitably aligned vectors
         vector_cnt = count;
-        vector_base = ioapic_aligned_vectors(bit_log2(count));
+         if (contiguous)
+             vector_base = ioapic_aligned_vectors(bit_log2(count));
+         else
+             vector_base = ioapic_alloc_vectors(count);
     }
 
     // See if we ran out of vectors

@@ -750,11 +750,11 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
     if (msix) {
         // 6.8.3.2 MSI-X configuration
 
-        // Disable MSI-X while messing with its configuration
-        PCI_MSIX_MSG_CTRL_MASK_SET(caps.msg_ctrl, 0);
-
         // "Software must not modify the MSI-X table when any IRQ is unmasked",
         // so we mask the whole function
+        PCI_MSIX_MSG_CTRL_MASK_SET(caps.msg_ctrl, 1);
+
+        // Enable MSI-X
         PCI_MSIX_MSG_CTRL_EN_SET(caps.msg_ctrl, 1);
 
         pci_config_write(addr,
@@ -836,7 +836,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         irq_range->msix = true;
         irq_range->base = apic_msi_irq_alloc(
                     msi_writes.data(), tbl_cnt, cpu, distribute,
-                    handler, name, target_cpus, vector_offsets);
+                    handler, name, target_cpus, vector_offsets, false);
 
         PCI_TRACE("Allocated MSI-X IRQ %d-%d\n",
                   irq_range->base, irq_range->base + irq_range->count - 1);
@@ -880,7 +880,8 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         irq_range->msix = false;
         irq_range->base = apic_msi_irq_alloc(
                     mem, irq_range->count,
-                    cpu, distribute, handler, name);
+                    cpu, distribute, handler, name,
+                    nullptr, nullptr, true);
 
         PCI_TRACE("Allocated MSI IRQ %d-%d\n",
                   irq_range->base, irq_range->base + irq_range->count - 1);
