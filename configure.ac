@@ -117,13 +117,17 @@ done
 AC_SUBST([INSTRUMENT_FUNCTIONS_FLAGS])
 
 AS_VAR_SET([ASAN_FLAGS], [])
-for flag in \
-	fsanitize=kernel-address D_ASAN_ENABLED
-do
-	AX_CHECK_COMPILE_FLAG([-$flag],
-		[AS_VAR_APPEND([ASAN_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
-done
+AC_ARG_ENABLE(asan,
+	AS_HELP_STRING([--enable-asan], [Enable Address Space SANitizer]), [
+		for flag in \
+			fsanitize=kernel-address D_ASAN_ENABLED
+		do
+			AX_CHECK_COMPILE_FLAG([-$flag],
+				[AS_VAR_APPEND([ASAN_FLAGS], [" -$flag"])],
+				[], [$COMPILER_WERROR])
+		done
+	]
+)
 AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
