@@ -31,7 +31,7 @@ static void physmap_delete(int index);
 static bool physmap_init()
 {
     physalloc_20bit_pt = -1;
-    
+
     if (!get_ram_regions())
         return false;
 
@@ -114,7 +114,7 @@ static bool physmap_init()
 
                 // Don't know which one wins, don't care, neither is normal...
             }
-            
+
             if (prev_normal) {
                 if (prev.base & PAGE_MASK) {
                     uint64_t new_base = (prev.base + PAGE_SIZE) & -PAGE_SIZE;
@@ -125,7 +125,7 @@ static bool physmap_init()
                 }
                 prev.size &= -PAGE_SIZE;
             }
-            
+
             if (curr_normal) {
                 if (curr.base & PAGE_MASK) {
                     uint64_t new_base = (curr.base + PAGE_SIZE) & -PAGE_SIZE;
@@ -136,13 +136,13 @@ static bool physmap_init()
                 }
                 curr.size &= -PAGE_SIZE;
             }
-            
+
             if (prev.size == 0) {
                 physmap_delete(i - 1);
                 did_something = true;
                 break;
             }
-            
+
             if (curr.size == 0) {
                 physmap_delete(i);
                 did_something = true;
@@ -158,7 +158,7 @@ static bool physmap_init()
 
                 physmap_delete(i);
                 physmap_replace(i - 1, entry1);
-                
+
                 did_something = true;
                 break;
             }
@@ -224,7 +224,7 @@ static int physmap_insert_at(int index, physmem_range_t const& entry)
 {
     assert(index >= 0);
     assert(index <= physalloc_count);
-    
+
     // Grow the map if necessary
     if (unlikely(physalloc_count + 1 > physalloc_capacity))
         physmap_grow();
@@ -262,7 +262,7 @@ static int physmap_find_insertion_point(uint64_t base)
                 en = mid;
         }
     }
-    
+
     return st;
 }
 
@@ -281,7 +281,7 @@ static char const *physmap_types[] = {
     "RECLAIMABLE",
     "NVS",
     "BAD",
-    
+
     // Custom types
     "ALLOCATED",
     "BOOTLOADER"
@@ -292,7 +292,7 @@ void physmap_dump()
     PRINT("--- physmap dump:");
     for (int i = 0; i < physalloc_count; ++i) {
         physmem_range_t &ent = physalloc_ranges[i];
-        PRINT("base=%" PRIx64", size=%" PRIx64 ", type=%s", 
+        PRINT("base=%" PRIx64", size=%" PRIx64 ", type=%s",
               ent.base, ent.size, ent.type < countof(physmap_types)
               ? physmap_types[ent.type] : "<invalid>");
     }
@@ -305,7 +305,7 @@ phys_alloc_t alloc_phys(uint64_t size)
 #if DEBUG_PHYSMAP
     physmap_dump();
 #endif
-    
+
     phys_alloc_t result;
 
     if (unlikely(physalloc_20bit_1st == 0))
@@ -318,17 +318,17 @@ phys_alloc_t alloc_phys(uint64_t size)
 
         if (entry1.type == PHYSMEM_TYPE_NORMAL) {
             result.base = entry1.base;
-            
+
             if (i > 0) {
                 // Peek at previous entry
                 physmem_range_t &prev = physalloc_ranges[i - 1];
-                
+
                 // If previous entry is allocated and reaches all the way
                 // up to the base of this entry...
                 if (prev.type == PHYSMEM_TYPE_ALLOCATED &&
                         prev.base + prev.size == entry1.base) {
                     // ...then we can just adjust the ranges
-                    
+
                     if (size < entry1.size) {
                         // Expand previous range to cover allocated range
                         prev.size += size;
@@ -336,7 +336,7 @@ phys_alloc_t alloc_phys(uint64_t size)
                         entry1.base += size;
                         // Reduce the size of the free range
                         entry1.size -= size;
-                        
+
                         result.size = size;
                     } else {
                         // We have consumed this entire free range, delete it
@@ -344,7 +344,7 @@ phys_alloc_t alloc_phys(uint64_t size)
                         prev.size += entry1.size;
                         physmap_delete(i);
                     }
-                    
+
                     break;
                 }
             }
@@ -358,7 +358,7 @@ phys_alloc_t alloc_phys(uint64_t size)
                 entry2.size = entry1.size - size;
                 entry2.type = PHYSMEM_TYPE_NORMAL;
                 entry2.valid = 1;
-                
+
                 entry1.size = size;
                 entry1.type = PHYSMEM_TYPE_ALLOCATED;
 
@@ -376,7 +376,7 @@ phys_alloc_t alloc_phys(uint64_t size)
     assert((result.base & 0xFFF) == 0);
     assert(result.base >= 0x100000);
     assert(result.base < INT64_C(0x100000000));
-    assert(result.size == size);
+    //assert(result.size == size);
 
     take_pages(result.base, result.size);
 
@@ -386,67 +386,67 @@ phys_alloc_t alloc_phys(uint64_t size)
 int physmap_take_range(uint64_t base, uint64_t size, uint32_t type)
 {
     uint64_t end = base + size;
-    
+
     int index = physmap_find_insertion_point(base);
-    
+
     // Bulldoze all entries that end at or before the end of taken range
     while (index < physalloc_count &&
            physalloc_ranges[index].base + physalloc_ranges[index].size <= end)
         physmap_delete(index);
-    
-    // If the range overlaps following range, 
+
+    // If the range overlaps following range,
     // clip space off the beginning of it
     if (physalloc_ranges[index].base < end) {
         physalloc_ranges[index].size = physalloc_ranges[index].base +
                 physalloc_ranges[index].size - end;
         physalloc_ranges[index].base = end;
     }
-    
+
     physmem_range_t entry{};
-    
+
     if (index > 0) {
         // Adjust previous entry to avoid taken range
         physmem_range_t &prev = physalloc_ranges[index - 1];
-        
+
         uint64_t prev_end = prev.base + prev.size;
 
-        
+
         if (prev_end < end) {
             // Clip space off the end of previous range and insert new range
-            
+
             prev.size = base - prev.base;
-            
+
             // If new range begins at the same place as the previous range
             // replace previous range
             if (prev.size == 0) {
                 physmap_delete(index - 1);
                 --index;
             }
-            
+
             entry.base = base;
             entry.size = size;
             entry.type = type;
             entry.valid = 1;
-            
+
             return physmap_insert_at(index, entry);
         } else {
             // Insert range in the middle of existing range
-            
+
             prev.size = base - prev.base;
-            
+
             if (prev.size == 0) {
                 physmap_delete(index - 1);
                 --index;
             }
-            
+
             entry.base = end;
             entry.size = end - prev_end;
             entry.type = prev.type;
             entry.valid = 1;
-            
+
             if (entry.size)
                 physmap_insert_at(index, entry);
-            
+
             entry.base = base;
             entry.size = size;
             entry.type = type;
@@ -454,7 +454,7 @@ int physmap_take_range(uint64_t base, uint64_t size, uint32_t type)
             return physmap_insert_at(index, entry);
         }
     }
-    
+
     // All overlaps resolved, just insert it
     entry.base = base;
     entry.size = size;
