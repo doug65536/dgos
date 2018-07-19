@@ -27,6 +27,7 @@
 #define _leaf                   __attribute__((__leaf__))
 #define __aligned(n)            __attribute__((__aligned__(n)))
 #define _always_inline         __attribute__((__always_inline__)) inline
+#define _always_optimize       __attribute__((optimize("-O2")))
 #define _noreturn              __attribute__((__noreturn__))
 #define _used                  __attribute__((__used__))
 #define _returns_twice         __attribute__((__returns_twice__))
