@@ -218,21 +218,6 @@ private:
 
         //uint64_t file_size_size = sizeof(file_size);
 
-        status = efi_pxe->Mtftp(
-                    efi_pxe, EFI_PXE_BASE_CODE_TFTP_GET_FILE_SIZE,
-                    nullptr, false, &file_size, nullptr,
-                    &server_addr, (UINT8*)"kernel-generic",
-                    &mtftp_info, false);
-
-        if (EFI_ERROR(status))
-            return false;
-
-        status = efi_systab->BootServices->AllocatePool(
-                    EFI_MEMORY_TYPE(0x80000000), file_size, &data);
-
-        if (EFI_ERROR(status))
-            return false;
-
         char *utf8_filename = (char*)malloc(strlen(filename) * 4 + 1);
 
         if (!utf8_filename)
@@ -245,6 +230,21 @@ private:
             codepoint = utf16_to_ucs4(in, &in);
             out += ucs4_to_utf8(out, codepoint);
         } while (codepoint);
+
+        status = efi_pxe->Mtftp(
+                    efi_pxe, EFI_PXE_BASE_CODE_TFTP_GET_FILE_SIZE,
+                    nullptr, false, &file_size, nullptr,
+                    &server_addr, (UINT8*)utf8_filename,
+                    &mtftp_info, false);
+
+        if (EFI_ERROR(status))
+            return false;
+
+        status = efi_systab->BootServices->AllocatePool(
+                    EFI_MEMORY_TYPE(0x80000000), file_size, &data);
+
+        if (EFI_ERROR(status))
+            return false;
 
         UINTN block_size = 4096;
 
