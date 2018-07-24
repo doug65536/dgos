@@ -1,0 +1,8 @@
+
+namespace std {
+
+void terminate()
+{
+}
+
+}

@@ -12,7 +12,6 @@ static bool validate_user_mmop(
             uintptr_t(INTPTR_MAX) - len < uintptr_t(naddr) ||
             (prot & (PROT_READ | PROT_WRITE | PROT_EXEC)) != prot ||
             (flags & MAP_USER_MASK) != flags) {
-        thread_set_error(errno_t::EINVAL);
         return false;
     }
 
@@ -31,7 +30,7 @@ void *sys_mmap(void *addr, size_t len, int prot,
 int sys_mprotect(void *addr, size_t len, int prot)
 {
     if (!validate_user_mmop(addr, len, prot, 0))
-        return -1;
+        return -int(errno_t::EINVAL);
 
     return sys_mprotect(addr, len, prot);
 }
@@ -39,7 +38,7 @@ int sys_mprotect(void *addr, size_t len, int prot)
 int sys_munmap(void *addr, size_t size)
 {
     if (!validate_user_mmop(addr, size, 0, 0))
-        return -1;
+        return -int(errno_t::EINVAL);
 
     return munmap(addr, size);
 }
@@ -61,7 +60,7 @@ void *sys_mremap(void *old_address, size_t old_size,
 int sys_madvise(void *addr, size_t len, int advice)
 {
     if (!validate_user_mmop(addr, len, 0, 0))
-        return -1;
+        return -int(errno_t::EINVAL);
 
     return madvise(addr, len, advice);
 }
@@ -69,38 +68,34 @@ int sys_madvise(void *addr, size_t len, int advice)
 int sys_msync(const void *addr, size_t len, int flags)
 {
     if (!validate_user_mmop(addr, len, 0, flags))
-        return -1;
+        return -int(errno_t::EINVAL);
 
     return msync(addr, len, flags);
 }
 
 int sys_mlock(const void *, size_t)
 {
-    thread_set_error(errno_t::ENOSYS);
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int sys_munlock(const void *, size_t)
 {
-    thread_set_error(errno_t::ENOSYS);
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int sys_mlockall(int)
 {
-    thread_set_error(errno_t::ENOSYS);
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int sys_munlockall()
 {
-    thread_set_error(errno_t::ENOSYS);
-    return -1;
+    return -int(errno_t::ENOSYS);
 }
 
 int clone(int flags, void *child_stack,
           int *ptid, unsigned long newtls,
           int *ctid)
 {
-    return -1;
+    return -int(errno_t::ENOSYS);
 }

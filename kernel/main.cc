@@ -63,14 +63,14 @@ REGISTER_CALLOUT(smp_main, nullptr, callout_type_t::smp_start, "100");
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_HEAP_STRESS_THREAD   0
+#define ENABLE_HEAP_STRESS_THREAD   1
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
 #define ENABLE_SPAWN_STRESS         0
 #define ENABLE_CONDVAR_STRESS       0
-#define ENABLE_STRESS_HEAP_SMALL    0
+#define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
-#define ENABLE_STRESS_HEAP_BOTH     1
+#define ENABLE_STRESS_HEAP_BOTH     0
 #define ENABLE_FIND_VBE             0
 
 #if ENABLE_STRESS_HEAP_SMALL
@@ -889,7 +889,7 @@ static int init_thread(void *)
     printk("Running heap stress with %d threads\n",
              ENABLE_HEAP_STRESS_THREAD);
     for (int i = 0; i < ENABLE_HEAP_STRESS_THREAD; ++i) {
-        thread_create(stress_heap_thread, 0, 0, false);
+        thread_create(stress_heap_thread, nullptr, 0, false);
     }
 #endif
 

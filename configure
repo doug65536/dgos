@@ -612,6 +612,7 @@ PE32_FLAGS
 ELF64_FLAGS
 ELF32_FLAGS
 NOFLOAT_FLAGS
+NOSTDLIB_FLAGS
 FREESTANDING_FLAGS
 SMALLEST_CODE_FLAGS
 ASM_DEBUG_INFO_FLAGS
@@ -626,6 +627,7 @@ SORT
 GREP
 MKISOFS
 SED
+FIND
 LN
 CP
 QEMU
@@ -6871,6 +6873,55 @@ $as_echo "$as_me: WARNING: Cannot find ln" >&2;}
 fi
 
 
+for ac_prog in find
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_FIND+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$FIND"; then
+  ac_cv_prog_FIND="$FIND" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_FIND="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+FIND=$ac_cv_prog_FIND
+if test -n "$FIND"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $FIND" >&5
+$as_echo "$FIND" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$FIND" && break
+done
+test -n "$FIND" || FIND="NOT_FOUND"
+
+if test x"$FIND" == x"NOT_FOUND"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find find" >&5
+$as_echo "$as_me: WARNING: Cannot find find" >&2;}
+fi
+
+
 for ac_prog in sed
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
@@ -7367,7 +7418,7 @@ for flag in \
 		std=c++14 fno-fat-lto-objects gdwarf-4 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
-		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
+		Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
@@ -7556,7 +7607,6 @@ fi
 done
 
 
-
 SMALLEST_CODE_FLAGS=
 as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-Oz" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -Oz" >&5
@@ -7712,6 +7762,50 @@ if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
 
 else
   $COMPILER_WERROR
+fi
+
+done
+
+
+NOSTDLIB_FLAGS=
+for flag in \
+	nostdlib nostartfiles
+do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS $COMPILER_WERROR -$flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
+  as_fn_append NOSTDLIB_FLAGS " -$flag"
+else
+  :
 fi
 
 done

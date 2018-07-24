@@ -249,12 +249,6 @@ void idt_xsave_detect(int ap)
     while (cpuid_has_xsave()) {
         cpuid_t info;
 
-        //uintptr_t bv = cpu_xcr_change_bits(0, 0, 0);
-
-        //printk("orig xcr0=%16zx\n", bv);
-
-        //printk("Detecting xsave support\n");
-
         // Get size of save area
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
             break;
@@ -265,6 +259,7 @@ void idt_xsave_detect(int ap)
 
         // Use compact format if available
         if (cpuid(&info, CPUID_INFO_XSAVE, 1)) {
+            // xsave area must be aligned on a 64 byte boundary
             sse_context_size = (sse_context_size + 63) & -64;
 
 			if (info.eax & (1 << 3)) {
@@ -315,7 +310,6 @@ void idt_xsave_detect(int ap)
 
             sse_avx_offset = (uint16_t)info.ebx;
             sse_avx_size = (uint16_t)info.eax;
-            //printk("Have AVX\n");
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_OPMASK_BIT)) {
@@ -325,7 +319,6 @@ void idt_xsave_detect(int ap)
 
             sse_avx512_opmask_offset = (uint16_t)info.ebx;
             sse_avx512_opmask_size = (uint16_t)info.eax;
-            //printk("Have AVX-512 opmask\n");
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_UPPER_BIT)) {
@@ -335,7 +328,6 @@ void idt_xsave_detect(int ap)
 
             sse_avx512_upper_offset = (uint16_t)info.ebx;
             sse_avx512_upper_size = (uint16_t)info.eax;
-            //printk("Have 512-bit AVX-512 registers\n");
         }
 
         if (cpuid(&info, CPUID_INFO_XSAVE, XCR0_AVX512_XREGS_BIT)) {
@@ -345,7 +337,6 @@ void idt_xsave_detect(int ap)
 
             sse_avx512_xregs_offset = (uint16_t)info.ebx;
             sse_avx512_xregs_size = (uint16_t)info.eax;
-            //printk("Have 32 AVX-512 registers\n");
         }
 
         // Sanity check offsets

@@ -487,10 +487,6 @@ static linaddr_t linear_base = PT_MAX_ADDR;
 
 mmu_phys_allocator_t phys_allocator;
 
-// Incremented every time the page tables are changed
-// Used to detect lazy TLB shootdown
-static uint64_t volatile mmu_seq;
-
 static uint64_t volatile shootdown_pending;
 
 static int contiguous_allocator_cmp_key(
@@ -502,8 +498,6 @@ static int contiguous_allocator_cmp_both(
         typename rbtree_t<>::kvp_t const *lhs,
         typename rbtree_t<>::kvp_t const *rhs,
         void *p);
-
-static uint64_t volatile page_fault_count;
 
 //
 // Contiguous allocator
@@ -1254,15 +1248,6 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     }
 }
 
-static isr_context_t *mmu_lazy_tlb_shootdown(isr_context_t *ctx)
-{
-    thread_set_cpu_mmu_seq(mmu_seq);
-    cpu_tlb_flush();
-
-    // Restart instruction
-    return ctx;
-}
-
 static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 {
     mm_dev_mapping_scoped_lock lock(mm_dev_mapping_lock);
@@ -1277,12 +1262,10 @@ static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 }
 
 // Page fault
-isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
+isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
 {
-    (void)intr;
-    assert(intr == INTR_EX_PAGE);
-
-    atomic_inc(&page_fault_count);
+    if (likely(thread_cpu_count()))
+        atomic_inc((cpu_gs_ptr<uint64_t, CPU_INFO_PF_COUNT_OFS>()));
 
     uintptr_t fault_addr = cpu_fault_address_get();
 
@@ -1308,10 +1291,23 @@ isr_context_t *mmu_page_fault_handler(int intr, isr_context_t *ctx)
     pte_t pte = (present_mask >= 0x07) ? *ptes[3] : 0;
 
     // Check for lazy TLB shootdown
-    if (present_mask == 0x0F &&
-            (pte & PTE_ADDR) != PTE_ADDR &&
-            thread_get_cpu_mmu_seq() != mmu_seq)
-        return mmu_lazy_tlb_shootdown(ctx);
+    if (present_mask == 0xF) {
+        // It is a not a lazy shootdown, if
+        //  - there was a reserved bit violation, or,
+        //  - there was a protection key violation, or,
+        //  - there was an SGX violation, or,
+        //  - the pte is not present, or,
+        //  - the access was a write and the pte is not writable, or,
+        //  - the access was an insn fetch and the pte is not executable
+        if (!((ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_R) ||
+              (ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_PK) ||
+              (ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_SGX) ||
+              ((ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_W) &&
+               !(pte & PTE_WRITABLE)) ||
+              ((ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_I) &&
+               (pte & PTE_NX))))
+            return ctx;
+    }
 
     // If the page table exists
     if (present_mask == 0x07) {
@@ -2502,8 +2498,6 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
         }
     }
 
-    atomic_inc(&mmu_seq);
-
     assert(linear_addr > 0x100000);
 
     PROFILE_MMAP_ONLY( printdbg("mmap of %zd bytes took %" PRIu64 " cycles\n",
@@ -2517,7 +2511,8 @@ void *mremap(
         size_t old_size,
         size_t new_size,
         int flags,
-        void *new_address)
+        void *new_address,
+        errno_t *ret_errno)
 {
     old_size = round_up(old_size);
     new_size = round_up(new_size);
@@ -2541,7 +2536,8 @@ void *mremap(
             unlikely(new_size == 0) ||
             unlikely(flags & MREMAP_INVALID_MASK) ||
             unlikely((!(flags & MREMAP_FIXED)) == (new_st == 0))) {
-        thread_set_error(errno_t::EINVAL);
+        if (ret_errno)
+            *ret_errno = errno_t::EINVAL;
         return MAP_FAILED;
     }
 
@@ -2549,7 +2545,8 @@ void *mremap(
     //  - Must pass MREMAP_MAYMOVE
     //  - Must not pass MREMAP_FIXED
     if (flags != MREMAP_MAYMOVE) {
-        thread_set_error(errno_t::ENOSYS);
+        if (ret_errno)
+            *ret_errno = errno_t::ENOSYS;
         return MAP_FAILED;
     }
 

@@ -160,8 +160,7 @@ struct alignas(128) cpu_info_t {
     int online;
     thread_info_t *goto_thread;
 
-    // Used for lazy TLB shootdown
-    uint64_t mmu_seq;
+    uint64_t pf_count;
     uint64_t volatile tlb_shootdown_count;
 
     uint32_t time_ratio;
@@ -182,6 +181,7 @@ C_ASSERT_ISPO2(sizeof(cpu_info_t));
 C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
+C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
     { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, {},
@@ -189,7 +189,7 @@ static cpu_info_t cpus[MAX_CPUS] = {
     }
 };
 
-static volatile uint32_t cpu_count;
+uint32_t cpu_count;
 
 ///
 
@@ -224,12 +224,12 @@ static uint32_t get_apic_id()
 
 static _always_inline cpu_info_t *this_cpu()
 {
-    return (cpu_info_t *)cpu_gs_read_ptr<0>();
+    return cpu_gs_read<cpu_info_t*, 0>();
 }
 
 static _always_inline thread_info_t *this_thread()
 {
-    return (thread_info_t*)cpu_gs_read_ptr<offsetof(cpu_info_t, cur_thread)>();
+    return cpu_gs_read<thread_info_t*, offsetof(cpu_info_t, cur_thread)>();
 }
 
 EXPORT void thread_yield()
@@ -297,6 +297,7 @@ static void thread_cleanup()
 
 static void thread_startup(thread_fn_t fn, void *p, thread_t id)
 {
+
     threads[id].exit_code = fn(p);
     thread_cleanup();
 }
@@ -682,21 +683,6 @@ static thread_info_t *thread_choose_next(
            ? incoming >= threads && incoming <= threads + countof(threads)
            : outgoing >= threads && outgoing <= threads + countof(threads));
 
-    if (incoming != outgoing) {
-        if (outgoing->flags & THREAD_FLAGS_USES_FPU)
-            isr_save_fpu_ctx(outgoing->ctx);
-        if (incoming->flags & THREAD_FLAGS_USES_FPU)
-            isr_restore_fpu_ctx(incoming->ctx);
-
-        // Update TPL. Idle CPUs have TPL==0, busy CPUs have TPL=8
-
-//        bool incoming_idle = incoming < threads + cpu_count;
-//        bool outgoing_idle = outgoing < threads + cpu_count;
-//
-//        if (incoming_idle != outgoing_idle)
-//            cpu_set_cr8(incoming_idle ? 0 : 8);
-    }
-
     return incoming;
 }
 
@@ -800,6 +786,23 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
         }
 
         pause();
+    }
+
+    if (thread != outgoing) {
+        if (outgoing->flags & THREAD_FLAGS_USES_FPU) {
+            // Save the context before marking
+            printdbg("Saving tid=%zu FPU context at %#zx\n",
+                     outgoing - threads,
+                     uintptr_t(outgoing->xsave_ptr) - sse_context_size);
+            isr_save_fpu_ctx(outgoing);
+        }
+
+        if (thread->flags & THREAD_FLAGS_USES_FPU && thread != outgoing) {
+            printdbg("Restoring tid=%zu FPU context at %#zx\n",
+                     thread - threads,
+                     uintptr_t(thread->xsave_ptr));
+            isr_restore_fpu_ctx(thread);
+        }
     }
 
     thread->sched_timestamp = now;
@@ -926,33 +929,9 @@ EXPORT int thread_wait(thread_t thread_id)
     return thread->exit_code;
 }
 
-int thread_cpu_count()
-{
-    return cpu_count;
-}
-
 uint32_t thread_cpus_started()
 {
     return thread_smp_running + 1;
-}
-
-uint64_t thread_get_cpu_mmu_seq()
-{
-    if (thread_get_cpu_count()) {
-        cpu_scoped_irq_disable intr_was_enabled;
-        cpu_info_t *cpu = this_cpu();
-        return cpu->mmu_seq;
-    }
-    return 0;
-}
-
-void thread_set_cpu_mmu_seq(uint64_t seq)
-{
-    if (thread_cpu_count()) {
-        cpu_scoped_irq_disable intr_was_enabled;
-        cpu_info_t *cpu = this_cpu();
-        cpu->mmu_seq = seq;
-    }
 }
 
 EXPORT thread_t thread_get_id()
@@ -1128,23 +1107,6 @@ void thread_shootdown_notify()
     atomic_inc(&cpu->tlb_shootdown_count);
 }
 
-void thread_set_error(errno_t errno)
-{
-    if (cpu_count) {
-        thread_info_t *info = this_thread();
-        info->errno = errno;
-    }
-}
-
-errno_t thread_get_error()
-{
-    if (cpu_count) {
-        thread_info_t *info = this_thread();
-        return info->errno;
-    }
-    return errno_t::OK;
-}
-
 void *thread_get_fsbase(int thread)
 {
     if (cpu_count) {
@@ -1175,3 +1137,8 @@ void thread_tss_ready(void*)
 }
 
 REGISTER_CALLOUT(thread_tss_ready, nullptr, callout_type_t::tss_list_ready, "000");
+
+void thread_exit(int exitcode)
+{
+
+}

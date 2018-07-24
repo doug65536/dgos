@@ -20,6 +20,21 @@ public:
 static vga_factory_t vga_factory;
 
 class vga_display_t : public text_dev_base_t {
+public:
+    void *operator new(size_t) noexcept
+    {
+        if (instance_count < countof(instances))
+            return instances + instance_count++;
+        return nullptr;
+    }
+
+    void operator delete(void *p)
+    {
+        if (p == instances + instance_count - 1)
+            --instance_count;
+    }
+
+private:
     friend class vga_factory_t;
 
     uint16_t *video_mem;
@@ -62,24 +77,11 @@ class vga_display_t : public text_dev_base_t {
     void remap();
 
     // This starts up extremely early, statically allocate
-    static vga_display_t instances[2];
+    static vga_display_t instances[1];
     static unsigned instance_count;
-
-    void *operator new(size_t) noexcept
-    {
-        if (instance_count < countof(instances))
-            return instances + instance_count++;
-        return nullptr;
-    }
-
-    void operator delete(void *p)
-    {
-        if (p == instances + instance_count - 1)
-            --instance_count;
-    }
 };
 
-vga_display_t vga_display_t::instances[2];
+vga_display_t vga_display_t::instances[1];
 unsigned vga_display_t::instance_count;
 
 #define VGA_CRTC_PORT    (io_base)
@@ -92,8 +94,6 @@ unsigned vga_display_t::instance_count;
 
 #define VGA_SET_CURSOR_HI(pos) (VGA_CRTC_CURSOR_HI | \
     ((pos) & 0xFF00))
-
-static std::vector<vga_display_t*> vga_displays;
 
 // === Internal API ===
 
@@ -369,14 +369,19 @@ void vga_display_t::print_character(int ch)
 
 int vga_factory_t::detect(text_dev_base_t ***ptrs)
 {
-    static text_dev_base_t *devs[4];
-    static size_t dev_count = 0;
-    *ptrs = devs + dev_count;
+    static text_dev_base_t *devs[countof(vga_display_t::instances)];
 
-    if (dev_count >= countof(devs)) {
+    if (vga_display_t::instance_count >=
+            countof(vga_display_t::instances)) {
         printdbg("Too many VGA devices!\n");
         return 0;
     }
+
+    vga_display_t* self = vga_display_t::instances +
+            vga_display_t::instance_count;
+
+    *ptrs = devs + vga_display_t::instance_count++;
+    **ptrs = self;
 
     // Does not work (in qemu anyway)
     //pci_dev_iterator_t dev_iter;
@@ -386,18 +391,16 @@ int vga_factory_t::detect(text_dev_base_t ***ptrs)
     //            PCI_SUBCLASS_DISPLAY_VGA))
     //    return 0;
 
-    vga_display_t *self = new vga_display_t;
 
-    devs[dev_count++] = self;
-
-    self->init();
+    if (!self->init())
+        return 0;
 
     return 1;
 }
 
 // Startup/shutdown
 
-void vga_display_t::init()
+bool vga_display_t::init()
 {
     // (Don't...) get I/O port base from BIOS data area
     io_base = 0x3B4;//*BIOS_DATA_AREA(uint16_t, BIOS_VGA_PORT_BASE);
@@ -422,6 +425,8 @@ void vga_display_t::init()
     shadow = video_mem + (80 * 25);
 
     mouse_toggle(1);
+
+    return true;
 }
 
 void vga_display_t::cleanup()
@@ -430,8 +435,8 @@ void vga_display_t::cleanup()
 
 void vga_remap_callback(void *)
 {
-    for (vga_display_t *self : vga_displays)
-        self->remap();
+    for (vga_display_t &self : vga_display_t::instances)
+        self.remap();
 }
 
 void vga_display_t::remap()

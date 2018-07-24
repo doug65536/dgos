@@ -1,5 +1,10 @@
+cxx/terminate.cc
 include/new.h
 include/sys/syscall_num.h
+math/cos.cc
+math/log.cc
+math/sin.cc
+src/errno/errno.cc
 src/fcntl/creat.cc
 src/fcntl/fcntl.cc
 src/fcntl/open.cc
@@ -33,7 +38,13 @@ src/stdlib/malloc.cc
 src/stdlib/new.cc
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
-src/sys/syscall.S
+src/sys/syscall0.S
+src/sys/syscall1.S
+src/sys/syscall2.S
+src/sys/syscall3.S
+src/sys/syscall4.S
+src/sys/syscall5.S
+src/sys/syscall6.S
 src/unistd/_exit.cc
 src/unistd/access.cc
 src/unistd/alarm.cc

@@ -27,7 +27,7 @@
 #include "bootinfo.h"
 #include "nano_time.h"
 #include "cmos.h"
-#include "apicbits.h"
+#include "apic.bits.h"
 #include "mutex.h"
 #include "bootinfo.h"
 #include "boottable.h"

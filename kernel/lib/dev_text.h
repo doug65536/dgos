@@ -28,9 +28,11 @@ struct text_dev_factory_t {
 };
 
 struct text_dev_base_t {
+    virtual ~text_dev_base_t() {}
+
     // Set/get dimensions
     // Startup/shutdown
-    virtual void init() = 0;
+    virtual bool init() = 0;
     virtual void cleanup() = 0;
 
     // Set/get dimensions
@@ -100,7 +102,7 @@ struct text_dev_base_t {
 };
 
 #define TEXT_DEV_IMPL                                                       \
-    virtual void init() override final;                                     \
+    virtual bool init() override final;                                     \
     virtual void cleanup() override final;                                  \
     virtual int set_dimensions(int width, int height) override final;       \
     virtual void get_dimensions(int *width, int *height) override final;    \

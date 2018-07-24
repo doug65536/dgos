@@ -5,6 +5,7 @@
 #define CPU_INFO_SELF_OFS           0
 #define CPU_INFO_CURTHREAD_OFS      8
 #define CPU_INFO_TSS_PTR_OFS        16
+#define CPU_INFO_PF_COUNT_OFS       40
 #define TSS_RSP0_OFS                8
 #define THREAD_XSAVE_PTR_OFS        8
 #define THREAD_FSBASE_OFS           24

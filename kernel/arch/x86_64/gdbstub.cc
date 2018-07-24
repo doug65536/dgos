@@ -486,10 +486,15 @@ private:
                                 char const *annex, size_t annex_sz);
     rx_state_t handle_query_features(char const *input);
 
+    _printf_format(2, 3)
     rx_state_t replyf_hex(char const *format, ...);
+
+    _printf_format(2, 3)
     rx_state_t replyf(char const *format, ...);
     rx_state_t reply(char const *data);
+
     rx_state_t reply_hex(char const *format, size_t size);
+
     rx_state_t reply(char const *data, size_t size);
 
     template<typename T>
@@ -700,7 +705,8 @@ void gdb_init()
     gdb_cpu_ctrl_t::start_stub();
 }
 
-gdbstub_t::rx_state_t gdbstub_t::replyf_hex(char const *format, ...)
+gdbstub_t::rx_state_t
+gdbstub_t::replyf_hex(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);
@@ -718,7 +724,7 @@ gdbstub_t::rx_state_t gdbstub_t::reply_hex(char const *data, size_t size)
     } else {
         tx_index = 0;
         for (size_t i = 0; i < size; ++i)
-            to_hex_bytes(tx_buf + i * 2, tx_buf[i]);
+            to_hex_bytes(tx_buf + i * 2, data[i]);
     }
 
     return reply(tx_buf, size * 2);
@@ -949,7 +955,7 @@ void gdbstub_t::run()
                 //replyf("T%02xswbreak:;", sig);
             }
             //else {
-                replyf("T%02xthread:%x;", sig, cpu_nr);
+                replyf("T%02xthread:%x;", unsigned(sig), cpu_nr);
             //}
         }
     }
@@ -1056,7 +1062,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
     size_t memop_index;
     uint8_t *memop_ptr;
     isr_context_t const *ctx;
-    bool ok;
+    bool volatile ok;
 
     if (!parse_memop(memop_addr, memop_size, input) || *input++ != ':')
         return reply("E02");
@@ -1520,7 +1526,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
         return rx_state_t::IDLE;
 
     case '?':
-        return replyf("T%02xthread:%02x;", gdb_signal_t::TRAP, c_cpu);
+        return replyf("T%02xthread:%02x;", unsigned(gdb_signal_t::TRAP), c_cpu);
 
     case 'g':
         // Get all CPU registers
@@ -1601,7 +1607,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
             return reply("QC1");
         } else if (match(input, "Supported", ":")) {
             // Query for feature support
-            return replyf("PacketSize=%x;qXfer:features:read+",
+            return replyf("PacketSize=%zx;qXfer:features:read+",
                           MAX_BUFFER_SIZE);
         } else if (match(input, "Xfer:features:read", ":")) {
             // Get machine description

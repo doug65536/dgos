@@ -4,6 +4,12 @@
 
 scriptroot="$(cd "$(dirname "$0")" && pwd)"
 
+function join_by {
+	local IFS="$1"
+	shift
+	echo "$*"
+}
+
 HOST=x86_64-elf
 AR="$HOST-gcc-ar"
 RANLIB="$HOST-gcc-ranlib"
@@ -13,15 +19,26 @@ export AR
 export RANLIB
 export NM
 
-compileflags=( "-nostdlib" "-ffreestanding" )
+if [[ ! -f sysroot/libc/libc.a ]]; then
+	echo Bootstrapping sysroot
+	compileflags=( "-nostdlib" "-nostartfiles" )
+	configureflags=()
+
+	CFLAGS="$(join_by ' ' ${compileflags[@]})" \
+		CXXFLAGS="$CFLAGS" \
+		LDFLAGS="$CFLAGS" \
+		"$scriptroot/configure" --host "$HOST" \
+		$(join_by ' ' ${configureflags[@]}) "$@" && \
+		nice make -j $(nproc) \
+			sysroot/lib/crt0.o \
+			sysroot/lib/libc.a \
+			sysroot/lib/libm.a \
+			sysroot/lib/libstdc++.a
+fi
+
+compileflags=( "--sysroot sysroot" )
 configureflags=()
 done=0
-
-function join_by {
-	local IFS="$1"
-	shift
-	echo "$*"
-}
 
 echo flags: "${compileflags[@]}"
 

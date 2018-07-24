@@ -3,6 +3,8 @@
 
 __BEGIN_DECLS
 
+struct thread_info_t;
+
 #define ISR_CTX_REG_GPR_n(ctx, i)       ((ctx)->gpr.r.r[(i)])
 #define ISR_CTX_REG_SEG_n(ctx, i)       ((ctx)->gpr.s.r[(i)])
 
@@ -464,7 +466,7 @@ extern void isr_entry_255(void);
 _noreturn
 void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 
-void isr_save_fpu_ctx(isr_context_t *outgoing_ctx);
-void isr_restore_fpu_ctx(isr_context_t *incoming_ctx);
+void isr_save_fpu_ctx(thread_info_t *outgoing_ctx);
+void isr_restore_fpu_ctx(thread_info_t *incoming_ctx);
 
 __END_DECLS

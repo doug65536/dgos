@@ -16,31 +16,31 @@ SECTIONS {
 
 	.edata ALIGN(4K) : {
 		*(.edata)
-	
+
 		. = ALIGN(16);
 		___ctors_st = .;
 		*(.ctors)
-		*(SORT(.ctors.*))
+		*(SORT_BY_INIT_PRIORITY(.ctors.*))
 		*(.init_array)
-		*(SORT(.init_array.*))
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		___ctors_en = .;
-	
+
 		. = ALIGN(16);
 		___dtors_st = .;
 		*(.dtors)
-		*(SORT(.dtors.*))
+		*(SORT_BY_INIT_PRIORITY(.dtors.*))
 		*(.fini_array)
-		*(SORT(.fini_array.*))
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		___dtors_en = .;
-	
+
 		/* Place 64 bit code high enough to be outside first 4KB */
 		*(.text.code64)
-	
+
 		*(.rodata)
 		*(.rodata.*)
 		*(.comment)
 	}
-	
+
 	.smp ALIGN(4K) : {
 		/* Gather all trampoline-critical code and data into this section */
 		/* It will protect data from being lost when exiting boot services */
@@ -52,7 +52,7 @@ SECTIONS {
 		*(.smp.data)
 		___smp_en = ABSOLUTE(.);
 	}
-	
+
 	.reloc ALIGN(4K) : { *(.reloc) }
 
 	.hash : ALIGN(64) {

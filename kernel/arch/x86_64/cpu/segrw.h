@@ -1,27 +1,29 @@
 #pragma once
 #include "types.h"
 
-template<ptrdiff_t ofs = 0>
-static _always_inline void *cpu_gs_read_ptr(void)
+template<typename T, ptrdiff_t ofs = 0>
+static _always_inline T cpu_gs_read(void)
 {
-    void *ptr;
+    T value;
     __asm__ __volatile__ (
-        "mov %%gs:%c[ofs],%[ptr]\n\t"
-        : [ptr] "=r" (ptr)
+        "mov %%gs:%c[ofs],%[value]\n\t"
+        : [value] "=r" (value)
         : [ofs] "i" (ofs)
         : "memory"
     );
-    return ptr;
+    return value;
 }
 
-static _always_inline void *cpu_gs_read_ptr(size_t offset)
+template<typename T, ptrdiff_t ofs = 0>
+static _always_inline T *cpu_gs_ptr(void)
 {
-    void *ptr;
+    T *value;
     __asm__ __volatile__ (
-        "mov %%gs:(%[offset]),%[ptr]\n\t"
-        : [ptr] "=r" (ptr)
-        : [offset] "er" (*(uintptr_t*)offset)
+        "mov %%gs:0,%[value]\n\t"
+        "add %[ofs],%[value]\n\t"
+        : [value] "=r" (value)
+        : [ofs] "i" (ofs)
         : "memory"
     );
-    return ptr;
+    return value;
 }

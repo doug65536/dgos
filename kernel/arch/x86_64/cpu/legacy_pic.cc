@@ -4,7 +4,7 @@
 #include "cpu/halt.h"
 #include "control_regs.h"
 #include "interrupts.h"
-#include "picbits.h"
+#include "pic.bits.h"
 #include "assert.h"
 
 // Implements legacy Programmable Interrupt Controller,

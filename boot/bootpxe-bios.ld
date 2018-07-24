@@ -20,7 +20,7 @@ SECTIONS {
 		*(.ctors)
 		*(.ctors.*)
 		*(.init_array)
-		*(SORT(.init_array.*))
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		___ctors_en = .;
 
 		. = ALIGN(16);
@@ -28,7 +28,7 @@ SECTIONS {
 		*(.dtors)
 		*(.dtors.*)
 		*(.fini_array)
-		*(SORT(.fini_array.*))
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		___dtors_en = .;
 
 		. = ALIGN(64);

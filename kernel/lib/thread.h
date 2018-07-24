@@ -60,9 +60,6 @@ uint64_t thread_shootdown_count(int cpu_nr);
 // Increment the TLB shootdown counter for the current CPU
 void thread_shootdown_notify();
 
-void thread_set_error(errno_t errno);
-errno_t thread_get_error();
-
 _noreturn
 void thread_idle();
 

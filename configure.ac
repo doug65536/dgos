@@ -49,6 +49,11 @@ AS_IF([test x"$LN" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find ln])])
 AC_SUBST([LN])
 
+AC_CHECK_PROGS([FIND], [find], [NOT_FOUND])
+AS_IF([test x"$FIND" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find find])])
+AC_SUBST([FIND])
+
 AC_CHECK_PROGS([SED], [sed], [NOT_FOUND])
 AS_IF([test x"$SED" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find sed])])
@@ -135,7 +140,7 @@ for flag in \
 		std=c++14 fno-fat-lto-objects gdwarf-4 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
-		Wfloat-equal Wundef Wwrite-strings Wredundant-decls \
+		Wundef Wwrite-strings Wredundant-decls \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
@@ -188,7 +193,6 @@ do
 done
 AC_SUBST([ASM_DEBUG_INFO_FLAGS])
 
-
 AS_VAR_SET([SMALLEST_CODE_FLAGS],[])
 AX_CHECK_COMPILE_FLAG([-Oz],
 	[AS_VAR_SET([SMALLEST_CODE_FLAGS], [-Oz])],
@@ -213,6 +217,16 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([FREESTANDING_FLAGS])
+
+AS_VAR_SET([NOSTDLIB_FLAGS], [])
+for flag in \
+	nostdlib nostartfiles
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([NOSTDLIB_FLAGS], [" -$flag"])],
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([NOSTDLIB_FLAGS])
 
 AS_VAR_SET([NOFLOAT_FLAGS], [])
 for flag in mgeneral-regs-only

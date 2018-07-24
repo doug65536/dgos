@@ -1,3 +1,3 @@
 // Intel I350 NIC driver
 
-#include "./i350bits.h"
+#include "i350.bits.h"

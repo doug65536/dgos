@@ -1,6 +1,7 @@
 #include <spawn.h>
 #include <sys/syscall.h>
 #include <sys/syscall_num.h>
+#include <errno.h>
 
 int posix_spawn(pid_t *restrict pid,
                 char const *restrict path,

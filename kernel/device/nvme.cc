@@ -4,7 +4,7 @@
 #include "mm.h"
 #include "printk.h"
 #include "cpu/atomic.h"
-#include "nvmebits.h"
+#include "nvme.bits.h"
 #include "string.h"
 #include "utility.h"
 #include "thread.h"

@@ -15,7 +15,7 @@
 #include "time.h"
 #include "inttypes.h"
 
-#include "usb_xhcibits.h"
+#include "usb_xhci.bits.h"
 
 #define USBXHCI_DEBUG   0
 #if USBXHCI_DEBUG

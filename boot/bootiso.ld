@@ -9,7 +9,7 @@ SECTIONS {
 		___initialized_data_st = .;
 		*(.head)
 		*(.early)
-		
+
 		. = ALIGN(4096);
 
 		. = ALIGN(64);
@@ -28,7 +28,7 @@ SECTIONS {
 		*(.ctors)
 		*(.ctors.*)
 		*(.init_array)
-		*(SORT(.init_array.*))
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		___ctors_en = .;
 
 		. = ALIGN(16);
@@ -36,7 +36,7 @@ SECTIONS {
 		*(.dtors)
 		*(.dtors.*)
 		*(.fini_array)
-		*(SORT(.fini_array.*))
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		___dtors_en = .;
 
 		. = ALIGN(16);
@@ -46,7 +46,7 @@ SECTIONS {
 		. = ALIGN(64);
 		*(.smp.data)
 		___smp_en = .;
-		
+
 		/* sector align end */
 		. = ALIGN(2048);
 		___initialized_data_en = .;
@@ -87,7 +87,7 @@ SECTIONS {
 	.rel            0 : { *(.rel*)          }
 	.iplt           0 : { *(.iplt*)         }
 	.igot           0 : { *(.igot*)         }
-	
+
 	/DISCARD/		0 : { *(.interp)               }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }

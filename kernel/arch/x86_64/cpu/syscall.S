@@ -25,7 +25,7 @@ syscall_entry:
     // CPU is configured to clear EFLAGS IF, DF, TF, AC on entry
 
     // Range check syscall number
-    cmpq $SYSCALL_COUNT,%rax
+    cmpq $ SYSCALL_COUNT,%rax
     jae 0f
 
     // Read function pointer from vector table

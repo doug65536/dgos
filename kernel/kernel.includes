@@ -17,3 +17,4 @@ syscall
 ../m4
 device
 ../emu/bochs
+../toolchain

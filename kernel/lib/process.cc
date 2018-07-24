@@ -234,6 +234,9 @@ int process_t::start()
     void *stack = mmap(nullptr, stack_size, PROT_READ | PROT_WRITE,
                        MAP_STACK | MAP_USER, -1, 0);
 
+    printdbg("process: allocated %zuKB stack at %#zx\n",
+             stack_size >> 10, uintptr_t(stack));
+
     // Initialize the stack according to the ELF ABI
     //
     // lowest address
@@ -250,21 +253,85 @@ int process_t::start()
     // highest address
 
     // Calculate size of variable sized area
-    size_t info_sz = 0;
+    size_t info_sz;
 
-    size_t info_arg_ofs = info_sz;
-    for (size_t i = 0; i < argc; ++i)
-        info_sz += strlen(argv[i]) + 1;
-    size_t info_arg_sz = info_sz - info_arg_ofs;
+    // Populate the stack
+    void *stack_ptr = (char*)stack + stack_size;
 
-    size_t info_env_ofs = info_sz;
-    for (size_t i = 0; i < envc; ++i)
-        info_sz += strlen(env[i]) + 1;
-    size_t info_env_sz = info_sz - info_env_ofs;
+// screw program headers and auxv for now
+//    // Calculate size of the program header array
+//    size_t info_ph_ofs = info_sz;
+//    info_sz += hdr.e_phentsize * hdr.e_phnum;
+//    size_t info_ph_sz = info_sz - info_ph_ofs;
 
-    size_t info_ph_ofs = info_sz;
-    info_sz += hdr.e_phentsize * hdr.e_phnum;
-    size_t info_ph_sz = info_sz - info_ph_ofs;
+//    // Copy the program headers onto the stack
+//    stack_ptr = (char*)stack_ptr - info_ph_sz;
+//    void *phdrs_ptr = stack_ptr;
+//    memcpy(stack_ptr, program_hdrs.data(),
+//           sizeof(*program_hdrs.data()) * hdr.e_phnum);
+
+    // Calculate the total size of environment string text
+    info_sz = 0;
+    for (size_t i = 0; i < envc; ++i) {
+        size_t len = strlen(env[i]) + 1;
+        info_sz += len;
+    }
+
+    // Calculate where the environment string text starts
+    stack_ptr = (char*)stack_ptr - info_sz;
+    char *env_ptr = (char*)stack_ptr;
+
+    // Calculate the total size of argument string text
+    info_sz = 0;
+    for (size_t i = 0; i < argc; ++i) {
+        size_t len = strlen(argv[i]) + 1;
+        info_sz += len;
+    }
+
+    // Calculate where the argument string text starts
+    stack_ptr = (char*)stack_ptr - info_sz;
+    char *arg_ptr = (char*)stack_ptr;
+
+    // Align the stack pointer
+    stack_ptr = (void*)(uintptr_t(stack_ptr) & -sizeof(void*));
+
+    // Calculate where the pointers to the environment strings start
+    stack_ptr = (char**)env_ptr - (envc + 1);
+    char **envp_ptr = (char**)stack_ptr;
+
+    // Copy the environment strings and populate environment string pointers
+    for (size_t i = 0; i < envc; ++i) {
+        size_t len = strlen(env[i]) + 1;
+        // Copy the string
+        memcpy(env_ptr, env[i], len);
+        // Write the pointer to the string
+        envp_ptr[i] = env_ptr;
+        // Advance string output pointer
+        env_ptr += len;
+    }
+
+    // Calculate where the pointers to the argument strings start
+    stack_ptr = envp_ptr - (argc + 1);
+    char **argp_ptr = (char**)stack_ptr;
+
+    // Copy the argument strings and populate argument string pointers
+    for (size_t i = 0; i < envc; ++i) {
+        size_t len = strlen(argv[i]) + 1;
+        // Copy the string
+        memcpy(arg_ptr, argv[i], len);
+        // Write the pointer to the string
+        argp_ptr[i] = arg_ptr;
+        // Advance string output pointer
+        arg_ptr += len;
+    }
+
+    // Push argv to the stack
+    stack_ptr = (char**)stack_ptr - 1;
+    *(char***)stack_ptr = argp_ptr;
+
+    // Push argc to the stack
+    stack_ptr = (uintptr_t*)stack_ptr - 1;
+    *(uintptr_t*)stack_ptr = argc;
 
     std::vector<auxv_t> auxent;
 
@@ -278,7 +345,7 @@ int process_t::start()
     lock.unlock();
     cond.notify_all();
 
-    isr_sysret64(hdr.e_entry, (uintptr_t)stack + stack_size);
+    isr_sysret64(hdr.e_entry, uintptr_t(stack_ptr));
 
     return pid;
 }
@@ -297,7 +364,12 @@ void process_t::set_allocator(void *allocator)
 
 void process_t::exit(pid_t pid, int exitcode)
 {
+    // Kill all the threads...
 
+    process_t *process_ptr = lookup(pid);
+
+    process_ptr->exitcode = exitcode;
+    thread_exit(exitcode);
 }
 
 bool process_t::add_thread(pid_t pid, thread_t tid)

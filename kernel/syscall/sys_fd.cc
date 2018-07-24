@@ -4,17 +4,18 @@
 #include "fileio.h"
 #include "syscall_helper.h"
 
+// Validate the errno and return its negated integer value
 static int err(errno_t errno)
 {
-    thread_set_error(errno);
-    return -1;
+    assert(int(errno) > int(errno_t::OK) &&
+           int(errno) < int(errno_t::MAX_ERRNO));
+    return -int(errno);
 }
 
 static int err(int negerr)
 {
     assert(negerr < 0 && -negerr < int(errno_t::MAX_ERRNO));
-    thread_set_error(errno_t(-negerr));
-    return -1;
+    return negerr;
 }
 
 static int badf_err()
@@ -35,10 +36,10 @@ ssize_t sys_read(int fd, void *bufaddr, size_t count)
 
     ssize_t sz = file_read(id, bufaddr, count);
 
-    if (sz < 0)
-        thread_set_error(errno_t(-sz));
+    if (likely(sz >= 0))
+        return sz;
 
-    return sz;
+    return err(sz);
 }
 
 ssize_t sys_write(int fd, void const *bufaddr, size_t count)
@@ -58,7 +59,7 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 
     ssize_t sz = file_write(id, bufaddr, count);
 
-    if (sz >= 0)
+    if (likely(sz >= 0))
         return sz;
 
     return err(sz);
@@ -74,7 +75,7 @@ int sys_close(int fd)
         return badf_err();
 
     int status = file_close(id);
-    if (status != 0)
+    if (likely(status == 0))
         return 0;
 
     return err(status);
@@ -90,7 +91,7 @@ ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
         return badf_err();
 
     int sz = file_pread(id, bufaddr, count, ofs);
-    if (sz >= 0)
+    if (likely(sz >= 0))
         return sz;
 
     return err(sz);
@@ -107,7 +108,7 @@ ssize_t sys_pwrite64(int fd, void const *bufaddr,
         return badf_err();
 
     int sz = file_pwrite(id, bufaddr, count, ofs);
-    if (sz >= 0)
+    if (likely(sz >= 0))
         return sz;
 
     return err(sz);
@@ -123,7 +124,7 @@ off_t sys_lseek(int fd, off_t ofs, int whence)
         return badf_err();
 
     int pos = file_seek(id, ofs, whence);
-    if (pos >= 0)
+    if (likely(pos >= 0))
         return pos;
 
     return err(pos);
@@ -139,7 +140,7 @@ int sys_fsync(int fd)
         return badf_err();
 
     int status = file_fsync(id);
-    if (status >= 0)
+    if (likely(status >= 0))
         return status;
 
     return err(status);
@@ -155,7 +156,7 @@ int sys_fdatasync(int fd)
         return badf_err();
 
     int status = file_fdatasync(id);
-    if (status >= 0)
+    if (likely(status >= 0))
         return status;
 
     return err(status);
@@ -171,7 +172,7 @@ int sys_ftruncate(int fd, off_t size)
         return badf_err();
 
     int status = file_ftruncate(id, size);
-    if (status >= 0)
+    if (likely(status >= 0))
         return status;
 
     return err(status);
@@ -185,7 +186,7 @@ int sys_dup(int oldfd)
 
     int newfd = p->ids.desc_alloc.alloc();
 
-    if (file_ref_filetab(id)) {
+    if (likely(file_ref_filetab(id))) {
         p->ids.ids[newfd] = id;
         return newfd;
     }
@@ -280,7 +281,7 @@ int sys_rename(char const *old_path, char const *new_path)
 int sys_mkdir(char const *path, mode_t mode)
 {
     int status = file_mkdir(path, mode);
-    if (status >= 0)
+    if (likely(status >= 0))
         return status;
 
     return err(status);

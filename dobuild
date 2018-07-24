@@ -4,7 +4,7 @@ scriptroot="$(cd "$(dirname "$0")" && pwd)"
 
 if [[ ! -f "cross-tool/.build-done" ]]; then
 	nice "$scriptroot/build-crossgcc.sh" \
-		-a x86_64-elf -o cross-build -p cross-tool -j 16 || exit
+		-a x86_64-elf -o cross-build -p cross-tool -j $(nproc) || exit
 	export PATH=$PATH:$PWD/cross-tool/bin
 	CFLAGS="-nostartfiles -nostdlib" CXXFLAGS=$CFLAGS \
 		"$scriptroot/configure" --host x86_64-elf || exit

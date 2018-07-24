@@ -7,6 +7,10 @@ BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
 	generated_headers \
+	sysroot/lib/crt0.o \
+	sysroot/lib/libc.a \
+	sysroot/lib/libm.a \
+	sysroot/lib/libstdc++.a \
 	trace-tool
 
 #  -> Link mbr-elf
@@ -28,7 +32,9 @@ LINKER_DEBUG =
 
 noinst_LIBRARIES = \
 	libbootsect.a \
-	libc.a
+	libc.a \
+	libm.a \
+	libstdc++.a
 
 bin_PROGRAMS = \
 	mbr-elf \
@@ -74,6 +80,7 @@ mbr_elf_LDFLAGS = \
 	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
+	$(NOSTDLIB_FLAGS) \
 	$(LINKER_SEL) -static
 
 EXTRA_mbr_elf_DEPENDENCIES = \
@@ -447,7 +454,8 @@ bootefi_amd64_CFLAGS = \
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(PE64_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS)
+	$(BOOTLOADER_EFI_FLAGS) \
+	$(FREESTANDING_FLAGS)
 
 #bootefi_i386_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
@@ -468,7 +476,8 @@ bootefi_amd64_LDFLAGS = \
 	$(LIBGCC_PE64) \
 	-g \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
-	-Wl,-Map,$(top_builddir)/bootefi-amd64.map
+	-Wl,-Map,$(top_builddir)/bootefi-amd64.map \
+	$(NOSTDLIB_FLAGS)
 
 #-Wl,--subsystem,10 \
 #-Wl,-pie \
@@ -813,7 +822,7 @@ KERNEL_LDFLAGS_SHARED = \
 	-export-dynamic -Wl,--no-dynamic-linker \
 	-Wl,-z,max-page-size=4096 \
 	-Wl,-pie \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(NOSTDLIB_FLAGS)
 
 #-Wl,-export-dynamic
 
@@ -905,6 +914,44 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 		-Wl,--end-group
 
 #-O3 -march=native
+
+# ----------------------------------------------------------------------------
+# crt0
+
+INCLUDES_NAMES = $(shell cd $(top_srcdir)/libc/include && $(FIND) -type f)
+INCLUDES_DEPLOYED = \
+	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
+
+sysroot/lib/crt0.o: $(top_srcdir)/user/crt0/crt0.S $(top_srcdir)/Makefile.am
+	mkdir -p "$(@D)" && $(CXX) -g -Wa,-g -o $@ -c $<
+
+sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+define deploy_sysroot_header =
+$$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
+	mkdir -p $$(@D)
+	cp -f $$< $$@
+
+endef
+
+$(foreach header,$(INCLUDES_NAMES),$(eval \
+	$(call deploy_sysroot_header,$(header)) \
+))
+
+#$(INCLUDES_DST): $(INCLUDES_SRC)
+#	mkdir -p sysroot/include
+#	for header in $(INCLUDES_NAMES); do \
+#		mkdir -p $$(dirname $(top_builddir)/sysroot/include/$$header) && \
+#		cp -u $(top_srcdir)/libc/include/$$header \
+#			$(top_builddir)/sysroot/include/$$header; \
+#		done
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1116,6 +1163,7 @@ libc_a_SOURCES = \
 	libc/src/unistd/unlinkat.cc \
 	libc/src/unistd/unlink.cc \
 	libc/src/unistd/write.cc \
+	libc/src/errno/errno.cc \
 	libc/src/posix_spawn/posix_spawn.cc \
 	libc/src/posix_spawn/posix_spawnp.cc \
 	libc/src/posix_spawn/posix_spawn_file_actions_init.cc \
@@ -1137,13 +1185,38 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
-	libc/src/sys/syscall.S \
+	libc/src/sys/syscall0.S \
+	libc/src/sys/syscall1.S \
+	libc/src/sys/syscall2.S \
+	libc/src/sys/syscall3.S \
+	libc/src/sys/syscall4.S \
+	libc/src/sys/syscall5.S \
+	libc/src/sys/syscall6.S \
 	$(libc_a_HEADERS)
 
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
 	$(FREESTANDING_FLAGS) \
+	-std=c++14 -static \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
+
+libm_a_SOURCES = \
+	libc/math/cos.cc \
+	libc/math/sin.cc \
+	libc/math/log.cc
+
+libm_a_CXXFLAGS = \
+	-isystem $(top_srcdir)/libc/include \
+	-std=c++14 -static \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
+
+libstdc___a_SOURCES = \
+	libc/cxx/terminate.cc
+
+libstdc___a_CXXFLAGS = \
+	-isystem $(top_srcdir)/libc/include \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -1200,6 +1273,7 @@ hello_km_SOURCES = \
 	modules/hello/hello.cc
 
 hello_km_CXXFLAGS = \
+	$(FREESTANDING_FLAGS) \
 	-fPIE \
 	-g \
 	-I$(top_srcdir)/kernel/lib \
@@ -1212,9 +1286,10 @@ hello_km_LDFLAGS = \
 	-Wl,-g \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
-	-mcmodel=kernel
+	$(NOSTDLIB_FLAGS)
 
-EXTRA_hello_km_DEPENDENCIES = kernel/arch/x86_64/module.ld \
+EXTRA_hello_km_DEPENDENCIES = \
+	kernel/arch/x86_64/module.ld \
 	Makefile.am
 
 user_shell_SOURCES = \
@@ -1288,73 +1363,30 @@ distclean-local:
 # ----------------------------------------------------------------------------
 # Generate register definitions
 
-generated_headers: \
-	$(top_srcdir)/kernel/device/nvmebits.h \
-	$(top_srcdir)/kernel/device/pcibits.h \
-	$(top_srcdir)/kernel/device/i350bits.h \
-	$(top_srcdir)/kernel/device/usb_xhcibits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h \
-	$(top_srcdir)/kernel/device/acpibits.h \
-	$(top_srcdir)/kernel/device/ahcibits.h
+BITFIELD_FILES = \
+	$(top_srcdir)/kernel/device/nvme.bits \
+	$(top_srcdir)/kernel/device/pci.bits \
+	$(top_srcdir)/kernel/device/i350.bits \
+	$(top_srcdir)/kernel/device/usb_xhci.bits \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
+	$(top_srcdir)/kernel/device/acpi.bits \
+	$(top_srcdir)/kernel/device/ahci.bits
+
+# 1=path to bits file
+define bitfield_gen =
+$(1).h: $(1) $$(top_srcdir)/genregs.py
+	rm -f "$$@"
+	$$(top_srcdir)/genregs.py "$$<" > "$$@"
+endef
+
+$(foreach bitsfile,$(BITFIELD_FILES), \
+	$(eval $(call bitfield_gen,$(bitsfile))) \
+)
+
+generated_headers: $(patsubst %,%.h,$(BITFIELD_FILES))
 
 .PHONY: generated_headers
-
-$(top_srcdir)/kernel/device/nvmebits.h: \
-		$(top_srcdir)/kernel/device/nvme.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/pcibits.h: \
-		$(top_srcdir)/kernel/device/pci.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/i350bits.h: \
-		$(top_srcdir)/kernel/device/i350.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/usb_xhcibits.h: \
-		$(top_srcdir)/kernel/device/usb_xhci.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
-		$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h: \
-		$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/acpibits.h: \
-		$(top_srcdir)/kernel/device/acpi.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/ahcibits.h: \
-		$(top_srcdir)/kernel/device/ahci.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
 
 # ----------------------------------------------------------------------------
 # Randomize RAM content
@@ -1380,9 +1412,9 @@ QEMU_EXTRA_DEPS = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out
 
-QEMU_CPUS = 2
-QEMU_CORES = 2
-QEMU_THREADS = 1
+QEMU_CPUS = 16
+QEMU_CORES = 8
+QEMU_THREADS = 2
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
 QEMU_RAM = 5G
@@ -1529,177 +1561,33 @@ $(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
 
 BOCHS=bochs
 
-$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-bios-kernel-commands
+# Generate the makefile targets for all the variations of bochs launch
+
+BOCHS_MEDIA = fat iso
+BOCHS_FW = bios efi
+BOCHS_PART = kernel boot
+
+# 1=media, 2=fw, 3=part
+define bochs_launcher =
+$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
+		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
 	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-fat-efi-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-efi-kernel-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-bios-boot-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-efi-boot-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-bios-kernel-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-efi-kernel-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-bios-boot-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-efi-boot-commands
-	cp "$<" "$@"
-
-## debug iso
-
-debug-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
+debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
+		mbr.sym boot$(1).sym \
 		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands \
-		$(BOCHS_FLAGS)
+		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
+		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
+	$$(BOCHS) \
+		-f $$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
+		-rc $$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands \
+		$$(BOCHS_FLAGS)
+.PHONY: debug-$(1)-$(2)-bochs-$(3)
+endef
 
-.PHONY: debug-iso-bios-bochs-kernel
-
-debug-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-iso-efi-bochs-kernel
-
-## debug fat
-
-debug-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-bios-bochs-kernel
-
-debug-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-efi-debugger-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-efi-kernel-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-efi-bochs-kernel
-
-## debug iso boot
-
-debug-iso-bios-bochs-boot: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-iso-bios-bochs-boot
-
-debug-iso-efi-bochs-boot: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-iso-efi-bochs-boot
-
-## debug fat boot
-
-debug-fat-bios-bochs-boot: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-bios-bochs-boot
-
-debug-fat-efi-bochs-boot: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-efi-bochs-boot
-
-# run iso
-
-run-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-iso-bios-bochs-kernel
-
-run-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-iso-efi-bochs-kernel
-
-# run fat
-
-run-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-fat-bios-bochs-kernel
-
-run-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
-		bootx64-efi.sym kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-fat-efi-bochs-kernel
+$(foreach media,$(BOCHS_MEDIA), \
+	$(foreach fw,$(BOCHS_FW), \
+		$(foreach part,$(BOCHS_PART), \
+			$(eval $(call bochs_launcher,$(media),$(fw),$(part))) \
+		) \
+	) \
+)

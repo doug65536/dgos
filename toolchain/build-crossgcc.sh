@@ -265,6 +265,10 @@ gcc_config="--target=$arches --with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \
 --with-gnu-as --with-gnu-ld \
 --enable-initfini-array \
+--enable-gnu-indirect-function \
+--enable-tls \
+--enable-threads \
+--with-long-double-128 \
 --enable-link-mutex \
 --disable-nls \
 --enable-system-zlib \

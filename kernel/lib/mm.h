@@ -3,6 +3,7 @@
 #include "types.h"
 #include "cpu/cpu_metrics.h"
 //#include "process.h"
+#include "errno.h"
 
 /// Failure return value for memory mapping functions
 #define MAP_FAILED ((void*)-1)
@@ -129,12 +130,12 @@ int munmap(void *__addr,
 /// __new_size, the quantity of address space needed after the move
 /// __flags, bitmaps, MREMAP_*
 /// __new_address, ignored unless MREMAP_FIXED was specified
-void *mremap(
-        void *__old_address,
+void *mremap(void *__old_address,
         size_t __old_size,
         size_t __new_size,
         int __flags,
-        void *__new_address = nullptr);
+        void *__new_address = nullptr,
+        errno_t *ret_errno = nullptr);
 
 /// Change protection on a range of memory
 /// __addr, address, start of range

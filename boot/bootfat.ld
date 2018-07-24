@@ -17,14 +17,14 @@ SECTIONS {
 		*(.ctors)
 		*(.ctors.*)
 		*(.init_array)
-		*(SORT(.init_array.*))
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		___ctors_en = .;
 
 		___dtors_st = .;
 		*(.dtors)
 		*(.dtors.*)
 		*(.fini_array)
-		*(SORT(.fini_array.*))
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		___dtors_en = .;
 
 		/* Place 64 bit code high enough to be outside first 4KB */

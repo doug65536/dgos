@@ -436,22 +436,21 @@ isr_common:
 
    .cfi_endproc
 
-// Expects ds loaded with kernel data segment
-// Pass context pointer in rdi
+// Pass thread_info_t pointer in rdi
 // Clobbers rsi,rdx,rax
 // Returns rdi=pointer to context
 .macro xsave_ctx insn
     .cfi_startproc
-    .cfi_def_cfa_register rbp
-    .cfi_def_cfa_offset 32
-
-    // Read xsave stack pointer from thread
-    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
-    sub sse_context_size(%rip),%rsi
+    .cfi_def_cfa_register rsp
+    .cfi_def_cfa_offset 8
 
     // Set all bits of edx:eax
     movl $-1,%eax
     movl %eax,%edx
+
+    // Read xsave stack pointer from thread
+    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
+    subq sse_context_size(%rip),%rsi
 
     // Save context using instruction passed to macro
     \insn (%rsi)
@@ -463,25 +462,24 @@ isr_common:
     .cfi_endproc
 .endm
 
-// Expects ds to be kernel data segment
 // Expects rdi to point to saved context
 // Clobbers eax,edx,ecx
 .macro xrstor_ctx insn
     .cfi_startproc
-    .cfi_def_cfa_register rbp
-    .cfi_def_cfa_offset 32
-
-    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
+    .cfi_def_cfa_register rsp
+    .cfi_def_cfa_offset 8
 
     // Set all bits of edx:eax
     movl $-1,%eax
     movl %eax,%edx
 
-    // Restore context using instruction passed to macro
-    \insn (%rdi)
+    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
 
-    add sse_context_size(%rip),%rsi
-    movq %rdi,THREAD_XSAVE_PTR_OFS(%rdi)
+    // Restore context using instruction passed to macro
+    \insn (%rsi)
+
+    addq sse_context_size(%rip),%rsi
+    movq %rsi,THREAD_XSAVE_PTR_OFS(%rdi)
 
     ret
 
@@ -629,77 +627,6 @@ isr_sysret64:
     push_cfi %rbp
     movq %rsp,%rbp
 
-    // Need to prevent context switch while initializing FPU
-    cli
-
-    // Initialize MXCSR and FCW
-    pushq $ CPU_FPUCW_ELF_INIT
-
-    movl $ CPU_MXCSR_MASK_ALL,%eax
-    andl default_mxcsr_mask(%rip),%eax
-    pushq %rax
-
-    fldcw 8(%rsp)
-
-    // Clear the opmask registers
-
-    xorl %eax,%eax
-
-    cmpw $0,sse_avx512_opmask_offset(%rip)
-    jne .Lclear_opmask
-
-.Ldone_opmask:
-    // Check for AVX
-    cmpw $0,sse_avx_offset(%rip)
-    je .Lno_avx
-
-    // Clear all vector registers
-    vldmxcsr (%rsp)
-    vzeroall
-    jmp .Ldone_sse
-
-.align 16
-.Lno_avx:
-    ldmxcsr (%rsp)
-    pxor %xmm0,%xmm0
-    movq %xmm0,%xmm1
-    movq %xmm0,%xmm2
-    movq %xmm0,%xmm3
-    movq %xmm0,%xmm4
-    movq %xmm0,%xmm5
-    movq %xmm0,%xmm6
-    movq %xmm0,%xmm7
-    movq %xmm0,%xmm8
-    movq %xmm0,%xmm9
-    movq %xmm0,%xmm10
-    movq %xmm0,%xmm11
-    movq %xmm0,%xmm12
-    movq %xmm0,%xmm13
-    movq %xmm0,%xmm14
-    movq %xmm0,%xmm15
-
-.align 16
-.Ldone_sse:
-    // Clear the x87 stack
-    fld1
-    fsub %st,%st
-    fld %st
-    fld %st
-    fld %st
-    fld %st
-    fld %st
-    fld %st
-    fld %st
-    fstp %st
-    fstp %st
-    fstp %st
-    fstp %st
-    fstp %st
-    fstp %st
-    fstp %st
-    fstp %st
-
-    cli
     mov %rdi,%rcx
     mov $ CPU_EFLAGS_IF | 2,%r11d
 
@@ -725,20 +652,13 @@ isr_sysret64:
     mov %eax,%r13d
     mov %eax,%r14d
     mov %eax,%r15d
+
+    // Prevent IRQ while swapped to user gs or using user stack
+    // in kernel mode
+    cli
     swapgs
     mov %rsi,%rsp
     sysretq
-
-.align 16
-.Lclear_opmask:
-    kmovw %eax,%k1
-    kmovw %eax,%k2
-    kmovw %eax,%k3
-    kmovw %eax,%k4
-    kmovw %eax,%k5
-    kmovw %eax,%k6
-    kmovw %eax,%k7
-    jmp .Ldone_opmask
 
     .cfi_endproc
 

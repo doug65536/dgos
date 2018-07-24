@@ -1,6 +1,6 @@
 #include "dev_storage.h"
 #include "ata.h"
-#include "ahcibits.h"
+#include "ahci.bits.h"
 #include "device/pci.h"
 #include "irq.h"
 #include "printk.h"

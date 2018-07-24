@@ -296,6 +296,7 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/unistd/libc_a-unlinkat.$(OBJEXT) \
 	libc/src/unistd/libc_a-unlink.$(OBJEXT) \
 	libc/src/unistd/libc_a-write.$(OBJEXT) \
+	libc/src/errno/libc_a-errno.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawn.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnp.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawn_file_actions_init.$(OBJEXT) \
@@ -317,8 +318,23 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT) \
-	libc/src/sys/syscall.$(OBJEXT) $(am__objects_1)
+	libc/src/sys/syscall0.$(OBJEXT) \
+	libc/src/sys/syscall1.$(OBJEXT) \
+	libc/src/sys/syscall2.$(OBJEXT) \
+	libc/src/sys/syscall3.$(OBJEXT) \
+	libc/src/sys/syscall4.$(OBJEXT) \
+	libc/src/sys/syscall5.$(OBJEXT) \
+	libc/src/sys/syscall6.$(OBJEXT) $(am__objects_1)
 libc_a_OBJECTS = $(am_libc_a_OBJECTS)
+libm_a_AR = $(AR) $(ARFLAGS)
+libm_a_LIBADD =
+am_libm_a_OBJECTS = libc/math/libm_a-cos.$(OBJEXT) \
+	libc/math/libm_a-sin.$(OBJEXT) libc/math/libm_a-log.$(OBJEXT)
+libm_a_OBJECTS = $(am_libm_a_OBJECTS)
+libstdc___a_AR = $(AR) $(ARFLAGS)
+libstdc___a_LIBADD =
+am_libstdc___a_OBJECTS = libc/cxx/libstdc___a-terminate.$(OBJEXT)
+libstdc___a_OBJECTS = $(am_libstdc___a_OBJECTS)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libc_adir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_boot1_elf_OBJECTS = boot/boot1_elf-boot1.$(OBJEXT)
@@ -711,18 +727,20 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
-	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
-	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
-	$(bootpxe_bios_elf_SOURCES) $(hello_km_SOURCES) \
-	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libm_a_SOURCES) \
+	$(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
+	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
+	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
+	$(hello_km_SOURCES) $(kernel_generic_SOURCES) \
+	$(kernel_tracing_SOURCES) $(mbr_elf_SOURCES) \
+	$(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
-	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
-	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
-	$(bootpxe_bios_elf_SOURCES) $(hello_km_SOURCES) \
-	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
+	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
+	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
+	$(hello_km_SOURCES) $(kernel_generic_SOURCES) \
+	$(kernel_tracing_SOURCES) $(mbr_elf_SOURCES) \
+	$(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -853,6 +871,7 @@ ELF32_FLAGS = @ELF32_FLAGS@
 ELF64_FLAGS = @ELF64_FLAGS@
 ENABLE_FRAMEPOINTER_FLAGS = @ENABLE_FRAMEPOINTER_FLAGS@
 EXEEXT = @EXEEXT@
+FIND = @FIND@
 FREESTANDING_FLAGS = @FREESTANDING_FLAGS@
 GREP = @GREP@
 GZIP = @GZIP@
@@ -876,6 +895,7 @@ MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MKISOFS = @MKISOFS@
 NOFLOAT_FLAGS = @NOFLOAT_FLAGS@
+NOSTDLIB_FLAGS = @NOSTDLIB_FLAGS@
 NO_COMMON_FLAGS = @NO_COMMON_FLAGS@
 NO_EXCEPTIONS_FLAGS = @NO_EXCEPTIONS_FLAGS@
 NO_LTO_FLAGS = @NO_LTO_FLAGS@
@@ -974,6 +994,10 @@ BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
 	generated_headers \
+	sysroot/lib/crt0.o \
+	sysroot/lib/libc.a \
+	sysroot/lib/libm.a \
+	sysroot/lib/libstdc++.a \
 	trace-tool
 
 
@@ -995,7 +1019,9 @@ BUILT_SOURCES = \
 LINKER_DEBUG = 
 noinst_LIBRARIES = \
 	libbootsect.a \
-	libc.a
+	libc.a \
+	libm.a \
+	libstdc++.a
 
 
 #bootefi-i386
@@ -1028,6 +1054,7 @@ mbr_elf_LDFLAGS = \
 	$(ELF32_FLAGS) \
 	-Wl,-T,$(top_srcdir)/mbr/mbr.ld \
 	$(LINKER_DEBUG) \
+	$(NOSTDLIB_FLAGS) \
 	$(LINKER_SEL) -static
 
 EXTRA_mbr_elf_DEPENDENCIES = \
@@ -1375,7 +1402,8 @@ bootefi_amd64_CFLAGS = \
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(PE64_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS)
+	$(BOOTLOADER_EFI_FLAGS) \
+	$(FREESTANDING_FLAGS)
 
 
 #bootefi_i386_CXXFLAGS = \
@@ -1396,7 +1424,8 @@ bootefi_amd64_LDFLAGS = \
 	$(LIBGCC_PE64) \
 	-g \
 	-Wl,-T,$(top_srcdir)/boot/bootefi.ld \
-	-Wl,-Map,$(top_builddir)/bootefi-amd64.map
+	-Wl,-Map,$(top_builddir)/bootefi-amd64.map \
+	$(NOSTDLIB_FLAGS)
 
 
 #-Wl,--subsystem,10 \
@@ -1728,7 +1757,7 @@ KERNEL_LDFLAGS_SHARED = \
 	-export-dynamic -Wl,--no-dynamic-linker \
 	-Wl,-z,max-page-size=4096 \
 	-Wl,-pie \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(NOSTDLIB_FLAGS)
 
 
 #-Wl,-export-dynamic
@@ -1798,6 +1827,21 @@ EXTRA_kernel_tracing_DEPENDENCIES = \
 
 
 #-O3 -march=native
+
+# ----------------------------------------------------------------------------
+# crt0
+INCLUDES_NAMES = $(shell cd $(top_srcdir)/libc/include && $(FIND) -type f)
+INCLUDES_DEPLOYED = \
+	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
+
+
+#$(INCLUDES_DST): $(INCLUDES_SRC)
+#	mkdir -p sysroot/include
+#	for header in $(INCLUDES_NAMES); do \
+#		mkdir -p $$(dirname $(top_builddir)/sysroot/include/$$header) && \
+#		cp -u $(top_srcdir)/libc/include/$$header \
+#			$(top_builddir)/sysroot/include/$$header; \
+#		done
 
 # ----------------------------------------------------------------------------
 # libc
@@ -2007,6 +2051,7 @@ libc_a_SOURCES = \
 	libc/src/unistd/unlinkat.cc \
 	libc/src/unistd/unlink.cc \
 	libc/src/unistd/write.cc \
+	libc/src/errno/errno.cc \
 	libc/src/posix_spawn/posix_spawn.cc \
 	libc/src/posix_spawn/posix_spawnp.cc \
 	libc/src/posix_spawn/posix_spawn_file_actions_init.cc \
@@ -2028,13 +2073,38 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
-	libc/src/sys/syscall.S \
+	libc/src/sys/syscall0.S \
+	libc/src/sys/syscall1.S \
+	libc/src/sys/syscall2.S \
+	libc/src/sys/syscall3.S \
+	libc/src/sys/syscall4.S \
+	libc/src/sys/syscall5.S \
+	libc/src/sys/syscall6.S \
 	$(libc_a_HEADERS)
 
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-isystem $(top_builddir)/cross-tool/x86_64-elf/include \
 	$(FREESTANDING_FLAGS) \
+	-std=c++14 -static \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
+
+libm_a_SOURCES = \
+	libc/math/cos.cc \
+	libc/math/sin.cc \
+	libc/math/log.cc
+
+libm_a_CXXFLAGS = \
+	-isystem $(top_srcdir)/libc/include \
+	-std=c++14 -static \
+	$(OPTIMIZE_SPEED_FLAGS) \
+	$(COMPILER_FLAGS)
+
+libstdc___a_SOURCES = \
+	libc/cxx/terminate.cc
+
+libstdc___a_CXXFLAGS = \
+	-isystem $(top_srcdir)/libc/include \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -2062,6 +2132,7 @@ hello_km_SOURCES = \
 	modules/hello/hello.cc
 
 hello_km_CXXFLAGS = \
+	$(FREESTANDING_FLAGS) \
 	-fPIE \
 	-g \
 	-I$(top_srcdir)/kernel/lib \
@@ -2074,9 +2145,10 @@ hello_km_LDFLAGS = \
 	-Wl,-g \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
-	-mcmodel=kernel
+	$(NOSTDLIB_FLAGS)
 
-EXTRA_hello_km_DEPENDENCIES = kernel/arch/x86_64/module.ld \
+EXTRA_hello_km_DEPENDENCIES = \
+	kernel/arch/x86_64/module.ld \
 	Makefile.am
 
 user_shell_SOURCES = \
@@ -2090,14 +2162,27 @@ user_shell_CCASFLAGS = \
 
 user_shell_LDADD = libc.a
 EXTRA_user_shell_DEPENDENCIES = libc.a
+
+# ----------------------------------------------------------------------------
+# Generate register definitions
+BITFIELD_FILES = \
+	$(top_srcdir)/kernel/device/nvme.bits \
+	$(top_srcdir)/kernel/device/pci.bits \
+	$(top_srcdir)/kernel/device/i350.bits \
+	$(top_srcdir)/kernel/device/usb_xhci.bits \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
+	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
+	$(top_srcdir)/kernel/device/acpi.bits \
+	$(top_srcdir)/kernel/device/ahci.bits
+
 QEMU_EXTRA_DEPS = \
 	random-mem.img \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out
 
-QEMU_CPUS = 2
-QEMU_CORES = 2
-QEMU_THREADS = 1
+QEMU_CPUS = 16
+QEMU_CORES = 8
+QEMU_THREADS = 2
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 QEMU_RAM = 5G
 QEMU_MEMFILL = \
@@ -2211,6 +2296,11 @@ QEMU_BOOTMEDIA_pxe_efi = \
 # ----------------------------------------------------------------------------
 # Bochs launcher
 BOCHS = bochs
+
+# Generate the makefile targets for all the variations of bochs launch
+BOCHS_MEDIA = fat iso
+BOCHS_FW = bios efi
+BOCHS_PART = kernel boot
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -2736,6 +2826,14 @@ libc/src/unistd/libc_a-unlink.$(OBJEXT):  \
 libc/src/unistd/libc_a-write.$(OBJEXT):  \
 	libc/src/unistd/$(am__dirstamp) \
 	libc/src/unistd/$(DEPDIR)/$(am__dirstamp)
+libc/src/errno/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/errno
+	@: > libc/src/errno/$(am__dirstamp)
+libc/src/errno/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/errno/$(DEPDIR)
+	@: > libc/src/errno/$(DEPDIR)/$(am__dirstamp)
+libc/src/errno/libc_a-errno.$(OBJEXT): libc/src/errno/$(am__dirstamp) \
+	libc/src/errno/$(DEPDIR)/$(am__dirstamp)
 libc/src/posix_spawn/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/posix_spawn
 	@: > libc/src/posix_spawn/$(am__dirstamp)
@@ -2811,13 +2909,55 @@ libc/src/sys/$(am__dirstamp):
 libc/src/sys/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/sys/$(DEPDIR)
 	@: > libc/src/sys/$(DEPDIR)/$(am__dirstamp)
-libc/src/sys/syscall.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+libc/src/sys/syscall0.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/syscall1.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/syscall2.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/syscall3.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/syscall4.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/syscall5.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/syscall6.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
 	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 
 libc.a: $(libc_a_OBJECTS) $(libc_a_DEPENDENCIES) $(EXTRA_libc_a_DEPENDENCIES) 
 	$(AM_V_at)-rm -f libc.a
 	$(AM_V_AR)$(libc_a_AR) libc.a $(libc_a_OBJECTS) $(libc_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libc.a
+libc/math/$(am__dirstamp):
+	@$(MKDIR_P) libc/math
+	@: > libc/math/$(am__dirstamp)
+libc/math/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/math/$(DEPDIR)
+	@: > libc/math/$(DEPDIR)/$(am__dirstamp)
+libc/math/libm_a-cos.$(OBJEXT): libc/math/$(am__dirstamp) \
+	libc/math/$(DEPDIR)/$(am__dirstamp)
+libc/math/libm_a-sin.$(OBJEXT): libc/math/$(am__dirstamp) \
+	libc/math/$(DEPDIR)/$(am__dirstamp)
+libc/math/libm_a-log.$(OBJEXT): libc/math/$(am__dirstamp) \
+	libc/math/$(DEPDIR)/$(am__dirstamp)
+
+libm.a: $(libm_a_OBJECTS) $(libm_a_DEPENDENCIES) $(EXTRA_libm_a_DEPENDENCIES) 
+	$(AM_V_at)-rm -f libm.a
+	$(AM_V_AR)$(libm_a_AR) libm.a $(libm_a_OBJECTS) $(libm_a_LIBADD)
+	$(AM_V_at)$(RANLIB) libm.a
+libc/cxx/$(am__dirstamp):
+	@$(MKDIR_P) libc/cxx
+	@: > libc/cxx/$(am__dirstamp)
+libc/cxx/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/cxx/$(DEPDIR)
+	@: > libc/cxx/$(DEPDIR)/$(am__dirstamp)
+libc/cxx/libstdc___a-terminate.$(OBJEXT): libc/cxx/$(am__dirstamp) \
+	libc/cxx/$(DEPDIR)/$(am__dirstamp)
+
+libstdc++.a: $(libstdc___a_OBJECTS) $(libstdc___a_DEPENDENCIES) $(EXTRA_libstdc___a_DEPENDENCIES) 
+	$(AM_V_at)-rm -f libstdc++.a
+	$(AM_V_AR)$(libstdc___a_AR) libstdc++.a $(libstdc___a_OBJECTS) $(libstdc___a_LIBADD)
+	$(AM_V_at)$(RANLIB) libstdc++.a
 install-binPROGRAMS: $(bin_PROGRAMS)
 	@$(NORMAL_INSTALL)
 	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
@@ -3745,6 +3885,9 @@ mostlyclean-compile:
 	-rm -f kernel/lib/*.$(OBJEXT)
 	-rm -f kernel/net/*.$(OBJEXT)
 	-rm -f kernel/syscall/*.$(OBJEXT)
+	-rm -f libc/cxx/*.$(OBJEXT)
+	-rm -f libc/math/*.$(OBJEXT)
+	-rm -f libc/src/errno/*.$(OBJEXT)
 	-rm -f libc/src/fcntl/*.$(OBJEXT)
 	-rm -f libc/src/posix_spawn/*.$(OBJEXT)
 	-rm -f libc/src/stdlib/*.$(OBJEXT)
@@ -4078,6 +4221,11 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_process.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-syscall_helper.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/cxx/$(DEPDIR)/libstdc___a-terminate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-cos.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-log.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-sin.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/errno/$(DEPDIR)/libc_a-errno.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-creat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-fcntl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-open.Po@am__quote@
@@ -4142,7 +4290,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strtok_r.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strxfrm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strxfrm_l.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall0.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall1.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall3.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall4.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall5.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall6.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-_exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-access.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-alarm.Po@am__quote@
@@ -6767,6 +6921,20 @@ libc/src/unistd/libc_a-write.obj: libc/src/unistd/write.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/unistd/libc_a-write.obj `if test -f 'libc/src/unistd/write.cc'; then $(CYGPATH_W) 'libc/src/unistd/write.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/unistd/write.cc'; fi`
 
+libc/src/errno/libc_a-errno.o: libc/src/errno/errno.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/errno/libc_a-errno.o -MD -MP -MF libc/src/errno/$(DEPDIR)/libc_a-errno.Tpo -c -o libc/src/errno/libc_a-errno.o `test -f 'libc/src/errno/errno.cc' || echo '$(srcdir)/'`libc/src/errno/errno.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/errno/$(DEPDIR)/libc_a-errno.Tpo libc/src/errno/$(DEPDIR)/libc_a-errno.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/errno/errno.cc' object='libc/src/errno/libc_a-errno.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/errno/libc_a-errno.o `test -f 'libc/src/errno/errno.cc' || echo '$(srcdir)/'`libc/src/errno/errno.cc
+
+libc/src/errno/libc_a-errno.obj: libc/src/errno/errno.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/errno/libc_a-errno.obj -MD -MP -MF libc/src/errno/$(DEPDIR)/libc_a-errno.Tpo -c -o libc/src/errno/libc_a-errno.obj `if test -f 'libc/src/errno/errno.cc'; then $(CYGPATH_W) 'libc/src/errno/errno.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/errno/errno.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/errno/$(DEPDIR)/libc_a-errno.Tpo libc/src/errno/$(DEPDIR)/libc_a-errno.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/errno/errno.cc' object='libc/src/errno/libc_a-errno.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/errno/libc_a-errno.obj `if test -f 'libc/src/errno/errno.cc'; then $(CYGPATH_W) 'libc/src/errno/errno.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/errno/errno.cc'; fi`
+
 libc/src/posix_spawn/libc_a-posix_spawn.o: libc/src/posix_spawn/posix_spawn.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/posix_spawn/libc_a-posix_spawn.o -MD -MP -MF libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Tpo -c -o libc/src/posix_spawn/libc_a-posix_spawn.o `test -f 'libc/src/posix_spawn/posix_spawn.cc' || echo '$(srcdir)/'`libc/src/posix_spawn/posix_spawn.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Tpo libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawn.Po
@@ -7060,6 +7228,62 @@ libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj: libc/src/posix_spawn/
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; fi`
+
+libc/math/libm_a-cos.o: libc/math/cos.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-cos.o -MD -MP -MF libc/math/$(DEPDIR)/libm_a-cos.Tpo -c -o libc/math/libm_a-cos.o `test -f 'libc/math/cos.cc' || echo '$(srcdir)/'`libc/math/cos.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/math/$(DEPDIR)/libm_a-cos.Tpo libc/math/$(DEPDIR)/libm_a-cos.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/math/cos.cc' object='libc/math/libm_a-cos.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/math/libm_a-cos.o `test -f 'libc/math/cos.cc' || echo '$(srcdir)/'`libc/math/cos.cc
+
+libc/math/libm_a-cos.obj: libc/math/cos.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-cos.obj -MD -MP -MF libc/math/$(DEPDIR)/libm_a-cos.Tpo -c -o libc/math/libm_a-cos.obj `if test -f 'libc/math/cos.cc'; then $(CYGPATH_W) 'libc/math/cos.cc'; else $(CYGPATH_W) '$(srcdir)/libc/math/cos.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/math/$(DEPDIR)/libm_a-cos.Tpo libc/math/$(DEPDIR)/libm_a-cos.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/math/cos.cc' object='libc/math/libm_a-cos.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/math/libm_a-cos.obj `if test -f 'libc/math/cos.cc'; then $(CYGPATH_W) 'libc/math/cos.cc'; else $(CYGPATH_W) '$(srcdir)/libc/math/cos.cc'; fi`
+
+libc/math/libm_a-sin.o: libc/math/sin.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-sin.o -MD -MP -MF libc/math/$(DEPDIR)/libm_a-sin.Tpo -c -o libc/math/libm_a-sin.o `test -f 'libc/math/sin.cc' || echo '$(srcdir)/'`libc/math/sin.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/math/$(DEPDIR)/libm_a-sin.Tpo libc/math/$(DEPDIR)/libm_a-sin.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/math/sin.cc' object='libc/math/libm_a-sin.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/math/libm_a-sin.o `test -f 'libc/math/sin.cc' || echo '$(srcdir)/'`libc/math/sin.cc
+
+libc/math/libm_a-sin.obj: libc/math/sin.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-sin.obj -MD -MP -MF libc/math/$(DEPDIR)/libm_a-sin.Tpo -c -o libc/math/libm_a-sin.obj `if test -f 'libc/math/sin.cc'; then $(CYGPATH_W) 'libc/math/sin.cc'; else $(CYGPATH_W) '$(srcdir)/libc/math/sin.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/math/$(DEPDIR)/libm_a-sin.Tpo libc/math/$(DEPDIR)/libm_a-sin.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/math/sin.cc' object='libc/math/libm_a-sin.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/math/libm_a-sin.obj `if test -f 'libc/math/sin.cc'; then $(CYGPATH_W) 'libc/math/sin.cc'; else $(CYGPATH_W) '$(srcdir)/libc/math/sin.cc'; fi`
+
+libc/math/libm_a-log.o: libc/math/log.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-log.o -MD -MP -MF libc/math/$(DEPDIR)/libm_a-log.Tpo -c -o libc/math/libm_a-log.o `test -f 'libc/math/log.cc' || echo '$(srcdir)/'`libc/math/log.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/math/$(DEPDIR)/libm_a-log.Tpo libc/math/$(DEPDIR)/libm_a-log.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/math/log.cc' object='libc/math/libm_a-log.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/math/libm_a-log.o `test -f 'libc/math/log.cc' || echo '$(srcdir)/'`libc/math/log.cc
+
+libc/math/libm_a-log.obj: libc/math/log.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-log.obj -MD -MP -MF libc/math/$(DEPDIR)/libm_a-log.Tpo -c -o libc/math/libm_a-log.obj `if test -f 'libc/math/log.cc'; then $(CYGPATH_W) 'libc/math/log.cc'; else $(CYGPATH_W) '$(srcdir)/libc/math/log.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/math/$(DEPDIR)/libm_a-log.Tpo libc/math/$(DEPDIR)/libm_a-log.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/math/log.cc' object='libc/math/libm_a-log.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/math/libm_a-log.obj `if test -f 'libc/math/log.cc'; then $(CYGPATH_W) 'libc/math/log.cc'; else $(CYGPATH_W) '$(srcdir)/libc/math/log.cc'; fi`
+
+libc/cxx/libstdc___a-terminate.o: libc/cxx/terminate.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -MT libc/cxx/libstdc___a-terminate.o -MD -MP -MF libc/cxx/$(DEPDIR)/libstdc___a-terminate.Tpo -c -o libc/cxx/libstdc___a-terminate.o `test -f 'libc/cxx/terminate.cc' || echo '$(srcdir)/'`libc/cxx/terminate.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/cxx/$(DEPDIR)/libstdc___a-terminate.Tpo libc/cxx/$(DEPDIR)/libstdc___a-terminate.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/cxx/terminate.cc' object='libc/cxx/libstdc___a-terminate.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -c -o libc/cxx/libstdc___a-terminate.o `test -f 'libc/cxx/terminate.cc' || echo '$(srcdir)/'`libc/cxx/terminate.cc
+
+libc/cxx/libstdc___a-terminate.obj: libc/cxx/terminate.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -MT libc/cxx/libstdc___a-terminate.obj -MD -MP -MF libc/cxx/$(DEPDIR)/libstdc___a-terminate.Tpo -c -o libc/cxx/libstdc___a-terminate.obj `if test -f 'libc/cxx/terminate.cc'; then $(CYGPATH_W) 'libc/cxx/terminate.cc'; else $(CYGPATH_W) '$(srcdir)/libc/cxx/terminate.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/cxx/$(DEPDIR)/libstdc___a-terminate.Tpo libc/cxx/$(DEPDIR)/libstdc___a-terminate.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/cxx/terminate.cc' object='libc/cxx/libstdc___a-terminate.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -c -o libc/cxx/libstdc___a-terminate.obj `if test -f 'libc/cxx/terminate.cc'; then $(CYGPATH_W) 'libc/cxx/terminate.cc'; else $(CYGPATH_W) '$(srcdir)/libc/cxx/terminate.cc'; fi`
 
 boot/bootefi_amd64-bootefi.o: boot/bootefi.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-bootefi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-bootefi.Tpo -c -o boot/bootefi_amd64-bootefi.o `test -f 'boot/bootefi.cc' || echo '$(srcdir)/'`boot/bootefi.cc
@@ -11155,6 +11379,12 @@ distclean-generic:
 	-rm -f kernel/net/$(am__dirstamp)
 	-rm -f kernel/syscall/$(DEPDIR)/$(am__dirstamp)
 	-rm -f kernel/syscall/$(am__dirstamp)
+	-rm -f libc/cxx/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/cxx/$(am__dirstamp)
+	-rm -f libc/math/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/math/$(am__dirstamp)
+	-rm -f libc/src/errno/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/errno/$(am__dirstamp)
 	-rm -f libc/src/fcntl/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/fcntl/$(am__dirstamp)
 	-rm -f libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
@@ -11185,7 +11415,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -11233,7 +11463,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -11331,6 +11561,29 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 		-Wl,--start-group \
 		-lncurses -ltinfo -lgpm -ldl -lz \
 		-Wl,--end-group
+
+sysroot/lib/crt0.o: $(top_srcdir)/user/crt0/crt0.S $(top_srcdir)/Makefile.am
+	mkdir -p "$(@D)" && $(CXX) -g -Wa,-g -o $@ -c $<
+
+sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+define deploy_sysroot_header =
+$$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
+	mkdir -p $$(@D)
+	cp -f $$< $$@
+
+endef
+
+$(foreach header,$(INCLUDES_NAMES),$(eval \
+	$(call deploy_sysroot_header,$(header)) \
+))
 
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 	echo "#define TERMESC_RED" \
@@ -11644,76 +11897,20 @@ distclean-local:
 	rm -f $(top_builddir)/isodisk.img
 	rm -f $(top_builddir)/qemu-emu.mk
 
-# ----------------------------------------------------------------------------
-# Generate register definitions
+# 1=path to bits file
+define bitfield_gen =
+$(1).h: $(1) $$(top_srcdir)/genregs.py
+	rm -f "$$@"
+	$$(top_srcdir)/genregs.py "$$<" > "$$@"
+endef
 
-generated_headers: \
-	$(top_srcdir)/kernel/device/nvmebits.h \
-	$(top_srcdir)/kernel/device/pcibits.h \
-	$(top_srcdir)/kernel/device/i350bits.h \
-	$(top_srcdir)/kernel/device/usb_xhcibits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h \
-	$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h \
-	$(top_srcdir)/kernel/device/acpibits.h \
-	$(top_srcdir)/kernel/device/ahcibits.h
+$(foreach bitsfile,$(BITFIELD_FILES), \
+	$(eval $(call bitfield_gen,$(bitsfile))) \
+)
+
+generated_headers: $(patsubst %,%.h,$(BITFIELD_FILES))
 
 .PHONY: generated_headers
-
-$(top_srcdir)/kernel/device/nvmebits.h: \
-		$(top_srcdir)/kernel/device/nvme.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/pcibits.h: \
-		$(top_srcdir)/kernel/device/pci.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/i350bits.h: \
-		$(top_srcdir)/kernel/device/i350.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/usb_xhcibits.h: \
-		$(top_srcdir)/kernel/device/usb_xhci.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/arch/x86_64/cpu/apicbits.h: \
-		$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/arch/x86_64/cpu/picbits.h: \
-		$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/acpibits.h: \
-		$(top_srcdir)/kernel/device/acpi.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
-
-$(top_srcdir)/kernel/device/ahcibits.h: \
-		$(top_srcdir)/kernel/device/ahci.bits \
-		$(top_srcdir)/genregs.py
-	mkdir -p "$(@D)"
-	rm -f "$@"
-	$(top_srcdir)/genregs.py "$<" > "$@"
 
 # ----------------------------------------------------------------------------
 # Randomize RAM content
@@ -11751,172 +11948,30 @@ $(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
 
 -include qemu-emu.mk
 
-$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-bios-kernel-commands
+# 1=media, 2=fw, 3=part
+define bochs_launcher =
+$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
+		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
 	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-fat-efi-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-efi-kernel-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-bios-boot-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-fat-efi-boot-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-bios-kernel-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-efi-kernel-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-bios-boot-commands
-	cp "$<" "$@"
-
-$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands: \
-		$(top_srcdir)/emu/bochs/bochs-debugger-iso-efi-boot-commands
-	cp "$<" "$@"
-
-debug-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
+debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
+		mbr.sym boot$(1).sym \
 		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-bios-kernel-commands \
-		$(BOCHS_FLAGS)
+		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
+		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
+	$$(BOCHS) \
+		-f $$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
+		-rc $$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands \
+		$$(BOCHS_FLAGS)
+.PHONY: debug-$(1)-$(2)-bochs-$(3)
+endef
 
-.PHONY: debug-iso-bios-bochs-kernel
-
-debug-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-efi-kernel-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-iso-efi-bochs-kernel
-
-debug-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-kernel-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-bios-bochs-kernel
-
-debug-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-efi-debugger-kernel-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-efi-kernel-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-efi-bochs-kernel
-
-debug-iso-bios-bochs-boot: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-bios-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-iso-bios-bochs-boot
-
-debug-iso-efi-bochs-boot: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-iso-efi-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-iso-efi-bochs-boot
-
-debug-fat-bios-bochs-boot: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-bios-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-bios-bochs-boot
-
-debug-fat-efi-bochs-boot: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		$(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands
-	$(BOCHS) \
-		-f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc \
-		-rc $(abs_top_builddir)/bochs-debugger-fat-efi-boot-commands \
-		$(BOCHS_FLAGS)
-
-.PHONY: debug-fat-efi-bochs-boot
-
-# run iso
-
-run-iso-bios-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-bios-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-iso-bios-bochs-kernel
-
-run-iso-efi-bochs-kernel: $(QEMU_IMAGE_iso) \
-		mbr.sym bootfat.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-iso-efi-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-iso-efi-bochs-kernel
-
-# run fat
-
-run-fat-bios-bochs-kernel: $(QEMU_IMAGE_fat) \
-		mbr.sym bootfat.sym bootx64-efi.sym \
-		kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-bios-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-fat-bios-bochs-kernel
-
-run-fat-efi-bochs-kernel: $(QEMU_IMAGE_fat) \
-		bootx64-efi.sym kernel-generic.sym kernel-tracing.sym \
-		$(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc
-	$(BOCHS) -f $(top_srcdir)/emu/bochs/bochs-fat-efi-config.bxrc -q \
-		$(BOCHS_FLAGS)
-
-.PHONY: run-fat-efi-bochs-kernel
+$(foreach media,$(BOCHS_MEDIA), \
+	$(foreach fw,$(BOCHS_FW), \
+		$(foreach part,$(BOCHS_PART), \
+			$(eval $(call bochs_launcher,$(media),$(fw),$(part))) \
+		) \
+	) \
+)
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

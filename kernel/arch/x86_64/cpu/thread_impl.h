@@ -11,17 +11,14 @@ extern uint32_t volatile thread_smp_running;
 isr_context_t *thread_schedule(isr_context_t *ctx);
 isr_context_t *thread_schedule_if_idle(isr_context_t *ctx);
 void thread_init(int ap);
-int thread_cpu_count(void);
 uint32_t thread_cpus_started(void);
 uint32_t thread_get_cpu_apic_id(int cpu);
+void thread_exit(int exitcode);
 
 // CPU-local storage
 size_t thread_cls_alloc(void);
 void *thread_cls_get(size_t slot);
 void thread_cls_set(size_t slot, void *value);
-
-uint64_t thread_get_cpu_mmu_seq(void);
-void thread_set_cpu_mmu_seq(uint64_t seq);
 
 void thread_check_stack(void);
 
@@ -43,8 +40,15 @@ void *thread_get_gsbase(int thread);
 _const
 static _always_inline process_t *fast_cur_process()
 {
-    void *thread_info = cpu_gs_read_ptr<CPU_INFO_CURTHREAD_OFS>();
+    void *thread_info = cpu_gs_read<void *, CPU_INFO_CURTHREAD_OFS>();
     return *(process_t**)((char*)thread_info + THREAD_PROCESS_PTR_OFS);
 }
 
 void thread_set_process(int thread, process_t *process);
+
+extern uint32_t cpu_count;
+
+static _always_inline int thread_cpu_count()
+{
+    return cpu_count;
+}

@@ -36,7 +36,7 @@ SECTIONS {
 	.rodata : ALIGN(64) {
 		PROVIDE_HIDDEN(___ctors_st = .);
 		*(.init_array)
-		*(SORT(.init_array.*))
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		*(.ctors)
 		*(.ctors.*)
 		PROVIDE_HIDDEN(___ctors_en = .);
@@ -44,7 +44,7 @@ SECTIONS {
 		. = ALIGN(16);
 		PROVIDE_HIDDEN(___dtors_st = .);
 		*(.fini_array)
-		*(SORT(.fini_array.*))
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		*(.dtors)
 		*(.dtors.*)
 		PROVIDE_HIDDEN(___dtors_en = .);

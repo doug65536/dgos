@@ -11,8 +11,9 @@ public:
 
 protected:
     // text_dev_base_t interface
-    void init() override final
+    bool init() override final
     {
+        return true;
     }
     void cleanup() override final
     {

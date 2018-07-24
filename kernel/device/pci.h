@@ -1,8 +1,9 @@
 #pragma once
 #include "types.h"
-#include "pcibits.h"
+#include "pci.bits.h"
 #include "assert.h"
 #include "irq.h"
+#include "string.h"
 
 struct pci_addr_t {
     // Legacy PCI supports 256 busses, 32 slots, 8 functions, and 64 dwords
@@ -415,6 +416,21 @@ struct pci_dev_iterator_t : public pci_dev_t {
 
     uint8_t bus_todo_len;
     uint8_t bus_todo[64];
+
+    void reset()
+    {
+        segment = 0;
+        bus = 0;
+        slot = 0;
+        func = 0;
+        dev_class = 0;
+        subclass = 0;
+        vendor = 0;
+        device = 0;
+        header_type = 0;
+        bus_todo_len = 0;
+        memset(bus_todo, 0, sizeof(bus_todo));
+    }
 };
 
 int pci_init(void);

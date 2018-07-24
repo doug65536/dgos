@@ -4,7 +4,5 @@
 
 void sys_exit(int exitcode)
 {
-    //process_t::exit(-1, exitcode);
-    printdbg("syscall bench %d cycles\n",
-             exitcode / 8000000);
+    process_t::exit(-1, exitcode);
 }

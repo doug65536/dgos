@@ -1,8 +1,8 @@
 .code64
 .section .text
 
-.global _start
-_start:
+.global main
+main:
 	xor %eax,%eax
 	rdtscp
 	shl $32,%rdx

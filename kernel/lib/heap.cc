@@ -21,10 +21,10 @@
 
 // Always use paged allocation with guard pages
 // Realloc always moves the memory to a new range
-#define HEAP_PAGEONLY 1
+#define HEAP_PAGEONLY 0
 
 // Don't free virtual address ranges, just free physical pages
-#define HEAP_NOVFREE 1
+#define HEAP_NOVFREE 0
 
 struct heap_hdr_t {
     uintptr_t size_next;
@@ -104,7 +104,7 @@ heap_t *heap_create(void)
     memset(heap->free_chains, 0, sizeof(heap->free_chains));
     memset(heap->arenas, 0, sizeof(heap->arenas));
     heap->arena_count = 0;
-    heap->last_ext_arena = 0;
+    heap->last_ext_arena = nullptr;
     mutex_init(&heap->lock);
     return heap;
 }
@@ -153,10 +153,10 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
         heap_ext_arena_t *new_list;
 
         new_list = (heap_ext_arena_t*)mmap(
-                    0, PAGESIZE, PROT_READ | PROT_WRITE,
+                    nullptr, PAGESIZE, PROT_READ | PROT_WRITE,
                     MAP_UNINITIALIZED, -1, 0);
         if (!new_list || new_list == MAP_FAILED)
-            return 0;
+            return nullptr;
 
         new_list->prev = heap->last_ext_arena;
         new_list->arena_count = 0;
@@ -176,7 +176,7 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
 
     size_t size = 1U << log2size;
 
-    heap_hdr_t *hdr = 0;
+    heap_hdr_t *hdr = nullptr;
     heap_hdr_t *first_free = heap->free_chains[bucket];
     for (char *fill = arena_end - size; fill >= arena; fill -= size) {
         hdr = (heap_hdr_t*)fill;
@@ -283,7 +283,7 @@ void *heap_alloc(heap_t *heap, size_t size)
         return first_free + 1;
     }
 
-    return 0;
+    return nullptr;
 }
 
 void heap_free(heap_t *heap, void *block)

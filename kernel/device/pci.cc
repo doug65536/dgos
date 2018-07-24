@@ -440,7 +440,7 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
                         int dev_class, int subclass, int vendor, int device)
 {
-    memset(iter, 0, sizeof(*iter));
+    iter->reset();
 
     iter->dev_class = dev_class;
     iter->subclass = subclass;

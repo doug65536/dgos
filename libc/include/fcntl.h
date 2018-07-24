@@ -263,7 +263,7 @@ int  fcntl(int, int, ...);
 int  open(char const *, int, ...);
 int  openat(int, char const *, int, ...);
 
-int  posix_fadvise(int, off_t, off_t, int);
+int  posix_fadvise(int, off_t offset, off_t len, int advice);
 int  posix_fallocate(int, off_t, off_t);
 
 __END_DECLS
