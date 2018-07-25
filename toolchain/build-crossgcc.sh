@@ -283,11 +283,12 @@ gcc_config="--target=$arches --with-system-zlib \
 bin_config="--target=$arches \
 --enable-targets=x86_64-elf,i686-elf,x86_64-pe,i686-pe \
 --enable-gold --enable-ld \
---enable-plugins --enable-lto
+--enable-plugins --enable-lto \
+--with-sysroot \
 --enable-shared"
 
 gdb_config="--target=$arches \
---with-python --with-expat --with-system-readline
+--with-python --with-expat --with-system-readline \
 --with-system-zlib --with-gnu-ld \
 --enable-plugins --enable-gdbserver=no --enable-targets=all \
 --enable-64-bit-bfd"
