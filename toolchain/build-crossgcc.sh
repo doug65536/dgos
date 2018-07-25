@@ -8,10 +8,7 @@ archives=
 prefixdir=
 logfile=
 cleanbuild=
-
-#export CFLAGS='-static'
-#export CXXFLAGS='-static'
-#export LDFLAGS='-static'
+parallel="-j$(which nproc >/dev/null && nproc || echo 1)"
 
 function log() {
 	if [[ -z $logfile ]]; then
@@ -155,7 +152,7 @@ function process_tarball() {
 function help() {
 	echo ' -a <arch list>   architectures to build (space separated list)'
 	echo ' -m <url>         use specified GNU mirror'
-	echo ' -j<#>            use <#> parallel workers to build'
+	echo ' -j <#>           use <#> parallel workers to build'
 	echo ' -o <dir>         output directory'
 	echo ' -p <dir>         prefix dir'
 	echo ' -c               clean the build directory'
@@ -268,13 +265,18 @@ gcc_config="--target=$arches --with-system-zlib \
 --enable-gnu-indirect-function \
 --enable-tls \
 --enable-threads \
+--enable-shared \
 --with-long-double-128 \
---enable-link-mutex \
 --disable-nls \
 --enable-system-zlib \
 --enable-multiarch \
 --with-arch-32=i686 --with-abi=m64 \
 --with-multilib-list=m32,m64,mx32"
+
+#--enable-threads=posix
+#--disable-hosted-libstdcxx
+#--disable-bootstrap
+
 
 # disable for now: --enable-threads=posix
 
