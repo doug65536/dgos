@@ -44,6 +44,8 @@ device/virtio-gpu.h
 lib/asan.cc
 lib/cc/memory.cc
 lib/cc/union_storage.h
+lib/contig_alloc.cc
+lib/contig_alloc.h
 lib/cxxexcept.cc
 lib/cxxexcept.h
 lib/dbllink.h

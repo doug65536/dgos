@@ -465,6 +465,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_generic-zlib_helper.$(OBJEXT) \
 	kernel/lib/kernel_generic-asan.$(OBJEXT) \
+	kernel/lib/kernel_generic-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_generic-ext4.$(OBJEXT) \
 	kernel/fs/kernel_generic-fat32.$(OBJEXT) \
 	kernel/fs/kernel_generic-iso9660.$(OBJEXT) \
@@ -591,6 +592,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-work_queue.$(OBJEXT) \
 	kernel/lib/kernel_tracing-zlib_helper.$(OBJEXT) \
 	kernel/lib/kernel_tracing-asan.$(OBJEXT) \
+	kernel/lib/kernel_tracing-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_tracing-ext4.$(OBJEXT) \
 	kernel/fs/kernel_tracing-fat32.$(OBJEXT) \
 	kernel/fs/kernel_tracing-iso9660.$(OBJEXT) \
@@ -1582,6 +1584,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/zlib_helper.cc \
 	kernel/lib/zlib_helper.h \
 	kernel/lib/asan.cc \
+	kernel/lib/contig_alloc.cc \
+	kernel/lib/contig_alloc.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/fat32.cc \
 	kernel/fs/fat32_decl.h \
@@ -3323,6 +3327,9 @@ kernel/lib/kernel_generic-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_generic-contig_alloc.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/$(am__dirstamp):
 	@$(MKDIR_P) kernel/fs
 	@: > kernel/fs/$(am__dirstamp)
@@ -3690,6 +3697,9 @@ kernel/lib/kernel_tracing-zlib_helper.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-asan.$(OBJEXT): kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_tracing-contig_alloc.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_tracing-ext4.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
@@ -4170,6 +4180,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-bswap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-callout.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-conio.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-cxxexcept.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-desc_alloc.Po@am__quote@
@@ -4212,6 +4223,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-bswap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-callout.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-conio.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-cxxexcept.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-desc_alloc.Po@am__quote@
@@ -8571,6 +8583,20 @@ kernel/lib/kernel_generic-asan.obj: kernel/lib/asan.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
 
+kernel/lib/kernel_generic-contig_alloc.o: kernel/lib/contig_alloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-contig_alloc.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Tpo -c -o kernel/lib/kernel_generic-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Tpo kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/contig_alloc.cc' object='kernel/lib/kernel_generic-contig_alloc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
+
+kernel/lib/kernel_generic-contig_alloc.obj: kernel/lib/contig_alloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-contig_alloc.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Tpo -c -o kernel/lib/kernel_generic-contig_alloc.obj `if test -f 'kernel/lib/contig_alloc.cc'; then $(CYGPATH_W) 'kernel/lib/contig_alloc.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/contig_alloc.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Tpo kernel/lib/$(DEPDIR)/kernel_generic-contig_alloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/contig_alloc.cc' object='kernel/lib/kernel_generic-contig_alloc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-contig_alloc.obj `if test -f 'kernel/lib/contig_alloc.cc'; then $(CYGPATH_W) 'kernel/lib/contig_alloc.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/contig_alloc.cc'; fi`
+
 kernel/fs/kernel_generic-ext4.o: kernel/fs/ext4.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-ext4.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-ext4.Tpo -c -o kernel/fs/kernel_generic-ext4.o `test -f 'kernel/fs/ext4.cc' || echo '$(srcdir)/'`kernel/fs/ext4.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-ext4.Tpo kernel/fs/$(DEPDIR)/kernel_generic-ext4.Po
@@ -10208,6 +10234,20 @@ kernel/lib/kernel_tracing-asan.obj: kernel/lib/asan.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/asan.cc' object='kernel/lib/kernel_tracing-asan.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-asan.obj `if test -f 'kernel/lib/asan.cc'; then $(CYGPATH_W) 'kernel/lib/asan.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/asan.cc'; fi`
+
+kernel/lib/kernel_tracing-contig_alloc.o: kernel/lib/contig_alloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-contig_alloc.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Tpo -c -o kernel/lib/kernel_tracing-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/contig_alloc.cc' object='kernel/lib/kernel_tracing-contig_alloc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-contig_alloc.o `test -f 'kernel/lib/contig_alloc.cc' || echo '$(srcdir)/'`kernel/lib/contig_alloc.cc
+
+kernel/lib/kernel_tracing-contig_alloc.obj: kernel/lib/contig_alloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-contig_alloc.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Tpo -c -o kernel/lib/kernel_tracing-contig_alloc.obj `if test -f 'kernel/lib/contig_alloc.cc'; then $(CYGPATH_W) 'kernel/lib/contig_alloc.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/contig_alloc.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-contig_alloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/contig_alloc.cc' object='kernel/lib/kernel_tracing-contig_alloc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-contig_alloc.obj `if test -f 'kernel/lib/contig_alloc.cc'; then $(CYGPATH_W) 'kernel/lib/contig_alloc.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/contig_alloc.cc'; fi`
 
 kernel/fs/kernel_tracing-ext4.o: kernel/fs/ext4.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-ext4.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-ext4.Tpo -c -o kernel/fs/kernel_tracing-ext4.o `test -f 'kernel/fs/ext4.cc' || echo '$(srcdir)/'`kernel/fs/ext4.cc
