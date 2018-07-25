@@ -126,7 +126,7 @@ boot1_elf_LDFLAGS = \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(NOSTDLIB_FLAGS)
 
 EXTRA_boot1_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/boot1.ld
@@ -281,7 +281,7 @@ bootfat_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
 	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(NOSTDLIB_FLAGS)
 
 EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
@@ -323,6 +323,7 @@ bootiso_elf_LDFLAGS = \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
+	$(NOSTDLIB_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -368,7 +369,7 @@ bootpxe_bios_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
 	-Wl,-Map,$(top_builddir)/bootpxe-bios.map \
 	$(LINKER_SEL) -static -Bsymbolic \
-	-nostartfiles -nodefaultlibs -nostdlib \
+	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS)
 
 bootpxe_bios_elf_LDADD = \
@@ -1081,6 +1082,14 @@ libc_a_SOURCES = \
 	libc/src/fcntl/openat.cc \
 	libc/src/fcntl/posix_fadvise.cc \
 	libc/src/fcntl/posix_fallocate.cc \
+	libc/src/sys/mman/mmap.cc \
+	libc/src/sys/mman/munmap.cc \
+	libc/src/sys/mman/mremap.cc \
+	libc/src/sys/mman/mprotect.cc \
+	libc/src/sys/mman/msync.cc \
+	libc/src/sys/mman/mlock.cc \
+	libc/src/sys/mman/munlock.cc \
+	libc/src/sys/mman/madvise.cc \
 	libc/src/unistd/access.cc \
 	libc/src/unistd/alarm.cc \
 	libc/src/unistd/chdir.cc \
@@ -1213,11 +1222,13 @@ libm_a_CXXFLAGS = \
 	$(COMPILER_FLAGS)
 
 libstdc___a_SOURCES = \
-	libc/cxx/terminate.cc
+	libc/cxx/terminate.cc \
+	libc/cxx/abi/cxa_allocate_exception.cc
 
 libstdc___a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-std=c++14 -static \
+	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -1299,11 +1310,7 @@ user_shell_LDFLAGS = \
 	-Wl,-z,max-page-size=4096
 
 user_shell_CCASFLAGS = \
-	$(ASM_DEBUG_INFO_FLAGS)
-
-user_shell_LDADD = libc.a
-
-EXTRA_user_shell_DEPENDENCIES = libc.a
+	$(ASM_DEBUG_INFO_FLAGS) -v -isystem sysroot/include
 
 # ----------------------------------------------------------------------------
 # Misc make rules

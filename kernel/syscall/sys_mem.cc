@@ -22,9 +22,14 @@ void *sys_mmap(void *addr, size_t len, int prot,
                int flags, int fd, off_t offset)
 {
     if (!validate_user_mmop(addr, len, prot, flags))
-        return MAP_FAILED;
+        return (void*)errno_t::EINVAL;
 
-    return mmap(addr, len, prot, flags | MAP_USER, fd, offset);
+    void *result = mmap(addr, len, prot, flags | MAP_USER, fd, offset);
+
+    if (likely(result != MAP_FAILED))
+        return result;
+
+    return (void*)errno_t::ENOMEM;
 }
 
 int sys_mprotect(void *addr, size_t len, int prot)
@@ -53,8 +58,15 @@ void *sys_mremap(void *old_address, size_t old_size,
                 new_address, new_size, 0, flags))
         return MAP_FAILED;
 
-    return mremap(old_address, old_size, new_size, flags,
-                  new_address);
+    errno_t err = errno_t::EINVAL;
+
+    void *result = mremap(old_address, old_size, new_size, flags,
+                          new_address, &err);
+
+    if (likely(result != MAP_FAILED))
+        return result;
+
+    return (void*)err;
 }
 
 int sys_madvise(void *addr, size_t len, int advice)

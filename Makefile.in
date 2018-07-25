@@ -214,6 +214,14 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/fcntl/libc_a-openat.$(OBJEXT) \
 	libc/src/fcntl/libc_a-posix_fadvise.$(OBJEXT) \
 	libc/src/fcntl/libc_a-posix_fallocate.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-mmap.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-munmap.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-mremap.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-mprotect.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-msync.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-mlock.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-munlock.$(OBJEXT) \
+	libc/src/sys/mman/libc_a-madvise.$(OBJEXT) \
 	libc/src/unistd/libc_a-access.$(OBJEXT) \
 	libc/src/unistd/libc_a-alarm.$(OBJEXT) \
 	libc/src/unistd/libc_a-chdir.$(OBJEXT) \
@@ -333,7 +341,8 @@ am_libm_a_OBJECTS = libc/math/libm_a-cos.$(OBJEXT) \
 libm_a_OBJECTS = $(am_libm_a_OBJECTS)
 libstdc___a_AR = $(AR) $(ARFLAGS)
 libstdc___a_LIBADD =
-am_libstdc___a_OBJECTS = libc/cxx/libstdc___a-terminate.$(OBJEXT)
+am_libstdc___a_OBJECTS = libc/cxx/libstdc___a-terminate.$(OBJEXT) \
+	libc/cxx/abi/libstdc___a-cxa_allocate_exception.$(OBJEXT)
 libstdc___a_OBJECTS = $(am_libstdc___a_OBJECTS)
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(libc_adir)"
 PROGRAMS = $(bin_PROGRAMS)
@@ -668,7 +677,7 @@ mbr_elf_LINK = $(CCLD) $(mbr_elf_CFLAGS) $(CFLAGS) $(mbr_elf_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
-user_shell_DEPENDENCIES = libc.a
+user_shell_LDADD = $(LDADD)
 user_shell_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(user_shell_LDFLAGS) \
 	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
@@ -1094,7 +1103,7 @@ boot1_elf_LDFLAGS = \
 	-Wl,-N \
 	$(LINKER_DEBUG) \
 	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(NOSTDLIB_FLAGS)
 
 EXTRA_boot1_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/boot1.ld
@@ -1244,7 +1253,7 @@ bootfat_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootfat.ld \
 	-Wl,-N \
 	$(LINKER_SEL) -static \
-	-nostartfiles -nodefaultlibs -nostdlib
+	$(NOSTDLIB_FLAGS)
 
 EXTRA_bootfat_elf_DEPENDENCIES = \
 	$(top_srcdir)/boot/bootfat.ld
@@ -1281,6 +1290,7 @@ bootiso_elf_LDFLAGS = \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
+	$(NOSTDLIB_FLAGS) \
 	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -1321,7 +1331,7 @@ bootpxe_bios_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
 	-Wl,-Map,$(top_builddir)/bootpxe-bios.map \
 	$(LINKER_SEL) -static -Bsymbolic \
-	-nostartfiles -nodefaultlibs -nostdlib \
+	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS)
 
 bootpxe_bios_elf_LDADD = \
@@ -1969,6 +1979,14 @@ libc_a_SOURCES = \
 	libc/src/fcntl/openat.cc \
 	libc/src/fcntl/posix_fadvise.cc \
 	libc/src/fcntl/posix_fallocate.cc \
+	libc/src/sys/mman/mmap.cc \
+	libc/src/sys/mman/munmap.cc \
+	libc/src/sys/mman/mremap.cc \
+	libc/src/sys/mman/mprotect.cc \
+	libc/src/sys/mman/msync.cc \
+	libc/src/sys/mman/mlock.cc \
+	libc/src/sys/mman/munlock.cc \
+	libc/src/sys/mman/madvise.cc \
 	libc/src/unistd/access.cc \
 	libc/src/unistd/alarm.cc \
 	libc/src/unistd/chdir.cc \
@@ -2101,11 +2119,13 @@ libm_a_CXXFLAGS = \
 	$(COMPILER_FLAGS)
 
 libstdc___a_SOURCES = \
-	libc/cxx/terminate.cc
+	libc/cxx/terminate.cc \
+	libc/cxx/abi/cxa_allocate_exception.cc
 
 libstdc___a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-std=c++14 -static \
+	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
@@ -2158,10 +2178,8 @@ user_shell_LDFLAGS = \
 	-Wl,-z,max-page-size=4096
 
 user_shell_CCASFLAGS = \
-	$(ASM_DEBUG_INFO_FLAGS)
+	$(ASM_DEBUG_INFO_FLAGS) -v -isystem sysroot/include
 
-user_shell_LDADD = libc.a
-EXTRA_user_shell_DEPENDENCIES = libc.a
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -2575,6 +2593,36 @@ libc/src/fcntl/libc_a-posix_fadvise.$(OBJEXT):  \
 libc/src/fcntl/libc_a-posix_fallocate.$(OBJEXT):  \
 	libc/src/fcntl/$(am__dirstamp) \
 	libc/src/fcntl/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/mman
+	@: > libc/src/sys/mman/$(am__dirstamp)
+libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/mman/$(DEPDIR)
+	@: > libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-mmap.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-munmap.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-mremap.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-mprotect.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-msync.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-mlock.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-munlock.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/mman/libc_a-madvise.$(OBJEXT):  \
+	libc/src/sys/mman/$(am__dirstamp) \
+	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
 libc/src/unistd/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/unistd
 	@: > libc/src/unistd/$(am__dirstamp)
@@ -2953,6 +3001,15 @@ libc/cxx/$(DEPDIR)/$(am__dirstamp):
 	@: > libc/cxx/$(DEPDIR)/$(am__dirstamp)
 libc/cxx/libstdc___a-terminate.$(OBJEXT): libc/cxx/$(am__dirstamp) \
 	libc/cxx/$(DEPDIR)/$(am__dirstamp)
+libc/cxx/abi/$(am__dirstamp):
+	@$(MKDIR_P) libc/cxx/abi
+	@: > libc/cxx/abi/$(am__dirstamp)
+libc/cxx/abi/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/cxx/abi/$(DEPDIR)
+	@: > libc/cxx/abi/$(DEPDIR)/$(am__dirstamp)
+libc/cxx/abi/libstdc___a-cxa_allocate_exception.$(OBJEXT):  \
+	libc/cxx/abi/$(am__dirstamp) \
+	libc/cxx/abi/$(DEPDIR)/$(am__dirstamp)
 
 libstdc++.a: $(libstdc___a_OBJECTS) $(libstdc___a_DEPENDENCIES) $(EXTRA_libstdc___a_DEPENDENCIES) 
 	$(AM_V_at)-rm -f libstdc++.a
@@ -3886,6 +3943,7 @@ mostlyclean-compile:
 	-rm -f kernel/net/*.$(OBJEXT)
 	-rm -f kernel/syscall/*.$(OBJEXT)
 	-rm -f libc/cxx/*.$(OBJEXT)
+	-rm -f libc/cxx/abi/*.$(OBJEXT)
 	-rm -f libc/math/*.$(OBJEXT)
 	-rm -f libc/src/errno/*.$(OBJEXT)
 	-rm -f libc/src/fcntl/*.$(OBJEXT)
@@ -3893,6 +3951,7 @@ mostlyclean-compile:
 	-rm -f libc/src/stdlib/*.$(OBJEXT)
 	-rm -f libc/src/string/*.$(OBJEXT)
 	-rm -f libc/src/sys/*.$(OBJEXT)
+	-rm -f libc/src/sys/mman/*.$(OBJEXT)
 	-rm -f libc/src/unistd/*.$(OBJEXT)
 	-rm -f mbr/*.$(OBJEXT)
 	-rm -f modules/hello/*.$(OBJEXT)
@@ -4222,6 +4281,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/cxx/$(DEPDIR)/libstdc___a-terminate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-cos.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-log.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-sin.Po@am__quote@
@@ -4297,6 +4357,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall6.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-_exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-access.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-alarm.Po@am__quote@
@@ -5772,6 +5840,118 @@ libc/src/fcntl/libc_a-posix_fallocate.obj: libc/src/fcntl/posix_fallocate.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/fcntl/posix_fallocate.cc' object='libc/src/fcntl/libc_a-posix_fallocate.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/fcntl/libc_a-posix_fallocate.obj `if test -f 'libc/src/fcntl/posix_fallocate.cc'; then $(CYGPATH_W) 'libc/src/fcntl/posix_fallocate.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/fcntl/posix_fallocate.cc'; fi`
+
+libc/src/sys/mman/libc_a-mmap.o: libc/src/sys/mman/mmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mmap.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo -c -o libc/src/sys/mman/libc_a-mmap.o `test -f 'libc/src/sys/mman/mmap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mmap.cc' object='libc/src/sys/mman/libc_a-mmap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mmap.o `test -f 'libc/src/sys/mman/mmap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mmap.cc
+
+libc/src/sys/mman/libc_a-mmap.obj: libc/src/sys/mman/mmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mmap.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo -c -o libc/src/sys/mman/libc_a-mmap.obj `if test -f 'libc/src/sys/mman/mmap.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mmap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mmap.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mmap.cc' object='libc/src/sys/mman/libc_a-mmap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mmap.obj `if test -f 'libc/src/sys/mman/mmap.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mmap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mmap.cc'; fi`
+
+libc/src/sys/mman/libc_a-munmap.o: libc/src/sys/mman/munmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-munmap.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Tpo -c -o libc/src/sys/mman/libc_a-munmap.o `test -f 'libc/src/sys/mman/munmap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/munmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/munmap.cc' object='libc/src/sys/mman/libc_a-munmap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-munmap.o `test -f 'libc/src/sys/mman/munmap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/munmap.cc
+
+libc/src/sys/mman/libc_a-munmap.obj: libc/src/sys/mman/munmap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-munmap.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Tpo -c -o libc/src/sys/mman/libc_a-munmap.obj `if test -f 'libc/src/sys/mman/munmap.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/munmap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/munmap.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/munmap.cc' object='libc/src/sys/mman/libc_a-munmap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-munmap.obj `if test -f 'libc/src/sys/mman/munmap.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/munmap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/munmap.cc'; fi`
+
+libc/src/sys/mman/libc_a-mremap.o: libc/src/sys/mman/mremap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mremap.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Tpo -c -o libc/src/sys/mman/libc_a-mremap.o `test -f 'libc/src/sys/mman/mremap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mremap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mremap.cc' object='libc/src/sys/mman/libc_a-mremap.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mremap.o `test -f 'libc/src/sys/mman/mremap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mremap.cc
+
+libc/src/sys/mman/libc_a-mremap.obj: libc/src/sys/mman/mremap.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mremap.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Tpo -c -o libc/src/sys/mman/libc_a-mremap.obj `if test -f 'libc/src/sys/mman/mremap.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mremap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mremap.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mremap.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mremap.cc' object='libc/src/sys/mman/libc_a-mremap.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mremap.obj `if test -f 'libc/src/sys/mman/mremap.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mremap.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mremap.cc'; fi`
+
+libc/src/sys/mman/libc_a-mprotect.o: libc/src/sys/mman/mprotect.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mprotect.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Tpo -c -o libc/src/sys/mman/libc_a-mprotect.o `test -f 'libc/src/sys/mman/mprotect.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mprotect.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mprotect.cc' object='libc/src/sys/mman/libc_a-mprotect.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mprotect.o `test -f 'libc/src/sys/mman/mprotect.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mprotect.cc
+
+libc/src/sys/mman/libc_a-mprotect.obj: libc/src/sys/mman/mprotect.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mprotect.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Tpo -c -o libc/src/sys/mman/libc_a-mprotect.obj `if test -f 'libc/src/sys/mman/mprotect.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mprotect.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mprotect.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mprotect.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mprotect.cc' object='libc/src/sys/mman/libc_a-mprotect.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mprotect.obj `if test -f 'libc/src/sys/mman/mprotect.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mprotect.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mprotect.cc'; fi`
+
+libc/src/sys/mman/libc_a-msync.o: libc/src/sys/mman/msync.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-msync.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Tpo -c -o libc/src/sys/mman/libc_a-msync.o `test -f 'libc/src/sys/mman/msync.cc' || echo '$(srcdir)/'`libc/src/sys/mman/msync.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/msync.cc' object='libc/src/sys/mman/libc_a-msync.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-msync.o `test -f 'libc/src/sys/mman/msync.cc' || echo '$(srcdir)/'`libc/src/sys/mman/msync.cc
+
+libc/src/sys/mman/libc_a-msync.obj: libc/src/sys/mman/msync.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-msync.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Tpo -c -o libc/src/sys/mman/libc_a-msync.obj `if test -f 'libc/src/sys/mman/msync.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/msync.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/msync.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/msync.cc' object='libc/src/sys/mman/libc_a-msync.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-msync.obj `if test -f 'libc/src/sys/mman/msync.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/msync.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/msync.cc'; fi`
+
+libc/src/sys/mman/libc_a-mlock.o: libc/src/sys/mman/mlock.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mlock.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Tpo -c -o libc/src/sys/mman/libc_a-mlock.o `test -f 'libc/src/sys/mman/mlock.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mlock.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mlock.cc' object='libc/src/sys/mman/libc_a-mlock.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mlock.o `test -f 'libc/src/sys/mman/mlock.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mlock.cc
+
+libc/src/sys/mman/libc_a-mlock.obj: libc/src/sys/mman/mlock.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mlock.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Tpo -c -o libc/src/sys/mman/libc_a-mlock.obj `if test -f 'libc/src/sys/mman/mlock.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mlock.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mlock.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/mlock.cc' object='libc/src/sys/mman/libc_a-mlock.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-mlock.obj `if test -f 'libc/src/sys/mman/mlock.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/mlock.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/mlock.cc'; fi`
+
+libc/src/sys/mman/libc_a-munlock.o: libc/src/sys/mman/munlock.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-munlock.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Tpo -c -o libc/src/sys/mman/libc_a-munlock.o `test -f 'libc/src/sys/mman/munlock.cc' || echo '$(srcdir)/'`libc/src/sys/mman/munlock.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/munlock.cc' object='libc/src/sys/mman/libc_a-munlock.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-munlock.o `test -f 'libc/src/sys/mman/munlock.cc' || echo '$(srcdir)/'`libc/src/sys/mman/munlock.cc
+
+libc/src/sys/mman/libc_a-munlock.obj: libc/src/sys/mman/munlock.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-munlock.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Tpo -c -o libc/src/sys/mman/libc_a-munlock.obj `if test -f 'libc/src/sys/mman/munlock.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/munlock.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/munlock.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/munlock.cc' object='libc/src/sys/mman/libc_a-munlock.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-munlock.obj `if test -f 'libc/src/sys/mman/munlock.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/munlock.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/munlock.cc'; fi`
+
+libc/src/sys/mman/libc_a-madvise.o: libc/src/sys/mman/madvise.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-madvise.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Tpo -c -o libc/src/sys/mman/libc_a-madvise.o `test -f 'libc/src/sys/mman/madvise.cc' || echo '$(srcdir)/'`libc/src/sys/mman/madvise.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/madvise.cc' object='libc/src/sys/mman/libc_a-madvise.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-madvise.o `test -f 'libc/src/sys/mman/madvise.cc' || echo '$(srcdir)/'`libc/src/sys/mman/madvise.cc
+
+libc/src/sys/mman/libc_a-madvise.obj: libc/src/sys/mman/madvise.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-madvise.obj -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Tpo -c -o libc/src/sys/mman/libc_a-madvise.obj `if test -f 'libc/src/sys/mman/madvise.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/madvise.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/madvise.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/mman/madvise.cc' object='libc/src/sys/mman/libc_a-madvise.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-madvise.obj `if test -f 'libc/src/sys/mman/madvise.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/madvise.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/madvise.cc'; fi`
 
 libc/src/unistd/libc_a-access.o: libc/src/unistd/access.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/unistd/libc_a-access.o -MD -MP -MF libc/src/unistd/$(DEPDIR)/libc_a-access.Tpo -c -o libc/src/unistd/libc_a-access.o `test -f 'libc/src/unistd/access.cc' || echo '$(srcdir)/'`libc/src/unistd/access.cc
@@ -7284,6 +7464,20 @@ libc/cxx/libstdc___a-terminate.obj: libc/cxx/terminate.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/cxx/terminate.cc' object='libc/cxx/libstdc___a-terminate.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -c -o libc/cxx/libstdc___a-terminate.obj `if test -f 'libc/cxx/terminate.cc'; then $(CYGPATH_W) 'libc/cxx/terminate.cc'; else $(CYGPATH_W) '$(srcdir)/libc/cxx/terminate.cc'; fi`
+
+libc/cxx/abi/libstdc___a-cxa_allocate_exception.o: libc/cxx/abi/cxa_allocate_exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -MT libc/cxx/abi/libstdc___a-cxa_allocate_exception.o -MD -MP -MF libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Tpo -c -o libc/cxx/abi/libstdc___a-cxa_allocate_exception.o `test -f 'libc/cxx/abi/cxa_allocate_exception.cc' || echo '$(srcdir)/'`libc/cxx/abi/cxa_allocate_exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Tpo libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/cxx/abi/cxa_allocate_exception.cc' object='libc/cxx/abi/libstdc___a-cxa_allocate_exception.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -c -o libc/cxx/abi/libstdc___a-cxa_allocate_exception.o `test -f 'libc/cxx/abi/cxa_allocate_exception.cc' || echo '$(srcdir)/'`libc/cxx/abi/cxa_allocate_exception.cc
+
+libc/cxx/abi/libstdc___a-cxa_allocate_exception.obj: libc/cxx/abi/cxa_allocate_exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -MT libc/cxx/abi/libstdc___a-cxa_allocate_exception.obj -MD -MP -MF libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Tpo -c -o libc/cxx/abi/libstdc___a-cxa_allocate_exception.obj `if test -f 'libc/cxx/abi/cxa_allocate_exception.cc'; then $(CYGPATH_W) 'libc/cxx/abi/cxa_allocate_exception.cc'; else $(CYGPATH_W) '$(srcdir)/libc/cxx/abi/cxa_allocate_exception.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Tpo libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/cxx/abi/cxa_allocate_exception.cc' object='libc/cxx/abi/libstdc___a-cxa_allocate_exception.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libstdc___a_CXXFLAGS) $(CXXFLAGS) -c -o libc/cxx/abi/libstdc___a-cxa_allocate_exception.obj `if test -f 'libc/cxx/abi/cxa_allocate_exception.cc'; then $(CYGPATH_W) 'libc/cxx/abi/cxa_allocate_exception.cc'; else $(CYGPATH_W) '$(srcdir)/libc/cxx/abi/cxa_allocate_exception.cc'; fi`
 
 boot/bootefi_amd64-bootefi.o: boot/bootefi.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-bootefi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-bootefi.Tpo -c -o boot/bootefi_amd64-bootefi.o `test -f 'boot/bootefi.cc' || echo '$(srcdir)/'`boot/bootefi.cc
@@ -11381,6 +11575,8 @@ distclean-generic:
 	-rm -f kernel/syscall/$(am__dirstamp)
 	-rm -f libc/cxx/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/cxx/$(am__dirstamp)
+	-rm -f libc/cxx/abi/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/cxx/abi/$(am__dirstamp)
 	-rm -f libc/math/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/math/$(am__dirstamp)
 	-rm -f libc/src/errno/$(DEPDIR)/$(am__dirstamp)
@@ -11395,6 +11591,8 @@ distclean-generic:
 	-rm -f libc/src/string/$(am__dirstamp)
 	-rm -f libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/sys/$(am__dirstamp)
+	-rm -f libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/sys/mman/$(am__dirstamp)
 	-rm -f libc/src/unistd/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/unistd/$(am__dirstamp)
 	-rm -f mbr/$(DEPDIR)/$(am__dirstamp)
@@ -11415,7 +11613,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -11463,7 +11661,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

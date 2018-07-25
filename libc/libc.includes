@@ -12,3 +12,5 @@ src/posix_spawn/bits
 math
 cxx
 src/errno
+cxx/abi
+src/sys/mman
