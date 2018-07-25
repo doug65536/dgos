@@ -172,11 +172,15 @@ struct process_t
     void *get_allocator();
     void set_allocator(void *allocator);
 
+    void destroy();
+
     static void exit(pid_t pid, int exitcode);
-    static bool add_thread(pid_t pid, thread_t tid);
+    bool add_thread(thread_t tid);
+    bool del_thread(thread_t tid);
 
 private:
-    std::vector<thread_t> threads;
+    using thread_list = std::vector<thread_t>;
+    thread_list threads;
 
     static process_t *lookup(pid_t pid);
 

@@ -21,6 +21,7 @@
 #include "callout.h"
 #include "vector.h"
 #include "mutex.h"
+#include "except.h"
 
 // Implements platform independent thread.h
 
@@ -40,6 +41,7 @@ enum thread_state_t : uint32_t {
     THREAD_IS_SLEEPING,
     THREAD_IS_DESTRUCTING,
     THREAD_IS_FINISHED,
+    THREAD_IS_EXITING,
 
     // Flag keeps other cpus from taking thread
     // until after stack switch
@@ -48,7 +50,8 @@ enum thread_state_t : uint32_t {
     THREAD_IS_READY_BUSY = THREAD_IS_READY | THREAD_BUSY,
     THREAD_IS_FINISHED_BUSY = THREAD_IS_FINISHED | THREAD_BUSY,
     THREAD_IS_SLEEPING_BUSY = THREAD_IS_SLEEPING | THREAD_BUSY,
-    THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY
+    THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY,
+    THREAD_IS_EXITING_BUSY = THREAD_IS_EXITING | THREAD_BUSY
 };
 
 struct thread_info_t;
@@ -122,6 +125,8 @@ struct alignas(256) thread_info_t {
     uint64_t sched_timestamp;
 
     int thread_id;
+
+    __exception_jmp_buf_t exit_jmpbuf;
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
@@ -286,18 +291,19 @@ static void thread_cleanup()
 
     cpu_irq_disable();
 
-    assert(thread->state == THREAD_IS_RUNNING);
+    assert(thread->state == THREAD_IS_RUNNING ||
+           thread->state == THREAD_IS_EXITING_BUSY);
 
     atomic_barrier();
     thread->priority = 0;
     thread->priority_boost = 0;
-    thread->state = THREAD_IS_DESTRUCTING_BUSY;
+    if (thread->state == THREAD_IS_RUNNING)
+        thread->state = THREAD_IS_DESTRUCTING_BUSY;
     thread_yield();
 }
 
 static void thread_startup(thread_fn_t fn, void *p, thread_t id)
 {
-
     threads[id].exit_code = fn(p);
     thread_cleanup();
 }
@@ -689,7 +695,9 @@ static thread_info_t *thread_choose_next(
 static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
-    atomic_and(&thread->state, ~THREAD_BUSY);
+
+    if (atomic_and(&thread->state, ~THREAD_BUSY) == THREAD_IS_EXITING)
+        thread->process->destroy();
 }
 
 isr_context_t *thread_schedule(isr_context_t *ctx)
@@ -1136,9 +1144,15 @@ void thread_tss_ready(void*)
     cpus[0].tss_ptr = tss_list;
 }
 
-REGISTER_CALLOUT(thread_tss_ready, nullptr, callout_type_t::tss_list_ready, "000");
+REGISTER_CALLOUT(thread_tss_ready, nullptr,
+                 callout_type_t::tss_list_ready, "000");
 
-void thread_exit(int exitcode)
+void thread_exit(int exit_code)
 {
-
+    thread_info_t *info = this_thread();
+    thread_t tid = info - threads;
+    info->exit_code = exit_code;
+    if (info->process->del_thread(tid))
+        info->state = THREAD_IS_EXITING_BUSY;
+    thread_cleanup();
 }

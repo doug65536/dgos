@@ -129,7 +129,7 @@ int process_t::spawn(pid_t * pid_result,
 
     thread_t tid = thread_create(&process_t::start, process, 0, true);
 
-    process->add_thread(process->pid, tid);
+    process->add_thread(tid);
 
     processes_scoped_lock lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
@@ -362,6 +362,25 @@ void process_t::set_allocator(void *allocator)
     linear_allocator = allocator;
 }
 
+void process_t::destroy()
+{
+    free(path);
+    path = nullptr;
+
+    for (size_t i = 0; i < argc; ++i)
+        free(argv[i]);
+    free(argv);
+    argv = nullptr;
+
+    for (size_t i = 0; i < envc; ++i)
+        free(env[i]);
+    free(env);
+    env = nullptr;
+
+    delete linear_allocator;
+    linear_allocator = nullptr;
+}
+
 void process_t::exit(pid_t pid, int exitcode)
 {
     // Kill all the threads...
@@ -372,13 +391,22 @@ void process_t::exit(pid_t pid, int exitcode)
     thread_exit(exitcode);
 }
 
-bool process_t::add_thread(pid_t pid, thread_t tid)
+bool process_t::add_thread(thread_t tid)
 {
-    process_t *process_ptr = lookup(pid);
+    return threads.push_back(tid);
+}
 
-    return process_ptr
-            ? process_ptr->threads.push_back(tid)
-            : false;
+// Returns true when the last thread exits
+bool process_t::del_thread(thread_t tid)
+{
+    thread_list::iterator it = std::find(threads.begin(), threads.end(), tid);
+
+    if (unlikely(it == threads.end()))
+        return false;
+
+    threads.erase(it);
+
+    return threads.empty();
 }
 
 process_t *process_t::lookup(pid_t pid)
