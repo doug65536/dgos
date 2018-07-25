@@ -258,10 +258,10 @@ struct flock {
 // The following shall be declared as functions and may also be defined
 // as macros. Function prototypes shall be provided.
 
-int  creat(char const *, mode_t);
-int  fcntl(int, int, ...);
-int  open(char const *, int, ...);
-int  openat(int, char const *, int, ...);
+int  creat(char const *path, mode_t mode);
+int  fcntl(int fd, int cmd, ...);
+int  open(char const *path, int flags, ...);
+int  openat(int dirfd, char const *path, int flags, ...);
 
 int  posix_fadvise(int, off_t offset, off_t len, int advice);
 int  posix_fallocate(int, off_t, off_t);

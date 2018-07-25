@@ -26,7 +26,7 @@ typedef struct {
     long long rem;
 } lldiv_t;
 
-void          _Exit(int);
+void          _Exit(int exitcode);
 
 long          a64l(char const *);
 
