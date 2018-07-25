@@ -14,6 +14,7 @@
 #include "desc_alloc.h"
 #include "cpu/control_regs.h"
 #include "cpu/isr.h"
+#include "contig_alloc.h"
 
 union process_ptr_t {
     process_t *p;
@@ -377,7 +378,7 @@ void process_t::destroy()
     free(env);
     env = nullptr;
 
-    delete linear_allocator;
+    delete (contiguous_allocator_t*)linear_allocator;
     linear_allocator = nullptr;
 }
 
