@@ -460,13 +460,17 @@ void virtio_virtqueue_t::recycle_used()
     size_t mask = ~-(1 << log2_queue_size);
     size_t done_idx = used_hdr->idx;
     do {
-        avail_t id = used_ring[tail & mask].id;
-
-        pending_completions.push_back(completions[tail & mask]);
+        used_t const& used = used_ring[tail & mask];
+        avail_t id = used.id;
+        uint64_t used_len = used.len;
 
         avail_t end = id;
         while (desc_tab[end].flags.bits.next)
             end = desc_tab[end].next;
+
+        virtio_iocp_t* completion = completions[tail & mask];
+        completion->set_result(used_len);
+        pending_completions.push_back(completion);
 
         desc_tab[end].next = desc_first_free;
         desc_first_free = id;

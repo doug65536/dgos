@@ -26,9 +26,19 @@ struct virtq_avail {
 
 class virtio_virtqueue_t {
 public:
+    class virtio_blocking_iocp_success_t {
+    public:
+        static constexpr bool succeeded(uint64_t const& status)
+        {
+            return true;
+        }
+    };
+
     using virtio_iocp_result_t = uint64_t;
-    using virtio_iocp_t = basic_iocp_t<virtio_iocp_result_t>;
-    using virtio_blocking_iocp_t = basic_blocking_iocp_t<virtio_iocp_result_t>;
+    using virtio_iocp_t = basic_iocp_t<
+        virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
+    using virtio_blocking_iocp_t = basic_blocking_iocp_t<
+        virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
 
     struct desc_t {
         uint64_t addr;
@@ -376,6 +386,11 @@ protected:
         return true;
     }
 
+    using blocking_iocp_t = virtio_virtqueue_t::virtio_blocking_iocp_t;
+    using async_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
+
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
     virtual void irq_handler(int irq) = 0;
 
@@ -387,8 +402,6 @@ protected:
     std::unique_ptr<virtio_virtqueue_t[]> queues;
     size_t queue_count;
 
-    using lock_type = std::mcslock;
-    using scoped_lock = std::unique_lock<lock_type>;
     lock_type cfg_lock;
 
     // MMIO
