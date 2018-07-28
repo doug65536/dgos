@@ -43,6 +43,7 @@ public:
         , crsr_queue(nullptr)
         , scrn_w(0)
         , scrn_h(0)
+        , configured(false)
     {
     }
 
@@ -469,6 +470,8 @@ private:
     bool issue_transfer_to_host_2d(uint32_t x, uint32_t y,
                                    uint32_t width, uint32_t height);
     bool issue_flush(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+    bool issue_detach_backing(uint32_t resource_id);
+    bool issue_resource_unref(uint32_t resource_id);
 
     uint32_t *backbuf;
     size_t backbuf_sz;
@@ -477,6 +480,7 @@ private:
     virtio_virtqueue_t *crsr_queue;
     uint32_t scrn_w;
     uint32_t scrn_h;
+    bool configured;
 };
 
 static void virtio_gpu_startup(void*)
@@ -560,13 +564,51 @@ bool virtio_gpu_dev_t::issue_create_2d(
     return true;
 }
 
+bool virtio_gpu_dev_t::issue_detach_backing(uint32_t resource_id)
+{
+    blocking_iocp_t iocp;
+    virtio_gpu_ctrl_hdr_t resp(0);
+
+    virtio_gpu_resource_detach_backing_t detach_backing;
+    detach_backing.resource_id = resource_id;
+
+    cmd_queue->sendrecv(&detach_backing, sizeof(detach_backing),
+                        &resp, sizeof(resp), &iocp);
+    iocp.wait();
+
+    if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
+        return false;
+
+    return true;
+}
+
+bool virtio_gpu_dev_t::issue_resource_unref(uint32_t resource_id)
+{
+    virtio_gpu_resource_unref_t unref;
+    virtio_gpu_ctrl_hdr_t resp(0);
+    blocking_iocp_t iocp;
+
+    unref.resource_id = resource_id;
+
+    cmd_queue->sendrecv(&unref, sizeof(unref), &resp, sizeof(resp), &iocp);
+    iocp.wait();
+
+    if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
+        return false;
+
+    return true;
+}
+
 bool virtio_gpu_dev_t::issue_attach_backing()
 {
     blocking_iocp_t iocp;
     virtio_gpu_ctrl_hdr_t resp(0);
 
-    if (backbuf_sz)
+    if (backbuf_sz) {
         munmap(backbuf, backbuf_sz);
+        backbuf = nullptr;
+        backbuf_sz = 0;
+    }
 
     // Allocate backbuffer
     backbuf_sz = scrn_w * scrn_h * sizeof(uint32_t);
@@ -685,6 +727,16 @@ bool virtio_gpu_dev_t::issue_flush(
 
 bool virtio_gpu_dev_t::handle_config_change()
 {
+    if (configured) {
+        if (!issue_detach_backing(1))
+            return false;
+
+        if (!issue_resource_unref(1))
+            return false;
+
+        configured = false;
+    }
+
     VIRTIO_GPU_TRACE("Getting display info\n");
     // Request screen dimensions
     if (!issue_get_display_info())
@@ -715,6 +767,8 @@ bool virtio_gpu_dev_t::handle_config_change()
         return false;
 
     VIRTIO_GPU_TRACE("Config change complete\n");
+
+    configured = true;
 
     return true;
 }
