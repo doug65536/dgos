@@ -2570,7 +2570,7 @@ uintptr_t mphysaddr(void volatile *addr)
 }
 
 static _always_inline int mphysranges_enum(
-        void *addr, size_t size,
+        void const *addr, size_t size,
         int (*callback)(mmphysrange_t, void*),
         void *context)
 {
@@ -2642,7 +2642,7 @@ static _always_inline int mphysranges_callback(
 
 size_t mphysranges(mmphysrange_t *ranges,
                    size_t ranges_count,
-                   void *addr, size_t size,
+                   void const *addr, size_t size,
                    size_t max_size)
 {
     if (unlikely(size == 0))
