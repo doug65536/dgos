@@ -97,7 +97,6 @@ template<typename T, typename S>
 basic_iocp_t<T, S>::~basic_iocp_t()
 {
     scoped_lock hold(lock);
-    assert(expect_count > 0);
     assert(done_count == expect_count);
 }
 
