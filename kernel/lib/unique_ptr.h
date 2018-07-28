@@ -108,12 +108,14 @@ public:
         return p;
     }
 
-    void reset(_T* p = pointer())
+    bool reset(_T* p = pointer())
     {
         _T* old = ptr;
         ptr = p;
         if (old)
             ((Tdeleter()))(old);
+
+        return ptr != nullptr;
     }
 
 private:
