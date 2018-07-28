@@ -41,7 +41,7 @@ static void pic8259_init(uint8_t pic1_irq_base,
 
     // Base IRQs
     outb(PIC1_BASE + PIC_ICW2, pic1_irq_base);
-    outb(PIC2_DATA + PIC_ICW2, pic2_irq_base);
+    outb(PIC2_BASE + PIC_ICW2, pic2_irq_base);
 
     // Slave at IRQ 2, cascade ID
     outb(PIC1_BASE + PIC_ICW3_M, PIC_ICW3_M_S2);
@@ -148,10 +148,6 @@ void pic8259_disable(void)
     // Need to move it to reasonable ISRs even if disabled
     // in case of spurious IRQs
     pic8259_init(INTR_PIC1_IRQ_BASE, INTR_PIC2_IRQ_BASE);
-
-    // Mask all IRQs
-    outb(PIC1_DATA, 0xFF);
-    outb(PIC2_DATA, 0xFF);
 }
 
 // Gets plugged into irq_setmask

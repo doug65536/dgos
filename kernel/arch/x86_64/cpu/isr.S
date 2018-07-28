@@ -43,9 +43,11 @@ isr_entry_\int_num\():
 .endr
 
 // Rarely invoked vectors (LAPIC spurious, LAPIC error, LAPIC thermal, reserved)
-.irp int_num,38,37,36,35,34,33,32
+.irp int_num,38,37,36,35,34,33
     isr_entry 0 \int_num
 .endr
+
+isr_entry 0 INTR_APIC_SPURIOUS
 
 // PIC vectors (typically never invoked)
 .irp int_num,255,254,253,252,251,250,249,248,247,246,245,244,243,242,241,240

@@ -238,8 +238,9 @@ static void ioapic_reset(mp_ioapic_t *ioapic);
 static void ioapic_set_type(mp_ioapic_t *ioapic,
                             uint8_t intin, uint8_t intr_type);
 static void ioapic_set_flags(mp_ioapic_t *ioapic,
-                             uint8_t intin, uint16_t intr_flags);
-static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg, const mp_ioapic_t::scoped_lock &);
+                             uint8_t intin, uint16_t intr_flags, bool isa);
+static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg,
+                            mp_ioapic_t::scoped_lock const &);
 static void ioapic_write(
         mp_ioapic_t *ioapic, uint32_t reg, uint32_t value,
         mp_ioapic_t::scoped_lock const&);
@@ -268,15 +269,6 @@ static uint8_t topo_cpu_count;
 
 static uintptr_t apic_base;
 static uint32_t volatile *apic_ptr;
-
-#define MP_TABLE_TYPE_CPU           0
-#define MP_TABLE_TYPE_BUS           1
-#define MP_TABLE_TYPE_IOAPIC        2
-#define MP_TABLE_TYPE_IOINTR        3
-#define MP_TABLE_TYPE_LINTR         4
-#define MP_TABLE_TYPE_ADDRMAP       128
-#define MP_TABLE_TYPE_BUSHIER       129
-#define MP_TABLE_TYPE_BUSCOMPAT     130
 
 //
 // APIC
@@ -716,14 +708,6 @@ struct acpi_madt_rec_hdr_t {
     uint8_t record_len;
 };
 
-#define ACPI_MADT_REC_TYPE_LAPIC    0
-#define ACPI_MADT_REC_TYPE_IOAPIC   1
-#define ACPI_MADT_REC_TYPE_IRQ      2
-#define ACPI_MADT_REC_TYPE_NMI      3
-#define ACPI_MADT_REC_TYPE_LNMI     4
-#define ACPI_MADT_REC_TYPE_LIRQ     5
-#define ACPI_MADT_REC_TYPE_X2APIC   9
-
 struct acpi_madt_lapic_t {
     acpi_madt_rec_hdr_t hdr;
     uint8_t cpu_id;
@@ -771,46 +755,6 @@ struct acpi_madt_x2apic_t {
 
 //
 // The IRQ routing flags are identical to MPS flags
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_BIT \
-    MP_INTR_FLAGS_POLARITY_BIT
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_BITS \
-    MP_INTR_FLAGS_POLARITY_BITS
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_BIT \
-    MP_INTR_FLAGS_TRIGGER_BIT
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_BITS \
-    MP_INTR_FLAGS_TRIGGER_BITS
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_MASK \
-    MP_INTR_FLAGS_TRIGGER_MASK
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_MASK \
-    MP_INTR_FLAGS_POLARITY_MASK
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER \
-    MP_INTR_FLAGS_TRIGGER
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY \
-    MP_INTR_FLAGS_POLARITY
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_DEFAULT \
-    MP_INTR_FLAGS_POLARITY_DEFAULT
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI \
-    MP_INTR_FLAGS_POLARITY_ACTIVEHI
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO \
-    MP_INTR_FLAGS_POLARITY_ACTIVELO
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_DEFAULT \
-    MP_INTR_FLAGS_TRIGGER_DEFAULT
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE \
-    MP_INTR_FLAGS_TRIGGER_EDGE
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL \
-    MP_INTR_FLAGS_TRIGGER_LEVEL
-
-#define ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(n) \
-    MP_INTR_FLAGS_POLARITY_n(n)
-#define ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(n) \
-    MP_INTR_FLAGS_TRIGGER_n(n)
 
 union acpi_madt_ent_t {
     acpi_madt_rec_hdr_t hdr;
@@ -1023,12 +967,20 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
             uint8_t gsi = ent->irq_src.gsi;
             uint8_t intr = INTR_APIC_IRQ_BASE + gsi;
             uint8_t irq = ent->irq_src.irq_src;
+            uint8_t bus = ent->irq_src.bus;
+            bool isa = (bus == 0);
 
             intr_to_irq[intr] = irq;
             irq_to_intr[irq] = intr;
 
-            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u, vector=%u\n",
-                       irq, gsi, intr);
+            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u"
+                       ", flags=%x vector=%u\n",
+                       irq, gsi, ent->irq_src.flags, intr);
+
+            int ioapic_index = intr_to_ioapic[intr];
+            mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
+            ioapic_set_flags(ioapic, irq - ioapic->irq_base,
+                             ent->irq_src.flags, isa);
 
             break;
         }
@@ -1414,8 +1366,10 @@ static void mp_parse_fps()
             uint16_t intr_flags = entry_iointr->flags;
             uint8_t ioapic_id = entry_iointr->dest_ioapic_id;
             uint8_t intin = entry_iointr->dest_ioapic_intin;
+            uint8_t bus = entry_iointr->source_bus;
+            bool isa = (bus == 0);
 
-            ioapic_set_flags(ioapic_by_id(ioapic_id), intin, intr_flags);
+            ioapic_set_flags(ioapic_by_id(ioapic_id), intin, intr_flags, isa);
 
             entry = (uint8_t*)(entry_iointr + 1);
             break;
@@ -1623,8 +1577,10 @@ static void apic_online(int enabled, int spurious_intr, int err_intr)
         APIC_SIR_APIC_ENABLE_SET(sir, 0);
     }
 
-    if (spurious_intr >= 32)
+    if (spurious_intr >= 32) {
+        APIC_TRACE("spurious interrupt=%d\n", spurious_intr);
         APIC_SIR_VECTOR_SET(sir, spurious_intr);
+    }
 
     // LDR is read only in x2APIC mode
     if (apic != &apic_x2)
@@ -2325,38 +2281,49 @@ static void ioapic_set_type(mp_ioapic_t *ioapic,
 }
 
 static void ioapic_set_flags(mp_ioapic_t *ioapic,
-                             uint8_t intin, uint16_t intr_flags)
+                             uint8_t intin, uint16_t intr_flags, bool isa)
 {
     mp_ioapic_t::scoped_lock lock(ioapic->lock);
 
     uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
 
-    switch (intr_flags & ACPI_MADT_ENT_IRQ_FLAGS_POLARITY) {
+    uint16_t polarity = ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_GET(intr_flags);
+    uint16_t trigger = ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_GET(intr_flags);
+
+    if (polarity == ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_DEFAULT)
+        polarity = isa ? ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI
+                       : ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO;
+
+    if (trigger == ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_DEFAULT)
+        trigger = isa ? ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE
+                      : ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL;
+
+    switch (polarity) {
     default:
-    case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(
-            ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI):
-        IOAPIC_REDLO_POLARITY_SET(reg, IOAPIC_REDLO_POLARITY_ACTIVEHI);
-        break;
-    case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_n(
-            ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO):
+        APIC_TRACE("MP: Unrecognized IRQ polarity type!"
+                   " Guessing active low\n");
+        // fall through
+
+    case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVELO:
         IOAPIC_REDLO_POLARITY_SET(reg, IOAPIC_REDLO_POLARITY_ACTIVELO);
+        break;
+
+    case ACPI_MADT_ENT_IRQ_FLAGS_POLARITY_ACTIVEHI:
+        IOAPIC_REDLO_POLARITY_SET(reg, IOAPIC_REDLO_POLARITY_ACTIVEHI);
         break;
     }
 
-    switch (intr_flags & ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER) {
+    switch (trigger) {
     default:
         APIC_TRACE("MP: Unrecognized IRQ trigger type!"
                    " Guessing edge\n");
         // fall through...
-    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
-            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_DEFAULT):
-    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
-            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE):
+
+    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_EDGE:
         IOAPIC_REDLO_TRIGGER_SET(reg, IOAPIC_REDLO_TRIGGER_EDGE);
         break;
 
-    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_n(
-            ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL):
+    case ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL:
         IOAPIC_REDLO_TRIGGER_SET(reg, IOAPIC_REDLO_TRIGGER_LEVEL);
         break;
 
@@ -2405,9 +2372,6 @@ void apic_config_cpu()
 
 isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
-    assert(intr >= 0);
-    assert(intr < 256);
-
     assert(intr >= INTR_APIC_IRQ_BASE);
     assert(intr < INTR_APIC_IRQ_END);
 
