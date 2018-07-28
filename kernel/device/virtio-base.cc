@@ -2,6 +2,8 @@
 #include "likely.h"
 #include "cpu/atomic.h"
 #include "inttypes.h"
+#include "time.h"
+#include "numeric_limits.h"
 
 #define DEBUG_VIRTIO 1
 #if DEBUG_VIRTIO
@@ -56,8 +58,22 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             common_cfg->device_status = 0;
 
             // 4.1.4.3.2 Wait until reset completes
-            while (common_cfg->device_status != 0)
+            uint64_t timeout;
+            timeout = time_ns() + 2000000000;
+            int timeout_divisor;
+            timeout_divisor = 1000000;
+            while (common_cfg->device_status != 0) {
+                if (--timeout_divisor) {
+                    timeout_divisor = 1000000;
+                    if (time_ns() > timeout) {
+                        printk("Timeout waiting for %s device reset!\n",
+                               isr_name);
+                        return false;
+                    }
+                }
+
                 pause();
+            }
 
             // Notify the device that a virtio driver has found it
             common_cfg->device_status |= VIRTIO_STATUS_ACKNOWLEDGE;
@@ -102,10 +118,6 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
             queue_count = common_cfg->num_queues;
 
-            use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false,
-                                      queue_count + 1,
-                                      &virtio_base_t::irq_handler, isr_name);
-
             // Allocate number of queues supported by device
             queues.reset(new virtio_virtqueue_t[queue_count]);
 
@@ -115,6 +127,10 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 return false;
             }
 
+            use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false,
+                                      queue_count + 1,
+                                      &virtio_base_t::irq_handler, isr_name);
+
             pci_set_irq_unmask(pci_iter, true);
 
             // Initialize MSI-X IRQs
@@ -123,7 +139,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             for (size_t i = queue_count; i > 0; --i) {
                 virtio_virtqueue_t& vq = queues[i - 1];
 
-                uint16_t queue_msix_vector = use_msi && irq_range.msix
+                uint16_t queue_msix_vector = (use_msi && irq_range.msix)
                         ? i : 0;
 
                 if (!vq.init(i - 1, common_cfg, (char*)notify_cap,
@@ -199,6 +215,8 @@ bool virtio_virtqueue_t::init(
         char volatile *notify_base, uint32_t notify_off_multiplier,
         uint16_t msix_vector)
 {
+    this->queue_idx = queue_idx;
+
     atomic_fence();
     common_cfg->queue_select = queue_idx;
     atomic_fence();
@@ -220,9 +238,11 @@ bool virtio_virtqueue_t::init(
 
     size_t bytes = (sizeof(desc_t) << log2_queue_size) +
             sizeof(ring_hdr_t) +
-            (sizeof(uint16_t) << log2_queue_size) +
+            (sizeof(avail_t) << log2_queue_size) +
             sizeof(ring_ftr_t) +
-            6 + (8 << log2_queue_size);
+            sizeof(ring_hdr_t) +
+            (sizeof(used_t) << log2_queue_size) +
+            sizeof(ring_ftr_t);
 
     single_page = bytes <= PAGE_SIZE;
 
@@ -234,35 +254,83 @@ bool virtio_virtqueue_t::init(
 
         // Calculate pointers to descriptor table, available ring, used ring
         desc_tab = (desc_t*)buffer;
-        avail_ring = (uint16_t*)(desc_tab + queue_count);
-        used_hdr = (ring_hdr_t*)(avail_ring + queue_count);
+        avail_hdr = (ring_hdr_t*)(desc_tab + queue_count);
+        avail_ring = (avail_t*)(avail_hdr + 1);
+        avail_ftr = (ring_ftr_t*)(avail_ring + queue_count);
+        used_hdr = (ring_hdr_t*)(avail_ftr + 1);
+        used_ring = (used_t*)(used_hdr + 1);
+        used_ftr = (ring_ftr_t*)(used_ring + queue_count);
     } else {
         desc_tab = (desc_t*)mmap(
                     nullptr, sizeof(desc_t) << log2_queue_size,
                     PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        if (desc_tab == MAP_FAILED)
+            return false;
 
-        avail_ring = (uint16_t*)mmap(
-                    nullptr, sizeof(uint16_t) << log2_queue_size,
+        avail_hdr = (ring_hdr_t*)mmap(
+                    nullptr, sizeof(ring_hdr_t) +
+                    (sizeof(avail_t) << log2_queue_size) +
+                    sizeof(ring_ftr_t),
                     PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        if (avail_hdr == MAP_FAILED)
+            return false;
 
         used_hdr = (ring_hdr_t*)mmap(
-                    nullptr, sizeof(uint16_t) << log2_queue_size,
+                    nullptr, sizeof(ring_hdr_t) +
+                    (sizeof(used_t) << log2_queue_size) +
+                    sizeof(ring_ftr_t),
                     PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
+        if (used_hdr == MAP_FAILED)
+            return false;
+
+        avail_ring = (avail_t*)(avail_hdr + 1);
+        avail_ftr = (ring_ftr_t*)(avail_ring + queue_count);
+
+        used_ring = (used_t*)(used_hdr + 1);
+        used_ftr = (ring_ftr_t*)(used_ring + queue_count);
     }
 
-    used_ring = (used_t*)(used_hdr + 1);
-    used_ftr = (ring_ftr_t*)(used_ring + queue_count);
+    completions.reset(new virtio_iocp_t*[queue_count]);
+    if (!completions)
+        return false;
+
+    if (!pending_completions.reserve(queue_count))
+        return false;
 
     // Link together all of the descriptors into the free list
+    assert(desc_first_free == -1);
     for (int i = 1 << log2_queue_size; i > 0; --i) {
         desc_tab[i - 1].next = desc_first_free;
         desc_first_free = i - 1;
     }
 
+//    printdbg("avail_hdr\n");
+//    hex_dump(avail_hdr, sizeof(*avail_hdr), uintptr_t(avail_hdr));
+//    printdbg("avail_ring\n");
+//    hex_dump(avail_ring, sizeof(*avail_ring) << log2_queue_size,
+//             uintptr_t(avail_ring));
+//    printdbg("avail_ftr\n");
+//    hex_dump(avail_ftr, sizeof(*avail_ftr),  uintptr_t(avail_ftr));
+
     common_cfg->queue_size = 1 << log2_queue_size;
-    common_cfg->queue_desc = mphysaddr(desc_tab);
-    common_cfg->queue_avail = mphysaddr(avail_ring);
-    common_cfg->queue_used = mphysaddr(used_ring);
+    assert(common_cfg->queue_size == (1 << log2_queue_size));
+
+    uint64_t addr;
+
+    addr = mphysaddr(desc_tab);
+    assert((addr & -16) == addr);
+    common_cfg->queue_desc = addr;
+    assert(common_cfg->queue_desc == addr);
+
+    addr = mphysaddr(avail_hdr);
+    assert((addr & -2) == addr);
+    common_cfg->queue_avail = addr;
+    assert(common_cfg->queue_avail == addr);
+
+    addr = mphysaddr(used_hdr);
+    assert((addr & -4) == addr);
+    common_cfg->queue_used = addr;
+    assert(common_cfg->queue_used == addr);
 
     common_cfg->queue_msix_vector = msix_vector;
     assert(common_cfg->queue_msix_vector == msix_vector);
@@ -283,9 +351,9 @@ virtio_virtqueue_t::desc_t *virtio_virtqueue_t::alloc_desc(bool dev_writable)
     desc_t *desc = desc_tab + desc_first_free;
     desc_first_free = desc->next;
 
-    memset(desc, 0, sizeof(*desc));
-
-    desc->next = -1;
+    desc->addr = 0;
+    desc->len = 0;
+    desc->flags.raw = 0;
 
     if (dev_writable)
         desc->flags.bits.write = true;
@@ -298,26 +366,122 @@ uint16_t virtio_virtqueue_t::index_of(desc_t *desc) const
     return desc - desc_tab;
 }
 
-void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count)
+void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
+                                       virtio_iocp_t *iocp)
 {
     size_t mask = ~-(1U << log2_queue_size);
 
     scoped_lock lock(queue_lock);
+
+    bool skip = false;
+    size_t avail_head = avail_hdr->idx;
     for (size_t i = 0; i < count; ++i) {
-        uint16_t index = index_of(desc[i]);
-        avail_ring[2 + (avail_head++ & mask)] = index;
+        if (!skip) {
+            iocp->set_expect(1);
+            completions[avail_head] = iocp;
+
+            uint16_t index = index_of(desc[i]);
+            avail_ring[avail_head++ & mask] = index;
+        }
+
+        skip = desc[i]->flags.bits.next;
     }
-    atomic_fence();
 
     // Update used idx
-    used_ftr->used_event = avail_head - 1;
+    atomic_st_rel(&avail_ftr->used_event, avail_head - 1);
 
     // Update idx
-    avail_ring[1] = avail_head - 1;
+    atomic_st_rel(&avail_hdr->idx, avail_head);
 
-    atomic_fence();
+    if ((int16_t)avail_head - (int16_t)avail_ftr->used_event > 0)
+        atomic_st_rel(notify_ptr, queue_idx);
+}
 
-    *notify_ptr = avail_head - 1;
+void virtio_virtqueue_t::sendrecv(const void *sent_data, size_t sent_size,
+                                  void *rcvd_data, size_t rcvd_size,
+                                  virtio_iocp_t *iocp)
+{
+    mmphysrange_t ranges[16];
+    size_t range_count;
+
+    desc_t *desc[32];
+    size_t out = 0;
+
+    if (sent_data && sent_size) {
+        range_count = mphysranges(ranges, countof(ranges),
+                                  const_cast<void*>(sent_data), sent_size,
+                                  std::numeric_limits<uint32_t>::max());
+
+        for (size_t i = 0; i < range_count; ++i, ++out) {
+            desc[out] = alloc_desc(false);
+            desc[out]->addr = ranges[i].physaddr;
+            desc[out]->len = ranges[i].size;
+
+            if (out > 0) {
+                desc[out - 1]->flags.bits.next = true;
+                desc[out - 1]->next = index_of(desc[out]);
+            }
+        }
+    }
+
+    if (rcvd_data && rcvd_size) {
+        range_count = mphysranges(ranges, countof(ranges),
+                                  rcvd_data, rcvd_size,
+                                  std::numeric_limits<uint32_t>::max());
+
+        for (size_t i = 0; i < range_count; ++i) {
+            desc[out] = alloc_desc(true);
+            desc[out]->addr = ranges[i].physaddr;
+            desc[out]->len = ranges[i].size;
+
+            if (out > 0) {
+                desc[out - 1]->flags.bits.next = true;
+                desc[out - 1]->next = index_of(desc[out]);
+            }
+        }
+    }
+
+    enqueue_avail(desc, out, iocp);
+}
+
+void virtio_virtqueue_t::recycle_used()
+{
+    scoped_lock lock(queue_lock);
+
+//    printdbg("used_hdr\n");
+//    hex_dump(used_hdr, sizeof(*used_hdr), uintptr_t(used_hdr));
+//    printdbg("used_ring\n");
+//    hex_dump(used_ring, sizeof(*used_ring) << log2_queue_size,
+//             uintptr_t(used_ring));
+//    printdbg("used_ftr\n");
+//    hex_dump(used_ftr, sizeof(*used_ftr), uintptr_t(used_ftr));
+
+    size_t tail = used_tail;
+    size_t mask = ~-(1 << log2_queue_size);
+    size_t done_idx = used_hdr->idx;
+    do {
+        avail_t id = used_ring[tail & mask].id;
+
+        pending_completions.push_back(completions[tail & mask]);
+
+        avail_t end = id;
+        while (desc_tab[end].flags.bits.next)
+            end = desc_tab[end].next;
+
+        desc_tab[end].next = desc_first_free;
+        desc_first_free = id;
+    } while (++tail != done_idx);
+
+    used_tail = tail;
+
+    // Notify device how far used ring has been processed
+    used_ftr->used_event = tail - 1;
+
+    lock.unlock();
+
+    for (virtio_iocp_t *completion : pending_completions)
+        completion->invoke();
+    pending_completions.clear();
 }
 
 int virtio_factory_base_t::detect_virtio(int dev_class, int device,
@@ -333,12 +497,16 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
                 pci_iter.config.device > VIRTIO_DEV_MAX)
             continue;
 
-        VIRTIO_TRACE("Found %s device\n", name);
+        VIRTIO_TRACE("Found %s device at %u:%u:%u\n", name,
+                     pci_iter.bus, pci_iter.slot, pci_iter.func);
 
         std::unique_ptr<virtio_base_t> self = create();
 
+        virtio_base_t::virtio_devs.push_back(self);
         if (self->init(pci_iter))
-            virtio_base_t::virtio_devs.push_back(self.release());
+            self.release();
+        else
+            virtio_base_t::virtio_devs.pop_back();
     } while (pci_enumerate_next(&pci_iter));
 
     return 0;

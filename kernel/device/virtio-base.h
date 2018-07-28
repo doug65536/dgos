@@ -4,6 +4,7 @@
 #include "vector.h"
 #include "mutex.h"
 #include "iocp.h"
+#include "unique_ptr.h"
 
 class virtio_base_t;
 struct virtio_pci_common_cfg_t;
@@ -25,6 +26,10 @@ struct virtq_avail {
 
 class virtio_virtqueue_t {
 public:
+    using virtio_iocp_result_t = uint64_t;
+    using virtio_iocp_t = basic_iocp_t<virtio_iocp_result_t>;
+    using virtio_blocking_iocp_t = basic_blocking_iocp_t<virtio_iocp_result_t>;
+
     struct desc_t {
         uint64_t addr;
 
@@ -52,7 +57,10 @@ public:
 
     struct ring_ftr_t {
         uint16_t used_event;
+        uint16_t padding;
     };
+
+    using avail_t = uint16_t;
 
     struct used_t {
         uint32_t id;
@@ -63,8 +71,7 @@ public:
         : desc_tab(nullptr)
         , avail_ring(nullptr)
         , used_ring(nullptr)
-        , avail_head(0)
-        , used_head(0)
+        , used_tail(0)
         , desc_first_free(-1)
         , log2_queue_size(0)
         , single_page(false)
@@ -94,7 +101,14 @@ public:
     desc_t *alloc_desc(bool dev_writable);
 
     uint16_t index_of(desc_t *desc) const;
-    void enqueue_avail(desc_t **desc, size_t count);
+
+    void enqueue_avail(desc_t **desc, size_t count, virtio_iocp_t *iocp);
+
+    void sendrecv(void const *sent_data, size_t sent_size,
+                  void *rcvd_data, size_t rcvd_size,
+                  virtio_iocp_t *iocp);
+
+    void recycle_used();
 
 private:
     using lock_type = std::mcslock;
@@ -103,14 +117,21 @@ private:
     lock_type queue_lock;
     std::condition_variable queue_not_full;
 
+    std::unique_ptr<virtio_iocp_t*[]> completions;
+    std::vector<virtio_iocp_t*> pending_completions;
+
     desc_t *desc_tab;
-    uint16_t *avail_ring;
+
+    ring_hdr_t *avail_hdr;
+    avail_t *avail_ring;
+    ring_ftr_t *avail_ftr;
+
     ring_hdr_t volatile *used_hdr;
     ring_ftr_t volatile *used_ftr;
     used_t volatile *used_ring;
 
-    uint16_t avail_head;
-    uint16_t used_head;
+    uint16_t used_tail;
+    uint16_t queue_idx;
 
     int desc_first_free;
     uint16_t volatile *notify_ptr;
@@ -129,6 +150,8 @@ struct virtio_pci_cap_hdr_t {
     uint32_t offset;
     uint32_t length;
 };
+
+C_ASSERT(sizeof(virtio_pci_cap_hdr_t) == 16);
 
 // Vendor ID for all virtio devices
 #define VIRTIO_VENDOR   0x1AF4
@@ -221,10 +244,14 @@ struct virtio_pci_common_cfg_t {
     uint64_t queue_used;
 };
 
+C_ASSERT(sizeof(virtio_pci_common_cfg_t) == 56);
+
 struct virtio_pci_notify_cap_t {
     virtio_pci_cap_hdr_t cap;
     uint32_t notify_off_multiplier;
 };
+
+C_ASSERT(sizeof(virtio_pci_notify_cap_t) == 20);
 
 class virtio_base_t {
 public:
