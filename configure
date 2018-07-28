@@ -7422,9 +7422,9 @@ for flag in \
 		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
-		Werror=return-type Werror=array-bounds \
+		Werror=return-type Werror=array-bounds Werror=format \
 		Wmultistatement-macros Warray-bounds Wformat-overflow \
-		Wsuggest-final-types Wsuggest-final-methods Wsuggest-override \
+		Wsuggest-override \
 		Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn
@@ -7468,6 +7468,8 @@ fi
 
 done
 
+#Wsuggest-final-types
+#Wsuggest-final-methods
 #Wsuggest-attribute=noreturn
 #Wsuggest-attribute=format
 #Wsuggest-attribute=pure
