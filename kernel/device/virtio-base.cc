@@ -374,7 +374,7 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
     scoped_lock lock(queue_lock);
 
     bool skip = false;
-    size_t avail_head = avail_hdr->idx;
+    size_t avail_head = atomic_ld_acq(&avail_hdr->idx);
     for (size_t i = 0; i < count; ++i) {
         if (!skip) {
             iocp->set_expect(1);
