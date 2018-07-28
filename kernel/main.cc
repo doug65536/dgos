@@ -36,6 +36,7 @@
 #include "gdbstub.h"
 #include "conio.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #include "bootloader.h"
 
@@ -665,6 +666,9 @@ static int draw_test(void *p)
 
 static int init_thread(void *)
 {
+    printk("Initializing kernel threadpool\n");
+    workq::init(thread_cpu_count());
+
     printk("Initializing PCI\n");
     pci_init();
 
