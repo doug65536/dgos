@@ -997,12 +997,13 @@ EXPORT int printdbg(char const *format, ...)
     return result;
 }
 
-static int hex_dump_formatter(void const *mem, size_t size, size_t base,
+static int hex_dump_formatter(void const volatile *mem,
+                              size_t size, uintptr_t base,
                               int (*output)(char const *format, ...)
                               _printf_format(1, 2))
 {
-    uint8_t *buf = (uint8_t*)mem;
-    char line_buf[8 + 1 + 1 + 3*16 + 1 + 16 + 2];
+    uint8_t volatile *buf = (uint8_t volatile *)mem;
+    char line_buf[16 + 1 + 1 + 3*16 + 1 + 16 + 2];
     int written = 0;
 
     int line_ofs = 0;
@@ -1043,7 +1044,7 @@ static int hex_dump_formatter(void const *mem, size_t size, size_t base,
     return written;
 }
 
-int hex_dump(void const *mem, size_t size, size_t base)
+int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
 {
     return hex_dump_formatter(mem, size, base, printdbg);
 }
