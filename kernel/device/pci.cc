@@ -986,10 +986,10 @@ void pci_adj_control_bits(pci_addr_t addr, uint16_t set, uint16_t clr)
     pci_adj_bits_16(addr, offsetof(pci_config_hdr_t, command), set, clr);
 }
 
-void pci_adj_control_bits(pci_dev_t const& pci_dev,
+void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
                           uint16_t set, uint16_t clr)
 {
-    pci_adj_control_bits(pci_dev.addr, set, clr);
+    pci_adj_control_bits((pci_addr_t)pci_dev, set, clr);
 }
 
 void pci_clear_status_bits(pci_addr_t addr, uint16_t bits)

@@ -543,7 +543,7 @@ void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line);
 
 void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin);
 
-void pci_adj_control_bits(pci_dev_t const& pci_dev,
+void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
                           uint16_t set, uint16_t clr);
 
 void pci_adj_control_bits(int bus, int slot, int func,
