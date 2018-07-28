@@ -378,7 +378,7 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
     for (size_t i = 0; i < count; ++i) {
         if (!skip) {
             iocp->set_expect(1);
-            completions[avail_head] = iocp;
+            completions[avail_head & mask] = iocp;
 
             uint16_t index = index_of(desc[i]);
             avail_ring[avail_head++ & mask] = index;
