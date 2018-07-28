@@ -39,6 +39,10 @@ public:
         : backbuf(nullptr)
         , backbuf_sz(0)
         , gpu_config(nullptr)
+        , cmd_queue(nullptr)
+        , crsr_queue(nullptr)
+        , scrn_w(0)
+        , scrn_h(0)
     {
     }
 
@@ -60,8 +64,13 @@ private:
         uint32_t reserved;
     };
 
+    //
+    // 2D commands
+
     enum virtio_gpu_ctrl_type_t {
-        /* 2d commands */
+        VIRTIO_GPU_UNDEFINED = 0,
+
+        // 2D commands
         VIRTIO_GPU_CMD_GET_DISPLAY_INFO = 0x0100,
         VIRTIO_GPU_CMD_RESOURCE_CREATE_2D,
         VIRTIO_GPU_CMD_RESOURCE_UNREF,
@@ -71,15 +80,25 @@ private:
         VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING,
         VIRTIO_GPU_CMD_RESOURCE_DETACH_BACKING,
 
-        /* cursor commands */
+        // 3D commands
+        VIRTIO_GPU_CMD_CTX_CREATE = 0x0200,
+        VIRTIO_GPU_CMD_CTX_DESTROY,
+        VIRTIO_GPU_CMD_CTX_ATTACH_RESOURCE,
+        VIRTIO_GPU_CMD_CTX_DETACH_RESOURCE,
+        VIRTIO_GPU_CMD_RESOURCE_CREATE_3D,
+        VIRTIO_GPU_CMD_TRANSFER_TO_HOST_3D,
+        VIRTIO_GPU_CMD_TRANSFER_FROM_HOST_3D,
+        VIRTIO_GPU_CMD_SUBMIT_3D,
+
+        // Cursor commands
         VIRTIO_GPU_CMD_UPDATE_CURSOR = 0x0300,
         VIRTIO_GPU_CMD_MOVE_CURSOR,
 
-        /* success responses */
+        // Success responses
         VIRTIO_GPU_RESP_OK_NODATA = 0x1100,
         VIRTIO_GPU_RESP_OK_DISPLAY_INFO,
 
-        /* error responses */
+        // Error responses
         VIRTIO_GPU_RESP_ERR_UNSPEC = 0x1200,
         VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY,
         VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID,
@@ -293,6 +312,145 @@ private:
         virtio_gpu_update_cursor_t update_cursor;
     };
 
+    //
+    // 3D commands
+
+    struct virtio_gpu_ctx_create_t {
+        virtio_gpu_ctx_create_t()
+            : hdr(VIRTIO_GPU_CMD_CTX_CREATE)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+        uint32_t nlen;
+        uint32_t padding;
+        char debug_name[64];
+    };
+
+    struct virtio_gpu_ctx_destroy_t {
+        virtio_gpu_ctx_destroy_t()
+            : hdr(VIRTIO_GPU_CMD_CTX_DESTROY)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+    };
+
+    struct virtio_gpu_ctx_attach_resource_t {
+        virtio_gpu_ctx_attach_resource_t()
+            : hdr(VIRTIO_GPU_CMD_CTX_ATTACH_RESOURCE)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+        uint32_t resource_id;
+        uint32_t padding;
+    };
+
+    struct virtio_gpu_ctx_detach_resource_t {
+        virtio_gpu_ctx_detach_resource_t()
+            : hdr(VIRTIO_GPU_CMD_CTX_DETACH_RESOURCE)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+        uint32_t resource_id;
+        uint32_t padding;
+    };
+
+    struct virtio_gpu_resource_create_3d_t {
+        virtio_gpu_resource_create_3d_t()
+            : hdr(VIRTIO_GPU_CMD_RESOURCE_CREATE_3D)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+        uint32_t resource_id;
+        uint32_t target;
+        uint32_t format;
+        uint32_t bind;
+        uint32_t width;
+        uint32_t height;
+        uint32_t depth;
+        uint32_t array_size;
+        uint32_t last_level;
+        uint32_t nr_samples;
+        uint32_t flags;
+        uint32_t padding;
+    };
+
+    struct virtio_gpu_box_t {
+        uint32_t x;
+        uint32_t y;
+        uint32_t z;
+        uint32_t w;
+        uint32_t h;
+        uint32_t d;
+    };
+
+    struct virtio_gpu_transfer_tofrom_host_3d_t {
+        virtio_gpu_transfer_tofrom_host_3d_t(bool to_host)
+            : hdr(to_host ? VIRTIO_GPU_CMD_TRANSFER_TO_HOST_3D
+                          : VIRTIO_GPU_CMD_TRANSFER_FROM_HOST_3D)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+        virtio_gpu_box_t box;
+        uint64_t offset;
+        uint32_t resource_id;
+        uint32_t level;
+        uint32_t stride;
+        uint32_t layer_stride;
+    };
+
+    struct virtio_gpu_cmd_submit_3d_t {
+        virtio_gpu_cmd_submit_3d_t()
+            : hdr(VIRTIO_GPU_CMD_SUBMIT_3D)
+        {
+        }
+
+        virtio_gpu_ctrl_hdr_t hdr;
+        uint32_t size;
+        uint32_t padding;
+    };
+
+    enum {
+       VIRGL_CCMD_NOP = 0,
+       VIRGL_CCMD_CREATE_OBJECT = 1,
+       VIRGL_CCMD_BIND_OBJECT,
+       VIRGL_CCMD_DESTROY_OBJECT,
+       VIRGL_CCMD_SET_VIEWPORT_STATE,
+       VIRGL_CCMD_SET_FRAMEBUFFER_STATE,
+       VIRGL_CCMD_SET_VERTEX_BUFFERS,
+       VIRGL_CCMD_CLEAR,
+       VIRGL_CCMD_DRAW_VBO,
+       VIRGL_CCMD_RESOURCE_INLINE_WRITE,
+       VIRGL_CCMD_SET_SAMPLER_VIEWS,
+       VIRGL_CCMD_SET_INDEX_BUFFER,
+       VIRGL_CCMD_SET_CONSTANT_BUFFER,
+       VIRGL_CCMD_SET_STENCIL_REF,
+       VIRGL_CCMD_SET_BLEND_COLOR,
+       VIRGL_CCMD_SET_SCISSOR_STATE,
+       VIRGL_CCMD_BLIT,
+       VIRGL_CCMD_RESOURCE_COPY_REGION,
+       VIRGL_CCMD_BIND_SAMPLER_STATES,
+       VIRGL_CCMD_BEGIN_QUERY,
+       VIRGL_CCMD_END_QUERY,
+       VIRGL_CCMD_GET_QUERY_RESULT,
+       VIRGL_CCMD_SET_POLYGON_STIPPLE,
+       VIRGL_CCMD_SET_CLIP_STATE,
+       VIRGL_CCMD_SET_SAMPLE_MASK,
+       VIRGL_CCMD_SET_STREAMOUT_TARGETS,
+       VIRGL_CCMD_SET_RENDER_CONDITION,
+       VIRGL_CCMD_SET_UNIFORM_BUFFER,
+
+       VIRGL_CCMD_SET_SUB_CTX,
+       VIRGL_CCMD_CREATE_SUB_CTX,
+       VIRGL_CCMD_DESTROY_SUB_CTX,
+       VIRGL_CCMD_BIND_SHADER
+    };
+
     void irq_handler(int offset) override final;
 
     void config_irq();
@@ -304,9 +462,21 @@ private:
 
     bool handle_config_change();
 
+    bool issue_get_display_info();
+    bool issue_create_2d(uint32_t width, uint32_t height, uint32_t resource_id);
+    bool issue_attach_backing();
+    bool issue_set_scanout();
+    bool issue_transfer_to_host_2d(uint32_t x, uint32_t y,
+                                   uint32_t width, uint32_t height);
+    bool issue_flush(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+
     uint32_t *backbuf;
     size_t backbuf_sz;
     virtio_gpu_config_t volatile *gpu_config;
+    virtio_virtqueue_t *cmd_queue;
+    virtio_virtqueue_t *crsr_queue;
+    uint32_t scrn_w;
+    uint32_t scrn_h;
 };
 
 static void virtio_gpu_startup(void*)
@@ -333,48 +503,67 @@ bool virtio_gpu_dev_t::init(pci_dev_iterator_t const &pci_iter)
     if (!virtio_init(pci_iter, "virtio-gpu"))
         return false;
 
+    cmd_queue = &queues[0];
+    crsr_queue = &queues[1];
+
     gpu_config = (virtio_gpu_config_t*)device_cfg;
 
-    if (!handle_config_change())
-        return false;
+    uint32_t events = atomic_ld_acq(&gpu_config->events_read);
+    if (events & 1) {
+        if (!handle_config_change())
+            return false;
+
+        atomic_st_rel(&gpu_config->events_clear, events);
+    }
 
     return true;
 }
 
-bool virtio_gpu_dev_t::handle_config_change()
+bool virtio_gpu_dev_t::issue_get_display_info()
 {
-    virtio_virtqueue_t& queue = queues[0];
-
-    virtio_virtqueue_t::virtio_blocking_iocp_t iocp;
-
-    // Request screen dimensions
     virtio_gpu_get_display_info_t get_display_info;
     virtio_gpu_resp_display_info_t display_info_resp;
+    blocking_iocp_t iocp;
 
-    queue.sendrecv(&get_display_info, sizeof(get_display_info),
-                   &display_info_resp, sizeof(display_info_resp), &iocp);
+    cmd_queue->sendrecv(&get_display_info, sizeof(get_display_info),
+                        &display_info_resp, sizeof(display_info_resp), &iocp);
     iocp.wait();
 
     if (display_info_resp.hdr.type != VIRTIO_GPU_RESP_OK_DISPLAY_INFO)
         return false;
 
-    int scrn_w = display_info_resp.pmodes[0].r.width;
-    int scrn_h = display_info_resp.pmodes[0].r.height;
+    scrn_w = display_info_resp.pmodes[0].r.width;
+    scrn_h = display_info_resp.pmodes[0].r.height;
 
+    return true;
+}
+
+bool virtio_gpu_dev_t::issue_create_2d(
+        uint32_t width, uint32_t height, uint32_t resource_id)
+{
     virtio_gpu_resource_create_2d_t create_2d;
     virtio_gpu_ctrl_hdr_t resp(0);
+    blocking_iocp_t iocp;
 
     create_2d.format = VIRTIO_GPU_FORMAT_B8G8R8X8_UNORM;
-    create_2d.width = scrn_w;
-    create_2d.height = scrn_h;
+    create_2d.width = width;
+    create_2d.height = height;
     create_2d.resource_id = 1;
 
-    iocp.reset();
-    queue.sendrecv(&create_2d, sizeof(create_2d), &resp, sizeof(resp), &iocp);
+    cmd_queue->sendrecv(&create_2d, sizeof(create_2d),
+                        &resp, sizeof(resp), &iocp);
     iocp.wait();
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
         return false;
+
+    return true;
+}
+
+bool virtio_gpu_dev_t::issue_attach_backing()
+{
+    blocking_iocp_t iocp;
+    virtio_gpu_ctrl_hdr_t resp(0);
 
     if (backbuf_sz)
         munmap(backbuf, backbuf_sz);
@@ -383,6 +572,7 @@ bool virtio_gpu_dev_t::handle_config_change()
     backbuf_sz = scrn_w * scrn_h * sizeof(uint32_t);
     backbuf = (uint32_t*)mmap(nullptr, backbuf_sz, PROT_READ | PROT_WRITE,
                               MAP_POPULATE, -1, 0);
+    mlock(backbuf, backbuf_sz);
 
     // Calculate worst case physical range list size
     size_t backbuf_ranges_cap = (backbuf_sz + PAGE_SIZE - 1) >> PAGE_SCALE;
@@ -415,16 +605,20 @@ bool virtio_gpu_dev_t::handle_config_change()
         mem_entries[i].length = backbuf_ranges[i].size;
     }
 
-    iocp.reset();
-    queue.sendrecv(backing_cmd.get(), backing_cmd_sz,
-                   &resp, sizeof(resp), &iocp);
+    cmd_queue->sendrecv(backing_cmd.get(), backing_cmd_sz,
+                        &resp, sizeof(resp), &iocp);
     iocp.wait();
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
         return false;
 
-    // Fill the backbuffer
-    memset32_nt(backbuf, 0x123456, backbuf_sz);
+    return true;
+}
+
+bool virtio_gpu_dev_t::issue_set_scanout()
+{
+    blocking_iocp_t iocp;
+    virtio_gpu_ctrl_hdr_t resp(0);
 
     virtio_gpu_set_scanout_t set_scanout;
 
@@ -435,43 +629,92 @@ bool virtio_gpu_dev_t::handle_config_change()
     set_scanout.resource_id = 1;
     set_scanout.scanout_id = 0;
 
-    iocp.reset();
-    queue.sendrecv(&set_scanout, sizeof(set_scanout),
-                   &resp, sizeof(resp), &iocp);
+    cmd_queue->sendrecv(&set_scanout, sizeof(set_scanout),
+                        &resp, sizeof(resp), &iocp);
     iocp.wait();
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
         return false;
 
-    virtio_gpu_transfer_to_host_2d_t xfer;
+    return true;
+}
 
-    xfer.r.x = 0;
-    xfer.r.y = 0;
-    xfer.r.width = scrn_w;
-    xfer.r.height = scrn_h;
+bool virtio_gpu_dev_t::issue_transfer_to_host_2d(
+        uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    virtio_gpu_transfer_to_host_2d_t xfer;
+    virtio_gpu_ctrl_hdr_t resp(0);
+    blocking_iocp_t iocp;
+
+    xfer.r.x = x;
+    xfer.r.y = y;
+    xfer.r.width = width;
+    xfer.r.height = height;
     xfer.resource_id = 1;
 
-    iocp.reset();
-    queue.sendrecv(&xfer, sizeof(xfer), &resp, sizeof(resp), &iocp);
+    cmd_queue->sendrecv(&xfer, sizeof(xfer), &resp, sizeof(resp), &iocp);
     iocp.wait();
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
         return false;
 
-    virtio_gpu_resource_flush_t flush;
+    return true;
+}
 
-    flush.r.x = 0;
-    flush.r.y = 0;
-    flush.r.width = scrn_w;
-    flush.r.height = scrn_h;
+bool virtio_gpu_dev_t::issue_flush(
+        uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    virtio_gpu_resource_flush_t flush;
+    virtio_gpu_ctrl_hdr_t resp(0);
+    blocking_iocp_t iocp;
+
+    flush.r.x = x;
+    flush.r.y = y;
+    flush.r.width = width;
+    flush.r.height = height;
     flush.resource_id = 1;
 
-    iocp.reset();
-    queue.sendrecv(&flush, sizeof(flush), &resp, sizeof(resp), &iocp);
+    cmd_queue->sendrecv(&flush, sizeof(flush), &resp, sizeof(resp), &iocp);
     iocp.wait();
 
     if (resp.type != VIRTIO_GPU_RESP_OK_NODATA)
         return false;
+
+    return true;
+}
+
+bool virtio_gpu_dev_t::handle_config_change()
+{
+    VIRTIO_GPU_TRACE("Getting display info\n");
+    // Request screen dimensions
+    if (!issue_get_display_info())
+        return false;
+    VIRTIO_GPU_TRACE("...W=%u, H=%u\n", scrn_w, scrn_h);
+
+    VIRTIO_GPU_TRACE("Issuing create_2d\n");
+    if (!issue_create_2d(scrn_w, scrn_h, 1))
+        return false;
+
+    VIRTIO_GPU_TRACE("Issuing attach_backing\n");
+    if (!issue_attach_backing())
+        return false;
+
+    VIRTIO_GPU_TRACE("Issuing set_scanout\n");
+    if (!issue_set_scanout())
+        return false;
+
+    // Fill the backbuffer
+    memset32_nt(backbuf, 0x123456, backbuf_sz);
+
+    VIRTIO_GPU_TRACE("Issuing transfer_to_host_2d\n");
+    if (!issue_transfer_to_host_2d(0, 0, scrn_w, scrn_h))
+        return false;
+
+    VIRTIO_GPU_TRACE("Issuing flush\n");
+    if (!issue_flush(0, 0, scrn_w, scrn_h))
+        return false;
+
+    VIRTIO_GPU_TRACE("Config change complete\n");
 
     return true;
 }
@@ -493,13 +736,12 @@ void virtio_gpu_dev_t::config_irq()
 
 void virtio_gpu_dev_t::queue_irq_command()
 {
-    virtio_virtqueue_t& queue = queues[0];
-    queue.recycle_used();
+    cmd_queue->recycle_used();
 }
 
 void virtio_gpu_dev_t::queue_irq_cursor()
 {
-
+    crsr_queue->recycle_used();
 }
 
 void virtio_gpu_dev_t::irq_handler(int offset)
@@ -519,11 +761,10 @@ bool virtio_gpu_dev_t::offer_features(feature_set_t &features)
     if (features[VIRTIO_F_GPU3D_BIT])
         printk("virtio: 3D supported\n");
 
-    feature_set_t supported(std::initializer_list<int>{
-                                VIRTIO_F_VERSION_1_BIT,
-                                VIRTIO_F_INDIRECT_DESC_BIT,
-                                VIRTIO_F_RING_EVENT_IDX_BIT,
-                                VIRTIO_F_GPU3D_BIT
+    feature_set_t supported({ VIRTIO_F_VERSION_1_BIT,
+                              VIRTIO_F_INDIRECT_DESC_BIT,
+                              VIRTIO_F_RING_EVENT_IDX_BIT,
+                              VIRTIO_F_GPU3D_BIT
                             });
 
     features &= supported;

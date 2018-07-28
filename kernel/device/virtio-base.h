@@ -136,9 +136,9 @@ private:
     avail_t *avail_ring;
     ring_ftr_t *avail_ftr;
 
-    ring_hdr_t volatile *used_hdr;
-    ring_ftr_t volatile *used_ftr;
-    used_t volatile *used_ring;
+    ring_hdr_t *used_hdr;
+    ring_ftr_t *used_ftr;
+    used_t *used_ring;
 
     uint16_t used_tail;
     uint16_t queue_idx;
