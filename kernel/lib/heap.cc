@@ -19,12 +19,8 @@
 // and filling allocated memory with 0xf0
 #define HEAP_DEBUG  1
 
-// Always use paged allocation with guard pages
-// Realloc always moves the memory to a new range
-#define HEAP_PAGEONLY 0
-
 // Don't free virtual address ranges, just free physical pages
-#define HEAP_NOVFREE 0
+#define HEAP_NOVFREE 1
 
 struct heap_hdr_t {
     uintptr_t size_next;
@@ -36,8 +32,6 @@ C_ASSERT(sizeof(heap_hdr_t) == 16);
 
 static constexpr uint32_t HEAP_BLK_TYPE_USED = 0xeda10ca1;  // "a10ca1ed"
 static constexpr uint32_t HEAP_BLK_TYPE_FREE = 0x0cb1eefe;  // "feeeb10c"
-
-#if !HEAP_PAGEONLY
 
 /// bucket  slot sz item sz items efficiency
 /// [ 0] ->      32      16  2048     50.00%
@@ -359,26 +353,10 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
     return block;
 }
 
-#endif
-
-#if HEAP_PAGEONLY
-
-struct heap_t {
-};
-
-heap_t *heap_create(void)
-{
-    return (heap_t*)0x42;
-}
-
-void heap_destroy(heap_t *)
-{
-}
-
 _assume_aligned(16)
-void *heap_calloc(heap_t *heap, size_t num, size_t size)
+void *pageheap_calloc(size_t num, size_t size)
 {
-    void *blk = heap_alloc(heap, num * size);
+    void *blk = pageheap_alloc(num * size);
     return memset(blk, 0, size);
 }
 
@@ -399,7 +377,7 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
 // |      ...     |
 
 _assume_aligned(16)
-void *heap_alloc(heap_t *heap, size_t size)
+void *pageheap_alloc(size_t size)
 {
     // Round size up to a multiple of 16 bytes, include header in size
     size = ((size + 15) & -16) + sizeof(heap_hdr_t);
@@ -433,7 +411,7 @@ void *heap_alloc(heap_t *heap, size_t size)
     return hdr + 1;
 }
 
-void heap_free(heap_t *heap, void *block)
+void pageheap_free(void *block)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
@@ -444,18 +422,16 @@ void heap_free(heap_t *heap, void *block)
 }
 
 _assume_aligned(16)
-void *heap_realloc(heap_t *heap, void *block, size_t size)
+void *pageheap_realloc(void *block, size_t size)
 {
     if (unlikely(!block))
-        return heap_alloc(heap, size);
+        return pageheap_alloc(size);
 
     if (unlikely(size == 0)) {
-        heap_free(heap, block);
+        pageheap_free(block);
     }
 
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
-    char *other = (char*)heap_alloc(heap, size);
+    char *other = (char*)pageheap_alloc(size);
     return memcpy(other, block, hdr->size_next - sizeof(heap_hdr_t));
 }
-
-#endif

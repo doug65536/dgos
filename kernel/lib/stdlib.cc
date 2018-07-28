@@ -6,6 +6,11 @@
 #include "heap.h"
 #include "callout.h"
 
+// Always use paged allocation with guard pages
+// Realloc always moves the memory to a new range
+#define HEAP_PAGEONLY 1
+
+#if !HEAP_PAGEONLY
 static heap_t *default_heap;
 
 void malloc_startup(void *p)
@@ -13,8 +18,6 @@ void malloc_startup(void *p)
     (void)p;
     default_heap = heap_create();
 }
-
-//REGISTER_CALLOUT(malloc_startup, nullptr, callout_type_t::vmm_ready, "000");
 
 void *calloc(size_t num, size_t size)
 {
@@ -35,6 +38,33 @@ void free(void *p)
 {
     heap_free(default_heap, p);
 }
+#else
+
+void malloc_startup(void *p)
+{
+}
+
+void *calloc(size_t num, size_t size)
+{
+    return pageheap_calloc(num, size);
+}
+
+void *malloc(size_t size)
+{
+    return pageheap_alloc(size);
+}
+
+void *realloc(void *p, size_t new_size)
+{
+    return pageheap_realloc(p, new_size);
+}
+
+void free(void *p)
+{
+    pageheap_free(p);
+}
+
+#endif
 
 char *strdup(char const *s)
 {
