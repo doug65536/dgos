@@ -244,7 +244,7 @@ struct mmphysrange_t {
 /// sizes less than or equal to max_length
 size_t mphysranges(mmphysrange_t *ranges,
                    size_t ranges_count,
-                   void *addr, size_t size,
+                   const void *addr, size_t size,
                    size_t max_size);
 
 // Ensure no range crosses the specified boundary
