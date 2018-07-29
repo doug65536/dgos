@@ -67,7 +67,6 @@ static void sanity_check_by_addr(rbtree_t *tree)
 }
 #endif
 
-#if DEBUG_ADDR_ALLOC
 template<typename K, typename V>
 static int dump_addr_node(typename rbtree_t<K,V>::kvp_t *kvp, void *p)
 {
@@ -88,7 +87,6 @@ static void dump_addr_tree(rbtree_t<K,V> *tree,
 
     tree->walk(dump_addr_node<K,V>, names);
 }
-#endif
 
 void contiguous_allocator_t::set_early_base(linaddr_t *base_ptr)
 {
@@ -209,12 +207,12 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
     linaddr_t end = addr + size;
 
     // Find the last free range before or at the address
-    tree_t::iter_t place = free_addr_by_addr.lower_bound(addr, 0);
+    tree_t::iter_t by_addr_place = free_addr_by_addr.lower_bound(addr, 0);
 
     tree_t::iter_t next_place;
 
-    for (; place; place = next_place) {
-        tree_t::kvp_t by_addr = free_addr_by_addr.item(place);
+    for (; by_addr_place; by_addr_place = next_place) {
+        tree_t::kvp_t by_addr = free_addr_by_addr.item(by_addr_place);
 
         if (by_addr.key <= addr && (by_addr.key + by_addr.val) >= end) {
             //
@@ -224,7 +222,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
 
             // Delete the address entry
-            free_addr_by_addr.delete_at(place);
+            free_addr_by_addr.delete_at(by_addr_place);
 
             // Free space up to beginning of hole
             tree_t::kvp_t new_before = {
@@ -251,20 +249,20 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
                 free_addr_by_size.insert(new_after.val, new_after.key);
 
             return true;
-        } else if (!require_free) {
+        } else if (require_free) {
             return false;
         } else if (by_addr.key < addr && by_addr.key + by_addr.val > addr) {
             //
             // The found free block is before the range and overlaps it
 
             // Save next block
-            next_place = free_addr_by_addr.next(place);
+            next_place = free_addr_by_addr.next(by_addr_place);
 
             // Delete the size entry
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
 
             // Delete the address entry
-            free_addr_by_addr.delete_at(place);
+            free_addr_by_addr.delete_at(by_addr_place);
 
             // Create a smaller block that does not overlap taken range
             by_addr.val = addr - by_addr.key;
@@ -278,19 +276,19 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             //
             // Range completely covers block, delete block
 
-            next_place = free_addr_by_addr.next(place);
+            next_place = free_addr_by_addr.next(by_addr_place);
 
             free_addr_by_size.delete_item(
                         by_addr.val, by_addr.key);
 
-            free_addr_by_addr.delete_at(place);
+            free_addr_by_addr.delete_at(by_addr_place);
         } else if (by_addr.key > addr) {
             //
             // Range cut off some of beginning of block
 
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
 
-            free_addr_by_addr.delete_at(place);
+            free_addr_by_addr.delete_at(by_addr_place);
 
             return true;
         } else {
@@ -351,7 +349,6 @@ void contiguous_allocator_t::release_linear(uintptr_t addr, size_t size)
 
 void contiguous_allocator_t::dump(char const *format, ...)
 {
-#if DEBUG_ADDR_ALLOC
     va_list ap;
     va_start(ap, format);
     vprintdbg(format, ap);
@@ -361,5 +358,4 @@ void contiguous_allocator_t::dump(char const *format, ...)
     dump_addr_tree(&free_addr_by_addr, "addr", "size");
     printdbg("By size\n");
     dump_addr_tree(&free_addr_by_size, "size", "addr");
-#endif
 }

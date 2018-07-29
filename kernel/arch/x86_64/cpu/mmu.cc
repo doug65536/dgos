@@ -25,6 +25,7 @@
 #include "main.h"
 #include "inttypes.h"
 #include "except.h"
+#include "contig_alloc.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
@@ -486,8 +487,6 @@ static linaddr_t linear_base = PT_MAX_ADDR;
 mmu_phys_allocator_t phys_allocator;
 
 static uint64_t volatile shootdown_pending;
-
-#include "contig_alloc.h"
 
 static contiguous_allocator_t linear_allocator;
 static contiguous_allocator_t near_allocator;
@@ -1668,7 +1667,7 @@ void mmu_init()
 
 static size_t round_up(size_t n)
 {
-    return (n + PAGE_MASK) & (int)-PAGE_SIZE;
+    return (n + PAGE_MASK) & -PAGE_SIZE;
 }
 
 static size_t round_down(size_t n)
@@ -2105,7 +2104,7 @@ void *mremap(
             unlikely(old_size == 0) ||
             unlikely(new_size == 0) ||
             unlikely(flags & MREMAP_INVALID_MASK) ||
-            unlikely((!(flags & MREMAP_FIXED)) == (new_st == 0))) {
+            unlikely((!(flags & MREMAP_FIXED)) != (new_st == 0))) {
         if (ret_errno)
             *ret_errno = errno_t::EINVAL;
         return MAP_FAILED;
@@ -2140,6 +2139,8 @@ void *mremap(
                 thread_current_process()->get_allocator() :
                 &linear_allocator;
 
+    allocator->dump("mremap allocator dump\n");
+
     pte_t *new_base;
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
@@ -2151,7 +2152,7 @@ void *mremap(
         new_base = mm_create_pagetables_aligned(new_st, new_size);
         pte_t new_pte = (low ? PTE_USER : PTE_GLOBAL) |
                 PTE_WRITABLE | PTE_ADDR;
-        for (size_t i = 0, e = new_size >> 3; i < e; ++i) {
+        for (size_t i = 0, e = new_size >> PAGE_SCALE; i < e; ++i) {
             pte_t pte = atomic_xchg(new_base + i, new_pte);
             if (pte && (pte & PTE_ADDR) != PTE_ADDR)
                 free_batch.free(pte & PTE_ADDR);
@@ -2165,9 +2166,16 @@ void *mremap(
     new_st = allocator->alloc_linear(new_size);
     new_base = mm_create_pagetables_aligned(new_st, new_size);
 
-    for (size_t i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
+    size_t i, e;
+    for (i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
         pte = atomic_xchg(new_base + i, pte);
+        if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+            free_batch.free(pte & PTE_ADDR);
+    }
+
+    for (e = new_size >> PAGE_SCALE; i < e; ++i) {
+        pte_t pte = atomic_xchg(new_base + i, PTE_ADDR | PTE_WRITABLE);
         if (pte && (pte & PTE_ADDR) != PTE_ADDR)
             free_batch.free(pte & PTE_ADDR);
     }
