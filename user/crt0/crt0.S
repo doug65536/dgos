@@ -35,7 +35,6 @@ _start:
     movq (%rbx),%rdx
     // Update the PLT with the resolver return value
     movq %rax,(%rdx)
-
 .Lrela_iplt_skip:
     addq $ 24,%rbx
 .Lrela_iplt_done:
