@@ -911,7 +911,7 @@ void nvme_if_t::identify_handler(
     munmap(data, 4096);
 }
 
-void nvme_if_t::cleanup()
+void nvme_if_t::cleanup_if()
 {
 }
 
@@ -945,7 +945,7 @@ void nvme_dev_t::init(nvme_if_t *parent,
     this->log2_sectorsize = log2_sectorsize;
 }
 
-void nvme_dev_t::cleanup()
+void nvme_dev_t::cleanup_dev()
 {
 
 }

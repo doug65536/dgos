@@ -1802,7 +1802,7 @@ std::vector<storage_dev_base_t*> ahci_if_t::detect_devices()
     return list;
 }
 
-void ahci_if_t::cleanup()
+void ahci_if_t::cleanup_if()
 {
 }
 
@@ -1843,7 +1843,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
     return true;
 }
 
-void ahci_dev_t::cleanup()
+void ahci_dev_t::cleanup_dev()
 {
 }
 

@@ -14,6 +14,15 @@
 
 std::vector<virtio_base_t*> virtio_base_t::virtio_devs;
 
+char const *virtio_base_t::cap_names[] = {
+    "<invalid>",
+    "VIRTIO_PCI_CAP_COMMON_CFG",
+    "VIRTIO_PCI_CAP_NOTIFY_CFG",
+    "VIRTIO_PCI_CAP_ISR_CFG",
+    "VIRTIO_PCI_CAP_DEVICE_CFG",
+    "VIRTIO_PCI_CAP_PCI_CFG"
+};
+
 bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                                 char const *isr_name)
 {
@@ -22,15 +31,20 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
     // Make sure bus master and memory space is enabled, disable I/O space
     pci_adj_control_bits(pci_iter, PCI_CMD_BME | PCI_CMD_MSE, PCI_CMD_IOSE);
 
+    VIRTIO_TRACE("Initializing vendor=%#x, device=%#x\n",
+                 pci_iter.config.vendor, pci_iter.config.device);
+
     for (int cap_start = 0, cap;
          0 != (cap = pci_find_capability(pci_iter, PCICAP_VENDOR, cap_start));
          cap_start = cap) {
         pci_config_copy(pci_iter, &cap_rec, cap, sizeof(cap_rec));
 
         VIRTIO_TRACE("Found %s capability"
-                     ": type=%#x, bar=%d"
+                     ": type=%s (%#x), bar=%d"
                      ", ofs=%#x, len=%#x\n",
                      isr_name,
+                     cap_names[cap_rec.type < countof(cap_names)
+                                ? cap_rec.type : 0],
                      cap_rec.type, cap_rec.bar,
                      cap_rec.offset, cap_rec.length);
 
@@ -46,8 +60,6 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
         switch (cap_rec.type) {
         case VIRTIO_PCI_CAP_COMMON_CFG:
-            VIRTIO_TRACE("... VIRTIO_PCI_CAP_COMMON_CFG\n");
-
             common_cfg_size = cap_rec.length;
 
             common_cfg = (virtio_pci_common_cfg_t*)mmap(
@@ -157,8 +169,6 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_NOTIFY_CFG:
-            VIRTIO_TRACE("... VIRTIO_PCI_CAP_NOTIFY_CFG\n");
-
             notify_cap_size = cap_rec.length;
             notify_cap = (virtio_pci_notify_cap_t *)mmap(
                         (void*)bar, cap_rec.length, PROT_READ | PROT_WRITE,
@@ -171,13 +181,10 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_ISR_CFG:
-            VIRTIO_TRACE("... VIRTIO_PCI_CAP_ISR_CFG\n");
             // This is ignored, because only MSI-X is used
             break;
 
         case VIRTIO_PCI_CAP_DEVICE_CFG:
-            VIRTIO_TRACE("... VIRTIO_PCI_CAP_DEVICE_CFG\n");
-
             device_cfg_size = cap_rec.length;
 
             device_cfg = (virtio_pci_common_cfg_t*)mmap(
@@ -187,11 +194,9 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_PCI_CFG:
-            VIRTIO_TRACE("... VIRTIO_PCI_CAP_PCI_CFG\n");
             break;
 
         default:
-            VIRTIO_TRACE("... unrecognized type!\n");
             break;
         }
     }
@@ -303,14 +308,6 @@ bool virtio_virtqueue_t::init(
         desc_tab[i - 1].next = desc_first_free;
         desc_first_free = i - 1;
     }
-
-//    printdbg("avail_hdr\n");
-//    hex_dump(avail_hdr, sizeof(*avail_hdr), uintptr_t(avail_hdr));
-//    printdbg("avail_ring\n");
-//    hex_dump(avail_ring, sizeof(*avail_ring) << log2_queue_size,
-//             uintptr_t(avail_ring));
-//    printdbg("avail_ftr\n");
-//    hex_dump(avail_ftr, sizeof(*avail_ftr),  uintptr_t(avail_ftr));
 
     common_cfg->queue_size = 1 << log2_queue_size;
     assert(common_cfg->queue_size == (1 << log2_queue_size));
@@ -448,14 +445,6 @@ void virtio_virtqueue_t::recycle_used()
 {
     scoped_lock lock(queue_lock);
 
-//    printdbg("used_hdr\n");
-//    hex_dump(used_hdr, sizeof(*used_hdr), uintptr_t(used_hdr));
-//    printdbg("used_ring\n");
-//    hex_dump(used_ring, sizeof(*used_ring) << log2_queue_size,
-//             uintptr_t(used_ring));
-//    printdbg("used_ftr\n");
-//    hex_dump(used_ftr, sizeof(*used_ftr), uintptr_t(used_ftr));
-
     size_t tail = used_tail;
     size_t mask = ~-(1 << log2_queue_size);
     size_t done_idx = used_hdr->idx;
@@ -493,6 +482,8 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 {
     pci_dev_iterator_t pci_iter;
 
+    VIRTIO_TRACE("Probing for %s device\n", name);
+
     if (!pci_enumerate_begin(&pci_iter, dev_class, -1, VIRTIO_VENDOR, device))
         return 0;
 
@@ -507,10 +498,12 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
         std::unique_ptr<virtio_base_t> self = create();
 
         virtio_base_t::virtio_devs.push_back(self);
-        if (self->init(pci_iter))
+        if (self->init(pci_iter)) {
+            found_device(self);
             self.release();
-        else
+        } else {
             virtio_base_t::virtio_devs.pop_back();
+        }
     } while (pci_enumerate_next(&pci_iter));
 
     return 0;

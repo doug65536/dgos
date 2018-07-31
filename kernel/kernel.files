@@ -39,6 +39,8 @@ device/usb_xhci.bits
 device/usb_xhci.bits.h
 device/virtio-base.cc
 device/virtio-base.h
+device/virtio-blk.cc
+device/virtio-blk.h
 device/virtio-gpu.cc
 device/virtio-gpu.h
 lib/asan.cc

@@ -322,7 +322,7 @@ std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
     return list;
 }
 
-void ide_if_t::cleanup()
+void ide_if_t::cleanup_if()
 {
 }
 
@@ -1206,7 +1206,7 @@ std::vector<storage_dev_base_t*> ide_if_t::detect_devices()
     return list;
 }
 
-void ide_dev_t::cleanup()
+void ide_dev_t::cleanup_dev()
 {
 }
 

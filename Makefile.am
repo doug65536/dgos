@@ -767,6 +767,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/virtio-base.h \
 	kernel/device/virtio-gpu.cc \
 	kernel/device/virtio-gpu.h \
+	kernel/device/virtio-blk.cc \
+	kernel/device/virtio-blk.h \
 	kernel/device/vga.cc \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
@@ -1509,6 +1511,7 @@ QEMU_DISK_TYPE_iso = ide-cd
 QEMU_DISK_TYPE_fat = ide-hd
 
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
+QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
 
 #-device ich9-ahci,id=bootif
 
@@ -1558,12 +1561,66 @@ monitor-debug-output:
 monitor-connect:
 	telnet localhost 7777
 
-# Generate emulators makefile
-$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
-		$(top_srcdir)/qemu-emu-generator
-	$(top_srcdir)/qemu-emu-generator
+QL_RT = debug run trace
+QL_NP = up smp
+QL_BT = bios efi
+QL_BM = pxe hd
+QL_FS = iso fat
+QL_SC = ahci ide nvme usb virtio
+QL_EM = kvm tcg
 
--include qemu-emu.mk
+# 1=rt, 2=np, 3=bt, 4=bm, 5=fs, 6=sc, 7=em
+define qemu_launcher =
+$(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7): $$(call QEMU_IMAGE,$(5)) $$(QEMU_EXTRA_DEPS)
+	echo -e -n '\ec' >> dump/qemu-debug-out
+	echo Running $$@
+	echo $$$$1 = $(1)
+	echo $$$$2 = $(2)
+	echo $$$$3 = $(3)
+	echo $$$$4 = $(4)
+	echo $$$$5 = $(5)
+	echo $$$$6 = $(6)
+	echo $$$$7 = $(7)
+	$$(QEMU_SUDO) $$(QEMU) \
+		$$(QEMU_EARLY) \
+		$$(QEMU_COMMON) \
+		$$(call QEMU_EMU,$(7)) \
+		$$(call QEMU_DRV,$(5)) \
+		$$(call QEMU_NP,$(2)) \
+		$$(call QEMU_HDCTL,$(6),$(5)) \
+		$$(call QEMU_BOOT,$(3)) \
+		$$(call QEMU_RT,$(1)) \
+		$$(call QEMU_BOOTMEDIA,$(4),$(3)) \
+		$$(QEMU_EXTRA)
+
+.PHONY: $(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7)
+
+endef
+
+$(foreach rt,$(QL_RT), \
+	$(foreach np,$(QL_NP), \
+		$(foreach bt,$(QL_BT), \
+			$(foreach bm,$(QL_BM), \
+				$(foreach fs,$(QL_FS), \
+					$(foreach sc,$(QL_SC), \
+						$(foreach em,$(QL_EM), \
+							$(eval \
+			$(call qemu_launcher,$(rt),$(np),$(bt),$(bm),$(fs),$(sc),$(em)) \
+							) \
+						) \
+					) \
+				) \
+			) \
+		) \
+	) \
+)
+
+# Generate emulators makefile
+#$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
+#		$(top_srcdir)/qemu-emu-generator
+#	$(top_srcdir)/qemu-emu-generator
+#
+#-include qemu-emu.mk
 
 # ----------------------------------------------------------------------------
 # Bochs launcher

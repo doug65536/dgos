@@ -13,6 +13,8 @@ class virtio_factory_base_t {
 protected:
     int detect_virtio(int dev_class, int device, char const *name);
 
+    virtual void found_device(virtio_base_t *) {}
+
     virtual ~virtio_factory_base_t() {}
     virtual virtio_base_t *create() = 0;
 };
@@ -35,6 +37,7 @@ public:
     };
 
     using virtio_iocp_result_t = uint64_t;
+
     using virtio_iocp_t = basic_iocp_t<
         virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
     using virtio_blocking_iocp_t = basic_blocking_iocp_t<
@@ -382,7 +385,8 @@ protected:
     virtual bool offer_features(feature_set_t& features) = 0;
 
     // Allow an implementation to verify which features actually got set
-    virtual bool verify_features(feature_set_t& features) {
+    virtual bool verify_features(feature_set_t& features)
+    {
         return true;
     }
 
@@ -392,7 +396,7 @@ protected:
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
-    virtual void irq_handler(int irq) = 0;
+    virtual void irq_handler(int offset) = 0;
 
     static std::vector<virtio_base_t*> virtio_devs;
 
@@ -415,4 +419,6 @@ protected:
     size_t notify_cap_size;
 
     uint32_t notify_off_multiplier;
+
+    static char const *cap_names[];
 };

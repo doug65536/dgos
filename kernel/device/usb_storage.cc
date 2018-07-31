@@ -240,8 +240,6 @@ public:
 private:
     STORAGE_IF_IMPL
 
-    //hashtbl_t pending_cmds;
-
     usb_pipe_t control, bulk_in, bulk_out;
     int iface_idx;
     int next_tag;
@@ -301,7 +299,7 @@ std::vector<storage_if_base_t *> usb_msc_if_factory_t::detect()
 //
 // Storage interface
 
-void usb_msc_if_t::cleanup()
+void usb_msc_if_t::cleanup_if()
 {
 }
 
@@ -319,7 +317,7 @@ std::vector<storage_dev_base_t*> usb_msc_if_t::detect_devices()
 //
 // USB device (LUN)
 
-void usb_msc_dev_t::cleanup()
+void usb_msc_dev_t::cleanup_dev()
 {
 }
 

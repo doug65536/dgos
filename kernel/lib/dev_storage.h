@@ -27,7 +27,7 @@ struct storage_dev_base_t {
     virtual ~storage_dev_base_t() {}
 
     // Startup/shutdown
-    virtual void cleanup() = 0;
+    virtual void cleanup_dev() = 0;
 
     //
     // Asynchronous I/O
@@ -58,7 +58,7 @@ struct storage_dev_base_t {
 };
 
 #define STORAGE_DEV_IMPL                                \
-    void cleanup() override final;                      \
+    void cleanup_dev() override final;                  \
                                                         \
     errno_t read_async(                                 \
             void *data, int64_t count,                  \
@@ -94,12 +94,12 @@ struct storage_if_factory_t {
 
 struct storage_if_base_t {
     virtual ~storage_if_base_t() {}
-    virtual void cleanup() = 0;
+    virtual void cleanup_if() = 0;
     virtual std::vector<storage_dev_base_t*> detect_devices() = 0;
 };
 
 #define STORAGE_IF_IMPL                         \
-    void cleanup() override final;              \
+    void cleanup_if() override final;           \
     std::vector<storage_dev_base_t*> detect_devices() override final;
 
 #define STORAGE_REGISTER_FACTORY(name) \

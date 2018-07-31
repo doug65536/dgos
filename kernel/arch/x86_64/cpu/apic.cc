@@ -843,14 +843,57 @@ static void ioapic_take_vectors(int base, int count)
 
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {
+    assert(count <= 64);
+
+    if (count > 64)
+        return 0;
+
+    uint64_t mask = count < 64 ? ~(UINT64_C(-1) << count) : ~UINT64_C(0);
+    uint64_t checked = mask;
+    uint8_t result = 0;
+
     ioapic_msi_alloc_scoped_lock lock(ioapic_msi_alloc_lock);
 
-    uint8_t base = ioapic_msi_next_irq;
-    ioapic_msi_next_irq += count;
+    for (size_t bit = 0;
+         bit < (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE) + 1 - count; )
+    {
+        // Skip completely allocated chunk of 64 vectors
+        if ((bit & 63) == 0) {
+            size_t i = bit >> 6;
+            if (ioapic_msi_alloc_map[i] == (uint64_t)-1) {
+                bit += 64;
+                continue;
+            }
+        }
 
-    ioapic_take_vectors(base - INTR_APIC_IRQ_BASE, count);
+        // Make sure a consecutive range of bits are all unallocated
+        size_t ofs;
+        for (ofs = 0; ofs < count; ++ofs) {
+            size_t i = (bit + ofs) >> 6;
+            uint64_t chk = UINT64_C(1) << ((bit + ofs) & 63);
 
-    return base;
+            if (ioapic_msi_alloc_map[i] & chk)
+                break;
+        }
+
+        if (ofs < count) {
+            bit += ofs + 1;
+            continue;
+        }
+
+        for (ofs = 0; ofs < count; ++ofs) {
+            size_t i = (bit + ofs) >> 6;
+            uint64_t chk = UINT64_C(1) << ((bit + ofs) & 63);
+
+            ioapic_msi_alloc_map[i] |= chk;
+        }
+
+        result = bit + INTR_APIC_IRQ_BASE;
+
+        return result;
+    }
+
+    return INTR_APIC_IRQ_END - count;
 }
 
 // Returns 0 on failure
@@ -867,7 +910,8 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
 
     ioapic_msi_alloc_scoped_lock lock(ioapic_msi_alloc_lock);
 
-    for (size_t bit = 0; bit < 128; bit += count)
+    for (size_t bit = 0; bit < (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE) + 1;
+         bit += count)
     {
         size_t i = bit >> 6;
 
@@ -2567,7 +2611,7 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
                        int cpu, bool distribute,
                        intr_handler_t handler, char const *name,
                        int const *target_cpus, int const *vector_offsets,
-                       bool contiguous)
+                       bool aligned)
 {
     // Don't try to use MSI if there are no IOAPIC devices
     if (ioapic_count == 0) {
@@ -2590,12 +2634,13 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
         // Allocate only as many vectors as we need per vector_offsets
         vector_base = ioapic_alloc_vectors(vector_cnt);
     } else {
-        // Allocate power of two count of suitably aligned vectors
         vector_cnt = count;
-         if (contiguous)
-             vector_base = ioapic_aligned_vectors(bit_log2(count));
-         else
-             vector_base = ioapic_alloc_vectors(count);
+        if (aligned) {
+            // Allocate power of two count of suitably aligned vectors
+            vector_base = ioapic_aligned_vectors(bit_log2(count));
+        } else {
+            vector_base = ioapic_alloc_vectors(count);
+        }
     }
 
     // See if we ran out of vectors
