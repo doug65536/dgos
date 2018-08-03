@@ -316,9 +316,10 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
     if (unlikely(pred)) {
         // queue was non-empty
 
-        node->locked = true;
+        atomic_st_rel(&node->locked, true);
 
-        assert(pred->thread_id != node->thread_id);
+        assert(atomic_ld_acq(&pred->thread_id) !=
+                atomic_ld_acq(&node->thread_id));
 
         // Link predecessor to this node
         atomic_st_rel(&pred->next, node);
