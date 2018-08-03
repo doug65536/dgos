@@ -1,4 +1,5 @@
 define startupbreakpoints
+	set osabi none
 	set scheduler-locking off
 	set range-stepping off
 	thbreak entry
