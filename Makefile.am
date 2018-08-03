@@ -1574,13 +1574,6 @@ define qemu_launcher =
 $(1)-$(2)-$(3)-$(4)-$(5)-$(6)-$(7): $$(call QEMU_IMAGE,$(5)) $$(QEMU_EXTRA_DEPS)
 	echo -e -n '\ec' >> dump/qemu-debug-out
 	echo Running $$@
-	echo $$$$1 = $(1)
-	echo $$$$2 = $(2)
-	echo $$$$3 = $(3)
-	echo $$$$4 = $(4)
-	echo $$$$5 = $(5)
-	echo $$$$6 = $(6)
-	echo $$$$7 = $(7)
 	$$(QEMU_SUDO) $$(QEMU) \
 		$$(QEMU_EARLY) \
 		$$(QEMU_COMMON) \
@@ -1604,9 +1597,7 @@ $(foreach rt,$(QL_RT), \
 				$(foreach fs,$(QL_FS), \
 					$(foreach sc,$(QL_SC), \
 						$(foreach em,$(QL_EM), \
-							$(eval \
-			$(call qemu_launcher,$(rt),$(np),$(bt),$(bm),$(fs),$(sc),$(em)) \
-							) \
+	$(eval $(call qemu_launcher,$(rt),$(np),$(bt),$(bm),$(fs),$(sc),$(em))) \
 						) \
 					) \
 				) \
