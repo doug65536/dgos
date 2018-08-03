@@ -23,22 +23,23 @@ void cpuid_init(void)
     }
 
     if (cpuid(&info, CPUID_INFO_FEATURES, 0)) {
-        cpuid_cache.has_de      = info.edx & (1U << 2);
-        cpuid_cache.has_pge     = info.edx & (1U << 13);
-        cpuid_cache.has_sysenter= info.edx & (1U << 11);
+        cpuid_cache.has_de          = info.edx & (1U << 2);
+        cpuid_cache.has_pge         = info.edx & (1U << 13);
+        cpuid_cache.has_sysenter    = info.edx & (1U << 11);
 
-        cpuid_cache.has_sse3    = info.ecx & (1U << 0);
-        cpuid_cache.has_mwait   = info.ecx & (1U << 3);
-        cpuid_cache.has_ssse3   = info.ecx & (1U << 9);
-        cpuid_cache.has_fma     = info.ecx & (1U << 12);
-        cpuid_cache.has_pcid    = info.ecx & (1U << 17);
-        cpuid_cache.has_sse4_1  = info.ecx & (1U << 19);
-        cpuid_cache.has_sse4_2  = info.ecx & (1U << 20);
-        cpuid_cache.has_x2apic  = info.ecx & (1U << 21);
-        cpuid_cache.has_aes     = info.ecx & (1U << 25);
-        cpuid_cache.has_xsave   = info.ecx & (1U << 26);
-        cpuid_cache.has_avx     = info.ecx & (1U << 28);
-        cpuid_cache.has_rdrand  = info.ecx & (1U << 30);
+        cpuid_cache.has_sse3        = info.ecx & (1U << 0);
+        cpuid_cache.has_mwait       = info.ecx & (1U << 3);
+        cpuid_cache.has_ssse3       = info.ecx & (1U << 9);
+        cpuid_cache.has_fma         = info.ecx & (1U << 12);
+        cpuid_cache.has_pcid        = info.ecx & (1U << 17);
+        cpuid_cache.has_sse4_1      = info.ecx & (1U << 19);
+        cpuid_cache.has_sse4_2      = info.ecx & (1U << 20);
+        cpuid_cache.has_x2apic      = info.ecx & (1U << 21);
+        cpuid_cache.has_aes         = info.ecx & (1U << 25);
+        cpuid_cache.has_xsave       = info.ecx & (1U << 26);
+        cpuid_cache.has_avx         = info.ecx & (1U << 28);
+        cpuid_cache.has_rdrand      = info.ecx & (1U << 30);
+        cpuid_cache.is_hypervisor   = info.ecx & (1U << 31);
     }
 
     if (cpuid(&info, CPUID_EXTINFO_FEATURES, 0)) {
@@ -81,7 +82,7 @@ void cpuid_init(void)
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)
 {
     // Automatically check for support for the leaf
-    if ((eax & 0x7FFFFFFF) != 0) {
+    if ((eax & 0xF0000000) != 0x40000000 && (eax & 0x7FFFFFFF) != 0) {
         // Try to use cached information
         uint32_t i = eax >> 31;
         if (max_leaf[i] != 0) {

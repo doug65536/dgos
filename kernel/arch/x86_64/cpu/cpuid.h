@@ -51,6 +51,7 @@ struct cpuid_cache_t {
     bool has_xsave      :1;
     bool has_avx        :1;
     bool has_rdrand     :1;
+    bool is_hypervisor  :1;
     bool has_2mpage     :1;
     bool has_1gpage     :1;
     bool has_nx         :1;
@@ -90,6 +91,12 @@ CPUID_CONST_INLINE bool cpuid_is_amd(void)
 CPUID_CONST_INLINE bool cpuid_is_intel(void)
 {
     return cpuid_cache.is_intel;
+}
+
+// Running under a hypervisor
+CPUID_CONST_INLINE bool cpuid_is_hypervisor(void)
+{
+    return cpuid_cache.is_hypervisor;
 }
 
 // No eXecute bit in page tables

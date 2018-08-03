@@ -1537,8 +1537,8 @@ QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 
 QEMU_EMU = $(QEMU_EMU_$(1))
-QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU)
-QEMU_EMU_tcg = -cpu max,fsgsbase
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc
+QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq
 #-cpu max,la57
 
 QEMU_BOOT = $(QEMU_BOOT_$(1))

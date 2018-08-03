@@ -2134,7 +2134,12 @@ static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)
 
 static void apic_calibrate()
 {
-    if (acpi_pm_timer_raw() >= 0) {
+    cpuid_t info{};
+    if (cpuid_is_hypervisor() && cpuid(&info, 0x40000000, 0) &&
+            info.eax >= 0x40000010 && cpuid(&info, 0x40000010, 0)) {
+        rdtsc_mhz = (info.eax + 500) / 1000;
+        apic_timer_freq = info.ebx * UINT64_C(1000);
+    } else if (acpi_pm_timer_raw() >= 0) {
         //
         // Have PM timer
 
