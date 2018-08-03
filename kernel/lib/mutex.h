@@ -253,6 +253,11 @@ public:
     {
     }
 
+    ~mcslock()
+    {
+        assert(m == nullptr);
+    }
+
     using mutex_type = mcs_queue_ent_t * volatile;
     void lock(mcs_queue_ent_t *node)
     {
