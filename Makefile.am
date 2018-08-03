@@ -551,10 +551,12 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/bswap.cc \
 	kernel/lib/bswap.h \
 	kernel/lib/callout.cc \
-    kernel/lib/callout.h \
-    kernel/lib/cxxexcept.h \
-    kernel/lib/cxxexcept.cc \
+	kernel/lib/callout.h \
+	kernel/lib/cxxexcept.h \
+	kernel/lib/cxxexcept.cc \
 	kernel/lib/cc/algorithm.h \
+	kernel/lib/cc/exception.h \
+	kernel/lib/cc/exception.cc \
 	kernel/lib/cc/functional.h \
 	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/memory.h \
@@ -805,7 +807,6 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=hidden \
@@ -813,6 +814,8 @@ KERNEL_CXXFLAGS_SHARED = \
 	-mgeneral-regs-only \
 	$(FREESTANDING_FLAGS) \
 	$(ASAN_FLAGS)
+
+#$(NO_EXCEPTIONS_FLAGS)
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \

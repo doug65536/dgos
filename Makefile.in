@@ -430,6 +430,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-bswap.$(OBJEXT) \
 	kernel/lib/kernel_generic-callout.$(OBJEXT) \
 	kernel/lib/kernel_generic-cxxexcept.$(OBJEXT) \
+	kernel/lib/cc/kernel_generic-exception.$(OBJEXT) \
 	kernel/lib/kernel_generic-conio.$(OBJEXT) \
 	kernel/lib/kernel_generic-debug.$(OBJEXT) \
 	kernel/lib/kernel_generic-desc_alloc.$(OBJEXT) \
@@ -558,6 +559,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-bswap.$(OBJEXT) \
 	kernel/lib/kernel_tracing-callout.$(OBJEXT) \
 	kernel/lib/kernel_tracing-cxxexcept.$(OBJEXT) \
+	kernel/lib/cc/kernel_tracing-exception.$(OBJEXT) \
 	kernel/lib/kernel_tracing-conio.$(OBJEXT) \
 	kernel/lib/kernel_tracing-debug.$(OBJEXT) \
 	kernel/lib/kernel_tracing-desc_alloc.$(OBJEXT) \
@@ -1499,10 +1501,12 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/bswap.cc \
 	kernel/lib/bswap.h \
 	kernel/lib/callout.cc \
-    kernel/lib/callout.h \
-    kernel/lib/cxxexcept.h \
-    kernel/lib/cxxexcept.cc \
+	kernel/lib/callout.h \
+	kernel/lib/cxxexcept.h \
+	kernel/lib/cxxexcept.cc \
 	kernel/lib/cc/algorithm.h \
+	kernel/lib/cc/exception.h \
+	kernel/lib/cc/exception.cc \
 	kernel/lib/cc/functional.h \
 	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/memory.h \
@@ -1753,7 +1757,6 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=hidden \
@@ -1762,6 +1765,8 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(FREESTANDING_FLAGS) \
 	$(ASAN_FLAGS)
 
+
+#$(NO_EXCEPTIONS_FLAGS)
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
 	$(COMPILER_FLAGS)
@@ -3256,6 +3261,15 @@ kernel/lib/kernel_generic-callout.$(OBJEXT):  \
 kernel/lib/kernel_generic-cxxexcept.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/$(am__dirstamp):
+	@$(MKDIR_P) kernel/lib/cc
+	@: > kernel/lib/cc/$(am__dirstamp)
+kernel/lib/cc/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) kernel/lib/cc/$(DEPDIR)
+	@: > kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_generic-exception.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-debug.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -3630,6 +3644,9 @@ kernel/lib/kernel_tracing-callout.$(OBJEXT):  \
 kernel/lib/kernel_tracing-cxxexcept.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_tracing-exception.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-debug.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -3975,6 +3992,7 @@ mostlyclean-compile:
 	-rm -f kernel/device/keyb8042_layout/*.$(OBJEXT)
 	-rm -f kernel/fs/*.$(OBJEXT)
 	-rm -f kernel/lib/*.$(OBJEXT)
+	-rm -f kernel/lib/cc/*.$(OBJEXT)
 	-rm -f kernel/net/*.$(OBJEXT)
 	-rm -f kernel/syscall/*.$(OBJEXT)
 	-rm -f libc/cxx/*.$(OBJEXT)
@@ -4285,6 +4303,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-unique_ptr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-work_queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-zlib_helper.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/net/$(DEPDIR)/kernel_generic-arp_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/net/$(DEPDIR)/kernel_generic-dhcp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/net/$(DEPDIR)/kernel_generic-eth_frame.Po@am__quote@
@@ -8120,6 +8140,20 @@ kernel/lib/kernel_generic-cxxexcept.obj: kernel/lib/cxxexcept.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-cxxexcept.obj `if test -f 'kernel/lib/cxxexcept.cc'; then $(CYGPATH_W) 'kernel/lib/cxxexcept.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cxxexcept.cc'; fi`
 
+kernel/lib/cc/kernel_generic-exception.o: kernel/lib/cc/exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-exception.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Tpo -c -o kernel/lib/cc/kernel_generic-exception.o `test -f 'kernel/lib/cc/exception.cc' || echo '$(srcdir)/'`kernel/lib/cc/exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Tpo kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/exception.cc' object='kernel/lib/cc/kernel_generic-exception.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-exception.o `test -f 'kernel/lib/cc/exception.cc' || echo '$(srcdir)/'`kernel/lib/cc/exception.cc
+
+kernel/lib/cc/kernel_generic-exception.obj: kernel/lib/cc/exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-exception.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Tpo -c -o kernel/lib/cc/kernel_generic-exception.obj `if test -f 'kernel/lib/cc/exception.cc'; then $(CYGPATH_W) 'kernel/lib/cc/exception.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/exception.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Tpo kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/exception.cc' object='kernel/lib/cc/kernel_generic-exception.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-exception.obj `if test -f 'kernel/lib/cc/exception.cc'; then $(CYGPATH_W) 'kernel/lib/cc/exception.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/exception.cc'; fi`
+
 kernel/lib/kernel_generic-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-conio.Tpo -c -o kernel/lib/kernel_generic-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-conio.Tpo kernel/lib/$(DEPDIR)/kernel_generic-conio.Po
@@ -9785,6 +9819,20 @@ kernel/lib/kernel_tracing-cxxexcept.obj: kernel/lib/cxxexcept.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cxxexcept.cc' object='kernel/lib/kernel_tracing-cxxexcept.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-cxxexcept.obj `if test -f 'kernel/lib/cxxexcept.cc'; then $(CYGPATH_W) 'kernel/lib/cxxexcept.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cxxexcept.cc'; fi`
+
+kernel/lib/cc/kernel_tracing-exception.o: kernel/lib/cc/exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-exception.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Tpo -c -o kernel/lib/cc/kernel_tracing-exception.o `test -f 'kernel/lib/cc/exception.cc' || echo '$(srcdir)/'`kernel/lib/cc/exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Tpo kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/exception.cc' object='kernel/lib/cc/kernel_tracing-exception.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-exception.o `test -f 'kernel/lib/cc/exception.cc' || echo '$(srcdir)/'`kernel/lib/cc/exception.cc
+
+kernel/lib/cc/kernel_tracing-exception.obj: kernel/lib/cc/exception.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-exception.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Tpo -c -o kernel/lib/cc/kernel_tracing-exception.obj `if test -f 'kernel/lib/cc/exception.cc'; then $(CYGPATH_W) 'kernel/lib/cc/exception.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/exception.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Tpo kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/exception.cc' object='kernel/lib/cc/kernel_tracing-exception.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-exception.obj `if test -f 'kernel/lib/cc/exception.cc'; then $(CYGPATH_W) 'kernel/lib/cc/exception.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/exception.cc'; fi`
 
 kernel/lib/kernel_tracing-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-conio.Tpo -c -o kernel/lib/kernel_tracing-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
@@ -11664,6 +11712,8 @@ distclean-generic:
 	-rm -f kernel/fs/$(am__dirstamp)
 	-rm -f kernel/lib/$(DEPDIR)/$(am__dirstamp)
 	-rm -f kernel/lib/$(am__dirstamp)
+	-rm -f kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+	-rm -f kernel/lib/cc/$(am__dirstamp)
 	-rm -f kernel/net/$(DEPDIR)/$(am__dirstamp)
 	-rm -f kernel/net/$(am__dirstamp)
 	-rm -f kernel/syscall/$(DEPDIR)/$(am__dirstamp)
@@ -11708,7 +11758,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -11756,7 +11806,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
