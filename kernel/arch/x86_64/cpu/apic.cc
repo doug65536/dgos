@@ -2151,7 +2151,7 @@ static void apic_calibrate()
         uint64_t tsc_en = cpu_rdtsc();
 
         uint64_t tsc_elap = tsc_en - tsc_st;
-        uint32_t ccr_elap = ccr_st - ccr_en;
+        uint64_t ccr_elap = ccr_st - ccr_en;
         uint64_t tmr_nsec = acpi_pm_timer_ns(tmr_diff);
 
         uint64_t cpu_freq = (tsc_elap * 1000000000) / tmr_nsec;
@@ -2162,6 +2162,9 @@ static void apic_calibrate()
         // Round APIC frequency to nearest multiple of 333kHz
         apic_timer_freq += 166666;
         apic_timer_freq -= apic_timer_freq % 333333;
+
+        // APIC frequency < 333kHz is impossible to believe
+        assert(apic_timer_freq > 333333);
 
         // Round CPU frequency to nearest multiple of 1MHz
         cpu_freq += 500000;
