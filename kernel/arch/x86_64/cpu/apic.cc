@@ -223,7 +223,6 @@ static mp_ioapic_t ioapic_list[16];
 using ioapic_msi_alloc_lock_type = std::mcslock;
 using ioapic_msi_alloc_scoped_lock = std::unique_lock<ioapic_msi_alloc_lock_type>;
 static ioapic_msi_alloc_lock_type ioapic_msi_alloc_lock;
-static uint8_t ioapic_msi_next_irq = INTR_APIC_IRQ_BASE;
 
 // Bit 0 of this corresponds to vector INTR_APIC_IRQ_BASE
 static uint64_t ioapic_msi_alloc_map[] = {
@@ -832,15 +831,6 @@ int acpi_have8259pic(void)
             !!(acpi_madt_flags & ACPI_MADT_FLAGS_HAVE_PIC);
 }
 
-static void ioapic_take_vectors(int base, int count)
-{
-    assert(base >= 0);
-    assert(base + count <= (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1));
-
-    for (size_t intr = base, end = base + count; intr < end; ++intr)
-        ioapic_msi_alloc_map[intr >> 6] |= UINT64_C(1) << (intr & 0x3F);
-}
-
 static uint8_t ioapic_alloc_vectors(uint8_t count)
 {
     assert(count <= 64);
@@ -848,14 +838,11 @@ static uint8_t ioapic_alloc_vectors(uint8_t count)
     if (count > 64)
         return 0;
 
-    uint64_t mask = count < 64 ? ~(UINT64_C(-1) << count) : ~UINT64_C(0);
-    uint64_t checked = mask;
     uint8_t result = 0;
 
     ioapic_msi_alloc_scoped_lock lock(ioapic_msi_alloc_lock);
 
-    for (size_t bit = 0;
-         bit < (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE) + 1 - count; )
+    for (size_t bit = 0; bit < INTR_APIC_IRQ_COUNT; )
     {
         // Skip completely allocated chunk of 64 vectors
         if ((bit & 63) == 0) {
@@ -910,8 +897,7 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
 
     ioapic_msi_alloc_scoped_lock lock(ioapic_msi_alloc_lock);
 
-    for (size_t bit = 0; bit < (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE) + 1;
-         bit += count)
+    for (size_t bit = 0; bit < INTR_APIC_IRQ_COUNT; bit += count)
     {
         size_t i = bit >> 6;
 
@@ -2429,7 +2415,7 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     int irq = intr_to_irq[intr];
 
     assert(irq >= 0);
-    assert(irq < (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1));
+    assert(irq < INTR_APIC_IRQ_COUNT);
 
     ctx = irq_invoke(intr, irq, ctx);
     apic_eoi(intr);

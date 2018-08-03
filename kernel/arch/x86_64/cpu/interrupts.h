@@ -51,6 +51,7 @@
 // 192 vectors for IOAPIC and MSI
 #define INTR_APIC_IRQ_BASE  48
 #define INTR_APIC_IRQ_END   239
+#define INTR_APIC_IRQ_COUNT (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1)
 
 // Vectors >= 240 go through pic_dispatcher codepath
 // PIC IRQs 0xF0-0xFF
