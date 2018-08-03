@@ -24,6 +24,14 @@
 // Device exports information on optimal I/O alignment.
 #define VIRTIO_BLK_F_TOPOLOGY_BIT (10)
 
+#define VIRTIO_BLK_T_IN     0
+#define VIRTIO_BLK_T_OUT    1
+#define VIRTIO_BLK_T_FLUSH  4
+
+#define VIRTIO_BLK_S_OK     0
+#define VIRTIO_BLK_S_IOERR  1
+#define VIRTIO_BLK_S_UNSUPP 2
+
 class virtio_blk_if_t;
 
 class virtio_blk_factory_t : public virtio_factory_base_t {
@@ -63,6 +71,8 @@ class virtio_blk_if_t
         , public storage_if_base_t
         , public storage_dev_base_t
 {
+    struct per_queue_t;
+
 public:
     using virtio_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
 
@@ -73,11 +83,9 @@ public:
             uint64_t lba;
         } header;
 
-        virtio_blk_if_t *owner;
-        uintptr_t tag;
+        per_queue_t *owner;
         void *data;
         int64_t count;
-        uint64_t lba;
         virtio_iocp_t io_iocp;
         iocp_t *caller_iocp;
         virtio_blk_op_t op;
@@ -85,6 +93,17 @@ public:
 
         uint8_t status;
     };
+
+    virtio_blk_if_t()
+        : per_queue(nullptr)
+        , blk_config(nullptr)
+        , log2_sectorsize(0)
+    {
+    }
+
+    ~virtio_blk_if_t()
+    {
+    }
 
     int io(request_t *request);
 
@@ -129,8 +148,17 @@ private:
         uint8_t reserved;
     };
 
+    struct per_queue_t {
+        int io(request_t *request);
+
+        virtio_blk_if_t *owner;
+        lock_type per_queue_lock;
+        std::vector<virtio_virtqueue_t::desc_t*> desc_chain;
+        virtio_virtqueue_t *req_queue;
+    };
+
     // virtio_base_t interface
-    bool init(const pci_dev_iterator_t &pci_iter) override final;
+    bool init(pci_dev_iterator_t const &pci_iter) override final;
     bool offer_features(feature_set_t &features) override final;
     bool verify_features(feature_set_t &features) override final;
     void irq_handler(int offset) override final;
@@ -139,12 +167,8 @@ private:
 
     static void io_completion(const uint64_t &total_len, uintptr_t arg);
 
-    using req_tag_t = uintptr_t;
-
-    lock_type drive_lock;
-
+    per_queue_t *per_queue;
     blk_config_t *blk_config;
-    virtio_virtqueue_t *req_queue;
     uint8_t log2_sectorsize;
 };
 
@@ -180,19 +204,25 @@ void virtio_blk_factory_t::found_device(virtio_base_t *device)
 
 int virtio_blk_if_t::io(request_t *request)
 {
-    request->header.lba = request->lba;
+    int cpu_nr = thread_cpu_number();
+    unsigned queue_nr = cpu_nr % queue_count;
 
+    return per_queue[queue_nr].io(request);
+}
+
+int virtio_blk_if_t::per_queue_t::io(request_t *request)
+{
     switch (request->op) {
     case virtio_blk_op_t::read:
-        request->header.type = 0;
+        request->header.type = VIRTIO_BLK_T_IN;
         break;
 
     case virtio_blk_op_t::write:
-        request->header.type = 1;
+        request->header.type = VIRTIO_BLK_T_OUT;
         break;
 
     case virtio_blk_op_t::flush:
-        request->header.type = 4;
+        request->header.type = VIRTIO_BLK_T_FLUSH;
         break;
 
     case virtio_blk_op_t::trim:
@@ -202,17 +232,16 @@ int virtio_blk_if_t::io(request_t *request)
     mmphysrange_t ranges[16];
     size_t range_count;
     char *data = (char*)request->data;
-    size_t remain = request->count << log2_sectorsize;
-
-    std::vector<virtio_virtqueue_t::desc_t*> desc_chain;
+    size_t remain = request->count << owner->log2_sectorsize;
 
     virtio_virtqueue_t::desc_t *desc;
     virtio_virtqueue_t::desc_t *prev;
 
+    scoped_lock lock(per_queue_lock);
+
     do {
         range_count = mphysranges(ranges, countof(ranges), data, remain,
-                                  blk_config->size_max);
-
+                                  owner->blk_config->size_max);
 
         desc = req_queue->alloc_desc(false);
 
@@ -252,6 +281,8 @@ int virtio_blk_if_t::io(request_t *request)
     req_queue->enqueue_avail(desc_chain.data(), desc_chain.size(),
                              &request->io_iocp);
 
+    desc_chain.clear();
+
     return 1;
 }
 
@@ -265,13 +296,20 @@ void virtio_blk_if_t::io_completion(
 
 bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
 {
-    if (!virtio_init(pci_iter, "virtio-blk"))
+    if (!virtio_init(pci_iter, "virtio-blk", true))
         return false;
-
-    req_queue = &queues[0];
 
     blk_config = (blk_config_t*)device_cfg;
     log2_sectorsize = bit_log2(blk_config->blk_size);
+
+    per_queue = new per_queue_t[queue_count];
+
+    for (size_t i = 0; i < queue_count; ++i) {
+        per_queue[i].owner = this;
+        per_queue[i].req_queue = &queues[i];
+        per_queue[i].desc_chain.reserve(
+                    size_t(1) << queues[i].get_log2_queue_size());
+    }
 
     return true;
 }
@@ -292,11 +330,17 @@ void virtio_blk_if_t::config_irq()
 
 void virtio_blk_if_t::irq_handler(int offset)
 {
+    assert(offset >= 0 && offset < 2);
+
     if (offset == 0 || irq_range.count == 1)
         config_irq();
 
-    if (offset == 1 || irq_range.count == 1)
-        req_queue->recycle_used();
+    if (offset == 1 || irq_range.count == 1) {
+        int cpu_nr = thread_cpu_number();
+        int queue_nr = cpu_nr % queue_count;
+
+        per_queue[queue_nr].req_queue->recycle_used();
+    }
 }
 
 errno_t virtio_blk_if_t::io(
@@ -306,7 +350,7 @@ errno_t virtio_blk_if_t::io(
    virtio_blk_if_t::request_t *request = new virtio_blk_if_t::request_t;
    request->data = data;
    request->count = count;
-   request->lba = lba;
+   request->header.lba = lba;
    request->op = op;
    request->fua = fua;
    request->caller_iocp = iocp;

@@ -24,7 +24,7 @@ char const *virtio_base_t::cap_names[] = {
 };
 
 bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
-                                char const *isr_name)
+                                char const *isr_name, bool per_cpu_queues)
 {
     virtio_pci_cap_hdr_t cap_rec;
 
@@ -139,9 +139,30 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 return false;
             }
 
-            use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false,
-                                      queue_count + 1,
-                                      &virtio_base_t::irq_handler, isr_name);
+            if (per_cpu_queues) {
+                // Use two vectors, first one is config IRQ, second one
+                // is shared by all queues
+                // Route first vector to CPU 0, route rest of vectors
+                // round robin across all CPUs, starting at CPU 0
+
+                std::vector<int> target_cpus(queue_count + 1, 0);
+                std::vector<int> vector_offsets(queue_count + 1, 1);
+                // Route config IRQs to CPU 0
+                vector_offsets[0] = 0;
+                int cpu_count = thread_get_cpu_count();
+                for (size_t i = 1; i <= queue_count; ++i)
+                    target_cpus[i] = (i - 1) % cpu_count;
+                use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false,
+                                          queue_count + 1,
+                                          &virtio_base_t::irq_handler,
+                                          isr_name, target_cpus.data(),
+                                          vector_offsets.data());
+            } else {
+                use_msi = pci_try_msi_irq(pci_iter, &irq_range, 0, false,
+                                          queue_count + 1,
+                                          &virtio_base_t::irq_handler,
+                                          isr_name);
+            }
 
             pci_set_irq_unmask(pci_iter, true);
 
@@ -301,6 +322,8 @@ bool virtio_virtqueue_t::init(
 
     if (!pending_completions.reserve(queue_count))
         return false;
+    if (!finished_completions.reserve(queue_count))
+        return false;
 
     // Link together all of the descriptors into the free list
     assert(desc_first_free == -1);
@@ -342,8 +365,12 @@ virtio_virtqueue_t::desc_t *virtio_virtqueue_t::alloc_desc(bool dev_writable)
 {
     scoped_lock lock(queue_lock);
 
-    while (desc_first_free == -1)
+    while (desc_first_free == avail_t(-1)) {
+        VIRTIO_TRACE("Waiting for free descriptor\n");
         queue_not_full.wait(lock);
+    }
+
+    VIRTIO_TRACE("Allocated descriptor id=%d\n", desc_first_free);
 
     desc_t *desc = desc_tab + desc_first_free;
     desc_first_free = desc->next;
@@ -351,6 +378,7 @@ virtio_virtqueue_t::desc_t *virtio_virtqueue_t::alloc_desc(bool dev_writable)
     desc->addr = 0;
     desc->len = 0;
     desc->flags.raw = 0;
+    desc->next = -1;
 
     if (dev_writable)
         desc->flags.bits.write = true;
@@ -374,11 +402,12 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
     size_t avail_head = atomic_ld_acq(&avail_hdr->idx);
     for (size_t i = 0; i < count; ++i) {
         if (!skip) {
-            iocp->set_expect(1);
-            completions[avail_head & mask] = iocp;
+            size_t id = index_of(desc[i]);
 
-            uint16_t index = index_of(desc[i]);
-            avail_ring[avail_head++ & mask] = index;
+            iocp->set_expect(1);
+            completions[id] = iocp;
+
+            avail_ring[avail_head++ & mask] = id;
         }
 
         skip = desc[i]->flags.bits.next;
@@ -445,36 +474,52 @@ void virtio_virtqueue_t::recycle_used()
 {
     scoped_lock lock(queue_lock);
 
+    VIRTIO_TRACE("Recycling used descriptors\n");
+
     size_t tail = used_tail;
     size_t mask = ~-(1 << log2_queue_size);
-    size_t done_idx = used_hdr->idx;
+    size_t done_idx = atomic_ld_acq(&used_hdr->idx);
+    VIRTIO_TRACE("done_idx = %zu\n", done_idx);
+    if (unlikely(done_idx == tail)) {
+        VIRTIO_TRACE("dropped spurious virtio IRQ\n");
+        return;
+    }
     do {
         used_t const& used = used_ring[tail & mask];
         avail_t id = used.id;
         uint64_t used_len = used.len;
 
-        avail_t end = id;
-        while (desc_tab[end].flags.bits.next)
-            end = desc_tab[end].next;
+        VIRTIO_TRACE("Recycling id=%u (head)\n", id);
 
-        virtio_iocp_t* completion = completions[tail & mask];
-        completion->set_result(used_len);
-        pending_completions.push_back(completion);
+        avail_t end = id;
+        while (desc_tab[end].flags.bits.next) {
+            end = desc_tab[end].next;
+            VIRTIO_TRACE("Recycling id=%u (chained)\n", end);
+        }
 
         desc_tab[end].next = desc_first_free;
         desc_first_free = id;
-    } while (++tail != done_idx);
+
+        virtio_iocp_t* completion = completions[id];
+        completions[id] = nullptr;
+        completion->set_result(used_len);
+        pending_completions.push_back(completion);
+    } while ((++tail & 0xFFFF) != done_idx);
 
     used_tail = tail;
 
     // Notify device how far used ring has been processed
-    used_ftr->used_event = tail - 1;
+    atomic_st_rel(&used_ftr->used_event, tail - 1);
+
+    pending_completions.swap(finished_completions);
 
     lock.unlock();
 
-    for (virtio_iocp_t *completion : pending_completions)
+    queue_not_full.notify_all();
+
+    for (virtio_iocp_t *completion : finished_completions)
         completion->invoke();
-    pending_completions.clear();
+    finished_completions.clear();
 }
 
 int virtio_factory_base_t::detect_virtio(int dev_class, int device,

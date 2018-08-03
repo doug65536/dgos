@@ -1511,7 +1511,7 @@ QEMU_DISK_TYPE_iso = ide-cd
 QEMU_DISK_TYPE_fat = ide-hd
 
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
-QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
+QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on,num-queues=$(QEMU_CPUS)
 
 #-device ich9-ahci,id=bootif
 

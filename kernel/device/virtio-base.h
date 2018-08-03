@@ -123,6 +123,11 @@ public:
 
     void recycle_used();
 
+    uint8_t get_log2_queue_size() const
+    {
+        return log2_queue_size;
+    }
+
 private:
     using lock_type = std::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
@@ -132,6 +137,7 @@ private:
 
     std::unique_ptr<virtio_iocp_t*[]> completions;
     std::vector<virtio_iocp_t*> pending_completions;
+    std::vector<virtio_iocp_t*> finished_completions;
 
     desc_t *desc_tab;
 
@@ -376,7 +382,8 @@ protected:
         uint32_t features[4];
     };
 
-    bool virtio_init(pci_dev_iterator_t const &pci_iter, char const *isr_name);
+    bool virtio_init(pci_dev_iterator_t const &pci_iter, char const *isr_name,
+                     bool per_cpu_queues = false);
 
     virtual bool init(pci_dev_iterator_t const &pci_iter) = 0;
 
