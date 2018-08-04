@@ -2482,7 +2482,7 @@ void gdb_cpu_ctrl_t::start()
     cpu_wait_value(&stub_running, true);
 
     cpu_irq_disable();
-    bool wait = true;
+    bool volatile wait = true;
     while (wait)
         thread_yield();
 }
