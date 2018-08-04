@@ -120,10 +120,11 @@ static int shell_thread(void *p)
 #if ENABLE_READ_STRESS_THREAD > 0
 class read_stress_thread_t {
 public:
-    thread_t start(dev_t devid, uint16_t *indicator)
+    thread_t start(dev_t devid, uint16_t *indicator, int index)
     {
         this->devid = devid;
         this->indicator = indicator;
+        this->index = index;
         tid = thread_create(&read_stress_thread_t::worker, this, 0, 0);
         return tid;
     }
@@ -136,11 +137,12 @@ private:
 
     int worker()
     {
-        //static uint8_t counts[ENABLE_READ_STRESS_THREAD << 6];
         static uint8_t counts[256 << 6];
         static int volatile next_id;
         static int completion_count;
         int id = atomic_xadd(&next_id, 1);
+
+        thread_set_affinity(tid, UINT64_C(1) << (index % thread_cpu_count()));
 
         storage_dev_base_t *drive = storage_dev_open(devid);
 
@@ -253,6 +255,7 @@ private:
     uint16_t *indicator;
     dev_t devid;
     thread_t tid;
+    int index;
 };
 #endif
 
@@ -883,6 +886,7 @@ static int init_thread(void *)
             new std::vector<read_stress_thread_t*>();
     read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD);
 
+    int n = 0;
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         for (int devid = 0; devid < dev_cnt; ++devid) {
             printk("(devid %d, worker %d)"
@@ -891,7 +895,7 @@ static int init_thread(void *)
             read_stress_thread_t *thread = new read_stress_thread_t();
             read_stress_threads->push_back(thread);
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
-            thread_t tid = thread->start(devid, indicator);
+            thread_t tid = thread->start(devid, indicator, n++);
             printk("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
         }
     }
