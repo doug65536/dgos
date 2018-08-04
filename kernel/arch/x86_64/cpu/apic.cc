@@ -2145,7 +2145,7 @@ static void apic_calibrate()
             pause();
             tmr_en = acpi_pm_timer_raw();
             tmr_diff = acpi_pm_timer_diff(tmr_st, tmr_en);
-        } while (tmr_diff < 3579);
+        } while (tmr_diff < 35790);
 
         uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
@@ -2179,7 +2179,7 @@ static void apic_calibrate()
         uint64_t tsc_st = cpu_rdtsc();
 
         // Wait for about 1ms
-        uint64_t tmr_nsec = nsleep(1000000);
+        uint64_t tmr_nsec = nsleep(10000000);
 
         uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
