@@ -37,6 +37,7 @@
 #include "conio.h"
 #include "inttypes.h"
 #include "work_queue.h"
+#include "cpu/except_asm.h"
 
 #include "bootloader.h"
 
@@ -664,8 +665,41 @@ static int draw_test(void *p)
 }
 #endif
 
+#if 0 // disabled unwind test - partially working
+__exception_jmp_buf_t test_unwind_jmpbuf;
+
+class test_unwind_cls {
+public:
+    ~test_unwind_cls()
+    {
+        printdbg("~test_unwind_cls called\n");
+    }
+};
+
+void test_unwind_nest(int level)
+{
+    test_unwind_cls inst;
+
+    if (level < 3)
+        test_unwind_nest(level + 1);
+    else
+        __exception_longjmp_unwind(&test_unwind_jmpbuf, 1);
+}
+
+void test_unwind()
+{
+    if (!__exception_setjmp(&test_unwind_jmpbuf)) {
+        test_unwind_nest(0);
+    } else {
+        printdbg("Unwind ended\n");
+    }
+}
+#endif
+
 static int init_thread(void *)
 {
+    //test_unwind();
+
     printk("Initializing kernel threadpool\n");
     workq::init(thread_cpu_count());
 
