@@ -19,4 +19,7 @@ extern "C" _returns_twice
 int __exception_setjmp(__exception_jmp_buf_t *__ctx);
 
 extern "C" _noreturn
-int __exception_longjmp(__exception_jmp_buf_t *__ctx, int value);
+void __exception_longjmp(__exception_jmp_buf_t *__ctx, int value);
+
+extern "C" _noreturn
+void __exception_longjmp_unwind(__exception_jmp_buf_t *__ctx, int value);

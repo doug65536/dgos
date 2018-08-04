@@ -43,7 +43,7 @@ private:
     type_info(const type_info&);
 };
 
-extern "C" {
+__BEGIN_DECLS
 
 _noreturn
 void abort();
@@ -55,7 +55,8 @@ void *__cxa_allocate_exception(size_t thrown_size);
 void __cxa_free_exception(void *thrown_exception);
 
 _Unwind_Reason_Code __gxx_personality_v0(
-        int version, _Unwind_Action actions, uint64_t exceptionClass,
+        int version, _Unwind_Action actions,
+        _Unwind_Exception_Class exceptionClass,
         _Unwind_Exception* unwind_exception, _Unwind_Context* context);
 
-}
+__END_DECLS
