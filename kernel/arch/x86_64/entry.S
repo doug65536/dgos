@@ -301,6 +301,13 @@ invoke_function_array:
     ret
 
 .align 16
+.global register_eh_frame
+register_eh_frame:
+    // Register .eh_frame for libgcc unwind
+    leaq ___eh_frame_st(%rip),%rdi
+    jmp __register_frame
+
+.align 16
 .global __cxa_pure_virtual
 .hidden __cxa_pure_virtual
 __cxa_pure_virtual:

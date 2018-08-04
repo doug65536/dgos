@@ -81,8 +81,12 @@ SECTIONS {
 	} :readonly
 
 	.eh_frame : ALIGN(64) {
+		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
 		*(.eh_frame.*)
+		PROVIDE_HIDDEN(___eh_frame_en = .);
+		/* Must end with 4 zero bytes */
+		LONG(0);
 	} :readonly
 
 	.hash : ALIGN(64) {

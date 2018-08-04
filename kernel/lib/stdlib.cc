@@ -13,10 +13,14 @@
 #if !HEAP_PAGEONLY
 static heap_t *default_heap;
 
+extern "C" void register_eh_frame();
+
 void malloc_startup(void *p)
 {
     (void)p;
     default_heap = heap_create();
+
+    register_eh_frame();
 }
 
 void *calloc(size_t num, size_t size)
