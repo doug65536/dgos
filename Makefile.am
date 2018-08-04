@@ -536,7 +536,7 @@ bootx64.efi: bootefi-amd64
 KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/entry.S \
 	kernel/arch/x86_64/cpu/isr.S \
-	kernel/arch/x86_64/cpu/except_asm.s \
+	kernel/arch/x86_64/cpu/except_asm.S \
 	kernel/arch/x86_64/cpu/syscall.S \
 	kernel/main.cc \
 	kernel/lib/assert.cc \

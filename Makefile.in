@@ -1486,7 +1486,7 @@ EXTRA_bootefi_amd64_DEPENDENCIES = \
 KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/entry.S \
 	kernel/arch/x86_64/cpu/isr.S \
-	kernel/arch/x86_64/cpu/except_asm.s \
+	kernel/arch/x86_64/cpu/except_asm.S \
 	kernel/arch/x86_64/cpu/syscall.S \
 	kernel/main.cc \
 	kernel/lib/assert.cc \
@@ -4115,6 +4115,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-cpu_broadcast.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-cpuid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-gdt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-halt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-idt.Po@am__quote@
@@ -4139,6 +4140,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-cpu_broadcast.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-cpuid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-gdt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-halt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-idt.Po@am__quote@
@@ -4750,6 +4752,20 @@ kernel/arch/x86_64/cpu/kernel_generic-isr.obj: kernel/arch/x86_64/cpu/isr.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-isr.obj `if test -f 'kernel/arch/x86_64/cpu/isr.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/isr.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/isr.S'; fi`
 
+kernel/arch/x86_64/cpu/kernel_generic-except_asm.o: kernel/arch/x86_64/cpu/except_asm.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_generic-except_asm.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Tpo -c -o kernel/arch/x86_64/cpu/kernel_generic-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/except_asm.S' object='kernel/arch/x86_64/cpu/kernel_generic-except_asm.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.S
+
+kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj: kernel/arch/x86_64/cpu/except_asm.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Tpo -c -o kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-except_asm.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/except_asm.S' object='kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.S'; fi`
+
 kernel/arch/x86_64/cpu/kernel_generic-syscall.o: kernel/arch/x86_64/cpu/syscall.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_generic-syscall.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-syscall.Tpo -c -o kernel/arch/x86_64/cpu/kernel_generic-syscall.o `test -f 'kernel/arch/x86_64/cpu/syscall.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/syscall.S
 @am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-syscall.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_generic-syscall.Po
@@ -4791,6 +4807,20 @@ kernel/arch/x86_64/cpu/kernel_tracing-isr.obj: kernel/arch/x86_64/cpu/isr.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/isr.S' object='kernel/arch/x86_64/cpu/kernel_tracing-isr.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-isr.obj `if test -f 'kernel/arch/x86_64/cpu/isr.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/isr.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/isr.S'; fi`
+
+kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o: kernel/arch/x86_64/cpu/except_asm.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Tpo -c -o kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/except_asm.S' object='kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.S
+
+kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj: kernel/arch/x86_64/cpu/except_asm.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Tpo -c -o kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Tpo kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-except_asm.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='kernel/arch/x86_64/cpu/except_asm.S' object='kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.S'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.S'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.S'; fi`
 
 kernel/arch/x86_64/cpu/kernel_tracing-syscall.o: kernel/arch/x86_64/cpu/syscall.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -MT kernel/arch/x86_64/cpu/kernel_tracing-syscall.o -MD -MP -MF kernel/arch/x86_64/cpu/$(DEPDIR)/kernel_tracing-syscall.Tpo -c -o kernel/arch/x86_64/cpu/kernel_tracing-syscall.o `test -f 'kernel/arch/x86_64/cpu/syscall.S' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/syscall.S
@@ -11405,18 +11435,6 @@ boot/libbootsect_a-exception.o: boot/exception.s
 
 boot/libbootsect_a-exception.obj: boot/exception.s
 	$(AM_V_CCAS)$(CCAS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-exception.obj `if test -f 'boot/exception.s'; then $(CYGPATH_W) 'boot/exception.s'; else $(CYGPATH_W) '$(srcdir)/boot/exception.s'; fi`
-
-kernel/arch/x86_64/cpu/kernel_generic-except_asm.o: kernel/arch/x86_64/cpu/except_asm.s
-	$(AM_V_CCAS)$(CCAS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.s' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.s
-
-kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj: kernel/arch/x86_64/cpu/except_asm.s
-	$(AM_V_CCAS)$(CCAS) $(kernel_generic_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_generic-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.s'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.s'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.s'; fi`
-
-kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o: kernel/arch/x86_64/cpu/except_asm.s
-	$(AM_V_CCAS)$(CCAS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-except_asm.o `test -f 'kernel/arch/x86_64/cpu/except_asm.s' || echo '$(srcdir)/'`kernel/arch/x86_64/cpu/except_asm.s
-
-kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj: kernel/arch/x86_64/cpu/except_asm.s
-	$(AM_V_CCAS)$(CCAS) $(kernel_tracing_CCASFLAGS) $(CCASFLAGS) -c -o kernel/arch/x86_64/cpu/kernel_tracing-except_asm.obj `if test -f 'kernel/arch/x86_64/cpu/except_asm.s'; then $(CYGPATH_W) 'kernel/arch/x86_64/cpu/except_asm.s'; else $(CYGPATH_W) '$(srcdir)/kernel/arch/x86_64/cpu/except_asm.s'; fi`
 install-libc_aHEADERS: $(libc_a_HEADERS)
 	@$(NORMAL_INSTALL)
 	@list='$(libc_a_HEADERS)'; test -n "$(libc_adir)" || list=; \

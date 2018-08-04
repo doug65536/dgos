@@ -9,6 +9,7 @@
 ../emu/bochs/bochs-debugger-iso-efi-kernel-commands
 ../toolchain/build-crossgcc-binutils.patch
 arch/x86_64/cpu/apic.bits.h
+arch/x86_64/cpu/except_asm.S
 arch/x86_64/cpu/pic.bits
 arch/x86_64/cpu/picbits.h
 device/acpi.bits
@@ -163,7 +164,6 @@ device/pci.h
 arch/x86_64/elf64.cc
 arch/x86_64/elf64.h
 arch/x86_64/Makefile
-arch/x86_64/cpu/except_asm.s
 arch/x86_64/cpu/cpu_broadcast.h
 arch/x86_64/cpu/gdt.h
 arch/x86_64/cpu/spinlock.h
