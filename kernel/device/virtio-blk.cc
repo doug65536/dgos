@@ -4,6 +4,13 @@
 #include "callout.h"
 #include "numeric_limits.h"
 
+#define DEBUG_VIRTIO_BLK 1
+#if DEBUG_VIRTIO_BLK
+#define VIRTIO_BLK_TRACE(...) printdbg("virtio-blk: " __VA_ARGS__)
+#else
+#define VIRTIO_BLK_TRACE(...) ((void)0)
+#endif
+
 #define VIRTIO_DEVICE_BLK (0x1042)
 
 // Maximum size of any single segment is in size_max.
@@ -338,6 +345,9 @@ void virtio_blk_if_t::irq_handler(int offset)
     if (offset == 1 || irq_range.count == 1) {
         int cpu_nr = thread_cpu_number();
         int queue_nr = cpu_nr % queue_count;
+
+        VIRTIO_BLK_TRACE("IRQ offset=%d, cpu=%d, queue=%d\n",
+                         offset, cpu_nr, queue_nr);
 
         per_queue[queue_nr].req_queue->recycle_used();
     }
