@@ -313,7 +313,7 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
 
     mcs_queue_ent_t *pred = atomic_xchg(lock, node);
 
-    if (unlikely(pred)) {
+    if (unlikely(pred != nullptr)) {
         // queue was non-empty
 
         atomic_st_rel(&node->locked, true);
@@ -347,7 +347,7 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
         // no known successor
 
         // If the root still points at this node, null it
-        if (atomic_cmpxchg(lock, node, nullptr)) {
+        if (atomic_cmpxchg(lock, node, nullptr) == node) {
             // List now empty
             return;
         }
