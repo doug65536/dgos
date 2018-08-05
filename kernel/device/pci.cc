@@ -952,6 +952,28 @@ bool pci_set_irq_unmask(pci_addr_t addr, bool unmask)
     return true;
 }
 
+int pci_max_vectors(pci_addr_t addr)
+{
+    pci_msi_caps_hdr_t caps;
+    bool msix;
+
+    int capability = pci_find_msi_msix(addr, msix, caps);
+
+    if (unlikely(!capability))
+        return 0;
+
+    int count = 0;
+
+    if (msix) {
+        count = PCI_MSIX_MSG_CTRL_TBLSZ_GET(caps.msg_ctrl) + 1;
+    } else {
+        uint8_t multi_exp = PCI_MSI_MSG_CTRL_MMC_GET(caps.msg_ctrl);
+        count = 1 << multi_exp;
+    }
+
+    return msix ? count : -count;
+}
+
 void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line)
 {
     pci_config_write(addr, offsetof(pci_config_hdr_t, irq_line),

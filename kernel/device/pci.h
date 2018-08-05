@@ -447,6 +447,9 @@ bool pci_config_write(pci_addr_t addr,
 
 void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size);
 
+// Returns positive count for msix, or negated count for msi
+int pci_max_vectors(pci_addr_t addr);
+
 int pci_find_capability(pci_addr_t addr,
         int capability_id, int start = 0);
 
