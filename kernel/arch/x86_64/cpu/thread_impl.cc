@@ -314,9 +314,10 @@ static char *thread_allocate_stack(
         thread_t tid, size_t stack_size, char const *noun, int fill)
 {
     char *stack;
-    stack = (char*)mmap(nullptr, stack_guard_size + stack_size + stack_guard_size,
-                 PROT_READ | PROT_WRITE,
-                 MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
+    stack = (char*)mmap(nullptr, stack_guard_size +
+                        stack_size + stack_guard_size,
+                        PROT_READ | PROT_WRITE,
+                        MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
 
     // Guard pages
     madvise(stack, stack_guard_size, MADV_DONTNEED);
