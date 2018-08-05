@@ -650,28 +650,33 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 
     size_t requested_queue_count = thread_get_cpu_count() + 1;
 
+    size_t requested_vector_count = 1;
+
+    if (pci_max_vectors(pci_dev) >= int(requested_queue_count))
+        requested_vector_count = requested_queue_count;
+
     // The admin queue is queue[0],
     // and the I/O command queue for CPU 0 is queue[1],
     // and the I/O command queue for CPU 1 is queue[2], etc,
     // so provide a target CPU list that targets the MSI-X interrupts
     // appropriately, in case MSI-X is supported
-    std::unique_ptr<int[]> target_cpus(new int[requested_queue_count]);
+    std::vector<int> target_cpus(requested_vector_count);
     target_cpus[0] = 0;
-    for (size_t i = 1; i < requested_queue_count; ++i)
+    for (size_t i = 1; i < requested_vector_count; ++i)
         target_cpus[i] = i - 1;
 
     // Prepare to use the same vector for all CPU-local queues
-    std::unique_ptr<int[]> vector_offsets(new int[requested_queue_count]);
+    std::vector<int> vector_offsets(requested_vector_count, 1);
     vector_offsets[0] = 0;
-    std::fill_n(vector_offsets.get() + 1, requested_queue_count - 1, 1);
 
     // Try to use MSI(X) IRQ
     use_msi = pci_try_msi_irq(pci_dev, &irq_range, 0, true,
-                              std::min(requested_queue_count - 1, size_t(32)),
-                              irq_handler, "nvme", target_cpus.get(),
-                              vector_offsets.get());
+                              requested_vector_count,
+                              irq_handler, "nvme", target_cpus.data(),
+                              vector_offsets.data());
 
     target_cpus.reset();
+    vector_offsets.reset();
 
     NVME_TRACE("Using IRQs %s=%d, base=%u, count=%u\n",
                irq_range.msix ? "msix" : "msi", use_msi,
@@ -817,9 +822,18 @@ bool nvme_if_t::init(pci_dev_iterator_t const &pci_dev)
 
     // Create completion queues
     for (size_t i = 1; i < queue_count; ++i) {
+        int vector;
+        if (irq_range.msix && irq_range.count == 2) {
+            // MSI-X with 2 vectors, dedicated vector for admin queue
+            vector = i;
+        } else {
+            // CPU 0 shares vector with admin queue
+            vector = i ? (i - 1) % irq_range.count : 0;
+        }
+
         admin_queue.submit_cmd(nvme_cmd_t::create_cmp_queue(
                                    queues[i].cmp_queue_ptr(),
-                                   queue_slots, i, i & (irq_range.count - 1)));
+                                   queue_slots, i, vector));
     }
 
     // Create submission queues
@@ -970,16 +984,14 @@ void nvme_if_t::irq_handler(int irq_offset)
 {
     //NVME_TRACE("received IRQ\n");
 
-    int queue_stride = irq_range.count;
-
-    if (irq_offset && irq_range.msix && irq_range.count == queue_count + 1) {
+    if (irq_offset && irq_range.msix && irq_range.count == 2) {
         // Infer queue index from CPU number
         int current_cpu = thread_cpu_number();
         nvme_queue_state_t& queue = queues[1 + current_cpu];
         queue.process_completions(this, queues);
     } else {
         // Fallback to vector that is not shared across CPUs
-        for (size_t i = irq_offset; i < queue_count; i += queue_stride)
+        for (size_t i = irq_offset; i < queue_count; i += irq_range.count)
         {
             nvme_queue_state_t& queue = queues[i];
             queue.process_completions(this, queues);

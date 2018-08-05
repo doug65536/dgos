@@ -838,6 +838,9 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                     msi_writes.data(), tbl_cnt, cpu, distribute,
                     handler, name, target_cpus, vector_offsets, false);
 
+        if (irq_range->base == 0)
+            return false;
+
         PCI_TRACE("Allocated MSI-X IRQ %d-%d\n",
                   irq_range->base, irq_range->base + irq_range->count - 1);
 

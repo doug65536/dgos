@@ -109,6 +109,7 @@ public:
     size_type capacity() const;
     void shrink_to_fit();
     void clear();
+    void reset();
 
     iterator insert(const_iterator __pos,
                     _T const& __value);
@@ -662,6 +663,17 @@ void vector<_T,_Allocator>::clear()
 {
     while (__sz > 0)
         pop_back();
+}
+
+template<typename _T, typename _Allocator>
+void vector<_T,_Allocator>::reset()
+{
+    clear();
+    if (__capacity > 0)
+        __alloc.deallocate(__m, __capacity);
+    __m = nullptr;
+    __sz = 0;
+    __capacity = 0;
 }
 
 template<typename _T, typename _Allocator>

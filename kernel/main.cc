@@ -886,7 +886,6 @@ static int init_thread(void *)
             new std::vector<read_stress_thread_t*>();
     read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD);
 
-    int n = 0;
     for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
         for (int devid = 0; devid < dev_cnt; ++devid) {
             printk("(devid %d, worker %d)"
@@ -895,7 +894,7 @@ static int init_thread(void *)
             read_stress_thread_t *thread = new read_stress_thread_t();
             read_stress_threads->push_back(thread);
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
-            thread_t tid = thread->start(devid, indicator, n++);
+            thread_t tid = thread->start(devid, indicator, i);
             printk("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
         }
     }

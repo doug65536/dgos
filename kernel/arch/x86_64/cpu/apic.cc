@@ -2586,7 +2586,7 @@ void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
     if (cpu >= 0) {
         // Specific CPU
         result->addr = (0xFEEU << 20) |
-                ((apic_id_list[cpu % cpu_count] << 12) & 0xFF);
+                ((apic_id_list[cpu % cpu_count] & 0xFF) << 12);
     } else {
         // Lowest priority
         result->addr = (0xFEEU << 20) | (1 << 2) | (1 << 3) |
@@ -2643,15 +2643,18 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
 
     for (int i = 0; i < count; ++i) {
         int vec_ofs = vector_offsets ? vector_offsets[i] : i;
+        int target_cpu = target_cpus ? target_cpus[i] : cpu;
 
-        apic_msi_target(results + i,
-                        target_cpus ? target_cpus[i] : cpu,
-                        vector_base + vec_ofs);
+        apic_msi_target(results + i, target_cpu, vector_base + vec_ofs);
 
         uint8_t intr = vector_base + vec_ofs;
         uint8_t irq = vector_base + vec_ofs - INTR_APIC_IRQ_BASE;
 
-        APIC_TRACE("%s msi(x) IRQ %u = vector %u\n", name, irq, intr);
+        APIC_TRACE("%s msi(x) IRQ %u = vector %u (%#x), cpu=%d"
+                   ", addr=%#zx, data=%#zx\n",
+                   name, irq, intr, intr, target_cpu,
+                   results[i].addr, results[i].data);
+
         irq_to_intr[irq] = intr;
         intr_to_irq[intr] = irq;
 
