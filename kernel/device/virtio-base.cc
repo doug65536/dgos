@@ -140,8 +140,8 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             }
 
             if (per_cpu_queues) {
-                // Use two vectors, first one is config IRQ, second one
-                // is shared by all queues
+                // Use two interrupt vectors, first one is config IRQ,
+                // second one is shared by all queues
                 // Route first vector to CPU 0, route rest of vectors
                 // round robin across all CPUs, starting at CPU 0
 
