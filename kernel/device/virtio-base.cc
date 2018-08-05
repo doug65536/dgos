@@ -513,9 +513,8 @@ void virtio_virtqueue_t::recycle_used()
 
     pending_completions.swap(finished_completions);
 
-    lock.unlock();
-
     queue_not_full.notify_all();
+    lock.unlock();
 
     for (virtio_iocp_t *completion : finished_completions)
         completion->invoke();
