@@ -350,7 +350,7 @@ static thread_t thread_create_with_state(
         thread_priority_t priority, bool user)
 {
     if (stack_size == 0)
-        stack_size = 16384;
+        stack_size = 32768;
     else if (stack_size < 16384)
         return -1;
 
