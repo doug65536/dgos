@@ -323,11 +323,35 @@ bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
 
 bool virtio_blk_if_t::offer_features(virtio_base_t::feature_set_t &features)
 {
+    virtio_base_t::feature_set_t support{
+        VIRTIO_BLK_F_SIZE_MAX_BIT,
+        VIRTIO_BLK_F_SEG_MAX_BIT,
+        VIRTIO_BLK_F_GEOMETRY_BIT,
+        VIRTIO_BLK_F_RO_BIT,
+        VIRTIO_BLK_F_BLK_SIZE_BIT,
+        VIRTIO_BLK_F_TOPOLOGY_BIT
+    };
+
+    features &= support;
+
     return true;
 }
 
 bool virtio_blk_if_t::verify_features(virtio_base_t::feature_set_t &features)
 {
+    if (features[VIRTIO_BLK_F_SIZE_MAX_BIT])
+        printk("virtio-blk: supports %s\n", "SIZE_MAX");
+    if (features[VIRTIO_BLK_F_SEG_MAX_BIT])
+        printk("virtio-blk: supports %s\n", "SEG_MAX");
+    if (features[VIRTIO_BLK_F_GEOMETRY_BIT])
+        printk("virtio-blk: supports %s\n", "GEOMETRY");
+    if (features[VIRTIO_BLK_F_RO_BIT])
+        printk("virtio-blk: supports %s\n", "RO");
+    if (features[VIRTIO_BLK_F_BLK_SIZE_BIT])
+        printk("virtio-blk: supports %s\n", "BLK_SIZE");
+    if (features[VIRTIO_BLK_F_TOPOLOGY_BIT])
+        printk("virtio-blk: supports %s\n", "TOPOLOGY");
+
     return true;
 }
 
@@ -337,6 +361,7 @@ void virtio_blk_if_t::config_irq()
 
 void virtio_blk_if_t::irq_handler(int offset)
 {
+
     assert(offset >= 0 && offset < 2);
 
     if (offset == 0 || irq_range.count == 1)
