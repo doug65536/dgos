@@ -173,16 +173,6 @@ void cpu_init(int ap)
     static_assert(GDT_SEL_KERNEL_DATA == GDT_SEL_KERNEL_CODE64 + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");
 
-    if (!ap && sse_avx_offset) {
-        // Patch vzeroall into syscall code path
-        extern uint8_t const syscall_patch_jmp[];
-        uintptr_t const base = uintptr_t(syscall_entry);
-        uintptr_t const syscall_jmp = base + syscall_patch_jmp[0];
-        uintptr_t const syscall_vzeroall = base + syscall_patch_jmp[1];
-        // 3 is the size of the vzeroall instruction
-        cpu_patch_code((void*)syscall_jmp, (void*)syscall_vzeroall, 3);
-    }
-
     // Load null LDT
     cpu_ldt_set(0);
 }
