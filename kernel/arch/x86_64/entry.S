@@ -174,7 +174,7 @@ bsp_init:
 
     // Mark VGA initialized
     movl $ 0xb8000,%rdi
-    leaq $ 0x08000,%rsi
+    movl $ 0x08000,%rsi
     subq %rdi,%rsi
     call __asan_storeN_noabort
 
