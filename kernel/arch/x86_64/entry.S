@@ -124,9 +124,9 @@ bsp_init:
 
     // Resolve .rela.iplt
     leaq __rela_iplt_start(%rip),%rbx
+    leaq __rela_iplt_end(%rip),%r12
 .Lrela_iplt_next:
-    leaq __rela_iplt_end(%rip),%rax
-    cmpq %rax,%rbx
+    cmpq %r12,%rbx
     jz .Lrela_iplt_done
 
     // Only apply STT_GNU_IFUNC (0x25)
