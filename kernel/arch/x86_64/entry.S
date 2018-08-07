@@ -107,7 +107,7 @@ bsp_init:
     debugind '4'
     call cpuid_init
 
-    xor %edi,%edi
+    xorl %edi,%edi
     call cpu_init_early
 
     debugind '7'
