@@ -18,6 +18,8 @@
 .hidden entry
 .type entry,@function
 entry:
+    .cfi_startproc
+
     debugind '1'
 
     // Align the stack
@@ -222,6 +224,8 @@ bsp_init:
 
     movq %rax,%rdi
     call exit
+
+    .cfi_endproc
 
 .section .data
 
