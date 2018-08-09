@@ -3,7 +3,7 @@
 #include "keyboard.h"
 #include "mouse.h"
 
-#define USBHID_DEBUG 1
+#define USBHID_DEBUG 0
 #if USBHID_DEBUG
 #define USBHID_TRACE(...) printdbg("usbhid: " __VA_ARGS__)
 #else
