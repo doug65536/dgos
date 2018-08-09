@@ -257,14 +257,6 @@ module_entry_fn_t modload_load(char const *path)
             continue;
         }
 
-        // Can't process relocations that do not refer to a section
-        //if (hdr->sh_info == 0)
-        //    continue;
-
-        // Can't process relocations for a section that is not allocated
-        //if (!(scn_hdrs[hdr->sh_info].sh_flags & SHF_ALLOC))
-        //    continue;
-
         if ((ssize_t)hdr->sh_size != file_pread(
                     fd, rel_buf, hdr->sh_size, hdr->sh_offset)) {
             printdbg("Error reading module relocations\n");
@@ -349,13 +341,6 @@ module_entry_fn_t modload_load(char const *path)
                          fixup_addr, match ? 'y' : 'n',
                          name, modload_rel_type_text(rel_type),
                          rel_type, sym->st_value, r->r_addend);
-
-                // ???
-                //if (!match) {
-                //    printdbg("Could not find relocation for \"%s\"\n", name);
-                //    continue;
-                //}
-
 
                 bool fixup_is_64 = false;
                 bool fixup_is_unsigned = false;
