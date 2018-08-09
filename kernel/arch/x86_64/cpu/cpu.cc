@@ -137,13 +137,13 @@ void cpu_init(int ap)
 
 //    if (cpuid_is_intel()) {
 //        clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
-//
+
 //        if (cpuid_has_mwait())
 //            set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
-//
+
 //        if (cpuid_has_nx())
 //            clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
-//
+
 //        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
 //    }
 
