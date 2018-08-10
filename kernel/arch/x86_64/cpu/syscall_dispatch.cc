@@ -31,7 +31,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigaction,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_rt_sigprocmask,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_stub_rt_sigreturn,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_sys_ioctl,
+    (syscall_handler_t*)(void*)sys_ioctl,
     (syscall_handler_t*)(void*)sys_pread64,
     (syscall_handler_t*)(void*)sys_pwrite64,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_readv,

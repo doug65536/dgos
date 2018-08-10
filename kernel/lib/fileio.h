@@ -22,6 +22,7 @@ int file_ftruncate(int id, off_t size);
 int file_fsync(int id);
 int file_fdatasync(int id);
 int file_syncfs(int id);
+int file_ioctl(int id, int cmd, void* arg, unsigned flags, void *data);
 
 int file_opendir(char const *path);
 ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result);
@@ -40,25 +41,25 @@ public:
         : fd(-1)
     {
     }
-    
+
     file_t(int fd)
         : fd(fd)
     {
     }
-    
+
     ~file_t()
     {
         if (fd >= 0)
             file_close(fd);
     }
-    
+
     int release()
     {
         int result = fd;
         fd = -1;
         return result;
     }
-    
+
     int close()
     {
         if (fd >= 0) {
@@ -68,24 +69,24 @@ public:
         }
         return 0;
     }
-    
+
     file_t& operator=(int fd)
     {
         close();
         this->fd = fd;
         return *this;
     }
-    
+
     operator int() const
     {
         return fd;
     }
-    
+
     bool is_open() const
     {
         return fd >= 0;
     }
-    
+
 private:
     int fd;
 };

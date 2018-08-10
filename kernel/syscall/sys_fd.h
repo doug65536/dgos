@@ -18,6 +18,7 @@ int sys_dup(int oldfd);
 int sys_dup2(int oldfd, int newfd);
 int sys_dup3(int oldfd, int newfd, int flags);
 int sys_ftruncate(int fd, off_t size);
+int sys_ioctl(int fd, int cmd, void* arg);
 
 int sys_open(char const *pathname, int flags, mode_t mode);
 int sys_creat(char const *path, mode_t mode);
@@ -64,9 +65,6 @@ int sys_listxattr(char const *path,
 //int bmap(fs_cpath_t path, size_t blocksize,
 //    uint64_t* blockno) final;
 //int statfs(fs_statvfs_t* stbuf) final;
-//int ioctl(fs_file_info_t *fi,
-//     int cmd, void* arg,
-//     unsigned int flags, void* data) final;
 //int poll(fs_file_info_t *fi,
 //    fs_pollhandle_t* ph, unsigned* reventsp) final;
 

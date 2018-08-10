@@ -385,3 +385,6 @@ void mm_init_process(process_t *process);
 uintptr_t mm_fork_kernel_text();
 
 void mm_set_master_pagedir();
+
+bool mm_copy_user(void *dst, void const *src, size_t size);
+bool mm_is_user_range(void *buf, size_t size);

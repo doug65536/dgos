@@ -3217,3 +3217,46 @@ void mm_set_master_pagedir()
 {
     cpu_page_directory_set(root_physaddr);
 }
+
+bool mm_copy_user_generic(void *dst, void const *src, size_t size)
+{
+    __try {
+        memcpy(dst, src, size);
+    } __catch {
+        return false;
+    }
+
+    return true;
+}
+
+bool mm_copy_user_smap(void *dst, void const *src, size_t size)
+{
+    __try {
+        cpu_stac();
+        memcpy(dst, src, size);
+        cpu_clac();
+    } __catch {
+        return false;
+    }
+
+    return true;
+}
+
+typedef bool (*mm_copy_user_fn)(void *dst, void const *src, size_t size);
+
+extern "C" mm_copy_user_fn mm_copy_to_user_resolver()
+{
+    if (cpuid_has_smap())
+        return mm_copy_user_smap;
+    return mm_copy_user_generic;
+}
+
+_ifunc_resolver(mm_copy_to_user_resolver)
+bool mm_copy_user(void *dst, void const *src, size_t size);
+
+bool mm_is_user_range(void *buf, size_t size)
+{
+    return linaddr_t(buf) >= 0x400000 &&
+            (linaddr_t(buf) < 0x7FFFFFFFFFFF) &&
+            (linaddr_t(buf) + size) <= 0x7FFFFFFFFFFF;
+}

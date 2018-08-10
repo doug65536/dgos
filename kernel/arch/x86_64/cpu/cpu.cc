@@ -96,6 +96,10 @@ void cpu_init(int ap)
     if (cpuid_has_smep())
         set |= CPU_CR4_SMEP;
 
+    // Supervisor Mode Access Prevention (SMAP)
+    if (cpuid_has_smap())
+        set |= CPU_CR4_SMAP;
+
     // Allow access to rdtsc in user mode
     set |= CPU_CR4_PCE;
 

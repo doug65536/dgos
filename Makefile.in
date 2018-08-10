@@ -222,6 +222,7 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-mlock.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-munlock.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-madvise.$(OBJEXT) \
+	libc/src/sys/ioctl/libc_a-ioctl.$(OBJEXT) \
 	libc/src/unistd/libc_a-access.$(OBJEXT) \
 	libc/src/unistd/libc_a-alarm.$(OBJEXT) \
 	libc/src/unistd/libc_a-chdir.$(OBJEXT) \
@@ -326,6 +327,7 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_getflags.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT) \
+	libc/src/sys/socket/libc_a-socket.$(OBJEXT) \
 	libc/src/sys/syscall0.$(OBJEXT) \
 	libc/src/sys/syscall1.$(OBJEXT) \
 	libc/src/sys/syscall2.$(OBJEXT) \
@@ -1946,7 +1948,9 @@ libc_a_HEADERS = \
 	libc/include/netinet/in.h \
 	libc/include/netinet/tcp.h \
 	libc/include/langinfo.h \
-	libc/include/locale.h
+	libc/include/locale.h \
+	libc/include/sys/socket.h \
+	libc/include/sys/ioctl.h
 
 libc_a_SOURCES = \
 	libc/src/string/__bytebitmap.cc \
@@ -2000,6 +2004,7 @@ libc_a_SOURCES = \
 	libc/src/sys/mman/mlock.cc \
 	libc/src/sys/mman/munlock.cc \
 	libc/src/sys/mman/madvise.cc \
+	libc/src/sys/ioctl/ioctl.cc \
 	libc/src/unistd/access.cc \
 	libc/src/unistd/alarm.cc \
 	libc/src/unistd/chdir.cc \
@@ -2104,6 +2109,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
+	libc/src/sys/socket/socket.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -2651,6 +2657,15 @@ libc/src/sys/mman/libc_a-munlock.$(OBJEXT):  \
 libc/src/sys/mman/libc_a-madvise.$(OBJEXT):  \
 	libc/src/sys/mman/$(am__dirstamp) \
 	libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/ioctl/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/ioctl
+	@: > libc/src/sys/ioctl/$(am__dirstamp)
+libc/src/sys/ioctl/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/ioctl/$(DEPDIR)
+	@: > libc/src/sys/ioctl/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/ioctl/libc_a-ioctl.$(OBJEXT):  \
+	libc/src/sys/ioctl/$(am__dirstamp) \
+	libc/src/sys/ioctl/$(DEPDIR)/$(am__dirstamp)
 libc/src/unistd/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/unistd
 	@: > libc/src/unistd/$(am__dirstamp)
@@ -2979,6 +2994,15 @@ libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.$(OBJEXT):  \
 libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT):  \
 	libc/src/posix_spawn/$(am__dirstamp) \
 	libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/socket/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/socket
+	@: > libc/src/sys/socket/$(am__dirstamp)
+libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/socket/$(DEPDIR)
+	@: > libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/socket/libc_a-socket.$(OBJEXT):  \
+	libc/src/sys/socket/$(am__dirstamp) \
+	libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/sys
 	@: > libc/src/sys/$(am__dirstamp)
@@ -4004,7 +4028,9 @@ mostlyclean-compile:
 	-rm -f libc/src/stdlib/*.$(OBJEXT)
 	-rm -f libc/src/string/*.$(OBJEXT)
 	-rm -f libc/src/sys/*.$(OBJEXT)
+	-rm -f libc/src/sys/ioctl/*.$(OBJEXT)
 	-rm -f libc/src/sys/mman/*.$(OBJEXT)
+	-rm -f libc/src/sys/socket/*.$(OBJEXT)
 	-rm -f libc/src/unistd/*.$(OBJEXT)
 	-rm -f mbr/*.$(OBJEXT)
 	-rm -f modules/hello/*.$(OBJEXT)
@@ -4418,6 +4444,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall5.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall6.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-madvise.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-mlock.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Po@am__quote@
@@ -4426,6 +4453,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-_exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-access.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-alarm.Po@am__quote@
@@ -6042,6 +6070,20 @@ libc/src/sys/mman/libc_a-madvise.obj: libc/src/sys/mman/madvise.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/mman/libc_a-madvise.obj `if test -f 'libc/src/sys/mman/madvise.cc'; then $(CYGPATH_W) 'libc/src/sys/mman/madvise.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/mman/madvise.cc'; fi`
 
+libc/src/sys/ioctl/libc_a-ioctl.o: libc/src/sys/ioctl/ioctl.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/ioctl/libc_a-ioctl.o -MD -MP -MF libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Tpo -c -o libc/src/sys/ioctl/libc_a-ioctl.o `test -f 'libc/src/sys/ioctl/ioctl.cc' || echo '$(srcdir)/'`libc/src/sys/ioctl/ioctl.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Tpo libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/ioctl/ioctl.cc' object='libc/src/sys/ioctl/libc_a-ioctl.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/ioctl/libc_a-ioctl.o `test -f 'libc/src/sys/ioctl/ioctl.cc' || echo '$(srcdir)/'`libc/src/sys/ioctl/ioctl.cc
+
+libc/src/sys/ioctl/libc_a-ioctl.obj: libc/src/sys/ioctl/ioctl.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/ioctl/libc_a-ioctl.obj -MD -MP -MF libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Tpo -c -o libc/src/sys/ioctl/libc_a-ioctl.obj `if test -f 'libc/src/sys/ioctl/ioctl.cc'; then $(CYGPATH_W) 'libc/src/sys/ioctl/ioctl.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/ioctl/ioctl.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Tpo libc/src/sys/ioctl/$(DEPDIR)/libc_a-ioctl.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/ioctl/ioctl.cc' object='libc/src/sys/ioctl/libc_a-ioctl.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/ioctl/libc_a-ioctl.obj `if test -f 'libc/src/sys/ioctl/ioctl.cc'; then $(CYGPATH_W) 'libc/src/sys/ioctl/ioctl.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/ioctl/ioctl.cc'; fi`
+
 libc/src/unistd/libc_a-access.o: libc/src/unistd/access.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/unistd/libc_a-access.o -MD -MP -MF libc/src/unistd/$(DEPDIR)/libc_a-access.Tpo -c -o libc/src/unistd/libc_a-access.o `test -f 'libc/src/unistd/access.cc' || echo '$(srcdir)/'`libc/src/unistd/access.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/unistd/$(DEPDIR)/libc_a-access.Tpo libc/src/unistd/$(DEPDIR)/libc_a-access.Po
@@ -7497,6 +7539,20 @@ libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj: libc/src/posix_spawn/
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/posix_spawn/posix_spawnattr_getpgroup.cc' object='libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.obj `if test -f 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; then $(CYGPATH_W) 'libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/posix_spawn/posix_spawnattr_getpgroup.cc'; fi`
+
+libc/src/sys/socket/libc_a-socket.o: libc/src/sys/socket/socket.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/socket/libc_a-socket.o -MD -MP -MF libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Tpo -c -o libc/src/sys/socket/libc_a-socket.o `test -f 'libc/src/sys/socket/socket.cc' || echo '$(srcdir)/'`libc/src/sys/socket/socket.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Tpo libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/socket/socket.cc' object='libc/src/sys/socket/libc_a-socket.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/socket/libc_a-socket.o `test -f 'libc/src/sys/socket/socket.cc' || echo '$(srcdir)/'`libc/src/sys/socket/socket.cc
+
+libc/src/sys/socket/libc_a-socket.obj: libc/src/sys/socket/socket.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/socket/libc_a-socket.obj -MD -MP -MF libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Tpo -c -o libc/src/sys/socket/libc_a-socket.obj `if test -f 'libc/src/sys/socket/socket.cc'; then $(CYGPATH_W) 'libc/src/sys/socket/socket.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/socket/socket.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Tpo libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/socket/socket.cc' object='libc/src/sys/socket/libc_a-socket.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/socket/libc_a-socket.obj `if test -f 'libc/src/sys/socket/socket.cc'; then $(CYGPATH_W) 'libc/src/sys/socket/socket.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/socket/socket.cc'; fi`
 
 libc/math/libm_a-cos.o: libc/math/cos.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-cos.o -MD -MP -MF libc/math/$(DEPDIR)/libm_a-cos.Tpo -c -o libc/math/libm_a-cos.o `test -f 'libc/math/cos.cc' || echo '$(srcdir)/'`libc/math/cos.cc
@@ -11754,8 +11810,12 @@ distclean-generic:
 	-rm -f libc/src/string/$(am__dirstamp)
 	-rm -f libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/sys/$(am__dirstamp)
+	-rm -f libc/src/sys/ioctl/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/sys/ioctl/$(am__dirstamp)
 	-rm -f libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/sys/mman/$(am__dirstamp)
+	-rm -f libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/sys/socket/$(am__dirstamp)
 	-rm -f libc/src/unistd/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/unistd/$(am__dirstamp)
 	-rm -f mbr/$(DEPDIR)/$(am__dirstamp)

@@ -1,6 +1,8 @@
 cxx/abi/cxa_allocate_exception.cc
 cxx/terminate.cc
 include/new.h
+include/sys/ioctl.h
+include/sys/socket.h
 include/sys/syscall_num.h
 math/cos.cc
 math/log.cc
@@ -39,6 +41,7 @@ src/stdlib/malloc.cc
 src/stdlib/new.cc
 src/string/__bytebitmap.cc
 src/string/__bytebitmap.h
+src/sys/ioctl/ioctl.cc
 src/sys/mman/madvise.cc
 src/sys/mman/mlock.cc
 src/sys/mman/mmap.cc
@@ -47,6 +50,7 @@ src/sys/mman/mremap.cc
 src/sys/mman/msync.cc
 src/sys/mman/munlock.cc
 src/sys/mman/munmap.cc
+src/sys/socket/socket.cc
 src/sys/syscall0.S
 src/sys/syscall1.S
 src/sys/syscall2.S

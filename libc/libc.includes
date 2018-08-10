@@ -14,3 +14,5 @@ cxx
 src/errno
 cxx/abi
 src/sys/mman
+src/sys/socket
+src/sys/ioctl

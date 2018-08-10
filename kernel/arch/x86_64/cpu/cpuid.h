@@ -195,6 +195,12 @@ CPUID_CONST_INLINE bool cpuid_has_smep(void)
     return cpuid_cache.has_smep;
 }
 
+// Supervisor Mode Access Prevention
+CPUID_CONST_INLINE bool cpuid_has_smap(void)
+{
+    return cpuid_cache.has_smap;
+}
+
 // Debugging Extensions
 CPUID_CONST_INLINE bool cpuid_has_de(void)
 {

@@ -1043,7 +1043,9 @@ libc_a_HEADERS = \
 	libc/include/netinet/in.h \
 	libc/include/netinet/tcp.h \
 	libc/include/langinfo.h \
-	libc/include/locale.h
+	libc/include/locale.h \
+	libc/include/sys/socket.h \
+	libc/include/sys/ioctl.h
 
 libc_a_SOURCES = \
 	libc/src/string/__bytebitmap.cc \
@@ -1097,6 +1099,7 @@ libc_a_SOURCES = \
 	libc/src/sys/mman/mlock.cc \
 	libc/src/sys/mman/munlock.cc \
 	libc/src/sys/mman/madvise.cc \
+	libc/src/sys/ioctl/ioctl.cc \
 	libc/src/unistd/access.cc \
 	libc/src/unistd/alarm.cc \
 	libc/src/unistd/chdir.cc \

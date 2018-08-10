@@ -3,6 +3,9 @@
 #include "thread.h"
 #include "fileio.h"
 #include "syscall_helper.h"
+#include "../libc/include/sys/ioctl.h"
+#include "mm.h"
+#include "unique_ptr.h"
 
 // Validate the errno and return its negated integer value
 static int err(errno_t errno)
@@ -176,6 +179,51 @@ int sys_ftruncate(int fd, off_t size)
         return status;
 
     return err(status);
+}
+
+int sys_ioctl(int fd, int cmd, void* arg)
+{
+    size_t size = _IOC_SIZE(cmd);
+
+    // If the size is nonzero and the argument pointer does not lie in user
+    // address range, then fail with EINVAL
+    if (unlikely(size > 0 && !mm_is_user_range(arg, size)))
+        return err(errno_t::EINVAL);
+
+    // If the file descriptor is not valid, then fail with EBADF
+    if (unlikely(fd < 0))
+        return err(errno_t::EBADF);
+
+    process_t *p = fast_cur_process();
+
+    int id = p->fd_to_id(fd);
+    if (unlikely(id < 0))
+        return err(errno_t::EBADF);
+
+    std::unique_ptr_free<void> data;
+
+    // If the command indicates read or write, and the size is nonzero,
+    // then allocate a kernel shadow buffer of the argument pointer data
+    if ((_IOC_DIR(cmd) & _IOC_RDWR) && size > 0) {
+        if (unlikely(!data.reset(calloc(1, size))))
+            return err(errno_t::ENOMEM);
+    }
+
+    // Copy the argument to a kernel memory buffer if WRITE
+    if ((_IOC_DIR(cmd) & _IOC_WRITE) && size > 0) {
+        if (!mm_copy_user(data, arg, size))
+            return err(errno_t::EFAULT);
+    }
+
+    int status = file_ioctl(id, cmd, arg, size, data);
+
+    // Copy the argument to user buffer if READ
+    if ((_IOC_DIR(cmd) & _IOC_READ) && size > 0) {
+        if (!mm_copy_user(arg, data, size))
+            return err(errno_t::EFAULT);
+    }
+
+    return status;
 }
 
 int sys_dup(int oldfd)
