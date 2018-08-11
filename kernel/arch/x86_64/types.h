@@ -26,6 +26,7 @@
 #define _use_result             __attribute__((__warn_unused_result__))
 #define _leaf                   __attribute__((__leaf__))
 #define __aligned(n)            __attribute__((__aligned__(n)))
+#define _warn_unused_result     __attribute__((__warn_unused_result__))
 #define _always_inline          __attribute__((__always_inline__)) inline
 #define _always_optimize        __attribute__((optimize("-O2")))
 #define _noreturn               __attribute__((__noreturn__))
