@@ -889,6 +889,12 @@ EXPORT void panic(char const *format, ...)
 }
 
 _noreturn
+EXPORT void panic_oom()
+{
+    panic("Out of memory");
+}
+
+_noreturn
 EXPORT void vpanic(char const *format, va_list ap)
 {
     printk("KERNEL PANIC! ");

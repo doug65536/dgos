@@ -695,8 +695,10 @@ off_t fat32_fs_t::walk_cluster_chain(
                 dirent_start_cluster(file->dirent, alloc);
 
             cluster_t fat_block = c_clus >> fat_block_shift;
-            if (sync_pending.empty() || sync_pending.back() != fat_block)
-                sync_pending.push_back(fat_block);
+            if (sync_pending.empty() || sync_pending.back() != fat_block) {
+                if (!sync_pending.push_back(fat_block))
+                    panic_oom();
+            }
 
             fat[c_clus] = alloc;
             fat2[c_clus] = alloc;
@@ -717,7 +719,8 @@ off_t fat32_fs_t::walk_cluster_chain(
 
         cluster_t fat_block = c_clus >> fat_block_shift;
         if (sync_pending.empty() || sync_pending.back() != fat_block)
-            sync_pending.push_back(fat_block);
+            if (!sync_pending.push_back(fat_block))
+                panic_oom();
     }
 
     for (cluster_t block_index : sync_pending) {
@@ -1234,7 +1237,8 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 
     std::unique_ptr<fat32_fs_t> self(new fat32_fs_t);
     if (self->mount(conn)) {
-        fat32_mounts.push_back(self);
+        if (!fat32_mounts.push_back(self))
+            panic_oom();
         return self.release();
     }
 

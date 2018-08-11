@@ -336,10 +336,14 @@ int process_t::start()
 
     std::vector<auxv_t> auxent;
 
-    auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry });
-    auxent.push_back({ auxv_t::AT_PAGESZ, PAGESIZE });
-    auxent.push_back({ auxv_t::AT_PHENT, hdr.e_phentsize });
-    auxent.push_back({ auxv_t::AT_EXECFD, fd.release() });
+    if (!auxent.push_back({ auxv_t::AT_ENTRY, (void*)hdr.e_entry }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_PAGESZ, PAGESIZE }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_PHENT, hdr.e_phentsize }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() }))
+        panic_oom();
 
     processes_scoped_lock lock(processes_lock);
     state = state_t::running;

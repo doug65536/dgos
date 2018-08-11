@@ -12,6 +12,9 @@ _noreturn
 void panic(char const *format, ...)
     _printf_format(1, 2);
 
+_noreturn
+void panic_oom();
+
 int vsnprintf(char *buf, size_t limit, char const *format, va_list ap);
 
 int snprintf(char *buf, size_t limit, char const *format, ...)

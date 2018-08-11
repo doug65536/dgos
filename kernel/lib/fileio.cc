@@ -25,7 +25,8 @@ static filetab_t *file_table_ff;
 static void file_init(void *)
 {
     file_table_scoped_lock lock(file_table_lock);
-    file_table.reserve(1000);
+    if (!file_table.reserve(1000))
+        panic_oom();
 }
 
 static fs_base_t *file_fs_from_path(char const *path)
@@ -45,7 +46,8 @@ static filetab_t *file_new_filetab(void)
         item->next_free = nullptr;
     } else if (file_table.size() < file_table.capacity()) {
         // Add another item
-        file_table.emplace_back();
+        if (!file_table.emplace_back())
+            return nullptr;
         item = &file_table.back();
     } else {
         return nullptr;

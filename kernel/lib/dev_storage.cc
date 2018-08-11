@@ -51,7 +51,8 @@ void storage_if_register_factory(char const *name,
 {
     (void)name;
 
-    storage_factories.push_back(factory);
+    if (!storage_factories.push_back(factory))
+        panic_oom();
     STORAGE_TRACE("Registered storage driver %s\n", name);
 }
 
@@ -69,7 +70,8 @@ void probe_storage_factory(storage_if_factory_t *factory)
         storage_if_base_t *if_ = list[i];
 
         // Store interface instance
-        storage_ifs.push_back(if_);
+        if (!storage_ifs.push_back(if_))
+            panic_oom();
 
         STORAGE_TRACE("Probing %s[%u] for drives...\n", factory->name, i);
 
@@ -83,7 +85,8 @@ void probe_storage_factory(storage_if_factory_t *factory)
             // Calculate pointer to storage device instance
             storage_dev_base_t *dev = dev_list[k];
             // Store device instance
-            storage_devs.push_back(dev);
+            if (!storage_devs.push_back(dev))
+                panic_oom();
         }
     }
 }
@@ -99,7 +102,8 @@ REGISTER_CALLOUT(invoke_storage_factories, nullptr,
 
 void fs_register_factory(char const *name, fs_factory_t *fs)
 {
-    fs_regs.push_back(new fs_reg_t{ name, fs });
+    if (!fs_regs.push_back(new fs_reg_t{ name, fs }))
+        panic_oom();
     printdbg("%s filesystem registered\n", name);
 }
 
@@ -132,8 +136,10 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     if (mfs && mfs->is_boot())
         fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, mfs });
-    else if (mfs)
-        fs_mounts.push_back(fs_mount_t{ fs_reg, mfs });
+    else if (mfs) {
+        if (!fs_mounts.push_back(fs_mount_t{ fs_reg, mfs }))
+            panic_oom();
+    }
 }
 
 fs_base_t *fs_from_id(size_t id)
@@ -145,7 +151,8 @@ fs_base_t *fs_from_id(size_t id)
 
 void part_register_factory(char const *name, part_factory_t *factory)
 {
-    part_factories.push_back(factory);
+    if (!part_factories.push_back(factory))
+        panic_oom();
     printk("%s partition type registered\n", name);
 }
 
