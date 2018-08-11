@@ -493,17 +493,27 @@ static contiguous_allocator_t near_allocator;
 static contiguous_allocator_t contig_phys_allocator;
 static contiguous_allocator_t hole_allocator;
 
+static size_t round_up(size_t n)
+{
+    return (n + PAGE_MASK) & -PAGE_SIZE;
+}
+
+static size_t round_down(size_t n)
+{
+    return n & (int)-PAGE_MASK;
+}
+
 //
 // Contiguous physical memory allocator
 
 uintptr_t mm_alloc_contiguous(size_t size)
 {
-    return contig_phys_allocator.alloc_linear(size);
+    return contig_phys_allocator.alloc_linear(round_up(size));
 }
 
 void mm_free_contiguous(uintptr_t addr, size_t size)
 {
-    contig_phys_allocator.release_linear(addr, size);
+    contig_phys_allocator.release_linear(addr, round_up(size));
 }
 
 //
@@ -1663,16 +1673,6 @@ void mmu_init()
     cpu_tlb_flush();
 
     callout_call(callout_type_t::vmm_ready);
-}
-
-static size_t round_up(size_t n)
-{
-    return (n + PAGE_MASK) & -PAGE_SIZE;
-}
-
-static size_t round_down(size_t n)
-{
-    return n & (int)-PAGE_MASK;
 }
 
 // Returns the present mask for the new page
