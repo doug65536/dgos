@@ -34,8 +34,8 @@ enum struct callout_type_t : uint32_t {
     storage_dev = 'H',
     partition_probe = 'P',
     nic = 'N',
-    usb = 'U',
-
+    nics_ready = 129,
+    usb = 'U'
 };
 
 struct callout_t {
