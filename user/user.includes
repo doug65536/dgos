@@ -1,3 +1,4 @@
 ../libc/include
 test
 crt0
+bin/dhcpclient
