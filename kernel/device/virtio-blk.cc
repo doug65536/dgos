@@ -156,11 +156,14 @@ private:
     };
 
     struct per_queue_t {
+        bool init(virtio_blk_if_t *owner, virtio_virtqueue_t *queue);
+
         int io(request_t *request);
 
         virtio_blk_if_t *owner;
         lock_type per_queue_lock;
         std::vector<virtio_virtqueue_t::desc_t*> desc_chain;
+        std::vector<mmphysrange_t> phys_ranges;
         virtio_virtqueue_t *req_queue;
     };
 
@@ -217,8 +220,23 @@ int virtio_blk_if_t::io(request_t *request)
     return per_queue[queue_nr].io(request);
 }
 
+bool virtio_blk_if_t::per_queue_t::init(
+        virtio_blk_if_t *owner, virtio_virtqueue_t *queue)
+{
+    this->owner = owner;
+    req_queue = queue;
+    if (!desc_chain.reserve(size_t(1) << queue->get_log2_queue_size()))
+        return false;
+    if (!phys_ranges.resize(16))
+        return false;
+
+    return true;
+}
+
 int virtio_blk_if_t::per_queue_t::io(request_t *request)
 {
+    request->owner = this;
+
     switch (request->op) {
     case virtio_blk_op_t::read:
         request->header.type = VIRTIO_BLK_T_IN;
@@ -236,59 +254,51 @@ int virtio_blk_if_t::per_queue_t::io(request_t *request)
         return -1;
     }
 
-    mmphysrange_t ranges[16];
     size_t range_count;
     char *data = (char*)request->data;
     size_t remain = request->count << owner->log2_sectorsize;
 
-    virtio_virtqueue_t::desc_t *desc;
-    virtio_virtqueue_t::desc_t *prev;
-
     scoped_lock lock(per_queue_lock);
 
-    do {
-        range_count = mphysranges(ranges, countof(ranges), data, remain,
-                                  owner->blk_config->size_max);
+    for (;;) {
+        range_count = mphysranges(phys_ranges.data(), phys_ranges.size(),
+                                  data, remain, owner->blk_config->size_max);
 
-        desc = req_queue->alloc_desc(false);
+        if (likely(range_count < phys_ranges.size()))
+            break;
 
-        desc->addr = mphysaddr(&request->header);
-        desc->len = sizeof(request->header);
-        desc_chain.push_back(desc);
+        // Double the size and try again
+        phys_ranges.resize(phys_ranges.size() * 2);
+    }
 
-        size_t batch_bytes = 0;
-        for (size_t i = 0; i < range_count; ++i) {
-            prev = desc;
-            desc = req_queue->alloc_desc(request->op == virtio_blk_op_t::read);
-            desc->addr = ranges[i].physaddr;
-            desc->len = ranges[i].size;
-            batch_bytes += ranges[i].size;
+    if (unlikely(desc_chain.size() < range_count + 2))
+        desc_chain.resize(range_count + 2);
 
-            prev->flags.bits.next = true;
-            prev->next = req_queue->index_of(desc);
-            desc_chain.push_back(desc);
-        }
+    req_queue->alloc_multiple(desc_chain.data(), range_count + 2);
 
-        data += batch_bytes;
-        remain -= batch_bytes;
-    } while (remain);
+    desc_chain[0]->addr = mphysaddr(&request->header);
+    desc_chain[0]->len = sizeof(request->header);
 
-    prev = desc;
-    desc = req_queue->alloc_desc(true);
-    desc->addr = mphysaddr(&request->status);
-    desc->len = sizeof(request->status);
-    prev->flags.bits.next = true;
-    prev->next = req_queue->index_of(desc);
-    desc_chain.push_back(desc);
+    size_t i;
+    for (i = 0; i < range_count; ++i) {
+        desc_chain[i + 1]->addr = phys_ranges[i].physaddr;
+        desc_chain[i + 1]->len = phys_ranges[i].size;
+        desc_chain[i + 1]->flags.bits.write =
+                (request->op == virtio_blk_op_t::read);
+        desc_chain[i]->next = req_queue->index_of(desc_chain[i + 1]);
+        desc_chain[i]->flags.bits.next = true;
+    }
 
-    request->owner = this;
+    desc_chain[i + 1]->addr = mphysaddr(&request->status);
+    desc_chain[i + 1]->len = sizeof(request->status);
+    desc_chain[i + 1]->flags.bits.write = true;
+    desc_chain[i]->next = req_queue->index_of(desc_chain[i + 1]);
+    desc_chain[i]->flags.bits.next = true;
 
     request->io_iocp.reset(&virtio_blk_if_t::io_completion,
                            uintptr_t(request));
-    req_queue->enqueue_avail(desc_chain.data(), desc_chain.size(),
+    req_queue->enqueue_avail(desc_chain.data(), range_count + 2,
                              &request->io_iocp);
-
-    desc_chain.clear();
 
     return 1;
 }
@@ -312,10 +322,8 @@ bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
     per_queue = new per_queue_t[queue_count];
 
     for (size_t i = 0; i < queue_count; ++i) {
-        per_queue[i].owner = this;
-        per_queue[i].req_queue = &queues[i];
-        per_queue[i].desc_chain.reserve(
-                    size_t(1) << queues[i].get_log2_queue_size());
+        if (!per_queue[i].init(this, &queues[i]))
+            return false;
     }
 
     return true;

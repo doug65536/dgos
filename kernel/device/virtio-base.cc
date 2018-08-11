@@ -327,7 +327,8 @@ bool virtio_virtqueue_t::init(
 
     // Link together all of the descriptors into the free list
     assert(desc_first_free == -1);
-    for (int i = 1 << log2_queue_size; i > 0; --i) {
+    desc_free_count = 1 << log2_queue_size;
+    for (int i = desc_free_count; i > 0; --i) {
         desc_tab[i - 1].next = desc_first_free;
         desc_first_free = i - 1;
     }
@@ -369,11 +370,13 @@ virtio_virtqueue_t::desc_t *virtio_virtqueue_t::alloc_desc(bool dev_writable)
         VIRTIO_TRACE("Waiting for free descriptor\n");
         queue_not_full.wait(lock);
     }
+    assert(desc_free_count > 0);
 
-    VIRTIO_TRACE("Allocated descriptor id=%d\n", desc_first_free);
-
+    --desc_free_count;
     desc_t *desc = desc_tab + desc_first_free;
     desc_first_free = desc->next;
+
+    lock.unlock();
 
     desc->addr = 0;
     desc->len = 0;
@@ -383,12 +386,32 @@ virtio_virtqueue_t::desc_t *virtio_virtqueue_t::alloc_desc(bool dev_writable)
     if (dev_writable)
         desc->flags.bits.write = true;
 
+    VIRTIO_TRACE("Allocated descriptor id=%zu\n", desc - desc_tab);
+
     return desc;
 }
 
-uint16_t virtio_virtqueue_t::index_of(desc_t *desc) const
+void virtio_virtqueue_t::alloc_multiple(
+        virtio_virtqueue_t::desc_t **descs, size_t count)
 {
-    return desc - desc_tab;
+    scoped_lock lock(queue_lock);
+
+    while (desc_free_count < count) {
+        VIRTIO_TRACE("Waiting for %zu free descriptors"
+                     ", desc_free_count=%u\n", count, desc_free_count);
+        queue_not_full.wait(lock);
+    }
+    desc_free_count -= count;
+
+    for (size_t i = 0; i < count; ++i) {
+        desc_t *desc = desc_tab + desc_first_free;
+        desc_first_free = desc->next;
+        descs[i] = desc;
+        desc->addr = 0;
+        desc->len = 0;
+        desc->flags.raw = 0;
+        desc->next = -1;
+    }
 }
 
 void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
@@ -477,39 +500,44 @@ void virtio_virtqueue_t::recycle_used()
     VIRTIO_TRACE("Recycling used descriptors\n");
 
     size_t tail = used_tail;
-    size_t mask = ~-(1 << log2_queue_size);
-    size_t done_idx = atomic_ld_acq(&used_hdr->idx);
+    size_t const mask = ~-(1 << log2_queue_size);
+    size_t const done_idx = atomic_ld_acq(&used_hdr->idx);
     VIRTIO_TRACE("done_idx = %zu\n", done_idx);
-    if (unlikely(done_idx == tail)) {
+    while (unlikely(done_idx == tail)) {
         VIRTIO_TRACE("dropped spurious virtio IRQ\n");
         return;
     }
     do {
         used_t const& used = used_ring[tail & mask];
-        avail_t id = used.id;
-        uint64_t used_len = used.len;
+        avail_t const id = used.id;
+        uint64_t const used_len = used.len;
 
         VIRTIO_TRACE("Recycling id=%u (head)\n", id);
+
+        unsigned freed_count = 1;
 
         avail_t end = id;
         while (desc_tab[end].flags.bits.next) {
             end = desc_tab[end].next;
+            ++freed_count;
             VIRTIO_TRACE("Recycling id=%u (chained)\n", end);
         }
 
         desc_tab[end].next = desc_first_free;
         desc_first_free = id;
+        desc_free_count += freed_count;
 
-        virtio_iocp_t* completion = completions[id];
+        virtio_iocp_t* const completion = completions[id];
         completions[id] = nullptr;
         completion->set_result(used_len);
-        pending_completions.push_back(completion);
+        if (!pending_completions.push_back(completion))
+            panic_oom();
     } while ((++tail & 0xFFFF) != done_idx);
 
     used_tail = tail;
 
     // Notify device how far used ring has been processed
-    atomic_st_rel(&used_ftr->used_event, tail - 1);
+    atomic_st_rel(&used_ftr->used_event, tail);
 
     pending_completions.swap(finished_completions);
 
@@ -519,6 +547,8 @@ void virtio_virtqueue_t::recycle_used()
     for (virtio_iocp_t *completion : finished_completions)
         completion->invoke();
     finished_completions.clear();
+
+    VIRTIO_TRACE("Free descriptors: %u\n", desc_free_count);
 }
 
 int virtio_factory_base_t::detect_virtio(int dev_class, int device,
@@ -541,7 +571,8 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
         std::unique_ptr<virtio_base_t> self = create();
 
-        virtio_base_t::virtio_devs.push_back(self);
+        if (!virtio_base_t::virtio_devs.push_back(self))
+            panic_oom();
         if (self->init(pci_iter)) {
             found_device(self);
             self.release();

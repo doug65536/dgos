@@ -113,7 +113,12 @@ public:
 
     desc_t *alloc_desc(bool dev_writable);
 
-    uint16_t index_of(desc_t *desc) const;
+    void alloc_multiple(desc_t **descs, size_t count);
+
+    uint16_t index_of(desc_t *desc) const
+    {
+        return desc - desc_tab;
+    }
 
     void enqueue_avail(desc_t **desc, size_t count, virtio_iocp_t *iocp);
 
@@ -153,6 +158,8 @@ private:
     uint16_t queue_idx;
 
     int desc_first_free;
+    unsigned desc_free_count;
+
     uint16_t volatile *notify_ptr;
 
     uint8_t log2_queue_size;
