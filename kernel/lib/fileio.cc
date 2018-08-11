@@ -215,6 +215,15 @@ int file_ftruncate(int id, off_t size)
     return fh->fs->ftruncate(fh->fi, size);
 }
 
+int file_ioctl(int id, int cmd, void* arg, unsigned int flags, void* data)
+{
+    filetab_t *fh = file_fh_from_id(id);
+    if (!fh)
+        return -1;
+
+    return fh->fs->ioctl(fh->fi, cmd, arg, flags, data);
+}
+
 ssize_t file_read(int id, void *buf, size_t bytes)
 {
     filetab_t *fh = file_fh_from_id(id);
