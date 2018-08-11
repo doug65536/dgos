@@ -102,10 +102,10 @@ int ethq_init(void)
 }
 
 #if 1
-static std::ticketlock ethq_lock;
+static std::mcslock ethq_lock;
 ethq_pkt_t *ethq_pkt_acquire(void)
 {
-    std::unique_lock<std::ticketlock> lock(ethq_lock);
+    std::unique_lock<std::mcslock> lock(ethq_lock);
 
     ethq_pkt_t *pkt = ethq_first_free;
 
@@ -117,7 +117,7 @@ ethq_pkt_t *ethq_pkt_acquire(void)
 
 void ethq_pkt_release(ethq_pkt_t *pkt)
 {
-    std::unique_lock<std::ticketlock> lock(ethq_lock);
+    std::unique_lock<std::mcslock> lock(ethq_lock);
 
     pkt->next = ethq_first_free;
     ethq_first_free = pkt;
