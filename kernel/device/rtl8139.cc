@@ -889,6 +889,7 @@ int rtl8139_dev_t::send(ethq_pkt_t *pkt)
 {
     scoped_lock lock_(lock);
 
+    // Write the source MAC address into the ethernet header
     memcpy(pkt->pkt.hdr.s_mac, mac_addr, 6);
 
     if (!tx_pkts[tx_head]) {
@@ -1094,18 +1095,15 @@ void rtl8139_dev_t::set_promiscuous(int promiscuous)
                      (!!promiscuous) << RTL8139_RCR_AAP_BIT);
 }
 
-#if 0
+#if 1
 static void rtl8139_startup_hack(void *p)
 {
-    (void)p;
-    rtl8139_detect();
-
     if (rtl8139_device_count == 0)
         return;
 
     ipv4_addr_pair_t bind = {
-        { IPV4_ADDR32(255,255,255,255), 67, 0 },
-        { IPV4_ADDR32(255,255,255,255), 68, 0 }
+        { IPV4_ADDR32(255U,255U,255U,255U), 67, 0 },
+        { IPV4_ADDR32(255U,255U,255U,255U), 68, 0 }
     };
 
     int handle = udp_bind(&bind);
@@ -1115,17 +1113,18 @@ static void rtl8139_startup_hack(void *p)
     rtl8139_dev_t *self = rtl8139_devices[0];
 
     // Send a DHCP discover
-    for (size_t i = 0; i < 10; ++i) {
+    for (size_t i = 0; i < 2; ++i) {
         ethq_pkt_t *pkt = ethq_pkt_acquire();
-        dhcp_pkt_t *discover = (void*)&pkt->pkt;
+        dhcp_pkt_t *discover = (dhcp_pkt_t*)&pkt->pkt;
 
         pkt->size = dhcp_build_discover(discover, self->mac_addr);
 
         RTL8139_TRACE("Sending pkt %p\n", (void*)pkt);
 
         sleep(100);
-        rtl8139_send(self, pkt);
+        self->send(pkt);
     }
 }
-REGISTER_CALLOUT(rtl8139_startup_hack, nullptr, 'L', "000");
+REGISTER_CALLOUT(rtl8139_startup_hack, nullptr,
+                 callout_type_t::nics_ready, "000");
 #endif
