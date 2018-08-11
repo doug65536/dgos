@@ -1543,7 +1543,7 @@ void mmu_init()
     for (int i = usable_mem_ranges; i > 0; --i) {
         auto& range = mem_ranges[i - 1];
 
-        if (range.size >= contig_pool_size) {
+        if (range.size >= contig_pool_size && range.base < 0x100000000) {
             contiguous_start = range.base + range.size - contig_pool_size;
             range.size -= contig_pool_size;
 
