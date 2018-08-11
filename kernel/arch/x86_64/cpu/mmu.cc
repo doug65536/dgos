@@ -1040,7 +1040,8 @@ void mm_phys_clear_init()
     for (int i = 0; i < clear_phys_state.level; ) {
         assert(*ptes[i] == 0);
         physaddr_t page = init_take_page(0);
-        printdbg("Assigning phys_clear_init table pte=%p page=%#.16" PRIx64 "\n",
+        printdbg("Assigning phys_clear_init table"
+                 " pte=%p page=%#.16" PRIx64 "\n",
                  (void*)ptes[i], page);
         *ptes[i] = (page | PTE_PRESENT | PTE_WRITABLE |
                 PTE_ACCESSED | PTE_DIRTY | PTE_GLOBAL) & global_mask;
@@ -3049,7 +3050,8 @@ int mlock(const void *addr, size_t len)
 uintptr_t mm_new_process(process_t *process)
 {
     // Allocate a page directory
-    pte_t *dir = (pte_t*)mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, 0, -1, 0);
+    pte_t *dir = (pte_t*)mmap(nullptr, PAGE_SIZE,
+                              PROT_READ | PROT_WRITE, 0, -1, 0);
 
     // Copy upper memory mappings into new page directory
     memcpy(dir + 256, master_pagedir + 256, sizeof(*dir) * 256);
