@@ -102,9 +102,9 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	bootfat-elf$(EXEEXT) bootiso-elf$(EXEEXT) \
-	bootefi-amd64$(EXEEXT) bootpxe-bios-elf$(EXEEXT) \
+	bootpxe-bios-elf$(EXEEXT) bootefi-amd64$(EXEEXT) \
 	kernel-generic$(EXEEXT) kernel-tracing$(EXEEXT) \
-	user-shell$(EXEEXT) hello.km$(EXEEXT)
+	dhcpclient$(EXEEXT) hello.km$(EXEEXT) user-shell$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -415,6 +415,11 @@ bootpxe_bios_elf_OBJECTS = $(am_bootpxe_bios_elf_OBJECTS)
 bootpxe_bios_elf_DEPENDENCIES = libbootsect.a $(am__DEPENDENCIES_1)
 bootpxe_bios_elf_LINK = $(CXXLD) $(bootpxe_bios_elf_CXXFLAGS) \
 	$(CXXFLAGS) $(bootpxe_bios_elf_LDFLAGS) $(LDFLAGS) -o $@
+am_dhcpclient_OBJECTS = user/bin/dhcpclient/dhcpclient-main.$(OBJEXT)
+dhcpclient_OBJECTS = $(am_dhcpclient_OBJECTS)
+dhcpclient_LDADD = $(LDADD)
+dhcpclient_LINK = $(CXXLD) $(dhcpclient_CXXFLAGS) $(CXXFLAGS) \
+	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 am_hello_km_OBJECTS = modules/hello/hello_km-hello.$(OBJEXT)
 hello_km_OBJECTS = $(am_hello_km_OBJECTS)
 hello_km_LDADD = $(LDADD)
@@ -748,16 +753,16 @@ SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libm_a_SOURCES) \
 	$(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
 	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
-	$(hello_km_SOURCES) $(kernel_generic_SOURCES) \
-	$(kernel_tracing_SOURCES) $(mbr_elf_SOURCES) \
-	$(user_shell_SOURCES)
+	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
+	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
+	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
 	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
-	$(hello_km_SOURCES) $(kernel_generic_SOURCES) \
-	$(kernel_tracing_SOURCES) $(mbr_elf_SOURCES) \
-	$(user_shell_SOURCES)
+	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
+	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
+	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -911,10 +916,10 @@ LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
 MKDIR_P = @MKDIR_P@
 MKISOFS = @MKISOFS@
-NOFLOAT_FLAGS = @NOFLOAT_FLAGS@
 NOSTDLIB_FLAGS = @NOSTDLIB_FLAGS@
 NO_COMMON_FLAGS = @NO_COMMON_FLAGS@
 NO_EXCEPTIONS_FLAGS = @NO_EXCEPTIONS_FLAGS@
+NO_FLOAT_FLAGS = @NO_FLOAT_FLAGS@
 NO_LTO_FLAGS = @NO_LTO_FLAGS@
 NO_PIC_FLAGS = @NO_PIC_FLAGS@
 NO_REDZONE_FLAGS = @NO_REDZONE_FLAGS@
@@ -1018,32 +1023,11 @@ BUILT_SOURCES = \
 	trace-tool
 
 
-#  -> Link mbr-elf
-#  -> Generate mbr-bin
-# Build libbootsect
-#  -> Link boot1-elf
-#  -> Generate boot1-bin
-#  -> Link bootfat-elf
-#  -> Generate bootfat-bin
-#  -> Link bootiso-elf
-#  -> Generate bootiso-bin
-#  -> Link bootefi-amd64
-#  -> Link bootefi-i386
-# Build libkernel-{generic,tracing}
-#  -> Build kernel-*
-
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG = 
-noinst_LIBRARIES = \
-	libbootsect.a \
-	libc.a \
-	libm.a \
-	libstdc++.a
 
-
-#bootefi-i386
-
-# mbr-elf
+# libbootsect.a
+noinst_LIBRARIES = libbootsect.a libc.a libm.a libstdc++.a
 mbr_elf_SOURCES = \
 	mbr/mbr.ld \
 	mbr/mbr.S
@@ -1052,6 +1036,7 @@ mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(NO_LTO_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -1062,6 +1047,7 @@ mbr_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) -static
 
@@ -1080,8 +1066,6 @@ EXTRA_mbr_elf_DEPENDENCIES = \
 mbr_elf_LDADD = \
 	$(LIBGCC_ELF32)
 
-
-# boot1-elf
 boot1_elf_SOURCES = \
 	boot/boot1.S \
 	boot/boot1.ld
@@ -1090,6 +1074,7 @@ boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(NO_LTO_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -1100,6 +1085,7 @@ boot1_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) -static
 
@@ -1119,8 +1105,6 @@ EXTRA_boot1_elf_DEPENDENCIES = \
 boot1_elf_LDADD = \
 	$(LIBGCC_ELF32)
 
-
-# libbootsect.a
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
 	boot/bioscall.S \
@@ -1197,6 +1181,7 @@ libbootsect_a_INCLUDES = \
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(NO_PIC_FLAGS) -static \
@@ -1218,6 +1203,7 @@ libbootsect_a_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
@@ -1231,8 +1217,6 @@ BOOT_SOURCES_SHARED = \
 	boot/malloc_bios.cc \
 	boot/mpentry_bios.S
 
-
-# bootfat-elf
 bootfat_elf_SOURCES = \
 	boot/bootfat.S \
 	$(BOOT_SOURCES_SHARED)
@@ -1244,6 +1228,7 @@ bootfat_elf_CCASFLAGS = \
 	-DFROMCCASFLAGS \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(COMPILER_FLAGS) \
@@ -1270,8 +1255,6 @@ bootfat_elf_LDADD = \
 	libbootsect.a \
 	$(LIBGCC_ELF32)
 
-
-# bootiso-elf
 bootiso_elf_SOURCES = \
 	boot/bootiso.S \
 	$(BOOT_SOURCES_SHARED)
@@ -1283,6 +1266,7 @@ bootiso_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -1310,8 +1294,6 @@ bootiso_elf_LDADD = \
 	libbootsect.a \
 	$(LIBGCC_ELF32)
 
-
-# bootpxe-bios
 bootpxe_bios_elf_SOURCES = \
 	boot/bootpxe-bios.ld \
 	boot/mpentry_bios.S \
@@ -1359,13 +1341,14 @@ BOOTLOADER_EFI_FLAGS = \
 	-Wl,--no-dynamic-linker \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(NOFLOAT_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	$(NO_RTTI_FLAGS)
+	$(NO_RTTI_FLAGS) \
+	$(FREESTANDING_FLAGS)
 
 bootefi_amd64_SOURCES = \
 	boot/bootefi.cc \
@@ -1420,8 +1403,7 @@ bootefi_amd64_CFLAGS = \
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(PE64_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS) \
-	$(FREESTANDING_FLAGS)
+	$(BOOTLOADER_EFI_FLAGS)
 
 
 #bootefi_i386_CXXFLAGS = \
@@ -1757,18 +1739,21 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
-	$(STACK_CHECK_FLAGS) \
+	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_COMMON_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=hidden \
+	-fvisibility-inlines-hidden \
 	-export-dynamic \
-	-mgeneral-regs-only \
+	$(NO_FLOAT_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(ASAN_FLAGS)
 
 
-#$(NO_EXCEPTIONS_FLAGS)
+# Buggy
+#$(STACK_CHECK_FLAGS)
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
 	$(COMPILER_FLAGS)
@@ -2157,16 +2142,16 @@ LIBC_TESTS = \
 
 LIBC_CXXFLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	-isystem $(top_srcdir)/libc/include \
 	-I$(top_builddir) \
 	-L$(top_builddir)
 
+dhcpclient_SOURCES = \
+	user/bin/dhcpclient/main.cc
 
-# ----------------------------------------------------------------------------
-# User programs
+dhcpclient_CXXFLAGS = -isystem sysroot/include
+EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED)
 hello_km_SOURCES = \
 	modules/hello/hello.cc
 
@@ -2244,11 +2229,14 @@ QEMU_USB = \
 #-device nec-usb-xhci,id=xhci,p2=16,p3=16,msix=on,streams=on
 #-device usb-storage,bus=xhci.0,drive=stick
 QEMU_NET = \
-	-net nic,model=rtl8139 \
-	-net nic,model=ne2k_pci \
-	-net nic,model=e1000 \
+	-netdev user,id=usernet \
+	--nic user,model=rtl8139,id=nic_rtl8139 \
+	-object filter-dump,file=dump/netdump_rtl8139.pcap,netdev=nic_rtl8139,id=pcap \
 	$(QEMU_BRIDGE)
 
+
+#	-nic model=ne2k_pci,id=nic_ne2k
+#	-nic model=e1000,id=nic_e1000
 QEMU_MONITOR = \
 	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet
 
@@ -2296,7 +2284,8 @@ QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 QEMU_DISK_TYPE_iso = ide-cd
 QEMU_DISK_TYPE_fat = ide-hd
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
-QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on,num-queues=$(QEMU_CPUS)
+QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
+#,num-queues=$(QEMU_CPUS)
 
 #-device ich9-ahci,id=bootif
 QEMU_HDCTL_DEV_ahci = -device $(QEMU_DISK_TYPE_$(1)),bus=ide.0,drive=bootdrv
@@ -3215,6 +3204,19 @@ boot/bootpxe_bios_elf-malloc_bios.$(OBJEXT): boot/$(am__dirstamp) \
 bootpxe-bios-elf$(EXEEXT): $(bootpxe_bios_elf_OBJECTS) $(bootpxe_bios_elf_DEPENDENCIES) $(EXTRA_bootpxe_bios_elf_DEPENDENCIES) 
 	@rm -f bootpxe-bios-elf$(EXEEXT)
 	$(AM_V_CXXLD)$(bootpxe_bios_elf_LINK) $(bootpxe_bios_elf_OBJECTS) $(bootpxe_bios_elf_LDADD) $(LIBS)
+user/bin/dhcpclient/$(am__dirstamp):
+	@$(MKDIR_P) user/bin/dhcpclient
+	@: > user/bin/dhcpclient/$(am__dirstamp)
+user/bin/dhcpclient/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) user/bin/dhcpclient/$(DEPDIR)
+	@: > user/bin/dhcpclient/$(DEPDIR)/$(am__dirstamp)
+user/bin/dhcpclient/dhcpclient-main.$(OBJEXT):  \
+	user/bin/dhcpclient/$(am__dirstamp) \
+	user/bin/dhcpclient/$(DEPDIR)/$(am__dirstamp)
+
+dhcpclient$(EXEEXT): $(dhcpclient_OBJECTS) $(dhcpclient_DEPENDENCIES) $(EXTRA_dhcpclient_DEPENDENCIES) 
+	@rm -f dhcpclient$(EXEEXT)
+	$(AM_V_CXXLD)$(dhcpclient_LINK) $(dhcpclient_OBJECTS) $(dhcpclient_LDADD) $(LIBS)
 modules/hello/$(am__dirstamp):
 	@$(MKDIR_P) modules/hello
 	@: > modules/hello/$(am__dirstamp)
@@ -4034,6 +4036,7 @@ mostlyclean-compile:
 	-rm -f libc/src/unistd/*.$(OBJEXT)
 	-rm -f mbr/*.$(OBJEXT)
 	-rm -f modules/hello/*.$(OBJEXT)
+	-rm -f user/bin/dhcpclient/*.$(OBJEXT)
 	-rm -f user/test/*.$(OBJEXT)
 
 distclean-compile:
@@ -4538,6 +4541,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-write.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-mbr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@modules/hello/$(DEPDIR)/hello_km-hello.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
 
 .S.o:
@@ -8099,6 +8103,20 @@ boot/bootpxe_bios_elf-malloc_bios.obj: boot/malloc_bios.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/malloc_bios.cc' object='boot/bootpxe_bios_elf-malloc_bios.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootpxe_bios_elf_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootpxe_bios_elf-malloc_bios.obj `if test -f 'boot/malloc_bios.cc'; then $(CYGPATH_W) 'boot/malloc_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/malloc_bios.cc'; fi`
+
+user/bin/dhcpclient/dhcpclient-main.o: user/bin/dhcpclient/main.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(dhcpclient_CXXFLAGS) $(CXXFLAGS) -MT user/bin/dhcpclient/dhcpclient-main.o -MD -MP -MF user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Tpo -c -o user/bin/dhcpclient/dhcpclient-main.o `test -f 'user/bin/dhcpclient/main.cc' || echo '$(srcdir)/'`user/bin/dhcpclient/main.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Tpo user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/bin/dhcpclient/main.cc' object='user/bin/dhcpclient/dhcpclient-main.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(dhcpclient_CXXFLAGS) $(CXXFLAGS) -c -o user/bin/dhcpclient/dhcpclient-main.o `test -f 'user/bin/dhcpclient/main.cc' || echo '$(srcdir)/'`user/bin/dhcpclient/main.cc
+
+user/bin/dhcpclient/dhcpclient-main.obj: user/bin/dhcpclient/main.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(dhcpclient_CXXFLAGS) $(CXXFLAGS) -MT user/bin/dhcpclient/dhcpclient-main.obj -MD -MP -MF user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Tpo -c -o user/bin/dhcpclient/dhcpclient-main.obj `if test -f 'user/bin/dhcpclient/main.cc'; then $(CYGPATH_W) 'user/bin/dhcpclient/main.cc'; else $(CYGPATH_W) '$(srcdir)/user/bin/dhcpclient/main.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Tpo user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/bin/dhcpclient/main.cc' object='user/bin/dhcpclient/dhcpclient-main.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(dhcpclient_CXXFLAGS) $(CXXFLAGS) -c -o user/bin/dhcpclient/dhcpclient-main.obj `if test -f 'user/bin/dhcpclient/main.cc'; then $(CYGPATH_W) 'user/bin/dhcpclient/main.cc'; else $(CYGPATH_W) '$(srcdir)/user/bin/dhcpclient/main.cc'; fi`
 
 modules/hello/hello_km-hello.o: modules/hello/hello.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(hello_km_CXXFLAGS) $(CXXFLAGS) -MT modules/hello/hello_km-hello.o -MD -MP -MF modules/hello/$(DEPDIR)/hello_km-hello.Tpo -c -o modules/hello/hello_km-hello.o `test -f 'modules/hello/hello.cc' || echo '$(srcdir)/'`modules/hello/hello.cc
@@ -11822,6 +11840,8 @@ distclean-generic:
 	-rm -f mbr/$(am__dirstamp)
 	-rm -f modules/hello/$(DEPDIR)/$(am__dirstamp)
 	-rm -f modules/hello/$(am__dirstamp)
+	-rm -f user/bin/dhcpclient/$(DEPDIR)/$(am__dirstamp)
+	-rm -f user/bin/dhcpclient/$(am__dirstamp)
 	-rm -f user/test/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/test/$(am__dirstamp)
 
@@ -11836,7 +11856,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -11884,7 +11904,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -12006,6 +12026,9 @@ $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
 
+#$(NO_EXCEPTIONS_FLAGS)
+#$(NO_EXCEPTIONS_FLAGS)
+
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 	echo "#define TERMESC_RED" \
 		"\"$$(tput setaf 1 | sed 's/\x1b/\\x1b/g')\"" \
@@ -12034,6 +12057,11 @@ test: test_compile
 	$(top_builddir)/libc_tests
 
 .PHONY: test_compile test
+
+define user_program =
+endef
+
+$(eval $(call user_program,dhcpclient))
 
 # ----------------------------------------------------------------------------
 # Misc make rules
@@ -12077,22 +12105,22 @@ kernel-tracing.sym: kernel-tracing \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
 bootefi-amd64.dis.gz: bootefi-amd64 $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
 mbr.dis.gz: mbr-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< | $(GZIP) > $@
+	$(OBJDUMP) --disassemble --demangle --source -m i8086 $< | $(GZIP) > $@ &
 
 bootfat.dis.gz: bootfat-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
 bootiso.dis.gz: bootiso-elf $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
 kernel-generic.dis.gz: kernel-generic $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
 kernel-tracing.dis.gz: kernel-tracing $(top_srcdir)/symbols.mk
-	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
 $(top_builddir)/fatpart.img: \
 		$(top_srcdir)/diskfat.mk \

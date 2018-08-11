@@ -13,44 +13,17 @@ BUILT_SOURCES = \
 	sysroot/lib/libstdc++.a \
 	trace-tool
 
-#  -> Link mbr-elf
-#  -> Generate mbr-bin
-# Build libbootsect
-#  -> Link boot1-elf
-#  -> Generate boot1-bin
-#  -> Link bootfat-elf
-#  -> Generate bootfat-bin
-#  -> Link bootiso-elf
-#  -> Generate bootiso-bin
-#  -> Link bootefi-amd64
-#  -> Link bootefi-i386
-# Build libkernel-{generic,tracing}
-#  -> Build kernel-*
-
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG =
 
-noinst_LIBRARIES = \
-	libbootsect.a \
-	libc.a \
-	libm.a \
-	libstdc++.a
-
-bin_PROGRAMS = \
-	mbr-elf \
-	boot1-elf \
-	bootfat-elf \
-	bootiso-elf \
-	bootefi-amd64 \
-	bootpxe-bios-elf \
-	kernel-generic \
-	kernel-tracing \
-	user-shell \
-	hello.km
+noinst_LIBRARIES =
+bin_PROGRAMS =
 
 #bootefi-i386
 
 # mbr-elf
+
+bin_PROGRAMS += mbr-elf
 
 mbr_elf_SOURCES = \
 	mbr/mbr.ld \
@@ -60,6 +33,7 @@ mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(NO_LTO_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -71,6 +45,7 @@ mbr_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) -static
 
@@ -96,6 +71,8 @@ $(top_builddir)/mbr-bin: $(top_builddir)/mbr-elf
 
 # boot1-elf
 
+bin_PROGRAMS += boot1-elf
+
 boot1_elf_SOURCES = \
 	boot/boot1.S \
 	boot/boot1.ld
@@ -104,6 +81,7 @@ boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(NO_LTO_FLAGS) -static \
 	$(OPTIMIZE_SIZE_FLAGS)
@@ -115,6 +93,7 @@ boot1_elf_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS) -static
 
@@ -140,6 +119,8 @@ $(top_builddir)/boot1-bin: $(top_builddir)/boot1-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # libbootsect.a
+
+noinst_LIBRARIES += libbootsect.a
 
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
@@ -217,6 +198,7 @@ libbootsect_a_INCLUDES = \
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(libbootsect_a_INCLUDES) \
 	$(NO_PIC_FLAGS) -static \
@@ -239,6 +221,7 @@ libbootsect_a_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
@@ -254,6 +237,8 @@ BOOT_SOURCES_SHARED = \
 
 # bootfat-elf
 
+bin_PROGRAMS += bootfat-elf
+
 bootfat_elf_SOURCES = \
 	boot/bootfat.S \
 	$(BOOT_SOURCES_SHARED)
@@ -265,6 +250,7 @@ bootfat_elf_CCASFLAGS = \
 	-DFROMCCASFLAGS \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(NO_PIC_FLAGS) -static \
 	$(COMPILER_FLAGS) \
@@ -297,6 +283,8 @@ $(top_builddir)/bootfat-bin: $(top_builddir)/bootfat-elf
 
 # bootiso-elf
 
+bin_PROGRAMS += bootiso-elf
+
 bootiso_elf_SOURCES = \
 	boot/bootiso.S \
 	$(BOOT_SOURCES_SHARED)
@@ -308,6 +296,7 @@ bootiso_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(NO_PIC_FLAGS) \
@@ -341,6 +330,8 @@ $(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
 # bootpxe-bios
+
+bin_PROGRAMS += bootpxe-bios-elf
 
 bootpxe_bios_elf_SOURCES = \
 	boot/bootpxe-bios.ld \
@@ -394,13 +385,16 @@ BOOTLOADER_EFI_FLAGS = \
 	-Wl,--no-dynamic-linker \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(NOFLOAT_FLAGS) \
+	$(NO_FLOAT_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	$(NO_RTTI_FLAGS)
+	$(NO_RTTI_FLAGS) \
+	$(FREESTANDING_FLAGS)
+
+bin_PROGRAMS += bootefi-amd64
 
 bootefi_amd64_SOURCES = \
 	boot/bootefi.cc \
@@ -455,8 +449,7 @@ bootefi_amd64_CFLAGS = \
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
 	$(PE64_FLAGS) \
-	$(BOOTLOADER_EFI_FLAGS) \
-	$(FREESTANDING_FLAGS)
+	$(BOOTLOADER_EFI_FLAGS)
 
 #bootefi_i386_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
@@ -805,17 +798,21 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
-	$(STACK_CHECK_FLAGS) \
+	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_COMMON_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=hidden \
+	-fvisibility-inlines-hidden \
 	-export-dynamic \
-	-mgeneral-regs-only \
+	$(NO_FLOAT_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(ASAN_FLAGS)
 
-#$(NO_EXCEPTIONS_FLAGS)
+# Buggy
+#$(STACK_CHECK_FLAGS)
+
 
 KERNEL_CCASFLAGS_SHARED = \
 	-DFROM_CCASFLAGS \
@@ -850,6 +847,8 @@ KERNEL_TRACING_FLAGS = \
 KERNEL_GENERIC_FLAGS = \
 	-Wl,-Map,$(top_builddir)/kernel-generic.map
 
+bin_PROGRAMS += kernel-generic
+
 kernel_generic_SOURCES = $(KERNEL_SOURCES_SHARED)
 
 kernel_generic_CXXFLAGS = \
@@ -875,6 +874,8 @@ EXTRA_kernel_generic_DEPENDENCIES = \
 
 kernel_tracing_SOURCES = \
 	$(KERNEL_SOURCES_SHARED)
+
+bin_PROGRAMS += kernel-tracing
 
 kernel_tracing_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
@@ -965,6 +966,8 @@ $(foreach header,$(INCLUDES_NAMES),$(eval \
 # libc
 
 libc_adir = $(includedir)/libc
+
+noinst_LIBRARIES += libc.a
 
 libc_a_HEADERS = \
 	libc/include/termios.h \
@@ -1204,6 +1207,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getflags.cc \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
+	libc/src/sys/socket/socket.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -1220,6 +1224,8 @@ libc_a_CXXFLAGS = \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
+noinst_LIBRARIES += libm.a
+
 libm_a_SOURCES = \
 	libc/math/cos.cc \
 	libc/math/sin.cc \
@@ -1230,6 +1236,8 @@ libm_a_CXXFLAGS = \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
+
+noinst_LIBRARIES += libstdc++.a
 
 libstdc___a_SOURCES = \
 	libc/cxx/terminate.cc \
@@ -1251,12 +1259,13 @@ LIBC_TESTS = \
 
 LIBC_CXXFLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	-isystem $(top_srcdir)/libc/include \
 	-I$(top_builddir) \
 	-L$(top_builddir)
+
+#$(NO_EXCEPTIONS_FLAGS)
+#$(NO_EXCEPTIONS_FLAGS)
 
 $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 	echo "#define TERMESC_RED" \
@@ -1290,6 +1299,23 @@ test: test_compile
 # ----------------------------------------------------------------------------
 # User programs
 
+bin_PROGRAMS += dhcpclient
+
+define user_program =
+bin_PROGRAMS += $(1)
+endef
+
+dhcpclient_SOURCES = \
+	user/bin/dhcpclient/main.cc
+
+dhcpclient_CXXFLAGS = -isystem sysroot/include
+
+EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED)
+
+$(eval $(call user_program,dhcpclient))
+
+bin_PROGRAMS += hello.km
+
 hello_km_SOURCES = \
 	modules/hello/hello.cc
 
@@ -1312,6 +1338,8 @@ hello_km_LDFLAGS = \
 EXTRA_hello_km_DEPENDENCIES = \
 	kernel/arch/x86_64/module.ld \
 	Makefile.am
+
+bin_PROGRAMS += user-shell
 
 user_shell_SOURCES = \
 	user/test/test.S
@@ -1460,10 +1488,13 @@ QEMU_USB = \
 #-device usb-storage,bus=xhci.0,drive=stick
 
 QEMU_NET = \
-	-net nic,model=rtl8139 \
-	-net nic,model=ne2k_pci \
-	-net nic,model=e1000 \
+	-netdev user,id=usernet \
+	--nic user,model=rtl8139,id=nic_rtl8139 \
+	-object filter-dump,file=dump/netdump_rtl8139.pcap,netdev=nic_rtl8139,id=pcap \
 	$(QEMU_BRIDGE)
+
+#	-nic model=ne2k_pci,id=nic_ne2k
+#	-nic model=e1000,id=nic_e1000
 
 QEMU_MONITOR = \
 	-chardev socket,id=qemu-monitor,host=localhost,port=7777,server,nowait,telnet

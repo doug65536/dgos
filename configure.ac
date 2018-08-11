@@ -149,7 +149,8 @@ for flag in \
 		Wsuggest-override \
 		Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
-		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn
+		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
+		mtls-direct-seg-refs ftls-model=local-exec
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
@@ -230,16 +231,16 @@ do
 done
 AC_SUBST([NOSTDLIB_FLAGS])
 
-AS_VAR_SET([NOFLOAT_FLAGS], [])
+AS_VAR_SET([NO_FLOAT_FLAGS], [])
 for flag in mgeneral-regs-only
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
-		[AS_VAR_APPEND([NOFLOAT_FLAGS], [" -$flag"])]
+		[AS_VAR_APPEND([NO_FLOAT_FLAGS], [" -$flag"])]
 		[], [$COMPILER_WERROR])
 done
-AC_SUBST([NOFLOAT_FLAGS])
+AC_SUBST([NO_FLOAT_FLAGS])
 
-ELF32_FLAGS=$NOFLOAT_FLAGS
+ELF32_FLAGS=
 for flag in \
 	m32 \
 	Wl,-m,elf_i386 \
@@ -253,7 +254,7 @@ do
 done
 AC_SUBST([ELF32_FLAGS])
 
-ELF64_FLAGS=$NOFLOAT_FLAGS
+ELF64_FLAGS=
 for flag in \
 	m64 \
 	Wl,-m,elf_x86_64 \
@@ -266,7 +267,7 @@ do
 done
 AC_SUBST([ELF64_FLAGS])
 
-PE32_FLAGS=$NOFLOAT_FLAGS
+PE32_FLAGS=
 for flag in \
 	m32 \
 	D__efi \

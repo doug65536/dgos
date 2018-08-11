@@ -611,7 +611,7 @@ PE64_FLAGS
 PE32_FLAGS
 ELF64_FLAGS
 ELF32_FLAGS
-NOFLOAT_FLAGS
+NO_FLOAT_FLAGS
 NOSTDLIB_FLAGS
 FREESTANDING_FLAGS
 SMALLEST_CODE_FLAGS
@@ -7427,7 +7427,8 @@ for flag in \
 		Wsuggest-override \
 		Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
-		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn
+		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
+		mtls-direct-seg-refs ftls-model=local-exec
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -7813,7 +7814,7 @@ fi
 done
 
 
-NOFLOAT_FLAGS=
+NO_FLOAT_FLAGS=
 for flag in mgeneral-regs-only
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
@@ -7848,7 +7849,7 @@ eval ac_res=\$$as_CACHEVAR
 	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
 $as_echo "$ac_res" >&6; }
 if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
-  as_fn_append NOFLOAT_FLAGS " -$flag"
+  as_fn_append NO_FLOAT_FLAGS " -$flag"
 
 else
   $COMPILER_WERROR
@@ -7857,7 +7858,7 @@ fi
 done
 
 
-ELF32_FLAGS=$NOFLOAT_FLAGS
+ELF32_FLAGS=
 for flag in \
 	m32 \
 	Wl,-m,elf_i386 \
@@ -7906,7 +7907,7 @@ fi
 done
 
 
-ELF64_FLAGS=$NOFLOAT_FLAGS
+ELF64_FLAGS=
 for flag in \
 	m64 \
 	Wl,-m,elf_x86_64 \
@@ -7954,7 +7955,7 @@ fi
 done
 
 
-PE32_FLAGS=$NOFLOAT_FLAGS
+PE32_FLAGS=
 for flag in \
 	m32 \
 	D__efi \
