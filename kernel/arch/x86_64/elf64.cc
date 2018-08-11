@@ -414,8 +414,8 @@ module_entry_fn_t modload_load(char const *path)
                             fixup64 > std::numeric_limits<int32_t>::max()) {
                         relocation_truncated = true;
                     } else if (fixup_is_unsigned) {
-                        if (fixup64 < 0 ||
-                                fixup64 > std::numeric_limits<uint32_t>::max()) {
+                        if (fixup64 < 0 || fixup64 >
+                                std::numeric_limits<uint32_t>::max()) {
                             relocation_truncated = true;
                         }
                     }

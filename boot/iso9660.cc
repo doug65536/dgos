@@ -473,7 +473,8 @@ void iso9660_boot_partition(uint32_t pvd_lba)
             (pvd->root_dirent.size_hi_le << 16);
 
     iso9660_serial = 0;
-    for (size_t i = 0, c; i < sizeof(pvd->app_id) && (c = pvd->app_id[i]); ++i) {
+    for (size_t i = 0, c; i < sizeof(pvd->app_id) &&
+         (c = pvd->app_id[i]); ++i) {
         if (c >= '0' && c <= '9')
             c -= '0';
         else if (c >= 'a' && c <= 'z')

@@ -690,7 +690,8 @@ bool virtio_gpu_dev_t::issue_attach_backing(
     return true;
 }
 
-bool virtio_gpu_dev_t::issue_set_scanout(uint32_t scanout_id, uint32_t resource_id)
+bool virtio_gpu_dev_t::issue_set_scanout(
+        uint32_t scanout_id, uint32_t resource_id)
 {
     blocking_iocp_t iocp;
     virtio_gpu_ctrl_hdr_t resp(0);

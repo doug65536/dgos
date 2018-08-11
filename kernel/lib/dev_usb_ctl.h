@@ -85,7 +85,8 @@ public:
 
     bool add_hub_port(int port);
 
-    bool set_hub_port_config(usb_hub_desc const& hub_desc, const usb_config_helper *cfg_hlp);
+    bool set_hub_port_config(usb_hub_desc const& hub_desc,
+                             usb_config_helper const *cfg_hlp);
 
 private:
     usb_bus_t *bus;

@@ -16,7 +16,8 @@ STORAGE_REGISTER_FACTORY(iso9660_part);
 
 static std::vector<part_dev_t*> partitions;
 
-std::vector<part_dev_t *> iso9660_part_factory_t::detect(storage_dev_base_t *drive)
+std::vector<part_dev_t *>
+iso9660_part_factory_t::detect(storage_dev_base_t *drive)
 {
     std::vector<part_dev_t *> list;
 

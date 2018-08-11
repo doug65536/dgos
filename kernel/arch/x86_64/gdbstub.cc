@@ -1661,7 +1661,8 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
             // Initialize an array with one entry per CPU
             // Values are set once, only entries with 0 value are modified
 
-            std::vector<step_action_t> step_actions(gdb_cpu_ctrl_t::get_gdb_cpu());
+            std::vector<step_action_t> step_actions(
+                        gdb_cpu_ctrl_t::get_gdb_cpu());
 
             step_cpu_nr = 0;
 

@@ -76,7 +76,8 @@ struct fat32_fs_t final : public fs_base_t {
 
     static uint8_t lfn_checksum(char const *fcb_name);
 
-    static void fcbname_from_lfn(full_lfn_t *full, char *fcbname, uint16_t const *lfn, size_t lfn_len);
+    static void fcbname_from_lfn(full_lfn_t *full, char *fcbname,
+                                 uint16_t const *lfn, size_t lfn_len);
 
     static void dirents_from_name(full_lfn_t *full,
                                   char const *pathname, size_t name_len);

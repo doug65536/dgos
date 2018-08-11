@@ -292,7 +292,8 @@ std::vector<storage_if_base_t *> usb_msc_if_factory_t::detect()
 {
     USB_MSC_TRACE("Reporting %d USB mass storage interfaces\n", usb_msc_count);
 
-    std::vector<storage_if_base_t*> list(usb_msc_devices.begin(), usb_msc_devices.end());
+    std::vector<storage_if_base_t*> list(usb_msc_devices.begin(),
+                                         usb_msc_devices.end());
     return list;
 }
 

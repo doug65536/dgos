@@ -520,7 +520,8 @@ void ide_if_t::ide_chan_t::release_access(int intr_was_enabled)
     cpu_irq_toggle(intr_was_enabled);
 }
 
-void ide_if_t::ide_chan_t::detect_devices(std::vector<storage_dev_base_t*>& list)
+void ide_if_t::ide_chan_t::detect_devices(
+        std::vector<storage_dev_base_t*>& list)
 {
     IDE_TRACE("Detecting IDE devices\n");
 

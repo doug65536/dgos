@@ -104,4 +104,5 @@ struct iovec_t {
     uint64_t size;
 };
 
-int paging_iovec(iovec_t **ret, uint64_t vaddr, uint64_t size, uint64_t max_chunk);
+int paging_iovec(iovec_t **ret, uint64_t vaddr,
+                 uint64_t size, uint64_t max_chunk);

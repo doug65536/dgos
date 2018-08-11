@@ -45,7 +45,8 @@ static intr_link_t intr_handlers_count;
 static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
 using intr_handler_reg_lock_type = std::mcslock;
-using intr_handler_reg_scoped_lock = std::unique_lock<intr_handler_reg_lock_type>;
+using intr_handler_reg_scoped_lock =
+    std::unique_lock<intr_handler_reg_lock_type>;
 static intr_handler_reg_lock_type intr_handler_reg_lock;
 
 // Vectors

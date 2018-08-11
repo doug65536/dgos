@@ -1,4 +1,4 @@
-        # ===========================================================================
+    # ===========================================================================
     #   https://www.gnu.org/software/autoconf-archive/ax_prog_cc_for_build.html
     # ===========================================================================
     #
@@ -31,16 +31,16 @@
     #   permitted in any medium without royalty provided the copyright notice
     #   and this notice are preserved. This file is offered as-is, without any
     #   warranty.
-    
+
     #serial 9
-    
+
     AU_ALIAS([AC_PROG_CC_FOR_BUILD], [AX_PROG_CC_FOR_BUILD])
     AC_DEFUN([AX_PROG_CC_FOR_BUILD], [dnl
     AC_REQUIRE([AC_PROG_CC])dnl
     AC_REQUIRE([AC_PROG_CPP])dnl
     AC_REQUIRE([AC_EXEEXT])dnl
     AC_REQUIRE([AC_CANONICAL_HOST])dnl
-    
+
     dnl Use the standard macros, but make them use other variable names
     dnl
     pushdef([ac_cv_prog_CPP], ac_cv_build_prog_CPP)dnl
@@ -70,19 +70,19 @@
     pushdef([ac_cpp], ac_build_cpp)dnl
     pushdef([ac_compile], ac_build_compile)dnl
     pushdef([ac_link], ac_build_link)dnl
-    
+
     save_cross_compiling=$cross_compiling
     save_ac_tool_prefix=$ac_tool_prefix
     cross_compiling=no
     ac_tool_prefix=
-    
+
     AC_PROG_CC
     AC_PROG_CPP
     AC_EXEEXT
-    
+
     ac_tool_prefix=$save_ac_tool_prefix
     cross_compiling=$save_cross_compiling
-    
+
     dnl Restore the old definitions
     dnl
     popdef([ac_link])dnl
@@ -112,7 +112,7 @@
     popdef([ac_cv_prog_cc_works])dnl
     popdef([ac_cv_prog_gcc])dnl
     popdef([ac_cv_prog_CPP])dnl
-    
+
     dnl Finally, set Makefile variables
     dnl
     BUILD_EXEEXT=$ac_build_exeext
@@ -123,4 +123,4 @@
     AC_SUBST([CPPFLAGS_FOR_BUILD])dnl
     AC_SUBST([LDFLAGS_FOR_BUILD])dnl
     ])
-    
+

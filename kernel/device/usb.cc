@@ -155,7 +155,8 @@ char const *usb_config_helper::ep_attr_text(usb_ep_attr attr)
     }
 }
 
-void const *usb_config_helper::get_bos_raw(usb_dev_cap_type cap_type, int index) const
+void const *usb_config_helper::get_bos_raw(
+        usb_dev_cap_type cap_type, int index) const
 {
     uint8_t const* bos_raw = (uint8_t const*)bos;
     uint8_t const* bos_end = bos_raw + bos->total_len;

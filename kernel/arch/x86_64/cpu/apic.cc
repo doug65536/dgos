@@ -221,7 +221,8 @@ static unsigned ioapic_count;
 static mp_ioapic_t ioapic_list[16];
 
 using ioapic_msi_alloc_lock_type = std::mcslock;
-using ioapic_msi_alloc_scoped_lock = std::unique_lock<ioapic_msi_alloc_lock_type>;
+using ioapic_msi_alloc_scoped_lock =
+    std::unique_lock<ioapic_msi_alloc_lock_type>;
 static ioapic_msi_alloc_lock_type ioapic_msi_alloc_lock;
 
 // Bit 0 of this corresponds to vector INTR_APIC_IRQ_BASE

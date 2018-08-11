@@ -758,7 +758,8 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 //        if (limit == 0)
 //            break;
 
-//        //PRINT(TEXT "Copying %zu byres of data to %zx\n", limit, uintptr_t(output));
+//        //PRINT(TEXT "Copying %zu byres of data to %zx\n",
+//                limit, uintptr_t(output));
 
 //        // Copy data from sector buffer
 //        memcpy(output, sector_buffer + byte_offset, limit);

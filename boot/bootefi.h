@@ -171,8 +171,8 @@ enum EFI_ALLOCATE_TYPE {
     ///
     AllocateAnyPages,
     ///
-    /// Allocate any available range of pages whose uppermost address is less than
-    /// or equal to a specified maximum address.
+    /// Allocate any available range of pages whose uppermost address is
+    /// less than or equal to a specified maximum address.
     ///
     AllocateMaxAddress,
     ///
@@ -196,8 +196,8 @@ enum EFI_MEMORY_TYPE {
     ///
     EfiLoaderCode,
     ///
-    /// The data portions of a loaded application and the default data allocation
-    /// type used by an application to allocate pool memory.
+    /// The data portions of a loaded application and the default data
+    /// allocation type used by an application to allocate pool memory.
     ///
     EfiLoaderData,
     ///
@@ -215,7 +215,8 @@ enum EFI_MEMORY_TYPE {
     EfiRuntimeServicesCode,
     ///
     /// The data portions of a loaded Runtime Services Driver and the default
-    /// data allocation type used by a Runtime Services Driver to allocate pool memory.
+    /// data allocation type used by a Runtime Services Driver to allocate
+    /// pool memory.
     ///
     EfiRuntimeServicesData,
     ///
@@ -236,7 +237,8 @@ enum EFI_MEMORY_TYPE {
     EfiACPIMemoryNVS,
     ///
     /// Used by system firmware to request that a memory-mapped IO region
-    /// be mapped by the OS to a virtual address so it can be accessed by EFI runtime services.
+    /// be mapped by the OS to a virtual address so it can be accessed by EFI
+    /// runtime services.
     ///
     EfiMemoryMappedIO,
     ///
@@ -245,7 +247,8 @@ enum EFI_MEMORY_TYPE {
     ///
     EfiMemoryMappedIOPortSpace,
     ///
-    /// Address space reserved by the firmware for code that is part of the processor.
+    /// Address space reserved by the firmware for code that is part of
+    /// the processor.
     ///
     EfiPalCode,
     ///
@@ -260,12 +263,16 @@ enum EFI_MEMORY_TYPE {
   Allocates memory pages from the system.
   @param[in]       Type         The type of allocation to perform.
   @param[in]       MemoryType   The type of memory to allocate.
-                                MemoryType values in the range 0x70000000..0x7FFFFFFF
-                                are reserved for OEM use. MemoryType values in the range
-                                0x80000000..0xFFFFFFFF are reserved for use by UEFI OS loaders
-                                that are provided by operating system vendors.
+                                MemoryType values in the range
+                                0x70000000..0x7FFFFFFF
+                                are reserved for OEM use.
+                                MemoryType values in the range
+                                0x80000000..0xFFFFFFFF are reserved for use by
+                                UEFI OS loaders that are provided by operating
+                                system vendors.
   @param[in]       Pages        The number of contiguous 4 KB pages to allocate.
-  @param[in, out]  Memory       The pointer to a physical address. On input, the way in which the address is
+  @param[in, out]  Memory       The pointer to a physical address. On input,
+                                the way in which the address is
                                 used depends on the value of Type.
   @retval EFI_SUCCESS           The requested pages were allocated.
   @retval EFI_INVALID_PARAMETER 1) Type is not AllocateAnyPages or
@@ -291,9 +298,10 @@ EFI_STATUS
   @param[in]  Memory      The base physical address of the pages to be freed.
   @param[in]  Pages       The number of contiguous 4 KB pages to free.
   @retval EFI_SUCCESS           The requested pages were freed.
-  @retval EFI_INVALID_PARAMETER Memory is not a page-aligned address or Pages is invalid.
-  @retval EFI_NOT_FOUND         The requested memory pages were not allocated with
-                                AllocatePages().
+  @retval EFI_INVALID_PARAMETER Memory is not a page-aligned address or Pages
+                                is invalid.
+  @retval EFI_NOT_FOUND         The requested memory pages were not allocated
+                                with AllocatePages().
 **/
 typedef
 EFI_STATUS
@@ -322,9 +330,9 @@ struct EFI_MEMORY_DESCRIPTOR {
     ///
     UINT64                NumberOfPages;
     ///
-    /// Attributes of the memory region that describe the bit mask of capabilities
-    /// for that memory region, and not necessarily the current settings for that
-    /// memory region.
+    /// Attributes of the memory region that describe the bit mask of
+    /// capabilities for that memory region, and not necessarily the current
+    /// settings for that memory region.
     ///
     UINT64                Attribute;
 };

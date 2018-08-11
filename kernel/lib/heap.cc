@@ -91,7 +91,8 @@ C_ASSERT(sizeof(heap_t) == PAGESIZE);
 
 heap_t *heap_create(void)
 {
-    heap_t *heap = (heap_t*)mmap(nullptr, sizeof(heap_t), PROT_READ | PROT_WRITE,
+    heap_t *heap = (heap_t*)mmap(nullptr, sizeof(heap_t),
+                                 PROT_READ | PROT_WRITE,
                                  MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
     if (unlikely(heap == MAP_FAILED))
         return nullptr;
