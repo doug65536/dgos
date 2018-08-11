@@ -1,7 +1,14 @@
 #pragma once
 
+#define __ERRNO_DIRECT_TLS  1
+
 typedef int errno_t;
 
-extern "C" int *__errno_location();
+#if __ERRNO_DIRECT_TLS
+extern __thread errno_t errno;
+#else
 
-#define errno (*__errno_location())
+//extern "C" int *__errno_location();
+//#define errno (*__errno_location())
+
+#endif
