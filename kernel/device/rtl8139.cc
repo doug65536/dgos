@@ -936,7 +936,8 @@ int rtl8139_factory_t::detect(eth_dev_base_t ***devices)
                  pci_iter.config.get_bar(5),
                  pci_iter.config.irq_line);
 
-        rtl8139_dev_t *self = (rtl8139_dev_t*)calloc(1, sizeof(rtl8139_dev_t));
+        void *mem = calloc(1, sizeof(rtl8139_dev_t));
+        rtl8139_dev_t *self = new (mem) rtl8139_dev_t;
 
         rtl8139_devices = (rtl8139_dev_t**)realloc(rtl8139_devices,
                                   sizeof(*rtl8139_devices) *
