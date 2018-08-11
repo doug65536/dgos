@@ -743,6 +743,10 @@ static int init_thread(void *)
     printk("Initializing network interfaces\n");
     callout_call(callout_type_t::nic);
 
+    // Register network interfaces
+    printk("Initializing network interfaces\n");
+    callout_call(callout_type_t::nics_ready);
+
     //bootdev_info(0, 0, 0);
 
 #if ENABLE_SPAWN_STRESS > 0
