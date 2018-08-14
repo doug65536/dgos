@@ -4,7 +4,6 @@
 enum struct bootparam_t {
     ap_entry_point,
     vbe_mode_info,
-    boot_device,
     boot_drv_serial,
     boot_debugger,
     boot_serial_log,
