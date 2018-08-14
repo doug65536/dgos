@@ -3,8 +3,12 @@
 #include "types.h"
 #include <unwind.h>
 
+/*
 namespace __cxxabiv1 {
-class __class_type_info;
+struct __class_type_info
+{
+    virtual void foo() {}
+};
 }
 
 class type_info {
@@ -42,6 +46,7 @@ private:
     type_info& operator=(const type_info&);
     type_info(const type_info&);
 };
+*/
 
 __BEGIN_DECLS
 
