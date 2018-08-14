@@ -17,18 +17,22 @@ struct bad_alloc
 };
 #endif
 
-extern "C" {
+__BEGIN_DECLS
 
 void malloc_startup(void *p);
 
-_malloc void *calloc(size_t num, size_t size);
+_malloc _assume_aligned(16) _alloc_size(1, 2)
+void *calloc(size_t num, size_t size);
 
-_malloc void *malloc(size_t size);
+_malloc _assume_aligned(16) _alloc_size(1)
+void *malloc(size_t size);
 
+_assume_aligned(16) _alloc_size(2)
 void *realloc(void *p, size_t new_size);
 
 void free(void *p);
 
+_malloc _assume_aligned(16)
 char *strdup(char const *s);
 
 int strtoi(char const *str, char **end, int base);
@@ -46,8 +50,12 @@ void auto_free(void *mem);
 
 void *operator new(size_t, void *p) noexcept;
 
+_malloc _assume_aligned(16)
 void *operator new(size_t size) noexcept;
+
+_malloc _assume_aligned(16)
 void *operator new[](size_t size) noexcept;
+
 void operator delete(void *block, unsigned long size) noexcept;
 
 class zero_init_t
