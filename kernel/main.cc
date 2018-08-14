@@ -668,7 +668,6 @@ static int draw_test(void *p)
 }
 #endif
 
-#if 0 // disabled unwind test - partially working
 __exception_jmp_buf_t test_unwind_jmpbuf;
 
 class test_unwind_cls {
@@ -697,11 +696,34 @@ void test_unwind()
         printdbg("Unwind ended\n");
     }
 }
-#endif
+
+void test_catch_nest(int level)
+{
+    test_unwind_cls inst;
+
+    if (level < 3)
+        test_catch_nest(level + 1);
+    else {
+//        cpu_crash();
+        char * volatile crashme = nullptr;
+        *crashme = 42;
+    }
+}
+
+void test_catch()
+{
+    __try {
+        test_catch_nest(0);
+    } __catch {
+        printk("Caught\n");
+    }
+}
 
 static int init_thread(void *)
 {
-    //test_unwind();
+    test_unwind();
+
+    test_catch();
 
     printk("Initializing kernel threadpool\n");
     workq::init(thread_cpu_count());
