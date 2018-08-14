@@ -36,5 +36,5 @@ int __exception_handler_invoke(int exception_code)
 
     top->__exception_code = exception_code;
 
-    __exception_longjmp(&top->__exception_state, 1);
+    __exception_longjmp_unwind(&top->__exception_state, 1);
 }
