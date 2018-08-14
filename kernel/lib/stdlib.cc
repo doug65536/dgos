@@ -116,7 +116,6 @@ void operator delete[](void *block, size_t) noexcept
     free(block);
 }
 
-_const
 void *operator new(size_t, void *p) noexcept
 {
     return p;
