@@ -18,7 +18,9 @@ __exception_setjmp:
 
 	// Save flags
 	pushfq
+    .cfi_adjust_cfa_offset 8
 	popq 8*8(%rdi)
+    .cfi_adjust_cfa_offset -8
 
 	// Save return address
 	movq (%rsp),%rax
@@ -50,7 +52,9 @@ __exception_longjmp:
 
 	// Restore flags
 	pushq 8*8(%rdi)
-	popfq
+    .cfi_adjust_cfa_offset 8
+    popfq
+    .cfi_adjust_cfa_offset -8
 
 	// Restore stack pointer
 	movq 1*8(%rdi),%rsp
@@ -67,14 +71,12 @@ __exception_longjmp_unwind:
 	.cfi_startproc
 	.cfi_def_cfa_offset 8
 
-	push_cfi %rbp
-	.cfi_offset rbp,-16
-	movq %rsp,%rbp
 	push_cfi %rbx
-	.cfi_offset rbx,-24
-	push_cfi %r8
+	.cfi_offset rbx,-16
+	push_cfi %r12
+    .cfi_offset r12,-24
 	movq %rdi,%rbx
-	movq %rsi,%r8
+	movq %rsi,%r12
 
 	// exception object (1st parameter)
 	mov $1024,%rdi
@@ -86,61 +88,7 @@ __exception_longjmp_unwind:
 	// stopfn is 2nd parameter
 	leaq __exception_stop_fn(%rip),%rsi
 	call _Unwind_ForcedUnwind
-	ud2
+
+
 
 	.cfi_endproc
-
-// __exception_stop_fn(int, _Unwind_Action, _Unwind_Exception_Class,
-//       struct _Unwind_Exception *, struct _Unwind_Context *, void *)
-__exception_stop_fn:
-	.cfi_startproc
-	.cfi_def_cfa_offset 8
-
-	push_cfi %rbp
-	.cfi_offset rbp,-16
-	movq %rsp,%rbp
-	push_cfi %rbx
-	.cfi_offset rbx,-24
-	push_cfi %r12
-	.cfi_offset r12,-32
-	push_cfi %r13
-	.cfi_offset r13,-40
-	push_cfi %r14
-	.cfi_offset r14,-48
-	push_cfi %r15
-	.cfi_offset r15,-56
-
-	movq %rdi,%rbx
-	movq %rsi,%r12
-	movq %rdx,%r13
-	movq %rcx,%r14
-	movq %r8,%r15
-	push_cfi %r9
-
-	movq %r15,%rdi
-	call _Unwind_GetCFA
-
-	pop_cfi %r9
-	pop_cfi %r15
-	.cfi_same_value r15
-	pop_cfi %r14
-	.cfi_same_value r14
-	pop_cfi %r13
-	.cfi_same_value r13
-	pop_cfi %r12
-	.cfi_same_value r12
-	pop_cfi %rbx
-	.cfi_same_value rbx
-	pop_cfi %rbp
-	.cfi_same_value rbp
-	// return _URC_NO_REASON
-	xorl %eax,%eax
-	ret
-	//jmp _Unwind_Resume
-
-	.cfi_endproc
-
-//.quad _Unwind_ForcedUnwind
-//.quad _Unwind_SetGR
-//.quad _Unwind_SetIP
-//.quad _Unwind_GetLanguageSpecificData
