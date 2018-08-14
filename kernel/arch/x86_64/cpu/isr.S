@@ -26,11 +26,22 @@
 .align 16
 isr_entry_\int_num\():
     .cfi_startproc
+    .cfi_signal_frame
     .if \has_code == 0
-        .cfi_def_cfa_offset 8
+        .cfi_def_cfa rsp,8
+        .cfi_offset ss,3*8
+        .cfi_offset rsp,2*8
+        .cfi_offset rflags,1*8
+        .cfi_offset cs,0*8
+        .cfi_offset rip,-1*8
         push_cfi $0
     .else
-        .cfi_def_cfa_offset 16
+        .cfi_def_cfa rsp,16
+        .cfi_offset ss,3*8
+        .cfi_offset rsp,2*8
+        .cfi_offset rflags,1*8
+        .cfi_offset cs,0*8
+        .cfi_offset rip,-1*8
     .endif
     push_cfi $\int_num
     jmp isr_common
@@ -131,21 +142,30 @@ isr_entry 0 INTR_APIC_TIMER
 .align 16
 isr_common:
     .cfi_startproc
-    .cfi_def_cfa_offset 24
-    .cfi_rel_offset rsp,16
+    .cfi_signal_frame
+    .cfi_def_cfa rsp,24
+    .cfi_offset ss,3*8
+    .cfi_offset rsp,2*8
+    .cfi_offset rflags,1*8
+    .cfi_offset cs,0*8
+    .cfi_offset rip,-1*8
 
     // push order: rbp, rbx, r15-r10, rax, r9-8, rcx, rdx, rsi, rdi
     push_cfi %rbp
-    .cfi_rel_offset rbp,0
-    mov %rsp,%rbp
-    .cfi_register rsp,rbp
-    .cfi_def_cfa_register rbp
-    .cfi_def_cfa_offset 32
+    .cfi_offset rbp,-4*8
+    movq %rsp,%rbp
+//    .cfi_register rsp,rbp
+    .cfi_def_cfa rbp,4*8
+    .cfi_offset ss,3*8
+    .cfi_offset rsp,2*8
+    .cfi_offset rflags,1*8
+    .cfi_offset cs,0*8
+    .cfi_offset rip,-1*8
 
     //   7*8(%rbp) -> ss            ┐
     //   6*8(%rbp) -> rsp           │
     //   5*8(%rbp) -> flags         │
-    //   4*8(%rbp) -> cs            ├ interrupt frame
+    //   4*8(%rbp) -> cs  <-- CFA   ├ interrupt frame
     //   3*8(%rbp) -> rip           │
     //   2*8(%rbp) -> error code    │
     //   1*8(%rbp) -> interrupt     ┘
@@ -164,44 +184,49 @@ isr_common:
     // -12*8(%rbp) -> rdx           │
     // -13*8(%rbp) -> rsi           │
     // -14*8(%rbp) -> rdi           ┘
+    // -15*8(%rbp) -> cr3
+    // -16*8(%rbp) -> segments
+    // -17*8(%rbp) -> fpu ctx ptr
+    // -18*8(%rbp) -> cleanup arg
+    // -19*8(%rbp) -> cleanup fn
 
     pushq %rbx
-    .cfi_rel_offset rbx,1*8
+    .cfi_offset rbx,-5*8
 
     pushq %r15
-    .cfi_rel_offset r15,2*8
+    .cfi_offset r15,-6*8
 
     // r15d=ds, r14d=es, r13d=fs, r12d=gs
     movl %ds,%r15d
 
     pushq %r14
-    .cfi_rel_offset r14,3*8
+    .cfi_offset r14,-7*8
 
     movl %es,%r14d
 
     pushq %r13
-    .cfi_rel_offset r13,4*8
+    .cfi_offset r13,-8*8
 
     movl %fs,%r13d
 
     pushq %r12
-    .cfi_rel_offset r12,5*8
+    .cfi_offset r12,-9*8
 
     movl %gs,%r12d
 
     pushq %r11
-    .cfi_rel_offset r11,6*8
+    .cfi_offset r11,-10*8
 
     // shift es, fs, gs into position to pack into r13
     shll $16,%r14d
 
     pushq %r10
-    .cfi_rel_offset r10,7*8
+    .cfi_offset r10,-11*8
 
     shlq $32,%r13
 
     pushq %rax
-    .cfi_rel_offset rax,8*8
+    .cfi_offset rax,-12*8
 
     shlq $48,%r12
 
@@ -212,31 +237,31 @@ isr_common:
 
     cld
     pushq %r9
-    .cfi_rel_offset r9,9*8
+    .cfi_offset r9,-13*8
 
     // Merge fs,gs into r13
     orq %r12,%r13
 
     pushq %r8
-    .cfi_rel_offset r8,10*8
+    .cfi_offset r8,-14*8
 
     // Merge ds|es,fs|gs into r13
     orq %r15,%r13
 
     pushq %rcx
-    .cfi_rel_offset rcx,11*8
+    .cfi_offset rcx,-15*8
 
     // Get interrupted code segment
     movzwl frame_cs(%rbp),%ecx
 
     pushq %rdx
-    .cfi_rel_offset rdx,12*8
+    .cfi_offset rdx,-16*8
 
     pushq %rsi
-    .cfi_rel_offset rsi,13*8
+    .cfi_offset rsi,-17*8
 
     pushq %rdi
-    .cfi_rel_offset rdi,14*8
+    .cfi_offset rdi,-18*8
 
     // Assume null FPU context pointer
     xorl %edi,%edi
@@ -267,9 +292,11 @@ isr_common:
     pushq $0
     pushq $0
 
-    // Pass intr, ctx
-    movq %rsp,%rsi
-    movl frame_intr(%rbp),%edi
+    // Hold isr_context_t pointer in r12
+    // Hold interrupt number in ebx
+
+    movq %rsp,%r12
+    movl frame_intr(%rbp),%ebx
 
     // Align stack pointer
     subq $8,%rsp
@@ -285,23 +312,28 @@ isr_common:
 
     // Fast path page fault
     leaq mmu_page_fault_handler(%rip),%rcx
-    cmpl $ INTR_EX_PAGE,%edi
+    cmpl $ INTR_EX_PAGE,%ebx
     cmoveq %rcx,%rax
 
     // 0x20-0x2F -> intr_invoke
     leaq intr_invoke(%rip),%rcx
-    cmpl $ INTR_SOFT_BASE,%edi
+    cmpl $ INTR_SOFT_BASE,%ebx
     cmovaeq %rcx,%rax
 
     // 0x30-0xEF -> apic_dispatcher
     leaq apic_dispatcher(%rip),%rcx
-    cmpl $ INTR_APIC_IRQ_BASE,%edi
+    cmpl $ INTR_APIC_IRQ_BASE,%ebx
     cmovaeq %rcx,%rax
 
     // 0xF0-0xFF -> pic_dispatcher
     leaq pic8259_dispatcher(%rip),%rcx
-    cmpl $ INTR_PIC1_IRQ_BASE,%edi
+    cmpl $ INTR_PIC1_IRQ_BASE,%ebx
     cmovaeq %rcx,%rax
+
+    // Pass intr, 1st parameter
+    // Pass context pointer, 2nd parameter
+    movl %ebx,%edi
+    movq %r12,%rsi
 
     // Call handler
     call *%rax
@@ -364,13 +396,13 @@ isr_common:
     cmpq %r13,%rdx
     jnz .Lsegments_changed
 
+    .cfi_remember_state
+
 .Lsegments_restored:
 .Lreturning_to_kernel:
     // Restore CR3
     popq %rax
     movq %rax,%cr3
-
-    .cfi_remember_state
 
     popq %rdi
     .cfi_restore rdi
@@ -415,9 +447,12 @@ isr_common:
     .cfi_restore rbx
 
     popq %rbp
-    .cfi_restore rbp
-    .cfi_def_cfa_register rsp
-    .cfi_def_cfa_offset 24
+    .cfi_def_cfa rsp,24
+    .cfi_offset ss,3*8
+    .cfi_offset rsp,2*8
+    .cfi_offset rflags,1*8
+    .cfi_offset cs,0*8
+    .cfi_offset rip,-1*8
 
     add_rsp 16
 
@@ -554,27 +589,22 @@ isr_save_fxsave:
 isr_restore_fxrstor:
     xrstor_ctx fxrstor64
 
-// isr_context_t *exception_isr_handler(int intr, isr_context_t *ctx)
-.type exception_isr_handler,@function
+// on entry, ebx=intr, r12=ctx
 exception_isr_handler:
     .cfi_startproc
-
-    .cfi_def_cfa_offset 8
-
-    push_cfi %rbp
-    push_cfi %rbx
-    push_cfi %r12
+    .cfi_def_cfa rbp,4*8
+    .cfi_offset ss,3*8
+    .cfi_offset rsp,2*8
+    .cfi_offset rflags,1*8
+    .cfi_offset cs,0*8
+    .cfi_offset rip,-1*8
 
     leaq intr_has_handler(%rip),%rax
-
-    // ebx=intr, r12=ctx
-    movl %edi,%ebx
-    movq %rsi,%r12
 
     // If there is no handler...
     callq *%rax
     testl %eax,%eax
-    jz 0f
+    jz .Lno_handler
 
     // There is a handler
     leaq intr_invoke(%rip),%rax
@@ -582,28 +612,19 @@ exception_isr_handler:
     movq %r12,%rsi
     callq *%rax
 
-1:  movq %r12,%rax
-    pop_cfi %r12
-    pop_cfi %rbx
-    pop_cfi %rbp
+    movq %r12,%rax
     retq
 
-0:  mov %ebx,%edi
-    mov %r12,%rsi
-    pop_cfi %r12
-    pop_cfi %rbx
-    pop_cfi %rbp
+.Lno_handler:
 
 // fall through...
 
 .align 16
 .Linvoke_catch:
-    mov %edi,%ebx
-    mov %rsi,%r12
-
     // ...no handler or handler rejected it
     leaq __exception_handler_invoke(%rip),%rax
     movl %ebx,%edi
+
     callq *%rax
     testl %eax,%eax
     jnz 2f
