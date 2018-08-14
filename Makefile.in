@@ -1742,7 +1742,6 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fvisibility=hidden \
 	-fvisibility-inlines-hidden \
