@@ -23,7 +23,7 @@ struct fs_mount_t {
     fs_base_t *fs;
 };
 
-static std::vector<storage_if_factory_t*> storage_factories;
+static std::vector<storage_if_factory_t*> storage_if_factories;
 static std::vector<storage_if_base_t*> storage_ifs;
 static std::vector<storage_dev_base_t*> storage_devs;
 static std::vector<part_factory_t*> part_factories;
@@ -51,7 +51,7 @@ void storage_if_register_factory(char const *name,
 {
     (void)name;
 
-    if (!storage_factories.push_back(factory))
+    if (!storage_if_factories.push_back(factory))
         panic_oom();
     STORAGE_TRACE("Registered storage driver %s\n", name);
 }
@@ -93,7 +93,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
 
 void invoke_storage_factories(void *)
 {
-    for (storage_if_factory_t* factory : storage_factories)
+    for (storage_if_factory_t* factory : storage_if_factories)
         probe_storage_factory(factory);
 }
 
