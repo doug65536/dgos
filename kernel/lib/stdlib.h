@@ -43,10 +43,7 @@ int atoi(char const *str);
 int atol(char const *str);
 int atoll(char const *str);
 
-void auto_free(void *mem);
-
-#define autofree __attribute__((cleanup(auto_free)))
-}
+__END_DECLS
 
 void *operator new(size_t, void *p) noexcept;
 

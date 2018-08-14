@@ -77,15 +77,6 @@ char *strdup(char const *s)
     return (char*)memcpy(b, s, len+1);
 }
 
-void auto_free(void *mem)
-{
-    void *blk = *(void**)mem;
-    if (blk) {
-        free(blk);
-        *(void**)mem = nullptr;
-    }
-}
-
 void *operator new(size_t size) noexcept
 {
     return malloc(size);
