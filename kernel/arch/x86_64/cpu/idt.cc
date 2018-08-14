@@ -16,7 +16,7 @@
 #include "mm.h"
 #include "asm_constants.h"
 #include "thread_impl.h"
-
+#include "stacktrace.h"
 #include "apic.h"
 
 // Enforce that we use the correct value in syscall.S
@@ -490,30 +490,30 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
     return nullptr;
 }
 
-static void stack_trace(isr_context_t *ctx,
-                        void (*cb)(uintptr_t rbp, uintptr_t rip))
-{
-    uintptr_t *frame_ptr = (uintptr_t*)ISR_CTX_REG_RBP(ctx);
+//static void stack_trace(isr_context_t *ctx,
+//                        void (*cb)(uintptr_t rbp, uintptr_t rip))
+//{
+//    uintptr_t *frame_ptr = (uintptr_t*)ISR_CTX_REG_RBP(ctx);
 
-    uintptr_t frame_rbp;
-    uintptr_t frame_rip;
+//    uintptr_t frame_rbp;
+//    uintptr_t frame_rip;
 
-    do {
-        if (!mpresent(uintptr_t(frame_ptr), sizeof(uintptr_t) * 2))
-            return;
+//    do {
+//        if (!mpresent(uintptr_t(frame_ptr), sizeof(uintptr_t) * 2))
+//            return;
 
-        frame_rbp = frame_ptr[0];
-        frame_rip = frame_ptr[1];
+//        frame_rbp = frame_ptr[0];
+//        frame_rip = frame_ptr[1];
 
-        cb(frame_rbp, frame_rip);
+//        cb(frame_rbp, frame_rip);
 
-        frame_ptr = (uintptr_t*)frame_rbp;
-    } while (frame_rbp);
-}
+//        frame_ptr = (uintptr_t*)frame_rbp;
+//    } while (frame_rbp);
+//}
 
 static void dump_frame(uintptr_t rbp, uintptr_t rip)
 {
-    printk("at rbp=%16zx rip=%16zx\n", rbp, rip);
+    printk("at cfa=%16zx ip=%16zx\n", rbp, rip);
 }
 
 void dump_context(isr_context_t *ctx, int to_screen)
@@ -755,7 +755,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)
         apic_dump_regs(0);
 
-    stack_trace(ctx, dump_frame);
+    stacktrace(dump_frame);
 }
 
 isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
