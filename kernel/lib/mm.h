@@ -53,40 +53,40 @@
 #define MAP_ANONYMOUS       0x00000200
 
 // Undefined flag mask
-#define MAP_INVALID_MASK    0x003FFC00
+#define MAP_INVALID_MASK    0x001FFC00
 
 // Allowed in user mode
 #define MAP_USER_MASK       0x000003FF
 
 // Kernel only: Commit no pages
-#define MAP_NOCOMMIT        0x00400000
+#define MAP_NOCOMMIT        0x00200000
 
 // Kernel only: Exclusive (fail if address range is not free)
-#define MAP_EXCLUSIVE       0x00800000
+#define MAP_EXCLUSIVE       0x00400000
 
 // Kernel only: Global
-#define MAP_GLOBAL          0x01000000
+#define MAP_GLOBAL          0x00800000
 
 /// Kernel only: Map near the kernel (modules)
-#define MAP_NEAR            0x02000000
+#define MAP_NEAR            0x01000000
 
 /// Kernel only: Map user mode pages
-#define MAP_USER            0x04000000
+#define MAP_USER            0x02000000
 
 /// Kernel only: Request weakly ordered memory
-#define MAP_WEAKORDER       0x08000000
+#define MAP_WEAKORDER       0x04000000
 
 /// Kernel only: Map a device mapping
-#define MAP_DEVICE          0x10000000
+#define MAP_DEVICE          0x08000000
 
 /// Kernel only: Write through
-#define MAP_WRITETHRU       0x20000000
+#define MAP_WRITETHRU       0x10000000
 
 /// Kernel only: Disable caching
-#define MAP_NOCACHE         0x40000000
+#define MAP_NOCACHE         0x20000000
 
 /// Kernel only: The provided address is a physical address
-#define MAP_PHYSICAL        0x80000000
+#define MAP_PHYSICAL        0x40000000
 
 /// Ignored. Redundant.
 #define MAP_DENYWRITE       0
