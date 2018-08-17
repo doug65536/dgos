@@ -1104,14 +1104,24 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
 
         size_t cluster_data_ofs = offsetof_cluster(file->cached_cluster);
 
+        void *disk_data = mm_dev + cluster_data_ofs +
+                (offset - file->cached_offset);
+
         if (read) {
-            memcpy(io, mm_dev + cluster_data_ofs +
-                   (offset - file->cached_offset), avail);
+            if (mm_is_user_range(io, avail)) {
+                if (unlikely(!mm_copy_user(io, disk_data, avail)))
+                    return -int(errno_t::EFAULT);
+            } else {
+                memcpy(io, disk_data, avail);
+            }
         } else {
-            void *output = mm_dev + cluster_data_ofs +
-                    (offset - file->cached_offset);
-            memcpy(output, io, avail);
-            int status = msync(output, avail, MS_ASYNC);
+            if (mm_is_user_range(io, avail)) {
+                if (unlikely(!mm_copy_user(disk_data, io, avail)))
+                    return -int(errno_t::EFAULT);
+            } else {
+                memcpy(disk_data, io, avail);
+            }
+            int status = msync(disk_data, avail, MS_ASYNC);
             if (status < 0)
                 return status;
 
