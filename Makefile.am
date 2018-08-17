@@ -915,6 +915,7 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 		-std=c++14 \
 		-fwhole-program -pthread \
 		-O0 \
+		-Wall -Wextra -Wpedantic \
 		$^ \
 		-Wl,--start-group \
 		-lncurses -ltinfo -lgpm -ldl -lz \
