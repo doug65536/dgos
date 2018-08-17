@@ -122,26 +122,28 @@ bsp_init:
 
     debugind '9'
 
-    // Resolve .rela.iplt
-    leaq __rela_iplt_start(%rip),%rbx
-    leaq __rela_iplt_end(%rip),%r12
+    // Resolve ifunc
+    leaq __rela_dyn_st(%rip),%r12
+    leaq __rela_dyn_en(%rip),%r13
 .Lrela_iplt_next:
-    cmpq %r12,%rbx
+    cmpq %r13,%r12
     jz .Lrela_iplt_done
 
+    movq 8(%r12),%rax
+
     // Only apply STT_GNU_IFUNC (0x25)
-    cmpl $ 0x25,8(%rbx)
+    cmpq $ 0x25,%rax
     jnz .Lrela_iplt_skip
 
     // Call the resolver
-    call * 16(%rbx)
+    call * 16(%r12)
 
     // Read PLT vector pointer from relocation record
-    movq (%rbx),%rdx
+    movq (%r12),%rdx
     // Update the PLT with the resolver return value
     movq %rax,(%rdx)
 .Lrela_iplt_skip:
-    addq $ 24,%rbx
+    addq $ 24,%r12
     jmp .Lrela_iplt_next
 .Lrela_iplt_done:
 
