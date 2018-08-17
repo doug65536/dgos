@@ -1249,7 +1249,6 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         mmu_dump_pf(err_code);
         mmu_dump_ptes(ptes);
         cpu_debug_break();
-        cpu_page_invalidate(fault_addr);
         return nullptr;
     }
 
