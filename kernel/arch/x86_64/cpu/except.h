@@ -11,5 +11,5 @@ __exception_jmp_buf_t *__exception_handler_add(void);
 
 #define __try if (__exception_setjmp(__exception_handler_add()) == 0)
 
-#define __catch if (__exception_handler_remove())
-#define __catch_code(__code) if (__code = __exception_handler_remove())
+#define __catch if (__exception_handler_remove() >= 0)
+#define __catch_code(__code) if ((__code = __exception_handler_remove()) >= 0)
