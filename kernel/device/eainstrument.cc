@@ -91,12 +91,12 @@ void __cyg_profile_func_enter(void *this_fn, void * /*call_site*/)
 
 void __cyg_profile_func_exit(void *this_fn, void * /*call_site*/)
 {
-    int tid = eainst_get_current_thread();
+    uintptr_t tid = eainst_get_current_thread();
     uintptr_t flags = eainst_lock_acquire();
     trace_item item;
     item.set_ip(this_fn);
-    item.set_tid(tid);
-    item.set_cid(flags >> 32);
+    item.set_tid(tid & 0xFFFFFFFF);
+    item.set_cid(tid >> 32);
     item.irq_en = flags & CPU_EFLAGS_IF;
     item.call = false;
     eainst_write_record(item);
