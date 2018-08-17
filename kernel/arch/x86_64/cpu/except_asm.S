@@ -75,6 +75,7 @@ __exception_longjmp_unwind:
     .cfi_offset rbx,-16
     push_cfi %r12
     .cfi_offset r12,-24
+    sub_rsp 8
     movq %rdi,%rbx
     movq %rsi,%r12
 
