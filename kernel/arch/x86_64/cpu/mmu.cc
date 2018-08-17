@@ -1800,7 +1800,7 @@ static pte_t *mm_create_pagetables_aligned(uintptr_t start, size_t size)
 
     // Mark high pages PTE_GLOBAL, low pages PTE_USER
     // First 3 levels PTE_ACCESSED and PTE_DIRTY
-    pte_t const page_flags = (low ? PTE_USER : PTE_GLOBAL) |
+    pte_t const page_flags = (low ? 0 : PTE_GLOBAL) | PTE_USER |
             PTE_ACCESSED | PTE_DIRTY | PTE_PRESENT | PTE_WRITABLE;
 
     pte_t global_mask = ~PTE_GLOBAL;

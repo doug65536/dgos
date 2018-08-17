@@ -85,7 +85,7 @@ static pte_t *paging_find_pte(addr64_t linear_addr,
             // Allocate a page table on first use
             next_segment = (pte_t)allocate_page_table();
 
-            pte = next_segment | (PTE_PRESENT | PTE_WRITABLE);
+            pte = next_segment | (PTE_PRESENT | PTE_WRITABLE | PTE_USER);
             ref[slot] = pte;
         }
 
@@ -241,7 +241,7 @@ void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
     // Try 1GB, 2MB, 4KB pages, select largest size that would work
     page_size = 1 << 30;
     for (log2_pagesize = 30; log2_pagesize > 12; log2_pagesize -= 9) {
-        // If the physical address, virtual address, 
+        // If the physical address, virtual address,
         // and length are suitably aligned...
         if ((phys_addr & -page_size) == phys_addr &&
                 (linear_base & -page_size) == linear_base &&
@@ -256,7 +256,7 @@ void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
 
             break;
         }
-        
+
         // Try the next smaller page size
         page_size >>= 9;
     }
@@ -301,7 +301,7 @@ _constructor(500) void paging_init()
     clear_page_table(root_page_dir);
 
     // Identity map first 64KB
-    paging_map_physical(0, 0, 0x10000, PTE_PRESENT | 
+    paging_map_physical(0, 0, 0x10000, PTE_PRESENT |
                         PTE_WRITABLE | PTE_EX_PHYSICAL);
 }
 
