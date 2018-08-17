@@ -480,7 +480,6 @@ private:
 };
 
 extern char ___init_brk[];
-extern uintptr_t ___top_physaddr;
 static linaddr_t near_base = (linaddr_t)___init_brk;
 static linaddr_t linear_base = PT_MAX_ADDR;
 
