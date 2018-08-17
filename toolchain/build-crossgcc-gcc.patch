@@ -1,7 +1,7 @@
 diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf
 --- gcc-6.2.0/gcc/config/i386/t-x86_64-elf	1969-12-31 16:00:00.000000000 -0800
 +++ gcc-6.2.0.patched/gcc/config/i386/t-x86_64-elf	2016-09-30 11:55:53.602700086 -0700
-@@ -0,0 +1,19 @@
+@@ -0,0 +1,22 @@
 +# Add redzoneless libgcc
 +MULTILIB_OPTIONS  += mno-red-zone
 +MULTILIB_DIRNAMES += no-red-zone
@@ -19,9 +19,11 @@ diff -durN gcc-6.2.0/gcc/config/i386/t-x86_64-elf gcc-6.2.0.patched/gcc/config/i
 +MULTILIB_OPTIONS  += mregparm=3
 +MULTILIB_DIRNAMES  += regparm3
 +
++MULTILIB_OPTIONS  += ffreestanding
++MULTILIB_DIRNAMES  += freestanding
++
 +#MULTILIB_EXCEPTIONS +=
 +
-Binary files gcc-6.2.0/gcc/config/i386/.t-x86_64-elf.swp and gcc-6.2.0.patched/gcc/config/i386/.t-x86_64-elf.swp differ
 diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
 --- gcc-6.2.0/gcc/config.gcc	2016-06-08 06:34:25.000000000 -0700
 +++ gcc-6.2.0.patched/gcc/config.gcc	2016-09-30 11:41:23.318385513 -0700
@@ -33,3 +35,15 @@ diff -durN gcc-6.2.0/gcc/config.gcc gcc-6.2.0.patched/gcc/config.gcc
 	tm_file="${tm_file} i386/unix.h i386/att.h dbxelf.h elfos.h newlib-stdint.h i386/i386elf.h i386/x86-64.h"
 	;;
  x86_64-*-rtems*)
+diff -durN gcc-8.2.0-orig/libgcc/unwind-dw2.c gcc-8.2.0/libgcc/unwind-dw2.c
+--- gcc-8.2.0-orig/libgcc/unwind-dw2.c	2018-08-14 11:21:32.915943395 -0400
++++ gcc-8.2.0/libgcc/unwind-dw2.c	2018-08-14 11:31:35.134075621 -0400
+@@ -22,6 +22,8 @@
+    see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see
+    <http://www.gnu.org/licenses/>.  */
+
++#pragma GCC target ("no-sse")
++
+ #include "tconfig.h"
+ #include "tsystem.h"
+ #include "coretypes.h"
