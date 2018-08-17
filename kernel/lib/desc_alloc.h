@@ -10,7 +10,7 @@ public:
     bool take(int fd);
 
 private:
-    typedef std::unique_lock<std::spinlock> scoped_lock_t;
+    using scoped_lock_t = std::unique_lock<std::spinlock>;
     std::spinlock alloc_lock;
 
     // Bit is set if corresponding level1 entry is full
