@@ -145,7 +145,7 @@ for flag in \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
-		Wmultistatement-macros Warray-bounds Wformat-overflow \
+		Warray-bounds Wformat-overflow \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
@@ -156,21 +156,21 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([COMPILER_FLAGS])
+#Wsuggest-attribute=pure Wsuggest-attribute=const
 #Wsuggest-final-types
 #Wsuggest-final-methods
 #Wsuggest-attribute=noreturn
 #Wsuggest-attribute=format
-#Wsuggest-attribute=pure
-#Wsuggest-attribute=const
 
 # fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize
 # fgcse-after-reload fdeclone-ctor-dtor
 # fdevirtualize-at-ltrans fsched-stalled-insns=0
+# mtune=znver1
 
 # fgcse-las causes compiler segfaults
 AS_VAR_SET([OPTIMIZATION_FLAGS], [])
 for flag in \
-	O2 fstrict-aliasing mtune=znver1
+	O2 fstrict-aliasing
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
