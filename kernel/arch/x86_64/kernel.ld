@@ -33,6 +33,22 @@ SECTIONS {
 		*(.text.startup .text.startup.*)
 	} :text
 
+	.plt.got : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_got = .);
+		*(.plt.got)
+	} :text
+
+	.plt.bnd : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_bnd = .);
+		*(.plt.bnd)
+	} :text
+
+	.plt : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt = .);
+		*(.plt)
+		*(.iplt)
+	} :text
+
 	.rodata : ALIGN(64) {
 		PROVIDE_HIDDEN(___ctors_st = .);
 		*(.init_array)
@@ -60,17 +76,11 @@ SECTIONS {
 		*(.rodata)
 		*(SORT(.rodata.*))
 
+		*(.gcc_except_table*)
+
 		*(.stub .text.* .gnu.linkonce.t.*)
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
-
-		/* Expose addresses/sizes to kernel as initialized data */
-
-		/* Provide the highest address taken by kernel as
-		   a global variable */
-		. = ALIGN(8);
-		PROVIDE_HIDDEN(___top_physaddr = .);
-		QUAD((___init_brk - ___text_st) + 0x100000);
 
 		PROVIDE_HIDDEN(___text_en = .);
 	} :readonly
@@ -109,62 +119,11 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	} :readonly
 
-	.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got)
-		*(.got.plt)
+	.rela.dyn : ALIGN(64) {
+		PROVIDE_HIDDEN(__rela_dyn_st = .);
+		*(.rela.dyn)
 	} :readonly
-
-	.rela : ALIGN(64) {
-		PROVIDE_HIDDEN(___rela_dyn = .);
-		*(.rela.init)
-		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
-		*(.rela.fini)
-		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
-		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
-		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
-		*(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
-		*(.rela.ctors)
-		*(.rela.dtors)
-		*(.rela.got)
-		*(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
-		*(.rela.ldata .rela.ldata.* .rela.gnu.linkonce.l.*)
-		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
-		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
-		*(.rela.ifunc)
-		*(.rela*)
-		*(.rel*)
-	} :readonly
-
-	.rela.plt : ALIGN(64) {
-		PROVIDE_HIDDEN(___rela_entry_start = .);
-		*(.rela.entry)
-		PROVIDE_HIDDEN(___rela_entry_end = .);
-
-		PROVIDE_HIDDEN(___rela_plt_start = .);
-		*(.rela.plt)
-		PROVIDE_HIDDEN(___rela_plt_end = .);
-
-		PROVIDE_HIDDEN (__rela_iplt_start = .);
-		*(.rela.iplt)
-		PROVIDE_HIDDEN (__rela_iplt_end = .);
-	} :readonly
-
-	.plt.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_got = .);
-		*(.plt.got)
-	} :readonly
-
-	.plt.bnd : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_bnd = .);
-		*(.plt.bnd)
-	} :readonly
-
-	.plt : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt = .);
-		*(.plt)
-		*(.iplt)
-	} :readonly
+	PROVIDE_HIDDEN(__rela_dyn_en = .);
 
 	.dynamic : ALIGN(4096) {
 		PROVIDE_HIDDEN(___dynamic_st = .);
@@ -179,7 +138,7 @@ SECTIONS {
 	} :data
 
 	/* Initialized data */
-	.data : ALIGN(4096) {
+	.data : ALIGN(64) {
 		PROVIDE_HIDDEN(___data_st = .);
 		*(.data)
 		*(SORT(.data.*))
