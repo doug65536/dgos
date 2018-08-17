@@ -4,8 +4,8 @@
 
 struct __exception_context_t;
 
-extern "C" int __exception_handler_remove(void);
-extern "C" int __exception_handler_invoke(int exception_code);
+extern "C" long __exception_handler_remove(void);
+extern "C" long __exception_handler_invoke(long exception_code);
 
 __exception_jmp_buf_t *__exception_handler_add(void);
 
