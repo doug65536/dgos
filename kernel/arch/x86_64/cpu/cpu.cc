@@ -77,17 +77,17 @@ void cpu_init(int ap)
     (void)ap;
 
     cpu_cr0_change_bits(
-                // MP = 0 (Monitor coprocessor task switched)
                 // TS = 0 (No task switch pending)
                 // EM = 0 (No FPU emulation)
                 // CD = 0 (Do not disable cache)
                 // NW = 0 (Writeback cache enabled)
-                CPU_CR0_MP | CPU_CR0_TS | CPU_CR0_EM | CPU_CR0_CD | CPU_CR0_NW,
+                CPU_CR0_TS | CPU_CR0_EM | CPU_CR0_CD | CPU_CR0_NW,
+                // MP = 1 (Monitor coprocessor task switched)
                 // WP = 1 (Enable write protection in CPL 0)
                 // ET = 1 (FPU is not an 80287)
                 // NE = 1 (Native FPU error handling, no IRQ)
                 // AM = 1 (Allow EFLAGS AC to enable alignment checks in CPL 3)
-                CPU_CR0_WP | CPU_CR0_ET | CPU_CR0_NE | CPU_CR0_AM);
+                CPU_CR0_MP | CPU_CR0_WP | CPU_CR0_ET | CPU_CR0_NE | CPU_CR0_AM);
 
     uintptr_t set = 0;
     uintptr_t clr = 0;

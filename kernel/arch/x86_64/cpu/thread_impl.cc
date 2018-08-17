@@ -171,6 +171,7 @@ struct alignas(128) cpu_info_t {
     uint32_t time_ratio;
     uint32_t busy_ratio;
     uint32_t busy_percent;
+    uint32_t cr0_shadow;
     uint64_t irq_count;
 
     using lock_type = std::mcslock;
@@ -189,7 +190,7 @@ C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
-    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, {},
+    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0, {},
       { }
     }
 };
@@ -553,6 +554,7 @@ void thread_init(int ap)
 
     cpu_gsbase_set(cpu);
     cpu_altgsbase_set((void*)0xFFFFD1D1D1D1D1D1);
+    cpu->cr0_shadow = uint32_t(cpu_cr0_get());
 
     if (!ap) {
         for (unsigned i = 0; i < countof(threads); ++i)
@@ -799,18 +801,27 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     if (thread != outgoing) {
         if (outgoing->flags & THREAD_FLAGS_USES_FPU) {
-            // Save the context before marking
-            printdbg("Saving tid=%zu FPU context at %#zx\n",
-                     outgoing - threads,
-                     uintptr_t(outgoing->xsave_ptr) - sse_context_size);
+//            printdbg("Saving tid=%zu FPU context at %#zx\n",
+//                     outgoing - threads,
+//                     uintptr_t(outgoing->xsave_ptr) - sse_context_size);
             isr_save_fpu_ctx(outgoing);
         }
 
-        if (thread->flags & THREAD_FLAGS_USES_FPU && thread != outgoing) {
-            printdbg("Restoring tid=%zu FPU context at %#zx\n",
-                     thread - threads,
-                     uintptr_t(thread->xsave_ptr));
+        if (thread->flags & THREAD_FLAGS_USES_FPU) {
+//            printdbg("Restoring tid=%zu FPU context at %#zx\n",
+//                     thread - threads,
+//                     uintptr_t(thread->xsave_ptr));
+            if (cpu->cr0_shadow & CPU_CR0_TS) {
+                // Clear TS flag to unblock access to FPU
+                cpu->cr0_shadow &= ~CPU_CR0_TS;
+                cpu_cr0_clts();
+            }
+
             isr_restore_fpu_ctx(thread);
+        } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
+            // Set TS flag to block access to FPU
+            cpu->cr0_shadow |= CPU_CR0_TS;
+            cpu_cr0_set(cpu->cr0_shadow);
         }
     }
 

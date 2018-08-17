@@ -127,6 +127,32 @@ static _always_inline uint64_t cpu_xcr_change_bits(
     return ((uint64_t)edx << 32) | eax;
 }
 
+static _always_inline uintptr_t cpu_cr0_get()
+{
+    uintptr_t rax;
+    __asm__ __volatile__ (
+        "mov %%cr0,%q[result]\n\t"
+        : [result] "=r" (rax)
+    );
+    return rax;
+}
+
+static _always_inline void cpu_cr0_set(uintptr_t cr0)
+{
+    __asm__ __volatile__ (
+        "mov %q[cr0],%%cr0\n\t"
+        :
+        : [cr0] "r" (cr0)
+    );
+}
+
+static _always_inline void cpu_cr0_clts()
+{
+    __asm__ __volatile__ (
+        "clts\n\t"
+    );
+}
+
 static _always_inline uintptr_t cpu_cr0_change_bits(
         uintptr_t clear, uintptr_t set)
 {
