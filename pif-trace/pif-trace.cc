@@ -60,8 +60,8 @@ public:
     using buffer_t = trace_item_vector;
 
     writer_thread_t()
-        : stop(false)
-        , out_file(nullptr)
+        : out_file(nullptr)
+        , stop(false)
     {
         thread = std::thread(&writer_thread_t::start, this);
     }
@@ -180,8 +180,9 @@ private:
             for (buffer_t const& buffer : buffers) {
                 unsigned write_size = buffer.size() *
                         sizeof(*buffer.data());
+                assert(write_size < INT_MAX);
                 int wrote = gzwrite(out_file, buffer.data(), write_size);
-                if (unlikely(wrote != write_size))
+                if (unlikely(wrote != int(write_size)))
                     throw trace_error("gzwrite failed: ", errno);
 
                 flushed = false;
@@ -410,11 +411,9 @@ int capture(bool verbose = false)
                 items[0] = items[got_count];
         }
     }
-}
 
-// Include down here because of ridiculous
-// #define namespace pollution
-#include <ncurses.h>
+    return 0;
+}
 
 struct alignas(16) trace_detail {
     // The record from the trace log
@@ -436,7 +435,7 @@ static_assert(sizeof(trace_detail) == 16, "Unexpected size");
 
 using trace_detail_vector = std::vector<trace_detail>;
 using trace_detail_iter = trace_detail_vector::iterator;
-using trace_thread_map = std::unordered_map<int, trace_detail_vector>;
+using trace_thread_map = std::map<int, trace_detail_vector>;
 
 trace_thread_map load_trace(char const *filename)
 {
@@ -527,18 +526,27 @@ static bool is_detail_shown(trace_detail const& item)
     return item.rec.show;
 }
 
+// Include down here because of ridiculous
+// #define namespace pollution
+#include <ncurses.h>
+
 class viewer {
 public:
     viewer(char const *filename)
-        : filename(filename)
+        : tid_detail(nullptr)
         , symbols(load_symbols())
+        , filename(filename)
         , data(load_trace(filename))
-        , done(false)
-        , tid(0)
-        , tid_detail(&data[tid])
         , offset(0)
+        , tid_index(0)
+        , tid(0)
         , cursor_row(0)
+        , done(false)
     {
+        tid_detail = &data[tid];
+        tid_list.reserve(data.size());
+        for (trace_thread_map::value_type &pair : data)
+            tid_list.push_back(pair.first);
         initscr();
         noecho();
         keypad(stdscr, TRUE);
@@ -689,7 +697,7 @@ public:
 
     void read_input()
     {
-        int key = getch();
+        int key = wgetch(stdscr);
 
         switch (key) {
         case 't':   // fall through
@@ -744,11 +752,18 @@ public:
         case '/':
             return find_text();
 
-        case 'n':
+        case 'n':   // fall through
+        case KEY_F(3):
             return find_next(1);
 
         case 'N':
             return find_next(-1);
+
+        case '<':
+            return prev_thread();
+
+        case '>':
+            return next_thread();
 
         case 'h':
             return show_help();
@@ -1027,14 +1042,38 @@ public:
 
             auto it = symbols->lower_bound(uint64_t(scan->rec.get_ip()));
 
-            auto wtf = it->second.c_str();
-
             if (std::regex_search(it->second, *search)) {
                 selection = scan;
                 clamp_offset();
                 break;
             }
         }
+    }
+
+    void prev_thread()
+    {
+        uint64_t selected_ordinal = selection->ordinal;
+
+        if (tid_index > 0) {
+            tid = tid_list[--tid_index];
+            tid_detail = &data[tid];
+        }
+
+        selection = std::lower_bound(tid_detail->begin(), tid_detail->end(),
+                                     selected_ordinal);
+    }
+
+    void next_thread()
+    {
+        uint64_t selected_ordinal = selection->ordinal;
+
+        if (tid_index + 1 < tid_list.size()) {
+            tid = tid_list[++tid_index];
+            tid_detail = &data[tid];
+        }
+
+        selection = std::lower_bound(tid_detail->begin(), tid_detail->end(),
+                                     selected_ordinal);
     }
 
     void handle_resize()
@@ -1060,19 +1099,21 @@ public:
 
     }
 
-    std::string filename;
-    std::unique_ptr<sym_tab> symbols;
-    trace_thread_map data;
-    bool done;
-    int tid;
     trace_detail_vector *tid_detail;
+    std::vector<int> tid_list;
+    std::unique_ptr<std::regex> search;
+    std::unique_ptr<sym_tab> symbols;
+    std::string filename;
+    trace_thread_map data;
     trace_detail_iter selection;
     trace_detail_iter highlight_st;
     trace_detail_iter highlight_en;
     int64_t offset;
+    size_t tid_index;
+    int tid;
     int cursor_row;
     int display_h, display_w;
-    std::unique_ptr<std::regex> search;
+    bool done;
 };
 
 int dump_trace(char const *filename)
@@ -1116,6 +1157,8 @@ int dump_trace(char const *filename)
                tree_widget,
                it->second.c_str());
     }
+
+    return 0;
 }
 
 int main(int argc, char **argv)
