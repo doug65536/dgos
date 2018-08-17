@@ -328,11 +328,11 @@ int process_t::start()
 
     // Push argv to the stack
     stack_ptr = (char**)stack_ptr - 1;
-    *(char***)stack_ptr = argp_ptr;
+    mm_copy_user(stack_ptr, &argp_ptr, sizeof(argp_ptr));
 
     // Push argc to the stack
     stack_ptr = (uintptr_t*)stack_ptr - 1;
-    *(uintptr_t*)stack_ptr = argc;
+    mm_copy_user(stack_ptr, &argc, sizeof(argc));
 
     std::vector<auxv_t> auxent;
 
