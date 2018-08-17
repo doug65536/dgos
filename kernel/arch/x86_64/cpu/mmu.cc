@@ -1241,10 +1241,12 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
     ptes_from_addr(ptes, fault_addr);
     int present_mask = ptes_present(ptes);
 
+    uintptr_t const err_code = ISR_CTX_ERRCODE(ctx);
+
     // Examine the error code
-    if (unlikely(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_R)) {
+    if (unlikely(err_code & CTX_ERRCODE_PF_R)) {
         // Reserved bit violation?!
-        mmu_dump_pf(ISR_CTX_ERRCODE(ctx));
+        mmu_dump_pf(err_code);
         mmu_dump_ptes(ptes);
         cpu_debug_break();
         cpu_page_invalidate(fault_addr);
@@ -1266,12 +1268,12 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         //  - the pte is not present, or,
         //  - the access was a write and the pte is not writable, or,
         //  - the access was an insn fetch and the pte is not executable
-        if (!((ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_R) ||
-              (ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_PK) ||
-              (ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_SGX) ||
-              ((ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_W) &&
+        if (!((err_code & CTX_ERRCODE_PF_R) ||
+              (err_code & CTX_ERRCODE_PF_PK) ||
+              (err_code & CTX_ERRCODE_PF_SGX) ||
+              ((err_code & CTX_ERRCODE_PF_W) &&
                !(pte & PTE_WRITABLE)) ||
-              ((ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_I) &&
+              ((err_code & CTX_ERRCODE_PF_I) &&
                (pte & PTE_NX))))
             return ctx;
     }
@@ -1292,7 +1294,7 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
 
             pte_t page_flags;
 
-            if (ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_W)
+            if (err_code & CTX_ERRCODE_PF_W)
                 page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
             else
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
@@ -1393,18 +1395,18 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
              "     instruction fetch=%d\n"
              "     protection key violation=%d\n"
              "     SGX violation=%d\n",
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_P),
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_W),
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_U),
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_R),
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_I),
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_PK),
-             !!(ISR_CTX_ERRCODE(ctx) & CTX_ERRCODE_PF_SGX));
+             !!(err_code & CTX_ERRCODE_PF_P),
+             !!(err_code & CTX_ERRCODE_PF_W),
+             !!(err_code & CTX_ERRCODE_PF_U),
+             !!(err_code & CTX_ERRCODE_PF_R),
+             !!(err_code & CTX_ERRCODE_PF_I),
+             !!(err_code & CTX_ERRCODE_PF_PK),
+             !!(err_code & CTX_ERRCODE_PF_SGX));
 
     printdbg("     present_mask=%#x\n",
              present_mask);
 
-    mmu_dump_pf(ISR_CTX_ERRCODE(ctx));
+    mmu_dump_pf(err_code);
     mmu_dump_ptes(ptes);
 
     return nullptr;
