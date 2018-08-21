@@ -9,8 +9,8 @@ class rbtree_t {
 private:
     struct node_t;
 
-    typedef Tkey key_t;
-    typedef Tval val_t;
+    using key_t = Tkey;
+    using val_t = Tval;
 
 public:
     struct kvp_t {
