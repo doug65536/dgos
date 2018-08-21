@@ -44,6 +44,7 @@ device/virtio-blk.cc
 device/virtio-blk.h
 device/virtio-gpu.cc
 device/virtio-gpu.h
+fs/devfs.cc
 lib/asan.cc
 lib/cc/cxxstring.h
 lib/cc/exception.cc
