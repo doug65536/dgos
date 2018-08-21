@@ -1520,7 +1520,7 @@ QEMU_COMMON = \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
 	$(QEMU_NET) \
-	-no-shutdown -no-reboot -d unimp,guest_errors,cpu_reset \
+	-no-shutdown -no-reboot -d unimp,guest_errors \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS) \
 	$(QEMU_USB) \
