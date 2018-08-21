@@ -131,3 +131,5 @@ $(top_builddir)/fatdisk.img: \
 			count=2 \
 			conv=notrunc
 
+$(top_builddir)/fatdisk.qcow: $(top_builddir)/fatdisk.img
+	$(QEMU_IMG) convert -f raw -O qcow -p $< $@

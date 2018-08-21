@@ -39,6 +39,11 @@ AS_IF([test x"$QEMU" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find qemu-system-x86_64])])
 AC_SUBST([QEMU])
 
+AC_CHECK_PROGS([QEMU_IMG], [qemu-img], [NOT_FOUND])
+AS_IF([test x"$QEMU_IMG" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find qemu-img])])
+AC_SUBST([QEMU_IMG])
+
 AC_CHECK_PROGS([CP], [cp], [NOT_FOUND])
 AS_IF([test x"$CP" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find cp])])

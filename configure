@@ -630,6 +630,7 @@ SED
 FIND
 LN
 CP
+QEMU_IMG
 QEMU
 RANLIB
 AR
@@ -6772,6 +6773,55 @@ test -n "$QEMU" || QEMU="NOT_FOUND"
 if test x"$QEMU" == x"NOT_FOUND"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find qemu-system-x86_64" >&5
 $as_echo "$as_me: WARNING: Cannot find qemu-system-x86_64" >&2;}
+fi
+
+
+for ac_prog in qemu-img
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_QEMU_IMG+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$QEMU_IMG"; then
+  ac_cv_prog_QEMU_IMG="$QEMU_IMG" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_QEMU_IMG="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+QEMU_IMG=$ac_cv_prog_QEMU_IMG
+if test -n "$QEMU_IMG"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $QEMU_IMG" >&5
+$as_echo "$QEMU_IMG" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$QEMU_IMG" && break
+done
+test -n "$QEMU_IMG" || QEMU_IMG="NOT_FOUND"
+
+if test x"$QEMU_IMG" == x"NOT_FOUND"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find qemu-img" >&5
+$as_echo "$as_me: WARNING: Cannot find qemu-img" >&2;}
 fi
 
 
