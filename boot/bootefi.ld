@@ -14,6 +14,36 @@ SECTIONS {
 		*(.text.unlikely)
 	}
 
+	.rela.plt : ALIGN(64) {
+		PROVIDE_HIDDEN(___rela_entry_start = .);
+		*(.rela.entry)
+		PROVIDE_HIDDEN(___rela_entry_end = .);
+
+		PROVIDE_HIDDEN(___rela_plt_start = .);
+		*(.rela.plt)
+		PROVIDE_HIDDEN(___rela_plt_end = .);
+
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
+	}
+
+	.plt.got : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_got = .);
+		*(.plt.got)
+	}
+
+	.plt.bnd : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_bnd = .);
+		*(.plt.bnd)
+	}
+
+	.plt : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt = .);
+		*(.plt)
+		*(.iplt)
+	}
+
 	.edata ALIGN(4K) : {
 		*(.edata)
 
@@ -98,36 +128,6 @@ SECTIONS {
 		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
 		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
 		*(.rela.ifunc)
-	}
-
-	.rela.plt : ALIGN(64) {
-		PROVIDE_HIDDEN(___rela_entry_start = .);
-		*(.rela.entry)
-		PROVIDE_HIDDEN(___rela_entry_end = .);
-
-		PROVIDE_HIDDEN(___rela_plt_start = .);
-		*(.rela.plt)
-		PROVIDE_HIDDEN(___rela_plt_end = .);
-
-		PROVIDE_HIDDEN (__rela_iplt_start = .);
-		*(.rela.iplt)
-		PROVIDE_HIDDEN (__rela_iplt_end = .);
-	}
-
-	.plt.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_got = .);
-		*(.plt.got)
-	}
-
-	.plt.bnd : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_bnd = .);
-		*(.plt.bnd)
-	}
-
-	.plt : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt = .);
-		*(.plt)
-		*(.iplt)
 	}
 
 	.dynamic : ALIGN(4096) {
