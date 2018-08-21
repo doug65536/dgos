@@ -134,6 +134,7 @@ struct fs_stat_t;
 class fs_file_info_t
 {
 public:
+    virtual ~fs_file_info_t() {}
     virtual ino_t get_inode() const = 0;
 };
 
