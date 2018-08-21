@@ -1277,7 +1277,7 @@ int fat32_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
     file_handle_t *file = create_handle(path, O_RDONLY | O_DIRECTORY, 0);
 
     if (!file)
-        return -1;
+        return -int(errno_t::ENOENT);
 
     *fi = file;
 
