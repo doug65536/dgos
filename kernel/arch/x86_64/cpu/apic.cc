@@ -930,6 +930,19 @@ static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
 
 }
 
+template<typename H, typename E, typename F>
+static bool acpi_foreach_record(H *hdr, E *ent_type, F callback, int type)
+{
+    E *ent = (E*)(hdr + 1);
+    E *end = (E*)(uintptr_t(hdr) + hdr->hdr.len);
+
+    for ( ; ent < end; ent = (E*)(uintptr_t(ent) + ent->hdr.record_len)) {
+        if (ent->hdr.entry_type == type || type == -1)
+            callback(ent);
+    }
+    return true;
+}
+
 static void acpi_process_madt(acpi_madt_t *madt_hdr)
 {
     acpi_madt_ent_t *ent = (acpi_madt_ent_t*)(madt_hdr + 1);
@@ -939,56 +952,66 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
     apic_base = madt_hdr->lapic_address;
     acpi_madt_flags = madt_hdr->flags & 1;
 
+    // Scan for APIC ID records
+    acpi_foreach_record(madt_hdr, (acpi_madt_ent_t*)nullptr,
+                        [](acpi_madt_ent_t* ent) {
+        if (apic_id_count < countof(apic_id_list)) {
+            ACPI_TRACE("Found LAPIC, ID=%d\n", ent->lapic.apic_id);
+
+            // If processor is enabled
+            if (ent->lapic.flags == 1) {
+                apic_id_list[apic_id_count++] = ent->lapic.apic_id;
+            } else {
+                ACPI_TRACE("Disabled processor detected\n");
+            }
+        } else {
+            ACPI_ERROR("Too many CPUs! Dropped one\n");
+        }
+    }, ACPI_MADT_REC_TYPE_LAPIC);
+
+    // Scan for IOAPIC records
+    acpi_foreach_record(madt_hdr, (acpi_madt_ent_t*)nullptr,
+                        [](acpi_madt_ent_t* ent) {
+        ACPI_TRACE("IOAPIC found\n");
+        if (ioapic_count < countof(ioapic_list)) {
+            mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
+            ioapic->addr = ent->ioapic.addr;
+            ioapic->irq_base = ent->ioapic.irq_base;
+            ioapic->id = ent->ioapic.apic_id;
+            ioapic->ptr = (uint32_t*)mmap(
+                        (void*)(uintptr_t)ent->ioapic.addr, 12,
+                        PROT_READ | PROT_WRITE,
+                        MAP_PHYSICAL | MAP_NOCACHE |
+                        MAP_WRITETHRU, -1, 0);
+
+            ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
+            uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
+            entries = IOAPIC_VER_ENTRIES_GET(entries) + 1;
+
+            ioapic->vector_count = entries;
+            ioapic->base_intr = ioapic_alloc_vectors(entries);
+
+            ioapic_reset(ioapic);
+
+            ACPI_TRACE("IOAPIC registered, id=%u, addr=%#x, irqbase=%d,"
+                       " entries=%u\n",
+                       ioapic->id, ioapic->addr, ioapic->irq_base,
+                       ioapic->vector_count);
+        } else {
+            ACPI_TRACE("Too many IOAPICs!\n");
+        }
+    }, ACPI_MADT_REC_TYPE_IOAPIC);
+
     for ( ; ent < end;
-          ent = (acpi_madt_ent_t*)((char*)ent + ent->ioapic.hdr.record_len)) {
+          ent = (acpi_madt_ent_t*)((char*)ent + ent->hdr.record_len)) {
         ACPI_TRACE("FADT record, type=%#x ptr=%p, len=%u\n",
                    ent->hdr.entry_type, (void*)ent,
                    ent->ioapic.hdr.record_len);
         switch (ent->hdr.entry_type) {
         case ACPI_MADT_REC_TYPE_LAPIC:
-            if (apic_id_count < countof(apic_id_list)) {
-                ACPI_TRACE("Found LAPIC, ID=%d\n", ent->lapic.apic_id);
-
-                // If processor is enabled
-                if (ent->lapic.flags == 1) {
-                    apic_id_list[apic_id_count++] = ent->lapic.apic_id;
-                } else {
-                    ACPI_TRACE("Disabled processor detected\n");
-                }
-            } else {
-                ACPI_ERROR("Too many CPUs! Dropped one\n");
-            }
             break;
 
         case ACPI_MADT_REC_TYPE_IOAPIC:
-            ACPI_TRACE("IOAPIC found\n");
-            if (ioapic_count < countof(ioapic_list)) {
-                mp_ioapic_t *ioapic = ioapic_list + ioapic_count++;
-                ioapic->addr = ent->ioapic.addr;
-                ioapic->irq_base = ent->ioapic.irq_base;
-                ioapic->id = ent->ioapic.apic_id;
-                ioapic->ptr = (uint32_t*)mmap(
-                            (void*)(uintptr_t)ent->ioapic.addr, 12,
-                            PROT_READ | PROT_WRITE,
-                            MAP_PHYSICAL | MAP_NOCACHE |
-                            MAP_WRITETHRU, -1, 0);
-
-                ioapic->ptr[IOAPIC_IOREGSEL] = IOAPIC_REG_VER;
-                uint32_t entries = ioapic->ptr[IOAPIC_IOREGWIN];
-                entries = IOAPIC_VER_ENTRIES_GET(entries) + 1;
-
-                ioapic->vector_count = entries;
-                ioapic->base_intr = ioapic_alloc_vectors(entries);
-
-                ioapic_reset(ioapic);
-
-                ACPI_TRACE("IOAPIC registered, id=%u, addr=%#x, irqbase=%d,"
-                           " entries=%u\n",
-                           ioapic->id, ioapic->addr, ioapic->irq_base,
-                           ioapic->vector_count);
-            } else {
-                ACPI_TRACE("Too many IOAPICs!\n");
-            }
             break;
 
         case ACPI_MADT_REC_TYPE_IRQ:
@@ -1004,11 +1027,12 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
             intr_to_irq[intr] = irq;
             irq_to_intr[irq] = intr;
 
-            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u"
-                       ", flags=%x vector=%u\n",
-                       irq, gsi, ent->irq_src.flags, intr);
-
             int ioapic_index = intr_to_ioapic[intr];
+
+            ACPI_TRACE("Applied redirection, irq=%u, gsi=%u"
+                       ", flags=%x vector=%u, ioapic_index=%d\n",
+                       irq, gsi, ent->irq_src.flags, intr, ioapic_index);
+
             mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
             ioapic_set_flags(ioapic, irq - ioapic->irq_base,
                              ent->irq_src.flags, isa);
