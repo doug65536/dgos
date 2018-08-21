@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include "assert.h"
 #include "cpu/except_asm.h"
+#include "hash.h"
 
 void abort()
 {
@@ -26,11 +27,58 @@ void __cxa_free_exception(void *thrown_exception)
     free(thrown_exception);
 }
 
+namespace __cxxabiv1 {
+    class __class_type_info {
+        virtual ~__class_type_info() {}
+    };
+}
+
 __BEGIN_NAMESPACE_STD
 class type_info
 {
-    void *dummy;
-    char const *class_name;
+    virtual ~type_info();
+
+    char const *name() const noexcept
+    {
+        return __name;
+    }
+
+    bool before(type_info const& rhs)
+    {
+        return __name < rhs.__name;
+    }
+
+    bool operator==(type_info const& rhs)
+    {
+        return __builtin_strcmp(__name, rhs.__name) == 0;
+    }
+
+    bool operator!=(type_info const& rhs)
+    {
+        return __builtin_strcmp(__name, rhs.__name) != 0;
+    }
+
+    size_t hash_code() const
+    {
+        return hash_32(__name, __builtin_strlen(__name));
+    }
+
+    virtual bool __is_pointer_p() const = 0;
+    virtual bool __is_function_p() const = 0;
+    virtual bool __do_catch(const type_info *__thr_type, void **__thr_obj,
+                            unsigned __outer) const;
+
+    // Internally used during catch matching
+    virtual bool __do_upcast(const __cxxabiv1::__class_type_info *__target,
+                             void **__obj_ptr) const;
+
+protected:
+    char const *__name;
+    explicit type_info(char const *__name) : __name(__name) {}
+
+private:
+    type_info &operator=(type_info const&) = delete;
+    type_info(type_info const&) = delete;
 };
 __END_NAMESPACE_STD
 
@@ -56,6 +104,19 @@ struct __cxa_exception {
 
 typedef uint8_t const *LSDA_ptr;
 
+#if 0
+class throw_me{};
+
+void test_throw()
+{
+    try {
+        throw throw_me();
+    } catch (int) {
+        printdbg("no way!\n");
+    }
+}
+#endif
+
 uintptr_t decode_uleb128(uint8_t const *&in)
 {
     uintptr_t result = 0;
@@ -70,6 +131,7 @@ uintptr_t decode_uleb128(uint8_t const *&in)
     return result;
 }
 
+#if 0   // not used
 intptr_t decode_sleb128(uint8_t const *&in)
 {
     intptr_t result = 0;
@@ -86,6 +148,7 @@ intptr_t decode_sleb128(uint8_t const *&in)
     }
     return result;
 }
+#endif
 
 _Unwind_Reason_Code __gxx_personality_v0(
         int version, _Unwind_Action actions,
