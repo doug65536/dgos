@@ -475,6 +475,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-asan.$(OBJEXT) \
 	kernel/lib/kernel_generic-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_generic-ext4.$(OBJEXT) \
+	kernel/fs/kernel_generic-devfs.$(OBJEXT) \
 	kernel/fs/kernel_generic-fat32.$(OBJEXT) \
 	kernel/fs/kernel_generic-iso9660.$(OBJEXT) \
 	kernel/fs/kernel_generic-iso9660_part.$(OBJEXT) \
@@ -604,6 +605,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-asan.$(OBJEXT) \
 	kernel/lib/kernel_tracing-contig_alloc.$(OBJEXT) \
 	kernel/fs/kernel_tracing-ext4.$(OBJEXT) \
+	kernel/fs/kernel_tracing-devfs.$(OBJEXT) \
 	kernel/fs/kernel_tracing-fat32.$(OBJEXT) \
 	kernel/fs/kernel_tracing-iso9660.$(OBJEXT) \
 	kernel/fs/kernel_tracing-iso9660_part.$(OBJEXT) \
@@ -1578,6 +1580,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/contig_alloc.cc \
 	kernel/lib/contig_alloc.h \
 	kernel/fs/ext4.cc \
+	kernel/fs/devfs.cc \
 	kernel/fs/fat32.cc \
 	kernel/fs/fat32_decl.h \
 	kernel/fs/iso9660.cc \
@@ -3397,6 +3400,8 @@ kernel/fs/$(DEPDIR)/$(am__dirstamp):
 	@: > kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_generic-ext4.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
+kernel/fs/kernel_generic-devfs.$(OBJEXT): kernel/fs/$(am__dirstamp) \
+	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_generic-fat32.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_generic-iso9660.$(OBJEXT): kernel/fs/$(am__dirstamp) \
@@ -3767,6 +3772,8 @@ kernel/lib/kernel_tracing-contig_alloc.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_tracing-ext4.$(OBJEXT): kernel/fs/$(am__dirstamp) \
+	kernel/fs/$(DEPDIR)/$(am__dirstamp)
+kernel/fs/kernel_tracing-devfs.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_tracing-fat32.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
@@ -4236,12 +4243,14 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_generic-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_tracing-keyb8042_layout_us.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-devfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-ext4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-fat32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-iso9660.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-iso9660_part.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-mbr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-tmpfs.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-ext4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-fat32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-iso9660.Po@am__quote@
@@ -8776,6 +8785,20 @@ kernel/fs/kernel_generic-ext4.obj: kernel/fs/ext4.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_generic-ext4.obj `if test -f 'kernel/fs/ext4.cc'; then $(CYGPATH_W) 'kernel/fs/ext4.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/ext4.cc'; fi`
 
+kernel/fs/kernel_generic-devfs.o: kernel/fs/devfs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-devfs.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-devfs.Tpo -c -o kernel/fs/kernel_generic-devfs.o `test -f 'kernel/fs/devfs.cc' || echo '$(srcdir)/'`kernel/fs/devfs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-devfs.Tpo kernel/fs/$(DEPDIR)/kernel_generic-devfs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/devfs.cc' object='kernel/fs/kernel_generic-devfs.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_generic-devfs.o `test -f 'kernel/fs/devfs.cc' || echo '$(srcdir)/'`kernel/fs/devfs.cc
+
+kernel/fs/kernel_generic-devfs.obj: kernel/fs/devfs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-devfs.obj -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-devfs.Tpo -c -o kernel/fs/kernel_generic-devfs.obj `if test -f 'kernel/fs/devfs.cc'; then $(CYGPATH_W) 'kernel/fs/devfs.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/devfs.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-devfs.Tpo kernel/fs/$(DEPDIR)/kernel_generic-devfs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/devfs.cc' object='kernel/fs/kernel_generic-devfs.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_generic-devfs.obj `if test -f 'kernel/fs/devfs.cc'; then $(CYGPATH_W) 'kernel/fs/devfs.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/devfs.cc'; fi`
+
 kernel/fs/kernel_generic-fat32.o: kernel/fs/fat32.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-fat32.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-fat32.Tpo -c -o kernel/fs/kernel_generic-fat32.o `test -f 'kernel/fs/fat32.cc' || echo '$(srcdir)/'`kernel/fs/fat32.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-fat32.Tpo kernel/fs/$(DEPDIR)/kernel_generic-fat32.Po
@@ -10455,6 +10478,20 @@ kernel/fs/kernel_tracing-ext4.obj: kernel/fs/ext4.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/ext4.cc' object='kernel/fs/kernel_tracing-ext4.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_tracing-ext4.obj `if test -f 'kernel/fs/ext4.cc'; then $(CYGPATH_W) 'kernel/fs/ext4.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/ext4.cc'; fi`
+
+kernel/fs/kernel_tracing-devfs.o: kernel/fs/devfs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-devfs.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Tpo -c -o kernel/fs/kernel_tracing-devfs.o `test -f 'kernel/fs/devfs.cc' || echo '$(srcdir)/'`kernel/fs/devfs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Tpo kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/devfs.cc' object='kernel/fs/kernel_tracing-devfs.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_tracing-devfs.o `test -f 'kernel/fs/devfs.cc' || echo '$(srcdir)/'`kernel/fs/devfs.cc
+
+kernel/fs/kernel_tracing-devfs.obj: kernel/fs/devfs.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-devfs.obj -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Tpo -c -o kernel/fs/kernel_tracing-devfs.obj `if test -f 'kernel/fs/devfs.cc'; then $(CYGPATH_W) 'kernel/fs/devfs.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/devfs.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Tpo kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/devfs.cc' object='kernel/fs/kernel_tracing-devfs.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_tracing-devfs.obj `if test -f 'kernel/fs/devfs.cc'; then $(CYGPATH_W) 'kernel/fs/devfs.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/devfs.cc'; fi`
 
 kernel/fs/kernel_tracing-fat32.o: kernel/fs/fat32.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-fat32.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-fat32.Tpo -c -o kernel/fs/kernel_tracing-fat32.o `test -f 'kernel/fs/fat32.cc' || echo '$(srcdir)/'`kernel/fs/fat32.cc

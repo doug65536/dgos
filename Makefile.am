@@ -637,6 +637,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/contig_alloc.cc \
 	kernel/lib/contig_alloc.h \
 	kernel/fs/ext4.cc \
+	kernel/fs/devfs.cc \
 	kernel/fs/fat32.cc \
 	kernel/fs/fat32_decl.h \
 	kernel/fs/iso9660.cc \
