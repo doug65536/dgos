@@ -15,7 +15,7 @@ static tui_menu_item_t tui_menu[] = {
     {
         TSTR "serial debug output",
         tui_ena_dis,
-        0
+        1
     }
 };
 
