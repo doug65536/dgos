@@ -154,7 +154,6 @@ isr_common:
     push_cfi %rbp
     .cfi_offset rbp,-4*8
     movq %rsp,%rbp
-//    .cfi_register rsp,rbp
     .cfi_def_cfa rbp,4*8
     .cfi_offset ss,3*8
     .cfi_offset rsp,2*8
