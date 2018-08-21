@@ -727,6 +727,9 @@ int iso9660_fs_t::opendir(fs_file_info_t **fi,
 {
     iso9660_pt_rec_t *ptrec = lookup_path(path, -1);
 
+    if (!ptrec)
+        return -int(errno_t::ENOENT);
+
     dir_handle_t *dir = (dir_handle_t*)pool_alloc(&iso9660_handles);
     dir->fs = this;
     dir->dirent = (iso9660_dir_ent_t *)lookup_sector(pt_rec_lba(ptrec));
