@@ -420,10 +420,11 @@ void vector<_T,_Allocator>::assign(size_type __count, _T const& value)
 }
 
 template<typename _T, typename _Allocator>
-template< typename InputIt >
+template<typename InputIt>
 void vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
 {
-    resize(0);
+    clear();// resize(0);
+    reserve(__last - __first);
     while (__first != __last) {
         push_back(*__first);
         ++__first;
@@ -661,8 +662,12 @@ void vector<_T,_Allocator>::shrink_to_fit()
 template<typename _T, typename _Allocator>
 void vector<_T,_Allocator>::clear()
 {
-    while (__sz > 0)
-        pop_back();
+    if (std::has_trivial_destructor<_T>::value) {
+        __sz = 0;
+    } else {
+        while (__sz > 0)
+            pop_back();
+    }
 }
 
 template<typename _T, typename _Allocator>

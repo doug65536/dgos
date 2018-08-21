@@ -174,6 +174,14 @@ _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
     return __out;
 }
 
+template<typename _InputIt, typename _OutputIt>
+_OutputIt copy(_InputIt __first, _InputIt __last, _OutputIt __out)
+{
+    for ( ; __first != __last; ++__first, ++__out)
+        *__out = *__first;
+    return __out;
+}
+
 template<typename _ForwardIt>
 constexpr _ForwardIt min_element(_ForwardIt __first, _ForwardIt __last)
 {

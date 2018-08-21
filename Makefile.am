@@ -557,6 +557,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/type_traits.h \
 	kernel/lib/cc/utility.h \
 	kernel/lib/cc/vector.h \
+	kernel/lib/cc/cxxstring.h \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
