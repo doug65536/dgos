@@ -182,7 +182,7 @@ private:
 
         uint64_t seed = 42;
         while (1) {
-            ++*indicator;
+            //++*indicator;
 
             uint64_t lba = rand_r_range(&seed, 16, data_blocks);
             //int64_t count = rand_r_range(&seed, 1, data_blocks);
