@@ -172,10 +172,10 @@ private:
         // Prime the queue
         for (size_t i = 0; i < queue_depth; ++i) {
             status = drive->read_async(data[i], 1, i, &iocp[i]);
-//            if (status != errno_t::OK)
-//                printdbg("(devid %d) (tid %3d)"
-//                         " Storage read (completion failed) status=%d\n",
-//                         devid, tid, (int)status);
+            if (status != errno_t::OK)
+                printdbg("(devid %d) (tid %3d)"
+                         " Storage read (completion failed) status=%d\n",
+                         devid, tid, (int)status);
         }
 
         size_t slot = 0;
