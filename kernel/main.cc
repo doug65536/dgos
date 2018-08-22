@@ -839,11 +839,6 @@ static int init_thread(void *)
         printk(" created %s\n\n", name);
     }
 
-    //void *user_test = mmap((void*)0x400000, 1<<20,
-    //                       PROT_READ | PROT_WRITE, MAP_USER, -1, 0);
-    //munmap(user_test, 1<<20);
-
-
     printk("Opening root directory\n");
 
     int od = file_opendir("");
