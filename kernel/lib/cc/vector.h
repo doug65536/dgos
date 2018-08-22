@@ -61,12 +61,12 @@ public:
     vector& operator=(vector&& __other);
     vector& operator=(initializer_list<_T> __ilist);
 
-    void assign(size_type __count, _T const& __value);
+    bool assign(size_type __count, _T const& __value);
 
     template<typename _InputIt>
-    void assign(_InputIt __first, _InputIt __last);
+    bool assign(_InputIt __first, _InputIt __last);
 
-    void assign(initializer_list<_T> __ilist);
+    bool assign(initializer_list<_T> __ilist);
 
     allocator_type get_allocator() const;
 
@@ -245,9 +245,9 @@ vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
         __pos.__p = __m;
 
     size_t e = __pos.__p - __m;
-    for (size_t i = __sz; i > e; --i) {
-        new (__m + i + __count - 1) value_type(move(__m[i - 1]));
-        __m[i - 1].~value_type();
+    for (size_t __i = __sz; __i > e; --__i) {
+        new (__m + __i + __count - 1) value_type(move(__m[__i - 1]));
+        __m[__i - 1].~value_type();
     }
     return __pos.__p;
 }
@@ -312,7 +312,8 @@ vector<_T,_Allocator>::vector(vector const& __other)
     , __sz(0)
     , __alloc(_Allocator())
 {
-    reserve(__other.size());
+    if (unlikely(!reserve(__other.size())))
+        panic_oom();
 }
 
 template<typename _T, typename _Allocator>
@@ -323,7 +324,8 @@ vector<_T,_Allocator>::vector(vector const& __other,
     , __sz(0)
     , __alloc(__alloc_)
 {
-    reserve(__other.size());
+    if (unlikely(!reserve(__other.size())))
+        panic_oom();
 }
 
 template<typename _T, typename _Allocator>
@@ -412,28 +414,33 @@ vector<_T,_Allocator>::operator=(initializer_list<_T> __ilist)
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::assign(size_type __count, _T const& value)
+bool vector<_T,_Allocator>::assign(size_type __count, _T const& __value)
 {
-    resize(0);
-    while (__sz < __count)
-        push_back(value);
+    clear();
+    if (!reserve(__count))
+        return false;
+    uninitialized_fill(__m, __m + __count, __value);
+    __sz = __count;
+    return true;
 }
 
 template<typename _T, typename _Allocator>
 template<typename InputIt>
-void vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
+bool vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
 {
-    clear();// resize(0);
-    reserve(__last - __first);
-    while (__first != __last) {
-        push_back(*__first);
-        ++__first;
-    }
+    clear();
+    if (!reserve(__last - __first))
+        return false;
+    while (__first != __last)
+        new (__m + __sz++) value_type(*__first);
+    return true;
 }
 
 template<typename _T, typename _Allocator>
-void vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
+bool vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
 {
+    if (!reserve(__ilist.size()))
+        return false;
     assign(__ilist.begin(), __ilist.end());
 }
 
@@ -899,14 +906,14 @@ template< typename _R, typename _Alloc >
 bool operator==(vector<_R,_Alloc> const& lhs,
                 vector<_R,_Alloc> const& rhs)
 {
-    return equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+    return equal(lhs.cbegin(), lhs.cend(), rhs.cbegin(), rhs.cend());
 }
 
 template< typename _R, typename _Alloc >
 bool operator!=(vector<_R,_Alloc> const& lhs,
                 vector<_R,_Alloc> const& rhs)
 {
-    return !equal(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+    return !equal(lhs.cbegin(), lhs.cend(), rhs.cbegin(), rhs.cend());
 }
 
 template< typename _R, typename _Alloc >
