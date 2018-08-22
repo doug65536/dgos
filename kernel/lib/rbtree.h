@@ -42,12 +42,12 @@ public:
 
     kvp_t *find(kvp_t *kvp, iter_t *iter);
 
-    iter_t first(iter_t start);
-    iter_t next(iter_t n);
-    iter_t prev(iter_t n);
-    iter_t last(iter_t start);
+    _pure iter_t first(iter_t start);
+    _pure iter_t next(iter_t n);
+    _pure iter_t prev(iter_t n);
+    _pure iter_t last(iter_t start);
 
-    kvp_t item(iter_t iter);
+    _pure kvp_t item(iter_t iter);
     int delete_at(iter_t n);
     int delete_pair(kvp_t *kvp);
     int delete_item(key_t key, val_t val);
