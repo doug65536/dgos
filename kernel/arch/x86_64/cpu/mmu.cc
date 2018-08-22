@@ -1258,6 +1258,18 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
 
     pte_t pte = (present_mask >= 0x07) ? *ptes[3] : 0;
 
+    // Check for SMAP violation
+    // (kernel accessing user mode memory with EFLAGS.AC==0)
+    if (unlikely(ISR_CTX_REG_CS(ctx) == GDT_SEL_KERNEL_CODE64 &&
+                 (ISR_CTX_REG_RFLAGS(ctx) & CPU_EFLAGS_AC) == 0 &&
+                 cpuid_has_smap() &&
+                 (pte & PTE_USER))) {
+        printdbg("Supervisor mode access prevention violation\n");
+        dump_context(ctx, true);
+        cpu_debug_break();
+        return nullptr;
+    }
+
     // Check for lazy TLB shootdown
     if (present_mask == 0xF) {
         // It is a not a lazy shootdown, if
