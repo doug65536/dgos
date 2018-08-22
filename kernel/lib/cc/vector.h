@@ -870,10 +870,10 @@ bool vector<_T,_Allocator>::resize(size_type __count,
                                    value_type const& __value)
 {
     if (__sz > __count) {
-        do {
-            pop_back();
-        } while (--__sz > __count);
-    } else {
+        for (size_t __i = __sz; __i > __count; --__i)
+            __alloc.destruct(__m + (__i - 1));
+        __sz = __count;
+    } else if (__sz < __count) {
         if (unlikely(!reserve(__count)))
             return false;
         uninitialized_fill(__m + __sz, __m + __count, __value);
