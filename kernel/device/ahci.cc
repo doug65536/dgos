@@ -1515,7 +1515,7 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
             cfis.h2d.feature_lo = 1;
 
             // LBA
-            cfis.d2h.device = request.fua ? AHCI_FIS_FUA_LBA : 0;
+            cfis.h2d.device = request.fua ? AHCI_FIS_FUA_LBA : 0;
         }
 
         atomic_barrier();
