@@ -630,8 +630,8 @@ bool vector<_T,_Allocator>::reserve(size_type __new_cap)
         if (unlikely(!new_p))
             return false;
         uninitialized_move(__m, __m + __sz, new_p.get());
-        for (size_t i = 0; i < __sz; ++i)
-            __m[i].~value_type();
+        for (size_t __i = 0; __i < __sz; ++__i)
+            __m[__i].~value_type();
         if (__m != nullptr)
             __alloc.deallocate(__m, __capacity);
         __m = new_p.release();
