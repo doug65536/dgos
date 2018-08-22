@@ -831,6 +831,9 @@ static int init_thread(void *)
         snprintf(name, sizeof(name), "created_%d", n);
         printk("creating %s\n", name);
         int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        if (create_test == -int(errno_t::EROFS))
+            continue;
+        assert(create_test >= 0);
         file_write(create_test, "Hello!", 6);
         file_close(create_test);
         printk(" created %s\n\n", name);
