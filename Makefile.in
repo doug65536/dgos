@@ -104,7 +104,8 @@ bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	bootfat-elf$(EXEEXT) bootiso-elf$(EXEEXT) \
 	bootpxe-bios-elf$(EXEEXT) bootefi-amd64$(EXEEXT) \
 	kernel-generic$(EXEEXT) kernel-tracing$(EXEEXT) \
-	dhcpclient$(EXEEXT) hello.km$(EXEEXT) user-shell$(EXEEXT)
+	dhcpclient$(EXEEXT) ls$(EXEEXT) hello.km$(EXEEXT) \
+	user-shell$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -206,6 +207,16 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/string/libc_a-memchr.$(OBJEXT) \
 	libc/src/string/libc_a-strxfrm_l.$(OBJEXT) \
 	libc/src/string/libc_a-strncmp.$(OBJEXT) \
+	libc/src/dirent/libc_a-opendir.$(OBJEXT) \
+	libc/src/dirent/libc_a-closedir.$(OBJEXT) \
+	libc/src/dirent/libc_a-fdopendir.$(OBJEXT) \
+	libc/src/dirent/libc_a-readdir.$(OBJEXT) \
+	libc/src/dirent/libc_a-rewinddir.$(OBJEXT) \
+	libc/src/dirent/libc_a-telldir.$(OBJEXT) \
+	libc/src/dirent/libc_a-dirfd.$(OBJEXT) \
+	libc/src/dirent/libc_a-opendir.$(OBJEXT) \
+	libc/src/dirent/libc_a-readdir_r.$(OBJEXT) \
+	libc/src/dirent/libc_a-seekdir.$(OBJEXT) \
 	libc/src/stdlib/libc_a-_Exit.$(OBJEXT) \
 	libc/src/stdlib/libc_a-abs.$(OBJEXT) \
 	libc/src/fcntl/libc_a-creat.$(OBJEXT) \
@@ -685,6 +696,11 @@ kernel_tracing_OBJECTS = $(am_kernel_tracing_OBJECTS)
 kernel_tracing_DEPENDENCIES = $(am__DEPENDENCIES_1)
 kernel_tracing_LINK = $(CXXLD) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_tracing_LDFLAGS) $(LDFLAGS) -o $@
+am_ls_OBJECTS = user/bin/ls/ls-ls.$(OBJEXT)
+ls_OBJECTS = $(am_ls_OBJECTS)
+ls_LDADD = $(LDADD)
+ls_LINK = $(CXXLD) $(ls_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) $(LDFLAGS) \
+	-o $@
 am_mbr_elf_OBJECTS = mbr/mbr_elf-mbr.$(OBJEXT)
 mbr_elf_OBJECTS = $(am_mbr_elf_OBJECTS)
 mbr_elf_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -757,14 +773,14 @@ SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libm_a_SOURCES) \
 	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
 	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
 	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(ls_SOURCES) $(mbr_elf_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
 	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
 	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
 	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
-	$(mbr_elf_SOURCES) $(user_shell_SOURCES)
+	$(ls_SOURCES) $(mbr_elf_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1977,6 +1993,16 @@ libc_a_SOURCES = \
 	libc/src/string/memchr.cc \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
+	libc/src/dirent/opendir.cc \
+	libc/src/dirent/closedir.cc \
+	libc/src/dirent/fdopendir.cc \
+	libc/src/dirent/readdir.cc \
+	libc/src/dirent/rewinddir.cc \
+	libc/src/dirent/telldir.cc \
+	libc/src/dirent/dirfd.cc \
+	libc/src/dirent/opendir.cc \
+	libc/src/dirent/readdir_r.cc \
+	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/_Exit.cc \
 	libc/src/stdlib/abs.cc \
 	libc/src/fcntl/creat.cc \
@@ -2155,7 +2181,12 @@ dhcpclient_SOURCES = \
 	user/bin/dhcpclient/main.cc
 
 dhcpclient_CXXFLAGS = -isystem sysroot/include
-EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED)
+EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
+ls_SOURCES = \
+	user/bin/ls/ls.cc
+
+ls_CXXFLAGS = -isystem sysroot/include
+EXTRA_ls_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
 hello_km_SOURCES = \
 	modules/hello/hello.cc
 
@@ -2588,6 +2619,39 @@ libc/src/string/libc_a-strxfrm_l.$(OBJEXT):  \
 libc/src/string/libc_a-strncmp.$(OBJEXT):  \
 	libc/src/string/$(am__dirstamp) \
 	libc/src/string/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/dirent
+	@: > libc/src/dirent/$(am__dirstamp)
+libc/src/dirent/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/dirent/$(DEPDIR)
+	@: > libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-opendir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-closedir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-fdopendir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-readdir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-rewinddir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-telldir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-dirfd.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-readdir_r.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+libc/src/dirent/libc_a-seekdir.$(OBJEXT):  \
+	libc/src/dirent/$(am__dirstamp) \
+	libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdlib/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/stdlib
 	@: > libc/src/stdlib/$(am__dirstamp)
@@ -3991,6 +4055,18 @@ kernel/syscall/kernel_tracing-sys_process.$(OBJEXT):  \
 kernel-tracing$(EXEEXT): $(kernel_tracing_OBJECTS) $(kernel_tracing_DEPENDENCIES) $(EXTRA_kernel_tracing_DEPENDENCIES) 
 	@rm -f kernel-tracing$(EXEEXT)
 	$(AM_V_CXXLD)$(kernel_tracing_LINK) $(kernel_tracing_OBJECTS) $(kernel_tracing_LDADD) $(LIBS)
+user/bin/ls/$(am__dirstamp):
+	@$(MKDIR_P) user/bin/ls
+	@: > user/bin/ls/$(am__dirstamp)
+user/bin/ls/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) user/bin/ls/$(DEPDIR)
+	@: > user/bin/ls/$(DEPDIR)/$(am__dirstamp)
+user/bin/ls/ls-ls.$(OBJEXT): user/bin/ls/$(am__dirstamp) \
+	user/bin/ls/$(DEPDIR)/$(am__dirstamp)
+
+ls$(EXEEXT): $(ls_OBJECTS) $(ls_DEPENDENCIES) $(EXTRA_ls_DEPENDENCIES) 
+	@rm -f ls$(EXEEXT)
+	$(AM_V_CXXLD)$(ls_LINK) $(ls_OBJECTS) $(ls_LDADD) $(LIBS)
 mbr/$(am__dirstamp):
 	@$(MKDIR_P) mbr
 	@: > mbr/$(am__dirstamp)
@@ -4032,6 +4108,7 @@ mostlyclean-compile:
 	-rm -f libc/cxx/*.$(OBJEXT)
 	-rm -f libc/cxx/abi/*.$(OBJEXT)
 	-rm -f libc/math/*.$(OBJEXT)
+	-rm -f libc/src/dirent/*.$(OBJEXT)
 	-rm -f libc/src/errno/*.$(OBJEXT)
 	-rm -f libc/src/fcntl/*.$(OBJEXT)
 	-rm -f libc/src/posix_spawn/*.$(OBJEXT)
@@ -4045,6 +4122,7 @@ mostlyclean-compile:
 	-rm -f mbr/*.$(OBJEXT)
 	-rm -f modules/hello/*.$(OBJEXT)
 	-rm -f user/bin/dhcpclient/*.$(OBJEXT)
+	-rm -f user/bin/ls/*.$(OBJEXT)
 	-rm -f user/test/*.$(OBJEXT)
 
 distclean-compile:
@@ -4385,6 +4463,15 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-cos.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-log.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-sin.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-closedir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-opendir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-readdir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-telldir.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/errno/$(DEPDIR)/libc_a-errno.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-creat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/fcntl/$(DEPDIR)/libc_a-fcntl.Po@am__quote@
@@ -4552,6 +4639,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-mbr.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@modules/hello/$(DEPDIR)/hello_km-hello.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@user/bin/ls/$(DEPDIR)/ls-ls.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
 
 .S.o:
@@ -5859,6 +5947,132 @@ libc/src/string/libc_a-strncmp.obj: libc/src/string/strncmp.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/string/strncmp.cc' object='libc/src/string/libc_a-strncmp.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/string/libc_a-strncmp.obj `if test -f 'libc/src/string/strncmp.cc'; then $(CYGPATH_W) 'libc/src/string/strncmp.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/string/strncmp.cc'; fi`
+
+libc/src/dirent/libc_a-opendir.o: libc/src/dirent/opendir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-opendir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-opendir.Tpo -c -o libc/src/dirent/libc_a-opendir.o `test -f 'libc/src/dirent/opendir.cc' || echo '$(srcdir)/'`libc/src/dirent/opendir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-opendir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-opendir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/opendir.cc' object='libc/src/dirent/libc_a-opendir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-opendir.o `test -f 'libc/src/dirent/opendir.cc' || echo '$(srcdir)/'`libc/src/dirent/opendir.cc
+
+libc/src/dirent/libc_a-opendir.obj: libc/src/dirent/opendir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-opendir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-opendir.Tpo -c -o libc/src/dirent/libc_a-opendir.obj `if test -f 'libc/src/dirent/opendir.cc'; then $(CYGPATH_W) 'libc/src/dirent/opendir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/opendir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-opendir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-opendir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/opendir.cc' object='libc/src/dirent/libc_a-opendir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-opendir.obj `if test -f 'libc/src/dirent/opendir.cc'; then $(CYGPATH_W) 'libc/src/dirent/opendir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/opendir.cc'; fi`
+
+libc/src/dirent/libc_a-closedir.o: libc/src/dirent/closedir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-closedir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-closedir.Tpo -c -o libc/src/dirent/libc_a-closedir.o `test -f 'libc/src/dirent/closedir.cc' || echo '$(srcdir)/'`libc/src/dirent/closedir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-closedir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-closedir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/closedir.cc' object='libc/src/dirent/libc_a-closedir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-closedir.o `test -f 'libc/src/dirent/closedir.cc' || echo '$(srcdir)/'`libc/src/dirent/closedir.cc
+
+libc/src/dirent/libc_a-closedir.obj: libc/src/dirent/closedir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-closedir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-closedir.Tpo -c -o libc/src/dirent/libc_a-closedir.obj `if test -f 'libc/src/dirent/closedir.cc'; then $(CYGPATH_W) 'libc/src/dirent/closedir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/closedir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-closedir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-closedir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/closedir.cc' object='libc/src/dirent/libc_a-closedir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-closedir.obj `if test -f 'libc/src/dirent/closedir.cc'; then $(CYGPATH_W) 'libc/src/dirent/closedir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/closedir.cc'; fi`
+
+libc/src/dirent/libc_a-fdopendir.o: libc/src/dirent/fdopendir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-fdopendir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Tpo -c -o libc/src/dirent/libc_a-fdopendir.o `test -f 'libc/src/dirent/fdopendir.cc' || echo '$(srcdir)/'`libc/src/dirent/fdopendir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/fdopendir.cc' object='libc/src/dirent/libc_a-fdopendir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-fdopendir.o `test -f 'libc/src/dirent/fdopendir.cc' || echo '$(srcdir)/'`libc/src/dirent/fdopendir.cc
+
+libc/src/dirent/libc_a-fdopendir.obj: libc/src/dirent/fdopendir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-fdopendir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Tpo -c -o libc/src/dirent/libc_a-fdopendir.obj `if test -f 'libc/src/dirent/fdopendir.cc'; then $(CYGPATH_W) 'libc/src/dirent/fdopendir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/fdopendir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/fdopendir.cc' object='libc/src/dirent/libc_a-fdopendir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-fdopendir.obj `if test -f 'libc/src/dirent/fdopendir.cc'; then $(CYGPATH_W) 'libc/src/dirent/fdopendir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/fdopendir.cc'; fi`
+
+libc/src/dirent/libc_a-readdir.o: libc/src/dirent/readdir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-readdir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-readdir.Tpo -c -o libc/src/dirent/libc_a-readdir.o `test -f 'libc/src/dirent/readdir.cc' || echo '$(srcdir)/'`libc/src/dirent/readdir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-readdir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-readdir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/readdir.cc' object='libc/src/dirent/libc_a-readdir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-readdir.o `test -f 'libc/src/dirent/readdir.cc' || echo '$(srcdir)/'`libc/src/dirent/readdir.cc
+
+libc/src/dirent/libc_a-readdir.obj: libc/src/dirent/readdir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-readdir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-readdir.Tpo -c -o libc/src/dirent/libc_a-readdir.obj `if test -f 'libc/src/dirent/readdir.cc'; then $(CYGPATH_W) 'libc/src/dirent/readdir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/readdir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-readdir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-readdir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/readdir.cc' object='libc/src/dirent/libc_a-readdir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-readdir.obj `if test -f 'libc/src/dirent/readdir.cc'; then $(CYGPATH_W) 'libc/src/dirent/readdir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/readdir.cc'; fi`
+
+libc/src/dirent/libc_a-rewinddir.o: libc/src/dirent/rewinddir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-rewinddir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Tpo -c -o libc/src/dirent/libc_a-rewinddir.o `test -f 'libc/src/dirent/rewinddir.cc' || echo '$(srcdir)/'`libc/src/dirent/rewinddir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/rewinddir.cc' object='libc/src/dirent/libc_a-rewinddir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-rewinddir.o `test -f 'libc/src/dirent/rewinddir.cc' || echo '$(srcdir)/'`libc/src/dirent/rewinddir.cc
+
+libc/src/dirent/libc_a-rewinddir.obj: libc/src/dirent/rewinddir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-rewinddir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Tpo -c -o libc/src/dirent/libc_a-rewinddir.obj `if test -f 'libc/src/dirent/rewinddir.cc'; then $(CYGPATH_W) 'libc/src/dirent/rewinddir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/rewinddir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-rewinddir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/rewinddir.cc' object='libc/src/dirent/libc_a-rewinddir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-rewinddir.obj `if test -f 'libc/src/dirent/rewinddir.cc'; then $(CYGPATH_W) 'libc/src/dirent/rewinddir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/rewinddir.cc'; fi`
+
+libc/src/dirent/libc_a-telldir.o: libc/src/dirent/telldir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-telldir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-telldir.Tpo -c -o libc/src/dirent/libc_a-telldir.o `test -f 'libc/src/dirent/telldir.cc' || echo '$(srcdir)/'`libc/src/dirent/telldir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-telldir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-telldir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/telldir.cc' object='libc/src/dirent/libc_a-telldir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-telldir.o `test -f 'libc/src/dirent/telldir.cc' || echo '$(srcdir)/'`libc/src/dirent/telldir.cc
+
+libc/src/dirent/libc_a-telldir.obj: libc/src/dirent/telldir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-telldir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-telldir.Tpo -c -o libc/src/dirent/libc_a-telldir.obj `if test -f 'libc/src/dirent/telldir.cc'; then $(CYGPATH_W) 'libc/src/dirent/telldir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/telldir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-telldir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-telldir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/telldir.cc' object='libc/src/dirent/libc_a-telldir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-telldir.obj `if test -f 'libc/src/dirent/telldir.cc'; then $(CYGPATH_W) 'libc/src/dirent/telldir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/telldir.cc'; fi`
+
+libc/src/dirent/libc_a-dirfd.o: libc/src/dirent/dirfd.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-dirfd.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Tpo -c -o libc/src/dirent/libc_a-dirfd.o `test -f 'libc/src/dirent/dirfd.cc' || echo '$(srcdir)/'`libc/src/dirent/dirfd.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Tpo libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/dirfd.cc' object='libc/src/dirent/libc_a-dirfd.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-dirfd.o `test -f 'libc/src/dirent/dirfd.cc' || echo '$(srcdir)/'`libc/src/dirent/dirfd.cc
+
+libc/src/dirent/libc_a-dirfd.obj: libc/src/dirent/dirfd.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-dirfd.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Tpo -c -o libc/src/dirent/libc_a-dirfd.obj `if test -f 'libc/src/dirent/dirfd.cc'; then $(CYGPATH_W) 'libc/src/dirent/dirfd.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/dirfd.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Tpo libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/dirfd.cc' object='libc/src/dirent/libc_a-dirfd.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-dirfd.obj `if test -f 'libc/src/dirent/dirfd.cc'; then $(CYGPATH_W) 'libc/src/dirent/dirfd.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/dirfd.cc'; fi`
+
+libc/src/dirent/libc_a-readdir_r.o: libc/src/dirent/readdir_r.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-readdir_r.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Tpo -c -o libc/src/dirent/libc_a-readdir_r.o `test -f 'libc/src/dirent/readdir_r.cc' || echo '$(srcdir)/'`libc/src/dirent/readdir_r.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Tpo libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/readdir_r.cc' object='libc/src/dirent/libc_a-readdir_r.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-readdir_r.o `test -f 'libc/src/dirent/readdir_r.cc' || echo '$(srcdir)/'`libc/src/dirent/readdir_r.cc
+
+libc/src/dirent/libc_a-readdir_r.obj: libc/src/dirent/readdir_r.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-readdir_r.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Tpo -c -o libc/src/dirent/libc_a-readdir_r.obj `if test -f 'libc/src/dirent/readdir_r.cc'; then $(CYGPATH_W) 'libc/src/dirent/readdir_r.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/readdir_r.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Tpo libc/src/dirent/$(DEPDIR)/libc_a-readdir_r.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/readdir_r.cc' object='libc/src/dirent/libc_a-readdir_r.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-readdir_r.obj `if test -f 'libc/src/dirent/readdir_r.cc'; then $(CYGPATH_W) 'libc/src/dirent/readdir_r.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/readdir_r.cc'; fi`
+
+libc/src/dirent/libc_a-seekdir.o: libc/src/dirent/seekdir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-seekdir.o -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Tpo -c -o libc/src/dirent/libc_a-seekdir.o `test -f 'libc/src/dirent/seekdir.cc' || echo '$(srcdir)/'`libc/src/dirent/seekdir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/seekdir.cc' object='libc/src/dirent/libc_a-seekdir.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-seekdir.o `test -f 'libc/src/dirent/seekdir.cc' || echo '$(srcdir)/'`libc/src/dirent/seekdir.cc
+
+libc/src/dirent/libc_a-seekdir.obj: libc/src/dirent/seekdir.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/dirent/libc_a-seekdir.obj -MD -MP -MF libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Tpo -c -o libc/src/dirent/libc_a-seekdir.obj `if test -f 'libc/src/dirent/seekdir.cc'; then $(CYGPATH_W) 'libc/src/dirent/seekdir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/seekdir.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Tpo libc/src/dirent/$(DEPDIR)/libc_a-seekdir.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/dirent/seekdir.cc' object='libc/src/dirent/libc_a-seekdir.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/dirent/libc_a-seekdir.obj `if test -f 'libc/src/dirent/seekdir.cc'; then $(CYGPATH_W) 'libc/src/dirent/seekdir.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/dirent/seekdir.cc'; fi`
 
 libc/src/stdlib/libc_a-_Exit.o: libc/src/stdlib/_Exit.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-_Exit.o -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-_Exit.Tpo -c -o libc/src/stdlib/libc_a-_Exit.o `test -f 'libc/src/stdlib/_Exit.cc' || echo '$(srcdir)/'`libc/src/stdlib/_Exit.cc
@@ -11530,6 +11744,20 @@ kernel/syscall/kernel_tracing-sys_process.obj: kernel/syscall/sys_process.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_tracing-sys_process.obj `if test -f 'kernel/syscall/sys_process.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_process.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_process.cc'; fi`
 
+user/bin/ls/ls-ls.o: user/bin/ls/ls.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ls_CXXFLAGS) $(CXXFLAGS) -MT user/bin/ls/ls-ls.o -MD -MP -MF user/bin/ls/$(DEPDIR)/ls-ls.Tpo -c -o user/bin/ls/ls-ls.o `test -f 'user/bin/ls/ls.cc' || echo '$(srcdir)/'`user/bin/ls/ls.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/bin/ls/$(DEPDIR)/ls-ls.Tpo user/bin/ls/$(DEPDIR)/ls-ls.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/bin/ls/ls.cc' object='user/bin/ls/ls-ls.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ls_CXXFLAGS) $(CXXFLAGS) -c -o user/bin/ls/ls-ls.o `test -f 'user/bin/ls/ls.cc' || echo '$(srcdir)/'`user/bin/ls/ls.cc
+
+user/bin/ls/ls-ls.obj: user/bin/ls/ls.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ls_CXXFLAGS) $(CXXFLAGS) -MT user/bin/ls/ls-ls.obj -MD -MP -MF user/bin/ls/$(DEPDIR)/ls-ls.Tpo -c -o user/bin/ls/ls-ls.obj `if test -f 'user/bin/ls/ls.cc'; then $(CYGPATH_W) 'user/bin/ls/ls.cc'; else $(CYGPATH_W) '$(srcdir)/user/bin/ls/ls.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/bin/ls/$(DEPDIR)/ls-ls.Tpo user/bin/ls/$(DEPDIR)/ls-ls.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/bin/ls/ls.cc' object='user/bin/ls/ls-ls.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ls_CXXFLAGS) $(CXXFLAGS) -c -o user/bin/ls/ls-ls.obj `if test -f 'user/bin/ls/ls.cc'; then $(CYGPATH_W) 'user/bin/ls/ls.cc'; else $(CYGPATH_W) '$(srcdir)/user/bin/ls/ls.cc'; fi`
+
 .s.o:
 	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ $<
 
@@ -11854,6 +12082,8 @@ distclean-generic:
 	-rm -f libc/cxx/abi/$(am__dirstamp)
 	-rm -f libc/math/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/math/$(am__dirstamp)
+	-rm -f libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/dirent/$(am__dirstamp)
 	-rm -f libc/src/errno/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/errno/$(am__dirstamp)
 	-rm -f libc/src/fcntl/$(DEPDIR)/$(am__dirstamp)
@@ -11880,6 +12110,8 @@ distclean-generic:
 	-rm -f modules/hello/$(am__dirstamp)
 	-rm -f user/bin/dhcpclient/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/bin/dhcpclient/$(am__dirstamp)
+	-rm -f user/bin/ls/$(DEPDIR)/$(am__dirstamp)
+	-rm -f user/bin/ls/$(am__dirstamp)
 	-rm -f user/test/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/test/$(am__dirstamp)
 
@@ -11894,7 +12126,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -11942,7 +12174,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -12096,11 +12328,6 @@ test: test_compile
 	$(top_builddir)/libc_tests
 
 .PHONY: test_compile test
-
-define user_program =
-endef
-
-$(eval $(call user_program,dhcpclient))
 
 # ----------------------------------------------------------------------------
 # Misc make rules

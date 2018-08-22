@@ -9,390 +9,390 @@ enum struct errno_t : int8_t {
     E2BIG = 1,
 
     /// Permission denied (POSIX.1).
-    EACCES,
+    EACCES = 2,
 
     /// Address already in use (POSIX.1).
-    EADDRINUSE,
+    EADDRINUSE = 3,
 
     /// Address not available (POSIX.1).
-    EADDRNOTAVAIL,
+    EADDRNOTAVAIL = 4,
 
     /// Address family not supported (POSIX.1).
-    EAFNOSUPPORT,
+    EAFNOSUPPORT = 5,
 
     /// Resource temporarily unavailable
     /// (may be the same value as EWOULDBLOCK) (POSIX.1).
-    EAGAIN,
+    EAGAIN = 6,
 
     /// Connection already in progress (POSIX.1).
-    EALREADY,
+    EALREADY = 7,
 
     /// Invalid exchange.
-    EBADE,
+    EBADE = 8,
 
     /// Bad file descriptor (POSIX.1).
-    EBADF,
+    EBADF = 9,
 
     /// File descriptor in bad state.
-    EBADFD,
+    EBADFD = 10,
 
     /// Bad message (POSIX.1).
-    EBADMSG,
+    EBADMSG = 11,
 
     /// Invalid request descriptor.
-    EBADR,
+    EBADR = 12,
 
     /// Invalid request code.
-    EBADRQC,
+    EBADRQC = 13,
 
     /// Invalid slot.
-    EBADSLT,
+    EBADSLT = 14,
 
     /// Device or resource busy (POSIX.1).
-    EBUSY,
+    EBUSY = 15,
 
     /// Operation canceled (POSIX.1).
-    ECANCELED,
+    ECANCELED = 16,
 
     /// No child processes (POSIX.1).
-    ECHILD,
+    ECHILD = 17,
 
     /// Channel number out of range.
-    ECHRNG,
+    ECHRNG = 18,
 
     /// Communication error on send.
-    ECOMM,
+    ECOMM = 19,
 
     /// Connection aborted (POSIX.1).
-    ECONNABORTED,
+    ECONNABORTED = 20,
 
     /// Connection refused (POSIX.1).
-    ECONNREFUSED,
+    ECONNREFUSED = 21,
 
     /// Connection reset (POSIX.1).
-    ECONNRESET,
+    ECONNRESET = 22,
 
     /// Resource deadlock avoided (POSIX.1).
-    EDEADLK,
+    EDEADLK = 23,
 
     /// Synonym for EDEADLK.
     EDEADLOCK = errno_t::EDEADLK,
 
     /// Destination address required (POSIX.1).
-    EDESTADDRREQ,
+    EDESTADDRREQ = 24,
 
     /// Mathematics argument out of domain of function (POSIX.1, C99).
-    EDOM,
+    EDOM = 25,
 
     /// Disk quota exceeded (POSIX.1).
-    EDQUOT,
+    EDQUOT = 26,
 
     /// File exists (POSIX.1).
-    EEXIST,
+    EEXIST = 27,
 
     /// Bad address (POSIX.1).
-    EFAULT,
+    EFAULT = 28,
 
     /// File too large (POSIX.1).
-    EFBIG,
+    EFBIG = 29,
 
     /// Host is down.
-    EHOSTDOWN,
+    EHOSTDOWN = 30,
 
     /// Host is unreachable (POSIX.1).
-    EHOSTUNREACH,
+    EHOSTUNREACH = 31,
 
     /// Identifier removed (POSIX.1).
-    EIDRM,
+    EIDRM = 32,
 
     /// Invalid or incomplete multibyte or wide character (POSIX.1, C99).
-    EILSEQ,
+    EILSEQ = 33,
 
     /// Operation in progress (POSIX.1).
-    EINPROGRESS,
+    EINPROGRESS = 34,
 
     /// Interrupted function call (POSIX.1); see signal(7).
-    EINTR,
+    EINTR = 35,
 
     /// Invalid argument (POSIX.1).
-    EINVAL,
+    EINVAL = 36,
 
     /// Input/output error (POSIX.1).
-    EIO,
+    EIO = 37,
 
     /// Socket is connected (POSIX.1).
-    EISCONN,
+    EISCONN = 38,
 
     /// Is a directory (POSIX.1).
-    EISDIR,
+    EISDIR = 39,
 
     /// Is a named type file.
-    EISNAM,
+    EISNAM = 40,
 
     /// Key has expired.
-    EKEYEXPIRED,
+    EKEYEXPIRED = 41,
 
     /// Key was rejected by service.
-    EKEYREJECTED,
+    EKEYREJECTED = 42,
 
     /// Key has been revoked.
-    EKEYREVOKED,
+    EKEYREVOKED = 43,
 
     /// Level 2 halted.
-    EL2HLT,
+    EL2HLT = 44,
 
     /// Level 2 not synchronized.
-    EL2NSYNC,
+    EL2NSYNC = 45,
 
     /// Level 3 halted.
-    EL3HLT,
+    EL3HLT = 46,
 
     /// Level 3 halted.
-    EL3RST,
+    EL3RST = 47,
 
     /// Cannot access a needed shared library.
-    ELIBACC,
+    ELIBACC = 48,
 
     /// Accessing a corrupted shared library.
-    ELIBBAD,
+    ELIBBAD = 49,
 
     /// Attempting to link in too many shared libraries.
-    ELIBMAX,
+    ELIBMAX = 50,
 
     /// .lib section in a.out corrupted
-    ELIBSCN,
+    ELIBSCN = 51,
 
     /// Cannot exec a shared library directly.
-    ELIBEXEC,
+    ELIBEXEC = 52,
 
     /// Too many levels of symbolic links (POSIX.1).
-    ELOOP,
+    ELOOP = 53,
 
     /// Wrong medium type.
-    EMEDIUMTYPE,
+    EMEDIUMTYPE = 54,
 
     /// Too many open files (POSIX.1).
     /// Commonly caused by exceeding the RLIMIT_NOFILE resource limit
     /// described in getrlimit(2).
-    EMFILE,
+    EMFILE = 55,
 
     /// Too many links (POSIX.1).
-    EMLINK,
+    EMLINK = 56,
 
     /// Message too long (POSIX.1).
-    EMSGSIZE,
+    EMSGSIZE = 57,
 
     /// Multihop attempted (POSIX.1).
-    EMULTIHOP,
+    EMULTIHOP = 58,
 
     /// Filename too long (POSIX.1).
-    ENAMETOOLONG,
+    ENAMETOOLONG = 59,
 
     /// Network is down (POSIX.1).
-    ENETDOWN,
+    ENETDOWN = 60,
 
     /// Connection aborted by network (POSIX.1).
-    ENETRESET,
+    ENETRESET = 61,
 
     /// Network unreachable (POSIX.1).
-    ENETUNREACH,
+    ENETUNREACH = 62,
 
     /// Too many open files in system (POSIX.1).
     /// On Linux, this is probably a result of encountering the
     ///  /proc/sys/fs/file-max limit (see proc(5)).
-    ENFILE,
+    ENFILE = 63,
 
     /// No buffer space available (POSIX.1 (XSI STREAMS option)).
-    ENOBUFS,
+    ENOBUFS = 64,
 
     /// No message is available on the STREAM head read queue (POSIX.1).
-    ENODATA,
+    ENODATA = 65,
 
     /// No such device (POSIX.1).
-    ENODEV,
+    ENODEV = 66,
 
     /// No such file or directory (POSIX.1).
     /// Typically, this error results when a specified,
     /// pathname does not exist, or one of the components in
     /// the directory prefix of a pathname does not exist, or
     /// the specified pathname is a dangling symbolic link.
-    ENOENT,
+    ENOENT = 67,
 
     /// Exec format error (POSIX.1).
-    ENOEXEC,
+    ENOEXEC = 68,
 
     /// Required key not available.
-    ENOKEY,
+    ENOKEY = 69,
 
     /// No locks available (POSIX.1).
-    ENOLCK,
+    ENOLCK = 70,
 
     /// Link has been severed (POSIX.1).
-    ENOLINK,
+    ENOLINK = 71,
 
     /// No medium found.
-    ENOMEDIUM,
+    ENOMEDIUM = 72,
 
     /// Not enough space (POSIX.1).
-    ENOMEM,
+    ENOMEM = 73,
 
     /// No message of the desired type (POSIX.1).
-    ENOMSG,
+    ENOMSG = 74,
 
     /// Machine is not on the network.
-    ENONET,
+    ENONET = 75,
 
     /// Package not installed.
-    ENOPKG,
+    ENOPKG = 76,
 
     /// Protocol not available (POSIX.1).
-    ENOPROTOOPT,
+    ENOPROTOOPT = 77,
 
     /// No space left on device (POSIX.1).
-    ENOSPC,
+    ENOSPC = 78,
 
     /// No STREAM resources (POSIX.1 (XSI STREAMS option)).
-    ENOSR,
+    ENOSR = 79,
 
     /// Not a STREAM (POSIX.1 (XSI STREAMS option)).
-    ENOSTR,
+    ENOSTR = 80,
 
     /// Function not implemented (POSIX.1).
-    ENOSYS,
+    ENOSYS = 81,
 
     /// Block device required.
-    ENOTBLK,
+    ENOTBLK = 82,
 
     /// The socket is not connected (POSIX.1).
-    ENOTCONN,
+    ENOTCONN = 83,
 
     /// Not a directory (POSIX.1).
-    ENOTDIR,
+    ENOTDIR = 84,
 
     /// Directory not empty (POSIX.1).
-    ENOTEMPTY,
+    ENOTEMPTY = 85,
 
     /// Not a socket (POSIX.1).
-    ENOTSOCK,
+    ENOTSOCK = 86,
 
     /// Operation not supported (POSIX.1).
-    ENOTSUP,
+    ENOTSUP = 87,
 
     /// Inappropriate I/O control operation (POSIX.1).
-    ENOTTY,
+    ENOTTY = 88,
 
     /// Name not unique on network.
-    ENOTUNIQ,
+    ENOTUNIQ = 89,
 
     /// No such device or address (POSIX.1).
-    ENXIO,
+    ENXIO = 90,
 
     /// Operation not supported on socket (POSIX.1).
     /// (ENOTSUP and EOPNOTSUPP have the same value on Linux,
     /// but according to POSIX.1 these error values should be
     /// distinct.)
-    EOPNOTSUPP,
+    EOPNOTSUPP = 91,
 
     /// Value too large to be stored in data type (POSIX.1).
-    EOVERFLOW,
+    EOVERFLOW = 92,
 
     /// Operation not permitted (POSIX.1).
-    EPERM,
+    EPERM = 93,
 
     /// Protocol family not supported.
-    EPFNOSUPPORT,
+    EPFNOSUPPORT = 94,
 
     /// Broken pipe (POSIX.1).
-    EPIPE,
+    EPIPE = 95,
 
     /// Protocol error (POSIX.1).
-    EPROTO,
+    EPROTO = 96,
 
     /// Protocol not supported (POSIX.1).
-    EPROTONOSUPPORT,
+    EPROTONOSUPPORT = 97,
 
     /// Protocol wrong type for socket (POSIX.1).
-    EPROTOTYPE,
+    EPROTOTYPE = 98,
 
     /// Result too large (POSIX.1, C99).
-    ERANGE,
+    ERANGE = 99,
 
     /// Remote address changed.
-    EREMCHG,
+    EREMCHG = 100,
 
     /// Object is remote.
-    EREMOTE,
+    EREMOTE = 101,
 
     /// Remote I/O error.
-    EREMOTEIO,
+    EREMOTEIO = 102,
 
     /// Interrupted system call should be restarted.
-    ERESTART,
+    ERESTART = 103,
 
     /// Read-only filesystem (POSIX.1).
-    EROFS,
+    EROFS = 104,
 
     /// Cannot send after transport endpoint shutdown.
-    ESHUTDOWN,
+    ESHUTDOWN = 105,
 
     /// Invalid seek (POSIX.1).
-    ESPIPE,
+    ESPIPE = 106,
 
     /// Socket type not supported.
-    ESOCKTNOSUPPORT,
+    ESOCKTNOSUPPORT = 107,
 
     /// No such process (POSIX.1).
-    ESRCH,
+    ESRCH = 108,
 
     /// Stale file handle (POSIX.1).
     /// This error can occur for NFS and for other
     /// filesystems.
-    ESTALE,
+    ESTALE = 109,
 
     /// Streams pipe error.
-    ESTRPIPE,
+    ESTRPIPE = 110,
 
     /// Timer expired.  (POSIX.1 (XSI STREAMS option))
     /// (POSIX.1 says "STREAM ioctl(2) timeout")
-    ETIME,
+    ETIME = 111,
 
     /// Connection timed out (POSIX.1).
-    ETIMEDOUT,
+    ETIMEDOUT = 112,
 
     /// Text file busy (POSIX.1).
-    ETXTBSY,
+    ETXTBSY = 113,
 
     /// Structure needs cleaning.
-    EUCLEAN,
+    EUCLEAN = 114,
 
     /// Protocol driver not attached.
-    EUNATCH,
+    EUNATCH = 115,
 
     /// Too many users.
-    EUSERS,
+    EUSERS = 116,
 
     /// Operation would block (may be same value as EAGAIN) (POSIX.1).
-    EWOULDBLOCK,
+    EWOULDBLOCK = 117,
 
     /// Improper link (POSIX.1).
-    EXDEV,
+    EXDEV = 118,
 
     /// Exchange full.
-    EXFULL,
+    EXFULL = 119,
 
     // Extensions
 
     // Unable to accept/provide data at the required rate
-    EOVERLOAD,
+    EOVERLOAD = 120,
 
     // Insufficient bandwidth
-    EBANDWIDTH,
+    EBANDWIDTH = 121,
 
     // Stopped
-    ESTOPPED,
+    ESTOPPED = 122,
 
     // Did not receive expected amount of data
-    ESHORT,
+    ESHORT = 123,
 
-    MAX_ERRNO
+    MAX_ERRNO = 124
 };

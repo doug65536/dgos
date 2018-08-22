@@ -1087,6 +1087,16 @@ libc_a_SOURCES = \
 	libc/src/string/memchr.cc \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
+	libc/src/dirent/opendir.cc \
+	libc/src/dirent/closedir.cc \
+	libc/src/dirent/fdopendir.cc \
+	libc/src/dirent/readdir.cc \
+	libc/src/dirent/rewinddir.cc \
+	libc/src/dirent/telldir.cc \
+	libc/src/dirent/dirfd.cc \
+	libc/src/dirent/opendir.cc \
+	libc/src/dirent/readdir_r.cc \
+	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/_Exit.cc \
 	libc/src/stdlib/abs.cc \
 	libc/src/fcntl/creat.cc \
@@ -1302,18 +1312,21 @@ test: test_compile
 
 bin_PROGRAMS += dhcpclient
 
-define user_program =
-bin_PROGRAMS += $(1)
-endef
-
 dhcpclient_SOURCES = \
 	user/bin/dhcpclient/main.cc
 
 dhcpclient_CXXFLAGS = -isystem sysroot/include
 
-EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED)
+EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
 
-$(eval $(call user_program,dhcpclient))
+bin_PROGRAMS += ls
+
+ls_SOURCES = \
+	user/bin/ls/ls.cc
+
+ls_CXXFLAGS = -isystem sysroot/include
+
+EXTRA_ls_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
 
 bin_PROGRAMS += hello.km
 
