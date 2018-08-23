@@ -56,6 +56,8 @@
 - IRQ driven AHCI with native command queueing (NCQ), asynchronous I/O,
   handles up to 32 concurrent commands per port
 - IRQ driven NVME with per-cpu queues and multiple namespace support
+- virtio disk driver
+- virtio-gpu driver
 - FAT32 and ISO9660 filesystems with LFN and Joliet support
   (with full unicode support, including outside the basic multilingual plane)
 - Virtual block storage device abstraction layer
@@ -79,3 +81,5 @@
 - Several stress test implementations
 - Extensive debugging support for QEMU and Bochs
 - QtCreator project files for easy editing and kernel debugging
+- Instrumented call trace generation with ncurses viewer
+- KASAN address space sanitizer
