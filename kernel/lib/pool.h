@@ -1,26 +1,78 @@
 #pragma once
 #include "types.h"
-#include "threadsync.h"
+#include "mutex.h"
 #include "assert.h"
 
-struct pool_t {
+struct pool_base_t {
+public:
+    pool_base_t()
+        : items(nullptr)
+        , item_size(0)
+        , item_capacity(0)
+        , item_count(0)
+        , first_free(0)
+    {
+    }
+    ~pool_base_t();
+
+    bool create(uint32_t item_size, uint32_t capacity);
+    void *item(uint32_t index);
+    void *alloc();
+    void *calloc();
+    void free(uint32_t index);
+
+protected:
+    using lock_type = std::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
+
     char *items;
     uint32_t item_size;
     uint32_t item_capacity;
     uint32_t item_count;
     uint32_t first_free;
-    mutex_t lock;
+    std::mcslock pool_lock;
 };
 
-// Isolate pool items onto separate cache lines
-#define POOL_LOG2_ALIGN     6
-#define POOL_ALIGN          (1U<<POOL_LOG2_ALIGN)
+template<typename T>
+class pool_t : public pool_base_t {
+public:
+    bool create(uint32_t capacity)
+    {
+        return pool_base_t::create(sizeof(T), capacity);
+    }
 
-C_ASSERT(sizeof(pool_t) < POOL_ALIGN);
+    T *item(uint32_t index)
+    {
+        return (T*)pool_base_t::item(index);
+    }
 
-int pool_create(pool_t *pool, uint32_t item_size, uint32_t capacity);
-void pool_destroy(pool_t *pool);
+    template<typename... Args>
+    T *alloc(Args&& ...args)
+    {
+        T *item = (T*)pool_base_t::alloc();
+        if (likely(item))
+            return new (item) T(std::forward<Args>(args)...);
+        return nullptr;
+    }
 
-void *pool_alloc(pool_t *pool);
-void *pool_calloc(pool_t *pool);
-void pool_free(pool_t *pool, void *item);
+    template<typename... Args>
+    T *calloc(Args&& ...args)
+    {
+        T *item = (T*)pool_base_t::calloc();
+        return new (item) T(std::forward<Args>(args)...);
+    }
+
+    T *operator[](uint32_t index)
+    {
+        return (T*)pool_base_t::item(index);
+    }
+
+    template<typename U>
+    void free(U* item)
+    {
+        size_t index = (T*)item - (T*)items;
+        assert(index < item_capacity);
+        item->~U();
+        pool_base_t::free(index);
+    }
+};

@@ -58,6 +58,9 @@ struct fat32_fs_t final : public fs_base_t {
         bool dirty;
     };
 
+    static pool_t<file_handle_t> handles;
+
+    class short_name_cache_t {
     bool mount(fs_init_info_t *conn);
 
     static int mm_fault_handler(void *dev, void *addr,
@@ -166,6 +169,8 @@ struct fat32_fs_t final : public fs_base_t {
     fat32_dir_union_t root_dirent;
 };
 
+pool_t<fat32_fs_t::file_handle_t> fat32_fs_t::handles;
+
 class fat32_factory_t : public fs_factory_t {
 public:
     fat32_factory_t() : fs_factory_t("fat32") {}
@@ -176,8 +181,6 @@ static fat32_factory_t fat32_factory;
 STORAGE_REGISTER_FACTORY(fat32);
 
 static std::vector<fat32_fs_t*> fat32_mounts;
-
-static pool_t fat32_handles;
 
 static constexpr uint8_t dirent_size_shift =
         bit_log2(sizeof(fat32_dir_union_t));
@@ -1044,9 +1047,8 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
         }
     }
 
-    file_handle_t *file = (file_handle_t*)pool_alloc(&fat32_handles);
+    file_handle_t *file = handles.alloc();
 
-    file = new (file) file_handle_t;
 
     file->fs = this;
     file->dirent = &fde->short_entry;
@@ -1243,7 +1245,7 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
 {
     if (fat32_mounts.empty())
-        pool_create(&fat32_handles, sizeof(fat32_fs_t::file_handle_t), 510);
+        fat32_fs_t::handles.create(510);
 
     std::unique_ptr<fat32_fs_t> self(new fat32_fs_t);
     if (self->mount(conn)) {
@@ -1370,11 +1372,7 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
 
 int fat32_fs_t::releasedir(fs_file_info_t *fi)
 {
-    std::shared_lock<std::shared_mutex> lock(rwlock);
-
-    ((file_handle_t*)fi)->~file_handle_t();
-    pool_free(&fat32_handles, fi);
-
+    handles.free((file_handle_t*)fi);
     return 0;
 }
 
@@ -1550,8 +1548,7 @@ int fat32_fs_t::release(fs_file_info_t *fi)
     if (file->dirty)
         status = msync(file->dirent, sizeof(*file->dirent), MS_SYNC);
 
-    file->~file_handle_t();
-    pool_free(&fat32_handles, fi);
+    handles.free(file);
 
     return status;
 }

@@ -38,10 +38,21 @@ struct iso9660_fs_t final : public fs_base_t {
     };
 
     union handle_t {
-        iso9660_fs_t *fs;
         file_handle_t file;
         dir_handle_t dir;
+
+        handle_t(std::true_type)
+            : file()
+        {
+        }
+
+        handle_t(std::false_type)
+            : dir()
+        {
+        }
     };
+
+    static pool_t<handle_t> handles;
 
     struct path_key_t {
         char const *name;
@@ -161,9 +172,8 @@ struct iso9660_fs_t final : public fs_base_t {
     uint8_t block_shift;
 };
 
+pool_t<iso9660_fs_t::handle_t> iso9660_fs_t::handles;
 static std::vector<iso9660_fs_t*> iso9660_mounts;
-
-static pool_t iso9660_handles;
 
 uint64_t iso9660_fs_t::dirent_size(iso9660_dir_ent_t const *de)
 {
@@ -527,7 +537,7 @@ int iso9660_fs_t::mm_fault_handler(void *addr, uint64_t offset, uint64_t length,
 fs_base_t *iso9660_factory_t::mount(fs_init_info_t *conn)
 {
     if (iso9660_mounts.empty())
-        pool_create(&iso9660_handles, sizeof(iso9660_fs_t::handle_t), 512);
+        iso9660_fs_t::handles.create(512);
 
     std::unique_ptr<iso9660_fs_t> self(new iso9660_fs_t);
     if (self->mount(conn)) {
@@ -730,7 +740,7 @@ int iso9660_fs_t::opendir(fs_file_info_t **fi,
     if (!ptrec)
         return -int(errno_t::ENOENT);
 
-    dir_handle_t *dir = (dir_handle_t*)pool_alloc(&iso9660_handles);
+    dir_handle_t *dir = (dir_handle_t*)handles.alloc(std::false_type());
     dir->fs = this;
     dir->dirent = (iso9660_dir_ent_t *)lookup_sector(pt_rec_lba(ptrec));
     dir->content = (char *)dir->dirent;
@@ -773,7 +783,7 @@ ssize_t iso9660_fs_t::readdir(fs_file_info_t *fi,
 
 int iso9660_fs_t::releasedir(fs_file_info_t *fi)
 {
-    pool_free(&iso9660_handles, fi);
+    handles.free(&((handle_t*)fi)->dir);
     return 0;
 }
 
@@ -901,7 +911,7 @@ int iso9660_fs_t::open(fs_file_info_t **fi,
     if (unlikely((flags & O_CREAT) | ((flags & O_RDWR) == O_WRONLY)))
         return -int(errno_t::EROFS);
 
-    file_handle_t *file = (file_handle_t *)pool_alloc(&iso9660_handles);
+    file_handle_t *file = (file_handle_t *)handles.alloc(std::true_type());
     *fi = file;
 
     file->dirent = lookup_dirent(path);
@@ -916,7 +926,7 @@ int iso9660_fs_t::open(fs_file_info_t **fi,
 
 int iso9660_fs_t::release(fs_file_info_t *fi)
 {
-    pool_free(&iso9660_handles, fi);
+    handles.free(&((handle_t*)fi)->file);
     return 0;
 }
 
