@@ -257,14 +257,37 @@ private:
     thread_t tid;
     int index;
 };
+
+void test_read_stress()
+{
+    int dev_cnt = storage_dev_count();
+    std::vector<read_stress_thread_t*> *read_stress_threads =
+            new std::vector<read_stress_thread_t*>();
+    if (!read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD))
+        panic("Out of memory");
+
+    for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
+        for (int devid = 0; devid < dev_cnt; ++devid) {
+            printk("(devid %d, worker %d)"
+                   " Running block read stress\n",
+                     devid, i);
+            read_stress_thread_t *thread = new read_stress_thread_t();
+            if (!read_stress_threads->push_back(thread))
+                panic_oom();
+            uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
+            thread_t tid = thread->start(devid, indicator, i);
+            printk("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
+        }
+    }
+}
 #endif
 
-#if ENABLE_SLEEP_THREAD
 struct test_thread_param_t {
     uint16_t *p;
     int sleep;
 };
 
+#if ENABLE_SLEEP_THREAD
 static int other_thread(void *p)
 {
     test_thread_param_t *tp = (test_thread_param_t *)p;
@@ -278,6 +301,20 @@ static int other_thread(void *p)
                             (1UL << (odd % thread_get_cpu_count())));
     }
     return 0;
+}
+
+void test_sleep()
+{
+    printk("Running sleep stress with %d threads\n",
+             ENABLE_SLEEP_THREAD);
+
+    static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
+
+    for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
+        ttp[i].sleep = i * 100;
+        ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
+        thread_create(other_thread, ttp + i, 0, false);
+    }
 }
 #endif
 
@@ -719,6 +756,47 @@ void test_catch()
     }
 }
 
+void test_filesystem()
+{
+    printk("Starting filesystem test\n");
+    for (int n = 0; n < 2; ++n) {
+        char name[16];
+        snprintf(name, sizeof(name), "created_%d", n);
+        printk("creating %s\n", name);
+        int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+        if (create_test == -int(errno_t::EROFS))
+            continue;
+        assert(create_test >= 0);
+        file_write(create_test, "Hello!", 6);
+        file_close(create_test);
+        printk(" created %s\n\n", name);
+    }
+
+    printk("Opening root directory\n");
+
+    int od = file_opendir("");
+    dirent_t de;
+    dirent_t *dep;
+    while (file_readdir_r(od, &de, &dep) > 0) {
+        printk("File: %s\n", de.d_name);
+    }
+    file_closedir(od);
+}
+
+void test_spawn()
+{
+    printk("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
+    for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
+        pid_t pid = 0;
+        int spawn_result = process_t::spawn(
+                    &pid, "user-shell", nullptr, nullptr);
+        //thread_sleep_for(10000);
+        printk("Started user mode process with PID=%d, status=%d\n",
+                 pid, spawn_result);
+        assert(spawn_result == 0 || pid < 0);
+    }
+}
+
 static int init_thread(void *)
 {
     test_unwind();
@@ -772,16 +850,7 @@ static int init_thread(void *)
     //bootdev_info(0, 0, 0);
 
 #if ENABLE_SPAWN_STRESS > 0
-    printk("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
-    for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
-        pid_t pid = 0;
-        int spawn_result = process_t::spawn(
-                    &pid, "user-shell", nullptr, nullptr);
-        //thread_sleep_for(10000);
-        printk("Started user mode process with PID=%d, status=%d\n",
-                 pid, spawn_result);
-        assert(spawn_result == 0 || pid < 0);
-    }
+    test_spawn();
 #endif
 
     //printk("Initializing framebuffer\n");
@@ -825,29 +894,7 @@ static int init_thread(void *)
 #endif
 
 #if ENABLE_FILESYSTEM_TEST
-    printk("Starting filesystem test\n");
-    for (int n = 0; n < 1000; ++n) {
-        char name[16];
-        snprintf(name, sizeof(name), "created_%d", n);
-        printk("creating %s\n", name);
-        int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-        if (create_test == -int(errno_t::EROFS))
-            continue;
-        assert(create_test >= 0);
-        file_write(create_test, "Hello!", 6);
-        file_close(create_test);
-        printk(" created %s\n\n", name);
-    }
-
-    printk("Opening root directory\n");
-
-    int od = file_opendir("");
-    dirent_t de;
-    dirent_t *dep;
-    while (file_readdir_r(od, &de, &dep) > 0) {
-        printk("File: %s\n", de.d_name);
-    }
-    file_closedir(od);
+    test_filesystem();
 #endif
 
     printk("Running mprotect self test\n");
@@ -892,38 +939,11 @@ static int init_thread(void *)
 #endif
 
 #if ENABLE_SLEEP_THREAD
-    printk("Running sleep stress with %d threads\n",
-             ENABLE_SLEEP_THREAD);
-
-    static test_thread_param_t ttp[ENABLE_SLEEP_THREAD];
-
-    for (int i = 0; i < ENABLE_SLEEP_THREAD; ++i) {
-        ttp[i].sleep = i * 100;
-        ttp[i].p = (uint16_t*)0xb8000 + 4 + i;
-        thread_create(other_thread, ttp + i, 0, false);
-    }
+    test_sleep();
 #endif
 
 #if ENABLE_READ_STRESS_THREAD > 0
-    int dev_cnt = storage_dev_count();
-    std::vector<read_stress_thread_t*> *read_stress_threads =
-            new std::vector<read_stress_thread_t*>();
-    if (!read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD))
-        panic("Out of memory");
-
-    for (int i = 0; i < ENABLE_READ_STRESS_THREAD; ++i) {
-        for (int devid = 0; devid < dev_cnt; ++devid) {
-            printk("(devid %d, worker %d)"
-                   " Running block read stress\n",
-                     devid, i);
-            read_stress_thread_t *thread = new read_stress_thread_t();
-            if (!read_stress_threads->push_back(thread))
-                panic_oom();
-            uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
-            thread_t tid = thread->start(devid, indicator, i);
-            printk("(devid %d) Read stress id[%d]=%d\n", devid, i, tid);
-        }
-    }
+    test_read_stress();
 #endif
 
 #if ENABLE_REGISTER_THREAD > 0
