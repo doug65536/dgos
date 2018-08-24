@@ -274,3 +274,183 @@ int storage_dev_base_t::flush()
         return -int64_t(err);
     return 0;
 }
+
+
+//
+// Modify directories
+
+int fs_base_ro_t::mknod(fs_cpath_t path,
+                         fs_mode_t mode,
+                         fs_dev_t rdev)
+{
+    (void)path;
+    (void)mode;
+    (void)rdev;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::mkdir(fs_cpath_t path,
+                         fs_mode_t mode)
+{
+    (void)path;
+    (void)mode;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::rmdir(fs_cpath_t path)
+{
+    (void)path;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::symlink(
+        fs_cpath_t to,
+        fs_cpath_t from)
+{
+    (void)to;
+    (void)from;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::rename(
+        fs_cpath_t from,
+        fs_cpath_t to)
+{
+    (void)from;
+    (void)to;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::link(
+        fs_cpath_t from,
+        fs_cpath_t to)
+{
+    (void)from;
+    (void)to;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::unlink(
+        fs_cpath_t path)
+{
+    (void)path;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+//
+// Modify directory entries
+
+int fs_base_ro_t::chmod(
+        fs_cpath_t path,
+        fs_mode_t mode)
+{
+    (void)path;
+    (void)mode;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::chown(
+        fs_cpath_t path,
+        fs_uid_t uid,
+        fs_gid_t gid)
+{
+    (void)path;
+    (void)uid;
+    (void)gid;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::truncate(
+        fs_cpath_t path,
+        off_t size)
+{
+    (void)path;
+    (void)size;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::utimens(
+        fs_cpath_t path,
+        const fs_timespec_t *ts)
+{
+    (void)path;
+    (void)ts;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
+                             char const *buf,
+                             size_t size,
+                             off_t offset)
+{
+    (void)buf;
+    (void)size;
+    (void)offset;
+    (void)fi;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
+                             off_t offset)
+{
+    (void)offset;
+    (void)fi;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}
+
+//
+// Sync files and directories and flush buffers
+
+int fs_base_ro_t::fsync(fs_file_info_t *fi,
+                         int isdatasync)
+{
+    (void)isdatasync;
+    (void)fi;
+    // Read only device, do nothing
+    return 0;
+}
+
+int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
+                            int isdatasync)
+{
+    (void)isdatasync;
+    (void)fi;
+    // Ignore, read only
+    return 0;
+}
+
+int fs_base_ro_t::flush(fs_file_info_t *fi)
+{
+    (void)fi;
+    // Do nothing, read only
+    return 0;
+}
+
+int fs_base_ro_t::setxattr(
+        fs_cpath_t path,
+        char const* name,
+        char const* value,
+        size_t size,
+        int flags)
+{
+    (void)path;
+    (void)name;
+    (void)value;
+    (void)size;
+    (void)flags;
+    // Fail, read only
+    return -int(errno_t::EROFS);
+}

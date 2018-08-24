@@ -339,17 +339,7 @@ struct fs_base_t {
                 fs_pollhandle_t* ph, unsigned* reventsp) = 0;
 };
 
-#define FS_BASE_IMPL \
-    void unmount() override final;                                      \
-    bool is_boot() const override final;                                \
-    int opendir(fs_file_info_t **fi, fs_cpath_t path) override final;   \
-    ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  \
-                    off_t offset) override final;                       \
-    int releasedir(fs_file_info_t *fi) override final;                  \
-    int getattr(fs_cpath_t path, fs_stat_t* stbuf) override final;      \
-    int access(fs_cpath_t path, int mask) override final;               \
-    int readlink(fs_cpath_t path, char* buf,                            \
-                 size_t size) override final;                           \
+#define FS_BASE_WR_IMPL \
     int mknod(fs_cpath_t path, fs_mode_t mode,                          \
               fs_dev_t rdev) override final;                            \
     int mkdir(fs_cpath_t path, fs_mode_t mode) override final;          \
@@ -365,8 +355,35 @@ struct fs_base_t {
          fs_gid_t gid) override final;                                  \
     int truncate(fs_cpath_t path,                                       \
             off_t size) override final;                                 \
+    ssize_t write(fs_file_info_t *fi,                                   \
+             char const *buf,                                           \
+             size_t size,                                               \
+             off_t offset) override final;                              \
+    int ftruncate(fs_file_info_t *fi,                                   \
+             off_t offset) override final;                              \
     int utimens(fs_cpath_t path,                                        \
            fs_timespec_t const *ts) override final;                     \
+    int setxattr(fs_cpath_t path,                                       \
+            char const* name, char const* value,                        \
+            size_t size, int flags) override final;                     \
+    int fsync(fs_file_info_t *fi,                                       \
+         int isdatasync) override final;                                \
+    int fsyncdir(fs_file_info_t *fi,                                    \
+            int isdatasync) override final;                             \
+    int flush(fs_file_info_t *fi) override final;                       \
+
+
+#define FS_BASE_IMPL \
+    void unmount() override final;                                      \
+    bool is_boot() const override final;                                \
+    int opendir(fs_file_info_t **fi, fs_cpath_t path) override final;   \
+    ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  \
+                    off_t offset) override final;                       \
+    int releasedir(fs_file_info_t *fi) override final;                  \
+    int getattr(fs_cpath_t path, fs_stat_t* stbuf) override final;      \
+    int access(fs_cpath_t path, int mask) override final;               \
+    int readlink(fs_cpath_t path, char* buf,                            \
+                 size_t size) override final;                           \
     int open(fs_file_info_t **fi,                                       \
         fs_cpath_t path, int flags, mode_t mode) override final;        \
     int release(fs_file_info_t *fi) override final;                     \
@@ -374,27 +391,13 @@ struct fs_base_t {
             char *buf,                                                  \
             size_t size,                                                \
             off_t offset) override final;                               \
-    ssize_t write(fs_file_info_t *fi,                                   \
-             char const *buf,                                           \
-             size_t size,                                               \
-             off_t offset) override final;                              \
-    int ftruncate(fs_file_info_t *fi,                                   \
-             off_t offset) override final;                              \
     int fstat(fs_file_info_t *fi,                                       \
          fs_stat_t *st) override final;                                 \
-    int fsync(fs_file_info_t *fi,                                       \
-         int isdatasync) override final;                                \
-    int fsyncdir(fs_file_info_t *fi,                                    \
-            int isdatasync) override final;                             \
-    int flush(fs_file_info_t *fi) override final;                       \
     int lock(fs_file_info_t *fi,                                        \
         int cmd, fs_flock_t* locks) override final;                     \
     int bmap(fs_cpath_t path, size_t blocksize,                         \
         uint64_t* blockno) override final;                              \
     int statfs(fs_statvfs_t* stbuf) override final;                     \
-    int setxattr(fs_cpath_t path,                                       \
-            char const* name, char const* value,                        \
-            size_t size, int flags) override final;                     \
     int getxattr(fs_cpath_t path,                                       \
             char const* name, char* value,                              \
             size_t size) override final;                                \
@@ -405,6 +408,16 @@ struct fs_base_t {
          unsigned int flags, void* data) override final;                \
     int poll(fs_file_info_t *fi,                                        \
         fs_pollhandle_t* ph, unsigned* reventsp) override final;
+
+#define FS_BASE_RW_IMPL \
+    FS_BASE_IMPL \
+    FS_BASE_WR_IMPL
+
+// Base for read-only filesystems,
+// provides implementation for all methods that write
+class fs_base_ro_t : public fs_base_t {
+    FS_BASE_WR_IMPL
+};
 
 #define FS_DEV_PTR(type, p) type *self = (type*)(p)
 

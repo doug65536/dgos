@@ -20,7 +20,7 @@ public:
 static iso9660_factory_t iso9660_factory;
 STORAGE_REGISTER_FACTORY(iso9660);
 
-struct iso9660_fs_t final : public fs_base_t {
+struct iso9660_fs_t final : public fs_base_ro_t {
     FS_BASE_IMPL
 
     struct file_handle_t : public fs_file_info_t {
@@ -787,121 +787,6 @@ int iso9660_fs_t::releasedir(fs_file_info_t *fi)
     return 0;
 }
 
-
-//
-// Modify directories
-
-int iso9660_fs_t::mknod(fs_cpath_t path,
-                         fs_mode_t mode,
-                         fs_dev_t rdev)
-{
-    (void)path;
-    (void)mode;
-    (void)rdev;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::mkdir(fs_cpath_t path,
-                         fs_mode_t mode)
-{
-    (void)path;
-    (void)mode;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::rmdir(fs_cpath_t path)
-{
-    (void)path;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::symlink(
-        fs_cpath_t to,
-        fs_cpath_t from)
-{
-    (void)to;
-    (void)from;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::rename(
-        fs_cpath_t from,
-        fs_cpath_t to)
-{
-    (void)from;
-    (void)to;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::link(
-        fs_cpath_t from,
-        fs_cpath_t to)
-{
-    (void)from;
-    (void)to;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::unlink(
-        fs_cpath_t path)
-{
-    (void)path;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-//
-// Modify directory entries
-
-int iso9660_fs_t::chmod(
-        fs_cpath_t path,
-        fs_mode_t mode)
-{
-    (void)path;
-    (void)mode;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::chown(
-        fs_cpath_t path,
-        fs_uid_t uid,
-        fs_gid_t gid)
-{
-    (void)path;
-    (void)uid;
-    (void)gid;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::truncate(
-        fs_cpath_t path,
-        off_t size)
-{
-    (void)path;
-    (void)size;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::utimens(
-        fs_cpath_t path,
-        const fs_timespec_t *ts)
-{
-    (void)path;
-    (void)ts;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-
 //
 // Open/close files
 
@@ -960,28 +845,6 @@ ssize_t iso9660_fs_t::read(fs_file_info_t *fi,
     return size;
 }
 
-ssize_t iso9660_fs_t::write(fs_file_info_t *fi,
-                             char const *buf,
-                             size_t size,
-                             off_t offset)
-{
-    (void)buf;
-    (void)size;
-    (void)offset;
-    (void)fi;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-int iso9660_fs_t::ftruncate(fs_file_info_t *fi,
-                             off_t offset)
-{
-    (void)offset;
-    (void)fi;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
 //
 // Query open file
 
@@ -996,34 +859,6 @@ int iso9660_fs_t::fstat(fs_file_info_t *fi,
     // FIXME: fill in more fields
     st->st_size = file_size;
 
-    return 0;
-}
-
-//
-// Sync files and directories and flush buffers
-
-int iso9660_fs_t::fsync(fs_file_info_t *fi,
-                         int isdatasync)
-{
-    (void)isdatasync;
-    (void)fi;
-    // Read only device, do nothing
-    return 0;
-}
-
-int iso9660_fs_t::fsyncdir(fs_file_info_t *fi,
-                            int isdatasync)
-{
-    (void)isdatasync;
-    (void)fi;
-    // Ignore, read only
-    return 0;
-}
-
-int iso9660_fs_t::flush(fs_file_info_t *fi)
-{
-    (void)fi;
-    // Do nothing, read only
     return 0;
 }
 
@@ -1098,22 +933,6 @@ int iso9660_fs_t::bmap(
 
 //
 // Read/Write/Enumerate extended attributes
-
-int iso9660_fs_t::setxattr(
-        fs_cpath_t path,
-        char const* name,
-        char const* value,
-        size_t size,
-        int flags)
-{
-    (void)path;
-    (void)name;
-    (void)value;
-    (void)size;
-    (void)flags;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
 
 int iso9660_fs_t::getxattr(
         fs_cpath_t path,
