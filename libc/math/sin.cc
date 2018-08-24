@@ -7,7 +7,7 @@ static constexpr double PI2 = 6.28318530717958647;
 //               3!    5!         𝑛=0      (2𝑛 + 1)!
 template<typename T>
 constexpr inline __attribute__((__always_inline__))
-T __sininpl(T x)
+T __sinimpl(T x)
 {
     // Argument reduction to bring into -2pi to 2pi range
     while (x > T(PI2))
@@ -53,18 +53,18 @@ extern "C"
 __attribute__((__target_clones__("default,avx")))
 double sin(double x)
 {
-    return __sininpl<double>(x);
+    return __sinimpl<double>(x);
 }
 
 extern "C"
 __attribute__((__target_clones__("default,avx")))
 float sinf(float x)
 {
-    return __sininpl<float>(x);
+    return __sinimpl<float>(x);
 }
 
 extern "C"
 long double sinl(long double x)
 {
-    return __sininpl<long double>(x);
+    return __sinimpl<long double>(x);
 }
