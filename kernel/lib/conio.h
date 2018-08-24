@@ -4,7 +4,7 @@
 
 extern text_dev_base_t *console_display;
 
-int con_exists(void);
+_pure int con_exists(void);
 void con_clear(void);
 int con_cursor_toggle(int show);
 void con_putc(int character);

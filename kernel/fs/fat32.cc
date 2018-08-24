@@ -68,15 +68,18 @@ struct fat32_fs_t final : public fs_base_t {
     int mm_fault_handler(void *addr,
             uint64_t offset, uint64_t length, bool read, bool flush);
 
+    _pure
     void *lookup_sector(uint64_t lba);
 
     uint64_t offsetof_cluster(uint64_t cluster);
 
     void *lookup_cluster(uint64_t cluster);
 
+    _pure
     static cluster_t dirent_start_cluster(fat32_dir_entry_t const *de);
     static void dirent_start_cluster(fat32_dir_entry_t *de, cluster_t cluster);
 
+    _pure
     static uint8_t lfn_checksum(char const *fcb_name);
 
     static void fcbname_from_lfn(full_lfn_t *full, char *fcbname,
@@ -88,8 +91,13 @@ struct fat32_fs_t final : public fs_base_t {
     static size_t name_from_dirents(char *pathname,
                                     full_lfn_t const *full);
 
+    _const
     static bool is_eof(cluster_t cluster);
+
+    _const
     static bool is_free(cluster_t cluster);
+
+    _pure
     static bool is_dirent_free(fat32_dir_union_t const *de);
 
     int32_t extend_fat_chain(cluster_t *clusters,

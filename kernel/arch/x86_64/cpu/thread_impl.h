@@ -12,7 +12,10 @@ isr_context_t *thread_schedule(isr_context_t *ctx);
 isr_context_t *thread_schedule_if_idle(isr_context_t *ctx);
 void thread_init(int ap);
 uint32_t thread_cpus_started(void);
+
+_pure
 uint32_t thread_get_cpu_apic_id(int cpu);
+
 void thread_exit(int exitcode);
 
 // CPU-local storage

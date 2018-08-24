@@ -389,5 +389,5 @@ void mm_set_master_pagedir();
 extern "C"
 bool mm_copy_user(void *dst, void const *src, size_t size);
 
-extern "C"
+extern "C" _const
 bool mm_is_user_range(void *buf, size_t size);

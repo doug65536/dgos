@@ -31,6 +31,7 @@ void apic_config_cpu();
 
 int acpi_have8259pic(void);
 
+_pure
 uint32_t acpi_cpu_count();
 
 extern "C" isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx);

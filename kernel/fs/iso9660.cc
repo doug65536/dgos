@@ -69,6 +69,7 @@ struct iso9660_fs_t final : public fs_base_ro_t {
         dirent_flag_multi_extent = 0x80
     };
 
+    _pure
     static uint64_t dirent_size(iso9660_dir_ent_t const *de);
 
     static uint64_t dirent_lba(iso9660_dir_ent_t const *de);
@@ -120,8 +121,10 @@ struct iso9660_fs_t final : public fs_base_ro_t {
 
     iso9660_pt_rec_t *lookup_path(char const *path, int path_len);
 
+    _pure
     void *lookup_sector(uint64_t lba);
 
+    _pure
     size_t next_dirent(iso9660_dir_ent_t *dir, size_t ofs);
 
     iso9660_dir_ent_t *lookup_dirent(char const *pathname);

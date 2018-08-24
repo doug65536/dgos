@@ -241,6 +241,7 @@ static int physmap_insert_at(int index, physmem_range_t const& entry)
     return index;
 }
 
+_pure
 static int physmap_find_insertion_point(uint64_t base)
 {
     int st = 0;

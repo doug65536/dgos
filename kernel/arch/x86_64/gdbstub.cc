@@ -120,9 +120,13 @@ public:
 
     static void start_stub();
 
+    _pure
     static int get_gdb_cpu();
 
+    _const
     static gdb_signal_idx_t signal_from_intr(int intr);
+
+    _const
     static char const *signal_name(gdb_signal_idx_t sig);
 
     template<typename T>
@@ -476,7 +480,7 @@ private:
                char const *separators, char *sep = nullptr);
     bool parse_memop(uintptr_t& addr, size_t& size, char const *&input);
 
-
+    _pure
     uint8_t calc_checksum(char const *data, size_t size);
 
     rx_state_t handle_packet();
