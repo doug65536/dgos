@@ -59,6 +59,7 @@ static filetab_t *file_new_filetab(void)
 
 static bool file_del_filetab(filetab_t *item)
 {
+    assert(item->refcount != 0);
     if (--item->refcount == 0) {
         item->next_free = file_table_ff;
         file_table_ff = item;
@@ -130,12 +131,14 @@ int file_close(int id)
     if (unlikely(!fh))
         return -int(errno_t::EBADF);
 
+    int status = 0;
+
     if (file_del_filetab(fh)) {
-        fh->fs->release(fh->fi);
+        status = fh->fs->release(fh->fi);
         memset(fh, 0, sizeof(*fh));
     }
 
-    return 0;
+    return status;
 }
 
 ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs)
@@ -296,9 +299,7 @@ int file_opendir(char const *path)
     }
 
     fh->fs = fs;
-    //fh->path = strdup(path);
     fh->pos = 0;
-    //fh->next = 0;
 
     return fh - file_table.data();
 }

@@ -130,7 +130,7 @@ struct fat32_fs_t final : public fs_base_t {
     static void date_encode(uint16_t *date_field, uint16_t *time_field,
                             uint8_t *centisec_field, time_of_day_t tod);
 
-    file_handle_t *create_handle(char const *path, int flags, mode_t mode);
+    file_handle_t *create_handle(char const *path, int flags, mode_t mode, errno_t &err);
 
     ssize_t internal_rw(file_handle_t *file,
             void *buf, size_t size, off_t offset, bool read);
@@ -1017,7 +1017,7 @@ int32_t fat32_fs_t::transact_cluster(
 }
 
 fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
-        char const *path, int flags, mode_t mode)
+        char const *path, int flags, mode_t mode, errno_t& err)
 {
     fat32_dir_union_t *dde;
     fat32_dir_union_t *fde = lookup_dirent(path, &dde);
@@ -1026,29 +1026,38 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
         // Opening existing file
         if (unlikely(!fde)) {
             // File not found
+            err = errno_t::ENOENT;
             return nullptr;
         }
     } else {
         // Creating file
         if (unlikely(!dde)) {
             // Path not found
+            err = errno_t::ENOENT;
             return nullptr;
         }
 
         if ((flags & O_EXCL) && fde) {
             // File already exists
+            err = errno_t::EEXIST;
             return nullptr;
         }
 
         if (!fde) {
             fde = create_dirent(path, dde, mode);
-            if (!fde)
+            if (!fde) {
+                err = errno_t::EIO;
                 return nullptr;
+            }
         }
     }
 
     file_handle_t *file = handles.alloc();
 
+    if (unlikely(!file)) {
+        err = errno_t::EMFILE;
+        return nullptr;
+    }
 
     file->fs = this;
     file->dirent = &fde->short_entry;
@@ -1087,8 +1096,9 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
             file->cached_cluster = dirent_start_cluster(file->dirent);
             file->cached_offset = 0;
             walk_cluster_chain(file, offset, !read);
-            if (file->dirent->is_directory() ||
-                    file->dirent->size > 0 || !read)
+            if (file->cached_cluster &&
+                    (file->dirent->is_directory() ||
+                     file->dirent->size > 0 || !read))
                 cached_end = file->cached_offset + block_size;
         }
 
@@ -1276,10 +1286,18 @@ int fat32_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
     std::shared_lock<std::shared_mutex> lock(rwlock);
 
-    file_handle_t *file = create_handle(path, O_RDONLY | O_DIRECTORY, 0);
+    errno_t err = errno_t::OK;
+
+    file_handle_t *file = create_handle(path, O_RDONLY | O_DIRECTORY, 0, err);
 
     if (!file)
-        return -int(errno_t::ENOENT);
+        return -int(err);
+
+    if (unlikely(!file->dirent->is_directory())) {
+        lock.unlock();
+        release(file);
+        return -int(errno_t::ENOTDIR);
+    }
 
     *fi = file;
 
@@ -1290,7 +1308,9 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
                              dirent_t *buf,
                              off_t offset)
 {
-    std::shared_lock<std::shared_mutex> lock(rwlock);
+    file_handle_t *file = (file_handle_t*)fi;
+    if (unlikely(!file->dirent->is_directory()))
+        return -int(errno_t::ENOTDIR);
 
     full_lfn_t lfn;
     size_t index;
@@ -1300,9 +1320,11 @@ ssize_t fat32_fs_t::readdir(fs_file_info_t *fi,
 
     char expected_fragments = 0;
 
+    std::shared_lock<std::shared_mutex> lock(rwlock);
+
     for (index = 0, distance = 0;
          sizeof(lfn.fragments[index]) == internal_rw(
-             (file_handle_t*)fi, lfn.fragments + index,
+             file, lfn.fragments + index,
              sizeof(lfn.fragments[index]),
              offset + sizeof(lfn.fragments[index]) * index, true);
          ++distance, ++index) {
@@ -1522,16 +1544,18 @@ int fat32_fs_t::open(fs_file_info_t **fi,
 {
     file_handle_t *file;
 
+    errno_t err = errno_t::OK;
+
     if (!(flags & O_CREAT)) {
         std::shared_lock<std::shared_mutex> lock(rwlock);
-        file = create_handle(path, flags, mode);
+        file = create_handle(path, flags, mode, err);
     } else {
         std::unique_lock<std::shared_mutex> lock(rwlock);
-        file = create_handle(path, flags, mode);
+        file = create_handle(path, flags, mode, err);
     }
 
     if (!file)
-        return -int(errno_t::ENOENT);
+        return -int(err);
 
     *fi = file;
 

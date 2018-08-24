@@ -60,6 +60,15 @@ struct iso9660_fs_t final : public fs_base_ro_t {
         size_t parent;
     };
 
+    enum dirent_flags_t : uint8_t {
+        dirent_flag_hide = 0x01,
+        dirent_flag_dir = 0x02,
+        dirent_flag_associated = 0x04,
+        dirent_flag_record_fmt = 0x08,
+        dirent_flag_has_rwx = 0x10,
+        dirent_flag_multi_extent = 0x80
+    };
+
     static uint64_t dirent_size(iso9660_dir_ent_t const *de);
 
     static uint64_t dirent_lba(iso9660_dir_ent_t const *de);
@@ -737,12 +746,22 @@ int iso9660_fs_t::opendir(fs_file_info_t **fi,
 {
     iso9660_pt_rec_t *ptrec = lookup_path(path, -1);
 
-    if (!ptrec)
+    if (unlikely(!ptrec))
         return -int(errno_t::ENOENT);
 
     dir_handle_t *dir = (dir_handle_t*)handles.alloc(std::false_type());
+
+    if (unlikely(!dir))
+        return -int(errno_t::EMFILE);
+
     dir->fs = this;
     dir->dirent = (iso9660_dir_ent_t *)lookup_sector(pt_rec_lba(ptrec));
+
+    if (unlikely(!(dir->dirent->flags & dirent_flag_dir))) {
+        handles.free(dir);
+        return -int(errno_t::ENOTDIR);
+    }
+
     dir->content = (char *)dir->dirent;
     *fi = dir;
 
