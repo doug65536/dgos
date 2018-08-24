@@ -18,6 +18,7 @@ src/dirent/dirfd.cc
 src/dirent/opendir.cc
 src/dirent/readdir_r.cc
 src/dirent/seekdir.cc
+src/dirent/bits/dirent.h
 src/errno/errno.cc
 src/fcntl/creat.cc
 src/fcntl/fcntl.cc

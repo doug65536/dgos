@@ -41,6 +41,4 @@ int readdir_r(DIR *__dirp, struct dirent *__entry, struct dirent **result);
 void seekdir(DIR *__dirp, off_t __ofs);
 off_t telldir(DIR *__dirp);
 
-
-
 __END_DECLS

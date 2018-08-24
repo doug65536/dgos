@@ -6,7 +6,7 @@ typedef uint16_t mode_t;
 
 struct dirent_t {
     ino_t d_ino;
-    char     d_name[256];
+    char d_name[256];
 };
 
 //
