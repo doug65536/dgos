@@ -28,12 +28,14 @@ isr_entry_\int_num\():
     .cfi_startproc
     .cfi_signal_frame
     .if \has_code == 0
-        // 5*8(%rsp) <-- CFA
-        // 4*8(%rsp) ss
-        // 3*8(%rsp) rsp
-        // 2*8(%rsp) rflags
-        // 1*8(%rsp) ss
-        // 0*8(%rsp) rip
+        // CFA
+        // index
+        //  0    5*8(%rsp) <-- CFA
+        // -1    4*8(%rsp) ss
+        // -2    3*8(%rsp) rsp
+        // -3    2*8(%rsp) rflags
+        // -4    1*8(%rsp) ss
+        // -5    0*8(%rsp) rip
         .cfi_def_cfa rsp,5*8
         .cfi_offset ss,-1*8
         .cfi_offset rsp,-2*8
@@ -42,13 +44,15 @@ isr_entry_\int_num\():
         .cfi_offset rip,-5*8
         push_cfi $0
     .else
-        // 6*8(%rsp) <-- CFA
-        // 5*8(%rsp) ss
-        // 4*8(%rsp) rsp
-        // 3*8(%rsp) rflags
-        // 2*8(%rsp) ss
-        // 1*8(%rsp) rip
-        // 0*8(%rsp) error code
+        // CFA
+        // index
+        //  0    6*8(%rsp) <-- CFA
+        // -1    5*8(%rsp) ss
+        // -2    4*8(%rsp) rsp
+        // -3    3*8(%rsp) rflags
+        // -4    2*8(%rsp) ss
+        // -5    1*8(%rsp) rip
+        // -6    0*8(%rsp) error code
         .cfi_def_cfa rsp,6*8
         .cfi_offset ss,-1*8
         .cfi_offset rsp,-2*8
@@ -56,6 +60,7 @@ isr_entry_\int_num\():
         .cfi_offset cs,-4*8
         .cfi_offset rip,-5*8
     .endif
+    // Push the interrupt number below the error code
     push_cfi $\int_num
     jmp isr_common
     .cfi_endproc
@@ -155,14 +160,16 @@ isr_entry 0 INTR_APIC_TIMER
 .align 16
 isr_common:
      // Initial CFA using raw stack pointer
-     // 7*8(%rsp) <-- CFA
-     // 6*8(%rsp) ss
-     // 5*8(%rsp) rsp
-     // 4*8(%rsp) rflags
-     // 3*8(%rsp) ss
-     // 2*8(%rsp) rip
-     // 1*8(%rsp) error code
-     // 0*8(%rsp) interrupt number
+     // CFA
+     // index
+     //  0    7*8(%rsp) <-- CFA
+     // -1    6*8(%rsp) ss
+     // -2    5*8(%rsp) rsp
+     // -3    4*8(%rsp) rflags
+     // -4    3*8(%rsp) ss
+     // -5    2*8(%rsp) rip
+     // -6    1*8(%rsp) error code
+     // -7    0*8(%rsp) interrupt number
 
     .cfi_startproc
     .cfi_signal_frame
