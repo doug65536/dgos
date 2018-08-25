@@ -28,20 +28,33 @@ isr_entry_\int_num\():
     .cfi_startproc
     .cfi_signal_frame
     .if \has_code == 0
-        .cfi_def_cfa rsp,8
-        .cfi_offset ss,3*8
-        .cfi_offset rsp,2*8
-        .cfi_offset rflags,1*8
-        .cfi_offset cs,0*8
-        .cfi_offset rip,-1*8
+        // 5*8(%rsp) <-- CFA
+        // 4*8(%rsp) ss
+        // 3*8(%rsp) rsp
+        // 2*8(%rsp) rflags
+        // 1*8(%rsp) ss
+        // 0*8(%rsp) rip
+        .cfi_def_cfa rsp,5*8
+        .cfi_offset ss,-1*8
+        .cfi_offset rsp,-2*8
+        .cfi_offset rflags,-3*8
+        .cfi_offset cs,-4*8
+        .cfi_offset rip,-5*8
         push_cfi $0
     .else
-        .cfi_def_cfa rsp,16
-        .cfi_offset ss,3*8
-        .cfi_offset rsp,2*8
-        .cfi_offset rflags,1*8
-        .cfi_offset cs,0*8
-        .cfi_offset rip,-1*8
+        // 6*8(%rsp) <-- CFA
+        // 5*8(%rsp) ss
+        // 4*8(%rsp) rsp
+        // 3*8(%rsp) rflags
+        // 2*8(%rsp) ss
+        // 1*8(%rsp) rip
+        // 0*8(%rsp) error code
+        .cfi_def_cfa rsp,6*8
+        .cfi_offset ss,-1*8
+        .cfi_offset rsp,-2*8
+        .cfi_offset rflags,-3*8
+        .cfi_offset cs,-4*8
+        .cfi_offset rip,-5*8
     .endif
     push_cfi $\int_num
     jmp isr_common
@@ -141,91 +154,106 @@ isr_entry 0 INTR_APIC_TIMER
 .type isr_common,@function
 .align 16
 isr_common:
+     // Initial CFA using raw stack pointer
+     // 7*8(%rsp) <-- CFA
+     // 6*8(%rsp) ss
+     // 5*8(%rsp) rsp
+     // 4*8(%rsp) rflags
+     // 3*8(%rsp) ss
+     // 2*8(%rsp) rip
+     // 1*8(%rsp) error code
+     // 0*8(%rsp) interrupt number
+
     .cfi_startproc
     .cfi_signal_frame
-    .cfi_def_cfa rsp,24
-    .cfi_offset ss,3*8
-    .cfi_offset rsp,2*8
-    .cfi_offset rflags,1*8
-    .cfi_offset cs,0*8
-    .cfi_offset rip,-1*8
+    .cfi_def_cfa rsp,7*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+
+    // Use fixed rbp for CFA to save lots of CFA adjustment eh_frame records
 
     // push order: rbp, rbx, r15-r10, rax, r9-8, rcx, rdx, rsi, rdi
     push_cfi %rbp
     .cfi_offset rbp,-4*8
     movq %rsp,%rbp
-    .cfi_def_cfa rbp,4*8
-    .cfi_offset ss,3*8
-    .cfi_offset rsp,2*8
-    .cfi_offset rflags,1*8
-    .cfi_offset cs,0*8
-    .cfi_offset rip,-1*8
+    .cfi_def_cfa rbp,8*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
 
-    //   7*8(%rbp) -> ss            ┐
-    //   6*8(%rbp) -> rsp           │
-    //   5*8(%rbp) -> flags         │
-    //   4*8(%rbp) -> cs  <-- CFA   ├ interrupt frame
-    //   3*8(%rbp) -> rip           │
-    //   2*8(%rbp) -> error code    │
-    //   1*8(%rbp) -> interrupt     ┘
-    //   0*8(%rbp) -> caller's rbp  ┐
-    //  -1*8(%rbp) -> rbx           │
-    //  -2*8(%rbp) -> r15           ├ call preserved
-    //  -3*8(%rbp) -> r14           │
-    //  -4*8(%rbp) -> r13           │
-    //  -5*8(%rbp) -> r12           ┘
-    //  -6*8(%rbp) -> r11           ┐
-    //  -7*8(%rbp) -> r10           │
-    //  -8*8(%rbp) -> rax           │
-    //  -9*8(%rbp) -> r9            │
-    // -10*8(%rbp) -> r8            ├ call clobbered
-    // -11*8(%rbp) -> rcx           │
-    // -12*8(%rbp) -> rdx           │
-    // -13*8(%rbp) -> rsi           │
-    // -14*8(%rbp) -> rdi           ┘
-    // -15*8(%rbp) -> cr3
-    // -16*8(%rbp) -> segments
-    // -17*8(%rbp) -> fpu ctx ptr
-    // -18*8(%rbp) -> cleanup arg
-    // -19*8(%rbp) -> cleanup fn
+    // CFA
+    // index
+    //   0    8*8(%rbp) <-- CFA
+    //  -1    7*8(%rbp) -> ss            ┐
+    //  -2    6*8(%rbp) -> rsp           │
+    //  -3    5*8(%rbp) -> flags         │
+    //  -4    4*8(%rbp) -> cs            ├ interrupt frame
+    //  -5    3*8(%rbp) -> rip           │
+    //  -6    2*8(%rbp) -> error code    │
+    //  -7    1*8(%rbp) -> interrupt     ┘
+    //  -8    0*8(%rbp) -> caller's rbp  ┐
+    //  -9   -1*8(%rbp) -> rbx           │
+    // -10   -2*8(%rbp) -> r15           ├ call preserved
+    // -11   -3*8(%rbp) -> r14           │
+    // -12   -4*8(%rbp) -> r13           │
+    // -13   -5*8(%rbp) -> r12           ┘
+    // -14   -6*8(%rbp) -> r11           ┐
+    // -15   -7*8(%rbp) -> r10           │
+    // -16   -8*8(%rbp) -> rax           │
+    // -17   -9*8(%rbp) -> r9            │
+    // -18  -10*8(%rbp) -> r8            ├ call clobbered
+    // -19  -11*8(%rbp) -> rcx           │
+    // -20  -12*8(%rbp) -> rdx           │
+    // -21  -13*8(%rbp) -> rsi           │
+    // -22  -14*8(%rbp) -> rdi           ┘
+    // -23  -15*8(%rbp) -> cr3
+    // -24  -16*8(%rbp) -> segments
+    // -25  -17*8(%rbp) -> fpu ctx ptr
+    // -26  -18*8(%rbp) -> cleanup arg
+    // -27  -19*8(%rbp) -> cleanup fn
 
     pushq %rbx
-    .cfi_offset rbx,-5*8
+    .cfi_offset rbx,-9*8
 
     pushq %r15
-    .cfi_offset r15,-6*8
+    .cfi_offset r15,-10*8
 
     // r15d=ds, r14d=es, r13d=fs, r12d=gs
     movl %ds,%r15d
 
     pushq %r14
-    .cfi_offset r14,-7*8
+    .cfi_offset r14,-11*8
 
     movl %es,%r14d
 
     pushq %r13
-    .cfi_offset r13,-8*8
+    .cfi_offset r13,-12*8
 
     movl %fs,%r13d
 
     pushq %r12
-    .cfi_offset r12,-9*8
+    .cfi_offset r12,-13*8
 
     movl %gs,%r12d
 
     pushq %r11
-    .cfi_offset r11,-10*8
+    .cfi_offset r11,-14*8
 
     // shift es, fs, gs into position to pack into r13
     shll $16,%r14d
 
     pushq %r10
-    .cfi_offset r10,-11*8
+    .cfi_offset r10,-15*8
 
     shlq $32,%r13
 
     pushq %rax
-    .cfi_offset rax,-12*8
+    .cfi_offset rax,-16*8
 
     shlq $48,%r12
 
@@ -236,31 +264,31 @@ isr_common:
 
     cld
     pushq %r9
-    .cfi_offset r9,-13*8
+    .cfi_offset r9,-17*8
 
     // Merge fs,gs into r13
     orq %r12,%r13
 
     pushq %r8
-    .cfi_offset r8,-14*8
+    .cfi_offset r8,-18*8
 
     // Merge ds|es,fs|gs into r13
     orq %r15,%r13
 
     pushq %rcx
-    .cfi_offset rcx,-15*8
+    .cfi_offset rcx,-19*8
 
     // Get interrupted code segment
     movzwl frame_cs(%rbp),%ecx
 
     pushq %rdx
-    .cfi_offset rdx,-16*8
+    .cfi_offset rdx,-20*8
 
     pushq %rsi
-    .cfi_offset rsi,-17*8
+    .cfi_offset rsi,-21*8
 
     pushq %rdi
-    .cfi_offset rdi,-18*8
+    .cfi_offset rdi,-22*8
 
     // Assume null FPU context pointer
     xorl %edi,%edi
@@ -446,12 +474,14 @@ isr_common:
     .cfi_restore rbx
 
     popq %rbp
-    .cfi_def_cfa rsp,24
-    .cfi_offset ss,3*8
-    .cfi_offset rsp,2*8
-    .cfi_offset rflags,1*8
-    .cfi_offset cs,0*8
-    .cfi_offset rip,-1*8
+
+    // rbp has been restored, back to raw rsp-relative CFA
+    .cfi_def_cfa rsp,7*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
 
     add_rsp 16
 
@@ -477,8 +507,6 @@ isr_common:
 // Returns rdi=pointer to context
 .macro xsave_ctx insn
     .cfi_startproc
-    .cfi_def_cfa_register rsp
-    .cfi_def_cfa_offset 8
 
     // Set all bits of edx:eax
     movl $-1,%eax
@@ -502,8 +530,6 @@ isr_common:
 // Clobbers eax,edx,ecx
 .macro xrstor_ctx insn
     .cfi_startproc
-    .cfi_def_cfa_register rsp
-    .cfi_def_cfa_offset 8
 
     // Set all bits of edx:eax
     movl $-1,%eax
@@ -646,8 +672,23 @@ isr_sysret64:
     .cfi_startproc
     .cfi_def_cfa_offset 8
 
+    push_cfi %rbx
+    .cfi_offset rbx,-2*8
+
     push_cfi %rbp
-    movq %rsp,%rbp
+    .cfi_offset rbp,-3*8
+
+    push_cfi %r12
+    .cfi_offset r12,-4*8
+
+    push_cfi %r13
+    .cfi_offset r13,-5*8
+
+    push_cfi %r14
+    .cfi_offset r14,-6*8
+
+    push_cfi %r15
+    .cfi_offset r15,-7*8
 
     mov %rdi,%rcx
     mov $ CPU_EFLAGS_IF | 2,%r11d
@@ -680,6 +721,14 @@ isr_sysret64:
     cli
     swapgs
     mov %rsi,%rsp
+    .cfi_undefined rip
+    .cfi_undefined rsp
+    .cfi_undefined rbx
+    .cfi_undefined rbp
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
     sysretq
 
     .cfi_endproc
