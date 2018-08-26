@@ -184,7 +184,7 @@ isr_common:
 
     // push order: rbp, rbx, r15-r10, rax, r9-8, rcx, rdx, rsi, rdi
     push_cfi %rbp
-    .cfi_offset rbp,-4*8
+    .cfi_offset rbp,-8*8
     movq %rsp,%rbp
     .cfi_def_cfa rbp,8*8
     .cfi_offset ss,-1*8
@@ -192,6 +192,8 @@ isr_common:
     .cfi_offset rflags,-3*8
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
+
+    .cfi_offset rbp,-8*8
 
     // CFA
     // index
