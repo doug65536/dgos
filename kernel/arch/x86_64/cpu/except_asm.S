@@ -6,7 +6,6 @@
 .hidden __exception_setjmp
 __exception_setjmp:
     .cfi_startproc
-    .cfi_def_cfa_offset 8
 
     // Save call preserved registers
     movq %rbx,2*8(%rdi)
@@ -40,7 +39,6 @@ __exception_setjmp:
 .hidden __exception_longjmp
 __exception_longjmp:
     .cfi_startproc
-    .cfi_def_cfa_offset 8
 
     // Restore call preserved registers
     movq 2*8(%rdi),%rbx
@@ -69,7 +67,6 @@ __exception_longjmp:
 .global __exception_longjmp_unwind
 __exception_longjmp_unwind:
     .cfi_startproc
-    .cfi_def_cfa_offset 8
 
     push_cfi %rbx
     .cfi_offset rbx,-16
