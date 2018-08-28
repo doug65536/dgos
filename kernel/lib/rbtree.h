@@ -1058,5 +1058,44 @@ int rbtree_t<_Tkey,_Tval>::test(void)
             _RBTREE_TRACE("---\n");
         }
     }
+
+    for (size_t pass = 0; pass < 2; ++pass) {
+        rbtree_t tree;
+
+        tree.init(&rbtree_t::test_cmp, nullptr);
+
+        int chk_div = 12345;
+
+        // Rotation stress
+        for (unsigned i = 0; i < 65536 + 1024; ++i) {
+            if (i < 65536)
+                tree.insert(i, i + 42);
+            if (i >= 1024)
+                tree.delete_item(i - 1024, i - 1024 + 42);
+
+            if (i != 65535 && --chk_div)
+                continue;
+
+            chk_div = 12345;
+
+            unsigned k = 0;
+            if (i >= 1024)
+                k = i - 1024 + 1;
+            for ( ; k <= i; ++k) {
+                if (k >= 65536)
+                    break;
+                rbtree_t::iter_t it;
+                rbtree_t::kvp_t needle{k, k + 42};
+                rbtree_t::kvp_t *item = tree.find(&needle, &it);
+                assert(item->key == k);
+                assert(item->val == k + 42);
+                rbtree_t::kvp_t& it_chk = tree.item(it);
+                assert(it_chk.key == k);
+                assert(it_chk.val == k + 42);
+            }
+        }
+        assert(tree.size() == 0);
+    }
+
     return 0;
 }
