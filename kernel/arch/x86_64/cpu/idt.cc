@@ -238,13 +238,22 @@ static void idtr_load(table_register_64_t *table_reg)
 }
 #endif
 
+struct load_fsgsbase_range_t {
+    void *target;
+    uint32_t *patch_points[2];
+};
+extern "C" load_fsgsbase_range_t load_fsgsbase_range;
+
 void idt_xsave_detect(int ap)
 {
-    (void)ap;
-
     cpu_scoped_irq_disable intr_was_enabled;
 
-    cpu_has_fsgsbase = cpuid_has_fsgsbase();
+    // Patch FS/GS loading code if CPU supports wrfsbase/wrgsbase
+
+    if (!ap && cpuid_has_fsgsbase())
+        cpu_patch_calls(load_fsgsbase_range.target,
+                        countof(load_fsgsbase_range.patch_points),
+                        load_fsgsbase_range.patch_points);
 
     while (cpuid_has_xsave()) {
         cpuid_t info;

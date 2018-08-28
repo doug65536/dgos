@@ -413,6 +413,8 @@ isr_common:
     // Pop segments
     popq %rdx
 
+    movq %gs:CPU_INFO_CURTHREAD_OFS,%r15
+
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
     cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
@@ -421,9 +423,9 @@ isr_common:
     // ...returning to user code
 
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
-    movq %gs:CPU_INFO_TSS_PTR_OFS,%rbx
+    movq %gs:CPU_INFO_TSS_PTR_OFS,%rcx
     leaq frame_end(%rbp),%rax
-    movq %rax,TSS_RSP0_OFS(%rbx)
+    movq %rax,TSS_RSP0_OFS(%rcx)
 
     // Restore user gs
     swapgs
@@ -432,10 +434,21 @@ isr_common:
     cmpq %r13,%rdx
     jnz .Lsegments_changed
 
+.Lsegments_restored:
+    movq THREAD_FSBASE_OFS(%r15),%r13
+    movq THREAD_GSBASE_OFS(%r15),%r14
+
+    // Load fsbase and gsbase
+    // NOTE: this may be patched to call
+    // .Lload_fs_gs_fast (to use wr(fs|gs)base)
+    // rax, rcx, rdx may be clobbered here
+    call .Lload_fs_gs_slow
+.Lpatch_fsgsbase_csw_end:
+
+.Lreturning_to_kernel:
+
     .cfi_remember_state
 
-.Lsegments_restored:
-.Lreturning_to_kernel:
     // Restore CR3
     popq %rax
     movq %rax,%cr3
@@ -498,18 +511,54 @@ isr_common:
 
 .align 16
 .Lsegments_changed:
-   .cfi_restore_state
-   // Restore segments
-   movw %dx,%ds
-   shrq $16,%rdx
-   movw %dx,%es
-   shrq $16,%rdx
-   movw %dx,%fs
-   shrl $16,%edx
-   movw %dx,%gs
-   jmp .Lsegments_restored
+    .cfi_restore_state
+    // Restore segments
+    movw %dx,%ds
+    shrq $16,%rdx
+    movw %dx,%es
+    shrq $16,%rdx
+    movw %dx,%fs
+    shrl $16,%edx
+    movw %dx,%gs
+    jmp .Lsegments_restored
 
-   .cfi_endproc
+    .cfi_endproc
+
+// Quickly load FS/GS base
+// Expects r13=user_fsbase, r14=user_gsbase
+.align 16
+.Lload_fs_gs_fast:
+    .cfi_startproc
+
+    wrfsbase %r13
+    wrgsbase %r14
+    ret
+
+    .cfi_endproc
+
+// Slow load FS/GS base for processors that don't support wrfsbase/wrgsbase
+// Reaches here with r13=user_fsbase, r14=user_gsbase
+.align 16
+.Lload_fs_gs_slow:
+    .cfi_startproc
+
+    movl $ CPU_MSR_FSBASE,%ecx
+    movq %r13,%rdx
+    movl %r13d,%eax
+    shrq $32,%rdx
+    wrmsr
+    movl $ CPU_MSR_GSBASE,%ecx
+    movq %r14,%rdx
+    movl %r14d,%eax
+    shrq $32,%rdx
+    wrmsr
+    // Clear registers for sysret scenario
+    xor %eax,%eax
+    mov %eax,%edx
+    mov %eax,%ecx
+    ret
+
+    .cfi_endproc
 
 // Pass thread_info_t pointer in rdi
 // Clobbers rsi,rdx,rax
@@ -679,7 +728,6 @@ exception_isr_handler:
 .global isr_sysret64
 isr_sysret64:
     .cfi_startproc
-    .cfi_def_cfa_offset 8
 
     push_cfi %rbx
     .cfi_offset rbx,-2*8
@@ -703,10 +751,25 @@ isr_sysret64:
     mov $ CPU_EFLAGS_IF | 2,%r11d
 
     // Initialize kernel stack pointer for this thread
+    // cpu_info_t *rbx = this_cpu()
     movq %gs:CPU_INFO_SELF_OFS,%rbx
+
+    // tss_t *rdx = rbx->tss_ptr
     movq CPU_INFO_TSS_PTR_OFS(%rbx),%rdx
+
+    // thread_info_t *rbx = rbx->cur_thread
     movq CPU_INFO_CURTHREAD_OFS(%rbx),%rbx
+
+    // void *fs_base = rbx->fsbase
+    movq THREAD_FSBASE_OFS(%rbx),%r13
+
+    // void *gs_base = rbx->gsbase
+    movq THREAD_GSBASE_OFS(%rbx),%r14
+
+    // void *rbx = rbx->stack
     movq THREAD_STACK_OFS(%rbx),%rbx
+
+    // rdx->rsp0 = rbx
     movq %rbx,TSS_RSP0_OFS(%rdx)
 
     // Avoid leaking any register values to user code
@@ -722,13 +785,15 @@ isr_sysret64:
     // not r11
     mov %eax,%r12d
     mov %eax,%r13d
-    mov %eax,%r14d
-    mov %eax,%r15d
+    // not r14
+    // not r15
 
     // Prevent IRQ while swapped to user gs or using user stack
     // in kernel mode
     cli
     swapgs
+    call .Lload_fs_gs_slow
+.Lpatch_fsgsbase_sysret_end:
     mov %rsi,%rsp
     .cfi_undefined rip
     .cfi_undefined rsp
@@ -755,3 +820,12 @@ sse_context_save:
 .global sse_context_restore
 sse_context_restore:
     .quad .Lsse_context_restore_jmp
+
+.hidden load_fsgsbase_range
+.global load_fsgsbase_range
+load_fsgsbase_range:
+    // Implementations
+    .quad .Lload_fs_gs_fast
+    // Patch points
+    .quad .Lpatch_fsgsbase_csw_end
+    .quad .Lpatch_fsgsbase_sysret_end
