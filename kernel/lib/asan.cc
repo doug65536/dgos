@@ -11,13 +11,16 @@
 
 using vaddr_t = uintptr_t;
 
+//#define _asan_optimize _always_optimize
+#define _asan_optimize
+
 // Page pool for very early accesses
 static uint8_t asan_pool[4096*1024];
 static size_t asan_alloc_ptr;
 
 bool asan_ready;
 
-_no_asan _always_optimize
+_no_asan _asan_optimize
 static void *asan_alloc_page()
 {
     if (likely(asan_alloc_ptr < countof(asan_pool))) {
@@ -32,7 +35,7 @@ static void *asan_alloc_page()
 // Compactly represent up to 128TB sparse array
 class radix_tree_t {
 public:
-    _no_asan _always_optimize
+    _no_asan _asan_optimize
     void *lookup(uint64_t addr, bool commit_pages)
     {
         unsigned misalignment = addr & PAGE_MASK;
@@ -94,7 +97,7 @@ public:
         return (char*)level3 + misalignment;
     }
 
-    _no_asan _always_optimize
+    _no_asan _asan_optimize
     void fill(uint64_t start, uint8_t value, uint64_t len)
     {
         while (len) {
@@ -114,7 +117,7 @@ public:
         }
     }
 
-    _no_asan _always_optimize
+    _no_asan _asan_optimize
     bool is_filled_with(uint64_t start, uint8_t value, uint64_t len)
     {
         while (len) {
@@ -141,7 +144,7 @@ public:
 
 private:
     template<typename T>
-    _no_asan _always_optimize
+    _no_asan _asan_optimize
     void *commit(T &p) {
         p = (T)asan_alloc_page();
         return p;
@@ -171,7 +174,7 @@ static void asan_error(vaddr_t addr, size_t size)
     assert(!"ASAN error");
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_load1_noabort(vaddr_t addr)
 {
     addr &= 0xFFFFFFFFFFFF;
@@ -181,7 +184,7 @@ void __asan_load1_noabort(vaddr_t addr)
         asan_error(addr, 1);
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_load2_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
@@ -196,7 +199,7 @@ void __asan_load2_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_load4_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
@@ -213,7 +216,7 @@ void __asan_load4_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_load8_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
@@ -228,7 +231,7 @@ void __asan_load8_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_load16_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFD)) {
@@ -243,7 +246,7 @@ void __asan_load16_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_loadN_noabort(vaddr_t addr, size_t size)
 {
     addr &= 0xFFFFFFFFFFFF;
@@ -276,7 +279,7 @@ void __asan_loadN_noabort(vaddr_t addr, size_t size)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_store1_noabort(vaddr_t addr)
 {
     addr &= 0xFFFFFFFFFFFF;
@@ -285,7 +288,7 @@ void __asan_store1_noabort(vaddr_t addr)
     *byte |= mask;
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_store2_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
@@ -299,7 +302,7 @@ void __asan_store2_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_store4_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
@@ -315,7 +318,7 @@ void __asan_store4_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_store8_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFF)) {
@@ -329,7 +332,7 @@ void __asan_store8_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_store16_noabort(vaddr_t addr)
 {
     if (likely(((addr >> 3) & 0xFFF) < 0xFFD)) {
@@ -343,7 +346,7 @@ void __asan_store16_noabort(vaddr_t addr)
     }
 }
 
-extern "C" _no_asan _always_optimize
+extern "C" _no_asan _asan_optimize
 void __asan_storeN_noabort(vaddr_t addr, size_t size)
 {
     addr &= 0xFFFFFFFFFFFF;
@@ -392,5 +395,47 @@ void __asan_after_dynamic_init()
 extern "C" _no_asan
 void __asan_handle_no_return()
 {
+}
+
+extern "C" _no_asan _asan_optimize
+void __asan_free1_noabort(vaddr_t addr)
+{
+    addr &= 0xFFFFFFFFFFFF;
+    uint8_t *byte = (uint8_t*)asan_shadow.lookup(addr >> 3, true);
+    uint8_t mask = 1 << (addr & 7);
+    *byte &= ~mask;
+}
+
+void __asan_freeN_noabort(void const *m, size_t size)
+{
+    vaddr_t addr = vaddr_t(m);
+
+    addr &= 0xFFFFFFFFFFFF;
+
+    // Get start aligned on an 8 byte boundary
+    while ((addr & 7) && size) {
+        __asan_free1_noabort(addr);
+        ++addr;
+        --size;
+    }
+
+    if (!size)
+        return;
+
+    uint64_t start_fill = addr >> 3;
+    uint64_t end_fill = (addr + size) >> 3;
+    uint64_t len_fill = end_fill - start_fill;
+
+    asan_shadow.fill(start_fill, 0, len_fill);
+
+    start_fill += len_fill;
+    addr += len_fill << 3;
+    size -= len_fill << 3;
+
+    while (size) {
+        __asan_free1_noabort(addr);
+        ++addr;
+        --size;
+    }
 }
 #endif
