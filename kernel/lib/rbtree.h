@@ -10,7 +10,7 @@ private:
     struct __node_t;
 
     template<typename _U>
-    static int default_cmp(_U const& __lhs, _U const& __rhs)
+    static int default_cmp(_U const& __lhs, _U const& __rhs, void*)
     {
         if (__lhs.key < __rhs.key)
             return -1;
@@ -40,6 +40,8 @@ public:
 
     rbtree_t();
     ~rbtree_t();
+
+    rbtree_t &init();
 
     rbtree_t &init(cmp_t __cmp, void *__p);
 
@@ -506,6 +508,13 @@ template<typename _Tkey, typename _Tval>
 rbtree_t<_Tkey,_Tval>::operator bool() const
 {
     return __nodes != nullptr;
+}
+
+template<typename _Tkey, typename _Tval>
+rbtree_t<_Tkey,_Tval> &
+rbtree_t<_Tkey,_Tval>::init()
+{
+    return init(default_cmp<_Tkey>, nullptr);
 }
 
 template<typename _Tkey, typename _Tval>
