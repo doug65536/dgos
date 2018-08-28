@@ -26,6 +26,7 @@
 #include "inttypes.h"
 #include "except.h"
 #include "contig_alloc.h"
+#include "asan.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
@@ -2198,6 +2199,8 @@ void *mremap(
 
 int munmap(void *addr, size_t size)
 {
+    __asan_freeN_noabort(addr, size);
+
     linaddr_t a = (linaddr_t)addr;
 
     uintptr_t misalignment = a & PAGE_MASK;

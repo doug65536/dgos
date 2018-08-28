@@ -3,6 +3,7 @@
 #include "assert.h"
 #include "string.h"
 #include "bitsearch.h"
+#include "asan.h"
 
 #ifdef __DGOS_KERNEL__
 #include "mm.h"
@@ -311,6 +312,7 @@ void heap_free(heap_t *heap, void *block)
     } else {
         heap_large_free(hdr, hdr->size_next);
     }
+    __asan_freeN_noabort(hdr, hdr->size_next);
 }
 
 void *heap_realloc(heap_t *heap, void *block, size_t size)
@@ -420,6 +422,7 @@ void pageheap_free(void *block)
     uintptr_t end = uintptr_t(hdr) + hdr->size_next;
     uintptr_t st = (uintptr_t(hdr) & -PAGESIZE);
     mprotect((void*)st, end - st, PROT_NONE);
+    __asan_freeN_noabort(hdr, hdr->size_next);
 }
 
 _assume_aligned(16)
@@ -434,5 +437,7 @@ void *pageheap_realloc(void *block, size_t size)
 
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
     char *other = (char*)pageheap_alloc(size);
-    return memcpy(other, block, hdr->size_next - sizeof(heap_hdr_t));
+    memcpy(other, block, hdr->size_next - sizeof(heap_hdr_t));
+    __asan_freeN_noabort(hdr, hdr->size_next);
+    return block;
 }
