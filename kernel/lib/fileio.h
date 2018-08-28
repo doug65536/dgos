@@ -42,15 +42,32 @@ public:
     {
     }
 
-    file_t(int fd)
+    explicit file_t(int fd)
         : fd(fd)
     {
     }
 
+    file_t(file_t&& rhs)
+        : fd(rhs.fd)
+    {
+        rhs.fd = -1;
+    }
+
+    file_t(file_t const&) = delete;
+    file_t& operator=(file_t const&) = delete;
+
+    file_t& operator=(file_t rhs)
+    {
+        if (fd != rhs.fd)
+            close();
+        fd = rhs.fd;
+        rhs.fd = -1;
+        return *this;
+    }
+
     ~file_t()
     {
-        if (fd >= 0)
-            file_close(fd);
+        close();
     }
 
     int release()
@@ -85,6 +102,11 @@ public:
     bool is_open() const
     {
         return fd >= 0;
+    }
+
+    operator bool() const
+    {
+        return is_open();
     }
 
 private:
