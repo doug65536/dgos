@@ -58,6 +58,8 @@ public:
 
     static void init(int cpu_count);
 
+    static void slih_startup(void *);
+
 protected:
     static void free_item(workq_work *item);
 

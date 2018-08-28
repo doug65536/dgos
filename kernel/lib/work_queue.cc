@@ -3,6 +3,8 @@
 #include "vector.h"
 #include "mutex.h"
 #include "heap.h"
+#include "callout.h"
+#include "cpu/thread_impl.h"
 
 workq_impl* workq::percpu;
 
@@ -41,3 +43,12 @@ workq_work *workq::allocate(workq_impl *queue, size_t size)
     workq_work *item = (workq_work *)heap_alloc(queue->heap, size);
     return item;
 }
+
+void workq::slih_startup(void*)
+{
+    printk("Initializing kernel threadpool\n");
+    init(thread_cpu_count());
+}
+
+REGISTER_CALLOUT(workq::slih_startup, nullptr,
+                 callout_type_t::smp_online, "900");
