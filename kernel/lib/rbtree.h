@@ -63,6 +63,7 @@ public:
     iter_t insert(_Tkey __key, _Tval __val);
 
     kvp_t *find(kvp_t *__kvp, iter_t *__iter);
+    kvp_t *find(kvp_t *__kvp, iter_t *__iter) const;
 
     _pure iter_t first(iter_t __start);
     _pure iter_t next(iter_t __n);
@@ -708,6 +709,14 @@ rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter)
         *__iter = 0;
 
     return cmp_result ? nullptr : &_NODE(n)->__kvp;
+}
+
+
+template<typename _Tkey, typename _Tval>
+typename rbtree_t<_Tkey,_Tval>::kvp_t *
+rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter) const
+{
+    return const_cast<rbtree_t<_Tkey,_Tval>*>(this)->find(__kvp, __iter);
 }
 
 //
