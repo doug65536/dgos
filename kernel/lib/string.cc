@@ -165,14 +165,14 @@ static void memset64(char *&d, uint64_t s, size_t n)
     );
 }
 
-static void memset_byte(char *&d, uint64_t s, uint32_t &ofs)
+static void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
 {
     __asm__ __volatile__ (
-        "mov %%al,(%%rdi,%%rdx)\n\t"
+        "movb %b[s],(%[d],%[ofs])\n\t"
         "add $1,%%rdx\n\t"
-        : "+D" (d)
-        , "+d" (ofs)
-        : "a" (s)
+        : [d] "+D" (d)
+        , [ofs] "+d" (ofs)
+        : [s] "a" (s)
         : "memory"
     );
 }
@@ -183,7 +183,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
     uint64_t s = 0x0101010101010101U * (c & 0xFFU);
 
     if (likely(n >= 7) && unlikely(uintptr_t(d) & 7)) {
-        uint32_t ofs = 0;
+        ptrdiff_t ofs = 0;
         switch (uintptr_t(d) & 7) {
         case 1: memset_byte(d, s, ofs); // fall thru
         case 2: memset_byte(d, s, ofs); // fall thru
@@ -205,7 +205,7 @@ EXPORT void *memset(void *dest, int c, size_t n)
     memset64(d, s, quads);
 
     if (unlikely(n &= 7)) {
-        uint32_t ofs = 0;
+        ptrdiff_t ofs = 0;
         switch (n) {
         case 7: memset_byte(d, s, ofs); // fall thru
         case 6: memset_byte(d, s, ofs); // fall thru
