@@ -15,6 +15,7 @@
 #include "cpu/control_regs.h"
 #include "unique_ptr.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #define AHCI_DEBUG  1
 #if AHCI_DEBUG
@@ -882,6 +883,7 @@ private:
     void slot_release(unsigned port_num, int slot);
     void handle_port_irqs(unsigned port_num);
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
+    void irq_handler(int irq_ofs);
     void port_stop(unsigned port_num);
     void port_start(unsigned port_num);
     void port_stop_all();
@@ -1118,26 +1120,32 @@ isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
     for (unsigned i = 0; i < ahci_devices.size(); ++i) {
         ahci_if_t *dev = ahci_devices[i];
 
-        int irq_offset = irq - dev->irq_range.base;
+        int irq_ofs = irq - dev->irq_range.base;
 
-        if (unlikely(irq_offset < 0 || irq_offset > dev->irq_range.count))
-            continue;
-
-        // Call callback on every port that has an interrupt pending
-        unsigned port;
-        for (uint32_t intr_status = dev->mmio_base->intr_status;
-             intr_status != 0; intr_status &= ~(1U << port)) {
-            // Look through each port
-            port = bit_lsb_set(intr_status);
-
-            dev->handle_port_irqs(port);
-
-            // Acknowledge the interrupt on the port
-            dev->mmio_base->intr_status = (1U << port);
+        if (unlikely(irq_ofs >= 0 && irq_ofs < dev->irq_range.count)) {
+            workq::enqueue([=] {
+                dev->irq_handler(irq_ofs);
+            });
         }
     }
 
     return ctx;
+}
+
+void ahci_if_t::irq_handler(int irq_ofs)
+{
+    // Call callback on every port that has an interrupt pending
+    unsigned port;
+    for (uint32_t intr_status = mmio_base->intr_status;
+         intr_status != 0; intr_status &= ~(1U << port)) {
+        // Look through each port
+        port = bit_lsb_set(intr_status);
+
+        handle_port_irqs(port);
+
+        // Acknowledge the interrupt on the port
+        mmio_base->intr_status = (1U << port);
+    }
 }
 
 void ahci_if_t::port_stop(unsigned port_num)
@@ -1147,8 +1155,6 @@ void ahci_if_t::port_stop(unsigned port_num)
     // Clear start bit
     // Clear FIS receive enable bit
     port->cmd &= ~(AHCI_HP_CMD_ST | AHCI_HP_CMD_FRE);
-
-    atomic_barrier();
 
     // Wait until there is not a command running,
     // and there is not a FIS receive running
