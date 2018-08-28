@@ -138,7 +138,7 @@ void workq::enqueue(T&& functor)
 {
     int current_cpu = thread_cpu_number();
     workq_impl *queue = percpu + current_cpu;
-    void *mem = workq::allocate(queue, sizeof(T));
+    void *mem = workq::allocate(queue, sizeof(workq_wrapper<T>));
     workq_wrapper<T> *item = new (mem) workq_wrapper<T>(
                 std::forward<T>(functor));
     item->owner = queue;
