@@ -15,6 +15,8 @@ public:
     {
     }
 
+    virtual ~workq_work() {}
+
     virtual void invoke() = 0;
 
 private:
