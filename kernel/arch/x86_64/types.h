@@ -79,7 +79,8 @@ typedef double _vector_size(16) __d64_vec2;
 typedef long long _vector_size(16) __i64_vec2LL;
 typedef unsigned long long _vector_size(16) __ivec2ULL;
 
-template <typename T, size_t N>
+template<typename T, size_t N>
+inline _no_instrument
 constexpr size_t countof(T const (&)[N]) noexcept
 {
     return N;
