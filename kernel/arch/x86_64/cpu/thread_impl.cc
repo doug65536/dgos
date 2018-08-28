@@ -587,6 +587,9 @@ void thread_init(int ap)
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
+
+        if (acpi_cpu_count() == 1)
+            thread_cls_ready = true;
     } else {
         cpu_irq_disable();
 
