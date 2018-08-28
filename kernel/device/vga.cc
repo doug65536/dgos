@@ -72,6 +72,7 @@ private:
     void scroll_screen(int x, int y);
     void advance_cursor(int distance);
     void print_character(int ch);
+    void print_characters_fast(char const *s, size_t len);
 
     friend void vga_remap_callback(void *);
     void remap();
@@ -147,10 +148,8 @@ int vga_display_t::mouse_hide_if_at(int x, int y)
 int vga_display_t::mouse_hide_if_within(int sx, int sy, int ex, int ey)
 {
     if (mouse_on &&
-            mouse_x >= sx &&
-            mouse_x < ex &&
-            mouse_y >= sy &&
-            mouse_y < ey) {
+            mouse_x >= sx && mouse_x < ex &&
+            mouse_y >= sy && mouse_y < ey) {
         return mouse_toggle(0);
     }
     return mouse_on;
@@ -344,9 +343,12 @@ void vga_display_t::print_character(int ch)
         advance_cursor(width - cursor_x);
         break;
 
+    case '\r':
+        advance_cursor(-cursor_x);
+        break;
+
     case '\t':
-        advance = ((cursor_x + 8) & -8) -
-                cursor_x;
+        advance = ((cursor_x + 8) & -8) - cursor_x;
         advance_cursor(advance);
         break;
 
@@ -356,13 +358,26 @@ void vga_display_t::print_character(int ch)
         break;
 
     default:
-        write_char_at(
-                      cursor_x,
-                      cursor_y,
-                      ch, attrib);
+        write_char_at(cursor_x, cursor_y, ch, attrib);
         advance_cursor(1);
         break;
     }
+}
+
+// Print printable characters. Fragment must not wrap to next line.
+void vga_display_t::print_characters_fast(char const *s, size_t len)
+{
+    int mouse_was_shown = mouse_hide_if_within(
+                cursor_x, cursor_y, cursor_x + len, cursor_y + 1);
+    for (size_t place = cursor_y * width + cursor_x, end = place + len;
+         place < end; ++place) {
+        char character = *s++;
+        uint16_t pair = (character & 0xFF) | ((attrib & 0xFF) << 8);
+        shadow[place] = pair;
+        video_mem[place] = pair;
+    }
+    advance_cursor(len);
+    mouse_toggle(mouse_was_shown);
 }
 
 // === Public API ===
@@ -588,9 +603,29 @@ int vga_display_t::print(char const *s)
 int vga_display_t::write(char const *s, intptr_t len)
 {
     int written = 0;
-    while (len--) {
-        ++written;
-        print_character(*s++);
+    while (len) {
+        intptr_t fragment_sz = 0;
+        while (fragment_sz < len &&
+               s[fragment_sz] != '\n' &&
+               s[fragment_sz] != '\t' &&
+               s[fragment_sz] != '\r')
+            ++fragment_sz;
+
+        // Clamp to rest of line
+        if (fragment_sz > width - cursor_x)
+            fragment_sz = width - cursor_x;
+
+        if (fragment_sz == 0) {
+            // Non printable character
+            ++written;
+            print_character(*s++);
+            --len;
+        } else {
+            print_characters_fast(s, fragment_sz);
+            written += fragment_sz;
+            s += fragment_sz;
+            len -= fragment_sz;
+        }
     }
 
     move_cursor_if_on();
