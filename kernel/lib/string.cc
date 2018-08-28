@@ -478,7 +478,7 @@ EXPORT size_t strspn(char const *src, char const *chars)
             ++i;
     } else {
         // Generalize
-        uint32_t map[256 / sizeof(uint32_t)];
+        unsigned map[256 / sizeof(unsigned)];
 
         for (makeByteBitmap(map, chars); src[i]; ++i) {
             size_t ch = (uint8_t)src[i];
@@ -500,7 +500,7 @@ EXPORT size_t strcspn(char const *src, char const *chars)
             ++i;
     } else {
         // Generalize
-        uint32_t map[256 / sizeof(uint32_t)];
+        unsigned map[256 / sizeof(unsigned)];
 
         for (makeByteBitmap(map, chars); src[i]; ++i) {
             size_t ch = (uint8_t)src[i];
