@@ -2446,7 +2446,7 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     apic_eoi(intr);
 
     if (ctx == orig_ctx)
-        return thread_schedule_if_idle(ctx);
+        return thread_schedule_postirq(ctx);
 
     return ctx;
 }

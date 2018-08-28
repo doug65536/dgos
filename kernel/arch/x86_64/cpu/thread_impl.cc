@@ -618,6 +618,10 @@ static thread_info_t *thread_choose_next(
     if (unlikely(thread_count < cpu_count))
         return outgoing;
 
+    // If the SLIH thread is ready, instantly choose that thread
+    if (unlikely(threads[cpu_count + cpu_nr].state == THREAD_IS_READY))
+        return threads + (cpu_count + cpu_nr);
+
     // Consider each thread, excluding idle threads
     size_t count = thread_count - cpu_count;
 
@@ -1095,11 +1099,19 @@ int thread_cpu_number()
     return cpu - cpus;
 }
 
-isr_context_t *thread_schedule_if_idle(isr_context_t *ctx)
+isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
 {
-    thread_info_t *cur_thread = this_thread();
-    if (cur_thread - threads < cpu_count && thread_idle_ready)
+    cpu_info_t *cur_cpu = this_cpu();
+    thread_info_t *cur_thread = cur_cpu->cur_thread;
+    unsigned tid = cur_thread->thread_id;
+
+    // If idle thread was interrupted,
+    // or the SLIH thread is ready and the SLIH thread wasn't running already
+    if ((thread_idle_ready && tid < cpu_count) ||
+            ((threads[cpu_count + cur_cpu->cpu_nr].state == THREAD_IS_READY) &&
+             tid != cpu_count + cur_cpu->cpu_nr))
         return thread_schedule(ctx);
+
     return ctx;
 }
 
