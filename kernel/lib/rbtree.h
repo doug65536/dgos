@@ -43,6 +43,16 @@ public:
 
     rbtree_t &init(cmp_t __cmp, void *__p);
 
+    size_t size() const
+    {
+        return __count;
+    }
+
+    size_t capacity() const
+    {
+        return __capacity;
+    }
+
     iter_t lower_bound_pair(kvp_t *__kvp);
     iter_t lower_bound(_Tkey __key, _Tval __val);
 
