@@ -2002,9 +2002,6 @@ void apic_start_smp(void)
     // Do per-cpu ACPI configuration
     apic_config_cpu();
 
-    // SMP online
-    callout_call(callout_type_t::smp_online);
-
     ioapic_irq_setcpu(0, 1);
 }
 

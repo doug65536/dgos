@@ -224,6 +224,8 @@ void cpu_hw_init(int ap)
 
     apic_start_smp();
 
+    callout_call(callout_type_t::smp_online);
+
     //printk("Enabling IRQs\n");
 }
 
