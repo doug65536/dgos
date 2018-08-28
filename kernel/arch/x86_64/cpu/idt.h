@@ -41,13 +41,7 @@ typedef isr_context_t *(*irq_dispatcher_handler_t)(
 
 typedef irq_dispatcher_handler_t idt_unhandled_exception_handler_t;
 
-// Handle EOI and invoke irq handler
-extern "C" isr_context_t *irq_dispatcher(int intr, isr_context_t *ctx);
-
-extern "C" isr_context_t *isr_handler(int intr, isr_context_t *ctx);
-
 extern "C" isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx);
-
 
 extern "C" void idt_xsave_detect(int ap);
 
