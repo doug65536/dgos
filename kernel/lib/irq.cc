@@ -30,8 +30,6 @@ uint16_t sse_avx512_upper_size;
 uint16_t sse_avx512_xregs_offset;
 uint16_t sse_avx512_xregs_size;
 
-bool cpu_has_fsgsbase;
-
 // Singly linked list head for each interrupt
 static intr_link_t intr_first[256];
 

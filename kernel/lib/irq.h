@@ -21,9 +21,6 @@ extern uint16_t sse_avx512_xregs_size;
 extern uint32_t * const sse_context_save;
 extern uint32_t * const sse_context_restore;
 
-// Keep this flag right next to other data touched in interrupt handler
-extern bool cpu_has_fsgsbase;
-
 // MSI IRQ
 struct msi_irq_mem_t {
     uintptr_t addr;
