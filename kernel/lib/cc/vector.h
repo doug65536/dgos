@@ -1158,4 +1158,49 @@ vector<_T,_Alloc>::vector_iter<_Dir, _Is_const>::operator-(
     return __p - rhs.__p;
 }
 
+//
+// begin/end overloads for vector
+
+template<typename _T, typename _Alloc>
+typename vector<_T, _Alloc>::iterator
+begin(vector<_T, _Alloc>& __rhs)
+{
+    return __rhs.begin();
+}
+
+template<typename _T, typename _Alloc>
+typename vector<_T, _Alloc>::const_iterator
+begin(vector<_T, _Alloc> const& __rhs)
+{
+    return __rhs.begin();
+}
+
+template<typename _T, typename _Alloc>
+typename vector<_T, _Alloc>::const_iterator
+cbegin(vector<_T, _Alloc> const& __rhs)
+{
+    return __rhs.begin();
+}
+
+template<typename _T, typename _Alloc>
+typename vector<_T, _Alloc>::iterator
+end(vector<_T, _Alloc>& __rhs)
+{
+    return __rhs.end();
+}
+
+template<typename _T, typename _Alloc>
+typename vector<_T, _Alloc>::const_iterator
+end(vector<_T, _Alloc> const& __rhs)
+{
+    return __rhs.end();
+}
+
+template<typename _T, typename _Alloc>
+typename vector<_T, _Alloc>::const_iterator
+cend(vector<_T, _Alloc> const& __rhs)
+{
+    return __rhs.end();
+}
+
 __END_NAMESPACE_STD
