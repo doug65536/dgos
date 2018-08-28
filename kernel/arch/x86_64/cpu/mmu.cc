@@ -1687,6 +1687,48 @@ void mmu_init()
     cpu_tlb_flush();
 
     callout_call(callout_type_t::vmm_ready);
+
+    printdbg("Allocating and filling all memory with garbage\n");
+
+#if 0 // Hack
+    size_t blocks_cap = 5<<(30-12);
+    size_t blocks_sz = sizeof(void*) * blocks_cap;
+    void **blocks = (void**)mmap(nullptr, blocks_sz, PROT_READ | PROT_WRITE,
+                                 MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+    size_t blocks_cnt = 0;
+    memset(blocks, 0xFA, blocks_sz);
+
+    for (;;) {
+        void *block = mmap(nullptr, 4096, PROT_READ | PROT_WRITE,
+                           MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
+        if (block == MAP_FAILED)
+            break;
+
+        memset(block, 0xF0, 4096);
+
+
+        blocks[blocks_cnt++] = block;
+
+        if (blocks_cnt && (blocks_cnt & 0xFFFF) == 0)
+            printk("...done %10zu KB\r", blocks_cnt << (12 - 10));
+    }
+
+    printk("...done %10zu KB\n", blocks_cnt << (12 - 10));
+
+    printk("Freeing all memory\n");
+
+    for (size_t i = 0; i < blocks_cnt; ++i) {
+        if (i && (i & 0xFFFF) == 0)
+            printk("...done %10zu KB\r", i << (12 - 10));
+
+        munmap(blocks[i], 4096);
+    }
+    printk("...done %10zu KB\n", blocks_cnt << (12 - 10));
+
+    munmap(blocks, blocks_sz);
+
+    printdbg("Memory fill stress done\n");
+#endif
 }
 
 // Returns the present mask for the new page
