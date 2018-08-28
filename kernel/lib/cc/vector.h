@@ -431,7 +431,7 @@ bool vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
     clear();
     if (!reserve(__last - __first))
         return false;
-    while (__first != __last)
+    for ( ; __first != __last; ++__first)
         new (__m + __sz++) value_type(*__first);
     return true;
 }
