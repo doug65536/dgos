@@ -67,7 +67,7 @@ public:
     _pure iter_t prev(iter_t __n);
     _pure iter_t last(iter_t __start);
 
-    _pure kvp_t item(iter_t __iter);
+    _pure kvp_t& item(iter_t __iter);
     int delete_at(iter_t __n);
     int delete_pair(kvp_t *__kvp);
     int delete_item(_Tkey __key, _Tval __val);
@@ -630,7 +630,7 @@ rbtree_t<_Tkey,_Tval>::prev(iter_t __n)
 }
 
 template<typename _Tkey, typename _Tval>
-typename rbtree_t<_Tkey,_Tval>::kvp_t
+typename rbtree_t<_Tkey,_Tval>::kvp_t&
 rbtree_t<_Tkey,_Tval>::item(iter_t __iter)
 {
     return __nodes[__iter].__kvp;
