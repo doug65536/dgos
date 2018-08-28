@@ -122,7 +122,7 @@ void modload_load_symbols(char const *path, uintptr_t addr)
 
 module_entry_fn_t modload_load(char const *path)
 {
-    file_t fd = file_open(path, O_RDONLY);
+    file_t fd{file_open(path, O_RDONLY)};
 
     if (unlikely(!fd.is_open())) {
         printdbg("Failed to open module \"%s\"\n", path);

@@ -155,7 +155,7 @@ int process_t::start()
     // Simply load it for now
     Elf64_Ehdr hdr;
 
-    file_t fd = file_open(path, O_RDONLY);
+    file_t fd{file_open(path, O_RDONLY)};
 
     ssize_t read_size;
 
