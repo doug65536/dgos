@@ -14,6 +14,7 @@
 #include "refcount.h"
 #include "time.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #include "usb_xhci.bits.h"
 
@@ -733,6 +734,9 @@ struct usbxhci_slot_data_t {
 class usbxhci final : public usb_bus_t {
 public:
     usbxhci();
+    usbxhci(usbxhci const&) = delete;
+    usbxhci(usbxhci&&) = delete;
+    usbxhci& operator=(usbxhci) = delete;
 
     static void detect();
 
@@ -876,7 +880,7 @@ private:
                      usbxhci_intr_t *ir, usbxhci_evt_t *evt, size_t ii);
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
-    void irq_handler(int irq);
+    void irq_handler(int irq_ofs);
 
     void walk_caps(char const volatile *caps);
 
@@ -2070,20 +2074,22 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
 
 isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
 {
-    for (usbxhci* dev : usbxhci_devices)
-        dev->irq_handler(irq);
+    for (usbxhci* dev : usbxhci_devices) {
+        int irq_ofs = irq - dev->irq_range.base;
+
+        if (irq_ofs >= 0 && irq_ofs < dev->irq_range.count) {
+            //dev->irq_handler(irq_ofs);
+            workq::enqueue([=]() {
+                dev->irq_handler(irq_ofs);
+            });
+        }
+    }
 
     return ctx;
 }
 
-void usbxhci::irq_handler(int irq)
+void usbxhci::irq_handler(int irq_ofs)
 {
-    int irq_ofs = irq - irq_range.base;
-
-    // Skip this device if it is not in the irq range
-    if (irq_ofs < 0 && irq_ofs >= irq_range.count)
-        return;
-
     uint32_t usbsts = mmio_op->usbsts;
 
     bool event_intr = USBXHCI_USBSTS_EINT_GET(usbsts);
@@ -2206,14 +2212,15 @@ void usbxhci::detect()
         if (pci_iter.config.prog_if != PCI_PROGIF_SERIAL_USB_XHCI)
             continue;
 
-        usbxhci *self = new usbxhci;
+        std::unique_ptr<usbxhci> self(new usbxhci);
 
-        if (!usbxhci_devices.emplace_back(self)) {
+        if (!usbxhci_devices.emplace_back(self.get())) {
             USBXHCI_TRACE("Out of memory!");
             break;
         }
 
         self->init(pci_iter, usbxhci_devices.size()-1);
+        self.release();
     } while (pci_enumerate_next(&pci_iter));
 }
 
