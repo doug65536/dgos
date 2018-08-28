@@ -13,8 +13,7 @@ syscall_entry:
     .cfi_startproc
     .cfi_register rip,rcx
     .cfi_return_column rcx
-    .cfi_def_cfa_register rsp
-    .cfi_def_cfa_offset 0
+    .cfi_def_cfa rsp,0
 
     // syscall rax
     // params rdi, rsi, rdx, r10, r8, r9
@@ -55,8 +54,7 @@ syscall_entry:
     // Push return address to syscall stack
     pushq %rcx
 
-    .cfi_def_cfa_register rsp
-    .cfi_def_cfa_offset 8
+    .cfi_def_cfa rsp,8
 
     // Move 4th parameter to proper place
     movq %r10,%rcx
