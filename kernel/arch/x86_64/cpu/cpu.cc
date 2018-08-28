@@ -251,4 +251,62 @@ void cpu_patch_code(void *addr, void const *src, size_t size)
     memcpy(addr, src, size);
     // Enable write protect
     cpu_cr0_change_bits(0, CPU_CR0_WP);
+    atomic_fence();
+}
+
+// points refers to an array of pointers to labels that are after the calls
+void cpu_patch_calls(void *call_target, size_t point_count, uint32_t **points)
+{
+    for (size_t i = 0; i < point_count; ++i) {
+        int32_t *point = (int32_t*)points[i];
+        intptr_t dist = intptr_t(call_target) - intptr_t(point);
+        assert(dist >= std::numeric_limits<int32_t>::min() &&
+               dist <= std::numeric_limits<int32_t>::max());
+        point[-1] = dist;
+    }
+    atomic_fence();
+}
+
+// Fill a region with optimal nops
+void cpu_patch_nop(void *addr, size_t size)
+{
+    static uint8_t const nop_insns[] = {
+        0x90,
+        0x66, 0x90,
+        0x0F, 0x1F, 0x00,
+        0x0F, 0x1F, 0x40, 0x00,
+        0x0F, 0x1F, 0x44, 0x00, 0x00,
+        0x66, 0x0F, 0x1F, 0x44, 0x00, 0x00,
+        0x0F, 0x1F, 0x80, 0x00, 0x00, 0x00, 0x00,
+        0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+
+    static uint8_t const nop_lookup[] = {
+        0,
+        0+1,
+        0+2+1,
+        0+3+2+1,
+        0+4+3+2+1,
+        0+5+4+3+2+1,
+        0+6+5+4+3+2+1,
+        0+7+6+5+4+3+2+1
+    };
+
+    uint8_t *out = (uint8_t*)addr;
+
+     while (size) {
+        size_t insn_sz = size <= 15 ? size : 15;
+        size -= insn_sz;
+
+        // Place a number of 0x66 prefixes for sizes over 8 bytes
+        if (size > 8) {
+            out = std::fill_n(out, insn_sz - 8, 0x66);
+            insn_sz = 8;
+        }
+
+        out = std::copy(nop_insns + nop_lookup[insn_sz - 1],
+                        nop_insns + nop_lookup[insn_sz - 1] + insn_sz, out);
+     }
+
+     atomic_fence();
 }
