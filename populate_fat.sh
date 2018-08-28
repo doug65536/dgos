@@ -11,6 +11,7 @@ truncate --size 128K stage/.big || exit
 
 ln -f kernel-generic stage/dgos-kernel-generic || exit
 ln -f kernel-tracing stage/dgos-kernel-tracing || exit
+ln -f kernel-asan stage/dgos-kernel-asan || exit
 cp -u hello.km stage/hello.km || exit
 
 cp -u user-shell stage || exit

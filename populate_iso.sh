@@ -9,6 +9,7 @@ cp -u bootiso-bin iso_stage/bootiso-bin || exit
 
 ln -f kernel-generic iso_stage/dgos-kernel-generic || exit
 ln -f kernel-tracing iso_stage/dgos-kernel-tracing || exit
+ln -f kernel-asan iso_stage/dgos-kernel-asan|| exit
 cp -u hello.km iso_stage/hello.km || exit
 
 cp -u user-shell iso_stage || exit

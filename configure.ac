@@ -127,17 +127,13 @@ done
 AC_SUBST([INSTRUMENT_FUNCTIONS_FLAGS])
 
 AS_VAR_SET([ASAN_FLAGS], [])
-AC_ARG_ENABLE(asan,
-	AS_HELP_STRING([--enable-asan], [Enable Address Space SANitizer]), [
-		for flag in \
-			fsanitize=kernel-address D_ASAN_ENABLED
-		do
-			AX_CHECK_COMPILE_FLAG([-$flag],
-				[AS_VAR_APPEND([ASAN_FLAGS], [" -$flag"])],
-				[], [$COMPILER_WERROR])
-		done
-	]
-)
+for flag in \
+	fsanitize=kernel-address D_ASAN_ENABLED
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([ASAN_FLAGS], [" -$flag"])],
+		[], [$COMPILER_WERROR])
+done
 AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
@@ -263,7 +259,9 @@ for flag in \
 	m64 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--no-dynamic-linker
+	Wl,--no-dynamic-linker \
+	Wl,--eh-frame-hdr \
+	Wl,-z,max-page-size=4096
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ELF64_FLAGS], [" -$flag"])]

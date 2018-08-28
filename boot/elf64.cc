@@ -32,14 +32,17 @@ extern char ___smp_en[];
 
 tchar const *cpu_choose_kernel()
 {
-    char fw_cfg_tracing[1];
+    char fw_cfg_type[1];
 
-    ssize_t got = qemu_fw_cfg(fw_cfg_tracing, sizeof(fw_cfg_tracing),
-                              "opt/com.doug16k.dgos.trace");
+    ssize_t type = qemu_fw_cfg(fw_cfg_type, sizeof(fw_cfg_type),
+                               "opt/com.doug16k.dgos.kernel_type");
 
-    if (got >= 1 && fw_cfg_tracing[0] == '1')
-        return TSTR "dgos-kernel-tracing";
-
+    if (type >= 0) {
+        switch (fw_cfg_type[0]) {
+        case 'A': return TSTR "dgos-kernel-asan";
+        case 'T': return TSTR "dgos-kernel-tracing";
+        }
+    }
     return TSTR "dgos-kernel-generic";
 }
 

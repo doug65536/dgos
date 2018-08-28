@@ -10,6 +10,10 @@ $(top_builddir)/isodisk.img: \
 		kernel-tracing.sym \
 		kernel-tracing.dis.gz \
 		\
+		kernel-asan \
+		kernel-asan.sym \
+		kernel-asan.dis.gz \
+		\
 		bootx64.efi \
 		bootx64-efi.sym \
 		bootefi-amd64.dis.gz \

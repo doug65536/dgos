@@ -758,7 +758,6 @@ ac_user_opts='
 enable_option_checking
 enable_silent_rules
 enable_dependency_tracking
-enable_asan
 enable_lto
 enable_optimize
 '
@@ -1412,7 +1411,6 @@ Optional Features:
                           do not reject slow dependency extractors
   --disable-dependency-tracking
                           speeds up one-time build
-  --enable-asan           Enable Address Space SANitizer
   --enable-lto            Enable link-time optimizations
   --enable-optimize       Enable size/speed optimizations
 
@@ -7413,13 +7411,10 @@ done
 
 
 ASAN_FLAGS=
-# Check whether --enable-asan was given.
-if test "${enable_asan+set}" = set; then :
-  enableval=$enable_asan;
-		for flag in \
-			fsanitize=kernel-address D_ASAN_ENABLED
-		do
-			as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
+for flag in \
+	fsanitize=kernel-address D_ASAN_ENABLED
+do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
 $as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
 if eval \${$as_CACHEVAR+:} false; then :
@@ -7456,11 +7451,7 @@ else
   :
 fi
 
-		done
-
-
-fi
-
+done
 
 
 COMPILER_FLAGS=
@@ -7961,7 +7952,9 @@ for flag in \
 	m64 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--no-dynamic-linker
+	Wl,--no-dynamic-linker \
+	Wl,--eh-frame-hdr \
+	Wl,-z,max-page-size=4096
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5

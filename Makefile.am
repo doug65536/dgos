@@ -808,8 +808,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility-inlines-hidden \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
-	$(FREESTANDING_FLAGS) \
-	$(ASAN_FLAGS)
+	$(FREESTANDING_FLAGS)
 
 # Buggy
 #$(STACK_CHECK_FLAGS)
@@ -820,14 +819,16 @@ KERNEL_CCASFLAGS_SHARED = \
 
 KERNEL_LDFLAGS_SHARED = \
 	-DFROM_LDFLAGS \
-	-Wl,-m,elf_x86_64 \
+	$(ELF64_FLAGS) \
 	-Wl,-T,$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
-	-export-dynamic -Wl,--no-dynamic-linker \
-	-Wl,-z,max-page-size=4096 \
+	-export-dynamic \
 	-Wl,-pie \
 	$(NOSTDLIB_FLAGS)
+
+#-Wl,-m,elf_x86_64
+#-Wl,--no-dynamic-linker
 
 #-Wl,-export-dynamic
 
@@ -843,6 +844,10 @@ KERNEL_LDADD_SHARED = -lgcc
 KERNEL_TRACING_FLAGS = \
 	$(INSTRUMENT_FUNCTIONS_FLAGS) \
 	-Wl,-Map,$(top_builddir)/kernel-tracing.map
+
+KERNEL_ASAN_FLAGS = \
+	$(ASAN_FLAGS) \
+	-Wl,-Map,$(top_builddir)/kernel-asan.map
 
 KERNEL_GENERIC_FLAGS = \
 	-Wl,-Map,$(top_builddir)/kernel-generic.map
@@ -872,10 +877,10 @@ kernel_generic_LDADD = \
 EXTRA_kernel_generic_DEPENDENCIES = \
 	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
+bin_PROGRAMS += kernel-tracing
+
 kernel_tracing_SOURCES = \
 	$(KERNEL_SOURCES_SHARED)
-
-bin_PROGRAMS += kernel-tracing
 
 kernel_tracing_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
@@ -902,10 +907,43 @@ kernel_tracing_LDADD = $(KERNEL_LDADD_SHARED)
 EXTRA_kernel_tracing_DEPENDENCIES = \
 	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
 
+bin_PROGRAMS += kernel-asan
+
+kernel_asan_SOURCES = \
+	$(KERNEL_SOURCES_SHARED)
+
+kernel_asan_CXXFLAGS = \
+	$(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(ASAN_FLAGS)
+
+kernel_asan_CFLAGS = \
+	$(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(ASAN_FLAGS)
+
+kernel_asan_CCASFLAGS = \
+	$(KERNEL_CCASFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(ASAN_FLAGS)
+
+kernel_asan_LDFLAGS = \
+	$(KERNEL_LDFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	$(ASAN_FLAGS)
+
+kernel_asan_LDADD = $(KERNEL_LDADD_SHARED)
+
+EXTRA_kernel_asan_DEPENDENCIES = \
+	$(EXTRA_KERNEL_DEPENDENCIES_SHARED)
+
 $(top_builddir)/dgos-kernel-generic: $(top_builddir)/kernel-generic
 	$(LN) -f "$<" "$@"
 
 $(top_builddir)/dgos-kernel-tracing: $(top_builddir)/kernel-tracing
+	$(LN) -f "$<" "$@"
+
+$(top_builddir)/dgos-kernel-asan: $(top_builddir)/kernel-asan
 	$(LN) -f "$<" "$@"
 
 # ----------------------------------------------------------------------------
@@ -1355,6 +1393,8 @@ EXTRA_hello_km_DEPENDENCIES = \
 
 bin_PROGRAMS += user-shell
 
+user_shell_CXXFLAGS = -g
+
 user_shell_SOURCES = \
 	user/test/test.S
 
@@ -1391,6 +1431,7 @@ clean-local:
 	rm -f $(top_builddir)/bootx64-efi.sym
 	rm -f $(top_builddir)/kernel-generic.sym
 	rm -f $(top_builddir)/kernel-tracing.sym
+	rm -f $(top_builddir)/kernel-asan.sym
 
 	rm -f $(top_builddir)/mbr.map
 	rm -f $(top_builddir)/bootfat.map
@@ -1401,6 +1442,7 @@ clean-local:
 	rm -f $(top_builddir)/bootefi-i386.map
 	rm -f $(top_builddir)/kernel-generic.map
 	rm -f $(top_builddir)/kernel-tracing.map
+	rm -f $(top_builddir)/kernel-asan.map
 
 	rm -f $(top_builddir)/mbr.dis.gz
 	rm -f $(top_builddir)/bootefi-i386.dis.gz
@@ -1409,6 +1451,7 @@ clean-local:
 	rm -f $(top_builddir)/bootfat.dis.gz
 	rm -f $(top_builddir)/kernel-generic.dis.gz
 	rm -f $(top_builddir)/kernel-tracing.dis.gz
+	rm -f $(top_builddir)/kernel-asan.dis.gz
 
 	rm -f $(top_builddir)/bochs-debuglog
 
@@ -1542,7 +1585,8 @@ QEMU_COMMON = \
 SECTOR_SZ = 512
 
 QEMU_RT = $(QEMU_RT_$(1))
-QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.trace,string=1
+QEMU_RT_asan = -s -S -fw_cfg name=opt/com.doug16k.dgos.kernel_type,string=A
+QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.kernel_type,string=T
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 
@@ -1589,8 +1633,8 @@ QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
 
 QEMU_EMU = $(QEMU_EMU_$(1))
-QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,rdrand
-QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
+QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq,topoext
 #-cpu max,la57
 
 QEMU_BOOT = $(QEMU_BOOT_$(1))
@@ -1613,7 +1657,7 @@ monitor-debug-output:
 monitor-connect:
 	telnet localhost 7777
 
-QL_RT = debug run trace
+QL_RT = debug run trace asan
 QL_NP = up smp
 QL_BT = bios efi
 QL_BM = pxe hd
@@ -1683,7 +1727,7 @@ $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 	cp "$<" "$@"
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 		mbr.sym boot$(1).sym \
-		kernel-generic.sym kernel-tracing.sym \
+		kernel-generic.sym kernel-tracing.sym kernel-asam.sym \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
 	$$(BOCHS) \

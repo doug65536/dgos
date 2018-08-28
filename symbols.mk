@@ -34,6 +34,11 @@ kernel-tracing.sym: kernel-tracing \
 	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
 		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
 
+kernel-asan.sym: kernel-asan \
+		$(top_srcdir)/symbols.mk $(top_srcdir)/gensymtab.sh
+	OBJDUMP="$(OBJDUMP)" SORT="$(SORT)" \
+		$(top_srcdir)/gensymtab.sh "$(OBJDUMP)" e "$@" "$<"
+
 bootefi-amd64.dis.gz: bootefi-amd64 $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
@@ -50,4 +55,7 @@ kernel-generic.dis.gz: kernel-generic $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
 
 kernel-tracing.dis.gz: kernel-tracing $(top_srcdir)/symbols.mk
+	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &
+
+kernel-asan.dis.gz: kernel-asan $(top_srcdir)/symbols.mk
 	$(OBJDUMP) --disassemble --demangle --source $< | $(GZIP) > $@ &

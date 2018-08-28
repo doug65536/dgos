@@ -20,6 +20,11 @@ $(top_builddir)/fatpart.img: \
 		$(top_builddir)/kernel-tracing.sym \
 		$(top_builddir)/kernel-tracing.dis.gz \
 		\
+		$(top_builddir)/dgos-kernel-asan \
+		$(top_builddir)/kernel-asan \
+		$(top_builddir)/kernel-asan.sym \
+		$(top_builddir)/kernel-asan.dis.gz \
+		\
 		$(top_builddir)/bootx64.efi \
 		$(top_builddir)/bootx64-efi.sym \
 		$(top_builddir)/bootefi-amd64.dis.gz \
