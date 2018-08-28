@@ -60,7 +60,6 @@ struct fat32_fs_t final : public fs_base_t {
 
     static pool_t<file_handle_t> handles;
 
-    class short_name_cache_t {
     bool mount(fs_init_info_t *conn);
 
     static int mm_fault_handler(void *dev, void *addr,
@@ -126,7 +125,7 @@ struct fat32_fs_t final : public fs_base_t {
                                      fat32_dir_union_t *dde, mode_t mode);
 
     fat32_dir_union_t *dirent_create(fat32_dir_union_t *dde,
-                                     full_lfn_t const& lfn);
+                                     full_lfn_t &lfn);
 
     int change_dirent_start(fat32_dir_union_t *dde, cluster_t start);
 
@@ -138,11 +137,15 @@ struct fat32_fs_t final : public fs_base_t {
     static void date_encode(uint16_t *date_field, uint16_t *time_field,
                             uint8_t *centisec_field, time_of_day_t tod);
 
-    file_handle_t *create_handle(char const *path, int flags, mode_t mode, errno_t &err);
+    file_handle_t *create_handle(char const *path, int flags,
+                                 mode_t mode, errno_t &err);
 
     ssize_t internal_rw(file_handle_t *file,
             void *buf, size_t size, off_t offset, bool read);
 
+    void generate_unique_shortname(full_lfn_t& lfn, uint64_t dir_index);
+
+    using lock_type = std::shared_mutex;
     std::shared_mutex rwlock;
 
     storage_dev_base_t *drive;
@@ -838,8 +841,38 @@ fat32_dir_union_t *fat32_fs_t::create_dirent(
     return entry_ptr;
 }
 
+void fat32_fs_t::generate_unique_shortname(full_lfn_t& lfn, uint64_t dir_index)
+{
+    // 32 character lookup table, 5 bits per character
+    // Replace each _ with a 5 bit value: ____~999___
+    // Up to approximately 32G unique filenames per directory
+    static char enc[] = "ABCDEFGHJKLMNPRSTUWXYZ0123456789";
+
+    // Generate a unique shortname from the dir_index
+    uint64_t n = dir_index;
+    fat32_dir_entry_t& short_name_entry =
+            lfn.fragments[lfn.lfn_entry_count].short_entry;
+
+    char *short_name = short_name_entry.name;
+    short_name[4] = '~';
+    short_name[5] = '9';
+    short_name[6] = '9';
+    short_name[7] = '9';
+
+    for (size_t i = 0; i < 11; ++i) {
+        short_name[i] = enc[n & 31];
+        n >>= 5;
+        if (i == 3)
+            i = 7;
+    }
+    uint8_t checksum = lfn_checksum(short_name);
+
+    for (size_t i = 0; i < lfn.lfn_entry_count; ++i)
+        lfn.fragments[i].long_entry.checksum = checksum;
+}
+
 fat32_dir_union_t *fat32_fs_t::dirent_create(
-        fat32_dir_union_t *dde, full_lfn_t const& lfn)
+        fat32_dir_union_t *dde, full_lfn_t& lfn)
 {
     fat32_dir_union_t *ins_point = nullptr;
 
@@ -853,6 +886,8 @@ fat32_dir_union_t *fat32_fs_t::dirent_create(
     cluster_t prev_cluster = 0;
     cluster_t last_cluster = 0;
     int consecutive_free = 0;
+    uint64_t dir_index = 0;
+    uint64_t ins_index = 0;
 
     cluster_t dir_start = dirent_start_cluster(&dde->short_entry);
     iterate_dir(dir_start, [&](fat32_dir_union_t *de,
@@ -866,6 +901,8 @@ fat32_dir_union_t *fat32_fs_t::dirent_create(
 
         last_cluster = cluster;
 
+        ++dir_index;
+
         if (!is_dirent_free(de)) {
             // We ran into an allocated entry, restart search
             consecutive_free = 0;
@@ -877,6 +914,7 @@ fat32_dir_union_t *fat32_fs_t::dirent_create(
         if (++consecutive_free == 1) {
             result_cluster = cluster;
             ins_point = de;
+            ins_index = dir_index - 1;
         }
 
         // Done when we have found enough consecutive free entries
@@ -884,6 +922,9 @@ fat32_dir_union_t *fat32_fs_t::dirent_create(
     }, &extend_cluster);
 
     cluster_t backup = 0;
+
+    // Generate a unique shortname
+    generate_unique_shortname(lfn, ins_index);
 
     if (extend_cluster) {
         // No need for transaction, it is in a new cluster
