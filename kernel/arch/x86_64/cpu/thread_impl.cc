@@ -124,7 +124,7 @@ struct alignas(256) thread_info_t {
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
 
-    int thread_id;
+    unsigned thread_id;
 
     __exception_jmp_buf_t exit_jmpbuf;
 };
@@ -179,6 +179,8 @@ struct alignas(128) cpu_info_t {
 
     lock_type queue_lock;
 
+    unsigned cpu_nr;
+
     void *storage[8];
 };
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
@@ -190,7 +192,7 @@ C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
-    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0, {},
+    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0, {}, 0,
       { }
     }
 };
@@ -535,18 +537,20 @@ static isr_context_t *thread_context_switch_handler(int, isr_context_t *ctx)
 
 void thread_init(int ap)
 {
-    uint32_t cpu_number = atomic_xadd(&cpu_count, 1);
+    uint32_t cpu_nr = atomic_xadd(&cpu_count, 1);
 
-    cpu_info_t *cpu = cpus + cpu_number;
+    cpu_info_t *cpu = cpus + cpu_nr;
 
-    if (cpu_number > 0) {
-        gdt_load_tr(cpu_number);
-        cpu->tss_ptr = tss_list + cpu_number;
+    cpu->cpu_nr = cpu_nr;
+
+    if (cpu_nr > 0) {
+        gdt_load_tr(cpu_nr);
+        cpu->tss_ptr = tss_list + cpu_nr;
     }
 
-    assert(thread_count == cpu_number);
+    assert(thread_count == cpu_nr);
 
-    thread_info_t *thread = threads + cpu_number;
+    thread_info_t *thread = threads + cpu_nr;
 
     cpu->self = cpu;
     cpu->apic_id = get_apic_id();
@@ -589,7 +593,7 @@ void thread_init(int ap)
         thread = threads + thread_create_with_state(
                     smp_idle_thread, nullptr, 0,
                     THREAD_IS_INITIALIZING,
-                    1 << cpu_number,
+                    1 << cpu_nr,
                     -256, false);
 
         thread->used_time = 0;
@@ -606,7 +610,7 @@ static thread_info_t *thread_choose_next(
         cpu_info_t *cpu,
         thread_info_t * const outgoing)
 {
-    size_t cpu_number = cpu - cpus;
+    size_t cpu_nr = cpu->cpu_nr;
     size_t i = outgoing - threads;
     thread_info_t *incoming = nullptr;
     thread_info_t *candidate;
@@ -639,7 +643,7 @@ static thread_info_t *thread_choose_next(
 
         // If this thread is not allowed to run on this CPU
         // then skip it
-        if (unlikely(!(candidate->cpu_affinity & (1U << cpu_number))))
+        if (unlikely(!(candidate->cpu_affinity & (1U << cpu_nr))))
             continue;
 
         //
@@ -690,7 +694,7 @@ static thread_info_t *thread_choose_next(
 
     // Did not find any ready thread, choose idle thread
     if (unlikely(!incoming))
-        incoming = threads + cpu_number;
+        incoming = threads + cpu_nr;
 
     assert(incoming
            ? incoming >= threads && incoming <= threads + countof(threads)
@@ -778,15 +782,15 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
         assert((thread >= threads + cpu_count &&
                 thread < threads + countof(threads)) ||
-               thread == threads + (cpu - cpus));
+               thread == threads + cpu->cpu_nr);
 
         if (thread == outgoing && thread->state == THREAD_IS_READY_BUSY) {
             // This doesn't need to be cmpxchg because the
             // outgoing thread is still marked busy
             atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
 
-//            if (thread - threads >= cpu_count)
-//                THREAD_TRACE("Staying on thread %zd\n", thread - threads);
+//            if (thread->thread_id >= cpu_count)
+//                THREAD_TRACE("Staying on thread %zd\n", thread->thread_id);
             break;
         } else if (thread->state == THREAD_IS_READY &&
                 atomic_cmpxchg(&thread->state,
@@ -794,8 +798,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
                            THREAD_IS_RUNNING) ==
                 THREAD_IS_READY) {
 
-//            if (thread - threads >= cpu_count)
-//                THREAD_TRACE("Switched to thread %zd\n", thread - threads);
+//            if (thread->thread_id >= cpu_count)
+//                THREAD_TRACE("Switched to thread %zd\n", thread->thread_id);
 
             break;
         }
@@ -813,7 +817,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
         if (thread->flags & THREAD_FLAGS_USES_FPU) {
 //            printdbg("Restoring tid=%zu FPU context at %#zx\n",
-//                     thread - threads,
+//                     thread->thread_id,
 //                     uintptr_t(thread->xsave_ptr));
             if (cpu->cr0_shadow & CPU_CR0_TS) {
                 // Clear TS flag to unblock access to FPU
@@ -904,7 +908,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 {
     thread_info_t *thread = this_thread();
 
-    *thread_id = thread - threads;
+    *thread_id = thread->thread_id;
 
     thread_state_t old_state;
     old_state = atomic_cmpxchg(&thread->state,
@@ -964,7 +968,7 @@ EXPORT thread_t thread_get_id()
         thread_t thread_id;
 
         thread_info_t *cur_thread = this_thread();
-        thread_id = cur_thread - threads;
+        thread_id = cur_thread->thread_id;
 
         return thread_id;
     }
@@ -987,20 +991,20 @@ EXPORT void thread_set_affinity(int id, uint64_t affinity)
 {
     cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
-    size_t cpu_number = cpu - cpus;
+    size_t cpu_nr = cpu->cpu_nr;
 
     threads[id].cpu_affinity = affinity;
 
     // Are we changing current thread affinity?
     while (cpu->cur_thread == threads + id &&
-            !(affinity & (1 << cpu_number))) {
+            !(affinity & (1 << cpu_nr))) {
         // Get off this CPU
         thread_yield();
 
         // Check again, a racing thread may have picked
         // up this thread without seeing change
         cpu = this_cpu();
-        cpu_number = cpu - cpus;
+        cpu_nr = cpu->cpu_nr;
     }
 }
 
@@ -1096,7 +1100,7 @@ void thread_send_ipi(int cpu, int intr)
 int thread_cpu_number()
 {
     cpu_info_t *cpu = this_cpu();
-    return cpu - cpus;
+    return cpu->cpu_nr;
 }
 
 isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
