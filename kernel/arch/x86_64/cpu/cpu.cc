@@ -18,6 +18,8 @@
 #include "interrupts.h"
 #include "syscall.h"
 #include "string.h"
+#include "algorithm.h"
+#include "numeric_limits.h"
 
 uint32_t default_mxcsr_mask;
 
