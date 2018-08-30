@@ -12,6 +12,7 @@
 #include "vector.h"
 #include "bootinfo.h"
 #include "inttypes.h"
+#include "cxxstring.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -52,6 +53,7 @@ struct fat32_fs_t final : public fs_base_t {
 
         fat32_fs_t *fs;
         fat32_dir_entry_t *dirent;
+        std::string filename;
 
         off_t cached_offset;
         cluster_t cached_cluster;
@@ -1105,6 +1107,8 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
     }
 
     file_handle_t *file = handles.alloc();
+
+    file->filename = path;
 
     if (unlikely(!file)) {
         err = errno_t::EMFILE;
