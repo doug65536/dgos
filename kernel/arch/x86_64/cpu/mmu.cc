@@ -27,6 +27,7 @@
 #include "except.h"
 #include "contig_alloc.h"
 #include "asan.h"
+#include "unique_ptr.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
@@ -335,8 +336,7 @@ static void mmu_dump_pf(uintptr_t pf)
 
 // Device registration for memory mapped device
 struct mmap_device_mapping_t {
-    void *base_addr;
-    uint64_t len;
+    ext::unique_mmap<char> range;
     mm_dev_mapping_callback_t callback;
     void *context;
     std::mutex lock;
@@ -1333,15 +1333,17 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
             if (unlikely(device < 0))
                 return nullptr;
 
+            assert(device < (intptr_t)mm_dev_mappings.size());
+
             mmap_device_mapping_t *mapping = mm_dev_mappings[device];
 
             uint64_t mapping_offset = (char*)rounded_addr -
-                    (char*)mapping->base_addr;
+                    (char*)mapping->range;
 
             // Round down to nearest 64KB boundary
             mapping_offset &= -0x10000;
 
-            rounded_addr = linaddr_t(mapping->base_addr) + mapping_offset;
+            rounded_addr = linaddr_t(mapping->range.get()) + mapping_offset;
 
             pte_t volatile *vpte = ptes[3];
 
@@ -2587,7 +2589,7 @@ int msync(void const *addr, size_t len, int flags)
     bool need_flush = (flags & MS_SYNC) != 0;
 
     int result = present_ranges([&](linaddr_t base, size_t range_len) -> int {
-        uintptr_t offset = base - uintptr_t(mapping->base_addr);
+        uintptr_t offset = base - uintptr_t(mapping->range.get());
 
         return mapping->callback(mapping->context, (void*)base,
                                  offset, range_len, false, need_flush);
@@ -2783,24 +2785,33 @@ void *mmap_register_device(void *context,
 
     auto ins = find(mm_dev_mappings.begin(), mm_dev_mappings.end(), nullptr);
 
+    size_t sz = block_size * block_count;
+
     mmap_device_mapping_t *mapping = new mmap_device_mapping_t{};
-    mapping->base_addr = mmap(addr, block_size * block_count,
-                              prot, MAP_DEVICE,
-                              int(ins - mm_dev_mappings.begin()),
-                              0);
+
+    if (!mapping)
+        return nullptr;
+
+    if (!mapping->range.mmap(addr, sz, prot, MAP_DEVICE,
+                             int(ins - mm_dev_mappings.begin())))
+        return nullptr;
 
     mapping->context = context;
-    mapping->len = block_size * block_count;
     mapping->callback = callback;
 
     mapping->active_read = -1;
 
-    if (ins == mm_dev_mappings.end())
-        mm_dev_mappings.push_back(mapping);
-    else
+    if (ins == mm_dev_mappings.end()) {
+        if (!mm_dev_mappings.push_back(mapping)) {
+            munmap(mapping->range, sz);
+            delete mapping;
+            return nullptr;
+        }
+    } else {
         *ins = mapping;
+    }
 
-    return likely(mapping) ? mapping->base_addr : nullptr;
+    return likely(mapping) ? mapping->range.get() : nullptr;
 }
 
 static int mm_dev_map_search(void const *v, void const *k, void *s)
@@ -2808,11 +2819,12 @@ static int mm_dev_map_search(void const *v, void const *k, void *s)
     (void)s;
     mmap_device_mapping_t const *mapping = *(mmap_device_mapping_t const **)v;
 
-    if (k < mapping->base_addr)
+    if (k < mapping->range)
         return -1;
 
-    void const *mapping_end = (char*)mapping->base_addr + mapping->len;
-    if (k > mapping_end)
+    void const *mapping_end = (char const*)mapping->range +
+            mapping->range.size();
+    if (k >= mapping_end)
         return 1;
 
     return 0;
