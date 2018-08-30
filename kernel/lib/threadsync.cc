@@ -110,7 +110,8 @@ EXPORT void mutex_lock(mutex_t *mutex)
             // Take ownership
             mutex->owner = thread_get_id();
 
-            MUTEX_DTRACE("Took ownership of %p\n", (void*)mutex);
+            MUTEX_DTRACE("Took ownership of %p, tid=%d\n",
+                         (void*)mutex, mutex->owner);
 
             // Increase spin count
             if (mutex->spin_count < SPINCOUNT_MAX)
@@ -160,17 +161,19 @@ EXPORT void mutex_unlock(mutex_t *mutex)
     // See if any threads are waiting
     if (mutex->link.next != &mutex->link) {
         // Wake up the first waiter
-        MUTEX_DTRACE("Mutex unlock waking waiter\n");
         thread_wait_t *waiter = (thread_wait_t*)mutex->link.next;
         thread_wait_del(&waiter->link);
         thread_t waked_thread = waiter->thread;
+        MUTEX_DTRACE("Mutex unlock waking waiter, old_tid=%d, new_tid=%d\n",
+                     mutex->owner, waked_thread);
         mutex->owner = waked_thread;
         spinlock_unlock(&mutex->lock);
         thread_resume(waked_thread);
     } else {
         // No waiters
+        MUTEX_DTRACE("Mutex unlock waking waiter, old_tid=%d, new_tid=none\n",
+                     mutex->owner);
         mutex->owner = -1;
-        atomic_barrier();
         spinlock_unlock(&mutex->lock);
     }
 }
