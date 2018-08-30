@@ -1135,7 +1135,9 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
     // the chain. If a read outside the "cached" range occurs
     // we reiterate through the fat chain and reset the cache
 
-    off_t cached_end = file->cached_offset + block_size;
+    off_t cached_end = file->cached_cluster
+            ? file->cached_offset + block_size
+            : 0;
     while (size > 0) {
         if (file->cached_cluster &&
                 file->dirent->is_within_size(offset) &&
