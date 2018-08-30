@@ -9,6 +9,12 @@
 #include "mutex.h"
 
 struct filetab_t {
+    filetab_t() = default;
+    filetab_t(filetab_t&&) = default;
+    filetab_t(filetab_t const&) = delete;
+    filetab_t& operator=(filetab_t const&) = delete;
+    filetab_t& operator=(filetab_t&&) = delete;
+
     fs_file_info_t *fi;
     fs_base_t *fs;
     off_t pos;
@@ -59,6 +65,7 @@ static filetab_t *file_new_filetab(void)
 
 static bool file_del_filetab(filetab_t *item)
 {
+    file_table_scoped_lock lock(file_table_lock);
     assert(item->refcount != 0);
     if (--item->refcount == 0) {
         item->next_free = file_table_ff;
@@ -72,8 +79,8 @@ static bool file_del_filetab(filetab_t *item)
 bool file_ref_filetab(int id)
 {
     file_table_scoped_lock lock(file_table_lock);
-    if (id >= 0 && id < (int)file_table.size() &&
-            file_table[id].refcount > 0) {
+    if (id >= 0 && size_t(id) < file_table.size()) {
+        assert(file_table[id].refcount > 0);
         ++file_table[id].refcount;
         return true;
     }
@@ -85,8 +92,9 @@ REGISTER_CALLOUT(file_init, nullptr, callout_type_t::partition_probe, "999");
 
 static filetab_t *file_fh_from_id(int id)
 {
+    file_table_scoped_lock lock(file_table_lock);
     filetab_t *item = nullptr;
-    if (likely(id >= 0 && id < (int)file_table.size())) {
+    if (likely(id >= 0 && size_t(id) < file_table.size())) {
         item = &file_table[id];
 
         if (likely(item->refcount > 0))
@@ -110,6 +118,8 @@ int file_open(char const *path, int flags, mode_t mode)
 
     filetab_t *fh = file_new_filetab();
 
+    int id = fh - file_table.data();
+
     if (unlikely(!fh))
         return -int(errno_t::ENFILE);
 
@@ -122,7 +132,7 @@ int file_open(char const *path, int flags, mode_t mode)
     fh->fs = fs;
     fh->pos = 0;
 
-    return fh - file_table.data();
+    return id;
 }
 
 int file_close(int id)
@@ -133,10 +143,9 @@ int file_close(int id)
 
     int status = 0;
 
-    if (file_del_filetab(fh)) {
-        status = fh->fs->release(fh->fi);
-        memset(fh, 0, sizeof(*fh));
-    }
+    fs_file_info_t *saved_file_info = fh->fi;
+    if (file_del_filetab(fh))
+        status = fh->fs->release(saved_file_info);
 
     return status;
 }
@@ -346,7 +355,13 @@ int file_closedir(int id)
     if (unlikely(!fh))
         return -int(errno_t::EBADF);
 
-    return fh->fs->releasedir(fh->fi);
+    int status = 0;
+
+    fs_file_info_t *saved_file_info = fh->fi;
+    if (file_del_filetab(fh))
+        status = fh->fs->releasedir(saved_file_info);
+
+    return status;
 }
 
 int file_mkdir(char const *path, mode_t mode)
