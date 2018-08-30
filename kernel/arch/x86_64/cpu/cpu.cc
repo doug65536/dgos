@@ -74,10 +74,8 @@ void cpu_init_early(int ap)
     }
 }
 
-void cpu_init(int ap)
+void cpu_init(int)
 {
-    (void)ap;
-
     cpu_cr0_change_bits(
                 // TS = 0 (No task switch pending)
                 // EM = 0 (No FPU emulation)

@@ -95,187 +95,187 @@ CPUID_CONST_INLINE unsigned cpuid_model()
 }
 
 // CPU is AuthenticAMD
-CPUID_CONST_INLINE bool cpuid_is_amd(void)
+CPUID_CONST_INLINE bool cpuid_is_amd()
 {
     return cpuid_cache.is_amd;
 }
 
 // CPU is GenuineIntel
-CPUID_CONST_INLINE bool cpuid_is_intel(void)
+CPUID_CONST_INLINE bool cpuid_is_intel()
 {
     return cpuid_cache.is_intel;
 }
 
 // Running under a hypervisor
-CPUID_CONST_INLINE bool cpuid_is_hypervisor(void)
+CPUID_CONST_INLINE bool cpuid_is_hypervisor()
 {
     return cpuid_cache.is_hypervisor;
 }
 
 // No eXecute bit in page tables
-CPUID_CONST_INLINE bool cpuid_has_nx(void)
+CPUID_CONST_INLINE bool cpuid_has_nx()
 {
     return cpuid_cache.has_nx;
 }
 
 // SSE instructions
-CPUID_CONST_INLINE bool cpuid_has_sse3(void)
+CPUID_CONST_INLINE bool cpuid_has_sse3()
 {
     return cpuid_cache.has_sse3;
 }
 
 // MONITOR/MWAIT instructions
-CPUID_CONST_INLINE bool cpuid_has_mwait(void)
+CPUID_CONST_INLINE bool cpuid_has_mwait()
 {
     return cpuid_cache.has_mwait;
 }
 
 // SSE3 instructions
-CPUID_CONST_INLINE bool cpuid_has_ssse3(void)
+CPUID_CONST_INLINE bool cpuid_has_ssse3()
 {
     return cpuid_cache.has_ssse3;
 }
 
 // Fused Multiply Add instructions
-CPUID_CONST_INLINE bool cpuid_has_fma(void)
+CPUID_CONST_INLINE bool cpuid_has_fma()
 {
     return cpuid_cache.has_fma;
 }
 
 // Page Global Enable capability
-CPUID_CONST_INLINE bool cpuid_has_pge(void)
+CPUID_CONST_INLINE bool cpuid_has_pge()
 {
     return cpuid_cache.has_pge;
 }
 
 // Process Context Identifiers
-CPUID_CONST_INLINE bool cpuid_has_pcid(void)
+CPUID_CONST_INLINE bool cpuid_has_pcid()
 {
     return cpuid_cache.has_pcid;
 }
 
 // Invalidate Process Context Identifier instruction
-CPUID_CONST_INLINE bool cpuid_has_invpcid(void)
+CPUID_CONST_INLINE bool cpuid_has_invpcid()
 {
     return cpuid_cache.has_invpcid;
 }
 
 // SSE4.1 instructions
-CPUID_CONST_INLINE bool cpuid_has_sse4_1(void)
+CPUID_CONST_INLINE bool cpuid_has_sse4_1()
 {
     return cpuid_cache.has_sse4_1;
 }
 
 // SSE4.2 instructions
-CPUID_CONST_INLINE bool cpuid_has_sse4_2(void)
+CPUID_CONST_INLINE bool cpuid_has_sse4_2()
 {
     return cpuid_cache.has_sse4_2;
 }
 
 // x2APIC present
-CPUID_CONST_INLINE bool cpuid_has_x2apic(void)
+CPUID_CONST_INLINE bool cpuid_has_x2apic()
 {
     return cpuid_cache.has_x2apic;
 }
 
 // Advanced Encryption Standard instructions
-CPUID_CONST_INLINE bool cpuid_has_aes(void)
+CPUID_CONST_INLINE bool cpuid_has_aes()
 {
     return cpuid_cache.has_aes;
 }
 
 // eXtented Save instructions
-CPUID_CONST_INLINE bool cpuid_has_xsave(void)
+CPUID_CONST_INLINE bool cpuid_has_xsave()
 {
     return cpuid_cache.has_xsave;
 }
 
 // Advanced Vector Extensions instructions
-CPUID_CONST_INLINE bool cpuid_has_avx(void)
+CPUID_CONST_INLINE bool cpuid_has_avx()
 {
     return cpuid_cache.has_avx;
 }
 
 // ReaD RAND instruction
-CPUID_CONST_INLINE bool cpuid_has_rdrand(void)
+CPUID_CONST_INLINE bool cpuid_has_rdrand()
 {
     return cpuid_cache.has_rdrand;
 }
 
 // Supervisor Mode Execution Prevention
-CPUID_CONST_INLINE bool cpuid_has_smep(void)
+CPUID_CONST_INLINE bool cpuid_has_smep()
 {
     return cpuid_cache.has_smep;
 }
 
 // Supervisor Mode Access Prevention
-CPUID_CONST_INLINE bool cpuid_has_smap(void)
+CPUID_CONST_INLINE bool cpuid_has_smap()
 {
     return cpuid_cache.has_smap;
 }
 
 // Debugging Extensions
-CPUID_CONST_INLINE bool cpuid_has_de(void)
+CPUID_CONST_INLINE bool cpuid_has_de()
 {
     return cpuid_cache.has_de;
 }
 
 // INvariant ReaD TimeStamp Counter
-CPUID_CONST_INLINE bool cpuid_has_inrdtsc(void)
+CPUID_CONST_INLINE bool cpuid_has_inrdtsc()
 {
     return cpuid_cache.has_inrdtsc;
 }
 
 // Avx-512 Foundation
-CPUID_CONST_INLINE bool cpuid_has_avx512f(void)
+CPUID_CONST_INLINE bool cpuid_has_avx512f()
 {
     return cpuid_cache.has_avx512f;
 }
 
 // {RD|WR}{FS|GS}BASE instructions
-CPUID_CONST_INLINE bool cpuid_has_fsgsbase(void)
+CPUID_CONST_INLINE bool cpuid_has_fsgsbase()
 {
     return cpuid_cache.has_fsgsbase;
 }
 
 // SYSENTER/SYSEXIT instructions
-CPUID_CONST_INLINE bool cpuid_has_sysenter(void)
+CPUID_CONST_INLINE bool cpuid_has_sysenter()
 {
     return cpuid_cache.has_sysenter;
 }
 
 // 2MB pages
-CPUID_CONST_INLINE bool cpuid_has_2mpage(void)
+CPUID_CONST_INLINE bool cpuid_has_2mpage()
 {
     return cpuid_cache.has_2mpage;
 }
 
 // 1GB pages
-CPUID_CONST_INLINE bool cpuid_has_1gpage(void)
+CPUID_CONST_INLINE bool cpuid_has_1gpage()
 {
     return cpuid_cache.has_1gpage;
 }
 
 // User mode instruction prevention
-CPUID_CONST_INLINE bool cpuid_has_umip(void)
+CPUID_CONST_INLINE bool cpuid_has_umip()
 {
     return cpuid_cache.has_umip;
 }
 
 // Enhanced rep move string
-CPUID_CONST_INLINE bool cpuid_has_erms(void)
+CPUID_CONST_INLINE bool cpuid_has_erms()
 {
     return cpuid_cache.has_erms;
 }
 
 // Linear address size in bits
-CPUID_CONST_INLINE uint8_t cpuid_laddr_bits(void)
+CPUID_CONST_INLINE uint8_t cpuid_laddr_bits()
 {
     return cpuid_cache.laddr_bits;
 }
 
 // Physical address size in bits
-CPUID_CONST_INLINE uint8_t cpuid_paddr_bits(void)
+CPUID_CONST_INLINE uint8_t cpuid_paddr_bits()
 {
     return cpuid_cache.paddr_bits;
 }

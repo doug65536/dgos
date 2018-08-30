@@ -11,7 +11,7 @@ static uint32_t max_leaf[2];
 cpuid_cache_t cpuid_cache;
 int cpuid_nx_mask;
 
-void cpuid_init(void)
+void cpuid_init()
 {
     cpuid_t info;
 
