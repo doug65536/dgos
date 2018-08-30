@@ -1091,7 +1091,7 @@ fat32_fs_t::file_handle_t *fat32_fs_t::create_handle(
             return nullptr;
         }
 
-        if ((flags & O_EXCL) && fde) {
+        if (unlikely((flags & O_EXCL) && fde)) {
             // File already exists
             err = errno_t::EEXIST;
             return nullptr;
