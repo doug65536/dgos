@@ -129,6 +129,8 @@ module_entry_fn_t modload_load(char const *path)
         return nullptr;
     }
 
+    ELF64_TRACE("module %s opened, fd=%d\n", path, (int)fd);
+
     Elf64_Ehdr file_hdr;
 
     if (unlikely(sizeof(file_hdr) !=
