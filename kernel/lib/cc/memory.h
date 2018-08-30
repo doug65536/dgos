@@ -8,7 +8,13 @@ __BEGIN_NAMESPACE_STD
 template<typename _T>
 struct allocator
 {
-    typedef _T value_type;
+    using value_type = _T;
+    using size_type = size_t;
+    using difference_type = ptrdiff_t;
+    using reference = _T&;
+    using const_reference = _T const&;
+    using pointer = _T*;
+    using const_pointer = _T const*;
 
     template<typename _U>
     struct rebind
