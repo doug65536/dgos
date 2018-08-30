@@ -8,6 +8,13 @@
 #include "vector.h"
 #include "mutex.h"
 
+#define DEBUG_FILEHANDLE 1
+#if DEBUG_FILEHANDLE
+#define FILEHANDLE_TRACE(...) printdbg("filehandle: " __VA_ARGS__)
+#else
+#define FILEHANDLE_TRACE(...) ((void)0)
+#endif
+
 struct filetab_t {
     filetab_t() = default;
     filetab_t(filetab_t&&) = default;
@@ -125,9 +132,12 @@ int file_open(char const *path, int flags, mode_t mode)
 
     int status = fs->open(&fh->fi, path, flags, mode);
     if (unlikely(status < 0)) {
+        FILEHANDLE_TRACE("open failed on %s, status=%d\n", path, status);
         file_del_filetab(fh);
         return status;
     }
+
+    FILEHANDLE_TRACE("opened %s, fd=%d\n", path, id);
 
     fh->fs = fs;
     fh->pos = 0;
@@ -146,6 +156,8 @@ int file_close(int id)
     fs_file_info_t *saved_file_info = fh->fi;
     if (file_del_filetab(fh))
         status = fh->fs->release(saved_file_info);
+
+    FILEHANDLE_TRACE("closed fd=%d\n", id);
 
     return status;
 }
