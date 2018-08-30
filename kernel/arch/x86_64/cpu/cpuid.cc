@@ -23,6 +23,12 @@ void cpuid_init(void)
     }
 
     if (cpuid(&info, CPUID_INFO_FEATURES, 0)) {
+        cpuid_cache.family          = ((info.eax >> 8) & 0xF) +
+                                        ((info.eax >> 20) & 0xFF);
+
+        cpuid_cache.model           = ((info.eax >> 4) & 0xF) |
+                                        (((info.eax >> 16) & 0xFF) << 4);
+
         cpuid_cache.has_de          = info.edx & (1U << 2);
         cpuid_cache.has_pge         = info.edx & (1U << 13);
         cpuid_cache.has_sysenter    = info.edx & (1U << 11);

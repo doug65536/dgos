@@ -10,7 +10,7 @@ struct cpuid_t {
     uint32_t ecx;
 };
 
-extern "C" void _generic_target cpuid_init(void);
+extern "C" void _generic_target cpuid_init();
 
 // Force use of CPUID instruction (for getting APIC ID)
 // Returns true if the CPU supports that leaf
@@ -33,6 +33,9 @@ _generic_target bool cpuid_ecx_bit(int bit, uint32_t eax, uint32_t ecx);
 _generic_target bool cpuid_edx_bit(int bit, uint32_t eax, uint32_t ecx);
 
 struct cpuid_cache_t {
+    unsigned family     :12;
+    unsigned model      :12;
+
     bool is_amd         :1;
     bool is_intel       :1;
 
@@ -80,6 +83,16 @@ struct cpuid_cache_t {
 
 extern cpuid_cache_t cpuid_cache;
 extern int cpuid_nx_mask;
+
+CPUID_CONST_INLINE unsigned cpuid_family()
+{
+    return cpuid_cache.family;
+}
+
+CPUID_CONST_INLINE unsigned cpuid_model()
+{
+    return cpuid_cache.model;
+}
 
 // CPU is AuthenticAMD
 CPUID_CONST_INLINE bool cpuid_is_amd(void)

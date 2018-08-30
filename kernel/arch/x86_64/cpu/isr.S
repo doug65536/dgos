@@ -372,7 +372,8 @@ isr_common:
     movq %r12,%rsi
 
     // Call handler
-    call *%rax
+    call __x86_indirect_thunk_rax
+    //call *%rax
 
     // If context pointer is null, invoke the exception handler for this thread
     test %rax,%rax
@@ -806,6 +807,26 @@ isr_sysret64:
     sysretq
 
     .cfi_endproc
+
+// Retpoline
+.macro make_retpoline_thunk reg
+.global __x86_indirect_thunk_\reg
+.align 16
+__x86_indirect_thunk_\reg:
+    push %\reg
+    call 0f
+1:  lfence
+    pause
+    jmp 1b
+0:  lea 8(%rsp),%rsp
+    // This will speculatively return to the 1 label, but at retirement
+    // it will see that it should have branched to the pushed value
+    ret
+.endm
+
+.irp reg,rax,rcx,rdx,rbx,rbp,r8,r9,r10,r11,r12,r13,r14,r15
+    make_retpoline_thunk \reg
+.endr
 
 .section .rodata
 .align 8

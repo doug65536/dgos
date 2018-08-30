@@ -168,6 +168,16 @@ AC_SUBST([COMPILER_FLAGS])
 # fdevirtualize-at-ltrans fsched-stalled-insns=0
 # mtune=znver1
 
+AS_VAR_SET([RETPOLINE_FLAGS])
+for flag in \
+	mindirect-branch=thunk-extern
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([RETPOLINE_FLAGS], [" -$flag"])],
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([RETPOLINE_FLAGS])
+
 # fgcse-las causes compiler segfaults
 AS_VAR_SET([OPTIMIZATION_FLAGS], [])
 for flag in \

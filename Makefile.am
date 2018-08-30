@@ -808,6 +808,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility-inlines-hidden \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
+	$(RETPOLINE_FLAGS) \
 	$(FREESTANDING_FLAGS)
 
 # Buggy

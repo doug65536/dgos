@@ -181,6 +181,14 @@ void cpu_init(int ap)
 
     // Load null LDT
     cpu_ldt_set(0);
+
+    // Enable lfence speculation control on AMD processors
+    // Enable lfence to block instruction issue until it retires
+    // MSR is available on family 10h/12h/14h/15h/16h/17h
+    if (cpuid_is_amd() && cpuid_family() >= 0x10 && cpuid_family() <= 0x17 &&
+            cpuid_family() != 0x11 && cpuid_family() != 0x13) {
+        cpu_msr_change_bits(0xC0011029, 0, 1);
+    }
 }
 
 void cpu_init_stage2(int ap)
