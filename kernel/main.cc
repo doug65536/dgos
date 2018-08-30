@@ -759,32 +759,54 @@ void test_catch()
 }
 #endif
 
+#if ENABLE_FILESYSTEM_TEST
+_noreturn
+int test_filesystem_thread(void *p)
+{
+    int x = int(intptr_t(p));
+
+    while (true) {
+        printk("Starting filesystem test\n");
+        for (int n = 0; n < 1000; ++n) {
+            char name[16];
+            snprintf(name, sizeof(name), "test_%d_%d", x, n);
+            printk("creating %s\n", name);
+            int create_test = file_open(
+                        name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
+            if (create_test == -int(errno_t::EROFS))
+                continue;
+            assert(create_test >= 0);
+            file_write(create_test, "Hello!", 6);
+            file_close(create_test);
+            printk(" created %s\n\n", name);
+        }
+        for (int n = 0; n < 1000; ++n) {
+            char name[16];
+            snprintf(name, sizeof(name), "created_%d_%d", x, n);
+            printk("deleting %s\n", name);
+            int unlink_test = file_unlink(name);
+            if (unlink_test == -int(errno_t::EROFS))
+                printk("Delete %s failed with %d\n", name, unlink_test);
+        }
+
+        printk("Opening root directory\n");
+
+        int od = file_opendir("");
+        dirent_t de;
+        dirent_t *dep;
+        while (file_readdir_r(od, &de, &dep) > 0) {
+            printk("File: %s\n", de.d_name);
+        }
+        file_closedir(od);
+    }
+}
+
 void test_filesystem()
 {
-    printk("Starting filesystem test\n");
-    for (int n = 0; n < 2; ++n) {
-        char name[16];
-        snprintf(name, sizeof(name), "created_%d", n);
-        printk("creating %s\n", name);
-        int create_test = file_open(name, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-        if (create_test == -int(errno_t::EROFS))
-            continue;
-        assert(create_test >= 0);
-        file_write(create_test, "Hello!", 6);
-        file_close(create_test);
-        printk(" created %s\n\n", name);
-    }
-
-    printk("Opening root directory\n");
-
-    int od = file_opendir("");
-    dirent_t de;
-    dirent_t *dep;
-    while (file_readdir_r(od, &de, &dep) > 0) {
-        printk("File: %s\n", de.d_name);
-    }
-    file_closedir(od);
+    for (int n = 0; n < ENABLE_FILESYSTEM_TEST; ++n)
+        thread_create(test_filesystem_thread, (void*)intptr_t(n), 0, false);
 }
+#endif
 
 void test_spawn()
 {
