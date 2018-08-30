@@ -1143,21 +1143,37 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
                 file->dirent->is_within_size(offset) &&
                 (offset >= cached_end) &&
                 (offset < cached_end + block_size)) {
-            // Move to next cluster
+            // We are caching a position in the chain, and,
+            // the offset is within the file size, and,
+            // the offset is in the next block in the chain, then,
+            // move to next cluster
             file->cached_offset += block_size;
+            cached_end = file->cached_offset + block_size;
             file->cached_cluster = fat[file->cached_cluster];
-            cached_end += block_size;
         } else if (!file->cached_cluster ||
                    (offset < file->cached_offset) ||
                    (offset >= cached_end)) {
-            // Offset cache miss
+            // We are not caching a position, or,
+            // we are rewinding to before the cached position, or,
+            // we are seeking past the end of the cached cluster, then,
+            // offset cache miss
             file->cached_cluster = dirent_start_cluster(file->dirent);
             file->cached_offset = 0;
+            cached_end = 0;
+
+            // Walk from the start of the chain to the new position
+            // if it is a write, possibly append clusters to the chain
             walk_cluster_chain(file, offset, !read);
+
             if (file->cached_cluster &&
                     (file->dirent->is_directory() ||
-                     file->dirent->size > 0 || !read))
+                     file->dirent->size > 0 || !read)) {
+                // We successfully walked the cluster chain, and
+                // (it is a directory or
+                //  the file is not empty
+                //  or it is a write), then
                 cached_end = file->cached_offset + block_size;
+            }
         }
 
         size_t avail;
