@@ -9,9 +9,9 @@ struct default_delete
 {
     constexpr default_delete() = default;
 
-    _always_inline void operator()(T* ptr) const
+    _always_inline void operator()(T* __ptr) const
     {
-        delete ptr;
+        delete __ptr;
     }
 };
 
@@ -21,9 +21,9 @@ struct default_delete<T[]>
     constexpr default_delete() = default;
 
     template<typename U>
-    _always_inline void operator()(U ptr) const
+    _always_inline void operator()(U __ptr) const
     {
-        delete[] ptr;
+        delete[] __ptr;
     }
 };
 
@@ -36,63 +36,63 @@ public:
     using const_pointer = _T const*;
 
     unique_ptr()
-        : ptr(nullptr)
+        : __ptr(nullptr)
     {
     }
 
-    unique_ptr(unique_ptr&& rhs)
-        : ptr(rhs.release())
+    unique_ptr(unique_ptr&& __rhs)
+        : __ptr(__rhs.release())
     {
     }
 
     unique_ptr(unique_ptr const &) = delete;
 
-    unique_ptr(_T* value)
-        : ptr(value)
+    unique_ptr(_T* __value)
+        : __ptr(__value)
     {
     }
 
     ~unique_ptr()
     {
-        if (ptr)
-            ((Tdeleter()))(ptr);
+        if (__ptr)
+            ((Tdeleter()))(__ptr);
     }
 
     operator _T*()
     {
-        return ptr;
+        return __ptr;
     }
 
     operator _T const*() const
     {
-        return ptr;
+        return __ptr;
     }
 
     _T* operator->()
     {
-        return ptr;
+        return __ptr;
     }
 
     _T const* operator->() const
     {
-        return ptr;
+        return __ptr;
     }
 
     _T* get()
     {
-        return ptr;
+        return __ptr;
     }
 
     _T const* get() const
     {
-        return ptr;
+        return __ptr;
     }
 
-    unique_ptr &operator=(_T* rhs)
+    unique_ptr &operator=(_T* __rhs)
     {
-        if (ptr)
-            ((Tdeleter()))(ptr);
-        ptr = rhs;
+        if (__ptr)
+            ((Tdeleter()))(__ptr);
+        __ptr = __rhs;
         return *this;
     }
 
@@ -103,23 +103,23 @@ public:
 
     _T* release()
     {
-        _T* p = ptr;
-        ptr = nullptr;
-        return p;
+        _T* __p = __ptr;
+        __ptr = nullptr;
+        return __p;
     }
 
     bool reset(_T* p = pointer())
     {
-        _T* old = ptr;
-        ptr = p;
-        if (old)
-            ((Tdeleter()))(old);
+        _T* __old = __ptr;
+        __ptr = p;
+        if (__old)
+            ((Tdeleter()))(__old);
 
-        return ptr != nullptr;
+        return __ptr != nullptr;
     }
 
 private:
-    _T* ptr;
+    _T* __ptr;
 };
 
 template<typename _T, typename Tdeleter>
@@ -131,73 +131,73 @@ public:
     using const_pointer = _T const*;
 
     unique_ptr()
-        : ptr(nullptr)
+        : __ptr(nullptr)
     {
     }
 
     unique_ptr(unique_ptr&& rhs)
-        : ptr(rhs.release())
+        : __ptr(rhs.release())
     {
     }
 
     unique_ptr(unique_ptr const &) = delete;
 
-    unique_ptr(_T* value)
-        : ptr(value)
+    unique_ptr(_T* __value)
+        : __ptr(__value)
     {
     }
 
     ~unique_ptr()
     {
-        if (ptr)
-            ((Tdeleter()))(ptr);
+        if (__ptr)
+            ((Tdeleter()))(__ptr);
     }
 
     operator _T*()
     {
-        return ptr;
+        return __ptr;
     }
 
     operator _T const*() const
     {
-        return ptr;
+        return __ptr;
     }
 
     _T& operator[](size_t i)
     {
-        return ptr[i];
+        return __ptr[i];
     }
 
-    _T const& operator[](size_t i) const
+    _T const& operator[](size_t __i) const
     {
-        return ptr[i];
+        return __ptr[__i];
     }
 
     _T* operator->()
     {
-        return ptr;
+        return __ptr;
     }
 
     _T const* operator->() const
     {
-        return ptr;
+        return __ptr;
     }
 
     _T* get()
     {
-        return ptr;
+        return __ptr;
     }
 
     _T const* get() const
     {
-        return ptr;
+        return __ptr;
     }
 
-    unique_ptr &operator=(_T* rhs)
+    unique_ptr &operator=(_T* __rhs)
     {
-        if (ptr)
-            ((Tdeleter()))(ptr);
-        ptr = rhs;
+        if (__ptr)
+            ((Tdeleter()))(__ptr);
+        __ptr = __rhs;
         return *this;
     }
 
@@ -208,21 +208,21 @@ public:
 
     _T* release()
     {
-        _T* p = ptr;
-        ptr = nullptr;
-        return p;
+        _T* __p = __ptr;
+        __ptr = nullptr;
+        return __p;
     }
 
-    void reset(_T* p = pointer())
+    void reset(_T* __p = pointer())
     {
-        _T* old = ptr;
-        ptr = p;
-        if (old)
-            ((Tdeleter()))(old);
+        _T* __old = __ptr;
+        __ptr = __p;
+        if (__old)
+            ((Tdeleter()))(__old);
     }
 
 private:
-    _T* ptr;
+    _T* __ptr;
 };
 
 __END_NAMESPACE_STD
@@ -235,11 +235,11 @@ class free_deleter
 public:
     constexpr free_deleter() = default;
 
-    _always_inline void operator()(T* ptr) const
+    _always_inline void operator()(T* __ptr) const
     {
-        if (ptr) {
-            destruct(ptr);
-            free(ptr);
+        if (__ptr) {
+            destruct(__ptr);
+            free(__ptr);
         }
     }
 
@@ -249,9 +249,9 @@ private:
     }
 
     template<typename U>
-    void destruct(U *ptr) const
+    void destruct(U *__ptr) const
     {
-        ptr->~U();
+        __ptr->~U();
     }
 };
 
