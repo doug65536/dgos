@@ -74,6 +74,7 @@ REGISTER_CALLOUT(smp_main, nullptr, callout_type_t::smp_start, "100");
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
 #define ENABLE_FIND_VBE             0
+#define ENABLE_UNWIND               1
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE         64
@@ -705,6 +706,7 @@ static int draw_test(void *p)
 }
 #endif
 
+#if ENABLE_UNWIND
 __exception_jmp_buf_t test_unwind_jmpbuf;
 
 class test_unwind_cls {
@@ -755,6 +757,7 @@ void test_catch()
         printk("Caught\n");
     }
 }
+#endif
 
 void test_filesystem()
 {
@@ -799,12 +802,10 @@ void test_spawn()
 
 static int init_thread(void *)
 {
+#if ENABLE_UNWIND
     test_unwind();
-
     test_catch();
-
-    printk("Initializing kernel threadpool\n");
-    workq::init(thread_cpu_count());
+#endif
 
     printk("Initializing PCI\n");
     pci_init();
