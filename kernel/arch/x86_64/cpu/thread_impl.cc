@@ -517,9 +517,6 @@ static int smp_idle_thread(void *)
     atomic_inc(&thread_smp_running);
     thread_check_stack();
 
-    if (cpu_count == acpi_cpu_count())
-        thread_cls_ready = true;
-
     thread_idle();
 }
 
@@ -537,6 +534,8 @@ static isr_context_t *thread_context_switch_handler(int, isr_context_t *ctx)
 
 void thread_init(int ap)
 {
+    thread_cls_ready = true;
+
     uint32_t cpu_nr = atomic_xadd(&cpu_count, 1);
 
     cpu_info_t *cpu = cpus + cpu_nr;
@@ -587,9 +586,6 @@ void thread_init(int ap)
         atomic_barrier();
         thread->state = THREAD_IS_RUNNING;
         thread_count = 1;
-
-        if (acpi_cpu_count() == 1)
-            thread_cls_ready = true;
     } else {
         cpu_irq_disable();
 
