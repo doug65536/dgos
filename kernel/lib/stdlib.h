@@ -45,6 +45,7 @@ int atoll(char const *str);
 
 __END_DECLS
 
+_const
 void *operator new(size_t, void *p) noexcept;
 
 _malloc _assume_aligned(16)
