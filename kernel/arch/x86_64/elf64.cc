@@ -148,9 +148,9 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     size_t mod_str_scn = 0;
-    std::unique_ptr_free<Elf64_Sym> mod_sym;
+    ext::unique_ptr_free<Elf64_Sym> mod_sym;
     Elf64_Sym *mod_sym_end = nullptr;
-    std::unique_ptr_free<char> mod_str;
+    ext::unique_ptr_free<char> mod_str;
 
     Elf64_Xword max_addr = 0;
     Elf64_Xword min_addr = (Elf64_Xword)-1;
@@ -239,7 +239,7 @@ module_entry_fn_t modload_load(char const *path)
         }
     }
 
-    std::unique_ptr_free<void> rel_buf(malloc(max_rel));
+    ext::unique_ptr_free<void> rel_buf(malloc(max_rel));
 
     Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf.get();
     Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf.get();
@@ -273,9 +273,9 @@ module_entry_fn_t modload_load(char const *path)
 
         modload_find_syms(&symtab, &strtab, scn_hdrs, i);
 
-        std::unique_ptr_free<Elf64_Sym> symdata(
+        ext::unique_ptr_free<Elf64_Sym> symdata(
                     (Elf64_Sym *)malloc(symtab->sh_size));
-        std::unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
+        ext::unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
 
         if (unlikely((ssize_t)symtab->sh_size != file_pread(
                     fd, symdata, symtab->sh_size, symtab->sh_offset))) {

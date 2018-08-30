@@ -200,7 +200,7 @@ int sys_ioctl(int fd, int cmd, void* arg)
     if (unlikely(id < 0))
         return err(errno_t::EBADF);
 
-    std::unique_ptr_free<void> data;
+    ext::unique_ptr_free<void> data;
 
     // If the command indicates read or write, and the size is nonzero,
     // then allocate a kernel shadow buffer of the argument pointer data

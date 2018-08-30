@@ -13,8 +13,11 @@
 # define __END_DECLS
 #endif
 
-#define __BEGIN_NAMESPACE_STD   namespace std {
-#define __END_NAMESPACE_STD     }
+#define __BEGIN_NAMESPACE(n)   namespace n {
+#define __BEGIN_NAMESPACE_STD   __BEGIN_NAMESPACE(std)
+#define __BEGIN_NAMESPACE_EXT   __BEGIN_NAMESPACE(ext)
+#define __END_NAMESPACE         }
+#define __END_NAMESPACE_STD     __END_NAMESPACE
 
 #if defined(__GNUC__)
 

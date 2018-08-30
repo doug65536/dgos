@@ -225,6 +225,10 @@ private:
     _T* ptr;
 };
 
+__END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+
 template<typename T>
 class free_deleter
 {
@@ -254,4 +258,4 @@ private:
 template<typename T>
 using unique_ptr_free = unique_ptr<T, free_deleter<T>>;
 
-__END_NAMESPACE_STD
+__END_NAMESPACE

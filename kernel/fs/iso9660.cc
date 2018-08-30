@@ -150,7 +150,7 @@ struct iso9660_fs_t final : public fs_base_ro_t {
     uint32_t pt_lba;
     uint32_t pt_bytes;
 
-    std::unique_ptr_free<char> serial;
+    ext::unique_ptr_free<char> serial;
 
     int (*name_convert)(void *encoded_buf,
                         char const *utf8);
