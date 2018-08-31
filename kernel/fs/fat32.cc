@@ -1231,6 +1231,9 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
         size -= avail;
         io += avail;
         result += avail;
+
+        if (unlikely(avail == 0))
+            break;
     }
 
     return result;
