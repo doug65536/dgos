@@ -336,7 +336,7 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
                 return nullptr;
 
             // Copy the original to the new block
-            memcpy(new_block, block, hdr->size_next);
+            memcpy(new_block, block, hdr->size_next - sizeof(heap_hdr_t));
 
             // Free the original
             heap_free(heap, block);
