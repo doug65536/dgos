@@ -4,6 +4,7 @@
 #include "inttypes.h"
 #include "time.h"
 #include "numeric_limits.h"
+#include "work_queue.h"
 
 #define DEBUG_VIRTIO 1
 #if DEBUG_VIRTIO
@@ -230,7 +231,9 @@ isr_context_t *virtio_base_t::irq_handler(int irq, isr_context_t *ctx)
     for (virtio_base_t *dev : virtio_devs) {
         if (irq >= dev->irq_range.base &&
                 irq < dev->irq_range.base + dev->irq_range.count) {
-            dev->irq_handler(irq - dev->irq_range.base);
+            workq::enqueue([=] {
+                dev->irq_handler(irq - dev->irq_range.base);
+            });
         }
     }
     return ctx;
