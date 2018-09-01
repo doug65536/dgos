@@ -789,7 +789,7 @@ isr_sysret64:
     mov %eax,%r10d
     // not r11
     mov %eax,%r12d
-    mov %eax,%r13d
+    // not r13
     // not r14
     // not r15
 
