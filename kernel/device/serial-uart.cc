@@ -6,6 +6,7 @@
 #include "mutex.h"
 #include "cpu/control_regs.h"
 #include "nano_time.h"
+#include "work_queue.h"
 
 #define DEBUG_UART  0
 #if DEBUG_UART
@@ -320,7 +321,7 @@ protected:
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
 
-    virtual isr_context_t *port_irq_handler(isr_context_t *ctx);
+    virtual void port_irq_handler();
 
     _always_inline void out(port_t ofs, uint8_t value) const;
     _always_inline void outs(port_t ofs, const void *value, size_t len) const;
@@ -589,15 +590,17 @@ isr_context_t *uart_t::irq_handler(int irq, isr_context_t *ctx)
     //printdbg("UART IRQ\n");
 
     for (uart_t *uart : uarts) {
-        if (uart->irq_hooked && uart->irq == irq)
-            ctx = uart->port_irq_handler(ctx);
+        if (uart->irq_hooked && uart->irq == irq) {
+            workq::enqueue([=] {
+                uart->port_irq_handler();
+            });
+        }
     }
     return ctx;
 }
 
-isr_context_t *uart_t::port_irq_handler(isr_context_t *ctx)
+void uart_t::port_irq_handler()
 {
-    return ctx;
 }
 
 void uart_t::out(port_t ofs, uint8_t value) const
@@ -636,7 +639,7 @@ private:
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);
-    isr_context_t *port_irq_handler(isr_context_t *ctx) override final;
+    void port_irq_handler() override final;
 
     void wait_tx_not_full(scoped_lock &lock_);
     void wait_rx_not_empty(scoped_lock& lock_);
@@ -853,7 +856,7 @@ void uart_async_t::tx_take_value()
     tx_tail = queue_next(tx_tail, log2_buffer_size);
 }
 
-isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
+void uart_async_t::port_irq_handler()
 {
     scoped_lock lock_(lock);
 
@@ -904,8 +907,6 @@ isr_context_t *uart_async_t::port_irq_handler(isr_context_t *ctx)
         UART_TRACE("Notifying rx\n");
         rx_not_empty.notify_all();
     }
-
-    return ctx;
 }
 
 void uart_async_t::wait_tx_not_full(scoped_lock& lock_)
