@@ -1400,6 +1400,9 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         dump_context(ctx, 1);
 
         assert(!"Invalid page fault path");
+    } else if (present_mask == 0x0F &&
+               (pte & PTE_NX)) {
+        printdbg("#PF: Instruction fectch from no-execute page\n");
     }
 
     printdbg("#PF: present=%d\n"
