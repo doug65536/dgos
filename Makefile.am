@@ -1595,7 +1595,7 @@ QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report
 QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
-QEMU_MACHINE = -machine q35
+QEMU_MACHINE = -machine q35 -vga virtio -display sdl,gl=on
 #QEMU_MACHINE_nvme = -machine q35
 #QEMU_MACHINE_ahci = -machine q35
 #QEMU_MACHINE_usb = -machine q35
