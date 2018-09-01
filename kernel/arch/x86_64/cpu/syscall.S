@@ -1,6 +1,7 @@
 .section .text, "ax"
 
 #include "asm_constants.h"
+#include "cfi_helpers.h"
 
 // This code may clobber rdi, rsi, rdx, rcx, r8-r11, rflags
 // This code may clobber the entire FPU/SSE/AVX state
@@ -11,8 +12,9 @@
 .hidden syscall_entry
 syscall_entry:
     .cfi_startproc
+    .cfi_signal_frame
     .cfi_register rip,rcx
-    .cfi_return_column rcx
+    .cfi_register rsp,rsp
     .cfi_def_cfa rsp,0
 
     // syscall rax
@@ -43,24 +45,71 @@ syscall_entry:
     // Switch to this thread's syscall stack
     xchgq %rsp,%r11
 
-    .cfi_def_cfa_register r11
+    .cfi_def_cfa r11,0
+    .cfi_register rsp,r11
 
     // IRQs are okay at this point
     sti
 
     // Push user stack pointer to syscall stack
     pushq %r11
+    .cfi_def_cfa rsp,0
+    .cfi_offset rsp,-1*8
 
     // Push return address to syscall stack
-    pushq %rcx
+    push_cfi %rcx
+    .cfi_offset rip,-2*8
 
-    .cfi_def_cfa rsp,8
+    // Prevent user mode from controlling rbx,rbp,r12,r13,r14,r15
+
+    push_cfi %rbp
+    .cfi_offset rbp,-3*8
+    xorl %ebp,%ebp
+
+    push_cfi %rbx
+    .cfi_offset rbx,-4*8
+    movl %ebp,%ebx
+
+    push_cfi %r12
+    .cfi_offset r12,-5*8
+    movl %ebp,%r12d
+
+    push_cfi %r13
+    .cfi_offset r13,-6*8
+    movl %ebp,%r13d
+
+    push_cfi %r14
+    .cfi_offset r14,-7*8
+    movl %ebp,%r14d
+
+    push_cfi %r15
+    .cfi_offset r15,-8*8
+    movl %ebp,%r15d
 
     // Move 4th parameter to proper place
     movq %r10,%rcx
 
     // Call handler
-    callq *%rax
+    call __x86_indirect_thunk_rax
+    //callq *%rax
+
+    pop_cfi %r15
+    .cfi_restore r15
+
+    pop_cfi %r14
+    .cfi_restore r14
+
+    pop_cfi %r13
+    .cfi_restore r13
+
+    pop_cfi %r12
+    .cfi_restore r12
+
+    pop_cfi %rbx
+    .cfi_restore rbx
+
+    pop_cfi %rbp
+    .cfi_restore rbp
 
     // IRQs are not safe when
     // - we have user gs and still in kernel mode
@@ -71,13 +120,15 @@ syscall_entry:
     swapgs
 
     // Restore return address
-    popq %rcx
+    pop_cfi %rcx
+    .cfi_register rip,rcx
 
     // Set return rflags
     movl $SYSCALL_RFLAGS,%r11d
 
     // Restore caller's stack
-    popq %rsp
+    pop_cfi %rsp
+    .cfi_def_cfa rsp,0
 
     // Don't leak information to user mode
     xorl %edx,%edx
