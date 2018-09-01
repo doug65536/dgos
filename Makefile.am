@@ -955,7 +955,7 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
 		-std=c++14 \
 		-fwhole-program -pthread \
-		-O0 \
+		-O3 -march=native \
 		-Wall -Wextra -Wpedantic \
 		$^ \
 		-Wl,--start-group \
