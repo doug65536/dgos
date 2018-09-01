@@ -131,7 +131,8 @@ void register_text_display_device(
     text_dev_factories = factory;
 }
 
-void text_dev_start(void *)
+_constructor(ctor_text_dev)
+static void text_dev_start()
 {
     for (text_dev_factory_t *f = text_dev_factories; f; f = f->next_factory) {
         text_dev_base_t **ptrs;
@@ -154,4 +155,4 @@ void text_dev_start(void *)
     }
 }
 
-REGISTER_CALLOUT(text_dev_start, nullptr, callout_type_t::txt_dev, "000");
+//REGISTER_CALLOUT(text_dev_start, nullptr, callout_type_t::txt_dev, "000");

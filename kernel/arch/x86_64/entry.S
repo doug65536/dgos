@@ -149,11 +149,6 @@ bsp_init:
     jmp .Lrela_iplt_next
 .Lrela_iplt_done:
 
-    // Call the constructors
-    leaq ___ctors_st(%rip),%rdi
-    leaq ___ctors_en(%rip),%rsi
-    call invoke_function_array
-
 #ifdef _ASAN_ENABLED
     // Mark the callout array initialized
     leaq ___callout_array_st(%rip),%rdi
@@ -187,27 +182,29 @@ bsp_init:
     movb $1,asan_ready(%rip)
 #endif
 
+    // Call the constructors
+    leaq ___ctors_st(%rip),%rdi
+    leaq ___ctors_en(%rip),%rsi
+    call invoke_function_array
+
     debugind 'A'
 
     // Notify constructors ran
-    movl $'C',%edi
-    call callout_call
+    //movl $'C',%edi
+    //call callout_call
 
     debugind 'B'
 
-    xorl %edi,%edi
-    call cpu_init
+    //xorl %edi,%edi
+    //call cpu_init
 
     debugind 'C'
 
     // Initialize text devices
-    movl $'V',%edi
-    call callout_call
+    //movl $'V',%edi
+    //call callout_call
 
     debugind 'D'
-
-    xorl %edi,%edi
-    call cpu_init_stage2
 
     debugind 'E'
 

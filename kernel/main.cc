@@ -46,14 +46,6 @@ kernel_params_t *kernel_params;
 size_t constexpr kernel_stack_size = 16384;
 char kernel_stack[kernel_stack_size] _section(".bspstk");
 
-static void smp_main(void*)
-{
-    printdbg("AP in smp_main...\n");
-    cpu_init(1);
-}
-
-REGISTER_CALLOUT(smp_main, nullptr, callout_type_t::smp_start, "100");
-
 #define TEST_FORMAT(f, t, v) \
     printk("Test %8s -> '" f \
     "' 99=%d\t\t", f, (t)v, 99)

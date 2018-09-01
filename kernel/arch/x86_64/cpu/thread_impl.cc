@@ -542,6 +542,12 @@ static isr_context_t *thread_context_switch_handler(int, isr_context_t *ctx)
     return thread_schedule(ctx);
 }
 
+_constructor(ctor_thread_init_bsp)
+static void thread_init_bsp()
+{
+    thread_init(0);
+}
+
 void thread_init(int ap)
 {
     thread_cls_ready = true;

@@ -1454,6 +1454,12 @@ static void mmu_configure_pat(void)
 #define TRACE_INIT(...) ((void)0)
 #endif
 
+_constructor(ctor_mmu_init)
+static void mmu_init_bsp()
+{
+    mmu_init();
+}
+
 void mmu_init()
 {
     TRACE_INIT("Hooking TLB shootdown\n");

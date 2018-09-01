@@ -15,6 +15,7 @@ static bool uart_ready;
 
 static char vt102_reset[] = "\x1B" "c";
 
+_constructor(ctor_ctors_ran)
 static void e9debug_serial_ready(void*)
 {
     if (bootinfo_parameter(bootparam_t::boot_serial_log)) {
@@ -62,5 +63,5 @@ void e9debug_init(void)
              "----------------------------------------------------\n");
 }
 
-REGISTER_CALLOUT(e9debug_serial_ready, nullptr,
-                 callout_type_t::constructors_ran, "000");
+//REGISTER_CALLOUT(e9debug_serial_ready, nullptr,
+//                 callout_type_t::constructors_ran, "000");

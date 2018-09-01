@@ -76,6 +76,12 @@ void cpu_init_early(int ap)
     }
 }
 
+_constructor(ctor_cpu_init_bsp)
+static void cpu_init_bsp()
+{
+    cpu_init(0);
+}
+
 void cpu_init(int)
 {
     cpu_cr0_change_bits(
@@ -191,14 +197,6 @@ void cpu_init(int)
     }
 }
 
-void cpu_init_stage2(int ap)
-{
-    if (!ap) {
-        mmu_init();
-        thread_init(ap);
-    }
-}
-
 void cpu_hw_init(int ap)
 {
     printk("Initializing PIT\n");
@@ -239,10 +237,11 @@ void cpu_hw_init(int ap)
     //printk("Enabling IRQs\n");
 }
 
-static void cpu_init_smp_apic(void *arg)
+static void cpu_init_smp_apic(void *)
 {
+    cpu_init(1);
+
     printdbg("AP in cpu_init_smp_apic\n");
-    (void)arg;
     apic_init(1);
 
     thread_init(1);

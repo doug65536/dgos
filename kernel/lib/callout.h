@@ -1,6 +1,14 @@
 #pragma once
 #include "types.h"
 
+enum constructor_order_t {
+    ctor_ctors_ran = 1000,
+    ctor_cpu_init_bsp,
+    ctor_text_dev,
+    ctor_mmu_init,
+    ctor_thread_init_bsp
+};
+
 // Types:
 //  'M': VMM initialized
 //  'S': Initialize SMP CPU
@@ -24,7 +32,7 @@ enum struct callout_type_t : uint32_t {
     acpi_ready = 'A',
     early_dev = 'E',
     smp_online = 'T',
-    constructors_ran = 'C',
+    //constructors_ran = 'C',
     tss_list_ready = 128,
 
     // from init_thread
