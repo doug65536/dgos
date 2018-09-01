@@ -8,6 +8,7 @@
 #include "interrupts.h"
 #include "mutex.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #include "conio.h"
 #include "printk.h"
@@ -107,11 +108,8 @@ static void pit8254_set_rate(unsigned hz)
     outb(PIT_DATA(0), (divisor >> 8) & 0xFF);
 }
 
-static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
+static void pit8254_irq_handler()
 {
-    (void)irq;
-    assert(irq == 0);
-
     atomic_inc(&timer_ticks);
     atomic_add(&timer_ns, tick_ns);
 
@@ -124,6 +122,16 @@ static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
 
         //con_draw_xy(70, 0, buf, 7);
     }
+}
+
+static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
+{
+    (void)irq;
+    assert(irq == 0);
+
+    workq::enqueue([=] {
+        pit8254_irq_handler();
+    });
 
     return ctx;
 }
