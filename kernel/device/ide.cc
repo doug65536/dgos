@@ -12,6 +12,7 @@
 #include "bswap.h"
 #include "unique_ptr.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #define IDE_DEBUG   1
 #if IDE_DEBUG
@@ -1161,8 +1162,12 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 isr_context_t *ide_if_t::ide_chan_t::irq_handler(int irq, isr_context_t *ctx)
 {
     for (unsigned i = 0; i < ide_devs.size(); ++i) {
-        if (ide_devs[i]->chan->ports.irq == irq)
-            ide_devs[i]->chan->irq_handler();
+        ide_dev_t *dev = ide_devs[i];
+        if (dev->chan->ports.irq == irq) {
+            workq::enqueue([=] {
+                dev->chan->irq_handler();
+            });
+        }
     }
 
     return ctx;
