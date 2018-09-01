@@ -1927,6 +1927,10 @@ void apic_start_smp(void)
     gdt_init_tss(topo_cpu_count);
     gdt_load_tr(0);
 
+    // Populate critical cpu local info on every cpu that is needed very early
+    for (size_t i = 0; i < apic_id_count; ++i)
+        thread_init_cpu(i, apic_id_list[i]);
+
     // See if there are any other CPUs to start
     if (topo_thread_count * topo_core_count == 1 &&
             apic_id_count == 1)

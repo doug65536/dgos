@@ -1193,3 +1193,18 @@ void thread_exit(int exit_code)
         info->state = THREAD_IS_EXITING_BUSY;
     thread_cleanup();
 }
+
+void thread_set_cpu_gsbase(int ap)
+{
+    cpu_info_t *cpu = ap ? this_cpu_by_apic_id_slow() : cpus;
+    cpu_gsbase_set(cpu);
+}
+
+void thread_init_cpu(size_t cpu_nr, uint32_t apic_id)
+{
+    cpu_info_t *cpu = cpus + cpu_nr;
+    cpu->self = cpu;
+    cpu->apic_id = apic_id;
+    cpu->cpu_nr = cpu_nr;
+    cpu->cur_thread = threads + cpu_nr;
+}

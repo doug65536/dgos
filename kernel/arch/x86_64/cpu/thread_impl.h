@@ -11,6 +11,8 @@ extern uint32_t volatile thread_smp_running;
 isr_context_t *thread_schedule(isr_context_t *ctx);
 isr_context_t *thread_schedule_postirq(isr_context_t *ctx);
 void thread_init(int ap);
+void thread_set_cpu_gsbase(int ap);
+void thread_init_cpu(size_t cpu_nr, uint32_t apic_id);
 uint32_t thread_cpus_started(void);
 
 _pure

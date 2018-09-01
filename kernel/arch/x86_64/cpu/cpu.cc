@@ -39,6 +39,8 @@ void cpu_init_early(int ap)
     cpu_fs_set(GDT_SEL_USER_DATA | 3);
     cpu_gs_set(GDT_SEL_USER_DATA | 3);
 
+    thread_set_cpu_gsbase(ap);
+
     // Enable SSE early
     cpu_cr4_change_bits(0, CPU_CR4_OFXSR | CPU_CR4_OSXMMEX);
 
