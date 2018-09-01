@@ -5,6 +5,7 @@
 int apic_init(int ap);
 void apic_start_smp(void);
 unsigned apic_get_id(void);
+size_t apic_cpu_count();
 
 // If intr == 2, sends an NMI
 // if target_apic_id is <= -2, sends to all CPUs

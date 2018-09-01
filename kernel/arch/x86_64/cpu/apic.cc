@@ -1582,6 +1582,11 @@ unsigned apic_get_id(void)
     return apic_id;
 }
 
+size_t apic_cpu_count()
+{
+    return apic_id_count;
+}
+
 static void apic_send_command(uint32_t dest, uint32_t cmd)
 {
     apic->command(dest, cmd);
