@@ -230,6 +230,16 @@ static uint32_t get_apic_id()
     return apic_id;
 }
 
+// Get executing CPU by APIC ID (slow, only used in early init)
+cpu_info_t *this_cpu_by_apic_id_slow()
+{
+    uint32_t apic_id = get_apic_id();
+    for (size_t i = 0; i < apic_cpu_count(); ++i)
+        if (cpus[i].apic_id == apic_id)
+            return cpus + i;
+    return nullptr;
+}
+
 static _always_inline cpu_info_t *this_cpu()
 {
     return cpu_gs_read<cpu_info_t*, 0>();
