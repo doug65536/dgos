@@ -131,10 +131,14 @@ void cpu_init(int)
 
     if (cpuid_has_umip()) {
         // Enable user mode instruction prevention
+        // Prevents execution of SGDT, SIDT, SLDT, SMSW, STR in user mode
         set |= CPU_CR4_UMIP;
     }
 
+    // Enable SSE and SSE exceptions
     set |= CPU_CR4_OFXSR | CPU_CR4_OSXMMEX;
+
+    // Do not bother disabling rdstc, it is futile in the presence of threads
     clr |= CPU_CR4_TSD;
 
     cpu_cr4_change_bits(clr, set);
@@ -208,7 +212,6 @@ void cpu_hw_init(int ap)
 
     apic_init(ap);
 
-
     // Initialize APIC, but fallback to 8259 if no MP tables
     if (!apic_enable()) {
         printk("Enabling 8259 PIC\n");
@@ -258,8 +261,10 @@ void cpu_patch_code(void *addr, void const *src, size_t size)
 {
     // Disable write protect
     cpu_cr0_change_bits(CPU_CR0_WP, 0);
+
     // Patch
     memcpy(addr, src, size);
+
     // Enable write protect
     cpu_cr0_change_bits(0, CPU_CR0_WP);
     atomic_fence();
