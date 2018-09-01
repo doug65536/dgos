@@ -12,6 +12,7 @@
 #include "cpu/control_regs.h"
 #include "mutex.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #define NVME_DEBUG	1
 #if NVME_DEBUG
@@ -974,7 +975,9 @@ isr_context_t *nvme_if_t::irq_handler(int irq, isr_context_t *ctx)
         if (unlikely(irq_offset < 0 || irq_offset > dev->irq_range.count))
             continue;
 
-        dev->irq_handler(irq_offset);
+        workq::enqueue([=] {
+            dev->irq_handler(irq_offset);
+        });
     }
 
     return ctx;
