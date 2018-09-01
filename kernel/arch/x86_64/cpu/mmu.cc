@@ -1699,9 +1699,9 @@ void mmu_init()
 
     callout_call(callout_type_t::vmm_ready);
 
+#if 0 // Hack
     printdbg("Allocating and filling all memory with garbage\n");
 
-#if 0 // Hack
     size_t blocks_cap = 5<<(30-12);
     size_t blocks_sz = sizeof(void*) * blocks_cap;
     void **blocks = (void**)mmap(nullptr, blocks_sz, PROT_READ | PROT_WRITE,

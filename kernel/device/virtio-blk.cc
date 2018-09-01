@@ -369,7 +369,6 @@ void virtio_blk_if_t::config_irq()
 
 void virtio_blk_if_t::irq_handler(int offset)
 {
-
     assert(offset >= 0 && offset < 2);
 
     if (offset == 0 || irq_range.count == 1)
