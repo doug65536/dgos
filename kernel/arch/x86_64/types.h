@@ -43,8 +43,8 @@
 #define _artificial             __attribute__((__artificial__))
 #define _no_instrument          __attribute__((__no_instrument_function__))
 #define _no_asan                __attribute__((__no_address_safety_analysis__))
-#define _constructor(prio)      __attribute__((__constructor__ (prio)))
-#define _destructor(prio)       __attribute__((__destructor__ (prio)))
+#define _constructor(prio)      __attribute__((__constructor__(prio)))
+#define _destructor(prio)       __attribute__((__destructor__(prio)))
 #define _ifunc_resolver(fn)     __attribute__((__ifunc__(#fn)))
 #define _section(name)          __attribute__((__section__(name)))
 
