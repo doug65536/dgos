@@ -392,7 +392,8 @@ isr_common:
     popq %rdi
     testq %rax,%rax
     jz .Lno_cleanup_call
-    call *%rax
+    call __x86_indirect_thunk_rax
+    //call *%rax
 .Lno_cleanup_call:
 
     // Pop the pointer to the FPU context
@@ -686,7 +687,8 @@ exception_isr_handler:
     leaq intr_has_handler(%rip),%rax
 
     // If there is no handler...
-    callq *%rax
+    call __x86_indirect_thunk_rax
+    //callq *%rax
     testl %eax,%eax
     jz .Lno_handler
 
@@ -694,7 +696,8 @@ exception_isr_handler:
     leaq intr_invoke(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
-    callq *%rax
+    call __x86_indirect_thunk_rax
+    //callq *%rax
 
     movq %r12,%rax
     retq
@@ -709,7 +712,8 @@ exception_isr_handler:
     leaq __exception_handler_invoke(%rip),%rax
     movl %ebx,%edi
 
-    callq *%rax
+    call __x86_indirect_thunk_rax
+    //callq *%rax
     testl %eax,%eax
     jnz 2f
 
@@ -808,19 +812,22 @@ isr_sysret64:
 
     .cfi_endproc
 
-// Retpoline
+// Retpoline. Works on the principle that the return stack overrides other
+// branch prediction information. Cause it to mispredict into a pause loop
+// until the ret retires, at which point it is guaranteed to branch to the
+// correct destination. Attacker cannot train a mispredict to a malicious
+// location.
 .macro make_retpoline_thunk reg
 .global __x86_indirect_thunk_\reg
 .align 16
 __x86_indirect_thunk_\reg:
-    push %\reg
     call 0f
 1:  lfence
     pause
     jmp 1b
-0:  lea 8(%rsp),%rsp
+0:  movq %\reg,(%rsp)
     // This will speculatively return to the 1 label, but at retirement
-    // it will see that it should have branched to the pushed value
+    // it will see that it should have branched to *%\reg
     ret
 .endm
 

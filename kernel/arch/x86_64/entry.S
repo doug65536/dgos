@@ -136,7 +136,9 @@ bsp_init:
     jnz .Lrela_iplt_skip
 
     // Call the resolver
-    call * 16(%r12)
+    mov 16(%r12),%rax
+    call __x86_indirect_thunk_rax
+    //call * 16(%r12)
 
     // Read PLT vector pointer from relocation record
     movq (%r12),%rdx
@@ -295,7 +297,9 @@ invoke_function_array:
     movq %rsi,%rbp
 0:  cmpq %rbx,%rbp
     jbe 0f
-    call *(%rbx)
+    mov (%rbx),%rax
+    call __x86_indirect_thunk_rax
+    //call *(%rbx)
     addq $8,%rbx
     jmp 0b
 0:  pop_cfi %rbp
