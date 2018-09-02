@@ -268,7 +268,7 @@ int capture(bool verbose = false)
 
     int watch = inotify_add_watch(notify, ".", IN_CLOSE_WRITE);
     if (unlikely(watch < 0))
-        throw trace_error("could not create inofity watch: %s\n", errno);
+        throw trace_error("could not create inotify watch: %s\n", errno);
 
     int in_fd = open("dump/call-trace-out", O_EXCL);
     if (unlikely(in_fd < 0))
@@ -581,6 +581,10 @@ public:
 
         getmaxyx(stdscr, display_h, display_w);
 
+        max_offset = (!tid_detail->empty()
+                ? advance_shown(tid_detail->end(), -display_h)
+                : tid_detail->begin()) - tid_detail->begin();
+
         trace_detail_iter item = update_selection();
 
         update_highlight_range();
@@ -672,7 +676,7 @@ public:
 
     trace_detail_iter update_selection()
     {
-        offset = std::min(int64_t(tid_detail->size()), offset);
+        offset = std::min(max_offset, offset);
         trace_detail_iter item = tid_detail->begin();
         selection = item;
         std::advance(item, offset);
@@ -832,12 +836,19 @@ public:
     {
         trace_detail_iter min_offset = advance_shown(
                     selection, -(display_h - 1));
+
+        if (offset > max_offset)
+            offset = max_offset;
+
         trace_detail_iter cur_offset = tid_detail->begin() + offset;
 
         if (cur_offset > selection)
             offset = selection - tid_detail->begin();
         else if (cur_offset < min_offset)
             offset = min_offset - tid_detail->begin();
+
+        if (offset > max_offset)
+            offset = max_offset;
 
         cur_offset = tid_detail->begin() + offset;
 
@@ -1109,6 +1120,7 @@ public:
     trace_detail_iter highlight_st;
     trace_detail_iter highlight_en;
     int64_t offset;
+    int64_t max_offset;
     size_t tid_index;
     int tid;
     int cursor_row;
