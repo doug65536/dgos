@@ -195,6 +195,10 @@ void cpu_init(int)
     cpu_ldt_set(0);
 }
 
+_constructor(ctor_cpu_hw_init)
+static void cpu_hw_init_bsp()
+{
+    cpu_hw_init(0);
 }
 
 void cpu_hw_init(int ap)

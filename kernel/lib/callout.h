@@ -6,7 +6,8 @@ enum constructor_order_t {
     ctor_cpu_init_bsp,
     ctor_text_dev,
     ctor_mmu_init,
-    ctor_thread_init_bsp
+    ctor_thread_init_bsp,
+    ctor_cpu_hw_init
 };
 
 // Types:
@@ -30,7 +31,6 @@ enum struct callout_type_t : uint32_t {
     smp_start = 'S',
     txt_dev = 'V',
     acpi_ready = 'A',
-    early_dev = 'E',
     smp_online = 'T',
     //constructors_ran = 'C',
     tss_list_ready = 128,

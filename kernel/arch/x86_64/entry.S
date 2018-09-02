@@ -187,38 +187,6 @@ bsp_init:
     leaq ___ctors_en(%rip),%rsi
     call invoke_function_array
 
-    debugind 'A'
-
-    // Notify constructors ran
-    //movl $'C',%edi
-    //call callout_call
-
-    debugind 'B'
-
-    //xorl %edi,%edi
-    //call cpu_init
-
-    debugind 'C'
-
-    // Initialize text devices
-    //movl $'V',%edi
-    //call callout_call
-
-    debugind 'D'
-
-    debugind 'E'
-
-    xorl %edi,%edi
-    call cpu_hw_init
-
-    debugind 'F'
-
-    // Initialize early-initialized devices
-    movl $'E',%edi
-    call callout_call
-
-    debugind 'G'
-
     call main
 
     debugind '?'

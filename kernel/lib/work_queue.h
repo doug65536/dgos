@@ -3,6 +3,7 @@
 #include "heap.h"
 #include <utility.h>
 #include "mutex.h"
+#include "stdlib.h"
 
 class workq_impl;
 class workq;
@@ -50,6 +51,9 @@ private:
 public:
     template<typename T>
     static void enqueue(T&& functor);
+
+    template<typename T>
+    static void enqueue_on_cpu(size_t cpu_nr, T&& functor);
 
     //template<typename T, typename... Args>
     //static void emplace(Args&& ...args)
@@ -138,12 +142,18 @@ private:
 template<typename T>
 void workq::enqueue(T&& functor)
 {
-    int current_cpu = thread_cpu_number();
-    workq_impl *queue = percpu + current_cpu;
+    size_t cpu_nr = thread_cpu_number();
+    enqueue_on_cpu(cpu_nr, std::forward<T>(functor));
+}
+
+template<typename T>
+void workq::enqueue_on_cpu(size_t cpu_nr, T&& functor)
+{
+    workq_impl *queue = percpu + cpu_nr;
     void *mem = workq::allocate(queue, sizeof(workq_wrapper<T>));
     workq_wrapper<T> *item = new (mem) workq_wrapper<T>(
                 std::forward<T>(functor));
     item->owner = queue;
     item->next = nullptr;
-    percpu[current_cpu].enqueue(item);
+    percpu[cpu_nr].enqueue(item);
 }
