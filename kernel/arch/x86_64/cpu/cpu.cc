@@ -20,6 +20,8 @@
 #include "string.h"
 #include "algorithm.h"
 #include "numeric_limits.h"
+#include "except.h"
+#include "work_queue.h"
 
 uint32_t default_mxcsr_mask;
 
@@ -191,14 +193,8 @@ void cpu_init(int)
 
     // Load null LDT
     cpu_ldt_set(0);
+}
 
-    // Enable lfence speculation control on AMD processors
-    // Enable lfence to block instruction issue until it retires
-    // MSR is available on family 10h/12h/14h/15h/16h/17h
-    if (cpuid_is_amd() && cpuid_family() >= 0x10 && cpuid_family() <= 0x17 &&
-            cpuid_family() != 0x11 && cpuid_family() != 0x13) {
-        cpu_msr_set(0xC0011029, 1);
-    }
 }
 
 void cpu_hw_init(int ap)
@@ -347,4 +343,27 @@ bool cpu_msr_get_safe(uint32_t msr, uint64_t &value)
         return false;
     }
     return true;
+}
+
+// Runs once on each CPU at early boot
+static void cpu_init_late_msrs_one_cpu()
+{
+    // Enable lfence speculation control on AMD processors
+    // Enable lfence to block instruction issue until it retires
+    // MSR is available on family 10h/12h/14h/15h/16h/17h
+    if (cpuid_is_amd() && cpuid_family() >= 0x10 && cpuid_family() <= 0x17 &&
+            cpuid_family() != 0x11 && cpuid_family() != 0x13) {
+        if (!cpu_msr_set_safe(0xC0011029, 1)) {
+            printdbg("Unable to set MSR 0xC0011029, lfence configuration\n");
+        }
+    }
+}
+
+void cpu_init_late_msrs()
+{
+    for (size_t i = 0, e = thread_cpu_count(); i < e; ++i) {
+        workq::enqueue_on_cpu(i, [=] {
+            cpu_init_late_msrs_one_cpu();
+        });
+    }
 }

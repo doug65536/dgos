@@ -18,3 +18,4 @@ extern "C" uint32_t default_mxcsr_mask;
 
 bool cpu_msr_set_safe(uint32_t msr, uint32_t value);
 bool cpu_msr_get_safe(uint32_t msr, uint64_t &value);
+void cpu_init_late_msrs();
