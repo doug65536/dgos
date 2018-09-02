@@ -248,7 +248,7 @@ extern "C" int __exception_stop_fn(
     __exception_jmp_buf_t *jmpbuf = (__exception_jmp_buf_t*)arg;
     _Unwind_Ptr cfa = _Unwind_GetCFA(ctx);
 
-    if (cfa != (_Unwind_Ptr)jmpbuf->rsp)
+    if (cfa < (_Unwind_Ptr)jmpbuf->rsp)
         return _URC_NO_REASON;
 
     // Found it
