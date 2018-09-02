@@ -326,3 +326,25 @@ void cpu_patch_nop(void *addr, size_t size)
 
      atomic_fence();
 }
+
+bool cpu_msr_set_safe(uint32_t msr, uint32_t value)
+{
+    __try {
+        cpu_msr_set(msr, value);
+    }
+    __catch {
+        return false;
+    }
+    return true;
+}
+
+bool cpu_msr_get_safe(uint32_t msr, uint64_t &value)
+{
+    __try {
+        value = cpu_msr_get(msr);
+    }
+    __catch {
+        return false;
+    }
+    return true;
+}

@@ -15,3 +15,6 @@ extern "C"
 void cpu_patch_calls(void *call_target, size_t point_count, uint32_t **points);
 
 extern "C" uint32_t default_mxcsr_mask;
+
+bool cpu_msr_set_safe(uint32_t msr, uint32_t value);
+bool cpu_msr_get_safe(uint32_t msr, uint64_t &value);
