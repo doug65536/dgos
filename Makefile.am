@@ -370,6 +370,8 @@ bootpxe_bios_elf_LDADD = \
 EXTRA_bootpxe_bios_elf_DEPENDENCIES = \
 	boot/bootpxe-bios.ld
 
+$(top_builddir)/bootpxe-bios.map: bootpxe-bios-elf
+
 # bootpxe-bin
 
 $(top_builddir)/bootpxe-bios-bin: $(top_builddir)/bootpxe-bios-elf

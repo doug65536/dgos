@@ -14612,6 +14612,8 @@ $(top_builddir)/bootfat-bin: $(top_builddir)/bootfat-elf
 $(top_builddir)/bootiso-bin: $(top_builddir)/bootiso-elf
 	$(OBJCOPY) -O binary --only-section=.text "$<" "$@"
 
+$(top_builddir)/bootpxe-bios.map: bootpxe-bios-elf
+
 # bootpxe-bin
 
 $(top_builddir)/bootpxe-bios-bin: $(top_builddir)/bootpxe-bios-elf
