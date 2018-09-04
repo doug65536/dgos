@@ -1,11 +1,11 @@
 define startupbreakpoints
 	set osabi none
-	set scheduler-locking off
-	set range-stepping off
+	set scheduler-locking step
+	set range-stepping on
 	thbreak entry
 	commands
 		#too much hbreak isr_entry_14
-		hbreak isr_entry_13
+		hb isr_entry_13
 		hb cpu_debug_break
 		b unhandled_exception_handler
 		b apic_spurious_handler
@@ -85,4 +85,32 @@ define walkthreads
 		set $tid = $tid + 1
 	end
 	eval "thread %d", $savecpu
+end
+
+define findtid
+	set $tid = $arg0
+	set $cpu_nr = 0
+	set $cpu_count = cpu_count
+	set $needle = threads + $tid
+	while $cpu_nr < $cpu_count
+		set $cpu_thr = cpus[$cpu_nr].cur_thread
+		if $cpu_thr == $needle
+			eval "thread %d", ($cpu_nr + 1)
+			eval "print cpus[%d]", ($cpu_nr)
+			loop_break
+		end
+		set $cpu_nr = $cpu_nr + 1
+	end
+	if $cpu_nr >= $cpu_count
+		print "Not running, here's thread context"
+		print threads[$tid]
+	end
+end
+
+define printtids
+	set $cpu_nr = 0
+	set $cpu_count = cpu_count
+	while $cpu_nr < $cpu_count
+		print cpus[$cpu_nr++].cur_thread - threads
+	end
 end
