@@ -459,6 +459,11 @@ trace_thread_map load_trace(char const *filename)
 
     gzFile file = gzopen64(filename, "r");
 
+    if (!file) {
+        int err = errno;
+        throw trace_error(std::string("Unable to open ") + filename, err);
+    }
+
     uint64_t ordinal = 0;
 
     buffer.resize(buffer_count);
