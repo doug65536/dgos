@@ -821,6 +821,9 @@ static int init_thread(void *)
     test_catch();
 #endif
 
+    printk("Initializing late MSRs\n");
+    cpu_init_late_msrs();
+
     printk("Initializing PCI\n");
     pci_init();
 
