@@ -138,7 +138,7 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects gdwarf-4 \
+		std=c++14 fno-fat-lto-objects ggdb \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
