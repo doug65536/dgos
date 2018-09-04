@@ -411,6 +411,8 @@ void *pageheap_alloc(size_t size)
 
     memset(hdr + 1, 0xF0, size - sizeof(heap_hdr_t));
 
+    assert((uintptr_t(hdr + 1) & ~-16) == 0);
+
     return hdr + 1;
 }
 
