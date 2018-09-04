@@ -10,8 +10,11 @@
 #include "utf.h"
 #include "assert.h"
 #include "log2.h"
+#include "halt.h"
 
 #include "../kernel/fs/fat32_decl.h"
+
+#define FAT32_DEBUG_DIRENT 0
 
 // ===========================================================================
 
@@ -178,15 +181,22 @@ static int sector_iterator_next(
         iter->sector_offset = 0;
 
         // Advance to the next cluster
-        iter->cluster = next_cluster(
-                    iter->cluster, sector, &iter->ok);
+        //iter->cluster = next_cluster(
+        //            iter->cluster, sector, &iter->ok);
+
+        if (iter->position >= iter->cluster_count)
+            return 0;
+
+        iter->cluster = iter->clusters[iter->position];
 
         if (iter->cluster == 0)
             return 0;
 
         if (iter->cluster == 0xFFFFFFFF)
             return -1;
-    } else if (read_data) {
+    }
+
+    if (read_data) {
         uint32_t lba = lba_from_cluster(iter->cluster) +
                 iter->sector_offset;
 
@@ -209,8 +219,7 @@ static int read_directory_begin(
         char *sector,
         uint32_t cluster)
 {
-    int status = fat32_sector_iterator_begin(
-                &iter->dir_file, sector, cluster);
+    int status = fat32_sector_iterator_begin(&iter->dir_file, sector, cluster);
     iter->sector_index = 0;
 
     return status;
@@ -243,8 +252,10 @@ static int16_t read_directory_move_next(dir_iterator_t *iter, char *sector)
 {
     // Advance to next sector_index
     if (++iter->sector_index >=
-            bpb.bytes_per_sec / sizeof(fat32_dir_entry_t))
+            bpb.bytes_per_sec / sizeof(fat32_dir_entry_t)) {
+        iter->sector_index = 0;
         return sector_iterator_next(&iter->dir_file, sector, 1);
+    }
 
     return 1;
 }
@@ -488,6 +499,28 @@ static bool dir_entry_match(fat32_dir_union_t const *entry,
     }
 }
 
+#if FAT32_DEBUG_DIRENT
+static void print_dirent(fat32_dir_union_t const *entry)
+{
+    char name[5 + 6 + 2 + 1];
+    if (entry->short_entry.attr == FAT_LONGNAME) {
+        for (int i = 0; i < 5; ++i)
+            name[i] = (char)entry->long_entry.name[i*2];
+        for (int i = 0; i < 6; ++i)
+            name[i+5] = (char)entry->long_entry.name2[i*2];
+        for (int i = 0; i < 2; ++i)
+            name[i+5+6] = (char)entry->long_entry.name3[i*2];
+        name[5+6+2] = 0;
+        PRINT(" long 0x%x: %s\n", entry->long_entry.ordinal, name);
+    } else {
+        memcpy(name, entry->short_entry.name,
+               sizeof(entry->short_entry.name));
+        name[sizeof(entry->short_entry.name)] = 0;
+        PRINT("  short: %s\n", name);
+    }
+}
+#endif
+
 // Returns 0 on failure
 static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
 {
@@ -563,6 +596,10 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
         fat32_dir_union_t const *entry =
                 read_directory_current(&dir, sector_buffer);
 
+#if FAT32_DEBUG_DIRENT
+        print_dirent(entry);
+#endif
+
         if (entry->short_entry.attr == FAT_LONGNAME)
             checksum = entry->long_entry.checksum;
 
@@ -578,6 +615,7 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
         } else {
             if (lfn_checksum(entry->short_entry.name) == checksum) {
                 // Found
+                PRINT("Found\n");
                 return ((uint32_t)entry->short_entry.start_hi << 16) |
                         entry->short_entry.start_lo;
             } else {
