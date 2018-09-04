@@ -35,6 +35,7 @@ void workq_impl::set_affinity(int cpu)
 
 void workq::free_item(workq_work *item)
 {
+    item->~workq_work();
     heap_free(item->owner->heap, item);
 }
 
