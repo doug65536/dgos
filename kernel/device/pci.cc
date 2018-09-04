@@ -791,7 +791,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                         offsetof(pci_config_hdr_t, base_addr) +
                         sizeof(uint32_t) * pba_bir, sizeof(pba_base));
 
-        // Mask off upper 32 bits of BAR is 32 bit
+        // Mask off upper 32 bits if BAR is 32 bit
         if (PCI_BAR_TYPE_GET(tbl_base) == 0)
             tbl_base &= 0xFFFFFFFF;
         if (PCI_BAR_TYPE_GET(pba_base) == 0)
