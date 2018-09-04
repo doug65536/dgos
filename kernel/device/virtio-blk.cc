@@ -122,7 +122,7 @@ private:
                virtio_blk_op_t op, iocp_t *iocp);
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = std::spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     struct blk_config_t {
