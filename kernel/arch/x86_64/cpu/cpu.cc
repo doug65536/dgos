@@ -206,7 +206,7 @@ void cpu_hw_init(int ap)
     printk("Initializing PIT\n");
 
     // May need PIT nsleep early for APIC calibration
-    pit8253_init();
+    pit8254_init();
 
     printk("Initializing APIC\n");
 

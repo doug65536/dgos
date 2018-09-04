@@ -65,9 +65,9 @@
 // Timer crystal runs at 1.193181666... MHz
 // Freq * 6 = 7159090.0 even
 
-using pit8253_lock_type = std::mcslock;
-using pit8253_scoped_lock = std::unique_lock<pit8253_lock_type>;
-static pit8253_lock_type pit8253_lock;
+using pit8254_lock_type = std::mcslock;
+using pit8254_scoped_lock = std::unique_lock<pit8254_lock_type>;
+static pit8254_lock_type pit8254_lock;
 
 // Total timer interrupts, no time relationship
 static uint64_t volatile timer_ticks;
@@ -97,7 +97,7 @@ static void pit8254_set_rate(unsigned hz)
     rate_hz = hz;
     accumulator = 0U;
 
-    pit8253_scoped_lock lock(pit8253_lock);
+    pit8254_scoped_lock lock(pit8254_lock);
 
     outb(PIT_CMD,
          PIT_CHANNEL(0) |
@@ -147,7 +147,7 @@ static void pit8254_time_ns_stop()
 
     irq_setmask(0, 0);
 
-    pit8253_scoped_lock lock(pit8253_lock);
+    pit8254_scoped_lock lock(pit8254_lock);
     outb(PIT_CMD,
          PIT_CHANNEL(0) |
          PIT_ACCESS_BOTH |
@@ -191,7 +191,7 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
     if (count > 0xFFFF)
         count = 0xFFFF;
 
-    pit8253_scoped_lock lock(pit8253_lock);
+    pit8254_scoped_lock lock(pit8254_lock);
 
     outb(PIT_CMD, PIT_CHANNEL(2) | PIT_ACCESS_BOTH |
          PIT_MODE_ONESHOT | PIT_FORMAT_BINARY);
@@ -213,7 +213,7 @@ static uint64_t pit8254_nsleep(uint64_t nanosec)
     return mul_64_64_div_64(count - readback, 1000000000, 1193182);
 }
 
-void pit8253_init()
+void pit8254_init()
 {
     nsleep_set_handler(pit8254_nsleep, nullptr, false);
 }
