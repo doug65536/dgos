@@ -245,7 +245,7 @@ std::unique_ptr<sym_tab> load_symbols()
     return symbols;
 }
 
-sig_atomic_t quit;
+sig_atomic_t volatile quit;
 
 void sigint_handler(int)
 {
@@ -255,6 +255,13 @@ void sigint_handler(int)
 int capture(bool verbose = false)
 {
     signal(SIGINT, sigint_handler);
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sigemptyset(&sa.sa_mask);
+    sigaddset(&sa.sa_mask, SIGINT);
+    sa.sa_flags = 0;
+    if (sigaction(SIGINT, &sa, nullptr) < 0)
+        throw trace_error("sigaction failed", errno);
 
     fprintf(stderr, "\nLoading symbols...");
     auto symbols = load_symbols();
@@ -295,6 +302,10 @@ int capture(bool verbose = false)
         // Wait for something to happen
         POLL_TRACE(stderr, "Waiting...\n");
         int nevents = poll(polls, 2, -1);
+
+        if (quit)
+            break;
+
         if (unlikely(nevents < 0))
             throw trace_error("poll failed: ", errno);
 
