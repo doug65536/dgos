@@ -292,7 +292,7 @@ ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
     return intr_state;
 }
 
-bool mcslock_try_lock(mcs_queue_ent_t * volatile*lock, mcs_queue_ent_t *node)
+bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
 {
     node->irq_enabled = cpu_irq_save_disable();
 
@@ -334,7 +334,8 @@ void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
     MCSLOCK_TRACE("Acquiring lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());
 
-    node->thread_id = thread_get_id();
+    thread_t tid = thread_get_id();
+    node->thread_id = tid;
     node->irq_enabled = cpu_irq_save_disable();
     mcslock_lock_nodis(lock, node);
 }
@@ -343,7 +344,7 @@ void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
                          mcs_queue_ent_t *node)
 {
-    if (!atomic_ld_acq(&node->next)) {
+    if (atomic_ld_acq(&node->next) == nullptr) {
         // no known successor
 
         // If the root still points at this node, null it
@@ -355,11 +356,8 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
         // Wait until node->next is not null
         // To be sure successor has initialized locked field
         cpu_wait_not_value(&node->next, (mcs_queue_ent_t*)nullptr);
-
-        //assert(node->next != nullptr);
     }
 
-    //assert(atomic_ld_acq(&node->next->locked) == true);
     atomic_st_rel(&node->next->locked, false);
 }
 
