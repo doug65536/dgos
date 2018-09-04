@@ -308,7 +308,7 @@ void virtio_blk_if_t::io_completion(
 {
     request_t *request = reinterpret_cast<request_t*>(arg);
     request->caller_iocp->invoke();
-    free(request);
+    delete request;
 }
 
 bool virtio_blk_if_t::init(pci_dev_iterator_t const &pci_iter)
