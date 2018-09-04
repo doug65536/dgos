@@ -223,6 +223,12 @@ void cpu_hw_init(int ap)
         panic("No IOAPICs, no MPS, and no 8259! Can't use IRQs! Halting.");
     }
 
+    printk("Starting SMP\n");
+
+    apic_start_smp();
+
+    callout_call(callout_type_t::smp_online);
+
     printk("Initializing RTC\n");
 
     cmos_init();
@@ -230,12 +236,6 @@ void cpu_hw_init(int ap)
     printk("Enabling 8254 PIT\n");
 
     pit8254_enable();
-
-    printk("Starting SMP\n");
-
-    apic_start_smp();
-
-    callout_call(callout_type_t::smp_online);
 
     //printk("Enabling IRQs\n");
 }
