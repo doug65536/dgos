@@ -28,7 +28,7 @@ static uint_least32_t sector_sz;
 static uint8_t log2_sector_sz;
 static uint8_t log2_sec_per_cluster;
 
-static uint32_t next_cluster(uint64_t current_cluster,
+static uint32_t next_cluster(uint32_t current_cluster,
                              char *sector, bool *ok_ptr);
 
 // Initialize bpb data from sector buffer
@@ -71,7 +71,7 @@ static bool is_eof_cluster(uint32_t cluster)
 static int fat32_sector_iterator_begin(
         fat32_sector_iterator_t *iter,
         char *sector,
-        uint64_t cluster)
+        uint32_t cluster)
 {
     iter->ok = true;
     iter->start_cluster = cluster;
@@ -119,15 +119,15 @@ static int fat32_sector_iterator_begin(
 // Returns new cluster number, returns 0 at end of file
 // Returns 0xFFFFFFFF on error
 static uint32_t next_cluster(
-        uint64_t current_cluster, char *sector, bool *ok_ptr)
+        uint32_t current_cluster, char *sector, bool *ok_ptr)
 {
     uint32_t fat_sector_index = current_cluster >> (log2_sector_sz-2);
     uint32_t fat_sector_offset = current_cluster &
-            ((1 << (log2_sector_sz-2))-1);
+            ((1U << (log2_sector_sz-2))-1);
     uint32_t const *fat_array = (uint32_t *)sector;
     uint64_t lba = bpb.first_fat_lba + fat_sector_index;
 
-    uint8_t ok = true;
+    bool ok = true;
     if (fat_buffer_lba != lba) {
         ok = disk_read_lba(uint64_t(fat_buffer), lba, log2_sector_sz, 1);
         if (ok_ptr)
@@ -199,37 +199,6 @@ static int sector_iterator_next(
     return 1;
 }
 
-// obsolete. keeping around until new implementation is completely proven
-//static int sector_iterator_seek(
-//        fat32_sector_iterator_t *iter,
-//        uint32_t sector_offset,
-//        char *sector)
-//{
-//    // See if we are already there
-//    if (iter->position == sector_offset) {
-//        bool is_eof_now = is_eof_cluster(iter->cluster);
-//        return is_eof_now ? 0 : 1;
-//    }
-//
-//    uint32_t cluster_index = sector_offset >> log2_sec_per_cluster;
-//    uint32_t cluster_offset = sector_offset & (bpb.sec_per_cluster - 1);
-//    iter->sector_offset = sector_offset;
-//
-//    // Check for EOF
-//    if (cluster_index > iter->cluster_count)
-//        return 0;
-//
-//    uint32_t cluster;
-//    cluster = iter->clusters[cluster_index];
-//    uint32_t lba = lba_from_cluster(cluster);
-//    iter->ok = disk_read_lba(uint64_t(sector), lba + cluster_offset,
-//                             log2_sector_sz, 1);
-//    if (!iter->ok)
-//        return -1;
-//
-//    return 1;
-//}
-
 // Read the first sector of a directory
 // and prepare to iterate it
 // Returns -1 on error
@@ -270,9 +239,7 @@ static fat32_dir_union_t const *read_directory_current(
     return nullptr;
 }
 
-static int16_t read_directory_move_next(
-        dir_iterator_t *iter,
-        char *sector)
+static int16_t read_directory_move_next(dir_iterator_t *iter, char *sector)
 {
     // Advance to next sector_index
     if (++iter->sector_index >=
@@ -522,8 +489,7 @@ static bool dir_entry_match(fat32_dir_union_t const *entry,
 }
 
 // Returns 0 on failure
-static uint32_t find_file_by_name(char const *filename,
-                                  uint32_t dir_cluster)
+static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
 {
     fat32_dir_union_t *match;
 
@@ -592,11 +558,8 @@ static uint32_t find_file_by_name(char const *filename,
     dir_iterator_t dir;
     uint16_t match_index = 0;
     uint8_t checksum = 0;
-    for (int status = read_directory_begin(
-             &dir, sector_buffer, dir_cluster);
-         status > 0;
-         status = read_directory_move_next(
-             &dir, sector_buffer)) {
+    for (int status = read_directory_begin(&dir, sector_buffer, dir_cluster);
+         status > 0; status = read_directory_move_next(&dir, sector_buffer)) {
         fat32_dir_union_t const *entry =
                 read_directory_current(&dir, sector_buffer);
 
@@ -733,53 +696,6 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     }
 
     return total_read;
-
-//    uint32_t sector_offset = ofs >> log2_sector_sz;
-//    uint16_t byte_offset = ofs & (sector_sz-1);
-
-//    int status = sector_iterator_seek(
-//                file_handles + file,
-//                sector_offset,
-//                sector_buffer);
-
-//    char *output = (char*)buf;
-
-//    int total = 0;
-//    for (;;) {
-//        // Error?
-//        if (status < 0)
-//            return -1;
-
-//        // EOF?
-//        if (status == 0)
-//            return 0;
-
-//        size_t limit = sector_sz - byte_offset;
-//        if (limit > bytes)
-//            limit = bytes;
-
-//        if (limit == 0)
-//            break;
-
-//        //PRINT(TEXT "Copying %zu byres of data to %zx\n",
-//                limit, uintptr_t(output));
-
-//        // Copy data from sector buffer
-//        memcpy(output, sector_buffer + byte_offset, limit);
-
-//        bytes -= limit;
-//        output += limit;
-//        total += limit;
-
-//        byte_offset = 0;
-
-//        if (bytes > 0) {
-//            status = sector_iterator_next(
-//                        file_handles + file, sector_buffer, 1);
-//        }
-//    }
-
-//    return total;
 }
 
 void fat32_boot_partition(uint64_t partition_lba)

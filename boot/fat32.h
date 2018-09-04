@@ -62,7 +62,7 @@ struct dir_iterator_t {
     fat32_sector_iterator_t dir_file;
 
     // dir_entry_t index into sector
-    uint16_t sector_index;
+    size_t sector_index;
 };
 
 extern "C" void fat32_boot_partition(uint64_t partition_lba);
