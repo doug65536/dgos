@@ -6,7 +6,7 @@
 #include "numeric_limits.h"
 #include "work_queue.h"
 
-#define DEBUG_VIRTIO 1
+#define DEBUG_VIRTIO 0
 #if DEBUG_VIRTIO
 #define VIRTIO_TRACE(...) printdbg("virtio: " __VA_ARGS__)
 #else

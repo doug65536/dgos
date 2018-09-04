@@ -4,7 +4,7 @@
 #include "callout.h"
 #include "numeric_limits.h"
 
-#define DEBUG_VIRTIO_BLK 1
+#define DEBUG_VIRTIO_BLK 0
 #if DEBUG_VIRTIO_BLK
 #define VIRTIO_BLK_TRACE(...) printdbg("virtio-blk: " __VA_ARGS__)
 #else
