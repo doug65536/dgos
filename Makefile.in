@@ -1164,7 +1164,6 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 DUMPDIR = $(top_builddir)/dump
 BUILT_SOURCES = \
-	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
 	generated_headers \
@@ -2530,13 +2529,6 @@ QL_BM = pxe hd
 QL_FS = iso fat
 QL_SC = ahci ide nvme usb virtio
 QL_EM = kvm tcg
-
-# Generate emulators makefile
-#$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
-#		$(top_srcdir)/qemu-emu-generator
-#	$(top_srcdir)/qemu-emu-generator
-#
-#-include qemu-emu.mk
 
 # ----------------------------------------------------------------------------
 # Bochs launcher
@@ -15016,7 +15008,6 @@ distclean-local:
 	rm -f $(top_builddir)/fatdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/isodisk.img
-	rm -f $(top_builddir)/qemu-emu.mk
 
 # 1=path to bits file
 define bitfield_gen =
