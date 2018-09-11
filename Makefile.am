@@ -3,7 +3,6 @@
 DUMPDIR = $(top_builddir)/dump
 
 BUILT_SOURCES = \
-	$(top_builddir)/qemu-emu.mk \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
 	generated_headers \
@@ -1464,7 +1463,6 @@ distclean-local:
 	rm -f $(top_builddir)/fatdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/isodisk.img
-	rm -f $(top_builddir)/qemu-emu.mk
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -1705,13 +1703,6 @@ $(foreach rt,$(QL_RT), \
 		) \
 	) \
 )
-
-# Generate emulators makefile
-#$(top_builddir)/qemu-emu.mk: $(top_srcdir)/Makefile.am \
-#		$(top_srcdir)/qemu-emu-generator
-#	$(top_srcdir)/qemu-emu-generator
-#
-#-include qemu-emu.mk
 
 # ----------------------------------------------------------------------------
 # Bochs launcher
