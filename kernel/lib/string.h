@@ -20,19 +20,19 @@ char *strstr(char const *str, char const *substr);
 void clear64(void *dest, size_t n);
 
 void *memset(void *dest, int c, size_t n);
-void *memcpy(void *dest, void const *src, size_t n);
+void *memcpy(void * restrict dest, void const * restrict src, size_t n);
 void *memmove(void *dest, void const *src, size_t n);
 
-char *strcpy(char *dest, char const *src);
-char *strcat(char *dest, char const *src);
+char *strcpy(char * restrict dest, char const * restrict src);
+char *strcat(char * restrict dest, char const * restrict src);
 
 char *stpcpy(char *dest, char const *src);
 
 size_t strspn(char const *src, char const *chars);
 size_t strcspn(char const *src, char const *chars);
 
-char *strncpy(char *dest, char const *src, size_t n);
-char *strncat(char *dest, char const *src, size_t n);
+char *strncpy(char * restrict dest, char const * restrict src, size_t n);
+char *strncat(char * restrict dest, char const * restrict src, size_t n);
 
 int ucs4_to_utf8(char *out, int in);
 int ucs4_to_utf16(uint16_t *out, int in);
