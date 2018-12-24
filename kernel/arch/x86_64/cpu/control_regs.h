@@ -706,6 +706,18 @@ static _always_inline uint64_t cpu_rdtsc()
     return tsc_lo | ((uint64_t)tsc_hi << 32);
 }
 
+_no_instrument
+static _always_inline uint64_t cpu_rdtsc_noinstrument()
+{
+    uint32_t tsc_lo;
+    uint32_t tsc_hi;
+    __asm__ __volatile__ (
+        "rdtsc\n\t"
+        : "=a" (tsc_lo), "=d" (tsc_hi)
+    );
+    return tsc_lo | ((uint64_t)tsc_hi << 32);
+}
+
 //
 // C++ utilities
 
