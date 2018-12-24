@@ -196,18 +196,35 @@ int paging_iovec(iovec_t **ret, uint64_t vaddr,
         if (offset + chunk > size)
             chunk = size - offset;
 
-        iovec[count].size = chunk;
-        iovec[count].base = paddr;
+        auto& iovec_curr = iovec[count];
+        iovec_curr.size = chunk;
+        iovec_curr.base = paddr;
         paddr += chunk;
         vaddr += chunk;
 
-        // If this entry is contiguous with the previous entry,
-        // and it would not exceed the specified max chunk size,
-        // then merge them
-        if (count && iovec[count-1].base + iovec[count-1].size ==
-                iovec[count].base &&
-                iovec[count-1].size + chunk <= max_chunk) {
-            iovec[count-1].size += iovec[count].size;
+        if (count) {
+            auto& iovec_last = iovec[count-1];
+
+            // If this entry is contiguous with the previous entry
+            if (iovec_last.base + iovec_last.size == iovec_curr.base) {
+                // Compute how much we can add onto the previous entry
+                auto max_coalesce = max_chunk - iovec_last.size;
+
+                if (max_coalesce >= iovec_curr.size) {
+                    // Coalesce entire incoming chunk with previous one
+                    iovec_last.size += iovec_curr.size;
+                } else if (max_coalesce > 0) {
+                    // Partially extend previous one + another with remainder
+                    iovec_last.size += max_coalesce;
+                    iovec_curr.base += max_coalesce;
+                    iovec_curr.size -= max_coalesce;
+                    ++count;
+                } else {
+                    // Cannot extend previous one at all, it is at max
+                    // Just keep the one we have
+                    ++count;
+                }
+            }
         } else {
             ++count;
         }
