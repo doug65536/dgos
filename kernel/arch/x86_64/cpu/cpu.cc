@@ -278,7 +278,8 @@ void cpu_patch_calls(void *call_target, size_t point_count, uint32_t **points)
         intptr_t dist = intptr_t(call_target) - intptr_t(point);
         assert(dist >= std::numeric_limits<int32_t>::min() &&
                dist <= std::numeric_limits<int32_t>::max());
-        point[-1] = dist;
+        cpu_patch_insn(point - 1, dist, sizeof(uint32_t));
+        //point[-1] = dist;
     }
     atomic_fence();
 }
