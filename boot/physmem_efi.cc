@@ -45,7 +45,7 @@ bool get_ram_regions()
     status = efi_systab->BootServices->GetMemoryMap(
                 &mapsz, memdesc_buf, &mapkey, &descsz, &descver);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         return false;
 
     size_t count = mapsz / descsz;
@@ -137,6 +137,6 @@ void take_pages(uint64_t phys_addr, uint64_t size)
                 AllocateAddress, EFI_MEMORY_TYPE(0x80000000),
                 size >> 12, &addr);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         PANIC("Could not take pages");
 }

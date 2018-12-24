@@ -88,7 +88,7 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
         status = efi_root_dir->Open(efi_root_dir, &file,
                                     filename, EFI_FILE_MODE_READ, 0);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         return true;
@@ -110,13 +110,13 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
 
         status = file->SetPosition(file, ofs);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return -1;
 
         UINTN transferred = bytes;
         status = file->Read(file, &transferred, buf);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         assert(transferred <= bytes);
@@ -237,13 +237,13 @@ private:
                     &server_addr, (UINT8*)utf8_filename,
                     &mtftp_info, false);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         status = efi_systab->BootServices->AllocatePool(
                     EFI_MEMORY_TYPE(0x80000000), file_size, &data);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         UINTN block_size = 4096;
@@ -256,7 +256,7 @@ private:
 
         free(utf8_filename);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             return false;
 
         return true;
@@ -304,7 +304,7 @@ _constructor(ctor_fs) void register_efi_fs()
                 &efi_loaded_image_protocol_guid,
                 (VOID**)&efi_loaded_image);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
     // Get the vtbl for the simple_filesystem_protocol of this executable
@@ -320,7 +320,7 @@ _constructor(ctor_fs) void register_efi_fs()
         status = efi_simple_filesystem->OpenVolume(
                     efi_simple_filesystem, &efi_root_dir);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             halt(TSTR "OpenVolume for boot partition failed");
 
         status = efi_systab->BootServices->HandleProtocol(
@@ -328,7 +328,7 @@ _constructor(ctor_fs) void register_efi_fs()
                 &efi_block_io_protocol_guid,
                 (VOID**)&efi_blk_io);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             halt(TSTR "HandleProtocol for block_io_protocol failed");
     } else {
         status = efi_systab->BootServices->HandleProtocol(
@@ -336,7 +336,7 @@ _constructor(ctor_fs) void register_efi_fs()
                     &efi_pxe_base_code_protocol,
                     (VOID**)&efi_pxe);
 
-        if (EFI_ERROR(status))
+        if (unlikely(EFI_ERROR(status)))
             halt(TSTR "HandleProtocol LOADED_IMAGE_PROTOCOL failed");
 
         efi_pxe_file_handle_t::initialize();
@@ -429,7 +429,7 @@ uint64_t file_handle_base_t::boot_drv_serial()
                                     0, efi_blk_io->Media->BlockSize, buffer);
 
     uint64_t serial = 0;
-    if (!EFI_ERROR(status)) {
+    if (likely(!EFI_ERROR(status))) {
         // BPB serial is 32 bit
         memcpy(&serial, buffer + 0x43, sizeof(uint32_t));
     } else {

@@ -28,7 +28,7 @@ _constructor(ctor_console) void conout_init()
                 &efi_num_text_output_handles,
                 &efi_text_output_handles);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Unable to query text output handle");
 
     status = efi_systab->BootServices->HandleProtocol(
@@ -36,7 +36,7 @@ _constructor(ctor_console) void conout_init()
             &efi_simple_text_output_protocol_guid,
             (VOID**)&efi_simple_text_output);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Unable to query text output interface");
 
     efi_simple_text_output->SetMode(efi_simple_text_output, 0);

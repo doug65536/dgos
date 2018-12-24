@@ -105,6 +105,7 @@ public:
             uint64_t fill = page_end - start;
             if (fill > len)
                 fill = len;
+
             uint8_t *p = (uint8_t*)lookup(start, true);
 
             // Note, can't use memset here because that would cause
@@ -180,7 +181,7 @@ void __asan_load1_noabort(vaddr_t addr)
     addr &= 0xFFFFFFFFFFFF;
     uint8_t *byte = (uint8_t*)asan_shadow.lookup(addr >> 3, false);
     uint8_t mask = 1 << (addr & 7);
-    if (!byte || !(*byte & mask))
+    if (unlikely(!byte || !(*byte & mask)))
         asan_error(addr, 1);
 }
 
@@ -191,7 +192,7 @@ void __asan_load2_noabort(vaddr_t addr)
         addr &= 0xFFFFFFFFFFFF;
         uint16_t *word = (uint16_t*)asan_shadow.lookup(addr >> 3, false);
         uint16_t mask = 3 << (addr & 7);
-        if (!word || (*word & mask) != mask)
+        if (unlikely(!word || (*word & mask) != mask))
             asan_error(addr, 2);
     } else {
         __asan_load1_noabort(addr);
@@ -206,7 +207,7 @@ void __asan_load4_noabort(vaddr_t addr)
         addr &= 0xFFFFFFFFFFFF;
         uint16_t *word = (uint16_t*)asan_shadow.lookup(addr >> 3, false);
         uint16_t mask = 0xF << (addr & 7);
-        if (!word || (*word & mask) != mask)
+        if (unlikely(!word || (*word & mask) != mask))
             asan_error(addr, 4);
     } else {
         __asan_load1_noabort(addr);
@@ -223,7 +224,7 @@ void __asan_load8_noabort(vaddr_t addr)
         addr &= 0xFFFFFFFFFFFF;
         uint16_t *word = (uint16_t*)asan_shadow.lookup(addr >> 3, false);
         uint16_t mask = 0xFF << (addr & 7);
-        if (!word || (*word & mask) != mask)
+        if (unlikely(!word || (*word & mask) != mask))
             asan_error(addr, 8);
     } else {
         for (size_t i = 0; i < 8; ++i)
@@ -238,7 +239,7 @@ void __asan_load16_noabort(vaddr_t addr)
         addr &= 0xFFFFFFFFFFFF;
         uint32_t *word = (uint32_t*)asan_shadow.lookup(addr >> 3, false);
         uint32_t mask = 0xFFFF << (addr & 7);
-        if (!word || (*word & mask) != mask)
+        if (unlikely(!word || (*word & mask) != mask))
             asan_error(addr, 16);
     } else {
         for (size_t i = 0; i < 16; ++i)
@@ -265,7 +266,7 @@ void __asan_loadN_noabort(vaddr_t addr, size_t size)
     uint64_t end_fill = (addr + size) >> 3;
     uint64_t len_fill = end_fill - start_fill;
 
-    if (!asan_shadow.is_filled_with(start_fill, 0xFF, len_fill))
+    if (unlikely(!asan_shadow.is_filled_with(start_fill, 0xFF, len_fill)))
         asan_error(addr, size);
 
     start_fill += len_fill;

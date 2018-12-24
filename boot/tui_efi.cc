@@ -141,7 +141,7 @@ _constructor(ctor_console) void conin_init()
                 &efi_num_text_input_handles,
                 &efi_text_input_handles);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Unable to query text input handle");
 
     status = efi_systab->BootServices->HandleProtocol(
@@ -156,7 +156,7 @@ _constructor(ctor_console) void conin_init()
                 EVT_TIMER | EVT_NOTIFY_SIGNAL, TPL_CALLBACK,
                 efi_timer_callback, nullptr, &efi_timer_event);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Could not create timer event");
 
     // Set timer tick period to 59.4ms
@@ -164,7 +164,7 @@ _constructor(ctor_console) void conin_init()
                 efi_timer_event,
                 TimerPeriodic, 549000);
 
-    if (EFI_ERROR(status))
+    if (unlikely(EFI_ERROR(status)))
         halt(TSTR "Could not set timer");
 }
 
