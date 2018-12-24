@@ -9,6 +9,7 @@
 #include "ctors.h"
 #include "cpu.h"
 #include "utf.h"
+#include "bootmenu.h"
 #include "../kernel/lib/bswap.h"
 
 EFI_HANDLE efi_image_handle;
@@ -352,24 +353,6 @@ _constructor(ctor_fs) void register_efi_fs()
 }
 #endif
 
-extern "C" _noreturn
-EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
-{
-    ::efi_image_handle = image_handle;
-    ::efi_systab = systab;
-
-    PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
-
-    ctors_invoke();
-
-    elf64_run(cpu_choose_kernel());// TSTR "dgos-kernel-generic");
-
-    //dtors_invoke();
-    //
-    //systab->BootServices->Exit(image_handle, 0, 0, nullptr);
-    //return EFI_SUCCESS;
-}
-
 int file_handle_base_t::open(const tchar *filename)
 {
     int fd = find_unused_handle();
@@ -439,4 +422,25 @@ uint64_t file_handle_base_t::boot_drv_serial()
     free(buffer);
 
     return serial;
+}
+
+extern "C" _noreturn
+EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
+{
+    ::efi_image_handle = image_handle;
+    ::efi_systab = systab;
+
+    PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
+
+    ctors_invoke();
+
+    kernel_params_t params;
+    boot_menu_show(params);
+
+    elf64_run(cpu_choose_kernel());// TSTR "dgos-kernel-generic");
+
+    //dtors_invoke();
+    //
+    //systab->BootServices->Exit(image_handle, 0, 0, nullptr);
+    //return EFI_SUCCESS;
 }
