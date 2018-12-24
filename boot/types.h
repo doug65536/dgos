@@ -7,6 +7,10 @@
 typedef long ssize_t;
 typedef int64_t off_t;
 
+#ifdef __cplusplus
+#define restrict __restrict
+#endif
+
 #define _stdcall                __attribute__((__stdcall__))
 
 #define _packed                 __attribute((__packed__))

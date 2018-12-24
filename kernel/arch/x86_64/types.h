@@ -5,7 +5,7 @@
 #include <limits.h>
 
 #ifdef	__cplusplus
-# define restrict
+# define restrict __restrict
 # define __BEGIN_DECLS	extern "C" {
 # define __END_DECLS	}
 #else
