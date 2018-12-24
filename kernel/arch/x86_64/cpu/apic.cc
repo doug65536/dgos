@@ -270,6 +270,26 @@ static uint8_t topo_cpu_count;
 static uintptr_t apic_base;
 static uint32_t volatile *apic_ptr;
 
+struct memory_affinity_t {
+    uint64_t base;
+    uint64_t length;
+    uint32_t domain;
+};
+
+static std::vector<memory_affinity_t> acpi_mem_affinity;
+
+struct apic_affinity_t {
+    uint32_t domain;
+    uint32_t apic_id;
+};
+
+static std::vector<apic_affinity_t> acpi_apic_affinity;
+
+static uint64_t acpi_slit_localities;
+static std::vector<uint8_t> acpi_slit_table;
+
+// SRAT
+
 //
 // APIC
 
@@ -574,6 +594,13 @@ struct acpi_srat_hdr_t {
 } _packed;
 
 C_ASSERT(sizeof(acpi_srat_hdr_t) == 48);
+
+struct acpi_slit_t {
+    acpi_sdt_hdr_t hdr;
+
+    uint64_t locality_count;
+    // Followed by locality_count squared 1-byte entries
+} _packed;
 
 struct acpi_srat_rec_hdr_t {
     uint8_t type;
@@ -1009,9 +1036,11 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                    ent->ioapic.hdr.record_len);
         switch (ent->hdr.entry_type) {
         case ACPI_MADT_REC_TYPE_LAPIC:
+            ACPI_TRACE("Got ACPI_MADT_REC_TYPE_LAPIC\n");
             break;
 
         case ACPI_MADT_REC_TYPE_IOAPIC:
+            ACPI_TRACE("Got ACPI_MADT_REC_TYPE_IOAPIC\n");
             break;
 
         case ACPI_MADT_REC_TYPE_IRQ:
@@ -1160,6 +1189,8 @@ static void acpi_parse_rsdt()
 
         hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, hdr->len);
 
+        ACPI_TRACE("Encountered sig=%4.4s\n", hdr->sig);
+
         if (!memcmp(hdr->sig, "FACP", 4)) {
             acpi_fadt_t *fadt_hdr = (acpi_fadt_t *)hdr;
 
@@ -1231,13 +1262,15 @@ static void acpi_parse_rsdt()
                                    ", domain=%#x"
                                    ", apic_id=%#x"
                                    ", enabled=%u"
+                                   ", clk_domain=%u"
                                    "\n",
                                    lapic_rec->domain_lo |
                                    (lapic_rec->domain_hi[0] << 8) |
                                    (lapic_rec->domain_hi[1] << 16) |
                                    (lapic_rec->domain_hi[2] << 24),
                                    lapic_rec->apic_id,
-                                   lapic_rec->flags);
+                                   lapic_rec->flags,
+                                   lapic_rec->clk_domain);
                         break;
 
                     case 1:
@@ -1253,6 +1286,13 @@ static void acpi_parse_rsdt()
                                    mem_rec->flags,
                                    mem_rec->range_base,
                                    mem_rec->range_length);
+
+                        if (!acpi_mem_affinity.
+                                push_back({mem_rec->range_base,
+                                          mem_rec->range_length,
+                                          mem_rec->domain}))
+                            panic_oom();
+
                         break;
 
                     case 2:
@@ -1266,6 +1306,12 @@ static void acpi_parse_rsdt()
                                    x2apic_rec->domain,
                                    x2apic_rec->x2apic_id,
                                    x2apic_rec->flags);
+
+                        if (!acpi_apic_affinity.
+                                push_back({x2apic_rec->domain,
+                                          x2apic_rec->x2apic_id}))
+                            panic_oom();
+
                         break;
 
                     default:
@@ -1275,16 +1321,25 @@ static void acpi_parse_rsdt()
                     }
                 }
             }
+        } else if (!memcmp(hdr->sig, "SLIT", 4)) {
+            acpi_slit_t *slit = (acpi_slit_t *)hdr;
+
+            acpi_slit_localities = slit->locality_count;
+            if (!acpi_slit_table.assign((char*)(slit + 1),
+                                        (char*)(slit + 1) +
+                                        (acpi_slit_localities *
+                                         acpi_slit_localities)))
+                panic_oom();
         } else {
             if (acpi_chk_hdr(hdr) == 0) {
                 ACPI_TRACE("ACPI %4.4s ignored\n", hdr->sig);
             } else {
                 ACPI_ERROR("ACPI %4.4s checksum mismatch!"
-                       " (ignored anyway)\n", hdr->sig);
+                       " (would have ignored anyway)\n", hdr->sig);
             }
         }
 
-        munmap(hdr, std::max(size_t(64 << 10), size_t(hdr->len)));
+        munmap(hdr, std::max(size_t(64) << 10, size_t(hdr->len)));
     }
 }
 
@@ -1764,6 +1819,7 @@ int apic_init(int ap)
 
     apic_online(1, INTR_APIC_SPURIOUS, INTR_APIC_ERROR);
 
+    // Initialize task priority register to zero, unmasking all IRQs
     apic->write32(APIC_REG_TPR, 0x0);
 
     assert(apic_base == (cpu_msr_get(CPU_APIC_BASE_MSR) & CPU_APIC_BASE_ADDR));
