@@ -2431,12 +2431,12 @@ QEMU_USB = \
 #-device nec-usb-xhci,id=xhci,p2=16,p3=16,msix=on,streams=on
 #-device usb-storage,bus=xhci.0,drive=stick
 QEMU_NET = \
-	-netdev user,id=usernet \
-	--nic user,model=rtl8139,id=nic_rtl8139 \
-	-object filter-dump,file=dump/netdump_rtl8139.pcap,netdev=nic_rtl8139,id=pcap \
+	-net nic,model=rtl8139,id=nic_rtl8139 \
+	-net user \
 	$(QEMU_BRIDGE)
 
 
+#	-object filter-dump,file=dump/netdump_rtl8139.pcap,netdev=nic_rtl8139,id=pcap \
 #	-nic model=ne2k_pci,id=nic_ne2k
 #	-nic model=e1000,id=nic_e1000
 QEMU_MONITOR = \
@@ -2472,13 +2472,16 @@ SECTOR_SZ = 512
 QEMU_RT = $(QEMU_RT_$(1))
 QEMU_RT_asan = -s -S -fw_cfg name=opt/com.doug16k.dgos.kernel_type,string=A
 QEMU_RT_trace = -s -fw_cfg name=opt/com.doug16k.dgos.kernel_type,string=T
+QEMU_RT_tracedbg = -S $(QEMU_RT_trace)
 QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report
 QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
-QEMU_MACHINE = -machine q35 -vga virtio -display sdl,gl=on
+QEMU_VGA = -vga virtio
+QEMU_DISPLAY = -display sdl,gl=on
+QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
 #QEMU_MACHINE_nvme = -machine q35
 #QEMU_MACHINE_ahci = -machine q35
 #QEMU_MACHINE_usb = -machine q35
@@ -2506,6 +2509,13 @@ QEMU_IMAGE_iso = isodisk.img
 QEMU_NP = $(QEMU_NP_$(1))
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
 QEMU_NP_up = -smp cpus=1,cores=1,threads=1
+QEMU_NP_numa = \
+    $(QEMU_NP_smp) \
+    -numa node,cpus=0-$(shell echo $$(( $(QEMU_CPUS) / 2 - 1 ))) \
+    -numa node,cpus=$(shell echo $$(( $(QEMU_CPUS) / 2 )))-$(shell echo $$(( $(QEMU_CPUS)-1 ))) \
+    -numa dist,src=1,dst=0,val=25 \
+    -numa dist,src=0,dst=1,val=15
+
 QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
 QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq,topoext
@@ -2522,8 +2532,8 @@ QEMU_BOOTMEDIA_pxe_bios = -boot n \
 QEMU_BOOTMEDIA_pxe_efi = \
 	-boot n -net user,tftp=$(top_builddir),bootfile=bootx64.efi
 
-QL_RT = debug run trace asan
-QL_NP = up smp
+QL_RT = debug run trace asan tracedbg
+QL_NP = up smp numa
 QL_BT = bios efi
 QL_BM = pxe hd
 QL_FS = iso fat
@@ -14819,7 +14829,7 @@ $(top_builddir)/fatpart.img: \
 		rm -f $(top_builddir)/fatpart.img \
 			$(top_builddir)/fatdisk.img && \
 		\
-		truncate --size=40M $(top_builddir)/fatpart.img && \
+		truncate --size=80M $(top_builddir)/fatpart.img && \
 		\
 		mkfs.vfat \
 			-F 32 \
