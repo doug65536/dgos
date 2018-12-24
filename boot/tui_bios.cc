@@ -10,6 +10,11 @@ int readkey()
     return regs.eax & 0xFFFF;
 }
 
+mouse_evt readmouse()
+{
+    return {};
+}
+
 // Get ticks since midnight (54.9ms units)
 int systime()
 {
@@ -17,6 +22,18 @@ int systime()
     regs.eax = 0;
     bioscall(&regs, 0x1A);
     return (regs.ecx << 16) | (regs.edx & 0xFFFF);
+}
+
+bool wait_input(uint32_t ms_timeout)
+{
+    uint32_t expire = systime() + ((ms_timeout * 10) / 549);
+
+    while (systime() < expire) {
+        if (pollkey())
+            return true;
+        idle();
+    }
+    return false;
 }
 
 void idle()
@@ -31,13 +48,12 @@ void idle()
 bool pollkey()
 {
     bios_regs_t regs{};
+
     regs.eax = 0x1100;
     bioscall(&regs, 0x16);
 
-    if (regs.flags_ZF()) {
-        idle();
-        return false;
-    }
+    if (!regs.flags_ZF())
+        return true;
 
-    return true;
+    return false;
 }

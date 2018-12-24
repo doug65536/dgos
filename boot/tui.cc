@@ -74,7 +74,10 @@ void tui_menu_renderer_t::draw(int selection)
 // Wait for a key
 int waitkey()
 {
-    while (!pollkey());
+    while (!pollkey())
+    {
+        //pollmouse();
+    }
     return readkey();
 }
 
@@ -88,9 +91,13 @@ void tui_menu_renderer_t::interact_timeout(int ms)
 
     int ms_ticks = ms / 54;
 
+    if (!wait_input(ms))
+        return;
+
     // Wait timeout seconds for a keystroke
     int ticks_last = systime();
     int ticks_elap = 0;
+
     do {
         int ticks_this = systime();
 

@@ -74,5 +74,11 @@ int readkey();
 int systime();
 void idle();
 bool pollkey();
+bool wait_input(uint32_t ms_timeout);
 
-
+struct mouse_evt {
+    int32_t x;
+    int32_t y;
+    int lmb;
+    int rmb;
+};
