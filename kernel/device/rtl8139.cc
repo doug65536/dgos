@@ -1,3 +1,5 @@
+// pci driver: C=NETWORK, S=ETHERNET, V=0x10EC, D=0x8139
+
 #include "pci.h"
 #include "callout.h"
 #include "printk.h"
@@ -17,6 +19,8 @@
 
 // test
 #include "net/dhcp.h"
+
+#include "rtl8139.bits.h"
 
 #define RTL8139_DEBUG   1
 #if RTL8139_DEBUG
@@ -142,268 +146,13 @@ struct rtl8139_dev_t : public eth_dev_base_t {
 static rtl8139_dev_t **rtl8139_devices;
 static size_t rtl8139_device_count;
 
-// MAC address (must be 32-bit I/O)
-#define RTL8139_IO_IDR_HI       0x00
-#define RTL8139_IO_IDR_LO       0x04
-
-// Multicast Address Register (must be 32-bit I/O)
-#define RTL8139_IO_MAR_LO       0x08
-#define RTL8139_IO_MAR_HI       0x0C
-
-// Tx status descriptor 0-3 (32-bit)
-#define RTL8139_IO_TSD_n(n)     (0x10 + ((n) << 2))
-
-// Tx start address descriptor 0-3 (32-bit)
-#define RTL8139_IO_TSAD_n(n)    (0x20 + ((n) << 2))
-
-// Rx buffer address descriptor (32-bit)
-#define RTL8139_IO_RBSTART      0x30
-
-// Early rx byte count (16-bit)
-#define RTL8139_IO_ERBCR        0x34
-
-// Early rx status register (8-bit)
-#define RTL8139_IO_ERSR         0x36
-
-// Command register (8-bit)
-#define RTL8139_IO_CR           0x37
-
-// Current address of packet read (16-bit)
-#define RTL8139_IO_CAPR         0x38
-
-// Current rx buffer address (16-bit)
-#define RTL8139_IO_CBR          0x3A
-
-// Interrupt Mask Register (16-bit)
-#define RTL8139_IO_IMR          0x3C
-
-// Interrupt Status Register (16-bit)
-#define RTL8139_IO_ISR          0x3E
-
-// Tx Configuration Register (32-bit)
-#define RTL8139_IO_TCR          0x40
-
-// Rx Configuration Register (32-bit)
-#define RTL8139_IO_RCR          0x44
-
-// Timer Count Register (32-bit)
-#define RTL8139_IO_TCTR         0x48
-
-// Missed Packet Counter (32-bit)
-#define RTL8139_IO_MPC          0x4C
-
-// 93C46 Command Register (8-bit)
-#define RTL8139_IO_9346CR       0x50
-
-// Configuration Register 0 (8-bit)
-#define RTL8139_IO_CONFIG0      0x51
-
-// Configuration Register 1 (8-bit)
-#define RTL8139_IO_CONFIG1      0x52
-
-// Timer Interrupt Register (32-bit)
-#define RTL8139_IO_TIMERINT     0x54
-
-// Media Status Register (8-bit)
-#define RTL8139_IO_MSR          0x58
-
-// Configuration Register 3 (8-bit)
-#define RTL8139_IO_CONFIG3      0x59
-
-// Configuration Register 4 (8-bit)
-#define RTL8139_IO_CONFIG4      0x5A
-
-// Multiple Interrupt Select (16-bit)
-#define RTL8139_IO_MULINT       0x5C
-
-// PCI Revision ID (8-bit)
-#define RTL8139_IO_RERID        0x5E
-
-// Tx Status of All Descriptors (16-bit)
-#define RTL8139_IO_TSAD         0x60
-
-// Basic Mode Control Register (16-bit)
-#define RTL8139_IO_BMCR         0x62
-
-// Basic Mode Status Register (16-bit)
-#define RTL8139_IO_BMSR         0x64
-
-// Auto-Negotiation Address Register (16-bit)
-#define RTL8139_IO_ANAR         0x66
-
-// Auto-Negotiation Link Partner Register (16-bit)
-#define RTL8139_IO_ANLPAR       0x68
-
-// Auto-Negotiation Expansion Register (16-bit)
-#define RTL8139_IO_ANER         0x6A
-
-// Disconnect counter (16-bit)
-#define RTL8139_IO_DIS          0x6C
-
-// False Carrier Sense Counter (16-bit)
-#define RTL8139_IO_FCSC         0x6E
-
-// N-Way Test Register (16-bit)
-#define RTL8139_IO_NWAYTR       0x70
-
-// RX_ER Counter (16-bit)
-#define RTL8139_IO_REC          0x72
-
-// CS Configuration Register (16-bit)
-#define RTL8139_IO_CSCR         0x74
-
-// PHY Parameter 1 (32-bit)
-#define RTL8139_IO_PHY1_PARM    0x78
-
-// Twister Parameter (32-bit)
-#define RTL8139_IO_TW_PARM      0x7C
-
-// PHY Parameter 2 (8-bit)
-#define RTL8139_IO_PHY2_PARM    0x80
-
-// Power Management CRC register for wakeup frame n (8-bit)
-#define RTL8139_IO_CRC_n(n)     (0x84 + (n))
-
-// Power Management wakeup frame0 (64-bit)
-#define RTL8139_IO_WAKELO_n(n)  (0x8C + ((n) << 2))
-#define RTL8139_IO_WAKEHI_n(n)  (0x90 + ((n) << 2))
-
-// LSB of mask byte of wakeup frame n within offset 12 to 75 (8-bit)
-#define RTL8139_IO_LSBCRC0_n(n) (0xCC + (n))
 
 //
 // Register bit defines
 
-//
-// RTL8139_IO_CR: Command register
-
-#define RTL8139_CR_RST_BIT      4
-#define RTL8139_CR_RXEN_BIT     3
-#define RTL8139_CR_TXEN_BIT     2
-#define RTL8139_CR_RXEMPTY_BIT  0
-
-// Reset
-#define RTL8139_CR_RST          (1U<<RTL8139_CR_RST_BIT)
-
-// Rx enable
-#define RTL8139_CR_RXEN         (1U<<RTL8139_CR_RXEN_BIT)
-
-// Tx enable
-#define RTL8139_CR_TXEN         (1U<<RTL8139_CR_TXEN_BIT)
-
-// Rx buffer empty (read only)
-#define RTL8139_CR_RXEMPTY      (1U<<RTL8139_CR_RXEMPTY_BIT)
 
 //
-// RTL8139_IO_TSD_n: Tx status descriptor 0-3
-
-#define RTL8139_TSD_CRS_BIT     31
-#define RTL8139_TSD_TABT_BIT    30
-#define RTL8139_TSD_OWC_BIT     29
-#define RTL8139_TSD_CDH_BIT     28
-#define RTL8139_TSD_NCC_BIT     24
-#define RTL8139_TSD_ERTXTH_BIT  16
-#define RTL8139_TSD_TOK_BIT     15
-#define RTL8139_TSD_TUN_BIT     14
-#define RTL8139_TSD_OWN_BIT     13
-#define RTL8139_TSD_SIZE_BIT    0
-
-#define RTL8139_TSD_NCC_BITS    4
-#define RTL8139_TSD_ERTXTH_BITS 6
-#define RTL8139_TSD_SIZE_BITS   13
-
-#define RTL8139_TSD_NCC_MASK    ((1U<<RTL8139_TSD_NCC_BITS)-1)
-#define RTL8139_TSD_ERTXTH_MASK ((1U<<RTL8139_TSD_ERTXTH_BITS)-1)
-#define RTL8139_TSD_SIZE_MASK   ((1U<<RTL8139_TSD_SIZE_BITS)-1)
-
-// Carrier sense lost (read only)
-#define RTL8139_TSD_CRS         (1U<<RTL8139_TSD_CRS_BIT)
-
-// Transmit aborted (read only)
-#define RTL8139_TSD_TABT        (1U<<RTL8139_TSD_TABT_BIT)
-
-// Out of window collision (read only)
-#define RTL8139_TSD_OWC         (1U<<RTL8139_TSD_OWC_BIT)
-
-// CD Heart Beat (10Mbps only) (read only)
-#define RTL8139_TSD_CDH         (1U<<RTL8139_TSD_CDH_BIT)
-
-// Transmit OK (read only)
-#define RTL8139_TSD_TOK         (1U<<RTL8139_TSD_TOK_BIT)
-
-// Transmit FIFO underrun (read only)
-#define RTL8139_TSD_TUN         (1U<<RTL8139_TSD_TUN_BIT)
-
-// Set to 0 if NIC is using descriptor,
-// Set to 1 if ready for driver to provide another packet
-// Must write 0 to this bit to start tx
-#define RTL8139_TSD_OWN         (1U<<RTL8139_TSD_OWN_BIT)
-
-// Number of tx collisions count
-#define RTL8139_TSD_NCC \
-    (RTL8139_TSD_NCC_MASK<<RTL8139_TSD_NCC_BIT)
-
-// Early tx threshold (in units of 8 bytes, 0=8 bytes, max 2KB)
-#define RTL8139_TSD_ERTXTH \
-    (RTL8139_TSD_ERTXTH_MASK<<RTL8139_TSD_ERTXTH_BIT)
-
-// Tx packet size
-#define RTL8139_TSD_SIZE \
-    (RTL8139_TSD_SIZE_MASK<<RTL8139_TSD_SIZE_BIT)
-
-// Early tx threshold (in units of 8 bytes, 0=8 bytes, max 2KB)
-#define RTL8139_TSD_ERTXTH_n(n) ((n)<<RTL8139_TSD_ERTXTH_BIT)
-
-// Tx packet size
-#define RTL8139_TSD_SIZE_n(n)   ((n)<<RTL8139_TSD_SIZE_BIT)
-#define RTL8139_TSD_SIZE_MAX    1792
-
-//
-// RTL8139_IO_IMR and RTL8139_IO_ISR: Interrupt Mask/Status Registers
-
-#define RTL8139_IxR_SERR_BIT        15
-#define RTL8139_IxR_TIMEOUT_BIT     14
-#define RTL8139_IxR_LENCHG_BIT      13
-#define RTL8139_IxR_FOVW_BIT        6
-#define RTL8139_IxR_PUNLC_BIT       5
-#define RTL8139_IxR_RXOVW_BIT       4
-#define RTL8139_IxR_TER_BIT         3
-#define RTL8139_IxR_TOK_BIT         2
-#define RTL8139_IxR_RER_BIT         1
-#define RTL8139_IxR_ROK_BIT         0
-
-// System error
-#define RTL8139_IxR_SERR            (1U<<RTL8139_IxR_SERR_BIT)
-
-// Timeout
-#define RTL8139_IxR_TIMEOUT         (1U<<RTL8139_IxR_TIMEOUT_BIT)
-
-// Cable length change
-#define RTL8139_IxR_LENCHG          (1U<<RTL8139_IxR_LENCHG_BIT)
-
-// Rx FIFO Overflow
-#define RTL8139_IxR_FOVW            (1U<<RTL8139_IxR_FOVW_BIT)
-
-// Packet underrun / link change
-#define RTL8139_IxR_PUNLC           (1U<<RTL8139_IxR_PUNLC_BIT)
-
-// Rx overflow
-#define RTL8139_IxR_RXOVW           (1U<<RTL8139_IxR_RXOVW_BIT)
-
-// Transmit error
-#define RTL8139_IxR_TER             (1U<<RTL8139_IxR_TER_BIT)
-
-// Transmit OK
-#define RTL8139_IxR_TOK             (1U<<RTL8139_IxR_TOK_BIT)
-
-// Rx error
-#define RTL8139_IxR_RER             (1U<<RTL8139_IxR_RER_BIT)
-
-// Rx OK
-#define RTL8139_IxR_ROK             (1U<<RTL8139_IxR_ROK_BIT)
-
-//
-// RTL8139_IO_RCR: Rx Configuration Register (32-bit)
+// RTL8139_RCR: Rx Configuration Register (32-bit)
 
 #define RTL8139_RCR_ERTH_BIT        24
 #define RTL8139_RCR_MULERINT_BIT    17
@@ -487,7 +236,7 @@ static size_t rtl8139_device_count;
 #define RTL8139_RCR_MXDMA_n(n)  ((n)<<RTL8139_RCR_MXDMA_BIT)
 
 //
-// RTL8139_IO_TCR: Tx Configuration Register (32-bit)
+// RTL8139_TCR: Tx Configuration Register (32-bit)
 
 #define RTL8139_TCR_HWVERID_A_BIT   26
 #define RTL8139_TCR_IFG_BIT         24
@@ -553,7 +302,7 @@ static size_t rtl8139_device_count;
 // Tx retry count (16+n*16)
 #define RTL8139_TCR_TXRR_n(n)       ((n)<<RTL8139_TCR_TXRR_BIT)
 
-// RTL8139_IO_TSAD: Tx Status of All Descriptors (16-bit)
+// RTL8139_TSAD: Tx Status of All Descriptors (16-bit)
 
 #define RTL8139_TSAD_OWN_BIT        0
 #define RTL8139_TSAD_TABT_BIT       4
@@ -624,9 +373,9 @@ void rtl8139_dev_t::tx_packet(int slot, ethq_pkt_t *pkt)
     RTL8139_TRACE("Transmitting packet addr=%p, len=%d slot=%d\n",
              (void*)pkt->physaddr, pkt->size, slot);
 
-    RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(slot), pkt->physaddr);
+    RTL8139_MM_WR_32(RTL8139_TSAD_n(slot), pkt->physaddr);
 
-    RTL8139_MM_WR_32(RTL8139_IO_TSD_n(slot),
+    RTL8139_MM_WR_32(RTL8139_TSD_n(slot),
                      RTL8139_TSD_SIZE_n(pkt->size));
 }
 
@@ -640,7 +389,7 @@ void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
     if (isr & RTL8139_IxR_RXOVW) {
         RTL8139_TRACE("IRQ Rx: RXOVW\n");
         //rx_offset = 0;
-        //RTL8139_MM_WR_16(RTL8139_IO_CAPR,
+        //RTL8139_MM_WR_16(RTL8139_CAPR,
         //                 (uint16_t)rx_offset);
     }
 
@@ -648,7 +397,7 @@ void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
     rtl8139_rx_hdr_t *hdr_ptr = (rtl8139_rx_hdr_t*)
             ((char*)rx_buffer + rx_offset);
 
-    while (!(RTL8139_MM_RD_8(RTL8139_IO_CR) & RTL8139_CR_RXEMPTY)) {
+    while (!(RTL8139_MM_RD_8(RTL8139_CR) & RTL8139_CR_RXEMPTY)) {
         memcpy(&hdr, hdr_ptr, sizeof(hdr));
 
         RTL8139_TRACE("Header flags: %x len=%d\n",
@@ -709,7 +458,7 @@ void rtl8139_dev_t::rx_irq_handler(uint16_t isr)
         hdr_ptr = (rtl8139_rx_hdr_t *)
                 ((char*)rx_buffer + rx_offset);
 
-        RTL8139_MM_WR_16(RTL8139_IO_CAPR, rx_offset - 16);
+        RTL8139_MM_WR_16(RTL8139_CAPR, rx_offset - 16);
     }
 }
 
@@ -718,7 +467,7 @@ void rtl8139_dev_t::tx_irq_handler()
     RTL8139_TRACE("IRQ: Tx OK\n");
 
     // Transmit status of all descriptors
-    uint16_t tsad = RTL8139_MM_RD_16(RTL8139_IO_TSAD);
+    uint16_t tsad = RTL8139_MM_RD_16(RTL8139_TSAD);
 
     RTL8139_TRACE("RX IRQ TSAD=%x\n", tsad);
 
@@ -751,7 +500,7 @@ void rtl8139_dev_t::tx_irq_handler()
             // Get another outgoing packet
             pkt = ethq_dequeue(&tx_queue);
 
-            //RTL8139_MM_WR_32(RTL8139_IO_TSD_n(tx_tail),
+            //RTL8139_MM_WR_32(RTL8139_TSD_n(tx_tail),
             //                 0);
 
             // Transmit new packet
@@ -774,8 +523,8 @@ void rtl8139_dev_t::tx_irq_handler()
             RTL8139_TRACE("*** Transmit aborted?!\n");
 
             // Clear transmit abort
-            RTL8139_MM_WR_32(RTL8139_IO_TCR,
-                             RTL8139_MM_RD_32(RTL8139_IO_TCR) |
+            RTL8139_MM_WR_32(RTL8139_TCR,
+                             RTL8139_MM_RD_32(RTL8139_TCR) |
                              RTL8139_TCR_CLRABT);
 
             if (pkt->callback)
@@ -819,10 +568,10 @@ void rtl8139_dev_t::irq_handler()
 {
     scoped_lock lock_(lock);
 
-    uint16_t isr = RTL8139_MM_RD_16(RTL8139_IO_ISR);
+    uint16_t isr = RTL8139_MM_RD_16(RTL8139_ISR);
 
     // Acknowledge everything
-    RTL8139_MM_WR_16(RTL8139_IO_ISR, isr);
+    RTL8139_MM_WR_16(RTL8139_ISR, isr);
 
     ethq_pkt_t *rx_first = nullptr;
 
@@ -965,10 +714,10 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
                          PCI_CMD_IOSE);
 
     // Power on
-    RTL8139_MM_WR_8(RTL8139_IO_CONFIG1, 0);
+    RTL8139_MM_WR_8(RTL8139_CONFIG1, 0);
 
     // Reset
-    RTL8139_MM_WR_8(RTL8139_IO_CR, RTL8139_CR_RST);
+    RTL8139_MM_WR_8(RTL8139_CR, RTL8139_CR_RST);
 
     // Allocate contiguous rx buffer
     rx_buffer_physaddr = mm_alloc_contiguous(65536 + 16);
@@ -979,15 +728,15 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
                            -1, 0);
 
     // Wait for reset to finish
-    while ((RTL8139_MM_RD_8(RTL8139_IO_CR) &
+    while ((RTL8139_MM_RD_8(RTL8139_CR) &
             RTL8139_CR_RST) != 0)
         pause();
 
     // Read MAC address
     uint32_t mac_hi;
     uint32_t mac_lo;
-    mac_hi = RTL8139_MM_RD_32(RTL8139_IO_IDR_HI);
-    mac_lo = RTL8139_MM_RD_32(RTL8139_IO_IDR_LO);
+    mac_hi = RTL8139_MM_RD_32(RTL8139_IDR_HI);
+    mac_lo = RTL8139_MM_RD_32(RTL8139_IDR_LO);
 
     memcpy(mac_addr + 4, &mac_lo, sizeof(uint16_t));
     memcpy(mac_addr, &mac_hi, sizeof(uint32_t));
@@ -1003,22 +752,22 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
 
     // Reset receive ring buffer offset
     rx_offset = 0;
-    RTL8139_MM_WR_16(RTL8139_IO_CAPR, 0);
+    RTL8139_MM_WR_16(RTL8139_CAPR, 0);
 
     // Set rx buffer physical address
-    RTL8139_MM_WR_32(RTL8139_IO_RBSTART,
+    RTL8139_MM_WR_32(RTL8139_RBSTART,
                      (uint32_t)rx_buffer_physaddr);
 
     // Set tx buffer physical addresses
     for (unsigned i = 0; i < 4; ++i)
-        RTL8139_MM_WR_32(RTL8139_IO_TSAD_n(i), 0);
+        RTL8139_MM_WR_32(RTL8139_TSAD_n(i), 0);
 
     // Enable rx and tx
-    RTL8139_MM_WR_8(RTL8139_IO_CR,
+    RTL8139_MM_WR_8(RTL8139_CR,
                     RTL8139_CR_RXEN |
                     RTL8139_CR_TXEN);
 
-    RTL8139_MM_WR_32(RTL8139_IO_RCR,
+    RTL8139_MM_WR_32(RTL8139_RCR,
                      // Early rx threshold 8=50%
                      RTL8139_RCR_ERTH_n(8) |
                      // Rx FIFO threshold 5=512 bytes
@@ -1035,7 +784,7 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
                      RTL8139_RCR_APM);
 
     // Tx configuration
-    RTL8139_MM_WR_32(RTL8139_IO_TCR,
+    RTL8139_MM_WR_32(RTL8139_TCR,
                      RTL8139_TCR_CRC |
                      RTL8139_TCR_IFG_n(3) |
                      RTL8139_TCR_TXRR_n(0) |
@@ -1054,10 +803,10 @@ void rtl8139_dev_t::detect(pci_dev_iterator_t const &pci_dev)
             RTL8139_IxR_ROK;
 
     // Acknowledge IRQs
-    //RTL8139_MM_WR_16(RTL8139_IO_ISR, unmask);
+    //RTL8139_MM_WR_16(RTL8139_ISR, unmask);
 
     // Unmask IRQs
-    RTL8139_MM_WR_16(RTL8139_IO_IMR, unmask);
+    RTL8139_MM_WR_16(RTL8139_IMR, unmask);
 
     pci_set_irq_unmask(pci_dev, true);
 }
@@ -1077,20 +826,20 @@ void rtl8139_dev_t::set_mac(void const *mac_addr_set)
     memcpy(&mac_lo, mac_addr + 4, sizeof(uint16_t));
     memcpy(&mac_hi, mac_addr, sizeof(uint32_t));
 
-    RTL8139_MM_WR_32(RTL8139_IO_IDR_HI, mac_hi);
-    RTL8139_MM_WR_32(RTL8139_IO_IDR_LO, mac_lo);
+    RTL8139_MM_WR_32(RTL8139_IDR_HI, mac_hi);
+    RTL8139_MM_WR_32(RTL8139_IDR_LO, mac_lo);
 }
 
 int rtl8139_dev_t::get_promiscuous()
 {
-    return !!(RTL8139_MM_RD_32(RTL8139_IO_RCR) &
+    return !!(RTL8139_MM_RD_32(RTL8139_RCR) &
             RTL8139_RCR_AAP);
 }
 
 void rtl8139_dev_t::set_promiscuous(int promiscuous)
 {
-    RTL8139_MM_WR_32(RTL8139_IO_RCR,
-                     (RTL8139_MM_RD_32(RTL8139_IO_RCR) &
+    RTL8139_MM_WR_32(RTL8139_RCR,
+                     (RTL8139_MM_RD_32(RTL8139_RCR) &
                      ~RTL8139_RCR_AAP) |
                      (!!promiscuous) << RTL8139_RCR_AAP_BIT);
 }
