@@ -94,6 +94,14 @@ AS_IF([test x"$SHRED" == x"NOT_FOUND"],
 	[AC_MSG_FAILURE([Cannot find shred])])
 AC_SUBST([SHRED])
 
+AC_CHECK_PROGS([LEMON], [lemon], [NOT_FOUND])
+AS_IF([test x"$LEMON" == x"NOT_FOUND"],
+	[AC_MSG_FAILURE([Cannot find lemon parser generator])])
+AC_SUBST([LEMON])
+
+AS_VAR_SET([YACC], [])
+AC_SUBST([YACC])
+
 AC_DEFUN([AX_CHECK_COMPILE_FLAG],
 [AC_PREREQ(2.64)dnl for _AC_LANG_PREFIX and AS_VAR_IF
 AS_VAR_PUSHDEF([CACHEVAR],[ax_cv_check_[]_AC_LANG_ABBREV[]flags_$4_$1])dnl
@@ -118,7 +126,7 @@ done
 
 AS_VAR_SET([INSTRUMENT_FUNCTIONS_FLAGS], [])
 for flag in \
-	finstrument-functions D_CALL_TRACE_ENABLED
+	finstrument-functions D_CALL_TRACE_ENABLED=1
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([INSTRUMENT_FUNCTIONS_FLAGS], [" -$flag"])],
@@ -170,7 +178,7 @@ AC_SUBST([COMPILER_FLAGS])
 
 AS_VAR_SET([RETPOLINE_FLAGS])
 for flag in \
-	mindirect-branch=thunk-extern
+	mindirect-branch=thunk-extern DUSE_RETPOLINE=1
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([RETPOLINE_FLAGS], [" -$flag"])],
@@ -253,6 +261,7 @@ AC_SUBST([NO_FLOAT_FLAGS])
 ELF32_FLAGS=
 for flag in \
 	m32 \
+	mpreferred-stack-boundary=2 \
 	Wl,-m,elf_i386 \
 	Wl,-N \
 	Wl,--no-dynamic-linker \
@@ -264,13 +273,15 @@ do
 done
 AC_SUBST([ELF32_FLAGS])
 
+
 ELF64_FLAGS=
 for flag in \
 	m64 \
+	mpreferred-stack-boundary=3 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--no-dynamic-linker \
 	Wl,--eh-frame-hdr \
+	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
@@ -279,11 +290,13 @@ do
 done
 AC_SUBST([ELF64_FLAGS])
 
+
 PE32_FLAGS=
 for flag in \
 	m32 \
 	D__efi \
 	fshort-wchar \
+	maccumulate-outgoing-args \
 	Wl,-m,i386pe \
 	Wl,-pie \
 	Wl,-N \
@@ -301,6 +314,7 @@ for flag in \
 	m64 \
 	D__efi \
 	fshort-wchar \
+	maccumulate-outgoing-args \
 	Wl,-m,i386pep \
 	Wl,-pie \
 	Wl,-N \
