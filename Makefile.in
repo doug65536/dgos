@@ -104,8 +104,8 @@ bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	bootfat-elf$(EXEEXT) bootiso-elf$(EXEEXT) \
 	bootpxe-bios-elf$(EXEEXT) bootefi-amd64$(EXEEXT) \
 	kernel-generic$(EXEEXT) kernel-tracing$(EXEEXT) \
-	kernel-asan$(EXEEXT) dhcpclient$(EXEEXT) ls$(EXEEXT) \
-	hello.km$(EXEEXT) user-shell$(EXEEXT)
+	kernel-asan$(EXEEXT) shell$(EXEEXT) dhcpclient$(EXEEXT) \
+	ls$(EXEEXT) hello.km$(EXEEXT) user-shell$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -131,6 +131,7 @@ libbootsect_a_LIBADD =
 am__dirstamp = $(am__leading_dot)dirstamp
 am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-bioscall.$(OBJEXT) \
+	boot/libbootsect_a-retpoline.$(OBJEXT) \
 	boot/libbootsect_a-diskio.$(OBJEXT) \
 	boot/libbootsect_a-ctors.$(OBJEXT) \
 	boot/libbootsect_a-assert.$(OBJEXT) \
@@ -158,6 +159,7 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-physmap.$(OBJEXT) \
 	boot/libbootsect_a-physmem_bios.$(OBJEXT) \
 	boot/libbootsect_a-vesa.$(OBJEXT) \
+	boot/libbootsect_a-vesa_bios.$(OBJEXT) \
 	boot/libbootsect_a-progressbar.$(OBJEXT) \
 	boot/libbootsect_a-debug.$(OBJEXT) \
 	boot/libbootsect_a-part.$(OBJEXT) \
@@ -172,7 +174,8 @@ libbootsect_a_OBJECTS = $(am_libbootsect_a_OBJECTS)
 libc_a_AR = $(AR) $(ARFLAGS)
 libc_a_LIBADD =
 am__objects_1 =
-am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
+am_libc_a_OBJECTS = libc/src/assert/libc_a-assert.$(OBJEXT) \
+	libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/string/libc_a-strsignal.$(OBJEXT) \
 	libc/src/string/libc_a-strcoll_l.$(OBJEXT) \
 	libc/src/string/libc_a-strerror.$(OBJEXT) \
@@ -219,12 +222,22 @@ am_libc_a_OBJECTS = libc/src/string/libc_a-__bytebitmap.$(OBJEXT) \
 	libc/src/dirent/libc_a-seekdir.$(OBJEXT) \
 	libc/src/stdlib/libc_a-_Exit.$(OBJEXT) \
 	libc/src/stdlib/libc_a-abs.$(OBJEXT) \
+	libc/src/stdlib/libc_a-malloc.$(OBJEXT) \
 	libc/src/fcntl/libc_a-creat.$(OBJEXT) \
 	libc/src/fcntl/libc_a-fcntl.$(OBJEXT) \
 	libc/src/fcntl/libc_a-open.$(OBJEXT) \
 	libc/src/fcntl/libc_a-openat.$(OBJEXT) \
 	libc/src/fcntl/libc_a-posix_fadvise.$(OBJEXT) \
 	libc/src/fcntl/libc_a-posix_fallocate.$(OBJEXT) \
+	libc/src/stdio/bits/libc_a-cfile.$(OBJEXT) \
+	libc/src/stdio/bits/libc_a-formatter.$(OBJEXT) \
+	libc/src/stdio/libc_a-fprintf.$(OBJEXT) \
+	libc/src/stdio/libc_a-fputc.$(OBJEXT) \
+	libc/src/stdio/libc_a-printf.$(OBJEXT) \
+	libc/src/stdio/libc_a-vfprintf.$(OBJEXT) \
+	libc/src/stdio/libc_a-vprintf.$(OBJEXT) \
+	libc/src/stdio/libc_a-fread.$(OBJEXT) \
+	libc/src/stdio/libc_a-fwrite.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-mmap.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-munmap.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-mremap.$(OBJEXT) \
@@ -369,6 +382,7 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-ctors.$(OBJEXT) \
 	boot/bootefi_amd64-fs.$(OBJEXT) \
 	boot/bootefi_amd64-cpu_efi.$(OBJEXT) \
+	boot/bootefi_amd64-retpoline.$(OBJEXT) \
 	boot/bootefi_amd64-physmap.$(OBJEXT) \
 	boot/bootefi_amd64-physmem_efi.$(OBJEXT) \
 	boot/bootefi_amd64-cpu.$(OBJEXT) \
@@ -392,6 +406,8 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-bootmenu.$(OBJEXT) \
 	boot/bootefi_amd64-tui.$(OBJEXT) \
 	boot/bootefi_amd64-tui_efi.$(OBJEXT) \
+	boot/bootefi_amd64-vesa.$(OBJEXT) \
+	boot/bootefi_amd64-vesa_efi.$(OBJEXT) \
 	boot/bootefi_amd64-boottable.$(OBJEXT) \
 	boot/bootefi_amd64-boottable_efi.$(OBJEXT) \
 	boot/bootefi_amd64-qemu.$(OBJEXT) \
@@ -454,6 +470,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/lib/kernel_asan-desc_alloc.$(OBJEXT) \
 	kernel/lib/kernel_asan-dev_eth.$(OBJEXT) \
 	kernel/lib/kernel_asan-dev_storage.$(OBJEXT) \
+	kernel/lib/kernel_asan-dev_char.$(OBJEXT) \
 	kernel/lib/kernel_asan-dev_text.$(OBJEXT) \
 	kernel/lib/kernel_asan-errno.$(OBJEXT) \
 	kernel/lib/kernel_asan-fileio.$(OBJEXT) \
@@ -552,6 +569,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/device/kernel_asan-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_asan-virtio-blk.$(OBJEXT) \
 	kernel/device/kernel_asan-vga.$(OBJEXT) \
+	kernel/device/kernel_asan-vt100.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_asan-elf64.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_asan-gdbstub.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_asan-nano_time.$(OBJEXT) \
@@ -584,6 +602,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-desc_alloc.$(OBJEXT) \
 	kernel/lib/kernel_generic-dev_eth.$(OBJEXT) \
 	kernel/lib/kernel_generic-dev_storage.$(OBJEXT) \
+	kernel/lib/kernel_generic-dev_char.$(OBJEXT) \
 	kernel/lib/kernel_generic-dev_text.$(OBJEXT) \
 	kernel/lib/kernel_generic-errno.$(OBJEXT) \
 	kernel/lib/kernel_generic-fileio.$(OBJEXT) \
@@ -682,6 +701,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/device/kernel_generic-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_generic-virtio-blk.$(OBJEXT) \
 	kernel/device/kernel_generic-vga.$(OBJEXT) \
+	kernel/device/kernel_generic-vt100.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-elf64.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-gdbstub.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_generic-nano_time.$(OBJEXT) \
@@ -714,6 +734,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-desc_alloc.$(OBJEXT) \
 	kernel/lib/kernel_tracing-dev_eth.$(OBJEXT) \
 	kernel/lib/kernel_tracing-dev_storage.$(OBJEXT) \
+	kernel/lib/kernel_tracing-dev_char.$(OBJEXT) \
 	kernel/lib/kernel_tracing-dev_text.$(OBJEXT) \
 	kernel/lib/kernel_tracing-errno.$(OBJEXT) \
 	kernel/lib/kernel_tracing-fileio.$(OBJEXT) \
@@ -812,6 +833,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/device/kernel_tracing-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_tracing-virtio-blk.$(OBJEXT) \
 	kernel/device/kernel_tracing-vga.$(OBJEXT) \
+	kernel/device/kernel_tracing-vt100.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_tracing-elf64.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_tracing-gdbstub.$(OBJEXT) \
 	kernel/arch/x86_64/kernel_tracing-nano_time.$(OBJEXT) \
@@ -835,6 +857,12 @@ am_mbr_elf_OBJECTS = mbr/mbr_elf-mbr.$(OBJEXT)
 mbr_elf_OBJECTS = $(am_mbr_elf_OBJECTS)
 mbr_elf_DEPENDENCIES = $(am__DEPENDENCIES_1)
 mbr_elf_LINK = $(CCLD) $(mbr_elf_CFLAGS) $(CFLAGS) $(mbr_elf_LDFLAGS) \
+	$(LDFLAGS) -o $@
+am_shell_OBJECTS = user/shell/shell-grammar.$(OBJEXT) \
+	user/shell/shell-parser.$(OBJEXT)
+shell_OBJECTS = $(am_shell_OBJECTS)
+shell_LDADD = $(LDADD)
+shell_LINK = $(CXXLD) $(shell_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
@@ -867,6 +895,18 @@ AM_V_CPPAS = $(am__v_CPPAS_@AM_V@)
 am__v_CPPAS_ = $(am__v_CPPAS_@AM_DEFAULT_V@)
 am__v_CPPAS_0 = @echo "  CPPAS   " $@;
 am__v_CPPAS_1 = 
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 = 
+CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 = 
 CXXCOMPILE = $(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) \
 	$(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CXXFLAGS) $(CXXFLAGS)
 AM_V_CXX = $(am__v_CXX_@AM_V@)
@@ -885,18 +925,6 @@ AM_V_CCAS = $(am__v_CCAS_@AM_V@)
 am__v_CCAS_ = $(am__v_CCAS_@AM_DEFAULT_V@)
 am__v_CCAS_0 = @echo "  CCAS    " $@;
 am__v_CCAS_1 = 
-COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
-	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
-AM_V_CC = $(am__v_CC_@AM_V@)
-am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
-am__v_CC_0 = @echo "  CC      " $@;
-am__v_CC_1 = 
-CCLD = $(CC)
-LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-AM_V_CCLD = $(am__v_CCLD_@AM_V@)
-am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
-am__v_CCLD_0 = @echo "  CCLD    " $@;
-am__v_CCLD_1 = 
 SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libm_a_SOURCES) \
 	$(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
@@ -904,7 +932,7 @@ SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libm_a_SOURCES) \
 	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
 	$(kernel_asan_SOURCES) $(kernel_generic_SOURCES) \
 	$(kernel_tracing_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
-	$(user_shell_SOURCES)
+	$(shell_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
@@ -912,7 +940,7 @@ DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
 	$(kernel_asan_SOURCES) $(kernel_generic_SOURCES) \
 	$(kernel_tracing_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
-	$(user_shell_SOURCES)
+	$(shell_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -977,7 +1005,8 @@ am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/diskfat.mk \
 	$(top_srcdir)/build-aux/missing AUTHORS COPYING ChangeLog \
 	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
 	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
-	build-aux/install-sh build-aux/ltmain.sh build-aux/missing
+	build-aux/install-sh build-aux/ltmain.sh build-aux/missing \
+	build-aux/ylwrap
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -1055,6 +1084,7 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 INSTRUMENT_FUNCTIONS_FLAGS = @INSTRUMENT_FUNCTIONS_FLAGS@
 LDFLAGS = @LDFLAGS@
 LDFLAGS_FOR_BUILD = @LDFLAGS_FOR_BUILD@
+LEMON = @LEMON@
 LIBGCC_ELF32 = @LIBGCC_ELF32@
 LIBGCC_ELF64 = @LIBGCC_ELF64@
 LIBGCC_PE32 = @LIBGCC_PE32@
@@ -1108,6 +1138,7 @@ STRIP = @STRIP@
 TRUNCATE = @TRUNCATE@
 VECTORIZE_FLAGS = @VECTORIZE_FLAGS@
 VERSION = @VERSION@
+YACC = @YACC@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
@@ -1162,6 +1193,12 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
+
+#SUFFIXES: .y
+#
+#%.c %.h %.out: %.y
+#	lemon $<
+#
 DUMPDIR = $(top_builddir)/dump
 BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
@@ -1259,6 +1296,7 @@ boot1_elf_LDADD = \
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
 	boot/bioscall.S \
+	boot/retpoline.S \
 	boot/diskio.cc \
 	boot/ctors.cc \
 	boot/assert.cc \
@@ -1286,6 +1324,7 @@ libbootsect_a_SOURCES = \
 	boot/physmap.cc \
 	boot/physmem_bios.cc \
 	boot/vesa.cc \
+	boot/vesa_bios.cc \
 	boot/progressbar.cc \
 	boot/debug.cc \
 	boot/part.s \
@@ -1346,6 +1385,7 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS) \
+	$(RETPOLINE_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 libbootsect_a_CFLAGS = 
@@ -1498,6 +1538,7 @@ BOOTLOADER_EFI_FLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
+	$(RETPOLINE_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	$(FREESTANDING_FLAGS)
 
@@ -1506,6 +1547,7 @@ bootefi_amd64_SOURCES = \
 	boot/ctors.cc \
 	boot/fs.cc \
 	boot/cpu_efi.cc \
+	boot/retpoline.S \
 	boot/physmap.cc \
 	boot/physmem_efi.cc \
 	boot/cpu.cc \
@@ -1531,6 +1573,8 @@ bootefi_amd64_SOURCES = \
 	boot/tui_efi.cc \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
+	boot/vesa.cc \
+	boot/vesa_efi.cc \
 	boot/boottable.cc \
 	boot/boottable_efi.cc \
 	boot/qemu.cc \
@@ -1661,6 +1705,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/dev_registration.h \
 	kernel/lib/dev_storage.cc \
 	kernel/lib/dev_storage.h \
+	kernel/lib/dev_char.cc \
+	kernel/lib/dev_char.h \
 	kernel/lib/dev_text.cc \
 	kernel/lib/dev_text.h \
 	kernel/lib/dirent.h \
@@ -1859,6 +1905,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/virtio-blk.cc \
 	kernel/device/virtio-blk.h \
 	kernel/device/vga.cc \
+	kernel/device/vt100.cc \
+	kernel/device/vt100.h \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
 	kernel/arch/x86_64/elf64.h \
@@ -2030,14 +2078,14 @@ INCLUDES_NAMES = $(shell cd $(top_srcdir)/libc/include && $(FIND) -type f)
 INCLUDES_DEPLOYED = \
 	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
 
+shell_SOURCES = \
+	user/shell/grammar.c \
+	user/shell/parser.h \
+	user/shell/parser.cc
 
-#$(INCLUDES_DST): $(INCLUDES_SRC)
-#	mkdir -p sysroot/include
-#	for header in $(INCLUDES_NAMES); do \
-#		mkdir -p $$(dirname $(top_builddir)/sysroot/include/$$header) && \
-#		cp -u $(top_srcdir)/libc/include/$$header \
-#			$(top_builddir)/sysroot/include/$$header; \
-#		done
+shell_CFLAGS = -isystem $(top_builddir)/sysroot/include
+shell_CXXFLAGS = $(shell_CFLAGS)
+EXTRA_shell_DEPENDENCIES = user/shell/grammar.c
 
 # ----------------------------------------------------------------------------
 # libc
@@ -2124,6 +2172,7 @@ libc_a_HEADERS = \
 	libc/include/sys/ioctl.h
 
 libc_a_SOURCES = \
+	libc/src/assert/assert.cc \
 	libc/src/string/__bytebitmap.cc \
 	libc/src/string/strsignal.cc \
 	libc/src/string/strcoll_l.cc \
@@ -2171,12 +2220,24 @@ libc_a_SOURCES = \
 	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/_Exit.cc \
 	libc/src/stdlib/abs.cc \
+	libc/src/stdlib/malloc.cc \
 	libc/src/fcntl/creat.cc \
 	libc/src/fcntl/fcntl.cc \
 	libc/src/fcntl/open.cc \
 	libc/src/fcntl/openat.cc \
 	libc/src/fcntl/posix_fadvise.cc \
 	libc/src/fcntl/posix_fallocate.cc \
+	libc/src/stdio/bits/cfile.cc \
+	libc/src/stdio/bits/cfile.h \
+	libc/src/stdio/bits/formatter.cc \
+	libc/src/stdio/bits/formatter.h \
+	libc/src/stdio/fprintf.cc \
+	libc/src/stdio/fputc.cc \
+	libc/src/stdio/printf.cc \
+	libc/src/stdio/vfprintf.cc \
+	libc/src/stdio/vprintf.cc \
+	libc/src/stdio/fread.cc \
+	libc/src/stdio/fwrite.cc \
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
 	libc/src/sys/mman/mremap.cc \
@@ -2392,12 +2453,14 @@ user_shell_CCASFLAGS = \
 BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/nvme.bits \
 	$(top_srcdir)/kernel/device/pci.bits \
+	$(top_srcdir)/kernel/device/rtl8139.bits \
 	$(top_srcdir)/kernel/device/i350.bits \
 	$(top_srcdir)/kernel/device/usb_xhci.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
 	$(top_srcdir)/kernel/device/acpi.bits \
-	$(top_srcdir)/kernel/device/ahci.bits
+	$(top_srcdir)/kernel/device/ahci.bits \
+	$(top_srcdir)/kernel/device/es173x.bits
 
 QEMU_EXTRA_DEPS = \
 	random-mem.img \
@@ -2552,7 +2615,7 @@ all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
 .SUFFIXES:
-.SUFFIXES: .S .cc .o .obj .s
+.SUFFIXES: .S .c .cc .o .obj .s
 am--refresh: Makefile
 	@:
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/symbols.mk $(srcdir)/diskfat.mk $(srcdir)/diskiso.mk $(am__configure_deps)
@@ -2599,6 +2662,8 @@ boot/$(DEPDIR)/$(am__dirstamp):
 boot/libbootsect_a-bootcommon.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-bioscall.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-retpoline.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-diskio.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -2654,6 +2719,8 @@ boot/libbootsect_a-physmem_bios.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-vesa.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
+boot/libbootsect_a-vesa_bios.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-progressbar.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-debug.$(OBJEXT): boot/$(am__dirstamp) \
@@ -2679,6 +2746,15 @@ libbootsect.a: $(libbootsect_a_OBJECTS) $(libbootsect_a_DEPENDENCIES) $(EXTRA_li
 	$(AM_V_at)-rm -f libbootsect.a
 	$(AM_V_AR)$(libbootsect_a_AR) libbootsect.a $(libbootsect_a_OBJECTS) $(libbootsect_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libbootsect.a
+libc/src/assert/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/assert
+	@: > libc/src/assert/$(am__dirstamp)
+libc/src/assert/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/assert/$(DEPDIR)
+	@: > libc/src/assert/$(DEPDIR)/$(am__dirstamp)
+libc/src/assert/libc_a-assert.$(OBJEXT):  \
+	libc/src/assert/$(am__dirstamp) \
+	libc/src/assert/$(DEPDIR)/$(am__dirstamp)
 libc/src/string/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/string
 	@: > libc/src/string/$(am__dirstamp)
@@ -2834,6 +2910,9 @@ libc/src/stdlib/libc_a-_Exit.$(OBJEXT):  \
 	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdlib/libc_a-abs.$(OBJEXT): libc/src/stdlib/$(am__dirstamp) \
 	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdlib/libc_a-malloc.$(OBJEXT):  \
+	libc/src/stdlib/$(am__dirstamp) \
+	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 libc/src/fcntl/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/fcntl
 	@: > libc/src/fcntl/$(am__dirstamp)
@@ -2855,6 +2934,43 @@ libc/src/fcntl/libc_a-posix_fadvise.$(OBJEXT):  \
 libc/src/fcntl/libc_a-posix_fallocate.$(OBJEXT):  \
 	libc/src/fcntl/$(am__dirstamp) \
 	libc/src/fcntl/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/bits/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/stdio/bits
+	@: > libc/src/stdio/bits/$(am__dirstamp)
+libc/src/stdio/bits/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/stdio/bits/$(DEPDIR)
+	@: > libc/src/stdio/bits/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/bits/libc_a-cfile.$(OBJEXT):  \
+	libc/src/stdio/bits/$(am__dirstamp) \
+	libc/src/stdio/bits/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/bits/libc_a-formatter.$(OBJEXT):  \
+	libc/src/stdio/bits/$(am__dirstamp) \
+	libc/src/stdio/bits/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/stdio
+	@: > libc/src/stdio/$(am__dirstamp)
+libc/src/stdio/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/stdio/$(DEPDIR)
+	@: > libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-fprintf.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-fputc.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-printf.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-vfprintf.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-vprintf.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-fread.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-fwrite.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/mman/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/sys/mman
 	@: > libc/src/sys/mman/$(am__dirstamp)
@@ -3351,6 +3467,8 @@ boot/bootefi_amd64-fs.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-cpu_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootefi_amd64-retpoline.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-physmap.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-physmem_efi.$(OBJEXT): boot/$(am__dirstamp) \
@@ -3396,6 +3514,10 @@ boot/bootefi_amd64-bootmenu.$(OBJEXT): boot/$(am__dirstamp) \
 boot/bootefi_amd64-tui.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-tui_efi.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootefi_amd64-vesa.$(OBJEXT): boot/$(am__dirstamp) \
+	boot/$(DEPDIR)/$(am__dirstamp)
+boot/bootefi_amd64-vesa_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-boottable.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3542,6 +3664,8 @@ kernel/lib/kernel_asan-dev_eth.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-dev_storage.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_asan-dev_char.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-dev_text.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
@@ -3825,6 +3949,9 @@ kernel/device/kernel_asan-virtio-blk.$(OBJEXT):  \
 kernel/device/kernel_asan-vga.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_asan-vt100.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/arch/x86_64/kernel_asan-elf64.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -3910,6 +4037,9 @@ kernel/lib/kernel_generic-dev_eth.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-dev_storage.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_generic-dev_char.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-dev_text.$(OBJEXT):  \
@@ -4180,6 +4310,9 @@ kernel/device/kernel_generic-virtio-blk.$(OBJEXT):  \
 kernel/device/kernel_generic-vga.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_generic-vt100.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/arch/x86_64/kernel_generic-elf64.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -4259,6 +4392,9 @@ kernel/lib/kernel_tracing-dev_eth.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-dev_storage.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_tracing-dev_char.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-dev_text.$(OBJEXT):  \
@@ -4529,6 +4665,9 @@ kernel/device/kernel_tracing-virtio-blk.$(OBJEXT):  \
 kernel/device/kernel_tracing-vga.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
+kernel/device/kernel_tracing-vt100.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/arch/x86_64/kernel_tracing-elf64.$(OBJEXT):  \
 	kernel/arch/x86_64/$(am__dirstamp) \
 	kernel/arch/x86_64/$(DEPDIR)/$(am__dirstamp)
@@ -4584,6 +4723,20 @@ mbr/mbr_elf-mbr.$(OBJEXT): mbr/$(am__dirstamp) \
 mbr-elf$(EXEEXT): $(mbr_elf_OBJECTS) $(mbr_elf_DEPENDENCIES) $(EXTRA_mbr_elf_DEPENDENCIES) 
 	@rm -f mbr-elf$(EXEEXT)
 	$(AM_V_CCLD)$(mbr_elf_LINK) $(mbr_elf_OBJECTS) $(mbr_elf_LDADD) $(LIBS)
+user/shell/$(am__dirstamp):
+	@$(MKDIR_P) user/shell
+	@: > user/shell/$(am__dirstamp)
+user/shell/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) user/shell/$(DEPDIR)
+	@: > user/shell/$(DEPDIR)/$(am__dirstamp)
+user/shell/shell-grammar.$(OBJEXT): user/shell/$(am__dirstamp) \
+	user/shell/$(DEPDIR)/$(am__dirstamp)
+user/shell/shell-parser.$(OBJEXT): user/shell/$(am__dirstamp) \
+	user/shell/$(DEPDIR)/$(am__dirstamp)
+
+shell$(EXEEXT): $(shell_OBJECTS) $(shell_DEPENDENCIES) $(EXTRA_shell_DEPENDENCIES) 
+	@rm -f shell$(EXEEXT)
+	$(AM_V_CXXLD)$(shell_LINK) $(shell_OBJECTS) $(shell_LDADD) $(LIBS)
 user/test/$(am__dirstamp):
 	@$(MKDIR_P) user/test
 	@: > user/test/$(am__dirstamp)
@@ -4613,10 +4766,13 @@ mostlyclean-compile:
 	-rm -f libc/cxx/*.$(OBJEXT)
 	-rm -f libc/cxx/abi/*.$(OBJEXT)
 	-rm -f libc/math/*.$(OBJEXT)
+	-rm -f libc/src/assert/*.$(OBJEXT)
 	-rm -f libc/src/dirent/*.$(OBJEXT)
 	-rm -f libc/src/errno/*.$(OBJEXT)
 	-rm -f libc/src/fcntl/*.$(OBJEXT)
 	-rm -f libc/src/posix_spawn/*.$(OBJEXT)
+	-rm -f libc/src/stdio/*.$(OBJEXT)
+	-rm -f libc/src/stdio/bits/*.$(OBJEXT)
 	-rm -f libc/src/stdlib/*.$(OBJEXT)
 	-rm -f libc/src/string/*.$(OBJEXT)
 	-rm -f libc/src/sys/*.$(OBJEXT)
@@ -4628,6 +4784,7 @@ mostlyclean-compile:
 	-rm -f modules/hello/*.$(OBJEXT)
 	-rm -f user/bin/dhcpclient/*.$(OBJEXT)
 	-rm -f user/bin/ls/*.$(OBJEXT)
+	-rm -f user/shell/*.$(OBJEXT)
 	-rm -f user/test/*.$(OBJEXT)
 
 distclean-compile:
@@ -4658,6 +4815,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-progressbar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-qemu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-rand.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-retpoline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-screen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-screen_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-string.Po@am__quote@
@@ -4665,6 +4823,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-tui_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-utf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-vesa.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-bootfat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-malloc_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootfat_elf-mpentry_bios.Po@am__quote@
@@ -4705,6 +4865,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-progressbar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-qemu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-rand.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-retpoline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-screen.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-screen_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-string.Po@am__quote@
@@ -4713,6 +4874,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-tui_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-utf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-vesa.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-vesa_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/$(DEPDIR)/kernel_asan-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/$(DEPDIR)/kernel_generic-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/$(DEPDIR)/kernel_tracing-main.Po@am__quote@
@@ -4833,6 +4995,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-virtio-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-virtio-blk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-virtio-gpu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-vt100.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-acpigas.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-acpihw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-ahci.Po@am__quote@
@@ -4857,6 +5020,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-blk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-gpu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-vt100.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-acpigas.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-acpihw.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-ahci.Po@am__quote@
@@ -4881,6 +5045,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-blk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-vt100.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_asan-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_generic-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_tracing-keyb8042_layout_us.Po@am__quote@
@@ -4917,6 +5082,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-cxxexcept.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-desc_alloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-dev_eth.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-dev_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-dev_text.Po@am__quote@
@@ -4960,6 +5126,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-cxxexcept.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-desc_alloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-dev_eth.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-dev_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-dev_text.Po@am__quote@
@@ -5003,6 +5170,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-cxxexcept.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-desc_alloc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-dev_eth.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-dev_storage.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-dev_text.Po@am__quote@
@@ -5093,6 +5261,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-cos.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-log.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-sin.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/assert/$(DEPDIR)/libc_a-assert.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-closedir.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-dirfd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/dirent/$(DEPDIR)/libc_a-fdopendir.Po@am__quote@
@@ -5130,8 +5299,18 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fputc.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fread.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-printf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-_Exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-abs.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memccpy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-memchr.Po@am__quote@
@@ -5270,6 +5449,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@modules/hello/$(DEPDIR)/hello_km-hello.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/bin/ls/$(DEPDIR)/ls-ls.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@user/shell/$(DEPDIR)/shell-grammar.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@user/shell/$(DEPDIR)/shell-parser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
 
 .S.o:
@@ -5315,6 +5496,20 @@ boot/libbootsect_a-bioscall.obj: boot/bioscall.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/bioscall.S' object='boot/libbootsect_a-bioscall.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-bioscall.obj `if test -f 'boot/bioscall.S'; then $(CYGPATH_W) 'boot/bioscall.S'; else $(CYGPATH_W) '$(srcdir)/boot/bioscall.S'; fi`
+
+boot/libbootsect_a-retpoline.o: boot/retpoline.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-retpoline.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-retpoline.Tpo -c -o boot/libbootsect_a-retpoline.o `test -f 'boot/retpoline.S' || echo '$(srcdir)/'`boot/retpoline.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-retpoline.Tpo boot/$(DEPDIR)/libbootsect_a-retpoline.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/retpoline.S' object='boot/libbootsect_a-retpoline.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-retpoline.o `test -f 'boot/retpoline.S' || echo '$(srcdir)/'`boot/retpoline.S
+
+boot/libbootsect_a-retpoline.obj: boot/retpoline.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-retpoline.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-retpoline.Tpo -c -o boot/libbootsect_a-retpoline.obj `if test -f 'boot/retpoline.S'; then $(CYGPATH_W) 'boot/retpoline.S'; else $(CYGPATH_W) '$(srcdir)/boot/retpoline.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-retpoline.Tpo boot/$(DEPDIR)/libbootsect_a-retpoline.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/retpoline.S' object='boot/libbootsect_a-retpoline.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -c -o boot/libbootsect_a-retpoline.obj `if test -f 'boot/retpoline.S'; then $(CYGPATH_W) 'boot/retpoline.S'; else $(CYGPATH_W) '$(srcdir)/boot/retpoline.S'; fi`
 
 boot/libbootsect_a-gdt.o: boot/gdt.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CCASFLAGS) $(CCASFLAGS) -MT boot/libbootsect_a-gdt.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-gdt.Tpo -c -o boot/libbootsect_a-gdt.o `test -f 'boot/gdt.S' || echo '$(srcdir)/'`boot/gdt.S
@@ -5371,6 +5566,20 @@ boot/boot1_elf-boot1.obj: boot/boot1.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/boot1.S' object='boot/boot1_elf-boot1.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(boot1_elf_CCASFLAGS) $(CCASFLAGS) -c -o boot/boot1_elf-boot1.obj `if test -f 'boot/boot1.S'; then $(CYGPATH_W) 'boot/boot1.S'; else $(CYGPATH_W) '$(srcdir)/boot/boot1.S'; fi`
+
+boot/bootefi_amd64-retpoline.o: boot/retpoline.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-retpoline.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-retpoline.Tpo -c -o boot/bootefi_amd64-retpoline.o `test -f 'boot/retpoline.S' || echo '$(srcdir)/'`boot/retpoline.S
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-retpoline.Tpo boot/$(DEPDIR)/bootefi_amd64-retpoline.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/retpoline.S' object='boot/bootefi_amd64-retpoline.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-retpoline.o `test -f 'boot/retpoline.S' || echo '$(srcdir)/'`boot/retpoline.S
+
+boot/bootefi_amd64-retpoline.obj: boot/retpoline.S
+@am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-retpoline.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-retpoline.Tpo -c -o boot/bootefi_amd64-retpoline.obj `if test -f 'boot/retpoline.S'; then $(CYGPATH_W) 'boot/retpoline.S'; else $(CYGPATH_W) '$(srcdir)/boot/retpoline.S'; fi`
+@am__fastdepCCAS_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-retpoline.Tpo boot/$(DEPDIR)/bootefi_amd64-retpoline.Po
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='boot/retpoline.S' object='boot/bootefi_amd64-retpoline.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -c -o boot/bootefi_amd64-retpoline.obj `if test -f 'boot/retpoline.S'; then $(CYGPATH_W) 'boot/retpoline.S'; else $(CYGPATH_W) '$(srcdir)/boot/retpoline.S'; fi`
 
 boot/bootefi_amd64-cpu64_efi.o: boot/cpu64_efi.S
 @am__fastdepCCAS_TRUE@	$(AM_V_CPPAS)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CCASFLAGS) $(CCASFLAGS) -MT boot/bootefi_amd64-cpu64_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-cpu64_efi.Tpo -c -o boot/bootefi_amd64-cpu64_efi.o `test -f 'boot/cpu64_efi.S' || echo '$(srcdir)/'`boot/cpu64_efi.S
@@ -5679,6 +5888,36 @@ user/test/user_shell-test.obj: user/test/test.S
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	$(AM_V_CPPAS)source='user/test/test.S' object='user/test/user_shell-test.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCCAS_FALSE@	DEPDIR=$(DEPDIR) $(CCASDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCCAS_FALSE@	$(AM_V_CPPAS@am__nodep@)$(CCAS) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(user_shell_CCASFLAGS) $(CCASFLAGS) -c -o user/test/user_shell-test.obj `if test -f 'user/test/test.S'; then $(CYGPATH_W) 'user/test/test.S'; else $(CYGPATH_W) '$(srcdir)/user/test/test.S'; fi`
+
+.c.o:
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
+
+.c.obj:
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+user/shell/shell-grammar.o: user/shell/grammar.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CFLAGS) $(CFLAGS) -MT user/shell/shell-grammar.o -MD -MP -MF user/shell/$(DEPDIR)/shell-grammar.Tpo -c -o user/shell/shell-grammar.o `test -f 'user/shell/grammar.c' || echo '$(srcdir)/'`user/shell/grammar.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) user/shell/$(DEPDIR)/shell-grammar.Tpo user/shell/$(DEPDIR)/shell-grammar.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='user/shell/grammar.c' object='user/shell/shell-grammar.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CFLAGS) $(CFLAGS) -c -o user/shell/shell-grammar.o `test -f 'user/shell/grammar.c' || echo '$(srcdir)/'`user/shell/grammar.c
+
+user/shell/shell-grammar.obj: user/shell/grammar.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CFLAGS) $(CFLAGS) -MT user/shell/shell-grammar.obj -MD -MP -MF user/shell/$(DEPDIR)/shell-grammar.Tpo -c -o user/shell/shell-grammar.obj `if test -f 'user/shell/grammar.c'; then $(CYGPATH_W) 'user/shell/grammar.c'; else $(CYGPATH_W) '$(srcdir)/user/shell/grammar.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) user/shell/$(DEPDIR)/shell-grammar.Tpo user/shell/$(DEPDIR)/shell-grammar.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='user/shell/grammar.c' object='user/shell/shell-grammar.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CFLAGS) $(CFLAGS) -c -o user/shell/shell-grammar.obj `if test -f 'user/shell/grammar.c'; then $(CYGPATH_W) 'user/shell/grammar.c'; else $(CYGPATH_W) '$(srcdir)/user/shell/grammar.c'; fi`
 
 .cc.o:
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -6032,6 +6271,20 @@ boot/libbootsect_a-vesa.obj: boot/vesa.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-vesa.obj `if test -f 'boot/vesa.cc'; then $(CYGPATH_W) 'boot/vesa.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa.cc'; fi`
 
+boot/libbootsect_a-vesa_bios.o: boot/vesa_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-vesa_bios.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-vesa_bios.Tpo -c -o boot/libbootsect_a-vesa_bios.o `test -f 'boot/vesa_bios.cc' || echo '$(srcdir)/'`boot/vesa_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-vesa_bios.Tpo boot/$(DEPDIR)/libbootsect_a-vesa_bios.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/vesa_bios.cc' object='boot/libbootsect_a-vesa_bios.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-vesa_bios.o `test -f 'boot/vesa_bios.cc' || echo '$(srcdir)/'`boot/vesa_bios.cc
+
+boot/libbootsect_a-vesa_bios.obj: boot/vesa_bios.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-vesa_bios.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-vesa_bios.Tpo -c -o boot/libbootsect_a-vesa_bios.obj `if test -f 'boot/vesa_bios.cc'; then $(CYGPATH_W) 'boot/vesa_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa_bios.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-vesa_bios.Tpo boot/$(DEPDIR)/libbootsect_a-vesa_bios.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/vesa_bios.cc' object='boot/libbootsect_a-vesa_bios.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-vesa_bios.obj `if test -f 'boot/vesa_bios.cc'; then $(CYGPATH_W) 'boot/vesa_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa_bios.cc'; fi`
+
 boot/libbootsect_a-progressbar.o: boot/progressbar.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-progressbar.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-progressbar.Tpo -c -o boot/libbootsect_a-progressbar.o `test -f 'boot/progressbar.cc' || echo '$(srcdir)/'`boot/progressbar.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-progressbar.Tpo boot/$(DEPDIR)/libbootsect_a-progressbar.Po
@@ -6143,6 +6396,20 @@ boot/libbootsect_a-qemu.obj: boot/qemu.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/qemu.cc' object='boot/libbootsect_a-qemu.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-qemu.obj `if test -f 'boot/qemu.cc'; then $(CYGPATH_W) 'boot/qemu.cc'; else $(CYGPATH_W) '$(srcdir)/boot/qemu.cc'; fi`
+
+libc/src/assert/libc_a-assert.o: libc/src/assert/assert.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/assert/libc_a-assert.o -MD -MP -MF libc/src/assert/$(DEPDIR)/libc_a-assert.Tpo -c -o libc/src/assert/libc_a-assert.o `test -f 'libc/src/assert/assert.cc' || echo '$(srcdir)/'`libc/src/assert/assert.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/assert/$(DEPDIR)/libc_a-assert.Tpo libc/src/assert/$(DEPDIR)/libc_a-assert.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/assert/assert.cc' object='libc/src/assert/libc_a-assert.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/assert/libc_a-assert.o `test -f 'libc/src/assert/assert.cc' || echo '$(srcdir)/'`libc/src/assert/assert.cc
+
+libc/src/assert/libc_a-assert.obj: libc/src/assert/assert.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/assert/libc_a-assert.obj -MD -MP -MF libc/src/assert/$(DEPDIR)/libc_a-assert.Tpo -c -o libc/src/assert/libc_a-assert.obj `if test -f 'libc/src/assert/assert.cc'; then $(CYGPATH_W) 'libc/src/assert/assert.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/assert/assert.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/assert/$(DEPDIR)/libc_a-assert.Tpo libc/src/assert/$(DEPDIR)/libc_a-assert.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/assert/assert.cc' object='libc/src/assert/libc_a-assert.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/assert/libc_a-assert.obj `if test -f 'libc/src/assert/assert.cc'; then $(CYGPATH_W) 'libc/src/assert/assert.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/assert/assert.cc'; fi`
 
 libc/src/string/libc_a-__bytebitmap.o: libc/src/string/__bytebitmap.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/string/libc_a-__bytebitmap.o -MD -MP -MF libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Tpo -c -o libc/src/string/libc_a-__bytebitmap.o `test -f 'libc/src/string/__bytebitmap.cc' || echo '$(srcdir)/'`libc/src/string/__bytebitmap.cc
@@ -6788,6 +7055,20 @@ libc/src/stdlib/libc_a-abs.obj: libc/src/stdlib/abs.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-abs.obj `if test -f 'libc/src/stdlib/abs.cc'; then $(CYGPATH_W) 'libc/src/stdlib/abs.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/abs.cc'; fi`
 
+libc/src/stdlib/libc_a-malloc.o: libc/src/stdlib/malloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-malloc.o -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Tpo -c -o libc/src/stdlib/libc_a-malloc.o `test -f 'libc/src/stdlib/malloc.cc' || echo '$(srcdir)/'`libc/src/stdlib/malloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/malloc.cc' object='libc/src/stdlib/libc_a-malloc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-malloc.o `test -f 'libc/src/stdlib/malloc.cc' || echo '$(srcdir)/'`libc/src/stdlib/malloc.cc
+
+libc/src/stdlib/libc_a-malloc.obj: libc/src/stdlib/malloc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-malloc.obj -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Tpo -c -o libc/src/stdlib/libc_a-malloc.obj `if test -f 'libc/src/stdlib/malloc.cc'; then $(CYGPATH_W) 'libc/src/stdlib/malloc.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/malloc.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/malloc.cc' object='libc/src/stdlib/libc_a-malloc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-malloc.obj `if test -f 'libc/src/stdlib/malloc.cc'; then $(CYGPATH_W) 'libc/src/stdlib/malloc.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/malloc.cc'; fi`
+
 libc/src/fcntl/libc_a-creat.o: libc/src/fcntl/creat.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/fcntl/libc_a-creat.o -MD -MP -MF libc/src/fcntl/$(DEPDIR)/libc_a-creat.Tpo -c -o libc/src/fcntl/libc_a-creat.o `test -f 'libc/src/fcntl/creat.cc' || echo '$(srcdir)/'`libc/src/fcntl/creat.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/fcntl/$(DEPDIR)/libc_a-creat.Tpo libc/src/fcntl/$(DEPDIR)/libc_a-creat.Po
@@ -6871,6 +7152,132 @@ libc/src/fcntl/libc_a-posix_fallocate.obj: libc/src/fcntl/posix_fallocate.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/fcntl/posix_fallocate.cc' object='libc/src/fcntl/libc_a-posix_fallocate.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/fcntl/libc_a-posix_fallocate.obj `if test -f 'libc/src/fcntl/posix_fallocate.cc'; then $(CYGPATH_W) 'libc/src/fcntl/posix_fallocate.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/fcntl/posix_fallocate.cc'; fi`
+
+libc/src/stdio/bits/libc_a-cfile.o: libc/src/stdio/bits/cfile.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/bits/libc_a-cfile.o -MD -MP -MF libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Tpo -c -o libc/src/stdio/bits/libc_a-cfile.o `test -f 'libc/src/stdio/bits/cfile.cc' || echo '$(srcdir)/'`libc/src/stdio/bits/cfile.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Tpo libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/bits/cfile.cc' object='libc/src/stdio/bits/libc_a-cfile.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/bits/libc_a-cfile.o `test -f 'libc/src/stdio/bits/cfile.cc' || echo '$(srcdir)/'`libc/src/stdio/bits/cfile.cc
+
+libc/src/stdio/bits/libc_a-cfile.obj: libc/src/stdio/bits/cfile.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/bits/libc_a-cfile.obj -MD -MP -MF libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Tpo -c -o libc/src/stdio/bits/libc_a-cfile.obj `if test -f 'libc/src/stdio/bits/cfile.cc'; then $(CYGPATH_W) 'libc/src/stdio/bits/cfile.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/bits/cfile.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Tpo libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/bits/cfile.cc' object='libc/src/stdio/bits/libc_a-cfile.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/bits/libc_a-cfile.obj `if test -f 'libc/src/stdio/bits/cfile.cc'; then $(CYGPATH_W) 'libc/src/stdio/bits/cfile.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/bits/cfile.cc'; fi`
+
+libc/src/stdio/bits/libc_a-formatter.o: libc/src/stdio/bits/formatter.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/bits/libc_a-formatter.o -MD -MP -MF libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Tpo -c -o libc/src/stdio/bits/libc_a-formatter.o `test -f 'libc/src/stdio/bits/formatter.cc' || echo '$(srcdir)/'`libc/src/stdio/bits/formatter.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Tpo libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/bits/formatter.cc' object='libc/src/stdio/bits/libc_a-formatter.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/bits/libc_a-formatter.o `test -f 'libc/src/stdio/bits/formatter.cc' || echo '$(srcdir)/'`libc/src/stdio/bits/formatter.cc
+
+libc/src/stdio/bits/libc_a-formatter.obj: libc/src/stdio/bits/formatter.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/bits/libc_a-formatter.obj -MD -MP -MF libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Tpo -c -o libc/src/stdio/bits/libc_a-formatter.obj `if test -f 'libc/src/stdio/bits/formatter.cc'; then $(CYGPATH_W) 'libc/src/stdio/bits/formatter.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/bits/formatter.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Tpo libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/bits/formatter.cc' object='libc/src/stdio/bits/libc_a-formatter.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/bits/libc_a-formatter.obj `if test -f 'libc/src/stdio/bits/formatter.cc'; then $(CYGPATH_W) 'libc/src/stdio/bits/formatter.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/bits/formatter.cc'; fi`
+
+libc/src/stdio/libc_a-fprintf.o: libc/src/stdio/fprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fprintf.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Tpo -c -o libc/src/stdio/libc_a-fprintf.o `test -f 'libc/src/stdio/fprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/fprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fprintf.cc' object='libc/src/stdio/libc_a-fprintf.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fprintf.o `test -f 'libc/src/stdio/fprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/fprintf.cc
+
+libc/src/stdio/libc_a-fprintf.obj: libc/src/stdio/fprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fprintf.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Tpo -c -o libc/src/stdio/libc_a-fprintf.obj `if test -f 'libc/src/stdio/fprintf.cc'; then $(CYGPATH_W) 'libc/src/stdio/fprintf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fprintf.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fprintf.cc' object='libc/src/stdio/libc_a-fprintf.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fprintf.obj `if test -f 'libc/src/stdio/fprintf.cc'; then $(CYGPATH_W) 'libc/src/stdio/fprintf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fprintf.cc'; fi`
+
+libc/src/stdio/libc_a-fputc.o: libc/src/stdio/fputc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fputc.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fputc.Tpo -c -o libc/src/stdio/libc_a-fputc.o `test -f 'libc/src/stdio/fputc.cc' || echo '$(srcdir)/'`libc/src/stdio/fputc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fputc.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fputc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fputc.cc' object='libc/src/stdio/libc_a-fputc.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fputc.o `test -f 'libc/src/stdio/fputc.cc' || echo '$(srcdir)/'`libc/src/stdio/fputc.cc
+
+libc/src/stdio/libc_a-fputc.obj: libc/src/stdio/fputc.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fputc.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fputc.Tpo -c -o libc/src/stdio/libc_a-fputc.obj `if test -f 'libc/src/stdio/fputc.cc'; then $(CYGPATH_W) 'libc/src/stdio/fputc.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fputc.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fputc.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fputc.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fputc.cc' object='libc/src/stdio/libc_a-fputc.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fputc.obj `if test -f 'libc/src/stdio/fputc.cc'; then $(CYGPATH_W) 'libc/src/stdio/fputc.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fputc.cc'; fi`
+
+libc/src/stdio/libc_a-printf.o: libc/src/stdio/printf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-printf.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-printf.Tpo -c -o libc/src/stdio/libc_a-printf.o `test -f 'libc/src/stdio/printf.cc' || echo '$(srcdir)/'`libc/src/stdio/printf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-printf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-printf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/printf.cc' object='libc/src/stdio/libc_a-printf.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-printf.o `test -f 'libc/src/stdio/printf.cc' || echo '$(srcdir)/'`libc/src/stdio/printf.cc
+
+libc/src/stdio/libc_a-printf.obj: libc/src/stdio/printf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-printf.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-printf.Tpo -c -o libc/src/stdio/libc_a-printf.obj `if test -f 'libc/src/stdio/printf.cc'; then $(CYGPATH_W) 'libc/src/stdio/printf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/printf.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-printf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-printf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/printf.cc' object='libc/src/stdio/libc_a-printf.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-printf.obj `if test -f 'libc/src/stdio/printf.cc'; then $(CYGPATH_W) 'libc/src/stdio/printf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/printf.cc'; fi`
+
+libc/src/stdio/libc_a-vfprintf.o: libc/src/stdio/vfprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-vfprintf.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Tpo -c -o libc/src/stdio/libc_a-vfprintf.o `test -f 'libc/src/stdio/vfprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/vfprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/vfprintf.cc' object='libc/src/stdio/libc_a-vfprintf.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-vfprintf.o `test -f 'libc/src/stdio/vfprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/vfprintf.cc
+
+libc/src/stdio/libc_a-vfprintf.obj: libc/src/stdio/vfprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-vfprintf.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Tpo -c -o libc/src/stdio/libc_a-vfprintf.obj `if test -f 'libc/src/stdio/vfprintf.cc'; then $(CYGPATH_W) 'libc/src/stdio/vfprintf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/vfprintf.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/vfprintf.cc' object='libc/src/stdio/libc_a-vfprintf.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-vfprintf.obj `if test -f 'libc/src/stdio/vfprintf.cc'; then $(CYGPATH_W) 'libc/src/stdio/vfprintf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/vfprintf.cc'; fi`
+
+libc/src/stdio/libc_a-vprintf.o: libc/src/stdio/vprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-vprintf.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Tpo -c -o libc/src/stdio/libc_a-vprintf.o `test -f 'libc/src/stdio/vprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/vprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/vprintf.cc' object='libc/src/stdio/libc_a-vprintf.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-vprintf.o `test -f 'libc/src/stdio/vprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/vprintf.cc
+
+libc/src/stdio/libc_a-vprintf.obj: libc/src/stdio/vprintf.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-vprintf.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Tpo -c -o libc/src/stdio/libc_a-vprintf.obj `if test -f 'libc/src/stdio/vprintf.cc'; then $(CYGPATH_W) 'libc/src/stdio/vprintf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/vprintf.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/vprintf.cc' object='libc/src/stdio/libc_a-vprintf.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-vprintf.obj `if test -f 'libc/src/stdio/vprintf.cc'; then $(CYGPATH_W) 'libc/src/stdio/vprintf.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/vprintf.cc'; fi`
+
+libc/src/stdio/libc_a-fread.o: libc/src/stdio/fread.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fread.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fread.Tpo -c -o libc/src/stdio/libc_a-fread.o `test -f 'libc/src/stdio/fread.cc' || echo '$(srcdir)/'`libc/src/stdio/fread.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fread.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fread.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fread.cc' object='libc/src/stdio/libc_a-fread.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fread.o `test -f 'libc/src/stdio/fread.cc' || echo '$(srcdir)/'`libc/src/stdio/fread.cc
+
+libc/src/stdio/libc_a-fread.obj: libc/src/stdio/fread.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fread.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fread.Tpo -c -o libc/src/stdio/libc_a-fread.obj `if test -f 'libc/src/stdio/fread.cc'; then $(CYGPATH_W) 'libc/src/stdio/fread.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fread.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fread.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fread.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fread.cc' object='libc/src/stdio/libc_a-fread.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fread.obj `if test -f 'libc/src/stdio/fread.cc'; then $(CYGPATH_W) 'libc/src/stdio/fread.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fread.cc'; fi`
+
+libc/src/stdio/libc_a-fwrite.o: libc/src/stdio/fwrite.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fwrite.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Tpo -c -o libc/src/stdio/libc_a-fwrite.o `test -f 'libc/src/stdio/fwrite.cc' || echo '$(srcdir)/'`libc/src/stdio/fwrite.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fwrite.cc' object='libc/src/stdio/libc_a-fwrite.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fwrite.o `test -f 'libc/src/stdio/fwrite.cc' || echo '$(srcdir)/'`libc/src/stdio/fwrite.cc
+
+libc/src/stdio/libc_a-fwrite.obj: libc/src/stdio/fwrite.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fwrite.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Tpo -c -o libc/src/stdio/libc_a-fwrite.obj `if test -f 'libc/src/stdio/fwrite.cc'; then $(CYGPATH_W) 'libc/src/stdio/fwrite.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fwrite.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fwrite.cc' object='libc/src/stdio/libc_a-fwrite.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fwrite.obj `if test -f 'libc/src/stdio/fwrite.cc'; then $(CYGPATH_W) 'libc/src/stdio/fwrite.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fwrite.cc'; fi`
 
 libc/src/sys/mman/libc_a-mmap.o: libc/src/sys/mman/mmap.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mmap.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo -c -o libc/src/sys/mman/libc_a-mmap.o `test -f 'libc/src/sys/mman/mmap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mmap.cc
@@ -8888,6 +9295,34 @@ boot/bootefi_amd64-tui_efi.obj: boot/tui_efi.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-tui_efi.obj `if test -f 'boot/tui_efi.cc'; then $(CYGPATH_W) 'boot/tui_efi.cc'; else $(CYGPATH_W) '$(srcdir)/boot/tui_efi.cc'; fi`
 
+boot/bootefi_amd64-vesa.o: boot/vesa.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-vesa.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-vesa.Tpo -c -o boot/bootefi_amd64-vesa.o `test -f 'boot/vesa.cc' || echo '$(srcdir)/'`boot/vesa.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-vesa.Tpo boot/$(DEPDIR)/bootefi_amd64-vesa.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/vesa.cc' object='boot/bootefi_amd64-vesa.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-vesa.o `test -f 'boot/vesa.cc' || echo '$(srcdir)/'`boot/vesa.cc
+
+boot/bootefi_amd64-vesa.obj: boot/vesa.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-vesa.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-vesa.Tpo -c -o boot/bootefi_amd64-vesa.obj `if test -f 'boot/vesa.cc'; then $(CYGPATH_W) 'boot/vesa.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-vesa.Tpo boot/$(DEPDIR)/bootefi_amd64-vesa.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/vesa.cc' object='boot/bootefi_amd64-vesa.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-vesa.obj `if test -f 'boot/vesa.cc'; then $(CYGPATH_W) 'boot/vesa.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa.cc'; fi`
+
+boot/bootefi_amd64-vesa_efi.o: boot/vesa_efi.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-vesa_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Tpo -c -o boot/bootefi_amd64-vesa_efi.o `test -f 'boot/vesa_efi.cc' || echo '$(srcdir)/'`boot/vesa_efi.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/vesa_efi.cc' object='boot/bootefi_amd64-vesa_efi.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-vesa_efi.o `test -f 'boot/vesa_efi.cc' || echo '$(srcdir)/'`boot/vesa_efi.cc
+
+boot/bootefi_amd64-vesa_efi.obj: boot/vesa_efi.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-vesa_efi.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Tpo -c -o boot/bootefi_amd64-vesa_efi.obj `if test -f 'boot/vesa_efi.cc'; then $(CYGPATH_W) 'boot/vesa_efi.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa_efi.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-vesa_efi.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/vesa_efi.cc' object='boot/bootefi_amd64-vesa_efi.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-vesa_efi.obj `if test -f 'boot/vesa_efi.cc'; then $(CYGPATH_W) 'boot/vesa_efi.cc'; else $(CYGPATH_W) '$(srcdir)/boot/vesa_efi.cc'; fi`
+
 boot/bootefi_amd64-boottable.o: boot/boottable.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-boottable.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-boottable.Tpo -c -o boot/bootefi_amd64-boottable.o `test -f 'boot/boottable.cc' || echo '$(srcdir)/'`boot/boottable.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-boottable.Tpo boot/$(DEPDIR)/bootefi_amd64-boottable.Po
@@ -9237,6 +9672,20 @@ kernel/lib/kernel_asan-dev_storage.obj: kernel/lib/dev_storage.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_storage.cc' object='kernel/lib/kernel_asan-dev_storage.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-dev_storage.obj `if test -f 'kernel/lib/dev_storage.cc'; then $(CYGPATH_W) 'kernel/lib/dev_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_storage.cc'; fi`
+
+kernel/lib/kernel_asan-dev_char.o: kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-dev_char.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Tpo -c -o kernel/lib/kernel_asan-dev_char.o `test -f 'kernel/lib/dev_char.cc' || echo '$(srcdir)/'`kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Tpo kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_char.cc' object='kernel/lib/kernel_asan-dev_char.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-dev_char.o `test -f 'kernel/lib/dev_char.cc' || echo '$(srcdir)/'`kernel/lib/dev_char.cc
+
+kernel/lib/kernel_asan-dev_char.obj: kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-dev_char.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Tpo -c -o kernel/lib/kernel_asan-dev_char.obj `if test -f 'kernel/lib/dev_char.cc'; then $(CYGPATH_W) 'kernel/lib/dev_char.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_char.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Tpo kernel/lib/$(DEPDIR)/kernel_asan-dev_char.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_char.cc' object='kernel/lib/kernel_asan-dev_char.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-dev_char.obj `if test -f 'kernel/lib/dev_char.cc'; then $(CYGPATH_W) 'kernel/lib/dev_char.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_char.cc'; fi`
 
 kernel/lib/kernel_asan-dev_text.o: kernel/lib/dev_text.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-dev_text.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-dev_text.Tpo -c -o kernel/lib/kernel_asan-dev_text.o `test -f 'kernel/lib/dev_text.cc' || echo '$(srcdir)/'`kernel/lib/dev_text.cc
@@ -10610,6 +11059,20 @@ kernel/device/kernel_asan-vga.obj: kernel/device/vga.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-vga.obj `if test -f 'kernel/device/vga.cc'; then $(CYGPATH_W) 'kernel/device/vga.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vga.cc'; fi`
 
+kernel/device/kernel_asan-vt100.o: kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-vt100.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-vt100.Tpo -c -o kernel/device/kernel_asan-vt100.o `test -f 'kernel/device/vt100.cc' || echo '$(srcdir)/'`kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-vt100.Tpo kernel/device/$(DEPDIR)/kernel_asan-vt100.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/vt100.cc' object='kernel/device/kernel_asan-vt100.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-vt100.o `test -f 'kernel/device/vt100.cc' || echo '$(srcdir)/'`kernel/device/vt100.cc
+
+kernel/device/kernel_asan-vt100.obj: kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-vt100.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-vt100.Tpo -c -o kernel/device/kernel_asan-vt100.obj `if test -f 'kernel/device/vt100.cc'; then $(CYGPATH_W) 'kernel/device/vt100.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vt100.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-vt100.Tpo kernel/device/$(DEPDIR)/kernel_asan-vt100.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/vt100.cc' object='kernel/device/kernel_asan-vt100.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-vt100.obj `if test -f 'kernel/device/vt100.cc'; then $(CYGPATH_W) 'kernel/device/vt100.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vt100.cc'; fi`
+
 kernel/arch/x86_64/kernel_asan-elf64.o: kernel/arch/x86_64/elf64.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/kernel_asan-elf64.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_asan-elf64.Tpo -c -o kernel/arch/x86_64/kernel_asan-elf64.o `test -f 'kernel/arch/x86_64/elf64.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/elf64.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/$(DEPDIR)/kernel_asan-elf64.Tpo kernel/arch/x86_64/$(DEPDIR)/kernel_asan-elf64.Po
@@ -10931,6 +11394,20 @@ kernel/lib/kernel_generic-dev_storage.obj: kernel/lib/dev_storage.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_storage.cc' object='kernel/lib/kernel_generic-dev_storage.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-dev_storage.obj `if test -f 'kernel/lib/dev_storage.cc'; then $(CYGPATH_W) 'kernel/lib/dev_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_storage.cc'; fi`
+
+kernel/lib/kernel_generic-dev_char.o: kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-dev_char.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Tpo -c -o kernel/lib/kernel_generic-dev_char.o `test -f 'kernel/lib/dev_char.cc' || echo '$(srcdir)/'`kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Tpo kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_char.cc' object='kernel/lib/kernel_generic-dev_char.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-dev_char.o `test -f 'kernel/lib/dev_char.cc' || echo '$(srcdir)/'`kernel/lib/dev_char.cc
+
+kernel/lib/kernel_generic-dev_char.obj: kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-dev_char.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Tpo -c -o kernel/lib/kernel_generic-dev_char.obj `if test -f 'kernel/lib/dev_char.cc'; then $(CYGPATH_W) 'kernel/lib/dev_char.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_char.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Tpo kernel/lib/$(DEPDIR)/kernel_generic-dev_char.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_char.cc' object='kernel/lib/kernel_generic-dev_char.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-dev_char.obj `if test -f 'kernel/lib/dev_char.cc'; then $(CYGPATH_W) 'kernel/lib/dev_char.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_char.cc'; fi`
 
 kernel/lib/kernel_generic-dev_text.o: kernel/lib/dev_text.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-dev_text.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-dev_text.Tpo -c -o kernel/lib/kernel_generic-dev_text.o `test -f 'kernel/lib/dev_text.cc' || echo '$(srcdir)/'`kernel/lib/dev_text.cc
@@ -12304,6 +12781,20 @@ kernel/device/kernel_generic-vga.obj: kernel/device/vga.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-vga.obj `if test -f 'kernel/device/vga.cc'; then $(CYGPATH_W) 'kernel/device/vga.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vga.cc'; fi`
 
+kernel/device/kernel_generic-vt100.o: kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-vt100.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-vt100.Tpo -c -o kernel/device/kernel_generic-vt100.o `test -f 'kernel/device/vt100.cc' || echo '$(srcdir)/'`kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-vt100.Tpo kernel/device/$(DEPDIR)/kernel_generic-vt100.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/vt100.cc' object='kernel/device/kernel_generic-vt100.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-vt100.o `test -f 'kernel/device/vt100.cc' || echo '$(srcdir)/'`kernel/device/vt100.cc
+
+kernel/device/kernel_generic-vt100.obj: kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-vt100.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-vt100.Tpo -c -o kernel/device/kernel_generic-vt100.obj `if test -f 'kernel/device/vt100.cc'; then $(CYGPATH_W) 'kernel/device/vt100.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vt100.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-vt100.Tpo kernel/device/$(DEPDIR)/kernel_generic-vt100.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/vt100.cc' object='kernel/device/kernel_generic-vt100.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-vt100.obj `if test -f 'kernel/device/vt100.cc'; then $(CYGPATH_W) 'kernel/device/vt100.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vt100.cc'; fi`
+
 kernel/arch/x86_64/kernel_generic-elf64.o: kernel/arch/x86_64/elf64.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/kernel_generic-elf64.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_generic-elf64.Tpo -c -o kernel/arch/x86_64/kernel_generic-elf64.o `test -f 'kernel/arch/x86_64/elf64.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/elf64.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/$(DEPDIR)/kernel_generic-elf64.Tpo kernel/arch/x86_64/$(DEPDIR)/kernel_generic-elf64.Po
@@ -12625,6 +13116,20 @@ kernel/lib/kernel_tracing-dev_storage.obj: kernel/lib/dev_storage.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_storage.cc' object='kernel/lib/kernel_tracing-dev_storage.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-dev_storage.obj `if test -f 'kernel/lib/dev_storage.cc'; then $(CYGPATH_W) 'kernel/lib/dev_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_storage.cc'; fi`
+
+kernel/lib/kernel_tracing-dev_char.o: kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-dev_char.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Tpo -c -o kernel/lib/kernel_tracing-dev_char.o `test -f 'kernel/lib/dev_char.cc' || echo '$(srcdir)/'`kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_char.cc' object='kernel/lib/kernel_tracing-dev_char.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-dev_char.o `test -f 'kernel/lib/dev_char.cc' || echo '$(srcdir)/'`kernel/lib/dev_char.cc
+
+kernel/lib/kernel_tracing-dev_char.obj: kernel/lib/dev_char.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-dev_char.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Tpo -c -o kernel/lib/kernel_tracing-dev_char.obj `if test -f 'kernel/lib/dev_char.cc'; then $(CYGPATH_W) 'kernel/lib/dev_char.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_char.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-dev_char.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/dev_char.cc' object='kernel/lib/kernel_tracing-dev_char.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-dev_char.obj `if test -f 'kernel/lib/dev_char.cc'; then $(CYGPATH_W) 'kernel/lib/dev_char.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/dev_char.cc'; fi`
 
 kernel/lib/kernel_tracing-dev_text.o: kernel/lib/dev_text.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-dev_text.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-dev_text.Tpo -c -o kernel/lib/kernel_tracing-dev_text.o `test -f 'kernel/lib/dev_text.cc' || echo '$(srcdir)/'`kernel/lib/dev_text.cc
@@ -13998,6 +14503,20 @@ kernel/device/kernel_tracing-vga.obj: kernel/device/vga.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-vga.obj `if test -f 'kernel/device/vga.cc'; then $(CYGPATH_W) 'kernel/device/vga.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vga.cc'; fi`
 
+kernel/device/kernel_tracing-vt100.o: kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-vt100.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-vt100.Tpo -c -o kernel/device/kernel_tracing-vt100.o `test -f 'kernel/device/vt100.cc' || echo '$(srcdir)/'`kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-vt100.Tpo kernel/device/$(DEPDIR)/kernel_tracing-vt100.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/vt100.cc' object='kernel/device/kernel_tracing-vt100.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-vt100.o `test -f 'kernel/device/vt100.cc' || echo '$(srcdir)/'`kernel/device/vt100.cc
+
+kernel/device/kernel_tracing-vt100.obj: kernel/device/vt100.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-vt100.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-vt100.Tpo -c -o kernel/device/kernel_tracing-vt100.obj `if test -f 'kernel/device/vt100.cc'; then $(CYGPATH_W) 'kernel/device/vt100.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vt100.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-vt100.Tpo kernel/device/$(DEPDIR)/kernel_tracing-vt100.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/vt100.cc' object='kernel/device/kernel_tracing-vt100.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-vt100.obj `if test -f 'kernel/device/vt100.cc'; then $(CYGPATH_W) 'kernel/device/vt100.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/vt100.cc'; fi`
+
 kernel/arch/x86_64/kernel_tracing-elf64.o: kernel/arch/x86_64/elf64.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/arch/x86_64/kernel_tracing-elf64.o -MD -MP -MF kernel/arch/x86_64/$(DEPDIR)/kernel_tracing-elf64.Tpo -c -o kernel/arch/x86_64/kernel_tracing-elf64.o `test -f 'kernel/arch/x86_64/elf64.cc' || echo '$(srcdir)/'`kernel/arch/x86_64/elf64.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/arch/x86_64/$(DEPDIR)/kernel_tracing-elf64.Tpo kernel/arch/x86_64/$(DEPDIR)/kernel_tracing-elf64.Po
@@ -14137,6 +14656,20 @@ user/bin/ls/ls-ls.obj: user/bin/ls/ls.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/bin/ls/ls.cc' object='user/bin/ls/ls-ls.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ls_CXXFLAGS) $(CXXFLAGS) -c -o user/bin/ls/ls-ls.obj `if test -f 'user/bin/ls/ls.cc'; then $(CYGPATH_W) 'user/bin/ls/ls.cc'; else $(CYGPATH_W) '$(srcdir)/user/bin/ls/ls.cc'; fi`
+
+user/shell/shell-parser.o: user/shell/parser.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CXXFLAGS) $(CXXFLAGS) -MT user/shell/shell-parser.o -MD -MP -MF user/shell/$(DEPDIR)/shell-parser.Tpo -c -o user/shell/shell-parser.o `test -f 'user/shell/parser.cc' || echo '$(srcdir)/'`user/shell/parser.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/shell/$(DEPDIR)/shell-parser.Tpo user/shell/$(DEPDIR)/shell-parser.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/shell/parser.cc' object='user/shell/shell-parser.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CXXFLAGS) $(CXXFLAGS) -c -o user/shell/shell-parser.o `test -f 'user/shell/parser.cc' || echo '$(srcdir)/'`user/shell/parser.cc
+
+user/shell/shell-parser.obj: user/shell/parser.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CXXFLAGS) $(CXXFLAGS) -MT user/shell/shell-parser.obj -MD -MP -MF user/shell/$(DEPDIR)/shell-parser.Tpo -c -o user/shell/shell-parser.obj `if test -f 'user/shell/parser.cc'; then $(CYGPATH_W) 'user/shell/parser.cc'; else $(CYGPATH_W) '$(srcdir)/user/shell/parser.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/shell/$(DEPDIR)/shell-parser.Tpo user/shell/$(DEPDIR)/shell-parser.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/shell/parser.cc' object='user/shell/shell-parser.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CXXFLAGS) $(CXXFLAGS) -c -o user/shell/shell-parser.obj `if test -f 'user/shell/parser.cc'; then $(CYGPATH_W) 'user/shell/parser.cc'; else $(CYGPATH_W) '$(srcdir)/user/shell/parser.cc'; fi`
 
 .s.o:
 	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ $<
@@ -14462,6 +14995,8 @@ distclean-generic:
 	-rm -f libc/cxx/abi/$(am__dirstamp)
 	-rm -f libc/math/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/math/$(am__dirstamp)
+	-rm -f libc/src/assert/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/assert/$(am__dirstamp)
 	-rm -f libc/src/dirent/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/dirent/$(am__dirstamp)
 	-rm -f libc/src/errno/$(DEPDIR)/$(am__dirstamp)
@@ -14470,6 +15005,10 @@ distclean-generic:
 	-rm -f libc/src/fcntl/$(am__dirstamp)
 	-rm -f libc/src/posix_spawn/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/posix_spawn/$(am__dirstamp)
+	-rm -f libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/stdio/$(am__dirstamp)
+	-rm -f libc/src/stdio/bits/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/stdio/bits/$(am__dirstamp)
 	-rm -f libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/stdlib/$(am__dirstamp)
 	-rm -f libc/src/string/$(DEPDIR)/$(am__dirstamp)
@@ -14492,6 +15031,8 @@ distclean-generic:
 	-rm -f user/bin/dhcpclient/$(am__dirstamp)
 	-rm -f user/bin/ls/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/bin/ls/$(am__dirstamp)
+	-rm -f user/shell/$(DEPDIR)/$(am__dirstamp)
+	-rm -f user/shell/$(am__dirstamp)
 	-rm -f user/test/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/test/$(am__dirstamp)
 
@@ -14506,7 +15047,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -14554,7 +15095,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -14682,6 +15223,13 @@ $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
 
+$(top_srcdir)/user/shell/grammar.c \
+	$(top_srcdir)/user/shell/grammar.h \
+	$(top_srcdir)/user/shell/grammar.out: \
+	$(top_srcdir)/user/shell/grammar.y
+	$(RM) -rf $@
+	lemon $<
+
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_EXCEPTIONS_FLAGS)
 
@@ -14704,7 +15252,6 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 		-o libc_tests \
 		$(LIBC_TESTS) \
 		-static -nostdlib \
-		-v \
 		$(top_builddir)/libc.a -lgcc
 
 test_compile: $(top_builddir)/libc_tests
@@ -14836,6 +15383,7 @@ $(top_builddir)/fatpart.img: \
 			-S $(SECTOR_SZ) \
 			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
 			-b $$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
+			-n dgos \
 			$(top_builddir)/fatpart.img && \
 			\
 		dd \

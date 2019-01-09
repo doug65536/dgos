@@ -1,5 +1,10 @@
 ## Process this file with automake to produce Makefile.in
 
+#SUFFIXES: .y
+#
+#%.c %.h %.out: %.y
+#	lemon $<
+#
 DUMPDIR = $(top_builddir)/dump
 
 BUILT_SOURCES = \
@@ -124,6 +129,7 @@ noinst_LIBRARIES += libbootsect.a
 libbootsect_a_SOURCES = \
 	boot/bootcommon.S \
 	boot/bioscall.S \
+	boot/retpoline.S \
 	boot/diskio.cc \
 	boot/ctors.cc \
 	boot/assert.cc \
@@ -151,6 +157,7 @@ libbootsect_a_SOURCES = \
 	boot/physmap.cc \
 	boot/physmem_bios.cc \
 	boot/vesa.cc \
+	boot/vesa_bios.cc \
 	boot/progressbar.cc \
 	boot/debug.cc \
 	boot/part.s \
@@ -211,6 +218,7 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS) \
+	$(RETPOLINE_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 libbootsect_a_CFLAGS =
@@ -392,6 +400,7 @@ BOOTLOADER_EFI_FLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
+	$(RETPOLINE_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	$(FREESTANDING_FLAGS)
 
@@ -402,6 +411,7 @@ bootefi_amd64_SOURCES = \
 	boot/ctors.cc \
 	boot/fs.cc \
 	boot/cpu_efi.cc \
+	boot/retpoline.S \
 	boot/physmap.cc \
 	boot/physmem_efi.cc \
 	boot/cpu.cc \
@@ -427,6 +437,8 @@ bootefi_amd64_SOURCES = \
 	boot/tui_efi.cc \
 	boot/include/boottable.h \
 	boot/include/boottable_decl.h \
+	boot/vesa.cc \
+	boot/vesa_efi.cc \
 	boot/boottable.cc \
 	boot/boottable_efi.cc \
 	boot/qemu.cc \
@@ -570,6 +582,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/dev_registration.h \
 	kernel/lib/dev_storage.cc \
 	kernel/lib/dev_storage.h \
+	kernel/lib/dev_char.cc \
+	kernel/lib/dev_char.h \
 	kernel/lib/dev_text.cc \
 	kernel/lib/dev_text.h \
 	kernel/lib/dirent.h \
@@ -768,6 +782,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/virtio-blk.cc \
 	kernel/device/virtio-blk.h \
 	kernel/device/vga.cc \
+	kernel/device/vt100.cc \
+	kernel/device/vt100.h \
 	kernel/arch/x86_64/elf64.cc \
 	kernel/arch/x86_64/elf64_decl.h \
 	kernel/arch/x86_64/elf64.h \
@@ -996,13 +1012,28 @@ $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
 
-#$(INCLUDES_DST): $(INCLUDES_SRC)
-#	mkdir -p sysroot/include
-#	for header in $(INCLUDES_NAMES); do \
-#		mkdir -p $$(dirname $(top_builddir)/sysroot/include/$$header) && \
-#		cp -u $(top_srcdir)/libc/include/$$header \
-#			$(top_builddir)/sysroot/include/$$header; \
-#		done
+# ----------------------------------------------------------------------------
+# Shell
+
+bin_PROGRAMS += shell
+
+shell_SOURCES = \
+	user/shell/grammar.c \
+	user/shell/parser.h \
+	user/shell/parser.cc
+
+shell_CFLAGS = -isystem $(top_builddir)/sysroot/include
+
+shell_CXXFLAGS = $(shell_CFLAGS)
+
+$(top_srcdir)/user/shell/grammar.c \
+	$(top_srcdir)/user/shell/grammar.h \
+	$(top_srcdir)/user/shell/grammar.out: \
+	$(top_srcdir)/user/shell/grammar.y
+	$(RM) -rf $@
+	lemon $<
+
+EXTRA_shell_DEPENDENCIES = user/shell/grammar.c
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1093,6 +1124,7 @@ libc_a_HEADERS = \
 	libc/include/sys/ioctl.h
 
 libc_a_SOURCES = \
+	libc/src/assert/assert.cc \
 	libc/src/string/__bytebitmap.cc \
 	libc/src/string/strsignal.cc \
 	libc/src/string/strcoll_l.cc \
@@ -1140,12 +1172,24 @@ libc_a_SOURCES = \
 	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/_Exit.cc \
 	libc/src/stdlib/abs.cc \
+	libc/src/stdlib/malloc.cc \
 	libc/src/fcntl/creat.cc \
 	libc/src/fcntl/fcntl.cc \
 	libc/src/fcntl/open.cc \
 	libc/src/fcntl/openat.cc \
 	libc/src/fcntl/posix_fadvise.cc \
 	libc/src/fcntl/posix_fallocate.cc \
+	libc/src/stdio/bits/cfile.cc \
+	libc/src/stdio/bits/cfile.h \
+	libc/src/stdio/bits/formatter.cc \
+	libc/src/stdio/bits/formatter.h \
+	libc/src/stdio/fprintf.cc \
+	libc/src/stdio/fputc.cc \
+	libc/src/stdio/printf.cc \
+	libc/src/stdio/vfprintf.cc \
+	libc/src/stdio/vprintf.cc \
+	libc/src/stdio/fread.cc \
+	libc/src/stdio/fwrite.cc \
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
 	libc/src/sys/mman/mremap.cc \
@@ -1338,7 +1382,6 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 		-o libc_tests \
 		$(LIBC_TESTS) \
 		-static -nostdlib \
-		-v \
 		$(top_builddir)/libc.a -lgcc
 
 test_compile: $(top_builddir)/libc_tests
@@ -1470,12 +1513,14 @@ distclean-local:
 BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/nvme.bits \
 	$(top_srcdir)/kernel/device/pci.bits \
+	$(top_srcdir)/kernel/device/rtl8139.bits \
 	$(top_srcdir)/kernel/device/i350.bits \
 	$(top_srcdir)/kernel/device/usb_xhci.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/apic.bits \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
 	$(top_srcdir)/kernel/device/acpi.bits \
-	$(top_srcdir)/kernel/device/ahci.bits
+	$(top_srcdir)/kernel/device/ahci.bits \
+	$(top_srcdir)/kernel/device/es173x.bits
 
 # 1=path to bits file
 define bitfield_gen =
