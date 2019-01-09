@@ -12,6 +12,7 @@ arch/x86_64/cpu/apic.bits.h
 arch/x86_64/cpu/except_asm.S
 arch/x86_64/cpu/pic.bits
 arch/x86_64/cpu/picbits.h
+arch/x86_64/cpu_bug.h
 device/acpi.bits
 device/acpi.bits.h
 device/acpigas.cc
@@ -24,11 +25,15 @@ device/ahcibits.h
 device/dev_usb_ctl.cc
 device/eainstrument.cc
 device/eainstrument.h
+device/es137x.cc
+device/es173x.bits
+device/es173x.bits.h
 device/i350.bits.h
 device/iocp.cc
 device/iocp.h
 device/nvme.bits.h
 device/pci.bits.h
+device/rtl8139.bits
 device/usb.cc
 device/usb_hid.cc
 device/usb_hid.h
@@ -44,6 +49,8 @@ device/virtio-blk.cc
 device/virtio-blk.h
 device/virtio-gpu.cc
 device/virtio-gpu.h
+device/vt100.cc
+device/vt100.h
 fs/devfs.cc
 lib/asan.cc
 lib/asan.h
@@ -57,6 +64,8 @@ lib/contig_alloc.h
 lib/cxxexcept.cc
 lib/cxxexcept.h
 lib/dbllink.h
+lib/dev_char.cc
+lib/dev_char.h
 lib/dev_usb_ctl.h
 lib/refcount.cc
 lib/refcount.h

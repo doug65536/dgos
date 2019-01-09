@@ -61,8 +61,10 @@ struct vbe_mode_info_t {
 } _packed;
 
 struct vbe_selected_mode_t {
-    uint32_t framebuffer_addr;
-    uint32_t framebuffer_bytes;
+    uint64_t framebuffer_addr;
+    uint64_t framebuffer_bytes;
+
+    uint16_t mode_num;
 
     uint16_t width;
     uint16_t height;
@@ -79,5 +81,5 @@ struct vbe_selected_mode_t {
     uint8_t mask_pos_b;
     uint8_t mask_pos_a;
 
-    char reserved[6];
+    char reserved[4];
 };

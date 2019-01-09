@@ -18,8 +18,8 @@ _constructor(ctor_console) void conout_init()
 {
     EFI_STATUS status;
 
-    EFI_HANDLE *efi_text_output_handles;
-    UINTN efi_num_text_output_handles;
+    EFI_HANDLE *efi_text_output_handles = nullptr;
+    UINTN efi_num_text_output_handles = 0;
 
     status = efi_systab->BootServices->LocateHandleBuffer(
                 ByProtocol,

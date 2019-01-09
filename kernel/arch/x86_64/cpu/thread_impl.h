@@ -12,6 +12,7 @@ isr_context_t *thread_schedule(isr_context_t *ctx);
 isr_context_t *thread_schedule_postirq(isr_context_t *ctx);
 void thread_init(int ap);
 void thread_set_cpu_gsbase(int ap);
+void thread_init_cpu_count(int count);
 void thread_init_cpu(size_t cpu_nr, uint32_t apic_id);
 uint32_t thread_cpus_started(void);
 
@@ -32,6 +33,20 @@ typedef void (*thread_cls_each_handler_t)(int cpu ,void *, void *, size_t);
 
 void thread_cls_init_each_cpu(
         size_t slot, thread_cls_init_handler_t handler, void *arg);
+
+template<typename C>
+static void *thread_cls_init_each_cpu_wrap(void *a)
+{
+    C &callback = *(C*)a;
+    return callback();
+}
+
+template<typename C>
+void thread_cls_init_each_cpu(size_t slot, int other_only, C callback)
+{
+    return thread_cls_init_each_cpu(
+                slot, thread_cls_init_each_cpu_wrap<C>, &callback);
+}
 
 void thread_cls_for_each_cpu(size_t slot, int other_only,
                              thread_cls_each_handler_t handler,
@@ -57,3 +72,5 @@ static _always_inline int thread_cpu_count()
 {
     return cpu_count;
 }
+
+int thread_cpu_usage(int cpu);

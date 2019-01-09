@@ -38,7 +38,7 @@ void rwspinlock_sh_unlock(rwspinlock_t *lock);
 typedef unsigned ticketlock_value_t;
 
 struct ticketlock_t {
-    ticketlock_t()
+    constexpr ticketlock_t()
         : now_serving(0)
         , next_ticket(0)
     {

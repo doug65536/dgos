@@ -144,7 +144,7 @@ reloc_entry:
     movw $0x4200,%ax
     movb boot_drive,%dl
     int $0x13
-    jc .Lretry_io
+    jnc load_done	
     
 load_done:	// utility label for placing debugger breakpoint
     

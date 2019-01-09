@@ -12,7 +12,7 @@ void cpu_debug_breakpoint_set_indirect(uintptr_t addr, int rw,
 {
     typedef void (*handler_t)(uintptr_t addr, int rw, int len, int enable);
 
-    static handler_t constexpr cpu_set_debug_breakpoint_handlers[4] = {
+    static handler_t constexpr const cpu_set_debug_breakpoint_handlers[4] = {
         cpu_debug_breakpoint_set<0>,
         cpu_debug_breakpoint_set<1>,
         cpu_debug_breakpoint_set<2>,

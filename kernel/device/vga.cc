@@ -1,3 +1,5 @@
+// pci driver: C=DISPLAY, S=VGA
+
 #include "dev_text.h"
 
 #include "bios_data.h"

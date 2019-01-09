@@ -23,12 +23,12 @@ struct gdt_entry_t {
     uint8_t flags_limit_high;
     uint8_t base_high;
 
-    void set_type(uint8_t type)
+    constexpr void set_type(uint8_t type)
     {
         access = (access & ~0xF) | type;
     }
 
-    uint8_t get_type()
+    constexpr uint8_t get_type()
     {
         return access & 0xF;
     }
@@ -171,7 +171,7 @@ struct tss_t {
 };
 
 // Ensure no false sharing
-C_ASSERT_ISPO2((sizeof(tss_t) & 63) == 0);
+C_ASSERT((sizeof(tss_t) & 63) == 0);
 
 // Ensure no spanning page boundaries
 C_ASSERT(4096 % sizeof(tss_t) == 0);

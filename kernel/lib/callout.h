@@ -28,6 +28,7 @@ enum constructor_order_t {
 enum struct callout_type_t : uint32_t {
     // bootstrap
     vmm_ready = 'M',
+    heap_ready = 'R',
     smp_start = 'S',
     txt_dev = 'V',
     acpi_ready = 'A',

@@ -307,7 +307,6 @@
 #define XCR0_PT                 (1U<<XCR0_PT_BIT)
 #define XCR0_PKRU               (1U<<XCR0_PKRU_BIT)
 
-
 //
 // CPU context
 

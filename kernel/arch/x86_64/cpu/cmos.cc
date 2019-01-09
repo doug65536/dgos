@@ -9,6 +9,10 @@
 #include "mutex.h"
 #include "bootinfo.h"
 #include "printk.h"
+#include "thread_impl.h"
+#include "apic.h"
+#include "cpu/interrupts.h"
+#include "device/eainstrument.h"
 
 #define CMOS_ADDR_PORT  0x70
 #define CMOS_DATA_PORT  0x71
@@ -243,6 +247,19 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
         // Update ended interrupt
         time_of_day = cmos_read_gettimeofday(lock);
         time_of_day_timestamp = time_ns();
+
+        char msg[512];
+        size_t ofs = 0;
+        for (int i = 0; i < thread_cpu_count(); ++i) {
+            ofs += snprintf(msg + ofs, countof(msg) - ofs, "(%d)=%d ",
+                     i, thread_cpu_usage(i));
+        }
+
+        printdbg("CPU usage: %s\n", msg);
+
+        // Flush trace
+        if (eainst_flush_ready)
+            apic_send_ipi_noinst(-2, INTR_FLUSH_TRACE);
     }
 
     return ctx;

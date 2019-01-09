@@ -66,7 +66,7 @@ lldiv_t       lldiv(long long, long long);
 
 long          lrand48(void);
 
-void         *malloc(size_t);
+void         *malloc(size_t sz);
 int           mblen(char const *, size_t);
 size_t        mbstowcs(wchar_t *restrict, char const *restrict, size_t);
 int           mbtowc(wchar_t *restrict, char const *restrict, size_t);

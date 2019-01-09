@@ -17,41 +17,41 @@ struct fd_table_t
         int16_t id;
         int16_t flags;
 
-        entry_t()
+        constexpr entry_t()
             : id(0)
             , flags(0)
         {
         }
 
-        entry_t(uint16_t id)
+        constexpr entry_t(uint16_t id)
             : id(id)
             , flags(0)
         {
         }
 
-        void set(int16_t id, int16_t flags)
+        constexpr void set(int16_t id, int16_t flags)
         {
             this->id = id;
             this->flags = flags;
         }
 
-        operator int16_t() const
+        constexpr operator int16_t() const
         {
             return id;
         }
 
-        entry_t& operator=(int16_t id)
+        constexpr entry_t& operator=(int16_t id)
         {
             this->id = id;
             return *this;
         }
 
-        bool close_on_exec() const
+        constexpr bool close_on_exec() const
         {
             return flags & 1;
         }
 
-        void set_close_on_exec(bool close)
+        constexpr void set_close_on_exec(bool close)
         {
             flags = close;
         }

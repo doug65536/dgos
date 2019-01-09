@@ -4,19 +4,21 @@
 
 ## Bootloader
 
+- Can boot from hard disk, flash drive, or CD/DVD using BIOS or EFI
 - Implemented mostly in C++
 - Custom bootloader, supports FAT32 with LFN and ISO9660 with Joliet
   boot with unified booloader
-- Can boot from hard disk, CD/DVD, or flash drive
 - Builds page tables and enters ELF64 kernel with CPU fully in long mode
 - Implements SMP trampoline
 - Gets physical memory map from BIOS
+- Uses memory map throughout, can tolerate arbitrarily fragmented memory map
 - Enumerates VESA BIOS video modes and configures video card for kernel
 - Implements basic exception handlers
 - Shows loading progress bar
 - Processes position independent executable relocations, allowing the
   kernel to be loaded to an arbitrary address for kernel address space
   layout randomization.
+- Implements boot menu
 
 ## Kernel
 
@@ -28,10 +30,10 @@
   fxsave/fxrstor or xsave/xsavec/xsaveopt/xrstor where available
 - Super fast recursive paging implementation
 - Super fast small block heap implementation
-- High-half mcmodel=kernel memory model
+- Position independent executable memory model with address randomization
 - Demand paged memory
 - Lazy TLB shootdown
-- Memory protection (no mapping of entire physical memory, no identity mapping)
+- Memory protection (no mapping of entire physical memory)
 - Interprocessor TLB shootdown
 - Sleep with 16ms resolution and usleep implementation
 - RTC
@@ -56,8 +58,8 @@
 - IRQ driven AHCI with native command queueing (NCQ), asynchronous I/O,
   handles up to 32 concurrent commands per port
 - IRQ driven NVME with per-cpu queues and multiple namespace support
-- virtio disk driver
-- virtio-gpu driver
+- virtio-block disk driver
+- virtio-gpu driver with dynamic vm window resize handling
 - FAT32 and ISO9660 filesystems with LFN and Joliet support
   (with full unicode support, including outside the basic multilingual plane)
 - Virtual block storage device abstraction layer

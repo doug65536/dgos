@@ -1,3 +1,5 @@
+// pci driver: C=STORAGE, V=VIRTIO (0x1AF4)
+
 #include "virtio-blk.h"
 #include "virtio-base.h"
 #include "dev_storage.h"
@@ -73,7 +75,7 @@ enum struct virtio_blk_op_t : uint8_t {
     flush
 };
 
-class virtio_blk_if_t
+class virtio_blk_if_t final
         : public virtio_base_t
         , public storage_if_base_t
         , public storage_dev_base_t

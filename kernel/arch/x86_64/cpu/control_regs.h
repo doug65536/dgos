@@ -654,7 +654,8 @@ static _always_inline void cpu_irq_disable()
     );
 }
 
-static _always_inline bool cpu_irq_save_disable()
+static _always_inline
+bool cpu_irq_save_disable()
 {
     uint32_t eflags;
     __asm__ __volatile__ (
@@ -668,12 +669,47 @@ static _always_inline bool cpu_irq_save_disable()
     return eflags & CPU_EFLAGS_IF;
 }
 
-static _always_inline void cpu_irq_enable()
+static _always_inline _no_instrument
+bool cpu_irq_save_disable_noinst()
+{
+    uint32_t eflags;
+    __asm__ __volatile__ (
+        "pushfq\n\t"
+        "popq %q[eflags]\n\t"
+        "cli\n\t"
+        : [eflags] "=r" (eflags)
+        :
+        : "cc"
+    );
+    return eflags & CPU_EFLAGS_IF;
+}
+
+static _always_inline
+void cpu_irq_enable()
 {
     __asm__ __volatile__ ( "sti" : : : "cc" );
 }
 
+_hot
 static _always_inline void cpu_irq_toggle(bool enable)
+{
+    uint32_t temp;
+    __asm__ __volatile__ (
+        "pushfq\n\t"
+        "popq %q[temp]\n\t"
+        "andl %[not_eflags_if],%k[temp]\n\t"
+        "orl %k[enable],%k[temp]\n\t"
+        "pushq %q[temp]\n\t"
+        "popfq\n\t"
+        : [temp] "=&r" (temp)
+        : [enable] "ir" (enable << CPU_EFLAGS_IF_BIT)
+        , [not_eflags_if] "i" (~CPU_EFLAGS_IF)
+        : "cc"
+    );
+}
+
+_hot _no_instrument
+static _always_inline void cpu_irq_toggle_noinst(bool enable)
 {
     uint32_t temp;
     __asm__ __volatile__ (
@@ -695,6 +731,7 @@ static _always_inline bool cpu_irq_is_enabled()
     return cpu_eflags_get() & CPU_EFLAGS_IF;
 }
 
+_hot
 static _always_inline uint64_t cpu_rdtsc()
 {
     uint32_t tsc_lo;

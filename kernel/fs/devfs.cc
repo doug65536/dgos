@@ -1,5 +1,16 @@
 #include "dev_storage.h"
 
+struct dev_fs_file_info_t final
+        : public fs_file_info_t
+{
+    // fs_file_info_t interface
+public:
+    ino_t get_inode() const override
+    {
+        return -int(errno_t::ENOSYS);
+    }
+};
+
 struct dev_fs_t final : public fs_base_t {
     FS_BASE_RW_IMPL
 

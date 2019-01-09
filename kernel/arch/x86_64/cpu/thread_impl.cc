@@ -92,6 +92,7 @@ struct alignas(256) thread_info_t {
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
     thread_priority_t volatile priority_boost;
+
     thread_state_t volatile state;
 
     // --- cache line ---
@@ -147,7 +148,12 @@ C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
 // Store in a big array, for now
 #define MAX_THREADS 512
 static thread_info_t threads[MAX_THREADS];
+
+// Separate to avoid constantly sharing dirty lines
+static uint8_t run_cpu[MAX_THREADS];
+
 static size_t volatile thread_count;
+
 uint32_t volatile thread_smp_running;
 int thread_idle_ready;
 int spincount_mask;
@@ -212,7 +218,7 @@ public:
 private:
     thread_info_t *current;
 
-    std::vector<thread_info_t*> priorities;
+    //std::set<ready_thread_t> priorities[32];
     uint32_t empty_flags;
 
     using lock_type = std::mcslock;
@@ -234,17 +240,19 @@ static uint32_t get_apic_id()
 cpu_info_t *this_cpu_by_apic_id_slow()
 {
     uint32_t apic_id = get_apic_id();
-    for (size_t i = 0; i < apic_cpu_count(); ++i)
+    for (size_t i = 0, e = apic_cpu_count(); i != e; ++i)
         if (cpus[i].apic_id == apic_id)
             return cpus + i;
     return nullptr;
 }
 
+_hot
 static _always_inline cpu_info_t *this_cpu()
 {
     return cpu_gs_read<cpu_info_t*, 0>();
 }
 
+_hot
 static _always_inline thread_info_t *this_thread()
 {
     return cpu_gs_read<thread_info_t*, offsetof(cpu_info_t, cur_thread)>();
@@ -330,7 +338,7 @@ static char *thread_allocate_stack(
     stack = (char*)mmap(nullptr, stack_guard_size +
                         stack_size + stack_guard_size,
                         PROT_READ | PROT_WRITE,
-                        MAP_UNINITIALIZED | MAP_POPULATE, -1, 0);
+                        MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
 
     // Guard pages
     madvise(stack, stack_guard_size, MADV_DONTNEED);
@@ -339,6 +347,7 @@ static char *thread_allocate_stack(
             stack_guard_size, MADV_DONTNEED);
     mprotect(stack + stack_guard_size + stack_size,
              stack_guard_size, PROT_NONE);
+    madvise(stack + stack_guard_size, stack_size, MADV_WILLNEED);
 
     THREAD_TRACE("Thread %d %s stack range=%p-%p,"
                  " stack=%p-%p\n", tid, noun,
@@ -621,6 +630,23 @@ void thread_init(int ap)
     }
 }
 
+///
+/// struct sched_entry_t {
+///     // Timestamp when this thread should run again, in nanoseconds
+///     uint64_t run_ns;
+///     size_t thread_id;
+/// }
+///
+/// When a thread's timeslice expires, calculate
+///  now + (timeslice_duration * running_threads)
+/// and reinsert it into the scheduling set
+///
+/// When a thread voluntarily blocks, it is removed from the scheduling
+/// set, but when it unblocks, it regains the run_ns value it had when
+/// it blocked, making threads which have blocked longest get serviced first.
+///
+/// set<sched_entry_t>
+
 static thread_info_t *thread_choose_next(
         cpu_info_t *cpu,
         thread_info_t * const outgoing)
@@ -648,6 +674,10 @@ static thread_info_t *thread_choose_next(
         // Skip idle threads, or wrap to the first non-idle thread
         if (i < cpu_count || i >= thread_count)
             i = cpu_count;
+
+        // Ignore threads not currently running on this CPU
+        if (run_cpu[i] != cpu_nr)
+            continue;
 
         candidate = threads + i;
 
@@ -726,6 +756,7 @@ static void thread_clear_busy(void *outgoing)
         thread->process->destroy();
 }
 
+_hot
 isr_context_t *thread_schedule(isr_context_t *ctx)
 {
     cpu_info_t *cpu = this_cpu();
@@ -766,6 +797,8 @@ isr_context_t *thread_schedule(isr_context_t *ctx)
 
     if (likely(cpu->time_ratio))
         cpu->busy_percent = 100 * cpu->busy_ratio / cpu->time_ratio;
+    else
+        cpu->busy_percent = cpu->busy_percent;
 
     thread_state_t state = atomic_ld_acq(&thread->state);
 
@@ -936,6 +969,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     spinlock_lock_restore(lock, saved_lock);
 }
 
+_hot
 EXPORT void thread_resume(thread_t tid)
 {
     thread_info_t *thread = threads + tid;
@@ -950,8 +984,14 @@ EXPORT void thread_resume(thread_t tid)
 
         if (thread->state == THREAD_IS_SUSPENDED &&
                 atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED,
-                           THREAD_IS_READY))
+                               THREAD_IS_READY) == THREAD_IS_SUSPENDED) {
+            // If its home is another CPU
+            auto this_tid = this_thread()->thread_id;
+            if (run_cpu[this_tid] != run_cpu[tid])
+                apic_send_ipi(cpus[run_cpu[tid]].apic_id, INTR_THREAD_YIELD);
+
             return;
+        }
 
         if (thread->state == THREAD_IS_SUSPENDED_BUSY &&
                 atomic_cmpxchg(&thread->state, THREAD_IS_SUSPENDED_BUSY,
@@ -1010,16 +1050,23 @@ EXPORT void thread_set_affinity(int id, uint64_t affinity)
 
     threads[id].cpu_affinity = affinity;
 
-    // Are we changing current thread affinity?
-    while (cpu->cur_thread == threads + id &&
-            !(affinity & (1 << cpu_nr))) {
-        // Get off this CPU
-        thread_yield();
+    if (((1 << run_cpu[id]) & affinity) == 0) {
+        // Home CPU is not in the affinity mask
+        // Move home to a cpu in the affinity mask
+        run_cpu[id] = bit_lsb_set(affinity);
+    }
 
-        // Check again, a racing thread may have picked
-        // up this thread without seeing change
-        cpu = this_cpu();
-        cpu_nr = cpu->cpu_nr;
+    // Are we changing current thread affinity?
+    if (cpu->cur_thread == threads + id) {
+        while (!(affinity & (UINT64_C(1) << cpu_nr))) {
+            // Get off this CPU
+            thread_yield();
+
+            // Check again, a racing CPU may have picked
+            // up this thread without seeing change
+            cpu = this_cpu();
+            cpu_nr = cpu->cpu_nr;
+        }
     }
 }
 
@@ -1118,6 +1165,7 @@ int thread_cpu_number()
     return cpu->cpu_nr;
 }
 
+_hot
 isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
 {
     cpu_info_t *cur_cpu = this_cpu();
@@ -1206,6 +1254,12 @@ void thread_set_cpu_gsbase(int ap)
     cpu_gsbase_set(cpu);
 }
 
+void thread_init_cpu_count(int count)
+{
+    for (size_t i = 0, e = countof(run_cpu); i != e; ++i)
+        run_cpu[i] = i % count;
+}
+
 void thread_init_cpu(size_t cpu_nr, uint32_t apic_id)
 {
     cpu_info_t *cpu = cpus + cpu_nr;
@@ -1213,4 +1267,58 @@ void thread_init_cpu(size_t cpu_nr, uint32_t apic_id)
     cpu->apic_id = apic_id;
     cpu->cpu_nr = cpu_nr;
     cpu->cur_thread = threads + cpu_nr;
+}
+
+// PCID address space is 4096 bits
+//  0 bits are free pcids, 1 bits are taken pcids
+//  4096 is 64*64, so represent it with a 2-level hierarchy
+//  The underlying maps are in pcid_alloc_map 1 thru 64 inclusive
+//  The top map is stored in pcid_alloc_map[0]
+//  The top map will have 1 bits if all of the underlying 64 bits are 1
+//  The top map will have 0 bits if any of the underlying 64 bits are 0
+static uint64_t pcid_alloc_map[65];
+
+int thread_pcid_alloc()
+{
+    // The top map will be all 1 bits when all pcids are taken
+    if (unlikely(~pcid_alloc_map[0] == 0))
+        return -1;
+
+    // Find the first qword with a 0 bit
+    size_t word = bit_lsb_set(~pcid_alloc_map[0]);
+
+    // Find the first 0 bit in that qword
+    uint8_t bit = bit_lsb_set(~pcid_alloc_map[word+1]);
+
+    uint64_t upd = pcid_alloc_map[word+1] | (UINT64_C(1) << bit);
+
+    pcid_alloc_map[word+1] = upd;
+
+    // Build a mask that will set the top bit to 1
+    // if all underlying bits are now 1
+    uint64_t top_mask = (UINT64_C(1) << word) & -(~upd == 0);
+
+    pcid_alloc_map[0] |= top_mask;
+
+    return int(word << 6) + bit;
+}
+
+void thread_pcid_free(int pcid)
+{
+    assert(size_t(pcid) < 4096);
+
+    size_t word = unsigned(pcid) >> 6;
+
+    uint8_t bit = word & 63;
+
+    // Clear that bit
+    pcid_alloc_map[word+1] &= ~(UINT64_C(1) << bit);
+
+    // Since we freed one, we know that the bit of level 0 must become 0
+    pcid_alloc_map[0] &= ~(UINT64_C(1) << word);
+}
+
+int thread_cpu_usage(int cpu)
+{
+    return cpus[cpu].busy_percent;
 }

@@ -387,6 +387,7 @@ uintptr_t mm_fork_kernel_text();
 void mm_set_master_pagedir();
 
 extern "C"
+_no_plt
 bool mm_copy_user(void *dst, void const *src, size_t size);
 
 extern "C" _const

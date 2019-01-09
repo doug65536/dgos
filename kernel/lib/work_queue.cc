@@ -18,13 +18,15 @@ void workq::init(int cpu_count)
 
 void workq_impl::enqueue(workq_work *work)
 {
-    scoped_lock hold(lock);
-    if (head == nullptr) {
-        head = tail = work;
-    } else {
-        tail->next = work;
-        tail = work;
-    }
+    scoped_lock lock(queue_lock);
+    enqueue_locked(work, lock);
+}
+
+void workq_impl::enqueue_locked(workq_work *work, scoped_lock& lock)
+{
+    workq_work **prev_ptr = head ? &tail->next : &head;
+    *prev_ptr = work;
+    tail = work;
     not_empty.notify_one();
 }
 
@@ -33,15 +35,11 @@ void workq_impl::set_affinity(int cpu)
     thread_set_affinity(tid, UINT64_C(1) << cpu);
 }
 
-void workq::free_item(workq_work *item)
-{
-    item->~workq_work();
-    heap_free(item->owner->heap, item);
-}
-
+_hot
 workq_work *workq::allocate(workq_impl *queue, size_t size)
 {
-    workq_work *item = (workq_work *)heap_alloc(queue->heap, size);
+    assert(size <= workq_alloc::item_sz);
+    workq_work *item = (workq_work *)queue->alloc.alloc();
     return item;
 }
 

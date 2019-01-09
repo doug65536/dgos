@@ -84,7 +84,7 @@ private:
     T value;
 };
 
-static simple_atomic<int> systime_counter;
+static simple_atomic<uint64_t> systime_counter;
 
 static constexpr int keybuf_mask = 15;
 static int keybuf_queue[keybuf_mask + 1];
@@ -216,7 +216,7 @@ mouse_evt readmouse()
 }
 
 // Get ticks since midnight (54.9ms units)
-int systime()
+int64_t systime()
 {
     return systime_counter.get();
 }

@@ -16,12 +16,14 @@
 // Exclusive lock. 0 is unlocked, 1 is locked
 
 // Unlock spinlock and return state without restoring interrupt mask
+_hot
 spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
 {
     assert(atomic_ld_acq(lock) & 1);
     return atomic_xchg(lock, 0);
 }
 
+_hot
 void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 {
     for (;;) {
@@ -34,6 +36,7 @@ void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
 }
 
 // Spin to acquire lock, return with IRQs disabled
+_hot
 void spinlock_lock(spinlock_t *lock)
 {
     if (cpu_irq_is_enabled()) {
@@ -62,7 +65,8 @@ bool spinlock_try_lock(spinlock_t *lock)
 {
     int intr_enabled = cpu_irq_save_disable() << 1;
 
-    if (*lock != 0 || atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
+    if (atomic_ld_acq(lock) != 0 ||
+            atomic_cmpxchg(lock, 0, 1 | intr_enabled) != 0) {
         cpu_irq_toggle(intr_enabled);
 
         return false;
@@ -71,6 +75,7 @@ bool spinlock_try_lock(spinlock_t *lock)
     return true;
 }
 
+_hot
 void spinlock_unlock(spinlock_t *lock)
 {
     bool intr_enabled = *lock & 2;
@@ -306,6 +311,7 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
 }
 
 // Lock mcslock without restoring/disabling interrupts
+_hot
 void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
                         mcs_queue_ent_t *node)
 {
@@ -329,6 +335,7 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
     }
 }
 
+_hot
 void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
     MCSLOCK_TRACE("Acquiring lock @ %p threadid=%d\n",
@@ -341,6 +348,7 @@ void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 }
 
 // Unlock mcslock without saving+enabling interrupts
+_hot
 void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
                          mcs_queue_ent_t *node)
 {
@@ -361,6 +369,7 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
     atomic_st_rel(&node->next->locked, false);
 }
 
+_hot
 void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
     MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",

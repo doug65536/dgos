@@ -1,19 +1,25 @@
 #pragma once
-#include "likely.h"
+#include "../likely.h"
+#ifdef __DGOS_KERNEL__
+#include "types.h"
+#else
+#include <stdint.h>
+#endif
+
 #include "type_traits.h"
 
 __BEGIN_NAMESPACE_STD
 
 template<typename _InputIt, typename _T>
-_InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
+constexpr _InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
 {
-    while (__first != __last && *__first != __v)
+    while (__first != __last && !(*__first == __v))
         ++__first;
     return __first;
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-_InputIt find_if(_InputIt __first, _InputIt __last, _UnaryPredicate&& __p)
+constexpr _InputIt find_if(_InputIt __first, _InputIt __last, _UnaryPredicate&& __p)
 {
     while (__first != __last && !__p(*__first))
         ++__first;
@@ -21,7 +27,7 @@ _InputIt find_if(_InputIt __first, _InputIt __last, _UnaryPredicate&& __p)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-_InputIt find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+constexpr _InputIt find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 {
     while (__first != __last && __p(*__first))
         ++__first;
@@ -29,7 +35,7 @@ _InputIt find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-bool all_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+constexpr bool all_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 {
     while (__first != __last) {
         if (!__p(*__first))
@@ -40,7 +46,7 @@ bool all_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-bool any_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+constexpr bool any_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 {
     while (__first != __last) {
         if (__p(*__first))
@@ -51,7 +57,7 @@ bool any_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-bool none_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+constexpr bool none_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 {
     while (__first != __last) {
         if (__p(*__first))
@@ -62,7 +68,7 @@ bool none_of(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
 }
 
 template<typename _InputIt1, typename _InputIt2>
-bool equal(_InputIt1 __first1, _InputIt1 __last1, _InputIt2 __first2)
+constexpr bool equal(_InputIt1 __first1, _InputIt1 __last1, _InputIt2 __first2)
 {
     while (__first1 != __last1) {
         if (*__first1 != *__first2)
@@ -74,7 +80,7 @@ bool equal(_InputIt1 __first1, _InputIt1 __last1, _InputIt2 __first2)
 }
 
 template<typename _InputIt1, typename _InputIt2, typename _BinaryPredicate>
-bool equal(_InputIt1 __first1, _InputIt1 __last1,
+constexpr bool equal(_InputIt1 __first1, _InputIt1 __last1,
            _InputIt2 __first2, _BinaryPredicate __p)
 {
     while (__first1 != __last1) {
@@ -87,7 +93,7 @@ bool equal(_InputIt1 __first1, _InputIt1 __last1,
 }
 
 template<typename _InputIt1, typename _InputIt2>
-bool equal(_InputIt1 __first1, _InputIt1 __last1,
+constexpr bool equal(_InputIt1 __first1, _InputIt1 __last1,
            _InputIt2 __first2, _InputIt2 __last2 )
 {
     // FIXME: if both are random iterators, should compare distances first
@@ -106,7 +112,7 @@ bool equal(_InputIt1 __first1, _InputIt1 __last1,
 }
 
 template<typename _InputIt1, typename _InputIt2, typename _BinaryPredicate>
-bool equal(_InputIt1 __first1, _InputIt1 __last1,
+constexpr bool equal(_InputIt1 __first1, _InputIt1 __last1,
            _InputIt2 __first2, _InputIt2 __last2,
            _BinaryPredicate __p )
 {
@@ -126,7 +132,7 @@ bool equal(_InputIt1 __first1, _InputIt1 __last1,
 }
 
 template<typename _OutputIt, typename _Size, typename _T>
-_OutputIt fill_n(_OutputIt __first, _Size __count, _T const& __value)
+constexpr _OutputIt fill_n(_OutputIt __first, _Size __count, _T const& __value)
 {
     while (__count > 0) {
         *__first = __value;
@@ -137,7 +143,7 @@ _OutputIt fill_n(_OutputIt __first, _Size __count, _T const& __value)
 }
 
 template<typename _InputIt, typename _OutputIt>
-_OutputIt uninitialized_copy(_InputIt __first, _InputIt __last,
+constexpr _OutputIt uninitialized_copy(_InputIt __first, _InputIt __last,
                              _OutputIt __out)
 {
     using T = decltype(*__out);
@@ -150,7 +156,7 @@ _OutputIt uninitialized_copy(_InputIt __first, _InputIt __last,
 }
 
 template<typename _OutputIt, typename _T>
-_OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
+constexpr _OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
                              _T const& __value)
 {
     using T = decltype(*__first);
@@ -162,7 +168,7 @@ _OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
 }
 
 template<typename _InputIt, typename _OutputIt>
-_OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
+constexpr _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
                              _OutputIt __out)
 {
     using T = typename remove_reference<decltype(*__out)>::type;
@@ -175,7 +181,7 @@ _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
 }
 
 template<typename _InputIt, typename _OutputIt>
-_OutputIt copy(_InputIt __first, _InputIt __last, _OutputIt __out)
+constexpr _OutputIt copy(_InputIt __first, _InputIt __last, _OutputIt __out)
 {
     for ( ; __first != __last; ++__first, ++__out)
         *__out = *__first;
@@ -250,6 +256,21 @@ constexpr _ForwardIt max_element(_ForwardIt __first, _ForwardIt __last,
     }
 
     return __last;
+}
+
+template<typename _RandomIt, typename _Val>
+constexpr _RandomIt lower_bound(_RandomIt __first, _RandomIt __last, _Val const& __val)
+{
+    size_t __st = 0;
+    size_t __en = __last - __first;
+    size_t __md = 0;
+    while (__st < __en) {
+        __md = ((__en - __st) >> 1) + __st;
+        bool __is_less = __first[__md] < __val;
+        __st = __is_less ? __md + 1 : __st;
+        __en = __is_less ? __en : __md;
+    }
+    return __first + __md;
 }
 
 __END_NAMESPACE_STD

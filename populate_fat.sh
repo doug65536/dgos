@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set +x
+
 IMG="$1"
 TOPSRC="$2"
 
@@ -22,5 +24,5 @@ cp -u bootx64.efi stage/EFI/boot/bootx64.efi || exit
 #cp -u bootia32.efi stage/EFI/boot/bootia32.efi || exit
 
 echo Populating FAT image
-mcopy -s -Q -i "$IMG" stage/* ::/ || exit
-mcopy -s -Q -i "$IMG" stage/.b* ::/ || exit
+mcopy -v -s -Q -i "$IMG" stage/* ::/ || exit
+mcopy -v -s -Q -i "$IMG" stage/.b* ::/ || exit

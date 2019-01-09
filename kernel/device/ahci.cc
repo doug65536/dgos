@@ -1,3 +1,5 @@
+// pci driver: C=STORAGE,S=SATA,I=AHCI
+
 #include "dev_storage.h"
 #include "ata.h"
 #include "ahci.bits.h"
@@ -793,12 +795,12 @@ enum struct slot_op_t {
 };
 
 struct slot_request_t {
-    void *data;
-    int64_t count;
     uint64_t lba;
+    iocp_t *callback;
+    void *data;
+    size_t count;
     slot_op_t op;
     bool fua;
-    iocp_t *callback;
 };
 
 struct hba_port_info_t {
@@ -841,7 +843,7 @@ struct hba_port_info_t {
 #define AHCI_PE_DBC_BIT     1
 #define AHCI_PE_DBC_n(n)    ((n)-1)
 
-class ahci_if_factory_t : public storage_if_factory_t {
+class ahci_if_factory_t final : public storage_if_factory_t {
 public:
     ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
@@ -852,7 +854,7 @@ static ahci_if_factory_t ahci_if_factory;
 STORAGE_REGISTER_FACTORY(ahci_if);
 
 // AHCI interface instance
-class ahci_if_t : public storage_if_base_t, public zero_init_t {
+class ahci_if_t final : public storage_if_base_t, public zero_init_t {
 public:
     ahci_if_t();
 
@@ -1014,7 +1016,11 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
 
             slot_request_t &request = pi->slot_requests[slot];
 
-            request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
+            request.callback->set_result(
+                        !error ? err_sz_pair_t{
+                                 errno_t::OK, request.count }
+                               : err_sz_pair_t{
+                                 errno_t::EIO, request.count });
 
             // Invoke completion callback
             assert(request.callback);
@@ -1086,7 +1092,11 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
                            error, (void*)this, pi - port_info);
             }
 
-            request.callback->set_result(!error ? errno_t::OK : errno_t::EIO);
+            request.callback->set_result(
+                        !error ? err_sz_pair_t{
+                                 errno_t::OK, request.count }
+                               : err_sz_pair_t{
+                                 errno_t::EIO, request.count });
 
             // Invoke completion callback
             assert(request.callback);
@@ -1134,7 +1144,7 @@ isr_context_t *ahci_if_t::irq_handler(int irq, isr_context_t *ctx)
 
 void ahci_if_t::irq_handler(int irq_ofs)
 {
-    // Call callback on every port that has an interrupt pending
+    // Handle every port that has an interrupt pending
     unsigned port;
     for (uint32_t intr_status = mmio_base->intr_status;
          intr_status != 0; intr_status &= ~(1U << port)) {
@@ -1412,7 +1422,8 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     if (unlikely((mmio_base->ports[port_num].sata_status & AHCI_HP_SS_DET) !=
                  AHCI_HP_SS_DET_n(AHCI_HP_SS_DET_ONLINE))) {
         // Not established
-        request.callback->set_result(errno_t::ENODEV);
+        request.callback->set_result(err_sz_pair_t{
+                                         errno_t::ENODEV, 0});
         request.callback->invoke();
         return 0;
     }
@@ -1424,10 +1435,10 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     unsigned chunks;
     for (chunks = 0; count > 0; ++chunks) {
         if (likely(request.data != nullptr)) {
-            ranges_count = mphysranges(ranges, countof(ranges),
-                                       request.data,
-                                       request.count << pi.log2_sector_size,
-                                       4<<20);
+            ranges_count = mphysranges(
+                        ranges, countof(ranges), request.data,
+                        request.count << pi.log2_sector_size,
+                        4 << 20);
         } else {
             ranges_count = 0;
         }
@@ -1830,7 +1841,7 @@ bool ahci_dev_t::init(ahci_if_t *parent, unsigned dev_port, bool dev_is_atapi)
 
     AHCI_TRACE("Waiting for identify to complete\n");
     block.set_expect(1);
-    status = block.wait();
+    status = block.wait().first;
     if (unlikely(status != errno_t::OK))
         return false;
     AHCI_TRACE("Identify completed successfully\n");

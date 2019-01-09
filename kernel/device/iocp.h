@@ -60,6 +60,9 @@ public:
 
     T wait();
 
+    template<typename U>
+    U wait_and_return();
+
 private:
     using lock_type = std::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
@@ -206,14 +209,34 @@ T basic_blocking_iocp_t<T, S>::wait()
     return status;
 }
 
+// Returns size on success, otherwise negated errno
+template<typename T, typename S>
+template<typename U>
+U basic_blocking_iocp_t<T,S>::wait_and_return()
+{
+    auto result = wait();
+    if (likely(result.first == errno_t::OK))
+        return U(result.second);
+    return -U(result.first);
+}
+
+using err_sz_pair_t = std::pair<errno_t, size_t>;
+
 template<typename T>
 struct __basic_iocp_error_success_t {
     static constexpr bool succeeded(errno_t const& status)
     {
         return status == errno_t::OK;
     }
+
+    static constexpr bool succeeded(err_sz_pair_t const& p)
+    {
+        return p.first == errno_t::OK;
+    }
 };
 
-using iocp_t = basic_iocp_t<errno_t, __basic_iocp_error_success_t<errno_t>>;
-using blocking_iocp_t = basic_blocking_iocp_t<errno_t,
-    __basic_iocp_error_success_t<errno_t>>;
+using iocp_t = basic_iocp_t<
+err_sz_pair_t, __basic_iocp_error_success_t<err_sz_pair_t>>;
+
+using blocking_iocp_t = basic_blocking_iocp_t<err_sz_pair_t,
+    __basic_iocp_error_success_t<err_sz_pair_t>>;

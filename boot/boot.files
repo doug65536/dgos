@@ -1,3 +1,6 @@
+retpoline.S
+vesa_efi.cc
+vesa_bios.cc
 array_list.cc
 array_list.h
 asmstruct.h

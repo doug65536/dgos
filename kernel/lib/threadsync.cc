@@ -85,6 +85,7 @@ EXPORT bool mutex_try_lock(mutex_t *mutex)
     return result;
 }
 
+_hot
 EXPORT void mutex_lock(mutex_t *mutex)
 {
     assert(mutex->owner != thread_get_id());
@@ -116,8 +117,6 @@ EXPORT void mutex_lock(mutex_t *mutex)
             // Increase spin count
             if (mutex->spin_count < SPINCOUNT_MAX)
                 mutex->spin_count -= spincount_mask;
-
-            atomic_barrier();
 
             break;
         }
@@ -235,7 +234,6 @@ EXPORT void rwlock_init(rwlock_t *rwlock)
     rwlock->reader_count = 0;
     rwlock->spin_count = spincount_mask &
             (SPINCOUNT_MIN + ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1));
-    atomic_barrier();
 }
 
 EXPORT void rwlock_destroy(rwlock_t *rwlock)

@@ -28,12 +28,6 @@ public:
         return *this;
     }
 
-    ptr64_t &operator=(far_ptr_t const& ptr)
-    {
-        addr = uint64_t((ptr.segment << 4) + ptr.offset);
-        return *this;
-    }
-
     T *operator->()
     {
         return reinterpret_cast<T *>(addr);
@@ -84,7 +78,7 @@ struct alignas(8) kernel_params_t {
     uint64_t phys_mem_table_size;
     ptr64_t<void(*)()> ap_entry;
     ptr64_t<vbe_info_t> vbe_info;
-    ptr64_t<vbe_mode_info_t> vbe_mode_info;
+    //ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
     boottbl_acpi_info_t acpi_rsdt;
     boottbl_mptables_info_t mptables;
@@ -95,5 +89,5 @@ struct alignas(8) kernel_params_t {
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 12 * 8 + 2 + 6);
-C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 12 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 11 * 8 + 2 + 6);
+C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 11 * 8);

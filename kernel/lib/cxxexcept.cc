@@ -6,6 +6,17 @@
 #include "assert.h"
 #include "cpu/except_asm.h"
 #include "hash.h"
+#include "callout.h"
+
+extern "C" void register_eh_frame();
+
+
+// Register EH frames as soon as we have a working heap
+void init_eh_frames(void*)
+{
+    register_eh_frame();
+}
+REGISTER_CALLOUT(init_eh_frames, nullptr, callout_type_t::heap_ready, "000");
 
 void abort()
 {

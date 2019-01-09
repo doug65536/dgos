@@ -32,7 +32,7 @@ enum struct usb_msc_op_t {
 };
 
 // A factory that enumerates all of the available storage devices
-class usb_msc_if_factory_t : public storage_if_factory_t {
+class usb_msc_if_factory_t final : public storage_if_factory_t {
 public:
     usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
 protected:
@@ -41,7 +41,7 @@ protected:
 };
 
 // A USB storage interface
-class usb_msc_if_t : public storage_if_base_t {
+class usb_msc_if_t final : public storage_if_base_t {
     // storage_if_base_t interface
 public:
     enum cmd_op_t : uint8_t {
@@ -671,12 +671,14 @@ void usb_msc_if_t::issue_cmd(pending_cmd_t *cmd, scoped_lock& hold_cmd_lock)
 
 void usb_msc_if_t::usb_completion(pending_cmd_t *cmd)
 {
+    auto xferred = cmd->cbw.xfer_len - cmd->csw.residue;
+
     if (cmd->csw.status == cmd_status_t::success) {
         USB_MSC_TRACE("Command completed successfully\n");
-        cmd->caller_iocp->set_result(errno_t::OK);
+        cmd->caller_iocp->set_result({ errno_t::OK, xferred });
     } else {
         USB_MSC_TRACE("Command failed \n");
-        cmd->caller_iocp->set_result(errno_t::EIO);
+        cmd->caller_iocp->set_result({ errno_t::EIO, xferred });
     }
 
     // Entry is finished

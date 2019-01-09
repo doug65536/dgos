@@ -231,7 +231,7 @@ char const *keybd_special_text(int codepoint)
         codepoint = -codepoint;
 
     int index = codepoint - KEYB_VK_BASE - 1;
-    if (index >= 0 && index < (int)countof(keyboard_special_text)) {
+    if (index >= 0 && index < int(countof(keyboard_special_text))) {
         return keyboard_special_text[index];
     } else if (codepoint < 0x101000)
         return "";

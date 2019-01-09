@@ -24,10 +24,8 @@ int main()
     return 0;
 }
 
-extern "C" void __do_global_ctors_aux(void);
-
 extern "C" void _start()
 {
-//    __do_global_ctors_aux();
+    //__do_global_ctors_aux();
     main();
 }

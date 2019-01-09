@@ -166,12 +166,19 @@ private:
 static radix_tree_t asan_shadow;
 
 _no_asan
+static constexpr vaddr_t asan_canonical(vaddr_t addr)
+{
+    return vaddr_t(intptr_t(addr << 16) >> 16);
+}
+
+_no_asan
 static void asan_error(vaddr_t addr, size_t size)
 {
     if (!asan_ready)
         return;
 
-    printdbg("Accessed uninitialized %zd-byte value at %#zx\n", size, addr);
+    printdbg("Accessed uninitialized %zd-byte value at %#zx\n",
+             size, asan_canonical(addr));
     assert(!"ASAN error");
 }
 

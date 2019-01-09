@@ -27,6 +27,6 @@ void print_box(int left, int top, int right, int bottom, int attr, bool clear);
 
 void print_lba(uint32_t lba);
 
-void dump_regs(bios_regs_t& regs, bool show_flags = false);
+//void dump_regs(bios_regs_t& regs, bool show_flags = false);
 
 #define PRINT(...) print_line(TSTR __VA_ARGS__)

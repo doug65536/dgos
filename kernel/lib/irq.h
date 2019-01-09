@@ -38,6 +38,8 @@ typedef int (*msi_irq_alloc_handler_t)(
         int cpu, int distribute);
 typedef bool (*irq_setcpu_handler_t)(int irq, int cpu);
 
+typedef void (*irq_unhandled_irq_handler_t)(int intr, int irq);
+
 //
 // Vectors set by interrupt controller implementation
 
@@ -55,6 +57,10 @@ extern "C" void msi_irq_alloc_set_handler(msi_irq_alloc_handler_t handler);
 
 // Route the specified IRQ to the specified CPU
 extern "C" void irq_setcpu_set_handler(irq_setcpu_handler_t handler);
+
+// Handle unhandled IRQ
+extern "C" void irq_set_unhandled_irq_handler(
+        irq_unhandled_irq_handler_t handler);
 
 // Change irq mask
 extern "C" void irq_setmask(int irq, bool unmask);

@@ -1,5 +1,10 @@
 #pragma once
+
+#ifdef __DGOS_KERNEL__
 #include "types.h"
+#else
+#include <stdint.h>
+#endif
 
 __BEGIN_NAMESPACE_STD
 

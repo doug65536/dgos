@@ -132,8 +132,14 @@ EXPORT char *strstr(char const *str, char const *substr)
     return nullptr;
 }
 
+extern "C" void __asan_storeN_noabort(uintptr_t addr, size_t size);
+
 static void memset16(char *&d, uint64_t s, size_t n)
 {
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(&d), n * sizeof(uint16_t));
+#endif
+
     __asm__ __volatile__ (
         "rep stosw"
         : "+D" (d)
@@ -145,6 +151,10 @@ static void memset16(char *&d, uint64_t s, size_t n)
 
 static void memset32(char *&d, uint64_t s, size_t n)
 {
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(&d), n * sizeof(uint32_t));
+#endif
+
     __asm__ __volatile__ (
         "rep stosl"
         : "+D" (d)
@@ -156,6 +166,10 @@ static void memset32(char *&d, uint64_t s, size_t n)
 
 static void memset64(char *&d, uint64_t s, size_t n)
 {
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(&d), n * sizeof(uint64_t));
+#endif
+
     __asm__ __volatile__ (
         "rep stosq"
         : "+D" (d)
@@ -511,7 +525,6 @@ EXPORT size_t strcspn(char const *src, char const *chars)
 
     return i;
 }
-
 
 EXPORT char *strcat(char *dest, char const *src)
 {

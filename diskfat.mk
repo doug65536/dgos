@@ -55,13 +55,14 @@ $(top_builddir)/fatpart.img: \
 		rm -f $(top_builddir)/fatpart.img \
 			$(top_builddir)/fatdisk.img && \
 		\
-		truncate --size=40M $(top_builddir)/fatpart.img && \
+		truncate --size=80M $(top_builddir)/fatpart.img && \
 		\
 		mkfs.vfat \
 			-F 32 \
 			-S $(SECTOR_SZ) \
 			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
 			-b $$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
+			-n dgos \
 			$(top_builddir)/fatpart.img && \
 			\
 		dd \

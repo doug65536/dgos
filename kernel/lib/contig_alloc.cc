@@ -6,6 +6,7 @@
 
 #define DEBUG_LINEAR_SANITY     0
 #define DEBUG_ADDR_ALLOC        0
+#define DEBUG_ADDR_EARLY        0
 
 //
 // Linear address allocator
@@ -110,7 +111,7 @@ void contiguous_allocator_t::early_init(size_t size, char const *name)
     free_addr_by_size.insert(size, *linear_base_ptr);
     free_addr_by_addr.insert(*linear_base_ptr, size);
 
-    dump("After early_init\n");
+    //dump("After early_init\n");
 }
 
 void contiguous_allocator_t::init(
@@ -126,7 +127,7 @@ void contiguous_allocator_t::init(
         free_addr_by_addr.insert(addr, size);
     }
 
-    dump("After init\n");
+    //dump("After init\n");
 }
 
 uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
@@ -187,10 +188,12 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
     } else {
         addr = atomic_xadd(linear_base_ptr, size);
 
+#if DEBUG_ADDR_EARLY
         printdbg("Took early address space @ %#" PRIx64
                  ", size=%#" PRIx64 ""
                  ", new linear_base=%#" PRIx64 "\n",
                  addr, size, *linear_base_ptr);
+#endif
     }
 
     return addr;

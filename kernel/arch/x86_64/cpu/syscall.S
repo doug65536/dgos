@@ -2,11 +2,12 @@
 
 #include "asm_constants.h"
 #include "cfi_helpers.h"
+#include "cpu_bug.h"
 
 // This code may clobber rdi, rsi, rdx, rcx, r8-r11, rflags
 // This code may clobber the entire FPU/SSE/AVX state
 // This code must preserve rbx, rbp, r12-r15
-// Note that these are the same rules as function calls
+// Note that these are the same rules as x86_64-elf function calls
 
 .global syscall_entry
 .hidden syscall_entry
@@ -90,26 +91,26 @@ syscall_entry:
     movq %r10,%rcx
 
     // Call handler
-    call __x86_indirect_thunk_rax
+    indirect_call rax
     //callq *%rax
 
     pop_cfi %r15
-    .cfi_restore r15
+    .cfi_same_value r15
 
     pop_cfi %r14
-    .cfi_restore r14
+    .cfi_same_value r14
 
     pop_cfi %r13
-    .cfi_restore r13
+    .cfi_same_value r13
 
     pop_cfi %r12
-    .cfi_restore r12
+    .cfi_same_value r12
 
     pop_cfi %rbx
-    .cfi_restore rbx
+    .cfi_same_value rbx
 
     pop_cfi %rbp
-    .cfi_restore rbp
+    .cfi_same_value rbp
 
     // IRQs are not safe when
     // - we have user gs and still in kernel mode

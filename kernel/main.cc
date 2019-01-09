@@ -51,13 +51,13 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   0
+#define ENABLE_READ_STRESS_THREAD   4
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
 #define ENABLE_MMAP_STRESS_THREAD   0
 #define ENABLE_CTXSW_STRESS_THREAD  0
-#define ENABLE_HEAP_STRESS_THREAD   1
+#define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
 #define ENABLE_SPAWN_STRESS         0
@@ -66,7 +66,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_STRESS_HEAP_LARGE    0
 #define ENABLE_STRESS_HEAP_BOTH     0
 #define ENABLE_FIND_VBE             0
-#define ENABLE_UNWIND               1
+#define ENABLE_UNWIND               0
 
 #if ENABLE_STRESS_HEAP_SMALL
 #define STRESS_HEAP_MINSIZE         64
@@ -135,7 +135,7 @@ private:
         static int completion_count;
         int id = atomic_xadd(&next_id, 1);
 
-        thread_set_affinity(tid, UINT64_C(1) << (index % thread_cpu_count()));
+        //thread_set_affinity(tid, UINT64_C(1) << (index % thread_cpu_count()));
 
         storage_dev_base_t *drive = storage_dev_open(devid);
 
@@ -175,12 +175,12 @@ private:
 
         uint64_t seed = 42;
         while (1) {
-            //++*indicator;
+            ++*indicator;
 
             uint64_t lba = rand_r_range(&seed, 16, data_blocks);
             //int64_t count = rand_r_range(&seed, 1, data_blocks);
 
-            status = iocp[slot].wait();
+            status = iocp[slot].wait().first;
             iocp[slot].reset();
             if (status != errno_t::OK) {
                 printdbg("(devid %d) (tid %3d)"
@@ -223,16 +223,18 @@ private:
                     ofs += snprintf(buf + ofs, sizeof(buf) - ofs, "%" PRIu64,
                                     completion_delta);
 
+                    auto ms = (now - last_time) / 1000000;
+
                     ofs += snprintf(buf + ofs, sizeof(buf) - ofs,
-                                    " %" PRIu64 " ms",
-                                    (now - last_time) / 1000000);
+                                    " %" PRIu64 " ms, %" PRIu64 "/sec",
+                                    ms, 1000 * completion_delta / ms);
 
                     last_time = now;
                 }
 
                 if (ofs) {
                     buf[ofs++] = 0;
-                    printdbg("%s\n", buf);
+                    printk("%s\n", buf);
                 }
             }
         }
@@ -343,7 +345,7 @@ static int stress_mutex(void *p)
 
 #include "cpu/except.h"
 
-#if 1
+#if 0
 static int mprotect_test(void *)
 {
 //    char *mem = (char*)mmap(nullptr, 256 << 20, PROT_NONE, 0, -1, 0);
@@ -802,6 +804,7 @@ void test_filesystem()
 
 void test_spawn()
 {
+#if ENABLE_SPAWN_STRESS
     printk("Starting spawn stress with %d threads\n", ENABLE_SPAWN_STRESS);
     for (size_t i = 0; i < ENABLE_SPAWN_STRESS; ++i) {
         pid_t pid = 0;
@@ -812,11 +815,13 @@ void test_spawn()
                  pid, spawn_result);
         assert(spawn_result == 0 || pid < 0);
     }
+#endif
 }
 
 static int init_thread(void *)
 {
 #if ENABLE_UNWIND
+    printk("Testing exception unwind\n");
     test_unwind();
     test_catch();
 #endif
@@ -871,8 +876,8 @@ static int init_thread(void *)
     test_spawn();
 #endif
 
-    //printk("Initializing framebuffer\n");
-    //fb_init();
+    printk("Initializing framebuffer\n");
+    fb_init();
 
     //priqueue_test.test();
 
@@ -915,11 +920,12 @@ static int init_thread(void *)
     test_filesystem();
 #endif
 
-    printk("Running mprotect self test\n");
-    mprotect_test(nullptr);
+    //printk("Running mprotect self test\n");
+    //mprotect_test(nullptr);
 
-    printk("Running red-black tree self test\n");
-    rbtree_t<>::test();
+    //printk("Running red-black tree self test\n");
+    ////std::set<int>::test();
+    //rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
     printk("Starting framebuffer stress\n");
@@ -997,6 +1003,8 @@ static int init_thread(void *)
         thread_create(stress_heap_thread, nullptr, 0, false);
     }
 #endif
+
+    printk("init_thread completed\n");
 
     return 0;
 }

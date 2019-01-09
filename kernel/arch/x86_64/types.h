@@ -33,6 +33,7 @@
 #define __aligned(n)            __attribute__((__aligned__(n)))
 #define _warn_unused_result     __attribute__((__warn_unused_result__))
 #define _always_inline          __attribute__((__always_inline__)) inline
+#define _flatten                __attribute__((__flatten__))
 #define _always_optimize        __attribute__((optimize("-O2")))
 #define _noreturn               __attribute__((__noreturn__))
 #define _used                   __attribute__((__used__))
@@ -43,10 +44,12 @@
 #define _artificial             __attribute__((__artificial__))
 #define _no_instrument          __attribute__((__no_instrument_function__))
 #define _no_asan                __attribute__((__no_address_safety_analysis__))
+#define _no_plt                 __attribute__((__noplt__))
 #define _constructor(prio)      __attribute__((__constructor__(prio)))
 #define _destructor(prio)       __attribute__((__destructor__(prio)))
 #define _ifunc_resolver(fn)     __attribute__((__ifunc__(#fn)))
 #define _section(name)          __attribute__((__section__(name)))
+#define _hot                    __attribute__((__hot__))
 
 #define _generic_target \
     __attribute__(( \

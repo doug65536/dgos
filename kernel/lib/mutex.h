@@ -116,7 +116,7 @@ class shared_spinlock {
 public:
     typedef rwspinlock_t mutex_type;
 
-    shared_spinlock()
+    constexpr shared_spinlock()
         : m(0)
     {
     }
@@ -170,7 +170,7 @@ class spinlock {
 public:
     typedef spinlock_t mutex_type;
 
-    spinlock()
+    constexpr spinlock()
         : m(0)
     {
     }
@@ -213,7 +213,7 @@ class ticketlock {
 public:
     typedef ticketlock_t mutex_type;
 
-    ticketlock()
+    constexpr ticketlock()
         : m{}
     {
     }
@@ -248,17 +248,21 @@ struct alignas(64) padded_ticketlock : public ticketlock {
 // Does not meet BasicLockable requirements, lock holder maintains node
 class mcslock {
 public:
-    mcslock()
+    _hot
+    constexpr mcslock()
         : m(nullptr)
     {
     }
 
+    _hot
     ~mcslock()
     {
         assert(m == nullptr);
     }
 
     using mutex_type = mcs_queue_ent_t * volatile;
+
+    _hot
     void lock(mcs_queue_ent_t *node)
     {
         mcslock_lock(&m, node);
@@ -269,6 +273,7 @@ public:
         return mcslock_try_lock(&m, node);
     }
 
+    _hot
     void unlock(mcs_queue_ent_t *node)
     {
         mcslock_unlock(&m, node);
@@ -290,6 +295,7 @@ template<typename T>
 class unique_lock
 {
 public:
+    _hot
     explicit unique_lock(T& m) noexcept
         : m(&m)
         , locked(false)
@@ -303,6 +309,7 @@ public:
     {
     }
 
+    _hot
     ~unique_lock() noexcept
     {
         unlock();
@@ -354,6 +361,7 @@ template<>
 class unique_lock<mcslock>
 {
 public:
+    _hot
     explicit unique_lock(mcslock& attached_lock)
         : m(&attached_lock)
         , locked(false)
@@ -371,6 +379,7 @@ public:
     unique_lock(unique_lock&&) = delete;
     unique_lock& operator=(unique_lock) = delete;
 
+    _hot
     ~unique_lock() noexcept
     {
         unlock();
@@ -428,6 +437,7 @@ template<typename T>
 class shared_lock
 {
 public:
+    _hot
     shared_lock(T& m)
         : m(&m)
         , locked(false)
@@ -441,6 +451,7 @@ public:
     {
     }
 
+    _hot
     ~shared_lock()
     {
         unlock();

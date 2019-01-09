@@ -5,6 +5,9 @@ struct heap_t;
 
 // Fast heap
 
+uint32_t heap_get_heap_id(heap_t *heap);
+uint32_t heap_get_block_heap_id(void *block);
+
 heap_t *heap_create(void);
 void heap_destroy(heap_t *heap);
 
@@ -22,11 +25,11 @@ void *heap_realloc(heap_t *heap, void *block, size_t size);
 // Page heap
 
 _malloc _assume_aligned(16) _alloc_size(2)
-void *pageheap_calloc(size_t num, size_t size);
+void *pageheap_calloc(heap_t *heap, size_t num, size_t size);
 
 _malloc _assume_aligned(16) _alloc_size(1)
-void *pageheap_alloc(size_t size);
-void pageheap_free(void *block);
+void *pageheap_alloc(heap_t *heap, size_t size);
+void pageheap_free(heap_t *heap, void *block);
 
 _assume_aligned(16) _alloc_size(2)
-void *pageheap_realloc(void *block, size_t size);
+void *pageheap_realloc(heap_t *heap, void *block, size_t size);

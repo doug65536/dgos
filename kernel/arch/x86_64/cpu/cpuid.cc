@@ -83,6 +83,9 @@ void cpuid_init()
         cpuid_cache.laddr_bits = 48;
         cpuid_cache.paddr_bits = 52;
     }
+
+    if (cpuid_cache.is_intel)
+        cpuid_cache.bug_meltdown = true;
 }
 
 int cpuid(cpuid_t *output, uint32_t eax, uint32_t ecx)

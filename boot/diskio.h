@@ -3,7 +3,6 @@
 #include "types.h"
 
 extern "C" uint8_t boot_drive;
-extern "C" uint32_t vbe_info_vector;
 
 bool disk_support_64bit_addr();
 

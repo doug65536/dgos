@@ -5,42 +5,100 @@
 #include "printk.h"
 #include "heap.h"
 #include "callout.h"
+#include "thread.h"
+#include "cpu/atomic.h"
 
 // Always use paged allocation with guard pages
 // Realloc always moves the memory to a new range
-#define HEAP_PAGEONLY 1
+#define HEAP_PAGEONLY 0
 
 #if !HEAP_PAGEONLY
-static heap_t *default_heap;
+static heap_t **default_heaps;
+static size_t heap_count;
 
-extern "C" void register_eh_frame();
-
-void malloc_startup(void *p)
+void malloc_startup(void*)
 {
-    (void)p;
-    default_heap = heap_create();
+    // Create a heap
+    heap_t *default_heap = heap_create();
 
-    register_eh_frame();
+    // Allocate an array for per-cpu heap pointers using the BSP heap
+    default_heaps = (heap_t**)heap_alloc(
+                default_heap, sizeof(*default_heaps) * 1);
+
+    if (unlikely(!default_heaps))
+        panic_oom();
+
+    // Place the BSP heap pointer as the CPU0 heap
+    default_heaps[0] = default_heap;
+
+    // Announce that we have a working heap
+    callout_call(callout_type_t::heap_ready);
+}
+
+static void malloc_statup_smp(void*)
+{
+    // Lock free transition to N per-cpu heaps
+    size_t new_heap_count = thread_get_cpu_count();
+
+    heap_t **new_default_heaps = new heap_t *[new_heap_count];
+    if (unlikely(!default_heaps))
+        panic_oom();
+
+    // Bring in the uniprocessor heap as the CPU 0 heap entry
+    new_default_heaps[0] = default_heaps[0];
+
+    for (size_t i = 1; i < new_heap_count; ++i)
+    {
+        new_default_heaps[i] = heap_create();
+
+
+        if (unlikely(!new_default_heaps[i]))
+            panic_oom();
+
+        // Make sure the first N cpu-local heaps get heap ID (0)thru(N-1)
+        assert(heap_get_heap_id(new_default_heaps[i]) == i);
+    }
+
+    auto old_default_heaps = atomic_xchg(&default_heaps, new_default_heaps);
+    atomic_st_rel(&heap_count, new_heap_count);
+
+    delete[] old_default_heaps;
+}
+
+REGISTER_CALLOUT(malloc_statup_smp, nullptr, callout_type_t::smp_online, "000");
+
+static heap_t *this_cpu_heap()
+{
+    auto cpu = thread_cpu_number();
+    assert(heap_count == 0 || size_t(cpu) < heap_count);
+    return default_heaps[cpu];
+}
+
+static heap_t *heap_get_block_heap(void *block)
+{
+    int id = heap_get_block_heap_id(block);
+    assert(heap_count == 0 || size_t(id) < heap_count);
+    return default_heaps[id];
 }
 
 void *calloc(size_t num, size_t size)
 {
-    return heap_calloc(default_heap, num, size);
+    return heap_calloc(this_cpu_heap(), num, size);
 }
 
 void *malloc(size_t size)
 {
-    return heap_alloc(default_heap, size);
+    return heap_alloc(this_cpu_heap(), size);
 }
 
 void *realloc(void *p, size_t new_size)
 {
-    return heap_realloc(default_heap, p, new_size);
+    return heap_realloc(heap_get_block_heap(p), p, new_size);
 }
 
 void free(void *p)
 {
-    heap_free(default_heap, p);
+    heap_free(heap_get_block_heap(p), p);
 }
 #else
 

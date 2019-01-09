@@ -1,13 +1,23 @@
 #pragma once
+
+#include "../likely.h"
+
+#ifdef __DGOS_KERNEL__
 #include "types.h"
-#include "likely.h"
+#else
+#include <stdint.h>
+#endif
+
 #include "initializer_list.h"
 #include "utility.h"
 #include "algorithm.h"
+#ifdef __DGOS_KERNEL__
 #include "printk.h"
 #include "bitsearch.h"
-#include "unique_ptr.h"
+#endif
 #include "memory.h"
+/*
+*/
 
 __BEGIN_NAMESPACE_STD
 
@@ -32,9 +42,9 @@ public:
     using reverse_iterator = vector_iter<-1, false>;
     using const_reverse_iterator = vector_iter<-1, true>;
 
-    vector();
+    constexpr vector();
 
-    explicit vector(_Allocator const& __alloc_);
+    constexpr explicit vector(_Allocator const& __alloc_);
 
     vector(size_type __count,
            _T const& __value,
@@ -49,8 +59,8 @@ public:
 
     vector(vector const& __other);
     vector(vector const& __other, _Allocator const& __alloc_);
-    vector(vector&& __other );
-    vector(vector&& __other, _Allocator const& __alloc_);
+    constexpr vector(vector&& __other );
+    constexpr vector(vector&& __other, _Allocator const& __alloc_);
 
     vector(initializer_list<_T> __init,
             _Allocator const& __alloc_ = _Allocator());
@@ -256,13 +266,13 @@ vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
 // vector implementation
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector()
+constexpr vector<_T,_Allocator>::vector()
     : vector(_Allocator())
 {
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(_Allocator const& __alloc_)
+constexpr vector<_T,_Allocator>::vector(_Allocator const& __alloc_)
     : __m(nullptr)
     , __capacity(0)
     , __sz(0)
@@ -329,7 +339,7 @@ vector<_T,_Allocator>::vector(vector const& __other,
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(vector&& __other )
+constexpr vector<_T,_Allocator>::vector(vector&& __other )
     : __m(__other.__m)
     , __capacity(__other.__capacity)
     , __sz(__other.__sz)
@@ -341,7 +351,7 @@ vector<_T,_Allocator>::vector(vector&& __other )
 }
 
 template<typename _T, typename _Allocator>
-vector<_T,_Allocator>::vector(vector&& __other,
+constexpr vector<_T,_Allocator>::vector(vector&& __other,
                               _Allocator const& __alloc_)
     : __m(__other.__m)
     , __capacity(__other.__capacity)

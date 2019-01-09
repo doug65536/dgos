@@ -339,5 +339,17 @@ clear_bss:
     popw %di
     ret
 
+.code32
+.align 16
+.global __cxa_atexit
+__cxa_atexit:
+    ret
+
 .section .bss
 cpu_a20_chk: .space 1
+
+.section .early
+
+.global __dso_handle
+__dso_handle:
+    .quad 0

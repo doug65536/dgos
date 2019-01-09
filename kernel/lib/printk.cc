@@ -289,8 +289,6 @@ intptr_t formatter(
         int (*emit_chars)(char const *, intptr_t, void*),
         void *emit_context)
 {
-    //formatter_scoped_lock hold_formatter_lock(formatter_lock);
-
     formatter_flags_t flags;
     intptr_t chars_written = 0;
     int *output_arg;
@@ -315,39 +313,40 @@ intptr_t formatter(
 
         ch = *++fp;
 
-        switch (ch) {
-        case '%':
+        if (ch == '%') {
             // Literal %
             chars_written += emit_chars(nullptr, '%', emit_context);
             continue;
+        }
 
-        case '-':
-            // Left justify
-            flags.left_justify = 1;
-            ch = *++fp;
-            break;
+        // Consume and apply one or more -, +, #, 0 modifiers
+        for (;; ch = *++fp) {
+            switch (ch) {
+            case '-':
+                // Left justify
+                flags.left_justify = 1;
+                continue;
 
-        case '+':
-            // Use leading plus if positive
-            flags.leading_plus = 1;
-            ch = *++fp;
-            break;
+            case '+':
+                // Use leading plus if positive
+                flags.leading_plus = 1;
+                continue;
 
-        case '#':
-            // Varies
-            flags.hash = 1;
-            ch = *++fp;
+            case '#':
+                // Varies
+                flags.hash = 1;
+                continue;
+
+            case '0':
+                // Use leading zeros
+                flags.leading_zero = 1;
+                continue;
+            }
+
             break;
         }
 
-        switch(ch) {
-        case '0':
-            // Use leading zeros
-            flags.leading_zero = 1;
-            ch = *++fp;
-            break;
-        }
-
+        // Consume and apply field width specification, if any
         if (ch == '*') {
             // Get minimum field width from arguments
             flags.has_min_width = 1;
@@ -363,6 +362,7 @@ intptr_t formatter(
             ch = *fp;
         }
 
+        // Consume and apply precision specification, if any
         if (ch == '.') {
             ch = *++fp;
 
@@ -392,7 +392,7 @@ intptr_t formatter(
         if (!flags.has_precision && flags.leading_zero)
             flags.precision = flags.min_width;
 
-        // Length modifier
+        // Consume and apply length modifier
         switch (ch) {
         case 'h':
             if (fp[1] == 'h') {
@@ -438,6 +438,7 @@ intptr_t formatter(
 
         }
 
+        // Consume and apply type specifier
         switch (ch) {
         case 'c':
             switch (flags.length) {

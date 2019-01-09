@@ -11,9 +11,16 @@
 #include "utf.h"
 #include "bootmenu.h"
 #include "../kernel/lib/bswap.h"
+#include "halt.h"
 
 EFI_HANDLE efi_image_handle;
 EFI_SYSTEM_TABLE *efi_systab;
+
+long __dso_handle;
+
+extern "C" void __cxa_atexit()
+{
+}
 
 #if 1
 #include "fs.h"
@@ -40,6 +47,8 @@ static EFI_GUID const efi_block_io_protocol_guid = {
         0x8e, 0x39, 0x0, 0xa0, 0xc9, 0x69, 0x72, 0x3b
     }
 };
+
+static EFI_GUID const efi_file_system_info_guid = EFI_FILE_SYSTEM_INFO_GUID;
 
 static EFI_GUID const efi_pxe_base_code_protocol =
         EFI_PXE_BASE_CODE_PROTOCOL_GUID;
@@ -242,7 +251,7 @@ private:
             return false;
 
         status = efi_systab->BootServices->AllocatePool(
-                    EFI_MEMORY_TYPE(0x80000000), file_size, &data);
+                    EfiRuntimeServicesData, file_size, &data);
 
         if (unlikely(EFI_ERROR(status)))
             return false;
@@ -405,6 +414,22 @@ uint64_t file_handle_base_t::boot_drv_serial()
         return -1;
 
     EFI_STATUS status;
+
+    {
+        size_t constexpr const sz = 512;
+        void *mem = calloc(1, sz);
+        if (mem == nullptr)
+            PANIC_OOM();
+        EFI_FILE_SYSTEM_INFO *info = new (mem) EFI_FILE_SYSTEM_INFO;
+
+        UINTN info_buffer_size = sz;
+        status = efi_root_dir->GetInfo(
+                    efi_root_dir, &efi_file_system_info_guid,
+                    &info_buffer_size, info);
+
+        info->~EFI_FILE_SYSTEM_INFO();
+        free(info);
+    }
 
     char *buffer = (char*)malloc(efi_blk_io->Media->BlockSize);
 

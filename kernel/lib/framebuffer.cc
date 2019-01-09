@@ -55,7 +55,7 @@ void fb_init(void)
 
     fb.back_buf = (uint8_t*)mmap(nullptr, screen_size, PROT_READ | PROT_WRITE,
                                  0, -1, 0);
-    fb.video_mem = (uint8_t*)(uintptr_t)fb.mode.framebuffer_addr;
+    fb.video_mem = (uint8_t*)fb.mode.framebuffer_addr;
 
     madvise(fb.video_mem, screen_size, MADV_WEAKORDER);
 

@@ -113,7 +113,7 @@ void gdt_init_tss(int cpu_count)
     for (int i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
 
-        for (int st = 0; st < 3; ++st) {
+        for (int st = 0; st < 4; ++st) {
             void *stack = mmap(nullptr, TSS_STACK_SIZE,
                                PROT_READ | PROT_WRITE,
                                MAP_POPULATE, -1, 0);

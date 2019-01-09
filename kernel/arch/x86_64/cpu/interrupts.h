@@ -45,7 +45,9 @@
 #define INTR_TLB_SHOOTDOWN  40
 #define INTR_THREAD_YIELD   41
 
-// 42-47 reserved
+#define INTR_FLUSH_TRACE    42
+
+// 43-47 reserved
 
 // Vectors >= 48 go through apic_dispatcher codepath
 // 192 vectors for IOAPIC and MSI

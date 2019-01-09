@@ -12,6 +12,7 @@ size_t apic_cpu_count();
 // if target_apic_id is == -1, sends to other CPUs
 // if target_apid_id is >= 0, sends to specific APIC ID
 void apic_send_ipi(int target_apic_id, uint8_t intr);
+void apic_send_ipi_noinst(int target_apic_id, uint8_t intr);
 
 void apic_eoi(int intr);
 uint32_t apic_timer_count(void);

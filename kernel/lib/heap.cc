@@ -26,7 +26,7 @@
 struct heap_hdr_t {
     uintptr_t size_next;
     uint32_t sig1;
-    uint32_t sig2;
+    uint32_t heap_id;
 };
 
 C_ASSERT(sizeof(heap_hdr_t) == 16);
@@ -71,6 +71,7 @@ static constexpr size_t HEAP_MAX_ARENAS =
     (((PAGESIZE -
     sizeof(void*) * HEAP_BUCKET_COUNT -
     sizeof(heap_ext_arena_t*) -
+    sizeof(uint32_t) -
     sizeof(mutex_t)) /
     sizeof(void*)) - 1);
 
@@ -86,9 +87,28 @@ struct heap_t {
 
     // Singly linked list of overflow arena pointer pages
     heap_ext_arena_t *last_ext_arena;
+
+    uint32_t id;
 };
 
 C_ASSERT(sizeof(heap_t) == PAGESIZE);
+
+static uint32_t next_heap_id;
+
+uint32_t heap_get_heap_id(heap_t *heap)
+{
+    return heap->id;
+}
+
+uint32_t heap_get_block_heap_id(void *block)
+{
+    heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
+
+    if (block)
+        return hdr->heap_id;
+
+    return thread_cpu_number();
+}
 
 heap_t *heap_create(void)
 {
@@ -101,6 +121,7 @@ heap_t *heap_create(void)
     memset(heap->arenas, 0, sizeof(heap->arenas));
     heap->arena_count = 0;
     heap->last_ext_arena = nullptr;
+    heap->id = atomic_xadd(&next_heap_id, 1);
     mutex_init(&heap->lock);
     return heap;
 }
@@ -193,7 +214,7 @@ void *heap_calloc(heap_t *heap, size_t num, size_t size)
     return memset(block, 0, size);
 }
 
-static void *heap_large_alloc(size_t size)
+static void *heap_large_alloc(size_t size, uint32_t heap_id)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)mmap(nullptr, size,
                            PROT_READ | PROT_WRITE,
@@ -206,7 +227,7 @@ static void *heap_large_alloc(size_t size)
 
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
-    hdr->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
+    hdr->heap_id = heap_id;
 
     return hdr + 1;
 }
@@ -239,13 +260,15 @@ void *heap_alloc(heap_t *heap, size_t size)
     heap_hdr_t *first_free;
 
     if (unlikely(bucket >= HEAP_BUCKET_COUNT))
-        return heap_large_alloc(orig_size);
+        return heap_large_alloc(orig_size, heap->id);
 
     {
-        // Disable irqs to allow malloc in interrupt handlers
-#ifdef __DGOS_KERNEL__
-        cpu_scoped_irq_disable intr_was_enabled;
-#endif
+
+// shouldn't be needed anymore
+//        // Disable irqs to allow malloc in interrupt handlers
+//#ifdef __DGOS_KERNEL__
+//        cpu_scoped_irq_disable intr_was_enabled;
+//#endif
 
         mutex_lock(&heap->lock);
 
@@ -270,7 +293,7 @@ void *heap_alloc(heap_t *heap, size_t size)
         assert(first_free->sig1 == HEAP_BLK_TYPE_FREE);
 
         first_free->sig1 = HEAP_BLK_TYPE_USED;
-        first_free->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
+        first_free->heap_id = heap->id;
 
 #if HEAP_DEBUG
         memset(first_free + 1, 0xf0, size - sizeof(*first_free));
@@ -300,11 +323,12 @@ void heap_free(heap_t *heap, void *block)
     size_t bucket = log2size - 5;
 
     if (bucket < HEAP_BUCKET_COUNT) {
-        assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ (size_t(1) << log2size)));
-
         hdr->sig1 = HEAP_BLK_TYPE_FREE;
 
-        cpu_scoped_irq_disable intr_was_enabled;
+// shouldn't be needed anymore
+//#ifdef __DGOS_KERNEL__
+//        cpu_scoped_irq_disable intr_was_enabled;
+//#endif
         mutex_lock(&heap->lock);
         hdr->size_next = uintptr_t(heap->free_chains[bucket]);
         heap->free_chains[bucket] = hdr;
@@ -357,9 +381,9 @@ void *heap_realloc(heap_t *heap, void *block, size_t size)
 }
 
 _assume_aligned(16)
-void *pageheap_calloc(size_t num, size_t size)
+void *pageheap_calloc(heap_t *heap, size_t num, size_t size)
 {
-    void *blk = pageheap_alloc(num * size);
+    void *blk = pageheap_alloc(heap, num * size);
     return memset(blk, 0, size);
 }
 
@@ -380,7 +404,7 @@ void *pageheap_calloc(size_t num, size_t size)
 // |      ...     |
 
 _assume_aligned(16)
-void *pageheap_alloc(size_t size)
+void *pageheap_alloc(heap_t *heap, size_t size)
 {
     // Round size up to a multiple of 16 bytes, include header in size
     size = ((size + 15) & -16) + sizeof(heap_hdr_t);
@@ -402,7 +426,7 @@ void *pageheap_alloc(size_t size)
 
     hdr->size_next = size;
     hdr->sig1 = HEAP_BLK_TYPE_USED;
-    hdr->sig2 = HEAP_BLK_TYPE_USED ^ uint32_t(size);
+    hdr->heap_id = heap->id;
 
     mprotect(blk, PAGESIZE, PROT_NONE);
     mprotect(blk + end_guard, PAGESIZE, PROT_NONE);
@@ -416,11 +440,11 @@ void *pageheap_alloc(size_t size)
     return hdr + 1;
 }
 
-void pageheap_free(void *block)
+void pageheap_free(heap_t *heap, void *block)
 {
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
     assert(hdr->sig1 == HEAP_BLK_TYPE_USED);
-    assert(hdr->sig2 == (HEAP_BLK_TYPE_USED ^ uint32_t(hdr->size_next)));
+    assert(hdr->heap_id == heap->id);
     uintptr_t end = uintptr_t(hdr) + hdr->size_next;
     uintptr_t st = (uintptr_t(hdr) & -PAGESIZE);
     mprotect((void*)st, end - st, PROT_NONE);
@@ -428,17 +452,19 @@ void pageheap_free(void *block)
 }
 
 _assume_aligned(16)
-void *pageheap_realloc(void *block, size_t size)
+void *pageheap_realloc(heap_t *heap, void *block, size_t size)
 {
     if (unlikely(!block))
-        return pageheap_alloc(size);
+        return pageheap_alloc(heap, size);
 
     if (unlikely(size == 0)) {
-        pageheap_free(block);
+        pageheap_free(heap, block);
+        return nullptr;
     }
 
     heap_hdr_t *hdr = (heap_hdr_t*)block - 1;
-    char *other = (char*)pageheap_alloc(size);
+    assert(hdr->heap_id == heap->id);
+    char *other = (char*)pageheap_alloc(heap, size);
     memcpy(other, block, hdr->size_next - sizeof(heap_hdr_t));
     __asan_freeN_noabort(hdr, hdr->size_next);
     return block;

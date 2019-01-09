@@ -49,7 +49,7 @@ char *strrchr(char const *, int);
 char *strsignal(int);
 
 size_t strspn(char const *, char const *);
-char *strstr(char const *, char const *);
+char *strstr(char const *haystack, char const *needle);
 char *strtok(char *restrict, char const *restrict);
 
 char *strtok_r(char *restrict, char const *restrict, char **restrict);

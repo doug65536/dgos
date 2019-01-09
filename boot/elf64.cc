@@ -19,7 +19,7 @@
 #include "qemu.h"
 
 extern "C" _noreturn
-void enter_kernel(uint64_t entry_point) _section(".smp.text");
+void enter_kernel(uint64_t entry_point, uint64_t base) _section(".smp.text");
 
 // Save the entry point address for later MP processor startup
 uint64_t smp_entry_point _section(".smp.data");
@@ -46,12 +46,41 @@ tchar const *cpu_choose_kernel()
     return TSTR "dgos-kernel-generic";
 }
 
-_noreturn
-static void enter_kernel_initial(uint64_t entry_point)
+static kernel_params_t *prompt_kernel_param(
+        void *phys_mem_table, void *ap_entry_ptr, int phys_mem_table_size)
 {
-    //uintptr_t vbe_info_vector = vbe_select_mode(65535, 800, 1) << 4;
-    //vbe_info_vector = vbe_select_mode(1920, 1080, 1) << 4;
+    kernel_params_t *params = new kernel_params_t{};
 
+    params->size = sizeof(*params);
+
+    params->ap_entry = uintptr_t((void(*)())ap_entry_ptr);
+    params->phys_mem_table = uint64_t(phys_mem_table);
+    params->phys_mem_table_size = phys_mem_table_size;
+    //params.vbe_selected_mode = vbe_info_vector;
+    params->boot_drv_serial = boot_serial();
+
+    params->acpi_rsdt = boottbl_find_acpi_rsdp();
+    params->mptables = boottbl_find_mptables();
+
+    boot_menu_show(*params);
+
+//    PRINT("           ap_entry: 0x%llx\n", uint64_t(params->ap_entry));
+//    PRINT("     phys_mem_table: 0x%llx\n",
+//          uint64_t(params->phys_mem_table));
+//    PRINT("phys_mem_table_size: 0x%llx\n", params->phys_mem_table_size);
+//    PRINT("  vbe_selected_mode: 0x%llx\n",
+//               uint64_t(params->vbe_selected_mode));
+//    PRINT("    boot_drv_serial: 0x%llx\n", params->boot_drv_serial);
+//    PRINT("    serial_debugout: 0x%llx\n",
+//               uint64_t(params->serial_debugout));
+//    PRINT("           wait_gdb: 0x%x\n", params->wait_gdb);
+
+    return params;
+}
+
+_noreturn
+static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
+{
     //
     // Relocate MP entry trampoline to 4KB boundary in the heap
 
@@ -69,62 +98,51 @@ static void enter_kernel_initial(uint64_t entry_point)
     int phys_mem_table_size = 0;
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
-    PRINT("Mapping aliasing window\n");
+    PRINT("Mapping low memory\n");
 
-    // Map first 4GB of physical addresses at -518G
-    paging_map_physical(0, -(UINT64_C(518) << 30),
-                        UINT64_C(4) << 30,
+    uint64_t physmap_addr = (base - (UINT64_C(512) << 30)) &
+            -(UINT64_C(512) << 30);
+
+    // Map first 512GB of physical addresses
+    // at 512GB boundary >= 512GB before load address
+    paging_map_physical(0, physmap_addr,
+                        UINT64_C(512) << 30,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
+
+    PRINT("Mapping dynamic frame\n");
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
     paging_map_physical(0, (0xFFFFFFFF80000000ULL - PAGE_SIZE) + base_adj,
                      PAGE_SIZE, PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
+    // Guarantee that the bootloader heap is mapped
     void *heap_st, *heap_en;
     malloc_get_heap_range(&heap_st, &heap_en);
     paging_map_physical(uint64_t(heap_st), uint64_t(heap_st),
                         uint64_t(heap_en) - uint64_t(heap_st),
                         PTE_PRESENT | PTE_WRITABLE);
 
-    kernel_params_t *params = new kernel_params_t{};
+    kernel_params_t *params = prompt_kernel_param(
+                phys_mem_table, ap_entry_ptr, phys_mem_table_size);
 
-    params->size = sizeof(*params);
-
-    params->ap_entry = uintptr_t((void(*)())ap_entry_ptr);
-    params->phys_mem_table = uint64_t(phys_mem_table);
-    params->phys_mem_table_size = phys_mem_table_size;
-    //params.vbe_selected_mode = vbe_info_vector;
-    params->boot_drv_serial = boot_serial();
-
-    params->acpi_rsdt = boottbl_find_acpi_rsdp();
-    params->mptables = boottbl_find_mptables();
-
-    boot_menu_show(*params);
-
-    PRINT("           ap_entry: 0x%llx\n", uint64_t(params->ap_entry));
-    PRINT("     phys_mem_table: 0x%llx\n",
-          uint64_t(params->phys_mem_table));
-    PRINT("phys_mem_table_size: 0x%llx\n", params->phys_mem_table_size);
-    PRINT("  vbe_selected_mode: 0x%llx\n",
-               uint64_t(params->vbe_selected_mode));
-    PRINT("    boot_drv_serial: 0x%llx\n", params->boot_drv_serial);
-    PRINT("    serial_debugout: 0x%llx\n",
-               uint64_t(params->serial_debugout));
-    PRINT("           wait_gdb: 0x%x\n", params->wait_gdb);
+    // This check is done late to make debugging easier
+    // It is impossible to debug 32 bit code on qemu-x86_64 target
+    if (!cpu_has_long_mode())
+        PANIC("Need 64-bit CPU");
 
     ELF64_TRACE("Entry point: 0x%llx\n", entry_point);
 
-    PRINT("Entering kernel at 0x%llx\n", entry_point);
+    //PRINT("Entering kernel at 0x%llx\n", entry_point);
 
     run_kernel(entry_point, params);
 }
 
-void enter_kernel(uint64_t entry_point)
+void enter_kernel(uint64_t entry_point, uint64_t base)
 {
     if (smp_entry_point == 0) {
         smp_entry_point = entry_point;
-        enter_kernel_initial(entry_point);
+        enter_kernel_initial(entry_point, base);
     } else {
         run_kernel(entry_point, nullptr);
     }
@@ -240,7 +258,7 @@ void elf64_run(tchar const *filename)
 
         ctx->done_bytes += blk->p_memsz;
 
-        int percent = 100 * ctx->done_bytes / ctx->total_bytes;
+        int percent = int(UINT64_C(100) * ctx->done_bytes / ctx->total_bytes);
 
         progress_bar_draw(0, 10, 70, percent);
     }
@@ -271,14 +289,11 @@ void elf64_run(tchar const *filename)
 
     free(program_hdrs);
 
-    // This check is done late to make debugging easier
-    // It is impossible to debug 32 bit code on qemu-x86_64 target
-    if (!cpu_has_long_mode())
-        PANIC("Need 64-bit CPU");
-
     ELF64_TRACE("Entering kernel");
 
-    enter_kernel(file_hdr.e_entry + base_adj);
+    //
+
+    enter_kernel(file_hdr.e_entry + base_adj, 0xFFFFFFFF80000000 + base_adj);
 }
 
 extern "C" _noreturn

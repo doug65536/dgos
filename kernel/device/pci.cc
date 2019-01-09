@@ -7,8 +7,9 @@
 #include "vector.h"
 #include "numeric.h"
 #include "inttypes.h"
+#include "time.h"
 
-#define PCI_DEBUG   1
+#define PCI_DEBUG   0
 #if PCI_DEBUG
 #define PCI_TRACE(...) printk("pci: " __VA_ARGS__)
 #else
@@ -275,7 +276,6 @@ bool pci_config_pio::copy(pci_addr_t addr, void *dest,
 pci_ecam_t *pci_config_mmio::find_ecam(int bus)
 {
     size_t i, e;
-
     pci_ecam_t *ent = pci_ecam_list.data();
     for (i = 0, e = pci_ecam_list.size(); i < e; ++i, ++ent) {
         if (ent->st_bus <= bus && ent->en_bus > bus)
@@ -299,7 +299,7 @@ uint32_t pci_config_mmio::read(pci_addr_t addr, size_t offset, size_t size)
     uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
             (addr.func() << 12) + unsigned(offset & -4);
 
-    uint32_t data = *(uint32_t*)(ent->mapping + ecam_offset);
+    uint32_t data = mm_rd(*(uint32_t*)(ent->mapping + ecam_offset));
 
     data >>= (offset & 3) << 3;
 
@@ -322,7 +322,26 @@ bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
     uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
             (addr.func() << 12) + unsigned(offset);
 
-    memcpy(ent->mapping + ecam_offset, values, size);
+    switch (size) {
+    case 1:
+        mm_wr(*(uint8_t volatile *)(ent->mapping + ecam_offset),
+              *(uint8_t const*)values);
+        return true;
+
+    case 2:
+        mm_wr(*(uint16_t volatile*)(ent->mapping + ecam_offset),
+              *(uint16_t const*)values);
+        return true;
+
+    case 4:
+        mm_wr(*(uint32_t volatile *)(ent->mapping + ecam_offset),
+              *(uint32_t const*)values);
+        return true;
+
+    default:
+        mm_copy_wr(ent->mapping + ecam_offset, values, size);
+        return true;
+    }
 
     return true;
 }
@@ -340,8 +359,22 @@ bool pci_config_mmio::copy(pci_addr_t addr, void *dest,
     uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
             (addr.func() << 12) + unsigned(offset);
 
-    memcpy(dest, ent->mapping + ecam_offset, size);
+    switch (size) {
+    case sizeof(uint8_t):
+        *(uint8_t*)dest = mm_rd(*(uint8_t volatile const *)
+                                (ent->mapping + ecam_offset));
+        return true;
+    case sizeof(uint16_t):
+        *(uint16_t*)dest = mm_rd(*(uint16_t volatile const *)
+                                (ent->mapping + ecam_offset));
+        return true;
+    case sizeof(uint32_t):
+        *(uint32_t*)dest = mm_rd(*(uint32_t volatile const *)
+                                (ent->mapping + ecam_offset));
+        return true;
+    }
 
+    mm_copy_rd(dest, ent->mapping + ecam_offset, size);
     return true;
 }
 
@@ -365,19 +398,23 @@ static void pci_enumerate_read(pci_addr_t addr, pci_config_hdr_t *config)
     pci_config_copy(addr, config, 0, sizeof(pci_config_hdr_t));
 }
 
-static int pci_enumerate_is_match(pci_dev_iterator_t *iter)
+static int pci_enumerate_is_match(pci_dev_iterator_t *iter,
+                                  pci_dev_iterator_t *blueprint = nullptr)
 {
-    return (iter->dev_class == -1 ||
-            iter->dev_class == iter->config.dev_class) &&
-            (iter->subclass == -1 ||
-             iter->subclass == iter->config.subclass) &&
-            (iter->vendor == -1 ||
-             iter->vendor == iter->config.vendor) &&
-            (iter->device == -1 ||
-             iter->device == iter->config.device);
+    if (blueprint == nullptr)
+        blueprint = iter;
+
+    return (blueprint->dev_class == -1 ||
+            blueprint->dev_class == iter->config.dev_class) &&
+            (blueprint->subclass == -1 ||
+             blueprint->subclass == iter->config.subclass) &&
+            (blueprint->vendor == -1 ||
+             blueprint->vendor == iter->config.vendor) &&
+            (blueprint->device == -1 ||
+             blueprint->device == iter->config.device);
 }
 
-int pci_enumerate_next(pci_dev_iterator_t *iter)
+static int pci_enumerate_next_direct(pci_dev_iterator_t *iter)
 {
     for (;;) {
         ++iter->func;
@@ -437,8 +474,9 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
     }
 }
 
-int pci_enumerate_begin(pci_dev_iterator_t *iter,
-                        int dev_class, int subclass, int vendor, int device)
+static void pci_dev_iter_init(
+        pci_dev_iterator_t *iter,
+        int dev_class, int device, int vendor, int subclass)
 {
     iter->reset();
 
@@ -454,10 +492,18 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
     iter->header_type = 0;
 
     iter->bus_todo_len = 0;
+}
+
+static int pci_enumerate_begin_direct(
+        pci_dev_iterator_t *iter,
+        int dev_class = -1, int subclass = -1,
+        int vendor = -1, int device = -1)
+{
+    pci_dev_iter_init(iter, dev_class, device, vendor, subclass);
 
     int found;
 
-    while ((found = pci_enumerate_next(iter)) != 0) {
+    while ((found = pci_enumerate_next_direct(iter)) != 0) {
         if (pci_enumerate_is_match(iter))
             break;
     }
@@ -465,12 +511,14 @@ int pci_enumerate_begin(pci_dev_iterator_t *iter,
     return found;
 }
 
+static pci_cache_t pci_cache;
+
 int pci_init(void)
 {
     // Initialize every BAR
     pci_dev_iterator_t pci_iter;
 
-    if (!pci_enumerate_begin(&pci_iter))
+    if (!pci_enumerate_begin_direct(&pci_iter))
         return 0;
 
     printk("Autoconfiguring PCI BARs\n");
@@ -478,6 +526,8 @@ int pci_init(void)
     do {
         printk("Probing %d:%d:%d\n",
                   pci_iter.bus, pci_iter.slot, pci_iter.func);
+
+        pci_cache.iters.push_back(pci_iter);
 
         bool any_mmio = false;
         bool any_io = false;
@@ -557,7 +607,9 @@ int pci_init(void)
                              (any_io ? PCI_CMD_IOSE : 0) | PCI_CMD_BME,
                              (!any_mmio ? PCI_CMD_MSE : 0) |
                              (!any_io ? PCI_CMD_IOSE : 0));
-    } while (pci_enumerate_next(&pci_iter));
+    } while (pci_enumerate_next_direct(&pci_iter));
+
+    pci_cache.updated_at = time_ns();
 
     return 0;
 }
@@ -1087,4 +1139,42 @@ void pci_config_hdr_t::set_mmio_bar(pci_addr_t pci_addr,
     // Read it back
     pci_config_copy(pci_addr, (char*)&base_addr[bar],
                     (char*)&base_addr[bar] - (char*)this, size);
+}
+
+int pci_enumerate_begin(
+        pci_dev_iterator_t *iter,
+        int dev_class, int subclass, int vendor, int device)
+{
+    pci_dev_iter_init(iter, dev_class, device, vendor, subclass);
+
+    for (size_t i = 0, e = pci_cache.iters.size(); i != e; ++i) {
+        auto& hdr = pci_cache.iters[i];
+
+        if (pci_enumerate_is_match(&hdr, iter)) {
+            iter->copy_from(hdr);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int pci_enumerate_next(pci_dev_iterator_t *iter)
+{
+    auto at = std::find(pci_cache.iters.begin(),
+                        pci_cache.iters.end(), *iter);
+
+    if (likely(at != pci_cache.iters.end()))
+        ++at;
+    else
+        assert(!"Nonsense iterator passed to pci_enumerate_next");
+
+    while (at != pci_cache.iters.end()) {
+        if (pci_enumerate_is_match(&*at)) {
+            iter->copy_from(*at);
+            return 1;
+        }
+    }
+
+    return 0;
 }

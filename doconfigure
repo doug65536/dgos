@@ -24,10 +24,10 @@ if [[ ! -f sysroot/libc/libc.a ]]; then
 	compileflags=( "-nostdlib" "-nostartfiles" )
 	configureflags=()
 set +x
-	CFLAGS="$(join_by ' ' ${compileflags[@]})" \
-		CXXFLAGS="$CFLAGS" \
-		LDFLAGS="$CFLAGS" \
 		"$scriptroot/configure" --host "$HOST" \
+		CFLAGS="$(join_by ' ' ${compileflags[@]})" \
+			CXXFLAGS="$CFLAGS" \
+			LDFLAGS="$CFLAGS" \
 		"$(join_by ' ' ${configureflags[@]})" "$@" && \
 		nice make -j $(nproc) \
 			sysroot/lib/crt0.o \
@@ -38,7 +38,6 @@ fi
 
 compileflags=( "--sysroot sysroot" )
 configureflags=()
-done=0
 
 echo flags: "${compileflags[@]}"
 

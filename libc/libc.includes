@@ -17,3 +17,6 @@ src/sys/mman
 src/sys/socket
 src/sys/ioctl
 src/dirent
+src/stdio/bits
+src/stdio
+src/assert

@@ -4,6 +4,7 @@
 #include "assert.h"
 #include "irq.h"
 #include "string.h"
+#include "vector.h"
 
 struct pci_addr_t {
     // Legacy PCI supports 256 busses, 32 slots, 8 functions, and 64 dwords
@@ -431,6 +432,26 @@ struct pci_dev_iterator_t : public pci_dev_t {
         bus_todo_len = 0;
         memset(bus_todo, 0, sizeof(bus_todo));
     }
+
+    pci_dev_iterator_t& copy_from(pci_dev_iterator_t const& rhs)
+    {
+        segment = rhs.segment;
+        bus = rhs.bus;
+        slot = rhs.slot;
+        func = rhs.func;
+
+        config = rhs.config;
+        addr = pci_addr_t(segment, bus, slot, func);
+        return *this;
+    }
+
+    bool operator==(pci_dev_iterator_t const& rhs) const
+    {
+        return (segment == rhs.segment) &
+                (bus == rhs.bus) &
+                (slot == rhs.slot) &
+                (func == rhs.func);
+    }
 };
 
 int pci_init(void);
@@ -557,3 +578,168 @@ void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
 char const * pci_device_class_text(uint8_t cls);
 
 int pci_vector_count_from_offsets(int const *vector_offsets, int count);
+
+// == MMIO accessor helpers
+
+#define _MM_WR_IMPL(type, mm, value) \
+    __asm__ __volatile__ ( \
+        "mov %" type "[src],(%q[dest])\n\t" \
+        : \
+        : [dest] "a" (&(mm)) \
+        , [src] "ri" (value) \
+        : "memory" \
+    )
+
+#define _MM_RD_IMPL(type, value, mm) \
+    __asm__ __volatile__ ( \
+        "mov (%[src]),%" type "[dest]\n\t" \
+        : [dest] "=r" (value) \
+        : [src] "a" (&(mm)) \
+        : "memory" \
+    ); \
+    return value
+
+static inline void mm_wr(uint8_t volatile& dest, uint8_t src)
+{
+    _MM_WR_IMPL("b", dest, src);
+}
+
+static inline void mm_wr(uint16_t volatile& dest, uint16_t src)
+{
+    _MM_WR_IMPL("w", dest, src);
+}
+
+static inline void mm_wr(uint32_t volatile& dest, uint32_t src)
+{
+    _MM_WR_IMPL("k", dest, src);
+}
+
+static inline void mm_wr(uint64_t volatile& dest, uint64_t src)
+{
+    _MM_WR_IMPL("q", dest, src);
+}
+
+static inline void mm_wr(int8_t volatile& dest, int8_t src)
+{
+    _MM_WR_IMPL("b", dest, src);
+}
+
+static inline void mm_wr(int16_t volatile& dest, int16_t src)
+{
+    _MM_WR_IMPL("w", dest, src);
+}
+
+static inline void mm_wr(int32_t volatile& dest, int32_t src)
+{
+    _MM_WR_IMPL("k", dest, src);
+}
+
+static inline void mm_wr(int64_t volatile& dest, int64_t src)
+{
+    _MM_WR_IMPL("q", dest, src);
+}
+
+static inline void mm_copy_wr(void volatile *dst, void const *src, size_t sz)
+{
+    while (sz >= sizeof(uint32_t)) {
+        mm_wr(*(uint32_t volatile*)dst, *(uint32_t const*)src);
+        dst = (char*)dst + sizeof(uint32_t);
+        src = (char*)src + sizeof(uint32_t);
+        sz -= sizeof(uint32_t);
+    }
+
+    while (sz >= sizeof(uint16_t)) {
+        mm_wr(*(uint16_t volatile*)dst, *(uint16_t const*)src);
+        dst = (char*)dst + sizeof(uint16_t);
+        src = (char*)src + sizeof(uint16_t);
+        sz -= sizeof(uint16_t);
+    }
+
+    while (sz >= sizeof(uint8_t)) {
+        mm_wr(*(uint8_t volatile*)dst, *(uint8_t const*)src);
+        dst = (char*)dst + sizeof(uint8_t);
+        src = (char*)src + sizeof(uint8_t);
+        sz -= sizeof(uint8_t);
+    }
+}
+
+//
+
+static inline uint8_t mm_rd(uint8_t volatile const& src)
+{
+    uint8_t dest;
+    _MM_RD_IMPL("b", dest, src);
+}
+
+static inline int8_t mm_rd(int8_t volatile const& src)
+{
+    uint8_t dest;
+    _MM_RD_IMPL("b", dest, src);
+}
+
+static inline uint16_t mm_rd(uint16_t volatile const& src)
+{
+    uint16_t dest;
+    _MM_RD_IMPL("w", dest, src);
+}
+
+static inline int16_t mm_rd(int16_t volatile const& src)
+{
+    uint16_t dest;
+    _MM_RD_IMPL("w", dest, src);
+}
+
+static inline uint32_t mm_rd(uint32_t volatile const& src)
+{
+    uint32_t dest;
+    _MM_RD_IMPL("k", dest, src);
+}
+
+static inline int32_t mm_rd(int32_t volatile const& src)
+{
+    uint32_t dest;
+    _MM_RD_IMPL("k", dest, src);
+}
+
+static inline uint64_t mm_rd(uint64_t volatile const& src)
+{
+    uint64_t dest;
+    _MM_RD_IMPL("q", dest, src);
+}
+
+static inline int64_t mm_rd(int64_t volatile const& src)
+{
+    uint64_t dest;
+    _MM_RD_IMPL("q", dest, src);
+}
+
+static inline void mm_copy_rd(void *dst, void const volatile *src, size_t sz)
+{
+    while (sz >= sizeof(uint32_t)) {
+        *(uint32_t*)dst = mm_rd(*(uint32_t const volatile *)src);
+        dst = (char*)dst + sizeof(uint32_t);
+        src = (char*)src + sizeof(uint32_t);
+        sz -= sizeof(uint32_t);
+    }
+
+    while (sz >= sizeof(uint16_t)) {
+        *(uint16_t*)dst = mm_rd(*(uint16_t const*)src);
+        dst = (char*)dst + sizeof(uint16_t);
+        src = (char*)src + sizeof(uint16_t);
+        sz -= sizeof(uint16_t);
+    }
+
+    while (sz >= sizeof(uint8_t)) {
+        *(uint8_t*)dst = mm_rd(*(uint8_t const*)src);
+        dst = (char*)dst + sizeof(uint8_t);
+        src = (char*)src + sizeof(uint8_t);
+        sz -= sizeof(uint8_t);
+    }
+}
+
+#undef _MM_RD_IMPL
+
+struct pci_cache_t {
+    std::vector<pci_dev_iterator_t> iters;
+    uint64_t updated_at;
+};

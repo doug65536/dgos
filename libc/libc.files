@@ -8,6 +8,7 @@ include/sys/syscall_num.h
 math/cos.cc
 math/log.cc
 math/sin.cc
+src/assert/assert.cc
 src/dirent/opendir.cc
 src/dirent/closedir.cc
 src/dirent/fdopendir.cc
@@ -48,6 +49,17 @@ src/posix_spawn/posix_spawnattr_setschedpolicy.cc
 src/posix_spawn/posix_spawnattr_setsigdefault.cc
 src/posix_spawn/posix_spawnattr_setsigmask.cc
 src/posix_spawn/posix_spawnp.cc
+src/stdio/bits/cfile.cc
+src/stdio/bits/cfile.h
+src/stdio/bits/formatter.cc
+src/stdio/bits/formatter.h
+src/stdio/fprintf.cc
+src/stdio/fputc.cc
+src/stdio/fread.cc
+src/stdio/fwrite.cc
+src/stdio/printf.cc
+src/stdio/vfprintf.cc
+src/stdio/vprintf.cc
 src/stdlib/abs.cc
 src/stdlib/malloc.cc
 src/stdlib/new.cc

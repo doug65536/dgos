@@ -1,6 +1,7 @@
 #include "cpu/control_regs_constants.h"
 #include "cpu/interrupts.h"
 #include "cfi_helpers.h"
+#include "cpu_bug.h"
 
 .section .entry, "ax"
 
@@ -45,6 +46,7 @@ entry:
     cmpl $ 0xB,%eax
     jb .Lapic8bit
 
+    // Read cpuid leaf 0xB, edx[31:0] contains the x2APIC ID
     movl $ 0xB,%eax
     cpuid
     movl %edx,%eax
@@ -52,6 +54,7 @@ entry:
     jmp .Lset_tsc_aux
 
 .Lapic8bit:
+    // Read cpuid leaf 1, ebx[31:24] contains the APIC ID
     movl $ 1,%eax
     cpuid
     shrl $ 24,%ebx
@@ -122,32 +125,32 @@ bsp_init:
 
     debugind '9'
 
-    // Resolve ifunc
-    leaq __rela_dyn_st(%rip),%r12
-    leaq __rela_dyn_en(%rip),%r13
-.Lrela_iplt_next:
-    cmpq %r13,%r12
-    jz .Lrela_iplt_done
-
-    movq 8(%r12),%rax
-
-    // Only apply STT_GNU_IFUNC (0x25)
-    cmpq $ 0x25,%rax
-    jnz .Lrela_iplt_skip
-
-    // Call the resolver
-    mov 16(%r12),%rax
-    call __x86_indirect_thunk_rax
-    //call * 16(%r12)
-
-    // Read PLT vector pointer from relocation record
-    movq (%r12),%rdx
-    // Update the PLT with the resolver return value
-    movq %rax,(%rdx)
-.Lrela_iplt_skip:
-    addq $ 24,%r12
-    jmp .Lrela_iplt_next
-.Lrela_iplt_done:
+//    // Resolve ifunc
+//    leaq __rela_dyn_st(%rip),%r12
+//    leaq __rela_dyn_en(%rip),%r13
+//.Lrela_iplt_next:
+//    cmpq %r13,%r12
+//    jz .Lrela_iplt_done
+//
+//    movq 8(%r12),%rax
+//
+//    // Only apply STT_GNU_IFUNC (0x25)
+//    cmpq $ 0x25,%rax
+//    jnz .Lrela_iplt_skip
+//
+//    // Call the resolver
+//    mov 16(%r12),%rax
+//    indirect_call rax
+//    //call * 16(%r12)
+//
+//    // Read PLT vector pointer from relocation record
+//    movq (%r12),%rdx
+//    // Update the PLT with the resolver return value
+//    movq %rax,(%rdx)
+//.Lrela_iplt_skip:
+//    addq $ 24,%r12
+//    jmp .Lrela_iplt_next
+//.Lrela_iplt_done:
 
 #ifdef _ASAN_ENABLED
     // Mark the callout array initialized
@@ -161,6 +164,18 @@ bsp_init:
     movl $ 13*8,%esi
     call __asan_storeN_noabort
 
+    // Mark .rodata initialized
+    leaq ___rodata_st(%rip),%rdi
+    leaq ___rodata_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // Mark .rodata initialized
+    leaq __bspstk_st(%rip),%rdi
+    leaq __bspstk_en(%rip),%rsi
+    subq %rdi,%rsi
+    call __asan_storeN_noabort
+
     // Mark .data initialized
     leaq ___data_st(%rip),%rdi
     leaq ___data_en(%rip),%rsi
@@ -171,6 +186,11 @@ bsp_init:
     leaq ___bss_st(%rip),%rdi
     leaq ___bss_en(%rip),%rsi
     subq %rdi,%rsi
+    call __asan_storeN_noabort
+
+    // XX: hardcoded
+    movabs $(-(518 << 30)),%rdi
+    movabs $(4 << 30),%rsi
     call __asan_storeN_noabort
 
     // Mark VGA initialized
@@ -263,7 +283,7 @@ invoke_function_array:
 0:  cmpq %rbx,%rbp
     jbe 0f
     mov (%rbx),%rax
-    call __x86_indirect_thunk_rax
+    indirect_call rax
     //call *(%rbx)
     addq $8,%rbx
     jmp 0b

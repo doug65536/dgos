@@ -1,3 +1,5 @@
+// pci driver: C=SERIAL, S=USB, I=XHCI
+
 #include "callout.h"
 #include "pci.h"
 #include "printk.h"
@@ -1191,8 +1193,10 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
         return false;
 
     // Get first 8 bytes of device descriptor to get max packet size
-    ext::unique_ptr_free<usb_desc_config> cfg_buf(
-                (usb_desc_config*)calloc(1, 128));
+    union {
+        usb_desc_config cfg_buf[1];
+        char filler[128];
+    };
 
     err = get_descriptor(slotid, 0, cfg_buf, 128, usb_req_type::STD,
                          usb_req_recip_t::DEVICE,
@@ -2072,6 +2076,7 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
     }
 }
 
+// Runs in IRQ handler
 isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
 {
     for (usbxhci* dev : usbxhci_devices) {
@@ -2088,6 +2093,7 @@ isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
     return ctx;
 }
 
+// Runs in CPU worker thread
 void usbxhci::irq_handler(int irq_ofs)
 {
     uint32_t usbsts = mmio_op->usbsts;

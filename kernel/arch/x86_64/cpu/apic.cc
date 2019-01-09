@@ -416,6 +416,14 @@ public:
     virtual uint64_t read64(uint32_t offset) const = 0;
     virtual void write64(uint32_t offset, uint64_t val) const = 0;
 
+    virtual void command_noinst(uint32_t dest, uint32_t cmd) const = 0;
+
+    virtual uint32_t read32_noinst(uint32_t offset) const = 0;
+    virtual void write32_noinst(uint32_t offset, uint32_t val) const = 0;
+
+    virtual uint64_t read64_noinst(uint32_t offset) const = 0;
+    virtual void write64_noinst(uint32_t offset, uint64_t val) const = 0;
+
     virtual bool reg_readable(uint32_t reg) const = 0;
     virtual bool reg_exists(uint32_t reg) const = 0;
 
@@ -451,7 +459,24 @@ class lapic_x_t : public lapic_t {
             pause();
     }
 
+    _no_instrument _flatten
+    void command_noinst(uint32_t dest, uint32_t cmd) const override final
+    {
+        bool irq_en = cpu_irq_save_disable_noinst();
+        write32_noinst(APIC_REG_ICR_HI, APIC_DEST_n(dest));
+        write32_noinst(APIC_REG_ICR_LO, cmd);
+        cpu_irq_toggle_noinst(irq_en);
+        while (read32_noinst(APIC_REG_ICR_LO) & APIC_CMD_PENDING)
+            __builtin_ia32_pause();
+    }
+
     uint32_t read32(uint32_t offset) const override final
+    {
+        return apic_ptr[offset << (4 - 2)];
+    }
+
+    _no_instrument
+    uint32_t read32_noinst(uint32_t offset) const override final
     {
         return apic_ptr[offset << (4 - 2)];
     }
@@ -461,12 +486,30 @@ class lapic_x_t : public lapic_t {
         apic_ptr[offset << (4 - 2)] = val;
     }
 
+    _no_instrument
+    void write32_noinst(uint32_t offset, uint32_t val) const override final
+    {
+        apic_ptr[offset << (4 - 2)] = val;
+    }
+
     uint64_t read64(uint32_t offset) const override final
     {
         return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
     }
 
+    _no_instrument
+    uint64_t read64_noinst(uint32_t offset) const override final
+    {
+        return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
+    }
+
     void write64(uint32_t offset, uint64_t val) const override final
+    {
+        ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
+    }
+
+    _no_instrument
+    void write64_noinst(uint32_t offset, uint64_t val) const override final
     {
         ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
     }
@@ -488,7 +531,19 @@ class lapic_x2_t : public lapic_t {
         write64(APIC_REG_ICR_LO, (uint64_t(dest) << 32) | cmd);
     }
 
+    _no_instrument
+    void command_noinst(uint32_t dest, uint32_t cmd) const override final
+    {
+        write64_noinst(APIC_REG_ICR_LO, (uint64_t(dest) << 32) | cmd);
+    }
+
     uint32_t read32(uint32_t offset) const override final
+    {
+        return cpu_msr_get_lo(0x800 + offset);
+    }
+
+    _no_instrument
+    uint32_t read32_noinst(uint32_t offset) const override final
     {
         return cpu_msr_get_lo(0x800 + offset);
     }
@@ -498,12 +553,30 @@ class lapic_x2_t : public lapic_t {
         cpu_msr_set(0x800 + offset, val);
     }
 
+    _no_instrument
+    void write32_noinst(uint32_t offset, uint32_t val) const override final
+    {
+        cpu_msr_set(0x800 + offset, val);
+    }
+
     uint64_t read64(uint32_t offset) const override final
     {
         return cpu_msr_get(0x800 + offset);
     }
 
+    _no_instrument
+    uint64_t read64_noinst(uint32_t offset) const override final
+    {
+        return cpu_msr_get(0x800 + offset);
+    }
+
     void write64(uint32_t offset, uint64_t val) const override final
+    {
+        cpu_msr_set(0x800 + offset, val);
+    }
+
+    _no_instrument
+    void write64_noinst(uint32_t offset, uint64_t val) const override final
     {
         cpu_msr_set(0x800 + offset, val);
     }
@@ -1603,6 +1676,7 @@ static int parse_mp_tables(void)
     return !!mp_tables;
 }
 
+_hot
 static isr_context_t *apic_timer_handler(int intr, isr_context_t *ctx)
 {
     apic_eoi(intr);
@@ -1647,6 +1721,13 @@ static void apic_send_command(uint32_t dest, uint32_t cmd)
     apic->command(dest, cmd);
 }
 
+_no_instrument
+static void apic_send_command_noinst(uint32_t dest, uint32_t cmd)
+{
+    apic->command_noinst(dest, cmd);
+}
+
+_hot
 void apic_send_ipi(int target_apic_id, uint8_t intr)
 {
     if (unlikely(!apic))
@@ -1664,15 +1745,32 @@ void apic_send_ipi(int target_apic_id, uint8_t intr)
 
     uint32_t dest = (target_apic_id >= 0) ? target_apic_id : 0;
 
-    if (intr != INTR_TLB_SHOOTDOWN) {
-        APIC_TRACE("IPI: intr=%x dest_type=%x dest_mode=%x cmd=%x\n",
-                   intr, dest_type, dest_mode,
-                   APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);
-    }
-
     apic_send_command(dest, APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);
 }
 
+_hot _no_instrument
+void apic_send_ipi_noinst(int target_apic_id, uint8_t intr)
+{
+    if (unlikely(!apic))
+        return;
+
+    uint32_t dest_type = (target_apic_id < -1)
+            ? APIC_CMD_DEST_TYPE_ALL
+            : (target_apic_id < 0)
+            ? APIC_CMD_DEST_TYPE_OTHER
+            : APIC_CMD_DEST_TYPE_BYID;
+
+    uint32_t dest_mode = (intr != INTR_EX_NMI)
+            ? APIC_CMD_DELIVERY_NORMAL
+            : APIC_CMD_DELIVERY_NMI;
+
+    uint32_t dest = (target_apic_id >= 0) ? target_apic_id : 0;
+
+    apic_send_command_noinst(
+                dest, APIC_CMD_VECTOR_n(intr) | dest_type | dest_mode);
+}
+
+_hot
 void apic_eoi(int intr)
 {
     apic->write32(APIC_REG_EOI, intr & 0);
@@ -1832,8 +1930,6 @@ int apic_init(int ap)
                              INTR_APIC_TIMER);
     }
 
-    //apic_dump_regs(ap);
-
     return 1;
 }
 
@@ -1983,6 +2079,8 @@ void apic_start_smp(void)
     gdt_init_tss(topo_cpu_count);
     gdt_load_tr(0);
 
+    thread_init_cpu_count(apic_id_count);
+
     // Populate critical cpu local info on every cpu that is needed very early
     for (size_t i = 0; i < apic_id_count; ++i)
         thread_init_cpu(i, apic_id_list[i]);
@@ -1993,27 +2091,16 @@ void apic_start_smp(void)
         return;
 
     // Read address of MP entry trampoline from boot sector
-    //uint32_t *mp_trampoline_ptr = (uint32_t*)0x7c40;
-    //		bootinfo_parameter(bootparam_t::ap_entry_point);
-    uint32_t mp_trampoline_addr = //*mp_trampoline_ptr;
-            (uint32_t)
+    uint32_t mp_trampoline_addr = (uint32_t)
             bootinfo_parameter(bootparam_t::ap_entry_point);
     uint32_t mp_trampoline_page = mp_trampoline_addr >> 12;
 
     cmos_prepare_ap();
 
     // Send INIT to all other CPUs
-//    for (size_t i = 1; i < apic_id_count; ++i) {
-        apic_send_command(0, APIC_CMD_DELIVERY_INIT |
-                          APIC_CMD_DEST_MODE_LOGICAL |
-                          APIC_CMD_DEST_TYPE_OTHER);
-//        APIC_TRACE("Sending INIT IPI to APIC ID %#x\n", apic_id_list[i]);
-//        __sync_synchronize();
-//        apic_send_command(apic_id_list[i],
-//                          APIC_CMD_DELIVERY_INIT |
-//                          APIC_CMD_DEST_MODE_PHYSICAL |
-//                          APIC_CMD_DEST_TYPE_BYID);
-//    }
+    apic_send_command(0, APIC_CMD_DELIVERY_INIT |
+                      APIC_CMD_DEST_MODE_LOGICAL |
+                      APIC_CMD_DEST_TYPE_OTHER);
     APIC_TRACE("Done sending INIT IPIs\n");
 
     // 10ms delay
@@ -2495,6 +2582,7 @@ void apic_config_cpu()
 //
 //
 
+_hot
 isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
     assert(intr >= INTR_APIC_IRQ_BASE);
@@ -2567,6 +2655,11 @@ static void ioapic_map_all(void)
     ioapic_msi_base_irq = ioapic->irq_base + ioapic->vector_count;
 }
 
+void ioapic_irq_unhandled(int irq, int intr)
+{
+    apic_eoi(intr);
+}
+
 // Returns 0 on failure, 1 on success
 bool ioapic_irq_setcpu(int irq, int cpu)
 {
@@ -2618,6 +2711,7 @@ int apic_enable(void)
     irq_hook_set_handler(ioapic_hook);
     irq_unhook_set_handler(ioapic_unhook);
     irq_setcpu_set_handler(ioapic_irq_setcpu);
+    irq_set_unhandled_irq_handler(ioapic_irq_unhandled);
 
     return 1;
 }

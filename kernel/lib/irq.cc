@@ -53,6 +53,7 @@ static irq_hook_handler_t irq_hook_vec;
 static irq_unhook_handler_t irq_unhook_vec;
 static msi_irq_alloc_handler_t msi_irq_alloc_vec;
 static irq_setcpu_handler_t irq_setcpu_vec;
+static irq_unhandled_irq_handler_t irq_unhandled_irq_vec;
 
 void irq_setmask_set_handler(irq_setmask_handler_t handler)
 {
@@ -79,9 +80,23 @@ void irq_setcpu_set_handler(irq_setcpu_handler_t handler)
     irq_setcpu_vec = handler;
 }
 
+void irq_set_unhandled_irq_handler(irq_unhandled_irq_handler_t handler)
+{
+    irq_unhandled_irq_vec = handler;
+}
+
 void irq_setmask(int irq, bool unmask)
 {
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
+
+    if (!intr_unmask_count[irq] && !unmask) {
+        // Caller is masking something never hooked (this happens
+        // when an IRQ is attempted to be dispatched and cannot be)
+        // Tell the hardware to mask it just in case
+        irq_setmask_vec(irq, unmask);
+        return;
+    }
+
     // Unmask when unmask count transitions from 0 to 1
     // Mask when unmask count transitions from 1 to 0
     assert(intr_unmask_count[irq] != (unmask ? 255U : 0U));
@@ -150,8 +165,7 @@ void intr_hook(int intr, intr_handler_t handler, char const *name)
         entry->eoi_handler = 0;
         entry->handler = handler;
 
-        atomic_barrier();
-        *prev_link = entry - intr_handlers;
+        atomic_st_rel(prev_link, entry - intr_handlers);
     }
 }
 
@@ -185,6 +199,7 @@ void intr_unhook(int intr, intr_handler_t handler)
     }
 }
 
+_hot
 int intr_has_handler(int intr)
 {
     return intr_handlers_count > 0 && intr_first[intr] >= 0;
@@ -203,6 +218,7 @@ isr_context_t *intr_invoke(int intr, isr_context_t *ctx)
     return ctx;
 }
 
+_hot
 isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx)
 {
     if (intr_has_handler(intr)) {
@@ -214,6 +230,7 @@ isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx)
         }
     } else {
         printdbg("Ignored IRQ %d INTR %d!\n", irq, intr);
+        irq_unhandled_irq_vec(intr, irq);
     }
     return ctx;
 }

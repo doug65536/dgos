@@ -12,12 +12,12 @@ PHDRS {
 }
 
 SECTIONS {
-
 	/* Code and read-only data */
 	.text 0xFFFFFFFF80000000 : AT (0x100000) {
 		PROVIDE_HIDDEN(___text_st = .);
 		/* ISR code is hot and should be page aligned because it is cloned */
 		PROVIDE_HIDDEN(___isr_st = .);
+		*(SORT(.text.isr.*))
 		*(.text.isr)
 		PROVIDE_HIDDEN(___isr_en = .);
 
@@ -50,6 +50,8 @@ SECTIONS {
 	} :text
 
 	.rodata : ALIGN(64) {
+		PROVIDE_HIDDEN(___rodata_st = .);
+
 		PROVIDE_HIDDEN(___ctors_st = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
@@ -83,6 +85,8 @@ SECTIONS {
 		*(.gnu.warning)
 
 		PROVIDE_HIDDEN(___text_en = .);
+
+		PROVIDE_HIDDEN(___rodata_en = .);
 	} :readonly
 
 	.eh_frame_hdr :  ALIGN(64) {
@@ -147,6 +151,7 @@ SECTIONS {
 
 	.bss (NOLOAD) : {
 		PROVIDE_HIDDEN(___bss_st = .);
+		*(.instr)
 		*(.bss)
 		*(SORT(.bss.*))
 		*(.dynbss)
@@ -159,10 +164,12 @@ SECTIONS {
 	} :guard
 
 	.bspstk (NOLOAD) : ALIGN(4096) {
+		PROVIDE_HIDDEN(__bspstk_st = .);
 		/* emergency stack for early bootstrap */
 		. = . + 65536;
 		/* bootstrap CPU stack */
 		*(.bspstk)
+		PROVIDE_HIDDEN(__bspstk_en = .);
 	} :stacks
 
 	.note : {

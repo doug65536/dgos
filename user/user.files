@@ -1,6 +1,8 @@
 bin/dhcpclient/main.cc
 bin/ls/ls.cc
 crt0/crt0.S
+shell/parser.cc
+shell/parser.h
 test/test.S
 shell/grammar.y
 shell/lemon_highlight.xml

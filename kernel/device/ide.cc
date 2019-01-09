@@ -1,3 +1,5 @@
+// pci driver: C=STORAGE, S=IDE
+
 #include "dev_storage.h"
 #include "ata.h"
 #include "cpu/ioport.h"
@@ -35,7 +37,7 @@ struct ide_chan_ports_t {
     uint8_t irq;
 };
 
-struct ide_if_factory_t : public storage_if_factory_t {
+struct ide_if_factory_t final : public storage_if_factory_t {
     ide_if_factory_t() : storage_if_factory_t("ide") {}
     virtual std::vector<storage_if_base_t *> detect(void) override;
 };
@@ -43,7 +45,7 @@ struct ide_if_factory_t : public storage_if_factory_t {
 static ide_if_factory_t ide_if_factory;
 STORAGE_REGISTER_FACTORY(ide_if);
 
-struct ide_if_t : public storage_if_base_t, public zero_init_t {
+struct ide_if_t final : public storage_if_base_t, public zero_init_t {
     STORAGE_IF_IMPL
 
     struct bmdma_prd_t {
@@ -1152,7 +1154,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
     release_access(intr_was_enabled);
 
-    iocp->set_result(err);
+    iocp->set_result(err_sz_pair_t{ err, count });
     iocp->set_expect(1);
     iocp->invoke();
 

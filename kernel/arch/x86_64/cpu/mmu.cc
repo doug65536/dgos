@@ -984,12 +984,17 @@ static physaddr_t init_take_page(int low)
 
 // Return a pointer to the initial physical mapping
 template<typename T>
-static _always_inline T *init_phys(uint64_t addr)
+static _always_inline constexpr T *init_phys(uint64_t addr)
 {
-    assert(addr <= 0xFFFFFFFFU);
+//    if (phys_mapping)
+//        return phys_mapping + addr;
 
-    // First 4GB of physical address space is mapped at -518G by bootloader
-    uint64_t physmap = -(UINT64_C(518) << 30);
+    //assert(addr <= 0xFFFFFFFFU);
+
+    // Physical mappings at highest 512GB boundary
+    // that is >= 512GB before .text
+    uint64_t physmap = uintptr_t(___text_st - (UINT64_C(512) << 30)) &
+            -(UINT64_C(512) << 30);
 
     return (T*)(physmap + addr);
 }
@@ -1005,6 +1010,8 @@ struct clear_phys_state_t {
     pte_t *pte;
     int log2_window_sz;
     int level;
+
+    size_t cls_tlb_ver;
 
     // 2TB before end of address space
     static constexpr linaddr_t addr = 0xFFFFFE0000000000;
@@ -1035,6 +1042,12 @@ void mm_phys_clear_init()
     ptes_from_addr(ptes, clear_phys_state_t::addr);
 
     pte_t global_mask = ~PTE_GLOBAL;
+
+    // Allocate a CPU-local storage slot for per-cpu TLB invalidation version
+    clear_phys_state.cls_tlb_ver = thread_cls_alloc();
+    thread_cls_init_each_cpu(clear_phys_state.cls_tlb_ver, false, [&] {
+        return nullptr;
+    });
 
     pte_t *page_base = nullptr;
     for (int i = 0; i < clear_phys_state.level; ) {
@@ -1092,6 +1105,7 @@ void clear_phys(physaddr_t addr)
     if (pte != expect)
         pte = expect;
 
+    // Shootdowns for this are never done so just flush that TLB entry
     cpu_page_invalidate(window);
 
     clear64((char*)window + offset, PAGE_SIZE);
@@ -1280,13 +1294,11 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         //  - the pte is not present, or,
         //  - the access was a write and the pte is not writable, or,
         //  - the access was an insn fetch and the pte is not executable
-        if (!((err_code & CTX_ERRCODE_PF_R) ||
-              (err_code & CTX_ERRCODE_PF_PK) ||
-              (err_code & CTX_ERRCODE_PF_SGX) ||
-              ((err_code & CTX_ERRCODE_PF_W) &&
-               !(pte & PTE_WRITABLE)) ||
-              ((err_code & CTX_ERRCODE_PF_I) &&
-               (pte & PTE_NX))))
+        if (likely(!((err_code & CTX_ERRCODE_PF_R) ||
+                     (err_code & CTX_ERRCODE_PF_PK) ||
+                     (err_code & CTX_ERRCODE_PF_SGX) ||
+                     ((err_code & CTX_ERRCODE_PF_W) && !(pte & PTE_WRITABLE)) ||
+                     ((err_code & CTX_ERRCODE_PF_I) && (pte & PTE_NX)))))
             return ctx;
     }
 
@@ -1465,9 +1477,8 @@ static void mmu_init_bsp()
 
 void mmu_init()
 {
-    TRACE_INIT("Hooking TLB shootdown\n");
-
     // Hook IPI for TLB shootdown
+    TRACE_INIT("Hooking TLB shootdown\n");
     intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler, "sw_tlbshoot");
 
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
@@ -2452,6 +2463,37 @@ int mprotect(void *addr, size_t len, int prot)
     return 1;
 }
 
+int madvise_will_need(pte_t *pte_scan, pte_t *end)
+{
+    physaddr_t page;
+    for (page = 0; pte_scan < end; ++pte_scan) {
+        pte_t old = *pte_scan;
+
+        for (;;) {
+            if ((old & PTE_ADDR) != PTE_ADDR)
+                break;
+
+            pte_t replacement;
+            if (!page)
+                page = phys_allocator.alloc_one(false);
+
+            replacement = (old & ~PTE_ADDR) | (page & PTE_ADDR);
+
+            if (atomic_cmpxchg_upd(pte_scan, &old, replacement)) {
+                page = 0;
+                break;
+            }
+        }
+    }
+
+    if (page) {
+        phys_allocator.release_one(page);
+        page = 0;
+    }
+
+    return 0;
+}
+
 // Support discarding pages and reverting to demand
 // paged state with MADV_DONTNEED.
 // Support enabling/disabling write combining
@@ -2484,9 +2526,14 @@ int madvise(void *addr, size_t len, int advice)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
+    if (advice == MADV_WILLNEED) {
+        pte_t *pte_scan = pt[3];
+        return madvise_will_need(pte_scan, end);
+    }
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
+
+    pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
 
     while (pt[3] < end &&
            (*pt[0] & PTE_PRESENT) &&

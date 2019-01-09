@@ -28,6 +28,7 @@ typedef int64_t off_t;
 #define _returns_twice         __attribute__((__returns_twice__))
 #define _vector_size(n)        __attribute__((__vector_size__(n)))
 #define _noinline              __attribute__((__noinline__))
+#define _flatten               __attribute__((__flatten__))
 #define _assume_aligned(n)     __attribute__((__assume_aligned__(n)))
 #define _printf_format(m,n)    __attribute__((__format__(__printf__, m, n)))
 
@@ -46,8 +47,10 @@ typedef char16_t tchar;
 #define TSTR u""
 #else
 typedef char tchar;
-#define TSTR
+#define TSTR u8""
 #endif
 
 #define countof(arr) (sizeof((arr))/sizeof(*(arr)))
 
+#define __BEGIN_NAMESPACE_STD namespace std {
+#define __END_NAMESPACE_STD }

@@ -40,11 +40,8 @@ entry:
 
 .section .code
 past_bpb:
-//    xor %ax,%ax
-//    0:
-//    test %ax,%ax
-//    jz 0b
-    
+    cli
+
     // Load the relevant portion of the partition table entry
     // into registers before writing any memory
     // (The CHS parts are discarded)
@@ -78,6 +75,8 @@ past_bpb:
     ljmp $0,$ reloc_entry
 reloc_entry:
 
+    // Relocation done, no more weird unrelocated offsets
+
     // Get drive parameters size (for sector size)
     mov $0x4800,%ax
     mov $ddp,%si
@@ -95,12 +94,42 @@ reloc_entry:
     mov %ax,sector_count
     
     // Load stage2
+more_sectors:
     movw $0x4200,%ax
     movw $dap,%si
     movb boot_drive,%dl
     int $0x13
-    jc fail
+	jnc okay
+
+	// It may be an error, or just a partial success. Check.
+
+	// Read number of blocks actally transferred
+	movw dap+dap_block_count,%ax
+
+	// If no blocks transferred, it really failed
+	test %ax,%ax
+	jz fail
+
+	// It was a partial success...
+
+	// Adjust (remaining) sector count
+	movw sector_count,%si
+	subw %ax,%si
+	movw %si,dap+dap_block_count
+	movw %si,sector_count
+
+	// Multiply the number of sectors transferred by the sector size
+	mulw ddp+ddp_sector_size
+
+	// Advance the address that many bytes
+	addw %ax,dap+dap_address
+	jnc no_ptr_carry
+	addw $0x1000,dap+dap_address+2
+no_ptr_carry:
+	cmp $0,sector_count
+	jne more_sectors
     
+okay:
     // Setup register parameters for stage 1
     // ds:si -> partition table entry
     // dl = boot drive

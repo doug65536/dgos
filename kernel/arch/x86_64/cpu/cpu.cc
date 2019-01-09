@@ -229,6 +229,11 @@ void cpu_hw_init(int ap)
 
     callout_call(callout_type_t::smp_online);
 
+#ifdef _CALL_TRACE_ENABLED
+    extern void eainst_set_cpu_count(int count);
+    eainst_set_cpu_count(thread_cpu_count());
+#endif
+
     printk("Initializing RTC\n");
 
     cmos_init();
@@ -354,7 +359,7 @@ bool cpu_msr_get_safe(uint32_t msr, uint64_t &value)
 static void cpu_init_late_msrs_one_cpu()
 {
     // Enable lfence speculation control on AMD processors
-    // Enable lfence to block instruction issue until it retires
+    // Enable lfence to block op dispatch until it retires
     // MSR is available on family 10h/12h/14h/15h/16h/17h
     if (cpuid_is_amd() && cpuid_family() >= 0x10 && cpuid_family() <= 0x17 &&
             cpuid_family() != 0x11 && cpuid_family() != 0x13) {

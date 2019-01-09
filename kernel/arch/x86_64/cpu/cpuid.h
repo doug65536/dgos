@@ -67,6 +67,8 @@ struct cpuid_cache_t {
     bool has_smap       :1;
     bool has_inrdtsc    :1;
 
+    bool bug_meltdown   :1;
+
     uint16_t min_monitor_line;
     uint16_t max_monitor_line;
     uint8_t laddr_bits;
@@ -278,4 +280,9 @@ CPUID_CONST_INLINE uint8_t cpuid_laddr_bits()
 CPUID_CONST_INLINE uint8_t cpuid_paddr_bits()
 {
     return cpuid_cache.paddr_bits;
+}
+
+CPUID_CONST_INLINE uint8_t cpuid_has_bug_meltdown()
+{
+    return cpuid_cache.bug_meltdown;
 }
