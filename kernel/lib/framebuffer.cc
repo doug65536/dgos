@@ -10,9 +10,11 @@
 #include "vesainfo.h"
 #include "dev_text.h"
 
+#define CHARHEIGHT 16
+
 struct bitmap_glyph_t {
     uint16_t codepoint;
-    uint8_t bits[14];
+    uint8_t bits[CHARHEIGHT];
 
     bool operator<(bitmap_glyph_t const& rhs) const noexcept
     {
@@ -525,14 +527,14 @@ static void draw_char(int x, int y, bitmap_glyph_t const * restrict glyph,
                       uint32_t fg, uint32_t bg)
 {
     if (unlikely(unsigned(x + 8) > fb.mode.width ||
-                 unsigned(y + 14) > fb.mode.height))
+                 unsigned(y + CHARHEIGHT) > fb.mode.height))
         return;
 
     // Simple, unclipped...
 
-    bool glyph_pixels[8*14];
+    bool glyph_pixels[8*CHARHEIGHT];
 
-    for (size_t y = 0, i = 0; y < 14; ++y) {
+    for (size_t y = 0, i = 0; y < CHARHEIGHT; ++y) {
         uint8_t scan = glyph->bits[y];
         for (size_t x = 0; x < 8; ++x) {
             glyph_pixels[i++] = (int8_t(scan) < 0);
@@ -543,7 +545,7 @@ static void draw_char(int x, int y, bitmap_glyph_t const * restrict glyph,
     size_t sx = x;
     size_t sy = y;
     size_t ex = x + 8;
-    size_t ey = y + 14;
+    size_t ey = y + CHARHEIGHT;
 
     fg = rgb(fg);
     bg = rgb(bg);
@@ -595,7 +597,7 @@ void scroll_up(size_t dist, uint32_t bg)
     if (fb.mode.pitch == fb.mode.width * fb.mode.byte_pp) {
         uint8_t *src = fb.video_mem + dist * fb.mode.pitch;
         uint8_t *dst = fb.video_mem;
-        memcpy(dst, src, fb.mode.pitch *
+        memmove(dst, src, fb.mode.pitch *
                 (fb.mode.height - dist));
         fill_rect(0, fb.mode.height - dist,
                   fb.mode.width, fb.mode.height, bg);
@@ -612,19 +614,20 @@ static void draw_str(int x, int y, char const* str,
                      uint32_t fg, uint32_t bg)
 {
     while (char32_t codepoint = utf8_to_ucs4_inplace(str)) {
-        draw_char(x, y, framebuffer_console_t::glyph(codepoint), fg, bg);
+        auto glyph = framebuffer_console_t::glyph(codepoint);
+        draw_char(x, y, glyph, fg, bg);
         x += 9;
 
         if (unlikely(x + 9 > fb.mode.width)) {
             // Went off the right side
             x = 0;
-            if (unlikely(y + 14 > fb.mode.height)) {
-                size_t dist = y + 14 - fb.mode.height;
+            if (unlikely(y + CHARHEIGHT > fb.mode.height)) {
+                size_t dist = y + CHARHEIGHT - fb.mode.height;
 
                 scroll_up(dist, bg);
-                y = fb.mode.height - 14;
+                y = fb.mode.height - CHARHEIGHT;
             } else {
-                y += 14;
+                y += CHARHEIGHT;
             }
         }
     }
@@ -652,15 +655,18 @@ bool framebuffer_console_t::init()
     fb_init();
 
     width = fb.mode.width / 9;
-    height = fb.mode.height / 14;
+    height = fb.mode.height / CHARHEIGHT;
 
     ofs_x = (fb.mode.width - width * 9) >> 1;
-    ofs_y = (fb.mode.height - height * 14) >> 1;
+    ofs_y = (fb.mode.height - height * CHARHEIGHT) >> 1;
 
-    uint64_t inv_height = 256 * 0x10000 / fb.mode.height;
+    // Fixedpoint inverse height and scale up to 128
+    uint64_t inv_height = 128 * UINT64_C(0x100000000) / fb.mode.height;
     for (size_t i = 0, e = fb.mode.height; i != e; ++i) {
-        fill_rect(0, i, fb.mode.width, i + 1,
-                              ((i * inv_height) >> 16) * 0x010101);
+        // Bias +128 and do fixedpoint 32.32 multiply
+        auto intensity = (128 + ((i * inv_height) >> 32));
+        auto color = intensity * 0x010101;
+        fill_rect(0, i, fb.mode.width, i + 1, color);
     }
 
     fill_rect(20, 30, 600, 700, 0x563412);
@@ -697,7 +703,7 @@ bool framebuffer_console_t::init()
     };
 
     for (size_t i = 0; i < countof(tests); ++i)
-        draw_str(24 + 40, 40 + 33 + 14 + i*24, tests[i], 0x777777U, 0x563412);
+        draw_str(24 + 40, 40 + 33 + 14 + i*20, tests[i], 0x777777U, 0x563412);
 
 
     return true;

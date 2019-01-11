@@ -15587,7 +15587,7 @@ generated_headers: $(patsubst %,%.h,$(BITFIELD_FILES))
 # ----------------------------------------------------------------------------
 # Unicode VGA font
 
-u_vga16.raw: u_vga16.bdf
+u_vga16.raw: u_vga16.bdf $(top_srcdir)/genfont.py
 	$(top_srcdir)/genfont.py < $< > $@
 
 u_vga16.o: u_vga16.raw

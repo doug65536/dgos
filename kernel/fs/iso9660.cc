@@ -249,7 +249,7 @@ int iso9660_fs_t::name_to_utf16be(
 {
     uint16_t *utf16be = (uint16_t*)utf16be_buf;
     int codepoint;
-    uint16_t utf16buf[3];
+    char16_t utf16buf[3];
     int utf16sz;
     int out = 0;
 

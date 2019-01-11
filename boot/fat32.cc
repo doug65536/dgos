@@ -615,7 +615,7 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
         } else {
             if (lfn_checksum(entry->short_entry.name) == checksum) {
                 // Found
-                PRINT("Found\n");
+                //PRINT("Found\n");
                 return ((uint32_t)entry->short_entry.start_hi << 16) |
                         entry->short_entry.start_lo;
             } else {
@@ -750,6 +750,7 @@ void fat32_boot_partition(uint64_t partition_lba)
 
     fat32_serial = bpb.serial;
 
+#if 0
     // 0x2C LBA
     PRINT("root_dir_start:	  %" PRIu32, bpb.root_dir_start);
 
@@ -770,6 +771,7 @@ void fat32_boot_partition(uint64_t partition_lba)
 
     // 0x10 Always 2
     PRINT("number_of_fats:	  %d", bpb.number_of_fats);
+#endif
 
     fs_api.boot_open = fat32_boot_open;
     fs_api.boot_close = fat32_boot_close;

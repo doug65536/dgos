@@ -66,18 +66,19 @@ static kernel_params_t *prompt_kernel_param(
 
     // Map framebuffer
     if (params->vbe_selected_mode) {
-        vbe_set_mode(params->vbe_selected_mode->mode_num);
-
         auto& mode = *params->vbe_selected_mode;
 
-        uint64_t linear_addr = (-UINT64_C(1024) << 30);
+        vbe_set_mode(mode);
+
+        // Place framebuffer at -2TB
+        uint64_t linear_addr = (-UINT64_C(2) << 40);
 
         paging_map_physical(mode.framebuffer_addr,
                             linear_addr,
                             mode.framebuffer_bytes, PTE_EX_PHYSICAL |
                             PTE_PRESENT | PTE_WRITABLE |
                             PTE_ACCESSED | PTE_DIRTY |
-                            PTE_NX | PTE_PAGESIZE);
+                            PTE_NX | PTE_PTPAT);
 
         mode.framebuffer_addr = linear_addr;
     }
@@ -104,9 +105,9 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
 
     void *ap_entry_ptr = malloc_aligned(___smp_en - ___smp_st, PAGE_SIZE);
 
-    PRINT("SMP trampoline at 0x%zx:%zx",
-          uintptr_t(ap_entry_ptr) >> 4,
-          uintptr_t(ap_entry_ptr) & 0xF);
+    //PRINT("SMP trampoline at 0x%zx:%zx",
+    //      uintptr_t(ap_entry_ptr) >> 4,
+    //      uintptr_t(ap_entry_ptr) & 0xF);
 
     memcpy(ap_entry_ptr, ___smp_st, ___smp_en - ___smp_st);
 
@@ -116,7 +117,7 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     int phys_mem_table_size = 0;
     void *phys_mem_table = physmap_get(&phys_mem_table_size);
 
-    PRINT("Mapping low memory\n");
+    //PRINT("Mapping low memory\n");
 
     uint64_t physmap_addr = (base - (UINT64_C(512) << 30)) &
             -(UINT64_C(512) << 30);
@@ -127,19 +128,20 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
                         UINT64_C(512) << 30,
                         PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
-    PRINT("Mapping dynamic frame\n");
+    //PRINT("Mapping dynamic frame\n");
 
     // Map a page that the kernel can use to manipulate
     // arbitrary physical addresses by changing its pte
     paging_map_physical(0, (0xFFFFFFFF80000000ULL - PAGE_SIZE) + base_adj,
-                     PAGE_SIZE, PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
+                        PAGE_SIZE, PTE_PRESENT |
+                        PTE_WRITABLE | PTE_EX_PHYSICAL);
 
     // Guarantee that the bootloader heap is mapped
     void *heap_st, *heap_en;
     malloc_get_heap_range(&heap_st, &heap_en);
     paging_map_physical(uint64_t(heap_st), uint64_t(heap_st),
                         uint64_t(heap_en) - uint64_t(heap_st),
-                        PTE_PRESENT | PTE_WRITABLE);
+                        PTE_PRESENT | PTE_WRITABLE | PTE_EX_PHYSICAL);
 
     kernel_params_t *params = prompt_kernel_param(
                 phys_mem_table, ap_entry_ptr, phys_mem_table_size);
@@ -184,7 +186,7 @@ void elf64_run(tchar const *filename)
                         (-cpu_has_global_pages() & PTE_GLOBAL) |
                         PTE_PCD | PTE_PWT);
 
-    PRINT("Loading %s...\n", filename);
+    //PRINT("Loading %s...\n", filename);
 
     int file = boot_open(filename);
 
@@ -237,7 +239,7 @@ void elf64_run(tchar const *filename)
     uint64_t new_base = 0xFFFFFFFF80000000;
     base_adj = new_base - 0xFFFFFFFF80000000;
 
-    PRINT("Loading kernel...");
+    //PRINT("Loading kernel...");
 
     // For each program header
     for (size_t i = 0; i < file_hdr.e_phnum; ++i) {

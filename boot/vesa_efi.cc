@@ -21,13 +21,15 @@ static inline uint8_t bits_width(uint32_t n, uint8_t lsb_set)
     return n ? 1 + lsb_set - bit_msb_set(n) : 0;
 }
 
-static vbe_selected_mode_t *selectedModeFromEfiMode(
+static vbe_selected_mode_t *selected_mode_from_efi_mode(
         vbe_selected_mode_t *result,
-        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *efi_mode)
+        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *efi_mode,
+        uint16_t mode_num)
 {
+    result->mode_num = mode_num;
+
     result->height = efi_mode->VerticalResolution;
     result->width = efi_mode->HorizontalResolution;
-    result->pitch = efi_mode->PixelsPerScanLine;
 
     switch (efi_mode->PixelFormat) {
     case PixelRedGreenBlueReserved8BitPerColor:
@@ -52,7 +54,7 @@ static vbe_selected_mode_t *selectedModeFromEfiMode(
         result->mask_size_b = 8;
         result->mask_size_a = 8;
         result->bpp = 32;
-        result->byte_pp = 0;
+        result->byte_pp = 4;
         break;
     case PixelBitMask:
     {
@@ -90,6 +92,8 @@ static vbe_selected_mode_t *selectedModeFromEfiMode(
         break;
     }
 
+    result->pitch = efi_mode->PixelsPerScanLine * result->byte_pp;
+
     aspect_ratio(&result->aspect_n, &result->aspect_d,
                  result->width, result->height);
 
@@ -97,22 +101,19 @@ static vbe_selected_mode_t *selectedModeFromEfiMode(
 }
 
 
-bool vbe_set_mode(int mode_number)
+bool vbe_set_mode(vbe_selected_mode_t& mode)
 {
     EFI_STATUS status;
 
-    status = efi_graphics_output->SetMode(efi_graphics_output, mode_number);
+    if (mode.mode_num != uint16_t(-1)) {
+        status = efi_graphics_output->SetMode(
+                    efi_graphics_output, mode.mode_num);
+    }
+
+    mode.framebuffer_addr = efi_graphics_output->Mode->FrameBufferBase;
+    mode.framebuffer_bytes = efi_graphics_output->Mode->FrameBufferSize;
 
     return !EFI_ERROR(status);
-}
-
-vbe_selected_mode_t *vbe_select_mode(
-        uint32_t width, uint32_t height, bool verbose)
-{
-    vbe_selected_mode_t *result = new vbe_selected_mode_t;
-    result->framebuffer_addr = efi_graphics_output->Mode->FrameBufferBase;
-    result->framebuffer_bytes = efi_graphics_output->Mode->FrameBufferSize;
-    return selectedModeFromEfiMode(result, efi_graphics_output->Mode->Info);
 }
 
 vbe_mode_list_t const& vbe_enumerate_modes()
@@ -129,8 +130,9 @@ vbe_mode_list_t const& vbe_enumerate_modes()
 
         status = efi_graphics_output->QueryMode(
                     efi_graphics_output, i, &info_sz, &info);
+
         if (likely(!EFI_ERROR(status)))
-            selectedModeFromEfiMode(&mode_list.modes[i], info);
+            selected_mode_from_efi_mode(&mode_list.modes[i], info, i);
         else
             mode_list.modes[i] = {};
     }

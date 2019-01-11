@@ -1013,8 +1013,8 @@ struct clear_phys_state_t {
 
     size_t cls_tlb_ver;
 
-    // 2TB before end of address space
-    static constexpr linaddr_t addr = 0xFFFFFE0000000000;
+    // 3TB before end of address space
+    static constexpr linaddr_t addr = 0xFFFFFD0000000000;
 
     void clear(physaddr_t addr);
     void reserve_addr();

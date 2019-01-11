@@ -46,6 +46,7 @@
 #define PTE_ACCESSED        (1ULL << PTE_ACCESSED_BIT)
 #define PTE_DIRTY           (1ULL << PTE_DIRTY_BIT)
 #define PTE_PAGESIZE        (1ULL << PTE_PAGESIZE_BIT)
+#define PTE_PTPAT           (1ULL << PTE_PAGESIZE_BIT)
 #define PTE_GLOBAL          (1ULL << PTE_GLOBAL_BIT)
 #define PTE_PAT             (1ULL << PTE_PAT_BIT)
 #define PTE_NX              (1ULL << PTE_NX_BIT)

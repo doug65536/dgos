@@ -48,7 +48,7 @@ struct vbe_mode_key_t {
 
 vbe_mode_list_t const& vbe_enumerate_modes();
 
-bool vbe_set_mode(int mode_number);
+bool vbe_set_mode(vbe_selected_mode_t &mode);
 
 vbe_selected_mode_t *vbe_select_mode(
         uint32_t width, uint32_t height, bool verbose);

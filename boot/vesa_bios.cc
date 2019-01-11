@@ -50,15 +50,13 @@ static int vbe_mode_info(vbe_mode_info_t *info, uint16_t mode)
     return vbe_get_info(info, 0x4F01, mode) == 0x4F;
 }
 
-bool vbe_set_mode(int mode)
+bool vbe_set_mode(vbe_selected_mode_t& mode)
 {
-    //mode = mode_list.modes[mode].mode_num;
-
     bios_regs_t regs;
 
     regs.eax = 0x4F02;
     // 0x4000 means use linear framebuffer
-    regs.ebx = 0x4000 | mode;
+    regs.ebx = 0x4000 | mode.mode_num;
 
     bioscall(&regs, 0x10);
 
@@ -147,82 +145,82 @@ vbe_mode_list_t const& vbe_enumerate_modes()
     return mode_list;
 }
 
-vbe_selected_mode_t *vbe_select_mode(
-        uint32_t width, uint32_t height, bool verbose)
-{
-    vbe_info_t *info = new vbe_info_t;
-    vbe_mode_info_t *mode_info = new vbe_mode_info_t;
+//vbe_selected_mode_t *vbe_select_mode(
+//        uint32_t width, uint32_t height, bool verbose)
+//{
+//    vbe_info_t *info = new vbe_info_t;
+//    vbe_mode_info_t *mode_info = new vbe_mode_info_t;
 
-    vbe_selected_mode_t *sel = new vbe_selected_mode_t{};
+//    vbe_selected_mode_t *sel = new vbe_selected_mode_t{};
 
-    uint16_t mode;
-    uint16_t done = 0;
-    if (vbe_detect(info)) {
-        VESA_TRACE("VBE Memory %dMB\n", info->mem_size_64k >> 4);
+//    uint16_t mode;
+//    uint16_t done = 0;
+//    if (vbe_detect(info)) {
+//        VESA_TRACE("VBE Memory %dMB\n", info->mem_size_64k >> 4);
 
-        uint16_t *modes = info->mode_list_ptr;
+//        uint16_t *modes = info->mode_list_ptr;
 
-        while (!done) {
-            // Get mode number
-            mode = *modes++;
+//        while (!done) {
+//            // Get mode number
+//            mode = *modes++;
 
-            if (mode == 0xFFFF)
-                break;
+//            if (mode == 0xFFFF)
+//                break;
 
-            // Get mode information
-            if (vbe_mode_info(mode_info, mode)) {
-                // Ignore palette modes
-                if (!mode_info->mask_size_r &&
-                        !mode_info->mask_size_g &&
-                        !mode_info->mask_size_b &&
-                        !mode_info->mask_size_rsvd)
-                    continue;
+//            // Get mode information
+//            if (vbe_mode_info(mode_info, mode)) {
+//                // Ignore palette modes
+//                if (!mode_info->mask_size_r &&
+//                        !mode_info->mask_size_g &&
+//                        !mode_info->mask_size_b &&
+//                        !mode_info->mask_size_rsvd)
+//                    continue;
 
-                aspect_ratio(&sel->aspect_n, &sel->aspect_d,
-                             mode_info->res_x,
-                             mode_info->res_y);
+//                aspect_ratio(&sel->aspect_n, &sel->aspect_d,
+//                             mode_info->res_x,
+//                             mode_info->res_y);
 
-                if (verbose) {
-                    VESA_TRACE("vbe mode %u w=%u h=%u"
-                               " %d:%d:%d:%d phys_addr=%" PRIx32 " %d:%d",
-                               mode,
-                               mode_info->res_x,
-                               mode_info->res_y,
-                               mode_info->mask_size_r,
-                               mode_info->mask_size_g,
-                               mode_info->mask_size_b,
-                               mode_info->mask_size_rsvd,
-                               mode_info->phys_base_ptr,
-                               sel->aspect_n, sel->aspect_d);
-                }
+//                if (verbose) {
+//                    VESA_TRACE("vbe mode %u w=%u h=%u"
+//                               " %d:%d:%d:%d phys_addr=%" PRIx32 " %d:%d",
+//                               mode,
+//                               mode_info->res_x,
+//                               mode_info->res_y,
+//                               mode_info->mask_size_r,
+//                               mode_info->mask_size_g,
+//                               mode_info->mask_size_b,
+//                               mode_info->mask_size_rsvd,
+//                               mode_info->phys_base_ptr,
+//                               sel->aspect_n, sel->aspect_d);
+//                }
 
-                if (mode_info->res_x == width &&
-                        mode_info->res_y == height &&
-                        mode_info->bpp == 32) {
-                    selected_from_vbeinfo(mode_info, info, sel, mode);
-                    done = 1;
-                    vbe_set_mode(mode);
-                    break;
-                }
-            }
-        }
-    }
+//                if (mode_info->res_x == width &&
+//                        mode_info->res_y == height &&
+//                        mode_info->bpp == 32) {
+//                    selected_from_vbeinfo(mode_info, info, sel, mode);
+//                    done = 1;
+//                    vbe_set_mode(*sel);
+//                    break;
+//                }
+//            }
+//        }
+//    }
 
-    void *kernel_data = nullptr;
+//    void *kernel_data = nullptr;
 
-    if (done) {
-        kernel_data = malloc(sizeof(sel));
-        memcpy(kernel_data, &sel, sizeof(sel));
+//    if (done) {
+//        kernel_data = malloc(sizeof(sel));
+//        memcpy(kernel_data, &sel, sizeof(sel));
 
-        uint64_t pte_flags = PTE_PRESENT | PTE_WRITABLE |
-                (-cpu_has_global_pages() & PTE_GLOBAL);
+//        uint64_t pte_flags = PTE_PRESENT | PTE_WRITABLE |
+//                (-cpu_has_global_pages() & PTE_GLOBAL);
 
-        paging_map_physical(sel->framebuffer_addr, sel->framebuffer_addr,
-                            sel->framebuffer_bytes, pte_flags);
-    }
+//        paging_map_physical(sel->framebuffer_addr, sel->framebuffer_addr,
+//                            sel->framebuffer_bytes, pte_flags);
+//    }
 
-    delete mode_info;
-    delete info;
+//    delete mode_info;
+//    delete info;
 
-    return (vbe_selected_mode_t*)kernel_data;
-}
+//    return (vbe_selected_mode_t*)kernel_data;
+//}

@@ -22,7 +22,7 @@ while True:
 		continue
 
 	if line.startswith('BITMAP'):
-		for y in range(0,14):
+		for y in range(0,16):
 			line = stream.readline()
 			# parse hex byte
 			data = int(line, 16)

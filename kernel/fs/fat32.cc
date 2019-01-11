@@ -84,7 +84,7 @@ struct fat32_fs_t final : public fs_base_t {
     static uint8_t lfn_checksum(char const *fcb_name);
 
     static void fcbname_from_lfn(full_lfn_t *full, char *fcbname,
-                                 uint16_t const *lfn, size_t lfn_len);
+                                 const char16_t *lfn, size_t lfn_len);
 
     static void dirents_from_name(full_lfn_t *full,
                                   char const *pathname, size_t name_len);
@@ -277,7 +277,7 @@ uint8_t fat32_fs_t::lfn_checksum(char const *fcb_name)
 
 void fat32_fs_t::fcbname_from_lfn(
         full_lfn_t *full, char *fcbname,
-        uint16_t const *lfn, size_t lfn_len)
+        char16_t const *lfn, size_t lfn_len)
 {
     memset(fcbname, ' ', 11);
 
@@ -362,11 +362,11 @@ void fat32_fs_t::dirents_from_name(
 {
     memset(full, 0, sizeof(*full));
 
-    uint16_t lfn[256];
+    char16_t lfn[256];
 
     char const *utf8_in = pathname;
     char const *utf8_end = pathname + name_len;
-    uint16_t *utf16_out = lfn;
+    char16_t *utf16_out = lfn;
     int codepoint;
 
     do {

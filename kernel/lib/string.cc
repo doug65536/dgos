@@ -559,7 +559,7 @@ EXPORT int ucs4_to_utf8(char *out, int in)
     return len;
 }
 
-EXPORT int ucs4_to_utf16(uint16_t *out, int in)
+EXPORT int ucs4_to_utf16(char16_t *out, int in)
 {
     if ((in > 0 && in < 0xD800) ||
             (in > 0xDFFF && in < 0x10000)) {
