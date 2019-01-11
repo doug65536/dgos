@@ -8,8 +8,88 @@
 #include "utility.h"
 #include "bootinfo.h"
 #include "vesainfo.h"
+#include "dev_text.h"
 
-#define USE_NONTEMPORAL 1
+struct bitmap_glyph_t {
+    uint16_t codepoint;
+    uint8_t bits[14];
+
+    bool operator<(bitmap_glyph_t const& rhs) const noexcept
+    {
+        return codepoint < rhs.codepoint;
+    }
+};
+
+// Linked in font
+extern bitmap_glyph_t const _binary_u_vga16_raw_start[];
+extern bitmap_glyph_t const _binary_u_vga16_raw_end[];
+
+class framebuffer_console_factory_t
+        : public text_dev_factory_t
+        , public zero_init_t {
+public:
+    framebuffer_console_factory_t()
+        : text_dev_factory_t("framebuffer_console")
+    {
+    }
+
+    int detect(text_dev_base_t ***ptrs) override final;
+};
+
+static framebuffer_console_factory_t framebuffer_console_factory;
+
+class framebuffer_console_t : public text_dev_base_t {
+public:
+    framebuffer_console_t()
+    {
+    }
+
+    static size_t glyph_index(size_t codepoint);
+    static const bitmap_glyph_t *glyph(size_t codepoint);
+
+private:
+    // text_dev_base_t interface
+    TEXT_DEV_IMPL
+
+    friend class framebuffer_console_factory_t;
+
+    static void static_init();
+
+    int cursor_x;
+    int cursor_y;
+    int cursor_on;
+
+    int width;
+    int height;
+
+    int ofs_x;
+    int ofs_y;
+
+    int attrib;
+
+    int mouse_x;
+    int mouse_y;
+    int mouse_on;
+
+    static constexpr bitmap_glyph_t const * const glyphs =
+            _binary_u_vga16_raw_start;
+
+    // O(1) glyph lookup for ASCII 32-126 range
+    static constexpr size_t const ascii_min = 32;
+    static constexpr size_t const ascii_max = 126;
+    static uint8_t ascii_lookup[1 + ascii_max - ascii_min];
+    static uint16_t replacement;
+
+    static framebuffer_console_t instances[1];
+    static unsigned instance_count;
+};
+
+framebuffer_console_t framebuffer_console_t::instances[1];
+unsigned framebuffer_console_t::instance_count;
+uint8_t framebuffer_console_t::ascii_lookup[1 + ascii_max - ascii_min];
+uint16_t framebuffer_console_t::replacement;
+
+#define USE_NONTEMPORAL 0
 
 struct fb_coord_t {
     int x;
@@ -53,11 +133,10 @@ void fb_init(void)
     // Round the back buffer size up to a multiple of the cache size
     screen_size = (screen_size + 63) & -64;
 
-    fb.back_buf = (uint8_t*)mmap(nullptr, screen_size, PROT_READ | PROT_WRITE,
-                                 0, -1, 0);
+    fb.back_buf = (uint8_t*)fb.mode.framebuffer_addr;
     fb.video_mem = (uint8_t*)fb.mode.framebuffer_addr;
 
-    madvise(fb.video_mem, screen_size, MADV_WEAKORDER);
+    //madvise(fb.video_mem, screen_size, MADV_WEAKORDER);
 
     fb_reset_dirty();
 }
@@ -140,23 +219,6 @@ void fb_copy_to(int scr_x, int scr_y,
 
 void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 {
-    if (unlikely(ex > fb.mode.width))
-        ex = fb.mode.width;
-
-    if (unlikely(ey > fb.mode.height))
-        ey = fb.mode.height;
-
-    if (unlikely(sx < 0))
-        sx = 0;
-
-    if (unlikely(sy < 0))
-        sy = 0;
-
-    if (unlikely(ex <= sx))
-        return;
-
-    if (unlikely(ey <= sy))
-        return;
 
     fb_update_dirty(sx, sy, ex, ey);
 
@@ -170,59 +232,6 @@ void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
         out += fb.mode.pitch;
     }
 }
-
-//#ifdef __x86_64__
-//static void fb_blend_pixel(uint8_t *pixel, __f32_vec4 fcolor, float alpha)
-//{
-//    //printdbg("alpha=%6.3f\n", (double)alpha);
-//    float ooa = 1.0f - alpha;
-//    __f32_vec4 tmp1, tmp2;
-//    __asm__ __volatile__ (
-//        "shufps $0,%[alpha],%[alpha]\n\t"
-//        "shufps $0,%[ooa],%[ooa]\n\t"
-//        "mulps %[ooa],%[fcolor]\n\t"
-//        // Load 32 bit pixel
-//        "movd (%[pixel]),%[tmp1]\n\t"
-//        // Unpack to 16 bit vector
-//        "punpcklbw %[zero],%[tmp1]\n\t"
-//        // Foreground color
-//        // Unpack to 32 bit vector
-//        "punpcklwd %[zero],%[tmp1]\n\t"
-//        // Convert pixel RGBA to floating point
-//        "cvtdq2ps %[tmp1],%[tmp1]\n\t"
-//        // Multiply pixel color by 1.0f - alpha
-//        "mulps %[alpha],%[tmp1]\n\t"
-//        // Add prescaled foreground color to result
-//        "addps %[fcolor],%[tmp1]\n\t"
-//        // Clamp
-//        "maxps %[zero],%[tmp1]\n\t"
-//        // Convert back to integer
-//        "cvttps2dq %[tmp1],%[tmp1]\n\t"
-//        // Pack to 16 bit vector
-//        "packssdw %[zero],%[tmp1]\n\t"
-//        // Pack to 8 bit vector
-//        "packuswb %[zero],%[tmp1]\n\t"
-//        // Store result pixel
-//        "movd %[tmp1],(%[pixel])\n\t"
-//        : [tmp1] "=&x" (tmp1), "=&x" (tmp2)
-//        , [alpha] "+x" (alpha)
-//        , [ooa] "+x" (ooa)
-//        , [fcolor] "+x" (fcolor)
-//        : [pixel] "r" (pixel)
-//        , [zero] "x" (0)
-//        : "memory"
-//    );
-//}
-//#else
-//static void fb_blend_pixel(uint8_t *pixel, __f32_vec4 fcolor, float alpha)
-//{
-//    float ooa = 1.0f - alpha;
-//    pixel[0] = fcolor[0] * alpha + apixel[0] * ooa;
-//    pixel[1] = fcolor[1] * alpha + apixel[1] * ooa;
-//    pixel[2] = fcolor[2] * alpha + apixel[2] * ooa;
-//    pixel[3] = fcolor[3] * alpha + apixel[3] * ooa;
-//}
-//#endif
 
 #if 1
 template<typename F>
@@ -419,3 +428,474 @@ void fb_update(void)
                      fb.dirty.en.x, fb.dirty.en.y);
     fb_reset_dirty();
 }
+
+///////////////////
+
+static uint32_t rgb(uint32_t color)
+{
+    unsigned r = color & 0xFF;
+    unsigned g = (color >> 8) & 0xFF;
+    unsigned b = (color >> 16) & 0xFF;
+    r >>= 8 - fb.mode.mask_size_r;
+    g >>= 8 - fb.mode.mask_size_g;
+    b >>= 8 - fb.mode.mask_size_b;
+    return (r << fb.mode.mask_pos_r) |
+            (g << fb.mode.mask_pos_g) |
+            (b << fb.mode.mask_pos_b);
+}
+
+static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
+{
+    if (unlikely(ex > fb.mode.width))
+        ex = fb.mode.width;
+
+    if (unlikely(ey > fb.mode.height))
+        ey = fb.mode.height;
+
+    if (unlikely(sx < 0))
+        sx = 0;
+
+    if (unlikely(sy < 0))
+        sy = 0;
+
+    if (unlikely(ex <= sx))
+        return;
+
+    if (unlikely(ey <= sy))
+        return;
+
+    uint32_t val = rgb(color);
+
+    char *dest = (char*)(fb.video_mem +
+                         sy * fb.mode.pitch +
+                         sx * fb.mode.byte_pp);
+    size_t wid = (ex - sx);
+    size_t skip = fb.mode.pitch - (wid * fb.mode.byte_pp);
+
+    switch (fb.mode.byte_pp) {
+    case 4:
+        while (sy < ey) {
+            memset32(dest, val, wid);
+            dest += skip;
+            ++sy;
+        }
+        break;
+
+    case 3:
+        // FIXME: optimize, take advantage of 4 pixels every 3 dwords
+        /// r g b r
+        /// g b r g
+        /// b r g b
+        while (sy < ey) {
+            for (int x = sx; x < ex; ++x) {
+                *dest++ = val & 0xFF;
+                *dest++ = (val >> 8) & 0xFF;
+                *dest++ = (val >> 16) & 0xFF;
+            }
+
+            dest += skip;
+            ++sy;
+        }
+        break;
+
+    case 1:
+        while (sy < ey) {
+            memset8(dest, val, wid);
+            dest += skip;
+            ++sy;
+        }
+        break;
+
+    case 2:
+        while (sy < ey) {
+            memset16(dest, val, wid);
+            dest += skip;
+            ++sy;
+        }
+        break;
+
+    }
+}
+
+static void scroll_rect(int sx, int sy, int ex, int ey, int dx, int dy) {
+
+}
+
+static void draw_char(int x, int y, bitmap_glyph_t const * restrict glyph,
+                      uint32_t fg, uint32_t bg)
+{
+    if (unlikely(unsigned(x + 8) > fb.mode.width ||
+                 unsigned(y + 14) > fb.mode.height))
+        return;
+
+    // Simple, unclipped...
+
+    bool glyph_pixels[8*14];
+
+    for (size_t y = 0, i = 0; y < 14; ++y) {
+        uint8_t scan = glyph->bits[y];
+        for (size_t x = 0; x < 8; ++x) {
+            glyph_pixels[i++] = (int8_t(scan) < 0);
+            scan <<= 1;
+        }
+    }
+
+    size_t sx = x;
+    size_t sy = y;
+    size_t ex = x + 8;
+    size_t ey = y + 14;
+
+    fg = rgb(fg);
+    bg = rgb(bg);
+
+    if (likely(unsigned(ex) <= fb.mode.width &&
+               unsigned(ey) <= fb.mode.height)) {
+        uint8_t *dest = fb.video_mem +
+                sy * fb.mode.pitch +
+                sx * fb.mode.byte_pp;
+        size_t skip = fb.mode.pitch - (8 * fb.mode.byte_pp);
+
+        switch (fb.mode.byte_pp) {
+        case 4:
+            for (size_t y = sy, i = 0; y < ey; ++y) {
+                for (size_t x = sx; x < ex; ++x) {
+                    *(uint32_t*)dest = glyph_pixels[i++] ? fg : bg;
+                    dest += sizeof(uint32_t);
+                }
+                dest += skip;
+            }
+            break;
+        case 3:
+            for (size_t y = sy, i = 0; y < ey; ++y) {
+                for (size_t x = sx; x < ex; ++x) {
+                    uint32_t c = glyph_pixels[i++] ? fg : bg;
+                    *dest++ = c & 0xFF;
+                    *dest++ = (c >> 8) & 0xFF;
+                    *dest++ = (c >> 16) & 0xFF;
+                }
+                dest += skip;
+            }
+            break;
+        case 2:
+            for (size_t y = sy, i = 0; y < ey; ++y) {
+                for (size_t x = sx; x < ex; ++x) {
+                    uint32_t c = glyph_pixels[i++] ? fg : bg;
+                    *(uint16_t*)dest = c;
+                    dest += sizeof(uint16_t);
+                }
+                dest += skip;
+            }
+            break;
+        }
+    }
+}
+
+void scroll_up(size_t dist, uint32_t bg)
+{
+    if (fb.mode.pitch == fb.mode.width * fb.mode.byte_pp) {
+        uint8_t *src = fb.video_mem + dist * fb.mode.pitch;
+        uint8_t *dst = fb.video_mem;
+        memcpy(dst, src, fb.mode.pitch *
+                (fb.mode.height - dist));
+        fill_rect(0, fb.mode.height - dist,
+                  fb.mode.width, fb.mode.height, bg);
+    } else {
+        // Scanline at a time to avoid touching offscreen
+//                        for (size_t y = dist, ey = fb.mode.height;
+//                             y < ey; ++y) {
+//                            memmove(fb.video_mem, fb.video_mem + fb.)
+//                        }
+    }
+}
+
+static void draw_str(int x, int y, char const* str,
+                     uint32_t fg, uint32_t bg)
+{
+    while (char32_t codepoint = utf8_to_ucs4_inplace(str)) {
+        draw_char(x, y, framebuffer_console_t::glyph(codepoint), fg, bg);
+        x += 9;
+
+        if (unlikely(x + 9 > fb.mode.width)) {
+            // Went off the right side
+            x = 0;
+            if (unlikely(y + 14 > fb.mode.height)) {
+                size_t dist = y + 14 - fb.mode.height;
+
+                scroll_up(dist, bg);
+                y = fb.mode.height - 14;
+            } else {
+                y += 14;
+            }
+        }
+    }
+}
+
+///
+
+void framebuffer_console_t::static_init()
+{
+    if (replacement)
+        return;
+
+    // Populate ASCII glyph lookup table
+    for (size_t i = ascii_min; i <= ascii_max; ++i)
+        ascii_lookup[i - ascii_min] = glyph_index(i);
+
+    // Lookup unicode replacement character
+    replacement = glyph_index(0xFFFD);
+}
+
+bool framebuffer_console_t::init()
+{
+    static_init();
+
+    fb_init();
+
+    width = fb.mode.width / 9;
+    height = fb.mode.height / 14;
+
+    ofs_x = (fb.mode.width - width * 9) >> 1;
+    ofs_y = (fb.mode.height - height * 14) >> 1;
+
+    uint64_t inv_height = 256 * 0x10000 / fb.mode.height;
+    for (size_t i = 0, e = fb.mode.height; i != e; ++i) {
+        fill_rect(0, i, fb.mode.width, i + 1,
+                              ((i * inv_height) >> 16) * 0x010101);
+    }
+
+    fill_rect(20, 30, 600, 700, 0x563412);
+
+    draw_str(20+24, 40+23, u8"There is unicode support: ❤✓☀★☂♞☯,☭",
+                         0x777777U, 0x563412);
+
+    static char const * const tests[] = {
+        u8"Czech: Písmo podporuje mnoho písmen",
+        u8"Danish: Skrifttypen understøtter mange bogstaver",
+        u8"Greek: Η γραμματοσειρά υποστηρίζει πολλά γράμματα",
+        u8"Spanish: La fuente soporta muchas letras.",
+        u8"Finnish: Kirjasin tukee monia kirjaimia",
+        u8"French: La police supporte beaucoup de lettres",
+        u8"Hindi: फ़ॉन्ट कई अक्षरों का समर्थन करता है",
+        u8"Armenian: Տառատեսակն ապահովում է բազմաթիվ տառեր",
+        u8"Italian: Il font supporta molte lettere",
+        u8"Hebrew: הגופן תומך במכתבים רבים",
+        u8"Japanese: フォントは多くの文字をサポートしています",
+        u8"Korean: 글꼴은 많은 문자를 지원합니다.",
+        u8"Latin: The font supports many letters",
+        u8"Lithuanian: Šriftas palaiko daug laiškų",
+        u8"Dutch: Het lettertype ondersteunt veel letters",
+        u8"Polish: Czcionka obsługuje wiele liter",
+        u8"Portuguese: A fonte suporta muitas letras",
+        u8"Romanian: Fontul acceptă multe litere",
+        u8"Russian: Шрифт поддерживает много букв",
+        u8"Swedish: Teckensnittet stöder många bokstäver",
+        u8"Thai: ตัวอักษรรองรับตัวอักษรหลายตัว",
+        u8"Vietnamese: Phông chữ hỗ trợ nhiều chữ cái",
+        u8"Chinese: 该字体支持许多字母",
+        u8"Chinese (Simplified): 该字体支持许多字母",
+        u8"Chinese (Traditional): 該字體支持許多字母"
+    };
+
+    for (size_t i = 0; i < countof(tests); ++i)
+        draw_str(24 + 40, 40 + 33 + 14 + i*24, tests[i], 0x777777U, 0x563412);
+
+
+    return true;
+}
+
+void framebuffer_console_t::cleanup()
+{
+
+}
+
+int framebuffer_console_t::set_dimensions(int width, int height)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+void framebuffer_console_t::get_dimensions(int *width, int *height)
+{
+    if (width)
+        *width = this->width;
+    if (height)
+        *height = this->height;
+}
+
+void framebuffer_console_t::goto_xy(int x, int y)
+{
+
+}
+
+int framebuffer_console_t::get_x()
+{
+    return 0;
+}
+
+int framebuffer_console_t::get_y()
+{
+    return 0;
+}
+
+void framebuffer_console_t::fg_set(int color)
+{
+}
+
+int framebuffer_console_t::fg_get()
+{
+    return 0;
+}
+
+void framebuffer_console_t::bg_set(int color)
+{
+}
+
+int framebuffer_console_t::bg_get()
+{
+    return 0;
+}
+
+int framebuffer_console_t::cursor_toggle(int show)
+{
+    return 0;
+}
+
+int framebuffer_console_t::cursor_is_shown()
+{
+    return 0;
+}
+
+void framebuffer_console_t::putc(int character)
+{
+}
+
+void framebuffer_console_t::putc_xy(int x, int y, int character)
+{
+}
+
+int framebuffer_console_t::print(const char *s)
+{
+    return 0;
+}
+
+int framebuffer_console_t::write(const char *s, intptr_t len)
+{
+    return 0;
+}
+
+int framebuffer_console_t::print_xy(int x, int y, const char *s)
+{
+    return 0;
+}
+
+int framebuffer_console_t::draw(const char *s)
+{
+    return 0;
+}
+
+int framebuffer_console_t::draw_xy(int x, int y, const char *s, int attrib)
+{
+    return 0;
+}
+
+void framebuffer_console_t::fill(int sx, int sy, int ex, int ey, int character)
+{
+}
+
+void framebuffer_console_t::clear()
+{
+
+}
+
+void framebuffer_console_t::scroll(int sx, int sy, int ex, int ey,
+                                   int xd, int yd, int clear)
+{
+
+}
+
+int framebuffer_console_t::mouse_supported()
+{
+    return 0;
+}
+
+int framebuffer_console_t::mouse_is_shown()
+{
+    return 0;
+}
+
+int framebuffer_console_t::mouse_get_x()
+{
+    return 0;
+}
+
+int framebuffer_console_t::mouse_get_y()
+{
+    return 0;
+}
+
+void framebuffer_console_t::mouse_goto_xy(int x, int y)
+{
+}
+
+void framebuffer_console_t::mouse_add_xy(int x, int y)
+{
+}
+
+int framebuffer_console_t::mouse_toggle(int show)
+{
+    return 0;
+}
+
+int framebuffer_console_factory_t::detect(text_dev_base_t ***ptrs)
+{
+    static text_dev_base_t *devs[countof(framebuffer_console_t::instances)];
+
+    if (framebuffer_console_t::instance_count >=
+            countof(framebuffer_console_t::instances)) {
+        printdbg("Too many VGA devices!\n");
+        return 0;
+    }
+
+    framebuffer_console_t* self = framebuffer_console_t::instances +
+            framebuffer_console_t::instance_count;
+
+    *ptrs = devs + framebuffer_console_t::instance_count++;
+    **ptrs = self;
+
+    if (!self->init())
+        return 0;
+
+    return 1;
+}
+
+size_t framebuffer_console_t::glyph_index(size_t codepoint)
+{
+    size_t const sz = _binary_u_vga16_raw_end - _binary_u_vga16_raw_start;
+    size_t st = 0;
+    size_t en = sz;
+    size_t md;
+
+    while (st < en) {
+        md = ((en - st) >> 1) + st;
+        if (glyphs[md].codepoint < codepoint)
+            st = md + 1;
+        else
+            en = md;
+    }
+
+    if (unlikely(st >= sz || glyphs[st].codepoint != codepoint))
+        return size_t(-1);
+
+    return st;
+}
+
+bitmap_glyph_t const *framebuffer_console_t::glyph(size_t codepoint)
+{
+    size_t i = glyph_index(codepoint);
+
+    return i != size_t(-1)
+            ? &glyphs[i]
+            : replacement
+              ? &glyphs[replacement]
+              : &glyphs[ascii_lookup[' ' - ascii_min]];
+}
+

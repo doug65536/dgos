@@ -853,9 +853,10 @@ KERNEL_LDFLAGS_SHARED = \
 
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
+	$(top_builddir)/u_vga16.o \
 	$(DUMPDIR)
 
-KERNEL_LDADD_SHARED = -lgcc
+KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
 
 # ----------------------------------------------------------------------------
 # kernel variations
@@ -1536,6 +1537,19 @@ $(foreach bitsfile,$(BITFIELD_FILES), \
 generated_headers: $(patsubst %,%.h,$(BITFIELD_FILES))
 
 .PHONY: generated_headers
+
+# ----------------------------------------------------------------------------
+# Unicode VGA font
+
+u_vga16.raw: u_vga16.bdf
+	$(top_srcdir)/genfont.py < $< > $@
+
+u_vga16.o: u_vga16.raw
+	$(LD) -r -b binary $< -o $@
+	$(OBJCOPY) \
+		--rename-section .data=.rodata \
+		--set-section-flags .data=load,readonly,data \
+		$@
 
 # ----------------------------------------------------------------------------
 # Randomize RAM content

@@ -581,7 +581,8 @@ am__objects_4 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/syscall/kernel_asan-sys_process.$(OBJEXT)
 am_kernel_asan_OBJECTS = $(am__objects_4)
 kernel_asan_OBJECTS = $(am_kernel_asan_OBJECTS)
-kernel_asan_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am__DEPENDENCIES_2 = $(top_builddir)/u_vga16.o
+kernel_asan_DEPENDENCIES = $(am__DEPENDENCIES_2)
 kernel_asan_LINK = $(CXXLD) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_asan_LDFLAGS) $(LDFLAGS) -o $@
 am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
@@ -713,7 +714,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_process.$(OBJEXT)
 am_kernel_generic_OBJECTS = $(am__objects_5)
 kernel_generic_OBJECTS = $(am_kernel_generic_OBJECTS)
-kernel_generic_DEPENDENCIES = $(am__DEPENDENCIES_1)
+kernel_generic_DEPENDENCIES = $(am__DEPENDENCIES_2)
 kernel_generic_LINK = $(CXXLD) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_generic_LDFLAGS) $(LDFLAGS) -o $@
 am__objects_6 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
@@ -845,7 +846,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/syscall/kernel_tracing-sys_process.$(OBJEXT)
 am_kernel_tracing_OBJECTS = $(am__objects_6)
 kernel_tracing_OBJECTS = $(am_kernel_tracing_OBJECTS)
-kernel_tracing_DEPENDENCIES = $(am__DEPENDENCIES_1)
+kernel_tracing_DEPENDENCIES = $(am__DEPENDENCIES_2)
 kernel_tracing_LINK = $(CXXLD) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) \
 	$(kernel_tracing_LDFLAGS) $(LDFLAGS) -o $@
 am_ls_OBJECTS = user/bin/ls/ls-ls.$(OBJEXT)
@@ -1976,9 +1977,10 @@ KERNEL_LDFLAGS_SHARED = \
 #-Wl,-export-dynamic
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
+	$(top_builddir)/u_vga16.o \
 	$(DUMPDIR)
 
-KERNEL_LDADD_SHARED = -lgcc
+KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
 
 # ----------------------------------------------------------------------------
 # kernel variations
@@ -15581,6 +15583,19 @@ $(foreach bitsfile,$(BITFIELD_FILES), \
 generated_headers: $(patsubst %,%.h,$(BITFIELD_FILES))
 
 .PHONY: generated_headers
+
+# ----------------------------------------------------------------------------
+# Unicode VGA font
+
+u_vga16.raw: u_vga16.bdf
+	$(top_srcdir)/genfont.py < $< > $@
+
+u_vga16.o: u_vga16.raw
+	$(LD) -r -b binary $< -o $@
+	$(OBJCOPY) \
+		--rename-section .data=.rodata \
+		--set-section-flags .data=load,readonly,data \
+		$@
 
 # ----------------------------------------------------------------------------
 # Randomize RAM content

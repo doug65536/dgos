@@ -485,10 +485,10 @@ static uint64_t const *cpu_get_fpr_reg(isr_context_t *ctx, uint8_t reg)
 //    } while (frame_rbp);
 //}
 
-static void dump_frame(uintptr_t rbp, uintptr_t rip)
-{
-    printk("at cfa=%16zx ip=%16zx\n", rbp, rip);
-}
+//static void dump_frame(uintptr_t rbp, uintptr_t rip)
+//{
+//    printk("at cfa=%16zx ip=%16zx\n", rbp, rip);
+//}
 
 void dump_context(isr_context_t *ctx, int to_screen)
 {

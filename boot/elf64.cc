@@ -64,6 +64,24 @@ static kernel_params_t *prompt_kernel_param(
 
     boot_menu_show(*params);
 
+    // Map framebuffer
+    if (params->vbe_selected_mode) {
+        vbe_set_mode(params->vbe_selected_mode->mode_num);
+
+        auto& mode = *params->vbe_selected_mode;
+
+        uint64_t linear_addr = (-UINT64_C(1024) << 30);
+
+        paging_map_physical(mode.framebuffer_addr,
+                            linear_addr,
+                            mode.framebuffer_bytes, PTE_EX_PHYSICAL |
+                            PTE_PRESENT | PTE_WRITABLE |
+                            PTE_ACCESSED | PTE_DIRTY |
+                            PTE_NX | PTE_PAGESIZE);
+
+        mode.framebuffer_addr = linear_addr;
+    }
+
 //    PRINT("           ap_entry: 0x%llx\n", uint64_t(params->ap_entry));
 //    PRINT("     phys_mem_table: 0x%llx\n",
 //          uint64_t(params->phys_mem_table));
@@ -301,3 +319,14 @@ void __cxa_pure_virtual()
 {
     PANIC("Pure virtual call!");
 }
+
+extern "C"
+void __cxa_guard_acquire()
+{
+}
+
+extern "C"
+void __cxa_guard_release()
+{
+}
+

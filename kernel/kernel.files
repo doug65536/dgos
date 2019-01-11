@@ -7,7 +7,9 @@
 ../emu/bochs/bochs-debugger-iso-bios-kernel-commands
 ../emu/bochs/bochs-debugger-iso-efi-boot-commands
 ../emu/bochs/bochs-debugger-iso-efi-kernel-commands
+../genfont.py
 ../toolchain/build-crossgcc-binutils.patch
+../u_vga16.bdf
 arch/x86_64/cpu/apic.bits.h
 arch/x86_64/cpu/except_asm.S
 arch/x86_64/cpu/pic.bits

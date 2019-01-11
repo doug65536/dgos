@@ -39,6 +39,8 @@ static vbe_selected_mode_t *selectedModeFromEfiMode(
         result->mask_size_g = 8;
         result->mask_size_b = 8;
         result->mask_size_a = 8;
+        result->bpp = 0;
+        result->byte_pp = 0;
         break;
     case PixelBlueGreenRedReserved8BitPerColor:
         result->mask_pos_r = 16;
@@ -49,6 +51,8 @@ static vbe_selected_mode_t *selectedModeFromEfiMode(
         result->mask_size_g = 8;
         result->mask_size_b = 8;
         result->mask_size_a = 8;
+        result->bpp = 32;
+        result->byte_pp = 0;
         break;
     case PixelBitMask:
     {
@@ -65,6 +69,12 @@ static vbe_selected_mode_t *selectedModeFromEfiMode(
 
         result->mask_pos_a = bit_lsb_set(pi.ReservedMask);
         result->mask_size_a = bits_width(pi.ReservedMask, result->mask_pos_a);
+
+        result->bpp = result->mask_size_r + result->mask_size_g +
+                result->mask_pos_b + result->mask_size_a;
+
+        result->byte_pp = (result->bpp + 7) >> 3;
+
         break;
     }
     case PixelBltOnly:

@@ -132,54 +132,7 @@ EXPORT char *strstr(char const *str, char const *substr)
     return nullptr;
 }
 
-extern "C" void __asan_storeN_noabort(uintptr_t addr, size_t size);
-
-static void memset16(char *&d, uint64_t s, size_t n)
-{
-#ifdef _ASAN_ENABLED
-    __asan_storeN_noabort(uintptr_t(&d), n * sizeof(uint16_t));
-#endif
-
-    __asm__ __volatile__ (
-        "rep stosw"
-        : "+D" (d)
-        , "+c" (n)
-        : "a" (s)
-        : "memory"
-    );
-}
-
-static void memset32(char *&d, uint64_t s, size_t n)
-{
-#ifdef _ASAN_ENABLED
-    __asan_storeN_noabort(uintptr_t(&d), n * sizeof(uint32_t));
-#endif
-
-    __asm__ __volatile__ (
-        "rep stosl"
-        : "+D" (d)
-        , "+c" (n)
-        : "a" (s)
-        : "memory"
-    );
-}
-
-static void memset64(char *&d, uint64_t s, size_t n)
-{
-#ifdef _ASAN_ENABLED
-    __asan_storeN_noabort(uintptr_t(&d), n * sizeof(uint64_t));
-#endif
-
-    __asm__ __volatile__ (
-        "rep stosq"
-        : "+D" (d)
-        , "+c" (n)
-        : "a" (s)
-        : "memory"
-    );
-}
-
-static void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
+static _always_inline void memset_byte(char *&d, uint64_t s, ptrdiff_t &ofs)
 {
     __asm__ __volatile__ (
         "movb %b[s],(%[d],%[ofs])\n\t"
@@ -639,7 +592,15 @@ EXPORT int ucs4_to_utf16(uint16_t *out, int in)
 // If the input is a null byte, and ret_end is not null,
 // then *ret_end is set to point to the null byte, it
 // is not advanced
-EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
+EXPORT char32_t utf8_to_ucs4(char const *in, char const **ret_end)
+{
+    char32_t result = utf8_to_ucs4_inplace(in);
+    if (ret_end)
+        *ret_end = in;
+    return result;
+}
+
+EXPORT char32_t utf8_to_ucs4_inplace(char const *&in)
 {
     int n;
 
@@ -703,9 +664,6 @@ EXPORT int utf8_to_ucs4(char const *in, char const **ret_end)
         ++in;
         n = -1;
     }
-
-    if (ret_end)
-        *ret_end = in;
 
     return n;
 }

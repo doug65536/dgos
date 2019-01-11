@@ -6,6 +6,8 @@
 #include "vector.h"
 #include "cpu/control_regs.h"
 
+#include "hash_table.h"
+
 #define DEBUG_STORAGE   0
 #if DEBUG_STORAGE
 #define STORAGE_TRACE(...) printk("storage: " __VA_ARGS__)
@@ -22,6 +24,9 @@ struct fs_mount_t {
     fs_reg_t *reg;
     fs_base_t *fs;
 };
+
+using path_table_t = hashtbl_t<fs_mount_t, fs_reg_t*, &fs_mount_t::reg>;
+static path_table_t path_table;
 
 static std::vector<storage_if_factory_t*> storage_if_factories;
 static std::vector<storage_if_base_t*> storage_ifs;

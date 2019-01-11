@@ -876,8 +876,8 @@ static int init_thread(void *)
     test_spawn();
 #endif
 
-    printk("Initializing framebuffer\n");
-    fb_init();
+//    printk("Initializing framebuffer\n");
+//    fb_init();
 
     //priqueue_test.test();
 

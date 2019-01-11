@@ -19,7 +19,7 @@ public:
     int detect(text_dev_base_t ***ptrs) override final;
 };
 
-static vga_factory_t vga_factory;
+//static vga_factory_t vga_factory;
 
 class vga_display_t : public text_dev_base_t {
 public:

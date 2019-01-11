@@ -81,5 +81,8 @@ struct vbe_selected_mode_t {
     uint8_t mask_pos_b;
     uint8_t mask_pos_a;
 
-    char reserved[4];
+    uint8_t bpp;
+    uint8_t byte_pp;
+
+    char reserved[2];
 };

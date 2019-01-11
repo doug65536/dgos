@@ -370,7 +370,7 @@ void fat32_fs_t::dirents_from_name(
     int codepoint;
 
     do {
-        codepoint = utf8_to_ucs4(utf8_in, &utf8_in);
+        codepoint = utf8_to_ucs4_inplace(utf8_in);
         utf16_out += ucs4_to_utf16(utf16_out, codepoint);
     } while (utf8_in < utf8_end);
     *utf16_out = 0;

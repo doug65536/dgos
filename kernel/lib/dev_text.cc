@@ -149,7 +149,7 @@ static void text_dev_start()
     if (console_display) {
         console_display->clear();
 
-        printk("vga device registered\n");
+        printk("text device registered\n");
     } else {
         console_display = &null_text_dev::instance;
     }

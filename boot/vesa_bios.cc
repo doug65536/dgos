@@ -52,7 +52,7 @@ static int vbe_mode_info(vbe_mode_info_t *info, uint16_t mode)
 
 bool vbe_set_mode(int mode)
 {
-    mode = mode_list.modes[mode].mode_num;
+    //mode = mode_list.modes[mode].mode_num;
 
     bios_regs_t regs;
 
@@ -84,6 +84,8 @@ void selected_from_vbeinfo(vbe_mode_info_t * restrict mode_info,
     sel->mask_pos_g = mode_info->mask_pos_g;
     sel->mask_pos_b = mode_info->mask_pos_b;
     sel->mask_pos_a = mode_info->mask_pos_rsvd;
+    sel->bpp = mode_info->bpp;
+    sel->byte_pp = (mode_info->bpp + 7) >> 3;
     memset(sel->reserved, 0, sizeof(sel->reserved));
 }
 

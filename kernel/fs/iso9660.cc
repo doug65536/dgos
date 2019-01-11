@@ -221,7 +221,7 @@ int iso9660_fs_t::name_to_ascii(
     char *lastdot = nullptr;
 
     for (int i = 0; *utf8 && i < ISO9660_MAX_NAME; ++i) {
-        codepoint = utf8_to_ucs4(utf8, &utf8);
+        codepoint = utf8_to_ucs4_inplace(utf8);
 
         if (codepoint == '.') {
             if (lastdot)

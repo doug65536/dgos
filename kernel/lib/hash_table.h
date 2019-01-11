@@ -35,6 +35,8 @@ public:
     void clear();
 
 private:
+    uint32_t hash_of_item(const P &item) const;
+
     std::vector<P> items;
     uint32_t used;
     uint32_t holes;
@@ -53,6 +55,14 @@ template<typename T, typename K, typename P,
 bool basic_hashtbl_t<T, K, P, key_member, key_sz>::grow()
 {
     return rehash(log2_capacity ? log2_capacity + 1 : 4);
+}
+
+template<typename T, typename K, typename P,
+         K const T::*key_member, size_t key_sz>
+uint32_t
+basic_hashtbl_t<T, K, P, key_member, key_sz>::hash_of_item(P const& item) const
+{
+    return hash_32(&(((T const*)item)->*key_member), key_sz);
 }
 
 template<typename T, typename K, typename P,
@@ -76,7 +86,7 @@ bool basic_hashtbl_t<T, K, P, key_member, key_sz>::rehash(uint8_t new_log2)
             if ((T*)item <= (void*)1)
                 continue;
 
-            uint32_t hash = hash_32(&(((T*)item)->*key_member), key_sz);
+            uint32_t hash = hash_of_item(item);
 
             hash &= new_mask;
 
@@ -110,7 +120,7 @@ bool basic_hashtbl_t<T, K, P, key_member, key_sz>::insert(T *item)
             return false;
     }
 
-    uint32_t hash = hash_32(&(item->*key_member), key_sz);
+    uint32_t hash = hash_of_item(item);
     uint32_t mask = ~(uint32_t(-1) << log2_capacity);
 
     hash &= mask;

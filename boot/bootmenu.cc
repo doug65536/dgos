@@ -1,6 +1,7 @@
 #include "bootmenu.h"
 #include "bootloader.h"
 #include "vesa.h"
+#include "paging.h"
 
 static tui_str_t tui_ena_dis[] = {
     TSTR "disabled",
@@ -79,7 +80,8 @@ OutIt to_str(T n, OutIt out, size_t out_sz, OutT pad = OutT{})
 
 void boot_menu_show(kernel_params_t &params)
 {
-    vbe_mode_list_t const& vbe_modes = vbe_enumerate_modes();
+    static vbe_mode_list_t const& vbe_modes =
+            vbe_enumerate_modes();
 
     // format is %dx%d-%d:%d:%d:%d-%dbpp
     //            ^  ^  ^  ^  ^  ^  ^
@@ -121,10 +123,7 @@ void boot_menu_show(kernel_params_t &params)
         if (res < end) *res++ = ':';
         res = to_str(mode.mask_size_a, res, end - res);
         if (res < end) *res++ = '-';
-        res = to_str(mode.mask_size_r +
-                     mode.mask_size_g +
-                     mode.mask_size_b +
-                     mode.mask_size_a, res, end - res);
+        res = to_str(mode.bpp, res, end - res);
         if (res < end) *res++ = 'b';
         if (res < end) *res++ = 'p';
         if (res < end) *res++ = 'p';
@@ -147,8 +146,10 @@ void boot_menu_show(kernel_params_t &params)
 
     boot_menu.interact_timeout(3000);
 
-    vbe_set_mode(tui_menu[2].index);
+    auto mode_index = tui_menu[2].index;
+    auto const& mode = vbe_modes.modes[mode_index];
 
+    params.vbe_selected_mode = uintptr_t(&mode);
     params.wait_gdb = tui_menu[0].index != 0;
     params.serial_debugout = tui_menu[1].index != 0;
 }

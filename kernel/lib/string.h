@@ -36,7 +36,8 @@ char *strncat(char * restrict dest, char const * restrict src, size_t n);
 
 int ucs4_to_utf8(char *out, int in);
 int ucs4_to_utf16(uint16_t *out, int in);
-int utf8_to_ucs4(char const *in, char const **ret_end);
+char32_t utf8_to_ucs4(char const *in, char const **ret_end);
+char32_t utf8_to_ucs4_inplace(char const *&in);
 
 int utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
 int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
@@ -239,4 +240,71 @@ static _always_inline auto devstore(T*p, T const& val) ->
     return devstore_impl(
                 p, val,
                 typename std::integral_constant<size_t, sizeof(T)>::type());
+}
+
+//
+
+
+#ifdef _ASAN_ENABLED
+extern "C" void __asan_storeN_noabort(uintptr_t addr, size_t size);
+#endif
+
+static _always_inline void memset8(char *&d, uint64_t s, size_t n)
+{
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(d), n * sizeof(uint8_t));
+#endif
+
+    __asm__ __volatile__ (
+        "rep stosb"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
+}
+
+static _always_inline void memset16(char *&d, uint64_t s, size_t n)
+{
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(d), n * sizeof(uint16_t));
+#endif
+
+    __asm__ __volatile__ (
+        "rep stosw"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
+}
+
+static _always_inline void memset32(char *&d, uint64_t s, size_t n)
+{
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(d), n * sizeof(uint32_t));
+#endif
+
+    __asm__ __volatile__ (
+        "rep stosl"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
+}
+
+static _always_inline void memset64(char *&d, uint64_t s, size_t n)
+{
+#ifdef _ASAN_ENABLED
+    __asan_storeN_noabort(uintptr_t(d), n * sizeof(uint64_t));
+#endif
+
+    __asm__ __volatile__ (
+        "rep stosq"
+        : "+D" (d)
+        , "+c" (n)
+        : "a" (s)
+        : "memory"
+    );
 }

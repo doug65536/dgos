@@ -58,3 +58,14 @@ void idt_clone_debug_exception_dispatcher(void);
 extern "C" uint32_t xsave_supported_states;
 extern "C" uint32_t xsave_enabled_states;
 extern "C" void dump_context(isr_context_t *ctx, int to_screen);
+
+// Direct call stub that will not stall on retpoline
+#define FAST_VECTOR(name, init_target) \
+    __asm__ __volatile__ ( \
+        ".global " #name "\n\t" \
+        #name ":" "\n\t" \
+        "jmp " #init_target "\n\t"\
+        ".global " #name "_patch" "\n\t" \
+        #name "_patch:" "\n\t" \
+    ); \
+    extern char name##_patch[]

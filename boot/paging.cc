@@ -429,6 +429,9 @@ void paging_map_physical(uint64_t phys_addr, uint64_t linear_base,
 void paging_map_physical_impl(uint64_t phys_addr, uint64_t linear_base,
                               uint64_t length, uint64_t pte_flags)
 {
+    // Mask off bit 63:48
+    linear_base &= 0xFFFFFFFFFFFF;
+
     // Make sure the flags don't set any address bits
     assert((pte_flags & PTE_ADDR) == 0);
 
