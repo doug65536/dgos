@@ -13,13 +13,7 @@
 #define CHARHEIGHT 16
 
 struct bitmap_glyph_t {
-    uint16_t codepoint;
     uint8_t bits[CHARHEIGHT];
-
-    bool operator<(bitmap_glyph_t const& rhs) const noexcept
-    {
-        return codepoint < rhs.codepoint;
-    }
 };
 
 // Linked in font
@@ -79,8 +73,10 @@ private:
     // O(1) glyph lookup for ASCII 32-126 range
     static constexpr size_t const ascii_min = 32;
     static constexpr size_t const ascii_max = 126;
-    static uint8_t ascii_lookup[1 + ascii_max - ascii_min];
+    static size_t glyph_count;
     static uint16_t replacement;
+    static uint16_t *glyph_codepoints;
+    static uint8_t ascii_lookup[1 + ascii_max - ascii_min];
 
     static framebuffer_console_t instances[1];
     static unsigned instance_count;
@@ -90,6 +86,8 @@ framebuffer_console_t framebuffer_console_t::instances[1];
 unsigned framebuffer_console_t::instance_count;
 uint8_t framebuffer_console_t::ascii_lookup[1 + ascii_max - ascii_min];
 uint16_t framebuffer_console_t::replacement;
+size_t framebuffer_console_t::glyph_count;
+uint16_t *framebuffer_console_t::glyph_codepoints;
 
 #define USE_NONTEMPORAL 0
 
@@ -448,6 +446,9 @@ static uint32_t rgb(uint32_t color)
 
 static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 {
+    if (unlikely(!fb.video_mem))
+        return;
+
     if (unlikely(ex > fb.mode.width))
         ex = fb.mode.width;
 
@@ -637,6 +638,13 @@ static void draw_str(int x, int y, char const* str,
 
 void framebuffer_console_t::static_init()
 {
+    // Detect the number of items from size
+    auto en = uintptr_t(_binary_u_vga16_raw_end);
+    auto st = uintptr_t(_binary_u_vga16_raw_start);
+    auto sz = en - st;
+    glyph_count = sz / (sizeof(bitmap_glyph_t) + sizeof(uint16_t));
+    glyph_codepoints = (uint16_t*)(_binary_u_vga16_raw_start + glyph_count);
+
     if (replacement)
         return;
 
@@ -809,7 +817,8 @@ void framebuffer_console_t::fill(int sx, int sy, int ex, int ey, int character)
 
 void framebuffer_console_t::clear()
 {
-
+    //uint32_t bg = 0x562312;
+    //fill_rect(0, 0, fb.mode.width, fb.mode.height, bg);
 }
 
 void framebuffer_console_t::scroll(int sx, int sy, int ex, int ey,
@@ -875,20 +884,22 @@ int framebuffer_console_factory_t::detect(text_dev_base_t ***ptrs)
 
 size_t framebuffer_console_t::glyph_index(size_t codepoint)
 {
-    size_t const sz = _binary_u_vga16_raw_end - _binary_u_vga16_raw_start;
+    if (likely(replacement && codepoint >= ascii_min && codepoint <= ascii_max))
+        return ascii_lookup[codepoint - ascii_min];
+
     size_t st = 0;
-    size_t en = sz;
+    size_t en = glyph_count;
     size_t md;
 
     while (st < en) {
         md = ((en - st) >> 1) + st;
-        if (glyphs[md].codepoint < codepoint)
+        if (glyph_codepoints[md] < codepoint)
             st = md + 1;
         else
             en = md;
     }
 
-    if (unlikely(st >= sz || glyphs[st].codepoint != codepoint))
+    if (unlikely(st >= glyph_count || glyph_codepoints[st] != codepoint))
         return size_t(-1);
 
     return st;
@@ -905,3 +916,9 @@ bitmap_glyph_t const *framebuffer_console_t::glyph(size_t codepoint)
               : &glyphs[ascii_lookup[' ' - ascii_min]];
 }
 
+
+void fb_change_backing(const vbe_selected_mode_t &mode)
+{
+    fb.back_buf = (uint8_t*)mode.framebuffer_addr;
+    fb.video_mem = (uint8_t*)mode.framebuffer_addr;
+}

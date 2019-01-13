@@ -1,3 +1,4 @@
+user64.ld
 bin/dhcpclient/main.cc
 bin/ls/ls.cc
 crt0/crt0.S

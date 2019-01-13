@@ -10,7 +10,6 @@ typedef struct _FILE FILE;
 
 typedef struct fpos_t {
     int64_t seek_pos;
-
 } fpos_t;
 
 #define EOF -1
@@ -43,11 +42,12 @@ int feof(FILE *stream);
 char *fgets(char *restrict buf, int sz, FILE *restrict stream);
 int fileno(FILE *stream);
 int fscanf(FILE *restrict stream, const char *restrict format, ...);
-int fseek(FILE *stream, long dist, int rel);
+int fseek(FILE *stream, off_t dist, int rel);
 long ftell(FILE *stream);
 int pclose(FILE *stream);
 
 FILE *fopen(char const *restrict filename, char const *restrict mode);
+FILE *fdopen(int fd, const char *mode);
 FILE *freopen(char const *restrict filename,
               char const *restrict mode,
               FILE *restrict stream);

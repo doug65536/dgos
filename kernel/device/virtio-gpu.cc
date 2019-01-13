@@ -8,6 +8,9 @@
 #include "numeric_limits.h"
 #include "work_queue.h"
 #include "heap.h"
+#include "conio.h"
+#include "framebuffer.h"
+#include "vesainfo.h"
 
 #define DEBUG_VIRTIO_GPU 1
 #if DEBUG_VIRTIO_GPU
@@ -55,6 +58,8 @@ public:
     }
 
     bool init(pci_dev_iterator_t const &pci_iter) override final;
+
+    void reattach_framebuffer();
 
 private:
     friend class virtio_gpu_factory_t;
@@ -474,7 +479,7 @@ private:
     bool offer_features(feature_set_t &features) override final;
     bool verify_features(feature_set_t &features) override final;
 
-    bool handle_config_change();
+    bool handle_config_change(int events);
     bool resize_backing(uint32_t new_w, uint32_t new_h,
                         uint32_t old_w, uint32_t old_h);
 
@@ -512,6 +517,8 @@ REGISTER_CALLOUT(virtio_gpu_startup, nullptr,
 
 int virtio_gpu_factory_t::detect()
 {
+    // hack, disabled for now
+    return 0;
     return detect_virtio(PCI_DEV_CLASS_DISPLAY, VIRTIO_DEVICE_GPU,
                          "virtio-gpu");
 }
@@ -519,6 +526,29 @@ int virtio_gpu_factory_t::detect()
 virtio_base_t *virtio_gpu_factory_t::create()
 {
     return new virtio_gpu_dev_t;
+}
+
+void virtio_gpu_dev_t::reattach_framebuffer()
+{
+    vbe_selected_mode_t new_mode{};
+    new_mode.mode_num = 0;
+    new_mode.width = scrn_w;
+    new_mode.height = scrn_h;
+    new_mode.framebuffer_addr = uint64_t(backbuf);
+    new_mode.framebuffer_bytes = sizeof(uint32_t) * scrn_w * scrn_h;
+    new_mode.mask_pos_r = 0;
+    new_mode.mask_pos_g = 8;
+    new_mode.mask_pos_b = 16;
+    new_mode.mask_pos_a = 24;
+    new_mode.mask_size_r = 8;
+    new_mode.mask_size_g = 8;
+    new_mode.mask_size_b = 8;
+    new_mode.mask_size_a = 8;
+    new_mode.bpp = 32;
+    new_mode.byte_pp = sizeof(uint32_t);
+    new_mode.pitch = scrn_w * sizeof(uint32_t);
+
+    fb_change_backing(new_mode);
 }
 
 bool virtio_gpu_dev_t::init(pci_dev_iterator_t const &pci_iter)
@@ -533,10 +563,13 @@ bool virtio_gpu_dev_t::init(pci_dev_iterator_t const &pci_iter)
 
     uint32_t events = atomic_ld_acq(&gpu_config->events_read);
     if (events & 1) {
-        if (!handle_config_change())
+        if (!handle_config_change(events))
             return false;
 
         atomic_st_rel(&gpu_config->events_clear, events);
+    } else {
+        issue_get_display_info();
+        handle_config_change(0);
     }
 
     return true;
@@ -548,9 +581,13 @@ bool virtio_gpu_dev_t::issue_get_display_info()
     virtio_gpu_resp_display_info_t display_info_resp;
     blocking_iocp_t iocp;
 
+    VIRTIO_GPU_TRACE("Issuing get display info...\n");
+
     cmd_queue->sendrecv(&get_display_info, sizeof(get_display_info),
                         &display_info_resp, sizeof(display_info_resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...get display info completed\n");
 
     if (display_info_resp.hdr.type != VIRTIO_GPU_RESP_OK_DISPLAY_INFO)
         return false;
@@ -573,9 +610,13 @@ bool virtio_gpu_dev_t::issue_create_2d(
     create_2d.width = width;
     create_2d.height = height;
 
+    VIRTIO_GPU_TRACE("Issuing create 2d...\n");
+
     cmd_queue->sendrecv(&create_2d, sizeof(create_2d),
                         &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...create 2d completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -591,9 +632,13 @@ bool virtio_gpu_dev_t::issue_detach_backing(uint32_t resource_id)
     virtio_gpu_resource_detach_backing_t detach_backing;
     detach_backing.resource_id = resource_id;
 
+    VIRTIO_GPU_TRACE("Issuing detach backing...\n");
+
     cmd_queue->sendrecv(&detach_backing, sizeof(detach_backing),
                         &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...detach backing completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -609,8 +654,12 @@ bool virtio_gpu_dev_t::issue_resource_unref(uint32_t resource_id)
 
     unref.resource_id = resource_id;
 
+    VIRTIO_GPU_TRACE("Issuing resource unred,,,\n");
+
     cmd_queue->sendrecv(&unref, sizeof(unref), &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...resource unred completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -634,8 +683,12 @@ bool virtio_gpu_dev_t::issue_create_render_target(
     create_3d.height = height;
     create_3d.nr_samples = nr_samples;
 
+    VIRTIO_GPU_TRACE("Issuing create 3d...\n");
+
     cmd_queue->sendrecv(&create_3d, sizeof(create_3d),
                         &resp, sizeof(resp), &iocp);
+
+    VIRTIO_GPU_TRACE("...create 3d completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -680,9 +733,13 @@ bool virtio_gpu_dev_t::issue_attach_backing(
         mem_entries[i].length = backbuf_ranges[i].size;
     }
 
+    VIRTIO_GPU_TRACE("Issuing attach backing...\n");
+
     cmd_queue->sendrecv(backing_cmd.get(), backing_cmd_sz,
                         &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...attach backing complete\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -705,9 +762,13 @@ bool virtio_gpu_dev_t::issue_set_scanout(
     set_scanout.resource_id = 1;
     set_scanout.scanout_id = 0;
 
+    VIRTIO_GPU_TRACE("Issuing set scanout...\n");
+
     cmd_queue->sendrecv(&set_scanout, sizeof(set_scanout),
                         &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...set scanout completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -728,8 +789,12 @@ bool virtio_gpu_dev_t::issue_transfer_to_host_2d(
     xfer.r.height = height;
     xfer.resource_id = 1;
 
+    VIRTIO_GPU_TRACE("Issuing transfer to host 2d...\n");
+
     cmd_queue->sendrecv(&xfer, sizeof(xfer), &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...transfer to host 2d completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -750,8 +815,12 @@ bool virtio_gpu_dev_t::issue_flush(
     flush.r.height = height;
     flush.resource_id = 1;
 
+    VIRTIO_GPU_TRACE("Issuing flush...\n");
+
     cmd_queue->sendrecv(&flush, sizeof(flush), &resp, sizeof(resp), &iocp);
     iocp.wait();
+
+    VIRTIO_GPU_TRACE("...flush completed\n");
 
     if (unlikely(resp.type != VIRTIO_GPU_RESP_OK_NODATA))
         return false;
@@ -759,7 +828,7 @@ bool virtio_gpu_dev_t::issue_flush(
     return true;
 }
 
-bool virtio_gpu_dev_t::handle_config_change()
+bool virtio_gpu_dev_t::handle_config_change(int events)
 {
     if (configured) {
         if (!issue_detach_backing(1))
@@ -780,7 +849,6 @@ bool virtio_gpu_dev_t::handle_config_change()
         return false;
     VIRTIO_GPU_TRACE("...W=%u, H=%u\n", scrn_w, scrn_h);
 
-    VIRTIO_GPU_TRACE("Issuing create_2d\n");
     if (!issue_create_2d(1, scrn_w, scrn_h))
         return false;
 
@@ -789,21 +857,20 @@ bool virtio_gpu_dev_t::handle_config_change()
     // Fill the backbuffer
     memset32_nt(backbuf, 0x123456, backbuf_sz);
 
-    VIRTIO_GPU_TRACE("Issuing attach_backing\n");
     if (!issue_attach_backing(1, backbuf, backbuf_sz))
         return false;
 
-    VIRTIO_GPU_TRACE("Issuing set_scanout\n");
     if (!issue_set_scanout(0, 1))
         return false;
 
-    VIRTIO_GPU_TRACE("Issuing transfer_to_host_2d\n");
     if (!issue_transfer_to_host_2d(0, 0, scrn_w, scrn_h))
         return false;
 
-    VIRTIO_GPU_TRACE("Issuing flush\n");
     if (!issue_flush(0, 0, scrn_w, scrn_h))
         return false;
+
+    VIRTIO_GPU_TRACE("Reattaching framebuffer\n");
+    reattach_framebuffer();
 
     VIRTIO_GPU_TRACE("Config change complete\n");
 
@@ -905,14 +972,12 @@ void virtio_gpu_dev_t::config_irq()
     int events = gpu_config->events_read;
 
     if (events & 1) {
-        workq::enqueue([this] {
-            handle_config_change();
+        workq::enqueue([this,events] {
+            if (events)
+                gpu_config->events_read = events;
+            handle_config_change(events);
         });
     }
-
-    // Acknowledge
-    if (events)
-        gpu_config->events_clear = events;
 }
 
 void virtio_gpu_dev_t::irq_handler(int offset)

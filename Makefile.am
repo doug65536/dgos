@@ -13,6 +13,7 @@ BUILT_SOURCES = \
 	generated_headers \
 	sysroot/lib/crt0.o \
 	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
 	sysroot/lib/libm.a \
 	sysroot/lib/libstdc++.a \
 	trace-tool
@@ -996,6 +997,9 @@ sysroot/lib/crt0.o: $(top_srcdir)/user/crt0/crt0.S $(top_srcdir)/Makefile.am
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
+sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
 sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
@@ -1023,9 +1027,21 @@ shell_SOURCES = \
 	user/shell/parser.h \
 	user/shell/parser.cc
 
-shell_CFLAGS = -isystem $(top_builddir)/sysroot/include
+shell_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-isystem $(top_builddir)/sysroot/include \
+	-g \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
-shell_CXXFLAGS = $(shell_CFLAGS)
+
+shell_CFLAGS = \
+	$(shell_CXXFLAGS)
+
+shell_CCASFLAGS =
+shell_LDFLAGS = $(shell_CFLAGS)
+
+#-v -Wl,-verbose
 
 $(top_srcdir)/user/shell/grammar.c \
 	$(top_srcdir)/user/shell/grammar.h \
@@ -1034,7 +1050,12 @@ $(top_srcdir)/user/shell/grammar.c \
 	$(RM) -rf $@
 	lemon $<
 
-EXTRA_shell_DEPENDENCIES = user/shell/grammar.c
+EXTRA_shell_DEPENDENCIES = \
+	user/user64.ld \
+	user/shell/grammar.c \
+	sysroot/lib/libc.a \
+	sysroot/lib/crt0.o \
+	generated_headers
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1172,6 +1193,7 @@ libc_a_SOURCES = \
 	libc/src/dirent/readdir_r.cc \
 	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/_Exit.cc \
+	libc/src/stdlib/abort.cc \
 	libc/src/stdlib/abs.cc \
 	libc/src/stdlib/malloc.cc \
 	libc/src/fcntl/creat.cc \
@@ -1184,13 +1206,17 @@ libc_a_SOURCES = \
 	libc/src/stdio/bits/cfile.h \
 	libc/src/stdio/bits/formatter.cc \
 	libc/src/stdio/bits/formatter.h \
+	libc/src/stdio/stdin_out_err.cc \
+	libc/src/stdio/fdopen.cc \
 	libc/src/stdio/fprintf.cc \
 	libc/src/stdio/fputc.cc \
+	libc/src/stdio/fgets.cc \
 	libc/src/stdio/printf.cc \
 	libc/src/stdio/vfprintf.cc \
 	libc/src/stdio/vprintf.cc \
 	libc/src/stdio/fread.cc \
 	libc/src/stdio/fwrite.cc \
+	libc/src/sys/indirect-thunk.S \
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
 	libc/src/sys/mman/mremap.cc \
@@ -1319,7 +1345,8 @@ libc_a_CXXFLAGS = \
 	$(FREESTANDING_FLAGS) \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
 noinst_LIBRARIES += libm.a
 
@@ -1332,7 +1359,8 @@ libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
 noinst_LIBRARIES += libstdc++.a
 
@@ -1345,7 +1373,8 @@ libstdc___a_CXXFLAGS = \
 	-std=c++14 -static \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
 # ----------------------------------------------------------------------------
 # libc unit tests
@@ -1391,6 +1420,18 @@ test: test_compile
 	$(top_builddir)/libc_tests
 
 .PHONY: test_compile test
+
+# ----------------------------------------------------------------------------
+# iibg
+
+noinst_LIBRARIES += libg.a
+
+libg_a_SOURCES = \
+	libc/libg/debug.cc
+
+libg_a_CFLAGS = $(LIBC_CXXFLAGS)
+libg_a_CXXFLAGS = $(LIBC_CXXFLAGS)
+libg_a_CCASFLAGS = $(LIBC_CXXFLAGS)
 
 # ----------------------------------------------------------------------------
 # User programs
@@ -1440,7 +1481,12 @@ EXTRA_hello_km_DEPENDENCIES = \
 
 bin_PROGRAMS += user-shell
 
-user_shell_CXXFLAGS = -g
+user_shell_CXXFLAGS = \
+	-g \
+	$(COMPILER_FLAGS)
+user_shell_CFLAGS = \
+	-g \
+	$(COMPILER_FLAGS)
 
 user_shell_SOURCES = \
 	user/test/test.S
@@ -1449,7 +1495,9 @@ user_shell_LDFLAGS = \
 	-Wl,-z,max-page-size=4096
 
 user_shell_CCASFLAGS = \
-	$(ASM_DEBUG_INFO_FLAGS) -v -isystem sysroot/include
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-v -isystem sysroot/include
 
 # ----------------------------------------------------------------------------
 # Misc make rules
@@ -1582,9 +1630,10 @@ QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
 QEMU_RAM = 5G
 
-QEMU_MEMFILL = \
-	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
-	-numa node,nodeid=0,memdev=ram-node0
+QEMU_MEMFILL =
+#QEMU_MEMFILL = \
+#	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
+#	-numa node,nodeid=0,memdev=ram-node0
 
 QEMU_USB_ROOT_PORTS ?= 16
 

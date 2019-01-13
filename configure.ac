@@ -189,7 +189,7 @@ AC_SUBST([RETPOLINE_FLAGS])
 # fgcse-las causes compiler segfaults
 AS_VAR_SET([OPTIMIZATION_FLAGS], [])
 for flag in \
-	O2 fstrict-aliasing
+	Os fstrict-aliasing
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
@@ -257,6 +257,24 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([NO_FLOAT_FLAGS])
+
+USER64_FLAGS=
+for flag in \
+	mindirect-branch=thunk-extern D_USE_RETPOLINE=1 \
+	falign-functions=4 falign-labels=4 falign-jumps=4 malign-stringops \
+	fbuiltin \
+	mred-zone \
+	m64 \
+	mpreferred-stack-boundary=4 \
+	fPIE \
+	Wl,-T$srcdir/user/user64.ld
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]
+		[], [$COMPILER_WERROR])
+done
+AC_SUBST([USER64_FLAGS])
+
 
 ELF32_FLAGS=
 for flag in \

@@ -51,7 +51,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
     "' 99=%d\t\t", f, (t)v, 99)
 
 #define ENABLE_SHELL_THREAD         1
-#define ENABLE_READ_STRESS_THREAD   4
+#define ENABLE_READ_STRESS_THREAD   0
 #define ENABLE_SLEEP_THREAD         0
 #define ENABLE_MUTEX_THREAD         0
 #define ENABLE_REGISTER_THREAD      0
@@ -816,6 +816,10 @@ void test_spawn()
         assert(spawn_result == 0 || pid < 0);
     }
 #endif
+
+    int shell_pid;
+    int spawn_result = process_t::spawn(
+                &shell_pid, "shell", nullptr, nullptr);
 }
 
 static int init_thread(void *)
@@ -872,9 +876,7 @@ static int init_thread(void *)
 
     //bootdev_info(0, 0, 0);
 
-#if ENABLE_SPAWN_STRESS > 0
     test_spawn();
-#endif
 
 //    printk("Initializing framebuffer\n");
 //    fb_init();

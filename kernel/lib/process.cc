@@ -176,15 +176,21 @@ int process_t::start()
                 hdr.e_phoff))
         return -1;
 
+    // Map every section, just in case any pages overlap
     for (Elf64_Phdr& ph : program_hdrs) {
         // If it is not readable, writable or executable, ignore
         if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
             continue;
 
+        // No memory size? Ignore
         if (ph.p_memsz == 0)
             continue;
 
-        // See if it grossly overflows into kernel space
+        // See if it begins in reserved space
+        if (intptr_t(ph.p_vaddr) < 0x400000)
+            return -1;
+
+        // See if it overflows into kernel space
         if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0)
             return -1;
 
@@ -192,20 +198,25 @@ int process_t::start()
 
         if (ph.p_flags & PF_R)
             page_prot |= PROT_READ;
+
         // Unconditionally writable until loaded
         page_prot |= PROT_WRITE;
         if (ph.p_flags & PF_X)
             page_prot |= PROT_EXEC;
 
-        void *mem = mmap((void*)ph.p_vaddr,
+        if (mmap((void*)ph.p_vaddr,
                          ph.p_memsz, page_prot,
-                         MAP_USER | MAP_POPULATE, -1, 0);
+                         MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)
+            return -1;
+    }
 
+    // Read everything after mapping the memory
+    for (Elf64_Phdr& ph : program_hdrs) {
         read_size = ph.p_filesz;
         if (ph.p_filesz > 0) {
             if (read_size != file_pread(
                         fd,
-                        mem,
+                        (void*)ph.p_vaddr,
                         read_size,
                         ph.p_offset)) {
                 return -1;
@@ -258,18 +269,6 @@ int process_t::start()
 
     // Populate the stack
     void *stack_ptr = (char*)stack + stack_size;
-
-// screw program headers and auxv for now
-//    // Calculate size of the program header array
-//    size_t info_ph_ofs = info_sz;
-//    info_sz += hdr.e_phentsize * hdr.e_phnum;
-//    size_t info_ph_sz = info_sz - info_ph_ofs;
-
-//    // Copy the program headers onto the stack
-//    stack_ptr = (char*)stack_ptr - info_ph_sz;
-//    void *phdrs_ptr = stack_ptr;
-//    memcpy(stack_ptr, program_hdrs.data(),
-//           sizeof(*program_hdrs.data()) * hdr.e_phnum);
 
     // Calculate the total size of environment string text
     info_sz = 0;
@@ -344,6 +343,11 @@ int process_t::start()
         panic_oom();
     if (!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() }))
         panic_oom();
+
+    // Open a stdin, stdout, and stderr
+    file_open("/dev/conin", 0, 0);
+    file_open("/dev/conout", 0, 0);
+    file_open("/dev/conerr", 0, 0);
 
     processes_scoped_lock lock(processes_lock);
     state = state_t::running;

@@ -322,11 +322,15 @@ void __cxa_pure_virtual()
     PANIC("Pure virtual call!");
 }
 
+// Do nothing to synchronize initialization
+// of static variables at function scope
 extern "C"
 void __cxa_guard_acquire()
 {
 }
 
+// Do nothing to synchronize initialization
+// of static variables at function scope
 extern "C"
 void __cxa_guard_release()
 {

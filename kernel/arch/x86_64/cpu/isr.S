@@ -558,7 +558,6 @@ isr_common:
     // ...came from user code
     swapgs
 
-.align 16
 .Lfrom_kernel:
     // Push FPU context pointer field, initially null
     pushq $0

@@ -17,6 +17,7 @@ ln -f kernel-asan stage/dgos-kernel-asan || exit
 cp -u hello.km stage/hello.km || exit
 
 cp -u user-shell stage || exit
+cp -u shell stage || exit
 cp -u "$TOPSRC/user/background.png" stage || exit
 
 mkdir -p stage/EFI/boot || exit

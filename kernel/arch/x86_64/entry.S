@@ -125,32 +125,32 @@ bsp_init:
 
     debugind '9'
 
-//    // Resolve ifunc
-//    leaq __rela_dyn_st(%rip),%r12
-//    leaq __rela_dyn_en(%rip),%r13
-//.Lrela_iplt_next:
-//    cmpq %r13,%r12
-//    jz .Lrela_iplt_done
-//
-//    movq 8(%r12),%rax
-//
-//    // Only apply STT_GNU_IFUNC (0x25)
-//    cmpq $ 0x25,%rax
-//    jnz .Lrela_iplt_skip
-//
-//    // Call the resolver
-//    mov 16(%r12),%rax
-//    indirect_call rax
-//    //call * 16(%r12)
-//
-//    // Read PLT vector pointer from relocation record
-//    movq (%r12),%rdx
-//    // Update the PLT with the resolver return value
-//    movq %rax,(%rdx)
-//.Lrela_iplt_skip:
-//    addq $ 24,%r12
-//    jmp .Lrela_iplt_next
-//.Lrela_iplt_done:
+    // Resolve ifunc
+    leaq __rela_dyn_st(%rip),%r12
+    leaq __rela_dyn_en(%rip),%r13
+.Lrela_iplt_next:
+    cmpq %r13,%r12
+    jz .Lrela_iplt_done
+
+    movq 8(%r12),%rax
+
+    // Only apply STT_GNU_IFUNC (0x25)
+    cmpq $ 0x25,%rax
+    jnz .Lrela_iplt_skip
+
+    // Call the resolver
+    mov 16(%r12),%rax
+    indirect_call rax
+    //call * 16(%r12)
+
+    // Read PLT vector pointer from relocation record
+    movq (%r12),%rdx
+    // Update the PLT with the resolver return value
+    movq %rax,(%rdx)
+.Lrela_iplt_skip:
+    addq $ 24,%r12
+    jmp .Lrela_iplt_next
+.Lrela_iplt_done:
 
 #ifdef _ASAN_ENABLED
     // Mark the callout array initialized

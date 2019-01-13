@@ -13,6 +13,7 @@ ln -f kernel-asan iso_stage/dgos-kernel-asan|| exit
 cp -u hello.km iso_stage/hello.km || exit
 
 cp -u user-shell iso_stage || exit
+cp -u shell iso_stage || exit
 cp -u "$1/user/background.png" iso_stage || exit
 
 mkdir -p iso_stage/EFI/boot || exit

@@ -221,6 +221,7 @@ am_libc_a_OBJECTS = libc/src/assert/libc_a-assert.$(OBJEXT) \
 	libc/src/dirent/libc_a-readdir_r.$(OBJEXT) \
 	libc/src/dirent/libc_a-seekdir.$(OBJEXT) \
 	libc/src/stdlib/libc_a-_Exit.$(OBJEXT) \
+	libc/src/stdlib/libc_a-abort.$(OBJEXT) \
 	libc/src/stdlib/libc_a-abs.$(OBJEXT) \
 	libc/src/stdlib/libc_a-malloc.$(OBJEXT) \
 	libc/src/fcntl/libc_a-creat.$(OBJEXT) \
@@ -231,13 +232,17 @@ am_libc_a_OBJECTS = libc/src/assert/libc_a-assert.$(OBJEXT) \
 	libc/src/fcntl/libc_a-posix_fallocate.$(OBJEXT) \
 	libc/src/stdio/bits/libc_a-cfile.$(OBJEXT) \
 	libc/src/stdio/bits/libc_a-formatter.$(OBJEXT) \
+	libc/src/stdio/libc_a-stdin_out_err.$(OBJEXT) \
+	libc/src/stdio/libc_a-fdopen.$(OBJEXT) \
 	libc/src/stdio/libc_a-fprintf.$(OBJEXT) \
 	libc/src/stdio/libc_a-fputc.$(OBJEXT) \
+	libc/src/stdio/libc_a-fgets.$(OBJEXT) \
 	libc/src/stdio/libc_a-printf.$(OBJEXT) \
 	libc/src/stdio/libc_a-vfprintf.$(OBJEXT) \
 	libc/src/stdio/libc_a-vprintf.$(OBJEXT) \
 	libc/src/stdio/libc_a-fread.$(OBJEXT) \
 	libc/src/stdio/libc_a-fwrite.$(OBJEXT) \
+	libc/src/sys/indirect-thunk.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-mmap.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-munmap.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-mremap.$(OBJEXT) \
@@ -360,6 +365,10 @@ am_libc_a_OBJECTS = libc/src/assert/libc_a-assert.$(OBJEXT) \
 	libc/src/sys/syscall5.$(OBJEXT) \
 	libc/src/sys/syscall6.$(OBJEXT) $(am__objects_1)
 libc_a_OBJECTS = $(am_libc_a_OBJECTS)
+libg_a_AR = $(AR) $(ARFLAGS)
+libg_a_LIBADD =
+am_libg_a_OBJECTS = libc/libg/libg_a-debug.$(OBJEXT)
+libg_a_OBJECTS = $(am_libg_a_OBJECTS)
 libm_a_AR = $(AR) $(ARFLAGS)
 libm_a_LIBADD =
 am_libm_a_OBJECTS = libc/math/libm_a-cos.$(OBJEXT) \
@@ -863,13 +872,13 @@ am_shell_OBJECTS = user/shell/shell-grammar.$(OBJEXT) \
 	user/shell/shell-parser.$(OBJEXT)
 shell_OBJECTS = $(am_shell_OBJECTS)
 shell_LDADD = $(LDADD)
-shell_LINK = $(CXXLD) $(shell_CXXFLAGS) $(CXXFLAGS) $(AM_LDFLAGS) \
+shell_LINK = $(CXXLD) $(shell_CXXFLAGS) $(CXXFLAGS) $(shell_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
 user_shell_LDADD = $(LDADD)
-user_shell_LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(user_shell_LDFLAGS) \
-	$(LDFLAGS) -o $@
+user_shell_LINK = $(CCLD) $(user_shell_CFLAGS) $(CFLAGS) \
+	$(user_shell_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -926,15 +935,7 @@ AM_V_CCAS = $(am__v_CCAS_@AM_V@)
 am__v_CCAS_ = $(am__v_CCAS_@AM_DEFAULT_V@)
 am__v_CCAS_0 = @echo "  CCAS    " $@;
 am__v_CCAS_1 = 
-SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libm_a_SOURCES) \
-	$(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
-	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
-	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
-	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
-	$(kernel_asan_SOURCES) $(kernel_generic_SOURCES) \
-	$(kernel_tracing_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
-	$(shell_SOURCES) $(user_shell_SOURCES)
-DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
+SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libg_a_SOURCES) \
 	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(boot1_elf_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
 	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
@@ -942,6 +943,15 @@ DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(kernel_asan_SOURCES) $(kernel_generic_SOURCES) \
 	$(kernel_tracing_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
 	$(shell_SOURCES) $(user_shell_SOURCES)
+DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
+	$(libg_a_SOURCES) $(libm_a_SOURCES) $(libstdc___a_SOURCES) \
+	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
+	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
+	$(bootpxe_bios_elf_SOURCES) $(dhcpclient_SOURCES) \
+	$(hello_km_SOURCES) $(kernel_asan_SOURCES) \
+	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
+	$(ls_SOURCES) $(mbr_elf_SOURCES) $(shell_SOURCES) \
+	$(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1137,6 +1147,7 @@ SORT = @SORT@
 STACK_CHECK_FLAGS = @STACK_CHECK_FLAGS@
 STRIP = @STRIP@
 TRUNCATE = @TRUNCATE@
+USER64_FLAGS = @USER64_FLAGS@
 VECTORIZE_FLAGS = @VECTORIZE_FLAGS@
 VERSION = @VERSION@
 YACC = @YACC@
@@ -1207,6 +1218,7 @@ BUILT_SOURCES = \
 	generated_headers \
 	sysroot/lib/crt0.o \
 	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
 	sysroot/lib/libm.a \
 	sysroot/lib/libstdc++.a \
 	trace-tool
@@ -1216,7 +1228,10 @@ BUILT_SOURCES = \
 LINKER_DEBUG = 
 
 # libbootsect.a
-noinst_LIBRARIES = libbootsect.a libc.a libm.a libstdc++.a
+
+# ----------------------------------------------------------------------------
+# iibg
+noinst_LIBRARIES = libbootsect.a libc.a libm.a libstdc++.a libg.a
 mbr_elf_SOURCES = \
 	mbr/mbr.ld \
 	mbr/mbr.S
@@ -2085,9 +2100,25 @@ shell_SOURCES = \
 	user/shell/parser.h \
 	user/shell/parser.cc
 
-shell_CFLAGS = -isystem $(top_builddir)/sysroot/include
-shell_CXXFLAGS = $(shell_CFLAGS)
-EXTRA_shell_DEPENDENCIES = user/shell/grammar.c
+shell_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-isystem $(top_builddir)/sysroot/include \
+	-g \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
+
+shell_CFLAGS = \
+	$(shell_CXXFLAGS)
+
+shell_CCASFLAGS = 
+shell_LDFLAGS = $(shell_CFLAGS)
+EXTRA_shell_DEPENDENCIES = \
+	user/user64.ld \
+	user/shell/grammar.c \
+	sysroot/lib/libc.a \
+	sysroot/lib/crt0.o \
+	generated_headers
+
 
 # ----------------------------------------------------------------------------
 # libc
@@ -2221,6 +2252,7 @@ libc_a_SOURCES = \
 	libc/src/dirent/readdir_r.cc \
 	libc/src/dirent/seekdir.cc \
 	libc/src/stdlib/_Exit.cc \
+	libc/src/stdlib/abort.cc \
 	libc/src/stdlib/abs.cc \
 	libc/src/stdlib/malloc.cc \
 	libc/src/fcntl/creat.cc \
@@ -2233,13 +2265,17 @@ libc_a_SOURCES = \
 	libc/src/stdio/bits/cfile.h \
 	libc/src/stdio/bits/formatter.cc \
 	libc/src/stdio/bits/formatter.h \
+	libc/src/stdio/stdin_out_err.cc \
+	libc/src/stdio/fdopen.cc \
 	libc/src/stdio/fprintf.cc \
 	libc/src/stdio/fputc.cc \
+	libc/src/stdio/fgets.cc \
 	libc/src/stdio/printf.cc \
 	libc/src/stdio/vfprintf.cc \
 	libc/src/stdio/vprintf.cc \
 	libc/src/stdio/fread.cc \
 	libc/src/stdio/fwrite.cc \
+	libc/src/sys/indirect-thunk.S \
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
 	libc/src/sys/mman/mremap.cc \
@@ -2368,7 +2404,8 @@ libc_a_CXXFLAGS = \
 	$(FREESTANDING_FLAGS) \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
 libm_a_SOURCES = \
 	libc/math/cos.cc \
@@ -2379,7 +2416,8 @@ libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	-std=c++14 -static \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
 libstdc___a_SOURCES = \
 	libc/cxx/terminate.cc \
@@ -2390,7 +2428,8 @@ libstdc___a_CXXFLAGS = \
 	-std=c++14 -static \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
-	$(COMPILER_FLAGS)
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
 
 
 # ----------------------------------------------------------------------------
@@ -2406,6 +2445,12 @@ LIBC_CXXFLAGS = \
 	-I$(top_builddir) \
 	-L$(top_builddir)
 
+libg_a_SOURCES = \
+	libc/libg/debug.cc
+
+libg_a_CFLAGS = $(LIBC_CXXFLAGS)
+libg_a_CXXFLAGS = $(LIBC_CXXFLAGS)
+libg_a_CCASFLAGS = $(LIBC_CXXFLAGS)
 dhcpclient_SOURCES = \
 	user/bin/dhcpclient/main.cc
 
@@ -2439,7 +2484,14 @@ EXTRA_hello_km_DEPENDENCIES = \
 	kernel/arch/x86_64/module.ld \
 	Makefile.am
 
-user_shell_CXXFLAGS = -g
+user_shell_CXXFLAGS = \
+	-g \
+	$(COMPILER_FLAGS)
+
+user_shell_CFLAGS = \
+	-g \
+	$(COMPILER_FLAGS)
+
 user_shell_SOURCES = \
 	user/test/test.S
 
@@ -2447,7 +2499,9 @@ user_shell_LDFLAGS = \
 	-Wl,-z,max-page-size=4096
 
 user_shell_CCASFLAGS = \
-	$(ASM_DEBUG_INFO_FLAGS) -v -isystem sysroot/include
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-v -isystem sysroot/include
 
 
 # ----------------------------------------------------------------------------
@@ -2474,10 +2528,7 @@ QEMU_CORES = 8
 QEMU_THREADS = 2
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 QEMU_RAM = 5G
-QEMU_MEMFILL = \
-	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
-	-numa node,nodeid=0,memdev=ram-node0
-
+QEMU_MEMFILL = 
 QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
 	-device usb-kbd,bus=xhci.0 \
@@ -2910,6 +2961,9 @@ libc/src/stdlib/$(DEPDIR)/$(am__dirstamp):
 libc/src/stdlib/libc_a-_Exit.$(OBJEXT):  \
 	libc/src/stdlib/$(am__dirstamp) \
 	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdlib/libc_a-abort.$(OBJEXT):  \
+	libc/src/stdlib/$(am__dirstamp) \
+	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdlib/libc_a-abs.$(OBJEXT): libc/src/stdlib/$(am__dirstamp) \
 	libc/src/stdlib/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdlib/libc_a-malloc.$(OBJEXT):  \
@@ -2954,10 +3008,18 @@ libc/src/stdio/$(am__dirstamp):
 libc/src/stdio/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/stdio/$(DEPDIR)
 	@: > libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-stdin_out_err.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-fdopen.$(OBJEXT):  \
+	libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdio/libc_a-fprintf.$(OBJEXT):  \
 	libc/src/stdio/$(am__dirstamp) \
 	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdio/libc_a-fputc.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-fgets.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
 	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
 libc/src/stdio/libc_a-printf.$(OBJEXT):  \
 	libc/src/stdio/$(am__dirstamp) \
@@ -2973,6 +3035,14 @@ libc/src/stdio/libc_a-fread.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
 libc/src/stdio/libc_a-fwrite.$(OBJEXT):  \
 	libc/src/stdio/$(am__dirstamp) \
 	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys
+	@: > libc/src/sys/$(am__dirstamp)
+libc/src/sys/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/$(DEPDIR)
+	@: > libc/src/sys/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/indirect-thunk.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
+	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/mman/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/sys/mman
 	@: > libc/src/sys/mman/$(am__dirstamp)
@@ -3349,12 +3419,6 @@ libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp):
 libc/src/sys/socket/libc_a-socket.$(OBJEXT):  \
 	libc/src/sys/socket/$(am__dirstamp) \
 	libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp)
-libc/src/sys/$(am__dirstamp):
-	@$(MKDIR_P) libc/src/sys
-	@: > libc/src/sys/$(am__dirstamp)
-libc/src/sys/$(DEPDIR)/$(am__dirstamp):
-	@$(MKDIR_P) libc/src/sys/$(DEPDIR)
-	@: > libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/syscall0.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
 	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/syscall1.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
@@ -3374,6 +3438,19 @@ libc.a: $(libc_a_OBJECTS) $(libc_a_DEPENDENCIES) $(EXTRA_libc_a_DEPENDENCIES)
 	$(AM_V_at)-rm -f libc.a
 	$(AM_V_AR)$(libc_a_AR) libc.a $(libc_a_OBJECTS) $(libc_a_LIBADD)
 	$(AM_V_at)$(RANLIB) libc.a
+libc/libg/$(am__dirstamp):
+	@$(MKDIR_P) libc/libg
+	@: > libc/libg/$(am__dirstamp)
+libc/libg/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/libg/$(DEPDIR)
+	@: > libc/libg/$(DEPDIR)/$(am__dirstamp)
+libc/libg/libg_a-debug.$(OBJEXT): libc/libg/$(am__dirstamp) \
+	libc/libg/$(DEPDIR)/$(am__dirstamp)
+
+libg.a: $(libg_a_OBJECTS) $(libg_a_DEPENDENCIES) $(EXTRA_libg_a_DEPENDENCIES) 
+	$(AM_V_at)-rm -f libg.a
+	$(AM_V_AR)$(libg_a_AR) libg.a $(libg_a_OBJECTS) $(libg_a_LIBADD)
+	$(AM_V_at)$(RANLIB) libg.a
 libc/math/$(am__dirstamp):
 	@$(MKDIR_P) libc/math
 	@: > libc/math/$(am__dirstamp)
@@ -4767,6 +4844,7 @@ mostlyclean-compile:
 	-rm -f kernel/syscall/*.$(OBJEXT)
 	-rm -f libc/cxx/*.$(OBJEXT)
 	-rm -f libc/cxx/abi/*.$(OBJEXT)
+	-rm -f libc/libg/*.$(OBJEXT)
 	-rm -f libc/math/*.$(OBJEXT)
 	-rm -f libc/src/assert/*.$(OBJEXT)
 	-rm -f libc/src/dirent/*.$(OBJEXT)
@@ -5260,6 +5338,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/cxx/$(DEPDIR)/libstdc___a-terminate.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/cxx/abi/$(DEPDIR)/libstdc___a-cxa_allocate_exception.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/libg/$(DEPDIR)/libg_a-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-cos.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-log.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/math/$(DEPDIR)/libm_a-sin.Po@am__quote@
@@ -5301,16 +5380,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigdefault.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnattr_setsigmask.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/posix_spawn/$(DEPDIR)/libc_a-posix_spawnp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fgets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fputc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-printf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/bits/$(DEPDIR)/libc_a-cfile.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/bits/$(DEPDIR)/libc_a-formatter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-_Exit.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-abort.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-abs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdlib/$(DEPDIR)/libc_a-malloc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-__bytebitmap.Po@am__quote@
@@ -5348,6 +5431,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strtok_r.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strxfrm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/string/$(DEPDIR)/libc_a-strxfrm_l.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/indirect-thunk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall0.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/$(DEPDIR)/syscall2.Po@am__quote@
@@ -7043,6 +7127,20 @@ libc/src/stdlib/libc_a-_Exit.obj: libc/src/stdlib/_Exit.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-_Exit.obj `if test -f 'libc/src/stdlib/_Exit.cc'; then $(CYGPATH_W) 'libc/src/stdlib/_Exit.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/_Exit.cc'; fi`
 
+libc/src/stdlib/libc_a-abort.o: libc/src/stdlib/abort.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-abort.o -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-abort.Tpo -c -o libc/src/stdlib/libc_a-abort.o `test -f 'libc/src/stdlib/abort.cc' || echo '$(srcdir)/'`libc/src/stdlib/abort.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-abort.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-abort.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/abort.cc' object='libc/src/stdlib/libc_a-abort.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-abort.o `test -f 'libc/src/stdlib/abort.cc' || echo '$(srcdir)/'`libc/src/stdlib/abort.cc
+
+libc/src/stdlib/libc_a-abort.obj: libc/src/stdlib/abort.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-abort.obj -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-abort.Tpo -c -o libc/src/stdlib/libc_a-abort.obj `if test -f 'libc/src/stdlib/abort.cc'; then $(CYGPATH_W) 'libc/src/stdlib/abort.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/abort.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-abort.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-abort.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdlib/abort.cc' object='libc/src/stdlib/libc_a-abort.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdlib/libc_a-abort.obj `if test -f 'libc/src/stdlib/abort.cc'; then $(CYGPATH_W) 'libc/src/stdlib/abort.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdlib/abort.cc'; fi`
+
 libc/src/stdlib/libc_a-abs.o: libc/src/stdlib/abs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdlib/libc_a-abs.o -MD -MP -MF libc/src/stdlib/$(DEPDIR)/libc_a-abs.Tpo -c -o libc/src/stdlib/libc_a-abs.o `test -f 'libc/src/stdlib/abs.cc' || echo '$(srcdir)/'`libc/src/stdlib/abs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdlib/$(DEPDIR)/libc_a-abs.Tpo libc/src/stdlib/$(DEPDIR)/libc_a-abs.Po
@@ -7183,6 +7281,34 @@ libc/src/stdio/bits/libc_a-formatter.obj: libc/src/stdio/bits/formatter.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/bits/libc_a-formatter.obj `if test -f 'libc/src/stdio/bits/formatter.cc'; then $(CYGPATH_W) 'libc/src/stdio/bits/formatter.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/bits/formatter.cc'; fi`
 
+libc/src/stdio/libc_a-stdin_out_err.o: libc/src/stdio/stdin_out_err.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-stdin_out_err.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Tpo -c -o libc/src/stdio/libc_a-stdin_out_err.o `test -f 'libc/src/stdio/stdin_out_err.cc' || echo '$(srcdir)/'`libc/src/stdio/stdin_out_err.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Tpo libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/stdin_out_err.cc' object='libc/src/stdio/libc_a-stdin_out_err.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-stdin_out_err.o `test -f 'libc/src/stdio/stdin_out_err.cc' || echo '$(srcdir)/'`libc/src/stdio/stdin_out_err.cc
+
+libc/src/stdio/libc_a-stdin_out_err.obj: libc/src/stdio/stdin_out_err.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-stdin_out_err.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Tpo -c -o libc/src/stdio/libc_a-stdin_out_err.obj `if test -f 'libc/src/stdio/stdin_out_err.cc'; then $(CYGPATH_W) 'libc/src/stdio/stdin_out_err.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/stdin_out_err.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Tpo libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/stdin_out_err.cc' object='libc/src/stdio/libc_a-stdin_out_err.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-stdin_out_err.obj `if test -f 'libc/src/stdio/stdin_out_err.cc'; then $(CYGPATH_W) 'libc/src/stdio/stdin_out_err.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/stdin_out_err.cc'; fi`
+
+libc/src/stdio/libc_a-fdopen.o: libc/src/stdio/fdopen.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fdopen.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Tpo -c -o libc/src/stdio/libc_a-fdopen.o `test -f 'libc/src/stdio/fdopen.cc' || echo '$(srcdir)/'`libc/src/stdio/fdopen.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fdopen.cc' object='libc/src/stdio/libc_a-fdopen.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fdopen.o `test -f 'libc/src/stdio/fdopen.cc' || echo '$(srcdir)/'`libc/src/stdio/fdopen.cc
+
+libc/src/stdio/libc_a-fdopen.obj: libc/src/stdio/fdopen.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fdopen.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Tpo -c -o libc/src/stdio/libc_a-fdopen.obj `if test -f 'libc/src/stdio/fdopen.cc'; then $(CYGPATH_W) 'libc/src/stdio/fdopen.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fdopen.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fdopen.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fdopen.cc' object='libc/src/stdio/libc_a-fdopen.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fdopen.obj `if test -f 'libc/src/stdio/fdopen.cc'; then $(CYGPATH_W) 'libc/src/stdio/fdopen.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fdopen.cc'; fi`
+
 libc/src/stdio/libc_a-fprintf.o: libc/src/stdio/fprintf.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fprintf.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Tpo -c -o libc/src/stdio/libc_a-fprintf.o `test -f 'libc/src/stdio/fprintf.cc' || echo '$(srcdir)/'`libc/src/stdio/fprintf.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fprintf.Po
@@ -7210,6 +7336,20 @@ libc/src/stdio/libc_a-fputc.obj: libc/src/stdio/fputc.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fputc.cc' object='libc/src/stdio/libc_a-fputc.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fputc.obj `if test -f 'libc/src/stdio/fputc.cc'; then $(CYGPATH_W) 'libc/src/stdio/fputc.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fputc.cc'; fi`
+
+libc/src/stdio/libc_a-fgets.o: libc/src/stdio/fgets.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fgets.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fgets.Tpo -c -o libc/src/stdio/libc_a-fgets.o `test -f 'libc/src/stdio/fgets.cc' || echo '$(srcdir)/'`libc/src/stdio/fgets.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fgets.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fgets.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fgets.cc' object='libc/src/stdio/libc_a-fgets.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fgets.o `test -f 'libc/src/stdio/fgets.cc' || echo '$(srcdir)/'`libc/src/stdio/fgets.cc
+
+libc/src/stdio/libc_a-fgets.obj: libc/src/stdio/fgets.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-fgets.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-fgets.Tpo -c -o libc/src/stdio/libc_a-fgets.obj `if test -f 'libc/src/stdio/fgets.cc'; then $(CYGPATH_W) 'libc/src/stdio/fgets.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fgets.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-fgets.Tpo libc/src/stdio/$(DEPDIR)/libc_a-fgets.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/fgets.cc' object='libc/src/stdio/libc_a-fgets.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fgets.obj `if test -f 'libc/src/stdio/fgets.cc'; then $(CYGPATH_W) 'libc/src/stdio/fgets.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fgets.cc'; fi`
 
 libc/src/stdio/libc_a-printf.o: libc/src/stdio/printf.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-printf.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-printf.Tpo -c -o libc/src/stdio/libc_a-printf.o `test -f 'libc/src/stdio/printf.cc' || echo '$(srcdir)/'`libc/src/stdio/printf.cc
@@ -8876,6 +9016,20 @@ libc/src/sys/socket/libc_a-socket.obj: libc/src/sys/socket/socket.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/socket/socket.cc' object='libc/src/sys/socket/libc_a-socket.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/socket/libc_a-socket.obj `if test -f 'libc/src/sys/socket/socket.cc'; then $(CYGPATH_W) 'libc/src/sys/socket/socket.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/socket/socket.cc'; fi`
+
+libc/libg/libg_a-debug.o: libc/libg/debug.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libg_a_CXXFLAGS) $(CXXFLAGS) -MT libc/libg/libg_a-debug.o -MD -MP -MF libc/libg/$(DEPDIR)/libg_a-debug.Tpo -c -o libc/libg/libg_a-debug.o `test -f 'libc/libg/debug.cc' || echo '$(srcdir)/'`libc/libg/debug.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/libg/$(DEPDIR)/libg_a-debug.Tpo libc/libg/$(DEPDIR)/libg_a-debug.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/libg/debug.cc' object='libc/libg/libg_a-debug.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libg_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/libg/libg_a-debug.o `test -f 'libc/libg/debug.cc' || echo '$(srcdir)/'`libc/libg/debug.cc
+
+libc/libg/libg_a-debug.obj: libc/libg/debug.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libg_a_CXXFLAGS) $(CXXFLAGS) -MT libc/libg/libg_a-debug.obj -MD -MP -MF libc/libg/$(DEPDIR)/libg_a-debug.Tpo -c -o libc/libg/libg_a-debug.obj `if test -f 'libc/libg/debug.cc'; then $(CYGPATH_W) 'libc/libg/debug.cc'; else $(CYGPATH_W) '$(srcdir)/libc/libg/debug.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/libg/$(DEPDIR)/libg_a-debug.Tpo libc/libg/$(DEPDIR)/libg_a-debug.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/libg/debug.cc' object='libc/libg/libg_a-debug.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libg_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/libg/libg_a-debug.obj `if test -f 'libc/libg/debug.cc'; then $(CYGPATH_W) 'libc/libg/debug.cc'; else $(CYGPATH_W) '$(srcdir)/libc/libg/debug.cc'; fi`
 
 libc/math/libm_a-cos.o: libc/math/cos.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libm_a_CXXFLAGS) $(CXXFLAGS) -MT libc/math/libm_a-cos.o -MD -MP -MF libc/math/$(DEPDIR)/libm_a-cos.Tpo -c -o libc/math/libm_a-cos.o `test -f 'libc/math/cos.cc' || echo '$(srcdir)/'`libc/math/cos.cc
@@ -14995,6 +15149,8 @@ distclean-generic:
 	-rm -f libc/cxx/$(am__dirstamp)
 	-rm -f libc/cxx/abi/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/cxx/abi/$(am__dirstamp)
+	-rm -f libc/libg/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/libg/$(am__dirstamp)
 	-rm -f libc/math/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/math/$(am__dirstamp)
 	-rm -f libc/src/assert/$(DEPDIR)/$(am__dirstamp)
@@ -15049,7 +15205,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/libg/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -15097,7 +15253,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/libg/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/hello/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -15208,6 +15364,9 @@ sysroot/lib/crt0.o: $(top_srcdir)/user/crt0/crt0.S $(top_srcdir)/Makefile.am
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
+sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
 sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
@@ -15224,6 +15383,8 @@ endef
 $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
+
+#-v -Wl,-verbose
 
 $(top_srcdir)/user/shell/grammar.c \
 	$(top_srcdir)/user/shell/grammar.h \
@@ -15485,6 +15646,7 @@ $(top_builddir)/isodisk.img: \
 		$(top_builddir)/bootpxe-bios.map \
 		\
 		user-shell \
+		shell \
 		hello.km \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
@@ -15615,6 +15777,9 @@ $(DUMPDIR)/qemu-debug-out:
 $(DUMPDIR)/call-trace-out:
 	mkdir -p "$(@D)"
 	mkfifo "$@"
+#QEMU_MEMFILL = \
+#	-object memory-backend-file,id=ram-node0,mem-path="random-mem.img",size=$(QEMU_RAM),prealloc=no \
+#	-numa node,nodeid=0,memdev=ram-node0
 
 QEMU_USB_ROOT_PORTS ?= 16
 

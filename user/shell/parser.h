@@ -1,4 +1,5 @@
-#include "assert.h"
+#include <assert.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,7 +36,7 @@ struct parser_node_t {
 
 typedef parser_node_t *parser_node_ptr_t;
 
-parser_node_ptr_t parser_node(int count, parser_op_t op, ...);
+parser_node_ptr_t parser_node(size_t count, parser_op_t op, ...);
 
 #ifdef __cplusplus
 }

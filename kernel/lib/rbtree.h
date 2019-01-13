@@ -340,7 +340,7 @@ template<typename _T>
 class avltree_policy_t
 {
 public:
-    static void retraceInsert(_T *&root_ptr, _T *_Z)
+    static void retrace_insert(_T *&root_ptr, _T *_Z)
     {
         _T *_X, *_N, *_G;
 
@@ -429,7 +429,7 @@ public:
         // the height of the total tree increases by 1.
     }
 
-    static void retraceDelete(_T *&__root_ptr, _T *_N)
+    static void retrace_delete(_T *&__root_ptr, _T *_N)
     {
         _T *_X, *_G, *_Z;
         int __b;
@@ -1011,7 +1011,7 @@ public:
 
         if (i != nullptr)
         {
-            TreePolicy::retraceInsert(root, i);
+            TreePolicy::retrace_insert(root, i);
         }
     }
 
@@ -1037,7 +1037,7 @@ public:
         node_t *i = __tree_ins(n, _Compare(), found_dup, ins, false);
 
         if (likely(!found_dup))
-            TreePolicy::retraceInsert(root, n);
+            TreePolicy::retrace_insert(root, n);
 
         return { iterator(i), !found_dup };
     }

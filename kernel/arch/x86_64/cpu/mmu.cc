@@ -408,8 +408,13 @@ public:
     public:
         void free(physaddr_t addr)
         {
-            if (count == countof(pages))
+            // Can't free demand page entry
+            if (unlikely(addr == PTE_ADDR))
+                return;
+
+            if (unlikely(count == countof(pages)))
                 flush();
+
             pages[count++] = addr;
         }
 
@@ -453,6 +458,7 @@ private:
     _always_inline void release_one_locked(physaddr_t addr)
     {
         size_t index = index_from_addr(addr);
+        assert(index < highest_usable);
         unsigned low = addr < 0x100000000;
         assert(entries[index] & used_mask);
         if (entries[index] == (1 | used_mask)) {
@@ -2074,7 +2080,10 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             pte = 0;
 
             if (paddr)
-                pte = paddr | page_flags | PTE_PRESENT;
+                pte = paddr | page_flags;
+
+            if (paddr && (paddr & PTE_ADDR) != PTE_ADDR)
+                pte |= PTE_PRESENT;
 
             if (paddr && !(flags & MAP_STACK)) {
                 // Commit first page
@@ -3165,9 +3174,20 @@ int mlock(const void *addr, size_t len)
     bool kernel = staddr >= 0x800000000000;
 
     if (unlikely(!kernel && enaddr >= 0x800000000000))
-        return int(errno_t::EINVAL);
+        return -int(errno_t::EINVAL);
 
+    return 0;
+}
 
+int munlock(const void *addr, size_t len)
+{
+    linaddr_t staddr = linaddr_t(addr);
+    linaddr_t enaddr = staddr + len;
+
+    bool kernel = staddr >= 0x800000000000;
+
+    if (unlikely(!kernel && enaddr >= 0x800000000000))
+        return -int(errno_t::EINVAL);
 
     return 0;
 }
@@ -3358,6 +3378,9 @@ bool mm_copy_user_generic(void *dst, void const *src, size_t size)
 
 bool mm_copy_user_smap(void *dst, void const *src, size_t size)
 {
+    // Assert that one side of the copy is user mode
+    assert((intptr_t(dst) > 0) != (intptr_t(src) > 0));
+
     __try {
         cpu_stac();
         memcpy(dst, src, size);

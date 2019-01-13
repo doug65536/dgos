@@ -2,6 +2,8 @@
 
 #include "dirent.h"
 
+#define PATH_MAX 256
+
 extern "C" {
 
 ssize_t sys_read(int fd, void *bufaddr, size_t count);

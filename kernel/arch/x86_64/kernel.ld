@@ -17,7 +17,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___text_st = .);
 		/* ISR code is hot and should be page aligned because it is cloned */
 		PROVIDE_HIDDEN(___isr_st = .);
-		*(SORT(.text.isr.*))
+		*(SORT_BY_NAME(.text.isr.*))
 		*(.text.isr)
 		PROVIDE_HIDDEN(___isr_en = .);
 

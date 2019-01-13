@@ -1,4 +1,5 @@
 #include "dev_storage.h"
+#include <cxxstring.h>
 
 struct dev_fs_file_info_t final
         : public fs_file_info_t
@@ -11,8 +12,21 @@ public:
     }
 };
 
-struct dev_fs_t final : public fs_base_t {
+struct device_t
+{
+    std::string name;
+    fs_base_t *fs;
+};
+
+struct dev_fs_t final
+        : public fs_base_t
+{
     FS_BASE_RW_IMPL
+
+    fs_base_t *resolve(char const *path);
+
+    using device_list = std::vector<device_t>;
+    device_list devices;
 
     struct file_handle_t : public fs_file_info_t {
         enum type_t {
@@ -232,4 +246,32 @@ int dev_fs_t::ioctl(fs_file_info_t *fi, int cmd, void* arg,
 int dev_fs_t::poll(fs_file_info_t *fi, fs_pollhandle_t* ph, unsigned* reventsp)
 {
     return -int(errno_t::ENOSYS);
+}
+
+fs_base_t *devfs_create()
+{
+    return new dev_fs_t();
+}
+
+fs_base_t *devfs_resolve(dev_fs_t * restrict dev_fs,
+                         char const * restrict path)
+{
+    return dev_fs->resolve(path);
+}
+
+fs_base_t *dev_fs_t::resolve(char const *path)
+{
+    size_t len = strlen(path);
+    device_list::iterator match = std::find_if(devices.begin(), devices.end(),
+                 [len, path](device_t const& item) {
+        return item.name.size() == len && item.name == path;
+    });
+    if (match != devices.end())
+        return match->fs;
+    return nullptr;
+}
+
+void devfs_delete(dev_fs_t *dev_fs)
+{
+    delete dev_fs;
 }

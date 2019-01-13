@@ -611,6 +611,7 @@ PE64_FLAGS
 PE32_FLAGS
 ELF64_FLAGS
 ELF32_FLAGS
+USER64_FLAGS
 NO_FLOAT_FLAGS
 NOSTDLIB_FLAGS
 FREESTANDING_FLAGS
@@ -7624,7 +7625,7 @@ done
 # fgcse-las causes compiler segfaults
 OPTIMIZATION_FLAGS=
 for flag in \
-	O2 fstrict-aliasing
+	Os fstrict-aliasing
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -7997,6 +7998,59 @@ else
 fi
 
 done
+
+
+USER64_FLAGS=
+for flag in \
+	mindirect-branch=thunk-extern D_USE_RETPOLINE=1 \
+	falign-functions=4 falign-labels=4 falign-jumps=4 malign-stringops \
+	fbuiltin \
+	mred-zone \
+	m64 \
+	mpreferred-stack-boundary=4 \
+	fPIE \
+	Wl,-T$srcdir/user/user64.ld
+do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
+  as_fn_append USER64_FLAGS " -$flag"
+
+else
+  $COMPILER_WERROR
+fi
+
+done
+
 
 
 ELF32_FLAGS=

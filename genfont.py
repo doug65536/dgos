@@ -8,6 +8,8 @@ if len(sys.argv) > 1 and sys.argv[1] != '-':
 else:
 	stream = sys.stdin
 
+codepoint_list = []
+
 while True:
 	line = stream.readline()
 
@@ -17,7 +19,7 @@ while True:
 	if line.startswith('ENCODING '):
 		codepoint = int(line[9:])
 		binary = chr(codepoint & 0xFF) + chr(codepoint >> 8)
-		sys.stdout.write(binary)
+		codepoint_list.append(binary)
 		#sys.stdout.seek(codepoint * 16)
 		continue
 
@@ -28,4 +30,5 @@ while True:
 			data = int(line, 16)
 			sys.stdout.write(chr(data))
 
-
+for binary in codepoint_list:
+	sys.stdout.write(binary)

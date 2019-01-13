@@ -7,6 +7,7 @@
 #include "string.h"
 #include "vector.h"
 #include "mutex.h"
+#include "fs/devfs.h"
 
 #define DEBUG_FILEHANDLE 1
 #if DEBUG_FILEHANDLE
@@ -16,24 +17,43 @@
 #endif
 
 struct filetab_t {
+    // Default and move construct allowed
     filetab_t() = default;
     filetab_t(filetab_t&&) = default;
+
+    // Copying not allowed
     filetab_t(filetab_t const&) = delete;
     filetab_t& operator=(filetab_t const&) = delete;
     filetab_t& operator=(filetab_t&&) = delete;
 
+    // Filesystem specific per-file structure
     fs_file_info_t *fi;
+
+    // Filesystem implementation
     fs_base_t *fs;
+
+    // Current seek position
     off_t pos;
+
+    // Free list pointer
     filetab_t *next_free;
+
+    // Reference count
     int refcount;
 };
 
 using file_table_lock_type = std::mcslock;
 using file_table_scoped_lock = std::unique_lock<file_table_lock_type>;
+
 static file_table_lock_type file_table_lock;
+
+// Array of files
 static std::vector<filetab_t> file_table;
+
+// First free
 static filetab_t *file_table_ff;
+
+static dev_fs_t *dev_fs;
 
 static void file_init(void *)
 {
@@ -42,13 +62,31 @@ static void file_init(void *)
         panic_oom();
 }
 
-static fs_base_t *file_fs_from_path(char const *path)
+static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
 {
+    if (path[0] == '/' && !memcmp(path, "/dev/", 5)) {
+        if (!atomic_ld_acq(&dev_fs)) {
+            // Create an instance, possibly racing with another thread
+            auto* new_devfs = devfs_create();
+
+            // Set it if it was zero
+            auto old_devfs = atomic_cmpxchg(&dev_fs, nullptr, new_devfs);
+
+            if (unlikely(old_devfs != nullptr)) {
+                // We got nonzero, another thread won the race, cleanup
+                devfs_delete(new_devfs);
+                return devfs_resolve(old_devfs, path + 5);
+            }
+
+            return devfs_resolve(new_devfs, path + 5);
+        }
+    }
+
     (void)path;
     return fs_from_id(0);
 }
 
-static filetab_t *file_new_filetab(void)
+filetab_t *file_new_filetab(void)
 {
     file_table_scoped_lock lock(file_table_lock);
     filetab_t *item = nullptr;
@@ -118,7 +156,8 @@ int file_creat(char const *path, mode_t mode)
 
 int file_open(char const *path, int flags, mode_t mode)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
@@ -130,7 +169,7 @@ int file_open(char const *path, int flags, mode_t mode)
     if (unlikely(!fh))
         return -int(errno_t::ENFILE);
 
-    int status = fs->open(&fh->fi, path, flags, mode);
+    int status = fs->open(&fh->fi, path + consumed, flags, mode);
     if (unlikely(status < 0)) {
         FILEHANDLE_TRACE("open failed on %s, status=%d\n", path, status);
         file_del_filetab(fh);
@@ -301,7 +340,8 @@ int file_fdatasync(int id)
 
 int file_opendir(char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
@@ -378,40 +418,50 @@ int file_closedir(int id)
 
 int file_mkdir(char const *path, mode_t mode)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->mkdir(path, mode);
+    return fs->mkdir(path + consumed, mode);
 }
 
 int file_rmdir(char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->rmdir(path);
+    return fs->rmdir(path + consumed);
 }
 
-int file_rename(char const *old_path, char const *new_path)
+int file_rename(char const *old_path, char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(old_path);
+    size_t old_consumed = 0;
+    fs_base_t *old_fs = file_fs_from_path(old_path, old_consumed);
+
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
+
+    if (unlikely(old_fs != fs))
+        return -int(errno_t::EXDEV);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->rename(old_path, new_path);
+    return fs->rename(old_path + old_consumed, path + consumed);
 }
 
 int file_unlink(char const *path)
 {
-    fs_base_t *fs = file_fs_from_path(path);
+    size_t consumed = 0;
+    fs_base_t *fs = file_fs_from_path(path, consumed);
 
     if (unlikely(!fs))
         return -int(errno_t::ENOENT);
 
-    return fs->unlink(path);
+    return fs->unlink(path + consumed);
 }

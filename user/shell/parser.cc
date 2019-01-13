@@ -3,8 +3,9 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <stdio.h>
 
-parser_node_ptr_t parser_node(int count, parser_op_t op, ...)
+parser_node_ptr_t parser_node(size_t count, parser_op_t op, ...)
 {
     va_list ap;
     va_start(ap, op);
@@ -19,7 +20,11 @@ parser_node_ptr_t parser_node(int count, parser_op_t op, ...)
 
 int main(int argc, char **argv)
 {
-
+    static constexpr size_t const sz = 4 << 10;
+    char buf[sz];
+    fgets(buf, sz, stdin);
+    printf("You said %s\n", buf);
+    return 0;
 }
 
 void parser_token_destructor(parser_token_t token)

@@ -54,6 +54,7 @@ device/virtio-gpu.h
 device/vt100.cc
 device/vt100.h
 fs/devfs.cc
+fs/devfs.h
 lib/asan.cc
 lib/asan.h
 lib/cc/cxxstring.h

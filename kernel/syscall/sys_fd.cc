@@ -7,6 +7,63 @@
 #include "mm.h"
 #include "unique_ptr.h"
 
+class unique_memlock
+{
+public:
+    unique_memlock()
+        : locked_addr{}
+        , locked_size{}
+    {
+    }
+
+    unique_memlock(std::defer_lock_t)
+        : unique_memlock()
+    {
+    }
+
+    unique_memlock(unique_memlock&& rhs)
+        : locked_addr{rhs.locked_addr}
+        , locked_size{rhs.locked_size}
+    {
+        rhs.locked_addr = nullptr;
+        rhs.locked_size = 0;
+    }
+
+    explicit unique_memlock(void const *addr, size_t size)
+        : unique_memlock()
+    {
+        lock(addr, size);
+    }
+
+    ~unique_memlock()
+    {
+        unlock();
+    }
+
+    int lock(void const *addr, size_t size)
+    {
+        unlock();
+        if (mlock(addr, size) < 0)
+            return -1;
+        locked_addr = addr;
+        locked_size = size;
+        return 0;
+    }
+
+    void unlock()
+    {
+        if (locked_size) {
+            munlock(locked_addr, locked_size);
+            locked_addr = nullptr;
+            locked_size = 0;
+        }
+    }
+
+private:
+    void const *locked_addr;
+    size_t locked_size;
+};
+
 // Validate the errno and return its negated integer value
 static int err(errno_t errno)
 {
@@ -32,10 +89,13 @@ ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
     process_t *p = fast_cur_process();
 
+
     int id = p->fd_to_id(fd);
 
     if (unlikely(id < 0))
         return badf_err();
+
+    unique_memlock memlock(bufaddr, count);
 
     ssize_t sz = file_read(id, bufaddr, count);
 
@@ -49,6 +109,7 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 {
     process_t *p = fast_cur_process();
 
+
     int id = p->fd_to_id(fd);
 
     if (unlikely(id < 0))
@@ -56,6 +117,8 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 
     if (uintptr_t(bufaddr) >= 0x800000000000)
         return err(errno_t::EFAULT);
+
+    unique_memlock memlock(bufaddr, count);
 
     if (!verify_accessible(bufaddr, count, false))
         return err(errno_t::EFAULT);
@@ -319,6 +382,15 @@ int sys_truncate(char const *path, off_t size)
 
 int sys_rename(char const *old_path, char const *new_path)
 {
+    if (unlikely(!old_path))
+        return err(errno_t::EFAULT);
+    if (unlikely(!new_path))
+        return err(errno_t::EFAULT);
+
+    mlock(old_path, PATH_MAX);
+
+    mlock(new_path, PATH_MAX);
+
     int status = file_rename(old_path, new_path);
     if (likely(status >= 0))
         return status;

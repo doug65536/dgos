@@ -23,6 +23,7 @@ $(top_builddir)/isodisk.img: \
 		$(top_builddir)/bootpxe-bios.map \
 		\
 		user-shell \
+		shell \
 		hello.km \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
