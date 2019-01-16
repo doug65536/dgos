@@ -146,7 +146,7 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects ggdb \
+		std=c++14 fno-fat-lto-objects g gdwarf-3 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
@@ -158,7 +158,7 @@ for flag in \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=local-exec
+		mtls-direct-seg-refs ftls-model=global-madynamic
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
@@ -197,7 +197,7 @@ do
 done
 
 AS_VAR_SET([DEBUG_INFO_FLAGS], [])
-for flag in g gcolumn-info
+for flag in ggdb3 gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([DEBUG_INFO_FLAGS], [" -$flag"])],
@@ -206,7 +206,7 @@ done
 AC_SUBST([DEBUG_INFO_FLAGS])
 
 AS_VAR_SET([ASM_DEBUG_INFO_FLAGS], [])
-for flag in Wa,-g g gcolumn-info
+for flag in Wa,-g g gdwarf-3 gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ASM_DEBUG_INFO_FLAGS], [" -$flag"])],
@@ -261,13 +261,15 @@ AC_SUBST([NO_FLOAT_FLAGS])
 USER64_FLAGS=
 for flag in \
 	mindirect-branch=thunk-extern D_USE_RETPOLINE=1 \
-	falign-functions=4 falign-labels=4 falign-jumps=4 malign-stringops \
+	malign-stringops \
 	fbuiltin \
 	mred-zone \
 	m64 \
 	mpreferred-stack-boundary=4 \
 	fPIE \
-	Wl,-T$srcdir/user/user64.ld
+	Wl,-T$srcdir/user/user64.ld \
+	fno-exceptions fno-rtti \
+	Wl,-z,max-page-size=4096
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]
@@ -298,7 +300,6 @@ for flag in \
 	mpreferred-stack-boundary=3 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--eh-frame-hdr \
 	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
@@ -307,7 +308,6 @@ do
 		[], [$COMPILER_WERROR])
 done
 AC_SUBST([ELF64_FLAGS])
-
 
 PE32_FLAGS=
 for flag in \
@@ -363,11 +363,15 @@ do
 done
 AC_SUBST([REGPARM_FLAGS])
 
+AS_IF([test x"$NO_FORCE_LIBGCC_GXX" == x""],
+	[AS_VAR_SET([LIBGCC_CXX], [x86_64-elf-g++])],
+	[AS_VAR_SET([LIBGCC_CXX], [$CXX])])
+
 AC_MSG_NOTICE([Using libgcc parameters: $REGPARM_FLAGS $BOOTLOADER_FLAGS])
-LIBGCC_ELF32=$($CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)
-LIBGCC_ELF64=$($CXX $REGPARM_FLAGS $ELF64_FLAGS -print-libgcc-file-name)
-LIBGCC_PE32=$($CXX $REGPARM_FLAGS $PE32_FLAGS -print-libgcc-file-name)
-LIBGCC_PE64=$($CXX $REGPARM_FLAGS $PE64_FLAGS -print-libgcc-file-name)
+LIBGCC_ELF32=$($LIBGCC_CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)
+LIBGCC_ELF64=$($LIBGCC_CXX $REGPARM_FLAGS $ELF64_FLAGS -print-libgcc-file-name)
+LIBGCC_PE32=$($LIBGCC_CXX $REGPARM_FLAGS $PE32_FLAGS -print-libgcc-file-name)
+LIBGCC_PE64=$($LIBGCC_CXX $REGPARM_FLAGS $PE64_FLAGS -print-libgcc-file-name)
 AC_MSG_NOTICE([Using elf32 libgcc: $LIBGCC_ELF32])
 AC_MSG_NOTICE([Using elf64 libgcc: $LIBGCC_ELF64])
 AC_MSG_NOTICE([Using pe32 libgcc: $LIBGCC_PE32])
@@ -515,10 +519,10 @@ AC_ARG_ENABLE(lto,
 				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $TUNE_FLAGS"])
 			], [
 				AC_MSG_NOTICE([Disabling optimizations])
-				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" -g -O0"])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" -ggdb3 -O0"])
 				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
 					[" $DISABLE_FRAMEPOINTER_FLAGS"])
-				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" -g -O0"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" -ggdb3 -O0"])
 				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
 					[" $DISABLE_FRAMEPOINTER_FLAGS"])
 			]

@@ -11,7 +11,7 @@ _constructor(ctor_malloc) void malloc_init_auto()
     static constexpr size_t heap_sz = (320 << 10);
     EFI_PHYSICAL_ADDRESS heap_physaddr = 0x90000;
     status = efi_systab->BootServices->AllocatePages(
-                AllocateMaxAddress, EFI_MEMORY_TYPE(0x80000000),
+                AllocateMaxAddress, EfiLoaderData,
                 heap_sz >> 12, &heap_physaddr);
 
     if (unlikely(EFI_ERROR(status)))

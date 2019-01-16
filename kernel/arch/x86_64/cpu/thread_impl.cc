@@ -759,6 +759,8 @@ static void thread_clear_busy(void *outgoing)
 _hot
 isr_context_t *thread_schedule(isr_context_t *ctx)
 {
+    cpu_scoped_irq_disable intr_dis;
+
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
 

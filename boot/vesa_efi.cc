@@ -103,7 +103,7 @@ static vbe_selected_mode_t *selected_mode_from_efi_mode(
 
 bool vbe_set_mode(vbe_selected_mode_t& mode)
 {
-    EFI_STATUS status;
+    EFI_STATUS status = 0;
 
     if (mode.mode_num != uint16_t(-1)) {
         status = efi_graphics_output->SetMode(

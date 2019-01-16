@@ -4,6 +4,11 @@
 //#include <typeinfo>
 //#include <cxxabi.h>
 
+static char emergency_space[4096];
+static size_t emergency_ptr = sizeof(emergency_space);
+
+namespace std { void terminate(); }
+
 /// Effects: Allocates memory to hold the exception to be thrown.
 /// thrown_size is the size of the exception object.
 /// Can allocate additional memory to hold private data.
@@ -12,15 +17,15 @@
 /// Returns: A pointer to the memory allocated for the exception object.
 extern "C" void *__cxa_allocate_exception(size_t thrown_size) throw()
 {
-    void *ex = mmap(nullptr, thrown_size, PROT_READ | PROT_WRITE,
-                    MAP_POPULATE, -1, 0);
-    return ex;
+    if (emergency_ptr > thrown_size)
+        return emergency_space + (emergency_ptr -= thrown_size);
+    std::terminate();
+    __builtin_unreachable();
 }
 
 /// Effects: Frees memory allocated by __cxa_allocate_exception.
 void __cxa_free_exception(void * thrown_exception) throw()
 {
-
 }
 
 #if 0

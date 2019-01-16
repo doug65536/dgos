@@ -13,9 +13,13 @@ BUILT_SOURCES = \
 	generated_headers \
 	sysroot/lib/crt0.o \
 	sysroot/lib/libc.a \
+	sysroot/lib/libc.so \
 	sysroot/lib/libg.a \
+	sysroot/lib/libg.so \
 	sysroot/lib/libm.a \
+	sysroot/lib/libm.so \
 	sysroot/lib/libstdc++.a \
+	sysroot/lib/libstdc++.so \
 	trace-tool
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
@@ -23,7 +27,6 @@ LINKER_DEBUG =
 
 noinst_LIBRARIES =
 bin_PROGRAMS =
-
 #bootefi-i386
 
 # mbr-elf
@@ -991,8 +994,19 @@ INCLUDES_NAMES = $(shell cd $(top_srcdir)/libc/include && $(FIND) -type f)
 INCLUDES_DEPLOYED = \
 	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
 
-sysroot/lib/crt0.o: $(top_srcdir)/user/crt0/crt0.S $(top_srcdir)/Makefile.am
-	mkdir -p "$(@D)" && $(CXX) -g -Wa,-g -o $@ -c $<
+sysroot/lib/crt0.o: \
+		$(top_srcdir)/user/crt0/crt0.S \
+		$(top_srcdir)/libc/include/sys/cpu_bug.h \
+		$(top_srcdir)/Makefile.am \
+		$(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && \
+		$(CXX) \
+			-g \
+			$(ASM_DEBUG_INFO_FLAGS) \
+			--sysroot $(top_builddir)/sysroot \
+			-isystem $(top_builddir)/sysroot/include \
+			-o $@ \
+			-c $<
 
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
@@ -1004,6 +1018,18 @@ sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
 sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libg.so: libg.so $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libm.so: libm.so $(INCLUDES_DEPLOYED)
+	mkdir -p "$(@D)" && cp $< $@
+
+sysroot/lib/libstdc++.so: libstdc++.so $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
 define deploy_sysroot_header =
@@ -1034,7 +1060,6 @@ shell_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
 
-
 shell_CFLAGS = \
 	$(shell_CXXFLAGS)
 
@@ -1055,7 +1080,7 @@ EXTRA_shell_DEPENDENCIES = \
 	user/shell/grammar.c \
 	sysroot/lib/libc.a \
 	sysroot/lib/crt0.o \
-	generated_headers
+	$(INCLUDES_DEPLOYED)
 
 # ----------------------------------------------------------------------------
 # libc
@@ -1093,6 +1118,7 @@ libc_a_HEADERS = \
 	libc/include/fcntl.h \
 	libc/include/stdio.h \
 	libc/include/setjmp.h \
+	libc/include/sys/cpu_bug.h \
 	libc/include/sys/syscall.h \
 	libc/include/sys/resource.h \
 	libc/include/sys/select.h \
@@ -1182,6 +1208,7 @@ libc_a_SOURCES = \
 	libc/src/string/memchr.cc \
 	libc/src/string/strxfrm_l.cc \
 	libc/src/string/strncmp.cc \
+	libc/src/new/operator-new.cc \
 	libc/src/dirent/opendir.cc \
 	libc/src/dirent/closedir.cc \
 	libc/src/dirent/fdopendir.cc \
@@ -1189,13 +1216,15 @@ libc_a_SOURCES = \
 	libc/src/dirent/rewinddir.cc \
 	libc/src/dirent/telldir.cc \
 	libc/src/dirent/dirfd.cc \
-	libc/src/dirent/opendir.cc \
 	libc/src/dirent/readdir_r.cc \
 	libc/src/dirent/seekdir.cc \
+	libc/src/stdlib/new.cc \
 	libc/src/stdlib/_Exit.cc \
 	libc/src/stdlib/abort.cc \
 	libc/src/stdlib/abs.cc \
 	libc/src/stdlib/malloc.cc \
+	libc/src/stdlib/calloc.cc \
+	libc/src/stdlib/free.cc \
 	libc/src/fcntl/creat.cc \
 	libc/src/fcntl/fcntl.cc \
 	libc/src/fcntl/open.cc \
@@ -1343,10 +1372,19 @@ libc_a_SOURCES = \
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	$(FREESTANDING_FLAGS) \
-	-std=c++14 -static \
+	-std=c++14 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
+
+bin_PROGRAMS += libc.so
+
+libc_so_SOURCES = $(libc_a_SOURCES) -fPIC -shared -nostdlib
+libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) -fPIC -shared -nostdlib
+libc_so_CFLAGS = $(libc_a_CFLAGS) -fPIC -shared -nostdlib
+libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) -fPIC -shared -nostdlib
+libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fPIC -shared -nostdlib
+EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
 
 noinst_LIBRARIES += libm.a
 
@@ -1357,10 +1395,20 @@ libm_a_SOURCES = \
 
 libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++14 -static \
+	-std=c++14 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
+
+bin_PROGRAMS += libm.so
+
+libm_so_SOURCES = $(libm_a_SOURCES) -fPIC -shared -nostdlib
+libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) -fPIC -shared -nostdlib
+libm_so_CFLAGS = $(libm_a_CFLAGS) -fPIC -shared -nostdlib
+libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) -fPIC -shared -nostdlib
+libm_so_LDFLAGS = $(libm_a_LDFLAGS) -fPIC -shared -nostdlib
+EXTRA_libm_so_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
+libm_so_LDADD = -lgcc
 
 noinst_LIBRARIES += libstdc++.a
 
@@ -1370,11 +1418,21 @@ libstdc___a_SOURCES = \
 
 libstdc___a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++14 -static \
+	-std=c++14 \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
 	$(USER64_FLAGS)
+
+bin_PROGRAMS += libstdc++.so
+
+libstdc___so_SOURCES = $(libstdc___a_SOURCES) -fPIC -shared -nostdlib
+libstdc___so_CXXFLAGS = $(libstdc___a_CXXFLAGS) -fPIC -shared -nostdlib
+libstdc___so_CFLAGS = $(libstdc___a_CFLAGS) -fPIC -shared -nostdlib
+libstdc___so_CCASFLAGS = $(libstdc___a_CCASFLAGS) -fPIC -shared -nostdlib
+libstdc___so_LDFLAGS = $(libstdc___a_LDFLAGS) -fPIC -shared -nostdlib
+EXTRA_libstdc___so_DEPENDENCIES = $(EXTRA_libstdc___a_DEPENDENCIES)
 
 # ----------------------------------------------------------------------------
 # libc unit tests
@@ -1386,6 +1444,7 @@ LIBC_TESTS = \
 LIBC_CXXFLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(FREESTANDING_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
 	-isystem $(top_srcdir)/libc/include \
 	-I$(top_builddir) \
 	-L$(top_builddir)
@@ -1432,6 +1491,15 @@ libg_a_SOURCES = \
 libg_a_CFLAGS = $(LIBC_CXXFLAGS)
 libg_a_CXXFLAGS = $(LIBC_CXXFLAGS)
 libg_a_CCASFLAGS = $(LIBC_CXXFLAGS)
+
+bin_PROGRAMS += libg.so
+
+libg_so_SOURCES = $(libg_a_SOURCES) -fPIC -shared -nostdlib
+libg_so_CXXFLAGS = $(libg_a_CXXFLAGS) -fPIC -shared -nostdlib
+libg_so_CFLAGS = $(libg_a_CFLAGS) -fPIC -shared -nostdlib
+libg_so_CCASFLAGS = $(libg_a_CCASFLAGS) -fPIC -shared -nostdlib
+libg_so_LDFLAGS = $(libg_a_LDFLAGS) -fPIC -shared -nostdlib
+EXTRA_libg_so_DEPENDENCIES = $(EXTRA_libg_a_DEPENDENCIES)
 
 # ----------------------------------------------------------------------------
 # User programs
@@ -1681,11 +1749,14 @@ QEMU_SERIAL = \
 	-chardev stdio,id=seabios \
 	-device isa-debugcon,iobase=0x402,chardev=seabios
 
+QEMU_SOUND = -soundhw es1370
+
 QEMU_COMMON = \
 	$(QEMU_MONITOR) \
 	$(QEMU_SERIAL) \
 	$(QEMU_DEBUGCON) \
 	$(QEMU_NET) \
+	$(QEMU_SOUND) \
 	-no-shutdown -no-reboot -d unimp,guest_errors \
 	-m $(QEMU_RAM) \
 	$(QEMU_FLAGS) \

@@ -52,7 +52,7 @@ _malloc _assume_aligned(16)
 void *operator new(size_t size) noexcept;
 
 _malloc _assume_aligned(16)
-void *operator new[](size_t size) noexcept;
+void *operator new[](size_t size);
 
 void operator delete(void *block, unsigned long size) noexcept;
 

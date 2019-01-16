@@ -1,12 +1,12 @@
 
-#if __LONG_WIDTH__ == 32 && __LONG_LONG_WIDTH__ == 64
+#if __SIZEOF_LONG__ == 4 && __SIZEOF_LONG_LONG__ == 8
 #define __FMT8      "hh"
 #define __FMT16     "h"
 #define __FMT32     "l"
 #define __FMT64     "ll"
 #define __FMTMX     "j"
 #define __FMTPT     "t"
-#elif __LONG_WIDTH__ == 64 && __LONG_LONG_WIDTH__ == 64
+#elif __SIZEOF_LONG__ == 8 && __SIZEOF_LONG_LONG__ == 8
 #define __FMT8      "hh"
 #define __FMT16     "h"
 #define __FMT32     ""

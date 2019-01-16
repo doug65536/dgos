@@ -134,7 +134,7 @@ void take_pages(uint64_t phys_addr, uint64_t size)
     //PRINT("Taking %" PRIx64 " at %" PRIx64, size, phys_addr);
 
     status = efi_systab->BootServices->AllocatePages(
-                AllocateAddress, EFI_MEMORY_TYPE(0x80000000),
+                AllocateAddress, EfiLoaderData,
                 size >> 12, &addr);
 
     if (unlikely(EFI_ERROR(status)))

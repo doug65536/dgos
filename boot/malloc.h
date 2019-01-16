@@ -16,7 +16,7 @@ void *malloc_aligned(size_t bytes, size_t alignment);
 _use_result _malloc _leaf
 void *realloc(void *p, size_t bytes);
 
-_use_result _malloc _alloc_align(1)
+_use_result _malloc _alloc_align(3)
 void *realloc_aligned(void *p, size_t bytes, size_t alignment);
 
 bool malloc_validate();

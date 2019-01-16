@@ -402,7 +402,7 @@ public:
 
     void addref(physaddr_t addr);
 
-    void addref_virtual_range(linaddr_t start, size_t len);
+    void adjref_virtual_range(linaddr_t start, size_t len, int adj);
 
     class free_batch_t {
     public:
@@ -3058,7 +3058,8 @@ void mmu_phys_allocator_t::addref(physaddr_t addr)
     ++entries[index];
 }
 
-void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
+void mmu_phys_allocator_t::adjref_virtual_range(
+        linaddr_t start, size_t len, int adj)
 {
     unsigned misalignment = start & PAGE_SCALE;
     start -= misalignment;
@@ -3070,18 +3071,35 @@ void mmu_phys_allocator_t::addref_virtual_range(linaddr_t start, size_t len)
 
     size_t count = len >> log2_pagesz;
 
+    free_batch_t free_batch(phys_allocator);
+
     scoped_lock lock_(lock);
 
-    for (size_t i = 0; i < count; ++i) {
-        physaddr_t addr = *ptes[3] & PTE_ADDR;
+    if (adj > 0) {
+        for (size_t i = 0; i < count; ++i) {
+            physaddr_t addr = *ptes[3] & PTE_ADDR;
 
-        if (addr && addr != PTE_ADDR) {
-            entry_t index = index_from_addr(addr);
-            assert(entries[index] & used_mask);
-            ++entries[index];
+            if (addr && addr != PTE_ADDR) {
+                entry_t index = index_from_addr(addr);
+                assert(entries[index] & used_mask);
+                ++entries[index];
+            }
+
+            ++ptes[3];
         }
+    } else if (adj < 0) {
+        for (size_t i = 0; i < count; ++i) {
+            physaddr_t addr = *ptes[3] & PTE_ADDR;
 
-        ++ptes[3];
+            if (addr && addr != PTE_ADDR) {
+                entry_t index = index_from_addr(addr);
+                assert(entries[index] & used_mask);
+                if (--entries[index] == 0)
+                    free_batch.free(addr_from_index(index));
+            }
+
+            ++ptes[3];
+        }
     }
 }
 
@@ -3171,10 +3189,14 @@ int mlock(const void *addr, size_t len)
     linaddr_t staddr = linaddr_t(addr);
     linaddr_t enaddr = staddr + len;
 
-    bool kernel = staddr >= 0x800000000000;
+    bool st_kernel = intptr_t(staddr) < 0;
+    bool en_kernel = intptr_t(enaddr-1) < 0;
 
-    if (unlikely(!kernel && enaddr >= 0x800000000000))
+    // Spans across privilege boundary
+    if (st_kernel != en_kernel)
         return -int(errno_t::EINVAL);
+
+    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, 1);
 
     return 0;
 }
@@ -3188,6 +3210,8 @@ int munlock(const void *addr, size_t len)
 
     if (unlikely(!kernel && enaddr >= 0x800000000000))
         return -int(errno_t::EINVAL);
+
+    phys_allocator.adjref_virtual_range(linaddr_t(addr), len, -1);
 
     return 0;
 }

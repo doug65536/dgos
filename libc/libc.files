@@ -1,7 +1,8 @@
 cxx/abi/cxa_allocate_exception.cc
 cxx/terminate.cc
+include/disabled_stdint.h
 include/new.h
-include/stdint.h
+include/sys/cpu_bug.h
 include/sys/ioctl.h
 include/sys/socket.h
 include/sys/syscall_num.h
@@ -28,6 +29,7 @@ src/fcntl/open.cc
 src/fcntl/openat.cc
 src/fcntl/posix_fadvise.cc
 src/fcntl/posix_fallocate.cc
+src/new/operator-new.cc
 src/posix_spawn/bits/posix_spawn_file_action.h
 src/posix_spawn/posix_spawn.cc
 src/posix_spawn/posix_spawn_file_actions_addclose.cc
@@ -67,6 +69,8 @@ src/stdio/vfprintf.cc
 src/stdio/vprintf.cc
 src/stdlib/abort.cc
 src/stdlib/abs.cc
+src/stdlib/calloc.cc
+src/stdlib/free.cc
 src/stdlib/malloc.cc
 src/stdlib/new.cc
 src/string/__bytebitmap.cc

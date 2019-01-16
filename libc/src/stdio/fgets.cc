@@ -15,7 +15,7 @@ char *fgets(char * restrict str, int count, FILE * restrict s)
             // or,
             // break when there is only room for a null terminator
             // after writing the null terminator to output
-            size_t idx = s->seek_pos - s->buf_pos;
+            off_t idx = s->seek_pos - s->buf_pos;
 
             while (idx < s->buf_got) {
                 ++idx;

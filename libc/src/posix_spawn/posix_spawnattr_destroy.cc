@@ -1,4 +1,5 @@
 #include <spawn.h>
+#include <stdlib.h>
 #include "bits/posix_spawn_file_action.h"
 
 int posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *fa)

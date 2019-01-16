@@ -314,6 +314,11 @@ constexpr uintptr_t isr_entry_point(size_t i)
     return uintptr_t(___isr_st + (i << 4));
 }
 
+static uint8_t idt_vector_type(size_t vec)
+{
+    return vec != INTR_THREAD_YIELD ? IDT_TRAP : IDT_INTR;
+}
+
 int idt_init(int ap)
 {
     uintptr_t addr;
@@ -325,7 +330,7 @@ int idt_init(int ap)
             idt[i].offset_hi = uint16_t((addr >> 16) & 0xFFFF);
             idt[i].offset_64_31 = uint32_t((addr >> 32) & 0xFFFFFFFF);
 
-            idt[i].type_attr = IDT_PRESENT | IDT_INTR;
+            idt[i].type_attr = IDT_PRESENT | idt_vector_type(i);
 
             idt[i].selector = IDT_SEL;
         }

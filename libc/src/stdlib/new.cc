@@ -16,7 +16,7 @@ void operator delete(void *block, size_t)
     free(block);
 }
 
-void operator delete(void *block) throw()
+void operator delete(void *block)
 {
     free(block);
 }

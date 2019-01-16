@@ -31,8 +31,3 @@ void parser_token_destructor(parser_token_t token)
 {
 
 }
-
-void *operator new(size_t n)
-{
-    return malloc(n);
-}

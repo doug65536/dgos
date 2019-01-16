@@ -19,12 +19,15 @@ _pure int strncat(char16_t const * restrict lhs,
 _pure int memcmp(void const *lhs, void const *rhs, size_t count);
 _pure char *strstr(tchar const *str, tchar const *substr);
 
-void *memset(void *dest, int c, size_t n);
-void *memcpy(void * restrict dest, void const * restrict src, size_t n);
-void *memmove(void *dest, void const *src, size_t n);
+extern "C" void *memset(void *dest, int c, size_t n);
+extern "C" void *memcpy(void * restrict dest,
+                        void const * restrict src, size_t n);
+extern "C" void *memmove(void *dest, void const *src, size_t n);
 
-char *strcpy(char * restrict dest, char const * restrict src);
-char *strcat(char * restrict dest, char const * restrict src);
+extern "C" char *strcpy(char * restrict dest, char const * restrict src);
+extern "C" char *strcat(char * restrict dest, char const * restrict src);
 
-char *strncpy(char * restrict dest, char const * restrict src, size_t n);
-char *strncat(char * restrict dest, char const * restrict src, size_t n);
+extern "C" char *strncpy(char * restrict dest,
+                         char const * restrict src, size_t n);
+extern "C" char *strncat(char * restrict dest,
+                         char const * restrict src, size_t n);

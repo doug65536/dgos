@@ -1239,7 +1239,8 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
 
     dump_config_desc(cfg_hlp);
 
-    usb_class_drv_t *drv = usb_class_drv_t::find_driver(&cfg_hlp, this);
+    usb_class_drv_t * drv = usb_class_drv_t::find_driver(&cfg_hlp, this);
+    (void)drv;
 
     USBXHCI_TRACE("Driver: %s\n", drv ? drv->name() : "<not found>");
 
@@ -1407,8 +1408,15 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     slot_data.resize(maxslots);
 
+    size_t cpu_count = thread_get_cpu_count();
+
+    if (maxintr >= cpu_count)
+        maxintr = cpu_count;
+    else
+        maxintr = 1;
+
     use_msi = pci_try_msi_irq(pci_iter, &irq_range,
-                              0, false, std::min(16U, maxintr),
+                              0, true, maxintr,
                               &usbxhci::irq_handler,
                               "usb_xhci");
 

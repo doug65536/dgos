@@ -1,5 +1,7 @@
 .code64
 
+#include <sys/cpu_bug.h>
+
 .section .text
 
 .global _start
@@ -44,7 +46,8 @@ _start:
     jnz .Lrela_iplt_skip
 
     // Call the resolver
-    call * 16(%rbx)
+	movq 16(%rbx),%rax
+	indirect_call rax
 
     // Read PLT vector pointer from relocation record
     movq (%rbx),%rdx

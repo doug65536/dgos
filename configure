@@ -7514,7 +7514,7 @@ done
 
 COMPILER_FLAGS=
 for flag in \
-		std=c++14 fno-fat-lto-objects ggdb \
+		std=c++14 fno-fat-lto-objects g gdwarf-3 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
@@ -7526,7 +7526,7 @@ for flag in \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=local-exec
+		mtls-direct-seg-refs ftls-model=global-madynamic
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -7667,7 +7667,7 @@ fi
 done
 
 DEBUG_INFO_FLAGS=
-for flag in g gcolumn-info
+for flag in ggdb3 gcolumn-info
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -7710,7 +7710,7 @@ done
 
 
 ASM_DEBUG_INFO_FLAGS=
-for flag in Wa,-g g gcolumn-info
+for flag in Wa,-g g gdwarf-3 gcolumn-info
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8003,13 +8003,15 @@ done
 USER64_FLAGS=
 for flag in \
 	mindirect-branch=thunk-extern D_USE_RETPOLINE=1 \
-	falign-functions=4 falign-labels=4 falign-jumps=4 malign-stringops \
+	malign-stringops \
 	fbuiltin \
 	mred-zone \
 	m64 \
 	mpreferred-stack-boundary=4 \
 	fPIE \
-	Wl,-T$srcdir/user/user64.ld
+	Wl,-T$srcdir/user/user64.ld \
+	fno-exceptions fno-rtti \
+	Wl,-z,max-page-size=4096
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8110,7 +8112,6 @@ for flag in \
 	mpreferred-stack-boundary=3 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--eh-frame-hdr \
 	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
@@ -8153,7 +8154,6 @@ else
 fi
 
 done
-
 
 
 PE32_FLAGS=
@@ -8350,12 +8350,18 @@ fi
 done
 
 
+if test x"$NO_FORCE_LIBGCC_GXX" == x""; then :
+  LIBGCC_CXX=x86_64-elf-g++
+else
+  LIBGCC_CXX=$CXX
+fi
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: Using libgcc parameters: $REGPARM_FLAGS $BOOTLOADER_FLAGS" >&5
 $as_echo "$as_me: Using libgcc parameters: $REGPARM_FLAGS $BOOTLOADER_FLAGS" >&6;}
-LIBGCC_ELF32=$($CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)
-LIBGCC_ELF64=$($CXX $REGPARM_FLAGS $ELF64_FLAGS -print-libgcc-file-name)
-LIBGCC_PE32=$($CXX $REGPARM_FLAGS $PE32_FLAGS -print-libgcc-file-name)
-LIBGCC_PE64=$($CXX $REGPARM_FLAGS $PE64_FLAGS -print-libgcc-file-name)
+LIBGCC_ELF32=$($LIBGCC_CXX $REGPARM_FLAGS $ELF32_FLAGS -print-libgcc-file-name)
+LIBGCC_ELF64=$($LIBGCC_CXX $REGPARM_FLAGS $ELF64_FLAGS -print-libgcc-file-name)
+LIBGCC_PE32=$($LIBGCC_CXX $REGPARM_FLAGS $PE32_FLAGS -print-libgcc-file-name)
+LIBGCC_PE64=$($LIBGCC_CXX $REGPARM_FLAGS $PE64_FLAGS -print-libgcc-file-name)
 { $as_echo "$as_me:${as_lineno-$LINENO}: Using elf32 libgcc: $LIBGCC_ELF32" >&5
 $as_echo "$as_me: Using elf32 libgcc: $LIBGCC_ELF32" >&6;}
 { $as_echo "$as_me:${as_lineno-$LINENO}: Using elf64 libgcc: $LIBGCC_ELF64" >&5
@@ -9130,9 +9136,9 @@ else
 
 				{ $as_echo "$as_me:${as_lineno-$LINENO}: Disabling optimizations" >&5
 $as_echo "$as_me: Disabling optimizations" >&6;}
-				as_fn_append OPTIMIZE_SIZE_FLAGS " -g -O0"
+				as_fn_append OPTIMIZE_SIZE_FLAGS " -ggdb3 -O0"
 				as_fn_append OPTIMIZE_SIZE_FLAGS " $DISABLE_FRAMEPOINTER_FLAGS"
-				as_fn_append OPTIMIZE_SPEED_FLAGS " -g -O0"
+				as_fn_append OPTIMIZE_SPEED_FLAGS " -ggdb3 -O0"
 				as_fn_append OPTIMIZE_SPEED_FLAGS " $DISABLE_FRAMEPOINTER_FLAGS"
 
 

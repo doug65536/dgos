@@ -148,8 +148,10 @@ int process_t::start(void *process_arg)
 
 int process_t::start()
 {
+    // Attach this kernel thread to this process
     thread_set_process(-1, this);
 
+    // Switch to user address space
     mmu_context = mm_new_process(this);
 
     // Simply load it for now
@@ -175,6 +177,9 @@ int process_t::start()
                 read_size,
                 hdr.e_phoff))
         return -1;
+
+    size_t last_region_st = ~size_t(0);
+    size_t last_region_en = 0;
 
     // Map every section, just in case any pages overlap
     for (Elf64_Phdr& ph : program_hdrs) {
@@ -204,10 +209,20 @@ int process_t::start()
         if (ph.p_flags & PF_X)
             page_prot |= PROT_EXEC;
 
+        // Skip pointless calls to mmap for little regions that overlap
+        // previously reserved regions
+        if (ph.p_vaddr >= last_region_st ||
+                ph.p_vaddr + ph.p_memsz <= last_region_en)
+            continue;
+
         if (mmap((void*)ph.p_vaddr,
                          ph.p_memsz, page_prot,
                          MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)
             return -1;
+
+        // Update region reserved by last mapping
+        last_region_st = ph.p_vaddr & -PAGESIZE;
+        last_region_en = ((ph.p_vaddr + ph.p_memsz) + PAGESIZE - 1) & -PAGESIZE;
     }
 
     // Read everything after mapping the memory
