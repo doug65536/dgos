@@ -97,6 +97,41 @@ int qemu_selector_by_name(const char * restrict name,
     return sel;
 }
 
+int qemu_selector_by_name_dma(const char * restrict name,
+                              uint32_t * restrict file_size_out)
+{
+    if (file_size_out)
+        *file_size_out = 0;
+
+    if (!qemu_fw_cfg_present())
+        return -1;
+
+    uint32_t file_count;
+
+    qemu_fw_cfg_dma(&file_count, sizeof(file_count), FW_CFG_FILE_DIR);
+    file_count = ntohl(file_count);
+
+    FWCfgFile *files = new FWCfgFile[file_count];
+
+    int sel = -1;
+
+    if (qemu_fw_cfg_dma(files, sizeof(*files) * file_count,
+                        FW_CFG_FILE_DIR, sizeof(file_count))) {
+        for (uint32_t i = 0; i < file_count; ++i) {
+            if (!strcmp(files[i].name, name)) {
+                sel = ntohs(files[i].select);
+                if (file_size_out)
+                    *file_size_out = ntohl(files[i].size);
+                break;
+            }
+        }
+    }
+
+    delete[] files;
+
+    return sel;
+}
+
 // Returns how much buffer should have been provided on success
 // Limits buffer fill to specified size
 // Returns -1 on error or if not running under qemu
@@ -153,21 +188,21 @@ bool qemu_fw_cfg_dma(uintptr_t buffer_addr, uint32_t size,
     FWCfgDmaAccess cmd_list[3] = {}, *cmd = cmd_list;
 
     // A command to select a file
-    cmd->control = bswap_32(uint32_t(fw_cfg_ctl_t::select) | (selector << 16));
+    cmd->control = htonl(uint32_t(fw_cfg_ctl_t::select) | (selector << 16));
     ++cmd;
 
     // A command to seek to an offset in the file, if it is nonzero
     if (file_offset > 0) {
-        cmd->control = bswap_32(uint32_t(fw_cfg_ctl_t::skip));
-        cmd->length = bswap_32(file_offset);
+        cmd->control = htonl(uint32_t(fw_cfg_ctl_t::skip));
+        cmd->length = htonl(file_offset);
         ++cmd;
     }
 
     // A command to perform read or write
     cmd->control = bswap_32(uint32_t(read ? fw_cfg_ctl_t::read
                                           : fw_cfg_ctl_t::write));
-    cmd->address = bswap_64(buffer_addr);
-    cmd->length = bswap_32(size);
+    cmd->address = htobe64(buffer_addr);
+    cmd->length = htonl(size);
     ++cmd;
 
     // Guarantee that memory changes thus far are globally visible before
