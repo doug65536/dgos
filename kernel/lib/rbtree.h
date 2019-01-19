@@ -1006,13 +1006,21 @@ public:
 
     pair<iterator, bool> insert(_T&& value)
     {
+        pair<iterator, bool> result;
+
         bool found_dup;
         node_t *i = __tree_ins(nullptr, _Compare(), found_dup, &value, true);
 
-        if (i != nullptr)
+        if (found_dup)
+            result = { iterator(i), false };
+        else if (i != nullptr)
         {
+            result = { iterator(i), true };
+
             TreePolicy::retrace_insert(root, i);
         }
+
+        return result;
     }
 
     pair<iterator, bool> insert(_T const& value)
