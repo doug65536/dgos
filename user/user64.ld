@@ -100,15 +100,15 @@ SECTIONS {
 
 	PROVIDE_HIDDEN(__image_end = .);
 
-	.debug          0 : { *(.debug)         } :read
-	.debug_info		0 : { *(.debug_info)    } :read
-	.debug_abbrev	0 : { *(.debug_abbrev)  } :read
-	.debug_aranges	0 : { *(.debug_aranges) } :read
-	.debug_ranges	0 : { *(.debug_ranges)  } :read
-	.debug_frame	0 : { *(.debug_frame)   } :read
-	.debug_macro	0 : { *(.debug_macro)   } :read
-	.debug_line		0 : { *(.debug_line)    } :read
-	.debug_str		0 : { *(.debug_str)     } :read
-	.debug_loc		0 : { *(.debug_loc)     } :read
-	.comment        0 : { *(.comment)       } :read
+	.debug          0 : { *(.debug)         }
+	.debug_info		0 : { *(.debug_info)    }
+	.debug_abbrev	0 : { *(.debug_abbrev)  }
+	.debug_aranges	0 : { *(.debug_aranges) }
+	.debug_ranges	0 : { *(.debug_ranges)  }
+	.debug_frame	0 : { *(.debug_frame)   }
+	.debug_macro	0 : { *(.debug_macro)   }
+	.debug_line		0 : { *(.debug_line)    }
+	.debug_str		0 : { *(.debug_str)     }
+	.debug_loc		0 : { *(.debug_loc)     }
+	.comment        0 : { *(.comment)       }
 }
