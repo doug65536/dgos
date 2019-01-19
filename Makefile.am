@@ -1065,7 +1065,8 @@ shell_CFLAGS = \
 	$(shell_CXXFLAGS)
 
 shell_CCASFLAGS =
-shell_LDFLAGS = $(shell_CFLAGS)
+shell_LDFLAGS =
+shell_LDADD =
 
 #-v -Wl,-verbose
 
@@ -1470,7 +1471,7 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 		$(LIBC_CXXFLAGS) \
 		-o libc_tests \
 		$(LIBC_TESTS) \
-		-static -nostdlib \
+		-static -nostdlib -g -fno-builtin \
 		$(top_builddir)/libc.a -lgcc
 
 test_compile: $(top_builddir)/libc_tests
