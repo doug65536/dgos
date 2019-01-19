@@ -38,10 +38,11 @@ struct FWCfgFile {      /* an individual file entry, 64 bytes total */
 // -1 not present, 0=unknown, 1=present
 static int fw_cfg_detected;
 
-bool qemu_fw_cfg_present()
+// returns: 0=not present, 1=present (no dma), 2=present (with dma)
+int qemu_fw_cfg_present()
 {
     if (likely(fw_cfg_detected))
-        return fw_cfg_detected > 0;
+        return fw_cfg_detected > 0 ? fw_cfg_detected : 0;
 
     // Guess not detected until proven otherwise so we can early out
     fw_cfg_detected = -1;
@@ -60,12 +61,27 @@ bool qemu_fw_cfg_present()
     // Proven
     fw_cfg_detected = 1;
 
-    return true;
+    // Look for DMA
+    uint32_t dma_port_signature[2];
+    dma_port_signature[0] = inl(FW_CFG_PORT_DMA);
+    dma_port_signature[1] = inl(FW_CFG_PORT_DMA + 4);
+    if (!memcmp(&dma_port_signature, "QEMU CFG", sizeof(uint32_t) * 2))
+        fw_cfg_detected = 2;
+
+    return fw_cfg_detected;
+}
+
+bool qemu_fw_cfg_has_dma()
+{
+    return qemu_fw_cfg_present() > 1;
 }
 
 int qemu_selector_by_name(const char * restrict name,
                           uint32_t * restrict file_size_out)
 {
+    if (qemu_fw_cfg_has_dma())
+        return qemu_selector_by_name_dma(name, file_size_out);
+
     if (file_size_out)
         *file_size_out = 0;
 
@@ -146,8 +162,12 @@ ssize_t qemu_fw_cfg(void *buffer, size_t size, char const *name)
     if (size > file_size)
         size = file_size;
 
-    outw(FW_CFG_PORT_SEL, sel);
-    insb(FW_CFG_PORT_DATA, buffer, size);
+    if (qemu_fw_cfg_has_dma()) {
+        qemu_fw_cfg_dma(buffer, size, sel);
+    } else {
+        outw(FW_CFG_PORT_SEL, sel);
+        insb(FW_CFG_PORT_DATA, buffer, size);
+    }
 
     return file_size;
 }

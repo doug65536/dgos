@@ -2,7 +2,7 @@
 #include "types.h"
 
 bool qemu_present();
-bool qemu_fw_cfg_present();
+int qemu_fw_cfg_present();
 
 int qemu_selector_by_name(char const * restrict name,
                           uint32_t * restrict file_size_out = nullptr);
