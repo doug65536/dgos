@@ -13,14 +13,15 @@ BUILT_SOURCES = \
 	generated_headers \
 	sysroot/lib/crt0.o \
 	sysroot/lib/libc.a \
-	sysroot/lib/libc.so \
 	sysroot/lib/libg.a \
-	sysroot/lib/libg.so \
 	sysroot/lib/libm.a \
-	sysroot/lib/libm.so \
 	sysroot/lib/libstdc++.a \
-	sysroot/lib/libstdc++.so \
 	trace-tool
+
+#sysroot/lib/libc.so \
+#sysroot/lib/libg.so \
+#sysroot/lib/libm.so \
+#sysroot/lib/libstdc++.so
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG =
@@ -1020,17 +1021,17 @@ sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
 sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
 	mkdir -p "$(@D)" && cp $< $@
 
-sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
-
-sysroot/lib/libg.so: libg.so $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
-
-sysroot/lib/libm.so: libm.so $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
-
-sysroot/lib/libstdc++.so: libstdc++.so $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
+#sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
+#	mkdir -p "$(@D)" && cp $< $@
+#
+#sysroot/lib/libg.so: libg.so $(INCLUDES_DEPLOYED)
+#	mkdir -p "$(@D)" && cp $< $@
+#
+#sysroot/lib/libm.so: libm.so $(INCLUDES_DEPLOYED)
+#	mkdir -p "$(@D)" && cp $< $@
+#
+#sysroot/lib/libstdc++.so: libstdc++.so $(INCLUDES_DEPLOYED)
+#	mkdir -p "$(@D)" && cp $< $@
 
 define deploy_sysroot_header =
 $$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
@@ -1377,14 +1378,14 @@ libc_a_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
 
-bin_PROGRAMS += libc.so
-
-libc_so_SOURCES = $(libc_a_SOURCES) -fPIC -shared -nostdlib
-libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) -fPIC -shared -nostdlib
-libc_so_CFLAGS = $(libc_a_CFLAGS) -fPIC -shared -nostdlib
-libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) -fPIC -shared -nostdlib
-libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fPIC -shared -nostdlib
-EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
+#bin_PROGRAMS += libc.so
+#
+#libc_so_SOURCES = $(libc_a_SOURCES)
+#libc_so_CXXFLAGS = $(libc_a_CXXFLAGS) -fPIC -shared -nostdlib
+#libc_so_CFLAGS = $(libc_a_CFLAGS) -fPIC -shared -nostdlib
+#libc_so_CCASFLAGS = $(libc_a_CCASFLAGS) -fPIC -shared -nostdlib
+#libc_so_LDFLAGS = $(libc_a_LDFLAGS) -fPIC -shared -nostdlib
+#EXTRA_libc_so_DEPENDENCIES = $(EXTRA_libc_a_DEPENDENCIES)
 
 noinst_LIBRARIES += libm.a
 
@@ -1400,15 +1401,15 @@ libm_a_CXXFLAGS = \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
 
-bin_PROGRAMS += libm.so
-
-libm_so_SOURCES = $(libm_a_SOURCES) -fPIC -shared -nostdlib
-libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) -fPIC -shared -nostdlib
-libm_so_CFLAGS = $(libm_a_CFLAGS) -fPIC -shared -nostdlib
-libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) -fPIC -shared -nostdlib
-libm_so_LDFLAGS = $(libm_a_LDFLAGS) -fPIC -shared -nostdlib
-EXTRA_libm_so_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
-libm_so_LDADD = -lgcc
+#bin_PROGRAMS += libm.so
+#
+#libm_so_SOURCES = $(libm_a_SOURCES) -fPIC -shared -nostdlib
+#libm_so_CXXFLAGS = $(libm_a_CXXFLAGS) -fPIC -shared -nostdlib
+#libm_so_CFLAGS = $(libm_a_CFLAGS) -fPIC -shared -nostdlib
+#libm_so_CCASFLAGS = $(libm_a_CCASFLAGS) -fPIC -shared -nostdlib
+#libm_so_LDFLAGS = $(libm_a_LDFLAGS) -fPIC -shared -nostdlib
+#EXTRA_libm_so_DEPENDENCIES = $(EXTRA_libm_a_DEPENDENCIES)
+#libm_so_LDADD = -lgcc
 
 noinst_LIBRARIES += libstdc++.a
 
@@ -1425,14 +1426,13 @@ libstdc___a_CXXFLAGS = \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(USER64_FLAGS)
 
-bin_PROGRAMS += libstdc++.so
-
-libstdc___so_SOURCES = $(libstdc___a_SOURCES) -fPIC -shared -nostdlib
-libstdc___so_CXXFLAGS = $(libstdc___a_CXXFLAGS) -fPIC -shared -nostdlib
-libstdc___so_CFLAGS = $(libstdc___a_CFLAGS) -fPIC -shared -nostdlib
-libstdc___so_CCASFLAGS = $(libstdc___a_CCASFLAGS) -fPIC -shared -nostdlib
-libstdc___so_LDFLAGS = $(libstdc___a_LDFLAGS) -fPIC -shared -nostdlib
-EXTRA_libstdc___so_DEPENDENCIES = $(EXTRA_libstdc___a_DEPENDENCIES)
+#bin_PROGRAMS += libstdc++.so
+#libstdc___so_SOURCES = $(libstdc___a_SOURCES) -fPIC -shared -nostdlib
+#libstdc___so_CXXFLAGS = $(libstdc___a_CXXFLAGS) -fPIC -shared -nostdlib
+#libstdc___so_CFLAGS = $(libstdc___a_CFLAGS) -fPIC -shared -nostdlib
+#libstdc___so_CCASFLAGS = $(libstdc___a_CCASFLAGS) -fPIC -shared -nostdlib
+#libstdc___so_LDFLAGS = $(libstdc___a_LDFLAGS) -fPIC -shared -nostdlib
+#EXTRA_libstdc___so_DEPENDENCIES = $(EXTRA_libstdc___a_DEPENDENCIES)
 
 # ----------------------------------------------------------------------------
 # libc unit tests
@@ -1492,14 +1492,13 @@ libg_a_CFLAGS = $(LIBC_CXXFLAGS)
 libg_a_CXXFLAGS = $(LIBC_CXXFLAGS)
 libg_a_CCASFLAGS = $(LIBC_CXXFLAGS)
 
-bin_PROGRAMS += libg.so
-
-libg_so_SOURCES = $(libg_a_SOURCES) -fPIC -shared -nostdlib
-libg_so_CXXFLAGS = $(libg_a_CXXFLAGS) -fPIC -shared -nostdlib
-libg_so_CFLAGS = $(libg_a_CFLAGS) -fPIC -shared -nostdlib
-libg_so_CCASFLAGS = $(libg_a_CCASFLAGS) -fPIC -shared -nostdlib
-libg_so_LDFLAGS = $(libg_a_LDFLAGS) -fPIC -shared -nostdlib
-EXTRA_libg_so_DEPENDENCIES = $(EXTRA_libg_a_DEPENDENCIES)
+#bin_PROGRAMS += libg.so
+#libg_so_SOURCES = $(libg_a_SOURCES) -fPIC -shared -nostdlib
+#libg_so_CXXFLAGS = $(libg_a_CXXFLAGS) -fPIC -shared -nostdlib
+#libg_so_CFLAGS = $(libg_a_CFLAGS) -fPIC -shared -nostdlib
+#libg_so_CCASFLAGS = $(libg_a_CCASFLAGS) -fPIC -shared -nostdlib
+#libg_so_LDFLAGS = $(libg_a_LDFLAGS) -fPIC -shared -nostdlib
+#EXTRA_libg_so_DEPENDENCIES = $(EXTRA_libg_a_DEPENDENCIES)
 
 # ----------------------------------------------------------------------------
 # User programs
