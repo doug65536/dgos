@@ -19,7 +19,6 @@
 #include "heap.h"
 #include "elf64.h"
 #include "fileio.h"
-#include "bootdev.h"
 //#include "zlib/zlib.h"
 //#include "zlib_helper.h"
 #include "stdlib.h"
@@ -873,8 +872,6 @@ static int init_thread(void *)
     // Register network interfaces
     printk("Initializing network interfaces\n");
     callout_call(callout_type_t::nics_ready);
-
-    //bootdev_info(0, 0, 0);
 
     test_spawn();
 

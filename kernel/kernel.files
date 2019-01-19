@@ -230,7 +230,6 @@ arch/x86_64/gdbstub.cc
 arch/x86_64/stacktrace.h
 arch/x86_64/nano_time.cc
 arch/x86_64/kernel.ld
-arch/x86_64/bootdev.h
 arch/Makefile
 arch/mmu.h
 Makefile.user

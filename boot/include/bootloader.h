@@ -3,7 +3,6 @@
 #include "farptr.h"
 #include "vesainfo.h"
 #include "physmem_data.h"
-#include "bootdev_info.h"
 #include "boottable.h"
 #include "assert.h"
 
