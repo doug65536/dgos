@@ -6320,8 +6320,6 @@ else
 fi
 
 
-#AM_PROG_AR
-#AC_PROG_RANLIB
 ac_ext=cpp
 ac_cpp='$CXXCPP $CPPFLAGS'
 ac_compile='$CXX -c $CXXFLAGS $CPPFLAGS conftest.$ac_ext >&5'
@@ -7514,7 +7512,7 @@ done
 
 COMPILER_FLAGS=
 for flag in \
-		std=c++14 fno-fat-lto-objects g gdwarf-3 \
+		std=c++14 fno-fat-lto-objects g \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \

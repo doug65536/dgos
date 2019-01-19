@@ -10,8 +10,6 @@ AM_INIT_AUTOMAKE([subdir-objects 1.11 -Wall -Wno-portability])
 AX_PROG_CXX_FOR_BUILD
 AC_PROG_CXX
 AM_PROG_AS
-#AM_PROG_AR
-#AC_PROG_RANLIB
 AC_LANG([C++])
 
 AC_CHECK_TOOL([OBJDUMP], [objdump], [NOT_FOUND])
@@ -146,7 +144,7 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects g gdwarf-3 \
+		std=c++14 fno-fat-lto-objects g \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
