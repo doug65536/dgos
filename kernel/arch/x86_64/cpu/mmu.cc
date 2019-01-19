@@ -2082,22 +2082,24 @@ void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
             if (paddr)
                 pte = paddr | page_flags;
 
-            if (paddr && (paddr & PTE_ADDR) != PTE_ADDR)
-                pte |= PTE_PRESENT;
+            if (!(flags & MAP_NOCOMMIT)) {
+                if (paddr && (paddr & PTE_ADDR) != PTE_ADDR)
+                    pte |= PTE_PRESENT;
 
-            if (paddr && !(flags & MAP_STACK)) {
-                // Commit first page
-                pte = atomic_xchg(base_pte, pte);
+                if (paddr && !(flags & (MAP_STACK | MAP_NOCOMMIT))) {
+                    // Commit first page
+                    pte = atomic_xchg(base_pte, pte);
 
-                ++ofs;
-            } else if (paddr) {
-                // Commit last page
+                    ++ofs;
+                } else if (paddr && !(flags & MAP_NOCOMMIT)) {
+                    // Commit last page
 
-                pte = atomic_xchg(base_pte + --end, pte);
+                    pte = atomic_xchg(base_pte + --end, pte);
+                }
+
+                if (unlikely(pte && pte != PTE_ADDR))
+                    free_batch.free(pte & PTE_ADDR);
             }
-
-            if (unlikely(pte && pte != PTE_ADDR))
-                free_batch.free(pte & PTE_ADDR);
 
             for ( ; ofs < end; ++ofs) {
                 pte = PTE_ADDR | page_flags;
