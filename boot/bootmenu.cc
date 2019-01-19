@@ -144,7 +144,7 @@ void boot_menu_show(kernel_params_t &params)
 
     boot_menu.center();
 
-    boot_menu.interact_timeout(3000);
+    boot_menu.interact_timeout(1000);
 
     auto mode_index = tui_menu[2].index;
     auto const& mode = vbe_modes.modes[mode_index];
