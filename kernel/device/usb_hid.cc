@@ -521,6 +521,9 @@ static std::vector<usb_hid_dev_t*> hid_devs;
 
 class usb_hid_class_drv_t final : public usb_class_drv_t {
 protected:
+    usb_hid_class_drv_t() = default;
+    ~usb_hid_class_drv_t() = default;
+
     static usb_hid_class_drv_t usb_hid;
 
     // usb_class_drv_t interface
