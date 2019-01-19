@@ -93,16 +93,19 @@ int qemu_selector_by_name(const char * restrict name,
 
     uint32_t file_count;
 
-    qemu_fw_cfg(&file_count, sizeof(file_count), FW_CFG_FILE_DIR);
+    qemu_fw_cfg(&file_count, sizeof(file_count),
+                sizeof(file_count), FW_CFG_FILE_DIR);
 
     file_count = ntohl(file_count);
+
+    size_t dir_file_size = sizeof(FWCfgFile) * file_count + sizeof(file_count);
 
     FWCfgFile file;
 
     int sel = -1;
 
     for (uint32_t i = 0; i < file_count; ++i) {
-        qemu_fw_cfg(&file, sizeof(file));
+        qemu_fw_cfg(&file, sizeof(file), dir_file_size);
 
         if (!strcmp(file.name, name)) {
             sel = ntohs(file.select);
@@ -113,35 +116,6 @@ int qemu_selector_by_name(const char * restrict name,
     }
 
     return sel;
-}
-
-// Returns how much buffer should have been provided on success
-// Limits buffer fill to specified size
-// Returns -1 on error or if not running under qemu
-ssize_t qemu_fw_cfg(void *buffer, size_t size, size_t offset, char const *name)
-{
-    uint32_t file_size;
-    int sel = qemu_selector_by_name(name, &file_size);
-
-    if (unlikely(sel < 0))
-        return -1;
-
-    if (size > file_size)
-        size = file_size;
-
-    if (qemu_fw_cfg_has_dma()) {
-        qemu_fw_cfg(buffer, size, sel, offset);
-    } else {
-        // Select
-        outw(FW_CFG_PORT_SEL, sel);
-        // Inefficient seek is best we can do
-        while (offset--)
-            inb(FW_CFG_PORT_DATA);
-        // Read
-        insb(FW_CFG_PORT_DATA, buffer, size);
-    }
-
-    return file_size;
 }
 
 // fw_cfg DMA commands
@@ -164,12 +138,16 @@ enum struct fw_cfg_ctl_t : uint32_t {
 //  select+read: qemu_fw_cfg_dma(buffer, size, sel, 0)
 //  select+seek+read: qemu_fw_cfg_dma(buffer, size, sel, offset)
 //  any combination
-bool qemu_fw_cfg(void *buffer, uint32_t size,
+bool qemu_fw_cfg(void *buffer, uint32_t size, uint32_t file_size,
                  int selector, uint64_t file_offset)
 {
     int present = qemu_fw_cfg_present();
 
     if (!present)
+        return false;
+
+    // DMA has this behaviour, touching one out of bounds byte = fail fast
+    if (uint64_t(file_offset) + size > file_size)
         return false;
 
     if (unlikely(present == 1)) {
@@ -184,6 +162,7 @@ bool qemu_fw_cfg(void *buffer, uint32_t size,
 
         insb(FW_CFG_PORT_DATA, buffer, size);
 
+        // Return how much is left
         return true;
     }
 
