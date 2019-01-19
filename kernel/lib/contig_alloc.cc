@@ -219,7 +219,7 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
 
         if (by_addr.key <= addr && (by_addr.key + by_addr.val) >= end) {
             //
-            // Need to punch a hole in the middle of the free block
+            // Need to punch a hole in a free block
 
             // Delete the size entry
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);

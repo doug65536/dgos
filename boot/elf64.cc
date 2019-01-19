@@ -56,7 +56,6 @@ static kernel_params_t *prompt_kernel_param(
     params->ap_entry = uintptr_t((void(*)())ap_entry_ptr);
     params->phys_mem_table = uint64_t(phys_mem_table);
     params->phys_mem_table_size = phys_mem_table_size;
-    //params.vbe_selected_mode = vbe_info_vector;
     params->boot_drv_serial = boot_serial();
 
     params->acpi_rsdt = boottbl_find_acpi_rsdp();

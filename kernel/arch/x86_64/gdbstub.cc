@@ -353,7 +353,7 @@ private:
         MXCSR,
         FSBASE,
         GSBASE,
-        // The following exist if AVX is supported
+        // The following exist if AVX is supported and are 128 bits each
         YMM0H,
         YMM1H,
         YMM2H,
@@ -1795,6 +1795,7 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
     case 'k':
         // FIXME: reboot the machine / kill the vm
+
         break;
     }
 
