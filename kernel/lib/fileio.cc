@@ -40,7 +40,13 @@ struct filetab_t {
 
     // Reference count
     int refcount;
+
+    // Size align
+    int reserved[7];
 };
+
+// Make it fast to compute index from pointer difference
+C_ASSERT_ISPO2(sizeof(filetab_t));
 
 using file_table_lock_type = std::mcslock;
 using file_table_scoped_lock = std::unique_lock<file_table_lock_type>;
