@@ -39,11 +39,9 @@ struct FWCfgFile {      /* an individual file entry, 64 bytes total */
 static int fw_cfg_detected;
 
 // returns: 0=not present, 1=present (no dma), 2=present (with dma)
-int qemu_fw_cfg_present()
-{
-    if (likely(fw_cfg_detected))
-        return fw_cfg_detected > 0 ? fw_cfg_detected : 0;
 
+static int qemu_fw_cfg_detect()
+{
     // Guess not detected until proven otherwise so we can early out
     fw_cfg_detected = -1;
 
@@ -71,7 +69,15 @@ int qemu_fw_cfg_present()
     return fw_cfg_detected;
 }
 
-bool qemu_fw_cfg_has_dma()
+int qemu_fw_cfg_present()
+{
+    if (likely(fw_cfg_detected))
+        return fw_cfg_detected > 0 ? fw_cfg_detected : 0;
+
+    return qemu_fw_cfg_detect();
+}
+
+static inline bool qemu_fw_cfg_has_dma()
 {
     return qemu_fw_cfg_present() > 1;
 }
@@ -79,9 +85,6 @@ bool qemu_fw_cfg_has_dma()
 int qemu_selector_by_name(const char * restrict name,
                           uint32_t * restrict file_size_out)
 {
-    if (qemu_fw_cfg_has_dma())
-        return qemu_selector_by_name_dma(name, file_size_out);
-
     if (file_size_out)
         *file_size_out = 0;
 
@@ -90,8 +93,7 @@ int qemu_selector_by_name(const char * restrict name,
 
     uint32_t file_count;
 
-    outw(FW_CFG_PORT_SEL, FW_CFG_FILE_DIR);
-    insb(FW_CFG_PORT_DATA, &file_count, sizeof(file_count));
+    qemu_fw_cfg(&file_count, sizeof(file_count), FW_CFG_FILE_DIR);
 
     file_count = ntohl(file_count);
 
@@ -100,7 +102,7 @@ int qemu_selector_by_name(const char * restrict name,
     int sel = -1;
 
     for (uint32_t i = 0; i < file_count; ++i) {
-        insb(FW_CFG_PORT_DATA, &file, sizeof(file));
+        qemu_fw_cfg(&file, sizeof(file));
 
         if (!strcmp(file.name, name)) {
             sel = ntohs(file.select);
@@ -124,14 +126,14 @@ int qemu_selector_by_name_dma(const char * restrict name,
 
     uint32_t file_count;
 
-    qemu_fw_cfg_dma(&file_count, sizeof(file_count), FW_CFG_FILE_DIR);
+    qemu_fw_cfg(&file_count, sizeof(file_count), FW_CFG_FILE_DIR);
     file_count = ntohl(file_count);
 
     FWCfgFile *files = new FWCfgFile[file_count];
 
     int sel = -1;
 
-    if (qemu_fw_cfg_dma(files, sizeof(*files) * file_count,
+    if (qemu_fw_cfg(files, sizeof(*files) * file_count,
                         FW_CFG_FILE_DIR, sizeof(file_count))) {
         for (uint32_t i = 0; i < file_count; ++i) {
             if (!strcmp(files[i].name, name)) {
@@ -151,7 +153,7 @@ int qemu_selector_by_name_dma(const char * restrict name,
 // Returns how much buffer should have been provided on success
 // Limits buffer fill to specified size
 // Returns -1 on error or if not running under qemu
-ssize_t qemu_fw_cfg(void *buffer, size_t size, char const *name)
+ssize_t qemu_fw_cfg(void *buffer, size_t size, size_t offset, char const *name)
 {
     uint32_t file_size;
     int sel = qemu_selector_by_name(name, &file_size);
@@ -163,9 +165,14 @@ ssize_t qemu_fw_cfg(void *buffer, size_t size, char const *name)
         size = file_size;
 
     if (qemu_fw_cfg_has_dma()) {
-        qemu_fw_cfg_dma(buffer, size, sel);
+        qemu_fw_cfg(buffer, size, sel, offset);
     } else {
+        // Select
         outw(FW_CFG_PORT_SEL, sel);
+        // Inefficient seek is best we can do
+        while (offset--)
+            inb(FW_CFG_PORT_DATA);
+        // Read
         insb(FW_CFG_PORT_DATA, buffer, size);
     }
 
@@ -181,14 +188,39 @@ enum struct fw_cfg_ctl_t : uint32_t {
     write = 16
 };
 
-bool qemu_fw_cfg_dma(uintptr_t buffer_addr, uint32_t size,
-                     int selector, uint64_t file_offset,
-                     bool read)
+// If the selector is >= 0, the selector is selected and seek offset is reset,
+// otherwise, the current file and seek position is preserved.
+// If the file_offset is nonzero, then the seek position is advanced that far,
+// If the size is nonzero, then a data transfer is performed
+// This can be used to individually select, seek, and read files
+//  select: qemu_fw_cfg_dma(nullptr, 0, sel, 0)
+//  seek: qemu_fw_cfg_dma(nullptr, 0, -1, offset)
+//  read: qemu_fw_cfg_dma(buffer, size, -1, 0)
+//  select+read: qemu_fw_cfg_dma(buffer, size, sel, 0)
+//  select+seek+read: qemu_fw_cfg_dma(buffer, size, sel, offset)
+//  any combination
+bool qemu_fw_cfg(void *buffer, uint32_t size,
+                 int selector, uint64_t file_offset)
 {
-    // Tolerate the caller using qemu_selector_by_name()
-    // without checking for error
-    if (selector < 0)
+    int present = qemu_fw_cfg_present();
+
+    if (!present)
         return false;
+
+    if (unlikely(present == 1)) {
+        // No DMA
+
+        if (selector >= 0)
+            outw(FW_CFG_PORT_SEL, selector);
+
+        // Read bytes and throw them away to seek
+        while (unlikely(file_offset--))
+            inb(FW_CFG_PORT_DATA);
+
+        insb(FW_CFG_PORT_DATA, buffer, size);
+
+        return true;
+    }
 
     // The address register is big-endian
     // The most significant half is at offset 0 from the dma register
@@ -208,8 +240,10 @@ bool qemu_fw_cfg_dma(uintptr_t buffer_addr, uint32_t size,
     FWCfgDmaAccess cmd_list[3] = {}, *cmd = cmd_list;
 
     // A command to select a file
-    cmd->control = htonl(uint32_t(fw_cfg_ctl_t::select) | (selector << 16));
-    ++cmd;
+    if (selector >= 0) {
+        cmd->control = htonl(uint32_t(fw_cfg_ctl_t::select) | (selector << 16));
+        ++cmd;
+    }
 
     // A command to seek to an offset in the file, if it is nonzero
     if (file_offset > 0) {
@@ -218,12 +252,13 @@ bool qemu_fw_cfg_dma(uintptr_t buffer_addr, uint32_t size,
         ++cmd;
     }
 
-    // A command to perform read or write
-    cmd->control = bswap_32(uint32_t(read ? fw_cfg_ctl_t::read
-                                          : fw_cfg_ctl_t::write));
-    cmd->address = htobe64(buffer_addr);
-    cmd->length = htonl(size);
-    ++cmd;
+    // A command to perform read
+    if (size > 0) {
+        cmd->control = bswap_32(uint32_t(fw_cfg_ctl_t::read));
+        cmd->address = htobe64(uintptr_t(buffer));
+        cmd->length = htonl(size);
+        ++cmd;
+    }
 
     // Guarantee that memory changes thus far are globally visible before
     // telling the hardware to fetch the command data
@@ -232,7 +267,6 @@ bool qemu_fw_cfg_dma(uintptr_t buffer_addr, uint32_t size,
     // Execute all of the commands. Volatile because the hardware may
     // asynchronously change fields
     for (FWCfgDmaAccess volatile *chk = cmd_list; chk < cmd; ++chk) {
-
         // This must be a physical address
         // This code runs identity mapped so the pointer is the physical address
         uint64_t cmd_physaddr = bswap_64(uintptr_t(chk));
