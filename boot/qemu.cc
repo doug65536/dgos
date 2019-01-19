@@ -115,41 +115,6 @@ int qemu_selector_by_name(const char * restrict name,
     return sel;
 }
 
-int qemu_selector_by_name_dma(const char * restrict name,
-                              uint32_t * restrict file_size_out)
-{
-    if (file_size_out)
-        *file_size_out = 0;
-
-    if (!qemu_fw_cfg_present())
-        return -1;
-
-    uint32_t file_count;
-
-    qemu_fw_cfg(&file_count, sizeof(file_count), FW_CFG_FILE_DIR);
-    file_count = ntohl(file_count);
-
-    FWCfgFile *files = new FWCfgFile[file_count];
-
-    int sel = -1;
-
-    if (qemu_fw_cfg(files, sizeof(*files) * file_count,
-                        FW_CFG_FILE_DIR, sizeof(file_count))) {
-        for (uint32_t i = 0; i < file_count; ++i) {
-            if (!strcmp(files[i].name, name)) {
-                sel = ntohs(files[i].select);
-                if (file_size_out)
-                    *file_size_out = ntohl(files[i].size);
-                break;
-            }
-        }
-    }
-
-    delete[] files;
-
-    return sel;
-}
-
 // Returns how much buffer should have been provided on success
 // Limits buffer fill to specified size
 // Returns -1 on error or if not running under qemu
@@ -260,32 +225,34 @@ bool qemu_fw_cfg(void *buffer, uint32_t size,
         ++cmd;
     }
 
-    // Guarantee that memory changes thus far are globally visible before
-    // telling the hardware to fetch the command data
-    __sync_synchronize();
+    // x86 I/O instructions are serializing. On platforms with MMIO
+    // a memory barrier may be required here.
 
     // Execute all of the commands. Volatile because the hardware may
     // asynchronously change fields
-    for (FWCfgDmaAccess volatile *chk = cmd_list; chk < cmd; ++chk) {
+    for (FWCfgDmaAccess volatile *iter = cmd_list; iter < cmd; ++iter) {
         // This must be a physical address
         // This code runs identity mapped so the pointer is the physical address
-        uint64_t cmd_physaddr = bswap_64(uintptr_t(chk));
+        uint32_t cmd_physaddr_lo = uint32_t(uintptr_t(iter) & 0xFFFFFFFFU);
+        uint32_t cmd_physaddr_hi = sizeof(uintptr_t) > sizeof(uint32_t)
+                ? uint32_t(uintptr_t(iter) >> 32)
+                : 0;
 
-        if (cmd_physaddr & 0xFFFFFFFFU)
-            outl(FW_CFG_PORT_DMA, cmd_physaddr & 0xFFFFFFFFU);
-        outl(FW_CFG_PORT_DMA + 4, cmd_physaddr >> 32);
+        if (cmd_physaddr_hi)
+            outl(FW_CFG_PORT_DMA, htonl(cmd_physaddr_hi));
+        outl(FW_CFG_PORT_DMA + 4, htonl(cmd_physaddr_lo));
 
-        // Guarantee that any recent device memory writes are picked up
-        __sync_synchronize();
+        // x86 I/O instructions are serializing. On platforms with MMIO
+        // a memory barrier may be required here.
 
-        uint32_t ctl = chk->control;
+        uint32_t ctl = iter->control;
 
         // Wait for the command to complete
         // (this should never loop but someday fw_cfg DMA may become async.
         // As of early 2019, QEMU completes all operations during the write
         // to the DMA I/O port, from the perspective of the quest)
         while (unlikely(!(ctl & uint32_t(fw_cfg_ctl_t::error)) && ctl))
-            ctl = chk->control;
+            ctl = iter->control;
 
         if (unlikely(ctl & uint32_t(fw_cfg_ctl_t::error)))
             return false;
