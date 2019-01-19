@@ -1138,7 +1138,19 @@ ssize_t fat32_fs_t::internal_rw(file_handle_t *file,
     off_t cached_end = file->cached_cluster
             ? file->cached_offset + block_size
             : 0;
+
     while (size > 0) {
+        if (unlikely(!file->dirent->is_within_size(offset)))
+            break;
+
+        // Calculate the amount of data remaining at this offset
+        off_t remain = file->dirent->size - offset;
+
+        remain = (remain > 0) ? remain : 0;
+
+        // Clamp read size to entire remainder of file
+        size = (size > uint64_t(remain)) ? remain : size;
+
         if (file->cached_cluster &&
                 file->dirent->is_within_size(offset) &&
                 (offset >= cached_end) &&
