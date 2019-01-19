@@ -11,7 +11,7 @@
 
 class vga_factory_t : public text_dev_factory_t, public zero_init_t {
 public:
-    vga_factory_t()
+    constexpr vga_factory_t()
         : text_dev_factory_t("vga")
     {
     }

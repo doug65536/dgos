@@ -506,7 +506,7 @@ private:
 
 class nvme_if_factory_t final : public storage_if_factory_t {
 public:
-    nvme_if_factory_t() : storage_if_factory_t("nvme") {}
+    constexpr nvme_if_factory_t() : storage_if_factory_t("nvme") {}
 private:
     virtual std::vector<storage_if_base_t*> detect(void) override final;
 };

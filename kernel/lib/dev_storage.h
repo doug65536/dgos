@@ -86,7 +86,11 @@ struct storage_dev_base_t {
 struct storage_if_base_t;
 
 struct storage_if_factory_t {
-    storage_if_factory_t(char const *factory_name);
+    constexpr storage_if_factory_t(char const *factory_name)
+        : name(factory_name)
+    {
+    }
+
     virtual std::vector<storage_if_base_t *> detect(void) = 0;
     static void register_factory(void *p);
     char const * const name;
@@ -201,7 +205,11 @@ struct fs_statvfs_t {
 struct fs_base_t;
 
 struct fs_factory_t {
-    explicit fs_factory_t(char const *factory_name);
+    explicit constexpr fs_factory_t(char const *factory_name)
+        : name(factory_name)
+    {
+    }
+
     virtual fs_base_t *mount(fs_init_info_t *conn) = 0;
     static void register_factory(void *p);
 
@@ -434,7 +442,11 @@ struct part_dev_t {
 };
 
 struct part_factory_t {
-    explicit part_factory_t(char const * factory_name);
+    explicit constexpr part_factory_t(char const * factory_name)
+        : name(factory_name)
+    {
+    }
+
     virtual std::vector<part_dev_t*> detect(storage_dev_base_t *drive) = 0;
     static void register_factory(void *p);
     char const * const name;

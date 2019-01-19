@@ -7,7 +7,7 @@
 //struct part_dev_t;
 
 struct iso9660_part_factory_t : public part_factory_t {
-    iso9660_part_factory_t() : part_factory_t("iso9660") {}
+    constexpr iso9660_part_factory_t() : part_factory_t("iso9660") {}
     std::vector<part_dev_t*> detect(storage_dev_base_t *drive) override;
 };
 

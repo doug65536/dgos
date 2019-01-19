@@ -199,10 +199,7 @@ static void invoke_part_factories(void *arg)
 REGISTER_CALLOUT(invoke_part_factories, nullptr,
                  callout_type_t::partition_probe, "000");
 
-fs_factory_t::fs_factory_t(char const *factory_name)
-    : name(factory_name)
-{
-}
+
 
 void fs_factory_t::register_factory(void *p)
 {
@@ -210,10 +207,7 @@ void fs_factory_t::register_factory(void *p)
     fs_register_factory(instance->name, instance);
 }
 
-storage_if_factory_t::storage_if_factory_t(char const *factory_name)
-    : name(factory_name)
-{
-}
+
 
 void storage_if_factory_t::register_factory(void *p)
 {
@@ -221,10 +215,7 @@ void storage_if_factory_t::register_factory(void *p)
     storage_if_register_factory(instance->name, instance);
 }
 
-part_factory_t::part_factory_t(char const *factory_name)
-    : name(factory_name)
-{
-}
+
 
 void part_factory_t::register_factory(void *p)
 {

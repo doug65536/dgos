@@ -14,7 +14,7 @@
 
 struct iso9660_factory_t : public fs_factory_t {
 public:
-    iso9660_factory_t() : fs_factory_t("iso9660") {}
+    constexpr iso9660_factory_t() : fs_factory_t("iso9660") {}
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 

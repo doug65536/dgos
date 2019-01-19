@@ -189,7 +189,7 @@ pool_t<fat32_fs_t::file_handle_t> fat32_fs_t::handles;
 
 class fat32_factory_t : public fs_factory_t {
 public:
-    fat32_factory_t() : fs_factory_t("fat32") {}
+    constexpr fat32_factory_t() : fs_factory_t("fat32") {}
     fs_base_t *mount(fs_init_info_t *conn) override;
 };
 

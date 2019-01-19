@@ -41,7 +41,4 @@ static void invoke_eth_dev_factories(void*)
 REGISTER_CALLOUT(invoke_eth_dev_factories, nullptr,
                  callout_type_t::nic, "000");
 
-eth_dev_factory_t::eth_dev_factory_t(char const *name)
-{
-    register_eth_dev_factory(name, this);
-}
+

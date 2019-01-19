@@ -845,7 +845,7 @@ struct hba_port_info_t {
 
 class ahci_if_factory_t final : public storage_if_factory_t {
 public:
-    ahci_if_factory_t() : storage_if_factory_t("ahci") {}
+    constexpr ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
     virtual std::vector<storage_if_base_t *> detect(void) override final;
 };

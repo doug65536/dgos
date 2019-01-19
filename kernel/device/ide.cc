@@ -38,7 +38,7 @@ struct ide_chan_ports_t {
 };
 
 struct ide_if_factory_t final : public storage_if_factory_t {
-    ide_if_factory_t() : storage_if_factory_t("ide") {}
+    constexpr ide_if_factory_t() : storage_if_factory_t("ide") {}
     virtual std::vector<storage_if_base_t *> detect(void) override;
 };
 

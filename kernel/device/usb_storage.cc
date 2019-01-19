@@ -34,7 +34,7 @@ enum struct usb_msc_op_t {
 // A factory that enumerates all of the available storage devices
 class usb_msc_if_factory_t final : public storage_if_factory_t {
 public:
-    usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
+    constexpr usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
 protected:
     // storage_if_factory_t interface
     std::vector<storage_if_base_t *> detect() override;

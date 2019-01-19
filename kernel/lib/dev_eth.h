@@ -5,8 +5,16 @@
 #include "dev_registration.h"
 #include "eth_q.h"
 
+struct eth_dev_factory_t;
+
+void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory);
+
 struct eth_dev_factory_t {
-    eth_dev_factory_t(char const *name);
+    constexpr eth_dev_factory_t(char const *name)
+    {
+        register_eth_dev_factory(name, this);
+    }
+
     virtual int detect(eth_dev_base_t ***result) = 0;
 };
 
@@ -28,4 +36,3 @@ struct eth_dev_base_t {
     virtual int get_promiscuous() override;                 \
     virtual void set_promiscuous(int promiscuous) override;
 
-void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory);

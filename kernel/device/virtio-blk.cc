@@ -60,7 +60,7 @@ std::vector<virtio_blk_if_t *> virtio_blk_ifs;
 
 class virtio_blk_if_factory_t : public storage_if_factory_t {
 public:
-    virtio_blk_if_factory_t() : storage_if_factory_t("virtio-blk") {}
+    constexpr virtio_blk_if_factory_t() : storage_if_factory_t("virtio-blk") {}
 private:
     virtual std::vector<storage_if_base_t *> detect(void) override final;
 };

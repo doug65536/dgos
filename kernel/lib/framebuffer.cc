@@ -24,7 +24,7 @@ class framebuffer_console_factory_t
         : public text_dev_factory_t
         , public zero_init_t {
 public:
-    framebuffer_console_factory_t()
+    constexpr framebuffer_console_factory_t()
         : text_dev_factory_t("framebuffer_console")
     {
     }

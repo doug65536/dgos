@@ -18,7 +18,7 @@ template<typename T, typename K, typename P,
          K const T::*key_member, size_t key_sz>
 struct basic_hashtbl_t {
 public:
-    basic_hashtbl_t()
+    constexpr basic_hashtbl_t()
         : used(0)
         , holes(0)
         , log2_capacity(0)
