@@ -1,4 +1,5 @@
 #include "process.h"
+#include <inttypes.h>
 
 #include "mm.h"
 #include "fileio.h"
@@ -159,11 +160,18 @@ int process_t::start()
 
     file_t fd{file_open(path, O_RDONLY)};
 
+    if (unlikely(!fd)) {
+        printdbg("Failed to open executable %s\n", path);
+        return -1;
+    }
+
     ssize_t read_size;
 
     read_size = file_read(fd, &hdr, sizeof(hdr));
-    if (read_size != sizeof(hdr))
+    if (unlikely(read_size != sizeof(hdr))) {
+        printdbg("Failed to read ELF header\n");
         return -1;
+    }
 
     // Allocate memory for program headers
     std::vector<Elf64_Phdr> program_hdrs;
@@ -171,12 +179,14 @@ int process_t::start()
 
     // Read program headers
     read_size = sizeof(Elf64_Phdr) * hdr.e_phnum;
-    if (read_size != file_pread(
-                fd,
-                program_hdrs.data(),
-                read_size,
-                hdr.e_phoff))
+    if (unlikely(read_size != file_pread(
+                     fd,
+                     program_hdrs.data(),
+                     read_size,
+                     hdr.e_phoff))) {
+        printdbg("Failed to read program headers\n");
         return -1;
+    }
 
     size_t last_region_st = ~size_t(0);
     size_t last_region_en = 0;
@@ -192,12 +202,16 @@ int process_t::start()
             continue;
 
         // See if it begins in reserved space
-        if (intptr_t(ph.p_vaddr) < 0x400000)
+        if (intptr_t(ph.p_vaddr) < 0x400000) {
+            printdbg("The virtual address is not in user address space\n");
             return -1;
+        }
 
         // See if it overflows into kernel space
-        if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0)
+        if (intptr_t(ph.p_vaddr + ph.p_memsz) < 0) {
+            printdbg("The section overflows into user space\n");
             return -1;
+        }
 
         int page_prot = 0;
 
@@ -211,29 +225,34 @@ int process_t::start()
 
         // Skip pointless calls to mmap for little regions that overlap
         // previously reserved regions
-        if (ph.p_vaddr >= last_region_st ||
+        if (ph.p_vaddr >= last_region_st &&
                 ph.p_vaddr + ph.p_memsz <= last_region_en)
             continue;
-
-        if (mmap((void*)ph.p_vaddr,
-                         ph.p_memsz, page_prot,
-                         MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)
-            return -1;
 
         // Update region reserved by last mapping
         last_region_st = ph.p_vaddr & -PAGESIZE;
         last_region_en = ((ph.p_vaddr + ph.p_memsz) + PAGESIZE - 1) & -PAGESIZE;
+
+        if (unlikely(mmap((void*)last_region_st,
+                          last_region_en - last_region_st, page_prot,
+                          MAP_USER | MAP_NOCOMMIT, -1, 0) == MAP_FAILED)) {
+            printdbg("Failed to reserve %#" PRIx64
+                     " bytes of address space"
+                     " with protection %d"
+                     " at %#" PRIx64 "! \n",
+                     ph.p_memsz, page_prot, ph.p_vaddr);
+            return -1;
+        }
     }
 
     // Read everything after mapping the memory
     for (Elf64_Phdr& ph : program_hdrs) {
         read_size = ph.p_filesz;
         if (ph.p_filesz > 0) {
-            if (read_size != file_pread(
-                        fd,
-                        (void*)ph.p_vaddr,
-                        read_size,
-                        ph.p_offset)) {
+            if (unlikely(read_size != file_pread(
+                             fd, (void*)ph.p_vaddr,
+                             read_size, ph.p_offset))) {
+                printdbg("Failed to read program headers!\n");
                 return -1;
             }
         }
@@ -252,7 +271,10 @@ int process_t::start()
         if (ph.p_flags & PF_X)
             page_prot |= PROT_EXEC;
 
-        mprotect((void*)ph.p_vaddr, ph.p_memsz, page_prot);
+        if (unlikely(mprotect((void*)ph.p_vaddr, ph.p_memsz, page_prot) < 0)) {
+            printdbg("Failed to set page protection\n");
+            return -1;
+        }
     }
 
     // Initialize the stack
@@ -260,6 +282,11 @@ int process_t::start()
     size_t stack_size = 65536;
     void *stack = mmap(nullptr, stack_size, PROT_READ | PROT_WRITE,
                        MAP_STACK | MAP_USER, -1, 0);
+
+    if (unlikely(stack == MAP_FAILED)) {
+        printdbg("Failed to allocate user stack\n");
+        return -1;
+    }
 
     printdbg("process: allocated %zuKB stack at %#zx\n",
              stack_size >> 10, uintptr_t(stack));
