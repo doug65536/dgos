@@ -80,7 +80,6 @@ struct alignas(256) thread_info_t {
     isr_context_t * volatile ctx;
 
     char * volatile xsave_ptr;
-    uint64_t volatile cpu_affinity;
 
     void * volatile fsbase;
     void * volatile gsbase;
@@ -95,9 +94,9 @@ struct alignas(256) thread_info_t {
 
     thread_state_t volatile state;
 
-    // --- cache line ---
     char *xsave_stack;
 
+    // --- cache line ---
     uint32_t flags;
     // Doesn't include guard page
     uint32_t stack_size;
@@ -127,12 +126,15 @@ struct alignas(256) thread_info_t {
 
     unsigned thread_id;
 
+
+    thread_cpu_affinity_t cpu_affinity;
+
     __exception_jmp_buf_t exit_jmpbuf;
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
 
-C_ASSERT(offsetof(thread_info_t, xsave_stack) == 64);
+C_ASSERT(offsetof(thread_info_t, flags) == 64);
 
 // Verify asm_constants.h values
 C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
@@ -368,7 +370,7 @@ static char *thread_allocate_stack(
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata, size_t stack_size,
-        thread_state_t state, uint64_t affinity,
+        thread_state_t state, thread_cpu_affinity_t const &affinity,
         thread_priority_t priority, bool user)
 {
     if (stack_size == 0)
@@ -437,7 +439,7 @@ static thread_t thread_create_with_state(
 
     thread->priority = priority;
     thread->priority_boost = 0;
-    thread->cpu_affinity = affinity ? affinity : creator_thread->cpu_affinity;
+    thread->cpu_affinity = affinity;
     thread->fsbase = nullptr;
     thread->gsbase = nullptr;
 
@@ -696,7 +698,7 @@ static thread_info_t *thread_choose_next(
 
         // If this thread is not allowed to run on this CPU
         // then skip it
-        if (unlikely(!(candidate->cpu_affinity & (1U << cpu_nr))))
+        if (unlikely(!(candidate->cpu_affinity[cpu_nr])))
             continue;
 
         //
@@ -1044,9 +1046,11 @@ EXPORT thread_t thread_get_id()
     return 0;
 }
 
-EXPORT uint64_t thread_get_affinity(int id)
+EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
+
+EXPORT thread_cpu_affinity_t const* thread_get_affinity(int id)
 {
-    return threads[id].cpu_affinity;
+    return &threads[id].cpu_affinity;
 }
 
 EXPORT size_t thread_get_cpu_count()
@@ -1054,7 +1058,7 @@ EXPORT size_t thread_get_cpu_count()
     return cpu_count;
 }
 
-EXPORT void thread_set_affinity(int id, uint64_t affinity)
+EXPORT void thread_set_affinity(int id, thread_cpu_affinity_t const &affinity)
 {
     cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
@@ -1062,15 +1066,15 @@ EXPORT void thread_set_affinity(int id, uint64_t affinity)
 
     threads[id].cpu_affinity = affinity;
 
-    if (((1 << run_cpu[id]) & affinity) == 0) {
+    if ((affinity[run_cpu[id]]) == false) {
         // Home CPU is not in the affinity mask
         // Move home to a cpu in the affinity mask
-        run_cpu[id] = bit_lsb_set(affinity);
+        run_cpu[id] = affinity.lsb_set();
     }
 
     // Are we changing current thread affinity?
-    if (cpu->cur_thread == threads + id) {
-        while (!(affinity & (UINT64_C(1) << cpu_nr))) {
+    if (cpu->cur_thread->thread_id == id) {
+        while (!(affinity[cpu_nr])) {
             // Get off this CPU
             thread_yield();
 
