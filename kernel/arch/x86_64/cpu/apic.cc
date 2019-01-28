@@ -2588,6 +2588,10 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     assert(intr >= INTR_APIC_IRQ_BASE);
     assert(intr < INTR_APIC_IRQ_END);
 
+    // The running thread only pays for execution up to this point
+
+    uint64_t st = cpu_rdtsc();
+
     isr_context_t *orig_ctx = ctx;
 
     int irq = intr_to_irq[intr];
@@ -2599,7 +2603,12 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     apic_eoi(intr);
 
     if (ctx == orig_ctx)
-        return thread_schedule_postirq(ctx);
+        ctx = thread_schedule_postirq(ctx);
+
+    uint64_t en = cpu_rdtsc();
+    en -= st;
+
+    thread_add_cpu_irq_time(en);
 
     return ctx;
 }

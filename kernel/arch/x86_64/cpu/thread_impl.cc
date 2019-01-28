@@ -126,6 +126,8 @@ struct alignas(256) thread_info_t {
 
     unsigned thread_id;
 
+    // 1 until closed, then 0
+    int ref_count;
 
     thread_cpu_affinity_t cpu_affinity;
 
@@ -181,6 +183,7 @@ struct alignas(128) cpu_info_t {
     uint32_t busy_percent;
     uint32_t cr0_shadow;
     uint64_t irq_count;
+    uint64_t irq_time;
 
     using lock_type = std::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
@@ -200,12 +203,14 @@ C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 
 static cpu_info_t cpus[MAX_CPUS] = {
-    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0, {}, 0,
+    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, {}, 0,
       { }
     }
 };
 
 uint32_t cpu_count;
+
+void thread_destruct(thread_info_t *thread);
 
 ///
 
@@ -409,6 +414,11 @@ static thread_t thread_create_with_state(
 
     thread->flags = 0;
 
+    mutex_init(&thread->lock);
+    condvar_init(&thread->done_cond);
+
+    thread->ref_count = 1;
+
     char *stack = thread_allocate_stack(i, stack_size, "", 0xFE);
     thread->stack = stack;
     thread->stack_size = stack_size;
@@ -504,12 +514,25 @@ static thread_t thread_create_with_state(
     return i;
 }
 
+
 EXPORT thread_t thread_create(thread_fn_t fn, void *userdata,
                               size_t stack_size, bool user)
 {
+    thread_create_info_t info{};
+    info.fn = fn;
+    info.userdata = userdata;
+    info.stack_size = stack_size;
+    info.user = user;
+
+    return thread_create_with_info(&info);
+}
+
+EXPORT thread_t thread_create_with_info(thread_create_info_t const* info)
+{
     return thread_create_with_state(
-                fn, userdata, stack_size,
-                THREAD_IS_READY, -1, 0, user);
+                info->fn, info->userdata, info->stack_size,
+                info->suspended ? THREAD_IS_SUSPENDED : THREAD_IS_READY,
+                -1, 0, info->user);
 }
 
 #if 0
@@ -541,6 +564,7 @@ static int smp_idle_thread(void *)
     thread_idle();
 }
 
+_hot
 void thread_idle()
 {
     assert(cpu_irq_is_enabled());
@@ -590,7 +614,7 @@ void thread_init(int ap)
     cpu->online = 1;
 
     cpu_gsbase_set(cpu);
-    cpu_altgsbase_set((void*)0xFFFFD1D1D1D1D1D1);
+    cpu_altgsbase_set(nullptr);
     cpu->cr0_shadow = uint32_t(cpu_cr0_get());
 
     if (!ap) {
@@ -696,6 +720,16 @@ static thread_info_t *thread_choose_next(
                 candidate->state == THREAD_IS_UNINITIALIZED)
             continue;
 
+        // Garbage collect destructing threads
+        if (unlikely(candidate->state == THREAD_IS_DESTRUCTING)) {
+            if (atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
+                               THREAD_IS_EXITING) == THREAD_IS_DESTRUCTING) {
+                thread_destruct(candidate);
+                continue;
+            }
+        }
+
+
         // If this thread is not allowed to run on this CPU
         // then skip it
         if (unlikely(!(candidate->cpu_affinity[cpu_nr])))
@@ -766,8 +800,40 @@ static void thread_clear_busy(void *outgoing)
         thread->process->destroy();
 }
 
+// Thread is not running anymore, destroy things
+void thread_destruct(thread_info_t *thread)
+{
+    munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
+           stack_guard_size + thread->stack_size + stack_guard_size);
+
+    if (thread->flags & THREAD_FLAGS_USES_FPU) {
+        assert(thread->xsave_stack != nullptr);
+        munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
+               stack_guard_size + xsave_stack_size + stack_guard_size);
+    }
+
+    mutex_lock_noyield(&thread->lock);
+    atomic_st_rel(&thread->state, THREAD_IS_FINISHED);
+    condvar_wake_all(&thread->done_cond);
+    mutex_unlock(&thread->lock);
+
+    if (thread->ref_count == 0) {
+        mutex_destroy(&thread->lock);
+        atomic_st_rel(&thread->state, THREAD_IS_UNINITIALIZED);
+    }
+}
+
+int thread_close(thread_t tid)
 {
     auto& thread = threads[tid];
+    if (thread.state == THREAD_IS_FINISHED) {
+        mutex_destroy(&thread.lock);
+        atomic_st_rel(&thread.state, THREAD_IS_UNINITIALIZED);
+        return 1;
+    }
+    return 0;
+}
+
 _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 {
     //need this if ISRs run with IRQ enabled:
@@ -799,40 +865,28 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     // Accumulate used and busy time on this CPU
     cpu->time_ratio += elapsed;
-    cpu->busy_ratio += elapsed & -(thread >= threads + cpu_count);
+    cpu->busy_ratio += elapsed & -(thread->thread_id >= cpu_count);
 
     // Normalize ratio to < 32768
     uint8_t time_scale = bit_msb_set(cpu->time_ratio);
-    if (time_scale > 15) {
-        time_scale -= 15;
+    if (time_scale >= 15) {
+        time_scale -= 14;
         cpu->time_ratio >>= time_scale;
         cpu->busy_ratio >>= time_scale;
     }
 
-    if (likely(cpu->time_ratio))
-        cpu->busy_percent = 100 * cpu->busy_ratio / cpu->time_ratio;
-    else
-        cpu->busy_percent = cpu->busy_percent;
+    if (likely(cpu->time_ratio)) {
+        int busy_percent = 100 * cpu->busy_ratio / cpu->time_ratio;
+        atomic_st_rel(&cpu->busy_percent, busy_percent);
+    } else {
+        atomic_st_rel(&cpu->busy_percent, 0);
+    }
 
     thread_state_t state = atomic_ld_acq(&thread->state);
 
     // Change to ready if running
     if (likely(state == THREAD_IS_RUNNING)) {
         atomic_st_rel(&thread->state, THREAD_IS_READY_BUSY);
-    } else if (state == THREAD_IS_DESTRUCTING) {
-        munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
-               stack_guard_size + thread->stack_size + stack_guard_size);
-
-        if (thread->flags & THREAD_FLAGS_USES_FPU) {
-            assert(thread->xsave_stack != nullptr);
-            munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
-                   stack_guard_size + xsave_stack_size + stack_guard_size);
-        }
-
-        mutex_lock_noyield(&thread->lock);
-        atomic_st_rel(&thread->state, THREAD_IS_FINISHED);
-        condvar_wake_all(&thread->done_cond);
-        mutex_unlock(&thread->lock);
     }
 
     // Retry because another CPU might steal this
@@ -850,18 +904,12 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             // This doesn't need to be cmpxchg because the
             // outgoing thread is still marked busy
             atomic_st_rel(&thread->state, THREAD_IS_RUNNING);
-
-//            if (thread->thread_id >= cpu_count)
-//                THREAD_TRACE("Staying on thread %zd\n", thread->thread_id);
             break;
         } else if (thread->state == THREAD_IS_READY &&
                 atomic_cmpxchg(&thread->state,
                            THREAD_IS_READY,
                            THREAD_IS_RUNNING) ==
                 THREAD_IS_READY) {
-
-//            if (thread->thread_id >= cpu_count)
-//                THREAD_TRACE("Switched to thread %zd\n", thread->thread_id);
 
             break;
         }
@@ -871,16 +919,10 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     if (thread != outgoing) {
         if (outgoing->flags & THREAD_FLAGS_USES_FPU) {
-//            printdbg("Saving tid=%zu FPU context at %#zx\n",
-//                     outgoing - threads,
-//                     uintptr_t(outgoing->xsave_ptr) - sse_context_size);
             isr_save_fpu_ctx(outgoing);
         }
 
         if (thread->flags & THREAD_FLAGS_USES_FPU) {
-//            printdbg("Restoring tid=%zu FPU context at %#zx\n",
-//                     thread->thread_id,
-//                     uintptr_t(thread->xsave_ptr));
             if (cpu->cr0_shadow & CPU_CR0_TS) {
                 // Clear TS flag to unblock access to FPU
                 cpu->cr0_shadow &= ~CPU_CR0_TS;
@@ -911,11 +953,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     assert(ctx->gpr.s.r[1] == (GDT_SEL_USER_DATA | 3));
     assert(ctx->gpr.s.r[2] == (GDT_SEL_USER_DATA | 3));
     assert(ctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
-
-    // Removed until I can range check user mode stack
-    //assert(ISR_CTX_REG_RSP(isrctx) >= (uintptr_t)thread->stack);
-    //assert(ISR_CTX_REG_RSP(isrctx) <
-    //       (uintptr_t)thread->stack + thread->stack_size + PAGE_SIZE);
 
     if (thread != outgoing) {
         // Add outgoing cleanup data at top of context
@@ -959,7 +996,7 @@ EXPORT void thread_sleep_for(uint64_t ms)
 
 EXPORT uint64_t thread_get_usage(int id)
 {
-    if (id >= int(countof(threads)))
+    if (unlikely(unsigned(id) >= unsigned(countof(threads))))
         return -1;
 
     thread_info_t *thread = id < 0 ? this_thread() : (threads + id);
@@ -1020,7 +1057,8 @@ EXPORT int thread_wait(thread_t thread_id)
 {
     thread_info_t *thread = threads + thread_id;
     mutex_lock(&thread->lock);
-    while (thread->state != THREAD_IS_FINISHED)
+    while (thread->state != THREAD_IS_FINISHED &&
+           thread->state != THREAD_IS_EXITING)
         condvar_wait(&thread->done_cond, &thread->lock);
     mutex_unlock(&thread->lock);
     return thread->exit_code;
@@ -1047,6 +1085,22 @@ EXPORT thread_t thread_get_id()
 }
 
 EXPORT void thread_set_gsbase(thread_t tid, uintptr_t gsbase)
+{
+    cpu_info_t *cpu = this_cpu();
+    if (tid < 0)
+        tid = cpu->cur_thread->thread_id;
+    if (uintptr_t(tid) < countof(threads))
+        threads[tid].gsbase = (void*)gsbase;
+}
+
+EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
+{
+    cpu_info_t *cpu = this_cpu();
+    if (tid < 0)
+        tid = cpu->cur_thread->thread_id;
+    if (uintptr_t(tid) < countof(threads))
+        threads[tid].fsbase = (void*)fsbase;
+}
 
 EXPORT thread_cpu_affinity_t const* thread_get_affinity(int id)
 {
@@ -1336,5 +1390,11 @@ void thread_pcid_free(int pcid)
 
 int thread_cpu_usage(int cpu)
 {
-    return cpus[cpu].busy_percent;
+    return atomic_ld_acq(&cpus[cpu].busy_percent);
+}
+
+void thread_add_cpu_irq_time(uint64_t tsc_ticks)
+{
+    atomic_add((cpu_gs_ptr<uint64_t, offsetof(cpu_info_t, irq_time)>()),
+               tsc_ticks);
 }

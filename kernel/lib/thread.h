@@ -17,6 +17,21 @@ typedef int16_t thread_priority_t;
 
 typedef int (*thread_fn_t)(void*);
 
+struct thread_create_info_t
+{
+    // Thread startup function and argument
+    thread_fn_t fn;
+    void *userdata;
+
+    size_t stack_size;
+    thread_priority_t priority;
+    bool user;
+    bool suspended;
+
+    uintptr_t tls_base;
+    uint64_t affinity;
+};
+
 // 10 == 1024 CPUs max
 #define thread_cpu_affinity_t_log2_max 10
 #define thread_max_cpu (1 << thread_cpu_affinity_t_log2_max)
@@ -88,13 +103,15 @@ extern int spincount_mask;
 thread_t thread_create(thread_fn_t fn, void *userdata,
                        size_t stack_size, bool user);
 
+thread_t thread_create_with_info(thread_create_info_t const* info);
+
 void thread_yield(void);
 void thread_sleep_until(uint64_t expiry);
 void thread_sleep_for(uint64_t ms);
 uint64_t thread_get_usage(int id);
 
-void thread_set_affinity(int id, uint64_t affinity);
-uint64_t thread_get_affinity(int id);
+void thread_set_fsbase(thread_t tid, uintptr_t fsbase);
+void thread_set_gsbase(thread_t tid, uintptr_t gsbase);
 
 void thread_set_affinity(int id, thread_cpu_affinity_t const& affinity);
 thread_cpu_affinity_t const* thread_get_affinity(int id);
@@ -131,4 +148,11 @@ void thread_shootdown_notify();
 _noreturn
 void thread_idle();
 
+int thread_close(thread_t tid);
+
 __END_DECLS
+
+thread_t thread_proc_0(void (*fn)());
+thread_t thread_proc_1(void (*fn)(void *), void *arg);
+thread_t thread_func_0(int (*fn)());
+thread_t thread_func_1(int (*fn)(void*), void *arg);

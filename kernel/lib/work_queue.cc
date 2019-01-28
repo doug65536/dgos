@@ -32,7 +32,7 @@ void workq_impl::enqueue_locked(workq_work *work, scoped_lock& lock)
 
 void workq_impl::set_affinity(int cpu)
 {
-    thread_set_affinity(tid, UINT64_C(1) << cpu);
+    thread_set_affinity(tid, cpu);
 }
 
 _hot

@@ -74,3 +74,5 @@ static _always_inline int thread_cpu_count()
 }
 
 int thread_cpu_usage(int cpu);
+
+void thread_add_cpu_irq_time(uint64_t tsc_ticks);

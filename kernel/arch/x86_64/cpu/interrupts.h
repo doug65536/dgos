@@ -44,6 +44,7 @@
 
 #define INTR_TLB_SHOOTDOWN  40
 #define INTR_THREAD_YIELD   41
+#define INTR_IPI_RESCHED    43
 
 #define INTR_FLUSH_TRACE    42
 

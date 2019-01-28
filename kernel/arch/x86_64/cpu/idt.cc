@@ -316,7 +316,7 @@ constexpr uintptr_t isr_entry_point(size_t i)
 
 static uint8_t idt_vector_type(size_t vec)
 {
-    return vec != INTR_THREAD_YIELD ? IDT_TRAP : IDT_INTR;
+    return false && vec != INTR_THREAD_YIELD ? IDT_TRAP : IDT_INTR;
 }
 
 int idt_init(int ap)
