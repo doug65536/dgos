@@ -4,52 +4,21 @@ PHDRS {
 	/* 4 = read */
 	/* 5 = 4+1 = read+execute */
 	/* 6 = 4+2 = read+write */
+	readonly PT_LOAD FILEHDR PHDRS FLAGS(4);
 	text PT_LOAD FLAGS(5);
-	readonly PT_LOAD FLAGS(4);
 	data PT_LOAD FLAGS(6);
 	guard PT_LOAD FLAGS(0);
 	stacks PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
-	/* Code and read-only data */
-	.text 0xFFFFFFFF80000000 : AT (0x100000) {
-		PROVIDE_HIDDEN(___text_st = .);
-		/* ISR code is hot and should be page aligned because it is cloned */
-		PROVIDE_HIDDEN(___isr_st = .);
-		*(SORT_BY_NAME(.text.isr.*))
-		*(.text.isr)
-		PROVIDE_HIDDEN(___isr_en = .);
+	. = 0xFFFFFFFF80000000;
 
-		/* cache line align start of hot code */
-		. = ALIGN(64);
-		*(.text.hot .text.hot.*)
-		*(.text)
-		*(SORT(.text.*))
-		*(.text.unlikely)
+	PROVIDE_HIDDEN(__image_start = .);
 
-		/* startup code away from normal code to maximize locality */
-		*(.entry)
-		*(.text.startup .text.startup.*)
-	} :text
+	. += SIZEOF_HEADERS;
 
-	.plt.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_got = .);
-		*(.plt.got)
-	} :text
-
-	.plt.bnd : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_bnd = .);
-		*(.plt.bnd)
-	} :text
-
-	.plt : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt = .);
-		*(.plt)
-		*(.iplt)
-	} :text
-
-	.rodata : ALIGN(64) {
+	.rodata : {
 		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___ctors_st = .);
@@ -80,11 +49,9 @@ SECTIONS {
 
 		*(.gcc_except_table*)
 
-		*(.stub .text.* .gnu.linkonce.t.*)
+		*(.stub .gnu.linkonce.t.*)
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
-
-		PROVIDE_HIDDEN(___text_en = .);
 
 		PROVIDE_HIDDEN(___rodata_en = .);
 	} :readonly
@@ -129,7 +96,49 @@ SECTIONS {
 	} :readonly
 	PROVIDE_HIDDEN(__rela_dyn_en = .);
 
-	.dynamic : ALIGN(4096) {
+	. = ALIGN(4K);
+
+	/* Code and read-only data */
+	.text : {
+		PROVIDE_HIDDEN(___text_st = .);
+		/* ISR code is hot and should be page aligned because it is cloned */
+		PROVIDE_HIDDEN(___isr_st = .);
+		*(SORT_BY_NAME(.text.isr.*))
+		*(.text.isr)
+		PROVIDE_HIDDEN(___isr_en = .);
+
+		/* cache line align start of hot code */
+		. = ALIGN(64);
+		*(.text.hot .text.hot.*)
+		*(.text)
+		*(SORT(.text.*))
+		*(.text.unlikely)
+
+		/* startup code away from normal code to maximize locality */
+		*(.entry)
+		*(.text.startup .text.startup.*)
+		PROVIDE_HIDDEN(___text_en = .);
+	} :text
+
+	.plt.got : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_got = .);
+		*(.plt.got)
+	} :text
+
+	.plt.bnd : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt_bnd = .);
+		*(.plt.bnd)
+	} :text
+
+	.plt : ALIGN(64) {
+		PROVIDE_HIDDEN(___plt = .);
+		*(.plt)
+		*(.iplt)
+	} :text
+
+	. = ALIGN(4K);
+
+	.dynamic : {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);

@@ -4,44 +4,54 @@ PHDRS {
 	/* 4 = read */
 	/* 5 = 4+1 = read+execute */
 	/* 6 = 4+2 = read+write */
+	read PT_LOAD FILEHDR PHDRS FLAGS(4);
+	tls PT_TLS FLAGS(4);
 	exec PT_LOAD FLAGS(5);
-	read PT_LOAD FLAGS(4);
 	writ PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
-	. = 0x400000 + SIZEOF_HEADERS;
+	. = 0x400000;
 
 	PROVIDE_HIDDEN(__image_start = .);
 
-	.text : {
-		PROVIDE_HIDDEN(__text_start = .);
-		*(.text)
-		*(.text.*)
-		PROVIDE_HIDDEN(__text_end = .);
-	} :exec
-
-	.rela.plt : {
-		PROVIDE_HIDDEN(__plt_start = .);
-		*(.plt)
-		PROVIDE_HIDDEN(__plt_end = .);
-		PROVIDE_HIDDEN(__iplt_start = .);
-		*(.iplt)
-		PROVIDE_HIDDEN(__iplt_end = .);
-		PROVIDE_HIDDEN(__rela_iplt_start = .);
-		*(.rela.iplt)
-		*(.rela.iplt.*)
-		PROVIDE_HIDDEN(__rela_iplt_end = .);
-	} :exec
-
 	/* Align for transition from r-x to r-- permission */
-	. = ALIGN(4K);
+	. += SIZEOF_HEADERS;
 
 	.rodata : {
 		PROVIDE_HIDDEN(__rodata_start = .);
 		*(.rodata)
 		*(.rodata.*)
+		*(.tm_clone_table)
 		PROVIDE_HIDDEN(__rodata_end = .);
+	} :read
+
+	.eh_frame : {
+		*(.eh_frame)
+	} :read
+
+	.rela.got : {
+		*(.rela.got)
+	} :read
+
+	.rela.dyn : {
+		*(.rela.dyn)
+	} :read
+
+	.rela.text : {
+		*(.rela.text)
+	} :read
+
+	.got : {
+		*(.got)
+	} :read
+
+	.got.plt : {
+		*(.got.plt)
+	} :read
+
+	.igot.plt : {
+		*(.igot.plt)
 	} :read
 
 	/* 64-bit align */
@@ -64,22 +74,50 @@ SECTIONS {
 		PROVIDE_HIDDEN(__fini_array_end = .);
 	} :read
 
-	.gcc_except_table   : { *(.gcc_except_table .gcc_except_table.*) }
-	.gnu_extab   : { *(.gnu_extab*) }
+	.gcc_except_table : {
+		*(.gcc_except_table .gcc_except_table.*)
+	} :read
+
+	.gnu_extab : {
+		*(.gnu_extab*)
+	} :read
 
 	.tdata : {
 		PROVIDE_HIDDEN(___tdata_st = .);
 		*(.tdata)
 		*(.tdata.*)
 		PROVIDE_HIDDEN(___tdata_en = .);
-	} :read
+	} :tls
 
 	.tbss (NOLOAD) : {
 		PROVIDE_HIDDEN(___tbss_st = .);
 		*(.tbss)
 		*(.tbss.*)
 		PROVIDE_HIDDEN(___tbss_en = .);
-	} :read
+	} :tls
+
+	/* Align for transition from r-- to r-x permission */
+	. = ALIGN(4K);
+
+	.text : {
+		PROVIDE_HIDDEN(__text_start = .);
+		*(.text)
+		*(.text.*)
+		PROVIDE_HIDDEN(__text_end = .);
+	} :exec
+
+	.rela.plt : {
+		PROVIDE_HIDDEN(__plt_start = .);
+		*(.plt)
+		PROVIDE_HIDDEN(__plt_end = .);
+		PROVIDE_HIDDEN(__iplt_start = .);
+		*(.iplt)
+		PROVIDE_HIDDEN(__iplt_end = .);
+		PROVIDE_HIDDEN(__rela_iplt_start = .);
+		*(.rela.iplt)
+		*(.rela.iplt.*)
+		PROVIDE_HIDDEN(__rela_iplt_end = .);
+	} :exec
 
 	/* Align for transition from r-x to rw- permission */
 	. = ALIGN(4K);
@@ -97,6 +135,8 @@ SECTIONS {
 		*(.bss.*)
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :writ
+
+	. = ALIGN(4K);
 
 	PROVIDE_HIDDEN(__image_end = .);
 
