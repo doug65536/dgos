@@ -87,8 +87,10 @@ static int badf_err()
 
 ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
-    process_t *p = fast_cur_process();
+    if (unlikely(!mm_is_user_range(bufaddr, count)))
+        return err(errno_t::EFAULT);
 
+    process_t *p = fast_cur_process();
 
     int id = p->fd_to_id(fd);
 
@@ -107,8 +109,10 @@ ssize_t sys_read(int fd, void *bufaddr, size_t count)
 
 ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 {
-    process_t *p = fast_cur_process();
+    if (unlikely(!mm_is_user_range(bufaddr, count)))
+        return err(errno_t::EFAULT);
 
+    process_t *p = fast_cur_process();
 
     int id = p->fd_to_id(fd);
 
@@ -149,6 +153,9 @@ int sys_close(int fd)
 
 ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
 {
+    if (unlikely(!mm_is_user_range(bufaddr, count)))
+        return err(errno_t::EFAULT);
+
     process_t *p = fast_cur_process();
 
     int id = p->fd_to_id(fd);
@@ -166,6 +173,9 @@ ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
 ssize_t sys_pwrite64(int fd, void const *bufaddr,
                      size_t count, off_t ofs)
 {
+    if (unlikely(!mm_is_user_range(bufaddr, count)))
+        return err(errno_t::EFAULT);
+
     process_t *p = fast_cur_process();
 
     int id = p->fd_to_id(fd);
