@@ -1,6 +1,9 @@
 #include "keyboard.h"
 #include "mutex.h"
 #include "printk.h"
+#include "memory.h"
+
+#include "fs/devfs.h"
 
 #define DEBUG_KEYBD 1
 #if DEBUG_KEYBD
@@ -364,3 +367,56 @@ int keybd_fsa_t::get_modifiers()
 
     return flags;
 }
+
+class keybd_file_reg_t : public dev_fs_file_reg_t {
+public:
+    static keybd_file_reg_t *get_registration()
+    {
+        if (unlikely(!instance))
+            instance.reset(new keybd_file_reg_t("conin"));
+        return instance;
+    }
+
+    keybd_file_reg_t(char const *name)
+        : dev_fs_file_reg_t(name)
+    {
+    }
+
+    struct keybd_file_t : public dev_fs_file_t {
+        // dev_fs_file_t interface
+        ssize_t read(char *buf, size_t size, off_t offset) override
+        {
+            if (size < sizeof(keyboard_event_t))
+                return -int(errno_t::EINVAL);
+
+            keyboard_event_t ev = keybd_waitevent();
+            memcpy(buf, &ev, sizeof(ev));
+            return sizeof(ev);
+        }
+
+        // dev_fs_file_t interface
+        ssize_t write(const char *buf, size_t size, off_t offset) override
+        {
+            return -int(errno_t::EROFS);
+        }
+    };
+
+    // dev_fs_file_reg_t interface
+    dev_fs_file_t *open(int flags, mode_t mode) override
+    {
+        return &file;
+    }
+
+    keybd_file_t file;
+
+    static std::unique_ptr<keybd_file_reg_t> instance;
+};
+
+std::unique_ptr<keybd_file_reg_t> keybd_file_reg_t::instance;
+
+void keybd_register(void*)
+{
+    devfs_register(keybd_file_reg_t::instance);
+}
+
+REGISTER_CALLOUT(keybd_register, nullptr, callout_type_t::devfs_ready, "000");
