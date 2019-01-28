@@ -139,7 +139,7 @@ enum struct fw_cfg_ctl_t : uint32_t {
 //  select+seek+read: qemu_fw_cfg_dma(buffer, size, sel, offset)
 //  any combination
 bool qemu_fw_cfg(void *buffer, uint32_t size, uint32_t file_size,
-                 int selector, uint64_t file_offset)
+                 int selector, off_t file_offset)
 {
     int present = qemu_fw_cfg_present();
 
