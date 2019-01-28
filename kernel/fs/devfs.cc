@@ -1,4 +1,4 @@
-#include "dev_storage.h"
+#include "devfs.h"
 #include <cxxstring.h>
 
 struct dev_fs_file_info_t final
@@ -10,51 +10,6 @@ public:
     {
         return -int(errno_t::ENOSYS);
     }
-};
-
-struct device_t
-{
-    std::string name;
-    fs_base_t *fs;
-};
-
-struct dev_fs_t final
-        : public fs_base_t
-{
-    FS_BASE_RW_IMPL
-
-    fs_base_t *resolve(char const *path);
-
-    using device_list = std::vector<device_t>;
-    device_list devices;
-
-    struct file_handle_t : public fs_file_info_t {
-        enum type_t {
-            NODE,
-            DIR
-        };
-
-        file_handle_t(type_t type)
-            : type(type)
-        {
-        }
-
-        type_t type;
-    };
-
-    struct node_handle_t : public file_handle_t {
-        node_handle_t()
-            : file_handle_t(NODE)
-        {
-        }
-    };
-
-    struct dir_handle_t : public file_handle_t {
-        dir_handle_t()
-            : file_handle_t(DIR)
-        {
-        }
-    };
 };
 
 static dev_fs_t dev_fs;
@@ -158,6 +113,17 @@ int dev_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
 int dev_fs_t::open(fs_file_info_t **fi, fs_cpath_t path,
                    int flags, mode_t mode)
 {
+    // Lookup the file info factory for this device name
+
+    size_t name_hash = dev_fs_file_reg_t::hash(path);
+
+    for (dev_fs_file_reg_t *reg : files) {
+        if (reg->name_hash == name_hash) {
+            *fi = reg->open(flags, mode);
+            return 0;
+        }
+    }
+
     return -int(errno_t::ENOSYS);
 }
 
@@ -248,30 +214,21 @@ int dev_fs_t::poll(fs_file_info_t *fi, fs_pollhandle_t* ph, unsigned* reventsp)
     return -int(errno_t::ENOSYS);
 }
 
-fs_base_t *devfs_create()
-{
-    return new dev_fs_t();
-}
+static dev_fs_t *devfs_instance;
 
-fs_base_t *devfs_resolve(dev_fs_t * restrict dev_fs,
-                         char const * restrict path)
+dev_fs_t *devfs_create()
 {
-    return dev_fs->resolve(path);
-}
-
-fs_base_t *dev_fs_t::resolve(char const *path)
-{
-    size_t len = strlen(path);
-    device_list::iterator match = std::find_if(devices.begin(), devices.end(),
-                 [len, path](device_t const& item) {
-        return item.name.size() == len && item.name == path;
-    });
-    if (match != devices.end())
-        return match->fs;
-    return nullptr;
+    devfs_instance = new dev_fs_t();
+    callout_call(callout_type_t::devfs_ready);
+    return devfs_instance;
 }
 
 void devfs_delete(dev_fs_t *dev_fs)
 {
     delete dev_fs;
+}
+
+void devfs_register(dev_fs_file_reg_t *reg)
+{
+    devfs_instance->register_file(reg);
 }
