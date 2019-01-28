@@ -1,4 +1,4 @@
-./mbr.s
+./mbr.S
 ./empty.cc
 ./mbr.ld
 ./mbr.files

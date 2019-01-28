@@ -47,6 +47,11 @@ AS_IF([test x"$CP" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find cp])])
 AC_SUBST([CP])
 
+AC_CHECK_PROGS([DD], [dd], [NOT_FOUND])
+AS_IF([test x"$DD" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find dd])])
+AC_SUBST([DD])
+
 AC_CHECK_PROGS([LN], [ln], [NOT_FOUND])
 AS_IF([test x"$LN" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find ln])])

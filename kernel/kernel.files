@@ -55,6 +55,7 @@ device/vt100.cc
 device/vt100.h
 fs/devfs.cc
 fs/devfs.h
+fs/gpt.cc
 lib/asan.cc
 lib/asan.h
 lib/cc/cxxstring.h

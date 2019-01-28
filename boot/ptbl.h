@@ -1,3 +1,4 @@
+#pragma once
 // ptbl_ent
 
 #include "asmstruct.h"

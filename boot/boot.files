@@ -1,3 +1,4 @@
+gpt.h
 retpoline.S
 vesa_efi.cc
 vesa_bios.cc

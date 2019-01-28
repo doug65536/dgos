@@ -84,12 +84,12 @@ _start:
 
 	.cfi_endproc
 
-#.section .init_st
-#    pushq %rbp
-#    movq %rsp,%rbp
-#
-#.section .init_en
-#    movq %rbp,%rsp
-#    popq %rbp
-#    ret
+//.section .init_st
+//    pushq %rbp
+//    movq %rsp,%rbp
+//
+//.section .init_en
+//    movq %rbp,%rsp
+//    popq %rbp
+//    ret
 

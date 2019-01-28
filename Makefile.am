@@ -664,6 +664,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/fs/iso9660_decl.h \
 	kernel/fs/iso9660_part.cc \
 	kernel/fs/mbr.cc \
+	kernel/fs/gpt.cc \
 	kernel/fs/tmpfs.cc \
 	kernel/net/arp_frame.cc \
 	kernel/net/arp_frame.h \
@@ -1620,7 +1621,8 @@ clean-local:
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
-	rm -f $(top_builddir)/fatdisk.img
+	rm -f $(top_builddir)/mbrdisk.img
+	rm -f $(top_builddir)/gptdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/isodisk.img
 
@@ -1787,7 +1789,8 @@ QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
 QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 
 QEMU_DISK_TYPE_iso = ide-cd
-QEMU_DISK_TYPE_fat = ide-hd
+QEMU_DISK_TYPE_mbr = ide-hd
+QEMU_DISK_TYPE_gpt = ide-hd
 
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
 QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
@@ -1805,11 +1808,13 @@ QEMU_HDCTL_DEV_usb = -device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE
 QEMU_HDCTL = $(call QEMU_MACHINE,$(1)) $(call QEMU_HDCTL_DEV_$(1),$(2))
 
 QEMU_MEDIA = $(QEMU_MEDIA_$(1))
-QEMU_MEDIA_fat = disk
+QEMU_MEDIA_gpt = disk
+QEMU_MEDIA_mbr = disk
 QEMU_MEDIA_iso = cdrom
 
 QEMU_IMAGE = $(QEMU_IMAGE_$(1))
-QEMU_IMAGE_fat = fatdisk.img
+QEMU_IMAGE_gpt = gptdisk.img
+QEMU_IMAGE_mbr = mbrdisk.img
 QEMU_IMAGE_iso = isodisk.img
 
 QEMU_NP = $(QEMU_NP_$(1))
@@ -1851,7 +1856,7 @@ QL_RT = debug run trace asan tracedbg
 QL_NP = up smp numa
 QL_BT = bios efi
 QL_BM = pxe hd
-QL_FS = iso fat
+QL_FS = iso mbr gpt
 QL_SC = ahci ide nvme usb virtio
 QL_EM = kvm tcg
 

@@ -1,6 +1,7 @@
 .code16
 
 #include "../boot/ptbl.h"
+#include "../boot/gpt.h"
 #include "../boot/dap.h"
 
 #define UNRELOCATED(n) n+0x7C00-0x600
@@ -21,6 +22,19 @@ entry:
 init_stack:
     .int 0x0000FFF8
 
+// Data close to start to get byte-sized offsets
+
+dap:
+    .byte dap_length
+    .byte 0
+    .word 1
+    .word 0x7c00
+    .word 0x0000
+    .quad 0
+
+ptbl_ent_ptr:
+    .word 0
+
 // ----------------------------------------------------------------------
 // The bootstrap code starts here
 .align 64
@@ -35,14 +49,16 @@ entry_start:
     mov $0x80,%dl
 0:
 
+    // Don't clobber dx!
+
     xorw %ax,%ax
     movw %ax,%ds
     movw %ax,%es
     
 // hang and wait for gdb
 //0:
-//	test %ax,%ax
-//	jz 0b
+//    test %ax,%ax
+//    jz 0b
 
     // Initialize stack to top of first 64KB
     movw init_stack-0x600+0x7c00+2,%ss
@@ -58,39 +74,81 @@ entry_start:
 relocated_entry:
 
     // Search for first bootable partition
-    movw $partition_table,%si
+    movw $partition_table,%bx
     movw $4,%cx
-0:
-    cmpb $0x80,ptbl_ent_bootflag(%si)
-    je found_partition
+
+0:  cmpb $0xEE,ptbl_ent_sysid(%bx)
+    je found_gpt
+
+    cmpb $0x80,ptbl_ent_bootflag(%bx)
+    je boot_partition
+
 bad_signature:
-    addw $ptbl_ent_length,%si
+    addw $ptbl_ent_length,%bx
     decw %cx
     jnz 0b
     jmp no_active_partition
 
-dap:
-    .byte dap_length
-    .byte 0
-    .word 1
-    .word 0x7c00
-    .word 0x0000
-    .quad 0
-
-found_partition:
-    pushw %si
-    movw ptbl_ent_stsec(%si),%cx
-    movw ptbl_ent_stsec+2(%si),%ax
-    movw $dap,%si
-    movw %cx,dap_lba(%si)
-    movw %ax,dap_lba+2(%si)
-    movw $0x4200,%ax
-    int $0x13
-    jc disk_error
-    popw %si
+boot_partition:
+    movw ptbl_ent_stsec(%bx),%ax
+    movw ptbl_ent_stsec+2(%bx),%cx
+    movw $1,dap+dap_block_count
+    call disk_io_with_lba
     cmpw $0xaa55,0x7dfe
     je 0x7c00
     jmp bad_signature
+
+found_gpt:
+    movw %bx,ptbl_ent_ptr
+    movw $2,dap+dap_lba
+    andw $0,dap+dap_lba+2
+
+.Lanother_gpt:
+    movw $1,dap+dap_block_count
+    call disk_io
+
+    // Look for bootable flag
+    testb $gpt_lba2_part_attr_bios,0x7c00+gpt_lba2_part_attr
+    jnz boot_gpt
+
+    addw $1,dap+dap_lba
+    adcw $0,dap+dap_lba+2
+    jmp .Lanother_gpt
+
+boot_gpt:
+    // Calculate 32 bit sector count (2TB limit)
+    movw 0x7c00+gpt_lba2_part_lba_en,%ax
+    movw 0x7c00+gpt_lba2_part_lba_en+2,%cx
+    subw 0x7c00+gpt_lba2_part_lba_st,%ax
+    sbbw 0x7c00+gpt_lba2_part_lba_st+2,%cx
+    addw $1,%ax
+    adcw $0,%cx
+    movw %ax,ptbl_ent_numsec(%bx)
+    movw %cx,ptbl_ent_numsec+2(%bx)
+
+    movw 0x7c00+gpt_lba2_part_lba_st,%ax
+    movw 0x7c00+gpt_lba2_part_lba_st+2,%cx
+    movw %ax,ptbl_ent_stsec(%bx)
+    movw %cx,ptbl_ent_stsec+2(%bx)
+    jmp boot_partition
+
+.Lpart_no_good:
+    incb dap_lba(%si)
+    cmpb $34,dap_lba(%si)
+    jb .Lanother_gpt
+
+//.space 220
+
+disk_io_with_lba:
+    movw %ax,dap_lba(%si)
+    movw %cx,dap_lba+2(%si)
+    // fall through
+disk_io:
+    movw $dap,%si
+    movw $0x4200,%ax
+    int $0x13
+    jc disk_error
+    ret
 
 disk_error:
     movw $'d'+0xF00,%ax
@@ -117,9 +175,9 @@ give_up:
 
 .macro partition_table_entry active,lba_start,lba_sectors,type
     .if \active != 0
-    	.byte 0x80
+        .byte 0x80
     .else
-    	.byte 0x00
+        .byte 0x00
     .endif
 
     .byte 0

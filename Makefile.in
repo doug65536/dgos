@@ -520,6 +520,7 @@ am__objects_4 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/fs/kernel_asan-iso9660.$(OBJEXT) \
 	kernel/fs/kernel_asan-iso9660_part.$(OBJEXT) \
 	kernel/fs/kernel_asan-mbr.$(OBJEXT) \
+	kernel/fs/kernel_asan-gpt.$(OBJEXT) \
 	kernel/fs/kernel_asan-tmpfs.$(OBJEXT) \
 	kernel/net/kernel_asan-arp_frame.$(OBJEXT) \
 	kernel/net/kernel_asan-dhcp.$(OBJEXT) \
@@ -653,6 +654,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/fs/kernel_generic-iso9660.$(OBJEXT) \
 	kernel/fs/kernel_generic-iso9660_part.$(OBJEXT) \
 	kernel/fs/kernel_generic-mbr.$(OBJEXT) \
+	kernel/fs/kernel_generic-gpt.$(OBJEXT) \
 	kernel/fs/kernel_generic-tmpfs.$(OBJEXT) \
 	kernel/net/kernel_generic-arp_frame.$(OBJEXT) \
 	kernel/net/kernel_generic-dhcp.$(OBJEXT) \
@@ -785,6 +787,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/fs/kernel_tracing-iso9660.$(OBJEXT) \
 	kernel/fs/kernel_tracing-iso9660_part.$(OBJEXT) \
 	kernel/fs/kernel_tracing-mbr.$(OBJEXT) \
+	kernel/fs/kernel_tracing-gpt.$(OBJEXT) \
 	kernel/fs/kernel_tracing-tmpfs.$(OBJEXT) \
 	kernel/net/kernel_tracing-arp_frame.$(OBJEXT) \
 	kernel/net/kernel_tracing-dhcp.$(OBJEXT) \
@@ -1825,6 +1828,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/fs/iso9660_decl.h \
 	kernel/fs/iso9660_part.cc \
 	kernel/fs/mbr.cc \
+	kernel/fs/gpt.cc \
 	kernel/fs/tmpfs.cc \
 	kernel/net/arp_frame.cc \
 	kernel/net/arp_frame.h \
@@ -2648,7 +2652,8 @@ QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
 #QEMU_MACHINE_ide = -machine pc
 QEMU_BLKSIZE = logical_block_size=$(SECTOR_SZ),physical_block_size=$(SECTOR_SZ)
 QEMU_DISK_TYPE_iso = ide-cd
-QEMU_DISK_TYPE_fat = ide-hd
+QEMU_DISK_TYPE_mbr = ide-hd
+QEMU_DISK_TYPE_gpt = ide-hd
 QEMU_HDCTL_DEV_nvme = -device nvme,drive=bootdrv,serial=42,$(QEMU_BLKSIZE)
 QEMU_HDCTL_DEV_virtio = -device virtio-blk-pci,drive=bootdrv,$(QEMU_BLKSIZE),disable-legacy=on
 #,num-queues=$(QEMU_CPUS)
@@ -2661,10 +2666,12 @@ QEMU_HDCTL_DEV_ide = -device piix4-ide,id=bootif \
 QEMU_HDCTL_DEV_usb = -device usb-storage,drive=bootdrv,bus=xhci.0,$(QEMU_BLKSIZE)
 QEMU_HDCTL = $(call QEMU_MACHINE,$(1)) $(call QEMU_HDCTL_DEV_$(1),$(2))
 QEMU_MEDIA = $(QEMU_MEDIA_$(1))
-QEMU_MEDIA_fat = disk
+QEMU_MEDIA_gpt = disk
+QEMU_MEDIA_mbr = disk
 QEMU_MEDIA_iso = cdrom
 QEMU_IMAGE = $(QEMU_IMAGE_$(1))
-QEMU_IMAGE_fat = fatdisk.img
+QEMU_IMAGE_gpt = gptdisk.img
+QEMU_IMAGE_mbr = mbrdisk.img
 QEMU_IMAGE_iso = isodisk.img
 QEMU_NP = $(QEMU_NP_$(1))
 QEMU_NP_smp = -smp cpus=$(QEMU_CPUS),cores=$(QEMU_CORES),threads=$(QEMU_THREADS)
@@ -2696,7 +2703,7 @@ QL_RT = debug run trace asan tracedbg
 QL_NP = up smp numa
 QL_BT = bios efi
 QL_BM = pxe hd
-QL_FS = iso fat
+QL_FS = iso mbr gpt
 QL_SC = ahci ide nvme usb virtio
 QL_EM = kvm tcg
 
@@ -3895,6 +3902,8 @@ kernel/fs/kernel_asan-iso9660_part.$(OBJEXT):  \
 	kernel/fs/$(am__dirstamp) kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_asan-mbr.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
+kernel/fs/kernel_asan-gpt.$(OBJEXT): kernel/fs/$(am__dirstamp) \
+	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_asan-tmpfs.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/net/$(am__dirstamp):
@@ -4274,6 +4283,8 @@ kernel/fs/kernel_generic-iso9660_part.$(OBJEXT):  \
 	kernel/fs/$(am__dirstamp) kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_generic-mbr.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
+kernel/fs/kernel_generic-gpt.$(OBJEXT): kernel/fs/$(am__dirstamp) \
+	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_generic-tmpfs.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/net/kernel_generic-arp_frame.$(OBJEXT):  \
@@ -4628,6 +4639,8 @@ kernel/fs/kernel_tracing-iso9660.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 kernel/fs/kernel_tracing-iso9660_part.$(OBJEXT):  \
 	kernel/fs/$(am__dirstamp) kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_tracing-mbr.$(OBJEXT): kernel/fs/$(am__dirstamp) \
+	kernel/fs/$(DEPDIR)/$(am__dirstamp)
+kernel/fs/kernel_tracing-gpt.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/kernel_tracing-tmpfs.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
@@ -5194,6 +5207,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-devfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-ext4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-fat32.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-gpt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-iso9660.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-iso9660_part.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_asan-mbr.Po@am__quote@
@@ -5201,6 +5215,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-devfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-ext4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-fat32.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-gpt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-iso9660.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-iso9660_part.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_generic-mbr.Po@am__quote@
@@ -5208,6 +5223,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-devfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-ext4.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-fat32.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-iso9660.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-iso9660_part.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/fs/$(DEPDIR)/kernel_tracing-mbr.Po@am__quote@
@@ -10483,6 +10499,20 @@ kernel/fs/kernel_asan-mbr.obj: kernel/fs/mbr.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_asan-mbr.obj `if test -f 'kernel/fs/mbr.cc'; then $(CYGPATH_W) 'kernel/fs/mbr.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/mbr.cc'; fi`
 
+kernel/fs/kernel_asan-gpt.o: kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_asan-gpt.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_asan-gpt.Tpo -c -o kernel/fs/kernel_asan-gpt.o `test -f 'kernel/fs/gpt.cc' || echo '$(srcdir)/'`kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_asan-gpt.Tpo kernel/fs/$(DEPDIR)/kernel_asan-gpt.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/gpt.cc' object='kernel/fs/kernel_asan-gpt.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_asan-gpt.o `test -f 'kernel/fs/gpt.cc' || echo '$(srcdir)/'`kernel/fs/gpt.cc
+
+kernel/fs/kernel_asan-gpt.obj: kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_asan-gpt.obj -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_asan-gpt.Tpo -c -o kernel/fs/kernel_asan-gpt.obj `if test -f 'kernel/fs/gpt.cc'; then $(CYGPATH_W) 'kernel/fs/gpt.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/gpt.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_asan-gpt.Tpo kernel/fs/$(DEPDIR)/kernel_asan-gpt.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/gpt.cc' object='kernel/fs/kernel_asan-gpt.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_asan-gpt.obj `if test -f 'kernel/fs/gpt.cc'; then $(CYGPATH_W) 'kernel/fs/gpt.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/gpt.cc'; fi`
+
 kernel/fs/kernel_asan-tmpfs.o: kernel/fs/tmpfs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_asan-tmpfs.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_asan-tmpfs.Tpo -c -o kernel/fs/kernel_asan-tmpfs.o `test -f 'kernel/fs/tmpfs.cc' || echo '$(srcdir)/'`kernel/fs/tmpfs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_asan-tmpfs.Tpo kernel/fs/$(DEPDIR)/kernel_asan-tmpfs.Po
@@ -12205,6 +12235,20 @@ kernel/fs/kernel_generic-mbr.obj: kernel/fs/mbr.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_generic-mbr.obj `if test -f 'kernel/fs/mbr.cc'; then $(CYGPATH_W) 'kernel/fs/mbr.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/mbr.cc'; fi`
 
+kernel/fs/kernel_generic-gpt.o: kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-gpt.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-gpt.Tpo -c -o kernel/fs/kernel_generic-gpt.o `test -f 'kernel/fs/gpt.cc' || echo '$(srcdir)/'`kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-gpt.Tpo kernel/fs/$(DEPDIR)/kernel_generic-gpt.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/gpt.cc' object='kernel/fs/kernel_generic-gpt.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_generic-gpt.o `test -f 'kernel/fs/gpt.cc' || echo '$(srcdir)/'`kernel/fs/gpt.cc
+
+kernel/fs/kernel_generic-gpt.obj: kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-gpt.obj -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-gpt.Tpo -c -o kernel/fs/kernel_generic-gpt.obj `if test -f 'kernel/fs/gpt.cc'; then $(CYGPATH_W) 'kernel/fs/gpt.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/gpt.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-gpt.Tpo kernel/fs/$(DEPDIR)/kernel_generic-gpt.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/gpt.cc' object='kernel/fs/kernel_generic-gpt.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_generic-gpt.obj `if test -f 'kernel/fs/gpt.cc'; then $(CYGPATH_W) 'kernel/fs/gpt.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/gpt.cc'; fi`
+
 kernel/fs/kernel_generic-tmpfs.o: kernel/fs/tmpfs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_generic-tmpfs.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_generic-tmpfs.Tpo -c -o kernel/fs/kernel_generic-tmpfs.o `test -f 'kernel/fs/tmpfs.cc' || echo '$(srcdir)/'`kernel/fs/tmpfs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_generic-tmpfs.Tpo kernel/fs/$(DEPDIR)/kernel_generic-tmpfs.Po
@@ -13926,6 +13970,20 @@ kernel/fs/kernel_tracing-mbr.obj: kernel/fs/mbr.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/mbr.cc' object='kernel/fs/kernel_tracing-mbr.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_tracing-mbr.obj `if test -f 'kernel/fs/mbr.cc'; then $(CYGPATH_W) 'kernel/fs/mbr.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/mbr.cc'; fi`
+
+kernel/fs/kernel_tracing-gpt.o: kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-gpt.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Tpo -c -o kernel/fs/kernel_tracing-gpt.o `test -f 'kernel/fs/gpt.cc' || echo '$(srcdir)/'`kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Tpo kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/gpt.cc' object='kernel/fs/kernel_tracing-gpt.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_tracing-gpt.o `test -f 'kernel/fs/gpt.cc' || echo '$(srcdir)/'`kernel/fs/gpt.cc
+
+kernel/fs/kernel_tracing-gpt.obj: kernel/fs/gpt.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-gpt.obj -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Tpo -c -o kernel/fs/kernel_tracing-gpt.obj `if test -f 'kernel/fs/gpt.cc'; then $(CYGPATH_W) 'kernel/fs/gpt.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/gpt.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Tpo kernel/fs/$(DEPDIR)/kernel_tracing-gpt.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/fs/gpt.cc' object='kernel/fs/kernel_tracing-gpt.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/fs/kernel_tracing-gpt.obj `if test -f 'kernel/fs/gpt.cc'; then $(CYGPATH_W) 'kernel/fs/gpt.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/fs/gpt.cc'; fi`
 
 kernel/fs/kernel_tracing-tmpfs.o: kernel/fs/tmpfs.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/kernel_tracing-tmpfs.o -MD -MP -MF kernel/fs/$(DEPDIR)/kernel_tracing-tmpfs.Tpo -c -o kernel/fs/kernel_tracing-tmpfs.o `test -f 'kernel/fs/tmpfs.cc' || echo '$(srcdir)/'`kernel/fs/tmpfs.cc
@@ -15684,9 +15742,10 @@ $(top_builddir)/fatpart.img: \
 		$(top_builddir)/bootfat.dis.gz
 	set -x && \
 		rm -f $(top_builddir)/fatpart.img \
-			$(top_builddir)/fatdisk.img && \
+			$(top_builddir)/mbrdisk.img \
+			$(top_builddir)/gptdisk.img && \
 		\
-		truncate --size=80M $(top_builddir)/fatpart.img && \
+		truncate --size=48M $(top_builddir)/fatpart.img && \
 		\
 		mkfs.vfat \
 			-F 32 \
@@ -15696,13 +15755,13 @@ $(top_builddir)/fatpart.img: \
 			-n dgos \
 			$(top_builddir)/fatpart.img && \
 			\
-		dd \
+		$(DD) \
 			if=$(top_builddir)/boot1-bin \
 			of=$(top_builddir)/fatpart.img \
 			bs=1 count=$$(( 0xB )) \
 			conv=notrunc && \
 			\
-		dd if=$(top_builddir)/boot1-bin \
+		$(DD) if=$(top_builddir)/boot1-bin \
 			of=$(top_builddir)/fatpart.img \
 			bs=1 \
 			seek=$$(( 0x5A )) \
@@ -15710,14 +15769,14 @@ $(top_builddir)/fatpart.img: \
 			count=$$(( 0x1FE - 0x5A )) \
 			conv=notrunc && \
 			\
-		dd if=$(top_builddir)/bootfat-bin \
+		$(DD) if=$(top_builddir)/bootfat-bin \
 			of=$(top_builddir)/fatpart.img \
 			bs=$(SECTOR_SZ) \
 			seek=2 \
 			skip=0 \
 			conv=notrunc && \
 			\
-		dd if=$(top_builddir)/fatpart.img \
+		$(DD) if=$(top_builddir)/fatpart.img \
 			of=$(top_builddir)/fatpart.img \
 			bs=$(SECTOR_SZ) \
 			count=1 \
@@ -15729,46 +15788,64 @@ $(top_builddir)/fatpart.img: \
 			$(top_srcdir)/populate_fat.sh \
 				$(top_builddir)/fatpart.img "$(top_srcdir)"
 
-$(top_builddir)/fatdisk.img: \
-		$(top_srcdir)/diskfat.mk \
+$(top_builddir)/mbrdisk.img: \
+		fatpart.img
+	truncate --size=64M $(top_builddir)/mbrdisk.img && \
 		\
-		fatpart.img \
-		\
-		$(top_builddir)/mbr-bin \
-		$(top_builddir)/mbr.sym \
-		$(top_builddir)/mbr.dis.gz \
-		\
-		$(top_builddir)/boot1-bin \
-		$(top_builddir)/boot1-elf \
-		\
-		$(top_builddir)/bootfat-bin \
-		$(top_builddir)/bootfat.sym \
-		$(top_builddir)/bootfat.dis.gz
-	truncate --size=262144K fatdisk.img && \
-		\
-		echo -e 'o\nn\np\n1\n2048\n\nt\nc\na\np\ni\nw\n' | \
-			fdisk -b $(SECTOR_SZ) $(top_builddir)/fatdisk.img && \
+		printf 'label: dos\nlength=2048, uuid=%s, name=DGOS, bootable\n' \
+				$(DGOS_GUID) | \
+			sfdisk $(top_builddir)/mbrdisk.img && \
 			\
-		dd if=$(top_builddir)/fatpart.img \
-			of=$(top_builddir)/fatdisk.img \
+		$(DD) if=$(top_builddir)/fatpart.img \
+			of=$(top_builddir)/mbrdisk.img \
 			bs=$(SECTOR_SZ) \
 			seek=2048 \
 			conv=notrunc && \
 			\
-		dd if=$(top_builddir)/mbr-bin \
-			of=$(top_builddir)/fatdisk.img \
+		$(DD) if=$(top_builddir)/mbr-bin \
+			of=$(top_builddir)/mbrdisk.img \
 			bs=1 \
 			count=446 \
 			conv=notrunc && \
 			\
-		dd if=$(top_builddir)/mbr-bin \
-			of=$(top_builddir)/fatdisk.img \
+		$(DD) if=$(top_builddir)/mbr-bin \
+			of=$(top_builddir)/mbrdisk.img \
 			bs=1 seek=510 \
 			skip=510 \
 			count=2 \
 			conv=notrunc
 
-$(top_builddir)/fatdisk.qcow: $(top_builddir)/fatdisk.img
+$(top_builddir)/gptdisk.img: fatpart.img
+	truncate --size=64M $(top_builddir)/gptdisk.img && \
+	\
+		printf 'label: gpt\n2048,,U,*' | \
+			sfdisk $(top_builddir)/gptdisk.img && \
+			\
+		sgdisk -A 1:set:2 $(top_builddir)/gptdisk.img && \
+		\
+		$(DD) if=$(top_builddir)/fatpart.img \
+			of=$(top_builddir)/gptdisk.img \
+			bs=$(SECTOR_SZ) \
+			seek=2048 \
+			conv=notrunc && \
+			\
+		$(DD) if=$(top_builddir)/mbr-bin \
+			of=$(top_builddir)/gptdisk.img \
+			bs=1 \
+			count=446 \
+			conv=notrunc && \
+			\
+		$(DD) if=$(top_builddir)/mbr-bin \
+			of=$(top_builddir)/gptdisk.img \
+			bs=1 seek=510 \
+			skip=510 \
+			count=2 \
+			conv=notrunc
+
+$(top_builddir)/mbrdisk.qcow: $(top_builddir)/mbrdisk.img
+	$(QEMU_IMG) convert -f raw -O qcow -p $< $@
+
+$(top_builddir)/gptdisk.qcow: $(top_builddir)/gptdisk.img
 	$(QEMU_IMG) convert -f raw -O qcow -p $< $@
 
 $(top_builddir)/isodisk.img: \
@@ -15874,7 +15951,8 @@ clean-local:
 
 distclean-local:
 	rm -rf $(top_builddir)/extern
-	rm -f $(top_builddir)/fatdisk.img
+	rm -f $(top_builddir)/mbrdisk.img
+	rm -f $(top_builddir)/gptdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/isodisk.img
 
