@@ -176,7 +176,8 @@ static _always_inline void outb(uint16_t dx, uint8_t al)
         "outb %b[val],%w[port]"
         :
         : [val] "a" (al)
-        , [port] "Nd" (dx));
+        , [port] "Nd" (dx)
+        : "memory");
 }
 
 static _always_inline void outw(uint16_t dx, uint16_t ax)
@@ -185,7 +186,8 @@ static _always_inline void outw(uint16_t dx, uint16_t ax)
         "outw %w[val],%w[port]"
         :
         : [val] "a" (ax)
-        , [port] "Nd" (dx));
+        , [port] "Nd" (dx)
+        : "memory");
 }
 
 static _always_inline void outl(uint16_t dx, uint32_t eax)
@@ -194,7 +196,8 @@ static _always_inline void outl(uint16_t dx, uint32_t eax)
         "outl %[val],%w[port]"
         :
         : [val] "a" (eax)
-        , [port] "Nd" (dx));
+        , [port] "Nd" (dx)
+        : "memory");
 }
 
 static _always_inline void outsb(uint16_t dx, void const *src, size_t n)
