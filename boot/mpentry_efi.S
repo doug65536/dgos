@@ -11,6 +11,8 @@
 .align 16
 .global ap_entry
 ap_entry:
+    cli
+    cld
     xor %ax,%ax
     mov %ax,%ss
     mov $0xFFF0,%sp
