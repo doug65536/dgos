@@ -385,6 +385,7 @@ public:
         unlock();
     }
 
+    _hot
     void lock() noexcept
     {
         assert(!locked);
@@ -392,6 +393,7 @@ public:
         locked = true;
     }
 
+    _hot
     void unlock() noexcept
     {
         if (locked) {
