@@ -286,10 +286,19 @@ static _always_inline uintptr_t cpu_fault_address_get()
 {
     uintptr_t addr;
     __asm__ __volatile__ (
-        "movq %%cr2,%[addr]\n\t"
+        "mov %%cr2,%[addr]\n\t"
         : [addr] "=r" (addr)
     );
     return addr;
+}
+
+static _always_inline void cpu_fault_address_set(uintptr_t addr)
+{
+    __asm__ __volatile__ (
+        "mov %[addr],%%cr2\n\t"
+        :
+        : [addr] "r" (addr)
+    );
 }
 
 static _always_inline void cpu_page_invalidate(uintptr_t addr)
