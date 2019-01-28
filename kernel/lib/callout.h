@@ -44,7 +44,9 @@ enum struct callout_type_t : uint32_t {
     partition_probe = 'P',
     nic = 'N',
     nics_ready = 129,
-    usb = 'U'
+    usb = 'U',
+
+    devfs_ready = 256
 };
 
 struct callout_t {
@@ -64,4 +66,4 @@ struct callout_t {
         (fn), (arg), (type), 0, 0 \
     }
 
-extern "C" size_t callout_call(callout_type_t type);
+extern "C" size_t callout_call(callout_type_t type, bool as_thread = false);
