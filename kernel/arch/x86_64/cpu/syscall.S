@@ -92,7 +92,6 @@ syscall_entry:
 
     // Call handler
     indirect_call rax
-    //callq *%rax
 
     pop_cfi %r15
     .cfi_same_value r15
