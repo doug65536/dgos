@@ -5,8 +5,8 @@
 #else
 #include <stdint.h>
 #endif
-
 #include "type_traits.h"
+#include "memory.h"
 
 __BEGIN_NAMESPACE_STD
 
