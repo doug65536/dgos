@@ -258,13 +258,11 @@ void elf64_run(tchar const *filename)
             if (blk->p_memsz == 0)
                 continue;
 
-            ctx->page_flags = (-cpu_has_global_pages() & PTE_GLOBAL);
+            // Global if possible
+            ctx->page_flags = pge_page_flags;
 
             // Pages present
             ctx->page_flags |= PTE_PRESENT;
-
-            // Global if possible
-            ctx->page_flags |= pge_page_flags;
 
             // If not executable, mark as no execute
             if ((blk->p_flags & PF_X) == 0)
