@@ -1116,7 +1116,7 @@ void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
 
     for (uint8_t const *base = (uint8_t const *)(cfg_hlp.find_config(0)),
          *raw = base;
-         *raw; raw += *raw)
+         *raw && *raw != 255; raw += *raw)
         hex_dump(raw, *raw, raw - base);
 
     usb_desc_config const *cfg;
@@ -1410,19 +1410,39 @@ void usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     size_t cpu_count = thread_get_cpu_count();
 
-    if (maxintr >= cpu_count)
+    // Share the same vector on all CPUs if using multiple interrupters
+    std::vector<int> target_cpus;
+    std::vector<int> vector_offsets;
+
+    if (maxintr >= cpu_count) {
+        USBXHCI_TRACE("Device supports per-CPU IRQs\n");
         maxintr = cpu_count;
-    else
+
+        // One MSI-X vector per CPU, all using same interrupt vector
+        target_cpus.resize(cpu_count);
+        for (size_t i = 0; i < cpu_count; ++i)
+            target_cpus[i] = i;
+        vector_offsets.resize(cpu_count, 0);
+    } else {
+        USBXHCI_TRACE("Device cannot support per-CPU IRQs, using one IRQ\n");
         maxintr = 1;
+    }
 
     use_msi = pci_try_msi_irq(pci_iter, &irq_range,
                               0, true, maxintr,
                               &usbxhci::irq_handler,
-                              "usb_xhci");
+                              "usb_xhci", !target_cpus.empty()
+                              ? target_cpus.data() : nullptr,
+                              !vector_offsets.empty()
+                              ? vector_offsets.data() : nullptr);
 
     // 17. Interrupters "when using PCI pin interrupt,
     // Interrupters 1 to MaxIntrs-1 shall be disabled."
     if (!use_msi)
+        maxintr = 1;
+
+    // Don't bother using multiple IRQs if no MSI-X for per CPU routing
+    if (!irq_range.msix)
         maxintr = 1;
 
     USBXHCI_TRACE("Using IRQs %s=%d, base=%u, count=%u\n",
@@ -2090,6 +2110,9 @@ isr_context_t *usbxhci::irq_handler(int irq, isr_context_t *ctx)
     for (usbxhci* dev : usbxhci_devices) {
         int irq_ofs = irq - dev->irq_range.base;
 
+        if (dev->maxintr != 1)
+            irq_ofs = thread_cpu_number();
+
         if (irq_ofs >= 0 && irq_ofs < dev->irq_range.count) {
             //dev->irq_handler(irq_ofs);
             workq::enqueue([=]() {
@@ -2274,13 +2297,17 @@ int usbxhci::make_data_trbs(
 
     usbxhci_ctl_trb_data_t *trb = trbs;
 
+    // Route the completions to this CPU if we are using multiple interrupters
+    unsigned interrupter = maxintr > 1 ? thread_cpu_number() : 0;
+
     for (size_t i = 0; i < range_count; ++i) {
         trb->data_physaddr = ranges[i].physaddr;
         trb->xfer_td_intr =
                 USBXHCI_CTL_TRB_XFERLEN_INTR_XFERLEN_n(ranges[i].size) |
                 USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_n(
                     std::min(size_t(USBXHCI_CTL_TRB_XFERLEN_INTR_TDSZ_MASK),
-                        range_count - i - 1));
+                        range_count - i - 1)) |
+                USBXHCI_CTL_TRB_XFERLEN_INTR_INTR_n(interrupter);
         trb->flags = USBXHCI_CTL_TRB_FLAGS_TRB_TYPE_n(USBXHCI_TRB_TYPE_DATA) |
                 USBXHCI_CTL_TRB_FLAGS_CH_n(i + 1 < range_count) |
                 USBXHCI_CTL_TRB_FLAGS_IOC_n(intr && i + 1 >= range_count) |
