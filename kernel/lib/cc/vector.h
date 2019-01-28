@@ -13,8 +13,8 @@
 #include "algorithm.h"
 #ifdef __DGOS_KERNEL__
 #include "printk.h"
-#include "bitsearch.h"
 #endif
+#include "bitsearch.h"
 #include "memory.h"
 /*
 */
