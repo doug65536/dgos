@@ -6,7 +6,7 @@
 __BEGIN_DECLS
 
 _noreturn
-void vpanic(char const *format, va_list ap);
+void vpanic(char const * restrict format, va_list ap);
 
 _noreturn
 void panic(char const *format, ...)
@@ -15,9 +15,11 @@ void panic(char const *format, ...)
 _noreturn
 void panic_oom();
 
-int vsnprintf(char *buf, size_t limit, char const *format, va_list ap);
+int vsnprintf(char * restrict buf, size_t limit,
+              char const * restrict format, va_list ap);
 
-int snprintf(char *buf, size_t limit, char const *format, ...)
+int snprintf(char * restrict buf, size_t limit,
+             char const * restrict format, ...)
     _printf_format(3, 4);
 
 void printk(char const *format, ...)
@@ -25,15 +27,15 @@ void printk(char const *format, ...)
 
 void vprintk(char const *format, va_list ap);
 
-int printdbg(char const *format, ...)
+int printdbg(char const * restrict format, ...)
     _printf_format(1, 2);
 
-int vprintdbg(char const *format, va_list ap);
+int vprintdbg(char const * restrict format, va_list ap);
 
-int cprintf(char const *format, ...)
+int cprintf(char const * restrict format, ...)
     _printf_format(1, 2);
 
-int vcprintf(char const *format, va_list ap);
+int vcprintf(char const * restrict format, va_list ap);
 
 int hex_dump(void const volatile *mem, size_t size, uintptr_t base = 0);
 
