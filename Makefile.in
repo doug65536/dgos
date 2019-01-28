@@ -105,7 +105,8 @@ bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	bootpxe-bios-elf$(EXEEXT) bootefi-amd64$(EXEEXT) \
 	kernel-generic$(EXEEXT) kernel-tracing$(EXEEXT) \
 	kernel-asan$(EXEEXT) shell$(EXEEXT) dhcpclient$(EXEEXT) \
-	ls$(EXEEXT) hello.km$(EXEEXT) user-shell$(EXEEXT)
+	ls$(EXEEXT) hello.km$(EXEEXT) rtl8139.km$(EXEEXT) \
+	user-shell$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -570,7 +571,6 @@ am__objects_4 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/device/keyb8042_layout/kernel_asan-keyb8042_layout_us.$(OBJEXT) \
 	kernel/device/kernel_asan-nvme.$(OBJEXT) \
 	kernel/device/kernel_asan-pci.$(OBJEXT) \
-	kernel/device/kernel_asan-rtl8139.$(OBJEXT) \
 	kernel/device/kernel_asan-serial-uart.$(OBJEXT) \
 	kernel/device/kernel_asan-usb.$(OBJEXT) \
 	kernel/device/kernel_asan-dev_usb_ctl.$(OBJEXT) \
@@ -704,7 +704,6 @@ am__objects_5 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/device/keyb8042_layout/kernel_generic-keyb8042_layout_us.$(OBJEXT) \
 	kernel/device/kernel_generic-nvme.$(OBJEXT) \
 	kernel/device/kernel_generic-pci.$(OBJEXT) \
-	kernel/device/kernel_generic-rtl8139.$(OBJEXT) \
 	kernel/device/kernel_generic-serial-uart.$(OBJEXT) \
 	kernel/device/kernel_generic-usb.$(OBJEXT) \
 	kernel/device/kernel_generic-dev_usb_ctl.$(OBJEXT) \
@@ -837,7 +836,6 @@ am__objects_6 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/device/keyb8042_layout/kernel_tracing-keyb8042_layout_us.$(OBJEXT) \
 	kernel/device/kernel_tracing-nvme.$(OBJEXT) \
 	kernel/device/kernel_tracing-pci.$(OBJEXT) \
-	kernel/device/kernel_tracing-rtl8139.$(OBJEXT) \
 	kernel/device/kernel_tracing-serial-uart.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb.$(OBJEXT) \
 	kernel/device/kernel_tracing-dev_usb_ctl.$(OBJEXT) \
@@ -874,6 +872,11 @@ mbr_elf_OBJECTS = $(am_mbr_elf_OBJECTS)
 mbr_elf_DEPENDENCIES = $(am__DEPENDENCIES_1)
 mbr_elf_LINK = $(CCLD) $(mbr_elf_CFLAGS) $(CFLAGS) $(mbr_elf_LDFLAGS) \
 	$(LDFLAGS) -o $@
+am_rtl8139_km_OBJECTS = kernel/device/rtl8139_km-rtl8139.$(OBJEXT)
+rtl8139_km_OBJECTS = $(am_rtl8139_km_OBJECTS)
+rtl8139_km_LDADD = $(LDADD)
+rtl8139_km_LINK = $(CXXLD) $(rtl8139_km_CXXFLAGS) $(CXXFLAGS) \
+	$(rtl8139_km_LDFLAGS) $(LDFLAGS) -o $@
 am_shell_OBJECTS = user/shell/shell-grammar.$(OBJEXT) \
 	user/shell/shell-parser.$(OBJEXT)
 shell_OBJECTS = $(am_shell_OBJECTS)
@@ -948,7 +951,7 @@ SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libg_a_SOURCES) \
 	$(dhcpclient_SOURCES) $(hello_km_SOURCES) \
 	$(kernel_asan_SOURCES) $(kernel_generic_SOURCES) \
 	$(kernel_tracing_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
-	$(shell_SOURCES) $(user_shell_SOURCES)
+	$(rtl8139_km_SOURCES) $(shell_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libg_a_SOURCES) $(libm_a_SOURCES) $(libstdc___a_SOURCES) \
 	$(boot1_elf_SOURCES) $(bootefi_amd64_SOURCES) \
@@ -956,8 +959,8 @@ DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(bootpxe_bios_elf_SOURCES) $(dhcpclient_SOURCES) \
 	$(hello_km_SOURCES) $(kernel_asan_SOURCES) \
 	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
-	$(ls_SOURCES) $(mbr_elf_SOURCES) $(shell_SOURCES) \
-	$(user_shell_SOURCES)
+	$(ls_SOURCES) $(mbr_elf_SOURCES) $(rtl8139_km_SOURCES) \
+	$(shell_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1022,8 +1025,7 @@ am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/diskfat.mk \
 	$(top_srcdir)/build-aux/missing AUTHORS COPYING ChangeLog \
 	INSTALL NEWS README build-aux/ar-lib build-aux/compile \
 	build-aux/config.guess build-aux/config.sub build-aux/depcomp \
-	build-aux/install-sh build-aux/ltmain.sh build-aux/missing \
-	build-aux/ylwrap
+	build-aux/install-sh build-aux/ltmain.sh build-aux/missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -1077,6 +1079,7 @@ CXXFLAGS = @CXXFLAGS@
 CXXFLAGS_FOR_BUILD = @CXXFLAGS_FOR_BUILD@
 CXX_FOR_BUILD = @CXX_FOR_BUILD@
 CYGPATH_W = @CYGPATH_W@
+DD = @DD@
 DEBUG_INFO_FLAGS = @DEBUG_INFO_FLAGS@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
@@ -1931,7 +1934,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/pci.cc \
 	kernel/device/pci.h \
 	kernel/device/pci.h \
-	kernel/device/rtl8139.cc \
 	kernel/device/serial-uart.cc \
 	kernel/device/serial-uart.h \
 	kernel/device/serial-uart.h \
@@ -2142,12 +2144,17 @@ shell_CFLAGS = \
 	$(shell_CXXFLAGS)
 
 shell_CCASFLAGS = 
-shell_LDFLAGS = 
+shell_LDFLAGS = \
+	-Wl,--orphan-handling,warn \
+	-Wl,-Map,$(top_builddir)/shell.map
+
 shell_LDADD = 
 EXTRA_shell_DEPENDENCIES = \
-	user/user64.ld \
+	$(top_srcdir)/user/user64.ld \
 	user/shell/grammar.c \
 	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
+	sysroot/lib/libm.a \
 	sysroot/lib/crt0.o \
 	$(INCLUDES_DEPLOYED)
 
@@ -2183,6 +2190,7 @@ libc_a_HEADERS = \
 	libc/include/iconv.h \
 	libc/include/fcntl.h \
 	libc/include/stdio.h \
+	libc/include/stdint.h \
 	libc/include/setjmp.h \
 	libc/include/sys/cpu_bug.h \
 	libc/include/sys/syscall.h \
@@ -2507,28 +2515,58 @@ ls_SOURCES = \
 
 ls_CXXFLAGS = -isystem sysroot/include
 EXTRA_ls_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
+
+#==========
+# Common module declarations
+KERNEL_MODULE_CXXFLAGS_SHARED = \
+	$(FREESTANDING_FLAGS) \
+	-D__DGOS_KERNEL__ \
+	-fvisibility=hidden \
+	-fno-exceptions \
+	-fPIC \
+	-g \
+	-I$(top_srcdir)/boot/include \
+	-I$(top_srcdir)/kernel \
+	-I$(top_srcdir)/kernel/lib \
+	-I$(top_srcdir)/kernel/net \
+	-I$(top_srcdir)/kernel/lib/cc \
+	-I$(top_srcdir)/kernel/arch \
+	-I$(top_srcdir)/kernel/arch/x86_64 \
+	$(COMPILER_FLAGS)
+
+KERNEL_MODULE_LDFLAGS_SHARED = \
+	-Wl,-shared \
+	-Wl,-g \
+	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
+	-Wl,-z,max-page-size=4096,-z,call-nop=prefix-addr \
+	$(NOSTDLIB_FLAGS)
+
+KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
+	kernel/arch/x86_64/module.ld
+
 hello_km_SOURCES = \
 	modules/hello/hello.cc
 
 hello_km_CXXFLAGS = \
-	$(FREESTANDING_FLAGS) \
-	-fPIE \
-	-g \
-	-I$(top_srcdir)/kernel/lib \
-	-I$(top_srcdir)/kernel/arch/x86_64 \
-	-I$(top_srcdir)/kernel/lib/cc \
-	-I$(top_srcdir)/kernel/lib/sys
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 hello_km_LDFLAGS = \
-	-Wl,-r \
-	-Wl,-g \
-	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
-	-Wl,-z,max-page-size=4096 \
-	$(NOSTDLIB_FLAGS)
+	$(KERNEL_MODULE_LDFLAGS_SHARED)
 
 EXTRA_hello_km_DEPENDENCIES = \
-	kernel/arch/x86_64/module.ld \
-	Makefile.am
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+rtl8139_km_SOURCES = \
+	kernel/device/rtl8139.cc
+
+rtl8139_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+rtl8139_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED)
+
+EXTRA_rtl8139_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 user_shell_CXXFLAGS = \
 	-g \
@@ -2549,6 +2587,12 @@ user_shell_CCASFLAGS = \
 	$(COMPILER_FLAGS) \
 	-v -isystem sysroot/include
 
+EXTRA_user_shell_DEPENDENCIES = \
+	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
+	sysroot/lib/libm.a
+
+DGOS_UUID = 0615151f-d802-4edf-914a-734dc4f03687
 
 # ----------------------------------------------------------------------------
 # Generate register definitions
@@ -2565,10 +2609,11 @@ BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/es173x.bits
 
 QEMU_EXTRA_DEPS = \
-	random-mem.img \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out
 
+
+#random-mem.img
 QEMU_CPUS = 16
 QEMU_CORES = 8
 QEMU_THREADS = 2
@@ -2685,7 +2730,8 @@ QEMU_NP_numa = \
 
 QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
-QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq,topoext
+QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq
+QEMU_EMU_mttcg = $(QEMU_EMU_tcg) --accel tcg,thread=multi
 #-cpu max,la57
 QEMU_BOOT = $(QEMU_BOOT_$(1))
 QEMU_BOOT_bios = -bios $(top_srcdir)/emu/seabios.rom
@@ -2705,7 +2751,7 @@ QL_BT = bios efi
 QL_BM = pxe hd
 QL_FS = iso mbr gpt
 QL_SC = ahci ide nvme usb virtio
-QL_EM = kvm tcg
+QL_EM = kvm tcg mttcg
 
 # ----------------------------------------------------------------------------
 # Bochs launcher
@@ -4062,9 +4108,6 @@ kernel/device/kernel_asan-nvme.$(OBJEXT):  \
 kernel/device/kernel_asan-pci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
-kernel/device/kernel_asan-rtl8139.$(OBJEXT):  \
-	kernel/device/$(am__dirstamp) \
-	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_asan-serial-uart.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -4425,9 +4468,6 @@ kernel/device/kernel_generic-nvme.$(OBJEXT):  \
 kernel/device/kernel_generic-pci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
-kernel/device/kernel_generic-rtl8139.$(OBJEXT):  \
-	kernel/device/$(am__dirstamp) \
-	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-serial-uart.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -4782,9 +4822,6 @@ kernel/device/kernel_tracing-nvme.$(OBJEXT):  \
 kernel/device/kernel_tracing-pci.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
-kernel/device/kernel_tracing-rtl8139.$(OBJEXT):  \
-	kernel/device/$(am__dirstamp) \
-	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_tracing-serial-uart.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -4876,6 +4913,13 @@ mbr/mbr_elf-mbr.$(OBJEXT): mbr/$(am__dirstamp) \
 mbr-elf$(EXEEXT): $(mbr_elf_OBJECTS) $(mbr_elf_DEPENDENCIES) $(EXTRA_mbr_elf_DEPENDENCIES) 
 	@rm -f mbr-elf$(EXEEXT)
 	$(AM_V_CCLD)$(mbr_elf_LINK) $(mbr_elf_OBJECTS) $(mbr_elf_LDADD) $(LIBS)
+kernel/device/rtl8139_km-rtl8139.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
+
+rtl8139.km$(EXEEXT): $(rtl8139_km_OBJECTS) $(rtl8139_km_DEPENDENCIES) $(EXTRA_rtl8139_km_DEPENDENCIES) 
+	@rm -f rtl8139.km$(EXEEXT)
+	$(AM_V_CXXLD)$(rtl8139_km_LINK) $(rtl8139_km_OBJECTS) $(rtl8139_km_LDADD) $(LIBS)
 user/shell/$(am__dirstamp):
 	@$(MKDIR_P) user/shell
 	@: > user/shell/$(am__dirstamp)
@@ -5139,7 +5183,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-keyb8042.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-nvme.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-pci.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-serial-uart.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-usb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-usb_hid.Po@am__quote@
@@ -5164,7 +5207,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-keyb8042.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-nvme.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-pci.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-serial-uart.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_hid.Po@am__quote@
@@ -5189,7 +5231,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-keyb8042.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-nvme.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-pci.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-serial-uart.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_hid.Po@am__quote@
@@ -5201,6 +5242,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-blk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-gpu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-vt100.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_asan-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_generic-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_tracing-keyb8042_layout_us.Po@am__quote@
@@ -11199,20 +11241,6 @@ kernel/device/kernel_asan-pci.obj: kernel/device/pci.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-pci.obj `if test -f 'kernel/device/pci.cc'; then $(CYGPATH_W) 'kernel/device/pci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/pci.cc'; fi`
 
-kernel/device/kernel_asan-rtl8139.o: kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-rtl8139.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Tpo -c -o kernel/device/kernel_asan-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Tpo kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/kernel_asan-rtl8139.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
-
-kernel/device/kernel_asan-rtl8139.obj: kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-rtl8139.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Tpo -c -o kernel/device/kernel_asan-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Tpo kernel/device/$(DEPDIR)/kernel_asan-rtl8139.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/kernel_asan-rtl8139.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
-
 kernel/device/kernel_asan-serial-uart.o: kernel/device/serial-uart.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-serial-uart.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-serial-uart.Tpo -c -o kernel/device/kernel_asan-serial-uart.o `test -f 'kernel/device/serial-uart.cc' || echo '$(srcdir)/'`kernel/device/serial-uart.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-serial-uart.Tpo kernel/device/$(DEPDIR)/kernel_asan-serial-uart.Po
@@ -12934,20 +12962,6 @@ kernel/device/kernel_generic-pci.obj: kernel/device/pci.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/pci.cc' object='kernel/device/kernel_generic-pci.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-pci.obj `if test -f 'kernel/device/pci.cc'; then $(CYGPATH_W) 'kernel/device/pci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/pci.cc'; fi`
-
-kernel/device/kernel_generic-rtl8139.o: kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-rtl8139.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Tpo -c -o kernel/device/kernel_generic-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Tpo kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/kernel_generic-rtl8139.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
-
-kernel/device/kernel_generic-rtl8139.obj: kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-rtl8139.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Tpo -c -o kernel/device/kernel_generic-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Tpo kernel/device/$(DEPDIR)/kernel_generic-rtl8139.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/kernel_generic-rtl8139.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
 
 kernel/device/kernel_generic-serial-uart.o: kernel/device/serial-uart.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-serial-uart.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-serial-uart.Tpo -c -o kernel/device/kernel_generic-serial-uart.o `test -f 'kernel/device/serial-uart.cc' || echo '$(srcdir)/'`kernel/device/serial-uart.cc
@@ -14671,20 +14685,6 @@ kernel/device/kernel_tracing-pci.obj: kernel/device/pci.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-pci.obj `if test -f 'kernel/device/pci.cc'; then $(CYGPATH_W) 'kernel/device/pci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/pci.cc'; fi`
 
-kernel/device/kernel_tracing-rtl8139.o: kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-rtl8139.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Tpo -c -o kernel/device/kernel_tracing-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Tpo kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/kernel_tracing-rtl8139.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
-
-kernel/device/kernel_tracing-rtl8139.obj: kernel/device/rtl8139.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-rtl8139.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Tpo -c -o kernel/device/kernel_tracing-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Tpo kernel/device/$(DEPDIR)/kernel_tracing-rtl8139.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/kernel_tracing-rtl8139.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
-
 kernel/device/kernel_tracing-serial-uart.o: kernel/device/serial-uart.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-serial-uart.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-serial-uart.Tpo -c -o kernel/device/kernel_tracing-serial-uart.o `test -f 'kernel/device/serial-uart.cc' || echo '$(srcdir)/'`kernel/device/serial-uart.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-serial-uart.Tpo kernel/device/$(DEPDIR)/kernel_tracing-serial-uart.Po
@@ -14992,6 +14992,20 @@ user/bin/ls/ls-ls.obj: user/bin/ls/ls.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/bin/ls/ls.cc' object='user/bin/ls/ls-ls.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ls_CXXFLAGS) $(CXXFLAGS) -c -o user/bin/ls/ls-ls.obj `if test -f 'user/bin/ls/ls.cc'; then $(CYGPATH_W) 'user/bin/ls/ls.cc'; else $(CYGPATH_W) '$(srcdir)/user/bin/ls/ls.cc'; fi`
+
+kernel/device/rtl8139_km-rtl8139.o: kernel/device/rtl8139.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rtl8139_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/rtl8139_km-rtl8139.o -MD -MP -MF kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Tpo -c -o kernel/device/rtl8139_km-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Tpo kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/rtl8139_km-rtl8139.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rtl8139_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/rtl8139_km-rtl8139.o `test -f 'kernel/device/rtl8139.cc' || echo '$(srcdir)/'`kernel/device/rtl8139.cc
+
+kernel/device/rtl8139_km-rtl8139.obj: kernel/device/rtl8139.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rtl8139_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/rtl8139_km-rtl8139.obj -MD -MP -MF kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Tpo -c -o kernel/device/rtl8139_km-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Tpo kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/rtl8139.cc' object='kernel/device/rtl8139_km-rtl8139.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(rtl8139_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/rtl8139_km-rtl8139.obj `if test -f 'kernel/device/rtl8139.cc'; then $(CYGPATH_W) 'kernel/device/rtl8139.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/rtl8139.cc'; fi`
 
 user/shell/shell-parser.o: user/shell/parser.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CXXFLAGS) $(CXXFLAGS) -MT user/shell/shell-parser.o -MD -MP -MF user/shell/$(DEPDIR)/shell-parser.Tpo -c -o user/shell/shell-parser.o `test -f 'user/shell/parser.cc' || echo '$(srcdir)/'`user/shell/parser.cc
@@ -15723,6 +15737,7 @@ $(top_builddir)/fatpart.img: \
 		$(top_builddir)/bootpxe-bios.map \
 		\
 		$(top_builddir)/user-shell \
+		$(top_builddir)/shell \
 		$(top_builddir)/hello.km \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
@@ -15987,10 +16002,10 @@ u_vga16.o: u_vga16.raw
 # ----------------------------------------------------------------------------
 # Randomize RAM content
 
-random-mem.img:
-	echo Building $(QEMU_RAM) random initial memory content image...
-	$(TRUNCATE) --size $(QEMU_RAM) "$@"
-	$(SHRED) --iterations=1 "$@"
+#random-mem.img:
+#	echo Building $(QEMU_RAM) random initial memory content image...
+#	$(TRUNCATE) --size $(QEMU_RAM) "$@"
+#	$(SHRED) --iterations=1 "$@"
 
 # ----------------------------------------------------------------------------
 # QEMU launcher

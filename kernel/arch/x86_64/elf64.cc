@@ -140,7 +140,7 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    std::unique_ptr<Elf64_Shdr> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
+    std::unique_ptr<Elf64_Shdr[]> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
 
     if (unlikely(scn_hdr_size != file_pread(
                      fd, scn_hdrs, scn_hdr_size,
@@ -150,9 +150,10 @@ module_entry_fn_t modload_load(char const *path)
     }
 
     size_t mod_str_scn = 0;
-    ext::unique_ptr_free<Elf64_Sym> mod_sym;
     Elf64_Sym *mod_sym_end = nullptr;
     ext::unique_ptr_free<char> mod_str;
+
+    std::vector<ext::unique_ptr_free<void>> tabs;
 
     Elf64_Xword max_addr = 0;
     Elf64_Xword min_addr = (Elf64_Xword)-1;
@@ -172,6 +173,8 @@ module_entry_fn_t modload_load(char const *path)
         if (min_addr > addr)
             min_addr = addr;
 
+        void *tab;
+
         switch (hdr->sh_type) {
         case SHT_SYMTAB:
             ELF64_TRACE("Found symbol table at offset %#" PRIx64
@@ -180,10 +183,11 @@ module_entry_fn_t modload_load(char const *path)
 
             mod_str_scn = hdr->sh_link;
 
-            mod_sym.reset((Elf64_Sym *)malloc(hdr->sh_size));
-            mod_sym_end = mod_sym + hdr->sh_size;
+            tab = malloc(hdr->sh_size);
+            tabs[i].reset(tab);
+
             if ((ssize_t)hdr->sh_size != file_pread(
-                        fd, mod_sym, hdr->sh_size, hdr->sh_offset)) {
+                        fd, tab, hdr->sh_size, hdr->sh_offset)) {
                 printdbg("Error reading module symbols\n");
                 return nullptr;
             }
@@ -192,8 +196,8 @@ module_entry_fn_t modload_load(char const *path)
             ELF64_TRACE("Found string table at offset %#" PRIx64
                         ", link=%#x, size=%#" PRIx64 "\n",
                         hdr->sh_offset, hdr->sh_link, hdr->sh_size);
-            if (i != mod_str_scn)
-                break;
+//            if (i != mod_str_scn)
+//                break;
             mod_str.reset((char*)malloc(hdr->sh_size));
             if ((ssize_t)hdr->sh_size != file_pread(
                         fd, mod_str, hdr->sh_size, hdr->sh_offset)) {
@@ -245,6 +249,8 @@ module_entry_fn_t modload_load(char const *path)
 
     Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf.get();
     Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf.get();
+
+    Elf64_Sym *mod_sym;
 
     // Process relocations
     for (size_t i = 1; i < file_hdr.e_shnum; ++i) {

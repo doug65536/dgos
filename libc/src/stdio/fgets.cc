@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <errno.h>
 #include "bits/cfile.h"
 
 char *fgets(char * restrict str, int count, FILE * restrict s)
@@ -37,6 +38,16 @@ char *fgets(char * restrict str, int count, FILE * restrict s)
             str[took] = 0;
         } else {
             // Replenish buffer
+
+            if (!s->buffer) {
+                s->buf_sz = 4096;
+                s->buffer = (char*)malloc(s->buf_sz);
+                s->buf_owned = true;
+
+                if (!s->buffer) {
+                    s->error = ENOMEM; return nullptr;
+                }
+            }
 
             // Update the seek position if necessary
             if (s->fd_seek_pos != s->seek_pos) {

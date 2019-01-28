@@ -1058,7 +1058,7 @@ public:
         if (!(++result).curr)
             --result;
 
-        TreePolicy::retraceDelete(root, node);
+        TreePolicy::retrace_delete(root, node);
 
         assert(node->left == nullptr);
         assert(node->right == nullptr);
@@ -1104,10 +1104,10 @@ public:
 private:
 
     struct node_t {
-        node_t *left;
-        node_t *right;
-        node_t *parent;
-        int balance;
+        node_t *left = nullptr;
+        node_t *right = nullptr;
+        node_t *parent = nullptr;
+        int balance = 0;
         typename std::aligned_storage<sizeof(_T), alignof(_T)>::type storage;
 
         inline reference item() noexcept

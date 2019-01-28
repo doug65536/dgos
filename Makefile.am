@@ -767,7 +767,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/pci.cc \
 	kernel/device/pci.h \
 	kernel/device/pci.h \
-	kernel/device/rtl8139.cc \
 	kernel/device/serial-uart.cc \
 	kernel/device/serial-uart.h \
 	kernel/device/serial-uart.h \
@@ -1066,7 +1065,9 @@ shell_CFLAGS = \
 	$(shell_CXXFLAGS)
 
 shell_CCASFLAGS =
-shell_LDFLAGS =
+shell_LDFLAGS = \
+	-Wl,--orphan-handling,warn \
+	-Wl,-Map,$(top_builddir)/shell.map
 shell_LDADD =
 
 #-v -Wl,-verbose
@@ -1079,9 +1080,11 @@ $(top_srcdir)/user/shell/grammar.c \
 	lemon $<
 
 EXTRA_shell_DEPENDENCIES = \
-	user/user64.ld \
+	$(top_srcdir)/user/user64.ld \
 	user/shell/grammar.c \
 	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
+	sysroot/lib/libm.a \
 	sysroot/lib/crt0.o \
 	$(INCLUDES_DEPLOYED)
 
@@ -1120,6 +1123,7 @@ libc_a_HEADERS = \
 	libc/include/iconv.h \
 	libc/include/fcntl.h \
 	libc/include/stdio.h \
+	libc/include/stdint.h \
 	libc/include/setjmp.h \
 	libc/include/sys/cpu_bug.h \
 	libc/include/sys/syscall.h \
@@ -1523,30 +1527,68 @@ ls_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_ls_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
 
+#==========
+# Common module declarations
+
+KERNEL_MODULE_CXXFLAGS_SHARED = \
+	$(FREESTANDING_FLAGS) \
+	-D__DGOS_KERNEL__ \
+	-fvisibility=hidden \
+	-fno-exceptions \
+	-fPIC \
+	-g \
+	-I$(top_srcdir)/boot/include \
+	-I$(top_srcdir)/kernel \
+	-I$(top_srcdir)/kernel/lib \
+	-I$(top_srcdir)/kernel/net \
+	-I$(top_srcdir)/kernel/lib/cc \
+	-I$(top_srcdir)/kernel/arch \
+	-I$(top_srcdir)/kernel/arch/x86_64 \
+	$(COMPILER_FLAGS)
+
+KERNEL_MODULE_LDFLAGS_SHARED = \
+	-Wl,-shared \
+	-Wl,-g \
+	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
+	-Wl,-z,max-page-size=4096,-z,call-nop=prefix-addr \
+	$(NOSTDLIB_FLAGS)
+
+KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
+	kernel/arch/x86_64/module.ld
+
+#==========
+
 bin_PROGRAMS += hello.km
 
 hello_km_SOURCES = \
 	modules/hello/hello.cc
 
 hello_km_CXXFLAGS = \
-	$(FREESTANDING_FLAGS) \
-	-fPIE \
-	-g \
-	-I$(top_srcdir)/kernel/lib \
-	-I$(top_srcdir)/kernel/arch/x86_64 \
-	-I$(top_srcdir)/kernel/lib/cc \
-	-I$(top_srcdir)/kernel/lib/sys
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 hello_km_LDFLAGS = \
-	-Wl,-r \
-	-Wl,-g \
-	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
-	-Wl,-z,max-page-size=4096 \
-	$(NOSTDLIB_FLAGS)
+	$(KERNEL_MODULE_LDFLAGS_SHARED)
 
 EXTRA_hello_km_DEPENDENCIES = \
-	kernel/arch/x86_64/module.ld \
-	Makefile.am
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += rtl8139.km
+
+rtl8139_km_SOURCES = \
+	kernel/device/rtl8139.cc
+
+rtl8139_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+rtl8139_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED)
+
+EXTRA_rtl8139_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
 
 bin_PROGRAMS += user-shell
 
@@ -1567,6 +1609,11 @@ user_shell_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
 	-v -isystem sysroot/include
+
+EXTRA_user_shell_DEPENDENCIES = \
+	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
+	sysroot/lib/libm.a
 
 # ----------------------------------------------------------------------------
 # Misc make rules
@@ -1672,10 +1719,10 @@ u_vga16.o: u_vga16.raw
 # ----------------------------------------------------------------------------
 # Randomize RAM content
 
-random-mem.img:
-	echo Building $(QEMU_RAM) random initial memory content image...
-	$(TRUNCATE) --size $(QEMU_RAM) "$@"
-	$(SHRED) --iterations=1 "$@"
+#random-mem.img:
+#	echo Building $(QEMU_RAM) random initial memory content image...
+#	$(TRUNCATE) --size $(QEMU_RAM) "$@"
+#	$(SHRED) --iterations=1 "$@"
 
 # ----------------------------------------------------------------------------
 # QEMU launcher
@@ -1689,9 +1736,10 @@ $(DUMPDIR)/call-trace-out:
 	mkfifo "$@"
 
 QEMU_EXTRA_DEPS = \
-	random-mem.img \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out
+
+#random-mem.img
 
 QEMU_CPUS = 16
 QEMU_CORES = 8
@@ -1829,7 +1877,8 @@ QEMU_NP_numa = \
 
 QEMU_EMU = $(QEMU_EMU_$(1))
 QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
-QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq,topoext
+QEMU_EMU_tcg = -cpu max,fsgsbase,invtsc,vmware-cpuid-freq
+QEMU_EMU_mttcg = $(QEMU_EMU_tcg) --accel tcg,thread=multi
 #-cpu max,la57
 
 QEMU_BOOT = $(QEMU_BOOT_$(1))
@@ -1858,7 +1907,7 @@ QL_BT = bios efi
 QL_BM = pxe hd
 QL_FS = iso mbr gpt
 QL_SC = ahci ide nvme usb virtio
-QL_EM = kvm tcg
+QL_EM = kvm tcg mttcg
 
 # 1=rt, 2=np, 3=bt, 4=bm, 5=fs, 6=sc, 7=em
 define qemu_launcher =

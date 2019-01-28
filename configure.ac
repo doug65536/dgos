@@ -161,7 +161,7 @@ for flag in \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=global-madynamic
+		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
@@ -272,6 +272,7 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
+	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],

@@ -7574,7 +7574,7 @@ for flag in \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=global-madynamic
+		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags_$COMPILER_WERROR_-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8059,6 +8059,7 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
+	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`

@@ -1,6 +1,7 @@
 #include "dhcp.h"
 #include "string.h"
 #include "bswap.h"
+#include "export.h"
 
 void dhcp_builder_begin(void *buf)
 {
@@ -174,7 +175,7 @@ uint16_t dhcp_builder_finalize(void *buf)
     return end - (char*)pkt;
 }
 
-uint16_t dhcp_build_discover(void *buf, uint8_t const *mac_addr)
+EXPORT uint16_t dhcp_build_discover(void *buf, uint8_t const *mac_addr)
 {
     dhcp_pkt_t *discover = (dhcp_pkt_t *)buf;
 

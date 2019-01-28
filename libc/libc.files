@@ -2,6 +2,7 @@ cxx/abi/cxa_allocate_exception.cc
 cxx/terminate.cc
 include/disabled_stdint.h
 include/new.h
+include/stdint.h
 include/sys/cpu_bug.h
 include/sys/ioctl.h
 include/sys/socket.h

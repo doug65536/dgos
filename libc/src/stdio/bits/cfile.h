@@ -4,36 +4,38 @@
 
 struct _FILE {
     // Pointer to the read/write buffer
-    char *buffer;
+    char *buffer = nullptr;
 
     // File pointer at beginning of buffer
-    off_t buf_pos;
+    off_t buf_pos = 0;
 
     // Current place in the file
     // Index into buffer will be seek_pos - buf_pos
-    off_t seek_pos;
+    off_t seek_pos = 0;
 
     // Track fd seek position to attempt to elide seeks
-    off_t fd_seek_pos;
+    off_t fd_seek_pos = 0;
 
     // Amount of data in the buffer
-    off_t buf_got;
+    off_t buf_got = 0;
 
     // Size of the buffer
-    off_t buf_sz;
+    off_t buf_sz = 0;
 
     // Half open range of bytes in buffer that have been modified
-    int64_t dirty_pos;
-    int64_t dirty_end_pos;
+    int64_t dirty_pos = 0;
+    int64_t dirty_end_pos = 0;
+
+    int error = 0;
 
     // File handle (down here because it is a smaller type)
-    int fd;
+    int fd = -1;
 
     // Holds the ungetch value, or -1 if empty
-    int unget;
+    int unget = -1;
 
     // Whether the buffer is owned (and subsequently freed) by the libc
-    bool buf_owned;
+    bool buf_owned = false;
 
     int open(int new_fd);
 
