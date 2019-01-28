@@ -393,6 +393,6 @@ _no_plt
 bool mm_copy_user(void *dst, void const *src, size_t size);
 
 extern "C" _const
-bool mm_is_user_range(void *buf, size_t size);
+bool mm_is_user_range(void const *buf, size_t size);
 
 __END_DECLS
