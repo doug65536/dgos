@@ -875,7 +875,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         pcix_tables.emplace_back(addr, pci_msix_mappings{
                                      tbl, pba, tbl_sz, pba_sz });
 
-        int tbl_cnt = std::min(req_count, table_count);
+        size_t tbl_cnt = std::min(req_count, table_count);
 
         std::vector<msi_irq_mem_t> msi_writes(tbl_cnt);
 
@@ -1177,4 +1177,47 @@ int pci_enumerate_next(pci_dev_iterator_t *iter)
     }
 
     return 0;
+}
+
+EXPORT pci_addr_t::pci_addr_t()
+    : addr(0)
+{
+}
+
+EXPORT pci_addr_t::pci_addr_t(int seg, int bus, int slot, int func)
+    : addr((uint32_t(seg) << 16) | (bus << 8) | (slot << 3) | (func))
+{
+    assert(seg >= 0);
+    assert(seg < 65536);
+    assert(bus >= 0);
+    assert(bus < 256);
+    assert(slot >= 0);
+    assert(slot < 32);
+    assert(func >= 0);
+    assert(func < 8);
+}
+
+EXPORT int pci_addr_t::bus() const
+{
+    return (addr >> 8) & 0xFF;
+}
+
+EXPORT int pci_addr_t::slot() const
+{
+    return (addr >> 3) & 0x1F;
+}
+
+EXPORT int pci_addr_t::func() const
+{
+    return addr & 0x7;
+}
+
+EXPORT bool pci_addr_t::is_legacy() const
+{
+    return (addr < 65536);
+}
+
+EXPORT uint64_t pci_addr_t::get_addr() const
+{
+    return addr << 12;
 }

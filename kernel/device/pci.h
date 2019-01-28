@@ -5,6 +5,7 @@
 #include "irq.h"
 #include "string.h"
 #include "vector.h"
+#include "export.h"
 
 struct pci_addr_t {
     // Legacy PCI supports 256 busses, 32 slots, 8 functions, and 64 dwords
@@ -29,49 +30,15 @@ struct pci_addr_t {
     //                       +-----------+-------+------+------+
     //                            16         8       5      3
 
-    pci_addr_t()
-        : addr(0)
-    {
-    }
-
-    pci_addr_t(int seg, int bus, int slot, int func)
-        : addr((uint32_t(seg) << 16) | (bus << 8) | (slot << 3) | (func))
-    {
-        assert(seg >= 0);
-        assert(seg < 65536);
-        assert(bus >= 0);
-        assert(bus < 256);
-        assert(slot >= 0);
-        assert(slot < 32);
-        assert(func >= 0);
-        assert(func < 8);
-    }
-
-    int bus() const
-    {
-        return (addr >> 8) & 0xFF;
-    }
-
-    int slot() const
-    {
-        return (addr >> 3) & 0x1F;
-    }
-
-    int func() const
-    {
-        return addr & 0x7;
-    }
+    pci_addr_t();
+    pci_addr_t(int seg, int bus, int slot, int func);
+    int bus() const;
+    int slot() const;
+    int func() const;
 
     // Returns true if segment is zero
-    bool is_legacy() const
-    {
-        return (addr < 65536);
-    }
-
-    uint64_t get_addr() const
-    {
-        return addr << 12;
-    }
+    bool is_legacy() const;
+    uint64_t get_addr() const;
 
 private:
     uint32_t addr;
@@ -111,32 +78,32 @@ struct pci_config_hdr_t {
     uint8_t min_grant;
     uint8_t max_latency;
 
-    bool is_bar_mmio(ptrdiff_t bar) const
+    EXPORT bool is_bar_mmio(ptrdiff_t bar) const
     {
         return (base_addr[bar] & 1) == 0;
     }
 
-    bool is_bar_portio(ptrdiff_t bar) const
+    EXPORT bool is_bar_portio(ptrdiff_t bar) const
     {
         return base_addr[bar] & 1;
     }
 
-    bool is_bar_prefetchable(ptrdiff_t bar) const
+    EXPORT bool is_bar_prefetchable(ptrdiff_t bar) const
     {
         return base_addr[bar] & 8;
     }
 
     // Returns true if the BAR is MMIO and is 64 bit
-    bool is_bar_64bit(ptrdiff_t bar) const
+    EXPORT bool is_bar_64bit(ptrdiff_t bar) const
     {
         return (base_addr[bar] & 7) == 4;
     }
 
-    uint64_t get_bar(ptrdiff_t bar) const;
+    EXPORT uint64_t get_bar(ptrdiff_t bar) const;
 
     // Write the specified address to the BAR and read it back, updating
     // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
-    void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
+    EXPORT void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
 };
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
@@ -454,6 +421,8 @@ struct pci_dev_iterator_t : public pci_dev_t {
     }
 };
 
+__BEGIN_DECLS
+
 int pci_init(void);
 
 int pci_enumerate_begin(pci_dev_iterator_t *iter,
@@ -570,14 +539,13 @@ void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin);
 void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
                           uint16_t set, uint16_t clr);
 
-void pci_adj_control_bits(int bus, int slot, int func,
-                          uint16_t set, uint16_t clr);
-
 void pci_clear_status_bits(pci_addr_t addr, uint16_t bits);
 
 char const * pci_device_class_text(uint8_t cls);
 
 int pci_vector_count_from_offsets(int const *vector_offsets, int count);
+
+__END_DECLS
 
 // == MMIO accessor helpers
 
