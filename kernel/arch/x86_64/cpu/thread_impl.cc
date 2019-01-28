@@ -546,8 +546,15 @@ void thread_idle()
         halt();
 }
 
-static isr_context_t *thread_context_switch_handler(int, isr_context_t *ctx)
+// Software interrupt handler to explicitly yield and for IPI reschedules
+static isr_context_t *thread_yield_handler(int, isr_context_t *ctx)
 {
+    return thread_schedule(ctx);
+}
+
+static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
+{
+    apic_eoi(intr);
     return thread_schedule(ctx);
 }
 
@@ -588,7 +595,8 @@ void thread_init(int ap)
         for (unsigned i = 0; i < countof(threads); ++i)
             threads[i].thread_id = i;
 
-        intr_hook(INTR_THREAD_YIELD, thread_context_switch_handler, "sw_yield");
+        intr_hook(INTR_THREAD_YIELD, thread_yield_handler, "sw_yield");
+        intr_hook(INTR_IPI_RESCHED, thread_ipi_resched, "sw_ipi_resched");
 
         thread->process = process_t::init(cpu_page_directory_get());
 
@@ -756,10 +764,12 @@ static void thread_clear_busy(void *outgoing)
         thread->process->destroy();
 }
 
-_hot
-isr_context_t *thread_schedule(isr_context_t *ctx)
 {
-    cpu_scoped_irq_disable intr_dis;
+    auto& thread = threads[tid];
+_hot isr_context_t *thread_schedule(isr_context_t *ctx)
+{
+    //need this if ISRs run with IRQ enabled:
+    //cpu_scoped_irq_disable intr_dis;
 
     cpu_info_t *cpu = this_cpu();
     thread_info_t *thread = cpu->cur_thread;
@@ -990,7 +1000,7 @@ EXPORT void thread_resume(thread_t tid)
             // If its home is another CPU
             auto this_tid = this_thread()->thread_id;
             if (run_cpu[this_tid] != run_cpu[tid])
-                apic_send_ipi(cpus[run_cpu[tid]].apic_id, INTR_THREAD_YIELD);
+                apic_send_ipi(cpus[run_cpu[tid]].apic_id, INTR_IPI_RESCHED);
 
             return;
         }

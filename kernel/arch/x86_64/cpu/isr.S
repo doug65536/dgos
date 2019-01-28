@@ -168,9 +168,9 @@ isr_entry 0 INTR_APIC_TIMER
 isr_entry 0 INTR_TLB_SHOOTDOWN
 isr_entry 0 INTR_THREAD_YIELD
 isr_entry 0 INTR_FLUSH_TRACE
+isr_entry 0 INTR_IPI_RESCHED
 
 // Reserved
-isr_entry 0 43
 isr_entry 0 44
 isr_entry 0 45
 isr_entry 0 46
