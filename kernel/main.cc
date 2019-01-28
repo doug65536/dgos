@@ -819,6 +819,7 @@ void test_spawn()
     int shell_pid;
     int spawn_result = process_t::spawn(
                 &shell_pid, "shell", nullptr, nullptr);
+    printk("shell pid: %d\n", spawn_result);
 }
 
 static int init_thread(void *)
@@ -833,45 +834,51 @@ static int init_thread(void *)
     cpu_init_late_msrs();
 
     printk("Initializing PCI\n");
-    pci_init();
+    thread_t tid_pci_init = thread_func_0(pci_init);
 
     printk("Initializing keyboard event queue\n");
     keybd_init();
 
     printk("Initializing 8042 keyboard\n");
-    keyb8042_init();
+    thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
+
+    // Wait for PCI initialization before starting drivers
+    thread_wait(tid_pci_init);
+    thread_close(tid_pci_init);
+    thread_wait(tid_keybd8042_init);
+    thread_close(tid_keybd8042_init);
 
     // Facilities needed by drivers
     printk("Initializing driver base\n");
-    callout_call(callout_type_t::driver_base);
+    callout_call(callout_type_t::driver_base, true);
 
     // Run late initializations
     printk("Initializing late devices\n");
-    callout_call(callout_type_t::late_dev);
+    callout_call(callout_type_t::late_dev, true);
 
     // Register USB interfaces
     printk("Initializing USB interfaces\n");
-    callout_call(callout_type_t::usb);
+    callout_call(callout_type_t::usb, true);
 
     // Register filesystems
     printk("Initializing filesystems\n");
-    callout_call(callout_type_t::reg_filesys);
+    callout_call(callout_type_t::reg_filesys, true);
 
     // Storage interfaces
     printk("Initializing storage devices\n");
-    callout_call(callout_type_t::storage_dev);
+    callout_call(callout_type_t::storage_dev, true);
 
     // Register partition schemes
     printk("Initializing partition probes\n");
-    callout_call(callout_type_t::partition_probe);
+    callout_call(callout_type_t::partition_probe, true);
 
     // Register network interfaces
     printk("Initializing network interfaces\n");
-    callout_call(callout_type_t::nic);
+    callout_call(callout_type_t::nic, true);
 
     // Register network interfaces
     printk("Initializing network interfaces\n");
-    callout_call(callout_type_t::nics_ready);
+    callout_call(callout_type_t::nics_ready, true);
 
     test_spawn();
 
@@ -923,7 +930,7 @@ static int init_thread(void *)
     //mprotect_test(nullptr);
 
     //printk("Running red-black tree self test\n");
-    ////std::set<int>::test();
+    std::set<int>::test();
     //rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
