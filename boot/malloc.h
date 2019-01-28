@@ -2,11 +2,13 @@
 
 #include "types.h"
 
+__BEGIN_DECLS
+
 _use_result _malloc _leaf
 void *malloc(size_t bytes);
 
 _use_result _malloc _leaf
-void *calloc(unsigned num, unsigned size);
+void *calloc(size_t num, size_t size);
 
 void free(void *p);
 
@@ -31,6 +33,8 @@ char *strdup(char const *s);
 #ifndef NDEBUG
 void test_malloc();
 #endif
+
+__END_DECLS
 
 void *operator new(size_t size) noexcept;
 void *operator new(size_t size, void *p) noexcept;

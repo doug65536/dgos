@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_DECLS
+
 //
 // Mutex spinlock
 
@@ -71,3 +73,5 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
 void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node);
 void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
                          mcs_queue_ent_t *node);
+
+__END_DECLS

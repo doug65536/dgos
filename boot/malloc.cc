@@ -311,7 +311,7 @@ void free(void *p)
     MALLOC_CHECK();
 }
 
-void *calloc(unsigned num, unsigned size)
+void *calloc(size_t num, size_t size)
 {
     uint16_t bytes = num * size;
     void *block = malloc(bytes);

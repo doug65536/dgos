@@ -5,6 +5,8 @@
 //#include "process.h"
 #include "errno.h"
 
+__BEGIN_DECLS
+
 /// Failure return value for memory mapping functions
 #define MAP_FAILED ((void*)-1)
 
@@ -392,3 +394,5 @@ bool mm_copy_user(void *dst, void const *src, size_t size);
 
 extern "C" _const
 bool mm_is_user_range(void *buf, size_t size);
+
+__END_DECLS

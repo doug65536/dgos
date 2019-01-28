@@ -8,7 +8,16 @@ typedef long ssize_t;
 typedef int64_t off_t;
 
 #ifdef __cplusplus
+
 #define restrict __restrict
+#define __BEGIN_DECLS extern "C" {
+#define __END_DECLS }
+
+#else
+
+#define __BEGIN_DECLS
+#define __END_DECLS
+
 #endif
 
 #define _stdcall                __attribute__((__stdcall__))
