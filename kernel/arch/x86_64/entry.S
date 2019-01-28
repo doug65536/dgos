@@ -141,7 +141,6 @@ bsp_init:
     // Call the resolver
     mov 16(%r12),%rax
     indirect_call rax
-    //call * 16(%r12)
 
     // Read PLT vector pointer from relocation record
     movq (%r12),%rdx
@@ -284,7 +283,6 @@ invoke_function_array:
     jbe 0f
     mov (%rbx),%rax
     indirect_call rax
-    //call *(%rbx)
     addq $8,%rbx
     jmp 0b
 0:  pop_cfi %rbp
