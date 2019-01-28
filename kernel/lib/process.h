@@ -115,17 +115,7 @@ C_ASSERT(sizeof(auxv_t) == sizeof(uintptr_t) * 2);
 
 struct process_t
 {
-    process_t()
-        : path(nullptr)
-        , argv(nullptr)
-        , env(nullptr)
-        , mmu_context(0)
-        , linear_allocator(nullptr)
-        , pid(0)
-        , exitcode(0)
-        , state(state_t::unused)
-    {
-    }
+    process_t() = default;
 
     bool valid_fd(int fd)
     {
@@ -146,22 +136,25 @@ struct process_t
         exited
     };
 
-    char *path;
-    char **argv;
-    char **env;
-    size_t argc;
-    size_t envc;
-    uintptr_t mmu_context;
-    void *linear_allocator;
-    pid_t pid;
+    char *path = nullptr;
+    char **argv = nullptr;
+    char **env = nullptr;
+    size_t argc = 0;
+    size_t envc = 0;
+    uintptr_t mmu_context = 0;
+    void *linear_allocator = nullptr;
+    uintptr_t tls_addr = 0;
+    size_t tls_msize = 0;
+    size_t tls_fsize = 0;
+    pid_t pid = 0;
     using lock_type = std::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type process_lock;
     std::condition_variable cond;
-    int exitcode;
+    int exitcode = -1;
 
     fd_table_t ids;
-    state_t state;
+    state_t state = state_t::unused;
 
     static int spawn(pid_t * pid_result,
                      char const * path,

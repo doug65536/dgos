@@ -240,6 +240,7 @@ struct Elf64_Phdr {
 #define PT_NOTE 4 // Note sections
 #define PT_SHLIB 5 // Reserved
 #define PT_PHDR 6 // Program header table
+#define PT_TLS 7 // TLS template location
 #define PT_LOOS 0x60000000 // Environment-specific use
 #define PT_HIOS 0x6FFFFFFF
 #define PT_LOPROC 0x70000000 // Processor-specific use

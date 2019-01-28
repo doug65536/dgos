@@ -158,6 +158,11 @@ int process_t::start()
     // Simply load it for now
     Elf64_Ehdr hdr;
 
+    // Open a stdin, stdout, and stderr
+    int fd_i = file_open("/dev/conin", 0, 0);
+    int fd_o = file_open("/dev/conout", 0, 0);
+    int fd_e = file_open("/dev/conerr", 0, 0);
+
     file_t fd{file_open(path, O_RDONLY)};
 
     if (unlikely(!fd)) {
@@ -275,6 +280,14 @@ int process_t::start()
             printdbg("Failed to set page protection\n");
             return -1;
         }
+
+        // If it is a TLS header, remember the range
+        // Note that this won't pick up the TLS header if it is writable
+        if (unlikely(ph.p_type == PT_TLS)) {
+            tls_addr = ph.p_vaddr;
+            tls_msize = ph.p_memsz;
+            tls_fsize = ph.p_filesz;
+        }
     }
 
     // Initialize the stack
@@ -290,6 +303,45 @@ int process_t::start()
 
     printdbg("process: allocated %zuKB stack at %#zx\n",
              stack_size >> 10, uintptr_t(stack));
+
+    // Initialize main thread TLS
+    static_assert(sizeof(uintptr_t) == sizeof(void*), "Unexpected size");
+    size_t tls_vsize = PAGE_SIZE + tls_msize + sizeof(uintptr_t) + PAGE_SIZE;
+    void *tls = mmap(nullptr, tls_vsize,
+                     PROT_READ | PROT_WRITE,
+                     MAP_USER | MAP_NOCOMMIT, -1, 0);
+    if (tls == MAP_FAILED)
+        return -1;
+
+    // 4KB guard region around TLS
+    mprotect(tls, PAGE_SIZE, PROT_NONE);
+    mprotect((void*)(((uintptr_t(tls) + PAGESIZE + tls_msize +
+                       PAGESIZE - 1)) & -PAGESIZE), PAGE_SIZE, PROT_NONE);
+
+    uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
+
+    // Copy template into TLS area
+    mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize);
+    mm_copy_user((char*)tls_area + tls_fsize, nullptr, tls_msize - tls_fsize);
+
+    /// TLS uses negative offsets from the end of the TLS data, and a
+    /// pointer to the TLS is located at the TLS base address.
+    ///
+    ///    /\       +-----------------+
+    ///    |  +-----| pointer to self |
+    ///    |  +---->+-----------------+ <--- TLS base address (FSBASE)
+    ///    +        |                 |
+    ///    +        |    TLS  data    | <--- copied from TLS template
+    ///    +        |                 |
+    ///  addr       +-----------------+ <--- mmap allocation for TLS
+    ///
+
+    uintptr_t tls_ptr = uintptr_t(tls) + PAGE_SIZE + tls_msize;
+    if (unlikely(!mm_is_user_range((void*)tls_ptr, sizeof(tls_ptr))))
+        return -1;
+    mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr));
+
+    thread_set_fsbase(thread_get_id(), tls_ptr);
 
     // Initialize the stack according to the ELF ABI
     //
@@ -385,11 +437,6 @@ int process_t::start()
         panic_oom();
     if (!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() }))
         panic_oom();
-
-    // Open a stdin, stdout, and stderr
-    file_open("/dev/conin", 0, 0);
-    file_open("/dev/conout", 0, 0);
-    file_open("/dev/conerr", 0, 0);
 
     processes_scoped_lock lock(processes_lock);
     state = state_t::running;
