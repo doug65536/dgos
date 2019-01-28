@@ -459,10 +459,10 @@ private:
     {
         size_t index = index_from_addr(addr);
         assert(index < highest_usable);
-        unsigned low = addr < 0x100000000;
         assert(entries[index] & used_mask);
         if (entries[index] == (1 | used_mask)) {
             // Free the page
+            size_t low = addr < 0x100000000;
             entries[index] = next_free[low];
             next_free[low] = index;
         } else {
@@ -2928,8 +2928,8 @@ void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
     unsigned low = base < 0x100000000;
     size_t pagesz = uint64_t(1) << log2_pagesz;
     entry_t index = index_from_addr(free_end) - 1;
-    assert(index < highest_usable);
     while (size != 0) {
+        assert(index < highest_usable);
         assert(entries[index] == entry_t(-1));
         entries[index] = next_free[low];
         next_free[low] = index;
@@ -2946,24 +2946,25 @@ physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 {
     scoped_lock lock_(lock);
 
-    size_t item = next_free[low];
+    size_t index = next_free[low];
 
-    if (unlikely(!item) && !low) {
+    if (unlikely(!index) && !low) {
         low = true;
-        item = next_free[low];
+        index = next_free[low];
     }
 
-    if (unlikely(!assert(item != 0 && item != entry_t(-1))))
+    if (unlikely(!assert(index != 0 && index != entry_t(-1))))
         return 0;
 
-    entry_t new_next = entries[item];
+    entry_t new_next = entries[index];
     assert(!(new_next & used_mask));
     next_free[low] = new_next;
-    entries[item] = used_mask | 1;
+    assert(index < highest_usable);
+    entries[index] = used_mask | 1;
 
     lock_.unlock();
 
-    physaddr_t addr = addr_from_index(item);
+    physaddr_t addr = addr_from_index(index);
 
 #if DEBUG_PHYS_ALLOC
     printdbg("Allocated page, low=%d, page=%p\n", low, (void*)addr);
@@ -2997,6 +2998,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
         entry_t new_next = first;
         size_t i;
         for (i = 0; i < count && new_next; ++i) {
+            assert(new_next < highest_usable);
             new_next = entries[new_next];
             assert(!(new_next & used_mask));
         }
@@ -3020,6 +3022,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
     for (size_t i = 0; i < count; ++i) {
+        assert(first < highest_usable);
         entry_t next = entries[first];
         assert(!(next & used_mask));
 
@@ -3057,6 +3060,7 @@ void mmu_phys_allocator_t::release_one(physaddr_t addr)
 void mmu_phys_allocator_t::addref(physaddr_t addr)
 {
     entry_t index = index_from_addr(addr);
+    assert(index < highest_usable);
     scoped_lock lock_(lock);
     assert(entries[index] & used_mask);
     ++entries[index];
@@ -3085,6 +3089,7 @@ void mmu_phys_allocator_t::adjref_virtual_range(
 
             if (addr && addr != PTE_ADDR) {
                 entry_t index = index_from_addr(addr);
+                assert(index < highest_usable);
                 assert(entries[index] & used_mask);
                 ++entries[index];
             }
@@ -3396,7 +3401,10 @@ void mm_set_master_pagedir()
 bool mm_copy_user_generic(void *dst, void const *src, size_t size)
 {
     __try {
-        memcpy(dst, src, size);
+        if (src)
+            memcpy(dst, src, size);
+        else
+            memset(dst, 0, size);
     } __catch {
         return false;
     }
@@ -3406,18 +3414,10 @@ bool mm_copy_user_generic(void *dst, void const *src, size_t size)
 
 bool mm_copy_user_smap(void *dst, void const *src, size_t size)
 {
-    // Assert that one side of the copy is user mode
-    assert((intptr_t(dst) > 0) != (intptr_t(src) > 0));
-
-    __try {
-        cpu_stac();
-        memcpy(dst, src, size);
-        cpu_clac();
-    } __catch {
-        return false;
-    }
-
-    return true;
+    cpu_stac();
+    bool result = mm_copy_user_generic(dst, src, size);
+    cpu_clac();
+    return result;
 }
 
 typedef bool (*mm_copy_user_fn)(void *dst, void const *src, size_t size);
@@ -3432,7 +3432,7 @@ extern "C" mm_copy_user_fn mm_copy_to_user_resolver()
 _ifunc_resolver(mm_copy_to_user_resolver)
 bool mm_copy_user(void *dst, void const *src, size_t size);
 
-bool mm_is_user_range(void *buf, size_t size)
+bool mm_is_user_range(void const *buf, size_t size)
 {
     return linaddr_t(buf) >= 0x400000 &&
             (linaddr_t(buf) < 0x7FFFFFFFFFFF) &&
