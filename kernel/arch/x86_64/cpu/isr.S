@@ -847,6 +847,7 @@ isr_common:
 .endm
 
 // Branch directly to appropriate save/restore
+.section .text.isr
 
 .align 16
 .global isr_save_fpu_ctx
@@ -923,53 +924,37 @@ exception_isr_handler:
     .cfi_offset cs,0*8
     .cfi_offset rip,-1*8
 
-    leaq intr_has_handler(%rip),%rax
-
-    // If there is no handler...
-    indirect_call rax
-    //callq *%rax
+    call intr_has_handler
     testl %eax,%eax
     jz .Lno_handler
 
     // There is a handler
-    leaq intr_invoke(%rip),%rax
     movl %ebx,%edi
     movq %r12,%rsi
-    indirect_call rax
-    //callq *%rax
+    call intr_invoke
 
     movq %r12,%rax
     retq
 
-.Lno_handler:
-
-// fall through...
+.Linvoke_catch:
+     nop
 
 .align 16
-.Linvoke_catch:
+.Lno_handler:
     // ...no handler or handler rejected it
-    leaq __exception_handler_invoke(%rip),%rax
     movl %ebx,%edi
+    call __exception_handler_invoke
 
-    indirect_call rax
-    //callq *%rax
-    testl %eax,%eax
-    jnz 2f
-
-    leaq cpu_debug_break(%rip),%rax
-    indirect_call rax
-    //call *%rax
+    call cpu_debug_break
 
     // (not Tail) call to unhandled_exception_handler
     // tail call breaks the backtrace, which is bad and not worth
     // an insignificant tail call optimization  on an already
     // expensive code path
 .align 16
-2:  leaq unhandled_exception_handler(%rip),%rax
-    movq %r12,%rdi
-    indirect_call rax
+2:  movq %r12,%rdi
+    call unhandled_exception_handler
     ret
-    //jmpq *%rax
 
     .cfi_endproc
 
@@ -1084,7 +1069,7 @@ __x86_indirect_thunk_\reg:
     make_retpoline_thunk \reg
 .endr
 
-.section .rodata
+.section .rodata, "a"
 .align 8
 
 // Pointers to patch points
