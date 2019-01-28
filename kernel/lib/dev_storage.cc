@@ -28,6 +28,10 @@ struct fs_mount_t {
 using path_table_t = hashtbl_t<fs_mount_t, fs_reg_t*, &fs_mount_t::reg>;
 static path_table_t path_table;
 
+using lock_type = std::mcslock;
+using scoped_lock = std::unique_lock<lock_type>;
+static lock_type storage_lock;
+
 static std::vector<storage_if_factory_t*> storage_if_factories;
 static std::vector<storage_if_base_t*> storage_ifs;
 static std::vector<storage_dev_base_t*> storage_devs;
@@ -37,11 +41,13 @@ static std::vector<fs_mount_t> fs_mounts;
 
 size_t storage_dev_count()
 {
+    scoped_lock lock(storage_lock);
     return storage_devs.size();
 }
 
 storage_dev_base_t *storage_dev_open(dev_t dev)
 {
+    scoped_lock lock(storage_lock);
     assert(size_t(dev) <= storage_devs.size());
     return size_t(dev) < storage_devs.size() ? storage_devs[dev] : nullptr;
 }
@@ -55,6 +61,8 @@ void storage_if_register_factory(char const *name,
                                 storage_if_factory_t *factory)
 {
     (void)name;
+
+    scoped_lock lock(storage_lock);
 
     if (!storage_if_factories.push_back(factory))
         panic_oom();
@@ -90,6 +98,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
             // Calculate pointer to storage device instance
             storage_dev_base_t *dev = dev_list[k];
             // Store device instance
+            scoped_lock lock(storage_lock);
             if (!storage_devs.push_back(dev))
                 panic_oom();
         }
@@ -107,6 +116,7 @@ REGISTER_CALLOUT(invoke_storage_factories, nullptr,
 
 void fs_register_factory(char const *name, fs_factory_t *fs)
 {
+    scoped_lock lock(storage_lock);
     if (!fs_regs.push_back(new fs_reg_t{ name, fs }))
         panic_oom();
     printdbg("%s filesystem registered\n", name);
@@ -114,6 +124,7 @@ void fs_register_factory(char const *name, fs_factory_t *fs)
 
 static fs_reg_t *find_fs(char const *name)
 {
+    scoped_lock lock(storage_lock);
     for (fs_reg_t *reg : fs_regs) {
         if (strcmp(reg->name, name))
             continue;
@@ -139,9 +150,12 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
     fs_base_t *mfs = fs_reg->factory->mount(info);
 
-    if (mfs && mfs->is_boot())
+    if (mfs && mfs->is_boot()) {
+        scoped_lock lock(storage_lock);
         fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, mfs });
-    else if (mfs) {
+
+    } else if (mfs) {
+        scoped_lock lock(storage_lock);
         if (!fs_mounts.push_back(fs_mount_t{ fs_reg, mfs }))
             panic_oom();
     }
@@ -149,6 +163,7 @@ void fs_mount(char const *fs_name, fs_init_info_t *info)
 
 fs_base_t *fs_from_id(size_t id)
 {
+    scoped_lock lock(storage_lock);
     return !fs_mounts.empty()
             ? fs_mounts[id].fs
             : nullptr;
@@ -156,6 +171,7 @@ fs_base_t *fs_from_id(size_t id)
 
 void part_register_factory(char const *name, part_factory_t *factory)
 {
+    scoped_lock lock(storage_lock);
     if (!part_factories.push_back(factory))
         panic_oom();
     printk("%s partition type registered\n", name);

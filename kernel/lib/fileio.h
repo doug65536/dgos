@@ -2,6 +2,8 @@
 #include "types.h"
 #include "dirent.h"
 
+#include "vector.h"
+
 #define SEEK_SET    0
 #define SEEK_CUR    1
 #define SEEK_END    2
@@ -113,3 +115,95 @@ private:
     int fd;
 };
 
+template<typename A = uintptr_t, typename S = size_t>
+class basic_pmd_t
+{
+    A addr;
+    S size;
+
+    constexpr A end() const { return addr + size; }
+};
+
+using pmd_t = basic_pmd_t<>;
+
+// A representation for a sequence of address ranges
+// Contiguous adds will be coalesced with the last entry
+// Discontiguity causes a new pmd range to start
+// The ranges need not be memory
+template<typename A = uintptr_t, typename S = size_t>
+class pmd_seq_t
+{
+public:
+    using pmt_t = basic_pmd_t<A, S>;
+
+    void add(A addr, S size)
+    {
+        if (!entries.empty()) {
+            pmd_t& last = entries.back();
+            if (addr == last.end()) {
+                last.size += size;
+                return;
+            }
+        }
+        entries.push_back({addr, size});
+    }
+
+    size_t size()
+    {
+        return entries.size();
+    }
+
+    pmd_t& item(size_t index)
+    {
+        return entries.at(index);
+    }
+
+    pmd_t& operator[](size_t index)
+    {
+        return entries.at(index);
+    }
+
+    // Pass 16 to ensure no range crosses a 64KB boundary
+    void apply_boundaries(S log2_boundary)
+    {
+        S boundary = S(1) << log2_boundary;
+
+        for (size_t i = 0; i < entries.size(); ++i) {
+            auto& entry = entries[i];
+            auto st = entry.addr;
+            auto max_end = (st + boundary) & -boundary;
+            auto en = entry.end();
+            if (en > max_end) {
+                pmd_t replacement{st, max_end - st};
+                pmd_t remainder{max_end, en - max_end};
+                // This may invalidate all iterators and references
+                entries.insert(entries.begin() + (i + 1), remainder);
+                // Use [] because reference may be invalidated
+                entries[i] = replacement;
+            }
+        }
+    }
+
+    void clamp_size(size_t log2_max_size)
+    {
+        S max_size = S(1) << log2_max_size;
+
+        for (size_t i = 0; i < entries.size(); ++i) {
+            auto& entry = entries[i];
+            auto st = entry.addr;
+            auto max_end = st + max_size;
+            auto en = entry.end();
+            if (entry.size > max_size) {
+                pmd_t replacement{st, max_end - st};
+                pmd_t remainder{max_end, en - max_end};
+                // This may invalidate all iterators and references
+                entries.insert(entries.begin() + (i + 1), remainder);
+                // Use [] because reference may be invalidated
+                entries[i] = replacement;
+            }
+        }
+    }
+
+private:
+    std::vector<pmd_t> entries;
+};

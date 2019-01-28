@@ -71,24 +71,28 @@ static void file_init(void *)
 static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
 {
     if (path[0] == '/' && !memcmp(path, "/dev/", 5)) {
-        if (!atomic_ld_acq(&dev_fs)) {
-            // Create an instance, possibly racing with another thread
-            auto* new_devfs = devfs_create();
+        consumed = 5;
 
-            // Set it if it was zero
-            auto old_devfs = atomic_cmpxchg(&dev_fs, nullptr, new_devfs);
+        auto cur_devfs = atomic_ld_acq(&dev_fs);
 
-            if (unlikely(old_devfs != nullptr)) {
-                // We got nonzero, another thread won the race, cleanup
-                devfs_delete(new_devfs);
-                return devfs_resolve(old_devfs, path + 5);
-            }
+        if (cur_devfs)
+            return cur_devfs;
 
-            return devfs_resolve(new_devfs, path + 5);
+        // Create an instance, possibly racing with another thread
+        auto* new_devfs = devfs_create();
+
+        // Set it if it was zero
+        auto old_devfs = atomic_cmpxchg(&dev_fs, nullptr, new_devfs);
+
+        if (unlikely(old_devfs != nullptr)) {
+            // We got nonzero, another thread won the race, cleanup
+            devfs_delete(new_devfs);
+            return old_devfs;
         }
+
+        return new_devfs;
     }
 
-    (void)path;
     return fs_from_id(0);
 }
 
