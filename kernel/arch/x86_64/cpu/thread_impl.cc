@@ -651,7 +651,7 @@ void thread_init(int ap)
         thread = threads + thread_create_with_state(
                     smp_idle_thread, nullptr, 0,
                     THREAD_IS_INITIALIZING,
-                    1 << cpu_nr,
+                    cpu_nr,
                     -256, false);
 
         thread->used_time = 0;
