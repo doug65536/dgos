@@ -60,6 +60,7 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_FRAMEBUFFER_THREAD   0
 #define ENABLE_FILESYSTEM_TEST      0
 #define ENABLE_SPAWN_STRESS         0
+#define ENABLE_SHELL                0
 #define ENABLE_CONDVAR_STRESS       0
 #define ENABLE_STRESS_HEAP_SMALL    1
 #define ENABLE_STRESS_HEAP_LARGE    0
@@ -816,10 +817,12 @@ void test_spawn()
     }
 #endif
 
+#if ENABLE_SHELL
     int shell_pid;
     int spawn_result = process_t::spawn(
                 &shell_pid, "shell", nullptr, nullptr);
     printk("shell pid: %d\n", spawn_result);
+#endif
 }
 
 static int init_thread(void *)
