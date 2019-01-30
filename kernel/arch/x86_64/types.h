@@ -18,6 +18,7 @@
 #define __BEGIN_NAMESPACE_EXT   __BEGIN_NAMESPACE(ext)
 #define __END_NAMESPACE         }
 #define __END_NAMESPACE_STD     __END_NAMESPACE
+#define __END_NAMESPACE_EXT     __END_NAMESPACE
 
 #if defined(__GNUC__)
 
