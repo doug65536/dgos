@@ -167,6 +167,23 @@ constexpr _OutputIt uninitialized_fill(_OutputIt __first, _OutputIt __last,
     return __first;
 }
 
+__END_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
+template<typename _T, typename _OutputIt, typename... _Args>
+constexpr _OutputIt uninitialized_emplace(
+        _OutputIt __first, _OutputIt __last, _Args&& ...__args)
+{
+    using T = decltype(*__first);
+    while (__first != __last) {
+        new (&*__first) typename std::remove_reference<T>::type(
+                    std::forward<_Args>(__args)...);
+        ++__first;
+    }
+    return __first;
+}
+__END_NAMESPACE_EXT
+__BEGIN_NAMESPACE_STD
+
 template<typename _InputIt, typename _OutputIt>
 constexpr _OutputIt uninitialized_move(_InputIt __first, _InputIt __last,
                              _OutputIt __out)

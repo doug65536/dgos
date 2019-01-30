@@ -300,7 +300,11 @@ vector<_T,_Allocator>::vector(
     , __sz(0)
     , __alloc(__alloc_)
 {
-    resize(__count);
+    if (!reserve(__count))
+        panic_oom();
+    // Default construct in-place, no copy
+    ext::uninitialized_emplace<_T>(__m, __m + __count);
+    __sz = __count;
 }
 
 template<typename _T, typename _Allocator>
