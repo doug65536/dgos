@@ -849,8 +849,10 @@ static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
 
-    if (atomic_and(&thread->state, ~THREAD_BUSY) == THREAD_IS_EXITING)
-        thread->process->destroy();
+    if (atomic_and(&thread->state, ~THREAD_BUSY) == THREAD_IS_EXITING) {
+        if (thread->process != threads[0].process)
+            thread->process->destroy();
+    }
 }
 
 // Thread is not running anymore, destroy things
