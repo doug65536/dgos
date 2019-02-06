@@ -583,7 +583,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/vector.h \
 	kernel/lib/cc/vector.cc \
 	kernel/lib/cc/cxxstring.h \
-	kernel/lib/cc/cxxstring.cc \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
@@ -626,7 +625,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/mm.h \
 	kernel/lib/mouse.cc \
 	kernel/lib/mouse.h \
-	kernel/lib/mutex.cc \
 	kernel/lib/png.cc \
 	kernel/lib/png.h \
 	kernel/lib/pool.cc \
@@ -666,11 +664,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/contig_alloc.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/devfs.cc \
-	kernel/fs/fat32.cc \
-	kernel/fs/fat32_decl.h \
-	kernel/fs/iso9660.cc \
-	kernel/fs/iso9660_decl.h \
-	kernel/fs/iso9660_part.cc \
 	kernel/fs/mbr.cc \
 	kernel/fs/gpt.cc \
 	kernel/fs/tmpfs.cc \
@@ -753,7 +746,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/acpigas.h \
 	kernel/device/acpihw.cc \
 	kernel/device/acpihw.h \
-	kernel/device/iocp.cc \
 	kernel/device/iocp.h \
 	kernel/device/ata.cc \
 	kernel/device/ata.h \
@@ -806,7 +798,10 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_time.cc \
 	kernel/syscall/sys_process.cc
 
-kernel/device/kernel_generic-iocp.$(OBJEXT): CXXFLAGS += -fvisibility=default -fno-visibility-inlines-hidden
+KERNEL_EXPLICIT_INSTANTIATIONS = \
+	kernel/device/iocp.cc \
+	kernel/lib/cc/cxxstring.cc \
+	kernel/lib/mutex.cc
 
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/boot/include \
@@ -853,6 +848,7 @@ KERNEL_LDFLAGS_SHARED = \
 	-Wl,-g \
 	-export-dynamic \
 	-Wl,-pie \
+	-Wl,--whole-archive libkei.a -Wl,--no-whole-archive \
 	$(NOSTDLIB_FLAGS)
 
 #-Wl,-m,elf_x86_64
@@ -863,9 +859,23 @@ KERNEL_LDFLAGS_SHARED = \
 EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/kernel.ld \
 	$(top_builddir)/u_vga16.o \
+	$(top_builddir)/libkei.a \
 	$(DUMPDIR)
 
 KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
+
+# ----------------------------------------------------------------------------
+# Explicit instantiations because __attribute__((__visibility__(...))) is broken
+
+noinst_LIBRARIES += libkei.a
+
+libkei_a_SOURCES = \
+	$(KERNEL_EXPLICIT_INSTANTIATIONS)
+
+libkei_a_CXXFLAGS = \
+	$(KERNEL_CXXFLAGS_SHARED) \
+	$(KERNEL_INCLUDES_SHARED) \
+	-fvisibility=default -fno-visibility-inlines-hidden
 
 # ----------------------------------------------------------------------------
 # kernel variations
@@ -1570,26 +1580,6 @@ KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 
 #==========
 
-bin_PROGRAMS += hello.km
-
-hello_km_SOURCES = \
-	modules/hello/hello.cc
-
-hello_km_CXXFLAGS = \
-	$(KERNEL_MODULE_CXXFLAGS_SHARED)
-
-hello_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/hello.km.map
-
-hello_km_LDADD = \
-	$(KERNEL_MODULE_LDADD_SHARED)
-
-EXTRA_hello_km_DEPENDENCIES = \
-	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
-
-#==========
-
 bin_PROGRAMS += rtl8139.km
 
 rtl8139_km_SOURCES = \
@@ -1698,6 +1688,90 @@ ide_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_ide_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += fat32.km
+
+fat32_km_SOURCES = \
+	kernel/fs/fat32.cc \
+	kernel/fs/fat32_decl.h
+
+fat32_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+fat32_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/fat32.km.map
+
+fat32_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_fat32_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += iso9660.km
+
+iso9660_km_SOURCES = \
+	kernel/fs/iso9660.cc \
+	kernel/fs/iso9660_decl.h \
+	kernel/fs/iso9660_part.cc
+
+iso9660_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+iso9660_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/iso9660.km.map
+
+iso9660_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_iso9660_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += mbr.km
+
+mbr_km_SOURCES = \
+	kernel/fs/mbr.cc
+
+mbr_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+mbr_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/mbr.km.map
+
+mbr_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_mbr_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+
+#==========
+
+bin_PROGRAMS += gpt.km
+
+gpt_km_SOURCES = \
+	kernel/fs/gpt.cc
+
+gpt_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+gpt_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/gpt.km.map
+
+gpt_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_gpt_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========

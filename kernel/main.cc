@@ -837,7 +837,8 @@ static int init_thread(void *)
     cpu_init_late_msrs();
 
     printk("Initializing PCI\n");
-    thread_t tid_pci_init = thread_func_0(pci_init);
+    //thread_t tid_pci_init = thread_func_0(pci_init);
+    pci_init();
 
     printk("Initializing keyboard event queue\n");
     keybd_init();
@@ -846,19 +847,20 @@ static int init_thread(void *)
 
     modload_init();
 
-    printk("Initializing 8042 keyboard\n");
-    modload_load("keyb8042.km");
-    //thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
-
     // Wait for PCI initialization before starting drivers
-    thread_wait(tid_pci_init);
-    thread_close(tid_pci_init);
-    //thread_wait(tid_keybd8042_init);
-    //thread_close(tid_keybd8042_init);
+    //thread_wait(tid_pci_init);
+    //thread_close(tid_pci_init);
 
     // Facilities needed by drivers
     printk("Initializing driver base\n");
     callout_call(callout_type_t::driver_base, true);
+
+    printk("Initializing 8042 keyboard\n");
+    modload_load("keyb8042.km");
+    //thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
+
+    //thread_wait(tid_keybd8042_init);
+    //thread_close(tid_keybd8042_init);
 
     // Run late initializations
     printk("Initializing late devices\n");

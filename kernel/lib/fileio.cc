@@ -143,7 +143,7 @@ bool file_ref_filetab(int id)
     return false;
 }
 
-REGISTER_CALLOUT(file_init, nullptr, callout_type_t::partition_probe, "999");
+REGISTER_CALLOUT(file_init, nullptr, callout_type_t::driver_base, "999");
 
 static filetab_t *file_fh_from_id(int id)
 {
