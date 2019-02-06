@@ -23,7 +23,7 @@ enum storage_dev_info_t : uint32_t {
     STORAGE_INFO_NAME
 };
 
-struct storage_dev_base_t {
+struct EXPORT storage_dev_base_t {
     virtual ~storage_dev_base_t() {}
 
     // Startup/shutdown
@@ -85,18 +85,15 @@ struct storage_dev_base_t {
 
 struct storage_if_base_t;
 
-struct storage_if_factory_t {
-    constexpr storage_if_factory_t(char const *factory_name)
-        : name(factory_name)
-    {
-    }
+struct EXPORT storage_if_factory_t {
+    storage_if_factory_t(char const *factory_name);
 
     virtual std::vector<storage_if_base_t *> detect(void) = 0;
     static void register_factory(void *p);
     char const * const name;
 };
 
-struct storage_if_base_t {
+struct EXPORT storage_if_base_t {
     virtual ~storage_if_base_t() {}
     virtual void cleanup_if() = 0;
     virtual std::vector<storage_dev_base_t*> detect_devices() = 0;
@@ -423,7 +420,7 @@ struct fs_base_t {
 
 // Base for read-only filesystems,
 // provides implementation for all methods that write
-class fs_base_ro_t : public fs_base_t {
+class EXPORT fs_base_ro_t : public fs_base_t {
     FS_BASE_WR_IMPL
 };
 
@@ -432,7 +429,7 @@ class fs_base_ro_t : public fs_base_t {
 void fs_register_factory(char const *name, fs_factory_t *fs);
 
 //
-// Partitioning scheme (MBR, UEFI, etc)
+// Partitioning scheme (MBR, GPT, and special types like CPIO, etc)
 
 struct part_dev_t {
     storage_dev_base_t *drive;
@@ -452,9 +449,19 @@ struct part_factory_t {
     char const * const name;
 };
 
+struct fs_reg_t {
+    char const *name;
+    fs_factory_t *factory;
+};
+
+__BEGIN_DECLS
+
 void part_register_factory(char const *name, part_factory_t *factory);
 
 void fs_mount(char const *fs_name, fs_init_info_t *info);
+void fs_add(fs_reg_t *reg, fs_base_t *fs);
 fs_base_t *fs_from_id(size_t id);
 
 void probe_storage_factory(storage_if_factory_t *factory);
+
+__END_DECLS

@@ -1,8 +1,9 @@
 #include "bootinfo.h"
 #include "bios_data.h"
 #include "main.h"
+#include "export.h"
 
-uintptr_t bootinfo_parameter(bootparam_t param)
+EXPORT uintptr_t bootinfo_parameter(bootparam_t param)
 {
     auto data = kernel_params;
 
@@ -30,6 +31,12 @@ uintptr_t bootinfo_parameter(bootparam_t param)
 
     case bootparam_t::boot_mptables:
         return uintptr_t(&data->mptables);
+
+    case bootparam_t::initrd_base:
+        return data->initrd_st;
+
+    case bootparam_t::initrd_size:
+        return data->initrd_sz;
 
     default:
         return 0;

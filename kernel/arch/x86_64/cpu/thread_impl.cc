@@ -22,6 +22,7 @@
 #include "vector.h"
 #include "mutex.h"
 #include "except.h"
+#include "rbtree.h"
 
 // Implements platform independent thread.h
 
@@ -76,6 +77,17 @@ struct cpu_info_t;
 //  THREAD_IS_UNINITIALIZED
 //
 
+struct link_t {
+    link_t *next;
+    link_t *prev;
+
+    template<typename T, size_t offset = offsetof(T, link)>
+    T *container(link_t *link)
+    {
+        return (T*)((char*)link - offset);
+    }
+};
+
 struct alignas(256) thread_info_t {
     isr_context_t * volatile ctx;
 
@@ -124,14 +136,28 @@ struct alignas(256) thread_info_t {
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
 
-    unsigned thread_id;
+    thread_t thread_id;
 
     // 1 until closed, then 0
     int ref_count;
 
+    // Threads that got their timeslice sooner are ones that have slept,
+    // so they are implicitly higher priority
+    // When their timeslice is used up, they get a new one timestamped now
+    // losing their privileged status allowing other threads to have a turn
+    uint64_t timeslice_timestamp;
+
+    // Each time a thread context switches, time is removed from this value
+    // When it reaches zero, it is replenished, and timeslice_timestamp
+    // is set to now. Preemption is set up so the timer will fire when this
+    // time elapses.
+    uint64_t timeslice_remaining;
+
     thread_cpu_affinity_t cpu_affinity;
 
     __exception_jmp_buf_t exit_jmpbuf;
+
+//    void awaken(cpu_info_t *cpu, uint64_t now);
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
@@ -185,12 +211,14 @@ struct alignas(128) cpu_info_t {
     uint64_t irq_count;
     uint64_t irq_time;
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type queue_lock;
 
     unsigned cpu_nr;
+
+    rbtree_t<uint64_t, uint64_t> ready_list;
 
     void *storage[8];
 };
@@ -202,11 +230,18 @@ C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
 
-static cpu_info_t cpus[MAX_CPUS] = {
-    { cpus, threads, tss_list, 0, 0, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, {}, 0,
-      { }
-    }
-};
+static cpu_info_t cpus[MAX_CPUS];
+
+_constructor(ctor_cpu_init_cpus)
+static void cpus_init_t()
+{
+    // Do some basic initializations on the first CPU
+    // without having a big initializer list of unreadable
+    // nonsense above
+    cpus[0].self = cpus;
+    cpus[0].cur_thread = threads;
+    cpus[0].tss_ptr = tss_list;
+}
 
 uint32_t cpu_count;
 
@@ -222,13 +257,16 @@ public:
 
     thread_info_t *choose_next();
 
-private:
+private:    
     thread_info_t *current;
 
-    //std::set<ready_thread_t> priorities[32];
+    // 32 vectors, one per priority level
+    std::vector<thread_t> priorities[32];
+
+    // Bitmask caches emptiness and allows O(1) selection of highest priority
     uint32_t empty_flags;
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
@@ -445,7 +483,7 @@ static thread_t thread_create_with_state(
     thread->syscall_stack = syscall_stack;
     thread->xsave_stack = xsave_stack;
 
-    thread_info_t *creator_thread = this_thread();
+//    thread_info_t *creator_thread = this_thread();
 
     thread->priority = priority;
     thread->priority_boost = 0;
@@ -572,12 +610,13 @@ void thread_idle()
         halt();
 }
 
-// Software interrupt handler to explicitly yield and for IPI reschedules
+// Software interrupt handler to explicitly yield
 static isr_context_t *thread_yield_handler(int, isr_context_t *ctx)
 {
     return thread_schedule(ctx);
 }
 
+// Hardware interrupt handler (an IPI) to provoke other CPUs to reschedule
 static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
 {
     apic_eoi(intr);
@@ -601,6 +640,7 @@ void thread_init(int ap)
     cpu->cpu_nr = cpu_nr;
 
     if (cpu_nr > 0) {
+        // Load hidden tssbase, point to cpu-local TSS
         gdt_load_tr(cpu_nr);
         cpu->tss_ptr = tss_list + cpu_nr;
     }
@@ -613,19 +653,32 @@ void thread_init(int ap)
     cpu->apic_id = get_apic_id();
     cpu->online = 1;
 
+    // Initialize kernel gsbase and other gsbase
     cpu_gsbase_set(cpu);
     cpu_altgsbase_set(nullptr);
+
+    // Remember CR0 so we can avoid changing it
     cpu->cr0_shadow = uint32_t(cpu_cr0_get());
 
     if (!ap) {
-        for (unsigned i = 0; i < countof(threads); ++i)
-            threads[i].thread_id = i;
+        //
+        // Perform BSP-only initializations
 
+        for (unsigned i = 0; i < countof(threads); ++i) {
+            // Initialize every thread ID so pointer tricks aren't needed
+            threads[i].thread_id = i;
+        }
+
+        // Hook handler that performs a voluntary reschedule
         intr_hook(INTR_THREAD_YIELD, thread_yield_handler, "sw_yield");
-        intr_hook(INTR_IPI_RESCHED, thread_ipi_resched, "sw_ipi_resched");
+
+        // Hook handler that performs a reschedule requested by another CPU
+        intr_hook(INTR_IPI_RESCHED, thread_ipi_resched, "hw_ipi_resched");
 
         thread->process = process_t::init(cpu_page_directory_get());
 
+        // The current thread for this CPU is this thread,
+        // which destined to become an idle thread
         cpu->cur_thread = thread;
 
         mm_init_process(thread->process);
@@ -1229,14 +1282,14 @@ void thread_send_ipi(int cpu, int intr)
     apic_send_ipi(cpus[cpu].apic_id, intr);
 }
 
-int thread_cpu_number()
+EXPORT int thread_cpu_number()
 {
     cpu_info_t *cpu = this_cpu();
     return cpu->cpu_nr;
 }
 
 _hot
-isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
+EXPORT isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
 {
     cpu_info_t *cur_cpu = this_cpu();
     thread_info_t *cur_thread = cur_cpu->cur_thread;
@@ -1252,7 +1305,7 @@ isr_context_t *thread_schedule_postirq(isr_context_t *ctx)
     return ctx;
 }
 
-process_t *thread_current_process()
+EXPORT process_t *thread_current_process()
 {
     thread_info_t *thread = this_thread();
     return thread->process;
@@ -1398,3 +1451,35 @@ void thread_add_cpu_irq_time(uint64_t tsc_ticks)
     atomic_add((cpu_gs_ptr<uint64_t, offsetof(cpu_info_t, irq_time)>()),
                tsc_ticks);
 }
+
+//void thread_info_t::awaken(cpu_info_t *cpu, uint64_t now)
+//{
+//    // If thread has nothing, then replenish timeslice
+//    if (timeslice_remaining == 0) {
+//        timeslice_timestamp = now;
+//        timeslice_remaining = 16666666;
+//    }
+
+//    // If enough time has elapsed for the thread to have gotten another
+//    // timeslice by now, and the thread doesn't have a full timeslice,
+//    // then add a full timeslice on top of what they had
+//    // This gives enough to catch up if they slept less than one timeslice
+//    if (now >= timeslice_timestamp + 16666666 &&
+//            timeslice_remaining < 16666666) {
+//        timeslice_remaining += 16666666;
+//    }
+
+//    // Find insertion point
+//    link_t *ins;
+//    for (ins = cpu->ready_list.next; ins != &cpu->ready_list;
+//         ins = ins->next) {
+//        auto thread = ins->container<thread_info_t>(ins);
+//        if (thread->timeslice_timestamp > timeslice_timestamp)
+//            break;
+//    }
+
+//    link.prev = ins->prev;
+//    link.next = ins;
+//    link.prev->next = &link;
+//    link.next->prev = &link;
+//}

@@ -1,10 +1,11 @@
-ENTRY(entry)
+ENTRY(module_entry)
 
 PHDRS {
 	read PT_LOAD FILEHDR PHDRS FLAGS(4);
 	ehfr PT_GNU_EH_FRAME FLAGS(4);
 	text PT_LOAD FLAGS(5);
 	data PT_LOAD FLAGS(6);
+	dyna PT_DYNAMIC FLAGS(4);
 }
 
 SECTIONS {
@@ -13,21 +14,22 @@ SECTIONS {
 	. = 0;
 	. += SIZEOF_HEADERS;
 
-	.rodata : {
-		PROVIDE_HIDDEN(___rodata_st = .);
-
+	.init_array : {
 		PROVIDE_HIDDEN(___init_st = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		PROVIDE_HIDDEN(___init_en = .);
+	} :read
 
-		. = ALIGN(16);
+	.fini_array : {
 		PROVIDE_HIDDEN(___fini_st = .);
 		*(.fini_array)
 		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		PROVIDE_HIDDEN(___fini_en = .);
+	} :read
 
-		. = ALIGN(32);
+	.rodata : {
+		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
@@ -73,11 +75,21 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	} :read
 
+	.rela.plt : {
+		PROVIDE_HIDDEN(___rela_plt = .);
+		*(.rela.plt)
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
+	} :read
+
 	.rela.dyn : {
-		PROVIDE_HIDDEN(___rela_dyn = .);
+		PROVIDE_HIDDEN(___rela_dyn_st = .);
 		*(.rela.init)
+		*(.rela.init_array)
 		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
 		*(.rela.fini)
+		*(.rela.fini_array)
 		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
 		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
 		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
@@ -90,14 +102,8 @@ SECTIONS {
 		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
 		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
 		*(.rela.ifunc)
-	} :read
-
-	.rela.plt : {
-		PROVIDE_HIDDEN(___rela_plt = .);
-		*(.rela.plt)
-		PROVIDE_HIDDEN (__rela_iplt_start = .);
-		*(.rela.iplt)
-		PROVIDE_HIDDEN (__rela_iplt_end = .);
+		*(.rela.*)
+		PROVIDE_HIDDEN (__rela_dyn_en = .);
 	} :read
 
 	.plt.got : {
@@ -108,6 +114,15 @@ SECTIONS {
 	.plt.bnd : {
 		PROVIDE_HIDDEN(___plt_bnd = .);
 		*(.plt.bnd)
+	} :read
+
+	.got : {
+		PROVIDE_HIDDEN(___got = .);
+		*(.got)
+	} :read
+
+	.got.plt : {
+		*(.got.plt)
 	} :read
 
 	. = ALIGN(4K);
@@ -138,7 +153,7 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
-	} :data
+	} :dyna :data
 
 	/* Initialized data */
 	.data  : {
@@ -147,15 +162,10 @@ SECTIONS {
 		. = ALIGN(16);
 	} :data
 
-	.got : {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got*)
-		*(.got.plt)
-	} :data
-
 	.bss : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
+		*(.dynbss)
 		*(SORT(.bss.*))
 		*(COMMON)
 		. = ALIGN(16);
@@ -165,13 +175,19 @@ SECTIONS {
 	. = ALIGN(4K);
 	PROVIDE_HIDDEN(___image_en = .);
 
+/*
 	.debug_info		(NOLOAD) : { *(.debug_info)    }
 	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  }
 	.debug_aranges	(NOLOAD) : { *(.debug_aranges) }
+	.debug_ranges	(NOLOAD) : { *(.debug_ranges) }
 	.debug_macro	(NOLOAD) : { *(.debug_macro)   }
 	.debug_line		(NOLOAD) : { *(.debug_line)    }
 	.debug_str		(NOLOAD) : { *(.debug_str)     }
 
 	/DISCARD/       : { *(.interp)        }
 	/DISCARD/		: { *(.comment)       }
+	/DISCARD/		: { *(.gnu.version_d) }
+	/DISCARD/		: { *(.gnu.version_r) }
+	/DISCARD/		: { *(.gnu.version)   }
+*/
 }

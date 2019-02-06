@@ -72,7 +72,7 @@ static std::vector<pci_ecam_t> pci_ecam_list;
 static pci_config_pio pci_pio_accessor;
 static pci_config_mmio pci_mmio_accessor;
 
-using pci_lock_type = std::mcslock;
+using pci_lock_type = ext::mcslock;
 using pci_scoped_lock = std::unique_lock<pci_lock_type>;
 static pci_lock_type pci_lock;
 static pci_config_rw *pci_accessor = &pci_pio_accessor;
@@ -378,17 +378,18 @@ bool pci_config_mmio::copy(pci_addr_t addr, void *dest,
     return true;
 }
 
-uint32_t pci_config_read(pci_addr_t addr, int offset, int size)
+EXPORT uint32_t pci_config_read(pci_addr_t addr, int offset, int size)
 {
     return pci_accessor->read(addr, offset, size);
 }
 
-bool pci_config_write(pci_addr_t addr, size_t offset, void *values, size_t size)
+EXPORT bool pci_config_write(pci_addr_t addr, size_t offset,
+                             void *values, size_t size)
 {
     return pci_accessor->write(addr, offset, values, size);
 }
 
-void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
+EXPORT void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
 {
     pci_accessor->copy(addr, dest, ofs, size);
 }
@@ -664,9 +665,9 @@ static int pci_enum_capabilities_match(
     return 0;
 }
 
-int pci_enum_capabilities(int start, pci_addr_t addr,
-                          int (*callback)(uint8_t, int, uintptr_t),
-                          uintptr_t context)
+EXPORT int pci_enum_capabilities(int start, pci_addr_t addr,
+                                 int (*callback)(uint8_t, int, uintptr_t),
+                                 uintptr_t context)
 {
     int ofs;
 
@@ -707,18 +708,18 @@ int pci_enum_capabilities(int start, pci_addr_t addr,
     return 0;
 }
 
-int pci_find_capability(pci_addr_t addr, int capability_id, int start)
+EXPORT int pci_find_capability(pci_addr_t addr, int capability_id, int start)
 {
     return pci_enum_capabilities(start, addr, pci_enum_capabilities_match,
                                  capability_id);
 }
 
-bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
-                     pci_irq_range_t *irq_range,
-                     int cpu, bool distribute, int req_count,
-                     intr_handler_t handler,
-                     char const *name, int const *target_cpus,
-                     int const *vector_offsets)
+EXPORT bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
+                            pci_irq_range_t *irq_range,
+                            int cpu, bool distribute, int req_count,
+                            intr_handler_t handler,
+                            char const *name, int const *target_cpus,
+                            int const *vector_offsets)
 {
     // Assume we can't use MSI at first, prepare to use pin interrupt
     irq_range->base = pci_dev.config.irq_line;
@@ -777,7 +778,7 @@ static int pci_find_msi_msix(pci_addr_t addr,
 }
 
 // Infer the number of vectors needed from the highest vector offset
-int pci_vector_count_from_offsets(int const *vector_offsets, int count)
+EXPORT int pci_vector_count_from_offsets(int const *vector_offsets, int count)
 {
     return std::accumulate(vector_offsets, vector_offsets + count, 0,
                       [&](int highest, int const& item) {
@@ -787,10 +788,10 @@ int pci_vector_count_from_offsets(int const *vector_offsets, int count)
 
 // Returns with the function masked if possible
 // Use pci_set_irq_mask to unmask it when appropriate
-bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
-                    int cpu, bool distribute, int req_count,
-                    intr_handler_t handler, char const *name,
-                    int const *target_cpus, int const *vector_offsets)
+EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
+                            int cpu, bool distribute, int req_count,
+                            intr_handler_t handler, char const *name,
+                            int const *target_cpus, int const *vector_offsets)
 {
     bool msix;
     pci_msi_caps_hdr_t caps;
@@ -974,7 +975,7 @@ bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
     return true;
 }
 
-bool pci_set_irq_unmask(pci_addr_t addr, bool unmask)
+EXPORT bool pci_set_irq_unmask(pci_addr_t addr, bool unmask)
 {
     bool msix;
     pci_msi_caps_hdr_t caps;
@@ -1007,7 +1008,7 @@ bool pci_set_irq_unmask(pci_addr_t addr, bool unmask)
     return true;
 }
 
-int pci_max_vectors(pci_addr_t addr)
+EXPORT int pci_max_vectors(pci_addr_t addr)
 {
     pci_msi_caps_hdr_t caps;
     bool msix;
@@ -1029,13 +1030,13 @@ int pci_max_vectors(pci_addr_t addr)
     return msix ? count : -count;
 }
 
-void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line)
+EXPORT void pci_set_irq_line(pci_addr_t addr, uint8_t irq_line)
 {
     pci_config_write(addr, offsetof(pci_config_hdr_t, irq_line),
                      &irq_line, sizeof(irq_line));
 }
 
-void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin)
+EXPORT void pci_set_irq_pin(pci_addr_t addr, uint8_t irq_pin)
 {
     pci_config_write(addr, offsetof(pci_config_hdr_t, irq_pin),
                      &irq_pin, sizeof(irq_pin));
@@ -1058,24 +1059,24 @@ static void pci_adj_bits_16(pci_addr_t addr, int offset,
     }
 }
 
-void pci_adj_control_bits(pci_addr_t addr, uint16_t set, uint16_t clr)
+EXPORT void pci_adj_control_bits(pci_addr_t addr, uint16_t set, uint16_t clr)
 {
     pci_adj_bits_16(addr, offsetof(pci_config_hdr_t, command), set, clr);
 }
 
-void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
+EXPORT void pci_adj_control_bits(pci_dev_iterator_t const& pci_dev,
                           uint16_t set, uint16_t clr)
 {
     pci_adj_control_bits((pci_addr_t)pci_dev, set, clr);
 }
 
-void pci_clear_status_bits(pci_addr_t addr, uint16_t bits)
+EXPORT void pci_clear_status_bits(pci_addr_t addr, uint16_t bits)
 {
     pci_config_write(addr, offsetof(pci_config_hdr_t, status),
                      &bits, sizeof(bits));
 }
 
-char const *pci_device_class_text(uint8_t cls)
+EXPORT char const *pci_device_class_text(uint8_t cls)
 {
     if (cls < sizeof(pci_device_class_text_lookup))
         return pci_device_class_text_lookup[cls];
@@ -1103,7 +1104,7 @@ void pci_init_ecam_enable()
     pci_accessor = &pci_mmio_accessor;
 }
 
-uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
+EXPORT uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
 {
     uint64_t addr;
 
@@ -1119,8 +1120,8 @@ uint64_t pci_config_hdr_t::get_bar(ptrdiff_t bar) const
     return addr;
 }
 
-void pci_config_hdr_t::set_mmio_bar(pci_addr_t pci_addr,
-                                    ptrdiff_t bar, uint64_t addr)
+EXPORT void pci_config_hdr_t::set_mmio_bar(
+        pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr)
 {
     // PCI 2.2 section 6.2.5
 
@@ -1141,7 +1142,7 @@ void pci_config_hdr_t::set_mmio_bar(pci_addr_t pci_addr,
                     (char*)&base_addr[bar] - (char*)this, size);
 }
 
-int pci_enumerate_begin(
+EXPORT int pci_enumerate_begin(
         pci_dev_iterator_t *iter,
         int dev_class, int subclass, int vendor, int device)
 {
@@ -1159,7 +1160,7 @@ int pci_enumerate_begin(
     return 0;
 }
 
-int pci_enumerate_next(pci_dev_iterator_t *iter)
+EXPORT int pci_enumerate_next(pci_dev_iterator_t *iter)
 {
     auto at = std::find(pci_cache.iters.begin(),
                         pci_cache.iters.end(), *iter);
@@ -1220,4 +1221,84 @@ EXPORT bool pci_addr_t::is_legacy() const
 EXPORT uint64_t pci_addr_t::get_addr() const
 {
     return addr << 12;
+}
+
+EXPORT pci_dev_iterator_t::operator pci_addr_t() const
+{
+    return pci_addr_t(segment, bus, slot, func);
+}
+
+EXPORT void pci_dev_iterator_t::reset()
+{
+    segment = 0;
+    bus = 0;
+    slot = 0;
+    func = 0;
+    dev_class = 0;
+    subclass = 0;
+    vendor = 0;
+    device = 0;
+    header_type = 0;
+    bus_todo_len = 0;
+    memset(bus_todo, 0, sizeof(bus_todo));
+}
+
+EXPORT pci_dev_iterator_t &pci_dev_iterator_t::copy_from(
+        pci_dev_iterator_t const& rhs)
+{
+    segment = rhs.segment;
+    bus = rhs.bus;
+    slot = rhs.slot;
+    func = rhs.func;
+
+    config = rhs.config;
+    addr = pci_addr_t(segment, bus, slot, func);
+    return *this;
+}
+
+EXPORT bool pci_dev_iterator_t::operator==(pci_dev_iterator_t const& rhs) const
+{
+    return (segment == rhs.segment) &
+            (bus == rhs.bus) &
+            (slot == rhs.slot) &
+            (func == rhs.func);
+}
+
+EXPORT bool pci_config_hdr_t::is_bar_mmio(ptrdiff_t bar) const
+{
+    return (base_addr[bar] & 1) == 0;
+}
+
+EXPORT bool pci_config_hdr_t::is_bar_portio(ptrdiff_t bar) const
+{
+    return base_addr[bar] & 1;
+}
+
+EXPORT bool pci_config_hdr_t::is_bar_prefetchable(ptrdiff_t bar) const
+{
+    return base_addr[bar] & 8;
+}
+
+EXPORT bool pci_config_hdr_t::is_bar_64bit(ptrdiff_t bar) const
+{
+    return (base_addr[bar] & 7) == 4;
+}
+
+EXPORT pci_dev_t::pci_dev_t()
+{
+}
+
+EXPORT pci_dev_t::~pci_dev_t()
+{
+
+}
+
+EXPORT pci_dev_iterator_t::pci_dev_iterator_t()
+{
+
+}
+
+EXPORT pci_dev_iterator_t::~pci_dev_iterator_t()
+{
+
 }

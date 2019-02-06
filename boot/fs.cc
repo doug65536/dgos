@@ -9,6 +9,11 @@ int boot_open(tchar const *filename)
     return fs_api.boot_open(filename);
 }
 
+off_t boot_filesize(int file)
+{
+    return fs_api.boot_filesize(file);
+}
+
 int boot_close(int file)
 {
     return fs_api.boot_close(file);

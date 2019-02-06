@@ -5,14 +5,7 @@
 
 struct pool_base_t {
 public:
-    pool_base_t()
-        : items(nullptr)
-        , item_size(0)
-        , item_capacity(0)
-        , item_count(0)
-        , first_free(0)
-    {
-    }
+    pool_base_t();
     ~pool_base_t();
 
     bool create(uint32_t item_size, uint32_t capacity);
@@ -22,7 +15,7 @@ public:
     void free(uint32_t index);
 
 protected:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     char *items;
@@ -30,7 +23,7 @@ protected:
     uint32_t item_capacity;
     uint32_t item_count;
     uint32_t first_free;
-    std::mcslock pool_lock;
+    ext::mcslock pool_lock;
 };
 
 template<typename T>

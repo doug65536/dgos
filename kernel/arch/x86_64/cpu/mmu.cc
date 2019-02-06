@@ -245,7 +245,7 @@ static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 // +---------------+-----------------------------------+
 // | -513G - -512G | Zeroing page                      |
 // +---------------+-----------------------------------+
-// | -255T - -513G | Kernel heap                       |
+// | -128T - -513G | Kernel heap                       |
 // +---------------+-----------------------------------+
 
 // Page tables for entire address, worst case, consists of
@@ -253,8 +253,7 @@ static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 //    134217728 2MB pages  (   262144 PD pages,     0x40000000 bytes,   1GB)
 //       262144 1GB pages  (      512 PDPT pages,     0x200000 bytes,   4MB)
 //                         (        1 PML4 page,        0x1000 bytes,   4KB)
-//                          ---------
-//                          134480385 total pages, 550,831,656,960 bytes)
+
 
 static format_flag_info_t pte_flags[] = {
     { "XD",     1,                  nullptr, PTE_NX_BIT       },
@@ -347,7 +346,7 @@ struct mmap_device_mapping_t {
 static int mm_dev_map_search(void const *v, void const *k, void *s);
 
 static std::vector<mmap_device_mapping_t*> mm_dev_mappings;
-using mm_dev_mapping_lock_type = std::mcslock;
+using mm_dev_mapping_lock_type = ext::mcslock;
 using mm_dev_mapping_scoped_lock = std::unique_lock<mm_dev_mapping_lock_type>;
 static mm_dev_mapping_lock_type mm_dev_mapping_lock;
 
@@ -471,7 +470,7 @@ private:
         }
     }
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static constexpr entry_t used_mask =
@@ -512,12 +511,12 @@ static size_t round_down(size_t n)
 //
 // Contiguous physical memory allocator
 
-uintptr_t mm_alloc_contiguous(size_t size)
+EXPORT uintptr_t mm_alloc_contiguous(size_t size)
 {
     return contig_phys_allocator.alloc_linear(round_up(size));
 }
 
-void mm_free_contiguous(uintptr_t addr, size_t size)
+EXPORT void mm_free_contiguous(uintptr_t addr, size_t size)
 {
     contig_phys_allocator.release_linear(addr, round_up(size));
 }
@@ -1009,7 +1008,7 @@ static _always_inline constexpr T *init_phys(uint64_t addr)
 // Zero initialization
 
 struct clear_phys_state_t {
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type locks[64];
 
@@ -1930,10 +1929,31 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
     return (true_val & mask) | (false_val & ~mask);
 }
 
-void *mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
+static void *mm_alloc_address_space(size_t len, bool user)
+{
+    contiguous_allocator_t *allocator =
+            user ? (contiguous_allocator_t*)
+                thread_current_process()->get_allocator()
+            : &linear_allocator;
+    return (void*)allocator->alloc_linear(round_up(len));
+}
+
+EXPORT void *mm_alloc_space(size_t size)
+{
+    return (void*)linear_allocator.alloc_linear(size);
+}
+
+EXPORT void *mmap(void *addr, size_t len, int prot,
+                  int flags, int fd, off_t offset)
 {
     (void)offset;
     assert(offset == 0);
+
+    // Special case PROT_NONE, MAP_NOCOMMIT
+    if (unlikely(addr == nullptr &&
+                 prot == PROT_NONE &&
+                 (flags & MAP_NOCOMMIT) == MAP_NOCOMMIT))
+        return mm_alloc_address_space(len, flags & MAP_USER);
 
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
@@ -2274,7 +2294,7 @@ void *mremap(
     return (void*)new_st;
 }
 
-int munmap(void *addr, size_t size)
+EXPORT int munmap(void *addr, size_t size)
 {
     __asan_freeN_noabort(addr, size);
 
@@ -2473,7 +2493,7 @@ int mprotect(void *addr, size_t len, int prot)
 
     mmu_send_tlb_shootdown();
 
-    return 1;
+    return 0;
 }
 
 int madvise_will_need(pte_t *pte_scan, pte_t *end)
@@ -2632,7 +2652,7 @@ static int present_ranges(F callback, linaddr_t rounded_addr, size_t len)
     return result;
 }
 
-int msync(void const *addr, size_t len, int flags)
+EXPORT int msync(void const *addr, size_t len, int flags)
 {
     // Check for validity, particularly accidentally using O_SYNC
     assert((flags & (MS_SYNC | MS_INVALIDATE)) == flags);
@@ -2667,7 +2687,7 @@ int msync(void const *addr, size_t len, int flags)
     return result;
 }
 
-uintptr_t mphysaddr(void volatile *addr)
+EXPORT uintptr_t mphysaddr(void volatile *addr)
 {
     linaddr_t linaddr = linaddr_t(addr);
 
@@ -2777,10 +2797,9 @@ static _always_inline int mphysranges_callback(
     return 1;
 }
 
-size_t mphysranges(mmphysrange_t *ranges,
-                   size_t ranges_count,
-                   void const *addr, size_t size,
-                   size_t max_size)
+EXPORT size_t mphysranges(
+        mmphysrange_t *ranges, size_t ranges_count,
+        void const *addr, size_t size, size_t max_size)
 {
     if (unlikely(size == 0))
         return 0;
@@ -2810,8 +2829,8 @@ size_t mphysranges(mmphysrange_t *ranges,
     return state.count;
 }
 
-bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
-                         size_t count_limit, uint8_t log2_boundary)
+EXPORT bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
+                              size_t count_limit, uint8_t log2_boundary)
 {
     if (unlikely(ranges_count == 0))
         return true;
@@ -2843,7 +2862,7 @@ bool mphysranges_split(mmphysrange_t *ranges, size_t &ranges_count,
     return true;
 }
 
-void *mmap_register_device(void *context,
+EXPORT void *mmap_register_device(void *context,
                            uint64_t block_size,
                            uint64_t block_count,
                            int prot,
@@ -3112,18 +3131,18 @@ void mmu_phys_allocator_t::adjref_virtual_range(
     }
 }
 
-uintptr_t mm_alloc_hole(size_t size)
+EXPORT uintptr_t mm_alloc_hole(size_t size)
 {
     size = (size + 63) & -64;
     return hole_allocator.alloc_linear(size);
 }
 
-void mm_free_hole(uintptr_t addr, size_t size)
+EXPORT void mm_free_hole(uintptr_t addr, size_t size)
 {
     hole_allocator.release_linear(addr, size);
 }
 
-void *mmap_window(size_t size)
+EXPORT void *mmap_window(size_t size)
 {
     size = round_up(size);
 
@@ -3143,8 +3162,9 @@ void munmap_window(void *addr, size_t size)
     linear_allocator.release_linear((uintptr_t)addr, size);
 }
 
-int alias_window(void *addr, size_t size,
-                  mmphysrange_t const *ranges, size_t range_count)
+EXPORT int alias_window(void *addr, size_t size,
+                        mmphysrange_t const *ranges,
+                        size_t range_count)
 {
     linaddr_t base = linaddr_t(addr);
     unsigned misalignment = base & PAGE_MASK;
@@ -3430,9 +3450,9 @@ extern "C" mm_copy_user_fn mm_copy_to_user_resolver()
 }
 
 _ifunc_resolver(mm_copy_to_user_resolver)
-bool mm_copy_user(void *dst, void const *src, size_t size);
+EXPORT bool mm_copy_user(void *dst, void const *src, size_t size);
 
-bool mm_is_user_range(void const *buf, size_t size)
+EXPORT bool mm_is_user_range(void const *buf, size_t size)
 {
     return linaddr_t(buf) >= 0x400000 &&
             (linaddr_t(buf) < 0x7FFFFFFFFFFF) &&

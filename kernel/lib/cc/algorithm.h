@@ -146,7 +146,7 @@ template<typename _InputIt, typename _OutputIt>
 constexpr _OutputIt uninitialized_copy(_InputIt __first, _InputIt __last,
                              _OutputIt __out)
 {
-    using T = decltype(*__out);
+    using T = typename remove_reference<decltype(*__out)>::type;
     while (__first != __last) {
         new (&*__out) T(*__first);
         ++__out;

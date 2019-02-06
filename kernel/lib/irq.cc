@@ -42,7 +42,7 @@ static intr_link_t intr_first_free;
 static intr_link_t intr_handlers_count;
 static intr_handler_reg_t intr_handlers[MAX_INTR_HANDLERS];
 
-using intr_handler_reg_lock_type = std::mcslock;
+using intr_handler_reg_lock_type = ext::mcslock;
 using intr_handler_reg_scoped_lock =
     std::unique_lock<intr_handler_reg_lock_type>;
 static intr_handler_reg_lock_type intr_handler_reg_lock;
@@ -85,7 +85,7 @@ void irq_set_unhandled_irq_handler(irq_unhandled_irq_handler_t handler)
     irq_unhandled_irq_vec = handler;
 }
 
-void irq_setmask(int irq, bool unmask)
+EXPORT void irq_setmask(int irq, bool unmask)
 {
     intr_handler_reg_scoped_lock lock(intr_handler_reg_lock);
 
@@ -104,12 +104,12 @@ void irq_setmask(int irq, bool unmask)
         irq_setmask_vec(irq, unmask);
 }
 
-void irq_hook(int irq, intr_handler_t handler, char const *name)
+EXPORT void irq_hook(int irq, intr_handler_t handler, char const *name)
 {
     irq_hook_vec(irq, handler, name);
 }
 
-void irq_unhook(int irq, intr_handler_t handler)
+EXPORT void irq_unhook(int irq, intr_handler_t handler)
 {
     irq_unhook_vec(irq, handler);
 }

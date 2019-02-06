@@ -47,10 +47,30 @@ AS_IF([test x"$CP" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find cp])])
 AC_SUBST([CP])
 
+AC_CHECK_PROGS([CPIO], [cpio], [NOT_FOUND])
+AS_IF([test x"$CPIO" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find cpio])])
+AC_SUBST([CPIO])
+
 AC_CHECK_PROGS([DD], [dd], [NOT_FOUND])
 AS_IF([test x"$DD" == x"NOT_FOUND"],
 	[AC_MSG_WARN([Cannot find dd])])
 AC_SUBST([DD])
+
+AC_CHECK_PROGS([STRIP], [strip], [NOT_FOUND])
+AS_IF([test x"$STRIP" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find strip])])
+AC_SUBST([STRIP])
+
+AC_CHECK_PROGS([MKDIR], [mkdir], [NOT_FOUND])
+AS_IF([test x"$MKDIR" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find mkdir])])
+AC_SUBST([MKDIR])
+
+AC_CHECK_PROGS([MV], [mv], [NOT_FOUND])
+AS_IF([test x"$MV" == x"NOT_FOUND"],
+	[AC_MSG_WARN([Cannot find mv])])
+AC_SUBST([MV])
 
 AC_CHECK_PROGS([LN], [ln], [NOT_FOUND])
 AS_IF([test x"$LN" == x"NOT_FOUND"],
@@ -272,7 +292,6 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
-	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
@@ -304,7 +323,6 @@ for flag in \
 	mpreferred-stack-boundary=3 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],

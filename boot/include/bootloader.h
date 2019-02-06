@@ -82,11 +82,13 @@ struct alignas(8) kernel_params_t {
     boottbl_acpi_info_t acpi_rsdt;
     boottbl_mptables_info_t mptables;
     uint64_t boot_drv_serial;
+    uint64_t initrd_st;
+    uint64_t initrd_sz;
     uint8_t wait_gdb;
     uint8_t serial_debugout;
     uint8_t reserved[6];
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 11 * 8 + 2 + 6);
-C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 11 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 11 * 8 + 16 + 2 + 6);
+C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 13 * 8);

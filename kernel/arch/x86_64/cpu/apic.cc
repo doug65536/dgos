@@ -205,8 +205,8 @@ struct mp_ioapic_t {
     uint8_t irq_base;
     uint32_t addr;
     uint32_t volatile *ptr;
-    using lock_type = std::mcslock;
-    using scoped_lock = std::unique_lock<std::mcslock>;
+    using lock_type = ext::mcslock;
+    using scoped_lock = std::unique_lock<ext::mcslock>;
     lock_type lock;
 };
 
@@ -220,7 +220,7 @@ static uint64_t apic_timer_freq;
 static unsigned ioapic_count;
 static mp_ioapic_t ioapic_list[16];
 
-using ioapic_msi_alloc_lock_type = std::mcslock;
+using ioapic_msi_alloc_lock_type = ext::mcslock;
 using ioapic_msi_alloc_scoped_lock =
     std::unique_lock<ioapic_msi_alloc_lock_type>;
 static ioapic_msi_alloc_lock_type ioapic_msi_alloc_lock;

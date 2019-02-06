@@ -67,9 +67,11 @@ struct allocator<void>
         using other = allocator<_U>;
     };
 };
+__END_NAMESPACE_STD
 
 #ifdef __DGOS_KERNEL__
 
+__BEGIN_NAMESPACE_EXT
 struct page_allocator_base
 {
 protected:
@@ -85,7 +87,7 @@ struct page_allocator : public page_allocator_base
     template<typename _U>
     struct rebind
     {
-        using other = allocator<_U>;
+        using other = std::allocator<_U>;
     };
 
     value_type * allocate(size_t __n) const
@@ -99,7 +101,7 @@ struct page_allocator : public page_allocator_base
     }
 };
 
-template<typename T, typename Alloc = allocator<void>,
+template<typename T, typename Alloc = std::allocator<void>,
          size_t chunk_size = PAGESIZE << 4>
 class bump_allocator_impl
     : public refcounted<T>
@@ -246,8 +248,10 @@ public:
 private:
     refptr<bump_allocator_impl<_T, _Alloc>> impl;
 };
+__END_NAMESPACE_EXT
 #endif
 
+__BEGIN_NAMESPACE_STD
 template<typename T>
 struct default_delete
 {

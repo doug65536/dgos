@@ -3,6 +3,7 @@
 #include "assert.h"
 #include "bswap.h"
 #include "printk.h"
+#include "export.h"
 
 enum struct ata_cmd_t : uint8_t {
     NOP                 = 0x00,
@@ -641,7 +642,7 @@ static format_flag_info_t const ide_flags_status[] = {
 #define ATA_REG_ERROR_UNC_BIT       6
 #define ATA_REG_ERROR_BBK_BIT       7
 
-extern format_flag_info_t const ide_flags_error[];
+EXPORT format_flag_info_t extern const ide_flags_error[];
 
 // Address mark not found
 #define ATA_REG_ERROR_AMNF          (1U<<ATA_REG_ERROR_AMNF_BIT)

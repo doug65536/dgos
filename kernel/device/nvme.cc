@@ -382,7 +382,7 @@ public:
     uint8_t cur_ns;
 
 private:
-    using lock_t = std::mcslock;
+    using lock_t = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_t>;
     uint64_t identify_data_physaddr;
     lock_t lock;
@@ -482,7 +482,7 @@ public:
     nvme_cmp_t *cmp_queue_ptr();
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     sub_queue_t sub_queue;
@@ -506,7 +506,7 @@ private:
 
 class nvme_if_factory_t final : public storage_if_factory_t {
 public:
-    constexpr nvme_if_factory_t() : storage_if_factory_t("nvme") {}
+    nvme_if_factory_t() : storage_if_factory_t("nvme") {}
 private:
     virtual std::vector<storage_if_base_t*> detect(void) override final;
 };

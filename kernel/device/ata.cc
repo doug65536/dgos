@@ -1,4 +1,5 @@
 #include "ata.h"
+#include "export.h"
 
 format_flag_info_t const ide_flags_error[] = {
     { "AMNF",  1, nullptr, ATA_REG_ERROR_AMNF_BIT  },

@@ -1,11 +1,12 @@
 #include "mouse.h"
 #include "conio.h"
 #include "printk.h"
+#include "export.h"
 
 static int accum_x;
 static int accum_y;
 
-void mouse_event(mouse_raw_event_t event)
+EXPORT void mouse_event(mouse_raw_event_t event)
 {
     accum_x += event.hdist * 10;
     accum_y += -event.vdist * 10;

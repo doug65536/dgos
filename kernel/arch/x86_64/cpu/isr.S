@@ -1038,7 +1038,96 @@ isr_sysret64:
     .cfi_undefined r13
     .cfi_undefined r14
     .cfi_undefined r15
+    // goto user mode and load flags
     sysretq
+
+    .cfi_endproc
+
+.align 16
+.global __module_dynlink_plt_thunk
+__module_dynlink_plt_thunk:
+    .cfi_startproc
+    .cfi_def_cfa_offset 8*3
+
+    // Stack
+    // +-------------+ <-- CFA
+    // | return_addr | <-- return address from call to @plt stub
+    // +=============+
+    // | plt_index   | <-- pushed by PLT stub
+    // *-------------*
+    // | dl_ctx      | <-- from GOT[1]
+    // +-------------+ <-- rsp at entry
+    // | result_buf  | <-- dynamic linker writes resolved address here, init 0
+    // *-------------*
+    // | rflags      |
+    // +-------------+
+    // | r11         |
+    // *-------------*
+    // | r10         |
+    // +-------------+
+    // | r9          |
+    // *-------------*
+    // | r8          |
+    // +-------------+
+    // | rcx         |
+    // *-------------*
+    // | rdx         |
+    // +-------------+
+    // | rsi         |
+    // *-------------*
+    // | rdi         |
+    // +-------------+
+    // | rax         |
+    // *-------------*
+
+    push_cfi $0
+    pushfq_cfi
+    .cfi_offset rflags,-5*8
+    push_cfi %r11
+    .cfi_offset r11,-6*8
+    push_cfi %r10
+    .cfi_offset r10,-7*8
+    push_cfi %r9
+    .cfi_offset r9,-8*8
+    push_cfi %r8
+    .cfi_offset r8,-9*8
+    push_cfi %rcx
+    .cfi_offset rcx,-10*8
+    push_cfi %rdx
+    .cfi_offset rdx,-11*8
+    push_cfi %rsi
+    .cfi_offset rsi,-12*8
+    push_cfi %rdi
+    .cfi_offset rdi,-13*8
+    push_cfi %rax
+    .cfi_offset rax,-14*8
+
+    movq %rsp,%rdi
+    call __module_dynamic_linker
+
+    pop_cfi %rax
+    .cfi_same_value rax
+    pop_cfi %rdi
+    .cfi_same_value rdi
+    pop_cfi %rsi
+    .cfi_same_value rsi
+    pop_cfi %rdx
+    .cfi_same_value rdx
+    pop_cfi %rcx
+    .cfi_same_value rcx
+    pop_cfi %r8
+    .cfi_same_value r8
+    pop_cfi %r9
+    .cfi_same_value r9
+    pop_cfi %r10
+    .cfi_same_value r10
+    pop_cfi %r11
+    .cfi_same_value r11
+    popfq_cfi
+    .cfi_same_value rflags
+    // The ret is going to mispredict, minimize dispatch of incorrect path
+    lfence
+    retq $16
 
     .cfi_endproc
 

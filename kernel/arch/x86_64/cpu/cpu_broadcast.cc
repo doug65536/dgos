@@ -22,7 +22,7 @@ struct cpu_broadcast_queue_t {
     cpu_broadcast_work_t *tail;
     cpu_broadcast_work_t *free;
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 };

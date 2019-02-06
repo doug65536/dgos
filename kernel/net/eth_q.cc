@@ -27,7 +27,7 @@ static uint32_t volatile ethq_first_free_aba;
 static ethq_pkt_t *ethq_first_free;
 
 // Redundant calls are tolerated and ignored
-int ethq_init(void)
+EXPORT int ethq_init(void)
 {
     if (ethq_pkts)
         return 1;
@@ -102,10 +102,10 @@ int ethq_init(void)
 }
 
 #if 1
-static std::mcslock ethq_lock;
-ethq_pkt_t *ethq_pkt_acquire(void)
+static ext::mcslock ethq_lock;
+EXPORT ethq_pkt_t *ethq_pkt_acquire(void)
 {
-    std::unique_lock<std::mcslock> lock(ethq_lock);
+    std::unique_lock<ext::mcslock> lock(ethq_lock);
 
     ethq_pkt_t *pkt = ethq_first_free;
 
@@ -115,9 +115,9 @@ ethq_pkt_t *ethq_pkt_acquire(void)
     return pkt;
 }
 
-void ethq_pkt_release(ethq_pkt_t *pkt)
+EXPORT void ethq_pkt_release(ethq_pkt_t *pkt)
 {
-    std::unique_lock<std::mcslock> lock(ethq_lock);
+    std::unique_lock<ext::mcslock> lock(ethq_lock);
 
     pkt->next = ethq_first_free;
     ethq_first_free = pkt;
@@ -190,7 +190,7 @@ void ethq_pkt_release(ethq_pkt_t *pkt)
 }
 #endif
 
-void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
+EXPORT void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
 {
     pkt->next = nullptr;
 
@@ -209,7 +209,7 @@ void ethq_enqueue(ethq_queue_t *queue, ethq_pkt_t *pkt)
     ++queue->count;
 }
 
-ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
+EXPORT ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
 {
     ethq_pkt_t *head = queue->head;
     ethq_pkt_t *tail = queue->tail;
@@ -228,7 +228,7 @@ ethq_pkt_t *ethq_dequeue(ethq_queue_t *queue)
     return tail;
 }
 
-ethq_pkt_t *ethq_dequeue_all(ethq_queue_t *queue)
+EXPORT ethq_pkt_t *ethq_dequeue_all(ethq_queue_t *queue)
 {
     ethq_pkt_t *all = queue->head;
     if (queue->tail)

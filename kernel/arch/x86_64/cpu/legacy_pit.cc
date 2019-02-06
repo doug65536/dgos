@@ -65,7 +65,7 @@
 // Timer crystal runs at 1.193181666... MHz
 // Freq * 6 = 7159090.0 even
 
-using pit8254_lock_type = std::mcslock;
+using pit8254_lock_type = ext::mcslock;
 using pit8254_scoped_lock = std::unique_lock<pit8254_lock_type>;
 static pit8254_lock_type pit8254_lock;
 

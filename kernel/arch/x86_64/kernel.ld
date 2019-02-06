@@ -93,6 +93,28 @@ SECTIONS {
 	.rela.dyn : ALIGN(64) {
 		PROVIDE_HIDDEN(__rela_dyn_st = .);
 		*(.rela.dyn)
+		*(.rela.init)
+		*(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
+		*(.rela.fini)
+		*(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
+		*(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)
+		*(.rela.tdata .rela.tdata.* .rela.gnu.linkonce.td.*)
+		*(.rela.tbss .rela.tbss.* .rela.gnu.linkonce.tb.*)
+		*(.rela.ctors)
+		*(.rela.dtors)
+		*(.rela.got)
+		*(.rela.bss .rela.bss.* .rela.gnu.linkonce.b.*)
+		*(.rela.ldata .rela.ldata.* .rela.gnu.linkonce.l.*)
+		*(.rela.lbss .rela.lbss.* .rela.gnu.linkonce.lb.*)
+		*(.rela.lrodata .rela.lrodata.* .rela.gnu.linkonce.lr.*)
+		*(.rela.ifunc)
+		PROVIDE_HIDDEN(___rela_plt = .);
+		*(.rela.plt)
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
+		*(.rela.*)
+		PROVIDE_HIDDEN (__rela_dyn_en = .);
 	} :readonly
 	PROVIDE_HIDDEN(__rela_dyn_en = .);
 
@@ -218,4 +240,6 @@ SECTIONS {
 	/DISCARD/		0 : { *(.gnu*)                 }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }
+
+	__cxa_pure_virtual = __cxa_pure_virtual;
 }

@@ -38,7 +38,7 @@ struct ide_chan_ports_t {
 };
 
 struct ide_if_factory_t final : public storage_if_factory_t {
-    constexpr ide_if_factory_t() : storage_if_factory_t("ide") {}
+    ide_if_factory_t() : storage_if_factory_t("ide") {}
     virtual std::vector<storage_if_base_t *> detect(void) override;
 };
 
@@ -1154,7 +1154,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
     release_access(intr_was_enabled);
 
-    iocp->set_result(err_sz_pair_t{ err, count });
+    iocp->set_result(dgos::err_sz_pair_t{ err, count });
     iocp->set_expect(1);
     iocp->invoke();
 

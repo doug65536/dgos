@@ -4,6 +4,7 @@
 #include "control_regs.h"
 #include "thread.h"
 #include "printk.h"
+#include "export.h"
 
 #define DEBUG_MCSLOCK 0
 #if DEBUG_MCSLOCK
@@ -370,7 +371,7 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
 }
 
 _hot
-void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+EXPORT void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
     MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());

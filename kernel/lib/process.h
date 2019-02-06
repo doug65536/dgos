@@ -147,7 +147,7 @@ struct process_t
     size_t tls_msize = 0;
     size_t tls_fsize = 0;
     pid_t pid = 0;
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type process_lock;
     std::condition_variable cond;

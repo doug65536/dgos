@@ -815,7 +815,7 @@ protected:
                             usb_hub_desc const &hub_desc) override final;
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     errno_t cc_to_errno(usb_cc_t cc);

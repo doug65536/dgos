@@ -11,7 +11,7 @@ struct process_t;
 
 // Platform independent thread API
 
-typedef int thread_t;
+typedef int  thread_t;
 
 typedef int16_t thread_priority_t;
 

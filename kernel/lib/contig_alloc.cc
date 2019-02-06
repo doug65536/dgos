@@ -214,6 +214,9 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
 
     tree_t::iter_t next_place;
 
+    tree_t::kvp_t new_before;
+    tree_t::kvp_t new_after;
+
     for (; by_addr_place; by_addr_place = next_place) {
         tree_t::kvp_t by_addr = free_addr_by_addr.item(by_addr_place);
 
@@ -228,13 +231,13 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             free_addr_by_addr.delete_at(by_addr_place);
 
             // Free space up to beginning of hole
-            tree_t::kvp_t new_before = {
+            new_before = {
                 by_addr.key,
                 addr - by_addr.key
             };
 
             // Free space after end of hole
-            tree_t::kvp_t new_after = {
+            new_after = {
                 end,
                 (by_addr.key + by_addr.val) - end
             };
@@ -258,6 +261,9 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             //
             // The found free block is before the range and overlaps it
 
+            if (require_free)
+                return false;
+
             // Save next block
             next_place = free_addr_by_addr.next(by_addr_place);
 
@@ -279,6 +285,9 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             //
             // Range completely covers block, delete block
 
+            if (require_free)
+                return false;
+
             next_place = free_addr_by_addr.next(by_addr_place);
 
             free_addr_by_size.delete_item(
@@ -289,16 +298,29 @@ bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
             //
             // Range cut off some of beginning of block
 
+            if (require_free)
+                return false;
+
             free_addr_by_size.delete_item(by_addr.val, by_addr.key);
 
             free_addr_by_addr.delete_at(by_addr_place);
 
+            size_t removed = end - by_addr.val;
+
+            by_addr.key += removed;
+            by_addr.val -= removed;
+
+            free_addr_by_addr.insert(by_addr.key + removed,
+                                     by_addr.val - removed);
+            free_addr_by_size.insert(by_addr.val - removed,
+                                     by_addr.key + removed);
+
+            return true;
+        } else if (by_addr.key + by_addr.val <= addr) {
+            // Block is already a completely allocated range
             return true;
         } else {
-            assert(by_addr.key >= end);
-
-            // Block is past end of allocated range, done
-            return true;
+            assert(!"What now?");
         }
     }
 

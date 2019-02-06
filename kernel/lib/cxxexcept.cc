@@ -7,6 +7,7 @@
 #include "cpu/except_asm.h"
 #include "hash.h"
 #include "callout.h"
+#include "export.h"
 
 extern "C" void register_eh_frame();
 
@@ -38,11 +39,11 @@ void __cxa_free_exception(void *thrown_exception)
     free(thrown_exception);
 }
 
-namespace __cxxabiv1 {
-    class __class_type_info {
-        virtual ~__class_type_info() {}
-    };
-}
+//namespace __cxxabiv1 {
+//    class EXPORT __class_type_info {
+//        EXPORT virtual ~__class_type_info() {}
+//    };
+//}
 
 __BEGIN_NAMESPACE_STD
 class type_info
@@ -80,7 +81,8 @@ class type_info
                             unsigned __outer) const;
 
     // Internally used during catch matching
-    virtual bool __do_upcast(const __cxxabiv1::__class_type_info *__target,
+    virtual bool __do_upcast(/*const __cxxabiv1::__class_type_info*/
+                             void *__target,
                              void **__obj_ptr) const;
 
 protected:

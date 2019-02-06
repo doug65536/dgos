@@ -2870,6 +2870,61 @@ struct _EFI_FILE_PROTOCOL {
   EFI_FILE_FLUSH_EX     FlushEx;
 };
 
+//*******************************************************
+//EFI_TIME
+//*******************************************************
+// This represents the current time information
+typedef struct {
+    UINT16 Year;
+    // 1900 – 9999
+    UINT8 Month;
+    // 1 – 12
+    UINT8 Day;
+    // 1 – 31
+    UINT8 Hour;
+    // 0 – 23
+    UINT8 Minute;
+    // 0 – 59
+    UINT8 Second;
+    // 0 – 59
+    UINT8 Pad1;
+    UINT32 Nanosecond; // 0 – 999,999,999
+    INT16 TimeZone;
+    // -1440 to 1440 or 2047
+    UINT8 Daylight;
+    UINT8 Pad2;
+} EFI_TIME;
+
+//*******************************************************
+// Bit Definitions for EFI_TIME.Daylight. See below.
+//*******************************************************
+
+#define EFI_TIME_ADJUST_DAYLIGHT 0x01
+#define EFI_TIME_IN_DAYLIGHT 0x02
+
+//*******************************************************
+// Value Definition for EFI_TIME.TimeZone. See below.
+//*******************************************************
+
+#define EFI_UNSPECIFIED_TIMEZONE 0x07FF
+
+#define EFI_FILE_INFO_GUID \
+    {0x09576e92,0x6d3f,0x11d2, { \
+        0x8e, 0x39,0x00,0xa0,0xc9,0x69,0x72,0x3b \
+    } \
+}
+
+typedef struct {
+    UINT64 Size;
+    UINT64 FileSize;
+    UINT64 PhysicalSize;
+    EFI_TIME CreateTime;
+    EFI_TIME LastAccessTime;
+    EFI_TIME ModificationTime;
+    UINT64 Attribute;
+    //CHAR16 FileName[];
+} EFI_FILE_INFO;
+
 typedef struct {
     UINT64 Size;
     BOOLEAN ReadOnly;

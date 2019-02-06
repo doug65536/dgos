@@ -26,6 +26,9 @@ uint64_t smp_entry_point _section(".smp.data");
 
 static int64_t base_adj;
 
+static int64_t initrd_base;
+static int64_t initrd_size;
+
 // .smp section pointers
 extern char ___smp_st[];
 extern char ___smp_en[];
@@ -147,6 +150,9 @@ static void enter_kernel_initial(uint64_t entry_point, uint64_t base)
     kernel_params_t *params = prompt_kernel_param(
                 phys_mem_table, ap_entry_ptr, phys_mem_table_size);
 
+    params->initrd_st = initrd_base;
+    params->initrd_sz = initrd_size;
+
     // This check is done late to make debugging easier
     // It is impossible to debug 32 bit code on qemu-x86_64 target
     if (!cpu_has_long_mode())
@@ -167,6 +173,30 @@ void enter_kernel(uint64_t entry_point, uint64_t base)
     } else {
         run_kernel(entry_point, nullptr);
     }
+}
+
+void load_initrd()
+{
+    ELF64_TRACE("Loading initrd...");
+
+    int initrd_fd = boot_open(TSTR "initrd");
+
+    initrd_size = boot_filesize(initrd_fd);
+
+    // load initrd at -64TB
+    initrd_base = -(UINT64_C(64) << 40);
+
+    alloc_page_factory_t allocator;
+
+    paging_map_range(&allocator, initrd_base, initrd_size,
+                     PTE_PRESENT | PTE_ACCESSED | PTE_NX);
+
+    if (initrd_size != paging_iovec_read(
+                initrd_fd, 0, initrd_base, initrd_size, 1 << 30)) {
+        PANIC("Could not load initrd file\n");
+    }
+
+    boot_close(initrd_fd);
 }
 
 void elf64_run(tchar const *filename)
@@ -308,9 +338,9 @@ void elf64_run(tchar const *filename)
 
     free(program_hdrs);
 
-    ELF64_TRACE("Entering kernel");
+    load_initrd();
 
-    //
+    ELF64_TRACE("Entering kernel");
 
     enter_kernel(file_hdr.e_entry + base_adj, 0xFFFFFFFF80000000 + base_adj);
 }

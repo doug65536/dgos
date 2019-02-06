@@ -29,7 +29,7 @@ union process_ptr_t {
 
 static std::vector<process_ptr_t> processes;
 static size_t process_count;
-using processes_lock_type = std::mcslock;
+using processes_lock_type = ext::mcslock;
 using processes_scoped_lock = std::unique_lock<processes_lock_type>;
 static processes_lock_type processes_lock;
 static pid_t process_first_free;

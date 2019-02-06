@@ -9,7 +9,7 @@ int (*text_ptr)(void) = worked;
 int volatile *data_ptr = &data_val;
 int volatile *bss_ptr = &bss_val;
 
-int entry(void)
+extern "C" int module_entry(void)
 {
     bss_val = 66;
 

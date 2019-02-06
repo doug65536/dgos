@@ -277,7 +277,7 @@ static char *dtoa(char *txt, size_t txt_sz,
 
 static char const formatter_hexlookup[] = "0123456789abcdef0123456789ABCDEF";
 
-using formatter_lock_type = std::spinlock;
+using formatter_lock_type = ext::spinlock;
 using formatter_scoped_lock = std::unique_lock<formatter_lock_type>;
 formatter_lock_type formatter_lock;
 
@@ -844,11 +844,11 @@ static int vcprintf_emit_chars(char const *s, intptr_t c, void *unused)
     return 0;
 }
 
-static std::mcslock cprintf_lock;
+static ext::mcslock cprintf_lock;
 
 EXPORT int vcprintf(char const * restrict format, va_list ap)
 {
-    std::unique_lock<std::mcslock> hold_cprintf_lock(cprintf_lock);
+    std::unique_lock<ext::mcslock> hold_cprintf_lock(cprintf_lock);
 
     int chars_written = 0;
     if (con_exists()) {
@@ -945,7 +945,7 @@ static int vsnprintf_emit_chars(char const * restrict s,
 // "buf".
 // "buf" is guaranteed to be null terminated upon
 // returning, if limit > 0.
-EXPORT int vsnprintf(char * restrict buf, size_t limit,
+int vsnprintf(char * restrict buf, size_t limit,
                      char const * restrict format, va_list ap)
 {
     vsnprintf_context_t context;
@@ -1060,7 +1060,7 @@ int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
     return hex_dump_formatter(mem, size, base, printdbg);
 }
 
-size_t format_flags_register(
+EXPORT size_t format_flags_register(
         char *buf, size_t buf_size,
         uintptr_t flags, format_flag_info_t const *info)
 {

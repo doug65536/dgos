@@ -15,11 +15,6 @@
 #define STORAGE_TRACE(...) ((void)0)
 #endif
 
-struct fs_reg_t {
-    char const *name;
-    fs_factory_t *factory;
-};
-
 struct fs_mount_t {
     fs_reg_t *reg;
     fs_base_t *fs;
@@ -28,7 +23,7 @@ struct fs_mount_t {
 using path_table_t = hashtbl_t<fs_mount_t, fs_reg_t*, &fs_mount_t::reg>;
 static path_table_t path_table;
 
-using lock_type = std::mcslock;
+using lock_type = ext::mcslock;
 using scoped_lock = std::unique_lock<lock_type>;
 static lock_type storage_lock;
 
@@ -57,8 +52,8 @@ void storage_dev_close(storage_dev_base_t *dev)
     (void)dev;
 }
 
-void storage_if_register_factory(char const *name,
-                                storage_if_factory_t *factory)
+EXPORT void storage_if_register_factory(
+        char const *name, storage_if_factory_t *factory)
 {
     (void)name;
 
@@ -114,7 +109,7 @@ void invoke_storage_factories(void *)
 REGISTER_CALLOUT(invoke_storage_factories, nullptr,
                  callout_type_t::storage_dev, "000");
 
-void fs_register_factory(char const *name, fs_factory_t *fs)
+EXPORT void fs_register_factory(char const *name, fs_factory_t *fs)
 {
     scoped_lock lock(storage_lock);
     if (!fs_regs.push_back(new fs_reg_t{ name, fs }))
@@ -134,7 +129,19 @@ static fs_reg_t *find_fs(char const *name)
     return nullptr;
 }
 
-void fs_mount(char const *fs_name, fs_init_info_t *info)
+EXPORT void fs_add(fs_reg_t *fs_reg, fs_base_t *fs)
+{
+    if (fs && fs->is_boot()) {
+        scoped_lock lock(storage_lock);
+        fs_mounts.insert(fs_mounts.begin(), fs_mount_t{ fs_reg, fs });
+    } else if (fs) {
+        scoped_lock lock(storage_lock);
+        if (!fs_mounts.push_back(fs_mount_t{ fs_reg, fs }))
+            panic_oom();
+    }
+}
+
+EXPORT void fs_mount(char const *fs_name, fs_init_info_t *info)
 {
     fs_reg_t *fs_reg = find_fs(fs_name);
 
@@ -217,29 +224,26 @@ REGISTER_CALLOUT(invoke_part_factories, nullptr,
 
 
 
-void fs_factory_t::register_factory(void *p)
+EXPORT void fs_factory_t::register_factory(void *p)
 {
     fs_factory_t *instance = (fs_factory_t*)p;
     fs_register_factory(instance->name, instance);
 }
 
-
-
-void storage_if_factory_t::register_factory(void *p)
+EXPORT void storage_if_factory_t::register_factory(void *p)
 {
     storage_if_factory_t *instance = (storage_if_factory_t*)p;
     storage_if_register_factory(instance->name, instance);
 }
 
-
-
-void part_factory_t::register_factory(void *p)
+EXPORT void part_factory_t::register_factory(void *p)
 {
     part_factory_t *instance = (part_factory_t*)p;
     part_register_factory(instance->name, instance);
 }
 
-int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
+EXPORT int storage_dev_base_t::read_blocks(
+        void *data, int64_t count, uint64_t lba)
 {
     blocking_iocp_t block;
     errno_t err = read_async(data, count, lba, &block);
@@ -251,7 +255,7 @@ int storage_dev_base_t::read_blocks(void *data, int64_t count, uint64_t lba)
     return result.second;
 }
 
-int storage_dev_base_t::write_blocks(
+EXPORT int storage_dev_base_t::write_blocks(
         const void *data, int64_t count, uint64_t lba, bool fua)
 {
     blocking_iocp_t block;
@@ -264,7 +268,7 @@ int storage_dev_base_t::write_blocks(
     return result.second;
 }
 
-int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
+EXPORT int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
 {
     blocking_iocp_t block;
     errno_t err = trim_async(count, lba, &block);
@@ -276,7 +280,7 @@ int64_t storage_dev_base_t::trim_blocks(int64_t count, uint64_t lba)
     return count;
 }
 
-int storage_dev_base_t::flush()
+EXPORT int storage_dev_base_t::flush()
 {
     blocking_iocp_t block;
     errno_t err = flush_async(&block);
@@ -288,11 +292,10 @@ int storage_dev_base_t::flush()
     return result.second;
 }
 
-
 //
 // Modify directories
 
-int fs_base_ro_t::mknod(fs_cpath_t path,
+EXPORT int fs_base_ro_t::mknod(fs_cpath_t path,
                          fs_mode_t mode,
                          fs_dev_t rdev)
 {
@@ -303,7 +306,7 @@ int fs_base_ro_t::mknod(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::mkdir(fs_cpath_t path,
+EXPORT int fs_base_ro_t::mkdir(fs_cpath_t path,
                          fs_mode_t mode)
 {
     (void)path;
@@ -312,14 +315,14 @@ int fs_base_ro_t::mkdir(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::rmdir(fs_cpath_t path)
+EXPORT int fs_base_ro_t::rmdir(fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::symlink(
+EXPORT int fs_base_ro_t::symlink(
         fs_cpath_t to,
         fs_cpath_t from)
 {
@@ -329,7 +332,7 @@ int fs_base_ro_t::symlink(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::rename(
+EXPORT int fs_base_ro_t::rename(
         fs_cpath_t from,
         fs_cpath_t to)
 {
@@ -339,7 +342,7 @@ int fs_base_ro_t::rename(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::link(
+EXPORT int fs_base_ro_t::link(
         fs_cpath_t from,
         fs_cpath_t to)
 {
@@ -349,7 +352,7 @@ int fs_base_ro_t::link(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::unlink(
+EXPORT int fs_base_ro_t::unlink(
         fs_cpath_t path)
 {
     (void)path;
@@ -360,7 +363,7 @@ int fs_base_ro_t::unlink(
 //
 // Modify directory entries
 
-int fs_base_ro_t::chmod(
+EXPORT int fs_base_ro_t::chmod(
         fs_cpath_t path,
         fs_mode_t mode)
 {
@@ -370,7 +373,7 @@ int fs_base_ro_t::chmod(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::chown(
+EXPORT int fs_base_ro_t::chown(
         fs_cpath_t path,
         fs_uid_t uid,
         fs_gid_t gid)
@@ -382,7 +385,7 @@ int fs_base_ro_t::chown(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::truncate(
+EXPORT int fs_base_ro_t::truncate(
         fs_cpath_t path,
         off_t size)
 {
@@ -392,7 +395,7 @@ int fs_base_ro_t::truncate(
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::utimens(
+EXPORT int fs_base_ro_t::utimens(
         fs_cpath_t path,
         const fs_timespec_t *ts)
 {
@@ -402,7 +405,7 @@ int fs_base_ro_t::utimens(
     return -int(errno_t::EROFS);
 }
 
-ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
+EXPORT ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
                              char const *buf,
                              size_t size,
                              off_t offset)
@@ -415,7 +418,7 @@ ssize_t fs_base_ro_t::write(fs_file_info_t *fi,
     return -int(errno_t::EROFS);
 }
 
-int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
+EXPORT int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
                              off_t offset)
 {
     (void)offset;
@@ -427,8 +430,8 @@ int fs_base_ro_t::ftruncate(fs_file_info_t *fi,
 //
 // Sync files and directories and flush buffers
 
-int fs_base_ro_t::fsync(fs_file_info_t *fi,
-                         int isdatasync)
+EXPORT int fs_base_ro_t::fsync(fs_file_info_t *fi,
+                               int isdatasync)
 {
     (void)isdatasync;
     (void)fi;
@@ -436,8 +439,8 @@ int fs_base_ro_t::fsync(fs_file_info_t *fi,
     return 0;
 }
 
-int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
-                            int isdatasync)
+EXPORT int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
+                                  int isdatasync)
 {
     (void)isdatasync;
     (void)fi;
@@ -445,14 +448,14 @@ int fs_base_ro_t::fsyncdir(fs_file_info_t *fi,
     return 0;
 }
 
-int fs_base_ro_t::flush(fs_file_info_t *fi)
+EXPORT int fs_base_ro_t::flush(fs_file_info_t *fi)
 {
     (void)fi;
     // Do nothing, read only
     return 0;
 }
 
-int fs_base_ro_t::setxattr(
+EXPORT int fs_base_ro_t::setxattr(
         fs_cpath_t path,
         char const* name,
         char const* value,
@@ -466,4 +469,9 @@ int fs_base_ro_t::setxattr(
     (void)flags;
     // Fail, read only
     return -int(errno_t::EROFS);
+}
+
+EXPORT storage_if_factory_t::storage_if_factory_t(const char *factory_name)
+    : name(factory_name)
+{
 }

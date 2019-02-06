@@ -633,7 +633,10 @@ MKISOFS
 SED
 FIND
 LN
+MV
+MKDIR
 DD
+CPIO
 CP
 QEMU_IMG
 QEMU
@@ -6875,6 +6878,55 @@ $as_echo "$as_me: WARNING: Cannot find cp" >&2;}
 fi
 
 
+for ac_prog in cpio
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_CPIO+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$CPIO"; then
+  ac_cv_prog_CPIO="$CPIO" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_CPIO="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+CPIO=$ac_cv_prog_CPIO
+if test -n "$CPIO"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CPIO" >&5
+$as_echo "$CPIO" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$CPIO" && break
+done
+test -n "$CPIO" || CPIO="NOT_FOUND"
+
+if test x"$CPIO" == x"NOT_FOUND"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find cpio" >&5
+$as_echo "$as_me: WARNING: Cannot find cpio" >&2;}
+fi
+
+
 for ac_prog in dd
 do
   # Extract the first word of "$ac_prog", so it can be a program name with args.
@@ -6921,6 +6973,153 @@ test -n "$DD" || DD="NOT_FOUND"
 if test x"$DD" == x"NOT_FOUND"; then :
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find dd" >&5
 $as_echo "$as_me: WARNING: Cannot find dd" >&2;}
+fi
+
+
+for ac_prog in strip
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_STRIP+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$STRIP"; then
+  ac_cv_prog_STRIP="$STRIP" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_STRIP="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+STRIP=$ac_cv_prog_STRIP
+if test -n "$STRIP"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $STRIP" >&5
+$as_echo "$STRIP" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$STRIP" && break
+done
+test -n "$STRIP" || STRIP="NOT_FOUND"
+
+if test x"$STRIP" == x"NOT_FOUND"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find strip" >&5
+$as_echo "$as_me: WARNING: Cannot find strip" >&2;}
+fi
+
+
+for ac_prog in mkdir
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_MKDIR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$MKDIR"; then
+  ac_cv_prog_MKDIR="$MKDIR" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_MKDIR="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+MKDIR=$ac_cv_prog_MKDIR
+if test -n "$MKDIR"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $MKDIR" >&5
+$as_echo "$MKDIR" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$MKDIR" && break
+done
+test -n "$MKDIR" || MKDIR="NOT_FOUND"
+
+if test x"$MKDIR" == x"NOT_FOUND"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find mkdir" >&5
+$as_echo "$as_me: WARNING: Cannot find mkdir" >&2;}
+fi
+
+
+for ac_prog in mv
+do
+  # Extract the first word of "$ac_prog", so it can be a program name with args.
+set dummy $ac_prog; ac_word=$2
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+$as_echo_n "checking for $ac_word... " >&6; }
+if ${ac_cv_prog_MV+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  if test -n "$MV"; then
+  ac_cv_prog_MV="$MV" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+    for ac_exec_ext in '' $ac_executable_extensions; do
+  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_MV="$ac_prog"
+    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+  done
+IFS=$as_save_IFS
+
+fi
+fi
+MV=$ac_cv_prog_MV
+if test -n "$MV"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $MV" >&5
+$as_echo "$MV" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+
+
+  test -n "$MV" && break
+done
+test -n "$MV" || MV="NOT_FOUND"
+
+if test x"$MV" == x"NOT_FOUND"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Cannot find mv" >&5
+$as_echo "$as_me: WARNING: Cannot find mv" >&2;}
 fi
 
 
@@ -8059,7 +8258,6 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
-	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
@@ -8161,7 +8359,6 @@ for flag in \
 	mpreferred-stack-boundary=3 \
 	Wl,-m,elf_x86_64 \
 	Wl,-N \
-	Wl,--no-dynamic-linker \
 	Wl,-z,max-page-size=4096
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`

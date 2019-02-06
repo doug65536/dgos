@@ -7,6 +7,7 @@
 #include "callout.h"
 #include "thread.h"
 #include "cpu/atomic.h"
+#include "export.h"
 
 // Always use paged allocation with guard pages
 // Realloc always moves the memory to a new range
@@ -81,22 +82,22 @@ static heap_t *heap_get_block_heap(void *block)
     return default_heaps[id];
 }
 
-void *calloc(size_t num, size_t size)
+EXPORT void *calloc(size_t num, size_t size)
 {
     return heap_calloc(this_cpu_heap(), num, size);
 }
 
-void *malloc(size_t size)
+EXPORT void *malloc(size_t size)
 {
     return heap_alloc(this_cpu_heap(), size);
 }
 
-void *realloc(void *p, size_t new_size)
+EXPORT void *realloc(void *p, size_t new_size)
 {
     return heap_realloc(heap_get_block_heap(p), p, new_size);
 }
 
-void free(void *p)
+EXPORT void free(void *p)
 {
     heap_free(heap_get_block_heap(p), p);
 }
@@ -106,66 +107,66 @@ void malloc_startup(void *p)
 {
 }
 
-void *calloc(size_t num, size_t size)
+EXPORT void *calloc(size_t num, size_t size)
 {
     return pageheap_calloc(num, size);
 }
 
-void *malloc(size_t size)
+EXPORT void *malloc(size_t size)
 {
     return pageheap_alloc(size);
 }
 
-void *realloc(void *p, size_t new_size)
+EXPORT void *realloc(void *p, size_t new_size)
 {
     return pageheap_realloc(p, new_size);
 }
 
-void free(void *p)
+EXPORT void free(void *p)
 {
     pageheap_free(p);
 }
 
 #endif
 
-char *strdup(char const *s)
+EXPORT char *strdup(char const *s)
 {
     size_t len = strlen(s);
     char *b = new char[len+1];
     return (char*)memcpy(b, s, len+1);
 }
 
-void *operator new(size_t size) noexcept
+EXPORT void *operator new(size_t size) noexcept
 {
     return malloc(size);
 }
 
-void *operator new[](size_t size)
+EXPORT void *operator new[](size_t size)
 {
     return malloc(size);
 }
 
-void operator delete(void *block, size_t) noexcept
+EXPORT void operator delete(void *block, size_t) noexcept
 {
     free(block);
 }
 
-void operator delete(void *block) throw()
+EXPORT void operator delete(void *block) throw()
 {
     free(block);
 }
 
-void operator delete[](void *block) noexcept
+EXPORT void operator delete[](void *block) noexcept
 {
     free(block);
 }
 
-void operator delete[](void *block, size_t) noexcept
+EXPORT void operator delete[](void *block, size_t) noexcept
 {
     free(block);
 }
 
-void *operator new(size_t, void *p) noexcept
+EXPORT void *operator new(size_t, void *p) noexcept
 {
     return p;
 }
@@ -211,17 +212,17 @@ static T strto(char const *str, char **end, int base)
     return !sign ? n : n * sign;
 }
 
-int strtoi(char const *str, char **end, int base)
+EXPORT int strtoi(char const *str, char **end, int base)
 {
     return strto<int>(str, end, base);
 }
 
-long strtol(char const *str, char **end, int base)
+EXPORT long strtol(char const *str, char **end, int base)
 {
     return strto<long>(str, end, base);
 }
 
-long long strtoll(char const *str, char **end, int base)
+EXPORT long long strtoll(char const *str, char **end, int base)
 {
     return strto<long long>(str, end, base);
 }

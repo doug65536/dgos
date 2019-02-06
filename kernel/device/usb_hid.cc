@@ -468,8 +468,8 @@ protected:
 
     static constexpr unsigned phase_count = 4;
 
-    using lock_type = std::mcslock;
-    using scoped_lock = std::unique_lock<std::mcslock>;
+    using lock_type = ext::mcslock;
+    using scoped_lock = std::unique_lock<ext::mcslock>;
     lock_type change_lock;
     usb_iocp_t in_iocp[phase_count];
     unsigned phase;

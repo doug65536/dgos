@@ -14,13 +14,9 @@ class workq;
 // Abstract work queue work item
 class workq_work {
 public:
-    workq_work()
-    {
-    }
+    workq_work();
 
-    virtual ~workq_work() {
-        __asm__ __volatile__ ("":::"memory");
-    }
+    virtual ~workq_work();
 
     virtual void invoke() = 0;
 
@@ -39,63 +35,18 @@ public:
 
     using value_type = std::aligned_storage<item_sz, 8>::type;
 
-    workq_alloc()
-        : top{}
-        , map{}
-    {
-    }
+    workq_alloc();
 
     workq_alloc(workq_alloc const&) = delete;
 
-    void *alloc()
-    {
-        return items + alloc_slot();
-    }
+    void *alloc();
 
-    void free(void *p)
-    {
-        size_t i = (value_type*)p - items;
-        free_slot(i);
-    }
+    void free(void *p);
 
 private:
-    int alloc_slot()
-    {
-        // The top map will be all 1 bits when all are taken
-        if (unlikely(~top == 0))
-            return -1;
+    int alloc_slot();
 
-        // Find the first qword with a 0 bit
-        size_t word = bit_lsb_set(~top);
-
-        // Find the first 0 bit in that qword
-        uint8_t bit = bit_lsb_set(~map[word]);
-        uint64_t upd = map[word] | (UINT64_C(1) << bit);
-        map[word] = upd;
-
-        // Build a mask that will set the top bit to 1
-        // if all underlying bits are now 1
-        uint64_t top_mask = (UINT64_C(1) << word) & -(~upd == 0);
-
-        top |= top_mask;
-
-        return int(word << 6) + bit;
-    }
-
-    void free_slot(size_t i)
-    {
-        assert(i < capacity);
-
-        size_t word = unsigned(i) >> 6;
-
-        uint8_t bit = word & 63;
-
-        // Clear that bit
-        map[word] &= ~(UINT64_C(1) << bit);
-
-        // Since we freed one, we know that the bit of level 0 must become 0
-        top &= ~(UINT64_C(1) << word);
-    }
+    void free_slot(size_t i);
 
     std::aligned_storage<item_sz, 8>::type items[capacity];
     uint32_t top;
@@ -167,7 +118,7 @@ private:
     };
 
     int tid;
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type queue_lock;
     std::condition_variable not_empty;

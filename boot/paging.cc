@@ -6,6 +6,7 @@
 #include "farptr.h"
 #include "ctors.h"
 #include "assert.h"
+#include "fs.h"
 #include "halt.h"
 
 // Builds 64-bit page tables
@@ -132,12 +133,12 @@ void paging_map_range(
 
     // Scan the region to calculate memory allocation size
     uint64_t needed = 0;
-    for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE) {
+    for (uint64_t addr = linear_base; addr < end; addr += PAGE_SIZE, ++pte) {
         // Calculate pte pointer at start and at 2MB boundaries
         if (!pte || ((addr & -(1<<21)) == addr))
             pte = paging_find_pte(addr, 12, true);
 
-        if (!(*pte++ & PTE_PRESENT))
+        if (!(*pte & PTE_PRESENT))
             needed += PAGE_SIZE;
     }
 
@@ -242,6 +243,28 @@ int paging_iovec(iovec_t **ret, uint64_t vaddr,
 
     *ret = iovec;
     return count;
+}
+
+off_t paging_iovec_read(int fd, off_t file_offset,
+                        uint64_t vaddr, uint64_t size,
+                        uint64_t max_chunk)
+{
+    iovec_t *iovec;
+    int iovec_count = paging_iovec(&iovec, vaddr, size, max_chunk);
+
+    uint64_t offset = 0;
+    for (int i = 0; i < iovec_count; ++i) {
+        ssize_t read = boot_pread(
+                    fd, (void*)iovec[i].base, iovec[i].size,
+                    file_offset + offset);
+
+        if (read != ssize_t(iovec[i].size))
+            PANIC("Disk read error");
+
+        offset += iovec[i].size;
+    }
+
+    return offset;
 }
 
 static inline constexpr uint64_t low_bits(uint64_t value, uint8_t log2n)
@@ -526,5 +549,5 @@ uint64_t paging_physaddr_of(uint64_t linear_addr)
 
     pte_t *p = paging_find_pte(linear_addr - misalignment, 12, false);
 
-    return (p && *p & PTE_PRESENT) ? (*p & PTE_ADDR) + misalignment : -1;
+    return (p && (*p & PTE_PRESENT)) ? (*p & PTE_ADDR) + misalignment : -1;
 }

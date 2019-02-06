@@ -34,7 +34,7 @@ enum struct usb_msc_op_t {
 // A factory that enumerates all of the available storage devices
 class usb_msc_if_factory_t final : public storage_if_factory_t {
 public:
-    constexpr usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
+    usb_msc_if_factory_t() : storage_if_factory_t("usb_msc") {}
 protected:
     // storage_if_factory_t interface
     std::vector<storage_if_base_t *> detect() override;
@@ -211,7 +211,7 @@ public:
     static constexpr uint32_t cmd_capacity =
             std::min(PAGE_SIZE / sizeof(pending_cmd_t), size_t(32U));
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type cmd_lock;
     std::condition_variable cmd_cond;

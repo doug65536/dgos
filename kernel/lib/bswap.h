@@ -23,9 +23,9 @@
 
 #define bswap_4c_m(a,b,c,d) \
     (((a) << 24) | \
-    ((a) << 16) | \
-    ((a) << 8) | \
-    (a))
+    ((b) << 16) | \
+    ((c) << 8) | \
+    (d))
 
 static _always_inline _const uint16_t bswap_16(uint16_t n)
 {

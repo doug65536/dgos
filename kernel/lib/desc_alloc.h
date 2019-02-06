@@ -10,8 +10,8 @@ public:
     bool take(int fd);
 
 private:
-    using scoped_lock_t = std::unique_lock<std::spinlock>;
-    std::spinlock alloc_lock;
+    using scoped_lock_t = std::unique_lock<ext::spinlock>;
+    ext::spinlock alloc_lock;
 
     // Bit is set if corresponding level1 entry is full
     int64_t level0;

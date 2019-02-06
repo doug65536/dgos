@@ -52,12 +52,12 @@ bool get_ram_regions()
 
     for (size_t i = 0; i < count;
          ++i, in = (EFI_MEMORY_DESCRIPTOR*)((char const*)in + descsz)) {
-//        PRINT("paddr=%" PRIx64 ", len=%" PRIx64
-//              ", attr=%" PRIx64 ", type=%x (%s)",
-//              in->PhysicalStart, in->NumberOfPages << 12,
-//              in->Attribute, in->Type,
-//              in->Type < sizeof(efi_mem_types) / sizeof(*efi_mem_types) ?
-//                  efi_mem_types[in->Type] : TSTR "<app defined>");
+        PRINT("paddr=%" PRIx64 ", len=%" PRIx64
+              ", attr=%" PRIx64 ", type=%x (%s)",
+              in->PhysicalStart, in->NumberOfPages << 12,
+              in->Attribute, in->Type,
+              in->Type < sizeof(efi_mem_types) / sizeof(*efi_mem_types) ?
+                  efi_mem_types[in->Type] : TSTR "<app defined!>");
 
         physmem_range_t entry{};
 

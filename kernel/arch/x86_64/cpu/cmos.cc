@@ -152,7 +152,7 @@
 // JMP DWORD with INT init
 #define CMOS_SHUTDOWN_STATUS_AP     0xB
 
-using cmos_lock_type = std::mcslock;
+using cmos_lock_type = ext::mcslock;
 using cmos_scoped_lock = std::unique_lock<cmos_lock_type>;
 static cmos_lock_type cmos_lock;
 static time_of_day_t time_of_day;
@@ -265,7 +265,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
     return ctx;
 }
 
-time_of_day_t cmos_gettimeofday()
+EXPORT time_of_day_t cmos_gettimeofday()
 {
     cmos_scoped_lock lock(cmos_lock);
 

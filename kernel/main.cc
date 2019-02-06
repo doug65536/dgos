@@ -37,7 +37,7 @@
 #include "inttypes.h"
 #include "work_queue.h"
 #include "cpu/except_asm.h"
-
+#include "fs/tmpfs.h"
 #include "bootloader.h"
 
 kernel_params_t *kernel_params;
@@ -842,14 +842,19 @@ static int init_thread(void *)
     printk("Initializing keyboard event queue\n");
     keybd_init();
 
+    tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
+
+    modload_init();
+
     printk("Initializing 8042 keyboard\n");
-    thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
+    modload_load("keyb8042.km");
+    //thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
 
     // Wait for PCI initialization before starting drivers
     thread_wait(tid_pci_init);
     thread_close(tid_pci_init);
-    thread_wait(tid_keybd8042_init);
-    thread_close(tid_keybd8042_init);
+    //thread_wait(tid_keybd8042_init);
+    //thread_close(tid_keybd8042_init);
 
     // Facilities needed by drivers
     printk("Initializing driver base\n");
@@ -871,17 +876,28 @@ static int init_thread(void *)
     printk("Initializing storage devices\n");
     callout_call(callout_type_t::storage_dev, true);
 
+    modload_load("nvme.km");
+    modload_load("ahci.km");
+    modload_load("ide.km");
+
     // Register partition schemes
     printk("Initializing partition probes\n");
     callout_call(callout_type_t::partition_probe, true);
+
+    modload_load("gpt.km");
+    modload_load("mbr.km");
 
     // Register network interfaces
     printk("Initializing network interfaces\n");
     callout_call(callout_type_t::nic, true);
 
+    modload_load("rtl8139.km");
+
     // Register network interfaces
     printk("Initializing network interfaces\n");
     callout_call(callout_type_t::nics_ready, true);
+
+    modload_load("ide.km");
 
     test_spawn();
 
@@ -943,15 +959,15 @@ static int init_thread(void *)
     printk("draw thread id=%d\n", draw_thread_id);
 #endif
 
-    modload_init();
+//    printk("Running module load test\n");
+//    module_entry_fn_t mod_entry = modload_load("hello.km");
+//    if (mod_entry) {
+//        int check = mod_entry();
+//        assert(check == 40);
+//        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
+//    }
 
-    printk("Running module load test\n");
-    module_entry_fn_t mod_entry = modload_load("hello.km");
-    if (mod_entry) {
-        int check = mod_entry();
-        assert(check == 40);
-        printk("Module load test %s\n", check == 40 ? "passed" : "failed");
-    }
+    modload_load("rtl8139.km");
 
 #if ENABLE_FIND_VBE
     thread_create(find_vbe, (void*)0xC0000, 0, false);

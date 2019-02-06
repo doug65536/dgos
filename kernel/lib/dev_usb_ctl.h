@@ -41,8 +41,8 @@ struct usb_iocp_result_t {
     }
 };
 
-using usb_iocp_t = basic_iocp_t<usb_iocp_result_t>;
-using usb_blocking_iocp_t = basic_blocking_iocp_t<usb_iocp_result_t>;
+using usb_iocp_t = dgos::basic_iocp_t<usb_iocp_result_t>;
+using usb_blocking_iocp_t = dgos::basic_blocking_iocp_t<usb_iocp_result_t>;
 
 class usb_pipe_t {
 public:

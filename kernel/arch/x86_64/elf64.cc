@@ -12,6 +12,9 @@
 #include "likely.h"
 #include "inttypes.h"
 #include "numeric_limits.h"
+#include "cpu.h"
+#include "callout.h"
+#include "cxxstring.h"
 
 #define ELF64_DEBUG     1
 #if ELF64_DEBUG
@@ -19,6 +22,27 @@
 #else
 #define ELF64_TRACE(...) ((void)0)
 #endif
+
+static std::vector<std::unique_ptr<module_t>> loaded_modules;
+
+// Keep this in sync with __module_dynlink_thunk
+struct plt_stub_data_t {
+    uintptr_t rax;
+    uintptr_t rdi;
+    uintptr_t rsi;
+    uintptr_t rdx;
+    uintptr_t rcx;
+    uintptr_t r8;
+    uintptr_t r9;
+    uintptr_t r10;
+    uintptr_t r11;
+    uintptr_t rflags;
+    uintptr_t result;
+    module_t *plt_ctx;
+    uintptr_t plt_index;
+};
+
+// Relocatable module loader
 
 extern Elf64_Sym const ___dynsym_st[];
 extern Elf64_Sym const ___dynsym_en[];
@@ -28,28 +52,13 @@ extern Elf64_Word const ___hash_st[];
 extern Elf64_Word const ___hash_en[];
 
 struct kernel_ht_t {
-    Elf64_Word hash_nbucket;
-    Elf64_Word hash_nchain;
-    Elf64_Word const * hash_buckets;
-    Elf64_Word const * hash_chains;
+    Elf64_Word hash_nbucket = 0;
+    Elf64_Word hash_nchain = 0;
+    Elf64_Word const * hash_buckets = nullptr;
+    Elf64_Word const * hash_chains = nullptr;
 };
 
 static kernel_ht_t export_ht;
-
-static void modload_find_syms(Elf64_Shdr const **symtab,
-                              Elf64_Shdr const **strtab,
-                              Elf64_Shdr const *scn_hdrs,
-                              size_t scn)
-{
-    *symtab = nullptr;
-    *strtab = nullptr;
-
-    Elf64_Word symtab_idx = scn_hdrs[scn].sh_link;
-    Elf64_Word strtab_idx = scn_hdrs[symtab_idx].sh_link;
-
-    *symtab = scn_hdrs + symtab_idx;
-    *strtab = scn_hdrs + strtab_idx;
-}
 
 static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
 {
@@ -69,420 +78,6 @@ static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
     return nullptr;
 }
 
-static Elf64_Sym const *modload_lookup_in_module(
-        Elf64_Sym const *mod_sym,
-        Elf64_Sym const *end,
-        char const *mod_str,
-        char const *name)
-{
-    for (Elf64_Sym const *s = mod_sym; s < end; ++s) {
-        if (s->st_name != 0) {
-            char const *sym_name = mod_str + s->st_name;
-            if (!strcmp(sym_name, name))
-                return s;
-        }
-    }
-    return nullptr;
-}
-
-static char const * modload_rel_type_text(int type)
-{
-    switch (type) {
-    case R_AMD64_NONE:          return "R_AMD64_NONE";
-    case R_AMD64_64:            return "R_AMD64_64";
-    case R_AMD64_32S:           return "R_AMD64_32S";
-    case R_AMD64_32:            return "R_AMD64_32";
-    case R_AMD64_16:            return "R_AMD64_16";
-    case R_AMD64_8:             return "R_AMD64_8";
-    case R_AMD64_PC64:          return "R_AMD64_PC64";
-    case R_AMD64_PC32:          return "R_AMD64_PC32";
-    case R_AMD64_PC16:          return "R_AMD64_PC16";
-    case R_AMD64_PC8:           return "R_AMD64_PC8";
-    case R_AMD64_GOT32:         return "R_AMD64_GOT32";
-    case R_AMD64_PLT32:         return "R_AMD64_PLT32";
-    case R_AMD64_COPY:          return "R_AMD64_COPY";
-    case R_AMD64_GLOB_DAT:      return "R_AMD64_GLOB_DAT";
-    case R_AMD64_JUMP_SLOT:     return "R_AMD64_JUMP_SLOT";
-    case R_AMD64_RELATIVE:      return "R_AMD64_RELATIVE";
-    case R_AMD64_GOTPCREL:      return "R_AMD64_GOTPCREL";
-    case R_AMD64_GOTOFF64:      return "R_AMD64_GOTOFF64";
-    case R_AMD64_GOTPC32:       return "R_AMD64_GOTPC32";
-    case R_AMD64_SIZE32:        return "R_AMD64_SIZE32";
-    case R_AMD64_SIZE64:        return "R_AMD64_SIZE64";
-    case R_AMD64_REX_GOTPCRELX: return "R_AMD64_REX_GOTPCRELX";
-    default:                    return "<?>";
-    }
-}
-
-void modload_load_symbols(char const *path, uintptr_t addr)
-{
-    // Force the compiler to believe that the call is necessary
-    __asm__ __volatile__ ("" : : "r" (path), "r" (addr));
-}
-
-module_entry_fn_t modload_load(char const *path)
-{
-    file_t fd{file_open(path, O_RDONLY)};
-
-    if (unlikely(!fd.is_open())) {
-        printdbg("Failed to open module \"%s\"\n", path);
-        return nullptr;
-    }
-
-    ELF64_TRACE("module %s opened, fd=%d\n", path, (int)fd);
-
-    Elf64_Ehdr file_hdr;
-
-    if (unlikely(sizeof(file_hdr) !=
-                 file_read(fd, &file_hdr, sizeof(file_hdr)))) {
-        printdbg("Failed to read module file header\n");
-        return nullptr;
-    }
-
-    ssize_t scn_hdr_size = sizeof(Elf64_Shdr) * file_hdr.e_shnum;
-    std::unique_ptr<Elf64_Shdr[]> scn_hdrs = new Elf64_Shdr[file_hdr.e_shnum];
-
-    if (unlikely(scn_hdr_size != file_pread(
-                     fd, scn_hdrs, scn_hdr_size,
-                     file_hdr.e_shoff))) {
-        printdbg("Error reading program headers\n");
-        return nullptr;
-    }
-
-    size_t mod_str_scn = 0;
-    Elf64_Sym *mod_sym_end = nullptr;
-    ext::unique_ptr_free<char> mod_str;
-
-    std::vector<ext::unique_ptr_free<void>> tabs;
-
-    Elf64_Xword max_addr = 0;
-    Elf64_Xword min_addr = (Elf64_Xword)-1;
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-
-        if (hdr->sh_type == SHT_NULL || hdr->sh_size == 0)
-            continue;
-
-        Elf64_Xword addr;
-
-        addr = hdr->sh_addr + hdr->sh_size;
-        if (max_addr < addr)
-            max_addr = addr;
-
-        addr = hdr->sh_addr;
-        if (min_addr > addr)
-            min_addr = addr;
-
-        void *tab;
-
-        switch (hdr->sh_type) {
-        case SHT_SYMTAB:
-            ELF64_TRACE("Found symbol table at offset %#" PRIx64
-                        ", link=%#x, size=%#" PRIx64 "\n",
-                        hdr->sh_offset, hdr->sh_link, hdr->sh_size);
-
-            mod_str_scn = hdr->sh_link;
-
-            tab = malloc(hdr->sh_size);
-            tabs[i].reset(tab);
-
-            if ((ssize_t)hdr->sh_size != file_pread(
-                        fd, tab, hdr->sh_size, hdr->sh_offset)) {
-                printdbg("Error reading module symbols\n");
-                return nullptr;
-            }
-            break;
-        case SHT_STRTAB:
-            ELF64_TRACE("Found string table at offset %#" PRIx64
-                        ", link=%#x, size=%#" PRIx64 "\n",
-                        hdr->sh_offset, hdr->sh_link, hdr->sh_size);
-//            if (i != mod_str_scn)
-//                break;
-            mod_str.reset((char*)malloc(hdr->sh_size));
-            if ((ssize_t)hdr->sh_size != file_pread(
-                        fd, mod_str, hdr->sh_size, hdr->sh_offset)) {
-                printdbg("Error reading module strings\n");
-                return nullptr;
-            }
-            break;
-        }
-    }
-
-    char *module = (char *)mmap(nullptr, max_addr - min_addr,
-                        PROT_READ | PROT_WRITE,
-                        MAP_NEAR, -1, 0);
-
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-        Elf64_Xword vofs = hdr->sh_addr - min_addr;
-        char *vaddr = module + vofs;
-
-        if ((hdr->sh_type != SHT_NOBITS) && (hdr->sh_flags & SHF_ALLOC)) {
-            if (hdr->sh_size != (size_t)file_pread(
-                        fd, vaddr, hdr->sh_size,
-                        hdr->sh_offset)) {
-                printdbg("Error reading module\n");
-                return nullptr;
-            }
-        }
-    }
-
-    // Find the largest relocation section
-    size_t max_rel = 0;
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-
-        // Can't process relocations that do not refer to a section
-        if (hdr->sh_info == 0)
-            continue;
-
-        switch (hdr->sh_type) {
-        case SHT_REL:   // fall thru
-        case SHT_RELA:
-            if (max_rel < hdr->sh_size)
-                max_rel = hdr->sh_size;
-            break;
-        }
-    }
-
-    ext::unique_ptr_free<void> rel_buf(malloc(max_rel));
-
-    Elf64_Rel const * const rel = (Elf64_Rel*)rel_buf.get();
-    Elf64_Rela const * const rela = (Elf64_Rela*)rel_buf.get();
-
-    Elf64_Sym *mod_sym;
-
-    // Process relocations
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr const * const hdr = scn_hdrs + i;
-
-        switch (hdr->sh_type) {
-        case SHT_REL:   // fall thru
-        case SHT_RELA:
-            break;
-
-        default:
-            continue;
-        }
-
-        if ((ssize_t)hdr->sh_size != file_pread(
-                    fd, rel_buf, hdr->sh_size, hdr->sh_offset)) {
-            printdbg("Error reading module relocations\n");
-            return nullptr;
-        }
-
-        hex_dump(rel_buf, hdr->sh_size, 0);
-
-        Elf64_Shdr const * const target_scn = scn_hdrs + hdr->sh_info;
-        void *end;
-
-        Elf64_Shdr const *symtab;
-        Elf64_Shdr const *strtab;
-
-        modload_find_syms(&symtab, &strtab, scn_hdrs, i);
-
-        ext::unique_ptr_free<Elf64_Sym> symdata(
-                    (Elf64_Sym *)malloc(symtab->sh_size));
-        ext::unique_ptr_free<char> strdata((char*)malloc(strtab->sh_size));
-
-        if (unlikely((ssize_t)symtab->sh_size != file_pread(
-                    fd, symdata, symtab->sh_size, symtab->sh_offset))) {
-            printdbg("Error reading symbol table\n");
-            return nullptr;
-        }
-
-        if (unlikely((ssize_t)strtab->sh_size != file_pread(
-                    fd, strdata, strtab->sh_size, strtab->sh_offset))) {
-            printdbg("Error reading string table\n");
-            return nullptr;
-        }
-
-        uint32_t symtab_idx;
-        uint32_t rel_type;
-        //void *patch;
-
-        // L is the address of the section being relocated
-        Elf64_Addr const scn_base = target_scn->sh_addr -
-                min_addr + (Elf64_Addr)module;
-
-        switch (hdr->sh_type) {
-        case SHT_REL:
-            end = (char*)rel + hdr->sh_size;
-            for (Elf64_Rel const *r = rel; (void*)r < end; ++r) {
-                //symtab_idx = ELF64_R_SYM(r->r_info);
-                //rel_type = ELF64_R_TYPE(r->r_info);
-                assert(!"Unhandled relocation type!");
-                return nullptr;
-            }
-            break;
-
-        case SHT_RELA:
-            end = (char*)rela + hdr->sh_size;
-            for (Elf64_Rela const *r = rela; (void*)r < end; ++r) {
-                symtab_idx = ELF64_R_SYM(r->r_info);
-                rel_type = ELF64_R_TYPE(r->r_info);
-
-                Elf64_Sym *sym = symdata + symtab_idx;
-                char const *name = strdata + sym->st_name;
-
-                Elf64_Sym const *match = nullptr;
-
-                int internal = 0;
-
-                if (name[0]) {
-                    if (sym->st_shndx == SHN_UNDEF) {
-                        match = modload_lookup_name(&export_ht, name);
-                    } else  {
-                        internal = 1;
-                        match = modload_lookup_in_module(
-                                    mod_sym, mod_sym_end, mod_str, name);
-                    }
-                } else {
-                    internal = 1;
-                }
-
-                Elf64_Addr fixup_addr = scn_base + r->r_offset;
-
-                printdbg("Fixup at %#" PRIx64 ", match=%c,"
-                         " name=%s, type=%s (%d), symvalue=%" PRIx64
-                         ", addend=%+" PRId64 "\n",
-                         fixup_addr, match ? 'y' : 'n',
-                         name, modload_rel_type_text(rel_type),
-                         rel_type, sym->st_value, r->r_addend);
-
-                bool fixup_is_64 = false;
-                bool fixup_is_unsigned = false;
-                int64_t fixup64 = 0;
-                switch (rel_type) {
-                case R_AMD64_PLT32: // L + A - P
-                    fixup64 = match->st_value +
-                            r->r_addend - fixup_addr;
-                    printdbg("...writing %#" PRIx32 "\n", int32_t(fixup64));
-                    break;
-
-                case R_AMD64_32S:   // S + A
-                    fixup64 = int64_t(module) +
-                            scn_hdrs[sym->st_shndx].sh_addr +
-                            r->r_addend;
-                    printdbg("...writing %#" PRIx32 "\n", int32_t(fixup64));
-                    break;
-
-                case R_AMD64_PC32:  // S + A - P
-                    if (!match) {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                r->r_addend - fixup_addr;
-                    } else {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                match->st_value +
-                                r->r_addend - fixup_addr;
-                    }
-                    printdbg("...writing %#" PRIx32 "\n", int32_t(fixup64));
-                    break;
-
-                case R_AMD64_64:
-                    fixup_is_64 = true;
-                    if (!match) {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                r->r_addend;
-                    } else {
-                        fixup64 = (uint64_t)module +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                match->st_value + r->r_addend;
-                    }
-                    printdbg("...writing %#" PRIx64 "\n", fixup64);
-                    break;
-
-                case R_AMD64_32:
-                    // Untested
-                    fixup_is_unsigned = true;
-                    if (internal) {
-                        fixup64 = uint64_t(module) +
-                                scn_hdrs[sym->st_shndx].sh_addr +
-                                r->r_addend;
-                    } else {
-                        fixup64 = uint64_t(module) +
-                                scn_hdrs[match->st_shndx].sh_addr +
-                                r->r_addend + match->st_value;
-                    }
-                    printdbg("...writing %#" PRIx32 "\n", uint32_t(fixup64));
-                    break;
-
-                default:
-                    printdbg("...unhandled relocation, type=%d!\n", rel_type);
-                    break;
-
-                }
-
-                bool relocation_truncated = false;
-                if (!fixup_is_64) {
-                    if (fixup64 < std::numeric_limits<int32_t>::min() ||
-                            fixup64 > std::numeric_limits<int32_t>::max()) {
-                        relocation_truncated = true;
-                    } else if (fixup_is_unsigned) {
-                        if (fixup64 < 0 || fixup64 >
-                                std::numeric_limits<uint32_t>::max()) {
-                            relocation_truncated = true;
-                        }
-                    }
-                }
-
-                if (relocation_truncated) {
-                    printdbg("Relocation truncated to fit!\n");
-                    munmap(module, max_addr - min_addr);
-                    return nullptr;
-                }
-
-                if (!fixup_is_64)
-                    *(int32_t*)fixup_addr = int32_t(fixup64);
-                else
-                    *(int64_t*)fixup_addr = fixup64;
-            }
-
-            break;
-        }
-    }
-
-    // Apply page permissions
-    for (size_t i = 1; i < file_hdr.e_shnum; ++i) {
-        Elf64_Shdr * const hdr = scn_hdrs + i;
-        Elf64_Xword vofs = hdr->sh_addr - min_addr;
-        char *vaddr = module + vofs;
-
-        if ((hdr->sh_flags & SHF_ALLOC) && hdr->sh_size) {
-            int prot = PROT_READ |
-                    ((hdr->sh_flags & SHF_WRITE) ? PROT_WRITE: 0) |
-                    ((hdr->sh_flags & SHF_EXECINSTR) ? PROT_EXEC : 0);
-
-            printdbg("Setting %c%c%c permissions for %zx bytes at %p\n",
-                     (prot & PROT_READ) ? 'r' : '-',
-                     (prot & PROT_WRITE) ? 'w' : '-',
-                     (prot & PROT_EXEC) ? 'x' : '-',
-                     hdr->sh_size, (void*)vaddr);
-
-            mprotect(vaddr, hdr->sh_size, prot);
-        } else if (hdr->sh_size) {
-//            printdbg("Discarding %zx at %p\n",
-//                     hdr->sh_size, (void*)vaddr);
-//            madvise(vaddr, hdr->sh_size, MADV_DONTNEED);
-//            mprotect(vaddr, hdr->sh_size, PROT_NONE);
-        }
-    }
-
-    printdbg("add-symbol-file %s %p\n", path, (void*)module);
-
-    // Work around pedantic warning
-    module_entry_fn_t fn;
-    void *entry = module + file_hdr.e_entry;
-    memcpy(&fn, &entry, sizeof(fn));
-
-    modload_load_symbols(path, uintptr_t(module));
-
-    return fn;
-}
-
 void modload_init(void)
 {
     for (Elf64_Sym const *sym = ___dynsym_st + 1;
@@ -499,7 +94,642 @@ void modload_init(void)
             export_ht.hash_nbucket;
 }
 
-extern "C" void dl_debug_state(void);
-EXPORT void dl_debug_state(void)
+static std::string module_reloc_type(size_t sym_type)
 {
+    switch (sym_type) {
+    case R_AMD64_NONE: return "R_AMD64_NONE";
+    case R_AMD64_64: return "R_AMD64_64";
+    case R_AMD64_PC32: return "R_AMD64_PC32";
+    case R_AMD64_GOT32: return "R_AMD64_GOT32";
+    case R_AMD64_PLT32: return "R_AMD64_PLT32";
+    case R_AMD64_COPY: return "R_AMD64_COPY";
+    case R_AMD64_GLOB_DAT: return "R_AMD64_GLOB_DAT";
+    case R_AMD64_JUMP_SLOT: return "R_AMD64_JUMP_SLOT";
+    case R_AMD64_RELATIVE: return "R_AMD64_RELATIVE";
+    case R_AMD64_GOTPCREL: return "R_AMD64_GOTPCREL";
+    case R_AMD64_32: return "R_AMD64_32";
+    case R_AMD64_32S: return "R_AMD64_32S";
+    case R_AMD64_16: return "R_AMD64_16";
+    case R_AMD64_PC16: return "R_AMD64_PC16";
+    case R_AMD64_8: return "R_AMD64_8";
+    case R_AMD64_PC8: return "R_AMD64_PC8";
+    case R_AMD64_PC64: return "R_AMD64_PC64";
+    case R_AMD64_GOTOFF64: return "R_AMD64_GOTOFF64";
+    case R_AMD64_GOTPC32: return "R_AMD64_GOTPC32";
+    case R_AMD64_SIZE32: return "R_AMD64_SIZE32";
+    case R_AMD64_SIZE64: return "R_AMD64_SIZE64";
+    }
+    return "Unknown";
 }
+
+class module_t {
+public:
+    bool load(char const *path);
+    int run();
+
+    ~module_t();
+
+    Elf64_Ehdr file_hdr{};
+    std::vector<Elf64_Phdr> phdrs;
+    Elf64_Addr min_vaddr = ~Elf64_Addr(0);
+    Elf64_Addr max_vaddr = 0;
+    void *image = nullptr;
+    Elf64_Sxword base_adj = 0;
+    Elf64_Phdr *dyn_seg = nullptr;
+    size_t dyn_entries = 0;
+    std::vector<Elf64_Dyn> dyn;
+
+    std::vector<Elf64_Xword> dt_needed;
+    Elf64_Addr dt_strtab = 0;
+    Elf64_Xword dt_strsz = 0;
+
+    Elf64_Addr dt_symtab = 0;
+
+    Elf64_Addr dt_pltgot = 0;
+    Elf64_Addr dt_jmprel = 0;
+
+    Elf64_Addr dt_rela = 0;
+    Elf64_Xword dt_relasz = 0;
+
+    Elf64_Xword dt_pltrelsz = 0;
+    Elf64_Xword dt_hash = 0;
+    Elf64_Xword dt_soname = 0;
+    Elf64_Xword dt_rpath = 0;
+    Elf64_Xword dt_symbolic = 0;
+    Elf64_Xword dt_relaent = 0;
+    Elf64_Xword dt_textrel = 0;
+    Elf64_Xword dt_bind_now = 0;
+    Elf64_Addr dt_init_array = 0;
+    Elf64_Addr dt_fini_array = 0;
+    Elf64_Xword dt_init_arraysz = 0;
+    Elf64_Xword dt_fini_arraysz = 0;
+    size_t unknown_count = 0;
+
+    Elf64_Sym const *syms = nullptr;
+    Elf64_Addr *plt_slots = nullptr;
+
+    module_entry_fn_t entry = nullptr;
+    int run_result = 0;
+
+    Elf64_Addr first_exec = 0;
+
+    kernel_ht_t ht;
+};
+
+// Shared module loader
+module_t *modload_load(char const *path, bool run)
+{
+    std::unique_ptr<module_t> module(new module_t{});
+    if (likely(module->load(path))) {
+//        if (run)
+//            module->run();
+        return module.release();
+    }
+    return nullptr;
+}
+
+int modload_run(module_t *module)
+{
+    return module->run();
+}
+
+bool module_t::load(const char *path)
+{
+    file_t fd{file_open(path, O_RDONLY)};
+
+    if (unlikely(!fd.is_open())) {
+        printdbg("Failed to open module \"%s\"\n", path);
+        return false;
+    }
+
+    ELF64_TRACE("module %s opened, fd=%d\n", path, (int)fd);
+
+    if (unlikely(sizeof(file_hdr) !=
+                 file_read(fd, &file_hdr, sizeof(file_hdr)))) {
+        printdbg("Failed to read module file header\n");
+        return false;
+    }
+
+    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
+        printdbg("Unrecognized program header record size\n");
+        return false;
+    }
+
+    if (!phdrs.resize(file_hdr.e_phnum)) {
+        printdbg("OOM!\n");
+        return false;
+    }
+
+    if (unlikely(ssize_t(sizeof(Elf64_Phdr) * file_hdr.e_phnum) != file_pread(
+                     fd, phdrs.data(), sizeof(Elf64_Phdr) * file_hdr.e_phnum,
+                     file_hdr.e_phoff))) {
+        printdbg("Failed to read %u program headers\n", file_hdr.e_phnum);
+        return false;
+    }
+
+    // Calculate address space needed
+
+    // Pass 1, compute address range covered by loadable segments
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        min_vaddr = std::min(min_vaddr, phdr.p_vaddr);
+        max_vaddr = std::max(max_vaddr, phdr.p_vaddr + phdr.p_memsz);
+    }
+
+    image = mm_alloc_space(max_vaddr - min_vaddr);
+
+    // Compute relocation distance
+    base_adj = Elf64_Sxword(Elf64_Addr(image) - min_vaddr);
+
+    dyn_seg = nullptr;
+
+    // Pass 2, map sections
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
+                          phdr.p_memsz, PROT_READ | PROT_WRITE,
+                          MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
+        if (addr == MAP_FAILED) {
+            printdbg("Failed to map section\n");
+            return false;
+        }
+    }
+
+    // Pass 3, load sections
+    for (Elf64_Phdr& phdr : phdrs) {
+        if (phdr.p_type == PT_DYNAMIC)
+            dyn_seg = &phdr;
+
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        void *addr = (void*)(phdr.p_vaddr + base_adj);
+
+        if (ssize_t(phdr.p_filesz) != file_pread(
+                    fd, addr, phdr.p_filesz, phdr.p_offset)) {
+            printdbg("Failed to read segment\n");
+            return false;
+        }
+    }
+
+    dyn_entries = dyn_seg->p_memsz / sizeof(Elf64_Dyn);
+
+    if (dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz) {
+        printdbg("Dynamic segment has unexpected size\n");
+        return false;
+    }
+
+    dyn.resize(dyn_entries);
+
+    if (unlikely(ssize_t(dyn_seg->p_filesz) != file_pread(
+                     fd, dyn.data(), dyn_seg->p_filesz, dyn_seg->p_offset))) {
+        // FIXME: LEAK!
+        printdbg("Dynamic segment read failed\n");
+        return false;
+    }
+
+    //
+    // Collect information from dynamic section
+
+    for (Elf64_Dyn const& dyn_ent : dyn) {
+        switch (dyn_ent.d_tag) {
+        case DT_NULL:
+            continue;
+
+        case DT_STRTAB:
+            dt_strtab = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_SYMTAB:
+            dt_symtab = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_STRSZ:
+            dt_strsz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_SYMENT:
+            if (unlikely(dyn_ent.d_un.d_val != sizeof(Elf64_Sym))) {
+                printdbg("Unexpected symbol record size"
+                         ", expect=%zu, got=%zu\n", sizeof(Elf64_Sym),
+                         dyn_ent.d_un.d_val);
+                return false;
+            }
+            continue;
+
+        case DT_PLTGOT:
+            dt_pltgot = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_PLTRELSZ:
+            dt_pltrelsz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_PLTREL:
+            if (unlikely(dyn_ent.d_un.d_val != DT_RELA)) {
+                printdbg("Unexpected relocation type, expecting RELA\n");
+                return false;
+            }
+            continue;
+
+        case DT_JMPREL:
+            dt_jmprel = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RELA:
+            dt_rela = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_RELASZ:
+            dt_relasz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RELAENT:
+            if (unlikely(dyn_ent.d_un.d_val != sizeof(Elf64_Rela))) {
+                printdbg("Relocations have unexpected size\n");
+                return false;
+            }
+            continue;
+
+        case DT_NEEDED:
+            dt_needed.push_back(dyn_ent.d_un.d_val);
+            continue;
+
+        case DT_HASH:
+            dt_hash = dyn_ent.d_un.d_ptr;
+
+            Elf64_Word const *hash;
+            hash = (Elf64_Word const *)(dt_hash + base_adj);
+
+            ht.hash_nbucket = hash[0];
+            ht.hash_nchain = hash[1];
+            ht.hash_buckets = hash + 2;
+            ht.hash_chains = ht.hash_buckets + ht.hash_nbucket;
+
+            continue;
+
+        case DT_INIT:
+            dt_init_array = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_FINI:
+            dt_fini_array = dyn_ent.d_un.d_ptr;
+            continue;
+
+        case DT_SONAME:
+            dt_soname = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_RPATH:
+            dt_rpath = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_SYMBOLIC:
+            dt_symbolic = dyn_ent.d_un.d_val;
+            continue;
+
+//        case DT_REL:
+//            dt_rel = dyn_ent.d_un.d_val;
+//            continue;
+//
+//        case DT_RELSZ:
+//            dt_relsz = dyn_ent.d_un.d_val;
+//            continue;
+//
+//        case DT_RELENT:
+//            dt_relent = dyn_ent.d_un.d_val;
+//            continue;
+//
+        case DT_DEBUG:
+            continue;
+
+        case DT_TEXTREL:
+            dt_textrel = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_BIND_NOW:
+            dt_bind_now = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_INIT_ARRAY:
+            dt_init_array = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_FINI_ARRAY:
+            dt_fini_array = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_INIT_ARRAYSZ:
+            dt_init_arraysz = dyn_ent.d_un.d_val;
+            continue;
+
+        case DT_FINI_ARRAYSZ:
+            dt_fini_arraysz = dyn_ent.d_un.d_val;
+            continue;
+
+        default:
+            ++unknown_count;
+            continue;
+        }
+    }
+
+    dt_relaent = dt_relasz / sizeof(Elf64_Rela);
+
+    syms = (Elf64_Sym*)(dt_symtab + base_adj);
+
+    Elf64_Rela const *rela_ptrs[] = {
+        (Elf64_Rela*)(dt_rela + base_adj),
+        (Elf64_Rela*)(dt_jmprel + base_adj)
+    };
+
+    size_t rela_cnts[] = {
+        dt_relaent,
+        dt_pltrelsz / sizeof(Elf64_Rela)
+    };
+
+    static_assert(countof(rela_cnts) == countof(rela_ptrs),
+                  "Arrays must have corresponding values");
+
+    for (size_t rel_idx = 0; rel_idx < countof(rela_ptrs); ++rel_idx) {
+        Elf64_Rela const *rela_ptr = rela_ptrs[rel_idx];
+        size_t ent_count = rela_cnts[rel_idx];
+        for (size_t i = 0; i < ent_count; ++i) {
+            void const *operand = (void*)(rela_ptr[i].r_offset + base_adj);
+            Elf64_Word sym_idx = ELF64_R_SYM(rela_ptr[i].r_info);
+            Elf64_Word sym_type = ELF64_R_TYPE(rela_ptr[i].r_info);
+
+            printdbg("Fixup at %#zx + %#zx (%#zx), type=%s\n",
+                     uintptr_t(base_adj), uintptr_t(rela_ptr[i].r_offset),
+                     base_adj + rela_ptr[i].r_offset,
+                     module_reloc_type(sym_type).c_str());
+
+            // A addend
+            // B base address
+            // G GOT offset
+            // L PLT entry address
+            // P place of relocation
+            // S symbol value
+            // Z size of relocation
+
+            auto const A = intptr_t(rela_ptr[i].r_addend);
+            auto const& B = base_adj;
+            auto const P = intptr_t(operand);
+            auto const& G = dt_pltgot + base_adj;
+
+            // hack
+            auto L = 0;
+            auto Z = 0;
+
+            auto const& sym = syms[sym_idx];
+            auto S = sym.st_value + base_adj;
+
+            auto strs = (char*)(dt_strtab + base_adj);
+
+            char const *name = nullptr;
+            if (sym.st_value == 0 && sym.st_name) {
+                // Lookup name in kernel
+                name = strs + sym.st_name;
+                Elf64_Sym const *addr = modload_lookup_name(&export_ht, name);
+                S = intptr_t(addr->st_value);
+            }
+
+            int64_t value;
+
+            switch (sym_type) {
+            case R_AMD64_NONE:
+                printdbg("R_AMD64_NONE\n");
+                continue;
+
+            case R_AMD64_64:
+                // word64 S + A
+                value = S + A;
+                *(int64_t*)operand = value;
+                printdbg("R_AMD64_64=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_PC32:
+                // word32 S + A - P
+                value = S + A - P;
+                *(int32_t*)operand = value;
+                printdbg("R_AMD64_PC32=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_GOT32:
+                // word32 G + A
+                value = G + A;
+                *(int32_t*)operand = value;
+                printdbg("R_AMD64_GOT32=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_PLT32:
+                // word32 L + A - P
+                value = L + A - P;
+                *(int32_t*)operand = value;
+                printdbg("R_AMD64_PLT32=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_COPY:
+                // Refer to the explanation following this table. ???
+                printdbg("R_AMD64_COPY\n");
+
+                break;
+
+            case R_AMD64_GLOB_DAT:
+                // word64 S
+                value = S; *(int64_t*)operand = value;
+                printdbg("R_AMD64_GLOB_DAT=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_JUMP_SLOT:
+                // word64 S
+                //value = S; *(int64_t*)operand = value;
+                *(int64_t*)operand += base_adj;
+
+                printdbg("R_AMD64_JUMP_SLOT=%#" PRIx64 ", name=%s\n",
+                         value, name);
+                break;
+
+            case R_AMD64_RELATIVE:
+                // word64 B + A
+                value = B + A; *(int64_t*)operand = value;
+                printdbg("R_AMD64_RELATIVE=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_GOTPCREL:
+                // word32 G + GOT + A - P
+                value = G + A - P; *(int32_t*)operand = value;
+                printdbg("R_AMD64_GOTPCREL=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_32:
+                // word32 S + A
+                value = S + A; *(int32_t*)operand = value;
+                printdbg("R_AMD64_32=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_32S:
+                // word32 S + A
+                value = S + A;
+                *(int32_t*)operand = value;
+                printdbg("R_AMD64_32S=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_16:
+                // word16 S + A
+                value = S + A;
+            *(int16_t*)operand = value;
+                printdbg("R_AMD64_16=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_PC16:
+                // word16 S + A - P
+                value = S + A - P;
+                *(int16_t*)operand = value;
+                printdbg("R_AMD64_PC16=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_8:
+                // word8 S + A
+                value = S + A;
+                *(int8_t*)operand = value;
+                printdbg("R_AMD64_8=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_PC8:
+                // word8 S + A - P
+                value = S + A - P;
+                *(int8_t*)operand = value;
+                printdbg("R_AMD64_PC8=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_PC64:
+                // word64 S + A - P
+                value = S + A - P;
+                *(int64_t*)operand = value;
+                printdbg("R_AMD64_PC64=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_GOTOFF64:
+                // word64 S + A - GOT
+                value = S + A - dt_pltgot;
+                *(int64_t*)operand = value;
+                printdbg("R_AMD64_GOTOFF64=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_GOTPC32:
+                // word32 GOT + A + P
+                value = G + A + P;
+                *(int32_t*)operand = value;
+                printdbg("R_AMD64_GOTPC32=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_SIZE32:
+                // word32 Z + A
+                value = Z + A;
+                *(int32_t*)operand = value;
+                printdbg("R_AMD64_SIZE32=%#" PRIx64 "\n", value);
+                break;
+
+            case R_AMD64_SIZE64:
+                // word64 Z + A
+                value = Z + A;
+                *(int64_t*)operand = value;
+                printdbg("R_AMD64_SIZE64=%#" PRIx64 "\n", value);
+                break;
+
+            default:
+                printdbg("Unknown relocation type %#x\n", sym_type);
+                break;
+            }
+        }
+    }
+
+    // Install PLT handler
+    plt_slots = (Elf64_Addr*)(dt_pltgot + base_adj);
+
+    plt_slots[0] += base_adj;
+    plt_slots[1] = uintptr_t(this);
+    plt_slots[2] = Elf64_Addr((void*)__module_dynlink_plt_thunk);
+
+    // Apply permissions
+    for (Elf64_Phdr const& phdr : phdrs) {
+        if (phdr.p_type != PT_LOAD)
+            continue;
+
+        int prot = 0;
+        prot |= -((phdr.p_flags & PF_R) != 0) & PROT_READ;
+        prot |= -((phdr.p_flags & PF_W) != 0) & PROT_WRITE;
+        prot |= -((phdr.p_flags & PF_X) != 0) & PROT_EXEC;
+        if (mprotect((void*)(phdr.p_vaddr + base_adj), phdr.p_memsz, prot) != 0)
+            printdbg("mprotect failed\n");
+    }
+
+    // Find first executable program header
+
+    for (Elf64_Phdr const& phdr : phdrs) {
+        if (phdr.p_flags & PF_X) {
+            first_exec = phdr.p_vaddr + base_adj;
+            break;
+        }
+    }
+
+    printdbg("Module %s loaded at %#" PRIx64 "\n", path, base_adj);
+    printdbg("gdb: add-symbol-file %s %#" PRIx64 "\n", path, first_exec);
+
+    // Run the init array
+    uintptr_t *fn_addrs = (uintptr_t*)(dt_init_array + base_adj);
+    for (size_t i = 0, e = dt_init_arraysz / sizeof(uintptr_t); i != e; ++i) {
+        auto fn = (void(*)())(fn_addrs[i]);
+        fn();
+    }
+
+    entry = module_entry_fn_t(file_hdr.e_entry + base_adj);
+
+    return true;
+}
+
+int module_t::run()
+{
+    run_result = entry();
+    return run_result;
+}
+
+module_t::~module_t()
+{
+    if (image && (max_vaddr-min_vaddr)) {
+        munmap(image, (max_vaddr - min_vaddr));
+        image = nullptr;
+    }
+}
+
+void __module_dynamic_linker(plt_stub_data_t *data)
+{
+    module_t *module = data->plt_ctx;
+
+    auto jmprel = (Elf64_Rela const *)(module->dt_jmprel + module->base_adj);
+
+    auto const& rela = jmprel[data->plt_index];
+    Elf64_Word sym_idx = ELF64_R_SYM(rela.r_info);
+    Elf64_Word sym_type = ELF64_R_TYPE(rela.r_info);
+
+    assert(sym_type == R_AMD64_JUMP_SLOT);
+
+    auto symtab = (Elf64_Sym const *)(module->dt_symtab + module->base_adj);
+    auto strtab = (char const *)(module->dt_strtab + module->base_adj);
+
+    char const *name = strtab + symtab[sym_idx].st_name;
+
+    Elf64_Sym const *sym = modload_lookup_name(&export_ht, name);
+
+    auto got = (uintptr_t *)(module->dt_pltgot + module->base_adj);
+
+    cpu_patch_code(&got[data->plt_index], &sym->st_value,
+            sizeof(got[data->plt_index]));
+
+    data->result = sym->st_value;
+}
+

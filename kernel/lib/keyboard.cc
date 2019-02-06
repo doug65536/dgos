@@ -17,7 +17,7 @@ struct keyboard_buffer_t {
     size_t head;
     size_t tail;
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
@@ -27,8 +27,8 @@ struct keyboard_buffer_t {
 static keyboard_buffer_t keybd_buffer;
 
 // Drivers plug implementation into these
-int (*keybd_get_modifiers)(void);
-int (*keybd_set_layout_name)(char const *name);
+EXPORT int (*keybd_get_modifiers)(void);
+EXPORT int (*keybd_set_layout_name)(char const *name);
 
 // The order here must match the order of KEYB_VK_NUMPAD_* enum
 char const keybd_fsa_t::numpad_ascii[] =
@@ -245,14 +245,14 @@ void keybd_init(void)
 {
 }
 
-keybd_fsa_t::keybd_fsa_t()
+EXPORT keybd_fsa_t::keybd_fsa_t()
     : shifted_lookup(shifted_lookup_us)
     , alt_code(0)
     , shift_state(0)
 {
 }
 
-void keybd_fsa_t::deliver_vk(int vk)
+EXPORT void keybd_fsa_t::deliver_vk(int vk)
 {
     int is_keyup = vk < 0;
 
@@ -349,7 +349,7 @@ void keybd_fsa_t::deliver_vk(int vk)
     }
 }
 
-int keybd_fsa_t::get_modifiers()
+EXPORT int keybd_fsa_t::get_modifiers()
 {
     int flags = 0;
 
@@ -414,7 +414,7 @@ public:
 
 std::unique_ptr<keybd_file_reg_t> keybd_file_reg_t::instance;
 
-void keybd_register(void*)
+EXPORT void keybd_register(void*)
 {
     devfs_register(keybd_file_reg_t::instance);
 }

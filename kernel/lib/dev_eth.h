@@ -5,9 +5,13 @@
 #include "dev_registration.h"
 #include "eth_q.h"
 
+__BEGIN_DECLS
+
 struct eth_dev_factory_t;
 
 void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory);
+
+__END_DECLS
 
 struct eth_dev_factory_t {
     constexpr eth_dev_factory_t(char const *name)

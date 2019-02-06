@@ -113,3 +113,7 @@ define printtids
 		print cpus[$cpu_nr++].cur_thread - threads
 	end
 end
+
+define dumpn
+	dump binary memory $arg0 $arg1 $arg1+$arg2
+end

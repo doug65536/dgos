@@ -188,9 +188,11 @@ public:
         return *this;
     }
 
+    static constexpr const _CharT __empty_str[1] = {};
+
     _CharT const *c_str() const
     {
-        return !__str.empty() ? __str.data() : "";
+        return !__str.empty() ? __str.data() : __empty_str;
     }
 
     operator bool() const
@@ -342,7 +344,7 @@ public:
     {
         size_type __removed = min(__count, __str.size() - __index);
         size_type __src = __index + __removed;
-        for (size_type __i = 0, __end = __str.size(); __i != __removed; ++__i)
+        for (size_type __i = 0; __i != __removed; ++__i)
             __str[__index + __i] = move(__str[__src + __i]);
         resize(__str.size() - __removed);
         return *this;
@@ -360,7 +362,7 @@ public:
 
     void swap(basic_string& __rhs)
     {
-        __str.swap(__rhs);
+        __str.swap(__rhs.__str);
     }
 
     size_type copy(_CharT* __dest, size_type __count, size_type __pos = 0) const
@@ -373,7 +375,7 @@ public:
         if (__count > __max_count)
             __count = __max_count;
 
-        copy(__str.data() + __pos, __str.data() + __pos + __count, __dest);
+        std::copy(__str.data() + __pos, __str.data() + __pos + __count, __dest);
 
         return __count;
     }
@@ -587,8 +589,11 @@ public:
 
         const_iterator const __str_st = __str.cbegin();
 
+        size_t __rhs_size;
+        for (__rhs_size = 0; __rhs[__rhs_size]; ++__rhs_size);
+
         for ( ; __pos <= __end_pos; ++__pos) {
-            if (equal(__str_st + __pos, __str_st + __pos + __rhs.size(),
+            if (equal(__str_st + __pos, __str_st + __pos + __rhs_size,
                       __rhs, __rhs + __count))
                 return __pos;
         }
@@ -604,7 +609,7 @@ public:
 
     size_type find(_CharT __ch, size_type __pos = 0) const
     {
-        const_iterator __it = find(__str.cbegin(), __str.cend(), __ch);
+        const_iterator __it = std::find(__str.cbegin(), __str.cend(), __ch);
         return __it != __str.cend() ? __it - __str.cbegin() : npos;
     }
 
@@ -678,62 +683,76 @@ public:
 
     size_type find_first_of(_CharT __ch, size_type __str_pos = 0) const
     {
+        auto result = std::find(__str.cbegin(), __str.cend(), __ch);
+        return result != __str.end() ? result - __str.begin() : npos;
     }
 
     size_type find_first_not_of(basic_string const& __rhs,
                                 size_type __pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_first_not_of(_CharT const* __s,
                                 size_type __str_pos, size_type __count) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_first_not_of(_CharT const* __s,
                                 size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_first_not_of(_CharT __ch, size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_of(basic_string const& __rhs,
                            size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_of(_CharT const* __s,
                            size_type __str_pos, size_type __count) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_of(_CharT const* __s, size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_of(_CharT __ch, size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_not_of(basic_string const& __rhs,
                                size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_not_of(_CharT const* __s,
                                size_type __str_pos, size_type __count) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_not_of(_CharT const* __s,
                                size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
     size_type find_last_not_of(_CharT __ch, size_type __str_pos = 0) const
     {
+        panic("Unimplemented");
     }
 
 private:
@@ -750,6 +769,9 @@ private:
 
     vector<_CharT> __str;
 };
+
+template<typename _CharT, typename _Traits, typename _Alloc>
+constexpr const _CharT basic_string<_CharT, _Traits, _Alloc>::__empty_str[1];
 
 template<typename _CharT, typename _Traits, typename _Alloc>
 bool operator==(basic_string<_CharT,_Traits,_Alloc> const& __lhs,
@@ -882,4 +904,11 @@ using wstring = basic_string<wchar_t>;
 using u16string = basic_string<char16_t>;
 using u32string = basic_string<char32_t>;
 
+// Explicit instantiations
+
 __END_NAMESPACE_STD
+
+extern template class std::basic_string<char>;
+extern template class std::basic_string<wchar_t>;
+extern template class std::basic_string<char16_t>;
+extern template class std::basic_string<char32_t>;

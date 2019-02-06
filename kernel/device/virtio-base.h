@@ -38,9 +38,9 @@ public:
 
     using virtio_iocp_result_t = uint64_t;
 
-    using virtio_iocp_t = basic_iocp_t<
+    using virtio_iocp_t = dgos::basic_iocp_t<
         virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
-    using virtio_blocking_iocp_t = basic_blocking_iocp_t<
+    using virtio_blocking_iocp_t = dgos::basic_blocking_iocp_t<
         virtio_iocp_result_t, virtio_blocking_iocp_success_t>;
 
     struct desc_t {
@@ -134,7 +134,7 @@ public:
     }
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type queue_lock;
@@ -406,7 +406,7 @@ protected:
 
     using blocking_iocp_t = virtio_virtqueue_t::virtio_blocking_iocp_t;
     using async_iocp_t = virtio_virtqueue_t::virtio_iocp_t;
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);

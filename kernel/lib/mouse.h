@@ -1,6 +1,8 @@
 #pragma once
 #include "types.h"
 
+__BEGIN_DECLS
+
 struct mouse_raw_event_t {
     int16_t hdist;
     int16_t vdist;
@@ -21,3 +23,5 @@ struct mouse_raw_event_t {
 
 // Used by mouse drivers to report mouse activity
 void mouse_event(mouse_raw_event_t event);
+
+__END_DECLS

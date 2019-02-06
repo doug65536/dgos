@@ -33,9 +33,7 @@ $(top_builddir)/fatpart.img: \
 		$(top_builddir)/bootpxe-bios-bin \
 		$(top_builddir)/bootpxe-bios.map \
 		\
-		$(top_builddir)/user-shell \
-		$(top_builddir)/shell \
-		$(top_builddir)/hello.km \
+		$(top_builddir)/initrd \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
 		\

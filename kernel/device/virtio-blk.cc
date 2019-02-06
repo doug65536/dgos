@@ -60,7 +60,7 @@ std::vector<virtio_blk_if_t *> virtio_blk_ifs;
 
 class virtio_blk_if_factory_t : public storage_if_factory_t {
 public:
-    constexpr virtio_blk_if_factory_t() : storage_if_factory_t("virtio-blk") {}
+    virtio_blk_if_factory_t() : storage_if_factory_t("virtio-blk") {}
 private:
     virtual std::vector<storage_if_base_t *> detect(void) override final;
 };
@@ -124,7 +124,7 @@ private:
                virtio_blk_op_t op, iocp_t *iocp);
 
 private:
-    using lock_type = std::spinlock;
+    using lock_type = ext::spinlock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     struct blk_config_t {

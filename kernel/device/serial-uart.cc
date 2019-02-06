@@ -17,12 +17,15 @@
 
 // Null modem connections:
 //
-//  Peer      Peer
-//   TxD  ->   RxD
-//   DTR  ->   DSR
-//   RTS  ->   CTS
-//   RxD  <-   TxD
-//   DSR  <-   DTR
+//  Self -- Peer
+// Out
+//   TxD -> RxD : Outgoing data
+//   RTS -> CTS : Deassert RTS when you are running out of Rx buffer space
+//   DTR -> DSR : Keep DTR asserted to keep connection open
+// In
+//   RxD <- TxD : Incoming data
+//   CTS <- RTS : Stop transmitting when peer deasserts CTS
+//   DSR <- DTR : Peer disconnect(ed) deasserts DSR
 //
 
 namespace uart_defs {
@@ -635,7 +638,7 @@ public:
     void route_irq(int cpu) override final;
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     static isr_context_t *irq_handler(int irq, isr_context_t *ctx);

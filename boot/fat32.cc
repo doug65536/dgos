@@ -522,8 +522,12 @@ static void print_dirent(fat32_dir_union_t const *entry)
 #endif
 
 // Returns 0 on failure
-static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
+static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster,
+                                  uint32_t *out_file_size)
 {
+    if (likely(out_file_size))
+        *out_file_size = 0;
+
     fat32_dir_union_t *match;
 
     filename_info_t info = get_filename_info(filename);
@@ -609,6 +613,13 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
             if (dir_entry_match(match + match_index, entry)) {
                 // Entries match
                 ++match_index;
+
+                if (lfn_entries == 0) {
+                    if (likely(out_file_size))
+                        *out_file_size = entry->short_entry.size;
+
+                    return entry->short_entry.get_start();
+                }
             } else {
                 match_index = 0;
             }
@@ -616,8 +627,11 @@ static uint32_t find_file_by_name(char const *filename, uint32_t dir_cluster)
             if (lfn_checksum(entry->short_entry.name) == checksum) {
                 // Found
                 //PRINT("Found\n");
-                return ((uint32_t)entry->short_entry.start_hi << 16) |
-                        entry->short_entry.start_lo;
+
+                if (likely(out_file_size))
+                    *out_file_size = entry->short_entry.size;
+
+                return (uint32_t)entry->short_entry.get_start();
             } else {
                 match_index = 0;
             }
@@ -644,9 +658,10 @@ static uint64_t fat32_boot_serial()
 static int fat32_boot_open(char const *filename)
 {
     uint32_t cluster;
+    uint32_t file_size = 0;
 
     // Find the start of the file
-    cluster = find_file_by_name(filename, bpb.root_dir_start);
+    cluster = find_file_by_name(filename, bpb.root_dir_start, &file_size);
     if (cluster == 0)
         return -1;
 
@@ -654,6 +669,8 @@ static int fat32_boot_open(char const *filename)
     int file = fat32_find_available_file_handle();
     if (file < 0)
         return -1;
+
+    file_handles[file].file_size = file_size;
 
     // Get ready to read the file
     int16_t status = fat32_sector_iterator_begin(
@@ -665,9 +682,22 @@ static int fat32_boot_open(char const *filename)
     return file;
 }
 
+static bool check_fd(int file)
+{
+    return file >= 0 && file < MAX_HANDLES;
+}
+
+static off_t fat32_boot_filesize(int file)
+{
+    if (!check_fd(file))
+        return -1;
+
+    return file_handles[file].file_size;
+}
+
 static int fat32_boot_close(int file)
 {
-    if (file < 0 || file >= MAX_HANDLES)
+    if (!check_fd(file))
         return -1;
 
     return file_handles[file].close();
@@ -679,7 +709,7 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
     assert(buf != nullptr);
     assert(bytes < 0x100000);
 
-    if (file < 0 || file >= MAX_HANDLES)
+    if (!check_fd(file))
         return -1;
 
     auto& desc = file_handles[file];
@@ -774,6 +804,7 @@ void fat32_boot_partition(uint64_t partition_lba)
 #endif
 
     fs_api.boot_open = fat32_boot_open;
+    fs_api.boot_filesize = fat32_boot_filesize;
     fs_api.boot_close = fat32_boot_close;
     fs_api.boot_pread = fat32_boot_pread;
     fs_api.boot_drv_serial = fat32_boot_serial;

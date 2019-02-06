@@ -823,7 +823,7 @@ struct hba_port_info_t {
     std::condition_variable non_ncq_done_cond;
 
     // Keep track of slot order
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 
@@ -845,7 +845,7 @@ struct hba_port_info_t {
 
 class ahci_if_factory_t final : public storage_if_factory_t {
 public:
-    constexpr ahci_if_factory_t() : storage_if_factory_t("ahci") {}
+    ahci_if_factory_t() : storage_if_factory_t("ahci") {}
 private:
     virtual std::vector<storage_if_base_t *> detect(void) override final;
 };
@@ -1017,9 +1017,9 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
             slot_request_t &request = pi->slot_requests[slot];
 
             request.callback->set_result(
-                        !error ? err_sz_pair_t{
+                        !error ? dgos::err_sz_pair_t{
                                  errno_t::OK, request.count }
-                               : err_sz_pair_t{
+                               : dgos::err_sz_pair_t{
                                  errno_t::EIO, request.count });
 
             // Invoke completion callback
@@ -1093,9 +1093,9 @@ void ahci_if_t::handle_port_irqs(unsigned port_num)
             }
 
             request.callback->set_result(
-                        !error ? err_sz_pair_t{
+                        !error ? dgos::err_sz_pair_t{
                                  errno_t::OK, request.count }
-                               : err_sz_pair_t{
+                               : dgos::err_sz_pair_t{
                                  errno_t::EIO, request.count });
 
             // Invoke completion callback
@@ -1422,7 +1422,7 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     if (unlikely((mmio_base->ports[port_num].sata_status & AHCI_HP_SS_DET) !=
                  AHCI_HP_SS_DET_n(AHCI_HP_SS_DET_ONLINE))) {
         // Not established
-        request.callback->set_result(err_sz_pair_t{
+        request.callback->set_result(dgos::err_sz_pair_t{
                                          errno_t::ENODEV, 0});
         request.callback->invoke();
         return 0;

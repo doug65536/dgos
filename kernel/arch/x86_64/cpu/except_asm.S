@@ -3,7 +3,6 @@
 .section .text, "ax"
 
 .global __exception_setjmp
-.hidden __exception_setjmp
 __exception_setjmp:
     .cfi_startproc
 
@@ -36,7 +35,6 @@ __exception_setjmp:
     .cfi_endproc
 
 .global __exception_longjmp
-.hidden __exception_longjmp
 __exception_longjmp:
     .cfi_startproc
 

@@ -60,6 +60,10 @@ struct rtl8139_factory_t : public eth_dev_factory_t {
     virtual int detect(eth_dev_base_t ***result) override;
 };
 
+extern "C" void module_entry()
+{
+}
+
 static rtl8139_factory_t rtl8139_factory;
 
 struct rtl8139_dev_t : public eth_dev_base_t {
@@ -128,7 +132,7 @@ struct rtl8139_dev_t : public eth_dev_base_t {
     unsigned tx_head;
     unsigned tx_tail;
 
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type lock;
 

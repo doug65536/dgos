@@ -23,8 +23,8 @@ BUILT_SOURCES = \
 #sysroot/lib/libm.so \
 #sysroot/lib/libstdc++.so
 
-#LINKER_DEBUG = -Wl,--orphan-handling,warn
-LINKER_DEBUG =
+LINKER_DEBUG = -Wl,--orphan-handling,warn
+#LINKER_DEBUG =
 
 noinst_LIBRARIES =
 bin_PROGRAMS =
@@ -566,16 +566,24 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cxxexcept.h \
 	kernel/lib/cxxexcept.cc \
 	kernel/lib/cc/algorithm.h \
+	kernel/lib/cc/algorithm.cc \
 	kernel/lib/cc/exception.h \
 	kernel/lib/cc/exception.cc \
 	kernel/lib/cc/functional.h \
+	kernel/lib/cc/functional.cc \
 	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/memory.h \
+	kernel/lib/cc/memory.cc \
 	kernel/lib/cc/numeric.h \
+	kernel/lib/cc/numeric.cc \
 	kernel/lib/cc/type_traits.h \
+	kernel/lib/cc/type_traits.cc \
 	kernel/lib/cc/utility.h \
+	kernel/lib/cc/utility.cc \
 	kernel/lib/cc/vector.h \
+	kernel/lib/cc/vector.cc \
 	kernel/lib/cc/cxxstring.h \
+	kernel/lib/cc/cxxstring.cc \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
@@ -747,7 +755,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/acpihw.h \
 	kernel/device/iocp.cc \
 	kernel/device/iocp.h \
-	kernel/device/ahci.cc \
 	kernel/device/ata.cc \
 	kernel/device/ata.h \
 	kernel/device/ata.h \
@@ -757,13 +764,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/eainstrument.h \
 	kernel/device/e9debug.h \
 	kernel/device/i350.cc \
-	kernel/device/ide.cc \
-	kernel/device/keyb8042.cc \
-	kernel/device/keyb8042.h \
-	kernel/device/keyb8042.h \
 	kernel/device/keyb8042_layout/keyb8042_layout_us.cc \
-	kernel/device/nvme.cc \
-	kernel/device/nvme.h \
 	kernel/device/pci.cc \
 	kernel/device/pci.h \
 	kernel/device/pci.h \
@@ -805,6 +806,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_time.cc \
 	kernel/syscall/sys_process.cc
 
+kernel/device/kernel_generic-iocp.$(OBJEXT): CXXFLAGS += -fvisibility=default -fno-visibility-inlines-hidden
+
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/boot/include \
 	-I$(top_srcdir)/kernel \
@@ -826,6 +829,7 @@ KERNEL_CXXFLAGS_SHARED = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
+	$(NO_EXCEPTIONS_FLAGS) \
 	-fvisibility=hidden \
 	-fvisibility-inlines-hidden \
 	-export-dynamic \
@@ -1000,7 +1004,7 @@ sysroot/lib/crt0.o: \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
 		$(top_srcdir)/Makefile.am \
 		$(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && \
+	$(MKDIR) -p "$(@D)" && \
 		$(CXX) \
 			-g \
 			$(ASM_DEBUG_INFO_FLAGS) \
@@ -1010,33 +1014,33 @@ sysroot/lib/crt0.o: \
 			-c $<
 
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && cp $< $@
 
 sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && cp $< $@
 
 sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && cp $< $@
 
 sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
-	mkdir -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && cp $< $@
 
 #sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
-#	mkdir -p "$(@D)" && cp $< $@
+#	$(MKDIR) -p "$(@D)" && cp $< $@
 #
 #sysroot/lib/libg.so: libg.so $(INCLUDES_DEPLOYED)
-#	mkdir -p "$(@D)" && cp $< $@
+#	$(MKDIR) -p "$(@D)" && cp $< $@
 #
 #sysroot/lib/libm.so: libm.so $(INCLUDES_DEPLOYED)
-#	mkdir -p "$(@D)" && cp $< $@
+#	$(MKDIR) -p "$(@D)" && cp $< $@
 #
 #sysroot/lib/libstdc++.so: libstdc++.so $(INCLUDES_DEPLOYED)
-#	mkdir -p "$(@D)" && cp $< $@
+#	$(MKDIR) -p "$(@D)" && cp $< $@
 
 define deploy_sysroot_header =
 $$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
-	mkdir -p $$(@D)
-	cp -f $$< $$@
+	$(MKDIR) -p $$(@D)
+	$(CP) -f "$$<" "$$@"
 
 endef
 
@@ -1059,6 +1063,7 @@ shell_CXXFLAGS = \
 	-isystem $(top_builddir)/sysroot/include \
 	-g \
 	$(COMPILER_FLAGS) \
+	$(RETPOLINE_FLAGS) \
 	$(USER64_FLAGS)
 
 shell_CFLAGS = \
@@ -1534,7 +1539,9 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(FREESTANDING_FLAGS) \
 	-D__DGOS_KERNEL__ \
 	-fvisibility=hidden \
-	-fno-exceptions \
+	-fvisibility-inlines-hidden \
+	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_RTTI_FLAGS) \
 	-fPIC \
 	-g \
 	-I$(top_srcdir)/boot/include \
@@ -1544,14 +1551,19 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
+	$(RETPOLINE_FLAGS) \
 	$(COMPILER_FLAGS)
 
 KERNEL_MODULE_LDFLAGS_SHARED = \
 	-Wl,-shared \
 	-Wl,-g \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
-	-Wl,-z,max-page-size=4096,-z,call-nop=prefix-addr \
+	-Wl,-z,max-page-size=4096 \
+	$(LINKER_DEBUG) \
 	$(NOSTDLIB_FLAGS)
+
+KERNEL_MODULE_LDADD_SHARED = \
+	libkm.a
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	kernel/arch/x86_64/module.ld
@@ -1567,7 +1579,11 @@ hello_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 hello_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED)
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/hello.km.map
+
+hello_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_hello_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
@@ -1583,10 +1599,119 @@ rtl8139_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 rtl8139_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED)
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/rtl8139.km.map
+
+rtl8139_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_rtl8139_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += nvme.km
+
+nvme_km_SOURCES = \
+	kernel/device/nvme.cc \
+	kernel/device/nvme.h
+
+nvme_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+nvme_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/nvme.km.map
+
+nvme_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_nvme_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += keyb8042.km
+
+keyb8042_km_SOURCES = \
+	kernel/device/keyb8042.cc
+
+keyb8042_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+keyb8042_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/keyb8402.km.map
+
+EXTRA_keyb8042_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+noinst_LIBRARIES += libkm.a
+
+libkm_a_SOURCES = \
+	modules/libkm/dso_handle.S \
+	modules/libkm/module_entry.cc
+
+libkm_a_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
+
+EXTRA_libkm_a_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += ahci.km
+
+ahci_km_SOURCES = \
+	kernel/device/ahci.cc
+
+ahci_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+ahci_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/ahci.km.map
+
+ahci_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_ahci_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += ide.km
+
+ide_km_SOURCES = \
+	kernel/device/ide.cc
+
+ide_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+ide_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/ide.km.map
+
+ide_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_ide_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+define strip_module =
+modsym/$(1).km: $(1).km
+	$(MKDIR) -p kmod
+	mv -- "$<" "$@"
+	$(STRIP) -g -o "$@" "$<"
+endef
+
+#$(foreach mod,$(MODULE_LIST), \
+#	$(eval $(call strip_module,$(mod)))
+#)
 
 #==========
 
@@ -1608,18 +1733,26 @@ user_shell_LDFLAGS = \
 user_shell_CCASFLAGS = \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(COMPILER_FLAGS) \
-	-v -isystem sysroot/include
+	-isystem sysroot/include
 
 EXTRA_user_shell_DEPENDENCIES = \
 	sysroot/lib/libc.a \
 	sysroot/lib/libg.a \
 	sysroot/lib/libm.a
 
+#===========
+
+MODULE_LIST = $(filter %.km,$(bin_PROGRAMS))
+
+initrd: $(MODULE_LIST)
+	$(CPIO) -o --device-independent  -H bin \
+		< <($(patsubst %,echo "%";,$(MODULE_LIST))) > "$@"
+
 # ----------------------------------------------------------------------------
 # Misc make rules
 
 $(DUMPDIR):
-	mkdir -p $(top_builddir)/dump
+	$(MKDIR) -p $(top_builddir)/dump
 
 #include zlib.mk
 include symbols.mk
@@ -1728,11 +1861,11 @@ u_vga16.o: u_vga16.raw
 # QEMU launcher
 
 $(DUMPDIR)/qemu-debug-out:
-	mkdir -p "$(@D)"
+	$(MKDIR) -p "$(@D)"
 	mkfifo "$@"
 
 $(DUMPDIR)/call-trace-out:
-	mkdir -p "$(@D)"
+	$(MKDIR) -p "$(@D)"
 	mkfifo "$@"
 
 QEMU_EXTRA_DEPS = \

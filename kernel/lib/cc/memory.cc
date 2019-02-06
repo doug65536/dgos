@@ -1,14 +1,16 @@
 #include "memory.h"
 #include "mm.h"
 
+#ifdef __DGOS_KERNEL__
 
-void *page_allocator_base::allocate_impl(size_t n)
+void *ext::page_allocator_base::allocate_impl(size_t n)
 {
-    return mmap(nullptr, __n * sizeof(value_type),
-                PROT_READ | PROT_WRITE, 0, -1, 0);
+    return mmap(nullptr, n, PROT_READ | PROT_WRITE, 0, -1, 0);
 }
 
-void page_allocator_base::deallocate_impl(void *p, size_t n)
+void ext::page_allocator_base::deallocate_impl(void *p, size_t n)
 {
-    munmap(__p, __n);
+    munmap(p, n);
 }
+
+#endif

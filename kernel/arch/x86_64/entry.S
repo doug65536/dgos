@@ -301,7 +301,7 @@ register_eh_frame:
 
 .align 16
 .global __cxa_pure_virtual
-.hidden __cxa_pure_virtual
+// Not .hidden!
 __cxa_pure_virtual:
     leaq pure_call_message(%rip),%rdi
     jmp panic
@@ -317,4 +317,5 @@ pure_call_message:
 
 .align 8
 .global __dso_handle
+.hidden __dso_handle
 __dso_handle: .quad __dso_handle

@@ -96,6 +96,9 @@ __BEGIN_DECLS
 #define MAP_FILE            0
 #define MAP_NONBLOCK        0
 
+/// Allocate address space only
+void *mm_alloc_space(size_t size);
+
 /// Map a range of address space
 /// __addr, hint, map memory as near as possible to that address,
 /// unless MAP_FIXED is used

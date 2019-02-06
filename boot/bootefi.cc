@@ -62,16 +62,18 @@ class efi_pxe_file_handle_t;
 class file_handle_base_t {
 public:
     static int open(tchar const* filename);
+    static off_t filesize(int fd);
     static int close(int fd);
     static ssize_t pread(int fd, void *buf, size_t bytes, off_t ofs);
     static uint64_t boot_drv_serial();
 
-protected:
     static constexpr int MAX_OPEN_FILES = 16;
+protected:
     static file_handle_base_t *file_handles[];
 
     virtual ~file_handle_base_t() {}
     virtual bool open_impl(tchar const *filename) = 0;
+    virtual off_t filesize_impl() = 0;
     virtual bool close_impl() = 0;
     virtual bool pread_impl(void *buf, size_t bytes, off_t ofs) = 0;
 
@@ -88,8 +90,11 @@ private:
 file_handle_base_t *
 file_handle_base_t::file_handles[file_handle_base_t::MAX_OPEN_FILES];
 
+static EFI_GUID efi_file_info_guid = EFI_FILE_INFO_GUID;
+
 struct efi_fs_file_handle_t : public file_handle_base_t {
-    EFI_FILE_PROTOCOL *file;
+    EFI_FILE_PROTOCOL *file = nullptr;
+    UINT64 file_size = 0;
 
     bool open_impl(tchar const *filename) override final
     {
@@ -101,7 +106,22 @@ struct efi_fs_file_handle_t : public file_handle_base_t {
         if (unlikely(EFI_ERROR(status)))
             return false;
 
+        UINTN buf_sz = sizeof(EFI_FILE_INFO) + sizeof(CHAR16) * 256;
+        auto info_buffer = (EFI_FILE_INFO*)malloc(buf_sz);
+        status = file->GetInfo(file, &efi_file_info_guid,
+                               &buf_sz, info_buffer);
+
+        if (unlikely(EFI_ERROR(status)))
+            return false;
+
+        file_size = info_buffer->FileSize;
+
         return true;
+    }
+
+    off_t filesize_impl() override final
+    {
+        return file_size;
     }
 
     bool close_impl() override final
@@ -272,6 +292,11 @@ private:
         return true;
     }
 
+    off_t filesize_impl() override final
+    {
+        return file_size;
+    }
+
     bool close_impl() override final
     {
         return true;
@@ -354,6 +379,7 @@ _constructor(ctor_fs) void register_efi_fs()
     }
 
     fs_api.boot_open = file_handle_base_t::open;
+    fs_api.boot_filesize = file_handle_base_t::filesize;
     fs_api.boot_pread = file_handle_base_t::pread;
     fs_api.boot_close = file_handle_base_t::close;
     fs_api.boot_drv_serial = file_handle_base_t::boot_drv_serial;
@@ -384,10 +410,26 @@ int file_handle_base_t::open(const tchar *filename)
     return fd;
 }
 
+static bool check_fd(int fd)
+{
+    bool ok = fd >= 0 && fd < file_handle_base_t::MAX_OPEN_FILES;
+    assert(fd >= 0 && fd < file_handle_base_t::MAX_OPEN_FILES);
+    return ok;
+}
+
+off_t file_handle_base_t::filesize(int fd)
+{
+    if (!check_fd(fd))
+        return -1;
+
+    off_t result = file_handles[fd]->filesize_impl();
+
+    return result;
+}
+
 int file_handle_base_t::close(int fd)
 {
-    assert(fd >= 0 && fd < MAX_OPEN_FILES);
-    if (fd < 0 || fd >= MAX_OPEN_FILES || !file_handles[fd])
+    if (!check_fd(fd))
         return -1;
 
     bool result = file_handles[fd]->close_impl();
@@ -398,8 +440,7 @@ int file_handle_base_t::close(int fd)
 
 ssize_t file_handle_base_t::pread(int fd, void *buf, size_t bytes, off_t ofs)
 {
-    assert(fd >= 0 && fd < MAX_OPEN_FILES);
-    if (fd < 0 || fd >= MAX_OPEN_FILES || !file_handles[fd])
+    if (!check_fd(fd))
         return -1;
 
     if (!file_handles[fd]->pread_impl(buf, bytes, ofs))

@@ -3,6 +3,7 @@
 
 enum constructor_order_t {
     ctor_ctors_ran = 1000,
+    ctor_cpu_init_cpus,
     ctor_cpu_init_bsp,
     ctor_text_dev,
     ctor_mmu_init,

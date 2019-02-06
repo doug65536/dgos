@@ -3,9 +3,13 @@
 #include "mutex.h"
 #include "cpu/atomic.h"
 
+namespace dgos {
+
 // I/O completion
 template<typename T, typename S = T>
-struct basic_iocp_t {
+class basic_iocp_t
+{
+public:
     typedef void (*callback_t)(T const& err, uintptr_t arg);
 
     basic_iocp_t();
@@ -29,7 +33,7 @@ struct basic_iocp_t {
     void reset(callback_t callback, uintptr_t arg);
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     void invoke_once(scoped_lock &hold);
@@ -44,7 +48,8 @@ private:
 };
 
 template<typename T, typename S = T>
-class basic_blocking_iocp_t : public basic_iocp_t<T, S> {
+class basic_blocking_iocp_t : public basic_iocp_t<T, S>
+{
 public:
     basic_blocking_iocp_t()
         : basic_iocp_t<T, S>(&basic_blocking_iocp_t::handler, uintptr_t(this))
@@ -64,13 +69,36 @@ public:
     U wait_and_return();
 
 private:
-    using lock_type = std::mcslock;
+    using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
 
     lock_type lock;
     std::condition_variable done_cond;
     bool volatile done;
 };
+
+using err_sz_pair_t = std::pair<errno_t, size_t>;
+
+template<typename T>
+class __basic_iocp_error_success_t
+{
+public:
+    static bool succeeded(errno_t const& status);
+
+    static bool succeeded(err_sz_pair_t const& p);
+};
+
+template<typename T>
+bool __basic_iocp_error_success_t<T>::succeeded(errno_t const &status)
+{
+    return status == errno_t::OK;
+}
+
+template<typename T>
+bool __basic_iocp_error_success_t<T>::succeeded(err_sz_pair_t const &p)
+{
+    return p.first == errno_t::OK;
+}
 
 template<typename T, typename S>
 basic_iocp_t<T, S>::basic_iocp_t()
@@ -104,7 +132,7 @@ basic_iocp_t<T, S>::~basic_iocp_t()
 }
 
 template<typename T, typename S>
-void basic_iocp_t<T, S>::set_expect(unsigned expect)
+EXPORT void basic_iocp_t<T, S>::set_expect(unsigned expect)
 {
     scoped_lock hold(lock);
     expect_count = expect;
@@ -220,23 +248,31 @@ U basic_blocking_iocp_t<T,S>::wait_and_return()
     return -U(result.first);
 }
 
-using err_sz_pair_t = std::pair<errno_t, size_t>;
+__END_NAMESPACE
 
-template<typename T>
-struct __basic_iocp_error_success_t {
-    static constexpr bool succeeded(errno_t const& status)
-    {
-        return status == errno_t::OK;
-    }
+using iocp_t = dgos::basic_iocp_t<
+    dgos::err_sz_pair_t,
+    dgos::__basic_iocp_error_success_t<dgos::err_sz_pair_t>
+>;
 
-    static constexpr bool succeeded(err_sz_pair_t const& p)
-    {
-        return p.first == errno_t::OK;
-    }
-};
+using blocking_iocp_t = dgos::basic_blocking_iocp_t<
+    dgos::err_sz_pair_t,
+    dgos::__basic_iocp_error_success_t<dgos::err_sz_pair_t>
+>;
 
-using iocp_t = basic_iocp_t<
-err_sz_pair_t, __basic_iocp_error_success_t<err_sz_pair_t>>;
+// Explicit instantiations
 
-using blocking_iocp_t = basic_blocking_iocp_t<err_sz_pair_t,
-    __basic_iocp_error_success_t<err_sz_pair_t>>;
+extern template class std::pair<errno_t, size_t>;
+
+extern template class dgos::__basic_iocp_error_success_t<
+        std::pair<errno_t, size_t>>;
+
+extern template class dgos::basic_iocp_t<
+        std::pair<errno_t, size_t>,
+        dgos::__basic_iocp_error_success_t<
+            std::pair<errno_t, size_t>>>;
+
+extern template class dgos::basic_blocking_iocp_t<
+        std::pair<errno_t, size_t>,
+        dgos::__basic_iocp_error_success_t<
+            std::pair<errno_t, size_t>>>;

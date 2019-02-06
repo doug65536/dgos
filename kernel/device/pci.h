@@ -78,28 +78,14 @@ struct pci_config_hdr_t {
     uint8_t min_grant;
     uint8_t max_latency;
 
-    EXPORT bool is_bar_mmio(ptrdiff_t bar) const
-    {
-        return (base_addr[bar] & 1) == 0;
-    }
-
-    EXPORT bool is_bar_portio(ptrdiff_t bar) const
-    {
-        return base_addr[bar] & 1;
-    }
-
-    EXPORT bool is_bar_prefetchable(ptrdiff_t bar) const
-    {
-        return base_addr[bar] & 8;
-    }
+    bool is_bar_mmio(ptrdiff_t bar) const;
+    bool is_bar_portio(ptrdiff_t bar) const;
+    bool is_bar_prefetchable(ptrdiff_t bar) const;
 
     // Returns true if the BAR is MMIO and is 64 bit
-    EXPORT bool is_bar_64bit(ptrdiff_t bar) const
-    {
-        return (base_addr[bar] & 7) == 4;
-    }
+    bool is_bar_64bit(ptrdiff_t bar) const;
 
-    EXPORT uint64_t get_bar(ptrdiff_t bar) const;
+    uint64_t get_bar(ptrdiff_t bar) const;
 
     // Write the specified address to the BAR and read it back, updating
     // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
@@ -362,13 +348,16 @@ C_ASSERT(offsetof(pci_config_hdr_t, capabilities_ptr) == 0x34);
 struct pci_dev_t {
     pci_config_hdr_t config;
     pci_addr_t addr;
+
+    pci_dev_t();
+    ~pci_dev_t();
 };
 
 struct pci_dev_iterator_t : public pci_dev_t {
-    operator pci_addr_t() const
-    {
-        return pci_addr_t(segment, bus, slot, func);
-    }
+    pci_dev_iterator_t();
+    ~pci_dev_iterator_t();
+
+    operator pci_addr_t() const;
 
     int segment;
     int bus;
@@ -385,40 +374,11 @@ struct pci_dev_iterator_t : public pci_dev_t {
     uint8_t bus_todo_len;
     uint8_t bus_todo[64];
 
-    void reset()
-    {
-        segment = 0;
-        bus = 0;
-        slot = 0;
-        func = 0;
-        dev_class = 0;
-        subclass = 0;
-        vendor = 0;
-        device = 0;
-        header_type = 0;
-        bus_todo_len = 0;
-        memset(bus_todo, 0, sizeof(bus_todo));
-    }
+    void reset();
 
-    pci_dev_iterator_t& copy_from(pci_dev_iterator_t const& rhs)
-    {
-        segment = rhs.segment;
-        bus = rhs.bus;
-        slot = rhs.slot;
-        func = rhs.func;
+    pci_dev_iterator_t& copy_from(pci_dev_iterator_t const& rhs);
 
-        config = rhs.config;
-        addr = pci_addr_t(segment, bus, slot, func);
-        return *this;
-    }
-
-    bool operator==(pci_dev_iterator_t const& rhs) const
-    {
-        return (segment == rhs.segment) &
-                (bus == rhs.bus) &
-                (slot == rhs.slot) &
-                (func == rhs.func);
-    }
+    bool operator==(pci_dev_iterator_t const& rhs) const;
 };
 
 __BEGIN_DECLS
