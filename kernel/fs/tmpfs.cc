@@ -11,6 +11,13 @@
 #include "vector.h"
 #include "hash.h"
 
+#define DEBUG_TMPFS 1
+#if DEBUG_TMPFS
+#define TMPFS_TRACE(...) printdbg("tmpfs: " __VA_ARGS__)
+#else
+#define TMPFS_TRACE(...) ((void)0)
+#endif
+
 static void *initrd_st;
 static size_t initrd_sz;
 
@@ -118,8 +125,10 @@ private:
             return nullptr;
 
         if (likely(add(hdr->name(), hdr->namesize,
-                       hdr->data(), hdr->filesize())))
+                       hdr->data(), hdr->filesize()))) {
+            TMPFS_TRACE("added %s\n", hdr->name());
             return hdr->next(en);
+        }
 
         return nullptr;
     }
