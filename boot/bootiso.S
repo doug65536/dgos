@@ -44,6 +44,9 @@ bootinfo_reserved:
     .space 10*4
 
 entry_start:
+    cli
+    cld
+
     // Initialize segment registers
     xorw %ax,%ax
     movw %ax,%ds
