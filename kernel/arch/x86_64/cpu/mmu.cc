@@ -2566,7 +2566,7 @@ int madvise(void *addr, size_t len, int advice)
 
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
-    pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
+    constexpr pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
 
     while (pt[3] < end &&
            (*pt[0] & PTE_PRESENT) &&
@@ -2580,7 +2580,7 @@ int madvise(void *addr, size_t len, int advice)
                 physaddr_t page = 0;
                 if (expect && (expect & demand_mask) != demand_mask) {
                     page = expect & PTE_ADDR;
-                    replace = expect | PTE_ADDR;
+                    replace = (expect | (PTE_ADDR >> 1)) & ~PTE_PRESENT;
 
                     if (unlikely(!atomic_cmpxchg_upd(pt[3], &expect, replace)))
                         continue;
