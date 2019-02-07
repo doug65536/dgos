@@ -372,6 +372,14 @@ static int iso9660_boot_open(char const *filename)
     return file;
 }
 
+static off_t iso9660_boot_filesize(int file)
+{
+    if (file < 0 || file >= MAX_HANDLES)
+        return -1;
+
+    return file_handles[file].size;
+}
+
 static int iso9660_boot_close(int file)
 {
     if (file < 0 || file >= MAX_HANDLES)
@@ -489,6 +497,7 @@ void iso9660_boot_partition(uint32_t pvd_lba)
     }
 
     fs_api.boot_open = iso9660_boot_open;
+    fs_api.boot_filesize = iso9660_boot_filesize;
     fs_api.boot_close = iso9660_boot_close;
     fs_api.boot_pread = iso9660_boot_pread;
     fs_api.boot_drv_serial = iso9660_boot_serial;
