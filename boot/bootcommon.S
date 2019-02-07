@@ -6,7 +6,7 @@
 // Return address in bx
 .global early_init
 early_init:
-    mov initial_stack_ptr+2,%ss
+     mov initial_stack_ptr+2,%ss
     mov initial_stack_ptr,%sp
 
     call clear_bss
