@@ -6,7 +6,7 @@
 // Return address in bx
 .global early_init
 early_init:
-     mov initial_stack_ptr+2,%ss
+    mov initial_stack_ptr+2,%ss
     mov initial_stack_ptr,%sp
 
     call clear_bss
@@ -258,7 +258,7 @@ idt_init:
 
 0:  movw isr_table(,%ecx,4),%ax
     movw %ax,(%edx,%ecx,8)
-    movw $GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
+    movw $ GDT_SEL_KERNEL_CODE64,2(%edx,%ecx,8)
     movw $0,4(%edx,%ecx,8)
     movw $0x8e,5(%edx,%ecx,8)
     movw $0,6(%edx,%ecx,8)
