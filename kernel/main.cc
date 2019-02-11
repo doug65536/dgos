@@ -612,9 +612,6 @@ int clks_unhalted(void *cpu)
     return 0;
 }
 
-extern void usbxhci_detect(void*);
-void (*usbxhci_pull_in)(void*) = usbxhci_detect;
-
 #if ENABLE_FIND_VBE
 static uint8_t sum_bytes(char *st, size_t len)
 {
@@ -868,7 +865,9 @@ static int init_thread(void *)
 
     // Register USB interfaces
     printk("Initializing USB interfaces\n");
-    callout_call(callout_type_t::usb, true);
+    //callout_call(callout_type_t::usb, true);
+
+    modload_load("usbxhci.km");
 
     // Register filesystems
     printk("Initializing filesystems\n");

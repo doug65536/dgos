@@ -1,7 +1,7 @@
 #include "usb.h"
+#include "export.h"
 
-
-usb_config_helper::usb_config_helper(int slotid,
+EXPORT usb_config_helper::usb_config_helper(int slotid,
                                      usb_desc_device const& dev_desc,
                                      usb_desc_bos *bos,
                                      void *data, size_t len)
@@ -13,17 +13,17 @@ usb_config_helper::usb_config_helper(int slotid,
 {
 }
 
-int usb_config_helper::slot() const
+EXPORT int usb_config_helper::slot() const
 {
     return slotid;
 }
 
-usb_desc_device const &usb_config_helper::device() const
+EXPORT usb_desc_device const &usb_config_helper::device() const
 {
     return dev_desc;
 }
 
-usb_desc_config const *usb_config_helper::find_config(int cfg_index) const
+EXPORT usb_desc_config const *usb_config_helper::find_config(int cfg_index) const
 {
     if (unlikely(!data))
         return nullptr;
@@ -43,7 +43,7 @@ usb_desc_config const *usb_config_helper::find_config(int cfg_index) const
             ? cfg : nullptr;
 }
 
-usb_desc_iface const *usb_config_helper::find_iface(
+EXPORT usb_desc_iface const *usb_config_helper::find_iface(
         usb_desc_config const *cfg, int iface_index)
 {
     if (unlikely(!cfg || iface_index >= cfg->num_iface || iface_index < 0))
@@ -60,7 +60,7 @@ usb_desc_iface const *usb_config_helper::find_iface(
     return iface < iface_en ? iface : nullptr;
 }
 
-usb_desc_ep const *usb_config_helper::find_ep(
+EXPORT usb_desc_ep const *usb_config_helper::find_ep(
         usb_desc_iface const *iface, int ep_index)
 {
     if (unlikely(!iface || ep_index >= iface->num_ep || ep_index < 0))
@@ -78,7 +78,7 @@ usb_desc_ep const *usb_config_helper::find_ep(
     return index < iface->num_ep ? ep : nullptr;
 }
 
-usb_desc_iface const *usb_config_helper::match_iface(
+EXPORT usb_desc_iface const *usb_config_helper::match_iface(
         usb_desc_config const* cfg, int protocol)
 {
     for (int index = 0; index < cfg->num_iface; ++index) {
@@ -89,7 +89,7 @@ usb_desc_iface const *usb_config_helper::match_iface(
     return nullptr;
 }
 
-usb_desc_ep const *usb_config_helper::match_ep(
+EXPORT usb_desc_ep const *usb_config_helper::match_ep(
         usb_desc_iface const *iface, int dir, usb_ep_attr attr)
 {
     usb_desc_ep const *ep;
@@ -102,7 +102,7 @@ usb_desc_ep const *usb_config_helper::match_ep(
     return ep;
 }
 
-usb_desc_ep_companion const*
+EXPORT usb_desc_ep_companion const*
 usb_config_helper::get_ep_companion(const usb_desc_ep *ep)
 {
     usb_desc_ep_companion const* end = (usb_desc_ep_companion const*)
@@ -116,7 +116,7 @@ usb_config_helper::get_ep_companion(const usb_desc_ep *ep)
     return nullptr;
 }
 
-char const *usb_config_helper::class_code_text(uint8_t cls)
+EXPORT char const *usb_config_helper::class_code_text(uint8_t cls)
 {
     switch (usb_class_t(cls)) {
     case usb_class_t::audio: return "Audio";
@@ -144,7 +144,7 @@ char const *usb_config_helper::class_code_text(uint8_t cls)
     }
 }
 
-char const *usb_config_helper::ep_attr_text(usb_ep_attr attr)
+EXPORT char const *usb_config_helper::ep_attr_text(usb_ep_attr attr)
 {
     switch (attr) {
     case usb_ep_attr::control: return "control";
@@ -155,7 +155,7 @@ char const *usb_config_helper::ep_attr_text(usb_ep_attr attr)
     }
 }
 
-void const *usb_config_helper::get_bos_raw(
+EXPORT void const *usb_config_helper::get_bos_raw(
         usb_dev_cap_type cap_type, int index) const
 {
     uint8_t const* bos_raw = (uint8_t const*)bos;

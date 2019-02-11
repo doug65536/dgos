@@ -1055,7 +1055,7 @@ static int hex_dump_formatter(void const volatile *mem,
     return written;
 }
 
-int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
+EXPORT int hex_dump(void const volatile *mem, size_t size, uintptr_t base)
 {
     return hex_dump_formatter(mem, size, base, printdbg);
 }

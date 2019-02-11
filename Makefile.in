@@ -105,10 +105,10 @@ bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	bootpxe-bios-elf$(EXEEXT) bootefi-amd64$(EXEEXT) \
 	kernel-generic$(EXEEXT) kernel-tracing$(EXEEXT) \
 	kernel-asan$(EXEEXT) shell$(EXEEXT) dhcpclient$(EXEEXT) \
-	ls$(EXEEXT) rtl8139.km$(EXEEXT) nvme.km$(EXEEXT) \
-	keyb8042.km$(EXEEXT) ahci.km$(EXEEXT) ide.km$(EXEEXT) \
-	fat32.km$(EXEEXT) iso9660.km$(EXEEXT) mbr.km$(EXEEXT) \
-	gpt.km$(EXEEXT) user-shell$(EXEEXT)
+	ls$(EXEEXT) usbxhci.km$(EXEEXT) rtl8139.km$(EXEEXT) \
+	nvme.km$(EXEEXT) keyb8042.km$(EXEEXT) ahci.km$(EXEEXT) \
+	ide.km$(EXEEXT) fat32.km$(EXEEXT) iso9660.km$(EXEEXT) \
+	mbr.km$(EXEEXT) gpt.km$(EXEEXT) user-shell$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -610,7 +610,6 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/device/kernel_asan-usb_hid.$(OBJEXT) \
 	kernel/device/kernel_asan-usb_hub.$(OBJEXT) \
 	kernel/device/kernel_asan-usb_storage.$(OBJEXT) \
-	kernel/device/kernel_asan-usb_xhci.$(OBJEXT) \
 	kernel/device/kernel_asan-virtio-base.$(OBJEXT) \
 	kernel/device/kernel_asan-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_asan-virtio-blk.$(OBJEXT) \
@@ -741,7 +740,6 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_hid.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_hub.$(OBJEXT) \
 	kernel/device/kernel_generic-usb_storage.$(OBJEXT) \
-	kernel/device/kernel_generic-usb_xhci.$(OBJEXT) \
 	kernel/device/kernel_generic-virtio-base.$(OBJEXT) \
 	kernel/device/kernel_generic-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_generic-virtio-blk.$(OBJEXT) \
@@ -871,7 +869,6 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb_hid.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb_hub.$(OBJEXT) \
 	kernel/device/kernel_tracing-usb_storage.$(OBJEXT) \
-	kernel/device/kernel_tracing-usb_xhci.$(OBJEXT) \
 	kernel/device/kernel_tracing-virtio-base.$(OBJEXT) \
 	kernel/device/kernel_tracing-virtio-gpu.$(OBJEXT) \
 	kernel/device/kernel_tracing-virtio-blk.$(OBJEXT) \
@@ -927,6 +924,11 @@ shell_OBJECTS = $(am_shell_OBJECTS)
 shell_DEPENDENCIES =
 shell_LINK = $(CXXLD) $(shell_CXXFLAGS) $(CXXFLAGS) $(shell_LDFLAGS) \
 	$(LDFLAGS) -o $@
+am_usbxhci_km_OBJECTS = kernel/device/usbxhci_km-usb_xhci.$(OBJEXT)
+usbxhci_km_OBJECTS = $(am_usbxhci_km_OBJECTS)
+usbxhci_km_DEPENDENCIES = $(KERNEL_MODULE_LDADD_SHARED)
+usbxhci_km_LINK = $(CXXLD) $(usbxhci_km_CXXFLAGS) $(CXXFLAGS) \
+	$(usbxhci_km_LDFLAGS) $(LDFLAGS) -o $@
 am_user_shell_OBJECTS = user/test/user_shell-test.$(OBJEXT)
 user_shell_OBJECTS = $(am_user_shell_OBJECTS)
 user_shell_LDADD = $(LDADD)
@@ -998,7 +1000,7 @@ SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libg_a_SOURCES) \
 	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
 	$(keyb8042_km_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
 	$(mbr_km_SOURCES) $(nvme_km_SOURCES) $(rtl8139_km_SOURCES) \
-	$(shell_SOURCES) $(user_shell_SOURCES)
+	$(shell_SOURCES) $(usbxhci_km_SOURCES) $(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libg_a_SOURCES) $(libkei_a_SOURCES) $(libkm_a_SOURCES) \
 	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(ahci_km_SOURCES) \
@@ -1010,7 +1012,7 @@ DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
 	$(keyb8042_km_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
 	$(mbr_km_SOURCES) $(nvme_km_SOURCES) $(rtl8139_km_SOURCES) \
-	$(shell_SOURCES) $(user_shell_SOURCES)
+	$(shell_SOURCES) $(usbxhci_km_SOURCES) $(user_shell_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1997,7 +1999,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/usb_hub.cc \
 	kernel/device/usb_storage.h \
 	kernel/device/usb_storage.cc \
-	kernel/device/usb_xhci.cc \
 	kernel/device/virtio-base.cc \
 	kernel/device/virtio-base.h \
 	kernel/device/virtio-gpu.cc \
@@ -2618,6 +2619,22 @@ KERNEL_MODULE_LDADD_SHARED = \
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	kernel/arch/x86_64/module.ld
+
+usbxhci_km_SOURCES = \
+	kernel/device/usb_xhci.cc
+
+usbxhci_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+usbxhci_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/usbxhci.km.map
+
+usbxhci_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_usbxhci_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 rtl8139_km_SOURCES = \
 	kernel/device/rtl8139.cc
@@ -4382,9 +4399,6 @@ kernel/device/kernel_asan-usb_hub.$(OBJEXT):  \
 kernel/device/kernel_asan-usb_storage.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
-kernel/device/kernel_asan-usb_xhci.$(OBJEXT):  \
-	kernel/device/$(am__dirstamp) \
-	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_asan-virtio-base.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -4740,9 +4754,6 @@ kernel/device/kernel_generic-usb_hub.$(OBJEXT):  \
 kernel/device/kernel_generic-usb_storage.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
-kernel/device/kernel_generic-usb_xhci.$(OBJEXT):  \
-	kernel/device/$(am__dirstamp) \
-	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_generic-virtio-base.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -5092,9 +5103,6 @@ kernel/device/kernel_tracing-usb_hub.$(OBJEXT):  \
 kernel/device/kernel_tracing-usb_storage.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
-kernel/device/kernel_tracing-usb_xhci.$(OBJEXT):  \
-	kernel/device/$(am__dirstamp) \
-	kernel/device/$(DEPDIR)/$(am__dirstamp)
 kernel/device/kernel_tracing-virtio-base.$(OBJEXT):  \
 	kernel/device/$(am__dirstamp) \
 	kernel/device/$(DEPDIR)/$(am__dirstamp)
@@ -5205,6 +5213,13 @@ user/shell/shell-parser.$(OBJEXT): user/shell/$(am__dirstamp) \
 shell$(EXEEXT): $(shell_OBJECTS) $(shell_DEPENDENCIES) $(EXTRA_shell_DEPENDENCIES) 
 	@rm -f shell$(EXEEXT)
 	$(AM_V_CXXLD)$(shell_LINK) $(shell_OBJECTS) $(shell_LDADD) $(LIBS)
+kernel/device/usbxhci_km-usb_xhci.$(OBJEXT):  \
+	kernel/device/$(am__dirstamp) \
+	kernel/device/$(DEPDIR)/$(am__dirstamp)
+
+usbxhci.km$(EXEEXT): $(usbxhci_km_OBJECTS) $(usbxhci_km_DEPENDENCIES) $(EXTRA_usbxhci_km_DEPENDENCIES) 
+	@rm -f usbxhci.km$(EXEEXT)
+	$(AM_V_CXXLD)$(usbxhci_km_LINK) $(usbxhci_km_OBJECTS) $(usbxhci_km_LDADD) $(LIBS)
 user/test/$(am__dirstamp):
 	@$(MKDIR_P) user/test
 	@: > user/test/$(am__dirstamp)
@@ -5456,7 +5471,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-usb_hid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-usb_hub.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-usb_storage.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-vga.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-virtio-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_asan-virtio-blk.Po@am__quote@
@@ -5475,7 +5489,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_hid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_hub.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_storage.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-vga.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_generic-virtio-blk.Po@am__quote@
@@ -5494,7 +5507,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_hid.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_hub.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_storage.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-vga.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/kernel_tracing-virtio-blk.Po@am__quote@
@@ -5504,6 +5516,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/libkei_a-iocp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/nvme_km-nvme.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/rtl8139_km-rtl8139.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_asan-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_generic-keyb8042_layout_us.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/device/keyb8042_layout/$(DEPDIR)/kernel_tracing-keyb8042_layout_us.Po@am__quote@
@@ -11701,20 +11714,6 @@ kernel/device/kernel_asan-usb_storage.obj: kernel/device/usb_storage.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
 
-kernel/device/kernel_asan-usb_xhci.o: kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-usb_xhci.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Tpo -c -o kernel/device/kernel_asan-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_asan-usb_xhci.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
-
-kernel/device/kernel_asan-usb_xhci.obj: kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-usb_xhci.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Tpo -c -o kernel/device/kernel_asan-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_asan-usb_xhci.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_asan-usb_xhci.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_asan-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
-
 kernel/device/kernel_asan-virtio-base.o: kernel/device/virtio-base.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_asan-virtio-base.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_asan-virtio-base.Tpo -c -o kernel/device/kernel_asan-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_asan-virtio-base.Tpo kernel/device/$(DEPDIR)/kernel_asan-virtio-base.Po
@@ -13394,20 +13393,6 @@ kernel/device/kernel_generic-usb_storage.obj: kernel/device/usb_storage.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_storage.cc' object='kernel/device/kernel_generic-usb_storage.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
-
-kernel/device/kernel_generic-usb_xhci.o: kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-usb_xhci.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Tpo -c -o kernel/device/kernel_generic-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_generic-usb_xhci.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
-
-kernel/device/kernel_generic-usb_xhci.obj: kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-usb_xhci.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Tpo -c -o kernel/device/kernel_generic-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_generic-usb_xhci.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_generic-usb_xhci.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_generic-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
 
 kernel/device/kernel_generic-virtio-base.o: kernel/device/virtio-base.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_generic-virtio-base.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_generic-virtio-base.Tpo -c -o kernel/device/kernel_generic-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
@@ -15089,20 +15074,6 @@ kernel/device/kernel_tracing-usb_storage.obj: kernel/device/usb_storage.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-usb_storage.obj `if test -f 'kernel/device/usb_storage.cc'; then $(CYGPATH_W) 'kernel/device/usb_storage.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_storage.cc'; fi`
 
-kernel/device/kernel_tracing-usb_xhci.o: kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-usb_xhci.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Tpo -c -o kernel/device/kernel_tracing-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_tracing-usb_xhci.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
-
-kernel/device/kernel_tracing-usb_xhci.obj: kernel/device/usb_xhci.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-usb_xhci.obj -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Tpo -c -o kernel/device/kernel_tracing-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Tpo kernel/device/$(DEPDIR)/kernel_tracing-usb_xhci.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/kernel_tracing-usb_xhci.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/kernel_tracing-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
-
 kernel/device/kernel_tracing-virtio-base.o: kernel/device/virtio-base.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/kernel_tracing-virtio-base.o -MD -MP -MF kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Tpo -c -o kernel/device/kernel_tracing-virtio-base.o `test -f 'kernel/device/virtio-base.cc' || echo '$(srcdir)/'`kernel/device/virtio-base.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Tpo kernel/device/$(DEPDIR)/kernel_tracing-virtio-base.Po
@@ -15382,6 +15353,20 @@ user/shell/shell-parser.obj: user/shell/parser.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/shell/parser.cc' object='user/shell/shell-parser.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(shell_CXXFLAGS) $(CXXFLAGS) -c -o user/shell/shell-parser.obj `if test -f 'user/shell/parser.cc'; then $(CYGPATH_W) 'user/shell/parser.cc'; else $(CYGPATH_W) '$(srcdir)/user/shell/parser.cc'; fi`
+
+kernel/device/usbxhci_km-usb_xhci.o: kernel/device/usb_xhci.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(usbxhci_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/usbxhci_km-usb_xhci.o -MD -MP -MF kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Tpo -c -o kernel/device/usbxhci_km-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Tpo kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/usbxhci_km-usb_xhci.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(usbxhci_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/usbxhci_km-usb_xhci.o `test -f 'kernel/device/usb_xhci.cc' || echo '$(srcdir)/'`kernel/device/usb_xhci.cc
+
+kernel/device/usbxhci_km-usb_xhci.obj: kernel/device/usb_xhci.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(usbxhci_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/usbxhci_km-usb_xhci.obj -MD -MP -MF kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Tpo -c -o kernel/device/usbxhci_km-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Tpo kernel/device/$(DEPDIR)/usbxhci_km-usb_xhci.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/device/usb_xhci.cc' object='kernel/device/usbxhci_km-usb_xhci.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(usbxhci_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/usbxhci_km-usb_xhci.obj `if test -f 'kernel/device/usb_xhci.cc'; then $(CYGPATH_W) 'kernel/device/usb_xhci.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/usb_xhci.cc'; fi`
 
 .s.o:
 	$(AM_V_CCAS)$(CCASCOMPILE) -c -o $@ $<

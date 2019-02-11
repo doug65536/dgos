@@ -2362,12 +2362,10 @@ int usbxhci::make_setup_trbs(
     return trb - trbs;
 }
 
-void usbxhci_detect(void *)
+_constructor(ctor_ctors_ran) void usbxhci_detect(void *)
 {
     usbxhci::detect();
 }
-
-REGISTER_CALLOUT(usbxhci_detect, nullptr, callout_type_t::usb, "000");
 
 template<typename T>
 void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,

@@ -772,7 +772,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/usb_hub.cc \
 	kernel/device/usb_storage.h \
 	kernel/device/usb_storage.cc \
-	kernel/device/usb_xhci.cc \
 	kernel/device/virtio-base.cc \
 	kernel/device/virtio-base.h \
 	kernel/device/virtio-gpu.cc \
@@ -1577,6 +1576,26 @@ KERNEL_MODULE_LDADD_SHARED = \
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	kernel/arch/x86_64/module.ld
+
+#==========
+
+bin_PROGRAMS += usbxhci.km
+
+usbxhci_km_SOURCES = \
+	kernel/device/usb_xhci.cc
+
+usbxhci_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+usbxhci_km_LDFLAGS = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/usbxhci.km.map
+
+usbxhci_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_usbxhci_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========
 
