@@ -1940,7 +1940,7 @@ static void *mm_alloc_address_space(size_t len, bool user)
 
 EXPORT void *mm_alloc_space(size_t size)
 {
-    return (void*)linear_allocator.alloc_linear(size);
+    return (void*)linear_allocator.alloc_linear(round_up(size));
 }
 
 EXPORT void *mmap(void *addr, size_t len, int prot,
