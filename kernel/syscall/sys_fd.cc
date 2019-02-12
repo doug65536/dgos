@@ -498,3 +498,81 @@ int sys_access(char const *path, int mask)
     // FIXME: implement me
     return -int(errno_t::ENOSYS);
 }
+
+// == Sockets ==
+
+int sys_socket(int domain, int type, int protocol)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_accept(int sockfd, sockaddr *addr, socklen_t *addrlen)
+{
+    // FIXME: implement me
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t sys_send(int sockfd, const void *buf, size_t len, int flags)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t sys_sendto(int sockfd, void const *buf, size_t len, int flags,
+               struct sockaddr const *dest_addr, socklen_t addrlen)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t sys_recv(int sockfd, void *buf, size_t len, int flags)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+ssize_t sys_recvfrom(int sockfd, void *buf, size_t len, int flags,
+                 struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_shutdown(int sockfd, int how)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_listen(int sockfd, int backlog)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_fcntl(int fd, int cmd, void *arg)
+{
+    //switch (cmd) {
+//    case F_DUPFD:
+//    case F_DUPFD_CLOEXEC:
+//    case F_GETFD:
+//    case F_SETFD:
+//    case F_GETFL:
+//    case F_SETFL:
+//    case F_SETLK:
+//    case F_SETLKW:
+//    case F_GETLK:
+//    }
+    return int(errno_t::ENOSYS);
+}
+
+char *sys_getcwd(char *buf, size_t size)
+{
+    return (char*)intptr_t(errno_t::ENOSYS);
+}

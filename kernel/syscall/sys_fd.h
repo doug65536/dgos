@@ -6,6 +6,8 @@
 
 extern "C" {
 
+typedef uint32_t socklen_t;
+
 ssize_t sys_read(int fd, void *bufaddr, size_t count);
 ssize_t sys_write(int fd, void const *bufaddr, size_t count);
 int sys_close(int fd);
@@ -71,3 +73,18 @@ int sys_listxattr(char const *path,
 //    fs_pollhandle_t* ph, unsigned* reventsp) final;
 
 }
+int sys_socket(int domain, int type, int protocol);
+int sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int sys_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+ssize_t sys_send(int sockfd, const void *buf, size_t len, int flags);
+ssize_t sys_sendto(int sockfd, void const *buf, size_t len, int flags,
+                   struct sockaddr const *dest_addr, socklen_t addrlen);
+ssize_t sys_recv(int sockfd, void *buf, size_t len, int flags);
+ssize_t sys_recvfrom(int sockfd, void *buf, size_t len, int flags,
+                     struct sockaddr *src_addr, socklen_t *addrlen);
+int sys_shutdown(int sockfd, int how);
+int sys_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+int sys_listen(int sockfd, int backlog);
+char *sys_getcwd(char *buf, size_t size);
+
+int sys_fcntl(int fd, int cmd, void *arg);
