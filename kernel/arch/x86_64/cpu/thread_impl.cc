@@ -376,6 +376,8 @@ static void thread_startup(thread_fn_t fn, void *p, thread_t id)
 
 static constexpr size_t stack_guard_size = (64<<10);
 
+// Allocate a stack with a large guard region at both ends and
+// return a pointer to the end of the middle committed part
 static char *thread_allocate_stack(
         thread_t tid, size_t stack_size, char const *noun, int fill)
 {
