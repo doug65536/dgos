@@ -5,20 +5,20 @@ set +x
 mkdir -p iso_stage || exit
 "$1/mkposixdirs.sh" iso_stage || exit
 
-cp -u bootiso-bin iso_stage/bootiso-bin || exit
+ln -fsTr bootiso-bin iso_stage/bootiso-bin || exit
 
-ln -f kernel-generic iso_stage/dgos-kernel-generic || exit
-ln -f kernel-tracing iso_stage/dgos-kernel-tracing || exit
-ln -f kernel-asan iso_stage/dgos-kernel-asan|| exit
+ln -fsTr kernel-generic iso_stage/dgos-kernel-generic || exit
+ln -fsTr kernel-tracing iso_stage/dgos-kernel-tracing || exit
+ln -fsTr kernel-asan iso_stage/dgos-kernel-asan|| exit
 for f in initrd; do
-    cp -u "$f" "iso_stage/$f" || exit
+    ln -fsTr "$f" "iso_stage/$f" || exit
 done
 
-cp -u "$1/user/background.png" iso_stage || exit
+ln -fsTr "$1/user/background.png" iso_stage || exit
 
 mkdir -p iso_stage/EFI/boot || exit
-cp -u bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit
+ln -fsTr bootx64.efi iso_stage/EFI/boot/bootx64.efi || exit
 
-ln -f fatpart.img iso_stage/efipart.img || exit
+ln -fsTr fatpart.img iso_stage/efipart.img || exit
 
 #cp -u bootia32.efi iso_stage/EFI/boot/bootia32.efi || exit

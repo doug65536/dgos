@@ -1023,16 +1023,16 @@ sysroot/lib/crt0.o: \
 			-c $<
 
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
 
 sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
 
 sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
 
 sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp $< $@
+	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
 
 #sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
 #	$(MKDIR) -p "$(@D)" && cp $< $@
