@@ -1,6 +1,6 @@
 #!/bin/bash
 
-[ "$1" == "" ] && exit 1
+[[ -z "$1" ]] && exit 1
 
 mkdir -p "$1/bin" || exit
 mkdir -p "$1/boot" || exit
