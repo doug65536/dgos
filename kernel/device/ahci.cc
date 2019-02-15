@@ -1524,8 +1524,13 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
             cfis.h2d.ctl = AHCI_FIS_CTL_CMD;
 
             cfis.h2d.command = request.op == slot_op_t::read
-                    ? ata_cmd_t::READ_DMA_EXT
-                    : ata_cmd_t::WRITE_DMA_EXT;
+                    ? (pi.use_48bit
+                       ? ata_cmd_t::READ_DMA_EXT
+                       : ata_cmd_t::READ_DMA)
+                    : (pi.use_48bit
+                       ? ata_cmd_t::WRITE_DMA_EXT
+                       : ata_cmd_t::WRITE_DMA);
+
             assert(request.lba < (1UL << 48));
             cfis.h2d.set_lba(request.lba);
             cfis.h2d.set_count(transferred_blocks);
