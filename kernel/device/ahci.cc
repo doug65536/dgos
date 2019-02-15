@@ -1494,14 +1494,15 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
             cfis.ncq.fis_type = FIS_TYPE_REG_H2D;
             cfis.ncq.ctl = AHCI_FIS_CTL_CMD;
 
+            // NCQ is always 48 bit so no need to check pi.use_48bit
             cfis.ncq.command = request.op == slot_op_t::read
                     ? ata_cmd_t::READ_DMA_NCQ
                     : ata_cmd_t::WRITE_DMA_NCQ;
             cfis.ncq.set_lba(request.lba);
             cfis.ncq.set_count(transferred_blocks);
             cfis.ncq.tag = AHCI_FIS_TAG_TAG_n(slot);
-            cfis.ncq.fua = AHCI_FIS_FUA_LBA | (request.fua
-                                               ? AHCI_FIS_FUA_FUA : 0);
+            cfis.ncq.fua = AHCI_FIS_FUA_LBA |
+                    (request.fua ? AHCI_FIS_FUA_FUA : 0);
             cfis.ncq.prio = 0;
             cfis.ncq.aux = 0;
         } else if (pi.is_atapi) {
