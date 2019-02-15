@@ -1207,44 +1207,6 @@ void ahci_if_t::port_start_all()
     }
 }
 
-// Must be holding port lock
-void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
-        hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
-        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count)
-{
-    hba_port_info_t *pi = port_info + port_num;
-    hba_port_t volatile *port = mmio_base->ports + port_num;
-
-    hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
-    hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
-
-    slot_request_t &request = pi->slot_requests[slot];
-
-    if (likely(prdts != nullptr))
-        memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
-    else
-        memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
-
-    memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
-
-    if (atapi_fis)
-        cmd_tbl_ent->atapi_fis = *atapi_fis;
-
-    cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
-            (request.op == slot_op_t::write ? AHCI_CH_WR : 0) |
-            (atapi_fis ? AHCI_CH_ATAPI : 0);
-    cmd_hdr->prdbc = 0;
-    cmd_hdr->prdtl = ranges_count;
-
-    atomic_barrier();
-
-    if (pi->use_ncq)
-        port->sata_act = (1U<<slot);
-
-    atomic_barrier();
-    port->cmd_issue = (1U<<slot);
-}
-
 unsigned ahci_if_t::get_sector_size(unsigned port)
 {
     return 1U << port_info[port].log2_sector_size;
@@ -1556,6 +1518,44 @@ unsigned ahci_if_t::io_locked(unsigned port_num, slot_request_t &request,
     }
 
     return chunks;
+}
+
+// Must be holding port lock
+void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
+        hba_cmd_cfis_t const *cfis, atapi_fis_t const *atapi_fis,
+        size_t fis_size, hba_prdt_ent_t const *prdts, size_t ranges_count)
+{
+    hba_port_info_t *pi = port_info + port_num;
+    hba_port_t volatile *port = mmio_base->ports + port_num;
+
+    hba_cmd_hdr_t *cmd_hdr = pi->cmd_hdr + slot;
+    hba_cmd_tbl_ent_t *cmd_tbl_ent = pi->cmd_tbl + slot;
+
+    slot_request_t &request = pi->slot_requests[slot];
+
+    if (likely(prdts != nullptr))
+        memcpy(cmd_tbl_ent->prdts, prdts, sizeof(cmd_tbl_ent->prdts));
+    else
+        memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
+
+    memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
+
+    if (atapi_fis)
+        cmd_tbl_ent->atapi_fis = *atapi_fis;
+
+    cmd_hdr->hdr = AHCI_CH_LEN_n(fis_size >> 2) |
+            (request.op == slot_op_t::write ? AHCI_CH_WR : 0) |
+            (atapi_fis ? AHCI_CH_ATAPI : 0);
+    cmd_hdr->prdbc = 0;
+    cmd_hdr->prdtl = ranges_count;
+
+    atomic_barrier();
+
+    if (pi->use_ncq)
+        port->sata_act = (1U<<slot);
+
+    atomic_barrier();
+    port->cmd_issue = (1U<<slot);
 }
 
 // The command engine must be stopped before calling port_reset
