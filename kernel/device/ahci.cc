@@ -1565,7 +1565,6 @@ void ahci_if_t::port_reset(unsigned port_num)
             AHCI_HP_SC_DET_n(AHCI_HP_SC_DET_INIT);
 
     // Wait 3x the documented minimum
-    // FIXME: this isn't completely safe from IRQ handler
     nsleep(3000000);
 
     // Put port into normal operation
