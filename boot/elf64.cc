@@ -232,22 +232,36 @@ void elf64_run(tchar const *filename)
     if (read_size != sizeof(file_hdr))
         PANIC("Could not read ELF header");
 
-    // Check magic number
-    if (memcmp(&file_hdr.e_ident[EI_MAG0],
-               elf_magic, sizeof(elf_magic)))
+    //
+    // Check magic number and other excuses not to work
+
+    if (unlikely(file_hdr.e_ehsize != sizeof(Elf64_Ehdr)))
+        PANIC("Executable has unexpected elf header size");
+
+    if (unlikely(memcmp(&file_hdr.e_ident[EI_MAG0],
+                        elf_magic, sizeof(elf_magic))))
         PANIC("Could not read magic number");
+
+    if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr)))
+        PANIC("Executable has unexpected program header size");
+
+    if (unlikely(file_hdr.e_shentsize != sizeof(Elf64_Shdr)))
+        PANIC("Executable has unexpected section header size");
+
+    if (unlikely(file_hdr.e_machine != 62))
+        PANIC("Executable is for an unexpected machine id");
 
     // Load program headers
     Elf64_Phdr *program_hdrs;
     read_size = sizeof(*program_hdrs) * file_hdr.e_phnum;
     program_hdrs = (Elf64_Phdr*)malloc(read_size);
-    if (!program_hdrs)
+    if (unlikely(!program_hdrs))
         PANIC("Insufficient memory for program headers");
-    if (read_size != boot_pread(
-                file,
-                program_hdrs,
-                read_size,
-                file_hdr.e_phoff))
+    if (unlikely(read_size != boot_pread(
+                     file,
+                     program_hdrs,
+                     read_size,
+                     file_hdr.e_phoff)))
         PANIC("Could not read program headers");
 
     elf64_context_t *ctx = load_kernel_begin();
@@ -258,9 +272,6 @@ void elf64_run(tchar const *filename)
     }
 
     // Load relocations
-    if (file_hdr.e_shentsize != sizeof(Elf64_Shdr))
-        PRINT("Executable has unexpected section header size");
-
     ssize_t shbytes = file_hdr.e_shentsize * file_hdr.e_shnum;
     Elf64_Shdr *shdrs = (Elf64_Shdr*)malloc(shbytes);
 
