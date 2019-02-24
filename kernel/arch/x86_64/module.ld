@@ -47,6 +47,18 @@ SECTIONS {
 		PROVIDE_HIDDEN(___rodata_en = .);
 	} :read
 
+	.gnu.version : {
+		*(.gnu.version)
+	} :read
+
+	.gnu.version_r : {
+		*(.gnu.version_r)
+	}
+
+	.gnu.version_d : {
+		*(.gnu.version_d)
+	}
+
 	.eh_frame_hdr : {
 		*(.eh_frame_hdr)
 		*(.eh_frame_entry .eh_frame_entry.*)
@@ -138,8 +150,6 @@ SECTIONS {
 		PROVIDE_HIDDEN(___text_en = .);
 	} :text
 
-	. = ALIGN(16);
-
 	.plt : {
 		PROVIDE_HIDDEN(___plt_st = .);
 		*(.plt)
@@ -175,19 +185,15 @@ SECTIONS {
 	. = ALIGN(4K);
 	PROVIDE_HIDDEN(___image_en = .);
 
-/*
-	.debug_info		(NOLOAD) : { *(.debug_info)    }
-	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  }
-	.debug_aranges	(NOLOAD) : { *(.debug_aranges) }
-	.debug_ranges	(NOLOAD) : { *(.debug_ranges) }
-	.debug_macro	(NOLOAD) : { *(.debug_macro)   }
-	.debug_line		(NOLOAD) : { *(.debug_line)    }
-	.debug_str		(NOLOAD) : { *(.debug_str)     }
-
-	/DISCARD/       : { *(.interp)        }
-	/DISCARD/		: { *(.comment)       }
-	/DISCARD/		: { *(.gnu.version_d) }
-	/DISCARD/		: { *(.gnu.version_r) }
-	/DISCARD/		: { *(.gnu.version)   }
-*/
+	.debug          : { *(.debug)         }
+	.debug_info		: { *(.debug_info)    }
+	.debug_abbrev	: { *(.debug_abbrev)  }
+	.debug_aranges	: { *(.debug_aranges) }
+	.debug_ranges	: { *(.debug_ranges)  }
+	.debug_frame	: { *(.debug_frame)   }
+	.debug_macro	: { *(.debug_macro)   }
+	.debug_line		: { *(.debug_line)    }
+	.debug_str		: { *(.debug_str)     }
+	.debug_loc		: { *(.debug_loc)     }
+	.comment        : { *(.comment)       }
 }

@@ -4,45 +4,58 @@ PHDRS {
 	/* 4 = read */
 	/* 5 = 4+1 = read+execute */
 	/* 6 = 4+2 = read+write */
+
+	/* r-- */
 	readonly PT_LOAD FILEHDR PHDRS FLAGS(4);
+
+	/* r-x */
 	text PT_LOAD FLAGS(5);
+
+	/* rw- */
 	data PT_LOAD FLAGS(6);
+
+	/* --- */
 	guard PT_LOAD FLAGS(0);
+
+	/* rw- */
 	stacks PT_LOAD FLAGS(6);
 }
 
 SECTIONS {
 	. = 0xFFFFFFFF80000000;
 
+	/* r-- begins */
+	. = ALIGN(4K);
+
 	PROVIDE_HIDDEN(__image_start = .);
 
 	. += SIZEOF_HEADERS;
 
-	.rodata : {
-		PROVIDE_HIDDEN(___rodata_st = .);
-
+	.init_array : {
 		PROVIDE_HIDDEN(___ctors_st = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		*(.ctors)
-		*(.ctors.*)
+		*(SORT_BY_INIT_PRIORITY(.ctors.*))
 		PROVIDE_HIDDEN(___ctors_en = .);
+	} :readonly
 
-		. = ALIGN(16);
+	.fini_array : {
 		PROVIDE_HIDDEN(___dtors_st = .);
 		*(.fini_array)
 		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
 		*(.dtors)
-		*(.dtors.*)
+		*(SORT_BY_INIT_PRIORITY(.dtors.*))
 		PROVIDE_HIDDEN(___dtors_en = .);
+	} :readonly
 
-		. = ALIGN(32);
+	.rodata : {
+		PROVIDE_HIDDEN(___rodata_st = .);
 
 		PROVIDE_HIDDEN(___callout_array_st = .);
 		*(SORT(.callout_array.*))
 		PROVIDE_HIDDEN(___callout_array_en = .);
 
-		. = ALIGN(64);
 		PROVIDE_HIDDEN(___rodata = .);
 		*(.rodata)
 		*(SORT(.rodata.*))
@@ -53,15 +66,17 @@ SECTIONS {
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
 
+		*(.comment)
+
 		PROVIDE_HIDDEN(___rodata_en = .);
 	} :readonly
 
-	.eh_frame_hdr :  ALIGN(64) {
+	.eh_frame_hdr : {
 		*(.eh_frame_hdr)
 		*(.eh_frame_entry .eh_frame_entry.*)
 	} :readonly
 
-	.eh_frame : ALIGN(64) {
+	.eh_frame : {
 		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
 		*(.eh_frame.*)
@@ -88,6 +103,14 @@ SECTIONS {
 		*(.dynstr);
 		*(.dynstr*);
 		PROVIDE_HIDDEN(___dynstr_en = .);
+	} :readonly
+
+	.rela.plt : {
+		PROVIDE_HIDDEN(___rela_plt = .);
+		*(.rela.plt)
+		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		*(.rela.iplt)
+		PROVIDE_HIDDEN (__rela_iplt_end = .);
 	} :readonly
 
 	.rela.dyn : ALIGN(64) {
@@ -118,9 +141,13 @@ SECTIONS {
 	} :readonly
 	PROVIDE_HIDDEN(__rela_dyn_en = .);
 
+	.note : {
+		*(.note*)
+	} :readonly
+
+	/* r-x begins */
 	. = ALIGN(4K);
 
-	/* Code and read-only data */
 	.text : {
 		PROVIDE_HIDDEN(___text_st = .);
 		/* ISR code is hot and should be page aligned because it is cloned */
@@ -142,22 +169,13 @@ SECTIONS {
 		PROVIDE_HIDDEN(___text_en = .);
 	} :text
 
-	.plt.got : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_got = .);
-		*(.plt.got)
-	} :text
-
-	.plt.bnd : ALIGN(64) {
-		PROVIDE_HIDDEN(___plt_bnd = .);
-		*(.plt.bnd)
-	} :text
-
-	.plt : ALIGN(64) {
+	.plt : {
 		PROVIDE_HIDDEN(___plt = .);
 		*(.plt)
 		*(.iplt)
 	} :text
 
+	/* rw- begins */
 	. = ALIGN(4K);
 
 	.dynamic : {
@@ -166,14 +184,27 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	} :data
 
-	.got : ALIGN(64) {
+	.plt.got : {
+		PROVIDE_HIDDEN(___plt_got = .);
+		*(.plt.got)
+	} :data
+
+	.plt.bnd : {
+		PROVIDE_HIDDEN(___plt_bnd = .);
+		*(.plt.bnd)
+	} :data
+
+	.got : {
 		PROVIDE_HIDDEN(___got = .);
-		*(.got*)
+		*(.got)
+	} :data
+
+	.got.plt : {
 		*(.got.plt)
 	} :data
 
 	/* Initialized data */
-	.data : ALIGN(64) {
+	.data : {
 		PROVIDE_HIDDEN(___data_st = .);
 		*(.data)
 		*(SORT(.data.*))
@@ -190,11 +221,17 @@ SECTIONS {
 		PROVIDE_HIDDEN(___bss_en = .);
 	} :data
 
-	.bspguard (NOLOAD) : ALIGN(4096) {
-		. += 4096;
+	/* --- begins */
+	. = ALIGN(4K);
+
+	.bspguard (NOLOAD) : {
+		. += 4K;
 	} :guard
 
-	.bspstk (NOLOAD) : ALIGN(4096) {
+	/* rw- begins */
+	. = ALIGN(4K);
+
+	.bspstk (NOLOAD) : {
 		PROVIDE_HIDDEN(__bspstk_st = .);
 		/* emergency stack for early bootstrap */
 		. = . + 65536;
@@ -203,24 +240,19 @@ SECTIONS {
 		PROVIDE_HIDDEN(__bspstk_en = .);
 	} :stacks
 
-	.note : {
-		*(.note*)
-	}
-
-	. = ALIGN(4096);
+	. = ALIGN(4K);
 	PROVIDE_HIDDEN(___init_brk = .);
 
-	.debug          0 : { *(.debug)         } :readonly
-	.debug_info		0 : { *(.debug_info)    } :readonly
-	.debug_abbrev	0 : { *(.debug_abbrev)  } :readonly
-	.debug_aranges	0 : { *(.debug_aranges) } :readonly
-	.debug_ranges	0 : { *(.debug_ranges)  } :readonly
-	.debug_frame	0 : { *(.debug_frame)   } :readonly
-	.debug_macro	0 : { *(.debug_macro)   } :readonly
-	.debug_line		0 : { *(.debug_line)    } :readonly
-	.debug_str		0 : { *(.debug_str)     } :readonly
-	.debug_loc		0 : { *(.debug_loc)     } :readonly
-	.comment        0 : { *(.comment)       } :readonly
+	.debug          0 : { *(.debug)         }
+	.debug_info		0 : { *(.debug_info)    }
+	.debug_abbrev	0 : { *(.debug_abbrev)  }
+	.debug_aranges	0 : { *(.debug_aranges) }
+	.debug_ranges	0 : { *(.debug_ranges)  }
+	.debug_frame	0 : { *(.debug_frame)   }
+	.debug_macro	0 : { *(.debug_macro)   }
+	.debug_line		0 : { *(.debug_line)    }
+	.debug_str		0 : { *(.debug_str)     }
+	.debug_loc		0 : { *(.debug_loc)     }
 
 /*
 	/DISCARD/		0 : { *(.debug)         } :readonly
@@ -240,6 +272,4 @@ SECTIONS {
 	/DISCARD/		0 : { *(.gnu*)                 }
 	/DISCARD/		0 : { *(.comment)              }
 	/DISCARD/		0 : { *(.note.gnu.build-id)    }
-
-	__cxa_pure_virtual = __cxa_pure_virtual;
 }

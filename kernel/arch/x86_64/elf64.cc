@@ -15,6 +15,7 @@
 #include "cpu.h"
 #include "callout.h"
 #include "cxxstring.h"
+#include "cpu/control_regs.h"
 
 #define ELF64_DEBUG     1
 #if ELF64_DEBUG
@@ -180,11 +181,8 @@ public:
 module_t *modload_load(char const *path, bool run)
 {
     std::unique_ptr<module_t> module(new module_t{});
-    if (likely(module->load(path))) {
-//        if (run)
-//            module->run();
+    if (likely(module->load(path)))
         return module.release();
-    }
     return nullptr;
 }
 
@@ -193,13 +191,77 @@ int modload_run(module_t *module)
     return module->run();
 }
 
+static char const * const relocation_types_0_15[16] = {
+    "NONE",
+    "64",
+    "PC32",
+    "GOT32",
+    "PLT32",
+    "COPY",
+    "GLOB_DAT",
+    "JUMP_SLOT",
+    "RELATIVE",
+    "GOTPCREL",
+    "32",
+    "32S",
+    "16",
+    "PC16",
+    "8",
+    "PC8"
+};
+
+static char const * const relocation_types_24_26[3] = {
+    "PC64",
+    "GOTOFF64",
+    "GOTPC32"
+};
+
+static char const * const relocation_types_32_33[2] = {
+    "SIZE32",
+    "SIZE64"
+};
+
+static char const * const relocation_types_42_42[1] = {
+    "REX_GOTPCRELX"
+};
+
+static constexpr char const *get_relocation_type(size_t type) {
+    if (type < 16)
+        return relocation_types_0_15[type];
+    if (type >= 24 && type <= 26)
+        return relocation_types_24_26[type - 24];
+    if (type >= 32 && type <= 33)
+        return relocation_types_32_33[type - 32];
+    if (type >= 42 && type <= 42)
+        return relocation_types_42_42[type - 42];
+    return "<unrecognized relocation!>";
+}
+
+// This function's purpose is to act as a place to put a breakpoint
+// with commands that magically load the symbols for a module when loaded
+static void modload_load_symbols(char const *path, uintptr_t addr)
+{
+    // Seriously compliler, please don't elide, thanks!
+    // The debugger is actually going to dereference path and get addr
+    // So that memory clobber is really needed, I need the caller to write
+    // the actual path string into memory there (flow analysis could discard
+    // it without the memory clobber)
+    __asm__ __volatile__ ("" : : "r" (path), "r" (addr) : "memory");
+}
+
+static bool load_failed()
+{
+    cpu_debug_break();
+    return false;
+}
+
 bool module_t::load(const char *path)
 {
     file_t fd{file_open(path, O_RDONLY)};
 
     if (unlikely(!fd.is_open())) {
         printdbg("Failed to open module \"%s\"\n", path);
-        return false;
+        return load_failed();
     }
 
     ELF64_TRACE("module %s opened, fd=%d\n", path, (int)fd);
@@ -207,24 +269,22 @@ bool module_t::load(const char *path)
     if (unlikely(sizeof(file_hdr) !=
                  file_read(fd, &file_hdr, sizeof(file_hdr)))) {
         printdbg("Failed to read module file header\n");
-        return false;
+        return load_failed();
     }
 
     if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
         printdbg("Unrecognized program header record size\n");
-        return false;
+        return load_failed();
     }
 
-    if (!phdrs.resize(file_hdr.e_phnum)) {
-        printdbg("OOM!\n");
-        return false;
-    }
+    if (unlikely(!phdrs.resize(file_hdr.e_phnum)))
+        panic_oom();
 
     if (unlikely(ssize_t(sizeof(Elf64_Phdr) * file_hdr.e_phnum) != file_pread(
                      fd, phdrs.data(), sizeof(Elf64_Phdr) * file_hdr.e_phnum,
                      file_hdr.e_phoff))) {
         printdbg("Failed to read %u program headers\n", file_hdr.e_phnum);
-        return false;
+        return load_failed();
     }
 
     // Calculate address space needed
@@ -253,10 +313,14 @@ bool module_t::load(const char *path)
         void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
                           phdr.p_memsz, PROT_READ | PROT_WRITE,
                           MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
-        if (addr == MAP_FAILED) {
+        if (unlikely(addr == MAP_FAILED)) {
             printdbg("Failed to map section\n");
-            return false;
+            return load_failed();
         }
+
+        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", path,
+                    ((phdr.p_memsz) + 4095) & -4096,
+                    uintptr_t(addr));
     }
 
     // Pass 3, load sections
@@ -269,27 +333,32 @@ bool module_t::load(const char *path)
 
         void *addr = (void*)(phdr.p_vaddr + base_adj);
 
-        if (ssize_t(phdr.p_filesz) != file_pread(
-                    fd, addr, phdr.p_filesz, phdr.p_offset)) {
+        if (unlikely(ssize_t(phdr.p_filesz) != file_pread(
+                         fd, addr, phdr.p_filesz, phdr.p_offset))) {
             printdbg("Failed to read segment\n");
-            return false;
+            return load_failed();
         }
+
+        size_t zeroed = phdr.p_memsz - phdr.p_filesz;
+        void *zeroed_addr = (void*)(phdr.p_vaddr + base_adj + phdr.p_filesz);
+        memset(zeroed_addr, 0, zeroed);
     }
 
     dyn_entries = dyn_seg->p_memsz / sizeof(Elf64_Dyn);
 
-    if (dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz) {
+    if (unlikely(dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz)) {
         printdbg("Dynamic segment has unexpected size\n");
-        return false;
+        return load_failed();
     }
 
-    dyn.resize(dyn_entries);
+    if (unlikely(!dyn.resize(dyn_entries)))
+        panic_oom();
 
     if (unlikely(ssize_t(dyn_seg->p_filesz) != file_pread(
                      fd, dyn.data(), dyn_seg->p_filesz, dyn_seg->p_offset))) {
         // FIXME: LEAK!
         printdbg("Dynamic segment read failed\n");
-        return false;
+        return load_failed();
     }
 
     //
@@ -317,7 +386,7 @@ bool module_t::load(const char *path)
                 printdbg("Unexpected symbol record size"
                          ", expect=%zu, got=%zu\n", sizeof(Elf64_Sym),
                          dyn_ent.d_un.d_val);
-                return false;
+                return load_failed();
             }
             continue;
 
@@ -332,7 +401,7 @@ bool module_t::load(const char *path)
         case DT_PLTREL:
             if (unlikely(dyn_ent.d_un.d_val != DT_RELA)) {
                 printdbg("Unexpected relocation type, expecting RELA\n");
-                return false;
+                return load_failed();
             }
             continue;
 
@@ -351,7 +420,7 @@ bool module_t::load(const char *path)
         case DT_RELAENT:
             if (unlikely(dyn_ent.d_un.d_val != sizeof(Elf64_Rela))) {
                 printdbg("Relocations have unexpected size\n");
-                return false;
+                return load_failed();
             }
             continue;
 
@@ -392,18 +461,12 @@ bool module_t::load(const char *path)
             dt_symbolic = dyn_ent.d_un.d_val;
             continue;
 
-//        case DT_REL:
-//            dt_rel = dyn_ent.d_un.d_val;
-//            continue;
-//
-//        case DT_RELSZ:
-//            dt_relsz = dyn_ent.d_un.d_val;
-//            continue;
-//
-//        case DT_RELENT:
-//            dt_relent = dyn_ent.d_un.d_val;
-//            continue;
-//
+        case DT_REL:    // fallthru
+        case DT_RELSZ:  // fallthru
+        case DT_RELENT:
+            printdbg("Unhandled relocation type\n");
+            continue;
+
         case DT_DEBUG:
             continue;
 
@@ -412,7 +475,7 @@ bool module_t::load(const char *path)
             continue;
 
         case DT_BIND_NOW:
-            dt_bind_now = dyn_ent.d_un.d_val;
+            dt_bind_now = 1;
             continue;
 
         case DT_INIT_ARRAY:
@@ -432,21 +495,28 @@ bool module_t::load(const char *path)
             continue;
 
         default:
+            printdbg("encountered unknown .dynamic entry type=%#" PRIx64 "\n",
+                     dyn_ent.d_tag);
             ++unknown_count;
             continue;
         }
     }
 
+    if (unknown_count) {
+        printdbg("encountered %zu unrecognized .dynamic entries\n",
+                 unknown_count);
+    }
+
     dt_relaent = dt_relasz / sizeof(Elf64_Rela);
 
-    syms = (Elf64_Sym*)(dt_symtab + base_adj);
+    syms = (Elf64_Sym const *)(dt_symtab + base_adj);
 
     Elf64_Rela const *rela_ptrs[] = {
         (Elf64_Rela*)(dt_rela + base_adj),
         (Elf64_Rela*)(dt_jmprel + base_adj)
     };
 
-    size_t rela_cnts[] = {
+    size_t const rela_cnts[] = {
         dt_relaent,
         dt_pltrelsz / sizeof(Elf64_Rela)
     };
@@ -461,6 +531,11 @@ bool module_t::load(const char *path)
             void const *operand = (void*)(rela_ptr[i].r_offset + base_adj);
             Elf64_Word sym_idx = ELF64_R_SYM(rela_ptr[i].r_info);
             Elf64_Word sym_type = ELF64_R_TYPE(rela_ptr[i].r_info);
+
+            auto const& sym = syms[sym_idx];
+
+            if (sym.st_info == 0)
+                continue;
 
             printdbg("Fixup at %#zx + %#zx (%#zx), type=%s\n",
                      uintptr_t(base_adj), uintptr_t(rela_ptr[i].r_offset),
@@ -480,170 +555,216 @@ bool module_t::load(const char *path)
             auto const P = intptr_t(operand);
             auto const& G = dt_pltgot + base_adj;
 
-            // hack
-            auto L = 0;
-            auto Z = 0;
+            auto const Z = sym.st_size;
 
-            auto const& sym = syms[sym_idx];
             auto S = sym.st_value + base_adj;
 
-            auto strs = (char*)(dt_strtab + base_adj);
+            auto const strs = (char const *)(dt_strtab + base_adj);
+            char const *name = strs + sym.st_name;
 
-            char const *name = nullptr;
-            if (sym.st_value == 0 && sym.st_name) {
+            //assert(!name ^ !sym.st_value);
+
+            if (sym.st_name) {
                 // Lookup name in kernel
-                name = strs + sym.st_name;
+                ELF64_TRACE("%s lookup %s\n", path, name);
                 Elf64_Sym const *addr = modload_lookup_name(&export_ht, name);
-                S = intptr_t(addr->st_value);
+
+                if (addr)
+                    S = intptr_t(addr->st_value);
+
+                if (!S) {
+                    printk("module link error in %s:"
+                           " Symbol \"%s\" not found", path, name);
+                    return load_failed();
+                }
             }
 
-            int64_t value;
+            uint64_t value;
+
+            char const * const type_txt = get_relocation_type(sym_type);
 
             switch (sym_type) {
-            case R_AMD64_NONE:
-                printdbg("R_AMD64_NONE\n");
-                continue;
-
-            case R_AMD64_64:
-                // word64 S + A
-                value = S + A;
-                *(int64_t*)operand = value;
-                printdbg("R_AMD64_64=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_PC32:
-                // word32 S + A - P
-                value = S + A - P;
-                *(int32_t*)operand = value;
-                printdbg("R_AMD64_PC32=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_GOT32:
-                // word32 G + A
-                value = G + A;
-                *(int32_t*)operand = value;
-                printdbg("R_AMD64_GOT32=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_PLT32:
-                // word32 L + A - P
-                value = L + A - P;
-                *(int32_t*)operand = value;
-                printdbg("R_AMD64_PLT32=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_COPY:
-                // Refer to the explanation following this table. ???
-                printdbg("R_AMD64_COPY\n");
-
-                break;
-
-            case R_AMD64_GLOB_DAT:
+            case R_AMD64_JUMP_SLOT://7
                 // word64 S
-                value = S; *(int64_t*)operand = value;
-                printdbg("R_AMD64_GLOB_DAT=%#" PRIx64 "\n", value);
-                break;
 
-            case R_AMD64_JUMP_SLOT:
-                // word64 S
-                //value = S; *(int64_t*)operand = value;
-                *(int64_t*)operand += base_adj;
+                if (dt_bind_now) {
+                    // Link it all right now
+                    *(int64_t*)operand = S;
+                } else {
+                    // Just add base to point to lazy resolution thunk
+                    *(int64_t*)operand += base_adj;
+                }
 
                 printdbg("R_AMD64_JUMP_SLOT=%#" PRIx64 ", name=%s\n",
                          value, name);
                 break;
 
-            case R_AMD64_RELATIVE:
+            // === 64 bit ===
+
+            case R_AMD64_64:    //1
+                // word64 S + A
+                value = S + A;
+                goto int64_common;
+
+            case R_AMD64_GLOB_DAT://6
+                // word64 S
+                value = S;
+                goto int64_common;
+
+            case R_AMD64_RELATIVE://8
                 // word64 B + A
-                value = B + A; *(int64_t*)operand = value;
-                printdbg("R_AMD64_RELATIVE=%#" PRIx64 "\n", value);
-                break;
+                value = B + A;
+                goto int64_common;
 
-            case R_AMD64_GOTPCREL:
-                // word32 G + GOT + A - P
-                value = G + A - P; *(int32_t*)operand = value;
-                printdbg("R_AMD64_GOTPCREL=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_32:
-                // word32 S + A
-                value = S + A; *(int32_t*)operand = value;
-                printdbg("R_AMD64_32=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_32S:
-                // word32 S + A
-                value = S + A;
-                *(int32_t*)operand = value;
-                printdbg("R_AMD64_32S=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_16:
-                // word16 S + A
-                value = S + A;
-            *(int16_t*)operand = value;
-                printdbg("R_AMD64_16=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_PC16:
-                // word16 S + A - P
-                value = S + A - P;
-                *(int16_t*)operand = value;
-                printdbg("R_AMD64_PC16=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_8:
-                // word8 S + A
-                value = S + A;
-                *(int8_t*)operand = value;
-                printdbg("R_AMD64_8=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_PC8:
-                // word8 S + A - P
-                value = S + A - P;
-                *(int8_t*)operand = value;
-                printdbg("R_AMD64_PC8=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_PC64:
-                // word64 S + A - P
-                value = S + A - P;
-                *(int64_t*)operand = value;
-                printdbg("R_AMD64_PC64=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_GOTOFF64:
+            case R_AMD64_GOTOFF64://25
                 // word64 S + A - GOT
                 value = S + A - dt_pltgot;
-                *(int64_t*)operand = value;
-                printdbg("R_AMD64_GOTOFF64=%#" PRIx64 "\n", value);
-                break;
+                goto int64_common;
 
-            case R_AMD64_GOTPC32:
-                // word32 GOT + A + P
-                value = G + A + P;
-                *(int32_t*)operand = value;
-                printdbg("R_AMD64_GOTPC32=%#" PRIx64 "\n", value);
-                break;
+            case R_AMD64_PC64:  //24
+                // word64 S + A - P
+                value = S + A - P;
+                goto int64_common;
 
-            case R_AMD64_SIZE32:
-                // word32 Z + A
-                value = Z + A;
-                *(int32_t*)operand = value;
-                printdbg("R_AMD64_SIZE32=%#" PRIx64 "\n", value);
-                break;
-
-            case R_AMD64_SIZE64:
+            case R_AMD64_SIZE64://33
                 // word64 Z + A
                 value = Z + A;
-                *(int64_t*)operand = value;
-                printdbg("R_AMD64_SIZE64=%#" PRIx64 "\n", value);
-                break;
+                goto int64_common;
+
+            // === 32 bit ===
+
+            case R_AMD64_PC32:  //2
+                // word32 S + A - P
+                value = S + A - P;
+                goto int32_common;
+
+            case R_AMD64_GOT32: //3
+                // word32 G + A
+                value = G + A;
+                goto uint32_common;
+
+//            case R_AMD64_COPY:  //5
+//                // Refer to the explanation following this table. ???
+//                printdbg("R_AMD64_COPY\n");
+
+//                break;
+
+            case R_AMD64_GOTPC32:// 26
+                // word32 GOT + A + P
+                value = G + A + P;
+                goto int32_common;
+
+            case R_AMD64_SIZE32:// 32
+                // word32 Z + A
+                cpu_debug_break();
+                value = Z + A;
+                goto uint32_common;
+
+//            case R_AMD64_PLT32: //4
+//                // word32 L + A - P
+//                value = L + A - P;
+//                goto int32_common;
+
+            case R_AMD64_GOTPCREL://9
+                // word32 G + GOT + A - P
+                value = G + A - P;
+                goto int32_common;
+
+            case R_AMD64_32:    //10
+                // word32 S + A
+                value = S + A;
+                goto uint32_common;
+
+            case R_AMD64_32S:   //11
+                // word32 S + A
+                value = S + A;
+                goto int32_common;
+
+            // === 16 bit ===
+
+            case R_AMD64_16:    //12
+                // word16 S + A
+                value = S + A;
+                goto uint16_common;
+
+            case R_AMD64_PC16:  //13
+                // word16 S + A - P
+                value = S + A - P;
+                goto int16_common;
+
+            // === 8 bit ===
+
+            case R_AMD64_8:     //14
+                // word8 S + A
+                value = S + A;
+                goto uint8_common;
+
+            case R_AMD64_PC8:   //15
+                // word8 S + A - P
+                value = S + A - P;
+                goto int8_common;
+
+            // === No operation ===
+
+            case R_AMD64_NONE:
+                printdbg("%s\n", type_txt);
+                continue;
 
             default:
                 printdbg("Unknown relocation type %#x\n", sym_type);
+                cpu_debug_break();
                 break;
+
+int32_common:
+                *(int32_t*)operand = value;
+                if (unlikely(int64_t(value) != int32_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+uint32_common:
+                *(uint32_t*)operand = uint32_t(value);
+                if (unlikely(value != uint32_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+int16_common:
+                *(int16_t*)operand = int16_t(value);
+                if (unlikely(int64_t(value) != int16_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+uint16_common:
+                *(uint16_t*)operand = uint16_t(value);
+                if (unlikely(value != uint16_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+int8_common:
+                *(int8_t*)operand = int8_t(value);
+                if (unlikely(int64_t(value) != int8_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+uint8_common:
+                *(uint8_t*)operand = uint8_t(value);
+                printdbg("%s=%#" PRIx64 "\n", type_txt, value);
+                if (unlikely(value != uint8_t(value)))
+                    goto truncated_common;
+                goto all_common;
+
+int64_common:
+                *(int64_t*)operand = int64_t(value);
+                goto all_common;
+
+all_common:
+                printdbg("Wrote type=%s, value=%#" PRIx64 " to vaddr=%#zx\n",
+                         type_txt, value, uintptr_t(operand));
+                break;
+
+truncated_common:
+                printdbg("%s: %s relocation truncated to fit!\n",
+                         path, type_txt);
+                return load_failed();
             }
         }
     }
@@ -680,10 +801,12 @@ bool module_t::load(const char *path)
     printdbg("Module %s loaded at %#" PRIx64 "\n", path, base_adj);
     printdbg("gdb: add-symbol-file %s %#" PRIx64 "\n", path, first_exec);
 
+    modload_load_symbols(path, first_exec);
+
     // Run the init array
-    uintptr_t *fn_addrs = (uintptr_t*)(dt_init_array + base_adj);
+    uintptr_t const *fn_addrs = (uintptr_t const *)(dt_init_array + base_adj);
     for (size_t i = 0, e = dt_init_arraysz / sizeof(uintptr_t); i != e; ++i) {
-        auto fn = (void(*)())(fn_addrs[i]);
+        auto fn = (void(*)())(fn_addrs[i] + base_adj);
         fn();
     }
 
