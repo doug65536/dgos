@@ -1538,7 +1538,7 @@ void ahci_if_t::cmd_issue(unsigned port_num, unsigned slot,
     else
         memset(cmd_tbl_ent->prdts, 0, sizeof(cmd_tbl_ent->prdts));
 
-    memcpy(&cmd_tbl_ent->cfis, cfis, sizeof(*cfis));
+    cmd_tbl_ent->cfis = *cfis;
 
     if (atapi_fis)
         cmd_tbl_ent->atapi_fis = *atapi_fis;
@@ -1786,10 +1786,22 @@ std::vector<storage_if_base_t *> ahci_if_factory_t::detect(void)
 
         std::unique_ptr<ahci_if_t> self(new ahci_if_t{});
 
-        if (self->init(pci_iter)) {
-            ahci_devices.push_back(self);
-            list.push_back(self.release());
+        if (likely(self->init(pci_iter))) {
+            if (likely(list.push_back(self.get()))) {
+                if (likely(ahci_devices.push_back(self))) {
+                    // Success path
+                    self.release();
+                    continue;
+                } else {
+                    // We are letting unique_ptr destroy the
+                    // item we put in here, so take it out
+                    list.pop_back();
+                }
+            }
         }
+
+        // Only reaches here if there was a problem above
+        AHCI_TRACE("Out of memory in push_back!");
     } while (pci_enumerate_next(&pci_iter));
 
     return list;
