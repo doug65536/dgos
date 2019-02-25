@@ -1100,6 +1100,24 @@ usbxhci_endpoint_data_t *usbxhci::lookup_endpoint(uint8_t slotid, uint8_t epid)
     return data;
 }
 
+bool usbxhci::remove_endpoint(uint8_t slotid, uint8_t epid)
+{
+    scoped_lock hold_endpoints_lock(endpoints_lock);
+
+    for (auto it = endpoints.begin(), en = endpoints.end(); it != en; ++it) {
+        auto& endpoint = *it;
+        if (endpoint->target.slotid == slotid &&
+                endpoint->target.epid == epid) {
+            endpoints.erase(it);
+            usbxhci_endpoint_target_t key{ slotid, epid };
+            endpoint_lookup.del(&key);
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void usbxhci::dump_config_desc(usb_config_helper const& cfg_hlp)
 {
     USBXHCI_TRACE("Dumping configuration descriptors\n");
@@ -2412,7 +2430,6 @@ void usbxhci_ring_data_t<T>::insert(usbxhci *ctrl, usbxhci_cmd_trb_t *src,
     atomic_st_rel(&dst->data[3],
             (src->data[3] & ~USBXHCI_CTL_TRB_FLAGS_C) |
             USBXHCI_CTL_TRB_FLAGS_C_n(cycle));
-
 
     if (ins_pending) {
         usbxhci_pending_cmd_t *pending_cmd = pending + next;
