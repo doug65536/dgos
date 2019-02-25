@@ -37,7 +37,7 @@ char *strncat(char * restrict dest, char const * restrict src, size_t n);
 int ucs4_to_utf8(char *out, int in);
 int ucs4_to_utf16(char16_t *out, int in);
 char32_t utf8_to_ucs4(char const *in, char const **ret_end);
-char32_t utf8_to_ucs4_inplace(char const *&in);
+char32_t utf8_to_ucs4_upd(char const *&in);
 
 int utf16_to_ucs4(uint16_t const *in, uint16_t const **ret_end);
 int utf16be_to_ucs4(uint16_t const *in, uint16_t const **ret_end);

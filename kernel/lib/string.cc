@@ -594,13 +594,13 @@ EXPORT int ucs4_to_utf16(char16_t *out, int in)
 // is not advanced
 EXPORT char32_t utf8_to_ucs4(char const *in, char const **ret_end)
 {
-    char32_t result = utf8_to_ucs4_inplace(in);
+    char32_t result = utf8_to_ucs4_upd(in);
     if (ret_end)
         *ret_end = in;
     return result;
 }
 
-EXPORT char32_t utf8_to_ucs4_inplace(char const *&in)
+EXPORT char32_t utf8_to_ucs4_upd(char const *&in)
 {
     int n;
 
