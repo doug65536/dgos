@@ -39,16 +39,16 @@
 #define INTR_APIC_SPURIOUS  32
 #define INTR_APIC_ERROR     33
 #define INTR_APIC_THERMAL   34
-// 35-38 reserved
-#define INTR_APIC_TIMER     39
+// 35-39 reserved
 
-#define INTR_TLB_SHOOTDOWN  40
-#define INTR_THREAD_YIELD   41
-#define INTR_IPI_RESCHED    43
+// Relatively hot area of the IDT, cache line aligned
+#define INTR_APIC_TIMER     40
+#define INTR_TLB_SHOOTDOWN  41
+#define INTR_THREAD_YIELD   42
+#define INTR_FLUSH_TRACE    43
+#define INTR_IPI_RESCHED    44
 
-#define INTR_FLUSH_TRACE    42
-
-// 43-47 reserved
+// 45-47 reserved
 
 // Vectors >= 48 go through apic_dispatcher codepath
 // 192 vectors for IOAPIC and MSI

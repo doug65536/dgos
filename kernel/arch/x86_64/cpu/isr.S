@@ -119,6 +119,12 @@ isr_section_name \int_num
 
 // Individually to make placing breakpoints trivial
 
+// Although every attempt is made to make these lines be written
+// in the order of vector number, the linker script and isr_entry
+// macro are working together to force them all to the correct order
+// anyway, so don't worry if it isn't perfect
+
+// Exceptions
 isr_entry 0 INTR_EX_DIV
 isr_entry 0 INTR_EX_DEBUG
 isr_entry 0 INTR_EX_NMI
@@ -154,29 +160,31 @@ isr_entry 0 29
 isr_entry 0 30
 isr_entry 0 31
 
+// Critical priority interrupts
 isr_entry 0 INTR_APIC_SPURIOUS
 isr_entry 0 INTR_APIC_ERROR
 isr_entry 0 INTR_APIC_THERMAL
 
-// Reserved
+// Reserved for future critical priority interrupts
 isr_entry 0 35
 isr_entry 0 36
 isr_entry 0 37
 isr_entry 0 38
+isr_entry 0 39
 
+// Very high priority interrupts
 isr_entry 0 INTR_APIC_TIMER
 isr_entry 0 INTR_TLB_SHOOTDOWN
 isr_entry 0 INTR_THREAD_YIELD
 isr_entry 0 INTR_FLUSH_TRACE
 isr_entry 0 INTR_IPI_RESCHED
 
-// Reserved
-isr_entry 0 44
+// Reserved for future very high priority interrupts
 isr_entry 0 45
 isr_entry 0 46
 isr_entry 0 47
 
-// APIC and MSI(x) IRQs
+// APIC and MSI(x) IRQs [48-240) = 192 interrupt vectors available
 isr_entry 0 48
 isr_entry 0 49
 isr_entry 0 50
@@ -370,7 +378,7 @@ isr_entry 0 237
 isr_entry 0 238
 isr_entry 0 239
 
-// PIC IRQs
+// PIC IRQs (lowest priority interrupts)
 isr_entry 0 240
 isr_entry 0 241
 isr_entry 0 242
@@ -1043,6 +1051,7 @@ isr_sysret64:
 
     .cfi_endproc
 
+/// Note! This code assumes -mno-red-zone
 .align 16
 .global __module_dynlink_plt_thunk
 __module_dynlink_plt_thunk:
