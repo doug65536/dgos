@@ -1255,7 +1255,6 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         atomic_inc((cpu_gs_ptr<uint64_t, CPU_INFO_PF_COUNT_OFS>()));
 
     uintptr_t fault_addr = cpu_fault_address_get();
-    cpu_fault_address_set(0);
 
     pte_t *ptes[4];
 
