@@ -789,7 +789,7 @@ EXPORT int pci_vector_count_from_offsets(int const *vector_offsets, int count)
 // Returns with the function masked if possible
 // Use pci_set_irq_mask to unmask it when appropriate
 EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
-                            int cpu, bool distribute, int req_count,
+                            int cpu, bool distribute, size_t req_count,
                             intr_handler_t handler, char const *name,
                             int const *target_cpus, int const *vector_offsets)
 {
@@ -814,7 +814,7 @@ EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                          capability + offsetof(pci_msi_caps_hdr_t, msg_ctrl),
                          &caps.msg_ctrl, sizeof(caps.msg_ctrl));
 
-        int table_count = PCI_MSIX_MSG_CTRL_TBLSZ_GET(caps.msg_ctrl) + 1;
+        size_t table_count = PCI_MSIX_MSG_CTRL_TBLSZ_GET(caps.msg_ctrl) + 1;
 
         uint32_t tbl_pba[2];
         pci_config_copy(addr, tbl_pba,
@@ -897,8 +897,8 @@ EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
         PCI_TRACE("Allocated MSI-X IRQ %d-%d\n",
                   irq_range->base, irq_range->base + irq_range->count - 1);
 
-        int i;
-        int n = 0;
+        size_t i;
+        size_t n = 0;
         for (i = 0; i != table_count; ++i) {
             msi_irq_mem_t const& write = msi_writes[n++];
             n *= (n < tbl_cnt);
