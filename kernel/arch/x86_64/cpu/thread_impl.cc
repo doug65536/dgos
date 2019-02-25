@@ -89,15 +89,14 @@ struct link_t {
 };
 
 struct alignas(256) thread_info_t {
+    // Hottest member by far
     isr_context_t * volatile ctx;
 
+    // Needed in context switch
     char * volatile xsave_ptr;
-
     void * volatile fsbase;
     void * volatile gsbase;
-
     char * volatile syscall_stack;
-
     uint64_t volatile wake_time;
 
     // Higher numbers are higher priority
@@ -109,25 +108,31 @@ struct alignas(256) thread_info_t {
     char *xsave_stack;
 
     // --- cache line ---
+
     uint32_t flags;
-    // Doesn't include guard page
+    // Doesn't include guard pages
     uint32_t stack_size;
 
+    // Owning process
     process_t *process;
 
+    // Current CPU exception longjmp container
     void *exception_chain;
 
     // Points to the end of the stack!
     void *stack;
 
+    // Process exit code
     int exit_code;
+
+    // Thread current kernel errno
     errno_t errno;
 
     // 3 bytes...
 
     int wake_count;
 
-    mutex_t lock;
+    mutex_t lock;   // 32 bytes
     condition_var_t done_cond;
 
     // Total cpu time used
@@ -357,14 +362,16 @@ static void thread_cleanup()
 
     cpu_irq_disable();
 
-    assert(thread->state == THREAD_IS_RUNNING ||
-           thread->state == THREAD_IS_EXITING_BUSY);
+    assert(thread->state == THREAD_IS_RUNNING);
 
     atomic_barrier();
     thread->priority = 0;
     thread->priority_boost = 0;
-    if (thread->state == THREAD_IS_RUNNING)
+    if (likely(thread->state == THREAD_IS_RUNNING))
         thread->state = THREAD_IS_DESTRUCTING_BUSY;
+    else
+        assert(!"Unexpected state!");
+
     thread_yield();
 }
 
@@ -793,13 +800,13 @@ static thread_info_t *thread_choose_next(
         //
         // Expect states to have busy bit set if it is the outgoing thread
 
-        thread_state_t expected_sleep = (outgoing != candidate)
-                ? THREAD_IS_SLEEPING
-                : THREAD_IS_SLEEPING_BUSY;
+        thread_state_t expected_sleep = (outgoing == candidate)
+                ? THREAD_IS_SLEEPING_BUSY
+                : THREAD_IS_SLEEPING;
 
-        thread_state_t expected_ready = (outgoing != candidate)
-                ? THREAD_IS_READY
-                : THREAD_IS_READY_BUSY;
+        thread_state_t expected_ready = (outgoing == candidate)
+                ? THREAD_IS_READY_BUSY
+                : THREAD_IS_READY;
 
         if (unlikely(candidate->state == expected_sleep)) {
             // The thread is sleeping, see if it should wake up yet
@@ -851,28 +858,37 @@ static void thread_clear_busy(void *outgoing)
 {
     thread_info_t *thread = (thread_info_t*)outgoing;
 
-    if (atomic_and(&thread->state, ~THREAD_BUSY) == THREAD_IS_EXITING) {
-        if (thread->process != threads[0].process)
-            thread->process->destroy();
-    }
+    // When the exiting thread has finished getting off the CPU, immediately
+    // delete the thread from the owning process
+    if (unlikely(atomic_and(&thread->state, ~THREAD_BUSY) == THREAD_IS_EXITING))
+        thread->process->del_thread(thread->thread_id);
 }
 
-// Thread is not running anymore, destroy things
+// Thread is not running anymore, destroy things only needed when it runs
 void thread_destruct(thread_info_t *thread)
 {
-    munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
-           stack_guard_size + thread->stack_size + stack_guard_size);
+    cpu_scoped_irq_disable irq_dis;
+
+    // The user stack
+    if (thread->stack != nullptr && thread->stack_size > 0) {
+        munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
+               stack_guard_size + thread->stack_size + stack_guard_size);
+        thread->stack = nullptr;
+        thread->stack_size = 0;
+    }
 
     if (thread->flags & THREAD_FLAGS_USES_FPU) {
         assert(thread->xsave_stack != nullptr);
         munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
                stack_guard_size + xsave_stack_size + stack_guard_size);
+        thread->xsave_stack = nullptr;
+        thread->flags &= ~THREAD_FLAGS_USES_FPU;
     }
 
     mutex_lock_noyield(&thread->lock);
-    atomic_st_rel(&thread->state, THREAD_IS_FINISHED);
-    condvar_wake_all(&thread->done_cond);
+    thread->state = THREAD_IS_FINISHED;
     mutex_unlock(&thread->lock);
+    condvar_wake_all(&thread->done_cond);
 
     if (thread->ref_count == 0) {
         mutex_destroy(&thread->lock);
@@ -922,7 +938,7 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     // Accumulate used and busy time on this CPU
     cpu->time_ratio += elapsed;
-    cpu->busy_ratio += elapsed & -(thread->thread_id >= cpu_count);
+    cpu->busy_ratio += elapsed & -(thread->thread_id >= int(cpu_count));
 
     // Normalize ratio to < 32768
     uint8_t time_scale = bit_msb_set(cpu->time_ratio);
