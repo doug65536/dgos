@@ -110,37 +110,35 @@ private:
 
     };
 
-    // must be space for 10 values at values
     template<size_t N>
     int parse_csi_integers(csi_iter&& inp, int (&values)[N])
     {
-        static_assert(N >= NPAR, "Insufficient 'values' buffer size");
-
         char32_t c;
         int n;
 
-        for (n = 0; inp != csi.end() &&
-             ((c = *inp), c >= 0x20 && c < 0x40); ++n) {
-            if (unlikely(n == NPAR))
-                return -1;
+        values[0] = 0;
 
+        for (n = 0; inp != csi.end() &&
+             ((c = *inp), c >= 0x20 && c < 0x40); ++inp) {
             if (c >= '0' && c <= '9') {
                 values[n] *= 10;
                 values[n] += c - '0';
             } else if (c == ';') {
-                ++n;
+                if (unlikely(++n == NPAR))
+                    return -1;
+                values[n] = 0;
             }
         }
 
         return n;
     }
 
-    void parse_csi()
+    void parse_csi(char32_t final)
     {
         int np;
         int params[NPAR];
 
-        switch (csi.back()) {
+        switch (final) {
         case 'A':
             // CUU - cursor up N times, do nothing at edge of screen
             np = parse_csi_integers(csi.begin(), params);
@@ -211,6 +209,17 @@ private:
             // SD - scroll down
             //  N=line count
 
+            break;
+
+        case 'h':
+            if (np == 1) {
+                switch (params[0]) {
+                case 20:
+                    // Set new line mode
+                    // ?
+                    break;
+                }
+            }
             break;
 
         case 'm':
@@ -301,7 +310,7 @@ private:
                 // intermediate byte
                 csi.append(1, c);
             } else if (c >= 0x40 && c < 0x7F) {
-                parse_csi();
+                parse_csi(c);
                 state = state_t::NORMAL;
             }
             break;
