@@ -605,7 +605,7 @@ void dump_context(isr_context_t *ctx, int to_screen)
     printdbg("cr2=%16lx\n", cpu_fault_address_get());
 
     // error code
-    printdbg("Error code %#16lx\n", ISR_CTX_ERRCODE(ctx));
+    printdbg("Error code %#4lx\n", ISR_CTX_ERRCODE(ctx));
 
     // rflags (it's actually only 22 bits) and description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf), ISR_CTX_REG_RFLAGS(ctx));
