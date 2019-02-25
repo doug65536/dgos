@@ -4,6 +4,14 @@
 #include "cpuid.h"
 #include "../kernel/lib/bswap.h"
 
+static char const sig_hv_tcg[12] = {
+    'T', 'C', 'G', 'T', 'C', 'G', 'T', 'C', 'G', 'T', 'C', 'G'
+};
+
+static char const sig_hv_kvm[12] = {
+    'K', 'V', 'M', 'K', 'V', 'M', 'K', 'V', 'M', 0, 0, 0
+};
+
 bool qemu_present()
 {
     cpuid_t info{};
@@ -15,8 +23,7 @@ bool qemu_present()
     memcpy(str + 4, &info.ecx, 4);
     memcpy(str + 8, &info.edx, 4);
 
-    return !memcmp(str, "TCGTCGTCGTCG", 12) ||
-            !memcmp(str, "KVMKVMKVM\0\0\0", 12);
+    return !memcmp(str, sig_hv_tcg, 12) || !memcmp(str, sig_hv_kvm, 12);
 }
 
 // From https://github.com/qemu/qemu/blob/master/docs/specs/fw_cfg.txt
