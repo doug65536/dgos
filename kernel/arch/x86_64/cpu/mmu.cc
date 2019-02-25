@@ -408,7 +408,7 @@ public:
         void free(physaddr_t addr)
         {
             // Can't free demand page entry
-            if (unlikely(addr == PTE_ADDR))
+            if (unlikely((addr & (PTE_ADDR >> 1)) == (PTE_ADDR >> 1)))
                 return;
 
             if (unlikely(count == countof(pages)))
@@ -1317,8 +1317,8 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
             assert(page != 0);
 
 #if DEBUG_PAGE_FAULT
-            printdbg("Assigning %#p with page %p\n",
-                     (void*)fault_addr, (void*)page);
+            printdbg("Assigning %#zx with page %#zx\n",
+                     fault_addr, page);
 #endif
 
             pte_t page_flags;
@@ -2126,7 +2126,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                 pte = PTE_ADDR | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
-                if (unlikely(pte && pte != PTE_ADDR))
+                if (unlikely(pte & PTE_PRESENT))
                     free_batch.free(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
@@ -2323,7 +2323,8 @@ EXPORT int munmap(void *addr, size_t size)
                 if ((pte & (PTE_EX_PHYSICAL | PTE_PRESENT)) == PTE_PRESENT) {
                     physaddr_t physaddr = pte & PTE_ADDR;
 
-                    if (physaddr && (physaddr != PTE_ADDR)) {
+                    if (physaddr && (((physaddr >> 1) & PTE_ADDR) !=
+                                     (PTE_ADDR >> 1))) {
                         free_batch.free(physaddr);
                         ++freed;
                     }
@@ -2526,6 +2527,30 @@ int madvise_will_need(pte_t *pte_scan, pte_t *end)
     return 0;
 }
 
+// Tell whether an array of 4 PTEs are present, accounting for large page flags
+bool pte_list_present(pte_t **ptes)
+{
+    if (unlikely(!(*ptes[0] & PTE_PRESENT)))
+        return false;
+
+    if (unlikely(!(*ptes[1] & PTE_PRESENT)))
+        return false;
+
+    if (unlikely((*ptes[1] & PTE_PAGESIZE)))
+        return true;
+
+    if (unlikely(!(*ptes[2] & PTE_PRESENT)))
+        return false;
+
+    if (unlikely(*ptes[2] & PTE_PAGESIZE))
+        return true;
+
+    if (unlikely(!(*ptes[2] & PTE_PRESENT)))
+        return false;
+
+    return *ptes[3] & PTE_PRESENT;
+}
+
 // Support discarding pages and reverting to demand
 // paged state with MADV_DONTNEED.
 // Support enabling/disabling write combining
@@ -2558,7 +2583,7 @@ int madvise(void *addr, size_t len, int advice)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    if (advice == MADV_WILLNEED) {
+    if (unlikely(advice == MADV_WILLNEED)) {
         pte_t *pte_scan = pt[3];
         return madvise_will_need(pte_scan, end);
     }
@@ -2567,11 +2592,7 @@ int madvise(void *addr, size_t len, int advice)
 
     constexpr pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
 
-    while (pt[3] < end &&
-           (*pt[0] & PTE_PRESENT) &&
-           (*pt[1] & PTE_PRESENT) &&
-           (*pt[2] & PTE_PRESENT))
-    {
+    while (pte_list_present(pt)) {
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
             if (order_bits == pte_t(-1)) {
@@ -2937,8 +2958,8 @@ void mmu_phys_allocator_t::init(
 void mmu_phys_allocator_t::add_free_space(physaddr_t base, size_t size)
 {
 #if DEBUG_PHYS_ALLOC
-    printdbg("Adding free space, base=%#p, length=%#zx\n",
-             (void*)base, size);
+    printdbg("Adding free space, base=%#zx, length=%#zx\n",
+             base, size);
 #endif
 
     scoped_lock lock_(lock);
