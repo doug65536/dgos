@@ -7,6 +7,9 @@ void cpu_debug_break()
 {
 }
 
+// This entire function is essentially one indirect branch
+// and 4 function pointers
+// The real work is done in the 4 instantiations of cpu_debug_breakpoint_set
 void cpu_debug_breakpoint_set_indirect(uintptr_t addr, int rw,
                                        int len, int enable, size_t index)
 {
@@ -19,5 +22,6 @@ void cpu_debug_breakpoint_set_indirect(uintptr_t addr, int rw,
         cpu_debug_breakpoint_set<3>
     };
 
-    cpu_set_debug_breakpoint_handlers[index](addr, rw, len, enable);
+    if (index < countof(cpu_set_debug_breakpoint_handlers))
+        cpu_set_debug_breakpoint_handlers[index](addr, rw, len, enable);
 }
