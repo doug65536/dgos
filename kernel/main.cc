@@ -58,7 +58,8 @@ char kernel_stack[kernel_stack_size] _section(".bspstk");
 #define ENABLE_CTXSW_STRESS_THREAD  0
 #define ENABLE_HEAP_STRESS_THREAD   0
 #define ENABLE_FRAMEBUFFER_THREAD   0
-#define ENABLE_FILESYSTEM_TEST      0
+#define ENABLE_FILESYSTEM_WR_TEST   0
+#define ENABLE_FILESYSTEM_RD_TEST   1
 #define ENABLE_SPAWN_STRESS         0
 #define ENABLE_SHELL                0
 #define ENABLE_CONDVAR_STRESS       0
@@ -750,9 +751,9 @@ void test_catch()
 }
 #endif
 
-#if ENABLE_FILESYSTEM_TEST
+#if ENABLE_FILESYSTEM_WR_TEST
 _noreturn
-int test_filesystem_thread(void *p)
+int test_filesystem_write_thread(void *p)
 {
     int x = int(intptr_t(p));
 
@@ -779,23 +780,40 @@ int test_filesystem_thread(void *p)
             if (unlink_test == -int(errno_t::EROFS))
                 printk("Delete %s failed with %d\n", name, unlink_test);
         }
-
-        printk("Opening root directory\n");
-
-        int od = file_opendir("");
-        dirent_t de;
-        dirent_t *dep;
-        while (file_readdir_r(od, &de, &dep) > 0) {
-            printk("File: %s\n", de.d_name);
-        }
-        file_closedir(od);
     }
 }
 
-void test_filesystem()
+int test_filesystem_write()
 {
-    for (int n = 0; n < ENABLE_FILESYSTEM_TEST; ++n)
-        thread_create(test_filesystem_thread, (void*)intptr_t(n), 0, false);
+    for (int n = 0; n < ENABLE_FILESYSTEM_WR_TEST; ++n)
+        thread_create(test_filesystem_write_thread, (void*)intptr_t(n), 0, false);
+    return 1;
+}
+#endif
+
+#if ENABLE_FILESYSTEM_RD_TEST > 0
+int test_filesystem_read_thread(void*)
+{
+    printk("Opening root directory\n");
+
+    int od = file_opendir("");
+    dirent_t de;
+    dirent_t *dep;
+    while (file_readdir_r(od, &de, &dep) > 0) {
+        printk("File: %s\n", de.d_name);
+    }
+    file_closedir(od);
+    return 1;
+}
+
+bool test_filesystem_read()
+{
+    int tid = thread_create(test_filesystem_read_thread, nullptr, 0, false);
+    if (tid > 0) {
+        thread_close(tid);
+        return true;
+    }
+    return false;
 }
 #endif
 
@@ -942,8 +960,12 @@ static int init_thread(void *)
     printk("Float formatter: %%+017.5e  -42.8e+60  -> %+017.5e\n", -42.8e+60);
 #endif
 
-#if ENABLE_FILESYSTEM_TEST
-    test_filesystem();
+#if ENABLE_FILESYSTEM_RD_TEST
+    test_filesystem_read();
+#endif
+
+#if ENABLE_FILESYSTEM_WR_TEST
+    test_filesystem_write();
 #endif
 
     //printk("Running mprotect self test\n");
