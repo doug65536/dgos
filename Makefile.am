@@ -157,7 +157,6 @@ libbootsect_a_SOURCES = \
 	boot/utf.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
-	boot/elf64_bios.cc \
 	boot/rand.cc \
 	boot/physmap.cc \
 	boot/physmem_bios.cc \
@@ -434,7 +433,6 @@ bootefi_amd64_SOURCES = \
 	boot/rand.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
-	boot/elf64_efi.cc \
 	boot/mpentry_efi.S \
 	boot/progressbar.cc \
 	boot/bootmenu.cc \

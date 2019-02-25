@@ -39,8 +39,6 @@ dap.h
 diskio.cc
 diskio.h
 elf64_abstract.h
-elf64_bios.cc
-elf64_efi.cc
 formatter.cc
 formatter.h
 gdt.S
