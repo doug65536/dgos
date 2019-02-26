@@ -40,3 +40,18 @@ struct mp_table_hdr_t {
 } _packed;
 
 C_ASSERT(sizeof(mp_table_hdr_t) == 16);
+
+// Data for physical memory allocator initialization
+
+// table of memory ranges, each associated with a domain
+struct memory_affinity_t {
+    uint64_t base;
+    uint64_t length;
+    uint32_t domain;
+};
+
+// table of cpus, each associated with a domain
+struct apic_affinity_t {
+    uint32_t domain;
+    uint32_t apic_id;
+};
