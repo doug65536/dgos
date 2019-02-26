@@ -2736,34 +2736,6 @@ void apic_msi_target(msi_irq_mem_t *result, int cpu, int vector)
     assert(vector >= INTR_APIC_IRQ_BASE);
     assert(vector < INTR_APIC_IRQ_END);
 
-    // Intel's ridiculous documentation for DM and RH fields:
-    ///  This bit indicates whether the Destination ID field should be
-    ///  interpreted as logical or physical APIC ID for delivery of the
-    ///  lowest priority interrupt. If RH is 1 and DM is 0, the Destination ID
-    ///  field is in physical destination mode and only the processor in the
-    ///  system that has the matching APIC ID is considered for delivery of
-    ///  that interrupt (this means no re-direction). If RH is 1 and DM is 1,
-    ///  the Destination ID Field is interpreted as in logical destination
-    ///  mode and the redirection is limited to only those processors that are
-    ///  part of the logical group of processors based on the processor’s
-    ///  logical APIC ID and the Destination ID field in the message. The
-    ///  logical group of processors consists of those identified by matching
-    ///  the 8-bit Destination ID with the logical destination identified by
-    ///  the Destination Format Register and the Logical Destination Register
-    ///  in each local APIC. The details are similar to those described in
-    ///  Section 10.6.2, “Determining IPI Destination.”
-    ///  If RH is 0, then the DM bit is ignored and the message is sent ahead
-    ///  independent of whether the physical or logical destination mode
-    ///  is used.
-    ///
-    /// It is ridiculous because:
-    ///
-    ///  1) It does not specify what "sent ahead" means. Sent ahead to where?
-    ///  2) It says that the handling of LDR and DFR are "similar" to
-    ///     another section. Similar?
-    ///
-    /// Translation:
-    ///
     /// +----+----+---------------------------------------------------------+
     /// | RH | DM |                                                         |
     /// |bit3|bit2|                                                         |
