@@ -1154,7 +1154,7 @@ errno_t ide_if_t::ide_chan_t::io(void *data, int64_t count, uint64_t lba,
 
     release_access(intr_was_enabled);
 
-    iocp->set_result(dgos::err_sz_pair_t{ err, count });
+    iocp->set_result(dgos::err_sz_pair_t{ err, size_t(count) });
     iocp->set_expect(1);
     iocp->invoke();
 
