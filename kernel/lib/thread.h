@@ -150,9 +150,16 @@ void thread_idle();
 
 int thread_close(thread_t tid);
 
-__END_DECLS
-
+_use_result
 thread_t thread_proc_0(void (*fn)());
+
+_use_result
 thread_t thread_proc_1(void (*fn)(void *), void *arg);
+
+_use_result
 thread_t thread_func_0(int (*fn)());
+
+_use_result
 thread_t thread_func_1(int (*fn)(void*), void *arg);
+
+__END_DECLS

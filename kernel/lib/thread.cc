@@ -20,6 +20,7 @@ struct thread_run_data_t
     thread_run_data_t(int (*f)());
     thread_run_data_t(int (*f)(void*), void *a);
 
+    _use_result
     thread_t spawn_thread(thread_run_data_t *data) const;
     int invoke() const;
 };
