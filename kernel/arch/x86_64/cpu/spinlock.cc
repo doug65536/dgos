@@ -2,9 +2,9 @@
 #include "atomic.h"
 #include "assert.h"
 #include "control_regs.h"
-#include "thread.h"
 #include "printk.h"
 #include "export.h"
+#include "thread.h"
 
 #define DEBUG_MCSLOCK 0
 #if DEBUG_MCSLOCK
