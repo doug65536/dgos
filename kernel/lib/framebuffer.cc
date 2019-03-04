@@ -9,6 +9,7 @@
 #include "bootinfo.h"
 #include "vesainfo.h"
 #include "dev_text.h"
+#include "thread.h"
 
 #define CHARHEIGHT 16
 
@@ -103,7 +104,7 @@ struct fb_rect_t {
 
 struct framebuffer_t {
     uint8_t *video_mem;
-    uint8_t *back_buf;
+    uint8_t *backing;
     vbe_selected_mode_t mode;
     fb_rect_t dirty;
 };
@@ -133,10 +134,8 @@ void fb_init(void)
     // Round the back buffer size up to a multiple of the cache size
     screen_size = (screen_size + 63) & -64;
 
-    fb.back_buf = (uint8_t*)fb.mode.framebuffer_addr;
+    fb.backing = (uint8_t*)fb.mode.framebuffer_addr;
     fb.video_mem = (uint8_t*)fb.mode.framebuffer_addr;
-
-    //madvise(fb.video_mem, screen_size, MADV_WEAKORDER);
 
     fb_reset_dirty();
 }
@@ -203,7 +202,7 @@ void fb_copy_to(int scr_x, int scr_y,
 
     fb_update_dirty(scr_x, scr_y, scr_ex, scr_ey);
 
-    uint8_t *out = fb.back_buf +
+    uint8_t *out = fb.backing +
             (scr_y * fb.mode.pitch + scr_x * sizeof(uint32_t));
 
     for (int y = scr_y; y < scr_ey; ++y, out += fb.mode.pitch) {
@@ -217,15 +216,36 @@ void fb_copy_to(int scr_x, int scr_y,
     }
 }
 
+static void nullify_degenerate(fb_rect_t& rect)
+{
+    // Clamp end against start
+    rect.en.x = std::max(rect.en.x, rect.st.x);
+    rect.en.y = std::max(rect.en.y, rect.st.y);
+}
+
+static void scissor_rect(fb_rect_t& rect, fb_rect_t const& scissor)
+{
+    // Clamp start against left and top edge
+    rect.st.x = std::max(rect.st.x, scissor.st.x);
+    rect.st.y = std::max(rect.st.x, scissor.st.y);
+
+    // Clamp end against right and bottom edge
+    rect.en.x = std::min(rect.en.x, scissor.en.x);
+    rect.en.y = std::min(rect.en.y, scissor.en.y);
+}
+
+void fb_fill_rect_clamped(int sx, int sy, int ex, int ey, uint32_t color)
+{
+}
+
 void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 {
-
     fb_update_dirty(sx, sy, ex, ey);
 
     size_t row_ofs = sx * sizeof(uint32_t);
     size_t row_end = ex * sizeof(uint32_t);
 
-    uint8_t *out = fb.back_buf + sy * fb.mode.pitch + row_ofs;
+    uint8_t *out = fb.backing + sy * fb.mode.pitch + row_ofs;
     size_t width = row_end - row_ofs;
     for (int y = sy; y < ey; ++y) {
         memset32_nt(out, color, width);
@@ -280,7 +300,7 @@ void fb_draw_aa_line(int x0, int y0, int x1, int y1, uint32_t color)
 {
     fb_draw_line(x0, y0, x1, y1, color, [](int x, int y, uint32_t pixel_color) {
         if (x >= 0 && x < fb.mode.width && y >= 0 && y < fb.mode.height)
-            ((uint32_t*)(fb.back_buf + fb.mode.pitch * y))[x] = pixel_color;
+            ((uint32_t*)(fb.backing + fb.mode.pitch * y))[x] = pixel_color;
     });
 }
 
@@ -414,7 +434,7 @@ static void fb_update_vidmem(int left, int top, int right, int bottom)
 #if USE_NONTEMPORAL
         memcpy512_nt(fb.video_mem + ofs, fb.back_buf + ofs, copy_width);
 #else
-        memcpy(fb.video_mem + ofs, fb.back_buf + ofs, copy_width);
+        memcpy(fb.video_mem + ofs, fb.backing + ofs, copy_width);
 #endif
     }
 #if USE_NONTEMPORAL
@@ -431,6 +451,7 @@ void fb_update(void)
 
 ///////////////////
 
+// Transform [7:0]=R [15:8]=G [23:16}=B into device specific pixel format
 static uint32_t rgb(uint32_t color)
 {
     unsigned r = color & 0xFF;
@@ -449,25 +470,31 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
     if (unlikely(!fb.video_mem))
         return;
 
+    // Clamp to right edge
     if (unlikely(ex > fb.mode.width))
         ex = fb.mode.width;
 
+    // Clamp to bottom edge
     if (unlikely(ey > fb.mode.height))
         ey = fb.mode.height;
 
+    // Clamp to left edge
     if (unlikely(sx < 0))
         sx = 0;
 
+    // Clamp to top edge
     if (unlikely(sy < 0))
         sy = 0;
 
+    // Reject degenerate
     if (unlikely(ex <= sx))
         return;
 
+    // Reject degenerate
     if (unlikely(ey <= sy))
         return;
 
-    uint32_t val = rgb(color);
+    uint32_t pixel_color = rgb(color);
 
     char *dest = (char*)(fb.video_mem +
                          sy * fb.mode.pitch +
@@ -478,23 +505,57 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
     switch (fb.mode.byte_pp) {
     case 4:
         while (sy < ey) {
-            memset32(dest, val, wid);
+            memset32(dest, pixel_color, wid);
             dest += skip;
             ++sy;
         }
         break;
 
     case 3:
-        // FIXME: optimize, take advantage of 4 pixels every 3 dwords
-        /// r g b r
-        /// g b r g
-        /// b r g b
+        // Take advantage of 4 pixels every 3 dwords
+        /// a = Rbgr
+        /// b = grBG
+        /// c = BGRb
+        /// possible misalignments are
+        /// 3, 2, 1, which, interestingly, is also the number of pixels
+        /// remaining until it is dword aligned again
+        pixel_color &= 0xFFFFFF;
+
+        size_t misalign_st;
+        size_t misalign_en;
+        misalign_st = uintptr_t(dest) & 3;
+        misalign_en = (uintptr_t(dest) + (wid * 3)) & 3;
+
+        // Width of left byte-filled area
+        int left_partial;
+        left_partial = misalign_st;
+
+        // Width of right byte-filled area
+        int right_partial;
+        right_partial = (misalign_en ? 4 - misalign_en : 0);
+
+        sx += left_partial;
+        ex -= left_partial;
+
+        size_t left_sz;
+        size_t right_sz;
+        left_sz = 3 * left_partial;
+        right_sz = 3 * right_partial;
+
+        uint32_t grp[3];
+        grp[0] = pixel_color | (pixel_color << 24);
+        grp[1] = (pixel_color << 16) | ((pixel_color >> 8) & 0xFFFF);
+        grp[2] = (pixel_color << 8) | (pixel_color >> 16);
+
         while (sy < ey) {
-            for (int x = sx; x < ex; ++x) {
-                *dest++ = val & 0xFF;
-                *dest++ = (val >> 8) & 0xFF;
-                *dest++ = (val >> 16) & 0xFF;
+            memcpy(dest, grp, left_sz);
+
+            for (int x = sx; x + 3 < ex; ++x) {
+                *((uint32_t*)dest++) = grp[0];
+                *((uint32_t*)dest++) = grp[1];
+                *((uint32_t*)dest++) = grp[2];
             }
+            memcpy(dest, grp, right_sz);
 
             dest += skip;
             ++sy;
@@ -503,7 +564,7 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 
     case 1:
         while (sy < ey) {
-            memset8(dest, val, wid);
+            memset8(dest, pixel_color, wid);
             dest += skip;
             ++sy;
         }
@@ -511,7 +572,7 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
 
     case 2:
         while (sy < ey) {
-            memset16(dest, val, wid);
+            memset16(dest, pixel_color, wid);
             dest += skip;
             ++sy;
         }
@@ -656,26 +717,26 @@ void framebuffer_console_t::static_init()
     replacement = glyph_index(0xFFFD);
 }
 
-bool framebuffer_console_t::init()
+static void test_framebuffer_thread()
 {
-    static_init();
-
-    fb_init();
-
-    width = fb.mode.width / 9;
-    height = fb.mode.height / CHARHEIGHT;
-
-    ofs_x = (fb.mode.width - width * 9) >> 1;
-    ofs_y = (fb.mode.height - height * CHARHEIGHT) >> 1;
-
     // Fixedpoint inverse height and scale up to 128
     uint64_t inv_height = 128 * UINT64_C(0x100000000) / fb.mode.height;
+
+    auto intens_fn = [=](int i) { return (128 + ((i * inv_height) >> 32)); };
+
+    int prev_color = intens_fn(0);
+    int prev_st = 0;
     for (size_t i = 0, e = fb.mode.height; i != e; ++i) {
         // Bias +128 and do fixedpoint 32.32 multiply
-        auto intensity = (128 + ((i * inv_height) >> 32));
-        auto color = intensity * 0x010101;
-        fill_rect(0, i, fb.mode.width, i + 1, color);
+        int color = intens_fn(i) * 0x010101;
+        if (color != prev_color || (i + 1) == e) {
+            fill_rect(0, prev_st, fb.mode.width, i, prev_color);
+            prev_st = i;
+            prev_color = color;
+        }
     }
+
+    fill_rect(0, prev_st, fb.mode.width, fb.mode.height, prev_color);
 
     fill_rect(20, 30, 600, 700, 0x563412);
 
@@ -710,9 +771,42 @@ bool framebuffer_console_t::init()
         u8"Chinese (Traditional): 該字體支持許多字母"
     };
 
-    for (size_t i = 0; i < countof(tests); ++i)
-        draw_str(24 + 40, 40 + 33 + 14 + i*20, tests[i], 0x777777U, 0x563412);
+    int y = 0;
+    int x = 0;
+    int xdir = 1;
+    int ydir = 1;
+    for (int i = 0; i < 1000000; ++i) {
+        for (size_t i = 0; i < countof(tests); ++i) {
+            draw_str(x + 24 + 40, y + 40 + 33 + 14 + i*20,
+                     tests[i], 0x777777U, 0x563412);
+        }
 
+        x += xdir;
+        if (x > 200 || x < 1) {
+            xdir = -xdir;
+            x += xdir;
+            y += ydir;
+            if (y > 200 || y < 1) {
+                ydir = -ydir;
+                y += ydir;
+            }
+        }
+    }
+}
+
+bool framebuffer_console_t::init()
+{
+    static_init();
+
+    fb_init();
+
+    width = fb.mode.width / 9;
+    height = fb.mode.height / CHARHEIGHT;
+
+    ofs_x = (fb.mode.width - width * 9) >> 1;
+    ofs_y = (fb.mode.height - height * CHARHEIGHT) >> 1;
+
+    //thread_close(thread_proc_0(test_framebuffer_thread));
 
     return true;
 }
@@ -919,6 +1013,6 @@ bitmap_glyph_t const *framebuffer_console_t::glyph(size_t codepoint)
 
 void fb_change_backing(const vbe_selected_mode_t &mode)
 {
-    fb.back_buf = (uint8_t*)mode.framebuffer_addr;
+    fb.backing = (uint8_t*)mode.framebuffer_addr;
     fb.video_mem = (uint8_t*)mode.framebuffer_addr;
 }
