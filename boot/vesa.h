@@ -7,34 +7,15 @@ struct vbe_mode_list_t {
     vbe_selected_mode_t *modes;
     size_t count;
 
-    vbe_mode_list_t()
-        : modes{}
-        , count{}
-    {
-    }
+    vbe_mode_list_t();
 
-    explicit vbe_mode_list_t(size_t count)
-        : modes{new vbe_selected_mode_t[count]}
-        , count(count)
-    {
-    }
+    explicit vbe_mode_list_t(size_t count);
 
-    vbe_mode_list_t(vbe_mode_list_t&& rhs)
-        : modes{rhs.modes}
-        , count{rhs.count}
-    {
-        rhs.modes = nullptr;
-        rhs.count = 0;
-    }
+    vbe_mode_list_t(vbe_mode_list_t&& rhs);
 
     vbe_mode_list_t& operator=(vbe_mode_list_t) = delete;
 
-    ~vbe_mode_list_t()
-    {
-        delete[] modes;
-        modes = nullptr;
-        count = 0;
-    }
+    ~vbe_mode_list_t();
 };
 
 struct vbe_mode_key_t {

@@ -37,3 +37,30 @@ void aspect_ratio(uint16_t *n, uint16_t *d, uint16_t w, uint16_t h)
     *n = w / div;
     *d = h / div;
 }
+
+vbe_mode_list_t::vbe_mode_list_t()
+    : modes{}
+    , count{}
+{
+}
+
+vbe_mode_list_t::vbe_mode_list_t(size_t count)
+    : modes{new vbe_selected_mode_t[count]}
+    , count(count)
+{
+}
+
+vbe_mode_list_t::vbe_mode_list_t(vbe_mode_list_t &&rhs)
+    : modes{rhs.modes}
+    , count{rhs.count}
+{
+    rhs.modes = nullptr;
+    rhs.count = 0;
+}
+
+vbe_mode_list_t::~vbe_mode_list_t()
+{
+    delete[] modes;
+    modes = nullptr;
+    count = 0;
+}
