@@ -5,6 +5,7 @@
 
 #include "irq.h"
 #include "cpu/interrupts.h"
+#include "cpu/apic.h"
 #include "thread.h"
 #include "printk.h"
 
@@ -245,6 +246,8 @@ void eainst_flush_cpu(int cid, size_t &cpu_queue_count, bool weak)
 _no_instrument
 static isr_context_t *eainst_intr_handler(int intr, isr_context_t *ctx)
 {
+    apic_eoi_noinst(intr);
+
     int cpu_nr = thread_cpu_number();
     size_t &cpu_queue_count = trace_queue_counts[cpu_nr].count;
 
