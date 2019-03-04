@@ -69,7 +69,10 @@ workq_alloc::workq_alloc()
 
 void *workq_alloc::alloc()
 {
-    return items + alloc_slot();
+    int slot;
+    if (likely((slot = alloc_slot()) >= 0))
+        return items + alloc_slot();
+    panic("Ran out of workq memory");
 }
 
 void workq_alloc::free(void *p)
