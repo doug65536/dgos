@@ -1,6 +1,7 @@
 #pragma once
 #include "ethernet.h"
 #include "utility.h"
+#include "ipv4.bits.h"
 
 struct ipv4_hdr_t {
     ethernet_hdr_t eth_hdr;
@@ -14,6 +15,16 @@ struct ipv4_hdr_t {
     uint16_t hdr_checksum;
     uint8_t s_ip[4];
     uint8_t d_ip[4];
+
+    size_t version() const
+    {
+        return IPv4_VERLEN_VER_GET(ver_ihl);
+    }
+
+    size_t header_sz() const
+    {
+        return IPv4_VERLEN_LEN_GET(ver_ihl) * sizeof(uint32_t);
+    }
 } _packed;
 
 #define IPV4_PROTO_ICMP     0x01
