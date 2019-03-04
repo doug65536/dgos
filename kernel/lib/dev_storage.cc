@@ -52,16 +52,14 @@ void storage_dev_close(storage_dev_base_t *dev)
     (void)dev;
 }
 
-EXPORT void storage_if_register_factory(
-        char const *name, storage_if_factory_t *factory)
+EXPORT void storage_if_register_factory(storage_if_factory_t *factory)
 {
-    (void)name;
-
     scoped_lock lock(storage_lock);
 
     if (!storage_if_factories.push_back(factory))
         panic_oom();
     STORAGE_TRACE("Registered storage driver %s\n", name);
+    probe_storage_factory(factory);
 }
 
 void probe_storage_factory(storage_if_factory_t *factory)
@@ -100,14 +98,6 @@ void probe_storage_factory(storage_if_factory_t *factory)
     }
 }
 
-void invoke_storage_factories(void *)
-{
-    for (storage_if_factory_t* factory : storage_if_factories)
-        probe_storage_factory(factory);
-}
-
-REGISTER_CALLOUT(invoke_storage_factories, nullptr,
-                 callout_type_t::storage_dev, "000");
 
 EXPORT void fs_register_factory(char const *name, fs_factory_t *fs)
 {
@@ -176,53 +166,47 @@ fs_base_t *fs_from_id(size_t id)
             : nullptr;
 }
 
+static void probe_part_factory_on_drive(
+        part_factory_t *factory, storage_dev_base_t *drive)
+{
+    if (drive) {
+        STORAGE_TRACE("Probing %s for %s partitions...\n",
+                      (char const *)drive->info(STORAGE_INFO_NAME),
+                      factory->name);
+
+        std::vector<part_dev_t*> part_list = factory->detect(drive);
+
+        // Mount partitions
+        for (unsigned i = 0; i < part_list.size(); ++i) {
+            part_dev_t *part = part_list[i];
+            fs_init_info_t info;
+            info.drive = drive;
+            info.part_st = part->lba_st;
+            info.part_len = part->lba_len;
+            fs_mount(part->name, &info);
+        }
+        storage_dev_close(drive);
+
+        STORAGE_TRACE("Found %zu %s partitions\n", part_list.size(),
+                      factory->name);
+    }
+}
+
+// For each storage device
+static void probe_part_factory(part_factory_t *factory)
+{
+    for (storage_dev_base_t *drive : storage_devs)
+        probe_part_factory_on_drive(factory, drive);
+}
+
 void part_register_factory(char const *name, part_factory_t *factory)
 {
     scoped_lock lock(storage_lock);
     if (!part_factories.push_back(factory))
         panic_oom();
     printk("%s partition type registered\n", name);
+    probe_part_factory(factory);
 }
-
-static void invoke_part_factories(void *arg)
-{
-    (void)arg;
-
-    // For each partition factory
-    for (part_factory_t *factory : part_factories) {
-        // For each storage device
-        for (storage_dev_base_t *drive : storage_devs) {
-            if (drive) {
-                STORAGE_TRACE("Probing %s for %s partitions...\n",
-                              (char const *)drive->info(STORAGE_INFO_NAME),
-                              factory->name);
-
-                std::vector<part_dev_t*> part_list = factory->detect(drive);
-
-                // Mount partitions
-                for (unsigned i = 0; i < part_list.size(); ++i) {
-                    part_dev_t *part = part_list[i];
-                    fs_init_info_t info;
-                    info.drive = drive;
-                    info.part_st = part->lba_st;
-                    info.part_len = part->lba_len;
-                    fs_mount(part->name, &info);
-                }
-                storage_dev_close(drive);
-
-                STORAGE_TRACE("Found %zu %s partitions\n", part_list.size(),
-                              factory->name);
-            }
-        }
-    }
-
-    STORAGE_TRACE("Partition probe complete\n");
-}
-
-REGISTER_CALLOUT(invoke_part_factories, nullptr,
-                 callout_type_t::partition_probe, "000");
-
-
 
 EXPORT void fs_factory_t::register_factory(void *p)
 {
@@ -233,7 +217,7 @@ EXPORT void fs_factory_t::register_factory(void *p)
 EXPORT void storage_if_factory_t::register_factory(void *p)
 {
     storage_if_factory_t *instance = (storage_if_factory_t*)p;
-    storage_if_register_factory(instance->name, instance);
+    storage_if_register_factory(instance);
 }
 
 EXPORT void part_factory_t::register_factory(void *p)
@@ -474,4 +458,66 @@ EXPORT int fs_base_ro_t::setxattr(
 EXPORT storage_if_factory_t::storage_if_factory_t(const char *factory_name)
     : name(factory_name)
 {
+}
+
+EXPORT disk_io_plan_t::disk_io_plan_t(void *dest, uint8_t log2_sector_size)
+    : dest(dest)
+    , vec(nullptr)
+    , count(0)
+    , capacity(0)
+    , log2_sector_size(log2_sector_size)
+{
+}
+
+EXPORT disk_io_plan_t::~disk_io_plan_t()
+{
+    free(vec);
+    vec = nullptr;
+    count = 0;
+    capacity = 0;
+}
+
+EXPORT bool disk_io_plan_t::add(
+        uint32_t lba, uint16_t sector_count,
+        uint16_t sector_ofs, uint16_t byte_count)
+{
+    if (count > 0) {
+        // See if we can coalesce with previous entry
+
+        disk_vec_t &prev = vec[count - 1];
+
+        uint32_t sector_size = UINT32_C(1) << log2_sector_size;;
+
+        if (prev.lba + prev.count == lba &&
+                prev.sector_ofs == 0 &&
+                sector_ofs == 0 &&
+                prev.byte_count == sector_size &&
+                byte_count == sector_size &&
+                0xFFFFFFFFU - count > prev.count) {
+            // Added entry is a sequential run of full sector-aligned sector
+            // which is contiguous with previous run of full sector-aligned
+            // sectors and the sector count won't overflow
+            prev.count += sector_count;
+            return true;
+        }
+    }
+
+    if (count + 1 > capacity) {
+        size_t new_capacity = capacity >= 16 ? capacity * 2 : 16;
+        disk_vec_t *new_vec = (disk_vec_t*)realloc(
+                    vec, new_capacity * sizeof(*vec));
+        if (unlikely(!new_vec))
+            return false;
+        vec = new_vec;
+        capacity = new_capacity;
+    }
+
+    disk_vec_t &item = vec[count++];
+
+    item.lba = lba;
+    item.count = sector_count;
+    item.sector_ofs = sector_ofs;
+    item.byte_count = byte_count;
+
+    return true;
 }

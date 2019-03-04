@@ -10,8 +10,39 @@
 
 #include "dev_registration.h"
 
-//
-// Forward declarations
+// Filesystem I/O code builds a list of these to do burst I/O
+struct disk_vec_t {
+    // Start LBA of range
+    uint64_t lba;
+
+    // Number of contiguous sectors
+    uint32_t count;
+
+    // Offset into first sector to transfer
+    // If this is nonzero, count is guaranteed to be 1
+    uint16_t sector_ofs;
+
+    // Number of bytes to transfer.
+    // If count is nonzero, this field is ignored, and count is the number
+    // of whole sectors to transfer.
+    uint16_t byte_count;
+};
+
+struct disk_io_plan_t {
+    void *dest;
+    disk_vec_t *vec;
+    uint16_t count;
+    uint16_t capacity;
+    uint8_t log2_sector_size;
+
+    disk_io_plan_t(void *dest, uint8_t log2_sector_size);
+    disk_io_plan_t(disk_io_plan_t const&) = delete;
+    disk_io_plan_t() = delete;
+    ~disk_io_plan_t();
+
+    bool add(uint32_t lba, uint16_t sector_count,
+             uint16_t sector_ofs, uint16_t byte_count);
+};
 
 //
 // Storage Device (hard drive, CDROM, etc)
@@ -30,9 +61,12 @@ struct EXPORT storage_dev_base_t {
     virtual void cleanup_dev() = 0;
 
     //
-    // Asynchronous I/O
+    // Asynchronous I/O plan
 
-    typedef void (*completion_callback_t)(errno_t err, uintptr_t arg);
+    //virtual errno_t io(disk_io_plan_t *plan);
+
+    //
+    // Asynchronous I/O
 
     virtual errno_t read_async(void *data, int64_t count,
                                uint64_t lba, iocp_t *iocp) = 0;
@@ -107,8 +141,8 @@ struct EXPORT storage_if_base_t {
     REGISTER_CALLOUT(& name##_factory_t::register_factory, \
         & name##_factory, callout_type_t::late_dev, "000")
 
-void storage_if_register_factory(char const *name,
-                                storage_if_factory_t *factory);
+void storage_if_register_factory(
+        char const *name, storage_if_factory_t *factory);
 
 typedef int dev_t;
 
