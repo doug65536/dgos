@@ -2348,6 +2348,7 @@ void gdb_cpu_ctrl_t::sync_hw_bp()
                 case 2: len = CPU_DR7_LEN_2; break;
                 case 4: len = CPU_DR7_LEN_4; break;
                 case 8: len = CPU_DR7_LEN_8; break;
+                default: return;
                 }
 
                 switch (bp.type) {
