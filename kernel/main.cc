@@ -891,6 +891,9 @@ static int init_thread(void *)
     printk("Initializing filesystems\n");
     callout_call(callout_type_t::reg_filesys, true);
 
+    modload_load("fat32.km");
+    modload_load("iso9660.km");
+
     // Storage interfaces
     printk("Initializing storage devices\n");
     callout_call(callout_type_t::storage_dev, true);
