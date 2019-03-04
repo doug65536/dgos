@@ -140,29 +140,37 @@ struct nvme_cmd_t {
     static nvme_cmd_t create_identify(
             void *addr, uint8_t cns, uint8_t nsid);
 
+    // Create a command that creates a submission queue
     static nvme_cmd_t create_sub_queue(
             void *addr, uint32_t size,
             uint16_t sqid, uint16_t cqid, uint8_t prio);
 
+    // Create a command that creates a completion queue
     static nvme_cmd_t create_cmp_queue(
             void *addr, uint32_t size,
             uint16_t cqid, uint16_t intr);
 
+    // Create a command that reads storage
     static nvme_cmd_t create_read(
             uint64_t lba, uint32_t count, uint8_t ns);
 
+    // Create a command that writes storage
     static nvme_cmd_t create_write(
             uint64_t lba, uint32_t count, uint8_t ns, bool fua);
 
+    // Create a command that does a trim
     static nvme_cmd_t create_trim(uint64_t lba, uint32_t count, uint8_t ns);
 
+    // Create a flush command
     static nvme_cmd_t create_flush(uint8_t ns);
 
+    // Create a command that sets the completion and submission queue counts
     static nvme_cmd_t create_setfeatures(uint16_t ncqr, uint16_t nsqr);
 };
 
 C_ASSERT(sizeof(nvme_cmd_t) == 64);
 C_ASSERT(offsetof(nvme_cmd_t, cmd_dword_10) == 40);
+
 // 4.6 Completion queue entry
 struct nvme_cmp_t {
     // Command specific
