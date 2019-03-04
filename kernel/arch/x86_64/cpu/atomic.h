@@ -49,11 +49,30 @@ static _always_inline _no_instrument void pause()
 #define atomic_cmpxchg(value, expect, replacement) \
     __sync_val_compare_and_swap((value), (expect), (replacement))
 
+// Bit test and reset
+#define atomic_btr(value, bit) __extension__ ({\
+    __typeof__(value) value_ = (value); \
+    __typeof__(*value) mask_ = uint64_t(1) << bit; \
+    (0 != (__atomic_fetch_and(value_, ~mask_, __ATOMIC_SEQ_CST) & mask_)); \
+    })
+
+// Bit test and set
+#define atomic_bts(value, bit) \
+    (0 != (__atomic_fetch_or((value), \
+        ((decltype(*(value)))1 << (bit))) & \
+        (decltype(*(value))1 << (bit))))
+
+// Bit test and complement
+#define atomic_btc(value, bit) \
+    (0 != (__atomic_fetch_xor((value), \
+        ((decltype(*(value)))1 << (bit))) & \
+        (decltype(*(value))1 << (bit))))
+
 #define atomic_ld_acq(value) \
     __atomic_load_n(value, __ATOMIC_ACQUIRE)
 
 #define atomic_st_rel(value, rhs) \
-    __atomic_store_n(value, rhs, __ATOMIC_RELEASE)
+    __atomic_store_n((value), (rhs), __ATOMIC_RELEASE)
 
 // Returns true if the exchange was successful. Otherwise, returns
 // false and updates expect. Expect is a pointer to a variable.
