@@ -707,7 +707,6 @@ static ssize_t fat32_boot_pread(int file, void *buf, size_t bytes, off_t ofs)
 {
     assert(file >= 0 && file < MAX_HANDLES);
     assert(buf != nullptr);
-    assert(bytes < 0x100000);
 
     if (!check_fd(file))
         return -1;
