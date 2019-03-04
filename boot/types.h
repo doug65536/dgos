@@ -63,3 +63,6 @@ typedef char tchar;
 
 #define __BEGIN_NAMESPACE_STD namespace std {
 #define __END_NAMESPACE_STD }
+
+#define __BEGIN_NAMESPACE_EXT namespace ext {
+#define __END_NAMESPACE_EXT }

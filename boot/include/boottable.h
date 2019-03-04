@@ -11,6 +11,16 @@ struct boottbl_mptables_info_t {
     uint64_t mp_addr;
 } _packed;
 
+struct boottbl_node_t {
+    uint64_t base;
+    uint64_t len;
+};
+
+struct boottbl_nodes_t {
+    uint64_t count;
+    uint64_t addr;
+};
+
 _pure
 void *boottbl_ebda_ptr();
 
