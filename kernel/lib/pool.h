@@ -29,6 +29,10 @@ protected:
 template<typename T>
 class pool_t : public pool_base_t {
 public:
+    pool_t() = default;
+    ~pool_t() = default;
+    pool_t(pool_t const&) = default;
+
     bool create(uint32_t capacity)
     {
         return pool_base_t::create(sizeof(T), capacity);
