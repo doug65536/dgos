@@ -589,10 +589,12 @@ bool module_t::load(const char *path)
 
                 if (dt_bind_now) {
                     // Link it all right now
+                    value = S;
                     *(int64_t*)operand = S;
                 } else {
                     // Just add base to point to lazy resolution thunk
-                    *(int64_t*)operand += base_adj;
+                    value = *(int64_t*)operand + base_adj;
+                    *(int64_t*)operand = value;
                 }
 
                 printdbg("R_AMD64_JUMP_SLOT=%#" PRIx64 ", name=%s\n",
