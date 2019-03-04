@@ -491,7 +491,7 @@ static linaddr_t linear_base = PT_MAX_ADDR;
 
 mmu_phys_allocator_t phys_allocator;
 
-static uint64_t volatile shootdown_pending;
+static thread_cpu_mask_t volatile shootdown_pending;
 
 static contiguous_allocator_t linear_allocator;
 static contiguous_allocator_t near_allocator;
@@ -1169,7 +1169,7 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
     int cpu_number = thread_cpu_number();
 
     // Clear pending
-    atomic_and(&shootdown_pending, ~(1 << cpu_number));
+    shootdown_pending.atom_clr(cpu_number);
 
     mmu_tlb_perform_shootdown();
 
