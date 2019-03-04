@@ -1184,11 +1184,12 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
 
     cpu_scoped_irq_disable irq_was_enabled;
     int cur_cpu = thread_cpu_number();
-    int all_cpu_mask = (1 << cpu_count) - 1;
-    int cur_cpu_mask = 1 << cur_cpu;
-    int other_cpu_mask = all_cpu_mask & ~cur_cpu_mask;
-    int old_pending = atomic_or(&shootdown_pending, other_cpu_mask);
-    int need_ipi_mask = old_pending & other_cpu_mask;
+    thread_cpu_mask_t all_cpu_mask(-1);
+    thread_cpu_mask_t cur_cpu_mask(cur_cpu);
+    thread_cpu_mask_t other_cpu_mask = all_cpu_mask - cur_cpu_mask;
+    thread_cpu_mask_t new_pending =
+            shootdown_pending.atom_or(other_cpu_mask);
+    thread_cpu_mask_t need_ipi_mask = new_pending & other_cpu_mask;
 
     std::vector<uint64_t> shootdown_counts;
     if (synchronous) {
@@ -1200,14 +1201,14 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
         }
     }
 
-    if (other_cpu_mask) {
+    if (!!other_cpu_mask) {
         if (need_ipi_mask == other_cpu_mask) {
             // Send to all other CPUs
             apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
         } else {
             int cpu_mask = 1;
             for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
-                if (!(old_pending & cpu_mask) && (need_ipi_mask & cpu_mask))
+                if (!(new_pending & cpu_mask) && !!(need_ipi_mask & cpu_mask))
                     thread_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
             }
         }
