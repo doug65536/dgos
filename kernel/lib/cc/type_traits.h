@@ -251,6 +251,9 @@ struct remove_reference<_T&&>
     using type = _T;
 };
 
+__END_NAMESPACE_STD
+__BEGIN_NAMESPACE_EXT
+
 template<int size, bool uns = true> struct type_from_size { };
 template<> struct type_from_size<1, true> { using type = uint8_t; };
 template<> struct type_from_size<2, true> { using type = uint16_t; };
@@ -270,20 +273,24 @@ private:
     struct helper;
 
     template<typename _U>
-    struct helper<_U, true_type>
+    struct helper<_U, std::true_type>
     {
-        using type = typename underlying_type<_U>::type;
+        using type = typename std::underlying_type<_U>::type;
     };
 
     template<typename _U>
-    struct helper<_U, false_type>
+    struct helper<_U, std::false_type>
     {
         using type = _U;
     };
 
 public:
-    using type = typename helper<_T, typename is_enum<_T>::type>::type;
+    using type = typename helper<_T, typename std::is_enum<_T>::type>::type;
 };
+
+__END_NAMESPACE_EXT
+
+__BEGIN_NAMESPACE_STD
 
 template<size_t _Len, size_t _Align = alignof(max_align_t)>
 struct aligned_storage {
