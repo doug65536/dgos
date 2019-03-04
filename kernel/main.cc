@@ -1001,7 +1001,7 @@ static int init_thread(void *)
     printk("Running context switch stress with %d threads\n",
              ENABLE_CTXSW_STRESS_THREAD);
     for (int i = 0; i < ENABLE_CTXSW_STRESS_THREAD; ++i) {
-        thread_create(ctx_sw_thread, 0, 0, false);
+        thread_close(thread_create(ctx_sw_thread, 0, 0, false));
     }
 #endif
 
