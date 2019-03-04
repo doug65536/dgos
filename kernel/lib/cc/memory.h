@@ -16,6 +16,7 @@
 #endif
 
 #include "memory.h"
+#include "type_traits.h"
 
 __BEGIN_NAMESPACE_STD
 

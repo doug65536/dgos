@@ -6,6 +6,9 @@
 #define CPU_INFO_CURTHREAD_OFS      8
 #define CPU_INFO_TSS_PTR_OFS        16
 #define CPU_INFO_PF_COUNT_OFS       40
+#define CPU_INFO_LOCKS_HELD_OFS     48
+#define CPU_INFO_CSW_DEFERRED_OFS   52
+#define CPU_INFO_TLB_SHOOTDOWN_COUNT_OFS    56
 #define TSS_RSP0_OFS                8
 #define THREAD_XSAVE_PTR_OFS        8
 #define THREAD_FSBASE_OFS           16

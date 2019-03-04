@@ -1140,6 +1140,56 @@ __module_dynlink_plt_thunk:
 
     .cfi_endproc
 
+// This blocks context switches and must preserve all registers
+// Entering ten critical sections requires you to leave ten to get out
+.global cs_enter_asm
+cs_enter_asm:
+    .cfi_startproc
+    incl %gs:CPU_INFO_LOCKS_HELD_OFS
+    ret
+    .cfi_endproc
+
+// This blocks context switches and must preserve all registers
+.global cs_leave_asm
+cs_leave_asm:
+    .cfi_startproc
+    movq %gs:0,%rax
+    decl CPU_INFO_LOCKS_HELD_OFS(%rax)
+    jb .Lpanic
+    jnz .Lnot_last_nest
+
+.Llast_one:
+    // Making it here means we just left the outermost critical section
+    cmpl $0,CPU_INFO_CSW_DEFERRED_OFS(%rax)
+
+    // not zero is unlikely
+    jnz .Lis_deferred_csw
+    jmp .Lno_deferred_csw
+
+.Lis_deferred_csw:
+    // These CFI are excessively good, but they maximize debuggability
+    // Normally you don't say how to restore the call clobbered registers
+    movl $0,CPU_INFO_CSW_DEFERRED_OFS(%rax)
+
+    call thread_yield
+
+.Lnot_last_nest:
+.Lno_deferred_csw:
+    ret
+
+.Lpanic:
+    lea .Lpanic_msg(%rip),%rdi
+    call panic
+    jmp .Lpanic
+
+    .cfi_endproc
+
+.section .rodata
+.Lpanic_msg:
+.asciz "Counter out of range"
+
+.section .text.isr
+
 // Retpoline. Works on the principle that the return stack overrides other
 // branch prediction information. Cause it to mispredict into a pause loop
 // until the ret retires, at which point it is guaranteed to branch to the

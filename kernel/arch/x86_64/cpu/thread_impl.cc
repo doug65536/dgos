@@ -204,20 +204,35 @@ static size_t constexpr xsave_stack_size = (size_t(64) << 10);
 
 struct alignas(128) cpu_info_t {
     cpu_info_t *self;
+
     thread_info_t * volatile cur_thread;
+
     tss_t *tss_ptr;
+
     uint32_t apic_id;
     int online;
+
     thread_info_t *goto_thread;
 
     uint64_t pf_count;
+
+    // Context switch is prevented when this is nonzero
+    uint32_t locks_held;
+    // When locks_held transitions to zero, a context switch is forced
+    // when this is true. Deferrng a context switch because locks_held
+    // is nonzero sets this to true
+    uint32_t csw_deferred;
+
     uint64_t volatile tlb_shootdown_count;
 
     uint32_t time_ratio;
     uint32_t busy_ratio;
+
     uint32_t busy_percent;
     uint32_t cr0_shadow;
+
     uint64_t irq_count;
+
     uint64_t irq_time;
 
     using lock_type = ext::mcslock;
@@ -227,9 +242,11 @@ struct alignas(128) cpu_info_t {
 
     unsigned cpu_nr;
 
-    rbtree_t<uint64_t, uint64_t> ready_list;
+    unsigned reserved;
 
     void *storage[8];
+
+    rbtree_t<uint64_t, uint64_t> ready_list;
 };
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
@@ -238,7 +255,10 @@ C_ASSERT(offsetof(cpu_info_t, self) == CPU_INFO_SELF_OFS);
 C_ASSERT(offsetof(cpu_info_t, cur_thread) == CPU_INFO_CURTHREAD_OFS);
 C_ASSERT(offsetof(cpu_info_t, tss_ptr) == CPU_INFO_TSS_PTR_OFS);
 C_ASSERT(offsetof(cpu_info_t, pf_count) == CPU_INFO_PF_COUNT_OFS);
-
+C_ASSERT(offsetof(cpu_info_t, tlb_shootdown_count) ==
+         CPU_INFO_TLB_SHOOTDOWN_COUNT_OFS);
+C_ASSERT(offsetof(cpu_info_t, locks_held) == CPU_INFO_LOCKS_HELD_OFS);
+C_ASSERT(offsetof(cpu_info_t, csw_deferred) == CPU_INFO_CSW_DEFERRED_OFS);
 static cpu_info_t cpus[MAX_CPUS];
 
 _constructor(ctor_cpu_init_cpus)
@@ -961,6 +981,13 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     //cpu_scoped_irq_disable intr_dis;
 
     cpu_info_t *cpu = this_cpu();
+
+    // Defer reschedule if locks are held
+    if (unlikely(cpu->locks_held)) {
+        cpu->csw_deferred = true;
+        return ctx;
+    }
+
     thread_info_t *thread = cpu->cur_thread;
 
     thread_info_t * const outgoing = thread;
@@ -1136,6 +1163,7 @@ void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
     assert(old_state == THREAD_IS_RUNNING);
 
     spinlock_value_t saved_lock = spinlock_unlock_save(lock);
+    assert(thread_locks_held() == 0);
     thread_yield();
     assert(thread->state == THREAD_IS_RUNNING);
     spinlock_lock_restore(lock, saved_lock);
@@ -1439,10 +1467,11 @@ void thread_exit(int exit_code)
     thread_cleanup();
 }
 
-void thread_set_cpu_gsbase(int ap)
+cpu_info_t *thread_set_cpu_gsbase(int ap)
 {
     cpu_info_t *cpu = ap ? this_cpu_by_apic_id_slow() : cpus;
     cpu_gsbase_set(cpu);
+    return cpu;
 }
 
 void thread_init_cpu_count(int count)
@@ -1551,3 +1580,16 @@ void thread_add_cpu_irq_time(uint64_t tsc_ticks)
 //    link.prev->next = &link;
 //    link.next->prev = &link;
 //}
+
+void thread_cls_init_early(int ap)
+{
+    cpu_info_t *cpu = thread_set_cpu_gsbase(ap);
+    cpu->self = cpu;
+    cpu->cpu_nr = cpu - cpus;
+}
+
+uint32_t thread_locks_held()
+{
+    cpu_info_t *cpu = this_cpu();
+    return cpu->locks_held;
+}
