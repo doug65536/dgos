@@ -81,6 +81,10 @@ public:
     template<typename T>
     static void enqueue_on_cpu(size_t cpu_nr, T&& functor);
 
+    // Run functor once on every cpu and block until every cpu is finished
+    template<typename T>
+    static void enqueue_on_all_barrier(T&& functor);
+
     static void init(int cpu_count);
 
     static void slih_startup(void *);
@@ -100,6 +104,12 @@ public:
     workq_impl()
     {
         tid = thread_create(worker, this, 0, false);
+    }
+
+    ~workq_impl()
+    {
+        if (tid > 0)
+            thread_close(tid);
     }
 
     workq_impl(workq_impl const&) = delete;
@@ -168,6 +178,29 @@ private:
         }
     }
 };
+
+template<typename T>
+void workq::enqueue_on_all_barrier(T &&functor)
+{
+    size_t cpu_count = thread_get_cpu_count();
+    ext::mcslock wait_lock;
+    std::condition_variable wait_done;
+    size_t done_count = 0;
+
+    for (size_t i = 0; i != cpu_count; ++i) {
+        functor(i);
+
+        std::unique_lock<ext::mcslock> lock(wait_lock);
+        if (++done_count == cpu_count) {
+            lock.unlock();
+            wait_done.notify_all();
+        }
+    }
+
+    std::unique_lock<ext::mcslock> lock(wait_lock);
+    while (done_count != cpu_count)
+        wait_done.wait(lock);
+}
 
 template<typename T>
 void workq::enqueue(T&& functor)
