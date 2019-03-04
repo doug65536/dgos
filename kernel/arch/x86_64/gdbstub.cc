@@ -443,7 +443,7 @@ private:
     template<typename T>
     static T from_hex(char const **input)
     {
-        using U = typename std::safe_underlying_type<T>::type;
+        using U = typename ext::safe_underlying_type<T>::type;
         U value;
         for (value = 0; **input; ++*input) {
             int digit = from_hex(**input);
