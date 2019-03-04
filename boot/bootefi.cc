@@ -174,7 +174,7 @@ private:
     static void initialize()
     {
 
-        EFI_PXE_BASE_CODE_PACKET const *dhcp_packet;
+        EFI_PXE_BASE_CODE_PACKET const *dhcp_packet = nullptr;
 
         static_assert(sizeof(server_addr.ipv4) ==
                       sizeof(efi_pxe->Mode->DhcpAck.Dhcpv4.BootpSiAddr),
@@ -190,6 +190,9 @@ private:
         } else {
             halt(TSTR "Don't know how to handle IPv6 PXE");
         }
+
+        if (unlikely(!dhcp_packet))
+            halt(TSTR "Unable to process DHCP packet");
 
         memcpy(&server_addr.ipv4, &dhcp_packet->Dhcpv4.BootpSiAddr,
                sizeof(server_addr.ipv4));
