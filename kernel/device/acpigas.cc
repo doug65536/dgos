@@ -10,7 +10,7 @@
 template<int size>
 class acpi_gas_mask_t : public acpi_gas_accessor_t {
 protected:
-    typedef typename std::type_from_size<size, true>::type value_type;
+    typedef typename ext::type_from_size<size, true>::type value_type;
 
     acpi_gas_mask_t(int bitofs, int bitwidth)
         : mask(size != bitwidth * 8
