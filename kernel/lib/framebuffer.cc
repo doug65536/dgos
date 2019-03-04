@@ -614,7 +614,7 @@ void scroll_up(size_t dist, uint32_t bg)
 static void draw_str(int x, int y, char const* str,
                      uint32_t fg, uint32_t bg)
 {
-    while (char32_t codepoint = utf8_to_ucs4_inplace(str)) {
+    while (char32_t codepoint = utf8_to_ucs4_upd(str)) {
         auto glyph = framebuffer_console_t::glyph(codepoint);
         draw_char(x, y, glyph, fg, bg);
         x += 9;
