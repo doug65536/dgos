@@ -5,6 +5,7 @@
 #include "printk.h"
 #include "time.h"
 #include "export.h"
+#include "cpu/control_regs.h"
 
 #define MUTEX_DEBUG 0
 #if MUTEX_DEBUG
@@ -597,19 +598,30 @@ struct condvar_mutex_noyield_t : public condvar_mutex_t {
 template<typename T>
 static void condvar_wait_ex(condition_var_t *var, T& lock_upd)
 {
+    // Lock the condition variable
     spinlock_lock(&var->lock);
+
+    // Uninterruptible code ahead
+    cpu_scoped_irq_disable irq_dis;
 
     thread_wait_t wait;
     thread_wait_add(&var->link, &wait.link);
 
+    // Unlock whatever lock is protecting the condition
     lock_upd.unlock();
+
+    // Atomically unlock the condition variable and suspend
     CONDVAR_DTRACE("%p: Suspending\n", (void*)&wait);
     thread_suspend_release(&var->lock, &wait.thread);
     CONDVAR_DTRACE("%p: Awoke\n", (void*)&wait);
 
+    // Release reacquired condition variable lock
     spinlock_unlock(&var->lock);
+
+    // Reacquire lock protecting condition before returning
     lock_upd.lock();
 
+    // Sanely disconnected nodes will have nulled links
     assert(wait.link.next == nullptr);
     assert(wait.link.prev == nullptr);
 }

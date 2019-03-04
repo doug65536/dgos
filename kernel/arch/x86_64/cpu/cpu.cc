@@ -31,8 +31,6 @@ void cpu_init_early(int ap)
         mm_set_master_pagedir();
 
     gdt_init(ap);
-    gdt_init_tss_early();
-    idt_init(ap);
 
     cpu_cs_set(GDT_SEL_KERNEL_CODE64);
     cpu_ss_set(GDT_SEL_KERNEL_DATA);
@@ -41,7 +39,10 @@ void cpu_init_early(int ap)
     cpu_fs_set(GDT_SEL_USER_DATA | 3);
     cpu_gs_set(GDT_SEL_USER_DATA | 3);
 
-    thread_set_cpu_gsbase(ap);
+    thread_cls_init_early(ap);
+
+    gdt_init_tss_early();
+    idt_init(ap);
 
     // Enable SSE early
     cpu_cr4_change_bits(0, CPU_CR4_OFXSR | CPU_CR4_OSXMMEX);
@@ -371,9 +372,7 @@ static void cpu_init_late_msrs_one_cpu()
 
 void cpu_init_late_msrs()
 {
-    for (size_t i = 0, e = thread_cpu_count(); i < e; ++i) {
-        workq::enqueue_on_cpu(i, [=] {
-            cpu_init_late_msrs_one_cpu();
-        });
-    }
+    workq::enqueue_on_all_barrier([=] (size_t) {
+        cpu_init_late_msrs_one_cpu();
+    });
 }
