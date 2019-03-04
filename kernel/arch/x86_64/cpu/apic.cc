@@ -32,6 +32,7 @@
 #include "bootinfo.h"
 #include "boottable.h"
 #include "inttypes.h"
+#include "work_queue.h"
 
 #define ENABLE_ACPI 1
 
@@ -270,6 +271,35 @@ static uint8_t topo_cpu_count;
 static uintptr_t apic_base;
 static uint32_t volatile *apic_ptr;
 
+struct acpi_mapping_t {
+    uint64_t base;
+    uint64_t len;
+
+    acpi_mapping_t()
+        : base{}
+        , len{}
+    {
+    }
+
+    acpi_mapping_t(uint64_t base, uint64_t len)
+        : base{base}
+        , len{len}
+    {
+    }
+
+    bool operator==(acpi_mapping_t const& rhs)
+    {
+        return (base == rhs.base) & (len == rhs.len);
+    }
+
+    bool operator!=(acpi_mapping_t const& rhs)
+    {
+        return (base != rhs.base) | (len != rhs.len);
+    }
+};
+
+static std::vector<acpi_mapping_t> acpi_mappings;
+
 struct memory_affinity_t {
     uint64_t base;
     uint64_t length;
@@ -408,24 +438,24 @@ static std::vector<uint8_t> acpi_slit_table;
 
 class lapic_t {
 public:
-    virtual void command(uint32_t dest, uint32_t cmd) const = 0;
+    virtual void command(uint32_t dest, uint32_t cmd) = 0;
 
-    virtual uint32_t read32(uint32_t offset) const = 0;
-    virtual void write32(uint32_t offset, uint32_t val) const = 0;
+    virtual uint32_t read32(uint32_t offset) = 0;
+    virtual void write32(uint32_t offset, uint32_t val) = 0;
 
-    virtual uint64_t read64(uint32_t offset) const = 0;
-    virtual void write64(uint32_t offset, uint64_t val) const = 0;
+    virtual uint64_t read64(uint32_t offset) = 0;
+    virtual void write64(uint32_t offset, uint64_t val) = 0;
 
-    virtual void command_noinst(uint32_t dest, uint32_t cmd) const = 0;
+    virtual void command_noinst(uint32_t dest, uint32_t cmd) = 0;
 
-    virtual uint32_t read32_noinst(uint32_t offset) const = 0;
-    virtual void write32_noinst(uint32_t offset, uint32_t val) const = 0;
+    virtual uint32_t read32_noinst(uint32_t offset) = 0;
+    virtual void write32_noinst(uint32_t offset, uint32_t val) = 0;
 
-    virtual uint64_t read64_noinst(uint32_t offset) const = 0;
-    virtual void write64_noinst(uint32_t offset, uint64_t val) const = 0;
+    virtual uint64_t read64_noinst(uint32_t offset) = 0;
+    virtual void write64_noinst(uint32_t offset, uint64_t val) = 0;
 
-    virtual bool reg_readable(uint32_t reg) const = 0;
-    virtual bool reg_exists(uint32_t reg) const = 0;
+    virtual bool reg_readable(uint32_t reg) = 0;
+    virtual bool reg_exists(uint32_t reg) = 0;
 
 protected:
     static bool reg_maybe_exists(uint32_t reg)
@@ -449,7 +479,7 @@ protected:
 };
 
 class lapic_x_t : public lapic_t {
-    void command(uint32_t dest, uint32_t cmd) const override final
+    void command(uint32_t dest, uint32_t cmd) override final
     {
         cpu_scoped_irq_disable intr_enabled;
         write32(APIC_REG_ICR_HI, APIC_DEST_n(dest));
@@ -460,7 +490,7 @@ class lapic_x_t : public lapic_t {
     }
 
     _no_instrument _flatten
-    void command_noinst(uint32_t dest, uint32_t cmd) const override final
+    void command_noinst(uint32_t dest, uint32_t cmd) override final
     {
         bool irq_en = cpu_irq_save_disable_noinst();
         write32_noinst(APIC_REG_ICR_HI, APIC_DEST_n(dest));
@@ -470,118 +500,119 @@ class lapic_x_t : public lapic_t {
             __builtin_ia32_pause();
     }
 
-    uint32_t read32(uint32_t offset) const override final
+    uint32_t read32(uint32_t offset) override final
     {
         return apic_ptr[offset << (4 - 2)];
     }
 
     _no_instrument
-    uint32_t read32_noinst(uint32_t offset) const override final
+    uint32_t read32_noinst(uint32_t offset) override final
     {
         return apic_ptr[offset << (4 - 2)];
     }
 
-    void write32(uint32_t offset, uint32_t val) const override final
+    void write32(uint32_t offset, uint32_t val) override final
     {
         apic_ptr[offset << (4 - 2)] = val;
     }
 
     _no_instrument
-    void write32_noinst(uint32_t offset, uint32_t val) const override final
+    void write32_noinst(uint32_t offset, uint32_t val) override final
     {
         apic_ptr[offset << (4 - 2)] = val;
     }
 
-    uint64_t read64(uint32_t offset) const override final
+    uint64_t read64(uint32_t offset) override final
     {
         return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
     }
 
     _no_instrument
-    uint64_t read64_noinst(uint32_t offset) const override final
+    uint64_t read64_noinst(uint32_t offset) override final
     {
         return ((uint64_t*)apic_ptr)[offset << (4 - 3)];
     }
 
-    void write64(uint32_t offset, uint64_t val) const override final
+    void write64(uint32_t offset, uint64_t val) override final
     {
         ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
     }
 
     _no_instrument
-    void write64_noinst(uint32_t offset, uint64_t val) const override final
+    void write64_noinst(uint32_t offset, uint64_t val) override final
     {
         ((uint64_t*)apic_ptr)[offset << (4 - 3)] = val;
     }
 
-    bool reg_readable(uint32_t reg) const override final
+    bool reg_readable(uint32_t reg) override final
     {
         return reg_maybe_readable(reg);
     }
 
-    bool reg_exists(uint32_t reg) const override final
+    bool reg_exists(uint32_t reg) override final
     {
         return reg_maybe_readable(reg);
     }
 };
 
 class lapic_x2_t : public lapic_t {
-    void command(uint32_t dest, uint32_t cmd) const override final
+protected:
+    void command(uint32_t dest, uint32_t cmd) override final
     {
         write64(APIC_REG_ICR_LO, (uint64_t(dest) << 32) | cmd);
     }
 
     _no_instrument
-    void command_noinst(uint32_t dest, uint32_t cmd) const override final
+    void command_noinst(uint32_t dest, uint32_t cmd) override final
     {
         write64_noinst(APIC_REG_ICR_LO, (uint64_t(dest) << 32) | cmd);
     }
 
-    uint32_t read32(uint32_t offset) const override final
+    uint32_t read32(uint32_t offset) override final
     {
         return cpu_msr_get_lo(0x800 + offset);
     }
 
     _no_instrument
-    uint32_t read32_noinst(uint32_t offset) const override final
+    uint32_t read32_noinst(uint32_t offset) override final
     {
         return cpu_msr_get_lo(0x800 + offset);
     }
 
-    void write32(uint32_t offset, uint32_t val) const override final
+    void write32(uint32_t offset, uint32_t val) override
     {
         cpu_msr_set(0x800 + offset, val);
     }
 
     _no_instrument
-    void write32_noinst(uint32_t offset, uint32_t val) const override final
+    void write32_noinst(uint32_t offset, uint32_t val) override final
     {
         cpu_msr_set(0x800 + offset, val);
     }
 
-    uint64_t read64(uint32_t offset) const override final
+    uint64_t read64(uint32_t offset) override final
     {
         return cpu_msr_get(0x800 + offset);
     }
 
     _no_instrument
-    uint64_t read64_noinst(uint32_t offset) const override final
+    uint64_t read64_noinst(uint32_t offset) override final
     {
         return cpu_msr_get(0x800 + offset);
     }
 
-    void write64(uint32_t offset, uint64_t val) const override final
+    void write64(uint32_t offset, uint64_t val) override final
     {
         cpu_msr_set(0x800 + offset, val);
     }
 
     _no_instrument
-    void write64_noinst(uint32_t offset, uint64_t val) const override final
+    void write64_noinst(uint32_t offset, uint64_t val) override final
     {
         cpu_msr_set(0x800 + offset, val);
     }
 
-    bool reg_readable(uint32_t reg) const override final
+    bool reg_readable(uint32_t reg) override final
     {
         // APIC_REG_LVT_CMCI raises #GP if CMCI not enabled
         return reg != APIC_REG_LVT_CMCI &&
@@ -590,12 +621,39 @@ class lapic_x2_t : public lapic_t {
                 reg_maybe_readable(reg);
     }
 
-    bool reg_exists(uint32_t reg) const override final
+    bool reg_exists(uint32_t reg) override final
     {
         return reg != APIC_REG_DFR &&
                 reg != APIC_REG_APR &&
                 reg_maybe_exists(reg);
     }
+};
+
+class lapic_kvm_t : public lapic_x2_t {
+public:
+    lapic_kvm_t();
+    ~lapic_kvm_t();
+
+    void write32(uint32_t offset, uint32_t val) override final;
+
+private:
+    // Each CPUs paravirtualized EOI address is on its own cache
+    // line. Only bit zero of value[0] is actually used.
+    // When KVM issues a paravirtualized IRQ, it sets bit 0
+    // of values[0] to 1. The kernel should test that bit to
+    // see if KVM is issuing a paravirtualized IRQ. If that
+    // bit is 1, then the kernel should exchange it with zero.
+    // The test and reset should be atomic.
+
+    struct cacheline_t {
+        uint32_t values[CPUM_CACHELINESIZE / sizeof(uint32_t)];
+    };
+
+    static constexpr uint32_t const msr_kvm_eoi = 0x4b564d04;
+    void paravirt_eoi();
+
+    std::unique_ptr<cacheline_t[]> cpus;
+    size_t cpu_count;
 };
 
 static lapic_x_t apic_x;
@@ -1209,9 +1267,14 @@ static T *acpi_remap_len(T *ptr, uintptr_t physaddr,
                          size_t guess, size_t actual_len)
 {
     if (actual_len > guess) {
+        auto it = std::find(acpi_mappings.begin(), acpi_mappings.end(),
+                            acpi_mapping_t{uint64_t(ptr), uint64_t(guess)});
+        assert(it != acpi_mappings.end());
+        acpi_mappings.erase(it);
         munmap(ptr, guess);
         ptr = (T*)mmap((void*)physaddr, actual_len,
                        PROT_READ, MAP_PHYSICAL, -1, 0);
+        acpi_mappings.push_back({uint64_t(ptr), uint64_t(actual_len)});
     }
 
     return ptr;
@@ -1222,10 +1285,11 @@ static void acpi_parse_rsdt()
     // Sanity check length (<= 1MB)
     assert(acpi_rsdt_len <= (1 << 20));
 
+    size_t len = acpi_rsdt_len ? acpi_rsdt_len : sizeof(acpi_sdt_hdr_t);
     acpi_sdt_hdr_t *rsdt_hdr = (acpi_sdt_hdr_t *)mmap(
-                (void*)acpi_rsdt_addr,
-                acpi_rsdt_len ? acpi_rsdt_len : sizeof(*rsdt_hdr),
+                (void*)acpi_rsdt_addr, len,
                 PROT_READ, MAP_PHYSICAL, -1, 0);
+    acpi_mappings.push_back({uint64_t(rsdt_hdr), len});
 
     // For ACPI 1.0, get length from header and remap
     if (!acpi_rsdt_len) {
@@ -1259,6 +1323,7 @@ static void acpi_parse_rsdt()
         acpi_sdt_hdr_t *hdr = (acpi_sdt_hdr_t *)
                 mmap((void*)hdr_addr,
                       64 << 10, PROT_READ, MAP_PHYSICAL, -1, 0);
+        acpi_mappings.push_back({uint64_t(hdr), uint64_t{64 << 10}});
 
         hdr = acpi_remap_len(hdr, hdr_addr, 64 << 10, hdr->len);
 
@@ -1412,7 +1477,7 @@ static void acpi_parse_rsdt()
             }
         }
 
-        munmap(hdr, std::max(size_t(64) << 10, size_t(hdr->len)));
+        //munmap(hdr, std::max(size_t(64) << 10, size_t(hdr->len)));
     }
 }
 
@@ -1421,6 +1486,7 @@ static void mp_parse_fps()
     mp_cfg_tbl_hdr_t *cth = (mp_cfg_tbl_hdr_t *)
             mmap((void*)mp_tables, 0x10000,
                  PROT_READ, MAP_PHYSICAL, -1, 0);
+    acpi_mappings.push_back({uint64_t(cth), 0x10000});
 
     cth = acpi_remap_len(cth, uintptr_t(mp_tables),
                          0x10000, cth->base_tbl_len + cth->ext_tbl_len);
@@ -1645,7 +1711,7 @@ static void mp_parse_fps()
         }
     }
 
-    munmap(cth, std::max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
+    //munmap(cth, std::max(0x10000, cth->base_tbl_len + cth->ext_tbl_len));
 }
 
 static int parse_mp_tables(void)
@@ -1776,6 +1842,12 @@ void apic_eoi(int intr)
     apic->write32(APIC_REG_EOI, intr & 0);
 }
 
+_no_instrument
+void apic_eoi_noinst(int intr)
+{
+    apic->write32_noinst(APIC_REG_EOI, intr & 0);
+}
+
 static void apic_online(int enabled, int spurious_intr, int err_intr)
 {
     uint32_t sir = apic->read32(APIC_REG_SIR);
@@ -1853,6 +1925,79 @@ static void apic_configure_timer(
                   APIC_LVT_TR_MODE_n(timer_mode) |
                   (mask ? APIC_LVT_MASK : 0));
     apic->write32(APIC_REG_LVT_ICR, icr);
+}
+
+static const constexpr uint8_t apic_shr_to_dcr[] = {
+    APIC_LVT_DCR_BY_1,
+    APIC_LVT_DCR_BY_2,
+    APIC_LVT_DCR_BY_4,
+    APIC_LVT_DCR_BY_8,
+    APIC_LVT_DCR_BY_16,
+    APIC_LVT_DCR_BY_32,
+    APIC_LVT_DCR_BY_64,
+    APIC_LVT_DCR_BY_128
+};
+
+// The maximum possible ticks value is 32+7=39 bits
+// 0x7FFFFFFF80
+// Rounds to nearest when resolution is insufficient due to divisor
+// Returns actual wait (possibly rounded off) wait time
+// in APIC timer ticks
+EXPORT uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask)
+{
+    if (ticks <= INT32_MAX) {
+        apic_configure_timer(APIC_LVT_DCR_BY_1, ticks,
+                             one_shot ? APIC_LVT_TR_MODE_ONESHOT
+                                      : APIC_LVT_TR_MODE_PERIODIC,
+                             INTR_APIC_TIMER, mask);
+        return ticks;
+    }
+
+    static constexpr const uint64_t ticks_max =
+            (UINT64_C(0xFFFFFFFF) << (countof(apic_shr_to_dcr) - 1));
+
+    // If counter is not representable, cap to maximum
+    ticks = ticks < ticks_max
+            ? ticks
+            : ticks_max;
+
+    // Determine the highest and lowest set bits
+    uint8_t lsb_set = bit_lsb_set(ticks);
+    uint8_t msb_set = bit_msb_set(ticks);
+
+    // Must shift at least this much to fit in 32 bit counter
+    // This is the minimum shift which maintains range
+    uint8_t min_shr = msb_set > 31 ? msb_set - 31 : 0;
+
+    // Would be nice to shift this much to keep full precision
+    // This is the maximum shift which maintains precision
+    uint8_t max_shr = lsb_set;
+
+    // min_shr takes precedence over max_shr to shift more
+    uint8_t shift = max_shr < min_shr ? min_shr : max_shr;
+
+    bool round_bit = shift && (ticks & (UINT64_C(1) << (shift - 1)));
+    ticks >>= shift;
+    ticks += round_bit;
+
+    // Rounding might carry to next shift
+    round_bit = unlikely(ticks > UINT64_C(0xFFFFFFFF));
+    ticks >>= uint8_t(round_bit);
+    shift += uint8_t(round_bit);
+
+    if (unlikely(shift > 7)) {
+        ticks = 0xFFFFFFFF;
+        shift = 7;
+    }
+
+    uint32_t dcr = apic_shr_to_dcr[shift];
+
+    apic_configure_timer(dcr, ticks,
+                         one_shot ? APIC_LVT_TR_MODE_ONESHOT
+                                  : APIC_LVT_TR_MODE_PERIODIC,
+                         INTR_APIC_TIMER, mask);
+
+    return ticks << shift;
 }
 
 int apic_init(int ap)
@@ -2838,4 +2983,42 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
 uint32_t acpi_cpu_count()
 {
     return apic_id_count;
+}
+
+lapic_kvm_t::lapic_kvm_t()
+{
+    cpu_count = thread_cpu_count();
+    cpus.reset(new cacheline_t[cpu_count]);
+
+    // Initialize the MSR on every CPU
+    workq::enqueue_on_all_barrier([&] (size_t i) {
+        // [63:2] = physical address of 32 bit paravirt dword
+        // [1] = reserved, MBZ
+        // [0] = enable paravirtualized EOI
+        uint64_t kvm_eoi = mphysaddr(&cpus[i].values[0]);
+        kvm_eoi |= 1;
+        cpu_msr_set(msr_kvm_eoi, kvm_eoi);
+    });
+}
+
+lapic_kvm_t::~lapic_kvm_t()
+{
+
+}
+
+void lapic_kvm_t::write32(uint32_t offset, uint32_t val)
+{
+    // Redirect EOI write to paravirtualized EOI
+    if (offset == APIC_REG_EOI)
+        paravirt_eoi();
+
+    return lapic_x2_t::write32(offset, val);
+}
+
+void lapic_kvm_t::paravirt_eoi()
+{
+    size_t cpu = thread_cpu_number();
+    // It was not set, cannot do paravirtualized EOI
+    if (unlikely(!atomic_btr(&cpus[cpu].values[0], 0)))
+        lapic_x2_t::write32(APIC_REG_EOI, 0);
 }

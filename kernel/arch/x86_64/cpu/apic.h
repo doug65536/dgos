@@ -15,8 +15,11 @@ void apic_send_ipi(int target_apic_id, uint8_t intr);
 void apic_send_ipi_noinst(int target_apic_id, uint8_t intr);
 
 void apic_eoi(int intr);
+void apic_eoi_noinst(int intr);
 uint32_t apic_timer_count(void);
 void apic_dump_regs(int ap);
+
+uint64_t apic_configure_timer(uint64_t ticks, bool one_shot, bool mask);
 
 int apic_enable(void);
 bool ioapic_irq_setcpu(int irq, int cpu);
