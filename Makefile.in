@@ -157,7 +157,6 @@ am_libbootsect_a_OBJECTS = boot/libbootsect_a-bootcommon.$(OBJEXT) \
 	boot/libbootsect_a-utf.$(OBJEXT) \
 	boot/libbootsect_a-paging.$(OBJEXT) \
 	boot/libbootsect_a-elf64.$(OBJEXT) \
-	boot/libbootsect_a-elf64_bios.$(OBJEXT) \
 	boot/libbootsect_a-rand.$(OBJEXT) \
 	boot/libbootsect_a-physmap.$(OBJEXT) \
 	boot/libbootsect_a-physmem_bios.$(OBJEXT) \
@@ -384,8 +383,9 @@ am_libkei_a_OBJECTS = $(am__objects_2)
 libkei_a_OBJECTS = $(am_libkei_a_OBJECTS)
 libkm_a_AR = $(AR) $(ARFLAGS)
 libkm_a_LIBADD =
-am_libkm_a_OBJECTS = modules/libkm/dso_handle.$(OBJEXT) \
-	modules/libkm/libkm_a-module_entry.$(OBJEXT)
+am_libkm_a_OBJECTS = modules/libkm/libkm_a-module_entry.$(OBJEXT) \
+	modules/libkm/dso_handle.$(OBJEXT) \
+	modules/libkm/__cxa_pure_virtual.$(OBJEXT)
 libkm_a_OBJECTS = $(am_libkm_a_OBJECTS)
 libm_a_AR = $(AR) $(ARFLAGS)
 libm_a_LIBADD =
@@ -432,7 +432,6 @@ am_bootefi_amd64_OBJECTS = boot/bootefi_amd64-bootefi.$(OBJEXT) \
 	boot/bootefi_amd64-rand.$(OBJEXT) \
 	boot/bootefi_amd64-paging.$(OBJEXT) \
 	boot/bootefi_amd64-elf64.$(OBJEXT) \
-	boot/bootefi_amd64-elf64_efi.$(OBJEXT) \
 	boot/bootefi_amd64-mpentry_efi.$(OBJEXT) \
 	boot/bootefi_amd64-progressbar.$(OBJEXT) \
 	boot/bootefi_amd64-bootmenu.$(OBJEXT) \
@@ -1428,7 +1427,6 @@ libbootsect_a_SOURCES = \
 	boot/utf.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
-	boot/elf64_bios.cc \
 	boot/rand.cc \
 	boot/physmap.cc \
 	boot/physmem_bios.cc \
@@ -1494,9 +1492,10 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
+
+#$(RETPOLINE_FLAGS)
 libbootsect_a_CFLAGS = 
 libbootsect_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
@@ -1508,7 +1507,6 @@ libbootsect_a_CCASFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 
@@ -1647,7 +1645,6 @@ BOOTLOADER_EFI_FLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	$(FREESTANDING_FLAGS)
 
@@ -1674,7 +1671,6 @@ bootefi_amd64_SOURCES = \
 	boot/rand.cc \
 	boot/paging.cc \
 	boot/elf64.cc \
-	boot/elf64_efi.cc \
 	boot/mpentry_efi.S \
 	boot/progressbar.cc \
 	boot/bootmenu.cc \
@@ -1965,6 +1961,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/segrw.h \
 	kernel/arch/x86_64/cpu/spinlock.cc \
 	kernel/arch/x86_64/cpu/spinlock.h \
+	kernel/arch/x86_64/cpu/spinlock_arch.h \
 	kernel/arch/x86_64/cpu/syscall_dispatch.cc \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
@@ -2055,9 +2052,10 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility-inlines-hidden \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(FREESTANDING_FLAGS)
 
+
+#$(RETPOLINE_FLAGS)
 
 # Buggy
 #$(STACK_CHECK_FLAGS)
@@ -2206,9 +2204,10 @@ shell_CXXFLAGS = \
 	-isystem $(top_builddir)/sysroot/include \
 	-g \
 	$(COMPILER_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(USER64_FLAGS)
 
+
+#$(RETPOLINE_FLAGS)
 shell_CFLAGS = \
 	$(shell_CXXFLAGS)
 
@@ -2603,14 +2602,16 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
-	$(RETPOLINE_FLAGS) \
 	$(COMPILER_FLAGS)
 
+
+#$(RETPOLINE_FLAGS)
 KERNEL_MODULE_LDFLAGS_SHARED = \
 	-Wl,-shared \
 	-Wl,-g \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
+	-Wl,--relax \
 	$(LINKER_DEBUG) \
 	$(NOSTDLIB_FLAGS)
 
@@ -2620,6 +2621,22 @@ KERNEL_MODULE_LDADD_SHARED = \
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	kernel/arch/x86_64/module.ld
 
+KERNEL_MODULE_LDFLAGS_FN = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/$(1).km.map \
+	-Wl,-z,now
+
+libkm_a_SOURCES = \
+	modules/libkm/module_entry.cc \
+	modules/libkm/dso_handle.S \
+	modules/libkm/__cxa_pure_virtual.S
+
+libkm_a_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
+
+EXTRA_libkm_a_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
 usbxhci_km_SOURCES = \
 	kernel/device/usb_xhci.cc
 
@@ -2627,8 +2644,7 @@ usbxhci_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 usbxhci_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/usbxhci.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,usbxhci)
 
 usbxhci_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2643,8 +2659,7 @@ rtl8139_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 rtl8139_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/rtl8139.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,rtl8193)
 
 rtl8139_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2660,8 +2675,7 @@ nvme_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 nvme_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/nvme.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,nvme)
 
 nvme_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2676,20 +2690,9 @@ keyb8042_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 keyb8042_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/keyb8402.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,keyb8042)
 
 EXTRA_keyb8042_km_DEPENDENCIES = \
-	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
-
-libkm_a_SOURCES = \
-	modules/libkm/dso_handle.S \
-	modules/libkm/module_entry.cc
-
-libkm_a_CXXFLAGS = \
-	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
-
-EXTRA_libkm_a_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 ahci_km_SOURCES = \
@@ -2699,8 +2702,7 @@ ahci_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 ahci_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/ahci.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,ahci)
 
 ahci_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2715,8 +2717,7 @@ ide_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 ide_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/ide.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,ide)
 
 ide_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2732,8 +2733,7 @@ fat32_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 fat32_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/fat32.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,fat32)
 
 fat32_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2750,8 +2750,7 @@ iso9660_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 iso9660_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/iso9660.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,iso9660)
 
 iso9660_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2766,8 +2765,7 @@ mbr_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 mbr_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/mbr.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,mbr)
 
 mbr_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2782,8 +2780,7 @@ gpt_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 gpt_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/gpt.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,gpt)
 
 gpt_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -2832,7 +2829,8 @@ BITFIELD_FILES = \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
 	$(top_srcdir)/kernel/device/acpi.bits \
 	$(top_srcdir)/kernel/device/ahci.bits \
-	$(top_srcdir)/kernel/device/es173x.bits
+	$(top_srcdir)/kernel/device/es173x.bits \
+	$(top_srcdir)/kernel/net/ipv4.bits
 
 QEMU_EXTRA_DEPS = \
 	$(DUMPDIR)/qemu-debug-out \
@@ -2849,9 +2847,11 @@ QEMU_MEMFILL =
 QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
 	-device usb-kbd,bus=xhci.0 \
-	-device usb-mouse,bus=xhci.0 \
+	-device usb-tablet,bus=xhci.0 \
 	$(QEMU_USB_EXTRA)
 
+
+#-device usb-mouse,bus=xhci.0
 
 #-device usb-storage,bus=xhci.0,drive=stick
 #-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none
@@ -3085,8 +3085,6 @@ boot/libbootsect_a-utf.$(OBJEXT): boot/$(am__dirstamp) \
 boot/libbootsect_a-paging.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-elf64.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/libbootsect_a-elf64_bios.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/libbootsect_a-rand.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -3828,9 +3826,12 @@ modules/libkm/$(am__dirstamp):
 modules/libkm/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) modules/libkm/$(DEPDIR)
 	@: > modules/libkm/$(DEPDIR)/$(am__dirstamp)
+modules/libkm/libkm_a-module_entry.$(OBJEXT):  \
+	modules/libkm/$(am__dirstamp) \
+	modules/libkm/$(DEPDIR)/$(am__dirstamp)
 modules/libkm/dso_handle.$(OBJEXT): modules/libkm/$(am__dirstamp) \
 	modules/libkm/$(DEPDIR)/$(am__dirstamp)
-modules/libkm/libkm_a-module_entry.$(OBJEXT):  \
+modules/libkm/__cxa_pure_virtual.$(OBJEXT):  \
 	modules/libkm/$(am__dirstamp) \
 	modules/libkm/$(DEPDIR)/$(am__dirstamp)
 
@@ -3974,8 +3975,6 @@ boot/bootefi_amd64-rand.$(OBJEXT): boot/$(am__dirstamp) \
 boot/bootefi_amd64-paging.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-elf64.$(OBJEXT): boot/$(am__dirstamp) \
-	boot/$(DEPDIR)/$(am__dirstamp)
-boot/bootefi_amd64-elf64_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
 boot/bootefi_amd64-mpentry_efi.$(OBJEXT): boot/$(am__dirstamp) \
 	boot/$(DEPDIR)/$(am__dirstamp)
@@ -5288,7 +5287,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-ctors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-elf64.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-fs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-halt_efi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/bootefi_amd64-malloc.Po@am__quote@
@@ -5337,7 +5335,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-debug.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-diskio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-elf64_bios.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-fat32.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-fs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@boot/$(DEPDIR)/libbootsect_a-gdt.Po@am__quote@
@@ -5946,6 +5943,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-unlinkat.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-write.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@mbr/$(DEPDIR)/mbr_elf-mbr.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@modules/libkm/$(DEPDIR)/__cxa_pure_virtual.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@modules/libkm/$(DEPDIR)/dso_handle.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@modules/libkm/$(DEPDIR)/libkm_a-module_entry.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po@am__quote@
@@ -6701,20 +6699,6 @@ boot/libbootsect_a-elf64.obj: boot/elf64.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/elf64.cc' object='boot/libbootsect_a-elf64.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-elf64.obj `if test -f 'boot/elf64.cc'; then $(CYGPATH_W) 'boot/elf64.cc'; else $(CYGPATH_W) '$(srcdir)/boot/elf64.cc'; fi`
-
-boot/libbootsect_a-elf64_bios.o: boot/elf64_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-elf64_bios.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-elf64_bios.Tpo -c -o boot/libbootsect_a-elf64_bios.o `test -f 'boot/elf64_bios.cc' || echo '$(srcdir)/'`boot/elf64_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-elf64_bios.Tpo boot/$(DEPDIR)/libbootsect_a-elf64_bios.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/elf64_bios.cc' object='boot/libbootsect_a-elf64_bios.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-elf64_bios.o `test -f 'boot/elf64_bios.cc' || echo '$(srcdir)/'`boot/elf64_bios.cc
-
-boot/libbootsect_a-elf64_bios.obj: boot/elf64_bios.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-elf64_bios.obj -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-elf64_bios.Tpo -c -o boot/libbootsect_a-elf64_bios.obj `if test -f 'boot/elf64_bios.cc'; then $(CYGPATH_W) 'boot/elf64_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/elf64_bios.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/libbootsect_a-elf64_bios.Tpo boot/$(DEPDIR)/libbootsect_a-elf64_bios.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/elf64_bios.cc' object='boot/libbootsect_a-elf64_bios.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -c -o boot/libbootsect_a-elf64_bios.obj `if test -f 'boot/elf64_bios.cc'; then $(CYGPATH_W) 'boot/elf64_bios.cc'; else $(CYGPATH_W) '$(srcdir)/boot/elf64_bios.cc'; fi`
 
 boot/libbootsect_a-rand.o: boot/rand.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libbootsect_a_CXXFLAGS) $(CXXFLAGS) -MT boot/libbootsect_a-rand.o -MD -MP -MF boot/$(DEPDIR)/libbootsect_a-rand.Tpo -c -o boot/libbootsect_a-rand.o `test -f 'boot/rand.cc' || echo '$(srcdir)/'`boot/rand.cc
@@ -9921,20 +9905,6 @@ boot/bootefi_amd64-elf64.obj: boot/elf64.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/elf64.cc' object='boot/bootefi_amd64-elf64.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-elf64.obj `if test -f 'boot/elf64.cc'; then $(CYGPATH_W) 'boot/elf64.cc'; else $(CYGPATH_W) '$(srcdir)/boot/elf64.cc'; fi`
-
-boot/bootefi_amd64-elf64_efi.o: boot/elf64_efi.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-elf64_efi.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Tpo -c -o boot/bootefi_amd64-elf64_efi.o `test -f 'boot/elf64_efi.cc' || echo '$(srcdir)/'`boot/elf64_efi.cc
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/elf64_efi.cc' object='boot/bootefi_amd64-elf64_efi.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-elf64_efi.o `test -f 'boot/elf64_efi.cc' || echo '$(srcdir)/'`boot/elf64_efi.cc
-
-boot/bootefi_amd64-elf64_efi.obj: boot/elf64_efi.cc
-@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-elf64_efi.obj -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Tpo -c -o boot/bootefi_amd64-elf64_efi.obj `if test -f 'boot/elf64_efi.cc'; then $(CYGPATH_W) 'boot/elf64_efi.cc'; else $(CYGPATH_W) '$(srcdir)/boot/elf64_efi.cc'; fi`
-@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Tpo boot/$(DEPDIR)/bootefi_amd64-elf64_efi.Po
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='boot/elf64_efi.cc' object='boot/bootefi_amd64-elf64_efi.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -c -o boot/bootefi_amd64-elf64_efi.obj `if test -f 'boot/elf64_efi.cc'; then $(CYGPATH_W) 'boot/elf64_efi.cc'; else $(CYGPATH_W) '$(srcdir)/boot/elf64_efi.cc'; fi`
 
 boot/bootefi_amd64-progressbar.o: boot/progressbar.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(bootefi_amd64_CXXFLAGS) $(CXXFLAGS) -MT boot/bootefi_amd64-progressbar.o -MD -MP -MF boot/$(DEPDIR)/bootefi_amd64-progressbar.Tpo -c -o boot/bootefi_amd64-progressbar.o `test -f 'boot/progressbar.cc' || echo '$(srcdir)/'`boot/progressbar.cc
@@ -15916,16 +15886,16 @@ sysroot/lib/crt0.o: \
 			-c $<
 
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 #sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
 #	$(MKDIR) -p "$(@D)" && cp $< $@

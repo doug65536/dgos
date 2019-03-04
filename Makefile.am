@@ -222,8 +222,9 @@ libbootsect_a_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(COMPILER_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
+
+#$(RETPOLINE_FLAGS)
 
 libbootsect_a_CFLAGS =
 
@@ -237,7 +238,6 @@ libbootsect_a_CCASFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_UNWIND_TABLES_FLAGS) \
-	$(OPTIMIZE_SIZE_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 # boot code
@@ -404,9 +404,10 @@ BOOTLOADER_EFI_FLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_COMMON_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	$(FREESTANDING_FLAGS)
+
+#$(RETPOLINE_FLAGS)
 
 bin_PROGRAMS += bootefi-amd64
 
@@ -736,6 +737,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/segrw.h \
 	kernel/arch/x86_64/cpu/spinlock.cc \
 	kernel/arch/x86_64/cpu/spinlock.h \
+	kernel/arch/x86_64/cpu/spinlock_arch.h \
 	kernel/arch/x86_64/cpu/syscall_dispatch.cc \
 	kernel/arch/x86_64/cpu/syscall_dispatch.h \
 	kernel/arch/x86_64/cpu/thread_impl.cc \
@@ -826,8 +828,9 @@ KERNEL_CXXFLAGS_SHARED = \
 	-fvisibility-inlines-hidden \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(FREESTANDING_FLAGS)
+
+#$(RETPOLINE_FLAGS)
 
 # Buggy
 #$(STACK_CHECK_FLAGS)
@@ -1021,16 +1024,16 @@ sysroot/lib/crt0.o: \
 			-c $<
 
 sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && ln -fsTr "$<" "$@"
+	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 #sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
 #	$(MKDIR) -p "$(@D)" && cp $< $@
@@ -1070,8 +1073,9 @@ shell_CXXFLAGS = \
 	-isystem $(top_builddir)/sysroot/include \
 	-g \
 	$(COMPILER_FLAGS) \
-	$(RETPOLINE_FLAGS) \
 	$(USER64_FLAGS)
+
+#$(RETPOLINE_FLAGS)
 
 shell_CFLAGS = \
 	$(shell_CXXFLAGS)
@@ -1558,14 +1562,16 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
-	$(RETPOLINE_FLAGS) \
 	$(COMPILER_FLAGS)
+
+#$(RETPOLINE_FLAGS)
 
 KERNEL_MODULE_LDFLAGS_SHARED = \
 	-Wl,-shared \
 	-Wl,-g \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
+	-Wl,--relax \
 	$(LINKER_DEBUG) \
 	$(NOSTDLIB_FLAGS)
 
@@ -1574,6 +1580,26 @@ KERNEL_MODULE_LDADD_SHARED = \
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	kernel/arch/x86_64/module.ld
+
+KERNEL_MODULE_LDFLAGS_FN = \
+	$(KERNEL_MODULE_LDFLAGS_SHARED) \
+	-Wl,-Map,$(top_builddir)/$(1).km.map \
+	-Wl,-z,now
+
+#==========
+
+noinst_LIBRARIES += libkm.a
+
+libkm_a_SOURCES = \
+	modules/libkm/module_entry.cc \
+	modules/libkm/dso_handle.S \
+	modules/libkm/__cxa_pure_virtual.S
+
+libkm_a_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
+
+EXTRA_libkm_a_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========
 
@@ -1586,8 +1612,7 @@ usbxhci_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 usbxhci_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/usbxhci.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,usbxhci)
 
 usbxhci_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1606,8 +1631,7 @@ rtl8139_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 rtl8139_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/rtl8139.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,rtl8193)
 
 rtl8139_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1627,8 +1651,7 @@ nvme_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 nvme_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/nvme.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,nvme)
 
 nvme_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1647,24 +1670,9 @@ keyb8042_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 keyb8042_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/keyb8402.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,keyb8042)
 
 EXTRA_keyb8042_km_DEPENDENCIES = \
-	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
-
-#==========
-
-noinst_LIBRARIES += libkm.a
-
-libkm_a_SOURCES = \
-	modules/libkm/dso_handle.S \
-	modules/libkm/module_entry.cc
-
-libkm_a_CXXFLAGS = \
-	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
-
-EXTRA_libkm_a_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========
@@ -1678,8 +1686,7 @@ ahci_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 ahci_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/ahci.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,ahci)
 
 ahci_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1698,8 +1705,7 @@ ide_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 ide_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/ide.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,ide)
 
 ide_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1719,8 +1725,7 @@ fat32_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 fat32_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/fat32.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,fat32)
 
 fat32_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1741,8 +1746,7 @@ iso9660_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 iso9660_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/iso9660.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,iso9660)
 
 iso9660_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1761,15 +1765,13 @@ mbr_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 mbr_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/mbr.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,mbr)
 
 mbr_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_mbr_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
-
 
 #==========
 
@@ -1782,8 +1784,7 @@ gpt_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
 
 gpt_km_LDFLAGS = \
-	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/gpt.km.map
+	$(call KERNEL_MODULE_LDFLAGS_FN,gpt)
 
 gpt_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
@@ -1910,7 +1911,8 @@ BITFIELD_FILES = \
 	$(top_srcdir)/kernel/arch/x86_64/cpu/pic.bits \
 	$(top_srcdir)/kernel/device/acpi.bits \
 	$(top_srcdir)/kernel/device/ahci.bits \
-	$(top_srcdir)/kernel/device/es173x.bits
+	$(top_srcdir)/kernel/device/es173x.bits \
+	$(top_srcdir)/kernel/net/ipv4.bits
 
 # 1=path to bits file
 define bitfield_gen =
@@ -1982,8 +1984,10 @@ QEMU_USB_ROOT_PORTS ?= 16
 QEMU_USB = \
 	-device qemu-xhci,id=xhci,p2=$(QEMU_USB_ROOT_PORTS),p3=$(QEMU_USB_ROOT_PORTS),streams=on \
 	-device usb-kbd,bus=xhci.0 \
-	-device usb-mouse,bus=xhci.0 \
+	-device usb-tablet,bus=xhci.0 \
 	$(QEMU_USB_EXTRA)
+
+#-device usb-mouse,bus=xhci.0
 
 #-device usb-storage,bus=xhci.0,drive=stick
 #-drive if=none,id=stick,file=usb_disk.img,format=raw,cache=none
