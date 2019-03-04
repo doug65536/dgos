@@ -180,10 +180,11 @@ void idt_xsave_detect(int ap)
 
     // Patch FS/GS loading code if CPU supports wrfsbase/wrgsbase
 
-    if (!ap && cpuid_has_fsgsbase())
+    if (!ap && cpuid_has_fsgsbase()) {
         cpu_patch_calls(load_fsgsbase_range.target,
                         countof(load_fsgsbase_range.patch_points),
                         load_fsgsbase_range.patch_points);
+    }
 
     while (cpuid_has_xsave()) {
         cpuid_t info;
