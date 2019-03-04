@@ -33,6 +33,13 @@
 #define THREAD_TRACE(...) ((void)0)
 #endif
 
+#define DEBUG_THREAD_STACK    1
+#if DEBUG_THREAD_STACK
+#define THREAD_STK_TRACE(...) printdbg("thread_stk: " __VA_ARGS__)
+#else
+#define THREAD_STK_TRACE(...) ((void)0)
+#endif
+
 enum thread_state_t : uint32_t {
     THREAD_IS_UNINITIALIZED = 0,
     THREAD_IS_INITIALIZING,
@@ -54,9 +61,6 @@ enum thread_state_t : uint32_t {
     THREAD_IS_DESTRUCTING_BUSY = THREAD_IS_DESTRUCTING | THREAD_BUSY,
     THREAD_IS_EXITING_BUSY = THREAD_IS_EXITING | THREAD_BUSY
 };
-
-struct thread_info_t;
-struct cpu_info_t;
 
 // When state is equal to one of these:
 //  THREAD_IS_READY
@@ -120,7 +124,7 @@ struct alignas(256) thread_info_t {
     void *exception_chain;
 
     // Points to the end of the stack!
-    void *stack;
+    char *stack;
 
     // Process exit code
     int exit_code;
@@ -158,7 +162,7 @@ struct alignas(256) thread_info_t {
     // time elapses.
     uint64_t timeslice_remaining;
 
-    thread_cpu_affinity_t cpu_affinity;
+    thread_cpu_mask_t cpu_affinity;
 
     __exception_jmp_buf_t exit_jmpbuf;
 
@@ -394,6 +398,12 @@ static char *thread_allocate_stack(
                         PROT_READ | PROT_WRITE,
                         MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
 
+    THREAD_STK_TRACE("Allocated %s stack"
+                     ", size=%#zx"
+                     ", tid=%d"
+                     ", filled=%d\n",
+                     noun, stack_size, tid, fill);
+
     // Guard pages
     madvise(stack, stack_guard_size, MADV_DONTNEED);
     mprotect(stack, stack_guard_size, PROT_NONE);
@@ -422,7 +432,7 @@ static char *thread_allocate_stack(
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
         thread_fn_t fn, void *userdata, size_t stack_size,
-        thread_state_t state, thread_cpu_affinity_t const &affinity,
+        thread_state_t state, thread_cpu_mask_t const &affinity,
         thread_priority_t priority, bool user)
 {
     if (stack_size == 0)
@@ -786,11 +796,11 @@ static thread_info_t *thread_choose_next(
         if (unlikely(candidate->state == THREAD_IS_DESTRUCTING)) {
             if (atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
                                THREAD_IS_EXITING) == THREAD_IS_DESTRUCTING) {
+                // We acquired the exclusive ability to cleanup the thread
                 thread_destruct(candidate);
                 continue;
             }
         }
-
 
         // If this thread is not allowed to run on this CPU
         // then skip it
@@ -864,32 +874,70 @@ static void thread_clear_busy(void *outgoing)
         thread->process->del_thread(thread->thread_id);
 }
 
+static void thread_free_stacks(thread_info_t *thread)
+{
+    char *stk;
+    size_t stk_sz;
+
+    // The user stack
+    if (thread->stack != nullptr && thread->stack_size > 0) {
+        stk = thread->stack - thread->stack_size - stack_guard_size;
+        stk_sz = stack_guard_size + thread->stack_size + stack_guard_size;
+        thread->stack = nullptr;
+        thread->stack_size = 0;
+
+        THREAD_STK_TRACE("Freeing %s stack"
+                         ", addr=%#zx"
+                         ", size=%#zx"
+                         ", tid=%d\n",
+                         "thread", uintptr_t(stk),
+                         stk_sz, thread->thread_id);
+
+        assert(stk != nullptr);
+        assert(stk_sz != 0);
+        munmap(stk, stk_sz);
+    }
+
+    // The xsave stack
+    if (thread->flags & THREAD_FLAGS_USES_FPU) {
+        stk = thread->xsave_stack - stack_guard_size - xsave_stack_size;
+        stk_sz = stack_guard_size + xsave_stack_size + stack_guard_size;
+        thread->xsave_stack = nullptr;
+        thread->flags &= ~THREAD_FLAGS_USES_FPU;
+
+        THREAD_STK_TRACE("Freeing %s stack"
+                         ", addr=%#zx"
+                         ", size=%#zx"
+                         ", tid=%d\n",
+                         "FPU", uintptr_t(stk),
+                         stk_sz, thread->thread_id);
+
+        assert(stk != nullptr);
+        assert(stk_sz != 0);
+        munmap(stk, stk_sz);
+    }
+}
+
+static void thread_signal_completion(thread_info_t *thread)
+{
+    // Wake up any threads waiting for this thread to exit ASAP
+    mutex_lock_noyield(&thread->lock);
+    thread->state = THREAD_IS_FINISHED;
+    mutex_unlock(&thread->lock);
+    condvar_wake_all(&thread->done_cond);
+}
+
 // Thread is not running anymore, destroy things only needed when it runs
 void thread_destruct(thread_info_t *thread)
 {
     cpu_scoped_irq_disable irq_dis;
 
-    // The user stack
-    if (thread->stack != nullptr && thread->stack_size > 0) {
-        munmap((char*)thread->stack - thread->stack_size - stack_guard_size,
-               stack_guard_size + thread->stack_size + stack_guard_size);
-        thread->stack = nullptr;
-        thread->stack_size = 0;
-    }
+    thread_signal_completion(thread);
 
-    if (thread->flags & THREAD_FLAGS_USES_FPU) {
-        assert(thread->xsave_stack != nullptr);
-        munmap(thread->xsave_stack - stack_guard_size - xsave_stack_size,
-               stack_guard_size + xsave_stack_size + stack_guard_size);
-        thread->xsave_stack = nullptr;
-        thread->flags &= ~THREAD_FLAGS_USES_FPU;
-    }
+    thread_free_stacks(thread);
 
-    mutex_lock_noyield(&thread->lock);
-    thread->state = THREAD_IS_FINISHED;
-    mutex_unlock(&thread->lock);
-    condvar_wake_all(&thread->done_cond);
-
+    // If everybody has closed their handle to this thread,
+    // then mark it for recycling
     if (thread->ref_count == 0) {
         mutex_destroy(&thread->lock);
         atomic_st_rel(&thread->state, THREAD_IS_UNINITIALIZED);
@@ -1175,7 +1223,7 @@ EXPORT void thread_set_fsbase(thread_t tid, uintptr_t fsbase)
         threads[tid].fsbase = (void*)fsbase;
 }
 
-EXPORT thread_cpu_affinity_t const* thread_get_affinity(int id)
+EXPORT thread_cpu_mask_t const* thread_get_affinity(int id)
 {
     return &threads[id].cpu_affinity;
 }
@@ -1185,7 +1233,7 @@ EXPORT size_t thread_get_cpu_count()
     return cpu_count;
 }
 
-EXPORT void thread_set_affinity(int id, thread_cpu_affinity_t const &affinity)
+EXPORT void thread_set_affinity(int id, thread_cpu_mask_t const &affinity)
 {
     cpu_scoped_irq_disable intr_was_enabled;
     cpu_info_t *cpu = this_cpu();
@@ -1228,10 +1276,10 @@ void thread_check_stack()
 {
     thread_info_t *thread = this_thread();
 
-    void *sp = cpu_stack_ptr_get();
+    char *sp = (char*)cpu_stack_ptr_get();
 
     if (sp > thread->stack ||
-            (char*)sp < (char*)thread->stack - thread->stack_size)
+            sp < thread->stack - thread->stack_size)
     {
         cpu_debug_break();
         cpu_crash();
