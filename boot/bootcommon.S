@@ -138,6 +138,8 @@ detect_ancient_cpu:
     test $0xF000,%ax
     jz detected_80286
 
+    // It is safe to use 32 bit instructions now...
+
     // An 80386 has eflags 18 (AC) permanently clear
     or $-1,%ecx
     mov $ 1 << 18,%edx
