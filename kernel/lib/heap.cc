@@ -185,7 +185,8 @@ static heap_hdr_t *heap_create_arena(heap_t *heap, uint8_t log2size)
 
     size_t bucket = log2size - 5;
 
-    char *arena = (char*)mmap(nullptr, HEAP_BUCKET_SIZE, PROT_READ | PROT_WRITE,
+    char *arena = (char*)mmap(nullptr, HEAP_BUCKET_SIZE,
+                              PROT_READ | PROT_WRITE,
                        MAP_POPULATE | MAP_UNINITIALIZED, -1, 0);
     char *arena_end = arena + HEAP_BUCKET_SIZE;
 

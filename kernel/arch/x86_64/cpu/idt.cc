@@ -317,7 +317,34 @@ constexpr uintptr_t isr_entry_point(size_t i)
 
 static uint8_t idt_vector_type(size_t vec)
 {
-    return false && vec != INTR_THREAD_YIELD ? IDT_TRAP : IDT_INTR;
+    switch (vec) {
+    case INTR_EX_DIV:
+    case INTR_EX_DEBUG:
+    //case INTR_EX_NMI:
+    case INTR_EX_BREAKPOINT:
+    case INTR_EX_OVF:
+    case INTR_EX_BOUND:
+    case INTR_EX_OPCODE:
+    case INTR_EX_DEV_NOT_AV:
+    //case INTR_EX_DBLFAULT:
+    case INTR_EX_COPR_SEG:
+    case INTR_EX_TSS:
+    case INTR_EX_SEGMENT:
+    case INTR_EX_STACK:
+    case INTR_EX_GPF:
+    case INTR_EX_PAGE:
+    case INTR_EX_MATH:
+    case INTR_EX_ALIGNMENT:
+    //case INTR_EX_MACHINE:
+    case INTR_EX_SIMD:
+    //case INTR_EX_VIRTUALIZE:
+    case INTR_THREAD_YIELD:
+        // Don't mask IRQs
+        return IDT_TRAP;
+    default:
+        // Mask IRQs
+        return IDT_INTR;
+    }
 }
 
 int idt_init(int ap)
@@ -578,11 +605,11 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // Exception
     if (ISR_CTX_INTR(ctx) < 32) {
-        printdbg("Exception %#02lx %s\n",
-                 ISR_CTX_INTR(ctx),
+        printdbg("Exception %#02zx %s\n",
+                 size_t(ISR_CTX_INTR(ctx)),
                  exception_names[ISR_CTX_INTR(ctx)]);
     } else {
-        printdbg("Interrupt %#02lx\n", ISR_CTX_INTR(ctx));
+        printdbg("Interrupt %#02zx\n", size_t(ISR_CTX_INTR(ctx)));
     }
 
     // mxcsr and description
@@ -675,14 +702,14 @@ void dump_context(isr_context_t *ctx, int to_screen)
     if (ISR_CTX_INTR(ctx) < 32) {
         // exception
         con_draw_xy(0, 17, "Exception", color);
-        snprintf(fmt_buf, sizeof(fmt_buf), " %#02lx %s",
-                 ISR_CTX_INTR(ctx),
+        snprintf(fmt_buf, sizeof(fmt_buf), " %#02zx %s",
+                 size_t(ISR_CTX_INTR(ctx)),
                  exception_names[ISR_CTX_INTR(ctx)]);
         con_draw_xy(9, 17, fmt_buf, color);
     } else {
         con_draw_xy(0, 17, "Interrupt", color);
-        snprintf(fmt_buf, sizeof(fmt_buf), " %#02lx",
-                 ISR_CTX_INTR(ctx));
+        snprintf(fmt_buf, sizeof(fmt_buf), " %#02zx",
+                 size_t(ISR_CTX_INTR(ctx)));
         con_draw_xy(9, 17, fmt_buf, color);
     }
 
@@ -758,7 +785,8 @@ isr_context_t *unhandled_exception_handler(isr_context_t *ctx)
     }
 
     printk("\nUnhandled exception %#zx (%s) at RIP=%p\n",
-           ISR_CTX_INTR(ctx), name ? name : "??", (void*)ISR_CTX_REG_RIP(ctx));
+           size_t(ISR_CTX_INTR(ctx)),
+           name ? name : "??", (void*)ISR_CTX_REG_RIP(ctx));
 
     dump_context(ctx, 1);
     cpu_debug_break();

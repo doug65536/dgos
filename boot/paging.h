@@ -10,8 +10,10 @@
 
 // 4KB pages
 #define PAGE_SIZE_BIT       12
+#ifndef PAGE_SIZE
 #define PAGE_SIZE           (1U << PAGE_SIZE_BIT)
 #define PAGE_MASK           (PAGE_SIZE - 1U)
+#endif
 
 // Page table entries
 #define PTE_PRESENT_BIT     0

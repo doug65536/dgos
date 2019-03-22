@@ -34,8 +34,13 @@ AC_SUBST([RANLIB])
 
 AC_CHECK_PROGS([QEMU], [qemu-system-x86_64], [NOT_FOUND])
 AS_IF([test x"$QEMU" == x"NOT_FOUND"],
-	[AC_MSG_WARN([Cannot find qemu-system-x86_64])])
+    [AC_MSG_WARN([Cannot find qemu-system-x86_64])])
 AC_SUBST([QEMU])
+
+AC_CHECK_PROGS([NPROC], [nproc], [NOT_FOUND])
+AS_IF([test x"$NPROC" == x"NOT_FOUND"],
+    [AC_MSG_WARN([Cannot find nproc])])
+AC_SUBST([NPROC])
 
 AC_CHECK_PROGS([QEMU_IMG], [qemu-img], [NOT_FOUND])
 AS_IF([test x"$QEMU_IMG" == x"NOT_FOUND"],
@@ -153,7 +158,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([INSTRUMENT_FUNCTIONS_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([INSTRUMENT_FUNCTIONS_FLAGS])
 
@@ -163,17 +168,17 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ASAN_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects g \
+		std=c++14 fno-fat-lto-objects g gdwarf-4 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
-		Wno-shadow Wno-strict-overflow Wno-overlength-strings \
+		Wstrict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
@@ -185,7 +190,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([COMPILER_FLAGS])
 #Wsuggest-attribute=pure Wsuggest-attribute=const
@@ -205,7 +210,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([RETPOLINE_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([RETPOLINE_FLAGS])
 
@@ -216,7 +221,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 
 AS_VAR_SET([DEBUG_INFO_FLAGS], [])
@@ -224,7 +229,7 @@ for flag in ggdb3 gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([DEBUG_INFO_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([DEBUG_INFO_FLAGS])
 
@@ -233,7 +238,7 @@ for flag in Wa,-g g gdwarf-3 gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ASM_DEBUG_INFO_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([ASM_DEBUG_INFO_FLAGS])
 
@@ -242,15 +247,15 @@ AX_CHECK_COMPILE_FLAG([-Oz],
 	[AS_VAR_SET([SMALLEST_CODE_FLAGS], [-Oz])],
 	[AX_CHECK_COMPILE_FLAG([-Os],
 		[AS_VAR_SET([SMALLEST_CODE_FLAGS],[-Os])],
-		[$COMPILER_WERROR])],
-	[$COMPILER_WERROR])
+		[])],
+	[])
 for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
 		mno-align-stringops Wno-ignored-optimization-argument \
 		fstack-usage
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([SMALLEST_CODE_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([SMALLEST_CODE_FLAGS])
 
@@ -258,7 +263,7 @@ for flag in ffreestanding fbuiltin
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([FREESTANDING_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([FREESTANDING_FLAGS])
 
@@ -268,7 +273,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([NOSTDLIB_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([NOSTDLIB_FLAGS])
 
@@ -277,7 +282,7 @@ for flag in mgeneral-regs-only
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([NO_FLOAT_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([NO_FLOAT_FLAGS])
 
@@ -292,11 +297,15 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
-	Wl,-z,max-page-size=4096
+	Wl,-z,max-page-size=4096 \
+	Wl,-z,separate-code \
+	Wl,-z,relro \
+	Wl,-z,now \
+	Wl,--relax
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([USER64_FLAGS])
 
@@ -312,22 +321,23 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ELF32_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([ELF32_FLAGS])
-
 
 ELF64_FLAGS=
 for flag in \
 	m64 \
 	mpreferred-stack-boundary=3 \
 	Wl,-m,elf_x86_64 \
-	Wl,-N \
-	Wl,-z,max-page-size=4096
+	Wl,-z,common-page-size=4096 \
+	Wl,-z,max-page-size=4096 \
+	Wl,-z,separate-code \
+	Bsymbolic-functions
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ELF64_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([ELF64_FLAGS])
 
@@ -345,7 +355,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([PE32_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([PE32_FLAGS])
 
@@ -363,7 +373,7 @@ for flag in \
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([PE64_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([PE64_FLAGS])
 
@@ -372,7 +382,7 @@ for flag in fno-lto
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([NO_LTO_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([NO_LTO_FLAGS])
 
@@ -381,7 +391,7 @@ for flag in mrtd mregparm=3
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([REGPARM_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([REGPARM_FLAGS])
 
@@ -408,7 +418,7 @@ for flag in fno-pie fno-PIE fno-pic fno-PIC
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([NO_PIC_FLAGS], [" -$flag"])],
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([NO_PIC_FLAGS])
 
@@ -417,81 +427,89 @@ for flag in mabm mbmi mbmi2
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([BMI_FLAGS], [" -$flag"])]
-		[], [$COMPILER_WERROR])
+		[], [])
 done
 AC_SUBST([BMI_FLAGS])
 
 AS_VAR_SET([DISABLE_FRAMEPOINTER_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
 	[AS_VAR_SET([DISABLE_FRAMEPOINTER_FLAGS], [" -fomit-frame-pointer"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([DISABLE_FRAMEPOINTER_FLAGS])
 
 AS_VAR_SET([ENABLE_FRAMEPOINTER_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],
 	[AS_VAR_SET([ENABLE_FRAMEPOINTER_FLAGS], [" -fno-omit-frame-pointer"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([ENABLE_FRAMEPOINTER_FLAGS])
 
 AS_VAR_SET([NO_REDZONE_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-mno-red-zone],
 	[AS_VAR_SET([NO_REDZONE_FLAGS], [" -mno-red-zone"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_REDZONE_FLAGS])
 
 AS_VAR_SET([NO_STACKPROTECTOR_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-stack-protector],
 	[AS_VAR_SET([NO_STACKPROTECTOR_FLAGS], [" -fno-stack-protector"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_STACKPROTECTOR_FLAGS])
 
 AS_VAR_SET([STACK_CHECK_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fstack-check],
 	[AS_VAR_SET([STACK_CHECK_FLAGS], [" -fstack-check"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([STACK_CHECK_FLAGS])
 
 AS_VAR_SET([NO_STACK_CHECK_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-stack-check],
 	[AS_VAR_SET([NO_STACK_CHECK_FLAGS], [" -fno-stack-check"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_STACK_CHECK_FLAGS])
 
 AS_VAR_SET([NO_RTTI_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-rtti],
 	[AS_VAR_SET([NO_RTTI_FLAGS], [" -fno-rtti"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_RTTI_FLAGS])
 
 AS_VAR_SET([NO_UNWIND_TABLES_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-asynchronous-unwind-tables],
 	[AS_VAR_SET([NO_UNWIND_TABLES_FLAGS], [" -fno-asynchronous-unwind-tables"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_UNWIND_TABLES_FLAGS])
 
 AS_VAR_SET([NO_EXCEPTIONS_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-exceptions],
 	[AS_VAR_SET([NO_EXCEPTIONS_FLAGS], [" -fno-exceptions"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_EXCEPTIONS_FLAGS])
 
 AS_VAR_SET([NO_COMMON_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-fno-common],
 	[AS_VAR_SET([NO_COMMON_FLAGS], [" -fno-common"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([NO_COMMON_FLAGS])
 
 AS_VAR_SET([VECTORIZE_FLAGS], [])
 AX_CHECK_COMPILE_FLAG([-ftree-vectorize],
 	[AS_VAR_SET([VECTORIZE_FLAGS], [" -ftree-vectorize"])]
-	[], [$COMPILER_WERROR])
+	[], [])
 AC_SUBST([VECTORIZE_FLAGS])
+
+AS_VAR_SET([NO_SIBLING_CALLS_FLAGS], [])
+AX_CHECK_COMPILE_FLAG([-ftree-NO_SIBLING_CALLS],
+	[AS_VAR_SET([NO_SIBLING_CALLS_FLAGS], [" -fno-optimize-sibling-calls"])]
+	[], [])
+AC_SUBST([NO_SIBLING_CALLS_FLAGS])
 
 AS_VAR_SET([TUNE_FLAGS], [])
 #AX_CHECK_COMPILE_FLAG([AS_VAR_SET([-mtune], [znver1])],
 #	[AS_VAR_SET([TUNE_FLAGS], [" -mtune=znver1"])]
-#	[], [$COMPILER_WERROR])
+#	[], [])
 #AC_SUBST([TUNE_FLAGS])
+
+AS_VAR_SET([DEBUGGING_CODE_FLAGS], [" -Og $NO_SIBLING_CALLS_FLAGS"])
 
 AS_VAR_SET([OPTIMIZE_SPEED_FLAGS], [])
 AS_VAR_SET([OPTIMIZE_SIZE_FLAGS], [])
@@ -522,18 +540,21 @@ AC_ARG_ENABLE(lto,
 		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $TUNE_FLAGS"])
 
 		# Disable debugging
-		AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" -g0"])
-		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" -g0"])
+		AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" $DEBUGGING_CODE_FLAGS"])
+		AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $DEBUGGING_CODE_FLAGS"])
 	], [
 		AC_ARG_ENABLE(optimize,
 			AS_HELP_STRING([--enable-optimize],
 				[Enable size/speed optimizations]), [
 				AC_MSG_NOTICE([Enabling optimizations])
-				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" $SMALLEST_CODE_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
+					[" $SMALLEST_CODE_FLAGS"])
 				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
 					[" $DISABLE_FRAMEPOINTER_FLAGS"])
-				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $OPTIMIZATION_FLAGS"])
-				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $VECTORIZE_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
+					[" $OPTIMIZATION_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
+					[" $VECTORIZE_FLAGS"])
 				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
 					[" $DISABLE_FRAMEPOINTER_FLAGS"])
 
@@ -541,18 +562,20 @@ AC_ARG_ENABLE(lto,
 				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" $TUNE_FLAGS"])
 			], [
 				AC_MSG_NOTICE([Disabling optimizations])
-				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS], [" -ggdb3 -O0"])
 				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
-					[" $DISABLE_FRAMEPOINTER_FLAGS"])
-				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS], [" -ggdb3 -O0"])
+					[" $DEBUGGING_CODE_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
+					[" $ENABLE_FRAMEPOINTER_FLAGS"])
+				AS_VAR_APPEND([OPTIMIZE_DEBUGGING_FLAGS],
+					[" $DEBUGGING_CODE_FLAGS"])
 				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
-					[" $DISABLE_FRAMEPOINTER_FLAGS"])
+					[" $ENABLE_FRAMEPOINTER_FLAGS"])
 			]
 		)
 	]
 )
 
-AS_VAR_SET([DISABLE_OPTIMIZATION_FLAGS], ["-O0 $DISABLE_FRAMEPOINTER_FLAGS"])
+AS_VAR_SET([DISABLE_OPTIMIZATION_FLAGS], ["-Og $DISABLE_FRAMEPOINTER_FLAGS"])
 
 AC_SUBST([DISABLE_OPTIMIZATION_FLAGS])
 AC_SUBST([OPTIMIZE_SIZE_FLAGS])

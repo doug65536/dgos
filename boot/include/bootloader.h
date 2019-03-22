@@ -81,6 +81,7 @@ struct alignas(8) kernel_params_t {
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
     boottbl_acpi_info_t acpi_rsdt;
     boottbl_mptables_info_t mptables;
+    boottbl_nodes_info_t numa;
     uint64_t boot_drv_serial;
     uint64_t initrd_st;
     uint64_t initrd_sz;
@@ -90,5 +91,5 @@ struct alignas(8) kernel_params_t {
 } _packed;
 
 // Ensure that all of the architectures have the same layout
-C_ASSERT(sizeof(kernel_params_t) == 11 * 8 + 16 + 2 + 6);
-C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 13 * 8);
+C_ASSERT(sizeof(kernel_params_t) == 11 * 8 + 16 + 2 + 6 + 32);
+C_ASSERT(offsetof(kernel_params_t, wait_gdb) == 13 * 8 + 32);

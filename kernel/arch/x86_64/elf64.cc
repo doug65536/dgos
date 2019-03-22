@@ -126,6 +126,7 @@ static std::string module_reloc_type(size_t sym_type)
 class module_t {
 public:
     bool load(char const *path);
+    bool load_image(void const *module, size_t module_sz, const char *module_name);
     int run();
 
     ~module_t();
@@ -186,6 +187,16 @@ module_t *modload_load(char const *path, bool run)
     return nullptr;
 }
 
+// Shared module loader
+module_t *modload_load_image(const void *image, size_t image_sz,
+                             char const *module_name, bool run)
+{
+    std::unique_ptr<module_t> module(new module_t{});
+    if (likely(module->load_image(image, image_sz, module_name)))
+        return module.release();
+    return nullptr;
+}
+
 int modload_run(module_t *module)
 {
     return module->run();
@@ -239,7 +250,7 @@ static constexpr char const *get_relocation_type(size_t type) {
 
 // This function's purpose is to act as a place to put a breakpoint
 // with commands that magically load the symbols for a module when loaded
-static void modload_load_symbols(char const *path, uintptr_t addr)
+void modload_load_symbols(char const *path, uintptr_t addr)
 {
     // Seriously compliler, please don't elide, thanks!
     // The debugger is actually going to dereference path and get addr
@@ -255,19 +266,21 @@ static bool load_failed()
     return false;
 }
 
-bool module_t::load(const char *path)
+bool module_t::load_image(void const *module, size_t module_sz,
+                          char const *module_name)
 {
-    file_t fd{file_open(path, O_RDONLY)};
+    auto pread = [&](void *buf, size_t sz, off_t ofs) -> ssize_t {
+        if (unlikely(ofs < 0 || size_t(ofs) >= module_sz))
+            return 0;
+        // If the read is truncated
+        if (off_t(sz) > off_t(module_sz) - ofs)
+            sz = module_sz > ofs ? module_sz - ofs : 0;
+        if (unlikely(!mm_copy_user(buf, (char *)module + ofs, sz)))
+            return -int(errno_t::EFAULT);
+        return sz;
+    };
 
-    if (unlikely(!fd.is_open())) {
-        printdbg("Failed to open module \"%s\"\n", path);
-        return load_failed();
-    }
-
-    ELF64_TRACE("module %s opened, fd=%d\n", path, (int)fd);
-
-    if (unlikely(sizeof(file_hdr) !=
-                 file_read(fd, &file_hdr, sizeof(file_hdr)))) {
+    if (unlikely(sizeof(file_hdr) != pread(&file_hdr, sizeof(file_hdr), 0))) {
         printdbg("Failed to read module file header\n");
         return load_failed();
     }
@@ -280,8 +293,8 @@ bool module_t::load(const char *path)
     if (unlikely(!phdrs.resize(file_hdr.e_phnum)))
         panic_oom();
 
-    if (unlikely(ssize_t(sizeof(Elf64_Phdr) * file_hdr.e_phnum) != file_pread(
-                     fd, phdrs.data(), sizeof(Elf64_Phdr) * file_hdr.e_phnum,
+    if (unlikely(ssize_t(sizeof(Elf64_Phdr) * file_hdr.e_phnum) != pread(
+                     phdrs.data(), sizeof(Elf64_Phdr) * file_hdr.e_phnum,
                      file_hdr.e_phoff))) {
         printdbg("Failed to read %u program headers\n", file_hdr.e_phnum);
         return load_failed();
@@ -312,13 +325,13 @@ bool module_t::load(const char *path)
 
         void *addr = mmap((void*)(phdr.p_vaddr + base_adj),
                           phdr.p_memsz, PROT_READ | PROT_WRITE,
-                          MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
+                          MAP_NOCOMMIT, -1, 0);
         if (unlikely(addr == MAP_FAILED)) {
             printdbg("Failed to map section\n");
             return load_failed();
         }
 
-        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", path,
+        ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name,
                     ((phdr.p_memsz) + 4095) & -4096,
                     uintptr_t(addr));
     }
@@ -333,8 +346,8 @@ bool module_t::load(const char *path)
 
         void *addr = (void*)(phdr.p_vaddr + base_adj);
 
-        if (unlikely(ssize_t(phdr.p_filesz) != file_pread(
-                         fd, addr, phdr.p_filesz, phdr.p_offset))) {
+        if (unlikely(ssize_t(phdr.p_filesz) != pread(
+                         addr, phdr.p_filesz, phdr.p_offset))) {
             printdbg("Failed to read segment\n");
             return load_failed();
         }
@@ -354,8 +367,8 @@ bool module_t::load(const char *path)
     if (unlikely(!dyn.resize(dyn_entries)))
         panic_oom();
 
-    if (unlikely(ssize_t(dyn_seg->p_filesz) != file_pread(
-                     fd, dyn.data(), dyn_seg->p_filesz, dyn_seg->p_offset))) {
+    if (unlikely(ssize_t(dyn_seg->p_filesz) != pread(
+                     dyn.data(), dyn_seg->p_filesz, dyn_seg->p_offset))) {
         // FIXME: LEAK!
         printdbg("Dynamic segment read failed\n");
         return load_failed();
@@ -566,7 +579,7 @@ bool module_t::load(const char *path)
 
             if (sym.st_name) {
                 // Lookup name in kernel
-                ELF64_TRACE("%s lookup %s\n", path, name);
+                ELF64_TRACE("%s lookup %s\n", module_name, name);
                 Elf64_Sym const *addr = modload_lookup_name(&export_ht, name);
 
                 if (addr)
@@ -574,7 +587,7 @@ bool module_t::load(const char *path)
 
                 if (!S) {
                     printk("module link error in %s:"
-                           " Symbol \"%s\" not found", path, name);
+                           " Symbol \"%s\" not found", module_name, name);
                     return load_failed();
                 }
             }
@@ -765,7 +778,7 @@ all_common:
 
 truncated_common:
                 printdbg("%s: %s relocation truncated to fit!\n",
-                         path, type_txt);
+                         module_name, type_txt);
                 return load_failed();
             }
         }
@@ -800,10 +813,10 @@ truncated_common:
         }
     }
 
-    printdbg("Module %s loaded at %#" PRIx64 "\n", path, base_adj);
-    printdbg("gdb: add-symbol-file %s %#" PRIx64 "\n", path, first_exec);
+    printdbg("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
+    printdbg("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
 
-    modload_load_symbols(path, first_exec);
+    modload_load_symbols(module_name, first_exec);
 
     // Run the init array
     uintptr_t const *fn_addrs = (uintptr_t const *)(dt_init_array + base_adj);
@@ -815,6 +828,11 @@ truncated_common:
     entry = module_entry_fn_t(file_hdr.e_entry + base_adj);
 
     return true;
+}
+
+bool module_t::load(char const *path)
+{
+    return false;
 }
 
 int module_t::run()

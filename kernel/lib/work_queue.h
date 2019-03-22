@@ -7,6 +7,7 @@
 #include "mm.h"
 #include "printk.h"
 #include "bitsearch.h"
+#include "cpu/control_regs.h"
 
 class workq_impl;
 class workq;
@@ -142,6 +143,7 @@ private:
 
     void free(workq_work *work)
     {
+        cpu_scoped_irq_disable irq_dis;
         scoped_lock lock(queue_lock);
         alloc.free(work);
     }
@@ -164,8 +166,10 @@ private:
 
     workq_work *dequeue_work()
     {
+        cpu_scoped_irq_disable irq_dis;
         scoped_lock lock(queue_lock);
-        return dequeue_work_locked(lock);
+        workq_work *result = dequeue_work_locked(lock);
+        return result;
     }
 
     void worker()
@@ -214,6 +218,7 @@ _hot
 void workq::enqueue_on_cpu(size_t cpu_nr, T&& functor)
 {
     workq_impl *queue = percpu + cpu_nr;
+    cpu_scoped_irq_disable irq_dis;
     workq_impl::scoped_lock lock(queue->queue_lock);
     void *mem = queue->allocate(queue, sizeof(workq_wrapper<T>));
     workq_wrapper<T> *item = new (mem) workq_wrapper<T>(

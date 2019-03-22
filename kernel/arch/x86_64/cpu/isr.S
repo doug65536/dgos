@@ -4,6 +4,7 @@
 #include "../cfi_helpers.h"
 #include "interrupts.h"
 #include "cpu_bug.h"
+#include "isr.h"
 
 .code64
 
@@ -108,6 +109,7 @@ isr_section_name \int_num
         fn_trace \pathname,enter
     .endif
     // Push the interrupt number below the error code
+    // ctx_flags will be zeroed by this too (the upper 32 bits)
     push_cfi $\int_num
     jmp \pathname
     .cfi_endproc
@@ -175,7 +177,7 @@ isr_entry 0 39
 // Very high priority interrupts
 isr_entry 0 INTR_APIC_TIMER
 isr_entry 0 INTR_TLB_SHOOTDOWN
-isr_entry 0 INTR_THREAD_YIELD
+isr_entry 0 42
 isr_entry 0 INTR_FLUSH_TRACE
 isr_entry 0 INTR_IPI_RESCHED
 
@@ -409,7 +411,7 @@ isr_entry 0 255
      // -4    3*8(%rsp) ss
      // -5    2*8(%rsp) rip
      // -6    1*8(%rsp) error code
-     // -7    0*8(%rsp) interrupt number
+     // -7    0*8(%rsp) interrupt number and ctx_flags
 
     .cfi_startproc
     .cfi_signal_frame
@@ -444,34 +446,33 @@ isr_common:
 
     // CFA
     // index
-    //   0    8*8(%rbp) <-- CFA
-    //  -1    7*8(%rbp) -> ss            ┐
-    //  -2    6*8(%rbp) -> rsp           │
-    //  -3    5*8(%rbp) -> flags         │
-    //  -4    4*8(%rbp) -> cs            ├ interrupt frame
-    //  -5    3*8(%rbp) -> rip           │
-    //  -6    2*8(%rbp) -> error code    │
-    //  -7    1*8(%rbp) -> interrupt     ┘
-    //  -8    0*8(%rbp) -> caller's rbp  ┐
-    //  -9   -1*8(%rbp) -> rbx           │
-    // -10   -2*8(%rbp) -> r15           ├ call preserved
-    // -11   -3*8(%rbp) -> r14           │
-    // -12   -4*8(%rbp) -> r13           │
-    // -13   -5*8(%rbp) -> r12           ┘
-    // -14   -6*8(%rbp) -> r11           ┐
-    // -15   -7*8(%rbp) -> r10           │
-    // -16   -8*8(%rbp) -> rax           │
-    // -17   -9*8(%rbp) -> r9            │
-    // -18  -10*8(%rbp) -> r8            ├ call clobbered
-    // -19  -11*8(%rbp) -> rcx           │
-    // -20  -12*8(%rbp) -> rdx           │
-    // -21  -13*8(%rbp) -> rsi           │
-    // -22  -14*8(%rbp) -> rdi           ┘
-    // -23  -15*8(%rbp) -> cr3
-    // -24  -16*8(%rbp) -> segments
-    // -25  -17*8(%rbp) -> fpu ctx ptr
-    // -26  -18*8(%rbp) -> cleanup arg
-    // -27  -19*8(%rbp) -> cleanup fn
+    //          frame      raw
+    //   0    8*8(%rbp) 25*8(%rsp) <-- CFA
+    //  -1    7*8(%rbp) 24*8(%rsp) -> ss            ┐
+    //  -2    6*8(%rbp) 23*8(%rsp) -> rsp           │
+    //  -3    5*8(%rbp) 22*8(%rsp) -> flags         │
+    //  -4    4*8(%rbp) 21*8(%rsp) -> cs            ├ interrupt frame
+    //  -5    3*8(%rbp) 20*8(%rsp) -> rip           │
+    //  -6    2*8(%rbp) 19*8(%rsp) -> error code    │
+    //  -7    1*8(%rbp) 18*8(%rsp) -> interrupt     ┘
+    //  -8    0*8(%rbp) 17*8(%rsp) -> caller's rbp  ┐
+    //  -9   -1*8(%rbp) 16*8(%rsp) -> rbx           │
+    // -10   -2*8(%rbp) 15*8(%rsp) -> r15           ├ call preserved
+    // -11   -3*8(%rbp) 14*8(%rsp) -> r14           │
+    // -12   -4*8(%rbp) 13*8(%rsp) -> r13           │
+    // -13   -5*8(%rbp) 12*8(%rsp) -> r12           ┘
+    // -14   -6*8(%rbp) 11*8(%rsp) -> r11           ┐
+    // -15   -7*8(%rbp) 10*8(%rsp) -> r10           │
+    // -16   -8*8(%rbp)  9*8(%rsp) -> rax           │
+    // -17   -9*8(%rbp)  8*8(%rsp) -> r9            │
+    // -18  -10*8(%rbp)  7*8(%rsp) -> r8            ├ call clobbered
+    // -19  -11*8(%rbp)  6*8(%rsp) -> rcx           │
+    // -20  -12*8(%rbp)  5*8(%rsp) -> rdx           │
+    // -21  -13*8(%rbp)  4*8(%rsp) -> rsi           │
+    // -22  -14*8(%rbp)  3*8(%rsp) -> rdi           ┘
+    // -23  -15*8(%rbp)  2*8(%rsp) -> cr3
+    // -24  -16*8(%rbp)  1*8(%rsp) -> segments
+    // -25  -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr   < Saved thread rsp
 
     pushq %rbx
     .cfi_offset rbx,-9*8
@@ -570,10 +571,6 @@ isr_common:
     // Push FPU context pointer field, initially null
     pushq $0
 
-    // Outgoing cleanup
-    pushq $0
-    pushq $0
-
     // Hold isr_context_t pointer in r12
     // Hold interrupt number in ebx
 
@@ -624,19 +621,31 @@ isr_common:
     test %rax,%rax
     jz .Linvoke_catch
 
+    // See of we are restoring a fast context and jump to simpler code if so
+    // Fast context will have sign bit of flags value set
+    movl 18*8(%rax),%edi
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
+    jc .Lrestore_fast_ctx
+
+    // Branches here from fast switcher if we switched to a slow context
+.Lrestore_slow_ctx:
+    // Load a zero to use much smaller encodings for gs acccesses below
+    xor %edi,%edi
+
     // isr can return a new stack pointer, or just return
     // the passed one to continue with this thread
     mov %rax,%rsp
 
     // Infer pointer to incoming thread's interrupt frame from ctx pointer
-    lea 19*8(%rax),%rbp
+    lea 17*8(%rax),%rbp
 
-    // Pop outgoing cleanup data
+    // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
-    popq %rax
-    popq %rdi
-    testq %rax,%rax
+    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi),%rax
+    test %rax,%rax
     jz .Lno_cleanup_call
+    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rdi),%rdi
     indirect_call rax
 .Lno_cleanup_call:
 
@@ -686,9 +695,9 @@ isr_common:
 
     // Load fsbase and gsbase
     // NOTE: this may be patched to call
-    // .Lload_fs_gs_fast (to use wr(fs|gs)base)
+    // load_fs_gs_fast (to use wr(fs|gs)base)
     // rax, rcx, rdx may be clobbered here
-    call .Lload_fs_gs_slow
+    call load_fs_gs_slow
 .Lpatch_fsgsbase_csw_end:
 
 .Lreturning_to_kernel:
@@ -742,6 +751,7 @@ isr_common:
     .cfi_same_value rbx
 
     popq %rbp
+    .cfi_same_value rbp
 
     // rbp has been restored, back to raw rsp-relative CFA
     .cfi_def_cfa rsp,7*8
@@ -772,10 +782,220 @@ isr_common:
 
     .cfi_endproc
 
+// Yield as efficiently as possible
+// Nothing is preserved! See void thread_yield_fast_wrapper()
+// Assumes yielding thread is a kernel thread in kernel mode
+.align 16
+.global thread_yield_fast
+thread_yield_fast:
+    .cfi_startproc
+
+    // Snag return address from the stack,
+    // we're replacing that with a synthetic interrupt frame
+    pop_cfi %rcx
+
+    // Switch to getting return address from a register
+    .cfi_register rip,rcx
+
+    // When this thread resumes, the call will have returned
+    movq %rsp,%rax
+
+    // push ss:rsp
+    push_cfi $GDT_SEL_KERNEL_DATA
+    push_cfi %rax
+
+    // rax remains a zero constant for a while
+    xor %eax,%eax
+
+    // push eflags
+    pushfq_cfi
+
+    cli
+
+    // push cs:rip
+    push_cfi $GDT_SEL_KERNEL_CODE64
+    push_cfi %rcx
+
+    // Switch back to getting return address from stack
+    .cfi_offset rip,-5*8
+
+    //          frame      raw
+    //   0   8*8(%rbp) 25*8(%rsp) <-- CFA
+    //  -1   7*8(%rbp) 24*8(%rsp) -> ss            ┐
+    //  -2   6*8(%rbp) 23*8(%rsp) -> rsp           │
+    //  -3   5*8(%rbp) 22*8(%rsp) -> flags         │
+    //  -4   4*8(%rbp) 21*8(%rsp) -> cs            ├ interrupt frame
+    //  -5   3*8(%rbp) 20*8(%rsp) -> rip           │
+    //  -6   2*8(%rbp) 19*8(%rsp) -> error code    │
+    //  -7   1*8(%rbp) 18*8(%rsp) -> interrupt     ┘ <- has fast ctx bit set
+    //  -8   0*8(%rbp) 17*8(%rsp) -> caller's rbp  ┐
+    //  -9  -1*8(%rbp) 16*8(%rsp) -> rbx           │
+    // -10  -2*8(%rbp) 15*8(%rsp) -> r15           ├ call preserved
+    // -11  -3*8(%rbp) 14*8(%rsp) -> r14           │
+    // -12  -4*8(%rbp) 13*8(%rsp) -> r13           │
+    // -13  -5*8(%rbp) 12*8(%rsp) -> r12           ┘
+    // -14  -6*8(%rbp) 11*8(%rsp) -> r11  XXX      ┐
+    // -15  -7*8(%rbp) 10*8(%rsp) -> r10  XXX      │
+    // -16  -8*8(%rbp)  9*8(%rsp) -> rax  XXX      │
+    // -17  -9*8(%rbp)  8*8(%rsp) -> r9   XXX      │
+    // -18 -10*8(%rbp)  7*8(%rsp) -> r8   XXX      ├ call clobbered
+    // -19 -11*8(%rbp)  6*8(%rsp) -> rcx  XXX      │ (garbage)
+    // -20 -12*8(%rbp)  5*8(%rsp) -> rdx  XXX      │
+    // -21 -13*8(%rbp)  4*8(%rsp) -> rsi  XXX      │
+    // -22 -14*8(%rbp)  3*8(%rsp) -> rdi  XXX      ┘
+    // -23 -15*8(%rbp)  2*8(%rsp) -> cr3
+    // -24 -16*8(%rbp)  1*8(%rsp) -> segments
+    // -25 -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr
+
+    // XXX: the values in all the general registers in the context,
+    // except rbp, will be garbage. Context restore will ignore memory
+    // and unconditionally return with them zeroed
+
+    // Push zero error code
+    push_cfi %rax
+
+    // Get started doing this ahead of time
+    mov %cr3,%rcx
+
+    // Segments (hardcoded kernel ones)
+    movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%rdx
+
+    // Push interrupt number
+    push_cfi $(INTR_THREAD_YIELD|(1<<ISR_CTX_CTX_FLAGS_FAST_QWBIT))
+
+    // Save caller rbp
+    push_cfi %rbp
+    .cfi_offset rbp,-8*8
+
+    // Switch to rbp-relative frame, avoid CFA adjustments I hope
+    movq %rsp,%rbp
+    .cfi_def_cfa rbp,8*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+
+    .cfi_offset rbp,-8*8
+
+    // Push call preserved registers
+    pushq %rbx
+    .cfi_offset rbx,-9*8
+    pushq %r15
+    .cfi_offset r15,-10*8
+    pushq %r14
+    .cfi_offset r14,-11*8
+    pushq %r13
+    .cfi_offset r13,-12*8
+    pushq %r12
+    .cfi_offset r12,-13*8
+
+    sub $ 9*8,%rsp
+
+    // Save CR3
+    push %rcx
+
+    // Push segments
+    push %rdx
+
+    // FPU context pointer is initially null
+    push %rax
+
+    // Reschedule directly, bypassing everything to do with interrupts
+    movq %rsp,%rdi
+    call thread_schedule
+
+    // See if we are restoring a fast context
+    movl 18*8(%rax),%edi
+    btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
+    jnc .Lrestore_slow_ctx
+
+    // Could branch here from full interrupt handler to restore a fast context
+.Lrestore_fast_ctx:
+    mov %rax,%rsp
+
+    // Run cpu-local outgoing cleanup after stack switch (now)
+    // Used to adjust outgoing thread state after switching stack
+    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi),%rax
+    test %rax,%rax
+    jz .Lno_cleanup_call_fast
+    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rdi),%rdi
+    indirect_call rax
+.Lno_cleanup_call_fast:
+
+    // Discard FPU ctx and segments
+    add $ 2*8,%rsp
+
+    // Pop CR3
+    popq %rax
+
+    // Throw away call clobbered registers
+    addq $ 9*8,%rsp
+
+    popq %r12
+    .cfi_same_value r12
+
+    popq %r13
+    .cfi_same_value r13
+
+    popq %r14
+    .cfi_same_value r14
+
+    popq %r15
+    .cfi_same_value r15
+
+    popq %rbx
+    .cfi_same_value rbx
+
+    popq %rbp
+    .cfi_same_value rbp
+
+    // rbp has been restored, back to raw rsp-relative CFA
+    .cfi_def_cfa rsp,7*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+
+    // Load CR3
+    movq %rax,%cr3
+    xorl %eax,%eax
+
+    // Load flags from interrupt frame
+    movl 16(%rsp),%ecx
+    push_cfi %rcx
+    popfq_cfi
+
+    // This should just rename every register to the same zeroed rax
+    // All general registers except rbp (rbp is preserved) are
+    // zeroed when thread_yield_fast returns
+    movl %eax,%ebx
+    movl %eax,%ecx
+    movl %eax,%edx
+    movl %eax,%esi
+    movl %eax,%edi
+    movl %eax,%r8d
+    movl %eax,%r9d
+    movl %eax,%r10d
+    movl %eax,%r11d
+    movl %eax,%r12d
+    movl %eax,%r13d
+    movl %eax,%r14d
+    movl %eax,%r15d
+
+    add_rsp 16
+
+    // Return and pop cs, eflags, rsp, ss
+    retq $ 32
+
+    .cfi_endproc
+
 // Quickly load FS/GS base
 // Expects r13=user_fsbase, r14=user_gsbase
 .align 16
-.Lload_fs_gs_fast:
+load_fs_gs_fast:
     .cfi_startproc
 
     wrfsbase %r13
@@ -787,7 +1007,7 @@ isr_common:
 // Slow load FS/GS base for processors that don't support wrfsbase/wrgsbase
 // Reaches here with r13=user_fsbase, r14=user_gsbase
 .align 16
-.Lload_fs_gs_slow:
+load_fs_gs_slow:
     .cfi_startproc
 
     movl $ CPU_MSR_FSBASE,%ecx
@@ -1035,7 +1255,7 @@ isr_sysret64:
     // in kernel mode
     cli
     swapgs
-    call .Lload_fs_gs_slow
+    call load_fs_gs_slow
 .Lpatch_fsgsbase_sysret_end:
     mov %rsi,%rsp
     .cfi_undefined rip
@@ -1140,42 +1360,26 @@ __module_dynlink_plt_thunk:
 
     .cfi_endproc
 
-// This blocks context switches and must preserve all registers
-// Entering ten critical sections requires you to leave ten to get out
-.global cs_enter_asm
-cs_enter_asm:
-    .cfi_startproc
-    incl %gs:CPU_INFO_LOCKS_HELD_OFS
-    ret
-    .cfi_endproc
-
-// This blocks context switches and must preserve all registers
+// This unblocks context switches and forces a switch if one was deferred
+.align 16
 .global cs_leave_asm
 cs_leave_asm:
     .cfi_startproc
-    movq %gs:0,%rax
-    decl CPU_INFO_LOCKS_HELD_OFS(%rax)
+    xorl %eax,%eax
+    decl %gs:CPU_INFO_LOCKS_HELD_OFS
     jb .Lpanic
-    jnz .Lnot_last_nest
+    jnz .Lreturn
 
-.Llast_one:
     // Making it here means we just left the outermost critical section
-    cmpl $0,CPU_INFO_CSW_DEFERRED_OFS(%rax)
-
-    // not zero is unlikely
-    jnz .Lis_deferred_csw
-    jmp .Lno_deferred_csw
+    cmpl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS
+    jz .Lreturn
 
 .Lis_deferred_csw:
-    // These CFI are excessively good, but they maximize debuggability
-    // Normally you don't say how to restore the call clobbered registers
-    movl $0,CPU_INFO_CSW_DEFERRED_OFS(%rax)
+    // Making it here means a context switch was deferred, reset flag
+    movl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS
 
-    call thread_yield
-
-.Lnot_last_nest:
-.Lno_deferred_csw:
-    ret
+    // Tail call
+    jmp thread_yield
 
 .Lpanic:
     lea .Lpanic_msg(%rip),%rdi
@@ -1184,7 +1388,18 @@ cs_leave_asm:
 
     .cfi_endproc
 
-.section .rodata
+// Entering ten critical sections requires you to leave ten to get out
+.align 16
+.global cs_enter_asm
+cs_enter_asm:
+    .cfi_startproc
+    incl %gs:CPU_INFO_LOCKS_HELD_OFS
+    jz .Lpanic
+.Lreturn:
+    ret
+    .cfi_endproc
+
+.section .rodata, "a"
 .Lpanic_msg:
 .asciz "Counter out of range"
 
@@ -1235,7 +1450,7 @@ sse_context_restore:
 .global load_fsgsbase_range
 load_fsgsbase_range:
     // Implementations
-    .quad .Lload_fs_gs_fast
+    .quad load_fs_gs_fast
     // Patch points
     .quad .Lpatch_fsgsbase_csw_end
     .quad .Lpatch_fsgsbase_sysret_end

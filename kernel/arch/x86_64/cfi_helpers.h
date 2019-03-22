@@ -20,11 +20,11 @@
 .endm
 
 .macro add_rsp	ofs
-    add $\ofs,%rsp
+    lea (\ofs)(%rsp),%rsp
     .cfi_adjust_cfa_offset -(\ofs)
 .endm
 
 .macro sub_rsp	ofs
-    sub $\ofs,%rsp
+    lea -(\ofs)(%rsp),%rsp
     .cfi_adjust_cfa_offset (\ofs)
 .endm

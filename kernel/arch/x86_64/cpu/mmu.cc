@@ -33,10 +33,10 @@
 // This causes KVM to throw #PF(reserved_bit_set|present)
 #define GLOBAL_RECURSIVE_MAPPING    0
 
-#define DEBUG_CREATE_PT         0
-#define DEBUG_PHYS_ALLOC        0
-#define DEBUG_PAGE_TABLES       0
-#define DEBUG_PAGE_FAULT        0
+#define DEBUG_CREATE_PT         1
+#define DEBUG_PHYS_ALLOC        1
+#define DEBUG_PAGE_TABLES       1
+#define DEBUG_PAGE_FAULT        1
 
 #define PROFILE_PHYS_ALLOC      0
 #if PROFILE_PHYS_ALLOC
@@ -408,7 +408,7 @@ public:
         void free(physaddr_t addr)
         {
             // Can't free demand page entry
-            if (unlikely((addr & (PTE_ADDR >> 1)) == (PTE_ADDR >> 1)))
+            if (unlikely(!addr || addr == PTE_ADDR))
                 return;
 
             if (unlikely(count == countof(pages)))
@@ -420,8 +420,18 @@ public:
         void flush()
         {
             scoped_lock lock(owner.lock);
-            for (size_t i = 0; i < count; ++i)
-                owner.release_one_locked(pages[i]);
+            // Heuristic that weakly attempts to free pages so they will be
+            // linked back into the free chain in an order that causes
+            // subsequent allocations to return blocks in ascending order
+            if (count < 2 || pages[0] > pages[1]) {
+                // Order doesn't matter or first is higher than second
+                for (size_t i = 0; i < count; ++i)
+                    owner.release_one_locked(pages[i]);
+            } else {
+                // Second is higher than first, release in reverse order
+                for (size_t i = count; i > 0; --i)
+                    owner.release_one_locked(pages[i-1]);
+            }
             count = 0;
         }
 
@@ -972,17 +982,14 @@ static physaddr_t init_take_page(int low)
         }
     }
 
-    physaddr_t addr = range->base +
-            range->size - PAGE_SIZE;
+    physaddr_t addr = range->base + range->size - PAGE_SIZE;
 
-    // Take a page off the size of the range
+    // Take a page off the end of the range
     range->size -= PAGE_SIZE;
 
 #if DEBUG_PHYS_ALLOC
     printdbg("Took early page @ %" PRIx64 "\n", addr);
 #endif
-
-    assert(addr != 0x0000000000101000);
 
     return addr;
 }
@@ -1179,6 +1186,8 @@ static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 static void mmu_send_tlb_shootdown(bool synchronous = false)
 {
     int cpu_count = thread_cpu_count();
+
+    // Skip if too early
     if (unlikely(cpu_count <= 1))
         return;
 
@@ -1929,6 +1938,32 @@ static _always_inline T select_mask(bool cond, T true_val, T false_val)
     return (true_val & mask) | (false_val & ~mask);
 }
 
+static _always_inline bool pte_is_sysmem(pte_t pte)
+{
+    return (pte & (PTE_PRESENT | PTE_EX_PHYSICAL | PTE_EX_DEVICE)) ==
+            PTE_PRESENT;
+}
+
+// True if demand paged
+_const
+static _always_inline bool pte_is_demand(pte_t pte)
+{
+    // Demand paged pages are represented by a not present page
+    // that has a physaddr field equal to the highest possible physaddr
+    // That's 0x000FFFFFFFFFF000
+    return (pte & PTE_ADDR) == PTE_ADDR;
+}
+
+// True if page of address space is dedicated to faulting on every access
+_const
+static _always_inline bool pte_is_guard(pte_t pte)
+{
+    // Guard pages are represented by a not present page
+    // that has a physaddr field of all 1's except 0 in MSB.
+    // That's 0x0007FFFFFFFFF000
+    return (pte & PTE_ADDR) == ((PTE_ADDR >> 1) & PTE_ADDR);
+}
+
 static void *mm_alloc_address_space(size_t len, bool user)
 {
     contiguous_allocator_t *allocator =
@@ -1950,10 +1985,10 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
     assert(offset == 0);
 
     // Special case PROT_NONE, MAP_NOCOMMIT
-    if (unlikely(addr == nullptr &&
-                 prot == PROT_NONE &&
-                 (flags & MAP_NOCOMMIT) == MAP_NOCOMMIT))
-        return mm_alloc_address_space(len, flags & MAP_USER);
+//    if (unlikely(addr == nullptr &&
+//                 prot == PROT_NONE &&
+//                 (flags & MAP_NOCOMMIT) == MAP_NOCOMMIT))
+//        return mm_alloc_address_space(len, flags & MAP_USER);
 
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC))))
@@ -2065,14 +2100,15 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
             bool success;
             success = phys_allocator.alloc_multiple(
-                        low, len, [&](size_t ofs, physaddr_t paddr) {
+                        low, len, [&](size_t idx, uint8_t log2_pagesz,
+                            physaddr_t paddr) {
                 if (likely(!(flags & MAP_UNINITIALIZED)))
                     clear_phys(paddr);
 
-                pte_t old = atomic_xchg(base_pte + (ofs >> 12),
-                                        paddr | page_flags);
+                pte_t old = atomic_xchg(base_pte + idx, paddr | page_flags);
 
-                if (old && ((old & PTE_ADDR) != PTE_ADDR))
+                if (old && (old & (PTE_PRESENT | PTE_EX_PHYSICAL)) ==
+                    PTE_PRESENT)
                     free_batch.free(old & PTE_ADDR);
 
                 return true;
@@ -2090,9 +2126,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
             size_t end = len >> PAGE_SCALE;
 
-            if (flags & MAP_NOCOMMIT) {
-                paddr = PTE_ADDR;
-            } else if (!(flags & MAP_DEVICE)) {
+            if (!(flags & MAP_NOCOMMIT) && !(flags & MAP_DEVICE)) {
                 paddr = mmu_alloc_phys(0);
 
                 if (paddr && !(flags & MAP_UNINITIALIZED))
@@ -2119,7 +2153,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                     pte = atomic_xchg(base_pte + --end, pte);
                 }
 
-                if (unlikely(pte && pte != PTE_ADDR))
+                if (unlikely(pte_is_sysmem(pte)))
                     free_batch.free(pte & PTE_ADDR);
             }
 
@@ -2127,7 +2161,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                 pte = PTE_ADDR | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
-                if (unlikely(pte & PTE_PRESENT))
+                if (unlikely(pte_is_sysmem(pte)))
                     free_batch.free(pte & PTE_ADDR);
             }
         } else if (flags & MAP_PHYSICAL) {
@@ -2139,7 +2173,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                 pte = paddr | page_flags;
                 pte = atomic_xchg(base_pte + ofs, pte);
 
-                if (pte && pte != PTE_ADDR)
+                if (unlikely(pte_is_sysmem(pte)))
                     free_batch.free(pte & PTE_ADDR);
             }
         } else {
@@ -2147,8 +2181,6 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
         }
     } else {
         // Early
-        // Assign entries in reverse because early
-        // physical pages are allocated in reverse order
         for (size_t ofs = len; ofs > 0; ofs -= PAGE_SIZE)
         {
             if (likely(!(flags & MAP_PHYSICAL))) {
@@ -2159,7 +2191,7 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
 
                 // If populating, assign physical memory immediately
                 // Always commit first page immediately
-                if (ofs == len || unlikely(flags & MAP_POPULATE)) {
+                if (ofs == PAGE_SIZE || unlikely(flags & MAP_POPULATE)) {
                     page = init_take_page(!!(flags & MAP_32BIT));
                     assert(page != 0);
                     if (likely(!(flags & MAP_UNINITIALIZED)))
@@ -2167,12 +2199,12 @@ EXPORT void *mmap(void *addr, size_t len, int prot,
                 }
 
                 mmu_map_page(linear_addr + ofs - PAGE_SIZE, page, page_flags |
-                             ((ofs == len) & PTE_PRESENT));
+                             ((ofs == 0) & PTE_PRESENT));
             } else {
                 // addr is a physical address, caller uses
                 // returned linear address to access it
                 mmu_map_page(linear_addr + ofs - PAGE_SIZE,
-                             (((physaddr_t)addr) + ofs - PAGE_SIZE) & PTE_ADDR,
+                             (((physaddr_t)addr) + ofs) & PTE_ADDR,
                              page_flags);
             }
         }
@@ -2265,7 +2297,7 @@ void *mremap(
                 PTE_WRITABLE | PTE_ADDR;
         for (size_t i = 0, e = new_size >> PAGE_SCALE; i < e; ++i) {
             pte_t pte = atomic_xchg(new_base + i, new_pte);
-            if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+            if (unlikely(pte_is_sysmem(pte)))
                 free_batch.free(pte & PTE_ADDR);
         }
         return (void*)old_st;
@@ -2281,13 +2313,13 @@ void *mremap(
     for (i = 0, e = old_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(old_pte[3] + i, 0);
         pte = atomic_xchg(new_base + i, pte);
-        if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+        if (unlikely(pte_is_sysmem(pte)))
             free_batch.free(pte & PTE_ADDR);
     }
 
     for (e = new_size >> PAGE_SCALE; i < e; ++i) {
         pte_t pte = atomic_xchg(new_base + i, PTE_ADDR | PTE_WRITABLE);
-        if (pte && (pte & PTE_ADDR) != PTE_ADDR)
+        if (unlikely(pte_is_sysmem(pte)))
             free_batch.free(pte & PTE_ADDR);
     }
 
@@ -2453,9 +2485,15 @@ int mprotect(void *addr, size_t len, int prot)
              ? 0
              : PTE_WRITABLE);
 
+
     pte_t *pt[4];
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
+
+    uintptr_t orig_addr = uintptr_t(addr);
+    pte_t *orig_pt3 = pt[3];
+    printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
+    hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
 
     while (pt[3] < end)
     {
@@ -2465,7 +2503,7 @@ int mprotect(void *addr, size_t len, int prot)
 
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
-            pte_t demand_paged = ((expect & demand_no_read) == demand_no_read);
+            bool demand_paged = ((expect & demand_no_read) == demand_no_read);
 
             if (expect == 0)
                 return -1;
@@ -2482,7 +2520,7 @@ int mprotect(void *addr, size_t len, int prot)
                 replace = (expect & ~clr_bits) | set_bits;
 
             // Try to update PTE
-            if (atomic_cmpxchg_upd(pt[3], &expect, replace))
+            if (likely(atomic_cmpxchg_upd(pt[3], &expect, replace)))
                 break;
         }
 
@@ -2492,38 +2530,11 @@ int mprotect(void *addr, size_t len, int prot)
         ptes_step(pt);
     }
 
+    printdbg("PTEs after mprotect(%#zx, %#zx)\n", orig_addr, len);
+    hex_dump((void*)orig_pt3, (end - orig_pt3) * sizeof(pte_t),
+             uintptr_t(orig_pt3));
+
     mmu_send_tlb_shootdown();
-
-    return 0;
-}
-
-int madvise_will_need(pte_t *pte_scan, pte_t *end)
-{
-    physaddr_t page;
-    for (page = 0; pte_scan < end; ++pte_scan) {
-        pte_t old = *pte_scan;
-
-        for (;;) {
-            if ((old & PTE_ADDR) != PTE_ADDR)
-                break;
-
-            pte_t replacement;
-            if (!page)
-                page = phys_allocator.alloc_one(false);
-
-            replacement = (old & ~PTE_ADDR) | (page & PTE_ADDR);
-
-            if (atomic_cmpxchg_upd(pte_scan, &old, replacement)) {
-                page = 0;
-                break;
-            }
-        }
-    }
-
-    if (page) {
-        phys_allocator.release_one(page);
-        page = 0;
-    }
 
     return 0;
 }
@@ -2549,7 +2560,7 @@ bool pte_list_present(pte_t **ptes)
     if (unlikely(!(*ptes[2] & PTE_PRESENT)))
         return false;
 
-    return *ptes[3] & PTE_PRESENT;
+    return true;
 }
 
 // Support discarding pages and reverting to demand
@@ -2576,6 +2587,10 @@ int madvise(void *addr, size_t len, int advice)
         order_bits = -1;
         break;
 
+    case MADV_WILLNEED:
+        order_bits = 0;
+        break;
+
     default:
         return 0;
     }
@@ -2584,30 +2599,43 @@ int madvise(void *addr, size_t len, int advice)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    if (unlikely(advice == MADV_WILLNEED)) {
-        pte_t *pte_scan = pt[3];
-        return madvise_will_need(pte_scan, end);
-    }
-
     mmu_phys_allocator_t::free_batch_t free_batch(phys_allocator);
 
-    constexpr pte_t const demand_mask = (PTE_ADDR >> 1) & PTE_ADDR;
-
-    while (pte_list_present(pt)) {
+    while (pt[3] < end && pte_list_present(pt)) {
         pte_t replace;
         for (pte_t expect = *pt[3]; ; pause()) {
             if (order_bits == pte_t(-1)) {
                 // Discarding
                 physaddr_t page = 0;
-                if (expect && (expect & demand_mask) != demand_mask) {
+                if (pte_is_sysmem(expect)) {
                     page = expect & PTE_ADDR;
-                    replace = (expect | (PTE_ADDR >> 1)) & ~PTE_PRESENT;
+                    // Replace with demand paged entry
+                    replace = (expect | PTE_ADDR) & ~PTE_PRESENT;
 
                     if (unlikely(!atomic_cmpxchg_upd(pt[3], &expect, replace)))
                         continue;
 
                     free_batch.free(page);
                 }
+                break;
+            } else if (order_bits == pte_t(0)) {
+                // Committing
+                bool success;
+                success = phys_allocator.alloc_multiple(
+                            false, len,
+                            [&](size_t idx, uint8_t, physaddr_t paddr) {
+                    pte_t pte = pt[3][idx];
+                    if (pte_is_demand(pte)) {
+                        pte_t replacement = (pte & ~PTE_ADDR) |
+                            paddr | PTE_PRESENT;
+                        bool replaced = atomic_cmpxchg(&pt[3][idx], pte,
+                                              replacement) == pte;
+                        return replaced;
+                    }
+                    return false;
+                });
+                if (!success)
+                    return -1;
                 break;
             } else {
                 // Weak/Strong order
@@ -2726,7 +2754,7 @@ EXPORT uintptr_t mphysaddr(void volatile *addr)
     physaddr_t page = pte & PTE_ADDR;
 
     // If page is being demand paged
-    if (page == PTE_ADDR) {
+    if (pte_is_demand(pte)) {
         // Commit a page
         page = mmu_alloc_phys(0);
 
@@ -3018,6 +3046,7 @@ physaddr_t mmu_phys_allocator_t::alloc_one(bool low)
 template<typename F>
 bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 {
+    assert(!(size & ((size_t(1) << log2_pagesz)-1)));
     size_t count = size >> log2_pagesz;
 
 #if DEBUG_PHYS_ALLOC
@@ -3074,7 +3103,7 @@ bool mmu_phys_allocator_t::alloc_multiple(bool low, size_t size, F callback)
 #endif
 
         // Call callable with physical address
-        if (callback(i << log2_pagesz, paddr)) {
+        if (callback(i, log2_pagesz, paddr)) {
             // Set reference count to 1
             entries[first] = 1 | used_mask;
         } else {
@@ -3140,7 +3169,7 @@ void mmu_phys_allocator_t::adjref_virtual_range(
         for (size_t i = 0; i < count; ++i) {
             physaddr_t addr = *ptes[3] & PTE_ADDR;
 
-            if (addr && addr != PTE_ADDR) {
+            if (pte_is_sysmem(*ptes[3])) {
                 entry_t index = index_from_addr(addr);
                 assert(entries[index] & used_mask);
                 if (--entries[index] == 0)
@@ -3364,7 +3393,9 @@ void mm_destroy_process()
 void mm_init_process(process_t *process)
 {
     contiguous_allocator_t *allocator = new contiguous_allocator_t{};
-    allocator->init(0x400000, 0x800000000000 - 0x400000, "process");
+    // 16TB unavailable margin between end of low memory and 128TB
+    allocator->init(0x400000, UINT64_C(0x700000000000) - UINT64_C(0x400000),
+                    "process");
     process->set_allocator(allocator);
 }
 
@@ -3414,10 +3445,8 @@ uintptr_t mm_fork_kernel_text()
             // Copy original to clone
             memcpy(window + 512, window, PAGE_SIZE);
 
-            atomic_barrier();
-
             // Point PTE to clone
-            *pte = page | flags;
+            atomic_st_rel(pte, page | flags);
 
             cpu_tlb_flush();
         }
@@ -3461,17 +3490,50 @@ bool mm_copy_user_smap(void *dst, void const *src, size_t size)
     return result;
 }
 
-typedef bool (*mm_copy_user_fn)(void *dst, void const *src, size_t size);
+bool mm_copy_user_str_generic(char *dst, char const *src, size_t max_size)
+{
+    __try {
+        if (src)
+            strncpy(dst, src, max_size);
+        else
+            memset(dst, 0, max_size);
+    } __catch {
+        return false;
+    }
 
-extern "C" mm_copy_user_fn mm_copy_to_user_resolver()
+    return true;
+}
+
+bool mm_copy_user_str_smap(char *dst, char const *src, size_t size)
+{
+    cpu_stac();
+    bool result = mm_copy_user_str_generic(dst, src, size);
+    cpu_clac();
+    return result;
+}
+
+typedef bool (*mm_copy_user_fn)(void *dst, void const *src, size_t size);
+typedef bool (*mm_copy_user_str_fn)(char *dst, char const *src, size_t size);
+
+extern "C" mm_copy_user_fn mm_copy_user_resolver()
 {
     if (cpuid_has_smap())
         return mm_copy_user_smap;
     return mm_copy_user_generic;
 }
 
-_ifunc_resolver(mm_copy_to_user_resolver)
+extern "C" mm_copy_user_str_fn mm_copy_user_str_resolver()
+{
+    if (cpuid_has_smap())
+        return mm_copy_user_str_smap;
+    return mm_copy_user_str_generic;
+}
+
+_ifunc_resolver(mm_copy_user_resolver)
 EXPORT bool mm_copy_user(void *dst, void const *src, size_t size);
+
+_ifunc_resolver(mm_copy_user_str_resolver)
+EXPORT bool mm_copy_user_str(char *dst, char const *src, size_t size);
 
 EXPORT bool mm_is_user_range(void const *buf, size_t size)
 {
@@ -3479,3 +3541,17 @@ EXPORT bool mm_is_user_range(void const *buf, size_t size)
             (linaddr_t(buf) < 0x7FFFFFFFFFFF) &&
             (linaddr_t(buf) + size) <= 0x7FFFFFFFFFFF;
 }
+
+// Hierarchical bitmap allocator
+//
+// with 64 bit word size
+//
+// +-------+-------+-----------+--------+
+// |levels | Items | Mem 2^(n) |  Mem   |
+// +-------+-------+-----------+--------+
+// |   1   |     8 |      ( 3) |   ~0   |
+// |   2   |   512 |      ( 9) |   ~0   |
+// |   3   |   32K |      (15) |   ~0   |
+// |   4   |   64G |      (21) |   ~2MB |
+// |   5   |    4T |      (27) | ~128MB |
+// +-------+-------+-----------+--------+

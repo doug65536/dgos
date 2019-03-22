@@ -1,4 +1,10 @@
 #pragma once
+
+#define ISR_CTX_CTX_FLAGS_FAST_BIT  7
+#define ISR_CTX_CTX_FLAGS_FAST_QWBIT  7+8
+
+#ifndef __ASSEMBLER__
+
 #include "types.h"
 #include "initializer_list.h"
 
@@ -41,6 +47,7 @@ struct thread_info_t;
 
 #define ISR_CTX_ERRCODE(ctx)            ((ctx)->gpr.info.error_code)
 #define ISR_CTX_INTR(ctx)               ((ctx)->gpr.info.interrupt)
+#define ISR_CTX_CTX_FLAGS(ctx)          ((ctx)->gpr.info.ctx_flags)
 
 #define ISR_CTX_FPU(ctx)                ((ctx)->fpr)
 
@@ -70,7 +77,9 @@ struct thread_info_t;
 
 // Passed by ISR handler
 struct interrupt_info_t {
-    uintptr_t interrupt;
+    uint8_t interrupt;
+    uint8_t ctx_flags;
+    uint8_t reserved[6];
     uintptr_t error_code;
 };
 
@@ -175,15 +184,9 @@ struct isr_fxsave_context_t {
     } xmm[16];
 };
 
-// Function to call after switching to another context stack
-struct isr_resume_context_t {
-    void (*cleanup)(void*);
-    void *cleanup_arg;
-};
-
 // Exception handler C call parameter
 struct isr_context_t {
-    isr_resume_context_t resume;
+    //isr_resume_context_t resume;
     isr_fxsave_context_t * fpr;
     isr_gpr_context_t gpr;
 };
@@ -274,3 +277,4 @@ void isr_save_fpu_ctx(thread_info_t *outgoing_ctx);
 void isr_restore_fpu_ctx(thread_info_t *incoming_ctx);
 
 __END_DECLS
+#endif

@@ -1,33 +1,8 @@
 #pragma once
 #include "assert.h"
+#include "acpi_decl.h"
 
 // ACPI Generic Address Structure
-
-// Generic Address Structure
-struct acpi_gas_t {
-    uint8_t addr_space;
-    uint8_t bit_width;
-    uint8_t bit_offset;
-    uint8_t access_size;
-    uint32_t addr_lo;
-    uint32_t addr_hi;
-} _packed;
-
-C_ASSERT(sizeof(acpi_gas_t) == 12);
-
-#define ACPI_GAS_ADDR_SYSMEM    0
-#define ACPI_GAS_ADDR_SYSIO     1
-#define ACPI_GAS_ADDR_PCICFG    2
-#define ACPI_GAS_ADDR_EMBED     3
-#define ACPI_GAS_ADDR_SMBUS     4
-#define ACPI_GAS_ADDR_FIXED     0x7F
-
-#define ACPI_GAS_ASZ_UNDEF  0
-#define ACPI_GAS_ASZ_8      1
-#define ACPI_GAS_ASZ_16     2
-#define ACPI_GAS_ASZ_32     3
-#define ACPI_GAS_ASZ_64     4
-
 
 class acpi_gas_accessor_t {
 public:

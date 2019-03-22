@@ -110,13 +110,21 @@ void gdt_init_tss(int cpu_count)
     //                       PROT_READ | PROT_WRITE,
     //                       MAP_POPULATE, -1, 0);
 
+    size_t stacks_nr = size_t(cpu_count) * 4;
+    size_t stacks_sz = TSS_STACK_SIZE * stacks_nr;
+
+    // Map space for all the stacks
+    char *stacks_base = (char*)mmap(
+                nullptr, stacks_sz, PROT_READ | PROT_WRITE,
+                MAP_POPULATE, -1, 0);
+    char *stacks_alloc = stacks_base;
+
     for (int i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
 
         for (int st = 0; st < 4; ++st) {
-            void *stack = mmap(nullptr, TSS_STACK_SIZE,
-                               PROT_READ | PROT_WRITE,
-                               MAP_POPULATE, -1, 0);
+            void *stack = stacks_alloc;
+            stacks_alloc += TSS_STACK_SIZE;
             madvise(stack, PAGESIZE, MADV_DONTNEED);
             mprotect(stack, PAGESIZE, PROT_NONE);
 

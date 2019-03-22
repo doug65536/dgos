@@ -341,7 +341,6 @@ void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
     thread_t tid = thread_get_id();
     node->thread_id = tid;
     //node->irq_enabled = cpu_irq_save_disable();
-    cs_enter();
     mcslock_lock_nodis(lock, node);
 }
 

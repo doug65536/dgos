@@ -16,6 +16,9 @@ void modload_init(void);
 class module_t;
 
 module_t *modload_load(char const *path, bool run = true);
+module_t *modload_load_image(void const *image, size_t image_sz, const char *module_name,
+                             bool run = true);
+
 int modload_run(module_t *module);
 
 __END_DECLS

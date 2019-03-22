@@ -127,6 +127,9 @@ static kernel_params_t *prompt_kernel_param(
     params->acpi_rsdt = boottbl_find_acpi_rsdp();
     params->mptables = boottbl_find_mptables();
 
+    // Find NUMA information
+    params->numa = boottbl_find_numa(params->acpi_rsdt);
+
     boot_menu_show(*params);
 
     // Map framebuffer

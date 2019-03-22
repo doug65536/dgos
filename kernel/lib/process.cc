@@ -147,6 +147,9 @@ int process_t::start(void *process_arg)
     return ((process_t*)process_arg)->start();
 }
 
+// Hack to reuse module loader symbol auto-load hook for processes too
+extern void modload_load_symbols(char const *path, uintptr_t addr);
+
 int process_t::start()
 {
     // Attach this kernel thread to this process
@@ -196,8 +199,14 @@ int process_t::start()
     size_t last_region_st = ~size_t(0);
     size_t last_region_en = 0;
 
+    uintptr_t first_exec = UINTPTR_MAX;
+
     // Map every section, just in case any pages overlap
     for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not loaded, ignore
+        if (ph.p_type != PT_LOAD)
+            continue;
+
         // If it is not readable, writable or executable, ignore
         if ((ph.p_flags & (PF_R | PF_W | PF_X)) == 0)
             continue;
@@ -225,8 +234,11 @@ int process_t::start()
 
         // Unconditionally writable until loaded
         page_prot |= PROT_WRITE;
-        if (ph.p_flags & PF_X)
+        if (ph.p_flags & PF_X) {
+            if (first_exec == UINTPTR_MAX)
+                first_exec = ph.p_vaddr;
             page_prot |= PROT_EXEC;
+        }
 
         // Skip pointless calls to mmap for little regions that overlap
         // previously reserved regions
@@ -252,6 +264,10 @@ int process_t::start()
 
     // Read everything after mapping the memory
     for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not loaded, ignore
+        if (ph.p_type != PT_LOAD)
+            continue;
+
         read_size = ph.p_filesz;
         if (ph.p_filesz > 0) {
             if (unlikely(read_size != file_pread(
@@ -265,6 +281,10 @@ int process_t::start()
 
     // Make read only pages read only
     for (Elf64_Phdr& ph : program_hdrs) {
+        // If it is not loaded, ignore
+        if (ph.p_type != PT_LOAD)
+            continue;
+
         int page_prot = 0;
 
         // Ignore the region if it should be writable
@@ -280,15 +300,19 @@ int process_t::start()
             printdbg("Failed to set page protection\n");
             return -1;
         }
+    }
 
+    // Find TLS
+    for (Elf64_Phdr& ph : program_hdrs) {
         // If it is a TLS header, remember the range
-        // Note that this won't pick up the TLS header if it is writable
         if (unlikely(ph.p_type == PT_TLS)) {
             tls_addr = ph.p_vaddr;
             tls_msize = ph.p_memsz;
             tls_fsize = ph.p_filesz;
         }
     }
+
+    modload_load_symbols(path, first_exec);
 
     // Initialize the stack
 
@@ -306,6 +330,7 @@ int process_t::start()
 
     // Initialize main thread TLS
     static_assert(sizeof(uintptr_t) == sizeof(void*), "Unexpected size");
+    // The space for the uintptr_t is for the pointer to itself at TLS offset 0
     size_t tls_vsize = PAGE_SIZE + tls_msize + sizeof(uintptr_t) + PAGE_SIZE;
     void *tls = mmap(nullptr, tls_vsize,
                      PROT_READ | PROT_WRITE,
@@ -319,6 +344,9 @@ int process_t::start()
                        PAGESIZE - 1)) & -PAGESIZE), PAGE_SIZE, PROT_NONE);
 
     uintptr_t tls_area = uintptr_t(tls) + PAGESIZE;
+
+    if (unlikely(!mm_is_user_range((void*)tls_area, tls_msize)))
+        return -1;
 
     // Copy template into TLS area
     mm_copy_user((char*)tls_area, (void*)tls_addr, tls_fsize);
@@ -336,11 +364,13 @@ int process_t::start()
     ///  addr       +-----------------+ <--- mmap allocation for TLS
     ///
 
+    // The TLS pointer here points to the end of the TLS, which is where
+    // the pointer to itself is located
     uintptr_t tls_ptr = uintptr_t(tls) + PAGE_SIZE + tls_msize;
-    if (unlikely(!mm_is_user_range((void*)tls_ptr, sizeof(tls_ptr))))
-        return -1;
+    // Patch the pointer to itself into the TLS area
     mm_copy_user((void*)tls_ptr, &tls_ptr, sizeof(tls_ptr));
 
+    // Point fs at it
     thread_set_fsbase(thread_get_id(), tls_ptr);
 
     // Initialize the stack according to the ELF ABI

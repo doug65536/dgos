@@ -22,6 +22,7 @@ typedef int64_t off_t;
 
 #define _stdcall                __attribute__((__stdcall__))
 
+#define _no_asan                __attribute((__no_address_safety_analysis__))
 #define _packed                 __attribute((__packed__))
 #define _const                  __attribute__((__const__))
 #define _pure                   __attribute__((__pure__))
@@ -66,3 +67,9 @@ typedef char tchar;
 
 #define __BEGIN_NAMESPACE_EXT namespace ext {
 #define __END_NAMESPACE_EXT }
+
+#ifndef PAGE_SIZE
+#define PAGE_SIZE_BIT   12
+#define PAGE_SIZE       (size_t(1) << PAGE_SIZE_BIT)
+#define PAGE_MASK       (PAGE_SIZE - 1)
+#endif

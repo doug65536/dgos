@@ -5,10 +5,6 @@
 
 .section .entry, "ax"
 
-.macro debugind ch
-    movb $\ch,0xb8000
-.endm
-
 // Things that must be done before entering any compiler
 // generated code:
 //  - Set up stack (aligned!)
@@ -21,8 +17,6 @@
 entry:
     .cfi_startproc
 
-    debugind '1'
-
     // Align the stack
     andq $-16,%rsp
 
@@ -31,8 +25,6 @@ entry:
     // Save parameter in call-preserved register
     movl %ecx,%r15d
     xorl %ebp,%ebp
-
-    debugind '2'
 
 #ifdef _CALL_TRACE_ENABLED
     // Enable FSGSBASE ASAP if tracing
@@ -72,8 +64,6 @@ entry:
     testl $ CPU_APIC_BASE_BSP,%eax
     jnz bsp_init
 
-    debugind 'Z'
-
 ap_init:
     // This is not the bootstrap CPU
 
@@ -98,8 +88,6 @@ ap_init:
 bsp_init:
     // This is the bootstrap processor
 
-    debugind '3'
-
     leaq kernel_stack(%rip),%rdx
     movq kernel_stack_size(%rip),%rbx
     leaq (%rdx,%rbx),%rsp
@@ -107,30 +95,23 @@ bsp_init:
     // Store the kernel parameters passed in from bootloader
     movq %r15,kernel_params(%rip)
 
-    debugind '4'
     call cpuid_init
 
     xorl %edi,%edi
     call cpu_init_early
 
-    debugind '7'
-
     // Get SSE context offsets
     xorl %edi,%edi
     call idt_xsave_detect
 
-    debugind '8'
-
     call e9debug_init
 
-    debugind '9'
-
     // Resolve ifunc
-    leaq __rela_dyn_st(%rip),%r12
-    leaq __rela_dyn_en(%rip),%r13
+    leaq ___rela_plt(%rip),%r12
+    leaq __rela_iplt_end(%rip),%r13
 .Lrela_iplt_next:
     cmpq %r13,%r12
-    jz .Lrela_iplt_done
+    jae .Lrela_iplt_done
 
     movq 8(%r12),%rax
 
@@ -170,10 +151,10 @@ bsp_init:
     call __asan_storeN_noabort
 
     // Mark .rodata initialized
-    leaq __bspstk_st(%rip),%rdi
-    leaq __bspstk_en(%rip),%rsi
-    subq %rdi,%rsi
-    call __asan_storeN_noabort
+//    leaq __bspstk_st(%rip),%rdi
+//    leaq __bspstk_en(%rip),%rsi
+//    subq %rdi,%rsi
+//    call __asan_storeN_noabort
 
     // Mark .data initialized
     leaq ___data_st(%rip),%rdi
@@ -207,8 +188,6 @@ bsp_init:
     call invoke_function_array
 
     call main
-
-    debugind '?'
 
     movq %rax,%rdi
     call exit

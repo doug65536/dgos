@@ -852,30 +852,45 @@ static int init_thread(void *)
     cpu_init_late_msrs();
 
     printk("Initializing PCI\n");
-    //thread_t tid_pci_init = thread_func_0(pci_init);
     pci_init();
 
     printk("Initializing keyboard event queue\n");
     keybd_init();
 
     tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
-
     modload_init();
 
-    // Wait for PCI initialization before starting drivers
-    //thread_wait(tid_pci_init);
-    //thread_close(tid_pci_init);
+    printk("Running set<int> self test\n");
+    //std::set<int>::test();
+//    rbtree_t<>::test();
+
+//    {
+//        using tree = rbtree_t<uintptr_t,uintptr_t>;
+//        tree rotation_stress;
+//        rotation_stress.init();
+//        for (int i = 0; i < 4000000; ++i) {
+//            rotation_stress.insert(i, 0);
+//            if (i >= 1000000) {
+//                tree::kvp_t kvp{i - 1000000, 0};
+//                tree::iter_t it;
+//                tree::kvp_t *item = rotation_stress.find(&kvp, &it);
+//                assert(it);
+//                rotation_stress.delete_at(it);
+//            }
+//        }
+//    }
+
+    pid_t init_pid = -1;
+    process_t::spawn(&init_pid, "init", nullptr, nullptr);
 
     // Facilities needed by drivers
     printk("Initializing driver base\n");
     callout_call(callout_type_t::driver_base, true);
 
+#if 0
     printk("Initializing 8042 keyboard\n");
     modload_load("keyb8042.km");
     //thread_t tid_keybd8042_init = thread_proc_0(keyb8042_init);
-
-    //thread_wait(tid_keybd8042_init);
-    //thread_close(tid_keybd8042_init);
 
     // Run late initializations
     printk("Initializing late devices\n");
@@ -920,8 +935,9 @@ static int init_thread(void *)
     callout_call(callout_type_t::nics_ready, true);
 
     modload_load("ide.km");
+#endif
 
-    test_spawn();
+    //test_spawn();
 
 //    printk("Initializing framebuffer\n");
 //    fb_init();
@@ -974,8 +990,7 @@ static int init_thread(void *)
     //printk("Running mprotect self test\n");
     //mprotect_test(nullptr);
 
-    //printk("Running red-black tree self test\n");
-    std::set<int>::test();
+    printk("Running red-black tree self test\n");
     //rbtree_t<>::test();
 
 #if ENABLE_FRAMEBUFFER_THREAD > 0
@@ -1085,9 +1100,5 @@ extern "C" _noreturn int main(void)
 
 extern "C" _noreturn void mp_main()
 {
-    cpu_init_early(1);
-
-    callout_call(callout_type_t::smp_start);
-
-    __builtin_unreachable();
+    cpu_init_ap();
 }

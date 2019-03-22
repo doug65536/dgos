@@ -660,314 +660,8 @@ static lapic_x_t apic_x;
 static lapic_x2_t apic_x2;
 static lapic_t *apic;
 
-//
-// ACPI
+//.....
 
-// Root System Description Pointer (ACPI 1.0)
-struct acpi_rsdp_t {
-    char sig[8];
-    uint8_t checksum;
-    char oem_id[6];
-    uint8_t rev;
-    uint32_t rsdt_addr;
-};
-
-C_ASSERT(sizeof(acpi_rsdp_t) == 20);
-
-// Root System Description Pointer (ACPI 2.0+)
-struct acpi_rsdp2_t {
-    acpi_rsdp_t rsdp1;
-
-    uint32_t length;
-    uint32_t xsdt_addr_lo;
-    uint32_t xsdt_addr_hi;
-    uint8_t checksum;
-    uint8_t reserved[3];
-};
-
-C_ASSERT(sizeof(acpi_rsdp2_t) == 36);
-
-// Root System Description Table
-struct acpi_sdt_hdr_t {
-    char sig[4];
-    uint32_t len;
-    uint8_t rev;
-    uint8_t checksum;
-    char oem_id[6];
-    char oem_table_id[8];
-    uint32_t oem_rev;
-    uint32_t creator_id;
-    uint32_t creator_rev;
-} _packed;
-
-C_ASSERT(sizeof(acpi_sdt_hdr_t) == 36);
-
-// PCIe Enhanced Configuration Access Mechanism record in MCFG table
-struct acpi_ecam_rec_t {
-    uint64_t ecam_base;
-    uint16_t segment_group;
-    uint8_t st_bus;
-    uint8_t en_bus;
-    uint32_t reserved;
-} _packed;
-
-// MCFG table
-struct acpi_mcfg_hdr_t {
-    acpi_sdt_hdr_t hdr;
-    uint64_t reserved;
-    // followed by instances of acpi_ecam_record_t
-} _packed;
-
-// SRAT
-struct acpi_srat_hdr_t {
-    acpi_sdt_hdr_t hdr;
-    uint8_t reserved[12];
-} _packed;
-
-C_ASSERT(sizeof(acpi_srat_hdr_t) == 48);
-
-struct acpi_slit_t {
-    acpi_sdt_hdr_t hdr;
-
-    uint64_t locality_count;
-    // Followed by locality_count squared 1-byte entries
-} _packed;
-
-struct acpi_srat_rec_hdr_t {
-    uint8_t type;
-    uint8_t len;
-} _packed;
-
-C_ASSERT(sizeof(acpi_srat_rec_hdr_t) == 2);
-
-struct acpi_srat_lapic_t {
-    acpi_srat_rec_hdr_t rec_hdr;
-
-    uint8_t domain_lo;
-    uint8_t apic_id;
-    uint32_t flags;
-    uint8_t sapic_eid;
-    uint8_t domain_hi[3];
-    uint32_t clk_domain;
-} _packed;
-
-C_ASSERT(sizeof(acpi_srat_lapic_t) == 16);
-
-struct acpi_srat_mem_t {
-    acpi_srat_rec_hdr_t rec_hdr;
-
-    // Domain of the memory region
-    uint32_t domain;
-
-    uint8_t reserved1[2];
-
-    // Range base and length
-    uint64_t range_base;
-    uint64_t range_length;
-
-    uint8_t reserved2[4];
-
-    // Only bit 0 is not reserved: 1=enabled
-    uint32_t flags;
-    uint8_t reserved3[8];
-} _packed;
-
-C_ASSERT(sizeof(acpi_srat_mem_t) == 40);
-
-struct acpi_srat_x2apic_t {
-    acpi_srat_rec_hdr_t rec_hdr;
-
-    uint16_t reserved1;
-    uint32_t domain;
-    uint32_t x2apic_id;
-    uint32_t flags;
-    uint32_t clk_domain;
-    uint32_t reserved2;
-} _packed;
-
-C_ASSERT(sizeof(acpi_srat_x2apic_t) == 24);
-
-struct acpi_fadt_t {
-    acpi_sdt_hdr_t hdr;
-    uint32_t fw_ctl;
-    uint32_t dsdt;
-
-    // field used in ACPI 1.0; no longer in use, for compatibility only
-    uint8_t  reserved;
-
-    uint8_t  preferred_pm_profile;
-    uint16_t sci_irq;
-    uint32_t smi_cmd_port;
-    uint8_t  acpi_enable;
-    uint8_t  acpi_disable;
-    uint8_t  s4_bios_req;
-    uint8_t  pstate_ctl;
-    uint32_t pm1a_event_block;
-    uint32_t pm1b_event_block;
-    uint32_t pm1a_ctl_block;
-    uint32_t pm1b_ctl_block;
-    uint32_t pm2_ctl_block;
-    uint32_t pm_timer_block;
-    uint32_t gpe0_block;
-    uint32_t gpe1_block;
-    uint8_t  pm1_event_len;
-    uint8_t  pm1_ctl_len;
-    uint8_t  pm2_ctl_len;
-    uint8_t  pm_timer_len;
-    uint8_t  gpe0_len;
-    uint8_t  gpe1_len;
-    uint8_t  gpe1_base;
-    uint8_t  cstate_ctl;
-    uint16_t worst_c2_lat;
-    uint16_t worst_c3_lat;
-    uint16_t flush_size;
-    uint16_t flush_stride;
-    uint8_t  duty_ofs;
-    uint8_t  duty_width;
-    uint8_t  day_alarm;
-    uint8_t  month_alarm;
-    uint8_t  century;
-
-    // reserved in ACPI 1.0; used since ACPI 2.0+
-    uint16_t boot_arch_flags;
-
-    uint8_t  reserved2;
-
-    // ACPI_FADT_FFF_*
-    uint32_t flags;
-
-    // 12 byte structure; see below for details
-    acpi_gas_t reset_reg;
-
-    uint8_t  reset_value;
-    uint8_t  reserved3[3];
-
-    // 64bit pointers - Available on ACPI 2.0+
-    uint64_t x_fw_ctl;
-    uint64_t x_dsdt;
-
-    acpi_gas_t x_pm1a_event_block;
-    acpi_gas_t x_pm1b_event_block;
-    acpi_gas_t x_pm1a_control_block;
-    acpi_gas_t x_pm1b_control_block;
-    acpi_gas_t x_pm2Control_block;
-    acpi_gas_t x_pm_timer_block;
-    acpi_gas_t x_gpe0_block;
-    acpi_gas_t x_gpe1_block;
-} _packed;
-
-struct acpi_ssdt_t {
-    // sig == ?
-    acpi_sdt_hdr_t hdr;
-} _packed;
-
-struct acpi_madt_rec_hdr_t {
-    uint8_t entry_type;
-    uint8_t record_len;
-};
-
-struct acpi_madt_lapic_t {
-    acpi_madt_rec_hdr_t hdr;
-    uint8_t cpu_id;
-    uint8_t apic_id;
-    uint32_t flags;
-} _packed;
-
-struct acpi_madt_ioapic_t {
-    acpi_madt_rec_hdr_t hdr;
-    uint8_t apic_id;
-    uint8_t reserved;
-    uint32_t addr;
-    uint32_t irq_base;
-} _packed;
-
-struct acpi_madt_irqsrc_t {
-    acpi_madt_rec_hdr_t hdr;
-    uint8_t bus;
-    uint8_t irq_src;
-    uint32_t gsi;
-    uint16_t flags;
-} _packed;
-
-// Which IOAPIC inputs should be NMI
-struct acpi_madt_nmisrc_t {
-    acpi_madt_rec_hdr_t hdr;
-    uint16_t flags;
-    uint32_t gsi;
-} _packed;
-
-struct acpi_madt_lnmi_t {
-    acpi_madt_rec_hdr_t hdr;
-    uint8_t apic_id;
-    uint16_t flags;
-    uint8_t lapic_lint;
-} _packed;
-
-struct acpi_madt_x2apic_t {
-    acpi_madt_rec_hdr_t hdr;
-    uint16_t reserved;
-    uint32_t x2apic_id;
-    uint32_t flags;
-    uint32_t uid;
-} _packed;
-
-//
-// The IRQ routing flags are identical to MPS flags
-
-union acpi_madt_ent_t {
-    acpi_madt_rec_hdr_t hdr;
-
-    // ACPI_MADT_REC_TYPE_LAPIC
-    acpi_madt_lapic_t lapic;
-
-    // ACPI_MADT_REC_TYPE_IOAPIC
-    acpi_madt_ioapic_t ioapic;
-
-    // ACPI_MADT_REC_TYPE_IRQ
-    acpi_madt_irqsrc_t irq_src;
-
-    // ACPI_MADT_REC_TYPE_NMI
-    acpi_madt_nmisrc_t nmi_src;
-
-    // ACPI_MADT_REC_TYPE_LNMI
-    acpi_madt_lnmi_t lnmi;
-
-    // ACPI_MADT_REC_TYPE_X2APIC
-    acpi_madt_x2apic_t x2apic;
-} _packed;
-
-struct acpi_madt_t {
-    // sig == "APIC"
-    acpi_sdt_hdr_t hdr;
-
-    uint32_t lapic_address;
-
-    // 1 = Dual 8259 PICs installed
-    uint32_t flags;
-} _packed;
-
-//
-// HPET ACPI info
-
-struct acpi_hpet_t {
-    acpi_sdt_hdr_t hdr;
-
-    uint32_t blk_id;
-    acpi_gas_t addr;
-    uint8_t number;
-    uint16_t min_tick_count;
-    uint8_t page_prot;
-};
-
-#define ACPI_HPET_BLKID_PCI_VEN_BIT     16
-#define ACPI_HPET_BLKID_LEGACY_CAP_BIT  15
-#define ACPI_HPET_BLKID_COUNTER_SZ_BIT  13
-#define ACPI_HPET_BLKID_NUM_CMP_BIT     8
-#define ACPI_HPET_BLKID_REV_ID_BIT      0
-
-#define ACPI_HPET_BLKID_PCI_VEN_BITS    16
-#define ACPI_HPET_BLKID_NUM_CMP_BITS    8
-#define ACPI_HPET_BLKID_REV_ID_BITS     8
 
 static std::vector<acpi_gas_t> acpi_hpet_list;
 static int acpi_madt_flags;
@@ -1071,14 +765,6 @@ static uint8_t ioapic_aligned_vectors(uint8_t log2n)
     }
 
     return result;
-}
-
-static _always_inline uint8_t checksum_bytes(char const *bytes, size_t len)
-{
-    uint8_t sum = 0;
-    for (size_t i = 0; i < len; ++i)
-        sum += (uint8_t)bytes[i];
-    return sum;
 }
 
 static void acpi_process_fadt(acpi_fadt_t *fadt_hdr)
@@ -1254,10 +940,6 @@ static void acpi_process_hpet(acpi_hpet_t *acpi_hdr)
     acpi_hpet_list.push_back(acpi_hdr->addr);
 }
 
-static _always_inline uint8_t acpi_chk_hdr(acpi_sdt_hdr_t *hdr)
-{
-    return checksum_bytes((char const *)hdr, hdr->len);
-}
 
 // Sometimes we have to guess the size
 // then read the header to get the actual size.
@@ -2291,7 +1973,9 @@ void apic_start_smp(void)
 
                 ++smp_expect;
 
+                APIC_TRACE("BSP waiting for AP");
                 cpu_wait_value(&thread_smp_running, smp_expect);
+                APIC_TRACE("BSP finished waiting for AP");
             }
         }
     }
@@ -2582,6 +2266,7 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
            ioapic->vector_count, ioapic - ioapic_list);
 
     // Assume GSIs are sequentially assigned to IOAPIC inputs
+    // Later overrides may remap these
     for (size_t i = 0; i < ioapic->vector_count; ++i) {
         intr_to_irq[ioapic->base_intr + i] =
                 ioapic->base_intr + i - INTR_APIC_IRQ_BASE;
@@ -2601,7 +2286,8 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
         ioapic_write(ioapic, IOAPIC_RED_LO_n(i), ent, lock);
 
         // Route to CPU 0 by default
-        ioapic_write(ioapic, IOAPIC_RED_HI_n(i), IOAPIC_REDHI_DEST_n(0), lock);
+        ioapic_write(ioapic, IOAPIC_RED_HI_n(i),
+                     IOAPIC_REDHI_DEST_n(apic_id_list[0]), lock);
     }
 }
 
@@ -2732,8 +2418,6 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
     assert(intr >= INTR_APIC_IRQ_BASE);
     assert(intr < INTR_APIC_IRQ_END);
-
-    // The running thread only pays for execution up to this point
 
     uint64_t st = cpu_rdtsc();
 

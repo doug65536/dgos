@@ -105,6 +105,8 @@ SECTIONS {
 		PROVIDE_HIDDEN(___dynstr_en = .);
 	} :readonly
 
+	. = ALIGN(16);
+
 	.rela.plt : {
 		PROVIDE_HIDDEN(___rela_plt = .);
 		*(.rela.plt)

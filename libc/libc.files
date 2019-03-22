@@ -5,6 +5,7 @@ include/new.h
 include/stdint.h
 include/sys/cpu_bug.h
 include/sys/ioctl.h
+include/sys/module.h
 include/sys/socket.h
 include/sys/syscall_num.h
 libg/debug.cc
@@ -65,6 +66,7 @@ src/stdio/fread.cc
 src/stdio/fseek.cc
 src/stdio/fwrite.cc
 src/stdio/printf.cc
+src/stdio/puts.cc
 src/stdio/stdin_out_err.cc
 src/stdio/vfprintf.cc
 src/stdio/vprintf.cc
@@ -86,6 +88,7 @@ src/sys/mman/mremap.cc
 src/sys/mman/msync.cc
 src/sys/mman/munlock.cc
 src/sys/mman/munmap.cc
+src/sys/module/init_module.cc
 src/sys/socket/socket.cc
 src/sys/syscall0.S
 src/sys/syscall1.S

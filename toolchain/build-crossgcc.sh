@@ -70,6 +70,7 @@ function extract_tool() {
 	local base="$1"
 	local ext="$2"
 	local config="$3"
+	local arch="$4"
 
 	local input=$(fullpath "$base$ext")
 
@@ -105,6 +106,7 @@ function make_tool() {
 	local ext="$2"
 	local target="$3"
 	local config="$4"
+	local arch="$5"
 
 	local name=${base#$archives/}
 
@@ -117,15 +119,15 @@ function make_tool() {
 	mkdir -p "$build/$name" || exit
 	pushd "$build/$name" || exit
 	log echo Making "$target" with config "$config" and prefix "$prefixdir" in $(pwd)...
-	if ! [[ -z "${@:5}" ]]
+	if ! [[ -z "${@:6}" ]]
 	then
-		log echo "...with extra configure options: ${@:5}"
+		log echo "...with extra configure options: ${@:6}"
 	fi
 
 	if ! [[ -f "Makefile" ]]
 	then
 	set -x
-		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:5}" || exit
+		log "$src/$name/configure" --prefix="$prefixdir" $config "${@:6}" || exit
 	fi
 	log make $parallel $target || exit
 	popd || exit
@@ -240,7 +242,7 @@ download_file "$gmpurl" "$archives"
 download_file "$mpcurl" "$archives"
 download_file "$mpfurl" "$archives"
 
-toolre='/([^/-]+)-'
+toolre='/([^/-]+)-[^/]+$'
 for tarball in $archives/*.tar.*; do
 	log echo Extracting tarball $tarball
 	if [[ $tarball =~ $toolre ]]; then
@@ -248,6 +250,12 @@ for tarball in $archives/*.tar.*; do
 	else
 		toolname=
 	fi
+
+	if [[ -z "$toolname" ]]; then
+		echo Could not deduce toolname from $tarball
+		exit 1
+	fi
+
 	process_tarball "$tarball" "extract_tool" "$toolname" || exit
 done
 
@@ -298,6 +306,8 @@ process_tarball "$archives/$bintar" "make_tool" install "$bin_config" || exit
 
 process_tarball "$archives/$gdbtar" "make_tool" all "$gdb_config" || exit
 process_tarball "$archives/$gdbtar" "make_tool" install "$gdb_config" || exit
+
 for target in all-gcc all-target-libgcc install-gcc install-target-libgcc; do
-	process_tarball "$archives/$gcctar" "make_tool" "$target" "$gcc_config" || exit
+	process_tarball "$archives/$gcctar" "make_tool" \
+		"$target" "$gcc_config" || exit
 done

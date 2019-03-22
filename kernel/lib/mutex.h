@@ -66,6 +66,7 @@ private:
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT
+// The size of this thing is two unsigned ints
 class ticketlock {
 public:
     typedef ticketlock_t mutex_type;
@@ -88,6 +89,7 @@ private:
 };
 
 // Does not meet BasicLockable requirements, lock holder maintains node
+// The size of this thing is the size of one pointer
 class mcslock {
 public:
     mcslock();

@@ -23,8 +23,8 @@ BUILT_SOURCES = \
 #sysroot/lib/libm.so \
 #sysroot/lib/libstdc++.so
 
-LINKER_DEBUG = -Wl,--orphan-handling,warn
-#LINKER_DEBUG =
+#LINKER_DEBUG = -Wl,--orphan-handling,warn
+LINKER_DEBUG =
 
 noinst_LIBRARIES =
 bin_PROGRAMS =
@@ -564,6 +564,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/callout.h \
 	kernel/lib/cxxexcept.h \
 	kernel/lib/cxxexcept.cc \
+	kernel/lib/radix_tree.h \
+	kernel/lib/radix_tree.cc \
 	kernel/lib/cc/algorithm.h \
 	kernel/lib/cc/algorithm.cc \
 	kernel/lib/cc/exception.h \
@@ -795,7 +797,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_fd.cc \
 	kernel/syscall/sys_mem.cc \
 	kernel/syscall/sys_time.cc \
-	kernel/syscall/sys_process.cc
+	kernel/syscall/sys_process.cc \
+	kernel/syscall/sys_module.cc \
+	kernel/syscall/sys_sys.cc
 
 KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/device/iocp.cc \
@@ -1084,6 +1088,7 @@ shell_CCASFLAGS =
 shell_LDFLAGS = \
 	-Wl,--orphan-handling,warn \
 	-Wl,-Map,$(top_builddir)/shell.map
+
 shell_LDADD =
 
 #-v -Wl,-verbose
@@ -1268,6 +1273,7 @@ libc_a_SOURCES = \
 	libc/src/stdio/vprintf.cc \
 	libc/src/stdio/fread.cc \
 	libc/src/stdio/fwrite.cc \
+	libc/src/stdio/puts.cc \
 	libc/src/sys/indirect-thunk.S \
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
@@ -1383,6 +1389,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
 	libc/src/sys/socket/socket.cc \
+	libc/src/sys/module/init_module.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -1812,6 +1819,7 @@ bin_PROGRAMS += user-shell
 user_shell_CXXFLAGS = \
 	-g \
 	$(COMPILER_FLAGS)
+
 user_shell_CFLAGS = \
 	-g \
 	$(COMPILER_FLAGS)
@@ -1832,9 +1840,46 @@ EXTRA_user_shell_DEPENDENCIES = \
 	sysroot/lib/libg.a \
 	sysroot/lib/libm.a
 
+#==========
+
+bin_PROGRAMS += init
+
+init_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
+
+init_CFLAGS = \
+	-DFROMCFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
+
+init_SOURCES = \
+	user/init/init.cc
+
+init_LDFLAGS = \
+	$(USER64_FLAGS)
+
+init_CCASFLAGS = \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-isystem $(top_builddir)/sysroot/include
+
+EXTRA_init_DEPENDENCIES = \
+	$(top_srcdir)/user/user64.ld \
+	sysroot/lib/crt0.o \
+	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
+	sysroot/lib/libm.a \
+	$(INCLUDES_DEPLOYED)
+
 #===========
 
-MODULE_LIST = $(filter %.km,$(bin_PROGRAMS))
+MODULE_LIST = $(filter %.km,$(bin_PROGRAMS)) init
 
 initrd: $(MODULE_LIST)
 	$(CPIO) -o --device-independent  -H bin \
@@ -1967,7 +2012,7 @@ QEMU_EXTRA_DEPS = \
 
 #random-mem.img
 
-QEMU_CPUS = 16
+QEMU_CPUS = $(shell $(NPROC))
 QEMU_CORES = 8
 QEMU_THREADS = 2
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase

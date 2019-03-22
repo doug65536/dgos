@@ -345,6 +345,9 @@
 #define CPU_EFLAGS_VIP      (1U << CPU_EFLAGS_VIP_BIT)
 #define CPU_EFLAGS_ID       (1U << CPU_EFLAGS_ID_BIT)
 
+// Always set bits
+#define CPU_EFLAGS_ALWAYS   2
+
 #define CPU_EFLAGS_IOPL_BITS    2
 #define CPU_EFLAGS_IOPL_MASK    ((1 << CPU_EFLAGS_IOPL_BITS)-1)
 #define CPU_EFLAGS_IOPL         (CPU_EFLAGS_IOPL_MASK << CPU_EFLAGS_IOPL_BIT)

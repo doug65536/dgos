@@ -22,6 +22,7 @@
 
 #if defined(__GNUC__)
 
+#define _no_asan                __attribute__((__no_address_safety_analysis__))
 #define _packed                 __attribute__((__packed__))
 #define _const                  __attribute__((__const__))
 #define _pure                   __attribute__((__pure__))

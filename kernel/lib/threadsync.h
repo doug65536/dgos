@@ -34,13 +34,11 @@ struct condition_var_t {
 };
 
 struct mutex_t {
+    // Linked list of threads waiting for the mutex
     thread_wait_link_t volatile link;
 
     thread_t volatile owner;
     int spin_count;
-
-    // Allows noyield lock acquire to have high priority
-    int noyield_waiting;
 
     // This lock must be held while updating the list
     spinlock_t lock;
@@ -65,7 +63,6 @@ void mutex_destroy(mutex_t *mutex);
 int mutex_held(mutex_t *mutex);
 bool mutex_try_lock(mutex_t *mutex);
 void mutex_lock(mutex_t *mutex);
-void mutex_lock_noyield(mutex_t *mutex);
 void mutex_unlock(mutex_t *mutex);
 
 void rwlock_init(rwlock_t *rwlock);

@@ -108,7 +108,8 @@ bin_PROGRAMS = mbr-elf$(EXEEXT) boot1-elf$(EXEEXT) \
 	ls$(EXEEXT) usbxhci.km$(EXEEXT) rtl8139.km$(EXEEXT) \
 	nvme.km$(EXEEXT) keyb8042.km$(EXEEXT) ahci.km$(EXEEXT) \
 	ide.km$(EXEEXT) fat32.km$(EXEEXT) iso9660.km$(EXEEXT) \
-	mbr.km$(EXEEXT) gpt.km$(EXEEXT) user-shell$(EXEEXT)
+	mbr.km$(EXEEXT) gpt.km$(EXEEXT) user-shell$(EXEEXT) \
+	init$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_prog_cc_for_build.m4 \
@@ -247,6 +248,7 @@ am_libc_a_OBJECTS = libc/src/assert/libc_a-assert.$(OBJEXT) \
 	libc/src/stdio/libc_a-vprintf.$(OBJEXT) \
 	libc/src/stdio/libc_a-fread.$(OBJEXT) \
 	libc/src/stdio/libc_a-fwrite.$(OBJEXT) \
+	libc/src/stdio/libc_a-puts.$(OBJEXT) \
 	libc/src/sys/indirect-thunk.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-mmap.$(OBJEXT) \
 	libc/src/sys/mman/libc_a-munmap.$(OBJEXT) \
@@ -362,6 +364,7 @@ am_libc_a_OBJECTS = libc/src/assert/libc_a-assert.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_setpgroup.$(OBJEXT) \
 	libc/src/posix_spawn/libc_a-posix_spawnattr_getpgroup.$(OBJEXT) \
 	libc/src/sys/socket/libc_a-socket.$(OBJEXT) \
+	libc/src/sys/module/libc_a-init_module.$(OBJEXT) \
 	libc/src/sys/syscall0.$(OBJEXT) \
 	libc/src/sys/syscall1.$(OBJEXT) \
 	libc/src/sys/syscall2.$(OBJEXT) \
@@ -493,6 +496,11 @@ ide_km_OBJECTS = $(am_ide_km_OBJECTS)
 ide_km_DEPENDENCIES = $(KERNEL_MODULE_LDADD_SHARED)
 ide_km_LINK = $(CXXLD) $(ide_km_CXXFLAGS) $(CXXFLAGS) \
 	$(ide_km_LDFLAGS) $(LDFLAGS) -o $@
+am_init_OBJECTS = user/init/init-init.$(OBJEXT)
+init_OBJECTS = $(am_init_OBJECTS)
+init_LDADD = $(LDADD)
+init_LINK = $(CXXLD) $(init_CXXFLAGS) $(CXXFLAGS) $(init_LDFLAGS) \
+	$(LDFLAGS) -o $@
 am_iso9660_km_OBJECTS = kernel/fs/iso9660_km-iso9660.$(OBJEXT) \
 	kernel/fs/iso9660_km-iso9660_part.$(OBJEXT)
 iso9660_km_OBJECTS = $(am_iso9660_km_OBJECTS)
@@ -511,6 +519,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/lib/kernel_asan-bswap.$(OBJEXT) \
 	kernel/lib/kernel_asan-callout.$(OBJEXT) \
 	kernel/lib/kernel_asan-cxxexcept.$(OBJEXT) \
+	kernel/lib/kernel_asan-radix_tree.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-algorithm.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-exception.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-functional.$(OBJEXT) \
@@ -622,7 +631,9 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/syscall/kernel_asan-sys_fd.$(OBJEXT) \
 	kernel/syscall/kernel_asan-sys_mem.$(OBJEXT) \
 	kernel/syscall/kernel_asan-sys_time.$(OBJEXT) \
-	kernel/syscall/kernel_asan-sys_process.$(OBJEXT)
+	kernel/syscall/kernel_asan-sys_process.$(OBJEXT) \
+	kernel/syscall/kernel_asan-sys_module.$(OBJEXT) \
+	kernel/syscall/kernel_asan-sys_sys.$(OBJEXT)
 am_kernel_asan_OBJECTS = $(am__objects_5)
 kernel_asan_OBJECTS = $(am_kernel_asan_OBJECTS)
 am__DEPENDENCIES_2 = $(top_builddir)/u_vga16.o
@@ -641,6 +652,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/kernel_generic-bswap.$(OBJEXT) \
 	kernel/lib/kernel_generic-callout.$(OBJEXT) \
 	kernel/lib/kernel_generic-cxxexcept.$(OBJEXT) \
+	kernel/lib/kernel_generic-radix_tree.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-algorithm.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-exception.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-functional.$(OBJEXT) \
@@ -752,7 +764,9 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_fd.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_mem.$(OBJEXT) \
 	kernel/syscall/kernel_generic-sys_time.$(OBJEXT) \
-	kernel/syscall/kernel_generic-sys_process.$(OBJEXT)
+	kernel/syscall/kernel_generic-sys_process.$(OBJEXT) \
+	kernel/syscall/kernel_generic-sys_module.$(OBJEXT) \
+	kernel/syscall/kernel_generic-sys_sys.$(OBJEXT)
 am_kernel_generic_OBJECTS = $(am__objects_6)
 kernel_generic_OBJECTS = $(am_kernel_generic_OBJECTS)
 kernel_generic_DEPENDENCIES = $(am__DEPENDENCIES_2)
@@ -770,6 +784,7 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/kernel_tracing-bswap.$(OBJEXT) \
 	kernel/lib/kernel_tracing-callout.$(OBJEXT) \
 	kernel/lib/kernel_tracing-cxxexcept.$(OBJEXT) \
+	kernel/lib/kernel_tracing-radix_tree.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-algorithm.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-exception.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-functional.$(OBJEXT) \
@@ -881,7 +896,9 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/syscall/kernel_tracing-sys_fd.$(OBJEXT) \
 	kernel/syscall/kernel_tracing-sys_mem.$(OBJEXT) \
 	kernel/syscall/kernel_tracing-sys_time.$(OBJEXT) \
-	kernel/syscall/kernel_tracing-sys_process.$(OBJEXT)
+	kernel/syscall/kernel_tracing-sys_process.$(OBJEXT) \
+	kernel/syscall/kernel_tracing-sys_module.$(OBJEXT) \
+	kernel/syscall/kernel_tracing-sys_sys.$(OBJEXT)
 am_kernel_tracing_OBJECTS = $(am__objects_7)
 kernel_tracing_OBJECTS = $(am_kernel_tracing_OBJECTS)
 kernel_tracing_DEPENDENCIES = $(am__DEPENDENCIES_2)
@@ -995,11 +1012,12 @@ SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) $(libg_a_SOURCES) \
 	$(bootefi_amd64_SOURCES) $(bootfat_elf_SOURCES) \
 	$(bootiso_elf_SOURCES) $(bootpxe_bios_elf_SOURCES) \
 	$(dhcpclient_SOURCES) $(fat32_km_SOURCES) $(gpt_km_SOURCES) \
-	$(ide_km_SOURCES) $(iso9660_km_SOURCES) $(kernel_asan_SOURCES) \
-	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
-	$(keyb8042_km_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
-	$(mbr_km_SOURCES) $(nvme_km_SOURCES) $(rtl8139_km_SOURCES) \
-	$(shell_SOURCES) $(usbxhci_km_SOURCES) $(user_shell_SOURCES)
+	$(ide_km_SOURCES) $(init_SOURCES) $(iso9660_km_SOURCES) \
+	$(kernel_asan_SOURCES) $(kernel_generic_SOURCES) \
+	$(kernel_tracing_SOURCES) $(keyb8042_km_SOURCES) $(ls_SOURCES) \
+	$(mbr_elf_SOURCES) $(mbr_km_SOURCES) $(nvme_km_SOURCES) \
+	$(rtl8139_km_SOURCES) $(shell_SOURCES) $(usbxhci_km_SOURCES) \
+	$(user_shell_SOURCES)
 DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(libg_a_SOURCES) $(libkei_a_SOURCES) $(libkm_a_SOURCES) \
 	$(libm_a_SOURCES) $(libstdc___a_SOURCES) $(ahci_km_SOURCES) \
@@ -1007,7 +1025,7 @@ DIST_SOURCES = $(libbootsect_a_SOURCES) $(libc_a_SOURCES) \
 	$(bootfat_elf_SOURCES) $(bootiso_elf_SOURCES) \
 	$(bootpxe_bios_elf_SOURCES) $(dhcpclient_SOURCES) \
 	$(fat32_km_SOURCES) $(gpt_km_SOURCES) $(ide_km_SOURCES) \
-	$(iso9660_km_SOURCES) $(kernel_asan_SOURCES) \
+	$(init_SOURCES) $(iso9660_km_SOURCES) $(kernel_asan_SOURCES) \
 	$(kernel_generic_SOURCES) $(kernel_tracing_SOURCES) \
 	$(keyb8042_km_SOURCES) $(ls_SOURCES) $(mbr_elf_SOURCES) \
 	$(mbr_km_SOURCES) $(nvme_km_SOURCES) $(rtl8139_km_SOURCES) \
@@ -1178,9 +1196,11 @@ NO_LTO_FLAGS = @NO_LTO_FLAGS@
 NO_PIC_FLAGS = @NO_PIC_FLAGS@
 NO_REDZONE_FLAGS = @NO_REDZONE_FLAGS@
 NO_RTTI_FLAGS = @NO_RTTI_FLAGS@
+NO_SIBLING_CALLS_FLAGS = @NO_SIBLING_CALLS_FLAGS@
 NO_STACKPROTECTOR_FLAGS = @NO_STACKPROTECTOR_FLAGS@
 NO_STACK_CHECK_FLAGS = @NO_STACK_CHECK_FLAGS@
 NO_UNWIND_TABLES_FLAGS = @NO_UNWIND_TABLES_FLAGS@
+NPROC = @NPROC@
 OBJCOPY = @OBJCOPY@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
@@ -1291,8 +1311,9 @@ BUILT_SOURCES = \
 #sysroot/lib/libg.so \
 #sysroot/lib/libm.so \
 #sysroot/lib/libstdc++.so
-LINKER_DEBUG = -Wl,--orphan-handling,warn
-#LINKER_DEBUG =
+
+#LINKER_DEBUG = -Wl,--orphan-handling,warn
+LINKER_DEBUG = 
 
 # libbootsect.a
 
@@ -1788,6 +1809,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/callout.h \
 	kernel/lib/cxxexcept.h \
 	kernel/lib/cxxexcept.cc \
+	kernel/lib/radix_tree.h \
+	kernel/lib/radix_tree.cc \
 	kernel/lib/cc/algorithm.h \
 	kernel/lib/cc/algorithm.cc \
 	kernel/lib/cc/exception.h \
@@ -2019,7 +2042,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_fd.cc \
 	kernel/syscall/sys_mem.cc \
 	kernel/syscall/sys_time.cc \
-	kernel/syscall/sys_process.cc
+	kernel/syscall/sys_process.cc \
+	kernel/syscall/sys_module.cc \
+	kernel/syscall/sys_sys.cc
 
 KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/device/iocp.cc \
@@ -2387,6 +2412,7 @@ libc_a_SOURCES = \
 	libc/src/stdio/vprintf.cc \
 	libc/src/stdio/fread.cc \
 	libc/src/stdio/fwrite.cc \
+	libc/src/stdio/puts.cc \
 	libc/src/sys/indirect-thunk.S \
 	libc/src/sys/mman/mmap.cc \
 	libc/src/sys/mman/munmap.cc \
@@ -2502,6 +2528,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_setpgroup.cc \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
 	libc/src/sys/socket/socket.cc \
+	libc/src/sys/module/init_module.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -2812,9 +2839,42 @@ EXTRA_user_shell_DEPENDENCIES = \
 	sysroot/lib/libg.a \
 	sysroot/lib/libm.a
 
+init_CXXFLAGS = \
+	-DFROMCXXFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
+
+init_CFLAGS = \
+	-DFROMCFLAGS  \
+	-ggdb \
+	-isystem $(top_builddir)/sysroot/include \
+	$(COMPILER_FLAGS) \
+	$(USER64_FLAGS)
+
+init_SOURCES = \
+	user/init/init.cc
+
+init_LDFLAGS = \
+	$(USER64_FLAGS)
+
+init_CCASFLAGS = \
+	$(ASM_DEBUG_INFO_FLAGS) \
+	$(COMPILER_FLAGS) \
+	-isystem $(top_builddir)/sysroot/include
+
+EXTRA_init_DEPENDENCIES = \
+	$(top_srcdir)/user/user64.ld \
+	sysroot/lib/crt0.o \
+	sysroot/lib/libc.a \
+	sysroot/lib/libg.a \
+	sysroot/lib/libm.a \
+	$(INCLUDES_DEPLOYED)
+
 
 #===========
-MODULE_LIST = $(filter %.km,$(bin_PROGRAMS))
+MODULE_LIST = $(filter %.km,$(bin_PROGRAMS)) init
 DGOS_UUID = 0615151f-d802-4edf-914a-734dc4f03687
 
 # ----------------------------------------------------------------------------
@@ -2838,7 +2898,7 @@ QEMU_EXTRA_DEPS = \
 
 
 #random-mem.img
-QEMU_CPUS = 16
+QEMU_CPUS = $(shell $(NPROC))
 QEMU_CORES = 8
 QEMU_THREADS = 2
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
@@ -3374,6 +3434,8 @@ libc/src/stdio/libc_a-fread.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
 libc/src/stdio/libc_a-fwrite.$(OBJEXT):  \
 	libc/src/stdio/$(am__dirstamp) \
 	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
+libc/src/stdio/libc_a-puts.$(OBJEXT): libc/src/stdio/$(am__dirstamp) \
+	libc/src/stdio/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/$(am__dirstamp):
 	@$(MKDIR_P) libc/src/sys
 	@: > libc/src/sys/$(am__dirstamp)
@@ -3758,6 +3820,15 @@ libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp):
 libc/src/sys/socket/libc_a-socket.$(OBJEXT):  \
 	libc/src/sys/socket/$(am__dirstamp) \
 	libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/module/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/module
+	@: > libc/src/sys/module/$(am__dirstamp)
+libc/src/sys/module/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) libc/src/sys/module/$(DEPDIR)
+	@: > libc/src/sys/module/$(DEPDIR)/$(am__dirstamp)
+libc/src/sys/module/libc_a-init_module.$(OBJEXT):  \
+	libc/src/sys/module/$(am__dirstamp) \
+	libc/src/sys/module/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/syscall0.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
 	libc/src/sys/$(DEPDIR)/$(am__dirstamp)
 libc/src/sys/syscall1.$(OBJEXT): libc/src/sys/$(am__dirstamp) \
@@ -4073,6 +4144,18 @@ kernel/device/ide_km-ide.$(OBJEXT): kernel/device/$(am__dirstamp) \
 ide.km$(EXEEXT): $(ide_km_OBJECTS) $(ide_km_DEPENDENCIES) $(EXTRA_ide_km_DEPENDENCIES) 
 	@rm -f ide.km$(EXEEXT)
 	$(AM_V_CXXLD)$(ide_km_LINK) $(ide_km_OBJECTS) $(ide_km_LDADD) $(LIBS)
+user/init/$(am__dirstamp):
+	@$(MKDIR_P) user/init
+	@: > user/init/$(am__dirstamp)
+user/init/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) user/init/$(DEPDIR)
+	@: > user/init/$(DEPDIR)/$(am__dirstamp)
+user/init/init-init.$(OBJEXT): user/init/$(am__dirstamp) \
+	user/init/$(DEPDIR)/$(am__dirstamp)
+
+init$(EXEEXT): $(init_OBJECTS) $(init_DEPENDENCIES) $(EXTRA_init_DEPENDENCIES) 
+	@rm -f init$(EXEEXT)
+	$(AM_V_CXXLD)$(init_LINK) $(init_OBJECTS) $(init_LDADD) $(LIBS)
 kernel/fs/iso9660_km-iso9660.$(OBJEXT): kernel/fs/$(am__dirstamp) \
 	kernel/fs/$(DEPDIR)/$(am__dirstamp)
 kernel/fs/iso9660_km-iso9660_part.$(OBJEXT):  \
@@ -4127,6 +4210,9 @@ kernel/lib/kernel_asan-bswap.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 kernel/lib/kernel_asan-callout.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-cxxexcept.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_asan-radix_tree.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_asan-algorithm.$(OBJEXT):  \
@@ -4446,6 +4532,12 @@ kernel/syscall/kernel_asan-sys_time.$(OBJEXT):  \
 kernel/syscall/kernel_asan-sys_process.$(OBJEXT):  \
 	kernel/syscall/$(am__dirstamp) \
 	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
+kernel/syscall/kernel_asan-sys_module.$(OBJEXT):  \
+	kernel/syscall/$(am__dirstamp) \
+	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
+kernel/syscall/kernel_asan-sys_sys.$(OBJEXT):  \
+	kernel/syscall/$(am__dirstamp) \
+	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
 
 kernel-asan$(EXEEXT): $(kernel_asan_OBJECTS) $(kernel_asan_DEPENDENCIES) $(EXTRA_kernel_asan_DEPENDENCIES) 
 	@rm -f kernel-asan$(EXEEXT)
@@ -4482,6 +4574,9 @@ kernel/lib/kernel_generic-callout.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-cxxexcept.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_generic-radix_tree.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_generic-algorithm.$(OBJEXT):  \
@@ -4795,6 +4890,12 @@ kernel/syscall/kernel_generic-sys_time.$(OBJEXT):  \
 kernel/syscall/kernel_generic-sys_process.$(OBJEXT):  \
 	kernel/syscall/$(am__dirstamp) \
 	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
+kernel/syscall/kernel_generic-sys_module.$(OBJEXT):  \
+	kernel/syscall/$(am__dirstamp) \
+	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
+kernel/syscall/kernel_generic-sys_sys.$(OBJEXT):  \
+	kernel/syscall/$(am__dirstamp) \
+	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
 
 kernel-generic$(EXEEXT): $(kernel_generic_OBJECTS) $(kernel_generic_DEPENDENCIES) $(EXTRA_kernel_generic_DEPENDENCIES) 
 	@rm -f kernel-generic$(EXEEXT)
@@ -4831,6 +4932,9 @@ kernel/lib/kernel_tracing-callout.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-cxxexcept.$(OBJEXT):  \
+	kernel/lib/$(am__dirstamp) \
+	kernel/lib/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/kernel_tracing-radix_tree.$(OBJEXT):  \
 	kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_tracing-algorithm.$(OBJEXT):  \
@@ -5144,6 +5248,12 @@ kernel/syscall/kernel_tracing-sys_time.$(OBJEXT):  \
 kernel/syscall/kernel_tracing-sys_process.$(OBJEXT):  \
 	kernel/syscall/$(am__dirstamp) \
 	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
+kernel/syscall/kernel_tracing-sys_module.$(OBJEXT):  \
+	kernel/syscall/$(am__dirstamp) \
+	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
+kernel/syscall/kernel_tracing-sys_sys.$(OBJEXT):  \
+	kernel/syscall/$(am__dirstamp) \
+	kernel/syscall/$(DEPDIR)/$(am__dirstamp)
 
 kernel-tracing$(EXEEXT): $(kernel_tracing_OBJECTS) $(kernel_tracing_DEPENDENCIES) $(EXTRA_kernel_tracing_DEPENDENCIES) 
 	@rm -f kernel-tracing$(EXEEXT)
@@ -5262,12 +5372,14 @@ mostlyclean-compile:
 	-rm -f libc/src/sys/*.$(OBJEXT)
 	-rm -f libc/src/sys/ioctl/*.$(OBJEXT)
 	-rm -f libc/src/sys/mman/*.$(OBJEXT)
+	-rm -f libc/src/sys/module/*.$(OBJEXT)
 	-rm -f libc/src/sys/socket/*.$(OBJEXT)
 	-rm -f libc/src/unistd/*.$(OBJEXT)
 	-rm -f mbr/*.$(OBJEXT)
 	-rm -f modules/libkm/*.$(OBJEXT)
 	-rm -f user/bin/dhcpclient/*.$(OBJEXT)
 	-rm -f user/bin/ls/*.$(OBJEXT)
+	-rm -f user/init/*.$(OBJEXT)
 	-rm -f user/shell/*.$(OBJEXT)
 	-rm -f user/test/*.$(OBJEXT)
 
@@ -5569,6 +5681,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-printk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-priorityqueue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-process.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-rbtree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_asan-refcount.Po@am__quote@
@@ -5612,6 +5725,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-printk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-priorityqueue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-process.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-rbtree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_generic-refcount.Po@am__quote@
@@ -5655,6 +5769,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-printk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-priorityqueue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-process.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-rbtree.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-refcount.Po@am__quote@
@@ -5730,17 +5845,23 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/net/$(DEPDIR)/kernel_tracing-udp_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-sys_fd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-sys_mem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-sys_process.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-sys_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_asan-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-sys_fd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-sys_mem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-sys_process.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-sys_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_generic-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_fd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_mem.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_process.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-sys_time.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/syscall/$(DEPDIR)/kernel_tracing-syscall_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/cxx/$(DEPDIR)/libstdc___a-terminate.Po@am__quote@
@@ -5795,6 +5916,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fread.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-fwrite.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-printf.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-puts.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-stdin_out_err.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-vfprintf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/stdio/$(DEPDIR)/libc_a-vprintf.Po@am__quote@
@@ -5859,6 +5981,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-msync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-munlock.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/mman/$(DEPDIR)/libc_a-munmap.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/sys/socket/$(DEPDIR)/libc_a-socket.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-_exit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@libc/src/unistd/$(DEPDIR)/libc_a-access.Po@am__quote@
@@ -5948,6 +6071,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@modules/libkm/$(DEPDIR)/libkm_a-module_entry.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/bin/dhcpclient/$(DEPDIR)/dhcpclient-main.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/bin/ls/$(DEPDIR)/ls-ls.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@user/init/$(DEPDIR)/init-init.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/shell/$(DEPDIR)/shell-grammar.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/shell/$(DEPDIR)/shell-parser.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@user/test/$(DEPDIR)/user_shell-test.Po@am__quote@
@@ -7876,6 +8000,20 @@ libc/src/stdio/libc_a-fwrite.obj: libc/src/stdio/fwrite.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-fwrite.obj `if test -f 'libc/src/stdio/fwrite.cc'; then $(CYGPATH_W) 'libc/src/stdio/fwrite.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/fwrite.cc'; fi`
 
+libc/src/stdio/libc_a-puts.o: libc/src/stdio/puts.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-puts.o -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-puts.Tpo -c -o libc/src/stdio/libc_a-puts.o `test -f 'libc/src/stdio/puts.cc' || echo '$(srcdir)/'`libc/src/stdio/puts.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-puts.Tpo libc/src/stdio/$(DEPDIR)/libc_a-puts.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/puts.cc' object='libc/src/stdio/libc_a-puts.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-puts.o `test -f 'libc/src/stdio/puts.cc' || echo '$(srcdir)/'`libc/src/stdio/puts.cc
+
+libc/src/stdio/libc_a-puts.obj: libc/src/stdio/puts.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/stdio/libc_a-puts.obj -MD -MP -MF libc/src/stdio/$(DEPDIR)/libc_a-puts.Tpo -c -o libc/src/stdio/libc_a-puts.obj `if test -f 'libc/src/stdio/puts.cc'; then $(CYGPATH_W) 'libc/src/stdio/puts.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/puts.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/stdio/$(DEPDIR)/libc_a-puts.Tpo libc/src/stdio/$(DEPDIR)/libc_a-puts.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/stdio/puts.cc' object='libc/src/stdio/libc_a-puts.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/stdio/libc_a-puts.obj `if test -f 'libc/src/stdio/puts.cc'; then $(CYGPATH_W) 'libc/src/stdio/puts.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/stdio/puts.cc'; fi`
+
 libc/src/sys/mman/libc_a-mmap.o: libc/src/sys/mman/mmap.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/mman/libc_a-mmap.o -MD -MP -MF libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo -c -o libc/src/sys/mman/libc_a-mmap.o `test -f 'libc/src/sys/mman/mmap.cc' || echo '$(srcdir)/'`libc/src/sys/mman/mmap.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Tpo libc/src/sys/mman/$(DEPDIR)/libc_a-mmap.Po
@@ -9472,6 +9610,20 @@ libc/src/sys/socket/libc_a-socket.obj: libc/src/sys/socket/socket.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/socket/libc_a-socket.obj `if test -f 'libc/src/sys/socket/socket.cc'; then $(CYGPATH_W) 'libc/src/sys/socket/socket.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/socket/socket.cc'; fi`
 
+libc/src/sys/module/libc_a-init_module.o: libc/src/sys/module/init_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/module/libc_a-init_module.o -MD -MP -MF libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Tpo -c -o libc/src/sys/module/libc_a-init_module.o `test -f 'libc/src/sys/module/init_module.cc' || echo '$(srcdir)/'`libc/src/sys/module/init_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Tpo libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/module/init_module.cc' object='libc/src/sys/module/libc_a-init_module.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/module/libc_a-init_module.o `test -f 'libc/src/sys/module/init_module.cc' || echo '$(srcdir)/'`libc/src/sys/module/init_module.cc
+
+libc/src/sys/module/libc_a-init_module.obj: libc/src/sys/module/init_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -MT libc/src/sys/module/libc_a-init_module.obj -MD -MP -MF libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Tpo -c -o libc/src/sys/module/libc_a-init_module.obj `if test -f 'libc/src/sys/module/init_module.cc'; then $(CYGPATH_W) 'libc/src/sys/module/init_module.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/module/init_module.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Tpo libc/src/sys/module/$(DEPDIR)/libc_a-init_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='libc/src/sys/module/init_module.cc' object='libc/src/sys/module/libc_a-init_module.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libc_a_CXXFLAGS) $(CXXFLAGS) -c -o libc/src/sys/module/libc_a-init_module.obj `if test -f 'libc/src/sys/module/init_module.cc'; then $(CYGPATH_W) 'libc/src/sys/module/init_module.cc'; else $(CYGPATH_W) '$(srcdir)/libc/src/sys/module/init_module.cc'; fi`
+
 libc/libg/libg_a-debug.o: libc/libg/debug.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libg_a_CXXFLAGS) $(CXXFLAGS) -MT libc/libg/libg_a-debug.o -MD -MP -MF libc/libg/$(DEPDIR)/libg_a-debug.Tpo -c -o libc/libg/libg_a-debug.o `test -f 'libc/libg/debug.cc' || echo '$(srcdir)/'`libc/libg/debug.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) libc/libg/$(DEPDIR)/libg_a-debug.Tpo libc/libg/$(DEPDIR)/libg_a-debug.Po
@@ -10172,6 +10324,20 @@ kernel/device/ide_km-ide.obj: kernel/device/ide.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(ide_km_CXXFLAGS) $(CXXFLAGS) -c -o kernel/device/ide_km-ide.obj `if test -f 'kernel/device/ide.cc'; then $(CYGPATH_W) 'kernel/device/ide.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/device/ide.cc'; fi`
 
+user/init/init-init.o: user/init/init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(init_CXXFLAGS) $(CXXFLAGS) -MT user/init/init-init.o -MD -MP -MF user/init/$(DEPDIR)/init-init.Tpo -c -o user/init/init-init.o `test -f 'user/init/init.cc' || echo '$(srcdir)/'`user/init/init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/init/$(DEPDIR)/init-init.Tpo user/init/$(DEPDIR)/init-init.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/init/init.cc' object='user/init/init-init.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(init_CXXFLAGS) $(CXXFLAGS) -c -o user/init/init-init.o `test -f 'user/init/init.cc' || echo '$(srcdir)/'`user/init/init.cc
+
+user/init/init-init.obj: user/init/init.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(init_CXXFLAGS) $(CXXFLAGS) -MT user/init/init-init.obj -MD -MP -MF user/init/$(DEPDIR)/init-init.Tpo -c -o user/init/init-init.obj `if test -f 'user/init/init.cc'; then $(CYGPATH_W) 'user/init/init.cc'; else $(CYGPATH_W) '$(srcdir)/user/init/init.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) user/init/$(DEPDIR)/init-init.Tpo user/init/$(DEPDIR)/init-init.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='user/init/init.cc' object='user/init/init-init.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(init_CXXFLAGS) $(CXXFLAGS) -c -o user/init/init-init.obj `if test -f 'user/init/init.cc'; then $(CYGPATH_W) 'user/init/init.cc'; else $(CYGPATH_W) '$(srcdir)/user/init/init.cc'; fi`
+
 kernel/fs/iso9660_km-iso9660.o: kernel/fs/iso9660.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(iso9660_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/fs/iso9660_km-iso9660.o -MD -MP -MF kernel/fs/$(DEPDIR)/iso9660_km-iso9660.Tpo -c -o kernel/fs/iso9660_km-iso9660.o `test -f 'kernel/fs/iso9660.cc' || echo '$(srcdir)/'`kernel/fs/iso9660.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/fs/$(DEPDIR)/iso9660_km-iso9660.Tpo kernel/fs/$(DEPDIR)/iso9660_km-iso9660.Po
@@ -10311,6 +10477,20 @@ kernel/lib/kernel_asan-cxxexcept.obj: kernel/lib/cxxexcept.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cxxexcept.cc' object='kernel/lib/kernel_asan-cxxexcept.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-cxxexcept.obj `if test -f 'kernel/lib/cxxexcept.cc'; then $(CYGPATH_W) 'kernel/lib/cxxexcept.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cxxexcept.cc'; fi`
+
+kernel/lib/kernel_asan-radix_tree.o: kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-radix_tree.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Tpo -c -o kernel/lib/kernel_asan-radix_tree.o `test -f 'kernel/lib/radix_tree.cc' || echo '$(srcdir)/'`kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Tpo kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/radix_tree.cc' object='kernel/lib/kernel_asan-radix_tree.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-radix_tree.o `test -f 'kernel/lib/radix_tree.cc' || echo '$(srcdir)/'`kernel/lib/radix_tree.cc
+
+kernel/lib/kernel_asan-radix_tree.obj: kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-radix_tree.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Tpo -c -o kernel/lib/kernel_asan-radix_tree.obj `if test -f 'kernel/lib/radix_tree.cc'; then $(CYGPATH_W) 'kernel/lib/radix_tree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/radix_tree.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Tpo kernel/lib/$(DEPDIR)/kernel_asan-radix_tree.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/radix_tree.cc' object='kernel/lib/kernel_asan-radix_tree.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_asan-radix_tree.obj `if test -f 'kernel/lib/radix_tree.cc'; then $(CYGPATH_W) 'kernel/lib/radix_tree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/radix_tree.cc'; fi`
 
 kernel/lib/cc/kernel_asan-algorithm.o: kernel/lib/cc/algorithm.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_asan-algorithm.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_asan-algorithm.Tpo -c -o kernel/lib/cc/kernel_asan-algorithm.o `test -f 'kernel/lib/cc/algorithm.cc' || echo '$(srcdir)/'`kernel/lib/cc/algorithm.cc
@@ -11880,6 +12060,34 @@ kernel/syscall/kernel_asan-sys_process.obj: kernel/syscall/sys_process.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_asan-sys_process.obj `if test -f 'kernel/syscall/sys_process.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_process.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_process.cc'; fi`
 
+kernel/syscall/kernel_asan-sys_module.o: kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_asan-sys_module.o -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Tpo -c -o kernel/syscall/kernel_asan-sys_module.o `test -f 'kernel/syscall/sys_module.cc' || echo '$(srcdir)/'`kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Tpo kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_module.cc' object='kernel/syscall/kernel_asan-sys_module.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_asan-sys_module.o `test -f 'kernel/syscall/sys_module.cc' || echo '$(srcdir)/'`kernel/syscall/sys_module.cc
+
+kernel/syscall/kernel_asan-sys_module.obj: kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_asan-sys_module.obj -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Tpo -c -o kernel/syscall/kernel_asan-sys_module.obj `if test -f 'kernel/syscall/sys_module.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_module.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_module.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Tpo kernel/syscall/$(DEPDIR)/kernel_asan-sys_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_module.cc' object='kernel/syscall/kernel_asan-sys_module.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_asan-sys_module.obj `if test -f 'kernel/syscall/sys_module.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_module.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_module.cc'; fi`
+
+kernel/syscall/kernel_asan-sys_sys.o: kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_asan-sys_sys.o -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Tpo -c -o kernel/syscall/kernel_asan-sys_sys.o `test -f 'kernel/syscall/sys_sys.cc' || echo '$(srcdir)/'`kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Tpo kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_sys.cc' object='kernel/syscall/kernel_asan-sys_sys.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_asan-sys_sys.o `test -f 'kernel/syscall/sys_sys.cc' || echo '$(srcdir)/'`kernel/syscall/sys_sys.cc
+
+kernel/syscall/kernel_asan-sys_sys.obj: kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_asan-sys_sys.obj -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Tpo -c -o kernel/syscall/kernel_asan-sys_sys.obj `if test -f 'kernel/syscall/sys_sys.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_sys.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_sys.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Tpo kernel/syscall/$(DEPDIR)/kernel_asan-sys_sys.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_sys.cc' object='kernel/syscall/kernel_asan-sys_sys.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_asan-sys_sys.obj `if test -f 'kernel/syscall/sys_sys.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_sys.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_sys.cc'; fi`
+
 kernel/kernel_generic-main.o: kernel/main.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/kernel_generic-main.o -MD -MP -MF kernel/$(DEPDIR)/kernel_generic-main.Tpo -c -o kernel/kernel_generic-main.o `test -f 'kernel/main.cc' || echo '$(srcdir)/'`kernel/main.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/$(DEPDIR)/kernel_generic-main.Tpo kernel/$(DEPDIR)/kernel_generic-main.Po
@@ -11991,6 +12199,20 @@ kernel/lib/kernel_generic-cxxexcept.obj: kernel/lib/cxxexcept.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cxxexcept.cc' object='kernel/lib/kernel_generic-cxxexcept.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-cxxexcept.obj `if test -f 'kernel/lib/cxxexcept.cc'; then $(CYGPATH_W) 'kernel/lib/cxxexcept.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cxxexcept.cc'; fi`
+
+kernel/lib/kernel_generic-radix_tree.o: kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-radix_tree.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Tpo -c -o kernel/lib/kernel_generic-radix_tree.o `test -f 'kernel/lib/radix_tree.cc' || echo '$(srcdir)/'`kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Tpo kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/radix_tree.cc' object='kernel/lib/kernel_generic-radix_tree.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-radix_tree.o `test -f 'kernel/lib/radix_tree.cc' || echo '$(srcdir)/'`kernel/lib/radix_tree.cc
+
+kernel/lib/kernel_generic-radix_tree.obj: kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-radix_tree.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Tpo -c -o kernel/lib/kernel_generic-radix_tree.obj `if test -f 'kernel/lib/radix_tree.cc'; then $(CYGPATH_W) 'kernel/lib/radix_tree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/radix_tree.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Tpo kernel/lib/$(DEPDIR)/kernel_generic-radix_tree.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/radix_tree.cc' object='kernel/lib/kernel_generic-radix_tree.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_generic-radix_tree.obj `if test -f 'kernel/lib/radix_tree.cc'; then $(CYGPATH_W) 'kernel/lib/radix_tree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/radix_tree.cc'; fi`
 
 kernel/lib/cc/kernel_generic-algorithm.o: kernel/lib/cc/algorithm.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-algorithm.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-algorithm.Tpo -c -o kernel/lib/cc/kernel_generic-algorithm.o `test -f 'kernel/lib/cc/algorithm.cc' || echo '$(srcdir)/'`kernel/lib/cc/algorithm.cc
@@ -13560,6 +13782,34 @@ kernel/syscall/kernel_generic-sys_process.obj: kernel/syscall/sys_process.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_process.obj `if test -f 'kernel/syscall/sys_process.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_process.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_process.cc'; fi`
 
+kernel/syscall/kernel_generic-sys_module.o: kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_generic-sys_module.o -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Tpo -c -o kernel/syscall/kernel_generic-sys_module.o `test -f 'kernel/syscall/sys_module.cc' || echo '$(srcdir)/'`kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Tpo kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_module.cc' object='kernel/syscall/kernel_generic-sys_module.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_module.o `test -f 'kernel/syscall/sys_module.cc' || echo '$(srcdir)/'`kernel/syscall/sys_module.cc
+
+kernel/syscall/kernel_generic-sys_module.obj: kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_generic-sys_module.obj -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Tpo -c -o kernel/syscall/kernel_generic-sys_module.obj `if test -f 'kernel/syscall/sys_module.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_module.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_module.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Tpo kernel/syscall/$(DEPDIR)/kernel_generic-sys_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_module.cc' object='kernel/syscall/kernel_generic-sys_module.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_module.obj `if test -f 'kernel/syscall/sys_module.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_module.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_module.cc'; fi`
+
+kernel/syscall/kernel_generic-sys_sys.o: kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_generic-sys_sys.o -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Tpo -c -o kernel/syscall/kernel_generic-sys_sys.o `test -f 'kernel/syscall/sys_sys.cc' || echo '$(srcdir)/'`kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Tpo kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_sys.cc' object='kernel/syscall/kernel_generic-sys_sys.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_sys.o `test -f 'kernel/syscall/sys_sys.cc' || echo '$(srcdir)/'`kernel/syscall/sys_sys.cc
+
+kernel/syscall/kernel_generic-sys_sys.obj: kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_generic-sys_sys.obj -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Tpo -c -o kernel/syscall/kernel_generic-sys_sys.obj `if test -f 'kernel/syscall/sys_sys.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_sys.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_sys.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Tpo kernel/syscall/$(DEPDIR)/kernel_generic-sys_sys.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_sys.cc' object='kernel/syscall/kernel_generic-sys_sys.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_generic-sys_sys.obj `if test -f 'kernel/syscall/sys_sys.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_sys.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_sys.cc'; fi`
+
 kernel/kernel_tracing-main.o: kernel/main.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/kernel_tracing-main.o -MD -MP -MF kernel/$(DEPDIR)/kernel_tracing-main.Tpo -c -o kernel/kernel_tracing-main.o `test -f 'kernel/main.cc' || echo '$(srcdir)/'`kernel/main.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/$(DEPDIR)/kernel_tracing-main.Tpo kernel/$(DEPDIR)/kernel_tracing-main.Po
@@ -13671,6 +13921,20 @@ kernel/lib/kernel_tracing-cxxexcept.obj: kernel/lib/cxxexcept.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cxxexcept.cc' object='kernel/lib/kernel_tracing-cxxexcept.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-cxxexcept.obj `if test -f 'kernel/lib/cxxexcept.cc'; then $(CYGPATH_W) 'kernel/lib/cxxexcept.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cxxexcept.cc'; fi`
+
+kernel/lib/kernel_tracing-radix_tree.o: kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-radix_tree.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Tpo -c -o kernel/lib/kernel_tracing-radix_tree.o `test -f 'kernel/lib/radix_tree.cc' || echo '$(srcdir)/'`kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/radix_tree.cc' object='kernel/lib/kernel_tracing-radix_tree.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-radix_tree.o `test -f 'kernel/lib/radix_tree.cc' || echo '$(srcdir)/'`kernel/lib/radix_tree.cc
+
+kernel/lib/kernel_tracing-radix_tree.obj: kernel/lib/radix_tree.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-radix_tree.obj -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Tpo -c -o kernel/lib/kernel_tracing-radix_tree.obj `if test -f 'kernel/lib/radix_tree.cc'; then $(CYGPATH_W) 'kernel/lib/radix_tree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/radix_tree.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Tpo kernel/lib/$(DEPDIR)/kernel_tracing-radix_tree.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/radix_tree.cc' object='kernel/lib/kernel_tracing-radix_tree.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/kernel_tracing-radix_tree.obj `if test -f 'kernel/lib/radix_tree.cc'; then $(CYGPATH_W) 'kernel/lib/radix_tree.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/radix_tree.cc'; fi`
 
 kernel/lib/cc/kernel_tracing-algorithm.o: kernel/lib/cc/algorithm.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-algorithm.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-algorithm.Tpo -c -o kernel/lib/cc/kernel_tracing-algorithm.o `test -f 'kernel/lib/cc/algorithm.cc' || echo '$(srcdir)/'`kernel/lib/cc/algorithm.cc
@@ -15240,6 +15504,34 @@ kernel/syscall/kernel_tracing-sys_process.obj: kernel/syscall/sys_process.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_tracing-sys_process.obj `if test -f 'kernel/syscall/sys_process.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_process.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_process.cc'; fi`
 
+kernel/syscall/kernel_tracing-sys_module.o: kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_tracing-sys_module.o -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Tpo -c -o kernel/syscall/kernel_tracing-sys_module.o `test -f 'kernel/syscall/sys_module.cc' || echo '$(srcdir)/'`kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Tpo kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_module.cc' object='kernel/syscall/kernel_tracing-sys_module.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_tracing-sys_module.o `test -f 'kernel/syscall/sys_module.cc' || echo '$(srcdir)/'`kernel/syscall/sys_module.cc
+
+kernel/syscall/kernel_tracing-sys_module.obj: kernel/syscall/sys_module.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_tracing-sys_module.obj -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Tpo -c -o kernel/syscall/kernel_tracing-sys_module.obj `if test -f 'kernel/syscall/sys_module.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_module.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_module.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Tpo kernel/syscall/$(DEPDIR)/kernel_tracing-sys_module.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_module.cc' object='kernel/syscall/kernel_tracing-sys_module.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_tracing-sys_module.obj `if test -f 'kernel/syscall/sys_module.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_module.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_module.cc'; fi`
+
+kernel/syscall/kernel_tracing-sys_sys.o: kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_tracing-sys_sys.o -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Tpo -c -o kernel/syscall/kernel_tracing-sys_sys.o `test -f 'kernel/syscall/sys_sys.cc' || echo '$(srcdir)/'`kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Tpo kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_sys.cc' object='kernel/syscall/kernel_tracing-sys_sys.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_tracing-sys_sys.o `test -f 'kernel/syscall/sys_sys.cc' || echo '$(srcdir)/'`kernel/syscall/sys_sys.cc
+
+kernel/syscall/kernel_tracing-sys_sys.obj: kernel/syscall/sys_sys.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/syscall/kernel_tracing-sys_sys.obj -MD -MP -MF kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Tpo -c -o kernel/syscall/kernel_tracing-sys_sys.obj `if test -f 'kernel/syscall/sys_sys.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_sys.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_sys.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Tpo kernel/syscall/$(DEPDIR)/kernel_tracing-sys_sys.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/syscall/sys_sys.cc' object='kernel/syscall/kernel_tracing-sys_sys.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/syscall/kernel_tracing-sys_sys.obj `if test -f 'kernel/syscall/sys_sys.cc'; then $(CYGPATH_W) 'kernel/syscall/sys_sys.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/syscall/sys_sys.cc'; fi`
+
 kernel/device/keyb8042_km-keyb8042.o: kernel/device/keyb8042.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(keyb8042_km_CXXFLAGS) $(CXXFLAGS) -MT kernel/device/keyb8042_km-keyb8042.o -MD -MP -MF kernel/device/$(DEPDIR)/keyb8042_km-keyb8042.Tpo -c -o kernel/device/keyb8042_km-keyb8042.o `test -f 'kernel/device/keyb8042.cc' || echo '$(srcdir)/'`kernel/device/keyb8042.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/device/$(DEPDIR)/keyb8042_km-keyb8042.Tpo kernel/device/$(DEPDIR)/keyb8042_km-keyb8042.Po
@@ -15690,6 +15982,8 @@ distclean-generic:
 	-rm -f libc/src/sys/ioctl/$(am__dirstamp)
 	-rm -f libc/src/sys/mman/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/sys/mman/$(am__dirstamp)
+	-rm -f libc/src/sys/module/$(DEPDIR)/$(am__dirstamp)
+	-rm -f libc/src/sys/module/$(am__dirstamp)
 	-rm -f libc/src/sys/socket/$(DEPDIR)/$(am__dirstamp)
 	-rm -f libc/src/sys/socket/$(am__dirstamp)
 	-rm -f libc/src/unistd/$(DEPDIR)/$(am__dirstamp)
@@ -15702,6 +15996,8 @@ distclean-generic:
 	-rm -f user/bin/dhcpclient/$(am__dirstamp)
 	-rm -f user/bin/ls/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/bin/ls/$(am__dirstamp)
+	-rm -f user/init/$(DEPDIR)/$(am__dirstamp)
+	-rm -f user/init/$(am__dirstamp)
 	-rm -f user/shell/$(DEPDIR)/$(am__dirstamp)
 	-rm -f user/shell/$(am__dirstamp)
 	-rm -f user/test/$(DEPDIR)/$(am__dirstamp)
@@ -15718,7 +16014,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-local \
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/libg/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/new/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/libkm/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/libg/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/new/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/module/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/libkm/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/init/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-local distclean-tags
@@ -15766,7 +16062,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/libg/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/new/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/libkm/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
+	-rm -rf boot/$(DEPDIR) kernel/$(DEPDIR) kernel/arch/x86_64/$(DEPDIR) kernel/arch/x86_64/cpu/$(DEPDIR) kernel/device/$(DEPDIR) kernel/device/keyb8042_layout/$(DEPDIR) kernel/fs/$(DEPDIR) kernel/lib/$(DEPDIR) kernel/lib/cc/$(DEPDIR) kernel/net/$(DEPDIR) kernel/syscall/$(DEPDIR) libc/cxx/$(DEPDIR) libc/cxx/abi/$(DEPDIR) libc/libg/$(DEPDIR) libc/math/$(DEPDIR) libc/src/assert/$(DEPDIR) libc/src/dirent/$(DEPDIR) libc/src/errno/$(DEPDIR) libc/src/fcntl/$(DEPDIR) libc/src/new/$(DEPDIR) libc/src/posix_spawn/$(DEPDIR) libc/src/stdio/$(DEPDIR) libc/src/stdio/bits/$(DEPDIR) libc/src/stdlib/$(DEPDIR) libc/src/string/$(DEPDIR) libc/src/sys/$(DEPDIR) libc/src/sys/ioctl/$(DEPDIR) libc/src/sys/mman/$(DEPDIR) libc/src/sys/module/$(DEPDIR) libc/src/sys/socket/$(DEPDIR) libc/src/unistd/$(DEPDIR) mbr/$(DEPDIR) modules/libkm/$(DEPDIR) user/bin/dhcpclient/$(DEPDIR) user/bin/ls/$(DEPDIR) user/init/$(DEPDIR) user/shell/$(DEPDIR) user/test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 

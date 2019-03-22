@@ -22,3 +22,4 @@ src/assert
 libg
 /home/doug/cross-elf/lib/gcc/x86_64-elf/7.3.0/include
 src/new
+src/sys/module

@@ -1,3 +1,4 @@
+init/init.cc
 user64.ld
 bin/dhcpclient/main.cc
 bin/ls/ls.cc

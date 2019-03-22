@@ -37,6 +37,10 @@ private:
         size_t file_ofs = 0;
         uint32_t name_hash = 0;
         uint32_t file_sz = 0;
+        uint32_t mtime = 0;
+        uint16_t ino = 0;
+        uint16_t mode = 0;
+        uint16_t nlink = 0;
     };
 
     struct cpio_hdr_t {
@@ -98,39 +102,35 @@ private:
         }
     } _packed;
 
-    bool add(char const *name, size_t name_size,
-             void const *file_data, size_t file_size)
-    {
-        file_t file{};
-        file.file_ofs = (char*)file_data - st;
-        file.name_ofs = names.size();
-        file.name_sz = name_size;
-        file.file_sz = file_size;
-        file.name_hash = likely(name_size) ? hash_32(name, name_size - 1) : 0;
-
-        for (size_t i = 0; i < name_size; ++i) {
-            if (unlikely(!names.push_back(name[i])))
-                return false;
-        }
-
-        if (unlikely(!files.push_back(file)))
-            return false;
-
-        return true;
-    }
-
     cpio_hdr_t const *add(cpio_hdr_t const *hdr)
     {
         if (unlikely(hdr->magic != 0x71c7))
             return nullptr;
 
-        if (likely(add(hdr->name(), hdr->namesize,
-                       hdr->data(), hdr->filesize()))) {
-            TMPFS_TRACE("added %s\n", hdr->name());
-            return hdr->next(en);
+        file_t file{};
+        file.file_ofs = (char*)hdr->data() - st;
+        file.name_ofs = names.size();
+        file.name_sz = hdr->namesize;
+        file.file_sz = hdr->filesize();
+        file.name_hash = likely(hdr->namesize)
+                ? hash_32(hdr->name(), hdr->namesize - 1)
+                : 0;
+        file.ino = hdr->ino;
+        file.mode = hdr->mode;
+        file.mtime = hdr->mtime();
+        file.nlink = hdr->nlink;
+
+        char const *name = hdr->name();
+        for (size_t i = 0, e = hdr->namesize; i < e; ++i) {
+            if (unlikely(!names.push_back(name[i])))
+                return nullptr;
         }
 
-        return nullptr;
+        if (unlikely(!files.push_back(file)))
+            return nullptr;
+
+        TMPFS_TRACE("added %s\n", hdr->name());
+        return hdr->next(en);
     }
 
     std::vector<file_t> files;
@@ -330,7 +330,6 @@ int tmpfs_fs_t::open(fs_file_info_t **fi,
     if (unlikely(flags & (O_CREAT | O_TRUNC)))
         return -int(errno_t::EROFS);
 
-    // Including the null terminator
     size_t path_len = strlen(path);
 
     auto name_hash = hash_32(path, path_len);
@@ -341,7 +340,7 @@ int tmpfs_fs_t::open(fs_file_info_t **fi,
         if (file.name_hash == name_hash &&
                 file.name_sz == path_len + 1 &&
                 !memcmp(name, path, path_len)) {
-            std::unique_ptr<tmpfs_file_t> file(new tmpfs_file_t);
+            std::unique_ptr<tmpfs_file_t> file(new tmpfs_file_t{});
             file->file_index = index;
             *fi = file.release();
             return 0;
@@ -371,7 +370,7 @@ ssize_t tmpfs_fs_t::read(fs_file_info_t *fi, char *buf,
     auto file = static_cast<tmpfs_file_t*>(fi);
     auto const& file_info = files[file->file_index];
 
-    if (offset > file_info.file_sz)
+    if (offset >= file_info.file_sz)
         return 0;
 
     off_t avail = off_t(file_info.file_sz) - offset;
@@ -385,7 +384,10 @@ ssize_t tmpfs_fs_t::read(fs_file_info_t *fi, char *buf,
     if (unlikely(offset < 0))
         return -int(errno_t::EINVAL);
 
-    memcpy(buf, st + file_info.file_ofs + offset, size);
+    if (mm_is_user_range(buf, size))
+        mm_copy_user(buf, st + file_info.file_ofs + offset, size);
+    else
+        memcpy(buf, st + file_info.file_ofs + offset, size);
 
     return size;
 }
@@ -413,9 +415,22 @@ int tmpfs_fs_t::ftruncate(fs_file_info_t *fi, off_t offset)
 
 int tmpfs_fs_t::fstat(fs_file_info_t *fi, fs_stat_t *st)
 {
-    (void)fi;
-    (void)st;
-    return -int(errno_t::ENOSYS);
+    auto file = static_cast<tmpfs_file_t*>(fi);
+    auto const& file_info = files[file->file_index];
+    *st = {};
+    st->st_ino = file_info.ino;
+    st->st_mode = file_info.mode;
+    st->st_nlink = file_info.nlink;
+    st->st_uid = 0;
+    st->st_gid = 0;
+    st->st_rdev = 0;
+    st->st_size = file_info.file_sz;
+    st->st_blksize = 512;
+    st->st_blocks = file_info.file_sz >> 9;
+    st->st_atime = file_info.mtime;
+    st->st_mtime = file_info.mtime;
+    st->st_ctime = file_info.mtime;
+    return 0;
 }
 
 //

@@ -262,7 +262,7 @@ static isr_context_t *eainst_intr_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-_no_instrument
+_hot _no_instrument
 static void eainst_write_record(trace_item const& item)
 {
     if (unlikely(!trace_queue_counts))
@@ -379,7 +379,7 @@ void eainst_set_cpu_count(int count)
     atomic_st_rel(&eainst_flush_ready, 1);
 }
 
-_no_instrument
+_hot _no_instrument
 void __cyg_profile_func_enter(void *this_fn, void * /*call_site*/)
 {
     trace_item item;
@@ -393,7 +393,7 @@ void __cyg_profile_func_enter(void *this_fn, void * /*call_site*/)
     eainst_write_record(item);
 }
 
-_no_instrument
+_hot _no_instrument
 void __cyg_profile_func_exit(void *this_fn, void * /*call_site*/)
 {
     trace_item item;

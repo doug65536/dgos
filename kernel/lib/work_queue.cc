@@ -18,6 +18,7 @@ void workq::init(int cpu_count)
 
 EXPORT void workq_impl::enqueue(workq_work *work)
 {
+    cpu_scoped_irq_disable irq_dis;
     scoped_lock lock(queue_lock);
     enqueue_locked(work, lock);
 }

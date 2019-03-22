@@ -8,6 +8,8 @@
 #include "syscall/sys_mem.h"
 #include "syscall/sys_time.h"
 #include "syscall/sys_process.h"
+#include "syscall/sys_module.h"
+#include "syscall/sys_sys.h"
 
 long sys_unimplemented()
 {
@@ -195,17 +197,17 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_umount2,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_swapon,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_swapoff,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_reboot,
+    (syscall_handler_t*)(void*)sys_reboot,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_sethostname,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_setdomainname,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_iopl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_ioperm,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_create_module,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_init_module,
+    (syscall_handler_t*)(void*)sys_init_module,
     // 0xB0
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_delete_module,
+    (syscall_handler_t*)(void*)sys_delete_module,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_get_kernel_syms,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_query_module,
+    (syscall_handler_t*)(void*)sys_query_module,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_quotactl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_nfsservctl,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_getpmsg,
@@ -348,7 +350,7 @@ syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_process_vm_readv,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_process_vm_writev,
     (syscall_handler_t*)(void*)sys_unimplemented,//sys_kcmp,
-    (syscall_handler_t*)(void*)sys_unimplemented,//sys_finit_module
+    (syscall_handler_t*)(void*)sys_unimplemented,//sys_finit_module,
     (syscall_handler_t*)(void*)sys_unimplemented//sys_fexecve
 };
 

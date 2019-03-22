@@ -75,8 +75,10 @@ public:
 
     unique_mmap& operator=(unique_mmap const&) = delete;
 
-    bool mmap(void *__addr, size_t __sz, int __prot = PROT_READ | PROT_WRITE,
-              int __flags = MAP_UNINITIALIZED, int __fd = -1, off_t __ofs = 0)
+    bool mmap(void *__addr, size_t __sz,
+              int __prot = PROT_READ | PROT_WRITE,
+              int __flags = MAP_UNINITIALIZED,
+              int __fd = -1, off_t __ofs = 0)
     {
         reset();
 

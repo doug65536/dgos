@@ -1,4 +1,3 @@
-
 #include "cpu.h"
 #include "mm.h"
 #include "mmu.h"
@@ -85,7 +84,17 @@ static void cpu_init_bsp()
     cpu_init(0);
 }
 
-void cpu_init(int)
+_noreturn
+void cpu_init_ap()
+{
+    cpu_init_early(1);
+    cpu_init(1);
+    apic_init(1);
+    thread_init(1);
+    __builtin_unreachable();
+}
+
+void cpu_init(int ap)
 {
     cpu_cr0_change_bits(
                 // TS = 0 (No task switch pending)
@@ -246,18 +255,6 @@ void cpu_hw_init(int ap)
     //printk("Enabling IRQs\n");
 }
 
-static void cpu_init_smp_apic(void *)
-{
-    cpu_init(1);
-
-    printdbg("AP in cpu_init_smp_apic\n");
-    apic_init(1);
-
-    thread_init(1);
-}
-
-REGISTER_CALLOUT(cpu_init_smp_apic, nullptr, callout_type_t::smp_start, "200");
-
 void cpu_patch_insn(void *addr, uint64_t value, size_t size)
 {
     return cpu_patch_code(addr, &value, size);
@@ -375,4 +372,19 @@ void cpu_init_late_msrs()
     workq::enqueue_on_all_barrier([=] (size_t) {
         cpu_init_late_msrs_one_cpu();
     });
+}
+
+EXPORT bool arch_irq_disable()
+{
+    return cpu_irq_save_disable();
+}
+
+EXPORT void arch_irq_enable()
+{
+    cpu_irq_enable();
+}
+
+EXPORT void arch_irq_toggle(bool en)
+{
+    cpu_irq_toggle(en);
 }

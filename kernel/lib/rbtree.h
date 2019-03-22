@@ -362,13 +362,13 @@ public:
                     {
                         // Right Left Case     (see figure 5)
                         // Double rotation: Right(Z) then Left(X)
-                        _N = __rotate_RightLeft(_X, _Z);
+                        _N = __rotate_rightleft(_X, _Z);
                     }
                     else
                     {
                         // Right Right Case    (see figure 4)
                         // Single rotation Left(X)
-                        _N = __rotate_Left(_X, _Z);
+                        _N = __rotate_left(_X, _Z);
                     }
                     // After rotation adapt parent link
                 } else {
@@ -450,11 +450,11 @@ public:
                     if (__b < 0)
                         // Right Left Case     (see figure 5)
                         // Double rotation: Right(Z) then Left(X)
-                        _N = __rotate_RightLeft(_X, _Z);
+                        _N = __rotate_rightleft(_X, _Z);
                     else
                         // Right Right Case    (see figure 4)
                         // Single rotation Left(X)
-                        _N = __rotate_Left(_X, _Z);
+                        _N = __rotate_left(_X, _Z);
 
                     // After rotation adapt parent link
                 } else {
@@ -520,7 +520,7 @@ public:
         // the height of the total tree decreases by 1.
     }
 
-    static _T *__rotate_RightLeft(_T *_X, _T *_Z)
+    static _T *__rotate_rightleft(_T *_X, _T *_Z)
     {
         _T *_Y, *__t3, *__t2;
 
@@ -638,7 +638,7 @@ public:
         return _Z;
     }
 
-    static _T *__rotate_Left(_T *_X, _T *_Z)
+    static _T *__rotate_left(_T *_X, _T *_Z)
     {
         // Z is by 2 higher than its sibling
 
@@ -1163,6 +1163,7 @@ private:
             bool is_lt = _Compare()(k, item);
             bool is_gt = _Compare()(item, k);
 
+            // Break when equal
             if (unlikely((is_lt | is_gt) == 0))
                 break;
 
@@ -1268,8 +1269,8 @@ private:
         node_t *n = root;
 
         if (n) {
-            while (n->left)
-                n = n->left;
+            while (n->right)
+                n = n->right;
         }
         return n;
     }
@@ -1279,13 +1280,45 @@ public:
     {
         basic_set chk;
 
-        for (_T i = 0; i < 100; ++i)
+        assert(chk.find(-1) == chk.end());
+
+        for (_T i = 0; i < 97; ++i)
         {
-            chk.insert(i);
+            pair<iterator,bool> ins_it = chk.insert(i);
+            assert(ins_it.second);
+            assert(*ins_it.first == i);
 
+            // Make sure every record is still found
+            for (_T c = 0; c <= i; ++c) {
+                auto it = chk.find(c);
+                assert(it != chk.end() && *it == c);
+            }
+
+            assert(chk.find(-1) == chk.end());
+            assert(chk.find(i+1) == chk.end());
+        }
+
+
+        for (_T& i : chk)
+        {
+            printdbg("%d\n", i);
+        }
+
+        for (_T i = 0; i < 97; ++i)
+        {
             auto it = chk.find(i);
-
             chk.erase(it);
+        }
+
+        for (_T& i : chk)
+        {
+            printdbg("%d\n", i);
+        }
+
+        // Make sure every record is not found
+        for (_T c = 0; c <= 97; ++c) {
+            auto it = chk.find(c);
+            assert(it == chk.end());
         }
 
         for (_T& i : chk)
@@ -1307,21 +1340,6 @@ __END_NAMESPACE_STD
 
 template<typename _Tkey = uintptr_t, typename _Tval = uintptr_t>
 class rbtree_t {
-private:
-    struct __node_t;
-
-    template<typename _U>
-    static int default_cmp(_U const& __lhs, _U const& __rhs, void*)
-    {
-        if (__lhs.key < __rhs.key)
-            return -1;
-
-        if (__rhs.key < __lhs.key)
-            return 1;
-
-        return 0;
-    }
-
 public:
     using key_type = _Tkey;
     using value_type = _Tval;
@@ -1399,6 +1417,19 @@ private:
     };
 
     C_ASSERT(sizeof(__node_t) == 32);
+
+    struct __node_t;
+
+    static int default_cmp(kvp_t const* __lhs, kvp_t const* __rhs, void*)
+    {
+        if (__lhs->key < __rhs->key)
+            return -1;
+
+        if (__rhs->key < __lhs->key)
+            return 1;
+
+        return 0;
+    }
 
     void insert_case1(iter_t __n);
     void insert_case2(iter_t __n);
@@ -1808,7 +1839,7 @@ template<typename _Tkey, typename _Tval>
 rbtree_t<_Tkey,_Tval> &
 rbtree_t<_Tkey,_Tval>::init()
 {
-    return init(default_cmp<_Tkey>, nullptr);
+    return init(default_cmp, nullptr);
 }
 
 template<typename _Tkey, typename _Tval>
@@ -1976,32 +2007,26 @@ typename rbtree_t<_Tkey,_Tval>::kvp_t *
 rbtree_t<_Tkey,_Tval>::find(kvp_t *__kvp, iter_t *__iter)
 {
     iter_t n = __root;
-    iter_t next;
-    int cmp_result = -1;
+    iter_t __next;
+    int __cmp_result = -1;
 
-    for (; n; n = next) {
-        __node_t const *node = _NODE(n);
+    for (; n; n = __next) {
+        __node_t const *__node = _NODE(n);
 
-        cmp_result = __cmp(__kvp, &node->__kvp, __cmp_param);
+        __cmp_result = __cmp(__kvp, &__node->__kvp, __cmp_param);
 
-        if (cmp_result == 0)
+        if (unlikely(__cmp_result == 0))
             break;
 
-        if (cmp_result < 0)
-            next = node->__left;
-        else
-            next = node->__right;
+        __next = __cmp_result < 0 ? __node->__left : __node->__right;
 
-        if (!next)
+        if (unlikely(!__next))
             break;
     }
 
-    if (__iter)
-        *__iter = n;
-    else
-        *__iter = 0;
+    *__iter = __iter ? n : 0;
 
-    return cmp_result ? nullptr : &_NODE(n)->__kvp;
+    return __cmp_result ? nullptr : &_NODE(n)->__kvp;
 }
 
 template<typename _Tkey, typename _Tval>

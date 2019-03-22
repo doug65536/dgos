@@ -57,7 +57,6 @@ EXPORT void mutex_init(mutex_t *mutex)
 {
     mutex->owner = -1;
     mutex->lock = 0;
-    mutex->noyield_waiting = 0;
     mutex->spin_count = spincount_mask &
             (SPINCOUNT_MIN + ((SPINCOUNT_MAX-SPINCOUNT_MIN)>>1));
     mutex->link.next = &mutex->link;
@@ -93,22 +92,20 @@ EXPORT void mutex_lock(mutex_t *mutex)
 
     for (int spin = 0; ; pause(), ++spin) {
         // Spin outside lock until spin limit
-        if (spin < mutex->spin_count &&
-                (mutex->owner >= 0 || mutex->noyield_waiting))
+        if (spin < mutex->spin_count && mutex->owner >= 0)
             continue;
 
         // Lock the mutex to acquire it or manipulate wait chain
         spinlock_lock(&mutex->lock);
 
         // Check again inside lock
-        if (spin < mutex->spin_count &&
-                (mutex->owner >= 0 || mutex->noyield_waiting)) {
+        if (spin < mutex->spin_count && mutex->owner >= 0) {
             // Racing thread beat us, go back to spinning outside lock
             spinlock_unlock(&mutex->lock);
             continue;
         }
 
-        if (mutex->owner < 0 && !mutex->noyield_waiting) {
+        if (mutex->owner < 0) {
             // Take ownership
             mutex->owner = thread_get_id();
 
@@ -175,38 +172,6 @@ EXPORT void mutex_unlock(mutex_t *mutex)
                      mutex->owner);
         mutex->owner = -1;
         spinlock_unlock(&mutex->lock);
-    }
-}
-
-EXPORT void mutex_lock_noyield(mutex_t *mutex)
-{
-    thread_t tid = thread_get_id();
-    int noyield_stored = 0;
-
-    for (bool done = false; ; pause()) {
-        if (noyield_stored && mutex->owner >= 0)
-            continue;
-
-        spinlock_lock(&mutex->lock);
-
-        if (mutex->noyield_waiting != tid && mutex->noyield_waiting == 0) {
-            mutex->noyield_waiting = tid;
-            noyield_stored = 1;
-        }
-
-        if (mutex->owner < 0) {
-            mutex->owner = thread_get_id();
-
-            if (noyield_stored)
-                mutex->noyield_waiting = 0;
-
-            done = true;
-        }
-
-        spinlock_unlock(&mutex->lock);
-
-        if (done)
-            break;
     }
 }
 
@@ -583,18 +548,6 @@ protected:
     mutex_t *mutex;
 };
 
-struct condvar_mutex_noyield_t : public condvar_mutex_t {
-    condvar_mutex_noyield_t(mutex_t *mutex)
-        : condvar_mutex_t(mutex)
-    {
-    }
-
-    _always_inline void lock()
-    {
-        mutex_lock_noyield(mutex);
-    }
-};
-
 template<typename T>
 static void condvar_wait_ex(condition_var_t *var, T& lock_upd)
 {
@@ -650,14 +603,6 @@ EXPORT void condvar_wait(condition_var_t *var, mutex_t *mutex)
 {
     assert(mutex->owner == thread_get_id());
     condvar_mutex_t state(mutex);
-    condvar_wait_ex(var, state);
-}
-
-EXPORT void condvar_wait_noyield(condition_var_t *var,
-                                 mutex_t *mutex)
-{
-    condvar_mutex_noyield_t state(mutex);
-    assert(mutex->owner >= 0);
     condvar_wait_ex(var, state);
 }
 

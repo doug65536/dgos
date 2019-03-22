@@ -107,7 +107,8 @@ public:
 
 private:
     template<typename T>
-    void *commit(T &p) {
+    void *commit(T &p)
+    {
         p = (T)alloc_phys(PAGE_SIZE).base;
         if (!p)
             return nullptr;

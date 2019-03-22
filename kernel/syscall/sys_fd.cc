@@ -199,7 +199,7 @@ off_t sys_lseek(int fd, off_t ofs, int whence)
     if (unlikely(id < 0))
         return badf_err();
 
-    int pos = file_seek(id, ofs, whence);
+    off_t pos = file_seek(id, ofs, whence);
     if (likely(pos >= 0))
         return pos;
 
@@ -350,11 +350,14 @@ int sys_dup2(int oldfd, int newfd)
 
 int sys_open(char const* pathname, int flags, mode_t mode)
 {
+    char kpathname[256];
+    mm_copy_user_str(kpathname, pathname, sizeof(kpathname));
+
     process_t *p = fast_cur_process();
 
     int fd = p->ids.desc_alloc.alloc();
 
-    int id = file_open(pathname, flags, mode);
+    int id = file_open(kpathname, flags, mode);
 
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;

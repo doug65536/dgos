@@ -1,110 +1,73 @@
 ENTRY(_start)
 
+/*
 PHDRS {
-	/* 4 = read */
-	/* 5 = 4+1 = read+execute */
-	/* 6 = 4+2 = read+write */
-	read PT_LOAD FILEHDR PHDRS FLAGS(4);
-	tls PT_TLS FLAGS(4);
+	hdr PT_PHDR FLAGS(0);
+	read PT_LOAD FLAGS(4);
+	tls PT_TLS FLAGS(0);
 	exec PT_LOAD FLAGS(5);
 	writ PT_LOAD FLAGS(6);
-}
+}*/
 
 SECTIONS {
-	. = 0x400000;
-
 	PROVIDE_HIDDEN(__image_start = .);
 
-	/* Align for transition from r-x to r-- permission */
-	. += SIZEOF_HEADERS;
-
-	.rodata : {
+	.rodata 0x400000 : {
+		. = . + SIZEOF_HEADERS;
 		PROVIDE_HIDDEN(__rodata_start = .);
 		*(.rodata)
 		*(.rodata.*)
 		*(.tm_clone_table)
 		PROVIDE_HIDDEN(__rodata_end = .);
-	} :read
+	} /*:read*/ /*:hdr*/
 
 	.eh_frame : {
 		*(.eh_frame)
-	} :read
+	} /*:read*/
 
 	.rela.got : {
 		*(.rela.got)
-	} :read
+	}
 
 	.rela.dyn : {
 		*(.rela.dyn)
-	} :read
+	}
 
 	.rela.text : {
 		*(.rela.text)
-	} :read
-
-	.got : {
-		*(.got)
-	} :read
-
-	.got.plt : {
-		*(.got.plt)
-	} :read
-
-	.igot.plt : {
-		*(.igot.plt)
-	} :read
+	}
 
 	/* 64-bit align */
-	. = ALIGN(8);
-
-	.init_array : {
+	.init_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__init_array_start = .);
 		*(.init_array)
 		*(SORT_BY_INIT_PRIORITY(.init_array.*))
 		PROVIDE_HIDDEN(__init_array_end = .);
-	} :read
+	}
 
 	/* 64-bit align */
-	. = ALIGN(8);
-
-	.fini_array : {
+	.fini_array ALIGN(8) : {
 		PROVIDE_HIDDEN(__fini_array_start = .);
 		KEEP(*(.fini_array))
 		KEEP(*(SORT_BY_INIT_PRIORITY(.fnit_array.*)))
 		PROVIDE_HIDDEN(__fini_array_end = .);
-	} :read
+	}
 
 	.gcc_except_table : {
 		*(.gcc_except_table .gcc_except_table.*)
-	} :read
+	}
 
 	.gnu_extab : {
 		*(.gnu_extab*)
-	} :read
-
-	.tdata : {
-		PROVIDE_HIDDEN(___tdata_st = .);
-		*(.tdata)
-		*(.tdata.*)
-		PROVIDE_HIDDEN(___tdata_en = .);
-	} :tls
-
-	.tbss (NOLOAD) : {
-		PROVIDE_HIDDEN(___tbss_st = .);
-		*(.tbss)
-		*(.tbss.*)
-		PROVIDE_HIDDEN(___tbss_en = .);
-	} :tls
+	}
 
 	/* Align for transition from r-- to r-x permission */
-	. = ALIGN(4K);
-
-	.text : {
+	.text ALIGN(4096) : {
 		PROVIDE_HIDDEN(__text_start = .);
 		*(.text)
 		*(.text.*)
 		PROVIDE_HIDDEN(__text_end = .);
-	} :exec
+	} /*:exec*/
 
 	.rela.plt : {
 		PROVIDE_HIDDEN(__plt_start = .);
@@ -117,38 +80,60 @@ SECTIONS {
 		*(.rela.iplt)
 		*(.rela.iplt.*)
 		PROVIDE_HIDDEN(__rela_iplt_end = .);
-	} :exec
+	}
 
 	/* Align for transition from r-x to rw- permission */
-	. = ALIGN(4K);
-
-	.data : {
+	.data ALIGN(4096) : {
 		PROVIDE_HIDDEN(___data_st = .);
 		*(.data)
 		*(.data.*)
 		PROVIDE_HIDDEN(___data_en = .);
-	} :writ
+	} /*:writ*/
+
+	.got : {
+		*(.got)
+	}
+
+	.got.plt : {
+		*(.got.plt)
+	}
+
+	.igot.plt : {
+		*(.igot.plt)
+	}
+
+	.tdata : {
+		PROVIDE_HIDDEN(___tdata_st = .);
+		*(.tdata .tdata.* .gnu.linkonce.td.*)
+		PROVIDE_HIDDEN(___tdata_en = .);
+	} /*:read*/ /*:tls*/
+
+	.tbss (NOLOAD) : {
+		PROVIDE_HIDDEN(___tbss_st = .);
+		*(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon)
+		PROVIDE_HIDDEN(___tbss_en = .);
+	} /*:tls*/
 
 	.bss (NOLOAD) : {
 		PROVIDE_HIDDEN(___bss_st = .);
 		*(.bss)
 		*(.bss.*)
 		PROVIDE_HIDDEN(___bss_en = .);
-	} :writ
+	}
 
 	. = ALIGN(4K);
 
 	PROVIDE_HIDDEN(__image_end = .);
 
-	.debug          0 : { *(.debug)         }
-	.debug_info		0 : { *(.debug_info)    }
-	.debug_abbrev	0 : { *(.debug_abbrev)  }
-	.debug_aranges	0 : { *(.debug_aranges) }
-	.debug_ranges	0 : { *(.debug_ranges)  }
-	.debug_frame	0 : { *(.debug_frame)   }
-	.debug_macro	0 : { *(.debug_macro)   }
-	.debug_line		0 : { *(.debug_line)    }
-	.debug_str		0 : { *(.debug_str)     }
-	.debug_loc		0 : { *(.debug_loc)     }
-	.comment        0 : { *(.comment)       }
+	.debug          (NOLOAD) : { *(.debug)         } /*:NONE*/
+	.debug_info		(NOLOAD) : { *(.debug_info)    } /*:NONE*/
+	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  } /*:NONE*/
+	.debug_aranges	(NOLOAD) : { *(.debug_aranges) } /*:NONE*/
+	.debug_ranges	(NOLOAD) : { *(.debug_ranges)  } /*:NONE*/
+	.debug_frame	(NOLOAD) : { *(.debug_frame)   } /*:NONE*/
+	.debug_macro	(NOLOAD) : { *(.debug_macro)   } /*:NONE*/
+	.debug_line		(NOLOAD) : { *(.debug_line)    } /*:NONE*/
+	.debug_str		(NOLOAD) : { *(.debug_str)     } /*:NONE*/
+	.debug_loc		(NOLOAD) : { *(.debug_loc)     } /*:NONE*/
+	.comment        (NOLOAD) : { *(.comment)       } /*:NONE*/
 }

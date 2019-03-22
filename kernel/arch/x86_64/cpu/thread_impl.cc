@@ -23,6 +23,7 @@
 #include "mutex.h"
 #include "except.h"
 #include "rbtree.h"
+#include "work_queue.h"
 
 // Implements platform independent thread.h
 
@@ -244,6 +245,10 @@ struct alignas(128) cpu_info_t {
 
     unsigned reserved;
 
+    // Cleanup to be run after switching stacks on a context switch
+    void (*after_csw_fn)(void*);
+    void *after_csw_vp;
+
     void *storage[8];
 
     rbtree_t<uint64_t, uint64_t> ready_list;
@@ -332,9 +337,13 @@ static _always_inline thread_info_t *this_thread()
     return cpu_gs_read<thread_info_t*, offsetof(cpu_info_t, cur_thread)>();
 }
 
+extern "C" void thread_yield_fast();
+
 EXPORT void thread_yield()
 {
 #if 1
+    thread_yield_fast();
+#elif 1
     __asm__ __volatile__ (
         // Emulate behavior of software interrupt instruction
         // int is a serializing instruction
@@ -415,8 +424,7 @@ static char *thread_allocate_stack(
     char *stack;
     stack = (char*)mmap(nullptr, stack_guard_size +
                         stack_size + stack_guard_size,
-                        PROT_READ | PROT_WRITE,
-                        MAP_UNINITIALIZED | MAP_NOCOMMIT, -1, 0);
+                        PROT_READ | PROT_WRITE, MAP_NOCOMMIT, -1, 0);
 
     THREAD_STK_TRACE("Allocated %s stack"
                      ", size=%#zx"
@@ -424,14 +432,14 @@ static char *thread_allocate_stack(
                      ", filled=%d\n",
                      noun, stack_size, tid, fill);
 
+    //
     // Guard pages
-    madvise(stack, stack_guard_size, MADV_DONTNEED);
+
+    // Mark guard region address ranges
     mprotect(stack, stack_guard_size, PROT_NONE);
-    madvise(stack + stack_guard_size + stack_size,
-            stack_guard_size, MADV_DONTNEED);
     mprotect(stack + stack_guard_size + stack_size,
              stack_guard_size, PROT_NONE);
-    madvise(stack + stack_guard_size, stack_size, MADV_WILLNEED);
+    madvise(stack + stack_guard_size, stack_size, MADV_DONTNEED);
 
     THREAD_TRACE("Thread %d %s stack range=%p-%p,"
                  " stack=%p-%p\n", tid, noun,
@@ -448,6 +456,21 @@ static char *thread_allocate_stack(
     return stack;
 }
 
+static void thread_gc()
+{
+    for (size_t i = 0; i < thread_count; ++i) {
+        if (likely(threads[i].state != THREAD_IS_FINISHED))
+            continue;
+
+        if (unlikely(atomic_cmpxchg(&threads[i].state, THREAD_IS_FINISHED,
+                                    THREAD_IS_FINISHED_BUSY) !=
+                     THREAD_IS_FINISHED))
+            continue;
+
+        thread_destruct(threads + i);
+    }
+}
+
 // Returns threads array index or 0 on error
 // Minimum allowable stack space is 4KB
 static thread_t thread_create_with_state(
@@ -455,6 +478,8 @@ static thread_t thread_create_with_state(
         thread_state_t state, thread_cpu_mask_t const &affinity,
         thread_priority_t priority, bool user)
 {
+    thread_gc();
+
     if (stack_size == 0)
         stack_size = 32768;
     else if (stack_size < 16384)
@@ -550,7 +575,7 @@ static thread_t thread_create_with_state(
 
     ISR_CTX_REG_SS(ctx) = GDT_SEL_KERNEL_DATA;
 
-    ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF;
+    ISR_CTX_REG_RFLAGS(ctx) = CPU_EFLAGS_IF | CPU_EFLAGS_ALWAYS;
 
     ISR_CTX_REG_RIP(ctx) = thread_fn_t(uintptr_t(thread_startup));
 
@@ -583,7 +608,7 @@ static thread_t thread_create_with_state(
     thread->ctx = ctx;
 
     atomic_barrier();
-    thread->state = state;
+    atomic_st_rel(&thread->state, state);
 
     // Atomically make sure thread_count > i
     atomic_max(&thread_count, i + 1);
@@ -638,6 +663,8 @@ static int smp_idle_thread(void *)
     atomic_inc(&thread_smp_running);
     thread_check_stack();
 
+    cpu_irq_enable();
+
     thread_idle();
 }
 
@@ -647,12 +674,6 @@ void thread_idle()
     assert(cpu_irq_is_enabled());
     for(;;)
         halt();
-}
-
-// Software interrupt handler to explicitly yield
-static isr_context_t *thread_yield_handler(int, isr_context_t *ctx)
-{
-    return thread_schedule(ctx);
 }
 
 // Hardware interrupt handler (an IPI) to provoke other CPUs to reschedule
@@ -707,9 +728,6 @@ void thread_init(int ap)
             // Initialize every thread ID so pointer tricks aren't needed
             threads[i].thread_id = i;
         }
-
-        // Hook handler that performs a voluntary reschedule
-        intr_hook(INTR_THREAD_YIELD, thread_yield_handler, "sw_yield");
 
         // Hook handler that performs a reschedule requested by another CPU
         intr_hook(INTR_IPI_RESCHED, thread_ipi_resched, "hw_ipi_resched");
@@ -807,19 +825,18 @@ static thread_info_t *thread_choose_next(
 
         candidate = threads + i;
 
-        // Quickly ignore running threads
+        // Quickly ignore running and suspended threads threads
         if (candidate->state == THREAD_IS_RUNNING ||
-                candidate->state == THREAD_IS_UNINITIALIZED)
+                candidate->state == THREAD_IS_SUSPENDED ||
+                candidate->state == THREAD_IS_UNINITIALIZED ||
+                candidate->state == THREAD_IS_EXITING)
             continue;
 
         // Garbage collect destructing threads
         if (unlikely(candidate->state == THREAD_IS_DESTRUCTING)) {
-            if (atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
-                               THREAD_IS_EXITING) == THREAD_IS_DESTRUCTING) {
-                // We acquired the exclusive ability to cleanup the thread
-                thread_destruct(candidate);
-                continue;
-            }
+            atomic_cmpxchg(&candidate->state, THREAD_IS_DESTRUCTING,
+                           THREAD_IS_EXITING);
+            continue;
         }
 
         // If this thread is not allowed to run on this CPU
@@ -899,6 +916,9 @@ static void thread_free_stacks(thread_info_t *thread)
     char *stk;
     size_t stk_sz;
 
+    assert(thread->state == THREAD_IS_EXITING ||
+           thread->state == THREAD_IS_FINISHED);
+
     // The user stack
     if (thread->stack != nullptr && thread->stack_size > 0) {
         stk = thread->stack - thread->stack_size - stack_guard_size;
@@ -920,7 +940,7 @@ static void thread_free_stacks(thread_info_t *thread)
 
     // The xsave stack
     if (thread->flags & THREAD_FLAGS_USES_FPU) {
-        stk = thread->xsave_stack - stack_guard_size - xsave_stack_size;
+        stk = thread->xsave_stack - xsave_stack_size - stack_guard_size;
         stk_sz = stack_guard_size + xsave_stack_size + stack_guard_size;
         thread->xsave_stack = nullptr;
         thread->flags &= ~THREAD_FLAGS_USES_FPU;
@@ -929,7 +949,7 @@ static void thread_free_stacks(thread_info_t *thread)
                          ", addr=%#zx"
                          ", size=%#zx"
                          ", tid=%d\n",
-                         "FPU", uintptr_t(stk),
+                         "xsave", uintptr_t(stk),
                          stk_sz, thread->thread_id);
 
         assert(stk != nullptr);
@@ -941,7 +961,7 @@ static void thread_free_stacks(thread_info_t *thread)
 static void thread_signal_completion(thread_info_t *thread)
 {
     // Wake up any threads waiting for this thread to exit ASAP
-    mutex_lock_noyield(&thread->lock);
+    mutex_lock(&thread->lock);
     thread->state = THREAD_IS_FINISHED;
     mutex_unlock(&thread->lock);
     condvar_wake_all(&thread->done_cond);
@@ -949,7 +969,7 @@ static void thread_signal_completion(thread_info_t *thread)
 
 // Thread is not running anymore, destroy things only needed when it runs
 void thread_destruct(thread_info_t *thread)
-{
+{\
     cpu_scoped_irq_disable irq_dis;
 
     thread_signal_completion(thread);
@@ -957,7 +977,7 @@ void thread_destruct(thread_info_t *thread)
     thread_free_stacks(thread);
 
     // If everybody has closed their handle to this thread,
-    // then mark it for recycling
+    // then mark it for recycling immediately
     if (thread->ref_count == 0) {
         mutex_destroy(&thread->lock);
         atomic_st_rel(&thread->state, THREAD_IS_UNINITIALIZED);
@@ -982,12 +1002,6 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     cpu_info_t *cpu = this_cpu();
 
-    // Defer reschedule if locks are held
-    if (unlikely(cpu->locks_held)) {
-        cpu->csw_deferred = true;
-        return ctx;
-    }
-
     thread_info_t *thread = cpu->cur_thread;
 
     thread_info_t * const outgoing = thread;
@@ -1002,6 +1016,12 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
         return ctx;
     }
 
+    // Defer reschedule if locks are held
+    if (unlikely(cpu->locks_held)) {
+        cpu->csw_deferred = true;
+        return ctx;
+    }
+
     // Store context pointer for resume later
     assert(thread->ctx == nullptr);
     thread->ctx = ctx;
@@ -1011,8 +1031,12 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
     thread->used_time += elapsed;
 
+    //
     // Accumulate used and busy time on this CPU
+
     cpu->time_ratio += elapsed;
+    // Time spent in idle thread is not considered busy even though technically it
+    // was probably very busy executing a halt continuously
     cpu->busy_ratio += elapsed & -(thread->thread_id >= int(cpu_count));
 
     // Normalize ratio to < 32768
@@ -1103,11 +1127,8 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     assert(ctx->gpr.s.r[3] == (GDT_SEL_USER_DATA | 3));
 
     if (thread != outgoing) {
-        // Add outgoing cleanup data at top of context
-        isr_resume_context_t *cleanup = &ctx->resume;
-
-        cleanup->cleanup = thread_clear_busy;
-        cleanup->cleanup_arg = outgoing;
+        cpu->after_csw_fn = thread_clear_busy;
+        cpu->after_csw_vp = outgoing;
     } else {
         assert(thread->state == THREAD_IS_RUNNING);
     }
@@ -1154,6 +1175,9 @@ EXPORT uint64_t thread_get_usage(int id)
 void thread_suspend_release(spinlock_t *lock, thread_t *thread_id)
 {
     thread_info_t *thread = this_thread();
+
+    // Idle threads should never try to block and context switch!
+    assert(thread->thread_id >= thread_t(cpu_count));
 
     *thread_id = thread->thread_id;
 
@@ -1462,8 +1486,7 @@ void thread_exit(int exit_code)
     thread_info_t *info = this_thread();
     thread_t tid = info - threads;
     info->exit_code = exit_code;
-    if (info->process->del_thread(tid))
-        info->state = THREAD_IS_EXITING_BUSY;
+    info->process->del_thread(tid);
     thread_cleanup();
 }
 

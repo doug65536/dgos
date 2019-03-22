@@ -1177,7 +1177,7 @@ isr_context_t *ide_if_t::ide_chan_t::irq_handler(int irq, isr_context_t *ctx)
 
 void ide_if_t::ide_chan_t::irq_handler()
 {
-    mutex_lock_noyield(&lock);
+    mutex_lock(&lock);
     io_done = 1;
     io_status = inb(ata_reg_cmd::STATUS);
     mutex_unlock(&lock);
