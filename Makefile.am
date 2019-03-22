@@ -2220,6 +2220,10 @@ $(foreach rt,$(QL_RT), \
 	) \
 )
 
+debug-tcg: debug-smp-bios-hd-gpt-nvme-tcg
+
+.PHONY: debug-tcg
+
 # ----------------------------------------------------------------------------
 # Bochs launcher
 

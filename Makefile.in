@@ -16690,6 +16690,10 @@ $(foreach rt,$(QL_RT), \
 	) \
 )
 
+debug-tcg: debug-smp-bios-hd-gpt-nvme-tcg
+
+.PHONY: debug-tcg
+
 # 1=media, 2=fw, 3=part
 define bochs_launcher =
 $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
