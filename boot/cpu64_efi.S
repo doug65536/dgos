@@ -2,7 +2,7 @@
 #include "gdt_sel.h"
 
 .code64
-.section .smp.text
+.section .smp.text, "ax"
 
 // extern "C" _noreturn void code64_run_kernel(
 //      uint64_t entry, void *params, uint64_t cr3, bool nx_available)

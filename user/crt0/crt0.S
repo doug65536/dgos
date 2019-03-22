@@ -2,7 +2,7 @@
 
 #include <sys/cpu_bug.h>
 
-.section .text
+.section .text, "ax"
 
 .global _start
 _start:
@@ -84,11 +84,11 @@ _start:
 
 	.cfi_endproc
 
-//.section .init_st
+//.section .init_st, "ax"
 //    pushq %rbp
 //    movq %rsp,%rbp
 //
-//.section .init_en
+//.section .init_en, "ax"
 //    movq %rbp,%rsp
 //    popq %rbp
 //    ret

@@ -1,6 +1,6 @@
 
 .code64
-.section .text.code64
+.section .text.code64, "ax"
 
 // void code64_run_kernel(void *p);
 // void code64_reloc_kernel(void *p);

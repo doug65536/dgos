@@ -194,7 +194,7 @@ bsp_init:
 
     .cfi_endproc
 
-.section .data
+.section .data, "aw"
 
 .align 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
@@ -234,7 +234,7 @@ early_tss:
     .space 8*8
 early_tss_end:
 
-.section .text
+.section .text, "ax"
 .align 16
 .global exit
 .hidden exit
@@ -290,7 +290,7 @@ __cxa_pure_virtual:
 __cxa_atexit:
     ret
 
-.section .rodata
+.section .rodata, ""
 pure_call_message:
     .string "Pure virtual function called"
 

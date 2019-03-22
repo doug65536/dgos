@@ -1,5 +1,5 @@
 .code64
-.section .text
+.section .text, "x"
 
 // Load segments 256,000,000 times from top of stack
 // old way 136 cycles

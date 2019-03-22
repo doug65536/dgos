@@ -33,12 +33,12 @@
 
 #define UNRELOCATED(n) (n)-0xF000+0x7C00
 
-.section .head
+.section .head, "x"
 .global entry
 entry:
     ljmp $0,$ UNRELOCATED(past_bpb)
 
-.section .code
+.section .code, "x"
 past_bpb:
     cli
 
@@ -166,5 +166,5 @@ ddp: .space ddp_length
 
 .byte 0xEE
 
-.section .uninit
+.section .uninit, ""
 

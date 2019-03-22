@@ -79,12 +79,16 @@ struct alignas(8) kernel_params_t {
     ptr64_t<vbe_info_t> vbe_info;
     //ptr64_t<vbe_mode_info_t> vbe_mode_info;
     ptr64_t<vbe_selected_mode_t> vbe_selected_mode;
+    // 3 * 8 bytes
     boottbl_acpi_info_t acpi_rsdt;
+    // 8 bytes
     boottbl_mptables_info_t mptables;
     boottbl_nodes_info_t numa;
+    // 4 * 8 bytes
     uint64_t boot_drv_serial;
     uint64_t initrd_st;
     uint64_t initrd_sz;
+    // 64
     uint8_t wait_gdb;
     uint8_t serial_debugout;
     uint8_t reserved[6];

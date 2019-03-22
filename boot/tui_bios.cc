@@ -7,7 +7,7 @@ extern char __int15_handler[];
 extern "C" far_ptr_t __int15_old;
 
 __asm__(
-".section .early\n"
+".section .early, \"wx\"\n"
 ".code16\n"
 ".align 16\n"
 ".global __int15_handler\n"
@@ -21,7 +21,7 @@ __asm__(
 "__int15_old:\n"
 ".space 4\n"
 ".code32\n"
-".section .text\n"
+".section .text, \"wx\"\n"
 );
 
 _constructor(ctor_console) void init_console()

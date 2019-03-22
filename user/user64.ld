@@ -17,9 +17,12 @@ SECTIONS {
 		PROVIDE_HIDDEN(__rodata_start = .);
 		*(.rodata)
 		*(.rodata.*)
-		*(.tm_clone_table)
 		PROVIDE_HIDDEN(__rodata_end = .);
 	} /*:read*/ /*:hdr*/
+
+	.tm_clone_table : {
+		*(.tm_clone_table)
+	}
 
 	.eh_frame : {
 		*(.eh_frame)
@@ -35,22 +38,6 @@ SECTIONS {
 
 	.rela.text : {
 		*(.rela.text)
-	}
-
-	/* 64-bit align */
-	.init_array ALIGN(8) : {
-		PROVIDE_HIDDEN(__init_array_start = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE_HIDDEN(__init_array_end = .);
-	}
-
-	/* 64-bit align */
-	.fini_array ALIGN(8) : {
-		PROVIDE_HIDDEN(__fini_array_start = .);
-		KEEP(*(.fini_array))
-		KEEP(*(SORT_BY_INIT_PRIORITY(.fnit_array.*)))
-		PROVIDE_HIDDEN(__fini_array_end = .);
 	}
 
 	.gcc_except_table : {
@@ -89,6 +76,22 @@ SECTIONS {
 		*(.data.*)
 		PROVIDE_HIDDEN(___data_en = .);
 	} /*:writ*/
+
+	/* 64-bit align */
+	.init_array ALIGN(8) : {
+		PROVIDE_HIDDEN(__init_array_start = .);
+		*(.init_array)
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		PROVIDE_HIDDEN(__init_array_end = .);
+	}
+
+	/* 64-bit align */
+	.fini_array ALIGN(8) : {
+		PROVIDE_HIDDEN(__fini_array_start = .);
+		KEEP(*(.fini_array))
+		KEEP(*(SORT_BY_INIT_PRIORITY(.fnit_array.*)))
+		PROVIDE_HIDDEN(__fini_array_end = .);
+	}
 
 	.got : {
 		*(.got)

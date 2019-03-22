@@ -1,7 +1,7 @@
 #include "gdt_sel.h"
 #include "gdt_macros.h"
 
-.section .data
+.section .data, "aw"
 
 .global gdt
 .global gdtr

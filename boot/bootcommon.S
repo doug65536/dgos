@@ -1,6 +1,6 @@
 #include "gdt_sel.h"
 
-.section .early
+.section .early, "wx"
 .code16
 
 // Return address in bx
@@ -323,7 +323,7 @@ cpu_a20_wait:
 1:  jmp 0b
 .code16
 
-.section .early
+.section .early, "wx"
 
 .global clear_bss
 clear_bss:
@@ -347,10 +347,10 @@ clear_bss:
 __cxa_atexit:
     ret
 
-.section .bss
+.section .bss, "aw"
 cpu_a20_chk: .space 1
 
-.section .early
+.section .early, "wx"
 
 .global __dso_handle
 __dso_handle:

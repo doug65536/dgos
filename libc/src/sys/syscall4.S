@@ -1,5 +1,5 @@
 .code64
-.section .text
+.section .text, "ax"
 
 //extern long syscall4(long p0, long p1, long p2, long p3,
 //                     long num);

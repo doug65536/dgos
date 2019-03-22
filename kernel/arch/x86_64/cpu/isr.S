@@ -56,11 +56,11 @@ isr_entry_st:
 
 .macro isr_section_name num
     .if \num < 10
-        .section .text.isr.00\num
+        .section .text.isr.00\num, "x"
     .elseif \num < 100
-        .section .text.isr.0\num
+        .section .text.isr.0\num, "x"
     .else
-        .section .text.isr.\num
+        .section .text.isr.\num, "x"
     .endif
 .endm
 
@@ -398,7 +398,7 @@ isr_entry 0 253
 isr_entry 0 254
 isr_entry 0 255
 
-.section .text.isr
+.section .text.isr, "ax"
 
 .macro isr_common_init_cfa
      // Initial CFA using raw stack pointer
@@ -1075,7 +1075,7 @@ load_fs_gs_slow:
 .endm
 
 // Branch directly to appropriate save/restore
-.section .text.isr
+.section .text.isr, "ax"
 
 .align 16
 .global isr_save_fpu_ctx
@@ -1399,11 +1399,11 @@ cs_enter_asm:
     ret
     .cfi_endproc
 
-.section .rodata, "a"
+.section .rodata, ""
 .Lpanic_msg:
 .asciz "Counter out of range"
 
-.section .text.isr
+.section .text.isr, "ax"
 
 // Retpoline. Works on the principle that the return stack overrides other
 // branch prediction information. Cause it to mispredict into a pause loop
@@ -1432,7 +1432,7 @@ __x86_indirect_thunk_\reg:
     make_retpoline_thunk \reg
 .endr
 
-.section .rodata, "a"
+.section .rodata, ""
 .align 8
 
 // Pointers to patch points

@@ -1,5 +1,5 @@
 .code64
-.section .text
+.section .text, "ax"
 
 //extern long syscall1(long p0, long num);
 .global syscall1

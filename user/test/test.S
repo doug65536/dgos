@@ -1,7 +1,7 @@
 #include <sys/syscall_num.h>
 
 .code64
-.section .text
+.section .text, "ax"
 
 .global main
 main:

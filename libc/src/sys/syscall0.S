@@ -1,5 +1,5 @@
 .code64
-.section .text
+.section .text, "ax"
 
 //extern long syscall0(long num);
 .align 16

@@ -16,7 +16,7 @@
 #define ZEROBASED(n) n - 0x1000
 
 // This is linked at the beginning of the binary
-.section .head
+.section .head, "wx"
 .global entry
 entry:
     // Jump to the unrelocated "entry_start"
@@ -119,7 +119,7 @@ relocate:
 relocate_end:
 
 // This is linked after head
-.section .early
+.section .early, "wx"
 reloc_entry:
     callw clear_bss
     
@@ -169,7 +169,7 @@ load_done:	// utility label for placing debugger breakpoint
 boot_drive:
     .byte 0
 
-.section .bss
+.section .bss, "aw"
 dap:
     .space dap_length
     
