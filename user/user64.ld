@@ -24,6 +24,10 @@ SECTIONS {
 		*(.tm_clone_table)
 	}
 
+	.eh_frame_hdr : {
+		*(.eh_frame_hdr)
+	} /*:read*/
+
 	.eh_frame : {
 		*(.eh_frame)
 	} /*:read*/
@@ -128,15 +132,15 @@ SECTIONS {
 
 	PROVIDE_HIDDEN(__image_end = .);
 
-	.debug          (NOLOAD) : { *(.debug)         } /*:NONE*/
-	.debug_info		(NOLOAD) : { *(.debug_info)    } /*:NONE*/
-	.debug_abbrev	(NOLOAD) : { *(.debug_abbrev)  } /*:NONE*/
-	.debug_aranges	(NOLOAD) : { *(.debug_aranges) } /*:NONE*/
-	.debug_ranges	(NOLOAD) : { *(.debug_ranges)  } /*:NONE*/
-	.debug_frame	(NOLOAD) : { *(.debug_frame)   } /*:NONE*/
-	.debug_macro	(NOLOAD) : { *(.debug_macro)   } /*:NONE*/
-	.debug_line		(NOLOAD) : { *(.debug_line)    } /*:NONE*/
-	.debug_str		(NOLOAD) : { *(.debug_str)     } /*:NONE*/
-	.debug_loc		(NOLOAD) : { *(.debug_loc)     } /*:NONE*/
-	.comment        (NOLOAD) : { *(.comment)       } /*:NONE*/
+	.debug          0 : { *(.debug)         } /*:NONE*/
+	.debug_info		0 : { *(.debug_info)    } /*:NONE*/
+	.debug_abbrev	0 : { *(.debug_abbrev)  } /*:NONE*/
+	.debug_aranges	0 : { *(.debug_aranges) } /*:NONE*/
+	.debug_ranges	0 : { *(.debug_ranges)  } /*:NONE*/
+	.debug_frame	0 : { *(.debug_frame)   } /*:NONE*/
+	.debug_macro	0 : { *(.debug_macro)   } /*:NONE*/
+	.debug_line		0 : { *(.debug_line)    } /*:NONE*/
+	.debug_str		0 : { *(.debug_str)     } /*:NONE*/
+	.debug_loc		0 : { *(.debug_loc)     } /*:NONE*/
+	.comment        0 : { *(.comment)       } /*:NONE*/
 }

@@ -839,6 +839,8 @@ static _always_inline void cpu_wait_masked(
 {
     if (cpuid_has_mwait()) {
         while (is_equal != ((atomic_ld_acq(value) & mask) == wait_value)) {
+            pause();
+
             cpu_monitor(value, 0, 0);
 
             if (is_equal != ((atomic_ld_acq(value) & mask) == wait_value))
@@ -861,6 +863,8 @@ static _always_inline void cpu_wait_unmasked(
 {
     if (cpuid_has_mwait()) {
         while (is_equal != (atomic_ld_acq(value) == wait_value)) {
+            pause();
+
             cpu_monitor(value, 0, 0);
 
             if (is_equal != (atomic_ld_acq(value) == wait_value))

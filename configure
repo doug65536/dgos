@@ -7812,7 +7812,7 @@ done
 
 COMPILER_FLAGS=
 for flag in \
-		std=c++14 fno-fat-lto-objects g gdwarf-4 \
+		std=c++14 fno-fat-lto-objects g gdwarf-2 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
@@ -7965,7 +7965,7 @@ fi
 done
 
 DEBUG_INFO_FLAGS=
-for flag in ggdb3 gcolumn-info
+for flag in g gcolumn-info
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8008,7 +8008,7 @@ done
 
 
 ASM_DEBUG_INFO_FLAGS=
-for flag in Wa,-g g gdwarf-3 gcolumn-info
+for flag in Wa,-g g gdwarf-2 gcolumn-info
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8307,11 +8307,13 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
+	Wl,--eh-frame-hdr \
 	Wl,-z,max-page-size=4096 \
 	Wl,-z,separate-code \
 	Wl,-z,relro \
 	Wl,-z,now \
-	Wl,--relax
+	Wl,--relax \
+	Wl,-g
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5

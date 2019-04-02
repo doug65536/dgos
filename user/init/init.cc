@@ -2,15 +2,19 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 __thread int testtls = 42;
 
+__attribute__((__format__(__printf__, 1, 0), __noreturn__))
 void verr(char const *format, va_list ap)
 {
     printf("Error:\n");
     vprintf(format, ap);
+    exit(1);
 }
 
+__attribute__((__format__(__printf__, 1, 2), __noreturn__))
 void err(char const *format, ...)
 {
     va_list ap;
@@ -49,13 +53,34 @@ void load_module(char const *path)
 
 int main(int argc, char **argv, char **envp)
 {
+    // fixme: check ACPI
     load_module("keyb8042.km");
-    load_module("usbxhci.km");
+
+    if (probe_pci_for(-1, -1,
+                      PCI_DEV_CLASS_SERIAL,
+                      PCI_SUBCLASS_SERIAL_USB,
+                      PCI_PROGIF_SERIAL_USB_XHCI) > 0)
+        load_module("usbxhci.km");
+
     load_module("fat32.km");
     load_module("iso9660.km");
-    load_module("nvme.km");
-    load_module("ahci.km");
-    load_module("ide.km");
+
+    if (probe_pci_for(-1, -1,
+                      PCI_DEV_CLASS_STORAGE,
+                      PCI_SUBCLASS_STORAGE_NVM,
+                      PCI_PROGIF_STORAGE_NVM_NVME) > 0)
+        load_module("nvme.km");
+    if (probe_pci_for(-1, -1,
+                      PCI_DEV_CLASS_STORAGE,
+                      PCI_SUBCLASS_STORAGE_SATA,
+                      PCI_PROGIF_STORAGE_SATA_AHCI) > 0)
+        load_module("ahci.km");
+
+    if (probe_pci_for(-1, -1,
+                      PCI_DEV_CLASS_STORAGE,
+                      PCI_SUBCLASS_STORAGE_ATA, -1))
+        load_module("ide.km");
+
     load_module("gpt.km");
     load_module("mbr.km");
     load_module("rtl8139.km");

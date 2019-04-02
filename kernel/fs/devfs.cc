@@ -118,7 +118,7 @@ int dev_fs_t::open(fs_file_info_t **fi, fs_cpath_t path,
     size_t name_hash = dev_fs_file_reg_t::hash(path);
 
     for (dev_fs_file_reg_t *reg : files) {
-        if (reg->name_hash == name_hash) {
+        if (reg->name_hash == name_hash && reg->name == path) {
             *fi = reg->open(flags, mode);
             return 0;
         }

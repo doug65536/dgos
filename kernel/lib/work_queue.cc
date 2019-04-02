@@ -31,6 +31,47 @@ EXPORT void workq_impl::enqueue_locked(workq_work *work, scoped_lock& lock)
     not_empty.notify_one();
 }
 
+void workq_impl::free(workq_work *work)
+{
+    cpu_scoped_irq_disable irq_dis;
+    scoped_lock lock(queue_lock);
+    alloc.free(work);
+}
+
+int workq_impl::worker(void *arg)
+{
+    ((workq_impl*)arg)->worker();
+    return 0;
+}
+
+workq_work *workq_impl::dequeue_work_locked(workq_impl::scoped_lock &lock)
+{
+    while (!head)
+        not_empty.wait(lock);
+    workq_work *item = head;
+    head = item->next;
+    tail = head ? tail : nullptr;
+    return item;
+}
+
+workq_work *workq_impl::dequeue_work()
+{
+    cpu_scoped_irq_disable irq_dis;
+    scoped_lock lock(queue_lock);
+    workq_work *result = dequeue_work_locked(lock);
+    return result;
+}
+
+void workq_impl::worker()
+{
+    for (;;) {
+        workq_work *item = dequeue_work();
+
+        item->invoke();
+        free(item);
+    }
+}
+
 EXPORT void workq_impl::set_affinity(int cpu)
 {
     thread_set_affinity(tid, cpu);
@@ -118,4 +159,15 @@ void workq_alloc::free_slot(size_t i)
 
     // Since we freed one, we know that the bit of level 0 must become 0
     top &= ~(UINT64_C(1) << word);
+}
+
+workq_impl::workq_impl()
+{
+    tid = thread_create(worker, this, 0, false);
+}
+
+workq_impl::~workq_impl()
+{
+    if (tid > 0)
+        thread_close(tid);
 }

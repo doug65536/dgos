@@ -4,6 +4,9 @@
 #include "elf64.h"
 #include "mm.h"
 #include "unique_ptr.h"
+#include "device/pci.h"
+#include "thread.h"
+#include "process.h"
 
 int sys_init_module(const char *module, size_t module_sz,
                     char const *module_name, const char *module_params)
@@ -41,4 +44,21 @@ int sys_query_module(const char *name_user, int which,
 int sys_get_kernel_syms(kernel_sym *table)
 {
     return int(errno_t::ENOSYS);
+}
+
+int sys_probe_pci_for(int32_t vendor, int32_t device, int32_t devclass, int32_t subclass, int32_t prog_if)
+{
+    process_t *proc = thread_current_process();
+
+    if (unlikely(proc->uid != 0))
+        return -int(errno_t::EACCES);
+
+    pci_dev_iterator_t iter;
+    if (pci_enumerate_begin(&iter, devclass, subclass, vendor, devclass)) {
+        do {
+            if (prog_if < 0 || iter.config.prog_if == prog_if)
+                return 1;
+        } while(pci_enumerate_next(&iter));
+    }
+    return 0;
 }

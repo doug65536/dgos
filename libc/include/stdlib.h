@@ -45,7 +45,9 @@ div_t         div(int, int);
 double        drand48(void);
 double        erand48(unsigned short [3]);
 
+__attribute__((__noreturn__))
 void          exit(int);
+
 void          free(void *);
 char         *getenv(char const *);
 

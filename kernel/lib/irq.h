@@ -27,9 +27,17 @@ struct msi_irq_mem_t {
     uintptr_t data;
 };
 
+enum intr_eoi_t : int16_t {
+    eoi_none,
+    eoi_auto,
+    eoi_i8259,
+    eoi_lapic
+};
+
 typedef isr_context_t *(*intr_handler_t)(int intr, isr_context_t*);
 
 typedef void (*irq_setmask_handler_t)(int irq, bool unmask);
+typedef bool (*irq_islevel_handler_t)(int irq);
 typedef void (*irq_hook_handler_t)(int irq, intr_handler_t handler,
                                    char const * name);
 typedef void (*irq_unhook_handler_t)(int irq, intr_handler_t handler);
@@ -45,6 +53,9 @@ typedef void (*irq_unhandled_irq_handler_t)(int intr, int irq);
 
 // Change irq mask
 extern "C" void irq_setmask_set_handler(irq_setmask_handler_t handler);
+
+// Query whether an IRQ is level triggered
+extern "C" void irq_islevel_set_handler(irq_islevel_handler_t handler);
 
 // Set the appropriate interrupt vector for the specified irq
 extern "C" void irq_hook_set_handler(irq_hook_handler_t handler);
@@ -65,8 +76,12 @@ extern "C" void irq_set_unhandled_irq_handler(
 // Change irq mask
 extern "C" void irq_setmask(int irq, bool unmask);
 
+// Change irq mask IF the IRQ is level triggered
+extern "C" bool irq_islevel(int irq);
+
 // Set the appropriate interrupt vector for the specified irq
-extern "C" void irq_hook(int irq, intr_handler_t handler, char const *name);
+extern "C" void irq_hook(int irq, intr_handler_t handler,
+                         char const *name, intr_eoi_t eoi_handler);
 
 // Reset the appropriate interrupt vector for the specified irq
 extern "C" void irq_unhook(int irq, intr_handler_t handler);
@@ -75,7 +90,8 @@ extern "C" void irq_unhook(int irq, intr_handler_t handler);
 // Interrupt vector manipulation and dispatch
 
 // Set interrupt vector
-extern "C" void intr_hook(int intr, intr_handler_t handler, char const *name);
+extern "C" void intr_hook(int intr, intr_handler_t handler,
+                          char const *name, intr_eoi_t eoi_handler);
 
 // Reset interrupt vector
 extern "C" void intr_unhook(int intr, intr_handler_t handler);
@@ -89,7 +105,7 @@ isr_context_t *irq_invoke(int intr, int irq, isr_context_t *ctx);
 // Returns true if there is an interrupt handler for the interrupt
 extern "C" int intr_has_handler(int intr);
 
-int msi_irq_alloc(msi_irq_mem_t *results, int count,
+int irq_msi_alloc(msi_irq_mem_t *results, int count,
                   int cpu, int distribute);
 
 bool irq_setcpu(int irq, int cpu);

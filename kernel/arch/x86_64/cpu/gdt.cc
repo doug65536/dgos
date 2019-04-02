@@ -91,17 +91,22 @@ void gdt_init(int)
 
 static void gdt_set_tss_base(tss_t *base)
 {
-    gdt_entry_combined_t gdt_ent_lo =
-            GDT_MAKE_TSS_DESCRIPTOR(
-                uintptr_t(&base->reserved0),
-                sizeof(*base)-1, 1, 0, 0);
+    if (base) {
+        gdt_entry_combined_t gdt_ent_lo =
+                GDT_MAKE_TSS_DESCRIPTOR(
+                    uintptr_t(&base->reserved0),
+                    sizeof(*base)-1, 1, 0, 0);
 
-    gdt_entry_combined_t gdt_ent_hi =
-            GDT_MAKE_TSS_HIGH_DESCRIPTOR(
-                uintptr_t(&base->reserved0));
+        gdt_entry_combined_t gdt_ent_hi =
+                GDT_MAKE_TSS_HIGH_DESCRIPTOR(
+                    uintptr_t(&base->reserved0));
 
-    gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
-    gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;
+        gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
+        gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;
+    } else {
+        gdt[GDT_SEL_TSS >> 3].raw = 0;
+        gdt[(GDT_SEL_TSS >> 3) + 1].raw = 0;
+    }
 }
 
 void gdt_init_tss(int cpu_count)
@@ -157,7 +162,7 @@ void gdt_init_tss_early()
     gdt_set_tss_base(&early_tss);
     assert(gdt[GDT_SEL_TSS >> 3].mem.get_type() == GDT_TYPE_TSS);
     cpu_tr_set(GDT_SEL_TSS);
-    gdt[GDT_SEL_TSS >> 3].mem.set_type(GDT_TYPE_TSS);
+    gdt[GDT_SEL_TSS >> 3].raw = 0;
 }
 
 void gdt_load_tr(int cpu_number)

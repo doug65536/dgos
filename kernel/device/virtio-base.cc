@@ -122,6 +122,7 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
 
             atomic_fence();
             common_cfg->device_status |= VIRTIO_STATUS_FEATURES_OK;
+
             atomic_fence();
             if (!(common_cfg->device_status & VIRTIO_STATUS_FEATURES_OK)) {
                 // Tell the device we gave up
@@ -231,8 +232,15 @@ isr_context_t *virtio_base_t::irq_handler(int irq, isr_context_t *ctx)
     for (virtio_base_t *dev : virtio_devs) {
         if (irq >= dev->irq_range.base &&
                 irq < dev->irq_range.base + dev->irq_range.count) {
+
+            if (irq_islevel(irq))
+                irq_setmask(irq, false);
+
             workq::enqueue([=] {
                 dev->irq_handler(irq - dev->irq_range.base);
+
+                if (irq_islevel(irq))
+                    irq_setmask(irq, true);
             });
         }
     }
@@ -337,30 +345,34 @@ bool virtio_virtqueue_t::init(
     }
 
     common_cfg->queue_size = 1 << log2_queue_size;
-    assert(common_cfg->queue_size == (1 << log2_queue_size));
 
-    uint64_t addr;
+    uint64_t desc_paddr;
+    desc_paddr = mphysaddr(desc_tab);
+    assert((desc_paddr & -16) == desc_paddr);
+    common_cfg->queue_desc = desc_paddr;
 
-    addr = mphysaddr(desc_tab);
-    assert((addr & -16) == addr);
-    common_cfg->queue_desc = addr;
-    assert(common_cfg->queue_desc == addr);
+    uint64_t avail_paddr;
+    avail_paddr = mphysaddr(avail_hdr);
+    assert((avail_paddr & -2) == avail_paddr);
+    common_cfg->queue_avail = avail_paddr;
 
-    addr = mphysaddr(avail_hdr);
-    assert((addr & -2) == addr);
-    common_cfg->queue_avail = addr;
-    assert(common_cfg->queue_avail == addr);
+    uint64_t used_paddr;
+    used_paddr = mphysaddr(used_hdr);
+    assert((used_paddr & -4) == used_paddr);
 
-    addr = mphysaddr(used_hdr);
-    assert((addr & -4) == addr);
-    common_cfg->queue_used = addr;
-    assert(common_cfg->queue_used == addr);
-
+    common_cfg->queue_used = used_paddr;
     common_cfg->queue_msix_vector = msix_vector;
-    assert(common_cfg->queue_msix_vector == msix_vector);
 
+    // Can't reliably read back anymore until enabled
     common_cfg->queue_enable = 1;
-    assert(common_cfg->queue_enable == 1);
+
+    if (unlikely(!(assert(common_cfg->queue_size == (1 << log2_queue_size)) ||
+                   assert(common_cfg->queue_avail == avail_paddr) ||
+                   assert(common_cfg->queue_desc == desc_paddr) ||
+                   assert(common_cfg->queue_used == used_paddr) ||
+                   assert(common_cfg->queue_msix_vector == msix_vector) ||
+                   assert(common_cfg->queue_enable == 1))))
+        return false;
 
     return true;
 }

@@ -10,3 +10,8 @@ int sys_delete_module(char const *name_user);
 int sys_query_module(char const *name_user, int which, char *buf,
                      size_t bufsize, size_t *ret);
 int sys_get_kernel_syms(struct kernel_sym *table);
+int sys_probe_pci_for(int32_t vendor,
+                      int32_t device,
+                      int32_t devclass,
+                      int32_t subclass,
+                      int32_t prog_if);

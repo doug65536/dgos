@@ -359,4 +359,6 @@ thread_t thread_func_0(int (*fn)());
 _use_result
 thread_t thread_func_1(int (*fn)(void*), void *arg);
 
+thread_t thread_create_irq_handler();
+
 __END_DECLS

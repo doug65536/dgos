@@ -319,7 +319,7 @@ void cpu_patch_nop(void *addr, size_t size)
         size -= insn_sz;
 
         // Place a number of 0x66 prefixes for sizes over 8 bytes
-        if (size > 8) {
+        if (insn_sz > 8) {
             out = std::fill_n(out, insn_sz - 8, 0x66);
             insn_sz = 8;
         }

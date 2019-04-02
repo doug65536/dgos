@@ -1,10 +1,4 @@
 /// pci driver:
-/// C=,
-/// S=,
-/// V=0x1274 (Ensoniq),
-/// D=0x1371 (ES1371)
-///
-/// pci driver:
 /// C=0x4 (MULTIMEDIA),
 /// S=1 (AUDIO),
 /// V=0x1274 (Ensoniq),
@@ -26,7 +20,6 @@ struct es137x_t {
     uint32_t pb1fc;
     uint32_t pb2fc;
     uint32_t rfc;
-    uint32_t
 };
 
 // Startup:

@@ -174,7 +174,7 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects g gdwarf-4 \
+		std=c++14 fno-fat-lto-objects g gdwarf-2 \
 		fno-integrated-as Wno-unused-command-line-argument \
 		Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
@@ -225,7 +225,7 @@ do
 done
 
 AS_VAR_SET([DEBUG_INFO_FLAGS], [])
-for flag in ggdb3 gcolumn-info
+for flag in g gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([DEBUG_INFO_FLAGS], [" -$flag"])],
@@ -234,7 +234,7 @@ done
 AC_SUBST([DEBUG_INFO_FLAGS])
 
 AS_VAR_SET([ASM_DEBUG_INFO_FLAGS], [])
-for flag in Wa,-g g gdwarf-3 gcolumn-info
+for flag in Wa,-g g gdwarf-2 gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ASM_DEBUG_INFO_FLAGS], [" -$flag"])],
@@ -297,11 +297,13 @@ for flag in \
 	fPIE \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
+	Wl,--eh-frame-hdr \
 	Wl,-z,max-page-size=4096 \
 	Wl,-z,separate-code \
 	Wl,-z,relro \
 	Wl,-z,now \
-	Wl,--relax
+	Wl,--relax \
+	Wl,-g
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([USER64_FLAGS], [" -$flag"])]

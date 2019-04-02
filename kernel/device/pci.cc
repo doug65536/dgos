@@ -287,26 +287,39 @@ pci_ecam_t *pci_config_mmio::find_ecam(int bus)
 
 uint32_t pci_config_mmio::read(pci_addr_t addr, size_t offset, size_t size)
 {
-    assert(size <= sizeof(uint32_t));
+    assert((offset & -size) == offset);
 
     int bus = addr.bus();
 
     pci_ecam_t *ent = find_ecam(bus);
 
     if (unlikely(!ent))
-        return ~0;
+        return uint32_t(-1);
 
     uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
-            (addr.func() << 12) + unsigned(offset & -4);
+            (addr.func() << 12) + unsigned(offset);
 
-    uint32_t data = mm_rd(*(uint32_t*)(ent->mapping + ecam_offset));
+    if (likely(size == sizeof(uint32_t)))
+        return mm_rd(*(uint32_t*)(ent->mapping + ecam_offset));
 
-    data >>= (offset & 3) << 3;
+    if (likely(size == sizeof(uint16_t)))
+        return mm_rd(*(uint16_t*)(ent->mapping + ecam_offset));
 
-    if (size != sizeof(uint32_t))
-        data &= ~((uint32_t)-1 << (size << 3));
+    if (likely(size == sizeof(uint8_t)))
+        return mm_rd(*(uint8_t*)(ent->mapping + ecam_offset));
 
-    return data;
+    panic("Nonsense operand size");
+
+//    ecam_offset &= -4;
+
+//    uint32_t data = mm_rd(*(uint32_t*)(ent->mapping + ecam_offset));
+
+//    data >>= (offset & 3) << 3;
+
+//    if (size != sizeof(uint32_t))
+//        data &= ~((uint32_t)-1 << (size << 3));
+
+//    return data;
 }
 
 bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
@@ -737,7 +750,7 @@ EXPORT bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
         pci_set_irq_pin(pci_dev.addr, pci_dev.config.irq_pin);
         pci_set_irq_line(pci_dev.addr, pci_dev.config.irq_line);
 
-        irq_hook(pci_dev.config.irq_line, handler, name);
+        irq_hook(pci_dev.config.irq_line, handler, name, eoi_auto);
         irq_setmask(pci_dev.config.irq_line, true);
     }
 

@@ -881,7 +881,10 @@ static int init_thread(void *)
 //    }
 
     pid_t init_pid = -1;
-    process_t::spawn(&init_pid, "init", nullptr, nullptr);
+    if (unlikely(process_t::spawn(&init_pid, "init", nullptr, nullptr) != 0))
+        panic("spawn init failed!");
+
+    process_t::wait_for_exit(init_pid);
 
     // Facilities needed by drivers
     printk("Initializing driver base\n");

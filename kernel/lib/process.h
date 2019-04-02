@@ -113,6 +113,12 @@ struct auxv_t {
 
 C_ASSERT(sizeof(auxv_t) == sizeof(uintptr_t) * 2);
 
+struct file_mapping_t {
+    void *vaddr;
+    off_t offset;
+    int fd;
+};
+
 struct process_t
 {
     process_t() = default;
@@ -147,6 +153,8 @@ struct process_t
     size_t tls_msize = 0;
     size_t tls_fsize = 0;
     pid_t pid = 0;
+    int uid = 0;
+    int gid = 0;
     using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type process_lock;
@@ -171,9 +179,13 @@ struct process_t
     bool add_thread(thread_t tid);
     bool del_thread(thread_t tid);
 
+    static int wait_for_exit(int pid);
+
 private:
     using thread_list = std::vector<thread_t>;
     thread_list threads;
+
+    std::vector<file_mapping_t> file_maps;
 
     static process_t *lookup(pid_t pid);
 
@@ -181,6 +193,7 @@ private:
     void remove();
     static process_t *add();
     static int start(void *process_arg);
+
     int start();
 };
 

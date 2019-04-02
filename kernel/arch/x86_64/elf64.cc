@@ -17,7 +17,7 @@
 #include "cxxstring.h"
 #include "cpu/control_regs.h"
 
-#define ELF64_DEBUG     1
+#define ELF64_DEBUG     0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) printdbg(__VA_ARGS__)
 #else
@@ -83,7 +83,7 @@ void modload_init(void)
 {
     for (Elf64_Sym const *sym = ___dynsym_st + 1;
          sym < ___dynsym_en; ++sym) {
-        printdbg("addr=%p symbol=%s\n",
+        ELF64_TRACE("addr=%p symbol=%s\n",
                  (void*)sym->st_value,
                  ___dynstr_st + sym->st_name);
     }
@@ -95,6 +95,7 @@ void modload_init(void)
             export_ht.hash_nbucket;
 }
 
+#if ELF64_DEBUG
 static std::string module_reloc_type(size_t sym_type)
 {
     switch (sym_type) {
@@ -122,6 +123,7 @@ static std::string module_reloc_type(size_t sym_type)
     }
     return "Unknown";
 }
+#endif
 
 class module_t {
 public:
@@ -274,19 +276,19 @@ bool module_t::load_image(void const *module, size_t module_sz,
             return 0;
         // If the read is truncated
         if (off_t(sz) > off_t(module_sz) - ofs)
-            sz = module_sz > ofs ? module_sz - ofs : 0;
+            sz = module_sz > uint64_t(ofs) ? module_sz - ofs : 0;
         if (unlikely(!mm_copy_user(buf, (char *)module + ofs, sz)))
             return -int(errno_t::EFAULT);
         return sz;
     };
 
     if (unlikely(sizeof(file_hdr) != pread(&file_hdr, sizeof(file_hdr), 0))) {
-        printdbg("Failed to read module file header\n");
+        printk("Failed to read module file header\n");
         return load_failed();
     }
 
     if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
-        printdbg("Unrecognized program header record size\n");
+        printk("Unrecognized program header record size\n");
         return load_failed();
     }
 
@@ -296,7 +298,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
     if (unlikely(ssize_t(sizeof(Elf64_Phdr) * file_hdr.e_phnum) != pread(
                      phdrs.data(), sizeof(Elf64_Phdr) * file_hdr.e_phnum,
                      file_hdr.e_phoff))) {
-        printdbg("Failed to read %u program headers\n", file_hdr.e_phnum);
+        printk("Failed to read %u program headers\n", file_hdr.e_phnum);
         return load_failed();
     }
 
@@ -550,7 +552,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
             if (sym.st_info == 0)
                 continue;
 
-            printdbg("Fixup at %#zx + %#zx (%#zx), type=%s\n",
+            ELF64_TRACE("Fixup at %#zx + %#zx (%#zx), type=%s\n",
                      uintptr_t(base_adj), uintptr_t(rela_ptr[i].r_offset),
                      base_adj + rela_ptr[i].r_offset,
                      module_reloc_type(sym_type).c_str());
@@ -610,7 +612,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
                     *(int64_t*)operand = value;
                 }
 
-                printdbg("R_AMD64_JUMP_SLOT=%#" PRIx64 ", name=%s\n",
+                ELF64_TRACE("R_AMD64_JUMP_SLOT=%#" PRIx64 ", name=%s\n",
                          value, name);
                 break;
 
@@ -660,7 +662,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
 
 //            case R_AMD64_COPY:  //5
 //                // Refer to the explanation following this table. ???
-//                printdbg("R_AMD64_COPY\n");
+//                ELF64_TRACE("R_AMD64_COPY\n");
 
 //                break;
 
@@ -722,11 +724,11 @@ bool module_t::load_image(void const *module, size_t module_sz,
             // === No operation ===
 
             case R_AMD64_NONE:
-                printdbg("%s\n", type_txt);
+                ELF64_TRACE("%s\n", type_txt);
                 continue;
 
             default:
-                printdbg("Unknown relocation type %#x\n", sym_type);
+                ELF64_TRACE("Unknown relocation type %#x\n", sym_type);
                 cpu_debug_break();
                 break;
 
@@ -762,7 +764,7 @@ int8_common:
 
 uint8_common:
                 *(uint8_t*)operand = uint8_t(value);
-                printdbg("%s=%#" PRIx64 "\n", type_txt, value);
+                ELF64_TRACE("%s=%#" PRIx64 "\n", type_txt, value);
                 if (unlikely(value != uint8_t(value)))
                     goto truncated_common;
                 goto all_common;
@@ -772,12 +774,12 @@ int64_common:
                 goto all_common;
 
 all_common:
-                printdbg("Wrote type=%s, value=%#" PRIx64 " to vaddr=%#zx\n",
+                ELF64_TRACE("Wrote type=%s, value=%#" PRIx64 " to vaddr=%#zx\n",
                          type_txt, value, uintptr_t(operand));
                 break;
 
 truncated_common:
-                printdbg("%s: %s relocation truncated to fit!\n",
+                printk("%s: %s relocation truncated to fit!\n",
                          module_name, type_txt);
                 return load_failed();
             }
@@ -800,8 +802,9 @@ truncated_common:
         prot |= -((phdr.p_flags & PF_R) != 0) & PROT_READ;
         prot |= -((phdr.p_flags & PF_W) != 0) & PROT_WRITE;
         prot |= -((phdr.p_flags & PF_X) != 0) & PROT_EXEC;
-        if (mprotect((void*)(phdr.p_vaddr + base_adj), phdr.p_memsz, prot) != 0)
-            printdbg("mprotect failed\n");
+        if (mprotect((void*)(phdr.p_vaddr + base_adj),
+                     phdr.p_memsz, prot) != 0)
+            printk("mprotect failed\n");
     }
 
     // Find first executable program header
@@ -813,8 +816,8 @@ truncated_common:
         }
     }
 
-    printdbg("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
-    printdbg("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
+    printk("Module %s loaded at %#" PRIx64 "\n", module_name, base_adj);
+    printk("gdb: add-symbol-file %s %#" PRIx64 "\n", module_name, first_exec);
 
     modload_load_symbols(module_name, first_exec);
 

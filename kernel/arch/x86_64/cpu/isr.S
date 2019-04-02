@@ -648,6 +648,7 @@ isr_common:
     mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rdi),%rdi
     indirect_call rax
 .Lno_cleanup_call:
+    xor %eax,%eax
 
     // Pop the pointer to the FPU context
     popq %rdi
@@ -668,7 +669,7 @@ isr_common:
     // Pop segments
     popq %rdx
 
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%r15
+    movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r15
 
     // See if we're not returning to user code
     // Branch past swapgs and restoration of segments if not
@@ -678,7 +679,7 @@ isr_common:
     // ...returning to user code
 
     // Fetch pointer to this CPU's TSS for TSS.RSP0 update
-    movq %gs:CPU_INFO_TSS_PTR_OFS,%rcx
+    movq %gs:CPU_INFO_TSS_PTR_OFS(%rax),%rcx
     leaq frame_end(%rbp),%rax
     movq %rax,TSS_RSP0_OFS(%rcx)
 
@@ -698,7 +699,7 @@ isr_common:
     // load_fs_gs_fast (to use wr(fs|gs)base)
     // rax, rcx, rdx may be clobbered here
     call load_fs_gs_slow
-.Lpatch_fsgsbase_csw_end:
+.Lpatch_load_fsgsbase_csw_end:
 
 .Lreturning_to_kernel:
 
@@ -1210,12 +1211,14 @@ isr_sysret64:
     push_cfi %r15
     .cfi_offset r15,-7*8
 
+    xorl %eax,%eax
+
     mov %rdi,%rcx
     mov $ CPU_EFLAGS_IF | 2,%r11d
 
     // Initialize kernel stack pointer for this thread
     // cpu_info_t *rbx = this_cpu()
-    movq %gs:CPU_INFO_SELF_OFS,%rbx
+    movq %gs:CPU_INFO_SELF_OFS(%rax),%rbx
 
     // tss_t *rdx = rbx->tss_ptr
     movq CPU_INFO_TSS_PTR_OFS(%rbx),%rdx
@@ -1256,7 +1259,7 @@ isr_sysret64:
     cli
     swapgs
     call load_fs_gs_slow
-.Lpatch_fsgsbase_sysret_end:
+.Lpatch_load_fsgsbase_sysret_end:
     mov %rsi,%rsp
     .cfi_undefined rip
     .cfi_undefined rsp
@@ -1310,24 +1313,34 @@ __module_dynlink_plt_thunk:
     // *-------------*
 
     push_cfi $0
+
     pushfq_cfi
     .cfi_offset rflags,-5*8
+
     push_cfi %r11
     .cfi_offset r11,-6*8
+
     push_cfi %r10
     .cfi_offset r10,-7*8
+
     push_cfi %r9
     .cfi_offset r9,-8*8
+
     push_cfi %r8
     .cfi_offset r8,-9*8
+
     push_cfi %rcx
     .cfi_offset rcx,-10*8
+
     push_cfi %rdx
     .cfi_offset rdx,-11*8
+
     push_cfi %rsi
     .cfi_offset rsi,-12*8
+
     push_cfi %rdi
     .cfi_offset rdi,-13*8
+
     push_cfi %rax
     .cfi_offset rax,-14*8
 
@@ -1336,26 +1349,46 @@ __module_dynlink_plt_thunk:
 
     pop_cfi %rax
     .cfi_same_value rax
+
     pop_cfi %rdi
     .cfi_same_value rdi
+
     pop_cfi %rsi
     .cfi_same_value rsi
+
     pop_cfi %rdx
     .cfi_same_value rdx
+
     pop_cfi %rcx
     .cfi_same_value rcx
+
     pop_cfi %r8
     .cfi_same_value r8
+
     pop_cfi %r9
     .cfi_same_value r9
+
     pop_cfi %r10
     .cfi_same_value r10
+
     pop_cfi %r11
     .cfi_same_value r11
+
     popfq_cfi
     .cfi_same_value rflags
+
     // The ret is going to mispredict, minimize dispatch of incorrect path
+    // The return stack is not correct
     lfence
+
+    // "return" is really tail calling to the entry point of the dynamically
+    // linked function that has been written to the GOT for next time.
+    // This pops the return address from the stack, then adds 16 to rsp.
+    // 16 to throw away the two things the PLT stub pushed that told us
+    // the PLT index to which function we're lazy linking and gave us
+    // an opaque callback context pointer
+    // The CPU lands on the dynamically linked function with CPU registers
+    // precisely as they were when the caller called the function
     retq $16
 
     .cfi_endproc
@@ -1366,17 +1399,17 @@ __module_dynlink_plt_thunk:
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
-    decl %gs:CPU_INFO_LOCKS_HELD_OFS
+    decl %gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
     jb .Lpanic
     jnz .Lreturn
 
     // Making it here means we just left the outermost critical section
-    cmpl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS
+    cmpl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS(%rax)
     jz .Lreturn
 
 .Lis_deferred_csw:
     // Making it here means a context switch was deferred, reset flag
-    movl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS
+    movl %eax,%gs:CPU_INFO_CSW_DEFERRED_OFS(%rax)
 
     // Tail call
     jmp thread_yield
@@ -1393,7 +1426,8 @@ cs_leave_asm:
 .global cs_enter_asm
 cs_enter_asm:
     .cfi_startproc
-    incl %gs:CPU_INFO_LOCKS_HELD_OFS
+    xor %eax,%eax
+    incl %gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
     jz .Lpanic
 .Lreturn:
     ret
@@ -1446,11 +1480,22 @@ sse_context_save:
 sse_context_restore:
     .quad .Lsse_context_restore_jmp
 
+// Expects r13=user_fsbase, r14=user_gsbase
+//.hidden save_fsgsbase_range
+//.global save_fsgsbase_range
+//save_fsgsbase_range:
+//    // Implementations
+//    .quad save_fs_gs_fast
+//    // Patch points
+//    .quad .Lpatch_fsgsbase_
+//    .quad .Lpatch_fsgsbase_
+
+// Table to patch code to use fast fsgs code
 .hidden load_fsgsbase_range
 .global load_fsgsbase_range
 load_fsgsbase_range:
     // Implementations
     .quad load_fs_gs_fast
     // Patch points
-    .quad .Lpatch_fsgsbase_csw_end
-    .quad .Lpatch_fsgsbase_sysret_end
+    .quad .Lpatch_load_fsgsbase_csw_end
+    .quad .Lpatch_load_fsgsbase_sysret_end

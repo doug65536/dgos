@@ -98,34 +98,45 @@ struct alignas(256) thread_info_t {
     isr_context_t * volatile ctx;
 
     // Needed in context switch
-    char * volatile xsave_ptr;
     void * volatile fsbase;
     void * volatile gsbase;
     char * volatile syscall_stack;
-    uint64_t volatile wake_time;
+    char * volatile xsave_ptr;
+    link_t link;
+
+    // Modified every context switch
+    uint64_t used_time;
+
+    // --- cache line ---
+
+    // Owning process
+    process_t *process;
+
+    char *xsave_stack;
+
+    // Points to the end of the stack!
+    char *stack;
+
+    thread_t thread_id;
+
+    // 1 until closed, then 0
+    int ref_count;
+
+    thread_state_t volatile state;
 
     // Higher numbers are higher priority
     thread_priority_t volatile priority;
     thread_priority_t volatile priority_boost;
 
-    thread_state_t volatile state;
-
-    char *xsave_stack;
-
-    // --- cache line ---
+    uint64_t volatile wake_time;
 
     uint32_t flags;
+
     // Doesn't include guard pages
     uint32_t stack_size;
 
-    // Owning process
-    process_t *process;
-
     // Current CPU exception longjmp container
     void *exception_chain;
-
-    // Points to the end of the stack!
-    char *stack;
 
     // Process exit code
     int exit_code;
@@ -135,21 +146,15 @@ struct alignas(256) thread_info_t {
 
     // 3 bytes...
 
-    int wake_count;
+    // --- cache line ---
 
     mutex_t lock;   // 32 bytes
     condition_var_t done_cond;
 
-    // Total cpu time used
-    uint64_t used_time;
+    int wake_count;
 
     // Timestamp at moment thread was resumed
     uint64_t sched_timestamp;
-
-    thread_t thread_id;
-
-    // 1 until closed, then 0
-    int ref_count;
 
     // Threads that got their timeslice sooner are ones that have slept,
     // so they are implicitly higher priority
@@ -166,20 +171,16 @@ struct alignas(256) thread_info_t {
     thread_cpu_mask_t cpu_affinity;
 
     __exception_jmp_buf_t exit_jmpbuf;
-
-//    void awaken(cpu_info_t *cpu, uint64_t now);
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
 
-C_ASSERT(offsetof(thread_info_t, flags) == 64);
-
 // Verify asm_constants.h values
+C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
+C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, syscall_stack) == THREAD_SYSCALL_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
-C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
 
@@ -251,7 +252,14 @@ struct alignas(128) cpu_info_t {
 
     void *storage[8];
 
-    rbtree_t<uint64_t, uint64_t> ready_list;
+    using timestamp = uint64_t;
+
+    // Tree sorted in order of when timestamp was issued.
+    // Only threads that are ready to run appear in this tree.
+    // Threads that block on I/O and keep a timeslice issued further in
+    // the past get drastically more priority than threads that used up
+    // their timeslice, and recently got a newer timeslice.
+    rbtree_t<timestamp, uintptr_t> ready_list;
 };
 C_ASSERT_ISPO2(sizeof(cpu_info_t));
 
@@ -730,7 +738,8 @@ void thread_init(int ap)
         }
 
         // Hook handler that performs a reschedule requested by another CPU
-        intr_hook(INTR_IPI_RESCHED, thread_ipi_resched, "hw_ipi_resched");
+        intr_hook(INTR_IPI_RESCHED, thread_ipi_resched,
+                  "hw_ipi_resched", eoi_lapic);
 
         thread->process = process_t::init(cpu_page_directory_get());
 

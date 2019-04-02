@@ -50,6 +50,7 @@ struct gdt_entry_tss_ldt_t {
 union gdt_entry_combined_t {
     gdt_entry_t mem;
     gdt_entry_tss_ldt_t tss_ldt;
+    uint64_t raw;
 
     constexpr gdt_entry_combined_t(gdt_entry_t e) : mem(e) {}
     constexpr gdt_entry_combined_t(gdt_entry_tss_ldt_t e) : tss_ldt(e) {}

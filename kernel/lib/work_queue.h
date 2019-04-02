@@ -61,16 +61,10 @@ private:
     class workq_wrapper : public workq_work
     {
     public:
-        workq_wrapper(T&& functor)
-            : functor(std::forward<T>(functor))
-        {
-        }
+        workq_wrapper(T&& functor);
 
     private:
-        void invoke() override final
-        {
-            functor();
-        }
+        void invoke() override final;
 
         T functor;
     };
@@ -100,18 +94,23 @@ protected:
     static workq_impl* percpu;
 };
 
+template<typename T>
+workq::workq_wrapper<T>::workq_wrapper(T&& functor)
+    : functor(std::forward<T>(functor))
+{
+}
+
+template<typename T>
+void workq::workq_wrapper<T>::invoke()
+{
+    functor();
+}
+
 class workq_impl : public workq {
 public:
-    workq_impl()
-    {
-        tid = thread_create(worker, this, 0, false);
-    }
+    workq_impl();
 
-    ~workq_impl()
-    {
-        if (tid > 0)
-            thread_close(tid);
-    }
+    ~workq_impl();
 
     workq_impl(workq_impl const&) = delete;
     workq_impl& operator=(workq_impl) = delete;
@@ -141,46 +140,16 @@ private:
     workq_work *head = nullptr;
     workq_work *tail = nullptr;
 
-    void free(workq_work *work)
-    {
-        cpu_scoped_irq_disable irq_dis;
-        scoped_lock lock(queue_lock);
-        alloc.free(work);
-    }
+    void free(workq_work *work);
 
-    static int worker(void *arg)
-    {
-        ((workq_impl*)arg)->worker();
-        return 0;
-    }
+    static int worker(void *arg);
 
-    workq_work *dequeue_work_locked(scoped_lock& lock)
-    {
-        while (!head)
-            not_empty.wait(lock);
-        workq_work *item = head;
-        head = item->next;
-        tail = head ? tail : nullptr;
-        return item;
-    }
+    workq_work *dequeue_work_locked(scoped_lock& lock);
 
-    workq_work *dequeue_work()
-    {
-        cpu_scoped_irq_disable irq_dis;
-        scoped_lock lock(queue_lock);
-        workq_work *result = dequeue_work_locked(lock);
-        return result;
-    }
+    workq_work *dequeue_work();
 
-    void worker()
-    {
-        for (;;) {
-            workq_work *item = dequeue_work();
-
-            item->invoke();
-            free(item);
-        }
-    }
+    _noreturn
+    void worker();
 };
 
 template<typename T>

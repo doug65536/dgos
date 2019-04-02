@@ -599,6 +599,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/dev_char.h \
 	kernel/lib/dev_text.cc \
 	kernel/lib/dev_text.h \
+	kernel/lib/dev_graphics.cc \
+	kernel/lib/dev_graphics.h \
 	kernel/lib/dirent.h \
 	kernel/lib/errno.h \
 	kernel/lib/errno.cc \
@@ -700,6 +702,9 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/bios_data.h \
 	kernel/arch/x86_64/cpu/apic.cc \
 	kernel/arch/x86_64/cpu/apic.h \
+	kernel/arch/x86_64/cpu/ioapic.cc \
+	kernel/arch/x86_64/cpu/ioapic.h \
+	kernel/arch/x86_64/cpu/mptables.h \
 	kernel/arch/x86_64/cpu/asm_constants.h \
 	kernel/arch/x86_64/cpu/atomic.cc \
 	kernel/arch/x86_64/cpu/atomic.h \
@@ -799,7 +804,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_time.cc \
 	kernel/syscall/sys_process.cc \
 	kernel/syscall/sys_module.cc \
-	kernel/syscall/sys_sys.cc
+	kernel/syscall/sys_sys.cc \
+	kernel/syscall/sys_render.cc
 
 KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/device/iocp.cc \
@@ -1101,7 +1107,7 @@ $(top_srcdir)/user/shell/grammar.c \
 	lemon $<
 
 EXTRA_shell_DEPENDENCIES = \
-	$(top_srcdir)/user/user64.ld \
+	$(top_srcdir)/user/user64_phdrs.ld \
 	user/shell/grammar.c \
 	sysroot/lib/libc.a \
 	sysroot/lib/libg.a \
@@ -1390,6 +1396,7 @@ libc_a_SOURCES = \
 	libc/src/posix_spawn/posix_spawnattr_getpgroup.cc \
 	libc/src/sys/socket/socket.cc \
 	libc/src/sys/module/init_module.cc \
+	libc/src/sys/module/probe_pci_for.cc \
 	libc/src/sys/syscall0.S \
 	libc/src/sys/syscall1.S \
 	libc/src/sys/syscall2.S \
@@ -1474,6 +1481,7 @@ LIBC_CXXFLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(FREESTANDING_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
+	$(ASM_DEBUG_INFO_FLAGS) \
 	-isystem $(top_srcdir)/libc/include \
 	-I$(top_builddir) \
 	-L$(top_builddir)
@@ -1870,7 +1878,7 @@ init_CCASFLAGS = \
 	-isystem $(top_builddir)/sysroot/include
 
 EXTRA_init_DEPENDENCIES = \
-	$(top_srcdir)/user/user64.ld \
+	$(top_srcdir)/user/user64_phdrs.ld \
 	sysroot/lib/crt0.o \
 	sysroot/lib/libc.a \
 	sysroot/lib/libg.a \

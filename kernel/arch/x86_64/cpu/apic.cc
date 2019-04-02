@@ -1,7 +1,8 @@
 #include "apic.h"
 #include "cpu/asm_constants.h"
+#include "cpu/mptables.h"
+#include "cpu/ioapic.h"
 #include "device/acpigas.h"
-#include "types.h"
 #include "gdt.h"
 #include "bios_data.h"
 #include "control_regs.h"
@@ -70,133 +71,11 @@
 #define IOAPIC_TRACE(...) ((void)0)
 #endif
 
-//
-// MP Tables
-
-struct mp_table_hdr_t {
-    char sig[4];
-    uint32_t phys_addr;
-    uint8_t length;
-    uint8_t spec;
-    uint8_t checksum;
-    uint8_t features[5];
-};
-
-struct mp_cfg_tbl_hdr_t {
-    char sig[4];
-    uint16_t base_tbl_len;
-    uint8_t spec_rev;
-    uint8_t checksum;
-    char oem_id_str[8];
-    char prod_id_str[12];
-    uint32_t oem_table_ptr;
-    uint16_t oem_table_size;
-    uint16_t entry_count;
-    uint32_t apic_addr;
-    uint16_t ext_tbl_len;
-    uint8_t ext_tbl_checksum;
-    uint8_t reserved;
-};
-
-// entry_type 0
-struct mp_cfg_cpu_t {
-    uint8_t entry_type;
-    uint8_t apic_id;
-    uint8_t apic_ver;
-    uint8_t flags;
-    uint32_t signature;
-    uint32_t features;
-    uint32_t reserved1;
-    uint32_t reserved2;
-};
-
-// entry_type 1
-struct mp_cfg_bus_t {
-    uint8_t entry_type;
-    uint8_t bus_id;
-    char type[6];
-};
-
-// entry_type 2
-struct mp_cfg_ioapic_t {
-    uint8_t entry_type;
-    uint8_t id;
-    uint8_t ver;
-    uint8_t flags;
-    uint32_t addr;
-};
-
-//
-// IOAPIC registers
-
-#define IOAPIC_IOREGSEL         0
-#define IOAPIC_IOREGWIN         4
-
-#define IOAPIC_REG_ID           0
-#define IOAPIC_REG_VER          1
-#define IOAPIC_REG_ARB          2
-
-#define IOAPIC_RED_LO_n(n)      (0x10 + (n) * 2)
-#define IOAPIC_RED_HI_n(n)      (0x10 + (n) * 2 + 1)
-
 static char const * const intr_type_text[] = {
     "APIC",
     "NMI",
     "SMI",
     "EXTINT"
-};
-
-// entry_type 3
-struct mp_cfg_iointr_t {
-    uint8_t entry_type;
-    uint8_t type;
-    uint16_t flags;
-    uint8_t source_bus;
-    uint8_t source_bus_irq;
-    uint8_t dest_ioapic_id;
-    uint8_t dest_ioapic_intin;
-};
-
-// entry_type 4
-struct mp_cfg_lintr_t {
-    uint8_t entry_type;
-    uint8_t type;
-    uint16_t flags;
-    uint8_t source_bus;
-    uint8_t source_bus_irq;
-    uint8_t dest_lapic_id;
-    uint8_t dest_lapic_lintin;
-};
-
-// entry_type 128
-struct mp_cfg_addrmap_t {
-    uint8_t entry_type;
-    uint8_t len;
-    uint8_t bus_id;
-    uint8_t addr_type;
-    uint32_t addr_lo;
-    uint32_t addr_hi;
-    uint32_t len_lo;
-    uint32_t len_hi;
-};
-
-// entry_type 129
-struct mp_cfg_bushier_t {
-    uint8_t entry_type;
-    uint8_t len;
-    uint8_t bus_id;
-    uint8_t info;
-    uint8_t parent_bus;
-    uint8_t reserved[3];
-};
-
-// entry_type 130
-struct mp_cfg_buscompat_t {
-    uint8_t entry_type;
-    uint8_t len;
-    uint8_t bus_id;
-    uint8_t bus_mod;
-    uint32_t predef_range_list;
 };
 
 struct mp_ioapic_t {
@@ -238,7 +117,7 @@ static mp_ioapic_t *ioapic_by_id(uint8_t id);
 static void ioapic_reset(mp_ioapic_t *ioapic);
 static void ioapic_set_type(mp_ioapic_t *ioapic,
                             uint8_t intin, uint8_t intr_type);
-static void ioapic_set_flags(mp_ioapic_t *ioapic,
+static bool ioapic_set_flags(mp_ioapic_t *ioapic,
                              uint8_t intin, uint16_t intr_flags, bool isa);
 static uint32_t ioapic_read(mp_ioapic_t *ioapic, uint32_t reg,
                             mp_ioapic_t::scoped_lock const &);
@@ -260,6 +139,7 @@ static uint32_t apic_id_list[64];
 static int16_t intr_to_irq[256];
 static int16_t irq_to_intr[256];
 static int16_t intr_to_ioapic[256];
+static int16_t irq_is_level[256];
 
 static uint8_t topo_thread_bits;
 static uint8_t topo_thread_count;
@@ -880,8 +760,9 @@ static void acpi_process_madt(acpi_madt_t *madt_hdr)
                        irq, gsi, ent->irq_src.flags, intr, ioapic_index);
 
             mp_ioapic_t *ioapic = ioapic_list + ioapic_index;
-            ioapic_set_flags(ioapic, irq - ioapic->irq_base,
-                             ent->irq_src.flags, isa);
+            irq_is_level[irq] = ioapic_set_flags(
+                        ioapic, irq - ioapic->irq_base,
+                        ent->irq_src.flags, isa);
 
             break;
         }
@@ -1727,9 +1608,12 @@ int apic_init(int ap)
     }
 
     if (!ap) {
-        intr_hook(INTR_APIC_TIMER, apic_timer_handler, "apic_timer");
-        intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler, "apic_spurious");
-        intr_hook(INTR_APIC_ERROR, apic_err_handler, "apic_error");
+        intr_hook(INTR_APIC_TIMER, apic_timer_handler,
+                  "apic_timer", eoi_lapic);
+        intr_hook(INTR_APIC_SPURIOUS, apic_spurious_handler,
+                  "apic_spurious", eoi_lapic);
+        intr_hook(INTR_APIC_ERROR, apic_err_handler,
+                  "apic_error", eoi_lapic);
 
         APIC_TRACE("Parsing boot tables\n");
 
@@ -2252,6 +2136,7 @@ static mp_ioapic_t *ioapic_by_id(uint8_t id)
 
 static void ioapic_reset(mp_ioapic_t *ioapic)
 {
+    cpu_scoped_irq_disable irq_dis;
     mp_ioapic_t::scoped_lock lock(ioapic->lock);
 
     // If this is the first IOAPIC, initialize some lookup tables
@@ -2294,6 +2179,7 @@ static void ioapic_reset(mp_ioapic_t *ioapic)
 static void ioapic_set_type(mp_ioapic_t *ioapic,
                             uint8_t intin, uint8_t intr_type)
 {
+    cpu_scoped_irq_disable irq_dis;
     mp_ioapic_t::scoped_lock lock(ioapic->lock);
 
     uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
@@ -2323,9 +2209,11 @@ static void ioapic_set_type(mp_ioapic_t *ioapic,
     ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), reg, lock);
 }
 
-static void ioapic_set_flags(mp_ioapic_t *ioapic,
+// Returns true if the irq is level triggered
+static bool ioapic_set_flags(mp_ioapic_t *ioapic,
                              uint8_t intin, uint16_t intr_flags, bool isa)
 {
+    cpu_scoped_irq_disable irq_dis;
     mp_ioapic_t::scoped_lock lock(ioapic->lock);
 
     uint32_t reg = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
@@ -2373,6 +2261,8 @@ static void ioapic_set_flags(mp_ioapic_t *ioapic,
     }
 
     ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), reg, lock);
+
+    return trigger & ACPI_MADT_ENT_IRQ_FLAGS_TRIGGER_LEVEL;
 }
 
 // Call on each CPU to configure local APIC using gathered MPS/ACPI records
@@ -2416,10 +2306,10 @@ void apic_config_cpu()
 _hot
 isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
+    uint64_t st = cpu_rdtsc();
+
     assert(intr >= INTR_APIC_IRQ_BASE);
     assert(intr < INTR_APIC_IRQ_END);
-
-    uint64_t st = cpu_rdtsc();
 
     isr_context_t *orig_ctx = ctx;
 
@@ -2431,7 +2321,7 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     ctx = irq_invoke(intr, irq, ctx);
     apic_eoi(intr);
 
-    if (ctx == orig_ctx)
+    if (likely(ctx == orig_ctx))
         ctx = thread_schedule_postirq(ctx);
 
     uint64_t en = cpu_rdtsc();
@@ -2453,6 +2343,7 @@ static void ioapic_setmask(int irq, bool unmask)
     int intin = irq_intr - ioapic->base_intr;
     assert(intin >= 0 && intin < ioapic->vector_count);
 
+    cpu_scoped_irq_disable irq_dis;
     mp_ioapic_t::scoped_lock lock(ioapic->lock);
 
     uint32_t ent = ioapic_read(ioapic, IOAPIC_RED_LO_n(intin), lock);
@@ -2465,13 +2356,20 @@ static void ioapic_setmask(int irq, bool unmask)
     ioapic_write(ioapic, IOAPIC_RED_LO_n(intin), ent, lock);
 }
 
+static bool ioapic_islevel(int irq)
+{
+    assert(irq >= 0);
+    assert(irq < 256);
+    return irq_is_level[irq];
+}
+
 static void ioapic_hook(int irq, intr_handler_t handler,
                         char const *name)
 {
     int intr = irq_to_intr[irq];
     assert(intr >= 0);
     if (intr >= 0) {
-        intr_hook(intr, handler, name);
+        intr_hook(intr, handler, name, eoi_lapic);
     } else {
         APIC_TRACE("Hooking %s IRQ %d failed, irq_to_intr[%d]==%d\n",
                    name, irq, irq, intr);
@@ -2546,6 +2444,7 @@ int apic_enable(void)
     ioapic_map_all();
 
     irq_setmask_set_handler(ioapic_setmask);
+    irq_islevel_set_handler(ioapic_islevel);
     irq_hook_set_handler(ioapic_hook);
     irq_unhook_set_handler(ioapic_unhook);
     irq_setcpu_set_handler(ioapic_irq_setcpu);
@@ -2655,10 +2554,6 @@ int apic_msi_irq_alloc(msi_irq_mem_t *results, int count,
             if (++cpu >= int(apic_id_count))
                 cpu = 0;
         }
-
-        // It will always be edge triggered
-        // (!!activehi << 14) |
-        // (!!level << 15);
     }
 
     return vector_base - INTR_APIC_IRQ_BASE;

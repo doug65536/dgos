@@ -569,7 +569,7 @@ bool uart_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
     in(port_t::DAT);
 
     if (use_irq) {
-        irq_hook(irq, &uart_t::irq_handler, "serial_uart");
+        irq_hook(irq, &uart_t::irq_handler, "serial_uart", eoi_auto);
         irq_setmask(irq, true);
         irq_hooked = true;
 

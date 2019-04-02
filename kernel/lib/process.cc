@@ -513,9 +513,15 @@ void process_t::exit(pid_t pid, int exitcode)
 {
     // Kill all the threads...
 
+    scoped_lock lock(processes_lock);
+
     process_t *process_ptr = lookup(pid);
 
     process_ptr->exitcode = exitcode;
+    process_ptr->state = state_t::exited;
+    lock.unlock();
+    process_ptr->cond.notify_all();
+
     thread_exit(exitcode);
 }
 
@@ -535,6 +541,21 @@ bool process_t::del_thread(thread_t tid)
     threads.erase(it);
 
     return threads.empty();
+}
+
+int process_t::wait_for_exit(int pid)
+{
+    scoped_lock lock(processes_lock);
+
+    process_t *p = lookup(pid);
+
+    if (unlikely(!p))
+        return -int(errno_t::EINVAL);
+
+    while (p->state != state_t::exited)
+        p->cond.wait(lock);
+
+    return 0;
 }
 
 process_t *process_t::lookup(pid_t pid)

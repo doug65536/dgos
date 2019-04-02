@@ -422,6 +422,72 @@ private:
         uint32_t padding;
     };
 
+    union clear_type_t;
+
+    struct cmd_list_t {
+        std::vector<uint32_t> data;
+
+        void add_clear(clear_type_t clear_type,
+                       uint32_t r, uint32_t g, uint32_t b, uint32_t a,
+                       uint64_t depth_f64, uint32_t stencil)
+        {
+            data.push_back(8 * sizeof(uint32_t));
+            data.push_back(VIRGL_CCMD_CLEAR);
+            data.push_back(clear_type.raw);
+            data.push_back(r);
+            data.push_back(g);
+            data.push_back(b);
+            data.push_back(a);
+            data.push_back(uint32_t(depth_f64));
+            data.push_back(uint32_t(depth_f64 >> 32));
+            data.push_back(stencil);
+        }
+
+        void add_draw_vbo(uint32_t start, uint32_t count,
+                          uint32_t mode, uint32_t indexed,
+                          uint32_t instance_count, uint32_t index_bias,
+                          uint32_t start_inst, uint32_t primitive_restart,
+                          uint32_t restart_index, uint32_t min_index,
+                          uint32_t max_index, uint32_t cso)
+        {
+            data.push_back(12 * sizeof(uint32_t));
+            data.push_back(VIRGL_CCMD_DRAW_VBO);
+            data.push_back(start);
+            data.push_back(count);
+            data.push_back(mode);
+            data.push_back(indexed);
+            data.push_back(instance_count);
+            data.push_back(index_bias);
+            data.push_back(start_inst);
+            data.push_back(primitive_restart);
+            data.push_back(restart_index);
+            data.push_back(min_index);
+            data.push_back(max_index);
+            data.push_back(cso);
+        }
+    };
+
+    union clear_type_t {
+        struct bits_t {
+            bool depth :1;
+            bool stencil:1;
+            bool color0:1;
+            bool color1:1;
+            bool color2:1;
+            bool color3:1;
+            bool color4:1;
+            bool color5:1;
+            bool color6:1;
+            bool color7:1;
+            unsigned unused1:6;
+            unsigned unused2:16;
+        } bits;
+        uint32_t raw;
+    };
+
+    static_assert(sizeof(clear_type_t::bits_t) == sizeof(uint32_t),
+                  "bitfield problem");
+
     enum : uint32_t {
        VIRGL_CCMD_NOP = 0,
        VIRGL_CCMD_CREATE_OBJECT = 1,
@@ -518,7 +584,7 @@ REGISTER_CALLOUT(virtio_gpu_startup, nullptr,
 int virtio_gpu_factory_t::detect()
 {
     // hack, disabled for now
-    return 0;
+    //return 0;
     return detect_virtio(PCI_DEV_CLASS_DISPLAY, VIRTIO_DEVICE_GPU,
                          "virtio-gpu");
 }
@@ -671,17 +737,17 @@ bool virtio_gpu_dev_t::issue_create_render_target(
         uint32_t ctx_id, uint32_t resource_id, uint32_t format,
         uint32_t width, uint32_t height, uint32_t nr_samples)
 {
-    virtio_gpu_resource_create_3d_t create_3d;
+    virtio_gpu_resource_create_2d_t create_3d;
     virtio_gpu_ctrl_hdr_t resp(0);
     blocking_iocp_t iocp;
 
     create_3d.hdr.ctx_id = ctx_id;
-    create_3d.bind = VIRGL_RES_BIND_RENDER_TARGET;
+    //create_3d.bind = VIRGL_RES_BIND_RENDER_TARGET;
     create_3d.format = format;
     create_3d.resource_id = resource_id;
     create_3d.width = width;
     create_3d.height = height;
-    create_3d.nr_samples = nr_samples;
+    //create_3d.nr_samples = nr_samples;
 
     VIRTIO_GPU_TRACE("Issuing create 3d...\n");
 
@@ -942,7 +1008,7 @@ bool virtio_gpu_dev_t::resize_backing(uint32_t new_w, uint32_t new_h,
         memset(dst + old_w, 0, clear_sz);
     }
 
-    if (new_w < old_w) {
+    if (new_w < old_w || new_h < old_h) {
         // Need to make backbuffer smaller after resizing
         uint32_t *new_backbuf;
         new_backbuf = (uint32_t*)mremap(backbuf, backbuf_sz, new_sz,

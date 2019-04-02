@@ -8,8 +8,8 @@ __BEGIN_NAMESPACE_STD
 template<typename>
 class function;
 
-template<typename R, typename... Args>
-class function<R(Args...)>
+template<typename R, typename... _Args>
+class function<R(_Args...)>
 {
 public:
     using result_type = R;
@@ -21,6 +21,12 @@ public:
     template<typename T>
     function(T callable)
         : impl(new Callable<T>(move(callable)))
+    {
+    }
+
+    template<typename _T>
+    function(R (_T::*member)(_Args&&...), _T const* instance)
+        : impl(new Callable<_T>(member, instance))
     {
     }
 
@@ -56,7 +62,7 @@ private:
     struct CallableBase
     {
         virtual ~CallableBase() {}
-        virtual R invoke(Args&& ...args) const = 0;
+        virtual R invoke(_Args&& ...args) const = 0;
         virtual CallableBase *copy() const = 0;
     };
 
@@ -73,9 +79,9 @@ private:
             return new Callable(storage);
         }
 
-        R invoke(Args&& ...args) const override final
+        R invoke(_Args&& ...args) const override final
         {
-            return storage(forward<Args>(args)...);
+            return storage(forward<_Args>(args)...);
         }
 
         T storage;

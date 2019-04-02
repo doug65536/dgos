@@ -5,6 +5,7 @@ include/new.h
 include/stdint.h
 include/sys/cpu_bug.h
 include/sys/ioctl.h
+include/sys/likely.h
 include/sys/module.h
 include/sys/socket.h
 include/sys/syscall_num.h
@@ -89,6 +90,7 @@ src/sys/mman/msync.cc
 src/sys/mman/munlock.cc
 src/sys/mman/munmap.cc
 src/sys/module/init_module.cc
+src/sys/module/probe_pci_for.cc
 src/sys/socket/socket.cc
 src/sys/syscall0.S
 src/sys/syscall1.S

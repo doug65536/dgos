@@ -371,7 +371,8 @@ int idt_init(int ap)
         //idt[INTR_EX_GPF].ist = 4;
         //idt[INTR_EX_PAGE].ist = 5;
 
-        intr_hook(INTR_EX_DEBUG, debug_exception_handler, "debug");
+        intr_hook(INTR_EX_DEBUG, debug_exception_handler,
+                  "debug", eoi_none);
     }
 
     table_register_64_t idtr;

@@ -1495,7 +1495,8 @@ void mmu_init()
 {
     // Hook IPI for TLB shootdown
     TRACE_INIT("Hooking TLB shootdown\n");
-    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler, "sw_tlbshoot");
+    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler,
+              "sw_tlbshoot", eoi_lapic);
 
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
            sizeof(*phys_mem_map) * kernel_params->phys_mem_table_size);
@@ -1645,7 +1646,8 @@ void mmu_init()
     printdbg("%" PRIu64 " pages free (%" PRIu64 "MB)\n",
            free_count, free_count >> (20 - PAGE_SIZE_BIT));
 
-    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler, "sw_page");
+    // This isn't actually used. #PF is fast-pathed in ISR handling
+    intr_hook(INTR_EX_PAGE, mmu_page_fault_handler, "sw_page", eoi_none);
 
     malloc_startup(nullptr);
 

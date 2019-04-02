@@ -323,3 +323,5 @@
 #define SYS_kcmp                    312
 #define SYS_finit_module            313
 #define SYS_fexecve                 314
+#define SYS_probe_pci_for           315
+#define SYS_render_batch            316
