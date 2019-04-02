@@ -1034,9 +1034,8 @@ void virtio_gpu_dev_t::config_irq()
     int events = gpu_config->events_read;
 
     if (events & 1) {
-        workq::enqueue([this,events] {
-            if (events)
-                gpu_config->events_read = events;
+        gpu_config->events_clear = events;
+        workq::enqueue([=] {
             handle_config_change(events);
         });
     }
@@ -1044,14 +1043,26 @@ void virtio_gpu_dev_t::config_irq()
 
 void virtio_gpu_dev_t::irq_handler(int offset)
 {
-    if (offset == 0 || irq_range.count == 1)
-        config_irq();
+    if (use_msi) {
+        if (offset == 0 || irq_range.count == 1)
+            config_irq();
 
-    if (offset == 1 || irq_range.count == 1)
-        cmd_queue->recycle_used();
+        if (offset == 1 || irq_range.count == 1)
+            cmd_queue->recycle_used();
 
-    if (offset == 2 || irq_range.count == 1)
-        crsr_queue->recycle_used();
+        if (offset == 2 || irq_range.count == 1)
+            crsr_queue->recycle_used();
+    } else {
+        uint32_t status = *isr_status;
+
+        if (status & 1) {
+            cmd_queue->recycle_used();
+            crsr_queue->recycle_used();
+        }
+        if (status & 2) {
+            config_irq();
+        }
+    }
 }
 
 bool virtio_gpu_dev_t::offer_features(feature_set_t &features)
