@@ -5,6 +5,10 @@
 .align 32
 .global syscall3
 syscall3:
+	.cfi_startproc
+
 	mov %ecx,%eax
 	syscall
 	ret
+
+	.cfi_endproc

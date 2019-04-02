@@ -4,6 +4,10 @@
 //extern long syscall1(long p0, long num);
 .global syscall1
 syscall1:
+	.cfi_startproc
+
 	mov %esi,%eax
 	syscall
 	ret
+
+	.cfi_endproc

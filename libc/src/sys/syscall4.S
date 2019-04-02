@@ -5,7 +5,11 @@
 //                     long num);
 .global syscall4
 syscall4:
+	.cfi_startproc
+
 	mov %r8d,%eax
 	mov %rcx,%r10
 	syscall
 	ret
+
+	.cfi_endproc

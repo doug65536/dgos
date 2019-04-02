@@ -5,7 +5,11 @@
 //                     long p4, long p5, int num);
 .global syscall6
 syscall6:
+	.cfi_startproc
+
 	mov 8(%rsp),%eax
 	mov %rcx,%r10
 	syscall
 	ret
+
+	.cfi_endproc
