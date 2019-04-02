@@ -120,31 +120,27 @@ private:
     struct virtio_gpu_ctrl_hdr_t {
         virtio_gpu_ctrl_hdr_t(uint32_t type)
             : type(type)
-            , flags(0)
-            , fence_id(0)
-            , ctx_id(0)
-            , padding(0)
         {
         }
 
         uint32_t type;
-        uint32_t flags;
-        uint64_t fence_id;
-        uint32_t ctx_id;
-        uint32_t padding;
+        uint32_t flags = 0;
+        uint64_t fence_id = 0;
+        uint32_t ctx_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_rect_t {
-        uint32_t x;
-        uint32_t y;
-        uint32_t width;
-        uint32_t height;
+        uint32_t x = 0;
+        uint32_t y = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
     };
 
     struct virtio_gpu_display_one_t {
         struct virtio_gpu_rect_t r;
-        uint32_t enabled;
-        uint32_t flags;
+        uint32_t enabled = 0;
+        uint32_t flags = 0;
     };
 
     struct virtio_gpu_resp_display_info_t {
@@ -185,10 +181,10 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t format;
-        uint32_t width;
-        uint32_t height;
+        uint32_t resource_id = 0;
+        uint32_t format = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
     };
 
     struct virtio_gpu_resource_unref_t {
@@ -198,8 +194,8 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_set_scanout_t {
@@ -210,8 +206,8 @@ private:
 
         virtio_gpu_ctrl_hdr_t hdr;
         virtio_gpu_rect_t r;
-        uint32_t scanout_id;
-        uint32_t resource_id;
+        uint32_t scanout_id = 0;
+        uint32_t resource_id = 0;
     };
 
     struct virtio_gpu_resource_flush_t {
@@ -222,8 +218,8 @@ private:
 
         virtio_gpu_ctrl_hdr_t hdr;
         virtio_gpu_rect_t r;
-        uint32_t resource_id;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_transfer_to_host_2d_t {
@@ -237,9 +233,9 @@ private:
 
         virtio_gpu_ctrl_hdr_t hdr;
         virtio_gpu_rect_t r;
-        uint64_t offset;
-        uint32_t resource_id;
-        uint32_t padding;
+        uint64_t offset = 0;
+        uint32_t resource_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_resource_attach_backing_t {
@@ -259,14 +255,14 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t nr_entries;
+        uint32_t resource_id = 0;
+        uint32_t nr_entries = 0;
     };
 
     struct virtio_gpu_mem_entry_t {
-        uint64_t addr;
-        uint32_t length;
-        uint32_t padding;
+        uint64_t addr = 0;
+        uint32_t length = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_resource_detach_backing_t {
@@ -276,15 +272,15 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_cursor_pos_t {
-        uint32_t scanout_id;
-        uint32_t x;
-        uint32_t y;
-        uint32_t padding;
+        uint32_t scanout_id = 0;
+        uint32_t x = 0;
+        uint32_t y = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_update_cursor_t {
@@ -297,10 +293,10 @@ private:
 
         virtio_gpu_ctrl_hdr_t hdr;
         virtio_gpu_cursor_pos_t pos;
-        uint32_t resource_id;
-        uint32_t hot_x;
-        uint32_t hot_y;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t hot_x = 0;
+        uint32_t hot_y = 0;
+        uint32_t padding = 0;
     };
 
     // Worst case packet sized union, 64 bytes
@@ -329,9 +325,9 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t nlen;
-        uint32_t padding;
-        char debug_name[64];
+        uint32_t nlen = 0;
+        uint32_t padding = 0;
+        char debug_name[64] = {};
     };
 
     struct virtio_gpu_ctx_destroy_t {
@@ -350,8 +346,8 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_ctx_detach_resource_t {
@@ -361,8 +357,8 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_resource_create_3d_t {
@@ -372,27 +368,27 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t resource_id;
-        uint32_t target;
-        uint32_t format;
-        uint32_t bind;
-        uint32_t width;
-        uint32_t height;
-        uint32_t depth;
-        uint32_t array_size;
-        uint32_t last_level;
-        uint32_t nr_samples;
-        uint32_t flags;
-        uint32_t padding;
+        uint32_t resource_id = 0;
+        uint32_t target = 0;
+        uint32_t format = 0;
+        uint32_t bind = 0;
+        uint32_t width = 0;
+        uint32_t height = 0;
+        uint32_t depth = 0;
+        uint32_t array_size = 0;
+        uint32_t last_level = 0;
+        uint32_t nr_samples = 0;
+        uint32_t flags = 0;
+        uint32_t padding = 0;
     };
 
     struct virtio_gpu_box_t {
-        uint32_t x;
-        uint32_t y;
-        uint32_t z;
-        uint32_t w;
-        uint32_t h;
-        uint32_t d;
+        uint32_t x = 0;
+        uint32_t y = 0;
+        uint32_t z = 0;
+        uint32_t w = 0;
+        uint32_t h = 0;
+        uint32_t d = 0;
     };
 
     struct virtio_gpu_transfer_tofrom_host_3d_t {
@@ -404,11 +400,11 @@ private:
 
         virtio_gpu_ctrl_hdr_t hdr;
         virtio_gpu_box_t box;
-        uint64_t offset;
-        uint32_t resource_id;
-        uint32_t level;
-        uint32_t stride;
-        uint32_t layer_stride;
+        uint64_t offset = 0;
+        uint32_t resource_id = 0;
+        uint32_t level = 0;
+        uint32_t stride = 0;
+        uint32_t layer_stride = 0;
     };
 
     struct virtio_gpu_cmd_submit_3d_t {
@@ -418,8 +414,8 @@ private:
         }
 
         virtio_gpu_ctrl_hdr_t hdr;
-        uint32_t size;
-        uint32_t padding;
+        uint32_t size = 0;
+        uint32_t padding = 0;
     };
 
     union clear_type_t;
@@ -643,8 +639,8 @@ bool virtio_gpu_dev_t::init(pci_dev_iterator_t const &pci_iter)
 
 bool virtio_gpu_dev_t::issue_get_display_info()
 {
-    virtio_gpu_get_display_info_t get_display_info;
-    virtio_gpu_resp_display_info_t display_info_resp;
+    virtio_gpu_get_display_info_t get_display_info{};
+    virtio_gpu_resp_display_info_t display_info_resp{};
     blocking_iocp_t iocp;
 
     VIRTIO_GPU_TRACE("Issuing get display info...\n");
@@ -667,7 +663,7 @@ bool virtio_gpu_dev_t::issue_get_display_info()
 bool virtio_gpu_dev_t::issue_create_2d(
         uint32_t resource_id, uint32_t width, uint32_t height)
 {
-    virtio_gpu_resource_create_2d_t create_2d;
+    virtio_gpu_resource_create_2d_t create_2d{};
     virtio_gpu_ctrl_hdr_t resp(0);
     blocking_iocp_t iocp;
 
@@ -695,7 +691,7 @@ bool virtio_gpu_dev_t::issue_detach_backing(uint32_t resource_id)
     blocking_iocp_t iocp;
     virtio_gpu_ctrl_hdr_t resp(0);
 
-    virtio_gpu_resource_detach_backing_t detach_backing;
+    virtio_gpu_resource_detach_backing_t detach_backing{};
     detach_backing.resource_id = resource_id;
 
     VIRTIO_GPU_TRACE("Issuing detach backing...\n");
@@ -714,7 +710,7 @@ bool virtio_gpu_dev_t::issue_detach_backing(uint32_t resource_id)
 
 bool virtio_gpu_dev_t::issue_resource_unref(uint32_t resource_id)
 {
-    virtio_gpu_resource_unref_t unref;
+    virtio_gpu_resource_unref_t unref{};
     virtio_gpu_ctrl_hdr_t resp(0);
     blocking_iocp_t iocp;
 
@@ -737,7 +733,7 @@ bool virtio_gpu_dev_t::issue_create_render_target(
         uint32_t ctx_id, uint32_t resource_id, uint32_t format,
         uint32_t width, uint32_t height, uint32_t nr_samples)
 {
-    virtio_gpu_resource_create_2d_t create_3d;
+    virtio_gpu_resource_create_2d_t create_3d{};
     virtio_gpu_ctrl_hdr_t resp(0);
     blocking_iocp_t iocp;
 
@@ -819,7 +815,7 @@ bool virtio_gpu_dev_t::issue_set_scanout(
     blocking_iocp_t iocp;
     virtio_gpu_ctrl_hdr_t resp(0);
 
-    virtio_gpu_set_scanout_t set_scanout;
+    virtio_gpu_set_scanout_t set_scanout{};
 
     set_scanout.r.x = 0;
     set_scanout.r.y = 0;
@@ -845,7 +841,7 @@ bool virtio_gpu_dev_t::issue_set_scanout(
 bool virtio_gpu_dev_t::issue_transfer_to_host_2d(
         uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 {
-    virtio_gpu_transfer_to_host_2d_t xfer;
+    virtio_gpu_transfer_to_host_2d_t xfer{};
     virtio_gpu_ctrl_hdr_t resp(0);
     blocking_iocp_t iocp;
 
@@ -871,7 +867,7 @@ bool virtio_gpu_dev_t::issue_transfer_to_host_2d(
 bool virtio_gpu_dev_t::issue_flush(
         uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 {
-    virtio_gpu_resource_flush_t flush;
+    virtio_gpu_resource_flush_t flush{};
     virtio_gpu_ctrl_hdr_t resp(0);
     blocking_iocp_t iocp;
 
