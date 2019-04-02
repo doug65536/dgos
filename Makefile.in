@@ -2992,7 +2992,13 @@ QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report
 QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
-QEMU_VGA = -vga virtio
+QEMU_VGA = \
+	-global driver=virtio-vga,property=disable-legacy,value=on \
+	-global driver=virtio-vga,property=disable-modern,value=off \
+	-global driver=virtio-vga,property=x-disable-pcie,value=off \
+	-global driver=virtio-vga,property=virgl,value=off \
+	-vga virtio
+
 QEMU_DISPLAY = -display sdl,gl=on
 QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
 #QEMU_MACHINE_nvme = -machine q35
