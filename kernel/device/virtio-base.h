@@ -285,6 +285,7 @@ public:
         : use_msi(false)
         , common_cfg(nullptr)
         , common_cfg_size(0)
+        , isr_status(nullptr)
         , notify_off_multiplier(0)
     {
     }
@@ -432,6 +433,7 @@ protected:
     virtio_pci_notify_cap_t *notify_cap;
     size_t notify_cap_size;
 
+    uint32_t *isr_status;
     uint32_t notify_off_multiplier;
 
     static char const *cap_names[];

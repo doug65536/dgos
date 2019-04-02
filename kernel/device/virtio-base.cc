@@ -204,7 +204,9 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_ISR_CFG:
-            // This is ignored, because only MSI-X is used
+            // This is ignored, because only MSI-X is used?
+            isr_status = (uint32_t*)mmap((void*)bar, sizeof(uint32_t),
+                                         PROT_READ, MAP_PHYSICAL, -1, 0);
             break;
 
         case VIRTIO_PCI_CAP_DEVICE_CFG:
