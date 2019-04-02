@@ -129,8 +129,7 @@ EXPORT bool irq_islevel(int irq)
     return irq_islevel_vec(irq);
 }
 
-EXPORT void irq_hook(int irq, intr_handler_t handler, char const *name,
-                     intr_eoi_t eoi_handler)
+EXPORT void irq_hook(int irq, intr_handler_t handler, char const *name)
 {
     irq_hook_vec(irq, handler, name);
 }

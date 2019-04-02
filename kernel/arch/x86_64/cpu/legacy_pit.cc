@@ -226,6 +226,6 @@ void pit8254_enable()
     PIT_TRACE("Starting PIT timer\n");
 
     pit8254_set_rate(20);
-    irq_hook(0, pit8254_irq_handler, "pit8254", eoi_auto);
+    irq_hook(0, pit8254_irq_handler, "pit8254");
     irq_setmask(0, true);
 }

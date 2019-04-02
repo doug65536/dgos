@@ -750,7 +750,7 @@ EXPORT bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
         pci_set_irq_pin(pci_dev.addr, pci_dev.config.irq_pin);
         pci_set_irq_line(pci_dev.addr, pci_dev.config.irq_line);
 
-        irq_hook(pci_dev.config.irq_line, handler, name, eoi_auto);
+        irq_hook(pci_dev.config.irq_line, handler, name);
         irq_setmask(pci_dev.config.irq_line, true);
     }
 

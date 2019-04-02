@@ -80,8 +80,7 @@ extern "C" void irq_setmask(int irq, bool unmask);
 extern "C" bool irq_islevel(int irq);
 
 // Set the appropriate interrupt vector for the specified irq
-extern "C" void irq_hook(int irq, intr_handler_t handler,
-                         char const *name, intr_eoi_t eoi_handler);
+extern "C" void irq_hook(int irq, intr_handler_t handler, char const *name);
 
 // Reset the appropriate interrupt vector for the specified irq
 extern "C" void irq_unhook(int irq, intr_handler_t handler);
