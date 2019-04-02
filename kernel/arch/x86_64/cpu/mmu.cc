@@ -33,10 +33,10 @@
 // This causes KVM to throw #PF(reserved_bit_set|present)
 #define GLOBAL_RECURSIVE_MAPPING    0
 
-#define DEBUG_CREATE_PT         1
-#define DEBUG_PHYS_ALLOC        1
-#define DEBUG_PAGE_TABLES       1
-#define DEBUG_PAGE_FAULT        1
+#define DEBUG_CREATE_PT         0
+#define DEBUG_PHYS_ALLOC        0
+#define DEBUG_PAGE_TABLES       0
+#define DEBUG_PAGE_FAULT        0
 
 #define PROFILE_PHYS_ALLOC      0
 #if PROFILE_PHYS_ALLOC
