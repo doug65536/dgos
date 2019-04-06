@@ -2111,7 +2111,8 @@ QEMU_VGA = \
 	-global driver=virtio-vga,property=disable-legacy,value=on \
 	-global driver=virtio-vga,property=disable-modern,value=off \
 	-global driver=virtio-vga,property=x-disable-pcie,value=off \
-	-global driver=virtio-vga,property=virgl,value=off \
+	-global driver=virtio-vga,property=virgl,value=on \
+	-global driver=virtio-vga,property=modern-pio-notify,value=on \
 	-vga virtio
 QEMU_DISPLAY = -display sdl,gl=on
 QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
