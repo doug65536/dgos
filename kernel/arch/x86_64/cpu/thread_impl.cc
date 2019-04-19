@@ -533,14 +533,8 @@ static thread_t thread_create_with_state(
     thread->stack = stack;
     thread->stack_size = stack_size;
 
-    char *syscall_stack = nullptr;
     char *xsave_stack = nullptr;
     if (user) {
-        // Syscall stack
-
-        syscall_stack = thread_allocate_stack(
-                    i, syscall_stack_size, "syscall", 0xFE);
-
         // XSave stack
 
         thread->flags |= THREAD_FLAGS_USES_FPU;

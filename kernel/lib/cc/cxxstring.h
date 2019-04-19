@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "vector.h"
+#include "hash.h"
 
 __BEGIN_NAMESPACE_STD
 
@@ -903,6 +904,14 @@ using string = basic_string<char>;
 using wstring = basic_string<wchar_t>;
 using u16string = basic_string<char16_t>;
 using u32string = basic_string<char32_t>;
+
+template<typename _CharT, typename _Traits, typename _Alloc>
+struct hash<std::basic_string<_CharT, _Traits, _Alloc>> {
+    size_t operator()(std::basic_string<_CharT, _Traits, _Alloc> const& s) const
+    {
+        return hash_32(s.data(), s.size() * sizeof(*s.data()));
+    }
+};
 
 // Explicit instantiations
 

@@ -59,8 +59,57 @@
 //                            kerneldata
 #define CPU_MSR_STAR            0xC0000081U
 
+#define CPU_MSR_SPEC_CTRL       0x48
+// IBRS if CPUID.(EAX=07H,ECX=0):EDX[26]=1
+#define CPU_MSR_SPEC_CTRL_IBRS_BIT      0
+
+// STIBP If CPUID.(EAX=07H,ECX=0):EDX[27]=1
+#define CPU_MSR_SPEC_CTRL_STIBP_BIT     1
+
+// SSBD If CPUID.(EAX=07H,ECX=0):EDX[31]=1
+#define CPU_MSR_SPEC_CTRL_SSBD_BIT      2
+
+#define CPU_MSR_PRED_CMD        0x49
+// If CPUID.(EAX=07H,ECX=0):EDX[26]=1
+#define CPU_MSR_PRED_CMD_IBPB_BIT   0
+#define CPU_MSR_PRED_CMD_IBPB       (1<<CPU_MSR_PRED_CMD_IBPB_BIT)
+
+#define CPU_MSR_SPEC_CTRL_IBRS      (1<<CPU_MSR_SPEC_CTRL_IBRS_BIT)
+#define CPU_MSR_SPEC_CTRL_STIBP     (1<<CPU_MSR_SPEC_CTRL_STIBP_BIT)
+#define CPU_MSR_SPEC_CTRL_SSBD      (1<<CPU_MSR_SPEC_CTRL_SSBD_BIT)
+
+#define CPU_MSR_SYSENTER_CS     0x174
+#define CPU_MSR_SYSENTER_ESP    0x175
+#define CPU_MSR_SYSENTER_EIP    0x176
+
+#define CPU_MSR_ARCH_CAPS       0x10A
+#define CPU_MSR_ARCH_CAPS_RDCL_NO_BIT   0
+#define CPU_MSR_ARCH_CAPS_IBRS_ALL_BIT  1
+#define CPU_MSR_ARCH_CAPS_RSBA_BIT      2
+#define CPU_MSR_ARCH_CAPS_L1TF_NO_BIT   3
+#define CPU_MSR_ARCH_CAPS_SSB_NO_BIT    4
+// 1=no rogue cache load
+#define CPU_MSR_ARCH_CAPS_RDCL_NO       (1<<CPU_MSR_ARCH_CAPS_RDCL_NO_BIT)
+// 1=support IBRS
+#define CPU_MSR_ARCH_CAPS_IBRS_ALL      (1<<CPU_MSR_ARCH_CAPS_IBRS_ALL_BIT)
+// 1=uses alternate predictor for ret
+#define CPU_MSR_ARCH_CAPS_RSBA          (1<<CPU_MSR_ARCH_CAPS_RSBA_BIT)
+// 1=no L1 terminal fault
+#define CPU_MSR_ARCH_CAPS_L1TF_NO       (1<<CPU_MSR_ARCH_CAPS_L1TF_NO_BIT)
+// 1=no speculative store bypass
+#define CPU_MSR_ARCH_CAPS_SSB_NO        (1<<CPU_MSR_ARCH_CAPS_SSB_NO_BIT)
+
+#define CPU_MSR_FLUSH_CMD       0x10B
+// Writeback and invalidate L1 cache
+#define CPU_MSR_FLUSH_CMD_L1D_FLUSH_BIT  0
+#define CPU_MSR_FLUSH_CMD_L1D_FLUSH  (1<<CPU_MSR_FLUSH_CMD_L1D_FLUSH_BIT)
+
 // IA32_MISC_ENABLE
-#define CPU_MSR_MISC_ENABLE    0x1A0U
+#define CPU_MSR_MISC_ENABLE     0x1A0U
+
+// IA32_PERF_BIAS
+#define CPU_MSR_PERF_BIAS       0x1B0
+//4 bit value, 0=fast, 1=lowpower If CPUID.6H:ECX[3] = 1
 
 // PAT MSR
 #define CPU_MSR_IA32_PAT        0x277U
@@ -124,6 +173,7 @@
 #define CPU_MSR_MISC_ENABLE_MONITOR_FSM_BIT     18
 #define CPU_MSR_MISC_ENABLE_LIMIT_CPUID_BIT     22
 #define CPU_MSR_MISC_ENABLE_XTPR_DISABLED_BIT   23
+// 33:24 reserved
 #define CPU_MSR_MISC_ENABLE_XD_DISABLE_BIT      34
 
 #define CPU_MSR_MISC_ENABLE_FAST_STR \

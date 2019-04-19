@@ -4,6 +4,36 @@
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
 
+// This code may clobber everything. Every single register except
+// esp is used to pass parameters
+// eax syscall number
+// ebx, ecx, edx, esi, edi, ebp 6 parameters
+sysenter_entry:
+    .cfi_startproc
+    cmpl $ SYSCALL_COUNT,%eax
+    jae 0f
+
+    // Swizzle 6 x86 parameters into x86_64 parameters
+    // edi -> rdi
+    // esi -> rsi
+    // edx -> rdx
+    // ecx -> rcx
+    // ebx -> r8
+    // ebp -> r9
+
+    movslq %edi,%rdi
+    movslq %esi,%rsi
+    movslq %edx,%rdx
+    movslq %ecx,%rcx
+    movslq %ebx,%r8
+    movslq %ebp,%r9
+
+
+
+    sysexit
+
+    .cfi_endproc
+
 // This code may clobber rdi, rsi, rdx, rcx, r8-r11, rflags
 // This code may clobber the entire FPU/SSE/AVX state
 // This code must preserve rbx, rbp, r12-r15

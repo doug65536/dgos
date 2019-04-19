@@ -62,6 +62,11 @@ void cpuid_init()
         cpuid_cache.has_invpcid = info.ebx & (1U << 10);
         cpuid_cache.has_avx512f = info.ebx & (1U << 16);
         cpuid_cache.has_smap    = info.ebx & (1U << 20);
+
+        cpuid_cache.has_ibrs    = info.edx & (1U << 26);
+        cpuid_cache.has_stibp   = info.edx & (1U << 27);
+        cpuid_cache.has_ssbd    = info.edx & (1U << 31);
+        cpuid_cache.has_l1df    = info.edx & (1U << 28);
     }
 
     if (cpuid(&info, CPUID_APM, 0)) {

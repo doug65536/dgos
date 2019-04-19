@@ -9,7 +9,7 @@
 #include "inttypes.h"
 #include "time.h"
 
-#define PCI_DEBUG   0
+#define PCI_DEBUG   1
 #if PCI_DEBUG
 #define PCI_TRACE(...) printk("pci: " __VA_ARGS__)
 #else
@@ -706,7 +706,7 @@ EXPORT int pci_enum_capabilities(int start, pci_addr_t addr,
     while (ofs != 0) {
         uint16_t type_next = pci_config_read(addr, ofs, 2);
         uint8_t type = type_next & 0xFF;
-        uint16_t next = (type_next >> 8) & 0xFF;
+        uint8_t next = (type_next >> 8) & 0xFF;
 
         PCI_TRACE("cap: ofs=%#x, bus=%d, func=%d, type=%#x, next=%#x\n",
                   ofs, addr.bus(), addr.func(), type, next);

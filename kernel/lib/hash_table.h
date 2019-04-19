@@ -12,7 +12,7 @@
 // A count of used items and holes are maintained.
 // If more than half of the entries are hole at deletion
 // then rehash without reducing the table size.
-// Rehashing resets eliminates all holes.
+// Rehashing eliminates all holes.
 
 template<typename T, typename K, typename P,
          K const T::*key_member, size_t key_sz>
@@ -116,7 +116,7 @@ template<typename T, typename K, typename P,
 bool basic_hashtbl_t<T, K, P, key_member, key_sz>::insert(T *item)
 {
     if (unlikely(items.empty() || used >= ((1U << log2_capacity) >> 1))) {
-        if (!grow())
+        if (unlikely(!grow()))
             return false;
     }
 

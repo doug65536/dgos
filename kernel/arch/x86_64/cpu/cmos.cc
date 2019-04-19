@@ -248,14 +248,14 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
         time_of_day = cmos_read_gettimeofday(lock);
         time_of_day_timestamp = time_ns();
 
-        char msg[512];
-        size_t ofs = 0;
-        for (int i = 0; i < thread_cpu_count(); ++i) {
-            ofs += snprintf(msg + ofs, countof(msg) - ofs, "(%d)=%d ",
-                     i, thread_cpu_usage(i));
-        }
+        //char msg[512];
+        //size_t ofs = 0;
+        //for (int i = 0; i < thread_cpu_count(); ++i) {
+        //    ofs += snprintf(msg + ofs, countof(msg) - ofs, "(%d)=%d ",
+        //             i, thread_cpu_usage(i));
+        //}
 
-        printdbg("CPU usage: %s\n", msg);
+        //printdbg("CPU usage: %s\n", msg);
 
         // Flush trace
         if (eainst_flush_ready)

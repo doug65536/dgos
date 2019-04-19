@@ -67,6 +67,12 @@ struct cpuid_cache_t {
     bool has_smap       :1;
     bool has_inrdtsc    :1;
 
+    bool has_ibpb       :1;
+    bool has_ibrs       :1;
+    bool has_stibp      :1;
+    bool has_ssbd       :1;
+    bool has_l1df       :1;
+
     bool bug_meltdown   :1;
 
     uint16_t min_monitor_line;
@@ -285,4 +291,29 @@ CPUID_CONST_INLINE uint8_t cpuid_paddr_bits()
 CPUID_CONST_INLINE uint8_t cpuid_has_bug_meltdown()
 {
     return cpuid_cache.bug_meltdown;
+}
+
+CPUID_CONST_INLINE uint8_t cpuid_has_ibpb()
+{
+    return cpuid_cache.has_ibpb;
+}
+
+CPUID_CONST_INLINE uint8_t cpuid_has_ibrs()
+{
+    return cpuid_cache.has_ibrs;
+}
+
+CPUID_CONST_INLINE uint8_t cpuid_has_stibp()
+{
+    return cpuid_cache.has_stibp;
+}
+
+CPUID_CONST_INLINE uint8_t cpuid_has_ssbd()
+{
+    return cpuid_cache.has_ssbd;
+}
+
+CPUID_CONST_INLINE uint8_t cpuid_has_l1d_flush()
+{
+    return cpuid_cache.has_l1df;
 }

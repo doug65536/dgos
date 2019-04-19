@@ -3514,8 +3514,33 @@ bool mm_copy_user_str_smap(char *dst, char const *src, size_t size)
     return result;
 }
 
-typedef bool (*mm_copy_user_fn)(void *dst, void const *src, size_t size);
-typedef bool (*mm_copy_user_str_fn)(char *dst, char const *src, size_t size);
+intptr_t mm_lenof_user_str_generic(char const *src, size_t max_size)
+{
+    __try {
+        for (intptr_t len = 0; len < max_size; ++len) {
+            if (src[len] == 0)
+                return len;
+        }
+    } __catch {
+        return -1;
+    }
+    return -1;
+}
+
+intptr_t mm_lenof_user_str_smap(char const *src, size_t max_size)
+{
+    cpu_stac();
+    intptr_t result = mm_lenof_user_str_generic(src, max_size);
+    cpu_clac();
+    return result;
+}
+
+typedef bool (*mm_copy_user_fn)(
+        void *dst, void const *src, size_t size);
+typedef bool (*mm_copy_user_str_fn)(
+        char *dst, char const *src, size_t size);
+typedef intptr_t (*mm_lenof_user_str_fn)(
+        char const *src, size_t max_size);
 
 extern "C" mm_copy_user_fn mm_copy_user_resolver()
 {
@@ -3531,11 +3556,21 @@ extern "C" mm_copy_user_str_fn mm_copy_user_str_resolver()
     return mm_copy_user_str_generic;
 }
 
+extern "C" mm_lenof_user_str_fn mm_lenof_user_str_resolver()
+{
+    if (cpuid_has_smap())
+        return mm_lenof_user_str_smap;
+    return mm_lenof_user_str_generic;
+}
+
 _ifunc_resolver(mm_copy_user_resolver)
 EXPORT bool mm_copy_user(void *dst, void const *src, size_t size);
 
 _ifunc_resolver(mm_copy_user_str_resolver)
 EXPORT bool mm_copy_user_str(char *dst, char const *src, size_t size);
+
+_ifunc_resolver(mm_lenof_user_str_resolver)
+EXPORT intptr_t mm_lenof_user_str(char const *src, size_t max_size);
 
 EXPORT bool mm_is_user_range(void const *buf, size_t size)
 {

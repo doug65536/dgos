@@ -147,7 +147,7 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
     GDT_MAKE_CODEDATA_DESCRIPTOR(0, 0x0FFFF, 1, ring, 0, 0, 1, 0, 0, 0)
 
 // Task State Segment (64-bit)
-struct tss_t {
+struct alignas(64) tss_t {
     // EVERYTHING is misaligned without dummy_align
     uint32_t dummy_align;
 

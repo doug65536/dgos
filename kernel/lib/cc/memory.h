@@ -475,3 +475,35 @@ private:
 };
 
 __END_NAMESPACE_STD
+
+__BEGIN_NAMESPACE_EXT
+#include "cpu/control_regs_constants.h"
+#include "thread.h"
+template<typename T>
+class per_cpu_t
+{
+    void init()
+    {
+        cpu_count = thread_get_cpu_count();
+        for (auto it = storage, en = storage + cpu_count; it != en; ++it)
+            new (it) T();
+    }
+
+    template<typename ...Args>
+    void init(Args&& ...args)
+    {
+        size_t cpu_count = thread_get_cpu_count();
+        for (auto it = storage, en = storage + cpu_count; it != en; ++it)
+            new (it) T(std::forward<Args>(args)...);
+    }
+
+    ~per_cpu_t()
+    {
+        for (auto it = storage, en = storage + cpu_count; it != en; ++it)
+            ((T*)(it))->~T();
+    }
+
+    typename std::aligned_storage<sizeof(T)>::type storage[MAX_CPUS];
+    size_t cpu_count = 0;
+};
+__END_NAMESPACE_EXT

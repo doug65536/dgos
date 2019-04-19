@@ -119,3 +119,189 @@ int thread_run_data_t::invoke() const
         }
     }
 }
+
+thread_cpu_mask_t::thread_cpu_mask_t(int bit)
+    : thread_cpu_mask_t()
+{
+    if (bit >= 0)
+        *this += bit;
+    else
+        std::fill_n(bitmap, countof(bitmap), ~UINT64_C(0));
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::operator+=(size_t bit)
+{
+    bitmap[(bit >> 6)] |= (UINT64_C(1) << (bit & 63));
+    return *this;
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::atom_set(size_t bit)
+{
+    atomic_or(&bitmap[(bit >> 6)], (UINT64_C(1) << (bit & 63)));
+    return *this;
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::operator-=(size_t bit)
+{
+    bitmap[(bit >> 6)] &= ~(UINT64_C(1) << (bit & 63));
+    return *this;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator-(const thread_cpu_mask_t &rhs) const
+{
+    thread_cpu_mask_t result{*this};
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = bitmap[i] & ~rhs.bitmap[i];
+    return result;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator+(const thread_cpu_mask_t &rhs) const
+{
+    thread_cpu_mask_t result{*this};
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = bitmap[i] | rhs.bitmap[i];
+    return result;
+}
+
+void thread_cpu_mask_t::atom_clr(size_t bit) volatile
+{
+    atomic_and(&bitmap[(bit >> 6)], ~(UINT64_C(1) << (bit & 63)));
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator&(const thread_cpu_mask_t &rhs) const
+{
+    thread_cpu_mask_t result;
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = bitmap[i] & rhs.bitmap[i];
+    return result;
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::operator&=(const thread_cpu_mask_t &rhs)
+{
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        bitmap[i] &= rhs.bitmap[i];
+    return *this;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::atom_and(const thread_cpu_mask_t &rhs) volatile
+{
+    thread_cpu_mask_t result;
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = atomic_and(&bitmap[i], rhs.bitmap[i]);
+    return result;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator|(const thread_cpu_mask_t &rhs) const
+{
+    thread_cpu_mask_t result;
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = bitmap[i] | rhs.bitmap[i];
+    return result;
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::operator|=(const thread_cpu_mask_t &rhs)
+{
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        bitmap[i] |= rhs.bitmap[i];
+    return *this;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::atom_or(const thread_cpu_mask_t &rhs) volatile
+{
+    thread_cpu_mask_t result;
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = atomic_or(&bitmap[i], rhs.bitmap[i]);
+    return result;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator^(const thread_cpu_mask_t &rhs) const
+{
+    thread_cpu_mask_t result;
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = bitmap[i] ^ rhs.bitmap[i];
+    return result;
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::operator^=(const thread_cpu_mask_t &rhs)
+{
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        bitmap[i] ^= rhs.bitmap[i];
+    return *this;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::atom_xor(const thread_cpu_mask_t &rhs) volatile
+{
+    thread_cpu_mask_t result;
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        result.bitmap[i] = atomic_xor(&bitmap[i], rhs.bitmap[i]);
+    return result;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator~() const
+{
+    thread_cpu_mask_t comp{};
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        comp.bitmap[i] = ~bitmap[i];
+    return comp;
+}
+
+bool thread_cpu_mask_t::operator!() const
+{
+    uint64_t un = bitmap[0];
+    for (size_t i = 1, e = countof(bitmap); i != e; ++i)
+        un |= bitmap[i];
+    return un == 0;
+}
+
+bool thread_cpu_mask_t::operator[](size_t bit) const
+{
+    return bitmap[(bit >> 6)] & (UINT64_C(1) << (bit & 63));
+}
+
+size_t thread_cpu_mask_t::lsb_set() const
+{
+    for (size_t i = 0; i < bitmap_entries; ++i) {
+        if (bitmap[i]) {
+            return bit_lsb_set(bitmap[i]) +
+                    i * (sizeof(*bitmap) * CHAR_BIT);
+        }
+    }
+    return ~size_t(0);
+}
+
+thread_cpu_mask_t &thread_cpu_mask_t::set_all()
+{
+    for (size_t i = 0, e = countof(bitmap); i != e; ++i)
+        bitmap[i] = ~(UINT64_C(0));
+    return *this;
+}
+
+bool thread_cpu_mask_t::operator==(const thread_cpu_mask_t &rhs) const
+{
+    bool is_equal = bitmap[0] == rhs.bitmap[0];
+    for (size_t i = 1, e = countof(bitmap); i != e; ++i)
+        is_equal = is_equal & (bitmap[i] == rhs.bitmap[i]);
+    return is_equal;
+}
+
+bool thread_cpu_mask_t::operator!=(const thread_cpu_mask_t &rhs) const
+{
+    bool not_equal = bitmap[0] != rhs.bitmap[0];
+    for (size_t i = 1, e = countof(bitmap); i != e; ++i)
+        not_equal = not_equal | (bitmap[i] != rhs.bitmap[i]);
+    return not_equal;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator-(size_t bit)
+{
+    thread_cpu_mask_t result{*this};
+    result -= bit;
+    return result;
+}
+
+thread_cpu_mask_t thread_cpu_mask_t::operator+(size_t bit)
+{
+    thread_cpu_mask_t result{*this};
+    result += bit;
+    return result;
+}

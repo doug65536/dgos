@@ -16,7 +16,7 @@ C_ASSERT(sizeof(gdt_entry_combined_t) == 8);
 
 // Must match control_regs_constants.h GDT_SEL_* defines!
 __aligned(64) gdt_entry_combined_t gdt[24] = {
-    // --- cache line ---
+    // --- cache line 0x00 ---
 
     // 0x00
     GDT_MAKE_EMPTY(),
@@ -34,7 +34,7 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY(),
 
-    // --- cache line ---
+    // --- cache line 0x40 ---
 
     // 32 bit user code
     // 0x40, 0x48, 0x50
@@ -50,11 +50,11 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     GDT_MAKE_CODESEG64(0),
     GDT_MAKE_DATASEG(0),
 
-    // 0x68, 0x70, 0x78
+    // 0x70, 0x78
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY(),
 
-    // --- cache line ---
+    // --- cache line 0x80 ---
 
     // CPU task selector
     // 0x80-0x8F
@@ -68,7 +68,7 @@ __aligned(64) gdt_entry_combined_t gdt[24] = {
     GDT_MAKE_EMPTY(),
     GDT_MAKE_EMPTY()
 
-    // --- cache line ---
+    // --- cache line 0xc0 ---
 };
 
 C_ASSERT(GDT_SEL_KERNEL_CODE64 == 12*8);

@@ -193,6 +193,30 @@ void cpu_init(int ap)
     cpu_msr_set(CPU_MSR_STAR, (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
                (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
 
+    // Configure sysenter
+    cpu_msr_set(CPU_MSR_SYSENTER_CS, GDT_SEL_KERNEL_CODE64);
+    cpu_msr_set(CPU_MSR_SYSENTER_EIP, uint64_t(sysenter_entry));
+    cpu_msr_set(CPU_MSR_SYSENTER_ESP, 0);
+
+    // Configure security features/workarounds
+    clr = 0;
+    set = 0;
+
+    // Try to resort to IBRS if IBPB not supported
+    if (!cpuid_has_ibpb() && cpuid_has_ibrs())
+        set |= CPU_MSR_SPEC_CTRL_IBRS;
+
+    // Enable peer threads to have separate indirect branch predictors
+    if (cpuid_has_stibp())
+        set |= CPU_MSR_SPEC_CTRL_STIBP;
+
+    // Enable blocking speculative stores until prior loads are resolved
+    if (cpuid_has_ssbd())
+        set |= CPU_MSR_SPEC_CTRL_SSBD;
+
+    if (set)
+        cpu_msr_change_bits(CPU_MSR_SPEC_CTRL, clr, set);
+
     // SYSCALL and SYSRET are hardwired to assume these things about the GDT:
     static_assert(GDT_SEL_USER_DATA == GDT_SEL_USER_CODE32 + 8,
                   "GDT inconsistent with SYSCALL/SYSRET behaviour");

@@ -3,8 +3,8 @@
 #include "cpu/spinlock.h"
 #include "cpu/spinlock_arch.h"
 #include "errno.h"
-#include "algorithm.h"
-#include "bitsearch.h"
+//#include "algorithm.h"
+//#include "bitsearch.h"
 
 __BEGIN_DECLS
 
@@ -54,215 +54,79 @@ struct thread_cpu_mask_t
     }
 
     // In-place, bit=-1 to set all bits, bit=6 to set bit 6 only, others clear
-    constexpr thread_cpu_mask_t(int bit)
-        : thread_cpu_mask_t()
-    {
-        if (bit >= 0)
-            *this += bit;
-        else
-            std::fill_n(bitmap, countof(bitmap), ~UINT64_C(0));
-    }
+    constexpr thread_cpu_mask_t(int bit);
 
     // += 4 sets bit 4. If bit 7 wasn't clear, writes value unchanged
-    constexpr thread_cpu_mask_t& operator+=(size_t bit)
-    {
-        bitmap[(bit >> 6)] |= (UINT64_C(1) << (bit & 63));
-        return *this;
-    }
+    constexpr thread_cpu_mask_t& operator+=(size_t bit);
 
-    constexpr thread_cpu_mask_t operator+(size_t bit)
-    {
-        thread_cpu_mask_t result{*this};
-        result += bit;
-        return result;
-    }
+    constexpr thread_cpu_mask_t operator+(size_t bit);
 
     // += 4 sets bit 4. If bit 7 wasn't clear, writes value unchanged
-    thread_cpu_mask_t& atom_set(size_t bit)
-    {
-        atomic_or(&bitmap[(bit >> 6)], (UINT64_C(1) << (bit & 63)));
-        return *this;
-    }
+    thread_cpu_mask_t& atom_set(size_t bit);
 
     // -= 7 clears bit 7. If bit 7 wasn't set, writes value unchanged
-    constexpr thread_cpu_mask_t& operator-=(size_t bit)
-    {
-        bitmap[(bit >> 6)] &= ~(UINT64_C(1) << (bit & 63));
-        return *this;
-    }
+    constexpr thread_cpu_mask_t& operator-=(size_t bit);
 
-    constexpr thread_cpu_mask_t operator-(size_t bit)
-    {
-        thread_cpu_mask_t result{*this};
-        result -= bit;
-        return result;
-    }
+    constexpr thread_cpu_mask_t operator-(size_t bit);
 
     constexpr thread_cpu_mask_t operator-(
-            thread_cpu_mask_t const& rhs) const
-    {
-        thread_cpu_mask_t result{*this};
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = bitmap[i] & ~rhs.bitmap[i];
-        return result;
-    }
+            thread_cpu_mask_t const& rhs) const;
 
     constexpr thread_cpu_mask_t operator+(
-            thread_cpu_mask_t const& rhs) const
-    {
-        thread_cpu_mask_t result{*this};
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = bitmap[i] | rhs.bitmap[i];
-        return result;
-    }
+            thread_cpu_mask_t const& rhs) const;
 
     // -= 7 clears bit 7. If bit 7 wasn't set, writes value unchanged
-    void atom_clr(size_t bit) volatile
-    {
-        atomic_and(&bitmap[(bit >> 6)], ~(UINT64_C(1) << (bit & 63)));
-    }
+    void atom_clr(size_t bit) volatile;
 
     // produce rvalue
     constexpr thread_cpu_mask_t operator&(
-            thread_cpu_mask_t const& rhs) const
-    {
-        thread_cpu_mask_t result;
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = bitmap[i] & rhs.bitmap[i];
-        return result;
-    }
+            thread_cpu_mask_t const& rhs) const;
 
     // modify in place
     constexpr thread_cpu_mask_t& operator&=(
-            thread_cpu_mask_t const& rhs)
-    {
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            bitmap[i] &= rhs.bitmap[i];
-        return *this;
-    }
+            thread_cpu_mask_t const& rhs);
 
     // modify in place
-    thread_cpu_mask_t atom_and(thread_cpu_mask_t const& rhs) volatile
-    {
-        thread_cpu_mask_t result;
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = atomic_and(&bitmap[i], rhs.bitmap[i]);
-        return result;
-    }
+    thread_cpu_mask_t atom_and(thread_cpu_mask_t const& rhs) volatile;
 
     // produce rvalue
     constexpr thread_cpu_mask_t operator|(
-            thread_cpu_mask_t const& rhs) const
-    {
-        thread_cpu_mask_t result;
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = bitmap[i] | rhs.bitmap[i];
-        return result;
-    }
+            thread_cpu_mask_t const& rhs) const;
 
     // modify in place
     constexpr thread_cpu_mask_t& operator|=(
-            thread_cpu_mask_t const& rhs)
-    {
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            bitmap[i] |= rhs.bitmap[i];
-        return *this;
-    }
+            thread_cpu_mask_t const& rhs);
 
-    thread_cpu_mask_t atom_or(thread_cpu_mask_t const& rhs) volatile
-    {
-        thread_cpu_mask_t result;
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = atomic_or(&bitmap[i], rhs.bitmap[i]);
-        return result;
-    }
+    thread_cpu_mask_t atom_or(thread_cpu_mask_t const& rhs) volatile;
 
     // produce rvalue
     constexpr thread_cpu_mask_t operator^(
-            thread_cpu_mask_t const& rhs) const
-    {
-        thread_cpu_mask_t result;
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = bitmap[i] ^ rhs.bitmap[i];
-        return result;
-    }
+            thread_cpu_mask_t const& rhs) const;
 
     // modify in place
     constexpr thread_cpu_mask_t& operator^=(
-            thread_cpu_mask_t const& rhs)
-    {
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            bitmap[i] ^= rhs.bitmap[i];
-        return *this;
-    }
+            thread_cpu_mask_t const& rhs);
 
     // modify in place
-    thread_cpu_mask_t atom_xor(thread_cpu_mask_t const& rhs) volatile
-    {
-        thread_cpu_mask_t result;
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            result.bitmap[i] = atomic_xor(&bitmap[i], rhs.bitmap[i]);
-        return result;
-    }
+    thread_cpu_mask_t atom_xor(thread_cpu_mask_t const& rhs) volatile;
 
     constexpr thread_cpu_mask_t(thread_cpu_mask_t const&) = default;
     ~thread_cpu_mask_t() = default;
 
-    constexpr thread_cpu_mask_t operator~() const
-    {
-        thread_cpu_mask_t comp{};
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            comp.bitmap[i] = ~bitmap[i];
-        return comp;
-    }
+    constexpr thread_cpu_mask_t operator~() const;
 
     // Returns true if every bit is zero
-    constexpr bool operator!() const
-    {
-        uint64_t un = bitmap[0];
-        for (size_t i = 1, e = countof(bitmap); i != e; ++i)
-            un |= bitmap[i];
-        return un == 0;
-    }
+    constexpr bool operator!() const;
 
-    constexpr bool operator[](size_t bit) const
-    {
-        return bitmap[(bit >> 6)] & (UINT64_C(1) << (bit & 63));
-    }
+    constexpr bool operator[](size_t bit) const;
 
-    constexpr size_t lsb_set() const
-    {
-        for (size_t i = 0; i < bitmap_entries; ++i) {
-            if (bitmap[i]) {
-                return bit_lsb_set(bitmap[i]) +
-                        i * (sizeof(*bitmap) * CHAR_BIT);
-            }
-        }
-        return ~size_t(0);
-    }
+    constexpr size_t lsb_set() const;
 
-    constexpr thread_cpu_mask_t& set_all()
-    {
-        for (size_t i = 0, e = countof(bitmap); i != e; ++i)
-            bitmap[i] = ~(UINT64_C(0));
-        return *this;
-    }
+    constexpr thread_cpu_mask_t& set_all();
 
-    bool operator==(thread_cpu_mask_t const& rhs) const
-    {
-        bool is_equal = bitmap[0] == rhs.bitmap[0];
-        for (size_t i = 1, e = countof(bitmap); i != e; ++i)
-            is_equal = is_equal & (bitmap[i] == rhs.bitmap[i]);
-        return is_equal;
-    }
+    bool operator==(thread_cpu_mask_t const& rhs) const;
 
-    bool operator!=(thread_cpu_mask_t const& rhs) const
-    {
-        bool not_equal = bitmap[0] != rhs.bitmap[0];
-        for (size_t i = 1, e = countof(bitmap); i != e; ++i)
-            not_equal = not_equal | (bitmap[i] != rhs.bitmap[i]);
-        return not_equal;
-    }
+    bool operator!=(thread_cpu_mask_t const& rhs) const;
 
     //
     // Bans

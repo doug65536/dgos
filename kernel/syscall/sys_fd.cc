@@ -85,14 +85,27 @@ static int badf_err()
 
 // == APIs that take file descriptors ==
 
+static int id_from_fd(int fd)
+{
+    process_t *p = fast_cur_process();
+
+    if (unlikely(fd < 0))
+        return badf_err();
+
+    int id = p->fd_to_id(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+
+    return id;
+}
+
 ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
     if (unlikely(!mm_is_user_range(bufaddr, count)))
         return err(errno_t::EFAULT);
 
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -112,9 +125,7 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
     if (unlikely(!mm_is_user_range(bufaddr, count)))
         return err(errno_t::EFAULT);
 
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -137,9 +148,7 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 
 int sys_close(int fd)
 {
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -156,9 +165,7 @@ ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
     if (unlikely(!mm_is_user_range(bufaddr, count)))
         return err(errno_t::EFAULT);
 
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -208,9 +215,7 @@ off_t sys_lseek(int fd, off_t ofs, int whence)
 
 int sys_fsync(int fd)
 {
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -224,9 +229,7 @@ int sys_fsync(int fd)
 
 int sys_fdatasync(int fd)
 {
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -240,9 +243,7 @@ int sys_fdatasync(int fd)
 
 int sys_ftruncate(int fd, off_t size)
 {
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
+    int id = id_from_fd(fd);
 
     if (unlikely(id < 0))
         return badf_err();
@@ -263,15 +264,10 @@ int sys_ioctl(int fd, int cmd, void* arg)
     if (unlikely(size > 0 && !mm_is_user_range(arg, size)))
         return err(errno_t::EINVAL);
 
-    // If the file descriptor is not valid, then fail with EBADF
-    if (unlikely(fd < 0))
-        return err(errno_t::EBADF);
+    int id = id_from_fd(fd);
 
-    process_t *p = fast_cur_process();
-
-    int id = p->fd_to_id(fd);
     if (unlikely(id < 0))
-        return err(errno_t::EBADF);
+        return badf_err();
 
     ext::unique_ptr_free<void> data;
 
@@ -350,8 +346,7 @@ int sys_dup2(int oldfd, int newfd)
 
 int sys_open(char const* pathname, int flags, mode_t mode)
 {
-    char kpathname[256];
-    mm_copy_user_str(kpathname, pathname, sizeof(kpathname));
+    path_t path(pathname);
 
     process_t *p = fast_cur_process();
 
@@ -374,7 +369,12 @@ int sys_creat(char const *path, mode_t mode)
 
     int fd = p->ids.desc_alloc.alloc();
 
-    int id = file_creat(path, mode);
+    int dirid = p->fd_to_id(dirfd);
+
+    if (unlikely(dirid < 0))
+        return badf_err();
+
+    int id = file_creatat(dirid, path, mode);
 
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
@@ -387,7 +387,12 @@ int sys_creat(char const *path, mode_t mode)
 
 int sys_truncate(char const *path, off_t size)
 {
-    int fd = sys_open(path, O_RDWR, 0);
+    return sys_truncateat(AT_FDCWD, path, size);
+}
+
+int sys_truncateat(int dirfd, char const *path, off_t size)
+{
+    int fd = sys_openat(dirfd, path, O_RDWR, 0);
     int err = sys_ftruncate(fd, size);
     sys_close(fd);
     return err;
@@ -397,36 +402,39 @@ int sys_rename(char const *old_path, char const *new_path)
 {
     if (unlikely(!old_path))
         return err(errno_t::EFAULT);
+
     if (unlikely(!new_path))
         return err(errno_t::EFAULT);
 
-    mlock(old_path, PATH_MAX);
+    char old_p[PATH_MAX];
+    char new_p[PATH_MAX];
 
-    mlock(new_path, PATH_MAX);
+    if (!mm_copy_user_str(old_p, old_path, sizeof(old_p)))
+        return -int(errno_t::EFAULT);
 
-    int status = file_rename(old_path, new_path);
-    if (likely(status >= 0))
-        return status;
+    int status = file_renameat(olddirfd, old_path, newdirfd, new_path);
+    if (unlikely(status < 0))
+        return err(status);
 
-    return err(status);
+    return status;
 }
 
 int sys_mkdir(char const *path, mode_t mode)
 {
     int status = file_mkdir(path, mode);
-    if (likely(status >= 0))
-        return status;
+    if (unlikely(status < 0))
+        return err(status);
 
-    return err(status);
+    return status;
 }
 
 int sys_rmdir(char const *path)
 {
     int status = file_rmdir(path);
-    if (likely(status >= 0))
-        return status;
+    if (unlikely(status < 0))
+        return err(status);
 
-    return err(status);
+    return status;
 }
 
 int sys_unlink(char const *path)
@@ -452,26 +460,67 @@ int sys_link(char const *from, char const *to)
 
 int sys_chmod(char const *path, mode_t mode)
 {
-    // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    file_t id(file_open(path, O_EXCL));
+    if (unlikely(id < 0))
+        return id;
+
+    int chmod_status = sys_fchmod(id, mode);
+
+    int close_status = id.close();
+
+    // If the actual chmod failed, and the close failed, report the chmod
+    // failure and drop the probably impossible close error
+
+    if (unlikely(close_status < 0 && chmod_status == 0))
+        return close_status;
+
+    return chmod_status;
 }
 
 int sys_fchmod(int fd, mode_t mode)
 {
-    // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+
+    return file_chmod(id, mode);
 }
 
 int sys_chown(char const *path, int uid, int gid)
 {
-    // FIXME: implement me
+    file_t id(file_open(path, O_EXCL));
+    if (unlikely(id < 0))
+        return id;
+
+    int chmod_status = sys_fchown(id, uid, gid);
+
+    int close_status = id.close();
+
+    // If the actual chmod failed, and the close failed, report the chmod
+    // failure and drop the probably impossible close error
+
+    if (unlikely(close_status < 0 && chmod_status == 0))
+        return close_status;
+
+    return chmod_status;
+}
+
+int sys_chownat(int dirfd, const char *path, int uid, int gid)
+{
     return -int(errno_t::ENOSYS);
 }
 
 int sys_fchown(int fd, int uid, int gid)
 {
-    // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    int id = id_from_fd(fd);
+
+    if (unlikely(id < 0))
+        return badf_err();
+
+    int chown_status = file_chown(id, uid, gid);
+
+    return chown_status;
 }
 
 int sys_setxattr(char const *path,
@@ -572,10 +621,11 @@ int sys_fcntl(int fd, int cmd, void *arg)
 //    case F_SETLKW:
 //    case F_GETLK:
 //    }
-    return int(errno_t::ENOSYS);
+    return -int(errno_t::ENOSYS);
 }
 
 char *sys_getcwd(char *buf, size_t size)
 {
     return (char*)intptr_t(errno_t::ENOSYS);
 }
+

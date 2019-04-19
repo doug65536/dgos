@@ -1,4 +1,5 @@
 #pragma once
+#include "sys_time.h"
 
 void sys_exit(int exitcode);
 void sys_futex(int *uaddr, int futex_op, int val,

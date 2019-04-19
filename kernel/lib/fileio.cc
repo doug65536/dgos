@@ -68,10 +68,19 @@ static void file_init(void *)
         panic_oom();
 }
 
-static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
+static filetab_t *file_fh_from_id(int id)
 {
-    if (path[0] == '/' && !memcmp(path, "/dev/", 5)) {
-        consumed = 5;
+    file_table_scoped_lock lock(file_table_lock);
+    filetab_t *item = nullptr;
+    if (likely(id >= 0 && size_t(id) < file_table.size())) {
+        item = &file_table[id];
+
+        if (likely(item->refcount > 0))
+            return item;
+        assert(!"Zero ref count!");
+    }
+    return nullptr;
+}
 
         auto cur_devfs = atomic_ld_acq(&dev_fs);
 
@@ -474,4 +483,188 @@ int file_unlink(char const *path)
         return -int(errno_t::ENOENT);
 
     return fs->unlink(path + consumed);
+}
+
+int file_chmod(int id, mode_t mode)
+{
+    filetab_t *fh = file_fh_from_id(id);
+    if (unlikely(!fh))
+        return int(errno_t::EBADF);
+
+    if (unlikely(!fh))
+        return -int(errno_t::ENOENT);
+
+    return fh->fs->fchmod(fh->fi, mode);
+}
+
+int file_chown(int id, int uid, int gid)
+{
+    filetab_t *fh = file_fh_from_id(id);
+
+    if (unlikely(!fh))
+        return -int(errno_t::ENOENT);
+
+    return fh->fs->fchown(fh->fi, uid, gid);
+}
+
+path_t::path_t(const char *user_path)
+{
+    // Get the length of the user memory string
+    intptr_t len = mm_lenof_user_str(user_path, PATH_MAX);
+
+    // Return with valid still false
+    if (unlikely(len < 0))
+        return;
+
+    // Get a pointer to aligned storage
+    char *buf = reinterpret_cast<char *>(&data);
+
+    // If failed to copy string
+    if (unlikely(!mm_copy_user(buf, user_path, len + 1))) {
+        err = errno_t::EFAULT;
+        return;
+    }
+
+    // If the string myseriously changed length, fail
+    if (unlikely(memchr(buf, 0, len + 1) != buf + len)) {
+        // That's strange, nice try
+        err = errno_t::EFAULT;
+        return;
+    }
+
+    // Round up to aligned boundary and place component pointer list there
+    size_t comp_ofs = (len + sizeof(void*) - 1) & -(sizeof(void*));
+
+    components = (path_frag_t *)(buf + comp_ofs);
+
+    char const *it = buf;
+
+    // One or three (but not two) leading slashes means absolute
+    if ((it[0] == '/' && it[1] != '/') ||
+            (it[0] == '/' && it[1] == '/' && it[2] == '/')) {
+        // Absolute path
+        absolute = true;
+        while (*++it == '/');
+    } else if (it[0] == '/' && it[1] == '/') {
+        // UNC path
+        absolute = true;
+        unc = true;
+        it += 2;
+    }
+
+    char const *st = it;
+
+    for (; ; ) {
+        // Handle separator or end of path as end of token
+        if (*it != '/' && *it != 0) {
+            ++it;
+        } else {
+            // Emit a component
+            components[nr_components++] = {
+                uint16_t(st - buf), uint16_t(it - buf), hash_32(st, it - st)
+            };
+
+            // If it was end of path, then done
+            if (*it == 0)
+                break;
+
+            // Eat consecutive slashes
+            while (*++it == '/');
+
+            // Next token starts here
+            st = it;
+        }
+    }
+
+    valid = true;
+}
+
+size_t path_t::size() const
+{
+    return nr_components;
+}
+
+size_t path_t::text_len() const
+{
+    return uintptr_t(components) - uintptr_t(&data);
+}
+
+uint32_t path_t::hash_of(size_t index) const
+{
+    return components[index].hash;
+}
+
+const char *path_t::begin_of(size_t index) const
+{
+    if (likely(index < nr_components))
+        return reinterpret_cast<char const *>(data.data) +
+                components[index].st;
+    assert(!"Not good");
+    return nullptr;
+}
+
+const char *path_t::end_of(size_t index) const
+{
+    if (likely(index < nr_components))
+        return reinterpret_cast<char const *>(data.data) +
+                components[index].en;
+    assert(!"Not good");
+    return nullptr;
+}
+
+size_t path_t::len_of(size_t index) const
+{
+    if (likely(index < nr_components)) {
+        path_frag_t const& frag = components[index];
+        return frag.en - frag.st;
+    }
+    return 0;
+}
+
+std::pair<const char *, const char *> path_t::range_of(size_t index) const
+{
+    if (likely(index < nr_components)) {
+        path_frag_t const& frag = components[index];
+        return {
+            reinterpret_cast<char const *>(data.data) + frag.st,
+                    reinterpret_cast<char const *>(data.data) + frag.en
+        };
+    }
+    assert(!"Not good");
+    return {nullptr, nullptr};
+}
+
+bool path_t::is_abs() const
+{
+    return absolute;
+}
+
+bool path_t::is_unc() const
+{
+    return unc;
+}
+
+bool path_t::is_relative() const
+{
+    return !absolute;
+}
+
+bool path_t::is_valid() const
+{
+    return valid;
+}
+
+errno_t path_t::error() const
+{
+    return err;
+}
+
+const char *path_t::operator[](size_t component) const
+{
+    return begin_of(component);
+}
+
+path_t::operator bool() const
+{
+    return valid && err == errno_t::OK;
 }

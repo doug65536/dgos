@@ -207,3 +207,94 @@ public:
 private:
     std::vector<pmd_t> entries;
 };
+
+// 64-bit
+struct path_frag_t {
+    // Half open range, start offset and offset of first character past end
+    uint16_t st;
+    uint16_t en;
+    // Hash
+    uint32_t hash;
+};
+
+// Safely bring a path string into a large object
+struct path_t {
+    // Locked down tight, create once, no copy, no assign
+    path_t(char const *user_path);
+    path_t(path_t const&) = delete;
+    path_t operator=(path_t const&) = delete;
+
+    operator bool() const;
+
+    // Worst cases:
+    // up to 4095 characters of path
+    // up to 2048 path components
+
+    size_t size() const;
+
+    size_t text_len() const;
+
+    uint32_t hash_of(size_t index) const;
+
+    // Null terminated, so c_str() like behaviour as well
+    char const *begin_of(size_t index) const;
+
+    char const *end_of(size_t index) const;
+
+    size_t len_of(size_t index) const;
+
+    std::pair<char const *, char const *> range_of(size_t index) const;
+
+    bool is_abs() const;
+
+    bool is_unc() const;
+
+    bool is_relative() const;
+
+    bool is_valid() const;
+
+    errno_t error() const;
+
+    char const *operator[](size_t component) const;
+
+#ifdef NDEBUG
+    __attribute__((__deprecated__("For debugging only")))
+#endif
+    std::string to_string() const
+    {
+        std::string s;
+
+        s.reserve(8 + uintptr_t(components) - uintptr_t(&data));
+
+        if (absolute)
+            s.push_back('/');
+
+        if (unc)
+            s.push_back('/');
+
+        for (size_t i = 0; i < nr_components; ++i) {
+            if (i > 0)
+                s.push_back('/');
+            std::pair<char const *, char const *> range = range_of(i);
+            s.append(range.first, range.second);
+        }
+
+        return s;
+    }
+
+private:
+    static const constexpr size_t path_buf_sz =
+            sizeof(path_frag_t) * (PATH_MAX/2) + PATH_MAX;
+
+    static_assert(path_buf_sz < 24 * 1024, "Will consume excessive stack");
+
+    path_frag_t *components = nullptr;
+
+    uint_fast16_t nr_components = 0;
+    errno_t err = errno_t::OK;
+    bool valid = false;
+    bool absolute = false;
+    bool unc = false;
+
+    typename std::aligned_storage<path_buf_sz, sizeof(char const*)>::type data;
+};

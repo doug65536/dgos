@@ -1499,3 +1499,16 @@ load_fsgsbase_range:
     // Patch points
     .quad .Lpatch_load_fsgsbase_csw_end
     .quad .Lpatch_load_fsgsbase_sysret_end
+
+// Table to patch code to use Indirect Branch Prediction Barrier
+.hidden ibpb_range
+ibpb_range:
+    // Implementations
+    .quad protection_barrier_ibpb
+    // Patch points
+    .quad .Lpatch_prot_bar_isr_entry
+    .quad .Lpatch_prot_bar_isr_exit
+    .quad .Lpatch_prot_bar_syscall
+    .quad .Lpatch_prot_bar_sysret
+    .quad .Lpatch_prot_bar_sysenter
+    .quad .Lpatch_prot_bar_sysexit
