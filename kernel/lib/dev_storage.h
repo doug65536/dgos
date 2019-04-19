@@ -5,6 +5,7 @@
 #include "cpu/atomic.h"
 #include "device/iocp.h"
 #include "vector.h"
+#include "fileio.h"
 
 // Storage device interface (IDE, AHCI, etc)
 
@@ -144,7 +145,7 @@ struct EXPORT storage_if_base_t {
 void storage_if_register_factory(
         char const *name, storage_if_factory_t *factory);
 
-typedef int dev_t;
+typedef int64_t dev_t;
 
 size_t storage_dev_count();
 storage_dev_base_t *storage_dev_open(dev_t dev);
@@ -170,6 +171,8 @@ class fs_file_info_t
 {
 public:
     virtual ~fs_file_info_t() {}
+    virtual void add_ref() = 0;
+    virtual void release_ref() = 0;
     virtual ino_t get_inode() const = 0;
 };
 
@@ -264,46 +267,62 @@ struct fs_base_t {
     // Scan directories
 
     virtual int opendir(fs_file_info_t **fi, fs_cpath_t path) = 0;
+
     virtual ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,
                             off_t offset) = 0;
+
     virtual int releasedir(fs_file_info_t *fi) = 0;
 
     //
     // Read directory entry information
 
-    virtual int getattr(fs_cpath_t path, fs_stat_t* stbuf) = 0;
-    virtual int access(fs_cpath_t path, int mask) = 0;
-    virtual int readlink(fs_cpath_t path, char* buf, size_t size) = 0;
+    virtual int fgetattr(fs_file_info_t *fi, fs_stat_t* stbuf) = 0;
+
+    virtual int accessat(fs_file_info_t *fi_dir, fs_cpath_t name,
+                         int mask) = 0;
+
+    virtual int freadlink(fs_file_info_t *fi, char* buf, size_t size) = 0;
 
     //
     // Modify directories
 
-    virtual int mknod(fs_cpath_t path, fs_mode_t mode, fs_dev_t rdev) = 0;
-    virtual int mkdir(fs_cpath_t path, fs_mode_t mode) = 0;
-    virtual int rmdir(fs_cpath_t path) = 0;
-    virtual int symlink(fs_cpath_t to, fs_cpath_t from) = 0;
-    virtual int rename(fs_cpath_t from, fs_cpath_t to) = 0;
-    virtual int link(fs_cpath_t from, fs_cpath_t to) = 0;
-    virtual int unlink(fs_cpath_t path) = 0;
+    virtual int mknodat(fs_file_info_t *fi_dir, fs_cpath_t path,
+                        fs_mode_t mode, fs_dev_t rdev) = 0;
+
+    virtual int mkdirat(fs_file_info_t *fi_dir, fs_cpath_t path,
+                        fs_mode_t mode) = 0;
+
+    virtual int rmdirat(fs_file_info_t *fi_dir, fs_cpath_t path) = 0;
+
+    virtual int symlinkat(fs_file_info_t *from_dir, fs_cpath_t from,
+                          fs_file_info_t *to_dir, fs_cpath_t to) = 0;
+
+    virtual int renameat(fs_file_info_t *from_dir, fs_cpath_t from,
+                         fs_file_info_t *to_dir, fs_cpath_t to) = 0;
+
+    virtual int linkat(fs_file_info_t *from_dir, fs_cpath_t from,
+                       fs_file_info_t *to_dir, fs_cpath_t to) = 0;
+
+    virtual int unlinkat(fs_file_info_t *fi_dir, fs_cpath_t name) = 0;
 
     //
     // Modify directory entries
 
-    virtual int chmod(fs_cpath_t path,
-                 fs_mode_t mode) = 0;
-    virtual int chown(fs_cpath_t path,
-                 fs_uid_t uid,
-                 fs_gid_t gid) = 0;
-    virtual int truncate(fs_cpath_t path,
-                    off_t size) = 0;
+    virtual int fchmod(fs_file_info_t *fi,
+                       fs_mode_t mode) = 0;
+
+    virtual int fchown(fs_file_info_t *fi,
+                       fs_uid_t uid, fs_gid_t gid) = 0;
+
     virtual int utimens(fs_cpath_t path,
-                   fs_timespec_t const *ts) = 0;
+                        fs_timespec_t const *ts) = 0;
 
     //
     // Open/close files
 
-    virtual int open(fs_file_info_t **fi,
-                fs_cpath_t path, int flags, mode_t mode) = 0;
+    virtual int openat(fs_file_info_t **fi, fs_file_info_t *fi_dir,
+                path_t const& path, int flags, mode_t mode) = 0;
+
     virtual int release(fs_file_info_t *fi) = 0;
 
     //
@@ -313,10 +332,12 @@ struct fs_base_t {
                     char *buf,
                     size_t size,
                     off_t offset) = 0;
+
     virtual ssize_t write(fs_file_info_t *fi,
                      char const *buf,
                      size_t size,
                      off_t offset) = 0;
+
     virtual int ftruncate(fs_file_info_t *fi,
                      off_t offset) = 0;
 
@@ -331,8 +352,10 @@ struct fs_base_t {
 
     virtual int fsync(fs_file_info_t *fi,
                  int isdatasync) = 0;
+
     virtual int fsyncdir(fs_file_info_t *fi,
                     int isdatasync) = 0;
+
     virtual int flush(fs_file_info_t *fi) = 0;
 
     //
@@ -344,8 +367,8 @@ struct fs_base_t {
     //
     // Get block map
 
-    virtual int bmap(fs_cpath_t path, size_t blocksize,
-                uint64_t* blockno) = 0;
+    virtual int bmapat(fs_file_info_t *dir_fi, path_t const& path,
+                       size_t blocksize, uint64_t* blockno) = 0;
 
     //
     // Get filesystem information
@@ -355,13 +378,15 @@ struct fs_base_t {
     //
     // Read/Write/Enumerate extended attributes
 
-    virtual int setxattr(fs_cpath_t path,
+    virtual int fsetxattr(fs_file_info_t *fi,
                     char const* name, char const* value,
                     size_t size, int flags) = 0;
-    virtual int getxattr(fs_cpath_t path,
+
+    virtual int fgetxattr(fs_file_info_t *fi,
                     char const* name, char* value,
                     size_t size) = 0;
-    virtual int listxattr(fs_cpath_t path,
+
+    virtual int flistxattr(fs_file_info_t *fi,
                      char const* list, size_t size) = 0;
 
     //
@@ -379,21 +404,27 @@ struct fs_base_t {
 };
 
 #define FS_BASE_WR_IMPL \
-    int mknod(fs_cpath_t path, fs_mode_t mode,                          \
-              fs_dev_t rdev) override final;                            \
-    int mkdir(fs_cpath_t path, fs_mode_t mode) override final;          \
-    int rmdir(fs_cpath_t path) override final;                          \
-    int symlink(fs_cpath_t to, fs_cpath_t from) override final;         \
-    int rename(fs_cpath_t from, fs_cpath_t to) override final;          \
-    int link(fs_cpath_t from, fs_cpath_t to) override final;            \
-    int unlink(fs_cpath_t path) override final;                         \
-    int chmod(fs_cpath_t path,                                          \
+    int mknodat(fs_file_info_t *fi_dir, fs_cpath_t path,                \
+                fs_mode_t mode, fs_dev_t rdev) override final;          \
+    int mkdirat(fs_file_info_t *fi_dir, fs_cpath_t path,                \
+                fs_mode_t mode) override final;                         \
+    int rmdirat(fs_file_info_t *fi_dir, fs_cpath_t path) override final;\
+    int symlinkat(fs_file_info_t *from_dir, fs_cpath_t from,            \
+                  fs_file_info_t *to_dir, fs_cpath_t to)                \
+                  override final;                                       \
+    int renameat(fs_file_info_t *from_dir, fs_cpath_t from,             \
+                 fs_file_info_t *to_dir, fs_cpath_t to) override final; \
+    int linkat(fs_file_info_t *from_dir, fs_cpath_t from,               \
+               fs_file_info_t *to_dir, fs_cpath_t to) override final;   \
+    int unlinkat(fs_file_info_t *fi_dir, fs_cpath_t path)               \
+                 override final;                                        \
+    int fchmod(fs_file_info_t *fi,                                      \
          fs_mode_t mode) override final;                                \
-    int chown(fs_cpath_t path,                                          \
+    int fchown(fs_file_info_t *fi,                                      \
          fs_uid_t uid,                                                  \
          fs_gid_t gid) override final;                                  \
-    int truncate(fs_cpath_t path,                                       \
-            off_t size) override final;                                 \
+    int truncate(fs_file_info_t *fi,                                    \
+            off_t size) = delete;                                       \
     ssize_t write(fs_file_info_t *fi,                                   \
              char const *buf,                                           \
              size_t size,                                               \
@@ -402,9 +433,9 @@ struct fs_base_t {
              off_t offset) override final;                              \
     int utimens(fs_cpath_t path,                                        \
            fs_timespec_t const *ts) override final;                     \
-    int setxattr(fs_cpath_t path,                                       \
-            char const* name, char const* value,                        \
-            size_t size, int flags) override final;                     \
+    int fsetxattr(fs_file_info_t *fi,                                   \
+                  char const* name, char const* value,                  \
+                  size_t size, int flags) override final;               \
     int fsync(fs_file_info_t *fi,                                       \
          int isdatasync) override final;                                \
     int fsyncdir(fs_file_info_t *fi,                                    \
@@ -419,12 +450,13 @@ struct fs_base_t {
     ssize_t readdir(fs_file_info_t *fi, dirent_t* buf,                  \
                     off_t offset) override final;                       \
     int releasedir(fs_file_info_t *fi) override final;                  \
-    int getattr(fs_cpath_t path, fs_stat_t* stbuf) override final;      \
-    int access(fs_cpath_t path, int mask) override final;               \
-    int readlink(fs_cpath_t path, char* buf,                            \
+    int fgetattr(fs_file_info_t *fi, fs_stat_t* stbuf) override final;  \
+    int accessat(fs_file_info_t *fi_dir, fs_cpath_t path, int mask)     \
+                 override final;                                        \
+    int freadlink(fs_file_info_t *fi, char* buf,                        \
                  size_t size) override final;                           \
-    int open(fs_file_info_t **fi,                                       \
-        fs_cpath_t path, int flags, mode_t mode) override final;        \
+    int openat(fs_file_info_t **fi, fs_file_info_t *fi_dir,             \
+        path_t const& path, int flags, mode_t mode) override final;     \
     int release(fs_file_info_t *fi) override final;                     \
     ssize_t read(fs_file_info_t *fi,                                    \
             char *buf,                                                  \
@@ -434,14 +466,13 @@ struct fs_base_t {
          fs_stat_t *st) override final;                                 \
     int lock(fs_file_info_t *fi,                                        \
         int cmd, fs_flock_t* locks) override final;                     \
-    int bmap(fs_cpath_t path, size_t blocksize,                         \
-        uint64_t* blockno) override final;                              \
+    int bmapat(fs_file_info_t *fi_dir, path_t const& path,              \
+        size_t blocksize, uint64_t* blockno) override final;            \
     int statfs(fs_statvfs_t* stbuf) override final;                     \
-    int getxattr(fs_cpath_t path,                                       \
-            char const* name, char* value,                              \
-            size_t size) override final;                                \
-    int listxattr(fs_cpath_t path,                                      \
-             char const* list, size_t size) override final;             \
+    int fgetxattr(fs_file_info_t *fi, char const* name, char* value,    \
+                  size_t size) override final;                          \
+    int flistxattr(fs_file_info_t *fi, char const* list, size_t size)   \
+                   override final;                                      \
     int ioctl(fs_file_info_t *fi,                                       \
          int cmd, void* arg,                                            \
          unsigned int flags, void* data) override final;                \

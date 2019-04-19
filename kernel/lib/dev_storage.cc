@@ -279,9 +279,8 @@ EXPORT int storage_dev_base_t::flush()
 //
 // Modify directories
 
-EXPORT int fs_base_ro_t::mknod(fs_cpath_t path,
-                         fs_mode_t mode,
-                         fs_dev_t rdev)
+EXPORT int fs_base_ro_t::mknodat(fs_file_info_t *fi_dir, fs_cpath_t path,
+                                 fs_mode_t mode, fs_dev_t rdev)
 {
     (void)path;
     (void)mode;
@@ -290,8 +289,8 @@ EXPORT int fs_base_ro_t::mknod(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::mkdir(fs_cpath_t path,
-                         fs_mode_t mode)
+EXPORT int fs_base_ro_t::mkdirat(fs_file_info_t *fi_dir,
+                                 fs_cpath_t path, fs_mode_t mode)
 {
     (void)path;
     (void)mode;
@@ -299,16 +298,16 @@ EXPORT int fs_base_ro_t::mkdir(fs_cpath_t path,
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::rmdir(fs_cpath_t path)
+EXPORT int fs_base_ro_t::rmdirat(fs_file_info_t *fi_dir, fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::symlink(
-        fs_cpath_t to,
-        fs_cpath_t from)
+EXPORT int fs_base_ro_t::symlinkat(
+        fs_file_info_t *from_dir, fs_cpath_t from,
+        fs_file_info_t *to_dir, fs_cpath_t to)
 {
     (void)to;
     (void)from;
@@ -316,9 +315,9 @@ EXPORT int fs_base_ro_t::symlink(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::rename(
-        fs_cpath_t from,
-        fs_cpath_t to)
+EXPORT int fs_base_ro_t::renameat(
+        fs_file_info_t *from_dir, fs_cpath_t from,
+        fs_file_info_t *to_dir, fs_cpath_t to)
 {
     (void)from;
     (void)to;
@@ -326,9 +325,9 @@ EXPORT int fs_base_ro_t::rename(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::link(
-        fs_cpath_t from,
-        fs_cpath_t to)
+EXPORT int fs_base_ro_t::linkat(
+        fs_file_info_t *from_dir, fs_cpath_t from,
+        fs_file_info_t *to_dir, fs_cpath_t to)
 {
     (void)from;
     (void)to;
@@ -336,8 +335,8 @@ EXPORT int fs_base_ro_t::link(
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::unlink(
-        fs_cpath_t path)
+EXPORT int fs_base_ro_t::unlinkat(
+        fs_file_info_t *fi_dir, fs_cpath_t path)
 {
     (void)path;
     // Fail, read only
@@ -347,34 +346,24 @@ EXPORT int fs_base_ro_t::unlink(
 //
 // Modify directory entries
 
-EXPORT int fs_base_ro_t::chmod(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fchmod(
+        fs_file_info_t *fi,
         fs_mode_t mode)
 {
-    (void)path;
+    (void)fi;
     (void)mode;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::chown(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fchown(
+        fs_file_info_t *fi,
         fs_uid_t uid,
         fs_gid_t gid)
 {
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
-    // Fail, read only
-    return -int(errno_t::EROFS);
-}
-
-EXPORT int fs_base_ro_t::truncate(
-        fs_cpath_t path,
-        off_t size)
-{
-    (void)path;
-    (void)size;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
@@ -439,15 +428,14 @@ EXPORT int fs_base_ro_t::flush(fs_file_info_t *fi)
     return 0;
 }
 
-EXPORT int fs_base_ro_t::setxattr(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fsetxattr(
+        fs_file_info_t *fi,
         char const* name,
         char const* value,
         size_t size,
         int flags)
 {
-    (void)path;
-    (void)name;
+    (void)fi;
     (void)value;
     (void)size;
     (void)flags;

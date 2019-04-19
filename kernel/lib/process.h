@@ -155,6 +155,7 @@ struct process_t
     pid_t pid = 0;
     int uid = 0;
     int gid = 0;
+    int cwdfd = 0;
     using lock_type = ext::mcslock;
     using scoped_lock = std::unique_lock<lock_type>;
     lock_type process_lock;

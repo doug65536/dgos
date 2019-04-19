@@ -1,8 +1,9 @@
 #pragma once
 #include "types.h"
 #include "dirent.h"
-
+#include "syscall/sys_fd.h"
 #include "vector.h"
+#include "cxxstring.h"
 
 #define SEEK_CUR    0
 #define SEEK_SET    1
@@ -10,11 +11,17 @@
 #define SEEK_DATA   3
 #define SEEK_HOLE   4
 
+#define AT_FDCWD -1
+
+struct path_t;
+
 bool file_ref_filetab(int id);
 
-int file_creat(char const *path, mode_t mode);
-int file_open(char const *path, int flags, mode_t mode = 0);
+int file_creatat(int dirid, char const *path, mode_t mode);
+int file_openat(int dirid, const path_t &path, int flags, mode_t mode = 0);
 int file_close(int id);
+int file_chmod(int id, mode_t mode);
+int file_chown(int id, int uid, int gid);
 ssize_t file_read(int id, void *buf, size_t bytes);
 ssize_t file_write(int id, void const *buf, size_t bytes);
 ssize_t file_pread(int id, void *buf, size_t bytes, off_t ofs);
@@ -26,16 +33,19 @@ int file_fdatasync(int id);
 int file_syncfs(int id);
 int file_ioctl(int id, int cmd, void* arg, unsigned flags, void *data);
 
-int file_opendir(char const *path);
+int file_opendirat(int dirid, char const *path);
 ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result);
 off_t file_telldir(int id);
 off_t file_seekdir(int id, off_t ofs);
 int file_closedir(int id);
 
+int file_mkdirat(int dirid, char const *path, mode_t mode);
 int file_mkdir(char const *path, mode_t mode);
 int file_rmdir(char const *path);
-int file_rename(char const *old_path, char const *new_path);
-int file_unlink(char const *path);
+int file_rmdirat(int dir_id, char const *path);
+int file_renameat(int olddirid, char const *old_path,
+                  int newdirid, char const *new_path);
+int file_unlinkat(int dirfd, char const *path);
 
 class file_t {
 public:

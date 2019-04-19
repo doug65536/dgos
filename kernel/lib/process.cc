@@ -162,11 +162,11 @@ int process_t::start()
     Elf64_Ehdr hdr;
 
     // Open a stdin, stdout, and stderr
-    int fd_i = file_open("/dev/conin", 0, 0);
-    int fd_o = file_open("/dev/conout", 0, 0);
-    int fd_e = file_open("/dev/conerr", 0, 0);
+    int fd_i = file_openat(AT_FDCWD, "/dev/conin", 0, 0);
+    int fd_o = file_openat(AT_FDCWD, "/dev/conout", 0, 0);
+    int fd_e = file_openat(AT_FDCWD, "/dev/conerr", 0, 0);
 
-    file_t fd{file_open(path, O_RDONLY)};
+    file_t fd{file_openat(AT_FDCWD, path, O_RDONLY)};
 
     if (unlikely(!fd)) {
         printdbg("Failed to open executable %s\n", path);

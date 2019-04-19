@@ -25,20 +25,34 @@ int sys_ftruncate(int fd, off_t size);
 int sys_ioctl(int fd, int cmd, void* arg);
 
 int sys_open(char const *pathname, int flags, mode_t mode);
+int sys_openat(int dirfd, char const *pathname, int flags, mode_t mode);
 int sys_creat(char const *path, mode_t mode);
+int sys_creatat(int dirfd, char const *path, mode_t mode);
 int sys_rename(char const *old_path, char const *new_path);
+int sys_renameat(int olddirfd, char const *old_path,
+                 int newdirfd, char const *new_path);
 int sys_mkdir(char const *path, mode_t mode);
+int sys_mkdirat(int dirfd, char const *path, mode_t mode);
 int sys_rmdir(char const *path);
+int sys_rmdirat(int dirfd, char const *path);
 int sys_unlink(char const *path);
+int sys_unlinkat(int dirfd, char const *path);
 int sys_truncate(char const *path, off_t size);
+int sys_truncateat(int dirfd, char const *path, off_t size);
 int sys_access(char const *path, int mask);
+int sys_accessat(int dirfd, char const *path, int mask);
 
 int sys_mknod(char const *path, mode_t mode, int rdev);
+int sys_mknodat(int dirfd, char const *path, mode_t mode, int rdev);
 
 int sys_link(char const *from, char const *to);
+int sys_linkat(int fromdirfd, char const *from,
+               int todirfd, char const *to);
 int sys_chmod(char const *path, mode_t mode);
+int sys_chmodat(int dirfd, char const *path, mode_t mode);
 int sys_fchmod(int fd, mode_t mode);
 int sys_chown(char const *path, int uid, int gid);
+int sys_chownat(int dirfd, char const *path, int uid, int gid);
 int sys_fchown(int fd, int uid, int gid);
 
 int sys_setxattr(char const *path,

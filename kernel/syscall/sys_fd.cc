@@ -357,7 +357,7 @@ int sys_open(char const* pathname, int flags, mode_t mode)
 
     int fd = p->ids.desc_alloc.alloc();
 
-    int id = file_open(kpathname, flags, mode);
+    int id = file_openat(AT_FDCWD, path, flags, mode);
 
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
@@ -368,7 +368,13 @@ int sys_open(char const* pathname, int flags, mode_t mode)
     return err(-id);
 }
 
+
 int sys_creat(char const *path, mode_t mode)
+{
+    return sys_creatat(AT_FDCWD, path, mode);
+}
+
+int sys_creatat(int dirfd, char const *path, mode_t mode)
 {
     process_t *p = fast_cur_process();
 
@@ -394,6 +400,12 @@ int sys_truncate(char const *path, off_t size)
 }
 
 int sys_rename(char const *old_path, char const *new_path)
+{
+    return sys_renameat(AT_FDCWD, old_path, AT_FDCWD, new_path);
+}
+
+int sys_renameat(int olddirfd, char const *old_path,
+                 int newdirfd, char const *new_path)
 {
     if (unlikely(!old_path))
         return err(errno_t::EFAULT);
@@ -578,4 +590,44 @@ int sys_fcntl(int fd, int cmd, void *arg)
 char *sys_getcwd(char *buf, size_t size)
 {
     return (char*)intptr_t(errno_t::ENOSYS);
+
+int sys_renameat(int olddirfd, const char *old_path,
+                 int newdirfd, const char *new_path)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_mkdirat(int dirfd, const char *path, mode_t mode)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_rmdirat(int dirfd, const char *path)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_unlinkat(int dirfd, const char *path)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_accessat(int dirfd, const char *path, int mask)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_mknodat(int dirfd, const char *path, mode_t mode, int rdev)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_linkat(int fromdirfd, const char *from, int todirfd, const char *to)
+{
+    return -int(errno_t::ENOSYS);
+}
+
+int sys_chmodat(int dirfd, const char *path, mode_t mode)
+{
+    return -int(errno_t::ENOSYS);
 }

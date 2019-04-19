@@ -796,7 +796,7 @@ int test_filesystem_read_thread(void*)
 {
     printk("Opening root directory\n");
 
-    int od = file_opendir("");
+    int od = file_opendirat(AT_FDCWD, "/");
     dirent_t de;
     dirent_t *dep;
     while (file_readdir_r(od, &de, &dep) > 0) {
