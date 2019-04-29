@@ -516,6 +516,10 @@ isr_common:
 
     movq %cr3,%rax
 
+    // This could be patched to a long nop
+.balign 8,,5
+    call protection_barrier
+
     // Merge ds,es into r15
     orl %r14d,%r15d
 
@@ -694,12 +698,10 @@ isr_common:
     movq THREAD_FSBASE_OFS(%r15),%r13
     movq THREAD_GSBASE_OFS(%r15),%r14
 
-    // Load fsbase and gsbase
-    // NOTE: this may be patched to call
-    // load_fs_gs_fast (to use wr(fs|gs)base)
-    // rax, rcx, rdx may be clobbered here
-    call load_fs_gs_slow
-.Lpatch_load_fsgsbase_csw_end:
+    // Will be patched to call load_fs_gs_slow when #UD
+.balign 16,,10
+    wrfsbase %r13
+    wrgsbase %r14
 
 .Lreturning_to_kernel:
 
@@ -761,6 +763,10 @@ isr_common:
     .cfi_offset rflags,-3*8
     .cfi_offset cs,-4*8
     .cfi_offset rip,-5*8
+
+    // This could be patched to a long nop
+.balign 8,,5
+    call protection_barrier
 
     fn_trace isr_common,exit
 
@@ -993,22 +999,82 @@ thread_yield_fast:
 
     .cfi_endproc
 
-// Quickly load FS/GS base
-// Expects r13=user_fsbase, r14=user_gsbase
+// Replaces opcodes sequence f3 49 0f ae d5: wrfsbase %r13
 .align 16
-load_fs_gs_fast:
+slow_wrfsbase_r13:
     .cfi_startproc
-
-    wrfsbase %r13
-    wrgsbase %r14
+    push_cfi %rcx
+    movl $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rax
+    movl %r13d,%eax
+    push_cfi %rdx
+    movq %r13,%rdx
+    shrq $ 32,%rdx
+    wrmsr
+    pop_cfi %rcx
+    pop_cfi %rdx
+    pop_cfi %rax
     ret
+    .cfi_endproc
 
+// Replaces opcodes sequence f3 49 0f ae de: wrgsbase %r14
+.align 16
+slow_wrgsbase_r14:
+    .cfi_startproc
+    push_cfi %rax
+    movl %r14d,%eax
+    push_cfi %rdx
+    movq %r14,%rdx
+    push_cfi %rcx
+    shrq $ 32,%rdx
+    movl $ CPU_MSR_GSBASE,%ecx
+    wrmsr
+    pop_cfi %rcx
+    pop_cfi %rdx
+    pop_cfi %rax
+    ret
+    .cfi_endproc
+
+// Replaces opcodes sequence f3 49 0f ae c5: rdfsbase %r13
+.align 16
+slow_rdfsbase_r13:
+    .cfi_startproc
+    push_cfi %rcx
+    movl $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rax
+    push_cfi %rdx
+    rdmsr
+    shlq $ 32,%rdx
+    pop_cfi %rcx
+    orq %rax,%rdx
+    pop_cfi %rax
+    mov %rdx,%r13
+    pop_cfi %rdx
+    ret
+    .cfi_endproc
+
+// Replaces opcodes sequence f3 49 0f ae ce: rdgsbase %r14
+.align 16
+slow_rdgsbase_r14:
+    .cfi_startproc
+    push_cfi %rcx
+    movl $ CPU_MSR_GSBASE,%ecx
+    push_cfi %rax
+    push_cfi %rdx
+    rdmsr
+    shlq $ 32,%rdx
+    pop_cfi %rcx
+    orq %rax,%rdx
+    pop_cfi %rax
+    mov %rdx,%r14
+    pop_cfi %rdx
+    ret
     .cfi_endproc
 
 // Slow load FS/GS base for processors that don't support wrfsbase/wrgsbase
 // Reaches here with r13=user_fsbase, r14=user_gsbase
 .align 16
-load_fs_gs_slow:
+load_fs_gs_nosave:
     .cfi_startproc
 
     movl $ CPU_MSR_FSBASE,%ecx
@@ -1142,6 +1208,36 @@ isr_save_fxsave:
 isr_restore_fxrstor:
     xrstor_ctx fxrstor64
 
+.hidden protection_barrier
+.global protection_barrier
+protection_barrier:
+    // Might be called early, but later, calls to this are NOP'd out
+    // Just return if it is getting called before patching to IBPB version
+    ret
+
+.hidden protection_barrier_ibpb
+protection_barrier_ibpb:
+    .cfi_startproc
+
+    push_cfi %rax
+    mov $ CPU_MSR_PRED_CMD_IBPB,%eax
+
+    push_cfi %rdx
+    xor %edx,%edx
+
+    push_cfi %rcx
+    mov $ CPU_MSR_PRED_CMD,%ecx
+
+    wrmsr
+
+    pop_cfi %rcx
+    pop_cfi %rdx
+    pop_cfi %rax
+
+    ret
+
+    .cfi_endproc
+
 // on entry, ebx=intr, r12=ctx
 .align 16
 exception_isr_handler:
@@ -1258,8 +1354,9 @@ isr_sysret64:
     // in kernel mode
     cli
     swapgs
-    call load_fs_gs_slow
-.Lpatch_load_fsgsbase_sysret_end:
+    wrfsbase %r13
+    wrgsbase %r14
+
     mov %rsi,%rsp
     .cfi_undefined rip
     .cfi_undefined rsp
@@ -1466,6 +1563,91 @@ __x86_indirect_thunk_\reg:
     make_retpoline_thunk \reg
 .endr
 
+.global soft_vzeroall
+.hidden soft_vzeroall
+soft_vzeroall:
+    pxor  %xmm0, %xmm0
+    pxor  %xmm1, %xmm1
+    pxor  %xmm2, %xmm2
+    pxor  %xmm3, %xmm3
+    pxor  %xmm4, %xmm4
+    pxor  %xmm5, %xmm5
+    pxor  %xmm6, %xmm6
+    pxor  %xmm7, %xmm7
+    pxor  %xmm8, %xmm8
+    pxor  %xmm9, %xmm9
+    pxor %xmm10,%xmm10
+    pxor %xmm11,%xmm11
+    pxor %xmm12,%xmm12
+    pxor %xmm13,%xmm13
+    pxor %xmm14,%xmm14
+    pxor %xmm15,%xmm15
+    ret
+
+// extern "C" void soft_rdfsbase_r13();
+.global soft_rdfsbase_r13
+.hidden soft_rdfsbase_r13
+soft_rdfsbase_r13:
+    push %rcx
+    mov $ CPU_MSR_FSBASE,%ecx
+    push %rdx
+    push %rax
+    rdmsr
+    shlq $32,%rdx
+    or %rax,%rdx
+    mov %rdx,%r13
+    pop %rax
+    pop %rdx
+    pop %rcx
+    ret
+
+// extern "C" void soft_rdgsbase_r14();
+.global soft_rdgsbase_r14
+.hidden soft_rdgsbase_r14
+soft_rdgsbase_r14:
+    push %rcx
+    mov $ CPU_MSR_GSBASE,%ecx
+    push %rdx
+    push %rax
+    rdmsr
+    shlq $32,%rdx
+    or %rax,%rdx
+    mov %rdx,%r14
+    pop %rax
+    pop %rdx
+    pop %rcx
+    ret
+
+// extern "C" void soft_wrfsbase_r13();
+soft_wrfsbase_r13:
+    push %rcx
+    mov $ CPU_MSR_FSBASE,%ecx
+    push %rdx
+    mov %r13,%rdx
+    push %rax
+    mov %r13d,%eax
+    shr $32,%rdx
+    wrmsr
+    pop %rax
+    pop %rdx
+    pop %rcx
+    ret
+
+// extern "C" void soft_wrgsbase_r14();
+soft_wrgsbase_r14:
+    push %rcx
+    mov $ CPU_MSR_GSBASE,%ecx
+    push %rdx
+    mov %r14,%rdx
+    push %rax
+    mov %r14d,%eax
+    shr $32,%rdx
+    wrmsr
+    pop %rax
+    pop %rdx
+    pop %rcx
+    ret
+
 .section .rodata, ""
 .align 8
 
@@ -1479,36 +1661,3 @@ sse_context_save:
 .global sse_context_restore
 sse_context_restore:
     .quad .Lsse_context_restore_jmp
-
-// Expects r13=user_fsbase, r14=user_gsbase
-//.hidden save_fsgsbase_range
-//.global save_fsgsbase_range
-//save_fsgsbase_range:
-//    // Implementations
-//    .quad save_fs_gs_fast
-//    // Patch points
-//    .quad .Lpatch_fsgsbase_
-//    .quad .Lpatch_fsgsbase_
-
-// Table to patch code to use fast fsgs code
-.hidden load_fsgsbase_range
-.global load_fsgsbase_range
-load_fsgsbase_range:
-    // Implementations
-    .quad load_fs_gs_fast
-    // Patch points
-    .quad .Lpatch_load_fsgsbase_csw_end
-    .quad .Lpatch_load_fsgsbase_sysret_end
-
-// Table to patch code to use Indirect Branch Prediction Barrier
-.hidden ibpb_range
-ibpb_range:
-    // Implementations
-    .quad protection_barrier_ibpb
-    // Patch points
-    .quad .Lpatch_prot_bar_isr_entry
-    .quad .Lpatch_prot_bar_isr_exit
-    .quad .Lpatch_prot_bar_syscall
-    .quad .Lpatch_prot_bar_sysret
-    .quad .Lpatch_prot_bar_sysenter
-    .quad .Lpatch_prot_bar_sysexit

@@ -12,7 +12,7 @@ class usb_hub_t {
 public:
     usb_hub_t(usb_pipe_t const& control, usb_pipe_t const& status);
 
-    bool init(const usb_config_helper *cfg_hlp);
+    bool init(usb_config_helper const *cfg_hlp);
 
 private:
     enum struct hub_request_t : uint8_t {

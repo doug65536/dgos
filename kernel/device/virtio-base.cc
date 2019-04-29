@@ -463,7 +463,7 @@ void virtio_virtqueue_t::enqueue_avail(desc_t **desc, size_t count,
         atomic_st_rel(notify_ptr, queue_idx);
 }
 
-void virtio_virtqueue_t::sendrecv(const void *sent_data, size_t sent_size,
+void virtio_virtqueue_t::sendrecv(void const *sent_data, size_t sent_size,
                                   void *rcvd_data, size_t rcvd_size,
                                   virtio_iocp_t *iocp)
 {

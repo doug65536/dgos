@@ -1,5 +1,7 @@
 #include "thread.h"
 #include "memory.h"
+#include "algorithm.h"
+#include "bitsearch.h"
 
 struct thread_run_data_t
 {
@@ -147,7 +149,8 @@ thread_cpu_mask_t &thread_cpu_mask_t::operator-=(size_t bit)
     return *this;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::operator-(const thread_cpu_mask_t &rhs) const
+thread_cpu_mask_t thread_cpu_mask_t::operator-(
+        thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result{*this};
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -155,7 +158,8 @@ thread_cpu_mask_t thread_cpu_mask_t::operator-(const thread_cpu_mask_t &rhs) con
     return result;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::operator+(const thread_cpu_mask_t &rhs) const
+thread_cpu_mask_t thread_cpu_mask_t::operator+(
+        thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result{*this};
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -168,7 +172,8 @@ void thread_cpu_mask_t::atom_clr(size_t bit) volatile
     atomic_and(&bitmap[(bit >> 6)], ~(UINT64_C(1) << (bit & 63)));
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::operator&(const thread_cpu_mask_t &rhs) const
+thread_cpu_mask_t thread_cpu_mask_t::operator&(
+        thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result;
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -176,14 +181,16 @@ thread_cpu_mask_t thread_cpu_mask_t::operator&(const thread_cpu_mask_t &rhs) con
     return result;
 }
 
-thread_cpu_mask_t &thread_cpu_mask_t::operator&=(const thread_cpu_mask_t &rhs)
+thread_cpu_mask_t &thread_cpu_mask_t::operator&=(
+        thread_cpu_mask_t const& rhs)
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
         bitmap[i] &= rhs.bitmap[i];
     return *this;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::atom_and(const thread_cpu_mask_t &rhs) volatile
+thread_cpu_mask_t thread_cpu_mask_t::atom_and(
+        thread_cpu_mask_t const& rhs) volatile
 {
     thread_cpu_mask_t result;
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -191,7 +198,8 @@ thread_cpu_mask_t thread_cpu_mask_t::atom_and(const thread_cpu_mask_t &rhs) vola
     return result;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::operator|(const thread_cpu_mask_t &rhs) const
+thread_cpu_mask_t thread_cpu_mask_t::operator|(
+        thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result;
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -199,14 +207,16 @@ thread_cpu_mask_t thread_cpu_mask_t::operator|(const thread_cpu_mask_t &rhs) con
     return result;
 }
 
-thread_cpu_mask_t &thread_cpu_mask_t::operator|=(const thread_cpu_mask_t &rhs)
+thread_cpu_mask_t &thread_cpu_mask_t::operator|=(
+        thread_cpu_mask_t const& rhs)
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
         bitmap[i] |= rhs.bitmap[i];
     return *this;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::atom_or(const thread_cpu_mask_t &rhs) volatile
+thread_cpu_mask_t thread_cpu_mask_t::atom_or(
+        thread_cpu_mask_t const& rhs) volatile
 {
     thread_cpu_mask_t result;
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -214,7 +224,8 @@ thread_cpu_mask_t thread_cpu_mask_t::atom_or(const thread_cpu_mask_t &rhs) volat
     return result;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::operator^(const thread_cpu_mask_t &rhs) const
+thread_cpu_mask_t thread_cpu_mask_t::operator^(
+        thread_cpu_mask_t const& rhs) const
 {
     thread_cpu_mask_t result;
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -222,14 +233,16 @@ thread_cpu_mask_t thread_cpu_mask_t::operator^(const thread_cpu_mask_t &rhs) con
     return result;
 }
 
-thread_cpu_mask_t &thread_cpu_mask_t::operator^=(const thread_cpu_mask_t &rhs)
+thread_cpu_mask_t &thread_cpu_mask_t::operator^=(
+        thread_cpu_mask_t const& rhs)
 {
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
         bitmap[i] ^= rhs.bitmap[i];
     return *this;
 }
 
-thread_cpu_mask_t thread_cpu_mask_t::atom_xor(const thread_cpu_mask_t &rhs) volatile
+thread_cpu_mask_t thread_cpu_mask_t::atom_xor(
+        thread_cpu_mask_t const& rhs) volatile
 {
     thread_cpu_mask_t result;
     for (size_t i = 0, e = countof(bitmap); i != e; ++i)
@@ -276,7 +289,7 @@ thread_cpu_mask_t &thread_cpu_mask_t::set_all()
     return *this;
 }
 
-bool thread_cpu_mask_t::operator==(const thread_cpu_mask_t &rhs) const
+bool thread_cpu_mask_t::operator==(thread_cpu_mask_t const& rhs) const
 {
     bool is_equal = bitmap[0] == rhs.bitmap[0];
     for (size_t i = 1, e = countof(bitmap); i != e; ++i)
@@ -284,7 +297,7 @@ bool thread_cpu_mask_t::operator==(const thread_cpu_mask_t &rhs) const
     return is_equal;
 }
 
-bool thread_cpu_mask_t::operator!=(const thread_cpu_mask_t &rhs) const
+bool thread_cpu_mask_t::operator!=(thread_cpu_mask_t const& rhs) const
 {
     bool not_equal = bitmap[0] != rhs.bitmap[0];
     for (size_t i = 1, e = countof(bitmap); i != e; ++i)

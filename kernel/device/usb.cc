@@ -103,7 +103,7 @@ EXPORT usb_desc_ep const *usb_config_helper::match_ep(
 }
 
 EXPORT usb_desc_ep_companion const*
-usb_config_helper::get_ep_companion(const usb_desc_ep *ep)
+usb_config_helper::get_ep_companion(usb_desc_ep const *ep)
 {
     usb_desc_ep_companion const* end = (usb_desc_ep_companion const*)
             ((char*)data + len);

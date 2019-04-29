@@ -50,7 +50,7 @@ int rand_r_range(uint64_t *seed, int min, int max)
     return (((int64_t)rand_r(seed) * (max-min)) >> 31) + min;
 }
 
-void c4rand::seed(const void *data, size_t len)
+void c4rand::seed(void const *data, size_t len)
 {
     for (size_t i = 0; i < 256; ++i)
         state[i] = i;
@@ -60,7 +60,7 @@ void c4rand::seed(const void *data, size_t len)
     write(data, len);
 }
 
-void c4rand::write(const void *data, size_t len)
+void c4rand::write(void const *data, size_t len)
 {
     uint8_t const *key = (uint8_t const *)data;
 

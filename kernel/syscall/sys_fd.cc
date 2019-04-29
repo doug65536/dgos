@@ -64,24 +64,13 @@ private:
     size_t locked_size;
 };
 
-// Validate the errno and return its negated integer value
-static int err(errno_t errno)
-{
-    assert(int(errno) > int(errno_t::OK) &&
-           int(errno) < int(errno_t::MAX_ERRNO));
-    return -int(errno);
-}
-
-static int err(int negerr)
-{
-    assert(negerr < 0 && -negerr < int(errno_t::MAX_ERRNO));
-    return negerr;
-}
-
-static int badf_err()
-{
-    return err(errno_t::EBADF);
-}
+static int err(errno_t errno);
+static int arg_err();
+static int fault_err();
+static int nosys_err();
+static int toomany_err();
+static int badf_err();
+static int err(int negerr);
 
 // == APIs that take file descriptors ==
 
@@ -103,7 +92,7 @@ static int id_from_fd(int fd)
 ssize_t sys_read(int fd, void *bufaddr, size_t count)
 {
     if (unlikely(!mm_is_user_range(bufaddr, count)))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     int id = id_from_fd(fd);
 
@@ -123,7 +112,7 @@ ssize_t sys_read(int fd, void *bufaddr, size_t count)
 ssize_t sys_write(int fd, void const *bufaddr, size_t count)
 {
     if (unlikely(!mm_is_user_range(bufaddr, count)))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     int id = id_from_fd(fd);
 
@@ -131,12 +120,12 @@ ssize_t sys_write(int fd, void const *bufaddr, size_t count)
         return badf_err();
 
     if (uintptr_t(bufaddr) >= 0x800000000000)
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     unique_memlock memlock(bufaddr, count);
 
     if (!verify_accessible(bufaddr, count, false))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     ssize_t sz = file_write(id, bufaddr, count);
 
@@ -163,7 +152,7 @@ int sys_close(int fd)
 ssize_t sys_pread64(int fd, void *bufaddr, size_t count, off_t ofs)
 {
     if (unlikely(!mm_is_user_range(bufaddr, count)))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     int id = id_from_fd(fd);
 
@@ -181,7 +170,7 @@ ssize_t sys_pwrite64(int fd, void const *bufaddr,
                      size_t count, off_t ofs)
 {
     if (unlikely(!mm_is_user_range(bufaddr, count)))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     process_t *p = fast_cur_process();
 
@@ -262,7 +251,7 @@ int sys_ioctl(int fd, int cmd, void* arg)
     // If the size is nonzero and the argument pointer does not lie in user
     // address range, then fail with EINVAL
     if (unlikely(size > 0 && !mm_is_user_range(arg, size)))
-        return err(errno_t::EINVAL);
+        return arg_err();
 
     int id = id_from_fd(fd);
 
@@ -281,7 +270,7 @@ int sys_ioctl(int fd, int cmd, void* arg)
     // Copy the argument to a kernel memory buffer if WRITE
     if ((_IOC_DIR(cmd) & _IOC_WRITE) && size > 0) {
         if (!mm_copy_user(data, arg, size))
-            return err(errno_t::EFAULT);
+            return fault_err();
     }
 
     int status = file_ioctl(id, cmd, arg, size, data);
@@ -289,7 +278,7 @@ int sys_ioctl(int fd, int cmd, void* arg)
     // Copy the argument to user buffer if READ
     if ((_IOC_DIR(cmd) & _IOC_READ) && size > 0) {
         if (!mm_copy_user(arg, data, size))
-            return err(errno_t::EFAULT);
+            return fault_err();
     }
 
     return status;
@@ -324,7 +313,7 @@ int sys_dup3(int oldfd, int newfd, int flags)
     if (newid >= 0)
         file_close(newid);
     else if (!p->ids.desc_alloc.take(newfd))
-        return err(errno_t::EMFILE);
+        return toomany_err();
 
 
     if (likely(file_ref_filetab(id))) {
@@ -346,13 +335,16 @@ int sys_dup2(int oldfd, int newfd)
 
 int sys_open(char const* pathname, int flags, mode_t mode)
 {
-    path_t path(pathname);
+    user_str_t path(pathname);
+
+    if (unlikely(!path))
+        return path.err_int();
 
     process_t *p = fast_cur_process();
 
     int fd = p->ids.desc_alloc.alloc();
 
-    int id = file_open(kpathname, flags, mode);
+    int id = file_open(path, flags, mode);
 
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
@@ -363,18 +355,18 @@ int sys_open(char const* pathname, int flags, mode_t mode)
     return err(-id);
 }
 
-int sys_creat(char const *path, mode_t mode)
+int sys_creat(char const *pathname, mode_t mode)
 {
+    user_str_t path(pathname);
+
     process_t *p = fast_cur_process();
 
     int fd = p->ids.desc_alloc.alloc();
 
-    int dirid = p->fd_to_id(dirfd);
+    if (unlikely(fd < 0))
+        return toomany_err();
 
-    if (unlikely(dirid < 0))
-        return badf_err();
-
-    int id = file_creatat(dirid, path, mode);
+    int id = file_creat(path, mode);
 
     if (likely(id >= 0)) {
         p->ids.ids[fd] = id;
@@ -387,32 +379,34 @@ int sys_creat(char const *path, mode_t mode)
 
 int sys_truncate(char const *path, off_t size)
 {
-    return sys_truncateat(AT_FDCWD, path, size);
-}
-
-int sys_truncateat(int dirfd, char const *path, off_t size)
-{
-    int fd = sys_openat(dirfd, path, O_RDWR, 0);
+    int fd = sys_open(path, O_RDWR, 0);
     int err = sys_ftruncate(fd, size);
     sys_close(fd);
     return err;
 }
 
-int sys_rename(char const *old_path, char const *new_path)
+int sys_rename(char const *old_pathname, char const *new_pathname)
 {
+    std::unique_ptr<user_str_t> old_path_storage(new user_str_t(old_pathname));
+
+    if (unlikely(!old_path_storage))
+        return old_path_storage->err_int();
+
+    std::unique_ptr<user_str_t> new_path_storage(new user_str_t(new_pathname));
+
+    if (unlikely(!new_path_storage))
+        return new_path_storage->err_int();
+
+    char const *old_path = *old_path_storage;
+    char const *new_path = *new_path_storage;
+
     if (unlikely(!old_path))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
     if (unlikely(!new_path))
-        return err(errno_t::EFAULT);
+        return fault_err();
 
-    char old_p[PATH_MAX];
-    char new_p[PATH_MAX];
-
-    if (!mm_copy_user_str(old_p, old_path, sizeof(old_p)))
-        return -int(errno_t::EFAULT);
-
-    int status = file_renameat(olddirfd, old_path, newdirfd, new_path);
+    int status = file_rename(old_path, new_path);
     if (unlikely(status < 0))
         return err(status);
 
@@ -449,13 +443,13 @@ int sys_unlink(char const *path)
 int sys_mknod(char const *path, mode_t mode, int rdev)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_link(char const *from, char const *to)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_chmod(char const *path, mode_t mode)
@@ -484,7 +478,7 @@ int sys_fchmod(int fd, mode_t mode)
     if (unlikely(id < 0))
         return badf_err();
 
-    return file_chmod(id, mode);
+    return file_fchmod(id, mode);
 }
 
 int sys_chown(char const *path, int uid, int gid)
@@ -506,9 +500,9 @@ int sys_chown(char const *path, int uid, int gid)
     return chmod_status;
 }
 
-int sys_chownat(int dirfd, const char *path, int uid, int gid)
+int sys_chownat(int dirfd, char const *path, int uid, int gid)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_fchown(int fd, int uid, int gid)
@@ -528,7 +522,7 @@ int sys_setxattr(char const *path,
                  size_t size, int flags)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_getxattr(char const *path,
@@ -536,19 +530,19 @@ int sys_getxattr(char const *path,
                  size_t size)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_listxattr(char const *path, char const *list, size_t size)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_access(char const *path, int mask)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 // == Sockets ==
@@ -556,56 +550,56 @@ int sys_access(char const *path, int mask)
 int sys_socket(int domain, int type, int protocol)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_accept(int sockfd, sockaddr *addr, socklen_t *addrlen)
 {
     // FIXME: implement me
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
-ssize_t sys_send(int sockfd, const void *buf, size_t len, int flags)
+ssize_t sys_send(int sockfd, void const *buf, size_t len, int flags)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 ssize_t sys_sendto(int sockfd, void const *buf, size_t len, int flags,
                struct sockaddr const *dest_addr, socklen_t addrlen)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 ssize_t sys_recv(int sockfd, void *buf, size_t len, int flags)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 ssize_t sys_recvfrom(int sockfd, void *buf, size_t len, int flags,
                  struct sockaddr *src_addr, socklen_t *addrlen)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_shutdown(int sockfd, int how)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_listen(int sockfd, int backlog)
 {
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 int sys_fcntl(int fd, int cmd, void *arg)
@@ -621,11 +615,51 @@ int sys_fcntl(int fd, int cmd, void *arg)
 //    case F_SETLKW:
 //    case F_GETLK:
 //    }
-    return -int(errno_t::ENOSYS);
+    return nosys_err();
 }
 
 char *sys_getcwd(char *buf, size_t size)
 {
-    return (char*)intptr_t(errno_t::ENOSYS);
+    return (char*)-nosys_err();
 }
 
+// Validate the errno and return its negated integer value
+static int err(errno_t errno)
+{
+    assert(int(errno) > int(errno_t::OK) &&
+           int(errno) < int(errno_t::MAX_ERRNO));
+    return -int(errno);
+}
+
+// Bottom to make unlikely path already naturally be a forward branch
+
+static int err(int negerr)
+{
+    assert(negerr < 0 && -negerr < int(errno_t::MAX_ERRNO));
+    return negerr;
+}
+
+static int badf_err()
+{
+    return err(errno_t::EBADF);
+}
+
+static int toomany_err()
+{
+    return err(errno_t::EMFILE);
+}
+
+static int fault_err()
+{
+    return err(errno_t::EFAULT);
+}
+
+static int arg_err()
+{
+    return err(errno_t::EINVAL);
+}
+
+static int nosys_err()
+{
+    return err(errno_t::ENOSYS);
+}

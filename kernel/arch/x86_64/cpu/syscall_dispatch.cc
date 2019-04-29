@@ -17,6 +17,8 @@ long sys_unimplemented()
     return -int(errno_t::ENOSYS);
 }
 
+uint8_t syscall_zmasks[SYSCALL_COUNT] = {};
+
 syscall_handler_t *syscall_handlers[SYSCALL_COUNT] = {
     // 0x00
     (syscall_handler_t*)(void*)sys_read,

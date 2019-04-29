@@ -1,7 +1,7 @@
 #include <spawn.h>
 
 int posix_spawnattr_getschedparam(
-        const posix_spawnattr_t *restrict satt,
+        posix_spawnattr_t const *restrict satt,
         struct sched_param *restrict)
 {
     return -1;

@@ -2,8 +2,6 @@
 
 #include "dirent.h"
 
-#define PATH_MAX 256
-
 extern "C" {
 
 typedef uint32_t socklen_t;
@@ -25,8 +23,8 @@ int sys_ftruncate(int fd, off_t size);
 int sys_ioctl(int fd, int cmd, void* arg);
 
 int sys_open(char const *pathname, int flags, mode_t mode);
-int sys_creat(char const *path, mode_t mode);
-int sys_rename(char const *old_path, char const *new_path);
+int sys_creat(char const *pathname, mode_t mode);
+int sys_rename(char const *old_pathname, char const *new_pathname);
 int sys_mkdir(char const *path, mode_t mode);
 int sys_rmdir(char const *path);
 int sys_unlink(char const *path);
@@ -76,7 +74,7 @@ int sys_listxattr(char const *path,
 int sys_socket(int domain, int type, int protocol);
 int sys_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
 int sys_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
-ssize_t sys_send(int sockfd, const void *buf, size_t len, int flags);
+ssize_t sys_send(int sockfd, void const *buf, size_t len, int flags);
 ssize_t sys_sendto(int sockfd, void const *buf, size_t len, int flags,
                    struct sockaddr const *dest_addr, socklen_t addrlen);
 ssize_t sys_recv(int sockfd, void *buf, size_t len, int flags);

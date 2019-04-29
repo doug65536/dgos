@@ -1,6 +1,7 @@
 #pragma once
 #include "types.h"
 #include "assert.h"
+#include "asm_constants.h"
 #include "control_regs.h"
 #include "control_regs_constants.h"
 
@@ -176,6 +177,8 @@ C_ASSERT((sizeof(tss_t) & 63) == 0);
 
 // Ensure no spanning page boundaries
 C_ASSERT(4096 % sizeof(tss_t) == 0);
+
+C_ASSERT(offsetof(tss_t, rsp) == TSS_RSP0_OFS);
 
 extern tss_t tss_list[];
 

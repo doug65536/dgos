@@ -77,7 +77,7 @@ int sys_madvise(void *addr, size_t len, int advice)
     return madvise(addr, len, advice);
 }
 
-int sys_msync(const void *addr, size_t len, int flags)
+int sys_msync(void const *addr, size_t len, int flags)
 {
     if (!validate_user_mmop(addr, len, 0, flags))
         return -int(errno_t::EINVAL);
@@ -85,12 +85,12 @@ int sys_msync(const void *addr, size_t len, int flags)
     return msync(addr, len, flags);
 }
 
-int sys_mlock(const void *, size_t)
+int sys_mlock(void const *, size_t)
 {
     return -int(errno_t::ENOSYS);
 }
 
-int sys_munlock(const void *, size_t)
+int sys_munlock(void const *, size_t)
 {
     return -int(errno_t::ENOSYS);
 }

@@ -3,7 +3,7 @@
 #include "malloc.h"
 #include "physmem.h"
 #include "screen.h"
-#include "farptr.h"
+#include "string.h"
 #include "ctors.h"
 #include "assert.h"
 #include "fs.h"

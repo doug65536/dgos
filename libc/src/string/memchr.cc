@@ -1,6 +1,6 @@
 #include <string.h>
 
-void *memchr(const void *dest, int c, size_t sz)
+void *memchr(void const *dest, int c, size_t sz)
 {
     char const *d = (char const *)dest;
     char const cc = (char)c;

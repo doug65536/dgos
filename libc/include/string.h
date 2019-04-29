@@ -6,13 +6,13 @@
 
 __BEGIN_DECLS
 
-void *memccpy(void *restrict dest, const void *restrict src,
+void *memccpy(void *restrict dest, void const *restrict src,
               int c, size_t sz);
 
-void *memchr(const void *, int, size_t);
-int memcmp(const void *, const void *, size_t);
-void *memcpy(void *restrict, const void *restrict, size_t);
-void *memmove(void *, const void *, size_t);
+void *memchr(void const *, int, size_t);
+int memcmp(void const *, void const *, size_t);
+void *memcpy(void *restrict, void const *restrict, size_t);
+void *memmove(void *, void const *, size_t);
 void *memset(void *, int, size_t);
 
 char *stpcpy(char *restrict, char const *restrict);

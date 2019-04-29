@@ -100,7 +100,8 @@ struct alignas(256) thread_info_t {
     // Needed in context switch
     void * volatile fsbase;
     void * volatile gsbase;
-    char * volatile syscall_stack;
+    //char * volatile syscall_stack;
+    char * volatile reserved;
     char * volatile xsave_ptr;
     link_t link;
 
@@ -179,7 +180,6 @@ C_ASSERT_ISPO2(sizeof(thread_info_t));
 C_ASSERT(offsetof(thread_info_t, fsbase) == THREAD_FSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, gsbase) == THREAD_GSBASE_OFS);
 C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
-C_ASSERT(offsetof(thread_info_t, syscall_stack) == THREAD_SYSCALL_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
@@ -546,7 +546,7 @@ static thread_t thread_create_with_state(
     } else {
         thread->xsave_ptr = nullptr;
     }
-    thread->syscall_stack = syscall_stack;
+    //thread->syscall_stack = syscall_stack;
     thread->xsave_stack = xsave_stack;
 
 //    thread_info_t *creator_thread = this_thread();

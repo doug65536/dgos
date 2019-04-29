@@ -1972,6 +1972,7 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
     return elap_ns;
 }
 
+// Binary GCD algorithm
 template<typename T>
 constexpr T gcd(T a, T b)
 {

@@ -391,7 +391,7 @@ _constructor(ctor_fs) void register_efi_fs()
 }
 #endif
 
-int file_handle_base_t::open(const tchar *filename)
+int file_handle_base_t::open(tchar const *filename)
 {
     int fd = find_unused_handle();
 
@@ -501,12 +501,17 @@ EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 
     PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
 
+    PRINT("invoking constructors");
     ctors_invoke();
 
+    PRINT("showing boot menu");
     kernel_params_t params;
     boot_menu_show(params);
 
+    PRINT("running kernel");
     elf64_run(cpu_choose_kernel());// TSTR "dgos-kernel-generic");
+
+    PRINT("it returned?");
 
     //dtors_invoke();
     //

@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int fprintf(FILE *stream, const char *format, ...)
+int fprintf(FILE *stream, char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);

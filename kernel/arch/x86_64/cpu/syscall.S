@@ -1,36 +1,120 @@
 .section .text, "ax"
 
+#include "control_regs_constants.h"
 #include "asm_constants.h"
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
 
-// This code may clobber everything. Every single register except
-// esp is used to pass parameters
-// eax syscall number
-// ebx, ecx, edx, esi, edi, ebp 6 parameters
-sysenter_entry:
+// i386 syscall ABI design notes
+//  - syscall number in eax
+//  - edx then ecx are preferred to be used first
+//  - then ebx, esi, edi, ebp
+
+// +------+--------+
+// | i386 | x86_64 |
+// +------+--------+
+// |  eax |   eax  | syscall number
+// |  edx |  [rcx] | return address \---+--> matches sysexit instruction
+// |  ecx |  [rsp] | caller's esp   /--/
+// | xmm0 |   rdi  | 1st parameter
+// | xmm1 |   rsi  | 2nd parameter
+// | xmm2 |   rdx  | 3rd parameter
+// | xmm3 |   rcx  | 4th parameter (r10 in syscall interface, rcx in function)
+// | xmm4 |   r8   | 5th parameter
+// | xmm5 |   r9   | 6th parameter
+// +------+--------+
+
+// incoming:
+// eax syscall number, ecx return address, edx return stack pointer
+// xmm0-xmm5 6 parameters in low 64 bits
+.global syscall32_entry
+.hidden syscall32_entry
+syscall32_entry:
     .cfi_startproc
-    cmpl $ SYSCALL_COUNT,%eax
+    .cfi_signal_frame
+    .cfi_def_cfa rsp,0
+    .cfi_register rip,rcx
+    .cfi_register rsp,rsp
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
+
+    // We can clobber r12, r13, r14, r15 without saving them,
+    // because the caller is 32 bit code
+    // Take advantage of that by saving caller's esp, eip, edi, esi
+    // in r15, r14, r13, r12, avoiding the stack
+
+    // Range check syscall number
+    cmp $ SYSCALL_COUNT,%rax
     jae 0f
 
-    // Swizzle 6 x86 parameters into x86_64 parameters
-    // edi -> rdi
-    // esi -> rsi
-    // edx -> rdx
-    // ecx -> rcx
-    // ebx -> r8
-    // ebp -> r9
+    xor %r15d,%r15d
 
-    movslq %edi,%rdi
-    movslq %esi,%rsi
-    movslq %edx,%rdx
-    movslq %ecx,%rcx
-    movslq %ebx,%r8
-    movslq %ebp,%r9
+    // Switch to kernel gs
+    swapgs
 
+    // Save return eip in r14d
+    mov %ecx,%r14d
+    .cfi_register rip,r14
 
+    // Get pointer to current CPU's TSS from CPU-local data
+    movq %gs:CPU_INFO_TSS_PTR_OFS(%r15),%r15
 
-    sysexit
+    movq %xmm5,%r9
+
+    lea syscall_handlers(%rip),%r11
+
+    movq %xmm4,%r8
+
+    // Save esi in r12
+    mov %esi,%r12d
+    .cfi_register rsi,r12
+
+    movq %xmm3,%rcx
+
+    // Get pointer to syscall stack from thread data
+    movq TSS_RSP0_OFS(%r15),%r15
+
+    movq %xmm2,%rdx
+
+    // Read the syscall vector
+    movq (%r11,%rax,8),%rax
+
+    movq %xmm1,%rsi
+
+    // Switch to this thread's syscall stack
+    // and save caller's esp in r15d
+    xchgq %r15,%rsp
+    .cfi_def_cfa rsp,0
+    .cfi_register rip,rcx
+    .cfi_register rsp,r14
+
+    // IRQs are okay at this point
+    sti
+
+    // Save edi in r13
+    mov %edi,%r13d
+    .cfi_register rdi,r13
+
+    movq %xmm0,%rdi
+
+    indirect_call rax
+
+    // Get return address back into ecx
+    mov %r14d,%ecx
+
+    // Get return stack pointer back into edx
+    mov %r15d,%edx
+
+    mov %r13d,%edi
+    mov %r12d,%esi
+
+.balign 16,,5
+    .byte 0x66, 0x66
+    vzeroall
+
+    sysret
 
     .cfi_endproc
 
@@ -44,9 +128,9 @@ sysenter_entry:
 syscall_entry:
     .cfi_startproc
     .cfi_signal_frame
+    .cfi_def_cfa rsp,0
     .cfi_register rip,rcx
     .cfi_register rsp,rsp
-    .cfi_def_cfa rsp,0
 
     // syscall rax
     // params rdi, rsi, rdx, r10, r8, r9
@@ -55,6 +139,7 @@ syscall_entry:
     // CPU puts rflags in r11 (which is clobbered)
     // on return, rflags is initialized to CPU_EFLAGS_IF | 2
     // CPU is configured to clear EFLAGS IF, DF, TF, AC on entry
+    // still on the caller's stack though!
 
     // Range check syscall number
     cmpq $ SYSCALL_COUNT,%rax
@@ -64,14 +149,14 @@ syscall_entry:
     lea syscall_handlers(%rip),%r11
     movq (%r11,%rax,8),%rax
 
-    // Switch to CPU-local data gs
+    // Switch to kernel gs
     swapgs
 
-    // Get pointer to current thread from CPU data
-    movq %gs:CPU_INFO_CURTHREAD_OFS,%r11
+    // Get pointer to current CPU's TSS from CPU-local data
+    movq %gs:CPU_INFO_TSS_PTR_OFS,%r11
 
     // Get pointer to syscall stack from thread data
-    movq THREAD_SYSCALL_STACK_OFS(%r11),%r11
+    movq TSS_RSP0_OFS(%r11),%r11
 
     // Switch to this thread's syscall stack
     xchgq %rsp,%r11
@@ -91,55 +176,14 @@ syscall_entry:
     push_cfi %rcx
     .cfi_offset rip,-2*8
 
-    // Prevent user mode from controlling rbx,rbp,r12,r13,r14,r15
-
-    push_cfi %rbp
-    .cfi_offset rbp,-3*8
-    xorl %ebp,%ebp
-
-    push_cfi %rbx
-    .cfi_offset rbx,-4*8
-    movl %ebp,%ebx
-
-    push_cfi %r12
-    .cfi_offset r12,-5*8
-    movl %ebp,%r12d
-
-    push_cfi %r13
-    .cfi_offset r13,-6*8
-    movl %ebp,%r13d
-
-    push_cfi %r14
-    .cfi_offset r14,-7*8
-    movl %ebp,%r14d
-
-    push_cfi %r15
-    .cfi_offset r15,-8*8
-    movl %ebp,%r15d
+.balign 8,,5
+    call protection_barrier
 
     // Move 4th parameter to proper place
     movq %r10,%rcx
 
     // Call handler
     indirect_call rax
-
-    pop_cfi %r15
-    .cfi_same_value r15
-
-    pop_cfi %r14
-    .cfi_same_value r14
-
-    pop_cfi %r13
-    .cfi_same_value r13
-
-    pop_cfi %r12
-    .cfi_same_value r12
-
-    pop_cfi %rbx
-    .cfi_same_value rbx
-
-    pop_cfi %rbp
-    .cfi_same_value rbp
 
     // IRQs are not safe when
     // - we have user gs and still in kernel mode
@@ -156,6 +200,9 @@ syscall_entry:
     // Set return rflags
     movl $SYSCALL_RFLAGS,%r11d
 
+.balign 8,,5
+    call protection_barrier
+
     // Restore caller's stack
     pop_cfi %rsp
     .cfi_def_cfa rsp,0
@@ -171,7 +218,7 @@ syscall_entry:
     sysretq
 
     // syscall number out of range
-0:  movl $SYSCALL_ENOSYS,%eax
+0:  movl $ SYSCALL_ENOSYS,%eax
     sysretq
 
     .cfi_endproc

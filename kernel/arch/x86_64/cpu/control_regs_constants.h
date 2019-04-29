@@ -60,6 +60,7 @@
 #define CPU_MSR_STAR            0xC0000081U
 
 #define CPU_MSR_SPEC_CTRL       0x48
+
 // IBRS if CPUID.(EAX=07H,ECX=0):EDX[26]=1
 #define CPU_MSR_SPEC_CTRL_IBRS_BIT      0
 
@@ -70,6 +71,7 @@
 #define CPU_MSR_SPEC_CTRL_SSBD_BIT      2
 
 #define CPU_MSR_PRED_CMD        0x49
+
 // If CPUID.(EAX=07H,ECX=0):EDX[26]=1
 #define CPU_MSR_PRED_CMD_IBPB_BIT   0
 #define CPU_MSR_PRED_CMD_IBPB       (1<<CPU_MSR_PRED_CMD_IBPB_BIT)

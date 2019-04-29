@@ -1821,7 +1821,7 @@ void gdbstub_t::append_ctx_reply(char *reply, int& ofs, T *value_ptr)
     }
 }
 
-size_t gdbstub_t::get_context(char *reply, const isr_context_t *ctx)
+size_t gdbstub_t::get_context(char *reply, isr_context_t const *ctx)
 {
     int ofs = 0;
 

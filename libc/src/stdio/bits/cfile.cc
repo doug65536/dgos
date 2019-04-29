@@ -44,7 +44,7 @@ long _FILE::readbuf(void *buffer, size_t size, size_t count)
     return 0;
 }
 
-long _FILE::writebuf(const void *buffer, size_t size, size_t count)
+long _FILE::writebuf(void const *buffer, size_t size, size_t count)
 {
     return write(fd, buffer, size * count);
 }

@@ -121,7 +121,7 @@ public:
                             int max_packet_sz, int interval,
                             usb_ep_attr ep_type) = 0;
 
-    bool alloc_pipe(int slotid, const usb_desc_iface *iface,
+    bool alloc_pipe(int slotid, usb_desc_iface const *iface,
                     usb_desc_ep const* ep, usb_pipe_t &pipe);
 
     virtual int send_control(

@@ -327,7 +327,7 @@ protected:
     virtual void port_irq_handler();
 
     _always_inline void out(port_t ofs, uint8_t value) const;
-    _always_inline void outs(port_t ofs, const void *value, size_t len) const;
+    _always_inline void outs(port_t ofs, void const *value, size_t len) const;
 
     template<typename T>
     _always_inline void outp(T const& reg)
@@ -939,7 +939,7 @@ public:
     bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
               uint8_t data_bits, char parity_type,
               uint8_t stop_bits) override final;
-    virtual ssize_t write(const void *buf, size_t size,
+    virtual ssize_t write(void const *buf, size_t size,
                           size_t min_write) override final;
     virtual ssize_t read(void *buf, size_t size,
                          size_t min_read) override final;
@@ -974,7 +974,7 @@ bool uart_poll_t::init(ioport_t port, uint8_t port_irq, uint32_t baud,
                         data_bits, parity_type, stop_bits, false);
 }
 
-ssize_t uart_poll_t::write(const void *buf, size_t size, size_t min_write)
+ssize_t uart_poll_t::write(void const *buf, size_t size, size_t min_write)
 {
     for (size_t i = 0; i < size; ) {
         // Wait for tx holding register to be empty

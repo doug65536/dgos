@@ -281,16 +281,16 @@ int tmpfs_fs_t::unlink(fs_cpath_t path)
 //
 // Modify directory entries
 
-int tmpfs_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
+int tmpfs_fs_t::fchmod(fs_file_info_t *fi, fs_mode_t mode)
 {
-    (void)path;
+    (void)fi;
     (void)mode;
     return -int(errno_t::ENOSYS);
 }
 
-int tmpfs_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int tmpfs_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
 {
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
     return -int(errno_t::ENOSYS);
@@ -303,7 +303,7 @@ int tmpfs_fs_t::truncate(fs_cpath_t path, off_t size)
     return -int(errno_t::ENOSYS);
 }
 
-int tmpfs_fs_t::utimens(fs_cpath_t path, const fs_timespec_t *ts)
+int tmpfs_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
 {
     (void)path;
     (void)ts;

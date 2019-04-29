@@ -41,13 +41,13 @@ char *ctermid(char *buf);
 int feof(FILE *stream);
 char *fgets(char *restrict buf, int sz, FILE *restrict stream);
 int fileno(FILE *stream);
-int fscanf(FILE *restrict stream, const char *restrict format, ...);
+int fscanf(FILE *restrict stream, char const *restrict format, ...);
 int fseek(FILE *stream, off_t dist, int rel);
 long ftell(FILE *stream);
 int pclose(FILE *stream);
 
 FILE *fopen(char const *restrict filename, char const *restrict mode);
-FILE *fdopen(int fd, const char *mode);
+FILE *fdopen(int fd, char const *mode);
 FILE *freopen(char const *restrict filename,
               char const *restrict mode,
               FILE *restrict stream);

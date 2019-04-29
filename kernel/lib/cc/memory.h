@@ -476,9 +476,10 @@ private:
 
 __END_NAMESPACE_STD
 
-__BEGIN_NAMESPACE_EXT
 #include "cpu/control_regs_constants.h"
 #include "thread.h"
+
+__BEGIN_NAMESPACE_EXT
 template<typename T>
 class per_cpu_t
 {

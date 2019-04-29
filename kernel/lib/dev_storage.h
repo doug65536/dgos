@@ -289,9 +289,9 @@ struct fs_base_t {
     //
     // Modify directory entries
 
-    virtual int chmod(fs_cpath_t path,
+    virtual int fchmod(fs_file_info_t *fi,
                  fs_mode_t mode) = 0;
-    virtual int chown(fs_cpath_t path,
+    virtual int fchown(fs_file_info_t *fi,
                  fs_uid_t uid,
                  fs_gid_t gid) = 0;
     virtual int truncate(fs_cpath_t path,
@@ -387,9 +387,9 @@ struct fs_base_t {
     int rename(fs_cpath_t from, fs_cpath_t to) override final;          \
     int link(fs_cpath_t from, fs_cpath_t to) override final;            \
     int unlink(fs_cpath_t path) override final;                         \
-    int chmod(fs_cpath_t path,                                          \
+    int fchmod(fs_file_info_t *fi,                                      \
          fs_mode_t mode) override final;                                \
-    int chown(fs_cpath_t path,                                          \
+    int fchown(fs_file_info_t *fi,                                      \
          fs_uid_t uid,                                                  \
          fs_gid_t gid) override final;                                  \
     int truncate(fs_cpath_t path,                                       \

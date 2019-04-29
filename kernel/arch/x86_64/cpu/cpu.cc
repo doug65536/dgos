@@ -163,17 +163,17 @@ void cpu_init(int ap)
         cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, 0,
                             CPU_MSR_MISC_ENABLE_FAST_STR);
 
-//    if (cpuid_is_intel()) {
-//        clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
+    //    if (cpuid_is_intel()) {
+    //        clr = CPU_MSR_MISC_ENABLE_LIMIT_CPUID;
 
-//        if (cpuid_has_mwait())
-//            set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
+    //        if (cpuid_has_mwait())
+    //            set = CPU_MSR_MISC_ENABLE_MONITOR_FSM;
 
-//        if (cpuid_has_nx())
-//            clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
+    //        if (cpuid_has_nx())
+    //            clr = CPU_MSR_MISC_ENABLE_XD_DISABLE;
 
-//        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
-//    }
+    //        cpu_msr_change_bits(CPU_MSR_MISC_ENABLE, clr, set);
+    //    }
 
     // Enable syscall/sysret
     set = CPU_MSR_EFER_SCE;
@@ -190,12 +190,13 @@ void cpu_init(int ap)
                 CPU_EFLAGS_TF | CPU_EFLAGS_IF | CPU_EFLAGS_RF |
                 CPU_EFLAGS_VM);
     cpu_msr_set(CPU_MSR_LSTAR, uint64_t(syscall_entry));
+    cpu_msr_set(CPU_MSR_CSTAR, uint64_t(syscall32_entry));
     cpu_msr_set(CPU_MSR_STAR, (uint64_t(GDT_SEL_KERNEL_CODE64) << 32) |
-               (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
+                (uint64_t(GDT_SEL_USER_CODE32 | 3) << 48));
 
     // Configure sysenter
-    cpu_msr_set(CPU_MSR_SYSENTER_CS, GDT_SEL_KERNEL_CODE64);
-    cpu_msr_set(CPU_MSR_SYSENTER_EIP, uint64_t(sysenter_entry));
+    cpu_msr_set(CPU_MSR_SYSENTER_CS, 0);
+    cpu_msr_set(CPU_MSR_SYSENTER_EIP, uint64_t(0));
     cpu_msr_set(CPU_MSR_SYSENTER_ESP, 0);
 
     // Configure security features/workarounds
@@ -203,6 +204,7 @@ void cpu_init(int ap)
     set = 0;
 
     // Try to resort to IBRS if IBPB not supported
+    // If we can't flush branch prediction caches then make CPU segregate
     if (!cpuid_has_ibpb() && cpuid_has_ibrs())
         set |= CPU_MSR_SPEC_CTRL_IBRS;
 
@@ -298,15 +300,24 @@ void cpu_patch_code(void *addr, void const *src, size_t size)
 }
 
 // points refers to an array of pointers to labels that are after the calls
-void cpu_patch_calls(void *call_target, size_t point_count, uint32_t **points)
+// pass nullptr call_target to NOP out call instructions
+void cpu_patch_calls(void const *call_target,
+                     size_t point_count, uint32_t **points)
 {
     for (size_t i = 0; i < point_count; ++i) {
         int32_t *point = (int32_t*)points[i];
         intptr_t dist = intptr_t(call_target) - intptr_t(point);
-        assert(dist >= std::numeric_limits<int32_t>::min() &&
-               dist <= std::numeric_limits<int32_t>::max());
-        cpu_patch_insn(point - 1, dist, sizeof(uint32_t));
-        //point[-1] = dist;
+        if (call_target != nullptr) {
+            assert(dist >= std::numeric_limits<int32_t>::min() &&
+                   dist <= std::numeric_limits<int32_t>::max());
+            cpu_patch_insn(point - 1, dist, sizeof(uint32_t));
+        } else {
+            // 0xE8 is call disp32 opcode
+            uint8_t *call = (uint8_t*)(point - 1) - 1;
+            assert(*call == 0xE8);
+            if (*call == 0xE8)
+                cpu_patch_nop(call, 5);
+        }
     }
     atomic_fence();
 }
@@ -338,7 +349,9 @@ void cpu_patch_nop(void *addr, size_t size)
 
     uint8_t *out = (uint8_t*)addr;
 
-     while (size) {
+    cpu_scoped_irq_disable irq_dis;
+
+    while (size) {
         size_t insn_sz = size <= 15 ? size : 15;
         size -= insn_sz;
 
@@ -349,10 +362,11 @@ void cpu_patch_nop(void *addr, size_t size)
         }
 
         out = std::copy(nop_insns + nop_lookup[insn_sz - 1],
-                        nop_insns + nop_lookup[insn_sz - 1] + insn_sz, out);
-     }
+                nop_insns + nop_lookup[insn_sz - 1] + insn_sz, out);
 
-     atomic_fence();
+        // Serializing instruction
+        cpu_fault_address_set(0);
+    }
 }
 
 bool cpu_msr_set_safe(uint32_t msr, uint32_t value)

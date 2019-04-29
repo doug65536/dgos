@@ -89,7 +89,7 @@ static inline bool qemu_fw_cfg_has_dma()
     return qemu_fw_cfg_present() > 1;
 }
 
-int qemu_selector_by_name(const char * restrict name,
+int qemu_selector_by_name(char const * restrict name,
                           uint32_t * restrict file_size_out)
 {
     if (file_size_out)

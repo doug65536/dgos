@@ -240,7 +240,7 @@ EXPORT int storage_dev_base_t::read_blocks(
 }
 
 EXPORT int storage_dev_base_t::write_blocks(
-        const void *data, int64_t count, uint64_t lba, bool fua)
+        void const *data, int64_t count, uint64_t lba, bool fua)
 {
     blocking_iocp_t block;
     errno_t err = write_async(data, count, lba, fua, &block);
@@ -347,22 +347,22 @@ EXPORT int fs_base_ro_t::unlink(
 //
 // Modify directory entries
 
-EXPORT int fs_base_ro_t::chmod(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fchmod(
+        fs_file_info_t *fi,
         fs_mode_t mode)
 {
-    (void)path;
+    (void)fi;
     (void)mode;
     // Fail, read only
     return -int(errno_t::EROFS);
 }
 
-EXPORT int fs_base_ro_t::chown(
-        fs_cpath_t path,
+EXPORT int fs_base_ro_t::fchown(
+        fs_file_info_t *fi,
         fs_uid_t uid,
         fs_gid_t gid)
 {
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
     // Fail, read only
@@ -381,7 +381,7 @@ EXPORT int fs_base_ro_t::truncate(
 
 EXPORT int fs_base_ro_t::utimens(
         fs_cpath_t path,
-        const fs_timespec_t *ts)
+        fs_timespec_t const *ts)
 {
     (void)path;
     (void)ts;
@@ -455,7 +455,7 @@ EXPORT int fs_base_ro_t::setxattr(
     return -int(errno_t::EROFS);
 }
 
-EXPORT storage_if_factory_t::storage_if_factory_t(const char *factory_name)
+EXPORT storage_if_factory_t::storage_if_factory_t(char const *factory_name)
     : name(factory_name)
 {
 }

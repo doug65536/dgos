@@ -72,7 +72,7 @@ SECTIONS {
 	} :readonly
 
 	.eh_frame_hdr : {
-		PROVIDE(__GNU_EH_FRAME_HDR) = .;
+		PROVIDE(__GNU_EH_FRAME_HDR = .);
 		*(.eh_frame_hdr)
 		*(.eh_frame_entry .eh_frame_entry.*)
 	} :readonly

@@ -30,10 +30,10 @@ public:
     // Return true if this is a function type
     virtual bool __is_function_p() const;
 
-    virtual bool __do_catch(const type_info *__thr_type, void **__thr_obj,
+    virtual bool __do_catch(type_info const *__thr_type, void **__thr_obj,
                             unsigned __outer) const;
 
-    virtual bool __do_upcast(const __cxxabiv1::__class_type_info *__target,
+    virtual bool __do_upcast(__cxxabiv1::__class_type_info const *__target,
                              void **__obj_ptr) const;
 
 protected:

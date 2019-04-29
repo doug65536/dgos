@@ -2021,8 +2021,8 @@ QEMU_EXTRA_DEPS = \
 #random-mem.img
 
 QEMU_CPUS = $(shell $(NPROC))
-QEMU_CORES = 8
 QEMU_THREADS = 2
+QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
 QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
 QEMU_RAM = 5G

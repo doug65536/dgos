@@ -395,7 +395,7 @@ public:
         }
 
         // dev_fs_file_t interface
-        ssize_t write(const char *buf, size_t size, off_t offset) override
+        ssize_t write(char const *buf, size_t size, off_t offset) override
         {
             return -int(errno_t::EROFS);
         }

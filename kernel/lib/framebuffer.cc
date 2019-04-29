@@ -1,4 +1,5 @@
 #include "framebuffer.h"
+#include "thread.h"
 #include "mm.h"
 #include "string.h"
 #include "likely.h"
@@ -9,7 +10,6 @@
 #include "bootinfo.h"
 #include "vesainfo.h"
 #include "dev_text.h"
-#include "thread.h"
 
 #define CHARHEIGHT 16
 
@@ -42,7 +42,7 @@ public:
     }
 
     static size_t glyph_index(size_t codepoint);
-    static const bitmap_glyph_t *glyph(size_t codepoint);
+    static bitmap_glyph_t const *glyph(size_t codepoint);
 
 private:
     // text_dev_base_t interface
@@ -782,7 +782,7 @@ static void test_framebuffer_thread()
         }
 
         x += xdir;
-        if (x > 200 || x < 1) {
+        if (x > 100 || x < 1) {
             xdir = -xdir;
             x += xdir;
             y += ydir;
@@ -806,7 +806,7 @@ bool framebuffer_console_t::init()
     ofs_x = (fb.mode.width - width * 9) >> 1;
     ofs_y = (fb.mode.height - height * CHARHEIGHT) >> 1;
 
-    //thread_close(thread_proc_0(test_framebuffer_thread));
+    test_framebuffer_thread();
 
     return true;
 }
@@ -880,27 +880,27 @@ void framebuffer_console_t::putc_xy(int x, int y, int character)
 {
 }
 
-int framebuffer_console_t::print(const char *s)
+int framebuffer_console_t::print(char const *s)
 {
     return 0;
 }
 
-int framebuffer_console_t::write(const char *s, intptr_t len)
+int framebuffer_console_t::write(char const *s, intptr_t len)
 {
     return 0;
 }
 
-int framebuffer_console_t::print_xy(int x, int y, const char *s)
+int framebuffer_console_t::print_xy(int x, int y, char const *s)
 {
     return 0;
 }
 
-int framebuffer_console_t::draw(const char *s)
+int framebuffer_console_t::draw(char const *s)
 {
     return 0;
 }
 
-int framebuffer_console_t::draw_xy(int x, int y, const char *s, int attrib)
+int framebuffer_console_t::draw_xy(int x, int y, char const *s, int attrib)
 {
     return 0;
 }

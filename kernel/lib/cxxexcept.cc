@@ -77,7 +77,7 @@ class type_info
 
     virtual bool __is_pointer_p() const = 0;
     virtual bool __is_function_p() const = 0;
-    virtual bool __do_catch(const type_info *__thr_type, void **__thr_obj,
+    virtual bool __do_catch(type_info const *__thr_type, void **__thr_obj,
                             unsigned __outer) const;
 
     // Internally used during catch matching
@@ -107,8 +107,8 @@ struct __cxa_exception {
 
 	int handlerCount;
 	int handlerSwitchValue;
-	const char *actionRecord;
-	const char *languageSpecificData;
+    char const *actionRecord;
+    char const *languageSpecificData;
 	void *catchTemp;
 	void *adjustedPtr;
 

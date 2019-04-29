@@ -67,7 +67,7 @@ struct cpuid_cache_t {
     bool has_smap       :1;
     bool has_inrdtsc    :1;
 
-    bool has_ibpb       :1;
+    // ibrs includes ibpb
     bool has_ibrs       :1;
     bool has_stibp      :1;
     bool has_ssbd       :1;
@@ -295,7 +295,8 @@ CPUID_CONST_INLINE uint8_t cpuid_has_bug_meltdown()
 
 CPUID_CONST_INLINE uint8_t cpuid_has_ibpb()
 {
-    return cpuid_cache.has_ibpb;
+    // Same as ibrs
+    return cpuid_cache.has_ibrs;
 }
 
 CPUID_CONST_INLINE uint8_t cpuid_has_ibrs()

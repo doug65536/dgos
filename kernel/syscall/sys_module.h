@@ -4,7 +4,7 @@
 struct module;
 struct kernel_sym;
 
-int sys_init_module(char const *module, size_t module_sz, const char *module_name,
+int sys_init_module(char const *module, size_t module_sz, char const *module_name,
                     char const *module_params);
 int sys_delete_module(char const *name_user);
 int sys_query_module(char const *name_user, int which, char *buf,

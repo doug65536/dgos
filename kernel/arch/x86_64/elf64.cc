@@ -128,7 +128,8 @@ static std::string module_reloc_type(size_t sym_type)
 class module_t {
 public:
     bool load(char const *path);
-    bool load_image(void const *module, size_t module_sz, const char *module_name);
+    bool load_image(void const *module, size_t module_sz,
+                    char const *module_name);
     int run();
 
     ~module_t();
@@ -190,7 +191,7 @@ module_t *modload_load(char const *path, bool run)
 }
 
 // Shared module loader
-module_t *modload_load_image(const void *image, size_t image_sz,
+module_t *modload_load_image(void const *image, size_t image_sz,
                              char const *module_name, bool run)
 {
     std::unique_ptr<module_t> module(new module_t{});

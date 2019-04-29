@@ -62,22 +62,22 @@ static char const *cpu_mxcsr_rc[] = {
 };
 
 static format_flag_info_t const cpu_mxcsr_info[] = {
-    { "IE",     1,                 nullptr,            CPU_MXCSR_IE_BIT  },
-    { "DE",     1,                 nullptr,            CPU_MXCSR_DE_BIT  },
-    { "ZE",     1,                 nullptr,            CPU_MXCSR_ZE_BIT  },
-    { "OE",     1,                 nullptr,            CPU_MXCSR_OE_BIT  },
-    { "UE",     1,                 nullptr,            CPU_MXCSR_UE_BIT  },
-    { "PE",     1,                 nullptr,            CPU_MXCSR_PE_BIT  },
-    { "DAZ",    1,                 nullptr,            CPU_MXCSR_DAZ_BIT },
-    { "IM",     1,                 nullptr,            CPU_MXCSR_IM_BIT  },
-    { "DM",     1,                 nullptr,            CPU_MXCSR_DM_BIT  },
-    { "ZM",     1,                 nullptr,            CPU_MXCSR_ZM_BIT  },
-    { "OM",     1,                 nullptr,            CPU_MXCSR_OM_BIT  },
-    { "UM",     1,                 nullptr,            CPU_MXCSR_UM_BIT  },
-    { "PM",     1,                 nullptr,            CPU_MXCSR_PM_BIT  },
-    { "RC",     CPU_MXCSR_RC_BITS, cpu_mxcsr_rc,       CPU_MXCSR_RC_BIT  },
-    { "FZ",     1,                 nullptr,            CPU_MXCSR_FZ_BIT  },
-    { nullptr,  0,                 nullptr,            -1                }
+    { "IE",     1,                 nullptr,      CPU_MXCSR_IE_BIT  },
+    { "DE",     1,                 nullptr,      CPU_MXCSR_DE_BIT  },
+    { "ZE",     1,                 nullptr,      CPU_MXCSR_ZE_BIT  },
+    { "OE",     1,                 nullptr,      CPU_MXCSR_OE_BIT  },
+    { "UE",     1,                 nullptr,      CPU_MXCSR_UE_BIT  },
+    { "PE",     1,                 nullptr,      CPU_MXCSR_PE_BIT  },
+    { "DAZ",    1,                 nullptr,      CPU_MXCSR_DAZ_BIT },
+    { "IM",     1,                 nullptr,      CPU_MXCSR_IM_BIT  },
+    { "DM",     1,                 nullptr,      CPU_MXCSR_DM_BIT  },
+    { "ZM",     1,                 nullptr,      CPU_MXCSR_ZM_BIT  },
+    { "OM",     1,                 nullptr,      CPU_MXCSR_OM_BIT  },
+    { "UM",     1,                 nullptr,      CPU_MXCSR_UM_BIT  },
+    { "PM",     1,                 nullptr,      CPU_MXCSR_PM_BIT  },
+    { "RC",     CPU_MXCSR_RC_BITS, cpu_mxcsr_rc, CPU_MXCSR_RC_BIT  },
+    { "FZ",     1,                 nullptr,      CPU_MXCSR_FZ_BIT  },
+    { nullptr,  0,                 nullptr,      -1                }
 };
 
 static char const *cpu_fpucw_pc[] = {
@@ -88,15 +88,15 @@ static char const *cpu_fpucw_pc[] = {
 };
 
 static format_flag_info_t const cpu_fpucw_info[] = {
-    { "IM",     1,                  nullptr,            CPU_FPUCW_IM_BIT },
-    { "DM",     1,                  nullptr,            CPU_FPUCW_DM_BIT },
-    { "ZM",     1,                  nullptr,            CPU_FPUCW_ZM_BIT },
-    { "OM",     1,                  nullptr,            CPU_FPUCW_OM_BIT },
-    { "UM",     1,                  nullptr,            CPU_FPUCW_UM_BIT },
-    { "PM",     1,                  nullptr,            CPU_FPUCW_PM_BIT },
-    { "PC",     CPU_FPUCW_PC_BITS,  cpu_fpucw_pc,       CPU_FPUCW_PC_BIT },
-    { "RC",     CPU_FPUCW_RC_BITS,  cpu_mxcsr_rc,       CPU_FPUCW_RC_BIT },
-    { nullptr,  0,                  nullptr,            -1               }
+    { "IM",     1,                  nullptr,      CPU_FPUCW_IM_BIT },
+    { "DM",     1,                  nullptr,      CPU_FPUCW_DM_BIT },
+    { "ZM",     1,                  nullptr,      CPU_FPUCW_ZM_BIT },
+    { "OM",     1,                  nullptr,      CPU_FPUCW_OM_BIT },
+    { "UM",     1,                  nullptr,      CPU_FPUCW_UM_BIT },
+    { "PM",     1,                  nullptr,      CPU_FPUCW_PM_BIT },
+    { "PC",     CPU_FPUCW_PC_BITS,  cpu_fpucw_pc, CPU_FPUCW_PC_BIT },
+    { "RC",     CPU_FPUCW_RC_BITS,  cpu_mxcsr_rc, CPU_FPUCW_RC_BIT },
+    { nullptr,  0,                  nullptr,      -1               }
 };
 
 static format_flag_info_t const cpu_fpusw_info[] = {
@@ -168,23 +168,11 @@ static void idtr_load(table_register_64_t *table_reg)
 }
 #endif
 
-struct load_fsgsbase_range_t {
-    void *target;
-    uint32_t *patch_points[2];
-};
-extern "C" load_fsgsbase_range_t load_fsgsbase_range;
-
 void idt_xsave_detect(int ap)
 {
     cpu_scoped_irq_disable intr_was_enabled;
 
     // Patch FS/GS loading code if CPU supports wrfsbase/wrgsbase
-
-    if (!ap && cpuid_has_fsgsbase()) {
-        cpu_patch_calls(load_fsgsbase_range.target,
-                        countof(load_fsgsbase_range.patch_points),
-                        load_fsgsbase_range.patch_points);
-    }
 
     while (cpuid_has_xsave()) {
         cpuid_t info;
@@ -308,6 +296,103 @@ isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
+static uint8_t const vzeroall_nopw_insn[] = {
+    0xc5, 0xfc, 0x77, 0x66, 0x90
+};
+
+static uint8_t const rdfsbase_r13_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xc5
+};
+
+static uint8_t const rdgsbase_r14_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xce
+};
+
+static uint8_t const wrfsbase_r13_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xd5
+};
+
+static uint8_t const wrgsbase_r14_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xde
+};
+
+// These preserve all registers like the instruction they replace
+extern "C" void soft_vzeroall();
+extern "C" void soft_rdfsbase_r13();
+extern "C" void soft_rdgsbase_r14();
+extern "C" void soft_wrfsbase_r13();
+extern "C" void soft_wrgsbase_r14();
+
+isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
+{
+    if (ctx->gpr.iret.cs == GDT_SEL_KERNEL_CODE64) {
+        // Dynamically patch
+        uint8_t const *code = (uint8_t const *)ctx->gpr.iret.rip;
+        uint8_t const *next = nullptr;
+        uint8_t const *aligned_code = (uint8_t const *)(uintptr_t(code) & -16);
+        size_t offset = code - aligned_code;
+
+        intptr_t dist = 0;
+
+        // Unconditionally restart `call disp32` instructions
+        // This cpu probably prefetched this
+        // before another cpu fixed it up
+        if (*code == 0xE8)
+            return ctx;
+
+        if (unlikely(memcmp(code, vzeroall_nopw_insn,
+                            sizeof(vzeroall_nopw_insn)))) {
+            next = code + 5;
+            dist = uintptr_t(soft_vzeroall) - uintptr_t(next);
+        }
+
+        if (unlikely(memcmp(code, rdfsbase_r13_insn,
+                            sizeof(rdfsbase_r13_insn)))) {
+            next = code + sizeof(rdfsbase_r13_insn);
+            dist = uintptr_t(soft_rdfsbase_r13) - uintptr_t(next);
+        }
+
+        // Replace with a call
+        uint8_t block[16];
+        memcpy(block, aligned_code, sizeof(block));
+        uint64_t expect_lo = ((uint64_t const *)block)[0];
+        uint64_t expect_hi = ((uint64_t const *)block)[1];
+        while (dist != 0) {
+            if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
+                return nullptr;
+            block[offset] = 0xE8;
+            block[offset+1] = (dist)       & 0xFF;
+            block[offset+2] = (dist >> 8)  & 0xFF;
+            block[offset+3] = (dist >> 16) & 0xFF;
+            block[offset+4] = (dist >> 24) & 0xFF;
+            uint64_t replace_lo = ((uint64_t const *)block)[0];
+            uint64_t replace_hi = ((uint64_t const *)block)[1];
+            bool replaced;
+            __asm__ __volatile__ (
+                "cmpxchg16b (%[ptr])"
+                : "=@ccz" (replaced)
+                , "+a" (expect_lo)
+                , "+d" (expect_hi)
+                : "b" (replace_lo)
+                , "c" (replace_hi)
+                , [ptr] "r" (aligned_code)
+            );
+            if (unlikely(!replaced)) {
+                memcpy(block, &expect_lo, sizeof(expect_lo));
+                memcpy(block + 8, &expect_hi, sizeof(expect_hi));
+                pause();
+                continue;
+            }
+            // Restart instruction
+            return ctx;
+        }
+    } else {
+
+    }
+
+    return ctx;
+}
+
 extern char ___isr_st[];
 
 constexpr uintptr_t isr_entry_point(size_t i)
@@ -373,6 +458,9 @@ int idt_init(int ap)
 
         intr_hook(INTR_EX_DEBUG, debug_exception_handler,
                   "debug", eoi_none);
+
+        intr_hook(INTR_EX_OPCODE, opcode_exception_handler,
+                  "#UD", eoi_none);
     }
 
     table_register_64_t idtr;

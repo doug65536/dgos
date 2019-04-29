@@ -3265,7 +3265,7 @@ EXPORT int alias_window(void *addr, size_t size,
     return 1;
 }
 
-int mlock(const void *addr, size_t len)
+int mlock(void const *addr, size_t len)
 {
     linaddr_t staddr = linaddr_t(addr);
     linaddr_t enaddr = staddr + len;
@@ -3282,7 +3282,7 @@ int mlock(const void *addr, size_t len)
     return 0;
 }
 
-int munlock(const void *addr, size_t len)
+int munlock(void const *addr, size_t len)
 {
     linaddr_t staddr = linaddr_t(addr);
     linaddr_t enaddr = staddr + len;

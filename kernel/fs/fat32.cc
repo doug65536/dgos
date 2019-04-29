@@ -84,7 +84,7 @@ struct fat32_fs_t final : public fs_base_t {
     static uint8_t lfn_checksum(char const *fcb_name);
 
     static void fcbname_from_lfn(full_lfn_t *full, char *fcbname,
-                                 const char16_t *lfn, size_t lfn_len);
+                                 char16_t const *lfn, size_t lfn_len);
 
     static void dirents_from_name(full_lfn_t *full,
                                   char const *pathname, size_t name_len);
@@ -1587,20 +1587,20 @@ int fat32_fs_t::unlink(fs_cpath_t path)
 //
 // Modify directory entries
 
-int fat32_fs_t::chmod(fs_cpath_t path, fs_mode_t mode)
+int fat32_fs_t::fchmod(fs_file_info_t *fi, fs_mode_t mode)
 {
     write_lock lock(rwlock);
 
-    (void)path;
+    (void)fi;
     (void)mode;
     return -int(errno_t::ENOSYS);
 }
 
-int fat32_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int fat32_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
 {
     write_lock lock(rwlock);
 
-    (void)path;
+    (void)fi;
     (void)uid;
     (void)gid;
     return -int(errno_t::ENOSYS);
@@ -1616,7 +1616,7 @@ int fat32_fs_t::truncate(fs_cpath_t path, off_t size)
 }
 
 int fat32_fs_t::utimens(fs_cpath_t path,
-                         const fs_timespec_t *ts)
+                         fs_timespec_t const *ts)
 {
     write_lock lock(rwlock);
 

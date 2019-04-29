@@ -12,7 +12,8 @@ extern "C" void cpu_patch_insn(void *addr, uint64_t value, size_t size);
 extern "C" void cpu_patch_nop(void *addr, size_t size);
 
 extern "C"
-void cpu_patch_calls(void *call_target, size_t point_count, uint32_t **points);
+void cpu_patch_calls(void const *call_target,
+                     size_t point_count, uint32_t **points);
 
 extern "C" uint32_t default_mxcsr_mask;
 

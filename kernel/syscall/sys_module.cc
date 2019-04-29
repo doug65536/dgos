@@ -8,8 +8,8 @@
 #include "thread.h"
 #include "process.h"
 
-int sys_init_module(const char *module, size_t module_sz,
-                    char const *module_name, const char *module_params)
+int sys_init_module(char const *module, size_t module_sz,
+                    char const *module_name, char const *module_params)
 {
     char kmname[256];
 
@@ -30,12 +30,12 @@ int sys_init_module(const char *module, size_t module_sz,
     return worked ? 0 : -int(errno_t::EINVAL);
 }
 
-int sys_delete_module(const char *name_user)
+int sys_delete_module(char const *name_user)
 {
     return int(errno_t::ENOSYS);
 }
 
-int sys_query_module(const char *name_user, int which,
+int sys_query_module(char const *name_user, int which,
                      char *buf, size_t bufsize, size_t *ret)
 {
     return int(errno_t::ENOSYS);

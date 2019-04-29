@@ -249,7 +249,7 @@ struct mmphysrange_t {
 /// sizes less than or equal to max_length
 size_t mphysranges(mmphysrange_t *ranges,
                    size_t ranges_count,
-                   const void *addr, size_t size,
+                   void const *addr, size_t size,
                    size_t max_size);
 
 // Ensure no range crosses the specified boundary
@@ -294,8 +294,8 @@ void *sbrk(intptr_t __increment);
 #endif
 
 /// Maximum number of arguments to exec functions
-#define _SC_ARG_MAX
-#define ARG_MAX _SC_ARG_MAX
+//#define _SC_ARG_MAX
+//#define ARG_MAX _SC_ARG_MAX
 
 /// Maximum number of processes per user
 #define _SC_CHILD_MAX
@@ -407,7 +407,7 @@ extern "C"
 #ifdef USE_RETPOLINE
 _no_plt
 #endif
-bool mm_lenof_user_str(char const *src, size_t max_size);
+intptr_t mm_lenof_user_str(char const *src, size_t max_size);
 
 extern "C" _const
 bool mm_is_user_range(void const *buf, size_t size);

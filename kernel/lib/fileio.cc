@@ -82,6 +82,11 @@ static filetab_t *file_fh_from_id(int id)
     return nullptr;
 }
 
+static fs_base_t *file_fs_from_path(char const *path, size_t& consumed)
+{
+    if (path[0] == '/' && !memcmp(path, "/dev/", 5)) {
+        consumed = 5;
+
         auto cur_devfs = atomic_ld_acq(&dev_fs);
 
         if (cur_devfs)
@@ -153,20 +158,6 @@ bool file_ref_filetab(int id)
 }
 
 REGISTER_CALLOUT(file_init, nullptr, callout_type_t::heap_ready, "000");
-
-static filetab_t *file_fh_from_id(int id)
-{
-    file_table_scoped_lock lock(file_table_lock);
-    filetab_t *item = nullptr;
-    if (likely(id >= 0 && size_t(id) < file_table.size())) {
-        item = &file_table[id];
-
-        if (likely(item->refcount > 0))
-            return item;
-        assert(!"Zero ref count!");
-    }
-    return nullptr;
-}
 
 int file_creat(char const *path, mode_t mode)
 {
@@ -485,7 +476,7 @@ int file_unlink(char const *path)
     return fs->unlink(path + consumed);
 }
 
-int file_chmod(int id, mode_t mode)
+int file_fchmod(int id, mode_t mode)
 {
     filetab_t *fh = file_fh_from_id(id);
     if (unlikely(!fh))
@@ -507,7 +498,7 @@ int file_chown(int id, int uid, int gid)
     return fh->fs->fchown(fh->fi, uid, gid);
 }
 
-path_t::path_t(const char *user_path)
+path_t::path_t(char const *user_path)
 {
     // Get the length of the user memory string
     intptr_t len = mm_lenof_user_str(user_path, PATH_MAX);
@@ -594,7 +585,7 @@ uint32_t path_t::hash_of(size_t index) const
     return components[index].hash;
 }
 
-const char *path_t::begin_of(size_t index) const
+char const *path_t::begin_of(size_t index) const
 {
     if (likely(index < nr_components))
         return reinterpret_cast<char const *>(data.data) +
@@ -603,7 +594,7 @@ const char *path_t::begin_of(size_t index) const
     return nullptr;
 }
 
-const char *path_t::end_of(size_t index) const
+char const *path_t::end_of(size_t index) const
 {
     if (likely(index < nr_components))
         return reinterpret_cast<char const *>(data.data) +
@@ -621,7 +612,7 @@ size_t path_t::len_of(size_t index) const
     return 0;
 }
 
-std::pair<const char *, const char *> path_t::range_of(size_t index) const
+std::pair<char const *, char const *> path_t::range_of(size_t index) const
 {
     if (likely(index < nr_components)) {
         path_frag_t const& frag = components[index];
@@ -659,12 +650,62 @@ errno_t path_t::error() const
     return err;
 }
 
-const char *path_t::operator[](size_t component) const
+char const *path_t::operator[](size_t component) const
 {
     return begin_of(component);
+}
+
+std::string path_t::to_string() const
+{
+    std::string s;
+
+    s.reserve(8 + uintptr_t(components) - uintptr_t(&data));
+
+    if (absolute)
+        s.push_back('/');
+
+    if (unc)
+        s.push_back('/');
+
+    for (size_t i = 0; i < nr_components; ++i) {
+        if (i > 0)
+            s.push_back('/');
+        std::pair<char const *, char const *> range = range_of(i);
+        s.append(range.first, range.second);
+    }
+
+    return s;
 }
 
 path_t::operator bool() const
 {
     return valid && err == errno_t::OK;
+}
+
+user_str_t::user_str_t(const char *user_str)
+{
+    // Get the length of the user memory string
+    lenof_str = mm_lenof_user_str(user_str, PATH_MAX);
+
+    // Return with valid still false
+    if (unlikely(lenof_str < 0))
+        return;
+
+    // Get a pointer to aligned storage
+    char *buf = reinterpret_cast<char *>(&data);
+
+    // If failed to copy string
+    if (unlikely(!mm_copy_user(buf, user_str, lenof_str + 1))) {
+        set_err(errno_t::EFAULT);
+        return;
+    }
+
+    // If the string myseriously changed length, fail
+    // See if any null terminators sneaked into the string
+    // Or the final null terminator mysteriously disappeared
+    if (unlikely(memchr(buf, 0, lenof_str + 1) != buf + lenof_str)) {
+        // That's strange, nice try
+        set_err(errno_t::EFAULT);
+        return;
+    }
 }

@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-int printf(const char *format, ...)
+int printf(char const *format, ...)
 {
     va_list ap;
     va_start(ap, format);

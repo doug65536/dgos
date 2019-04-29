@@ -89,13 +89,13 @@ int dev_fs_t::unlink(fs_cpath_t path)
     return -int(errno_t::ENOSYS);
 }
 
-int dev_fs_t::chmod(fs_cpath_t path,
+int dev_fs_t::fchmod(fs_file_info_t *fi,
      fs_mode_t mode)
 {
     return -int(errno_t::ENOSYS);
 }
 
-int dev_fs_t::chown(fs_cpath_t path, fs_uid_t uid, fs_gid_t gid)
+int dev_fs_t::fchown(fs_file_info_t *fi, fs_uid_t uid, fs_gid_t gid)
 {
     return -int(errno_t::ENOSYS);
 }

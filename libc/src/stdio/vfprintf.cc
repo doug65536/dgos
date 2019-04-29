@@ -23,7 +23,7 @@ static int emit_stream_chars(char const *p, intptr_t n, void* ctx)
     return n;
 }
 
-int vfprintf(FILE *stream, const char *format, va_list ap)
+int vfprintf(FILE *stream, char const *format, va_list ap)
 {
     return formatter(format, ap, emit_stream_chars, stream);
 }

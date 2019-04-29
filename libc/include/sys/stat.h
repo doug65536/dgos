@@ -206,22 +206,22 @@ struct stat {
 ///
 /// The following shall be declared as functions and may also be defined as macros. Function prototypes shall be provided.
 ///
-int    chmod(const char *, mode_t);
+int    chmod(char const *, mode_t);
 int    fchmod(int, mode_t);
-int    fchmodat(int, const char *, mode_t, int);
+int    fchmodat(int, char const *, mode_t, int);
 int    fstat(int, struct stat *);
-int    fstatat(int, const char *restrict, struct stat *restrict, int);
+int    fstatat(int, char const *restrict, struct stat *restrict, int);
 int    futimens(int, const struct timespec [2]);
-int    lstat(const char *restrict, struct stat *restrict);
-int    mkdir(const char *, mode_t);
-int    mkdirat(int, const char *, mode_t);
-int    mkfifo(const char *, mode_t);
-int    mkfifoat(int, const char *, mode_t);
-int    mknod(const char *, mode_t, dev_t);
-int    mknodat(int, const char *, mode_t, dev_t);
-int    stat(const char *restrict, struct stat *restrict);
+int    lstat(char const *restrict, struct stat *restrict);
+int    mkdir(char const *, mode_t);
+int    mkdirat(int, char const *, mode_t);
+int    mkfifo(char const *, mode_t);
+int    mkfifoat(int, char const *, mode_t);
+int    mknod(char const *, mode_t, dev_t);
+int    mknodat(int, char const *, mode_t, dev_t);
+int    stat(char const *restrict, struct stat *restrict);
 mode_t umask(mode_t);
-int    utimensat(int, const char *, const struct timespec [2], int);
+int    utimensat(int, char const *, const struct timespec [2], int);
 
 ///
 /// Inclusion of the <sys/stat.h> header may make visible all symbols from the <time.h> header.

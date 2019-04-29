@@ -99,6 +99,7 @@ syscall/sys_exit.cc
 syscall/sys_exit.h
 syscall/sys_fd.cc
 syscall/sys_fd.h
+syscall/sys_limits.h
 syscall/sys_mem.cc
 syscall/sys_mem.h
 syscall/sys_module.cc

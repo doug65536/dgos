@@ -1,6 +1,6 @@
 #include <string.h>
 
-void *memcpy(void *restrict lhs, const void *restrict rhs, size_t sz)
+void *memcpy(void *restrict lhs, void const *restrict rhs, size_t sz)
 {
     auto d = (char *)lhs;
     auto s = (char const *)rhs;
