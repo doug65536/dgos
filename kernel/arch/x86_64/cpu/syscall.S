@@ -169,7 +169,7 @@ syscall_entry:
 
     // Push user stack pointer to syscall stack
     pushq %r11
-    .cfi_def_cfa rsp,0
+    .cfi_def_cfa rsp,8
     .cfi_offset rsp,-1*8
 
     // Push return address to syscall stack
@@ -206,6 +206,7 @@ syscall_entry:
     // Restore caller's stack
     pop_cfi %rsp
     .cfi_def_cfa rsp,0
+    .cfi_register rsp,rsp
 
     // Don't leak information to user mode
     xorl %edx,%edx
