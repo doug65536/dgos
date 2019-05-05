@@ -3517,6 +3517,9 @@ bool mm_copy_user_str_smap(char *dst, char const *src, size_t size)
 intptr_t mm_lenof_user_str_generic(char const *src, size_t max_size)
 {
     __try {
+        if (unlikely(max_size > std::numeric_limits<intptr_t>::max()))
+            return -1;
+
         for (intptr_t len = 0; len < max_size; ++len) {
             if (src[len] == 0)
                 return len;
@@ -3588,7 +3591,7 @@ EXPORT bool mm_is_user_range(void const *buf, size_t size)
 // +-------+-------+-----------+--------+
 // |   1   |     8 |      ( 3) |   ~0   |
 // |   2   |   512 |      ( 9) |   ~0   |
-// |   3   |   32K |      (15) |   ~0   |
+// |   3   |   32K |      (15) |  ~32KB |
 // |   4   |   64G |      (21) |   ~2MB |
 // |   5   |    4T |      (27) | ~128MB |
 // +-------+-------+-----------+--------+

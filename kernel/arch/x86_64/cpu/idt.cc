@@ -318,6 +318,8 @@ static uint8_t const wrgsbase_r14_insn[] = {
 
 // These preserve all registers like the instruction they replace
 extern "C" void soft_vzeroall();
+extern "C" void soft_rdfsgsbase_r13r14();
+extern "C" void soft_wrfsgsbase_r13r14();
 extern "C" void soft_rdfsbase_r13();
 extern "C" void soft_rdgsbase_r14();
 extern "C" void soft_wrfsbase_r13();
@@ -325,48 +327,112 @@ extern "C" void soft_wrgsbase_r14();
 
 isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
 {
-    if (ctx->gpr.iret.cs == GDT_SEL_KERNEL_CODE64) {
+    if (ISR_CTX_REG_CS(ctx) == GDT_SEL_KERNEL_CODE64) {
         // Dynamically patch
-        uint8_t const *code = (uint8_t const *)ctx->gpr.iret.rip;
+        uint8_t const *code = (uint8_t const *)ISR_CTX_REG_RIP(ctx);
         uint8_t const *next = nullptr;
         uint8_t const *aligned_code = (uint8_t const *)(uintptr_t(code) & -16);
         size_t offset = code - aligned_code;
+        size_t avail = 16 - offset;
+        size_t replace_sz = 0;
 
         intptr_t dist = 0;
 
         // Unconditionally restart `call disp32` instructions
-        // This cpu probably prefetched this
-        // before another cpu fixed it up
+        // This cpu probably prefetched this before another cpu fixed it up
         if (*code == 0xE8)
             return ctx;
 
-        if (unlikely(memcmp(code, vzeroall_nopw_insn,
+        if (unlikely(avail >= sizeof(vzeroall_nopw_insn) &&
+                     !memcmp(code, vzeroall_nopw_insn,
                             sizeof(vzeroall_nopw_insn)))) {
-            next = code + 5;
+            replace_sz = 5;
+            next = code + replace_sz;
             dist = uintptr_t(soft_vzeroall) - uintptr_t(next);
         }
 
-        if (unlikely(memcmp(code, rdfsbase_r13_insn,
-                            sizeof(rdfsbase_r13_insn)))) {
-            next = code + sizeof(rdfsbase_r13_insn);
+        //
+        // Read and write fsbase r13
+
+        if (unlikely(avail > sizeof(rdfsbase_r13_insn) +
+                     sizeof(rdgsbase_r14_insn) &&
+                     !memcmp(code, rdfsbase_r13_insn,
+                            sizeof(rdfsbase_r13_insn)) &&
+                     !memcmp(code + sizeof(rdfsbase_r13_insn),
+                             rdgsbase_r14_insn, sizeof(rdgsbase_r14_insn)))) {
+            // Both at once in one
+            replace_sz = 10;
+            next = code + 5;
+            dist = uintptr_t(soft_rdfsgsbase_r13r14) - uintptr_t(next);
+        } else if (unlikely(avail > sizeof(wrfsbase_r13_insn) +
+                     sizeof(wrgsbase_r14_insn) &&
+                     !memcmp(code, wrfsbase_r13_insn,
+                            sizeof(wrfsbase_r13_insn)) &&
+                     !memcmp(code + sizeof(wrfsbase_r13_insn),
+                             wrgsbase_r14_insn, sizeof(wrgsbase_r14_insn)))) {
+            // Both at once in one
+            replace_sz = 10;
+            next = code + 5;
+            dist = uintptr_t(soft_wrfsgsbase_r13r14) - uintptr_t(next);
+        } else if (unlikely(avail >= sizeof(rdfsbase_r13_insn) &&
+                     !memcmp(code, rdfsbase_r13_insn,
+                             sizeof(rdfsbase_r13_insn)))) {
+            replace_sz = 5;
+            next = code + replace_sz;
             dist = uintptr_t(soft_rdfsbase_r13) - uintptr_t(next);
+        } else if (unlikely(avail >= sizeof(wrfsbase_r13_insn) &&
+                     !memcmp(code, wrfsbase_r13_insn,
+                             sizeof(wrfsbase_r13_insn)))) {
+            replace_sz = 5;
+            next = code + replace_sz;
+            dist = uintptr_t(soft_wrfsbase_r13) - uintptr_t(next);
+        } else if (unlikely(avail >= sizeof(rdgsbase_r14_insn) &&
+                     !memcmp(code, rdgsbase_r14_insn,
+                             sizeof(rdgsbase_r14_insn)))) {
+            replace_sz = 5;
+            next = code + replace_sz;
+            dist = uintptr_t(soft_rdgsbase_r14) - uintptr_t(next);
+        } else if (unlikely(avail >= sizeof(wrgsbase_r14_insn) &&
+                     !memcmp(code, wrgsbase_r14_insn,
+                             sizeof(wrgsbase_r14_insn)))) {
+            replace_sz = 5;
+            next = code + replace_sz;
+            dist = uintptr_t(soft_wrgsbase_r14) - uintptr_t(next);
         }
 
         // Replace with a call
-        uint8_t block[16];
-        memcpy(block, aligned_code, sizeof(block));
-        uint64_t expect_lo = ((uint64_t const *)block)[0];
-        uint64_t expect_hi = ((uint64_t const *)block)[1];
+        alignas(16) uint8_t block[16];
+        uint64_t expect_lo, expect_hi;
+        memcpy(&expect_lo, aligned_code, sizeof(expect_lo));
+        memcpy(&expect_hi, aligned_code + 8, sizeof(expect_hi));
+        // Relocation truncated to fit? Doubt it but unhandled if so
+        if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
+            return nullptr;
+
+        if (unlikely(avail < replace_sz))
+            panic("Bad #UD fixup crosses 16-byte boundary!");
+
+        // Disable write protection temporarily
+        cpu_scoped_wp_disable wp_dis;
+
         while (dist != 0) {
-            if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
-                return nullptr;
+            memcpy(block, &expect_lo, sizeof(expect_lo));
+            memcpy(block + 8, &expect_hi, sizeof(expect_hi));
+
             block[offset] = 0xE8;
-            block[offset+1] = (dist)       & 0xFF;
-            block[offset+2] = (dist >> 8)  & 0xFF;
-            block[offset+3] = (dist >> 16) & 0xFF;
-            block[offset+4] = (dist >> 24) & 0xFF;
-            uint64_t replace_lo = ((uint64_t const *)block)[0];
-            uint64_t replace_hi = ((uint64_t const *)block)[1];
+            memcpy(block + offset + 1, &dist, sizeof(uint32_t));
+
+            if (unlikely(replace_sz > 5))
+                cpu_patch_nop(block + offset + 5, replace_sz - 5);
+
+            uint64_t replace_lo, replace_hi;
+            memcpy(&replace_lo, block, sizeof(replace_lo));
+            memcpy(&replace_hi, block + 8, sizeof(replace_hi));
+
+            // Maybe nothing to do anymore
+            if (unlikely(expect_hi == replace_hi && expect_lo == replace_lo))
+                return ctx;
+
             bool replaced;
             __asm__ __volatile__ (
                 "cmpxchg16b (%[ptr])"
@@ -377,20 +443,18 @@ isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
                 , "c" (replace_hi)
                 , [ptr] "r" (aligned_code)
             );
-            if (unlikely(!replaced)) {
-                memcpy(block, &expect_lo, sizeof(expect_lo));
-                memcpy(block + 8, &expect_hi, sizeof(expect_hi));
-                pause();
-                continue;
-            }
-            // Restart instruction
-            return ctx;
-        }
-    } else {
 
+            // The iretq is serializing so this core will have no problem
+            // with the newly patched instruction
+            if (likely(replaced))
+                return ctx;
+
+            pause();
+        }
     }
 
-    return ctx;
+    // Unhandled
+    return nullptr;
 }
 
 extern char ___isr_st[];
@@ -726,13 +790,13 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // rflags (it's actually only 22 bits) and description
     cpu_describe_eflags(fmt_buf, sizeof(fmt_buf), ISR_CTX_REG_RFLAGS(ctx));
-    printdbg("rflags=%06lx %s\n", ISR_CTX_REG_RFLAGS(ctx), fmt_buf);
+    printdbg("rflags=%#.16lx %s\n", ISR_CTX_REG_RFLAGS(ctx), fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%18p\n", fsbase);
+    printdbg("fsbase=%#.16lx\n", fsbase);
 
     // gsbase
-    printdbg("gsbase=%18p\n", gsbase);
+    printdbg("gsbase=%#.16lx\n", gsbase);
 
     printdbg("-------------------------------------------\n");
 
@@ -840,12 +904,12 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%18p ", fsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%#.16lx ", fsbase);
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%18p ", gsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%#.16lx ", gsbase);
     con_draw_xy(6, 21, fmt_buf, color);
 
     if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)

@@ -779,7 +779,7 @@ public:
     _always_inline
     ~cpu_scoped_irq_disable()
     {
-        if (intr_was_enabled)
+        if (intr_was_enabled > 0)
             cpu_irq_toggle(intr_was_enabled > 0);
     }
 
@@ -800,6 +800,50 @@ public:
 
 private:
     int8_t intr_was_enabled;
+};
+
+class cpu_scoped_wp_disable
+{
+public:
+    _always_inline
+    cpu_scoped_wp_disable()
+        : wp_was_enabled(init())
+    {
+    }
+
+    _always_inline
+    static int8_t init()
+    {
+        uintptr_t cr0 = cpu_cr0_get();
+        uint8_t result = (cr0 & CPU_CR0_WP_BIT) ? 1 : -1;
+        cpu_cr0_set(cr0 & ~CPU_CR0_WP);
+        return result;
+    }
+
+    _always_inline
+    ~cpu_scoped_wp_disable()
+    {
+        if (wp_was_enabled > 0)
+            cpu_cr0_change_bits(0, CPU_CR0_WP);
+    }
+
+    _always_inline
+    operator bool() const
+    {
+        return wp_was_enabled > 0;
+    }
+
+    _always_inline
+    void restore()
+    {
+        if (wp_was_enabled) {
+            cpu_cr0_change_bits(0, CPU_CR0_WP);
+            wp_was_enabled = 0;
+        }
+    }
+
+private:
+    int8_t wp_was_enabled;
 };
 
 // Monitor/mwait

@@ -999,9 +999,81 @@ thread_yield_fast:
 
     .cfi_endproc
 
+.align 16
+.global soft_vzeroall
+.hidden soft_vzeroall
+soft_vzeroall:
+    pxor   %xmm0, %xmm0
+    movdqa %xmm0, %xmm1
+    movdqa %xmm0, %xmm2
+    movdqa %xmm0, %xmm3
+    movdqa %xmm0, %xmm4
+    movdqa %xmm0, %xmm5
+    movdqa %xmm0, %xmm6
+    movdqa %xmm0, %xmm7
+    movdqa %xmm0, %xmm8
+    movdqa %xmm0, %xmm9
+    movdqa %xmm0,%xmm10
+    movdqa %xmm0,%xmm11
+    movdqa %xmm0,%xmm12
+    movdqa %xmm0,%xmm13
+    movdqa %xmm0,%xmm14
+    movdqa %xmm0,%xmm15
+    ret
+
+.align 16
+.global soft_rdfsgsbase_r13r14
+.hidden soft_rdfsgsbase_r13r14
+soft_rdfsgsbase_r13r14:
+    .cfi_startproc
+    push_cfi %rcx
+    mov $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rdx
+    push_cfi %rax
+    rdmsr
+    mov $ CPU_MSR_GSBASE,%ecx
+    shl $ 32,%rdx
+    mov %eax,%r13d
+    or %rdx,%r13
+    rdmsr
+    shl $ 32,%rdx
+    mov %eax,%r14d
+    pop_cfi %rax
+    or %rdx,%r14
+    pop_cfi %rdx
+    pop_cfi %rcx
+    ret
+    .cfi_endproc
+
+.align 16
+.global soft_wrfsgsbase_r13r14
+.hidden soft_wrfsgsbase_r13r14
+soft_wrfsgsbase_r13r14:
+    .cfi_startproc
+    push_cfi %rcx
+    mov $ CPU_MSR_FSBASE,%ecx
+    push_cfi %rdx
+    mov %r13,%rdx
+    push_cfi %rax
+    mov %r13d,%eax
+    shr $ 32,%rdx
+    wrmsr
+    mov $ CPU_MSR_GSBASE,%ecx
+    mov %r14,%rdx
+    mov %r14d,%eax
+    shr $ 32,%rdx
+    wrmsr
+    pop_cfi %rax
+    pop_cfi %rdx
+    pop_cfi %rcx
+    ret
+    .cfi_endproc
+
 // Replaces opcodes sequence f3 49 0f ae d5: wrfsbase %r13
 .align 16
-slow_wrfsbase_r13:
+.global soft_wrfsbase_r13
+.hidden soft_wrfsbase_r13
+soft_wrfsbase_r13:
     .cfi_startproc
     push_cfi %rcx
     movl $ CPU_MSR_FSBASE,%ecx
@@ -1011,15 +1083,17 @@ slow_wrfsbase_r13:
     movq %r13,%rdx
     shrq $ 32,%rdx
     wrmsr
-    pop_cfi %rcx
     pop_cfi %rdx
     pop_cfi %rax
+    pop_cfi %rcx
     ret
     .cfi_endproc
 
 // Replaces opcodes sequence f3 49 0f ae de: wrgsbase %r14
 .align 16
-slow_wrgsbase_r14:
+.global soft_wrgsbase_r14
+.hidden soft_wrgsbase_r14
+soft_wrgsbase_r14:
     .cfi_startproc
     push_cfi %rax
     movl %r14d,%eax
@@ -1037,12 +1111,14 @@ slow_wrgsbase_r14:
 
 // Replaces opcodes sequence f3 49 0f ae c5: rdfsbase %r13
 .align 16
-slow_rdfsbase_r13:
+.global soft_rdfsbase_r13
+.hidden soft_rdfsbase_r13
+soft_rdfsbase_r13:
     .cfi_startproc
+    push_cfi %rdx
+    push_cfi %rax
     push_cfi %rcx
     movl $ CPU_MSR_FSBASE,%ecx
-    push_cfi %rax
-    push_cfi %rdx
     rdmsr
     shlq $ 32,%rdx
     pop_cfi %rcx
@@ -1055,12 +1131,14 @@ slow_rdfsbase_r13:
 
 // Replaces opcodes sequence f3 49 0f ae ce: rdgsbase %r14
 .align 16
-slow_rdgsbase_r14:
+.global soft_rdgsbase_r14
+.hidden soft_rdgsbase_r14
+soft_rdgsbase_r14:
     .cfi_startproc
+    push_cfi %rdx
+    push_cfi %rax
     push_cfi %rcx
     movl $ CPU_MSR_GSBASE,%ecx
-    push_cfi %rax
-    push_cfi %rdx
     rdmsr
     shlq $ 32,%rdx
     pop_cfi %rcx
@@ -1069,30 +1147,6 @@ slow_rdgsbase_r14:
     mov %rdx,%r14
     pop_cfi %rdx
     ret
-    .cfi_endproc
-
-// Slow load FS/GS base for processors that don't support wrfsbase/wrgsbase
-// Reaches here with r13=user_fsbase, r14=user_gsbase
-.align 16
-load_fs_gs_nosave:
-    .cfi_startproc
-
-    movl $ CPU_MSR_FSBASE,%ecx
-    movq %r13,%rdx
-    movl %r13d,%eax
-    shrq $32,%rdx
-    wrmsr
-    movl $ CPU_MSR_GSBASE,%ecx
-    movq %r14,%rdx
-    movl %r14d,%eax
-    shrq $32,%rdx
-    wrmsr
-    // Clear registers for sysret scenario
-    xor %eax,%eax
-    mov %eax,%edx
-    mov %eax,%ecx
-    ret
-
     .cfi_endproc
 
 // Pass thread_info_t pointer in rdi
@@ -1562,91 +1616,6 @@ __x86_indirect_thunk_\reg:
 .irp reg,rax,rcx,rdx,rbx,rbp,r8,r9,r10,r11,r12,r13,r14,r15
     make_retpoline_thunk \reg
 .endr
-
-.global soft_vzeroall
-.hidden soft_vzeroall
-soft_vzeroall:
-    pxor  %xmm0, %xmm0
-    pxor  %xmm1, %xmm1
-    pxor  %xmm2, %xmm2
-    pxor  %xmm3, %xmm3
-    pxor  %xmm4, %xmm4
-    pxor  %xmm5, %xmm5
-    pxor  %xmm6, %xmm6
-    pxor  %xmm7, %xmm7
-    pxor  %xmm8, %xmm8
-    pxor  %xmm9, %xmm9
-    pxor %xmm10,%xmm10
-    pxor %xmm11,%xmm11
-    pxor %xmm12,%xmm12
-    pxor %xmm13,%xmm13
-    pxor %xmm14,%xmm14
-    pxor %xmm15,%xmm15
-    ret
-
-// extern "C" void soft_rdfsbase_r13();
-.global soft_rdfsbase_r13
-.hidden soft_rdfsbase_r13
-soft_rdfsbase_r13:
-    push %rcx
-    mov $ CPU_MSR_FSBASE,%ecx
-    push %rdx
-    push %rax
-    rdmsr
-    shlq $32,%rdx
-    or %rax,%rdx
-    mov %rdx,%r13
-    pop %rax
-    pop %rdx
-    pop %rcx
-    ret
-
-// extern "C" void soft_rdgsbase_r14();
-.global soft_rdgsbase_r14
-.hidden soft_rdgsbase_r14
-soft_rdgsbase_r14:
-    push %rcx
-    mov $ CPU_MSR_GSBASE,%ecx
-    push %rdx
-    push %rax
-    rdmsr
-    shlq $32,%rdx
-    or %rax,%rdx
-    mov %rdx,%r14
-    pop %rax
-    pop %rdx
-    pop %rcx
-    ret
-
-// extern "C" void soft_wrfsbase_r13();
-soft_wrfsbase_r13:
-    push %rcx
-    mov $ CPU_MSR_FSBASE,%ecx
-    push %rdx
-    mov %r13,%rdx
-    push %rax
-    mov %r13d,%eax
-    shr $32,%rdx
-    wrmsr
-    pop %rax
-    pop %rdx
-    pop %rcx
-    ret
-
-// extern "C" void soft_wrgsbase_r14();
-soft_wrgsbase_r14:
-    push %rcx
-    mov $ CPU_MSR_GSBASE,%ecx
-    push %rdx
-    mov %r14,%rdx
-    push %rax
-    mov %r14d,%eax
-    shr $32,%rdx
-    wrmsr
-    pop %rax
-    pop %rdx
-    pop %rcx
-    ret
 
 .section .rodata, ""
 .align 8

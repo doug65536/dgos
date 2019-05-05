@@ -186,7 +186,6 @@ struct isr_fxsave_context_t {
 
 // Exception handler C call parameter
 struct isr_context_t {
-    //isr_resume_context_t resume;
     isr_fxsave_context_t * fpr;
     isr_gpr_context_t gpr;
 };
@@ -203,9 +202,22 @@ struct isr_sse_regn_t {
     uint8_t log2_size;
 };
 
-using isr_sse_reg_parts_t = std::initializer_list<isr_sse_regn_t>;
+class isr_sse_reg_parts_t {
+public:
+    constexpr isr_sse_reg_parts_t(std::initializer_list<isr_sse_regn_t> init)
+        : count(init.size())
+        , buf{}
+    {
+        size_t i = 0;
+        for (auto const& e : init)
+            buf[i++] = e;
+        count = i;
+    }
 
-// Provides initializer list of initializer lists
+    static const constexpr size_t max_parts = 3;
+    size_t count;
+    isr_sse_regn_t buf[max_parts];
+};
 
 static inline constexpr isr_sse_reg_parts_t isr_sse_xmm_parts(size_t i)
 {
