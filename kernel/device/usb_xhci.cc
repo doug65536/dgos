@@ -1110,8 +1110,9 @@ bool usbxhci::remove_endpoint(uint8_t slotid, uint8_t epid)
                 endpoint->target.epid == epid) {
             endpoints.erase(it);
             usbxhci_endpoint_target_t key{ slotid, epid };
-            endpoint_lookup.del(&key);
-            return true;
+            bool found = endpoint_lookup.del(&key);
+            assert(found);
+            return found;
         }
     }
 

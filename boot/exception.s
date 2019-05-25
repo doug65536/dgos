@@ -99,7 +99,7 @@ isr_common:
 
 	iretq
 
-.align 8
+.balign 8
 
 msg_exception:
 	.string "Exception=0x"

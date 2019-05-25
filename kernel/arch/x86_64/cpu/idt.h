@@ -69,3 +69,14 @@ extern "C" void dump_context(isr_context_t *ctx, int to_screen);
         #name "_patch:" "\n\t" \
     ); \
     extern char name##_patch[]
+
+
+enum struct xsave_support_t {
+    FXSAVE,
+    XSAVE,
+    XSAVEC,
+    XSAVEOPT,
+    XSAVES
+};
+
+extern xsave_support_t xsave_support;

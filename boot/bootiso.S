@@ -22,7 +22,7 @@ entry:
     // Jump to the unrelocated "entry_start"
     ljmpw $0,$ UNRELOCATED(entry_start)
 
-.align 8
+.balign 8
 .global bootinfo_primary_volume_desc
 bootinfo_primary_volume_desc:
     .space 4
@@ -98,7 +98,7 @@ entry_start:
     // the middle of its execution
     ljmpw *(%bx)
 
-.align 4
+.balign 4
 relocate_farptr:
     .space 4
 
@@ -164,7 +164,7 @@ load_done:	// utility label for placing debugger breakpoint
 0:  hlt
     jmp 0b
 
-.align 64
+.balign 64
 .global boot_drive
 boot_drive:
     .byte 0

@@ -255,8 +255,9 @@ void load_initrd()
     paging_map_range(&allocator, initrd_base, initrd_size,
                      PTE_PRESENT | PTE_ACCESSED | PTE_NX);
 
-    if (initrd_size != paging_iovec_read(
-                initrd_fd, 0, initrd_base, initrd_size, 1 << 30)) {
+    auto read_size = paging_iovec_read(
+                initrd_fd, 0, initrd_base, initrd_size, 1 << 30);
+    if (initrd_size != read_size) {
         PANIC("Could not load initrd file\n");
     }
 

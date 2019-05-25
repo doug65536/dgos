@@ -9,16 +9,26 @@
 // generated code:
 //  - Set up stack (aligned!)
 //  - Clear EFLAGS.DF
+//  - cs base == es base == ss base
 
-.align 16
+.balign 16
 .global entry
 .hidden entry
 .type entry,@function
 entry:
     .cfi_startproc
 
-    // Align the stack
-    andq $-16,%rsp
+    .cfi_undefined rip
+    .cfi_undefined rsp
+    .cfi_undefined rbp
+    .cfi_undefined rbx
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
+
+    // #GP if something tries to use stack before it is ready
+    movabs $0x8000000000000000,%rsp
 
     cld
 
@@ -101,8 +111,8 @@ bsp_init:
     call cpu_init_early
 
     // Get SSE context offsets
-    xorl %edi,%edi
-    call idt_xsave_detect
+//    xorl %edi,%edi
+//    call idt_xsave_detect
 
     call e9debug_init
 
@@ -196,7 +206,7 @@ bsp_init:
 
 .section .data, "aw"
 
-.align 16
+.balign 16
     // TSS layout is completely misaligned without nudging it up 4 bytes
     //  uint32_t dummy_align;
     .space 4
@@ -235,7 +245,7 @@ early_tss:
 early_tss_end:
 
 .section .text, "ax"
-.align 16
+.balign 16
 .global exit
 .hidden exit
 exit:
@@ -248,7 +258,7 @@ exit:
 
     call halt_forever
 
-.align 16
+.balign 16
 invoke_function_array:
     .cfi_startproc
 
@@ -271,21 +281,21 @@ invoke_function_array:
     .cfi_endproc
     ret
 
-.align 16
+.balign 16
 .global register_eh_frame
 register_eh_frame:
     // Register .eh_frame for libgcc unwind
     leaq ___eh_frame_st(%rip),%rdi
     jmp __register_frame
 
-.align 16
+.balign 16
 .global __cxa_pure_virtual
 // Not .hidden!
 __cxa_pure_virtual:
     leaq pure_call_message(%rip),%rdi
     jmp panic
 
-.align 16
+.balign 16
 .global __cxa_atexit
 __cxa_atexit:
     ret
@@ -294,7 +304,7 @@ __cxa_atexit:
 pure_call_message:
     .string "Pure virtual function called"
 
-.align 8
+.balign 8
 .global __dso_handle
 .hidden __dso_handle
 __dso_handle: .quad __dso_handle

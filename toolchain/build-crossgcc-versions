@@ -5,7 +5,7 @@
 #mpfver=3.1.5
 #gdbver=8.0.1
 
-gccver=8.2.0
+gccver=9.1.0
 binver=2.31
 gdbver=8.1
 gmpver=6.1.2

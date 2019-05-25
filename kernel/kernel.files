@@ -13,6 +13,7 @@
 ../u_vga16.bdf
 arch/x86_64/cpu/apic.bits.h
 arch/x86_64/cpu/except_asm.S
+arch/x86_64/cpu/fixup.h
 arch/x86_64/cpu/ioapic.cc
 arch/x86_64/cpu/ioapic.h
 arch/x86_64/cpu/mptables.h
@@ -43,6 +44,7 @@ device/nvme.bits.h
 device/pci.bits.h
 device/rtl8139.bits
 device/usb.cc
+device/usb_hid.bits
 device/usb_hid.cc
 device/usb_hid.h
 device/usb_hub.cc
@@ -67,6 +69,8 @@ lib/acpi_decl.h
 lib/asan.cc
 lib/asan.h
 lib/cc/algorithm.cc
+lib/cc/chrono.cc
+lib/cc/chrono.h
 lib/cc/cxxstring.cc
 lib/cc/cxxstring.h
 lib/cc/exception.cc
@@ -74,6 +78,7 @@ lib/cc/exception.h
 lib/cc/functional.cc
 lib/cc/memory.cc
 lib/cc/numeric.cc
+lib/cc/ratio.h
 lib/cc/type_traits.cc
 lib/cc/union_storage.h
 lib/cc/utility.cc

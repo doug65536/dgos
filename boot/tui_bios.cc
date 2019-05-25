@@ -9,7 +9,7 @@ extern "C" far_ptr_t __int15_old;
 __asm__(
 ".section .early, \"ax\"\n"
 ".code16\n"
-".align 16\n"
+".balign 16\n"
 ".global __int15_handler\n"
 "__int15_handler:"
 "cmp $0x5305,%ax\n"

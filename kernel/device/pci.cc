@@ -42,6 +42,9 @@ public:
                void const *values, size_t size) override final;
     bool copy(pci_addr_t addr, void *dest,
               size_t offset, size_t size) override final;
+
+private:
+    static size_t pioofs(pci_addr_t addr, size_t offset);
 };
 
 // Modern PCIe ECAM MMIO PCI configuration space accessor
@@ -54,6 +57,9 @@ public:
                void const *values, size_t size) override final;
     bool copy(pci_addr_t addr, void *dest,
               size_t offset, size_t size) override final;
+
+private:
+    static size_t ecamofs(pci_addr_t addr, int bus_adj, size_t offset);
 };
 
 //
@@ -168,10 +174,18 @@ static char const *pci_device_class_text_lookup[] = {
 
 uint32_t pci_config_pio::read(pci_addr_t addr, size_t offset, size_t size)
 {
+    // Must be power of two
+    assert_ispo2(size);
+
+    // Must be naturally aligned
+    assert((offset & -size) == offset);
+
     assert(offset < 256);
+
+    // Field requested must begin and end in the same 32 bit range
     assert((offset & -4) == ((offset + size - 1) & -4));
 
-    uint32_t pci_address = (1 << 31) | addr.get_addr() | (offset & -4);
+    uint32_t pci_address = pioofs(addr, offset);
 
     pci_scoped_lock lock(pci_lock);
 
@@ -180,8 +194,11 @@ uint32_t pci_config_pio::read(pci_addr_t addr, size_t offset, size_t size)
 
     lock.unlock();
 
+    // Shift right 8 bits for every byte of misalignment
+    // to put the requested data at the LSB
     data >>= (offset & 3) << 3;
 
+    // If the size is not the entire register, only keep the bits we want
     if (size != sizeof(uint32_t))
         data &= ~((uint32_t)-1 << (size << 3));
 
@@ -198,7 +215,12 @@ bool pci_config_pio::write(pci_addr_t addr, size_t offset,
     // Pointer to input data
     char *p = (char*)values;
 
-    uint32_t pci_address = (1 << 31) | addr.get_addr();
+
+    uint32_t pci_address = (1 << 31) |
+            (addr.bus() << 16) |
+            (addr.slot() << 11) |
+            (addr.func() << 8) |
+            (offset & -4);
 
     pci_scoped_lock lock(pci_lock);
 
@@ -261,16 +283,24 @@ bool pci_config_pio::copy(pci_addr_t addr, void *dest,
     uint32_t value;
     char *out = (char*)dest;
 
-    for (size_t i = 0; i < size; i += sizeof(uint32_t)) {
-        value = pci_config_read(addr, offset + i, sizeof(value));
+    size_t block_sz;
+    for (size_t i = 0; i < size; i += block_sz) {
+        block_sz = std::min(sizeof(uint32_t), size - i);
+        value = pci_config_read(addr, offset + i, block_sz);
 
-        if (i + sizeof(value) <= size)
-            memcpy(out + i, &value, sizeof(value));
-        else
-            memcpy(out + i, &value, size - i);
+        memcpy(out + i, &value, block_sz);
     }
 
     return true;
+}
+
+size_t pci_config_pio::pioofs(pci_addr_t addr, size_t offset)
+{
+    return (1 << 31) |
+            (addr.bus() << 16) |
+            (addr.slot() << 11) |
+            (addr.func() << 8) |
+            (offset & -4);
 }
 
 pci_ecam_t *pci_config_mmio::find_ecam(int bus)
@@ -296,8 +326,7 @@ uint32_t pci_config_mmio::read(pci_addr_t addr, size_t offset, size_t size)
     if (unlikely(!ent))
         return uint32_t(-1);
 
-    uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
-            (addr.func() << 12) + unsigned(offset);
+    uint64_t ecam_offset = ecamofs(addr, ent->st_bus, offset);
 
     if (likely(size == sizeof(uint32_t)))
         return mm_rd(*(uint32_t*)(ent->mapping + ecam_offset));
@@ -309,17 +338,6 @@ uint32_t pci_config_mmio::read(pci_addr_t addr, size_t offset, size_t size)
         return mm_rd(*(uint8_t*)(ent->mapping + ecam_offset));
 
     panic("Nonsense operand size");
-
-//    ecam_offset &= -4;
-
-//    uint32_t data = mm_rd(*(uint32_t*)(ent->mapping + ecam_offset));
-
-//    data >>= (offset & 3) << 3;
-
-//    if (size != sizeof(uint32_t))
-//        data &= ~((uint32_t)-1 << (size << 3));
-
-//    return data;
 }
 
 bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
@@ -332,8 +350,7 @@ bool pci_config_mmio::write(pci_addr_t addr, size_t offset,
     if (unlikely(!ent))
         return false;
 
-    uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
-            (addr.func() << 12) + unsigned(offset);
+    uint64_t ecam_offset = ecamofs(addr, ent->st_bus, offset);
 
     switch (size) {
     case 1:
@@ -369,8 +386,7 @@ bool pci_config_mmio::copy(pci_addr_t addr, void *dest,
     if (unlikely(!ent))
         return false;
 
-    uint64_t ecam_offset = ((bus - ent->st_bus) << 20) + (addr.slot() << 15) +
-            (addr.func() << 12) + unsigned(offset);
+    uint64_t ecam_offset = ecamofs(addr, ent->st_bus, offset);
 
     switch (size) {
     case sizeof(uint8_t):
@@ -391,6 +407,14 @@ bool pci_config_mmio::copy(pci_addr_t addr, void *dest,
     return true;
 }
 
+size_t pci_config_mmio::ecamofs(pci_addr_t addr, int bus_adj, size_t offset)
+{
+    return ((addr.bus() - bus_adj) << 20) +
+            (addr.slot() << 15) +
+            (addr.func() << 12) +
+            unsigned(offset);
+}
+
 EXPORT uint32_t pci_config_read(pci_addr_t addr, int offset, int size)
 {
     return pci_accessor->read(addr, offset, size);
@@ -404,7 +428,19 @@ EXPORT bool pci_config_write(pci_addr_t addr, size_t offset,
 
 EXPORT void pci_config_copy(pci_addr_t addr, void *dest, int ofs, size_t size)
 {
+    PCI_TRACE("copy: bus=%#.2x, slot=%#.2x, func=%#.2x, ofs=%#.x, sz=%#.zx\n",
+              addr.bus(), addr.slot(), addr.func(), ofs, size);
+
     pci_accessor->copy(addr, dest, ofs, size);
+
+    size_t i = 0;
+    for (i = 0; i < size; ++i)
+        if (((uint8_t const *)dest)[i] != 0xFF)
+            break;
+    if (i != size)
+        hex_dump(dest, size);
+    else
+        PCI_TRACE("All 0xFF\n");
 }
 
 static void pci_enumerate_read(pci_addr_t addr, pci_config_hdr_t *config)
@@ -412,11 +448,11 @@ static void pci_enumerate_read(pci_addr_t addr, pci_config_hdr_t *config)
     pci_config_copy(addr, config, 0, sizeof(pci_config_hdr_t));
 }
 
-static int pci_enumerate_is_match(pci_dev_iterator_t *iter,
-                                  pci_dev_iterator_t *blueprint = nullptr)
+static int pci_enumerate_is_match(pci_dev_iterator_t const *iter,
+                                  pci_dev_iterator_t const *blueprint = nullptr)
 {
     if (blueprint == nullptr)
-        blueprint = iter;
+        return true;
 
     return (blueprint->dev_class == -1 ||
             blueprint->dev_class == iter->config.dev_class) &&
@@ -431,12 +467,18 @@ static int pci_enumerate_is_match(pci_dev_iterator_t *iter,
 static int pci_enumerate_next_direct(pci_dev_iterator_t *iter)
 {
     for (;;) {
+        // Skip over the function scan if header type not multifunction
+        if (iter->func == 0 && !(iter->config.header_type & 0x80))
+            iter->func = 7;
+
         ++iter->func;
 
         if (((iter->header_type & 0x80) && iter->func < 8) ||
                 iter->func < 1) {
             // Might be a device here
-            pci_enumerate_read(*iter, &iter->config);
+            iter->addr = pci_addr_t(iter->segment, iter->bus,
+                                    iter->slot, iter->func);
+            pci_enumerate_read(iter->addr, &iter->config);
 
             // Capture header type on function 0
             if (iter->func == 0)
@@ -535,13 +577,81 @@ int pci_init(void)
     if (!pci_enumerate_begin_direct(&pci_iter))
         return 0;
 
-    printk("Autoconfiguring PCI BARs\n");
+    printk("Caching PCI device list\n");
 
     do {
+        printk("Found PCI device"
+               ", bus=%#.4x"
+               ", slot=%#.2x"
+               ", func=%#.2x"
+               ", vendor=%#.4x"
+               ", device=%#.4x"
+               ", class=%#.2x (%s)"
+               ", subclass=%#.2x"
+               ", progif=%#.2x\n",
+               pci_iter.bus,
+               pci_iter.slot,
+               pci_iter.func,
+               pci_iter.config.vendor,
+               pci_iter.config.device,
+               pci_iter.config.dev_class,
+               pci_device_class_text(pci_iter.config.dev_class),
+               pci_iter.config.subclass,
+               pci_iter.config.prog_if);
+
+        pci_cache.iters.push_back(pci_iter);
+    } while (pci_enumerate_next_direct(&pci_iter));
+
+    printk("Enumerating PCI Express capabilities\n");
+
+    struct pcie_cap_t {
+        uint8_t id;
+        uint8_t next;
+        uint16_t pcie_caps;
+        uint32_t dev_caps;
+        uint16_t dev_ctrl;
+        uint16_t dev_status;
+        uint32_t link_caps;
+        uint16_t link_ctrl;
+        uint16_t link_status;
+        uint32_t slot_caps;
+        uint16_t slot_ctrl;
+        uint16_t slot_status;
+        uint16_t root_ctrl;
+        uint16_t root_caps;
+        uint32_t root_status;
+
+        uint32_t dev_caps2;
+        uint16_t dev_ctrl2;
+        uint16_t dev_status2;
+        uint32_t link_caps2;
+        uint16_t link_ctrl2;
+        uint16_t link_status2;
+        uint32_t slot_caps2;
+        uint16_t slot_ctrl2;
+        uint16_t slot_status2;
+    };
+
+    C_ASSERT(sizeof(pcie_cap_t) == 0x3C);
+
+    for (pci_dev_iterator_t const& it : pci_cache.iters) {
+        int ofs = pci_find_capability(it.addr, PCICAP_PCIE);
+        if (!ofs)
+            continue;
+        pcie_cap_t pcie_cap;
+
+        pci_config_copy(it.addr, &pcie_cap, ofs, sizeof(pcie_cap));
+
+        printk("Found PCIe capability on %#.2x:%#.2x:%#.2x\n",
+               it.addr.bus(), it.addr.slot(), it.addr.func());
+    }
+
+    printk("Autoconfiguring PCI BARs\n");
+
+    for (pci_dev_iterator_t& pci_iter : pci_cache.iters) {
         printk("Probing %d:%d:%d\n",
                   pci_iter.bus, pci_iter.slot, pci_iter.func);
 
-        pci_cache.iters.push_back(pci_iter);
 
         bool any_mmio = false;
         bool any_io = false;
@@ -621,7 +731,7 @@ int pci_init(void)
                              (any_io ? PCI_CMD_IOSE : 0) | PCI_CMD_BME,
                              (!any_mmio ? PCI_CMD_MSE : 0) |
                              (!any_io ? PCI_CMD_IOSE : 0));
-    } while (pci_enumerate_next_direct(&pci_iter));
+    }
 
     pci_cache.updated_at = time_ns();
 
@@ -704,7 +814,7 @@ EXPORT int pci_enum_capabilities(int start, pci_addr_t addr,
     }
 
     while (ofs != 0) {
-        uint16_t type_next = pci_config_read(addr, ofs, 2);
+        uint16_t type_next = pci_config_read(addr, ofs, sizeof(uint16_t));
         uint8_t type = type_next & 0xFF;
         uint8_t next = (type_next >> 8) & 0xFF;
 
@@ -717,6 +827,27 @@ EXPORT int pci_enum_capabilities(int start, pci_addr_t addr,
 
         ofs = next;
     }
+
+    //
+    // Scan extended capabilities
+
+//    if (!pci_ecam_list.empty()) {
+//        ofs = 0x100;
+
+//        while (ofs != 0 && unsigned(ofs) < 4096 - sizeof(int32_t)) {
+//            uint32_t extcap = pci_config_read(addr, ofs, sizeof(uint32_t));
+//            uint16_t capability_id = PCI_MSIX_EXTCAP_CAPID_GET(extcap);
+//            //uint16_t capability_ver = PCI_MSIX_EXTCAP_CAPVER_GET(extcap);
+//            uint16_t nextofs = PCI_MSIX_EXTCAP_NEXTOFS_GET(extcap);
+
+//            int result = callback(capability_id, ofs, context);
+//            if (result != 0)
+//                return result;
+
+//            // Software must mask the low two bits
+//            ofs = nextofs & -4;
+//        }
+//    }
 
     return 0;
 }
@@ -747,8 +878,8 @@ EXPORT bool pci_try_msi_irq(pci_dev_iterator_t const& pci_dev,
         // Plain IRQ pin
         PCI_TRACE("Using pin IRQ for IRQ %d\n", irq_range->base);
 
-        pci_set_irq_pin(pci_dev.addr, pci_dev.config.irq_pin);
-        pci_set_irq_line(pci_dev.addr, pci_dev.config.irq_line);
+        //pci_set_irq_pin(pci_dev.addr, pci_dev.config.irq_pin);
+        //pci_set_irq_line(pci_dev.addr, pci_dev.config.irq_line);
 
         irq_hook(pci_dev.config.irq_line, handler, name);
         irq_setmask(pci_dev.config.irq_line, true);
@@ -806,8 +937,8 @@ EXPORT bool pci_set_msi_irq(pci_addr_t addr, pci_irq_range_t *irq_range,
                             intr_handler_t handler, char const *name,
                             int const *target_cpus, int const *vector_offsets)
 {
-    bool msix;
-    pci_msi_caps_hdr_t caps;
+    bool msix = false;
+    pci_msi_caps_hdr_t caps{};
     int capability = pci_find_msi_msix(addr, msix, caps);
 
     if (!capability)
@@ -1162,7 +1293,7 @@ EXPORT int pci_enumerate_begin(
     pci_dev_iter_init(iter, dev_class, device, vendor, subclass);
 
     for (size_t i = 0, e = pci_cache.iters.size(); i != e; ++i) {
-        auto& hdr = pci_cache.iters[i];
+        auto const& hdr = pci_cache.iters[i];
 
         if (pci_enumerate_is_match(&hdr, iter)) {
             iter->copy_from(hdr);
@@ -1253,6 +1384,7 @@ EXPORT void pci_dev_iterator_t::reset()
     device = 0;
     header_type = 0;
     bus_todo_len = 0;
+    config = {};
     memset(bus_todo, 0, sizeof(bus_todo));
 }
 

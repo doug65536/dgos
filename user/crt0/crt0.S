@@ -7,24 +7,30 @@
 .global _start
 _start:
 	.cfi_startproc
+    // The caller does not exist
+    .cfi_undefined rip
+    .cfi_undefined rsp
+    .cfi_undefined rbp
+    .cfi_undefined rbx
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
+    .cfi_def_cfa rsp,0
 
 	// Load up call preserved registers before modifying memory at all
 
     // r12 = argc
     movq (%rsp),%r12
-	.cfi_undefined r12
 
     // r13 = argv
     movq 8(%rsp),%r13
-	.cfi_undefined r13
 
 	// r14 = envp = argv + (argc + 1)
     lea 8(%r13,%r12,8),%r14
-	.cfi_undefined r14
 
 	// r15 = auxv
     movq %r14,%r15
-	.cfi_undefined r15
 
 .Lcheck_envp:
     cmpq $0,(%r15)
@@ -33,11 +39,9 @@ _start:
 
     // Resolve .rela.iplt
     leaq __rela_iplt_start(%rip),%rbx
-	.cfi_undefined rbx
 
 .Lrela_iplt_next:
     leaq __rela_iplt_end(%rip),%rax
-	.cfi_undefined rax
 	cmpq %rax,%rbx
     jz .Lrela_iplt_done
 
@@ -51,7 +55,6 @@ _start:
 
     // Read PLT vector pointer from relocation record
     movq (%rbx),%rdx
-	.cfi_undefined rdx
 	// Update the PLT with the resolver return value
     movq %rax,(%rdx)
 .Lrela_iplt_skip:

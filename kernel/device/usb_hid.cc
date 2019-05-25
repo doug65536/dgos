@@ -444,6 +444,20 @@ static int const usb_hid_keybd_lookup[] = {
 
 C_ASSERT(countof(usb_hid_keybd_lookup) == 0xe8);
 
+class usb_hid_report_parser_t {
+public:
+    usb_hid_report_parser_t() {
+
+    }
+
+    usb_hid_report_parser_t(usb_hid_report_parser_t const&) = delete;
+    usb_hid_report_parser_t& operator=(usb_hid_report_parser_t) = delete;
+
+    /// type
+    /// tag
+    /// size
+};
+
 class usb_hid_dev_t {
 protected:
     enum struct hid_request_t : uint8_t {

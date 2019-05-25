@@ -6,9 +6,10 @@ __BEGIN_DECLS
 
 // Call external code with guarantee of no registers affected
 // As an added bonus, it also creates a compiler barrier
+// Registers are not clobbered (but flags are)
 static _always_inline void cs_enter() {
     __asm__ __volatile__ (
-        "call cs_enter_asm\n\t" : : : "memory"
+        "call cs_enter_asm\n\t" : : : "memory", "cc", "rax"
     );
 }
 

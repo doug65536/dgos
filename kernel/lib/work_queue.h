@@ -56,19 +56,6 @@ private:
 };
 
 class workq {
-private:
-    template<typename T>
-    class workq_wrapper : public workq_work
-    {
-    public:
-        workq_wrapper(T&& functor);
-
-    private:
-        void invoke() override final;
-
-        T functor;
-    };
-
 public:
     template<typename T>
     static void enqueue(T&& functor);
@@ -92,6 +79,19 @@ protected:
 
     // Array of queues, one per CPU
     static workq_impl* percpu;
+
+private:
+    template<typename T>
+    class workq_wrapper : public workq_work
+    {
+    public:
+        workq_wrapper(T&& functor);
+
+    private:
+        void invoke() override final;
+
+        T functor;
+    };
 };
 
 template<typename T>
@@ -142,6 +142,7 @@ private:
 
     void free(workq_work *work);
 
+    _noreturn
     static int worker(void *arg);
 
     workq_work *dequeue_work_locked(scoped_lock& lock);

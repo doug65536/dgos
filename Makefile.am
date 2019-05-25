@@ -18,6 +18,9 @@ BUILT_SOURCES = \
 	sysroot/lib/libstdc++.a \
 	trace-tool
 
+BOOTLOADER_COMMON_FLAGS = \
+	-D__DGOS__
+
 #sysroot/lib/libc.so \
 #sysroot/lib/libg.so \
 #sysroot/lib/libm.so \
@@ -40,6 +43,7 @@ mbr_elf_SOURCES = \
 
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -48,6 +52,7 @@ mbr_elf_CXXFLAGS = \
 	$(OPTIMIZE_SIZE_FLAGS)
 
 mbr_elf_CFLAGS =
+	$(mbr_elf_CXXFLAGS)
 
 mbr_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
@@ -88,6 +93,7 @@ boot1_elf_SOURCES = \
 
 boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -99,6 +105,7 @@ boot1_elf_CFLAGS =
 
 boot1_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -207,6 +214,7 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
@@ -230,6 +238,7 @@ libbootsect_a_CFLAGS =
 
 libbootsect_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -259,6 +268,7 @@ bootfat_elf_CXXFLAGS = \
 
 bootfat_elf_CCASFLAGS = \
 	-DFROMCCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -305,6 +315,7 @@ bootiso_elf_CXXFLAGS = \
 
 bootiso_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -455,26 +466,31 @@ bootefi_amd64_SOURCES = \
 
 bootefi_amd64_CFLAGS = \
 	-DFROM_CFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
 
 #bootefi_i386_CFLAGS = \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	-DFROM_CFLAGS \
 	$(PE32_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
 
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
 
 #bootefi_i386_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE32_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
 
 bootefi_amd64_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(bootefi_amd64_CXXFLAGS)
 
@@ -513,8 +529,7 @@ bootefi_amd64_LDADD = \
    $(LIBGCC_PE32)
 
 EXTRA_bootefi_amd64_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootefi.ld \
-	$(top_srcdir)/Makefile.am
+    $(top_srcdir)/boot/bootefi.ld
 
 bootx64.efi: bootefi-amd64
 	$(OBJCOPY) \
@@ -583,6 +598,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/utility.cc \
 	kernel/lib/cc/vector.h \
 	kernel/lib/cc/vector.cc \
+	kernel/lib/cc/chrono.cc \
+	kernel/lib/cc/chrono.h \
 	kernel/lib/cc/cxxstring.h \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
@@ -810,6 +827,7 @@ KERNEL_SOURCES_SHARED = \
 KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/device/iocp.cc \
 	kernel/lib/cc/cxxstring.cc \
+	kernel/lib/cc/chrono.cc \
 	kernel/lib/mutex.cc
 
 KERNEL_INCLUDES_SHARED = \
@@ -823,8 +841,9 @@ KERNEL_INCLUDES_SHARED = \
 
 KERNEL_CXXFLAGS_SHARED = \
 	-DFROM_CXXFLAGS \
+	-D__DGOS__ \
 	-D__DGOS_KERNEL__=0x00000001 \
-	-std=c++14 \
+	-std=c++17 \
 	-fPIE \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
@@ -885,7 +904,7 @@ libkei_a_SOURCES = \
 libkei_a_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	-fvisibility=default -fno-visibility-inlines-hidden
+	-fvisibility=default -fno-visibility-inlines-hidden -DLIBKEI
 
 # ----------------------------------------------------------------------------
 # kernel variations
@@ -1001,7 +1020,7 @@ $(top_builddir)/dgos-kernel-asan: $(top_builddir)/kernel-asan
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 	$(CXX_FOR_BUILD) -ggdb3 -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
-		-std=c++14 \
+		-std=c++17 \
 		-fwhole-program -pthread \
 		-O3 -march=native \
 		-Wall -Wextra -Wpedantic \
@@ -1022,7 +1041,6 @@ INCLUDES_DEPLOYED = \
 sysroot/lib/crt0.o: \
 		$(top_srcdir)/user/crt0/crt0.S \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
-		$(top_srcdir)/Makefile.am \
 		$(INCLUDES_DEPLOYED)
 	$(MKDIR) -p "$(@D)" && \
 		$(CXX) \
@@ -1409,7 +1427,7 @@ libc_a_SOURCES = \
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	$(FREESTANDING_FLAGS) \
-	-std=c++14 \
+	-std=c++17 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
@@ -1432,7 +1450,7 @@ libm_a_SOURCES = \
 
 libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++14 \
+	-std=c++17 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
@@ -1455,7 +1473,7 @@ libstdc___a_SOURCES = \
 
 libstdc___a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++14 \
+	-std=c++17 \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
@@ -1956,6 +1974,7 @@ distclean-local:
 
 BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/nvme.bits \
+	$(top_srcdir)/kernel/device/usb_hid.bits \
 	$(top_srcdir)/kernel/device/pci.bits \
 	$(top_srcdir)/kernel/device/rtl8139.bits \
 	$(top_srcdir)/kernel/device/i350.bits \
@@ -2023,7 +2042,7 @@ QEMU_EXTRA_DEPS = \
 QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
-QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
+QEMU_CPU = max,migratable=false,host-cache-info=true,-fsgsbase
 
 QEMU_RAM = 5G
 
@@ -2106,15 +2125,20 @@ QEMU_RT_run = -s
 QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report
 QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
 
+QEMU_VGA_3D = \
+	-global driver=virtio-vga,property=virgl,value=on
+
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
 QEMU_VGA = \
 	-global driver=virtio-vga,property=disable-legacy,value=on \
 	-global driver=virtio-vga,property=disable-modern,value=off \
 	-global driver=virtio-vga,property=x-disable-pcie,value=off \
-	-global driver=virtio-vga,property=virgl,value=on \
 	-global driver=virtio-vga,property=modern-pio-notify,value=on \
+	-global driver=virtio-vga,property=max_outputs,value=16 \
+	-global driver=virtio-vga,property=x-pcie-extcap-init,value=on \
 	-vga virtio
-QEMU_DISPLAY = -display sdl,gl=on
+QEMU_DISPLAY_SPICE = -spice ipv4,port=14446,disable-ticketing=on
+QEMU_DISPLAY =
 QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
 #QEMU_MACHINE_nvme = -machine q35
 #QEMU_MACHINE_ahci = -machine q35

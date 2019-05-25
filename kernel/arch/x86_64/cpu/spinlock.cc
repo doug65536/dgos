@@ -16,29 +16,6 @@
 //
 // Exclusive lock. 0 is unlocked, 1 is locked
 
-// Unlock spinlock and return state without restoring interrupt mask
-_hot
-spinlock_value_t spinlock_unlock_save(spinlock_t *lock)
-{
-    assert(atomic_ld_acq(lock) & 1);
-    spinlock_value_t result = atomic_xchg(lock, 0);
-    cs_leave();
-    return result;
-}
-
-_hot
-void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock)
-{
-    cs_enter();
-    for (;;) {
-        if (atomic_ld_acq(lock) == 0 &&
-                atomic_cmpxchg(lock, 0, saved_lock) == 0)
-            return;
-
-        cpu_wait_value(lock, 0);
-    }
-}
-
 // Spin to acquire lock, return having entered critical section
 _hot
 void spinlock_lock(spinlock_t *lock)
@@ -209,7 +186,6 @@ bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
 void ticketlock_lock(ticketlock_t *lock)
 {
     cs_enter();
-    //ticketlock_value_t intr_enabled = cpu_irq_save_disable();
 
     ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
 
@@ -247,7 +223,6 @@ void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
 bool ticketlock_try_lock(ticketlock_t *lock)
 {
     cs_enter();
-    //ticketlock_value_t intr_enabled = cpu_irq_save_disable();
 
     ticketlock_value_t old_next = lock->next_ticket;
     ticketlock_value_t serving = lock->now_serving;
@@ -270,7 +245,6 @@ bool ticketlock_try_lock(ticketlock_t *lock)
 
     // There are threads queued for it, give up
     cs_leave();
-    //cpu_irq_toggle(intr_enabled);
     return false;
 }
 
@@ -279,7 +253,6 @@ void ticketlock_unlock(ticketlock_t *lock)
     ticketlock_value_t serving = lock->now_serving;
     lock->now_serving = (serving + 2) & -2;
     cs_leave();
-    //cpu_irq_toggle(serving & 1);
 }
 
 ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
@@ -292,7 +265,6 @@ ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
 
 bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
 {
-    //node->irq_enabled = cpu_irq_save_disable();
     cs_enter();
 
     atomic_st_rel(&node->next, nullptr);
@@ -300,7 +272,6 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
     if (atomic_cmpxchg(lock, nullptr, node) == nullptr)
         return true;
 
-    //cpu_irq_toggle(node->irq_enabled);
     cs_leave();
     return false;
 }
@@ -340,7 +311,6 @@ void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 
     thread_t tid = thread_get_id();
     node->thread_id = tid;
-    //node->irq_enabled = cpu_irq_save_disable();
     mcslock_lock_nodis(lock, node);
 }
 
@@ -374,7 +344,5 @@ EXPORT void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *no
     MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());
     mcslock_unlock_noena(lock, node);
-    //cpu_irq_toggle(node->irq_enabled);
-    //cs_leave();
 }
 

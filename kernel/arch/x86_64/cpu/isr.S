@@ -5,6 +5,7 @@
 #include "interrupts.h"
 #include "cpu_bug.h"
 #include "isr.h"
+#include "fixup.h"
 
 .code64
 
@@ -69,7 +70,7 @@ isr_section_name \int_num
 .global \entryname\()_\int_num\()
 .hidden \entryname\()_\int_num\()
 .type \entryname\()_\int_num\(),@function
-.align 16
+.balign 16
 \entryname\()_\int_num\():
     .cfi_startproc
     .cfi_signal_frame
@@ -424,7 +425,7 @@ isr_entry 0 255
 .endm
 
 .type isr_common,@function
-.align 16
+.balign 16
 .global isr_common
 isr_common:
     isr_common_init_cfa
@@ -477,64 +478,58 @@ isr_common:
     pushq %rbx
     .cfi_offset rbx,-9*8
 
+    // rbx available...
+
     pushq %r15
     .cfi_offset r15,-10*8
 
-    // r15d=ds, r14d=es, r13d=fs, r12d=gs
+    // r15 = ds | es << 16 | fs << 32 | gs << 48
     movl %ds,%r15d
 
     pushq %r14
     .cfi_offset r14,-11*8
 
-    movl %es,%r14d
+    movl %es,%ebx
 
     pushq %r13
     .cfi_offset r13,-12*8
 
-    movl %fs,%r13d
+    shl $16,%ebx
 
     pushq %r12
     .cfi_offset r12,-13*8
 
-    movl %gs,%r12d
+    or %ebx,%r15d
 
     pushq %r11
     .cfi_offset r11,-14*8
 
-    // shift es, fs, gs into position to pack into r13
-    shll $16,%r14d
+    mov %fs,%ebx
 
     pushq %r10
     .cfi_offset r10,-15*8
 
-    shlq $32,%r13
+    shl $32,%rbx
 
     pushq %rax
     .cfi_offset rax,-16*8
 
-    shlq $48,%r12
+    or %rbx,%r15
 
     movq %cr3,%rax
 
-    // This could be patched to a long nop
-.balign 8,,5
-    call protection_barrier
-
-    // Merge ds,es into r15
-    orl %r14d,%r15d
+    mov %gs,%ebx
 
     cld
     pushq %r9
     .cfi_offset r9,-17*8
 
-    // Merge fs,gs into r13
-    orq %r12,%r13
+    shl $48,%rbx
 
     pushq %r8
     .cfi_offset r8,-18*8
 
-    // Merge ds|es,fs|gs into r13
-    orq %r15,%r13
+    or %rbx,%r15
 
     pushq %rcx
     .cfi_offset rcx,-19*8
@@ -558,9 +553,9 @@ isr_common:
     pushq %rax
 
     // Save segments
-    pushq %r13
+    pushq %r15
 
-    // Check for doublefault nonsense cs
+    // Check for doublefault nonsense cs (unlikely)
     testl %ecx,%ecx
     jz .Lfrom_kernel
 
@@ -569,8 +564,31 @@ isr_common:
     je .Lfrom_kernel
 
     // ...came from user code
+
+    xor %r12d,%r12d
+    insn_fixup
+    rdfsbase %r13
+    rdgsbase %r14
+
     swapgs
 
+    // Flush indirect branch prediction data because the cpu
+    // is tainted by user mode process
+    // This could be patched to a long nop
+    insn_fixup
+    call protection_barrier
+
+    mov %gs:CPU_INFO_CURTHREAD_OFS(%r12),%r12
+
+    // Unlikely
+    cmp %r13,THREAD_FSBASE_OFS(%r12)
+    jne .Lthread_bases_changed
+
+    // Unlikely
+    cmp %r14,THREAD_GSBASE_OFS(%r12)
+    jne .Lthread_bases_changed
+
+.Lthread_bases_done:
 .Lfrom_kernel:
     // Push FPU context pointer field, initially null
     pushq $0
@@ -625,31 +643,33 @@ isr_common:
     test %rax,%rax
     jz .Linvoke_catch
 
-    // See of we are restoring a fast context and jump to simpler code if so
-    // Fast context will have sign bit of flags value set
-    movl 18*8(%rax),%edi
+    // If we are restoring a fast context then jump to simpler code
+    // Fast context will have sign bit of ctx flag field set
+    // (packed in interrupt value)
+    movl ISR_CTX_OFS_INTERRUPT(%rax),%edi
     btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
     jc .Lrestore_fast_ctx
 
     // Branches here from fast switcher if we switched to a slow context
 .Lrestore_slow_ctx:
     // Load a zero to use much smaller encodings for gs acccesses below
-    xor %edi,%edi
+    xor %ecx,%ecx
 
     // isr can return a new stack pointer, or just return
     // the passed one to continue with this thread
     mov %rax,%rsp
 
     // Infer pointer to incoming thread's interrupt frame from ctx pointer
-    lea 17*8(%rax),%rbp
+    lea ISR_CTX_OFS_RBP(%rax),%rbp
 
     // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
-    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi),%rax
+    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
     test %rax,%rax
     jz .Lno_cleanup_call
-    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi)
-    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rdi),%rdi
+    movq %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
+    mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
     indirect_call rax
 .Lno_cleanup_call:
     xor %eax,%eax
@@ -664,7 +684,7 @@ isr_common:
     //   if any data segment is not GDT_SEL_USER_DATA | 3
     //     load all segment registers with GDT_SEL_USER_DATA | 3
     //   endif
-    //   restore fsbase
+    //   restore fsgsbase
     // endif
 
     // Load return cs
@@ -673,6 +693,7 @@ isr_common:
     // Pop segments
     popq %rdx
 
+    // r15 = current thread
     movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r15
 
     // See if we're not returning to user code
@@ -698,8 +719,6 @@ isr_common:
     movq THREAD_FSBASE_OFS(%r15),%r13
     movq THREAD_GSBASE_OFS(%r15),%r14
 
-    // Will be patched to call load_fs_gs_slow when #UD
-.balign 16,,10
     wrfsbase %r13
     wrgsbase %r14
 
@@ -708,8 +727,7 @@ isr_common:
     .cfi_remember_state
 
     // Restore CR3
-    popq %rax
-    movq %rax,%cr3
+    popq %rbx
 
     popq %rdi
     .cfi_same_value rdi
@@ -750,6 +768,8 @@ isr_common:
     popq %r15
     .cfi_same_value r15
 
+    movq %rbx,%cr3
+
     popq %rbx
     .cfi_same_value rbx
 
@@ -765,16 +785,16 @@ isr_common:
     .cfi_offset rip,-5*8
 
     // This could be patched to a long nop
-.balign 8,,5
+    insn_fixup
     call protection_barrier
 
     fn_trace isr_common,exit
 
-    add_rsp 16
+    adj_rsp 16
 
     iretq
 
-.align 16
+.balign 16
 .Lsegments_changed:
     .cfi_restore_state
     // Restore segments
@@ -787,14 +807,19 @@ isr_common:
     movw %dx,%gs
     jmp .Lsegments_restored
 
+.balign 16
+.Lthread_bases_changed:
+    mov %r13,THREAD_FSBASE_OFS(%r12)
+    mov %r14,THREAD_GSBASE_OFS(%r12)
+    jmp .Lthread_bases_done
+
     .cfi_endproc
 
 // Yield as efficiently as possible
-// Nothing is preserved! See void thread_yield_fast_wrapper()
-// Assumes yielding thread is a kernel thread in kernel mode
-.align 16
-.global thread_yield_fast
-thread_yield_fast:
+// Assumes yielding thread is in kernel mode
+.balign 16
+.global thread_yield
+thread_yield:
     .cfi_startproc
 
     // Snag return address from the stack,
@@ -804,18 +829,23 @@ thread_yield_fast:
     // Switch to getting return address from a register
     .cfi_register rip,rcx
 
-    // When this thread resumes, the call will have returned
+    // At this point, the stack pointer conveniently has
+    // the value it will have when the thread resumes
+    // Save caller's rsp in rax
     movq %rsp,%rax
 
     // push ss:rsp
     push_cfi $GDT_SEL_KERNEL_DATA
     push_cfi %rax
 
-    // rax remains a zero constant for a while
-    xor %eax,%eax
-
     // push eflags
     pushfq_cfi
+
+    // Segments (hardcoded kernel ones) (scheduled far ahead)
+    movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%rdx
+
+    // rax remains a zero constant for a while
+    xor %eax,%eax
 
     cli
 
@@ -861,11 +891,8 @@ thread_yield_fast:
     // Push zero error code
     push_cfi %rax
 
-    // Get started doing this ahead of time
+    // Save PDBR (scheduled ahead)
     mov %cr3,%rcx
-
-    // Segments (hardcoded kernel ones)
-    movabs $ (GDT_SEL_USER_DATA | 3) * 0x0001000100010001,%rdx
 
     // Push interrupt number
     push_cfi $(INTR_THREAD_YIELD|(1<<ISR_CTX_CTX_FLAGS_FAST_QWBIT))
@@ -906,28 +933,33 @@ thread_yield_fast:
     push %rdx
 
     // FPU context pointer is initially null
-    push %rax
+    push $ 0
 
     // Reschedule directly, bypassing everything to do with interrupts
     movq %rsp,%rdi
     call thread_schedule
 
     // See if we are restoring a fast context
-    movl 18*8(%rax),%edi
+    movl ISR_CTX_OFS_INTERRUPT(%rax),%edi
     btl $ ISR_CTX_CTX_FLAGS_FAST_QWBIT,%edi
     jnc .Lrestore_slow_ctx
 
     // Could branch here from full interrupt handler to restore a fast context
 .Lrestore_fast_ctx:
+    // Zero constant
+    xor %ecx,%ecx
+
     mov %rax,%rsp
 
     // Run cpu-local outgoing cleanup after stack switch (now)
     // Used to adjust outgoing thread state after switching stack
-    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi),%rax
+    mov %gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx),%rax
     test %rax,%rax
     jz .Lno_cleanup_call_fast
-    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rdi)
-    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rdi),%rdi
+    movq %rdi,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx),%rdi
+    mov %rcx,%gs:CPU_INFO_AFTER_CSW_FN_OFS(%rcx)
+    mov %rcx,%gs:CPU_INFO_AFTER_CSW_VP_OFS(%rcx)
     indirect_call rax
 .Lno_cleanup_call_fast:
 
@@ -968,38 +1000,32 @@ thread_yield_fast:
 
     // Load CR3
     movq %rax,%cr3
-    xorl %eax,%eax
 
-    // Load flags from interrupt frame
-    movl 16(%rsp),%ecx
-    push_cfi %rcx
+    // Error code is wakeup return value
+    mov 8(%rsp),%rax
+
+    // Load flags from interrupt frame (reach over intr+errcode+rip+cs)
+    movl 8*4(%rsp),%edi
+    push_cfi %rdi
     popfq_cfi
 
-    // This should just rename every register to the same zeroed rax
-    // All general registers except rbp (rbp is preserved) are
-    // zeroed when thread_yield_fast returns
-    movl %eax,%ebx
-    movl %eax,%ecx
-    movl %eax,%edx
-    movl %eax,%esi
-    movl %eax,%edi
-    movl %eax,%r8d
-    movl %eax,%r9d
-    movl %eax,%r10d
-    movl %eax,%r11d
-    movl %eax,%r12d
-    movl %eax,%r13d
-    movl %eax,%r14d
-    movl %eax,%r15d
+    // Zero all clobbered registers
+    movl %ecx,%edx
+    movl %ecx,%esi
+    movl %ecx,%edi
+    movl %ecx,%r8d
+    movl %ecx,%r9d
+    movl %ecx,%r10d
+    movl %ecx,%r11d
 
-    add_rsp 16
+    adj_rsp 16
 
     // Return and pop cs, eflags, rsp, ss
     retq $ 32
 
     .cfi_endproc
 
-.align 16
+.balign 16
 .global soft_vzeroall
 .hidden soft_vzeroall
 soft_vzeroall:
@@ -1021,7 +1047,7 @@ soft_vzeroall:
     movdqa %xmm0,%xmm15
     ret
 
-.align 16
+.balign 16
 .global soft_rdfsgsbase_r13r14
 .hidden soft_rdfsgsbase_r13r14
 soft_rdfsgsbase_r13r14:
@@ -1045,7 +1071,7 @@ soft_rdfsgsbase_r13r14:
     ret
     .cfi_endproc
 
-.align 16
+.balign 16
 .global soft_wrfsgsbase_r13r14
 .hidden soft_wrfsgsbase_r13r14
 soft_wrfsgsbase_r13r14:
@@ -1070,7 +1096,7 @@ soft_wrfsgsbase_r13r14:
     .cfi_endproc
 
 // Replaces opcodes sequence f3 49 0f ae d5: wrfsbase %r13
-.align 16
+.balign 16
 .global soft_wrfsbase_r13
 .hidden soft_wrfsbase_r13
 soft_wrfsbase_r13:
@@ -1090,7 +1116,7 @@ soft_wrfsbase_r13:
     .cfi_endproc
 
 // Replaces opcodes sequence f3 49 0f ae de: wrgsbase %r14
-.align 16
+.balign 16
 .global soft_wrgsbase_r14
 .hidden soft_wrgsbase_r14
 soft_wrgsbase_r14:
@@ -1110,7 +1136,7 @@ soft_wrgsbase_r14:
     .cfi_endproc
 
 // Replaces opcodes sequence f3 49 0f ae c5: rdfsbase %r13
-.align 16
+.balign 16
 .global soft_rdfsbase_r13
 .hidden soft_rdfsbase_r13
 soft_rdfsbase_r13:
@@ -1130,7 +1156,7 @@ soft_rdfsbase_r13:
     .cfi_endproc
 
 // Replaces opcodes sequence f3 49 0f ae ce: rdgsbase %r14
-.align 16
+.balign 16
 .global soft_rdgsbase_r14
 .hidden soft_rdgsbase_r14
 soft_rdgsbase_r14:
@@ -1164,6 +1190,7 @@ soft_rdgsbase_r14:
     subq sse_context_size(%rip),%rsi
 
     // Save context using instruction passed to macro
+    insn_fixup
     \insn (%rsi)
 
     // Update xsave stack pointer in thread
@@ -1185,6 +1212,7 @@ soft_rdgsbase_r14:
     movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
 
     // Restore context using instruction passed to macro
+    insn_fixup
     \insn (%rsi)
 
     addq sse_context_size(%rip),%rsi
@@ -1195,72 +1223,31 @@ soft_rdgsbase_r14:
     .cfi_endproc
 .endm
 
-// Branch directly to appropriate save/restore
 .section .text.isr, "ax"
 
-.align 16
-.global isr_save_fpu_ctx
-.hidden isr_save_fpu_ctx
-isr_save_fpu_ctx:
-    jmp isr_save_fxsave
-.Lsse_context_save_jmp:
-
-.align 16
-.global isr_restore_fpu_ctx
-.hidden isr_restore_fpu_ctx
-isr_restore_fpu_ctx:
-    jmp isr_restore_fxrstor
-.Lsse_context_restore_jmp:
-
-// Save/restore implementations
-
-.align 16
-.global isr_save_xsaveopt
-.hidden isr_save_xsaveopt
-isr_save_xsaveopt:
-    xsave_ctx xsaveopt64
-
-.align 16
-.global isr_save_xsave
-.hidden isr_save_xsave
-isr_save_xsave:
-    xsave_ctx xsave64
-
-.align 16
-.global isr_save_xsavec
-.hidden isr_save_xsavec
-isr_save_xsavec:
-    xsave_ctx xsavec64
-
-.align 16
-.global isr_save_xsaves
-.hidden isr_save_xsaves
-isr_save_xsaves:
-    xsave_ctx xsaves64
-
-.align 16
-.global isr_restore_xrstors
-.hidden isr_restore_xrstors
-isr_restore_xrstors:
-    xrstor_ctx xrstors64
-
-.align 16
-.global isr_restore_xrstor
-.hidden isr_restore_xrstor
-isr_restore_xrstor:
-    xrstor_ctx xrstor64
-
-.align 16
-.global isr_save_fxsave
-.hidden isr_save_fxsave
-isr_save_fxsave:
+.balign 16
+.global isr_save_fpu_ctx64
+.hidden isr_save_fpu_ctx64
+isr_save_fpu_ctx64:
     xsave_ctx fxsave64
 
-.align 16
-.global isr_restore_fxrstor
-.hidden isr_restore_fxrstor
-isr_restore_fxrstor:
-    xrstor_ctx fxrstor64
+.balign 16
+.global isr_save_fpu_ctx32
+.hidden isr_save_fpu_ctx32
+isr_save_fpu_ctx32:
+    xsave_ctx fxsave
+
+ .balign 16
+ .global isr_restore_fpu_ctx64
+ .hidden isr_restore_fpu_ctx64
+ isr_restore_fpu_ctx64:
+     xrstor_ctx fxrstor64
+
+.balign 16
+.global isr_restore_fpu_ctx32
+.hidden isr_restore_fpu_ctx32
+isr_restore_fpu_ctx32:
+    xrstor_ctx fxrstor
 
 .hidden protection_barrier
 .global protection_barrier
@@ -1270,6 +1257,7 @@ protection_barrier:
     ret
 
 .hidden protection_barrier_ibpb
+.global protection_barrier_ibpb
 protection_barrier_ibpb:
     .cfi_startproc
 
@@ -1293,7 +1281,7 @@ protection_barrier_ibpb:
     .cfi_endproc
 
 // on entry, ebx=intr, r12=ctx
-.align 16
+.balign 16
 exception_isr_handler:
     .cfi_startproc
     .cfi_def_cfa rbp,4*8
@@ -1318,7 +1306,7 @@ exception_isr_handler:
 .Linvoke_catch:
      nop
 
-.align 16
+.balign 16
 .Lno_handler:
     // ...no handler or handler rejected it
     movl %ebx,%edi
@@ -1330,10 +1318,32 @@ exception_isr_handler:
     // tail call breaks the backtrace, which is bad and not worth
     // an insignificant tail call optimization  on an already
     // expensive code path
-.align 16
+.balign 16
 2:  movq %r12,%rdi
     call unhandled_exception_handler
     ret
+
+    .cfi_endproc
+
+//thread_fn_t fn, void *p, thread_t id
+.global thread_entry
+thread_entry:
+    .cfi_startproc
+
+    // Stop the stack trace
+    .cfi_undefined rip
+    .cfi_undefined rsp
+    .cfi_undefined rbp
+    .cfi_undefined rbx
+    .cfi_undefined r12
+    .cfi_undefined r13
+    .cfi_undefined r14
+    .cfi_undefined r15
+
+    // Future person: Stack not 16 byte aligned here!
+
+    call thread_startup
+    ud2
 
     .cfi_endproc
 
@@ -1408,6 +1418,8 @@ isr_sysret64:
     // in kernel mode
     cli
     swapgs
+
+    insn_fixup
     wrfsbase %r13
     wrgsbase %r14
 
@@ -1426,7 +1438,7 @@ isr_sysret64:
     .cfi_endproc
 
 /// Note! This code assumes -mno-red-zone
-.align 16
+.balign 16
 .global __module_dynlink_plt_thunk
 __module_dynlink_plt_thunk:
     .cfi_startproc
@@ -1545,12 +1557,12 @@ __module_dynlink_plt_thunk:
     .cfi_endproc
 
 // This unblocks context switches and forces a switch if one was deferred
-.align 16
+.balign 16
 .global cs_leave_asm
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
-    decl %gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
+    subl $1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
     jb .Lpanic
     jnz .Lreturn
 
@@ -1572,13 +1584,13 @@ cs_leave_asm:
 
     .cfi_endproc
 
-// Entering ten critical sections requires you to leave ten to get out
-.align 16
+// Entering N critical sections requires you to leave N to get out
+.balign 16
 .global cs_enter_asm
 cs_enter_asm:
     .cfi_startproc
     xor %eax,%eax
-    incl %gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
+    addl $1,%gs:CPU_INFO_LOCKS_HELD_OFS(%rax)
     jz .Lpanic
 .Lreturn:
     ret
@@ -1597,7 +1609,7 @@ cs_enter_asm:
 // location.
 .macro make_retpoline_thunk reg
 .global __x86_indirect_thunk_\reg
-.align 16
+.balign 16
 __x86_indirect_thunk_\reg:
     .cfi_startproc
     .cfi_def_cfa rsp,8
@@ -1616,17 +1628,3 @@ __x86_indirect_thunk_\reg:
 .irp reg,rax,rcx,rdx,rbx,rbp,r8,r9,r10,r11,r12,r13,r14,r15
     make_retpoline_thunk \reg
 .endr
-
-.section .rodata, ""
-.align 8
-
-// Pointers to patch points
-.hidden sse_context_save
-.global sse_context_save
-sse_context_save:
-    .quad .Lsse_context_save_jmp
-
-.hidden sse_context_restore
-.global sse_context_restore
-sse_context_restore:
-    .quad .Lsse_context_restore_jmp

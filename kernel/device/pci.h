@@ -45,30 +45,40 @@ private:
 };
 
 struct pci_config_hdr_t {
+    // 0x00
     uint16_t vendor;
     uint16_t device;
 
+    // 0x04
     uint16_t command;
     uint16_t status;
 
+    // 0x08
     uint8_t revision;
     uint8_t prog_if;
     uint8_t subclass;
     uint8_t dev_class;
 
+    // 0x0C
     uint8_t cache_line_size;
     uint8_t latency_timer;
     uint8_t header_type;
     uint8_t bist;
 
+    // 0x10, 0x14, 0x18, 0x1C, 0x20, 0x24
     uint32_t base_addr[6];
 
+    // 0x28
     uint32_t cardbus_cis_ptr;
 
+    // 0x2C
     uint16_t subsystem_vendor;
     uint16_t subsystem_id;
 
+    // 0x30
     uint32_t expansion_rom_addr;
+
+    // 0x34
     uint8_t capabilities_ptr;
 
     uint8_t reserved[7];
@@ -91,6 +101,20 @@ struct pci_config_hdr_t {
     // config.base_addr[bar] and config.base_addr[bar+1] if it is 64 bit
     EXPORT void set_mmio_bar(pci_addr_t pci_addr, ptrdiff_t bar, uint64_t addr);
 };
+
+template<typename T>
+static _always_inline void pci_config_copy_read(
+        pci_addr_t addr, T& dest, int ofs)
+{
+    pci_config_copy(addr, &dest, ofs, sizeof(T));
+}
+
+template<typename T>
+static _always_inline void pci_config_copy_write(
+        pci_addr_t addr, T const& dest, int ofs)
+{
+    pci_config_write(addr, ofs, &dest, sizeof(T));
+}
 
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01

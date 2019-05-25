@@ -14,7 +14,7 @@ main:
     mov %rax,%r13
     mov $ SYS_getpriority,%ebx
     mov $1000000,%r12d
-.align 16
+.balign 16
 0:	mov %ebx,%eax
     syscall
 

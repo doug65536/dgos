@@ -120,7 +120,7 @@ struct trace_record {
 
 static_assert(sizeof(trace_record) == 32, "Unexpected size");
 
-#ifdef __DGOS_KERNEL__
+#ifdef __DGOS__
 extern "C" _no_instrument
 void __cyg_profile_func_enter(void *this_fn, void *call_site);
 

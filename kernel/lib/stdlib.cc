@@ -136,7 +136,7 @@ EXPORT char *strdup(char const *s)
     return (char*)memcpy(b, s, len+1);
 }
 
-EXPORT void *operator new(size_t size) noexcept
+EXPORT void *operator new(size_t size)
 {
     return malloc(size);
 }

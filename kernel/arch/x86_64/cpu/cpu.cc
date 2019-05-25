@@ -24,6 +24,199 @@
 
 uint32_t default_mxcsr_mask;
 
+extern uint8_t * const ___rodata_fixup_insn_st[];
+extern uint8_t * const ___rodata_fixup_insn_en[];
+
+static uint8_t const vzeroall_nopw_insn[] = {
+    0xc5, 0xfc, 0x77, 0x66, 0x90
+};
+
+static uint8_t const rdfsbase_r13_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xc5
+};
+
+static uint8_t const rdgsbase_r14_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xce
+};
+
+static uint8_t const wrfsbase_r13_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xd5
+};
+
+static uint8_t const wrgsbase_r14_insn[] = {
+    0xf3, 0x49, 0x0f, 0xae, 0xde
+};
+
+static uint8_t const xsaves_rsi_insn[] = {
+    0x0f, 0xc7, 0x2e    // xsaves (%rsi)
+};
+
+static uint8_t const xsaveopt_rsi_insn[] = {
+    0x0f, 0xae, 0x36    // xsaveopt (%rsi)
+};
+
+static uint8_t const xsavec_rsi_insn[] = {
+    0x0f, 0xc7, 0x26    // xsavec (%rsi)
+};
+
+static uint8_t const xsave_rsi_insn[] = {
+    0x0f, 0xae, 0x26    // xsave  (%rsi)
+};
+
+static uint8_t const fxsave_rsi_insn[] = {
+    0x0f, 0xae, 0x06    // fxsave (%rsi)
+};
+
+static uint8_t const xrstor_rsi_insn[] = {
+    0x0f, 0xae, 0x2e    // xrstor (%rsi)
+};
+
+static uint8_t const xrstors_rsi_insn[] = {
+    0x0f, 0xc7, 0x1e    // xrstors (%rsi)
+};
+
+static uint8_t const fxrstor_rsi_insn[] = {
+    0x0f, 0xae, 0x0e        // fxrstor (%rsi)
+};
+
+static uint8_t const xsaves64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x2e  // xsaves64 (%rsi)
+};
+
+static uint8_t const xsaveopt64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x36  // xsaveopt64 (%rsi)
+};
+
+static uint8_t const xsavec64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x26  // xsavec64 (%rsi)
+};
+
+static uint8_t const xsave64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x26  // xsave64 (%rsi)
+};
+
+static uint8_t const fxsave64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x06  // fxsave64 (%rsi)
+};
+
+static uint8_t const xrstor64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x2e  // xrstor64 (%rsi)
+};
+
+static uint8_t const xrstors64_rsi_insn[] = {
+    0x48, 0x0f, 0xc7, 0x1e  // xrstors64 (%rsi)
+};
+
+static uint8_t const fxrstor64_rsi_insn[] = {
+    0x48, 0x0f, 0xae, 0x0e  // fxrstor64 (%rsi)
+};
+
+static uint8_t const *xsave64_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxsave64_rsi_insn;
+    case xsave_support_t::XSAVE: return xsave64_rsi_insn;
+    case xsave_support_t::XSAVEC: return xsavec64_rsi_insn;
+    case xsave_support_t::XSAVEOPT: return xsaveopt64_rsi_insn;
+    case xsave_support_t::XSAVES: return xsaves64_rsi_insn;
+    }
+}
+
+static size_t xsave64_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxsave64_rsi_insn);
+    case xsave_support_t::XSAVE: return sizeof(xsave64_rsi_insn);
+    case xsave_support_t::XSAVEC: return sizeof(xsavec64_rsi_insn);
+    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt64_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xsaves64_rsi_insn);
+    }
+}
+
+static uint8_t const *xsave32_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxsave_rsi_insn;
+    case xsave_support_t::XSAVE: return xsave_rsi_insn;
+    case xsave_support_t::XSAVEC: return xsavec_rsi_insn;
+    case xsave_support_t::XSAVEOPT: return xsaveopt_rsi_insn;
+    case xsave_support_t::XSAVES: return xsaves_rsi_insn;
+    }
+}
+
+static size_t xsave32_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxsave_rsi_insn);
+    case xsave_support_t::XSAVE: return sizeof(xsave_rsi_insn);
+    case xsave_support_t::XSAVEC: return sizeof(xsavec_rsi_insn);
+    case xsave_support_t::XSAVEOPT: return sizeof(xsaveopt_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xsaves_rsi_insn);
+    }
+}
+
+static uint8_t const *xrstor64_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxrstor_rsi_insn;
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return xrstor64_rsi_insn;
+    case xsave_support_t::XSAVES: return xrstors64_rsi_insn;
+    }
+}
+
+static size_t xrstor64_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxrstor_rsi_insn);
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return sizeof(xrstor64_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xrstors64_rsi_insn);
+    }
+}
+
+static uint8_t const *xrstor32_insn(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return fxrstor_rsi_insn;
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return xrstor_rsi_insn;
+    case xsave_support_t::XSAVES: return xrstors_rsi_insn;
+    }
+}
+
+static size_t xrstor32_sz(xsave_support_t support)
+{
+    switch (support) {
+    default:
+    case xsave_support_t::FXSAVE: return sizeof(fxrstor_rsi_insn);
+    case xsave_support_t::XSAVE:
+    case xsave_support_t::XSAVEC:
+    case xsave_support_t::XSAVEOPT: return sizeof(xrstor_rsi_insn);
+    case xsave_support_t::XSAVES: return sizeof(xrstors_rsi_insn);
+    }
+}
+
+// These preserve all registers like the instruction they replace
+extern "C" void soft_vzeroall();
+extern "C" void soft_rdfsgsbase_r13r14();
+extern "C" void soft_wrfsgsbase_r13r14();
+extern "C" void soft_rdfsbase_r13();
+extern "C" void soft_rdgsbase_r14();
+extern "C" void soft_wrfsbase_r13();
+extern "C" void soft_wrgsbase_r14();
+
+
 void cpu_init_early(int ap)
 {
     if (ap)
@@ -31,8 +224,13 @@ void cpu_init_early(int ap)
 
     gdt_init(ap);
 
+    // These two must agree, always
     cpu_cs_set(GDT_SEL_KERNEL_CODE64);
     cpu_ss_set(GDT_SEL_KERNEL_DATA);
+
+    // The CPU doesn't care about any of these registers in long mode
+    // So, might as well leave them
+    // permanently set to compatibility mode values
     cpu_ds_set(GDT_SEL_USER_DATA | 3);
     cpu_es_set(GDT_SEL_USER_DATA | 3);
     cpu_fs_set(GDT_SEL_USER_DATA | 3);
@@ -75,6 +273,152 @@ void cpu_init_early(int ap)
 
         cpu_cr4_change_bits(0, CPU_CR4_OSXSAVE);
         cpu_xcr_change_bits(0, ~xsave_supported_states, xsave_enabled_states);
+    }
+
+    idt_xsave_detect(ap);
+
+    // Perform code patch fixups
+    for (uint8_t * const *fixup_ptr = ___rodata_fixup_insn_st;
+         !ap && fixup_ptr < ___rodata_fixup_insn_en; ++fixup_ptr) {
+        uint8_t *code = *fixup_ptr;
+
+        uintptr_t addr = uintptr_t(code);
+        uintptr_t next = 0;
+
+        size_t replace_sz = 0;
+
+        intptr_t dist = 0;
+
+        switch (*code) {
+        case 0xE8:
+            // Call instruction
+            int32_t disp32;
+            next = addr + 5;
+            memcpy(&disp32, code + 1, sizeof(disp32));
+
+            uintptr_t dest_addr;
+            dest_addr = next + disp32;
+
+            if (dest_addr == uintptr_t(protection_barrier)) {
+                // No point calling protection barrier if
+                // the CPU does not have IBPB, nop it out
+                cpu_scoped_wp_disable wp_dis;
+                if (!cpuid_has_ibpb()) {
+                    cpu_patch_nop(code, 5);
+                } else {
+                    replace_sz = 5;
+                    next = addr + 5;
+                    dist = uintptr_t(protection_barrier_ibpb) - next;
+                    break;
+                }
+            }
+
+            continue;
+
+        case 0xF3:
+            // rd/wr fs/gs base
+
+            //
+            // Read and write fsbase r13
+
+            if (unlikely(!memcmp(code, rdfsbase_r13_insn,
+                                sizeof(rdfsbase_r13_insn)) &&
+                         !memcmp(code + sizeof(rdfsbase_r13_insn),
+                                 rdgsbase_r14_insn,
+                                 sizeof(rdgsbase_r14_insn)))) {
+                // Both at once in one
+                replace_sz = 10;
+                next = addr + 5;
+                dist = uintptr_t(soft_rdfsgsbase_r13r14) - next;
+            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
+                                        sizeof(wrfsbase_r13_insn)) &&
+                                !memcmp(code + sizeof(wrfsbase_r13_insn),
+                                        wrgsbase_r14_insn,
+                                        sizeof(wrgsbase_r14_insn)))) {
+                // Both at once in one
+                replace_sz = 10;
+                next = addr + 5;
+                dist = uintptr_t(soft_wrfsgsbase_r13r14) - next;
+            } else if (unlikely(!memcmp(code, rdfsbase_r13_insn,
+                                        sizeof(rdfsbase_r13_insn)))) {
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_rdfsbase_r13) - next;
+            } else if (unlikely(!memcmp(code, wrfsbase_r13_insn,
+                                        sizeof(wrfsbase_r13_insn)))) {
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_wrfsbase_r13) - next;
+            } else if (unlikely(!memcmp(code, rdgsbase_r14_insn,
+                                        sizeof(rdgsbase_r14_insn)))) {
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_rdgsbase_r14) - next;
+            } else if (unlikely(!memcmp(code, wrgsbase_r14_insn,
+                                        sizeof(wrgsbase_r14_insn)))) {
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_wrgsbase_r14) - next;
+            }
+            break;
+
+        case 0xC5:
+            if (unlikely(!memcmp(code, vzeroall_nopw_insn,
+                                 sizeof(vzeroall_nopw_insn)))) {
+                replace_sz = 5;
+                next = addr + replace_sz;
+                dist = uintptr_t(soft_vzeroall) - next;
+            }
+            break;
+
+        case 0x0f:
+            if (unlikely(!memcmp(code, fxsave_rsi_insn,
+                                 sizeof(fxsave_rsi_insn)))) {
+                cpu_patch_code(code, xsave32_insn(xsave_support),
+                               xsave32_sz(xsave_support));
+                continue;
+            } else if (unlikely(!memcmp(code, fxrstor_rsi_insn,
+                                        sizeof(fxrstor_rsi_insn)))) {
+                cpu_patch_code(code, xrstor32_insn(xsave_support),
+                               xrstor32_sz(xsave_support));
+                continue;
+            }
+            break;
+
+        case 0x48:
+            if (unlikely(!memcmp(code, fxsave64_rsi_insn,
+                                 sizeof(fxsave64_rsi_insn)))) {
+                cpu_patch_code(code, xsave64_insn(xsave_support),
+                               xsave64_sz(xsave_support));
+                continue;
+            } else if (unlikely(!memcmp(code, fxrstor64_rsi_insn,
+                                        sizeof(fxrstor64_rsi_insn)))) {
+                cpu_patch_code(code, xrstor64_insn(xsave_support),
+                               xrstor64_sz(xsave_support));
+                continue;
+            }
+            break;
+
+        }
+
+        if (unlikely(dist == 0))
+            panic("Not valid\n");
+
+        // Replace with a call
+
+        // Relocation truncated to fit? Doubt it but unhandled if so
+        if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
+            panic("Relocation would be truncated to fit");
+
+        // Disable write protection and interrupts temporarily
+        cpu_scoped_wp_disable wp_dis;
+        cpu_scoped_irq_disable irq_dis;
+
+        code[0] = 0xE8;
+        memcpy(code + 1, &dist, sizeof(uint32_t));
+
+        if (unlikely(replace_sz > 5))
+            cpu_patch_nop(code + 5, replace_sz - 5);
     }
 }
 

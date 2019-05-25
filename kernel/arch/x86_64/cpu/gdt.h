@@ -6,6 +6,16 @@
 #include "control_regs_constants.h"
 
 struct gdt_entry_t {
+    constexpr gdt_entry_t()
+        : limit_low(0)
+        , base_low(0)
+        , base_middle(0)
+        , access(0)
+        , flags_limit_high(0)
+        , base_high(0)
+    {
+    }
+
     constexpr gdt_entry_t(uint64_t base, uint64_t limit,
                           uint8_t access_, uint8_t flags_)
         : limit_low(limit & 0xFFFF)
@@ -24,9 +34,41 @@ struct gdt_entry_t {
     uint8_t flags_limit_high;
     uint8_t base_high;
 
-    constexpr void set_type(uint8_t type)
+    constexpr gdt_entry_t& set_base(uint32_t base_31_0)
+    {
+        base_low = base_31_0 & 0xFFFF;
+        base_31_0 >>= 16;
+        base_middle = base_31_0 & 0xFF;
+        base_31_0 >>= 8;
+        base_high = base_31_0 & 0xFF;
+        return *this;
+    }
+
+    constexpr gdt_entry_t& set_limit(uint32_t limit)
+    {
+        if (limit >= (1U << 22)) {
+            limit >>= 12;
+            limit_low = limit & 0xFFFF;
+            limit >>= 16;
+            flags_limit_high &= 0xF0;
+            limit &= 0xF;
+            flags_limit_high = (flags_limit_high & 0xF0) | limit;
+        }
+        return *this;
+    }
+
+    constexpr gdt_entry_t& set_type(uint8_t type)
     {
         access = (access & ~0xF) | type;
+        return *this;
+    }
+
+    constexpr gdt_entry_t& set_flags(uint8_t flags)
+    {
+        flags_limit_high &= 0x0F;
+        flags &= 0xF0;
+        flags_limit_high |= flags;
+        return *this;
     }
 
     constexpr uint8_t get_type()
@@ -38,10 +80,22 @@ struct gdt_entry_t {
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 
 struct gdt_entry_tss_ldt_t {
-    constexpr gdt_entry_tss_ldt_t(uint64_t base)
-        : base_high2((base >> 32) & 0xFFFFFFFF)
+    constexpr gdt_entry_tss_ldt_t()
+        : base_high2(0)
         , reserved(0)
     {
+    }
+
+    constexpr gdt_entry_tss_ldt_t(uint64_t base)
+        : base_high2((base >> 32) & 0xFFFFFFFFU)
+        , reserved(0)
+    {
+    }
+
+    constexpr gdt_entry_tss_ldt_t& set_base(uint64_t base)
+    {
+        base_high2 = (base >> 32) & 0xFFFFFFFFU;
+        return *this;
     }
 
     uint32_t base_high2;

@@ -41,7 +41,7 @@ void workq_impl::free(workq_work *work)
 int workq_impl::worker(void *arg)
 {
     ((workq_impl*)arg)->worker();
-    return 0;
+    // noreturn
 }
 
 workq_work *workq_impl::dequeue_work_locked(workq_impl::scoped_lock &lock)
@@ -74,7 +74,7 @@ void workq_impl::worker()
 
 EXPORT void workq_impl::set_affinity(int cpu)
 {
-    thread_set_affinity(tid, cpu);
+    thread_set_affinity(tid, thread_cpu_mask_t(cpu));
 }
 
 _hot

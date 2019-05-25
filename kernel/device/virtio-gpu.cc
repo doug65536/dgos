@@ -11,6 +11,7 @@
 #include "conio.h"
 #include "framebuffer.h"
 #include "vesainfo.h"
+#include "threadsync.h"
 
 #define DEBUG_VIRTIO_GPU 1
 #if DEBUG_VIRTIO_GPU
@@ -567,6 +568,20 @@ private:
     uint32_t scrn_w;
     uint32_t scrn_h;
     bool configured;
+
+    // Config change worker thread
+    thread_t config_worker_tid = 0;
+    unsigned config_current = 0;
+    unsigned config_latest = 0;
+    uint32_t config_events = 0;
+    lock_type config_lock;
+    std::condition_variable config_changed;
+
+    _noreturn
+    static int config_work_thread(void *arg);
+
+    _noreturn
+    int config_work_thread();
 };
 
 static void virtio_gpu_startup(void*)
@@ -623,6 +638,8 @@ bool virtio_gpu_dev_t::init(pci_dev_iterator_t const &pci_iter)
 
     gpu_config = (virtio_gpu_config_t*)device_cfg;
 
+    config_worker_tid = thread_create(config_work_thread, this, 0, false);
+
     uint32_t events = atomic_ld_acq(&gpu_config->events_read);
     if (events & 1) {
         if (!handle_config_change(events))
@@ -647,7 +664,12 @@ bool virtio_gpu_dev_t::issue_get_display_info()
 
     cmd_queue->sendrecv(&get_display_info, sizeof(get_display_info),
                         &display_info_resp, sizeof(display_info_resp), &iocp);
-    iocp.wait();
+
+    if (!iocp.wait_until(std::chrono::steady_clock::now() +
+                         std::chrono::seconds(5))) {
+        VIRTIO_GPU_TRACE("...timed out!\n");
+        return false;
+    }
 
     VIRTIO_GPU_TRACE("...get display info completed\n");
 
@@ -1035,9 +1057,20 @@ void virtio_gpu_dev_t::config_irq()
 
     if (events & 1) {
         gpu_config->events_clear = events;
-        workq::enqueue([=] {
-            handle_config_change(events);
-        });
+
+        // Register
+        scoped_lock lock(config_lock);
+
+        // Remember config changes
+        config_events = events;
+
+        // Bump config version
+        ++config_current;
+
+        lock.unlock();
+
+        // Kick config change thread
+        config_changed.notify_all();
     }
 }
 
@@ -1062,6 +1095,40 @@ void virtio_gpu_dev_t::irq_handler(int offset)
         if (status & 2) {
             config_irq();
         }
+    }
+}
+
+int virtio_gpu_dev_t::config_work_thread(void *arg)
+{
+    reinterpret_cast<virtio_gpu_dev_t*>(arg)->config_work_thread();
+}
+
+int virtio_gpu_dev_t::config_work_thread()
+{
+    // Must disable interrupts here to prevent an IRQ occurring and that
+    // ISR also acquiring the config lock. It would deadlock. In practice IRQs
+    // will be enabled very soon because .wait will context switch to
+    // something that probably has interrupts enabled
+    cpu_scoped_irq_disable irq_dis;
+    scoped_lock lock(config_lock);
+
+    while (true)
+    {
+        while (config_latest == config_current)
+            config_changed.wait(lock);
+
+        uint32_t events = config_events;
+        config_events = 0;
+
+        lock.unlock();
+        irq_dis.restore();
+
+        // Handle config change with interrupts enabled
+        // and config_lock unlocked
+        handle_config_change(events);
+
+        irq_dis.redisable();
+        lock.lock();
     }
 }
 

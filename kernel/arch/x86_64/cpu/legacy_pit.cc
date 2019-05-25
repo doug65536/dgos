@@ -62,6 +62,8 @@
 // Read/write
 #define PIT_DATA(channel)   (PIT_BASE + (channel))
 
+#define PIT_IRQ     0
+
 // Timer crystal runs at 1.193181666... MHz
 // Freq * 6 = 7159090.0 even
 
@@ -73,7 +75,7 @@ static pit8254_lock_type pit8254_lock;
 static uint64_t volatile timer_ticks;
 
 // Exceeds 2^63 in about 292 years
-static uint64_t volatile timer_ns;
+static int64_t volatile timer_ns;
 
 static unsigned rate_hz;
 static uint64_t tick_ns;
@@ -92,6 +94,7 @@ static void pit8254_set_rate(unsigned hz)
     else
         divisor = 7159090U / (hz * 6U);
 
+    // Calculate ticks per nanosecond for the given timer frequency
     tick_ns = 600000000UL * divisor / 715909;
 
     rate_hz = hz;
@@ -114,24 +117,22 @@ static void pit8254_irq_handler()
     atomic_add(&timer_ns, tick_ns);
 
     // Test
-    static uint64_t last_time;
+    static int64_t last_time;
     if (last_time + 1000000000 <= timer_ns) {
         last_time += 1000000000;
 
-        printdbg("PIT Time: %8" PRId64 "\n", timer_ns);
-
-        //con_draw_xy(70, 0, buf, 7);
+        workq::enqueue([=] {
+            printdbg("PIT Time: %8" PRId64 "\n", timer_ns);
+        });
     }
 }
 
 static isr_context_t *pit8254_irq_handler(int irq, isr_context_t *ctx)
 {
     (void)irq;
-    assert(irq == 0);
+    assert(irq == PIT_IRQ);
 
-    workq::enqueue([=] {
-        pit8254_irq_handler();
-    });
+    pit8254_irq_handler();
 
     return ctx;
 }
@@ -145,7 +146,7 @@ static void pit8254_time_ns_stop()
 {
     PIT_TRACE("Disabling PIT timer tick\n");
 
-    irq_setmask(0, 0);
+    irq_setmask(PIT_IRQ, false);
 
     pit8254_scoped_lock lock(pit8254_lock);
     outb(PIT_CMD,
@@ -157,7 +158,7 @@ static void pit8254_time_ns_stop()
     outb(PIT_DATA(0), 0);
     lock.unlock();
 
-    irq_unhook(0, pit8254_irq_handler);
+    irq_unhook(PIT_IRQ, pit8254_irq_handler);
 }
 
 // Multiply two unsigned 64 bit values, giving an intermediate 128 bit result,
@@ -226,6 +227,6 @@ void pit8254_enable()
     PIT_TRACE("Starting PIT timer\n");
 
     pit8254_set_rate(20);
-    irq_hook(0, pit8254_irq_handler, "pit8254");
-    irq_setmask(0, true);
+    irq_hook(PIT_IRQ, pit8254_irq_handler, "pit8254");
+    irq_setmask(PIT_IRQ, true);
 }

@@ -168,6 +168,9 @@ static void idtr_load(table_register_64_t *table_reg)
 }
 #endif
 
+// Assume the worst
+xsave_support_t xsave_support = xsave_support_t::FXSAVE;
+
 void idt_xsave_detect(int ap)
 {
     cpu_scoped_irq_disable intr_was_enabled;
@@ -177,9 +180,13 @@ void idt_xsave_detect(int ap)
     while (cpuid_has_xsave()) {
         cpuid_t info;
 
+        xsave_support = xsave_support_t::FXSAVE;
+
         // Get size of save area
         if (!cpuid(&info, CPUID_INFO_XSAVE, 0))
             break;
+
+        xsave_support = xsave_support_t::XSAVE;
 
         // Store size of save area
         assert(info.ebx < UINT16_MAX);
@@ -191,41 +198,20 @@ void idt_xsave_detect(int ap)
             sse_context_size = (sse_context_size + 63) & -64;
 
 			if (info.eax & (1 << 3)) {
-				// xsaves available
+                // xsaves available, awesome!
 
-				// Patch jmp instruction
-                cpu_patch_insn(sse_context_save - 1,
-                               uintptr_t(isr_save_xsaves) -
-                               uintptr_t(sse_context_save),
-                               sizeof(*sse_context_save));
-                cpu_patch_insn(sse_context_restore - 1,
-                               uintptr_t(isr_restore_xrstors) -
-                               uintptr_t(sse_context_restore),
-                               sizeof(*sse_context_restore));
+                xsave_support = xsave_support_t::XSAVES;
+
 			} else if (info.eax & (1 << 0)) {
-				// xsaveopt available
+                // xsaveopt available, pretty good
 
-                // Patch jmp instruction
-                cpu_patch_insn(sse_context_save - 1,
-                               uintptr_t(isr_save_xsaveopt) -
-                               uintptr_t(sse_context_save),
-                               sizeof(*sse_context_save));
-                cpu_patch_insn(sse_context_restore - 1,
-                               uintptr_t(isr_restore_xrstor) -
-                               uintptr_t(sse_context_restore),
-                               sizeof(*sse_context_restore));
-                //printk("Using xsaveopt\n");
-            } else if (info.eax & 2) {
-                // Patch jmp instruction
-                cpu_patch_insn(sse_context_save - 1,
-                               uintptr_t(isr_save_xsavec) -
-                               uintptr_t(sse_context_save),
-                               sizeof(*sse_context_save));
-                cpu_patch_insn(sse_context_restore - 1,
-                               uintptr_t(isr_restore_xrstor) -
-                               uintptr_t(sse_context_restore),
-                               sizeof(*sse_context_restore));
-                //printk("Using xsavec\n");
+                xsave_support = xsave_support_t::XSAVEOPT;
+
+            } else if (info.eax & (1 << 1)) {
+                // xsavec available
+
+                xsave_support = xsave_support_t::XSAVEC;
+
             }
         }
 
@@ -296,164 +282,8 @@ isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
     return ctx;
 }
 
-static uint8_t const vzeroall_nopw_insn[] = {
-    0xc5, 0xfc, 0x77, 0x66, 0x90
-};
-
-static uint8_t const rdfsbase_r13_insn[] = {
-    0xf3, 0x49, 0x0f, 0xae, 0xc5
-};
-
-static uint8_t const rdgsbase_r14_insn[] = {
-    0xf3, 0x49, 0x0f, 0xae, 0xce
-};
-
-static uint8_t const wrfsbase_r13_insn[] = {
-    0xf3, 0x49, 0x0f, 0xae, 0xd5
-};
-
-static uint8_t const wrgsbase_r14_insn[] = {
-    0xf3, 0x49, 0x0f, 0xae, 0xde
-};
-
-// These preserve all registers like the instruction they replace
-extern "C" void soft_vzeroall();
-extern "C" void soft_rdfsgsbase_r13r14();
-extern "C" void soft_wrfsgsbase_r13r14();
-extern "C" void soft_rdfsbase_r13();
-extern "C" void soft_rdgsbase_r14();
-extern "C" void soft_wrfsbase_r13();
-extern "C" void soft_wrgsbase_r14();
-
 isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
 {
-    if (ISR_CTX_REG_CS(ctx) == GDT_SEL_KERNEL_CODE64) {
-        // Dynamically patch
-        uint8_t const *code = (uint8_t const *)ISR_CTX_REG_RIP(ctx);
-        uint8_t const *next = nullptr;
-        uint8_t const *aligned_code = (uint8_t const *)(uintptr_t(code) & -16);
-        size_t offset = code - aligned_code;
-        size_t avail = 16 - offset;
-        size_t replace_sz = 0;
-
-        intptr_t dist = 0;
-
-        // Unconditionally restart `call disp32` instructions
-        // This cpu probably prefetched this before another cpu fixed it up
-        if (*code == 0xE8)
-            return ctx;
-
-        if (unlikely(avail >= sizeof(vzeroall_nopw_insn) &&
-                     !memcmp(code, vzeroall_nopw_insn,
-                            sizeof(vzeroall_nopw_insn)))) {
-            replace_sz = 5;
-            next = code + replace_sz;
-            dist = uintptr_t(soft_vzeroall) - uintptr_t(next);
-        }
-
-        //
-        // Read and write fsbase r13
-
-        if (unlikely(avail > sizeof(rdfsbase_r13_insn) +
-                     sizeof(rdgsbase_r14_insn) &&
-                     !memcmp(code, rdfsbase_r13_insn,
-                            sizeof(rdfsbase_r13_insn)) &&
-                     !memcmp(code + sizeof(rdfsbase_r13_insn),
-                             rdgsbase_r14_insn, sizeof(rdgsbase_r14_insn)))) {
-            // Both at once in one
-            replace_sz = 10;
-            next = code + 5;
-            dist = uintptr_t(soft_rdfsgsbase_r13r14) - uintptr_t(next);
-        } else if (unlikely(avail > sizeof(wrfsbase_r13_insn) +
-                     sizeof(wrgsbase_r14_insn) &&
-                     !memcmp(code, wrfsbase_r13_insn,
-                            sizeof(wrfsbase_r13_insn)) &&
-                     !memcmp(code + sizeof(wrfsbase_r13_insn),
-                             wrgsbase_r14_insn, sizeof(wrgsbase_r14_insn)))) {
-            // Both at once in one
-            replace_sz = 10;
-            next = code + 5;
-            dist = uintptr_t(soft_wrfsgsbase_r13r14) - uintptr_t(next);
-        } else if (unlikely(avail >= sizeof(rdfsbase_r13_insn) &&
-                     !memcmp(code, rdfsbase_r13_insn,
-                             sizeof(rdfsbase_r13_insn)))) {
-            replace_sz = 5;
-            next = code + replace_sz;
-            dist = uintptr_t(soft_rdfsbase_r13) - uintptr_t(next);
-        } else if (unlikely(avail >= sizeof(wrfsbase_r13_insn) &&
-                     !memcmp(code, wrfsbase_r13_insn,
-                             sizeof(wrfsbase_r13_insn)))) {
-            replace_sz = 5;
-            next = code + replace_sz;
-            dist = uintptr_t(soft_wrfsbase_r13) - uintptr_t(next);
-        } else if (unlikely(avail >= sizeof(rdgsbase_r14_insn) &&
-                     !memcmp(code, rdgsbase_r14_insn,
-                             sizeof(rdgsbase_r14_insn)))) {
-            replace_sz = 5;
-            next = code + replace_sz;
-            dist = uintptr_t(soft_rdgsbase_r14) - uintptr_t(next);
-        } else if (unlikely(avail >= sizeof(wrgsbase_r14_insn) &&
-                     !memcmp(code, wrgsbase_r14_insn,
-                             sizeof(wrgsbase_r14_insn)))) {
-            replace_sz = 5;
-            next = code + replace_sz;
-            dist = uintptr_t(soft_wrgsbase_r14) - uintptr_t(next);
-        }
-
-        // Replace with a call
-        alignas(16) uint8_t block[16];
-        uint64_t expect_lo, expect_hi;
-        memcpy(&expect_lo, aligned_code, sizeof(expect_lo));
-        memcpy(&expect_hi, aligned_code + 8, sizeof(expect_hi));
-        // Relocation truncated to fit? Doubt it but unhandled if so
-        if (unlikely(dist < INT32_MIN || dist > INT32_MAX))
-            return nullptr;
-
-        if (unlikely(avail < replace_sz))
-            panic("Bad #UD fixup crosses 16-byte boundary!");
-
-        // Disable write protection temporarily
-        cpu_scoped_wp_disable wp_dis;
-
-        while (dist != 0) {
-            memcpy(block, &expect_lo, sizeof(expect_lo));
-            memcpy(block + 8, &expect_hi, sizeof(expect_hi));
-
-            block[offset] = 0xE8;
-            memcpy(block + offset + 1, &dist, sizeof(uint32_t));
-
-            if (unlikely(replace_sz > 5))
-                cpu_patch_nop(block + offset + 5, replace_sz - 5);
-
-            uint64_t replace_lo, replace_hi;
-            memcpy(&replace_lo, block, sizeof(replace_lo));
-            memcpy(&replace_hi, block + 8, sizeof(replace_hi));
-
-            // Maybe nothing to do anymore
-            if (unlikely(expect_hi == replace_hi && expect_lo == replace_lo))
-                return ctx;
-
-            bool replaced;
-            __asm__ __volatile__ (
-                "cmpxchg16b (%[ptr])"
-                : "=@ccz" (replaced)
-                , "+a" (expect_lo)
-                , "+d" (expect_hi)
-                : "b" (replace_lo)
-                , "c" (replace_hi)
-                , [ptr] "r" (aligned_code)
-            );
-
-            // The iretq is serializing so this core will have no problem
-            // with the newly patched instruction
-            if (likely(replaced))
-                return ctx;
-
-            pause();
-        }
-    }
-
-    // Unhandled
     return nullptr;
 }
 
@@ -793,10 +623,10 @@ void dump_context(isr_context_t *ctx, int to_screen)
     printdbg("rflags=%#.16lx %s\n", ISR_CTX_REG_RFLAGS(ctx), fmt_buf);
 
     // fsbase
-    printdbg("fsbase=%#.16lx\n", fsbase);
+    printdbg("fsbase=%#.16lx\n", uintptr_t(fsbase));
 
     // gsbase
-    printdbg("gsbase=%#.16lx\n", gsbase);
+    printdbg("gsbase=%#.16lx\n", uintptr_t(gsbase));
 
     printdbg("-------------------------------------------\n");
 
@@ -904,12 +734,12 @@ void dump_context(isr_context_t *ctx, int to_screen)
 
     // fsbase
     con_draw_xy(0, 20, "fsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%#.16lx ", fsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%#.16lx ", uintptr_t(fsbase));
     con_draw_xy(6, 20, fmt_buf, color);
 
     // gsbase
     con_draw_xy(0, 21, "gsbase", color);
-    snprintf(fmt_buf, sizeof(fmt_buf), "=%#.16lx ", gsbase);
+    snprintf(fmt_buf, sizeof(fmt_buf), "=%#.16lx ", uintptr_t(gsbase));
     con_draw_xy(6, 21, fmt_buf, color);
 
     if (ISR_CTX_INTR(ctx) == INTR_EX_GPF)

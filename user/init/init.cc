@@ -70,6 +70,7 @@ int main(int argc, char **argv, char **envp)
                       PCI_SUBCLASS_STORAGE_NVM,
                       PCI_PROGIF_STORAGE_NVM_NVME) > 0)
         load_module("nvme.km");
+
     if (probe_pci_for(-1, -1,
                       PCI_DEV_CLASS_STORAGE,
                       PCI_SUBCLASS_STORAGE_SATA,
@@ -83,5 +84,9 @@ int main(int argc, char **argv, char **envp)
 
     load_module("gpt.km");
     load_module("mbr.km");
-    load_module("rtl8139.km");
+
+    if (probe_pci_for(0x10EC, 0x8139,
+                      PCI_DEV_CLASS_NETWORK,
+                      PCI_SUBCLASS_NETWORK_ETHERNET, -1))
+        load_module("rtl8139.km");
 }

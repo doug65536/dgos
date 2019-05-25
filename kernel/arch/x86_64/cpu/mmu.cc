@@ -1217,7 +1217,8 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
         } else {
             int cpu_mask = 1;
             for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
-                if (!(new_pending & cpu_mask) && !!(need_ipi_mask & cpu_mask))
+                if (!(new_pending & thread_cpu_mask_t(cpu_mask)) &&
+                    !!(need_ipi_mask & thread_cpu_mask_t(cpu_mask)))
                     thread_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
             }
         }
@@ -2494,8 +2495,8 @@ int mprotect(void *addr, size_t len, int prot)
 
     uintptr_t orig_addr = uintptr_t(addr);
     pte_t *orig_pt3 = pt[3];
-    printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
-    hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
+//    printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
+//    hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
 
     while (pt[3] < end)
     {
@@ -2532,9 +2533,9 @@ int mprotect(void *addr, size_t len, int prot)
         ptes_step(pt);
     }
 
-    printdbg("PTEs after mprotect(%#zx, %#zx)\n", orig_addr, len);
-    hex_dump((void*)orig_pt3, (end - orig_pt3) * sizeof(pte_t),
-             uintptr_t(orig_pt3));
+//    printdbg("PTEs after mprotect(%#zx, %#zx)\n", orig_addr, len);
+//    hex_dump((void*)orig_pt3, (end - orig_pt3) * sizeof(pte_t),
+//             uintptr_t(orig_pt3));
 
     mmu_send_tlb_shootdown();
 
@@ -3517,12 +3518,12 @@ bool mm_copy_user_str_smap(char *dst, char const *src, size_t size)
 intptr_t mm_lenof_user_str_generic(char const *src, size_t max_size)
 {
     __try {
-        if (unlikely(max_size > std::numeric_limits<intptr_t>::max()))
+        if (unlikely(max_size > size_t(std::numeric_limits<intptr_t>::max())))
             return -1;
 
-        for (intptr_t len = 0; len < max_size; ++len) {
+        for (uintptr_t len = 0; len < max_size; ++len) {
             if (src[len] == 0)
-                return len;
+                return intptr_t(len);
         }
     } __catch {
         return -1;

@@ -1,6 +1,6 @@
 #pragma once
 #include "../likely.h"
-#ifdef __DGOS_KERNEL__
+#ifdef __DGOS__
 #include "types.h"
 #else
 #include <stdint.h>

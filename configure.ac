@@ -174,15 +174,15 @@ AC_SUBST([ASAN_FLAGS])
 
 AS_VAR_SET([COMPILER_FLAGS],[])
 for flag in \
-		std=c++14 fno-fat-lto-objects g gdwarf-2 \
-		fno-integrated-as Wno-unused-command-line-argument \
-		Wall Wextra Wpedantic Wdouble-promotion Wformat \
+		std=c++17 fno-fat-lto-objects g \
+		fno-integrated-as Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
 		Wstrict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
+		Wno-address-of-packed-member \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
@@ -193,6 +193,7 @@ do
 		[], [])
 done
 AC_SUBST([COMPILER_FLAGS])
+#fsanitize-undefined-trap-on-error fsanitize=undefined
 #Wsuggest-attribute=pure Wsuggest-attribute=const
 #Wsuggest-final-types
 #Wsuggest-final-methods
@@ -217,7 +218,7 @@ AC_SUBST([RETPOLINE_FLAGS])
 # fgcse-las causes compiler segfaults
 AS_VAR_SET([OPTIMIZATION_FLAGS], [])
 for flag in \
-	Os fstrict-aliasing
+	O2 fstrict-aliasing falign-functions=16
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([OPTIMIZATION_FLAGS], [" -$flag"])],
@@ -234,7 +235,7 @@ done
 AC_SUBST([DEBUG_INFO_FLAGS])
 
 AS_VAR_SET([ASM_DEBUG_INFO_FLAGS], [])
-for flag in Wa,-g g gdwarf-2 gcolumn-info
+for flag in Wa,-g g gcolumn-info
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([ASM_DEBUG_INFO_FLAGS], [" -$flag"])],
@@ -249,7 +250,8 @@ AX_CHECK_COMPILE_FLAG([-Oz],
 		[AS_VAR_SET([SMALLEST_CODE_FLAGS],[-Os])],
 		[])],
 	[])
-for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
+#falign-functions=0
+for flag in falign-loops=0 falign-labels=0 falign-jumps=0 \
 		mno-align-stringops Wno-ignored-optimization-argument \
 		fstack-usage
 do
@@ -500,7 +502,7 @@ AX_CHECK_COMPILE_FLAG([-ftree-vectorize],
 AC_SUBST([VECTORIZE_FLAGS])
 
 AS_VAR_SET([NO_SIBLING_CALLS_FLAGS], [])
-AX_CHECK_COMPILE_FLAG([-ftree-NO_SIBLING_CALLS],
+AX_CHECK_COMPILE_FLAG([-fno-optimize-sibling-calls],
 	[AS_VAR_SET([NO_SIBLING_CALLS_FLAGS], [" -fno-optimize-sibling-calls"])]
 	[], [])
 AC_SUBST([NO_SIBLING_CALLS_FLAGS])
@@ -567,11 +569,11 @@ AC_ARG_ENABLE(lto,
 				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
 					[" $DEBUGGING_CODE_FLAGS"])
 				AS_VAR_APPEND([OPTIMIZE_SIZE_FLAGS],
-					[" $ENABLE_FRAMEPOINTER_FLAGS"])
+					[" $DISABLE_FRAMEPOINTER_FLAGS"])
 				AS_VAR_APPEND([OPTIMIZE_DEBUGGING_FLAGS],
 					[" $DEBUGGING_CODE_FLAGS"])
 				AS_VAR_APPEND([OPTIMIZE_SPEED_FLAGS],
-					[" $ENABLE_FRAMEPOINTER_FLAGS"])
+					[" $DISABLE_FRAMEPOINTER_FLAGS"])
 			]
 		)
 	]

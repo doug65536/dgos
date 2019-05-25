@@ -18,6 +18,8 @@ typedef int16_t thread_priority_t;
 
 typedef int (*thread_fn_t)(void*);
 
+void thread_startup(thread_fn_t fn, void *p, thread_t id);
+
 struct thread_create_info_t
 {
     // Thread startup function and argument
@@ -54,7 +56,7 @@ struct thread_cpu_mask_t
     }
 
     // In-place, bit=-1 to set all bits, bit=6 to set bit 6 only, others clear
-    thread_cpu_mask_t(int bit);
+    explicit thread_cpu_mask_t(int bit);
 
     // += 4 sets bit 4. If bit 7 wasn't clear, writes value unchanged
     thread_cpu_mask_t& operator+=(size_t bit);
@@ -164,7 +166,7 @@ thread_t thread_create(thread_fn_t fn, void *userdata,
 
 thread_t thread_create_with_info(thread_create_info_t const* info);
 
-void thread_yield(void);
+uintptr_t thread_yield(void);
 void thread_sleep_until(uint64_t expiry);
 void thread_sleep_for(uint64_t ms);
 uint64_t thread_get_usage(int id);
@@ -181,10 +183,11 @@ int thread_cpu_number();
 thread_t thread_get_id(void);
 
 // Suspend the thread, then release the lock,
-// reacquire lock before returning
-void thread_suspend_release(spinlock_t *lock, thread_t *thread_id);
+// DOES NOT reacquire lock before returning
+uintptr_t thread_sleep_release(spinlock_t *lock, thread_t *thread_id,
+                               int64_t timeout_time);
 
-void thread_resume(thread_t thread);
+void thread_resume(thread_t thread, intptr_t exit_code);
 
 thread_priority_t thread_get_priority(thread_t thread_id);
 void thread_set_priority(thread_t thread_id, thread_priority_t priority);

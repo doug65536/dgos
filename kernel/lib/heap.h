@@ -27,9 +27,9 @@ void *heap_realloc(heap_t *heap, void *block, size_t size);
 _malloc _assume_aligned(16) _alloc_size(2)
 void *pageheap_calloc(heap_t *heap, size_t num, size_t size);
 
-_malloc _assume_aligned(16) _alloc_size(1)
+_malloc _assume_aligned(16) _alloc_size(2)
 void *pageheap_alloc(heap_t *heap, size_t size);
 void pageheap_free(heap_t *heap, void *block);
 
-_assume_aligned(16) _alloc_size(2)
+_assume_aligned(16) _alloc_size(3)
 void *pageheap_realloc(heap_t *heap, void *block, size_t size);

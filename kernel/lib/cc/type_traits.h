@@ -299,4 +299,58 @@ struct aligned_storage {
     };
 };
 
+
+__BEGIN_NAMESPACE_DETAIL
+
+template<typename T>
+struct type_identity {
+    using type = T;
+};
+
+template<typename T>
+auto try_add_lvalue_reference(int) -> type_identity<T&>;
+
+template<typename T>
+auto try_add_lvalue_reference(...) -> type_identity<T>;
+
+template<typename T>
+auto try_add_rvalue_reference(int) -> type_identity<T&&>;
+
+template<typename T>
+auto try_add_rvalue_reference(...) -> type_identity<T>;
+
+__END_NAMESPACE // detail
+
+template<typename T>
+struct add_lvalue_reference : decltype(detail::try_add_lvalue_reference<T>(0)) {};
+
+template<typename T>
+struct add_rvalue_reference : decltype(detail::try_add_rvalue_reference<T>(0)) {};
+
+
+template<typename T>
+typename add_rvalue_reference<T>::type declval() noexcept;
+
+__BEGIN_NAMESPACE_DETAIL
+
+template<typename _T1, typename _T2, typename ..._Rest>
+auto select_common(_T1&&, _T2&&, _Rest&& ...rest) ->
+decltype(select_common(sum_result(declval<_T1>(), declval<_T2>()),
+                    declval<_Rest>()...));
+
+template<typename _T1, typename _T2>
+auto select_common(_T1&&, _T2&&) -> decltype(declval<_T1>() + declval<_T2>());
+
+template<typename _T1, typename _T2>
+auto select_common(_T1&&, _T2&&) -> decltype(declval<_T1>() + declval<_T2>());
+
+__END_NAMESPACE
+
+template<typename... _Types>
+class common_type
+{
+public:
+    using type = decltype(detail::select_common(declval<_Types>()...));
+};
+
 __END_NAMESPACE_STD

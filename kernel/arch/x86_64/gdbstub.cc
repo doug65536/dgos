@@ -1608,7 +1608,8 @@ gdbstub_t::rx_state_t gdbstub_t::handle_packet()
 
     case 'q':
         if (!strcmp(input, "C")) {
-            return reply("QC1");
+            // "qC" queries the current thread ID
+            return replyf("QC%u", c_cpu);
         } else if (match(input, "Supported", ":")) {
             // Query for feature support
             return replyf("PacketSize=%zx;qXfer:features:read+",
@@ -2523,7 +2524,7 @@ void gdb_cpu_ctrl_t::gdb_thread()
 
     gdb_cpu = cpus.size();
 
-    thread_set_affinity(stub_tid, 1U << (gdb_cpu));
+    thread_set_affinity(stub_tid, thread_cpu_mask_t(gdb_cpu));
 
     // Set GDB stub to time critical priority
     thread_set_priority(stub_tid, 32767);

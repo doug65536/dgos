@@ -2,6 +2,7 @@
 #include "errno.h"
 #include "mutex.h"
 #include "cpu/atomic.h"
+#include "chrono.h"
 
 namespace dgos {
 
@@ -64,6 +65,16 @@ public:
     void handler(T const&);
 
     T wait();
+
+    template<typename _Clock, typename _Duration>
+    bool wait_until(std::chrono::time_point<_Clock, _Duration>
+                    const& timeout_time)
+    {
+        return wait_until(std::chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
+    }
+
+    bool wait_until(uint64_t timeout_time);
 
     template<typename U>
     U wait_and_return();
@@ -235,6 +246,20 @@ T basic_blocking_iocp_t<T, S>::wait()
         done_cond.wait(hold);
     T status = basic_iocp_t<T, S>::get_result();
     return status;
+}
+
+template<typename T, typename S>
+bool basic_blocking_iocp_t<T, S>::wait_until(uint64_t timeout_time)
+{
+    auto timeout = std::chrono::time_point<std::chrono::steady_clock>(
+                std::chrono::nanoseconds(timeout_time));
+
+    scoped_lock hold(lock);
+    while (!done) {
+        if (done_cond.wait_until(hold, timeout) == std::cv_status::timeout)
+            return false;
+    }
+    return true;
 }
 
 // Returns size on success, otherwise negated errno

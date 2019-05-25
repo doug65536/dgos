@@ -13,9 +13,6 @@ void spinlock_lock(spinlock_t *lock);
 bool spinlock_try_lock(spinlock_t *lock);
 void spinlock_unlock(spinlock_t *lock);
 
-spinlock_value_t spinlock_unlock_save(spinlock_t *lock);
-void spinlock_lock_restore(spinlock_t *lock, spinlock_value_t saved_lock);
-
 //
 // Reader/writer spinlock
 

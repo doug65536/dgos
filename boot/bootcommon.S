@@ -342,7 +342,7 @@ clear_bss:
     ret
 
 .code32
-.align 16
+.balign 16
 .global __cxa_atexit
 __cxa_atexit:
     ret

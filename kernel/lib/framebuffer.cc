@@ -134,6 +134,8 @@ void fb_init(void)
     // Round the back buffer size up to a multiple of the cache size
     screen_size = (screen_size + 63) & -64;
 
+    // This is really early on, too early to allocate a huge back buffer
+    // Just point both at the hardware video memory
     fb.backing = (uint8_t*)fb.mode.framebuffer_addr;
     fb.video_mem = (uint8_t*)fb.mode.framebuffer_addr;
 
@@ -724,7 +726,7 @@ static void test_framebuffer_thread()
 
     auto intens_fn = [=](int i) { return (128 + ((i * inv_height) >> 32)); };
 
-    int prev_color = intens_fn(0);
+    int prev_color = intens_fn(0) * 0x010101;
     int prev_st = 0;
     for (size_t i = 0, e = fb.mode.height; i != e; ++i) {
         // Bias +128 and do fixedpoint 32.32 multiply
@@ -775,7 +777,7 @@ static void test_framebuffer_thread()
     int x = 0;
     int xdir = 1;
     int ydir = 1;
-    for (int i = 0; i < 1000000; ++i) {
+    for (int i = 0; i < 2; ++i) {
         for (size_t i = 0; i < countof(tests); ++i) {
             draw_str(x + 24 + 40, y + 40 + 33 + 14 + i*20,
                      tests[i], 0x777777U, 0x563412);
@@ -1013,6 +1015,9 @@ bitmap_glyph_t const *framebuffer_console_t::glyph(size_t codepoint)
 
 void fb_change_backing(const vbe_selected_mode_t &mode)
 {
+    assert(mode.framebuffer_addr != 0);
     fb.backing = (uint8_t*)mode.framebuffer_addr;
     fb.video_mem = (uint8_t*)mode.framebuffer_addr;
+
+    test_framebuffer_thread();
 }

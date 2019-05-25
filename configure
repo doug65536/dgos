@@ -7812,15 +7812,15 @@ done
 
 COMPILER_FLAGS=
 for flag in \
-		std=c++14 fno-fat-lto-objects g gdwarf-2 \
-		fno-integrated-as Wno-unused-command-line-argument \
-		Wall Wextra Wpedantic Wdouble-promotion Wformat \
+		std=c++17 fno-fat-lto-objects g \
+		fno-integrated-as Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
 		Wstrict-overflow Wno-overlength-strings \
 		Wno-unused-parameter Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
+		Wno-address-of-packed-member \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
@@ -7865,6 +7865,7 @@ fi
 
 done
 
+#fsanitize-undefined-trap-on-error fsanitize=undefined
 #Wsuggest-attribute=pure Wsuggest-attribute=const
 #Wsuggest-final-types
 #Wsuggest-final-methods
@@ -7923,7 +7924,7 @@ done
 # fgcse-las causes compiler segfaults
 OPTIMIZATION_FLAGS=
 for flag in \
-	Os fstrict-aliasing
+	O2 fstrict-aliasing falign-functions=16
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8008,7 +8009,7 @@ done
 
 
 ASM_DEBUG_INFO_FLAGS=
-for flag in Wa,-g g gdwarf-2 gcolumn-info
+for flag in Wa,-g g gcolumn-info
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8120,7 +8121,8 @@ fi
 
 fi
 
-for flag in falign-loops=0 falign-functions=0 falign-labels=0 falign-jumps=0 \
+#falign-functions=0
+for flag in falign-loops=0 falign-labels=0 falign-jumps=0 \
 		mno-align-stringops Wno-ignored-optimization-argument \
 		fstack-usage
 do
@@ -9194,14 +9196,14 @@ fi
 
 
 NO_SIBLING_CALLS_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -ftree-NO_SIBLING_CALLS" >&5
-$as_echo_n "checking whether C++ compiler accepts -ftree-NO_SIBLING_CALLS... " >&6; }
-if ${ax_cv_check_cxxflags___ftree_NO_SIBLING_CALLS+:} false; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-optimize-sibling-calls" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-optimize-sibling-calls... " >&6; }
+if ${ax_cv_check_cxxflags___fno_optimize_sibling_calls+:} false; then :
   $as_echo_n "(cached) " >&6
 else
 
   ax_check_save_flags=$CXXFLAGS
-  CXXFLAGS="$CXXFLAGS  -ftree-NO_SIBLING_CALLS"
+  CXXFLAGS="$CXXFLAGS  -fno-optimize-sibling-calls"
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -9214,16 +9216,16 @@ main ()
 }
 _ACEOF
 if ac_fn_cxx_try_compile "$LINENO"; then :
-  ax_cv_check_cxxflags___ftree_NO_SIBLING_CALLS=yes
+  ax_cv_check_cxxflags___fno_optimize_sibling_calls=yes
 else
-  ax_cv_check_cxxflags___ftree_NO_SIBLING_CALLS=no
+  ax_cv_check_cxxflags___fno_optimize_sibling_calls=no
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   CXXFLAGS=$ax_check_save_flags
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___ftree_NO_SIBLING_CALLS" >&5
-$as_echo "$ax_cv_check_cxxflags___ftree_NO_SIBLING_CALLS" >&6; }
-if test "x$ax_cv_check_cxxflags___ftree_NO_SIBLING_CALLS" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_optimize_sibling_calls" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_optimize_sibling_calls" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_optimize_sibling_calls" = xyes; then :
   NO_SIBLING_CALLS_FLAGS=" -fno-optimize-sibling-calls"
 
 else
@@ -9480,9 +9482,9 @@ else
 				{ $as_echo "$as_me:${as_lineno-$LINENO}: Disabling optimizations" >&5
 $as_echo "$as_me: Disabling optimizations" >&6;}
 				as_fn_append OPTIMIZE_SIZE_FLAGS " $DEBUGGING_CODE_FLAGS"
-				as_fn_append OPTIMIZE_SIZE_FLAGS " $ENABLE_FRAMEPOINTER_FLAGS"
+				as_fn_append OPTIMIZE_SIZE_FLAGS " $DISABLE_FRAMEPOINTER_FLAGS"
 				as_fn_append OPTIMIZE_DEBUGGING_FLAGS " $DEBUGGING_CODE_FLAGS"
-				as_fn_append OPTIMIZE_SPEED_FLAGS " $ENABLE_FRAMEPOINTER_FLAGS"
+				as_fn_append OPTIMIZE_SPEED_FLAGS " $DISABLE_FRAMEPOINTER_FLAGS"
 
 
 fi

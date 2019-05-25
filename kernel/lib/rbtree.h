@@ -1400,6 +1400,8 @@ public:
 
     static int test(void);
 
+    void dump();
+
 private:
     enum __color_t : int {
         _NOCOLOR,
@@ -1446,7 +1448,6 @@ private:
 
     iter_t alloc_node();
     void free_node(iter_t __n);
-    void dump();
     iter_t grandparent(iter_t __n);
     iter_t uncle(iter_t __n);
 

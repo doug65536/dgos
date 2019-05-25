@@ -166,7 +166,7 @@ void paging_map_range(
     }
 }
 
-int paging_iovec(iovec_t **ret, uint64_t vaddr,
+size_t paging_iovec(iovec_t **ret, uint64_t vaddr,
                  uint64_t size, uint64_t max_chunk)
 {
     size_t capacity = 16;
@@ -249,19 +249,23 @@ off_t paging_iovec_read(int fd, off_t file_offset,
                         uint64_t vaddr, uint64_t size,
                         uint64_t max_chunk)
 {
-    iovec_t *iovec;
-    int iovec_count = paging_iovec(&iovec, vaddr, size, max_chunk);
-
     uint64_t offset = 0;
-    for (int i = 0; i < iovec_count; ++i) {
-        ssize_t read = boot_pread(
-                    fd, (void*)iovec[i].base, iovec[i].size,
-                    file_offset + offset);
 
-        if (read != ssize_t(iovec[i].size))
-            PANIC("Disk read error");
+    while (offset < size) {
+        iovec_t *iovec = nullptr;
+        size_t iovec_count = paging_iovec(
+                    &iovec, vaddr + offset, size - offset, max_chunk);
 
-        offset += iovec[i].size;
+        for (size_t i = 0; i < iovec_count; ++i) {
+            ssize_t read = boot_pread(
+                        fd, (void*)iovec[i].base, iovec[i].size,
+                        file_offset + offset);
+
+            if (read != ssize_t(iovec[i].size))
+                PANIC("Disk read error");
+
+            offset += iovec[i].size;
+        }
     }
 
     return offset;

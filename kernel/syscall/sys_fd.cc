@@ -620,7 +620,7 @@ int sys_fcntl(int fd, int cmd, void *arg)
 
 char *sys_getcwd(char *buf, size_t size)
 {
-    return (char*)-nosys_err();
+    return (char*)-intptr_t(nosys_err());
 }
 
 // Validate the errno and return its negated integer value

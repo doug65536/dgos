@@ -382,6 +382,7 @@ libkei_a_AR = $(AR) $(ARFLAGS)
 libkei_a_LIBADD =
 am__objects_2 = kernel/device/libkei_a-iocp.$(OBJEXT) \
 	kernel/lib/cc/libkei_a-cxxstring.$(OBJEXT) \
+	kernel/lib/cc/libkei_a-chrono.$(OBJEXT) \
 	kernel/lib/libkei_a-mutex.$(OBJEXT)
 am_libkei_a_OBJECTS = $(am__objects_2)
 libkei_a_OBJECTS = $(am_libkei_a_OBJECTS)
@@ -529,6 +530,7 @@ am__objects_5 = kernel/arch/x86_64/kernel_asan-entry.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-type_traits.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-utility.$(OBJEXT) \
 	kernel/lib/cc/kernel_asan-vector.$(OBJEXT) \
+	kernel/lib/cc/kernel_asan-chrono.$(OBJEXT) \
 	kernel/lib/kernel_asan-conio.$(OBJEXT) \
 	kernel/lib/kernel_asan-debug.$(OBJEXT) \
 	kernel/lib/kernel_asan-desc_alloc.$(OBJEXT) \
@@ -665,6 +667,7 @@ am__objects_6 = kernel/arch/x86_64/kernel_generic-entry.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-type_traits.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-utility.$(OBJEXT) \
 	kernel/lib/cc/kernel_generic-vector.$(OBJEXT) \
+	kernel/lib/cc/kernel_generic-chrono.$(OBJEXT) \
 	kernel/lib/kernel_generic-conio.$(OBJEXT) \
 	kernel/lib/kernel_generic-debug.$(OBJEXT) \
 	kernel/lib/kernel_generic-desc_alloc.$(OBJEXT) \
@@ -800,6 +803,7 @@ am__objects_7 = kernel/arch/x86_64/kernel_tracing-entry.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-type_traits.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-utility.$(OBJEXT) \
 	kernel/lib/cc/kernel_tracing-vector.$(OBJEXT) \
+	kernel/lib/cc/kernel_tracing-chrono.$(OBJEXT) \
 	kernel/lib/kernel_tracing-conio.$(OBJEXT) \
 	kernel/lib/kernel_tracing-debug.$(OBJEXT) \
 	kernel/lib/kernel_tracing-desc_alloc.$(OBJEXT) \
@@ -1316,6 +1320,9 @@ BUILT_SOURCES = \
 	sysroot/lib/libstdc++.a \
 	trace-tool
 
+BOOTLOADER_COMMON_FLAGS = \
+	-D__DGOS__
+
 
 #sysroot/lib/libc.so \
 #sysroot/lib/libg.so \
@@ -1361,6 +1368,7 @@ mbr_elf_SOURCES = \
 
 mbr_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -1399,6 +1407,7 @@ boot1_elf_SOURCES = \
 
 boot1_elf_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -1409,6 +1418,7 @@ boot1_elf_CXXFLAGS = \
 boot1_elf_CFLAGS = 
 boot1_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -1508,6 +1518,7 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
 	$(REGPARM_FLAGS) \
@@ -1530,6 +1541,7 @@ libbootsect_a_CXXFLAGS = \
 libbootsect_a_CFLAGS = 
 libbootsect_a_CCASFLAGS = \
 	-DFROMCCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
@@ -1555,6 +1567,7 @@ bootfat_elf_CXXFLAGS = \
 
 bootfat_elf_CCASFLAGS = \
 	-DFROMCCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -1593,6 +1606,7 @@ bootiso_elf_CXXFLAGS = \
 
 bootiso_elf_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -1723,26 +1737,31 @@ bootefi_amd64_SOURCES = \
 #	$(bootefi_amd64_SOURCES)
 bootefi_amd64_CFLAGS = \
 	-DFROM_CFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
 
 
 #bootefi_i386_CFLAGS = \
+#	$(BOOTLOADER_COMMON_FLAGS) \
 #	-DFROM_CFLAGS \
 #	$(PE32_FLAGS) \
 #	$(BOOTLOADER_EFI_FLAGS)
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
 
 
 #bootefi_i386_CXXFLAGS = \
 #	-DFROM_CXXFLAGS \
+#	$(BOOTLOADER_COMMON_FLAGS) \
 #	$(PE32_FLAGS) \
 #	$(BOOTLOADER_EFI_FLAGS)
 bootefi_amd64_CCASFLAGS = \
 	-DFROM_CCASFLAGS \
+	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	$(bootefi_amd64_CXXFLAGS)
 
@@ -1781,8 +1800,7 @@ bootefi_amd64_LDADD = \
 #bootefi_i386_LDADD = \
 #   $(LIBGCC_PE32)
 EXTRA_bootefi_amd64_DEPENDENCIES = \
-	$(top_srcdir)/boot/bootefi.ld \
-	$(top_srcdir)/Makefile.am
+    $(top_srcdir)/boot/bootefi.ld
 
 
 #bootia32.efi: bootefi-i386
@@ -1838,6 +1856,8 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/utility.cc \
 	kernel/lib/cc/vector.h \
 	kernel/lib/cc/vector.cc \
+	kernel/lib/cc/chrono.cc \
+	kernel/lib/cc/chrono.h \
 	kernel/lib/cc/cxxstring.h \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
@@ -2065,6 +2085,7 @@ KERNEL_SOURCES_SHARED = \
 KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/device/iocp.cc \
 	kernel/lib/cc/cxxstring.cc \
+	kernel/lib/cc/chrono.cc \
 	kernel/lib/mutex.cc
 
 KERNEL_INCLUDES_SHARED = \
@@ -2078,8 +2099,9 @@ KERNEL_INCLUDES_SHARED = \
 
 KERNEL_CXXFLAGS_SHARED = \
 	-DFROM_CXXFLAGS \
+	-D__DGOS__ \
 	-D__DGOS_KERNEL__=0x00000001 \
-	-std=c++14 \
+	-std=c++17 \
 	-fPIE \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
@@ -2134,7 +2156,7 @@ libkei_a_SOURCES = \
 libkei_a_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	-fvisibility=default -fno-visibility-inlines-hidden
+	-fvisibility=default -fno-visibility-inlines-hidden -DLIBKEI
 
 
 # ----------------------------------------------------------------------------
@@ -2558,7 +2580,7 @@ libc_a_SOURCES = \
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	$(FREESTANDING_FLAGS) \
-	-std=c++14 \
+	-std=c++17 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
@@ -2570,7 +2592,7 @@ libm_a_SOURCES = \
 
 libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++14 \
+	-std=c++17 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
@@ -2581,7 +2603,7 @@ libstdc___a_SOURCES = \
 
 libstdc___a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++14 \
+	-std=c++17 \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
@@ -2899,6 +2921,7 @@ DGOS_UUID = 0615151f-d802-4edf-914a-734dc4f03687
 # Generate register definitions
 BITFIELD_FILES = \
 	$(top_srcdir)/kernel/device/nvme.bits \
+	$(top_srcdir)/kernel/device/usb_hid.bits \
 	$(top_srcdir)/kernel/device/pci.bits \
 	$(top_srcdir)/kernel/device/rtl8139.bits \
 	$(top_srcdir)/kernel/device/i350.bits \
@@ -2919,7 +2942,7 @@ QEMU_EXTRA_DEPS = \
 QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
-QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
+QEMU_CPU = max,migratable=false,host-cache-info=true,-fsgsbase
 QEMU_RAM = 5G
 QEMU_MEMFILL = 
 QEMU_USB = \
@@ -2990,17 +3013,22 @@ QEMU_RT_debug = -s -S
 QEMU_RT_run = -s
 QEMU_DRV_COMMON = id=bootdrv,if=none,format=raw,werror=report,rerror=report
 QEMU_DRV = -drive file=$(QEMU_IMAGE_$(1)),media=$(QEMU_MEDIA_$(1)),$(QEMU_DRV_COMMON)
+QEMU_VGA_3D = \
+	-global driver=virtio-vga,property=virgl,value=on
+
 
 #QEMU_MACHINE = $(QEMU_MACHINE_$(1))
 QEMU_VGA = \
 	-global driver=virtio-vga,property=disable-legacy,value=on \
 	-global driver=virtio-vga,property=disable-modern,value=off \
 	-global driver=virtio-vga,property=x-disable-pcie,value=off \
-	-global driver=virtio-vga,property=virgl,value=on \
 	-global driver=virtio-vga,property=modern-pio-notify,value=on \
+	-global driver=virtio-vga,property=max_outputs,value=16 \
+	-global driver=virtio-vga,property=x-pcie-extcap-init,value=on \
 	-vga virtio
 
-QEMU_DISPLAY = -display sdl,gl=on
+QEMU_DISPLAY_SPICE = -spice ipv4,port=14446,disable-ticketing=on
+QEMU_DISPLAY = 
 QEMU_MACHINE = -machine q35 $(QEMU_VGA) $(QEMU_DISPLAY)
 #QEMU_MACHINE_nvme = -machine q35
 #QEMU_MACHINE_ahci = -machine q35
@@ -3906,6 +3934,9 @@ kernel/lib/cc/$(DEPDIR)/$(am__dirstamp):
 kernel/lib/cc/libkei_a-cxxstring.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/libkei_a-chrono.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/$(am__dirstamp):
 	@$(MKDIR_P) kernel/lib
 	@: > kernel/lib/$(am__dirstamp)
@@ -4265,6 +4296,9 @@ kernel/lib/cc/kernel_asan-utility.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_asan-vector.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_asan-chrono.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_asan-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -4640,6 +4674,9 @@ kernel/lib/cc/kernel_generic-utility.$(OBJEXT):  \
 kernel/lib/cc/kernel_generic-vector.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_generic-chrono.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
 	kernel/lib/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_generic-debug.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -5005,6 +5042,9 @@ kernel/lib/cc/kernel_tracing-utility.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/cc/kernel_tracing-vector.$(OBJEXT):  \
+	kernel/lib/cc/$(am__dirstamp) \
+	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
+kernel/lib/cc/kernel_tracing-chrono.$(OBJEXT):  \
 	kernel/lib/cc/$(am__dirstamp) \
 	kernel/lib/cc/$(DEPDIR)/$(am__dirstamp)
 kernel/lib/kernel_tracing-conio.$(OBJEXT): kernel/lib/$(am__dirstamp) \
@@ -5844,6 +5884,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/kernel_tracing-zlib_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/$(DEPDIR)/libkei_a-mutex.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-algorithm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-functional.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-memory.Po@am__quote@
@@ -5852,6 +5893,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-utility.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_asan-vector.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-algorithm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-functional.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-memory.Po@am__quote@
@@ -5860,6 +5902,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-utility.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_generic-vector.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-algorithm.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-exception.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-functional.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-memory.Po@am__quote@
@@ -5867,6 +5910,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-type_traits.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-utility.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/kernel_tracing-vector.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/lib/cc/$(DEPDIR)/libkei_a-cxxstring.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/net/$(DEPDIR)/kernel_asan-arp_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@kernel/net/$(DEPDIR)/kernel_asan-dhcp.Po@am__quote@
@@ -9745,6 +9789,20 @@ kernel/lib/cc/libkei_a-cxxstring.obj: kernel/lib/cc/cxxstring.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkei_a_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/libkei_a-cxxstring.obj `if test -f 'kernel/lib/cc/cxxstring.cc'; then $(CYGPATH_W) 'kernel/lib/cc/cxxstring.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/cxxstring.cc'; fi`
 
+kernel/lib/cc/libkei_a-chrono.o: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkei_a_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/libkei_a-chrono.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Tpo -c -o kernel/lib/cc/libkei_a-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Tpo kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/libkei_a-chrono.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkei_a_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/libkei_a-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+
+kernel/lib/cc/libkei_a-chrono.obj: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkei_a_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/libkei_a-chrono.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Tpo -c -o kernel/lib/cc/libkei_a-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Tpo kernel/lib/cc/$(DEPDIR)/libkei_a-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/libkei_a-chrono.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkei_a_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/libkei_a-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
+
 kernel/lib/libkei_a-mutex.o: kernel/lib/mutex.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libkei_a_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/libkei_a-mutex.o -MD -MP -MF kernel/lib/$(DEPDIR)/libkei_a-mutex.Tpo -c -o kernel/lib/libkei_a-mutex.o `test -f 'kernel/lib/mutex.cc' || echo '$(srcdir)/'`kernel/lib/mutex.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/libkei_a-mutex.Tpo kernel/lib/$(DEPDIR)/libkei_a-mutex.Po
@@ -10682,6 +10740,20 @@ kernel/lib/cc/kernel_asan-vector.obj: kernel/lib/cc/vector.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/vector.cc' object='kernel/lib/cc/kernel_asan-vector.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_asan-vector.obj `if test -f 'kernel/lib/cc/vector.cc'; then $(CYGPATH_W) 'kernel/lib/cc/vector.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/vector.cc'; fi`
+
+kernel/lib/cc/kernel_asan-chrono.o: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_asan-chrono.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Tpo -c -o kernel/lib/cc/kernel_asan-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Tpo kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/kernel_asan-chrono.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_asan-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+
+kernel/lib/cc/kernel_asan-chrono.obj: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_asan-chrono.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Tpo -c -o kernel/lib/cc/kernel_asan-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Tpo kernel/lib/cc/$(DEPDIR)/kernel_asan-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/kernel_asan-chrono.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_asan-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
 
 kernel/lib/kernel_asan-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_asan_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_asan-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_asan-conio.Tpo -c -o kernel/lib/kernel_asan-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
@@ -12447,6 +12519,20 @@ kernel/lib/cc/kernel_generic-vector.obj: kernel/lib/cc/vector.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-vector.obj `if test -f 'kernel/lib/cc/vector.cc'; then $(CYGPATH_W) 'kernel/lib/cc/vector.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/vector.cc'; fi`
 
+kernel/lib/cc/kernel_generic-chrono.o: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-chrono.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Tpo -c -o kernel/lib/cc/kernel_generic-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Tpo kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/kernel_generic-chrono.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+
+kernel/lib/cc/kernel_generic-chrono.obj: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_generic-chrono.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Tpo -c -o kernel/lib/cc/kernel_generic-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Tpo kernel/lib/cc/$(DEPDIR)/kernel_generic-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/kernel_generic-chrono.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_generic-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
+
 kernel/lib/kernel_generic-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_generic_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_generic-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_generic-conio.Tpo -c -o kernel/lib/kernel_generic-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/$(DEPDIR)/kernel_generic-conio.Tpo kernel/lib/$(DEPDIR)/kernel_generic-conio.Po
@@ -14210,6 +14296,20 @@ kernel/lib/cc/kernel_tracing-vector.obj: kernel/lib/cc/vector.cc
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/vector.cc' object='kernel/lib/cc/kernel_tracing-vector.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-vector.obj `if test -f 'kernel/lib/cc/vector.cc'; then $(CYGPATH_W) 'kernel/lib/cc/vector.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/vector.cc'; fi`
+
+kernel/lib/cc/kernel_tracing-chrono.o: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-chrono.o -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Tpo -c -o kernel/lib/cc/kernel_tracing-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Tpo kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/kernel_tracing-chrono.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-chrono.o `test -f 'kernel/lib/cc/chrono.cc' || echo '$(srcdir)/'`kernel/lib/cc/chrono.cc
+
+kernel/lib/cc/kernel_tracing-chrono.obj: kernel/lib/cc/chrono.cc
+@am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/cc/kernel_tracing-chrono.obj -MD -MP -MF kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Tpo -c -o kernel/lib/cc/kernel_tracing-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
+@am__fastdepCXX_TRUE@	$(AM_V_at)$(am__mv) kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Tpo kernel/lib/cc/$(DEPDIR)/kernel_tracing-chrono.Po
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	$(AM_V_CXX)source='kernel/lib/cc/chrono.cc' object='kernel/lib/cc/kernel_tracing-chrono.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCXX_FALSE@	DEPDIR=$(DEPDIR) $(CXXDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCXX_FALSE@	$(AM_V_CXX@am__nodep@)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -c -o kernel/lib/cc/kernel_tracing-chrono.obj `if test -f 'kernel/lib/cc/chrono.cc'; then $(CYGPATH_W) 'kernel/lib/cc/chrono.cc'; else $(CYGPATH_W) '$(srcdir)/kernel/lib/cc/chrono.cc'; fi`
 
 kernel/lib/kernel_tracing-conio.o: kernel/lib/conio.cc
 @am__fastdepCXX_TRUE@	$(AM_V_CXX)$(CXX) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(kernel_tracing_CXXFLAGS) $(CXXFLAGS) -MT kernel/lib/kernel_tracing-conio.o -MD -MP -MF kernel/lib/$(DEPDIR)/kernel_tracing-conio.Tpo -c -o kernel/lib/kernel_tracing-conio.o `test -f 'kernel/lib/conio.cc' || echo '$(srcdir)/'`kernel/lib/conio.cc
@@ -16307,6 +16407,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-libc_aHEADERS
 
 .PRECIOUS: Makefile
 
+	$(mbr_elf_CXXFLAGS)
 
 # mbr-bin
 
@@ -16363,7 +16464,7 @@ $(top_builddir)/dgos-kernel-asan: $(top_builddir)/kernel-asan
 trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 	$(CXX_FOR_BUILD) -ggdb3 -o "$@" \
 		-D_GNU_SOURCE -D_DEFAULT_SOURCE \
-		-std=c++14 \
+		-std=c++17 \
 		-fwhole-program -pthread \
 		-O3 -march=native \
 		-Wall -Wextra -Wpedantic \
@@ -16375,7 +16476,6 @@ trace-tool$(EXEEXT): $(top_srcdir)/pif-trace/pif-trace.cc
 sysroot/lib/crt0.o: \
 		$(top_srcdir)/user/crt0/crt0.S \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
-		$(top_srcdir)/Makefile.am \
 		$(INCLUDES_DEPLOYED)
 	$(MKDIR) -p "$(@D)" && \
 		$(CXX) \

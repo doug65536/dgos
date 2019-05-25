@@ -7,6 +7,7 @@
 #include "callout.h"
 #include "mutex.h"
 #include "inttypes.h"
+#include "stdlib.h"
 
 C_ASSERT(sizeof(gdt_entry_t) == 8);
 C_ASSERT(sizeof(gdt_entry_tss_ldt_t) == 8);
@@ -92,6 +93,18 @@ void gdt_init(int)
 static void gdt_set_tss_base(tss_t *base)
 {
     if (base) {
+        gdt_entry_t tss_lo;
+        gdt_entry_tss_ldt_t tss_hi;
+
+        tss_lo.set_type(GDT_TYPE_TSS);
+        uintptr_t tss_addr = uintptr_t(&base->reserved0);
+        tss_lo.set_base(uint32_t(tss_addr & 0xFFFFFFFF));
+        tss_hi.set_base(uintptr_t(&base->reserved0));
+        tss_lo.set_limit(sizeof(*base) - 1);
+
+        //new (&gdt[(GDT_SEL_TSS >> 3)]) gdt_entry_t(tss_lo);
+        //new (&gdt[(GDT_SEL_TSS >> 3) + 1]) gdt_entry_tss_ldt_t(tss_hi);
+
         gdt_entry_combined_t gdt_ent_lo =
                 GDT_MAKE_TSS_DESCRIPTOR(
                     uintptr_t(&base->reserved0),
@@ -100,6 +113,14 @@ static void gdt_set_tss_base(tss_t *base)
         gdt_entry_combined_t gdt_ent_hi =
                 GDT_MAKE_TSS_HIGH_DESCRIPTOR(
                     uintptr_t(&base->reserved0));
+
+        printdbg("no ub\n");
+        hex_dump(&tss_lo, sizeof(tss_lo));
+        hex_dump(&tss_hi, sizeof(tss_lo));
+
+        printdbg("ub\n");
+        hex_dump(&gdt_ent_lo, sizeof(tss_lo));
+        hex_dump(&gdt_ent_hi, sizeof(tss_hi));
 
         gdt[GDT_SEL_TSS >> 3] = gdt_ent_lo;
         gdt[(GDT_SEL_TSS >> 3) + 1] = gdt_ent_hi;

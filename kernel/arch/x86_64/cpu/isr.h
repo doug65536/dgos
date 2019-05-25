@@ -1,7 +1,10 @@
 #pragma once
 
 #define ISR_CTX_CTX_FLAGS_FAST_BIT  7
-#define ISR_CTX_CTX_FLAGS_FAST_QWBIT  7+8
+#define ISR_CTX_CTX_FLAGS_FAST_QWBIT  (7+8)
+
+#define ISR_CTX_OFS_INTERRUPT       (18*8)
+#define ISR_CTX_OFS_RBP             (17*8)
 
 #ifndef __ASSEMBLER__
 
@@ -285,8 +288,15 @@ void isr_restore_fxrstor(void);
 _noreturn
 void isr_sysret64(uintptr_t rip, uintptr_t rsp);
 
-void isr_save_fpu_ctx(thread_info_t *outgoing_ctx);
-void isr_restore_fpu_ctx(thread_info_t *incoming_ctx);
+void isr_save_fpu_ctx64(thread_info_t *outgoing_ctx);
+void isr_restore_fpu_ctx64(thread_info_t *incoming_ctx);
+void isr_save_fpu_ctx32(thread_info_t *outgoing_ctx);
+void isr_restore_fpu_ctx32(thread_info_t *incoming_ctx);
+
+void protection_barrier();
+void protection_barrier_ibpb();
+
+void thread_entry(void *);
 
 __END_DECLS
 #endif

@@ -798,7 +798,18 @@ public:
         }
     }
 
+    _always_inline
+    void redisable()
+    {
+        if (!intr_was_enabled) {
+            intr_was_enabled = (cpu_irq_save_disable() << 1) - 1;
+        }
+    }
+
 private:
+    // -1: IRQs were disabled before
+    //  0: Don't know anything, haven't done anything
+    //  1: IRQs were enabled before
     int8_t intr_was_enabled;
 };
 

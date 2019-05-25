@@ -451,7 +451,7 @@ public:
         return *this;
     }
 
-    template< class _InputIt >
+    template<typename _InputIt >
     basic_string& append(_InputIt __first, _InputIt __last)
     {
         __str.reserve(__str.size() + (__last - __first));

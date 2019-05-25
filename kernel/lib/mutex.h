@@ -2,6 +2,7 @@
 #include "threadsync.h"
 #include "utility.h"
 #include "export.h"
+#include "chrono.h"
 
 __BEGIN_NAMESPACE_STD
 class mutex;
@@ -340,6 +341,12 @@ private:
     bool locked;
 };
 
+enum class cv_status
+{
+    no_timeout,
+    timeout
+};
+
 class condition_variable
 {
 public:
@@ -348,12 +355,64 @@ public:
 
     void notify_one();
     void notify_all();
+
+    // Extension
+    void notify_n(size_t n);
+
     void wait(unique_lock<mutex>& lock);
     void wait(unique_lock<ext::spinlock>& lock);
     void wait(unique_lock<ext::ticketlock>& lock);
     void wait(unique_lock<ext::mcslock>& lock);
 
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<mutex>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
+    {
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
+    }
+
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<ext::spinlock>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
+    {
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
+    }
+
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<ext::ticketlock>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
+    {
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
+    }
+
+    template<typename _Clock, typename _Duration>
+    cv_status wait_until(unique_lock<ext::mcslock>& lock,
+                    chrono::time_point<_Clock, _Duration> const& timeout_time)
+    {
+        return wait_until(lock, chrono::steady_clock::time_point(
+                              timeout_time).time_since_epoch().count());
+    }
+
 private:
+    //
+    // Underlying implementation uses monotonic time_ns time for timeout
+
+    cv_status wait_until(unique_lock<mutex>& lock,
+                         int64_t timeout_time);
+
+    cv_status wait_until(unique_lock<ext::spinlock>& lock,
+                         int64_t timeout_time);
+
+    cv_status wait_until(unique_lock<ext::ticketlock>& lock,
+                         int64_t timeout_time);
+
+    cv_status wait_until(unique_lock<ext::mcslock>& lock,
+                         int64_t timeout_time);
+
+
     condition_var_t m;
 };
 

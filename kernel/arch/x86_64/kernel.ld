@@ -58,6 +58,11 @@ SECTIONS {
 
 		PROVIDE_HIDDEN(___rodata = .);
 		*(.rodata)
+
+		PROVIDE_HIDDEN(___rodata_fixup_insn_st = .);
+		*(.rodata.fixup.insn)
+		PROVIDE_HIDDEN(___rodata_fixup_insn_en = .);
+
 		*(SORT(.rodata.*))
 
 		*(.gcc_except_table*)

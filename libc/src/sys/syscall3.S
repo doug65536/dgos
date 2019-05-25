@@ -2,7 +2,7 @@
 .section .text, "ax"
 
 //extern long syscall3(long p0, long p1, long p2, long num);
-.align 32
+.balign 32
 .global syscall3
 syscall3:
 	.cfi_startproc

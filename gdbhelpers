@@ -10,6 +10,7 @@ define startupbreakpoints
 		b unhandled_exception_handler
 		b apic_spurious_handler
 		b isr_entry_8
+		b vpanic
 	end
 
 	b modload_load_symbols

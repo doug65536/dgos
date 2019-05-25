@@ -250,3 +250,35 @@ static constexpr _always_inline _flatten uint8_t bit_popcnt(T const& n)
     return bit_popcnt_n(n, typename std::integral_constant<
                         uint8_t, sizeof(n)>::type());
 }
+
+template<size_t _D>
+class bitmap_tree_impl_t {
+public:
+    // depth     max capacity              min capacity
+    // ----- --------------------- -------------------------
+    //   1            64 (2^(6*1))                         1
+    //   2          4096 (2^(6*2))                      64+1
+    //   3        262144 (2^(6*3))                 4096+64+1
+    //   4      16777216 (2^(6*4))          262144+4096+64+1
+    //   5    1073741824 (2^(6*5)) 16777216+262144+4096+64+1
+
+    static_assert(sizeof(uint64_t) == 8, "");
+
+    static constexpr const size_t depth = _D;
+    static constexpr const size_t capacity = 1 << (depth * 6);
+    //static constexpr const size_t slots = infer_slot_count;
+
+private:
+};
+
+static inline constexpr size_t bitmap_tree_depth(size_t n)
+{
+    for (size_t d = 1, c = 64; d < 6; ++d, c <<= 6) {
+        if (c >= n)
+            return d;
+    }
+    return 0;
+}
+
+template<size_t _N>
+using bitmap_tree_t = bitmap_tree_impl_t<bitmap_tree_depth(_N)>;

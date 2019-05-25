@@ -1,4 +1,5 @@
 #include "apic.h"
+#include "numeric.h"
 #include "cpu/asm_constants.h"
 #include "cpu/mptables.h"
 #include "cpu/ioapic.h"
@@ -140,6 +141,7 @@ static int16_t intr_to_irq[256];
 static int16_t irq_to_intr[256];
 static int16_t intr_to_ioapic[256];
 static int16_t irq_is_level[256];
+static int16_t irq_manual_eoi[256];
 
 static uint8_t topo_thread_bits;
 static uint8_t topo_thread_count;
@@ -919,23 +921,27 @@ static void acpi_parse_rsdt()
             } else {
                 ACPI_ERROR("ACPI MADT checksum mismatch!\n");
             }
-        } else if (!memcmp(hdr->sig, "MCFG", 4)) {
+        } else if (!memcmp(hdr->sig, "MCFG", 4) /* && false killed */) {
             acpi_mcfg_hdr_t *mcfg_hdr = (acpi_mcfg_hdr_t*)hdr;
 
             if (acpi_chk_hdr(&mcfg_hdr->hdr) == 0) {
-                acpi_ecam_rec_t *ecam_ptr = (acpi_ecam_rec_t*)(mcfg_hdr+1);
+                acpi_ecam_rec_t *ecam_ptr = (acpi_ecam_rec_t*)
+                        (mcfg_hdr+1);
                 acpi_ecam_rec_t *ecam_end = (acpi_ecam_rec_t*)
-                        ((char*)mcfg_hdr + mcfg_hdr->hdr.len);
+                        ((char*)&mcfg_hdr->hdr + mcfg_hdr->hdr.len);
                 size_t ecam_count = ecam_end - ecam_ptr;
                 pci_init_ecam(ecam_count);
                 for (size_t i = 0; i < ecam_count; ++i) {
+                    acpi_ecam_rec_t item;
+                    memcpy(&item, ecam_ptr, sizeof(item));
+
                     ACPI_TRACE("PCIe ECAM ptr=%#" PRIx64 " busses=%u-%u\n",
-                               ecam_ptr[i].ecam_base,
-                               ecam_ptr[i].st_bus, ecam_ptr[i].en_bus);
-                    pci_init_ecam_entry(ecam_ptr[i].ecam_base,
-                                        ecam_ptr[i].segment_group,
-                                        ecam_ptr[i].st_bus,
-                                        ecam_ptr[i].en_bus);
+                               item.ecam_base,
+                               item.st_bus, item.en_bus);
+                    pci_init_ecam_entry(item.ecam_base,
+                                        item.segment_group,
+                                        item.st_bus,
+                                        item.en_bus);
                 }
                 pci_init_ecam_enable();
             }
@@ -1972,19 +1978,6 @@ static uint64_t acpi_pm_timer_nsleep_handler(uint64_t ns)
     return elap_ns;
 }
 
-// Binary GCD algorithm
-template<typename T>
-constexpr T gcd(T a, T b)
-{
-    T tmp;
-    while (b) {
-        tmp = a;
-        a = b;
-        b = tmp % b;
-    }
-    return a;
-}
-
 static uint64_t apic_rdtsc_time_ns_handler()
 {
     uint64_t now = cpu_rdtsc();
@@ -2089,7 +2082,7 @@ static void apic_calibrate()
     // clk_to_ns: let clks = 2500000000
     //  2500000000 * 2 / 5 = 1000000000ns
 
-    uint64_t clk_to_ns_gcd = gcd(uint64_t(1000), rdtsc_mhz);
+    uint64_t clk_to_ns_gcd = std::gcd(uint64_t(1000), rdtsc_mhz);
 
     APIC_TRACE("CPU MHz GCD: %" PRId64 "\n", clk_to_ns_gcd);
 
@@ -2320,7 +2313,9 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
     assert(irq < INTR_APIC_IRQ_COUNT);
 
     ctx = irq_invoke(intr, irq, ctx);
-    apic_eoi(intr);
+
+    if (!irq_manual_eoi[irq])
+        apic_eoi(intr);
 
     if (likely(ctx == orig_ctx))
         ctx = thread_schedule_postirq(ctx);

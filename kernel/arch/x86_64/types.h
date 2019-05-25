@@ -8,17 +8,18 @@
 # define restrict __restrict
 # define __BEGIN_DECLS	extern "C" {
 # define __END_DECLS	}
+
+#define __BEGIN_NAMESPACE(n)        namespace n {
+#define __BEGIN_NAMESPACE_DETAIL    __BEGIN_NAMESPACE(detail)
+#define __BEGIN_NAMESPACE_STD       __BEGIN_NAMESPACE(std)
+#define __BEGIN_NAMESPACE_EXT       __BEGIN_NAMESPACE(ext)
+#define __END_NAMESPACE             }
+#define __END_NAMESPACE_STD         __END_NAMESPACE
+#define __END_NAMESPACE_EXT         __END_NAMESPACE
 #else
 # define __BEGIN_DECLS
 # define __END_DECLS
 #endif
-
-#define __BEGIN_NAMESPACE(n)   namespace n {
-#define __BEGIN_NAMESPACE_STD   __BEGIN_NAMESPACE(std)
-#define __BEGIN_NAMESPACE_EXT   __BEGIN_NAMESPACE(ext)
-#define __END_NAMESPACE         }
-#define __END_NAMESPACE_STD     __END_NAMESPACE
-#define __END_NAMESPACE_EXT     __END_NAMESPACE
 
 #if defined(__GNUC__)
 
@@ -36,7 +37,7 @@
 #define _warn_unused_result     __attribute__((__warn_unused_result__))
 #define _always_inline          __attribute__((__always_inline__)) inline
 #define _flatten                __attribute__((__flatten__))
-#define _always_optimize        __attribute__((optimize("-O2")))
+#define _always_optimize        __attribute__((__optimize__("-O2")))
 #define _noreturn               __attribute__((__noreturn__))
 #define _used                   __attribute__((__used__))
 #define _returns_twice          __attribute__((__returns_twice__))
@@ -63,6 +64,27 @@
     __target__("no-avx"), \
     __target__("no-avx2") \
     ))
+
+typedef __UINT64_TYPE__ uint64_t;
+typedef __INT64_TYPE__ int64_t;
+typedef __UINT32_TYPE__ uint32_t;
+typedef __INT32_TYPE__ int32_t;
+typedef __UINT16_TYPE__ uint16_t;
+typedef __INT16_TYPE__ int16_t;
+typedef __UINT8_TYPE__ uint8_t;
+typedef __INT8_TYPE__ int8_t;
+
+typedef __UINT64_TYPE__ uint_fast64_t;
+typedef __INT64_TYPE__ int_fast64_t;
+typedef __UINT32_TYPE__ uint_fast32_t;
+typedef __INT32_TYPE__ int_fast32_t;
+typedef __UINT32_TYPE__ uint_fast16_t;
+typedef __INT32_TYPE__ int_fast16_t;
+typedef __UINT32_TYPE__ uint_fast8_t;
+typedef __INT32_TYPE__ int_fast8_t;
+
+typedef __UINTPTR_TYPE__ uintptr_t;
+typedef __INTPTR_TYPE__ intptr_t;
 
 typedef int_fast64_t off_t;
 typedef __SIZE_TYPE__ size_t;

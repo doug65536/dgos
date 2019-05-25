@@ -49,7 +49,7 @@ _const
 void *operator new(size_t, void *p) noexcept;
 
 _malloc _assume_aligned(16)
-void *operator new(size_t size) noexcept;
+void *operator new(size_t size);
 
 _malloc _assume_aligned(16)
 void *operator new[](size_t size);

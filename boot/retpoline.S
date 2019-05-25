@@ -6,7 +6,7 @@
 // location.
 .macro make_retpoline_thunk reg
 .global __x86_indirect_thunk_\reg
-.align 16
+.balign 16
 __x86_indirect_thunk_\reg:
 	.cfi_startproc
 #ifdef __x86_64__

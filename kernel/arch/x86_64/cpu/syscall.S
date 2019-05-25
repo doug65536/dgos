@@ -4,6 +4,7 @@
 #include "asm_constants.h"
 #include "cfi_helpers.h"
 #include "cpu_bug.h"
+#include "fixup.h"
 
 // i386 syscall ABI design notes
 //  - syscall number in eax
@@ -110,9 +111,9 @@ syscall32_entry:
     mov %r13d,%edi
     mov %r12d,%esi
 
-.balign 16,,5
-    .byte 0x66, 0x66
+    insn_fixup
     vzeroall
+    .byte 0x66, 0x90
 
     sysret
 
@@ -177,6 +178,7 @@ syscall_entry:
     .cfi_offset rip,-2*8
 
 .balign 8,,5
+    insn_fixup
     call protection_barrier
 
     // Move 4th parameter to proper place
@@ -201,6 +203,7 @@ syscall_entry:
     movl $SYSCALL_RFLAGS,%r11d
 
 .balign 8,,5
+    insn_fixup
     call protection_barrier
 
     // Restore caller's stack
