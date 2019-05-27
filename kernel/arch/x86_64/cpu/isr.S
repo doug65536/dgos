@@ -1237,11 +1237,11 @@ isr_save_fpu_ctx64:
 isr_save_fpu_ctx32:
     xsave_ctx fxsave
 
- .balign 16
- .global isr_restore_fpu_ctx64
- .hidden isr_restore_fpu_ctx64
- isr_restore_fpu_ctx64:
-     xrstor_ctx fxrstor64
+.balign 16
+.global isr_restore_fpu_ctx64
+.hidden isr_restore_fpu_ctx64
+isr_restore_fpu_ctx64:
+    xrstor_ctx fxrstor64
 
 .balign 16
 .global isr_restore_fpu_ctx32
@@ -1392,14 +1392,13 @@ isr_sysret64:
     // void *gs_base = rbx->gsbase
     movq THREAD_GSBASE_OFS(%rbx),%r14
 
-    // void *rbx = rbx->stack
-    movq THREAD_STACK_OFS(%rbx),%rbx
+    // void *rdi = rbx->stack
+    movq THREAD_STACK_OFS(%rbx),%rdi
 
     // rdx->rsp0 = rbx
-    movq %rbx,TSS_RSP0_OFS(%rdx)
+    movq %rdi,TSS_RSP0_OFS(%rdx)
 
     // Avoid leaking any register values to user code
-    mov %eax,%ebx
     // not ecx
     mov %eax,%edx
     // not esi
@@ -1422,6 +1421,22 @@ isr_sysret64:
     insn_fixup
     wrfsbase %r13
     wrgsbase %r14
+
+    vzeroall_insn
+    emms
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    fldz
+    emms
+
+    ldmxcsr THREAD_SC_MXCSR_OFS(%rbx)
+    fldcw THREAD_SC_FCW87_OFS(%rbx)
+    mov %eax,%ebx
 
     mov %rsi,%rsp
     .cfi_undefined rip

@@ -22,6 +22,9 @@
 #define THREAD_STACK_OFS            80
 #define THREAD_THREAD_ID_OFS        88
 
+#define THREAD_SC_MXCSR_OFS         24
+#define THREAD_SC_FCW87_OFS         28
+
 #define SYSCALL_COUNT   317
 #define SYSCALL_ENOSYS  -81
 #define SYSCALL_RFLAGS  0x202

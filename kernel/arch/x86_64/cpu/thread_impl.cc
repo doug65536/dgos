@@ -95,11 +95,11 @@ struct alignas(256) thread_info_t {
     // Hottest member by far
     isr_context_t * volatile ctx;
 
-    // Needed in context switch
+    // Needed in context switch and/or syscall
     void * volatile fsbase;
     void * volatile gsbase;
-    //char * volatile syscall_stack;
-    char * volatile reserved;
+    uint32_t syscall_mxcsr;
+    uint32_t syscall_fcw87;
     char * volatile xsave_ptr;
     link_t link;
 
@@ -182,7 +182,16 @@ C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
 
-#define THREAD_FLAGS_USES_FPU   (1U<<0)
+// Save FPU context when interrupted in user mode
+// (always on for threads that execute user programs)
+#define THREAD_FLAGS_USER_FPU   (1U<<0)
+
+// Save FPU context when interrupted in kernel mode
+#define THREAD_FLAGS_KERNEL_FPU (1U<<1)
+
+#define THREAD_FLAGS_ANY_FPU ( \
+    THREAD_FLAGS_KERNEL_FPU | \
+    THREAD_FLAGS_USER_FPU)
 
 // Store in a big array, for now
 #define MAX_THREADS 512
@@ -486,7 +495,7 @@ static thread_t thread_create_with_state(
     if (user) {
         // XSave stack
 
-        thread->flags |= THREAD_FLAGS_USES_FPU;
+        thread->flags |= THREAD_FLAGS_USER_FPU;
 
         xsave_stack = thread_allocate_stack(
                     i, xsave_stack_size, "xsave", 0);
@@ -541,7 +550,7 @@ static thread_t thread_create_with_state(
     ISR_CTX_REG_RDX(ctx) = i;
     ISR_CTX_REG_CR3(ctx) = cpu_page_directory_get();
 
-    if (thread->flags & THREAD_FLAGS_USES_FPU) {
+    if (thread->flags & THREAD_FLAGS_ANY_FPU) {
         ISR_CTX_SSE_MXCSR(ctx) = (CPU_MXCSR_MASK_ALL |
                 CPU_MXCSR_RC_n(CPU_MXCSR_RC_NEAREST)) &
                 default_mxcsr_mask;
@@ -895,11 +904,11 @@ static void thread_free_stacks(thread_info_t *thread)
     }
 
     // The xsave stack
-    if (thread->flags & THREAD_FLAGS_USES_FPU) {
+    if (thread->flags & THREAD_FLAGS_ANY_FPU) {
         stk = thread->xsave_stack - xsave_stack_size - stack_guard_size;
         stk_sz = stack_guard_size + xsave_stack_size + stack_guard_size;
         thread->xsave_stack = nullptr;
-        thread->flags &= ~THREAD_FLAGS_USES_FPU;
+        thread->flags &= ~THREAD_FLAGS_ANY_FPU;
 
         THREAD_STK_TRACE("Freeing %s stack"
                          ", addr=%#zx"
@@ -1043,14 +1052,25 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     }
 
     if (thread != outgoing) {
-        if (outgoing->flags & THREAD_FLAGS_USES_FPU) {
-            if (ISR_CTX_REG_CS(ctx) != GDT_SEL_USER_CODE32)
-                isr_save_fpu_ctx64(outgoing);
-            else
-                isr_save_fpu_ctx32(outgoing);
+        if (outgoing->flags & THREAD_FLAGS_ANY_FPU) {
+            unsigned cs = ISR_CTX_REG_CS(ctx);
+
+            bool from_user = (cs == GDT_SEL_USER_CODE64 ||
+                              cs == GDT_SEL_USER_CODE32);
+
+            bool is64 = (cs == GDT_SEL_KERNEL_CODE64 ||
+                         cs == GDT_SEL_USER_CODE64);
+
+            if ((outgoing->flags & THREAD_FLAGS_KERNEL_FPU) ||
+                ((outgoing->flags & THREAD_FLAGS_USER_FPU) && from_user)) {
+                if (is64)
+                    isr_save_fpu_ctx64(outgoing);
+                else
+                    isr_save_fpu_ctx32(outgoing);
+            }
         }
 
-        if (thread->flags & THREAD_FLAGS_USES_FPU) {
+        if (thread->flags & THREAD_FLAGS_ANY_FPU) {
             if (cpu->cr0_shadow & CPU_CR0_TS) {
                 // Clear TS flag to unblock access to FPU
                 cpu->cr0_shadow &= ~CPU_CR0_TS;

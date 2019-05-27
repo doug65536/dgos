@@ -50,8 +50,6 @@ syscall32_entry:
     cmp $ SYSCALL_COUNT,%rax
     jae 0f
 
-    xor %r15d,%r15d
-
     // Switch to kernel gs
     swapgs
 
@@ -60,7 +58,7 @@ syscall32_entry:
     .cfi_register rip,r14
 
     // Get pointer to current CPU's TSS from CPU-local data
-    movq %gs:CPU_INFO_TSS_PTR_OFS(%r15),%r15
+    movq %gs:CPU_INFO_TSS_PTR_OFS,%r15
 
     movq %xmm5,%r9
 
@@ -102,6 +100,24 @@ syscall32_entry:
 
     indirect_call rax
 
+    mov %gs:CPU_INFO_CURTHREAD_OFS,%rdi
+    cli
+    swapgs
+
+    vzeroall_insn
+    emms
+    fldz
+    fldz
+    fldz
+    fldz
+    ldmxcsr THREAD_SC_MXCSR_OFS(%rdi)
+    fldz
+    fldz
+    fldz
+    fldz
+    emms
+    fldcw THREAD_SC_FCW87_OFS(%rdi)
+
     // Get return address back into ecx
     mov %r14d,%ecx
 
@@ -111,16 +127,12 @@ syscall32_entry:
     mov %r13d,%edi
     mov %r12d,%esi
 
-    insn_fixup
-    vzeroall
-    .byte 0x66, 0x90
-
-    sysret
+    sysretl
 
     .cfi_endproc
 
 // This code may clobber rdi, rsi, rdx, rcx, r8-r11, rflags
-// This code may clobber the entire FPU/SSE/AVX state
+// This code may clobber the entire FPU/SSE/AVX state (except control words)
 // This code must preserve rbx, rbp, r12-r15
 // Note that these are the same rules as x86_64-elf function calls
 
@@ -153,6 +165,13 @@ syscall_entry:
     // Switch to kernel gs
     swapgs
 
+    // Get pointer to current thread
+    movq %gs:CPU_INFO_CURTHREAD_OFS,%r11
+
+    // Store SSE and x87 control words
+    stmxcsr THREAD_SC_MXCSR_OFS(%r11)
+    fnstcw THREAD_SC_FCW87_OFS(%r11)
+
     // Get pointer to current CPU's TSS from CPU-local data
     movq %gs:CPU_INFO_TSS_PTR_OFS,%r11
 
@@ -177,7 +196,7 @@ syscall_entry:
     push_cfi %rcx
     .cfi_offset rip,-2*8
 
-.balign 8,,5
+    // call IBPB or patched with nop if not available
     insn_fixup
     call protection_barrier
 
@@ -187,6 +206,8 @@ syscall_entry:
     // Call handler
     indirect_call rax
 
+    movq %gs:CPU_INFO_CURTHREAD_OFS,%rdi
+
     // IRQs are not safe when
     // - we have user gs and still in kernel mode
     // - stack is switched to user stack in kernel mode
@@ -195,14 +216,21 @@ syscall_entry:
     // Switch to user gs
     swapgs
 
+    // Don't leak information to user mode, clear SSE, clear x87
+    vzeroall_insn
+    emms
+
     // Restore return address
     pop_cfi %rcx
     .cfi_register rip,rcx
 
-    // Set return rflags
-    movl $SYSCALL_RFLAGS,%r11d
+    fldz
 
-.balign 8,,5
+    // Set return rflags
+    movl $ SYSCALL_RFLAGS,%r11d
+
+    fldz
+
     insn_fixup
     call protection_barrier
 
@@ -211,13 +239,21 @@ syscall_entry:
     .cfi_def_cfa rsp,0
     .cfi_register rsp,rsp
 
-    // Don't leak information to user mode
     xorl %edx,%edx
+    fldz
     movl %edx,%esi
-    movl %edx,%edi
+    fldz
     movl %edx,%r8d
+    fldz
     movl %edx,%r9d
+    fldz
     movl %edx,%r10d
+    fldz
+    ldmxcsr THREAD_SC_MXCSR_OFS(%rdi)
+    fldz
+    emms
+    fldcw THREAD_SC_FCW87_OFS(%rdi)
+    mov %edx,%edi
 
     sysretq
 
