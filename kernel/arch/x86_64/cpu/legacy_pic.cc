@@ -203,5 +203,4 @@ void pic8259_enable(void)
     irq_islevel_set_handler(pic8259_islevel);
     irq_hook_set_handler(pic8259_hook);
     irq_unhook_set_handler(pic8259_unhook);
-    //cpu_irq_enable();
 }
