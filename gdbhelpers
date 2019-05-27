@@ -1,6 +1,6 @@
 define startupbreakpoints
 	set architecture i386:x86-64
-	set osabi sysv
+	set osabi none
 	set scheduler-locking step
 	set range-stepping off
 	thbreak entry
