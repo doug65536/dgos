@@ -276,11 +276,15 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
     return false;
 }
 
-// Lock mcslock without restoring/disabling interrupts
 _hot
-void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
-                        mcs_queue_ent_t *node)
+void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
+    MCSLOCK_TRACE("Acquiring lock @ %p threadid=%d\n",
+                  (void*)lock, thread_get_id());
+
+    thread_t tid = thread_get_id();
+    node->thread_id = tid;
+
     cs_enter();
 
     node->next = nullptr;
@@ -301,24 +305,15 @@ void mcslock_lock_nodis(mcs_queue_ent_t * volatile *lock,
         // The predecessor will set locked to false when they unlock it
         cpu_wait_value(&node->locked, false);
     }
+
 }
 
 _hot
-void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+EXPORT void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 {
-    MCSLOCK_TRACE("Acquiring lock @ %p threadid=%d\n",
+    MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());
 
-    thread_t tid = thread_get_id();
-    node->thread_id = tid;
-    mcslock_lock_nodis(lock, node);
-}
-
-// Unlock mcslock without saving+enabling interrupts
-_hot
-void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
-                         mcs_queue_ent_t *node)
-{
     if (atomic_ld_acq(&node->next) == nullptr) {
         // no known successor
 
@@ -336,13 +331,5 @@ void mcslock_unlock_noena(mcs_queue_ent_t * volatile *lock,
 
     atomic_st_rel(&node->next->locked, false);
     cs_leave();
-}
-
-_hot
-EXPORT void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
-{
-    MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",
-                  (void*)lock, thread_get_id());
-    mcslock_unlock_noena(lock, node);
 }
 

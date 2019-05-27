@@ -540,12 +540,12 @@ public:
 
     _always_inline void lock()
     {
-        mcslock_lock_nodis(root, node);
+        mcslock_lock(root, node);
     }
 
     _always_inline void unlock()
     {
-        mcslock_unlock_noena(root, node);
+        mcslock_unlock(root, node);
     }
 
 protected:
