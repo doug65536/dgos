@@ -17006,7 +17006,7 @@ $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 	cp "$<" "$@"
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
 		mbr.sym boot$(1).sym \
-		kernel-generic.sym kernel-tracing.sym kernel-asam.sym \
+		kernel-generic.sym kernel-tracing.sym kernel-asan.sym \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
 	$$(BOCHS) \
