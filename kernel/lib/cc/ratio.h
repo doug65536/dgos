@@ -49,4 +49,48 @@ using exa   = ratio<1000000000000000000, 1>;
 //bit much using zetta = ratio<1000000000000000000000, 1>;
 //bit much using yotta = ratio<1000000000000000000000000, 1>;
 
+template<typename _R1, typename _R2>
+using ratio_divide = typename ratio<
+    intmax_t(_R1::num) * intmax_t(_R2::den),
+    intmax_t(_R1::den) * intmax_t(_R2::num)
+>::type;
+
+template<typename _R1, typename _R2>
+using ratio_add = typename ratio<
+    ratio<
+        _R1::num * _R2::den + _R2::num * _R1::den,
+        _R1::den * _R2::den
+    >::type::num,
+    ratio<
+        _R1::num * _R2::den + _R2::num * _R1::den,
+        _R1::den * _R2::den
+    >::type::den
+>::type;
+
+template<typename _R1, typename _R2>
+using ratio_multiply = typename ratio<
+    ratio<
+        _R1::num * _R2::num,
+        _R1::den * _R2::den
+    >::type::num,
+    ratio<
+        _R1::num * _R2::num,
+        _R1::den * _R2::den
+    >::type::den
+>::type;
+
+template<typename _R1, typename _R2>
+using ratio_subtract = typename ratio<
+    ratio<
+        _R1::num * _R2::den - _R2::num * _R1::den,
+        _R1::den * _R2::den
+    >::type::num,
+    ratio<
+        _R1::num * _R2::den - _R2::num * _R1::den,
+        _R1::den * _R2::den
+    >::type::den
+>::type;
+
+
+
 __END_NAMESPACE_STD

@@ -399,9 +399,9 @@ int file_handle_base_t::open(tchar const *filename)
         return fd;
 
     if (!efi_pxe) {
-        file_handles[fd] = new efi_fs_file_handle_t;
+        file_handles[fd] = new (std::nothrow) efi_fs_file_handle_t;
     } else {
-        file_handles[fd] = new efi_pxe_file_handle_t;
+        file_handles[fd] = new (std::nothrow) efi_pxe_file_handle_t;
     }
 
     if (!file_handles[fd]->open_impl(filename)) {

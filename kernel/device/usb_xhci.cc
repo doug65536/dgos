@@ -740,8 +740,7 @@ public:
     template<typename T>
     friend class usbxhci_ring_data_t;
 
-    void *operator new(size_t sz) noexcept;
-
+    void *operator new(size_t sz, std::nothrow_t const&) noexcept;
     void operator delete(void *p) noexcept;
 
 protected:
@@ -1066,7 +1065,8 @@ void usbxhci::cmd_comp(usbxhci_evt_t *evt, usb_iocp_t *iocp)
 
 usbxhci_endpoint_data_t *usbxhci::add_endpoint(uint8_t slotid, uint8_t epid)
 {
-    usbxhci_endpoint_data_t *newepd = new usbxhci_endpoint_data_t;
+    usbxhci_endpoint_data_t *newepd =
+            new (std::nothrow) usbxhci_endpoint_data_t;
     if (!newepd)
         return nullptr;
 
@@ -1256,7 +1256,7 @@ bool usbxhci::add_device(int parent_slot, int port, int route)
     return true;
 }
 
-void *usbxhci::operator new(size_t sz) noexcept
+void *usbxhci::operator new(size_t sz, std::nothrow_t const&) noexcept
 {
     return calloc(1, sz);
 }
@@ -2295,7 +2295,7 @@ void usbxhci::detect()
         if (pci_iter.config.prog_if != PCI_PROGIF_SERIAL_USB_XHCI)
             continue;
 
-        std::unique_ptr<usbxhci> self(new usbxhci);
+        std::unique_ptr<usbxhci> self(new (std::nothrow) usbxhci);
 
         if (!usbxhci_devices.emplace_back(self.get())) {
             USBXHCI_TRACE("Out of memory!");

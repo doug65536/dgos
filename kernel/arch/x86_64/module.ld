@@ -1,11 +1,14 @@
 ENTRY(module_entry)
+EXTERN(module_entry)
 
 PHDRS {
 	read PT_LOAD FILEHDR PHDRS FLAGS(4);
-	ehfr PT_GNU_EH_FRAME FLAGS(4);
 	text PT_LOAD FLAGS(5);
 	data PT_LOAD FLAGS(6);
+
+	ehfr PT_GNU_EH_FRAME FLAGS(4);
 	dyna PT_DYNAMIC FLAGS(4);
+	/*relr 0x6474e552 / *PT_GNU_RELRO* / FLAGS(6);*/
 }
 
 SECTIONS {
@@ -13,20 +16,6 @@ SECTIONS {
 
 	. = 0;
 	. += SIZEOF_HEADERS;
-
-	.init_array : {
-		PROVIDE_HIDDEN(___init_st = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		PROVIDE_HIDDEN(___init_en = .);
-	} :read
-
-	.fini_array : {
-		PROVIDE_HIDDEN(___fini_st = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
-		PROVIDE_HIDDEN(___fini_en = .);
-	} :read
 
 	.rodata : {
 		PROVIDE_HIDDEN(___rodata_st = .);
@@ -128,16 +117,12 @@ SECTIONS {
 		*(.plt.bnd)
 	} :read
 
-	.got : {
-		PROVIDE_HIDDEN(___got = .);
-		*(.got)
-	} :read
-
-	.got.plt : {
-		*(.got.plt)
-	} :read
-
 	. = ALIGN(4K);
+
+	/*
+	 * text must be the first executable section to correctly infer
+	 * the symbol address when auto-loading kernel symbols
+	 */
 
 	.text : {
 		PROVIDE_HIDDEN(___text_st = .);
@@ -159,17 +144,41 @@ SECTIONS {
 
 	. = ALIGN(4K);
 
+	.got : {
+		PROVIDE_HIDDEN(___got = .);
+		*(.got)
+	} :data
+
+	.got.plt : {
+		*(.got.plt)
+	} :data
+
 	.dynamic : {
 		PROVIDE_HIDDEN(___dynamic_st = .);
 		*(.dynamic);
 		PROVIDE_HIDDEN(___dynamic_en = .);
 	} :dyna :data
 
+	.init_array : {
+		PROVIDE_HIDDEN(___init_st = .);
+		*(.init_array)
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		PROVIDE_HIDDEN(___init_en = .);
+	} :data
+
+	.fini_array : {
+		PROVIDE_HIDDEN(___fini_st = .);
+		*(.fini_array)
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		PROVIDE_HIDDEN(___fini_en = .);
+	} :data
+
+	/* . = ALIGN(4K); */
+
 	/* Initialized data */
-	.data  : {
+	.data : {
 		*(.data)
 		*(SORT(.data.*))
-		. = ALIGN(16);
 	} :data
 
 	.bss : {
@@ -185,6 +194,7 @@ SECTIONS {
 	. = ALIGN(4K);
 	PROVIDE_HIDDEN(___image_en = .);
 
+/*
 	.debug          : { *(.debug)         }
 	.debug_info		: { *(.debug_info)    }
 	.debug_abbrev	: { *(.debug_abbrev)  }
@@ -196,4 +206,5 @@ SECTIONS {
 	.debug_str		: { *(.debug_str)     }
 	.debug_loc		: { *(.debug_loc)     }
 	.comment        : { *(.comment)       }
+*/
 }

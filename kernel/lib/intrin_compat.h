@@ -11,6 +11,7 @@ static _always_inline void __builtin_ia32_movntdq(
         :
         : [dst] "m" (*d)
         , [src] "x" ((__i64_vec2LL)val128)
+        : "memory"
     );
 }
 #endif

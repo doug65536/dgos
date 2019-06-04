@@ -91,7 +91,7 @@ static int fat32_sector_iterator_begin(
     }
 
     iter->cluster_count = cluster_count;
-    iter->clusters = new uint32_t[cluster_count];
+    iter->clusters = new (std::nothrow) uint32_t[cluster_count];
 
     if (!iter->clusters)
         PANIC_OOM();

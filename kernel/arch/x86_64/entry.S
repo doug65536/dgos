@@ -27,8 +27,7 @@ entry:
     .cfi_undefined r14
     .cfi_undefined r15
 
-    // #GP if something tries to use stack before it is ready
-    movabs $0x8000000000000000,%rsp
+    xor %rsp,%rsp
 
     cld
 
@@ -92,7 +91,7 @@ ap_init:
 
     // mp_main should not return
 0:  call halt_forever
-    // halt_forever should not return either!
+    // halt_forever should not return either! Stop poking at the mainboard
     jmp 0b
 
 bsp_init:
@@ -109,10 +108,6 @@ bsp_init:
 
     xorl %edi,%edi
     call cpu_init_early
-
-    // Get SSE context offsets
-//    xorl %edi,%edi
-//    call idt_xsave_detect
 
     call e9debug_init
 
@@ -221,10 +216,10 @@ early_tss:
     .quad 0
     .quad 0
     //
-    //  uint64_t ist[8];
+    //  uint64_t ist[8]; 2 emergency stacks in last 8KB of main stack
     .quad 0
-    .quad kernel_stack-32768
-    .quad kernel_stack-32768
+    .quad kernel_stack+8192
+    .quad kernel_stack+4096
     .space 5*8
     //
     //  uint32_t reserved3;
@@ -235,7 +230,7 @@ early_tss:
     //  uint16_t reserved5;
     .short 0
     //  uint16_t iomap_base;
-    .short early_tss_end-early_tss
+    .short early_tss_end - early_tss
     //  uint32_t dummy_align2;
     .int 0
     //
@@ -304,6 +299,7 @@ __cxa_atexit:
 pure_call_message:
     .string "Pure virtual function called"
 
+// hidden by definition, it's the whole point
 .balign 8
 .global __dso_handle
 .hidden __dso_handle

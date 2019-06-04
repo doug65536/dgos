@@ -98,8 +98,7 @@ struct alignas(256) thread_info_t {
     // Needed in context switch and/or syscall
     void * volatile fsbase;
     void * volatile gsbase;
-    uint32_t syscall_mxcsr;
-    uint32_t syscall_fcw87;
+    uint32_t syscall_mxcsr, syscall_fcw87;
     char * volatile xsave_ptr;
     link_t link;
 
@@ -181,6 +180,8 @@ C_ASSERT(offsetof(thread_info_t, process) == THREAD_PROCESS_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, xsave_ptr) == THREAD_XSAVE_PTR_OFS);
 C_ASSERT(offsetof(thread_info_t, stack) == THREAD_STACK_OFS);
 C_ASSERT(offsetof(thread_info_t, thread_id) == THREAD_THREAD_ID_OFS);
+C_ASSERT(offsetof(thread_info_t, syscall_mxcsr) == THREAD_SC_MXCSR_OFS);
+C_ASSERT(offsetof(thread_info_t, syscall_fcw87) == THREAD_SC_FCW87_OFS);
 
 // Save FPU context when interrupted in user mode
 // (always on for threads that execute user programs)
@@ -208,8 +209,7 @@ int spincount_mask;
 size_t storage_next_slot;
 bool thread_cls_ready;
 
-static size_t constexpr syscall_stack_size = (size_t(8) << 10);
-static size_t constexpr xsave_stack_size = (size_t(64) << 10);
+static size_t constexpr xsave_stack_size = (size_t(4) << 10);
 
 struct alignas(128) cpu_info_t {
     cpu_info_t *self;
@@ -292,7 +292,11 @@ static void cpus_init_t()
     cpus[0].tss_ptr = tss_list;
 }
 
+// Ticks up as each AP startups up
 uint32_t cpu_count;
+
+// Holds full count
+uint32_t total_cpus;
 
 void thread_destruct(thread_info_t *thread);
 
@@ -334,7 +338,7 @@ static uint32_t get_apic_id()
 cpu_info_t *this_cpu_by_apic_id_slow()
 {
     uint32_t apic_id = get_apic_id();
-    for (size_t i = 0, e = apic_cpu_count(); i != e; ++i)
+    for (size_t i = 0, e = total_cpus; i != e; ++i)
         if (cpus[i].apic_id == apic_id)
             return cpus + i;
     return nullptr;
@@ -500,6 +504,7 @@ static thread_t thread_create_with_state(
         xsave_stack = thread_allocate_stack(
                     i, xsave_stack_size, "xsave", 0);
 
+        assert(sse_context_size > 512);
         thread->xsave_ptr = xsave_stack - sse_context_size;
     } else {
         thread->xsave_ptr = nullptr;
@@ -515,8 +520,8 @@ static thread_t thread_create_with_state(
     thread->fsbase = nullptr;
     thread->gsbase = nullptr;
 
-    // APs inherit BSP's process
-    thread->process = cpus[0].cur_thread->process;
+    // Created thread inherits creator's process
+    thread->process = thread_current_process();
 
     uintptr_t stack_addr = uintptr_t(stack);
     uintptr_t stack_end = stack_addr;
@@ -649,9 +654,15 @@ static void thread_init_bsp()
     thread_init(0);
 }
 
+void thread_set_cpu_count(size_t new_cpu_count)
+{
+    total_cpus = new_cpu_count;
+}
+
 void thread_init(int ap)
 {
-    thread_cls_ready = true;
+    if (!thread_cls_ready)
+        thread_cls_ready = true;
 
     uint32_t cpu_nr = atomic_xadd(&cpu_count, 1);
 
@@ -684,19 +695,22 @@ void thread_init(int ap)
         //
         // Perform BSP-only initializations
 
+        thread->process = process_t::init(cpu_page_directory_get());
+
         for (unsigned i = 0; i < countof(threads); ++i) {
             // Initialize every thread ID so pointer tricks aren't needed
             threads[i].thread_id = i;
+
+            // First 2N threads, 1N for idle threads, 1N for per cpu workers
+            if (i < total_cpus * 2)
+                threads[i].process = threads[0].process;
         }
 
         // Hook handler that performs a reschedule requested by another CPU
         intr_hook(INTR_IPI_RESCHED, thread_ipi_resched,
                   "hw_ipi_resched", eoi_lapic);
 
-        thread->process = process_t::init(cpu_page_directory_get());
-
-        // The current thread for this CPU is this thread,
-        // which destined to become an idle thread
+        // The current thread for this CPU is this thread
         cpu->cur_thread = thread;
 
         mm_init_process(thread->process);
@@ -724,6 +738,8 @@ void thread_init(int ap)
                     THREAD_IS_INITIALIZING,
                     thread_cpu_mask_t(cpu_nr),
                     -256, false);
+
+        thread->process = threads[0].process;
 
         thread->used_time = 0;
 
@@ -1063,6 +1079,9 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
 
             if ((outgoing->flags & THREAD_FLAGS_KERNEL_FPU) ||
                 ((outgoing->flags & THREAD_FLAGS_USER_FPU) && from_user)) {
+                THREAD_TRACE("Saving context of thread %zx\n",
+                             outgoing - threads);
+
                 if (is64)
                     isr_save_fpu_ctx64(outgoing);
                 else
@@ -1076,6 +1095,9 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
                 cpu->cr0_shadow &= ~CPU_CR0_TS;
                 cpu_cr0_clts();
             }
+
+            THREAD_TRACE("Restoring context of thread %zx\n",
+                         thread - threads);
 
             if (ISR_CTX_REG_CS(ctx) != GDT_SEL_USER_CODE32)
                 isr_restore_fpu_ctx64(thread);

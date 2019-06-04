@@ -88,7 +88,7 @@ struct page_allocator : public page_allocator_base
     template<typename _U>
     struct rebind
     {
-        using other = std::allocator<_U>;
+        using other = typename std::allocator<_U>;
     };
 
     value_type * allocate(size_t __n) const
@@ -229,7 +229,7 @@ public:
 
     bump_allocator()
     {
-        impl = new bump_allocator_impl<_T, _Alloc>;
+        impl = new (std::nothrow) bump_allocator_impl<_T, _Alloc>;
     }
 
     bump_allocator(bump_allocator const&) = default;

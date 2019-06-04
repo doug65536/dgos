@@ -563,6 +563,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/cpu/isr.S \
 	kernel/arch/x86_64/cpu/except_asm.S \
 	kernel/arch/x86_64/cpu/syscall.S \
+	kernel/arch/x86_64/user_mem.cc \
 	kernel/main.cc \
 	kernel/lib/assert.cc \
 	kernel/lib/assert.h \
@@ -682,6 +683,7 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/asan.cc \
 	kernel/lib/contig_alloc.cc \
 	kernel/lib/contig_alloc.h \
+	kernel/lib/user_mem.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/devfs.cc \
 	kernel/fs/mbr.cc \
@@ -826,6 +828,7 @@ KERNEL_SOURCES_SHARED = \
 
 KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/device/iocp.cc \
+	kernel/lib/cc/vector.cc \
 	kernel/lib/cc/cxxstring.cc \
 	kernel/lib/cc/chrono.cc \
 	kernel/lib/mutex.cc
@@ -877,7 +880,7 @@ KERNEL_LDFLAGS_SHARED = \
 	-Wl,-g \
 	-export-dynamic \
 	-Wl,-pie \
-	-Wl,--whole-archive libkei.a -Wl,--no-whole-archive \
+	-Wl,--whole-archive -Wl,libkei.a -Wl,--no-whole-archive \
 	$(NOSTDLIB_FLAGS)
 
 #-Wl,-m,elf_x86_64
@@ -904,7 +907,9 @@ libkei_a_SOURCES = \
 libkei_a_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	-fvisibility=default -fno-visibility-inlines-hidden -DLIBKEI
+	-fvisibility=default -fno-visibility-inlines-hidden \
+	-fPIC \
+	-DLIBKEI
 
 # ----------------------------------------------------------------------------
 # kernel variations
@@ -1126,11 +1131,11 @@ $(top_srcdir)/user/shell/grammar.c \
 
 EXTRA_shell_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
-	user/shell/grammar.c \
-	sysroot/lib/libc.a \
-	sysroot/lib/libg.a \
-	sysroot/lib/libm.a \
-	sysroot/lib/crt0.o \
+	$(top_srcdir)/user/shell/grammar.c \
+	$(top_builddir)/sysroot/lib/libc.a \
+	$(top_builddir)/sysroot/lib/libg.a \
+	$(top_builddir)/sysroot/lib/libm.a \
+	$(top_builddir)/sysroot/lib/crt0.o \
 	$(INCLUDES_DEPLOYED)
 
 # ----------------------------------------------------------------------------
@@ -1565,7 +1570,9 @@ dhcpclient_SOURCES = \
 
 dhcpclient_CXXFLAGS = -isystem sysroot/include
 
-EXTRA_dhcpclient_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
+EXTRA_dhcpclient_DEPENDENCIES = \
+	$(INCLUDES_DEPLOYED)
+	$(top_builddir)/libc.a
 
 bin_PROGRAMS += ls
 
@@ -1574,7 +1581,9 @@ ls_SOURCES = \
 
 ls_CXXFLAGS = -isystem sysroot/include
 
-EXTRA_ls_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
+EXTRA_ls_DEPENDENCIES = \
+	$(INCLUDES_DEPLOYED) \
+	$(top_builddir)/libc.a
 
 #==========
 # Common module declarations
@@ -1582,12 +1591,11 @@ EXTRA_ls_DEPENDENCIES = $(INCLUDES_DEPLOYED) libc.a
 KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(FREESTANDING_FLAGS) \
 	-D__DGOS_KERNEL__ \
-	-fvisibility=hidden \
-	-fvisibility-inlines-hidden \
+	$(VISIBILITY_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fPIC \
-	-g \
+	-ggdb \
 	-I$(top_srcdir)/boot/include \
 	-I$(top_srcdir)/kernel \
 	-I$(top_srcdir)/kernel/lib \
@@ -1601,7 +1609,6 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 
 KERNEL_MODULE_LDFLAGS_SHARED = \
 	-Wl,-shared \
-	-Wl,-g \
 	-Wl,-T$(top_srcdir)/kernel/arch/x86_64/module.ld \
 	-Wl,-z,max-page-size=4096 \
 	-Wl,--relax \
@@ -1612,12 +1619,14 @@ KERNEL_MODULE_LDADD_SHARED = \
 	libkm.a
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
-	kernel/arch/x86_64/module.ld
+	$(top_srcdir)/kernel/arch/x86_64/module.ld \
+	$(top_builddir)/libkm.a
 
 KERNEL_MODULE_LDFLAGS_FN = \
 	$(KERNEL_MODULE_LDFLAGS_SHARED) \
 	-Wl,-Map,$(top_builddir)/$(1).km.map \
-	-Wl,-z,now
+	-Wl,-z,now \
+	libkm.a
 
 #==========
 
@@ -1625,14 +1634,14 @@ noinst_LIBRARIES += libkm.a
 
 libkm_a_SOURCES = \
 	modules/libkm/module_entry.cc \
+	modules/libkm/module_main.cc \
 	modules/libkm/dso_handle.S \
 	modules/libkm/__cxa_pure_virtual.S
 
 libkm_a_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
 
-EXTRA_libkm_a_DEPENDENCIES = \
-	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+EXTRA_libkm_a_DEPENDENCIES =
 
 #==========
 
@@ -1690,6 +1699,30 @@ nvme_km_LDADD = \
 	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_nvme_km_DEPENDENCIES = \
+	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
+
+#==========
+
+bin_PROGRAMS += unittest.km
+
+unittest_km_SOURCES = \
+	kernel/unittest/unittest.cc \
+	kernel/unittest/unittest.h \
+	kernel/unittest/test_vector.cc \
+	kernel/unittest/test_string.cc \
+	kernel/unittest/test_printk.cc \
+	kernel/unittest/test_chrono.cc
+
+unittest_km_CXXFLAGS = \
+	$(KERNEL_MODULE_CXXFLAGS_SHARED)
+
+unittest_km_LDFLAGS = \
+	$(call KERNEL_MODULE_LDFLAGS_FN,unittest)
+
+unittest_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
+
+EXTRA_unittest_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)
 
 #==========
@@ -1862,9 +1895,9 @@ user_shell_CCASFLAGS = \
 	-isystem sysroot/include
 
 EXTRA_user_shell_DEPENDENCIES = \
-	sysroot/lib/libc.a \
-	sysroot/lib/libg.a \
-	sysroot/lib/libm.a
+	$(top_builddir)/sysroot/lib/libc.a \
+	$(top_builddir)/sysroot/lib/libg.a \
+	$(top_builddir)/sysroot/lib/libm.a
 
 #==========
 
@@ -1927,47 +1960,25 @@ clean-local:
 	rm -f $(top_builddir)/bootfat-bin
 	rm -f $(top_builddir)/bootiso-bin
 	rm -f $(top_builddir)/bootpxe-bios-bin
+	rm -f $(top_builddir)/trace-tool
 
 	rm -f $(top_builddir)/bootefi-pe
-	rm -f $(top_builddir)/bootx64.efi
-	rm -f $(top_builddir)/bootia32.efi
+	rm -f $(top_builddir)/boot*.efi
 
-	rm -f $(top_builddir)/mbr.sym
-	rm -f $(top_builddir)/bootfat.sym
-	rm -f $(top_builddir)/bootiso.sym
-	rm -f $(top_builddir)/bootx64-efi.sym
-	rm -f $(top_builddir)/kernel-generic.sym
-	rm -f $(top_builddir)/kernel-tracing.sym
-	rm -f $(top_builddir)/kernel-asan.sym
+	rm -f $(top_builddir)/*.sym
 
-	rm -f $(top_builddir)/mbr.map
-	rm -f $(top_builddir)/bootfat.map
-	rm -f $(top_builddir)/bootiso.map
-	rm -f $(top_builddir)/bootpxe-bios.map
-	rm -f $(top_builddir)/bootefi-pe.map
-	rm -f $(top_builddir)/bootefi-amd64.map
-	rm -f $(top_builddir)/bootefi-i386.map
-	rm -f $(top_builddir)/kernel-generic.map
-	rm -f $(top_builddir)/kernel-tracing.map
-	rm -f $(top_builddir)/kernel-asan.map
+	rm -f $(top_builddir)/*.map
 
-	rm -f $(top_builddir)/mbr.dis.gz
-	rm -f $(top_builddir)/bootefi-i386.dis.gz
-	rm -f $(top_builddir)/bootefi-amd64.dis.gz
-	rm -f $(top_builddir)/bootiso.dis.gz
-	rm -f $(top_builddir)/bootfat.dis.gz
-	rm -f $(top_builddir)/kernel-generic.dis.gz
-	rm -f $(top_builddir)/kernel-tracing.dis.gz
-	rm -f $(top_builddir)/kernel-asan.dis.gz
-
+	rm -f $(top_builddir)/*.dis.gz
 	rm -f $(top_builddir)/bochs-debuglog
-
-distclean-local:
-	rm -rf $(top_builddir)/extern
 	rm -f $(top_builddir)/mbrdisk.img
 	rm -f $(top_builddir)/gptdisk.img
 	rm -f $(top_builddir)/fatpart.img
 	rm -f $(top_builddir)/isodisk.img
+	rm -f $(top_builddir)/initrd
+
+distclean-local:
+	rm -rf $(top_builddir)/extern
 
 # ----------------------------------------------------------------------------
 # Generate register definitions

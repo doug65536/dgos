@@ -267,5 +267,5 @@ int probe_pci_for(
         int32_t prog_if);
 
 int init_module(void const *module, size_t module_sz, char const *module_name,
-                struct module *mod_user);
+                struct module *mod_user, char const *parameters);
 

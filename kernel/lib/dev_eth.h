@@ -14,7 +14,7 @@ void register_eth_dev_factory(char const *name, eth_dev_factory_t *factory);
 __END_DECLS
 
 struct eth_dev_factory_t {
-    constexpr eth_dev_factory_t(char const *name)
+    eth_dev_factory_t(char const *name)
     {
         register_eth_dev_factory(name, this);
     }

@@ -10,7 +10,7 @@ EXPORT int assert_failed(char const *expr,
                          int line)
 {
     printdbg("\n** ASSERT FAILED: %s(%d): %s %s\n",
-           file, line, expr, msg ? msg : "");
+             file, line, expr, msg ? msg : "");
     cpu_debug_break();
     cpu_irq_disable();
     // volatile because I might change it in the debugger and I want control

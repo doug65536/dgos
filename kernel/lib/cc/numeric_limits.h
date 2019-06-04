@@ -1,4 +1,5 @@
 #pragma once
+#include "types.h"
 #include "type_traits.h"
 
 __BEGIN_NAMESPACE_STD
@@ -124,6 +125,7 @@ template<> class numeric_limits<bool>
     static constexpr bool max() { return true; }
 };
 
+#ifdef __WCHAR_MIN__
 template<> class numeric_limits<wchar_t>
         : public __basic_integral_numeric_limits<wchar_t>
 {
@@ -131,6 +133,7 @@ public:
     static constexpr wchar_t min() { return __WCHAR_MIN__; }
     static constexpr wchar_t max() { return __WCHAR_MAX__; }
 };
+#endif
 
 template<> class numeric_limits<char>
         : public __basic_integral_numeric_limits<char>
@@ -205,6 +208,7 @@ public:
 template<> class numeric_limits<unsigned long>
         : public __basic_integral_numeric_limits<unsigned long>
 {
+public:
     static constexpr unsigned long min() { return 0UL; }
     static constexpr unsigned long max() { return ~0UL; }
 };

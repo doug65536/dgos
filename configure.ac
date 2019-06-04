@@ -200,6 +200,17 @@ AC_SUBST([COMPILER_FLAGS])
 #Wsuggest-attribute=noreturn
 #Wsuggest-attribute=format
 
+AS_VAR_SET([VISIBILITY_FLAGS],[])
+for flag in \
+	fvisibility=hidden \
+	fvisibility-inlines-hidden
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([VISIBILITY_FLAGS], [" -$flag"])],
+		[], [])
+done
+AC_SUBST([VISIBILITY_FLAGS])
+
 # fipa-pta fsched-pressure fipa-bit-cp ftree-vectorize
 # fgcse-after-reload fdeclone-ctor-dtor
 # fdevirtualize-at-ltrans fsched-stalled-insns=0
@@ -288,6 +299,8 @@ do
 done
 AC_SUBST([NO_FLOAT_FLAGS])
 
+#Wl,--eh-frame-hdr
+
 USER64_FLAGS=
 for flag in \
 	mindirect-branch=thunk-extern D_USE_RETPOLINE=1 \
@@ -297,9 +310,9 @@ for flag in \
 	m64 \
 	mpreferred-stack-boundary=4 \
 	fPIE \
+	Wl,--no-eh-frame-hdr \
 	Wl,-T$srcdir/user/user64.ld \
 	fno-exceptions fno-rtti \
-	Wl,--eh-frame-hdr \
 	Wl,-z,max-page-size=4096 \
 	Wl,-z,separate-code \
 	Wl,-z,relro \

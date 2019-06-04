@@ -36,7 +36,7 @@ struct trace_item {
     inline constexpr bool valid() const { return sync == 0x55; }
 
     __attribute__((__no_instrument_function__))
-    inline constexpr void *get_ip() const
+    inline void *get_ip() const
     {
         return (void*)(int64_t(uint64_t(fn) << 16) >> 16);
     }
@@ -48,7 +48,7 @@ struct trace_item {
     inline constexpr int get_cid() const { return cid; }
 
     __attribute__((__no_instrument_function__))
-    inline constexpr void set_ip(void *p) { fn = uint64_t(p); }
+    inline void set_ip(void *p) { fn = uint64_t(p); }
 
     __attribute__((__no_instrument_function__))
     inline constexpr void set_tid(unsigned t) { tid = t <= 255 ? t : 255; }
@@ -110,7 +110,7 @@ struct trace_record {
     }
 
     __attribute__((__no_instrument_function__))
-    inline constexpr void *get_ip() const
+    inline void *get_ip() const
     {
         return (void*)(int64_t(fn << 16) >> 16);
     }

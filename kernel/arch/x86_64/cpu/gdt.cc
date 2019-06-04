@@ -148,7 +148,7 @@ void gdt_init_tss(int cpu_count)
     for (int i = 0; i < cpu_count; ++i) {
         tss_t *tss = tss_list + i;
 
-        for (int st = 0; st < 4; ++st) {
+        for (int st = 0; st < 5; ++st) {
             void *stack = stacks_alloc;
             stacks_alloc += TSS_STACK_SIZE;
             madvise(stack, PAGESIZE, MADV_DONTNEED);

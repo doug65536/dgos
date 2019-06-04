@@ -102,10 +102,10 @@ vbe_mode_list_t const& vbe_enumerate_modes()
     if (mode_list.count != 0)
         return mode_list;
 
-    vbe_info_t *info = new vbe_info_t{};
+    vbe_info_t *info = new (std::nothrow) vbe_info_t{};
 
     if (vbe_detect(info)) {
-        vbe_mode_info_t *mode_info = new vbe_mode_info_t{};
+        vbe_mode_info_t *mode_info = new (std::nothrow) vbe_mode_info_t{};
 
         mode_list.count = 0;
 
@@ -122,7 +122,8 @@ vbe_mode_list_t const& vbe_enumerate_modes()
             ++mode_list.count;
         }
 
-        mode_list.modes = new vbe_selected_mode_t[mode_list.count] {};
+        mode_list.modes = new (std::nothrow)
+                vbe_selected_mode_t[mode_list.count] {};
 
         size_t out = 0;
 
@@ -148,10 +149,10 @@ vbe_mode_list_t const& vbe_enumerate_modes()
 //vbe_selected_mode_t *vbe_select_mode(
 //        uint32_t width, uint32_t height, bool verbose)
 //{
-//    vbe_info_t *info = new vbe_info_t;
+//    vbe_info_t *info = new (std::nothrow) vbe_info_t;
 //    vbe_mode_info_t *mode_info = new vbe_mode_info_t;
 
-//    vbe_selected_mode_t *sel = new vbe_selected_mode_t{};
+//    vbe_selected_mode_t *sel = new (std::nothrow) vbe_selected_mode_t{};
 
 //    uint16_t mode;
 //    uint16_t done = 0;

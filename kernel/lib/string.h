@@ -177,7 +177,6 @@ template<typename T>
 static _always_inline void devstore_impl(
         T *p, T const& val, std::integral_constant<size_t, 1>::type)
 {
-    uint8_t result;
     __asm__ __volatile__ (
         "movb %b[src],%[dest]\n\t"
         : [dest] "=m" (*(uint8_t *)p)

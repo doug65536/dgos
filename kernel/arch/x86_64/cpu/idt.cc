@@ -275,6 +275,18 @@ void idt_xsave_detect(int ap)
         sse_context_size = 512;
 }
 
+void idt_ist_adjust(int cpu, size_t ist, ptrdiff_t adj)
+{
+    size_t cpu_count = thread_cpu_count();
+    if (cpu >= 0 && size_t(cpu) < cpu_count) {
+        tss_list[cpu].ist[ist] += adj;
+        return;
+    }
+
+    for (size_t i = 0; i < cpu_count; ++i)
+        tss_list[cpu].ist[ist] += adj;
+}
+
 isr_context_t *debug_exception_handler(int intr, isr_context_t *ctx)
 {
     assert(intr == INTR_EX_DEBUG);
@@ -289,7 +301,7 @@ isr_context_t *opcode_exception_handler(int intr, isr_context_t *ctx)
 
 extern char ___isr_st[];
 
-constexpr uintptr_t isr_entry_point(size_t i)
+uintptr_t isr_entry_point(size_t i)
 {
     return uintptr_t(___isr_st + (i << 4));
 }
@@ -343,9 +355,10 @@ int idt_init(int ap)
         }
 
         // Assign IST entries to interrupts
-        idt[INTR_EX_STACK].ist = 1;
-        idt[INTR_EX_DBLFAULT].ist = 2;
-        idt[INTR_FLUSH_TRACE].ist = 3;
+        idt[INTR_EX_STACK].ist = IDT_IST_SLOT_STACK;
+        idt[INTR_EX_DBLFAULT].ist = IDT_IST_SLOT_DBLFAULT;
+        idt[INTR_FLUSH_TRACE].ist = IDT_IST_SLOT_FLUSH_TRACE;
+        idt[INTR_EX_NMI].ist = IDT_IST_SLOT_NMI;
         //idt[INTR_EX_TSS].ist = 3;
         //idt[INTR_EX_GPF].ist = 4;
         //idt[INTR_EX_PAGE].ist = 5;

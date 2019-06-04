@@ -23,8 +23,11 @@ void err(char const *format, ...)
     va_end(ap);
 }
 
-void load_module(char const *path)
+void load_module(char const *path, char const *parameters = nullptr)
 {
+    if (!parameters)
+        parameters = "";
+
     int fd = open(path, O_EXCL | O_RDONLY);
     if (fd < 0)
         err("Cannot open %s\n", path);
@@ -43,7 +46,7 @@ void load_module(char const *path)
     if (sz != read(fd, mem, sz))
         err("Cannot read %zd bytes\n", sz);
 
-    int status = init_module(mem, sz, path, nullptr);
+    int status = init_module(mem, sz, path, nullptr, parameters);
 
     if (status < 0)
         err("Module failed to initialize with %d %d\n", status, errno);
@@ -89,4 +92,6 @@ int main(int argc, char **argv, char **envp)
                       PCI_DEV_CLASS_NETWORK,
                       PCI_SUBCLASS_NETWORK_ETHERNET, -1))
         load_module("rtl8139.km");
+
+    load_module("unittest.km");
 }

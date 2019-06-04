@@ -42,7 +42,7 @@ public:
     using reverse_iterator = vector_iter<-1, false>;
     using const_reverse_iterator = vector_iter<-1, true>;
 
-    constexpr vector();
+    inline constexpr vector();
 
     constexpr explicit vector(_Allocator const& __alloc_);
 
@@ -59,8 +59,8 @@ public:
 
     vector(vector const& __other);
     vector(vector const& __other, _Allocator const& __alloc_);
-    constexpr vector(vector&& __other );
-    constexpr vector(vector&& __other, _Allocator const& __alloc_);
+    inline constexpr vector(vector&& __other );
+    inline constexpr vector(vector&& __other, _Allocator const& __alloc_);
 
     vector(initializer_list<_T> __init,
             _Allocator const& __alloc_ = _Allocator());
@@ -68,7 +68,7 @@ public:
     ~vector();
 
     vector& operator=(vector const& __other);
-    vector& operator=(vector&& __other);
+    inline vector& operator=(vector&& __other);
     vector& operator=(initializer_list<_T> __ilist);
 
     bool assign(size_type __count, _T const& __value);
@@ -83,40 +83,40 @@ public:
     _T& at(size_type __pos);
     _T const& at(size_type __pos) const;
 
-    _T& operator[](size_type __pos);
-    _T const& operator[](size_type __pos) const;
+    inline _T& operator[](size_type __pos);
+    inline _T const& operator[](size_type __pos) const;
 
-    _T& front();
-    _T const& front() const;
+    inline _T& front();
+    inline _T const& front() const;
 
-    _T& back();
-    _T const& back() const;
+    inline _T& back();
+    inline _T const& back() const;
 
-    pointer data();
-    const_pointer data() const;
+    inline pointer data();
+    inline const_pointer data() const;
 
-    iterator begin();
-    const_iterator begin() const;
-    const_iterator cbegin() const;
+    inline iterator begin();
+    inline const_iterator begin() const;
+    inline const_iterator cbegin() const;
 
-    iterator end();
-    const_iterator end() const;
-    const_iterator cend() const;
+    inline iterator end();
+    inline const_iterator end() const;
+    inline const_iterator cend() const;
 
-    reverse_iterator rbegin();
-    const_reverse_iterator rbegin() const;
-    const_reverse_iterator crbegin() const;
+    inline reverse_iterator rbegin();
+    inline const_reverse_iterator rbegin() const;
+    inline const_reverse_iterator crbegin() const;
 
-    reverse_iterator rend();
-    const_reverse_iterator rend() const;
-    const_reverse_iterator crend() const;
+    inline reverse_iterator rend();
+    inline const_reverse_iterator rend() const;
+    inline const_reverse_iterator crend() const;
 
-    bool empty() const;
-    size_type size() const;
-    size_type max_size() const;
+    inline bool empty() const;
+    inline size_type size() const;
+    inline size_type max_size() const;
 
     bool reserve(size_type __new_cap);
-    size_type capacity() const;
+    inline size_type capacity() const;
     void shrink_to_fit();
     void clear();
     void reset();
@@ -329,7 +329,7 @@ vector<_T,_Allocator>::vector(vector const& __other)
     , __sz(0)
     , __alloc(_Allocator())
 {
-    if (unlikely(!reserve(__other.size())))
+    if (unlikely(!reserve(__other.__sz)))
         panic_oom();
 }
 
@@ -341,7 +341,7 @@ vector<_T,_Allocator>::vector(vector const& __other,
     , __sz(0)
     , __alloc(__alloc_)
 {
-    if (unlikely(!reserve(__other.size())))
+    if (unlikely(!reserve(__other.__sz)))
         panic_oom();
 }
 
@@ -458,7 +458,7 @@ bool vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
 {
     if (!reserve(__ilist.size()))
         return false;
-    assign(__ilist.begin(), __ilist.end());
+    return assign(__ilist.begin(), __ilist.end());
 }
 
 template<typename _T, typename _Allocator>
@@ -676,7 +676,7 @@ void vector<_T,_Allocator>::shrink_to_fit()
 {
     if (__capacity > __sz) {
         pointer __tmp = __alloc.allocate(__sz * sizeof(value_type));
-        uninitialized_copy(__m, __m + __sz, __tmp);
+        uninitialized_move(__m, __m + __sz, __tmp);
         __alloc.deallocate(__m, __capacity);
         __m = __tmp;
         __capacity = __sz;
@@ -713,7 +713,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos, _T const& __value)
 
     constexpr size_t __count = 1;
 
-    new (__make_space(__pos, __count)) value_type(__value);
+    new (__make_space(__it, __count)) value_type(__value);
 
     __sz += __count;
 
@@ -740,7 +740,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(
         const_iterator __pos, size_type __count, _T const& __value)
 {
-    iterator __it = iterator(__pos.p);
+    iterator __it = iterator(__pos.__p);
     pointer place = __make_space(__it, __count);
     uninitialized_fill(place, place + __count, __value);
 
@@ -756,7 +756,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
                               InputIt __first, InputIt __last)
 {
     iterator __it(__pos.__p);
-    constexpr size_t __count = __last - __first;
+    size_t __count = __last - __first;
     pointer place = __make_space(__it, __count);
     uninitialized_copy(__first, __last, place);
 
@@ -768,7 +768,7 @@ typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               initializer_list<_T> __ilist)
 {
-    return insert(iterator(__pos.__p), __ilist.begin(), __ilist.end());
+    return iterator(insert(__pos, __ilist.begin(), __ilist.end()).__p);
 }
 
 template<typename _T, typename _Allocator>
@@ -1222,3 +1222,8 @@ cend(vector<_T, _Alloc> const& __rhs)
 }
 
 __END_NAMESPACE_STD
+
+extern template class std::vector<char, std::allocator<char>>;
+extern template class std::vector<uint8_t, std::allocator<uint8_t>>;
+extern template class std::vector<char16_t, std::allocator<char16_t>>;
+extern template class std::vector<wchar_t, std::allocator<wchar_t>>;

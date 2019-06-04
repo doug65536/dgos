@@ -10,6 +10,7 @@
 #include "cxxstring.h"
 #include "vector.h"
 #include "hash.h"
+#include "user_mem.h"
 
 #define DEBUG_TMPFS 1
 #if DEBUG_TMPFS
@@ -340,7 +341,8 @@ int tmpfs_fs_t::open(fs_file_info_t **fi,
         if (file.name_hash == name_hash &&
                 file.name_sz == path_len + 1 &&
                 !memcmp(name, path, path_len)) {
-            std::unique_ptr<tmpfs_file_t> file(new tmpfs_file_t{});
+            std::unique_ptr<tmpfs_file_t> file(new (std::nothrow)
+                                               tmpfs_file_t{});
             file->file_index = index;
             *fi = file.release();
             return 0;
@@ -565,7 +567,7 @@ bool tmpfs_startup(void *st, size_t sz)
     initrd_st = st;
     initrd_sz = sz;
 
-    std::unique_ptr<tmpfs_fs_t> fs(new tmpfs_fs_t);
+    std::unique_ptr<tmpfs_fs_t> fs(new (std::nothrow) tmpfs_fs_t);
     fs_init_info_t info{};
     info.part_st = (uint64_t)st;
     info.part_len = sz;

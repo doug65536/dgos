@@ -2,3 +2,4 @@ libkm/__cxa_pure_virtual.S
 libkm/module_entry.cc
 libkm/dso_handle.S
 hello/hello.cc
+libkm/module_main.cc

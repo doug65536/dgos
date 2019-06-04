@@ -676,8 +676,8 @@ uart_async_t::uart_async_t()
     , sending_break(false)
     , sending_data(false)
 {
-    rx_buffer = new uint16_t[1 << log2_buffer_size];
-    tx_buffer = new uint16_t[1 << log2_buffer_size];
+    rx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size];
+    tx_buffer = new (std::nothrow) uint16_t[1 << log2_buffer_size];
 }
 
 uart_async_t::~uart_async_t()
@@ -1069,7 +1069,7 @@ uart_dev_t *uart_dev_t::open(size_t id, bool simple, uint8_t data_bits,
     if (!simple)
         return id < uart_defs::uarts.size()
                 ? uart_defs::uarts[id].get()
-                : new uart_defs::uart_async_t();
+                : new (std::nothrow) uart_defs::uart_async_t();
     uart_defs::debug_uart.init(0x3F8, 4, 115200,
                                data_bits, parity_type, stop_bits);
     return &uart_defs::debug_uart;
@@ -1081,8 +1081,10 @@ uart_dev_t *uart_dev_t::open(uint16_t port, uint8_t irq,
                              bool polled)
 {
     uart_dev_t *uart = polled
-            ? static_cast<uart_dev_t*>(new uart_defs::uart_poll_t())
-            : static_cast<uart_dev_t*>(new uart_defs::uart_async_t());
+            ? static_cast<uart_dev_t*>(new (std::nothrow)
+                                       uart_defs::uart_poll_t())
+            : static_cast<uart_dev_t*>(new (std::nothrow)
+                                       uart_defs::uart_async_t());
 
     uart_defs::uarts.emplace_back(static_cast<uart_defs::uart_t*>(uart));
     uart->init(port, irq, baud, data_bits, parity_type, stop_bits);

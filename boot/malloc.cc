@@ -22,6 +22,8 @@
 #define MALLOC_CHECK() ((void)0)
 #endif
 
+std::nothrow_t const std::nothrow;
+
 struct blk_hdr_t {
     // Size including this header, in bytes
     uint32_t size;
@@ -362,29 +364,58 @@ bool malloc_validate()
     return true;
 }
 
-void *operator new(size_t size) noexcept
+// deleted, must use nothrow
+//void* operator new(size_t count, std::align_val_t alignment)
+//{
+//    return malloc_aligned(count, size_t(alignment));
+//}
+
+// deleted, must use nothrow
+//void* operator new[](size_t count, std::align_val_t alignment)
+//{
+//    return malloc_aligned(count, size_t(alignment));
+//}
+
+void* operator new[](size_t count, std::align_val_t alignment,
+    std::nothrow_t const&) noexcept
+{
+    return malloc_aligned(count, size_t(alignment));
+}
+
+// deleted, must use nothrow
+//void *operator new(size_t size)
+//{
+//    return malloc(size);
+//}
+
+void *operator new(size_t size, std::nothrow_t const&) noexcept
+{
+    return malloc(size);
+}
+
+void *operator new[](size_t size, std::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
 
 _const
-void *operator new(size_t, void *p) noexcept
+void *operator new(size_t, void *p)
 {
     return p;
 }
 
-void *operator new[](size_t size) noexcept
-{
-    return malloc(size);
-}
+//void *operator new[](size_t size)
+//{
+//    return malloc(size);
+//}
 
-void operator delete(void *block, unsigned long size) noexcept
+void operator delete(void *block, unsigned long size)
 {
     (void)size;
     free(block);
 }
 
-void operator delete(void *block, unsigned size) noexcept
+void operator delete(void *block, unsigned size)
 {
     (void)size;
     free(block);
@@ -400,12 +431,12 @@ void operator delete[](void *block) noexcept
     free(block);
 }
 
-void operator delete[](void *block, unsigned int) noexcept
+void operator delete[](void *block, unsigned int)
 {
     free(block);
 }
 
-void operator delete[](void *block, unsigned long) noexcept
+void operator delete[](void *block, unsigned long)
 {
     free(block);
 }

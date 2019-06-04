@@ -35,6 +35,7 @@
 #include "boottable.h"
 #include "inttypes.h"
 #include "work_queue.h"
+#include "stdlib.h"
 
 #define ENABLE_ACPI 1
 
@@ -1863,9 +1864,9 @@ void apic_start_smp(void)
 
                 ++smp_expect;
 
-                APIC_TRACE("BSP waiting for AP");
+                APIC_TRACE("BSP waiting for AP\n");
                 cpu_wait_value(&thread_smp_running, smp_expect);
-                APIC_TRACE("BSP finished waiting for AP");
+                APIC_TRACE("BSP finished waiting for AP\n");
             }
         }
     }
@@ -2563,7 +2564,7 @@ uint32_t acpi_cpu_count()
 lapic_kvm_t::lapic_kvm_t()
 {
     cpu_count = thread_cpu_count();
-    cpus.reset(new cacheline_t[cpu_count]);
+    cpus.reset(new (std::nothrow) cacheline_t[cpu_count]);
 
     // Initialize the MSR on every CPU
     workq::enqueue_on_all_barrier([&] (size_t i) {

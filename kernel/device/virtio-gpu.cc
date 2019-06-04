@@ -245,12 +245,13 @@ private:
         {
         }
 
-        void *operator new(size_t sz, size_t entries)
+        void *operator new(size_t sz, size_t entries,
+                           std::nothrow_t const&) noexcept
         {
             return malloc(sz + sizeof(virtio_gpu_mem_entry_t) * entries);
         }
 
-        void operator delete(void *mem)
+        void operator delete(void *mem) noexcept
         {
             free(mem);
         }
@@ -602,7 +603,7 @@ int virtio_gpu_factory_t::detect()
 
 virtio_base_t *virtio_gpu_factory_t::create()
 {
-    return new virtio_gpu_dev_t;
+    return new (std::nothrow) virtio_gpu_dev_t;
 }
 
 void virtio_gpu_dev_t::reattach_framebuffer()
@@ -791,7 +792,7 @@ bool virtio_gpu_dev_t::issue_attach_backing(
 
     // Allocate worst case physical range list
     std::unique_ptr<mmphysrange_t[]> backbuf_ranges(
-                new mmphysrange_t[backbuf_ranges_cap]);
+                new (std::nothrow) mmphysrange_t[backbuf_ranges_cap]);
 
     // Get physical ranges
     size_t backbuf_range_count = mphysranges(
@@ -804,7 +805,8 @@ bool virtio_gpu_dev_t::issue_attach_backing(
 
     // Allocate a buffer to hold virtio_gpu_resource_attach_backing_t command
     std::unique_ptr<virtio_gpu_resource_attach_backing_t> backing_cmd(
-                new (backbuf_range_count) virtio_gpu_resource_attach_backing_t);
+                new (backbuf_range_count, std::nothrow)
+                virtio_gpu_resource_attach_backing_t);
 
     backing_cmd->resource_id = resource_id;
     backing_cmd->nr_entries = backbuf_range_count;

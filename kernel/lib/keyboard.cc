@@ -373,7 +373,7 @@ public:
     static keybd_file_reg_t *get_registration()
     {
         if (unlikely(!instance))
-            instance.reset(new keybd_file_reg_t("conin"));
+            instance.reset(new (std::nothrow) keybd_file_reg_t("conin"));
         return instance;
     }
 

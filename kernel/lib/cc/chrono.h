@@ -4,6 +4,7 @@
 #include "type_traits.h"
 #include "time.h"
 #include "numeric.h"
+#include "export.h"
 
 __BEGIN_NAMESPACE_STD
 __BEGIN_NAMESPACE(chrono)
@@ -49,15 +50,9 @@ public:
     using rep = _Rep;
     using period = _Period;
 
-    duration(rep __tick_count)
-        : __tick_count(__tick_count)
-    {
-    }
+    duration(rep __tick_count);
 
-    duration(duration const& rhs)
-        : __tick_count(rhs.__tick_count)
-    {
-    }
+    duration(duration const& rhs);
 
     template<typename _Rep2, typename _Period2>
     duration(duration<_Rep2, _Period2> const& rhs)
@@ -66,58 +61,105 @@ public:
     {
     }
 
-    rep count() const
-    {
-        return __tick_count;
-    }
+    rep count() const;
 
-    duration operator-() const
-    {
-        return duration(-__tick_count);
-    }
+    duration operator-() const;
 
-    duration operator+() const
-    {
-        return *this;
-    }
+    duration operator+() const;
 
-    duration operator+(duration const& rhs)
-    {
-        return duration(__tick_count + rhs.__tick_count);
-    }
+    duration operator+(duration const& rhs);
 
-    duration operator-(duration const& rhs)
-    {
-        return duration(__tick_count - rhs.__tick_count);
-    }
+    duration operator-(duration const& rhs);
 
-    duration& operator++()
-    {
-        ++__tick_count;
-        return *this;
-    }
+    duration& operator++();
 
-    duration operator++(int)
-    {
-        return duration(__tick_count++);
-    }
+    duration operator++(int);
 
-    duration& operator--()
-    {
-        --__tick_count;
-        return *this;
-    }
+    duration& operator--();
 
-    duration operator--(int)
-    {
-        return duration(__tick_count--);
-    }
+    duration operator--(int);
 
 private:
 
     rep __tick_count;
 };
 
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>
+duration<_Rep,_Period>::operator--(int)
+{
+    return duration(__tick_count--);
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period> &
+duration<_Rep,_Period>::operator--()
+{
+    --__tick_count;
+    return *this;
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>
+duration<_Rep,_Period>::operator++(int)
+{
+    return duration(__tick_count++);
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period> &
+duration<_Rep,_Period>::operator++()
+{
+    ++__tick_count;
+    return *this;
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>
+duration<_Rep,_Period>::operator-(duration const& rhs)
+{
+    return duration(__tick_count - rhs.__tick_count);
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>
+duration<_Rep,_Period>::operator+(duration const& rhs)
+{
+    return duration(__tick_count + rhs.__tick_count);
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>
+duration<_Rep,_Period>::operator+() const
+{
+    return *this;
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>
+duration<_Rep,_Period>::operator-() const
+{
+    return duration(-__tick_count);
+}
+
+template<typename _Rep, typename _Period>
+typename duration<_Rep,_Period>::rep
+duration<_Rep,_Period>::count() const
+{
+    return __tick_count;
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>::duration(duration const& rhs)
+    : __tick_count(rhs.__tick_count)
+{
+}
+
+template<typename _Rep, typename _Period>
+duration<_Rep,_Period>::duration(rep __tick_count)
+    : __tick_count(__tick_count)
+{
+}
 
 template<typename _Rep1, typename _Period1,
          typename _Rep2, typename _Period2>
@@ -284,10 +326,10 @@ using milliseconds = duration<int64_t, milli>;
 using seconds      = duration<int64_t>;
 using minutes      = duration<int64_t, ratio<60>>;
 using hours        = duration<int64_t, ratio<3600>>;
-using days         = duration<int64_t, ratio<86400>>;
-using weeks        = duration<int64_t, ratio<604800>>;
-using months       = duration<int64_t, ratio<2629746>>;
-using years        = duration<int64_t, ratio<31556952>>;
+//c++20 using days         = duration<int64_t, ratio<86400>>;
+//c++20 using weeks        = duration<int64_t, ratio<604800>>;
+//c++20 using months       = duration<int64_t, ratio<2629746>>;
+//c++20 using years        = duration<int64_t, ratio<31556952>>;
 
 // Never treat as floating point
 template<typename Rep>
@@ -340,7 +382,7 @@ using sys_time = time_point<system_clock, _Duration>;
 using sys_seconds = sys_time<seconds>;
 
 // System time time_point in days since epoch
-using sys_days = sys_time<days>;
+//using sys_days = sys_time<days>;
 
 __END_NAMESPACE // chrono
 __END_NAMESPACE_STD

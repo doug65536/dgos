@@ -3,6 +3,7 @@
 #include "ctors.h"
 #include "likely.h"
 #include "../kernel/lib/bitsearch.h"
+#include "malloc.h"
 
 static constexpr EFI_GUID efi_graphics_output_protocol_guid =
         EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
@@ -123,7 +124,8 @@ vbe_mode_list_t const& vbe_enumerate_modes()
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info = nullptr;
 
     mode_list.count = efi_graphics_output->Mode->MaxMode;
-    mode_list.modes = new vbe_selected_mode_t[mode_list.count] {};
+    mode_list.modes = new (std::nothrow)
+            vbe_selected_mode_t[mode_list.count] {};
 
     for (size_t i = 0; i < mode_list.count; ++i) {
         UINTN info_sz = sizeof(*info);

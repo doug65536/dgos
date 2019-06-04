@@ -63,6 +63,10 @@ SECTIONS {
 		*(.rodata.fixup.insn)
 		PROVIDE_HIDDEN(___rodata_fixup_insn_en = .);
 
+		PROVIDE_HIDDEN(___rodata_fixup_swapgs_st = .);
+		*(.rodata.fixup.swapgs)
+		PROVIDE_HIDDEN(___rodata_fixup_swapgs_en = .);
+
 		*(SORT(.rodata.*))
 
 		*(.gcc_except_table*)
@@ -251,6 +255,7 @@ SECTIONS {
 	. = ALIGN(4K);
 	PROVIDE_HIDDEN(___init_brk = .);
 
+/*
 	.debug          0 : { *(.debug)         }
 	.debug_info		0 : { *(.debug_info)    }
 	.debug_abbrev	0 : { *(.debug_abbrev)  }
@@ -261,6 +266,7 @@ SECTIONS {
 	.debug_line		0 : { *(.debug_line)    }
 	.debug_str		0 : { *(.debug_str)     }
 	.debug_loc		0 : { *(.debug_loc)     }
+*/
 
 /*
 	/DISCARD/		0 : { *(.debug)         } :readonly

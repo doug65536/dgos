@@ -9,6 +9,8 @@
 #include "cpu/atomic.h"
 #include "export.h"
 
+std::nothrow_t const std::nothrow;
+
 // Always use paged allocation with guard pages
 // Realloc always moves the memory to a new range
 #define HEAP_PAGEONLY 0
@@ -41,7 +43,7 @@ static void malloc_statup_smp(void*)
     // Lock free transition to N per-cpu heaps
     size_t new_heap_count = thread_get_cpu_count();
 
-    heap_t **new_default_heaps = new heap_t *[new_heap_count];
+    heap_t **new_default_heaps = new (std::nothrow) heap_t *[new_heap_count];
     if (unlikely(!default_heaps))
         panic_oom();
 
@@ -132,16 +134,28 @@ EXPORT void free(void *p)
 EXPORT char *strdup(char const *s)
 {
     size_t len = strlen(s);
-    char *b = new char[len+1];
+    char *b = new (std::nothrow) char[len+1];
     return (char*)memcpy(b, s, len+1);
 }
 
-EXPORT void *operator new(size_t size)
+// banned throwing new, linker error please
+//EXPORT void *operator new(size_t size)
+//{
+//    return malloc(size);
+//}
+
+EXPORT void *operator new(size_t size, std::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
 
-EXPORT void *operator new[](size_t size)
+// banned throwing new, linker error please
+//EXPORT void *operator new[](size_t size)
+//{
+//    return malloc(size);
+//}
+
+EXPORT void *operator new[](size_t size, std::nothrow_t const&) noexcept
 {
     return malloc(size);
 }
@@ -151,7 +165,7 @@ EXPORT void operator delete(void *block, size_t) noexcept
     free(block);
 }
 
-EXPORT void operator delete(void *block) throw()
+EXPORT void operator delete(void *block) noexcept
 {
     free(block);
 }

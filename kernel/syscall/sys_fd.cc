@@ -6,6 +6,7 @@
 #include "../libc/include/sys/ioctl.h"
 #include "mm.h"
 #include "unique_ptr.h"
+#include "user_mem.h"
 
 class unique_memlock
 {
@@ -387,12 +388,14 @@ int sys_truncate(char const *path, off_t size)
 
 int sys_rename(char const *old_pathname, char const *new_pathname)
 {
-    std::unique_ptr<user_str_t> old_path_storage(new user_str_t(old_pathname));
+    std::unique_ptr<user_str_t> old_path_storage(new (std::nothrow)
+                                                 user_str_t(old_pathname));
 
     if (unlikely(!old_path_storage))
         return old_path_storage->err_int();
 
-    std::unique_ptr<user_str_t> new_path_storage(new user_str_t(new_pathname));
+    std::unique_ptr<user_str_t> new_path_storage(new (std::nothrow)
+                                                 user_str_t(new_pathname));
 
     if (unlikely(!new_path_storage))
         return new_path_storage->err_int();

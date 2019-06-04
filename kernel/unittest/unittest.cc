@@ -1,10 +1,23 @@
 #include "unittest.h"
+#include "kmodule.h"
 #include "printk.h"
 
-_constructor(1000) void module_main()
+unittest::unit *unittest::unit::list_st;
+unittest::unit *unittest::unit::list_en;
+
+int module_main(int argc, char const * const * argv)
 {
     unittest::unit_ctx ctx;
     unittest::unit::run_all(&ctx);
+
+    if (ctx.failure_count() == 0) {
+        printdbg("Test passed!\n");
+
+    } else {
+        printdbg("FAILED!\n");
+        return 1;
+    }
+    return 0;
 }
 
 void unittest::unit_ctx::fail(unittest::unit *test)
@@ -19,6 +32,11 @@ unittest::unit::unit(const char *name)
     unit **prev_ptr = list_en ? &list_en->next : &list_st;
     *prev_ptr = this;
     list_en = this;
+}
+
+void unittest::unit::fail()
+{
+    ctx->fail(this);
 }
 
 void unittest::unit::set_ctx(unittest::unit_ctx *ctx)

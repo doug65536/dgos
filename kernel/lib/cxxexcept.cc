@@ -265,7 +265,7 @@ extern "C" int __exception_stop_fn(
         return _URC_NO_REASON;
 
     // Found it
-    __cxa_free_exception(thrown_exception);
+    _Unwind_DeleteException(thrown_exception);
 
     __exception_longjmp(jmpbuf, 1);
 }

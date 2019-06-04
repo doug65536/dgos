@@ -36,10 +36,32 @@ void test_malloc();
 
 __END_DECLS
 
-void *operator new(size_t size) noexcept;
-void *operator new(size_t size, void *p) noexcept;
-void *operator new[](size_t size) noexcept;
-void operator delete(void *block, unsigned long size) noexcept;
+_malloc
+void *operator new(size_t size);
+
+_const
+void *operator new(size_t size, void *p);
+
+_malloc
+void *operator new[](size_t size);
+void operator delete(void *block, unsigned long size);
 void operator delete(void *block) noexcept;
 void operator delete[](void *block) noexcept;
-void operator delete[](void *block, unsigned int) noexcept;
+void operator delete[](void *block, unsigned int);
+
+
+__BEGIN_NAMESPACE_STD
+
+struct nothrow_t {
+    explicit nothrow_t() = default;
+};
+enum class align_val_t : size_t {};
+extern std::nothrow_t const nothrow;
+
+__END_NAMESPACE_STD
+
+void* operator new[](size_t count, std::align_val_t alignment);
+void* operator new[](size_t count, std::align_val_t alignment,
+    std::nothrow_t const&) noexcept;
+void *operator new(size_t size, std::nothrow_t const&) noexcept;
+void *operator new[](size_t size, std::nothrow_t const&) noexcept;

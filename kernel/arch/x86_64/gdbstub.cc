@@ -5,6 +5,7 @@
 #include "mm.h"
 #include "printk.h"
 #include "inttypes.h"
+#include "cpu/idt.h"
 
 #include "device/serial-uart.h"
 
@@ -230,7 +231,7 @@ public:
     _noreturn
     void run();
 
-    void *operator new(size_t) noexcept
+    void *operator new(size_t, std::nothrow_t const&) noexcept
     {
         return calloc(1, sizeof(gdbstub_t));
     }
@@ -808,6 +809,8 @@ gdbstub_t::rx_state_t gdbstub_t::reply(char const *data, size_t size)
 
         if (ack != '+')
             GDBSTUB_TRACE("Got reply response: %c\n", ack);
+        else
+            GDBSTUB_TRACE("Got ACK\n");
     } while (ack == '-');
 
     return rx_state_t::IDLE;
@@ -915,8 +918,12 @@ void gdbstub_t::run()
     isr_context_t *ctx;
     gdb_signal_idx_t sig;
 
+    bool should_block = false;
+
     for (;;) {
-        ssize_t rcvd = port->read(rx_buf, MAX_BUFFER_SIZE, 0);
+        ssize_t rcvd = port->read(rx_buf, MAX_BUFFER_SIZE,
+                                  should_block ? 1 : 0);
+        should_block = false;
 
         if (rcvd != 0) {
             GDBSTUB_TRACE("Received serial data:\n");
@@ -934,7 +941,7 @@ void gdbstub_t::run()
 
             if (run_state == run_state_t::STOPPED || cpu_nr == 0 ||
                     !gdb_cpu_ctrl_t::is_cpu_frozen(cpu_nr)) {
-                halt();
+                should_block = true;
                 continue;
             }
 
@@ -949,12 +956,12 @@ void gdbstub_t::run()
 
             if (ISR_CTX_INTR(ctx) == INTR_EX_BREAKPOINT) {
                 // If we planted the breakpoint, adjust RIP
-                if (gdb_cpu_ctrl_t::breakpoint_get_byte(
-                            (uint8_t*)ISR_CTX_REG_RIP(ctx) - 1,
-                            ctx->gpr.cr3) >= 0) {
+//                if (gdb_cpu_ctrl_t::breakpoint_get_byte(
+//                            (uint8_t*)ISR_CTX_REG_RIP(ctx) - 1,
+//                            ctx->gpr.cr3) >= 0) {
                     ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
                             ((uint8_t*)ISR_CTX_REG_RIP(ctx) - 1);
-                }
+//                }
 
                 //replyf("T%02xswbreak:;", sig);
             }
@@ -1425,7 +1432,7 @@ bool gdbstub_t::get_target_desc(
 
     result_sz += (countof(x86_64_target_footer) - 1);
 
-    result.reset(new char[result_sz + 1]);
+    result.reset(new (std::nothrow) char[result_sz + 1]);
 
     char *output = result;
 
@@ -2241,7 +2248,8 @@ void gdb_cpu_ctrl_t::breakpoint_toggle_list(bp_list &list, bool activate)
 
 isr_context_t *gdb_cpu_ctrl_t::context_of(int cpu_nr)
 {
-    gdb_cpu_t const *cpu = instance.cpu_from_nr(cpu_nr);
+    // volatile to fix weird longjmp warning
+    gdb_cpu_t const * volatile cpu = instance.cpu_from_nr(cpu_nr);
     return cpu ? cpu->ctx : nullptr;
 }
 
@@ -2529,7 +2537,7 @@ void gdb_cpu_ctrl_t::gdb_thread()
     // Set GDB stub to time critical priority
     thread_set_priority(stub_tid, 32767);
 
-    std::unique_ptr<gdbstub_t> stub(new gdbstub_t);
+    std::unique_ptr<gdbstub_t> stub(new (std::nothrow) gdbstub_t);
 
     freeze_all(1);
 
@@ -2560,6 +2568,34 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(int, isr_context_t *ctx)
 {
     return instance.exception_handler(ctx);
 }
+
+static inline void cpu_unmask_nmi()
+{
+    // x86 masks NMI until iretq
+    intptr_t iretq_rsp, iretq_rip;
+    __asm__ __volatile__ (
+        "mov %%rsp,%[iretq_rsp]"    "\n\t"
+        "lea 0f(%%rip),%[iretq_rip]""\n\t"
+        "push %[ss]"                "\n\t"
+        "push %[iretq_rsp]"         "\n\t"
+        "pushfq"                    "\n\t"
+        "push %[cs]"                "\n\t"
+        "push %[iretq_rip]"         "\n\t"
+        "iretq"                     "\n\t"
+        "0:"                        "\n\t"
+        : [iretq_rip] "=&r" (iretq_rip)
+        , [iretq_rsp] "=&r" (iretq_rsp)
+        : [ss] "i" (GDT_SEL_KERNEL_DATA)
+        , [cs] "i" (GDT_SEL_KERNEL_CODE64)
+    );
+}
+
+// To interrupt a CPU, the state is changed to FREEZING and an NMI is sent
+// This handler updates the state to FROZEN, unmasks NMI, and waits
+// for the state to change to resuming.
+// When the stub wants to resume a thread, it changes the state to RESUMING
+// and sends a second NMI, nesting the first. The nested NMI returns without
+// doing much and it returns to the wait loop in the first NMI
 
 isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 {
@@ -2594,7 +2630,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 
             // Adjust RIP back to start of instruction
             ISR_CTX_REG_RIP(ctx) = (int(*)(void*))
-                    ((char*)ctx->gpr.iret.rip - 1);
+                    ((char*)ISR_CTX_REG_RIP(ctx) - 1);
 
             bp_workaround_addr = uintptr_t(ISR_CTX_REG_RIP(ctx));
 
@@ -2616,7 +2652,7 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
         return nullptr;
     }
 
-    // Ignore NMI when not freezing
+    // Ignore NMI when not freezing (particularly nested one when RESUMING)
     if (ISR_CTX_INTR(ctx) == INTR_EX_NMI &&
             cpu->state != gdb_cpu_state_t::FREEZING) {
         GDBSTUB_TRACE("Received NMI on cpu %d, continuing\n", cpu->cpu_nr);
@@ -2634,25 +2670,48 @@ isr_context_t *gdb_cpu_ctrl_t::exception_handler(isr_context_t *ctx)
 
     cpu->ctx = ctx;
 
-    // GDB thread waits for the state to transition to FROZEN
-    cpu->state = gdb_cpu_state_t::FROZEN;
+    if (cpu->state == gdb_cpu_state_t::FREEZING) {
+        if (ISR_CTX_INTR(ctx) == INTR_EX_NMI) {
+            // Prepare to nest NMI
+            GDBSTUB_TRACE("Preparing for nested NMI on cpu %d\n", cpu->cpu_nr);
+            idt_ist_adjust(cpu->cpu_nr - 1, IDT_IST_SLOT_NMI, -(4 << 10));
+            cpu_unmask_nmi();
+        }
 
-    GDBSTUB_TRACE("CPU entering wait: %d (%s)\n", cpu->cpu_nr,
-                  signal_name(signal_from_intr(ISR_CTX_INTR(ctx))));
+        // GDB thread waits for the state to transition to FROZEN
+        // Must be prepared to receive another NMI after setting
+        // state to frozen
+        cpu->state = gdb_cpu_state_t::FROZEN;
 
-    while (cpu->state != gdb_cpu_state_t::RESUMING) {
-        // Idle the CPU until NMI wakes it
-        wait(cpu);
+        GDBSTUB_TRACE("CPU entering wait: %d (%s)\n", cpu->cpu_nr,
+                      signal_name(signal_from_intr(ISR_CTX_INTR(ctx))));
 
-        if (cpu->state == gdb_cpu_state_t::SYNC_HW_BP) {
-            cpu->sync_bp();
+        while (cpu->state != gdb_cpu_state_t::RESUMING) {
+            // Idle the CPU until NMI wakes it (nested NMI occurs here)
+            wait(cpu);
 
-            cpu->state = gdb_cpu_state_t::FROZEN;
+            GDBSTUB_TRACE("Woke up from waiting for resuming on cpu %d\n",
+                          cpu->cpu_nr);
+
+            // Returned from nested NMI by now
+
+            if (cpu->state == gdb_cpu_state_t::SYNC_HW_BP) {
+                cpu->sync_bp();
+
+                cpu->state = gdb_cpu_state_t::FROZEN;
+            }
+        }
+
+        // Un-nest NMI
+        if (ISR_CTX_INTR(ctx) == INTR_EX_NMI) {
+            GDBSTUB_TRACE("Un-nested NMI stack on cpu %d\n", cpu->cpu_nr);
+            idt_ist_adjust(cpu->cpu_nr - 1, IDT_IST_SLOT_NMI, (4 << 10));
         }
     }
 
     GDBSTUB_TRACE("CPU woke up: %d\n", cpu->cpu_nr);
 
+    // Lost track of this CPU's context now, it's going to take off
     cpu->ctx = nullptr;
 
     // Only running threads can be transitioned back to FREEZING

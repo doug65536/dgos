@@ -102,7 +102,7 @@ void probe_storage_factory(storage_if_factory_t *factory)
 EXPORT void fs_register_factory(char const *name, fs_factory_t *fs)
 {
     scoped_lock lock(storage_lock);
-    if (!fs_regs.push_back(new fs_reg_t{ name, fs }))
+    if (!fs_regs.push_back(new (std::nothrow) fs_reg_t{ name, fs }))
         panic_oom();
     printdbg("%s filesystem registered\n", name);
 }

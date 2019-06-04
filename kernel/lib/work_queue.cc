@@ -10,7 +10,7 @@ EXPORT workq_impl* workq::percpu;
 
 void workq::init(int cpu_count)
 {
-    percpu = new workq_impl[cpu_count];
+    percpu = new (std::nothrow) workq_impl[cpu_count];
 
     for (int i = 0; i < cpu_count; ++i)
         percpu[i].set_affinity(i);

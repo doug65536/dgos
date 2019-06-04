@@ -274,6 +274,7 @@ gcc_config="--target=$arches --with-system-zlib \
 --enable-tls \
 --enable-threads \
 --enable-shared \
+--without-headers \
 --with-long-double-128 \
 --disable-nls \
 --enable-system-zlib \

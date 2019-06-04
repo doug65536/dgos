@@ -1,11 +1,14 @@
 #include "chrono.h"
+#include "export.h"
+
+
+#pragma GCC visibility push(default)
+template class std::chrono::duration<int64_t, std::nano>;
+template class std::chrono::time_point<std::chrono::system_clock>;
+template class std::chrono::time_point<std::chrono::steady_clock>;
+#pragma GCC visibility pop
 
 __BEGIN_NAMESPACE_STD
-
-template class chrono::duration<int64_t, std::nano>;
-template class chrono::time_point<std::chrono::system_clock>;
-template class chrono::time_point<std::chrono::steady_clock>;
-
 #ifndef LIBKEI
 // Adjustment factor in ns to go from steady_clock to system_clock time_point
 int64_t chrono::system_clock::__epoch;

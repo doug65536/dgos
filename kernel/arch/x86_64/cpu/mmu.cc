@@ -28,6 +28,7 @@
 #include "contig_alloc.h"
 #include "asan.h"
 #include "unique_ptr.h"
+#include "cxxstring.h"
 
 // Allow G bit set in PDPT and PD in recursive page table mapping
 // This causes KVM to throw #PF(reserved_bit_set|present)
@@ -1434,6 +1435,8 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
         printdbg("#PF: Instruction fetch from no-execute page\n");
     }
 
+    printdbg("#PF: CR2=%#zx\n", fault_addr);
+
     printdbg("#PF: present=%d\n"
              "     write=%d\n"
              "     user=%d\n"
@@ -1967,14 +1970,14 @@ static _always_inline bool pte_is_guard(pte_t pte)
     return (pte & PTE_ADDR) == ((PTE_ADDR >> 1) & PTE_ADDR);
 }
 
-static void *mm_alloc_address_space(size_t len, bool user)
-{
-    contiguous_allocator_t *allocator =
-            user ? (contiguous_allocator_t*)
-                thread_current_process()->get_allocator()
-            : &linear_allocator;
-    return (void*)allocator->alloc_linear(round_up(len));
-}
+//static void *mm_alloc_address_space(size_t len, bool user)
+//{
+//    contiguous_allocator_t *allocator =
+//            user ? (contiguous_allocator_t*)
+//                thread_current_process()->get_allocator()
+//            : &linear_allocator;
+//    return (void*)allocator->alloc_linear(round_up(len));
+//}
 
 EXPORT void *mm_alloc_space(size_t size)
 {
@@ -2493,8 +2496,8 @@ int mprotect(void *addr, size_t len, int prot)
     ptes_from_addr(pt, linaddr_t(addr));
     pte_t *end = pt[3] + (len >> PAGE_SCALE);
 
-    uintptr_t orig_addr = uintptr_t(addr);
-    pte_t *orig_pt3 = pt[3];
+    //uintptr_t orig_addr = uintptr_t(addr);
+    //pte_t *orig_pt3 = pt[3];
 //    printdbg("Before mprotect(%#zx, %#zx)\n", orig_addr, len);
 //    hex_dump(pt[3], (end - orig_pt3) * sizeof(pte_t), uintptr_t(pt[3]));
 
@@ -2927,7 +2930,7 @@ EXPORT void *mmap_register_device(void *context,
 
     size_t sz = block_size * block_count;
 
-    mmap_device_mapping_t *mapping = new mmap_device_mapping_t{};
+    mmap_device_mapping_t *mapping = new (std::nothrow) mmap_device_mapping_t{};
 
     if (!mapping)
         return nullptr;
@@ -3395,7 +3398,8 @@ void mm_destroy_process()
 
 void mm_init_process(process_t *process)
 {
-    contiguous_allocator_t *allocator = new contiguous_allocator_t{};
+    contiguous_allocator_t *allocator =
+            new (std::nothrow) contiguous_allocator_t{};
     // 16TB unavailable margin between end of low memory and 128TB
     allocator->init(0x400000, UINT64_C(0x700000000000) - UINT64_C(0x400000),
                     "process");
@@ -3469,118 +3473,6 @@ void clear_phys_state_t::reserve_addr()
 void mm_set_master_pagedir()
 {
     cpu_page_directory_set(root_physaddr);
-}
-
-bool mm_copy_user_generic(void *dst, void const *src, size_t size)
-{
-    __try {
-        if (src)
-            memcpy(dst, src, size);
-        else
-            memset(dst, 0, size);
-    } __catch {
-        return false;
-    }
-
-    return true;
-}
-
-bool mm_copy_user_smap(void *dst, void const *src, size_t size)
-{
-    cpu_stac();
-    bool result = mm_copy_user_generic(dst, src, size);
-    cpu_clac();
-    return result;
-}
-
-bool mm_copy_user_str_generic(char *dst, char const *src, size_t max_size)
-{
-    __try {
-        if (src)
-            strncpy(dst, src, max_size);
-        else
-            memset(dst, 0, max_size);
-    } __catch {
-        return false;
-    }
-
-    return true;
-}
-
-bool mm_copy_user_str_smap(char *dst, char const *src, size_t size)
-{
-    cpu_stac();
-    bool result = mm_copy_user_str_generic(dst, src, size);
-    cpu_clac();
-    return result;
-}
-
-intptr_t mm_lenof_user_str_generic(char const *src, size_t max_size)
-{
-    __try {
-        if (unlikely(max_size > size_t(std::numeric_limits<intptr_t>::max())))
-            return -1;
-
-        for (uintptr_t len = 0; len < max_size; ++len) {
-            if (src[len] == 0)
-                return intptr_t(len);
-        }
-    } __catch {
-        return -1;
-    }
-    return -1;
-}
-
-intptr_t mm_lenof_user_str_smap(char const *src, size_t max_size)
-{
-    cpu_stac();
-    intptr_t result = mm_lenof_user_str_generic(src, max_size);
-    cpu_clac();
-    return result;
-}
-
-typedef bool (*mm_copy_user_fn)(
-        void *dst, void const *src, size_t size);
-typedef bool (*mm_copy_user_str_fn)(
-        char *dst, char const *src, size_t size);
-typedef intptr_t (*mm_lenof_user_str_fn)(
-        char const *src, size_t max_size);
-
-extern "C" mm_copy_user_fn mm_copy_user_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_copy_user_smap;
-    return mm_copy_user_generic;
-}
-
-extern "C" mm_copy_user_str_fn mm_copy_user_str_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_copy_user_str_smap;
-    return mm_copy_user_str_generic;
-}
-
-extern "C" mm_lenof_user_str_fn mm_lenof_user_str_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_lenof_user_str_smap;
-    return mm_lenof_user_str_generic;
-}
-
-_ifunc_resolver(mm_copy_user_resolver)
-EXPORT bool mm_copy_user(void *dst, void const *src, size_t size);
-
-_ifunc_resolver(mm_copy_user_str_resolver)
-EXPORT bool mm_copy_user_str(char *dst, char const *src, size_t size);
-
-_ifunc_resolver(mm_lenof_user_str_resolver)
-EXPORT intptr_t mm_lenof_user_str(char const *src, size_t max_size);
-
-EXPORT bool mm_is_user_range(void const *buf, size_t size)
-{
-    return linaddr_t(buf) >= 0x400000 &&
-            (linaddr_t(buf) < 0x7FFFFFFFFFFF) &&
-            (linaddr_t(buf) + size) <= 0x7FFFFFFFFFFF;
 }
 
 // Hierarchical bitmap allocator

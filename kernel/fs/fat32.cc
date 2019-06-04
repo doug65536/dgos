@@ -13,6 +13,7 @@
 #include "bootinfo.h"
 #include "inttypes.h"
 #include "cxxstring.h"
+#include "user_mem.h"
 
 #define DEBUG_FAT32 1
 #if DEBUG_FAT32
@@ -1281,7 +1282,8 @@ bool fat32_fs_t::mount(fs_init_info_t *conn)
 
     sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
-    std::unique_ptr<char[]> sector_buffer = new char[sector_size];
+    std::unique_ptr<char[]> sector_buffer =
+            new (std::nothrow) char[sector_size];
 
     if (!sector_buffer)
         return false;
@@ -1346,7 +1348,7 @@ fs_base_t *fat32_factory_t::mount(fs_init_info_t *conn)
     if (fat32_mounts.empty())
         fat32_fs_t::handles.create(510);
 
-    std::unique_ptr<fat32_fs_t> self(new fat32_fs_t);
+    std::unique_ptr<fat32_fs_t> self(new (std::nothrow) fat32_fs_t);
     if (self->mount(conn)) {
         if (!fat32_mounts.push_back(self))
             panic_oom();

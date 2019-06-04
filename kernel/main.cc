@@ -258,7 +258,7 @@ void test_read_stress()
 {
     int dev_cnt = storage_dev_count();
     std::vector<read_stress_thread_t*> *read_stress_threads =
-            new std::vector<read_stress_thread_t*>();
+            new (std::nothrow) std::vector<read_stress_thread_t*>();
     if (!read_stress_threads->reserve(dev_cnt * ENABLE_READ_STRESS_THREAD))
         panic("Out of memory");
 
@@ -267,7 +267,8 @@ void test_read_stress()
             printk("(devid %d, worker %d)"
                    " Running block read stress\n",
                      devid, i);
-            read_stress_thread_t *thread = new read_stress_thread_t();
+            read_stress_thread_t *thread =
+                    new (std::nothrow) read_stress_thread_t();
             if (!read_stress_threads->push_back(thread))
                 panic_oom();
             uint16_t *indicator = (uint16_t*)0xb8000 + 80*devid + i;
@@ -860,7 +861,7 @@ static int init_thread(void *)
     tmpfs_startup((void*)kernel_params->initrd_st, kernel_params->initrd_sz);
     modload_init();
 
-    printk("Running set<int> self test\n");
+    //printk("Running set<int> self test\n");
     //std::set<int>::test();
 //    rbtree_t<>::test();
 

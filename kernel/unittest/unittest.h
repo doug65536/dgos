@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "string.h"
 
 namespace unittest {
 
@@ -22,50 +23,58 @@ class unit {
 public:
     unit(char const *name);
 
+    void fail();
+
     void set_ctx(unit_ctx *ctx);
 
     virtual void invoke() = 0;
+
+    void eq(char const *expect, char const *value)
+    {
+        if (strcmp(expect, value))
+            fail();
+    }
 
     template<typename T, typename U>
     void eq(T expect, U value)
     {
         if (!(expect == value))
-            ctx->fail(this);
+            fail();
     }
 
     template<typename T, typename U>
     void ne(T expect, U value)
     {
         if (!(expect != value))
-            ctx->fail(this);
+            fail();
     }
 
     template<typename T, typename U>
     void lt(T expect, U value)
     {
         if (!(expect < value))
-            ctx->fail(this);
+            fail();
     }
 
     template<typename T, typename U>
     void gt(T expect, U value)
     {
         if (!(expect > value))
-            ctx->fail(this);
+            fail();
     }
 
     template<typename T, typename U>
     void le(T expect, U value)
     {
         if (!(expect <= value))
-            ctx->fail(this);
+            fail();
     }
 
     template<typename T, typename U>
     void ge(T expect, U value)
     {
         if (!(expect >= value))
-            ctx->fail(this);
+            fail();
     }
 
     char const *get_name() const;
@@ -92,7 +101,7 @@ class symbol \
 public: \
     symbol() : unit(#name) {} \
     void invoke() override final; \
-}; void symbol ::invoke()
+}; symbol UNITTEST_CONCAT(symbol, instance); void symbol ::invoke()
 
 #define UNITTEST(name) UNITTESTIMPL(name, UNITTEST_CONCAT(unit_, name))
 

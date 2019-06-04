@@ -253,7 +253,7 @@ std::vector<storage_if_base_t *> ide_if_factory_t::detect(void)
     size_t std_idx = 0;
 
     do {
-        std::unique_ptr<ide_if_t> if_(new ide_if_t{});
+        std::unique_ptr<ide_if_t> if_(new (std::nothrow) ide_if_t{});
 
         if_->chan[0].ports.cmd = pci_iter.config.is_bar_portio(0) &&
                 pci_iter.config.get_bar(0)
@@ -617,7 +617,7 @@ void ide_if_t::ide_chan_t::detect_devices(
             continue;
         }
 
-        std::unique_ptr<ide_dev_t> dev(new ide_dev_t{});
+        std::unique_ptr<ide_dev_t> dev(new (std::nothrow) ide_dev_t{});
         dev->chan = this;
         dev->slave = slave;
         dev->is_atapi = is_atapi;
@@ -626,7 +626,8 @@ void ide_if_t::ide_chan_t::detect_devices(
         if (!list.push_back(dev.release()))
             panic_oom();
 
-        std::unique_ptr<ata_identify_t> ident = new ata_identify_t;
+        std::unique_ptr<ata_identify_t> ident =
+                new (std::nothrow) ata_identify_t;
 
         IDE_TRACE("if=%d, slave=%d, receiving IDENTIFY\n", secondary, slave);
 

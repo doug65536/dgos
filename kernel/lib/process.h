@@ -64,18 +64,43 @@ struct auxv_t {
     enum type_t {
         AT_NULL    =  0,    // ignored
         AT_IGNORE  =  1,    // ignored
+
+        // File descriptor of program executable
         AT_EXECFD  =  2,    // a_val
+
+        // The address of the program headers
         AT_PHDR    =  3,    // a_ptr
+
+        // The size of a program header entry
         AT_PHENT   =  4,    // a_val
+
+        // The number of program headers
         AT_PHNUM   =  5,    // a_val
+
+        // The system page size
         AT_PAGESZ  =  6,    // a_val
+
+        // The base address
         AT_BASE    =  7,    // a_ptr
+
+        // Unused
         AT_FLAGS   =  8,    // a_val
+
+        // The entry point
         AT_ENTRY   =  9,    // a_ptr
+
         AT_NOTELF  = 10,    // a_val
+
+        // The real user id of the main thread
         AT_UID     = 11,    // a_val
+
+        // The effective user id of the main thread
         AT_EUID    = 12,    // a_val
+
+        // The real group id of the main thread
         AT_GID     = 13,    // a_val
+
+        // The effective group id of the main thread
         AT_EGID    = 14     // a_val
     };
 

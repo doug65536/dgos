@@ -2,6 +2,7 @@
 #include "time.h"
 #include "utility.h"
 #include "cpuid.h"
+#include "likely.h"
 
 void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
 {
@@ -66,17 +67,16 @@ void c4rand::write(void const *data, size_t len)
 
     bool done = false;
 
-    for (size_t i = 0, ki = 0; i || !done; ++i, ++ki) {
-        if (ki >= len) {
-            ki = 0;
-            done = true;
-        }
-
-        if (i >= 256)
-            i = 0;
-
+    // Keep going until we are both done and at index 0
+    for (size_t ki = 0, i = 0; (i &= 0xFF) || !done; ++i) {
         b = (b + state[i] + key[ki]) & 0xFF;
         std::swap(state[i], state[b]);
+
+        // If we are at the end of the key, wrap around
+        if (++ki >= len) {
+            done = true;
+            ki = 0;
+        }
     }
 
     a = 0;

@@ -45,7 +45,7 @@ vbe_mode_list_t::vbe_mode_list_t()
 }
 
 vbe_mode_list_t::vbe_mode_list_t(size_t count)
-    : modes{new vbe_selected_mode_t[count]}
+    : modes{new (std::nothrow) vbe_selected_mode_t[count]}
     , count(count)
 {
 }

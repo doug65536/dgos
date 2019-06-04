@@ -21,6 +21,7 @@ arch/x86_64/cpu/pic.bits
 arch/x86_64/cpu/picbits.h
 arch/x86_64/cpu/spinlock_arch.h
 arch/x86_64/cpu_bug.h
+arch/x86_64/user_mem.cc
 device/acpi.bits
 device/acpi.bits.h
 device/acpigas.cc
@@ -93,6 +94,7 @@ lib/dev_char.h
 lib/dev_graphics.cc
 lib/dev_graphics.h
 lib/dev_usb_ctl.h
+lib/kmodule.h
 lib/radix_tree.cc
 lib/radix_tree.h
 lib/refcount.cc
@@ -100,6 +102,7 @@ lib/refcount.h
 lib/sys/sys_types.h
 lib/thread_irq.cc
 lib/thread_irq.h
+lib/user_mem.h
 syscall/sys_exit.cc
 syscall/sys_exit.h
 syscall/sys_fd.cc
@@ -395,3 +398,9 @@ arch/x86_64/cpu/segrw.h
 arch/x86_64/cpu/segrw.cc
 ../toolchain/build-crossgcc.sh
 ../toolchain/build-crossgcc-versions
+unittest/test_chrono.cc
+unittest/test_printk.cc
+unittest/test_string.cc
+unittest/test_vector.cc
+unittest/unittest.cc
+unittest/unittest.h

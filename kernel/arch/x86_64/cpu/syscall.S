@@ -28,6 +28,7 @@
 // incoming:
 // eax syscall number, ecx return address, edx return stack pointer
 // xmm0-xmm5 6 parameters in low 64 bits
+.balign 16
 .global syscall32_entry
 .hidden syscall32_entry
 syscall32_entry:
@@ -136,6 +137,7 @@ syscall32_entry:
 // This code must preserve rbx, rbp, r12-r15
 // Note that these are the same rules as x86_64-elf function calls
 
+.balign 16
 .global syscall_entry
 .hidden syscall_entry
 syscall_entry:
@@ -144,6 +146,14 @@ syscall_entry:
     .cfi_def_cfa rsp,0
     .cfi_register rip,rcx
     .cfi_register rsp,rsp
+
+    // CFI to encode caller's cs and ss to hardcoded values (because
+    // we "know" cs and ss were certain values, since this is the
+    // syscall code for 64 bit code
+    .cfi_val_encoded_addr cs, 0, GDT_SEL_USER_CODE64+3
+    .cfi_val_encoded_addr ss, 0, GDT_SEL_USER_DATA+3
+
+    swapgs_boundary // in kernel cs with user gs begins
 
     // syscall rax
     // params rdi, rsi, rdx, r10, r8, r9
@@ -164,6 +174,8 @@ syscall_entry:
 
     // Switch to kernel gs
     swapgs
+
+    swapgs_boundary // in kernel cs with user gs ends
 
     // Get pointer to current thread
     movq %gs:CPU_INFO_CURTHREAD_OFS,%r11
@@ -213,9 +225,6 @@ syscall_entry:
     // - stack is switched to user stack in kernel mode
     cli
 
-    // Switch to user gs
-    swapgs
-
     // Don't leak information to user mode, clear SSE, clear x87
     vzeroall_insn
     emms
@@ -255,10 +264,19 @@ syscall_entry:
     fldcw THREAD_SC_FCW87_OFS(%rdi)
     mov %edx,%edi
 
+    // Switch to user gs
+    swapgs
+    swapgs_boundary // in kernel cs with user gs begins
     sysretq
 
     // syscall number out of range
 0:  movl $ SYSCALL_ENOSYS,%eax
     sysretq
+    swapgs_boundary // in kernel cs with user gs ends
 
     .cfi_endproc
+
+.balign 16
+.global syscall_entry_end
+.hidden syscall_entry_end
+syscall_entry_end:

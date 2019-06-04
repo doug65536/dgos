@@ -300,7 +300,7 @@ int ext4_fs_t::mm_fault_handler(
 
 fs_base_t *ext4_factory_t::mount(fs_init_info_t *conn)
 {
-    std::unique_ptr<ext4_fs_t> self(new ext4_fs_t);
+    std::unique_ptr<ext4_fs_t> self(new (std::nothrow) ext4_fs_t);
     if (self->mount(conn)) {
         if (!ext4_mounts.push_back(self)) {
             panic_oom();

@@ -47,7 +47,8 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
     long sector_size = drive->info(STORAGE_INFO_BLOCKSIZE);
 
     if (sector_size >= 512) {
-        std::unique_ptr<uint8_t[]> sector(new uint8_t[sector_size]);
+        std::unique_ptr<uint8_t[]> sector(new (std::nothrow)
+                                          uint8_t[sector_size]);
         memset(sector, 0, sector_size);
 
         if (drive->read_blocks(sector, 1, 0) >= 0) {
@@ -62,7 +63,7 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                     case 0x0B:// fall thru
                     case 0x0C:
                         // FAT32 LBA filesystem
-                        part.reset(new part_dev_t{});
+                        part.reset(new (std::nothrow) part_dev_t{});
                         part->drive = drive;
                         part->lba_st = ptbl[i].start_lba;
                         part->lba_len = ptbl[i].total_sectors;
@@ -75,7 +76,7 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                     case 0x83:
                         // Linux filesystem
                         std::unique_ptr<uint8_t> ext_superblock =
-                                new uint8_t[sector_size];
+                                new (std::nothrow) uint8_t[sector_size];
 
                         if (drive->read_blocks(ext_superblock, 1,
                                                 ptbl[i].start_lba) < 0) {
@@ -84,7 +85,7 @@ std::vector<part_dev_t *> mbr_part_factory_t::detect(storage_dev_base_t *drive)
                             break;
                         }
 
-                        part.reset(new part_dev_t{});
+                        part.reset(new (std::nothrow) part_dev_t{});
                         part->drive = drive;
                         part->lba_st = ptbl[i].start_lba;
                         part->lba_len = ptbl[i].total_sectors;

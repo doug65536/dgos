@@ -412,7 +412,7 @@ bool usb_msc_classdrv_t::probe(usb_config_helper *cfg_hlp, usb_bus_t *bus)
     assert(bulk_out);
 
     // Allocate an interface
-    std::unique_ptr<usb_msc_if_t> if_(new usb_msc_if_t{});
+    std::unique_ptr<usb_msc_if_t> if_(new (std::nothrow) usb_msc_if_t{});
 
     USB_MSC_TRACE("initializing interface, slot=%d\n",
                   cfg_hlp->slot());
@@ -512,7 +512,7 @@ bool usb_msc_if_t::init(usb_pipe_t const& control,
     for (int lun = 0; lun <= max_lun; ++lun) {
         USB_MSC_TRACE("Initializing lun %d\n", lun);
 
-        std::unique_ptr<usb_msc_dev_t> drv(new usb_msc_dev_t{});
+        std::unique_ptr<usb_msc_dev_t> drv(new (std::nothrow) usb_msc_dev_t{});
 
         // Get size and block size
         wrapper_t cap;

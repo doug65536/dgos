@@ -4,6 +4,7 @@
 #include "hash_table.h"
 #include "threadsync.h"
 #include "chrono.h"
+#include "user_mem.h"
 
 struct futex_tab_ent_t {
     uintptr_t addr;
@@ -46,7 +47,8 @@ static long futex_wait(int *uaddr, int expect, int64_t timeout_time)
     futex_tab_ent_t *fent = futex_tab.lookup(&value);
 
     if (!fent) {
-        std::unique_ptr<futex_tab_ent_t> new_ent(new futex_tab_ent_t);
+        std::unique_ptr<futex_tab_ent_t> new_ent(
+                    new (std::nothrow) futex_tab_ent_t);
 
         if (unlikely(!new_ent))
             return -int(errno_t::ENOMEM);

@@ -1,8 +1,16 @@
 
+#if !defined(__SIZEOF_LONG__) || !defined(__SIZEOF_LONG_LONG__)
+#error Required information missing
+#endif
+
 #if __SIZEOF_LONG__ == 4 && __SIZEOF_LONG_LONG__ == 8
 #define __FMT8      "hh"
 #define __FMT16     "h"
+#ifdef __clang__
+#define __FMT32     ""
+#else
 #define __FMT32     "l"
+#endif
 #define __FMT64     "ll"
 #define __FMTMX     "j"
 #define __FMTPT     "t"

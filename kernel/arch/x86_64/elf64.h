@@ -1,9 +1,9 @@
 #pragma once
 #include "types.h"
+#include "vector.h"
+#include "cxxstring.h"
 
 __BEGIN_DECLS
-
-typedef int (*module_entry_fn_t)();
 
 struct plt_stub_data_t;
 
@@ -17,7 +17,9 @@ class module_t;
 
 module_t *modload_load(char const *path, bool run = true);
 module_t *modload_load_image(void const *image, size_t image_sz,
-                             char const *module_name, bool run = true);
+                             char const *module_name,
+                             std::vector<std::string> parameters,
+                             errno_t *ret_errno = nullptr);
 
 int modload_run(module_t *module);
 

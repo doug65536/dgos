@@ -18,7 +18,7 @@
 
 // Spin to acquire lock, return having entered critical section
 _hot
-void spinlock_lock(spinlock_t *lock)
+EXPORT void spinlock_lock(spinlock_t *lock)
 {
     cs_enter();
     while (atomic_ld_acq(lock) != 0 || atomic_cmpxchg(lock, 0, 1) != 0)
@@ -27,7 +27,7 @@ void spinlock_lock(spinlock_t *lock)
 
 // Returns 1 with interrupts disabled if lock was acquired
 // Returns 0 with interrupts preserved if lock was not acquired
-bool spinlock_try_lock(spinlock_t *lock)
+EXPORT bool spinlock_try_lock(spinlock_t *lock)
 {
     cs_enter();
 
@@ -42,7 +42,7 @@ bool spinlock_try_lock(spinlock_t *lock)
 }
 
 _hot
-void spinlock_unlock(spinlock_t *lock)
+EXPORT void spinlock_unlock(spinlock_t *lock)
 {
     assert(*lock & 1);
     atomic_st_rel(lock, 0);
@@ -103,32 +103,32 @@ static void rwspinlock_ex_lock_impl(rwspinlock_t *lock,
     }
 }
 
-void rwspinlock_ex_lock(rwspinlock_t *lock)
+EXPORT void rwspinlock_ex_lock(rwspinlock_t *lock)
 {
     rwspinlock_ex_lock_impl(lock, 0);
 }
 
 // Upgrade from shared lock to exclusive lock
-void rwspinlock_upgrade(rwspinlock_t *lock)
+EXPORT void rwspinlock_upgrade(rwspinlock_t *lock)
 {
     assert(*lock > 0);
     rwspinlock_ex_lock_impl(lock, 1);
 }
 
 // Downgrade from exclusive lock to shared lock
-void rwspinlock_downgrade(rwspinlock_t *lock)
+EXPORT void rwspinlock_downgrade(rwspinlock_t *lock)
 {
     assert(*lock == -1);
     *lock = 1;
 }
 
-void rwspinlock_ex_unlock(rwspinlock_t *lock)
+EXPORT void rwspinlock_ex_unlock(rwspinlock_t *lock)
 {
     assert(*lock == -1);
     *lock = 0;
 }
 
-void rwspinlock_sh_lock(rwspinlock_t *lock)
+EXPORT void rwspinlock_sh_lock(rwspinlock_t *lock)
 {
     for (rwspinlock_value_t old_value = *lock; ; pause()) {
         if (old_value >= 0 && old_value < (1<<30)) {
@@ -147,7 +147,7 @@ void rwspinlock_sh_lock(rwspinlock_t *lock)
     }
 }
 
-void rwspinlock_sh_unlock(rwspinlock_t *lock)
+EXPORT void rwspinlock_sh_unlock(rwspinlock_t *lock)
 {
     for (rwspinlock_value_t old_value = *lock; ; pause()) {
         if (old_value > 0) {
@@ -161,7 +161,7 @@ void rwspinlock_sh_unlock(rwspinlock_t *lock)
     }
 }
 
-bool rwspinlock_ex_try_lock(rwspinlock_t *lock)
+EXPORT bool rwspinlock_ex_try_lock(rwspinlock_t *lock)
 {
     if (*lock == 0)
         return atomic_cmpxchg(lock, 0, -1) == 0;
@@ -169,7 +169,7 @@ bool rwspinlock_ex_try_lock(rwspinlock_t *lock)
     return false;
 }
 
-bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
+EXPORT bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
 {
     for (rwspinlock_value_t expect = *lock; expect >= 0; pause()) {
         if (atomic_cmpxchg_upd(lock, &expect, expect + 1))
@@ -183,7 +183,7 @@ bool rwspinlock_sh_try_lock(rwspinlock_t *lock)
     return false;
 }
 
-void ticketlock_lock(ticketlock_t *lock)
+EXPORT void ticketlock_lock(ticketlock_t *lock)
 {
     cs_enter();
 
@@ -203,7 +203,8 @@ void ticketlock_lock(ticketlock_t *lock)
     }
 }
 
-void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
+EXPORT void ticketlock_lock_restore(
+        ticketlock_t *lock, ticketlock_value_t saved_lock)
 {
     ticketlock_value_t my_ticket = atomic_xadd(&lock->next_ticket, 2);
 
@@ -220,7 +221,7 @@ void ticketlock_lock_restore(ticketlock_t *lock, ticketlock_value_t saved_lock)
     }
 }
 
-bool ticketlock_try_lock(ticketlock_t *lock)
+EXPORT bool ticketlock_try_lock(ticketlock_t *lock)
 {
     cs_enter();
 
@@ -248,14 +249,14 @@ bool ticketlock_try_lock(ticketlock_t *lock)
     return false;
 }
 
-void ticketlock_unlock(ticketlock_t *lock)
+EXPORT void ticketlock_unlock(ticketlock_t *lock)
 {
     ticketlock_value_t serving = lock->now_serving;
     lock->now_serving = (serving + 2) & -2;
     cs_leave();
 }
 
-ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
+EXPORT ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
 {
     ticketlock_value_t intr_state = lock->now_serving & 1;
     ticketlock_value_t serving = lock->now_serving;
@@ -263,7 +264,8 @@ ticketlock_value_t ticketlock_unlock_save(ticketlock_t *lock)
     return intr_state;
 }
 
-bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
+EXPORT bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock,
+                             mcs_queue_ent_t *node)
 {
     cs_enter();
 
@@ -277,7 +279,8 @@ bool mcslock_try_lock(mcs_queue_ent_t * volatile * lock, mcs_queue_ent_t *node)
 }
 
 _hot
-void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+EXPORT void mcslock_lock(mcs_queue_ent_t * volatile *lock,
+                         mcs_queue_ent_t *node)
 {
     MCSLOCK_TRACE("Acquiring lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());
@@ -309,7 +312,8 @@ void mcslock_lock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
 }
 
 _hot
-EXPORT void mcslock_unlock(mcs_queue_ent_t * volatile *lock, mcs_queue_ent_t *node)
+EXPORT void mcslock_unlock(mcs_queue_ent_t * volatile *lock,
+                           mcs_queue_ent_t *node)
 {
     MCSLOCK_TRACE("Releasing lock @ %p threadid=%d\n",
                   (void*)lock, thread_get_id());

@@ -22,6 +22,7 @@
 
 .section .text.isr, "ax"
 
+.balign 16
 .global isr_entry_st
 isr_entry_st:
 
@@ -114,6 +115,10 @@ isr_section_name \int_num
     push_cfi $\int_num
     jmp \pathname
     .cfi_endproc
+.endm
+
+.macro isr_entry_custom has_code int_num handler
+    isr_entry_impl \has_code \int_num isr_entry \handler
 .endm
 
 .macro isr_entry has_code int_num
@@ -546,7 +551,7 @@ isr_common:
     pushq %rdi
     .cfi_offset rdi,-22*8
 
-    // Assume null FPU context pointer
+    // Zero constant
     xorl %edi,%edi
 
     // Save CR3
@@ -565,7 +570,6 @@ isr_common:
 
     // ...came from user code
 
-    xor %r12d,%r12d
     insn_fixup
     rdfsbase %r13
     rdgsbase %r14
@@ -578,7 +582,7 @@ isr_common:
     insn_fixup
     call protection_barrier
 
-    mov %gs:CPU_INFO_CURTHREAD_OFS(%r12),%r12
+    mov %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
 
     // Unlikely
     cmp %r13,THREAD_FSBASE_OFS(%r12)
@@ -719,6 +723,7 @@ isr_common:
     movq THREAD_FSBASE_OFS(%r15),%r13
     movq THREAD_GSBASE_OFS(%r15),%r14
 
+    insn_fixup
     wrfsbase %r13
     wrgsbase %r14
 
@@ -1181,13 +1186,13 @@ soft_rdgsbase_r14:
 .macro xsave_ctx insn
     .cfi_startproc
 
-    // Set all bits of edx:eax
-    movl $-1,%eax
-    movl %eax,%edx
-
     // Read xsave stack pointer from thread
     movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
     subq sse_context_size(%rip),%rsi
+
+    // Set all bits of edx:eax
+    movl $-1,%eax
+    movl %eax,%edx
 
     // Save context using instruction passed to macro
     insn_fixup
@@ -1205,11 +1210,11 @@ soft_rdgsbase_r14:
 .macro xrstor_ctx insn
     .cfi_startproc
 
+    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
+
     // Set all bits of edx:eax
     movl $-1,%eax
     movl %eax,%edx
-
-    movq THREAD_XSAVE_PTR_OFS(%rdi),%rsi
 
     // Restore context using instruction passed to macro
     insn_fixup
@@ -1249,6 +1254,7 @@ isr_restore_fpu_ctx64:
 isr_restore_fpu_ctx32:
     xrstor_ctx fxrstor
 
+.balign 16
 .hidden protection_barrier
 .global protection_barrier
 protection_barrier:
@@ -1256,6 +1262,7 @@ protection_barrier:
     // Just return if it is getting called before patching to IBPB version
     ret
 
+.balign 16
 .hidden protection_barrier_ibpb
 .global protection_barrier_ibpb
 protection_barrier_ibpb:
@@ -1326,6 +1333,7 @@ exception_isr_handler:
     .cfi_endproc
 
 //thread_fn_t fn, void *p, thread_t id
+.balign 16
 .global thread_entry
 thread_entry:
     .cfi_startproc
@@ -1348,6 +1356,7 @@ thread_entry:
     .cfi_endproc
 
 // _noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
+.balign 16
 .hidden isr_sysret64
 .global isr_sysret64
 isr_sysret64:
@@ -1416,11 +1425,6 @@ isr_sysret64:
     // Prevent IRQ while swapped to user gs or using user stack
     // in kernel mode
     cli
-    swapgs
-
-    insn_fixup
-    wrfsbase %r13
-    wrgsbase %r14
 
     vzeroall_insn
     emms
@@ -1438,6 +1442,14 @@ isr_sysret64:
     fldcw THREAD_SC_FCW87_OFS(%rbx)
     mov %eax,%ebx
 
+    swapgs
+
+    swapgs_boundary
+
+    insn_fixup
+    wrfsbase %r13
+    wrgsbase %r14
+
     mov %rsi,%rsp
     .cfi_undefined rip
     .cfi_undefined rsp
@@ -1449,6 +1461,8 @@ isr_sysret64:
     .cfi_undefined r15
     // goto user mode and load flags
     sysretq
+
+    swapgs_boundary
 
     .cfi_endproc
 

@@ -228,4 +228,6 @@ thread_t thread_func_1(int (*fn)(void*), void *arg);
 
 thread_t thread_create_irq_handler();
 
+void thread_set_cpu_count(size_t new_cpu_count);
+
 __END_DECLS

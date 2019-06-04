@@ -81,7 +81,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
     if (unlikely(sector_size < 128))
         return list;
 
-    std::unique_ptr<uint8_t[]> sector(new uint8_t[sector_size]);
+    std::unique_ptr<uint8_t[]> sector(new (std::nothrow) uint8_t[sector_size]);
     memset(sector, 0, sector_size);
 
     gpt_hdr_t hdr;
@@ -105,7 +105,7 @@ std::vector<part_dev_t *> gpt_part_factory_t::detect(storage_dev_base_t *drive)
         memcpy(&ptent, sector, sizeof(ptent));
 
         if (ptent.type_guid == efi_part) {
-            part.reset(new part_dev_t{});
+            part.reset(new (std::nothrow) part_dev_t{});
             part->drive = drive;
             part->lba_st = ptent.lba_st;
             part->lba_len = ptent.lba_en - ptent.lba_st + 1;

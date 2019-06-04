@@ -592,6 +592,10 @@ void cpu_hw_init(int ap)
 
     apic_init(ap);
 
+    // We know the machine topology now...
+
+    thread_set_cpu_count(apic_cpu_count());
+
     // Initialize APIC, but fallback to 8259 if no MP tables
     if (!apic_enable()) {
         printk("Enabling 8259 PIC\n");

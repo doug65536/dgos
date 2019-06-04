@@ -1,7 +1,8 @@
-// module_entry.cc
-#include "export.h"
+#include "kmodule.h"
 
-extern "C" int module_entry()
+extern "C"
+__attribute__((__section__(".entry")))
+int module_entry(int argc, char **argv)
 {
-    return 0;
+    return module_main(argc, argv);
 }

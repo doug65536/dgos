@@ -50,19 +50,19 @@ public:
     constexpr const_iterator
     end() const noexcept
     {
-        return begin() + size();
+        return __array + __len;
     }
 };
 
 template<typename _T>
-constexpr const _T*
+constexpr _T const *
 begin(initializer_list<_T> __ils) noexcept
 {
     return __ils.begin();
 }
 
 template<typename _T>
-constexpr const _T*
+constexpr _T const *
 end(initializer_list<_T> __ils) noexcept
 {
     return __ils.end();

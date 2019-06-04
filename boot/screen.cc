@@ -215,7 +215,7 @@ void print_str_xy(int x, int y, tchar const *s, size_t len,
 
 void print_lba(uint32_t lba)
 {
-    PRINT("%" PRIu32 "\n", lba);
+    //PRINT("%" PRIu32 "\n", lba);
 }
 
 //void dump_regs(bios_regs_t& regs, bool show_flags)

@@ -16,6 +16,8 @@
 #include "callout.h"
 #include "cxxstring.h"
 #include "cpu/control_regs.h"
+#include "user_mem.h"
+#include "kmodule.h"
 
 #define ELF64_DEBUG     0
 #if ELF64_DEBUG
@@ -128,8 +130,9 @@ static std::string module_reloc_type(size_t sym_type)
 class module_t {
 public:
     bool load(char const *path);
-    bool load_image(void const *module, size_t module_sz,
-                    char const *module_name);
+    errno_t load_image(void const *module, size_t module_sz,
+                    char const *module_name,
+                    std::vector<std::string> parameters);
     int run();
 
     ~module_t();
@@ -179,12 +182,15 @@ public:
     Elf64_Addr first_exec = 0;
 
     kernel_ht_t ht;
+
+    std::vector<std::string> param;
+    std::vector<char const *> argv;
 };
 
 // Shared module loader
 module_t *modload_load(char const *path, bool run)
 {
-    std::unique_ptr<module_t> module(new module_t{});
+    std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
     if (likely(module->load(path)))
         return module.release();
     return nullptr;
@@ -192,11 +198,32 @@ module_t *modload_load(char const *path, bool run)
 
 // Shared module loader
 module_t *modload_load_image(void const *image, size_t image_sz,
-                             char const *module_name, bool run)
+                             char const *module_name,
+                             std::vector<std::string> parameters,
+                             errno_t *ret_errno)
 {
-    std::unique_ptr<module_t> module(new module_t{});
-    if (likely(module->load_image(image, image_sz, module_name)))
+    std::unique_ptr<module_t> module(new (std::nothrow) module_t{});
+
+    if (unlikely(!module)) {
+        if (ret_errno)
+            *ret_errno = errno_t::ENOMEM;
+        return nullptr;
+    }
+
+    parameters.insert(parameters.begin(), module_name);
+
+//    if (parameters.back())
+//        parameters.push_back(nullptr);
+
+    errno_t err = module->load_image(image, image_sz, module_name,
+                                     std::move(parameters));
+
+    if (likely(err == errno_t::OK))
         return module.release();
+
+    if (ret_errno)
+        *ret_errno = err;
+
     return nullptr;
 }
 
@@ -255,7 +282,7 @@ static constexpr char const *get_relocation_type(size_t type) {
 // with commands that magically load the symbols for a module when loaded
 void modload_load_symbols(char const *path, uintptr_t addr)
 {
-    // Seriously compliler, please don't elide, thanks!
+    // Automated breakpoint is placed here to load symbols
     // The debugger is actually going to dereference path and get addr
     // So that memory clobber is really needed, I need the caller to write
     // the actual path string into memory there (flow analysis could discard
@@ -263,16 +290,19 @@ void modload_load_symbols(char const *path, uintptr_t addr)
     __asm__ __volatile__ ("" : : "r" (path), "r" (addr) : "memory");
 }
 
-static bool load_failed()
+static errno_t load_failed(errno_t err)
 {
     cpu_debug_break();
-    return false;
+    return err;
 }
 
-bool module_t::load_image(void const *module, size_t module_sz,
-                          char const *module_name)
+errno_t module_t::load_image(void const *module, size_t module_sz,
+                             char const *module_name,
+                             std::vector<std::string> parameters)
 {
-    auto pread = [&](void *buf, size_t sz, off_t ofs) -> ssize_t {
+    param = std::move(parameters);
+
+    auto const pread = [&](void *buf, size_t sz, off_t ofs) -> ssize_t {
         if (unlikely(ofs < 0 || size_t(ofs) >= module_sz))
             return 0;
         // If the read is truncated
@@ -283,24 +313,32 @@ bool module_t::load_image(void const *module, size_t module_sz,
         return sz;
     };
 
-    if (unlikely(sizeof(file_hdr) != pread(&file_hdr, sizeof(file_hdr), 0))) {
+    size_t io_size = sizeof(file_hdr);
+    auto io_result = pread(&file_hdr, io_size, 0);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
         printk("Failed to read module file header\n");
-        return load_failed();
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
     }
 
     if (unlikely(file_hdr.e_phentsize != sizeof(Elf64_Phdr))) {
         printk("Unrecognized program header record size\n");
-        return load_failed();
+        return load_failed(errno_t::ENOEXEC);
     }
 
     if (unlikely(!phdrs.resize(file_hdr.e_phnum)))
-        panic_oom();
+        return load_failed(errno_t::ENOMEM);
 
-    if (unlikely(ssize_t(sizeof(Elf64_Phdr) * file_hdr.e_phnum) != pread(
-                     phdrs.data(), sizeof(Elf64_Phdr) * file_hdr.e_phnum,
-                     file_hdr.e_phoff))) {
+    io_size = sizeof(Elf64_Phdr) * file_hdr.e_phnum;
+    io_result = pread(phdrs.data(), io_size, file_hdr.e_phoff);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
         printk("Failed to read %u program headers\n", file_hdr.e_phnum);
-        return load_failed();
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
     }
 
     // Calculate address space needed
@@ -315,6 +353,9 @@ bool module_t::load_image(void const *module, size_t module_sz,
     }
 
     image = mm_alloc_space(max_vaddr - min_vaddr);
+
+    if (unlikely(!image))
+        return load_failed(errno_t::ENOMEM);
 
     // Compute relocation distance
     base_adj = Elf64_Sxword(Elf64_Addr(image) - min_vaddr);
@@ -331,7 +372,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
                           MAP_NOCOMMIT, -1, 0);
         if (unlikely(addr == MAP_FAILED)) {
             printdbg("Failed to map section\n");
-            return load_failed();
+            return load_failed(errno_t::ENOMEM);
         }
 
         ELF64_TRACE("%s: Mapped %#zx bytes at %#zx\n", module_name,
@@ -349,10 +390,14 @@ bool module_t::load_image(void const *module, size_t module_sz,
 
         void *addr = (void*)(phdr.p_vaddr + base_adj);
 
-        if (unlikely(ssize_t(phdr.p_filesz) != pread(
-                         addr, phdr.p_filesz, phdr.p_offset))) {
+        io_size = phdr.p_filesz;
+        io_result = pread(addr, phdr.p_filesz, phdr.p_offset);
+
+        if (unlikely(ssize_t(io_size) != io_result)) {
             printdbg("Failed to read segment\n");
-            return load_failed();
+            return load_failed(io_result < 0
+                               ? errno_t(-io_result)
+                               : errno_t::ENOEXEC);
         }
 
         size_t zeroed = phdr.p_memsz - phdr.p_filesz;
@@ -364,17 +409,20 @@ bool module_t::load_image(void const *module, size_t module_sz,
 
     if (unlikely(dyn_entries * sizeof(Elf64_Dyn) != dyn_seg->p_memsz)) {
         printdbg("Dynamic segment has unexpected size\n");
-        return load_failed();
+        return load_failed(errno_t::ENOEXEC);
     }
 
     if (unlikely(!dyn.resize(dyn_entries)))
-        panic_oom();
+        return load_failed(errno_t::ENOMEM);
 
-    if (unlikely(ssize_t(dyn_seg->p_filesz) != pread(
-                     dyn.data(), dyn_seg->p_filesz, dyn_seg->p_offset))) {
-        // FIXME: LEAK!
+    io_size = dyn_seg->p_filesz;
+    io_result = pread(dyn.data(), io_size, dyn_seg->p_offset);
+
+    if (unlikely(ssize_t(io_size) != io_result)) {
         printdbg("Dynamic segment read failed\n");
-        return load_failed();
+        return load_failed(io_result < 0
+                           ? errno_t(-io_result)
+                           : errno_t::ENOEXEC);
     }
 
     //
@@ -402,7 +450,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
                 printdbg("Unexpected symbol record size"
                          ", expect=%zu, got=%zu\n", sizeof(Elf64_Sym),
                          dyn_ent.d_un.d_val);
-                return load_failed();
+                return load_failed(errno_t::ENOEXEC);
             }
             continue;
 
@@ -417,7 +465,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
         case DT_PLTREL:
             if (unlikely(dyn_ent.d_un.d_val != DT_RELA)) {
                 printdbg("Unexpected relocation type, expecting RELA\n");
-                return load_failed();
+                return load_failed(errno_t::ENOEXEC);
             }
             continue;
 
@@ -436,7 +484,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
         case DT_RELAENT:
             if (unlikely(dyn_ent.d_un.d_val != sizeof(Elf64_Rela))) {
                 printdbg("Relocations have unexpected size\n");
-                return load_failed();
+                return load_failed(errno_t::ENOEXEC);
             }
             continue;
 
@@ -550,9 +598,6 @@ bool module_t::load_image(void const *module, size_t module_sz,
 
             auto const& sym = syms[sym_idx];
 
-            if (sym.st_info == 0)
-                continue;
-
             ELF64_TRACE("Fixup at %#zx + %#zx (%#zx), type=%s\n",
                      uintptr_t(base_adj), uintptr_t(rela_ptr[i].r_offset),
                      base_adj + rela_ptr[i].r_offset,
@@ -591,7 +636,7 @@ bool module_t::load_image(void const *module, size_t module_sz,
                 if (!S) {
                     printk("module link error in %s:"
                            " Symbol \"%s\" not found", module_name, name);
-                    return load_failed();
+                    return load_failed(errno_t::ENOEXEC);
                 }
             }
 
@@ -782,7 +827,7 @@ all_common:
 truncated_common:
                 printk("%s: %s relocation truncated to fit!\n",
                          module_name, type_txt);
-                return load_failed();
+                return load_failed(errno_t::ENOEXEC);
             }
         }
     }
@@ -810,10 +855,11 @@ truncated_common:
 
     // Find first executable program header
 
+    first_exec = 0;
     for (Elf64_Phdr const& phdr : phdrs) {
         if (phdr.p_flags & PF_X) {
-            first_exec = phdr.p_vaddr + base_adj;
-            break;
+            if (!first_exec || first_exec < phdr.p_vaddr + base_adj)
+                first_exec = phdr.p_vaddr + base_adj;
         }
     }
 
@@ -825,13 +871,21 @@ truncated_common:
     // Run the init array
     uintptr_t const *fn_addrs = (uintptr_t const *)(dt_init_array + base_adj);
     for (size_t i = 0, e = dt_init_arraysz / sizeof(uintptr_t); i != e; ++i) {
-        auto fn = (void(*)())(fn_addrs[i] + base_adj);
+        auto fn = (void(*)())(fn_addrs[i]);
         fn();
     }
 
     entry = module_entry_fn_t(file_hdr.e_entry + base_adj);
 
-    return true;
+    if (unlikely(!argv.reserve(param.size() + 1)))
+        return load_failed(errno_t::ENOMEM);
+
+    for (std::string const& parameter : param)
+        argv.push_back(parameter.c_str());
+
+    run();
+
+    return errno_t::OK;
 }
 
 bool module_t::load(char const *path)
@@ -841,7 +895,7 @@ bool module_t::load(char const *path)
 
 int module_t::run()
 {
-    run_result = entry();
+    run_result = entry(argv.size() - 1, argv.data());
     return run_result;
 }
 

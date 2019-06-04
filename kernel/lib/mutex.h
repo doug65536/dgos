@@ -234,7 +234,7 @@ private:
 };
 
 template<>
-class unique_lock<ext::mcslock>
+class EXPORT unique_lock<ext::mcslock>
 {
 public:
     _hot

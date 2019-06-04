@@ -125,6 +125,7 @@ private:
 template<typename A = uintptr_t, typename S = size_t>
 class basic_pmd_t
 {
+public:
     A addr;
     S size;
 

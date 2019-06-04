@@ -2,6 +2,7 @@
 
 .section .text, "ax"
 
+.balign 16
 .global __exception_setjmp
 __exception_setjmp:
     .cfi_startproc
@@ -34,6 +35,7 @@ __exception_setjmp:
 
     .cfi_endproc
 
+.balign 16
 .global __exception_longjmp
 __exception_longjmp:
     .cfi_startproc
@@ -41,16 +43,20 @@ __exception_longjmp:
     // Restore call preserved registers
     movq 2*8(%rdi),%rbx
     movq 3*8(%rdi),%rbp
+    xorl %r11d,%r11d
+    xorl %r10d,%r10d
     movq 4*8(%rdi),%r12
     movq 5*8(%rdi),%r13
+    xorl %r9d,%r9d
+    xorl %r8d,%r8d
     movq 6*8(%rdi),%r14
     movq 7*8(%rdi),%r15
+    xorl %edx,%edx
+    xorl %ecx,%ecx
 
     // Restore flags
-    pushq 8*8(%rdi)
-    .cfi_adjust_cfa_offset 8
-    popfq
-    .cfi_adjust_cfa_offset -8
+    push_cfi 8*8(%rdi)
+    popfq_cfi
 
     // Restore stack pointer
     movq 1*8(%rdi),%rsp
@@ -62,6 +68,7 @@ __exception_longjmp:
     .cfi_endproc
 
 // void __exception_longjmp_unwind(__exception_jmp_buf_t *__ctx, int value);
+.balign 16
 .global __exception_longjmp_unwind
 __exception_longjmp_unwind:
     .cfi_startproc
@@ -84,5 +91,6 @@ __exception_longjmp_unwind:
     // stopfn is 2nd parameter
     leaq __exception_stop_fn(%rip),%rsi
     call _Unwind_ForcedUnwind
+    ud2
 
     .cfi_endproc

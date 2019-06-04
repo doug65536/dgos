@@ -27,6 +27,9 @@ extern "C" void *memmove(void *dest, void const *src, size_t n);
 extern "C" char *strcpy(char * restrict dest, char const * restrict src);
 extern "C" char *strcat(char * restrict dest, char const * restrict src);
 
+// Copies up to n bytes to the destination
+// If the input is too long, the resulting string is not null terminated
+// In all cases the unused excess portion of the destination is zero cleared
 extern "C" char *strncpy(char * restrict dest,
                          char const * restrict src, size_t n);
 extern "C" char *strncat(char * restrict dest,

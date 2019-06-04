@@ -4,6 +4,7 @@
 
 .section .text, "ax"
 
+.balign 16
 .global _start
 _start:
 	.cfi_startproc

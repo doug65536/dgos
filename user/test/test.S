@@ -3,6 +3,7 @@
 .code64
 .section .text, "ax"
 
+.balign 16
 .global main
 main:
     .cfi_startproc

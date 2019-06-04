@@ -1,4 +1,5 @@
 
+.balign 16
 .global __cxa_pure_virtual
 .hidden __cxa_pure_virtual
 __cxa_pure_virtual:

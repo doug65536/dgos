@@ -62,7 +62,7 @@ $(top_builddir)/fatpart.img: \
 			-S $(SECTOR_SZ) \
 			-R $$(( 0x10000 / $(SECTOR_SZ) )) \
 			-b $$(( 0x10000 / $(SECTOR_SZ) - 1 )) \
-			-n dgos \
+			-n DGOS \
 			$(top_builddir)/fatpart.img && \
 			\
 		$(DD) \

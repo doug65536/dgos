@@ -12,8 +12,10 @@ PHDRS {
 SECTIONS {
 	PROVIDE_HIDDEN(__image_start = .);
 
-	.rodata 0x400000 : {
-		. = . + SIZEOF_HEADERS;
+	. = 0x400000;
+	. += SIZEOF_HEADERS;
+
+	.rodata : {
 		PROVIDE_HIDDEN(__rodata_start = .);
 		*(.rodata)
 		*(.rodata.*)

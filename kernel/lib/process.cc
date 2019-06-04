@@ -16,6 +16,7 @@
 #include "cpu/control_regs.h"
 #include "cpu/isr.h"
 #include "contig_alloc.h"
+#include "user_mem.h"
 
 union process_ptr_t {
     process_t *p;
@@ -40,7 +41,7 @@ process_t *process_t::add_locked(processes_scoped_lock const&)
     pid_t pid;
     size_t realloc_count = 0;
 
-    process_t *process = new process_t;
+    process_t *process = new (std::nothrow) process_t;
     if (unlikely(!process))
         return nullptr;
 
@@ -162,9 +163,9 @@ int process_t::start()
     Elf64_Ehdr hdr;
 
     // Open a stdin, stdout, and stderr
-    int fd_i = file_open("/dev/conin", 0, 0);
-    int fd_o = file_open("/dev/conout", 0, 0);
-    int fd_e = file_open("/dev/conerr", 0, 0);
+    /*int fd_i = */file_open("/dev/conin", 0, 0);
+    /*int fd_o = */file_open("/dev/conout", 0, 0);
+    /*int fd_e = */file_open("/dev/conerr", 0, 0);
 
     file_t fd{file_open(path, O_RDONLY)};
 
@@ -183,7 +184,10 @@ int process_t::start()
 
     // Allocate memory for program headers
     std::vector<Elf64_Phdr> program_hdrs;
-    program_hdrs.resize(hdr.e_phnum);
+    if (!program_hdrs.resize(hdr.e_phnum)) {
+        printdbg("Failed to allocate memory for program headers\n");
+        return -1;
+    }
 
     // Read program headers
     read_size = sizeof(Elf64_Phdr) * hdr.e_phnum;
@@ -466,6 +470,14 @@ int process_t::start()
     if (!auxent.push_back({ auxv_t::AT_PHENT, hdr.e_phentsize }))
         panic_oom();
     if (!auxent.push_back({ auxv_t::AT_EXECFD, fd.release() }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_UID, 0L }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_EUID, 0L }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_GID, 0L }))
+        panic_oom();
+    if (!auxent.push_back({ auxv_t::AT_EGID, 0L }))
         panic_oom();
 
     processes_scoped_lock lock(processes_lock);

@@ -154,10 +154,14 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_sysmem(uint64_t addr, int size,
                                                       int bitofs, int bitwidth)
 {
     switch (size) {
-    case 1: return new acpi_gas_accessor_sysmem_t<1>(addr, bitofs, bitwidth);
-    case 2: return new acpi_gas_accessor_sysmem_t<2>(addr, bitofs, bitwidth);
-    case 4: return new acpi_gas_accessor_sysmem_t<4>(addr, bitofs, bitwidth);
-    case 8: return new acpi_gas_accessor_sysmem_t<8>(addr, bitofs, bitwidth);
+    case 1: return new (std::nothrow)
+                acpi_gas_accessor_sysmem_t<1>(addr, bitofs, bitwidth);
+    case 2: return new (std::nothrow)
+                acpi_gas_accessor_sysmem_t<2>(addr, bitofs, bitwidth);
+    case 4: return new (std::nothrow)
+                acpi_gas_accessor_sysmem_t<4>(addr, bitofs, bitwidth);
+    case 8: return new (std::nothrow)
+                acpi_gas_accessor_sysmem_t<8>(addr, bitofs, bitwidth);
     default: return nullptr;
     }
 }
@@ -166,10 +170,14 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_pcicfg(uint32_t addr, int size,
                                                       int bitofs, int bitwidth)
 {
     switch (size) {
-    case 1: return new acpi_gas_accessor_pcicfg_t<1>(addr, bitofs, bitwidth);
-    case 2: return new acpi_gas_accessor_pcicfg_t<2>(addr, bitofs, bitwidth);
-    case 4: return new acpi_gas_accessor_pcicfg_t<4>(addr, bitofs, bitwidth);
-    case 8: return new acpi_gas_accessor_pcicfg_t<8>(addr, bitofs, bitwidth);
+    case 1: return new (std::nothrow)
+                acpi_gas_accessor_pcicfg_t<1>(addr, bitofs, bitwidth);
+    case 2: return new (std::nothrow)
+                acpi_gas_accessor_pcicfg_t<2>(addr, bitofs, bitwidth);
+    case 4: return new (std::nothrow)
+                acpi_gas_accessor_pcicfg_t<4>(addr, bitofs, bitwidth);
+    case 8: return new (std::nothrow)
+                acpi_gas_accessor_pcicfg_t<8>(addr, bitofs, bitwidth);
     default: return nullptr;
     }
 }
@@ -179,9 +187,12 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_ioport(uint16_t ioport, int size,
 {
 #if defined(__x86_64__) || defined(__i386__)
     switch (size) {
-    case 1: return new acpi_gas_accessor_sysio_t<1>(ioport, bitofs, bitwidth);
-    case 2: return new acpi_gas_accessor_sysio_t<2>(ioport, bitofs, bitwidth);
-    case 4: return new acpi_gas_accessor_sysio_t<4>(ioport, bitofs, bitwidth);
+    case 1: return new (std::nothrow)
+                acpi_gas_accessor_sysio_t<1>(ioport, bitofs, bitwidth);
+    case 2: return new (std::nothrow)
+                acpi_gas_accessor_sysio_t<2>(ioport, bitofs, bitwidth);
+    case 4: return new (std::nothrow)
+                acpi_gas_accessor_sysio_t<4>(ioport, bitofs, bitwidth);
     case 8: return nullptr;
     default: return nullptr;
     }

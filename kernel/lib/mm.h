@@ -4,6 +4,7 @@
 #include "cpu/cpu_metrics.h"
 //#include "process.h"
 #include "errno.h"
+#include "string.h"
 
 __BEGIN_DECLS
 
@@ -390,26 +391,5 @@ void mm_init_process(process_t *process);
 uintptr_t mm_fork_kernel_text();
 
 void mm_set_master_pagedir();
-
-extern "C"
-#ifdef USE_RETPOLINE
-_no_plt
-#endif
-bool mm_copy_user(void *dst, void const *src, size_t size);
-
-extern "C"
-#ifdef USE_RETPOLINE
-_no_plt
-#endif
-bool mm_copy_user_str(char *dst, char const *src, size_t size);
-
-extern "C"
-#ifdef USE_RETPOLINE
-_no_plt
-#endif
-intptr_t mm_lenof_user_str(char const *src, size_t max_size);
-
-extern "C" _const
-bool mm_is_user_range(void const *buf, size_t size);
 
 __END_DECLS

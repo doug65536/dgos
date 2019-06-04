@@ -1,5 +1,6 @@
 // pci driver: C=NETWORK, S=ETHERNET, V=0x10EC, D=0x8139
 
+#include "kmodule.h"
 #include "pci.h"
 #include "callout.h"
 #include "printk.h"
@@ -56,12 +57,13 @@
     rtl8139_mm_in_32(reg)
 
 struct rtl8139_factory_t : public eth_dev_factory_t {
-    constexpr rtl8139_factory_t() : eth_dev_factory_t("rtl8139") {}
+    rtl8139_factory_t() : eth_dev_factory_t("rtl8139") {}
     virtual int detect(eth_dev_base_t ***result) override;
 };
 
-extern "C" void module_entry()
+int module_main(int argc, char const * const * argv)
 {
+    return 0;
 }
 
 static rtl8139_factory_t rtl8139_factory;
