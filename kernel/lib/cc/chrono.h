@@ -263,13 +263,15 @@ constexpr operator%(duration<_Rep1,_Period1> const& lhs,
 template<typename _ToDuration, typename _Rep, typename _Period>
 constexpr _ToDuration duration_cast(duration<_Rep,_Period> const& rhs)
 {
-    using __conv = typename ratio<
-        _Period::den * _ToDuration::period::num,
-        _Period::num * _ToDuration::period::den>::type;
+    using __conv = typename std::ratio_divide<
+        _Period, typename _ToDuration::period>;
 
-    return _ToDuration(typename _ToDuration::rep(
-                           intmax_t(rhs.count()) *
-                           __conv::num / __conv::den));
+    // To see in debugger
+    auto __n = __conv::num;
+    auto __d = __conv::den;
+    auto __r = typename _ToDuration::rep(intmax_t(rhs.count()) * __n / __d);
+
+    return _ToDuration(__r);
 }
 
 template<typename _Clock, typename _Duration = typename _Clock::duration>

@@ -44,7 +44,7 @@ static_assert(
             >::type,
             std::ratio<1, 2>::type
         >::value,
-        "ratio_add does not work correctly");
+        "ratio_subtract does not work correctly");
 
 UNITTEST(test_chrono_conversion)
 {
