@@ -345,27 +345,21 @@ public:
         _T *_X, *_N, *_G;
 
         // Loop (possibly up to the root)
-        for (_X = _Z->parent; _X != nullptr; _X = _Z->parent)
-        {
+        for (_X = _Z->parent; _X != nullptr; _X = _Z->parent) {
             // X->balance has to be updated:
-            if (_Z == _X->right)
-            {
+            if (_Z == _X->right) {
                 // The right subtree increases
-                if (_X->balance > 0)
-                {
+                if (_X->balance > 0) {
                     // X is right-heavy
                     // ===> the temporary X->balance == +2
                     // ===> rebalancing is required.
                     _G = _X->parent; // Save parent of X around rotations
 
-                    if (_Z->balance < 0)
-                    {
+                    if (_Z->balance < 0) {
                         // Right Left Case     (see figure 5)
                         // Double rotation: Right(Z) then Left(X)
                         _N = __rotate_rightleft(_X, _Z);
-                    }
-                    else
-                    {
+                    } else {
                         // Right Right Case    (see figure 4)
                         // Single rotation Left(X)
                         _N = __rotate_left(_X, _Z);
@@ -386,13 +380,15 @@ public:
                 if (_X->balance < 0) { // X is left-heavy
                     // ===> the temporary X->balance == -2
                     // ===> rebalancing is required.
-                    _G = _X->parent; // Save parent of X around rotations
-                    if (_Z->balance > 0)      // Left Right Case
+                    // Save parent of X around rotations
+                    _G = _X->parent;
+                    // Left Right Case
+                    if (_Z->balance > 0)
                         // Double rotation: Left(Z) then Right(X)
-                        _N = __rotate_LeftRight(_X, _Z);
+                        _N = __rotate_leftright(_X, _Z);
                     else                           // Left Left Case
                         // Single rotation Right(X)
-                        _N = __rotate_Right(_X, _Z);
+                        _N = __rotate_right(_X, _Z);
                     // After rotation adapt parent link
                 } else {
                     if (_X->balance > 0) {
@@ -480,11 +476,11 @@ public:
                     if (__b > 0)
                         // Left Right Case
                         // Double rotation: Left(Z) then Right(X)
-                        _N = __rotate_LeftRight(_X, _Z);
+                        _N = __rotate_leftright(_X, _Z);
                     else
                         // Left Left Case
                         // Single rotation Right(X)
-                        _N = __rotate_Right(_X, _Z);
+                        _N = __rotate_right(_X, _Z);
                     // After rotation adapt parent link
                 } else {
                     if (_X->balance == 0) {
@@ -564,7 +560,7 @@ public:
         return _Y;
     }
 
-    static _T *__rotate_LeftRight(_T *_X, _T *_Z)
+    static _T *__rotate_leftright(_T *_X, _T *_Z)
     {
         _T *_Y, *__t3, *__t2;
 
@@ -608,7 +604,7 @@ public:
         return _Y;
     }
 
-    static _T *__rotate_Right(_T *_X, _T *_Z)
+    static _T *__rotate_right(_T *_X, _T *_Z)
     {
         // Z is by 2 higher than its sibling
 

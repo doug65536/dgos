@@ -27,7 +27,7 @@
 #define AHCI_TRACE(...) ((void)0)
 #endif
 
-int module_main(int argc, const char * const * argv)
+int module_main(int argc, char const * const * argv)
 {
     return 0;
 }
