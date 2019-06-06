@@ -73,7 +73,8 @@ public:
 
     bool assign(size_type __count, _T const& __value);
 
-    template<typename _InputIt>
+    template<typename _InputIt,
+             typename _InputVal = decltype(*declval<_InputIt>())>
     bool assign(_InputIt __first, _InputIt __last);
 
     bool assign(initializer_list<_T> __ilist);
@@ -459,9 +460,9 @@ bool vector<_T,_Allocator>::assign(size_type __count, _T const& __value)
 }
 
 template<typename _T, typename _Allocator>
-template<typename InputIt>
+template<typename _InputIt, typename _InputVal>
 EXPORT
-bool vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
+bool vector<_T,_Allocator>::assign(_InputIt __first, _InputIt __last)
 {
     clear();
     if (!reserve(__last - __first))
