@@ -1,5 +1,6 @@
 // pci driver: C=SERIAL, S=USB, I=XHCI
 
+#include "kmodule.h"
 #include "callout.h"
 #include "pci.h"
 #include "printk.h"
@@ -1376,7 +1377,7 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     timeout = time_ns() + 2000000000;
 
     // Wait for CNR (controller not ready) to be zero
-    uint64_t now;
+    uint64_t now = 0;
     while ((mmio_op->usbsts & USBXHCI_USBSTS_CNR) &&
            ((now = time_ns()) < timeout))
         pause();
@@ -2277,6 +2278,12 @@ void usbxhci::irq_handler(int irq_ofs)
             iocp->invoke();
         completed_iocp.clear();
     }
+}
+
+int module_main(int argc, char const * const * argv)
+{
+    usbxhci::detect();
+    return 0;
 }
 
 usbxhci::usbxhci()
