@@ -913,10 +913,21 @@ struct hash<std::basic_string<_CharT, _Traits, _Alloc>> {
     }
 };
 
-// Explicit instantiations
+std::string to_string(int value);
+std::string to_string( long value );
+std::string to_string( long long value );
+std::string to_string( unsigned value );
+std::string to_string( unsigned long value );
+std::string to_string( unsigned long long value );
+#ifndef __DGOS_KERNEL__
+std::string to_string( float value );
+std::string to_string( double value );
+std::string to_string( long double value );
+#endif
 
 __END_NAMESPACE_STD
 
+// Explicit instantiations
 extern template class std::basic_string<char>;
 extern template class std::basic_string<wchar_t>;
 extern template class std::basic_string<char16_t>;
