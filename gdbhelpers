@@ -13,7 +13,7 @@ define startupbreakpoints
 		b vpanic
 	end
 
-	b modload_load_symbols
+	hbreak modload_load_symbols
 	commands
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
 	end

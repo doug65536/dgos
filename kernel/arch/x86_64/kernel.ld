@@ -31,24 +31,6 @@ SECTIONS {
 
 	. += SIZEOF_HEADERS;
 
-	.init_array : {
-		PROVIDE_HIDDEN(___ctors_st = .);
-		*(.init_array)
-		*(SORT_BY_INIT_PRIORITY(.init_array.*))
-		*(.ctors)
-		*(SORT_BY_INIT_PRIORITY(.ctors.*))
-		PROVIDE_HIDDEN(___ctors_en = .);
-	} :readonly
-
-	.fini_array : {
-		PROVIDE_HIDDEN(___dtors_st = .);
-		*(.fini_array)
-		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
-		*(.dtors)
-		*(SORT_BY_INIT_PRIORITY(.dtors.*))
-		PROVIDE_HIDDEN(___dtors_en = .);
-	} :readonly
-
 	.rodata : {
 		PROVIDE_HIDDEN(___rodata_st = .);
 
@@ -189,6 +171,24 @@ SECTIONS {
 
 	/* rw- begins */
 	. = ALIGN(4K);
+
+	.init_array : {
+		PROVIDE_HIDDEN(___ctors_st = .);
+		*(.init_array)
+		*(SORT_BY_INIT_PRIORITY(.init_array.*))
+		*(.ctors)
+		*(SORT_BY_INIT_PRIORITY(.ctors.*))
+		PROVIDE_HIDDEN(___ctors_en = .);
+	} :data
+
+	.fini_array : {
+		PROVIDE_HIDDEN(___dtors_st = .);
+		*(.fini_array)
+		*(SORT_BY_INIT_PRIORITY(.fini_array.*))
+		*(.dtors)
+		*(SORT_BY_INIT_PRIORITY(.dtors.*))
+		PROVIDE_HIDDEN(___dtors_en = .);
+	} :data
 
 	.dynamic : {
 		PROVIDE_HIDDEN(___dynamic_st = .);

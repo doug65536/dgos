@@ -42,11 +42,11 @@ SECTIONS {
 
 	.gnu.version_r : {
 		*(.gnu.version_r)
-	}
+	} :read
 
 	.gnu.version_d : {
 		*(.gnu.version_d)
-	}
+	} :read
 
 	.eh_frame_hdr : {
 		*(.eh_frame_hdr)

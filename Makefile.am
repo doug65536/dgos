@@ -214,6 +214,7 @@ libbootsect_a_INCLUDES = \
 
 libbootsect_a_CXXFLAGS = \
 	-DFROMCXXFLAGS \
+	$(NOSTDLIB_FLAGS) \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(ELF32_FLAGS) \
 	$(NO_FLOAT_FLAGS) \
@@ -335,7 +336,6 @@ bootiso_elf_LDFLAGS = \
 	-Wl,-T,$(top_srcdir)/boot/bootiso.ld \
 	$(LINKER_SEL) -static \
 	$(NOSTDLIB_FLAGS) \
-	-nostartfiles -nodefaultlibs -nostdlib \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SIZE_FLAGS)
 
@@ -380,7 +380,7 @@ bootpxe_bios_elf_LDFLAGS = \
 	$(NO_PIC_FLAGS) \
 	$(LINKER_DEBUG) \
 	-Wl,-T,$(top_srcdir)/boot/bootpxe-bios.ld \
-	-Wl,-Map,$(top_builddir)/bootpxe-bios.map \
+	-Wl,-Map,$(top_builddir)/bootpxe-bios.map
 	$(LINKER_SEL) -static -Bsymbolic \
 	$(NOSTDLIB_FLAGS) \
 	$(COMPILER_FLAGS)
@@ -466,6 +466,7 @@ bootefi_amd64_SOURCES = \
 
 bootefi_amd64_CFLAGS = \
 	-DFROM_CFLAGS \
+	-nostartfiles \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
@@ -478,6 +479,7 @@ bootefi_amd64_CFLAGS = \
 
 bootefi_amd64_CXXFLAGS = \
 	-DFROM_CXXFLAGS \
+	-nostartfiles \
 	$(BOOTLOADER_COMMON_FLAGS) \
 	$(PE64_FLAGS) \
 	$(BOOTLOADER_EFI_FLAGS)
@@ -558,6 +560,26 @@ bootx64.efi: bootefi-amd64
 
 # kernel
 
+KERNEL_EXPLICIT_INSTANTIATIONS = \
+	kernel/device/iocp.cc \
+	kernel/device/iocp.h \
+	kernel/lib/cc/vector.h \
+	kernel/lib/cc/vector.cc \
+	kernel/lib/cc/cxxstring.h \
+	kernel/lib/cc/cxxstring.cc \
+	kernel/lib/cc/chrono.h \
+	kernel/lib/cc/chrono.cc \
+	kernel/lib/cc/numeric.h \
+	kernel/lib/cc/numeric.cc \
+	kernel/lib/cc/functional.h \
+	kernel/lib/cc/functional.cc \
+	kernel/lib/cc/initializer_list.h \
+	kernel/lib/cc/type_traits.h \
+	kernel/lib/cc/type_traits.cc \
+	kernel/lib/mutex.cc
+
+#$(KERNEL_EXPLICIT_INSTANTIATIONS)
+
 KERNEL_SOURCES_SHARED = \
 	kernel/arch/x86_64/entry.S \
 	kernel/arch/x86_64/cpu/isr.S \
@@ -586,22 +608,10 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/cc/algorithm.cc \
 	kernel/lib/cc/exception.h \
 	kernel/lib/cc/exception.cc \
-	kernel/lib/cc/functional.h \
-	kernel/lib/cc/functional.cc \
-	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/memory.h \
 	kernel/lib/cc/memory.cc \
-	kernel/lib/cc/numeric.h \
-	kernel/lib/cc/numeric.cc \
-	kernel/lib/cc/type_traits.h \
-	kernel/lib/cc/type_traits.cc \
 	kernel/lib/cc/utility.h \
 	kernel/lib/cc/utility.cc \
-	kernel/lib/cc/vector.h \
-	kernel/lib/cc/vector.cc \
-	kernel/lib/cc/chrono.cc \
-	kernel/lib/cc/chrono.h \
-	kernel/lib/cc/cxxstring.h \
 	kernel/lib/conio.cc \
 	kernel/lib/conio.h \
 	kernel/lib/debug.cc \
@@ -772,7 +782,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/device/acpigas.h \
 	kernel/device/acpihw.cc \
 	kernel/device/acpihw.h \
-	kernel/device/iocp.h \
 	kernel/device/ata.cc \
 	kernel/device/ata.h \
 	kernel/device/ata.h \
@@ -825,13 +834,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/syscall/sys_module.cc \
 	kernel/syscall/sys_sys.cc \
 	kernel/syscall/sys_render.cc
-
-KERNEL_EXPLICIT_INSTANTIATIONS = \
-	kernel/device/iocp.cc \
-	kernel/lib/cc/vector.cc \
-	kernel/lib/cc/cxxstring.cc \
-	kernel/lib/cc/chrono.cc \
-	kernel/lib/mutex.cc
 
 KERNEL_INCLUDES_SHARED = \
 	-I$(top_srcdir)/boot/include \
@@ -894,6 +896,7 @@ EXTRA_KERNEL_DEPENDENCIES_SHARED = \
 	$(top_builddir)/libkei.a \
 	$(DUMPDIR)
 
+
 KERNEL_LDADD_SHARED = -lgcc $(top_builddir)/u_vga16.o
 
 # ----------------------------------------------------------------------------
@@ -908,7 +911,6 @@ libkei_a_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
 	-fvisibility=default -fno-visibility-inlines-hidden \
-	-fPIC \
 	-DLIBKEI
 
 # ----------------------------------------------------------------------------
@@ -1624,7 +1626,7 @@ KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 
 KERNEL_MODULE_LDFLAGS_FN = \
 	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/$(1).km.map \
+	-Wl,-Map,$(top_builddir)/$(1).km.map
 	-Wl,-z,now \
 	libkm.a
 
@@ -1737,6 +1739,9 @@ keyb8042_km_CXXFLAGS = \
 
 keyb8042_km_LDFLAGS = \
 	$(call KERNEL_MODULE_LDFLAGS_FN,keyb8042)
+
+keyb8042_km_LDADD = \
+	$(KERNEL_MODULE_LDADD_SHARED)
 
 EXTRA_keyb8042_km_DEPENDENCIES = \
 	$(KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED)

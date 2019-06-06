@@ -22,7 +22,7 @@
 __BEGIN_NAMESPACE_STD
 
 template<typename _T, typename _Allocator = allocator<_T>>
-class vector
+class EXPORT vector
 {
 public:
     using value_type = _T;
@@ -59,7 +59,7 @@ public:
 
     vector(vector const& __other);
     vector(vector const& __other, _Allocator const& __alloc_);
-    inline constexpr vector(vector&& __other );
+    _always_inline constexpr vector(vector&& __other );
     inline constexpr vector(vector&& __other, _Allocator const& __alloc_);
 
     vector(initializer_list<_T> __init,
@@ -83,37 +83,37 @@ public:
     _T& at(size_type __pos);
     _T const& at(size_type __pos) const;
 
-    inline _T& operator[](size_type __pos);
-    inline _T const& operator[](size_type __pos) const;
+    _always_inline _T& operator[](size_type __pos);
+    _always_inline _T const& operator[](size_type __pos) const;
 
-    inline _T& front();
-    inline _T const& front() const;
+    _always_inline _T& front();
+    _always_inline _T const& front() const;
 
-    inline _T& back();
-    inline _T const& back() const;
+    _always_inline _T& back();
+    _always_inline _T const& back() const;
 
-    inline pointer data();
-    inline const_pointer data() const;
+    _always_inline pointer data();
+    _always_inline const_pointer data() const;
 
-    inline iterator begin();
-    inline const_iterator begin() const;
-    inline const_iterator cbegin() const;
+    _always_inline iterator begin();
+    _always_inline const_iterator begin() const;
+    _always_inline const_iterator cbegin() const;
 
-    inline iterator end();
-    inline const_iterator end() const;
-    inline const_iterator cend() const;
+    _always_inline iterator end();
+    _always_inline const_iterator end() const;
+    _always_inline const_iterator cend() const;
 
-    inline reverse_iterator rbegin();
-    inline const_reverse_iterator rbegin() const;
-    inline const_reverse_iterator crbegin() const;
+    _always_inline reverse_iterator rbegin();
+    _always_inline const_reverse_iterator rbegin() const;
+    _always_inline const_reverse_iterator crbegin() const;
 
-    inline reverse_iterator rend();
-    inline const_reverse_iterator rend() const;
-    inline const_reverse_iterator crend() const;
+    _always_inline reverse_iterator rend();
+    _always_inline const_reverse_iterator rend() const;
+    _always_inline const_reverse_iterator crend() const;
 
-    inline bool empty() const;
-    inline size_type size() const;
-    inline size_type max_size() const;
+    _always_inline bool empty() const;
+    _always_inline size_type size() const;
+    _always_inline size_type max_size() const;
 
     bool reserve(size_type __new_cap);
     inline size_type capacity() const;
@@ -230,6 +230,7 @@ private:
 };
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::__grow(size_t __amount)
 {
     size_t __new_cap;
@@ -247,6 +248,7 @@ bool vector<_T,_Allocator>::__grow(size_t __amount)
 
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::pointer
 vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
 {
@@ -269,12 +271,14 @@ vector<_T,_Allocator>::__make_space(iterator __pos, size_t __count)
 // vector implementation
 
 template<typename _T, typename _Allocator>
+EXPORT
 constexpr vector<_T,_Allocator>::vector()
     : vector(_Allocator())
 {
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 constexpr vector<_T,_Allocator>::vector(_Allocator const& __alloc_)
     : __m(nullptr)
     , __capacity(0)
@@ -284,6 +288,7 @@ constexpr vector<_T,_Allocator>::vector(_Allocator const& __alloc_)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>::vector(size_type __count,
        _T const& __value,
        _Allocator const& __alloc_)
@@ -296,6 +301,7 @@ vector<_T,_Allocator>::vector(size_type __count,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>::vector(
         size_type __count, _Allocator const& __alloc_)
     : __m(nullptr)
@@ -312,6 +318,7 @@ vector<_T,_Allocator>::vector(
 
 template<typename _T, typename _Allocator>
 template< typename InputIt >
+EXPORT
 vector<_T,_Allocator>::vector(InputIt __first, InputIt __last,
         _Allocator const& __alloc_)
     : __m(nullptr)
@@ -323,6 +330,7 @@ vector<_T,_Allocator>::vector(InputIt __first, InputIt __last,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>::vector(vector const& __other)
     : __m(nullptr)
     , __capacity(0)
@@ -334,6 +342,7 @@ vector<_T,_Allocator>::vector(vector const& __other)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>::vector(vector const& __other,
                               _Allocator const& __alloc_)
     : __m(nullptr)
@@ -346,6 +355,7 @@ vector<_T,_Allocator>::vector(vector const& __other,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 constexpr vector<_T,_Allocator>::vector(vector&& __other )
     : __m(__other.__m)
     , __capacity(__other.__capacity)
@@ -358,6 +368,7 @@ constexpr vector<_T,_Allocator>::vector(vector&& __other )
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 constexpr vector<_T,_Allocator>::vector(vector&& __other,
                               _Allocator const& __alloc_)
     : __m(__other.__m)
@@ -371,6 +382,7 @@ constexpr vector<_T,_Allocator>::vector(vector&& __other,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>::vector(initializer_list<_T> __init,
         _Allocator const& __alloc_)
     : __m(nullptr)
@@ -381,6 +393,7 @@ vector<_T,_Allocator>::vector(initializer_list<_T> __init,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>::~vector()
 {
     clear();
@@ -393,6 +406,7 @@ vector<_T,_Allocator>::~vector()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>&
 vector<_T,_Allocator>::operator=(vector const& other)
 {
@@ -401,6 +415,7 @@ vector<_T,_Allocator>::operator=(vector const& other)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>&
 vector<_T,_Allocator>::operator=(vector&& __other)
 {
@@ -423,6 +438,7 @@ vector<_T,_Allocator>::operator=(vector&& __other)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 vector<_T,_Allocator>&
 vector<_T,_Allocator>::operator=(initializer_list<_T> __ilist)
 {
@@ -431,6 +447,7 @@ vector<_T,_Allocator>::operator=(initializer_list<_T> __ilist)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::assign(size_type __count, _T const& __value)
 {
     clear();
@@ -443,6 +460,7 @@ bool vector<_T,_Allocator>::assign(size_type __count, _T const& __value)
 
 template<typename _T, typename _Allocator>
 template<typename InputIt>
+EXPORT
 bool vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
 {
     clear();
@@ -454,6 +472,7 @@ bool vector<_T,_Allocator>::assign(InputIt __first, InputIt __last)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
 {
     if (!reserve(__ilist.size()))
@@ -462,6 +481,7 @@ bool vector<_T,_Allocator>::assign(initializer_list<_T> __ilist)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::allocator_type
 vector<_T,_Allocator>::get_allocator() const
 {
@@ -469,6 +489,7 @@ vector<_T,_Allocator>::get_allocator() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T&
 vector<_T,_Allocator>::at(size_type __pos)
 {
@@ -478,6 +499,7 @@ vector<_T,_Allocator>::at(size_type __pos)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T const&
 vector<_T,_Allocator>::at(size_type __pos) const
 {
@@ -487,6 +509,7 @@ vector<_T,_Allocator>::at(size_type __pos) const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T&
 vector<_T,_Allocator>::operator[](size_type __pos)
 {
@@ -494,6 +517,7 @@ vector<_T,_Allocator>::operator[](size_type __pos)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T const&
 vector<_T,_Allocator>::operator[](size_type __pos) const
 {
@@ -501,6 +525,7 @@ vector<_T,_Allocator>::operator[](size_type __pos) const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T&
 vector<_T,_Allocator>::front()
 {
@@ -508,6 +533,7 @@ vector<_T,_Allocator>::front()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T const&
 vector<_T,_Allocator>::front() const
 {
@@ -515,6 +541,7 @@ vector<_T,_Allocator>::front() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T&
 vector<_T,_Allocator>::back()
 {
@@ -522,6 +549,7 @@ vector<_T,_Allocator>::back()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 _T const&
 vector<_T,_Allocator>::back() const
 {
@@ -529,6 +557,7 @@ vector<_T,_Allocator>::back() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::pointer
 vector<_T,_Allocator>::data()
 {
@@ -536,6 +565,7 @@ vector<_T,_Allocator>::data()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_pointer
 vector<_T,_Allocator>::data() const
 {
@@ -543,6 +573,7 @@ vector<_T,_Allocator>::data() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::begin()
 {
@@ -550,6 +581,7 @@ vector<_T,_Allocator>::begin()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_iterator
 vector<_T,_Allocator>::begin() const
 {
@@ -557,6 +589,7 @@ vector<_T,_Allocator>::begin() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_iterator
 vector<_T,_Allocator>::cbegin() const
 {
@@ -564,6 +597,7 @@ vector<_T,_Allocator>::cbegin() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::end()
 {
@@ -571,6 +605,7 @@ vector<_T,_Allocator>::end()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_iterator
 vector<_T,_Allocator>::end() const
 {
@@ -578,6 +613,7 @@ vector<_T,_Allocator>::end() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_iterator
 vector<_T,_Allocator>::cend() const
 {
@@ -585,6 +621,7 @@ vector<_T,_Allocator>::cend() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::reverse_iterator
 vector<_T,_Allocator>::rbegin()
 {
@@ -592,6 +629,7 @@ vector<_T,_Allocator>::rbegin()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_reverse_iterator
 vector<_T,_Allocator>::rbegin() const
 {
@@ -599,6 +637,7 @@ vector<_T,_Allocator>::rbegin() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_reverse_iterator
 vector<_T,_Allocator>::crbegin() const
 {
@@ -606,6 +645,7 @@ vector<_T,_Allocator>::crbegin() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::reverse_iterator
 vector<_T,_Allocator>::rend()
 {
@@ -613,6 +653,7 @@ vector<_T,_Allocator>::rend()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_reverse_iterator
 vector<_T,_Allocator>::rend() const
 {
@@ -620,6 +661,7 @@ vector<_T,_Allocator>::rend() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::const_reverse_iterator
 vector<_T,_Allocator>::crend() const
 {
@@ -627,12 +669,14 @@ vector<_T,_Allocator>::crend() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::empty() const
 {
     return __sz == 0;
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::size_type
 vector<_T,_Allocator>::size() const
 {
@@ -640,6 +684,7 @@ vector<_T,_Allocator>::size() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::size_type
 vector<_T,_Allocator>::max_size() const
 {
@@ -647,6 +692,7 @@ vector<_T,_Allocator>::max_size() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::reserve(size_type __new_cap)
 {
     if (__capacity < __new_cap) {
@@ -665,6 +711,7 @@ bool vector<_T,_Allocator>::reserve(size_type __new_cap)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::size_type
 vector<_T,_Allocator>::capacity() const
 {
@@ -672,6 +719,7 @@ vector<_T,_Allocator>::capacity() const
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 void vector<_T,_Allocator>::shrink_to_fit()
 {
     if (__capacity > __sz) {
@@ -684,6 +732,7 @@ void vector<_T,_Allocator>::shrink_to_fit()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 void vector<_T,_Allocator>::clear()
 {
     if (std::has_trivial_destructor<_T>::value) {
@@ -695,6 +744,7 @@ void vector<_T,_Allocator>::clear()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 void vector<_T,_Allocator>::reset()
 {
     clear();
@@ -706,6 +756,7 @@ void vector<_T,_Allocator>::reset()
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos, _T const& __value)
 {
@@ -721,6 +772,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos, _T const& __value)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos, _T&& __value)
 {
@@ -736,6 +788,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos, _T&& __value)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(
         const_iterator __pos, size_type __count, _T const& __value)
@@ -751,6 +804,7 @@ vector<_T,_Allocator>::insert(
 
 template<typename _T, typename _Allocator>
 template<typename InputIt>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               InputIt __first, InputIt __last)
@@ -764,6 +818,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::insert(const_iterator __pos,
                               initializer_list<_T> __ilist)
@@ -773,6 +828,7 @@ vector<_T,_Allocator>::insert(const_iterator __pos,
 
 template<typename _T, typename _Allocator>
 template<typename... _Args >
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::emplace(const_iterator __pos, _Args&&... __args)
 {
@@ -781,6 +837,7 @@ vector<_T,_Allocator>::emplace(const_iterator __pos, _Args&&... __args)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::erase(const_iterator __pos)
 {
@@ -797,6 +854,7 @@ vector<_T,_Allocator>::erase(const_iterator __pos)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T,_Allocator>::iterator
 vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
 {
@@ -813,6 +871,7 @@ vector<_T,_Allocator>::erase(const_iterator __first, const_iterator __last)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T, _Allocator>::iterator
 vector<_T, _Allocator>::assign_erase(const_iterator __pos)
 {
@@ -822,6 +881,7 @@ vector<_T, _Allocator>::assign_erase(const_iterator __pos)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 typename vector<_T, _Allocator>::iterator
 vector<_T, _Allocator>::move_erase(const_iterator __pos)
 {
@@ -832,6 +892,7 @@ vector<_T, _Allocator>::move_erase(const_iterator __pos)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::push_back(_T const& __value)
 {
     if (unlikely(__sz + 1 > __capacity)) {
@@ -847,6 +908,7 @@ bool vector<_T,_Allocator>::push_back(_T const& __value)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::push_back(_T&& __value)
 {
     if (unlikely(__sz + 1 > __capacity)) {
@@ -863,6 +925,7 @@ bool vector<_T,_Allocator>::push_back(_T&& __value)
 
 template<typename _T, typename _Allocator>
 template<typename... _Args>
+EXPORT
 bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
 {
     if (unlikely(__sz + 1 > __capacity)) {
@@ -878,18 +941,21 @@ bool vector<_T,_Allocator>::emplace_back(_Args&& ...__args)
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 void vector<_T,_Allocator>::pop_back()
 {
     __alloc.destruct(__m + --__sz);
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::resize(size_type __count)
 {
     return resize(__count, value_type());
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 bool vector<_T,_Allocator>::resize(size_type __count,
                                    value_type const& __value)
 {
@@ -908,6 +974,7 @@ bool vector<_T,_Allocator>::resize(size_type __count,
 }
 
 template<typename _T, typename _Allocator>
+EXPORT
 void vector<_T,_Allocator>::swap(vector &__other)
 {
     std::swap(__m, __other.__m);
@@ -920,6 +987,7 @@ void vector<_T,_Allocator>::swap(vector &__other)
 // Comparison
 
 template< typename _R, typename _Alloc >
+EXPORT
 bool operator==(vector<_R,_Alloc> const& lhs,
                 vector<_R,_Alloc> const& rhs)
 {
@@ -927,6 +995,7 @@ bool operator==(vector<_R,_Alloc> const& lhs,
 }
 
 template< typename _R, typename _Alloc >
+EXPORT
 bool operator!=(vector<_R,_Alloc> const& lhs,
                 vector<_R,_Alloc> const& rhs)
 {

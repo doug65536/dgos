@@ -19,7 +19,7 @@
 #include "user_mem.h"
 #include "kmodule.h"
 
-#define ELF64_DEBUG     0
+#define ELF64_DEBUG     1
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) printdbg(__VA_ARGS__)
 #else
@@ -287,7 +287,7 @@ void modload_load_symbols(char const *path, uintptr_t addr)
     // So that memory clobber is really needed, I need the caller to write
     // the actual path string into memory there (flow analysis could discard
     // it without the memory clobber)
-    __asm__ __volatile__ ("" : : "r" (path), "r" (addr) : "memory");
+    __asm__ __volatile__ ("" : : "D" (path), "S" (addr) : "memory");
 }
 
 static errno_t load_failed(errno_t err)
@@ -632,6 +632,8 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
 
                 if (addr)
                     S = intptr_t(addr->st_value);
+                else
+                    S = 0;
 
                 if (!S) {
                     printk("module link error in %s:"
@@ -648,7 +650,7 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
             case R_AMD64_JUMP_SLOT://7
                 // word64 S
 
-                if (dt_bind_now) {
+                if (dt_bind_now || true) {
                     // Link it all right now
                     value = S;
                     *(int64_t*)operand = S;
@@ -858,7 +860,7 @@ truncated_common:
     first_exec = 0;
     for (Elf64_Phdr const& phdr : phdrs) {
         if (phdr.p_flags & PF_X) {
-            if (!first_exec || first_exec < phdr.p_vaddr + base_adj)
+            if (!first_exec || first_exec > phdr.p_vaddr + base_adj)
                 first_exec = phdr.p_vaddr + base_adj;
         }
     }
@@ -925,6 +927,8 @@ void __module_dynamic_linker(plt_stub_data_t *data)
     char const *name = strtab + symtab[sym_idx].st_name;
 
     Elf64_Sym const *sym = modload_lookup_name(&export_ht, name);
+
+    assert(sym);
 
     auto got = (uintptr_t *)(module->dt_pltgot + module->base_adj);
 

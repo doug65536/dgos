@@ -480,6 +480,10 @@ isr_common:
     // -24  -16*8(%rbp)  1*8(%rsp) -> segments
     // -25  -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr   < Saved thread rsp
 
+    /// Register usage:
+    ///  r15 accumulates segment registers
+    ///  rbx used to shift segment values into place before merge into r15
+
     pushq %rbx
     .cfi_offset rbx,-9*8
 
@@ -539,6 +543,10 @@ isr_common:
     pushq %rcx
     .cfi_offset rcx,-19*8
 
+    /// Register usage:
+    ///  Finished with rbx, r15 now has all segment registers
+    ///  ecx = caller cs
+
     // Get interrupted code segment
     movzwl frame_cs(%rbp),%ecx
 
@@ -554,11 +562,19 @@ isr_common:
     // Zero constant
     xorl %edi,%edi
 
+    /// Register usage:
+    ///  Finished with rbx, r15 now has all segment registers
+    ///  ecx = caller cs
+    ///  rdi = 0
+
     // Save CR3
     pushq %rax
 
     // Save segments
     pushq %r15
+
+    /// Register usage:
+    ///  Finished with r15
 
     // Check for doublefault nonsense cs (unlikely)
     testl %ecx,%ecx
@@ -568,7 +584,7 @@ isr_common:
     cmpl $ GDT_SEL_KERNEL_CODE64,%ecx
     je .Lfrom_kernel
 
-    // ...came from user code
+    // ...came from user code, fastest most common case falling right through
 
     insn_fixup
     rdfsbase %r13
@@ -584,11 +600,17 @@ isr_common:
 
     mov %gs:CPU_INFO_CURTHREAD_OFS(%rdi),%r12
 
-    // Unlikely
+    /// Register usage:
+    ///  rdi = 0
+    ///  r12 = this_cpu()->cur_thread
+    ///  r13 = caller fsbase
+    ///  r14 = caller gsbase
+
+    // Unlikely detour to code that loads fsbase and gsbase
     cmp %r13,THREAD_FSBASE_OFS(%r12)
     jne .Lthread_bases_changed
 
-    // Unlikely
+    // Unlikely detour to code that loads fsbase and gsbase
     cmp %r14,THREAD_GSBASE_OFS(%r12)
     jne .Lthread_bases_changed
 
@@ -597,8 +619,9 @@ isr_common:
     // Push FPU context pointer field, initially null
     pushq $0
 
-    // Hold isr_context_t pointer in r12
-    // Hold interrupt number in ebx
+    /// Register usage:
+    ///  Hold isr_context_t pointer in r12
+    ///  Hold interrupt number in ebx
 
     movq %rsp,%r12
     movl frame_intr(%rbp),%ebx
@@ -697,7 +720,7 @@ isr_common:
     // Pop segments
     popq %rdx
 
-    // r15 = current thread
+    // r15 = current thread (maybe changed since last loaded)
     movq %gs:CPU_INFO_CURTHREAD_OFS(%rax),%r15
 
     // See if we're not returning to user code
@@ -1568,6 +1591,15 @@ __module_dynlink_plt_thunk:
 
     popfq_cfi
     .cfi_same_value rflags
+
+    // Balance the RSB so this false call matches up with the hacked return
+    // on first entry to the function, and when that returns it returns to the
+    // actual caller nicely (RSB continues working fine from there on)
+
+    call 0f
+    nop
+.balign 16
+0:  lea 8(%rsp),%rsp
 
     // The ret is going to mispredict, minimize dispatch of incorrect path
     // The return stack is not correct
