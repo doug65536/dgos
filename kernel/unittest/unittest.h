@@ -29,49 +29,49 @@ public:
 
     virtual void invoke() = 0;
 
-    void eq(char const *expect, char const *value)
+    void eq(char const *expect, char *value)
     {
         if (strcmp(expect, value))
             fail();
     }
 
     template<typename T, typename U>
-    void eq(T expect, U value)
+    void eq(T&& expect, U&& value)
     {
         if (!(expect == value))
             fail();
     }
 
     template<typename T, typename U>
-    void ne(T expect, U value)
+    void ne(T&& expect, U&& value)
     {
         if (!(expect != value))
             fail();
     }
 
     template<typename T, typename U>
-    void lt(T expect, U value)
+    void lt(T&& expect, U&& value)
     {
         if (!(expect < value))
             fail();
     }
 
     template<typename T, typename U>
-    void gt(T expect, U value)
+    void gt(T&& expect, U&& value)
     {
         if (!(expect > value))
             fail();
     }
 
     template<typename T, typename U>
-    void le(T expect, U value)
+    void le(T&& expect, U&& value)
     {
         if (!(expect <= value))
             fail();
     }
 
     template<typename T, typename U>
-    void ge(T expect, U value)
+    void ge(T&& expect, U&& value)
     {
         if (!(expect >= value))
             fail();

@@ -11,7 +11,7 @@ int module_main(int argc, char const * const * argv)
     unittest::unit::run_all(&ctx);
 
     if (ctx.failure_count() == 0) {
-        printdbg("Test passed!\n");
+        printdbg("All tests passed!\n");
 
     } else {
         printdbg("FAILED!\n");
@@ -36,6 +36,7 @@ unittest::unit::unit(const char *name)
 
 void unittest::unit::fail()
 {
+    printk("Test failed: %s\n", name);
     ctx->fail(this);
 }
 
