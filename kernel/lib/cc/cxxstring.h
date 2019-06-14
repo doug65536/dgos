@@ -160,12 +160,20 @@ public:
     basic_string(_CharT const *__st, _CharT const *__en)
     {
         size_type __sz = __en - __st;
-        __str.reserve((__en - __st) + 1);
+        __str.reserve(__sz + 1);
         __str.assign(__st, __en);
         __str[__sz] = 0;
     }
 
-    template<typename _IterT>
+    basic_string(size_type __n, _CharT __value)
+    {
+        __str.reserve(__n + 1);
+        __str.assign(__n, __value);
+        __str[__n] = 0;
+    }
+
+    template<typename _IterT,
+             typename _IterV = decltype(*declval<_IterT>())>
     basic_string(_IterT __st, _IterT __en)
     {
         size_type __sz = __en - __st;
