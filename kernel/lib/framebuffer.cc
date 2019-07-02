@@ -131,7 +131,7 @@ void fb_init(void)
 
     size_t screen_size = fb.mode.width * fb.mode.height * sizeof(uint32_t);
 
-    // Round the back buffer size up to a multiple of the cache size
+    // Round the back buffer size up to a multiple of the cache line size
     screen_size = (screen_size + 63) & -64;
 
     // This is really early on, too early to allocate a huge back buffer
@@ -236,8 +236,11 @@ static void scissor_rect(fb_rect_t& rect, fb_rect_t const& scissor)
     rect.en.y = std::min(rect.en.y, scissor.en.y);
 }
 
-void fb_fill_rect_clamped(int sx, int sy, int ex, int ey, uint32_t color)
+void fb_fill_rect_clamped(int sx _unused, int sy _unused,
+                          int ex _unused, int ey _unused,
+                          uint32_t color _unused)
 {
+
 }
 
 void fb_fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
@@ -583,7 +586,9 @@ static void fill_rect(int sx, int sy, int ex, int ey, uint32_t color)
     }
 }
 
-static void scroll_rect(int sx, int sy, int ex, int ey, int dx, int dy) {
+static void scroll_rect(int sx _unused, int sy _unused,
+                        int ex _unused, int ey _unused,
+                        int dx _unused, int dy _unused) {
 
 }
 
@@ -721,6 +726,12 @@ void framebuffer_console_t::static_init()
 
 static void test_framebuffer_thread()
 {
+    // Avoid divide by zero
+    if (unlikely(fb.mode.height == 0)) {
+        printk("Fatail error initializing framebuffer, screen height is zero\n");
+        return;
+    }
+
     // Fixedpoint inverse height and scale up to 128
     uint64_t inv_height = 128 * UINT64_C(0x100000000) / fb.mode.height;
 
@@ -818,8 +829,10 @@ void framebuffer_console_t::cleanup()
 
 }
 
-int framebuffer_console_t::set_dimensions(int width, int height)
+int framebuffer_console_t::set_dimensions(int width _unused,
+                                          int height _unused)
 {
+    this->width = width;
     return -int(errno_t::ENOSYS);
 }
 
@@ -831,7 +844,7 @@ void framebuffer_console_t::get_dimensions(int *width, int *height)
         *height = this->height;
 }
 
-void framebuffer_console_t::goto_xy(int x, int y)
+void framebuffer_console_t::goto_xy(int x _unused, int y _unused)
 {
 
 }
@@ -846,7 +859,7 @@ int framebuffer_console_t::get_y()
     return 0;
 }
 
-void framebuffer_console_t::fg_set(int color)
+void framebuffer_console_t::fg_set(int color _unused)
 {
 }
 
@@ -855,7 +868,7 @@ int framebuffer_console_t::fg_get()
     return 0;
 }
 
-void framebuffer_console_t::bg_set(int color)
+void framebuffer_console_t::bg_set(int color _unused)
 {
 }
 
@@ -864,7 +877,7 @@ int framebuffer_console_t::bg_get()
     return 0;
 }
 
-int framebuffer_console_t::cursor_toggle(int show)
+int framebuffer_console_t::cursor_toggle(int show _unused)
 {
     return 0;
 }
@@ -874,40 +887,44 @@ int framebuffer_console_t::cursor_is_shown()
     return 0;
 }
 
-void framebuffer_console_t::putc(int character)
+void framebuffer_console_t::putc(int character _unused)
 {
 }
 
-void framebuffer_console_t::putc_xy(int x, int y, int character)
+void framebuffer_console_t::putc_xy(int x _unused, int y _unused,
+                                    int character _unused)
 {
 }
 
-int framebuffer_console_t::print(char const *s)
-{
-    return 0;
-}
-
-int framebuffer_console_t::write(char const *s, intptr_t len)
+int framebuffer_console_t::print(char const *s _unused)
 {
     return 0;
 }
 
-int framebuffer_console_t::print_xy(int x, int y, char const *s)
+int framebuffer_console_t::write(char const *s _unused, intptr_t len _unused)
 {
     return 0;
 }
 
-int framebuffer_console_t::draw(char const *s)
+int framebuffer_console_t::print_xy(int x, int y, char const *s _unused)
 {
     return 0;
 }
 
-int framebuffer_console_t::draw_xy(int x, int y, char const *s, int attrib)
+int framebuffer_console_t::draw(char const *s _unused)
 {
     return 0;
 }
 
-void framebuffer_console_t::fill(int sx, int sy, int ex, int ey, int character)
+int framebuffer_console_t::draw_xy(int x _unused, int y _unused,
+                                   char const *s _unused, int attrib _unused)
+{
+    return 0;
+}
+
+void framebuffer_console_t::fill(int sx _unused, int sy _unused,
+                                 int ex _unused, int ey _unused,
+                                 int character _unused)
 {
 }
 
@@ -917,8 +934,10 @@ void framebuffer_console_t::clear()
     //fill_rect(0, 0, fb.mode.width, fb.mode.height, bg);
 }
 
-void framebuffer_console_t::scroll(int sx, int sy, int ex, int ey,
-                                   int xd, int yd, int clear)
+void framebuffer_console_t::scroll(int sx _unused, int sy _unused,
+                                   int ex _unused, int ey _unused,
+                                   int xd _unused, int yd _unused,
+                                   int clear _unused)
 {
 
 }
@@ -947,11 +966,11 @@ void framebuffer_console_t::mouse_goto_xy(int x, int y)
 {
 }
 
-void framebuffer_console_t::mouse_add_xy(int x, int y)
+void framebuffer_console_t::mouse_add_xy(int x _unused, int y _unused)
 {
 }
 
-int framebuffer_console_t::mouse_toggle(int show)
+int framebuffer_console_t::mouse_toggle(int show _unused)
 {
     return 0;
 }
@@ -966,7 +985,7 @@ int framebuffer_console_factory_t::detect(text_dev_base_t ***ptrs)
         return 0;
     }
 
-    framebuffer_console_t* self = framebuffer_console_t::instances +
+    framebuffer_console_t *self = framebuffer_console_t::instances +
             framebuffer_console_t::instance_count;
 
     *ptrs = devs + framebuffer_console_t::instance_count++;

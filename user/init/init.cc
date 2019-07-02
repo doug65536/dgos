@@ -3,6 +3,7 @@
 #include <sys/mman.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/likely.h>
 
 __thread int testtls = 42;
 
@@ -40,15 +41,15 @@ void load_module(char const *path, char const *parameters = nullptr)
         err("Cannot seek to start of module\n");
 
     void *mem = mmap(nullptr, sz, PROT_READ | PROT_WRITE, MAP_POPULATE, -1, 0);
-    if (mem == MAP_FAILED)
+    if (unlikely(mem == MAP_FAILED))
         err("Cannot allocate %zd bytes\n", sz);
 
-    if (sz != read(fd, mem, sz))
+    if (unlikely(sz != read(fd, mem, sz)))
         err("Cannot read %zd bytes\n", sz);
 
     int status = init_module(mem, sz, path, nullptr, parameters);
 
-    if (status < 0)
+    if (unlikely(status < 0))
         err("Module failed to initialize with %d %d\n", status, errno);
 
     close(fd);

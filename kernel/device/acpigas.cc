@@ -206,3 +206,7 @@ acpi_gas_accessor_t *acpi_gas_accessor_t::from_fixed(uint16_t ioport, int size,
 {
     return from_ioport(ioport, size, bitofs, bitwidth);
 }
+
+acpi_gas_accessor_t::~acpi_gas_accessor_t()
+{
+}

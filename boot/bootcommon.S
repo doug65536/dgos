@@ -354,4 +354,4 @@ cpu_a20_chk: .space 1
 
 .global __dso_handle
 __dso_handle:
-    .quad 0
+    .int __dso_handle

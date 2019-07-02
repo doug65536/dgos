@@ -7,6 +7,7 @@ SECTIONS {
 			(__section_alignment__ < 0x1000
 			? .
 			: __section_alignment__ ) : {
+		__text_st = .;
 		___initialized_data_st = .;
 
 		*(.text)
@@ -15,17 +16,17 @@ SECTIONS {
 	}
 
 	.rela.plt : ALIGN(64) {
-		PROVIDE_HIDDEN(___rela_entry_start = .);
+		PROVIDE_HIDDEN(___rela_entry_st = .);
 		*(.rela.entry)
-		PROVIDE_HIDDEN(___rela_entry_end = .);
+		PROVIDE_HIDDEN(___rela_entry_en = .);
 
-		PROVIDE_HIDDEN(___rela_plt_start = .);
+		PROVIDE_HIDDEN(___rela_plt_st = .);
 		*(.rela.plt)
-		PROVIDE_HIDDEN(___rela_plt_end = .);
+		PROVIDE_HIDDEN(___rela_plt_en = .);
 
-		PROVIDE_HIDDEN (__rela_iplt_start = .);
+		PROVIDE_HIDDEN (__rela_iplt_st = .);
 		*(.rela.iplt)
-		PROVIDE_HIDDEN (__rela_iplt_end = .);
+		PROVIDE_HIDDEN (__rela_iplt_en = .);
 	}
 
 	.plt.got : ALIGN(64) {

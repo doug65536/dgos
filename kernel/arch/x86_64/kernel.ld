@@ -53,6 +53,27 @@ SECTIONS {
 
 		*(.gcc_except_table*)
 
+		. = ALIGN(8);
+		PROVIDE_HIDDEN(__nofault_tab_st = .);
+		*(.nofault.tab.st)
+		PROVIDE_HIDDEN(__nofault_tab_en = .);
+		*(.nofault.tab.en)
+		PROVIDE_HIDDEN(__nofault_tab_lp = .);
+		*(.nofault.tab.lp)
+		PROVIDE_HIDDEN(__nofault_tab_xx = .);
+
+		/* define and initialize a global variable named __nofault_tab_sz */
+		PROVIDE_HIDDEN(__nofault_tab_sz = .);
+		QUAD(__nofault_tab_en - __nofault_tab_st);
+		ASSERT((__nofault_tab_lp - __nofault_tab_en) ==
+			(__nofault_tab_en - __nofault_tab_st), "Messed up SOA");
+		ASSERT((__nofault_tab_xx - __nofault_tab_lp) ==
+			(__nofault_tab_en - __nofault_tab_st), "Messed up SOA");
+
+		/* define and initialize a global variable named __nofault_text_sz */
+		PROVIDE_HIDDEN(__nofault_text_sz = .);
+		QUAD(__nofault_text_en - __nofault_text_st);
+
 		*(.stub .gnu.linkonce.t.*)
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
@@ -149,6 +170,10 @@ SECTIONS {
 		*(SORT_BY_NAME(.text.isr.*))
 		*(.text.isr)
 		PROVIDE_HIDDEN(___isr_en = .);
+
+		PROVIDE_HIDDEN(__nofault_text_st = .);
+		*(.nofault.text)
+		PROVIDE_HIDDEN(__nofault_text_en = .);
 
 		/* cache line align start of hot code */
 		. = ALIGN(64);

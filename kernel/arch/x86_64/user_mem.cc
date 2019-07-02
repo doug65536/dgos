@@ -3,120 +3,39 @@
 #include "cpu/except.h"
 #include "numeric_limits.h"
 #include "export.h"
+#include "mm.h"
 
 //
 // mm_copy_user
+extern "C" int nofault_memcpy(void *dest, void const *src, size_t size);
+extern "C" int nofault_memset(void *dest, int value, size_t size);
+extern "C" int nofault_strncpy(char *dest, char const *value, size_t size);
+extern "C" ptrdiff_t nofault_strnlen(char const *s, size_t max_size);
 
-bool mm_copy_user_generic(void *dst, void const *src, size_t size)
+extern "C" ptrdiff_t nofault_offsetof(char const *s, int value, size_t size);
+
+EXPORT bool mm_copy_user(void *dst, const void *src, size_t size)
 {
-    __try {
-        if (src)
-            memcpy(dst, src, size);
-        else
-            memset(dst, 0, size);
-    } __catch {
-        return false;
-    }
-
-    return true;
-}
-
-bool mm_copy_user_smap(void *dst, void const *src, size_t size)
-{
-    cpu_stac();
-    bool result = mm_copy_user_generic(dst, src, size);
-    cpu_clac();
-    return result;
+    if (src)
+        return nofault_memcpy(dst, src, size) >= 0;
+    return nofault_memset(dst, 0, size) >= 0;
 }
 
 //
 // mm_copy_user_str
 
-static bool mm_copy_user_str_generic(
-        char *dst, char const *src, size_t max_size)
+EXPORT ptrdiff_t mm_copy_user_str(char *dst, char const *src, size_t max_size)
 {
-    __try {
-        if (src)
-            strncpy(dst, src, max_size);
-        else
-            memset(dst, 0, max_size);
-    } __catch {
-        return false;
-    }
-
-    return true;
-}
-
-static bool mm_copy_user_str_smap(char *dst, char const *src, size_t size)
-{
-    cpu_stac();
-    bool result = mm_copy_user_str_generic(dst, src, size);
-    cpu_clac();
-    return result;
+    return nofault_strncpy(dst, src, max_size);
 }
 
 //
 // mm_lenof_user_str
 
-intptr_t mm_lenof_user_str_generic(char const *src, size_t max_size)
+EXPORT intptr_t mm_lenof_user_str(char const *src, size_t max_size)
 {
-    __try {
-        if (unlikely(max_size > size_t(std::numeric_limits<intptr_t>::max())))
-            return -1;
-
-        for (uintptr_t len = 0; len < max_size; ++len) {
-            if (src[len] == 0)
-                return intptr_t(len);
-        }
-    } __catch {
-    }
-    return -1;
+    return nofault_strnlen(src, max_size);
 }
-
-intptr_t mm_lenof_user_str_smap(char const *src, size_t max_size)
-{
-    cpu_stac();
-    intptr_t result = mm_lenof_user_str_generic(src, max_size);
-    cpu_clac();
-    return result;
-}
-
-typedef bool (*mm_copy_user_fn)(
-        void *dst, void const *src, size_t size);
-typedef bool (*mm_copy_user_str_fn)(
-        char *dst, char const *src, size_t size);
-typedef intptr_t (*mm_lenof_user_str_fn)(
-        char const *src, size_t max_size);
-
-extern "C" mm_copy_user_fn mm_copy_user_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_copy_user_smap;
-    return mm_copy_user_generic;
-}
-
-extern "C" mm_copy_user_str_fn mm_copy_user_str_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_copy_user_str_smap;
-    return mm_copy_user_str_generic;
-}
-
-extern "C" mm_lenof_user_str_fn mm_lenof_user_str_resolver()
-{
-    if (cpuid_has_smap())
-        return mm_lenof_user_str_smap;
-    return mm_lenof_user_str_generic;
-}
-
-_ifunc_resolver(mm_copy_user_resolver)
-EXPORT bool mm_copy_user(void *dst, void const *src, size_t size);
-
-_ifunc_resolver(mm_copy_user_str_resolver)
-EXPORT bool mm_copy_user_str(char *dst, char const *src, size_t size);
-
-_ifunc_resolver(mm_lenof_user_str_resolver)
-EXPORT intptr_t mm_lenof_user_str(char const *src, size_t max_size);
 
 EXPORT bool mm_is_user_range(void const *buf, size_t size)
 {
@@ -133,7 +52,7 @@ EXPORT bool mm_max_user_len(void const *buf)
             : 0;
 }
 
-mm_copy_string_result_t mm_copy_user_string(
+EXPORT mm_copy_string_result_t mm_copy_user_string(
         char const *user_src, size_t max_size)
 {
     mm_copy_string_result_t result{};
@@ -164,3 +83,4 @@ mm_copy_string_result_t mm_copy_user_string(
 
     return result;
 }
+

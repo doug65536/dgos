@@ -6,6 +6,7 @@
 #include "cpu/thread_impl.h"
 #include "desc_alloc.h"
 #include "thread.h"
+#include "cpu/except_asm.h"
 
 struct fd_table_t
 {
@@ -186,6 +187,8 @@ struct process_t
     std::condition_variable cond;
     int exitcode = -1;
 
+    __exception_jmp_buf_t exit_jmpbuf = {};
+
     fd_table_t ids;
     state_t state = state_t::unused;
 
@@ -206,6 +209,8 @@ struct process_t
 
     static int wait_for_exit(int pid);
 
+    int enter_user(uintptr_t ip, uintptr_t sp);
+
 private:
     using thread_list = std::vector<thread_t>;
     thread_list threads;
@@ -217,9 +222,9 @@ private:
     static process_t *add_locked(scoped_lock const&);
     void remove();
     static process_t *add();
-    static int start(void *process_arg);
+    static int run(void *process_arg);
 
-    int start();
+    int run();
 };
 
 void *process_get_allocator();

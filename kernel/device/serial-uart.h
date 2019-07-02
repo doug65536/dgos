@@ -4,7 +4,7 @@
 
 class uart_dev_t {
 public:
-    virtual ~uart_dev_t() {}
+    virtual ~uart_dev_t() = 0;
 
     virtual bool init(ioport_t port, uint8_t port_irq, uint32_t baud,
                       uint8_t data_bits, char parity_type,

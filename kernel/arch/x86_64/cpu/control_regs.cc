@@ -2,11 +2,6 @@
 #include "assert.h"
 #include "halt.h"
 
-_noinline
-void cpu_debug_break()
-{
-}
-
 // This entire function is essentially one indirect branch
 // and 4 function pointers
 // The real work is done in the 4 instantiations of cpu_debug_breakpoint_set

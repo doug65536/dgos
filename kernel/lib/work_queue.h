@@ -13,7 +13,7 @@ class workq_impl;
 class workq;
 
 // Abstract work queue work item
-class workq_work {
+class EXPORT workq_work {
 public:
     workq_work();
 

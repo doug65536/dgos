@@ -2,8 +2,6 @@
 #include "types.h"
 #include "likely.h"
 
-extern "C" _noinline void cpu_debug_break();
-
 extern "C" _noinline int assert_failed(
         tchar const *expr, tchar const *msg, tchar const *file, int line);
 

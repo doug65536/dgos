@@ -230,4 +230,9 @@ thread_t thread_create_irq_handler();
 
 void thread_set_cpu_count(size_t new_cpu_count);
 
+class __cxa_exception;
+
+struct __cxa_eh_globals;
+__cxa_eh_globals *thread_cxa_get_globals();
+
 __END_DECLS

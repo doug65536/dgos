@@ -590,8 +590,8 @@ static void virtio_gpu_startup(void*)
     virtio_gpu_factory.detect();
 }
 
-REGISTER_CALLOUT(virtio_gpu_startup, nullptr,
-                 callout_type_t::driver_base, "000");
+//REGISTER_CALLOUT(virtio_gpu_startup, nullptr,
+//                 callout_type_t::driver_base, "000");
 
 int virtio_gpu_factory_t::detect()
 {
@@ -739,7 +739,7 @@ bool virtio_gpu_dev_t::issue_resource_unref(uint32_t resource_id)
 
     unref.resource_id = resource_id;
 
-    VIRTIO_GPU_TRACE("Issuing resource unred,,,\n");
+    VIRTIO_GPU_TRACE("Issuing resource unref,,,\n");
 
     cmd_queue->sendrecv(&unref, sizeof(unref), &resp, sizeof(resp), &iocp);
     iocp.wait();
@@ -1078,7 +1078,7 @@ void virtio_gpu_dev_t::config_irq()
 
 void virtio_gpu_dev_t::irq_handler(int offset)
 {
-    if (use_msi) {
+    if (use_msi && irq_range.count >= 3) {
         if (offset == 0 || irq_range.count == 1)
             config_irq();
 

@@ -14,7 +14,7 @@ int sys_init_module(char const *module, size_t module_sz,
 {
     char kmname[256];
 
-    if (unlikely(!mm_copy_user_str(kmname, module_name, sizeof(kmname))))
+    if (unlikely(mm_copy_user_str(kmname, module_name, sizeof(kmname)) < 0))
         return -int(errno_t::EFAULT);
 
     ext::unique_mmap<char> mem;
@@ -27,8 +27,10 @@ int sys_init_module(char const *module, size_t module_sz,
         return -int(errno_t::EFAULT);
 
     // Maximum of 64KB of parameters
-    mm_copy_string_result_t parameter_buffer =
-            mm_copy_user_string(module_params, 64 << 10);
+    mm_copy_string_result_t parameter_buffer;
+
+    if (module_params)
+        parameter_buffer = mm_copy_user_string(module_params, 64 << 10);
 
     if (unlikely(module_params && !parameter_buffer.second))
         return -int(errno_t::EFAULT);

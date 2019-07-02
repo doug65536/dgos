@@ -1,4 +1,5 @@
 #include "mmu.h"
+#include "debug.h"
 #include "assert.h"
 #include "mm.h"
 #include "control_regs.h"
@@ -220,6 +221,16 @@ typedef uintptr_t pte_t;
 extern char ___text_st[];
 extern char ___text_en[];
 
+// Linker script magic
+extern char __nofault_text_st[];
+extern char __nofault_text_en[];
+extern uint64_t __nofault_text_sz;
+
+extern uintptr_t __nofault_tab_st[];
+extern uintptr_t __nofault_tab_en[];
+extern uintptr_t __nofault_tab_lp[];
+extern uint64_t __nofault_tab_sz;
+
 // -512GB
 static uint64_t min_kern_addr = 0xFFFFFF8000000000;
 
@@ -388,7 +399,7 @@ public:
     // Unreliably peek and see if there might be a free page, outside lock
     operator bool() const
     {
-        return next_free != nullptr;
+        return next_free[0] != -1U && next_free[1] != -1U;
     }
 
     physaddr_t alloc_one(bool low);
@@ -1261,7 +1272,7 @@ static intptr_t mmu_device_from_addr(linaddr_t rounded_addr)
 }
 
 // Page fault
-isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
+isr_context_t *mmu_page_fault_handler(int intr _unused, isr_context_t *ctx)
 {
     if (likely(thread_cpu_count()))
         atomic_inc((cpu_gs_ptr<uint64_t, CPU_INFO_PF_COUNT_OFS>()));
@@ -1335,10 +1346,14 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
 
             pte_t page_flags;
 
-            if (err_code & CTX_ERRCODE_PF_W)
+            if (err_code & CTX_ERRCODE_PF_W) {
+                // It was a write fault, mark it dirty. If not done here,
+                // the CPU will beforced to do a locked RMW to set it
+                // when it restarts the instruction
                 page_flags = PTE_PRESENT | PTE_ACCESSED | PTE_DIRTY;
-            else
+            } else {
                 page_flags = PTE_PRESENT | PTE_ACCESSED;
+            }
 
             // Update PTE and restart instruction
             if (atomic_cmpxchg(ptes[3], pte,
@@ -1348,6 +1363,9 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
                 // Another thread beat us to it
                 mmu_free_phys(page);
                 cpu_page_invalidate(fault_addr);
+
+                // If not perfect, it'll fault again and we'll start over
+                // and probably not race that time
             }
 
             return ctx;
@@ -1412,7 +1430,25 @@ isr_context_t *mmu_page_fault_handler(int /*intr*/, isr_context_t *ctx)
             // Must wait for another CPU to finish doing something with PTE
             cpu_wait_bit_clear(ptes[3], PTE_EX_WAIT_BIT);
             return ctx;
+        } else if (uintptr_t(ISR_CTX_REG_RIP(ctx)) -
+                   uintptr_t(__nofault_text_st) <
+                   __nofault_text_sz) {
+            //
+            // Fault occurred in nofault code region
+
+            // Figure out which landing pad to use
+            for (size_t i = 0, e = __nofault_tab_sz >> 3,
+                 rip = uintptr_t(ISR_CTX_REG_RIP(ctx)); i < e; ++i) {
+                if (rip >= __nofault_tab_st[i] && rip < __nofault_tab_en[i]) {
+                    // Put CPU on landing pad with rax == -1
+                    ISR_CTX_REG_RAX(ctx) = -1;
+                    ISR_CTX_REG_RIP(ctx) = (int(*)(void*))__nofault_tab_lp[i];
+                    return ctx;
+                }
+            }
+            goto no_landing_pad;
         } else {
+no_landing_pad:
             printdbg("Invalid page fault at %#zx, RIP=%p\n",
                      fault_addr, (void*)ISR_CTX_REG_RIP(ctx));
             if (thread_get_exception_top())

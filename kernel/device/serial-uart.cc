@@ -4,7 +4,6 @@
 #include "vector.h"
 #include "irq.h"
 #include "mutex.h"
-#include "cpu/control_regs.h"
 #include "nano_time.h"
 #include "work_queue.h"
 
@@ -1062,6 +1061,10 @@ static uart_poll_t debug_uart;
 
 // ===========================================================================
 //
+
+uart_dev_t::~uart_dev_t()
+{
+}
 
 uart_dev_t *uart_dev_t::open(size_t id, bool simple, uint8_t data_bits,
                              char parity_type, uint8_t stop_bits)

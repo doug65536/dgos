@@ -5,6 +5,7 @@
 //#include "process.h"
 #include "errno.h"
 #include "string.h"
+#include "refcount.h"
 
 __BEGIN_DECLS
 
@@ -393,3 +394,31 @@ uintptr_t mm_fork_kernel_text();
 void mm_set_master_pagedir();
 
 __END_DECLS
+
+#include "cxxexception.h"
+
+class inval_user_pf : public std::exception {
+    inval_user_pf(uintptr_t address, bool insn, bool write);
+
+    inval_user_pf(inval_user_pf const&) = default;
+    ~inval_user_pf() = default;
+
+    uintptr_t const address = 0;
+    bool insn = false;
+    bool write = false;
+
+    // exception interface
+protected:
+    const char *what() const noexcept override;
+};
+
+class ralloc_item_t : refcounted<ralloc_item_t> {
+public:
+    virtual ~ralloc_item_t() = 0;
+};
+
+class ralloc_t {
+public:
+
+private:
+};

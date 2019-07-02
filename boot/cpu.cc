@@ -80,5 +80,5 @@ uint32_t gp_available;
 void cpu_init()
 {
     nx_available = cpu_has_no_execute();
-    gp_available = cpu_has_global_pages() ? (1 << 7) : 0;
+    gp_available = cpu_has_global_pages() ? CPU_CR4_PGE : 0;
 }

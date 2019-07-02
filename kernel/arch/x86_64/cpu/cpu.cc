@@ -21,11 +21,20 @@
 #include "numeric_limits.h"
 #include "except.h"
 #include "work_queue.h"
+#include "utility.h"
 
 uint32_t default_mxcsr_mask;
 
 extern uint8_t * const ___rodata_fixup_insn_st[];
 extern uint8_t * const ___rodata_fixup_insn_en[];
+
+static uint8_t const stac_insn[] = {
+    0x0f, 0x01, 0xcb
+};
+
+static uint8_t const clac_insn[] = {
+    0x0f, 0x01, 0xca
+};
 
 static uint8_t const vzeroall_nopw_insn[] = {
     0xc5, 0xfc, 0x77, 0x66, 0x90
@@ -109,6 +118,10 @@ static uint8_t const xrstors64_rsi_insn[] = {
 
 static uint8_t const fxrstor64_rsi_insn[] = {
     0x48, 0x0f, 0xae, 0x0e  // fxrstor64 (%rsi)
+};
+
+static uint8_t const jmp_disp32_insn[] = {
+    0xe9, 0x00, 0x00, 0x00  // jmp further_than_signed_byte_displacement
 };
 
 static uint8_t const *xsave64_insn(xsave_support_t support)
@@ -381,6 +394,16 @@ void cpu_init_early(int ap)
                                         sizeof(fxrstor_rsi_insn)))) {
                 cpu_patch_code(code, xrstor32_insn(xsave_support),
                                xrstor32_sz(xsave_support));
+                continue;
+            } else if (unlikely(!memcmp(code, stac_insn,
+                                        sizeof(stac_insn)))) {
+                if (!cpuid_has_smap())
+                    cpu_patch_nop(code, sizeof(stac_insn));
+                continue;
+            } else if (unlikely(!memcmp(code, clac_insn,
+                                        sizeof(clac_insn)))) {
+                if (!cpuid_has_smap())
+                    cpu_patch_nop(code, sizeof(stac_insn));
                 continue;
             }
             break;
@@ -709,34 +732,54 @@ void cpu_patch_nop(void *addr, size_t size)
             insn_sz = 8;
         }
 
-        out = std::copy(nop_insns + nop_lookup[insn_sz - 1],
-                nop_insns + nop_lookup[insn_sz - 1] + insn_sz, out);
+        cpu_patch_code(out, nop_insns + nop_lookup[insn_sz - 1], insn_sz);
 
         // Serializing instruction
         cpu_fault_address_set(0);
     }
 }
 
-bool cpu_msr_set_safe(uint32_t msr, uint32_t value)
+bool cpu_patch_jmp(void *addr, size_t size, void const *jmp_target)
 {
-    __try {
-        cpu_msr_set(msr, value);
+    assert(size >= 5);
+    uintptr_t code = uintptr_t(addr);
+    uintptr_t next = code + 4;
+    uintptr_t dest = uintptr_t(jmp_target);
+    intptr_t dist = dest - next;
+    if (likely(dist >= std::numeric_limits<int32_t>::min() ||
+               dist <= std::numeric_limits<int32_t>::max())) {
+        uint8_t buf[sizeof(jmp_disp32_insn)];
+        memcpy(buf, jmp_disp32_insn, sizeof(buf));
+        int32_t disp32 = dist;
+        memcpy(buf + 1, &disp32, sizeof(disp32));
+        cpu_patch_code(addr, jmp_disp32_insn, sizeof(jmp_disp32_insn));
+        return true;
     }
-    __catch {
-        return false;
-    }
-    return true;
+    return false;
 }
+
+bool cpu_msr_set_safe(uint32_t msr, uint64_t value)
+{
+    bool result = true;
+    try {
+        cpu_msr_set(msr, value);
+    } catch (ext::gpf_exception const&) {
+        result = false;
+    }
+
+    return result;
+}
+
+
+
+extern "C" uint128_t nofault_rdmsr(uint32_t msr);
 
 bool cpu_msr_get_safe(uint32_t msr, uint64_t &value)
 {
-    __try {
-        value = cpu_msr_get(msr);
-    }
-    __catch {
-        return false;
-    }
-    return true;
+    auto result = nofault_rdmsr(msr);
+
+    value = uint64_t(result);
+    return (result >> 64) == 0;
 }
 
 // Runs once on each CPU at early boot

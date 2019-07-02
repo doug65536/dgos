@@ -63,7 +63,7 @@ OutIt to_str(T n, OutIt out, size_t out_sz, OutT pad = OutT{})
         n /= 10;
     } while (out != out_en && n);
 
-    size_t len = out_st - buf_out;
+    size_t len = size_t(out_st - buf_out);
 
     size_t padding = 0;
     if (len < out_sz && pad)
@@ -112,19 +112,19 @@ void boot_menu_show(kernel_params_t &params)
         tchar *end = res + 32 - 1;
         auto& mode = vbe_modes.modes[i];
         *end = 0;
-        res = to_str(mode.width, res, end - res);
+        res = to_str(mode.width, res, size_t(end - res));
         if (res < end) *res++ = 'x';\
-        res = to_str(mode.height, res, end - res);
+        res = to_str(mode.height, res, size_t(end - res));
         if (res < end) *res++ = '-';
-        res = to_str(mode.mask_size_r, res, end - res);
+        res = to_str(mode.mask_size_r, res, size_t(end - res));
         if (res < end) *res++ = ':';
-        res = to_str(mode.mask_size_g, res, end - res);
+        res = to_str(mode.mask_size_g, res, size_t(end - res));
         if (res < end) *res++ = ':';
-        res = to_str(mode.mask_size_b, res, end - res);
+        res = to_str(mode.mask_size_b, res, size_t(end - res));
         if (res < end) *res++ = ':';
-        res = to_str(mode.mask_size_a, res, end - res);
+        res = to_str(mode.mask_size_a, res, size_t(end - res));
         if (res < end) *res++ = '-';
-        res = to_str(mode.bpp, res, end - res);
+        res = to_str(mode.bpp, res, size_t(end - res));
         if (res < end) *res++ = 'b';
         if (res < end) *res++ = 'p';
         if (res < end) *res++ = 'p';
@@ -148,9 +148,9 @@ void boot_menu_show(kernel_params_t &params)
     boot_menu.interact_timeout(1000);
 
     auto mode_index = tui_menu[2].index;
-    auto const& mode = vbe_modes.modes[mode_index];
+    auto const* mode = &vbe_modes.modes[mode_index];
 
-    params.vbe_selected_mode = uintptr_t(&mode);
+    params.vbe_selected_mode = uintptr_t(mode);
     params.wait_gdb = tui_menu[0].index != 0;
     params.serial_debugout = tui_menu[1].index != 0;
 }

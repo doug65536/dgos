@@ -553,5 +553,9 @@ uint64_t paging_physaddr_of(uint64_t linear_addr)
 
     pte_t *p = paging_find_pte(linear_addr - misalignment, 12, false);
 
-    return (p && (*p & PTE_PRESENT)) ? (*p & PTE_ADDR) + misalignment : -1;
+    return (p && (*p & PTE_PRESENT)) ? (*p & PTE_ADDR) + misalignment : -1U;
+}
+
+page_factory_t::~page_factory_t() noexcept
+{
 }

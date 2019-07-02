@@ -4,7 +4,6 @@
 #include "string.h"
 #include "assert.h"
 #include "vector.h"
-#include "cpu/control_regs.h"
 
 #include "hash_table.h"
 
@@ -521,3 +520,13 @@ EXPORT bool disk_io_plan_t::add(
 
     return true;
 }
+
+EXPORT storage_dev_base_t::~storage_dev_base_t()
+{
+}
+
+EXPORT storage_if_base_t::~storage_if_base_t()
+{
+}
+
+//std::unique_ptr<storage_if_base_t> dummy;

@@ -430,14 +430,16 @@ void __cxa_pure_virtual()
 // Do nothing to synchronize initialization
 // of static variables at function scope
 extern "C"
-void __cxa_guard_acquire()
+int __cxa_guard_acquire(uint64_t *guard_object)
 {
+    return *guard_object == 0;
 }
 
 // Do nothing to synchronize initialization
 // of static variables at function scope
 extern "C"
-void __cxa_guard_release()
+void __cxa_guard_release(uint64_t *guard_object)
 {
+    *guard_object = 1;
 }
 

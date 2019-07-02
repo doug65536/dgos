@@ -15,7 +15,6 @@
 #include "cpu/atomic.h"
 #include "time.h"
 #include "threadsync.h"
-#include "cpu/control_regs.h"
 #include "unique_ptr.h"
 #include "inttypes.h"
 #include "work_queue.h"

@@ -24,6 +24,10 @@ char const *virtio_base_t::cap_names[] = {
     "VIRTIO_PCI_CAP_PCI_CFG"
 };
 
+virtio_base_t::~virtio_base_t()
+{
+}
+
 bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                                 char const *isr_name, bool per_cpu_queues)
 {
@@ -49,13 +53,11 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                      cap_rec.type, cap_rec.bar,
                      cap_rec.offset, cap_rec.length);
 
-        bool is_mmio;
-        is_mmio = pci_iter.config.is_bar_mmio(cap_rec.bar);
+        bool is_mmio = pci_iter.config.is_bar_mmio(cap_rec.bar);
 
         // bar is nullptr
         uint64_t bar;
-        bar = is_mmio ? pci_iter.config.get_bar(cap_rec.bar) + cap_rec.offset
-                      : 0;
+        bar = pci_iter.config.get_bar(cap_rec.bar) + cap_rec.offset;
 
         switch (cap_rec.type) {
         case VIRTIO_PCI_CAP_COMMON_CFG:
@@ -195,6 +197,9 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
                 }
             }
 
+            atomic_fence();
+            common_cfg->device_status |= VIRTIO_STATUS_FEATURES_OK;
+            atomic_fence();
             common_cfg->device_status |= VIRTIO_STATUS_DRIVER_OK;
 
             VIRTIO_TRACE("Successfully negotiated features\n");
@@ -202,11 +207,19 @@ bool virtio_base_t::virtio_init(pci_dev_iterator_t const& pci_iter,
             break;
 
         case VIRTIO_PCI_CAP_NOTIFY_CFG:
-            //if (notify_cap)
-            //    break;
+            if (notify_cap)
+                break;
             notify_cap_size = cap_rec.length;
+            notify_bar = bar;
+            notify_is_mmio = is_mmio;
+            uint64_t notify_paddr;
+            notify_paddr = bar + cap_rec.offset;
+            VIRTIO_TRACE("mapping notify bar %u"
+                         " at physaddr %#" PRIx64
+                         ", mmio=%u",
+                         (unsigned)bar, notify_paddr, (unsigned)notify_is_mmio);
             notify_cap = (virtio_pci_notify_cap_t *)mmap(
-                        (void*)(bar + cap_rec.offset), cap_rec.length,
+                        (void*)notify_paddr, cap_rec.length,
                         PROT_READ | PROT_WRITE,
                         MAP_PHYSICAL | MAP_NOCACHE | MAP_WRITETHRU, -1, 0);
             if (unlikely(notify_cap == MAP_FAILED)) {
@@ -274,10 +287,6 @@ bool virtio_virtqueue_t::init(
     this->queue_idx = queue_idx;
 
     atomic_st_rel(&common_cfg->queue_select, queue_idx);
-
-    notify_ptr = (uint16_t*)
-            (notify_base + (common_cfg->queue_notify_off *
-                            notify_off_multiplier));
 
     uint8_t log2_queue_size = bit_log2(common_cfg->queue_size);
 
@@ -382,6 +391,10 @@ bool virtio_virtqueue_t::init(
 
     // Can't reliably read back anymore until enabled
     common_cfg->queue_enable = 1;
+
+    notify_ptr = (uint16_t*)
+            (notify_base + (common_cfg->queue_notify_off *
+                            notify_off_multiplier));
 
     if (unlikely(!(assert(common_cfg->queue_size == (1 << log2_queue_size)) ||
                    assert(common_cfg->queue_avail == avail_paddr) ||
@@ -590,12 +603,13 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
     VIRTIO_TRACE("Probing for %s device\n", name);
 
-    if (!pci_enumerate_begin(&pci_iter, dev_class, -1, VIRTIO_VENDOR, device))
+    if (unlikely(!pci_enumerate_begin(&pci_iter, dev_class,
+                                      -1, VIRTIO_VENDOR, device)))
         return 0;
 
     do {
-        if (pci_iter.config.device < VIRTIO_DEV_MIN ||
-                pci_iter.config.device > VIRTIO_DEV_MAX)
+        if (unlikely(pci_iter.config.device < VIRTIO_DEV_MIN ||
+                     pci_iter.config.device > VIRTIO_DEV_MAX))
             continue;
 
         VIRTIO_TRACE("Found %s device at %u:%u:%u\n", name,
@@ -603,9 +617,10 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
 
         std::unique_ptr<virtio_base_t> self = create();
 
-        if (!virtio_base_t::virtio_devs.push_back(self))
+        if (unlikely(!virtio_base_t::virtio_devs.push_back(self)))
             panic_oom();
-        if (self->init(pci_iter)) {
+
+        if (likely(self->init(pci_iter))) {
             found_device(self);
             self.release();
         } else {
@@ -614,4 +629,8 @@ int virtio_factory_base_t::detect_virtio(int dev_class, int device,
     } while (pci_enumerate_next(&pci_iter));
 
     return 0;
+}
+
+virtio_factory_base_t::~virtio_factory_base_t()
+{
 }

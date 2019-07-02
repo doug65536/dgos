@@ -1,5 +1,4 @@
 #include "gdt.h"
-#include "control_regs.h"
 #include "mm.h"
 #include "string.h"
 #include "printk.h"

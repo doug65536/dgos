@@ -23,7 +23,7 @@ EXPORT void workq_impl::enqueue(workq_work *work)
     enqueue_locked(work, lock);
 }
 
-EXPORT void workq_impl::enqueue_locked(workq_work *work, scoped_lock& lock)
+EXPORT void workq_impl::enqueue_locked(workq_work *work, scoped_lock&)
 {
     work->next = nullptr;
     work->owner = this;

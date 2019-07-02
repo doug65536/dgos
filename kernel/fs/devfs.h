@@ -33,7 +33,7 @@ public:
     {
     }
 
-    virtual ~dev_fs_file_reg_t() {}
+    virtual ~dev_fs_file_reg_t() = 0;
 
     virtual dev_fs_file_t *open(int flags, mode_t mode) = 0;
 
@@ -59,7 +59,7 @@ struct dev_fs_t final
     FS_BASE_RW_IMPL
 
     struct device_factory_t {
-        virtual ~device_factory_t() {}
+        virtual ~device_factory_t() = 0;
         virtual fs_file_info_t *open(fs_cpath_t path,
                                      int flags, mode_t mode) = 0;
     };

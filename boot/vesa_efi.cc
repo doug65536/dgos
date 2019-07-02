@@ -25,12 +25,12 @@ static inline uint8_t bits_width(uint32_t n, uint8_t lsb_set)
 static vbe_selected_mode_t *selected_mode_from_efi_mode(
         vbe_selected_mode_t *result,
         EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *efi_mode,
-        uint16_t mode_num)
+        uint32_t mode_num)
 {
     result->mode_num = mode_num;
 
-    result->height = efi_mode->VerticalResolution;
-    result->width = efi_mode->HorizontalResolution;
+    result->height = uint16_t(efi_mode->VerticalResolution);
+    result->width = uint16_t(efi_mode->HorizontalResolution);
 
     switch (efi_mode->PixelFormat) {
     case PixelRedGreenBlueReserved8BitPerColor:
@@ -127,7 +127,7 @@ vbe_mode_list_t const& vbe_enumerate_modes()
     mode_list.modes = new (std::nothrow)
             vbe_selected_mode_t[mode_list.count] {};
 
-    for (size_t i = 0; i < mode_list.count; ++i) {
+    for (uint32_t i = 0; i < mode_list.count; ++i) {
         UINTN info_sz = sizeof(*info);
 
         status = efi_graphics_output->QueryMode(

@@ -477,14 +477,27 @@ EXPORT void condvar_init(condition_var_t *var)
 
 EXPORT void condvar_destroy(condition_var_t *var)
 {
-    if (unlikely(var->link.prev != &var->link)) {
-        spinlock_lock(&var->lock);
-        for (thread_wait_link_t *node = var->link.next;
-             node != &var->link; node = thread_wait_del(node));
-        spinlock_unlock(&var->lock);
+    // Lock the condition variable
+    spinlock_lock(&var->lock);
+
+    // Unlink every waiter from the condition variable
+    // Might as well go in reverse order, most likely to be cached
+    for (thread_wait_link_t *prev, *node = var->link.prev;
+         node != &var->link; node = prev) {
+        // Stash pointer for next iteration before clearing node
+        prev = node->prev;
+        node->next = nullptr;
+        node->prev = nullptr;
     }
+
+    // Empty the list
+    var->link.next = &var->link;
+    var->link.prev = &var->link;\
+
     assert(var->link.next == &var->link);
     assert(var->link.prev == &var->link);
+
+    spinlock_unlock(&var->lock);
 }
 
 class condvar_spinlock_t {

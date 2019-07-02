@@ -912,9 +912,9 @@ thread_yield:
     // -24 -16*8(%rbp)  1*8(%rsp) -> segments
     // -25 -17*8(%rbp)  0*8(%rsp) -> fpu ctx ptr
 
-    // XXX: the values in all the general registers in the context,
-    // except rbp, will be garbage. Context restore will ignore memory
-    // and unconditionally return with them zeroed
+
+
+
 
     // Push zero error code
     push_cfi %rax
@@ -1285,9 +1285,9 @@ protection_barrier:
     // Just return if it is getting called before patching to IBPB version
     ret
 
-.balign 16
 .hidden protection_barrier_ibpb
 .global protection_barrier_ibpb
+.balign 16
 protection_barrier_ibpb:
     .cfi_startproc
 
@@ -1314,12 +1314,28 @@ protection_barrier_ibpb:
 .balign 16
 exception_isr_handler:
     .cfi_startproc
-    .cfi_def_cfa rbp,4*8
-    .cfi_offset ss,3*8
-    .cfi_offset rsp,2*8
-    .cfi_offset rflags,1*8
-    .cfi_offset cs,0*8
-    .cfi_offset rip,-1*8
+    .cfi_def_cfa rbp,8*8
+    .cfi_offset ss,-1*8
+    .cfi_offset rsp,-2*8
+    .cfi_offset rflags,-3*8
+    .cfi_offset cs,-4*8
+    .cfi_offset rip,-5*8
+
+    .cfi_offset rbp,-8*8
+    .cfi_offset rbx,-9*8
+    .cfi_offset r15,-10*8
+    .cfi_offset r14,-11*8
+    .cfi_offset r13,-12*8
+    .cfi_offset r12,-13*8
+    .cfi_offset r11,-14*8
+    .cfi_offset r10,-15*8
+    .cfi_offset rax,-16*8
+    .cfi_offset r9,-17*8
+    .cfi_offset r8,-18*8
+    .cfi_offset rcx,-19*8
+    .cfi_offset rdx,-20*8
+    .cfi_offset rsi,-21*8
+    .cfi_offset rdi,-22*8
 
     call intr_has_handler
     testl %eax,%eax
@@ -1356,8 +1372,8 @@ exception_isr_handler:
     .cfi_endproc
 
 //thread_fn_t fn, void *p, thread_t id
-.balign 16
 .global thread_entry
+.balign 16
 thread_entry:
     .cfi_startproc
 
@@ -1379,9 +1395,9 @@ thread_entry:
     .cfi_endproc
 
 // _noreturn void isr_sysret64(uintptr_t rip, uintptr_t rsp);
-.balign 16
 .hidden isr_sysret64
 .global isr_sysret64
+.balign 16
 isr_sysret64:
     .cfi_startproc
 
@@ -1490,8 +1506,8 @@ isr_sysret64:
     .cfi_endproc
 
 /// Note! This code assumes -mno-red-zone
-.balign 16
 .global __module_dynlink_plt_thunk
+.balign 16
 __module_dynlink_plt_thunk:
     .cfi_startproc
     .cfi_def_cfa_offset 8*3
@@ -1618,8 +1634,8 @@ __module_dynlink_plt_thunk:
     .cfi_endproc
 
 // This unblocks context switches and forces a switch if one was deferred
-.balign 16
 .global cs_leave_asm
+.balign 16
 cs_leave_asm:
     .cfi_startproc
     xorl %eax,%eax
@@ -1646,8 +1662,8 @@ cs_leave_asm:
     .cfi_endproc
 
 // Entering N critical sections requires you to leave N to get out
-.balign 16
 .global cs_enter_asm
+.balign 16
 cs_enter_asm:
     .cfi_startproc
     xor %eax,%eax
@@ -1689,3 +1705,386 @@ __x86_indirect_thunk_\reg:
 .irp reg,rax,rcx,rdx,rbx,rbp,r8,r9,r10,r11,r12,r13,r14,r15
     make_retpoline_thunk \reg
 .endr
+
+// Each fault resistant function consists of an address range where faults
+// are dismissed and handled. Each range has a landing pad. When a fault
+// occurs in that range, the rax register is reset to -1, and the
+// instruction pointer is reset to the landing pad (*_faulted location)
+
+.macro nofault_define_region name
+
+.pushsection .nofault.tab.st
+.balign 8
+.quad \name
+.popsection
+
+.pushsection .nofault.tab.en
+.balign 8
+.quad .L\name\()_end
+.popsection
+
+.pushsection .nofault.tab.lp
+.balign 8
+.quad .L\name\()_faulted
+.popsection
+
+.endm
+
+.section .nofault.text, "ax"
+
+// uint128_t nofault_rdmsr(uint32_t msr)
+// returns 128 bit result in rax,rdx
+// upper 64 bits (rdx) is is zero on success, lower 64 bits (rax) is value
+.global nofault_rdmsr
+.hidden nofault_rdmsr
+.balign 16
+nofault_rdmsr:
+    .cfi_startproc
+
+    // Register number into ecx for rdmsr instruction
+    mov %edi,%ecx
+    rdmsr
+
+    // edx:eax -> rax
+    shl $ 32,%rdx
+    or %rdx,%rax
+
+    // Zero upper half means success
+    xor %edx,%edx
+
+    ret
+
+.Lnofault_rdmsr_faulted:
+    // Put -1 into upper half and return 0 value
+    mov %rax,%rdx
+    xor %eax,%eax
+    ret
+
+.Lnofault_rdmsr_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_rdmsr
+
+// Returns 0 on success
+// int nofault_wrmsr(uint32_t msr, uint64_t value)
+.global nofault_wrmsr
+.hidden nofault_wrmsr
+.balign 16
+nofault_wrmsr:
+    .cfi_startproc
+
+    mov %rsi,%rdx
+    mov %edi,%ecx
+    mov %esi,%eax
+    shr $ 32,%rdx
+    wrmsr
+    shl $ 32,%rdx
+    or %rdx,%rax
+    xor %eax,%eax
+.Lnofault_wrmsr_faulted:
+    ret
+
+.Lnofault_wrmsr_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_wrmsr
+
+
+
+// ptrdiff_t nofault_strncpy(char *dest, char const *value, size_t size);
+.global nofault_strncpy
+.hidden nofault_strncpy
+.balign 16
+nofault_strncpy:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    xor %eax,%eax
+
+.Lnofault_strncpy_loop:
+    mov (%rsi,%rax),%cl
+    movb %cl,(%rdi,%rax)
+    test %cl,%cl
+    jz .Lnofault_strncpy_done
+    inc %rax
+    cmp %rdx,%rax
+    jb .Lnofault_strncpy_loop
+
+    // Failed! String too long (-2 long, get it?)
+    mov $-2,%rax
+
+.Lnofault_strncpy_faulted:
+.Lnofault_strncpy_done:
+    insn_fixup
+    clac
+
+    ret
+
+.Lnofault_strncpy_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_strncpy
+
+
+
+// Returns offset to the byte matching the low byte of value
+// If not found, returns -2
+// If faults, returns -1
+// ptrdiff_t nofault_offsetof(char const *s, int value, size_t size)
+.global nofault_offsetof
+.hidden nofault_offsetof
+.balign 16
+nofault_offsetof:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    mov %esi,%eax
+    mov %rdx,%rcx
+    repne scasb
+    jne .Lnofault_offsetof_nomatch
+
+    sub %rcx,%rdx
+    dec %rdx
+    mov %rdx,%rax
+
+.Lnofault_offsetof_done:
+    insn_fixup
+    clac
+
+    ret
+
+.Lnofault_offsetof_nomatch:
+    mov $ -2,%rax
+.Lnofault_offsetof_faulted:
+    jmp .Lnofault_offsetof_done
+
+.Lnofault_offsetof_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_offsetof
+
+
+// Returns the length if the string fits in a max_size buffer with null
+// Returns -2 if string too long
+// Returns -1 if faulted
+// ptrdiff_t nofault_strnlen(char const *s, size_t max_size)
+.global nofault_strnlen
+.hidden nofault_strnlen
+.balign 16
+nofault_strnlen:
+    .cfi_startproc
+
+    xor %eax,%eax
+
+.Lnofault_strnlen_loop:
+    movb (%rdi,%rax),%cl
+
+    // If the value that was loaded was zero then done
+    test %cl,%cl
+    jz .Lnofault_strnlen_done
+
+    // Rather use simplest addressing mode above and increment two registers
+    inc %rax
+
+    // Continue looping if the offset has not reached the maximum yet
+    cmp %rax,%rsi
+    jb .Lnofault_strnlen_loop
+
+    // Max length! Return -2 (to differentiate it from -1 from fault)
+    // -2 for "too" long
+    mov $-2,%rax
+
+.Lnofault_strnlen_done:
+.Lnofault_strnlen_faulted:// crash will resume here with -1 in rax
+    ret
+
+.Lnofault_strnlen_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_strnlen
+
+
+
+// Returns 0 on success
+// Returns -1 if faulted
+// int nofault_memset(void *dest, int value, size_t size) noexcept;
+.global nofault_memset
+.hidden nofault_memset
+.balign 16
+nofault_memset:
+    .cfi_startproc
+
+    insn_fixup
+    stac
+
+    mov %rdx,%rcx
+    mov %esi,%eax
+    rep stosb
+
+    xor %eax,%eax
+.Lnofault_memset_faulted:
+
+    insn_fixup
+    clac
+
+    ret
+
+    .cfi_endproc
+
+.Lnofault_memset_end:
+
+
+
+// Returns 0 on success
+// Returns -1 if faulted
+// int nofault_memcpy(void *dest, void const *src, size_t size) noexcept;
+.global nofault_memcpy
+.hidden nofault_memcpy
+.balign 16
+nofault_memcpy:
+    .cfi_startproc
+
+#if 0
+
+    insn_fixup
+    stac
+
+    mov %rdx,%rcx
+    xor %eax,%eax
+    rep movsb
+
+.Lnofault_memcpy_faulted:
+
+    insn_fixup
+    clac
+
+    ret
+
+#else
+
+    // To test against -64 and to adjust loop counters/pointers
+    mov $-64,%rcx
+
+    // Becomes nop if cpu does not support SMAP
+    insn_fixup
+    stac
+
+    // Handle zero size copy
+    test %rdx,%rdx
+    jz .Lnofault_memcpy_done
+
+    // branch to alignment loop if not 64-bit aligned
+.Lnofault_memcpy_misaligned_mainloop:
+    test $7,%rdi
+    jnz .Lmisaligned_dest
+
+    // At this point, the destination is guaranteed to be 64-bit aligned
+
+.Lnofault_memcpy_fast_mainloop:
+    // See if >= 64 bytes remaining
+    test %rcx,%rdx
+    jz .Lnofault_memcpy_little_remaining
+
+    // At least 64 bytes remaining and destination is 64 bit aligned
+
+    // Copy 64 bytes unconditionally
+    mov (%rsi),%rax
+    mov %rax,(%rdi)
+    mov 1*8(%rsi),%rax
+    mov %rax,1*8(%rdi)
+    mov 2*8(%rsi),%rax
+    mov %rax,2*8(%rdi)
+    mov 3*8(%rsi),%rax
+    mov %rax,3*8(%rdi)
+    mov 4*8(%rsi),%rax
+    mov %rax,4*8(%rdi)
+    mov 5*8(%rsi),%rax
+    mov %rax,5*8(%rdi)
+    mov 6*8(%rsi),%rax
+    mov %rax,6*8(%rdi)
+    mov 7*8(%rsi),%rax
+    mov %rax,7*8(%rdi)
+
+    sub %rcx,%rdi
+    sub %rcx,%rsi
+    add %rcx,%rdx
+    jnz .Lnofault_memcpy_fast_mainloop
+
+.Lnofault_memcpy_done:
+    mov $1,%eax
+.Lnofault_memcpy_faulted:
+
+    // Becomes nop if cpu does not support SMAP
+    insn_fixup
+    clac
+
+    ret
+
+.Lmisaligned_dest:
+    movzbl (%rsi),%eax
+    add $1,%rsi
+    movb %al,(%rdi)
+    add $1,%rdi
+    add $-1,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_misaligned_mainloop
+
+.Lnofault_memcpy_little_remaining:
+    // See if any number of 64 bit chunks are remaining
+    test $-8,%rdx
+    jz .Lnofault_memcpy_little_remaining_not64
+
+    // Copy a 64 bit chunk
+    mov (%rsi),%rax
+    add $8,%rsi
+    mov %rax,(%rdi)
+    add $8,%rdi
+    add $-8,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_little_remaining
+
+.Lnofault_memcpy_little_remaining_not64:
+    // See if any number of 32 bit chunks are remaining
+    test $-4,%rdx
+    jz .Lnofault_memcpy_little_remaining_not32
+
+    // Copy a 32 bit chunk
+    mov (%rsi),%eax
+    add $4,%rsi
+    mov %eax,(%rdi)
+    add $4,%rdi
+    add $-4,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_little_remaining_not64
+
+.Lnofault_memcpy_little_remaining_not32:
+    movzbl (%rsi),%eax
+    add $1,%rsi
+    mov %al,(%rdi)
+    add $1,%rdi
+    add $-1,%rdx
+    jz .Lnofault_memcpy_done
+    jmp .Lnofault_memcpy_little_remaining_not32
+#endif
+
+.Lnofault_memcpy_end:
+
+    .cfi_endproc
+
+nofault_define_region nofault_memcpy
+
+
+
+.global __module_unwind_resume
+.balign 16
+__module_unwind_resume:
+    jmp _Unwind_Resume

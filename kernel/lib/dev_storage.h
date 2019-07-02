@@ -55,7 +55,7 @@ enum storage_dev_info_t : uint32_t {
 };
 
 struct EXPORT storage_dev_base_t {
-    virtual ~storage_dev_base_t() {}
+    virtual ~storage_dev_base_t() = 0;
 
     // Startup/shutdown
     virtual void cleanup_dev() = 0;
@@ -127,11 +127,13 @@ struct EXPORT storage_if_factory_t {
     char const * const name;
 };
 
+#pragma GCC visibility push(default)
 struct EXPORT storage_if_base_t {
-    virtual ~storage_if_base_t() {}
+    virtual ~storage_if_base_t() = 0;
     virtual void cleanup_if() = 0;
     virtual std::vector<storage_dev_base_t*> detect_devices() = 0;
 };
+#pragma GCC visibility pop
 
 #define STORAGE_IF_IMPL                         \
     void cleanup_if() override final;           \

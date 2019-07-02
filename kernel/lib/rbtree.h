@@ -705,6 +705,10 @@ public:
     template<bool _is_const, int dir>
     class basic_iterator
     {
+    private:
+        static_assert(dir == 1 || -dir == 1, "Unexpected direction");
+        using owner_ptr_t = typename conditional<_is_const,
+            basic_set const *, basic_set *>::type;
     public:
         basic_iterator() = default;
         basic_iterator(basic_iterator const& rhs) = default;
@@ -713,6 +717,7 @@ public:
         template<bool _rhs_is_const, int _dir>
         basic_iterator(basic_iterator<_rhs_is_const, _dir> const& rhs)
             : curr(rhs.curr)
+            , owner(rhs.owner)
         {
             // --------+---------+---------
             // LHS     | RHS     | Allowed
@@ -727,8 +732,8 @@ public:
                 "Cannot copy const_(reverse_)iterator to (reverse_)iterator");
         }
 
-        // ++ at end has no effect
-        basic_iterator& operator++()
+        // Step to the element that compares greater
+        basic_iterator& step(integral_constant<int, 1>::type const&)
         {
             if (curr) {
                 if (curr->right) {
@@ -748,10 +753,12 @@ public:
                     curr = p;
                 }
             }
+
             return *this;
         }
 
-        basic_iterator& operator--()
+        // Step to the element that compares lesser
+        basic_iterator& step(integral_constant<int, -1>::type const&)
         {
             if (curr) {
                 if (curr->left) {
@@ -777,17 +784,39 @@ public:
             return *this;
         }
 
+        basic_iterator& inc()
+        {
+            return step(typename integral_constant<int, dir>::type());
+        }
+
+        basic_iterator& dec()
+        {
+            // Steps to lesser if forward, greater if reverse
+            return step(typename integral_constant<int, -dir>::type());
+        }
+
+        // ++ at end has no effect
+        basic_iterator& operator++()
+        {
+            return inc();
+        }
+
+        basic_iterator& operator--()
+        {
+            return dec();
+        }
+
         basic_iterator operator++(int)
         {
             basic_iterator orig(*this);
-            ++*this;
+            inc();
             return orig;
         }
 
         basic_iterator operator--(int)
         {
             basic_iterator orig(*this);
-            --*this;
+            dec();
             return orig;
         }
 
@@ -821,21 +850,49 @@ public:
             return curr != rhs.curr;
         }
 
+        basic_iterator operator-(size_t n)
+        {
+            basic_iterator result(*this);
+
+            if (curr == nullptr && n) {
+                --n;
+                if (dir > 0)
+                    result.curr = owner->tree_max();
+                else
+                    result.curr = owner->tree_min();
+            }
+
+            while (n-- && result.curr)
+                --result;
+
+            return result;
+        }
+
+        basic_iterator operator+(size_t n)
+        {
+            basic_iterator result(*this);
+            while (n-- && result.curr)
+                ++result;
+            return result;
+        }
+
     private:
         friend class basic_set;
 
-        basic_iterator(node_t *node)
+        basic_iterator(node_t *node, owner_ptr_t owner)
             : curr(node)
+            , owner(owner)
         {
         }
 
-        node_t *curr;
+        node_t *curr = nullptr;
+        owner_ptr_t owner = nullptr;
     };
 
-    using iterator = basic_iterator<false, false>;
-    using const_iterator = basic_iterator<true, false>;
-    using reverse_iterator = basic_iterator<false, true>;
-    using const_reverse_iterator = basic_iterator<true, true>;
+    using iterator = basic_iterator<false, 1>;
+    using const_iterator = basic_iterator<true, 1>;
+    using reverse_iterator = basic_iterator<false, -1>;
+    using const_reverse_iterator = basic_iterator<true, -1>;
 
     basic_set()
         : root(nullptr)
@@ -871,7 +928,7 @@ public:
 
     size_type size() const
     {
-        return size;
+        return current_size;
     }
 
     bool empty() const
@@ -879,70 +936,80 @@ public:
         return current_size == 0;
     }
 
+    ///     (nullptr)     (max)
+    ///       rend       rbegin
+    ///        |           |
+    ///       ~~~+---+---+---+~~~
+    ///      :   | V | V | V |   :
+    ///       ~~~+---+---+---+~~~
+    ///            |           |
+    ///          begin        end
+    ///           (min)    (nullptr)
+
     iterator begin()
     {
         node_t *n = tree_min();
-        return iterator(n);
+        return iterator(n, this);
     }
 
     const_iterator begin() const
     {
         node_t *n = tree_min();
-        return const_iterator(n);
+        return const_iterator(n, this);
     }
 
     const_iterator cbegin() const
     {
         node_t *n = tree_min();
-        return const_iterator(n);
+        return const_iterator(n, this);
     }
 
     reverse_iterator rbegin()
     {
         node_t *n = tree_max();
-        return reverse_iterator(n);
+        return reverse_iterator(n, this);
     }
 
     const_reverse_iterator rbegin() const
     {
         node_t *n = tree_max();
-        return const_reverse_iterator(n);
+        return const_reverse_iterator(n, this);
     }
 
     const_reverse_iterator crbegin() const
     {
         node_t *n = tree_max();
-        return const_reverse_iterator(n);
+        return const_reverse_iterator(n, this);
     }
 
     iterator end()
     {
-        return iterator(nullptr);
+        return iterator(nullptr, this);
     }
 
     const_iterator end() const
     {
-        return const_iterator(nullptr);
+        return const_iterator(nullptr, this);
     }
 
     const_iterator cend() const
     {
-        return const_iterator(nullptr);
+        return const_iterator(nullptr, this);
     }
 
     reverse_iterator rend()
     {
-        return reverse_iterator(nullptr);
+        return reverse_iterator(nullptr, this);
     }
 
     const_reverse_iterator rend() const
     {
-        return const_reverse_iterator(nullptr);
+        return const_reverse_iterator(nullptr, this);
     }
 
     const_reverse_iterator crend() const
     {
-        return const_reverse_iterator(nullptr);
+        return const_reverse_iterator(nullptr, this);
     }
 
     size_type max_size()
@@ -972,12 +1039,12 @@ public:
 
     iterator find(_T const& k)
     {
-        return iterator(const_cast<node_t*>(__tree_find(k)));
+        return iterator(const_cast<node_t*>(__tree_find(k)), this);
     }
 
     const_iterator find(_T const& k) const
     {
-        return const_iterator(__tree_find(k));
+        return const_iterator(__tree_find(k), this);
     }
 
     template<typename U>
@@ -987,7 +1054,7 @@ public:
                       "C++14 find requires comparator type to have"
                       " is_transparent member type");
 
-        return iterator(const_cast<node_t*>(__tree_find(k)));
+        return iterator(const_cast<node_t*>(__tree_find(k)), this);
     }
 
     template<typename U>
@@ -1008,10 +1075,10 @@ public:
         node_t *i = __tree_ins(nullptr, _Compare(), found_dup, &value, true);
 
         if (found_dup)
-            result = { iterator(i), false };
+            result = { iterator(i, this), false };
         else if (i != nullptr)
         {
-            result = { iterator(i), true };
+            result = { iterator(i, this), true };
 
             TreePolicy::retrace_insert(root, i);
         }
@@ -1043,7 +1110,7 @@ public:
         if (likely(!found_dup))
             TreePolicy::retrace_insert(root, n);
 
-        return { iterator(i), !found_dup };
+        return pair<iterator, bool>(iterator(i, this), !found_dup);
     }
 
     iterator erase(const_iterator place)
@@ -1415,8 +1482,6 @@ private:
     };
 
     C_ASSERT(sizeof(__node_t) == 32);
-
-    struct __node_t;
 
     static int default_cmp(kvp_t const* __lhs, kvp_t const* __rhs, void*)
     {

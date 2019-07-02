@@ -17,8 +17,8 @@ EXPORT size_t strlen(char const *src)
 
 EXPORT void *memchr(void const *mem, int ch, size_t count)
 {
-    for (char const *p = (char const *)mem; count--; ++p)
-        if (*p == (char)ch)
+    for (unsigned char const *p = (unsigned char const *)mem; count--; ++p)
+        if ((unsigned char)*p == (unsigned char)ch)
             return (void *)p;
    return nullptr;
 }

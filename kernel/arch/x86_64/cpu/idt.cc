@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "debug.h"
 #include "assert.h"
 #include "isr.h"
 #include "irq.h"
@@ -10,7 +11,6 @@
 #include "cpu/halt.h"
 #include "time.h"
 #include "interrupts.h"
-#include "control_regs.h"
 #include "string.h"
 #include "except.h"
 #include "mm.h"

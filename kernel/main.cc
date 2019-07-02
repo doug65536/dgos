@@ -13,7 +13,6 @@
 #include "threadsync.h"
 #include "assert.h"
 #include "cpu/atomic.h"
-#include "cpu/control_regs.h"
 #include "rand.h"
 #include "string.h"
 #include "heap.h"
@@ -601,17 +600,17 @@ static int stress_heap_thread(void *p)
 }
 #endif
 
+_noreturn
 int clks_unhalted(void *cpu)
 {
-    //auto cpu_nr = size_t(cpu);
-    //uint64_t last = thread_get_usage(-1);
-    //while (1) {
-    //    thread_sleep_for(1000);
-    //    uint64_t curr = thread_get_usage(-1);
-    //    printk("CPU %zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
-    //    last = curr;
-    //}
-    return 0;
+    auto cpu_nr = size_t(cpu);
+    uint64_t last = thread_get_usage(-1);
+    while (1) {
+        thread_sleep_for(1000);
+        uint64_t curr = thread_get_usage(-1);
+        printk("CPU %zx: %" PRIu64 " clocks\n", cpu_nr, curr - last);
+        last = curr;
+    }
 }
 
 #if ENABLE_FIND_VBE
@@ -885,7 +884,8 @@ static int init_thread(void *)
     if (unlikely(process_t::spawn(&init_pid, "init", nullptr, nullptr) != 0))
         panic("spawn init failed!");
 
-    process_t::wait_for_exit(init_pid);
+    if (unlikely(process_t::wait_for_exit(init_pid) < 0))
+        panic("failed to wait for init");
 
     // Facilities needed by drivers
     printk("Initializing driver base\n");
@@ -1088,8 +1088,59 @@ int debugger_thread(void *)
     return 0;
 }
 
+class something {
+public:
+    int big = 0xbbb12166;
+    long long enough = 0xeee000020001111;
+
+    ~something()
+    {
+        printdbg("something destructed\n");
+    }
+};
+
+class locked {
+public:
+    virtual void do_thing()
+    {
+        scoped_lock lock(some_lock);
+
+        do_throw();
+
+        x = 1;
+    }
+
+    virtual void do_throw()
+    {
+        if (x == 0)
+            throw something();
+    }
+
+private:
+    int x = 0;
+
+    using lock_type = std::mutex;
+    using scoped_lock = std::unique_lock<lock_type>;
+    lock_type some_lock;
+};
+
 extern "C" _noreturn int main(void)
 {
+    bool caught = false;
+    try {
+        throw something();
+    } catch (something const& e) {
+        caught = true;
+    }
+
+    caught = false;
+    try {
+        locked thing;
+        thing.do_thing();
+    } catch (something const& e) {
+        caught = true;
+    }
+
     if (!kernel_params->wait_gdb)
         thread_create(init_thread, nullptr, 0, false);
     else

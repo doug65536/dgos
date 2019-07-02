@@ -1,4 +1,5 @@
 #include "cpu/thread_impl.h"
+#include "debug.h"
 #include "process.h"
 #include "types.h"
 #include "interrupts.h"
@@ -7,7 +8,6 @@
 #include "likely.h"
 
 #include "thread.h"
-#include "control_regs.h"
 #include "main.h"
 #include "halt.h"
 #include "cpu.h"
@@ -24,6 +24,7 @@
 #include "except.h"
 #include "rbtree.h"
 #include "work_queue.h"
+#include "cxxexcept.h"
 
 // Implements platform independent thread.h
 
@@ -92,10 +93,12 @@ struct link_t {
 };
 
 struct alignas(256) thread_info_t {
-    // Hottest member by far
+    // Dirty line, frequently modified items
+
     isr_context_t * volatile ctx;
 
     // Needed in context switch and/or syscall
+    // TODO: need place to put 32 bit flags during syscall entry
     void * volatile fsbase;
     void * volatile gsbase;
     uint32_t syscall_mxcsr, syscall_fcw87;
@@ -146,6 +149,8 @@ struct alignas(256) thread_info_t {
 
     // --- cache line ---
 
+    __cxa_eh_globals cxx_exception_info;
+
     mutex_t lock;   // 32 bytes
     condition_var_t done_cond;
 
@@ -168,7 +173,7 @@ struct alignas(256) thread_info_t {
 
     thread_cpu_mask_t cpu_affinity;
 
-    __exception_jmp_buf_t exit_jmpbuf;
+    std::vector<__exception_jmp_buf_t> exit_jmpbuf;
 };
 
 C_ASSERT_ISPO2(sizeof(thread_info_t));
@@ -888,7 +893,9 @@ static void thread_clear_busy(void *outgoing)
 
     // When the exiting thread has finished getting off the CPU, immediately
     // delete the thread from the owning process
-    if (unlikely(atomic_and(&thread->state, ~THREAD_BUSY) == THREAD_IS_EXITING))
+    if (unlikely(atomic_and(&thread->state,
+                            (thread_state_t)~THREAD_BUSY) ==
+                 THREAD_IS_EXITING))
         thread->process->del_thread(thread->thread_id);
 }
 
@@ -1068,28 +1075,45 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
     }
 
     if (thread != outgoing) {
-        if (outgoing->flags & THREAD_FLAGS_ANY_FPU) {
-            unsigned cs = ISR_CTX_REG_CS(ctx);
+        //
+        // FPU context switch save and/or restore, lockout/unlock
 
-            bool from_user = (cs == GDT_SEL_USER_CODE64 ||
-                              cs == GDT_SEL_USER_CODE32);
+        unsigned from_cs = ISR_CTX_REG_CS(ctx);
 
-            bool is64 = (cs == GDT_SEL_KERNEL_CODE64 ||
-                         cs == GDT_SEL_USER_CODE64);
+        bool from_user = (from_cs == GDT_SEL_USER_CODE64 ||
+                          from_cs == GDT_SEL_USER_CODE32);
 
-            if ((outgoing->flags & THREAD_FLAGS_KERNEL_FPU) ||
-                ((outgoing->flags & THREAD_FLAGS_USER_FPU) && from_user)) {
-                THREAD_TRACE("Saving context of thread %zx\n",
-                             outgoing - threads);
+        bool from_cs64 = (from_cs == GDT_SEL_KERNEL_CODE64 ||
+                          from_cs == GDT_SEL_USER_CODE64);
 
-                if (is64)
-                    isr_save_fpu_ctx64(outgoing);
-                else
-                    isr_save_fpu_ctx32(outgoing);
-            }
+        unsigned to_cs = ISR_CTX_REG_CS(thread->ctx);
+
+        bool to_user = (to_cs == GDT_SEL_USER_CODE64 ||
+                        to_cs == GDT_SEL_USER_CODE32);
+
+        bool to_cs64 = (to_cs == GDT_SEL_KERNEL_CODE64 ||
+                        to_cs == GDT_SEL_USER_CODE64);
+
+        if ((outgoing->flags & THREAD_FLAGS_KERNEL_FPU) ||
+            ((outgoing->flags & THREAD_FLAGS_USER_FPU) && from_user)) {
+            //
+            // The outgoing FPU context needs to be saved
+
+            THREAD_TRACE("Saving context of thread %zx\n",
+                         outgoing - threads);
+
+            // Save it correctly
+            if (from_cs64)
+                isr_save_fpu_ctx64(outgoing);
+            else
+                isr_save_fpu_ctx32(outgoing);
         }
 
-        if (thread->flags & THREAD_FLAGS_ANY_FPU) {
+        if ((thread->flags & THREAD_FLAGS_KERNEL_FPU) ||
+            ((thread->flags & THREAD_FLAGS_USER_FPU) && to_user)) {
+            //
+            // The incoming FPU context needs to be restored
+
             if (cpu->cr0_shadow & CPU_CR0_TS) {
                 // Clear TS flag to unblock access to FPU
                 cpu->cr0_shadow &= ~CPU_CR0_TS;
@@ -1099,11 +1123,19 @@ _hot isr_context_t *thread_schedule(isr_context_t *ctx)
             THREAD_TRACE("Restoring context of thread %zx\n",
                          thread - threads);
 
-            if (ISR_CTX_REG_CS(ctx) != GDT_SEL_USER_CODE32)
+            if (to_cs64)
                 isr_restore_fpu_ctx64(thread);
             else
                 isr_restore_fpu_ctx32(thread);
-        } else if ((cpu->cr0_shadow & CPU_CR0_TS) == 0) {
+        } else if (thread->flags & THREAD_FLAGS_ANY_FPU) {
+            // Allow use of FPU but don't restore anything
+            cpu_cr0_clts();
+        }
+
+        // Lock out the FPU if the incoming thread does not use the
+        // FPU at all
+        if (!(thread->flags & THREAD_FLAGS_ANY_FPU) &&
+            (cpu->cr0_shadow & CPU_CR0_TS) == 0) {
             // Set TS flag to block access to FPU
             cpu->cr0_shadow |= CPU_CR0_TS;
             cpu_cr0_set(cpu->cr0_shadow);
@@ -1365,7 +1397,7 @@ void thread_idle_set_ready()
 void *thread_get_exception_top()
 {
     // Ensure that threading is initialized, in case of early exception
-    if (thread_get_cpu_count()) {
+    if (likely(thread_get_cpu_count())) {
         thread_info_t *thread = this_thread();
         return thread->exception_chain;
     }
@@ -1500,10 +1532,14 @@ void thread_tss_ready(void*)
 REGISTER_CALLOUT(thread_tss_ready, nullptr,
                  callout_type_t::tss_list_ready, "000");
 
+void thread_terminate(thread_t tid)
+{
+}
+
 void thread_exit(int exit_code)
 {
     thread_info_t *info = this_thread();
-    thread_t tid = info - threads;
+    thread_t tid = info->thread_id;
     info->exit_code = exit_code;
     info->process->del_thread(tid);
     thread_cleanup();
@@ -1634,4 +1670,9 @@ uint32_t thread_locks_held()
 {
     cpu_info_t *cpu = this_cpu();
     return cpu->locks_held;
+}
+
+__cxa_eh_globals *thread_cxa_get_globals()
+{
+    return &this_thread()->cxx_exception_info;
 }

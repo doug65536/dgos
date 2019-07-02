@@ -2,6 +2,10 @@
 
 // Explicit instantiations
 #pragma GCC visibility push(default)
+template class std::char_traits<char>;
+template class std::char_traits<wchar_t>;
+template class std::char_traits<char16_t>;
+template class std::char_traits<char32_t>;
 template class std::basic_string<char>;
 template class std::basic_string<wchar_t>;
 template class std::basic_string<char16_t>;
@@ -90,3 +94,8 @@ std::string std::to_string(long double value)
     return result;
 }
 #endif
+
+void std::detail::throw_bad_alloc()
+{
+    throw std::bad_alloc();
+}

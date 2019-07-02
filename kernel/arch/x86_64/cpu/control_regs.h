@@ -646,6 +646,31 @@ static _always_inline uint32_t cpu_eflags_change(
     return flags;
 }
 
+static _always_inline void cpu_stac_safe()
+{
+    __asm__ __volatile__ (
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "stac"
+        : : :
+    );
+}
+
+static _always_inline void cpu_clac_safe()
+{
+    __asm__ __volatile__ (
+        //insn_fixup
+        ".pushsection .rodata.fixup.insn\n\t"
+        ".quad .Linsn_fixup_%=\n\t"
+        ".popsection\n\t"
+        ".Linsn_fixup_%=:\n\t"
+        "clac"
+        : : :
+    );
+}
+
 static _always_inline void cpu_stac()
 {
     __asm__ __volatile__ ("stac");
@@ -982,6 +1007,3 @@ static _always_inline void cpu_wait_bit_set(
 {
     return cpu_wait_bit_value(value, bit, true);
 }
-
-extern "C" _noinline
-void cpu_debug_break();

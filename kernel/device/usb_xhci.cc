@@ -21,7 +21,7 @@
 
 #include "usb_xhci.bits.h"
 
-#define USBXHCI_DEBUG   0
+#define USBXHCI_DEBUG   1
 #if USBXHCI_DEBUG
 #define USBXHCI_TRACE(...) printdbg("xhci: " __VA_ARGS__)
 #else
@@ -1373,11 +1373,12 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
 
     USBXHCI_TRACE("Waiting for controller not ready == zero\n");
 
-    // 2 seconds is the point where no working controller is that slow
-    timeout = time_ns() + 2000000000;
+    // 20 seconds is the point where no working controller is that slow
+    uint64_t now = time_ns();
+    uint64_t time_st = now;
+    timeout = time_st + 20000000000;
 
     // Wait for CNR (controller not ready) to be zero
-    uint64_t now = 0;
     while ((mmio_op->usbsts & USBXHCI_USBSTS_CNR) &&
            ((now = time_ns()) < timeout))
         pause();
@@ -1399,7 +1400,9 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     USBXHCI_TRACE("Stopping controller\n");
 
     // 2 seconds is the point where no working controller is that slow
-    timeout = time_ns() + 2000000000;
+    now = time_ns();
+    time_st = now;
+    timeout = time_st + 2000000000;
 
     // Stop the controller
     mmio_op->usbcmd &= ~USBXHCI_USBCMD_RUNSTOP;
@@ -1415,12 +1418,14 @@ bool usbxhci::init(pci_dev_iterator_t const& pci_iter, size_t busid)
     }
 
     USBXHCI_TRACE("Stop completed in %" PRIu64 "ms\n",
-                  (time_ns() - time_st) / 1000000);
+                  (now - time_st) / 1000000);
 
     USBXHCI_TRACE("Resetting controller\n");
 
-    // 2 seconds is the point where no working controller is that slow
-    timeout = time_ns() + 2000000000;
+    // 20 seconds is the point where no working controller is that slow
+    now = time_ns();
+    time_st = now;
+    timeout = time_st + 200000000000;
 
     // Reset the controller
     mmio_op->usbcmd |= USBXHCI_USBCMD_HCRST;

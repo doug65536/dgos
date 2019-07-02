@@ -280,7 +280,9 @@ invoke_function_array:
 .global register_eh_frame
 register_eh_frame:
     // Register .eh_frame for libgcc unwind
+    leaq ___eh_frame_en(%rip),%rsi
     leaq ___eh_frame_st(%rip),%rdi
+    subq %rdi,%rsi
     jmp __register_frame
 
 .balign 16

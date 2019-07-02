@@ -2,7 +2,6 @@
 #include "ioport.h"
 #include "irq.h"
 #include "cpu/halt.h"
-#include "control_regs.h"
 #include "interrupts.h"
 #include "pic.bits.h"
 #include "assert.h"
@@ -178,7 +177,7 @@ static void pic8259_setmask(int irq, bool unmask)
     outb(port, (pic8259_mask >> shift) & 0xFF);
 }
 
-static bool pic8259_islevel(int irq)
+static bool pic8259_islevel(int irq _unused)
 {
     // Always edge on ISA
     return false;

@@ -1,12 +1,40 @@
 #pragma once
-#include "unique_ptr.h"
-#include "utility.h"
-#include "algorithm.h"
+#ifndef _FUNCTIONAL_H_
+#define _FUNCTIONAL_H_
+
+#include "types.h"
 
 __BEGIN_NAMESPACE_STD
 
 template<typename>
 class function;
+
+template<typename>
+struct equal_to;
+
+template<typename>
+struct less;
+
+template<typename>
+struct less_equal;
+
+template<typename>
+struct greater;
+
+template<typename>
+struct greater_equal;
+
+template<typename>
+class reference_wrapper;
+
+__END_NAMESPACE_STD
+
+#include "unique_ptr.h"
+#include "utility.h"
+#include "algorithm.h"
+#include "type_traits.h"
+
+__BEGIN_NAMESPACE_STD
 
 template<typename R, typename... _Args>
 class function<R(_Args...)>
@@ -61,7 +89,7 @@ public:
 private:
     struct CallableBase
     {
-        virtual ~CallableBase() {}
+        virtual ~CallableBase() = 0;
         virtual R invoke(_Args&& ...args) const = 0;
         virtual CallableBase *copy() const = 0;
     };
@@ -89,6 +117,11 @@ private:
 
     std::unique_ptr<CallableBase> impl;
 };
+
+template<typename R, typename... _Args>
+function<R(_Args...)>::CallableBase::~CallableBase()
+{
+}
 
 template<typename _T>
 struct equal_to
@@ -121,6 +154,7 @@ struct less
     using result_type = bool;
     using first_argument = _T;
     using second_argument = _T;
+    using is_transparent = true_type;
 
     bool constexpr operator()(_T const& __lhs, _T const& __rhs) const
     {
@@ -216,3 +250,5 @@ struct greater_equal<void>
 };
 
 __END_NAMESPACE_STD
+
+#endif

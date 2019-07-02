@@ -2,6 +2,7 @@
 #include "types.h"
 #include "vector.h"
 #include "hash.h"
+#include "cxxexception.h"
 
 __BEGIN_NAMESPACE_STD
 
@@ -12,43 +13,35 @@ public:
     using char_type = _CharT;
     using int_type = int;
 
-    static constexpr void assign(char_type& __r, char_type const& __a)
+    static inline constexpr void assign(char_type& __r, char_type const& __a)
     {
         __r = __a;
     }
 
-    static char_type* assign(char_type* __p, size_t __count, char_type __a)
+    static inline char_type* assign(
+            char_type* __p, size_t __count, char_type __a)
     {
-        fill_n(__p, __p + __count, __a);
+        fill_n(__p, __count, __a);
         return __p;
     }
 
-    static constexpr bool eq(char_type __a, char_type __b)
+    static inline constexpr bool eq(char_type __a, char_type __b)
     {
         return __a == __b;
     }
 
-    static constexpr bool lt(char_type __a, char_type __b)
+    static inline constexpr bool lt(char_type __a, char_type __b)
     {
         return __a < __b;
     }
 
     static char_type* move(char_type* __dest,
-                           char_type const* __src, size_t count)
-    {
-        if (__dest < __src) {
-            copy(__src, __src + count, __dest);
-        } else if (__dest > __src) {
-            for (size_t __i = count; __i > 0; --__i)
-                __dest[__i] = __src[__i];
-        }
-        return __dest;
-    }
+                           char_type const* __src, size_t __count);
 
     static char_type* copy(char_type* __dest,
                            char_type const* __src, size_t __count)
     {
-        copy(__src, __src + __count, __dest);
+        return std::copy(__src, __src + __count, __dest);
     }
 
     static int compare(_CharT const *__lhs, _CharT const *__rhs, size_t __rlen)
@@ -71,52 +64,78 @@ public:
     }
 
     static char_type const* find(char_type const* __rhs, size_t __count,
-                                 char_type const& __ch)
-    {
-        for (size_t __chk = 0; __chk < __count; ++__chk) {
-            if (__rhs[__chk] == __ch)
-                return __rhs + __chk;
-        }
-        return nullptr;
-    }
+                                 char_type const& __ch);
 
-    static constexpr char_type to_char_type(int_type c)
+    static inline constexpr char_type to_char_type(int_type c)
     {
         return char_type(c);
     }
 
-    static constexpr int_type to_int_type(char_type c)
+    static inline constexpr int_type to_int_type(char_type c)
     {
         return int_type(c);
     }
 
-    static constexpr bool eq_int_type(int_type c1, int_type c2)
+    static inline constexpr bool eq_int_type(int_type c1, int_type c2)
     {
         return c1 == c2;
     }
 
-    static constexpr int_type eof()
+    static inline constexpr int_type eof()
     {
         return -1;
     }
 
-    static constexpr int_type not_eof(int_type e) noexcept
+    static inline constexpr int_type not_eof(int_type e) noexcept
     {
         return e == eof() ? 0 : e;
     }
 
 };
 
-template<typename _CharT,
-         typename _Traits = char_traits<_CharT>,
-         typename _Allocator = allocator<_CharT>>
-class basic_string
+template<typename _CharT>
+typename char_traits<_CharT>::char_type *
+char_traits<_CharT>::move(
+        char_type *__dest, char_type const *__src, size_t __count)
 {
-private:
-    using _Storage = vector<_CharT, _Allocator>;
-public:
-    static_assert(std::has_trivial_destructor<_CharT>::value,
-                  "Null termination technique requires"
+    if (__dest < __src || __src + __count <= __dest) {
+        std::copy(__src, __src + __count, __dest);
+    } else if (__dest > __src) {
+        for (size_t __i = __count; __i > 0; --__i)
+            __dest[__i] = __src[__i];
+    }
+    return __dest;
+}
+
+template<typename _CharT>
+typename char_traits<_CharT>::char_type const *
+char_traits<_CharT>::find(char_type const *__rhs, size_t __count,
+                  char_type const &__ch)
+{
+    for (size_t __chk = 0; __chk < __count; ++__chk) {
+        if (__rhs[__chk] == __ch)
+            return __rhs + __chk;
+    }
+    return nullptr;
+}
+
+__BEGIN_NAMESPACE_DETAIL
+
+_noreturn _noinline
+void throw_bad_alloc();
+
+__END_NAMESPACE
+
+template<typename _CharT,
+typename _Traits = char_traits<_CharT>,
+typename _Allocator = allocator<_CharT>>
+                                         class basic_string
+{
+                                         private:
+                                         using _Storage = vector<_CharT, _Allocator>;
+                                         public:
+                                         static_assert(std::has_trivial_destructor<_CharT>::value,
+                                                       "Null termination technique requires"
                   " trivially destructible type");
 
     using traits_type = _Traits;
@@ -142,7 +161,8 @@ public:
     basic_string(_CharT const *__rhs)
     {
         size_type __sz = traits_type::length(__rhs);
-        __str.reserve(__sz + 1);
+        if (unlikely(!__str.reserve(__sz + 1)))
+            detail::throw_bad_alloc();
         __str.assign(__rhs, __rhs + __sz);
         __str[__sz] = 0;
     }
@@ -152,7 +172,7 @@ public:
     {
     }
 
-    basic_string(basic_string&& __rhs)
+    basic_string(basic_string&& __rhs) noexcept
         : __str(move(__rhs.__str))
     {
     }
@@ -160,14 +180,16 @@ public:
     basic_string(_CharT const *__st, _CharT const *__en)
     {
         size_type __sz = __en - __st;
-        __str.reserve(__sz + 1);
+        if (unlikely(!__str.reserve(__sz + 1)))
+            detail::throw_bad_alloc();
         __str.assign(__st, __en);
         __str[__sz] = 0;
     }
 
     basic_string(size_type __n, _CharT __value)
     {
-        __str.reserve(__n + 1);
+        if (unlikely(!__str.reserve(__n + 1)))
+            detail::throw_bad_alloc();
         __str.assign(__n, __value);
         __str[__n] = 0;
     }
@@ -177,7 +199,9 @@ public:
     basic_string(_IterT __st, _IterT __en)
     {
         size_type __sz = __en - __st;
-        __str.reserve(__sz + 1);
+        if (unlikely(!__str.reserve(__sz + 1)))
+            detail::throw_bad_alloc();
+
         __str.assign(__st, __en);
         __str[__sz] = 0;
     }
@@ -191,7 +215,9 @@ public:
     basic_string &operator=(_CharT const *__rhs)
     {
         size_type __sz = traits_type::length(__rhs);
-        __str.reserve(__sz + 1);
+        if (unlikely(!__str.reserve(__sz + 1)))
+            detail::throw_bad_alloc();
+
         __str.assign(__rhs, __rhs + __sz);
         __str[__sz] = 0;
         return *this;
@@ -391,15 +417,20 @@ public:
 
     basic_string& append(size_type __count, _CharT __ch)
     {
-        __str.resize(__count - __str.size(), __ch);
+        if (!__str.resize(__count - __str.size(), __ch))
+            detail::throw_bad_alloc();
+
         return *this;
     }
 
     basic_string& append(basic_string const& __rhs)
     {
-        __str.reserve(__str.size() + __rhs.size());
+        if (unlikely(!__str.reserve(__str.size() + __rhs.size())))
+            detail::throw_bad_alloc();
+
         for (_CharT const& __ch : __rhs)
             __str.push_back(__ch);
+
         return *this;
     }
 
@@ -429,7 +460,9 @@ public:
         if (__count > __max_count)
             __count = __max_count;
 
-        __str.reserve(__str.size() + __count);
+        if (unlikely(!__str.reserve(__str.size() + __count)))
+            detail::throw_bad_alloc();
+
         const_iterator __end = __rhs.begin() + (__pos + __count);
 
         for (const_iterator __src = __rhs.cbegin(); __src != __end; ++__src)
@@ -442,9 +475,12 @@ public:
     {
         _CharT const *__end = __s + __count;
         size_type __sz = __end - __s;
-        __str.reserve(__str.size() + __sz);
+        if (unlikely(!__str.reserve(__str.size() + __sz)))
+            detail::throw_bad_alloc();
+
         for ( ; __s != __end; ++__s)
             __str.push_back(*__s);
+
         return *this;
     }
 
@@ -453,7 +489,10 @@ public:
         _CharT const *__end;
         for (__end = __s; *__end; ++__end);
         size_type __sz = __end - __s;
-        __str.reserve(__str.size() + __sz);
+
+        if (unlikely(!__str.reserve(__str.size() + __sz)))
+            detail::throw_bad_alloc();
+
         for ( ; __s != __end; ++__s)
             __str.push_back(*__s);
         return *this;
@@ -462,9 +501,12 @@ public:
     template<typename _InputIt >
     basic_string& append(_InputIt __first, _InputIt __last)
     {
-        __str.reserve(__str.size() + (__last - __first));
+        if (unlikely(!__str.reserve(__str.size() + (__last - __first))))
+            detail::throw_bad_alloc();
+
         for ( ; __first != __last; ++__first)
             __str.push_back(*__first);
+
         return *this;
     }
 
@@ -618,7 +660,8 @@ public:
 
     size_type find(_CharT __ch, size_type __pos = 0) const
     {
-        const_iterator __it = std::find(__str.cbegin(), __str.cend(), __ch);
+        const_iterator __it = std::find(__str.cbegin() + __pos,
+                                        __str.cend(), __ch);
         return __it != __str.cend() ? __it - __str.cbegin() : npos;
     }
 
@@ -656,7 +699,7 @@ public:
 
     size_type rfind(_CharT __ch, size_type __pos = 0) const
     {
-        for (size_type __srch = __str.size(); __srch; --__srch) {
+        for (size_type __srch = __str.size() - __pos; __srch; --__srch) {
             if (__str[__srch - 1] == __ch)
                 return __srch - 1;
         }
@@ -692,7 +735,7 @@ public:
 
     size_type find_first_of(_CharT __ch, size_type __str_pos = 0) const
     {
-        auto result = std::find(__str.cbegin(), __str.cend(), __ch);
+        auto result = std::find(__str.cbegin() + __str_pos, __str.cend(), __ch);
         return result != __str.end() ? result - __str.begin() : npos;
     }
 
@@ -768,7 +811,8 @@ private:
     basic_string& __ensure_terminated()
     {
         if (__str.capacity() == __str.size())
-            __str.reserve(__str.size() + 1);
+            if (unlikely(!__str.reserve(__str.size() + 1)))
+                detail::throw_bad_alloc();
 
         if (__str[__str.size()] == 0)
             __str[__str.size()] = 0;
@@ -914,28 +958,32 @@ using u16string = basic_string<char16_t>;
 using u32string = basic_string<char32_t>;
 
 template<typename _CharT, typename _Traits, typename _Alloc>
-struct hash<std::basic_string<_CharT, _Traits, _Alloc>> {
+struct hash<basic_string<_CharT, _Traits, _Alloc>> {
     size_t operator()(std::basic_string<_CharT, _Traits, _Alloc> const& s) const
     {
         return hash_32(s.data(), s.size() * sizeof(*s.data()));
     }
 };
 
-std::string to_string(int value);
-std::string to_string( long value );
-std::string to_string( long long value );
-std::string to_string( unsigned value );
-std::string to_string( unsigned long value );
-std::string to_string( unsigned long long value );
+string to_string(int value);
+string to_string( long value );
+string to_string( long long value );
+string to_string( unsigned value );
+string to_string( unsigned long value );
+string to_string( unsigned long long value );
 #ifndef __DGOS_KERNEL__
-std::string to_string( float value );
-std::string to_string( double value );
-std::string to_string( long double value );
+string to_string( float value );
+string to_string( double value );
+string to_string( long double value );
 #endif
 
 __END_NAMESPACE_STD
 
 // Explicit instantiations
+extern template class std::char_traits<char>;
+extern template class std::char_traits<wchar_t>;
+extern template class std::char_traits<char16_t>;
+extern template class std::char_traits<char32_t>;
 extern template class std::basic_string<char>;
 extern template class std::basic_string<wchar_t>;
 extern template class std::basic_string<char16_t>;

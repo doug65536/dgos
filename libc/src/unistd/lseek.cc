@@ -11,7 +11,7 @@ off_t lseek(int fd, off_t off, int whence)
     if (status >= 0)
         return status;
 
-    errno = -status;
+    errno = errno_t(-status);
 
     return -1;
 }

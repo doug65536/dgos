@@ -9,6 +9,7 @@
 #include "assert.h"
 #include "math.h"
 #include "inttypes.h"
+#include "debug.h"
 
 typedef enum length_mod_t {
     length_none,
@@ -900,6 +901,7 @@ EXPORT void vpanic(char const * restrict format, va_list ap)
 {
     printk("KERNEL PANIC! ");
     vprintk(format, ap);
+    cpu_debug_break();
     halt_forever();
 }
 

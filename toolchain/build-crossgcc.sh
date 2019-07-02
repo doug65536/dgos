@@ -8,6 +8,7 @@ archives=
 prefixdir=
 logfile=
 cleanbuild=
+extractonly=
 parallel="-j$(which nproc >/dev/null && nproc || echo 1)"
 
 function log() {
@@ -118,7 +119,8 @@ function make_tool() {
 
 	mkdir -p "$build/$name" || exit
 	pushd "$build/$name" || exit
-	log echo Making "$target" with config "$config" and prefix "$prefixdir" in $(pwd)...
+	log echo Making "$target" with config "$config" \
+		and prefix "$prefixdir" in $(pwd)...
 	if ! [[ -z "${@:6}" ]]
 	then
 		log echo "...with extra configure options: ${@:6}"
@@ -157,6 +159,7 @@ function help() {
 	echo ' -j <#>           use <#> parallel workers to build'
 	echo ' -o <dir>         output directory'
 	echo ' -p <dir>         prefix dir'
+	echo ' -x               extract sources only'
 	echo ' -c               clean the build directory'
 	echo ' -q               quiet'
 	echo ' -h|-?            display this help message'
@@ -164,7 +167,7 @@ function help() {
 }
 
 # Parse arguments
-while getopts a:m:j:o:cp:qh? arg
+while getopts a:m:j:o:cxp:qh? arg
 do
 	case $arg in
 		a ) arches="$OPTARG" ;;
@@ -174,6 +177,7 @@ do
 		p ) prefixdir="$OPTARG" ;;
 		c ) cleanbuild=1 ;;
 		q ) quiet=1 ;;
+		x ) extractonly=1 ;;
 		h ) help ;;
 		? ) help ;;
 		* ) echo "unrecognized option '$arg'" ; exit 1 ;;
@@ -182,7 +186,9 @@ done
 
 require_value "$arches" "Architecture list required, need -a <dir>"
 require_value "$outdir" "Output directory required, need -o <dir>"
-require_value "$prefixdir" "Prefix directory required, need -p <dir>"
+if [[ -z extractonly ]]; then
+	require_value "$prefixdir" "Prefix directory required, need -p <dir>"
+fi
 require_value "$gnu_mirror" "Specified mirror URL is invalid: -m \"$gnu_mirror\""
 
 mkdir -p "$outdir"
@@ -265,6 +271,10 @@ ln -sf $(fullpath "$outdir/src/mpc-$mpcver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpc") || exit
 ln -sf $(fullpath "$outdir/src/mpfr-$mpfver") \
 	$(fullpath "$outdir/src/gcc-$gccver/mpfr") || exit
+
+if ! [[ -z extractonly ]]; then
+	exit 0
+fi
 
 gcc_config="--target=$arches --with-system-zlib \
 --enable-multilib --enable-languages=c,c++ \

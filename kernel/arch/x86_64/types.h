@@ -31,6 +31,7 @@
 #define _assume_aligned(n)      __attribute__((__assume_aligned__(n)))
 #define _alloc_size(...)        __attribute__((__alloc_size__(__VA_ARGS__)))
 #define _alloc_align(pi)        __attribute__((__alloc_align__(pi)))
+#define _unused                 __attribute__((__unused__))
 #define _use_result             __attribute__((__warn_unused_result__))
 #define _leaf                   __attribute__((__leaf__))
 #define __aligned(n)            __attribute__((__aligned__(n)))
@@ -93,6 +94,9 @@ typedef long ssize_t;
 #endif
 
 #endif
+
+__extension__ typedef __int128 int128_t;
+__extension__ typedef __int128 unsigned uint128_t;
 
 typedef int_fast64_t off_t;
 typedef intptr_t ssize_t;

@@ -62,9 +62,9 @@ _start:
     addq $ 24,%rbx
 .Lrela_iplt_done:
 
-	lea __init_array_start(%rip),%rbx
+    lea __init_array_start(%rip),%rbx
 .Lnext_init:
-	leaq __init_array_end(%rip),%rax
+    leaq __init_array_end(%rip),%rax
 	cmpq %rax,%rbx
 	je .Ldone_init
 	movq (%rbx),%rax

@@ -150,6 +150,7 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
         tree_t::kvp_t by_size = free_addr_by_size.item(place);
 
         while (by_size.key < size) {
+            free_addr_by_size.dump();
             place = free_addr_by_size.next(place);
             if (unlikely(!place))
                 return 0;
@@ -200,6 +201,55 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
 
     return addr;
 }
+
+/*
+ * 9 scenarios                                                         *
+ *                                                                     *
+ *   A-----B  X: The range we are taking                               *
+ *   C-----D  Y: The existing range                                    *
+ *
+ * Query finds [ ranges.lower_bound(A), ranges.upper_bound(B) )
+ *
+ * For each one use this table to determine outcome against the first
+ *
+ *  +-------+-------+-------------+-------+--------------------------------+
+ *  | A<=>C | B<=>D |             | Added |                                |
+ *  +-------+-------+-------------+-------+--------------------------------+
+ *  |       |       |             |       |                                |
+ *  |  -1   |  -1   | <--->       |   1   | No overlap, do nothing, done   |
+ *  |       |       |       <---> |       |                                |
+ *  |       |       |             |       |                                |
+ *  |  -1   |   0   | <---------> |   0   | Replace obstacle, done         |
+ *  |       |       |       <xxx> |       |                                |
+ *  |       |       |             |       |                                |
+ *  |  -1   |   1   | <---------> |   0   | Replace obstacle               |
+ *  |       |       |    <xxx>    |       |                                |
+ *  |       |       |             |       |                                |
+ *  |   0   |  -1   | <--->       |   1   | Clip obstacle start, done      |
+ *  |       |       | <xxx------> |       |                                |
+ *  |       |       |             |       |                                |
+ *  |   0   |   0   | <--->       |   0   | Replace obstacle, done         |
+ *  |       |       | <xxx>       |       |                                |
+ *  |       |       |             |       |                                |
+ *  |   0   |   1   | <---------> |   0   | Replace obstacle               |
+ *  |       |       | <xxx>       |       |                                |
+ *  |       |       |             |       |                                |
+ *  |   1   |  -1   |   <--->     |   2   | Duplicate obstacle, clip end   |
+ *  |       |       | <-->x<-->   |       | of original, clip start of     |
+ *  |       |       |             |       | duplicate, done                |
+ *  |       |       |             |       |                                |
+ *  |   1   |   0   |   <--->     |   1   | Clip obstacle end, done        |
+ *  |       |       | <--xxx>     |       |                                |
+ *  |       |       |             |       |                                |
+ *  |   1   |   1   |     <-----> |   1   | Clip obstacle end              |
+ *  |       |       |   <--xx>    |       |                                |
+ *  |       |       |             |       |                                |
+ *  +-------+-------+-------------+-------+--------------------------------+
+ *
+ * "done" means, there is no point in continuing to iterate forward in the
+ * range query results, there is no way it could overlap any more items.
+ *
+ */
 
 bool contiguous_allocator_t::take_linear(linaddr_t addr, size_t size,
                                          bool require_free)

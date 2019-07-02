@@ -10,6 +10,7 @@ extern "C" void cpu_hw_init(int ap);
 extern "C" void cpu_patch_code(void *addr, void const *src, size_t size);
 extern "C" void cpu_patch_insn(void *addr, uint64_t value, size_t size);
 extern "C" void cpu_patch_nop(void *addr, size_t size);
+extern "C" bool cpu_patch_jmp(void *addr, size_t size, const void *jmp_target);
 
 extern "C"
 void cpu_patch_calls(void const *call_target,
@@ -17,7 +18,7 @@ void cpu_patch_calls(void const *call_target,
 
 extern "C" uint32_t default_mxcsr_mask;
 
-bool cpu_msr_set_safe(uint32_t msr, uint32_t value);
+bool cpu_msr_set_safe(uint32_t msr, uint64_t value);
 bool cpu_msr_get_safe(uint32_t msr, uint64_t &value);
 void cpu_init_late_msrs();
 _noreturn

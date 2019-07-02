@@ -72,7 +72,7 @@
 // 45-47 reserved
 
 // Vectors >= 48 go through apic_dispatcher codepath
-// 192 vectors for IOAPIC and MSI
+// 192 vectors for IOAPIC and MSI(x)
 #define INTR_APIC_IRQ_BASE  48
 #define INTR_APIC_IRQ_END   239
 #define INTR_APIC_IRQ_COUNT (INTR_APIC_IRQ_END - INTR_APIC_IRQ_BASE + 1)

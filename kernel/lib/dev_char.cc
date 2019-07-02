@@ -1,5 +1,9 @@
 #include "dev_char.h"
 
+dev_char_t::~dev_char_t()
+{
+}
+
 int dev_char_t::read(void *data, int64_t count)
 {
     blocking_iocp_t iocp;

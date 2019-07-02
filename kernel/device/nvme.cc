@@ -12,7 +12,6 @@
 #include "utility.h"
 #include "thread.h"
 #include "vector.h"
-#include "cpu/control_regs.h"
 #include "mutex.h"
 #include "inttypes.h"
 #include "work_queue.h"
@@ -44,6 +43,7 @@ nvme_cmd_t nvme_cmd_t::create_identify(
     return cmd;
 }
 
+// Create a "create submission queue" command
 nvme_cmd_t nvme_cmd_t::create_sub_queue(
         void *addr, uint32_t size,
         uint16_t sqid, uint16_t cqid, uint8_t prio)
@@ -62,6 +62,7 @@ nvme_cmd_t nvme_cmd_t::create_sub_queue(
     return cmd;
 }
 
+// Create a "create completion queue" command
 nvme_cmd_t nvme_cmd_t::create_cmp_queue(
         void *addr, uint32_t size,
         uint16_t cqid, uint16_t intr)
@@ -80,6 +81,7 @@ nvme_cmd_t nvme_cmd_t::create_cmp_queue(
     return cmd;
 }
 
+// Create a read command
 nvme_cmd_t nvme_cmd_t::create_read(uint64_t lba, uint32_t count, uint8_t ns)
 {
     nvme_cmd_t cmd{};
@@ -95,6 +97,7 @@ nvme_cmd_t nvme_cmd_t::create_read(uint64_t lba, uint32_t count, uint8_t ns)
     return cmd;
 }
 
+// Create a write command
 nvme_cmd_t nvme_cmd_t::create_write(uint64_t lba, uint32_t count,
                                uint8_t ns, bool fua)
 {
@@ -112,6 +115,7 @@ nvme_cmd_t nvme_cmd_t::create_write(uint64_t lba, uint32_t count,
     return cmd;
 }
 
+// Create a trim command
 nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
                                    uint8_t ns)
 {
@@ -133,6 +137,7 @@ nvme_cmd_t nvme_cmd_t::create_trim(uint64_t lba, uint32_t count,
     return cmd;
 }
 
+// Create a flush command
 nvme_cmd_t nvme_cmd_t::create_flush(uint8_t ns)
 {
     nvme_cmd_t cmd{};
@@ -142,6 +147,7 @@ nvme_cmd_t nvme_cmd_t::create_flush(uint8_t ns)
     return cmd;
 }
 
+// Create a setfeatures command
 nvme_cmd_t nvme_cmd_t::create_setfeatures(uint16_t ncqr, uint16_t nsqr)
 {
     nvme_cmd_t cmd{};

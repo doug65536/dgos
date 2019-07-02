@@ -16,7 +16,7 @@
 EFI_HANDLE efi_image_handle;
 EFI_SYSTEM_TABLE *efi_systab;
 
-long __dso_handle;
+void * __dso_handle = &__dso_handle;
 
 extern "C" void __cxa_atexit()
 {
@@ -71,7 +71,7 @@ public:
 protected:
     static file_handle_base_t *file_handles[];
 
-    virtual ~file_handle_base_t() {}
+    virtual ~file_handle_base_t() = 0;
     virtual bool open_impl(tchar const *filename) = 0;
     virtual off_t filesize_impl() = 0;
     virtual bool close_impl() = 0;
@@ -493,23 +493,31 @@ uint64_t file_handle_base_t::boot_drv_serial()
     return serial;
 }
 
+file_handle_base_t::~file_handle_base_t()
+{
+}
+
+extern char __text_st[];
+
 extern "C" _noreturn
 EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *systab)
 {
     ::efi_image_handle = image_handle;
     ::efi_systab = systab;
 
+    PRINT("efi bootloader .text @ 0x%" PRIx64 "\n", uint64_t(__text_st));
+
     PRINT("efi_main = %" PRIxPTR, uintptr_t(efi_main));
 
     PRINT("invoking constructors");
     ctors_invoke();
 
-    PRINT("showing boot menu");
-    kernel_params_t params;
-    boot_menu_show(params);
+//    PRINT("showing boot menu");
+//    kernel_params_t params;
+//    boot_menu_show(params);
 
     PRINT("running kernel");
-    elf64_run(cpu_choose_kernel());// TSTR "dgos-kernel-generic");
+    elf64_run(cpu_choose_kernel());
 
     PRINT("it returned?");
 

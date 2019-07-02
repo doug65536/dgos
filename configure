@@ -621,6 +621,7 @@ ASM_DEBUG_INFO_FLAGS
 DEBUG_INFO_FLAGS
 RETPOLINE_FLAGS
 VISIBILITY_FLAGS
+INVISIBILITY_FLAGS
 COMPILER_FLAGS
 ASAN_FLAGS
 INSTRUMENT_FUNCTIONS_FLAGS
@@ -7816,8 +7817,8 @@ for flag in \
 		std=c++17 fno-fat-lto-objects g \
 		fno-integrated-as Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
-		Wstrict-overflow Wno-overlength-strings \
-		Wno-unused-parameter Wtautological-compare \
+		Wstrict-overflow \
+		Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
@@ -7825,7 +7826,10 @@ for flag in \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack
+		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
+		Wsuggest-attribute=const Wsuggest-attribute=pure \
+		Wno-unused-parameter fno-eliminate-unused-debug-types \
+		fno-eliminate-unused-debug-symbols
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -7866,6 +7870,9 @@ fi
 
 done
 
+#fvar-tracking
+#fvar-tracking-assignments
+#Wno-overlength-strings
 #fsanitize-undefined-trap-on-error fsanitize=undefined
 #Wsuggest-attribute=pure Wsuggest-attribute=const
 #Wsuggest-final-types
@@ -7873,10 +7880,55 @@ done
 #Wsuggest-attribute=noreturn
 #Wsuggest-attribute=format
 
-VISIBILITY_FLAGS=
+INVISIBILITY_FLAGS=
 for flag in \
 	fvisibility=hidden \
 	fvisibility-inlines-hidden
+do
+	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
+$as_echo_n "checking whether C++ compiler accepts -$flag... " >&6; }
+if eval \${$as_CACHEVAR+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -$flag"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  eval "$as_CACHEVAR=yes"
+else
+  eval "$as_CACHEVAR=no"
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+eval ac_res=\$$as_CACHEVAR
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_CACHEVAR"\" = x"yes"; then :
+  as_fn_append INVISIBILITY_FLAGS " -$flag"
+else
+  :
+fi
+
+done
+
+
+VISIBILITY_FLAGS=
+for flag in \
+	fvisibility=default \
+	fno-visibility-inlines-hidden
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -$flag" >&5
@@ -8169,7 +8221,7 @@ fi
 
 #falign-functions=0
 for flag in falign-loops=0 falign-labels=0 falign-jumps=0 \
-		mno-align-stringops Wno-ignored-optimization-argument \
+		mno-align-stringops \
 		fstack-usage
 do
 	as_CACHEVAR=`$as_echo "ax_cv_check_cxxflags__-$flag" | $as_tr_sh`
@@ -8815,45 +8867,6 @@ done
 
 
 DISABLE_FRAMEPOINTER_FLAGS=
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-omit-frame-pointer" >&5
-$as_echo_n "checking whether C++ compiler accepts -fno-omit-frame-pointer... " >&6; }
-if ${ax_cv_check_cxxflags___fno_omit_frame_pointer+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-
-  ax_check_save_flags=$CXXFLAGS
-  CXXFLAGS="$CXXFLAGS  -fno-omit-frame-pointer"
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_cxx_try_compile "$LINENO"; then :
-  ax_cv_check_cxxflags___fno_omit_frame_pointer=yes
-else
-  ax_cv_check_cxxflags___fno_omit_frame_pointer=no
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-  CXXFLAGS=$ax_check_save_flags
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_omit_frame_pointer" >&5
-$as_echo "$ax_cv_check_cxxflags___fno_omit_frame_pointer" >&6; }
-if test "x$ax_cv_check_cxxflags___fno_omit_frame_pointer" = xyes; then :
-  DISABLE_FRAMEPOINTER_FLAGS=" -fomit-frame-pointer"
-
-else
-  :
-fi
-
-
-
-ENABLE_FRAMEPOINTER_FLAGS=
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fomit-frame-pointer" >&5
 $as_echo_n "checking whether C++ compiler accepts -fomit-frame-pointer... " >&6; }
 if ${ax_cv_check_cxxflags___fomit_frame_pointer+:} false; then :
@@ -8884,6 +8897,45 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fomit_frame_pointer" >&5
 $as_echo "$ax_cv_check_cxxflags___fomit_frame_pointer" >&6; }
 if test "x$ax_cv_check_cxxflags___fomit_frame_pointer" = xyes; then :
+  DISABLE_FRAMEPOINTER_FLAGS=" -fomit-frame-pointer"
+
+else
+  :
+fi
+
+
+
+ENABLE_FRAMEPOINTER_FLAGS=
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether C++ compiler accepts -fno-omit-frame-pointer" >&5
+$as_echo_n "checking whether C++ compiler accepts -fno-omit-frame-pointer... " >&6; }
+if ${ax_cv_check_cxxflags___fno_omit_frame_pointer+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+  ax_check_save_flags=$CXXFLAGS
+  CXXFLAGS="$CXXFLAGS  -fno-omit-frame-pointer"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_compile "$LINENO"; then :
+  ax_cv_check_cxxflags___fno_omit_frame_pointer=yes
+else
+  ax_cv_check_cxxflags___fno_omit_frame_pointer=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  CXXFLAGS=$ax_check_save_flags
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ax_cv_check_cxxflags___fno_omit_frame_pointer" >&5
+$as_echo "$ax_cv_check_cxxflags___fno_omit_frame_pointer" >&6; }
+if test "x$ax_cv_check_cxxflags___fno_omit_frame_pointer" = xyes; then :
   ENABLE_FRAMEPOINTER_FLAGS=" -fno-omit-frame-pointer"
 
 else

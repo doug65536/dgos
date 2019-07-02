@@ -77,7 +77,7 @@ public:
     virtual phys_alloc_t alloc(size64_t size) noexcept = 0;
 
 protected:
-    virtual ~page_factory_t() noexcept {}
+    virtual ~page_factory_t() noexcept = 0;
 };
 
 void paging_map_range(

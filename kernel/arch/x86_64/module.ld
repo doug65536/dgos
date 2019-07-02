@@ -1,5 +1,5 @@
-ENTRY(module_entry)
-EXTERN(module_entry)
+ENTRY(module_entry);
+EXTERN(module_entry);
 
 PHDRS {
 	read PT_LOAD FILEHDR PHDRS FLAGS(4);
@@ -48,14 +48,11 @@ SECTIONS {
 		*(.gnu.version_d)
 	} :read
 
-	.eh_frame_hdr : {
-		*(.eh_frame_hdr)
-		*(.eh_frame_entry .eh_frame_entry.*)
-	} :read
-
 	.eh_frame : {
+		PROVIDE_HIDDEN(___eh_frame_st = .);
 		KEEP(*(.eh_frame))
 		*(.eh_frame.*)
+		PROVIDE_HIDDEN(___eh_frame_en = .);
 	} :read :ehfr
 
 	.hash : {

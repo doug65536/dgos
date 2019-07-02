@@ -7,16 +7,24 @@
 #
 DUMPDIR = $(top_builddir)/dump
 
+STARTUP_FILE_NAMES = \
+	crt0 crt0pc80 crt0pc64 crt0pc32
+
+STDLIB_FILE_NAMES = c g m stdc++
+
+STARTUP_FILES_INSTALLED = \
+	$(patsubst %,$(top_builddir)/sysroot/lib/%.o,$(STARTUP_FILE_NAMES))
+
+STDLIB_FILES_INSTALLED = \
+	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,$(STDLIB_FILE_NAMES))
+
 BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
-	generated_headers \
-	sysroot/lib/crt0.o \
-	sysroot/lib/libc.a \
-	sysroot/lib/libg.a \
-	sysroot/lib/libm.a \
-	sysroot/lib/libstdc++.a \
-	trace-tool
+	$(generated_headers) \
+	$(STARTUP_FILES_INSTALLED) \
+	$(STDLIB_FILES_INSTALLED) \
+	$(top_builddir)/trace-tool
 
 BOOTLOADER_COMMON_FLAGS = \
 	-D__DGOS__
@@ -28,6 +36,8 @@ BOOTLOADER_COMMON_FLAGS = \
 
 #LINKER_DEBUG = -Wl,--orphan-handling,warn
 LINKER_DEBUG =
+
+STARTUPFILES =
 
 noinst_LIBRARIES =
 bin_PROGRAMS =
@@ -414,8 +424,8 @@ BOOTLOADER_EFI_FLAGS = \
 	$(STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(NO_EXCEPTIONS_FLAGS) \
-	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	$(FREESTANDING_FLAGS)
 
 #$(RETPOLINE_FLAGS)
@@ -576,7 +586,13 @@ KERNEL_EXPLICIT_INSTANTIATIONS = \
 	kernel/lib/cc/initializer_list.h \
 	kernel/lib/cc/type_traits.h \
 	kernel/lib/cc/type_traits.cc \
-	kernel/lib/mutex.cc
+	kernel/lib/cc/cxxexception.h \
+	kernel/lib/cc/cxxexception.cc \
+	kernel/lib/cxxexcept.h \
+	kernel/lib/cxxexcept.cc \
+	kernel/lib/mutex.cc \
+	kernel/lib/dev_storage.cc \
+	kernel/lib/dev_storage.h
 
 #$(KERNEL_EXPLICIT_INSTANTIATIONS)
 
@@ -600,8 +616,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/bswap.h \
 	kernel/lib/callout.cc \
 	kernel/lib/callout.h \
-	kernel/lib/cxxexcept.h \
-	kernel/lib/cxxexcept.cc \
 	kernel/lib/radix_tree.h \
 	kernel/lib/radix_tree.cc \
 	kernel/lib/cc/algorithm.h \
@@ -621,8 +635,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/dev_eth.cc \
 	kernel/lib/dev_eth.h \
 	kernel/lib/dev_registration.h \
-	kernel/lib/dev_storage.cc \
-	kernel/lib/dev_storage.h \
 	kernel/lib/dev_char.cc \
 	kernel/lib/dev_char.h \
 	kernel/lib/dev_text.cc \
@@ -696,8 +708,6 @@ KERNEL_SOURCES_SHARED = \
 	kernel/lib/user_mem.h \
 	kernel/fs/ext4.cc \
 	kernel/fs/devfs.cc \
-	kernel/fs/mbr.cc \
-	kernel/fs/gpt.cc \
 	kernel/fs/tmpfs.cc \
 	kernel/net/arp_frame.cc \
 	kernel/net/arp_frame.h \
@@ -848,21 +858,22 @@ KERNEL_CXXFLAGS_SHARED = \
 	-DFROM_CXXFLAGS \
 	-D__DGOS__ \
 	-D__DGOS_KERNEL__=0x00000001 \
-	-std=c++17 \
 	-fPIE \
 	$(COMPILER_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(NO_REDZONE_FLAGS) \
 	$(NO_STACK_CHECK_FLAGS) \
 	$(NO_STACKPROTECTOR_FLAGS) \
-	$(NO_COMMON_FLAGS) \
 	$(NO_RTTI_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
+	$(NO_COMMON_FLAGS) \
 	-fvisibility=hidden \
 	-fvisibility-inlines-hidden \
 	-export-dynamic \
 	$(NO_FLOAT_FLAGS) \
 	$(FREESTANDING_FLAGS)
+
+#$(NO_EXCEPTIONS_FLAGS)
+#$(NO_RTTI_FLAGS)
 
 #$(RETPOLINE_FLAGS)
 
@@ -881,8 +892,10 @@ KERNEL_LDFLAGS_SHARED = \
 	$(LINKER_DEBUG) \
 	-Wl,-g \
 	-export-dynamic \
+	-Wl,--gc-keep-exported \
 	-Wl,-pie \
 	-Wl,--whole-archive -Wl,libkei.a -Wl,--no-whole-archive \
+	-Wl,--no-strip-discarded \
 	$(NOSTDLIB_FLAGS)
 
 #-Wl,-m,elf_x86_64
@@ -910,7 +923,7 @@ libkei_a_SOURCES = \
 libkei_a_CXXFLAGS = \
 	$(KERNEL_CXXFLAGS_SHARED) \
 	$(KERNEL_INCLUDES_SHARED) \
-	-fvisibility=default -fno-visibility-inlines-hidden \
+	$(VISIBILITY_FLAGS) \
 	-DLIBKEI
 
 # ----------------------------------------------------------------------------
@@ -1045,29 +1058,76 @@ INCLUDES_NAMES = $(shell cd $(top_srcdir)/libc/include && $(FIND) -type f)
 INCLUDES_DEPLOYED = \
 	$(patsubst %,$(top_builddir)/sysroot/include/%,$(INCLUDES_NAMES))
 
-sysroot/lib/crt0.o: \
-		$(top_srcdir)/user/crt0/crt0.S \
+sysroot/lib/:
+	$(MKDIR) -p $@
+
+define compilestartup =
+STARTUPFILES += $(top_builddir)/sysroot/lib/$(1)
+
+$(top_builddir)/sysroot/lib/$(1): \
+		$(2) \
 		$(top_srcdir)/libc/include/sys/cpu_bug.h \
 		$(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && \
-		$(CXX) \
+	$$(MKDIR) -p "$$(@D)" && \
+		$$(CXX) \
 			-g \
-			$(ASM_DEBUG_INFO_FLAGS) \
+			$$(ASM_DEBUG_INFO_FLAGS) \
 			--sysroot $(top_builddir)/sysroot \
 			-isystem $(top_builddir)/sysroot/include \
-			-o $@ \
-			-c $<
+			-o $$@ \
+			-c $$<
 
-sysroot/lib/libc.a: libc.a $(INCLUDES_DEPLOYED)
+endef
+
+$(eval $(call \
+	compilestartup,crt0.o,$(top_srcdir)/user/crt0/crt0.S \
+))
+$(eval $(call \
+	compilestartup,crt0pc80.o,$(top_srcdir)/user/crt0/crt0pc80.S \
+))
+$(eval $(call \
+	compilestartup,crt0pc64.o,$(top_srcdir)/user/crt0/crt0pc64.S \
+))
+$(eval $(call \
+	compilestartup,crt0pc32.o,$(top_srcdir)/user/crt0/crt0pc32.S \
+))
+$(eval $(call \
+	compilestartup,x32-crt0pc80.o,$(top_srcdir)/user/crt0/x32-crt0pc80.S \
+))
+$(eval $(call \
+	compilestartup,x32-crt0pc64.o,$(top_srcdir)/user/crt0/x32-crt0pc64.S \
+))
+$(eval $(call \
+	compilestartup,x32-crt0pc32.o,$(top_srcdir)/user/crt0/x32-crt0pc32.S \
+))
+
+#sysroot/lib/crt0.o: \
+#		$(top_srcdir)/user/crt0/crt0.S \
+#		$(top_srcdir)/libc/include/sys/cpu_bug.h \
+#		$(INCLUDES_DEPLOYED)
+#	$(MKDIR) -p "$(@D)" && \
+#		$(CXX) \
+#			-g \
+#			$(ASM_DEBUG_INFO_FLAGS) \
+#			--sysroot $(top_builddir)/sysroot \
+#			-isystem $(top_builddir)/sysroot/include \
+#			-o $@ \
+#			-c $<
+
+$(top_builddir)/sysroot/lib/libc.a: \
+		$(top_builddir)/libc.a $(INCLUDES_DEPLOYED)
 	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
-sysroot/lib/libg.a: libg.a $(INCLUDES_DEPLOYED)
+$(top_builddir)/sysroot/lib/libg.a: \
+		$(top_builddir)/libg.a $(INCLUDES_DEPLOYED)
 	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
-sysroot/lib/libm.a: libm.a $(INCLUDES_DEPLOYED)
+$(top_builddir)/sysroot/lib/libm.a: \
+		$(top_builddir)/libm.a $(INCLUDES_DEPLOYED)
 	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
-sysroot/lib/libstdc++.a: libstdc++.a $(INCLUDES_DEPLOYED)
+$(top_builddir)/sysroot/lib/libstdc++.a: \
+		$(top_builddir)/libstdc++.a $(INCLUDES_DEPLOYED)
 	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
 
 #sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
@@ -1092,6 +1152,14 @@ endef
 $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
+
+startupcode: $(STARTUPFILES) \
+	$(top_builddir)/sysroot/lib/libc.a \
+	$(top_builddir)/sysroot/lib/libm.a \
+	$(top_builddir)/sysroot/lib/libg.a \
+	$(top_builddir)/sysroot/lib/libstdc++.a
+
+.PHONY: startupcode
 
 # ----------------------------------------------------------------------------
 # Shell
@@ -1137,7 +1205,7 @@ EXTRA_shell_DEPENDENCIES = \
 	$(top_builddir)/sysroot/lib/libc.a \
 	$(top_builddir)/sysroot/lib/libg.a \
 	$(top_builddir)/sysroot/lib/libm.a \
-	$(top_builddir)/sysroot/lib/crt0.o \
+	$(STARTUPFILES) \
 	$(INCLUDES_DEPLOYED)
 
 # ----------------------------------------------------------------------------
@@ -1434,7 +1502,6 @@ libc_a_SOURCES = \
 libc_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
 	$(FREESTANDING_FLAGS) \
-	-std=c++17 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
@@ -1457,7 +1524,6 @@ libm_a_SOURCES = \
 
 libm_a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++17 \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
 	$(USER64_FLAGS)
@@ -1480,12 +1546,12 @@ libstdc___a_SOURCES = \
 
 libstdc___a_CXXFLAGS = \
 	-isystem $(top_srcdir)/libc/include \
-	-std=c++17 \
 	$(FREESTANDING_FLAGS) \
 	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(USER64_FLAGS)
+
+#$(NO_EXCEPTIONS_FLAGS)
 
 #bin_PROGRAMS += libstdc++.so
 #libstdc___so_SOURCES = $(libstdc___a_SOURCES) -fPIC -shared -nostdlib
@@ -1505,12 +1571,12 @@ LIBC_TESTS = \
 LIBC_CXXFLAGS = \
 	$(NO_STACKPROTECTOR_FLAGS) \
 	$(FREESTANDING_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
 	$(ASM_DEBUG_INFO_FLAGS) \
 	-isystem $(top_srcdir)/libc/include \
 	-I$(top_builddir) \
 	-L$(top_builddir)
 
+#$(NO_EXCEPTIONS_FLAGS)
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_EXCEPTIONS_FLAGS)
 
@@ -1593,8 +1659,7 @@ EXTRA_ls_DEPENDENCIES = \
 KERNEL_MODULE_CXXFLAGS_SHARED = \
 	$(FREESTANDING_FLAGS) \
 	-D__DGOS_KERNEL__ \
-	$(VISIBILITY_FLAGS) \
-	$(NO_EXCEPTIONS_FLAGS) \
+	$(INVISIBILITY_FLAGS) \
 	$(NO_RTTI_FLAGS) \
 	-fPIC \
 	-ggdb \
@@ -1605,8 +1670,11 @@ KERNEL_MODULE_CXXFLAGS_SHARED = \
 	-I$(top_srcdir)/kernel/lib/cc \
 	-I$(top_srcdir)/kernel/arch \
 	-I$(top_srcdir)/kernel/arch/x86_64 \
+	$(OPTIMIZE_SPEED_FLAGS) \
 	$(COMPILER_FLAGS)
 
+#$(NO_EXCEPTIONS_FLAGS)
+#$(NO_RTTI_FLAGS)
 #$(RETPOLINE_FLAGS)
 
 KERNEL_MODULE_LDFLAGS_SHARED = \
@@ -1618,7 +1686,7 @@ KERNEL_MODULE_LDFLAGS_SHARED = \
 	$(NOSTDLIB_FLAGS)
 
 KERNEL_MODULE_LDADD_SHARED = \
-	libkm.a
+	$(top_builddir)/libkm.a
 
 KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 	$(top_srcdir)/kernel/arch/x86_64/module.ld \
@@ -1626,9 +1694,9 @@ KERNEL_MODULE_EXTRA_DEPENDENCIES_SHARED = \
 
 KERNEL_MODULE_LDFLAGS_FN = \
 	$(KERNEL_MODULE_LDFLAGS_SHARED) \
-	-Wl,-Map,$(top_builddir)/$(1).km.map
+	-Wl,-Map,$(top_builddir)/$(1).km.map \
 	-Wl,-z,now \
-	libkm.a
+	$(top_builddir)/libkm.a
 
 #==========
 
@@ -1638,7 +1706,8 @@ libkm_a_SOURCES = \
 	modules/libkm/module_entry.cc \
 	modules/libkm/module_main.cc \
 	modules/libkm/dso_handle.S \
-	modules/libkm/__cxa_pure_virtual.S
+	modules/libkm/__cxa_pure_virtual.S \
+	modules/libkm/unwind_resume.S
 
 libkm_a_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED) -static
@@ -1710,10 +1779,13 @@ bin_PROGRAMS += unittest.km
 unittest_km_SOURCES = \
 	kernel/unittest/unittest.cc \
 	kernel/unittest/unittest.h \
+	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
+	kernel/unittest/test_set.cc \
 	kernel/unittest/test_string.cc \
 	kernel/unittest/test_printk.cc \
-	kernel/unittest/test_chrono.cc
+	kernel/unittest/test_chrono.cc \
+	kernel/unittest/test_nofault.cc
 
 unittest_km_CXXFLAGS = \
 	$(KERNEL_MODULE_CXXFLAGS_SHARED)
@@ -1935,19 +2007,41 @@ init_CCASFLAGS = \
 
 EXTRA_init_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
-	sysroot/lib/crt0.o \
-	sysroot/lib/libc.a \
-	sysroot/lib/libg.a \
-	sysroot/lib/libm.a \
+	$(STARTUP_FILES_INSTALLED) \
+	$(STDLIB_FILES_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 #===========
 
-MODULE_LIST = $(filter %.km,$(bin_PROGRAMS)) init
+MODULE_FILENAMES = $(filter %.km,$(bin_PROGRAMS)) init
+MODULE_LIST = $(subst %,$(top_builddir)/%,$(MODULE_FILENAMES))
 
-initrd: $(MODULE_LIST)
-	$(CPIO) -o --device-independent  -H bin \
-		< <($(patsubst %,echo "%";,$(MODULE_LIST))) > "$@"
+SYMBOL_FILES = \
+	kernel-generic \
+	kernel-asan \
+	kernel-tracing \
+	bootx64-efi
+SYMBOL_FILES_INSTALLED = $(patsubst %,$(call SYMBOL_FILE,%),$(SYMBOL_FILES))
+
+SYMBOL_FILE = sym/$(1).sym
+
+CPIO_LIST = $(MODULE_LIST) $(SYMBOL_FILES_INSTALLED)
+
+$(top_builddir)/sym/:
+	$(MKDIR) -p "$@"
+
+define copy_sym =
+$(top_builddir)/sym/$(1): $(top_builddir)/$(1) $(top_builddir)/sym/
+	$$(CP) -f $$< $$@
+endef
+
+$(foreach symfile,$(SYMBOL_FILES), \
+	$(eval $(call copy_sym,$(symfile))) \
+)
+
+$(top_builddir)/initrd: $(CPIO_LIST)
+	$(CPIO) -o --device-independent -H bin \
+		< <($(patsubst %,echo "%";,$(CPIO_LIST))) > "$@"
 
 # ----------------------------------------------------------------------------
 # Misc make rules
@@ -1956,9 +2050,9 @@ $(DUMPDIR):
 	$(MKDIR) -p $(top_builddir)/dump
 
 #include zlib.mk
-include symbols.mk
-include diskfat.mk
-include diskiso.mk
+include $(top_srcdir)/symbols.mk
+include $(top_srcdir)/diskfat.mk
+include $(top_srcdir)/diskiso.mk
 
 clean-local:
 	rm -f $(top_builddir)/mbr-bin
@@ -2013,9 +2107,7 @@ $(foreach bitsfile,$(BITFIELD_FILES), \
 	$(eval $(call bitfield_gen,$(bitsfile))) \
 )
 
-generated_headers: $(patsubst %,%.h,$(BITFIELD_FILES))
-
-.PHONY: generated_headers
+generated_headers = $(patsubst %,%.h,$(BITFIELD_FILES))
 
 # ----------------------------------------------------------------------------
 # Unicode VGA font
@@ -2058,7 +2150,7 @@ QEMU_EXTRA_DEPS = \
 QEMU_CPUS = $(shell $(NPROC))
 QEMU_THREADS = 2
 QEMU_CORES = $(shell echo $$(( $(QEMU_CPUS) / $(QEMU_THREADS) )))
-QEMU_CPU = max,migratable=false,host-cache-info=true,-fsgsbase
+QEMU_CPU = max,migratable=false,host-cache-info=true,fsgsbase
 
 QEMU_RAM = 5G
 
@@ -2203,7 +2295,7 @@ QEMU_NP_numa = \
     -numa dist,src=0,dst=1,val=15
 
 QEMU_EMU = $(QEMU_EMU_$(1))
-QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand
+QEMU_EMU_kvm = -enable-kvm -cpu $(QEMU_CPU),invtsc,vmware-cpuid-freq,rdrand,fsgsbase
 QEMU_EMU_tcg_BASE = -cpu max,migratable=false,fsgsbase,invtsc,vmware-cpuid-freq
 QEMU_EMU_tcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=single
 QEMU_EMU_mttcg = $(QEMU_EMU_tcg_BASE) --accel tcg,thread=multi
@@ -2295,8 +2387,7 @@ $(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands: \
 		$$(top_srcdir)/emu/bochs/bochs-debugger-$(1)-$(2)-$(3)-commands
 	cp "$<" "$@"
 debug-$(1)-$(2)-bochs-$(3): $(QEMU_IMAGE_$(1)) \
-		mbr.sym boot$(1).sym \
-		kernel-generic.sym kernel-tracing.sym kernel-asan.sym \
+		$(SYMBOL_FILES_INSTALLED) \
 		$$(top_srcdir)/emu/bochs/bochs-$(1)-$(2)-config.bxrc \
 		$$(abs_top_builddir)/bochs-debugger-$(1)-$(2)-$(3)-commands
 	$$(BOCHS) \
@@ -2313,3 +2404,4 @@ $(foreach media,$(BOCHS_MEDIA), \
 		) \
 	) \
 )
+

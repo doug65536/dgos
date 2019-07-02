@@ -1,4 +1,5 @@
 #include "apic.h"
+#include "debug.h"
 #include "numeric.h"
 #include "cpu/asm_constants.h"
 #include "cpu/mptables.h"
@@ -6,7 +7,6 @@
 #include "device/acpigas.h"
 #include "gdt.h"
 #include "bios_data.h"
-#include "control_regs.h"
 #include "interrupts.h"
 #include "irq.h"
 #include "isr.h"
@@ -537,6 +537,35 @@ private:
 
     std::unique_ptr<cacheline_t[]> cpus;
     size_t cpu_count;
+};
+
+union lapic_both_t {
+    lapic_x_t apic_x;
+    lapic_x2_t apic_x2;
+    lapic_kvm_t apic_kvm;
+
+    struct xapic_tag_t {};
+    struct x2apic_tag_t {};
+    struct kvmpvapic_tag_t {};
+
+    lapic_both_t()
+    {
+    }
+
+    lapic_both_t(xapic_tag_t)
+        : apic_x{}
+    {
+    }
+
+    lapic_both_t(x2apic_tag_t)
+        : apic_x2{}
+    {
+    }
+
+    lapic_both_t(kvmpvapic_tag_t)
+        : apic_kvm{}
+    {
+    }
 };
 
 static lapic_x_t apic_x;
@@ -1626,8 +1655,10 @@ int apic_init(int ap)
 
         parse_mp_tables();
 
-        APIC_TRACE("Calibrating APIC timer\n");
+        APIC_TRACE("Calibrating APIC timer (twice)\n");
 
+        // Twice, once for warmup, once to actually calibrate
+        apic_calibrate();
         apic_calibrate();
     }
 
@@ -2003,9 +2034,9 @@ static uint64_t apic_rdtsc_nsleep_handler(uint64_t nanosec)
 static void apic_calibrate()
 {
     cpuid_t info{};
-    if (cpuid_is_hypervisor() && cpuid(&info, 0x40000000, 0) &&
+    if (0 && cpuid_is_hypervisor() && cpuid(&info, 0x40000000, 0) &&
             info.eax >= 0x40000010 && cpuid(&info, 0x40000010, 0)) {
-        rdtsc_mhz = (info.eax + 500) / 1000;
+        rdtsc_freq = (info.eax + 500) * 1000;
         apic_timer_freq = info.ebx * UINT64_C(1000);
     } else if (acpi_pm_timer_raw() >= 0) {
         //
@@ -2022,12 +2053,14 @@ static void apic_calibrate()
         uint64_t tsc_st = cpu_rdtsc();
         uint32_t tmr_diff;
 
-        // Wait for about 1ms
+        // Wait for almost 24ms
+        unsigned iter = 0;
         do {
             pause();
             tmr_en = acpi_pm_timer_raw();
             tmr_diff = acpi_pm_timer_diff(tmr_st, tmr_en);
-        } while (tmr_diff < 35790);
+            ++iter;
+        } while (tmr_diff < (ACPI_PM_TIMER_HZ/42));
 
         uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
@@ -2042,38 +2075,50 @@ static void apic_calibrate()
         apic_timer_freq = ccr_freq;
 
         // Round APIC frequency to nearest multiple of 333kHz
-        apic_timer_freq += 166666;
-        apic_timer_freq -= apic_timer_freq % 333333;
+//        apic_timer_freq += 166666;
+//        apic_timer_freq -= apic_timer_freq % 333333;
 
         // APIC frequency < 333kHz is impossible to believe
         assert(apic_timer_freq > 333333);
 
         // Round CPU frequency to nearest multiple of 1MHz
         cpu_freq += 500000;
-        rdtsc_mhz = cpu_freq / 1000000;
+        rdtsc_freq = cpu_freq;
     } else {
         // Program timer (should be high enough to measure 858ms @ 5GHz)
         apic_configure_timer(APIC_LVT_DCR_BY_1, 0xFFFFFFF0U,
                              APIC_LVT_TR_MODE_n(APIC_LVT_TR_MODE_ONESHOT),
                              INTR_APIC_TIMER, true);
 
+        // Note starting values of both the timer and the timestamp counter
         uint32_t ccr_st = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_st = cpu_rdtsc();
 
-        // Wait for about 1ms
+        // Wait for about 10ms
         uint64_t tmr_nsec = nsleep(10000000);
 
+        // Note the ending values of the timer and the timestamp counter
         uint32_t ccr_en = apic->read32(APIC_REG_LVT_CCR);
         uint64_t tsc_en = cpu_rdtsc();
 
+        // Compute how many ticks occurred on both timers
         uint64_t tsc_elap = tsc_en - tsc_st;
-        uint32_t ccr_elap = ccr_st - ccr_en;
+        uint64_t ccr_elap = ccr_st - ccr_en;
 
+        // Extrapolate how many ticks per second will occur on both timers
         uint64_t cpu_freq = (tsc_elap * 1000000000) / tmr_nsec;
         uint64_t ccr_freq = (ccr_elap * 1000000000) / tmr_nsec;
 
+        // Cheapest crystals found online were +/- 50ppm stability, and
+        // +/- 30ppm tolerance, so they may be out as much as 80ppm
+        // low=0.99992*1193181.6...=1193086
+        //  hi=1.00008*1193181.6...=1193277
+        // varies 191Hz
+        //
+
+        // Remember both frequencies
         apic_timer_freq = ccr_freq;
-        rdtsc_mhz = (cpu_freq + 500000) / 1000000;
+        rdtsc_freq = cpu_freq;
     }
 
     // Example: let rdtsc_mhz = 2500. gcd(1000,2500) = 500
@@ -2083,15 +2128,15 @@ static void apic_calibrate()
     // clk_to_ns: let clks = 2500000000
     //  2500000000 * 2 / 5 = 1000000000ns
 
-    uint64_t clk_to_ns_gcd = std::gcd(uint64_t(1000), rdtsc_mhz);
+    uint64_t clk_to_ns_gcd = std::gcd(uint64_t(1000000000), rdtsc_freq);
 
-    APIC_TRACE("CPU MHz GCD: %" PRId64 "\n", clk_to_ns_gcd);
+    //APIC_TRACE("CPU MHz GCD: %" PRId64 "\n", clk_to_ns_gcd);
 
-    clk_to_ns_numer = 1000 / clk_to_ns_gcd;
-    clk_to_ns_denom = rdtsc_mhz / clk_to_ns_gcd;
+    clk_to_ns_numer = 1000000000 / clk_to_ns_gcd;
+    clk_to_ns_denom = rdtsc_freq / clk_to_ns_gcd;
 
-    APIC_TRACE("clk_to_ns_numer: %" PRId64 "\n", clk_to_ns_numer);
-    APIC_TRACE("clk_to_ns_denom: %" PRId64 "\n", clk_to_ns_denom);
+    //APIC_TRACE("clk_to_ns_numer: %" PRId64 "\n", clk_to_ns_numer);
+    //APIC_TRACE("clk_to_ns_denom: %" PRId64 "\n", clk_to_ns_denom);
 
     if (cpuid_has_inrdtsc()) {
         APIC_TRACE("Using RDTSC for precision timing\n");
@@ -2099,8 +2144,12 @@ static void apic_calibrate()
         nsleep_set_handler(apic_rdtsc_nsleep_handler, nullptr, true);
     }
 
-    APIC_TRACE("CPU clock: %" PRIu64 "MHz\n", rdtsc_mhz);
-    APIC_TRACE("APIC clock: %" PRIu64 "Hz\n", apic_timer_freq);
+    APIC_TRACE("CPU clock: %" PRIu64 "Hz (%" PRIu64 ".%02u GHz)\n", rdtsc_freq,
+               rdtsc_freq / 1000000000,
+               unsigned((rdtsc_freq / 10000000) % 100));
+    APIC_TRACE("APIC clock: %" PRIu64 "Hz (%" PRIu64 ".%02u MHz)\n",
+               apic_timer_freq, apic_timer_freq / 1000000,
+               unsigned((apic_timer_freq / 10000) % 100));
 }
 
 //

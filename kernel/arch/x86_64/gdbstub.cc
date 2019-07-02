@@ -1030,10 +1030,10 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
     ctx = gdb_cpu_ctrl_t::context_of(g_cpu);
     saved_cr3 = cpu_page_directory_get();
 
-    __try {
+    try_catch([&] {
         cpu_page_directory_set(ctx->gpr.cr3);
         cpu_tlb_flush();
-        __try {
+        try_catch([&] {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
                 size_t index = memop_index;
 
@@ -1049,12 +1049,12 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_read(char const *input)
                 else
                     to_hex_bytes(tx_buf + index*2, uint8_t(bp_byte));
             }
-        }
-        __catch {
-        }
-    }
-    __catch {
-    }
+        }, [&] {
+            // catch
+        });
+    }, [&] {
+        // catch
+    });
 
     cpu_page_directory_set(saved_cr3);
     cpu_tlb_flush();
@@ -1085,10 +1085,10 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
 
     ok = false;
 
-    __try {
+    try_catch([&] {
         cpu_page_directory_set(ctx->gpr.cr3);
         cpu_tlb_flush();
-        __try {
+        try_catch([&] {
             for (memop_index = 0; memop_index < memop_size; ++memop_index) {
                 uint8_t& mem_value = memop_ptr[memop_index];
                 uint8_t new_value;
@@ -1098,12 +1098,12 @@ gdbstub_t::rx_state_t gdbstub_t::handle_memop_write(char const *&input)
                     mem_value = new_value;
             }
             ok = true;
-        }
-        __catch {
-        }
-    }
-    __catch {
-    }
+        }, [&] {
+            // catch
+        });
+    }, [&] {
+        // catch
+    });
 
     cpu_page_directory_set(saved_cr3);
     cpu_tlb_flush();

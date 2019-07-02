@@ -1,6 +1,5 @@
 #include "time.h"
 #include "cpu/halt.h"
-#include "cpu/control_regs.h"
 #include "thread.h"
 #include "printk.h"
 #include "export.h"

@@ -21,6 +21,7 @@
 #define THREAD_PROCESS_PTR_OFS      64
 #define THREAD_STACK_OFS            80
 #define THREAD_THREAD_ID_OFS        88
+#define THREAD_CXX_EXCEPT_OFS       128
 
 #define THREAD_SC_MXCSR_OFS         24
 #define THREAD_SC_FCW87_OFS         28

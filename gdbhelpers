@@ -11,11 +11,13 @@ define startupbreakpoints
 		b apic_spurious_handler
 		b isr_entry_8
 		b vpanic
+		b unittest::unit::fail()
 	end
 
 	hbreak modload_load_symbols
 	commands
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
+		c
 	end
 end
 

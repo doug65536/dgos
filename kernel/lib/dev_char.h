@@ -5,7 +5,7 @@
 
 class dev_char_t {
 public:
-    virtual ~dev_char_t() {}
+    virtual ~dev_char_t() = 0;
 
     virtual errno_t read_async(void *data, int64_t count, iocp_t *iocp) = 0;
     virtual errno_t write_async(void *data, int64_t count, iocp_t *iocp) = 0;

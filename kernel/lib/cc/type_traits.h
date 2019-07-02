@@ -368,4 +368,10 @@ template<> struct is_integral<unsigned int> : public true_type {};
 template<> struct is_integral<unsigned long> : public true_type {};
 template<> struct is_integral<unsigned long long> : public true_type {};
 
+template<typename T>
+struct remove_cvref {
+    using type = typename remove_cv<typename remove_reference<T>::type>::type;
+};
+
+
 __END_NAMESPACE_STD

@@ -1,13 +1,16 @@
 #include "mutex.h"
 #include "export.h"
 
+#include "cpu/control_regs.h"
+
 #pragma GCC visibility push(default)
 template class std::unique_lock<std::mutex>;
 template class std::unique_lock<std::shared_mutex>;
-template class std::unique_lock<ext::mcslock>;
-template class std::unique_lock<ext::spinlock>;
-template class std::unique_lock<ext::ticketlock>;
 template class std::unique_lock<ext::shared_spinlock>;
+template class std::unique_lock<ext::ticketlock>;
+template class std::unique_lock<ext::spinlock>;
+template class std::unique_lock<ext::irqlock>;
+template class std::unique_lock<ext::mcslock>;
 #pragma GCC visibility pop
 
 EXPORT std::mutex::mutex()
@@ -94,7 +97,7 @@ EXPORT std::unique_lock<ext::mcslock>::unique_lock(
 {
 }
 
-EXPORT std::unique_lock<ext::mcslock>::~unique_lock()
+EXPORT std::unique_lock<ext::mcslock>::~unique_lock() noexcept
 {
     unlock();
 }
@@ -341,4 +344,29 @@ EXPORT bool ext::mcslock::try_lock(mcs_queue_ent_t *node)
 EXPORT void ext::mcslock::unlock(mcs_queue_ent_t *node)
 {
     mcslock_unlock(&m, node);
+}
+
+ext::irqlock::~irqlock()
+{
+    if (saved_mask > 0)
+        cpu_irq_enable();
+    saved_mask = 0;
+}
+
+void ext::irqlock::lock()
+{
+    assert(saved_mask == 0);
+    // Gets 2 or 0, then subtracts one, making it either 1 or -1
+    saved_mask = (cpu_irq_save_disable() << 1) - 1;
+}
+
+void ext::irqlock::unlock()
+{
+    assert(saved_mask != 0);
+    cpu_irq_toggle(saved_mask > 0);
+}
+
+int &ext::irqlock::native_handle()
+{
+    return saved_mask;
 }

@@ -2,21 +2,13 @@
 #bootia32.efi
 
 $(top_builddir)/isodisk.img: \
-		kernel-generic \
-		kernel-generic.sym \
-		kernel-generic.dis.gz \
+		$(top_builddir)/kernel-generic \
 		\
-		kernel-tracing \
-		kernel-tracing.sym \
-		kernel-tracing.dis.gz \
+		$(top_builddir)/kernel-tracing \
 		\
-		kernel-asan \
-		kernel-asan.sym \
-		kernel-asan.dis.gz \
+		$(top_builddir)/kernel-asan \
 		\
-		bootx64.efi \
-		bootx64-efi.sym \
-		bootefi-amd64.dis.gz \
+		$(top_builddir)/bootx64.efi \
 		\
 		$(top_builddir)/bootpxe-bios-elf \
 		$(top_builddir)/bootpxe-bios-bin \
@@ -26,14 +18,12 @@ $(top_builddir)/isodisk.img: \
 		\
 		$(top_srcdir)/mkposixdirs.sh \
 		\
-		diskiso.mk \
+		$(top_srcdir)/diskiso.mk \
 		$(top_srcdir)/populate_iso.sh \
 		\
-		fatpart.img \
+		$(top_builddir)/fatpart.img \
 		\
-		bootiso-bin \
-		bootiso.sym \
-		bootiso.dis.gz
+		$(top_builddir)/bootiso-bin
 	$(top_srcdir)/populate_iso.sh $(top_srcdir)
 	size=$$(wc -c < bootiso-bin) && \
 	blocks=$$(( ( (size + 2047) / 2048) * 4 )) && \

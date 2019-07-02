@@ -29,11 +29,14 @@ set +x
 			CXXFLAGS="$CFLAGS" \
 			LDFLAGS="$CFLAGS" \
 		"$(join_by ' ' ${configureflags[@]})" "$@" && \
-		nice make -j $(nproc) \
+		nice make --trace -j $(nproc) \
 			sysroot/lib/crt0.o \
+			sysroot/lib/crt0pc32.o \
+			sysroot/lib/crt0pc64.o \
+			sysroot/lib/crt0pc80.o \
 			sysroot/lib/libc.a \
-			sysroot/lib/libm.a \
-			sysroot/lib/libstdc++.a
+			startupcode
+
 fi
 
 compileflags=( "--sysroot sysroot" )

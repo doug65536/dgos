@@ -385,7 +385,7 @@ ssize_t file_readdir_r(int id, dirent_t *buf, dirent_t **result)
     ssize_t size = fh->fs->readdir(fh->fi, buf, fh->pos);
 
     *result = nullptr;
-    if (size < 0)
+    if (unlikely(size < 0))
         return -int(errno_t::EINVAL);
 
     fh->pos += size;
@@ -685,26 +685,23 @@ path_t::operator bool() const
 
 user_str_t::user_str_t(const char *user_str)
 {
-    // Get the length of the user memory string
-    lenof_str = mm_lenof_user_str(user_str, PATH_MAX);
-
-    // Return with valid still false
-    if (unlikely(lenof_str < 0))
-        return;
-
     // Get a pointer to aligned storage
     char *buf = reinterpret_cast<char *>(&data);
 
+    lenof_str = mm_copy_user_str(buf, user_str, PATH_MAX);
+
     // If failed to copy string
-    if (unlikely(!mm_copy_user(buf, user_str, lenof_str + 1))) {
+    if (unlikely(lenof_str < 0)) {
         set_err(errno_t::EFAULT);
         return;
     }
 
+    char const *nt = (char const *)memchr(buf, 0, lenof_str + 1);
+
     // If the string myseriously changed length, fail
     // See if any null terminators sneaked into the string
     // Or the final null terminator mysteriously disappeared
-    if (unlikely(memchr(buf, 0, lenof_str + 1) != buf + lenof_str)) {
+    if (unlikely(nt != buf + lenof_str)) {
         // That's strange, nice try
         set_err(errno_t::EFAULT);
         return;

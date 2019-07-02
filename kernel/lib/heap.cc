@@ -4,10 +4,10 @@
 #include "string.h"
 #include "bitsearch.h"
 #include "asan.h"
+#include "cpu/atomic.h"
 
 #ifdef __DGOS_KERNEL__
 #include "mm.h"
-#include "cpu/control_regs.h"
 #else
 #include <pthread.h>
 #define mutex_init pthread_mutex_init

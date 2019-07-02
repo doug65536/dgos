@@ -2,7 +2,7 @@
 #include "time.h"
 #include "cpu/control_regs.h"
 
-uint64_t rdtsc_mhz;
+uint64_t rdtsc_freq;
 uint64_t clk_to_ns_numer;
 uint64_t clk_to_ns_denom;
 

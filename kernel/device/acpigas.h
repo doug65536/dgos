@@ -16,7 +16,7 @@ public:
     static acpi_gas_accessor_t *from_fixed(uint16_t ioport, int size,
                                            int bitofs, int bitwidth);
 
-    virtual ~acpi_gas_accessor_t() {}
+    virtual ~acpi_gas_accessor_t() = 0;
     virtual size_t get_size() const = 0;
     virtual int64_t read() const = 0;
     virtual void write(int64_t value) const = 0;

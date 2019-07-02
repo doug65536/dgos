@@ -12,22 +12,14 @@ $(top_builddir)/fatpart.img: \
 		\
 		$(top_builddir)/dgos-kernel-generic \
 		$(top_builddir)/kernel-generic \
-		$(top_builddir)/kernel-generic.sym \
-		$(top_builddir)/kernel-generic.dis.gz \
 		\
 		$(top_builddir)/dgos-kernel-tracing \
 		$(top_builddir)/kernel-tracing \
-		$(top_builddir)/kernel-tracing.sym \
-		$(top_builddir)/kernel-tracing.dis.gz \
 		\
 		$(top_builddir)/dgos-kernel-asan \
 		$(top_builddir)/kernel-asan \
-		$(top_builddir)/kernel-asan.sym \
-		$(top_builddir)/kernel-asan.dis.gz \
 		\
 		$(top_builddir)/bootx64.efi \
-		$(top_builddir)/bootx64-efi.sym \
-		$(top_builddir)/bootefi-amd64.dis.gz \
 		\
 		$(top_builddir)/bootpxe-bios-elf \
 		$(top_builddir)/bootpxe-bios-bin \
@@ -41,15 +33,13 @@ $(top_builddir)/fatpart.img: \
 		$(top_srcdir)/populate_fat.sh \
 		\
 		$(top_builddir)/mbr-bin \
-		$(top_builddir)/mbr.sym \
-		$(top_builddir)/mbr.dis.gz \
 		\
 		$(top_builddir)/boot1-bin \
 		$(top_builddir)/boot1-elf \
 		\
 		$(top_builddir)/bootfat-bin \
-		$(top_builddir)/bootfat.sym \
-		$(top_builddir)/bootfat.dis.gz
+		\
+		$(MODULE_LIST)
 	set -x && \
 		rm -f $(top_builddir)/fatpart.img \
 			$(top_builddir)/mbrdisk.img \

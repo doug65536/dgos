@@ -3,8 +3,8 @@
 .section .text, "ax"
 
 .balign 16
-.global __exception_setjmp
-__exception_setjmp:
+.global __setjmp
+__setjmp:
     .cfi_startproc
 
     // Save call preserved registers
@@ -36,8 +36,8 @@ __exception_setjmp:
     .cfi_endproc
 
 .balign 16
-.global __exception_longjmp
-__exception_longjmp:
+.global __longjmp
+__longjmp:
     .cfi_startproc
 
     // Restore call preserved registers
@@ -60,6 +60,7 @@ __exception_longjmp:
 
     // Restore stack pointer
     movq 1*8(%rdi),%rsp
+    .cfi_register rsp,rsp
 
     // Return value is second parameter and "return" from setjmp again
     movq %rsi,%rax

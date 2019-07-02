@@ -13,10 +13,10 @@
 #include "thread.h"
 #include "vector.h"
 #include "desc_alloc.h"
-#include "cpu/control_regs.h"
 #include "cpu/isr.h"
 #include "contig_alloc.h"
 #include "user_mem.h"
+#include "cpu/except_asm.h"
 
 union process_ptr_t {
     process_t *p;
@@ -105,6 +105,9 @@ int process_t::spawn(pid_t * pid_result,
 
     process->path = strdup(path);
 
+    if (unlikely(!process->path))
+        return int(errno_t::ENOMEM);
+
     // Count the arguments
     size_t arg_count = 0;
     while (argv && argv[arg_count++]);
@@ -115,43 +118,64 @@ int process_t::spawn(pid_t * pid_result,
 
     // Make a copy of the arguments and environment variables
     process->argv = (char**)calloc(arg_count + 1, sizeof(*argv));
+
+    if (unlikely(!process->argv))
+        return int(errno_t::ENOMEM);
+
     process->env = (char**)calloc(env_count + 1, sizeof(*envp));
 
-    for (size_t i = 0; i < arg_count; ++i)
+    if (unlikely(!process->env))
+        return int(errno_t::ENOMEM);
+
+    for (size_t i = 0; i < arg_count; ++i) {
         process->argv[i] = strdup(argv[i]);
+
+        if (unlikely(!process->argv[i]))
+            return int(errno_t::ENOMEM);
+    }
     process->argv[arg_count] = nullptr;
     process->argc = arg_count;
 
-    for (size_t i = 0; i < env_count; ++i)
+    for (size_t i = 0; i < env_count; ++i) {
         process->env[i] = strdup(envp[i]);
+
+        if (unlikely(!process->env[i]))
+            return int(errno_t::ENOMEM);
+    }
     process->env[env_count] = nullptr;
     process->envc = env_count;
 
     // Return the assigned PID
     *pid_result = process->pid;
 
-    thread_t tid = thread_create(&process_t::start, process, 0, true);
+    thread_t tid = thread_create(&process_t::run, process, 0, true);
 
-    process->add_thread(tid);
+    if (unlikely(tid < 0))
+        return int(errno_t::ENOMEM);
+
+    if (unlikely(!process->add_thread(tid)))
+        return int(errno_t::ENOMEM);
 
     processes_scoped_lock lock(process->process_lock);
     while (process->state == process_t::state_t::starting)
         process->cond.wait(lock);
 
-    return process->state == process_t::state_t::running
+    return (process->state == process_t::state_t::running ||
+            process->state == process_t::state_t::exited)
             ? 0
             : int(errno_t::EFAULT);
 }
 
-int process_t::start(void *process_arg)
+int process_t::run(void *process_arg)
 {
-    return ((process_t*)process_arg)->start();
+    return ((process_t*)process_arg)->run();
 }
 
 // Hack to reuse module loader symbol auto-load hook for processes too
 extern void modload_load_symbols(char const *path, uintptr_t addr);
 
-int process_t::start()
+// Returns when program exits
+int process_t::run()
 {
     // Attach this kernel thread to this process
     thread_set_process(-1, this);
@@ -485,9 +509,20 @@ int process_t::start()
     lock.unlock();
     cond.notify_all();
 
-    isr_sysret64(hdr.e_entry, uintptr_t(stack_ptr));
+    return enter_user(hdr.e_entry, uintptr_t(stack_ptr));
+}
 
-    return pid;
+int process_t::enter_user(uintptr_t ip, uintptr_t sp)
+{
+    //
+    if (!__setjmp(&exit_jmpbuf)) {
+        // First time
+        isr_sysret64(ip, sp);
+        __builtin_trap();
+    }
+
+    // exiting program continues here
+    return exitcode;
 }
 
 void *process_t::get_allocator()
@@ -523,11 +558,20 @@ void process_t::destroy()
 
 void process_t::exit(pid_t pid, int exitcode)
 {
-    // Kill all the threads...
-
     scoped_lock lock(processes_lock);
 
     process_t *process_ptr = lookup(pid);
+
+    thread_t current_thread_id = thread_get_id();
+
+    // Kill all the threads...
+    for (thread_t thread : process_ptr->threads) {
+        if (thread != current_thread_id) {
+
+        }
+        //thread_terminate(thread);
+
+    }
 
     process_ptr->exitcode = exitcode;
     process_ptr->state = state_t::exited;

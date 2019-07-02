@@ -232,3 +232,10 @@ void devfs_register(dev_fs_file_reg_t *reg)
 {
     devfs_instance->register_file(reg);
 }
+dev_fs_file_reg_t::~dev_fs_file_reg_t()
+{
+}
+
+dev_fs_t::device_factory_t::~device_factory_t()
+{
+}

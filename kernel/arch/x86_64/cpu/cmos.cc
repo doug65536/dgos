@@ -5,7 +5,6 @@
 #include "string.h"
 #include "isr.h"
 #include "irq.h"
-#include "control_regs.h"
 #include "mutex.h"
 #include "bootinfo.h"
 #include "printk.h"

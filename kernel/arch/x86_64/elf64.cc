@@ -1,5 +1,6 @@
 #include "elf64.h"
 #include "elf64_decl.h"
+#include "debug.h"
 #include "printk.h"
 #include "mm.h"
 #include "fileio.h"
@@ -15,17 +16,21 @@
 #include "cpu.h"
 #include "callout.h"
 #include "cxxstring.h"
-#include "cpu/control_regs.h"
 #include "user_mem.h"
 #include "kmodule.h"
+#include "mutex.h"
 
-#define ELF64_DEBUG     1
+#define ELF64_DEBUG     0
 #if ELF64_DEBUG
 #define ELF64_TRACE(...) printdbg(__VA_ARGS__)
 #else
 #define ELF64_TRACE(...) ((void)0)
 #endif
 
+using lock_type = std::shared_mutex;
+using ex_lock = std::unique_lock<lock_type>;
+using sh_lock = std::shared_lock<lock_type>;
+static lock_type loaded_modules_lock;
 static std::vector<std::unique_ptr<module_t>> loaded_modules;
 
 // Keep this in sync with __module_dynlink_thunk
@@ -63,7 +68,8 @@ struct kernel_ht_t {
 
 static kernel_ht_t export_ht;
 
-static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
+static Elf64_Sym const *
+modload_lookup_name(kernel_ht_t *ht, char const *name)
 {
     Elf64_Word hash = elf64_hash((unsigned char const*)name);
     Elf64_Word bucket = hash % ht->hash_nbucket;
@@ -73,10 +79,14 @@ static Elf64_Sym const *modload_lookup_name(kernel_ht_t *ht, char const *name)
         Elf64_Sym const *chk_sym = ___dynsym_st + i;
         Elf64_Word name_index = chk_sym->st_name;
         char const *chk_name = ___dynstr_st + name_index;
-        if (!strcmp(chk_name, name))
+        if (likely(!strcmp(chk_name, name)))
             return chk_sym;
         i = ht->hash_chains[i];
     } while (i != 0);
+
+    ELF64_TRACE("Failed to find %s\n", name);
+
+    cpu_debug_break();
 
     return nullptr;
 }
@@ -630,16 +640,13 @@ errno_t module_t::load_image(void const *module, size_t module_sz,
                 ELF64_TRACE("%s lookup %s\n", module_name, name);
                 Elf64_Sym const *addr = modload_lookup_name(&export_ht, name);
 
-                if (addr)
-                    S = intptr_t(addr->st_value);
-                else
-                    S = 0;
-
-                if (!S) {
+                if (unlikely(!addr)) {
                     printk("module link error in %s:"
                            " Symbol \"%s\" not found", module_name, name);
                     return load_failed(errno_t::ENOEXEC);
                 }
+
+                S = intptr_t(addr->st_value);
             }
 
             uint64_t value;
@@ -882,8 +889,16 @@ truncated_common:
     if (unlikely(!argv.reserve(param.size() + 1)))
         return load_failed(errno_t::ENOMEM);
 
-    for (std::string const& parameter : param)
-        argv.push_back(parameter.c_str());
+    for (std::string const& parameter : param) {
+        if (unlikely(!argv.push_back(parameter.c_str())))
+            return load_failed(errno_t::ENOMEM);
+    }
+
+    // Made it this far, we can put the module on the list
+    ex_lock lock(loaded_modules_lock);
+    if (unlikely(!loaded_modules.push_back(this)))
+        return load_failed(errno_t::ENOMEM);
+    lock.unlock();
 
     run();
 
@@ -938,3 +953,7 @@ void __module_dynamic_linker(plt_stub_data_t *data)
     data->result = sym->st_value;
 }
 
+EXPORT void __module_register_frame(void const * const *__module_dso_handle, void *__frame)
+{
+
+}

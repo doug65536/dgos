@@ -313,6 +313,11 @@ public:
         return time_point(__point + rhs);
     }
 
+    duration operator-(time_point const& rhs)
+    {
+        return duration(__point - rhs.__point);
+    }
+
     duration operator-(duration const& rhs) const
     {
         return __point + rhs;

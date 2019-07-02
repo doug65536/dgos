@@ -15,7 +15,7 @@ protected:
 
     virtual void found_device(virtio_base_t *) {}
 
-    virtual ~virtio_factory_base_t() {}
+    virtual ~virtio_factory_base_t() = 0;
     virtual virtio_base_t *create() = 0;
 };
 
@@ -274,16 +274,11 @@ C_ASSERT(sizeof(virtio_pci_notify_cap_t) == 20);
 
 class virtio_base_t {
 public:
-    virtio_base_t()
-        : use_msi(false)
-        , common_cfg(nullptr)
-        , common_cfg_size(0)
-        , isr_status(nullptr)
-        , notify_off_multiplier(0)
-    {
-    }
+    virtio_base_t() = default;
+    virtio_base_t(virtio_base_t const&) = delete;
+    virtio_base_t(virtio_base_t&&) = default;
 
-    virtual ~virtio_base_t() {}
+    virtual ~virtio_base_t() = 0;
 protected:
     friend class virtio_factory_base_t;
 
@@ -393,7 +388,7 @@ protected:
     virtual bool offer_features(feature_set_t& features) = 0;
 
     // Allow an implementation to verify which features actually got set
-    virtual bool verify_features(feature_set_t& features)
+    virtual bool verify_features(feature_set_t& features _unused)
     {
         return true;
     }
@@ -425,7 +420,9 @@ protected:
     size_t device_cfg_size = 0;
 
     virtio_pci_notify_cap_t volatile *notify_cap = nullptr;
+    uint64_t notify_bar = 0;
     size_t notify_cap_size = 0;
+    bool notify_is_mmio;
 
     uint32_t volatile *isr_status = nullptr;
     uint32_t notify_off_multiplier = 0;

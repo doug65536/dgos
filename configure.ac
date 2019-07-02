@@ -177,8 +177,8 @@ for flag in \
 		std=c++17 fno-fat-lto-objects g \
 		fno-integrated-as Wall Wextra Wpedantic Wdouble-promotion Wformat \
 		Wundef Wwrite-strings Wredundant-decls \
-		Wstrict-overflow Wno-overlength-strings \
-		Wno-unused-parameter Wtautological-compare \
+		Wstrict-overflow \
+		Wtautological-compare \
 		Wstrict-aliasing Wlogical-op \
 		Werror=return-type Werror=array-bounds Werror=format \
 		Warray-bounds Wformat-overflow \
@@ -186,13 +186,19 @@ for flag in \
 		Wsuggest-override Wsuggest-attribute=format \
 		Wduplicated-branches Wduplicated-cond Wc++1z-compat Wuseless-cast \
 		Wzero-as-null-pointer-constant Wsuggest-attribute=noreturn \
-		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack
+		mtls-direct-seg-refs ftls-model=local-exec fconserve-stack \
+		Wsuggest-attribute=const Wsuggest-attribute=pure \
+		Wno-unused-parameter fno-eliminate-unused-debug-types \
+		fno-eliminate-unused-debug-symbols
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([COMPILER_FLAGS], [" -$flag"])],
 		[], [])
 done
 AC_SUBST([COMPILER_FLAGS])
+#fvar-tracking
+#fvar-tracking-assignments
+#Wno-overlength-strings
 #fsanitize-undefined-trap-on-error fsanitize=undefined
 #Wsuggest-attribute=pure Wsuggest-attribute=const
 #Wsuggest-final-types
@@ -200,10 +206,21 @@ AC_SUBST([COMPILER_FLAGS])
 #Wsuggest-attribute=noreturn
 #Wsuggest-attribute=format
 
-AS_VAR_SET([VISIBILITY_FLAGS],[])
+AS_VAR_SET([INVISIBILITY_FLAGS],[])
 for flag in \
 	fvisibility=hidden \
 	fvisibility-inlines-hidden
+do
+	AX_CHECK_COMPILE_FLAG([-$flag],
+		[AS_VAR_APPEND([INVISIBILITY_FLAGS], [" -$flag"])],
+		[], [])
+done
+AC_SUBST([INVISIBILITY_FLAGS])
+
+AS_VAR_SET([VISIBILITY_FLAGS],[])
+for flag in \
+	fvisibility=default \
+	fno-visibility-inlines-hidden
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
 		[AS_VAR_APPEND([VISIBILITY_FLAGS], [" -$flag"])],
@@ -263,7 +280,7 @@ AX_CHECK_COMPILE_FLAG([-Oz],
 	[])
 #falign-functions=0
 for flag in falign-loops=0 falign-labels=0 falign-jumps=0 \
-		mno-align-stringops Wno-ignored-optimization-argument \
+		mno-align-stringops \
 		fstack-usage
 do
 	AX_CHECK_COMPILE_FLAG([-$flag],
@@ -449,13 +466,13 @@ done
 AC_SUBST([BMI_FLAGS])
 
 AS_VAR_SET([DISABLE_FRAMEPOINTER_FLAGS], [])
-AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
+AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],
 	[AS_VAR_SET([DISABLE_FRAMEPOINTER_FLAGS], [" -fomit-frame-pointer"])]
 	[], [])
 AC_SUBST([DISABLE_FRAMEPOINTER_FLAGS])
 
 AS_VAR_SET([ENABLE_FRAMEPOINTER_FLAGS], [])
-AX_CHECK_COMPILE_FLAG([-fomit-frame-pointer],
+AX_CHECK_COMPILE_FLAG([-fno-omit-frame-pointer],
 	[AS_VAR_SET([ENABLE_FRAMEPOINTER_FLAGS], [" -fno-omit-frame-pointer"])]
 	[], [])
 AC_SUBST([ENABLE_FRAMEPOINTER_FLAGS])

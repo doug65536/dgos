@@ -12,6 +12,7 @@ template<typename T> class shared_lock;
 __END_NAMESPACE_STD
 
 __BEGIN_NAMESPACE_EXT
+class irqlock;
 class ticketlock;
 class spinlock;
 class shared_spinlock;
@@ -19,6 +20,27 @@ class mcslock;
 __END_NAMESPACE_EXT
 
 __BEGIN_NAMESPACE_EXT
+// Not a "real" lock, just saves and disables IRQs when locked,
+// and restores saved IRQ mask when unlocked
+class irqlock {
+public:
+    using mutex_type = int;
+
+    constexpr irqlock() {}
+    ~irqlock();
+    irqlock(irqlock const&) = delete;
+
+    void lock();
+    _always_inline bool try_lock() { lock(); return true; }
+    void unlock();
+
+    int& native_handle();
+
+private:
+    // 0 = undefined, -1 = irq was disabled, 1 = irq was enabled
+    mutex_type saved_mask = 0;
+};
+
 // Meets BasicLockable requirements
 class spinlock {
 public:
@@ -443,5 +465,6 @@ extern template class std::unique_lock<std::shared_mutex>;
 extern template class std::unique_lock<ext::shared_spinlock>;
 extern template class std::unique_lock<ext::ticketlock>;
 extern template class std::unique_lock<ext::spinlock>;
+extern template class std::unique_lock<ext::irqlock>;
 extern template class std::unique_lock<ext::mcslock>;
 

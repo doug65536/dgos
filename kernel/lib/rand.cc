@@ -2,9 +2,10 @@
 #include "time.h"
 #include "utility.h"
 #include "cpuid.h"
+#include "export.h"
 #include "likely.h"
 
-void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
+EXPORT void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
 {
     state->seed_z1 = seed;
     state->seed_z2 = seed;
@@ -12,12 +13,12 @@ void lfsr113_seed(lfsr113_state_t *state, uint32_t seed)
     state->seed_z4 = seed;
 }
 
-void lfsr113_autoseed(lfsr113_state_t *state)
+EXPORT void lfsr113_autoseed(lfsr113_state_t *state)
 {
     lfsr113_seed(state, (uint32_t)nano_time());
 }
 
-uint32_t lfsr113_rand(lfsr113_state_t *state)
+EXPORT uint32_t lfsr113_rand(lfsr113_state_t *state)
 {
    unsigned int b;
    b  = ((state->seed_z1 << 6) ^ state->seed_z1) >> 13;
@@ -32,12 +33,25 @@ uint32_t lfsr113_rand(lfsr113_state_t *state)
            state->seed_z3 ^ state->seed_z4);
 }
 
-uint32_t rand_range(lfsr113_state_t *state, uint32_t st, uint32_t en)
+EXPORT uint32_t rand_range(lfsr113_state_t *state, uint32_t st, uint32_t en)
 {
-    uint32_t n = lfsr113_rand(state);
-    n %= (en - st);
-    n += st;
-    return n;
+    uint32_t n = en - st;
+
+    // Find highest random number that is an even multiple of the range needed
+    uint32_t limit = (UINT64_C(1) << 32) - (UINT64_C(1) << 32) % n;
+
+    for (;;) {
+        uint32_t r = lfsr113_rand(state);
+
+        if (likely(r < limit || !limit)) {
+            r %= n;
+            r += st;
+            return r;
+        }
+
+        // Unlikely case that random number fell in last partial range
+        // try again. Chance of looping is very low.
+    }
 }
 
 int rand_r(uint64_t *seed)

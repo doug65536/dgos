@@ -178,6 +178,20 @@ bool tmpfs_fs_t::is_boot() const
     return true;
 }
 
+struct tmpfs_file_t : public fs_file_info_t {
+    size_t file_index = 0;
+
+    // Used by opendir
+    size_t end_index = 0;
+
+    // fs_file_info_t interface
+public:
+    ino_t get_inode() const override
+    {
+        return file_index + 1;
+    }
+};
+
 //
 // Read directory entry information
 
@@ -208,23 +222,31 @@ int tmpfs_fs_t::readlink(fs_cpath_t path, char* buf, size_t size)
 
 int tmpfs_fs_t::opendir(fs_file_info_t **fi, fs_cpath_t path)
 {
-    (void)path;
-    (void)fi;
-    return -int(errno_t::ENOSYS);
+    *fi = new (std::nothrow) tmpfs_file_t;
+
+    return 0;
 }
 
 ssize_t tmpfs_fs_t::readdir(fs_file_info_t *fi, dirent_t *buf, off_t offset)
 {
-    (void)buf;
-    (void)offset;
-    (void)fi;
-    return -int(errno_t::ENOSYS);
+    auto file = static_cast<tmpfs_file_t*>(fi);
+    if (unlikely(offset >= off_t(files.size())))
+        return 0;
+    size_t index = file->file_index + offset;
+    auto const& file_info = files[index];
+
+    buf->d_ino = index + 1;
+    char const *name = names.data() + file_info.name_ofs;
+    strncpy(buf->d_name, name, sizeof(buf->d_name));
+
+    return index + 1;
 }
 
 int tmpfs_fs_t::releasedir(fs_file_info_t *fi)
 {
-    (void)fi;
-    return -int(errno_t::ENOSYS);
+    auto file = static_cast<tmpfs_file_t*>(fi);
+    delete file;
+    return  0;
 }
 
 
@@ -313,18 +335,6 @@ int tmpfs_fs_t::utimens(fs_cpath_t path, fs_timespec_t const *ts)
 
 //
 // Open/close files
-
-struct tmpfs_file_t : public fs_file_info_t {
-    size_t file_index;
-
-    // fs_file_info_t interface
-public:
-    ino_t get_inode() const override
-    {
-        return file_index + 1;
-    }
-};
-
 int tmpfs_fs_t::open(fs_file_info_t **fi,
                      fs_cpath_t path, int flags, mode_t mode)
 {
@@ -386,10 +396,12 @@ ssize_t tmpfs_fs_t::read(fs_file_info_t *fi, char *buf,
     if (unlikely(offset < 0))
         return -int(errno_t::EINVAL);
 
-    if (mm_is_user_range(buf, size))
-        mm_copy_user(buf, st + file_info.file_ofs + offset, size);
-    else
+    if (mm_is_user_range(buf, size)) {
+        if (!mm_copy_user(buf, st + file_info.file_ofs + offset, size))
+            return -int(errno_t::EFAULT);
+    } else {
         memcpy(buf, st + file_info.file_ofs + offset, size);
+    }
 
     return size;
 }

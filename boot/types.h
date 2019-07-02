@@ -34,6 +34,7 @@ typedef int64_t off_t;
 #define _malloc                 __attribute__((__malloc__))
 #define _alloc_align(pi)        __attribute__((__alloc_align__(pi)))
 #define _ms_struct              __attribute__((__ms_struct__))
+#define _unused                 __attribute__((__unused__))
 #define _use_result             __attribute__((__warn_unused_result__))
 #define _leaf                   __attribute__((__leaf__))
 #define _aligned(n)             __attribute__((__aligned__(n)))

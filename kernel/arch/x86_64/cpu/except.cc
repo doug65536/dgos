@@ -3,18 +3,23 @@
 #include "except_asm.h"
 #include "thread.h"
 
-struct __exception_context_t {
-    __exception_jmp_buf_t __exception_state;
-    long __exception_code;
-    __exception_context_t *__next;
-};
-
 __exception_jmp_buf_t *__exception_handler_add(void)
 {
     __exception_context_t *ctx = new (std::nothrow) __exception_context_t;
+    ctx->flags = 1;
     ctx->__next = (__exception_context_t *)thread_set_exception_top(ctx);
     ctx->__exception_code = -1;
     return &ctx->__exception_state;
+}
+
+__exception_jmp_buf_t *
+__exception_handler_add_owned(__exception_context_t *ectx)
+{
+    *ectx = {};
+    ectx->flags = 0;
+    ectx->__next = (__exception_context_t *)thread_set_exception_top(ectx);
+    ectx->__exception_code = -1;
+    return &ectx->__exception_state;
 }
 
 long __exception_handler_remove(void)
@@ -23,7 +28,8 @@ long __exception_handler_remove(void)
             thread_get_exception_top();
     long code = top->__exception_code;
     thread_set_exception_top(top->__next);
-    free(top);
+    if (top->flags & 1)
+        delete top;
     return code;
 }
 

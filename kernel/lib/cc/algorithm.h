@@ -7,6 +7,8 @@
 #endif
 #include "type_traits.h"
 #include "memory.h"
+#include "cxxiterator.h"
+#include "functional.h"
 
 __BEGIN_NAMESPACE_STD
 
@@ -19,7 +21,8 @@ constexpr _InputIt find(_InputIt __first, _InputIt __last, _T const& __v)
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-constexpr _InputIt find_if(_InputIt __first, _InputIt __last, _UnaryPredicate&& __p)
+constexpr _InputIt find_if(_InputIt __first, _InputIt __last,
+                           _UnaryPredicate&& __p)
 {
     while (__first != __last && !__p(*__first))
         ++__first;
@@ -27,7 +30,8 @@ constexpr _InputIt find_if(_InputIt __first, _InputIt __last, _UnaryPredicate&& 
 }
 
 template<typename _InputIt, typename _UnaryPredicate>
-constexpr _InputIt find_if_not(_InputIt __first, _InputIt __last, _UnaryPredicate __p)
+constexpr _InputIt find_if_not(_InputIt __first, _InputIt __last,
+                               _UnaryPredicate __p)
 {
     while (__first != __last && __p(*__first))
         ++__first;
@@ -134,6 +138,7 @@ constexpr bool equal(_InputIt1 __first1, _InputIt1 __last1,
 template<typename _OutputIt, typename _Size, typename _T>
 constexpr _OutputIt fill_n(_OutputIt __first, _Size __count, _T const& __value)
 {
+    static_assert(is_integral<_Size>::value, "Must pass integral count");
     while (__count > 0) {
         *__first = __value;
         ++__first;
@@ -276,7 +281,8 @@ constexpr _ForwardIt max_element(_ForwardIt __first, _ForwardIt __last,
 }
 
 template<typename _RandomIt, typename _Val>
-constexpr _RandomIt lower_bound(_RandomIt __first, _RandomIt __last, _Val const& __val)
+constexpr _RandomIt lower_bound(_RandomIt __first, _RandomIt __last,
+                                _Val const& __val)
 {
     size_t __st = 0;
     size_t __en = __last - __first;
@@ -288,6 +294,106 @@ constexpr _RandomIt lower_bound(_RandomIt __first, _RandomIt __last, _Val const&
         __en = __is_less ? __en : __md;
     }
     return __first + __md;
+}
+
+__BEGIN_NAMESPACE_DETAIL
+
+
+///algorithm quicksort(A, lo, hi) is
+///if lo < hi then
+///    p := partition(A, lo, hi)
+///    quicksort(A, lo, p)
+///    quicksort(A, p + 1, hi)
+//
+///algorithm partition(A, lo, hi) is
+///pivot := A[(hi + lo) / 2]
+///loop forever
+///    while A[lo] < pivot
+///        lo := lo + 1
+//
+///    while A[hi] > pivot
+///        hi := hi - 1
+//
+///    if lo >= hi then
+///        return hi
+//
+///    swap A[lo] with A[hi]
+//
+///    lo := lo + 1
+///    hi := hi - 1
+///
+
+extern uintptr_t quicksort_cmp_count;
+extern uintptr_t quicksort_swp_count;
+
+// Partition an array given an inclusive index range, return partition index
+template<typename _T, typename _Compare>
+constexpr size_t hoare_partition(_T* a, size_t __lo, size_t __hi,
+                                 _Compare&& __is_less)
+{
+    _T *__pivot = a + (__lo + ((__hi - __lo) >> 1));
+
+    for (;;) {
+        while (__is_less(a[__lo], *__pivot)) {
+            ++quicksort_cmp_count;
+            ++__lo;
+        }
+
+        while (__is_less(*__pivot, a[__hi])) {
+            ++quicksort_cmp_count;
+            --__hi;
+        }
+
+        if (__lo >= __hi)
+            return __hi;
+
+        ++quicksort_swp_count;
+        std::swap(a[__lo], a[__hi]);
+
+        // Pivot follows the swap if it was involved
+        __pivot = __pivot == &a[__hi]
+                ? &a[__lo]
+                : __pivot == &a[__lo]
+                ? &a[__hi]
+                : __pivot;
+
+        ++__lo;
+        --__hi;
+    }
+}
+
+template<typename _T, typename _Compare>
+constexpr void quicksort(_T* a, size_t lo, size_t hi, _Compare&& __is_less)
+{
+    if (lo < hi) {
+        size_t p = hoare_partition(
+                    a, lo, hi, std::forward<_Compare>(__is_less));
+        quicksort(a, lo, p, std::forward<_Compare>(__is_less));
+        quicksort(a, p + 1, hi, std::forward<_Compare>(__is_less));
+    }
+}
+
+__END_NAMESPACE
+
+template<typename _RandomIt,
+typename _V = typename iterator_traits<_RandomIt>::value_type>
+constexpr void sort(_RandomIt __first, _RandomIt __last)
+{
+    detail::quicksort_cmp_count = 0;
+    detail::quicksort_swp_count = 0;
+    size_t __sz = __last - __first;
+    if (__sz) {
+        detail::quicksort(&*__first, 0, __sz - 1, less<_V>());
+    }
+}
+
+template<typename _RandomIt, typename _Compare >
+constexpr void sort(_RandomIt __first, _RandomIt __last, _Compare __is_less)
+{
+    size_t __sz = __last - __first;
+    if (__sz) {
+        detail::quicksort(&*__first, 0, __sz - 1, std::forward<_Compare>(__is_less));
+    }
 }
 
 __END_NAMESPACE_STD

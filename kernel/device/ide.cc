@@ -9,7 +9,6 @@
 #include "time.h"
 #include "printk.h"
 #include "cpu/atomic.h"
-#include "cpu/control_regs.h"
 #include "threadsync.h"
 #include "bswap.h"
 #include "unique_ptr.h"

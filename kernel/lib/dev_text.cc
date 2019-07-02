@@ -18,14 +18,17 @@ protected:
     void cleanup() override final
     {
     }
-    int set_dimensions(int width, int height) override final
+    int set_dimensions(int width _unused, int height _unused) override final
     {
         return 0;
     }
-    void get_dimensions(int *width, int *height) override final
+
+    void get_dimensions(int * width _unused,
+                        int * height _unused) override final
     {
     }
-    void goto_xy(int x, int y) override final
+
+    void goto_xy(int x _unused, int y _unused) override final
     {
     }
     int get_x() override final
@@ -36,21 +39,21 @@ protected:
     {
         return 0;
     }
-    void fg_set(int color) override final
+    void fg_set(int color _unused) override final
     {
     }
     int fg_get() override final
     {
         return 0;
     }
-    void bg_set(int color) override final
+    void bg_set(int color _unused) override final
     {
     }
     int bg_get() override final
     {
         return 0;
     }
-    int cursor_toggle(int show) override final
+    int cursor_toggle(int show _unused) override final
     {
         return 0;
     }
@@ -58,40 +61,48 @@ protected:
     {
         return 0;
     }
-    void putc(int character) override final
+    void putc(int character _unused) override final
     {
     }
-    void putc_xy(int x, int y, int character) override final
+    void putc_xy(int x _unused, int y _unused,
+                 int character _unused) override final
     {
     }
-    int print(char const *s) override final
-    {
-        return 0;
-    }
-    int write(char const *s, intptr_t len) override final
+    int print(char const * s _unused) override final
     {
         return 0;
     }
-    int print_xy(int x, int y, char const *s) override final
+    int write(char const * s _unused, intptr_t len _unused) override final
     {
         return 0;
     }
-    int draw(char const *s) override final
+    int print_xy(int x _unused, int y _unused,
+                 char const * s _unused) override final
     {
         return 0;
     }
-    int draw_xy(int x, int y, char const *s, int attrib) override final
+    int draw(char const *s _unused) override final
     {
         return 0;
     }
-    void fill(int sx, int sy, int ex, int ey, int character) override final
+    int draw_xy(int x _unused, int y _unused,
+                char const * s _unused, int attrib _unused) override final
+    {
+        return 0;
+    }
+    void fill(int sx _unused, int sy _unused,
+              int ex _unused, int ey _unused,
+              int character _unused) override final
     {
     }
+
     void clear() override final
     {
     }
-    void scroll(int sx, int sy, int ex, int ey,
-                int xd, int yd, int clear) override final
+    void scroll(int sx _unused, int sy _unused,
+                int ex _unused, int ey _unused,
+                int xd _unused, int yd _unused,
+                int clear _unused) override final
     {
     }
     int mouse_supported() override final
@@ -110,13 +121,13 @@ protected:
     {
         return 0;
     }
-    void mouse_goto_xy(int x, int y) override final
+    void mouse_goto_xy(int x _unused, int y _unused) override final
     {
     }
-    void mouse_add_xy(int x, int y) override final
+    void mouse_add_xy(int x _unused, int y _unused) override final
     {
     }
-    int mouse_toggle(int show) override final
+    int mouse_toggle(int show _unused) override final
     {
         return 0;
     }
@@ -129,6 +140,7 @@ void register_text_display_device(
 {
     factory->next_factory = text_dev_factories;
     text_dev_factories = factory;
+    printk("Registered %s text device factory\n", name);
 }
 
 _constructor(ctor_text_dev)
