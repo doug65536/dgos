@@ -258,7 +258,7 @@ static isr_context_t *cmos_irq_handler(int, isr_context_t *ctx)
 
         // Flush trace
         if (eainst_flush_ready)
-            apic_send_ipi_noinst(-2, INTR_FLUSH_TRACE);
+            apic_send_ipi_noinst(-2, INTR_IPI_FL_TRACE);
     }
 
     return ctx;

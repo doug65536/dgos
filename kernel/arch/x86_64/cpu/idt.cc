@@ -357,7 +357,7 @@ int idt_init(int ap)
         // Assign IST entries to interrupts
         idt[INTR_EX_STACK].ist = IDT_IST_SLOT_STACK;
         idt[INTR_EX_DBLFAULT].ist = IDT_IST_SLOT_DBLFAULT;
-        idt[INTR_FLUSH_TRACE].ist = IDT_IST_SLOT_FLUSH_TRACE;
+        idt[INTR_IPI_FL_TRACE].ist = IDT_IST_SLOT_FLUSH_TRACE;
         idt[INTR_EX_NMI].ist = IDT_IST_SLOT_NMI;
         //idt[INTR_EX_TSS].ist = 3;
         //idt[INTR_EX_GPF].ist = 4;

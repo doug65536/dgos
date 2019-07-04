@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+__BEGIN_DECLS
+
 #define PCI_DEV_CLASS_UNCLASSIFIED      0x00
 #define PCI_DEV_CLASS_STORAGE           0x01
 #define PCI_DEV_CLASS_NETWORK           0x02
@@ -266,6 +268,8 @@ int probe_pci_for(
         int32_t subclass,
         int32_t prog_if);
 
-int init_module(void const *module, size_t module_sz, char const *module_name,
+int init_module(void const *module,
+                ptrdiff_t module_sz, char const *module_name,
                 struct module *mod_user, char const *parameters);
 
+__END_DECLS

@@ -213,10 +213,10 @@ uintptr_t contiguous_allocator_t::alloc_linear(size_t size)
  * For each one use this table to determine outcome against the first
  *
  *  +-------+-------+-------------+-------+--------------------------------+
- *  | A<=>C | B<=>D |             | Added |                                |
+ *  | A<=>C | B<=>D |             | Count |                                |
  *  +-------+-------+-------------+-------+--------------------------------+
  *  |       |       |             |       |                                |
- *  |  -1   |  -1   | <--->       |   1   | No overlap, do nothing, done   |
+ *  |  -1   |  -1   | <--->       |  +1   | No overlap, do nothing, done   |
  *  |       |       |       <---> |       |                                |
  *  |       |       |             |       |                                |
  *  |  -1   |   0   | <---------> |   0   | Replace obstacle, done         |

@@ -181,16 +181,14 @@ isr_entry 0 38
 isr_entry 0 39
 
 // Very high priority interrupts
-isr_entry 0 INTR_APIC_TIMER
-isr_entry 0 INTR_TLB_SHOOTDOWN
+isr_entry 0 40
+isr_entry 0 41
 isr_entry 0 42
-isr_entry 0 INTR_FLUSH_TRACE
+isr_entry 0 43
+isr_entry 0 INTR_APIC_TIMER
+isr_entry 0 INTR_IPI_TLB_SHTDN
 isr_entry 0 INTR_IPI_RESCHED
-
-// Reserved for future very high priority interrupts
-isr_entry 0 45
-isr_entry 0 46
-isr_entry 0 47
+isr_entry 0 INTR_IPI_FL_TRACE
 
 // APIC and MSI(x) IRQs [48-240) = 192 interrupt vectors available
 isr_entry 0 48
@@ -650,7 +648,7 @@ isr_common:
 
     // 0x30-0xEF -> apic_dispatcher
     leaq apic_dispatcher(%rip),%rcx
-    cmpl $ INTR_APIC_IRQ_BASE,%ebx
+    cmpl $ INTR_APIC_DSP_BASE,%ebx
     cmovaeq %rcx,%rax
 
     // 0xF0-0xFF -> pic_dispatcher

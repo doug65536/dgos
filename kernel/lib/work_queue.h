@@ -120,6 +120,8 @@ public:
 
 private:
     friend class workq;
+    using lock_type = ext::mcslock;
+    using scoped_lock = std::unique_lock<lock_type>;
 
     struct work {
         typedef void (*callback_t)(uintptr_t arg);
@@ -127,18 +129,7 @@ private:
         uintptr_t arg;
     };
 
-    int tid;
-    using lock_type = ext::mcslock;
-    using scoped_lock = std::unique_lock<lock_type>;
-    lock_type queue_lock;
-    std::condition_variable not_empty;
-
-    workq_alloc alloc;
-
-    void enqueue_locked(workq_work *work, scoped_lock& lock);
-
-    workq_work *head = nullptr;
-    workq_work *tail = nullptr;
+    void enqueue_and_unlock(workq_work *work, scoped_lock& lock);
 
     void free(workq_work *work);
 
@@ -151,6 +142,15 @@ private:
 
     _noreturn
     void worker();
+
+    lock_type queue_lock;
+    std::condition_variable not_empty;
+    int tid;
+
+    workq_alloc alloc;
+
+    workq_work *head = nullptr;
+    workq_work *tail = nullptr;
 };
 
 template<typename T>
@@ -164,7 +164,7 @@ void workq::enqueue_on_all_barrier(T &&functor)
     for (size_t i = 0; i != cpu_count; ++i) {
         functor(i);
 
-        std::unique_lock<ext::mcslock> lock(wait_lock);
+        workq_impl::scoped_lock lock(wait_lock);
         if (++done_count == cpu_count) {
             lock.unlock();
             wait_done.notify_all();
@@ -179,6 +179,7 @@ void workq::enqueue_on_all_barrier(T &&functor)
 template<typename T>
 void workq::enqueue(T&& functor)
 {
+    cpu_scoped_irq_disable irq_dis;
     size_t cpu_nr = thread_cpu_number();
     enqueue_on_cpu(cpu_nr, std::forward<T>(functor));
 }
@@ -188,12 +189,9 @@ _hot
 void workq::enqueue_on_cpu(size_t cpu_nr, T&& functor)
 {
     workq_impl *queue = percpu + cpu_nr;
-    cpu_scoped_irq_disable irq_dis;
     workq_impl::scoped_lock lock(queue->queue_lock);
     void *mem = queue->allocate(queue, sizeof(workq_wrapper<T>));
     workq_wrapper<T> *item = new (mem) workq_wrapper<T>(
                 std::forward<T>(functor));
-    item->owner = queue;
-    item->next = nullptr;
-    percpu[cpu_nr].enqueue_locked(item, lock);
+    percpu[cpu_nr].enqueue_and_unlock(item, lock);
 }

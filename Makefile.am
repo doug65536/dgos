@@ -18,6 +18,8 @@ STARTUP_FILES_INSTALLED = \
 STDLIB_FILES_INSTALLED = \
 	$(patsubst %,$(top_builddir)/sysroot/lib/lib%.a,$(STDLIB_FILE_NAMES))
 
+ALL_INSTALLED = $(STDLIB_FILES_INSTALLED) $(STARTUP_FILES_INSTALLED)
+
 BUILT_SOURCES = \
 	$(DUMPDIR)/qemu-debug-out \
 	$(DUMPDIR)/call-trace-out \
@@ -1101,46 +1103,16 @@ $(eval $(call \
 	compilestartup,x32-crt0pc32.o,$(top_srcdir)/user/crt0/x32-crt0pc32.S \
 ))
 
-#sysroot/lib/crt0.o: \
-#		$(top_srcdir)/user/crt0/crt0.S \
-#		$(top_srcdir)/libc/include/sys/cpu_bug.h \
-#		$(INCLUDES_DEPLOYED)
-#	$(MKDIR) -p "$(@D)" && \
-#		$(CXX) \
-#			-g \
-#			$(ASM_DEBUG_INFO_FLAGS) \
-#			--sysroot $(top_builddir)/sysroot \
-#			-isystem $(top_builddir)/sysroot/include \
-#			-o $@ \
-#			-c $<
-
-$(top_builddir)/sysroot/lib/libc.a: \
-		$(top_builddir)/libc.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
-
-$(top_builddir)/sysroot/lib/libg.a: \
-		$(top_builddir)/libg.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
-
-$(top_builddir)/sysroot/lib/libm.a: \
-		$(top_builddir)/libm.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
-
-$(top_builddir)/sysroot/lib/libstdc++.a: \
-		$(top_builddir)/libstdc++.a $(INCLUDES_DEPLOYED)
-	$(MKDIR) -p "$(@D)" && cp "$<" "$@"
-
-#sysroot/lib/libc.so: libc.so $(INCLUDES_DEPLOYED)
-#	$(MKDIR) -p "$(@D)" && cp $< $@
 #
-#sysroot/lib/libg.so: libg.so $(INCLUDES_DEPLOYED)
-#	$(MKDIR) -p "$(@D)" && cp $< $@
-#
-#sysroot/lib/libm.so: libm.so $(INCLUDES_DEPLOYED)
-#	$(MKDIR) -p "$(@D)" && cp $< $@
-#
-#sysroot/lib/libstdc++.so: libstdc++.so $(INCLUDES_DEPLOYED)
-#	$(MKDIR) -p "$(@D)" && cp $< $@
+
+define deploy_stdlib=
+
+$(top_builddir)/sysroot/lib/lib$(1).a: $(top_builddir)/lib$(1).a
+	$$(MKDIR) -p $$(@D) && $$(CP) "$$<" "$$@"
+
+endef
+
+$(foreach name,$(STDLIB_FILE_NAMES),$(eval $(call deploy_stdlib,$(name))))
 
 define deploy_sysroot_header =
 $$(top_builddir)/sysroot/include/$(1): $$(top_srcdir)/libc/include/$(1)
@@ -1153,11 +1125,7 @@ $(foreach header,$(INCLUDES_NAMES),$(eval \
 	$(call deploy_sysroot_header,$(header)) \
 ))
 
-startupcode: $(STARTUPFILES) \
-	$(top_builddir)/sysroot/lib/libc.a \
-	$(top_builddir)/sysroot/lib/libm.a \
-	$(top_builddir)/sysroot/lib/libg.a \
-	$(top_builddir)/sysroot/lib/libstdc++.a
+startupcode: $(STARTUPFILES) $(ALL_INSTALLED)
 
 .PHONY: startupcode
 
@@ -1202,10 +1170,7 @@ $(top_srcdir)/user/shell/grammar.c \
 EXTRA_shell_DEPENDENCIES = \
 	$(top_srcdir)/user/user64_phdrs.ld \
 	$(top_srcdir)/user/shell/grammar.c \
-	$(top_builddir)/sysroot/lib/libc.a \
-	$(top_builddir)/sysroot/lib/libg.a \
-	$(top_builddir)/sysroot/lib/libm.a \
-	$(STARTUPFILES) \
+	$(ALL_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
 
 # ----------------------------------------------------------------------------
@@ -1580,7 +1545,7 @@ LIBC_CXXFLAGS = \
 #$(NO_EXCEPTIONS_FLAGS)
 #$(NO_EXCEPTIONS_FLAGS)
 
-$(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
+$(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/sysroot/lib/libc.a
 	echo "#define TERMESC_RED" \
 		"\"$$(tput setaf 1 | sed 's/\x1b/\\x1b/g')\"" \
 		> $(top_builddir)/termesc.h
@@ -1599,7 +1564,7 @@ $(top_builddir)/libc_tests: $(LIBC_TESTS) $(top_builddir)/libc.a
 		-o libc_tests \
 		$(LIBC_TESTS) \
 		-static -nostdlib -g -fno-builtin \
-		$(top_builddir)/libc.a -lgcc
+		$(STDLIB_FILES_INSTALLED) -lgcc
 
 test_compile: $(top_builddir)/libc_tests
 
@@ -1639,8 +1604,8 @@ dhcpclient_SOURCES = \
 dhcpclient_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_dhcpclient_DEPENDENCIES = \
+	$(ALL_INSTALLED) \
 	$(INCLUDES_DEPLOYED)
-	$(top_builddir)/libc.a
 
 bin_PROGRAMS += ls
 
@@ -1650,8 +1615,8 @@ ls_SOURCES = \
 ls_CXXFLAGS = -isystem sysroot/include
 
 EXTRA_ls_DEPENDENCIES = \
-	$(INCLUDES_DEPLOYED) \
-	$(top_builddir)/libc.a
+	$(ALL_INSTALLED) \
+	$(INCLUDES_DEPLOYED)
 
 #==========
 # Common module declarations
@@ -1779,6 +1744,7 @@ bin_PROGRAMS += unittest.km
 unittest_km_SOURCES = \
 	kernel/unittest/unittest.cc \
 	kernel/unittest/unittest.h \
+	kernel/unittest/test_allocator.cc \
 	kernel/unittest/test_sort.cc \
 	kernel/unittest/test_vector.cc \
 	kernel/unittest/test_set.cc \
@@ -1972,9 +1938,7 @@ user_shell_CCASFLAGS = \
 	-isystem sysroot/include
 
 EXTRA_user_shell_DEPENDENCIES = \
-	$(top_builddir)/sysroot/lib/libc.a \
-	$(top_builddir)/sysroot/lib/libg.a \
-	$(top_builddir)/sysroot/lib/libm.a
+	$(ALL_INSTALLED)
 
 #==========
 

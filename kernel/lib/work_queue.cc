@@ -20,16 +20,19 @@ EXPORT void workq_impl::enqueue(workq_work *work)
 {
     cpu_scoped_irq_disable irq_dis;
     scoped_lock lock(queue_lock);
-    enqueue_locked(work, lock);
+    enqueue_and_unlock(work, lock);
 }
 
-EXPORT void workq_impl::enqueue_locked(workq_work *work, scoped_lock&)
+EXPORT void workq_impl::enqueue_and_unlock(workq_work *work, scoped_lock& lock)
 {
     work->next = nullptr;
     work->owner = this;
-    workq_work **prev_ptr = head ? &tail->next : &head;
-    *prev_ptr = work;
+
+    // Point tail next to new node if one exists, otherwise point head
+    workq_work **prev_ptr = tail ? &tail->next : &head;
     tail = work;
+    *prev_ptr = work;
+    lock.unlock();
     not_empty.notify_one();
 }
 

@@ -16,6 +16,7 @@ define startupbreakpoints
 
 	hbreak modload_load_symbols
 	commands
+		printf "Loading %s at 0x%lx",$rdi,$rsi
 		eval "add-symbol-file %s 0x%lx",$rdi,$rsi
 		c
 	end

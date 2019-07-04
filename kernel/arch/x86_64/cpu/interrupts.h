@@ -62,16 +62,18 @@
 #define INTR_APIC_THERMAL   34
 // 35-39 reserved
 
+// Not really used, but yielded context is written using this interrupt number
+#define INTR_THREAD_YIELD   40
+// 41-43 reserved
+
+// Vectors >= 44 go through apic_dispatcher codepath
 // Relatively hot area of the IDT, cache line aligned
-#define INTR_APIC_TIMER     40
-#define INTR_TLB_SHOOTDOWN  41
-#define INTR_THREAD_YIELD   42
-#define INTR_FLUSH_TRACE    43
-#define INTR_IPI_RESCHED    44
+#define INTR_APIC_DSP_BASE  44
+#define INTR_APIC_TIMER     44
+#define INTR_IPI_TLB_SHTDN  45
+#define INTR_IPI_RESCHED    46
+#define INTR_IPI_FL_TRACE   47
 
-// 45-47 reserved
-
-// Vectors >= 48 go through apic_dispatcher codepath
 // 192 vectors for IOAPIC and MSI(x)
 #define INTR_APIC_IRQ_BASE  48
 #define INTR_APIC_IRQ_END   239

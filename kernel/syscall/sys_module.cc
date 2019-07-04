@@ -9,7 +9,7 @@
 #include "process.h"
 #include "user_mem.h"
 
-int sys_init_module(char const *module, size_t module_sz,
+int sys_init_module(char const *module, ptrdiff_t module_sz,
                     char const *module_name, char const *module_params)
 {
     char kmname[256];

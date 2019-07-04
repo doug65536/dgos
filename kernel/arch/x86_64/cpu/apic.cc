@@ -1344,7 +1344,6 @@ static int parse_mp_tables(void)
 _hot
 static isr_context_t *apic_timer_handler(int intr, isr_context_t *ctx)
 {
-    apic_eoi(intr);
     return thread_schedule(ctx);
 }
 
@@ -2352,14 +2351,14 @@ isr_context_t *apic_dispatcher(int intr, isr_context_t *ctx)
 {
     uint64_t st = cpu_rdtsc();
 
-    assert(intr >= INTR_APIC_IRQ_BASE);
+    assert(intr >= INTR_APIC_DSP_BASE);
     assert(intr < INTR_APIC_IRQ_END);
 
     isr_context_t *orig_ctx = ctx;
 
-    int irq = intr_to_irq[intr];
+    int irq = intr < INTR_APIC_IRQ_BASE ? intr : intr_to_irq[intr];
 
-    assert(irq >= 0);
+    assert(intr < INTR_APIC_IRQ_BASE || irq >= 0);
     assert(irq < INTR_APIC_IRQ_COUNT);
 
     ctx = irq_invoke(intr, irq, ctx);

@@ -84,7 +84,7 @@ struct usbxhci_intr_t {
 
     // 5.5.2.3.3 Event Ring Dequeue Pointer Register
     uint64_t erdp;
-} _packed;
+};
 
 C_ASSERT(sizeof(usbxhci_intr_t) == 0x20);
 
@@ -2089,6 +2089,7 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
 
     usbxhci_evt_cmdcomp_t *cmdcomp;
     usbxhci_evt_xfer_t *xfer;
+    usbxhci_evt_portstchg_t *portscevt;
     uint64_t cmdaddr = 0;
 
     switch (type) {
@@ -2108,6 +2109,32 @@ void usbxhci::evt_handler(usbxhci_interrupter_info_t *ir_info,
     case USBXHCI_TRB_TYPE_PORTSTSCHGEVT:
         // Port status change
         USBXHCI_TRACE("PORTSTSCHGEVT\n");
+
+        portscevt = (usbxhci_evt_portstchg_t*)evt;
+
+        size_t portid;
+        portid = portscevt->portid;
+
+        uint32_t volatile *portsc;
+        portsc = &mmio_op->ports[portid].portsc;
+
+        bool connect_status_chg;
+        connect_status_chg = USBXHCI_PORTSC_CSC_GET(*portsc);
+
+        if (connect_status_chg) {
+            bool connected = USBXHCI_PORTSC_CCS_GET(*portsc);
+
+            if (connected) {
+                USBXHCI_TRACE("PORTSTSCHGEVT detected"
+                              " port %zu device %sconnect\n", portid, "");
+            } else {
+                USBXHCI_TRACE("PORTSTSCHGEVT detected"
+                              " port %zu device %sconnect\n", portid, "dis");
+            }
+
+            // Clear connect status changed
+            *portsc = USBXHCI_PORTSC_CSC;
+        }
         break;
 
     case USBXHCI_TRB_TYPE_BWREQEVT:
@@ -2230,7 +2257,7 @@ void usbxhci::irq_handler(int irq_ofs)
 
     // Acknowledge pending IRQs
     if (ack)
-        mmio_op->usbsts = ack;
+        atomic_st_rel(&mmio_op->usbsts, ack);
 
     // Skip if interrupt is not pending
     if (!event_intr)
@@ -2241,7 +2268,7 @@ void usbxhci::irq_handler(int irq_ofs)
         usbxhci_interrupter_info_t *ir_info = interrupters + ii;
         usbxhci_intr_t *ir = (usbxhci_intr_t*)(mmio_rt->ir + ii);
 
-        if (USBXHCI_INTR_IMAN_IP_GET(ir->iman)) {
+        if (USBXHCI_INTR_IMAN_IP_GET(atomic_ld_acq(&ir->iman))) {
             // Interrupt is pending
             USBXHCI_TRACE("Interrupt pending on interrupter %zu\n", ii);
 

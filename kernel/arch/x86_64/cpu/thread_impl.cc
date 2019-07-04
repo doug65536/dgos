@@ -649,7 +649,6 @@ void thread_idle()
 // Hardware interrupt handler (an IPI) to provoke other CPUs to reschedule
 static isr_context_t *thread_ipi_resched(int intr, isr_context_t *ctx)
 {
-    apic_eoi(intr);
     return thread_schedule(ctx);
 }
 

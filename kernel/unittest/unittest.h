@@ -30,6 +30,7 @@ class unit {
 public:
     unit(char const *name, char const *test_file, int test_line);
 
+    _noinline
     void fail(const char *file, int line);
 
     void set_ctx(unit_ctx *ctx);

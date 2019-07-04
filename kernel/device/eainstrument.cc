@@ -374,7 +374,7 @@ void eainst_set_cpu_count(int count)
     }
 
     // Start periodically flushing
-    intr_hook(INTR_FLUSH_TRACE, eainst_intr_handler,
+    intr_hook(INTR_IPI_FL_TRACE, eainst_intr_handler,
               "eainst-flush", eoi_lapic);
 
     atomic_st_rel(&eainst_flush_ready, 1);

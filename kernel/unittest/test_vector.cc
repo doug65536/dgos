@@ -254,6 +254,53 @@ UNITTEST(test_vector_construct_pointer_pair)
     eq(42042, v[1]);
 }
 
+UNITTEST(test_vector_push)
+{
+    std::vector<int> v;
+
+    int count = 0;
+
+    for (int i = 0; i < 1024; ++i) {
+        v.push_back(i);
+
+        eq(i, v[count]);
+        eq(i, v.data()[count]);
+
+        if (count >= 11)
+            eq(11, v[11]);
+
+        ++count;
+
+        eq(size_t(count), v.size());
+        le(size_t(count), v.capacity());
+        eq(false, v.empty());
+        ne(nullptr, v.data());
+        eq(i, v.back());
+        eq(0, v.front());
+        eq(count, v.end() - v.begin());
+        eq(count, v.cend() - v.cbegin());
+        eq(count, v.rend() - v.rbegin());
+        eq(count, v.crend() - v.crbegin());
+    }
+
+    eq(1024, count);
+}
+
+UNITTEST(test_vector_pop)
+{
+
+}
+
+UNITTEST(test_vector_insert)
+{
+
+}
+
+UNITTEST(test_vector_erase)
+{
+
+}
+
 DISABLED_UNITTEST(test_vector_lifecycle)
 {
     MockStats stats;

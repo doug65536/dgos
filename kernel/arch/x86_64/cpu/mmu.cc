@@ -1181,9 +1181,7 @@ static void mmu_tlb_perform_shootdown(void)
 static isr_context_t *mmu_tlb_shootdown_handler(int intr, isr_context_t *ctx)
 {
     (void)intr;
-    assert(intr == INTR_TLB_SHOOTDOWN);
-
-    apic_eoi(intr);
+    assert(intr == INTR_IPI_TLB_SHTDN);
 
     int cpu_number = thread_cpu_number();
 
@@ -1208,8 +1206,7 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     thread_cpu_mask_t all_cpu_mask(-1);
     thread_cpu_mask_t cur_cpu_mask(cur_cpu);
     thread_cpu_mask_t other_cpu_mask = all_cpu_mask - cur_cpu_mask;
-    thread_cpu_mask_t new_pending =
-            shootdown_pending.atom_or(other_cpu_mask);
+    thread_cpu_mask_t new_pending = shootdown_pending.atom_or(other_cpu_mask);
     thread_cpu_mask_t need_ipi_mask = new_pending & other_cpu_mask;
 
     std::vector<uint64_t> shootdown_counts;
@@ -1225,13 +1222,13 @@ static void mmu_send_tlb_shootdown(bool synchronous = false)
     if (!!other_cpu_mask) {
         if (need_ipi_mask == other_cpu_mask) {
             // Send to all other CPUs
-            apic_send_ipi(-1, INTR_TLB_SHOOTDOWN);
+            apic_send_ipi(-1, INTR_IPI_TLB_SHTDN);
         } else {
             int cpu_mask = 1;
             for (int cpu = 0; cpu < cpu_count; ++cpu, cpu_mask <<= 1) {
                 if (!(new_pending & thread_cpu_mask_t(cpu_mask)) &&
                     !!(need_ipi_mask & thread_cpu_mask_t(cpu_mask)))
-                    thread_send_ipi(cpu, INTR_TLB_SHOOTDOWN);
+                    thread_send_ipi(cpu, INTR_IPI_TLB_SHTDN);
             }
         }
     }
@@ -1535,7 +1532,7 @@ void mmu_init()
 {
     // Hook IPI for TLB shootdown
     TRACE_INIT("Hooking TLB shootdown\n");
-    intr_hook(INTR_TLB_SHOOTDOWN, mmu_tlb_shootdown_handler,
+    intr_hook(INTR_IPI_TLB_SHTDN, mmu_tlb_shootdown_handler,
               "sw_tlbshoot", eoi_lapic);
 
     memcpy(phys_mem_map, kernel_params->phys_mem_table,
@@ -2468,7 +2465,7 @@ EXPORT int munmap(void *addr, size_t size)
     return 0;
 }
 
-int mprotect(void *addr, size_t len, int prot)
+EXPORT int mprotect(void *addr, size_t len, int prot)
 {
     // Fail on invalid protection mask
     if (unlikely(prot != (prot & (PROT_READ | PROT_WRITE | PROT_EXEC)))) {

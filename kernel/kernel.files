@@ -403,6 +403,7 @@ arch/x86_64/cpu/segrw.h
 arch/x86_64/cpu/segrw.cc
 ../toolchain/build-crossgcc.sh
 ../toolchain/build-crossgcc-versions
+unittest/test_allocator.cc
 unittest/test_chrono.cc
 unittest/test_nofault.cc
 unittest/test_printk.cc

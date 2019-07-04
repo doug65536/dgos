@@ -795,7 +795,6 @@ public:
             return step(typename integral_constant<int, -dir>::type());
         }
 
-        // ++ at end has no effect
         basic_iterator& operator++()
         {
             return inc();

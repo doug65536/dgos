@@ -27,7 +27,7 @@ entry:
     .cfi_undefined r14
     .cfi_undefined r15
 
-    xor %rsp,%rsp
+    xor %esp,%esp
 
     cld
 
